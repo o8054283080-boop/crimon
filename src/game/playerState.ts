@@ -1,3 +1,4 @@
+import { Equipment, EquipSlot } from "../core/equipment.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
 
@@ -7,6 +8,7 @@ export interface PlayerState {
   monsters: MonsterInstance[];
   partyIds: string[];
   clearedStageIds: string[];
+  equipment: Equipment[];
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -26,7 +28,17 @@ export function createInitialState(): PlayerState {
     monsters,
     partyIds: monsters.map((m) => m.id),
     clearedStageIds: [],
+    equipment: [],
   };
+}
+
+/** 旧バージョンのセーブデータ(装備システム導入前)を読み込んでも壊れないよう不足フィールドを補う */
+function normalizeState(state: PlayerState): PlayerState {
+  if (!state.equipment) state.equipment = [];
+  for (const monster of state.monsters) {
+    if (!monster.equipment) monster.equipment = {};
+  }
+  return state;
 }
 
 export function loadPlayerState(): PlayerState {
@@ -35,7 +47,7 @@ export function loadPlayerState(): PlayerState {
     if (!raw) return createInitialState();
     const parsed = JSON.parse(raw) as PlayerState;
     if (!parsed.monsters || parsed.monsters.length === 0) return createInitialState();
-    return parsed;
+    return normalizeState(parsed);
   } catch {
     return createInitialState();
   }
@@ -71,4 +83,44 @@ export function markStageCleared(state: PlayerState, stageId: string): void {
   if (!state.clearedStageIds.includes(stageId)) {
     state.clearedStageIds.push(stageId);
   }
+}
+
+export function addEquipment(state: PlayerState, equipment: Equipment): void {
+  state.equipment.push(equipment);
+}
+
+/** 装備がどこかのモンスターに装着中かどうか */
+export function isEquipmentEquipped(state: PlayerState, equipmentId: string): boolean {
+  return state.monsters.some((m) => Object.values(m.equipment).includes(equipmentId));
+}
+
+export function findEquippedOwner(state: PlayerState, equipmentId: string): MonsterInstance | undefined {
+  return state.monsters.find((m) => Object.values(m.equipment).includes(equipmentId));
+}
+
+/** 装備をモンスターのスロットに装着する。スロット不一致・所持外は失敗しfalseを返す */
+export function equipToMonster(state: PlayerState, monsterId: string, equipmentId: string): boolean {
+  const monster = state.monsters.find((m) => m.id === monsterId);
+  const equipment = state.equipment.find((e) => e.id === equipmentId);
+  if (!monster || !equipment) return false;
+
+  // 他のモンスターに装着中なら先に外す
+  for (const other of state.monsters) {
+    if (other.id === monster.id) continue;
+    const slot = (Object.entries(other.equipment) as [string, string][]).find(([, id]) => id === equipmentId)?.[0];
+    if (slot) delete other.equipment[Number(slot) as EquipSlot];
+  }
+
+  monster.equipment[equipment.slot] = equipment.id;
+  return true;
+}
+
+export function unequipFromMonster(state: PlayerState, monsterId: string, slot: EquipSlot): void {
+  const monster = state.monsters.find((m) => m.id === monsterId);
+  if (!monster) return;
+  delete monster.equipment[slot];
+}
+
+export function getEquipmentById(state: PlayerState, equipmentId: string): Equipment | undefined {
+  return state.equipment.find((e) => e.id === equipmentId);
 }

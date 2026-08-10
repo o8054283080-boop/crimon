@@ -1,3 +1,4 @@
+import { Equipment, STAT_LABEL } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { el } from "../dom.js";
 
@@ -16,6 +17,7 @@ export interface StageResultInfo {
   levelUps: StageResultLevelUp[];
   dropDexId: string | null;
   dropStar: number | null;
+  equipmentDrop: Equipment | null;
 }
 
 export interface StageResultProps {
@@ -50,6 +52,19 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
             el("div", { className: "summon-card__name" }, [dropDex.name]),
             el("div", { className: "summon-card__star" }, ["★".repeat(info.dropStar)]),
           ]),
+        ])
+      : null,
+    info.equipmentDrop
+      ? el("section", { className: "panel" }, [
+          el("h2", {}, ["装備ドロップ！"]),
+          el("div", { className: "summon-card summon-card--rare" }, [
+            el("div", { className: "summon-card__name" }, [`スロット${info.equipmentDrop.slot}`]),
+            el("div", { className: "summon-card__star" }, ["★".repeat(info.equipmentDrop.star)]),
+            el("div", { className: "summon-card__name" }, [STAT_LABEL[info.equipmentDrop.mainStat.type]]),
+            info.equipmentDrop.subStats.length > 0
+              ? el("div", { className: "summon-card__name" }, [`サブ${info.equipmentDrop.subStats.length}個`])
+              : null,
+          ].filter((n): n is HTMLDivElement => n !== null)),
         ])
       : null,
     el("button", { type: "button", className: "btn btn--primary btn--large", onclick: onClose }, ["ホームに戻る"]),

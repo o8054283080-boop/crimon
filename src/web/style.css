@@ -585,3 +585,136 @@ body {
   background: none;
   color: var(--text);
 }
+
+/* --- equipment --- */
+
+.equip-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.equip-slot {
+  appearance: none;
+  border: 1px dashed var(--panel-border);
+  background: var(--bg-alt);
+  border-radius: 10px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  color: var(--text);
+  min-height: 64px;
+}
+
+.equip-slot--filled {
+  border: 1px solid var(--accent);
+}
+
+.equip-slot__label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.equip-slot__star {
+  font-size: 0.68rem;
+  color: #ffd166;
+}
+
+.equip-slot__stat {
+  font-size: 0.62rem;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.equip-slot__plus {
+  font-size: 1.1rem;
+  color: var(--text-dim);
+}
+
+.equip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.equip-card {
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-alt);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+}
+
+.equip-card__slot {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.equip-card__star {
+  font-size: 0.7rem;
+  color: #ffd166;
+}
+
+.equip-card__main {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.equip-card__subs {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.equip-card__owner {
+  font-size: 0.62rem;
+  color: var(--hp-high);
+}
+
+.equip-card__owner--free {
+  color: var(--text-dim);
+}
+
+.equip-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.equip-detail__star {
+  color: #ffd166;
+  font-size: 1.1rem;
+}
+
+.equip-detail__main {
+  font-weight: 700;
+}
+
+.equip-detail__subs {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (min-width: 480px) {
+  .equip-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .equip-slot-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}

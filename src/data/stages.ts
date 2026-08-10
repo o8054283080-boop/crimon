@@ -1,4 +1,5 @@
 import { Element } from "../core/element.js";
+import { Equipment, generateNormalStageEquipment } from "../core/equipment.js";
 import { Star } from "../core/rarity.js";
 import { MONSTER_TEMPLATES } from "./monsters.js";
 
@@ -29,6 +30,8 @@ export interface StageRewards {
   dropRate: number;
   /** ドロップするモンスターの星候補(この中から抽選) */
   dropStars: Star[];
+  /** ステージクリア時に装備がドロップする確率(0-1)。モンスタードロップとは独立した抽選 */
+  equipmentDropRate: number;
 }
 
 export interface Stage {
@@ -91,6 +94,7 @@ function buildStage(stageNumber: number): Stage {
     waveExp: 25 * stageNumber,
     dropRate: Math.min(0.6, 0.15 + 0.08 * stageNumber),
     dropStars: stageNumber <= 2 ? [1] : stageNumber <= 4 ? [1, 1, 2] : [1, 2, 2, 3],
+    equipmentDropRate: Math.min(0.7, 0.35 + 0.06 * stageNumber),
   };
 
   return { id: `1-${stageNumber}`, stageNumber, name: `ステージ 1-${stageNumber}`, waves, rewards };
@@ -114,4 +118,10 @@ export function rollStageDrop(stage: Stage, rng: () => number = Math.random): St
   const template = MONSTER_TEMPLATES[Math.floor(rng() * MONSTER_TEMPLATES.length)];
   const element = NORMAL_ELEMENTS[Math.floor(rng() * NORMAL_ELEMENTS.length)];
   return { dexId: `${template.templateId}_${element}`, star };
+}
+
+/** ステージクリア報酬として、確率で装備をドロップする(なければnull)。モンスタードロップとは独立した抽選 */
+export function rollStageEquipment(stage: Stage, rng: () => number = Math.random): Equipment | null {
+  if (rng() >= stage.rewards.equipmentDropRate) return null;
+  return generateNormalStageEquipment(rng);
 }

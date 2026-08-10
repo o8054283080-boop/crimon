@@ -1,6 +1,7 @@
 import { BattleEngine } from "../battle/engine.js";
+import { Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
-import { MonsterInstance, toBattleDefinition } from "../core/monsterInstance.js";
+import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { computeEffectiveStats } from "../core/rarity.js";
 import { Wave, WaveEnemy } from "../data/stages.js";
 import { findMonsterById } from "../data/monsters.js";
@@ -46,8 +47,11 @@ export function setupWaveBattle(
   partyInstances: MonsterInstance[],
   carryHp: Map<string, number> | null,
   wave: Wave,
+  allEquipment: Equipment[] = [],
 ): WaveBattleSetup {
-  const playerDefs = partyInstances.map((instance) => toBattleDefinition(instance, resolveDex(instance.dexId)));
+  const playerDefs = partyInstances.map((instance) =>
+    toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, allEquipment)),
+  );
   const enemyDefs = buildEnemyTeam(wave);
   const initialPlayerHp = carryHp
     ? partyInstances.map((instance, i) => carryHp.get(instance.id) ?? playerDefs[i].stats.hp)
