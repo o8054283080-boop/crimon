@@ -30,7 +30,10 @@ export function calcDamage(
   const isCrit = rng() < attacker.def.stats.criRate;
   const critMultiplier = isCrit ? attacker.def.stats.criDmg : 1;
 
-  const rawDamage = afterDefense * elementMultiplier * critMultiplier;
+  const dealtMultiplier = attacker.def.combatMods?.damageDealtMultiplier ?? 1;
+  const takenMultiplier = defender.def.combatMods?.damageTakenMultiplier ?? 1;
+
+  const rawDamage = afterDefense * elementMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
   const damage = Math.max(1, Math.round(rawDamage));
 
   return { damage, isCrit, affinity };

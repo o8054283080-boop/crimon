@@ -1,6 +1,16 @@
 import { el } from "../dom.js";
 
-export type ScreenName = "HOME" | "SUMMON" | "MONSTERS" | "EQUIPMENT" | "PARTY" | "STAGES" | "BATTLE" | "STAGE_RESULT";
+export type ScreenName =
+  | "HOME"
+  | "SUMMON"
+  | "MONSTERS"
+  | "EQUIPMENT"
+  | "PARTY"
+  | "STAGES"
+  | "BATTLE"
+  | "STAGE_RESULT"
+  | "EQUIP_DUNGEON"
+  | "DUNGEON_BATTLE";
 
 const TABS: { screen: ScreenName; icon: string; label: string }[] = [
   { screen: "HOME", icon: "🏠", label: "ホーム" },

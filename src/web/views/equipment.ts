@@ -1,4 +1,4 @@
-import { canEnhanceEquipment, enhanceEquipmentCost, Equipment, EquipSlot, STAT_LABEL, StatRoll } from "../../core/equipment.js";
+import { canEnhanceEquipment, enhanceEquipmentCost, Equipment, EquipSlot, SET_LABEL, STAT_LABEL, StatRoll } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -17,6 +17,7 @@ export interface EquipmentProps {
   onUnequip: (equipmentId: string) => void;
   onEnhance: (equipmentId: string) => void;
   onCancelPicker: () => void;
+  onGoDungeon: () => void;
 }
 
 function formatStatValue(roll: StatRoll): string {
@@ -40,6 +41,7 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
     [
       el("div", { className: "equip-card__slot" }, [`S${equipment.slot}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),
       el("div", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
+      el("div", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
       el("div", { className: "equip-card__main" }, [formatStatValue(equipment.mainStat)]),
       el("div", { className: "equip-card__subs" }, [`サブ${equipment.subStats.length}個`]),
       ownerName ? el("div", { className: "equip-card__owner" }, [`装着中: ${ownerName}`]) : el("div", { className: "equip-card__owner equip-card__owner--free" }, ["未装着"]),
@@ -69,7 +71,7 @@ function renderList(props: EquipmentProps): HTMLElement {
     ]),
     props.pickerContext
       ? el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancelPicker }, ["◀ キャンセル"])
-      : null,
+      : el("button", { type: "button", className: "btn btn--primary btn--large", onclick: props.onGoDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
     el("section", { className: "panel" }, [
       items.length === 0
         ? el("p", { className: "app-subtitle" }, ["該当する装備がありません。ステージクリアでドロップします。"])
@@ -88,6 +90,7 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
     el("header", { className: "app-header" }, [el("h1", {}, [`スロット${equipment.slot}の装備`])]),
     el("section", { className: "panel equip-detail" }, [
       el("div", { className: "equip-detail__star" }, ["★".repeat(equipment.star)]),
+      el("div", { className: "equip-detail__set" }, [`${SET_LABEL[equipment.set]}シリーズ`]),
       el("div", { className: "equip-detail__level" }, [`強化 +${equipment.level} / 15`]),
       el("div", { className: "equip-detail__main" }, [`メイン: ${formatStatValue(equipment.mainStat)}`]),
       equipment.subStats.length > 0

@@ -1,4 +1,4 @@
-import { Equipment, EquipSlot, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost } from "../core/equipment.js";
+import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost } from "../core/equipment.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
 
@@ -32,11 +32,22 @@ export function createInitialState(): PlayerState {
   };
 }
 
-/** 旧バージョンのセーブデータ(装備システム・強化レベル導入前)を読み込んでも壊れないよう不足フィールドを補う */
+/** 装備IDから決定的にシリーズを割り当てる(旧セーブデータ補完用。読み込むたびに同じ結果になる) */
+function deterministicSetFromId(id: string): Equipment["set"] {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  const index = Math.abs(hash) % SET_TYPES.length;
+  return SET_TYPES[index];
+}
+
+/** 旧バージョンのセーブデータ(装備システム・強化レベル・セット導入前)を読み込んでも壊れないよう不足フィールドを補う */
 function normalizeState(state: PlayerState): PlayerState {
   if (!state.equipment) state.equipment = [];
   for (const equipment of state.equipment) {
     if (typeof equipment.level !== "number") equipment.level = 0;
+    if (!equipment.set) equipment.set = deterministicSetFromId(equipment.id);
   }
   for (const monster of state.monsters) {
     if (!monster.equipment) monster.equipment = {};

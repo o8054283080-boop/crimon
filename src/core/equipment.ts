@@ -74,12 +74,87 @@ export interface StatRoll {
   value: number;
 }
 
+/** 装備のシリーズ(セット)種類。同じシリーズを規定数まとめて装着するとセット効果が発動する */
+export type SetType = "CRIT" | "POWER" | "GUARD" | "VITALITY" | "ACCURACY_SET" | "RESIST_SET" | "SWIFT";
+
+export const SET_TYPES: SetType[] = ["CRIT", "POWER", "GUARD", "VITALITY", "ACCURACY_SET", "RESIST_SET", "SWIFT"];
+
+export const SET_LABEL: Record<SetType, string> = {
+  CRIT: "会心",
+  POWER: "筋力",
+  GUARD: "守護",
+  VITALITY: "体力",
+  ACCURACY_SET: "的中",
+  RESIST_SET: "抵抗",
+  SWIFT: "速攻",
+};
+
+/**
+ * セット効果1件分の定義。STAT系はステータス計算に、それ以外は戦闘中の特殊効果(CombatModifiers)に反映される。
+ * 4個セット条件を満たすと2個セットの効果と重複して両方発動する。
+ */
+export type SetBonusEffect =
+  | { kind: "STAT"; stat: "ATK_PERCENT" | "DEF_PERCENT" | "HP_PERCENT" | "SPD_PERCENT" | "CRIT_RATE" | "CRIT_DMG" | "ACCURACY" | "RESISTANCE"; amount: number }
+  | { kind: "DAMAGE_DEALT_MULTIPLIER"; amount: number }
+  | { kind: "DAMAGE_TAKEN_MULTIPLIER"; amount: number }
+  | { kind: "TURN_HEAL_PERCENT"; amount: number }
+  | { kind: "IGNORE_RESISTANCE_PERCENT"; amount: number }
+  | { kind: "HEAL_ON_RESIST_PERCENT"; amount: number };
+
+/** シリーズごとの2個セット/4個セットの効果定義(ユーザー指定の全7シリーズ) */
+export const SET_BONUS_CONFIG: Record<SetType, { two: SetBonusEffect; four: SetBonusEffect }> = {
+  CRIT: {
+    two: { kind: "STAT", stat: "CRIT_RATE", amount: 0.15 },
+    four: { kind: "STAT", stat: "CRIT_DMG", amount: 0.3 },
+  },
+  POWER: {
+    two: { kind: "STAT", stat: "ATK_PERCENT", amount: 0.2 },
+    four: { kind: "DAMAGE_DEALT_MULTIPLIER", amount: 0.2 },
+  },
+  GUARD: {
+    two: { kind: "STAT", stat: "DEF_PERCENT", amount: 0.2 },
+    four: { kind: "DAMAGE_TAKEN_MULTIPLIER", amount: -0.2 },
+  },
+  VITALITY: {
+    two: { kind: "STAT", stat: "HP_PERCENT", amount: 0.2 },
+    four: { kind: "TURN_HEAL_PERCENT", amount: 0.05 },
+  },
+  ACCURACY_SET: {
+    two: { kind: "STAT", stat: "ACCURACY", amount: 0.15 },
+    four: { kind: "IGNORE_RESISTANCE_PERCENT", amount: 0.25 },
+  },
+  RESIST_SET: {
+    two: { kind: "STAT", stat: "RESISTANCE", amount: 0.25 },
+    four: { kind: "HEAL_ON_RESIST_PERCENT", amount: 0.15 },
+  },
+  SWIFT: {
+    two: { kind: "STAT", stat: "SPD_PERCENT", amount: 0.05 },
+    four: { kind: "STAT", stat: "SPD_PERCENT", amount: 0.12 },
+  },
+};
+
+/** UI表示用の効果テキスト */
+export const SET_BONUS_DESCRIPTION: Record<SetType, { two: string; four: string }> = {
+  CRIT: { two: "クリ率+15%", four: "クリダメ+30%" },
+  POWER: { two: "攻撃力+20%", four: "与えるダメージ1.2倍" },
+  GUARD: { two: "防御力+20%", four: "受けるダメージ0.8倍" },
+  VITALITY: { two: "HP+20%", four: "毎ターンHP5%回復" },
+  ACCURACY_SET: { two: "状態異常付与率+15%", four: "敵の状態異常抵抗率25%無視" },
+  RESIST_SET: { two: "状態異常抵抗率+25%", four: "状態異常を抵抗した時HP15%回復" },
+  SWIFT: { two: "速度+5%", four: "速度+12%" },
+};
+
+/** 2個セットに必要な個数 / 4個セットに必要な個数 */
+export const SET_PIECE_COUNTS = { TWO: 2, FOUR: 4 } as const;
+
 export interface Equipment {
   id: string;
   slot: EquipSlot;
   star: EquipStar;
   /** 強化レベル。0(無強化)〜15(最大) */
   level: number;
+  /** 装備シリーズ。同じシリーズを2個/4個そろえるとセット効果が発動する */
+  set: SetType;
   mainStat: StatRoll;
   subStats: StatRoll[];
 }
@@ -177,14 +252,17 @@ export interface GenerateEquipmentOptions {
   star: EquipStar;
   /** サブステータスの個数(0-4)。呼び出し側で確率制御する */
   subStatCount: number;
+  /** シリーズ未指定ならランダムに決まる */
+  set?: SetType;
   rng?: () => number;
 }
 
-/** 装備を1つ生成する(強化レベル0)。スロット未指定ならランダムに決まる */
+/** 装備を1つ生成する(強化レベル0)。スロット・シリーズ未指定ならランダムに決まる */
 export function generateEquipment(options: GenerateEquipmentOptions): Equipment {
   const rng = options.rng ?? Math.random;
   const slot = options.slot ?? pick(EQUIP_SLOTS, rng);
   const star = options.star;
+  const set = options.set ?? pick(SET_TYPES, rng);
 
   const mainType = pick(SLOT_MAIN_STAT_OPTIONS[slot], rng);
   const mainStat: StatRoll = { type: mainType, value: rollStatValue(mainType, star, 1, rng) };
@@ -199,7 +277,7 @@ export function generateEquipment(options: GenerateEquipmentOptions): Equipment 
     subStats.push({ type, value: rollStatValue(type, star, SUB_STAT_RATIO, rng) });
   }
 
-  return { id: generateEquipmentId(), slot, star, level: 0, mainStat, subStats };
+  return { id: generateEquipmentId(), slot, star, level: 0, set, mainStat, subStats };
 }
 
 export function canEnhanceEquipment(equipment: Equipment): boolean {
@@ -254,17 +332,166 @@ export function sumEquipmentStats(equipmentList: Equipment[]): Partial<Record<St
   return totals;
 }
 
-/** 装備込みの実効ステータスを計算する。%系は基礎ステータスに、実数値系は加算で乗る */
+/** シリーズごとの装着数を集計する */
+export function getEquippedSetCounts(equipmentList: Equipment[]): Partial<Record<SetType, number>> {
+  const counts: Partial<Record<SetType, number>> = {};
+  for (const eq of equipmentList) {
+    counts[eq.set] = (counts[eq.set] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export interface ActiveSetBonus {
+  set: SetType;
+  count: number;
+  twoActive: boolean;
+  fourActive: boolean;
+}
+
+/** 現在発動中(2個以上そろっている)のセットボーナス一覧。UI表示に使う */
+export function getActiveSetBonuses(equipmentList: Equipment[]): ActiveSetBonus[] {
+  const counts = getEquippedSetCounts(equipmentList);
+  return SET_TYPES.filter((type) => (counts[type] ?? 0) >= SET_PIECE_COUNTS.TWO).map((type) => ({
+    set: type,
+    count: counts[type] ?? 0,
+    twoActive: (counts[type] ?? 0) >= SET_PIECE_COUNTS.TWO,
+    fourActive: (counts[type] ?? 0) >= SET_PIECE_COUNTS.FOUR,
+  }));
+}
+
+interface SetStatBonuses {
+  atkPercent: number;
+  defPercent: number;
+  hpPercent: number;
+  spdPercent: number;
+  criRate: number;
+  criDmg: number;
+  accuracy: number;
+  resistance: number;
+}
+
+const ZERO_SET_STAT_BONUSES: SetStatBonuses = {
+  atkPercent: 0,
+  defPercent: 0,
+  hpPercent: 0,
+  spdPercent: 0,
+  criRate: 0,
+  criDmg: 0,
+  accuracy: 0,
+  resistance: 0,
+};
+
+/** 戦闘専用の特殊効果。基礎ステータス計算には反映されず、戦闘エンジン側で個別に参照する */
+export interface CombatModifiers {
+  /** 与えるダメージの倍率(1 = 補正なし) */
+  damageDealtMultiplier: number;
+  /** 受けるダメージの倍率(1 = 補正なし) */
+  damageTakenMultiplier: number;
+  /** 毎ターン開始時、最大HPに対する割合で回復する量 */
+  turnHealPercent: number;
+  /** 状態異常付与時、相手の状態異常抵抗率をこの割合分無視する */
+  ignoreResistancePercent: number;
+  /** 状態異常を抵抗した時、最大HPに対する割合で回復する量 */
+  healOnResistPercent: number;
+}
+
+export const DEFAULT_COMBAT_MODIFIERS: CombatModifiers = {
+  damageDealtMultiplier: 1,
+  damageTakenMultiplier: 1,
+  turnHealPercent: 0,
+  ignoreResistancePercent: 0,
+  healOnResistPercent: 0,
+};
+
+function applyStatEffect(bonus: SetStatBonuses, effect: SetBonusEffect): void {
+  if (effect.kind !== "STAT") return;
+  switch (effect.stat) {
+    case "ATK_PERCENT":
+      bonus.atkPercent += effect.amount;
+      break;
+    case "DEF_PERCENT":
+      bonus.defPercent += effect.amount;
+      break;
+    case "HP_PERCENT":
+      bonus.hpPercent += effect.amount;
+      break;
+    case "SPD_PERCENT":
+      bonus.spdPercent += effect.amount;
+      break;
+    case "CRIT_RATE":
+      bonus.criRate += effect.amount;
+      break;
+    case "CRIT_DMG":
+      bonus.criDmg += effect.amount;
+      break;
+    case "ACCURACY":
+      bonus.accuracy += effect.amount;
+      break;
+    case "RESISTANCE":
+      bonus.resistance += effect.amount;
+      break;
+  }
+}
+
+function applyCombatEffect(mods: CombatModifiers, effect: SetBonusEffect): void {
+  switch (effect.kind) {
+    case "DAMAGE_DEALT_MULTIPLIER":
+      mods.damageDealtMultiplier *= 1 + effect.amount;
+      break;
+    case "DAMAGE_TAKEN_MULTIPLIER":
+      mods.damageTakenMultiplier *= 1 + effect.amount;
+      break;
+    case "TURN_HEAL_PERCENT":
+      mods.turnHealPercent += effect.amount;
+      break;
+    case "IGNORE_RESISTANCE_PERCENT":
+      mods.ignoreResistancePercent += effect.amount;
+      break;
+    case "HEAL_ON_RESIST_PERCENT":
+      mods.healOnResistPercent += effect.amount;
+      break;
+    default:
+      break;
+  }
+}
+
+function computeSetStatBonuses(equipmentList: Equipment[]): SetStatBonuses {
+  const counts = getEquippedSetCounts(equipmentList);
+  const bonus: SetStatBonuses = { ...ZERO_SET_STAT_BONUSES };
+  for (const type of SET_TYPES) {
+    const count = counts[type] ?? 0;
+    const config = SET_BONUS_CONFIG[type];
+    if (count >= SET_PIECE_COUNTS.TWO) applyStatEffect(bonus, config.two);
+    if (count >= SET_PIECE_COUNTS.FOUR) applyStatEffect(bonus, config.four);
+  }
+  return bonus;
+}
+
+/** 装備セットの戦闘専用効果(与ダメ/被ダメ倍率・毎ターン回復・抵抗無視・抵抗時回復)を集計する */
+export function computeSetCombatModifiers(equipmentList: Equipment[]): CombatModifiers {
+  const counts = getEquippedSetCounts(equipmentList);
+  const mods: CombatModifiers = { ...DEFAULT_COMBAT_MODIFIERS };
+  for (const type of SET_TYPES) {
+    const count = counts[type] ?? 0;
+    const config = SET_BONUS_CONFIG[type];
+    if (count >= SET_PIECE_COUNTS.TWO) applyCombatEffect(mods, config.two);
+    if (count >= SET_PIECE_COUNTS.FOUR) applyCombatEffect(mods, config.four);
+  }
+  return mods;
+}
+
+/** 装備込みの実効ステータスを計算する。%系は基礎ステータスに、実数値系は加算で乗る。セットのステータス系効果も反映する */
 export function applyEquipmentToStats(base: Stats, equipmentList: Equipment[]): Stats {
   const t = sumEquipmentStats(equipmentList);
-  const atk = base.atk * (1 + (t.ATK_PERCENT ?? 0)) + (t.ATK_FLAT ?? 0);
-  const def = base.def * (1 + (t.DEF_PERCENT ?? 0)) + (t.DEF_FLAT ?? 0);
-  const hp = base.hp * (1 + (t.HP_PERCENT ?? 0)) + (t.HP_FLAT ?? 0);
-  const spd = base.spd + (t.SPD ?? 0);
-  const criRate = Math.min(1, base.criRate + (t.CRIT_RATE ?? 0));
-  const criDmg = base.criDmg + (t.CRIT_DMG ?? 0);
-  const accuracy = Math.min(1, base.accuracy + (t.ACCURACY ?? 0));
-  const resistance = Math.min(1, base.resistance + (t.RESISTANCE ?? 0));
+  const setBonus = computeSetStatBonuses(equipmentList);
+  const atk = base.atk * (1 + (t.ATK_PERCENT ?? 0) + setBonus.atkPercent) + (t.ATK_FLAT ?? 0);
+  const def = base.def * (1 + (t.DEF_PERCENT ?? 0) + setBonus.defPercent) + (t.DEF_FLAT ?? 0);
+  const hp = base.hp * (1 + (t.HP_PERCENT ?? 0) + setBonus.hpPercent) + (t.HP_FLAT ?? 0);
+  const spd = (base.spd + (t.SPD ?? 0)) * (1 + setBonus.spdPercent);
+  const criRate = Math.min(1, base.criRate + (t.CRIT_RATE ?? 0) + setBonus.criRate);
+  const criDmg = base.criDmg + (t.CRIT_DMG ?? 0) + setBonus.criDmg;
+  const accuracy = Math.min(1, base.accuracy + (t.ACCURACY ?? 0) + setBonus.accuracy);
+  const resistance = Math.min(1, base.resistance + (t.RESISTANCE ?? 0) + setBonus.resistance);
 
   return {
     hp: Math.round(hp),
@@ -314,5 +541,132 @@ const NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS: WeightedOption<number>[] = [
 export function generateNormalStageEquipment(rng: () => number = Math.random): Equipment {
   const star = weightedPick(NORMAL_STAGE_STAR_WEIGHTS, rng);
   const subStatCount = weightedPick(NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS, rng);
+  return generateEquipment({ star, subStatCount, rng });
+}
+
+/**
+ * 装備ダンジョン(1〜10階)向けの階層別・星ドロップ率テーブル。
+ * 1〜3階は星4まで、4〜6階は星5まで、7〜10階は星6までが出現し、
+ * 階層が上がるほどそのグループ内で最高レアリティの出現率が上がっていく。
+ * 各階の重みの合計は100になっているため、weightそのものをドロップ%として扱える。
+ */
+export const DUNGEON_FLOOR_COUNT = 10;
+
+export const DUNGEON_FLOOR_STAR_WEIGHTS: Record<number, WeightedOption<EquipStar>[]> = {
+  1: [
+    { value: 1, weight: 40 },
+    { value: 2, weight: 35 },
+    { value: 3, weight: 20 },
+    { value: 4, weight: 5 },
+  ],
+  2: [
+    { value: 1, weight: 28 },
+    { value: 2, weight: 35 },
+    { value: 3, weight: 27 },
+    { value: 4, weight: 10 },
+  ],
+  3: [
+    { value: 1, weight: 15 },
+    { value: 2, weight: 30 },
+    { value: 3, weight: 35 },
+    { value: 4, weight: 20 },
+  ],
+  4: [
+    { value: 2, weight: 25 },
+    { value: 3, weight: 30 },
+    { value: 4, weight: 30 },
+    { value: 5, weight: 15 },
+  ],
+  5: [
+    { value: 2, weight: 15 },
+    { value: 3, weight: 25 },
+    { value: 4, weight: 35 },
+    { value: 5, weight: 25 },
+  ],
+  6: [
+    { value: 2, weight: 5 },
+    { value: 3, weight: 18 },
+    { value: 4, weight: 37 },
+    { value: 5, weight: 40 },
+  ],
+  7: [
+    { value: 3, weight: 15 },
+    { value: 4, weight: 25 },
+    { value: 5, weight: 35 },
+    { value: 6, weight: 25 },
+  ],
+  8: [
+    { value: 3, weight: 10 },
+    { value: 4, weight: 20 },
+    { value: 5, weight: 35 },
+    { value: 6, weight: 35 },
+  ],
+  9: [
+    { value: 3, weight: 5 },
+    { value: 4, weight: 14 },
+    { value: 5, weight: 31 },
+    { value: 6, weight: 50 },
+  ],
+  10: [
+    { value: 4, weight: 8 },
+    { value: 5, weight: 24 },
+    { value: 6, weight: 68 },
+  ],
+};
+
+/** 星のランクごとのサブステータス個数の出やすさ。星が高いほどサブが多くつきやすい */
+const DUNGEON_SUBSTAT_COUNT_WEIGHTS_BY_STAR: Record<EquipStar, WeightedOption<number>[]> = {
+  1: [
+    { value: 0, weight: 45 },
+    { value: 1, weight: 35 },
+    { value: 2, weight: 20 },
+  ],
+  2: [
+    { value: 0, weight: 35 },
+    { value: 1, weight: 35 },
+    { value: 2, weight: 25 },
+    { value: 3, weight: 5 },
+  ],
+  3: [
+    { value: 0, weight: 15 },
+    { value: 1, weight: 30 },
+    { value: 2, weight: 30 },
+    { value: 3, weight: 20 },
+    { value: 4, weight: 5 },
+  ],
+  4: [
+    { value: 0, weight: 8 },
+    { value: 1, weight: 22 },
+    { value: 2, weight: 30 },
+    { value: 3, weight: 28 },
+    { value: 4, weight: 12 },
+  ],
+  5: [
+    { value: 0, weight: 5 },
+    { value: 1, weight: 15 },
+    { value: 2, weight: 30 },
+    { value: 3, weight: 30 },
+    { value: 4, weight: 20 },
+  ],
+  6: [
+    { value: 1, weight: 5 },
+    { value: 2, weight: 20 },
+    { value: 3, weight: 35 },
+    { value: 4, weight: 40 },
+  ],
+};
+
+/** 指定した階層のドロップ率テーブルを取得する(1階=[{star:1,percent:40}, ...]のような表示用) */
+export function getDungeonFloorDropRates(floor: number): { star: EquipStar; percent: number }[] {
+  const weights = DUNGEON_FLOOR_STAR_WEIGHTS[floor] ?? [];
+  const total = weights.reduce((sum, w) => sum + w.weight, 0);
+  return weights.map((w) => ({ star: w.value, percent: total > 0 ? Math.round((w.weight / total) * 1000) / 10 : 0 }));
+}
+
+/** 装備ダンジョンの指定階層で装備を1つ生成する(ドロップは呼び出し側で確定させてから呼ぶ) */
+export function generateDungeonEquipment(floor: number, rng: () => number = Math.random): Equipment {
+  const starWeights = DUNGEON_FLOOR_STAR_WEIGHTS[floor] ?? DUNGEON_FLOOR_STAR_WEIGHTS[1];
+  const star = weightedPick(starWeights, rng);
+  const subStatCount = weightedPick(DUNGEON_SUBSTAT_COUNT_WEIGHTS_BY_STAR[star], rng);
   return generateEquipment({ star, subStatCount, rng });
 }

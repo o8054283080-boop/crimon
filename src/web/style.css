@@ -686,6 +686,14 @@ body {
   color: var(--text-dim);
 }
 
+.equip-card__set {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  background: var(--panel-border);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
 .equip-detail {
   display: flex;
   flex-direction: column;
@@ -697,10 +705,27 @@ body {
   font-size: 1.1rem;
 }
 
+.equip-detail__set {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
 .equip-detail__level {
   color: var(--accent);
   font-weight: 700;
   font-size: 0.85rem;
+}
+
+.set-bonus-row {
+  font-size: 0.85rem;
+  color: var(--hp-high);
+  padding: 2px 0;
+}
+
+.equip-dungeon__warning {
+  color: #ffd166;
+  font-weight: 700;
 }
 
 .equip-detail__main {

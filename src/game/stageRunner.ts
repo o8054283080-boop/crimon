@@ -6,7 +6,7 @@ import { computeEffectiveStats } from "../core/rarity.js";
 import { Wave, WaveEnemy } from "../data/stages.js";
 import { findMonsterById } from "../data/monsters.js";
 
-function resolveDex(dexId: string): MonsterDefinition {
+export function resolveDex(dexId: string): MonsterDefinition {
   const dex = findMonsterById(dexId);
   if (!dex) throw new Error(`図鑑に存在しないモンスターです: ${dexId}`);
   return dex;

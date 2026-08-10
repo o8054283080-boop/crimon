@@ -1,4 +1,4 @@
-import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, STAT_LABEL } from "../../core/equipment.js";
+import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
 import { MonsterInstance, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
@@ -82,6 +82,22 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
   return el("div", { className: "equip-slot-grid" }, boxes);
 }
 
+function renderSetBonusPanel(equippedItems: ReturnType<typeof resolveEquippedItems>): HTMLElement | null {
+  const active = getActiveSetBonuses(equippedItems);
+  if (active.length === 0) return null;
+
+  const rows = active.flatMap((bonus) => {
+    const desc = SET_BONUS_DESCRIPTION[bonus.set];
+    const lines = [el("div", { className: "set-bonus-row" }, [`${SET_LABEL[bonus.set]}(${bonus.count}) 2セット: ${desc.two}`])];
+    if (bonus.fourActive) {
+      lines.push(el("div", { className: "set-bonus-row" }, [`${SET_LABEL[bonus.set]}(${bonus.count}) 4セット: ${desc.four}`]));
+    }
+    return lines;
+  });
+
+  return el("section", { className: "panel" }, [el("h2", {}, ["発動中のセット効果"]), ...rows]);
+}
+
 function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   const maxLevel = STAR_MAX_LEVEL[instance.star];
@@ -109,6 +125,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
     ].filter((n): n is HTMLDivElement => n !== null)),
     el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
+    renderSetBonusPanel(equippedItems),
     rankReady
       ? el(
           "button",
@@ -119,7 +136,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
           instance.star >= 5 ? "最大ランクに到達しています" : `最大レベル(Lv${maxLevel})になるとランクアップできます`,
         ]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectDetail(null) }, ["◀ 一覧に戻る"]),
-  ]);
+  ].filter((n): n is HTMLElement => n !== null));
 }
 
 function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElement {
