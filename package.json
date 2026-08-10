@@ -1,0 +1,18 @@
+{
+  "name": "crimon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "モンスター4対4のターン制コマンドバトルゲーム",
+  "type": "module",
+  "scripts": {
+    "battle": "tsx src/simulate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}
