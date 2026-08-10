@@ -1,4 +1,5 @@
 import { Element, ELEMENT_COLOR, ELEMENT_JA, ELEMENTS } from "./element.js";
+import { CombatModifiers } from "./equipment.js";
 import { Skill } from "./skill.js";
 import { Stats, cloneStats } from "./stats.js";
 
@@ -21,6 +22,8 @@ export interface MonsterDefinition {
   role: string;
   stats: Stats;
   skills: [Skill, Skill, Skill];
+  /** 装備セット由来の戦闘専用効果。装備なし(敵など)ではundefined */
+  combatMods?: CombatModifiers;
 }
 
 /**

@@ -151,6 +151,13 @@ export class BattleEngine {
     tickEffectsAtTurnStart(unit);
     tickCooldownsAtTurnStart(unit);
 
+    const turnHealPercent = unit.def.combatMods?.turnHealPercent ?? 0;
+    if (turnHealPercent > 0 && unit.alive) {
+      const healAmount = Math.round(unit.maxHp * turnHealPercent);
+      applyHeal(unit, healAmount);
+      this.push(`${this.label(unit)} は体力シリーズの効果でHPが ${healAmount} 回復！ (${unit.currentHp}/${unit.maxHp})`);
+    }
+
     if (unit.stunTurns > 0) {
       unit.stunTurns -= 1;
       this.push(`${this.label(unit)} はスタン中で行動できない！`);
@@ -214,10 +221,7 @@ export class BattleEngine {
         }
 
         case "DEBUFF": {
-          if (this.rng() < target.def.stats.resistance) {
-            this.push(`  → ${this.label(target)} は効果を抵抗した！`);
-            break;
-          }
+          if (this.rollStatusResist(source, target)) break;
           target.effects.push({
             stat: effect.stat,
             amount: -effect.amount,
@@ -229,16 +233,35 @@ export class BattleEngine {
         }
 
         case "STUN": {
-          if (this.rng() < target.def.stats.resistance) {
-            this.push(`  → ${this.label(target)} は効果を抵抗した！`);
-            break;
-          }
+          if (this.rollStatusResist(source, target)) break;
           target.stunTurns = Math.max(target.stunTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} はスタンした！`);
           break;
         }
       }
     }
+  }
+
+  /**
+   * 状態異常の抵抗判定。相手の効果抵抗率から自分の効果命中率を差し引き、
+   * 的中シリーズ(4個セット)を装着していれば相手の抵抗率をさらに一部無視する。
+   * 抵抗成功時、抵抗シリーズ(4個セット)を装着していればHPが回復する。
+   */
+  private rollStatusResist(source: BattleUnit, target: BattleUnit): boolean {
+    const ignoreRatio = source.def.combatMods?.ignoreResistancePercent ?? 0;
+    const effectiveResistance = target.def.stats.resistance * (1 - ignoreRatio);
+    const resistChance = Math.max(0, Math.min(1, effectiveResistance - source.def.stats.accuracy));
+
+    if (this.rng() >= resistChance) return false;
+
+    this.push(`  → ${this.label(target)} は効果を抵抗した！`);
+    const healOnResistPercent = target.def.combatMods?.healOnResistPercent ?? 0;
+    if (healOnResistPercent > 0 && target.alive) {
+      const healAmount = Math.round(target.maxHp * healOnResistPercent);
+      applyHeal(target, healAmount);
+      this.push(`  → ${this.label(target)} は抵抗シリーズの効果でHPが ${healAmount} 回復！ (${target.currentHp}/${target.maxHp})`);
+    }
+    return true;
   }
 
   private label(unit: BattleUnit): string {

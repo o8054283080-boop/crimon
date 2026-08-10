@@ -8,10 +8,11 @@ export interface HomeProps {
   onGoSummon: () => void;
   onGoStages: () => void;
   onGoParty: () => void;
+  onGoEquipDungeon: () => void;
 }
 
 export function renderHome(props: HomeProps): HTMLElement {
-  const { player, onGoSummon, onGoStages, onGoParty } = props;
+  const { player, onGoSummon, onGoStages, onGoParty, onGoEquipDungeon } = props;
   const party = getParty(player);
 
   const partySlots = Array.from({ length: 4 }, (_, i) => {
@@ -37,5 +38,6 @@ export function renderHome(props: HomeProps): HTMLElement {
     ]),
     el("button", { type: "button", className: "btn btn--primary btn--large", onclick: onGoStages }, ["🗺 ステージに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoSummon }, ["✨ モンスターを召喚する"]),
+    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoEquipDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
   ]);
 }

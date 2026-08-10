@@ -1,4 +1,4 @@
-import { Equipment, EquipSlot, applyEquipmentToStats } from "./equipment.js";
+import { Equipment, EquipSlot, applyEquipmentToStats, computeSetCombatModifiers } from "./equipment.js";
 import { MonsterDefinition } from "./monster.js";
 import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
 
@@ -55,11 +55,13 @@ export function toBattleDefinition(
 ): MonsterDefinition {
   const growthStats = computeEffectiveStats(dex.stats, instance.star, instance.level);
   const stats = equippedItems.length > 0 ? applyEquipmentToStats(growthStats, equippedItems) : growthStats;
+  const combatMods = equippedItems.length > 0 ? computeSetCombatModifiers(equippedItems) : undefined;
   return {
     ...dex,
     id: instance.id,
     name: `${dex.name}★${instance.star} Lv${instance.level}`,
     stats,
+    combatMods,
   };
 }
 

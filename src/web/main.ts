@@ -5,8 +5,10 @@ import { EquipSlot } from "../core/equipment.js";
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
 import { findMonsterById } from "../data/monsters.js";
+import { DungeonFloor, rollDungeonEquipment } from "../data/equipmentDungeon.js";
 import { Stage, StageDrop, rollStageDrop, rollStageEquipment } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
+import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import {
   PlayerState,
   addEquipment,
@@ -25,6 +27,7 @@ import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
+import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderHome } from "./views/home.js";
 import { renderMonsters } from "./views/monsters.js";
 import { renderParty } from "./views/party.js";
@@ -44,6 +47,11 @@ interface StageRunState {
   wavesCleared: number;
 }
 
+interface DungeonRunState {
+  floor: DungeonFloor;
+  partyInstances: MonsterInstance[];
+}
+
 interface AppState {
   screen: ScreenName;
   player: PlayerState;
@@ -56,6 +64,8 @@ interface AppState {
   stageResult: StageResultInfo | null;
   equipmentDetailId: string | null;
   equipmentPickerContext: EquipmentPickerContext | null;
+  selectedDungeonFloor: number | null;
+  dungeonRun: DungeonRunState | null;
 }
 
 const state: AppState = {
@@ -70,6 +80,8 @@ const state: AppState = {
   stageResult: null,
   equipmentDetailId: null,
   equipmentPickerContext: null,
+  selectedDungeonFloor: null,
+  dungeonRun: null,
 };
 
 const rootCandidate = document.getElementById("app");
@@ -87,6 +99,7 @@ function navigate(screen: ScreenName): void {
   state.summonResults = null;
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
+  state.selectedDungeonFloor = null;
   render();
 }
 
@@ -232,6 +245,78 @@ function finishStage(cleared: boolean): void {
   render();
 }
 
+function startDungeonFloor(floor: DungeonFloor): void {
+  const party = getParty(state.player);
+  if (party.length === 0) return;
+  state.dungeonRun = { floor, partyInstances: party };
+  state.screen = "DUNGEON_BATTLE";
+  render();
+}
+
+function finishDungeon(cleared: boolean): void {
+  const run = state.dungeonRun;
+  if (!run) return;
+  const floor = run.floor;
+
+  const levelUps: StageResultLevelUp[] = [];
+  let goldEarned = 0;
+  let equipmentDrop = null;
+
+  if (cleared) {
+    const expTotal = floor.floor * 20;
+    for (const instance of run.partyInstances) {
+      const gained = addExp(instance, expTotal, STAR_MAX_LEVEL[instance.star]);
+      if (gained > 0) {
+        const dex = findMonsterById(instance.dexId);
+        levelUps.push({ instanceId: instance.id, name: dex ? dex.name : instance.dexId, levels: gained });
+      }
+    }
+
+    goldEarned = floor.goldReward;
+    equipmentDrop = rollDungeonEquipment(floor);
+    addEquipment(state.player, equipmentDrop);
+  }
+
+  state.player.gold += goldEarned;
+  savePlayerState(state.player);
+
+  state.stageResult = {
+    cleared,
+    stageName: floor.name,
+    goldEarned,
+    wavesCleared: cleared ? 1 : 0,
+    totalWaves: 1,
+    levelUps,
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop,
+  };
+  state.dungeonRun = null;
+  state.screen = "STAGE_RESULT";
+  render();
+}
+
+function renderCurrentDungeonBattle(): BattleViewHandle {
+  const run = state.dungeonRun;
+  if (!run) throw new Error("dungeonRun is not set");
+
+  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment);
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+  const result = engine.run();
+
+  const backLabel = result.winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る";
+  const onBack = () => finishDungeon(result.winner === "PLAYER");
+
+  return renderBattleView({
+    result,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    backLabel,
+    title: run.floor.name,
+    onBack,
+  });
+}
+
 function renderCurrentWaveBattle(): BattleViewHandle {
   const run = state.stageRun;
   if (!run) throw new Error("stageRun is not set");
@@ -292,6 +377,7 @@ function render(): void {
         onGoSummon: () => navigate("SUMMON"),
         onGoStages: () => navigate("STAGES"),
         onGoParty: () => navigate("PARTY"),
+        onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
       });
       break;
 
@@ -326,6 +412,26 @@ function render(): void {
     case "BATTLE": {
       showNav = false;
       const handle = renderCurrentWaveBattle();
+      disposeCurrentView = handle.dispose;
+      content = handle.element;
+      break;
+    }
+
+    case "EQUIP_DUNGEON":
+      content = renderEquipmentDungeon({
+        player: state.player,
+        selectedFloor: state.selectedDungeonFloor,
+        onSelectFloor: (floor) => {
+          state.selectedDungeonFloor = floor;
+          render();
+        },
+        onStartFloor: startDungeonFloor,
+      });
+      break;
+
+    case "DUNGEON_BATTLE": {
+      showNav = false;
+      const handle = renderCurrentDungeonBattle();
       disposeCurrentView = handle.dispose;
       content = handle.element;
       break;
@@ -410,6 +516,7 @@ function renderEquipmentScreen(): HTMLElement {
       state.screen = "MONSTERS";
       render();
     },
+    onGoDungeon: () => navigate("EQUIP_DUNGEON"),
   });
 }
 
