@@ -18,8 +18,12 @@ export interface StageResultInfo {
   dropDexId: string | null;
   dropStar: number | null;
   equipmentDrop: Equipment | null;
-  /** 召喚の書がドロップしたか(装備ダンジョン限定) */
+  /** 召喚の書がドロップしたか */
   summonScrollDropped?: boolean;
+  /** 転生ピッグのボーナスドロップ(通常の一般モンスタードロップとは別枠) */
+  pigDrop?: { dexId: string; star: number } | null;
+  /** このクリアでファイターレベルが何レベル上がったか */
+  fighterLevelsGained?: number;
 }
 
 export interface StageResultProps {
@@ -30,22 +34,28 @@ export interface StageResultProps {
 export function renderStageResult(props: StageResultProps): HTMLElement {
   const { info, onClose } = props;
   const dropDex = info.dropDexId ? findMonsterById(info.dropDexId) : undefined;
+  const pigDex = info.pigDrop ? findMonsterById(info.pigDrop.dexId) : undefined;
+
+  const summaryChildren: (HTMLElement | null)[] = [
+    el("p", {}, [`🪙 獲得ゴールド: ${info.goldEarned}`]),
+    info.fighterLevelsGained && info.fighterLevelsGained > 0
+      ? el("p", {}, [`🎖 ファイターレベルが+${info.fighterLevelsGained}上がりました！(スタミナ全回復・上限アップ)`])
+      : null,
+    info.levelUps.length > 0
+      ? el(
+          "div",
+          {},
+          info.levelUps.map((l) => el("p", {}, [`⬆ ${l.name} が Lv+${l.levels} しました！`])),
+        )
+      : el("p", { className: "app-subtitle" }, ["レベルアップしたモンスターはいません"]),
+  ];
 
   return el("div", { className: "screen stage-result-screen" }, [
     el("header", { className: "app-header" }, [
       el("h1", {}, [info.cleared ? "🎉 ステージクリア！" : "💀 全滅…"]),
       el("p", { className: "app-subtitle" }, [`${info.stageName} (${info.wavesCleared}/${info.totalWaves} ウェーブクリア)`]),
     ]),
-    el("section", { className: "panel" }, [
-      el("p", {}, [`🪙 獲得ゴールド: ${info.goldEarned}`]),
-      info.levelUps.length > 0
-        ? el(
-            "div",
-            {},
-            info.levelUps.map((l) => el("p", {}, [`⬆ ${l.name} が Lv+${l.levels} しました！`])),
-          )
-        : el("p", { className: "app-subtitle" }, ["レベルアップしたモンスターはいません"]),
-    ]),
+    el("section", { className: "panel" }, summaryChildren.filter((n): n is HTMLElement => n !== null)),
     dropDex && info.dropStar
       ? el("section", { className: "panel" }, [
           el("h2", {}, ["モンスタードロップ！"]),
@@ -53,6 +63,16 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
             el("div", { className: "summon-card__avatar", style: `background:${dropDex.color}` }, []),
             el("div", { className: "summon-card__name" }, [dropDex.name]),
             el("div", { className: "summon-card__star" }, ["★".repeat(info.dropStar)]),
+          ]),
+        ])
+      : null,
+    pigDex && info.pigDrop
+      ? el("section", { className: "panel" }, [
+          el("h2", {}, ["転生ピッグを入手！"]),
+          el("div", { className: "summon-card summon-card--rare" }, [
+            el("div", { className: "summon-card__avatar", style: `background:${pigDex.color}` }, []),
+            el("div", { className: "summon-card__name" }, [pigDex.name]),
+            el("div", { className: "summon-card__star" }, ["★".repeat(info.pigDrop.star)]),
           ]),
         ])
       : null,

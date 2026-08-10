@@ -2,18 +2,21 @@ import "./style.css";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { EquipSlot } from "../core/equipment.js";
+import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
 import { findMonsterById } from "../data/monsters.js";
 import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
-import { Stage, StageDrop, rollStageDrop, rollStageEquipment } from "../data/stages.js";
+import { Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import {
   PlayerState,
   addEquipment,
+  addFighterExp,
   addMonster,
   addSummonScrolls,
+  applyPassiveStaminaRegen,
   equipToMonster,
   getDungeonParty,
   getParty,
@@ -23,6 +26,7 @@ import {
   savePlayerState,
   toggleDungeonPartyMember,
   tryEnhanceEquipment,
+  trySpendStamina,
   tryUseSummonScroll,
   unequipFromMonster,
 } from "../game/playerState.js";
@@ -199,6 +203,8 @@ function handleToggleParty(instanceId: string): void {
 function startStage(stage: Stage): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
+  if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) return;
+  savePlayerState(state.player);
   state.stageRun = {
     stage,
     waveIndex: 0,
@@ -232,6 +238,9 @@ function finishStage(cleared: boolean): void {
   let totalGold = run.goldEarned;
   let drop: StageDrop | null = null;
   let equipmentDrop = null;
+  let pigDrop: StageDrop | null = null;
+  let summonScrollDropped = false;
+  let fighterLevelsGained = 0;
   if (cleared) {
     totalGold += stage.rewards.clearGold;
     markStageCleared(state.player, stage.id);
@@ -239,6 +248,14 @@ function finishStage(cleared: boolean): void {
     if (drop) addMonster(state.player, drop.dexId, drop.star);
     equipmentDrop = rollStageEquipment(stage);
     if (equipmentDrop) addEquipment(state.player, equipmentDrop);
+
+    pigDrop = rollStageReincarnationPig();
+    if (pigDrop) addMonster(state.player, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);
+
+    summonScrollDropped = rollStageSummonScroll();
+    if (summonScrollDropped) addSummonScrolls(state.player, 1);
+
+    fighterLevelsGained = addFighterExp(state.player, expTotal).levelsGained;
   }
   state.player.gold += totalGold;
   savePlayerState(state.player);
@@ -253,6 +270,9 @@ function finishStage(cleared: boolean): void {
     dropDexId: drop ? drop.dexId : null,
     dropStar: drop ? drop.star : null,
     equipmentDrop,
+    pigDrop,
+    summonScrollDropped,
+    fighterLevelsGained,
   };
   state.stageRun = null;
   state.screen = "STAGE_RESULT";
@@ -262,6 +282,8 @@ function finishStage(cleared: boolean): void {
 function startDungeonFloor(floor: DungeonFloor): void {
   const party = getDungeonParty(state.player);
   if (party.length === 0) return;
+  if (!trySpendStamina(state.player, DUNGEON_STAMINA_COST).ok) return;
+  savePlayerState(state.player);
   state.dungeonRun = { floor, partyInstances: party };
   state.screen = "DUNGEON_BATTLE";
   render();
@@ -277,6 +299,7 @@ function finishDungeon(cleared: boolean): void {
   let equipmentDrop = null;
   let pigDrop: StageDrop | null = null;
   let summonScrollDropped = false;
+  let fighterLevelsGained = 0;
 
   if (cleared) {
     const expTotal = floor.floor * 20;
@@ -295,11 +318,13 @@ function finishDungeon(cleared: boolean): void {
     summonScrollDropped = rollDungeonSummonScroll();
     if (summonScrollDropped) addSummonScrolls(state.player, 1);
 
-    const pigDexId = rollDungeonReincarnationPig(floor);
-    if (pigDexId) {
-      pigDrop = { dexId: pigDexId, star: 3 };
-      addMonster(state.player, pigDexId, 3, STAR_MAX_LEVEL[3]);
+    const pig = rollDungeonReincarnationPig(floor);
+    if (pig) {
+      pigDrop = { dexId: pig.dexId, star: pig.star };
+      addMonster(state.player, pig.dexId, pig.star, STAR_MAX_LEVEL[pig.star]);
     }
+
+    fighterLevelsGained = addFighterExp(state.player, expTotal).levelsGained;
   }
 
   state.player.gold += goldEarned;
@@ -312,10 +337,12 @@ function finishDungeon(cleared: boolean): void {
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
     levelUps,
-    dropDexId: pigDrop ? pigDrop.dexId : null,
-    dropStar: pigDrop ? pigDrop.star : null,
+    dropDexId: null,
+    dropStar: null,
     equipmentDrop,
+    pigDrop,
     summonScrollDropped,
+    fighterLevelsGained,
   };
   state.dungeonRun = null;
   state.screen = "STAGE_RESULT";
@@ -392,6 +419,10 @@ function render(): void {
   disposeCurrentView?.();
   disposeCurrentView = null;
   root.innerHTML = "";
+
+  const staminaBefore = state.player.stamina;
+  applyPassiveStaminaRegen(state.player);
+  if (state.player.stamina !== staminaBefore) savePlayerState(state.player);
 
   let content: HTMLElement;
   let showNav = true;

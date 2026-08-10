@@ -26,7 +26,21 @@ function mulberry32(seed: number): () => number {
 }
 
 function makeState(): PlayerState {
-  return { crystal: 0, gold: 1_000_000, monsters: [], partyIds: [], clearedStageIds: [], equipment: [], dungeonPartyIds: [], summonScrolls: 0 };
+  return {
+    crystal: 0,
+    gold: 1_000_000,
+    monsters: [],
+    partyIds: [],
+    clearedStageIds: [],
+    equipment: [],
+    dungeonPartyIds: [],
+    summonScrolls: 0,
+    fighterLevel: 1,
+    fighterExp: 0,
+    stamina: 150,
+    maxStamina: 150,
+    lastStaminaUpdateAt: Date.now(),
+  };
 }
 
 describe("装備強化 (enhanceEquipment)", () => {

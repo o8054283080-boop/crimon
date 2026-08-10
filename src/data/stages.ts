@@ -1,7 +1,7 @@
 import { Element } from "../core/element.js";
 import { Equipment, generateNormalStageEquipment } from "../core/equipment.js";
 import { Star } from "../core/rarity.js";
-import { MONSTER_TEMPLATES } from "./monsters.js";
+import { MONSTER_TEMPLATES, REINCARNATION_PIG_DEX } from "./monsters.js";
 
 export interface WaveEnemy {
   templateId: string;
@@ -124,4 +124,21 @@ export function rollStageDrop(stage: Stage, rng: () => number = Math.random): St
 export function rollStageEquipment(stage: Stage, rng: () => number = Math.random): Equipment | null {
   if (rng() >= stage.rewards.equipmentDropRate) return null;
   return generateNormalStageEquipment(rng);
+}
+
+/** 通常ステージでの転生ピッグ(星2)ドロップ率。他のドロップとは独立した抽選 */
+export const STAGE_REINCARNATION_PIG_DROP_RATE = 0.05;
+/** 通常ステージでの召喚の書ドロップ率。他のドロップとは独立した抽選 */
+export const STAGE_SUMMON_SCROLL_DROP_RATE = 0.01;
+
+/** ステージクリア報酬として、低確率で転生ピッグ(星2固定)がドロップする(なければnull) */
+export function rollStageReincarnationPig(rng: () => number = Math.random): StageDrop | null {
+  if (rng() >= STAGE_REINCARNATION_PIG_DROP_RATE) return null;
+  const variant = REINCARNATION_PIG_DEX[Math.floor(rng() * REINCARNATION_PIG_DEX.length)];
+  return { dexId: variant.id, star: 2 };
+}
+
+/** ステージクリア報酬として、低確率で召喚の書がドロップする */
+export function rollStageSummonScroll(rng: () => number = Math.random): boolean {
+  return rng() < STAGE_SUMMON_SCROLL_DROP_RATE;
 }

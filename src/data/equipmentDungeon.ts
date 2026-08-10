@@ -59,20 +59,31 @@ export function rollDungeonEquipment(floor: DungeonFloor, rng: () => number = Ma
 
 /** 召喚の書の階層共通ドロップ率 */
 export const SUMMON_SCROLL_DROP_RATE = 0.05;
-/** 転生ピッグがドロップする階層(10階のみ) */
-export const REINCARNATION_PIG_DROP_FLOOR = 10;
-/** 転生ピッグのドロップ率(対象階層でのみ判定) */
+/** 転生ピッグのドロップ率(全階層共通) */
 export const REINCARNATION_PIG_DROP_RATE = 0.1;
+/** この階層まで(1〜6階)は星2ピッグ、それより上(7〜10階)は星3ピッグがドロップする */
+export const REINCARNATION_PIG_LOW_TIER_MAX_FLOOR = 6;
+
+export interface DungeonPigDrop {
+  dexId: string;
+  star: Star;
+}
 
 /** 装備ドロップとは独立して、低確率で召喚の書もドロップする(全階層共通) */
 export function rollDungeonSummonScroll(rng: () => number = Math.random): boolean {
   return rng() < SUMMON_SCROLL_DROP_RATE;
 }
 
-/** 10階クリア時のみ、低確率で転生ピッグ(星3・Lv30固定)がドロップする。ドロップしなければnull */
-export function rollDungeonReincarnationPig(floor: DungeonFloor, rng: () => number = Math.random): string | null {
-  if (floor.floor !== REINCARNATION_PIG_DROP_FLOOR) return null;
+function reincarnationPigStarForFloor(floor: number): Star {
+  return floor <= REINCARNATION_PIG_LOW_TIER_MAX_FLOOR ? 2 : 3;
+}
+
+/**
+ * 低確率で転生ピッグがドロップする(全階層共通10%)。
+ * 1〜6階は星2、7〜10階は星3のピッグがドロップする。ドロップしなければnull
+ */
+export function rollDungeonReincarnationPig(floor: DungeonFloor, rng: () => number = Math.random): DungeonPigDrop | null {
   if (rng() >= REINCARNATION_PIG_DROP_RATE) return null;
   const variant = REINCARNATION_PIG_DEX[Math.floor(rng() * REINCARNATION_PIG_DEX.length)];
-  return variant.id;
+  return { dexId: variant.id, star: reincarnationPigStarForFloor(floor.floor) };
 }

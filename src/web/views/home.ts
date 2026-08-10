@@ -1,4 +1,5 @@
 import { findMonsterById } from "../../data/monsters.js";
+import { MAX_FIGHTER_LEVEL, requiredExpForFighterLevel } from "../../core/fighterLevel.js";
 import { starLabel } from "../../core/monsterInstance.js";
 import { getParty, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -26,11 +27,21 @@ export function renderHome(props: HomeProps): HTMLElement {
     ]);
   });
 
+  const isMaxFighterLevel = player.fighterLevel >= MAX_FIGHTER_LEVEL;
+  const fighterExpNeeded = requiredExpForFighterLevel(player.fighterLevel);
+
   return el("div", { className: "screen home-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["Crimon"]), el("p", { className: "app-subtitle" }, ["周回してモンスターを育てよう"])]),
     el("section", { className: "panel currency-panel" }, [
       el("div", { className: "currency-chip" }, [el("span", {}, ["💎"]), ` ${player.crystal}`]),
       el("div", { className: "currency-chip" }, [el("span", {}, ["🪙"]), ` ${player.gold}`]),
+    ]),
+    el("section", { className: "panel" }, [
+      el("div", { className: "panel-header" }, [
+        el("h2", {}, [`ファイターLv.${player.fighterLevel}`]),
+        el("span", { className: "app-subtitle" }, [isMaxFighterLevel ? "MAX" : `EXP ${player.fighterExp}/${fighterExpNeeded}`]),
+      ]),
+      el("p", {}, [`⚡ スタミナ ${player.stamina} / ${player.maxStamina}`]),
     ]),
     el("section", { className: "panel" }, [
       el("div", { className: "panel-header" }, [el("h2", {}, ["現在のパーティ"]), el("button", { type: "button", className: "btn btn--ghost", onclick: onGoParty }, ["編成へ"])]),

@@ -12,8 +12,8 @@ import {
 import { DUNGEON_FLOOR_STAR_WEIGHTS } from "../src/core/equipment.js";
 import {
   EQUIPMENT_DUNGEON_FLOORS,
-  REINCARNATION_PIG_DROP_FLOOR,
   REINCARNATION_PIG_DROP_RATE,
+  REINCARNATION_PIG_LOW_TIER_MAX_FLOOR,
   SUMMON_SCROLL_DROP_RATE,
   rollDungeonReincarnationPig,
   rollDungeonSummonScroll,
@@ -69,21 +69,18 @@ describe("転生ピッグ", () => {
 });
 
 describe("装備ダンジョンのボーナスドロップ", () => {
-  it("転生ピッグは10階でのみドロップし得る", () => {
+  it("転生ピッグは全階層でドロップし得て、1〜6階は星2・7〜10階は星3になる", () => {
     const rng = () => 0; // 必ずドロップ側に倒れる乱数
     for (const floor of EQUIPMENT_DUNGEON_FLOORS) {
       const result = rollDungeonReincarnationPig(floor, rng);
-      if (floor.floor === REINCARNATION_PIG_DROP_FLOOR) {
-        expect(result).not.toBeNull();
-      } else {
-        expect(result).toBeNull();
-      }
+      expect(result).not.toBeNull();
+      expect(result!.star).toBe(floor.floor <= REINCARNATION_PIG_LOW_TIER_MAX_FLOOR ? 2 : 3);
     }
   });
 
-  it("10階の転生ピッグドロップ率はおよそ10%(統計的検証)", () => {
+  it("転生ピッグのドロップ率はどの階層でもおよそ10%(統計的検証)", () => {
     const rng = mulberry32(1);
-    const floor = EQUIPMENT_DUNGEON_FLOORS[REINCARNATION_PIG_DROP_FLOOR - 1];
+    const floor = EQUIPMENT_DUNGEON_FLOORS[9];
     const N = 4000;
     let count = 0;
     for (let i = 0; i < N; i++) {

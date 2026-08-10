@@ -1,4 +1,5 @@
 import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost } from "../core/equipment.js";
+import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
 
@@ -13,6 +14,16 @@ export interface PlayerState {
   dungeonPartyIds: string[];
   /** 召喚の書の所持数。1個消費すると石を使わずに1回分の召喚ができる */
   summonScrolls: number;
+  /** プレイヤー(ファイター)自身のレベル。上限30 */
+  fighterLevel: number;
+  /** 次のファイターレベルまでの累積経験値 */
+  fighterExp: number;
+  /** 現在のスタミナ */
+  stamina: number;
+  /** スタミナ上限(ファイターレベルに応じて増える) */
+  maxStamina: number;
+  /** スタミナの自然回復計算の基準時刻(ミリ秒epoch) */
+  lastStaminaUpdateAt: number;
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -38,6 +49,11 @@ export function createInitialState(): PlayerState {
     equipment: [],
     dungeonPartyIds: [],
     summonScrolls: 0,
+    fighterLevel: 1,
+    fighterExp: 0,
+    stamina: INITIAL_MAX_STAMINA,
+    maxStamina: INITIAL_MAX_STAMINA,
+    lastStaminaUpdateAt: Date.now(),
   };
 }
 
@@ -63,6 +79,11 @@ function normalizeState(state: PlayerState): PlayerState {
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
+  if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
+  if (typeof state.fighterExp !== "number") state.fighterExp = 0;
+  if (typeof state.maxStamina !== "number") state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
+  if (typeof state.stamina !== "number") state.stamina = state.maxStamina;
+  if (typeof state.lastStaminaUpdateAt !== "number") state.lastStaminaUpdateAt = Date.now();
   return state;
 }
 
@@ -185,6 +206,67 @@ export function tryEnhanceEquipment(state: PlayerState, equipmentId: string, rng
   state.gold -= cost;
   enhanceEquipment(equipment, rng);
   return { ok: true };
+}
+
+/** スタミナが1回復するまでの実時間(分)。時間経過で自然回復する */
+export const STAMINA_REGEN_INTERVAL_MINUTES = 5;
+
+/**
+ * 最後に計算した時刻からの経過時間に応じてスタミナを自然回復させる。
+ * 消費したぶんの時間だけ基準時刻を進める(端数の経過時間は次回に持ち越す)。
+ */
+export function applyPassiveStaminaRegen(state: PlayerState, now: number = Date.now()): void {
+  if (state.stamina >= state.maxStamina) {
+    state.lastStaminaUpdateAt = now;
+    return;
+  }
+  const intervalMs = STAMINA_REGEN_INTERVAL_MINUTES * 60_000;
+  const elapsedTicks = Math.floor((now - state.lastStaminaUpdateAt) / intervalMs);
+  if (elapsedTicks <= 0) return;
+
+  const gained = Math.min(elapsedTicks, state.maxStamina - state.stamina);
+  state.stamina += gained;
+  state.lastStaminaUpdateAt += elapsedTicks * intervalMs;
+}
+
+export interface StaminaSpendResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/** スタミナが足りていれば消費する(挑戦開始時に呼ぶ)。呼ぶ前に自然回復を反映する */
+export function trySpendStamina(state: PlayerState, cost: number): StaminaSpendResult {
+  applyPassiveStaminaRegen(state);
+  if (state.stamina < cost) return { ok: false, reason: "スタミナが足りません" };
+  state.stamina -= cost;
+  return { ok: true };
+}
+
+export interface FighterExpResult {
+  levelsGained: number;
+}
+
+/**
+ * ファイター経験値を加算し、可能な限りレベルアップさせる。
+ * レベルアップのたびにスタミナ上限が上がり、スタミナは全回復する。
+ */
+export function addFighterExp(state: PlayerState, exp: number): FighterExpResult {
+  if (state.fighterLevel >= MAX_FIGHTER_LEVEL || exp <= 0) return { levelsGained: 0 };
+
+  state.fighterExp += exp;
+  let levelsGained = 0;
+  while (state.fighterLevel < MAX_FIGHTER_LEVEL && state.fighterExp >= requiredExpForFighterLevel(state.fighterLevel)) {
+    state.fighterExp -= requiredExpForFighterLevel(state.fighterLevel);
+    state.fighterLevel += 1;
+    state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
+    state.stamina = state.maxStamina;
+    levelsGained += 1;
+  }
+  if (state.fighterLevel >= MAX_FIGHTER_LEVEL) {
+    state.fighterLevel = MAX_FIGHTER_LEVEL;
+    state.fighterExp = 0;
+  }
+  return { levelsGained };
 }
 
 export function addSummonScrolls(state: PlayerState, count = 1): void {
