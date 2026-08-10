@@ -22,8 +22,13 @@ export const RANK_UP_SACRIFICE_COUNT: Record<Star, number> = {
   5: 0, // 星5は上限。ランクアップ不可
 };
 
-/** ランクアップ時のステータス倍率(星2で1.2倍、星3で1.2^2倍…と複利で効く) */
-const RANK_UP_MULTIPLIER = 1.2;
+/**
+ * ランクアップ時のステータス倍率(星2で1.4倍、星3で1.4^2倍…と複利で効く)。
+ * レベル成長(levelMultiplier)が最大レベルで2.0倍になる設計と組み合わさることで、
+ * ランクアップ直後(新しい星のレベル1)の実効ステータスは、進化前(旧星の最大レベル)の
+ * 70%(= 1.4 / 2.0)からスタートするようになっている。
+ */
+const RANK_UP_MULTIPLIER = 1.4;
 
 export function starMultiplier(star: Star): number {
   return RANK_UP_MULTIPLIER ** (star - 1);
@@ -44,7 +49,7 @@ export function computeEffectiveStats(baseStats: Stats, star: Star, level: numbe
     hp: Math.round(baseStats.hp * multiplier),
     atk: Math.round(baseStats.atk * multiplier),
     def: Math.round(baseStats.def * multiplier),
-    spd: Math.round(baseStats.spd * (1 + (multiplier - 1) * 0.4)), // SPDは伸びを緩やかにする
+    spd: baseStats.spd, // SPDは星・レベルによる変化なし(常に基礎値のまま)
     criRate: baseStats.criRate,
     criDmg: baseStats.criDmg,
     resistance: baseStats.resistance,
