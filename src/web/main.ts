@@ -5,7 +5,7 @@ import { EquipSlot } from "../core/equipment.js";
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
 import { findMonsterById } from "../data/monsters.js";
-import { DungeonFloor, rollDungeonEquipment } from "../data/equipmentDungeon.js";
+import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
 import { Stage, StageDrop, rollStageDrop, rollStageEquipment } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
@@ -13,19 +13,24 @@ import {
   PlayerState,
   addEquipment,
   addMonster,
+  addSummonScrolls,
   equipToMonster,
+  getDungeonParty,
   getParty,
   loadPlayerState,
   markStageCleared,
   removeMonsters,
   savePlayerState,
+  toggleDungeonPartyMember,
   tryEnhanceEquipment,
+  tryUseSummonScroll,
   unequipFromMonster,
 } from "../game/playerState.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
+import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderHome } from "./views/home.js";
@@ -153,6 +158,15 @@ function handleSummon(count: number): void {
   render();
 }
 
+function handleUseSummonScroll(): void {
+  if (!tryUseSummonScroll(state.player)) return;
+  const results = summonMany(1);
+  for (const r of results) addMonster(state.player, r.dexId, r.star);
+  savePlayerState(state.player);
+  state.summonResults = results;
+  render();
+}
+
 function handleConfirmRankUp(): void {
   const target = state.player.monsters.find((m) => m.id === state.monsterDetailId);
   if (!target) return;
@@ -246,7 +260,7 @@ function finishStage(cleared: boolean): void {
 }
 
 function startDungeonFloor(floor: DungeonFloor): void {
-  const party = getParty(state.player);
+  const party = getDungeonParty(state.player);
   if (party.length === 0) return;
   state.dungeonRun = { floor, partyInstances: party };
   state.screen = "DUNGEON_BATTLE";
@@ -261,6 +275,8 @@ function finishDungeon(cleared: boolean): void {
   const levelUps: StageResultLevelUp[] = [];
   let goldEarned = 0;
   let equipmentDrop = null;
+  let pigDrop: StageDrop | null = null;
+  let summonScrollDropped = false;
 
   if (cleared) {
     const expTotal = floor.floor * 20;
@@ -275,6 +291,15 @@ function finishDungeon(cleared: boolean): void {
     goldEarned = floor.goldReward;
     equipmentDrop = rollDungeonEquipment(floor);
     addEquipment(state.player, equipmentDrop);
+
+    summonScrollDropped = rollDungeonSummonScroll();
+    if (summonScrollDropped) addSummonScrolls(state.player, 1);
+
+    const pigDexId = rollDungeonReincarnationPig(floor);
+    if (pigDexId) {
+      pigDrop = { dexId: pigDexId, star: 3 };
+      addMonster(state.player, pigDexId, 3, STAR_MAX_LEVEL[3]);
+    }
   }
 
   state.player.gold += goldEarned;
@@ -287,9 +312,10 @@ function finishDungeon(cleared: boolean): void {
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
     levelUps,
-    dropDexId: null,
-    dropStar: null,
+    dropDexId: pigDrop ? pigDrop.dexId : null,
+    dropStar: pigDrop ? pigDrop.star : null,
     equipmentDrop,
+    summonScrollDropped,
   };
   state.dungeonRun = null;
   state.screen = "STAGE_RESULT";
@@ -426,6 +452,25 @@ function render(): void {
           render();
         },
         onStartFloor: startDungeonFloor,
+        onGoDungeonParty: () => {
+          state.screen = "DUNGEON_PARTY";
+          render();
+        },
+      });
+      break;
+
+    case "DUNGEON_PARTY":
+      content = renderDungeonParty({
+        player: state.player,
+        onToggleMember: (id) => {
+          toggleDungeonPartyMember(state.player, id);
+          savePlayerState(state.player);
+          render();
+        },
+        onBack: () => {
+          state.screen = "EQUIP_DUNGEON";
+          render();
+        },
       });
       break;
 
@@ -462,6 +507,7 @@ function renderSummonScreen(): HTMLElement {
       state.summonResults = null;
       render();
     },
+    onUseSummonScroll: handleUseSummonScroll,
   });
 }
 

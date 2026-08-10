@@ -1,7 +1,7 @@
-import { EquipStar, getDungeonFloorDropRates } from "../../core/equipment.js";
+import { EquipStar } from "../../core/equipment.js";
 import { ELEMENT_JA } from "../../core/element.js";
 import { DungeonFloor, EQUIPMENT_DUNGEON_FLOORS } from "../../data/equipmentDungeon.js";
-import { getParty, PlayerState } from "../../game/playerState.js";
+import { getDungeonParty, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 
 export interface EquipmentDungeonProps {
@@ -9,22 +9,25 @@ export interface EquipmentDungeonProps {
   selectedFloor: number | null;
   onSelectFloor: (floor: number | null) => void;
   onStartFloor: (floor: DungeonFloor) => void;
+  onGoDungeonParty: () => void;
 }
 
 function starLabel(star: EquipStar): string {
   return "★".repeat(star);
 }
 
+function maxStarForFloor(floor: DungeonFloor): EquipStar {
+  return floor.floor <= 3 ? 4 : floor.floor <= 6 ? 5 : 6;
+}
+
 function renderList(props: EquipmentDungeonProps): HTMLElement {
   const cards = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
-    const rates = getDungeonFloorDropRates(floor.floor);
-    const topRate = rates[rates.length - 1];
     return el(
       "button",
       { type: "button", className: "stage-card", onclick: () => props.onSelectFloor(floor.floor) },
       [
         el("div", { className: "stage-card__name" }, [floor.name]),
-        el("div", { className: "stage-card__meta" }, [`最高レア: ${starLabel(topRate.star)} (${topRate.percent}%)`]),
+        el("div", { className: "stage-card__meta" }, [`最高レア: ${starLabel(maxStarForFloor(floor))}`]),
       ],
     );
   });
@@ -39,27 +42,31 @@ function renderList(props: EquipmentDungeonProps): HTMLElement {
         "⚠ 最上級コンテンツです。星5の装備を6箇所すべてに装着した星5モンスターでなければ1階すら突破は困難です。",
       ]),
     ]),
+    el("section", { className: "panel" }, [
+      el(
+        "button",
+        { type: "button", className: "btn btn--ghost btn--large", onclick: props.onGoDungeonParty },
+        [`🧑‍🤝‍🧑 ダンジョン専用パーティ編成 (${getDungeonParty(props.player).length}/5)`],
+      ),
+    ]),
     el("section", { className: "panel" }, [el("div", { className: "stage-list" }, cards)]),
   ]);
 }
 
 function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLElement {
-  const party = getParty(props.player);
+  const party = getDungeonParty(props.player);
   const canChallenge = party.length > 0;
-  const rates = getDungeonFloorDropRates(floor.floor);
 
   const enemyTags = floor.enemies.map((e) =>
     el("span", { className: "enemy-tag" }, [`${e.templateId}[${ELEMENT_JA[e.element]}]★${e.star}Lv${e.level}`]),
   );
 
-  const rateRows = rates.map((r) =>
-    el("div", { className: "wave-row" }, [
-      el("div", { className: "wave-row__title" }, [starLabel(r.star)]),
-      el("div", { className: "wave-row__enemies" }, [`${r.percent}%`]),
-    ]),
-  );
-
   const recommendedGear = floor.floor <= 5 ? "★5装備(サブ4個推奨)" : "★6装備推奨";
+  const bonusNotes = [
+    "クリアすると装備が1個確定でドロップします(サブステータス数は星が高いほど付きやすくなります)。",
+    "低確率で「召喚の書」もドロップします。",
+    floor.floor === 10 ? "この階だけ、低確率で転生ピッグ(ランクアップ素材専用モンスター)もドロップします。" : null,
+  ].filter((n): n is string => n !== null);
 
   return el("div", { className: "screen stages-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [floor.name])]),
@@ -69,12 +76,15 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
       el("p", { className: "app-subtitle" }, [`推奨装備目安: ${recommendedGear} / モンスター★5`]),
     ]),
     el("section", { className: "panel" }, [
-      el("h2", {}, ["装備ドロップ率(星ランク別)"]),
-      el("div", { className: "wave-rows" }, rateRows),
-      el("p", { className: "app-subtitle" }, ["クリアすると装備が1個確定でドロップします(サブステータス数は星が高いほど付きやすくなります)。"]),
+      el("h2", {}, ["報酬"]),
+      ...bonusNotes.map((note) => el("p", { className: "app-subtitle" }, [note])),
+      el("p", {}, [`🪙 クリア報酬ゴールド: ${floor.goldReward}`]),
     ]),
-    el("section", { className: "panel" }, [el("p", {}, [`🪙 クリア報酬ゴールド: ${floor.goldReward}`])]),
-    !canChallenge ? el("p", { className: "app-subtitle" }, ["パーティが編成されていません。先にパーティを編成してください。"]) : null,
+    el("section", { className: "panel" }, [
+      el("p", { className: "app-subtitle" }, [`ダンジョン専用パーティ: ${party.length}/5体`]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoDungeonParty }, ["編成を変更する"]),
+    ]),
+    !canChallenge ? el("p", { className: "app-subtitle" }, ["ダンジョン専用パーティが編成されていません。先に編成してください。"]) : null,
     el(
       "button",
       { type: "button", className: "btn btn--primary btn--large", disabled: !canChallenge, onclick: () => props.onStartFloor(floor) },

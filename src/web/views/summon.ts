@@ -9,6 +9,7 @@ export interface SummonProps {
   lastResults: SummonResult[] | null;
   onSummon: (count: number) => void;
   onDismissResults: () => void;
+  onUseSummonScroll: () => void;
 }
 
 function resultCard(r: SummonResult): HTMLElement {
@@ -21,7 +22,7 @@ function resultCard(r: SummonResult): HTMLElement {
 }
 
 export function renderSummon(props: SummonProps): HTMLElement {
-  const { player, lastResults, onSummon, onDismissResults } = props;
+  const { player, lastResults, onSummon, onDismissResults, onUseSummonScroll } = props;
 
   if (lastResults) {
     return el("div", { className: "screen summon-screen" }, [
@@ -50,6 +51,11 @@ export function renderSummon(props: SummonProps): HTMLElement {
       "button",
       { type: "button", className: "btn btn--primary btn--large", disabled: !canTen, onclick: () => onSummon(10) },
       [`✨✨ 10連召喚 (${SUMMON_COST_TEN}💎)`],
+    ),
+    el(
+      "button",
+      { type: "button", className: "btn btn--ghost btn--large", disabled: player.summonScrolls <= 0, onclick: onUseSummonScroll },
+      [`📜 召喚の書を使う (所持:${player.summonScrolls})`],
     ),
   ]);
 }

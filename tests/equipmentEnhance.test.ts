@@ -26,7 +26,7 @@ function mulberry32(seed: number): () => number {
 }
 
 function makeState(): PlayerState {
-  return { crystal: 0, gold: 1_000_000, monsters: [], partyIds: [], clearedStageIds: [], equipment: [] };
+  return { crystal: 0, gold: 1_000_000, monsters: [], partyIds: [], clearedStageIds: [], equipment: [], dungeonPartyIds: [], summonScrolls: 0 };
 }
 
 describe("装備強化 (enhanceEquipment)", () => {

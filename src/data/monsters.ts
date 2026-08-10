@@ -176,8 +176,62 @@ const FAIRY: MonsterTemplate = {
 
 export const MONSTER_TEMPLATES: MonsterTemplate[] = [SLIME, WOLF, GOLEM, FAIRY];
 
-/** テンプレート×6属性 = 24体の色違いモンスター図鑑 */
-export const MONSTER_DEX = MONSTER_TEMPLATES.flatMap((template) => createAllVariants(template));
+/**
+ * 転生ピッグ: ランクアップ素材専用のモンスター。ガチャやステージには一切出現せず、
+ * 装備ダンジョンでのみドロップする。常に星3・そのレベル上限(Lv30)で入手できるが、
+ * ステータスは他のモンスターよりはるかに低く設定されており、戦力にはならない
+ * (ランクアップの素材として、育てた星3モンスターを犠牲にせずに済むようにするための存在)。
+ */
+export const REINCARNATION_PIG: MonsterTemplate = {
+  templateId: "reincarnation_pig",
+  baseName: "転生ピッグ",
+  role: "素材",
+  baseStats: {
+    hp: 200,
+    atk: 15,
+    def: 8,
+    spd: 60,
+    criRate: 0.02,
+    criDmg: 1.2,
+    resistance: 0.02,
+    accuracy: 0.02,
+  },
+  skills: [
+    {
+      id: "reincarnation_pig_s1",
+      name: "ぷいぷい",
+      description: "敵単体に攻撃力0.3倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 0,
+      effects: [{ kind: "DAMAGE", multiplier: 0.3 }],
+    },
+    {
+      id: "reincarnation_pig_s2",
+      name: "つのでつつく",
+      description: "敵単体に攻撃力0.4倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 2,
+      effects: [{ kind: "DAMAGE", multiplier: 0.4 }],
+    },
+    {
+      id: "reincarnation_pig_s3",
+      name: "ぶくぶく",
+      description: "敵単体に攻撃力0.5倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 4,
+      effects: [{ kind: "DAMAGE", multiplier: 0.5 }],
+    },
+  ],
+};
+
+/** テンプレート×6属性 = 24体の色違いモンスター図鑑(通常の召喚・ステージ対象) */
+export const MONSTER_TEMPLATES_DEX = MONSTER_TEMPLATES.flatMap((template) => createAllVariants(template));
+
+/** 転生ピッグの6属性色違いバリエーション(図鑑には含めるが、通常の召喚・ステージ抽選には出さない) */
+export const REINCARNATION_PIG_DEX = createAllVariants(REINCARNATION_PIG);
+
+/** 検索用の全モンスター図鑑(通常モンスター + 転生ピッグ) */
+export const MONSTER_DEX = [...MONSTER_TEMPLATES_DEX, ...REINCARNATION_PIG_DEX];
 
 export function findMonster(templateId: string, element: string) {
   return MONSTER_DEX.find((m) => m.templateId === templateId && m.element === element);
