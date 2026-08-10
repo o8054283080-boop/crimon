@@ -544,69 +544,72 @@ export function generateThemedStageEquipment(set: SetType, rng: () => number = M
  * 1〜3階は星4まで、4〜6階は星5まで、7〜10階は星6までが出現し、
  * 階層が上がるほどそのグループ内で最高レアリティの出現率が上がっていく。
  * 各階の重みの合計は100になっているため、weightそのものをドロップ%として扱える。
+ *
+ * 1階の攻略難易度自体は「星3モンスター+星1装備」くらいまで下げてあるため、
+ * 誰でも足を踏み入れやすい代わりに、もらえる装備の質はかなり渋め(特に序盤の階層ほど
+ * 低い星に大きく偏る)にしてあり、良い装備を狙うにはより深い階層への挑戦が必要になる。
  */
 export const DUNGEON_FLOOR_COUNT = 10;
 
 export const DUNGEON_FLOOR_STAR_WEIGHTS: Record<number, WeightedOption<EquipStar>[]> = {
   1: [
-    { value: 1, weight: 40 },
-    { value: 2, weight: 35 },
-    { value: 3, weight: 20 },
-    { value: 4, weight: 5 },
+    { value: 1, weight: 65 },
+    { value: 2, weight: 26 },
+    { value: 3, weight: 8 },
+    { value: 4, weight: 1 },
   ],
   2: [
-    { value: 1, weight: 28 },
-    { value: 2, weight: 35 },
-    { value: 3, weight: 27 },
-    { value: 4, weight: 10 },
+    { value: 1, weight: 50 },
+    { value: 2, weight: 31 },
+    { value: 3, weight: 15 },
+    { value: 4, weight: 4 },
   ],
   3: [
-    { value: 1, weight: 15 },
-    { value: 2, weight: 30 },
-    { value: 3, weight: 35 },
-    { value: 4, weight: 20 },
+    { value: 1, weight: 35 },
+    { value: 2, weight: 33 },
+    { value: 3, weight: 24 },
+    { value: 4, weight: 8 },
   ],
   4: [
-    { value: 2, weight: 25 },
-    { value: 3, weight: 30 },
-    { value: 4, weight: 30 },
-    { value: 5, weight: 15 },
+    { value: 2, weight: 45 },
+    { value: 3, weight: 32 },
+    { value: 4, weight: 18 },
+    { value: 5, weight: 5 },
   ],
   5: [
-    { value: 2, weight: 15 },
-    { value: 3, weight: 25 },
-    { value: 4, weight: 35 },
-    { value: 5, weight: 25 },
+    { value: 2, weight: 32 },
+    { value: 3, weight: 32 },
+    { value: 4, weight: 26 },
+    { value: 5, weight: 10 },
   ],
   6: [
-    { value: 2, weight: 5 },
-    { value: 3, weight: 18 },
+    { value: 2, weight: 15 },
+    { value: 3, weight: 28 },
     { value: 4, weight: 37 },
-    { value: 5, weight: 40 },
+    { value: 5, weight: 20 },
   ],
-  // 7〜10階は星6の排出重みを元の約半分まで下げ、その分を他の星に再配分してある
   7: [
-    { value: 3, weight: 18 },
-    { value: 4, weight: 29 },
-    { value: 5, weight: 41 },
-    { value: 6, weight: 12 },
+    { value: 3, weight: 32 },
+    { value: 4, weight: 33 },
+    { value: 5, weight: 30 },
+    { value: 6, weight: 5 },
   ],
   8: [
-    { value: 3, weight: 13 },
-    { value: 4, weight: 25 },
-    { value: 5, weight: 44 },
-    { value: 6, weight: 18 },
+    { value: 3, weight: 24 },
+    { value: 4, weight: 30 },
+    { value: 5, weight: 37 },
+    { value: 6, weight: 9 },
   ],
   9: [
-    { value: 3, weight: 8 },
-    { value: 4, weight: 21 },
-    { value: 5, weight: 46 },
-    { value: 6, weight: 25 },
+    { value: 3, weight: 16 },
+    { value: 4, weight: 26 },
+    { value: 5, weight: 43 },
+    { value: 6, weight: 15 },
   ],
   10: [
-    { value: 4, weight: 17 },
-    { value: 5, weight: 49 },
-    { value: 6, weight: 34 },
+    { value: 4, weight: 30 },
+    { value: 5, weight: 47 },
+    { value: 6, weight: 23 },
   ],
 };
 

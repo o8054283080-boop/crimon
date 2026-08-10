@@ -26,14 +26,17 @@ const DUNGEON_ENEMY_STAR: Star = 5;
 const DUNGEON_ENEMY_LEVEL = 50;
 
 /**
- * 1階/10階の必要パワースケール(星5装備で武装した星5モンスターでないと勝てない水準〜
- * 星6装備をそろえてようやく挑める最終関門)。
+ * 1階/10階の必要パワースケール。
+ * 1階は「星3モンスターに星1装備」くらいの、まだ育成途中のパーティでも挑めるくらいまで下げてあり、
+ * 装備ダンジョンの入り口として無理なく足を踏み入れられるようにしてある。
+ * そこから階層を上がるごとになだらかに強くなっていき、10階は星6装備をそろえてようやく勝てる
+ * 最終関門になる(星5装備だけではまだ足りない水準)。
  * ランクアップの複利倍率引き上げ(星5/Lv50の実効ステータス底上げ)や、
  * モンスターごとのスキル2/3が属性ごとに異なる組み合わせになったことによる
  * 戦闘バランスの変化に合わせて、この値は都度調整してある。
  */
-const POWER_SCALE_START = 1.3;
-const POWER_SCALE_END = 2.6;
+const POWER_SCALE_START = 0.62;
+const POWER_SCALE_END = 1.7;
 
 function buildFloor(floor: number): DungeonFloor {
   // 属性は階層によらず固定(要素ジャンケンの巡り合わせで難易度が階層ごとにぶれないようにする)
@@ -44,8 +47,8 @@ function buildFloor(floor: number): DungeonFloor {
     level: DUNGEON_ENEMY_LEVEL,
   }));
 
-  // 星5装備で埋めた星5モンスターでないと勝てないレベルまでパワースケールを引き上げ、
-  // 階層が上がるほど星6装備クラスの投資が必要になるよう線形に上昇させる
+  // 1階は星3モンスター+星1装備くらいで挑める水準から始まり、階層が上がるごとに
+  // なだらかに線形上昇して、10階では星6装備クラスの投資が必要になる
   const powerScale = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
 
   return { floor, name: `装備ダンジョン ${floor}階`, enemies, powerScale, goldReward: 60 * floor };
