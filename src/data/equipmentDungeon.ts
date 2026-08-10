@@ -25,10 +25,14 @@ const NORMAL_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
 const DUNGEON_ENEMY_STAR: Star = 5;
 const DUNGEON_ENEMY_LEVEL = 50;
 
-/** 1階の必要パワースケール(星5装備で武装した星5モンスターでないと勝てない水準) */
-const POWER_SCALE_START = 1.7;
-/** 10階の必要パワースケール(星6装備をそろえてようやく挑める最終関門) */
-const POWER_SCALE_END = 3.1;
+/**
+ * 1階/10階の必要パワースケール(星5装備で武装した星5モンスターでないと勝てない水準〜
+ * 星6装備をそろえてようやく挑める最終関門)。
+ * ランクアップの複利倍率(1.2→1.4倍)引き上げに伴い、星5/Lv50の実効ステータス自体が
+ * 底上げされたため、この値も合わせて調整してある。
+ */
+const POWER_SCALE_START = 1.4;
+const POWER_SCALE_END = 2.6;
 
 function buildFloor(floor: number): DungeonFloor {
   // 属性は階層によらず固定(要素ジャンケンの巡り合わせで難易度が階層ごとにぶれないようにする)

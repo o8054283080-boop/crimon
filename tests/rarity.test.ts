@@ -8,11 +8,11 @@ describe("星ランクによるステータス倍率", () => {
     expect(starMultiplier(1)).toBeCloseTo(1.0);
   });
 
-  it("星が上がるごとに1.2倍ずつ複利で上昇する", () => {
-    expect(starMultiplier(2)).toBeCloseTo(1.2);
-    expect(starMultiplier(3)).toBeCloseTo(1.44);
-    expect(starMultiplier(4)).toBeCloseTo(1.728);
-    expect(starMultiplier(5)).toBeCloseTo(2.0736);
+  it("星が上がるごとに1.4倍ずつ複利で上昇する", () => {
+    expect(starMultiplier(2)).toBeCloseTo(1.4);
+    expect(starMultiplier(3)).toBeCloseTo(1.96);
+    expect(starMultiplier(4)).toBeCloseTo(2.744);
+    expect(starMultiplier(5)).toBeCloseTo(3.8416);
   });
 });
 
@@ -45,6 +45,25 @@ describe("実効ステータス計算", () => {
     const star2 = computeEffectiveStats(BASE_STATS, 2, 1);
     expect(star2.hp).toBeGreaterThan(star1.hp);
     expect(star2.atk).toBeGreaterThan(star1.atk);
+  });
+
+  it("ランクアップ直後(新しい星のレベル1)は、進化前(旧星の最大レベル)の70%のステータスになる", () => {
+    const beforeRankUp = computeEffectiveStats(BASE_STATS, 1, STAR_MAX_LEVEL[1]);
+    const afterRankUp = computeEffectiveStats(BASE_STATS, 2, 1);
+    expect(afterRankUp.hp).toBe(Math.round(beforeRankUp.hp * 0.7));
+    expect(afterRankUp.atk).toBe(Math.round(beforeRankUp.atk * 0.7));
+    expect(afterRankUp.def).toBe(Math.round(beforeRankUp.def * 0.7));
+  });
+
+  it("SPDは星・レベルによらず常に基礎値のまま変化しない", () => {
+    const lv1Star1 = computeEffectiveStats(BASE_STATS, 1, 1);
+    const maxLvStar1 = computeEffectiveStats(BASE_STATS, 1, STAR_MAX_LEVEL[1]);
+    const lv1Star5 = computeEffectiveStats(BASE_STATS, 5, 1);
+    const maxLvStar5 = computeEffectiveStats(BASE_STATS, 5, STAR_MAX_LEVEL[5]);
+    expect(lv1Star1.spd).toBe(BASE_STATS.spd);
+    expect(maxLvStar1.spd).toBe(BASE_STATS.spd);
+    expect(lv1Star5.spd).toBe(BASE_STATS.spd);
+    expect(maxLvStar5.spd).toBe(BASE_STATS.spd);
   });
 });
 
