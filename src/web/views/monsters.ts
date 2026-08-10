@@ -65,7 +65,7 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
           onclick: () => props.onUnequipSlot(instance.id, slot),
         },
         [
-          el("div", { className: "equip-slot__label" }, [`S${slot}`]),
+          el("div", { className: "equip-slot__label" }, [`S${slot}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),
           el("div", { className: "equip-slot__star" }, ["★".repeat(equipment.star)]),
           el("div", { className: "equip-slot__stat" }, [STAT_LABEL[equipment.mainStat.type]]),
         ],

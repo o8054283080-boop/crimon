@@ -1,4 +1,4 @@
-import { Equipment, EquipSlot, STAT_LABEL, StatRoll } from "../../core/equipment.js";
+import { canEnhanceEquipment, enhanceEquipmentCost, Equipment, EquipSlot, STAT_LABEL, StatRoll } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -15,6 +15,7 @@ export interface EquipmentProps {
   onSelectDetail: (id: string | null) => void;
   onEquip: (equipmentId: string, monsterId: string) => void;
   onUnequip: (equipmentId: string) => void;
+  onEnhance: (equipmentId: string) => void;
   onCancelPicker: () => void;
 }
 
@@ -37,7 +38,7 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
     "button",
     { type: "button", className: "equip-card", onclick: onClick },
     [
-      el("div", { className: "equip-card__slot" }, [`S${equipment.slot}`]),
+      el("div", { className: "equip-card__slot" }, [`S${equipment.slot}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),
       el("div", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
       el("div", { className: "equip-card__main" }, [formatStatValue(equipment.mainStat)]),
       el("div", { className: "equip-card__subs" }, [`サブ${equipment.subStats.length}個`]),
@@ -79,11 +80,15 @@ function renderList(props: EquipmentProps): HTMLElement {
 
 function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement {
   const ownerName = equipmentOwnerName(props.player, equipment);
+  const canEnhance = canEnhanceEquipment(equipment);
+  const cost = enhanceEquipmentCost(equipment);
+  const canAfford = props.player.gold >= cost;
 
   return el("div", { className: "screen equipment-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [`スロット${equipment.slot}の装備`])]),
     el("section", { className: "panel equip-detail" }, [
       el("div", { className: "equip-detail__star" }, ["★".repeat(equipment.star)]),
+      el("div", { className: "equip-detail__level" }, [`強化 +${equipment.level} / 15`]),
       el("div", { className: "equip-detail__main" }, [`メイン: ${formatStatValue(equipment.mainStat)}`]),
       equipment.subStats.length > 0
         ? el(
@@ -94,8 +99,20 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
         : el("p", { className: "app-subtitle" }, ["サブステータスなし"]),
       ownerName ? el("p", {}, [`装着中: ${ownerName}`]) : el("p", { className: "app-subtitle" }, ["未装着"]),
     ]),
+    canEnhance
+      ? el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--primary btn--large",
+            disabled: !canAfford,
+            onclick: () => props.onEnhance(equipment.id),
+          },
+          [`⬆ 強化する (🪙${cost})`],
+        )
+      : el("div", { className: "panel rankup-hint" }, ["最大強化レベルに到達しています"]),
     ownerName
-      ? el("button", { type: "button", className: "btn btn--primary btn--large", onclick: () => props.onUnequip(equipment.id) }, ["外す"])
+      ? el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onUnequip(equipment.id) }, ["外す"])
       : null,
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectDetail(null) }, ["◀ 一覧に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));

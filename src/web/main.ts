@@ -17,6 +17,7 @@ import {
   markStageCleared,
   removeMonsters,
   savePlayerState,
+  tryEnhanceEquipment,
   unequipFromMonster,
 } from "../game/playerState.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
@@ -117,6 +118,13 @@ function handleUnequipFromEquipmentScreen(equipmentId: string): void {
       delete monster.equipment[equipment.slot];
     }
   }
+  savePlayerState(state.player);
+  render();
+}
+
+function handleEnhanceEquipment(equipmentId: string): void {
+  const result = tryEnhanceEquipment(state.player, equipmentId);
+  if (!result.ok) return;
   savePlayerState(state.player);
   render();
 }
@@ -396,6 +404,7 @@ function renderEquipmentScreen(): HTMLElement {
     },
     onEquip: handleEquip,
     onUnequip: handleUnequipFromEquipmentScreen,
+    onEnhance: handleEnhanceEquipment,
     onCancelPicker: () => {
       state.equipmentPickerContext = null;
       state.screen = "MONSTERS";

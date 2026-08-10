@@ -78,6 +78,8 @@ export interface Equipment {
   id: string;
   slot: EquipSlot;
   star: EquipStar;
+  /** 強化レベル。0(無強化)〜15(最大) */
+  level: number;
   mainStat: StatRoll;
   subStats: StatRoll[];
 }
@@ -89,17 +91,45 @@ function generateEquipmentId(): string {
   return `equip_${Date.now().toString(36)}_${equipmentCounter}_${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-const STAR_GROWTH: Record<EquipStar, number> = { 1: 1, 2: 1.5, 3: 2.2, 4: 3.1, 5: 4.2, 6: 5.5 };
+/**
+ * 星ごとのメインステータス初期値(強化レベル0時点)の倍率。
+ * 星1〜4は一定間隔(+0.5)で上がるが、星5・6は初期値そのものを大きく引き上げる。
+ */
+const STAR_INITIAL_MULTIPLIER: Record<EquipStar, number> = {
+  1: 1.0,
+  2: 1.5,
+  3: 2.0,
+  4: 2.5,
+  5: 4.0,
+  6: 6.0,
+};
 
-/** 星1における基準値。星が上がるほど STAR_GROWTH 倍される */
+/**
+ * 星ごとの、強化レベルが1上がるごとにメインステータスへ加算される量の割合(STAT_BASE_VALUEに対する比率)。
+ * 星5・6は星1〜4より明確に高い上昇率にしてある。
+ */
+const STAR_LEVEL_GROWTH_RATE: Record<EquipStar, number> = {
+  1: 0.06,
+  2: 0.08,
+  3: 0.1,
+  4: 0.12,
+  5: 0.22,
+  6: 0.3,
+};
+
+/**
+ * 星1・強化レベル0における基準値。上記の倍率・上昇率はこの値に対して掛かる。
+ * 実数値系(ATK+/DEF+/HP+/SPD+)は整数に丸められる(最低1)ため、
+ * レベル成長が丸めで潰れて差が出なくなることのないよう、ある程度大きめの値にしてある。
+ */
 const STAT_BASE_VALUE: Record<StatType, number> = {
-  ATK_FLAT: 8,
-  DEF_FLAT: 7,
-  HP_FLAT: 90,
+  ATK_FLAT: 20,
+  DEF_FLAT: 18,
+  HP_FLAT: 220,
   ATK_PERCENT: 0.09,
   DEF_PERCENT: 0.09,
   HP_PERCENT: 0.09,
-  SPD: 5,
+  SPD: 14,
   CRIT_RATE: 0.05,
   CRIT_DMG: 0.08,
   ACCURACY: 0.08,
@@ -109,18 +139,37 @@ const STAT_BASE_VALUE: Record<StatType, number> = {
 /** サブステータスはメインステータスに対してこの比率分だけ弱くなる */
 const SUB_STAT_RATIO = 0.4;
 
+/** 装備の最大強化レベル */
+export const EQUIP_MAX_LEVEL = 15;
+/** サブステータスの最大個数 */
+export const MAX_SUB_STATS = 4;
+/** この強化レベルに到達するたびサブステータスが強化される(3レベルごと) */
+export const SUBSTAT_POWERUP_LEVELS = [3, 6, 9, 12, 15];
+/** 最大強化レベル(15)到達時、メインステータスの上昇量に掛かる追加倍率。1〜14レベルの通常上昇より大きくなる */
+const LEVEL_MAX_BONUS_MULTIPLIER = 2.5;
+
 function pick<T>(items: T[], rng: () => number): T {
   return items[Math.floor(rng() * items.length)];
 }
 
-function rollStatValue(type: StatType, star: EquipStar, ratio: number, rng: () => number): number {
-  const base = STAT_BASE_VALUE[type] * STAR_GROWTH[star] * ratio;
-  const variance = 0.85 + rng() * 0.3; // 0.85〜1.15倍のばらつき
-  const raw = base * variance;
+function roundStatValue(type: StatType, raw: number): number {
   if (FLAT_STAT_TYPES.has(type)) {
     return Math.max(1, Math.round(raw));
   }
   return Math.round(raw * 1000) / 1000;
+}
+
+function rollStatValue(type: StatType, star: EquipStar, ratio: number, rng: () => number): number {
+  const base = STAT_BASE_VALUE[type] * STAR_INITIAL_MULTIPLIER[star] * ratio;
+  const variance = 0.85 + rng() * 0.3; // 0.85〜1.15倍のばらつき
+  return roundStatValue(type, base * variance);
+}
+
+/** 強化レベルが1上がったときにメインステータスへ加算される量(15レベル到達時のみ大きく増える) */
+function mainStatLevelIncrement(type: StatType, star: EquipStar, reachedLevel: number): number {
+  const base = STAT_BASE_VALUE[type] * STAR_LEVEL_GROWTH_RATE[star];
+  const bonus = reachedLevel === EQUIP_MAX_LEVEL ? LEVEL_MAX_BONUS_MULTIPLIER : 1;
+  return roundStatValue(type, base * bonus);
 }
 
 export interface GenerateEquipmentOptions {
@@ -131,7 +180,7 @@ export interface GenerateEquipmentOptions {
   rng?: () => number;
 }
 
-/** 装備を1つ生成する。スロット未指定ならランダムに決まる */
+/** 装備を1つ生成する(強化レベル0)。スロット未指定ならランダムに決まる */
 export function generateEquipment(options: GenerateEquipmentOptions): Equipment {
   const rng = options.rng ?? Math.random;
   const slot = options.slot ?? pick(EQUIP_SLOTS, rng);
@@ -141,7 +190,7 @@ export function generateEquipment(options: GenerateEquipmentOptions): Equipment 
   const mainStat: StatRoll = { type: mainType, value: rollStatValue(mainType, star, 1, rng) };
 
   const subCandidates = STAT_TYPES.filter((t) => t !== mainType);
-  const subCount = Math.max(0, Math.min(4, options.subStatCount));
+  const subCount = Math.max(0, Math.min(MAX_SUB_STATS, options.subStatCount));
   const subStats: StatRoll[] = [];
   const pool = [...subCandidates];
   for (let i = 0; i < subCount && pool.length > 0; i += 1) {
@@ -150,7 +199,48 @@ export function generateEquipment(options: GenerateEquipmentOptions): Equipment 
     subStats.push({ type, value: rollStatValue(type, star, SUB_STAT_RATIO, rng) });
   }
 
-  return { id: generateEquipmentId(), slot, star, mainStat, subStats };
+  return { id: generateEquipmentId(), slot, star, level: 0, mainStat, subStats };
+}
+
+export function canEnhanceEquipment(equipment: Equipment): boolean {
+  return equipment.level < EQUIP_MAX_LEVEL;
+}
+
+/** 装備を1レベル強化するのに必要なゴールド */
+export function enhanceEquipmentCost(equipment: Equipment): number {
+  return Math.round(30 * (equipment.level + 1) * equipment.star);
+}
+
+/**
+ * 装備を1レベル強化する(呼び出し前に canEnhanceEquipment で確認すること)。
+ * メインステータスは毎レベル上昇し、15レベル到達時は1〜14レベルより大きく上昇する。
+ * 3・6・9・12・15レベル到達時は、サブステータスが4個未満ならランダムで1個追加され、
+ * 既に4個ある場合は既存のサブステータスのうち1つがランダムに強化される。
+ */
+export function enhanceEquipment(equipment: Equipment, rng: () => number = Math.random): boolean {
+  if (!canEnhanceEquipment(equipment)) return false;
+  equipment.level += 1;
+
+  const mainType = equipment.mainStat.type;
+  const increment = mainStatLevelIncrement(mainType, equipment.star, equipment.level);
+  equipment.mainStat.value = roundStatValue(mainType, equipment.mainStat.value + increment);
+
+  if (SUBSTAT_POWERUP_LEVELS.includes(equipment.level)) {
+    if (equipment.subStats.length < MAX_SUB_STATS) {
+      const usedTypes = new Set([mainType, ...equipment.subStats.map((s) => s.type)]);
+      const pool = STAT_TYPES.filter((t) => !usedTypes.has(t));
+      if (pool.length > 0) {
+        const newType = pick(pool, rng);
+        equipment.subStats.push({ type: newType, value: rollStatValue(newType, equipment.star, SUB_STAT_RATIO, rng) });
+      }
+    } else {
+      const target = equipment.subStats[Math.floor(rng() * equipment.subStats.length)];
+      const boost = rollStatValue(target.type, equipment.star, SUB_STAT_RATIO, rng);
+      target.value = roundStatValue(target.type, target.value + boost);
+    }
+  }
+
+  return true;
 }
 
 /** 装備リストの全ステータス加算値をタイプ別に集計する */
