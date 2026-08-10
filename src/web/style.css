@@ -697,6 +697,12 @@ body {
   font-size: 1.1rem;
 }
 
+.equip-detail__level {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
 .equip-detail__main {
   font-weight: 700;
 }

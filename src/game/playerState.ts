@@ -1,4 +1,4 @@
-import { Equipment, EquipSlot } from "../core/equipment.js";
+import { Equipment, EquipSlot, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost } from "../core/equipment.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
 
@@ -32,9 +32,12 @@ export function createInitialState(): PlayerState {
   };
 }
 
-/** 旧バージョンのセーブデータ(装備システム導入前)を読み込んでも壊れないよう不足フィールドを補う */
+/** 旧バージョンのセーブデータ(装備システム・強化レベル導入前)を読み込んでも壊れないよう不足フィールドを補う */
 function normalizeState(state: PlayerState): PlayerState {
   if (!state.equipment) state.equipment = [];
+  for (const equipment of state.equipment) {
+    if (typeof equipment.level !== "number") equipment.level = 0;
+  }
   for (const monster of state.monsters) {
     if (!monster.equipment) monster.equipment = {};
   }
@@ -123,4 +126,23 @@ export function unequipFromMonster(state: PlayerState, monsterId: string, slot: 
 
 export function getEquipmentById(state: PlayerState, equipmentId: string): Equipment | undefined {
   return state.equipment.find((e) => e.id === equipmentId);
+}
+
+export interface EnhanceResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/** 所持ゴールドを消費して装備を1レベル強化する */
+export function tryEnhanceEquipment(state: PlayerState, equipmentId: string, rng?: () => number): EnhanceResult {
+  const equipment = state.equipment.find((e) => e.id === equipmentId);
+  if (!equipment) return { ok: false, reason: "装備が見つかりません" };
+  if (!canEnhanceEquipment(equipment)) return { ok: false, reason: "最大強化レベルに達しています" };
+
+  const cost = enhanceEquipmentCost(equipment);
+  if (state.gold < cost) return { ok: false, reason: "ゴールドが足りません" };
+
+  state.gold -= cost;
+  enhanceEquipment(equipment, rng);
+  return { ok: true };
 }
