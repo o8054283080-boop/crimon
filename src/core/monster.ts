@@ -3,13 +3,19 @@ import { CombatModifiers } from "./equipment.js";
 import { Skill } from "./skill.js";
 import { Stats, cloneStats } from "./stats.js";
 
-/** モンスターの「原型」。6属性の色違いバリエーションのベースとなる */
+/**
+ * モンスターの「原型」。6属性の色違いバリエーションのベースとなる。
+ * スキル1(クールタイム無しの通常攻撃)は全属性共通だが、スキル2・3は属性ごとに
+ * 異なる組み合わせになるよう、それぞれ候補(通常3種類)から属性に応じて1つ選ばれる。
+ */
 export interface MonsterTemplate {
   templateId: string;
   baseName: string;
   role: string;
   baseStats: Stats;
-  skills: [Skill, Skill, Skill];
+  skill1: Skill;
+  skill2Variants: Skill[];
+  skill3Variants: Skill[];
 }
 
 /** 属性ごとの色違いバリエーションとして実体化されたモンスター定義(静的データ) */
@@ -39,8 +45,16 @@ const ELEMENT_STAT_FLAVOR: Record<Element, (stats: Stats) => Stats> = {
   DARK: (s) => ({ ...s, criDmg: s.criDmg + 0.2 }),
 };
 
+/** 属性(ELEMENTS配列中の並び順)に応じて、スキル候補の中から1つを決定的に選ぶ */
+function pickSkillVariant(variants: Skill[], element: Element): Skill {
+  const index = ELEMENTS.indexOf(element) % variants.length;
+  return variants[index];
+}
+
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
   const flavoredStats = ELEMENT_STAT_FLAVOR[element](cloneStats(template.baseStats));
+  const skill2 = pickSkillVariant(template.skill2Variants, element);
+  const skill3 = pickSkillVariant(template.skill3Variants, element);
   return {
     id: `${template.templateId}_${element}`,
     templateId: template.templateId,
@@ -49,7 +63,7 @@ export function createMonsterVariant(template: MonsterTemplate, element: Element
     color: ELEMENT_COLOR[element],
     role: template.role,
     stats: flavoredStats,
-    skills: template.skills,
+    skills: [template.skill1, skill2, skill3],
   };
 }
 
