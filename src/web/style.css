@@ -761,6 +761,15 @@ body {
   margin-top: 4px;
 }
 
+.skill-row__effects {
+  font-size: 0.82rem;
+  color: var(--hp-high);
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .equip-dungeon__warning {
   color: #ffd166;
   font-weight: 700;
