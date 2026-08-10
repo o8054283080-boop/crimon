@@ -82,6 +82,22 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
   return el("div", { className: "equip-slot-grid" }, boxes);
 }
 
+function renderSkillPanel(dex: ReturnType<typeof findMonsterById>): HTMLElement | null {
+  if (!dex) return null;
+
+  const rows = dex.skills.map((skill, i) =>
+    el("div", { className: "skill-row" }, [
+      el("div", { className: "skill-row__header" }, [
+        el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`]),
+        el("span", { className: "skill-row__cooldown" }, [skill.cooldownTurns > 0 ? `CT ${skill.cooldownTurns}ターン` : "CTなし"]),
+      ]),
+      el("div", { className: "skill-row__desc" }, [skill.description]),
+    ]),
+  );
+
+  return el("section", { className: "panel" }, [el("h2", {}, ["スキル"]), ...rows]);
+}
+
 function renderSetBonusPanel(equippedItems: ReturnType<typeof resolveEquippedItems>): HTMLElement | null {
   const active = getActiveSetBonuses(equippedItems);
   if (active.length === 0) return null;
@@ -124,6 +140,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
         ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
     ].filter((n): n is HTMLDivElement => n !== null)),
+    renderSkillPanel(dex),
     el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
     renderSetBonusPanel(equippedItems),
     rankReady

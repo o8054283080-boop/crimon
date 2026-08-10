@@ -723,6 +723,44 @@ body {
   padding: 2px 0;
 }
 
+.skill-row {
+  background: var(--bg-alt);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.skill-row:last-child {
+  margin-bottom: 0;
+}
+
+.skill-row__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-row__name {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.skill-row__cooldown {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  background: var(--panel-border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.skill-row__desc {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
 .equip-dungeon__warning {
   color: #ffd166;
   font-weight: 700;
