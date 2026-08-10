@@ -67,25 +67,32 @@ function winRate(
   return wins / trials;
 }
 
-describe("装備ダンジョンの難易度(星5装備+星5モンスターが実質必須になっているか)", () => {
-  it("装備なしの星5パーティは1階にほとんど勝てない", () => {
-    const rate = winRate(1, 5, 50, null, 0, 60);
+describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで挑める、10階は星6装備クラスが必要)", () => {
+  it("星1Lv1の未装備パーティは1階にほとんど勝てない(最低限の育成は必要)", () => {
+    const rate = winRate(1, 1, 1, null, 0, 60);
     expect(rate).toBeLessThan(0.15);
   });
 
-  it("星4装備をフル装備した星5パーティでも1階の勝率は低い", () => {
-    const rate = winRate(1, 5, 50, 4, 2, 120);
-    expect(rate).toBeLessThan(0.3);
+  it("星3モンスターでも未装備では1階の勝率は低い(装備が意味を持つ)", () => {
+    const rate = winRate(1, 3, 30, null, 0, 60);
+    expect(rate).toBeLessThan(0.2);
   });
 
-  it("星5装備をフル装備した星5パーティは1階を高い勝率でクリアできる", () => {
-    const rate = winRate(1, 5, 50, 5, 2, 120);
+  it("星3モンスターに星1装備をフル装備すれば1階を高い勝率でクリアできる", () => {
+    const rate = winRate(1, 3, 30, 1, 2, 120);
     expect(rate).toBeGreaterThan(0.6);
   });
 
+  it("10階は星5装備フルでもまだ足りず、星6装備クラスでようやく勝てる", () => {
+    const star5Rate = winRate(10, 5, 50, 5, 2, 100);
+    const star6Rate = winRate(10, 5, 50, 6, 2, 100);
+    expect(star5Rate).toBeLessThan(0.2);
+    expect(star6Rate).toBeGreaterThan(0.4);
+  });
+
   it("同じ星5装備フル装備でも、10階は1階よりはっきり難しい", () => {
-    const floor1Rate = winRate(1, 5, 50, 5, 4, 100);
-    const floor10Rate = winRate(10, 5, 50, 5, 4, 100);
+    const floor1Rate = winRate(1, 5, 50, 5, 4, 60);
+    const floor10Rate = winRate(10, 5, 50, 5, 4, 60);
     expect(floor10Rate).toBeLessThan(floor1Rate);
   });
 

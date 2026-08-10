@@ -104,18 +104,23 @@ describe("装備ダンジョンのボーナスドロップ", () => {
   });
 });
 
-describe("星6ドロップ率の引き下げ", () => {
-  it("7〜10階の星6排出重みは、以前の値(25/35/50/68)のおよそ半分になっている", () => {
-    const previousStar6Weights: Record<number, number> = { 7: 25, 8: 35, 9: 50, 10: 68 };
-    for (const [floorStr, prevWeight] of Object.entries(previousStar6Weights)) {
-      const floor = Number(floorStr);
-      const weights = DUNGEON_FLOOR_STAR_WEIGHTS[floor];
-      const total = weights.reduce((sum, w) => sum + w.weight, 0);
-      const star6 = weights.find((w) => w.value === 6)!;
-      const star6Percent = (star6.weight / total) * 100;
-      expect(star6Percent).toBeGreaterThan(prevWeight / 2 - 5);
-      expect(star6Percent).toBeLessThan(prevWeight / 2 + 5);
+describe("装備ダンジョンのドロップは渋め(高難易度の割に高星装備は出にくい)", () => {
+  it("星6は7〜10階でしか出現せず、10階でも半分未満の出現率にとどまる", () => {
+    for (let floor = 1; floor <= 6; floor++) {
+      const stars = DUNGEON_FLOOR_STAR_WEIGHTS[floor].map((w) => w.value);
+      expect(stars).not.toContain(6);
     }
+    const weights = DUNGEON_FLOOR_STAR_WEIGHTS[10];
+    const total = weights.reduce((sum, w) => sum + w.weight, 0);
+    const star6Percent = (weights.find((w) => w.value === 6)!.weight / total) * 100;
+    expect(star6Percent).toBeLessThan(50);
+  });
+
+  it("1階は星1の出現率が過半数を占めるくらい渋い(1階の攻略難易度が下がった分、もらえる装備の質は低め)", () => {
+    const weights = DUNGEON_FLOOR_STAR_WEIGHTS[1];
+    const total = weights.reduce((sum, w) => sum + w.weight, 0);
+    const star1Percent = (weights.find((w) => w.value === 1)!.weight / total) * 100;
+    expect(star1Percent).toBeGreaterThan(50);
   });
 });
 
