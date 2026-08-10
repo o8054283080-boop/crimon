@@ -9,9 +9,16 @@ export interface PlayerState {
   partyIds: string[];
   clearedStageIds: string[];
   equipment: Equipment[];
+  /** 装備ダンジョン専用のパーティ編成(通常ステージのpartyIdsとは別枠、最大5体) */
+  dungeonPartyIds: string[];
+  /** 召喚の書の所持数。1個消費すると石を使わずに1回分の召喚ができる */
+  summonScrolls: number;
 }
 
 const STORAGE_KEY = "crimon_save_v1";
+
+/** 装備ダンジョン専用パーティの最大人数(通常ステージの4体より1体多い) */
+export const MAX_DUNGEON_PARTY_SIZE = 5;
 
 const STARTER_MONSTERS: { templateId: string; element: string }[] = [
   { templateId: "slime", element: "FIRE" },
@@ -29,6 +36,8 @@ export function createInitialState(): PlayerState {
     partyIds: monsters.map((m) => m.id),
     clearedStageIds: [],
     equipment: [],
+    dungeonPartyIds: [],
+    summonScrolls: 0,
   };
 }
 
@@ -42,7 +51,7 @@ function deterministicSetFromId(id: string): Equipment["set"] {
   return SET_TYPES[index];
 }
 
-/** 旧バージョンのセーブデータ(装備システム・強化レベル・セット導入前)を読み込んでも壊れないよう不足フィールドを補う */
+/** 旧バージョンのセーブデータ(装備システム・強化レベル・セット・ダンジョン専用パーティ・召喚の書導入前)を読み込んでも壊れないよう不足フィールドを補う */
 function normalizeState(state: PlayerState): PlayerState {
   if (!state.equipment) state.equipment = [];
   for (const equipment of state.equipment) {
@@ -52,6 +61,8 @@ function normalizeState(state: PlayerState): PlayerState {
   for (const monster of state.monsters) {
     if (!monster.equipment) monster.equipment = {};
   }
+  if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
+  if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   return state;
 }
 
@@ -81,12 +92,30 @@ export function removeMonsters(state: PlayerState, instanceIds: readonly string[
   const idSet = new Set(instanceIds);
   state.monsters = state.monsters.filter((m) => !idSet.has(m.id));
   state.partyIds = state.partyIds.filter((id) => !idSet.has(id));
+  state.dungeonPartyIds = state.dungeonPartyIds.filter((id) => !idSet.has(id));
 }
 
 export function getParty(state: PlayerState): MonsterInstance[] {
   return state.partyIds
     .map((id) => state.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
+}
+
+export function getDungeonParty(state: PlayerState): MonsterInstance[] {
+  return state.dungeonPartyIds
+    .map((id) => state.monsters.find((m) => m.id === id))
+    .filter((m): m is MonsterInstance => m !== undefined);
+}
+
+/** 装備ダンジョン専用パーティにモンスターを追加/除外する(最大5体まで) */
+export function toggleDungeonPartyMember(state: PlayerState, instanceId: string): void {
+  const idx = state.dungeonPartyIds.indexOf(instanceId);
+  if (idx >= 0) {
+    state.dungeonPartyIds.splice(idx, 1);
+    return;
+  }
+  if (state.dungeonPartyIds.length >= MAX_DUNGEON_PARTY_SIZE) return;
+  state.dungeonPartyIds.push(instanceId);
 }
 
 export function isStageCleared(state: PlayerState, stageId: string): boolean {
@@ -156,4 +185,15 @@ export function tryEnhanceEquipment(state: PlayerState, equipmentId: string, rng
   state.gold -= cost;
   enhanceEquipment(equipment, rng);
   return { ok: true };
+}
+
+export function addSummonScrolls(state: PlayerState, count = 1): void {
+  state.summonScrolls += count;
+}
+
+/** 召喚の書を1個消費できるなら消費してtrueを返す(石を使わずに1回分の召喚権を得る) */
+export function tryUseSummonScroll(state: PlayerState): boolean {
+  if (state.summonScrolls <= 0) return false;
+  state.summonScrolls -= 1;
+  return true;
 }

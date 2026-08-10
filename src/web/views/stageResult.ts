@@ -18,6 +18,8 @@ export interface StageResultInfo {
   dropDexId: string | null;
   dropStar: number | null;
   equipmentDrop: Equipment | null;
+  /** 召喚の書がドロップしたか(装備ダンジョン限定) */
+  summonScrollDropped?: boolean;
 }
 
 export interface StageResultProps {
@@ -53,6 +55,9 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
             el("div", { className: "summon-card__star" }, ["★".repeat(info.dropStar)]),
           ]),
         ])
+      : null,
+    info.summonScrollDropped
+      ? el("section", { className: "panel" }, [el("h2", {}, ["召喚の書を入手！"]), el("p", {}, ["📜 召喚画面から消費して1回分の召喚ができます。"])])
       : null,
     info.equipmentDrop
       ? el("section", { className: "panel" }, [

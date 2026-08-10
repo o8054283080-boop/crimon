@@ -10,7 +10,8 @@ export type ScreenName =
   | "BATTLE"
   | "STAGE_RESULT"
   | "EQUIP_DUNGEON"
-  | "DUNGEON_BATTLE";
+  | "DUNGEON_BATTLE"
+  | "DUNGEON_PARTY";
 
 const TABS: { screen: ScreenName; icon: string; label: string }[] = [
   { screen: "HOME", icon: "🏠", label: "ホーム" },

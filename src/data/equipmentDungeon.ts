@@ -1,7 +1,7 @@
 import { Element } from "../core/element.js";
-import { DUNGEON_FLOOR_COUNT, Equipment, generateDungeonEquipment, getDungeonFloorDropRates } from "../core/equipment.js";
+import { DUNGEON_FLOOR_COUNT, Equipment, generateDungeonEquipment } from "../core/equipment.js";
 import { Star } from "../core/rarity.js";
-import { MONSTER_TEMPLATES } from "./monsters.js";
+import { MONSTER_TEMPLATES, REINCARNATION_PIG_DEX } from "./monsters.js";
 
 export interface DungeonEnemy {
   templateId: string;
@@ -57,4 +57,22 @@ export function rollDungeonEquipment(floor: DungeonFloor, rng: () => number = Ma
   return generateDungeonEquipment(floor.floor, rng);
 }
 
-export { getDungeonFloorDropRates };
+/** 召喚の書の階層共通ドロップ率 */
+export const SUMMON_SCROLL_DROP_RATE = 0.05;
+/** 転生ピッグがドロップする階層(10階のみ) */
+export const REINCARNATION_PIG_DROP_FLOOR = 10;
+/** 転生ピッグのドロップ率(対象階層でのみ判定) */
+export const REINCARNATION_PIG_DROP_RATE = 0.1;
+
+/** 装備ドロップとは独立して、低確率で召喚の書もドロップする(全階層共通) */
+export function rollDungeonSummonScroll(rng: () => number = Math.random): boolean {
+  return rng() < SUMMON_SCROLL_DROP_RATE;
+}
+
+/** 10階クリア時のみ、低確率で転生ピッグ(星3・Lv30固定)がドロップする。ドロップしなければnull */
+export function rollDungeonReincarnationPig(floor: DungeonFloor, rng: () => number = Math.random): string | null {
+  if (floor.floor !== REINCARNATION_PIG_DROP_FLOOR) return null;
+  if (rng() >= REINCARNATION_PIG_DROP_RATE) return null;
+  const variant = REINCARNATION_PIG_DEX[Math.floor(rng() * REINCARNATION_PIG_DEX.length)];
+  return variant.id;
+}

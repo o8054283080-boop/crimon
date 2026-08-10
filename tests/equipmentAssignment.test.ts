@@ -11,7 +11,7 @@ import {
 } from "../src/game/playerState.js";
 
 function makeState(): PlayerState {
-  return { crystal: 0, gold: 0, monsters: [], partyIds: [], clearedStageIds: [], equipment: [] };
+  return { crystal: 0, gold: 0, monsters: [], partyIds: [], clearedStageIds: [], equipment: [], dungeonPartyIds: [], summonScrolls: 0 };
 }
 
 describe("装備の装着・解除", () => {
