@@ -1,8 +1,6 @@
-import { MonsterInstance, starLabel } from "../../core/monsterInstance.js";
-import { STAR_MAX_LEVEL } from "../../core/rarity.js";
-import { findMonsterById } from "../../data/monsters.js";
 import { MAX_DUNGEON_PARTY_SIZE, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { partyMemberCard, renderPartySlots } from "./partyCard.js";
 
 export interface DungeonPartyProps {
   player: PlayerState;
@@ -10,28 +8,13 @@ export interface DungeonPartyProps {
   onBack: () => void;
 }
 
-function card(instance: MonsterInstance, selected: boolean, onClick: () => void): HTMLElement {
-  const dex = findMonsterById(instance.dexId);
-  const maxLevel = STAR_MAX_LEVEL[instance.star];
-  return el(
-    "button",
-    {
-      type: "button",
-      className: "monster-card" + (selected ? " monster-card--selected" : ""),
-      onclick: onClick,
-    },
-    [
-      el("div", { className: "monster-card__avatar", style: dex ? `background:${dex.color}` : undefined }, []),
-      el("div", { className: "monster-card__name" }, [dex ? dex.name : instance.dexId]),
-      el("div", { className: "monster-card__meta" }, [`${starLabel(instance.star)} Lv${instance.level}/${maxLevel}`]),
-    ],
-  );
-}
-
 export function renderDungeonParty(props: DungeonPartyProps): HTMLElement {
   const { player, onToggleMember, onBack } = props;
+  const activeMembers = player.dungeonPartyIds
+    .map((id) => player.monsters.find((m) => m.id === id))
+    .filter((m): m is NonNullable<typeof m> => m !== undefined);
   const cards = player.monsters.map((instance) =>
-    card(instance, player.dungeonPartyIds.includes(instance.id), () => onToggleMember(instance.id)),
+    partyMemberCard(instance, player.dungeonPartyIds.includes(instance.id), () => onToggleMember(instance.id)),
   );
 
   return el("div", { className: "screen party-screen" }, [
@@ -40,6 +23,10 @@ export function renderDungeonParty(props: DungeonPartyProps): HTMLElement {
       el("p", { className: "app-subtitle" }, [
         `${player.dungeonPartyIds.length} / ${MAX_DUNGEON_PARTY_SIZE} 体編成中(タップで編成/解除)。通常ステージのパーティとは別枠です。`,
       ]),
+    ]),
+    el("section", { className: "panel" }, [
+      el("h2", {}, ["現在編成中のメンバー"]),
+      renderPartySlots(activeMembers, MAX_DUNGEON_PARTY_SIZE),
     ]),
     el("section", { className: "panel" }, [
       player.monsters.length === 0

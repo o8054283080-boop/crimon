@@ -28,13 +28,20 @@ describe("スキル2・3の属性別バリエーション", () => {
     }
   });
 
-  it("同じ属性同士は同じスキル2・3の組み合わせになる(決定的)", () => {
+  it("同じ属性は常に同じスキル2・3の組み合わせになる(決定的)", () => {
     for (const template of MONSTER_TEMPLATES) {
-      const fireVariant = findMonster(template.templateId, "FIRE")!;
-      const waterVariant = findMonster(template.templateId, "WATER")!;
-      // FIRE(index0)とWATER(index3)は index%3 が同じ(0)になる想定
-      expect(fireVariant.skills[1].id).toBe(waterVariant.skills[1].id);
-      expect(fireVariant.skills[2].id).toBe(waterVariant.skills[2].id);
+      const first = findMonster(template.templateId, "FIRE")!;
+      const second = findMonster(template.templateId, "FIRE")!;
+      expect(first.skills[1].id).toBe(second.skills[1].id);
+      expect(first.skills[2].id).toBe(second.skills[2].id);
+    }
+  });
+
+  it("6属性すべてで(スキル2, スキル3)の組み合わせが重複しない(同種族で技構成が丸かぶりする2体が出ない)", () => {
+    for (const template of MONSTER_TEMPLATES) {
+      const variants = ELEMENTS.map((element) => findMonster(template.templateId, element)!);
+      const combos = variants.map((v) => `${v.skills[1].id}|${v.skills[2].id}`);
+      expect(new Set(combos).size).toBe(ELEMENTS.length);
     }
   });
 

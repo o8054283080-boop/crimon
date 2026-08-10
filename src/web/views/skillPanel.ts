@@ -26,3 +26,28 @@ export function renderSkillRows(skills: readonly Skill[], levels?: readonly numb
     ]);
   });
 }
+
+/** 図鑑用: スキルレベルを上げると何がどう変わるかを、Lv.1/Lv.4/Lv.5の実効値を並べて見せるプレビュー行 */
+const GROWTH_PREVIEW_LEVELS = [1, 4, 5] as const;
+
+export function renderSkillGrowthRows(skills: readonly Skill[]): HTMLElement[] {
+  return skills.map((skill, i) => {
+    const previewRows = GROWTH_PREVIEW_LEVELS.map((level) => {
+      const leveled = computeLeveledSkill(skill, level);
+      const cooldownText = leveled.cooldownTurns > 0 ? `CT ${leveled.cooldownTurns}ターン` : "CTなし";
+      const effectText = leveled.effects.map((effect) => describeSkillEffect(effect)).join(" / ");
+      const levelLabel = level === 1 ? "Lv.1(初期)" : level === MAX_SKILL_LEVEL ? `Lv.${level}(最大)` : `Lv.${level}`;
+
+      return el("div", { className: "skill-growth-row" }, [
+        el("span", { className: "skill-growth-row__level" }, [levelLabel]),
+        el("span", { className: "skill-growth-row__value" }, [`${effectText} (${cooldownText})`]),
+      ]);
+    });
+
+    return el("div", { className: "skill-row" }, [
+      el("div", { className: "skill-row__header" }, [el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`])]),
+      el("div", { className: "skill-row__desc" }, [skill.description]),
+      el("div", { className: "skill-growth" }, previewRows),
+    ]);
+  });
+}

@@ -77,4 +77,16 @@ describe("モンスター図鑑データ", () => {
     expect(dex).toBeDefined();
     expect(dex?.id).toBe(MONSTER_TEMPLATES_DEX[0].id);
   });
+
+  it("全モンスター(転生ピッグ含む)に仮アイコンの絵文字が設定されている", () => {
+    for (const dex of [...MONSTER_TEMPLATES_DEX, ...REINCARNATION_PIG_DEX]) {
+      expect(dex.emoji.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("種族が同じなら属性が違っても同じ絵文字になる(色違いフレーバー)", () => {
+    const fireSlime = findMonsterById("slime_FIRE")!;
+    const waterSlime = findMonsterById("slime_WATER")!;
+    expect(fireSlime.emoji).toBe(waterSlime.emoji);
+  });
 });

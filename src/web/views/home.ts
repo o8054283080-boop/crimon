@@ -1,8 +1,7 @@
-import { findMonsterById } from "../../data/monsters.js";
 import { MAX_FIGHTER_LEVEL, requiredExpForFighterLevel } from "../../core/fighterLevel.js";
-import { starLabel } from "../../core/monsterInstance.js";
 import { getParty, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { renderPartySlots } from "./partyCard.js";
 
 export interface HomeProps {
   player: PlayerState;
@@ -15,17 +14,6 @@ export interface HomeProps {
 export function renderHome(props: HomeProps): HTMLElement {
   const { player, onGoSummon, onGoStages, onGoParty, onGoEquipDungeon } = props;
   const party = getParty(player);
-
-  const partySlots = Array.from({ length: 4 }, (_, i) => {
-    const instance = party[i];
-    if (!instance) {
-      return el("div", { className: "party-slot party-slot--empty" }, ["+"]);
-    }
-    const dex = findMonsterById(instance.dexId);
-    return el("div", { className: "party-slot", style: dex ? `background:${dex.color}` : undefined }, [
-      el("span", { className: "party-slot__star" }, [starLabel(instance.star)]),
-    ]);
-  });
 
   const isMaxFighterLevel = player.fighterLevel >= MAX_FIGHTER_LEVEL;
   const fighterExpNeeded = requiredExpForFighterLevel(player.fighterLevel);
@@ -45,7 +33,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     ]),
     el("section", { className: "panel" }, [
       el("div", { className: "panel-header" }, [el("h2", {}, ["現在のパーティ"]), el("button", { type: "button", className: "btn btn--ghost", onclick: onGoParty }, ["編成へ"])]),
-      el("div", { className: "party-slots" }, partySlots),
+      renderPartySlots(party, 4),
     ]),
     el("button", { type: "button", className: "btn btn--primary btn--large", onclick: onGoStages }, ["🗺 ステージに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoSummon }, ["✨ モンスターを召喚する"]),

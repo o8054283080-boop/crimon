@@ -4,6 +4,7 @@ const SLIME: MonsterTemplate = {
   templateId: "slime",
   baseName: "スライム",
   role: "アタッカー",
+  emoji: "🟢",
   baseStats: {
     hp: 1200,
     atk: 120,
@@ -88,6 +89,7 @@ const SLIME: MonsterTemplate = {
 const WOLF: MonsterTemplate = {
   templateId: "wolf",
   baseName: "ウルフ",
+  emoji: "🐺",
   role: "アタッカー",
   baseStats: {
     hp: 1050,
@@ -176,6 +178,7 @@ const WOLF: MonsterTemplate = {
 const GOLEM: MonsterTemplate = {
   templateId: "golem",
   baseName: "ゴーレム",
+  emoji: "🗿",
   role: "ディフェンダー",
   baseStats: {
     hp: 1600,
@@ -255,6 +258,7 @@ const GOLEM: MonsterTemplate = {
 const FAIRY: MonsterTemplate = {
   templateId: "fairy",
   baseName: "フェアリー",
+  emoji: "🧚",
   role: "ヒーラー",
   baseStats: {
     hp: 950,
@@ -346,6 +350,7 @@ export const MONSTER_TEMPLATES: MonsterTemplate[] = [SLIME, WOLF, GOLEM, FAIRY];
 export const REINCARNATION_PIG: MonsterTemplate = {
   templateId: "reincarnation_pig",
   baseName: "転生ピッグ",
+  emoji: "🐷",
   role: "素材",
   baseStats: {
     hp: 200,

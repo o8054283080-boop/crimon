@@ -76,7 +76,8 @@ describe("BattleEngine 4vs4", () => {
 
   it("片方のチームが全滅した時点でそのチームの敗北になる", () => {
     const strongDef = findMonster("wolf", "FIRE")!;
-    const weakDef = findMonster("fairy", "WATER")!;
+    // GRASSはFIREに弱い(1.5倍ダメージ)属性なので、fairyの回復スキルがあっても押し切れる組み合わせ
+    const weakDef = findMonster("fairy", "GRASS")!;
 
     const playerTeam = [strongDef, strongDef, strongDef, strongDef];
     const enemyTeam = [weakDef, weakDef, weakDef, weakDef];
