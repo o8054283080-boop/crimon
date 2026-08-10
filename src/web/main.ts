@@ -41,7 +41,7 @@ import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderHome } from "./views/home.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderMonsters } from "./views/monsters.js";
-import { renderParty } from "./views/party.js";
+import { PartyEditMode, renderParty } from "./views/party.js";
 import { renderSkillTraining } from "./views/skillTraining.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
@@ -81,6 +81,7 @@ interface AppState {
   selectedDexEntryId: string | null;
   skillTrainingTargetId: string | null;
   skillTrainingMaterialIds: string[];
+  partyEditMode: PartyEditMode;
 }
 
 const state: AppState = {
@@ -100,6 +101,7 @@ const state: AppState = {
   selectedDexEntryId: null,
   skillTrainingTargetId: null,
   skillTrainingMaterialIds: [],
+  partyEditMode: "NORMAL",
 };
 
 const rootCandidate = document.getElementById("app");
@@ -482,7 +484,20 @@ function render(): void {
       break;
 
     case "PARTY":
-      content = renderParty({ player: state.player, onToggleParty: handleToggleParty });
+      content = renderParty({
+        player: state.player,
+        mode: state.partyEditMode,
+        onSetMode: (mode) => {
+          state.partyEditMode = mode;
+          render();
+        },
+        onToggleParty: handleToggleParty,
+        onToggleDungeonMember: (id) => {
+          toggleDungeonPartyMember(state.player, id);
+          savePlayerState(state.player);
+          render();
+        },
+      });
       break;
 
     case "STAGES":

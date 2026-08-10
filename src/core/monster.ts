@@ -12,6 +12,8 @@ export interface MonsterTemplate {
   templateId: string;
   baseName: string;
   role: string;
+  /** 専用アイコン画像が入るまでの仮アイコン(絵文字) */
+  emoji: string;
   baseStats: Stats;
   skill1: Skill;
   skill2Variants: Skill[];
@@ -26,6 +28,8 @@ export interface MonsterDefinition {
   element: Element;
   color: string;
   role: string;
+  /** 専用アイコン画像が入るまでの仮アイコン(絵文字) */
+  emoji: string;
   stats: Stats;
   skills: [Skill, Skill, Skill];
   /** 装備セット由来の戦闘専用効果。装備なし(敵など)ではundefined */
@@ -45,16 +49,25 @@ const ELEMENT_STAT_FLAVOR: Record<Element, (stats: Stats) => Stats> = {
   DARK: (s) => ({ ...s, criDmg: s.criDmg + 0.2 }),
 };
 
-/** 属性(ELEMENTS配列中の並び順)に応じて、スキル候補の中から1つを決定的に選ぶ */
-function pickSkillVariant(variants: Skill[], element: Element): Skill {
-  const index = ELEMENTS.indexOf(element) % variants.length;
+/**
+ * 属性(ELEMENTS配列中の並び順)に応じて、スキル候補の中から1つを決定的に選ぶ。
+ * candidateCountより属性数が多い場合、単純な剰余だけだと複数の属性が同じ添字に
+ * 揃ってしまう(例: 候補3種×属性6なら2属性ずつ完全に同じ組み合わせになる)。
+ * groupOffsetを1にすると、2周目以降の属性ではさらに1つずらした添字を使うため、
+ * skill2とskill3を異なるgroupOffsetで選べば、6属性すべてで(skill2, skill3)の
+ * 組み合わせが重複しなくなる。
+ */
+function pickSkillVariant(variants: Skill[], element: Element, groupOffset: number): Skill {
+  const elementIndex = ELEMENTS.indexOf(element);
+  const group = Math.floor(elementIndex / variants.length);
+  const index = (elementIndex + group * groupOffset) % variants.length;
   return variants[index];
 }
 
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
   const flavoredStats = ELEMENT_STAT_FLAVOR[element](cloneStats(template.baseStats));
-  const skill2 = pickSkillVariant(template.skill2Variants, element);
-  const skill3 = pickSkillVariant(template.skill3Variants, element);
+  const skill2 = pickSkillVariant(template.skill2Variants, element, 0);
+  const skill3 = pickSkillVariant(template.skill3Variants, element, 1);
   return {
     id: `${template.templateId}_${element}`,
     templateId: template.templateId,
@@ -62,6 +75,7 @@ export function createMonsterVariant(template: MonsterTemplate, element: Element
     element,
     color: ELEMENT_COLOR[element],
     role: template.role,
+    emoji: template.emoji,
     stats: flavoredStats,
     skills: [template.skill1, skill2, skill3],
   };

@@ -96,6 +96,30 @@ body {
   margin-left: 4px;
 }
 
+.mode-toggle {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+}
+
+.mode-toggle__btn {
+  appearance: none;
+  border: none;
+  flex: 1;
+  border-radius: 10px;
+  padding: 10px 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--bg-alt);
+  color: var(--text-dim);
+}
+
+.mode-toggle__btn--active {
+  background: var(--accent);
+  color: #0c1020;
+}
+
 .btn {
   appearance: none;
   border: none;
@@ -323,6 +347,7 @@ body {
 }
 
 .party-slot {
+  position: relative;
   aspect-ratio: 1;
   border-radius: 14px;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
@@ -341,7 +366,17 @@ body {
   box-shadow: inset 0 0 0 2px var(--panel-border);
 }
 
+.party-slot__emoji {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.4rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
 .party-slot__star {
+  position: relative;
   font-size: 0.62rem;
   color: #fffbe0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
@@ -383,6 +418,17 @@ body {
   height: 40px;
   border-radius: 50%;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.monster-card__badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--accent);
 }
 
 .monster-card__name {
@@ -421,6 +467,11 @@ body {
   height: 96px;
   border-radius: 50%;
   box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  line-height: 1;
 }
 
 .monster-detail__star {
@@ -768,6 +819,31 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.skill-growth {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skill-growth-row {
+  display: flex;
+  gap: 8px;
+  font-size: 0.78rem;
+  align-items: baseline;
+}
+
+.skill-growth-row__level {
+  flex: 0 0 auto;
+  min-width: 68px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.skill-growth-row__value {
+  color: var(--hp-high);
 }
 
 .equip-dungeon__warning {
