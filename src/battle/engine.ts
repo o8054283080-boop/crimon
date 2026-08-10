@@ -20,10 +20,27 @@ const GAUGE_EPSILON = 1e-6;
 
 export type BattleWinner = "PLAYER" | "ENEMY" | "DRAW";
 
+export interface UnitSnapshot {
+  instanceId: string;
+  team: Team;
+  currentHp: number;
+  maxHp: number;
+  gauge: number;
+  alive: boolean;
+}
+
+/** ユニット1体の1手番分の記録。UIでのアニメーション再生に使う */
+export interface TurnRecord {
+  actorId: string;
+  lines: string[];
+  snapshot: UnitSnapshot[];
+}
+
 export interface BattleResult {
   winner: BattleWinner;
   log: string[];
   turnsTaken: number;
+  turns: TurnRecord[];
 }
 
 export interface BattleEngineOptions {
@@ -36,6 +53,7 @@ export class BattleEngine {
   private readonly rng: () => number;
   private readonly maxTurns: number;
   private readonly log: string[] = [];
+  private readonly turns: TurnRecord[] = [];
 
   constructor(playerTeam: MonsterDefinition[], enemyTeam: MonsterDefinition[], options: BattleEngineOptions = {}) {
     if (playerTeam.length === 0 || enemyTeam.length === 0) {
@@ -55,7 +73,7 @@ export class BattleEngine {
     while (turnsTaken < this.maxTurns) {
       const winner = this.checkWinner();
       if (winner) {
-        return { winner, log: this.log, turnsTaken };
+        return { winner, log: this.log, turnsTaken, turns: this.turns };
       }
 
       const aliveUnits = this.units.filter((u) => u.alive);
@@ -77,16 +95,34 @@ export class BattleEngine {
 
         const winnerMidLoop = this.checkWinner();
         if (winnerMidLoop) {
-          return { winner: winnerMidLoop, log: this.log, turnsTaken };
+          return { winner: winnerMidLoop, log: this.log, turnsTaken, turns: this.turns };
         }
 
+        const linesBefore = this.log.length;
         this.takeTurn(unit);
+        this.turns.push({
+          actorId: unit.instanceId,
+          lines: this.log.slice(linesBefore),
+          snapshot: this.snapshotUnits(),
+        });
+
         turnsTaken += 1;
         if (turnsTaken >= this.maxTurns) break;
       }
     }
 
-    return { winner: this.checkWinner() ?? "DRAW", log: this.log, turnsTaken };
+    return { winner: this.checkWinner() ?? "DRAW", log: this.log, turnsTaken, turns: this.turns };
+  }
+
+  private snapshotUnits(): UnitSnapshot[] {
+    return this.units.map((u) => ({
+      instanceId: u.instanceId,
+      team: u.team,
+      currentHp: u.currentHp,
+      maxHp: u.maxHp,
+      gauge: Math.round(u.gauge),
+      alive: u.alive,
+    }));
   }
 
   private checkWinner(): BattleWinner | null {

@@ -28,11 +28,13 @@ src/
     unit.ts      戦闘中のユニット状態(HP・ATBゲージ・クールタイム・バフ)
     damage.ts    ダメージ計算(属性相性・防御力・クリティカル)
     ai.ts        スキル選択・対象選択の簡易AI
-    engine.ts    4vs4バトルの本体(ATBループ・スキル実行・ログ生成)
+    engine.ts    4vs4バトルの本体(ATBループ・スキル実行・ログ生成・再生用TurnRecord)
   data/
     monsters.ts  サンプルモンスター(スライム/ウルフ/ゴーレム/フェアリー) × 6属性
   simulate.ts    CLIで4vs4のオートバトルを観戦できるシミュレーター
+  web/           ブラウザ版UI(チーム編成画面・バトル観戦画面・PWA登録)
 tests/           vitest によるユニットテスト
+public/icons/    PWA/ホーム画面アイコン
 ```
 
 ## 使い方
@@ -40,7 +42,12 @@ tests/           vitest によるユニットテスト
 ```bash
 npm install
 
-# 4vs4のオートバトルをコンソールで観戦する
+# ブラウザ版を開発モードで起動(スマホのホーム画面に追加できるPWA)
+npm run dev
+# ビルドしてプレビュー(本番相当のService Worker込みで確認)
+npm run build && npm run preview
+
+# 4vs4のオートバトルをコンソールで観戦する(CLI版)
 npm run battle
 # シード指定で再現可能なバトルにする
 npx tsx src/simulate.ts --seed=42
@@ -51,6 +58,15 @@ npm run typecheck
 # テスト
 npm test
 ```
+
+## スマホのホーム画面に追加する(PWA)
+
+`npm run build && npm run preview` (または実機からアクセス可能な形でホスティング)した上で、スマホのブラウザでURLを開きます。
+
+- **iOS (Safari)**: 共有ボタン → 「ホーム画面に追加」
+- **Android (Chrome)**: メニュー → 「アプリをインストール」/「ホーム画面に追加」(自動でインストールバナーが出ることもあります)
+
+`vite-plugin-pwa` で `manifest.webmanifest` と Service Worker を自動生成しており、アイコン(`public/icons/`)・スタンドアロン表示・オフラインキャッシュに対応しています。PWAとして正しく認識させるには**HTTPS(またはlocalhost)での配信が必須**です。
 
 ## 今後の拡張ポイント
 
