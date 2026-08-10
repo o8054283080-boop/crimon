@@ -78,11 +78,25 @@ function clampLevel(star: Star, level: number, max: Record<Star, number>): numbe
 
 const STAR_MAX: Record<Star, number> = { 1: 15, 2: 20, 3: 30, 4: 40, 5: 50 };
 
-function buildWave(stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
+/**
+ * チャプター3・4では敵の基本星をさらに+1底上げする(星1〜5のレンジに収まるようクランプされる)。
+ * 星の上昇は装備で覆すのが難しいほど重いため、チャプター1・2は据え置き、
+ * 後半チャプターだけ一段階上げるくらいに留めてバランスを取っている。
+ */
+function chapterStarBump(chapter: number): number {
+  return chapter >= 3 ? 1 : 0;
+}
+/** チャプターが1つ上がるごとに敵の実効ステータス倍率(powerScale)がこの分だけ底上げされる。星と違って上限に張り付かず滑らかに調整できるため、章ごとの強さの主な差分はこちらが担う */
+const CHAPTER_POWER_SCALE_STEP = 0.15;
+const POWER_SCALE_MAX = 1.6;
+
+function buildWave(chapter: number, stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
   // 星1のスターターパーティ(Lv1)がステージ1-1から無理なく挑戦できるよう、
-  // レベルは緩やかに(1-1で敵Lv1、1-5ボスでも星2Lv15程度まで)しか上げない。
-  // どのチャプターも同じ難易度カーブ(チャプターはドロップのテーマのみが異なる)。
-  const baseStar = Math.min(2, Math.ceil(stageNumber / 3)) as Star;
+  // チャプター1内はレベルを緩やかに(1-1で敵Lv1、1-5ボスでも星2Lv15程度まで)しか上げない。
+  // チャプター2以降は、その章に入るたびに基本星とpowerScaleが底上げされ、
+  // 章が進むごとにちゃんと敵が強くなっていく(章の中での上がり方自体はチャプター1と同じカーブ)。
+  const localBaseStar = Math.min(2, Math.ceil(stageNumber / 3)) as Star;
+  const baseStar = Math.min(5, localBaseStar + chapterStarBump(chapter)) as Star;
   const baseLevel = 1 + (stageNumber - 1) * 2 + (waveNumber - 1);
 
   const enemies: WaveEnemy[] = MONSTER_TEMPLATES.map((template, i) => {
@@ -107,20 +121,26 @@ function buildWave(stageNumber: number, waveNumber: number, isBossWave: boolean)
   }
 
   // 序盤ステージの敵は少し弱めにして、初心者でも安定して勝てるようにする。
-  // ステージ5でようやく等倍(プレイヤーと五分)になる。
-  const powerScale = Math.min(1, 0.45 + 0.11 * stageNumber);
+  // チャプター1の5ステージ目でようやく等倍(プレイヤーと五分)になり、
+  // チャプター2以降はさらにCHAPTER_POWER_SCALE_STEPずつ上乗せされ、章を追うごとに手強くなる。
+  const localPowerScale = Math.min(1, 0.45 + 0.11 * stageNumber);
+  const powerScale = Math.min(POWER_SCALE_MAX, localPowerScale + CHAPTER_POWER_SCALE_STEP * (chapter - 1));
 
   return { waveNumber, isBossWave, enemies, powerScale };
 }
 
+/** チャプターが1つ上がるごとに、強くなった敵に見合うようウェーブ報酬(ゴールド・経験値)も底上げする */
+const CHAPTER_REWARD_STEP = 0.6;
+
 function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
   const isFinalStage = stageNumber === 5;
-  const waves: Wave[] = [1, 2, 3].map((waveNumber) => buildWave(stageNumber, waveNumber, isFinalStage && waveNumber === 3));
+  const waves: Wave[] = [1, 2, 3].map((waveNumber) => buildWave(theme.chapter, stageNumber, waveNumber, isFinalStage && waveNumber === 3));
+  const chapterRewardMultiplier = 1 + CHAPTER_REWARD_STEP * (theme.chapter - 1);
 
   const rewards: StageRewards = {
-    waveGold: 30 * stageNumber,
-    clearGold: 150 * stageNumber,
-    waveExp: 25 * stageNumber,
+    waveGold: Math.round(30 * stageNumber * chapterRewardMultiplier),
+    clearGold: Math.round(150 * stageNumber * chapterRewardMultiplier),
+    waveExp: Math.round(25 * stageNumber * chapterRewardMultiplier),
     dropRate: CHAPTER_MONSTER_DROP_RATE,
     dropStars: [1],
     dropTemplateId: theme.templateId,

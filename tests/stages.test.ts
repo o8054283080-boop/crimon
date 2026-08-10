@@ -64,7 +64,19 @@ describe("ステージデータ", () => {
       for (let i = 1; i < scales.length; i++) {
         expect(scales[i]).toBeGreaterThanOrEqual(scales[i - 1]);
       }
-      expect(scales[scales.length - 1]).toBeLessThanOrEqual(1);
+    }
+    // チャプター1(スターター向け)はプレイヤーと五分以下(等倍まで)に据え置かれている
+    expect(stagesOf(1)[stagesOf(1).length - 1].waves[0].powerScale).toBeLessThanOrEqual(1);
+  });
+
+  it("チャプターが上がるほど、同じステージ番号でも難易度(星・powerScale)が上がる", () => {
+    for (let stageNumber = 1; stageNumber <= 5; stageNumber++) {
+      const starsByChapter = CHAPTERS.map((c) => stagesOf(c)[stageNumber - 1].waves[0].enemies[0].star);
+      const scalesByChapter = CHAPTERS.map((c) => stagesOf(c)[stageNumber - 1].waves[0].powerScale);
+      for (let i = 1; i < CHAPTERS.length; i++) {
+        expect(starsByChapter[i]).toBeGreaterThanOrEqual(starsByChapter[i - 1]);
+        expect(scalesByChapter[i]).toBeGreaterThan(scalesByChapter[i - 1]);
+      }
     }
   });
 
@@ -73,6 +85,15 @@ describe("ステージデータ", () => {
       const stages = stagesOf(chapter);
       for (let i = 1; i < stages.length; i++) {
         expect(stages[i].rewards.clearGold).toBeGreaterThan(stages[i - 1].rewards.clearGold);
+      }
+    }
+  });
+
+  it("チャプターが上がるほど、同じステージ番号の報酬も大きくなる", () => {
+    for (let stageNumber = 1; stageNumber <= 5; stageNumber++) {
+      const goldByChapter = CHAPTERS.map((c) => stagesOf(c)[stageNumber - 1].rewards.clearGold);
+      for (let i = 1; i < CHAPTERS.length; i++) {
+        expect(goldByChapter[i]).toBeGreaterThan(goldByChapter[i - 1]);
       }
     }
   });
