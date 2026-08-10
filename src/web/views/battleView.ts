@@ -7,6 +7,8 @@ export interface BattleViewProps {
   playerTeam: MonsterDefinition[];
   enemyTeam: MonsterDefinition[];
   onBack: () => void;
+  backLabel?: string;
+  title?: string;
 }
 
 export interface BattleViewHandle {
@@ -49,7 +51,7 @@ function buildTeamPanel(
 }
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
-  const { result, playerTeam, enemyTeam, onBack } = props;
+  const { result, playerTeam, enemyTeam, onBack, backLabel = "◀ 編成に戻る", title = "バトル観戦" } = props;
 
   let index = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -175,11 +177,11 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
         onBack();
       },
     },
-    ["◀ 編成に戻る"],
+    [backLabel],
   );
 
   const container = el("div", { className: "screen battle-view" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["バトル観戦"])]),
+    el("header", { className: "app-header" }, [el("h1", {}, [title])]),
     el("section", { className: "panel" }, [el("h2", {}, ["敵チーム"]), enemyPanel]),
     el("section", { className: "panel" }, [el("h2", {}, ["味方チーム"]), playerPanel]),
     el("div", { className: "battle-controls" }, [playPauseBtn, speedBtn, skipBtn, backBtn]),

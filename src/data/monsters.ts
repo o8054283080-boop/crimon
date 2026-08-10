@@ -182,3 +182,7 @@ export const MONSTER_DEX = MONSTER_TEMPLATES.flatMap((template) => createAllVari
 export function findMonster(templateId: string, element: string) {
   return MONSTER_DEX.find((m) => m.templateId === templateId && m.element === element);
 }
+
+export function findMonsterById(dexId: string) {
+  return MONSTER_DEX.find((m) => m.id === dexId);
+}

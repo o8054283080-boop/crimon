@@ -46,6 +46,11 @@ export interface BattleResult {
 export interface BattleEngineOptions {
   rng?: () => number;
   maxTurns?: number;
+  /**
+   * ステージの連戦などでウェーブをまたいでHPを持ち越す場合に指定する。
+   * playerTeamと同じ並び順で、そのユニットの開始時HPを上書きする(最大HPでクランプ)。
+   */
+  initialPlayerHp?: number[];
 }
 
 export class BattleEngine {
@@ -63,6 +68,14 @@ export class BattleEngine {
       ...playerTeam.map((def, i) => createBattleUnit(def, "PLAYER", `P${i + 1}`)),
       ...enemyTeam.map((def, i) => createBattleUnit(def, "ENEMY", `E${i + 1}`)),
     ];
+
+    if (options.initialPlayerHp) {
+      options.initialPlayerHp.forEach((hp, i) => {
+        const unit = this.units[i];
+        if (!unit) return;
+        unit.currentHp = Math.max(1, Math.min(hp, unit.maxHp));
+      });
+    }
     this.rng = options.rng ?? Math.random;
     this.maxTurns = options.maxTurns ?? 300;
   }
