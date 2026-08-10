@@ -1,4 +1,5 @@
 import { ELEMENT_JA } from "../../core/element.js";
+import { STAGE_STAMINA_COST } from "../../core/fighterLevel.js";
 import { STAGES, Stage } from "../../data/stages.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -35,7 +36,8 @@ function renderList(props: StagesProps): HTMLElement {
 
 function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
   const party = getParty(props.player);
-  const canChallenge = party.length > 0;
+  const hasEnoughStamina = props.player.stamina >= STAGE_STAMINA_COST;
+  const canChallenge = party.length > 0 && hasEnoughStamina;
 
   const waveRows = stage.waves.map((wave) =>
     el("div", { className: "wave-row" }, [
@@ -61,11 +63,12 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
       el("p", {}, [`ステージクリアボーナス: 🪙${stage.rewards.clearGold}`]),
       el("p", {}, [`モンスタードロップ率: ${Math.round(stage.rewards.dropRate * 100)}%`]),
     ]),
-    !canChallenge ? el("p", { className: "app-subtitle" }, ["パーティが編成されていません。先にパーティを編成してください。"]) : null,
+    party.length === 0 ? el("p", { className: "app-subtitle" }, ["パーティが編成されていません。先にパーティを編成してください。"]) : null,
+    !hasEnoughStamina ? el("p", { className: "app-subtitle" }, ["スタミナが足りません。"]) : null,
     el(
       "button",
       { type: "button", className: "btn btn--primary btn--large", disabled: !canChallenge, onclick: () => props.onStartStage(stage) },
-      ["⚔ 挑戦する"],
+      [`⚔ 挑戦する (⚡${STAGE_STAMINA_COST})`],
     ),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectStage(null) }, ["◀ ステージ選択に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
