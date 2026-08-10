@@ -1,5 +1,5 @@
 import { Element } from "../core/element.js";
-import { Equipment, generateNormalStageEquipment } from "../core/equipment.js";
+import { Equipment, SetType, generateThemedStageEquipment } from "../core/equipment.js";
 import { Star } from "../core/rarity.js";
 import { MONSTER_TEMPLATES, REINCARNATION_PIG_DEX } from "./monsters.js";
 
@@ -30,12 +30,18 @@ export interface StageRewards {
   dropRate: number;
   /** ドロップするモンスターの星候補(この中から抽選) */
   dropStars: Star[];
+  /** ドロップするモンスターの種族(このチャプターのテーマ種族固定) */
+  dropTemplateId: string;
   /** ステージクリア時に装備がドロップする確率(0-1)。モンスタードロップとは独立した抽選 */
   equipmentDropRate: number;
+  /** ドロップする装備のシリーズ(このチャプターのテーマシリーズ固定) */
+  equipmentSet: SetType;
 }
 
 export interface Stage {
   id: string;
+  /** チャプター番号(1〜4)。チャプターごとにドロップするモンスター種族・装備シリーズのテーマが決まっている */
+  chapter: number;
   stageNumber: number;
   name: string;
   waves: Wave[];
@@ -43,6 +49,28 @@ export interface Stage {
 }
 
 const NORMAL_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
+
+/**
+ * チャプター(ステージ1〜4)ごとのテーマ。各チャプターをクリアすると、
+ * このテーマ種族(星1)とテーマ装備シリーズ(星1)が固定で出やすくなる。
+ */
+interface ChapterTheme {
+  chapter: number;
+  templateId: string;
+  equipmentSet: SetType;
+}
+
+const CHAPTER_THEMES: ChapterTheme[] = [
+  { chapter: 1, templateId: "slime", equipmentSet: "CRIT" },
+  { chapter: 2, templateId: "wolf", equipmentSet: "POWER" },
+  { chapter: 3, templateId: "golem", equipmentSet: "GUARD" },
+  { chapter: 4, templateId: "fairy", equipmentSet: "VITALITY" },
+];
+
+/** チャプターテーマのモンスター(星1)がステージクリア時にドロップする確率。ゲーム内では非公開 */
+const CHAPTER_MONSTER_DROP_RATE = 0.15;
+/** チャプターテーマの装備(星1)がステージクリア時にドロップする確率。ゲーム内では非公開 */
+const CHAPTER_EQUIPMENT_DROP_RATE = 0.5;
 
 function clampLevel(star: Star, level: number, max: Record<Star, number>): number {
   return Math.min(level, max[star]);
@@ -53,6 +81,7 @@ const STAR_MAX: Record<Star, number> = { 1: 15, 2: 20, 3: 30, 4: 40, 5: 50 };
 function buildWave(stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
   // 星1のスターターパーティ(Lv1)がステージ1-1から無理なく挑戦できるよう、
   // レベルは緩やかに(1-1で敵Lv1、1-5ボスでも星2Lv15程度まで)しか上げない。
+  // どのチャプターも同じ難易度カーブ(チャプターはドロップのテーマのみが異なる)。
   const baseStar = Math.min(2, Math.ceil(stageNumber / 3)) as Star;
   const baseLevel = 1 + (stageNumber - 1) * 2 + (waveNumber - 1);
 
@@ -84,7 +113,7 @@ function buildWave(stageNumber: number, waveNumber: number, isBossWave: boolean)
   return { waveNumber, isBossWave, enemies, powerScale };
 }
 
-function buildStage(stageNumber: number): Stage {
+function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
   const isFinalStage = stageNumber === 5;
   const waves: Wave[] = [1, 2, 3].map((waveNumber) => buildWave(stageNumber, waveNumber, isFinalStage && waveNumber === 3));
 
@@ -92,15 +121,24 @@ function buildStage(stageNumber: number): Stage {
     waveGold: 30 * stageNumber,
     clearGold: 150 * stageNumber,
     waveExp: 25 * stageNumber,
-    dropRate: Math.min(0.6, 0.15 + 0.08 * stageNumber),
-    dropStars: stageNumber <= 2 ? [1] : stageNumber <= 4 ? [1, 1, 2] : [1, 2, 2, 3],
-    equipmentDropRate: Math.min(0.7, 0.35 + 0.06 * stageNumber),
+    dropRate: CHAPTER_MONSTER_DROP_RATE,
+    dropStars: [1],
+    dropTemplateId: theme.templateId,
+    equipmentDropRate: CHAPTER_EQUIPMENT_DROP_RATE,
+    equipmentSet: theme.equipmentSet,
   };
 
-  return { id: `1-${stageNumber}`, stageNumber, name: `ステージ 1-${stageNumber}`, waves, rewards };
+  return {
+    id: `${theme.chapter}-${stageNumber}`,
+    chapter: theme.chapter,
+    stageNumber,
+    name: `ステージ ${theme.chapter}-${stageNumber}`,
+    waves,
+    rewards,
+  };
 }
 
-export const STAGES: Stage[] = [1, 2, 3, 4, 5].map(buildStage);
+export const STAGES: Stage[] = CHAPTER_THEMES.flatMap((theme) => [1, 2, 3, 4, 5].map((stageNumber) => buildStage(theme, stageNumber)));
 
 export function findStage(stageId: string): Stage | undefined {
   return STAGES.find((s) => s.id === stageId);
@@ -111,19 +149,18 @@ export interface StageDrop {
   star: Star;
 }
 
-/** ステージクリア報酬として、確率でモンスターをドロップする(なければnull) */
+/** ステージクリア報酬として、確率でモンスターをドロップする(なければnull)。種族はそのチャプターのテーマ種族固定 */
 export function rollStageDrop(stage: Stage, rng: () => number = Math.random): StageDrop | null {
   if (rng() >= stage.rewards.dropRate) return null;
   const star = stage.rewards.dropStars[Math.floor(rng() * stage.rewards.dropStars.length)];
-  const template = MONSTER_TEMPLATES[Math.floor(rng() * MONSTER_TEMPLATES.length)];
   const element = NORMAL_ELEMENTS[Math.floor(rng() * NORMAL_ELEMENTS.length)];
-  return { dexId: `${template.templateId}_${element}`, star };
+  return { dexId: `${stage.rewards.dropTemplateId}_${element}`, star };
 }
 
-/** ステージクリア報酬として、確率で装備をドロップする(なければnull)。モンスタードロップとは独立した抽選 */
+/** ステージクリア報酬として、確率で装備をドロップする(なければnull)。シリーズはそのチャプターのテーマシリーズ固定。モンスタードロップとは独立した抽選 */
 export function rollStageEquipment(stage: Stage, rng: () => number = Math.random): Equipment | null {
   if (rng() >= stage.rewards.equipmentDropRate) return null;
-  return generateNormalStageEquipment(rng);
+  return generateThemedStageEquipment(stage.rewards.equipmentSet, rng);
 }
 
 /** 通常ステージでの転生ピッグ(星2)ドロップ率。他のドロップとは独立した抽選 */

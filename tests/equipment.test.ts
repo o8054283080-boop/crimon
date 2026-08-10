@@ -4,7 +4,7 @@ import {
   SLOT_MAIN_STAT_OPTIONS,
   applyEquipmentToStats,
   generateEquipment,
-  generateNormalStageEquipment,
+  generateThemedStageEquipment,
 } from "../src/core/equipment.js";
 import { Stats } from "../src/core/stats.js";
 
@@ -92,28 +92,25 @@ describe("装備込みステータス計算 (applyEquipmentToStats)", () => {
   });
 });
 
-describe("通常ステージの装備ドロップ (generateNormalStageEquipment)", () => {
-  it("星は1〜3のみ、サブステータスは0〜2個のみ", () => {
+describe("チャプターテーマ装備ドロップ (generateThemedStageEquipment)", () => {
+  it("星は必ず1、シリーズは指定したものになり、サブステータスは0〜2個のみ", () => {
     const rng = mulberry32(6);
     for (let i = 0; i < 500; i++) {
-      const eq = generateNormalStageEquipment(rng);
-      expect(eq.star).toBeGreaterThanOrEqual(1);
-      expect(eq.star).toBeLessThanOrEqual(3);
+      const eq = generateThemedStageEquipment("CRIT", rng);
+      expect(eq.star).toBe(1);
+      expect(eq.set).toBe("CRIT");
       expect(eq.subStats.length).toBeLessThanOrEqual(2);
     }
   });
 
-  it("星3やサブ付き装備の出現率はかなり低い", () => {
+  it("サブ付き装備の出現率はかなり低い", () => {
     const rng = mulberry32(7);
     const N = 2000;
-    let star3Count = 0;
     let hasSubCount = 0;
     for (let i = 0; i < N; i++) {
-      const eq = generateNormalStageEquipment(rng);
-      if (eq.star === 3) star3Count += 1;
+      const eq = generateThemedStageEquipment("POWER", rng);
       if (eq.subStats.length > 0) hasSubCount += 1;
     }
-    expect(star3Count / N).toBeLessThan(0.1);
     expect(hasSubCount / N).toBeLessThan(0.55);
   });
 });
