@@ -76,6 +76,7 @@ function normalizeState(state: PlayerState): PlayerState {
   }
   for (const monster of state.monsters) {
     if (!monster.equipment) monster.equipment = {};
+    if (!monster.skillLevels) monster.skillLevels = [1, 1, 1];
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;

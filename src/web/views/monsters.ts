@@ -1,10 +1,11 @@
 import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
-import { MonsterInstance, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
+import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
 import { el } from "../dom.js";
+import { renderSkillRows } from "./skillPanel.js";
 
 export interface MonstersProps {
   player: PlayerState;
@@ -18,9 +19,11 @@ export interface MonstersProps {
   onCancelRankUp: () => void;
   onSelectSlot: (monsterId: string, slot: EquipSlot) => void;
   onUnequipSlot: (monsterId: string, slot: EquipSlot) => void;
+  onGoSkillTraining: (monsterId: string) => void;
+  onGoMonsterDex: () => void;
 }
 
-function monsterCard(instance: MonsterInstance, onClick: () => void, extra?: { selected?: boolean; disabled?: boolean }): HTMLElement {
+export function monsterCard(instance: MonsterInstance, onClick: () => void, extra?: { selected?: boolean; disabled?: boolean }): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   const maxLevel = STAR_MAX_LEVEL[instance.star];
   const classes = ["monster-card"];
@@ -47,6 +50,9 @@ function renderList(props: MonstersProps): HTMLElement {
   const cards = props.player.monsters.map((instance) => monsterCard(instance, () => props.onSelectDetail(instance.id)));
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["所持モンスター"]), el("p", { className: "app-subtitle" }, [`${props.player.monsters.length}体所持中`])]),
+    el("section", { className: "panel" }, [
+      el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onGoMonsterDex }, ["📖 モンスター図鑑を見る"]),
+    ]),
     el("section", { className: "panel" }, [el("div", { className: "monster-grid" }, cards)]),
   ]);
 }
@@ -82,20 +88,16 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
   return el("div", { className: "equip-slot-grid" }, boxes);
 }
 
-function renderSkillPanel(dex: ReturnType<typeof findMonsterById>): HTMLElement | null {
+function renderSkillPanel(dex: ReturnType<typeof findMonsterById>, instance: MonsterInstance, onGoSkillTraining: () => void): HTMLElement | null {
   if (!dex) return null;
 
-  const rows = dex.skills.map((skill, i) =>
-    el("div", { className: "skill-row" }, [
-      el("div", { className: "skill-row__header" }, [
-        el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`]),
-        el("span", { className: "skill-row__cooldown" }, [skill.cooldownTurns > 0 ? `CT ${skill.cooldownTurns}ターン` : "CTなし"]),
-      ]),
-      el("div", { className: "skill-row__desc" }, [skill.description]),
-    ]),
-  );
-
-  return el("section", { className: "panel" }, [el("h2", {}, ["スキル"]), ...rows]);
+  return el("section", { className: "panel" }, [
+    el("h2", {}, ["スキル"]),
+    ...renderSkillRows(dex.skills, instance.skillLevels),
+    isSkillMaxLevel(instance)
+      ? el("p", { className: "app-subtitle" }, ["スキルはすべて最大レベルです"])
+      : el("button", { type: "button", className: "btn btn--ghost", onclick: onGoSkillTraining }, ["🔼 スキル強化"]),
+  ]);
 }
 
 function renderSetBonusPanel(equippedItems: ReturnType<typeof resolveEquippedItems>): HTMLElement | null {
@@ -140,7 +142,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
         ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
     ].filter((n): n is HTMLDivElement => n !== null)),
-    renderSkillPanel(dex),
+    renderSkillPanel(dex, instance, () => props.onGoSkillTraining(instance.id)),
     el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
     renderSetBonusPanel(equippedItems),
     rankReady

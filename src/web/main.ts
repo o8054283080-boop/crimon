@@ -10,6 +10,7 @@ import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDu
 import { Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
+import { applySkillTraining, checkSkillTraining } from "../game/skillTraining.js";
 import {
   PlayerState,
   addEquipment,
@@ -38,8 +39,10 @@ import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderHome } from "./views/home.js";
+import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderMonsters } from "./views/monsters.js";
 import { renderParty } from "./views/party.js";
+import { renderSkillTraining } from "./views/skillTraining.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
@@ -75,6 +78,9 @@ interface AppState {
   equipmentPickerContext: EquipmentPickerContext | null;
   selectedDungeonFloor: number | null;
   dungeonRun: DungeonRunState | null;
+  selectedDexEntryId: string | null;
+  skillTrainingTargetId: string | null;
+  skillTrainingMaterialIds: string[];
 }
 
 const state: AppState = {
@@ -91,6 +97,9 @@ const state: AppState = {
   equipmentPickerContext: null,
   selectedDungeonFloor: null,
   dungeonRun: null,
+  selectedDexEntryId: null,
+  skillTrainingTargetId: null,
+  skillTrainingMaterialIds: [],
 };
 
 const rootCandidate = document.getElementById("app");
@@ -109,6 +118,9 @@ function navigate(screen: ScreenName): void {
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
   state.selectedDungeonFloor = null;
+  state.selectedDexEntryId = null;
+  state.skillTrainingTargetId = null;
+  state.skillTrainingMaterialIds = [];
   render();
 }
 
@@ -185,6 +197,25 @@ function handleConfirmRankUp(): void {
   savePlayerState(state.player);
   state.rankUpMode = false;
   state.rankUpSacrificeIds = [];
+  render();
+}
+
+function handleConfirmSkillTraining(): void {
+  const target = state.player.monsters.find((m) => m.id === state.skillTrainingTargetId);
+  if (!target) return;
+  const materials = state.skillTrainingMaterialIds
+    .map((id) => state.player.monsters.find((m) => m.id === id))
+    .filter((m): m is MonsterInstance => m !== undefined);
+  const check = checkSkillTraining(target, materials, state.player.partyIds);
+  if (!check.ok) return;
+
+  applySkillTraining(target, materials.length);
+  removeMonsters(state.player, state.skillTrainingMaterialIds);
+  savePlayerState(state.player);
+  state.skillTrainingTargetId = null;
+  state.skillTrainingMaterialIds = [];
+  state.monsterDetailId = target.id;
+  state.screen = "MONSTERS";
   render();
 }
 
@@ -513,6 +544,47 @@ function render(): void {
       break;
     }
 
+    case "MONSTER_DEX":
+      content = renderMonsterDex({
+        selectedDexId: state.selectedDexEntryId,
+        onSelectEntry: (id) => {
+          state.selectedDexEntryId = id;
+          render();
+        },
+        onBack: () => {
+          state.selectedDexEntryId = null;
+          state.screen = "MONSTERS";
+          render();
+        },
+      });
+      break;
+
+    case "SKILL_TRAINING": {
+      if (!state.skillTrainingTargetId) {
+        navigate("MONSTERS");
+        return;
+      }
+      content = renderSkillTraining({
+        player: state.player,
+        targetId: state.skillTrainingTargetId,
+        selectedMaterialIds: state.skillTrainingMaterialIds,
+        onToggleMaterial: (id) => {
+          const idx = state.skillTrainingMaterialIds.indexOf(id);
+          if (idx >= 0) state.skillTrainingMaterialIds.splice(idx, 1);
+          else state.skillTrainingMaterialIds.push(id);
+          render();
+        },
+        onConfirm: handleConfirmSkillTraining,
+        onCancel: () => {
+          state.skillTrainingTargetId = null;
+          state.skillTrainingMaterialIds = [];
+          state.screen = "MONSTERS";
+          render();
+        },
+      });
+      break;
+    }
+
     case "STAGE_RESULT": {
       showNav = false;
       const info = state.stageResult;
@@ -573,6 +645,17 @@ function renderMonstersScreen(): HTMLElement {
     },
     onSelectSlot: handleSelectSlot,
     onUnequipSlot: handleUnequipSlot,
+    onGoSkillTraining: (monsterId) => {
+      state.skillTrainingTargetId = monsterId;
+      state.skillTrainingMaterialIds = [];
+      state.screen = "SKILL_TRAINING";
+      render();
+    },
+    onGoMonsterDex: () => {
+      state.selectedDexEntryId = null;
+      state.screen = "MONSTER_DEX";
+      render();
+    },
   });
 }
 
