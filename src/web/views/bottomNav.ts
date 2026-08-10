@@ -1,11 +1,12 @@
 import { el } from "../dom.js";
 
-export type ScreenName = "HOME" | "SUMMON" | "MONSTERS" | "PARTY" | "STAGES" | "BATTLE" | "STAGE_RESULT";
+export type ScreenName = "HOME" | "SUMMON" | "MONSTERS" | "EQUIPMENT" | "PARTY" | "STAGES" | "BATTLE" | "STAGE_RESULT";
 
 const TABS: { screen: ScreenName; icon: string; label: string }[] = [
   { screen: "HOME", icon: "🏠", label: "ホーム" },
   { screen: "SUMMON", icon: "✨", label: "召喚" },
   { screen: "MONSTERS", icon: "📖", label: "モンスター" },
+  { screen: "EQUIPMENT", icon: "⚔️", label: "装備" },
   { screen: "PARTY", icon: "🛡", label: "パーティ" },
   { screen: "STAGES", icon: "🗺", label: "ステージ" },
 ];

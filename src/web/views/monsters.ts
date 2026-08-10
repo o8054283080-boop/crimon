@@ -1,4 +1,5 @@
-import { MonsterInstance, starLabel } from "../../core/monsterInstance.js";
+import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, STAT_LABEL } from "../../core/equipment.js";
+import { MonsterInstance, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
@@ -15,6 +16,8 @@ export interface MonstersProps {
   onToggleSacrifice: (id: string) => void;
   onConfirmRankUp: () => void;
   onCancelRankUp: () => void;
+  onSelectSlot: (monsterId: string, slot: EquipSlot) => void;
+  onUnequipSlot: (monsterId: string, slot: EquipSlot) => void;
 }
 
 function monsterCard(instance: MonsterInstance, onClick: () => void, extra?: { selected?: boolean; disabled?: boolean }): HTMLElement {
@@ -48,10 +51,43 @@ function renderList(props: MonstersProps): HTMLElement {
   ]);
 }
 
+function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLElement {
+  const boxes = EQUIP_SLOTS.map((slot) => {
+    const equipmentId = instance.equipment[slot];
+    const equipment = equipmentId ? props.player.equipment.find((e) => e.id === equipmentId) : undefined;
+
+    if (equipment) {
+      return el(
+        "button",
+        {
+          type: "button",
+          className: "equip-slot equip-slot--filled",
+          onclick: () => props.onUnequipSlot(instance.id, slot),
+        },
+        [
+          el("div", { className: "equip-slot__label" }, [`S${slot}`]),
+          el("div", { className: "equip-slot__star" }, ["★".repeat(equipment.star)]),
+          el("div", { className: "equip-slot__stat" }, [STAT_LABEL[equipment.mainStat.type]]),
+        ],
+      );
+    }
+
+    return el(
+      "button",
+      { type: "button", className: "equip-slot equip-slot--empty", onclick: () => props.onSelectSlot(instance.id, slot) },
+      [el("div", { className: "equip-slot__label" }, [`S${slot}`]), el("div", { className: "equip-slot__plus" }, ["+"])],
+    );
+  });
+
+  return el("div", { className: "equip-slot-grid" }, boxes);
+}
+
 function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   const maxLevel = STAR_MAX_LEVEL[instance.star];
-  const effectiveStats = dex ? computeEffectiveStats(dex.stats, instance.star, instance.level) : null;
+  const growthStats = dex ? computeEffectiveStats(dex.stats, instance.star, instance.level) : null;
+  const equippedItems = resolveEquippedItems(instance, props.player.equipment);
+  const effectiveStats = growthStats ? applyEquipmentToStats(growthStats, equippedItems) : null;
   const rankReady = canRankUp(instance.star, instance.level);
   const expNeeded = requiredExpForLevel(instance.level);
   const inParty = props.player.partyIds.includes(instance.id);
@@ -72,6 +108,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
         ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
     ].filter((n): n is HTMLDivElement => n !== null)),
+    el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
     rankReady
       ? el(
           "button",

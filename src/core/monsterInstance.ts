@@ -1,3 +1,4 @@
+import { Equipment, EquipSlot, applyEquipmentToStats } from "./equipment.js";
 import { MonsterDefinition } from "./monster.js";
 import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
 
@@ -8,6 +9,8 @@ export interface MonsterInstance {
   star: Star;
   level: number;
   exp: number;
+  /** スロット番号 → 装着中の装備ID */
+  equipment: Partial<Record<EquipSlot, string>>;
 }
 
 let instanceCounter = 0;
@@ -18,7 +21,7 @@ function generateInstanceId(): string {
 }
 
 export function createMonsterInstance(dexId: string, star: Star, level = 1): MonsterInstance {
-  return { id: generateInstanceId(), dexId, star, level, exp: 0 };
+  return { id: generateInstanceId(), dexId, star, level, exp: 0, equipment: {} };
 }
 
 /** 経験値を加算し、可能な限りレベルアップさせる。実際に上がったレベル数を返す */
@@ -38,9 +41,20 @@ export function addExp(instance: MonsterInstance, exp: number, maxLevel: number)
   return levelsGained;
 }
 
-/** MonsterInstance + 図鑑データから、バトルエンジンに渡せる実効ステータス付きの定義を作る */
-export function toBattleDefinition(instance: MonsterInstance, dex: MonsterDefinition): MonsterDefinition {
-  const stats = computeEffectiveStats(dex.stats, instance.star, instance.level);
+/** そのインスタンスが装着している装備の実体を、渡された装備リストから解決する */
+export function resolveEquippedItems(instance: MonsterInstance, allEquipment: Equipment[]): Equipment[] {
+  const equippedIds = new Set(Object.values(instance.equipment));
+  return allEquipment.filter((eq) => equippedIds.has(eq.id));
+}
+
+/** MonsterInstance + 図鑑データ(+装備)から、バトルエンジンに渡せる実効ステータス付きの定義を作る */
+export function toBattleDefinition(
+  instance: MonsterInstance,
+  dex: MonsterDefinition,
+  equippedItems: Equipment[] = [],
+): MonsterDefinition {
+  const growthStats = computeEffectiveStats(dex.stats, instance.star, instance.level);
+  const stats = equippedItems.length > 0 ? applyEquipmentToStats(growthStats, equippedItems) : growthStats;
   return {
     ...dex,
     id: instance.id,

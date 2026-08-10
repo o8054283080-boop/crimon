@@ -1,24 +1,29 @@
 import "./style.css";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
+import { EquipSlot } from "../core/equipment.js";
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
 import { findMonsterById } from "../data/monsters.js";
-import { Stage, StageDrop, rollStageDrop } from "../data/stages.js";
+import { Stage, StageDrop, rollStageDrop, rollStageEquipment } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import {
   PlayerState,
+  addEquipment,
   addMonster,
+  equipToMonster,
   getParty,
   loadPlayerState,
   markStageCleared,
   removeMonsters,
   savePlayerState,
+  unequipFromMonster,
 } from "../game/playerState.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
+import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
 import { renderHome } from "./views/home.js";
 import { renderMonsters } from "./views/monsters.js";
 import { renderParty } from "./views/party.js";
@@ -48,6 +53,8 @@ interface AppState {
   selectedStageId: string | null;
   stageRun: StageRunState | null;
   stageResult: StageResultInfo | null;
+  equipmentDetailId: string | null;
+  equipmentPickerContext: EquipmentPickerContext | null;
 }
 
 const state: AppState = {
@@ -60,6 +67,8 @@ const state: AppState = {
   selectedStageId: null,
   stageRun: null,
   stageResult: null,
+  equipmentDetailId: null,
+  equipmentPickerContext: null,
 };
 
 const rootCandidate = document.getElementById("app");
@@ -75,6 +84,40 @@ function navigate(screen: ScreenName): void {
   state.rankUpSacrificeIds = [];
   state.selectedStageId = null;
   state.summonResults = null;
+  state.equipmentDetailId = null;
+  state.equipmentPickerContext = null;
+  render();
+}
+
+function handleSelectSlot(monsterId: string, slot: EquipSlot): void {
+  state.equipmentPickerContext = { monsterId, slot };
+  state.screen = "EQUIPMENT";
+  render();
+}
+
+function handleUnequipSlot(monsterId: string, slot: EquipSlot): void {
+  unequipFromMonster(state.player, monsterId, slot);
+  savePlayerState(state.player);
+  render();
+}
+
+function handleEquip(equipmentId: string, monsterId: string): void {
+  equipToMonster(state.player, monsterId, equipmentId);
+  savePlayerState(state.player);
+  state.equipmentPickerContext = null;
+  state.screen = "MONSTERS";
+  render();
+}
+
+function handleUnequipFromEquipmentScreen(equipmentId: string): void {
+  const equipment = state.player.equipment.find((e) => e.id === equipmentId);
+  if (!equipment) return;
+  for (const monster of state.player.monsters) {
+    if (monster.equipment[equipment.slot] === equipmentId) {
+      delete monster.equipment[equipment.slot];
+    }
+  }
+  savePlayerState(state.player);
   render();
 }
 
@@ -153,11 +196,14 @@ function finishStage(cleared: boolean): void {
 
   let totalGold = run.goldEarned;
   let drop: StageDrop | null = null;
+  let equipmentDrop = null;
   if (cleared) {
     totalGold += stage.rewards.clearGold;
     markStageCleared(state.player, stage.id);
     drop = rollStageDrop(stage);
     if (drop) addMonster(state.player, drop.dexId, drop.star);
+    equipmentDrop = rollStageEquipment(stage);
+    if (equipmentDrop) addEquipment(state.player, equipmentDrop);
   }
   state.player.gold += totalGold;
   savePlayerState(state.player);
@@ -171,6 +217,7 @@ function finishStage(cleared: boolean): void {
     levelUps,
     dropDexId: drop ? drop.dexId : null,
     dropStar: drop ? drop.star : null,
+    equipmentDrop,
   };
   state.stageRun = null;
   state.screen = "STAGE_RESULT";
@@ -182,7 +229,7 @@ function renderCurrentWaveBattle(): BattleViewHandle {
   if (!run) throw new Error("stageRun is not set");
 
   const wave = run.stage.waves[run.waveIndex];
-  const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave);
+  const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave, state.player.equipment);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp });
   const result = engine.run();
   const { survivorInstances, survivorHp } = extractSurvivors(engine, run.currentPartyInstances);
@@ -246,6 +293,10 @@ function render(): void {
 
     case "MONSTERS":
       content = renderMonstersScreen();
+      break;
+
+    case "EQUIPMENT":
+      content = renderEquipmentScreen();
       break;
 
     case "PARTY":
@@ -327,6 +378,27 @@ function renderMonstersScreen(): HTMLElement {
     onCancelRankUp: () => {
       state.rankUpMode = false;
       state.rankUpSacrificeIds = [];
+      render();
+    },
+    onSelectSlot: handleSelectSlot,
+    onUnequipSlot: handleUnequipSlot,
+  });
+}
+
+function renderEquipmentScreen(): HTMLElement {
+  return renderEquipment({
+    player: state.player,
+    detailId: state.equipmentDetailId,
+    pickerContext: state.equipmentPickerContext,
+    onSelectDetail: (id) => {
+      state.equipmentDetailId = id;
+      render();
+    },
+    onEquip: handleEquip,
+    onUnequip: handleUnequipFromEquipmentScreen,
+    onCancelPicker: () => {
+      state.equipmentPickerContext = null;
+      state.screen = "MONSTERS";
       render();
     },
   });
