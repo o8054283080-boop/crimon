@@ -521,27 +521,22 @@ function weightedPick<T>(options: WeightedOption<T>[], rng: () => number): T {
 }
 
 /**
- * 通常冒険(ステージ)向けの装備抽選設定。
- * 星は1〜3まで、サブステータスも最大2個までしか付かず、
- * 星3やサブ付きの装備が出る確率はかなり低めにしてある。
- * ダンジョン等の高難度コンテンツでは、より高い星やサブ4個までを許可する別設定を今後追加する想定。
+ * 通常冒険(ステージ)向けの装備抽選設定。サブステータスは最大2個までしか付かず、
+ * サブ付きの装備が出る確率はかなり低めにしてある。
  */
-const NORMAL_STAGE_STAR_WEIGHTS: WeightedOption<EquipStar>[] = [
-  { value: 1, weight: 70 },
-  { value: 2, weight: 25 },
-  { value: 3, weight: 5 },
-];
-
 const NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS: WeightedOption<number>[] = [
   { value: 0, weight: 60 },
   { value: 1, weight: 30 },
   { value: 2, weight: 10 },
 ];
 
-export function generateNormalStageEquipment(rng: () => number = Math.random): Equipment {
-  const star = weightedPick(NORMAL_STAGE_STAR_WEIGHTS, rng);
+/**
+ * チャプター(ステージ1〜4)テーマ装備。星は必ず1固定、シリーズは指定されたものに固定される。
+ * サブステータスの個数分布は通常ステージ装備と同じ(0〜2個、大半は0〜1個)。
+ */
+export function generateThemedStageEquipment(set: SetType, rng: () => number = Math.random): Equipment {
   const subStatCount = weightedPick(NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS, rng);
-  return generateEquipment({ star, subStatCount, rng });
+  return generateEquipment({ star: 1, set, subStatCount, rng });
 }
 
 /**

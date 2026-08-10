@@ -1,6 +1,8 @@
 import { ELEMENT_JA } from "../../core/element.js";
+import { SET_LABEL } from "../../core/equipment.js";
 import { STAGE_STAMINA_COST } from "../../core/fighterLevel.js";
 import { STAGES, Stage } from "../../data/stages.js";
+import { MONSTER_TEMPLATES } from "../../data/monsters.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
 import { el } from "../dom.js";
 
@@ -11,26 +13,47 @@ export interface StagesProps {
   onStartStage: (stage: Stage) => void;
 }
 
+function speciesLabel(templateId: string): string {
+  return MONSTER_TEMPLATES.find((t) => t.templateId === templateId)?.baseName ?? templateId;
+}
+
+function chapterThemeLabel(stage: Stage): string {
+  return `${speciesLabel(stage.rewards.dropTemplateId)} / ${SET_LABEL[stage.rewards.equipmentSet]}シリーズ`;
+}
+
 function renderList(props: StagesProps): HTMLElement {
-  const cards = STAGES.map((stage) => {
-    const cleared = isStageCleared(props.player, stage.id);
-    return el(
-      "button",
-      {
-        type: "button",
-        className: "stage-card" + (cleared ? " stage-card--cleared" : ""),
-        onclick: () => props.onSelectStage(stage.id),
-      },
-      [
-        el("div", { className: "stage-card__name" }, [stage.name]),
-        el("div", { className: "stage-card__meta" }, [cleared ? "クリア済み ✅" : "未クリア"]),
-      ],
-    );
+  const chapters = Array.from(new Set(STAGES.map((s) => s.chapter))).sort((a, b) => a - b);
+
+  const chapterSections = chapters.map((chapter) => {
+    const stagesInChapter = STAGES.filter((s) => s.chapter === chapter);
+    const cards = stagesInChapter.map((stage) => {
+      const cleared = isStageCleared(props.player, stage.id);
+      return el(
+        "button",
+        {
+          type: "button",
+          className: "stage-card" + (cleared ? " stage-card--cleared" : ""),
+          onclick: () => props.onSelectStage(stage.id),
+        },
+        [
+          el("div", { className: "stage-card__name" }, [stage.name]),
+          el("div", { className: "stage-card__meta" }, [cleared ? "クリア済み ✅" : "未クリア"]),
+        ],
+      );
+    });
+
+    return el("section", { className: "panel" }, [
+      el("div", { className: "panel-header" }, [
+        el("h2", {}, [`チャプター${chapter}`]),
+        el("span", { className: "app-subtitle" }, [chapterThemeLabel(stagesInChapter[0])]),
+      ]),
+      el("div", { className: "stage-list" }, cards),
+    ]);
   });
 
   return el("div", { className: "screen stages-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["ステージ選択"]), el("p", { className: "app-subtitle" }, ["各ステージは3ウェーブ構成。最終ステージの3ウェーブ目はボス戦です。"])]),
-    el("section", { className: "panel" }, [el("div", { className: "stage-list" }, cards)]),
+    ...chapterSections,
   ]);
 }
 
@@ -61,7 +84,7 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
       el("h2", {}, ["報酬"]),
       el("p", {}, [`ウェーブクリア毎: 🪙${stage.rewards.waveGold} / モンスター経験値${stage.rewards.waveExp}`]),
       el("p", {}, [`ステージクリアボーナス: 🪙${stage.rewards.clearGold}`]),
-      el("p", {}, [`モンスタードロップ率: ${Math.round(stage.rewards.dropRate * 100)}%`]),
+      el("p", {}, [`クリアすると${speciesLabel(stage.rewards.dropTemplateId)}や${SET_LABEL[stage.rewards.equipmentSet]}シリーズの装備が出やすくなります。`]),
     ]),
     party.length === 0 ? el("p", { className: "app-subtitle" }, ["パーティが編成されていません。先にパーティを編成してください。"]) : null,
     !hasEnoughStamina ? el("p", { className: "app-subtitle" }, ["スタミナが足りません。"]) : null,
