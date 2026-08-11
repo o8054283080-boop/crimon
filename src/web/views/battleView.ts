@@ -26,6 +26,7 @@ const SPEED_INTERVAL_MS: Record<string, number> = { "1": 650, "2": 300, "4": 120
 interface UnitTokenRefs {
   token: HTMLElement;
   avatar: HTMLElement;
+  hpBadge: HTMLElement;
   hpFill: HTMLElement;
   hpText: HTMLElement;
   gaugeFill: HTMLElement;
@@ -87,18 +88,19 @@ function buildTeamRow(
     const instanceId = instanceIdOf(i);
     const avatar = el("div", { className: "unit-token__avatar", style: `background:${def.color}` }, [def.emoji]);
     const badges = el("div", { className: "unit-token__badges" });
+    const hpBadge = el("div", { className: "unit-token__hp-badge" }, [String(def.stats.hp)]);
     const hpFill = el("div", { className: "unit-token__hp-fill" });
     const hpText = el("div", { className: "unit-token__hp-text" }, [`${def.stats.hp}/${def.stats.hp}`]);
     const gaugeFill = el("div", { className: "unit-token__gauge-fill" });
     const token = el("div", { className: `unit-token ${teamClass}` }, [
-      el("div", { className: "unit-token__avatar-wrap" }, [avatar]),
       badges,
+      el("div", { className: "unit-token__avatar-wrap" }, [el("div", { className: "unit-token__platform" }), avatar]),
       el("div", { className: "unit-token__name" }, [def.name]),
-      el("div", { className: "unit-token__hp-bar" }, [hpFill]),
+      el("div", { className: "unit-token__hp-row" }, [hpBadge, el("div", { className: "unit-token__hp-bar" }, [hpFill])]),
       hpText,
       el("div", { className: "unit-token__gauge-bar" }, [gaugeFill]),
     ]);
-    refs.set(instanceId, { token, avatar, hpFill, hpText, gaugeFill, badges });
+    refs.set(instanceId, { token, avatar, hpBadge, hpFill, hpText, gaugeFill, badges });
     return token;
   });
   return el("div", { className: `battle-arena__team ${teamClass}s` }, tokens);
@@ -140,6 +142,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       const ratio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.currentHp / s.maxHp)) : 0;
       refs.hpFill.style.width = `${ratio * 100}%`;
       refs.hpFill.classList.toggle("unit-token__hp-fill--low", ratio <= 0.3);
+      refs.hpBadge.textContent = String(s.currentHp);
+      refs.hpBadge.classList.toggle("unit-token__hp-badge--low", ratio <= 0.3);
       refs.hpText.textContent = `${s.currentHp}/${s.maxHp}`;
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
       refs.token.classList.toggle("unit-token--dead", !s.alive);
@@ -237,15 +241,18 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
                   onclick: () => handleSkillPicked(unit, idx, skill),
                 },
                 [
-                  el("div", { className: "action-skill-btn__name" }, [
-                    skill.name,
-                    onCooldown
-                      ? ` (CT残り${unit.cooldowns[idx]})`
-                      : skill.cooldownTurns > 0
-                        ? ` (CT ${skill.cooldownTurns}ターン)`
-                        : "",
+                  el("div", { className: "action-skill-btn__icon" }, [String(idx + 1)]),
+                  el("div", { className: "action-skill-btn__body" }, [
+                    el("div", { className: "action-skill-btn__name" }, [
+                      skill.name,
+                      onCooldown
+                        ? ` (CT残り${unit.cooldowns[idx]})`
+                        : skill.cooldownTurns > 0
+                          ? ` (CT ${skill.cooldownTurns}ターン)`
+                          : "",
+                    ]),
+                    el("div", { className: "action-skill-btn__meta" }, [effectText]),
                   ]),
-                  el("div", { className: "action-skill-btn__meta" }, [effectText]),
                 ],
               );
             }),
@@ -393,23 +400,26 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     "button",
     {
       type: "button",
-      className: "btn btn--ghost",
+      className: "battle-icon-btn battle-icon-btn--play",
+      title: "一時停止",
       onclick: () => {
         if (finished) return;
         userPaused = !userPaused;
-        playPauseBtn.textContent = userPaused ? "▶ 再生" : "⏸ 一時停止";
+        playPauseBtn.textContent = userPaused ? "▶" : "⏸";
+        playPauseBtn.setAttribute("title", userPaused ? "再生" : "一時停止");
         if (!userPaused) maybeScheduleTick();
         else stopTimer();
       },
     },
-    ["⏸ 一時停止"],
+    ["⏸"],
   );
 
   const speedBtn = el(
     "button",
     {
       type: "button",
-      className: "btn btn--ghost",
+      className: "battle-speed-btn",
+      title: "再生速度",
       onclick: () => {
         speed = speed === "1" ? "2" : speed === "2" ? "4" : "1";
         speedBtn.textContent = `x${speed}`;
@@ -422,11 +432,13 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     "button",
     {
       type: "button",
-      className: "btn btn--ghost",
+      className: "battle-icon-btn",
+      title: "オート",
       onclick: () => {
         if (finished) return;
         mode = mode === "AUTO" ? "MANUAL" : "AUTO";
-        modeBtn.textContent = mode === "AUTO" ? "🤖 オート" : "✋ 手動";
+        modeBtn.textContent = mode === "AUTO" ? "🤖" : "✋";
+        modeBtn.setAttribute("title", mode === "AUTO" ? "オート" : "手動");
         if (mode === "AUTO" && picker.phase !== "NONE") {
           // 手動待ちだった行動をAIに任せて続行する
           const pendingUnit = picker.unit;
@@ -438,10 +450,14 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
         maybeScheduleTick();
       },
     },
-    ["🤖 オート"],
+    ["🤖"],
   );
 
-  const skipBtn = el("button", { type: "button", className: "btn btn--ghost", onclick: skipToEnd }, ["⏭ 結果までスキップ"]);
+  const skipBtn = el(
+    "button",
+    { type: "button", className: "battle-icon-btn", title: "結果までスキップ", onclick: skipToEnd },
+    ["⏭"],
+  );
 
   const finishBtn = el(
     "button",
@@ -455,7 +471,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     el("header", { className: "app-header" }, [el("h1", {}, [title])]),
     battleArena,
     actionPanelEl,
-    el("div", { className: "battle-controls" }, [modeBtn, playPauseBtn, speedBtn, skipBtn]),
+    el("div", { className: "battle-controls" }, [modeBtn, speedBtn, playPauseBtn, skipBtn]),
     resultBanner,
     finishBtn,
     el("section", { className: "panel battle-log-panel" }, [el("h2", {}, ["バトルログ"]), logEl]),
