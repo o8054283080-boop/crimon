@@ -1,5 +1,5 @@
 import { MonsterInstance, addExp, rollSkillLevelUp } from "../core/monsterInstance.js";
-import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
+import { Star, STAR_MAX_LEVEL, requiredExpForLevel } from "../core/rarity.js";
 import { findMonsterById } from "../data/monsters.js";
 
 export interface MonsterPowerUpCheck {
@@ -28,12 +28,17 @@ export function checkMonsterPowerUp(
   return { ok: true };
 }
 
-/** 星ごとの、素材1体あたりの基礎経験値。星・レベルが高い素材ほど経験値としての価値が高い */
+/** 星ごとの、素材1体あたりの基礎経験値(レアリティ分の価値)。星が高い素材ほど経験値としての価値が高い */
 const FEED_EXP_BASE_PER_STAR: Record<Star, number> = { 1: 50, 2: 90, 3: 160, 4: 280, 5: 480, 6: 800 };
 
-/** 素材モンスター1体を強化に使った時に得られる経験値 */
+/**
+ * 素材モンスター1体を強化に使った時に得られる経験値。
+ * 星ごとの基礎価値に加えて、その素材が現在のレベルに到達するために本来必要な経験値
+ * (requiredExpForLevel)分も上乗せする。レベルが高い素材ほど、それだけ多くの経験値を
+ * 費やして育てられてきたことになるため、素材にした時の価値もその分だけ大きくなる。
+ */
 export function feedExpValue(material: MonsterInstance): number {
-  return Math.round(FEED_EXP_BASE_PER_STAR[material.star] * (1 + (material.level - 1) * 0.1));
+  return Math.round(FEED_EXP_BASE_PER_STAR[material.star] + requiredExpForLevel(material.level));
 }
 
 /** 素材が対象と同じ種族(テンプレートID)かどうか。属性(色)が違っていても種族が同じならtrue */
