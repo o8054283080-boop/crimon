@@ -64,12 +64,12 @@ describe("血のいけにえに自身の防御力スケールダメージを追�
   });
 });
 
-describe("光ネメシスのスキル3(味方全体の行動ゲージ+スピードバフ)", () => {
-  it("ALL_ALLIES対象でGAUGE効果とSPDバフ2ターンを持つ", () => {
+describe("光ネメシスのスキル3(味方全体の行動ゲージ+クリ率バフ)", () => {
+  it("ALL_ALLIES対象でGAUGE効果とクリ率バフ2ターンを持つ", () => {
     const nemesis = findMonster("nemesis", "LIGHT")!;
     const skill3 = nemesis.skills[2];
     expect(skill3.target).toBe("ALL_ALLIES");
     expect(skill3.effects).toContainEqual({ kind: "GAUGE", amount: 0.3 });
-    expect(skill3.effects).toContainEqual({ kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 2 });
+    expect(skill3.effects).toContainEqual({ kind: "BUFF", stat: "criRate", amount: 0.3, durationTurns: 2 });
   });
 });

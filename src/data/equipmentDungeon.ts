@@ -86,7 +86,7 @@ const POWER_SCALE_END = 1.7;
  * サブステータスまでしっかり詰めてようやく安定して勝てる水準まで引き上げてある
  * (通常モンスターだけの編成では、装備が最大でもほぼ勝てない想定)。
  */
-const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.58, 10: 2.12 };
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.58, 10: 1.98 };
 
 function powerScaleForFloor(floor: number): number {
   const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
