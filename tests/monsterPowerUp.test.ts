@@ -3,6 +3,7 @@ import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { STAR_MAX_LEVEL, requiredExpForLevel } from "../src/core/rarity.js";
 import {
   ALL_DISPLAYABLE_MONSTERS_DEX,
+  ANCIENT_CRYSTAL_CURSE_DEX,
   ANCIENT_CRYSTAL_DEX,
   ANCIENT_DEMON_DEX,
   EXP_PIG_DEX,
@@ -204,20 +205,43 @@ describe("モンスター図鑑データ", () => {
     }
   });
 
-  it("古代の魔人・古代のクリスタルは装備ダンジョン専用で、通常の召喚・図鑑表示には出てこない", () => {
-    const specialIds = new Set([...ANCIENT_DEMON_DEX, ...ANCIENT_CRYSTAL_DEX].map((m) => m.id));
+  it("古代の魔人・古代のクリスタル・古代の呪晶は装備ダンジョン専用で、通常の召喚・図鑑表示には出てこない", () => {
+    const specialIds = new Set([...ANCIENT_DEMON_DEX, ...ANCIENT_CRYSTAL_DEX, ...ANCIENT_CRYSTAL_CURSE_DEX].map((m) => m.id));
     for (const dex of [...MONSTER_TEMPLATES_DEX, ...ALL_DISPLAYABLE_MONSTERS_DEX]) {
       expect(specialIds.has(dex.id)).toBe(false);
     }
   });
 
-  it("古代の魔人・古代のクリスタルはfindMonsterByIdで解決できる(装備ダンジョンのバトル生成に必要)", () => {
+  it("古代の魔人・古代のクリスタル・古代の呪晶はfindMonsterByIdで解決できる(装備ダンジョンのバトル生成に必要)", () => {
     const demon = findMonsterById("ancient_demon_FIRE");
     const crystal = findMonsterById("ancient_crystal_FIRE");
+    const curseCrystal = findMonsterById("ancient_crystal_curse_FIRE");
     expect(demon).toBeDefined();
     expect(demon?.skills).toHaveLength(3);
     expect(crystal).toBeDefined();
     expect(crystal?.skills).toHaveLength(3);
+    expect(curseCrystal).toBeDefined();
+    expect(curseCrystal?.skills).toHaveLength(3);
+  });
+
+  it("古代の魔人のスキル3はクールタイム5の全体攻撃になっている", () => {
+    const demon = findMonsterById("ancient_demon_FIRE")!;
+    const skill3 = demon.skills[2];
+    expect(skill3.cooldownTurns).toBe(5);
+    expect(skill3.target).toBe("ALL_ENEMIES");
+    expect(skill3.effects.some((e) => e.kind === "DAMAGE")).toBe(true);
+  });
+
+  it("古代のクリスタルは支援(バフ・回復)、古代の呪晶はデバフ・全体攻撃で役割が分かれている", () => {
+    const crystal = findMonsterById("ancient_crystal_FIRE")!;
+    const curseCrystal = findMonsterById("ancient_crystal_curse_FIRE")!;
+
+    expect(crystal.skills.some((s) => s.effects.some((e) => e.kind === "BUFF" || e.kind === "HEAL"))).toBe(true);
+    expect(crystal.skills.some((s) => s.effects.some((e) => e.kind === "DEBUFF"))).toBe(false);
+
+    expect(curseCrystal.skills.some((s) => s.effects.some((e) => e.kind === "DEBUFF"))).toBe(true);
+    expect(curseCrystal.skills.some((s) => s.target === "ALL_ENEMIES")).toBe(true);
+    expect(curseCrystal.skills.some((s) => s.effects.some((e) => e.kind === "BUFF" || e.kind === "HEAL"))).toBe(false);
   });
 
   it("種族が同じなら属性が違っても同じ絵文字になる(色違いフレーバー)", () => {

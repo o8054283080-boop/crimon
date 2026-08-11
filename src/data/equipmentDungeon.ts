@@ -3,6 +3,7 @@ import { DUNGEON_FLOOR_COUNT, Equipment, generateDungeonEquipment } from "../cor
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import {
   ANCIENT_CRYSTAL,
+  ANCIENT_CRYSTAL_CURSE,
   ANCIENT_DEMON,
   GACHA_SR_COMMON_TEMPLATE,
   GACHA_SR_RARE_TEMPLATE,
@@ -50,12 +51,14 @@ const BOSS_TEMPLATES = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, GACHA_
 /**
  * 9・10階(ダンジョン最終盤の最終関門)だけは、装備ダンジョン専用のオリジナルボス
  * 「古代の魔人」が固定で登場する。ガチャには一切出現しない完全にダンジョン専用の存在で、
- * お供2体も同じく専用の「古代のクリスタル」固定になる。古代のクリスタルは自ら攻めるよりも
- * 古代の魔人へのバフ・回復を優先するサポート役として立ち回る。
+ * お供2体も同じく専用の「古代のクリスタル」「古代の呪晶」の組み合わせで固定になる。
+ * 古代のクリスタルは自ら攻めるよりも古代の魔人へのバフ・回復を優先するサポート役、
+ * 古代の呪晶は逆に支援より全体攻撃・デバフでプレイヤー側を弱らせにくる攻撃寄りのお供で、
+ * 支援と攻撃で役割がはっきり分かれた2体構成になっている。
  */
 const FINAL_BOSS_FLOOR_START = 9;
 const FINAL_BOSS_TEMPLATE = ANCIENT_DEMON;
-const FINAL_BOSS_COMPANION_TEMPLATE = ANCIENT_CRYSTAL;
+const FINAL_BOSS_COMPANION_TEMPLATES = [ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE];
 
 /**
  * 1階/8階の必要パワースケール。
@@ -75,13 +78,15 @@ const POWER_SCALE_END = 1.7;
  * 装備ダンジョンは通常パーティ(4体)より1体多い専用パーティ(最大5体)で挑めるうえ、
  * ガチャ限定の高レア(SR/SSR)モンスターは通常モンスターよりベースステータス・専用スキルとも
  * 明確に強力なため、SR/SSRを軸にした編成だと通常モンスターだけの編成基準の数値では
- * あっさり突破されてしまう。また9・10階の「古代のクリスタル」は回復・防御バフで古代の魔人を
- * 支え続けるサポート役のため、他の階層のお供よりも同じpowerScaleでも体感の粘り強さが増す。
- * これらを踏まえ、9・10階は「星5のSR/SSRを複数体、星6装備込みで編成した終盤パーティ」を基準に、
+ * あっさり突破されてしまう。また9・10階のお供は、回復・防御バフで古代の魔人を支え続ける
+ * 「古代のクリスタル」と、全体攻撃・デバフでプレイヤー側を弱らせにくる「古代の呪晶」の
+ * 組み合わせで、古代の魔人自身も5ターンCTの全体攻撃を持つため、他の階層より同じpowerScale
+ * でも体感の厳しさが増す。これらを踏まえ、9・10階は「星5のSR/SSRを複数体、星6装備込みで
+ * 編成した終盤パーティ」を基準に、
  * サブステータスまでしっかり詰めてようやく安定して勝てる水準まで引き上げてある
  * (通常モンスターだけの編成では、装備が最大でもほぼ勝てない想定)。
  */
-const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.9, 10: 2.35 };
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.58, 10: 2.12 };
 
 function powerScaleForFloor(floor: number): number {
   const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
@@ -95,7 +100,7 @@ function buildFloor(floor: number): DungeonFloor {
 
   const bossTemplateId = isFinalBossFloor ? FINAL_BOSS_TEMPLATE.templateId : BOSS_TEMPLATES[(floor - 1) % BOSS_TEMPLATES.length].templateId;
   const companionTemplateIds = isFinalBossFloor
-    ? [FINAL_BOSS_COMPANION_TEMPLATE.templateId, FINAL_BOSS_COMPANION_TEMPLATE.templateId]
+    ? FINAL_BOSS_COMPANION_TEMPLATES.map((t) => t.templateId)
     : [MONSTER_TEMPLATES[(floor - 1) % MONSTER_TEMPLATES.length].templateId, MONSTER_TEMPLATES[floor % MONSTER_TEMPLATES.length].templateId];
 
   // ボス1体+お供2体の3体編成。ボスを先頭に置く
