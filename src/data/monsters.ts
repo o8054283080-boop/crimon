@@ -707,6 +707,114 @@ const NEMESIS: MonsterTemplate = {
   ],
 };
 
+/**
+ * 装備ダンジョン専用のオリジナルボス「古代の魔人」。ガチャには一切出現せず、召喚・図鑑にも含めない
+ * 完全にダンジョン専用の存在(ステータスはGRIFFON/DRAGON/SERAPH/NEMESISの平均値を基準にしてある)。
+ */
+export const ANCIENT_DEMON: MonsterTemplate = {
+  templateId: "ancient_demon",
+  baseName: "古代の魔人",
+  emoji: "😈",
+  role: "ボス",
+  baseStats: {
+    hp: 1400,
+    atk: 210,
+    def: 100,
+    spd: 118,
+    criRate: 0.28,
+    criDmg: 1.76,
+    resistance: 0.22,
+    accuracy: 0.2,
+  },
+  skill1: {
+    id: "ancient_demon_s1",
+    name: "闇の一撃",
+    description: "敵単体に攻撃力1.15倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 1.15 }],
+  },
+  skill2Variants: [
+    {
+      id: "ancient_demon_s2",
+      name: "古代の呪詛",
+      description: "封じられていた呪いを解き放ち、敵全体に攻撃力1.6倍のダメージを与え、45%で攻撃力を大きく低下させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.6 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.45 },
+      ],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "ancient_demon_s3",
+      name: "終焉の審判",
+      description: "太古の力を込めた渾身の一撃(3.8倍)を叩き込み、60%で相手をスタンさせる。自身の防御力が高いほど威力が上がる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 3.8, scaleBonus: { stat: "def", ratePerPoint: 0.003 } },
+        { kind: "STUN", durationTurns: 1, chance: 0.6 },
+      ],
+    },
+  ],
+};
+
+/**
+ * 装備ダンジョン専用のオリジナルお供「古代のクリスタル」。古代の魔人を支援するサポート役で、
+ * 自ら攻めるよりも古代の魔人へのバフ・回復を優先する(ステータスは通常モンスター4種の平均値を
+ * 基準にしつつ、支援役らしく攻撃力を抑えて防御力・効果抵抗率を高めにしてある)。
+ */
+export const ANCIENT_CRYSTAL: MonsterTemplate = {
+  templateId: "ancient_crystal",
+  baseName: "古代のクリスタル",
+  emoji: "🔮",
+  role: "サポート",
+  baseStats: {
+    hp: 1200,
+    atk: 90,
+    def: 95,
+    spd: 95,
+    criRate: 0.1,
+    criDmg: 1.5,
+    resistance: 0.25,
+    accuracy: 0.15,
+  },
+  skill1: {
+    id: "ancient_crystal_s1",
+    name: "光弾",
+    description: "敵単体に攻撃力0.9倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 0.9 }],
+  },
+  skill2Variants: [
+    {
+      id: "ancient_crystal_s2",
+      name: "古代の加護",
+      description: "味方単体に古代の力を送り込み、2ターン攻撃力を大きく上昇させる。",
+      target: "SINGLE_ALLY",
+      cooldownTurns: 3,
+      effects: [{ kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 2 }],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "ancient_crystal_s3",
+      name: "古代の結界",
+      description: "自身の防御力に応じて味方全体のHPを回復し、3ターン防御力を上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "HEAL", scaleStat: "def", healRate: 1.2 },
+        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+      ],
+    },
+  ],
+};
+
 /** ガチャの星4(SR)テンプレート: 火水電草側 / 光闇側 */
 export const GACHA_SR_COMMON_TEMPLATE = GRIFFON;
 export const GACHA_SR_RARE_TEMPLATE = SERAPH;
@@ -831,6 +939,10 @@ export const REINCARNATION_PIG_DEX = createAllVariants(REINCARNATION_PIG);
 /** 経験ピッグの6属性色違いバリエーション(図鑑には含めるが、通常の召喚・ステージ抽選には出さない) */
 export const EXP_PIG_DEX = createAllVariants(EXP_PIG);
 
+/** 古代の魔人・古代のクリスタルの6属性色違いバリエーション(装備ダンジョン専用。召喚・図鑑表示には一切出さない) */
+export const ANCIENT_DEMON_DEX = createAllVariants(ANCIENT_DEMON);
+export const ANCIENT_CRYSTAL_DEX = createAllVariants(ANCIENT_CRYSTAL);
+
 /** ガチャ限定の高レアモンスター(SR/SSR)図鑑。GRIFFON/DRAGON/SERAPH/NEMESISとも全6属性 */
 export const GACHA_EXCLUSIVE_DEX = [
   ...GACHA_SR_COMMON_DEX,
@@ -839,8 +951,15 @@ export const GACHA_EXCLUSIVE_DEX = [
   ...GACHA_SSR_RARE_DEX,
 ];
 
-/** 検索用の全モンスター図鑑(通常モンスター + ガチャ限定高レア + 転生ピッグ + 経験ピッグ) */
-export const MONSTER_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...REINCARNATION_PIG_DEX, ...EXP_PIG_DEX];
+/** 検索用の全モンスター図鑑(通常モンスター + ガチャ限定高レア + 転生ピッグ + 経験ピッグ + 装備ダンジョン専用ボス/お供) */
+export const MONSTER_DEX = [
+  ...MONSTER_TEMPLATES_DEX,
+  ...GACHA_EXCLUSIVE_DEX,
+  ...REINCARNATION_PIG_DEX,
+  ...EXP_PIG_DEX,
+  ...ANCIENT_DEMON_DEX,
+  ...ANCIENT_CRYSTAL_DEX,
+];
 
 /** モンスター図鑑UI表示用(転生ピッグは素材専用のため除外) */
 export const ALL_DISPLAYABLE_MONSTERS_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX];

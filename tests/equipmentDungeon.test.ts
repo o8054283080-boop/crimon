@@ -10,6 +10,7 @@ import { MONSTER_TEMPLATES } from "../src/data/monsters.js";
 
 const BOSS_TEMPLATE_IDS = ["griffon", "seraph", "dragon", "nemesis"];
 const COMPANION_TEMPLATE_IDS = MONSTER_TEMPLATES.map((t) => t.templateId);
+const FINAL_BOSS_FLOOR_START = 9;
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -47,8 +48,8 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
-  it("ボスはガチャ限定の高レアモンスター(グリフォン/セラフ/ドラゴン/ネメシス)から選ばれ、星6・Lv60で登場する", () => {
-    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+  it("1〜8階のボスはガチャ限定の高レアモンスター(グリフォン/セラフ/ドラゴン/ネメシス)から選ばれ、星6・Lv60で登場する", () => {
+    for (let floor = 1; floor < FINAL_BOSS_FLOOR_START; floor++) {
       const boss = findDungeonFloor(floor)!.enemies.find((e) => e.isBoss)!;
       expect(BOSS_TEMPLATE_IDS).toContain(boss.templateId);
       expect(boss.star).toBe(6);
@@ -56,12 +57,29 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
-  it("お供は通常モンスター種から選ばれ、星5・Lv50でボスより格下の強さになっている", () => {
-    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+  it("1〜8階のお供は通常モンスター種から選ばれ、星5・Lv50でボスより格下の強さになっている", () => {
+    for (let floor = 1; floor < FINAL_BOSS_FLOOR_START; floor++) {
       const companions = findDungeonFloor(floor)!.enemies.filter((e) => !e.isBoss);
       expect(companions).toHaveLength(2);
       for (const companion of companions) {
         expect(COMPANION_TEMPLATE_IDS).toContain(companion.templateId);
+        expect(companion.star).toBe(5);
+        expect(companion.level).toBe(50);
+      }
+    }
+  });
+
+  it("9・10階(最終関門)は専用のオリジナルボス「古代の魔人」+お供「古代のクリスタル」×2で固定される", () => {
+    for (let floor = FINAL_BOSS_FLOOR_START; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+      const enemies = findDungeonFloor(floor)!.enemies;
+      const boss = enemies.find((e) => e.isBoss)!;
+      const companions = enemies.filter((e) => !e.isBoss);
+      expect(boss.templateId).toBe("ancient_demon");
+      expect(boss.star).toBe(6);
+      expect(boss.level).toBe(60);
+      expect(companions).toHaveLength(2);
+      for (const companion of companions) {
+        expect(companion.templateId).toBe("ancient_crystal");
         expect(companion.star).toBe(5);
         expect(companion.level).toBe(50);
       }

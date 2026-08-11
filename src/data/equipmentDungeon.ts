@@ -2,6 +2,8 @@ import { Element } from "../core/element.js";
 import { DUNGEON_FLOOR_COUNT, Equipment, generateDungeonEquipment } from "../core/equipment.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import {
+  ANCIENT_CRYSTAL,
+  ANCIENT_DEMON,
   GACHA_SR_COMMON_TEMPLATE,
   GACHA_SR_RARE_TEMPLATE,
   GACHA_SSR_COMMON_TEMPLATE,
@@ -39,11 +41,21 @@ const DUNGEON_BOSS_STAR: Star = 6;
 const DUNGEON_BOSS_LEVEL = STAR_MAX_LEVEL[DUNGEON_BOSS_STAR];
 
 /**
- * 各階層のボスは、ガチャ限定の高レアモンスター(SR:グリフォン/セラフ、SSR:ドラゴン/ネメシス)を
+ * 1〜8階のボスは、ガチャ限定の高レアモンスター(SR:グリフォン/セラフ、SSR:ドラゴン/ネメシス)を
  * 巡回で1体割り当てる。ステータスも通常モンスターよりベースが高く設定されているうえに星6で
  * 登場するため、お供2体とはっきり格の違うボスらしい強さになる。
  */
 const BOSS_TEMPLATES = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE];
+
+/**
+ * 9・10階(ダンジョン最終盤の最終関門)だけは、装備ダンジョン専用のオリジナルボス
+ * 「古代の魔人」が固定で登場する。ガチャには一切出現しない完全にダンジョン専用の存在で、
+ * お供2体も同じく専用の「古代のクリスタル」固定になる。古代のクリスタルは自ら攻めるよりも
+ * 古代の魔人へのバフ・回復を優先するサポート役として立ち回る。
+ */
+const FINAL_BOSS_FLOOR_START = 9;
+const FINAL_BOSS_TEMPLATE = ANCIENT_DEMON;
+const FINAL_BOSS_COMPANION_TEMPLATE = ANCIENT_CRYSTAL;
 
 /**
  * 1階/8階の必要パワースケール。
@@ -63,11 +75,13 @@ const POWER_SCALE_END = 1.7;
  * 装備ダンジョンは通常パーティ(4体)より1体多い専用パーティ(最大5体)で挑めるうえ、
  * ガチャ限定の高レア(SR/SSR)モンスターは通常モンスターよりベースステータス・専用スキルとも
  * 明確に強力なため、SR/SSRを軸にした編成だと通常モンスターだけの編成基準の数値では
- * あっさり突破されてしまう。9・10階は「星5のSR/SSRを複数体、星6装備込みで編成した
- * 終盤パーティ」を基準に、サブステータスまでしっかり詰めてようやく安定して勝てる水準まで
- * 引き上げてある(通常モンスターだけの編成では、装備が最大でもほぼ勝てない想定)。
+ * あっさり突破されてしまう。また9・10階の「古代のクリスタル」は回復・防御バフで古代の魔人を
+ * 支え続けるサポート役のため、他の階層のお供よりも同じpowerScaleでも体感の粘り強さが増す。
+ * これらを踏まえ、9・10階は「星5のSR/SSRを複数体、星6装備込みで編成した終盤パーティ」を基準に、
+ * サブステータスまでしっかり詰めてようやく安定して勝てる水準まで引き上げてある
+ * (通常モンスターだけの編成では、装備が最大でもほぼ勝てない想定)。
  */
-const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 2.72, 10: 2.94 };
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.9, 10: 2.35 };
 
 function powerScaleForFloor(floor: number): number {
   const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
@@ -77,21 +91,18 @@ function powerScaleForFloor(floor: number): number {
 function buildFloor(floor: number): DungeonFloor {
   // 各階層の敵は単一属性で統一する。弱点を突く属性のパーティを組めば有利に戦えるようになる
   const floorElement = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
+  const isFinalBossFloor = floor >= FINAL_BOSS_FLOOR_START;
 
-  const companionTemplates = [MONSTER_TEMPLATES[(floor - 1) % MONSTER_TEMPLATES.length], MONSTER_TEMPLATES[floor % MONSTER_TEMPLATES.length]];
-  const bossTemplate = BOSS_TEMPLATES[(floor - 1) % BOSS_TEMPLATES.length];
+  const bossTemplateId = isFinalBossFloor ? FINAL_BOSS_TEMPLATE.templateId : BOSS_TEMPLATES[(floor - 1) % BOSS_TEMPLATES.length].templateId;
+  const companionTemplateIds = isFinalBossFloor
+    ? [FINAL_BOSS_COMPANION_TEMPLATE.templateId, FINAL_BOSS_COMPANION_TEMPLATE.templateId]
+    : [MONSTER_TEMPLATES[(floor - 1) % MONSTER_TEMPLATES.length].templateId, MONSTER_TEMPLATES[floor % MONSTER_TEMPLATES.length].templateId];
 
   // ボス1体+お供2体の3体編成。ボスを先頭に置く
   const enemies: DungeonEnemy[] = [
-    {
-      templateId: bossTemplate.templateId,
-      element: floorElement,
-      star: DUNGEON_BOSS_STAR,
-      level: DUNGEON_BOSS_LEVEL,
-      isBoss: true,
-    },
-    ...companionTemplates.map((template) => ({
-      templateId: template.templateId,
+    { templateId: bossTemplateId, element: floorElement, star: DUNGEON_BOSS_STAR, level: DUNGEON_BOSS_LEVEL, isBoss: true },
+    ...companionTemplateIds.map((templateId) => ({
+      templateId,
       element: floorElement,
       star: DUNGEON_ENEMY_STAR,
       level: DUNGEON_ENEMY_LEVEL,

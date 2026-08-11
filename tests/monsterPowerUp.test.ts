@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { STAR_MAX_LEVEL, requiredExpForLevel } from "../src/core/rarity.js";
-import { EXP_PIG_DEX, MONSTER_TEMPLATES_DEX, REINCARNATION_PIG_DEX, findMonsterById } from "../src/data/monsters.js";
+import {
+  ALL_DISPLAYABLE_MONSTERS_DEX,
+  ANCIENT_CRYSTAL_DEX,
+  ANCIENT_DEMON_DEX,
+  EXP_PIG_DEX,
+  MONSTER_TEMPLATES_DEX,
+  REINCARNATION_PIG_DEX,
+  findMonsterById,
+} from "../src/data/monsters.js";
 import {
   applyMonsterPowerUp,
   checkMonsterPowerUp,
@@ -194,6 +202,22 @@ describe("モンスター図鑑データ", () => {
     for (const dex of [...MONSTER_TEMPLATES_DEX, ...REINCARNATION_PIG_DEX]) {
       expect(dex.emoji.length).toBeGreaterThan(0);
     }
+  });
+
+  it("古代の魔人・古代のクリスタルは装備ダンジョン専用で、通常の召喚・図鑑表示には出てこない", () => {
+    const specialIds = new Set([...ANCIENT_DEMON_DEX, ...ANCIENT_CRYSTAL_DEX].map((m) => m.id));
+    for (const dex of [...MONSTER_TEMPLATES_DEX, ...ALL_DISPLAYABLE_MONSTERS_DEX]) {
+      expect(specialIds.has(dex.id)).toBe(false);
+    }
+  });
+
+  it("古代の魔人・古代のクリスタルはfindMonsterByIdで解決できる(装備ダンジョンのバトル生成に必要)", () => {
+    const demon = findMonsterById("ancient_demon_FIRE");
+    const crystal = findMonsterById("ancient_crystal_FIRE");
+    expect(demon).toBeDefined();
+    expect(demon?.skills).toHaveLength(3);
+    expect(crystal).toBeDefined();
+    expect(crystal?.skills).toHaveLength(3);
   });
 
   it("種族が同じなら属性が違っても同じ絵文字になる(色違いフレーバー)", () => {
