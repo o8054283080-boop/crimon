@@ -294,28 +294,62 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   color: #eaf0ff;
-  background: rgba(6, 9, 20, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  background: linear-gradient(180deg, rgba(38, 46, 74, 0.92), rgba(8, 11, 22, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 2px 5px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
 }
 
 .unit-hud--active .unit-hud__name {
-  color: #0d1020;
-  background: linear-gradient(180deg, #ffe27a, #f1c40f);
-  box-shadow: 0 0 12px 2px rgba(241, 196, 15, 0.55);
+  color: #1a1405;
+  background: linear-gradient(180deg, #fff3bd 0%, #ffd93b 55%, #e0a000 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 0 14px 3px rgba(255, 205, 40, 0.6);
+  animation: unit-hud-active-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes unit-hud-active-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18);
+  }
 }
 
 .unit-hud__hp {
   position: relative;
   width: 100%;
-  height: 9px;
+  height: 10px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.68);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 1px 3px rgba(0, 0, 0, 0.7);
+  background: linear-gradient(180deg, #05070f, #131829);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 1px 2px rgba(0, 0, 0, 0.9),
+    0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* 減った分を遅れて追いかける帯。被弾の瞬間だけ赤く覗いて手応えを出す */
+.unit-hud__hp-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff8f7a, #d63a2a);
+  transition: width 0.55s cubic-bezier(0.33, 1, 0.68, 1) 0.22s;
+}
+
+/* 回復時は遅れて追う意味がないので即座に合わせる */
+.unit-hud__hp-trail--instant {
+  transition: none;
 }
 
 .unit-hud__hp-fill {
@@ -323,9 +357,9 @@ body {
   inset: 0;
   width: 100%;
   border-radius: 999px;
-  background: linear-gradient(180deg, #58e58a, #24a35a);
-  box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
-  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  background: linear-gradient(180deg, #7bf0a4 0%, #35c46c 45%, #1d8b4c 100%);
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .unit-hud__hp-fill--low {

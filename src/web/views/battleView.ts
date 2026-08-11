@@ -29,6 +29,8 @@ const IMPACT_DELAY_MS: Record<string, number> = { "1": 260, "2": 150, "4": 60 };
 interface UnitHudRefs {
   card: HTMLElement;
   hpFill: HTMLElement;
+  /** 減った分を少し遅れて追いかける帯。どれだけ削られたかが目で分かる */
+  hpTrail: HTMLElement;
   hpText: HTMLElement;
   gaugeFill: HTMLElement;
   badges: HTMLElement;
@@ -114,17 +116,19 @@ type PickerState =
 /** 3Dキャラの頭上に重ねる、名前/HP/ATBのHUDカードを作る */
 function buildHudCard(def: MonsterDefinition, teamClass: string): { card: HTMLElement; refs: UnitHudRefs } {
   const badges = el("div", { className: "unit-hud__badges" });
+  const hpTrail = el("div", { className: "unit-hud__hp-trail" });
   const hpFill = el("div", { className: "unit-hud__hp-fill" });
   const hpText = el("div", { className: "unit-hud__hp-text" }, [`${def.stats.hp}`]);
   const gaugeFill = el("div", { className: "unit-hud__gauge-fill" });
   const card = el("div", { className: `unit-hud ${teamClass}` }, [
     badges,
     el("div", { className: "unit-hud__name" }, [def.name]),
-    el("div", { className: "unit-hud__hp" }, [hpFill, hpText]),
+    // 追従バーは実バーの背面に置く。削られた瞬間だけ赤い帯として覗く
+    el("div", { className: "unit-hud__hp" }, [hpTrail, hpFill, hpText]),
     el("div", { className: "unit-hud__gauge" }, [gaugeFill]),
   ]);
   card.style.setProperty("--unit-color", def.color);
-  return { card, refs: { card, hpFill, hpText, gaugeFill, badges } };
+  return { card, refs: { card, hpFill, hpTrail, hpText, gaugeFill, badges } };
 }
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
@@ -268,6 +272,10 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       const ratio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.currentHp / s.maxHp)) : 0;
       refs.hpFill.style.width = `${ratio * 100}%`;
       refs.hpFill.classList.toggle("unit-hud__hp-fill--low", ratio <= 0.3);
+      // 回復時は追従バーを即座に合わせ、被弾時だけ遅れて追いつかせる
+      const previous = Number.parseFloat(refs.hpTrail.style.width) || 100;
+      refs.hpTrail.classList.toggle("unit-hud__hp-trail--instant", ratio * 100 > previous);
+      refs.hpTrail.style.width = `${ratio * 100}%`;
       refs.hpText.textContent = String(s.currentHp);
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
       refs.card.classList.toggle("unit-hud--dead", !s.alive);
