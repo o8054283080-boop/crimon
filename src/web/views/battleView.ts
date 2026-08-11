@@ -195,16 +195,46 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
   // 3Dの座標に合わせてHUDカードを毎フレーム追従させる
   let overlayFrame: number | null = null;
+  /** 重なり回避のために積み上げた、このフレームで確定済みのカード矩形 */
+  const placedCards: { left: number; right: number; top: number; bottom: number }[] = [];
+
   function syncOverlay(): void {
     overlayFrame = requestAnimationFrame(syncOverlay);
-    for (const anchor of stage.computeScreenAnchors()) {
+    placedCards.length = 0;
+
+    // 奥(画面の上)にいるユニットから先に置く。手前のカードは
+    // ぶつかったら上へ逃がすので、奥のものを基準にした方が動きが小さい
+    const anchors = stage.computeScreenAnchors().sort((a, b) => a.y - b.y);
+
+    for (const anchor of anchors) {
       const refs = hudRefs.get(anchor.instanceId);
       if (!refs) continue;
+
       anchorPositions.set(anchor.instanceId, { x: anchor.x, y: anchor.y });
       refs.card.style.transform = `translate(-50%, -100%) scale(${anchor.scale.toFixed(3)})`;
-      refs.card.style.left = `${anchor.x}px`;
-      refs.card.style.top = `${anchor.y}px`;
       refs.card.style.visibility = anchor.visible ? "visible" : "hidden";
+
+      // カードは translate(-50%,-100%) で配置されるので、
+      // アンカーの真上・左右中央に矩形が来る
+      const width = (refs.card.offsetWidth || 76) * anchor.scale;
+      const height = (refs.card.offsetHeight || 42) * anchor.scale;
+      let top = anchor.y - height;
+
+      // 既に置いたカードと重なる間、少しずつ上へ逃がす。
+      // 隣り合うユニットの名前とHPが潰れて読めなくなるのを防ぐ
+      const left = anchor.x - width / 2;
+      const right = anchor.x + width / 2;
+      for (let guard = 0; guard < 8; guard++) {
+        const hit = placedCards.find(
+          (r) => left < r.right - 2 && right > r.left + 2 && top < r.bottom - 2 && top + height > r.top + 2,
+        );
+        if (!hit) break;
+        top = hit.top - height - 2;
+      }
+
+      placedCards.push({ left, right, top, bottom: top + height });
+      refs.card.style.left = `${anchor.x}px`;
+      refs.card.style.top = `${top + height}px`;
     }
   }
   overlayFrame = requestAnimationFrame(syncOverlay);
