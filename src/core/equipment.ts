@@ -290,6 +290,17 @@ export function enhanceEquipmentCost(equipment: Equipment): number {
 }
 
 /**
+ * 装備を売却した時にもらえるゴールド。星が高いほど、また強化レベル・サブステータス個数が
+ * 多いほど(=それだけ育成に投資されているほど)高くなる。
+ */
+export function equipmentSellPrice(equipment: Equipment): number {
+  const base = 100 * equipment.star * equipment.star;
+  const levelBonus = equipment.level * 40 * equipment.star;
+  const subStatBonus = equipment.subStats.length * 50;
+  return Math.round(base + levelBonus + subStatBonus);
+}
+
+/**
  * 装備を1レベル強化する(呼び出し前に canEnhanceEquipment で確認すること)。
  * メインステータスは毎レベル上昇し、15レベル到達時は1〜14レベルより大きく上昇する。
  * 3・6・9・12・15レベル到達時は、サブステータスが4個未満ならランダムで1個追加され、

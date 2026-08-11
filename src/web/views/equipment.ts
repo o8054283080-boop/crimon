@@ -1,4 +1,4 @@
-import { canEnhanceEquipment, enhanceEquipmentCost, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, StatRoll } from "../../core/equipment.js";
+import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, StatRoll } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -17,6 +17,7 @@ export interface EquipmentProps {
   onEquip: (equipmentId: string, monsterId: string) => void;
   onUnequip: (equipmentId: string) => void;
   onEnhance: (equipmentId: string) => void;
+  onSell: (equipmentId: string) => void;
   onCancelPicker: () => void;
   onGoDungeon: () => void;
   onChangeSlotFilter: (slot: EquipSlot | null) => void;
@@ -121,6 +122,8 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
   const canEnhance = canEnhanceEquipment(equipment);
   const cost = enhanceEquipmentCost(equipment);
   const canAfford = props.player.gold >= cost;
+  const sellPrice = equipmentSellPrice(equipment);
+  const isEquipped = ownerName !== null;
 
   return el("div", { className: "screen equipment-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [`スロット${equipment.slot}の装備`])]),
@@ -153,6 +156,12 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
     ownerName
       ? el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onUnequip(equipment.id) }, ["外す"])
       : null,
+    isEquipped ? el("p", { className: "app-subtitle" }, ["装着中の装備は売却できません(先に外してください)"]) : null,
+    el(
+      "button",
+      { type: "button", className: "btn btn--ghost btn--large", disabled: isEquipped, onclick: () => props.onSell(equipment.id) },
+      [`💰 売却する (🪙${sellPrice})`],
+    ),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectDetail(null) }, ["◀ 一覧に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }

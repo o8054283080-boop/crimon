@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateEquipment } from "../src/core/equipment.js";
+import { equipmentSellPrice, generateEquipment } from "../src/core/equipment.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import {
   PlayerState,
@@ -7,6 +7,7 @@ import {
   equipToMonster,
   findEquippedOwner,
   isEquipmentEquipped,
+  sellEquipment,
   unequipFromMonster,
 } from "../src/game/playerState.js";
 
@@ -30,6 +31,8 @@ function makeState(): PlayerState {
     fighterName: "ファイター",
     lastLoginBonusAt: null,
     loginBonusClaimCount: 0,
+    goldDungeonChallengesToday: 0,
+    lastGoldDungeonResetAt: null,
   };
 }
 
@@ -102,5 +105,44 @@ describe("装備の装着・解除", () => {
     expect(equipToMonster(state, "no-such-monster", eq.id)).toBe(false);
     expect(equipToMonster(state, monster.id, "no-such-equipment")).toBe(false);
     expect(monster.equipment[1]).toBeUndefined();
+  });
+});
+
+describe("装備売却 (sellEquipment)", () => {
+  it("装備が売却され、売却価格分のゴールドが手に入る", () => {
+    const state = makeState();
+    const eq = generateEquipment({ slot: 1, star: 3, subStatCount: 0 });
+    addEquipment(state, eq);
+    const goldBefore = state.gold;
+
+    const result = sellEquipment(state, eq.id);
+
+    expect(result.ok).toBe(true);
+    expect(result.goldEarned).toBe(equipmentSellPrice(eq));
+    expect(state.gold).toBe(goldBefore + result.goldEarned);
+    expect(state.equipment.find((e) => e.id === eq.id)).toBeUndefined();
+  });
+
+  it("装着中の装備は売却できない", () => {
+    const state = makeState();
+    const monster = createMonsterInstance("slime_FIRE", 1, 1);
+    state.monsters.push(monster);
+    const eq = generateEquipment({ slot: 1, star: 3, subStatCount: 0 });
+    addEquipment(state, eq);
+    equipToMonster(state, monster.id, eq.id);
+    const goldBefore = state.gold;
+
+    const result = sellEquipment(state, eq.id);
+
+    expect(result.ok).toBe(false);
+    expect(state.gold).toBe(goldBefore);
+    expect(state.equipment.find((e) => e.id === eq.id)).toBeDefined();
+  });
+
+  it("存在しない装備を指定した場合は失敗する", () => {
+    const state = makeState();
+    const result = sellEquipment(state, "no-such-equipment");
+    expect(result.ok).toBe(false);
+    expect(result.goldEarned).toBe(0);
   });
 });

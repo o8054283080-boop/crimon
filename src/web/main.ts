@@ -2,15 +2,16 @@ import "./style.css";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { EquipSlot } from "../core/equipment.js";
-import { DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
+import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor } from "../data/equipmentDungeon.js";
+import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef, LevelDungeonTier } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
-import { AutoFarmResult, runDungeonAutoFarm, runLevelDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
-import { applyDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
+import { AutoFarmResult, runDungeonAutoFarm, runGoldDungeonAutoFarm, runLevelDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
+import { applyDungeonClearRewards, applyGoldDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import {
   claimDailyLoginBonus,
@@ -25,11 +26,13 @@ import {
   loadPlayerState,
   removeMonsters,
   savePlayerState,
+  sellEquipment,
   setFighterName,
   toggleDungeonPartyMember,
   tryEnhanceEquipment,
   tryRefillStaminaFull,
   tryRefillStaminaPartial,
+  trySpendGoldDungeonChallenge,
   trySpendStamina,
   tryUseSummonScroll,
 } from "../game/playerState.js";
@@ -41,6 +44,7 @@ import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
+import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
 import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
@@ -74,6 +78,11 @@ interface LevelDungeonRunState {
   partyInstances: MonsterInstance[];
 }
 
+interface GoldDungeonRunState {
+  floor: GoldDungeonFloor;
+  partyInstances: MonsterInstance[];
+}
+
 interface AppState {
   screen: ScreenName;
   player: PlayerState;
@@ -94,6 +103,8 @@ interface AppState {
   dungeonRun: DungeonRunState | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
   levelDungeonRun: LevelDungeonRunState | null;
+  selectedGoldDungeonFloor: number | null;
+  goldDungeonRun: GoldDungeonRunState | null;
   selectedDexEntryId: string | null;
   monsterTrainingTargetId: string | null;
   monsterTrainingMaterialIds: string[];
@@ -123,6 +134,8 @@ const state: AppState = {
   dungeonRun: null,
   selectedLevelDungeonTier: null,
   levelDungeonRun: null,
+  selectedGoldDungeonFloor: null,
+  goldDungeonRun: null,
   selectedDexEntryId: null,
   monsterTrainingTargetId: null,
   monsterTrainingMaterialIds: [],
@@ -165,6 +178,7 @@ function routeKey(): string {
     state.selectedDexEntryId,
     state.monsterTrainingTargetId,
     state.selectedLevelDungeonTier,
+    state.selectedGoldDungeonFloor,
   ]);
 }
 
@@ -182,6 +196,7 @@ function navigate(screen: ScreenName): void {
   state.equipmentReturnMonsterId = null;
   state.selectedDungeonFloor = null;
   state.selectedLevelDungeonTier = null;
+  state.selectedGoldDungeonFloor = null;
   state.selectedDexEntryId = null;
   state.monsterTrainingTargetId = null;
   state.monsterTrainingMaterialIds = [];
@@ -229,6 +244,15 @@ function handleEnhanceEquipment(equipmentId: string): void {
   render();
 }
 
+function handleSellEquipment(equipmentId: string): void {
+  if (!window.confirm("この装備を売却しますか?この操作は取り消せません。")) return;
+  const result = sellEquipment(state.player, equipmentId);
+  if (!result.ok) return;
+  savePlayerState(state.player);
+  state.equipmentDetailId = null;
+  render();
+}
+
 function handleSummon(count: number): void {
   const cost = count >= 10 ? SUMMON_COST_TEN : SUMMON_COST_SINGLE * count;
   if (state.player.crystal < cost) return;
@@ -258,7 +282,7 @@ function handleConfirmRankUp(): void {
   const check = checkRankUp(target, sacrifices, state.player.partyIds);
   if (!check.ok) return;
 
-  applyRankUp(target);
+  applyRankUp(target, sacrifices);
   removeMonsters(state.player, state.rankUpSacrificeIds);
   savePlayerState(state.player);
   state.rankUpMode = false;
@@ -456,6 +480,55 @@ function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
   render();
 }
 
+function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
+  const party = getParty(state.player);
+  if (party.length === 0) return;
+  if (!trySpendGoldDungeonChallenge(state.player).ok) return;
+  if (!trySpendStamina(state.player, GOLD_DUNGEON_STAMINA_COST).ok) return;
+  savePlayerState(state.player);
+  state.goldDungeonRun = { floor, partyInstances: party };
+  state.screen = "GOLD_DUNGEON_BATTLE";
+  render();
+}
+
+function finishGoldDungeon(cleared: boolean): void {
+  const run = state.goldDungeonRun;
+  if (!run) return;
+  const floor = run.floor;
+
+  const reward = cleared ? applyGoldDungeonClearRewards(state.player, floor, run.partyInstances) : null;
+  savePlayerState(state.player);
+
+  state.stageResult = {
+    cleared,
+    stageName: floor.name,
+    goldEarned: reward?.goldEarned ?? 0,
+    crystalEarned: reward?.crystalEarned ?? 0,
+    wavesCleared: cleared ? 1 : 0,
+    totalWaves: 1,
+    levelUps: reward?.levelUps ?? [],
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop: null,
+    summonScrollDropped: false,
+    fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
+  };
+  state.goldDungeonRun = null;
+  state.screen = "STAGE_RESULT";
+  render();
+}
+
+function handleAutoFarmGoldDungeon(floor: GoldDungeonFloor, count: number): void {
+  const result = runGoldDungeonAutoFarm(state.player, floor, count);
+  savePlayerState(state.player);
+  state.autoFarmResult = result;
+  state.autoFarmTargetName = floor.name;
+  state.selectedGoldDungeonFloor = null;
+  state.screen = "AUTO_FARM_RESULT";
+  render();
+}
+
 function renderCurrentDungeonBattle(): BattleViewHandle {
   const run = state.dungeonRun;
   if (!run) throw new Error("dungeonRun is not set");
@@ -487,6 +560,23 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
     title: run.def.name,
     resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
     onFinish: (winner) => finishLevelDungeon(winner === "PLAYER"),
+  });
+}
+
+function renderCurrentGoldDungeonBattle(): BattleViewHandle {
+  const run = state.goldDungeonRun;
+  if (!run) throw new Error("goldDungeonRun is not set");
+
+  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment);
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+
+  return renderBattleView({
+    engine,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    title: run.floor.name,
+    resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
+    onFinish: (winner) => finishGoldDungeon(winner === "PLAYER"),
   });
 }
 
@@ -557,6 +647,7 @@ function render(): void {
         onGoParty: () => navigate("PARTY"),
         onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
+        onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
         onRefillStaminaPartial: () => {
           if (!tryRefillStaminaPartial(state.player).ok) return;
           savePlayerState(state.player);
@@ -705,6 +796,33 @@ function render(): void {
     case "LEVEL_DUNGEON_BATTLE": {
       showNav = false;
       const handle = renderCurrentLevelDungeonBattle();
+      disposeCurrentView = handle.dispose;
+      content = handle.element;
+      break;
+    }
+
+    case "GOLD_DUNGEON":
+      content = renderGoldDungeon({
+        player: state.player,
+        selectedFloor: state.selectedGoldDungeonFloor,
+        onSelectFloor: (floor) => {
+          state.selectedGoldDungeonFloor = floor;
+          render();
+        },
+        onStartFloor: startGoldDungeonFloor,
+        onGoParty: () => navigate("PARTY"),
+        autoFarmCount: state.autoFarmCount,
+        onChangeAutoFarmCount: (count) => {
+          state.autoFarmCount = count;
+          render();
+        },
+        onAutoFarm: handleAutoFarmGoldDungeon,
+      });
+      break;
+
+    case "GOLD_DUNGEON_BATTLE": {
+      showNav = false;
+      const handle = renderCurrentGoldDungeonBattle();
       disposeCurrentView = handle.dispose;
       content = handle.element;
       break;
@@ -867,6 +985,7 @@ function renderEquipmentScreen(): HTMLElement {
     onEquip: handleEquip,
     onUnequip: handleUnequipFromEquipmentScreen,
     onEnhance: handleEnhanceEquipment,
+    onSell: handleSellEquipment,
     onCancelPicker: () => {
       state.equipmentPickerContext = null;
       state.screen = "MONSTERS";

@@ -1,7 +1,8 @@
-import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost } from "../core/equipment.js";
+import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost, equipmentSellPrice } from "../core/equipment.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
+import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
 import { Difficulty } from "../data/stages.js";
 
 export interface PlayerState {
@@ -35,6 +36,10 @@ export interface PlayerState {
   lastLoginBonusAt: number | null;
   /** ログインボーナスを受け取った日数の累計(10日ごとの追加ボーナス判定に使う) */
   loginBonusClaimCount: number;
+  /** ゴールドダンジョンの本日の挑戦回数(1日GOLD_DUNGEON_DAILY_LIMIT回まで) */
+  goldDungeonChallengesToday: number;
+  /** ゴールドダンジョンの挑戦回数を最後にリセットした時刻(ミリ秒epoch)。日付が変わると回数がリセットされる */
+  lastGoldDungeonResetAt: number | null;
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -74,6 +79,8 @@ export function createInitialState(): PlayerState {
     fighterName: DEFAULT_FIGHTER_NAME,
     lastLoginBonusAt: null,
     loginBonusClaimCount: 0,
+    goldDungeonChallengesToday: 0,
+    lastGoldDungeonResetAt: null,
   };
 }
 
@@ -117,6 +124,8 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.fighterName !== "string" || state.fighterName.length === 0) state.fighterName = DEFAULT_FIGHTER_NAME;
   if (typeof state.lastLoginBonusAt !== "number") state.lastLoginBonusAt = null;
   if (typeof state.loginBonusClaimCount !== "number") state.loginBonusClaimCount = 0;
+  if (typeof state.goldDungeonChallengesToday !== "number") state.goldDungeonChallengesToday = 0;
+  if (typeof state.lastGoldDungeonResetAt !== "number") state.lastGoldDungeonResetAt = null;
   return state;
 }
 
@@ -410,4 +419,55 @@ export function tryUseSummonScroll(state: PlayerState): boolean {
   if (state.summonScrolls <= 0) return false;
   state.summonScrolls -= 1;
   return true;
+}
+
+/** 日付が変わっていたらゴールドダンジョンの本日の挑戦回数をリセットする(カレンダー日の変わり目で判定) */
+function resetGoldDungeonChallengesIfNewDay(state: PlayerState, now: number): void {
+  const isNewDay =
+    state.lastGoldDungeonResetAt === null || new Date(state.lastGoldDungeonResetAt).toDateString() !== new Date(now).toDateString();
+  if (isNewDay) {
+    state.goldDungeonChallengesToday = 0;
+    state.lastGoldDungeonResetAt = now;
+  }
+}
+
+/** ゴールドダンジョンの本日の残り挑戦回数 */
+export function goldDungeonChallengesRemaining(state: PlayerState, now: number = Date.now()): number {
+  resetGoldDungeonChallengesIfNewDay(state, now);
+  return Math.max(0, GOLD_DUNGEON_DAILY_LIMIT - state.goldDungeonChallengesToday);
+}
+
+export interface GoldDungeonChallengeResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/** ゴールドダンジョンへの挑戦権を1回消費する(スタミナとは別に、1日GOLD_DUNGEON_DAILY_LIMIT回までの制限を課す) */
+export function trySpendGoldDungeonChallenge(state: PlayerState, now: number = Date.now()): GoldDungeonChallengeResult {
+  resetGoldDungeonChallengesIfNewDay(state, now);
+  if (state.goldDungeonChallengesToday >= GOLD_DUNGEON_DAILY_LIMIT) {
+    return { ok: false, reason: "本日のゴールドダンジョン挑戦回数の上限に達しています" };
+  }
+  state.goldDungeonChallengesToday += 1;
+  return { ok: true };
+}
+
+export interface SellEquipmentResult {
+  ok: boolean;
+  reason?: string;
+  goldEarned: number;
+}
+
+/** 装備を売却してゴールドを得る。装着中の装備は先に外す必要がある */
+export function sellEquipment(state: PlayerState, equipmentId: string): SellEquipmentResult {
+  const equipment = state.equipment.find((e) => e.id === equipmentId);
+  if (!equipment) return { ok: false, reason: "装備が見つかりません", goldEarned: 0 };
+  if (isEquipmentEquipped(state, equipmentId)) {
+    return { ok: false, reason: "装着中の装備は売却できません(先に外してください)", goldEarned: 0 };
+  }
+
+  const goldEarned = equipmentSellPrice(equipment);
+  state.equipment = state.equipment.filter((e) => e.id !== equipmentId);
+  state.gold += goldEarned;
+  return { ok: true, goldEarned };
 }

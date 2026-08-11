@@ -3,6 +3,8 @@ import {
   EQUIP_SLOTS,
   SLOT_MAIN_STAT_OPTIONS,
   applyEquipmentToStats,
+  enhanceEquipment,
+  equipmentSellPrice,
   generateEquipment,
   generateThemedStageEquipment,
 } from "../src/core/equipment.js";
@@ -89,6 +91,31 @@ describe("装備込みステータス計算 (applyEquipmentToStats)", () => {
     const result = applyEquipmentToStats({ ...BASE_STATS, criRate: 0.9, resistance: 0.9 }, many);
     expect(result.criRate).toBeLessThanOrEqual(1);
     expect(result.resistance).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("装備売却価格 (equipmentSellPrice)", () => {
+  it("星が高いほど売却価格が高い", () => {
+    const rng = mulberry32(8);
+    const low = generateEquipment({ slot: 1, star: 1, subStatCount: 0, rng });
+    const high = generateEquipment({ slot: 1, star: 6, subStatCount: 0, rng });
+    expect(equipmentSellPrice(high)).toBeGreaterThan(equipmentSellPrice(low));
+  });
+
+  it("強化レベルが高いほど売却価格が高い", () => {
+    const rng = mulberry32(9);
+    const eq = generateEquipment({ slot: 1, star: 3, subStatCount: 0, rng });
+    const priceBefore = equipmentSellPrice(eq);
+    enhanceEquipment(eq, rng);
+    const priceAfter = equipmentSellPrice(eq);
+    expect(priceAfter).toBeGreaterThan(priceBefore);
+  });
+
+  it("サブステータスが多いほど売却価格が高い", () => {
+    const rng = mulberry32(10);
+    const noSub = generateEquipment({ slot: 6, star: 3, subStatCount: 0, rng });
+    const withSub = generateEquipment({ slot: 6, star: 3, subStatCount: 4, rng });
+    expect(equipmentSellPrice(withSub)).toBeGreaterThan(equipmentSellPrice(noSub));
   });
 });
 
