@@ -21,6 +21,8 @@ const VIEWPORTS = [
   // ソフトウェアGL(swiftshader)で撮るため、dprは1に抑える(2にするとブルーム込みで描画が間に合わない)
   { name: "phone", width: 430, height: 932, dpr: 1 },
   { name: "tablet", width: 900, height: 1200, dpr: 1 },
+  // 端末を寝かせた状態。4体対4体の並びに最も合う構図なので必ず確認する
+  { name: "landscape", width: 932, height: 430, dpr: 1 },
 ];
 
 /** バトルの進行度違い。序盤の整列と、戦闘中盤の荒れた画を両方撮る */
