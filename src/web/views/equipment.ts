@@ -1,4 +1,4 @@
-import { canEnhanceEquipment, enhanceEquipmentCost, Equipment, EquipSlot, SET_LABEL, STAT_LABEL, StatRoll } from "../../core/equipment.js";
+import { canEnhanceEquipment, enhanceEquipmentCost, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, StatRoll } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -12,12 +12,14 @@ export interface EquipmentProps {
   player: PlayerState;
   detailId: string | null;
   pickerContext: EquipmentPickerContext | null;
+  slotFilter: EquipSlot | null;
   onSelectDetail: (id: string | null) => void;
   onEquip: (equipmentId: string, monsterId: string) => void;
   onUnequip: (equipmentId: string) => void;
   onEnhance: (equipmentId: string) => void;
   onCancelPicker: () => void;
   onGoDungeon: () => void;
+  onChangeSlotFilter: (slot: EquipSlot | null) => void;
 }
 
 function formatStatValue(roll: StatRoll): string {
@@ -35,24 +37,56 @@ function equipmentOwnerName(player: PlayerState, equipment: Equipment): string |
 
 function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () => void): HTMLElement {
   const ownerName = equipmentOwnerName(player, equipment);
+  const subLines =
+    equipment.subStats.length > 0
+      ? equipment.subStats.map((s) => el("div", { className: "equip-card__sub-line" }, [`・${formatStatValue(s)}`]))
+      : [el("div", { className: "equip-card__sub-line equip-card__sub-line--empty" }, ["サブステータスなし"])];
+
   return el(
     "button",
     { type: "button", className: "equip-card", onclick: onClick },
     [
-      el("div", { className: "equip-card__slot" }, [`S${equipment.slot}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),
+      el("div", { className: "equip-card__slot" }, [`${SLOT_LABEL[equipment.slot]}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),
       el("div", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
       el("div", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
-      el("div", { className: "equip-card__main" }, [formatStatValue(equipment.mainStat)]),
-      el("div", { className: "equip-card__subs" }, [`サブ${equipment.subStats.length}個`]),
+      el("div", { className: "equip-card__main" }, [`メイン: ${formatStatValue(equipment.mainStat)}`]),
+      el("div", { className: "equip-card__subs" }, subLines),
       ownerName ? el("div", { className: "equip-card__owner" }, [`装着中: ${ownerName}`]) : el("div", { className: "equip-card__owner equip-card__owner--free" }, ["未装着"]),
     ],
   );
 }
 
+function renderSlotFilterRow(props: EquipmentProps): HTMLElement {
+  const allChip = el(
+    "button",
+    {
+      type: "button",
+      className: `slot-filter-chip${props.slotFilter === null ? " slot-filter-chip--active" : ""}`,
+      onclick: () => props.onChangeSlotFilter(null),
+    },
+    ["すべて"],
+  );
+  const slotChips = EQUIP_SLOTS.map((slot) =>
+    el(
+      "button",
+      {
+        type: "button",
+        className: `slot-filter-chip${props.slotFilter === slot ? " slot-filter-chip--active" : ""}`,
+        onclick: () => props.onChangeSlotFilter(slot),
+      },
+      [SLOT_LABEL[slot]],
+    ),
+  );
+  return el("div", { className: "slot-filter-row" }, [allChip, ...slotChips]);
+}
+
 function renderList(props: EquipmentProps): HTMLElement {
   const items = props.pickerContext
     ? props.player.equipment.filter((e) => e.slot === props.pickerContext!.slot)
-    : props.player.equipment;
+    : props.player.equipment
+        .filter((e) => props.slotFilter === null || e.slot === props.slotFilter)
+        .slice()
+        .sort((a, b) => a.slot - b.slot || b.star - a.star || b.level - a.level);
 
   const cards = items.map((eq) =>
     equipmentCard(props.player, eq, () => {
@@ -72,6 +106,7 @@ function renderList(props: EquipmentProps): HTMLElement {
     props.pickerContext
       ? el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancelPicker }, ["◀ キャンセル"])
       : el("button", { type: "button", className: "btn btn--primary btn--large", onclick: props.onGoDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
+    props.pickerContext ? null : renderSlotFilterRow(props),
     el("section", { className: "panel" }, [
       items.length === 0
         ? el("p", { className: "app-subtitle" }, ["該当する装備がありません。ステージクリアでドロップします。"])

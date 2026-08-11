@@ -81,6 +81,7 @@ interface AppState {
   stageResult: StageResultInfo | null;
   equipmentDetailId: string | null;
   equipmentPickerContext: EquipmentPickerContext | null;
+  equipmentSlotFilter: EquipSlot | null;
   selectedDungeonFloor: number | null;
   dungeonRun: DungeonRunState | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
@@ -107,6 +108,7 @@ const state: AppState = {
   stageResult: null,
   equipmentDetailId: null,
   equipmentPickerContext: null,
+  equipmentSlotFilter: null,
   selectedDungeonFloor: null,
   dungeonRun: null,
   selectedLevelDungeonTier: null,
@@ -137,6 +139,7 @@ function routeKey(): string {
     state.rankUpMode,
     state.equipmentDetailId,
     state.equipmentPickerContext,
+    state.equipmentSlotFilter,
     state.selectedStageId,
     state.selectedDifficulty,
     state.selectedDungeonFloor,
@@ -156,6 +159,7 @@ function navigate(screen: ScreenName): void {
   state.summonResults = null;
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
+  state.equipmentSlotFilter = null;
   state.selectedDungeonFloor = null;
   state.selectedLevelDungeonTier = null;
   state.selectedDexEntryId = null;
@@ -798,6 +802,11 @@ function renderEquipmentScreen(): HTMLElement {
     player: state.player,
     detailId: state.equipmentDetailId,
     pickerContext: state.equipmentPickerContext,
+    slotFilter: state.equipmentSlotFilter,
+    onChangeSlotFilter: (slot) => {
+      state.equipmentSlotFilter = slot;
+      render();
+    },
     onSelectDetail: (id) => {
       state.equipmentDetailId = id;
       render();
