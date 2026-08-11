@@ -17,7 +17,12 @@ export interface DamageEffect {
 
 export interface HealEffect {
   kind: "HEAL";
-  /** 対象の最大HPに対する割合 */
+  /**
+   * healRateの基準にする値。省略時(undefined)は対象の最大HPに対する割合。
+   * "atk"/"def"を指定すると、施術者(スキルの使い手)の攻撃力/防御力に対する割合になる。
+   */
+  scaleStat?: "atk" | "def";
+  /** scaleStat省略時は対象の最大HPに対する割合、指定時は施術者のその能力値に対する割合 */
   healRate: number;
 }
 
@@ -112,6 +117,8 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "DAMAGE":
       return `ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}`;
     case "HEAL":
+      if (effect.scaleStat === "atk") return `回復量 自身の攻撃力の${(effect.healRate * 100).toFixed(0)}%`;
+      if (effect.scaleStat === "def") return `回復量 自身の防御力の${(effect.healRate * 100).toFixed(0)}%`;
       return `回復量 最大HPの${(effect.healRate * 100).toFixed(1)}%`;
     case "BUFF":
       return `${BUFF_STAT_JA[effect.stat]}+${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;

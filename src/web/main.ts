@@ -3,26 +3,22 @@ import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { EquipSlot } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
-import { MonsterInstance, addExp } from "../core/monsterInstance.js";
-import { STAR_MAX_LEVEL } from "../core/rarity.js";
-import { findMonsterById } from "../data/monsters.js";
-import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
-import { Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
+import { MonsterInstance } from "../core/monsterInstance.js";
+import { DungeonFloor } from "../data/equipmentDungeon.js";
+import { Stage } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
+import { AutoFarmResult, runDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
+import { applyDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
 import { applySkillTraining, checkSkillTraining } from "../game/skillTraining.js";
 import {
   PlayerState,
-  addEquipment,
-  addFighterExp,
   addMonster,
-  addSummonScrolls,
   applyPassiveStaminaRegen,
   equipToMonster,
   getDungeonParty,
   getParty,
   loadPlayerState,
-  markStageCleared,
   removeMonsters,
   savePlayerState,
   toggleDungeonPartyMember,
@@ -34,6 +30,7 @@ import {
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
+import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
@@ -82,6 +79,9 @@ interface AppState {
   skillTrainingTargetId: string | null;
   skillTrainingMaterialIds: string[];
   partyEditMode: PartyEditMode;
+  autoFarmCount: number;
+  autoFarmResult: AutoFarmResult | null;
+  autoFarmTargetName: string;
 }
 
 const state: AppState = {
@@ -102,6 +102,9 @@ const state: AppState = {
   skillTrainingTargetId: null,
   skillTrainingMaterialIds: [],
   partyEditMode: "NORMAL",
+  autoFarmCount: 10,
+  autoFarmResult: null,
+  autoFarmTargetName: "",
 };
 
 const rootCandidate = document.getElementById("app");
@@ -123,6 +126,7 @@ function navigate(screen: ScreenName): void {
   state.selectedDexEntryId = null;
   state.skillTrainingTargetId = null;
   state.skillTrainingMaterialIds = [];
+  state.autoFarmResult = null;
   render();
 }
 
@@ -256,56 +260,27 @@ function finishStage(cleared: boolean): void {
   if (!run) return;
   const stage = run.stage;
 
-  const levelUps: StageResultLevelUp[] = [];
-  const expTotal = run.wavesCleared * stage.rewards.waveExp;
-  for (const id of run.originalPartyIds) {
-    const instance = state.player.monsters.find((m) => m.id === id);
-    if (!instance) continue;
-    const gained = addExp(instance, expTotal, STAR_MAX_LEVEL[instance.star]);
-    if (gained > 0) {
-      const dex = findMonsterById(instance.dexId);
-      levelUps.push({ instanceId: id, name: dex ? dex.name : instance.dexId, levels: gained });
-    }
-  }
-
-  let totalGold = run.goldEarned;
-  let drop: StageDrop | null = null;
-  let equipmentDrop = null;
-  let pigDrop: StageDrop | null = null;
-  let summonScrollDropped = false;
-  let fighterLevelsGained = 0;
-  if (cleared) {
-    totalGold += stage.rewards.clearGold;
-    markStageCleared(state.player, stage.id);
-    drop = rollStageDrop(stage);
-    if (drop) addMonster(state.player, drop.dexId, drop.star);
-    equipmentDrop = rollStageEquipment(stage);
-    if (equipmentDrop) addEquipment(state.player, equipmentDrop);
-
-    pigDrop = rollStageReincarnationPig();
-    if (pigDrop) addMonster(state.player, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);
-
-    summonScrollDropped = rollStageSummonScroll();
-    if (summonScrollDropped) addSummonScrolls(state.player, 1);
-
-    fighterLevelsGained = addFighterExp(state.player, expTotal).levelsGained;
-  }
-  state.player.gold += totalGold;
+  const partyInstances = run.originalPartyIds
+    .map((id) => state.player.monsters.find((m) => m.id === id))
+    .filter((m): m is MonsterInstance => m !== undefined);
+  const reward = cleared ? applyStageClearRewards(state.player, stage, run.wavesCleared, partyInstances) : null;
+  state.player.gold += run.goldEarned;
   savePlayerState(state.player);
 
   state.stageResult = {
     cleared,
     stageName: stage.name,
-    goldEarned: totalGold,
+    goldEarned: run.goldEarned + (reward?.goldEarned ?? 0),
+    crystalEarned: reward?.crystalEarned ?? 0,
     wavesCleared: run.wavesCleared,
     totalWaves: stage.waves.length,
-    levelUps,
-    dropDexId: drop ? drop.dexId : null,
-    dropStar: drop ? drop.star : null,
-    equipmentDrop,
-    pigDrop,
-    summonScrollDropped,
-    fighterLevelsGained,
+    levelUps: reward?.levelUps ?? [],
+    dropDexId: reward?.dropDexId ?? null,
+    dropStar: reward?.dropStar ?? null,
+    equipmentDrop: reward?.equipmentDrop ?? null,
+    pigDrop: reward?.pigDrop ?? null,
+    summonScrollDropped: reward?.summonScrollDropped ?? false,
+    fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.stageRun = null;
   state.screen = "STAGE_RESULT";
@@ -327,58 +302,46 @@ function finishDungeon(cleared: boolean): void {
   if (!run) return;
   const floor = run.floor;
 
-  const levelUps: StageResultLevelUp[] = [];
-  let goldEarned = 0;
-  let equipmentDrop = null;
-  let pigDrop: StageDrop | null = null;
-  let summonScrollDropped = false;
-  let fighterLevelsGained = 0;
-
-  if (cleared) {
-    const expTotal = floor.floor * 20;
-    for (const instance of run.partyInstances) {
-      const gained = addExp(instance, expTotal, STAR_MAX_LEVEL[instance.star]);
-      if (gained > 0) {
-        const dex = findMonsterById(instance.dexId);
-        levelUps.push({ instanceId: instance.id, name: dex ? dex.name : instance.dexId, levels: gained });
-      }
-    }
-
-    goldEarned = floor.goldReward;
-    equipmentDrop = rollDungeonEquipment(floor);
-    addEquipment(state.player, equipmentDrop);
-
-    summonScrollDropped = rollDungeonSummonScroll();
-    if (summonScrollDropped) addSummonScrolls(state.player, 1);
-
-    const pig = rollDungeonReincarnationPig(floor);
-    if (pig) {
-      pigDrop = { dexId: pig.dexId, star: pig.star };
-      addMonster(state.player, pig.dexId, pig.star, STAR_MAX_LEVEL[pig.star]);
-    }
-
-    fighterLevelsGained = addFighterExp(state.player, expTotal).levelsGained;
-  }
-
-  state.player.gold += goldEarned;
+  const reward = cleared ? applyDungeonClearRewards(state.player, floor, run.partyInstances) : null;
   savePlayerState(state.player);
 
   state.stageResult = {
     cleared,
     stageName: floor.name,
-    goldEarned,
+    goldEarned: reward?.goldEarned ?? 0,
+    crystalEarned: reward?.crystalEarned ?? 0,
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
-    levelUps,
+    levelUps: reward?.levelUps ?? [],
     dropDexId: null,
     dropStar: null,
-    equipmentDrop,
-    pigDrop,
-    summonScrollDropped,
-    fighterLevelsGained,
+    equipmentDrop: reward?.equipmentDrop ?? null,
+    pigDrop: reward?.pigDrop ?? null,
+    summonScrollDropped: reward?.summonScrollDropped ?? false,
+    fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.dungeonRun = null;
   state.screen = "STAGE_RESULT";
+  render();
+}
+
+function handleAutoFarmStage(stage: Stage, count: number): void {
+  const result = runStageAutoFarm(state.player, stage, count);
+  savePlayerState(state.player);
+  state.autoFarmResult = result;
+  state.autoFarmTargetName = stage.name;
+  state.selectedStageId = null;
+  state.screen = "AUTO_FARM_RESULT";
+  render();
+}
+
+function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
+  const result = runDungeonAutoFarm(state.player, floor, count);
+  savePlayerState(state.player);
+  state.autoFarmResult = result;
+  state.autoFarmTargetName = floor.name;
+  state.selectedDungeonFloor = null;
+  state.screen = "AUTO_FARM_RESULT";
   render();
 }
 
@@ -498,6 +461,12 @@ function render(): void {
           render();
         },
         onStartStage: startStage,
+        autoFarmCount: state.autoFarmCount,
+        onChangeAutoFarmCount: (count) => {
+          state.autoFarmCount = count;
+          render();
+        },
+        onAutoFarm: handleAutoFarmStage,
       });
       break;
 
@@ -522,6 +491,12 @@ function render(): void {
           state.screen = "DUNGEON_PARTY";
           render();
         },
+        autoFarmCount: state.autoFarmCount,
+        onChangeAutoFarmCount: (count) => {
+          state.autoFarmCount = count;
+          render();
+        },
+        onAutoFarm: handleAutoFarmDungeon,
       });
       break;
 
@@ -597,6 +572,17 @@ function render(): void {
         return;
       }
       content = renderStageResult({ info, onClose: () => navigate("HOME") });
+      break;
+    }
+
+    case "AUTO_FARM_RESULT": {
+      showNav = false;
+      const result = state.autoFarmResult;
+      if (!result) {
+        navigate("HOME");
+        return;
+      }
+      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, onClose: () => navigate("HOME") });
       break;
     }
   }

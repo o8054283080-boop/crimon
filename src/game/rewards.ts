@@ -1,0 +1,140 @@
+import { MonsterInstance, addExp } from "../core/monsterInstance.js";
+import { STAR_MAX_LEVEL } from "../core/rarity.js";
+import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
+import { Equipment } from "../core/equipment.js";
+import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
+import { findMonsterById } from "../data/monsters.js";
+import { Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
+import {
+  FIRST_CLEAR_CRYSTAL_REWARD,
+  PlayerState,
+  addEquipment,
+  addFighterExp,
+  addMonster,
+  addSummonScrolls,
+  isDungeonFloorCleared,
+  isStageCleared,
+  markDungeonFloorCleared,
+  markStageCleared,
+} from "./playerState.js";
+
+export interface LevelUpInfo {
+  instanceId: string;
+  name: string;
+  levels: number;
+}
+
+export interface ClearRewardResult {
+  /** ステージクリアボーナス/装備ダンジョンクリア報酬のゴールド(ウェーブ毎のゴールドは含まない) */
+  goldEarned: number;
+  crystalEarned: number;
+  expTotal: number;
+  levelUps: LevelUpInfo[];
+  dropDexId: string | null;
+  dropStar: number | null;
+  equipmentDrop: Equipment | null;
+  pigDrop: StageDrop | null;
+  summonScrollDropped: boolean;
+  fighterLevelsGained: number;
+}
+
+function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal: number): LevelUpInfo[] {
+  const levelUps: LevelUpInfo[] = [];
+  for (const instance of partyInstances) {
+    const gained = addExp(instance, expTotal, STAR_MAX_LEVEL[instance.star]);
+    if (gained > 0) {
+      const dex = findMonsterById(instance.dexId);
+      levelUps.push({ instanceId: instance.id, name: dex ? dex.name : instance.dexId, levels: gained });
+    }
+  }
+  return levelUps;
+}
+
+/**
+ * ステージクリア(全ウェーブ)時の報酬をまとめて付与する。
+ * ダイヤは初回クリアなら200、既にクリア済みのステージなら消費スタミナと同量。
+ */
+export function applyStageClearRewards(
+  state: PlayerState,
+  stage: Stage,
+  wavesCleared: number,
+  partyInstances: MonsterInstance[],
+): ClearRewardResult {
+  const isFirstClear = !isStageCleared(state, stage.id);
+  markStageCleared(state, stage.id);
+
+  const expTotal = wavesCleared * stage.rewards.waveExp;
+  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+
+  const goldEarned = stage.rewards.clearGold;
+  const crystalEarned = isFirstClear ? FIRST_CLEAR_CRYSTAL_REWARD : STAGE_STAMINA_COST;
+
+  const drop = rollStageDrop(stage);
+  if (drop) addMonster(state, drop.dexId, drop.star);
+  const equipmentDrop = rollStageEquipment(stage);
+  if (equipmentDrop) addEquipment(state, equipmentDrop);
+  const pigDrop = rollStageReincarnationPig();
+  if (pigDrop) addMonster(state, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);
+  const summonScrollDropped = rollStageSummonScroll();
+  if (summonScrollDropped) addSummonScrolls(state, 1);
+  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+
+  state.gold += goldEarned;
+  state.crystal += crystalEarned;
+
+  return {
+    goldEarned,
+    crystalEarned,
+    expTotal,
+    levelUps,
+    dropDexId: drop ? drop.dexId : null,
+    dropStar: drop ? drop.star : null,
+    equipmentDrop,
+    pigDrop,
+    summonScrollDropped,
+    fighterLevelsGained,
+  };
+}
+
+/**
+ * 装備ダンジョンクリア時の報酬をまとめて付与する。
+ * ダイヤは初回クリアなら200、既にクリア済みの階層なら消費スタミナと同量。
+ */
+export function applyDungeonClearRewards(state: PlayerState, floor: DungeonFloor, partyInstances: MonsterInstance[]): ClearRewardResult {
+  const isFirstClear = !isDungeonFloorCleared(state, floor.floor);
+  markDungeonFloorCleared(state, floor.floor);
+
+  const expTotal = floor.floor * 20;
+  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+
+  const goldEarned = floor.goldReward;
+  const crystalEarned = isFirstClear ? FIRST_CLEAR_CRYSTAL_REWARD : DUNGEON_STAMINA_COST;
+
+  const equipmentDrop = rollDungeonEquipment(floor);
+  addEquipment(state, equipmentDrop);
+  const summonScrollDropped = rollDungeonSummonScroll();
+  if (summonScrollDropped) addSummonScrolls(state, 1);
+  let pigDrop: StageDrop | null = null;
+  const pig = rollDungeonReincarnationPig(floor);
+  if (pig) {
+    pigDrop = { dexId: pig.dexId, star: pig.star };
+    addMonster(state, pig.dexId, pig.star, STAR_MAX_LEVEL[pig.star]);
+  }
+  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+
+  state.gold += goldEarned;
+  state.crystal += crystalEarned;
+
+  return {
+    goldEarned,
+    crystalEarned,
+    expTotal,
+    levelUps,
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop,
+    pigDrop,
+    summonScrollDropped,
+    fighterLevelsGained,
+  };
+}

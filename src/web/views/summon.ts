@@ -36,11 +36,12 @@ export function renderSummon(props: SummonProps): HTMLElement {
   const canTen = player.crystal >= SUMMON_COST_TEN;
 
   return el("div", { className: "screen summon-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["召喚"]), el("p", { className: "app-subtitle" }, ["光・闇属性はレア枠(排出率低め)です"])]),
+    el("header", { className: "app-header" }, [el("h1", {}, ["召喚"]), el("p", { className: "app-subtitle" }, ["星3以上が確定。光・闇属性はレア枠(排出率低め)です"])]),
     el("section", { className: "panel currency-panel" }, [el("div", { className: "currency-chip" }, [el("span", {}, ["💎"]), ` ${player.crystal}`])]),
     el("section", { className: "panel gacha-info" }, [
-      el("p", {}, ["通常属性(火・水・電気・草)は排出率が高く、光・闇はレア枠として排出率が低い代わりに高い星でも排出されます。"]),
-      el("p", {}, ["10連召喚では、レアが1体も出なかった場合に必ず1体レア(光/闇)が確定します。"]),
+      el("p", {}, ["召喚では星3以上のモンスターが確定で出現します。星4はSR、星5はSSRの専用モンスターです。"]),
+      el("p", {}, ["通常属性(火・水・電気・草)は排出率が高く、光・闇はレア枠として排出率が低い代わりに、より強力な専用スキルを持つ上位モンスターが揃っています。"]),
+      el("p", {}, ["10連召喚では、レア(光/闇)が1体も出なかった場合に必ず1体レアが確定します。"]),
     ]),
     el(
       "button",

@@ -25,5 +25,5 @@ export function maxStaminaForFighterLevel(level: number): number {
 
 /** そのファイターレベルから次のレベルに上がるために必要な累積経験値 */
 export function requiredExpForFighterLevel(level: number): number {
-  return Math.round(60 * level ** 1.5);
+  return Math.round(130 * level ** 1.5);
 }
