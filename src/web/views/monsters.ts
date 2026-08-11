@@ -19,16 +19,21 @@ export interface MonstersProps {
   onCancelRankUp: () => void;
   onSelectSlot: (monsterId: string, slot: EquipSlot) => void;
   onUnequipSlot: (monsterId: string, slot: EquipSlot) => void;
-  onGoSkillTraining: (monsterId: string) => void;
+  onGoMonsterTraining: (monsterId: string) => void;
   onGoMonsterDex: () => void;
 }
 
-export function monsterCard(instance: MonsterInstance, onClick: () => void, extra?: { selected?: boolean; disabled?: boolean }): HTMLElement {
+export function monsterCard(
+  instance: MonsterInstance,
+  onClick: () => void,
+  extra?: { selected?: boolean; disabled?: boolean; bonus?: boolean },
+): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   const maxLevel = STAR_MAX_LEVEL[instance.star];
   const classes = ["monster-card"];
   if (extra?.selected) classes.push("monster-card--selected");
   if (extra?.disabled) classes.push("monster-card--disabled");
+  if (extra?.bonus) classes.push("monster-card--bonus");
 
   return el(
     "button",
@@ -39,10 +44,11 @@ export function monsterCard(instance: MonsterInstance, onClick: () => void, extr
       onclick: onClick,
     },
     [
+      extra?.bonus ? el("div", { className: "monster-card__bonus-badge" }, ["★"]) : null,
       el("div", { className: "monster-card__avatar", style: dex ? `background:${dex.color}` : undefined }, [dex ? dex.emoji : "❓"]),
       el("div", { className: "monster-card__name" }, [dex ? dex.name : instance.dexId]),
       el("div", { className: "monster-card__meta" }, [`${starLabel(instance.star)} Lv${instance.level}/${maxLevel}`]),
-    ],
+    ].filter((n): n is HTMLDivElement => n !== null),
   );
 }
 
@@ -88,16 +94,15 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
   return el("div", { className: "equip-slot-grid" }, boxes);
 }
 
-function renderSkillPanel(dex: ReturnType<typeof findMonsterById>, instance: MonsterInstance, onGoSkillTraining: () => void): HTMLElement | null {
+function renderSkillPanel(dex: ReturnType<typeof findMonsterById>, instance: MonsterInstance, onGoMonsterTraining: () => void): HTMLElement | null {
   if (!dex) return null;
 
   return el("section", { className: "panel" }, [
     el("h2", {}, ["スキル"]),
     ...renderSkillRows(dex.skills, instance.skillLevels),
-    isSkillMaxLevel(instance)
-      ? el("p", { className: "app-subtitle" }, ["スキルはすべて最大レベルです"])
-      : el("button", { type: "button", className: "btn btn--ghost", onclick: onGoSkillTraining }, ["🔼 スキル強化"]),
-  ]);
+    isSkillMaxLevel(instance) ? el("p", { className: "app-subtitle" }, ["スキルはすべて最大レベルです"]) : null,
+    el("button", { type: "button", className: "btn btn--ghost", onclick: onGoMonsterTraining }, ["💪 モンスター強化"]),
+  ].filter((n): n is HTMLElement => n !== null));
 }
 
 function renderSetBonusPanel(equippedItems: ReturnType<typeof resolveEquippedItems>): HTMLElement | null {
@@ -142,7 +147,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
         ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
     ].filter((n): n is HTMLDivElement => n !== null)),
-    renderSkillPanel(dex, instance, () => props.onGoSkillTraining(instance.id)),
+    renderSkillPanel(dex, instance, () => props.onGoMonsterTraining(instance.id)),
     el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
     renderSetBonusPanel(equippedItems),
     rankReady

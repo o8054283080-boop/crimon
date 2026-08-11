@@ -13,7 +13,7 @@ export type ScreenName =
   | "DUNGEON_BATTLE"
   | "DUNGEON_PARTY"
   | "MONSTER_DEX"
-  | "SKILL_TRAINING"
+  | "MONSTER_TRAINING"
   | "AUTO_FARM_RESULT";
 
 const TABS: { screen: ScreenName; icon: string; label: string }[] = [

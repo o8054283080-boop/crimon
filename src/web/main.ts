@@ -10,7 +10,7 @@ import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from ".
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, runDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
 import { applyDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
-import { applySkillTraining, checkSkillTraining } from "../game/skillTraining.js";
+import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import {
   PlayerState,
   addMonster,
@@ -39,7 +39,7 @@ import { renderHome } from "./views/home.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderMonsters } from "./views/monsters.js";
 import { PartyEditMode, renderParty } from "./views/party.js";
-import { renderSkillTraining } from "./views/skillTraining.js";
+import { renderMonsterTraining } from "./views/monsterTraining.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
@@ -78,8 +78,8 @@ interface AppState {
   selectedDungeonFloor: number | null;
   dungeonRun: DungeonRunState | null;
   selectedDexEntryId: string | null;
-  skillTrainingTargetId: string | null;
-  skillTrainingMaterialIds: string[];
+  monsterTrainingTargetId: string | null;
+  monsterTrainingMaterialIds: string[];
   partyEditMode: PartyEditMode;
   autoFarmCount: number;
   autoFarmResult: AutoFarmResult | null;
@@ -102,8 +102,8 @@ const state: AppState = {
   selectedDungeonFloor: null,
   dungeonRun: null,
   selectedDexEntryId: null,
-  skillTrainingTargetId: null,
-  skillTrainingMaterialIds: [],
+  monsterTrainingTargetId: null,
+  monsterTrainingMaterialIds: [],
   partyEditMode: "NORMAL",
   autoFarmCount: 10,
   autoFarmResult: null,
@@ -128,8 +128,8 @@ function navigate(screen: ScreenName): void {
   state.equipmentPickerContext = null;
   state.selectedDungeonFloor = null;
   state.selectedDexEntryId = null;
-  state.skillTrainingTargetId = null;
-  state.skillTrainingMaterialIds = [];
+  state.monsterTrainingTargetId = null;
+  state.monsterTrainingMaterialIds = [];
   state.autoFarmResult = null;
   render();
 }
@@ -210,20 +210,20 @@ function handleConfirmRankUp(): void {
   render();
 }
 
-function handleConfirmSkillTraining(): void {
-  const target = state.player.monsters.find((m) => m.id === state.skillTrainingTargetId);
+function handleConfirmMonsterTraining(): void {
+  const target = state.player.monsters.find((m) => m.id === state.monsterTrainingTargetId);
   if (!target) return;
-  const materials = state.skillTrainingMaterialIds
+  const materials = state.monsterTrainingMaterialIds
     .map((id) => state.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
-  const check = checkSkillTraining(target, materials, state.player.partyIds);
+  const check = checkMonsterPowerUp(target, materials, state.player.partyIds);
   if (!check.ok) return;
 
-  applySkillTraining(target, materials.length);
-  removeMonsters(state.player, state.skillTrainingMaterialIds);
+  applyMonsterPowerUp(target, materials);
+  removeMonsters(state.player, state.monsterTrainingMaterialIds);
   savePlayerState(state.player);
-  state.skillTrainingTargetId = null;
-  state.skillTrainingMaterialIds = [];
+  state.monsterTrainingTargetId = null;
+  state.monsterTrainingMaterialIds = [];
   state.monsterDetailId = target.id;
   state.screen = "MONSTERS";
   render();
@@ -552,25 +552,25 @@ function render(): void {
       });
       break;
 
-    case "SKILL_TRAINING": {
-      if (!state.skillTrainingTargetId) {
+    case "MONSTER_TRAINING": {
+      if (!state.monsterTrainingTargetId) {
         navigate("MONSTERS");
         return;
       }
-      content = renderSkillTraining({
+      content = renderMonsterTraining({
         player: state.player,
-        targetId: state.skillTrainingTargetId,
-        selectedMaterialIds: state.skillTrainingMaterialIds,
+        targetId: state.monsterTrainingTargetId,
+        selectedMaterialIds: state.monsterTrainingMaterialIds,
         onToggleMaterial: (id) => {
-          const idx = state.skillTrainingMaterialIds.indexOf(id);
-          if (idx >= 0) state.skillTrainingMaterialIds.splice(idx, 1);
-          else state.skillTrainingMaterialIds.push(id);
+          const idx = state.monsterTrainingMaterialIds.indexOf(id);
+          if (idx >= 0) state.monsterTrainingMaterialIds.splice(idx, 1);
+          else state.monsterTrainingMaterialIds.push(id);
           render();
         },
-        onConfirm: handleConfirmSkillTraining,
+        onConfirm: handleConfirmMonsterTraining,
         onCancel: () => {
-          state.skillTrainingTargetId = null;
-          state.skillTrainingMaterialIds = [];
+          state.monsterTrainingTargetId = null;
+          state.monsterTrainingMaterialIds = [];
           state.screen = "MONSTERS";
           render();
         },
@@ -649,10 +649,10 @@ function renderMonstersScreen(): HTMLElement {
     },
     onSelectSlot: handleSelectSlot,
     onUnequipSlot: handleUnequipSlot,
-    onGoSkillTraining: (monsterId) => {
-      state.skillTrainingTargetId = monsterId;
-      state.skillTrainingMaterialIds = [];
-      state.screen = "SKILL_TRAINING";
+    onGoMonsterTraining: (monsterId) => {
+      state.monsterTrainingTargetId = monsterId;
+      state.monsterTrainingMaterialIds = [];
+      state.screen = "MONSTER_TRAINING";
       render();
     },
     onGoMonsterDex: () => {

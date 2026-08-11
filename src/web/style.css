@@ -552,6 +552,19 @@ body {
   cursor: not-allowed;
 }
 
+.monster-card--bonus {
+  box-shadow: 0 0 0 1px var(--accent, gold) inset;
+  position: relative;
+}
+
+.monster-card__bonus-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.75rem;
+  color: gold;
+}
+
 .monster-card__avatar {
   width: 40px;
   height: 40px;
