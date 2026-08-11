@@ -26,28 +26,39 @@ export interface ScreenAnchor {
   scale: number;
 }
 
-const PLAYER_LINE_Z = 2.7;
-const ENEMY_LINE_Z = -3.2;
-/** 隊列を左右にずらす量。前後の列が重ならないよう、互い違いに配置するために使う */
-const PLAYER_LINE_SHIFT = -0.62;
-const ENEMY_LINE_SHIFT = 0.62;
+const PLAYER_LINE_Z = 3.8;
+const ENEMY_LINE_Z = -5.0;
+
+/**
+ * 奥の列を広げる倍率。
+ *
+ * 遠くのものは透視投影で中央へ寄るため、両チームを同じ間隔で置くと
+ * 奥の列が画面上で詰まり、手前の列の真後ろに隠れてしまう。
+ * (カメラ距離 ÷ 奥の列までの距離)のおおよその比で、あらかじめ
+ * 奥の列だけ横に広げておき、画面上で同じ間隔に見えるようにする。
+ */
+const ENEMY_SPREAD = 1.24;
 
 /**
  * 隊列の並び。
  *
  * 望遠寄りのカメラだと前後の列が画面上で重なりやすいので、
- * 左右にも半歩ずらして「奥のユニットが手前のユニットの隙間に見える」ようにする。
+ * 奥の列を「手前の列の隙間」に来るよう半歩ずらしたうえで、
+ * 上記の ENEMY_SPREAD で遠近による詰まりを打ち消す。
  * さらに端のユニットをわずかに前後させ、直線的な整列を崩して奥行きを出す。
  */
 function slotPositions(count: number, lineZ: number, team: "PLAYER" | "ENEMY"): { x: number; z: number }[] {
   if (count <= 0) return [];
-  const spacing = count <= 4 ? 2.5 : 2.24;
+  const isEnemy = team === "ENEMY";
+  const baseSpacing = count <= 4 ? 2.5 : 2.24;
+  const spacing = baseSpacing * (isEnemy ? ENEMY_SPREAD : 1);
   const totalWidth = (count - 1) * spacing;
-  const shift = team === "PLAYER" ? PLAYER_LINE_SHIFT : ENEMY_LINE_SHIFT;
+  // 半スロット分ずらして、奥の列が手前の列の隙間に覗くようにする
+  const shift = (isEnemy ? 1 : -1) * (baseSpacing / 4) * (isEnemy ? ENEMY_SPREAD : 1);
   return Array.from({ length: count }, (_, i) => {
     const x = -totalWidth / 2 + i * spacing + shift;
     // 手前の列は端ほど奥へ、奥の列は端ほど手前へ。ゆるい弧を描かせる
-    const arc = Math.abs(x) * (team === "PLAYER" ? -0.1 : 0.09);
+    const arc = Math.abs(x) * (isEnemy ? 0.09 : -0.1);
     return { x, z: lineZ + arc };
   });
 }
@@ -181,9 +192,10 @@ export class BattleStage {
     key.shadow.normalBias = 0.02;
     this.scene.add(key);
 
-    // フィルライト: カメラ側の左下から寒色で。キーの影を持ち上げるだけの弱さに留める
-    const fill = new THREE.DirectionalLight(0x6d86d8, 0.62);
-    fill.position.set(-9, 4.5, 9);
+    // フィルライト: カメラ側から。敵チームはこちらを向いて立つため、
+    // この光が敵の正面を照らす主光源になる(弱すぎると敵が黒く沈んで見えなくなる)
+    const fill = new THREE.DirectionalLight(0x93a7e8, 1.05);
+    fill.position.set(-9, 5.5, 12);
     this.scene.add(fill);
 
     // リムライト: 奥のゲート方向から。キャラの輪郭を光らせ、背景から抜く
@@ -230,11 +242,13 @@ export class BattleStage {
     if (this.avatars.size > 0) {
       // 体の太さ + オーラの余白を足して、実際の配置から必要な画角を決める
       this.frameBox = {
-        halfWidth: maxAbsX + 1.5,
+        // 余白は体の太さ分だけ。広く取りすぎるとカメラが引いて
+        // キャラが小さくなり、画面上下に無駄な空きができる
+        halfWidth: maxAbsX + 0.85,
         zNear: maxZ + 1.6,
         zFar: minZ - 1.6,
-        yBottom: -0.15,
-        yTop: 3.35,
+        yBottom: -0.1,
+        yTop: 2.9,
       };
     }
   }
@@ -250,9 +264,9 @@ export class BattleStage {
     const aspect = width / height;
     // 横長ほど望遠に、縦長では収まりを優先して少しだけ広角にする
     const fov = THREE.MathUtils.clamp(34 - (aspect - 0.6) * 9, 24.5, 36);
-    // 見下ろし角。画面上端が地平線の少し上に来る角度にして、
-    // 上部に空と建築、下部に床、という配分を作る
-    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(fov / 2 - 1.8, 9.5, 16.5));
+    // 見下ろし角。浅いと前後の列が画面上で潰れて重なるので、
+    // 奥行きが縦方向の距離に変換される程度まで見下ろす
+    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(fov / 2 + 6, 18, 27));
 
     const tanY = Math.tan(THREE.MathUtils.degToRad(fov / 2));
     const tanX = tanY * aspect;
