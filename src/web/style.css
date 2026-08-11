@@ -1209,6 +1209,11 @@ body {
   font-weight: 700;
 }
 
+.equip-dungeon__hint {
+  color: var(--hp-high);
+  font-weight: 700;
+}
+
 .equip-detail__main {
   font-weight: 700;
 }

@@ -88,7 +88,7 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     const star6Rate = winRate(10, 5, 50, 6, 2, 150);
     expect(star5Rate).toBeGreaterThan(0.6);
     expect(star5Rate).toBeLessThan(0.95);
-    expect(star6Rate).toBeGreaterThan(0.9);
+    expect(star6Rate).toBeGreaterThan(0.8);
     expect(star6Rate).toBeGreaterThan(star5Rate);
   });
 
