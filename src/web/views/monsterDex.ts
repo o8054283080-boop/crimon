@@ -1,4 +1,5 @@
 import { MonsterDefinition } from "../../core/monster.js";
+import { formatExtraStatLines } from "../../core/stats.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../../data/monsters.js";
 import { el } from "../dom.js";
 import { renderSkillGrowthRows } from "./skillPanel.js";
@@ -35,7 +36,13 @@ function renderList(props: MonsterDexProps): HTMLElement {
 }
 
 function renderDetail(props: MonsterDexProps, dex: MonsterDefinition): HTMLElement {
-  const statLines = [`HP ${dex.stats.hp}`, `ATK ${dex.stats.atk}`, `DEF ${dex.stats.def}`, `SPD ${dex.stats.spd}`];
+  const statLines = [
+    `HP ${dex.stats.hp}`,
+    `ATK ${dex.stats.atk}`,
+    `DEF ${dex.stats.def}`,
+    `SPD ${dex.stats.spd}`,
+    ...formatExtraStatLines(dex.stats),
+  ];
 
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [dex.name])]),

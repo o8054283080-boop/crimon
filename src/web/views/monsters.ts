@@ -1,6 +1,7 @@
 import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
 import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
+import { formatExtraStatLines } from "../../core/stats.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
@@ -132,7 +133,13 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const inParty = props.player.partyIds.includes(instance.id);
 
   const statLines = effectiveStats
-    ? [`HP ${effectiveStats.hp}`, `ATK ${effectiveStats.atk}`, `DEF ${effectiveStats.def}`, `SPD ${effectiveStats.spd}`]
+    ? [
+        `HP ${effectiveStats.hp}`,
+        `ATK ${effectiveStats.atk}`,
+        `DEF ${effectiveStats.def}`,
+        `SPD ${effectiveStats.spd}`,
+        ...formatExtraStatLines(effectiveStats),
+      ]
     : [];
 
   return el("div", { className: "screen monsters-screen" }, [
