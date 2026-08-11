@@ -1,7 +1,8 @@
-import { BattleEngine, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
+import { BattleEngine, BattleEvent, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
+import { ActiveEffect } from "../../battle/unit.js";
 import { BattleUnit } from "../../battle/unit.js";
 import { MonsterDefinition } from "../../core/monster.js";
-import { describeSkillEffect } from "../../core/skill.js";
+import { BUFF_STAT_JA, BuffStat, describeSkillEffect } from "../../core/skill.js";
 import { el } from "../dom.js";
 
 export interface BattleViewProps {
@@ -24,9 +25,38 @@ const SPEED_INTERVAL_MS: Record<string, number> = { "1": 650, "2": 300, "4": 120
 
 interface UnitTokenRefs {
   token: HTMLElement;
+  avatar: HTMLElement;
   hpFill: HTMLElement;
   hpText: HTMLElement;
   gaugeFill: HTMLElement;
+  badges: HTMLElement;
+}
+
+const STAT_ICON: Record<BuffStat, string> = { atk: "⚔", def: "🛡", spd: "💨" };
+
+function buildBadge(effect: ActiveEffect): HTMLElement {
+  const isBuff = effect.kind === "BUFF";
+  const arrow = isBuff ? "↑" : "↓";
+  const percent = Math.round(Math.abs(effect.amount) * 100);
+  return el(
+    "span",
+    {
+      className: `unit-badge ${isBuff ? "unit-badge--buff" : "unit-badge--debuff"}`,
+      title: `${BUFF_STAT_JA[effect.stat]}${arrow}${percent}% (残り${effect.remainingTurns}ターン)`,
+    },
+    [`${STAT_ICON[effect.stat]}${arrow}`],
+  );
+}
+
+function buildBadgesRow(snapshot: UnitSnapshot): HTMLElement[] {
+  const badges = snapshot.effects.map((e) => buildBadge(e));
+  if (snapshot.stunTurns > 0) {
+    badges.push(el("span", { className: "unit-badge unit-badge--stun", title: `スタン中(残り${snapshot.stunTurns}ターン)` }, ["💫"]));
+  }
+  if (snapshot.burnTurns > 0) {
+    badges.push(el("span", { className: "unit-badge unit-badge--burn", title: `火傷(残り${snapshot.burnTurns}ターン)` }, ["🔥"]));
+  }
+  return badges;
 }
 
 type PickerState =
@@ -42,17 +72,20 @@ function buildTeamRow(
 ): HTMLElement {
   const tokens = team.map((def, i) => {
     const instanceId = instanceIdOf(i);
+    const avatar = el("div", { className: "unit-token__avatar", style: `background:${def.color}` }, [def.emoji]);
+    const badges = el("div", { className: "unit-token__badges" });
     const hpFill = el("div", { className: "unit-token__hp-fill" });
     const hpText = el("div", { className: "unit-token__hp-text" }, [`${def.stats.hp}/${def.stats.hp}`]);
     const gaugeFill = el("div", { className: "unit-token__gauge-fill" });
     const token = el("div", { className: `unit-token ${teamClass}` }, [
-      el("div", { className: "unit-token__avatar", style: `background:${def.color}` }, [def.emoji]),
+      el("div", { className: "unit-token__avatar-wrap" }, [avatar]),
+      badges,
       el("div", { className: "unit-token__name" }, [def.name]),
       el("div", { className: "unit-token__hp-bar" }, [hpFill]),
       hpText,
       el("div", { className: "unit-token__gauge-bar" }, [gaugeFill]),
     ]);
-    refs.set(instanceId, { token, hpFill, hpText, gaugeFill });
+    refs.set(instanceId, { token, avatar, hpFill, hpText, gaugeFill, badges });
     return token;
   });
   return el("div", { className: `battle-arena__team ${teamClass}s` }, tokens);
@@ -97,20 +130,67 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       refs.hpText.textContent = `${s.currentHp}/${s.maxHp}`;
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
       refs.token.classList.toggle("unit-token--dead", !s.alive);
+      refs.badges.replaceChildren(...buildBadgesRow(s));
     }
   }
 
+  const LOG_LINE_RULES: { match: RegExp; className: string }[] = [
+    { match: /会心の一撃/, className: "battle-log__line--crit" },
+    { match: /は倒れた/, className: "battle-log__line--death" },
+    { match: /ダメージ/, className: "battle-log__line--damage" },
+    { match: /HPが .+ 回復/, className: "battle-log__line--heal" },
+    { match: /が上昇/, className: "battle-log__line--buff" },
+    { match: /が低下/, className: "battle-log__line--debuff" },
+    { match: /スタンした|スタン中で/, className: "battle-log__line--stun" },
+    { match: /火傷/, className: "battle-log__line--burn" },
+    { match: /抵抗した/, className: "battle-log__line--resist" },
+  ];
+
   function appendLines(lines: string[]): void {
     for (const line of lines) {
-      logEl.append(el("div", { className: "battle-log__line" }, [line]));
+      const isSkillLine = !line.startsWith(" ");
+      const extra = LOG_LINE_RULES.find((rule) => rule.match.test(line))?.className;
+      const className = ["battle-log__line", isSkillLine ? "battle-log__line--skill" : null, extra ?? null]
+        .filter((c): c is string => c !== null)
+        .join(" ");
+      logEl.append(el("div", { className }, [line]));
     }
     logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function spawnFloatingNumber(event: BattleEvent): void {
+    if (event.kind === "DEATH") return;
+    const refs = unitRefs.get(event.targetId);
+    if (!refs) return;
+
+    if (event.kind === "DAMAGE") {
+      refs.avatar.classList.remove("unit-token__avatar--hit");
+      // 強制再フローさせて同じアニメーションを連続でも再生できるようにする
+      void refs.avatar.offsetWidth;
+      refs.avatar.classList.add("unit-token__avatar--hit");
+    }
+
+    const text = event.kind === "DAMAGE" ? `-${event.amount}` : event.kind === "HEAL" ? `+${event.amount}` : "MISS";
+    const kindClass =
+      event.kind === "DAMAGE"
+        ? event.isCrit
+          ? "floating-number--crit"
+          : "floating-number--damage"
+        : event.kind === "HEAL"
+          ? "floating-number--heal"
+          : "floating-number--resist";
+
+    const popup = el("div", { className: `floating-number ${kindClass}` }, [event.isCrit ? `${text}!` : text]);
+    refs.token.append(popup);
+    popup.addEventListener("animationend", () => popup.remove());
+    setTimeout(() => popup.remove(), 1200);
   }
 
   function applyRecord(record: TurnRecord): void {
     setActive(record.actorId);
     appendLines(record.lines);
     applySnapshot(record.snapshot);
+    for (const event of record.events) spawnFloatingNumber(event);
   }
 
   function getTargetCandidates(unit: BattleUnit, skill: MonsterDefinition["skills"][number]): BattleUnit[] {
