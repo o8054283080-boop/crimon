@@ -1,5 +1,5 @@
 import { MAX_FIGHTER_LEVEL, requiredExpForFighterLevel } from "../../core/fighterLevel.js";
-import { getParty, PlayerState } from "../../game/playerState.js";
+import { getParty, PlayerState, STAMINA_REFILL_FULL_COST, STAMINA_REFILL_PARTIAL_AMOUNT, STAMINA_REFILL_PARTIAL_COST } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderPartySlots } from "./partyCard.js";
 
@@ -10,14 +10,17 @@ export interface HomeProps {
   onGoParty: () => void;
   onGoEquipDungeon: () => void;
   onGoLevelDungeon: () => void;
+  onRefillStaminaPartial: () => void;
+  onRefillStaminaFull: () => void;
 }
 
 export function renderHome(props: HomeProps): HTMLElement {
-  const { player, onGoSummon, onGoStages, onGoParty, onGoEquipDungeon, onGoLevelDungeon } = props;
+  const { player, onGoSummon, onGoStages, onGoParty, onGoEquipDungeon, onGoLevelDungeon, onRefillStaminaPartial, onRefillStaminaFull } = props;
   const party = getParty(player);
 
   const isMaxFighterLevel = player.fighterLevel >= MAX_FIGHTER_LEVEL;
   const fighterExpNeeded = requiredExpForFighterLevel(player.fighterLevel);
+  const isStaminaFull = player.stamina >= player.maxStamina;
 
   return el("div", { className: "screen home-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["Crimon"]), el("p", { className: "app-subtitle" }, ["周回してモンスターを育てよう"])]),
@@ -31,6 +34,28 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("span", { className: "app-subtitle" }, [isMaxFighterLevel ? "MAX" : `EXP ${player.fighterExp}/${fighterExpNeeded}`]),
       ]),
       el("p", {}, [`⚡ スタミナ ${player.stamina} / ${player.maxStamina}`]),
+      el("div", { className: "stamina-refill-row" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--ghost",
+            disabled: isStaminaFull || player.crystal < STAMINA_REFILL_PARTIAL_COST,
+            onclick: onRefillStaminaPartial,
+          },
+          [`💎${STAMINA_REFILL_PARTIAL_COST}で+${STAMINA_REFILL_PARTIAL_AMOUNT}回復`],
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--ghost",
+            disabled: isStaminaFull || player.crystal < STAMINA_REFILL_FULL_COST,
+            onclick: onRefillStaminaFull,
+          },
+          [`💎${STAMINA_REFILL_FULL_COST}で全回復`],
+        ),
+      ]),
     ]),
     el("section", { className: "panel" }, [
       el("div", { className: "panel-header" }, [el("h2", {}, ["現在のパーティ"]), el("button", { type: "button", className: "btn btn--ghost", onclick: onGoParty }, ["編成へ"])]),

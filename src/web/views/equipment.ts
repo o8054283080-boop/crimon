@@ -81,12 +81,13 @@ function renderSlotFilterRow(props: EquipmentProps): HTMLElement {
 }
 
 function renderList(props: EquipmentProps): HTMLElement {
+  const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
   const items = props.pickerContext
     ? props.player.equipment.filter((e) => e.slot === props.pickerContext!.slot)
     : props.player.equipment
         .filter((e) => props.slotFilter === null || e.slot === props.slotFilter)
         .slice()
-        .sort((a, b) => a.slot - b.slot || b.star - a.star || b.level - a.level);
+        .sort((a, b) => Number(isEquipped(b)) - Number(isEquipped(a)) || a.slot - b.slot || b.star - a.star || b.level - a.level);
 
   const cards = items.map((eq) =>
     equipmentCard(props.player, eq, () => {

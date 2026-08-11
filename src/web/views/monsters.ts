@@ -19,7 +19,7 @@ export interface MonstersProps {
   onConfirmRankUp: () => void;
   onCancelRankUp: () => void;
   onSelectSlot: (monsterId: string, slot: EquipSlot) => void;
-  onViewEquippedSlot: (equipmentId: string) => void;
+  onViewEquippedSlot: (equipmentId: string, monsterId: string) => void;
   onGoMonsterTraining: (monsterId: string) => void;
   onGoMonsterDex: () => void;
 }
@@ -54,7 +54,10 @@ export function monsterCard(
 }
 
 function renderList(props: MonstersProps): HTMLElement {
-  const cards = props.player.monsters.map((instance) => monsterCard(instance, () => props.onSelectDetail(instance.id)));
+  const sortedMonsters = props.player.monsters
+    .slice()
+    .sort((a, b) => Number(props.player.partyIds.includes(b.id)) - Number(props.player.partyIds.includes(a.id)));
+  const cards = sortedMonsters.map((instance) => monsterCard(instance, () => props.onSelectDetail(instance.id)));
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["所持モンスター"]), el("p", { className: "app-subtitle" }, [`${props.player.monsters.length}体所持中`])]),
     el("section", { className: "panel" }, [
@@ -75,7 +78,7 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
         {
           type: "button",
           className: "equip-slot equip-slot--filled",
-          onclick: () => props.onViewEquippedSlot(equipment.id),
+          onclick: () => props.onViewEquippedSlot(equipment.id, instance.id),
         },
         [
           el("div", { className: "equip-slot__label" }, [`S${slot}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),

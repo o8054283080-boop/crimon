@@ -13,7 +13,10 @@ export function renderDungeonParty(props: DungeonPartyProps): HTMLElement {
   const activeMembers = player.dungeonPartyIds
     .map((id) => player.monsters.find((m) => m.id === id))
     .filter((m): m is NonNullable<typeof m> => m !== undefined);
-  const cards = player.monsters.map((instance) =>
+  const sortedMonsters = player.monsters
+    .slice()
+    .sort((a, b) => Number(player.dungeonPartyIds.includes(b.id)) - Number(player.dungeonPartyIds.includes(a.id)));
+  const cards = sortedMonsters.map((instance) =>
     partyMemberCard(instance, player.dungeonPartyIds.includes(instance.id), () => onToggleMember(instance.id)),
   );
 
