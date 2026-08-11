@@ -1,6 +1,5 @@
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
-import { DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { Equipment } from "../core/equipment.js";
 import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
 import { LevelDungeonDef } from "../data/levelDungeon.js";
@@ -8,6 +7,8 @@ import { EXP_PIG_DEX, findMonsterById } from "../data/monsters.js";
 import { Difficulty, Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
 import {
   FIRST_CLEAR_CRYSTAL_REWARD,
+  REPEAT_CLEAR_CRYSTAL_CHANCE,
+  REPEAT_CLEAR_CRYSTAL_REWARD,
   PlayerState,
   addEquipment,
   addFighterExp,
@@ -20,6 +21,12 @@ import {
   markLevelDungeonTierCleared,
   markStageCleared,
 } from "./playerState.js";
+
+/** 初回クリアはダイヤ200確定。2回目以降は3%の確率でダイヤ50がもらえる */
+function rollClearCrystal(isFirstClear: boolean, rng: () => number): number {
+  if (isFirstClear) return FIRST_CLEAR_CRYSTAL_REWARD;
+  return rng() < REPEAT_CLEAR_CRYSTAL_CHANCE ? REPEAT_CLEAR_CRYSTAL_REWARD : 0;
+}
 
 export interface LevelUpInfo {
   instanceId: string;
@@ -55,7 +62,7 @@ function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal: number
 
 /**
  * ステージクリア(全ウェーブ)時の報酬をまとめて付与する。
- * ダイヤは初回クリアなら200、既にクリア済みのステージなら消費スタミナと同量。
+ * ダイヤは初回クリアなら200確定、既にクリア済みのステージなら3%の確率で50。
  */
 export function applyStageClearRewards(
   state: PlayerState,
@@ -63,6 +70,7 @@ export function applyStageClearRewards(
   wavesCleared: number,
   partyInstances: MonsterInstance[],
   difficulty: Difficulty = "NORMAL",
+  rng: () => number = Math.random,
 ): ClearRewardResult {
   const isFirstClear = !isStageCleared(state, stage.id, difficulty);
   markStageCleared(state, stage.id, difficulty);
@@ -71,7 +79,7 @@ export function applyStageClearRewards(
   const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = stage.rewards.clearGold;
-  const crystalEarned = isFirstClear ? FIRST_CLEAR_CRYSTAL_REWARD : STAGE_STAMINA_COST;
+  const crystalEarned = rollClearCrystal(isFirstClear, rng);
 
   const drop = rollStageDrop(stage);
   if (drop) addMonster(state, drop.dexId, drop.star);
@@ -102,9 +110,14 @@ export function applyStageClearRewards(
 
 /**
  * 装備ダンジョンクリア時の報酬をまとめて付与する。
- * ダイヤは初回クリアなら200、既にクリア済みの階層なら消費スタミナと同量。
+ * ダイヤは初回クリアなら200確定、既にクリア済みの階層なら3%の確率で50。
  */
-export function applyDungeonClearRewards(state: PlayerState, floor: DungeonFloor, partyInstances: MonsterInstance[]): ClearRewardResult {
+export function applyDungeonClearRewards(
+  state: PlayerState,
+  floor: DungeonFloor,
+  partyInstances: MonsterInstance[],
+  rng: () => number = Math.random,
+): ClearRewardResult {
   const isFirstClear = !isDungeonFloorCleared(state, floor.floor);
   markDungeonFloorCleared(state, floor.floor);
 
@@ -112,7 +125,7 @@ export function applyDungeonClearRewards(state: PlayerState, floor: DungeonFloor
   const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = floor.goldReward;
-  const crystalEarned = isFirstClear ? FIRST_CLEAR_CRYSTAL_REWARD : DUNGEON_STAMINA_COST;
+  const crystalEarned = rollClearCrystal(isFirstClear, rng);
 
   const equipmentDrop = rollDungeonEquipment(floor);
   addEquipment(state, equipmentDrop);
@@ -146,7 +159,7 @@ export function applyDungeonClearRewards(state: PlayerState, floor: DungeonFloor
 /**
  * レベル上げダンジョンクリア時の報酬をまとめて付与する。装備ダンジョンと異なり装備ドロップはなく、
  * 代わりに経験値そのものが大きく、経験ピッグ(経験値フィード専用モンスター)を確定で入手できる。
- * ダイヤは初回クリアなら200、既にクリア済みの難易度なら消費スタミナと同量。
+ * ダイヤは初回クリアなら200確定、既にクリア済みの難易度なら3%の確率で50。
  */
 export function applyLevelDungeonClearRewards(
   state: PlayerState,
@@ -161,7 +174,7 @@ export function applyLevelDungeonClearRewards(
   const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = def.goldReward;
-  const crystalEarned = isFirstClear ? FIRST_CLEAR_CRYSTAL_REWARD : LEVEL_DUNGEON_STAMINA_COST;
+  const crystalEarned = rollClearCrystal(isFirstClear, rng);
 
   const pigVariant = EXP_PIG_DEX[Math.floor(rng() * EXP_PIG_DEX.length)];
   const pigDrop: StageDrop = { dexId: pigVariant.id, star: def.pigStar };

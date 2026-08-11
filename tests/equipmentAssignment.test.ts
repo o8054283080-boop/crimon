@@ -27,6 +27,9 @@ function makeState(): PlayerState {
     stamina: 150,
     maxStamina: 150,
     lastStaminaUpdateAt: Date.now(),
+    fighterName: "ファイター",
+    lastLoginBonusAt: null,
+    loginBonusClaimCount: 0,
   };
 }
 

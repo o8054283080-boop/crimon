@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { EQUIP_SLOTS, generateEquipment } from "../src/core/equipment.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { STAGE_STAMINA_COST, DUNGEON_STAMINA_COST } from "../src/core/fighterLevel.js";
+import { STAGE_STAMINA_COST } from "../src/core/fighterLevel.js";
 import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
 import { STAGES } from "../src/data/stages.js";
 import { MAX_FIGHTER_LEVEL } from "../src/core/fighterLevel.js";
 import {
   FIRST_CLEAR_CRYSTAL_REWARD,
+  REPEAT_CLEAR_CRYSTAL_REWARD,
   addEquipment,
   createInitialState,
   equipToMonster,
@@ -26,7 +27,7 @@ function mulberry32(seed: number): () => number {
 }
 
 describe("ステージのオート周回 (runStageAutoFarm)", () => {
-  it("指定回数を消化し、1回目は初回クリア報酬(ダイヤ200)、2回目以降はスタミナ分のダイヤになる", () => {
+  it("指定回数を消化し、1回目は初回クリア報酬(ダイヤ200)、2回目以降は低確率でダイヤ50が追加される", () => {
     const state = createInitialState();
     const stage = STAGES[0];
 
@@ -35,7 +36,8 @@ describe("ステージのオート周回 (runStageAutoFarm)", () => {
     expect(result.attempts).toBe(5);
     expect(result.cleared).toBe(5);
     expect(result.stopReason).toBe("COMPLETED");
-    expect(result.totalCrystal).toBe(FIRST_CLEAR_CRYSTAL_REWARD + 4 * STAGE_STAMINA_COST);
+    expect(result.totalCrystal).toBeGreaterThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD);
+    expect(result.totalCrystal).toBeLessThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD + 4 * REPEAT_CLEAR_CRYSTAL_REWARD);
     expect(result.totalGold).toBeGreaterThan(0);
     // ファイターレベルアップでスタミナが全回復することがあるため、消費した分だけ減っているとは限らない
     expect(state.stamina).toBeLessThanOrEqual(150);
@@ -106,6 +108,7 @@ describe("装備ダンジョンのオート周回 (runDungeonAutoFarm)", () => {
     expect(result.attempts).toBe(3);
     expect(result.cleared).toBe(3);
     expect(result.stopReason).toBe("COMPLETED");
-    expect(result.totalCrystal).toBe(FIRST_CLEAR_CRYSTAL_REWARD + 2 * DUNGEON_STAMINA_COST);
+    expect(result.totalCrystal).toBeGreaterThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD);
+    expect(result.totalCrystal).toBeLessThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD + 2 * REPEAT_CLEAR_CRYSTAL_REWARD);
   });
 });
