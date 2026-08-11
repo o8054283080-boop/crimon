@@ -1,0 +1,171 @@
+import { describe, expect, it } from "vitest";
+import { createMonsterInstance } from "../src/core/monsterInstance.js";
+import { MONSTER_TEMPLATES_DEX, REINCARNATION_PIG_DEX, findMonsterById } from "../src/data/monsters.js";
+import {
+  applyMonsterPowerUp,
+  checkMonsterPowerUp,
+  feedExpValue,
+  isSameSpecies,
+} from "../src/game/monsterPowerUp.js";
+
+describe("checkMonsterPowerUp", () => {
+  it("素材が0体だと実行できない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    expect(checkMonsterPowerUp(target, [], []).ok).toBe(false);
+  });
+
+  it("対象自身を素材にはできない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    expect(checkMonsterPowerUp(target, [target], []).ok).toBe(false);
+  });
+
+  it("異なる種族の素材でも経験値用の素材として使える", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("wolf_FIRE", 1, 1);
+    expect(checkMonsterPowerUp(target, [material], []).ok).toBe(true);
+  });
+
+  it("同じ種族(属性違い)の素材も使える", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("slime_WATER", 1, 1);
+    expect(checkMonsterPowerUp(target, [material], []).ok).toBe(true);
+  });
+
+  it("パーティ編成中のモンスターは素材にできない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("wolf_FIRE", 1, 1);
+    expect(checkMonsterPowerUp(target, [material], [material.id]).ok).toBe(false);
+  });
+});
+
+describe("isSameSpecies", () => {
+  it("同じ種族・同じ属性ならtrue", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("slime_FIRE", 1, 1);
+    expect(isSameSpecies(target, material)).toBe(true);
+  });
+
+  it("同じ種族で属性(色)が違ってもtrue", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("slime_WATER", 1, 1);
+    expect(isSameSpecies(target, material)).toBe(true);
+  });
+
+  it("種族が異なればfalse", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("wolf_FIRE", 1, 1);
+    expect(isSameSpecies(target, material)).toBe(false);
+  });
+});
+
+describe("feedExpValue", () => {
+  it("星が高いほど経験値の価値が高い", () => {
+    const low = createMonsterInstance("slime_FIRE", 1, 1);
+    const high = createMonsterInstance("slime_FIRE", 3, 1);
+    expect(feedExpValue(high)).toBeGreaterThan(feedExpValue(low));
+  });
+
+  it("同じ星ならレベルが高いほど経験値の価値が高い", () => {
+    const low = createMonsterInstance("slime_FIRE", 2, 1);
+    const high = createMonsterInstance("slime_FIRE", 2, 15);
+    expect(feedExpValue(high)).toBeGreaterThan(feedExpValue(low));
+  });
+});
+
+describe("applyMonsterPowerUp", () => {
+  it("素材はすべて経験値になり、対象のレベルが上がる", () => {
+    const target = createMonsterInstance("slime_FIRE", 3, 1);
+    const materials = [createMonsterInstance("wolf_FIRE", 3, 20), createMonsterInstance("golem_WATER", 3, 20)];
+    const before = target.level;
+
+    const result = applyMonsterPowerUp(target, materials, () => 0);
+
+    expect(result.expGained).toBeGreaterThan(0);
+    expect(target.level).toBeGreaterThan(before);
+  });
+
+  it("異なる種族の素材ではスキルレベルは上がらない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const materials = [createMonsterInstance("wolf_FIRE", 1, 1)];
+
+    const result = applyMonsterPowerUp(target, materials, () => 0);
+
+    expect(result.leveledSkillIndices).toHaveLength(0);
+  });
+
+  it("同じ種族(属性違い)の素材1体につき1回スキルレベルアップを試行する", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const materials = [
+      createMonsterInstance("slime_WATER", 1, 1),
+      createMonsterInstance("slime_ELECTRIC", 1, 1),
+      createMonsterInstance("slime_GRASS", 1, 1),
+    ];
+
+    const result = applyMonsterPowerUp(target, materials, () => 0);
+
+    expect(result.leveledSkillIndices).toHaveLength(3);
+    expect(target.skillLevels.reduce((a, b) => a + b, 0)).toBe(3 + 3); // 初期値3(1,1,1) + 3レベル分
+  });
+
+  it("スキルが全て最大レベルに達すると以降は上昇しない(経験値は引き続き入る)", () => {
+    const target = createMonsterInstance("slime_FIRE", 3, 1);
+    target.skillLevels = [5, 5, 4];
+    const materials = [
+      createMonsterInstance("slime_WATER", 3, 20),
+      createMonsterInstance("slime_ELECTRIC", 3, 20),
+    ];
+
+    const result = applyMonsterPowerUp(target, materials, () => 0);
+
+    expect(target.skillLevels).toEqual([5, 5, 5]);
+    expect(result.leveledSkillIndices.length).toBeLessThanOrEqual(1);
+    expect(result.expGained).toBeGreaterThan(0);
+  });
+
+  it("同種と異種が混ざった素材でも、同種の分だけスキルレベルアップを試行する", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const materials = [
+      createMonsterInstance("slime_WATER", 1, 1),
+      createMonsterInstance("wolf_FIRE", 1, 1),
+      createMonsterInstance("golem_WATER", 1, 1),
+    ];
+
+    const result = applyMonsterPowerUp(target, materials, () => 0);
+
+    expect(result.leveledSkillIndices).toHaveLength(1);
+  });
+});
+
+describe("モンスター図鑑データ", () => {
+  it("全モンスター種×全属性が図鑑に掲載されている", () => {
+    expect(MONSTER_TEMPLATES_DEX.length).toBeGreaterThan(0);
+    for (const dex of MONSTER_TEMPLATES_DEX) {
+      expect(dex.skills).toHaveLength(3);
+    }
+  });
+
+  it("転生ピッグは図鑑一覧(通常モンスター図鑑)には含まれない", () => {
+    const pigIds = new Set(REINCARNATION_PIG_DEX.map((p) => p.id));
+    for (const dex of MONSTER_TEMPLATES_DEX) {
+      expect(pigIds.has(dex.id)).toBe(false);
+    }
+  });
+
+  it("findMonsterByIdで図鑑エントリを取得できる", () => {
+    const dex = findMonsterById(MONSTER_TEMPLATES_DEX[0].id);
+    expect(dex).toBeDefined();
+    expect(dex?.id).toBe(MONSTER_TEMPLATES_DEX[0].id);
+  });
+
+  it("全モンスター(転生ピッグ含む)に仮アイコンの絵文字が設定されている", () => {
+    for (const dex of [...MONSTER_TEMPLATES_DEX, ...REINCARNATION_PIG_DEX]) {
+      expect(dex.emoji.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("種族が同じなら属性が違っても同じ絵文字になる(色違いフレーバー)", () => {
+    const fireSlime = findMonsterById("slime_FIRE")!;
+    const waterSlime = findMonsterById("slime_WATER")!;
+    expect(fireSlime.emoji).toBe(waterSlime.emoji);
+  });
+});

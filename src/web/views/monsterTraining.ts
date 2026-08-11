@@ -1,11 +1,11 @@
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
-import { checkSkillTraining } from "../../game/skillTraining.js";
+import { checkMonsterPowerUp, feedExpValue, isSameSpecies } from "../../game/monsterPowerUp.js";
 import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
 
-export interface SkillTrainingProps {
+export interface MonsterTrainingProps {
   player: PlayerState;
   targetId: string;
   selectedMaterialIds: string[];
@@ -14,7 +14,7 @@ export interface SkillTrainingProps {
   onCancel: () => void;
 }
 
-export function renderSkillTraining(props: SkillTrainingProps): HTMLElement {
+export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement {
   const target = props.player.monsters.find((m) => m.id === props.targetId);
   if (!target) {
     return el("div", { className: "screen monsters-screen" }, [
@@ -24,39 +24,44 @@ export function renderSkillTraining(props: SkillTrainingProps): HTMLElement {
   }
 
   const dex = findMonsterById(target.dexId);
-  const candidates = props.player.monsters.filter(
-    (m) => m.id !== target.id && m.dexId === target.dexId && !props.player.partyIds.includes(m.id),
-  );
+  const candidates = props.player.monsters.filter((m) => m.id !== target.id && !props.player.partyIds.includes(m.id));
   const materials = props.selectedMaterialIds
     .map((id) => props.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
-  const check = checkSkillTraining(target, materials, props.player.partyIds);
+  const check = checkMonsterPowerUp(target, materials, props.player.partyIds);
+
+  const totalExp = materials.reduce((sum, m) => sum + feedExpValue(m), 0);
+  const bonusCount = materials.filter((m) => isSameSpecies(target, m)).length;
 
   const cards = candidates.map((c) =>
-    monsterCard(c, () => props.onToggleMaterial(c.id), { selected: props.selectedMaterialIds.includes(c.id) }),
+    monsterCard(c, () => props.onToggleMaterial(c.id), {
+      selected: props.selectedMaterialIds.includes(c.id),
+      bonus: isSameSpecies(target, c),
+    }),
   );
 
   return el("div", { className: "screen monsters-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["スキル強化素材選択"])]),
+    el("header", { className: "app-header" }, [el("h1", {}, ["モンスター強化素材選択"])]),
     el("section", { className: "panel" }, [
       el("p", {}, [`対象: ${dex ? dex.name : target.dexId}`]),
+      el("p", { className: "app-subtitle" }, [`現在 Lv${target.level} / 経験値${target.exp}`]),
       el("p", { className: "app-subtitle" }, [
         `現在のスキルレベル: ${target.skillLevels.map((lvl, i) => `スキル${i + 1} Lv.${lvl}`).join(" / ")}`,
       ]),
       el("p", { className: "app-subtitle" }, [
-        "同じモンスター(同じ種類・同じ属性)を素材にすると、1体につきランダムでいずれか1つのスキルレベルが+1されます。",
+        "どのモンスターでも素材にすると経験値になり、対象のレベルが上がります。★マーク付きは対象と同じ種族(属性違いも可)で、1体につきランダムでいずれか1つのスキルレベルも+1されます。",
       ]),
-      el("p", {}, [`${props.selectedMaterialIds.length}体選択中`]),
+      el("p", {}, [`${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体) / 獲得予定経験値 ${totalExp}`]),
     ]),
     el("section", { className: "panel" }, [
       candidates.length === 0
-        ? el("p", { className: "app-subtitle" }, ["素材にできる同じモンスターがいません"])
+        ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : el("div", { className: "monster-grid" }, cards),
     ]),
     el(
       "button",
       { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
-      ["🔼 スキル強化実行"],
+      ["💪 モンスター強化実行"],
     ),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancel }, ["キャンセル"]),
   ]);
