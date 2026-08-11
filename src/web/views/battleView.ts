@@ -44,17 +44,30 @@ function buildBadge(effect: ActiveEffect): HTMLElement {
       className: `unit-badge ${isBuff ? "unit-badge--buff" : "unit-badge--debuff"}`,
       title: `${BUFF_STAT_JA[effect.stat]}${arrow}${percent}% (残り${effect.remainingTurns}ターン)`,
     },
-    [`${STAT_ICON[effect.stat]}${arrow}`],
+    [
+      el("span", { className: "unit-badge__icon" }, [`${STAT_ICON[effect.stat]}${arrow}`]),
+      el("span", { className: "unit-badge__turns" }, [String(effect.remainingTurns)]),
+    ],
   );
 }
 
 function buildBadgesRow(snapshot: UnitSnapshot): HTMLElement[] {
   const badges = snapshot.effects.map((e) => buildBadge(e));
   if (snapshot.stunTurns > 0) {
-    badges.push(el("span", { className: "unit-badge unit-badge--stun", title: `スタン中(残り${snapshot.stunTurns}ターン)` }, ["💫"]));
+    badges.push(
+      el("span", { className: "unit-badge unit-badge--stun", title: `スタン中(残り${snapshot.stunTurns}ターン)` }, [
+        el("span", { className: "unit-badge__icon" }, ["💫"]),
+        el("span", { className: "unit-badge__turns" }, [String(snapshot.stunTurns)]),
+      ]),
+    );
   }
   if (snapshot.burnTurns > 0) {
-    badges.push(el("span", { className: "unit-badge unit-badge--burn", title: `火傷(残り${snapshot.burnTurns}ターン)` }, ["🔥"]));
+    badges.push(
+      el("span", { className: "unit-badge unit-badge--burn", title: `火傷(残り${snapshot.burnTurns}ターン)` }, [
+        el("span", { className: "unit-badge__icon" }, ["🔥"]),
+        el("span", { className: "unit-badge__turns" }, [String(snapshot.burnTurns)]),
+      ]),
+    );
   }
   return badges;
 }
