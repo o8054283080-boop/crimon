@@ -231,7 +231,17 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
       refs.card.classList.toggle("unit-hud--dead", !s.alive);
       refs.badges.replaceChildren(...buildBadgesRow(s));
-      stage.syncUnitState(s.instanceId, ratio, s.alive);
+      stage.syncUnitState(s.instanceId, ratio, s.alive, {
+        poison: s.poisonStacks > 0,
+        burn: s.burnTurns > 0,
+        shield: s.shieldValue > 0,
+        immune: s.immuneTurns > 0,
+        stun: s.stunTurns > 0,
+        // 継続回復は専用フィールドを持たないため、バフ枠と同じ扱いにする
+        regen: false,
+        buff: s.effects.some((e) => e.kind === "BUFF"),
+        debuff: s.effects.some((e) => e.kind === "DEBUFF"),
+      });
     }
   }
 
@@ -290,17 +300,17 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   }
 
   /** 1件のイベントに対応する3D演出を再生する */
-  function playEventVisual(actorId: string, event: BattleEvent): void {
+  function playEventVisual(actorId: string, event: BattleEvent, aoe: boolean): void {
     switch (event.kind) {
       case "DAMAGE": {
         const actorTeam = teamOf.get(actorId);
         const isEnemyOfActor = teamOf.get(event.targetId) !== actorTeam;
-        const color = isEnemyOfActor ? stage.getAvatar(actorId)?.theme.vfx : undefined;
-        stage.playDamage(event.targetId, event.isCrit === true, color);
+        // 敵への攻撃は攻撃側の属性で、火傷や毒などの自傷は対象側の属性で弾ける
+        stage.playDamage(event.targetId, event.isCrit === true, isEnemyOfActor ? actorId : undefined, aoe);
         break;
       }
       case "HEAL":
-        stage.playHeal(event.targetId);
+        stage.playHeal(event.targetId, aoe);
         break;
       case "DEATH":
         stage.playDeath(event.targetId);
@@ -337,7 +347,10 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     later(() => {
       applySnapshot(record.snapshot);
       playStatusVisuals(record);
-      for (const event of record.events) playEventVisual(record.actorId, event);
+      // 複数のユニットが影響を受けていれば全体技とみなし、演出の規模を上げる
+      const affected = new Set(record.events.filter((e) => e.kind !== "DEATH").map((e) => e.targetId));
+      const aoe = affected.size >= 2;
+      for (const event of record.events) playEventVisual(record.actorId, event, aoe);
     }, delay);
   }
 

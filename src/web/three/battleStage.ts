@@ -7,7 +7,7 @@ import { MonsterDefinition } from "../../core/monster.js";
 import { createArena } from "./arena.js";
 import { MonsterAvatar } from "./monsterAvatar.js";
 import { CinematicPass } from "./postfx/cinematicPass.js";
-import { VfxSystem } from "./vfx.js";
+import { HitStyle, StatusAuraKind, VfxElement, VfxSystem } from "./vfx.js";
 
 export interface StageUnitInit {
   instanceId: string;
@@ -63,6 +63,34 @@ function slotPositions(count: number, lineZ: number, team: "PLAYER" | "ENEMY"): 
   });
 }
 
+/**
+ * 役割ごとの当たり方の質感。
+ * 前衛の物理職は斬撃(弧を描く軌跡)、重量級は打撃(放射状の衝撃)、
+ * 支援・術者系は魔法(粒子と紋様)で、同じダメージでも印象を変える。
+ */
+const HIT_STYLE_BY_ROLE: Record<string, HitStyle> = {
+  アタッカー: "slash",
+  ディフェンダー: "blunt",
+  ボス: "blunt",
+  ヒーラー: "magic",
+  サポート: "magic",
+  デバッファー: "magic",
+  バランス型: "pierce",
+  素材: "blunt",
+};
+
+/** そのユニットに今かかっている状態。継続エフェクトの出し分けに使う */
+export interface UnitStatusFlags {
+  poison: boolean;
+  burn: boolean;
+  shield: boolean;
+  immune: boolean;
+  stun: boolean;
+  regen: boolean;
+  buff: boolean;
+  debuff: boolean;
+}
+
 /** カメラに必ず収めたい領域(ワールド座標) */
 interface FrameBox {
   halfWidth: number;
@@ -84,6 +112,12 @@ export class BattleStage {
   private readonly arena = createArena();
   private readonly vfx = new VfxSystem();
   private readonly avatars = new Map<string, MonsterAvatar>();
+  /** エフェクトの出し分けに使う、ユニットごとの属性 */
+  private readonly unitElements = new Map<string, VfxElement>();
+  /** 当たり方の質感。役割から決める(前衛は斬撃、重量級は打撃、後衛は魔法) */
+  private readonly unitHitStyles = new Map<string, HitStyle>();
+  /** 現在そのユニットに出している継続エフェクトの種類 */
+  private readonly activeAuras = new Map<string, Set<StatusAuraKind>>();
   private readonly resizeObserver: ResizeObserver;
   private readonly clock = new THREE.Clock();
 
@@ -224,6 +258,8 @@ export class BattleStage {
         avatar.setSlotPosition(slots[index].x, slots[index].z);
         this.scene.add(avatar.root);
         this.avatars.set(unit.instanceId, avatar);
+        this.unitElements.set(unit.instanceId, unit.def.element as VfxElement);
+        this.unitHitStyles.set(unit.instanceId, HIT_STYLE_BY_ROLE[unit.def.role] ?? "magic");
 
         maxAbsX = Math.max(maxAbsX, Math.abs(slots[index].x));
         maxZ = Math.max(maxZ, slots[index].z);
@@ -346,6 +382,12 @@ export class BattleStage {
 
     this.arena.update(this.elapsed);
     for (const avatar of this.avatars.values()) avatar.update(delta, this.elapsed);
+    // 継続エフェクトは、踏み込みなどで動くキャラの位置へ毎フレーム追従させる
+    for (const [instanceId, kinds] of this.activeAuras) {
+      if (kinds.size === 0) continue;
+      const anchor = this.anchorOf(instanceId);
+      if (anchor) this.vfx.updateStatusAura(instanceId, anchor);
+    }
     this.vfx.update(delta);
     this.vfx.faceCamera(this.camera);
     this.updateCamera(delta);
@@ -402,6 +444,14 @@ export class BattleStage {
     return this.avatars.get(instanceId);
   }
 
+  private elementOf(instanceId: string): VfxElement {
+    return this.unitElements.get(instanceId) ?? "NEUTRAL";
+  }
+
+  private hitStyleOf(instanceId: string): HitStyle {
+    return this.unitHitStyles.get(instanceId) ?? "magic";
+  }
+
   /** ユニットの頭上あたりのワールド座標(VFXの発生位置に使う) */
   private anchorOf(instanceId: string): THREE.Vector3 | null {
     const avatar = this.avatars.get(instanceId);
@@ -418,7 +468,7 @@ export class BattleStage {
     if (!avatar) return;
     avatar.playCast();
     const anchor = this.anchorOf(actorId);
-    if (anchor) this.vfx.spawnCastCharge(anchor, avatar.theme.vfx);
+    if (anchor) this.vfx.spawnCastCharge(anchor, avatar.theme.vfx, { element: this.elementOf(actorId) });
   }
 
   /** 術者から対象へ飛ぶ弾。到達時にonArriveでヒット表現へつなぐ */
@@ -430,53 +480,71 @@ export class BattleStage {
       onArrive();
       return;
     }
-    this.vfx.spawnProjectile({ from, to, color: avatar.theme.vfx, arcHeight: 1.1, durationSec: 0.28, onArrive });
+    const element = this.elementOf(actorId);
+    // 電気属性だけは弾ではなく、術者から対象へ走る稲妻で表現する
+    if (element === "ELECTRIC") {
+      this.vfx.spawnLightningBolt(from, to, avatar.theme.vfx);
+      window.setTimeout(onArrive, 90);
+      return;
+    }
+    this.vfx.spawnProjectile({ from, to, color: avatar.theme.vfx, arcHeight: 1.1, durationSec: 0.28, onArrive, element });
   }
 
-  playDamage(targetId: string, isCrit: boolean, sourceColor?: THREE.Color): void {
+  /**
+   * 命中演出。攻撃側の属性と役割で、弾ける形と色が変わる。
+   * aoeを立てると規模と余韻が大きくなり、全体攻撃らしく見える。
+   */
+  playDamage(targetId: string, isCrit: boolean, attackerId?: string, aoe = false): void {
     const avatar = this.avatars.get(targetId);
     const anchor = this.anchorOf(targetId);
     if (!avatar || !anchor) return;
 
     avatar.playHit();
-    const color = sourceColor ?? avatar.theme.vfx;
+    const attacker = attackerId ? this.avatars.get(attackerId) : undefined;
+    const color = attacker ? attacker.theme.vfx : avatar.theme.vfx;
+    const element = attackerId ? this.elementOf(attackerId) : "NEUTRAL";
+    const hitStyle = attackerId ? this.hitStyleOf(attackerId) : "magic";
+    const options = { element, hitStyle, aoe };
+
     if (isCrit) {
-      this.vfx.spawnCriticalImpact(anchor, color);
-      this.shake(0.42);
+      this.vfx.spawnCriticalImpact(anchor, color, options);
+      // 斬撃系はクリティカル時だけ、追加で交差する斬り筋を出す
+      if (hitStyle === "slash") this.vfx.spawnSlash(anchor, color, { element, cross: true, scale: 1.15 });
+      this.shake(aoe ? 0.55 : 0.42);
       this.hitStop(0.09);
     } else {
-      this.vfx.spawnImpact(anchor, color, 1);
-      this.shake(0.16);
+      this.vfx.spawnImpact(anchor, color, 1, options);
+      this.shake(aoe ? 0.24 : 0.16);
       this.hitStop(0.035);
     }
   }
 
-  playHeal(targetId: string): void {
+  playHeal(targetId: string, aoe = false): void {
     const avatar = this.avatars.get(targetId);
     const anchor = this.anchorOf(targetId);
     if (!avatar || !anchor) return;
-    this.vfx.spawnHeal(anchor, avatar.theme.vfx);
+    this.vfx.spawnHeal(anchor, avatar.theme.vfx, { element: this.elementOf(targetId), aoe });
   }
 
   playBuff(targetId: string): void {
     const avatar = this.avatars.get(targetId);
     const anchor = this.anchorOf(targetId);
     if (!avatar || !anchor) return;
-    this.vfx.spawnBuff(anchor, avatar.theme.vfx);
+    this.vfx.spawnBuff(anchor, avatar.theme.vfx, { element: this.elementOf(targetId) });
   }
 
   playDebuff(targetId: string): void {
     const avatar = this.avatars.get(targetId);
     const anchor = this.anchorOf(targetId);
     if (!avatar || !anchor) return;
-    this.vfx.spawnDebuff(anchor, avatar.theme.vfx);
+    this.vfx.spawnDebuff(anchor, avatar.theme.vfx, { element: this.elementOf(targetId) });
   }
 
   playShield(targetId: string): void {
     const avatar = this.avatars.get(targetId);
     const anchor = this.anchorOf(targetId);
     if (!avatar || !anchor) return;
-    this.vfx.spawnShield(anchor, avatar.theme.vfx);
+    this.vfx.spawnShield(anchor, avatar.theme.vfx, { element: this.elementOf(targetId) });
   }
 
   playDeath(targetId: string): void {
@@ -484,7 +552,8 @@ export class BattleStage {
     const anchor = this.anchorOf(targetId);
     if (!avatar || !anchor) return;
     avatar.playDeath();
-    this.vfx.spawnDeath(anchor, avatar.theme.vfx);
+    this.vfx.spawnDeath(anchor, avatar.theme.vfx, { element: this.elementOf(targetId) });
+    this.vfx.detachStatusAura(targetId);
     this.shake(0.55);
   }
 
@@ -497,12 +566,44 @@ export class BattleStage {
   }
 
   /** HP割合や生死をアバターへ反映する */
-  syncUnitState(instanceId: string, hpRatio: number, alive: boolean): void {
+  syncUnitState(instanceId: string, hpRatio: number, alive: boolean, status?: UnitStatusFlags): void {
     const avatar = this.avatars.get(instanceId);
     if (!avatar) return;
     avatar.setHpRatio(hpRatio);
     if (!alive && !avatar.isDying()) avatar.playDeath();
     if (alive && avatar.isDying()) avatar.revive();
+    this.syncStatusAuras(instanceId, alive, status);
+  }
+
+  /**
+   * 状態異常の継続エフェクトを、いまかかっている効果に合わせて付け外しする。
+   * 毎ターン呼ばれるので、既に出ているものは張り直さず、消えたものだけ外す。
+   */
+  private syncStatusAuras(instanceId: string, alive: boolean, status?: UnitStatusFlags): void {
+    const current = this.activeAuras.get(instanceId) ?? new Set<StatusAuraKind>();
+    const wanted = new Set<StatusAuraKind>();
+
+    if (alive && status) {
+      if (status.poison) wanted.add("poison");
+      if (status.burn) wanted.add("burn");
+      if (status.shield) wanted.add("shield");
+      if (status.immune) wanted.add("immunity");
+      if (status.stun) wanted.add("stun");
+      if (status.regen) wanted.add("regen");
+      if (status.buff) wanted.add("buff");
+      if (status.debuff) wanted.add("curse");
+    }
+
+    const anchor = this.anchorOf(instanceId);
+    for (const kind of wanted) {
+      if (!current.has(kind) && anchor) {
+        this.vfx.attachStatusAura(instanceId, kind, anchor);
+      }
+    }
+    for (const kind of current) {
+      if (!wanted.has(kind)) this.vfx.detachStatusAura(instanceId, kind);
+    }
+    this.activeAuras.set(instanceId, wanted);
   }
 
   /** HTMLオーバーレイ(HPバー等)を3D位置に追従させるための画面座標を返す */
