@@ -76,7 +76,7 @@ describe("レベル上げダンジョンの報酬 (applyLevelDungeonClearRewards
     expect(addedPig.level).toBe(STAR_MAX_LEVEL[def.pigStar]);
   });
 
-  it("初回クリアはダイヤ200、2回目以降は消費スタミナ分になる", () => {
+  it("初回クリアはダイヤ200、2回目以降は3%の確率でダイヤ50になる", () => {
     const state = createInitialState();
     const def = findLevelDungeonDef("BEGINNER")!;
     const party = [createMonsterInstance("slime_FIRE", 1, 1)];
@@ -87,7 +87,10 @@ describe("レベル上げダンジョンの報酬 (applyLevelDungeonClearRewards
     expect(isLevelDungeonTierCleared(state, def.tier)).toBe(true);
 
     const second = applyLevelDungeonClearRewards(state, def, party, () => 0);
-    expect(second.crystalEarned).toBe(20);
+    expect(second.crystalEarned).toBe(50);
+
+    const missed = applyLevelDungeonClearRewards(state, def, party, () => 0.5);
+    expect(missed.crystalEarned).toBe(0);
   });
 
   it("markLevelDungeonTierClearedは重複しても1回分しか記録しない", () => {

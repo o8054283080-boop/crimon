@@ -121,7 +121,7 @@ export function runStageAutoFarm(
     state.gold += waveGoldEarned;
 
     if (cleared) {
-      const reward = applyStageClearRewards(state, stage, wavesCleared, originalParty, difficulty);
+      const reward = applyStageClearRewards(state, stage, wavesCleared, originalParty, difficulty, rng);
       mergeReward(result, reward, 0);
       result.cleared += 1;
     } else {
@@ -163,7 +163,7 @@ export function runDungeonAutoFarm(
     const battleResult = engine.run();
 
     if (battleResult.winner === "PLAYER") {
-      const reward = applyDungeonClearRewards(state, floor, party);
+      const reward = applyDungeonClearRewards(state, floor, party, rng);
       mergeReward(result, reward, 0);
       result.cleared += 1;
     } else {

@@ -13,6 +13,9 @@ import { AutoFarmResult, runDungeonAutoFarm, runLevelDungeonAutoFarm, runStageAu
 import { applyDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import {
+  claimDailyLoginBonus,
+  FIGHTER_NAME_MAX_LENGTH,
+  LoginBonusResult,
   PlayerState,
   addMonster,
   applyPassiveStaminaRegen,
@@ -22,6 +25,7 @@ import {
   loadPlayerState,
   removeMonsters,
   savePlayerState,
+  setFighterName,
   toggleDungeonPartyMember,
   tryEnhanceEquipment,
   tryRefillStaminaFull,
@@ -97,6 +101,7 @@ interface AppState {
   autoFarmCount: number;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
+  loginBonusResult: LoginBonusResult | null;
 }
 
 const state: AppState = {
@@ -125,7 +130,16 @@ const state: AppState = {
   autoFarmCount: 10,
   autoFarmResult: null,
   autoFarmTargetName: "",
+  loginBonusResult: null,
 };
+
+{
+  const loginBonus = claimDailyLoginBonus(state.player);
+  if (loginBonus.claimed) {
+    state.loginBonusResult = loginBonus;
+    savePlayerState(state.player);
+  }
+}
 
 const rootCandidate = document.getElementById("app");
 if (!rootCandidate) throw new Error("#app root element not found");
@@ -533,6 +547,11 @@ function render(): void {
     case "HOME":
       content = renderHome({
         player: state.player,
+        loginBonusResult: state.loginBonusResult,
+        onDismissLoginBonus: () => {
+          state.loginBonusResult = null;
+          render();
+        },
         onGoSummon: () => navigate("SUMMON"),
         onGoStages: () => navigate("STAGES"),
         onGoParty: () => navigate("PARTY"),
@@ -545,6 +564,13 @@ function render(): void {
         },
         onRefillStaminaFull: () => {
           if (!tryRefillStaminaFull(state.player).ok) return;
+          savePlayerState(state.player);
+          render();
+        },
+        onEditFighterName: () => {
+          const name = window.prompt(`ファイター名を入力してください(最大${FIGHTER_NAME_MAX_LENGTH}文字)`, state.player.fighterName);
+          if (name === null) return;
+          setFighterName(state.player, name);
           savePlayerState(state.player);
           render();
         },

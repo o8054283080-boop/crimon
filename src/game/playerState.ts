@@ -19,7 +19,7 @@ export interface PlayerState {
   dungeonPartyIds: string[];
   /** 召喚の書の所持数。1個消費すると石を使わずに1回分の召喚ができる */
   summonScrolls: number;
-  /** プレイヤー(ファイター)自身のレベル。上限30 */
+  /** プレイヤー(ファイター)自身のレベル。上限50 */
   fighterLevel: number;
   /** 次のファイターレベルまでの累積経験値 */
   fighterExp: number;
@@ -29,6 +29,12 @@ export interface PlayerState {
   maxStamina: number;
   /** スタミナの自然回復計算の基準時刻(ミリ秒epoch) */
   lastStaminaUpdateAt: number;
+  /** プレイヤーが自由に設定できるファイター名 */
+  fighterName: string;
+  /** 直近でログインボーナスを受け取った時刻(ミリ秒epoch)。同じ日にはもう受け取れない */
+  lastLoginBonusAt: number | null;
+  /** ログインボーナスを受け取った日数の累計(10日ごとの追加ボーナス判定に使う) */
+  loginBonusClaimCount: number;
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -42,6 +48,10 @@ const STARTER_MONSTERS: { templateId: string; element: string }[] = [
   { templateId: "golem", element: "ELECTRIC" },
   { templateId: "fairy", element: "GRASS" },
 ];
+
+/** ファイター名の初期値・最大文字数 */
+export const DEFAULT_FIGHTER_NAME = "ファイター";
+export const FIGHTER_NAME_MAX_LENGTH = 12;
 
 export function createInitialState(): PlayerState {
   const monsters = STARTER_MONSTERS.map((s) => createMonsterInstance(`${s.templateId}_${s.element}`, 1, 1));
@@ -61,7 +71,17 @@ export function createInitialState(): PlayerState {
     stamina: INITIAL_MAX_STAMINA,
     maxStamina: INITIAL_MAX_STAMINA,
     lastStaminaUpdateAt: Date.now(),
+    fighterName: DEFAULT_FIGHTER_NAME,
+    lastLoginBonusAt: null,
+    loginBonusClaimCount: 0,
   };
+}
+
+/** ファイター名を変更する。空文字や規定文字数超過は無視して元の値を保つ */
+export function setFighterName(state: PlayerState, name: string): void {
+  const trimmed = name.trim().slice(0, FIGHTER_NAME_MAX_LENGTH);
+  if (trimmed.length === 0) return;
+  state.fighterName = trimmed;
 }
 
 /** 装備IDから決定的にシリーズを割り当てる(旧セーブデータ補完用。読み込むたびに同じ結果になる) */
@@ -94,6 +114,9 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.maxStamina !== "number") state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
   if (typeof state.stamina !== "number") state.stamina = state.maxStamina;
   if (typeof state.lastStaminaUpdateAt !== "number") state.lastStaminaUpdateAt = Date.now();
+  if (typeof state.fighterName !== "string" || state.fighterName.length === 0) state.fighterName = DEFAULT_FIGHTER_NAME;
+  if (typeof state.lastLoginBonusAt !== "number") state.lastLoginBonusAt = null;
+  if (typeof state.loginBonusClaimCount !== "number") state.loginBonusClaimCount = 0;
   return state;
 }
 
@@ -188,8 +211,10 @@ export function markLevelDungeonTierCleared(state: PlayerState, tier: string): v
   }
 }
 
-/** 初回クリアかどうかでダイヤ報酬額を決める(初回200、以降は消費スタミナと同量) */
+/** 初回クリアなら200ダイヤ確定。2回目以降は低確率(3%)で50ダイヤがもらえる */
 export const FIRST_CLEAR_CRYSTAL_REWARD = 200;
+export const REPEAT_CLEAR_CRYSTAL_CHANCE = 0.03;
+export const REPEAT_CLEAR_CRYSTAL_REWARD = 50;
 
 export function addEquipment(state: PlayerState, equipment: Equipment): void {
   state.equipment.push(equipment);
@@ -251,7 +276,7 @@ export function tryEnhanceEquipment(state: PlayerState, equipmentId: string, rng
 }
 
 /** スタミナが1回復するまでの実時間(分)。時間経過で自然回復する */
-export const STAMINA_REGEN_INTERVAL_MINUTES = 5;
+export const STAMINA_REGEN_INTERVAL_MINUTES = 3;
 
 /**
  * 最後に計算した時刻からの経過時間に応じてスタミナを自然回復させる。
@@ -319,9 +344,12 @@ export interface FighterExpResult {
   levelsGained: number;
 }
 
+/** ファイターレベルが1上がるごとにもらえるダイヤ */
+export const FIGHTER_LEVEL_UP_CRYSTAL_REWARD = 300;
+
 /**
  * ファイター経験値を加算し、可能な限りレベルアップさせる。
- * レベルアップのたびにスタミナ上限が上がり、スタミナは全回復する。
+ * レベルアップのたびにスタミナ上限が上がり、スタミナは全回復し、ダイヤも獲得する。
  */
 export function addFighterExp(state: PlayerState, exp: number): FighterExpResult {
   if (state.fighterLevel >= MAX_FIGHTER_LEVEL || exp <= 0) return { levelsGained: 0 };
@@ -339,7 +367,38 @@ export function addFighterExp(state: PlayerState, exp: number): FighterExpResult
     state.fighterLevel = MAX_FIGHTER_LEVEL;
     state.fighterExp = 0;
   }
+  if (levelsGained > 0) state.crystal += FIGHTER_LEVEL_UP_CRYSTAL_REWARD * levelsGained;
   return { levelsGained };
+}
+
+/** 毎日のログインボーナス(ダイヤ200)。10日分(累計)受け取るごとに追加でダイヤ1000がもらえる */
+export const LOGIN_BONUS_DAILY_CRYSTAL = 200;
+export const LOGIN_BONUS_MILESTONE_CRYSTAL = 1000;
+export const LOGIN_BONUS_MILESTONE_INTERVAL_DAYS = 10;
+
+export interface LoginBonusResult {
+  claimed: boolean;
+  dailyCrystal: number;
+  milestoneCrystal: number;
+  claimCount: number;
+}
+
+/**
+ * まだその日のログインボーナスを受け取っていなければ付与する(カレンダー日の変わり目で判定)。
+ * 受け取った累計日数が10の倍数に達するたびに追加でダイヤ1000が付与される。
+ */
+export function claimDailyLoginBonus(state: PlayerState, now: number = Date.now()): LoginBonusResult {
+  const alreadyClaimedToday = state.lastLoginBonusAt !== null && new Date(state.lastLoginBonusAt).toDateString() === new Date(now).toDateString();
+  if (alreadyClaimedToday) {
+    return { claimed: false, dailyCrystal: 0, milestoneCrystal: 0, claimCount: state.loginBonusClaimCount };
+  }
+
+  state.lastLoginBonusAt = now;
+  state.loginBonusClaimCount += 1;
+  const milestoneCrystal = state.loginBonusClaimCount % LOGIN_BONUS_MILESTONE_INTERVAL_DAYS === 0 ? LOGIN_BONUS_MILESTONE_CRYSTAL : 0;
+  state.crystal += LOGIN_BONUS_DAILY_CRYSTAL + milestoneCrystal;
+
+  return { claimed: true, dailyCrystal: LOGIN_BONUS_DAILY_CRYSTAL, milestoneCrystal, claimCount: state.loginBonusClaimCount };
 }
 
 export function addSummonScrolls(state: PlayerState, count = 1): void {

@@ -11,6 +11,7 @@ import {
   addFighterExp,
   applyPassiveStaminaRegen,
   createInitialState,
+  FIGHTER_LEVEL_UP_CRYSTAL_REWARD,
   STAMINA_REFILL_FULL_COST,
   STAMINA_REFILL_PARTIAL_AMOUNT,
   STAMINA_REFILL_PARTIAL_COST,
@@ -132,11 +133,32 @@ describe("ファイター経験値とレベルアップ (addFighterExp)", () => 
     expect(state.fighterLevel).toBe(6);
   });
 
-  it("ファイターレベルの上限は30", () => {
+  it("レベルアップごとにダイヤ300を獲得する", () => {
+    const state = createInitialState();
+    const crystalBefore = state.crystal;
+    const needed = requiredExpForFighterLevel(1);
+
+    addFighterExp(state, needed);
+
+    expect(state.crystal).toBe(crystalBefore + FIGHTER_LEVEL_UP_CRYSTAL_REWARD);
+  });
+
+  it("複数レベル一気に上がった場合はレベル数分のダイヤを獲得する", () => {
+    const state = createInitialState();
+    const crystalBefore = state.crystal;
+    let hugeExp = 0;
+    for (let lvl = 1; lvl <= 5; lvl++) hugeExp += requiredExpForFighterLevel(lvl);
+
+    const result = addFighterExp(state, hugeExp);
+
+    expect(state.crystal).toBe(crystalBefore + FIGHTER_LEVEL_UP_CRYSTAL_REWARD * result.levelsGained);
+  });
+
+  it("ファイターレベルの上限は50", () => {
     const state = createInitialState();
     addFighterExp(state, 10_000_000);
     expect(state.fighterLevel).toBe(MAX_FIGHTER_LEVEL);
-    expect(state.fighterLevel).toBe(30);
+    expect(state.fighterLevel).toBe(50);
   });
 
   it("上限到達後はそれ以上レベルが上がらない", () => {

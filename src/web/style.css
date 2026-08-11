@@ -86,6 +86,27 @@ body {
   margin: 0;
 }
 
+.fighter-name-edit-btn {
+  padding: 6px 10px;
+  min-height: unset;
+  font-size: 0.75rem;
+}
+
+.login-bonus-banner {
+  border: 1px solid var(--accent);
+  background: var(--bg-alt);
+}
+
+.login-bonus-banner p {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: var(--hp-high);
+}
+
+.login-bonus-banner .btn {
+  margin-top: 4px;
+}
+
 .role-badge {
   font-weight: 500;
   font-size: 0.72rem;

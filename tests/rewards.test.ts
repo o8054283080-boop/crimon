@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { STAGE_STAMINA_COST, DUNGEON_STAMINA_COST } from "../src/core/fighterLevel.js";
 import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
 import { STAGES } from "../src/data/stages.js";
-import { createInitialState, getParty, FIRST_CLEAR_CRYSTAL_REWARD } from "../src/game/playerState.js";
+import {
+  createInitialState,
+  getParty,
+  FIRST_CLEAR_CRYSTAL_REWARD,
+  REPEAT_CLEAR_CRYSTAL_CHANCE,
+  REPEAT_CLEAR_CRYSTAL_REWARD,
+} from "../src/game/playerState.js";
 import { applyDungeonClearRewards, applyStageClearRewards } from "../src/game/rewards.js";
 
 describe("ダイヤ報酬 (applyStageClearRewards)", () => {
@@ -18,17 +23,32 @@ describe("ダイヤ報酬 (applyStageClearRewards)", () => {
     expect(state.crystal).toBe(before + FIRST_CLEAR_CRYSTAL_REWARD);
   });
 
-  it("2回目以降のクリアは消費スタミナと同量のダイヤになる", () => {
+  it("2回目以降のクリアは3%の確率でダイヤ50がもらえる(当選時)", () => {
     const state = createInitialState();
     const stage = STAGES[0];
     const party = getParty(state);
 
     applyStageClearRewards(state, stage, stage.waves.length, party);
     const before = state.crystal;
-    const result = applyStageClearRewards(state, stage, stage.waves.length, party);
+    const result = applyStageClearRewards(state, stage, stage.waves.length, party, "NORMAL", () => 0);
 
-    expect(result.crystalEarned).toBe(STAGE_STAMINA_COST);
-    expect(state.crystal).toBe(before + STAGE_STAMINA_COST);
+    // crystalEarnedがステージクリア分のダイヤ。state.crystalの増分にはこれに加えて
+    // ファイターレベルアップ報酬が乗ることがあるため、結果フィールド側だけを厳密に検証する
+    expect(result.crystalEarned).toBe(REPEAT_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBeGreaterThanOrEqual(before + REPEAT_CLEAR_CRYSTAL_REWARD);
+  });
+
+  it("2回目以降のクリアは外れれば0ダイヤになる", () => {
+    const state = createInitialState();
+    const stage = STAGES[0];
+    const party = getParty(state);
+
+    applyStageClearRewards(state, stage, stage.waves.length, party);
+    const before = state.crystal;
+    const result = applyStageClearRewards(state, stage, stage.waves.length, party, "NORMAL", () => REPEAT_CLEAR_CRYSTAL_CHANCE);
+
+    expect(result.crystalEarned).toBe(0);
+    expect(state.crystal).toBeGreaterThanOrEqual(before);
   });
 });
 
@@ -45,17 +65,30 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
     expect(state.crystal).toBe(before + FIRST_CLEAR_CRYSTAL_REWARD);
   });
 
-  it("2回目以降のクリアは消費スタミナと同量のダイヤになる", () => {
+  it("2回目以降のクリアは3%の確率でダイヤ50がもらえる(当選時)", () => {
     const state = createInitialState();
     const floor = EQUIPMENT_DUNGEON_FLOORS[0];
     const party = getParty(state);
 
     applyDungeonClearRewards(state, floor, party);
     const before = state.crystal;
-    const result = applyDungeonClearRewards(state, floor, party);
+    const result = applyDungeonClearRewards(state, floor, party, () => 0);
 
-    expect(result.crystalEarned).toBe(DUNGEON_STAMINA_COST);
-    expect(state.crystal).toBe(before + DUNGEON_STAMINA_COST);
+    expect(result.crystalEarned).toBe(REPEAT_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBe(before + REPEAT_CLEAR_CRYSTAL_REWARD);
+  });
+
+  it("2回目以降のクリアは外れれば0ダイヤになる", () => {
+    const state = createInitialState();
+    const floor = EQUIPMENT_DUNGEON_FLOORS[0];
+    const party = getParty(state);
+
+    applyDungeonClearRewards(state, floor, party);
+    const before = state.crystal;
+    const result = applyDungeonClearRewards(state, floor, party, () => REPEAT_CLEAR_CRYSTAL_CHANCE);
+
+    expect(result.crystalEarned).toBe(0);
+    expect(state.crystal).toBe(before);
   });
 
   it("階層が異なればそれぞれ初回扱いになる", () => {

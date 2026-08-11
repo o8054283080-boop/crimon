@@ -5,7 +5,7 @@
  */
 
 /** ファイターレベルの上限 */
-export const MAX_FIGHTER_LEVEL = 30;
+export const MAX_FIGHTER_LEVEL = 50;
 
 /** 初期スタミナ上限(ファイターレベル1のとき) */
 export const INITIAL_MAX_STAMINA = 150;
