@@ -52,7 +52,10 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         "どのモンスターでも素材にすると経験値になり、対象のレベルが上がります。★マーク付きは対象と同じ種族(属性違いも可)で、1体につきランダムでいずれか1つのスキルレベルも+1されます。",
       ]),
       el("p", {}, [`${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体) / 獲得予定経験値 ${totalExp}`]),
-    ]),
+      materials.length > 0 && !check.ok && check.reason
+        ? el("p", { className: "app-subtitle training-warning" }, [`⚠ ${check.reason}`])
+        : null,
+    ].filter((n): n is HTMLParagraphElement => n !== null)),
     el("section", { className: "panel" }, [
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
