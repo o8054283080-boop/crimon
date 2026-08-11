@@ -4,6 +4,7 @@ import { BattleUnit } from "../../battle/unit.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { BUFF_STAT_JA, BuffStat, describeSkillEffect } from "../../core/skill.js";
 import { el } from "../dom.js";
+import { BattleStage, StageUnitInit } from "../three/battleStage.js";
 
 export interface BattleViewProps {
   engine: BattleEngine;
@@ -22,11 +23,11 @@ export interface BattleViewHandle {
 }
 
 const SPEED_INTERVAL_MS: Record<string, number> = { "1": 650, "2": 300, "4": 120 };
+/** 攻撃モーションを見せてから着弾させるまでの間(再生速度で縮む) */
+const IMPACT_DELAY_MS: Record<string, number> = { "1": 260, "2": 150, "4": 60 };
 
-interface UnitTokenRefs {
-  token: HTMLElement;
-  avatar: HTMLElement;
-  hpBadge: HTMLElement;
+interface UnitHudRefs {
+  card: HTMLElement;
   hpFill: HTMLElement;
   hpText: HTMLElement;
   gaugeFill: HTMLElement;
@@ -110,32 +111,20 @@ type PickerState =
   | { phase: "SKILL"; unit: BattleUnit }
   | { phase: "TARGET"; unit: BattleUnit; skillIndex: 0 | 1 | 2 };
 
-function buildTeamRow(
-  team: MonsterDefinition[],
-  instanceIdOf: (index: number) => string,
-  teamClass: string,
-  refs: Map<string, UnitTokenRefs>,
-): HTMLElement {
-  const tokens = team.map((def, i) => {
-    const instanceId = instanceIdOf(i);
-    const avatar = el("div", { className: "unit-token__avatar", style: `background:${def.color}` }, [def.emoji]);
-    const badges = el("div", { className: "unit-token__badges" });
-    const hpBadge = el("div", { className: "unit-token__hp-badge" }, [String(def.stats.hp)]);
-    const hpFill = el("div", { className: "unit-token__hp-fill" });
-    const hpText = el("div", { className: "unit-token__hp-text" }, [`${def.stats.hp}/${def.stats.hp}`]);
-    const gaugeFill = el("div", { className: "unit-token__gauge-fill" });
-    const token = el("div", { className: `unit-token ${teamClass}` }, [
-      badges,
-      el("div", { className: "unit-token__avatar-wrap" }, [el("div", { className: "unit-token__platform" }), avatar]),
-      el("div", { className: "unit-token__name" }, [def.name]),
-      el("div", { className: "unit-token__hp-row" }, [hpBadge, el("div", { className: "unit-token__hp-bar" }, [hpFill])]),
-      hpText,
-      el("div", { className: "unit-token__gauge-bar" }, [gaugeFill]),
-    ]);
-    refs.set(instanceId, { token, avatar, hpBadge, hpFill, hpText, gaugeFill, badges });
-    return token;
-  });
-  return el("div", { className: `battle-arena__team ${teamClass}s` }, tokens);
+/** 3Dキャラの頭上に重ねる、名前/HP/ATBのHUDカードを作る */
+function buildHudCard(def: MonsterDefinition, teamClass: string): { card: HTMLElement; refs: UnitHudRefs } {
+  const badges = el("div", { className: "unit-hud__badges" });
+  const hpFill = el("div", { className: "unit-hud__hp-fill" });
+  const hpText = el("div", { className: "unit-hud__hp-text" }, [`${def.stats.hp}`]);
+  const gaugeFill = el("div", { className: "unit-hud__gauge-fill" });
+  const card = el("div", { className: `unit-hud ${teamClass}` }, [
+    badges,
+    el("div", { className: "unit-hud__name" }, [def.name]),
+    el("div", { className: "unit-hud__hp" }, [hpFill, hpText]),
+    el("div", { className: "unit-hud__gauge" }, [gaugeFill]),
+  ]);
+  card.style.setProperty("--unit-color", def.color);
+  return { card, refs: { card, hpFill, hpText, gaugeFill, badges } };
 }
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
@@ -149,37 +138,100 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   let picker: PickerState = { phase: "NONE" };
   let activeInstanceId: string | null = null;
 
-  const unitRefs = new Map<string, UnitTokenRefs>();
-  const defByInstanceId = new Map<string, MonsterDefinition>();
-  enemyTeam.forEach((def, i) => defByInstanceId.set(`E${i + 1}`, def));
-  playerTeam.forEach((def, i) => defByInstanceId.set(`P${i + 1}`, def));
+  const hudRefs = new Map<string, UnitHudRefs>();
+  const teamOf = new Map<string, "PLAYER" | "ENEMY">();
+  const anchorPositions = new Map<string, { x: number; y: number }>();
 
-  const enemyRow = buildTeamRow(enemyTeam, (i) => `E${i + 1}`, "unit-token--enemy", unitRefs);
-  const playerRow = buildTeamRow(playerTeam, (i) => `P${i + 1}`, "unit-token--player", unitRefs);
+  /** 着弾待ちなど、時間差で走る演出。スキップ時は即座に実行して整合を保つ */
+  const pendingEffects: { handle: ReturnType<typeof setTimeout>; run: () => void }[] = [];
+
+  function later(run: () => void, ms: number): void {
+    if (ms <= 0 || finished) {
+      run();
+      return;
+    }
+    const entry = {
+      handle: setTimeout(() => {
+        const index = pendingEffects.indexOf(entry);
+        if (index >= 0) pendingEffects.splice(index, 1);
+        run();
+      }, ms),
+      run,
+    };
+    pendingEffects.push(entry);
+  }
+
+  function flushPending(): void {
+    const entries = pendingEffects.splice(0, pendingEffects.length);
+    for (const entry of entries) {
+      clearTimeout(entry.handle);
+      entry.run();
+    }
+  }
+
+  function cancelPending(): void {
+    for (const entry of pendingEffects.splice(0, pendingEffects.length)) clearTimeout(entry.handle);
+  }
+
+  // --- 3Dステージ ---
+  const stageUnits: StageUnitInit[] = [
+    ...playerTeam.map((def, i) => ({ instanceId: `P${i + 1}`, def, team: "PLAYER" as const })),
+    ...enemyTeam.map((def, i) => ({ instanceId: `E${i + 1}`, def, team: "ENEMY" as const })),
+  ];
+  for (const unit of stageUnits) teamOf.set(unit.instanceId, unit.team);
+
+  const stageHost = el("div", { className: "battle-stage" });
+  const overlay = el("div", { className: "battle-stage__overlay" });
+  const fxLayer = el("div", { className: "battle-stage__fx" });
+  stageHost.append(overlay, fxLayer);
+
+  for (const unit of stageUnits) {
+    const { card, refs } = buildHudCard(unit.def, unit.team === "PLAYER" ? "unit-hud--player" : "unit-hud--enemy");
+    hudRefs.set(unit.instanceId, refs);
+    overlay.append(card);
+  }
+
+  const stage = new BattleStage(stageHost, stageUnits);
+
+  // 3Dの座標に合わせてHUDカードを毎フレーム追従させる
+  let overlayFrame: number | null = null;
+  function syncOverlay(): void {
+    overlayFrame = requestAnimationFrame(syncOverlay);
+    for (const anchor of stage.computeScreenAnchors()) {
+      const refs = hudRefs.get(anchor.instanceId);
+      if (!refs) continue;
+      anchorPositions.set(anchor.instanceId, { x: anchor.x, y: anchor.y });
+      refs.card.style.transform = `translate(-50%, -100%) scale(${anchor.scale.toFixed(3)})`;
+      refs.card.style.left = `${anchor.x}px`;
+      refs.card.style.top = `${anchor.y}px`;
+      refs.card.style.visibility = anchor.visible ? "visible" : "hidden";
+    }
+  }
+  overlayFrame = requestAnimationFrame(syncOverlay);
 
   const actionPanelEl = el("div", { className: "action-panel-slot" });
   const logEl = el("div", { className: "battle-log" });
   const resultBanner = el("div", { className: "result-banner result-banner--hidden" });
 
   function setActive(instanceId: string | null): void {
-    if (activeInstanceId) unitRefs.get(activeInstanceId)?.token.classList.remove("unit-token--active");
+    if (activeInstanceId) hudRefs.get(activeInstanceId)?.card.classList.remove("unit-hud--active");
     activeInstanceId = instanceId;
-    if (activeInstanceId) unitRefs.get(activeInstanceId)?.token.classList.add("unit-token--active");
+    if (activeInstanceId) hudRefs.get(activeInstanceId)?.card.classList.add("unit-hud--active");
+    stage.focusOn(instanceId);
   }
 
   function applySnapshot(snapshot: UnitSnapshot[]): void {
     for (const s of snapshot) {
-      const refs = unitRefs.get(s.instanceId);
+      const refs = hudRefs.get(s.instanceId);
       if (!refs) continue;
       const ratio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.currentHp / s.maxHp)) : 0;
       refs.hpFill.style.width = `${ratio * 100}%`;
-      refs.hpFill.classList.toggle("unit-token__hp-fill--low", ratio <= 0.3);
-      refs.hpBadge.textContent = String(s.currentHp);
-      refs.hpBadge.classList.toggle("unit-token__hp-badge--low", ratio <= 0.3);
-      refs.hpText.textContent = `${s.currentHp}/${s.maxHp}`;
+      refs.hpFill.classList.toggle("unit-hud__hp-fill--low", ratio <= 0.3);
+      refs.hpText.textContent = String(s.currentHp);
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
-      refs.token.classList.toggle("unit-token--dead", !s.alive);
+      refs.card.classList.toggle("unit-hud--dead", !s.alive);
       refs.badges.replaceChildren(...buildBadgesRow(s));
+      stage.syncUnitState(s.instanceId, ratio, s.alive);
     }
   }
 
@@ -209,15 +261,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
   function spawnFloatingNumber(event: BattleEvent): void {
     if (event.kind === "DEATH") return;
-    const refs = unitRefs.get(event.targetId);
-    if (!refs) return;
-
-    if (event.kind === "DAMAGE") {
-      refs.avatar.classList.remove("unit-token__avatar--hit");
-      // 強制再フローさせて同じアニメーションを連続でも再生できるようにする
-      void refs.avatar.offsetWidth;
-      refs.avatar.classList.add("unit-token__avatar--hit");
-    }
+    const position = anchorPositions.get(event.targetId);
+    if (!position) return;
 
     const text = event.kind === "DAMAGE" ? `-${event.amount}` : event.kind === "HEAL" ? `+${event.amount}` : "MISS";
     const kindClass =
@@ -230,16 +275,70 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
           : "floating-number--resist";
 
     const popup = el("div", { className: `floating-number ${kindClass}` }, [event.isCrit ? `${text}!` : text]);
-    refs.token.append(popup);
+    // 同じ位置に重ならないよう、左右に少しばらけさせる
+    popup.style.left = `${position.x + (Math.random() - 0.5) * 36}px`;
+    popup.style.top = `${position.y - 18}px`;
+    fxLayer.append(popup);
     popup.addEventListener("animationend", () => popup.remove());
-    setTimeout(() => popup.remove(), 1200);
+    setTimeout(() => popup.remove(), 1400);
+  }
+
+  /** イベント列から、術者が「殴った」のか「唱えた」のかを判定する */
+  function isOffensiveTurn(actorId: string, events: BattleEvent[]): boolean {
+    const actorTeam = teamOf.get(actorId);
+    return events.some((e) => e.kind === "DAMAGE" && teamOf.get(e.targetId) !== actorTeam);
+  }
+
+  /** 1件のイベントに対応する3D演出を再生する */
+  function playEventVisual(actorId: string, event: BattleEvent): void {
+    switch (event.kind) {
+      case "DAMAGE": {
+        const actorTeam = teamOf.get(actorId);
+        const isEnemyOfActor = teamOf.get(event.targetId) !== actorTeam;
+        const color = isEnemyOfActor ? stage.getAvatar(actorId)?.theme.vfx : undefined;
+        stage.playDamage(event.targetId, event.isCrit === true, color);
+        break;
+      }
+      case "HEAL":
+        stage.playHeal(event.targetId);
+        break;
+      case "DEATH":
+        stage.playDeath(event.targetId);
+        break;
+      case "RESIST":
+        stage.playShield(event.targetId);
+        break;
+    }
+    spawnFloatingNumber(event);
+  }
+
+  /** ログ行から、VFXでしか表現できない状態変化(バフ/デバフ)を拾う */
+  function playStatusVisuals(record: TurnRecord): void {
+    for (const line of record.lines) {
+      const buffTarget = /\[(?:味方|敵):([A-Z]\d+)\] .* が上昇/.exec(line);
+      if (buffTarget) stage.playBuff(buffTarget[1]);
+      const debuffTarget = /\[(?:味方|敵):([A-Z]\d+)\] .* が低下/.exec(line);
+      if (debuffTarget) stage.playDebuff(debuffTarget[1]);
+      const shieldTarget = /\[(?:味方|敵):([A-Z]\d+)\] .* にシールドが張られた/.exec(line);
+      if (shieldTarget) stage.playShield(shieldTarget[1]);
+    }
   }
 
   function applyRecord(record: TurnRecord): void {
     setActive(record.actorId);
     appendLines(record.lines);
-    applySnapshot(record.snapshot);
-    for (const event of record.events) spawnFloatingNumber(event);
+
+    const offensive = isOffensiveTurn(record.actorId, record.events);
+    if (offensive) stage.playAttackMotion(record.actorId);
+    else stage.playCastMotion(record.actorId);
+
+    // 踏み込みモーションを見せてから着弾させる
+    const delay = offensive ? IMPACT_DELAY_MS[speed] : Math.round(IMPACT_DELAY_MS[speed] * 0.6);
+    later(() => {
+      applySnapshot(record.snapshot);
+      playStatusVisuals(record);
+      for (const event of record.events) playEventVisual(record.actorId, event);
+    }, delay);
   }
 
   function getTargetCandidates(unit: BattleUnit, skill: MonsterDefinition["skills"][number]): BattleUnit[] {
@@ -407,6 +506,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   function skipToEnd(): void {
     userPaused = true;
     stopTimer();
+    cancelPending();
     picker = { phase: "NONE" };
     renderActionPanel();
     let lastRecord: TurnRecord | null = null;
@@ -497,11 +597,9 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     ["結果へ進む"],
   );
 
-  const battleArena = el("div", { className: "battle-arena" }, [enemyRow, playerRow]);
-
   const container = el("div", { className: "screen battle-view" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, [title])]),
-    battleArena,
+    el("header", { className: "app-header battle-view__header" }, [el("h1", {}, [title])]),
+    stageHost,
     actionPanelEl,
     el("div", { className: "battle-controls" }, [modeBtn, speedBtn, playPauseBtn, skipBtn]),
     resultBanner,
@@ -515,6 +613,9 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     element: container,
     dispose: () => {
       stopTimer();
+      cancelPending();
+      if (overlayFrame !== null) cancelAnimationFrame(overlayFrame);
+      stage.dispose();
     },
   };
 }
