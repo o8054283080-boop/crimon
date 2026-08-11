@@ -1,8 +1,8 @@
 import { Stats } from "./stats.js";
 
-export type Star = 1 | 2 | 3 | 4 | 5;
+export type Star = 1 | 2 | 3 | 4 | 5 | 6;
 
-export const STARS: Star[] = [1, 2, 3, 4, 5];
+export const STARS: Star[] = [1, 2, 3, 4, 5, 6];
 
 /** 星ごとの最大レベル */
 export const STAR_MAX_LEVEL: Record<Star, number> = {
@@ -11,6 +11,7 @@ export const STAR_MAX_LEVEL: Record<Star, number> = {
   3: 30,
   4: 40,
   5: 50,
+  6: 60,
 };
 
 /** ランクアップ(星を1つ上げる)に必要な、同じ星の素材モンスターの数 */
@@ -19,7 +20,8 @@ export const RANK_UP_SACRIFICE_COUNT: Record<Star, number> = {
   2: 2,
   3: 3,
   4: 4,
-  5: 0, // 星5は上限。ランクアップ不可
+  5: 5,
+  6: 0, // 星6は上限。ランクアップ不可
 };
 
 /**
@@ -63,5 +65,5 @@ export function requiredExpForLevel(level: number): number {
 }
 
 export function canRankUp(star: Star, level: number): boolean {
-  return star < 5 && level >= STAR_MAX_LEVEL[star];
+  return star < 6 && level >= STAR_MAX_LEVEL[star];
 }

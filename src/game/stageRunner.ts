@@ -2,14 +2,23 @@ import { BattleEngine } from "../battle/engine.js";
 import { Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
-import { computeEffectiveStats } from "../core/rarity.js";
-import { Wave, WaveEnemy } from "../data/stages.js";
+import { Star, STAR_MAX_LEVEL, computeEffectiveStats } from "../core/rarity.js";
+import { Difficulty, DIFFICULTY_MODIFIERS, Wave, WaveEnemy } from "../data/stages.js";
 import { findMonsterById } from "../data/monsters.js";
 
 export function resolveDex(dexId: string): MonsterDefinition {
   const dex = findMonsterById(dexId);
   if (!dex) throw new Error(`図鑑に存在しないモンスターです: ${dexId}`);
   return dex;
+}
+
+/** 難易度に応じて敵の星・レベルを底上げする(星は6でクランプ、レベルは新しい星の最大レベルでクランプ) */
+function applyDifficultyToEnemy(enemy: WaveEnemy, difficulty: Difficulty): WaveEnemy {
+  const mod = DIFFICULTY_MODIFIERS[difficulty];
+  if (mod.starBonus === 0 && mod.levelBonus === 0) return enemy;
+  const star = Math.min(6, enemy.star + mod.starBonus) as Star;
+  const level = Math.min(enemy.level + mod.levelBonus, STAR_MAX_LEVEL[star]);
+  return { ...enemy, star, level };
 }
 
 function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number): MonsterDefinition {
@@ -29,8 +38,10 @@ function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number): MonsterDefiniti
   };
 }
 
-export function buildEnemyTeam(wave: Wave): MonsterDefinition[] {
-  return wave.enemies.map((enemy) => defFromWaveEnemy(enemy, wave.powerScale));
+export function buildEnemyTeam(wave: Wave, difficulty: Difficulty = "NORMAL"): MonsterDefinition[] {
+  const mod = DIFFICULTY_MODIFIERS[difficulty];
+  const powerScale = wave.powerScale * mod.powerScaleMultiplier;
+  return wave.enemies.map((enemy) => defFromWaveEnemy(applyDifficultyToEnemy(enemy, difficulty), powerScale));
 }
 
 export interface WaveBattleSetup {
@@ -48,11 +59,12 @@ export function setupWaveBattle(
   carryHp: Map<string, number> | null,
   wave: Wave,
   allEquipment: Equipment[] = [],
+  difficulty: Difficulty = "NORMAL",
 ): WaveBattleSetup {
   const playerDefs = partyInstances.map((instance) =>
     toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, allEquipment)),
   );
-  const enemyDefs = buildEnemyTeam(wave);
+  const enemyDefs = buildEnemyTeam(wave, difficulty);
   const initialPlayerHp = carryHp
     ? partyInstances.map((instance, i) => carryHp.get(instance.id) ?? playerDefs[i].stats.hp)
     : undefined;

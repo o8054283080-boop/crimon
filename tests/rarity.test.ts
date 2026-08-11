@@ -13,16 +13,18 @@ describe("星ランクによるステータス倍率", () => {
     expect(starMultiplier(3)).toBeCloseTo(1.96);
     expect(starMultiplier(4)).toBeCloseTo(2.744);
     expect(starMultiplier(5)).toBeCloseTo(3.8416);
+    expect(starMultiplier(6)).toBeCloseTo(5.37824);
   });
 });
 
 describe("最大レベル", () => {
-  it("星1から星5まで段階的に最大レベルが上がる", () => {
+  it("星1から星6まで段階的に最大レベルが上がる", () => {
     expect(STAR_MAX_LEVEL[1]).toBe(15);
     expect(STAR_MAX_LEVEL[2]).toBe(20);
     expect(STAR_MAX_LEVEL[3]).toBe(30);
     expect(STAR_MAX_LEVEL[4]).toBe(40);
     expect(STAR_MAX_LEVEL[5]).toBe(50);
+    expect(STAR_MAX_LEVEL[6]).toBe(60);
   });
 });
 
@@ -81,7 +83,11 @@ describe("経験値カーブとランクアップ判定", () => {
     expect(canRankUp(1, 15)).toBe(true);
   });
 
-  it("星5は最大レベルでもランクアップ不可", () => {
-    expect(canRankUp(5, 50)).toBe(false);
+  it("星5は最大レベルに到達するとランクアップ可能(星6へ)", () => {
+    expect(canRankUp(5, 50)).toBe(true);
+  });
+
+  it("星6は最大レベルでもランクアップ不可(上限)", () => {
+    expect(canRankUp(6, 60)).toBe(false);
   });
 });

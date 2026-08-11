@@ -1,7 +1,30 @@
 import { Element } from "../core/element.js";
 import { Equipment, SetType, generateThemedStageEquipment } from "../core/equipment.js";
-import { Star } from "../core/rarity.js";
+import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import { MONSTER_TEMPLATES, REINCARNATION_PIG_DEX } from "./monsters.js";
+
+/** ステージの難易度。ノーマル→ハード→ヘルの順で敵が強化され、ドロップする装備の星も上がる */
+export type Difficulty = "NORMAL" | "HARD" | "HELL";
+export const DIFFICULTIES: Difficulty[] = ["NORMAL", "HARD", "HELL"];
+export const DIFFICULTY_JA: Record<Difficulty, string> = { NORMAL: "ノーマル", HARD: "ハード", HELL: "ヘル" };
+
+interface DifficultyModifier {
+  /** 敵の星への加算値(6を超える分はクランプされる) */
+  starBonus: number;
+  /** 敵のレベルへの加算値(新しい星の最大レベルでクランプされる) */
+  levelBonus: number;
+  /** 敵の実効ステータス倍率(powerScale)にさらに掛かる倍率 */
+  powerScaleMultiplier: number;
+  /** ドロップする装備の星への加算値 */
+  equipmentStarBonus: number;
+}
+
+/** 難易度ごとの敵強化・装備ドロップ星ボーナス。具体的な倍率はゲーム内では非公開 */
+export const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifier> = {
+  NORMAL: { starBonus: 0, levelBonus: 0, powerScaleMultiplier: 1.0, equipmentStarBonus: 0 },
+  HARD: { starBonus: 1, levelBonus: 5, powerScaleMultiplier: 1.35, equipmentStarBonus: 1 },
+  HELL: { starBonus: 2, levelBonus: 10, powerScaleMultiplier: 1.8, equipmentStarBonus: 2 },
+};
 
 export interface WaveEnemy {
   templateId: string;
@@ -76,28 +99,59 @@ function clampLevel(star: Star, level: number, max: Record<Star, number>): numbe
   return Math.min(level, max[star]);
 }
 
-const STAR_MAX: Record<Star, number> = { 1: 15, 2: 20, 3: 30, 4: 40, 5: 50 };
+const MAX_STAR: Star = 6;
 
 /**
- * チャプター3・4では敵の基本星をさらに+1底上げする(星1〜5のレンジに収まるようクランプされる)。
- * 星の上昇は装備で覆すのが難しいほど重いため、チャプター1・2は据え置き、
- * 後半チャプターだけ一段階上げるくらいに留めてバランスを取っている。
+ * 全4チャプター×5ステージを通しで並べた「グローバルステージ番号」(1〜20)。
+ * チャプターをまたいでも強さがリセットされないよう、星・レベル・powerScaleは
+ * すべてこの通し番号を基準に連続的に上昇させる(同じステージ番号でもチャプターが
+ * 上がれば必ず明確に強くなる)。
  */
-function chapterStarBump(chapter: number): number {
-  return chapter >= 3 ? 1 : 0;
+function globalStageIndex(chapter: number, stageNumber: number): number {
+  return (chapter - 1) * 5 + stageNumber;
 }
-/** チャプターが1つ上がるごとに敵の実効ステータス倍率(powerScale)がこの分だけ底上げされる。星と違って上限に張り付かず滑らかに調整できるため、章ごとの強さの主な差分はこちらが担う */
-const CHAPTER_POWER_SCALE_STEP = 0.15;
-const POWER_SCALE_MAX = 1.6;
+
+/**
+ * グローバルステージ番号がこの値に到達した時点で、敵の基本星がその添字+1になる(星1〜5)。
+ * 4ステージごとに星が1つ上がる均等な刻みにしてあり、チャプターをまたぐたびに必ず星が変わる。
+ * 星6は基本星としては出現せず、各チャプター最終ステージのボス個体(+1される)だけが到達できる
+ * 特別な星として、20ステージ目(最終チャプターのボス)で初めて到達するようにしてある。
+ */
+const STAR_BREAKPOINTS = [1, 5, 9, 13, 17];
+
+function baseStarForGlobalIndex(globalIndex: number): Star {
+  let star = 1;
+  for (let i = STAR_BREAKPOINTS.length - 1; i >= 0; i--) {
+    if (globalIndex >= STAR_BREAKPOINTS[i]) {
+      star = i + 1;
+      break;
+    }
+  }
+  return star as Star;
+}
+
+/** グローバルステージ番号が1つ上がるごとにレベルが+2される(ウェーブ内でもさらに+1ずつ) */
+function baseLevelForGlobalIndex(globalIndex: number, waveNumber: number): number {
+  return 1 + (globalIndex - 1) * 2 + (waveNumber - 1);
+}
+
+/**
+ * 敵の実効ステータス倍率(powerScale)。ステージ1-1の0.5倍から始まり、全20ステージを通して滑らかに上昇する。
+ * 星の上昇(最大で1.4^4≒3.8倍)だけでも十分に強い上昇カーブになるため、powerScaleの上げ幅は
+ * 控えめ(最大でも1.0倍=据え置き相当)に留め、星と掛け合わさって難易度が跳ね上がりすぎないようにしてある。
+ */
+const POWER_SCALE_BASE = 0.5;
+const POWER_SCALE_STEP = 0.026;
+const POWER_SCALE_MAX = 1.0;
+
+function powerScaleForGlobalIndex(globalIndex: number): number {
+  return Math.min(POWER_SCALE_MAX, POWER_SCALE_BASE + POWER_SCALE_STEP * (globalIndex - 1));
+}
 
 function buildWave(chapter: number, stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
-  // 星1のスターターパーティ(Lv1)がステージ1-1から無理なく挑戦できるよう、
-  // チャプター1内はレベルを緩やかに(1-1で敵Lv1、1-5ボスでも星2Lv15程度まで)しか上げない。
-  // チャプター2以降は、その章に入るたびに基本星とpowerScaleが底上げされ、
-  // 章が進むごとにちゃんと敵が強くなっていく(章の中での上がり方自体はチャプター1と同じカーブ)。
-  const localBaseStar = Math.min(2, Math.ceil(stageNumber / 3)) as Star;
-  const baseStar = Math.min(5, localBaseStar + chapterStarBump(chapter)) as Star;
-  const baseLevel = 1 + (stageNumber - 1) * 2 + (waveNumber - 1);
+  const globalIndex = globalStageIndex(chapter, stageNumber);
+  const baseStar = baseStarForGlobalIndex(globalIndex);
+  const baseLevel = baseLevelForGlobalIndex(globalIndex, waveNumber);
 
   const enemies: WaveEnemy[] = MONSTER_TEMPLATES.map((template, i) => {
     const element = NORMAL_ELEMENTS[(i + stageNumber + waveNumber) % NORMAL_ELEMENTS.length];
@@ -105,26 +159,22 @@ function buildWave(chapter: number, stageNumber: number, waveNumber: number, isB
       templateId: template.templateId,
       element,
       star: baseStar,
-      level: clampLevel(baseStar, baseLevel, STAR_MAX),
+      level: clampLevel(baseStar, baseLevel, STAR_MAX_LEVEL),
     };
   });
 
   if (isBossWave) {
-    const bossStar = Math.min(5, baseStar + 1) as Star;
+    const bossStar = Math.min(MAX_STAR, baseStar + 1) as Star;
     enemies[0] = {
       ...enemies[0],
       element: "DARK",
       star: bossStar,
-      level: clampLevel(bossStar, baseLevel + 5, STAR_MAX),
+      level: clampLevel(bossStar, baseLevel + 5, STAR_MAX_LEVEL),
       isBoss: true,
     };
   }
 
-  // 序盤ステージの敵は少し弱めにして、初心者でも安定して勝てるようにする。
-  // チャプター1の5ステージ目でようやく等倍(プレイヤーと五分)になり、
-  // チャプター2以降はさらにCHAPTER_POWER_SCALE_STEPずつ上乗せされ、章を追うごとに手強くなる。
-  const localPowerScale = Math.min(1, 0.45 + 0.11 * stageNumber);
-  const powerScale = Math.min(POWER_SCALE_MAX, localPowerScale + CHAPTER_POWER_SCALE_STEP * (chapter - 1));
+  const powerScale = powerScaleForGlobalIndex(globalIndex);
 
   return { waveNumber, isBossWave, enemies, powerScale };
 }
@@ -177,10 +227,20 @@ export function rollStageDrop(stage: Stage, rng: () => number = Math.random): St
   return { dexId: `${stage.rewards.dropTemplateId}_${element}`, star };
 }
 
-/** ステージクリア報酬として、確率で装備をドロップする(なければnull)。シリーズはそのチャプターのテーマシリーズ固定。モンスタードロップとは独立した抽選 */
-export function rollStageEquipment(stage: Stage, rng: () => number = Math.random): Equipment | null {
+/** ボスステージ(各チャプター最終ステージ)クリア時、装備が星+1でドロップする確率。ゲーム内では非公開 */
+const BOSS_STAGE_EQUIPMENT_STAR_BONUS_RATE = 0.25;
+
+/**
+ * ステージクリア報酬として、確率で装備をドロップする(なければnull)。シリーズはそのチャプターのテーマシリーズ固定。
+ * モンスタードロップとは独立した抽選。ボスステージ(stageNumber=5)ではたまに星+1の装備が出るほか、
+ * 難易度がハード/ヘルの場合はさらに星が加算される。
+ */
+export function rollStageEquipment(stage: Stage, rng: () => number = Math.random, difficulty: Difficulty = "NORMAL"): Equipment | null {
   if (rng() >= stage.rewards.equipmentDropRate) return null;
-  return generateThemedStageEquipment(stage.rewards.equipmentSet, rng);
+  const isBossStage = stage.stageNumber === 5;
+  const bossBonus = isBossStage && rng() < BOSS_STAGE_EQUIPMENT_STAR_BONUS_RATE ? 1 : 0;
+  const starBonus = bossBonus + DIFFICULTY_MODIFIERS[difficulty].equipmentStarBonus;
+  return generateThemedStageEquipment(stage.rewards.equipmentSet, rng, starBonus);
 }
 
 /** 通常ステージでの転生ピッグ(星2)ドロップ率。他のドロップとは独立した抽選 */

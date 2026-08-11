@@ -5,7 +5,7 @@ import { EquipSlot } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor } from "../data/equipmentDungeon.js";
-import { Stage } from "../data/stages.js";
+import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, runDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
@@ -48,6 +48,7 @@ registerSW({ immediate: true });
 
 interface StageRunState {
   stage: Stage;
+  difficulty: Difficulty;
   waveIndex: number;
   originalPartyIds: string[];
   currentPartyInstances: MonsterInstance[];
@@ -69,6 +70,7 @@ interface AppState {
   rankUpMode: boolean;
   rankUpSacrificeIds: string[];
   selectedStageId: string | null;
+  selectedDifficulty: Difficulty;
   stageRun: StageRunState | null;
   stageResult: StageResultInfo | null;
   equipmentDetailId: string | null;
@@ -92,6 +94,7 @@ const state: AppState = {
   rankUpMode: false,
   rankUpSacrificeIds: [],
   selectedStageId: null,
+  selectedDifficulty: "NORMAL",
   stageRun: null,
   stageResult: null,
   equipmentDetailId: null,
@@ -119,6 +122,7 @@ function navigate(screen: ScreenName): void {
   state.rankUpMode = false;
   state.rankUpSacrificeIds = [];
   state.selectedStageId = null;
+  state.selectedDifficulty = "NORMAL";
   state.summonResults = null;
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
@@ -237,13 +241,14 @@ function handleToggleParty(instanceId: string): void {
   render();
 }
 
-function startStage(stage: Stage): void {
+function startStage(stage: Stage, difficulty: Difficulty): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) return;
   savePlayerState(state.player);
   state.stageRun = {
     stage,
+    difficulty,
     waveIndex: 0,
     originalPartyIds: party.map((p) => p.id),
     currentPartyInstances: party,
@@ -263,13 +268,14 @@ function finishStage(cleared: boolean): void {
   const partyInstances = run.originalPartyIds
     .map((id) => state.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
-  const reward = cleared ? applyStageClearRewards(state.player, stage, run.wavesCleared, partyInstances) : null;
+  const reward = cleared ? applyStageClearRewards(state.player, stage, run.wavesCleared, partyInstances, run.difficulty) : null;
   state.player.gold += run.goldEarned;
   savePlayerState(state.player);
 
+  const difficultySuffix = run.difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[run.difficulty]}]`;
   state.stageResult = {
     cleared,
-    stageName: stage.name,
+    stageName: `${stage.name}${difficultySuffix}`,
     goldEarned: run.goldEarned + (reward?.goldEarned ?? 0),
     crystalEarned: reward?.crystalEarned ?? 0,
     wavesCleared: run.wavesCleared,
@@ -325,11 +331,12 @@ function finishDungeon(cleared: boolean): void {
   render();
 }
 
-function handleAutoFarmStage(stage: Stage, count: number): void {
-  const result = runStageAutoFarm(state.player, stage, count);
+function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty): void {
+  const result = runStageAutoFarm(state.player, stage, count, Math.random, difficulty);
   savePlayerState(state.player);
   state.autoFarmResult = result;
-  state.autoFarmTargetName = stage.name;
+  const difficultySuffix = difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[difficulty]}]`;
+  state.autoFarmTargetName = `${stage.name}${difficultySuffix}`;
   state.selectedStageId = null;
   state.screen = "AUTO_FARM_RESULT";
   render();
@@ -367,15 +374,16 @@ function renderCurrentWaveBattle(): BattleViewHandle {
   if (!run) throw new Error("stageRun is not set");
 
   const wave = run.stage.waves[run.waveIndex];
-  const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave, state.player.equipment);
+  const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave, state.player.equipment, run.difficulty);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp });
   const isLastWave = run.waveIndex >= run.stage.waves.length - 1;
+  const difficultySuffix = run.difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[run.difficulty]}]`;
 
   return renderBattleView({
     engine,
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
-    title: `${run.stage.name} - ウェーブ${wave.waveNumber}${wave.isBossWave ? "(BOSS)" : ""}`,
+    title: `${run.stage.name}${difficultySuffix} - ウェーブ${wave.waveNumber}${wave.isBossWave ? "(BOSS)" : ""}`,
     resultLabel: (winner) => {
       if (winner !== "PLAYER") return "ステージ選択に戻る";
       return isLastWave ? "🎁 報酬を受け取る" : "▶ 次のウェーブへ";
@@ -458,6 +466,12 @@ function render(): void {
         selectedStageId: state.selectedStageId,
         onSelectStage: (id) => {
           state.selectedStageId = id;
+          state.selectedDifficulty = "NORMAL";
+          render();
+        },
+        selectedDifficulty: state.selectedDifficulty,
+        onSelectDifficulty: (difficulty) => {
+          state.selectedDifficulty = difficulty;
           render();
         },
         onStartStage: startStage,

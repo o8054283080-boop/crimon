@@ -53,6 +53,20 @@ describe("ランクアップ判定 (checkRankUp)", () => {
     const result = checkRankUp(target, [sac], [sac.id]);
     expect(result.ok).toBe(false);
   });
+
+  it("星5→6は素材5体で成立する(星6が上限)", () => {
+    const target = createMonsterInstance("slime_FIRE", 5, 50);
+    const sacrifices = Array.from({ length: 5 }, () => createMonsterInstance("wolf_WATER", 5, 1));
+    const result = checkRankUp(target, sacrifices, []);
+    expect(result.ok).toBe(true);
+    expect(result.requiredCount).toBe(5);
+  });
+
+  it("星6は最大レベルでもランクアップできない(素材0体でも失敗)", () => {
+    const target = createMonsterInstance("slime_FIRE", 6, 60);
+    const result = checkRankUp(target, [], []);
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("ランクアップの適用 (applyRankUp)", () => {
