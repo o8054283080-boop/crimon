@@ -26,6 +26,14 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
+  it("各階層の敵は全員同じ属性で統一されている(弱点属性を突きやすくするため)", () => {
+    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+      const enemies = findDungeonFloor(floor)!.enemies;
+      const elements = new Set(enemies.map((e) => e.element));
+      expect(elements.size).toBe(1);
+    }
+  });
+
   it("1〜3階は星4まで、4〜6階は星5まで、7〜10階は星6までしか出現しない", () => {
     for (let floor = 1; floor <= 3; floor++) {
       const stars = DUNGEON_FLOOR_STAR_WEIGHTS[floor].map((w) => w.value);

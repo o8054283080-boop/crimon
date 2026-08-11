@@ -1,5 +1,5 @@
 import { EquipStar } from "../../core/equipment.js";
-import { ELEMENT_JA } from "../../core/element.js";
+import { CYCLE_ELEMENTS, Element, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
 import { DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
 import { DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
 import { getDungeonParty, PlayerState } from "../../game/playerState.js";
@@ -24,6 +24,16 @@ function maxStarForFloor(floor: DungeonFloor): EquipStar {
   return floor.floor <= 3 ? 4 : floor.floor <= 6 ? 5 : 6;
 }
 
+/** その階層の敵は全員この属性で統一されている(弱点属性を突きやすくするため) */
+function floorElement(floor: DungeonFloor): Element {
+  return floor.enemies[0].element;
+}
+
+/** floorElementに対して有利(弱点を突ける)属性を返す */
+function counterElement(element: Element): Element | null {
+  return CYCLE_ELEMENTS.find((e) => getElementAffinity(e, element) === "ADVANTAGE") ?? null;
+}
+
 function renderList(props: EquipmentDungeonProps): HTMLElement {
   const cards = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
     return el(
@@ -31,7 +41,9 @@ function renderList(props: EquipmentDungeonProps): HTMLElement {
       { type: "button", className: "stage-card", onclick: () => props.onSelectFloor(floor.floor) },
       [
         el("div", { className: "stage-card__name" }, [floor.name]),
-        el("div", { className: "stage-card__meta" }, [`最高レア: ${starLabel(maxStarForFloor(floor))}`]),
+        el("div", { className: "stage-card__meta" }, [
+          `最高レア: ${starLabel(maxStarForFloor(floor))} / 敵属性: ${ELEMENT_JA[floorElement(floor)]}`,
+        ]),
       ],
     );
   });
@@ -66,6 +78,8 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
     el("span", { className: "enemy-tag" }, [`${e.templateId}[${ELEMENT_JA[e.element]}]★${e.star}Lv${e.level}`]),
   );
 
+  const element = floorElement(floor);
+  const counter = counterElement(element);
   const recommendedGear = floor.floor <= 5 ? "★5装備(サブ4個推奨)" : "★6装備推奨";
   const pigStar = floor.floor <= REINCARNATION_PIG_LOW_TIER_MAX_FLOOR ? 2 : 3;
   const bonusNotes = [
@@ -76,11 +90,22 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
 
   return el("div", { className: "screen stages-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [floor.name])]),
-    el("section", { className: "panel" }, [
-      el("h2", {}, ["出現する敵"]),
-      el("div", { className: "wave-row__enemies" }, enemyTags),
-      el("p", { className: "app-subtitle" }, [`推奨装備目安: ${recommendedGear} / モンスター★5`]),
-    ]),
+    el(
+      "section",
+      { className: "panel" },
+      (
+        [
+          el("h2", {}, ["出現する敵"]),
+          el("div", { className: "wave-row__enemies" }, enemyTags),
+          el("p", { className: "app-subtitle" }, [`推奨装備目安: ${recommendedGear} / モンスター★5`]),
+          counter
+            ? el("p", { className: "app-subtitle equip-dungeon__hint" }, [
+                `💡 この階層の敵は全員「${ELEMENT_JA[element]}」属性です。弱点である「${ELEMENT_JA[counter]}」属性のモンスターで挑むと有利に戦えます。`,
+              ])
+            : null,
+        ] as (HTMLElement | null)[]
+      ).filter((n): n is HTMLElement => n !== null),
+    ),
     el("section", { className: "panel" }, [
       el("h2", {}, ["報酬"]),
       ...bonusNotes.map((note) => el("p", { className: "app-subtitle" }, [note])),

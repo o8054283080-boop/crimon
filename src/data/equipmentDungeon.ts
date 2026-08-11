@@ -39,10 +39,11 @@ const POWER_SCALE_START = 0.62;
 const POWER_SCALE_END = 1.7;
 
 function buildFloor(floor: number): DungeonFloor {
-  // 属性は階層によらず固定(要素ジャンケンの巡り合わせで難易度が階層ごとにぶれないようにする)
-  const enemies: DungeonEnemy[] = MONSTER_TEMPLATES.map((template, i) => ({
+  // 各階層の敵は単一属性で統一する。弱点を突く属性のパーティを組めば有利に戦えるようになる
+  const floorElement = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
+  const enemies: DungeonEnemy[] = MONSTER_TEMPLATES.map((template) => ({
     templateId: template.templateId,
-    element: NORMAL_ELEMENTS[i % NORMAL_ELEMENTS.length],
+    element: floorElement,
     star: DUNGEON_ENEMY_STAR,
     level: DUNGEON_ENEMY_LEVEL,
   }));
