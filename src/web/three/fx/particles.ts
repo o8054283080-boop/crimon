@@ -22,12 +22,21 @@ varying float vCell;
 varying vec3 vColor;
 
 void main() {
-  vAlpha = aAlpha;
   vRot = aRot;
   vCell = aCell;
   vColor = aColor;
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = aSize * (300.0 / max(0.001, -mvPosition.z));
+
+  // ビュー空間の奥行き(前方が正)。カメラ位置に近づくほど点は大きく描かれる。
+  float depth = -mvPosition.z;
+
+  // カメラの手前や背後に来た粒は描かない。
+  // ここを許すと depth がほぼ0になり、次の割り算で点が画面全体を覆うほど巨大化する。
+  vAlpha = depth > 0.2 ? aAlpha : 0.0;
+
+  // 遠近に応じた大きさ。分母を下限で守ったうえで、最終的な画素サイズにも
+  // 上限を設ける(1粒が画面を覆い尽くして白飛びするのを構造的に防ぐ)。
+  gl_PointSize = clamp(aSize * (300.0 / max(0.2, depth)), 0.0, 44.0);
   gl_Position = projectionMatrix * mvPosition;
 }
 `;
@@ -191,6 +200,9 @@ class ParticleLayer {
     this.points.renderOrder = kind === "add" ? 3 : 2;
   }
 
+  /** 粒の大きさにかかる共通倍率(BillboardFieldと同じ考え方) */
+  sizeScale = 1;
+
   spawn(spec: ParticleSpec): void {
     const index = this.cursor;
     this.cursor = (this.cursor + 1) % this.capacity;
@@ -201,7 +213,7 @@ class ParticleLayer {
     particle.life = particle.maxLife;
     particle.gravity = spec.gravity ?? 0;
     particle.drag = spec.drag ?? 0.9;
-    particle.size = spec.size;
+    particle.size = spec.size * this.sizeScale;
     particle.growth = spec.growth ?? 1;
     particle.alpha = spec.alpha ?? 1;
     particle.fadeIn = spec.fadeIn ?? 0;
@@ -312,6 +324,12 @@ export class ParticleField {
     this.additive = new ParticleLayer(additiveCapacity, "add");
     this.alpha = new ParticleLayer(alphaCapacity, "alpha");
     this.root.add(this.additive.points, this.alpha.points);
+  }
+
+  /** 粒の大きさにかかる共通倍率。内部の2レイヤーへまとめて配る */
+  setSizeScale(scale: number): void {
+    this.alpha.sizeScale = scale;
+    this.additive.sizeScale = scale;
   }
 
   spawn(spec: ParticleSpec): void {

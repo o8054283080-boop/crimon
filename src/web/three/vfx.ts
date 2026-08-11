@@ -108,9 +108,14 @@ function normalizeImpactOptions(arg: ImpactArg | undefined): ImpactOptions {
 export class VfxSystem {
   readonly root = new THREE.Group();
 
-  private readonly particles = new ParticleField();
-  private readonly billboards = new BillboardField(80);
-  private readonly strips = new StripField(52);
+  // 粒も同じ理由で上限を絞る。加算合成では同時に生きている数がそのまま
+  // 明るさになるため、多すぎると画面全体が白く飽和してしまう。
+  private readonly particles = new ParticleField(170, 110);
+  // 同時に存在できる枚数の上限。加算合成では枚数がそのまま明るさになるため、
+  // ここを小さく保つことが「画面が白く飽和しない」ことの最終的な保証になる。
+  // 上限に達すると古いものから順に置き換わるので、演出自体は途切れない。
+  private readonly billboards = new BillboardField(18);
+  private readonly strips = new StripField(10);
   private readonly auras = new Map<string, Map<StatusAuraKind, StatusAura>>();
   private readonly auraRoot = new THREE.Group();
 
@@ -140,6 +145,35 @@ export class VfxSystem {
   /** パーティクル量の調整(0.5=省電力, 1=標準, 1.5=リッチ) */
   setQuality(quality: number): void {
     this.quality = Math.max(0.25, Math.min(1.5, quality));
+  }
+
+  /**
+   * エフェクト全体の大きさ倍率。
+   *
+   * 個々の演出はキャラクターの背丈(約2.2)を基準に組んであるが、
+   * カメラの画角と距離によっては、その大きさが画面の縦幅に対して
+   * 大きすぎることがある。加算合成のため、画面を覆うほど大きいと
+   * 全体が白く飽和して何も見えなくなるので、構図に合わせてここで絞る。
+   */
+  setSizeScale(scale: number): void {
+    const clamped = Math.max(0.15, Math.min(2, scale));
+    this.billboards.sizeScale = clamped;
+    this.strips.sizeScale = clamped;
+    this.particles.setSizeScale(clamped);
+  }
+
+  /**
+   * 1枚の板の大きさの上限(ワールド単位)。
+   * 画面に映る高さの一部に収まるよう外から指定することで、
+   * どの演出も画面を覆い尽くせなくなる。
+   */
+  setMaxBillboardScale(maxScale: number): void {
+    this.billboards.maxScale = Math.max(0.5, maxScale);
+  }
+
+  /** エフェクト板1枚あたりの濃さ。重なった時の飽和を抑えるために使う */
+  setOpacityScale(scale: number): void {
+    this.billboards.opacityScale = Math.max(0.05, Math.min(1, scale));
   }
 
   private count(base: number): number {

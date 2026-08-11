@@ -171,7 +171,17 @@ export class StripField {
     };
   }
 
+  /** 帯の太さにかかる共通倍率(BillboardField/ParticleFieldと同じ考え方) */
+  sizeScale = 1;
+
+  /** ビルボードと同じ考え方で、混雑してきたら新しい帯を間引く */
+  private readonly softLimit = 8;
+
   spawn(spec: StripSpec, cameraPosition: THREE.Vector3): void {
+    if (this.items.length > this.softLimit) {
+      const over = (this.items.length - this.softLimit) / Math.max(1, this.capacity - this.softLimit);
+      if (Math.random() < Math.min(0.97, over)) return;
+    }
     if (spec.points.length < 2) return;
     if (this.items.length >= this.capacity) {
       const oldest = this.items.shift();
@@ -195,7 +205,7 @@ export class StripField {
       this.side.crossVectors(this.tangent, this.view);
       if (this.side.lengthSq() < 1e-8) this.side.set(1, 0, 0);
       const t = i / segments;
-      this.side.normalize().multiplyScalar((spec.width * widthAt(spec.widthProfile, t)) / 2);
+      this.side.normalize().multiplyScalar((spec.width * this.sizeScale * widthAt(spec.widthProfile, t)) / 2);
 
       const base = i * 6;
       item.basePositions[base + 0] = point.x - this.side.x;

@@ -79,6 +79,28 @@ const HIT_STYLE_BY_ROLE: Record<string, HitStyle> = {
   素材: "blunt",
 };
 
+/**
+ * エフェクトの大きさを決める基準の高さ(ワールド単位)。
+ * 画面の縦にこの高さが収まっている時、各エフェクトは指定どおりの寸法で描かれる。
+ * 実際の画角がこれより狭ければ、その比率でエフェクトも小さくなる。
+ * 値はキャラクターの背丈(約2.2)の10倍強で、大きめの演出でも画面の
+ * 半分程度に収まるよう選んである。
+ */
+const VFX_REFERENCE_HEIGHT = 42;
+
+/**
+ * パーティクルの密度。1未満にすると粒の数が減る。
+ * 加算合成のエフェクトは重なるほど明るくなるので、
+ * 画面が白く飽和しない範囲に密度を落としてある。
+ */
+const VFX_DENSITY = 0.5;
+
+/** エフェクト板1枚あたりの濃さ。重なりでの飽和を抑えるため薄くしてある */
+const VFX_OPACITY = 0.55;
+
+/** 1枚のエフェクト板が占めてよい、画面の高さに対する最大割合 */
+const VFX_MAX_SCREEN_RATIO = 0.22;
+
 /** そのユニットに今かかっている状態。継続エフェクトの出し分けに使う */
 export interface UnitStatusFlags {
   poison: boolean;
@@ -174,7 +196,7 @@ export class BattleStage {
 
     // ブルームは RenderPass 直後(=トーンマッピング前のリニアHDR)にかかる。
     // しきい値を1超えに置くことで、本当に明るい部分だけが滲むようにしている。
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.34, 0.6, 1.02);
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.18, 0.5, 1.15);
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
 
@@ -348,6 +370,19 @@ export class BattleStage {
     this.camera.updateProjectionMatrix();
     this.camera.position.copy(this.cameraBase);
     this.camera.lookAt(this.cameraTarget);
+
+    // エフェクトの大きさを、いまの構図に対して相対的に決める。
+    // 画面の縦がワールド何単位ぶん映っているかを求め、その一定割合を
+    // 「大きめのエフェクト1つ分」の基準にする。こうしておくと、
+    // 画角や距離を変えても演出が画面を覆って白飛びすることがない。
+    const visibleHeight = 2 * high * tanY;
+    this.vfx.setSizeScale(visibleHeight / VFX_REFERENCE_HEIGHT);
+    // どんな演出でも、1枚の板が画面の高さのこの割合を超えないようにする
+    this.vfx.setMaxBillboardScale(visibleHeight * VFX_MAX_SCREEN_RATIO);
+    // 粒の「数」も抑える。大きさだけ絞っても、加算合成では重なった総量で
+    // 画面が飽和するため、密度側からも下げる必要がある
+    this.vfx.setQuality(VFX_DENSITY);
+    this.vfx.setOpacityScale(VFX_OPACITY);
   }
 
   private handleResize(): void {

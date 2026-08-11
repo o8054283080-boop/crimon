@@ -12,6 +12,8 @@ import { writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
 const outFile = process.argv[2] ?? "diagnose.json";
+// 調べたい場面をクエリで切り替える(例: "seed=777&turns=4" で進行中のバトル)
+const query = process.argv[3] ?? "seed=12345&paused=1";
 const PORT = Number(process.env.SHOOT_PORT ?? 5320);
 const BASE = `http://127.0.0.1:${PORT}/preview.html`;
 
@@ -54,6 +56,60 @@ function collect() {
       fov: +camera.fov.toFixed(2),
     },
     sceneChildren: stage.scene.children.length,
+    // 描画が破綻した時に、エフェクトの出しっぱなしを疑うための計測値
+    vfx: (() => {
+      const info = {
+        rootChildren: stage.vfx.root.children.length,
+        auraUnits: stage.vfx.auras ? stage.vfx.auras.size : null,
+        auraTotal: stage.vfx.auras
+          ? [...stage.vfx.auras.values()].reduce((sum, byKind) => sum + byKind.size, 0)
+          : null,
+      };
+      // どのサブシステムが画面を埋めているかを切り分けるための実数
+      try {
+        const v = stage.vfx;
+        info.liveBillboards = v.billboards?.items?.length ?? null;
+        info.billboardMaxScale = v.billboards?.maxScale ?? null;
+        info.biggestBillboard = v.billboards?.items
+          ? Math.max(0, ...v.billboards.items.map((i) => i.mesh.scale.x))
+          : null;
+        info.liveStrips = v.strips?.items?.length ?? null;
+        info.liveParticlesAdditive = v.particles?.additive?.liveCount ?? null;
+        info.liveParticlesAlpha = v.particles?.alpha?.liveCount ?? null;
+      } catch (e) {
+        info.probeError = String(e);
+      }
+      // 粒子がカメラの手前/背後に来ると gl_PointSize が発散して画面を覆う。
+      // 実際にそうなっている粒があるかを、ビュー空間の奥行きで数える。
+      const field = stage.vfx.particles;
+      if (field && field.geometry) {
+        const pos = field.geometry.getAttribute("position");
+        const alpha = field.geometry.getAttribute("aAlpha") ?? field.geometry.getAttribute("aLife");
+        const size = field.geometry.getAttribute("aSize");
+        const mv = camera.matrixWorldInverse;
+        let live = 0;
+        let danger = 0;
+        let worstSize = 0;
+        let worstDepth = Infinity;
+        for (let i = 0; i < pos.count; i++) {
+          const a = alpha ? alpha.getX(i) : 1;
+          if (a <= 0.002) continue;
+          live++;
+          const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+          // ビュー空間 z(負が前方)。-z が 0 に近いほど点が巨大化する
+          const vz = mv.elements[2] * x + mv.elements[6] * y + mv.elements[10] * z + mv.elements[14];
+          const depth = -vz;
+          const px = (size ? size.getX(i) : 1) * (300 / Math.max(0.001, depth));
+          if (depth < 1) danger++;
+          if (px > worstSize) { worstSize = px; worstDepth = depth; }
+        }
+        info.liveParticles = live;
+        info.nearCameraParticles = danger;
+        info.worstPointSizePx = +worstSize.toFixed(1);
+        info.worstDepth = +worstDepth.toFixed(3);
+      }
+      return info;
+    })(),
     units: [],
   };
 
@@ -129,7 +185,7 @@ async function main() {
     });
 
     // networkidle は vite の HMR WebSocket が開いたままだと成立しないことがある
-    await page.goto(`${BASE}?seed=12345&paused=1`, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.goto(`${BASE}?${query}`, { waitUntil: "domcontentloaded", timeout: 45000 });
     log("ページ読み込み完了、初期化待ち...");
     await page.waitForFunction(() => window.__crimonPreviewReady === true, null, { timeout: 60000 });
     log("プレビュー初期化完了、描画待ち...");

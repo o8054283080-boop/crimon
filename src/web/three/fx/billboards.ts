@@ -73,9 +73,45 @@ export class BillboardField {
   private readonly quaternion = new THREE.Quaternion();
   private readonly groundQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
 
-  constructor(private readonly capacity = 64) {}
+  constructor(private readonly capacity = 64) {
+    this.softLimit = Math.max(6, Math.round(capacity * 0.12));
+  }
+
+  /**
+   * 板の大きさにかかる共通倍率。
+   * エフェクトはカメラの画角と距離に対して相対的に大きすぎると、
+   * 加算合成のため画面全体が白く飽和してしまう。個々の指定値を
+   * 直すのではなく、ここで一括して現在の構図に合う大きさへ収める。
+   */
+  sizeScale = 1;
+
+  /**
+   * 1枚の板が取りうる最大の大きさ(ワールド単位)。
+   * 加算合成では画面を覆う板が1枚あるだけで全体が白く飽和するため、
+   * 演出側がどんな値を指定しても、ここで物理的に頭打ちにする。
+   */
+  maxScale = Infinity;
+
+  /**
+   * 板の不透明度にかかる共通倍率。
+   * 加算合成は重なった枚数だけ明るくなるため、1枚あたりを薄くしておかないと
+   * 同時に多くの演出が出た瞬間に画面が白く飽和する。
+   */
+  opacityScale = 1;
+
+  /**
+   * この枚数を超えたあたりから、新しい板を確率的に間引く。
+   * 加算合成では枚数がそのまま明るさになるため、同時に多数が重なると
+   * 個々をいくら小さく薄くしても画面が白く飽和してしまう。
+   * 混雑してきたら描かずに捨てることで、見た目の上限を保つ。
+   */
+  private readonly softLimit: number;
 
   spawn(spec: BillboardSpec): void {
+    if (this.items.length > this.softLimit) {
+      const over = (this.items.length - this.softLimit) / Math.max(1, this.capacity - this.softLimit);
+      if (Math.random() < Math.min(0.985, over)) return;
+    }
     if (this.items.length >= this.capacity) {
       const oldest = this.items.shift();
       if (oldest) this.release(oldest);
@@ -112,14 +148,14 @@ export class BillboardField {
     item.material.map = spec.texture;
     item.material.color.copy(spec.color);
     item.material.blending = spec.blending ?? THREE.AdditiveBlending;
-    item.material.opacity = spec.fadeIn ? 0 : (spec.opacity ?? 1);
+    item.material.opacity = spec.fadeIn ? 0 : (spec.opacity ?? 1) * this.opacityScale;
     item.material.needsUpdate = true;
     item.maxLife = Math.max(0.01, spec.life);
     item.life = item.maxLife;
-    item.startScale = spec.startScale;
-    item.endScale = spec.endScale;
+    item.startScale = Math.min(spec.startScale * this.sizeScale, this.maxScale);
+    item.endScale = Math.min(spec.endScale * this.sizeScale, this.maxScale);
     item.aspect = spec.aspect ?? 1;
-    item.opacity = spec.opacity ?? 1;
+    item.opacity = (spec.opacity ?? 1) * this.opacityScale;
     item.orient = spec.orient ?? "camera";
     item.roll = spec.roll ?? 0;
     item.spin = spec.spin ?? 0;
@@ -132,7 +168,7 @@ export class BillboardField {
     else item.velocity.set(0, 0, 0);
 
     item.mesh.position.copy(spec.position);
-    item.mesh.scale.set(spec.startScale, spec.startScale * item.aspect, 1);
+    item.mesh.scale.set(item.startScale, item.startScale * item.aspect, 1);
     item.mesh.renderOrder = spec.renderOrder ?? 4;
     item.mesh.visible = true;
     if (spec.orient === "fixed" && spec.quaternion) item.mesh.quaternion.copy(spec.quaternion);
