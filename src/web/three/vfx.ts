@@ -114,7 +114,7 @@ export class VfxSystem {
   // 同時に存在できる枚数の上限。加算合成では枚数がそのまま明るさになるため、
   // ここを小さく保つことが「画面が白く飽和しない」ことの最終的な保証になる。
   // 上限に達すると古いものから順に置き換わるので、演出自体は途切れない。
-  private readonly billboards = new BillboardField(18);
+  private readonly billboards = new BillboardField(14);
   private readonly strips = new StripField(10);
   private readonly auras = new Map<string, Map<StatusAuraKind, StatusAura>>();
   private readonly auraRoot = new THREE.Group();

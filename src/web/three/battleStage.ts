@@ -96,10 +96,10 @@ const VFX_REFERENCE_HEIGHT = 42;
 const VFX_DENSITY = 0.5;
 
 /** エフェクト板1枚あたりの濃さ。重なりでの飽和を抑えるため薄くしてある */
-const VFX_OPACITY = 0.55;
+const VFX_OPACITY = 0.42;
 
 /** 1枚のエフェクト板が占めてよい、画面の高さに対する最大割合 */
-const VFX_MAX_SCREEN_RATIO = 0.22;
+const VFX_MAX_SCREEN_RATIO = 0.16;
 
 /** そのユニットに今かかっている状態。継続エフェクトの出し分けに使う */
 export interface UnitStatusFlags {
@@ -618,6 +618,11 @@ export class BattleStage {
     const current = this.activeAuras.get(instanceId) ?? new Set<StatusAuraKind>();
     const wanted = new Set<StatusAuraKind>();
 
+    // 3Dで纏わせるのは「体に起きていること」が絵になる状態だけに絞る。
+    //
+    // 強化/弱体はほぼ全ユニットに常時かかるため、これを光らせると
+    // 8体すべてが光に覆われてキャラクターの色も形も見えなくなる。
+    // しかもHUDのバッジで既に一覧できているので、3D側では出さない。
     if (alive && status) {
       if (status.poison) wanted.add("poison");
       if (status.burn) wanted.add("burn");
@@ -625,8 +630,6 @@ export class BattleStage {
       if (status.immune) wanted.add("immunity");
       if (status.stun) wanted.add("stun");
       if (status.regen) wanted.add("regen");
-      if (status.buff) wanted.add("buff");
-      if (status.debuff) wanted.add("curse");
     }
 
     const anchor = this.anchorOf(instanceId);

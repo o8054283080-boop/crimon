@@ -225,7 +225,9 @@ void main() {
     color += uGlow * mask * 1.5;
   }
 
-  color = mix(color, vec3(1.5), uFlash);
+  // 被弾の白飛び。振り切ると体の形も属性色も消えてしまうので、
+  // 「強く光った」と分かる程度に留め、シルエットを残す
+  color = mix(color, vec3(1.25), uFlash * 0.6);
 
   // 撃破ディゾルブ: 上から崩れ、境界が強く発光する
   if (uDissolve > 0.001) {

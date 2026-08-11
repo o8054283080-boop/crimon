@@ -220,17 +220,28 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       const height = (refs.card.offsetHeight || 42) * anchor.scale;
       let top = anchor.y - height;
 
-      // 既に置いたカードと重なる間、少しずつ上へ逃がす。
-      // 隣り合うユニットの名前とHPが潰れて読めなくなるのを防ぐ
+      // 既に置いたカードと重なる間、少しずつ逃がす。
+      // 隣り合うユニットの名前とHPが潰れて読めなくなるのを防ぐ。
+      // 上に空きが無くなったら下側へ回す(上端で潰し合うのを避ける)
       const left = anchor.x - width / 2;
       const right = anchor.x + width / 2;
-      for (let guard = 0; guard < 8; guard++) {
-        const hit = placedCards.find(
-          (r) => left < r.right - 2 && right > r.left + 2 && top < r.bottom - 2 && top + height > r.top + 2,
+      const overlaps = (candidate: number) =>
+        placedCards.find(
+          (r) => left < r.right - 2 && right > r.left + 2 && candidate < r.bottom - 2 && candidate + height > r.top + 2,
         );
+
+      for (let guard = 0; guard < 8; guard++) {
+        const hit = overlaps(top);
         if (!hit) break;
-        top = hit.top - height - 2;
+        const above = hit.top - height - 2;
+        if (above >= 2) {
+          top = above;
+        } else {
+          // 上が詰まっているので、ぶつかった相手の下へ回す
+          top = hit.bottom + 2;
+        }
       }
+      top = Math.max(2, top);
 
       placedCards.push({ left, right, top, bottom: top + height });
       refs.card.style.left = `${anchor.x}px`;

@@ -14,6 +14,12 @@ import { chromium } from "playwright";
 const outFile = process.argv[2] ?? "diagnose.json";
 // 調べたい場面をクエリで切り替える(例: "seed=777&turns=4" で進行中のバトル)
 const query = process.argv[3] ?? "seed=12345&paused=1";
+// 画面比によって構図もエフェクトの大きさも変わるため、指定できるようにする
+const vpWidth = Number(process.argv[4] ?? 640);
+const vpHeight = Number(process.argv[5] ?? 640);
+// 進行中のバトルは撮る瞬間で絵が大きく変わる。1枚では判断できないので
+// 少し間隔を空けて複数枚撮り、傾向で見られるようにする
+const frames = Number(process.argv[6] ?? 1);
 const PORT = Number(process.env.SHOOT_PORT ?? 5320);
 const BASE = `http://127.0.0.1:${PORT}/preview.html`;
 
@@ -177,7 +183,7 @@ async function main() {
 
   try {
     // 描画負荷を下げるため小さめのビューポートで調べる
-    const context = await browser.newContext({ viewport: { width: 640, height: 640 }, deviceScaleFactor: 1 });
+    const context = await browser.newContext({ viewport: { width: vpWidth, height: vpHeight }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     page.on("pageerror", (e) => log("PAGEERROR:", e.message));
     page.on("console", (m) => {
@@ -206,9 +212,13 @@ async function main() {
       return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     });
     if (box && box.width > 1) {
-      const shot = outFile.replace(/\.json$/, "") + "-stage.png";
-      await page.screenshot({ path: shot, clip: box, timeout: 90000 });
-      log(`ステージ画像を ${shot} に保存しました`);
+      const base = outFile.replace(/\.json$/, "");
+      for (let i = 0; i < frames; i++) {
+        const shot = frames > 1 ? `${base}-stage-${i + 1}.png` : `${base}-stage.png`;
+        await page.screenshot({ path: shot, clip: box, timeout: 90000 });
+        log(`ステージ画像を ${shot} に保存しました`);
+        if (i < frames - 1) await page.waitForTimeout(500);
+      }
     }
 
     console.log(json);
