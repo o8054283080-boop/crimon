@@ -6,6 +6,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { MonsterDefinition } from "../../core/monster.js";
 import { createArena } from "./arena.js";
 import { MonsterAvatar } from "./monsterAvatar.js";
+import { CinematicPass } from "./postfx/cinematicPass.js";
 import { VfxSystem } from "./vfx.js";
 
 export interface StageUnitInit {
@@ -25,20 +26,39 @@ export interface ScreenAnchor {
   scale: number;
 }
 
-const PLAYER_LINE_Z = 3.4;
-const ENEMY_LINE_Z = -3.8;
+const PLAYER_LINE_Z = 2.7;
+const ENEMY_LINE_Z = -3.2;
+/** 隊列を左右にずらす量。前後の列が重ならないよう、互い違いに配置するために使う */
+const PLAYER_LINE_SHIFT = -0.62;
+const ENEMY_LINE_SHIFT = 0.62;
 
-/** 隊列の並び。中央に寄せつつ、奥行きを少しずらして重なりを避ける */
+/**
+ * 隊列の並び。
+ *
+ * 望遠寄りのカメラだと前後の列が画面上で重なりやすいので、
+ * 左右にも半歩ずらして「奥のユニットが手前のユニットの隙間に見える」ようにする。
+ * さらに端のユニットをわずかに前後させ、直線的な整列を崩して奥行きを出す。
+ */
 function slotPositions(count: number, lineZ: number, team: "PLAYER" | "ENEMY"): { x: number; z: number }[] {
   if (count <= 0) return [];
-  const spacing = count <= 4 ? 2.75 : 2.45;
+  const spacing = count <= 4 ? 2.5 : 2.24;
   const totalWidth = (count - 1) * spacing;
+  const shift = team === "PLAYER" ? PLAYER_LINE_SHIFT : ENEMY_LINE_SHIFT;
   return Array.from({ length: count }, (_, i) => {
-    const x = -totalWidth / 2 + i * spacing;
-    // 端のユニットほど少し奥へ下げて、扇状の陣形に見せる
-    const depthOffset = Math.abs(x) * 0.16 * (team === "PLAYER" ? 1 : -1);
-    return { x, z: lineZ + depthOffset };
+    const x = -totalWidth / 2 + i * spacing + shift;
+    // 手前の列は端ほど奥へ、奥の列は端ほど手前へ。ゆるい弧を描かせる
+    const arc = Math.abs(x) * (team === "PLAYER" ? -0.1 : 0.09);
+    return { x, z: lineZ + arc };
   });
+}
+
+/** カメラに必ず収めたい領域(ワールド座標) */
+interface FrameBox {
+  halfWidth: number;
+  zNear: number;
+  zFar: number;
+  yBottom: number;
+  yTop: number;
 }
 
 export class BattleStage {
@@ -49,19 +69,27 @@ export class BattleStage {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly composer: EffectComposer;
   private readonly bloomPass: UnrealBloomPass;
+  private readonly cinematicPass: CinematicPass;
   private readonly arena = createArena();
   private readonly vfx = new VfxSystem();
   private readonly avatars = new Map<string, MonsterAvatar>();
   private readonly resizeObserver: ResizeObserver;
   private readonly clock = new THREE.Clock();
 
-  private readonly cameraBase = new THREE.Vector3(0, 7.2, 13.2);
-  private readonly cameraTarget = new THREE.Vector3(0, 1.6, -0.3);
+  /** 見下ろし角と距離から毎回組み立てる、フレーミング後のカメラ基準位置 */
+  private readonly cameraBase = new THREE.Vector3(0, 5.4, 20);
+  private readonly cameraTarget = new THREE.Vector3(0, 1.42, -0.25);
   private readonly cameraOffset = new THREE.Vector3();
   private readonly cameraLookOffset = new THREE.Vector3();
   private readonly desiredCameraOffset = new THREE.Vector3();
   private readonly desiredLookOffset = new THREE.Vector3();
   private readonly tmpVector = new THREE.Vector3();
+  private readonly tmpRelative = new THREE.Vector3();
+
+  /** 両チームが必ず収まる箱。setupUnitsで実際のスロット位置から作る */
+  private frameBox: FrameBox = { halfWidth: 5.4, zNear: 4.4, zFar: -4.9, yBottom: -0.1, yTop: 3.3 };
+  /** フレーミングで決まったカメラ距離。UIの遠近スケールの基準にも使う */
+  private frameDistance = 20;
 
   private shakeStrength = 0;
   private hitStopRemaining = 0;
@@ -77,17 +105,17 @@ export class BattleStage {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    // 露出は「白飛びしない」ことを最優先に、やや低めで固定する
+    this.renderer.toneMappingExposure = 0.92;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.className = "battle-stage__canvas";
     container.append(this.renderer.domElement);
 
     const { width, height } = this.measure();
-    this.camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 250);
-    this.camera.position.copy(this.cameraBase);
-    this.camera.lookAt(this.cameraTarget);
+    this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 320);
 
-    this.scene.fog = new THREE.FogExp2(0x0a0a16, 0.021);
+    // 霧の色は空のシェーダの地平線色と合わせてある。遠景がそのまま霞へ溶ける
+    this.scene.fog = new THREE.FogExp2(0x2a3055, 0.0165);
     this.scene.add(this.arena.group);
     this.scene.add(this.vfx.root);
 
@@ -98,9 +126,23 @@ export class BattleStage {
     this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.composer.setSize(width, height);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.72, 0.62, 0.72);
+
+    // ブルームは RenderPass 直後(=トーンマッピング前のリニアHDR)にかかる。
+    // しきい値を1超えに置くことで、本当に明るい部分だけが滲むようにしている。
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.34, 0.6, 1.02);
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
+
+    // 仕上げはトーンマッピング後(sRGB)に適用する
+    this.cinematicPass = new CinematicPass({
+      vignette: 0.4,
+      aberration: 1.0,
+      grain: 0.045,
+      saturation: 1.06,
+      contrast: 0.12,
+      tintStrength: 0.15,
+    });
+    this.composer.addPass(this.cinematicPass);
 
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(container);
@@ -115,37 +157,42 @@ export class BattleStage {
   }
 
   private setupLights(): void {
-    // 全体の底上げ。空(上)と床(下)で色を変えて自然な陰影を作る
-    this.scene.add(new THREE.HemisphereLight(0x8ea2ff, 0x1a1424, 0.55));
+    // 環境光。空の青と床の暗さで色を分け、影が真っ黒に潰れない下地を作る
+    this.scene.add(new THREE.HemisphereLight(0x7d92e0, 0x191526, 0.5));
 
-    // キーライト: 斜め上手前から。影を落とす唯一のライト
-    const key = new THREE.DirectionalLight(0xffffff, 1.35);
-    key.position.set(6, 12, 8);
+    // キーライト: 右奥やや高めから。影が手前左へ伸びるので、床に立体感が出る
+    const key = new THREE.DirectionalLight(0xfff1dc, 2.1);
+    key.position.set(10, 12.5, -4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.near = 1;
-    key.shadow.camera.far = 40;
-    key.shadow.camera.left = -14;
-    key.shadow.camera.right = 14;
-    key.shadow.camera.top = 14;
-    key.shadow.camera.bottom = -14;
-    key.shadow.bias = -0.0012;
+    key.shadow.camera.near = 2;
+    key.shadow.camera.far = 46;
+    key.shadow.camera.left = -17;
+    key.shadow.camera.right = 17;
+    key.shadow.camera.top = 17;
+    key.shadow.camera.bottom = -17;
+    key.shadow.bias = -0.0009;
+    key.shadow.normalBias = 0.02;
     this.scene.add(key);
 
-    // フィルライト: 反対側から弱く当てて、影が潰れすぎないようにする
-    const fill = new THREE.DirectionalLight(0x5f7cff, 0.5);
-    fill.position.set(-8, 5, 4);
+    // フィルライト: カメラ側の左下から寒色で。キーの影を持ち上げるだけの弱さに留める
+    const fill = new THREE.DirectionalLight(0x6d86d8, 0.62);
+    fill.position.set(-9, 4.5, 9);
     this.scene.add(fill);
 
-    // リムライト: 背後から輪郭を光らせ、背景からキャラを分離する
-    const rim = new THREE.DirectionalLight(0xff7ad9, 0.65);
-    rim.position.set(0, 6, -12);
+    // リムライト: 奥のゲート方向から。キャラの輪郭を光らせ、背景から抜く
+    const rim = new THREE.DirectionalLight(0xc9a6ff, 1.5);
+    rim.position.set(-2, 5.5, -14);
     this.scene.add(rim);
   }
 
   private setupUnits(units: StageUnitInit[]): void {
     const players = units.filter((u) => u.team === "PLAYER");
     const enemies = units.filter((u) => u.team === "ENEMY");
+
+    let maxAbsX = 0;
+    let maxZ = -Infinity;
+    let minZ = Infinity;
 
     const place = (list: StageUnitInit[], lineZ: number, team: "PLAYER" | "ENEMY") => {
       const slots = slotPositions(list.length, lineZ, team);
@@ -159,26 +206,101 @@ export class BattleStage {
         this.scene.add(avatar.root);
         this.avatars.set(unit.instanceId, avatar);
 
-        // 属性色のポイントライトを1体ずつ持たせ、床への色移りで存在感を出す
-        const light = new THREE.PointLight(avatar.theme.light, 6.5, 9, 2);
-        light.position.set(slots[index].x, 2.0, slots[index].z);
+        maxAbsX = Math.max(maxAbsX, Math.abs(slots[index].x));
+        maxZ = Math.max(maxZ, slots[index].z);
+        minZ = Math.min(minZ, slots[index].z);
+
+        // 属性色のポイントライト。床への色移りで存在感を出すが、
+        // 台数が増えるとモバイルGPUで重くなるので範囲と強さは控えめにする
+        const light = new THREE.PointLight(avatar.theme.light, 4.5, 6.5, 2);
+        light.position.set(slots[index].x, 1.5, slots[index].z);
         this.scene.add(light);
       });
     };
 
     place(players, PLAYER_LINE_Z, "PLAYER");
     place(enemies, ENEMY_LINE_Z, "ENEMY");
+
+    if (this.avatars.size > 0) {
+      // 体の太さ + オーラの余白を足して、実際の配置から必要な画角を決める
+      this.frameBox = {
+        halfWidth: maxAbsX + 1.5,
+        zNear: maxZ + 1.6,
+        zFar: minZ - 1.6,
+        yBottom: -0.15,
+        yTop: 3.35,
+      };
+    }
+  }
+
+  /**
+   * 画面比に合わせてカメラを組み直す。
+   *
+   * 方針は「画角は望遠寄りで固定し、足りない分は引いて稼ぐ」。
+   * 画角を広げて寄ると手前のユニットだけが極端に大きくなるので、
+   * frameBox が収まる最短距離を二分探索で求めて、そこにカメラを置く。
+   */
+  private frameCamera(width: number, height: number): void {
+    const aspect = width / height;
+    // 横長ほど望遠に、縦長では収まりを優先して少しだけ広角にする
+    const fov = THREE.MathUtils.clamp(34 - (aspect - 0.6) * 9, 24.5, 36);
+    // 見下ろし角。画面上端が地平線の少し上に来る角度にして、
+    // 上部に空と建築、下部に床、という配分を作る
+    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(fov / 2 - 1.8, 9.5, 16.5));
+
+    const tanY = Math.tan(THREE.MathUtils.degToRad(fov / 2));
+    const tanX = tanY * aspect;
+    const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch));
+    const forward = dir.clone().negate();
+    const up = new THREE.Vector3(0, Math.cos(pitch), -Math.sin(pitch));
+
+    const box = this.frameBox;
+    const corners: THREE.Vector3[] = [];
+    for (const x of [-box.halfWidth, box.halfWidth]) {
+      for (const y of [box.yBottom, box.yTop]) {
+        for (const z of [box.zFar, box.zNear]) corners.push(new THREE.Vector3(x, y, z));
+      }
+    }
+
+    const padding = 1.04;
+    const camera = new THREE.Vector3();
+    const fits = (distance: number): boolean => {
+      camera.copy(this.cameraTarget).addScaledVector(dir, distance);
+      for (const corner of corners) {
+        this.tmpRelative.copy(corner).sub(camera);
+        const depth = this.tmpRelative.dot(forward);
+        if (depth < 0.5) return false;
+        if (Math.abs(this.tmpRelative.x) * padding > tanX * depth) return false;
+        if (Math.abs(this.tmpRelative.dot(up)) * padding > tanY * depth) return false;
+      }
+      return true;
+    };
+
+    let low = 4;
+    let high = 120;
+    for (let i = 0; i < 26; i++) {
+      const mid = (low + high) / 2;
+      if (fits(mid)) high = mid;
+      else low = mid;
+    }
+
+    this.frameDistance = high;
+    this.cameraBase.copy(this.cameraTarget).addScaledVector(dir, high);
+    this.camera.fov = fov;
+    this.camera.aspect = aspect;
+    this.camera.updateProjectionMatrix();
+    this.camera.position.copy(this.cameraBase);
+    this.camera.lookAt(this.cameraTarget);
   }
 
   private handleResize(): void {
     const { width, height } = this.measure();
-    this.camera.aspect = width / height;
-    // 縦長の画面ではキャラが小さくなりすぎるため、画角を広げて全体を収める
-    this.camera.fov = height > width ? 46 : 38;
-    this.camera.updateProjectionMatrix();
+    this.frameCamera(width, height);
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height);
     this.bloomPass.setSize(width, height);
+    const ratio = Math.min(window.devicePixelRatio, 2);
+    this.cinematicPass.setResolution(width * ratio, height * ratio);
   }
 
   private start(): void {
@@ -206,6 +328,7 @@ export class BattleStage {
     this.vfx.update(delta);
     this.vfx.faceCamera(this.camera);
     this.updateCamera(delta);
+    this.cinematicPass.setTime(this.elapsed);
 
     this.composer.render();
   }
@@ -216,9 +339,10 @@ export class BattleStage {
     this.cameraOffset.lerp(this.desiredCameraOffset, follow);
     this.cameraLookOffset.lerp(this.desiredLookOffset, follow);
 
-    // 待機中もわずかに揺らして、静止画に見えないようにする
-    const idleX = Math.sin(this.elapsed * 0.22) * 0.45;
-    const idleY = Math.sin(this.elapsed * 0.31 + 1.2) * 0.22;
+    // 待機中もわずかに揺らして静止画に見せない。
+    // フレーミングを壊さないよう、振れ幅は構図に影響しない範囲に抑える
+    const idleX = Math.sin(this.elapsed * 0.19) * 0.16;
+    const idleY = Math.sin(this.elapsed * 0.27 + 1.2) * 0.08;
 
     this.camera.position.copy(this.cameraBase).add(this.cameraOffset);
     this.camera.position.x += idleX;
@@ -248,9 +372,9 @@ export class BattleStage {
     if (!avatar) return;
 
     const position = avatar.root.position;
-    // 行動者の方向へカメラを少し振り、わずかに寄る
-    this.desiredCameraOffset.set(position.x * 0.22, -0.5, position.z * 0.12 - 1.1);
-    this.desiredLookOffset.set(position.x * 0.3, 0.15, position.z * 0.18);
+    // 行動者の方向へ少しだけパン+寄り。全員が読める構図を壊さない程度に留める
+    this.desiredCameraOffset.set(position.x * 0.12, -0.12, -0.9);
+    this.desiredLookOffset.set(position.x * 0.2, 0.12, position.z * 0.1);
   }
 
   getAvatar(instanceId: string): MonsterAvatar | undefined {
@@ -374,8 +498,8 @@ export class BattleStage {
         x: (this.tmpVector.x * 0.5 + 0.5) * width,
         y: (-this.tmpVector.y * 0.5 + 0.5) * height,
         visible,
-        // 近いほど大きく。極端になりすぎないよう範囲を絞る
-        scale: Math.max(0.72, Math.min(1.15, 14 / distance)),
+        // カメラ距離を基準にした相対スケール。極端にならないよう範囲を絞る
+        scale: THREE.MathUtils.clamp(this.frameDistance / distance, 0.78, 1.12),
       });
     }
     return anchors;

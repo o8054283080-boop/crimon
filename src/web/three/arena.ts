@@ -1,65 +1,42 @@
 import * as THREE from "three";
 import { SIMPLEX_NOISE_3D } from "./shaderChunks.js";
 
-const GROUND_VERTEX = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vWorld;
-void main() {
-  vUv = uv;
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorld = worldPosition.xyz;
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
-`;
+/**
+ * 闘技場「蒼穹のコロッセウム」。
+ *
+ * 構造は外側へ向かって
+ *   闘技床(r=13) → 観客席の段(r=13→18.4) → 列柱(r=17.9) → 石壁(r=20)
+ * の順に積み上がる。カメラは常に手前側の低い位置から見下ろすので、
+ * 画面に映るのは「床・奥の段・奥の列柱・奥の壁」で、手前側の建築は
+ * フレーム外に落ちる。それでも全周を作ってあるのは、画面比が変わっても
+ * 破綻しないようにするため。
+ *
+ * 見た目の狙い:
+ *  - 冷たい青の環境光 + 篝火の暖色、という寒暖のコントラスト
+ *  - 奥のゲートから漏れる光でキャラのシルエットを背景から抜く
+ *  - 霞・塵・光条で「空気」を作り、平坦な3D感を消す
+ */
 
-const GROUND_FRAGMENT = /* glsl */ `
-uniform float uTime;
-uniform vec3 uBaseColor;
-uniform vec3 uGridColor;
-uniform vec3 uGlowColor;
-varying vec2 vUv;
-varying vec3 vWorld;
+// --- 寸法 ---
+const FLOOR_RADIUS = 13.0;
+const TIER_INNER = 13.0;
+const TIER_OUTER = 18.4;
+const TIER_TOP_Y = 1.55;
+const COLUMN_RADIUS = 17.9;
+const COLUMN_COUNT = 24;
+const COLUMN_BASE_Y = TIER_TOP_Y;
+const COLUMN_SHAFT_H = 2.95;
+const WALL_RADIUS = 20.0;
+const WALL_HEIGHT = 8.4;
 
-${SIMPLEX_NOISE_3D}
-
-/** 等間隔の線を、距離に応じて太さを補正しながら描く(遠景でモアレが出ないように) */
-float gridLine(vec2 coord, float spacing, float thickness) {
-  vec2 grid = abs(fract(coord / spacing - 0.5) - 0.5) / fwidth(coord / spacing);
-  float line = min(grid.x, grid.y);
-  return 1.0 - min(line * thickness, 1.0);
-}
-
-void main() {
-  float distanceFromCenter = length(vWorld.xz);
-
-  // 中央の闘技場だけを明るく残し、外周は闇に溶かす
-  float arena = 1.0 - smoothstep(9.0, 24.0, distanceFromCenter);
-  float vignette = 1.0 - smoothstep(3.0, 20.0, distanceFromCenter);
-
-  vec3 color = uBaseColor * (0.25 + vignette * 0.55);
-
-  // 二重のグリッド。細かい線と太い線を重ねて情報量を出す
-  float fine = gridLine(vWorld.xz, 1.0, 1.4);
-  float coarse = gridLine(vWorld.xz, 5.0, 2.2);
-  color += uGridColor * fine * 0.16 * arena;
-  color += uGridColor * coarse * 0.3 * arena;
-
-  // 中心から外へ広がるエネルギーの波
-  float wave = sin(distanceFromCenter * 1.1 - uTime * 1.6);
-  float pulse = smoothstep(0.86, 1.0, wave) * arena;
-  color += uGlowColor * pulse * 0.5;
-
-  // 床面のざらつき
-  float grain = snoise(vec3(vWorld.xz * 0.35, uTime * 0.05));
-  color += grain * 0.02;
-
-  // 闘技場の外周リング
-  float edge = smoothstep(0.06, 0.0, abs(distanceFromCenter - 9.0));
-  color += uGlowColor * edge * 0.8;
-
-  gl_FragColor = vec4(color, 1.0);
-}
-`;
+// --- 色 ---
+const STONE_LIGHT = "#6d7186";
+const STONE_MID = "#4b4f63";
+const STONE_DARK = "#2e3145";
+const STONE_DEEP = "#191b2b";
+const GROUT = "#14161f";
+const RUNE = "#7fd4ff";
+const EMBER = "#ff9a4a";
 
 const SKY_VERTEX = /* glsl */ `
 varying vec3 vWorld;
@@ -69,32 +46,107 @@ void main() {
 }
 `;
 
+/**
+ * 空。地平線より下は霧の色に寄せてあるので、遠景の建築が
+ * そのまま霞に溶け込む。奥(-Z)側にだけ暖色の光源を置き、
+ * 敵チームの背後が明るくなるようにしている。
+ */
 const SKY_FRAGMENT = /* glsl */ `
-uniform vec3 uTop;
-uniform vec3 uBottom;
-uniform vec3 uHorizon;
+uniform vec3 uZenith;
+uniform vec3 uMid;
+uniform vec3 uHaze;
+uniform vec3 uGlow;
 uniform float uTime;
 varying vec3 vWorld;
 
 ${SIMPLEX_NOISE_3D}
 
 void main() {
-  vec3 direction = normalize(vWorld);
-  float height = direction.y * 0.5 + 0.5;
+  vec3 dir = normalize(vWorld);
+  float h = dir.y;
 
-  // 地平線付近を明るくした3色グラデーション
-  vec3 color = mix(uBottom, uHorizon, smoothstep(0.0, 0.5, height));
-  color = mix(color, uTop, smoothstep(0.42, 1.0, height));
+  vec3 color = mix(uHaze, uMid, smoothstep(-0.05, 0.34, h));
+  color = mix(color, uZenith, smoothstep(0.3, 0.95, h));
 
-  // ゆっくり流れる霧状の雲
-  float clouds = fbm(vec3(direction.xz * 2.4, uTime * 0.02));
-  color += uHorizon * smoothstep(0.1, 0.75, clouds) * 0.14 * (1.0 - abs(direction.y));
+  // 地平線のすぐ下は霧の色そのもの(遠景がシームレスに溶ける)
+  color = mix(color, uHaze, smoothstep(0.02, -0.16, h));
 
-  // 上空にうっすら星
-  float stars = snoise(direction * 90.0);
-  color += vec3(smoothstep(0.93, 1.0, stars)) * smoothstep(0.25, 0.9, height) * 0.5;
+  // 奥側の光源。方位で減衰させ、片側だけを暖かくする
+  float back = max(0.0, -dir.z);
+  float glow = pow(back, 3.0) * exp(-abs(h - 0.06) * 5.0);
+  color += uGlow * glow * 0.85;
+
+  // ゆっくり流れる高層の雲
+  float clouds = fbm(vec3(dir.xz * 1.7 + vec2(uTime * 0.006, 0.0), uTime * 0.01));
+  color += uMid * smoothstep(0.15, 0.8, clouds) * 0.35 * smoothstep(0.0, 0.45, h);
+
+  // 星。地平線近くは霞んで見えない
+  float stars = snoise(dir * 120.0);
+  color += vec3(0.75, 0.82, 1.0) * smoothstep(0.955, 1.0, stars) * smoothstep(0.25, 0.85, h) * 0.55;
 
   gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+/** 追加合成のソフトなグラデーション板(光の柱・霞・ゲートの光に使う) */
+const GLOW_VERTEX = /* glsl */ `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const SHAFT_FRAGMENT = /* glsl */ `
+uniform vec3 uColor;
+uniform float uOpacity;
+uniform float uTime;
+uniform float uSeed;
+varying vec2 vUv;
+
+void main() {
+  // 横方向は中央が濃い、縦方向は上が強く下へ消える
+  float across = 1.0 - abs(vUv.x - 0.5) * 2.0;
+  across = pow(max(across, 0.0), 1.7);
+  float along = smoothstep(0.0, 0.35, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.y));
+  float flicker = 0.82 + 0.18 * sin(uTime * 0.7 + uSeed * 6.28);
+  gl_FragColor = vec4(uColor, across * along * uOpacity * flicker);
+}
+`;
+
+const MIST_FRAGMENT = /* glsl */ `
+uniform vec3 uColor;
+uniform float uOpacity;
+uniform float uTime;
+uniform float uSeed;
+varying vec2 vUv;
+
+${SIMPLEX_NOISE_3D}
+
+void main() {
+  vec2 p = vUv - 0.5;
+  float radial = 1.0 - smoothstep(0.16, 0.5, length(p));
+  float n = fbm(vec3(p * 5.0, uTime * 0.05 + uSeed * 10.0));
+  float a = radial * smoothstep(0.25, 0.85, n) * uOpacity;
+  gl_FragColor = vec4(uColor, a);
+}
+`;
+
+const GATE_FRAGMENT = /* glsl */ `
+uniform vec3 uInner;
+uniform vec3 uOuter;
+uniform float uOpacity;
+uniform float uTime;
+varying vec2 vUv;
+
+void main() {
+  vec2 p = (vUv - vec2(0.5, 0.42)) * vec2(2.1, 1.55);
+  float d = length(p);
+  float core = 1.0 - smoothstep(0.0, 0.55, d);
+  float halo = 1.0 - smoothstep(0.2, 1.0, d);
+  float pulse = 0.9 + 0.1 * sin(uTime * 0.5);
+  vec3 color = mix(uOuter, uInner, core);
+  gl_FragColor = vec4(color, (core * 0.75 + halo * 0.45) * uOpacity * pulse);
 }
 `;
 
@@ -104,111 +156,701 @@ export interface ArenaHandles {
   dispose: () => void;
 }
 
+function makeCanvas(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2Dコンテキストを取得できませんでした");
+  return { canvas, ctx };
+}
+
+/** 決定的な擬似乱数。テクスチャを毎回同じ絵にするため */
+function makeRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** キャンバス全面に細かいノイズを乗せて、CGっぽい均一さを消す */
+function sprinkleGrain(ctx: CanvasRenderingContext2D, w: number, h: number, amount: number, seed: number): void {
+  const rand = makeRandom(seed);
+  const image = ctx.getImageData(0, 0, w, h);
+  const data = image.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const n = (rand() - 0.5) * amount;
+    data[i] = Math.max(0, Math.min(255, data[i] + n));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + n));
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
 /**
- * 闘技場の背景を作る。空(内側から見る球)・床・浮遊する塵・
- * 遠景の柱で、キャラクターを引き立てる暗く重厚なステージにする。
+ * 闘技床のテクスチャ。CircleGeometryのUVは円が正方形に内接するので、
+ * キャンバスの中心 = 床の中心としてそのまま極座標で描ける。
+ * grayscale=true のときは粗さマップ用のグレースケールを返す。
  */
+function drawFloorTexture(size: number, grayscale: boolean): HTMLCanvasElement {
+  const { canvas, ctx } = makeCanvas(size, size);
+  const c = size / 2;
+  const rand = makeRandom(9137);
+  const pick = (color: string, gray: string) => (grayscale ? gray : color);
+
+  ctx.fillStyle = pick(STONE_MID, "#b4b4b4");
+  ctx.fillRect(0, 0, size, size);
+
+  // 石のムラ。大きめの斑を重ねて自然な色ムラを作る
+  for (let i = 0; i < 260; i++) {
+    const r = (0.02 + rand() * 0.12) * size;
+    const x = rand() * size;
+    const y = rand() * size;
+    const tone = rand();
+    ctx.globalAlpha = 0.05 + rand() * 0.09;
+    ctx.fillStyle = grayscale
+      ? tone > 0.5
+        ? "#cfcfcf"
+        : "#9a9a9a"
+      : tone > 0.5
+        ? STONE_LIGHT
+        : STONE_DARK;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // 同心円の目地。内側ほど密にして、中央に視線が集まるようにする
+  const ringFractions = [0.13, 0.24, 0.36, 0.5, 0.63, 0.76, 0.88, 0.955];
+  const drawRing = (fr: number, width: number, color: string, alpha: number) => {
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.arc(c, c, fr * c, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  };
+
+  for (const fr of ringFractions) {
+    // 目地の影 + そのすぐ外側に光る面取り、の2本で立体感を出す
+    drawRing(fr, size * 0.006, pick(GROUT, "#f0f0f0"), 0.85);
+    drawRing(fr + 0.004, size * 0.0035, pick(STONE_LIGHT, "#8c8c8c"), 0.5);
+  }
+
+  // 放射方向の目地。リングごとに分割数を変えて石畳らしくする
+  const sectorsFor = (fr: number) => (fr < 0.3 ? 12 : fr < 0.65 ? 24 : 36);
+  ctx.lineCap = "butt";
+  for (let ri = 0; ri < ringFractions.length - 1; ri++) {
+    const inner = ringFractions[ri] * c;
+    const outer = ringFractions[ri + 1] * c;
+    const sectors = sectorsFor(ringFractions[ri]);
+    // リングごとに半セクタずらして、目地が一直線に通らないようにする
+    const phase = (ri % 2) * (Math.PI / sectors);
+    for (let s = 0; s < sectors; s++) {
+      const a = (s / sectors) * Math.PI * 2 + phase;
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = pick(GROUT, "#f0f0f0");
+      ctx.lineWidth = size * 0.005;
+      ctx.beginPath();
+      ctx.moveTo(c + Math.cos(a) * inner, c + Math.sin(a) * inner);
+      ctx.lineTo(c + Math.cos(a) * outer, c + Math.sin(a) * outer);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // 中央の紋章。うっすらとした線画で、床の主役になりすぎない濃さにする
+  ctx.save();
+  ctx.translate(c, c);
+  ctx.strokeStyle = pick(RUNE, "#d8d8d8");
+  ctx.globalAlpha = grayscale ? 0.25 : 0.32;
+  ctx.lineWidth = size * 0.0045;
+  for (const fr of [0.045, 0.075, 0.105]) {
+    ctx.beginPath();
+    ctx.arc(0, 0, fr * c, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  for (let i = 0; i <= 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    const r = 0.105 * c;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  // 外周へ伸びる短いルーン線
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 0.115 * c, Math.sin(a) * 0.115 * c);
+    ctx.lineTo(Math.cos(a) * 0.155 * c, Math.sin(a) * 0.155 * c);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // 傷・欠け。数を絞って「汚しすぎない」程度に
+  for (let i = 0; i < 90; i++) {
+    const a = rand() * Math.PI * 2;
+    const rr = (0.1 + rand() * 0.85) * c;
+    const len = (0.01 + rand() * 0.05) * size;
+    const dir = rand() * Math.PI * 2;
+    ctx.globalAlpha = 0.14 + rand() * 0.16;
+    ctx.strokeStyle = pick(STONE_DARK, "#dcdcdc");
+    ctx.lineWidth = size * (0.001 + rand() * 0.002);
+    ctx.beginPath();
+    ctx.moveTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr);
+    ctx.lineTo(c + Math.cos(a) * rr + Math.cos(dir) * len, c + Math.sin(a) * rr + Math.sin(dir) * len);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  if (!grayscale) {
+    // 外周を落として中央を持ち上げるビネット。視線を中央の戦闘へ寄せる
+    const vignette = ctx.createRadialGradient(c, c, c * 0.12, c, c, c);
+    vignette.addColorStop(0, "rgba(150,164,214,0.16)");
+    vignette.addColorStop(0.45, "rgba(0,0,0,0)");
+    vignette.addColorStop(0.8, "rgba(6,7,16,0.42)");
+    vignette.addColorStop(1, "rgba(4,5,12,0.78)");
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  sprinkleGrain(ctx, size, size, grayscale ? 14 : 20, 4471);
+  return canvas;
+}
+
+/**
+ * 外周の壁。円柱の内側に貼るので、横1タイル分にアーチ2連を描き、
+ * 周方向に12回繰り返す。emissive側はアーチの奥だけを光らせる。
+ */
+function drawWallTexture(w: number, h: number, mode: "color" | "emissive" | "rough"): HTMLCanvasElement {
+  const { canvas, ctx } = makeCanvas(w, h);
+  const rand = makeRandom(2255);
+
+  if (mode === "emissive") {
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, w, h);
+  } else if (mode === "rough") {
+    ctx.fillStyle = "#c8c8c8";
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.fillStyle = STONE_DARK;
+    ctx.fillRect(0, 0, w, h);
+    // 石積み。段ごとに半個ずらす
+    const rows = 22;
+    const rowH = h / rows;
+    for (let r = 0; r < rows; r++) {
+      const cols = 10;
+      const colW = w / cols;
+      const offset = (r % 2) * colW * 0.5;
+      for (let cI = -1; cI < cols + 1; cI++) {
+        const x = cI * colW + offset;
+        const y = r * rowH;
+        const tone = 0.72 + rand() * 0.5;
+        ctx.fillStyle = `rgba(${Math.round(58 * tone)},${Math.round(62 * tone)},${Math.round(84 * tone)},1)`;
+        ctx.fillRect(x + 1, y + 1, colW - 2, rowH - 2);
+      }
+    }
+  }
+
+  const archCount = 2;
+  const tileW = w / archCount;
+  for (let i = 0; i < archCount; i++) {
+    const cx = tileW * (i + 0.5);
+    const archW = tileW * 0.52;
+    const springY = h * 0.68; // アーチの起拱点(下ほど大きいy)
+    const baseY = h * 0.93;
+    const topY = springY - archW * 0.5;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx - archW / 2, baseY);
+    ctx.lineTo(cx - archW / 2, springY);
+    ctx.arc(cx, springY, archW / 2, Math.PI, 0);
+    ctx.lineTo(cx + archW / 2, baseY);
+    ctx.closePath();
+
+    if (mode === "emissive") {
+      // 奥から漏れる灯り。下ほど明るく、上は闇に沈む
+      const g = ctx.createLinearGradient(0, baseY, 0, topY);
+      g.addColorStop(0, "rgba(255,150,72,0.95)");
+      g.addColorStop(0.35, "rgba(150,96,70,0.45)");
+      g.addColorStop(1, "rgba(20,24,50,0.0)");
+      ctx.fillStyle = g;
+      ctx.fill();
+    } else if (mode === "rough") {
+      ctx.fillStyle = "#f4f4f4";
+      ctx.fill();
+    } else {
+      const g = ctx.createLinearGradient(0, baseY, 0, topY);
+      g.addColorStop(0, "#3a2b28");
+      g.addColorStop(0.4, "#161726");
+      g.addColorStop(1, "#0a0b15");
+      ctx.fillStyle = g;
+      ctx.fill();
+      // アーチ枠の迫石
+      ctx.strokeStyle = STONE_LIGHT;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = h * 0.012;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  if (mode === "color") {
+    // 付柱(ピラスター)。アーチの間に縦の帯を入れてリズムを作る
+    for (let i = 0; i <= archCount; i++) {
+      const x = tileW * i;
+      const pw = tileW * 0.14;
+      const g = ctx.createLinearGradient(x - pw / 2, 0, x + pw / 2, 0);
+      g.addColorStop(0, STONE_DEEP);
+      g.addColorStop(0.35, STONE_MID);
+      g.addColorStop(0.55, STONE_LIGHT);
+      g.addColorStop(1, STONE_DEEP);
+      ctx.fillStyle = g;
+      ctx.fillRect(x - pw / 2, h * 0.06, pw, h * 0.87);
+    }
+
+    // 上部のコーニス(軒)とデンティル(歯飾り)
+    ctx.fillStyle = STONE_MID;
+    ctx.fillRect(0, 0, w, h * 0.06);
+    ctx.fillStyle = STONE_LIGHT;
+    ctx.fillRect(0, h * 0.045, w, h * 0.012);
+    for (let x = 0; x < w; x += w / 48) {
+      ctx.fillStyle = STONE_DEEP;
+      ctx.fillRect(x + w / 160, h * 0.062, w / 110, h * 0.026);
+    }
+    // 下部の基壇
+    ctx.fillStyle = STONE_DEEP;
+    ctx.fillRect(0, h * 0.93, w, h * 0.07);
+    ctx.fillStyle = STONE_MID;
+    ctx.fillRect(0, h * 0.925, w, h * 0.012);
+
+    // 全体を下ほど暗くして、床との接地を締める
+    const shade = ctx.createLinearGradient(0, 0, 0, h);
+    shade.addColorStop(0, "rgba(120,140,210,0.12)");
+    shade.addColorStop(0.55, "rgba(0,0,0,0)");
+    shade.addColorStop(1, "rgba(3,4,10,0.55)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, w, h);
+
+    sprinkleGrain(ctx, w, h, 16, 8823);
+  }
+
+  return canvas;
+}
+
+function textureFrom(canvas: HTMLCanvasElement, srgb: boolean): THREE.CanvasTexture {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  texture.anisotropy = 4;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
+/** ふわっとした円形のアルファ。塵や篝火のスプライトに使う */
+function softDotTexture(size = 64): THREE.CanvasTexture {
+  const { canvas, ctx } = makeCanvas(size, size);
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.35, "rgba(255,255,255,0.55)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 export function createArena(): ArenaHandles {
   const group = new THREE.Group();
   const disposables: { dispose: () => void }[] = [];
+  const animatedUniforms: { uTime: { value: number } }[] = [];
 
-  // --- 空 ---
-  const skyGeometry = new THREE.SphereGeometry(90, 32, 24);
-  const skyMaterial = new THREE.ShaderMaterial({
-    vertexShader: SKY_VERTEX,
-    fragmentShader: SKY_FRAGMENT,
-    uniforms: {
-      uTop: { value: new THREE.Color(0x05060f) },
-      uHorizon: { value: new THREE.Color(0x2a1f4a) },
-      uBottom: { value: new THREE.Color(0x0a0812) },
-      uTime: { value: 0 },
-    },
-    side: THREE.BackSide,
-    depthWrite: false,
-  });
+  const track = <T extends { dispose: () => void }>(item: T): T => {
+    disposables.push(item);
+    return item;
+  };
+
+  // ============================== 空 ==============================
+  const skyGeometry = track(new THREE.SphereGeometry(160, 32, 20));
+  const skyMaterial = track(
+    new THREE.ShaderMaterial({
+      vertexShader: SKY_VERTEX,
+      fragmentShader: SKY_FRAGMENT,
+      uniforms: {
+        uZenith: { value: new THREE.Color(0x060814) },
+        uMid: { value: new THREE.Color(0x1b2245) },
+        uHaze: { value: new THREE.Color(0x2a3055) },
+        uGlow: { value: new THREE.Color(0x6c4a7a) },
+        uTime: { value: 0 },
+      },
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+    }),
+  );
   const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+  sky.renderOrder = -10;
   group.add(sky);
-  disposables.push(skyGeometry, skyMaterial);
+  animatedUniforms.push(skyMaterial.uniforms as { uTime: { value: number } });
 
-  // --- 床 ---
-  const groundGeometry = new THREE.PlaneGeometry(120, 120, 1, 1);
-  const groundMaterial = new THREE.ShaderMaterial({
-    vertexShader: GROUND_VERTEX,
-    fragmentShader: GROUND_FRAGMENT,
-    uniforms: {
-      uTime: { value: 0 },
-      uBaseColor: { value: new THREE.Color(0x141726) },
-      uGridColor: { value: new THREE.Color(0x4a6fd8) },
-      uGlowColor: { value: new THREE.Color(0x5c7cff) },
-    },
-  });
-  const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  group.add(ground);
-  disposables.push(groundGeometry, groundMaterial);
+  // ============================== 闘技床 ==============================
+  const floorMap = track(textureFrom(drawFloorTexture(1024, false), true));
+  const floorRough = track(textureFrom(drawFloorTexture(512, true), false));
+  const floorGeometry = track(new THREE.CircleGeometry(FLOOR_RADIUS, 96));
+  const floorMaterial = track(
+    new THREE.MeshStandardMaterial({
+      map: floorMap,
+      roughnessMap: floorRough,
+      roughness: 0.82,
+      metalness: 0.06,
+      color: 0xffffff,
+    }),
+  );
+  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  group.add(floor);
 
-  // --- 遠景の柱(奥行きとスケール感を出す) ---
-  const pillarGeometry = new THREE.CylinderGeometry(0.55, 0.85, 16, 6, 1, true);
-  const pillarMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1a1c30,
-    roughness: 0.85,
-    metalness: 0.25,
-    emissive: new THREE.Color(0x2b3570),
-    emissiveIntensity: 0.35,
-    side: THREE.DoubleSide,
-  });
-  disposables.push(pillarGeometry, pillarMaterial);
-  const pillarCount = 10;
-  for (let i = 0; i < pillarCount; i++) {
-    const angle = (i / pillarCount) * Math.PI * 2 + Math.PI / pillarCount;
-    const radius = 15.5;
-    const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-    pillar.position.set(Math.cos(angle) * radius, 8, Math.sin(angle) * radius);
-    pillar.rotation.y = angle;
-    group.add(pillar);
+  // 床の外周を縁取る発光リング。細く抑えて、安っぽい線に見せない
+  const runeGeometry = track(new THREE.RingGeometry(FLOOR_RADIUS - 0.16, FLOOR_RADIUS - 0.02, 128));
+  const runeMaterial = track(
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(RUNE),
+      transparent: true,
+      opacity: 0.34,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  const runeRing = new THREE.Mesh(runeGeometry, runeMaterial);
+  runeRing.rotation.x = -Math.PI / 2;
+  runeRing.position.y = 0.015;
+  group.add(runeRing);
+
+  // ============================== 観客席の段 ==============================
+  // 内側から外側へ、4段の階段状に立ち上げる(LatheGeometryで一体成型)
+  const tierProfile: THREE.Vector2[] = [];
+  const tierSteps = 4;
+  for (let i = 0; i <= tierSteps; i++) {
+    const t = i / tierSteps;
+    const r = THREE.MathUtils.lerp(TIER_INNER, TIER_OUTER, t);
+    const y = TIER_TOP_Y * t;
+    const rPrev = THREE.MathUtils.lerp(TIER_INNER, TIER_OUTER, Math.max(0, (i - 1) / tierSteps));
+    if (i > 0) tierProfile.push(new THREE.Vector2(rPrev, y)); // 蹴上げ
+    tierProfile.push(new THREE.Vector2(r, y)); // 踏み面
+  }
+  tierProfile.unshift(new THREE.Vector2(TIER_INNER, -0.4));
+  const tierGeometry = track(new THREE.LatheGeometry(tierProfile, 64));
+  const tierMaterial = track(
+    new THREE.MeshStandardMaterial({
+      color: 0x353a51,
+      roughness: 0.9,
+      metalness: 0.04,
+      side: THREE.DoubleSide,
+      flatShading: true,
+    }),
+  );
+  const tiers = new THREE.Mesh(tierGeometry, tierMaterial);
+  tiers.receiveShadow = true;
+  group.add(tiers);
+
+  // ============================== 外周の壁 ==============================
+  const wallColor = track(textureFrom(drawWallTexture(512, 340, "color"), true));
+  const wallEmissive = track(textureFrom(drawWallTexture(512, 340, "emissive"), true));
+  const wallRough = track(textureFrom(drawWallTexture(256, 170, "rough"), false));
+  for (const texture of [wallColor, wallEmissive, wallRough]) texture.repeat.set(12, 1);
+  const wallGeometry = track(new THREE.CylinderGeometry(WALL_RADIUS, WALL_RADIUS, WALL_HEIGHT, 72, 1, true));
+  const wallMaterial = track(
+    new THREE.MeshStandardMaterial({
+      map: wallColor,
+      emissiveMap: wallEmissive,
+      emissive: new THREE.Color(0xffffff),
+      emissiveIntensity: 0.85,
+      roughnessMap: wallRough,
+      roughness: 0.95,
+      metalness: 0.02,
+      side: THREE.BackSide,
+    }),
+  );
+  const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+  wall.position.y = TIER_TOP_Y + WALL_HEIGHT / 2 - 0.6;
+  group.add(wall);
+
+  // 壁のさらに上、天へ抜ける胸壁。切れているように見せないための帯
+  const parapetGeometry = track(new THREE.CylinderGeometry(WALL_RADIUS + 0.45, WALL_RADIUS + 0.45, 1.2, 72, 1, true));
+  const parapetMaterial = track(
+    new THREE.MeshStandardMaterial({ color: 0x262a3e, roughness: 0.95, metalness: 0.02, side: THREE.DoubleSide }),
+  );
+  const parapet = new THREE.Mesh(parapetGeometry, parapetMaterial);
+  parapet.position.y = TIER_TOP_Y + WALL_HEIGHT - 0.05;
+  group.add(parapet);
+
+  // ============================== 列柱 ==============================
+  // 基礎・柱身・柱頭をそれぞれInstancedMeshにして、描画回数を3回に抑える
+  const columnMaterial = track(
+    new THREE.MeshStandardMaterial({ color: 0x585d75, roughness: 0.78, metalness: 0.08, flatShading: true }),
+  );
+  const baseGeometry = track(new THREE.CylinderGeometry(0.46, 0.52, 0.34, 10));
+  const shaftGeometry = track(new THREE.CylinderGeometry(0.29, 0.34, COLUMN_SHAFT_H, 10, 1));
+  const capGeometry = track(new THREE.CylinderGeometry(0.44, 0.32, 0.34, 10));
+  const abacusGeometry = track(new THREE.BoxGeometry(0.94, 0.16, 0.94));
+
+  const columnParts: { geometry: THREE.BufferGeometry; y: number }[] = [
+    { geometry: baseGeometry, y: COLUMN_BASE_Y + 0.17 },
+    { geometry: shaftGeometry, y: COLUMN_BASE_Y + 0.34 + COLUMN_SHAFT_H / 2 },
+    { geometry: capGeometry, y: COLUMN_BASE_Y + 0.34 + COLUMN_SHAFT_H + 0.17 },
+    { geometry: abacusGeometry, y: COLUMN_BASE_Y + 0.34 + COLUMN_SHAFT_H + 0.42 },
+  ];
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+  const position = new THREE.Vector3();
+  for (const part of columnParts) {
+    const mesh = new THREE.InstancedMesh(part.geometry, columnMaterial, COLUMN_COUNT);
+    for (let i = 0; i < COLUMN_COUNT; i++) {
+      const angle = (i / COLUMN_COUNT) * Math.PI * 2 + Math.PI / COLUMN_COUNT;
+      position.set(Math.cos(angle) * COLUMN_RADIUS, part.y, Math.sin(angle) * COLUMN_RADIUS);
+      quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -angle);
+      matrix.compose(position, quaternion, scale);
+      mesh.setMatrixAt(i, matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    disposables.push({ dispose: () => mesh.dispose() });
   }
 
-  // --- 空中を漂う塵 ---
-  const dustCount = 420;
-  const dustPositions = new Float32Array(dustCount * 3);
-  const dustSpeeds = new Float32Array(dustCount);
-  for (let i = 0; i < dustCount; i++) {
-    const radius = 3 + Math.random() * 16;
-    const angle = Math.random() * Math.PI * 2;
-    dustPositions[i * 3 + 0] = Math.cos(angle) * radius;
-    dustPositions[i * 3 + 1] = Math.random() * 12;
-    dustPositions[i * 3 + 2] = Math.sin(angle) * radius;
-    dustSpeeds[i] = 0.15 + Math.random() * 0.45;
+  // 柱の上に載る水平材(アーキトレーブ)。柱がバラバラの棒に見えないようつなぐ
+  const architraveGeometry = track(
+    new THREE.CylinderGeometry(COLUMN_RADIUS + 0.42, COLUMN_RADIUS + 0.42, 0.62, 64, 1, true),
+  );
+  const architraveMaterial = track(
+    new THREE.MeshStandardMaterial({ color: 0x4a4f66, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide }),
+  );
+  const architrave = new THREE.Mesh(architraveGeometry, architraveMaterial);
+  architrave.position.y = COLUMN_BASE_Y + 0.34 + COLUMN_SHAFT_H + 0.5 + 0.31;
+  architrave.castShadow = true;
+  group.add(architrave);
+
+  // ============================== 奥のゲートの光 ==============================
+  const gateGeometry = track(new THREE.PlaneGeometry(11.5, 8.5));
+  const gateMaterial = track(
+    new THREE.ShaderMaterial({
+      vertexShader: GLOW_VERTEX,
+      fragmentShader: GATE_FRAGMENT,
+      uniforms: {
+        uInner: { value: new THREE.Color(0xffd9a8) },
+        uOuter: { value: new THREE.Color(0x7d5bb0) },
+        uOpacity: { value: 0.5 },
+        uTime: { value: 0 },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      fog: false,
+    }),
+  );
+  const gate = new THREE.Mesh(gateGeometry, gateMaterial);
+  gate.position.set(0, 3.6, -(WALL_RADIUS - 1.4));
+  group.add(gate);
+  animatedUniforms.push(gateMaterial.uniforms as { uTime: { value: number } });
+
+  // ============================== 光条(ゴッドレイ風) ==============================
+  // 列柱の隙間から差し込む光を、加算合成の板で擬似的に作る
+  const shaftGeo = track(new THREE.PlaneGeometry(3.4, 13));
+  const shaftAngles = [-0.62, -0.3, 0.0, 0.3, 0.62, 2.6, 3.68];
+  for (let i = 0; i < shaftAngles.length; i++) {
+    const angle = shaftAngles[i] + Math.PI; // 基準を奥(-Z)側にする
+    const material = track(
+      new THREE.ShaderMaterial({
+        vertexShader: GLOW_VERTEX,
+        fragmentShader: SHAFT_FRAGMENT,
+        uniforms: {
+          uColor: { value: new THREE.Color(i < 5 ? 0xbcd0ff : 0xffb073) },
+          uOpacity: { value: i === 2 ? 0.16 : 0.1 },
+          uTime: { value: 0 },
+          uSeed: { value: i * 0.37 },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        fog: false,
+      }),
+    );
+    const mesh = new THREE.Mesh(shaftGeo, material);
+    const radius = COLUMN_RADIUS - 1.5;
+    mesh.position.set(Math.cos(angle + Math.PI / 2) * radius, 5.4, Math.sin(angle + Math.PI / 2) * radius);
+    mesh.lookAt(0, 3.0, 0);
+    // 上から降ってくる角度に寝かせる
+    mesh.rotateX(-0.42);
+    group.add(mesh);
+    animatedUniforms.push(material.uniforms as { uTime: { value: number } });
   }
-  const dustGeometry = new THREE.BufferGeometry();
-  dustGeometry.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
-  const dustMaterial = new THREE.PointsMaterial({
-    color: 0x9db4ff,
-    size: 0.075,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    sizeAttenuation: true,
+
+  // ============================== 篝火 ==============================
+  const dotTexture = track(softDotTexture(64));
+  const braziers: { sprite: THREE.Sprite; light: THREE.PointLight | null; phase: number }[] = [];
+  const brazierBowlGeometry = track(new THREE.CylinderGeometry(0.42, 0.24, 0.5, 10));
+  const brazierStemGeometry = track(new THREE.CylinderGeometry(0.12, 0.2, 1.5, 8));
+  const brazierMaterial = track(new THREE.MeshStandardMaterial({ color: 0x2b2f45, roughness: 0.85, metalness: 0.3 }));
+  const flameMaterial = track(
+    new THREE.SpriteMaterial({
+      map: dotTexture,
+      color: new THREE.Color(EMBER),
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  const brazierAngles = [Math.PI * 0.72, Math.PI * 1.28, Math.PI * 0.5, Math.PI * 1.5];
+  brazierAngles.forEach((angle, index) => {
+    const radius = TIER_OUTER - 2.4;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const y = TIER_TOP_Y * 0.78;
+
+    const stem = new THREE.Mesh(brazierStemGeometry, brazierMaterial);
+    stem.position.set(x, y + 0.75, z);
+    stem.castShadow = true;
+    group.add(stem);
+
+    const bowl = new THREE.Mesh(brazierBowlGeometry, brazierMaterial);
+    bowl.position.set(x, y + 1.7, z);
+    bowl.castShadow = true;
+    group.add(bowl);
+
+    const sprite = new THREE.Sprite(flameMaterial);
+    sprite.position.set(x, y + 2.1, z);
+    sprite.scale.setScalar(2.4);
+    group.add(sprite);
+
+    // ポイントライトは奥側の2基だけ。モバイルGPUでのライト数を抑える
+    let light: THREE.PointLight | null = null;
+    if (index < 2) {
+      light = new THREE.PointLight(0xff9a52, 14, 17, 2);
+      light.position.set(x, y + 2.2, z);
+      group.add(light);
+    }
+    braziers.push({ sprite, light, phase: index * 1.7 });
   });
-  const dust = new THREE.Points(dustGeometry, dustMaterial);
-  dust.frustumCulled = false;
-  group.add(dust);
-  disposables.push(dustGeometry, dustMaterial);
+
+  // ============================== 地表の霞 ==============================
+  const mistGeometry = track(new THREE.PlaneGeometry(46, 46));
+  const mistLayers: THREE.Mesh[] = [];
+  for (let i = 0; i < 3; i++) {
+    const material = track(
+      new THREE.ShaderMaterial({
+        vertexShader: GLOW_VERTEX,
+        fragmentShader: MIST_FRAGMENT,
+        uniforms: {
+          uColor: { value: new THREE.Color(i === 2 ? 0x8f7fb8 : 0x6d86c8) },
+          uOpacity: { value: i === 0 ? 0.3 : 0.2 },
+          uTime: { value: 0 },
+          uSeed: { value: i * 3.1 },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        fog: false,
+      }),
+    );
+    const mesh = new THREE.Mesh(mistGeometry, material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.22 + i * 0.55;
+    group.add(mesh);
+    mistLayers.push(mesh);
+    animatedUniforms.push(material.uniforms as { uTime: { value: number } });
+  }
+
+  // ============================== 塵と火の粉 ==============================
+  const makePoints = (
+    count: number,
+    color: number,
+    size: number,
+    opacity: number,
+    radiusRange: [number, number],
+    heightRange: [number, number],
+  ) => {
+    const positions = new Float32Array(count * 3);
+    const speeds = new Float32Array(count);
+    const swing = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const radius = radiusRange[0] + Math.random() * (radiusRange[1] - radiusRange[0]);
+      const angle = Math.random() * Math.PI * 2;
+      positions[i * 3 + 0] = Math.cos(angle) * radius;
+      positions[i * 3 + 1] = heightRange[0] + Math.random() * (heightRange[1] - heightRange[0]);
+      positions[i * 3 + 2] = Math.sin(angle) * radius;
+      speeds[i] = 0.12 + Math.random() * 0.4;
+      swing[i] = Math.random() * Math.PI * 2;
+    }
+    const geometry = track(new THREE.BufferGeometry());
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const material = track(
+      new THREE.PointsMaterial({
+        color,
+        size,
+        map: dotTexture,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+      }),
+    );
+    const points = new THREE.Points(geometry, material);
+    points.frustumCulled = false;
+    group.add(points);
+    return { geometry, positions, speeds, swing, count, top: heightRange[1] };
+  };
+
+  const dust = makePoints(300, 0x9fb6ff, 0.09, 0.4, [2, 20], [0, 11]);
+  const embers = makePoints(110, 0xff9c4e, 0.13, 0.62, [6, 18], [0.5, 9]);
 
   function update(elapsed: number): void {
-    skyMaterial.uniforms.uTime.value = elapsed;
-    groundMaterial.uniforms.uTime.value = elapsed;
+    for (const uniforms of animatedUniforms) uniforms.uTime.value = elapsed;
 
-    // 塵をゆっくり上昇させ、天井に達したら下から出し直す
-    const positions = dustGeometry.attributes.position.array as Float32Array;
-    for (let i = 0; i < dustCount; i++) {
-      positions[i * 3 + 1] += dustSpeeds[i] * 0.016;
-      if (positions[i * 3 + 1] > 12) positions[i * 3 + 1] = 0;
+    const drift = (set: typeof dust, rise: number, sway: number) => {
+      const { positions, speeds, swing, count, geometry, top } = set;
+      for (let i = 0; i < count; i++) {
+        positions[i * 3 + 1] += speeds[i] * rise;
+        positions[i * 3 + 0] += Math.sin(elapsed * 0.6 + swing[i]) * sway;
+        if (positions[i * 3 + 1] > top) positions[i * 3 + 1] = 0;
+      }
+      geometry.attributes.position.needsUpdate = true;
+    };
+    drift(dust, 0.011, 0.0016);
+    drift(embers, 0.02, 0.0032);
+
+    // 霞をゆっくり逆回転させ、層の重なりで動きを見せる
+    for (let i = 0; i < mistLayers.length; i++) {
+      mistLayers[i].rotation.z = elapsed * (i % 2 === 0 ? 0.012 : -0.009);
     }
-    dustGeometry.attributes.position.needsUpdate = true;
-    dust.rotation.y = elapsed * 0.012;
+
+    // 篝火のゆらぎ
+    for (const brazier of braziers) {
+      const flicker = 0.86 + Math.sin(elapsed * 6.1 + brazier.phase) * 0.08 + Math.sin(elapsed * 11.3 + brazier.phase) * 0.05;
+      brazier.sprite.scale.setScalar(2.4 * flicker);
+      if (brazier.light) brazier.light.intensity = 14 * flicker;
+    }
   }
 
   function dispose(): void {
