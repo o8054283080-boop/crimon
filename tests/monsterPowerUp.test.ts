@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { STAR_MAX_LEVEL } from "../src/core/rarity.js";
+import { STAR_MAX_LEVEL, requiredExpForLevel } from "../src/core/rarity.js";
 import { EXP_PIG_DEX, MONSTER_TEMPLATES_DEX, REINCARNATION_PIG_DEX, findMonsterById } from "../src/data/monsters.js";
 import {
   applyMonsterPowerUp,
@@ -84,6 +84,13 @@ describe("feedExpValue", () => {
     const low = createMonsterInstance("slime_FIRE", 2, 1);
     const high = createMonsterInstance("slime_FIRE", 2, 15);
     expect(feedExpValue(high)).toBeGreaterThan(feedExpValue(low));
+  });
+
+  it("星ごとの基礎価値にそのレベルへ到達するための必要経験値分が上乗せされる", () => {
+    const FEED_EXP_BASE_PER_STAR: Record<number, number> = { 1: 50, 2: 90, 3: 160, 4: 280, 5: 480, 6: 800 };
+    const material = createMonsterInstance("slime_FIRE", 4, 12);
+    const expected = Math.round(FEED_EXP_BASE_PER_STAR[4] + requiredExpForLevel(12));
+    expect(feedExpValue(material)).toBe(expected);
   });
 });
 
