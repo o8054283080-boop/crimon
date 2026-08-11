@@ -14,6 +14,8 @@ import {
   hpRatio,
   tickCooldownsAtTurnStart,
   tickEffectsAtTurnStart,
+  tickImmunityAtTurnStart,
+  tickShieldAtTurnStart,
 } from "./unit.js";
 
 const ATB_THRESHOLD = 100;
@@ -34,6 +36,16 @@ export interface UnitSnapshot {
   stunTurns: number;
   /** 火傷残りターン(0=火傷していない) */
   burnTurns: number;
+  /** 現在のシールド量(0=シールドなし) */
+  shieldValue: number;
+  /** シールド残りターン */
+  shieldTurns: number;
+  /** 状態異常免疫の残りターン(0=免疫していない) */
+  immuneTurns: number;
+  /** 毒のスタック数(0=毒なし) */
+  poisonStacks: number;
+  /** 毒の残りターン */
+  poisonTurns: number;
 }
 
 /** 演出用: そのターンに起きたHP増減イベント1件分(ダメージ数値のポップアップ表示などに使う) */
@@ -219,6 +231,11 @@ export class BattleEngine {
       effects: u.effects.map((e) => ({ ...e })),
       stunTurns: u.stunTurns,
       burnTurns: u.burnTurns,
+      shieldValue: u.shieldValue,
+      shieldTurns: u.shieldTurns,
+      immuneTurns: u.immuneTurns,
+      poisonStacks: u.poisonStacks,
+      poisonTurns: u.poisonTurns,
     }));
   }
 
@@ -234,6 +251,8 @@ export class BattleEngine {
   private takeTurn(unit: BattleUnit, choice?: ManualChoice): void {
     tickEffectsAtTurnStart(unit);
     tickCooldownsAtTurnStart(unit);
+    tickShieldAtTurnStart(unit);
+    tickImmunityAtTurnStart(unit);
 
     const turnHealPercent = unit.def.combatMods?.turnHealPercent ?? 0;
     if (turnHealPercent > 0 && unit.alive) {
@@ -243,7 +262,12 @@ export class BattleEngine {
       this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount: healAmount });
     }
 
-    if (unit.stunTurns > 0) {
+    this.applyRegenAtTurnStart(unit);
+    this.applyPoisonAtTurnStart(unit);
+
+    if (!unit.alive) {
+      // 毒などで手番開始時に力尽きた場合、この手番はここで終わる
+    } else if (unit.stunTurns > 0) {
       unit.stunTurns -= 1;
       this.push(`${this.label(unit)} はスタン中で行動できない！`);
     } else {
@@ -290,6 +314,37 @@ export class BattleEngine {
     applyDamage(unit, burnDamage);
     this.push(`  → ${this.label(unit)} は火傷でダメージを受けた！ ${burnDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: burnDamage });
+    if (!unit.alive) {
+      this.push(`  → ${this.label(unit)} は倒れた！`);
+      this.pushEvent({ targetId: unit.instanceId, kind: "DEATH" });
+    }
+  }
+
+  /** 継続回復がかかっている場合、手番開始時に最大HPのregenRate分回復する */
+  private applyRegenAtTurnStart(unit: BattleUnit): void {
+    if (unit.regenTurns <= 0 || !unit.alive) return;
+    unit.regenTurns -= 1;
+    if (unit.regenTurns <= 0) unit.regenRate = 0;
+    const healAmount = Math.round(unit.maxHp * unit.regenRate);
+    if (healAmount <= 0) return;
+    applyHeal(unit, healAmount);
+    this.push(`  → ${this.label(unit)} は継続回復でHPが ${healAmount} 回復！ (${unit.currentHp}/${unit.maxHp})`);
+    this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount: healAmount });
+  }
+
+  /** 毒のスタックがある場合、手番開始時にスタック数×poisonDamageRate分のダメージを受ける */
+  private applyPoisonAtTurnStart(unit: BattleUnit): void {
+    if (unit.poisonStacks <= 0 || !unit.alive) return;
+    unit.poisonTurns -= 1;
+    const stacks = unit.poisonStacks;
+    if (unit.poisonTurns <= 0) {
+      unit.poisonStacks = 0;
+      unit.poisonDamageRate = 0;
+    }
+    const poisonDamage = Math.max(1, Math.round(unit.maxHp * unit.poisonDamageRate * stacks));
+    applyDamage(unit, poisonDamage);
+    this.push(`  → ${this.label(unit)} は毒(${stacks}スタック)でダメージを受けた！ ${poisonDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
+    this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: poisonDamage });
     if (!unit.alive) {
       this.push(`  → ${this.label(unit)} は倒れた！`);
       this.pushEvent({ targetId: unit.instanceId, kind: "DEATH" });
@@ -361,6 +416,7 @@ export class BattleEngine {
         }
 
         case "DEBUFF": {
+          if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.effects.push({
             stat: effect.stat,
@@ -373,6 +429,7 @@ export class BattleEngine {
         }
 
         case "STUN": {
+          if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.stunTurns = Math.max(target.stunTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} はスタンした！`);
@@ -380,6 +437,7 @@ export class BattleEngine {
         }
 
         case "BURN": {
+          if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.burnTurns = Math.max(target.burnTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} は火傷を負った！ (${effect.durationTurns}ターン)`);
@@ -393,8 +451,64 @@ export class BattleEngine {
           this.push(`  → ${this.label(target)} の行動ゲージが${verb}！`);
           break;
         }
+
+        case "SHIELD": {
+          if (!target.alive) break;
+          const shieldAmount = Math.round(target.maxHp * effect.shieldRate);
+          target.shieldValue = Math.max(target.shieldValue, shieldAmount);
+          target.shieldTurns = Math.max(target.shieldTurns, effect.durationTurns);
+          this.push(`  → ${this.label(target)} にシールドが張られた！ (${shieldAmount}、${effect.durationTurns}ターン)`);
+          break;
+        }
+
+        case "IMMUNITY": {
+          if (!target.alive) break;
+          target.immuneTurns = Math.max(target.immuneTurns, effect.durationTurns);
+          this.push(`  → ${this.label(target)} は状態異常免疫を得た！ (${effect.durationTurns}ターン)`);
+          break;
+        }
+
+        case "REGEN": {
+          if (!target.alive) break;
+          target.regenRate = Math.max(target.regenRate, effect.healRate);
+          target.regenTurns = Math.max(target.regenTurns, effect.durationTurns);
+          this.push(`  → ${this.label(target)} は継続回復を得た！ (${effect.durationTurns}ターン)`);
+          break;
+        }
+
+        case "CLEANSE": {
+          if (!target.alive) break;
+          const hadDebuff = target.effects.some((e) => e.kind === "DEBUFF");
+          target.effects = target.effects.filter((e) => e.kind !== "DEBUFF");
+          if (hadDebuff) this.push(`  → ${this.label(target)} のデバフが解除された！`);
+          break;
+        }
+
+        case "COOLDOWN_EXTEND": {
+          if (!target.alive) break;
+          target.cooldowns = target.cooldowns.map((c) => c + effect.turns) as [number, number, number];
+          this.push(`  → ${this.label(target)} のスキルのクールタイムが ${effect.turns}ターン延長された！`);
+          break;
+        }
+
+        case "POISON": {
+          if (this.isImmune(target)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          target.poisonStacks = Math.min(5, target.poisonStacks + 1);
+          target.poisonTurns = Math.max(target.poisonTurns, effect.durationTurns);
+          target.poisonDamageRate = Math.max(target.poisonDamageRate, effect.damageRatePerStack);
+          this.push(`  → ${this.label(target)} は毒を受けた！ (${target.poisonStacks}スタック、${effect.durationTurns}ターン)`);
+          break;
+        }
       }
     }
+  }
+
+  /** 状態異常免疫中かどうかを判定する。免疫中ならログを出してtrueを返す(呼び出し側はこの後の付与処理をスキップすること) */
+  private isImmune(target: BattleUnit): boolean {
+    if (target.immuneTurns <= 0) return false;
+    this.push(`  → ${this.label(target)} は状態異常免疫で無効化した！`);
+    return true;
   }
 
   /**

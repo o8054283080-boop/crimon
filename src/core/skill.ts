@@ -5,7 +5,8 @@ export type TargetType =
   | "ALL_ALLIES"
   | "SELF";
 
-export type BuffStat = "atk" | "def" | "spd";
+/** BUFF/DEBUFFで操作できる能力値。atk/def/spdは倍率(乗算)、criRate/criDmgは加算で効く */
+export type BuffStat = "atk" | "def" | "spd" | "criRate" | "criDmg";
 
 export interface DamageEffect {
   kind: "DAMAGE";
@@ -15,6 +16,8 @@ export interface DamageEffect {
   hits?: number;
   /** 追加ダメージ: 自身のいずれかの能力値が高いほど、その能力値1につきこの倍率が上乗せされる */
   scaleBonus?: { stat: "spd" | "def" | "hp"; ratePerPoint: number };
+  /** trueの場合、相手の防御力を完全に無視してダメージを計算する */
+  ignoreDefense?: boolean;
 }
 
 export interface HealEffect {
@@ -74,6 +77,46 @@ export interface GaugeEffect {
   amount: number;
 }
 
+/** シールド(バリア): 対象の最大HPに対する割合でダメージ肩代わり用のバリアを張る。HPより先にダメージを吸収する */
+export interface ShieldEffect {
+  kind: "SHIELD";
+  shieldRate: number;
+  durationTurns: number;
+}
+
+/** 状態異常免疫: この間、新たなスタン・火傷・デバフ・毒の付与を防ぐ(既にかかっている効果は解除しない) */
+export interface ImmunityEffect {
+  kind: "IMMUNITY";
+  durationTurns: number;
+}
+
+/** 継続回復: 対象の手番開始時、最大HPに対するこの割合を毎ターン回復する */
+export interface RegenEffect {
+  kind: "REGEN";
+  healRate: number;
+  durationTurns: number;
+}
+
+/** デバフ解除: 対象にかかっているデバフ(DEBUFF効果)を全て取り除く */
+export interface CleanseEffect {
+  kind: "CLEANSE";
+}
+
+/** クールタイム延長: 対象の全スキルのクールタイムをこのターン数だけ延長する(封印効果) */
+export interface CooldownExtendEffect {
+  kind: "COOLDOWN_EXTEND";
+  turns: number;
+}
+
+/** 毒: 1スタックにつき、対象の手番開始時に最大HPのdamageRatePerStack分のダメージを受ける(最大5スタックまで重複) */
+export interface PoisonEffect {
+  kind: "POISON";
+  damageRatePerStack: number;
+  durationTurns: number;
+  /** この効果が発動を試みる基礎確率(0-1)。省略時は常に発動を試みる(その後、命中率/抵抗率判定を経る) */
+  chance?: number;
+}
+
 export type SkillEffect =
   | DamageEffect
   | HealEffect
@@ -82,7 +125,13 @@ export type SkillEffect =
   | DebuffEffect
   | StunEffect
   | BurnEffect
-  | GaugeEffect;
+  | GaugeEffect
+  | ShieldEffect
+  | ImmunityEffect
+  | RegenEffect
+  | CleanseEffect
+  | CooldownExtendEffect
+  | PoisonEffect;
 
 export interface Skill {
   id: string;
@@ -166,6 +215,21 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
         return { ...effect, chance: growChance(effect.chance, growth) };
       case "GAUGE":
         return { ...effect, amount: round3(effect.amount * growth) };
+      case "SHIELD": {
+        const withRate = { ...effect, shieldRate: round3(effect.shieldRate * growth) };
+        return isMaxLevel ? { ...withRate, durationTurns: withRate.durationTurns + 1 } : withRate;
+      }
+      case "IMMUNITY":
+        return isMaxLevel ? { ...effect, durationTurns: effect.durationTurns + 1 } : effect;
+      case "REGEN": {
+        const withRate = { ...effect, healRate: round3(effect.healRate * growth) };
+        return isMaxLevel ? { ...withRate, durationTurns: withRate.durationTurns + 1 } : withRate;
+      }
+      case "POISON": {
+        const withRate = { ...effect, damageRatePerStack: round3(effect.damageRatePerStack * growth) };
+        const withChance = withRate.chance !== undefined ? { ...withRate, chance: growChance(withRate.chance, growth) } : withRate;
+        return isMaxLevel ? { ...withChance, durationTurns: withChance.durationTurns + 1 } : withChance;
+      }
       default:
         return effect;
     }
@@ -180,6 +244,8 @@ export const BUFF_STAT_JA: Record<BuffStat, string> = {
   atk: "攻撃力",
   def: "防御力",
   spd: "速度",
+  criRate: "クリ率",
+  criDmg: "クリダメ",
 };
 
 const SCALE_BONUS_STAT_JA: Record<"spd" | "def" | "hp", string> = {
@@ -199,7 +265,8 @@ export function describeSkillEffect(effect: SkillEffect): string {
       const scaleText = effect.scaleBonus
         ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
         : "";
-      return `ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}`;
+      const ignoreDefenseText = effect.ignoreDefense ? "(防御力無視)" : "";
+      return `ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}`;
     }
     case "HEAL":
       if (effect.scaleStat === "atk") return `回復量 自身の攻撃力の${(effect.healRate * 100).toFixed(0)}%`;
@@ -217,5 +284,17 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `${chanceSuffix(effect.chance)}火傷 (${effect.durationTurns}ターン、自身のターン終了時に自身の攻撃力分のダメージ)`;
     case "GAUGE":
       return `行動ゲージ+${Math.round(effect.amount * 100)}%`;
+    case "SHIELD":
+      return `シールド 最大HPの${Math.round(effect.shieldRate * 100)}% (${effect.durationTurns}ターン、ダメージを肩代わり)`;
+    case "IMMUNITY":
+      return `状態異常無効 (${effect.durationTurns}ターン)`;
+    case "REGEN":
+      return `継続回復 最大HPの${(effect.healRate * 100).toFixed(1)}% (${effect.durationTurns}ターン、自身のターン開始時)`;
+    case "CLEANSE":
+      return `デバフを解除`;
+    case "COOLDOWN_EXTEND":
+      return `敵の全スキルのクールタイムを${effect.turns}ターン延長`;
+    case "POISON":
+      return `${chanceSuffix(effect.chance)}毒 (1スタックにつき最大HPの${Math.round(effect.damageRatePerStack * 100)}%、最大5スタック、${effect.durationTurns}ターン)`;
   }
 }
