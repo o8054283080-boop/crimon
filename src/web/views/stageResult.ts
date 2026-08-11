@@ -12,6 +12,7 @@ export interface StageResultInfo {
   cleared: boolean;
   stageName: string;
   goldEarned: number;
+  crystalEarned: number;
   wavesCleared: number;
   totalWaves: number;
   levelUps: StageResultLevelUp[];
@@ -38,6 +39,7 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
 
   const summaryChildren: (HTMLElement | null)[] = [
     el("p", {}, [`🪙 獲得ゴールド: ${info.goldEarned}`]),
+    info.crystalEarned > 0 ? el("p", {}, [`💎 獲得ダイヤ: ${info.crystalEarned}`]) : null,
     info.fighterLevelsGained && info.fighterLevelsGained > 0
       ? el("p", {}, [`🎖 ファイターレベルが+${info.fighterLevelsGained}上がりました！(スタミナ全回復・上限アップ)`])
       : null,

@@ -18,6 +18,11 @@ export interface MonsterTemplate {
   skill1: Skill;
   skill2Variants: Skill[];
   skill3Variants: Skill[];
+  /**
+   * このテンプレートが実体化される属性の範囲。省略時は全6属性。
+   * ガチャ限定の光/闇専用モンスターなど、一部の属性でしか登場しないテンプレートに使う。
+   */
+  elements?: Element[];
 }
 
 /** 属性ごとの色違いバリエーションとして実体化されたモンスター定義(静的データ) */
@@ -81,7 +86,7 @@ export function createMonsterVariant(template: MonsterTemplate, element: Element
   };
 }
 
-/** テンプレートから6属性すべての色違いバリエーションを生成する */
+/** テンプレートから(elements指定があればその範囲、なければ全6属性の)色違いバリエーションを生成する */
 export function createAllVariants(template: MonsterTemplate): MonsterDefinition[] {
-  return ELEMENTS.map((element) => createMonsterVariant(template, element));
+  return (template.elements ?? ELEMENTS).map((element) => createMonsterVariant(template, element));
 }

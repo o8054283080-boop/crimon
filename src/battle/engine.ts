@@ -272,7 +272,13 @@ export class BattleEngine {
 
         case "HEAL": {
           if (!target.alive) break;
-          const healAmount = Math.round(target.maxHp * effect.healRate);
+          const healBase =
+            effect.scaleStat === "atk"
+              ? getEffectiveStat(source, "atk")
+              : effect.scaleStat === "def"
+                ? getEffectiveStat(source, "def")
+                : target.maxHp;
+          const healAmount = Math.round(healBase * effect.healRate);
           applyHeal(target, healAmount);
           this.push(`  → ${this.label(target)} のHPが ${healAmount} 回復！ (${target.currentHp}/${target.maxHp})`);
           break;

@@ -11,6 +11,9 @@ export interface EquipmentDungeonProps {
   onSelectFloor: (floor: number | null) => void;
   onStartFloor: (floor: DungeonFloor) => void;
   onGoDungeonParty: () => void;
+  autoFarmCount: number;
+  onChangeAutoFarmCount: (count: number) => void;
+  onAutoFarm: (floor: DungeonFloor, count: number) => void;
 }
 
 function starLabel(star: EquipStar): string {
@@ -94,6 +97,34 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
       { type: "button", className: "btn btn--primary btn--large", disabled: !canChallenge, onclick: () => props.onStartFloor(floor) },
       [`⚔ 挑戦する (⚡${DUNGEON_STAMINA_COST})`],
     ),
+    el("section", { className: "panel auto-farm-panel" }, [
+      el("h2", {}, ["🔁 オート周回"]),
+      el("p", { className: "app-subtitle" }, ["指定した回数まで自動で挑戦し、スタミナが尽きるか敗北したら中断します。"]),
+      el("div", { className: "auto-farm-count-row" }, [
+        el("input", {
+          type: "number",
+          min: "1",
+          max: "999",
+          value: String(props.autoFarmCount),
+          className: "auto-farm-count-input",
+          oninput: (e: Event) => {
+            const value = Math.max(1, Math.min(999, Number((e.target as HTMLInputElement).value) || 1));
+            props.onChangeAutoFarmCount(value);
+          },
+        }),
+        el("span", {}, ["回"]),
+      ]),
+      el(
+        "button",
+        {
+          type: "button",
+          className: "btn btn--primary btn--large",
+          disabled: !canChallenge,
+          onclick: () => props.onAutoFarm(floor, props.autoFarmCount),
+        },
+        [`▶ オート周回開始`],
+      ),
+    ]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectFloor(null) }, ["◀ 階層選択に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }

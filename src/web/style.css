@@ -732,6 +732,28 @@ body {
   color: var(--text-dim);
 }
 
+.auto-farm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auto-farm-count-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-farm-count-input {
+  width: 80px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #444);
+  background: var(--bg-alt);
+  color: var(--text);
+  font-size: 1rem;
+}
+
 .wave-rows {
   display: flex;
   flex-direction: column;

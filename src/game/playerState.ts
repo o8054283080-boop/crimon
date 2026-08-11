@@ -9,6 +9,8 @@ export interface PlayerState {
   monsters: MonsterInstance[];
   partyIds: string[];
   clearedStageIds: string[];
+  /** クリア済みの装備ダンジョン階層(初回クリア判定・ダイヤ報酬用) */
+  clearedDungeonFloors: number[];
   equipment: Equipment[];
   /** 装備ダンジョン専用のパーティ編成(通常ステージのpartyIdsとは別枠、最大5体) */
   dungeonPartyIds: string[];
@@ -46,6 +48,7 @@ export function createInitialState(): PlayerState {
     monsters,
     partyIds: monsters.map((m) => m.id),
     clearedStageIds: [],
+    clearedDungeonFloors: [],
     equipment: [],
     dungeonPartyIds: [],
     summonScrolls: 0,
@@ -79,6 +82,7 @@ function normalizeState(state: PlayerState): PlayerState {
     if (!monster.skillLevels) monster.skillLevels = [1, 1, 1];
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
+  if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
   if (typeof state.fighterExp !== "number") state.fighterExp = 0;
@@ -149,6 +153,19 @@ export function markStageCleared(state: PlayerState, stageId: string): void {
     state.clearedStageIds.push(stageId);
   }
 }
+
+export function isDungeonFloorCleared(state: PlayerState, floor: number): boolean {
+  return state.clearedDungeonFloors.includes(floor);
+}
+
+export function markDungeonFloorCleared(state: PlayerState, floor: number): void {
+  if (!state.clearedDungeonFloors.includes(floor)) {
+    state.clearedDungeonFloors.push(floor);
+  }
+}
+
+/** 初回クリアかどうかでダイヤ報酬額を決める(初回200、以降は消費スタミナと同量) */
+export const FIRST_CLEAR_CRYSTAL_REWARD = 200;
 
 export function addEquipment(state: PlayerState, equipment: Equipment): void {
   state.equipment.push(equipment);

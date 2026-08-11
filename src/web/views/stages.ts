@@ -11,6 +11,9 @@ export interface StagesProps {
   selectedStageId: string | null;
   onSelectStage: (id: string | null) => void;
   onStartStage: (stage: Stage) => void;
+  autoFarmCount: number;
+  onChangeAutoFarmCount: (count: number) => void;
+  onAutoFarm: (stage: Stage, count: number) => void;
 }
 
 function speciesLabel(templateId: string): string {
@@ -93,6 +96,34 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
       { type: "button", className: "btn btn--primary btn--large", disabled: !canChallenge, onclick: () => props.onStartStage(stage) },
       [`⚔ 挑戦する (⚡${STAGE_STAMINA_COST})`],
     ),
+    el("section", { className: "panel auto-farm-panel" }, [
+      el("h2", {}, ["🔁 オート周回"]),
+      el("p", { className: "app-subtitle" }, ["指定した回数まで自動でウェーブを消化し、スタミナが尽きるか敗北したら中断します。"]),
+      el("div", { className: "auto-farm-count-row" }, [
+        el("input", {
+          type: "number",
+          min: "1",
+          max: "999",
+          value: String(props.autoFarmCount),
+          className: "auto-farm-count-input",
+          oninput: (e: Event) => {
+            const value = Math.max(1, Math.min(999, Number((e.target as HTMLInputElement).value) || 1));
+            props.onChangeAutoFarmCount(value);
+          },
+        }),
+        el("span", {}, ["回"]),
+      ]),
+      el(
+        "button",
+        {
+          type: "button",
+          className: "btn btn--primary btn--large",
+          disabled: !canChallenge,
+          onclick: () => props.onAutoFarm(stage, props.autoFarmCount),
+        },
+        [`▶ オート周回開始`],
+      ),
+    ]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectStage(null) }, ["◀ ステージ選択に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }

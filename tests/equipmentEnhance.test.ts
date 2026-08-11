@@ -32,6 +32,7 @@ function makeState(): PlayerState {
     monsters: [],
     partyIds: [],
     clearedStageIds: [],
+    clearedDungeonFloors: [],
     equipment: [],
     dungeonPartyIds: [],
     summonScrolls: 0,

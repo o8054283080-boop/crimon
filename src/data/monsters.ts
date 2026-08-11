@@ -341,6 +341,371 @@ const FAIRY: MonsterTemplate = {
 export const MONSTER_TEMPLATES: MonsterTemplate[] = [SLIME, WOLF, GOLEM, FAIRY];
 
 /**
+ * ガチャ専用の高レア新規モンスター(星4=SR / 星5=SSR)。
+ * GRIFFON・DRAGONは火水電草の4属性、SERAPH・NEMESISは光闇専用として登場する。
+ * MONSTER_TEMPLATESには含めず、ステージの敵構成には影響させない。
+ */
+const GRIFFON: MonsterTemplate = {
+  templateId: "griffon",
+  baseName: "グリフォン",
+  emoji: "🦅",
+  role: "アタッカー",
+  elements: ["FIRE", "WATER", "ELECTRIC", "GRASS"],
+  baseStats: {
+    hp: 1300,
+    atk: 190,
+    def: 85,
+    spd: 115,
+    criRate: 0.28,
+    criDmg: 1.7,
+    resistance: 0.15,
+    accuracy: 0.15,
+  },
+  skill1: {
+    id: "griffon_s1",
+    name: "ついばみ",
+    description: "敵単体に攻撃力1.1倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 1.1 }],
+  },
+  skill2Variants: [
+    {
+      id: "griffon_s2_a",
+      name: "きりさく突風",
+      description: "鋭い風の刃で敵単体に攻撃力2.0倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 2.0 }],
+    },
+    {
+      id: "griffon_s2_b",
+      name: "はやてづき",
+      description: "敵単体に攻撃力0.95倍のダメージを2回与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 2 }],
+    },
+    {
+      id: "griffon_s2_c",
+      name: "ダイブアタック",
+      description: "急降下して敵単体に攻撃力1.7倍のダメージを与え、防御力を低下させる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.7 },
+        { kind: "DEBUFF", stat: "def", amount: 0.2, durationTurns: 2 },
+      ],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "griffon_s3_a",
+      name: "嵐の一撃",
+      description: "渾身の一撃(2.8倍)を叩き込み、相手をスタンさせる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.8 },
+        { kind: "STUN", durationTurns: 1 },
+      ],
+    },
+    {
+      id: "griffon_s3_b",
+      name: "せんぷうげき",
+      description: "旋風を巻き起こし敵全体に攻撃力1.3倍のダメージを与える。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [{ kind: "DAMAGE", multiplier: 1.3 }],
+    },
+    {
+      id: "griffon_s3_c",
+      name: "猛禽の加護",
+      description: "味方全体の攻撃力を大きく上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [{ kind: "BUFF", stat: "atk", amount: 0.4, durationTurns: 3 }],
+    },
+  ],
+};
+
+const DRAGON: MonsterTemplate = {
+  templateId: "dragon",
+  baseName: "ドラゴン",
+  emoji: "🐉",
+  role: "アタッカー",
+  elements: ["FIRE", "WATER", "ELECTRIC", "GRASS"],
+  baseStats: {
+    hp: 1450,
+    atk: 230,
+    def: 100,
+    spd: 120,
+    criRate: 0.3,
+    criDmg: 1.8,
+    resistance: 0.2,
+    accuracy: 0.18,
+  },
+  skill1: {
+    id: "dragon_s1",
+    name: "つのぶつけ",
+    description: "敵単体に攻撃力1.2倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 1.2 }],
+  },
+  skill2Variants: [
+    {
+      id: "dragon_s2_a",
+      name: "フレイムブレス",
+      description: "灼熱の息を吐き、敵全体に攻撃力1.5倍のダメージを与える。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 1.5 }],
+    },
+    {
+      id: "dragon_s2_b",
+      name: "ドラゴンクロー",
+      description: "敵単体に攻撃力2.4倍のダメージを与え、防御力を低下させる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.4 },
+        { kind: "DEBUFF", stat: "def", amount: 0.25, durationTurns: 2 },
+      ],
+    },
+    {
+      id: "dragon_s2_c",
+      name: "しっぽなぎ払い",
+      description: "敵全体に攻撃力0.9倍のダメージを2回与える。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2 }],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "dragon_s3_a",
+      name: "破滅の咆哮",
+      description: "敵全体に攻撃力1.8倍のダメージを与え、攻撃力を低下させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.8 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.2, durationTurns: 2 },
+      ],
+    },
+    {
+      id: "dragon_s3_b",
+      name: "竜神の逆鱗",
+      description: "渾身の一撃(3.6倍)を叩き込み、相手をスタンさせる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 3.6 },
+        { kind: "STUN", durationTurns: 1 },
+      ],
+    },
+    {
+      id: "dragon_s3_c",
+      name: "古龍の守り",
+      description: "自身の防御力に応じてHPを回復し、防御力を大きく上昇させる。",
+      target: "SELF",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "HEAL", scaleStat: "def", healRate: 1.8 },
+        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 },
+      ],
+    },
+  ],
+};
+
+const SERAPH: MonsterTemplate = {
+  templateId: "seraph",
+  baseName: "セラフ",
+  emoji: "😇",
+  role: "バランス型",
+  elements: ["LIGHT", "DARK"],
+  baseStats: {
+    hp: 1380,
+    atk: 175,
+    def: 105,
+    spd: 113,
+    criRate: 0.24,
+    criDmg: 1.65,
+    resistance: 0.3,
+    accuracy: 0.25,
+  },
+  skill1: {
+    id: "seraph_s1",
+    name: "光の一閃",
+    description: "敵単体に攻撃力1.15倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 1.15 }],
+  },
+  skill2Variants: [
+    {
+      id: "seraph_s2_a",
+      name: "さばきの光",
+      description: "敵単体に攻撃力2.3倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 2.3 }],
+    },
+    {
+      id: "seraph_s2_b",
+      name: "いやしの詠唱",
+      description: "自身の攻撃力に応じて味方単体のHPを回復する。",
+      target: "SINGLE_ALLY",
+      cooldownTurns: 3,
+      effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 1.6 }],
+    },
+    {
+      id: "seraph_s2_c",
+      name: "封印の光",
+      description: "敵単体に攻撃力1.6倍のダメージを与え、攻撃力を低下させる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.6 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.25, durationTurns: 2 },
+      ],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "seraph_s3_a",
+      name: "裁きの雷光",
+      description: "天より雷光を降らせ、敵全体に攻撃力1.6倍のダメージを与える。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [{ kind: "DAMAGE", multiplier: 1.6 }],
+    },
+    {
+      id: "seraph_s3_b",
+      name: "聖なる守護陣",
+      description: "自身の防御力に応じて味方全体のHPを回復し、防御力を上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "HEAL", scaleStat: "def", healRate: 2.0 },
+        { kind: "BUFF", stat: "def", amount: 0.25, durationTurns: 3 },
+      ],
+    },
+    {
+      id: "seraph_s3_c",
+      name: "セラフィムの祝福",
+      description: "味方全体の攻撃力を大きく上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [{ kind: "BUFF", stat: "atk", amount: 0.45, durationTurns: 3 }],
+    },
+  ],
+};
+
+const NEMESIS: MonsterTemplate = {
+  templateId: "nemesis",
+  baseName: "ネメシス",
+  emoji: "👹",
+  role: "アタッカー",
+  elements: ["LIGHT", "DARK"],
+  baseStats: {
+    hp: 1500,
+    atk: 250,
+    def: 110,
+    spd: 125,
+    criRate: 0.32,
+    criDmg: 1.9,
+    resistance: 0.25,
+    accuracy: 0.2,
+  },
+  skill1: {
+    id: "nemesis_s1",
+    name: "ダークスラッシュ",
+    description: "敵単体に攻撃力1.3倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 1.3 }],
+  },
+  skill2Variants: [
+    {
+      id: "nemesis_s2_a",
+      name: "冥府の炎",
+      description: "暗黒の炎で敵全体に攻撃力1.7倍のダメージを与える。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 1.7 }],
+    },
+    {
+      id: "nemesis_s2_b",
+      name: "デーモンクロー",
+      description: "敵単体に攻撃力2.7倍のダメージを与え、防御力を大きく低下させる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.7 },
+        { kind: "DEBUFF", stat: "def", amount: 0.3, durationTurns: 2 },
+      ],
+    },
+    {
+      id: "nemesis_s2_c",
+      name: "血のいけにえ",
+      description: "敵単体に攻撃力0.75倍のダメージを2回与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 2 }],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "nemesis_s3_a",
+      name: "終焉の一撃",
+      description: "渾身の一撃(3.9倍)を叩き込み、相手をスタンさせる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 3.9 },
+        { kind: "STUN", durationTurns: 1 },
+      ],
+    },
+    {
+      id: "nemesis_s3_b",
+      name: "冥王の激震",
+      description: "敵全体に攻撃力2.0倍のダメージを与え、攻撃力を低下させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.0 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.25, durationTurns: 2 },
+      ],
+    },
+    {
+      id: "nemesis_s3_c",
+      name: "不死なる魂",
+      description: "自身の攻撃力に応じてHPを回復し、攻撃力を大きく上昇させる。",
+      target: "SELF",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "HEAL", scaleStat: "atk", healRate: 1.0 },
+        { kind: "BUFF", stat: "atk", amount: 0.35, durationTurns: 3 },
+      ],
+    },
+  ],
+};
+
+/** ガチャの星4(SR)テンプレート: 火水電草側 / 光闇側 */
+export const GACHA_SR_COMMON_TEMPLATE = GRIFFON;
+export const GACHA_SR_RARE_TEMPLATE = SERAPH;
+/** ガチャの星5(SSR)テンプレート: 火水電草側 / 光闇側 */
+export const GACHA_SSR_COMMON_TEMPLATE = DRAGON;
+export const GACHA_SSR_RARE_TEMPLATE = NEMESIS;
+
+export const GACHA_SR_COMMON_DEX = createAllVariants(GRIFFON);
+export const GACHA_SSR_COMMON_DEX = createAllVariants(DRAGON);
+export const GACHA_SR_RARE_DEX = createAllVariants(SERAPH);
+export const GACHA_SSR_RARE_DEX = createAllVariants(NEMESIS);
+
+/**
  * 転生ピッグ: ランクアップ素材専用のモンスター。ガチャやステージには一切出現せず、
  * 装備ダンジョンでのみドロップする。星2または星3・そのレベル上限で入手できるが、
  * ステータスは他のモンスターよりはるかに低く設定されており、戦力にはならない
@@ -398,8 +763,19 @@ export const MONSTER_TEMPLATES_DEX = MONSTER_TEMPLATES.flatMap((template) => cre
 /** 転生ピッグの6属性色違いバリエーション(図鑑には含めるが、通常の召喚・ステージ抽選には出さない) */
 export const REINCARNATION_PIG_DEX = createAllVariants(REINCARNATION_PIG);
 
-/** 検索用の全モンスター図鑑(通常モンスター + 転生ピッグ) */
-export const MONSTER_DEX = [...MONSTER_TEMPLATES_DEX, ...REINCARNATION_PIG_DEX];
+/** ガチャ限定の高レアモンスター(SR/SSR)図鑑。GRIFFON/DRAGONは4属性、SERAPH/NEMESISは光闇のみ */
+export const GACHA_EXCLUSIVE_DEX = [
+  ...GACHA_SR_COMMON_DEX,
+  ...GACHA_SSR_COMMON_DEX,
+  ...GACHA_SR_RARE_DEX,
+  ...GACHA_SSR_RARE_DEX,
+];
+
+/** 検索用の全モンスター図鑑(通常モンスター + ガチャ限定高レア + 転生ピッグ) */
+export const MONSTER_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...REINCARNATION_PIG_DEX];
+
+/** モンスター図鑑UI表示用(転生ピッグは素材専用のため除外) */
+export const ALL_DISPLAYABLE_MONSTERS_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX];
 
 export function findMonster(templateId: string, element: string) {
   return MONSTER_DEX.find((m) => m.templateId === templateId && m.element === element);
