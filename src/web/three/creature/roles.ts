@@ -999,3 +999,85 @@ const BUILDERS: Record<string, { build: (kit: CreatureKit, rig: CreatureRig) => 
 export function builderFor(role: string): { build: (kit: CreatureKit, rig: CreatureRig) => void; height: number; float: number } {
   return BUILDERS[role] ?? BUILDERS["バランス型"];
 }
+
+/**
+ * モンスター種別ごとの追加造形。
+ *
+ * シルエットを役割(role)だけで決めると、同じ役割の別モンスターが
+ * 完全に同じ見た目になってしまう(例: ドラゴンとグリフォンはどちらも
+ * 「アタッカー」なので、色以外に区別がつかない)。
+ * そこで役割ビルダーで骨格を組んだあとに、種別固有の特徴を足して
+ * 一目で見分けられるようにする。
+ */
+const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => void> = {
+  /** ドラゴン: 大きな皮膜の翼。畳まずに広げて、横幅のあるシルエットにする */
+  dragon: (kit, rig) => {
+    for (const side of [-1, 1]) {
+      const wing = new THREE.Group();
+      markAnimated(wing);
+      place(wing, side * 0.3, 0.62, 0.18, 0.16, -side * 0.42, side * 0.12);
+      addBatWing(kit, wing, side, 1.5);
+      rig.torso.add(wing);
+      rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
+    }
+    rig.anim.wingFlap = 0.55;
+  },
+
+  /** グリフォン: 羽毛の翼と、頭の羽根飾り。鳥類寄りのシルエットにする */
+  griffon: (kit, rig) => {
+    const p = kit.palette;
+    for (const side of [-1, 1]) {
+      const wing = new THREE.Group();
+      markAnimated(wing);
+      place(wing, side * 0.28, 0.58, 0.14, 0.24, -side * 0.5, 0);
+      addFeatherWing(kit, wing, side, 8, 1.5);
+      rig.torso.add(wing);
+      rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
+    }
+    // 後頭部の羽根飾り
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
+      const crest = kit.spike(0.028, 0.2 + Math.sin(t * Math.PI) * 0.12, 0.5, "plate", p.plate);
+      place(crest, (t - 0.5) * 0.13, 0.13, 0.1, -0.5, Math.PI / 2, 0);
+      rig.head.add(crest);
+    }
+    rig.anim.wingFlap = 0.85;
+  },
+
+  /** セラフ: 二対の光の翼と光輪。天使的なシルエットで他と明確に分ける */
+  seraph: (kit, rig) => {
+    const p = kit.palette;
+    for (const side of [-1, 1]) {
+      for (const [index, spec] of [
+        { y: 0.72, span: 1.5, pitch: 0.1 },
+        { y: 0.44, span: 1.15, pitch: 0.5 },
+      ].entries()) {
+        const wing = new THREE.Group();
+        markAnimated(wing);
+        place(wing, side * 0.24, spec.y, 0.14, spec.pitch, -side * 0.46, 0);
+        addFeatherWing(kit, wing, side, 7, spec.span);
+        rig.torso.add(wing);
+        rig.wings.push({
+          root: wing,
+          rootRest: wing.rotation.clone(),
+          lower: null,
+          lowerRest: null,
+          tip: wing,
+          side,
+          // 上下の翼で位相をずらし、順に羽ばたいて見えるようにする
+          phase: index * 0.9,
+        });
+      }
+    }
+    const halo = kit.ring(0.26, 0.026, "glow", p.glow, 30);
+    place(halo, 0, 0.46, 0.04, Math.PI / 2, 0, 0);
+    rig.head.add(halo);
+    rig.spinners.push({ object: halo, axis: "z", speed: 0.5 });
+    rig.anim.wingFlap = 0.4;
+  },
+};
+
+/** 種別固有の造形を足す。該当がなければ何もしない(役割ビルダーのままになる) */
+export function applyTemplateTraits(templateId: string, kit: CreatureKit, rig: CreatureRig): void {
+  TEMPLATE_TRAITS[templateId]?.(kit, rig);
+}

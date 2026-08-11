@@ -218,6 +218,7 @@ export class BattleStage {
         const avatar = new MonsterAvatar({
           element: unit.def.element,
           role: unit.def.role,
+          templateId: unit.def.templateId,
           facing: team === "PLAYER" ? 1 : -1,
         });
         avatar.setSlotPosition(slots[index].x, slots[index].z);

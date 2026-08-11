@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Element } from "../../core/element.js";
 import { CreatureKit } from "./creature/kit.js";
 import { CreatureRig, finalizeRig } from "./creature/rig.js";
-import { builderFor } from "./creature/roles.js";
+import { applyTemplateTraits, builderFor } from "./creature/roles.js";
 import { CreatureUniforms, SurfaceSet, createCreatureUniforms, paletteFor } from "./creature/surface.js";
 import { ElementTheme, themeFor } from "./elementTheme.js";
 import { radialGlowTexture, shadowTexture, sigilTexture } from "./textures.js";
@@ -55,6 +55,8 @@ function windupCurve(t: number): number {
 export interface MonsterAvatarOptions {
   element: Element;
   role: string;
+  /** モンスター種別。同じ役割でも種別ごとに翼や角を足して見分けられるようにする */
+  templateId: string;
   /** PLAYER側は+Z(手前)、ENEMY側は-Z(奥)に立つ */
   facing: 1 | -1;
 }
@@ -94,7 +96,7 @@ export class MonsterAvatar {
   private readonly tmpVector = new THREE.Vector3();
 
   constructor(options: MonsterAvatarOptions) {
-    const { element, role, facing } = options;
+    const { element, role, templateId, facing } = options;
     this.theme = themeFor(element);
 
     const palette = paletteFor(this.theme);
@@ -104,6 +106,8 @@ export class MonsterAvatar {
 
     const builder = builderFor(role);
     builder.build(this.kit, this.rig);
+    // 役割で組んだ骨格に、種別固有の特徴(翼・光輪・羽根飾りなど)を足す
+    applyTemplateTraits(templateId, this.kit, this.rig);
     finalizeRig(this.rig, this.kit, builder.height, builder.float);
     this.uniforms.uHeight.value = this.rig.height;
 
