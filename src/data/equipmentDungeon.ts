@@ -60,8 +60,11 @@ const POWER_SCALE_END = 1.7;
 /**
  * 9・10階はダンジョン最終盤の最終関門として、8階までの線形カーブに対してさらに
  * 大きく難易度を引き上げる(星6装備クラスをフルで固めてようやく勝てる水準を想定)。
+ * 装備ダンジョンは通常パーティ(4体)より1体多い専用パーティ(最大5体)で挑めるため、
+ * 5体編成であることを踏まえて9・10階のボーナス倍率を引き上げてある
+ * (4体想定の数値のままだと、5体目の分だけ想定より簡単に突破できてしまうため)。
  */
-const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.15, 10: 1.35 };
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.55, 10: 1.65 };
 
 function powerScaleForFloor(floor: number): number {
   const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
