@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { MONSTER_TEMPLATES_DEX, REINCARNATION_PIG_DEX, findMonsterById } from "../src/data/monsters.js";
+import { STAR_MAX_LEVEL } from "../src/core/rarity.js";
+import { EXP_PIG_DEX, MONSTER_TEMPLATES_DEX, REINCARNATION_PIG_DEX, findMonsterById } from "../src/data/monsters.js";
 import {
   applyMonsterPowerUp,
   checkMonsterPowerUp,
@@ -35,6 +36,20 @@ describe("checkMonsterPowerUp", () => {
     const target = createMonsterInstance("slime_FIRE", 1, 1);
     const material = createMonsterInstance("wolf_FIRE", 1, 1);
     expect(checkMonsterPowerUp(target, [material], [material.id]).ok).toBe(false);
+  });
+
+  it("対象が現在の星の最大レベルに達している場合、素材が無駄になるので実行できない(バグ回帰テスト)", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, STAR_MAX_LEVEL[1]);
+    const material = createMonsterInstance(EXP_PIG_DEX[0].id, 6, STAR_MAX_LEVEL[6]);
+    const check = checkMonsterPowerUp(target, [material], []);
+    expect(check.ok).toBe(false);
+    expect(check.reason).toBeTruthy();
+  });
+
+  it("対象がまだ最大レベルに達していなければ実行できる", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, STAR_MAX_LEVEL[1] - 1);
+    const material = createMonsterInstance("wolf_FIRE", 1, 1);
+    expect(checkMonsterPowerUp(target, [material], []).ok).toBe(true);
   });
 });
 

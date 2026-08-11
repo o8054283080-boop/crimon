@@ -22,6 +22,9 @@ export function checkMonsterPowerUp(
   if (materials.some((m) => partyIds.includes(m.id))) {
     return { ok: false, reason: "パーティに編成中のモンスターは素材にできません" };
   }
+  if (target.level >= STAR_MAX_LEVEL[target.star]) {
+    return { ok: false, reason: "対象は現在の星の最大レベルに達しています(素材を無駄にしないよう、ランクアップしてください)" };
+  }
   return { ok: true };
 }
 
