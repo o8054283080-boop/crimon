@@ -1,7 +1,7 @@
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
-import { checkMonsterPowerUp, feedExpValue, isSameSpecies } from "../../game/monsterPowerUp.js";
+import { checkMonsterPowerUp, feedExpValue, isSameElement, isSameSpecies } from "../../game/monsterPowerUp.js";
 import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
 
@@ -30,8 +30,9 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkMonsterPowerUp(target, materials, props.player.partyIds);
 
-  const totalExp = materials.reduce((sum, m) => sum + feedExpValue(m), 0);
+  const totalExp = materials.reduce((sum, m) => sum + feedExpValue(target, m), 0);
   const bonusCount = materials.filter((m) => isSameSpecies(target, m)).length;
+  const sameElementCount = materials.filter((m) => isSameElement(target, m)).length;
 
   const cards = candidates.map((c) =>
     monsterCard(c, () => props.onToggleMaterial(c.id), {
@@ -49,9 +50,11 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         `現在のスキルレベル: ${target.skillLevels.map((lvl, i) => `スキル${i + 1} Lv.${lvl}`).join(" / ")}`,
       ]),
       el("p", { className: "app-subtitle" }, [
-        "どのモンスターでも素材にすると経験値になり、対象のレベルが上がります。★マーク付きは対象と同じ種族(属性違いも可)で、1体につきランダムでいずれか1つのスキルレベルも+1されます。",
+        "どのモンスターでも素材にすると経験値になり、対象のレベルが上がります。★マーク付きは対象と同じ種族(属性違いも可)で、1体につきランダムでいずれか1つのスキルレベルも+1されます。対象と同じ属性(色)の素材は経験値が1.5倍になります。",
       ]),
-      el("p", {}, [`${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体) / 獲得予定経験値 ${totalExp}`]),
+      el("p", {}, [
+        `${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体・同属性${sameElementCount}体) / 獲得予定経験値 ${totalExp}`,
+      ]),
       materials.length > 0 && !check.ok && check.reason
         ? el("p", { className: "app-subtitle training-warning" }, [`⚠ ${check.reason}`])
         : null,

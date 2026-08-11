@@ -1,14 +1,22 @@
 import { BattleEngine } from "../battle/engine.js";
-import { DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
+import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { DungeonFloor } from "../data/equipmentDungeon.js";
+import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef } from "../data/levelDungeon.js";
 import { Difficulty, Stage } from "../data/stages.js";
 import { setupDungeonBattle } from "./dungeonRunner.js";
-import { getDungeonParty, getParty, PlayerState, trySpendStamina } from "./playerState.js";
-import { ClearRewardResult, LevelUpInfo, applyDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "./rewards.js";
+import { getDungeonParty, getParty, PlayerState, trySpendGoldDungeonChallenge, trySpendStamina } from "./playerState.js";
+import {
+  ClearRewardResult,
+  LevelUpInfo,
+  applyDungeonClearRewards,
+  applyGoldDungeonClearRewards,
+  applyLevelDungeonClearRewards,
+  applyStageClearRewards,
+} from "./rewards.js";
 import { extractSurvivors, setupWaveBattle } from "./stageRunner.js";
 
-export type AutoFarmStopReason = "COMPLETED" | "STAMINA" | "DEFEAT" | "NO_PARTY";
+export type AutoFarmStopReason = "COMPLETED" | "STAMINA" | "DEFEAT" | "NO_PARTY" | "DAILY_LIMIT";
 
 export interface AutoFarmDrop {
   dexId: string;
@@ -206,6 +214,51 @@ export function runLevelDungeonAutoFarm(
 
     if (battleResult.winner === "PLAYER") {
       const reward = applyLevelDungeonClearRewards(state, def, party, rng);
+      mergeReward(result, reward, 0);
+      result.cleared += 1;
+    } else {
+      result.stopReason = "DEFEAT";
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * ゴールドダンジョンの指定階層に指定回数まで自動で挑戦する(周回)。
+ * 他コンテンツと異なり、スタミナに加えて1日の挑戦回数上限にも達すると中断する。
+ */
+export function runGoldDungeonAutoFarm(
+  state: PlayerState,
+  floor: GoldDungeonFloor,
+  times: number,
+  rng: () => number = Math.random,
+): AutoFarmResult {
+  const result = emptyResult();
+
+  for (let i = 0; i < times; i++) {
+    const party = getParty(state);
+    if (party.length === 0) {
+      result.stopReason = "NO_PARTY";
+      break;
+    }
+    if (!trySpendGoldDungeonChallenge(state).ok) {
+      result.stopReason = "DAILY_LIMIT";
+      break;
+    }
+    if (!trySpendStamina(state, GOLD_DUNGEON_STAMINA_COST).ok) {
+      result.stopReason = "STAMINA";
+      break;
+    }
+    result.attempts += 1;
+
+    const setup = setupDungeonBattle(party, floor, state.equipment);
+    const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
+    const battleResult = engine.run();
+
+    if (battleResult.winner === "PLAYER") {
+      const reward = applyGoldDungeonClearRewards(state, floor, party);
       mergeReward(result, reward, 0);
       result.cleared += 1;
     } else {

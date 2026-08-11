@@ -31,14 +31,28 @@ export function checkMonsterPowerUp(
 /** 星ごとの、素材1体あたりの基礎経験値(レアリティ分の価値)。星が高い素材ほど経験値としての価値が高い */
 const FEED_EXP_BASE_PER_STAR: Record<Star, number> = { 1: 50, 2: 90, 3: 160, 4: 280, 5: 480, 6: 800 };
 
+/** 素材の属性(色)が対象と同じ場合の経験値ボーナス倍率 */
+const SAME_ELEMENT_EXP_MULTIPLIER = 1.5;
+
+/** 素材が対象と同じ属性(色)かどうか */
+export function isSameElement(target: MonsterInstance, material: MonsterInstance): boolean {
+  const targetDex = findMonsterById(target.dexId);
+  const materialDex = findMonsterById(material.dexId);
+  if (!targetDex || !materialDex) return false;
+  return targetDex.element === materialDex.element;
+}
+
 /**
  * 素材モンスター1体を強化に使った時に得られる経験値。
  * 星ごとの基礎価値に加えて、その素材が現在のレベルに到達するために本来必要な経験値
  * (requiredExpForLevel)分も上乗せする。レベルが高い素材ほど、それだけ多くの経験値を
  * 費やして育てられてきたことになるため、素材にした時の価値もその分だけ大きくなる。
+ * さらに、素材の属性(色)が対象と同じ場合は経験値が1.5倍になる。
  */
-export function feedExpValue(material: MonsterInstance): number {
-  return Math.round(FEED_EXP_BASE_PER_STAR[material.star] + requiredExpForLevel(material.level));
+export function feedExpValue(target: MonsterInstance, material: MonsterInstance): number {
+  const base = FEED_EXP_BASE_PER_STAR[material.star] + requiredExpForLevel(material.level);
+  const multiplier = isSameElement(target, material) ? SAME_ELEMENT_EXP_MULTIPLIER : 1;
+  return Math.round(base * multiplier);
 }
 
 /** 素材が対象と同じ種族(テンプレートID)かどうか。属性(色)が違っていても種族が同じならtrue */
@@ -67,7 +81,7 @@ export function applyMonsterPowerUp(
   materials: MonsterInstance[],
   rng: () => number = Math.random,
 ): MonsterPowerUpResult {
-  const expGained = materials.reduce((sum, m) => sum + feedExpValue(m), 0);
+  const expGained = materials.reduce((sum, m) => sum + feedExpValue(target, m), 0);
   const levelsGained = addExp(target, expGained, STAR_MAX_LEVEL[target.star]);
 
   const leveledSkillIndices: number[] = [];

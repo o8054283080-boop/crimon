@@ -20,6 +20,7 @@ export interface HomeProps {
   onGoParty: () => void;
   onGoEquipDungeon: () => void;
   onGoLevelDungeon: () => void;
+  onGoGoldDungeon: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
   onEditFighterName: () => void;
@@ -47,6 +48,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     onGoParty,
     onGoEquipDungeon,
     onGoLevelDungeon,
+    onGoGoldDungeon,
     onRefillStaminaPartial,
     onRefillStaminaFull,
     onEditFighterName,
@@ -102,5 +104,6 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoSummon }, ["✨ モンスターを召喚する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoEquipDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoLevelDungeon }, ["📈 レベル上げダンジョンに挑戦する"]),
+    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoGoldDungeon }, ["🪙 ゴールドダンジョンに挑戦する"]),
   ].filter((n): n is HTMLElement => n !== null));
 }

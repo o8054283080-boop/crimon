@@ -45,6 +45,8 @@ function makeState(): PlayerState {
     fighterName: "ファイター",
     lastLoginBonusAt: null,
     loginBonusClaimCount: 0,
+    goldDungeonChallengesToday: 0,
+    lastGoldDungeonResetAt: null,
   };
 }
 

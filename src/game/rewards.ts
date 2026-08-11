@@ -2,6 +2,7 @@ import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
 import { Equipment } from "../core/equipment.js";
 import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
+import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef } from "../data/levelDungeon.js";
 import { EXP_PIG_DEX, findMonsterById } from "../data/monsters.js";
 import { Difficulty, Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
@@ -194,6 +195,38 @@ export function applyLevelDungeonClearRewards(
     dropStar: null,
     equipmentDrop: null,
     pigDrop,
+    summonScrollDropped: false,
+    fighterLevelsGained,
+  };
+}
+
+/**
+ * ゴールドダンジョンクリア時の報酬をまとめて付与する。
+ * 1日の挑戦回数制限がある代わりに、他コンテンツと違い装備ドロップやダイヤ報酬はなく、
+ * その分ゴールド報酬そのものが大幅に大きい。
+ */
+export function applyGoldDungeonClearRewards(
+  state: PlayerState,
+  floor: GoldDungeonFloor,
+  partyInstances: MonsterInstance[],
+): ClearRewardResult {
+  const expTotal = floor.floor * 20;
+  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+
+  const goldEarned = floor.goldReward;
+  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+
+  state.gold += goldEarned;
+
+  return {
+    goldEarned,
+    crystalEarned: 0,
+    expTotal,
+    levelUps,
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop: null,
     summonScrollDropped: false,
     fighterLevelsGained,
   };

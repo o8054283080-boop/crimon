@@ -6,6 +6,7 @@ import {
   applyMonsterPowerUp,
   checkMonsterPowerUp,
   feedExpValue,
+  isSameElement,
   isSameSpecies,
 } from "../src/game/monsterPowerUp.js";
 
@@ -75,22 +76,32 @@ describe("isSameSpecies", () => {
 
 describe("feedExpValue", () => {
   it("星が高いほど経験値の価値が高い", () => {
+    const target = createMonsterInstance("slime_WATER", 1, 1);
     const low = createMonsterInstance("slime_FIRE", 1, 1);
     const high = createMonsterInstance("slime_FIRE", 3, 1);
-    expect(feedExpValue(high)).toBeGreaterThan(feedExpValue(low));
+    expect(feedExpValue(target, high)).toBeGreaterThan(feedExpValue(target, low));
   });
 
   it("同じ星ならレベルが高いほど経験値の価値が高い", () => {
+    const target = createMonsterInstance("slime_WATER", 2, 1);
     const low = createMonsterInstance("slime_FIRE", 2, 1);
     const high = createMonsterInstance("slime_FIRE", 2, 15);
-    expect(feedExpValue(high)).toBeGreaterThan(feedExpValue(low));
+    expect(feedExpValue(target, high)).toBeGreaterThan(feedExpValue(target, low));
   });
 
-  it("星ごとの基礎価値にそのレベルへ到達するための必要経験値分が上乗せされる", () => {
+  it("星ごとの基礎価値にそのレベルへ到達するための必要経験値分が上乗せされる(属性が異なる場合)", () => {
     const FEED_EXP_BASE_PER_STAR: Record<number, number> = { 1: 50, 2: 90, 3: 160, 4: 280, 5: 480, 6: 800 };
+    const target = createMonsterInstance("slime_WATER", 4, 12);
     const material = createMonsterInstance("slime_FIRE", 4, 12);
     const expected = Math.round(FEED_EXP_BASE_PER_STAR[4] + requiredExpForLevel(12));
-    expect(feedExpValue(material)).toBe(expected);
+    expect(feedExpValue(target, material)).toBe(expected);
+  });
+
+  it("対象と同じ属性(色)の素材は経験値が1.5倍になる", () => {
+    const target = createMonsterInstance("slime_FIRE", 4, 12);
+    const sameElement = createMonsterInstance("wolf_FIRE", 4, 12);
+    const diffElement = createMonsterInstance("wolf_WATER", 4, 12);
+    expect(feedExpValue(target, sameElement)).toBe(Math.round(feedExpValue(target, diffElement) * 1.5));
   });
 });
 
