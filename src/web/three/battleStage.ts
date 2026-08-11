@@ -148,6 +148,12 @@ export class BattleStage {
     this.resizeObserver.observe(container);
     this.handleResize();
 
+    // 開発時だけ、シーンの中身を外から覗けるようにしておく(見た目の不具合調査用)。
+    // 本番ビルドではこのブロックごと落ちる。
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).__crimonStage = this;
+    }
+
     this.start();
   }
 
