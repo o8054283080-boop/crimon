@@ -751,12 +751,12 @@ export const ANCIENT_DEMON: MonsterTemplate = {
     {
       id: "ancient_demon_s3",
       name: "終焉の審判",
-      description: "太古の力を込めた渾身の一撃(3.8倍)を叩き込み、60%で相手をスタンさせる。自身の防御力が高いほど威力が上がる。",
-      target: "SINGLE_ENEMY",
+      description: "太古の力を解き放ち、敵全体に攻撃力2.0倍のダメージを与え、50%で攻撃力を大きく低下させる。自身の防御力が高いほど威力が上がる。",
+      target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 3.8, scaleBonus: { stat: "def", ratePerPoint: 0.003 } },
-        { kind: "STUN", durationTurns: 1, chance: 0.6 },
+        { kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "def", ratePerPoint: 0.002 } },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.5 },
       ],
     },
   ],
@@ -810,6 +810,62 @@ export const ANCIENT_CRYSTAL: MonsterTemplate = {
       effects: [
         { kind: "HEAL", scaleStat: "def", healRate: 1.2 },
         { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+      ],
+    },
+  ],
+};
+
+/**
+ * 装備ダンジョン専用のオリジナルお供「古代の呪晶」。古代のクリスタルとは対照的に、
+ * 支援よりもデバフ・全体攻撃で敵(プレイヤー側)を弱らせることを優先する攻撃寄りのお供
+ * (ステータスは古代のクリスタルより攻撃力を高く、防御力・効果抵抗率を低めにしてある)。
+ */
+export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
+  templateId: "ancient_crystal_curse",
+  baseName: "古代の呪晶",
+  emoji: "💀",
+  role: "デバッファー",
+  baseStats: {
+    hp: 1150,
+    atk: 130,
+    def: 75,
+    spd: 100,
+    criRate: 0.12,
+    criDmg: 1.5,
+    resistance: 0.15,
+    accuracy: 0.2,
+  },
+  skill1: {
+    id: "ancient_crystal_curse_s1",
+    name: "呪いの光弾",
+    description: "敵単体に攻撃力0.9倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 0.9 }],
+  },
+  skill2Variants: [
+    {
+      id: "ancient_crystal_curse_s2",
+      name: "呪縛の波動",
+      description: "敵全体に攻撃力0.9倍のダメージを与え、55%で攻撃力を大きく低下させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.9 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.55 },
+      ],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "ancient_crystal_curse_s3",
+      name: "破滅の呪詛",
+      description: "敵全体に攻撃力1.8倍のダメージを与え、50%で防御力を大きく低下させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.8 },
+        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.5 },
       ],
     },
   ],
@@ -939,9 +995,10 @@ export const REINCARNATION_PIG_DEX = createAllVariants(REINCARNATION_PIG);
 /** 経験ピッグの6属性色違いバリエーション(図鑑には含めるが、通常の召喚・ステージ抽選には出さない) */
 export const EXP_PIG_DEX = createAllVariants(EXP_PIG);
 
-/** 古代の魔人・古代のクリスタルの6属性色違いバリエーション(装備ダンジョン専用。召喚・図鑑表示には一切出さない) */
+/** 古代の魔人・古代のクリスタル・古代の呪晶の6属性色違いバリエーション(装備ダンジョン専用。召喚・図鑑表示には一切出さない) */
 export const ANCIENT_DEMON_DEX = createAllVariants(ANCIENT_DEMON);
 export const ANCIENT_CRYSTAL_DEX = createAllVariants(ANCIENT_CRYSTAL);
+export const ANCIENT_CRYSTAL_CURSE_DEX = createAllVariants(ANCIENT_CRYSTAL_CURSE);
 
 /** ガチャ限定の高レアモンスター(SR/SSR)図鑑。GRIFFON/DRAGON/SERAPH/NEMESISとも全6属性 */
 export const GACHA_EXCLUSIVE_DEX = [
@@ -959,6 +1016,7 @@ export const MONSTER_DEX = [
   ...EXP_PIG_DEX,
   ...ANCIENT_DEMON_DEX,
   ...ANCIENT_CRYSTAL_DEX,
+  ...ANCIENT_CRYSTAL_CURSE_DEX,
 ];
 
 /** モンスター図鑑UI表示用(転生ピッグは素材専用のため除外) */

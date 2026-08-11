@@ -69,7 +69,7 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
-  it("9・10階(最終関門)は専用のオリジナルボス「古代の魔人」+お供「古代のクリスタル」×2で固定される", () => {
+  it("9・10階(最終関門)は専用のオリジナルボス「古代の魔人」+お供「古代のクリスタル」「古代の呪晶」で固定される", () => {
     for (let floor = FINAL_BOSS_FLOOR_START; floor <= DUNGEON_FLOOR_COUNT; floor++) {
       const enemies = findDungeonFloor(floor)!.enemies;
       const boss = enemies.find((e) => e.isBoss)!;
@@ -78,8 +78,9 @@ describe("装備ダンジョン フロアデータ", () => {
       expect(boss.star).toBe(6);
       expect(boss.level).toBe(60);
       expect(companions).toHaveLength(2);
+      const companionTemplateIds = companions.map((c) => c.templateId).sort();
+      expect(companionTemplateIds).toEqual(["ancient_crystal", "ancient_crystal_curse"]);
       for (const companion of companions) {
-        expect(companion.templateId).toBe("ancient_crystal");
         expect(companion.star).toBe(5);
         expect(companion.level).toBe(50);
       }
