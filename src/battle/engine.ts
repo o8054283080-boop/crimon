@@ -149,7 +149,8 @@ export class BattleEngine {
     const aliveUnits = this.units.filter((u) => u.alive);
     const speeds = aliveUnits.map((u) => Math.max(1, getEffectiveStat(u, "spd")));
     const ticksToReady = aliveUnits.map((u, i) => (ATB_THRESHOLD - u.gauge) / speeds[i]);
-    const minTicks = Math.min(...ticksToReady);
+    // GAUGE効果などで既に閾値を超えているユニットがいても、他のユニットのゲージを巻き戻さない
+    const minTicks = Math.max(0, Math.min(...ticksToReady));
 
     aliveUnits.forEach((u, i) => {
       u.gauge += speeds[i] * minTicks;
@@ -382,6 +383,14 @@ export class BattleEngine {
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.burnTurns = Math.max(target.burnTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} は火傷を負った！ (${effect.durationTurns}ターン)`);
+          break;
+        }
+
+        case "GAUGE": {
+          if (!target.alive) break;
+          target.gauge = Math.max(0, target.gauge + effect.amount * ATB_THRESHOLD);
+          const verb = effect.amount >= 0 ? "進んだ" : "後退した";
+          this.push(`  → ${this.label(target)} の行動ゲージが${verb}！`);
           break;
         }
       }

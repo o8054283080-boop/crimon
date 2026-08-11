@@ -14,7 +14,7 @@ export interface DamageEffect {
   /** 命中回数 */
   hits?: number;
   /** 追加ダメージ: 自身のいずれかの能力値が高いほど、その能力値1につきこの倍率が上乗せされる */
-  scaleBonus?: { stat: "spd" | "def"; ratePerPoint: number };
+  scaleBonus?: { stat: "spd" | "def" | "hp"; ratePerPoint: number };
 }
 
 export interface HealEffect {
@@ -68,7 +68,21 @@ export interface BurnEffect {
   chance: number;
 }
 
-export type SkillEffect = DamageEffect | HealEffect | LifestealEffect | BuffEffect | DebuffEffect | StunEffect | BurnEffect;
+/** 行動ゲージ操作: 対象のATBゲージを即座に増減させる(例: 0.2で+20%進む) */
+export interface GaugeEffect {
+  kind: "GAUGE";
+  amount: number;
+}
+
+export type SkillEffect =
+  | DamageEffect
+  | HealEffect
+  | LifestealEffect
+  | BuffEffect
+  | DebuffEffect
+  | StunEffect
+  | BurnEffect
+  | GaugeEffect;
 
 export interface Skill {
   id: string;
@@ -150,6 +164,8 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
         return effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
       case "BURN":
         return { ...effect, chance: growChance(effect.chance, growth) };
+      case "GAUGE":
+        return { ...effect, amount: round3(effect.amount * growth) };
       default:
         return effect;
     }
@@ -166,6 +182,12 @@ export const BUFF_STAT_JA: Record<BuffStat, string> = {
   spd: "速度",
 };
 
+const SCALE_BONUS_STAT_JA: Record<"spd" | "def" | "hp", string> = {
+  spd: "速度",
+  def: "防御力",
+  hp: "最大HP",
+};
+
 function chanceSuffix(chance: number | undefined): string {
   return chance !== undefined ? `${Math.round(chance * 100)}%で` : "";
 }
@@ -175,7 +197,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
   switch (effect.kind) {
     case "DAMAGE": {
       const scaleText = effect.scaleBonus
-        ? `(自身の${BUFF_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
+        ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
         : "";
       return `ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}`;
     }
@@ -193,5 +215,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `${chanceSuffix(effect.chance)}スタン (${effect.durationTurns}ターン)`;
     case "BURN":
       return `${chanceSuffix(effect.chance)}火傷 (${effect.durationTurns}ターン、自身のターン終了時に自身の攻撃力分のダメージ)`;
+    case "GAUGE":
+      return `行動ゲージ+${Math.round(effect.amount * 100)}%`;
   }
 }

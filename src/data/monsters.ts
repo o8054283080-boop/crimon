@@ -163,13 +163,13 @@ const WOLF: MonsterTemplate = {
     },
     {
       id: "wolf_s3_c",
-      name: "ひっさつのキバ",
-      description: "敵単体に攻撃力1.8倍のダメージを与え、55%で防御力を大きく低下させる。",
-      target: "SINGLE_ENEMY",
+      name: "はやての号令",
+      description: "味方全体の行動ゲージを20%進め、防御力を2ターン大きく上昇させる。",
+      target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.8 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.55 },
+        { kind: "GAUGE", amount: 0.2 },
+        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 2 },
       ],
     },
   ],
@@ -272,11 +272,11 @@ const FAIRY: MonsterTemplate = {
   },
   skill1: {
     id: "fairy_s1",
-    name: "ちいさな祝福",
-    description: "味方単体のHPを最大HPの18%回復する。",
-    target: "SINGLE_ALLY",
+    name: "ちいさな一撃",
+    description: "敵単体に攻撃力1.2倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "HEAL", healRate: 0.18 }],
+    effects: [{ kind: "DAMAGE", multiplier: 1.2 }],
   },
   skill2Variants: [
     {
@@ -492,13 +492,10 @@ const DRAGON: MonsterTemplate = {
     {
       id: "dragon_s3_a",
       name: "破滅の咆哮",
-      description: "敵全体に攻撃力1.8倍のダメージを与え、40%で攻撃力を大きく低下させる。",
+      description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.8 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.4 },
-      ],
+      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
     },
     {
       id: "dragon_s3_b",
@@ -513,13 +510,14 @@ const DRAGON: MonsterTemplate = {
     },
     {
       id: "dragon_s3_c",
-      name: "古龍の守り",
-      description: "自身の防御力に応じてHPを回復し、防御力を大きく上昇させる。",
-      target: "SELF",
+      name: "古龍の加護",
+      description: "味方全体の攻撃力・防御力を3ターン大きく上昇させ、自身の防御力の150%のHPを回復する。",
+      target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "HEAL", scaleStat: "def", healRate: 1.8 },
+        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 },
         { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+        { kind: "HEAL", scaleStat: "def", healRate: 1.5 },
       ],
     },
   ],
@@ -666,22 +664,22 @@ const NEMESIS: MonsterTemplate = {
     {
       id: "nemesis_s2_c",
       name: "血のいけにえ",
-      description: "敵単体に攻撃力1.2倍のダメージを2回与える。",
+      description: "敵単体に攻撃力1.2倍のダメージを2回与える。自身の防御力が高いほど威力が上がる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2 }],
+      effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2, scaleBonus: { stat: "def", ratePerPoint: 0.003 } }],
     },
   ],
   skill3Variants: [
     {
       id: "nemesis_s3_a",
       name: "終焉の一撃",
-      description: "渾身の一撃(3.9倍)を叩き込み、30%で相手をスタンさせる。自身の防御力が高いほど威力が上がる。",
+      description: "渾身の一撃(3.9倍)を叩き込み、70%で相手をスタンさせる。自身の防御力が高いほど威力が上がる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 3.9, scaleBonus: { stat: "def", ratePerPoint: 0.003 } },
-        { kind: "STUN", durationTurns: 1, chance: 0.3 },
+        { kind: "STUN", durationTurns: 1, chance: 0.7 },
       ],
     },
     {
@@ -697,13 +695,13 @@ const NEMESIS: MonsterTemplate = {
     },
     {
       id: "nemesis_s3_c",
-      name: "不死なる魂",
-      description: "自身の攻撃力に応じてHPを回復し、攻撃力を大きく上昇させる。",
-      target: "SELF",
+      name: "加速の号令",
+      description: "味方全体の行動ゲージを30%進め、スピードを2ターン上昇させる。",
+      target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "HEAL", scaleStat: "atk", healRate: 1.0 },
-        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 },
+        { kind: "GAUGE", amount: 0.3 },
+        { kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 2 },
       ],
     },
   ],
