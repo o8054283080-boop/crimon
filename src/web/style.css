@@ -354,6 +354,18 @@ body {
   color: #e67e22;
 }
 
+.unit-badge--poison {
+  color: #9b59b6;
+}
+
+.unit-badge--shield {
+  color: #3498db;
+}
+
+.unit-badge--immune {
+  color: #f4d35e;
+}
+
 .floating-number {
   position: absolute;
   top: -4px;

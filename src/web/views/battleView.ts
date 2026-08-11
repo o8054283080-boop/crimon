@@ -33,7 +33,7 @@ interface UnitTokenRefs {
   badges: HTMLElement;
 }
 
-const STAT_ICON: Record<BuffStat, string> = { atk: "⚔", def: "🛡", spd: "💨" };
+const STAT_ICON: Record<BuffStat, string> = { atk: "⚔", def: "🛡", spd: "💨", criRate: "🎯", criDmg: "💥" };
 
 function buildBadge(effect: ActiveEffect): HTMLElement {
   const isBuff = effect.kind === "BUFF";
@@ -67,6 +67,38 @@ function buildBadgesRow(snapshot: UnitSnapshot): HTMLElement[] {
       el("span", { className: "unit-badge unit-badge--burn", title: `火傷(残り${snapshot.burnTurns}ターン)` }, [
         el("span", { className: "unit-badge__icon" }, ["🔥"]),
         el("span", { className: "unit-badge__turns" }, [String(snapshot.burnTurns)]),
+      ]),
+    );
+  }
+  if (snapshot.poisonStacks > 0) {
+    badges.push(
+      el(
+        "span",
+        {
+          className: "unit-badge unit-badge--poison",
+          title: `毒 ${snapshot.poisonStacks}スタック(残り${snapshot.poisonTurns}ターン)`,
+        },
+        [
+          el("span", { className: "unit-badge__icon" }, ["☠"]),
+          el("span", { className: "unit-badge__turns" }, [`${snapshot.poisonStacks}/${snapshot.poisonTurns}`]),
+        ],
+      ),
+    );
+  }
+  if (snapshot.shieldValue > 0) {
+    badges.push(
+      el(
+        "span",
+        { className: "unit-badge unit-badge--shield", title: `シールド ${snapshot.shieldValue}(残り${snapshot.shieldTurns}ターン)` },
+        [el("span", { className: "unit-badge__icon" }, ["🔵"]), el("span", { className: "unit-badge__turns" }, [String(snapshot.shieldTurns)])],
+      ),
+    );
+  }
+  if (snapshot.immuneTurns > 0) {
+    badges.push(
+      el("span", { className: "unit-badge unit-badge--immune", title: `状態異常免疫(残り${snapshot.immuneTurns}ターン)` }, [
+        el("span", { className: "unit-badge__icon" }, ["✨"]),
+        el("span", { className: "unit-badge__turns" }, [String(snapshot.immuneTurns)]),
       ]),
     );
   }

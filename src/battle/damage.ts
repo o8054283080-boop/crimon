@@ -27,14 +27,14 @@ export function calcDamage(
     : 0;
   const scaleBonus = effect.scaleBonus ? effect.scaleBonus.ratePerPoint * scaleBonusStatValue : 0;
   const base = atk * (effect.multiplier + scaleBonus);
-  const mitigation = def / (def + DEFENSE_SOFTENING_CONSTANT);
+  const mitigation = effect.ignoreDefense ? 0 : def / (def + DEFENSE_SOFTENING_CONSTANT);
   const afterDefense = base * (1 - mitigation);
 
   const affinity = getElementAffinity(attacker.def.element, defender.def.element);
   const elementMultiplier = getElementMultiplier(attacker.def.element, defender.def.element);
 
-  const isCrit = rng() < attacker.def.stats.criRate;
-  const critMultiplier = isCrit ? attacker.def.stats.criDmg : 1;
+  const isCrit = rng() < getEffectiveStat(attacker, "criRate");
+  const critMultiplier = isCrit ? getEffectiveStat(attacker, "criDmg") : 1;
 
   const dealtMultiplier = attacker.def.combatMods?.damageDealtMultiplier ?? 1;
   const takenMultiplier = defender.def.combatMods?.damageTakenMultiplier ?? 1;
