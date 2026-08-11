@@ -77,6 +77,7 @@ const VERTEX = /* glsl */ `
 varying vec3 vNormalW;
 varying vec3 vViewDir;
 varying vec3 vLocal;
+varying vec3 vWorld;
 varying float vWorldY;
 
 void main() {
@@ -84,6 +85,9 @@ void main() {
   vec4 worldPosition = modelMatrix * vec4(position, 1.0);
   vNormalW = normalize(mat3(modelMatrix) * normal);
   vViewDir = normalize(cameraPosition - worldPosition.xyz);
+  // 模様はワールド座標基準で描く。パーツごとに大きさが違っても
+  // 鱗や筋の粗さが揃い、1体の生き物として見える
+  vWorld = worldPosition.xyz;
   vWorldY = worldPosition.y;
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }
@@ -111,9 +115,28 @@ uniform float uHeight;
 varying vec3 vNormalW;
 varying vec3 vViewDir;
 varying vec3 vLocal;
+varying vec3 vWorld;
 varying float vWorldY;
 
 ${SIMPLEX_NOISE_3D}
+
+/**
+ * 鱗。格子状のセルごとに濃淡を変え、境目をわずかに暗く落とす。
+ * テクスチャを持たずに「一枚の皮ではない」情報量を出すのが狙い。
+ */
+float scalePattern(vec3 p) {
+  vec3 q = p * 16.0;
+  vec3 cell = floor(q);
+  vec3 f = fract(q) - 0.5;
+  float tone = snoise(cell * 1.7) * 0.5 + 0.5;
+  float edge = smoothstep(0.34, 0.5, max(abs(f.x), max(abs(f.y), abs(f.z))));
+  return mix(tone, 0.25, edge);
+}
+
+/** 磨いた金属の筋。一方向へ細長く伸ばしたノイズ */
+float brushedStreak(vec3 p) {
+  return snoise(vec3(p.x * 42.0, p.y * 3.5, p.z * 42.0)) * 0.5 + 0.5;
+}
 
 const vec3 KEY_DIR = vec3(0.401, 0.802, 0.442);
 const vec3 FILL_DIR = vec3(-0.771, 0.482, 0.417);
@@ -145,8 +168,36 @@ void main() {
   // 半球光(上は青空、下は床の紫)で暗部が潰れないようにする
   vec3 ambient = mix(vec3(0.10, 0.08, 0.13), vec3(0.20, 0.23, 0.36), normal.y * 0.5 + 0.5);
 
-  vec3 color = uColor * (ambient + ramp(key) * 1.05);
-  color += uColor * vec3(0.38, 0.48, 1.0) * fill * 0.30;
+  // --- 体表のディテール ---------------------------------------------
+  // 単色のままだとプラスチックの人形に見えるため、色ムラ・ざらつき・
+  // 接地側の落ち込みを重ねて情報量を作る。すべて手続き的に計算しており
+  // テクスチャ画像は使わない。
+  float blotch = snoise(vWorld * 5.5) * 0.5 + 0.5;
+  float grain = snoise(vWorld * 26.0) * 0.5 + 0.5;
+  // 体の下ほど暗くして、光が上から回っている感じと接地感を出す
+  float height01 = clamp(vWorldY / max(0.6, uHeight), 0.0, 1.0);
+
+  vec3 albedo = uColor;
+  albedo *= 0.84 + blotch * 0.32;
+  albedo *= 0.93 + grain * 0.14;
+  albedo *= 0.74 + height01 * 0.38;
+
+  #ifdef SCALES
+    // 皮膚は鱗状に。境目が落ちることでパーツの丸みも読み取りやすくなる
+    albedo *= 0.78 + scalePattern(vWorld) * 0.44;
+  #endif
+
+  #ifdef STREAKS
+    // 角・装甲は研いだ金属のような細い筋を走らせる
+    albedo *= 0.88 + brushedStreak(vWorld) * 0.24;
+  #endif
+
+  // 窪みの擬似的な陰り。大きなムラの暗い側をさらに沈めて締める
+  float occlusion = 0.82 + smoothstep(0.15, 0.6, blotch) * 0.18;
+  albedo *= occlusion;
+
+  vec3 color = albedo * (ambient + ramp(key) * 1.05);
+  color += albedo * vec3(0.38, 0.48, 1.0) * fill * 0.30;
   // 背後のリムライト(ステージのピンクライト)。暗い背景から輪郭を切り離す主役
   color += vec3(1.0, 0.48, 0.85) * pow(back, 1.6) * 0.42;
   color += uRim * fresnel * uRimStrength * (1.0 + uActive * 1.5);
@@ -159,7 +210,7 @@ void main() {
   #ifdef TRANSLUCENT
     // 薄い膜。正面から見ると濃く、縁と逆光で明るく抜ける
     float thin = pow(1.0 - facing, 1.4);
-    color = uColor * (0.34 + ramp(key) * 0.5) + uRim * thin * 0.9;
+    color = albedo * (0.34 + ramp(key) * 0.5) + uRim * thin * 0.9;
     color += uGlow * pow(max(dot(-normal, KEY_DIR), 0.0), 2.0) * 0.35;
     alpha = uOpacity * (0.72 + thin * 0.28);
   #endif
@@ -203,7 +254,7 @@ interface StyleConfig {
 
 const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   hide: {
-    defines: {},
+    defines: { SCALES: "" },
     rimStrength: 0.55,
     emissive: 0,
     opacity: 1,
@@ -213,7 +264,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: true,
   },
   plate: {
-    defines: { SPECULAR: "" },
+    defines: { SPECULAR: "", STREAKS: "" },
     rimStrength: 0.75,
     emissive: 0,
     opacity: 1,
