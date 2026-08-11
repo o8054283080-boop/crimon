@@ -12,6 +12,8 @@ export interface PlayerState {
   clearedStageIds: string[];
   /** クリア済みの装備ダンジョン階層(初回クリア判定・ダイヤ報酬用) */
   clearedDungeonFloors: number[];
+  /** クリア済みのレベル上げダンジョン難易度(初回クリア判定・ダイヤ報酬用) */
+  clearedLevelDungeonTiers: string[];
   equipment: Equipment[];
   /** 装備ダンジョン専用のパーティ編成(通常ステージのpartyIdsとは別枠、最大5体) */
   dungeonPartyIds: string[];
@@ -50,6 +52,7 @@ export function createInitialState(): PlayerState {
     partyIds: monsters.map((m) => m.id),
     clearedStageIds: [],
     clearedDungeonFloors: [],
+    clearedLevelDungeonTiers: [],
     equipment: [],
     dungeonPartyIds: [],
     summonScrolls: 0,
@@ -84,6 +87,7 @@ function normalizeState(state: PlayerState): PlayerState {
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];
+  if (!state.clearedLevelDungeonTiers) state.clearedLevelDungeonTiers = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
   if (typeof state.fighterExp !== "number") state.fighterExp = 0;
@@ -171,6 +175,16 @@ export function isDungeonFloorCleared(state: PlayerState, floor: number): boolea
 export function markDungeonFloorCleared(state: PlayerState, floor: number): void {
   if (!state.clearedDungeonFloors.includes(floor)) {
     state.clearedDungeonFloors.push(floor);
+  }
+}
+
+export function isLevelDungeonTierCleared(state: PlayerState, tier: string): boolean {
+  return state.clearedLevelDungeonTiers.includes(tier);
+}
+
+export function markLevelDungeonTierCleared(state: PlayerState, tier: string): void {
+  if (!state.clearedLevelDungeonTiers.includes(tier)) {
+    state.clearedLevelDungeonTiers.push(tier);
   }
 }
 

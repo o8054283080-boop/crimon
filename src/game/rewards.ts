@@ -1,9 +1,10 @@
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
-import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
+import { DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { Equipment } from "../core/equipment.js";
 import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
-import { findMonsterById } from "../data/monsters.js";
+import { LevelDungeonDef } from "../data/levelDungeon.js";
+import { EXP_PIG_DEX, findMonsterById } from "../data/monsters.js";
 import { Difficulty, Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
 import {
   FIRST_CLEAR_CRYSTAL_REWARD,
@@ -13,8 +14,10 @@ import {
   addMonster,
   addSummonScrolls,
   isDungeonFloorCleared,
+  isLevelDungeonTierCleared,
   isStageCleared,
   markDungeonFloorCleared,
+  markLevelDungeonTierCleared,
   markStageCleared,
 } from "./playerState.js";
 
@@ -136,6 +139,49 @@ export function applyDungeonClearRewards(state: PlayerState, floor: DungeonFloor
     equipmentDrop,
     pigDrop,
     summonScrollDropped,
+    fighterLevelsGained,
+  };
+}
+
+/**
+ * レベル上げダンジョンクリア時の報酬をまとめて付与する。装備ダンジョンと異なり装備ドロップはなく、
+ * 代わりに経験値そのものが大きく、経験ピッグ(経験値フィード専用モンスター)を確定で入手できる。
+ * ダイヤは初回クリアなら200、既にクリア済みの難易度なら消費スタミナと同量。
+ */
+export function applyLevelDungeonClearRewards(
+  state: PlayerState,
+  def: LevelDungeonDef,
+  partyInstances: MonsterInstance[],
+  rng: () => number = Math.random,
+): ClearRewardResult {
+  const isFirstClear = !isLevelDungeonTierCleared(state, def.tier);
+  markLevelDungeonTierCleared(state, def.tier);
+
+  const expTotal = def.expReward;
+  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+
+  const goldEarned = def.goldReward;
+  const crystalEarned = isFirstClear ? FIRST_CLEAR_CRYSTAL_REWARD : LEVEL_DUNGEON_STAMINA_COST;
+
+  const pigVariant = EXP_PIG_DEX[Math.floor(rng() * EXP_PIG_DEX.length)];
+  const pigDrop: StageDrop = { dexId: pigVariant.id, star: def.pigStar };
+  addMonster(state, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);
+
+  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+
+  state.gold += goldEarned;
+  state.crystal += crystalEarned;
+
+  return {
+    goldEarned,
+    crystalEarned,
+    expTotal,
+    levelUps,
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop,
+    summonScrollDropped: false,
     fighterLevelsGained,
   };
 }

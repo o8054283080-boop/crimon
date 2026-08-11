@@ -19,7 +19,7 @@ export interface MonstersProps {
   onConfirmRankUp: () => void;
   onCancelRankUp: () => void;
   onSelectSlot: (monsterId: string, slot: EquipSlot) => void;
-  onUnequipSlot: (monsterId: string, slot: EquipSlot) => void;
+  onViewEquippedSlot: (equipmentId: string) => void;
   onGoMonsterTraining: (monsterId: string) => void;
   onGoMonsterDex: () => void;
 }
@@ -75,7 +75,7 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
         {
           type: "button",
           className: "equip-slot equip-slot--filled",
-          onclick: () => props.onUnequipSlot(instance.id, slot),
+          onclick: () => props.onViewEquippedSlot(equipment.id),
         },
         [
           el("div", { className: "equip-slot__label" }, [`S${slot}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),

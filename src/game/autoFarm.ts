@@ -1,10 +1,11 @@
 import { BattleEngine } from "../battle/engine.js";
-import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
+import { DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { DungeonFloor } from "../data/equipmentDungeon.js";
+import { LevelDungeonDef } from "../data/levelDungeon.js";
 import { Difficulty, Stage } from "../data/stages.js";
 import { setupDungeonBattle } from "./dungeonRunner.js";
 import { getDungeonParty, getParty, PlayerState, trySpendStamina } from "./playerState.js";
-import { ClearRewardResult, LevelUpInfo, applyDungeonClearRewards, applyStageClearRewards } from "./rewards.js";
+import { ClearRewardResult, LevelUpInfo, applyDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "./rewards.js";
 import { extractSurvivors, setupWaveBattle } from "./stageRunner.js";
 
 export type AutoFarmStopReason = "COMPLETED" | "STAMINA" | "DEFEAT" | "NO_PARTY";
@@ -163,6 +164,48 @@ export function runDungeonAutoFarm(
 
     if (battleResult.winner === "PLAYER") {
       const reward = applyDungeonClearRewards(state, floor, party);
+      mergeReward(result, reward, 0);
+      result.cleared += 1;
+    } else {
+      result.stopReason = "DEFEAT";
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * レベル上げダンジョンの指定難易度に指定回数まで自動で挑戦する(周回)。
+ * 装備ダンジョンと同じく単発バトル・持ち越しHPなしで、毎回全回復状態から挑む。
+ * 通常パーティ(パーティ編成画面の4体)を使う点が装備ダンジョン専用パーティと異なる。
+ */
+export function runLevelDungeonAutoFarm(
+  state: PlayerState,
+  def: LevelDungeonDef,
+  times: number,
+  rng: () => number = Math.random,
+): AutoFarmResult {
+  const result = emptyResult();
+
+  for (let i = 0; i < times; i++) {
+    const party = getParty(state);
+    if (party.length === 0) {
+      result.stopReason = "NO_PARTY";
+      break;
+    }
+    if (!trySpendStamina(state, LEVEL_DUNGEON_STAMINA_COST).ok) {
+      result.stopReason = "STAMINA";
+      break;
+    }
+    result.attempts += 1;
+
+    const setup = setupDungeonBattle(party, def, state.equipment);
+    const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
+    const battleResult = engine.run();
+
+    if (battleResult.winner === "PLAYER") {
+      const reward = applyLevelDungeonClearRewards(state, def, party, rng);
       mergeReward(result, reward, 0);
       result.cleared += 1;
     } else {
