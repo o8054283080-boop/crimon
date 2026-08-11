@@ -24,7 +24,7 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number): MonsterDe
   return {
     ...dex,
     id: `${dex.id}_dungeon`,
-    name: `${dex.name}★${enemy.star} Lv${enemy.level}`,
+    name: `${dex.name}★${enemy.star} Lv${enemy.level}${enemy.isBoss ? " 【BOSS】" : ""}`,
     stats,
   };
 }

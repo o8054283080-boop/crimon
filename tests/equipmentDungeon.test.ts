@@ -6,6 +6,10 @@ import {
   getDungeonFloorDropRates,
 } from "../src/core/equipment.js";
 import { EQUIPMENT_DUNGEON_FLOORS, findDungeonFloor } from "../src/data/equipmentDungeon.js";
+import { MONSTER_TEMPLATES } from "../src/data/monsters.js";
+
+const BOSS_TEMPLATE_IDS = ["griffon", "seraph", "dragon", "nemesis"];
+const COMPANION_TEMPLATE_IDS = MONSTER_TEMPLATES.map((t) => t.templateId);
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -31,6 +35,36 @@ describe("装備ダンジョン フロアデータ", () => {
       const enemies = findDungeonFloor(floor)!.enemies;
       const elements = new Set(enemies.map((e) => e.element));
       expect(elements.size).toBe(1);
+    }
+  });
+
+  it("各階層はボス1体+お供2体の3体編成になっている", () => {
+    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+      const enemies = findDungeonFloor(floor)!.enemies;
+      expect(enemies).toHaveLength(3);
+      const bosses = enemies.filter((e) => e.isBoss);
+      expect(bosses).toHaveLength(1);
+    }
+  });
+
+  it("ボスはガチャ限定の高レアモンスター(グリフォン/セラフ/ドラゴン/ネメシス)から選ばれ、星6・Lv60で登場する", () => {
+    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+      const boss = findDungeonFloor(floor)!.enemies.find((e) => e.isBoss)!;
+      expect(BOSS_TEMPLATE_IDS).toContain(boss.templateId);
+      expect(boss.star).toBe(6);
+      expect(boss.level).toBe(60);
+    }
+  });
+
+  it("お供は通常モンスター種から選ばれ、星5・Lv50でボスより格下の強さになっている", () => {
+    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+      const companions = findDungeonFloor(floor)!.enemies.filter((e) => !e.isBoss);
+      expect(companions).toHaveLength(2);
+      for (const companion of companions) {
+        expect(COMPANION_TEMPLATE_IDS).toContain(companion.templateId);
+        expect(companion.star).toBe(5);
+        expect(companion.level).toBe(50);
+      }
     }
   });
 
