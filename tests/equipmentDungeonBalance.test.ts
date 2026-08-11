@@ -81,6 +81,43 @@ function buildModestParty(): MonsterInstance[] {
   ];
 }
 
+/**
+ * ガチャ限定の高レア(SR/SSR)モンスターだけで組んだ、装備ダンジョン最終関門想定の編成。
+ * SR/SSRは通常モンスターよりベースステータス・専用スキルとも明確に強力なため、
+ * 通常モンスターだけの編成基準の数値だと最終関門があっさり突破されてしまう
+ * (実際に「通常モンスター+SR/SSR混成の5体編成でオート周回したら10階があっさり倒せた」
+ * というバランス報告を受けて、SR/SSRを軸にした編成を基準に9・10階を再調整した)。
+ */
+function buildSrSsrParty(state: PlayerState, eqStar: EquipStar, subStatCount: number, rng: () => number): MonsterInstance[] {
+  const party = [
+    createMonsterInstance("griffon_GRASS", 5, 50),
+    createMonsterInstance("dragon_FIRE", 5, 50),
+    createMonsterInstance("seraph_WATER", 5, 50),
+    createMonsterInstance("nemesis_ELECTRIC", 5, 50),
+    createMonsterInstance("griffon_WATER", 5, 50),
+  ];
+  state.monsters = party;
+  for (const m of party) equipFullLoadout(state, m.id, eqStar, subStatCount, rng);
+  return party;
+}
+
+/**
+ * 実際のバランス報告にあった編成(通常モンスター1体+SR/SSR4体、レベル・装備の質もばらつきあり)を
+ * 模した、まだ最終関門には届いていない現実的な編成。
+ */
+function buildReportedMixedParty(state: PlayerState, eqStar: EquipStar, subStatCount: number, rng: () => number): MonsterInstance[] {
+  const party = [
+    createMonsterInstance("fairy_GRASS", 5, 50),
+    createMonsterInstance("nemesis_DARK", 5, 50),
+    createMonsterInstance("seraph_DARK", 5, 45),
+    createMonsterInstance("griffon_GRASS", 5, 50),
+    createMonsterInstance("seraph_LIGHT", 5, 35),
+  ];
+  state.monsters = party;
+  for (const m of party) equipFullLoadout(state, m.id, eqStar, subStatCount, rng);
+  return party;
+}
+
 describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで挑める、9・10階は星6装備クラスをフルで固めてようやく突破できる最終関門)", () => {
   it("星1Lv1の未装備パーティは1階にほとんど勝てない(最低限の育成は必要)", () => {
     const rate = winRate(1, 1, 1, null, 0, 60);
@@ -103,23 +140,53 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
    * 4体基準のまま難易度を据え置くと、5体目の分だけ想定より簡単に突破できてしまう
    * (実際に「5体目込みでオート周回したら10階があっさり倒せた」というバランス報告を受けて調整)。
    */
-  it("10階は星5装備クラス(5体編成)ではほぼ勝てず、星6装備でもサブ2個程度ではまだ厳しい(最終関門)", () => {
-    const star5Rate = winRate(10, 5, 50, 5, 2, 150, MAX_DUNGEON_PARTY_SIZE);
-    const star6Rate = winRate(10, 5, 50, 6, 2, 150, MAX_DUNGEON_PARTY_SIZE);
-    expect(star5Rate).toBeLessThan(0.15);
-    expect(star6Rate).toBeGreaterThan(star5Rate);
-    expect(star6Rate).toBeLessThan(0.35);
+  it("10階は通常モンスターだけの編成(5体)だと、装備が星6サブ4個フルでもほぼ勝てない(SR/SSRが前提の最終関門)", () => {
+    const rate = winRate(10, 5, 50, 6, 4, 100, MAX_DUNGEON_PARTY_SIZE);
+    expect(rate).toBeLessThan(0.15);
   });
 
-  it("10階は星6装備をサブ4個までフルで固めれば(5体編成)しっかり突破できるようになる", () => {
-    const rate = winRate(10, 5, 50, 6, 4, 150, MAX_DUNGEON_PARTY_SIZE);
-    expect(rate).toBeGreaterThan(0.75);
+  it("10階はSR/SSRを軸にした編成でも、装備がサブ2個程度ではまだ厳しい", () => {
+    let wins = 0;
+    const trials = 150;
+    for (let i = 0; i < trials; i++) {
+      const rng = mulberry32(1500 + i);
+      const state = createInitialState();
+      const party = buildSrSsrParty(state, 6, 2, rng);
+      const setup = setupDungeonBattle(party, EQUIPMENT_DUNGEON_FLOORS[9], state.equipment);
+      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
+      if (engine.run().winner === "PLAYER") wins += 1;
+    }
+    expect(wins / trials).toBeLessThan(0.35);
   });
 
-  it("9階は10階ほど厳しくなく、星5装備クラス(5体編成)でも十分勝機があるが、確実ではない", () => {
-    const rate = winRate(9, 5, 50, 5, 2, 150, MAX_DUNGEON_PARTY_SIZE);
-    expect(rate).toBeGreaterThan(0.5);
-    expect(rate).toBeLessThan(0.95);
+  it("10階はSR/SSRを星6装備サブ4個までフルで固めれば安定して突破できるようになる(真の最終到達点)", () => {
+    let wins = 0;
+    const trials = 150;
+    for (let i = 0; i < trials; i++) {
+      const rng = mulberry32(2500 + i);
+      const state = createInitialState();
+      const party = buildSrSsrParty(state, 6, 4, rng);
+      const setup = setupDungeonBattle(party, EQUIPMENT_DUNGEON_FLOORS[9], state.equipment);
+      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
+      if (engine.run().winner === "PLAYER") wins += 1;
+    }
+    expect(wins / trials).toBeGreaterThan(0.75);
+  });
+
+  it("9階は10階ほど厳しくなく、SR/SSR軸の編成なら十分勝機があるが、通常モンスターだけではまだ厳しい", () => {
+    let srSsrWins = 0;
+    let genericWins = 0;
+    const trials = 150;
+    for (let i = 0; i < trials; i++) {
+      const rng = mulberry32(3500 + i);
+      const srSsrState = createInitialState();
+      const srSsrParty = buildSrSsrParty(srSsrState, 6, 2, rng);
+      const srSsrSetup = setupDungeonBattle(srSsrParty, EQUIPMENT_DUNGEON_FLOORS[8], srSsrState.equipment);
+      if (new BattleEngine(srSsrSetup.playerDefs, srSsrSetup.enemyDefs, { rng }).run().winner === "PLAYER") srSsrWins += 1;
+    }
+    const genericRate = winRate(9, 5, 50, 5, 2, 100, MAX_DUNGEON_PARTY_SIZE);
+    expect(srSsrWins / trials).toBeGreaterThan(0.5);
+    expect(genericRate).toBeLessThan(0.15);
   });
 
   it("育成途中で1体だけそこそこ強いモンスターがいる程度の編成(5体)では、10階にはほぼ勝てない(バランス報告の回帰テスト)", () => {
@@ -133,6 +200,20 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
       if (engine.run().winner === "PLAYER") wins += 1;
     }
     expect(wins / trials).toBeLessThan(0.1);
+  });
+
+  it("バランス報告と同様の編成(通常1体+SR/SSR4体、装備サブ2個程度)では、10階にはほぼ勝てない(回帰テスト)", () => {
+    let wins = 0;
+    const trials = 100;
+    for (let i = 0; i < trials; i++) {
+      const rng = mulberry32(4500 + i);
+      const state = createInitialState();
+      const party = buildReportedMixedParty(state, 6, 2, rng);
+      const setup = setupDungeonBattle(party, EQUIPMENT_DUNGEON_FLOORS[9], state.equipment);
+      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
+      if (engine.run().winner === "PLAYER") wins += 1;
+    }
+    expect(wins / trials).toBeLessThan(0.2);
   });
 
   it("同じ星4装備フル装備でも、10階は1階よりはっきり難しい", () => {
