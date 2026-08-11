@@ -53,12 +53,21 @@ export interface BattleEngineOptions {
   initialPlayerHp?: number[];
 }
 
+/** 手動操作時にプレイヤーが選んだ行動。省略された場合はAIが代わりに決める */
+export interface ManualChoice {
+  skillIndex: 0 | 1 | 2;
+  /** SINGLE_ENEMY/SINGLE_ALLYスキルの対象instanceId。それ以外の対象タイプでは無視される */
+  targetId?: string;
+}
+
 export class BattleEngine {
   private readonly units: BattleUnit[];
   private readonly rng: () => number;
   private readonly maxTurns: number;
   private readonly log: string[] = [];
   private readonly turns: TurnRecord[] = [];
+  /** getNextActor()/resolveTurn()による手動進行専用のキュー。run()は使わない */
+  private interactiveQueue: BattleUnit[] = [];
 
   constructor(playerTeam: MonsterDefinition[], enemyTeam: MonsterDefinition[], options: BattleEngineOptions = {}) {
     if (playerTeam.length === 0 || enemyTeam.length === 0) {
@@ -89,18 +98,7 @@ export class BattleEngine {
         return { winner, log: this.log, turnsTaken, turns: this.turns };
       }
 
-      const aliveUnits = this.units.filter((u) => u.alive);
-      const speeds = aliveUnits.map((u) => Math.max(1, getEffectiveStat(u, "spd")));
-      const ticksToReady = aliveUnits.map((u, i) => (ATB_THRESHOLD - u.gauge) / speeds[i]);
-      const minTicks = Math.min(...ticksToReady);
-
-      aliveUnits.forEach((u, i) => {
-        u.gauge += speeds[i] * minTicks;
-      });
-
-      const actingUnits = aliveUnits
-        .filter((u) => u.gauge >= ATB_THRESHOLD - GAUGE_EPSILON)
-        .sort((a, b) => b.gauge - a.gauge || getEffectiveStat(b, "spd") - getEffectiveStat(a, "spd"));
+      const actingUnits = this.advanceGaugesToNextBatch();
 
       for (const unit of actingUnits) {
         if (!unit.alive) continue;
@@ -127,6 +125,63 @@ export class BattleEngine {
     return { winner: this.checkWinner() ?? "DRAW", log: this.log, turnsTaken, turns: this.turns };
   }
 
+  /** 生存ユニットのATBゲージを、次に誰かが行動可能になるまで進め、行動可能になったユニット(行動順)を返す */
+  private advanceGaugesToNextBatch(): BattleUnit[] {
+    const aliveUnits = this.units.filter((u) => u.alive);
+    const speeds = aliveUnits.map((u) => Math.max(1, getEffectiveStat(u, "spd")));
+    const ticksToReady = aliveUnits.map((u, i) => (ATB_THRESHOLD - u.gauge) / speeds[i]);
+    const minTicks = Math.min(...ticksToReady);
+
+    aliveUnits.forEach((u, i) => {
+      u.gauge += speeds[i] * minTicks;
+    });
+
+    return aliveUnits
+      .filter((u) => u.gauge >= ATB_THRESHOLD - GAUGE_EPSILON)
+      .sort((a, b) => b.gauge - a.gauge || getEffectiveStat(b, "spd") - getEffectiveStat(a, "spd"));
+  }
+
+  /** 手動操作/ライブ進行用: 現在の勝敗を返す(未決着ならnull) */
+  getWinner(): BattleWinner | null {
+    return this.checkWinner();
+  }
+
+  /**
+   * 手動操作/ライブ進行用: 次に行動すべきユニットを返す(まだ行動は消費しない)。
+   * 内部で必要な分だけ全ユニットのATBゲージを進める。勝敗が既についていればnullを返す。
+   * 返されたユニットに対してresolveTurn()を呼ぶことで実際に行動を解決する。
+   */
+  getNextActor(): BattleUnit | null {
+    if (this.checkWinner()) return null;
+    for (;;) {
+      this.interactiveQueue = this.interactiveQueue.filter((u) => u.alive);
+      if (this.interactiveQueue.length > 0) return this.interactiveQueue[0];
+      if (this.checkWinner()) return null;
+      this.interactiveQueue = this.advanceGaugesToNextBatch();
+    }
+  }
+
+  /**
+   * 手動操作/ライブ進行用: 指定ユニットの手番を解決する。getNextActor()が返したユニットに対して呼ぶこと。
+   * choiceを渡すとその内容で行動する(指定したスキルがクールタイム中ならAIにフォールバックする)。
+   * choiceを省略した場合はAIが行動を決める(敵ユニットや、手動操作をしない時に使う)。
+   */
+  resolveTurn(unit: BattleUnit, choice?: ManualChoice): TurnRecord {
+    const idx = this.interactiveQueue.indexOf(unit);
+    if (idx >= 0) this.interactiveQueue.splice(idx, 1);
+    unit.gauge -= ATB_THRESHOLD;
+
+    const linesBefore = this.log.length;
+    this.takeTurn(unit, choice);
+    const record: TurnRecord = {
+      actorId: unit.instanceId,
+      lines: this.log.slice(linesBefore),
+      snapshot: this.snapshotUnits(),
+    };
+    this.turns.push(record);
+    return record;
+  }
+
   private snapshotUnits(): UnitSnapshot[] {
     return this.units.map((u) => ({
       instanceId: u.instanceId,
@@ -147,7 +202,7 @@ export class BattleEngine {
     return null;
   }
 
-  private takeTurn(unit: BattleUnit): void {
+  private takeTurn(unit: BattleUnit, choice?: ManualChoice): void {
     tickEffectsAtTurnStart(unit);
     tickCooldownsAtTurnStart(unit);
 
@@ -164,8 +219,22 @@ export class BattleEngine {
       return;
     }
 
-    const { skill, index } = chooseSkill(unit);
-    const targets = chooseTargets(unit, skill, this.units);
+    let skill: Skill;
+    let index: 0 | 1 | 2;
+    if (choice && unit.cooldowns[choice.skillIndex] === 0) {
+      skill = unit.def.skills[choice.skillIndex];
+      index = choice.skillIndex;
+    } else {
+      ({ skill, index } = chooseSkill(unit));
+    }
+
+    let targets: BattleUnit[];
+    if (choice?.targetId && (skill.target === "SINGLE_ENEMY" || skill.target === "SINGLE_ALLY")) {
+      const explicitTarget = this.units.find((u) => u.instanceId === choice.targetId && u.alive);
+      targets = explicitTarget ? [explicitTarget] : chooseTargets(unit, skill, this.units);
+    } else {
+      targets = chooseTargets(unit, skill, this.units);
+    }
     if (targets.length === 0) return;
 
     if (skill.cooldownTurns > 0) {

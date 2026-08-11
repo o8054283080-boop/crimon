@@ -166,44 +166,6 @@ body {
   overflow: hidden;
 }
 
-.turn-order {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-  position: relative;
-  z-index: 1;
-}
-
-.turn-order__token {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
-  background: var(--bg-alt);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
-  opacity: 0.55;
-  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-}
-
-.turn-order__token--player {
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-
-.turn-order__token--enemy {
-  box-shadow: inset 0 0 0 2px var(--hp-low);
-}
-
-.turn-order__token--active {
-  opacity: 1;
-  transform: scale(1.3);
-  box-shadow: 0 0 0 2px #fff, 0 0 10px 2px var(--gauge);
-}
-
 .battle-arena__team {
   display: flex;
   justify-content: center;
@@ -306,6 +268,102 @@ body {
   flex: 1;
   min-width: 120px;
   border-radius: 999px;
+}
+
+.battle-controls__finish {
+  width: 100%;
+}
+
+.battle-controls__finish--hidden {
+  display: none;
+}
+
+.action-panel {
+  background: var(--bg-alt);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.action-panel__title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.action-panel__skills,
+.action-panel__targets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-skill-btn {
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.action-skill-btn--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-skill-btn__name {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.action-skill-btn__meta {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.action-target-btn {
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-target-btn__avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.action-target-btn__name {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.action-target-btn__hp {
+  font-size: 0.72rem;
+  color: var(--text-dim);
 }
 
 .result-banner {
