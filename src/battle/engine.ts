@@ -216,9 +216,14 @@ export class BattleEngine {
     if (unit.stunTurns > 0) {
       unit.stunTurns -= 1;
       this.push(`${this.label(unit)} はスタン中で行動できない！`);
-      return;
+    } else {
+      this.act(unit, choice);
     }
 
+    this.applyBurnAtTurnEnd(unit);
+  }
+
+  private act(unit: BattleUnit, choice?: ManualChoice): void {
     let skill: Skill;
     let index: 0 | 1 | 2;
     if (choice && unit.cooldowns[choice.skillIndex] === 0) {
@@ -247,9 +252,23 @@ export class BattleEngine {
     }
   }
 
+  /** 火傷している場合、手番の最後(行動の有無・スタンの有無を問わず)に自分の攻撃力分のダメージを受ける */
+  private applyBurnAtTurnEnd(unit: BattleUnit): void {
+    if (unit.burnTurns <= 0 || !unit.alive) return;
+    unit.burnTurns -= 1;
+    const burnDamage = Math.max(1, getEffectiveStat(unit, "atk"));
+    applyDamage(unit, burnDamage);
+    this.push(`  → ${this.label(unit)} は火傷でダメージを受けた！ ${burnDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
+    if (!unit.alive) {
+      this.push(`  → ${this.label(unit)} は倒れた！`);
+    }
+  }
+
   private applySkillEffects(source: BattleUnit, target: BattleUnit, skill: Skill): void {
+    let damageDealtThisCall = 0;
+
     for (const effect of skill.effects) {
-      if (!target.alive && effect.kind !== "HEAL") continue;
+      if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL") continue;
 
       switch (effect.kind) {
         case "DAMAGE": {
@@ -257,6 +276,7 @@ export class BattleEngine {
           for (let h = 0; h < hits && target.alive; h += 1) {
             const result = calcDamage(source, target, effect, this.rng);
             applyDamage(target, result.damage);
+            damageDealtThisCall += result.damage;
             const critText = result.isCrit ? "会心の一撃！" : "";
             const affinityText =
               result.affinity === "ADVANTAGE" ? " 効果は抜群だ！" : result.affinity === "DISADVANTAGE" ? " 効果は今ひとつだ…" : "";
@@ -284,6 +304,15 @@ export class BattleEngine {
           break;
         }
 
+        case "LIFESTEAL": {
+          if (!source.alive || damageDealtThisCall <= 0) break;
+          const healAmount = Math.round(damageDealtThisCall * effect.healRate);
+          if (healAmount <= 0) break;
+          applyHeal(source, healAmount);
+          this.push(`  → ${this.label(source)} は与えたダメージの一部でHPが ${healAmount} 回復！ (${source.currentHp}/${source.maxHp})`);
+          break;
+        }
+
         case "BUFF": {
           target.effects.push({
             stat: effect.stat,
@@ -296,7 +325,7 @@ export class BattleEngine {
         }
 
         case "DEBUFF": {
-          if (this.rollStatusResist(source, target)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.effects.push({
             stat: effect.stat,
             amount: -effect.amount,
@@ -308,9 +337,16 @@ export class BattleEngine {
         }
 
         case "STUN": {
-          if (this.rollStatusResist(source, target)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.stunTurns = Math.max(target.stunTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} はスタンした！`);
+          break;
+        }
+
+        case "BURN": {
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          target.burnTurns = Math.max(target.burnTurns, effect.durationTurns);
+          this.push(`  → ${this.label(target)} は火傷を負った！ (${effect.durationTurns}ターン)`);
           break;
         }
       }
@@ -318,16 +354,23 @@ export class BattleEngine {
   }
 
   /**
-   * 状態異常の抵抗判定。相手の効果抵抗率から自分の効果命中率を差し引き、
+   * 状態異常(デバフ・スタン・火傷)の発動判定。まずスキル自体の発動確率(chance、省略時は必ず発動を試みる)を
+   * 判定し、成功したら続けて命中率/抵抗率による的中判定を行う。的中率は
+   * (1 - 相手の効果抵抗率 + 自分の効果命中率) / (1 + 自分の効果命中率) で求まり、
+   * 命中率を最大まで積んでも相手の抵抗率を完全には無効化できない(必ず一定の抵抗余地が残る)。
    * 的中シリーズ(4個セット)を装着していれば相手の抵抗率をさらに一部無視する。
    * 抵抗成功時、抵抗シリーズ(4個セット)を装着していればHPが回復する。
    */
-  private rollStatusResist(source: BattleUnit, target: BattleUnit): boolean {
+  private rollEffectSuccess(source: BattleUnit, target: BattleUnit, baseChance: number | undefined): boolean {
+    const procChance = baseChance ?? 1;
+    if (this.rng() >= procChance) return false;
+
     const ignoreRatio = source.def.combatMods?.ignoreResistancePercent ?? 0;
     const effectiveResistance = target.def.stats.resistance * (1 - ignoreRatio);
-    const resistChance = Math.max(0, Math.min(1, effectiveResistance - source.def.stats.accuracy));
+    const accuracy = source.def.stats.accuracy;
+    const hitChance = Math.max(0, Math.min(1, (1 - effectiveResistance + accuracy) / (1 + accuracy)));
 
-    if (this.rng() >= resistChance) return false;
+    if (this.rng() < hitChance) return true;
 
     this.push(`  → ${this.label(target)} は効果を抵抗した！`);
     const healOnResistPercent = target.def.combatMods?.healOnResistPercent ?? 0;
@@ -336,7 +379,7 @@ export class BattleEngine {
       applyHeal(target, healAmount);
       this.push(`  → ${this.label(target)} は抵抗シリーズの効果でHPが ${healAmount} 回復！ (${target.currentHp}/${target.maxHp})`);
     }
-    return true;
+    return false;
   }
 
   private label(unit: BattleUnit): string {

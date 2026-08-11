@@ -20,7 +20,8 @@ export function calcDamage(
   const atk = getEffectiveStat(attacker, "atk");
   const def = getEffectiveStat(defender, "def");
 
-  const base = atk * effect.multiplier;
+  const scaleBonus = effect.scaleBonus ? effect.scaleBonus.ratePerPoint * getEffectiveStat(attacker, effect.scaleBonus.stat) : 0;
+  const base = atk * (effect.multiplier + scaleBonus);
   const mitigation = def / (def + DEFENSE_SOFTENING_CONSTANT);
   const afterDefense = base * (1 - mitigation);
 

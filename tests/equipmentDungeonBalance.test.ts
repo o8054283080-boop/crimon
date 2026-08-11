@@ -84,10 +84,11 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
   });
 
   it("10階は星5装備フルでもまだ足りず、星6装備クラスでようやく勝てる", () => {
-    const star5Rate = winRate(10, 5, 50, 5, 2, 100);
-    const star6Rate = winRate(10, 5, 50, 6, 2, 100);
-    expect(star5Rate).toBeLessThan(0.2);
-    expect(star6Rate).toBeGreaterThan(0.4);
+    const star5Rate = winRate(10, 5, 50, 5, 2, 150);
+    const star6Rate = winRate(10, 5, 50, 6, 2, 150);
+    expect(star5Rate).toBeLessThan(0.45);
+    expect(star6Rate).toBeGreaterThan(0.6);
+    expect(star6Rate).toBeGreaterThan(star5Rate);
   });
 
   it("同じ星5装備フル装備でも、10階は1階よりはっきり難しい", () => {

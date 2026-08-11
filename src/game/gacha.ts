@@ -53,7 +53,12 @@ function pickTier(table: GachaTier[], rng: () => number): GachaTier {
   return table[table.length - 1];
 }
 
-/** 星・レア枠に応じて、実際に抽選対象となるモンスターのdexIdを決める */
+/**
+ * 星・レア枠に応じて、実際に抽選対象となるモンスターのdexIdを決める。
+ * 属性(色)は引き続き通常枠/レア枠(火水電草 or 光闇)で決まるが、星4/5のテンプレート自体は
+ * GRIFFON/DRAGON・SERAPH/NEMESISとも全属性に対応しているため、どちらが出るかは属性のレア度と
+ * 切り離してランダムに決める(同じ星4でも火グリフォンと火セラフの両方が出る)。
+ */
 function resolveDexId(tier: GachaTier, rng: () => number): string {
   const elements = tier.isRare ? RARE_ELEMENTS : NORMAL_ELEMENTS;
   const element = pick(elements, rng);
@@ -63,10 +68,10 @@ function resolveDexId(tier: GachaTier, rng: () => number): string {
     return `${template.templateId}_${element}`;
   }
   if (tier.star === 4) {
-    const template = tier.isRare ? GACHA_SR_RARE_TEMPLATE : GACHA_SR_COMMON_TEMPLATE;
+    const template = pick([GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE], rng);
     return `${template.templateId}_${element}`;
   }
-  const template = tier.isRare ? GACHA_SSR_RARE_TEMPLATE : GACHA_SSR_COMMON_TEMPLATE;
+  const template = pick([GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE], rng);
   return `${template.templateId}_${element}`;
 }
 

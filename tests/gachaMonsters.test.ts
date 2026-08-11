@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ELEMENTS } from "../src/core/element.js";
 import {
   GACHA_SR_COMMON_DEX,
   GACHA_SR_COMMON_TEMPLATE,
@@ -11,20 +12,14 @@ import {
   findMonster,
 } from "../src/data/monsters.js";
 
-describe("ガチャ限定モンスター(SR/SSR)のelements制限", () => {
-  it("通常枠(グリフォン・ドラゴン)は火水電草の4属性のみ生成される", () => {
-    expect(GACHA_SR_COMMON_DEX).toHaveLength(4);
-    expect(GACHA_SSR_COMMON_DEX).toHaveLength(4);
-    for (const dex of [...GACHA_SR_COMMON_DEX, ...GACHA_SSR_COMMON_DEX]) {
-      expect(["FIRE", "WATER", "ELECTRIC", "GRASS"]).toContain(dex.element);
-    }
-  });
-
-  it("レア枠(セラフ・ネメシス)は光闇の2属性のみ生成される", () => {
-    expect(GACHA_SR_RARE_DEX).toHaveLength(2);
-    expect(GACHA_SSR_RARE_DEX).toHaveLength(2);
-    for (const dex of [...GACHA_SR_RARE_DEX, ...GACHA_SSR_RARE_DEX]) {
-      expect(["LIGHT", "DARK"]).toContain(dex.element);
+describe("ガチャ限定モンスター(SR/SSR)の全属性対応", () => {
+  it("グリフォン・ドラゴン・セラフ・ネメシスはすべて全6属性で生成される", () => {
+    expect(GACHA_SR_COMMON_DEX).toHaveLength(ELEMENTS.length);
+    expect(GACHA_SSR_COMMON_DEX).toHaveLength(ELEMENTS.length);
+    expect(GACHA_SR_RARE_DEX).toHaveLength(ELEMENTS.length);
+    expect(GACHA_SSR_RARE_DEX).toHaveLength(ELEMENTS.length);
+    for (const dex of [...GACHA_SR_COMMON_DEX, ...GACHA_SSR_COMMON_DEX, ...GACHA_SR_RARE_DEX, ...GACHA_SSR_RARE_DEX]) {
+      expect(ELEMENTS).toContain(dex.element);
     }
   });
 
@@ -39,7 +34,7 @@ describe("ガチャ限定モンスター(SR/SSR)のelements制限", () => {
     expect(ssrRare.stats.atk).toBeGreaterThan(srRare.stats.atk);
   });
 
-  it("光闇専用モンスターは同格の通常枠モンスターよりステータスが高い(素の基礎値で比較)", () => {
+  it("セラフ/ネメシスは同格のグリフォン/ドラゴンよりステータスが高い(素の基礎値で比較)", () => {
     expect(GACHA_SR_RARE_TEMPLATE.baseStats.hp).toBeGreaterThan(GACHA_SR_COMMON_TEMPLATE.baseStats.hp);
     expect(GACHA_SSR_RARE_TEMPLATE.baseStats.atk).toBeGreaterThan(GACHA_SSR_COMMON_TEMPLATE.baseStats.atk);
   });
