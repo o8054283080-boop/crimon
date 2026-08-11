@@ -1,14 +1,18 @@
-import { BattleResult, UnitSnapshot } from "../../battle/engine.js";
+import { BattleEngine, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
+import { BattleUnit } from "../../battle/unit.js";
 import { MonsterDefinition } from "../../core/monster.js";
+import { describeSkillEffect } from "../../core/skill.js";
 import { el } from "../dom.js";
 
 export interface BattleViewProps {
-  result: BattleResult;
+  engine: BattleEngine;
   playerTeam: MonsterDefinition[];
   enemyTeam: MonsterDefinition[];
-  onBack: () => void;
-  backLabel?: string;
   title?: string;
+  /** 決着後に表示するボタンのラベル(勝敗によって文言を変えたい場合に使う) */
+  resultLabel: (winner: BattleWinner) => string;
+  /** 決着後、結果ボタンが押されたら呼ばれる */
+  onFinish: (winner: BattleWinner) => void;
 }
 
 export interface BattleViewHandle {
@@ -17,8 +21,6 @@ export interface BattleViewHandle {
 }
 
 const SPEED_INTERVAL_MS: Record<string, number> = { "1": 650, "2": 300, "4": 120 };
-/** 行動順プレビューに表示する人数(現在行動中を含む) */
-const TURN_PREVIEW_COUNT = 6;
 
 interface UnitTokenRefs {
   token: HTMLElement;
@@ -26,6 +28,11 @@ interface UnitTokenRefs {
   hpText: HTMLElement;
   gaugeFill: HTMLElement;
 }
+
+type PickerState =
+  | { phase: "NONE" }
+  | { phase: "SKILL"; unit: BattleUnit }
+  | { phase: "TARGET"; unit: BattleUnit; skillIndex: 0 | 1 | 2 };
 
 function buildTeamRow(
   team: MonsterDefinition[],
@@ -52,11 +59,14 @@ function buildTeamRow(
 }
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
-  const { result, playerTeam, enemyTeam, onBack, backLabel = "◀ 編成に戻る", title = "バトル観戦" } = props;
+  const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish } = props;
 
-  let index = 0;
-  let timer: ReturnType<typeof setInterval> | null = null;
+  let mode: "AUTO" | "MANUAL" = "AUTO";
+  let userPaused = false;
   let speed = "1";
+  let finished = false;
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  let picker: PickerState = { phase: "NONE" };
   let activeInstanceId: string | null = null;
 
   const unitRefs = new Map<string, UnitTokenRefs>();
@@ -67,21 +77,9 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const enemyRow = buildTeamRow(enemyTeam, (i) => `E${i + 1}`, "unit-token--enemy", unitRefs);
   const playerRow = buildTeamRow(playerTeam, (i) => `P${i + 1}`, "unit-token--player", unitRefs);
 
-  const turnOrderEl = el("div", { className: "turn-order" });
+  const actionPanelEl = el("div", { className: "action-panel-slot" });
   const logEl = el("div", { className: "battle-log" });
   const resultBanner = el("div", { className: "result-banner result-banner--hidden" });
-
-  function renderTurnOrder(fromIndex: number): void {
-    turnOrderEl.innerHTML = "";
-    const upcoming = result.turns.slice(fromIndex, fromIndex + TURN_PREVIEW_COUNT);
-    upcoming.forEach((record, i) => {
-      const def = defByInstanceId.get(record.actorId);
-      const isPlayer = record.actorId.startsWith("P");
-      const teamClass = isPlayer ? "turn-order__token--player" : "turn-order__token--enemy";
-      const activeClass = i === 0 ? " turn-order__token--active" : "";
-      turnOrderEl.append(el("div", { className: `turn-order__token ${teamClass}${activeClass}` }, [def ? def.emoji : "?"]));
-    });
-  }
 
   function setActive(instanceId: string | null): void {
     if (activeInstanceId) unitRefs.get(activeInstanceId)?.token.classList.remove("unit-token--active");
@@ -109,42 +107,193 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  function showResult(): void {
-    setActive(null);
-    resultBanner.classList.remove("result-banner--hidden");
-    resultBanner.textContent = "";
-    const text = result.winner === "PLAYER" ? "🎉 勝利！" : result.winner === "ENEMY" ? "💀 敗北…" : "🤝 引き分け";
-    resultBanner.append(el("div", { className: "result-banner__text" }, [text]));
-  }
-
-  function stepOnce(): boolean {
-    if (index >= result.turns.length) return false;
-    const record = result.turns[index];
-    renderTurnOrder(index);
+  function applyRecord(record: TurnRecord): void {
     setActive(record.actorId);
     appendLines(record.lines);
     applySnapshot(record.snapshot);
-    index += 1;
-    return true;
   }
 
-  function stop(): void {
-    if (timer !== null) {
-      clearInterval(timer);
-      timer = null;
+  function getTargetCandidates(unit: BattleUnit, skill: MonsterDefinition["skills"][number]): BattleUnit[] {
+    const allUnits = engine.getUnits();
+    if (skill.target === "SINGLE_ENEMY") return allUnits.filter((u) => u.team !== unit.team && u.alive);
+    if (skill.target === "SINGLE_ALLY") return allUnits.filter((u) => u.team === unit.team && u.alive);
+    return [];
+  }
+
+  function renderActionPanel(): void {
+    actionPanelEl.innerHTML = "";
+    if (picker.phase === "SKILL") {
+      const unit = picker.unit;
+      const def = unit.def;
+      actionPanelEl.append(
+        el("div", { className: "action-panel" }, [
+          el("div", { className: "action-panel__title" }, [`${def.name} の番です。スキルを選んでください`]),
+          el(
+            "div",
+            { className: "action-panel__skills" },
+            def.skills.map((skill, i) => {
+              const idx = i as 0 | 1 | 2;
+              const onCooldown = unit.cooldowns[idx] > 0;
+              const effectText = skill.effects.map((e) => describeSkillEffect(e)).join(" / ");
+              return el(
+                "button",
+                {
+                  type: "button",
+                  className: "action-skill-btn" + (onCooldown ? " action-skill-btn--disabled" : ""),
+                  disabled: onCooldown,
+                  onclick: () => handleSkillPicked(unit, idx, skill),
+                },
+                [
+                  el("div", { className: "action-skill-btn__name" }, [
+                    skill.name,
+                    onCooldown
+                      ? ` (CT残り${unit.cooldowns[idx]})`
+                      : skill.cooldownTurns > 0
+                        ? ` (CT ${skill.cooldownTurns}ターン)`
+                        : "",
+                  ]),
+                  el("div", { className: "action-skill-btn__meta" }, [effectText]),
+                ],
+              );
+            }),
+          ),
+        ]),
+      );
+    } else if (picker.phase === "TARGET") {
+      const { unit, skillIndex } = picker;
+      const skill = unit.def.skills[skillIndex];
+      const candidates = getTargetCandidates(unit, skill);
+      actionPanelEl.append(
+        el("div", { className: "action-panel" }, [
+          el("div", { className: "action-panel__title" }, [`「${skill.name}」の対象を選んでください`]),
+          el(
+            "div",
+            { className: "action-panel__targets" },
+            candidates.map((t) =>
+              el(
+                "button",
+                { type: "button", className: "action-target-btn", onclick: () => handleTargetPicked(unit, skillIndex, t.instanceId) },
+                [
+                  el("span", { className: "action-target-btn__avatar", style: `background:${t.def.color}` }, [t.def.emoji]),
+                  el("span", { className: "action-target-btn__name" }, [t.def.name]),
+                  el("span", { className: "action-target-btn__hp" }, [`${t.currentHp}/${t.maxHp}`]),
+                ],
+              ),
+            ),
+          ),
+          el(
+            "button",
+            {
+              type: "button",
+              className: "btn btn--ghost",
+              onclick: () => {
+                picker = { phase: "SKILL", unit };
+                renderActionPanel();
+              },
+            },
+            ["◀ スキル選び直し"],
+          ),
+        ]),
+      );
     }
   }
 
-  function play(): void {
-    stop();
-    timer = setInterval(() => {
-      if (!stepOnce()) {
-        stop();
-        showResult();
-        playPauseBtn.textContent = "▶ 再生";
-      }
+  function handleSkillPicked(unit: BattleUnit, skillIndex: 0 | 1 | 2, skill: MonsterDefinition["skills"][number]): void {
+    if (skill.target === "SINGLE_ENEMY" || skill.target === "SINGLE_ALLY") {
+      picker = { phase: "TARGET", unit, skillIndex };
+      renderActionPanel();
+    } else {
+      submitChoice(unit, { skillIndex });
+    }
+  }
+
+  function handleTargetPicked(unit: BattleUnit, skillIndex: 0 | 1 | 2, targetId: string): void {
+    submitChoice(unit, { skillIndex, targetId });
+  }
+
+  function submitChoice(unit: BattleUnit, choice: ManualChoice): void {
+    const record = engine.resolveTurn(unit, choice);
+    picker = { phase: "NONE" };
+    renderActionPanel();
+    applyRecord(record);
+    maybeScheduleTick();
+  }
+
+  function showResult(winner: BattleWinner): void {
+    finished = true;
+    userPaused = true;
+    stopTimer();
+    setActive(null);
+    picker = { phase: "NONE" };
+    renderActionPanel();
+    resultBanner.classList.remove("result-banner--hidden");
+    resultBanner.textContent = "";
+    const text = winner === "PLAYER" ? "🎉 勝利！" : winner === "ENEMY" ? "💀 敗北…" : "🤝 引き分け";
+    resultBanner.append(el("div", { className: "result-banner__text" }, [text]));
+    finishBtn.textContent = resultLabel(winner);
+    finishBtn.classList.remove("battle-controls__finish--hidden");
+    finishBtn.onclick = () => onFinish(winner);
+  }
+
+  function tick(): void {
+    if (finished) return;
+    const winner = engine.getWinner();
+    if (winner) {
+      showResult(winner);
+      return;
+    }
+    const actor = engine.getNextActor();
+    if (!actor) {
+      showResult(engine.getWinner() ?? "DRAW");
+      return;
+    }
+    if (mode === "MANUAL" && actor.team === "PLAYER" && actor.stunTurns === 0) {
+      picker = { phase: "SKILL", unit: actor };
+      renderActionPanel();
+      return;
+    }
+    const record = engine.resolveTurn(actor);
+    applyRecord(record);
+  }
+
+  function stopTimer(): void {
+    if (timeoutHandle !== null) {
+      clearTimeout(timeoutHandle);
+      timeoutHandle = null;
+    }
+  }
+
+  function maybeScheduleTick(): void {
+    if (finished || userPaused || picker.phase !== "NONE" || timeoutHandle !== null) return;
+    timeoutHandle = setTimeout(() => {
+      timeoutHandle = null;
+      tick();
+      maybeScheduleTick();
     }, SPEED_INTERVAL_MS[speed]);
-    playPauseBtn.textContent = "⏸ 一時停止";
+  }
+
+  function skipToEnd(): void {
+    userPaused = true;
+    stopTimer();
+    picker = { phase: "NONE" };
+    renderActionPanel();
+    let lastRecord: TurnRecord | null = null;
+    let guard = 0;
+    while (!finished && guard < 10000) {
+      guard += 1;
+      const winner = engine.getWinner();
+      if (winner) break;
+      const actor = engine.getNextActor();
+      if (!actor) break;
+      const record = engine.resolveTurn(actor);
+      appendLines(record.lines);
+      lastRecord = record;
+    }
+    if (lastRecord) {
+      setActive(lastRecord.actorId);
+      applySnapshot(lastRecord.snapshot);
+    }
+    showResult(engine.getWinner() ?? "DRAW");
   }
 
   const playPauseBtn = el(
@@ -153,12 +302,11 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       type: "button",
       className: "btn btn--ghost",
       onclick: () => {
-        if (timer !== null) {
-          stop();
-          playPauseBtn.textContent = "▶ 再生";
-        } else if (index < result.turns.length) {
-          play();
-        }
+        if (finished) return;
+        userPaused = !userPaused;
+        playPauseBtn.textContent = userPaused ? "▶ 再生" : "⏸ 一時停止";
+        if (!userPaused) maybeScheduleTick();
+        else stopTimer();
       },
     },
     ["⏸ 一時停止"],
@@ -172,54 +320,60 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       onclick: () => {
         speed = speed === "1" ? "2" : speed === "2" ? "4" : "1";
         speedBtn.textContent = `x${speed}`;
-        if (timer !== null) play();
       },
     },
     ["x1"],
   );
 
-  const skipBtn = el(
+  const modeBtn = el(
     "button",
     {
       type: "button",
       className: "btn btn--ghost",
       onclick: () => {
-        stop();
-        while (stepOnce()) {
-          /* fast forward to the end */
+        if (finished) return;
+        mode = mode === "AUTO" ? "MANUAL" : "AUTO";
+        modeBtn.textContent = mode === "AUTO" ? "🤖 オート" : "✋ 手動";
+        if (mode === "AUTO" && picker.phase !== "NONE") {
+          // 手動待ちだった行動をAIに任せて続行する
+          const pendingUnit = picker.unit;
+          picker = { phase: "NONE" };
+          renderActionPanel();
+          const record = engine.resolveTurn(pendingUnit);
+          applyRecord(record);
         }
-        showResult();
-        playPauseBtn.textContent = "▶ 再生";
+        maybeScheduleTick();
       },
     },
-    ["⏭ 結果までスキップ"],
+    ["🤖 オート"],
   );
 
-  const backBtn = el(
+  const skipBtn = el("button", { type: "button", className: "btn btn--ghost", onclick: skipToEnd }, ["⏭ 結果までスキップ"]);
+
+  const finishBtn = el(
     "button",
-    {
-      type: "button",
-      className: "btn btn--primary",
-      onclick: () => {
-        stop();
-        onBack();
-      },
-    },
-    [backLabel],
+    { type: "button", className: "btn btn--primary battle-controls__finish battle-controls__finish--hidden" },
+    ["結果へ進む"],
   );
 
-  const battleArena = el("div", { className: "battle-arena" }, [turnOrderEl, enemyRow, playerRow]);
+  const battleArena = el("div", { className: "battle-arena" }, [enemyRow, playerRow]);
 
   const container = el("div", { className: "screen battle-view" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [title])]),
     battleArena,
-    el("div", { className: "battle-controls" }, [playPauseBtn, speedBtn, skipBtn, backBtn]),
+    actionPanelEl,
+    el("div", { className: "battle-controls" }, [modeBtn, playPauseBtn, speedBtn, skipBtn]),
     resultBanner,
+    finishBtn,
     el("section", { className: "panel battle-log-panel" }, [el("h2", {}, ["バトルログ"]), logEl]),
   ]);
 
-  renderTurnOrder(0);
-  play();
+  maybeScheduleTick();
 
-  return { element: container, dispose: stop };
+  return {
+    element: container,
+    dispose: () => {
+      stopTimer();
+    },
+  };
 }

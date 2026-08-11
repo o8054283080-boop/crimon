@@ -388,18 +388,14 @@ function renderCurrentDungeonBattle(): BattleViewHandle {
 
   const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
-  const result = engine.run();
-
-  const backLabel = result.winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る";
-  const onBack = () => finishDungeon(result.winner === "PLAYER");
 
   return renderBattleView({
-    result,
+    engine,
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
-    backLabel,
     title: run.floor.name,
-    onBack,
+    resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
+    onFinish: (winner) => finishDungeon(winner === "PLAYER"),
   });
 }
 
@@ -410,41 +406,34 @@ function renderCurrentWaveBattle(): BattleViewHandle {
   const wave = run.stage.waves[run.waveIndex];
   const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave, state.player.equipment);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp });
-  const result = engine.run();
-  const { survivorInstances, survivorHp } = extractSurvivors(engine, run.currentPartyInstances);
-
-  let backLabel: string;
-  let onBack: () => void;
-
-  if (result.winner === "PLAYER") {
-    run.goldEarned += run.stage.rewards.waveGold;
-    run.wavesCleared += 1;
-    run.carryHp = survivorHp;
-    run.currentPartyInstances = survivorInstances;
-
-    const isLastWave = run.waveIndex >= run.stage.waves.length - 1;
-    if (isLastWave) {
-      backLabel = "🎁 報酬を受け取る";
-      onBack = () => finishStage(true);
-    } else {
-      backLabel = "▶ 次のウェーブへ";
-      onBack = () => {
-        run.waveIndex += 1;
-        render();
-      };
-    }
-  } else {
-    backLabel = "ステージ選択に戻る";
-    onBack = () => finishStage(false);
-  }
+  const isLastWave = run.waveIndex >= run.stage.waves.length - 1;
 
   return renderBattleView({
-    result,
+    engine,
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
-    backLabel,
     title: `${run.stage.name} - ウェーブ${wave.waveNumber}${wave.isBossWave ? "(BOSS)" : ""}`,
-    onBack,
+    resultLabel: (winner) => {
+      if (winner !== "PLAYER") return "ステージ選択に戻る";
+      return isLastWave ? "🎁 報酬を受け取る" : "▶ 次のウェーブへ";
+    },
+    onFinish: (winner) => {
+      if (winner === "PLAYER") {
+        const { survivorInstances, survivorHp } = extractSurvivors(engine, run.currentPartyInstances);
+        run.goldEarned += run.stage.rewards.waveGold;
+        run.wavesCleared += 1;
+        run.carryHp = survivorHp;
+        run.currentPartyInstances = survivorInstances;
+        if (isLastWave) {
+          finishStage(true);
+        } else {
+          run.waveIndex += 1;
+          render();
+        }
+      } else {
+        finishStage(false);
+      }
+    },
   });
 }
 
