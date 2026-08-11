@@ -22,6 +22,8 @@ export interface BattleUnit {
   /** スキルごとの残りクールタイム(0=使用可能)。index 0-2 が skill 0-2 に対応 */
   cooldowns: [number, number, number];
   stunTurns: number;
+  /** 火傷の残りターン数。0より大きい間、自身の手番終了時に自分の攻撃力分のダメージを受ける */
+  burnTurns: number;
   effects: ActiveEffect[];
   alive: boolean;
 }
@@ -36,6 +38,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     gauge: 0,
     cooldowns: [0, 0, 0],
     stunTurns: 0,
+    burnTurns: 0,
     effects: [],
     alive: true,
   };

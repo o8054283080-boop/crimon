@@ -49,28 +49,18 @@ describe("ガチャ (summonMany)", () => {
     }
   });
 
-  it("通常枠の星4はグリフォン、星5はドラゴンが排出される", () => {
+  it("星4はグリフォンかセラフ、星5はドラゴンかネメシスが排出される(属性のレア度とは独立)", () => {
     const rng = mulberry32(11);
-    const results = summonMany(2000, rng);
+    const results = summonMany(4000, rng);
     for (const r of results) {
-      if (r.isRare) continue;
-      if (r.star === 4) expect(r.dexId.startsWith("griffon_")).toBe(true);
-      if (r.star === 5) expect(r.dexId.startsWith("dragon_")).toBe(true);
+      if (r.star === 4) expect(r.dexId.startsWith("griffon_") || r.dexId.startsWith("seraph_")).toBe(true);
+      if (r.star === 5) expect(r.dexId.startsWith("dragon_") || r.dexId.startsWith("nemesis_")).toBe(true);
     }
-    expect(results.some((r) => !r.isRare && r.star === 4)).toBe(true);
-    expect(results.some((r) => !r.isRare && r.star === 5)).toBe(true);
-  });
-
-  it("レア枠の星4はセラフ、星5はネメシスが排出される", () => {
-    const rng = mulberry32(13);
-    const results = summonMany(3000, rng);
-    for (const r of results) {
-      if (!r.isRare) continue;
-      if (r.star === 4) expect(r.dexId.startsWith("seraph_")).toBe(true);
-      if (r.star === 5) expect(r.dexId.startsWith("nemesis_")).toBe(true);
-    }
-    expect(results.some((r) => r.isRare && r.star === 4)).toBe(true);
-    expect(results.some((r) => r.isRare && r.star === 5)).toBe(true);
+    // 通常枠(火水電草)でもセラフ/ネメシスが、レア枠(光闇)でもグリフォン/ドラゴンが出ることを確認する
+    expect(results.some((r) => !r.isRare && r.dexId.startsWith("seraph_"))).toBe(true);
+    expect(results.some((r) => !r.isRare && r.dexId.startsWith("nemesis_"))).toBe(true);
+    expect(results.some((r) => r.isRare && r.dexId.startsWith("griffon_"))).toBe(true);
+    expect(results.some((r) => r.isRare && r.dexId.startsWith("dragon_"))).toBe(true);
   });
 
   it("10連ではレアが1体も出なければ天井で1体確定する", () => {

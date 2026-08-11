@@ -29,6 +29,33 @@ const buffSkill: Skill = {
   effects: [{ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 }],
 };
 
+const debuffSkillWithChance: Skill = {
+  id: "test_debuff",
+  name: "テストデバフ",
+  description: "テスト用のデバフスキル",
+  target: "SINGLE_ENEMY",
+  cooldownTurns: 3,
+  effects: [{ kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.5 }],
+};
+
+const stunSkillWithChance: Skill = {
+  id: "test_stun",
+  name: "テストスタン",
+  description: "テスト用のスタンスキル",
+  target: "SINGLE_ENEMY",
+  cooldownTurns: 4,
+  effects: [{ kind: "STUN", durationTurns: 1, chance: 0.3 }],
+};
+
+const zeroCooldownDamageSkill: Skill = {
+  id: "test_skill1",
+  name: "テスト通常攻撃",
+  description: "テスト用のクールタイム無しスキル",
+  target: "SINGLE_ENEMY",
+  cooldownTurns: 0,
+  effects: [{ kind: "DAMAGE", multiplier: 1.0 }],
+};
+
 describe("computeLeveledSkill", () => {
   it("レベル1は元のスキルをそのまま返す", () => {
     const leveled = computeLeveledSkill(damageSkill, 1);
@@ -84,6 +111,57 @@ describe("computeLeveledSkill", () => {
     expect(computeLeveledSkill(damageSkill, 0)).toEqual(damageSkill);
     expect(computeLeveledSkill(damageSkill, 6)).toEqual(computeLeveledSkill(damageSkill, MAX_SKILL_LEVEL));
   });
+
+  it("レベル5でもスタンの継続ターンは延びない(強すぎるため固定)", () => {
+    const lv5 = computeLeveledSkill(stunSkillWithChance, 5);
+    const effect = lv5.effects[0];
+    expect(effect.kind).toBe("STUN");
+    if (effect.kind === "STUN") {
+      expect(effect.durationTurns).toBe(stunSkillWithChance.effects[0].kind === "STUN" ? stunSkillWithChance.effects[0].durationTurns : -1);
+    }
+  });
+
+  it("レベルが上がるとスタン/デバフの発動確率が上昇する(100%は超えない)", () => {
+    const stunBaseChance = stunSkillWithChance.effects[0].kind === "STUN" ? stunSkillWithChance.effects[0].chance! : 0;
+    const stunLv4 = computeLeveledSkill(stunSkillWithChance, 4).effects[0];
+    expect(stunLv4.kind).toBe("STUN");
+    if (stunLv4.kind === "STUN") {
+      expect(stunLv4.chance!).toBeGreaterThan(stunBaseChance);
+      expect(stunLv4.chance!).toBeLessThanOrEqual(1);
+    }
+
+    const debuffBaseChance = debuffSkillWithChance.effects[0].kind === "DEBUFF" ? debuffSkillWithChance.effects[0].chance! : 0;
+    const debuffLv4 = computeLeveledSkill(debuffSkillWithChance, 4).effects[0];
+    expect(debuffLv4.kind).toBe("DEBUFF");
+    if (debuffLv4.kind === "DEBUFF") {
+      expect(debuffLv4.chance!).toBeGreaterThan(debuffBaseChance);
+    }
+  });
+
+  it("レベル5のデバフは発動確率の成長に加え、継続ターンも1ターン延びる", () => {
+    const lv5 = computeLeveledSkill(debuffSkillWithChance, 5).effects[0];
+    expect(lv5.kind).toBe("DEBUFF");
+    if (lv5.kind === "DEBUFF") {
+      expect(lv5.durationTurns).toBe(debuffSkillWithChance.effects[0].kind === "DEBUFF" ? debuffSkillWithChance.effects[0].durationTurns + 1 : -1);
+    }
+  });
+
+  it("クールタイム無しスキル(スキル1)はレベル5でさらに追加成長し、通常のレベル4より威力が高い", () => {
+    const lv4 = computeLeveledSkill(zeroCooldownDamageSkill, 4);
+    const lv5 = computeLeveledSkill(zeroCooldownDamageSkill, 5);
+    const dmg4 = (lv4.effects[0] as { multiplier: number }).multiplier;
+    const dmg5 = (lv5.effects[0] as { multiplier: number }).multiplier;
+    expect(dmg5).toBeGreaterThan(dmg4);
+  });
+
+  it("クールタイムがあるスキルはレベル5で威力が伸びず、クールタイム短縮のみ", () => {
+    const lv4 = computeLeveledSkill(damageSkill, 4);
+    const lv5 = computeLeveledSkill(damageSkill, 5);
+    const dmg4 = (lv4.effects[0] as { multiplier: number }).multiplier;
+    const dmg5 = (lv5.effects[0] as { multiplier: number }).multiplier;
+    expect(dmg5).toBe(dmg4);
+    expect(lv5.cooldownTurns).toBeLessThan(lv4.cooldownTurns);
+  });
 });
 
 describe("describeSkillEffect", () => {
@@ -94,6 +172,24 @@ describe("describeSkillEffect", () => {
     expect(describeSkillEffect({ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 })).toContain("+30%");
     expect(describeSkillEffect({ kind: "DEBUFF", stat: "def", amount: 0.3, durationTurns: 2 })).toContain("-30%");
     expect(describeSkillEffect({ kind: "STUN", durationTurns: 1 })).toContain("スタン");
+  });
+
+  it("発動確率(chance)付きの効果は先頭に「N%で」が付く", () => {
+    expect(describeSkillEffect({ kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.65 })).toContain("65%で");
+    expect(describeSkillEffect({ kind: "STUN", durationTurns: 1, chance: 0.15 })).toContain("15%で");
+    expect(describeSkillEffect({ kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2 })).not.toContain("%で");
+  });
+
+  it("LIFESTEALとBURNを日本語テキストに変換できる", () => {
+    expect(describeSkillEffect({ kind: "LIFESTEAL", healRate: 0.1 })).toContain("10%");
+    const burnText = describeSkillEffect({ kind: "BURN", durationTurns: 1, chance: 0.65 });
+    expect(burnText).toContain("65%で");
+    expect(burnText).toContain("火傷");
+  });
+
+  it("scaleBonus付きのDAMAGE効果は説明文に能力値名が入る", () => {
+    const text = describeSkillEffect({ kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", ratePerPoint: 0.003 } });
+    expect(text).toContain("速度");
   });
 });
 
