@@ -4,6 +4,7 @@ import { Skill } from "../core/skill.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
 import { calcDamage } from "./damage.js";
 import {
+  ActiveEffect,
   BattleUnit,
   Team,
   applyDamage,
@@ -27,6 +28,20 @@ export interface UnitSnapshot {
   maxHp: number;
   gauge: number;
   alive: boolean;
+  /** 現在かかっているバフ/デバフ(演出用) */
+  effects: ActiveEffect[];
+  /** スタン残りターン(0=スタンしていない) */
+  stunTurns: number;
+  /** 火傷残りターン(0=火傷していない) */
+  burnTurns: number;
+}
+
+/** 演出用: そのターンに起きたHP増減イベント1件分(ダメージ数値のポップアップ表示などに使う) */
+export interface BattleEvent {
+  targetId: string;
+  kind: "DAMAGE" | "HEAL" | "DEATH" | "RESIST";
+  amount?: number;
+  isCrit?: boolean;
 }
 
 /** ユニット1体の1手番分の記録。UIでのアニメーション再生に使う */
@@ -34,6 +49,7 @@ export interface TurnRecord {
   actorId: string;
   lines: string[];
   snapshot: UnitSnapshot[];
+  events: BattleEvent[];
 }
 
 export interface BattleResult {
@@ -65,6 +81,7 @@ export class BattleEngine {
   private readonly rng: () => number;
   private readonly maxTurns: number;
   private readonly log: string[] = [];
+  private readonly events: BattleEvent[] = [];
   private readonly turns: TurnRecord[] = [];
   /** getNextActor()/resolveTurn()による手動進行専用のキュー。run()は使わない */
   private interactiveQueue: BattleUnit[] = [];
@@ -110,10 +127,12 @@ export class BattleEngine {
         }
 
         const linesBefore = this.log.length;
+        const eventsBefore = this.events.length;
         this.takeTurn(unit);
         this.turns.push({
           actorId: unit.instanceId,
           lines: this.log.slice(linesBefore),
+          events: this.events.slice(eventsBefore),
           snapshot: this.snapshotUnits(),
         });
 
@@ -172,14 +191,20 @@ export class BattleEngine {
     unit.gauge -= ATB_THRESHOLD;
 
     const linesBefore = this.log.length;
+    const eventsBefore = this.events.length;
     this.takeTurn(unit, choice);
     const record: TurnRecord = {
       actorId: unit.instanceId,
       lines: this.log.slice(linesBefore),
+      events: this.events.slice(eventsBefore),
       snapshot: this.snapshotUnits(),
     };
     this.turns.push(record);
     return record;
+  }
+
+  private pushEvent(event: BattleEvent): void {
+    this.events.push(event);
   }
 
   private snapshotUnits(): UnitSnapshot[] {
@@ -190,6 +215,9 @@ export class BattleEngine {
       maxHp: u.maxHp,
       gauge: Math.round(u.gauge),
       alive: u.alive,
+      effects: u.effects.map((e) => ({ ...e })),
+      stunTurns: u.stunTurns,
+      burnTurns: u.burnTurns,
     }));
   }
 
@@ -211,6 +239,7 @@ export class BattleEngine {
       const healAmount = Math.round(unit.maxHp * turnHealPercent);
       applyHeal(unit, healAmount);
       this.push(`${this.label(unit)} は体力シリーズの効果でHPが ${healAmount} 回復！ (${unit.currentHp}/${unit.maxHp})`);
+      this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount: healAmount });
     }
 
     if (unit.stunTurns > 0) {
@@ -259,8 +288,10 @@ export class BattleEngine {
     const burnDamage = Math.max(1, getEffectiveStat(unit, "atk"));
     applyDamage(unit, burnDamage);
     this.push(`  → ${this.label(unit)} は火傷でダメージを受けた！ ${burnDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
+    this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: burnDamage });
     if (!unit.alive) {
       this.push(`  → ${this.label(unit)} は倒れた！`);
+      this.pushEvent({ targetId: unit.instanceId, kind: "DEATH" });
     }
   }
 
@@ -283,8 +314,10 @@ export class BattleEngine {
             this.push(
               `  → ${this.label(target)} に ${result.damage} ダメージ！${critText}${affinityText} (残りHP ${target.currentHp}/${target.maxHp})`,
             );
+            this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: result.damage, isCrit: result.isCrit });
             if (!target.alive) {
               this.push(`  → ${this.label(target)} は倒れた！`);
+              this.pushEvent({ targetId: target.instanceId, kind: "DEATH" });
             }
           }
           break;
@@ -301,6 +334,7 @@ export class BattleEngine {
           const healAmount = Math.round(healBase * effect.healRate);
           applyHeal(target, healAmount);
           this.push(`  → ${this.label(target)} のHPが ${healAmount} 回復！ (${target.currentHp}/${target.maxHp})`);
+          this.pushEvent({ targetId: target.instanceId, kind: "HEAL", amount: healAmount });
           break;
         }
 
@@ -310,6 +344,7 @@ export class BattleEngine {
           if (healAmount <= 0) break;
           applyHeal(source, healAmount);
           this.push(`  → ${this.label(source)} は与えたダメージの一部でHPが ${healAmount} 回復！ (${source.currentHp}/${source.maxHp})`);
+          this.pushEvent({ targetId: source.instanceId, kind: "HEAL", amount: healAmount });
           break;
         }
 
@@ -373,11 +408,13 @@ export class BattleEngine {
     if (this.rng() < hitChance) return true;
 
     this.push(`  → ${this.label(target)} は効果を抵抗した！`);
+    this.pushEvent({ targetId: target.instanceId, kind: "RESIST" });
     const healOnResistPercent = target.def.combatMods?.healOnResistPercent ?? 0;
     if (healOnResistPercent > 0 && target.alive) {
       const healAmount = Math.round(target.maxHp * healOnResistPercent);
       applyHeal(target, healAmount);
       this.push(`  → ${this.label(target)} は抵抗シリーズの効果でHPが ${healAmount} 回復！ (${target.currentHp}/${target.maxHp})`);
+      this.pushEvent({ targetId: target.instanceId, kind: "HEAL", amount: healAmount });
     }
     return false;
   }
