@@ -182,7 +182,8 @@ body {
 .battle-stage {
   position: relative;
   width: 100%;
-  /* 縦横比を固定して、どの端末でも同じ構図で見えるようにする */
+  /* 横長寄りの画面では横長のステージにする。カメラは実際の縦横比から
+     構図を組み直すので、比率が変わっても両チームは必ず収まる */
   aspect-ratio: 4 / 3;
   max-height: 58vh;
   border-radius: 20px;
@@ -193,6 +194,14 @@ body {
     inset 0 0 60px rgba(0, 0, 0, 0.75),
     0 10px 30px rgba(0, 0, 0, 0.5);
   contain: layout paint;
+}
+
+@media (max-width: 560px) {
+  .battle-stage {
+    /* 縦画面ではステージを縦長にして、キャラを大きく見せる */
+    aspect-ratio: 3 / 4;
+    max-height: 64vh;
+  }
 }
 
 .battle-stage__canvas {
@@ -319,6 +328,10 @@ body {
   background: var(--gauge);
   box-shadow: 0 0 6px var(--gauge);
   transition: width 0.3s linear;
+}
+
+.unit-hud--enemy {
+  translate: 0 -14px;
 }
 
 .unit-hud--enemy .unit-hud__name {
