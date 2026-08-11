@@ -11,7 +11,12 @@ import {
   addFighterExp,
   applyPassiveStaminaRegen,
   createInitialState,
+  STAMINA_REFILL_FULL_COST,
+  STAMINA_REFILL_PARTIAL_AMOUNT,
+  STAMINA_REFILL_PARTIAL_COST,
   STAMINA_REGEN_INTERVAL_MINUTES,
+  tryRefillStaminaFull,
+  tryRefillStaminaPartial,
   trySpendStamina,
 } from "../src/game/playerState.js";
 
@@ -40,6 +45,64 @@ describe("スタミナ消費 (trySpendStamina)", () => {
     const result = trySpendStamina(state, STAGE_STAMINA_COST);
     expect(result.ok).toBe(false);
     expect(state.stamina).toBe(3);
+  });
+});
+
+describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefillStaminaFull)", () => {
+  it("ダイヤ50を消費してスタミナが100回復する", () => {
+    const state = createInitialState();
+    state.stamina = 20;
+    state.crystal = 100;
+    const result = tryRefillStaminaPartial(state);
+    expect(result.ok).toBe(true);
+    expect(state.stamina).toBe(20 + STAMINA_REFILL_PARTIAL_AMOUNT);
+    expect(state.crystal).toBe(100 - STAMINA_REFILL_PARTIAL_COST);
+  });
+
+  it("上限を超える分は切り捨てられる", () => {
+    const state = createInitialState();
+    state.stamina = state.maxStamina - 30;
+    state.crystal = 100;
+    tryRefillStaminaPartial(state);
+    expect(state.stamina).toBe(state.maxStamina);
+  });
+
+  it("ダイヤが足りない場合は消費されず失敗する", () => {
+    const state = createInitialState();
+    state.stamina = 20;
+    state.crystal = STAMINA_REFILL_PARTIAL_COST - 1;
+    const result = tryRefillStaminaPartial(state);
+    expect(result.ok).toBe(false);
+    expect(state.stamina).toBe(20);
+    expect(state.crystal).toBe(STAMINA_REFILL_PARTIAL_COST - 1);
+  });
+
+  it("スタミナが満タンの場合は実行できない(ダイヤを無駄にしない)", () => {
+    const state = createInitialState();
+    state.crystal = 1000;
+    expect(state.stamina).toBe(state.maxStamina);
+    const result = tryRefillStaminaPartial(state);
+    expect(result.ok).toBe(false);
+    expect(state.crystal).toBe(1000);
+  });
+
+  it("ダイヤ200を消費してスタミナが全回復する", () => {
+    const state = createInitialState();
+    state.stamina = 1;
+    state.crystal = 500;
+    const result = tryRefillStaminaFull(state);
+    expect(result.ok).toBe(true);
+    expect(state.stamina).toBe(state.maxStamina);
+    expect(state.crystal).toBe(500 - STAMINA_REFILL_FULL_COST);
+  });
+
+  it("全回復もダイヤが足りない場合は失敗する", () => {
+    const state = createInitialState();
+    state.stamina = 1;
+    state.crystal = STAMINA_REFILL_FULL_COST - 1;
+    const result = tryRefillStaminaFull(state);
+    expect(result.ok).toBe(false);
+    expect(state.stamina).toBe(1);
   });
 });
 

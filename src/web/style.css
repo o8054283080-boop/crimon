@@ -656,6 +656,20 @@ body {
   font-weight: 700;
 }
 
+.stamina-refill-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.stamina-refill-row .btn {
+  flex: 1;
+  min-width: 140px;
+  font-size: 0.8rem;
+  padding: 8px 10px;
+}
+
 .party-slots {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

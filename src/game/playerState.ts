@@ -284,6 +284,37 @@ export function trySpendStamina(state: PlayerState, cost: number): StaminaSpendR
   return { ok: true };
 }
 
+/** ダイヤ50でスタミナ100回復(上限を超える分は切り捨て) */
+export const STAMINA_REFILL_PARTIAL_COST = 50;
+export const STAMINA_REFILL_PARTIAL_AMOUNT = 100;
+/** ダイヤ200でスタミナ全回復 */
+export const STAMINA_REFILL_FULL_COST = 200;
+
+export interface StaminaRefillResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/** ダイヤを消費してスタミナを100回復する。呼ぶ前に自然回復を反映する */
+export function tryRefillStaminaPartial(state: PlayerState): StaminaRefillResult {
+  applyPassiveStaminaRegen(state);
+  if (state.stamina >= state.maxStamina) return { ok: false, reason: "スタミナは既に満タンです" };
+  if (state.crystal < STAMINA_REFILL_PARTIAL_COST) return { ok: false, reason: "ダイヤが足りません" };
+  state.crystal -= STAMINA_REFILL_PARTIAL_COST;
+  state.stamina = Math.min(state.maxStamina, state.stamina + STAMINA_REFILL_PARTIAL_AMOUNT);
+  return { ok: true };
+}
+
+/** ダイヤを消費してスタミナを全回復する。呼ぶ前に自然回復を反映する */
+export function tryRefillStaminaFull(state: PlayerState): StaminaRefillResult {
+  applyPassiveStaminaRegen(state);
+  if (state.stamina >= state.maxStamina) return { ok: false, reason: "スタミナは既に満タンです" };
+  if (state.crystal < STAMINA_REFILL_FULL_COST) return { ok: false, reason: "ダイヤが足りません" };
+  state.crystal -= STAMINA_REFILL_FULL_COST;
+  state.stamina = state.maxStamina;
+  return { ok: true };
+}
+
 export interface FighterExpResult {
   levelsGained: number;
 }

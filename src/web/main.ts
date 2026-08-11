@@ -24,6 +24,8 @@ import {
   savePlayerState,
   toggleDungeonPartyMember,
   tryEnhanceEquipment,
+  tryRefillStaminaFull,
+  tryRefillStaminaPartial,
   trySpendStamina,
   tryUseSummonScroll,
 } from "../game/playerState.js";
@@ -82,6 +84,8 @@ interface AppState {
   equipmentDetailId: string | null;
   equipmentPickerContext: EquipmentPickerContext | null;
   equipmentSlotFilter: EquipSlot | null;
+  /** モンスターの装備スロットから装備詳細を開いた場合、戻る操作でこのモンスターの画面に戻るための参照 */
+  equipmentReturnMonsterId: string | null;
   selectedDungeonFloor: number | null;
   dungeonRun: DungeonRunState | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
@@ -109,6 +113,7 @@ const state: AppState = {
   equipmentDetailId: null,
   equipmentPickerContext: null,
   equipmentSlotFilter: null,
+  equipmentReturnMonsterId: null,
   selectedDungeonFloor: null,
   dungeonRun: null,
   selectedLevelDungeonTier: null,
@@ -160,6 +165,7 @@ function navigate(screen: ScreenName): void {
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
   state.equipmentSlotFilter = null;
+  state.equipmentReturnMonsterId = null;
   state.selectedDungeonFloor = null;
   state.selectedLevelDungeonTier = null;
   state.selectedDexEntryId = null;
@@ -175,8 +181,9 @@ function handleSelectSlot(monsterId: string, slot: EquipSlot): void {
   render();
 }
 
-function handleViewEquippedSlot(equipmentId: string): void {
+function handleViewEquippedSlot(equipmentId: string, monsterId: string): void {
   state.equipmentDetailId = equipmentId;
+  state.equipmentReturnMonsterId = monsterId;
   state.screen = "EQUIPMENT";
   render();
 }
@@ -531,6 +538,16 @@ function render(): void {
         onGoParty: () => navigate("PARTY"),
         onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
+        onRefillStaminaPartial: () => {
+          if (!tryRefillStaminaPartial(state.player).ok) return;
+          savePlayerState(state.player);
+          render();
+        },
+        onRefillStaminaFull: () => {
+          if (!tryRefillStaminaFull(state.player).ok) return;
+          savePlayerState(state.player);
+          render();
+        },
       });
       break;
 
@@ -808,7 +825,17 @@ function renderEquipmentScreen(): HTMLElement {
       render();
     },
     onSelectDetail: (id) => {
+      if (id === null && state.equipmentReturnMonsterId) {
+        const monsterId = state.equipmentReturnMonsterId;
+        state.equipmentReturnMonsterId = null;
+        state.equipmentDetailId = null;
+        state.monsterDetailId = monsterId;
+        state.screen = "MONSTERS";
+        render();
+        return;
+      }
       state.equipmentDetailId = id;
+      state.equipmentReturnMonsterId = null;
       render();
     },
     onEquip: handleEquip,

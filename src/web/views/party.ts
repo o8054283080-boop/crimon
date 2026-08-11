@@ -24,7 +24,8 @@ export function renderParty(props: PartyProps): HTMLElement {
     .map((id) => player.monsters.find((m) => m.id === id))
     .filter((m): m is NonNullable<typeof m> => m !== undefined);
 
-  const cards = player.monsters.map((instance) => partyMemberCard(instance, activeIds.includes(instance.id), () => onToggle(instance.id)));
+  const sortedMonsters = player.monsters.slice().sort((a, b) => Number(activeIds.includes(b.id)) - Number(activeIds.includes(a.id)));
+  const cards = sortedMonsters.map((instance) => partyMemberCard(instance, activeIds.includes(instance.id), () => onToggle(instance.id)));
 
   return el("div", { className: "screen party-screen" }, [
     el("header", { className: "app-header" }, [
