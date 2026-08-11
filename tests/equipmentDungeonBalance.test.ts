@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
 import { EQUIP_SLOTS, EquipStar, generateEquipment } from "../src/core/equipment.js";
-import { createMonsterInstance } from "../src/core/monsterInstance.js";
+import { createMonsterInstance, MonsterInstance } from "../src/core/monsterInstance.js";
 import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
-import { addEquipment, createInitialState, equipToMonster, PlayerState } from "../src/game/playerState.js";
+import { MAX_DUNGEON_PARTY_SIZE, addEquipment, createInitialState, equipToMonster, PlayerState } from "../src/game/playerState.js";
 import { setupDungeonBattle } from "../src/game/dungeonRunner.js";
 
 function mulberry32(seed: number): () => number {
@@ -17,15 +17,17 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** 装備ダンジョン専用パーティは通常パーティ(4体)より1体多い最大5体まで組める */
 const STARTER = [
   { templateId: "slime", element: "FIRE" },
   { templateId: "wolf", element: "WATER" },
   { templateId: "golem", element: "ELECTRIC" },
   { templateId: "fairy", element: "GRASS" },
+  { templateId: "slime", element: "WATER" },
 ];
 
-function buildParty(star: 1 | 2 | 3 | 4 | 5, level: number) {
-  return STARTER.map((s) => createMonsterInstance(`${s.templateId}_${s.element}`, star, level));
+function buildParty(star: 1 | 2 | 3 | 4 | 5, level: number, partySize = 4) {
+  return STARTER.slice(0, partySize).map((s) => createMonsterInstance(`${s.templateId}_${s.element}`, star, level));
 }
 
 function equipFullLoadout(state: PlayerState, monsterId: string, eqStar: EquipStar, subStatCount: number, rng: () => number): void {
@@ -48,13 +50,14 @@ function winRate(
   eqStar: EquipStar | null,
   subStatCount: number,
   trials: number,
+  partySize = 4,
 ): number {
   const floor = EQUIPMENT_DUNGEON_FLOORS[floorNum - 1];
   let wins = 0;
   for (let i = 0; i < trials; i++) {
     const rng = mulberry32(500 + i);
     const state = createInitialState();
-    const party = buildParty(star, level);
+    const party = buildParty(star, level, partySize);
     state.monsters = party;
     if (eqStar !== null) {
       for (const m of party) equipFullLoadout(state, m.id, eqStar, subStatCount, rng);
@@ -65,6 +68,17 @@ function winRate(
     if (engine.run().winner === "PLAYER") wins += 1;
   }
   return wins / trials;
+}
+
+/** 「育成途中の手持ちの中で1体だけそこそこ強いモンスターがいる」くらいの、まだ最終関門には遠い編成 */
+function buildModestParty(): MonsterInstance[] {
+  return [
+    createMonsterInstance("slime_FIRE", 4, 1), // ランクアップ直後の星4Lv1(スキルは初期値のまま)
+    createMonsterInstance("wolf_WATER", 2, 20),
+    createMonsterInstance("golem_ELECTRIC", 2, 20),
+    createMonsterInstance("fairy_GRASS", 3, 30),
+    createMonsterInstance("slime_WATER", 2, 20),
+  ];
 }
 
 describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで挑める、9・10階は星6装備クラスをフルで固めてようやく突破できる最終関門)", () => {
@@ -83,27 +97,47 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     expect(rate).toBeGreaterThan(0.6);
   });
 
-  it("10階は星5装備クラスではほぼ勝てず、星6装備でもサブ2個程度ではまだ厳しい(最終関門)", () => {
-    const star5Rate = winRate(10, 5, 50, 5, 2, 150);
-    const star6Rate = winRate(10, 5, 50, 6, 2, 150);
+  /**
+   * 9・10階は装備ダンジョン専用パーティ(最大5体)で挑む前提の最終関門のため、
+   * ここから先のテストは通常パーティ(4体)ではなく実際の専用パーティ枠(5体)で検証する。
+   * 4体基準のまま難易度を据え置くと、5体目の分だけ想定より簡単に突破できてしまう
+   * (実際に「5体目込みでオート周回したら10階があっさり倒せた」というバランス報告を受けて調整)。
+   */
+  it("10階は星5装備クラス(5体編成)ではほぼ勝てず、星6装備でもサブ2個程度ではまだ厳しい(最終関門)", () => {
+    const star5Rate = winRate(10, 5, 50, 5, 2, 150, MAX_DUNGEON_PARTY_SIZE);
+    const star6Rate = winRate(10, 5, 50, 6, 2, 150, MAX_DUNGEON_PARTY_SIZE);
     expect(star5Rate).toBeLessThan(0.15);
     expect(star6Rate).toBeGreaterThan(star5Rate);
-    expect(star6Rate).toBeLessThan(0.6);
+    expect(star6Rate).toBeLessThan(0.35);
   });
 
-  it("10階は星6装備をサブ4個までフルで固めればしっかり突破できるようになる", () => {
-    const rate = winRate(10, 5, 50, 6, 4, 150);
-    expect(rate).toBeGreaterThan(0.8);
+  it("10階は星6装備をサブ4個までフルで固めれば(5体編成)しっかり突破できるようになる", () => {
+    const rate = winRate(10, 5, 50, 6, 4, 150, MAX_DUNGEON_PARTY_SIZE);
+    expect(rate).toBeGreaterThan(0.75);
   });
 
-  it("9階は10階ほど厳しくなく、星5装備クラスでも十分勝機がある", () => {
-    const rate = winRate(9, 5, 50, 5, 2, 150);
-    expect(rate).toBeGreaterThan(0.7);
+  it("9階は10階ほど厳しくなく、星5装備クラス(5体編成)でも十分勝機があるが、確実ではない", () => {
+    const rate = winRate(9, 5, 50, 5, 2, 150, MAX_DUNGEON_PARTY_SIZE);
+    expect(rate).toBeGreaterThan(0.5);
+    expect(rate).toBeLessThan(0.95);
+  });
+
+  it("育成途中で1体だけそこそこ強いモンスターがいる程度の編成(5体)では、10階にはほぼ勝てない(バランス報告の回帰テスト)", () => {
+    let wins = 0;
+    const trials = 60;
+    for (let i = 0; i < trials; i++) {
+      const rng = mulberry32(900 + i);
+      const party = buildModestParty();
+      const setup = setupDungeonBattle(party, EQUIPMENT_DUNGEON_FLOORS[9], []);
+      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
+      if (engine.run().winner === "PLAYER") wins += 1;
+    }
+    expect(wins / trials).toBeLessThan(0.1);
   });
 
   it("同じ星4装備フル装備でも、10階は1階よりはっきり難しい", () => {
     const floor1Rate = winRate(1, 5, 50, 4, 2, 80);
-    const floor10Rate = winRate(10, 5, 50, 4, 2, 80);
+    const floor10Rate = winRate(10, 5, 50, 4, 2, 80, MAX_DUNGEON_PARTY_SIZE);
     expect(floor10Rate).toBeLessThan(floor1Rate);
   });
 
