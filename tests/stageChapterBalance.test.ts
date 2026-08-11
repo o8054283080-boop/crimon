@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
-import { generateEquipment, SetType } from "../src/core/equipment.js";
+import { EquipStar, generateEquipment, SetType } from "../src/core/equipment.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { Star } from "../src/core/rarity.js";
 import { STAGES } from "../src/data/stages.js";
@@ -25,10 +25,10 @@ const STARTER = [
 ];
 
 /**
- * 章のボス(最終ステージ最終ウェーブ)を、指定した星・レベル・装備(全員フル6スロット、星1・サブ2個の
+ * 章のボス(最終ステージ最終ウェーブ)を、指定した星・レベル・装備(全員フル6スロット、指定した星・サブ2個の
  * チャプターテーマシリーズ)のパーティでクリアできるかを試行し、勝率を返す。
  */
-function chapterBossWinRate(chapter: number, star: Star, level: number, set: SetType, trials: number): number {
+function chapterBossWinRate(chapter: number, star: Star, level: number, set: SetType, eqStar: EquipStar, trials: number): number {
   const stage = STAGES.filter((s) => s.chapter === chapter)[4];
   let wins = 0;
   for (let i = 0; i < trials; i++) {
@@ -37,7 +37,7 @@ function chapterBossWinRate(chapter: number, star: Star, level: number, set: Set
     const equipmentList = party.flatMap((instance) => {
       const slots = [1, 2, 3, 4, 5, 6] as const;
       return slots.map((slot) => {
-        const eq = generateEquipment({ slot, star: 1, subStatCount: 2, set, rng: gearRng });
+        const eq = generateEquipment({ slot, star: eqStar, subStatCount: 2, set, rng: gearRng });
         instance.equipment[slot] = eq.id;
         return eq;
       });
@@ -65,23 +65,23 @@ function chapterBossWinRate(chapter: number, star: Star, level: number, set: Set
 }
 
 describe("チャプター間の難易度エスカレーション(章が進むほどちゃんと強くなるか)", () => {
-  it("チャプター1・2のボスは星2Lv20のパーティで安定してクリアできる(序盤の据え置きバランスを維持)", () => {
-    expect(chapterBossWinRate(1, 2, 20, "CRIT", 40)).toBeGreaterThan(0.8);
-    expect(chapterBossWinRate(2, 2, 20, "POWER", 40)).toBeGreaterThan(0.8);
+  it("チャプター1・2のボスは星2Lv20+星1装備のパーティで安定してクリアできる(序盤の据え置きバランスを維持)", () => {
+    expect(chapterBossWinRate(1, 2, 20, "CRIT", 1, 40)).toBeGreaterThan(0.8);
+    expect(chapterBossWinRate(2, 2, 20, "POWER", 1, 40)).toBeGreaterThan(0.8);
   });
 
-  it("チャプター3のボスは星2Lv20のパーティでは苦戦し、星3Lv30まで育てると安定してクリアできる", () => {
-    expect(chapterBossWinRate(3, 2, 20, "GUARD", 40)).toBeLessThan(0.3);
-    expect(chapterBossWinRate(3, 3, 30, "GUARD", 40)).toBeGreaterThan(0.4);
+  it("チャプター3のボスは星2Lv20では苦戦し、星4Lv40+星3装備まで育てると安定してクリアできる", () => {
+    expect(chapterBossWinRate(3, 2, 20, "GUARD", 1, 40)).toBeLessThan(0.3);
+    expect(chapterBossWinRate(3, 4, 40, "GUARD", 3, 40)).toBeGreaterThan(0.8);
   });
 
-  it("チャプター4のボスは星3Lv30ではまだ厳しく、星4Lv40まで育てると安定してクリアできる", () => {
-    expect(chapterBossWinRate(4, 3, 30, "VITALITY", 40)).toBeLessThan(0.3);
-    expect(chapterBossWinRate(4, 4, 40, "VITALITY", 40)).toBeGreaterThan(0.8);
+  it("チャプター4のボス(最終ボス)は星4Lv40+星2装備ではまだ厳しく、星6Lv60+星5装備まで育てると安定してクリアできる", () => {
+    expect(chapterBossWinRate(4, 4, 40, "VITALITY", 2, 40)).toBeLessThan(0.3);
+    expect(chapterBossWinRate(4, 6, 60, "VITALITY", 5, 40)).toBeGreaterThan(0.8);
   });
 
-  it("同じ星2Lv20装備のパーティでも、チャプターが上がるほど勝率は下がっていく(単調悪化)", () => {
-    const rates = [1, 2, 3, 4].map((chapter) => chapterBossWinRate(chapter, 2, 20, "CRIT", 30));
+  it("同じ星2Lv20+星1装備のパーティでも、チャプターが上がるほど勝率は下がっていく(単調悪化)", () => {
+    const rates = [1, 2, 3, 4].map((chapter) => chapterBossWinRate(chapter, 2, 20, "CRIT", 1, 30));
     for (let i = 1; i < rates.length; i++) {
       expect(rates[i]).toBeLessThanOrEqual(rates[i - 1]);
     }

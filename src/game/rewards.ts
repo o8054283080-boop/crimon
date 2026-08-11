@@ -4,7 +4,7 @@ import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.j
 import { Equipment } from "../core/equipment.js";
 import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
 import { findMonsterById } from "../data/monsters.js";
-import { Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
+import { Difficulty, Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
 import {
   FIRST_CLEAR_CRYSTAL_REWARD,
   PlayerState,
@@ -59,9 +59,10 @@ export function applyStageClearRewards(
   stage: Stage,
   wavesCleared: number,
   partyInstances: MonsterInstance[],
+  difficulty: Difficulty = "NORMAL",
 ): ClearRewardResult {
-  const isFirstClear = !isStageCleared(state, stage.id);
-  markStageCleared(state, stage.id);
+  const isFirstClear = !isStageCleared(state, stage.id, difficulty);
+  markStageCleared(state, stage.id, difficulty);
 
   const expTotal = wavesCleared * stage.rewards.waveExp;
   const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
@@ -71,7 +72,7 @@ export function applyStageClearRewards(
 
   const drop = rollStageDrop(stage);
   if (drop) addMonster(state, drop.dexId, drop.star);
-  const equipmentDrop = rollStageEquipment(stage);
+  const equipmentDrop = rollStageEquipment(stage, Math.random, difficulty);
   if (equipmentDrop) addEquipment(state, equipmentDrop);
   const pigDrop = rollStageReincarnationPig();
   if (pigDrop) addMonster(state, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);

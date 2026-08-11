@@ -152,7 +152,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
           [`⭐ ランクアップ (素材${RANK_UP_SACRIFICE_COUNT[instance.star]}体必要)`],
         )
       : el("div", { className: "panel rankup-hint" }, [
-          instance.star >= 5 ? "最大ランクに到達しています" : `最大レベル(Lv${maxLevel})になるとランクアップできます`,
+          instance.star >= 6 ? "最大ランクに到達しています" : `最大レベル(Lv${maxLevel})になるとランクアップできます`,
         ]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectDetail(null) }, ["◀ 一覧に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));

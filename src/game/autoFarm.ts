@@ -1,7 +1,7 @@
 import { BattleEngine } from "../battle/engine.js";
 import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { DungeonFloor } from "../data/equipmentDungeon.js";
-import { Stage } from "../data/stages.js";
+import { Difficulty, Stage } from "../data/stages.js";
 import { setupDungeonBattle } from "./dungeonRunner.js";
 import { getDungeonParty, getParty, PlayerState, trySpendStamina } from "./playerState.js";
 import { ClearRewardResult, LevelUpInfo, applyDungeonClearRewards, applyStageClearRewards } from "./rewards.js";
@@ -80,6 +80,7 @@ export function runStageAutoFarm(
   stage: Stage,
   times: number,
   rng: () => number = Math.random,
+  difficulty: Difficulty = "NORMAL",
 ): AutoFarmResult {
   const result = emptyResult();
 
@@ -102,7 +103,7 @@ export function runStageAutoFarm(
     let cleared = true;
 
     for (const wave of stage.waves) {
-      const setup = setupWaveBattle(currentParty, carryHp, wave, state.equipment);
+      const setup = setupWaveBattle(currentParty, carryHp, wave, state.equipment, difficulty);
       const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp, rng });
       const battleResult = engine.run();
       if (battleResult.winner !== "PLAYER") {
@@ -119,7 +120,7 @@ export function runStageAutoFarm(
     state.gold += waveGoldEarned;
 
     if (cleared) {
-      const reward = applyStageClearRewards(state, stage, wavesCleared, originalParty);
+      const reward = applyStageClearRewards(state, stage, wavesCleared, originalParty, difficulty);
       mergeReward(result, reward, 0);
       result.cleared += 1;
     } else {

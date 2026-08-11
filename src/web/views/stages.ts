@@ -1,7 +1,7 @@
 import { ELEMENT_JA } from "../../core/element.js";
 import { SET_LABEL } from "../../core/equipment.js";
 import { STAGE_STAMINA_COST } from "../../core/fighterLevel.js";
-import { STAGES, Stage } from "../../data/stages.js";
+import { DIFFICULTIES, Difficulty, DIFFICULTY_JA, STAGES, Stage } from "../../data/stages.js";
 import { MONSTER_TEMPLATES } from "../../data/monsters.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -10,11 +10,19 @@ export interface StagesProps {
   player: PlayerState;
   selectedStageId: string | null;
   onSelectStage: (id: string | null) => void;
-  onStartStage: (stage: Stage) => void;
+  selectedDifficulty: Difficulty;
+  onSelectDifficulty: (difficulty: Difficulty) => void;
+  onStartStage: (stage: Stage, difficulty: Difficulty) => void;
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
-  onAutoFarm: (stage: Stage, count: number) => void;
+  onAutoFarm: (stage: Stage, count: number, difficulty: Difficulty) => void;
 }
+
+const DIFFICULTY_DESCRIPTION: Record<Difficulty, string> = {
+  NORMAL: "標準の強さです。",
+  HARD: "敵が強化される代わりに、ドロップする装備の星が上がりやすくなります。",
+  HELL: "敵が大幅に強化される代わりに、ドロップする装備の星がさらに上がりやすくなります。",
+};
 
 function speciesLabel(templateId: string): string {
   return MONSTER_TEMPLATES.find((t) => t.templateId === templateId)?.baseName ?? templateId;
@@ -80,8 +88,26 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
     ]),
   );
 
+  const difficulty = props.selectedDifficulty;
+  const difficultyButtons = DIFFICULTIES.map((d) =>
+    el(
+      "button",
+      {
+        type: "button",
+        className: "btn" + (d === difficulty ? " btn--primary" : " btn--ghost"),
+        onclick: () => props.onSelectDifficulty(d),
+      },
+      [DIFFICULTY_JA[d]],
+    ),
+  );
+
   return el("div", { className: "screen stages-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [stage.name])]),
+    el("section", { className: "panel" }, [
+      el("h2", {}, ["難易度"]),
+      el("div", { className: "difficulty-picker" }, difficultyButtons),
+      el("p", { className: "app-subtitle" }, [DIFFICULTY_DESCRIPTION[difficulty]]),
+    ]),
     el("section", { className: "panel" }, [el("div", { className: "wave-rows" }, waveRows)]),
     el("section", { className: "panel" }, [
       el("h2", {}, ["報酬"]),
@@ -93,7 +119,7 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
     !hasEnoughStamina ? el("p", { className: "app-subtitle" }, ["スタミナが足りません。"]) : null,
     el(
       "button",
-      { type: "button", className: "btn btn--primary btn--large", disabled: !canChallenge, onclick: () => props.onStartStage(stage) },
+      { type: "button", className: "btn btn--primary btn--large", disabled: !canChallenge, onclick: () => props.onStartStage(stage, difficulty) },
       [`⚔ 挑戦する (⚡${STAGE_STAMINA_COST})`],
     ),
     el("section", { className: "panel auto-farm-panel" }, [
@@ -119,7 +145,7 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
           type: "button",
           className: "btn btn--primary btn--large",
           disabled: !canChallenge,
-          onclick: () => props.onAutoFarm(stage, props.autoFarmCount),
+          onclick: () => props.onAutoFarm(stage, props.autoFarmCount, difficulty),
         },
         [`▶ オート周回開始`],
       ),

@@ -531,12 +531,14 @@ const NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS: WeightedOption<number>[] = [
 ];
 
 /**
- * チャプター(ステージ1〜4)テーマ装備。星は必ず1固定、シリーズは指定されたものに固定される。
+ * チャプター(ステージ1〜4)テーマ装備。星は通常1固定だが、starBonusを渡すとその分だけ星を引き上げられる
+ * (ボスステージのボーナスドロップ・ハード/ヘル難易度用、6を超える分はクランプされる)。シリーズは指定されたものに固定される。
  * サブステータスの個数分布は通常ステージ装備と同じ(0〜2個、大半は0〜1個)。
  */
-export function generateThemedStageEquipment(set: SetType, rng: () => number = Math.random): Equipment {
+export function generateThemedStageEquipment(set: SetType, rng: () => number = Math.random, starBonus = 0): Equipment {
   const subStatCount = weightedPick(NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS, rng);
-  return generateEquipment({ star: 1, set, subStatCount, rng });
+  const star = Math.max(1, Math.min(6, 1 + starBonus)) as EquipStar;
+  return generateEquipment({ star, set, subStatCount, rng });
 }
 
 /**

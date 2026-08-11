@@ -2,6 +2,7 @@ import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment,
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
+import { Difficulty } from "../data/stages.js";
 
 export interface PlayerState {
   crystal: number;
@@ -144,13 +145,22 @@ export function toggleDungeonPartyMember(state: PlayerState, instanceId: string)
   state.dungeonPartyIds.push(instanceId);
 }
 
-export function isStageCleared(state: PlayerState, stageId: string): boolean {
-  return state.clearedStageIds.includes(stageId);
+/**
+ * クリア済み判定用のキーを作る。ノーマルは既存セーブとの後方互換のため素のstageIdのまま扱い、
+ * ハード/ヘルだけ難易度サフィックスを付けて別枠のクリア扱いにする。
+ */
+function stageClearKey(stageId: string, difficulty: Difficulty): string {
+  return difficulty === "NORMAL" ? stageId : `${stageId}::${difficulty}`;
 }
 
-export function markStageCleared(state: PlayerState, stageId: string): void {
-  if (!state.clearedStageIds.includes(stageId)) {
-    state.clearedStageIds.push(stageId);
+export function isStageCleared(state: PlayerState, stageId: string, difficulty: Difficulty = "NORMAL"): boolean {
+  return state.clearedStageIds.includes(stageClearKey(stageId, difficulty));
+}
+
+export function markStageCleared(state: PlayerState, stageId: string, difficulty: Difficulty = "NORMAL"): void {
+  const key = stageClearKey(stageId, difficulty);
+  if (!state.clearedStageIds.includes(key)) {
+    state.clearedStageIds.push(key);
   }
 }
 
