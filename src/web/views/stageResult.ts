@@ -70,7 +70,7 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
       : null,
     pigDex && info.pigDrop
       ? el("section", { className: "panel" }, [
-          el("h2", {}, ["転生ピッグを入手！"]),
+          el("h2", {}, ["🐷 ボーナスモンスターを入手！"]),
           el("div", { className: "summon-card summon-card--rare" }, [
             el("div", { className: "summon-card__avatar", style: `background:${pigDex.color}` }, []),
             el("div", { className: "summon-card__name" }, [pigDex.name]),

@@ -9,10 +9,11 @@ export interface HomeProps {
   onGoStages: () => void;
   onGoParty: () => void;
   onGoEquipDungeon: () => void;
+  onGoLevelDungeon: () => void;
 }
 
 export function renderHome(props: HomeProps): HTMLElement {
-  const { player, onGoSummon, onGoStages, onGoParty, onGoEquipDungeon } = props;
+  const { player, onGoSummon, onGoStages, onGoParty, onGoEquipDungeon, onGoLevelDungeon } = props;
   const party = getParty(player);
 
   const isMaxFighterLevel = player.fighterLevel >= MAX_FIGHTER_LEVEL;
@@ -38,5 +39,6 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("button", { type: "button", className: "btn btn--primary btn--large", onclick: onGoStages }, ["🗺 ステージに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoSummon }, ["✨ モンスターを召喚する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoEquipDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
+    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoLevelDungeon }, ["📈 レベル上げダンジョンに挑戦する"]),
   ]);
 }

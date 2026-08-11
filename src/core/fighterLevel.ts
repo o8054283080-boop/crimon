@@ -16,6 +16,8 @@ export const STAMINA_PER_LEVEL = 10;
 export const STAGE_STAMINA_COST = 5;
 /** 装備ダンジョン挑戦1回あたりのスタミナ消費量 */
 export const DUNGEON_STAMINA_COST = 10;
+/** レベル上げダンジョン挑戦1回あたりのスタミナ消費量 */
+export const LEVEL_DUNGEON_STAMINA_COST = 20;
 
 /** そのファイターレベルにおけるスタミナ上限 */
 export function maxStaminaForFighterLevel(level: number): number {

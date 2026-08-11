@@ -2,14 +2,15 @@ import "./style.css";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { EquipSlot } from "../core/equipment.js";
-import { DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
+import { DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor } from "../data/equipmentDungeon.js";
+import { LevelDungeonDef, LevelDungeonTier } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
-import { AutoFarmResult, runDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
-import { applyDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
+import { AutoFarmResult, runDungeonAutoFarm, runLevelDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
+import { applyDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import {
   PlayerState,
@@ -25,7 +26,6 @@ import {
   tryEnhanceEquipment,
   trySpendStamina,
   tryUseSummonScroll,
-  unequipFromMonster,
 } from "../game/playerState.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
@@ -36,6 +36,7 @@ import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderHome } from "./views/home.js";
+import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderMonsters } from "./views/monsters.js";
 import { PartyEditMode, renderParty } from "./views/party.js";
@@ -62,6 +63,11 @@ interface DungeonRunState {
   partyInstances: MonsterInstance[];
 }
 
+interface LevelDungeonRunState {
+  def: LevelDungeonDef;
+  partyInstances: MonsterInstance[];
+}
+
 interface AppState {
   screen: ScreenName;
   player: PlayerState;
@@ -77,6 +83,8 @@ interface AppState {
   equipmentPickerContext: EquipmentPickerContext | null;
   selectedDungeonFloor: number | null;
   dungeonRun: DungeonRunState | null;
+  selectedLevelDungeonTier: LevelDungeonTier | null;
+  levelDungeonRun: LevelDungeonRunState | null;
   selectedDexEntryId: string | null;
   monsterTrainingTargetId: string | null;
   monsterTrainingMaterialIds: string[];
@@ -101,6 +109,8 @@ const state: AppState = {
   equipmentPickerContext: null,
   selectedDungeonFloor: null,
   dungeonRun: null,
+  selectedLevelDungeonTier: null,
+  levelDungeonRun: null,
   selectedDexEntryId: null,
   monsterTrainingTargetId: null,
   monsterTrainingMaterialIds: [],
@@ -116,6 +126,26 @@ const root: HTMLElement = rootCandidate;
 
 let disposeCurrentView: (() => void) | null = null;
 
+/** 画面(+サブ状態)ごとのスクロール位置を記憶し、その画面に戻った時に復元する */
+const scrollPositions = new Map<string, number>();
+let lastRouteKey: string | null = null;
+
+function routeKey(): string {
+  return JSON.stringify([
+    state.screen,
+    state.monsterDetailId,
+    state.rankUpMode,
+    state.equipmentDetailId,
+    state.equipmentPickerContext,
+    state.selectedStageId,
+    state.selectedDifficulty,
+    state.selectedDungeonFloor,
+    state.selectedDexEntryId,
+    state.monsterTrainingTargetId,
+    state.selectedLevelDungeonTier,
+  ]);
+}
+
 function navigate(screen: ScreenName): void {
   state.screen = screen;
   state.monsterDetailId = null;
@@ -127,6 +157,7 @@ function navigate(screen: ScreenName): void {
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
   state.selectedDungeonFloor = null;
+  state.selectedLevelDungeonTier = null;
   state.selectedDexEntryId = null;
   state.monsterTrainingTargetId = null;
   state.monsterTrainingMaterialIds = [];
@@ -140,9 +171,9 @@ function handleSelectSlot(monsterId: string, slot: EquipSlot): void {
   render();
 }
 
-function handleUnequipSlot(monsterId: string, slot: EquipSlot): void {
-  unequipFromMonster(state.player, monsterId, slot);
-  savePlayerState(state.player);
+function handleViewEquippedSlot(equipmentId: string): void {
+  state.equipmentDetailId = equipmentId;
+  state.screen = "EQUIPMENT";
   render();
 }
 
@@ -352,6 +383,54 @@ function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
   render();
 }
 
+function startLevelDungeonTier(def: LevelDungeonDef): void {
+  const party = getParty(state.player);
+  if (party.length === 0) return;
+  if (!trySpendStamina(state.player, LEVEL_DUNGEON_STAMINA_COST).ok) return;
+  savePlayerState(state.player);
+  state.levelDungeonRun = { def, partyInstances: party };
+  state.screen = "LEVEL_DUNGEON_BATTLE";
+  render();
+}
+
+function finishLevelDungeon(cleared: boolean): void {
+  const run = state.levelDungeonRun;
+  if (!run) return;
+  const def = run.def;
+
+  const reward = cleared ? applyLevelDungeonClearRewards(state.player, def, run.partyInstances) : null;
+  savePlayerState(state.player);
+
+  state.stageResult = {
+    cleared,
+    stageName: def.name,
+    goldEarned: reward?.goldEarned ?? 0,
+    crystalEarned: reward?.crystalEarned ?? 0,
+    wavesCleared: cleared ? 1 : 0,
+    totalWaves: 1,
+    levelUps: reward?.levelUps ?? [],
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop: reward?.pigDrop ?? null,
+    summonScrollDropped: false,
+    fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
+  };
+  state.levelDungeonRun = null;
+  state.screen = "STAGE_RESULT";
+  render();
+}
+
+function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
+  const result = runLevelDungeonAutoFarm(state.player, def, count);
+  savePlayerState(state.player);
+  state.autoFarmResult = result;
+  state.autoFarmTargetName = def.name;
+  state.selectedLevelDungeonTier = null;
+  state.screen = "AUTO_FARM_RESULT";
+  render();
+}
+
 function renderCurrentDungeonBattle(): BattleViewHandle {
   const run = state.dungeonRun;
   if (!run) throw new Error("dungeonRun is not set");
@@ -366,6 +445,23 @@ function renderCurrentDungeonBattle(): BattleViewHandle {
     title: run.floor.name,
     resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
     onFinish: (winner) => finishDungeon(winner === "PLAYER"),
+  });
+}
+
+function renderCurrentLevelDungeonBattle(): BattleViewHandle {
+  const run = state.levelDungeonRun;
+  if (!run) throw new Error("levelDungeonRun is not set");
+
+  const setup = setupDungeonBattle(run.partyInstances, run.def, state.player.equipment);
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+
+  return renderBattleView({
+    engine,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    title: run.def.name,
+    resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
+    onFinish: (winner) => finishLevelDungeon(winner === "PLAYER"),
   });
 }
 
@@ -409,6 +505,8 @@ function renderCurrentWaveBattle(): BattleViewHandle {
 }
 
 function render(): void {
+  if (lastRouteKey !== null) scrollPositions.set(lastRouteKey, window.scrollY);
+
   disposeCurrentView?.();
   disposeCurrentView = null;
   root.innerHTML = "";
@@ -428,6 +526,7 @@ function render(): void {
         onGoStages: () => navigate("STAGES"),
         onGoParty: () => navigate("PARTY"),
         onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
+        onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
       });
       break;
 
@@ -537,6 +636,33 @@ function render(): void {
       break;
     }
 
+    case "LEVEL_DUNGEON":
+      content = renderLevelDungeon({
+        player: state.player,
+        selectedTier: state.selectedLevelDungeonTier,
+        onSelectTier: (tier) => {
+          state.selectedLevelDungeonTier = tier;
+          render();
+        },
+        onStartTier: startLevelDungeonTier,
+        onGoParty: () => navigate("PARTY"),
+        autoFarmCount: state.autoFarmCount,
+        onChangeAutoFarmCount: (count) => {
+          state.autoFarmCount = count;
+          render();
+        },
+        onAutoFarm: handleAutoFarmLevelDungeon,
+      });
+      break;
+
+    case "LEVEL_DUNGEON_BATTLE": {
+      showNav = false;
+      const handle = renderCurrentLevelDungeonBattle();
+      disposeCurrentView = handle.dispose;
+      content = handle.element;
+      break;
+    }
+
     case "MONSTER_DEX":
       content = renderMonsterDex({
         selectedDexId: state.selectedDexEntryId,
@@ -603,6 +729,10 @@ function render(): void {
 
   root.append(content);
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
+
+  const newRouteKey = routeKey();
+  window.scrollTo(0, scrollPositions.get(newRouteKey) ?? 0);
+  lastRouteKey = newRouteKey;
 }
 
 function renderSummonScreen(): HTMLElement {
@@ -648,7 +778,7 @@ function renderMonstersScreen(): HTMLElement {
       render();
     },
     onSelectSlot: handleSelectSlot,
-    onUnequipSlot: handleUnequipSlot,
+    onViewEquippedSlot: handleViewEquippedSlot,
     onGoMonsterTraining: (monsterId) => {
       state.monsterTrainingTargetId = monsterId;
       state.monsterTrainingMaterialIds = [];

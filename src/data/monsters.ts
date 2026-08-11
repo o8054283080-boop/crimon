@@ -773,11 +773,65 @@ export const REINCARNATION_PIG: MonsterTemplate = {
   ],
 };
 
+/**
+ * 経験ピッグ: モンスター強化(経験値フィード)専用のモンスター。ガチャやステージには一切出現せず、
+ * レベル上げダンジョンでのみ入手できる。常にその星のレベル上限で手に入るため、
+ * 星が高いほど素材にした時の経験値量が大きくなる(戦力にはならない点は転生ピッグと同じ)。
+ * 素材専用のため、スキルは属性によらず共通(バリエーションなし)。
+ */
+export const EXP_PIG: MonsterTemplate = {
+  templateId: "exp_pig",
+  baseName: "経験ピッグ",
+  emoji: "🐖",
+  role: "素材",
+  baseStats: {
+    hp: 200,
+    atk: 15,
+    def: 8,
+    spd: 60,
+    criRate: 0.02,
+    criDmg: 1.2,
+    resistance: 0.02,
+    accuracy: 0.02,
+  },
+  skill1: {
+    id: "exp_pig_s1",
+    name: "ちょこっと突進",
+    description: "敵単体に攻撃力0.3倍のダメージを与える。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 0.3 }],
+  },
+  skill2Variants: [
+    {
+      id: "exp_pig_s2",
+      name: "はなさき体当たり",
+      description: "敵単体に攻撃力0.4倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 2,
+      effects: [{ kind: "DAMAGE", multiplier: 0.4 }],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "exp_pig_s3",
+      name: "ぶひぶひ",
+      description: "敵単体に攻撃力0.5倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 4,
+      effects: [{ kind: "DAMAGE", multiplier: 0.5 }],
+    },
+  ],
+};
+
 /** テンプレート×6属性 = 24体の色違いモンスター図鑑(通常の召喚・ステージ対象) */
 export const MONSTER_TEMPLATES_DEX = MONSTER_TEMPLATES.flatMap((template) => createAllVariants(template));
 
 /** 転生ピッグの6属性色違いバリエーション(図鑑には含めるが、通常の召喚・ステージ抽選には出さない) */
 export const REINCARNATION_PIG_DEX = createAllVariants(REINCARNATION_PIG);
+
+/** 経験ピッグの6属性色違いバリエーション(図鑑には含めるが、通常の召喚・ステージ抽選には出さない) */
+export const EXP_PIG_DEX = createAllVariants(EXP_PIG);
 
 /** ガチャ限定の高レアモンスター(SR/SSR)図鑑。GRIFFON/DRAGON/SERAPH/NEMESISとも全6属性 */
 export const GACHA_EXCLUSIVE_DEX = [
@@ -787,8 +841,8 @@ export const GACHA_EXCLUSIVE_DEX = [
   ...GACHA_SSR_RARE_DEX,
 ];
 
-/** 検索用の全モンスター図鑑(通常モンスター + ガチャ限定高レア + 転生ピッグ) */
-export const MONSTER_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...REINCARNATION_PIG_DEX];
+/** 検索用の全モンスター図鑑(通常モンスター + ガチャ限定高レア + 転生ピッグ + 経験ピッグ) */
+export const MONSTER_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...REINCARNATION_PIG_DEX, ...EXP_PIG_DEX];
 
 /** モンスター図鑑UI表示用(転生ピッグは素材専用のため除外) */
 export const ALL_DISPLAYABLE_MONSTERS_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX];
