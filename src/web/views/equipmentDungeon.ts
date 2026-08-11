@@ -1,7 +1,8 @@
 import { EquipStar } from "../../core/equipment.js";
 import { CYCLE_ELEMENTS, Element, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
 import { DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
-import { DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
+import { DungeonEnemy, DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
+import { findMonster } from "../../data/monsters.js";
 import { getDungeonParty, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 
@@ -32,6 +33,10 @@ function floorElement(floor: DungeonFloor): Element {
 /** floorElementに対して有利(弱点を突ける)属性を返す */
 function counterElement(element: Element): Element | null {
   return CYCLE_ELEMENTS.find((e) => getElementAffinity(e, element) === "ADVANTAGE") ?? null;
+}
+
+function enemyDisplayName(enemy: DungeonEnemy): string {
+  return findMonster(enemy.templateId, enemy.element)?.name ?? enemy.templateId;
 }
 
 function renderList(props: EquipmentDungeonProps): HTMLElement {
@@ -75,7 +80,9 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
   const canChallenge = party.length > 0 && hasEnoughStamina;
 
   const enemyTags = floor.enemies.map((e) =>
-    el("span", { className: "enemy-tag" }, [`${e.templateId}[${ELEMENT_JA[e.element]}]★${e.star}Lv${e.level}`]),
+    el("span", { className: "enemy-tag" + (e.isBoss ? " enemy-tag--boss" : "") }, [
+      `${e.isBoss ? "👑 " : ""}${enemyDisplayName(e)}★${e.star}Lv${e.level}${e.isBoss ? " 【BOSS】" : ""}`,
+    ]),
   );
 
   const element = floorElement(floor);

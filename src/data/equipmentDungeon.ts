@@ -1,13 +1,22 @@
 import { Element } from "../core/element.js";
 import { DUNGEON_FLOOR_COUNT, Equipment, generateDungeonEquipment } from "../core/equipment.js";
-import { Star } from "../core/rarity.js";
-import { MONSTER_TEMPLATES, REINCARNATION_PIG_DEX } from "./monsters.js";
+import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
+import {
+  GACHA_SR_COMMON_TEMPLATE,
+  GACHA_SR_RARE_TEMPLATE,
+  GACHA_SSR_COMMON_TEMPLATE,
+  GACHA_SSR_RARE_TEMPLATE,
+  MONSTER_TEMPLATES,
+  REINCARNATION_PIG_DEX,
+} from "./monsters.js";
 
 export interface DungeonEnemy {
   templateId: string;
   element: Element;
   star: Star;
   level: number;
+  /** 階層専用ボス(お供2体を連れて登場する)かどうか */
+  isBoss?: boolean;
 }
 
 export interface DungeonFloor {
@@ -21,16 +30,26 @@ export interface DungeonFloor {
 
 const NORMAL_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
 
-/** 装備ダンジョンの敵は全階層とも星5・Lv50(最大値)で固定。難易度はpowerScaleのみで表現する */
+/** お供(通常モンスター2体)は星5・Lv50(星5の最大値)で固定。難易度はpowerScaleのみで表現する */
 const DUNGEON_ENEMY_STAR: Star = 5;
 const DUNGEON_ENEMY_LEVEL = 50;
 
+/** 階層専用ボスは、お供よりさらに一段階強い星6・Lv60(星6の最大値)で登場する */
+const DUNGEON_BOSS_STAR: Star = 6;
+const DUNGEON_BOSS_LEVEL = STAR_MAX_LEVEL[DUNGEON_BOSS_STAR];
+
 /**
- * 1階/10階の必要パワースケール。
+ * 各階層のボスは、ガチャ限定の高レアモンスター(SR:グリフォン/セラフ、SSR:ドラゴン/ネメシス)を
+ * 巡回で1体割り当てる。ステータスも通常モンスターよりベースが高く設定されているうえに星6で
+ * 登場するため、お供2体とはっきり格の違うボスらしい強さになる。
+ */
+const BOSS_TEMPLATES = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE];
+
+/**
+ * 1階/8階の必要パワースケール。
  * 1階は「星3モンスターに星1装備」くらいの、まだ育成途中のパーティでも挑めるくらいまで下げてあり、
  * 装備ダンジョンの入り口として無理なく足を踏み入れられるようにしてある。
- * そこから階層を上がるごとになだらかに強くなっていき、10階は星6装備をそろえてようやく勝てる
- * 最終関門になる(星5装備だけではまだ足りない水準)。
+ * そこから階層を上がるごとになだらかに強くなっていく。
  * ランクアップの複利倍率引き上げ(星5/Lv50の実効ステータス底上げ)や、
  * モンスターごとのスキル2/3が属性ごとに異なる組み合わせになったことによる
  * 戦闘バランスの変化に合わせて、この値は都度調整してある。
@@ -38,21 +57,42 @@ const DUNGEON_ENEMY_LEVEL = 50;
 const POWER_SCALE_START = 0.62;
 const POWER_SCALE_END = 1.7;
 
+/**
+ * 9・10階はダンジョン最終盤の最終関門として、8階までの線形カーブに対してさらに
+ * 大きく難易度を引き上げる(星6装備クラスをフルで固めてようやく勝てる水準を想定)。
+ */
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.15, 10: 1.35 };
+
+function powerScaleForFloor(floor: number): number {
+  const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
+  return base * (LATE_FLOOR_POWER_BONUS[floor] ?? 1);
+}
+
 function buildFloor(floor: number): DungeonFloor {
   // 各階層の敵は単一属性で統一する。弱点を突く属性のパーティを組めば有利に戦えるようになる
   const floorElement = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
-  const enemies: DungeonEnemy[] = MONSTER_TEMPLATES.map((template) => ({
-    templateId: template.templateId,
-    element: floorElement,
-    star: DUNGEON_ENEMY_STAR,
-    level: DUNGEON_ENEMY_LEVEL,
-  }));
 
-  // 1階は星3モンスター+星1装備くらいで挑める水準から始まり、階層が上がるごとに
-  // なだらかに線形上昇して、10階では星6装備クラスの投資が必要になる
-  const powerScale = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
+  const companionTemplates = [MONSTER_TEMPLATES[(floor - 1) % MONSTER_TEMPLATES.length], MONSTER_TEMPLATES[floor % MONSTER_TEMPLATES.length]];
+  const bossTemplate = BOSS_TEMPLATES[(floor - 1) % BOSS_TEMPLATES.length];
 
-  return { floor, name: `装備ダンジョン ${floor}階`, enemies, powerScale, goldReward: 60 * floor };
+  // ボス1体+お供2体の3体編成。ボスを先頭に置く
+  const enemies: DungeonEnemy[] = [
+    {
+      templateId: bossTemplate.templateId,
+      element: floorElement,
+      star: DUNGEON_BOSS_STAR,
+      level: DUNGEON_BOSS_LEVEL,
+      isBoss: true,
+    },
+    ...companionTemplates.map((template) => ({
+      templateId: template.templateId,
+      element: floorElement,
+      star: DUNGEON_ENEMY_STAR,
+      level: DUNGEON_ENEMY_LEVEL,
+    })),
+  ];
+
+  return { floor, name: `装備ダンジョン ${floor}階`, enemies, powerScale: powerScaleForFloor(floor), goldReward: 60 * floor };
 }
 
 export const EQUIPMENT_DUNGEON_FLOORS: DungeonFloor[] = Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildFloor(i + 1));
