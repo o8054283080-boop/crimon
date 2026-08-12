@@ -173,150 +173,237 @@ body {
   padding: 16px;
 }
 
-/* --- バトルアリーナ(SW風の演出寄り) --- */
+/* --- バトルステージ(Three.jsによる3D描画 + HTMLオーバーレイHUD) --- */
 
-.battle-arena {
-  position: relative;
-  border-radius: 20px;
-  padding: 16px 10px 22px;
-  background:
-    radial-gradient(ellipse 60% 34% at 50% 63%, rgba(120, 190, 255, 0.28), transparent 72%),
-    repeating-radial-gradient(circle at 50% 63%, rgba(255, 255, 255, 0.05) 0px, rgba(255, 255, 255, 0.05) 1px, transparent 1px, transparent 16px),
-    radial-gradient(ellipse 90% 55% at 50% 68%, rgba(255, 255, 255, 0.06), transparent 70%),
-    linear-gradient(180deg, #1c3049 0%, #182a42 30%, #142033 58%, #101728 80%, #0b0f1a 100%);
-  border: 1px solid var(--panel-border);
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
+.battle-view__header {
+  margin-bottom: 8px;
 }
 
-.battle-arena::before {
-  /* 敵側と味方側の境目のうっすらした水平線(地平線のイメージ) */
+.battle-stage {
+  position: relative;
+  width: 100%;
+  /* 横長寄りの画面では横長のステージにする。カメラは実際の縦横比から
+     構図を組み直すので、比率が変わっても両チームは必ず収まる */
+  aspect-ratio: 4 / 3;
+  max-height: 58vh;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #06070f;
+  border: 1px solid var(--panel-border);
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.75),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+  contain: layout paint;
+}
+
+/*
+ * 横向きのバトル表示。
+ * 4体対4体が横に並ぶこのゲームでは、横長の画面が最も構図に合う。
+ * 端末を寝かせた時は余白と付随情報を削り、ステージで画面を使い切る。
+ */
+@media (orientation: landscape) and (max-height: 620px) {
+  .screen.battle-view {
+    max-width: none;
+    gap: 6px;
+    padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+
+  .battle-view__header {
+    display: none;
+  }
+
+  .battle-stage {
+    /* 高さ基準にして画面いっぱいに広げる(縦横比の固定を解除) */
+    aspect-ratio: auto;
+    height: 74vh;
+    max-height: none;
+    border-radius: 14px;
+  }
+
+  /* ログは邪魔にならない細い帯に留める */
+  .battle-log-panel {
+    padding: 8px 10px;
+  }
+
+  .battle-log-panel h2 {
+    display: none;
+  }
+
+  .battle-log {
+    max-height: 52px;
+  }
+}
+
+.battle-stage__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.battle-stage::after {
+  /* 画面周辺を落とすビネット。中央の戦闘に視線を集める */
   content: "";
   position: absolute;
-  left: 6%;
-  right: 6%;
-  top: 46%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
-  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 78% 68% at 50% 52%, transparent 55%, rgba(0, 0, 0, 0.62) 100%);
+  z-index: 3;
 }
 
-.battle-arena__team {
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
-  padding: 10px 0;
+.battle-stage__overlay,
+.battle-stage__fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
 }
 
-.unit-token--enemys {
-  align-items: flex-start;
-}
-
-.unit-token--enemy:nth-child(odd) {
-  transform: translateY(-6px);
-}
-
-.unit-token--enemy:nth-child(even) {
-  transform: translateY(5px);
-}
-
-.unit-token {
-  position: relative;
+.unit-hud {
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  width: 78px;
+  gap: 2px;
+  width: 76px;
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
   transition: opacity 0.3s ease, filter 0.3s ease;
+  will-change: transform, left, top;
 }
 
-.unit-token__avatar-wrap {
-  position: relative;
-}
-
-.unit-token__platform {
-  position: absolute;
-  left: 50%;
-  bottom: -5px;
-  width: 56px;
-  height: 14px;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.5), transparent 72%);
-  z-index: -1;
-}
-
-.unit-token--dead {
-  opacity: 0.3;
+.unit-hud--dead {
+  opacity: 0;
   filter: grayscale(1);
 }
 
-.unit-token__avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
+.unit-hud__badges {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
-  font-size: 1.4rem;
-  line-height: 1;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25), 0 3px 10px rgba(0, 0, 0, 0.5);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  gap: 2px;
+  min-height: 0;
 }
 
-.unit-token--active .unit-token__avatar {
-  box-shadow: 0 0 0 3px var(--gauge), 0 0 16px 4px rgba(241, 196, 15, 0.6);
-  transform: scale(1.1);
-  animation: unit-active-pulse 1.1s ease-in-out infinite;
+.unit-hud__name {
+  font-size: 0.54rem;
+  font-weight: 700;
+  max-width: 76px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #eaf0ff;
+  background: linear-gradient(180deg, rgba(38, 46, 74, 0.92), rgba(8, 11, 22, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 2px 5px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
 }
 
-@keyframes unit-active-pulse {
+.unit-hud--active .unit-hud__name {
+  color: #1a1405;
+  background: linear-gradient(180deg, #fff3bd 0%, #ffd93b 55%, #e0a000 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 0 14px 3px rgba(255, 205, 40, 0.6);
+  animation: unit-hud-active-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes unit-hud-active-pulse {
   0%,
   100% {
     filter: brightness(1);
   }
   50% {
-    filter: brightness(1.25);
+    filter: brightness(1.18);
   }
 }
 
-.unit-token__avatar--hit {
-  animation: unit-hit-shake 0.4s ease;
+.unit-hud__hp {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #05070f, #131829);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 1px 2px rgba(0, 0, 0, 0.9),
+    0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-@keyframes unit-hit-shake {
-  0% {
-    transform: translateX(0);
-    filter: brightness(1);
-  }
-  15% {
-    transform: translateX(-6px);
-    filter: brightness(1.8) saturate(2);
-  }
-  30% {
-    transform: translateX(5px);
-  }
-  45% {
-    transform: translateX(-4px);
-  }
-  60% {
-    transform: translateX(3px);
-  }
-  100% {
-    transform: translateX(0);
-    filter: brightness(1);
-  }
+/* 減った分を遅れて追いかける帯。被弾の瞬間だけ赤く覗いて手応えを出す */
+.unit-hud__hp-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff8f7a, #d63a2a);
+  transition: width 0.55s cubic-bezier(0.33, 1, 0.68, 1) 0.22s;
 }
 
-.unit-token__badges {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 2px;
+/* 回復時は遅れて追う意味がないので即座に合わせる */
+.unit-hud__hp-trail--instant {
+  transition: none;
+}
+
+.unit-hud__hp-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #7bf0a4 0%, #35c46c 45%, #1d8b4c 100%);
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.unit-hud__hp-fill--low {
+  background: linear-gradient(180deg, #ff7a6b, #c0392b);
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.7);
+}
+
+.unit-hud__hp-text {
+  position: relative;
+  z-index: 1;
+  display: block;
+  text-align: center;
+  font-size: 0.5rem;
+  font-weight: 800;
+  line-height: 9px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+.unit-hud__gauge {
+  width: 78%;
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.unit-hud__gauge-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--gauge);
+  box-shadow: 0 0 6px var(--gauge);
+  transition: width 0.3s linear;
+}
+
+.unit-hud--enemy {
+  translate: 0 -14px;
+}
+
+.unit-hud--enemy .unit-hud__name {
+  box-shadow: inset 0 0 0 1px rgba(255, 120, 120, 0.35);
+}
+
+.unit-hud__badges {
   min-height: 15px;
 }
 
@@ -368,131 +455,57 @@ body {
 
 .floating-number {
   position: absolute;
-  top: -4px;
-  left: 50%;
   transform: translateX(-50%);
-  font-weight: 800;
-  font-size: 0.85rem;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  -webkit-text-stroke: 2px rgba(4, 6, 14, 0.9);
+  paint-order: stroke fill;
   pointer-events: none;
   white-space: nowrap;
   z-index: 5;
-  animation: floating-number-rise 1.1s ease-out forwards;
+  animation: floating-number-rise 1.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .floating-number--damage {
-  color: #ff6b6b;
+  color: #ff8b7a;
+  text-shadow: 0 0 12px rgba(255, 90, 70, 0.75);
 }
 
 .floating-number--crit {
   color: #ffd23f;
-  font-size: 1.15rem;
+  font-size: 1.7rem;
+  text-shadow: 0 0 18px rgba(255, 200, 40, 0.9), 0 0 34px rgba(255, 140, 0, 0.6);
 }
 
 .floating-number--heal {
-  color: #2ecc71;
+  color: #5dffa0;
+  text-shadow: 0 0 14px rgba(46, 204, 113, 0.8);
 }
 
 .floating-number--resist {
-  color: var(--text-dim);
-  font-size: 0.7rem;
+  color: #c8d2e8;
+  font-size: 0.82rem;
 }
 
 @keyframes floating-number-rise {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(0) scale(0.8);
+    transform: translateX(-50%) translateY(6px) scale(0.6);
   }
-  15% {
+  12% {
     opacity: 1;
-    transform: translateX(-50%) translateY(-10px) scale(1.05);
+    transform: translateX(-50%) translateY(-14px) scale(1.22);
+  }
+  26% {
+    transform: translateX(-50%) translateY(-20px) scale(0.98);
   }
   100% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-38px) scale(1);
+    transform: translateX(-50%) translateY(-58px) scale(1);
   }
 }
 
-.unit-token__name {
-  font-size: 0.62rem;
-  font-weight: 700;
-  max-width: 72px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.unit-token__hp-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 20px;
-}
-
-.unit-token__hp-badge {
-  position: relative;
-  z-index: 2;
-  min-width: 24px;
-  height: 20px;
-  padding: 0 4px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.62rem;
-  font-weight: 800;
-  color: #fff;
-  background: linear-gradient(180deg, #3f4d70, #232c47);
-  border: 2px solid #0b0e18;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
-}
-
-.unit-token__hp-badge--low {
-  background: linear-gradient(180deg, #8a3b3b, #4c1c1c);
-}
-
-.unit-token__hp-bar {
-  flex: 1;
-  height: 10px;
-  margin-left: -9px;
-  padding-left: 9px;
-  background: #00000077;
-  border-radius: 0 999px 999px 0;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-.unit-token__hp-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #2ecc71, #27ae60);
-  width: 100%;
-  transition: width 0.4s ease;
-}
-
-.unit-token__hp-fill--low {
-  background: linear-gradient(90deg, #e74c3c, #c0392b);
-}
-
-.unit-token__hp-text {
-  font-size: 0.52rem;
-  color: var(--text-dim);
-  opacity: 0.85;
-}
-
-.unit-token__gauge-bar {
-  width: 100%;
-  height: 4px;
-  background: #00000055;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.unit-token__gauge-fill {
-  height: 100%;
-  background: var(--gauge);
-  width: 0%;
-  transition: width 0.3s ease;
-}
 
 .battle-controls {
   display: flex;
