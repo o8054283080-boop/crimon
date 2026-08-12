@@ -383,22 +383,45 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     }
   }
 
+  /**
+   * その手番で使われたスキルの番号を、ログの見出し行から割り出す。
+   * エンジンは「〇〇 の「スキル名」！」という行を必ず先頭に出すので、
+   * 名前を行動者の3つのスキルと突き合わせれば番号が分かる。
+   * 番号が分かると、必殺技(3番目)だけ演出を別格にできる。
+   */
+  function skillIndexOf(record: TurnRecord): 0 | 1 | 2 {
+    const headline = record.lines.find((line) => !line.startsWith(" "));
+    const name = headline ? /「(.+?)」/.exec(headline)?.[1] : undefined;
+    if (!name) return 0;
+    const actor = engine.getUnits().find((u) => u.instanceId === record.actorId);
+    const index = actor?.def.skills.findIndex((skill) => skill.name === name) ?? -1;
+    return index === 1 || index === 2 ? index : 0;
+  }
+
   function applyRecord(record: TurnRecord): void {
     setActive(record.actorId);
     appendLines(record.lines);
 
     const offensive = isOffensiveTurn(record.actorId, record.events);
+    const skillIndex = skillIndexOf(record);
+
     if (offensive) stage.playAttackMotion(record.actorId);
     else stage.playCastMotion(record.actorId);
 
+    // 必殺技は溜めを見せてから撃つ。カメラも寄せて「ここぞ」を作る
+    if (skillIndex === 2) stage.playUltimateIntro(record.actorId);
+
     // 踏み込みモーションを見せてから着弾させる
-    const delay = offensive ? IMPACT_DELAY_MS[speed] : Math.round(IMPACT_DELAY_MS[speed] * 0.6);
+    const base = offensive ? IMPACT_DELAY_MS[speed] : Math.round(IMPACT_DELAY_MS[speed] * 0.6);
+    const delay = skillIndex === 2 ? Math.round(base * 1.6) : base;
+
     later(() => {
       applySnapshot(record.snapshot);
       playStatusVisuals(record);
       // 複数のユニットが影響を受けていれば全体技とみなし、演出の規模を上げる
       const affected = new Set(record.events.filter((e) => e.kind !== "DEATH").map((e) => e.targetId));
       const aoe = affected.size >= 2;
+      if (skillIndex === 2) stage.playUltimateBurst(record.actorId, aoe);
       for (const event of record.events) playEventVisual(record.actorId, event, aoe);
     }, delay);
   }

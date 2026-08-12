@@ -592,6 +592,44 @@ export class BattleStage {
     this.shake(0.55);
   }
 
+  /**
+   * 必殺技の予備動作。術者へカメラを寄せ、足元に力を溜める。
+   * 通常の攻撃と同じ絵にせず「ここぞ」を作るための演出。
+   */
+  playUltimateIntro(actorId: string): void {
+    const avatar = this.avatars.get(actorId);
+    const anchor = this.anchorOf(actorId);
+    if (!avatar || !anchor) return;
+
+    avatar.playCast();
+    this.vfx.spawnCastCharge(anchor, avatar.theme.vfx, { element: this.elementOf(actorId), scale: 1.3 });
+
+    // 通常のfocusOnより一段強く寄る。着弾時にshakeが入ると自然に戻る
+    const position = avatar.root.position;
+    this.desiredCameraOffset.set(position.x * 0.3, -1.1, position.z * 0.16 - 2.4);
+    this.desiredLookOffset.set(position.x * 0.36, 0.25, position.z * 0.22);
+  }
+
+  /** 必殺技の着弾。地面を走る衝撃と、強い揺れ・時間停止を重ねる */
+  playUltimateBurst(actorId: string, aoe: boolean): void {
+    const avatar = this.avatars.get(actorId);
+    if (!avatar) return;
+
+    // 衝撃は術者ではなく戦場の中央から広げ、盤面全体が揺れたように見せる
+    const center = this.tmpVector.set(0, 0.12, aoe ? 0 : ENEMY_LINE_Z * 0.6);
+    this.vfx.spawnAoeImpact(center, avatar.theme.vfx, {
+      element: this.elementOf(actorId),
+      aoe: true,
+      radius: aoe ? 6.5 : 4.2,
+    });
+    this.shake(aoe ? 0.85 : 0.62);
+    this.hitStop(0.14);
+
+    // 寄っていたカメラを戻す(次の手番のfocusOnで上書きされる)
+    this.desiredCameraOffset.multiplyScalar(0.35);
+    this.desiredLookOffset.multiplyScalar(0.35);
+  }
+
   shake(strength: number): void {
     this.shakeStrength = Math.max(this.shakeStrength, strength);
   }
