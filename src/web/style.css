@@ -1050,100 +1050,7 @@ body {
   gap: 10px;
 }
 
-.monster-card {
-  appearance: none;
-  position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 10px 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  color: var(--text);
-  box-shadow: var(--edge-light), var(--drop-soft);
-  overflow: hidden;
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
-}
 
-.monster-card::before {
-  /* 上半分の光沢。平らな板ではなく、面を持った駒に見せる */
-  content: "";
-  position: absolute;
-  inset: 0 0 62% 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent);
-  pointer-events: none;
-}
-
-.monster-card:active {
-  transform: translateY(1px);
-}
-
-.monster-card--selected {
-  border-color: #79b0ff;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 0 0 1px rgba(121, 176, 255, 0.6),
-    0 0 16px rgba(79, 140, 255, 0.45);
-}
-
-.monster-card--disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.monster-card--bonus {
-  box-shadow: 0 0 0 1px var(--accent, gold) inset;
-  position: relative;
-}
-
-.monster-card__bonus-badge {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 0.75rem;
-  color: gold;
-}
-
-.monster-card__avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  /* 上端の光・内側のフチ・下側の落ち込みで球状に見せる */
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.5),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.22),
-    inset 0 -8px 12px rgba(0, 0, 0, 0.4),
-    0 3px 8px rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.45rem;
-  line-height: 1;
-}
-
-.monster-card__badge {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.monster-card__name {
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.monster-card__meta {
-  font-size: 0.66rem;
-  color: var(--text-dim);
-}
 
 @media (min-width: 480px) {
   .monster-grid {
@@ -1636,4 +1543,211 @@ body {
   .equip-slot-grid {
     grid-template-columns: repeat(6, 1fr);
   }
+}
+
+/* ===== モンスターカード(レア度の額縁つき) ===================================
+ * 外側から レア度の額縁 → 属性色の肖像 → 星の帯 → 名前 の層で構成する。
+ * 額縁の色が星の数で変わるので、並べた時に強さが一目で伝わる。
+ */
+
+.mcard {
+  --frame-a: #8a93b8;
+  --frame-b: #464e70;
+  --frame-glow: rgba(140, 155, 200, 0.35);
+
+  appearance: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--text);
+  /* 額縁: 外側の金属色 → 内側の暗い縁 の二重 */
+  background: linear-gradient(160deg, var(--frame-a), var(--frame-b) 55%, #0e1224 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.mcard:active {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+
+.mcard--disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.mcard--selected {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 0 0 2px #7fd4ff,
+    0 0 18px var(--frame-glow),
+    0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* --- レア度ごとの額縁 --- */
+.mcard--rarity-low {
+  --frame-a: #8b95b4;
+  --frame-b: #3f465f;
+  --frame-glow: rgba(150, 160, 190, 0.3);
+}
+
+.mcard--rarity-3 {
+  --frame-a: #6fd0ff;
+  --frame-b: #1d5a86;
+  --frame-glow: rgba(90, 190, 255, 0.45);
+}
+
+.mcard--rarity-4 {
+  --frame-a: #c99bff;
+  --frame-b: #4d2a80;
+  --frame-glow: rgba(180, 120, 255, 0.5);
+}
+
+.mcard--rarity-5 {
+  --frame-a: #ffd76a;
+  --frame-b: #8a5b10;
+  --frame-glow: rgba(255, 200, 70, 0.55);
+}
+
+.mcard--rarity-6 {
+  --frame-a: #fff0a8;
+  --frame-b: #b2560c;
+  --frame-glow: rgba(255, 170, 60, 0.7);
+}
+
+.mcard--rarity-none {
+  --frame-a: #79839f;
+  --frame-b: #363c52;
+  --frame-glow: rgba(140, 150, 180, 0.25);
+}
+
+/* --- 肖像 --- */
+.mcard__portrait {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 9px;
+  overflow: hidden;
+  /* 属性色を上から差し、下へ落として奥行きを作る */
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 22%, rgba(255, 255, 255, 0.4), transparent 65%),
+    linear-gradient(180deg, var(--elem, #4a5372) 0%, rgba(0, 0, 0, 0.55) 130%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 -12px 18px rgba(0, 0, 0, 0.35);
+}
+
+.mcard__emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+
+.mcard__element {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  /* 「電気」のように2文字の属性名もあるので、丸ではなく横に伸びる錠剤にする */
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(20, 24, 40, 0.95), rgba(6, 8, 16, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.mcard__level {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: #eaf1ff;
+  background: rgba(6, 9, 20, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.mcard__bonus {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.8rem;
+  color: #ffd23f;
+  text-shadow: 0 0 6px rgba(255, 200, 40, 0.9);
+}
+
+/* --- 星の帯 --- */
+.mcard__stars {
+  display: flex;
+  justify-content: center;
+  padding: 1px 0;
+  border-radius: 999px;
+  background: rgba(4, 6, 14, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.mcard__star-row {
+  display: flex;
+  gap: 1px;
+}
+
+.mcard__star {
+  font-size: 0.55rem;
+  line-height: 1.2;
+  color: #ffd23f;
+  text-shadow: 0 0 4px rgba(255, 190, 40, 0.85);
+}
+
+/* --- 名前・補足 --- */
+.mcard__name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.mcard__caption {
+  font-size: 0.6rem;
+  text-align: center;
+  color: #c3ccea;
+  opacity: 0.85;
+}
+
+.mcard__badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #06210f;
+  background: linear-gradient(180deg, #a8f5c0, #37c46b);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  pointer-events: none;
 }

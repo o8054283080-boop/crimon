@@ -2,6 +2,7 @@ import { MonsterDefinition } from "../../core/monster.js";
 import { formatExtraStatLines } from "../../core/stats.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../../data/monsters.js";
 import { el } from "../dom.js";
+import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillGrowthRows } from "./skillPanel.js";
 
 export interface MonsterDexProps {
@@ -11,15 +12,7 @@ export interface MonsterDexProps {
 }
 
 function dexCard(dex: MonsterDefinition, onClick: () => void): HTMLElement {
-  return el(
-    "button",
-    { type: "button", className: "monster-card", onclick: onClick },
-    [
-      el("div", { className: "monster-card__avatar", style: `background:${dex.color}` }, [dex.emoji]),
-      el("div", { className: "monster-card__name" }, [dex.name]),
-      el("div", { className: "monster-card__meta" }, [dex.role]),
-    ],
-  );
+  return buildMonsterCard(dex, dex.id, onClick, { caption: dex.role });
 }
 
 function renderList(props: MonsterDexProps): HTMLElement {

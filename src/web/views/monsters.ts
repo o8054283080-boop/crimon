@@ -6,6 +6,7 @@ import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
 import { el } from "../dom.js";
+import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillRows } from "./skillPanel.js";
 
 export interface MonstersProps {
@@ -30,27 +31,14 @@ export function monsterCard(
   extra?: { selected?: boolean; disabled?: boolean; bonus?: boolean },
 ): HTMLElement {
   const dex = findMonsterById(instance.dexId);
-  const maxLevel = STAR_MAX_LEVEL[instance.star];
-  const classes = ["monster-card"];
-  if (extra?.selected) classes.push("monster-card--selected");
-  if (extra?.disabled) classes.push("monster-card--disabled");
-  if (extra?.bonus) classes.push("monster-card--bonus");
-
-  return el(
-    "button",
-    {
-      type: "button",
-      className: classes.join(" "),
-      disabled: extra?.disabled,
-      onclick: onClick,
-    },
-    [
-      extra?.bonus ? el("div", { className: "monster-card__bonus-badge" }, ["★"]) : null,
-      el("div", { className: "monster-card__avatar", style: dex ? `background:${dex.color}` : undefined }, [dex ? dex.emoji : "❓"]),
-      el("div", { className: "monster-card__name" }, [dex ? dex.name : instance.dexId]),
-      el("div", { className: "monster-card__meta" }, [`${starLabel(instance.star)} Lv${instance.level}/${maxLevel}`]),
-    ].filter((n): n is HTMLDivElement => n !== null),
-  );
+  return buildMonsterCard(dex, instance.dexId, onClick, {
+    selected: extra?.selected,
+    disabled: extra?.disabled,
+    bonus: extra?.bonus,
+    star: instance.star,
+    level: instance.level,
+    maxLevel: STAR_MAX_LEVEL[instance.star],
+  });
 }
 
 function renderList(props: MonstersProps): HTMLElement {
