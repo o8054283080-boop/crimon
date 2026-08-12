@@ -8,12 +8,14 @@
  *   ?paused=1     自動進行を止めて初期状態のまま表示する
  *   ?turns=8      指定ターン数だけ即座に進めた状態から表示する
  *   ?view=result  バトルではなく戦闘結果画面を表示する(&lose=1 で敗北時)
+ *   ?view=farm    オート周回の結果画面を表示する
  */
 import "./web/style.css";
 import { BattleEngine } from "./battle/engine.js";
 import { MonsterDefinition } from "./core/monster.js";
 import { findMonster } from "./data/monsters.js";
 import { renderBattleView } from "./web/views/battleView.js";
+import { renderAutoFarmResult } from "./web/views/autoFarmResult.js";
 import { renderStageResult } from "./web/views/stageResult.js";
 
 function mulberry32(seed: number): () => number {
@@ -35,6 +37,44 @@ function must(templateId: string, element: string): MonsterDefinition {
 
 const params = new URLSearchParams(location.search);
 const app = document.querySelector("#app");
+
+// オート周回の結果画面のプレビュー。ドロップが多い時に破綻しないかを見る
+if (params.get("view") === "farm") {
+  app?.append(
+    renderAutoFarmResult({
+      targetName: "第3章 4-5 氷結の谷",
+      result: {
+        attempts: 12,
+        cleared: 11,
+        stopReason: "STAMINA",
+        totalGold: 8640,
+        totalCrystal: 90,
+        totalFighterLevels: 2,
+        equipmentDropCount: 7,
+        summonScrollCount: 2,
+        totalExp: 4200,
+        pigDropCount: 1,
+        levelUps: [
+          { instanceId: "a", name: "ドラゴン[火]", levels: 4 },
+          { instanceId: "b", name: "セラフ[光]", levels: 3 },
+          { instanceId: "c", name: "グリフォン[電気]", levels: 2 },
+        ],
+        monsterDrops: [
+          { dexId: "slime_FIRE", star: 2 },
+          { dexId: "slime_FIRE", star: 2 },
+          { dexId: "slime_FIRE", star: 2 },
+          { dexId: "wolf_WATER", star: 3 },
+          { dexId: "wolf_WATER", star: 3 },
+          { dexId: "golem_ELECTRIC", star: 1 },
+          { dexId: "fairy_GRASS", star: 4 },
+        ],
+      },
+      onClose: () => location.reload(),
+    }),
+  );
+  Object.assign(window, { __crimonPreviewReady: true });
+  throw new Error("周回結果のプレビューを表示しました");
+}
 
 // 戦闘結果画面のプレビュー。報酬が一通り出た状態で、1画面に収まるかを見る
 if (params.get("view") === "result") {

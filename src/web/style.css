@@ -2120,3 +2120,34 @@ body {
     padding: 8px 16px;
   }
 }
+
+/* 周回結果など、勝敗ではない見出しは少し小さく出す */
+.result-banner-large__text--compact {
+  font-size: clamp(1.4rem, 5.5vw, 2.2rem);
+  letter-spacing: 0.06em;
+  /* 勝敗ほど派手にする必要はないので、読みやすさを優先して明るい銀にする */
+  background: linear-gradient(180deg, #ffffff 0%, #d8e3ff 45%, #93a4d6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke-width: 2px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+}
+
+.result-banner-large__note {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  opacity: 0.85;
+}
+
+/* 同じモンスターがまとまった時の枚数表示は、名札より控えめにする */
+.reward-drop .mcard__badge {
+  top: 8px;
+  left: auto;
+  right: 6px;
+  transform: none;
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  color: #06121f;
+  background: linear-gradient(180deg, #ffffff, #bcd2f5);
+}
