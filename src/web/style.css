@@ -175,8 +175,76 @@ body {
 
 /* --- バトルステージ(Three.jsによる3D描画 + HTMLオーバーレイHUD) --- */
 
+/*
+ * バトル画面はページをスクロールさせない。
+ * ステージ・操作・ログが常に同時に見えていないと、戦況を追いながら
+ * 操作することができないため、画面の高さに収める。
+ * この画面ではボトムナビを出さないので、その分の余白も要らない。
+ */
+.screen.battle-view {
+  height: 100dvh;
+  min-height: 0;
+  gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) 12px max(8px, env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
 .battle-view__header {
-  margin-bottom: 8px;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  padding: 2px 0;
+}
+
+.battle-view__header h1 {
+  font-size: 1.15rem;
+}
+
+/*
+ * 縦画面では、8体を横に並べる都合でキャラの大きさは画面の「幅」で決まる。
+ * ステージを縦に伸ばしても空と床が増えるだけなので、横長の比率に留め、
+ * 余った高さはログへ回す。
+ */
+.battle-view .battle-stage {
+  flex: 0 1 auto;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  max-height: 52vh;
+}
+
+.battle-view .battle-log-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.battle-view .action-panel-slot:empty {
+  display: none;
+}
+
+.battle-view .battle-controls,
+.battle-view .action-panel-slot,
+.battle-view .battle-log-panel,
+.battle-view .result-banner,
+.battle-view .battle-controls__finish {
+  flex: 0 0 auto;
+}
+
+/* ログは常時見えるが、場所は取らせない */
+.battle-view .battle-log-panel {
+  padding: 8px 12px;
+}
+
+.battle-view .battle-log-panel h2 {
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+}
+
+.battle-view .battle-log {
+  flex: 1 1 auto;
+  min-height: 60px;
+  max-height: none;
+  overflow-y: auto;
 }
 
 .battle-stage {
@@ -213,12 +281,15 @@ body {
     display: none;
   }
 
-  .battle-stage {
-    /* 高さ基準にして画面いっぱいに広げる(縦横比の固定を解除) */
+  .battle-view .battle-stage {
+    flex: 1 1 auto;
     aspect-ratio: auto;
-    height: 74vh;
     max-height: none;
     border-radius: 14px;
+  }
+
+  .battle-view .battle-log-panel {
+    flex: 0 0 auto;
   }
 
   /* ログは邪魔にならない細い帯に留める */
@@ -230,8 +301,9 @@ body {
     display: none;
   }
 
-  .battle-log {
-    max-height: 52px;
+  .battle-view .battle-log {
+    height: 44px;
+    max-height: 44px;
   }
 }
 

@@ -62,6 +62,12 @@ function collect() {
       fov: +camera.fov.toFixed(2),
     },
     sceneChildren: stage.scene.children.length,
+    // 画面に収まっているか(バトル中にページをスクロールさせたくない)
+    page: {
+      scrollHeight: document.documentElement.scrollHeight,
+      viewportHeight: document.documentElement.clientHeight,
+      scrolls: document.documentElement.scrollHeight > document.documentElement.clientHeight + 2,
+    },
     // 描画が破綻した時に、エフェクトの出しっぱなしを疑うための計測値
     vfx: (() => {
       const info = {
@@ -211,6 +217,11 @@ async function main() {
       const rect = node.getBoundingClientRect();
       return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     });
+    // 画面全体(操作やログも含む)の収まりを見るカット
+    const pageShot = outFile.replace(/\.json$/, "") + "-page.png";
+    await page.screenshot({ path: pageShot, timeout: 90000 });
+    log(`画面全体を ${pageShot} に保存しました`);
+
     if (box && box.width > 1) {
       const base = outFile.replace(/\.json$/, "");
       for (let i = 0; i < frames; i++) {
