@@ -222,12 +222,14 @@ void main() {
   if (uWound > 0.01) {
     float crack = snoise(vLocal * 6.5 + uTime * 0.08);
     float mask = smoothstep(0.62 - uWound * 0.42, 0.72, crack) * uWound;
-    color += uGlow * mask * 1.5;
+    // 瀕死の状態は長く続くので、光らせすぎると終盤ずっと画面が白む
+    color += uGlow * mask * 0.7;
   }
 
-  // 被弾の白飛び。振り切ると体の形も属性色も消えてしまうので、
-  // 「強く光った」と分かる程度に留め、シルエットを残す
-  color = mix(color, vec3(1.25), uFlash * 0.6);
+  // 被弾の白飛び。
+  // 全体攻撃では8体が同時に光るため、1体あたりが強い/長いと
+  // 画面全体が白い靄になってしまう。短く鋭い「点滅」に留める。
+  color = mix(color, vec3(1.3), uFlash * 0.32);
 
   // 撃破ディゾルブ: 上から崩れ、境界が強く発光する
   if (uDissolve > 0.001) {

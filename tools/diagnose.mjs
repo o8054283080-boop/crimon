@@ -157,8 +157,15 @@ function collect() {
     const anchor = avatar.getAnchorWorldPosition(scratch.clone());
     const ndc = anchor.clone().project(camera);
 
+    // 体表シェーダの状態。白く見える時に、被弾フラッシュが残っているのか
+    // エフェクトに覆われているのかを区別するために出す
+    const u = avatar.uniforms ?? {};
     out.units.push({
       id,
+      flash: u.uFlash ? +u.uFlash.value.toFixed(3) : null,
+      activeGlow: u.uActive ? +u.uActive.value.toFixed(3) : null,
+      dissolve: u.uDissolve ? +u.uDissolve.value.toFixed(3) : null,
+      wound: u.uWound ? +u.uWound.value.toFixed(3) : null,
       rootPos: avatar.root.position.toArray().map((v) => +v.toFixed(2)),
       rootScale: avatar.root.scale.toArray().map((v) => +v.toFixed(3)),
       rootRotY: +avatar.root.rotation.y.toFixed(2),

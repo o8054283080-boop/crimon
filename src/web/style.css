@@ -217,138 +217,242 @@ body {
   padding: 16px;
 }
 
-/* --- バトルステージ(Three.jsによる3D描画 + HTMLオーバーレイHUD) --- */
-
-/*
- * バトル画面はページをスクロールさせない。
- * ステージ・操作・ログが常に同時に見えていないと、戦況を追いながら
- * 操作することができないため、画面の高さに収める。
- * この画面ではボトムナビを出さないので、その分の余白も要らない。
+/* --- バトル画面 -------------------------------------------------------
+ * 戦場を画面いっぱいに広げ、情報と操作はその上に重ねる。
+ * 帯に分けて縦へ積むと戦場が痩せ、目線も分散するため、
+ * 「1画面で戦闘が完結する」作りを最優先にしている。
  */
+
 .screen.battle-view {
   height: 100dvh;
   min-height: 0;
-  gap: 8px;
-  padding: max(8px, env(safe-area-inset-top)) 12px max(8px, env(safe-area-inset-bottom));
+  max-width: none;
+  gap: 0;
+  padding: 0;
   overflow: hidden;
 }
 
-.battle-view__header {
-  flex: 0 0 auto;
-  margin-bottom: 0;
-  padding: 2px 0;
-}
-
-.battle-view__header h1 {
-  font-size: 1.15rem;
-}
-
-/*
- * 縦画面では、8体を横に並べる都合でキャラの大きさは画面の「幅」で決まる。
- * ステージを縦に伸ばしても空と床が増えるだけなので、横長の比率に留め、
- * 余った高さはログへ回す。
- */
 .battle-view .battle-stage {
-  flex: 0 1 auto;
-  min-height: 0;
-  aspect-ratio: 4 / 3;
-  max-height: 52vh;
-}
-
-.battle-view .battle-log-panel {
   flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
+  aspect-ratio: auto;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+}
+
+/* --- 上部の帯: 名前と操作 --- */
+.battle-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 10px max(10px, env(safe-area-inset-left));
+  /* 上端だけ暗く落として文字を読ませる。板を置くと戦場が狭く見える */
+  background: linear-gradient(180deg, rgba(4, 6, 14, 0.78), transparent);
+  pointer-events: none;
+}
+
+.battle-topbar__title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #eaf0ff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
+  letter-spacing: 0.02em;
+}
+
+.battle-topbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+/* --- 下部のスキルドック --- */
+.skill-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  background: linear-gradient(0deg, rgba(4, 6, 14, 0.82), transparent);
+  pointer-events: none;
+}
+
+.skill-dock__owner {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #b9c6ea;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  opacity: 0.75;
+}
+
+.skill-dock--active .skill-dock__owner {
+  color: #ffe27a;
+  opacity: 1;
+}
+
+.skill-dock__row {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.skill-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  color: #dbe4ff;
+}
+
+.skill-btn__face {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 属性色を芯に、外周は金属の縁。押せる時だけ光る */
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 25%, rgba(255, 255, 255, 0.45), transparent 65%),
+    linear-gradient(180deg, var(--elem, #4a5372), rgba(6, 9, 20, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.18),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.skill-dock--active .skill-btn:not(:disabled) .skill-btn__face {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.28),
+    0 0 0 2px rgba(255, 226, 122, 0.75),
+    0 0 16px rgba(255, 200, 60, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+.skill-btn:not(:disabled):active .skill-btn__face {
+  transform: translateY(2px);
+  filter: brightness(0.92);
+}
+
+.skill-btn__index {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+/* クールタイム中は暗い幕をかけ、残りターン数を大きく出す */
+.skill-btn--cooling .skill-btn__face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: rgba(3, 5, 12, 0.72);
+}
+
+.skill-btn__cool {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95);
+}
+
+.skill-btn--idle {
+  cursor: default;
+}
+
+.skill-btn--idle .skill-btn__face {
+  filter: saturate(0.55) brightness(0.72);
+}
+
+.skill-btn__name {
+  max-width: 74px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+/* --- ログは左下に小さく重ねる --- */
+/*
+ * ログは画面上部の空きに寄せる。
+ * 下に置くとキャラクターに重なって、肝心の戦闘が見えなくなる。
+ * 板は敷かず、下端へ向かって消えるようにして存在感を抑える。
+ */
+.battle-logstrip {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  top: 46px;
+  z-index: 5;
+  width: min(300px, 44%);
+  max-height: 58px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.75;
+  mask-image: linear-gradient(180deg, #000 45%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent);
+}
+
+.battle-logstrip .battle-log {
+  max-height: 58px;
+  overflow: hidden;
+  font-size: 0.58rem;
+  line-height: 1.4;
+  background: none;
+  padding: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+/* 対象選択は戦場の上に浮かせる */
+.battle-view .action-panel-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 108px;
+  z-index: 7;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .battle-view .action-panel-slot:empty {
   display: none;
 }
 
-.battle-view .battle-controls,
-.battle-view .action-panel-slot,
-.battle-view .battle-log-panel,
-.battle-view .result-banner,
-.battle-view .battle-controls__finish {
-  flex: 0 0 auto;
-}
-
-/* ログは常時見えるが、場所は取らせない */
-.battle-view .battle-log-panel {
-  padding: 8px 12px;
-}
-
-.battle-view .battle-log-panel h2 {
-  margin-bottom: 4px;
-  font-size: 0.72rem;
-}
-
-.battle-view .battle-log {
-  flex: 1 1 auto;
-  min-height: 60px;
-  max-height: none;
-  overflow-y: auto;
-}
-
-.battle-stage {
-  position: relative;
-  width: 100%;
-  /* 横長寄りの画面では横長のステージにする。カメラは実際の縦横比から
-     構図を組み直すので、比率が変わっても両チームは必ず収まる */
-  aspect-ratio: 4 / 3;
-  max-height: 58vh;
-  border-radius: 20px;
-  overflow: hidden;
-  background: #06070f;
-  border: 1px solid var(--panel-border);
-  box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.75),
-    0 10px 30px rgba(0, 0, 0, 0.5);
-  contain: layout paint;
-}
-
-/*
- * 横向きのバトル表示。
- * 4体対4体が横に並ぶこのゲームでは、横長の画面が最も構図に合う。
- * 端末を寝かせた時は余白と付随情報を削り、ステージで画面を使い切る。
- */
-@media (orientation: landscape) and (max-height: 620px) {
-  .screen.battle-view {
-    max-width: none;
-    gap: 6px;
-    padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom))
-      max(10px, env(safe-area-inset-left));
-  }
-
-  .battle-view__header {
-    display: none;
-  }
-
-  .battle-view .battle-stage {
-    flex: 1 1 auto;
-    aspect-ratio: auto;
-    max-height: none;
-    border-radius: 14px;
-  }
-
-  .battle-view .battle-log-panel {
-    flex: 0 0 auto;
-  }
-
-  /* ログは邪魔にならない細い帯に留める */
-  .battle-log-panel {
-    padding: 8px 10px;
-  }
-
-  .battle-log-panel h2 {
-    display: none;
-  }
-
-  .battle-view .battle-log {
-    height: 44px;
-    max-height: 44px;
-  }
+.battle-view .action-panel {
+  pointer-events: auto;
+  max-width: min(560px, 94vw);
 }
 
 .battle-stage__canvas {
