@@ -1751,3 +1751,268 @@ body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   pointer-events: none;
 }
+
+/* ===== 戦闘結果(1画面で完結させる) =====================================
+ * 報酬を縦に積むと、ドロップが増えるほどスクロールが必要になり、
+ * 「勝った → 受け取る」という一番気持ちのいい流れが途切れる。
+ * 画面の高さに収め、横に並べることで、1画面で完結させる。
+ */
+
+.screen.result-screen {
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* --- 勝敗の帯 --- */
+.result-banner-large {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.result-banner-large__text {
+  font-size: clamp(1.9rem, 8vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  -webkit-text-stroke: 3px rgba(4, 6, 14, 0.85);
+  paint-order: stroke fill;
+  animation: result-banner-pop 0.5s cubic-bezier(0.18, 1.5, 0.4, 1) both;
+}
+
+.result-screen--win .result-banner-large__text {
+  background: linear-gradient(180deg, #fff6c9 0%, #ffd23f 45%, #e08a00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 16px rgba(255, 190, 40, 0.65));
+}
+
+.result-screen--lose .result-banner-large__text {
+  background: linear-gradient(180deg, #dfe6ff 0%, #8d9ac4 45%, #47507a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes result-banner-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.result-banner-large__sub {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* --- 中身。入りきらない時だけ内部で送る --- */
+.result-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* --- 通貨などの札 --- */
+.reward-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.reward-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 78px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+}
+
+.reward-tile__icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.reward-tile__amount {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.reward-tile__label {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.reward-tile--gold {
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(255, 200, 70, 0.4), var(--drop-soft);
+}
+
+.reward-tile--crystal {
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(120, 200, 255, 0.4), var(--drop-soft);
+}
+
+/* --- 現物のドロップ --- */
+.reward-drops {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.reward-drop {
+  position: relative;
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: reward-drop-in 0.45s cubic-bezier(0.18, 1.4, 0.4, 1) both 0.15s;
+}
+
+@keyframes reward-drop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ドロップ表示のカードは飾りなので、押しても反応しないようにする */
+.reward-drop .mcard {
+  cursor: default;
+  pointer-events: none;
+}
+
+.reward-drop__art {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: linear-gradient(180deg, #3c4468, #171b30);
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(0, 0, 0, 0.5), var(--drop-soft);
+}
+
+.reward-drop__emoji {
+  font-size: 1.8rem;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
+}
+
+.reward-drop__stars {
+  font-size: 0.6rem;
+  color: #ffd23f;
+  text-shadow: 0 0 5px rgba(255, 190, 40, 0.8);
+}
+
+.reward-drop__name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.reward-drop__meta {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.reward-drop__tag {
+  align-self: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #06121f;
+  background: linear-gradient(180deg, #b9dcff, #5b9bea);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.reward-drop__tag--bonus {
+  color: #2a1600;
+  background: linear-gradient(180deg, #ffe9a8, #f5b301);
+}
+
+/* --- レベルアップ。1行に圧縮して場所を取らせない --- */
+.result-levelups {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.result-levelups__item {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #d8ffe6;
+  background: rgba(28, 122, 66, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(90, 230, 150, 0.4);
+}
+
+.result-empty {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.result-confirm {
+  flex: 0 0 auto;
+  width: min(420px, 100%);
+}
+
+/* 横向きの低い画面では、帯を小さくして中身の場所を確保する */
+@media (orientation: landscape) and (max-height: 620px) {
+  .screen.result-screen {
+    gap: 6px;
+    padding-top: max(6px, env(safe-area-inset-top));
+  }
+
+  .result-banner-large__text {
+    font-size: clamp(1.5rem, 6vh, 2.2rem);
+  }
+
+  .result-body {
+    gap: 8px;
+  }
+
+  .reward-drop {
+    width: 84px;
+  }
+
+  .result-confirm {
+    min-height: 40px;
+    padding: 8px 16px;
+  }
+}

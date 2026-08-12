@@ -7,12 +7,14 @@
  *   ?seed=123     バトルの乱数シード(同じ値なら同じ展開になる)
  *   ?paused=1     自動進行を止めて初期状態のまま表示する
  *   ?turns=8      指定ターン数だけ即座に進めた状態から表示する
+ *   ?view=result  バトルではなく戦闘結果画面を表示する(&lose=1 で敗北時)
  */
 import "./web/style.css";
 import { BattleEngine } from "./battle/engine.js";
 import { MonsterDefinition } from "./core/monster.js";
 import { findMonster } from "./data/monsters.js";
 import { renderBattleView } from "./web/views/battleView.js";
+import { renderStageResult } from "./web/views/stageResult.js";
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -32,6 +34,45 @@ function must(templateId: string, element: string): MonsterDefinition {
 }
 
 const params = new URLSearchParams(location.search);
+const app = document.querySelector("#app");
+
+// 戦闘結果画面のプレビュー。報酬が一通り出た状態で、1画面に収まるかを見る
+if (params.get("view") === "result") {
+  const cleared = params.get("lose") !== "1";
+  app?.append(
+    renderStageResult({
+      info: {
+        cleared,
+        stageName: "第4章 5-5 古城の主",
+        goldEarned: 1240,
+        crystalEarned: 30,
+        wavesCleared: cleared ? 3 : 2,
+        totalWaves: 3,
+        levelUps: [
+          { instanceId: "a", name: "ドラゴン[火]", levels: 2 },
+          { instanceId: "b", name: "セラフ[光]", levels: 1 },
+        ],
+        dropDexId: "griffon_ELECTRIC",
+        dropStar: 4,
+        equipmentDrop: {
+          id: "eq1",
+          slot: 2,
+          star: 5,
+          level: 0,
+          set: "CRIT",
+          mainStat: { type: "ATK_PERCENT", value: 12 },
+          subStats: [{ type: "SPD", value: 8 }],
+        },
+        summonScrollDropped: true,
+        pigDrop: { dexId: "reincarnation_pig_GRASS", star: 3 },
+        fighterLevelsGained: 1,
+      },
+      onClose: () => location.reload(),
+    }),
+  );
+  Object.assign(window, { __crimonPreviewReady: true });
+  throw new Error("結果画面のプレビューを表示しました(以降のバトル初期化は行いません)");
+}
 const seed = Number(params.get("seed") ?? 12345);
 const paused = params.get("paused") === "1";
 const preTurns = Number(params.get("turns") ?? 0);
@@ -69,7 +110,6 @@ const view = renderBattleView({
   onFinish: () => location.reload(),
 });
 
-const app = document.querySelector("#app");
 app?.append(view.element);
 
 if (paused) {
