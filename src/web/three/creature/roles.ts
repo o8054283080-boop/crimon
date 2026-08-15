@@ -494,7 +494,11 @@ function buildDefender(kit: CreatureKit, rig: CreatureRig): void {
       p.main,
     );
     leg.root.position.set(side * 0.32, -0.06, 0);
+    // 膝の当て金と、脛を覆う板。硬い役割ほど装甲の重なりで見せる
+    addJoint(kit, leg.joints[1], 0, 0.2, true);
+    leg.joints[1].add(place(kit.lens(0.2, 0.26, 0.14, "metal", p.metal), 0, -0.24, -0.16, 0.06, 0, 0));
     leg.tip.add(place(kit.rock(0.26, 0.13, 0.32, "hide", p.dark, 0.2), 0, -0.06, -0.06));
+    leg.tip.add(place(kit.lens(0.22, 0.07, 0.2, "metal", p.metal), 0, -0.02, -0.16, -0.3, 0, 0));
     rig.pelvis.add(leg.root);
     rig.legs.push(limbFrom(leg, side, side * 0.6));
   }
@@ -503,6 +507,9 @@ function buildDefender(kit: CreatureKit, rig: CreatureRig): void {
   place(torso, 0, 0.06, 0, -0.1, 0, 0);
   torso.add(place(kit.rock(0.58, 0.5, 0.46, "hide", p.main, 0.2), 0, 0.5, 0));
   torso.add(place(kit.rock(0.44, 0.26, 0.3, "hide", p.main, 0.25), 0, 0.88, 0.14));
+  // 胸の装甲。重ねた板の段差が、岩の塊に「作られたもの」の情報を足す
+  addPlating(kit, torso, 3, 0.30, 0.66, 0.34, -0.34);
+  torso.add(place(kit.band(0.46, 0.035, Math.PI * 1.1, "metal", p.metal, 14), 0, 0.24, 0, Math.PI / 2, -Math.PI * 0.55, 0));
   // 胸の動力コア
   torso.add(place(kit.octa(0.15, 0.22, 0.15, "crystal", p.accent), 0, 0.52, -0.44));
   torso.add(place(kit.octa(0.07, 0.12, 0.07, "glow", p.glow), 0, 0.52, -0.46));
@@ -532,9 +539,12 @@ function buildDefender(kit: CreatureKit, rig: CreatureRig): void {
       p.main,
     );
     arm.root.position.set(side * 0.64, 0.7, 0);
+    addJoint(kit, arm.joints[1], 0, 0.19, true);
+    // 前腕を覆う装甲板
+    arm.joints[1].add(place(kit.lens(0.2, 0.24, 0.13, "metal", p.metal), 0, -0.24, -0.16, 0.1, 0, 0));
     arm.tip.add(place(kit.rock(0.26, 0.24, 0.26, "hide", p.main, 0.22), 0, -0.16, -0.02));
     for (let i = -1; i <= 1; i++) {
-      const knuckle = kit.spike(0.06, 0.14, 0.9, "plate", p.plate);
+      const knuckle = kit.spike(0.06, 0.14, 0.9, "metal", p.metal);
       place(knuckle, i * 0.11, -0.16, -0.2, AIM_FORWARD, 0, 0);
       arm.tip.add(knuckle);
     }
@@ -694,16 +704,20 @@ function buildSupport(kit: CreatureKit, rig: CreatureRig): void {
   rig.floats = true;
   rig.pelvis.position.y = 0.95;
 
-  // 下へ細くなる結晶のスタック
+  // 下へ細くなる結晶のスタック。逆さに吊り下がった尖塔で、足がないことを示す
   const stack: [number, number, number][] = [
-    [0.2, 0.3, 0.2],
-    [0.13, 0.22, 0.13],
-    [0.07, 0.14, 0.07],
+    [0.22, 0.30, 0.22],
+    [0.14, 0.24, 0.14],
+    [0.08, 0.16, 0.08],
   ];
   stack.forEach((size, index) => {
     const shard = kit.octa(size[0], size[1], size[2], "crystal", p.main);
     place(shard, 0, -0.18 - index * 0.3, 0, 0, index * 0.5, 0);
     rig.pelvis.add(shard);
+    // 節ごとの締めの輪。段が付いて「浮いている一本の柱」に見える
+    rig.pelvis.add(
+      place(kit.band(size[0] * 1.15, 0.018, Math.PI * 2, "metal", p.metal, 12), 0, -0.18 - index * 0.3, 0, Math.PI / 2, 0, 0),
+    );
   });
 
   const torso = rig.torso;
@@ -711,16 +725,51 @@ function buildSupport(kit: CreatureKit, rig: CreatureRig): void {
   torso.add(place(kit.octa(0.34, 0.56, 0.34, "crystal", p.main), 0, 0.1, 0));
   torso.add(place(kit.octa(0.15, 0.3, 0.15, "glow", p.glow), 0, 0.1, 0));
   torso.add(place(kit.octa(0.2, 0.34, 0.2, "crystal", p.accent), 0, 0.1, -0.14, 0, 0.6, 0));
-
-  // 肩にあたる大きな板。攻撃時に前へ突き出す
+  // 本体を抱える金属の枠。結晶だけだと透けて構造が読めない
   for (const side of [-1, 1]) {
-    const shoulder = new THREE.Group();
-    markAnimated(shoulder);
-    place(shoulder, side * 0.42, 0.22, 0.02, 0, 0, -side * 0.3);
-    shoulder.add(place(kit.octa(0.08, 0.42, 0.05, "crystal", p.accent), 0, 0, 0));
-    shoulder.add(place(kit.octa(0.05, 0.26, 0.035, "crystal", p.accent), side * 0.16, -0.12, 0.06, 0, 0, -side * 0.25));
-    torso.add(shoulder);
-    rig.arms.push({ root: shoulder, rootRest: shoulder.rotation.clone(), lower: null, lowerRest: null, tip: shoulder, side, phase: side });
+    torso.add(
+      place(kit.taperedTube(
+        [
+          { x: side * 0.06, y: 0.44, z: 0 },
+          { x: side * 0.30, y: 0.16, z: 0.02 },
+          { x: side * 0.22, y: -0.16, z: 0 },
+        ],
+        0.028,
+        0.018,
+        "metal",
+        p.metal,
+        5,
+        8,
+      ), 0, 0, 0),
+    );
+  }
+
+  // 浮遊する4本の腕。胴と繋がっていない結晶の節を並べ、
+  // 「多腕の構造物」として、四肢を持つ他の役割と骨格から分ける
+  const armSpecs = [
+    { y: 0.34, x: 0.44, tilt: 0.30, len: 0.36 },
+    { y: 0.00, x: 0.36, tilt: -0.45, len: 0.28 },
+  ];
+  for (const side of [-1, 1]) {
+    armSpecs.forEach((spec, index) => {
+      const arm = new THREE.Group();
+      markAnimated(arm);
+      place(arm, side * spec.x, spec.y, 0.02, 0, 0, -side * spec.tilt);
+      // 肩(浮いた小片)→ 前腕 → 先端の光点、と離して並べる
+      arm.add(place(kit.octa(0.09, 0.15, 0.07, "crystal", p.accent), 0, 0, 0));
+      arm.add(place(kit.octa(0.06, spec.len, 0.05, "crystal", p.main), side * 0.1, -spec.len * 0.85, 0.02, 0, 0, -side * 0.3));
+      arm.add(place(kit.octa(0.035, 0.07, 0.035, "glow", p.glow), side * 0.17, -spec.len * 1.55, 0.04));
+      torso.add(arm);
+      rig.arms.push({
+        root: arm,
+        rootRest: arm.rotation.clone(),
+        lower: null,
+        lowerRest: null,
+        tip: arm,
+        side,
+        phase: side * (1 + index * 0.7),
+      });
+    });
   }
 
   // 水平の環と斜めの環
@@ -737,7 +786,10 @@ function buildSupport(kit: CreatureKit, rig: CreatureRig): void {
   place(rig.neck, 0, 0.62, 0);
   place(rig.head, 0, 0.14, 0);
   rig.head.add(place(kit.octa(0.19, 0.2, 0.19, "crystal", p.plate), 0, 0, 0));
-  rig.head.add(place(kit.box(0.22, 0.035, 0.03, "glow", p.glow), 0, 0.0, -0.16));
+  // 頭を締める金属の輪と、単眼。顔の情報を1点に集めて視線を作る
+  rig.head.add(place(kit.band(0.2, 0.022, Math.PI * 2, "metal", p.metal, 14), 0, 0, 0, 0.35, 0, 0));
+  rig.head.add(place(kit.ball(0.07, 0.05, 0.03, "hide", p.deep, 8), 0, 0.0, -0.17));
+  rig.head.add(place(kit.box(0.22, 0.035, 0.03, "glow", p.glow), 0, 0.0, -0.185));
   for (let i = 0; i < 3; i++) {
     const crown = kit.octa(0.045, 0.18, 0.045, "crystal", p.accent);
     place(crown, (i - 1) * 0.14, 0.24, 0.02, 0, 0, (i - 1) * -0.45);
