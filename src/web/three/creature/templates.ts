@@ -303,48 +303,77 @@ function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
     ),
   );
 
-  // 裾の波打ち。真円のシルエットを崩し、液体の縁に見せる
-  for (let i = 0; i < 7; i++) {
-    const angle = (i / 7) * Math.PI * 2 + 0.4;
-    const bulge = 0.10 + Math.abs(Math.sin(i * 2.3)) * 0.06;
+  // 床に広がった水たまりの縁。
+  // 粒を並べると「足の指」に見えてしまったので、薄い円盤で一度つないでから、
+  // その上に半分埋まった膨らみを重ねて、途切れない波打ちにする
+  rig.pelvis.add(
+    kit.lathe(
+      [
+        [0.001, 0.0],
+        [0.92, 0.0],
+        [0.90, 0.035],
+        [0.78, 0.075],
+        [0.66, 0.09],
+      ],
+      "hide",
+      p.dark,
+      26,
+    ),
+  );
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * Math.PI * 2 + 0.4;
+    const bulge = 0.16 + Math.abs(Math.sin(i * 2.3)) * 0.07;
     rig.pelvis.add(
       place(
-        kit.ball(bulge * 1.5, bulge * 0.85, bulge * 1.5, "hide", p.main, 10),
-        Math.cos(angle) * 0.72,
-        bulge * 0.75,
-        Math.sin(angle) * 0.72,
+        kit.ball(bulge * 1.4, bulge * 0.5, bulge * 1.4, "hide", p.main, 10),
+        Math.cos(angle) * 0.70,
+        0.03,
+        Math.sin(angle) * 0.70,
       ),
     );
   }
 
-  // 表面を伝う雫。上から下へ垂れる筋を非対称に配置する
+  // 表面を伝う雫。輪郭からはみ出す太さにしないと、遠目では体に埋もれて見えない。
+  // 左右非対称に散らすことで、真後ろから見ても「流れている」向きが読める
   for (const drip of [
-    { angle: 1.1, y: 0.74, len: 0.34 },
-    { angle: 2.6, y: 0.55, len: 0.24 },
-    { angle: -1.9, y: 0.66, len: 0.30 },
-    { angle: -0.35, y: 0.82, len: 0.20 },
+    { angle: 1.1, y: 0.72, len: 0.40 },
+    { angle: 2.5, y: 0.52, len: 0.30 },
+    { angle: -1.9, y: 0.64, len: 0.36 },
+    { angle: -0.35, y: 0.80, len: 0.26 },
+    { angle: 3.5, y: 0.78, len: 0.22 },
   ]) {
-    const radius = 0.62 + drip.y * -0.18;
+    // 本体の輪郭より少し外側を通す
+    const radius = 0.86 - drip.y * 0.42;
     const cos = Math.cos(drip.angle);
     const sin = Math.sin(drip.angle);
     rig.pelvis.add(
       kit.taperedTube(
         [
-          { x: cos * radius * 0.98, y: drip.y, z: sin * radius * 0.98 },
-          { x: cos * (radius + 0.05), y: drip.y - drip.len * 0.6, z: sin * (radius + 0.05) },
-          { x: cos * (radius + 0.02), y: drip.y - drip.len, z: sin * (radius + 0.02) },
+          { x: cos * radius * 0.9, y: drip.y + 0.05, z: sin * radius * 0.9 },
+          { x: cos * (radius + 0.06), y: drip.y - drip.len * 0.55, z: sin * (radius + 0.06) },
+          { x: cos * (radius + 0.03), y: drip.y - drip.len, z: sin * (radius + 0.03) },
         ],
-        0.055,
-        0.03,
+        0.115,
+        0.05,
         "hide",
         p.main,
-        6,
-        6,
+        7,
+        7,
       ),
     );
     rig.pelvis.add(
-      place(kit.ball(0.055, 0.07, 0.055, "hide", p.main, 8), cos * (radius + 0.02), drip.y - drip.len - 0.03, sin * (radius + 0.02)),
+      place(kit.ball(0.075, 0.095, 0.075, "hide", p.main, 8), cos * (radius + 0.03), drip.y - drip.len - 0.04, sin * (radius + 0.03)),
     );
+  }
+
+  // 濡れた照り。硬い材質の薄片を上面に寝かせると、面のハイライトだけが立ち、
+  // 不透明な体でも「濡れた粘体」に見える
+  for (const shine of [
+    { x: -0.30, y: 0.86, z: -0.26, rx: 0.20, rz: 0.13, rot: -0.5 },
+    { x: -0.44, y: 0.66, z: -0.10, rx: 0.10, rz: 0.07, rot: -0.9 },
+    { x: 0.30, y: 0.80, z: 0.28, rx: 0.14, rz: 0.09, rot: 0.7 },
+  ]) {
+    rig.pelvis.add(place(kit.lens(shine.rx, shine.rz, 0.02, "crystal", p.accent, 10), shine.x, shine.y, shine.z, 1.1, shine.rot, 0));
   }
 
   // 体内に浮く核と気泡。透過する結晶を内側に置くことで、
@@ -383,33 +412,21 @@ function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.add(droop);
   rig.cloth.push({ group: droop, rest: droop.rotation.clone(), phase: 0, amount: 1.5 });
 
-  // 疑似脚(本体から垂れる粘りの柱)。伸縮した時に床との繋がりが読める
-  for (const side of [-1, 1]) {
-    const foot = kit.chain(
-      [{ len: 0.16, r0: 0.16, r1: 0.19, rot: [0.1, 0, side * 0.12], radial: 8 }],
-      "hide",
-      p.dark,
-    );
-    foot.root.position.set(side * 0.36, 0.2, -0.12);
-    foot.tip.add(place(kit.ball(0.19, 0.06, 0.22, "hide", p.dark, 10), 0, 0.02, -0.02));
-    rig.pelvis.add(foot.root);
-    rig.legs.push(limbFrom(foot, side, side * 1.1));
-  }
-
-  // 触手状の腕。細く伸ばして先を丸め、攻撃時に前へ突き出す
+  // 触手状の腕。体から直に生えた粘りの柱で、先へ行くほど太く垂れる。
+  // 前方(-Z)寄りに付けて、正面からは手、背面からは体の膨らみとして読ませる
   const torso = rig.torso;
-  place(torso, 0, 0.5, 0);
+  place(torso, 0, 0.44, 0);
   for (const side of [-1, 1]) {
     const arm = kit.chain(
       [
-        { len: 0.24, r0: 0.13, r1: 0.09, rot: [0.35, 0, side * 1.05], radial: 7 },
-        { len: 0.20, r0: 0.085, r1: 0.06, rot: [0.3, 0, -side * 0.5], radial: 7 },
+        { len: 0.26, r0: 0.17, r1: 0.12, rot: [0.3, 0, side * 1.15], radial: 8 },
+        { len: 0.22, r0: 0.115, r1: 0.10, rot: [0.5, 0, -side * 0.55], radial: 8 },
       ],
       "hide",
       p.main,
     );
-    arm.root.position.set(side * 0.56, 0.02, -0.06);
-    arm.tip.add(place(kit.ball(0.09, 0.09, 0.09, "hide", p.main, 8), 0, -0.03, 0));
+    arm.root.position.set(side * 0.48, 0.06, -0.16);
+    arm.tip.add(place(kit.ball(0.115, 0.10, 0.115, "hide", p.main, 10), 0, -0.04, -0.01));
     torso.add(arm.root);
     rig.arms.push(limbFrom(arm, side, side * 1.4));
   }
@@ -460,12 +477,13 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 後脚(細く、踵が高いデジティグレード) ---
+  // 脚を長くすると鹿に見える。狼は「胴が長く脚が短い」比率で読ませる
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.38, r0: 0.13, r1: 0.085, rot: [0.52, 0, 0], radial: 7 },
-        { len: 0.38, r0: 0.085, r1: 0.055, rot: [-1.14, 0, 0], radial: 7 },
-        { len: 0.26, r0: 0.055, r1: 0.045, rot: [0.76, 0, 0], radial: 7 },
+        { len: 0.30, r0: 0.13, r1: 0.085, rot: [0.56, 0, 0], radial: 7 },
+        { len: 0.30, r0: 0.085, r1: 0.055, rot: [-1.20, 0, 0], radial: 7 },
+        { len: 0.21, r0: 0.055, r1: 0.045, rot: [0.80, 0, 0], radial: 7 },
       ],
       "hide",
       p.main,
@@ -480,21 +498,23 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
     rig.legs.push(limbFrom(leg, side, side * 0.9));
   }
 
-  // --- 胴(深い胸、絞れた腹) ---
+  // --- 胴(深い胸、絞れた腹。前後に長く取る) ---
   const torso = rig.torso;
-  place(torso, 0, 0.08, -0.42, 0.02, 0, 0);
-  torso.add(place(kit.ball(0.24, 0.28, 0.34, "hide", p.main), 0, 0.02, -0.12));
-  torso.add(place(kit.ball(0.21, 0.22, 0.32, "hide", p.main), 0, 0.0, 0.14));
-  torso.add(place(kit.ball(0.17, 0.14, 0.36, "hide", p.dark), 0, -0.14, 0.02));
+  place(torso, 0, 0.06, -0.54, 0.02, 0, 0);
+  // 胸郭。狼は前脚の間が深く、そこから腹へ向けて一気に絞れる
+  torso.add(place(kit.ball(0.25, 0.31, 0.36, "hide", p.main), 0, 0.0, -0.14));
+  torso.add(place(kit.ball(0.21, 0.23, 0.34, "hide", p.main), 0, 0.0, 0.20));
+  torso.add(place(kit.ball(0.18, 0.18, 0.24, "hide", p.dark), 0, -0.14, -0.14));
+  torso.add(place(kit.ball(0.15, 0.12, 0.34, "hide", p.dark), 0, -0.14, 0.14));
   // 肩甲骨の張り
   for (const side of [-1, 1]) {
-    torso.add(place(kit.ball(0.11, 0.15, 0.16, "hide", p.main), side * 0.21, 0.06, -0.18));
+    torso.add(place(kit.ball(0.11, 0.16, 0.17, "hide", p.main), side * 0.22, 0.08, -0.20));
   }
   // 背の毛並み。棘ではなく毛の房を寝かせて並べる
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    const hair = kit.spike(0.05, 0.20 - t * 0.08, 0.5, "fur", p.fur);
-    place(hair, 0, 0.22 - t * 0.03, -0.28 + t * 0.56, 1.1, Math.PI / 2, 0);
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const hair = kit.spike(0.055, 0.22 - t * 0.09, 0.5, "fur", p.fur);
+    place(hair, 0, 0.24 - t * 0.04, -0.32 + t * 0.72, 1.1, Math.PI / 2, 0);
     torso.add(hair);
   }
 
@@ -502,14 +522,14 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.38, r0: 0.11, r1: 0.075, rot: [0.14, 0, side * 0.04], radial: 7 },
-        { len: 0.34, r0: 0.07, r1: 0.05, rot: [-0.2, 0, 0], radial: 7 },
-        { len: 0.13, r0: 0.05, r1: 0.045, rot: [0.16, 0, 0], radial: 7 },
+        { len: 0.31, r0: 0.11, r1: 0.075, rot: [0.14, 0, side * 0.04], radial: 7 },
+        { len: 0.28, r0: 0.07, r1: 0.05, rot: [-0.2, 0, 0], radial: 7 },
+        { len: 0.11, r0: 0.05, r1: 0.045, rot: [0.16, 0, 0], radial: 7 },
       ],
       "hide",
       p.main,
     );
-    leg.root.position.set(side * 0.19, -0.02, -0.24);
+    leg.root.position.set(side * 0.19, -0.02, -0.26);
     leg.tip.add(place(kit.ball(0.07, 0.045, 0.10, "hide", p.dark), 0, -0.02, -0.04));
     addClaws(kit, leg.tip, 3, 0.10, 0.022, 0.05);
     torso.add(leg.root);
@@ -517,16 +537,17 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 首まわりの毛(狼の見分けどころ) ---
-  place(rig.neck, 0, 0.20, -0.36, -0.30, 0, 0);
+  // 首を立てると鹿になる。前へ低く送り出して、頭が肩より前に出るようにする
+  place(rig.neck, 0, 0.16, -0.40, 0.34, 0, 0);
   rig.neck.add(
     kit.taperedTube(
       [
         { x: 0, y: 0, z: 0 },
-        { x: 0, y: 0.16, z: -0.06 },
-        { x: 0, y: 0.32, z: -0.04 },
+        { x: 0, y: 0.16, z: -0.02 },
+        { x: 0, y: 0.30, z: 0.02 },
       ],
-      0.14,
-      0.085,
+      0.16,
+      0.095,
       "hide",
       p.main,
       7,
@@ -534,36 +555,39 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
     ),
   );
   // 襟巻き状のたてがみ。首の付け根を1周させる
-  for (let i = 0; i < 9; i++) {
-    const angle = (i / 9) * Math.PI * 2;
-    const hair = kit.spike(0.07, 0.30 - Math.cos(angle) * 0.08, 0.6, "fur", p.fur);
+  for (let i = 0; i < 10; i++) {
+    const angle = (i / 10) * Math.PI * 2;
+    const hair = kit.spike(0.075, 0.34 - Math.cos(angle) * 0.10, 0.6, "fur", p.fur);
     place(
       hair,
-      Math.sin(angle) * 0.13,
-      0.05,
-      Math.cos(angle) * 0.13,
-      Math.PI * 0.62 + Math.cos(angle) * 0.35,
+      Math.sin(angle) * 0.14,
+      0.04,
+      Math.cos(angle) * 0.14,
+      Math.PI * 0.66 + Math.cos(angle) * 0.4,
       0,
-      -Math.sin(angle) * 1.2,
+      -Math.sin(angle) * 1.25,
     );
     rig.neck.add(hair);
   }
 
   // --- 頭(細長い鼻づら、立った耳) ---
-  place(rig.head, 0, 0.32, 0, 0.72, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.145, 0.14, 0.19], snout: 0.30, jaw: true, horns: "none", crest: 0, eye: 0.04 });
+  place(rig.head, 0, 0.30, 0, 0.22, 0, 0);
+  addBeastHead(kit, rig, { skull: [0.16, 0.15, 0.21], snout: 0.36, jaw: true, horns: "none", crest: 0, eye: 0.042 });
   // 立った三角の耳。獣の種類を一番はっきり伝える部位
   for (const side of [-1, 1]) {
     const ear = new THREE.Group();
-    place(ear, side * 0.115, 0.24, 0.10, -0.30, 0, -side * 0.30);
-    ear.add(place(kit.spike(0.075, 0.26, 0.45, "fur", p.fur), 0, 0, 0));
-    ear.add(place(kit.spike(0.045, 0.18, 0.35, "hide", p.deep), 0, 0.02, -0.03));
+    place(ear, side * 0.125, 0.25, 0.12, -0.24, 0, -side * 0.28);
+    ear.add(place(kit.spike(0.085, 0.30, 0.45, "fur", p.fur), 0, 0, 0));
+    ear.add(place(kit.spike(0.05, 0.21, 0.35, "hide", p.deep), 0, 0.02, -0.03));
     rig.head.add(ear);
   }
-  // 鼻すじの毛と、頬の毛
-  addFurTuft(kit, rig.head, 3, 0.05, 0.18, [0, 0.16, 0.02], 0.20, [1.5, 0, 0]);
+  // 頬の毛。顔の横幅を広げて、細い鼻づらとの対比を作る
+  for (const side of [-1, 1]) {
+    addFurTuft(kit, rig.head, 3, 0.055, 0.22, [side * 0.13, 0.10, 0.06], 0.10, [1.4, 0, side * 1.4]);
+  }
 
-  addFurTail(kit, rig, [0, 0.10, 0.24], 5, 0.19, 0.085, -1.35, -0.16);
+  // 長くて太い尾。後ろへ低く流すと、胴の長さがさらに強調される
+  addFurTail(kit, rig, [0, 0.08, 0.22], 5, 0.22, 0.09, -1.05, -0.10);
 
   rig.wingAnchor.set(0.18, 0.32, -0.02);
 
@@ -678,22 +702,28 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
       // 左手は素手の鉤爪。右手の得物と対にして、左右で情報を変える
       addClaws(kit, arm.tip, 4, 0.22, 0.032, 0.065);
     } else {
-      // 右手の大鎌。刃を湾曲させることで、直剣を持つバランス型と混ざらない
+      // 右手の大鎌。
+      // 「武器を持っている」ではなく「大鎌である」と一目で分かる必要があるので、
+      // 柄は体高に近い長さ、刃は肩幅を超える大きさまで振り切る。
+      // 湾曲した刃にすることで、直剣を持つバランス型とも混ざらない
       const scythe = new THREE.Group();
-      place(scythe, 0, -0.06, -0.02, -0.62, 0, 0.12);
-      scythe.add(place(kit.link({ x: 0, y: -0.62, z: 0 }, { x: 0, y: 1.12, z: 0 }, 0.036, 0.028, "plate", p.plate, 6), 0, 0, 0));
-      scythe.add(place(kit.band(0.055, 0.02, Math.PI * 2, "metal", p.metal, 12), 0, 0.34, 0, Math.PI / 2, 0, 0));
-      scythe.add(place(kit.band(0.055, 0.02, Math.PI * 2, "metal", p.metal, 12), 0, -0.24, 0, Math.PI / 2, 0, 0));
-      scythe.add(place(kit.octa(0.05, 0.09, 0.04, "crystal", p.accent), 0, -0.68, 0));
-      // 刃(内側へ湾曲した爪を大きく使う)と、峰の光
-      const blade = kit.claw(0.92, 0.085, 0.85, "metal", p.metal);
-      place(blade, 0, 1.06, 0, 0, 0, -1.35);
+      place(scythe, 0, -0.06, -0.02, -0.52, 0.1, 0.16);
+      scythe.add(place(kit.link({ x: 0, y: -0.85, z: 0 }, { x: 0, y: 1.55, z: 0 }, 0.05, 0.038, "plate", p.plate, 6), 0, 0, 0));
+      scythe.add(place(kit.band(0.07, 0.024, Math.PI * 2, "metal", p.metal, 12), 0, 0.5, 0, Math.PI / 2, 0, 0));
+      scythe.add(place(kit.band(0.07, 0.024, Math.PI * 2, "metal", p.metal, 12), 0, -0.35, 0, Math.PI / 2, 0, 0));
+      scythe.add(place(kit.octa(0.07, 0.14, 0.06, "crystal", p.accent), 0, -0.94, 0));
+      // 刃の付け根の金具。柄と刃が「繋がっている」ように見せる
+      scythe.add(place(kit.octa(0.09, 0.16, 0.08, "metal", p.metal), 0, 1.5, 0));
+      // 刃(内側へ湾曲した爪を大きく使う)。峰の光は細い線に留める
+      const blade = kit.claw(1.45, 0.13, 0.75, "metal", p.metal);
+      place(blade, 0, 1.52, 0, 0, 0, -1.42);
       scythe.add(blade);
-      const edge = kit.claw(0.86, 0.03, 0.9, "glow", p.glow);
-      place(edge, 0.02, 1.08, -0.03, 0, 0, -1.4);
+      const edge = kit.claw(1.36, 0.035, 0.8, "glow", p.glow);
+      place(edge, 0.0, 1.55, -0.05, 0, 0, -1.48);
       scythe.add(edge);
-      const spur = kit.claw(0.26, 0.05, 0.5, "metal", p.metal);
-      place(spur, 0, 1.02, 0, 0, 0, 1.9);
+      // 逆側の小刃。刃が一方向に伸びるだけの棒に見えないようにする
+      const spur = kit.claw(0.38, 0.06, 0.5, "metal", p.metal);
+      place(spur, 0, 1.46, 0.02, 0, 0, 1.85);
       scythe.add(spur);
       arm.tip.add(scythe);
     }
