@@ -172,12 +172,43 @@ function addBeastHead(kit: CreatureKit, rig: CreatureRig, o: BeastHeadOptions): 
   }
 
   if (o.horns === "swept") {
+    // 後ろへ流れる曲がった角。根元に輪を重ねて年輪の節を作り、
+    // 途中から小さな枝を出して「1本の棒」に見えないようにする
     for (const side of [-1, 1]) {
-      const base = new THREE.Vector3(side * sx * 0.66, sy * 1.2, sz * 0.1);
-      const mid = new THREE.Vector3(side * sx * 1.25, sy * 1.75, sz * 0.9);
-      const tip = new THREE.Vector3(side * sx * 1.5, sy * 1.7, sz * 2.0);
-      head.add(kit.link(base, mid, sx * 0.26, sx * 0.17, "plate", p.plate, 6));
-      head.add(kit.link(mid, tip, sx * 0.17, sx * 0.02, "plate", p.plate, 6));
+      const curve: THREE.Vector3Like[] = [
+        { x: side * sx * 0.66, y: sy * 1.2, z: sz * 0.1 },
+        { x: side * sx * 1.1, y: sy * 1.66, z: sz * 0.7 },
+        { x: side * sx * 1.42, y: sy * 1.76, z: sz * 1.5 },
+        { x: side * sx * 1.5, y: sy * 1.6, z: sz * 2.3 },
+      ];
+      head.add(kit.taperedTube(curve, sx * 0.28, sx * 0.02, "plate", p.plate, 6, 10));
+      for (let i = 0; i < 3; i++) {
+        const t = 0.1 + i * 0.16;
+        const ring = kit.band(sx * (0.3 - i * 0.045), sx * 0.05, Math.PI * 2, "plate", p.plate, 8);
+        const at = new THREE.Vector3().lerpVectors(
+          new THREE.Vector3(curve[0].x, curve[0].y, curve[0].z),
+          new THREE.Vector3(curve[1].x, curve[1].y, curve[1].z),
+          t * 2.2,
+        );
+        place(ring, at.x, at.y, at.z, 0.9, side * 0.9, 0);
+        head.add(ring);
+      }
+      // 枝分かれした副角
+      head.add(
+        kit.taperedTube(
+          [
+            { x: side * sx * 1.05, y: sy * 1.6, z: sz * 0.66 },
+            { x: side * sx * 1.15, y: sy * 1.95, z: sz * 0.9 },
+            { x: side * sx * 1.05, y: sy * 2.2, z: sz * 1.3 },
+          ],
+          sx * 0.1,
+          sx * 0.012,
+          "plate",
+          p.plate,
+          5,
+          6,
+        ),
+      );
     }
   } else if (o.horns === "crown") {
     const count = 6;
@@ -186,7 +217,29 @@ function addBeastHead(kit: CreatureKit, rig: CreatureRig, o: BeastHeadOptions): 
       const horn = kit.spike(sx * 0.2, sy * (1.5 - Math.abs(t) * 1.2), 0.85, "plate", p.plate);
       place(horn, t * sx * 1.7, sy * 1.35, sz * (0.1 + Math.abs(t) * 0.5), 0.5, 0, -t * 1.5);
       head.add(horn);
+      // 冠の根元をつなぐ台座。棘が「刺さっている」のではなく生えて見える
+      if (i < count - 1) {
+        head.add(
+          place(
+            kit.lens(sx * 0.2, sy * 0.12, sz * 0.12, "plate", p.plate, 7),
+            (t + 0.5 / (count - 1)) * sx * 1.7,
+            sy * 1.3,
+            sz * (0.1 + Math.abs(t) * 0.5),
+            0.3,
+            0,
+            -t,
+          ),
+        );
+      }
     }
+  }
+
+  // 頬の甲板と耳。頭蓋がただの球にならないようにする
+  for (const side of [-1, 1]) {
+    head.add(place(kit.lens(sx * 0.44, sy * 0.5, sx * 0.3, "plate", p.plate, 8), side * sx * 0.82, sy * 0.86, -sz * 0.2, 0, side * 0.4, side * 0.25));
+    const ear = kit.spike(sx * 0.22, sy * 0.9, 0.35, "hide", skin);
+    place(ear, side * sx * 0.8, sy * 1.15, sz * 0.4, 0.5, 0, -side * 1.15);
+    head.add(ear);
   }
 
   for (let i = 0; i < o.crest; i++) {
