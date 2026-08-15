@@ -233,12 +233,15 @@ export class MonsterAvatar {
     );
     rig.torso.scale.set(1 + breath * 0.022 * breathStrength, 1 + breath * 0.03 * breathStrength, 1 + breath * 0.022 * breathStrength);
 
-    // 全身の上下動と体重移動
-    let offsetY = Math.sin(t * (rig.floats ? 0.9 : 1.55)) * anim.bob;
+    // 全身の上下動と体重移動。
+    // 待機中は「左右の脚に交互に体重を預ける」ゆっくりした周期を主に置き、
+    // 呼吸(速い)と重心移動(遅い)の2つの周期が重なることで生気が出る
+    const shift = Math.sin(t * 0.44);
+    let offsetY = Math.sin(t * (rig.floats ? 0.9 : 1.55)) * anim.bob - Math.abs(shift) * 0.012 * anim.sway;
     let offsetZ = 0;
-    let offsetX = Math.sin(t * 0.62) * 0.02 * anim.sway;
+    let offsetX = shift * 0.035 * anim.sway;
     let leanX = 0;
-    let leanZ = Math.sin(t * 0.62) * 0.012 * anim.sway;
+    let leanZ = shift * 0.03 * anim.sway;
 
     // 首と頭。生き物らしさが一番出るので、周期をずらして複数の波を重ねる
     rig.neck.rotation.set(
@@ -247,8 +250,12 @@ export class MonsterAvatar {
       rig.neckRest.z,
     );
     let headX = rig.headRest.x + Math.sin(t * 1.21 + 1.1) * 0.05 * anim.headSway;
-    let headY = rig.headRest.y + Math.sin(t * 0.67) * 0.13 * anim.headSway;
+    // 頭は敵の方(-Z)を見る。体を斜に構えている分だけ首を戻し、
+    // そこへゆっくりした「見回し」を重ねる。視線があるだけで生き物に見える
+    let headY = rig.headRest.y - rig.yawBias * 0.75 + Math.sin(t * 0.67) * 0.13 * anim.headSway;
     let headZ = rig.headRest.z + Math.sin(t * 0.89) * 0.04 * anim.headSway;
+    // 体重が乗っている側へ、首も少し傾ぐ
+    headZ -= shift * 0.05 * anim.headSway;
     let jawOpen = 0;
 
     // 尾: 根元から先端へ遅れて伝わる波
@@ -441,6 +448,36 @@ export class MonsterAvatar {
       }
       for (const wing of rig.wings) wing.root.rotation.z += wing.side * fall * 0.7;
       for (let i = 0; i < rig.tail.length; i++) rig.tail[i].group.rotation.x += fall * 0.25;
+    }
+
+    // === 慣性 =============================================================
+    // 重心の移動を覚えておき、尾・翼・布を1テンポ遅れて振る。
+    // 全身が同じ位相で動くと人形に見えるので、末端だけ遅らせるのが要。
+    if (dt > 0.0001) {
+      const velocity = this.tmpVector.set(
+        (offsetX - this.previousOffset.x) / dt,
+        (offsetY - this.previousOffset.y) / dt,
+        (offsetZ - this.previousOffset.z) / dt,
+      );
+      // 速度は攻撃・被弾で跳ねるので頭打ちにする(暴れると布が突き抜ける)
+      velocity.clampScalar(-6, 6);
+      this.lag.lerp(velocity, Math.min(1, dt * 9));
+    }
+    this.previousOffset.set(offsetX, offsetY, offsetZ);
+
+    for (let i = 0; i < rig.tail.length; i++) {
+      const follow = (i + 1) / rig.tail.length;
+      rig.tail[i].group.rotation.x += this.lag.z * 0.045 * follow;
+      rig.tail[i].group.rotation.y -= this.lag.x * 0.05 * follow;
+    }
+    for (const wing of rig.wings) {
+      // 沈む時に翼が遅れて持ち上がる
+      wing.root.rotation.z += wing.side * this.lag.y * 0.05;
+      wing.root.rotation.x += this.lag.z * 0.03;
+    }
+    for (const cloth of rig.cloth) {
+      cloth.group.rotation.x += this.lag.z * 0.06 * cloth.amount;
+      cloth.group.rotation.z -= this.lag.x * 0.07 * cloth.amount;
     }
 
     // === 姿勢の確定 =======================================================
