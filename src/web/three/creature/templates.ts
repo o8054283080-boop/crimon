@@ -865,7 +865,7 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 0.92;
 
   // --- 腰(横に広い岩の台) ---
-  rig.pelvis.add(place(kit.rock(0.52, 0.26, 0.42, "hide", p.main, 0.26), 0, -0.04, 0));
+  rig.pelvis.add(place(kit.rock(0.52, 0.26, 0.42, "hide", p.dark, 0.26), 0, -0.04, 0));
   rig.pelvis.add(place(kit.rock(0.30, 0.16, 0.26, "hide", p.dark, 0.3), 0, -0.14, 0.16));
 
   // --- 脚(太く短い柱) ---
@@ -879,9 +879,9 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
       p.main,
     );
     leg.root.position.set(side * 0.34, -0.08, 0);
-    leg.joints[0].add(place(kit.rock(0.30, 0.20, 0.28, "hide", p.main, 0.24), 0, -0.18, 0));
+    leg.joints[0].add(place(kit.rock(0.30, 0.20, 0.28, "hide", p.dark, 0.24), 0, -0.18, 0));
     addJoint(kit, leg.joints[1], 0, 0.24, false);
-    leg.joints[1].add(place(kit.rock(0.28, 0.20, 0.26, "hide", p.main, 0.24), 0, -0.18, -0.02));
+    leg.joints[1].add(place(kit.rock(0.28, 0.20, 0.26, "hide", p.dark, 0.24), 0, -0.18, -0.02));
     leg.tip.add(place(kit.rock(0.34, 0.17, 0.44, "hide", p.dark, 0.2), 0, -0.08, -0.08));
     // 爪先の岩の指
     for (let i = -1; i <= 1; i++) {
@@ -894,13 +894,15 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(下から上へ大きくなる3段の岩。段の隙間から光が漏れる) ---
   const torso = rig.torso;
   place(torso, 0, 0.02, 0, -0.05, 0, 0);
-  const stack: { y: number; size: [number, number, number]; jitter: number }[] = [
-    { y: 0.24, size: [0.46, 0.24, 0.38], jitter: 0.26 },
-    { y: 0.60, size: [0.62, 0.28, 0.48], jitter: 0.24 },
-    { y: 0.96, size: [0.84, 0.30, 0.54], jitter: 0.22 },
+  // 段ごとに石の色を変える。1色で積むと、面積が大きいぶん属性色に染まって
+  // 明るい塊になってしまい、加算エフェクトが乗った時に飛びやすい
+  const stack: { y: number; size: [number, number, number]; jitter: number; tone: THREE.Color }[] = [
+    { y: 0.24, size: [0.46, 0.24, 0.38], jitter: 0.26, tone: p.dark },
+    { y: 0.60, size: [0.62, 0.28, 0.48], jitter: 0.24, tone: p.main },
+    { y: 0.96, size: [0.84, 0.30, 0.54], jitter: 0.22, tone: p.dark },
   ];
   for (const [index, block] of stack.entries()) {
-    torso.add(place(kit.rock(block.size[0], block.size[1], block.size[2], "hide", p.main, block.jitter), 0, block.y, 0, 0, index * 0.4, 0));
+    torso.add(place(kit.rock(block.size[0], block.size[1], block.size[2], "hide", block.tone, block.jitter), 0, block.y, 0, 0, index * 0.4, 0));
     // 段の継ぎ目。細い線なので、光っても画面全体を持ち上げない
     torso.add(
       place(
@@ -947,11 +949,11 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
       p.main,
     );
     arm.root.position.set(side * 0.90, 0.96, 0);
-    arm.joints[0].add(place(kit.rock(0.28, 0.24, 0.26, "hide", p.main, 0.24), 0, -0.28, 0));
+    arm.joints[0].add(place(kit.rock(0.28, 0.24, 0.26, "hide", p.dark, 0.24), 0, -0.28, 0));
     addJoint(kit, arm.joints[1], 0, 0.24, false);
     arm.joints[1].add(place(kit.rock(0.27, 0.26, 0.25, "hide", p.main, 0.26), 0, -0.28, -0.02));
     // 拳。前腕より一回り大きい岩にすると、重さが読める
-    arm.tip.add(place(kit.rock(0.34, 0.30, 0.34, "hide", p.main, 0.22), 0, -0.18, -0.02));
+    arm.tip.add(place(kit.rock(0.34, 0.30, 0.34, "hide", p.dark, 0.22), 0, -0.18, -0.02));
     for (let i = -1; i <= 1; i++) {
       arm.tip.add(place(kit.rock(0.11, 0.10, 0.12, "hide", p.dark, 0.3), i * 0.19, -0.20, -0.28));
     }
