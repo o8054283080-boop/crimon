@@ -154,6 +154,101 @@ export class CreatureKit {
     return mesh;
   }
 
+  /** 平たい装甲板・鱗板。閉じた立体なのでどこから見ても破綻しない */
+  lens(rx: number, ry: number, thickness: number, style: SurfaceStyle, color: THREE.Color, segments = 10): THREE.Mesh {
+    const geometry = new THREE.SphereGeometry(1, segments, Math.max(5, Math.round(segments * 0.6)));
+    geometry.scale(rx, ry, thickness);
+    return this.mesh(geometry, style, color);
+  }
+
+  /**
+   * 部分的な輪。肋・首輪・肩の装甲リングに使う。
+   * XY平面に立ち、arcの分だけ +X から反時計回りに描かれる。
+   */
+  band(
+    radius: number,
+    tube: number,
+    arc: number,
+    style: SurfaceStyle,
+    color: THREE.Color,
+    segments = 14,
+  ): THREE.Mesh {
+    return this.mesh(new THREE.TorusGeometry(radius, tube, 5, segments, arc), style, color);
+  }
+
+  /**
+   * 制御点を通る、根元から先へ細くなる管。
+   * 曲がった角・鉤爪・触手・肋骨など「まっすぐでない硬い部位」に使う。
+   * 円柱を継ぐより関節の段差が出ず、シルエットの情報量が上がる。
+   */
+  taperedTube(
+    points: THREE.Vector3Like[],
+    r0: number,
+    r1: number,
+    style: SurfaceStyle,
+    color: THREE.Color,
+    radial = 6,
+    segments = 10,
+  ): THREE.Mesh {
+    const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(p.x, p.y, p.z)));
+    const geometry = new THREE.TubeGeometry(curve, segments, 1, radial, false);
+    const position = geometry.attributes.position as THREE.BufferAttribute;
+    const uv = geometry.attributes.uv as THREE.BufferAttribute;
+    const center = new THREE.Vector3();
+    const vertex = new THREE.Vector3();
+    // TubeGeometryは太さが一定なので、uv.u(=長さ方向)を見て軸へ寄せ、先を細くする
+    for (let i = 0; i < position.count; i++) {
+      const u = uv.getX(i);
+      curve.getPointAt(Math.min(1, Math.max(0, u)), center);
+      vertex.fromBufferAttribute(position, i);
+      vertex.sub(center).multiplyScalar(r0 + (r1 - r0) * u).add(center);
+      position.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    }
+    geometry.computeVertexNormals();
+    return this.mesh(geometry, style, color);
+  }
+
+  /**
+   * 内側へ湾曲した爪・牙。付け根が原点で、+Y方向へ伸びながら curve の分だけ -Z へ反る。
+   * 直線の円錐より生き物らしく、小さくても「引っ掛ける形」だと分かる。
+   */
+  claw(length: number, radius: number, curve: number, style: SurfaceStyle, color: THREE.Color): THREE.Mesh {
+    const points: THREE.Vector3Like[] = [];
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      points.push({ x: 0, y: length * t, z: -curve * length * t * t });
+    }
+    return this.taperedTube(points, radius, radius * 0.06, style, color, 5, 6);
+  }
+
+  /**
+   * 羽根1枚。XY平面に立ち、+Y方向へ伸びる木の葉形。
+   * 針状の円錐を放射状に並べると「ウニ」になるため、
+   * 面積を持った板を重ねて羽根に見せる。
+   */
+  feather(length: number, width: number, style: SurfaceStyle, color: THREE.Color, bend = 0.12): THREE.Mesh {
+    const geometry = new THREE.ShapeGeometry(
+      (() => {
+        const shape = new THREE.Shape();
+        shape.moveTo(0, 0);
+        shape.bezierCurveTo(width * 0.9, length * 0.18, width, length * 0.62, width * 0.18, length);
+        shape.bezierCurveTo(-width * 0.5, length * 0.68, -width * 0.7, length * 0.2, 0, 0);
+        return shape;
+      })(),
+      10,
+    );
+    // 断面をわずかに反らせ、平板に見えないようにする
+    const position = geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < position.count; i++) {
+      const x = position.getX(i);
+      const y = position.getY(i);
+      position.setZ(i, -Math.abs(x) * bend - y * y * bend * 0.35 / Math.max(0.01, length));
+    }
+    geometry.computeVertexNormals();
+    return this.mesh(geometry, style, color);
+  }
+
   /** 平面の膜。翼膜・布・ひれに使う。shapeはXY平面に描く */
   membrane(build: (shape: THREE.Shape) => void, style: SurfaceStyle, color: THREE.Color, curvature = 0): THREE.Mesh {
     const shape = new THREE.Shape();
