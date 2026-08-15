@@ -151,12 +151,13 @@
   height: 0;
   display: grid;
   place-items: center;
-  font-size: calc(var(--d) * 0.06);
+  font-size: calc(var(--d) * 0.072);
   font-style: normal;
   line-height: 1;
-  color: #d7e8ff;
-  text-shadow: 0 0 10px rgba(120, 180, 255, 0.95);
-  transform: rotate(var(--deg)) translateY(calc(var(--d) * -0.44)) rotate(calc(var(--deg) * -1));
+  color: #e8f2ff;
+  text-shadow: 0 0 12px rgba(140, 195, 255, 1);
+  /* 外周の目盛りと重ならない位置に置く。重ねると文字が読めない */
+  transform: rotate(var(--deg)) translateY(calc(var(--d) * -0.37)) rotate(calc(var(--deg) * -1));
   animation: rune-blink 3.4s ease-in-out infinite;
   animation-delay: var(--delay);
 }
