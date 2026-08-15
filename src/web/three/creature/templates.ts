@@ -658,7 +658,9 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(逆三角形。肩が広く腰が細い) ---
   const torso = rig.torso;
   place(torso, 0, 0.06, 0, -0.08, 0, 0);
-  torso.add(place(kit.ball(0.22, 0.22, 0.18, "hide", p.dark), 0, 0.16, 0));
+  // 腹。ここが細いと、背後のマントが胴の隙間から透けて「前掛け」に見える
+  torso.add(place(kit.ball(0.24, 0.24, 0.21, "hide", p.dark), 0, 0.16, 0));
+  torso.add(place(kit.ball(0.27, 0.20, 0.22, "hide", p.main), 0, 0.32, -0.02));
   torso.add(place(kit.ball(0.36, 0.32, 0.26, "hide", p.main), 0, 0.48, 0));
   addPlating(kit, torso, 3, 0.30, 0.60, 0.30, -0.18);
   torso.add(place(kit.lens(0.34, 0.20, 0.16, "metal", p.metal), 0, 0.64, -0.10, -0.12, 0, 0));
@@ -737,7 +739,7 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   // --- マント(裾が裂けた長い膜) ---
   const cape = new THREE.Group();
   markAnimated(cape);
-  place(cape, 0, 0.72, 0.16, 0.1, 0, 0);
+  place(cape, 0, 0.72, 0.28, 0.16, 0, 0);
   cape.add(
     kit.membrane(
       (shape) => {
