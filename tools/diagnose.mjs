@@ -241,9 +241,21 @@ async function main() {
 
     console.log(json);
   } finally {
-    await browser.close();
+    // 後始末で固まらないようにする。
+    // ブラウザやdevサーバの終了待ちが返ってこないことがあり、
+    // 実際の調査が終わっているのにプロセスだけが残り続けていた。
+    await Promise.race([browser.close().catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
     server.kill("SIGTERM");
+    // SIGTERMで落ちない場合に備えて、少し待ってから強制終了する
+    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      server.kill("SIGKILL");
+    } catch {
+      // 既に終了していれば何もしなくてよい
+    }
   }
+  // 開いたままのハンドルが残っていてもNodeを確実に終わらせる
+  process.exit(0);
 }
 
 main().catch(async (error) => {
