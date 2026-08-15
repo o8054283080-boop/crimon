@@ -132,7 +132,13 @@ function addFurTail(
       chain.joints[i].add(hair);
     }
   }
-  chain.tip.add(place(kit.ball(radius * 1.5, radius * 1.9, radius * 1.5, "fur", p.fur, 8), 0, -length * 0.2, 0));
+  // 先端。丸を1つ足すだけだと「棒の先の玉」になるので、細く長い房で締める
+  for (let k = 0; k < 4; k++) {
+    const angle = (k / 4) * Math.PI * 2 + 0.6;
+    const tipHair = kit.spike(radius * 0.55, length * 1.15, 0.8, "fur", p.fur);
+    place(tipHair, Math.cos(angle) * radius * 0.3, -length * 0.1, Math.sin(angle) * radius * 0.3, Math.PI - 0.25, 0, Math.cos(angle) * 0.5);
+    chain.tip.add(tipHair);
+  }
   rig.pelvis.add(chain.root);
 }
 
@@ -493,11 +499,11 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     torso.add(place(kit.ball(0.11, 0.16, 0.17, "hide", p.main), side * 0.22, 0.08, -0.20));
   }
-  // 背の毛並み。棘ではなく毛の房を寝かせて並べる
-  for (let i = 0; i < 7; i++) {
-    const t = i / 6;
-    const hair = kit.spike(0.055, 0.22 - t * 0.09, 0.5, "fur", p.fur);
-    place(hair, 0, 0.24 - t * 0.04, -0.32 + t * 0.72, 1.1, Math.PI / 2, 0);
+  // 背の毛並み。立てると恐竜の背びれになるので、短く寝かせて並べる
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7;
+    const hair = kit.spike(0.075, 0.16 - t * 0.06, 0.85, "fur", p.fur);
+    place(hair, 0, 0.22 - t * 0.03, -0.34 + t * 0.74, 1.45, Math.PI / 2, 0);
     torso.add(hair);
   }
 
@@ -537,10 +543,11 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
       6,
     ),
   );
-  // 襟巻き状のたてがみ。首の付け根を1周させる
-  for (let i = 0; i < 10; i++) {
-    const angle = (i / 10) * Math.PI * 2;
-    const hair = kit.spike(0.075, 0.34 - Math.cos(angle) * 0.10, 0.6, "fur", p.fur);
+  // 襟巻き状のたてがみ。首の付け根を1周させる。
+  // 断面を丸く(flatを大きく)して幅を持たせないと、棘が刺さって見える
+  for (let i = 0; i < 13; i++) {
+    const angle = (i / 13) * Math.PI * 2;
+    const hair = kit.spike(0.085, 0.30 - Math.cos(angle) * 0.09, 0.9, "fur", p.fur);
     place(
       hair,
       Math.sin(angle) * 0.14,
@@ -938,14 +945,17 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 頭(首を持たず、肩の間に沈む小さな岩) ---
-  place(rig.neck, 0, 1.12, -0.06, -0.08, 0, 0);
-  place(rig.head, 0, 0.06, 0, 0.16, 0, 0);
+  // 完全に埋めると顔が読めないので、肩の稜線からわずかに出す高さで止める
+  place(rig.neck, 0, 1.20, -0.10, -0.08, 0, 0);
+  place(rig.head, 0, 0.08, 0, 0.16, 0, 0);
   const head = rig.head;
-  head.add(place(kit.rock(0.28, 0.22, 0.26, "hide", p.main, 0.26), 0, 0.10, 0));
-  head.add(place(kit.rock(0.30, 0.10, 0.20, "hide", p.dark, 0.3), 0, 0.24, 0.02));
-  // 目は一本の光る裂け目。顔のパーツを作り込まない方が石らしい
-  head.add(place(kit.box(0.28, 0.045, 0.04, "glow", p.glow), 0, 0.08, -0.22));
-  head.add(place(kit.rock(0.32, 0.10, 0.16, "hide", p.main, 0.24), 0, 0.18, -0.16, -0.2, 0, 0));
+  head.add(place(kit.rock(0.30, 0.24, 0.28, "hide", p.main, 0.26), 0, 0.10, 0));
+  head.add(place(kit.rock(0.32, 0.11, 0.22, "hide", p.dark, 0.3), 0, 0.26, 0.02));
+  // 目は一本の光る裂け目。顔のパーツを作り込まない方が石らしい。
+  // 眉庇を前へ張り出させ、その影の中で光らせることで、小さくても顔の位置が分かる
+  head.add(place(kit.rock(0.30, 0.13, 0.10, "hide", p.deep, 0.2), 0, 0.06, -0.24));
+  head.add(place(kit.box(0.32, 0.055, 0.04, "glow", p.glow), 0, 0.07, -0.29));
+  head.add(place(kit.rock(0.34, 0.12, 0.20, "hide", p.main, 0.24), 0, 0.20, -0.20, -0.3, 0, 0));
   for (const side of [-1, 1]) {
     const crag = kit.rock(0.10, 0.17, 0.10, "hide", p.main, 0.3);
     place(crag, side * 0.20, 0.24, 0.04, 0, 0, -side * 0.5);
