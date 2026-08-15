@@ -42,6 +42,8 @@ export interface BattleUnit {
   poisonTurns: number;
   /** 毒1スタックあたりのダメージ割合(最大HPに対する%) */
   poisonDamageRate: number;
+  /** 暗闇の残りターン数。0より大きい間、攻撃するたびに外れ判定が入る */
+  blindTurns: number;
 }
 
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
@@ -65,6 +67,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     poisonStacks: 0,
     poisonTurns: 0,
     poisonDamageRate: 0,
+    blindTurns: 0,
   };
 }
 
@@ -137,4 +140,9 @@ export function tickShieldAtTurnStart(unit: BattleUnit): void {
 /** そのユニットの手番開始時に呼ぶ。状態異常免疫の残りターンを減らす */
 export function tickImmunityAtTurnStart(unit: BattleUnit): void {
   if (unit.immuneTurns > 0) unit.immuneTurns -= 1;
+}
+
+/** そのユニットの手番開始時に呼ぶ。暗闇の残りターンを減らす */
+export function tickBlindAtTurnStart(unit: BattleUnit): void {
+  if (unit.blindTurns > 0) unit.blindTurns -= 1;
 }

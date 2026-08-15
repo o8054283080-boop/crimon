@@ -141,8 +141,8 @@ function baseLevelForGlobalIndex(globalIndex: number, waveNumber: number): numbe
  * 控えめ(最大でも1.0倍=据え置き相当)に留め、星と掛け合わさって難易度が跳ね上がりすぎないようにしてある。
  */
 const POWER_SCALE_BASE = 0.5;
-const POWER_SCALE_STEP = 0.026;
-const POWER_SCALE_MAX = 1.0;
+const POWER_SCALE_STEP = 0.031;
+const POWER_SCALE_MAX = 1.12;
 
 function powerScaleForGlobalIndex(globalIndex: number): number {
   return Math.min(POWER_SCALE_MAX, POWER_SCALE_BASE + POWER_SCALE_STEP * (globalIndex - 1));

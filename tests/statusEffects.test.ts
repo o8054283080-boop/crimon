@@ -77,6 +77,16 @@ describe("状態異常の命中率計算(命中率/抵抗率)", () => {
   });
 });
 
+/** 検証したい機構以外が働かないようにするための、何もしないスキル */
+const idleSkill: Skill = {
+  id: "test_idle",
+  name: "テスト待機",
+  description: "テスト用",
+  target: "SINGLE_ENEMY",
+  cooldownTurns: 0,
+  effects: [],
+};
+
 const burnSkill: Skill = {
   id: "test_burn",
   name: "テスト火傷",
@@ -89,7 +99,8 @@ const burnSkill: Skill = {
 describe("火傷(BURN)", () => {
   it("付与された相手は自分の手番終了時に自身の攻撃力分のダメージを受ける(付与した側のターンでは発動しない)", () => {
     const attacker = withSkills(findMonster("slime", "FIRE")!, [burnSkill, burnSkill, burnSkill]);
-    const defender = findMonster("golem", "WATER")!;
+    // 相手が自分でシールドや回復を使うと火傷の検証にならないので、何もしないスキルにしておく
+    const defender = withSkills(findMonster("golem", "WATER")!, [idleSkill, idleSkill, idleSkill]);
 
     const engine = new BattleEngine([attacker], [defender], { rng: () => 0, maxTurns: 1 });
     const units = engine.getUnits();

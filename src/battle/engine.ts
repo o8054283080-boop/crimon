@@ -14,11 +14,17 @@ import {
   hpRatio,
   tickCooldownsAtTurnStart,
   tickEffectsAtTurnStart,
+  tickBlindAtTurnStart,
   tickImmunityAtTurnStart,
   tickShieldAtTurnStart,
 } from "./unit.js";
 
 const ATB_THRESHOLD = 100;
+
+/** 暗闇がかかっている時、攻撃が外れる確率 */
+const BLIND_MISS_CHANCE = 0.5;
+/** 暗闇で外した攻撃のダメージ減少率 */
+const BLIND_DAMAGE_REDUCTION = 0.75;
 const GAUGE_EPSILON = 1e-6;
 
 export type BattleWinner = "PLAYER" | "ENEMY" | "DRAW";
@@ -46,6 +52,8 @@ export interface UnitSnapshot {
   poisonStacks: number;
   /** 毒の残りターン */
   poisonTurns: number;
+  /** 暗闇の残りターン(0=暗闇していない) */
+  blindTurns: number;
 }
 
 /** 演出用: そのターンに起きたHP増減イベント1件分(ダメージ数値のポップアップ表示などに使う) */
@@ -236,6 +244,7 @@ export class BattleEngine {
       immuneTurns: u.immuneTurns,
       poisonStacks: u.poisonStacks,
       poisonTurns: u.poisonTurns,
+      blindTurns: u.blindTurns,
     }));
   }
 
@@ -253,6 +262,7 @@ export class BattleEngine {
     tickCooldownsAtTurnStart(unit);
     tickShieldAtTurnStart(unit);
     tickImmunityAtTurnStart(unit);
+    tickBlindAtTurnStart(unit);
 
     const turnHealPercent = unit.def.combatMods?.turnHealPercent ?? 0;
     if (turnHealPercent > 0 && unit.alive) {
@@ -301,8 +311,17 @@ export class BattleEngine {
     }
 
     this.push(`${this.label(unit)} の「${skill.name}」！`);
+
+    // 暗闇がかかっていると、攻撃するたびに外れ判定が入る。
+    // 外れた場合はこの手番のあいだ、ダメージが大きく下がり追加効果も乗らない。
+    let missed = false;
+    if (unit.blindTurns > 0 && this.rng() < BLIND_MISS_CHANCE) {
+      missed = true;
+      this.push(`  → ${this.label(unit)} は暗闇で手元が狂った！`);
+    }
+
     for (const target of targets) {
-      this.applySkillEffects(unit, target, skill);
+      this.applySkillEffects(unit, target, skill, missed);
     }
   }
 
@@ -351,17 +370,21 @@ export class BattleEngine {
     }
   }
 
-  private applySkillEffects(source: BattleUnit, target: BattleUnit, skill: Skill): void {
+  private applySkillEffects(source: BattleUnit, target: BattleUnit, skill: Skill, missed = false): void {
     let damageDealtThisCall = 0;
 
     for (const effect of skill.effects) {
       if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL") continue;
+      // 暗闇で外した場合、ダメージ以外の効果は一切乗らない
+      if (missed && effect.kind !== "DAMAGE" && effect.kind !== "LIFESTEAL") continue;
 
       switch (effect.kind) {
         case "DAMAGE": {
           const hits = effect.hits ?? 1;
           for (let h = 0; h < hits && target.alive; h += 1) {
             const result = calcDamage(source, target, effect, this.rng);
+            // 暗闇で外した攻撃はかすり傷程度にしかならない
+            if (missed) result.damage = Math.max(1, Math.round(result.damage * (1 - BLIND_DAMAGE_REDUCTION)));
             applyDamage(target, result.damage);
             damageDealtThisCall += result.damage;
             const critText = result.isCrit ? "会心の一撃！" : "";
@@ -380,17 +403,20 @@ export class BattleEngine {
         }
 
         case "HEAL": {
-          if (!target.alive) break;
+          // toSelfが立っている場合は、スキルの対象ではなく術者を回復する
+          const healTarget = effect.toSelf ? source : target;
+          if (!healTarget.alive) break;
           const healBase =
             effect.scaleStat === "atk"
               ? getEffectiveStat(source, "atk")
               : effect.scaleStat === "def"
                 ? getEffectiveStat(source, "def")
-                : target.maxHp;
+                : healTarget.maxHp;
           const healAmount = Math.round(healBase * effect.healRate);
-          applyHeal(target, healAmount);
-          this.push(`  → ${this.label(target)} のHPが ${healAmount} 回復！ (${target.currentHp}/${target.maxHp})`);
-          this.pushEvent({ targetId: target.instanceId, kind: "HEAL", amount: healAmount });
+          if (healAmount <= 0) break;
+          applyHeal(healTarget, healAmount);
+          this.push(`  → ${this.label(healTarget)} のHPが ${healAmount} 回復！ (${healTarget.currentHp}/${healTarget.maxHp})`);
+          this.pushEvent({ targetId: healTarget.instanceId, kind: "HEAL", amount: healAmount });
           break;
         }
 
@@ -405,13 +431,22 @@ export class BattleEngine {
         }
 
         case "BUFF": {
-          target.effects.push({
-            stat: effect.stat,
-            amount: effect.amount,
-            remainingTurns: effect.durationTurns,
-            kind: "BUFF",
-          });
-          this.push(`  → ${this.label(target)} の ${effect.stat.toUpperCase()} が上昇！ (${effect.durationTurns}ターン)`);
+          // 適用先を選べる。敵を攻撃しつつ味方を強化するスキルなどで使う
+          const receivers =
+            effect.applyTo === "SELF"
+              ? [source]
+              : effect.applyTo === "ALLIES"
+                ? this.units.filter((u) => u.team === source.team && u.alive)
+                : [target];
+          for (const receiver of receivers) {
+            receiver.effects.push({
+              stat: effect.stat,
+              amount: effect.amount,
+              remainingTurns: effect.durationTurns,
+              kind: "BUFF",
+            });
+            this.push(`  → ${this.label(receiver)} の ${effect.stat.toUpperCase()} が上昇！ (${effect.durationTurns}ターン)`);
+          }
           break;
         }
 
@@ -446,9 +481,26 @@ export class BattleEngine {
 
         case "GAUGE": {
           if (!target.alive) break;
+          if (effect.drain) {
+            // 吸収: 対象から減らした分をそのまま術者へ移す
+            const before = target.gauge;
+            target.gauge = Math.max(0, target.gauge - effect.amount * ATB_THRESHOLD);
+            const stolen = before - target.gauge;
+            source.gauge = Math.max(0, source.gauge + stolen);
+            this.push(`  → ${this.label(source)} が ${this.label(target)} の行動ゲージを吸収した！`);
+            break;
+          }
           target.gauge = Math.max(0, target.gauge + effect.amount * ATB_THRESHOLD);
           const verb = effect.amount >= 0 ? "進んだ" : "後退した";
           this.push(`  → ${this.label(target)} の行動ゲージが${verb}！`);
+          break;
+        }
+
+        case "BLIND": {
+          if (this.isImmune(target)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          target.blindTurns = Math.max(target.blindTurns, effect.durationTurns);
+          this.push(`  → ${this.label(target)} は暗闇に包まれた！ (${effect.durationTurns}ターン)`);
           break;
         }
 

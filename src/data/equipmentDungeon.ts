@@ -83,10 +83,12 @@ const POWER_SCALE_END = 1.7;
  * 組み合わせで、古代の魔人自身も5ターンCTの全体攻撃を持つため、他の階層より同じpowerScale
  * でも体感の厳しさが増す。これらを踏まえ、9・10階は「星5のSR/SSRを複数体、星6装備込みで
  * 編成した終盤パーティ」を基準に、
- * サブステータスまでしっかり詰めてようやく安定して勝てる水準まで引き上げてある
- * (通常モンスターだけの編成では、装備が最大でもほぼ勝てない想定)。
+ * サブステータスまでしっかり詰めてようやく安定して勝てる水準まで引き上げてある。
+ * なおスキル調整で通常モンスターの連携(全体デバフ・毒・継続回復)が強くなったため、
+ * 装備を極めた通常モンスターだけの編成でも突破できる場合はあるが、
+ * SR/SSR軸の編成と比べれば依然としてはっきり不利になるよう調整してある。
  */
-const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.58, 10: 1.98 };
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.62, 10: 1.9 };
 
 function powerScaleForFloor(floor: number): number {
   const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);

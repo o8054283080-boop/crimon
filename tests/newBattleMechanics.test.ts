@@ -34,7 +34,16 @@ describe("シールド(SHIELD)", () => {
 
   it("シールドはHPより先にダメージを吸収する", () => {
     const caster = withSkills(findMonster("fairy", "GRASS")!, [shieldSkill, shieldSkill, shieldSkill]);
-    const ally = findMonster("golem", "WATER")!;
+    // 味方が自分でシールドを張り直すと残りターンの検証にならないので、何もしないスキルにしておく
+    const idleSkill: Skill = {
+      id: "test_idle",
+      name: "テスト待機",
+      description: "テスト用",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 0,
+      effects: [],
+    };
+    const ally = withSkills(findMonster("golem", "WATER")!, [idleSkill, idleSkill, idleSkill]);
     const attacker = withSkills(findMonster("wolf", "FIRE")!, [plainAttackSkill, plainAttackSkill, plainAttackSkill]);
 
     const engine = new BattleEngine([caster, ally], [attacker], { rng: () => 0.999, maxTurns: 1 });
@@ -59,7 +68,16 @@ describe("シールド(SHIELD)", () => {
 
   it("シールドの残りターンが尽きると消滅する", () => {
     const caster = withSkills(findMonster("fairy", "GRASS")!, [shieldSkill, shieldSkill, shieldSkill]);
-    const ally = findMonster("golem", "WATER")!;
+    // 味方が自分でシールドを張り直すと残りターンの検証にならないので、何もしないスキルにしておく
+    const idleSkill: Skill = {
+      id: "test_idle",
+      name: "テスト待機",
+      description: "テスト用",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 0,
+      effects: [],
+    };
+    const ally = withSkills(findMonster("golem", "WATER")!, [idleSkill, idleSkill, idleSkill]);
     const enemy = findMonster("slime", "FIRE")!;
 
     const engine = new BattleEngine([caster, ally], [enemy], { rng: () => 0.999, maxTurns: 1 });
@@ -438,5 +456,117 @@ describe("速度デバフ(既存のDEBUFF機構をspdに適用)", () => {
     engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
     expect(targetUnit.effects.some((e) => e.stat === "spd" && e.amount < 0)).toBe(true);
     expect(getEffectiveStat(targetUnit, "spd")).toBe(Math.round(spdBefore * 0.75));
+  });
+});
+
+describe("暗闇(BLIND)", () => {
+  const blindSkill: Skill = {
+    id: "test_blind",
+    name: "テスト暗闇",
+    description: "テスト用",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "BLIND", durationTurns: 2 }],
+  };
+
+  const strikeSkill: Skill = {
+    id: "test_strike",
+    name: "テスト攻撃",
+    description: "テスト用",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.0 },
+      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2 },
+    ],
+  };
+
+  it("暗闇を付与でき、残りターンが手番ごとに減る", () => {
+    const caster = withSkills(findMonster("seraph", "LIGHT")!, [blindSkill, blindSkill, blindSkill]);
+    const target = withSkills(findMonster("golem", "WATER")!, [strikeSkill, strikeSkill, strikeSkill]);
+
+    const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
+    const units = engine.getUnits();
+    const casterUnit = units.find((u) => u.instanceId === "P1")!;
+    const targetUnit = units.find((u) => u.instanceId === "E1")!;
+
+    engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
+    expect(targetUnit.blindTurns).toBe(2);
+
+    engine.resolveTurn(targetUnit);
+    expect(targetUnit.blindTurns).toBe(1);
+  });
+
+  it("暗闇で外すとダメージが大きく減り、追加効果も乗らない", () => {
+    const attacker = withSkills(findMonster("wolf", "FIRE")!, [strikeSkill, strikeSkill, strikeSkill]);
+    const victim = withStats(findMonster("golem", "WATER")!, { hp: 100000, def: 1 });
+
+    // 暗闇が付いていない側。低い乱数にして、効果抵抗の判定にも勝つようにする
+    const hitEngine = new BattleEngine([attacker], [victim], { rng: () => 0.1, maxTurns: 1 });
+    const hitUnits = hitEngine.getUnits();
+    const hitAttacker = hitUnits.find((u) => u.instanceId === "P1")!;
+    const hitVictim = hitUnits.find((u) => u.instanceId === "E1")!;
+    const hpBeforeHit = hitVictim.currentHp;
+    hitEngine.resolveTurn(hitAttacker, { skillIndex: 0, targetId: hitVictim.instanceId });
+    const normalDamage = hpBeforeHit - hitVictim.currentHp;
+    expect(hitVictim.effects.some((e) => e.kind === "DEBUFF")).toBe(true);
+
+    // rngが常に0を返すので、暗闇の外れ判定に必ず引っかかる
+    const missEngine = new BattleEngine([attacker], [victim], { rng: () => 0, maxTurns: 1 });
+    const missUnits = missEngine.getUnits();
+    const missAttacker = missUnits.find((u) => u.instanceId === "P1")!;
+    const missVictim = missUnits.find((u) => u.instanceId === "E1")!;
+    missAttacker.blindTurns = 2;
+    const hpBeforeMiss = missVictim.currentHp;
+    missEngine.resolveTurn(missAttacker, { skillIndex: 0, targetId: missVictim.instanceId });
+    const blindedDamage = hpBeforeMiss - missVictim.currentHp;
+
+    // 外した攻撃はダメージが4分の1程度まで落ちる
+    expect(blindedDamage).toBeLessThan(normalDamage * 0.5);
+    // 追加効果(防御低下)は一切乗らない
+    expect(missVictim.effects.some((e) => e.kind === "DEBUFF")).toBe(false);
+  });
+
+  it("状態異常免疫があると暗闇を防げる", () => {
+    const caster = withSkills(findMonster("seraph", "LIGHT")!, [blindSkill, blindSkill, blindSkill]);
+    const target = withSkills(findMonster("golem", "WATER")!, [strikeSkill, strikeSkill, strikeSkill]);
+
+    const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
+    const units = engine.getUnits();
+    const casterUnit = units.find((u) => u.instanceId === "P1")!;
+    const targetUnit = units.find((u) => u.instanceId === "E1")!;
+
+    targetUnit.immuneTurns = 3;
+    engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
+    expect(targetUnit.blindTurns).toBe(0);
+  });
+});
+
+describe("行動ゲージの吸収", () => {
+  it("対象から減らした分だけ術者のゲージが増える", () => {
+    const drainSkill: Skill = {
+      id: "test_drain",
+      name: "テスト吸収",
+      description: "テスト用",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 0,
+      effects: [{ kind: "GAUGE", amount: 0.1, drain: true }],
+    };
+    const caster = withSkills(findMonster("nemesis", "DARK")!, [drainSkill, drainSkill, drainSkill]);
+    const target = findMonster("golem", "WATER")!;
+
+    const engine = new BattleEngine([caster], [target], { rng: () => 0.9, maxTurns: 1 });
+    const units = engine.getUnits();
+    const casterUnit = units.find((u) => u.instanceId === "P1")!;
+    const targetUnit = units.find((u) => u.instanceId === "E1")!;
+
+    targetUnit.gauge = 50;
+    // 手番を解決すると術者のゲージは100消費される。消費後に0を下回らないよう満タンにしておく
+    casterUnit.gauge = 100;
+    engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
+
+    expect(targetUnit.gauge).toBe(40);
+    // 対象から減った10が、そのまま術者へ移っている
+    expect(casterUnit.gauge).toBe(10);
   });
 });
