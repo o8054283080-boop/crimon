@@ -175,12 +175,37 @@ async function main() {
     await page.waitForTimeout(700);
     await shoot(page, "16-ten-skipped");
   } finally {
-    await browser.close();
-    server.kill("SIGTERM");
+    await shutdown(browser, server);
   }
 }
 
-main().catch((error) => {
-  log("失敗:", error.message);
-  process.exit(1);
-});
+/**
+ * 後始末。
+ *
+ * 画像を撮り終えたあと、ブラウザやdevサーバの終了待ちで固まることがある
+ * (実際に30分以上ハングした)。撮影自体は済んでいるので、
+ * 待つのは数秒だけにして、居座るプロセスは強制的に落とす。
+ */
+async function shutdown(browser, server) {
+  const limit = (promise, ms, label) =>
+    Promise.race([
+      promise.catch(() => {}),
+      new Promise((resolve) => setTimeout(() => { log(`${label}の終了待ちを打ち切ります`); resolve(); }, ms)),
+    ]);
+
+  await limit(browser.close(), 5000, "ブラウザ");
+  server.kill("SIGTERM");
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  if (server.exitCode === null && server.signalCode === null) server.kill("SIGKILL");
+}
+
+main()
+  .then(() => {
+    log("完了");
+    // 残ったハンドルに関係なくNodeを終わらせる
+    process.exit(0);
+  })
+  .catch((error) => {
+    log("失敗:", error.message);
+    process.exit(1);
+  });
