@@ -87,6 +87,9 @@ export class MonsterAvatar {
   private readonly hitTrack = newTrack();
   private readonly castTrack = newTrack();
 
+  /** 前フレームの重心。尾や布を遅れて振るための慣性計算に使う */
+  private readonly previousOffset = new THREE.Vector3();
+  private readonly lag = new THREE.Vector3();
   private deathProgress = 0;
   private dying = false;
   private hpRatio = 1;
@@ -111,8 +114,9 @@ export class MonsterAvatar {
     finalizeRig(this.rig, this.kit, builder.height, builder.float);
     this.uniforms.uHeight.value = this.rig.height;
 
-    // 正面(-Z)を敵へ向けたうえで、少しだけ斜に構えて立体感を出す
-    this.rig.root.rotation.y = (facing > 0 ? 0 : Math.PI) + 0.3;
+    // 正面(-Z)を敵へ向けたうえで、少しだけ斜に構えて立体感を出す。
+    // 四足のように前後へ長い骨格は、正面からだと胴が見えないので深く構える
+    this.rig.root.rotation.y = (facing > 0 ? 0 : Math.PI) + 0.3 + this.rig.yawBias;
     this.root.add(this.rig.root);
 
     const footprint = this.rig.height * 0.62;
@@ -171,7 +175,9 @@ export class MonsterAvatar {
   /** ダメージ表示などをぶら下げるための、頭上あたりのワールド座標 */
   getAnchorWorldPosition(target: THREE.Vector3): THREE.Vector3 {
     this.rig.core.getWorldPosition(target);
-    target.y += this.rig.height * 0.7;
+    // HPバーがこの位置に出るため、低すぎると顔がラベルで隠れる。
+    // 一方で被弾エフェクトの中心でもあるので、頭のすぐ下あたりに置く
+    target.y += this.rig.height * 0.86;
     return target;
   }
 
@@ -229,12 +235,15 @@ export class MonsterAvatar {
     );
     rig.torso.scale.set(1 + breath * 0.022 * breathStrength, 1 + breath * 0.03 * breathStrength, 1 + breath * 0.022 * breathStrength);
 
-    // 全身の上下動と体重移動
-    let offsetY = Math.sin(t * (rig.floats ? 0.9 : 1.55)) * anim.bob;
+    // 全身の上下動と体重移動。
+    // 待機中は「左右の脚に交互に体重を預ける」ゆっくりした周期を主に置き、
+    // 呼吸(速い)と重心移動(遅い)の2つの周期が重なることで生気が出る
+    const shift = Math.sin(t * 0.44);
+    let offsetY = Math.sin(t * (rig.floats ? 0.9 : 1.55)) * anim.bob - Math.abs(shift) * 0.012 * anim.sway;
     let offsetZ = 0;
-    let offsetX = Math.sin(t * 0.62) * 0.02 * anim.sway;
+    let offsetX = shift * 0.035 * anim.sway;
     let leanX = 0;
-    let leanZ = Math.sin(t * 0.62) * 0.012 * anim.sway;
+    let leanZ = shift * 0.03 * anim.sway;
 
     // 首と頭。生き物らしさが一番出るので、周期をずらして複数の波を重ねる
     rig.neck.rotation.set(
@@ -243,8 +252,12 @@ export class MonsterAvatar {
       rig.neckRest.z,
     );
     let headX = rig.headRest.x + Math.sin(t * 1.21 + 1.1) * 0.05 * anim.headSway;
-    let headY = rig.headRest.y + Math.sin(t * 0.67) * 0.13 * anim.headSway;
+    // 頭は敵の方(-Z)を見る。体を斜に構えている分だけ首を戻し、
+    // そこへゆっくりした「見回し」を重ねる。視線があるだけで生き物に見える
+    let headY = rig.headRest.y - rig.yawBias * 0.75 + Math.sin(t * 0.67) * 0.13 * anim.headSway;
     let headZ = rig.headRest.z + Math.sin(t * 0.89) * 0.04 * anim.headSway;
+    // 体重が乗っている側へ、首も少し傾ぐ
+    headZ -= shift * 0.05 * anim.headSway;
     let jawOpen = 0;
 
     // 尾: 根元から先端へ遅れて伝わる波
@@ -331,6 +344,19 @@ export class MonsterAvatar {
         leanX += -strike * 0.5;
         headY += strike * 0.4;
         for (const arm of rig.arms) arm.root.rotation.x += strike * 1.3;
+      } else if (anim.attack === "pounce") {
+        // 四足の跳びかかり。腕を振るのではなく、体を沈めてから前へ跳ぶ。
+        // 着地の頭突き・噛みつきに重心が乗るよう、頭を大きく振り下ろす
+        offsetY += -windup * 0.1 + arc(attackT) * 0.3;
+        offsetZ += windup * 0.24 - strike * anim.lunge * 1.05;
+        leanX += windup * 0.24 - strike * 0.32;
+        headX += -windup * 0.4 + strike * 0.5;
+        for (const leg of rig.legs) {
+          // 前脚は伸ばして掴みかかり、後脚は蹴り出して畳む
+          leg.root.rotation.x += leg.front ? -windup * 0.5 + strike * 1.1 : windup * 0.4 - strike * 0.7;
+          if (leg.lower && leg.lowerRest) leg.lower.rotation.x += leg.front ? windup * 0.4 - strike * 0.6 : -windup * 0.3;
+        }
+        for (const wing of rig.wings) wing.root.rotation.z -= wing.side * (windup * 0.5 + strike * 0.3);
       } else if (anim.attack === "cast") {
         // 溜めてから前方へ放つ
         offsetZ += windup * 0.16 - strike * anim.lunge * 0.45;
@@ -426,6 +452,36 @@ export class MonsterAvatar {
       for (let i = 0; i < rig.tail.length; i++) rig.tail[i].group.rotation.x += fall * 0.25;
     }
 
+    // === 慣性 =============================================================
+    // 重心の移動を覚えておき、尾・翼・布を1テンポ遅れて振る。
+    // 全身が同じ位相で動くと人形に見えるので、末端だけ遅らせるのが要。
+    if (dt > 0.0001) {
+      const velocity = this.tmpVector.set(
+        (offsetX - this.previousOffset.x) / dt,
+        (offsetY - this.previousOffset.y) / dt,
+        (offsetZ - this.previousOffset.z) / dt,
+      );
+      // 速度は攻撃・被弾で跳ねるので頭打ちにする(暴れると布が突き抜ける)
+      velocity.clampScalar(-6, 6);
+      this.lag.lerp(velocity, Math.min(1, dt * 9));
+    }
+    this.previousOffset.set(offsetX, offsetY, offsetZ);
+
+    for (let i = 0; i < rig.tail.length; i++) {
+      const follow = (i + 1) / rig.tail.length;
+      rig.tail[i].group.rotation.x += this.lag.z * 0.045 * follow;
+      rig.tail[i].group.rotation.y -= this.lag.x * 0.05 * follow;
+    }
+    for (const wing of rig.wings) {
+      // 沈む時に翼が遅れて持ち上がる
+      wing.root.rotation.z += wing.side * this.lag.y * 0.05;
+      wing.root.rotation.x += this.lag.z * 0.03;
+    }
+    for (const cloth of rig.cloth) {
+      cloth.group.rotation.x += this.lag.z * 0.06 * cloth.amount;
+      cloth.group.rotation.z -= this.lag.x * 0.07 * cloth.amount;
+    }
+
     // === 姿勢の確定 =======================================================
     rig.core.position.set(offsetX, offsetY, offsetZ);
     rig.core.rotation.set(leanX * 0.45, 0, leanZ);
@@ -435,7 +491,9 @@ export class MonsterAvatar {
 
     // === 光まわり =========================================================
     this.activeGlow += (this.targetActiveGlow - this.activeGlow) * Math.min(1, dt * 7);
-    this.flash = Math.max(0, this.flash - dt * 4.5);
+    // 素早く消す。長く残ると、全体攻撃で全員が同時に光った時に
+    // 画面がしばらく白いままになる
+    this.flash = Math.max(0, this.flash - dt * 9);
 
     const fade = 1 - death;
     const sigilMaterial = this.sigilMesh.material as THREE.MeshBasicMaterial;

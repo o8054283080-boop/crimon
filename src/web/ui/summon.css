@@ -1,0 +1,1509 @@
+/* =========================================================================
+ * 召喚(ガチャ)画面
+ *
+ * ここはゲーム最大の見せ場なので、他の画面のような「情報の並べ方」ではなく
+ * 「起きごと(イベント)の見せ方」で作る。
+ *   引く前 : 祭壇が静かに回り続ける   = いつでも起こせる期待
+ *   溜め   : 魔法陣が収束し、色が 青→紫→金→虹 と上がる = 何が来るか読める
+ *   爆発   : 閃光と衝撃波で画面を白く飛ばす = 出た
+ *   出現   : レア度の額縁つきカードが飛び出す = 何が出たか
+ * どの段階でも画面のどこかを押せばスキップできる(周回するゲームなので必須)。
+ *
+ * 色は style.css の共通トークン(--surface / --edge-light / --drop など)を使い、
+ * 演出色だけを等級 g1..g4 と溜めの段階 charge-a..d で差し替える。
+ *
+ * 位置決めは vmin/vmax などの長さで行う。
+ * (%指定の translate は「自分自身の大きさ」に対する割合になり、
+ *  数pxしか動かない事故になるため、演出では使わない)
+ * ========================================================================= */
+
+.screen.summon-screen {
+  /* 1画面完結。縦横どちらでもスクロールを出さない */
+  --summon-nav: 68px;
+
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  overflow: hidden;
+  gap: 8px;
+  padding:
+    max(10px, env(safe-area-inset-top)) 14px
+    calc(var(--summon-nav) + max(6px, env(safe-area-inset-bottom)));
+}
+
+/* --- 上部: タイトルと所持数 ------------------------------------------- */
+
+.summon-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.summon-top__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  background: linear-gradient(180deg, #fff6d0, #ffd76a 45%, #c08a1c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+
+.summon-top__wallet {
+  display: flex;
+  gap: 6px;
+}
+
+.summon-wallet {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+}
+
+.summon-wallet--scroll {
+  color: #ffe6a8;
+}
+
+/* --- 祭壇(引く前の主役)----------------------------------------------- */
+
+.summon-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 祭壇の直径。ルーンの軌道半径や文字の大きさもここから計算するので、
+ * %(親や自分自身が基準になる)を混ぜてはいけない。
+ * font-size では親の文字サイズ、translateY では自分の高さ(=0)になってしまう。 */
+.altar {
+  --d: min(82vw, 46vh, 360px);
+
+  position: relative;
+  width: var(--d);
+  height: var(--d);
+  max-width: 100%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.altar > * {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+/* 足元に敷く広い光。魔法陣が空中に浮いて見えるようにする */
+.altar__halo {
+  inset: -18%;
+  background: radial-gradient(circle at 50% 50%, rgba(120, 170, 255, 0.34), rgba(90, 60, 190, 0.13) 42%, transparent 68%);
+  filter: blur(6px);
+  animation: altar-breathe 4.2s ease-in-out infinite;
+}
+
+.altar__ring {
+  border: 1px solid rgba(160, 200, 255, 0.32);
+  box-shadow: inset 0 0 26px rgba(90, 150, 255, 0.22), 0 0 20px rgba(70, 120, 230, 0.16);
+}
+
+.altar__ring--outer {
+  background: repeating-conic-gradient(from 0deg, rgba(160, 205, 255, 0.55) 0deg 1.6deg, transparent 1.6deg 11deg);
+  -webkit-mask: radial-gradient(circle, transparent 45%, #000 46.5%, #000 50%, transparent 51%);
+  mask: radial-gradient(circle, transparent 45%, #000 46.5%, #000 50%, transparent 51%);
+  border: none;
+  box-shadow: none;
+  animation: spin 26s linear infinite;
+}
+
+.altar__ring--mid {
+  inset: 13%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(120, 180, 255, 0.55) 40deg, transparent 120deg, rgba(180, 140, 255, 0.5) 200deg, transparent 300deg);
+  -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%);
+  mask: radial-gradient(circle, transparent 60%, #000 62%);
+  border: none;
+  animation: spin-rev 17s linear infinite;
+}
+
+.altar__ring--inner {
+  inset: 27%;
+  border-style: dashed;
+  border-color: rgba(190, 220, 255, 0.38);
+  animation: spin 11s linear infinite;
+}
+
+.altar__runes {
+  animation: spin-rev 34s linear infinite;
+}
+
+/* ルーンは祭壇の直径から軌道半径を出す(自分の大きさに対する%だと動かない) */
+.altar__rune {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--d) * 0.072);
+  font-style: normal;
+  line-height: 1;
+  color: #e8f2ff;
+  text-shadow: 0 0 12px rgba(140, 195, 255, 1);
+  /* 外周の目盛りと重ならない位置に置く。重ねると文字が読めない */
+  transform: rotate(var(--deg)) translateY(calc(var(--d) * -0.37)) rotate(calc(var(--deg) * -1));
+  animation: rune-blink 3.4s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+/* 中心の宝珠。呼吸のように明滅させ、押したくなる焦点を作る */
+.altar__orb {
+  inset: 33%;
+  background: radial-gradient(circle at 36% 30%, #ffffff 0%, #b7d8ff 18%, #5b8ef0 48%, #23306e 78%, #101430 100%);
+  box-shadow:
+    0 0 46px rgba(110, 160, 255, 0.55),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.45),
+    inset 0 8px 18px rgba(255, 255, 255, 0.35);
+  animation: orb-float 3.6s ease-in-out infinite;
+}
+
+.altar__orb-core {
+  position: absolute;
+  inset: 16%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(150, 200, 255, 0.25) 55%, transparent 72%);
+  animation: altar-breathe 2.4s ease-in-out infinite;
+}
+
+.altar__orb-spec {
+  position: absolute;
+  top: 12%;
+  left: 20%;
+  width: 34%;
+  height: 22%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), transparent);
+  filter: blur(1px);
+}
+
+.altar__motes {
+  inset: -4%;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.mote {
+  position: absolute;
+  bottom: -8px;
+  width: var(--size, 3px);
+  height: var(--size, 3px);
+  border-radius: 50%;
+  background: #cfe6ff;
+  box-shadow: 0 0 9px rgba(150, 200, 255, 0.95);
+  opacity: 0;
+  animation: mote-rise var(--dur, 4s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+/* --- 下部: 排出の目安・注記・引くボタン --------------------------------- */
+
+.summon-bottom {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summon-rates {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.summon-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0d1020;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.summon-tag--r {
+  background: linear-gradient(180deg, #9fdcff, #3a86bd);
+}
+.summon-tag--sr {
+  background: linear-gradient(180deg, #dcb6ff, #7a44c8);
+  color: #fff;
+}
+.summon-tag--ssr {
+  background: linear-gradient(180deg, #ffe79a, #d29a1c);
+}
+.summon-tag--rare {
+  background: linear-gradient(180deg, #ffd0f0, #b44ea0);
+  color: #fff;
+}
+
+.summon-note {
+  margin: 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.summon-cta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.summon-cta__btn {
+  appearance: none;
+  position: relative;
+  border: none;
+  border-radius: 14px;
+  padding: 10px 8px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  color: #f6f9ff;
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--edge-line), var(--drop);
+  transition: transform 0.08s ease, filter 0.12s ease;
+  overflow: hidden;
+}
+
+.summon-cta__btn:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(0.94);
+}
+
+.summon-cta__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.summon-cta__lead {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+.summon-cta__sub {
+  font-size: 0.62rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.summon-cta__cost {
+  margin-top: 2px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: rgba(5, 8, 18, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+/* 10連が主役。金色で一番大きく、光が走る */
+.summon-cta__btn--ten {
+  grid-column: 1 / -1;
+  padding: 13px 8px 12px;
+  color: #2a1a02;
+  background: linear-gradient(180deg, #ffe9a8 0%, #f0b93f 46%, #b9791a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 0 22px rgba(255, 190, 70, 0.35),
+    var(--drop);
+}
+
+.summon-cta__btn--ten .summon-cta__lead {
+  font-size: 1.2rem;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.summon-cta__btn--ten .summon-cta__cost {
+  color: #ffeec2;
+}
+
+.summon-cta__btn--ten::after {
+  /* 表面を斜めに走る光。押す前の期待を作る */
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -40%;
+  width: 40%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  transform: rotate(18deg);
+  animation: sheen 3.6s ease-in-out infinite;
+}
+
+.summon-cta__btn--ten:disabled::after {
+  display: none;
+}
+
+.summon-cta__btn--single {
+  background: linear-gradient(180deg, #8fc0ff 0%, #4f8cff 45%, #2a63d8 100%);
+  color: #061024;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 0 16px rgba(79, 140, 255, 0.3), var(--drop);
+}
+
+.summon-cta__btn--scroll {
+  background: var(--surface);
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(255, 255, 255, 0.14), var(--drop);
+}
+
+/* =========================================================================
+ * 結果画面(演出)
+ * ========================================================================= */
+
+.screen.summon-screen--result {
+  position: relative;
+  /* 演出中はボトムナビより手前に出し、画面全体を舞台として使う */
+  z-index: 20;
+  justify-content: space-between;
+  isolation: isolate;
+}
+
+/* --- 等級ごとの「出たあと」の色 --- */
+.summon-screen--result {
+  --fx1: #bcd8ff;
+  --fx-soft: rgba(120, 180, 255, 0.5);
+  --ray: #5f93ff;
+
+  /* 溜め中の色(段階で上書きされる) */
+  --chg1: #bcd8ff;
+  --chg-soft: rgba(120, 180, 255, 0.55);
+}
+
+.summon-screen--result.g2 {
+  --fx1: #e6c2ff;
+  --fx-soft: rgba(200, 150, 255, 0.55);
+  --ray: #a86bff;
+}
+
+.summon-screen--result.g3 {
+  --fx1: #ffe6a0;
+  --fx-soft: rgba(255, 205, 100, 0.6);
+  --ray: #ffbe3d;
+}
+
+.summon-screen--result.g4 {
+  --fx1: #fff3d0;
+  --fx-soft: rgba(255, 215, 150, 0.68);
+  --ray: #ffab2e;
+}
+
+/* --- 溜めの段階(色がどこまで上がるかで当たりが読める)--- */
+.charge-a {
+  --chg1: #bcd8ff;
+  --chg-soft: rgba(120, 180, 255, 0.55);
+}
+
+.charge-b {
+  --chg1: #e6c2ff;
+  --chg-soft: rgba(190, 130, 255, 0.6);
+}
+
+.charge-c {
+  --chg1: #ffe4a2;
+  --chg-soft: rgba(255, 200, 90, 0.65);
+}
+
+.charge-d {
+  --chg1: #ffffff;
+  --chg-soft: rgba(255, 235, 200, 0.75);
+}
+
+/* --- 背面の演出レイヤ --------------------------------------------------- */
+
+.fx {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 画面全体を落とす暗幕。演出中はここが舞台の「暗さ」を作る */
+.fx__backdrop {
+  position: fixed;
+  inset: -12px;
+  background:
+    radial-gradient(ellipse 80% 62% at 50% 44%, rgba(10, 14, 34, 0.2), rgba(2, 3, 10, 0.9) 78%),
+    rgba(3, 4, 12, 0.55);
+  opacity: 0.85;
+  transition: opacity 0.5s ease;
+}
+
+.phase-charge .fx__backdrop {
+  opacity: 1;
+}
+
+.phase-reveal .fx__backdrop {
+  opacity: 0.78;
+}
+
+.phase-done .fx__backdrop {
+  opacity: 0.62;
+}
+
+/* 出たあと背面で回り続ける光条。高レアほど強い */
+.fx__rays {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 200vmax;
+  height: 200vmax;
+  margin: -100vmax 0 0 -100vmax;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+.fx__rays > i {
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(from 0deg, var(--ray) 0deg 2.2deg, transparent 2.2deg 12deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 3%, rgba(0, 0, 0, 0.8) 11%, rgba(0, 0, 0, 0.34) 24%, transparent 44%);
+  mask: radial-gradient(closest-side, transparent 3%, rgba(0, 0, 0, 0.8) 11%, rgba(0, 0, 0, 0.34) 24%, transparent 44%);
+  mix-blend-mode: screen;
+  animation: spin 34s linear infinite;
+}
+
+.phase-reveal .fx__rays {
+  opacity: 0.5;
+}
+
+.g1.phase-reveal .fx__rays {
+  opacity: 0.22;
+}
+
+.g3.phase-reveal .fx__rays {
+  opacity: 0.62;
+}
+
+.g4.phase-reveal .fx__rays {
+  opacity: 0.66;
+}
+
+/* 収束する魔法陣。段階が上がるほど小さく速く、明るくなる */
+.fx__circle {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(84vw, 74vh);
+  height: min(84vw, 74vh);
+  transform: translate(-50%, -50%) scale(1.35);
+  opacity: 0;
+  filter: drop-shadow(0 0 10px var(--chg-soft));
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, filter 0.4s ease;
+}
+
+.fx__circle > * {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+/* 外周の目盛り。マスクは closest-side にしないと
+ * 既定の farthest-corner(=対角線)基準になり、想定より内側に描かれる */
+.fx__circle-a {
+  background: repeating-conic-gradient(from 0deg, var(--chg1) 0deg 1.4deg, transparent 1.4deg 9deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 88%, #000 91%, #000 99%, transparent 100%);
+  mask: radial-gradient(circle closest-side, transparent 88%, #000 91%, #000 99%, transparent 100%);
+  animation: spin 9s linear infinite;
+}
+
+.fx__circle-b {
+  inset: 13%;
+  border: 2px dashed var(--chg1);
+  opacity: 0.85;
+  animation: spin-rev 5s linear infinite;
+}
+
+.fx__circle-c {
+  inset: 26%;
+  background: conic-gradient(from 0deg, transparent 10deg, var(--chg1) 70deg, transparent 130deg, transparent 190deg, var(--chg1) 250deg, transparent 310deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 88%, #000 93%, #000 100%);
+  mask: radial-gradient(circle closest-side, transparent 88%, #000 93%, #000 100%);
+  animation: spin 3.4s linear infinite;
+}
+
+/* 中心にたまっていく光の玉。これが弾けて召喚になる。
+ * 大きな影を付けると拡大時に画面全体が白く濁るので、光は背景の階調だけで作る */
+.fx__circle-core {
+  inset: 42%;
+  background: radial-gradient(circle closest-side, #fff 0 24%, var(--chg1) 44%, var(--chg-soft) 62%, transparent 80%);
+  transform: scale(0.4);
+  opacity: 0;
+  transition: transform 0.5s cubic-bezier(0.3, 0, 0.2, 1), opacity 0.4s ease;
+}
+
+.phase-charge .fx__circle {
+  opacity: 0.95;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.phase-charge .fx__circle-core {
+  opacity: 0.9;
+  transform: scale(1);
+}
+
+.phase-charge.charge-b .fx__circle {
+  transform: translate(-50%, -50%) scale(0.88) rotate(18deg);
+  filter: brightness(1.15) drop-shadow(0 0 16px var(--chg-soft));
+}
+
+.phase-charge.charge-b .fx__circle-core {
+  transform: scale(1.35);
+}
+
+.phase-charge.charge-c .fx__circle {
+  transform: translate(-50%, -50%) scale(0.78) rotate(-22deg);
+  filter: brightness(1.3) saturate(1.2) drop-shadow(0 0 24px var(--chg-soft));
+}
+
+.phase-charge.charge-c .fx__circle-core {
+  transform: scale(1.75);
+}
+
+.phase-charge.charge-d .fx__circle {
+  transform: translate(-50%, -50%) scale(0.68) rotate(26deg);
+  filter: brightness(1.5) saturate(1.35) drop-shadow(0 0 34px var(--chg-soft));
+}
+
+.phase-charge.charge-d .fx__circle-core {
+  transform: scale(2.9);
+}
+
+/* 最高等級の最終段階だけ、魔法陣が虹色になる */
+.charge-d .fx__circle-a {
+  background: repeating-conic-gradient(
+    from 0deg,
+    #ff5a7a 0deg 1.4deg,
+    transparent 1.4deg 9deg,
+    #ffd25a 9deg 10.4deg,
+    transparent 10.4deg 18deg,
+    #5ad2ff 18deg 19.4deg,
+    transparent 19.4deg 27deg,
+    #b98cff 27deg 28.4deg,
+    transparent 28.4deg 36deg
+  );
+}
+
+.charge-d .fx__circle-c {
+  background: conic-gradient(from 0deg, #ff5a7a, #ffd25a 25%, #7cf0a0 45%, #5ad2ff 65%, #b98cff 85%, #ff5a7a);
+}
+
+/* 溜めの終盤は画面を細かく揺らす */
+.charge-c .fx,
+.charge-d .fx {
+  animation: shake 0.13s linear infinite;
+}
+
+.charge-d .fx {
+  animation-duration: 0.09s;
+}
+
+/* 中心へ吸い込まれる光の粒 */
+.fx__converge {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.phase-charge .fx__converge {
+  opacity: 1;
+}
+
+.fx__spark {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 14px var(--chg1), 0 0 4px var(--chg1);
+  opacity: 0;
+}
+
+.phase-charge .fx__spark {
+  animation: converge 1.15s ease-in infinite;
+  animation-delay: var(--delay);
+}
+
+.phase-charge.charge-c .fx__spark {
+  animation-duration: 0.6s;
+}
+
+.phase-charge.charge-d .fx__spark {
+  animation-duration: 0.42s;
+}
+
+/* 中心から立ちのぼる光柱 */
+.fx__beam {
+  position: fixed;
+  top: -5%;
+  bottom: -5%;
+  left: 50%;
+  width: 17vmin;
+  margin-left: -8.5vmin;
+  background: linear-gradient(180deg, transparent, var(--chg-soft) 34%, var(--chg-soft) 66%, transparent);
+  filter: blur(16px);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: scaleX(0.25);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.phase-charge.charge-b .fx__beam {
+  opacity: 0.26;
+  transform: scaleX(0.55);
+}
+
+.phase-charge.charge-c .fx__beam {
+  opacity: 0.4;
+  transform: scaleX(0.85);
+}
+
+.phase-charge.charge-d .fx__beam {
+  opacity: 0.55;
+  transform: scaleX(1.15);
+}
+
+/* 出た瞬間の衝撃波 */
+.fx__shock {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 34vmin;
+  height: 34vmin;
+  margin: -17vmin 0 0 -17vmin;
+  border-radius: 50%;
+  border: 3px solid var(--fx1);
+  opacity: 0;
+}
+
+.phase-burst .fx__shock {
+  animation: shock 0.8s cubic-bezier(0.15, 0.75, 0.3, 1) forwards;
+}
+
+.phase-burst .fx__shock--b {
+  animation-delay: 0.12s;
+  animation-duration: 1s;
+}
+
+.g1.phase-burst .fx__shock--b {
+  display: none;
+}
+
+/* 出た瞬間に弾ける粒 */
+.fx__burst {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+}
+
+.fx__bmote {
+  position: absolute;
+  width: var(--size, 6px);
+  height: var(--size, 6px);
+  margin: calc(var(--size, 6px) / -2) 0 0 calc(var(--size, 6px) / -2);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 16px var(--fx1), 0 0 6px var(--fx1);
+  opacity: 0;
+}
+
+.phase-burst .fx__bmote {
+  animation: burst-out 1s ease-out forwards;
+  animation-delay: var(--delay);
+}
+
+/* 画面を白く飛ばす閃光。等級で強さと長さが変わる */
+.fx__flash {
+  position: fixed;
+  inset: -10%;
+  background: radial-gradient(circle at 50% 46%, #fff 0%, var(--fx1) 32%, transparent 70%);
+  opacity: 0;
+}
+
+.phase-burst .fx__flash {
+  animation: flash 0.6s ease-out forwards;
+}
+
+.g1 .fx__flash {
+  background: radial-gradient(circle at 50% 46%, #fff 0%, var(--fx1) 18%, transparent 42%);
+}
+
+/* 低レアは周回で何度も見るので、画面全体を白く飛ばさず軽く光らせるだけにする */
+.g1.phase-burst .fx__flash {
+  animation: flash-lite 0.34s ease-out forwards;
+}
+
+.g4.phase-burst .fx__flash {
+  animation-duration: 0.9s;
+}
+
+/* --- 溜め中の煽り文 ----------------------------------------------------- */
+
+.fx__omen {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 20%;
+  z-index: 2;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #fff;
+  text-shadow: 0 0 14px var(--chg1), 0 2px 6px rgba(0, 0, 0, 0.85);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fx__omen.is-on {
+  animation: omen-in 0.5s ease-out forwards;
+}
+
+.charge-d .fx__omen {
+  font-size: 1.2rem;
+}
+
+/* --- スキップ(画面のどこを押しても飛ばせる)--------------------------- */
+
+.summon-skip {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: max(12px, env(safe-area-inset-top)) 14px;
+  cursor: pointer;
+}
+
+.summon-skip__pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #dce7ff;
+  background: rgba(8, 11, 24, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(4px);
+}
+
+/* --- 結果の中身 --------------------------------------------------------- */
+
+.summon-result {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  gap: 8px;
+}
+
+.summon-banner {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.9);
+  transition: opacity 0.4s ease 0.1s, transform 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) 0.1s;
+}
+
+.phase-reveal .summon-banner {
+  opacity: 1;
+  transform: none;
+}
+
+.summon-banner__text {
+  display: inline-block;
+  padding: 5px 18px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0c1020;
+  background: linear-gradient(180deg, #fff, var(--fx1));
+  box-shadow: 0 0 22px var(--fx-soft), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.g4 .summon-banner__text {
+  font-size: 1.02rem;
+  background: linear-gradient(100deg, #ffd0dc, #ffe9a8 30%, #d4ffe0 55%, #cfe6ff 78%, #e8d0ff);
+  box-shadow: 0 0 28px rgba(255, 220, 150, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.summon-result__body {
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* --- カードの出現 ------------------------------------------------------- */
+
+.pop {
+  position: relative;
+  opacity: 0;
+  transform: scale(0.5) translateY(16px);
+}
+
+.pop.is-in {
+  animation: pop-in 0.44s cubic-bezier(0.2, 1.45, 0.4, 1) forwards;
+}
+
+.pop .mcard {
+  width: 100%;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* カード裏の光。等級が上がるほど強い */
+.pop__aura {
+  position: absolute;
+  inset: -14%;
+  border-radius: 22px;
+  background: radial-gradient(circle, var(--fx-soft), transparent 66%);
+  filter: blur(14px);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.pop.is-lit .pop__aura,
+.pop--g3.is-in .pop__aura,
+.pop--g4.is-in .pop__aura {
+  opacity: 1;
+  animation: aura-pulse 2.4s ease-in-out infinite;
+}
+
+.pop--g1 .pop__aura {
+  display: none;
+}
+
+/* 出た瞬間にカードから広がる輪 */
+.pop__ring {
+  position: absolute;
+  inset: -6%;
+  border-radius: 20px;
+  border: 2px solid var(--fx1);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pop.is-in .pop__ring {
+  animation: card-ring 0.5s ease-out forwards;
+}
+
+.pop--g1 .pop__ring {
+  display: none;
+}
+
+/* 最高レアの1枚だけ、額縁の外にもう一段の光をまとう */
+.pop--star.is-lit .mcard {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 0 0 2px var(--fx1),
+    0 0 30px var(--fx-soft),
+    0 6px 14px rgba(0, 0, 0, 0.55);
+}
+
+.pop__rank {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #1a1204;
+  background: linear-gradient(180deg, #fff3c4, #e2a417);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
+
+.pop--g4 .pop__rank,
+.pop--g3 .pop__rank {
+  background: linear-gradient(180deg, #fff6d8, #ff9d2f);
+}
+
+/* 高レアのカードを漂う光の粒 */
+.sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sparks__i {
+  position: absolute;
+  z-index: 2;
+  width: var(--size, 4px);
+  height: var(--size, 4px);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 10px var(--fx1);
+  opacity: 0;
+}
+
+.pop--hero .sparks__i {
+  width: calc(var(--size, 4px) * 1.6);
+  height: calc(var(--size, 4px) * 1.6);
+}
+
+.pop.is-in .sparks__i {
+  animation: spark-float var(--dur, 2s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+/* --- 単発: 主役1枚を大きく --------------------------------------------- */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero__card {
+  width: clamp(150px, 58vmin, 260px);
+}
+
+/* 大きく出す時は中の絵も大きくする(小さい絵のまま引き伸ばすと安く見える) */
+.hero__card .mcard {
+  padding: 6px 6px 8px;
+  border-radius: 16px;
+}
+
+.hero__card .mcard__portrait {
+  position: relative;
+}
+
+/* 肖像の中心に光だまりを作り、絵が浮いて見えるようにする */
+.hero__card .mcard__portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 56%, rgba(255, 255, 255, 0.32), transparent 48%),
+    radial-gradient(circle at 50% 50%, transparent 42%, rgba(0, 0, 0, 0.5) 100%);
+  pointer-events: none;
+}
+
+.hero__card .mcard__emoji {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(3rem, 21vmin, 5.4rem);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
+}
+
+.hero__card .mcard__name {
+  font-size: 0.86rem;
+}
+
+.hero__card .mcard__star {
+  font-size: 0.8rem;
+}
+
+.hero__card .mcard__element {
+  min-width: 22px;
+  height: 22px;
+  font-size: 0.66rem;
+}
+
+.hero__plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 20px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(20, 25, 45, 0.85), rgba(8, 10, 22, 0.9));
+  box-shadow: var(--edge-light), var(--edge-line), var(--drop);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.45s ease 0.3s, transform 0.45s ease 0.3s;
+}
+
+.phase-reveal .hero__plate {
+  opacity: 1;
+  transform: none;
+}
+
+.hero__rarity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero__rank {
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #0d1020;
+  background: linear-gradient(180deg, #9fdcff, #3a86bd);
+}
+
+.hero__rank--sr {
+  background: linear-gradient(180deg, #dcb6ff, #7a44c8);
+  color: #fff;
+}
+
+.hero__rank--ssr {
+  background: linear-gradient(180deg, #ffe79a, #d29a1c);
+}
+
+.hero__rare-tag,
+.hero__elem {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.hero__rare-tag {
+  color: #ffd9f4;
+  background: rgba(180, 78, 160, 0.35);
+}
+
+.hero__name {
+  font-size: 1.24rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.hero__stars {
+  font-size: 0.9rem;
+  letter-spacing: 0.12em;
+  color: #ffd23f;
+  text-shadow: 0 0 8px rgba(255, 190, 40, 0.85);
+}
+
+/* --- 10連: 5列2段 ------------------------------------------------------- */
+
+.grid10 .mcard__name {
+  font-size: 0.58rem;
+}
+
+.grid10 .mcard {
+  padding: 3px 3px 5px;
+  gap: 3px;
+}
+
+.grid10 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: min(100%, 460px);
+}
+
+/* --- まとめ ------------------------------------------------------------- */
+
+.summon-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.4s ease 0.35s;
+}
+
+.phase-reveal .summon-summary {
+  opacity: 1;
+}
+
+.sum-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #0d1020;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.45);
+  background: linear-gradient(180deg, #9fdcff, #3a86bd);
+}
+
+.sum-chip--sr {
+  background: linear-gradient(180deg, #dcb6ff, #7a44c8);
+  color: #fff;
+}
+
+.sum-chip--ssr {
+  background: linear-gradient(180deg, #ffe79a, #d29a1c);
+}
+
+.sum-chip--rare {
+  background: linear-gradient(180deg, #ffd0f0, #b44ea0);
+  color: #fff;
+}
+
+/* --- 下部の操作 --------------------------------------------------------- */
+
+.summon-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 460px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 0.4s ease 0.4s, transform 0.4s ease 0.4s;
+}
+
+.phase-reveal .summon-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.summon-actions__btn {
+  flex: 1 1 0;
+}
+
+/* =========================================================================
+ * 横画面(932x430)
+ * 縦に積むと確実に溢れるので、祭壇と操作を左右に分ける。
+ * 10連は1段10列にして、カードを小さくせずに1画面へ収める。
+ * ========================================================================= */
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .screen.summon-screen {
+    --summon-nav: 60px;
+
+    display: grid;
+    grid-template-columns: 1fr minmax(320px, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "top top"
+      "stage side";
+    column-gap: 18px;
+    row-gap: 4px;
+  }
+
+  .summon-top {
+    grid-area: top;
+  }
+
+  .summon-stage {
+    grid-area: stage;
+  }
+
+  .summon-bottom {
+    grid-area: side;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .altar {
+    --d: min(68vh, 290px);
+  }
+
+  /* --- 結果 --- */
+  .screen.summon-screen--result {
+    display: flex;
+  }
+
+  .summon-result {
+    gap: 6px;
+  }
+
+  .grid10 {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    max-width: 100%;
+    gap: 7px;
+  }
+
+  .hero {
+    flex-direction: row;
+    gap: 24px;
+  }
+
+  .hero__card {
+    width: clamp(110px, 34vh, 160px);
+  }
+
+  .hero__card .mcard__emoji {
+    font-size: clamp(2rem, 12vh, 3.2rem);
+  }
+
+  .hero__plate {
+    align-items: flex-start;
+  }
+
+  .summon-actions {
+    max-width: 340px;
+  }
+
+  .fx__omen {
+    top: 13%;
+  }
+}
+
+/* =========================================================================
+ * アニメーション定義
+ * ========================================================================= */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes altar-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translateY(-2%);
+    filter: brightness(1);
+  }
+  50% {
+    transform: translateY(2%);
+    filter: brightness(1.18);
+  }
+}
+
+@keyframes rune-blink {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes mote-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-140px) scale(1.1);
+  }
+}
+
+@keyframes sheen {
+  0%,
+  62% {
+    left: -40%;
+  }
+  100% {
+    left: 130%;
+  }
+}
+
+@keyframes converge {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--deg)) translateY(-52vmin) scale(0.5);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--deg)) translateY(-2vmin) scale(0.2);
+  }
+}
+
+@keyframes burst-out {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--deg)) translateY(-2vmin) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--deg)) translateY(calc(var(--dist) * -1)) scale(0.3);
+  }
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes flash-lite {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  20% {
+    opacity: 0.72;
+    transform: scale(0.78);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes shock {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.12);
+    border-width: 10px;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.6);
+    border-width: 1px;
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(16px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.07) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes card-ring {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.22);
+  }
+}
+
+@keyframes aura-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes spark-float {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-18px) scale(1);
+  }
+}
+
+@keyframes omen-in {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.4em;
+    transform: scale(1.15);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.95;
+    letter-spacing: 0.12em;
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+  0% {
+    transform: translate(-2px, 1px);
+  }
+  33% {
+    transform: translate(2px, -1px);
+  }
+  66% {
+    transform: translate(-1px, -2px);
+  }
+  100% {
+    transform: translate(2px, 1px);
+  }
+}

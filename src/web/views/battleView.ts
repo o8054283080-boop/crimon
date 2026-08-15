@@ -255,6 +255,65 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   overlayFrame = requestAnimationFrame(syncOverlay);
 
   const actionPanelEl = el("div", { className: "action-panel-slot" });
+  const skillDock = el("div", { className: "skill-dock" });
+
+  /** スキルドックに出す対象。手番待ちならその者、そうでなければ直前に動いた味方 */
+  let dockUnit: BattleUnit | null = null;
+
+  /**
+   * 画面下のスキルドックを描き直す。
+   *
+   * 手番が来ていない時も、直前に動いた味方のスキルとクールタイムを
+   * 出したままにする。押せる時だけ現れる作りだと、そのたびに
+   * 画面の高さが変わって戦場が揺れてしまう。
+   */
+  function renderSkillDock(): void {
+    const unit = picker.phase === "SKILL" ? picker.unit : dockUnit;
+    if (!unit) {
+      skillDock.replaceChildren();
+      skillDock.classList.remove("skill-dock--active");
+      return;
+    }
+
+    const active = picker.phase === "SKILL";
+    skillDock.classList.toggle("skill-dock--active", active);
+
+    skillDock.replaceChildren(
+      el("div", { className: "skill-dock__owner" }, [unit.def.name]),
+      el(
+        "div",
+        { className: "skill-dock__row" },
+        unit.def.skills.map((skill, i) => {
+          const idx = i as 0 | 1 | 2;
+          const remaining = unit.cooldowns[idx];
+          const usable = active && remaining === 0;
+          const classes = ["skill-btn"];
+          if (remaining > 0) classes.push("skill-btn--cooling");
+          if (!usable) classes.push("skill-btn--idle");
+
+          return el(
+            "button",
+            {
+              type: "button",
+              className: classes.join(" "),
+              disabled: !usable,
+              title: skill.effects.map((e) => describeSkillEffect(e)).join(" / "),
+              onclick: () => {
+                if (usable) handleSkillPicked(unit, idx, skill);
+              },
+            },
+            [
+              el("span", { className: "skill-btn__face", style: `--elem:${unit.def.color}` }, [
+                el("span", { className: "skill-btn__index" }, [String(idx + 1)]),
+                remaining > 0 ? el("span", { className: "skill-btn__cool" }, [String(remaining)]) : null,
+              ].filter((n): n is HTMLElement => n !== null)),
+              el("span", { className: "skill-btn__name" }, [skill.name]),
+            ],
+          );
+        }),
+      ),
+    );
+  }
   const logEl = el("div", { className: "battle-log" });
   const resultBanner = el("div", { className: "result-banner result-banner--hidden" });
 
@@ -400,6 +459,9 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
   function applyRecord(record: TurnRecord): void {
     setActive(record.actorId);
+    if (teamOf.get(record.actorId) === "PLAYER") {
+      dockUnit = engine.getUnits().find((u) => u.instanceId === record.actorId) ?? dockUnit;
+    }
     appendLines(record.lines);
 
     const offensive = isOffensiveTurn(record.actorId, record.events);
@@ -434,48 +496,9 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   }
 
   function renderActionPanel(): void {
+    renderSkillDock();
     actionPanelEl.innerHTML = "";
-    if (picker.phase === "SKILL") {
-      const unit = picker.unit;
-      const def = unit.def;
-      actionPanelEl.append(
-        el("div", { className: "action-panel" }, [
-          el("div", { className: "action-panel__title" }, [`${def.name} の番です。スキルを選んでください`]),
-          el(
-            "div",
-            { className: "action-panel__skills" },
-            def.skills.map((skill, i) => {
-              const idx = i as 0 | 1 | 2;
-              const onCooldown = unit.cooldowns[idx] > 0;
-              const effectText = skill.effects.map((e) => describeSkillEffect(e)).join(" / ");
-              return el(
-                "button",
-                {
-                  type: "button",
-                  className: "action-skill-btn" + (onCooldown ? " action-skill-btn--disabled" : ""),
-                  disabled: onCooldown,
-                  onclick: () => handleSkillPicked(unit, idx, skill),
-                },
-                [
-                  el("div", { className: "action-skill-btn__icon" }, [String(idx + 1)]),
-                  el("div", { className: "action-skill-btn__body" }, [
-                    el("div", { className: "action-skill-btn__name" }, [
-                      skill.name,
-                      onCooldown
-                        ? ` (CT残り${unit.cooldowns[idx]})`
-                        : skill.cooldownTurns > 0
-                          ? ` (CT ${skill.cooldownTurns}ターン)`
-                          : "",
-                    ]),
-                    el("div", { className: "action-skill-btn__meta" }, [effectText]),
-                  ]),
-                ],
-              );
-            }),
-          ),
-        ]),
-      );
-    } else if (picker.phase === "TARGET") {
+    if (picker.phase === "TARGET") {
       const { unit, skillIndex } = picker;
       const skill = unit.def.skills[skillIndex];
       const candidates = getTargetCandidates(unit, skill);
@@ -682,15 +705,18 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     ["結果へ進む"],
   );
 
-  const container = el("div", { className: "screen battle-view" }, [
-    el("header", { className: "app-header battle-view__header" }, [el("h1", {}, [title])]),
-    stageHost,
-    actionPanelEl,
-    el("div", { className: "battle-controls" }, [modeBtn, speedBtn, playPauseBtn, skipBtn]),
-    resultBanner,
-    finishBtn,
-    el("section", { className: "panel battle-log-panel" }, [el("h2", {}, ["バトルログ"]), logEl]),
+  // 戦場を画面いっぱいに広げ、情報と操作はその上に重ねる。
+  // 別々の帯に分けて縦に積むと戦場が痩せるうえ、目線も分散する。
+  const topBar = el("div", { className: "battle-topbar" }, [
+    el("div", { className: "battle-topbar__title" }, [title]),
+    el("div", { className: "battle-topbar__controls" }, [modeBtn, speedBtn, playPauseBtn, skipBtn]),
   ]);
+
+  const logStrip = el("div", { className: "battle-logstrip" }, [logEl]);
+
+  stageHost.append(topBar, actionPanelEl, skillDock, logStrip);
+
+  const container = el("div", { className: "screen battle-view" }, [stageHost, resultBanner, finishBtn]);
 
   maybeScheduleTick();
 

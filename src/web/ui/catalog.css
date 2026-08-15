@@ -1,0 +1,453 @@
+/**
+ * ステージ選択・ステージ詳細のスタイル。
+ *
+ * 「どこへ行くか」を選ぶ画面なので、章ごとに情景の色を持たせて
+ * 行き先として区別できるようにし、進行度が一目で分かることを優先する。
+ * 共通トークン(--surface, --edge-light など)は style.css で定義済み。
+ */
+
+/* ===== 一覧の見出し ===== */
+
+.stages-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stages-head__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stages-head__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.stages-head__stamina,
+.stages-head__count,
+.stages-head__progress {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.stages-head__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stages-head__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  background: rgba(8, 11, 22, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* ===== 章のカード ===== */
+
+.chapter-card {
+  --scenery-a: #3a4a7a;
+  --scenery-b: #141a2e;
+
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+  background: linear-gradient(180deg, var(--surface-raised, #23253a), #12162a);
+  box-shadow: var(--edge-light, inset 0 1px 0 rgba(255, 255, 255, 0.18)), 0 6px 16px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.18s ease;
+}
+
+.chapter-card:active {
+  transform: translateY(2px);
+}
+
+/* 章ごとの情景。行き先の雰囲気を色で伝える */
+.chapter-card__scenery {
+  position: relative;
+  height: 84px;
+  background:
+    radial-gradient(ellipse 80% 120% at 20% 110%, rgba(255, 255, 255, 0.22), transparent 60%),
+    linear-gradient(160deg, var(--scenery-a), var(--scenery-b));
+}
+
+.chapter-card__scenery::after {
+  /* 下端を暗く落として文字を載せられるようにする */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(6, 9, 18, 0.85));
+}
+
+.chapter-card__banner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  opacity: 0.35;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+}
+
+.chapter-card__head {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chapter-card__no {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #b9c6ea;
+}
+
+.chapter-card__title {
+  font-size: 1rem;
+  font-weight: 800;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.chapter-card__count {
+  font-size: 0.66rem;
+  color: #cfd8f5;
+}
+
+.chapter-card__facts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 10px;
+}
+
+.chapter-card__progress {
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* 進行度の帯 */
+.cat-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.cat-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #58e58a, #24a35a);
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+  transition: width 0.4s ease;
+}
+
+/* ===== ステージの並び ===== */
+
+.stage-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.stage-tile__no {
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.stage-tile__pips {
+  display: flex;
+  gap: 2px;
+  font-size: 0.5rem;
+  color: #ffd23f;
+}
+
+.stage-tile__clear {
+  font-size: 0.6rem;
+  color: #5dffa0;
+}
+
+.stage-tile__boss {
+  font-size: 0.6rem;
+  color: #ff9a6b;
+}
+
+.stage-tile__now {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #1a1405;
+  background: linear-gradient(180deg, #fff3bd, #ffd93b);
+  box-shadow: 0 0 10px rgba(255, 205, 40, 0.6);
+}
+
+/* ===== ステージ詳細 ===== */
+
+.stage-detail-screen {
+  gap: 12px;
+}
+
+.stage-hero {
+  position: relative;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface-raised, #23253a), #12162a);
+  box-shadow: var(--edge-light, inset 0 1px 0 rgba(255, 255, 255, 0.18)), 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.stage-hero__scenery {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, var(--scenery-a, #3a4a7a), var(--scenery-b, #141a2e));
+  opacity: 0.55;
+}
+
+.stage-hero__back {
+  position: relative;
+  z-index: 1;
+  appearance: none;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(6, 9, 20, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+}
+
+.stage-hero__chapter {
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  color: #c6d2f2;
+}
+
+.stage-hero__name {
+  position: relative;
+  z-index: 1;
+  font-size: 1.2rem;
+  font-weight: 900;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9);
+}
+
+.stage-hero__tags {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* ===== 難易度の切り替え ===== */
+
+.diff-seg {
+  flex: 1;
+  appearance: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--text-dim);
+  background: rgba(8, 11, 22, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transition: color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.diff-seg[aria-pressed="true"] {
+  color: #fff;
+  background: linear-gradient(180deg, #3d5da8, #1d2c52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(120, 170, 255, 0.5);
+}
+
+.diff-seg__icon {
+  font-size: 1rem;
+}
+
+.diff-seg__name {
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.diff-seg__state {
+  font-size: 0.55rem;
+  opacity: 0.85;
+}
+
+/* ===== 挑戦パネル ===== */
+
+.challenge-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.challenge-panel__warn {
+  font-size: 0.7rem;
+  color: #ffb4a2;
+}
+
+.challenge-panel__go {
+  width: 100%;
+}
+
+.auto-farm-cost {
+  font-size: 0.66rem;
+  color: var(--text-dim);
+}
+
+/* ===== 出現する敵 ===== */
+
+.wave-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wave-card {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(8, 11, 22, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.wave-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.wave-card__no {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #c6d2f2;
+}
+
+.wave-card__count {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+}
+
+.wave-card__boss {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #2a1600;
+  background: linear-gradient(180deg, #ffe9a8, #f5b301);
+}
+
+.wave-card__enemies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.enemy-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 999px;
+  background: rgba(20, 25, 44, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.enemy-chip__icon {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  background: var(--elem, #3a4160);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.enemy-chip__body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.enemy-chip__name {
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.enemy-chip__meta,
+.enemy-chip__elem {
+  font-size: 0.54rem;
+  color: var(--text-dim);
+}
+
+/* ===== 報酬 ===== */
+
+.reward-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reward-tile__value {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.reward-drops__label {
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.reward-drops__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  background: rgba(8, 11, 22, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}

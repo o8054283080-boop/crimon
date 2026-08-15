@@ -1,15 +1,24 @@
 :root {
-  --bg: #171826;
-  --bg-alt: #1f2133;
-  --panel: #23253a;
-  --panel-border: #33365233;
+  --bg: #0e1020;
+  --bg-alt: #1a1d31;
+  --panel: #1c2036;
+  --panel-border: #4a5590aa;
   --text: #f4f6ff;
-  --text-dim: #9aa0c0;
+  --text-dim: #96a0c4;
   --accent: #4f8cff;
   --accent-dim: #2f4f8f;
   --hp-high: #2ecc71;
   --hp-low: #e74c3c;
   --gauge: #f1c40f;
+
+  /* 面の作り方。バトル画面と同じ「暗い下地 + 上端の光 + 落ちる影」で統一する */
+  --surface: linear-gradient(180deg, #262c4a 0%, #1b2036 42%, #151930 100%);
+  --surface-raised: linear-gradient(180deg, #2f3757 0%, #222840 60%, #1a1f36 100%);
+  --edge-light: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --edge-line: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --drop: 0 6px 16px rgba(0, 0, 0, 0.45);
+  --drop-soft: 0 3px 9px rgba(0, 0, 0, 0.35);
+
   color-scheme: dark;
 }
 
@@ -21,7 +30,12 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  /* 上部を淡く持ち上げ、下へ落とす。単色だと画面全体が紙のように見える */
+  background:
+    radial-gradient(ellipse 120% 60% at 50% -10%, rgba(88, 120, 220, 0.22), transparent 70%),
+    radial-gradient(ellipse 90% 50% at 50% 105%, rgba(120, 70, 190, 0.16), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -62,17 +76,36 @@ body {
 }
 
 .panel {
-  background: var(--panel);
+  position: relative;
+  background: var(--surface);
   border: 1px solid var(--panel-border);
   border-radius: 16px;
   padding: 14px;
+  box-shadow: var(--edge-light), var(--drop);
 }
 
 .panel h2 {
+  position: relative;
   margin: 0 0 10px;
+  padding-left: 10px;
   font-size: 1rem;
-  color: var(--text-dim);
-  font-weight: 600;
+  color: #c6cfee;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.panel h2::before {
+  /* 見出しの左に光る棒を立てて、情報の区切りを分かりやすくする */
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0.95em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8fc0ff, #3f6fd8);
+  box-shadow: 0 0 8px rgba(79, 140, 255, 0.7);
 }
 
 .panel-header {
@@ -151,20 +184,31 @@ body {
   cursor: pointer;
   min-height: 44px;
   color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+  transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+  filter: brightness(0.94);
 }
 
 .btn--primary {
-  background: var(--accent);
-  color: #0c1020;
-}
-
-.btn--primary:active {
-  background: var(--accent-dim);
+  color: #071024;
+  background: linear-gradient(180deg, #8fc0ff 0%, #4f8cff 45%, #2a63d8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 18px rgba(79, 140, 255, 0.32),
+    var(--drop);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .btn--ghost {
-  background: var(--bg-alt);
+  background: var(--surface);
   border: 1px solid var(--panel-border);
+  color: var(--text);
 }
 
 .btn--large {
@@ -173,66 +217,242 @@ body {
   padding: 16px;
 }
 
-/* --- バトルステージ(Three.jsによる3D描画 + HTMLオーバーレイHUD) --- */
-
-.battle-view__header {
-  margin-bottom: 8px;
-}
-
-.battle-stage {
-  position: relative;
-  width: 100%;
-  /* 横長寄りの画面では横長のステージにする。カメラは実際の縦横比から
-     構図を組み直すので、比率が変わっても両チームは必ず収まる */
-  aspect-ratio: 4 / 3;
-  max-height: 58vh;
-  border-radius: 20px;
-  overflow: hidden;
-  background: #06070f;
-  border: 1px solid var(--panel-border);
-  box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.75),
-    0 10px 30px rgba(0, 0, 0, 0.5);
-  contain: layout paint;
-}
-
-/*
- * 横向きのバトル表示。
- * 4体対4体が横に並ぶこのゲームでは、横長の画面が最も構図に合う。
- * 端末を寝かせた時は余白と付随情報を削り、ステージで画面を使い切る。
+/* --- バトル画面 -------------------------------------------------------
+ * 戦場を画面いっぱいに広げ、情報と操作はその上に重ねる。
+ * 帯に分けて縦へ積むと戦場が痩せ、目線も分散するため、
+ * 「1画面で戦闘が完結する」作りを最優先にしている。
  */
-@media (orientation: landscape) and (max-height: 620px) {
-  .screen.battle-view {
-    max-width: none;
-    gap: 6px;
-    padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom))
-      max(10px, env(safe-area-inset-left));
-  }
 
-  .battle-view__header {
-    display: none;
-  }
+.screen.battle-view {
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
-  .battle-stage {
-    /* 高さ基準にして画面いっぱいに広げる(縦横比の固定を解除) */
-    aspect-ratio: auto;
-    height: 74vh;
-    max-height: none;
-    border-radius: 14px;
-  }
+.battle-view .battle-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  aspect-ratio: auto;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+}
 
-  /* ログは邪魔にならない細い帯に留める */
-  .battle-log-panel {
-    padding: 8px 10px;
-  }
+/* --- 上部の帯: 名前と操作 --- */
+.battle-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 10px max(10px, env(safe-area-inset-left));
+  /* 上端だけ暗く落として文字を読ませる。板を置くと戦場が狭く見える */
+  background: linear-gradient(180deg, rgba(4, 6, 14, 0.78), transparent);
+  pointer-events: none;
+}
 
-  .battle-log-panel h2 {
-    display: none;
-  }
+.battle-topbar__title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #eaf0ff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
+  letter-spacing: 0.02em;
+}
 
-  .battle-log {
-    max-height: 52px;
-  }
+.battle-topbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+/* --- 下部のスキルドック --- */
+.skill-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  background: linear-gradient(0deg, rgba(4, 6, 14, 0.82), transparent);
+  pointer-events: none;
+}
+
+.skill-dock__owner {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #b9c6ea;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  opacity: 0.75;
+}
+
+.skill-dock--active .skill-dock__owner {
+  color: #ffe27a;
+  opacity: 1;
+}
+
+.skill-dock__row {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.skill-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  color: #dbe4ff;
+}
+
+.skill-btn__face {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 属性色を芯に、外周は金属の縁。押せる時だけ光る */
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 25%, rgba(255, 255, 255, 0.45), transparent 65%),
+    linear-gradient(180deg, var(--elem, #4a5372), rgba(6, 9, 20, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.18),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.skill-dock--active .skill-btn:not(:disabled) .skill-btn__face {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.28),
+    0 0 0 2px rgba(255, 226, 122, 0.75),
+    0 0 16px rgba(255, 200, 60, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+.skill-btn:not(:disabled):active .skill-btn__face {
+  transform: translateY(2px);
+  filter: brightness(0.92);
+}
+
+.skill-btn__index {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+/* クールタイム中は暗い幕をかけ、残りターン数を大きく出す */
+.skill-btn--cooling .skill-btn__face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: rgba(3, 5, 12, 0.72);
+}
+
+.skill-btn__cool {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95);
+}
+
+.skill-btn--idle {
+  cursor: default;
+}
+
+.skill-btn--idle .skill-btn__face {
+  filter: saturate(0.55) brightness(0.72);
+}
+
+.skill-btn__name {
+  max-width: 74px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+/* --- ログは左下に小さく重ねる --- */
+/*
+ * ログは画面上部の空きに寄せる。
+ * 下に置くとキャラクターに重なって、肝心の戦闘が見えなくなる。
+ * 板は敷かず、下端へ向かって消えるようにして存在感を抑える。
+ */
+.battle-logstrip {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  top: 46px;
+  z-index: 5;
+  width: min(300px, 44%);
+  max-height: 58px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.75;
+  mask-image: linear-gradient(180deg, #000 45%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent);
+}
+
+.battle-logstrip .battle-log {
+  max-height: 58px;
+  overflow: hidden;
+  font-size: 0.58rem;
+  line-height: 1.4;
+  background: none;
+  padding: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+/* 対象選択は戦場の上に浮かせる */
+.battle-view .action-panel-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 108px;
+  z-index: 7;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.battle-view .action-panel-slot:empty {
+  display: none;
+}
+
+.battle-view .action-panel {
+  pointer-events: auto;
+  max-width: min(560px, 94vw);
 }
 
 .battle-stage__canvas {
@@ -789,8 +1009,12 @@ body {
   right: 0;
   bottom: 0;
   display: flex;
-  background: var(--panel);
-  border-top: 1px solid var(--panel-border);
+  /* 背景を透かして奥行きを出す。境目は上端の細い光で示す */
+  background: linear-gradient(180deg, rgba(30, 36, 62, 0.86), rgba(12, 15, 28, 0.96));
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 -8px 22px rgba(0, 0, 0, 0.5);
   padding: 6px 4px max(6px, env(safe-area-inset-bottom));
   z-index: 10;
 }
@@ -811,8 +1035,15 @@ body {
 }
 
 .bottom-nav__btn--active {
-  color: var(--accent);
-  background: var(--bg-alt);
+  color: #cfe0ff;
+  background: linear-gradient(180deg, rgba(79, 140, 255, 0.28), rgba(79, 140, 255, 0.08));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(120, 170, 255, 0.35);
+}
+
+.bottom-nav__btn--active .bottom-nav__icon {
+  filter: drop-shadow(0 0 6px rgba(110, 165, 255, 0.85));
 }
 
 .bottom-nav__icon {
@@ -836,10 +1067,12 @@ body {
 }
 
 .currency-chip {
-  background: var(--bg-alt);
+  background: var(--surface-raised);
   border-radius: 999px;
   padding: 8px 16px;
   font-weight: 700;
+  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+  letter-spacing: 0.02em;
 }
 
 .stamina-refill-row {
@@ -866,11 +1099,26 @@ body {
   position: relative;
   aspect-ratio: 1;
   border-radius: 14px;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
+  /* 上端の光・内側のフチ・落ちる影で、板ではなく立体の駒に見せる */
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.42),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.2),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.35),
+    var(--drop-soft);
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 4px;
+  overflow: hidden;
+}
+
+.party-slot::after {
+  /* 上半分にかかる光沢 */
+  content: "";
+  position: absolute;
+  inset: 0 0 55% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent);
+  pointer-events: none;
 }
 
 .party-slot--empty {
@@ -906,74 +1154,7 @@ body {
   gap: 10px;
 }
 
-.monster-card {
-  appearance: none;
-  border: 2px solid transparent;
-  background: var(--bg-alt);
-  border-radius: 12px;
-  padding: 10px 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  color: var(--text);
-}
 
-.monster-card--selected {
-  border-color: var(--accent);
-}
-
-.monster-card--disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.monster-card--bonus {
-  box-shadow: 0 0 0 1px var(--accent, gold) inset;
-  position: relative;
-}
-
-.monster-card__bonus-badge {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 0.75rem;
-  color: gold;
-}
-
-.monster-card__avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.3rem;
-  line-height: 1;
-}
-
-.monster-card__badge {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.monster-card__name {
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.monster-card__meta {
-  font-size: 0.66rem;
-  color: var(--text-dim);
-}
 
 @media (min-width: 480px) {
   .monster-grid {
@@ -1466,4 +1647,507 @@ body {
   .equip-slot-grid {
     grid-template-columns: repeat(6, 1fr);
   }
+}
+
+/* ===== モンスターカード(レア度の額縁つき) ===================================
+ * 外側から レア度の額縁 → 属性色の肖像 → 星の帯 → 名前 の層で構成する。
+ * 額縁の色が星の数で変わるので、並べた時に強さが一目で伝わる。
+ */
+
+.mcard {
+  --frame-a: #8a93b8;
+  --frame-b: #464e70;
+  --frame-glow: rgba(140, 155, 200, 0.35);
+
+  appearance: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--text);
+  /* 額縁: 外側の金属色 → 内側の暗い縁 の二重 */
+  background: linear-gradient(160deg, var(--frame-a), var(--frame-b) 55%, #0e1224 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.mcard:active {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+
+.mcard--disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.mcard--selected {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 0 0 2px #7fd4ff,
+    0 0 18px var(--frame-glow),
+    0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* --- レア度ごとの額縁 --- */
+.mcard--rarity-low {
+  --frame-a: #8b95b4;
+  --frame-b: #3f465f;
+  --frame-glow: rgba(150, 160, 190, 0.3);
+}
+
+.mcard--rarity-3 {
+  --frame-a: #6fd0ff;
+  --frame-b: #1d5a86;
+  --frame-glow: rgba(90, 190, 255, 0.45);
+}
+
+.mcard--rarity-4 {
+  --frame-a: #c99bff;
+  --frame-b: #4d2a80;
+  --frame-glow: rgba(180, 120, 255, 0.5);
+}
+
+.mcard--rarity-5 {
+  --frame-a: #ffd76a;
+  --frame-b: #8a5b10;
+  --frame-glow: rgba(255, 200, 70, 0.55);
+}
+
+.mcard--rarity-6 {
+  --frame-a: #fff0a8;
+  --frame-b: #b2560c;
+  --frame-glow: rgba(255, 170, 60, 0.7);
+}
+
+.mcard--rarity-none {
+  --frame-a: #79839f;
+  --frame-b: #363c52;
+  --frame-glow: rgba(140, 150, 180, 0.25);
+}
+
+/* --- 肖像 --- */
+.mcard__portrait {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 9px;
+  overflow: hidden;
+  /* 属性色を上から差し、下へ落として奥行きを作る */
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 22%, rgba(255, 255, 255, 0.4), transparent 65%),
+    linear-gradient(180deg, var(--elem, #4a5372) 0%, rgba(0, 0, 0, 0.55) 130%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 -12px 18px rgba(0, 0, 0, 0.35);
+}
+
+.mcard__emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+
+.mcard__element {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  /* 「電気」のように2文字の属性名もあるので、丸ではなく横に伸びる錠剤にする */
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(20, 24, 40, 0.95), rgba(6, 8, 16, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.mcard__level {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: #eaf1ff;
+  background: rgba(6, 9, 20, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.mcard__bonus {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.8rem;
+  color: #ffd23f;
+  text-shadow: 0 0 6px rgba(255, 200, 40, 0.9);
+}
+
+/* --- 星の帯 --- */
+.mcard__stars {
+  display: flex;
+  justify-content: center;
+  padding: 1px 0;
+  border-radius: 999px;
+  background: rgba(4, 6, 14, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.mcard__star-row {
+  display: flex;
+  gap: 1px;
+}
+
+.mcard__star {
+  font-size: 0.55rem;
+  line-height: 1.2;
+  color: #ffd23f;
+  text-shadow: 0 0 4px rgba(255, 190, 40, 0.85);
+}
+
+/* --- 名前・補足 --- */
+.mcard__name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.mcard__caption {
+  font-size: 0.6rem;
+  text-align: center;
+  color: #c3ccea;
+  opacity: 0.85;
+}
+
+.mcard__badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #06210f;
+  background: linear-gradient(180deg, #a8f5c0, #37c46b);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+/* ===== 戦闘結果(1画面で完結させる) =====================================
+ * 報酬を縦に積むと、ドロップが増えるほどスクロールが必要になり、
+ * 「勝った → 受け取る」という一番気持ちのいい流れが途切れる。
+ * 画面の高さに収め、横に並べることで、1画面で完結させる。
+ */
+
+.screen.result-screen {
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* --- 勝敗の帯 --- */
+.result-banner-large {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.result-banner-large__text {
+  font-size: clamp(1.9rem, 8vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  -webkit-text-stroke: 3px rgba(4, 6, 14, 0.85);
+  paint-order: stroke fill;
+  animation: result-banner-pop 0.5s cubic-bezier(0.18, 1.5, 0.4, 1) both;
+}
+
+.result-screen--win .result-banner-large__text {
+  background: linear-gradient(180deg, #fff6c9 0%, #ffd23f 45%, #e08a00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 16px rgba(255, 190, 40, 0.65));
+}
+
+.result-screen--lose .result-banner-large__text {
+  background: linear-gradient(180deg, #dfe6ff 0%, #8d9ac4 45%, #47507a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes result-banner-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.result-banner-large__sub {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* --- 中身。入りきらない時だけ内部で送る --- */
+.result-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* --- 通貨などの札 --- */
+.reward-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.reward-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 78px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+}
+
+.reward-tile__icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.reward-tile__amount {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.reward-tile__label {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.reward-tile--gold {
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(255, 200, 70, 0.4), var(--drop-soft);
+}
+
+.reward-tile--crystal {
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(120, 200, 255, 0.4), var(--drop-soft);
+}
+
+/* --- 現物のドロップ --- */
+.reward-drops {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.reward-drop {
+  position: relative;
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: reward-drop-in 0.45s cubic-bezier(0.18, 1.4, 0.4, 1) both 0.15s;
+}
+
+@keyframes reward-drop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ドロップ表示のカードは飾りなので、押しても反応しないようにする */
+.reward-drop .mcard {
+  cursor: default;
+  pointer-events: none;
+}
+
+.reward-drop__art {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: linear-gradient(180deg, #3c4468, #171b30);
+  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(0, 0, 0, 0.5), var(--drop-soft);
+}
+
+.reward-drop__emoji {
+  font-size: 1.8rem;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
+}
+
+.reward-drop__stars {
+  font-size: 0.6rem;
+  color: #ffd23f;
+  text-shadow: 0 0 5px rgba(255, 190, 40, 0.8);
+}
+
+.reward-drop__name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.reward-drop__meta {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.reward-drop__tag {
+  align-self: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #06121f;
+  background: linear-gradient(180deg, #b9dcff, #5b9bea);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.reward-drop__tag--bonus {
+  color: #2a1600;
+  background: linear-gradient(180deg, #ffe9a8, #f5b301);
+}
+
+/* --- レベルアップ。1行に圧縮して場所を取らせない --- */
+.result-levelups {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.result-levelups__item {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #d8ffe6;
+  background: rgba(28, 122, 66, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(90, 230, 150, 0.4);
+}
+
+.result-empty {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.result-confirm {
+  flex: 0 0 auto;
+  width: min(420px, 100%);
+}
+
+/* 横向きの低い画面では、帯を小さくして中身の場所を確保する */
+@media (orientation: landscape) and (max-height: 620px) {
+  .screen.result-screen {
+    gap: 6px;
+    padding-top: max(6px, env(safe-area-inset-top));
+  }
+
+  .result-banner-large__text {
+    font-size: clamp(1.5rem, 6vh, 2.2rem);
+  }
+
+  .result-body {
+    gap: 8px;
+  }
+
+  .reward-drop {
+    width: 84px;
+  }
+
+  .result-confirm {
+    min-height: 40px;
+    padding: 8px 16px;
+  }
+}
+
+/* 周回結果など、勝敗ではない見出しは少し小さく出す */
+.result-banner-large__text--compact {
+  font-size: clamp(1.4rem, 5.5vw, 2.2rem);
+  letter-spacing: 0.06em;
+  /* 勝敗ほど派手にする必要はないので、読みやすさを優先して明るい銀にする */
+  background: linear-gradient(180deg, #ffffff 0%, #d8e3ff 45%, #93a4d6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke-width: 2px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+}
+
+.result-banner-large__note {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  opacity: 0.85;
+}
+
+/* 同じモンスターがまとまった時の枚数表示は、名札より控えめにする */
+.reward-drop .mcard__badge {
+  top: 8px;
+  left: auto;
+  right: 6px;
+  transform: none;
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  color: #06121f;
+  background: linear-gradient(180deg, #ffffff, #bcd2f5);
 }

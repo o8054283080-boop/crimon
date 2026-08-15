@@ -4,17 +4,26 @@ import { SIMPLEX_NOISE_3D } from "../shaderChunks.js";
 
 /**
  * モンスターの体を構成する「材質」の種類。
- * 1体のモンスターは複数の材質を混ぜて作る(肉+骨+膜+結晶+発光)ことで、
+ * 1体のモンスターは複数の材質を混ぜて作る(肉+骨+金属+膜+結晶+発光)ことで、
  * 単色の塊ではなく生き物として読める見た目になる。
+ *
+ * 材質は色だけでなく「反射の鋭さ」「ざらつきの模様」「縁の抜け方」で
+ * 描き分ける。色を変えただけでは、属性色に染まった時に区別がつかなくなる。
  */
 export type SurfaceStyle =
-  /** 皮膚・肉。マットで柔らかい */
+  /** 皮膚・鱗。マットで柔らかく、細かい鱗目が入る */
   | "hide"
-  /** 角・爪・骨・金属装甲。硬くハイライトが立つ */
+  /** 毛皮・羽毛。ハイライトが立たず、縁が柔らかく光る */
+  | "fur"
+  /** 角・爪・骨・甲殻。硬く、蝋のような広いハイライト */
   | "plate"
-  /** 翼膜・衣・布。薄く透けて逆光で光る */
+  /** 金属装甲。暗い下地に鋭いハイライトと磨き筋、継ぎ目が入る */
+  | "metal"
+  /** 布・衣。マットだが斜めから見ると絹のような光沢が出る */
+  | "cloth"
+  /** 翼膜・薄布。薄く透けて逆光で光り、血管の筋が浮く */
   | "membrane"
-  /** 結晶。透過とフレネルが強い */
+  /** 結晶。透過とフレネルが強く、内側が光る */
   | "crystal"
   /** 目・コアなどの自発光。ライティングを受けない */
   | "glow";
@@ -25,25 +34,42 @@ export interface CreaturePalette {
   main: THREE.Color;
   /** 腹・関節など、影になる部分 */
   dark: THREE.Color;
-  /** 角・爪・装甲(骨っぽい明るい色) */
+  /** 溝・口内・関節の隙間に使う最暗色 */
+  deep: THREE.Color;
+  /** 角・爪・骨(明るい生成り色) */
   plate: THREE.Color;
+  /** 金属装甲 */
+  metal: THREE.Color;
+  /** 布・衣 */
+  cloth: THREE.Color;
+  /** 毛皮・羽毛 */
+  fur: THREE.Color;
   /** 縁取り・差し色 */
   accent: THREE.Color;
   /** 目・コアの発光色 */
   glow: THREE.Color;
-  /** 翼膜・衣 */
+  /** 翼膜 */
   membrane: THREE.Color;
 }
 
 export function paletteFor(theme: ElementTheme): CreaturePalette {
+  // ブルームで白飛びしないよう、体表は暗めに保ち、明るいのは差し色だけにする
+  const shell = theme.shell.clone();
   return {
-    // ブルームで白飛びしないよう、体表は暗めに保ち、明るいのは差し色だけにする
-    main: theme.shell.clone().lerp(theme.rim, 0.24),
-    dark: theme.shell.clone().multiplyScalar(0.5).lerp(new THREE.Color(0x0d1020), 0.45),
+    main: shell.clone().lerp(theme.rim, 0.24),
+    dark: shell.clone().multiplyScalar(0.5).lerp(new THREE.Color(0x0d1020), 0.45),
+    deep: shell.clone().multiplyScalar(0.28).lerp(new THREE.Color(0x07080f), 0.6),
     plate: new THREE.Color(0xcfc7ae).lerp(theme.rim, 0.3).multiplyScalar(0.62),
+    // 金属は属性色に染めすぎず、鋼の地色を残す。
+    // 暗くしすぎると装甲が「焦げた塊」に見えるので、中明度を保って
+    // 明暗はハイライトと映り込みで作る
+    metal: new THREE.Color(0x7d8698).lerp(theme.shell, 0.28).multiplyScalar(0.72),
+    cloth: shell.clone().multiplyScalar(0.62).lerp(theme.rim, 0.14),
+    // 羽根は面積が大きい。属性色を保ったまま、体より一段だけ明るくする
+    fur: shell.clone().lerp(theme.rim, 0.34).multiplyScalar(0.78),
     accent: theme.rim.clone().multiplyScalar(0.85),
     glow: theme.core.clone(),
-    membrane: theme.shell.clone().lerp(theme.rim, 0.42),
+    membrane: shell.clone().lerp(theme.rim, 0.42),
   };
 }
 
@@ -105,6 +131,8 @@ uniform vec3 uGlow;
 uniform float uRimStrength;
 uniform float uEmissive;
 uniform float uOpacity;
+uniform float uSpecPower;
+uniform float uSpecStrength;
 uniform float uTime;
 uniform float uFlash;
 uniform float uDissolve;
@@ -138,6 +166,17 @@ float brushedStreak(vec3 p) {
   return snoise(vec3(p.x * 42.0, p.y * 3.5, p.z * 42.0)) * 0.5 + 0.5;
 }
 
+/** 毛の流れ。縦に細長いノイズで、束になった毛羽を表す */
+float strandPattern(vec3 p) {
+  return snoise(vec3(p.x * 34.0, p.y * 6.0, p.z * 34.0)) * 0.5 + 0.5;
+}
+
+/** 織り目。縦横2方向の細かい縞を掛け合わせる */
+float weavePattern(vec3 p) {
+  float warp = sin(p.x * 150.0) * sin(p.y * 150.0);
+  return warp * 0.5 + 0.5;
+}
+
 const vec3 KEY_DIR = vec3(0.401, 0.802, 0.442);
 const vec3 FILL_DIR = vec3(-0.771, 0.482, 0.417);
 const vec3 BACK_DIR = vec3(0.0, 0.446, -0.895);
@@ -165,6 +204,13 @@ void main() {
   float fill = max(dot(normal, FILL_DIR), 0.0);
   float back = max(dot(normal, BACK_DIR), 0.0);
 
+  #ifdef WRAP
+    // 羽根や葉のように薄い面は、裏を向いた瞬間に真っ黒になって
+    // 板の集まりに見えてしまう。光を回り込ませて面の向きの差を弱める。
+    key = key * 0.5 + (dot(normal, KEY_DIR) * 0.5 + 0.5) * 0.5;
+    fill = fill * 0.5 + (dot(normal, FILL_DIR) * 0.5 + 0.5) * 0.5;
+  #endif
+
   // 半球光(上は青空、下は床の紫)で暗部が潰れないようにする
   vec3 ambient = mix(vec3(0.10, 0.08, 0.13), vec3(0.20, 0.23, 0.36), normal.y * 0.5 + 0.5);
 
@@ -172,24 +218,41 @@ void main() {
   // 単色のままだとプラスチックの人形に見えるため、色ムラ・ざらつき・
   // 接地側の落ち込みを重ねて情報量を作る。すべて手続き的に計算しており
   // テクスチャ画像は使わない。
+  //
+  // 画面上のモンスターは高さ100px前後にしかならないので、細かい模様だけでは
+  // 潰れて灰色になる。大きなムラ(blotch)と、下向きの面を沈める処理で
+  // 「かたまりの向き」が離れて見ても読めるようにするのが主眼。
   float blotch = snoise(vWorld * 5.5) * 0.5 + 0.5;
   float grain = snoise(vWorld * 26.0) * 0.5 + 0.5;
   // 体の下ほど暗くして、光が上から回っている感じと接地感を出す
   float height01 = clamp(vWorldY / max(0.6, uHeight), 0.0, 1.0);
+  // 下を向いた面を沈める。腹・顎下・腕の内側が落ちて、部位の丸みが分離する
+  float upness = normal.y * 0.5 + 0.5;
 
   vec3 albedo = uColor;
   albedo *= 0.84 + blotch * 0.32;
   albedo *= 0.93 + grain * 0.14;
-  albedo *= 0.74 + height01 * 0.38;
+  albedo *= 0.78 + height01 * 0.30;
+  albedo *= 0.70 + upness * 0.42;
 
   #ifdef SCALES
     // 皮膚は鱗状に。境目が落ちることでパーツの丸みも読み取りやすくなる
     albedo *= 0.78 + scalePattern(vWorld) * 0.44;
   #endif
 
+  #ifdef STRANDS
+    // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる
+    albedo *= 0.80 + strandPattern(vWorld) * 0.34;
+  #endif
+
   #ifdef STREAKS
     // 角・装甲は研いだ金属のような細い筋を走らせる
     albedo *= 0.88 + brushedStreak(vWorld) * 0.24;
+  #endif
+
+  #ifdef WEAVE
+    // 布は細かい織り目。ローカル座標基準なので、揺れても模様が泳がない
+    albedo *= 0.90 + weavePattern(vLocal) * 0.16;
   #endif
 
   // 窪みの擬似的な陰り。大きなムラの暗い側をさらに沈めて締める
@@ -202,9 +265,23 @@ void main() {
   color += vec3(1.0, 0.48, 0.85) * pow(back, 1.6) * 0.42;
   color += uRim * fresnel * uRimStrength * (1.0 + uActive * 1.5);
 
+  #ifdef METALLIC
+    // 金属は拡散が弱く、上下の環境色を映し込む。
+    // これがあるだけで、同じ色でも肉と金属が別物に見える
+    color *= 0.78;
+    vec3 sky = vec3(0.26, 0.30, 0.44);
+    vec3 ground = vec3(0.14, 0.10, 0.16);
+    color += mix(ground, sky, smoothstep(-0.2, 0.6, normal.y)) * 0.34 * (0.4 + brushedStreak(vWorld) * 0.6);
+  #endif
+
   #ifdef SPECULAR
     vec3 halfDir = normalize(KEY_DIR + viewDir);
-    color += mix(vec3(1.0), uRim, 0.35) * pow(max(dot(normal, halfDir), 0.0), 42.0) * 0.85;
+    color += mix(vec3(1.0), uRim, 0.35) * pow(max(dot(normal, halfDir), 0.0), uSpecPower) * uSpecStrength;
+  #endif
+
+  #ifdef SHEEN
+    // 布の光沢。面が寝ているほど強く、絹のように縁が明るくなる
+    color += mix(uRim, vec3(1.0), 0.35) * pow(1.0 - facing, 3.5) * 0.30;
   #endif
 
   #ifdef TRANSLUCENT
@@ -214,6 +291,19 @@ void main() {
     color += uGlow * pow(max(dot(-normal, KEY_DIR), 0.0), 2.0) * 0.35;
     alpha = uOpacity * (0.72 + thin * 0.28);
   #endif
+
+  #ifdef VEINS
+    // 翼膜の血管。ローカル座標で描くので、羽ばたいても模様が流れない
+    float vein = 1.0 - smoothstep(0.0, 0.16, abs(snoise(vLocal * 7.0)));
+    color *= 1.0 - vein * 0.34;
+    color += uRim * vein * 0.10;
+  #endif
+
+  #ifdef FACETS
+    // 結晶の内部。奥行き方向の縞が透けて、中身が詰まって見える
+    float inner = sin(dot(vLocal, vec3(9.0, 13.0, 7.0)) + uTime * 0.4) * 0.5 + 0.5;
+    color += uGlow * inner * 0.12;
+  #endif
 #endif
 
   color += uGlow * uEmissive;
@@ -222,12 +312,14 @@ void main() {
   if (uWound > 0.01) {
     float crack = snoise(vLocal * 6.5 + uTime * 0.08);
     float mask = smoothstep(0.62 - uWound * 0.42, 0.72, crack) * uWound;
-    color += uGlow * mask * 1.5;
+    // 瀕死の状態は長く続くので、光らせすぎると終盤ずっと画面が白む
+    color += uGlow * mask * 0.7;
   }
 
-  // 被弾の白飛び。振り切ると体の形も属性色も消えてしまうので、
-  // 「強く光った」と分かる程度に留め、シルエットを残す
-  color = mix(color, vec3(1.25), uFlash * 0.6);
+  // 被弾の白飛び。
+  // 全体攻撃では8体が同時に光るため、1体あたりが強い/長いと
+  // 画面全体が白い靄になってしまう。短く鋭い「点滅」に留める。
+  color = mix(color, vec3(1.3), uFlash * 0.32);
 
   // 撃破ディゾルブ: 上から崩れ、境界が強く発光する
   if (uDissolve > 0.001) {
@@ -252,11 +344,16 @@ interface StyleConfig {
   side: THREE.Side;
   depthWrite: boolean;
   castShadow: boolean;
+  /** ハイライトの鋭さ(大きいほど点に近い) */
+  specPower: number;
+  /** ハイライトの強さ */
+  specStrength: number;
 }
 
 const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
+  // 肉: ハイライトは広く弱い。生き物の湿り気だけを感じさせる
   hide: {
-    defines: { SCALES: "" },
+    defines: { SCALES: "", SPECULAR: "" },
     rimStrength: 0.55,
     emissive: 0,
     opacity: 1,
@@ -264,7 +361,24 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     side: THREE.FrontSide,
     depthWrite: true,
     castShadow: true,
+    specPower: 8,
+    specStrength: 0.1,
   },
+  // 毛皮・羽毛: ハイライトを持たず、縁だけがふわりと光る
+  fur: {
+    defines: { STRANDS: "", WRAP: "" },
+    rimStrength: 0.85,
+    emissive: 0,
+    opacity: 1,
+    transparent: false,
+    // 羽根は平面1枚で作るので、裏から見ても消えないようにする
+    side: THREE.DoubleSide,
+    depthWrite: true,
+    castShadow: true,
+    specPower: 4,
+    specStrength: 0,
+  },
+  // 骨・角・爪: 蝋のような、やや広くて強いハイライト
   plate: {
     defines: { SPECULAR: "", STREAKS: "" },
     rimStrength: 0.75,
@@ -274,9 +388,37 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     side: THREE.FrontSide,
     depthWrite: true,
     castShadow: true,
+    specPower: 26,
+    specStrength: 0.5,
+  },
+  // 金属: 暗い下地・環境の映り込み・鋭いハイライト
+  metal: {
+    defines: { SPECULAR: "", STREAKS: "", METALLIC: "" },
+    rimStrength: 0.5,
+    emissive: 0,
+    opacity: 1,
+    transparent: false,
+    side: THREE.FrontSide,
+    depthWrite: true,
+    castShadow: true,
+    specPower: 90,
+    specStrength: 1.1,
+  },
+  // 布: ハイライトは出ず、斜めから見た時だけ絹の光沢が乗る
+  cloth: {
+    defines: { WEAVE: "", SHEEN: "" },
+    rimStrength: 0.35,
+    emissive: 0,
+    opacity: 1,
+    transparent: false,
+    side: THREE.DoubleSide,
+    depthWrite: true,
+    castShadow: true,
+    specPower: 6,
+    specStrength: 0,
   },
   membrane: {
-    defines: { TRANSLUCENT: "" },
+    defines: { TRANSLUCENT: "", VEINS: "" },
     rimStrength: 0.9,
     emissive: 0.04,
     opacity: 0.94,
@@ -284,9 +426,11 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     side: THREE.DoubleSide,
     depthWrite: true,
     castShadow: false,
+    specPower: 12,
+    specStrength: 0,
   },
   crystal: {
-    defines: { SPECULAR: "", TRANSLUCENT: "" },
+    defines: { SPECULAR: "", TRANSLUCENT: "", FACETS: "" },
     rimStrength: 1.3,
     emissive: 0.18,
     opacity: 0.88,
@@ -294,6 +438,8 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     side: THREE.DoubleSide,
     depthWrite: true,
     castShadow: false,
+    specPower: 120,
+    specStrength: 0.9,
   },
   glow: {
     defines: { UNLIT: "" },
@@ -304,6 +450,8 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     side: THREE.FrontSide,
     depthWrite: true,
     castShadow: false,
+    specPower: 4,
+    specStrength: 0,
   },
 };
 
@@ -344,6 +492,8 @@ export class SurfaceSet {
         uRimStrength: { value: config.rimStrength },
         uEmissive: { value: config.emissive },
         uOpacity: { value: config.opacity },
+        uSpecPower: { value: config.specPower },
+        uSpecStrength: { value: config.specStrength },
         // 以下は1体で共有する参照(同じオブジェクトを渡すことで一括更新される)
         uTime: this.uniforms.uTime,
         uFlash: this.uniforms.uFlash,

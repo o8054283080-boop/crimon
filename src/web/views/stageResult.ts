@@ -1,6 +1,8 @@
 import { Equipment, STAT_LABEL } from "../../core/equipment.js";
+import { Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { el } from "../dom.js";
+import { buildMonsterCard } from "./monsterCard.js";
 
 export interface StageResultLevelUp {
   instanceId: string;
@@ -32,68 +34,91 @@ export interface StageResultProps {
   onClose: () => void;
 }
 
+/** 通貨などの「数が出るだけ」の報酬を、横に並ぶ小さな札で表す */
+function rewardTile(icon: string, label: string, amount: string, modifier?: string): HTMLElement {
+  return el("div", { className: `reward-tile${modifier ? ` reward-tile--${modifier}` : ""}` }, [
+    el("span", { className: "reward-tile__icon" }, [icon]),
+    el("span", { className: "reward-tile__amount" }, [amount]),
+    el("span", { className: "reward-tile__label" }, [label]),
+  ]);
+}
+
+/** 装備ドロップの札。スロット・星・主効果を1枚にまとめる */
+function equipmentTile(equipment: Equipment): HTMLElement {
+  return el("div", { className: "reward-drop" }, [
+    el("div", { className: "reward-drop__art reward-drop__art--gear" }, [
+      el("span", { className: "reward-drop__emoji" }, ["⚔"]),
+      el("span", { className: "reward-drop__stars" }, ["★".repeat(equipment.star)]),
+    ]),
+    el("div", { className: "reward-drop__name" }, [`スロット${equipment.slot}`]),
+    el("div", { className: "reward-drop__meta" }, [STAT_LABEL[equipment.mainStat.type]]),
+  ]);
+}
+
 export function renderStageResult(props: StageResultProps): HTMLElement {
   const { info, onClose } = props;
   const dropDex = info.dropDexId ? findMonsterById(info.dropDexId) : undefined;
   const pigDex = info.pigDrop ? findMonsterById(info.pigDrop.dexId) : undefined;
 
-  const summaryChildren: (HTMLElement | null)[] = [
-    el("p", {}, [`🪙 獲得ゴールド: ${info.goldEarned}`]),
-    info.crystalEarned > 0 ? el("p", {}, [`💎 獲得ダイヤ: ${info.crystalEarned}`]) : null,
-    info.fighterLevelsGained && info.fighterLevelsGained > 0
-      ? el("p", {}, [`🎖 ファイターレベルが+${info.fighterLevelsGained}上がりました！(スタミナ全回復・上限アップ)`])
-      : null,
+  // --- 数で表せる報酬は札にして横並びにする ---
+  const tiles: HTMLElement[] = [];
+  if (info.goldEarned > 0) tiles.push(rewardTile("🪙", "ゴールド", `+${info.goldEarned}`, "gold"));
+  if (info.crystalEarned > 0) tiles.push(rewardTile("💎", "ダイヤ", `+${info.crystalEarned}`, "crystal"));
+  if (info.summonScrollDropped) tiles.push(rewardTile("📜", "召喚の書", "+1", "scroll"));
+  if (info.fighterLevelsGained && info.fighterLevelsGained > 0) {
+    tiles.push(rewardTile("🎖", "ファイター", `Lv+${info.fighterLevelsGained}`, "fighter"));
+  }
+
+  // --- 現物のドロップは、一覧と同じカードで見せる ---
+  const drops: HTMLElement[] = [];
+  if (dropDex && info.dropStar) {
+    drops.push(
+      el("div", { className: "reward-drop" }, [
+        buildMonsterCard(dropDex, dropDex.id, () => {}, { star: info.dropStar as Star }),
+        el("div", { className: "reward-drop__tag" }, ["モンスター"]),
+      ]),
+    );
+  }
+  if (pigDex && info.pigDrop) {
+    drops.push(
+      el("div", { className: "reward-drop" }, [
+        buildMonsterCard(pigDex, pigDex.id, () => {}, { star: info.pigDrop.star as Star }),
+        el("div", { className: "reward-drop__tag reward-drop__tag--bonus" }, ["ボーナス"]),
+      ]),
+    );
+  }
+  if (info.equipmentDrop) {
+    drops.push(
+      el("div", { className: "reward-drop" }, [equipmentTile(info.equipmentDrop), el("div", { className: "reward-drop__tag" }, ["装備"])]),
+    );
+  }
+
+  const levelUpLine =
     info.levelUps.length > 0
       ? el(
           "div",
-          {},
-          info.levelUps.map((l) => el("p", {}, [`⬆ ${l.name} が Lv+${l.levels} しました！`])),
+          { className: "result-levelups" },
+          info.levelUps.map((l) => el("span", { className: "result-levelups__item" }, [`${l.name} Lv+${l.levels}`])),
         )
-      : el("p", { className: "app-subtitle" }, ["レベルアップしたモンスターはいません"]),
+      : null;
+
+  const body: (HTMLElement | null)[] = [
+    tiles.length > 0 ? el("div", { className: "reward-tiles" }, tiles) : null,
+    drops.length > 0 ? el("div", { className: "reward-drops" }, drops) : null,
+    levelUpLine,
+    tiles.length === 0 && drops.length === 0 && !levelUpLine
+      ? el("p", { className: "result-empty" }, ["獲得したものはありません"])
+      : null,
   ];
 
-  return el("div", { className: "screen stage-result-screen" }, [
-    el("header", { className: "app-header" }, [
-      el("h1", {}, [info.cleared ? "🎉 ステージクリア！" : "💀 全滅…"]),
-      el("p", { className: "app-subtitle" }, [`${info.stageName} (${info.wavesCleared}/${info.totalWaves} ウェーブクリア)`]),
+  return el("div", { className: `screen result-screen${info.cleared ? " result-screen--win" : " result-screen--lose"}` }, [
+    el("div", { className: "result-banner-large" }, [
+      el("span", { className: "result-banner-large__text" }, [info.cleared ? "VICTORY" : "DEFEAT"]),
+      el("span", { className: "result-banner-large__sub" }, [
+        `${info.stageName} ・ ${info.wavesCleared}/${info.totalWaves} ウェーブ`,
+      ]),
     ]),
-    el("section", { className: "panel" }, summaryChildren.filter((n): n is HTMLElement => n !== null)),
-    dropDex && info.dropStar
-      ? el("section", { className: "panel" }, [
-          el("h2", {}, ["モンスタードロップ！"]),
-          el("div", { className: "summon-card summon-card--rare" }, [
-            el("div", { className: "summon-card__avatar", style: `background:${dropDex.color}` }, []),
-            el("div", { className: "summon-card__name" }, [dropDex.name]),
-            el("div", { className: "summon-card__star" }, ["★".repeat(info.dropStar)]),
-          ]),
-        ])
-      : null,
-    pigDex && info.pigDrop
-      ? el("section", { className: "panel" }, [
-          el("h2", {}, ["🐷 ボーナスモンスターを入手！"]),
-          el("div", { className: "summon-card summon-card--rare" }, [
-            el("div", { className: "summon-card__avatar", style: `background:${pigDex.color}` }, []),
-            el("div", { className: "summon-card__name" }, [pigDex.name]),
-            el("div", { className: "summon-card__star" }, ["★".repeat(info.pigDrop.star)]),
-          ]),
-        ])
-      : null,
-    info.summonScrollDropped
-      ? el("section", { className: "panel" }, [el("h2", {}, ["召喚の書を入手！"]), el("p", {}, ["📜 召喚画面から消費して1回分の召喚ができます。"])])
-      : null,
-    info.equipmentDrop
-      ? el("section", { className: "panel" }, [
-          el("h2", {}, ["装備ドロップ！"]),
-          el("div", { className: "summon-card summon-card--rare" }, [
-            el("div", { className: "summon-card__name" }, [`スロット${info.equipmentDrop.slot}`]),
-            el("div", { className: "summon-card__star" }, ["★".repeat(info.equipmentDrop.star)]),
-            el("div", { className: "summon-card__name" }, [STAT_LABEL[info.equipmentDrop.mainStat.type]]),
-            info.equipmentDrop.subStats.length > 0
-              ? el("div", { className: "summon-card__name" }, [`サブ${info.equipmentDrop.subStats.length}個`])
-              : null,
-          ].filter((n): n is HTMLDivElement => n !== null)),
-        ])
-      : null,
-    el("button", { type: "button", className: "btn btn--primary btn--large", onclick: onClose }, ["ホームに戻る"]),
-  ].filter((n): n is HTMLElement => n !== null));
+    el("div", { className: "result-body" }, body.filter((n): n is HTMLElement => n !== null)),
+    el("button", { type: "button", className: "btn btn--primary result-confirm", onclick: onClose }, ["ホームに戻る"]),
+  ]);
 }
