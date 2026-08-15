@@ -384,7 +384,6 @@
 /* --- 等級ごとの「出たあと」の色 --- */
 .summon-screen--result {
   --fx1: #bcd8ff;
-  --fx2: #3a6fd8;
   --fx-soft: rgba(120, 180, 255, 0.5);
   --ray: #5f93ff;
 
@@ -395,21 +394,18 @@
 
 .summon-screen--result.g2 {
   --fx1: #e6c2ff;
-  --fx2: #7a2fd8;
   --fx-soft: rgba(200, 150, 255, 0.55);
   --ray: #a86bff;
 }
 
 .summon-screen--result.g3 {
   --fx1: #ffe6a0;
-  --fx2: #e08a10;
   --fx-soft: rgba(255, 205, 100, 0.6);
   --ray: #ffbe3d;
 }
 
 .summon-screen--result.g4 {
   --fx1: #fff3d0;
-  --fx2: #ff7a2f;
   --fx-soft: rgba(255, 215, 150, 0.68);
   --ray: #ffab2e;
 }
