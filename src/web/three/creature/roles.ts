@@ -35,13 +35,71 @@ function limbFrom(chain: ChainResult, side: number, phase: number): RigLimb {
   };
 }
 
-/** 指(爪)を扇状に付ける */
+/**
+ * 指と爪を扇状に付ける。
+ * 指の節(短い骨)を挟んでから鉤爪を付けることで、
+ * 「手先に棘が生えている」ではなく「指の先の爪」に見える。
+ */
 function addClaws(kit: CreatureKit, hand: THREE.Object3D, count: number, length: number, radius: number, spread: number): void {
+  const p = kit.palette;
   for (let i = 0; i < count; i++) {
     const offset = (i - (count - 1) / 2) * spread;
-    const claw = kit.spike(radius, length, 0.7, "plate", kit.palette.plate);
-    place(claw, offset, -0.02, -0.02, AIM_FORWARD + 0.55, offset * 1.6, 0);
-    hand.add(claw);
+    const finger = new THREE.Group();
+    place(finger, offset, -0.02, -0.02, AIM_FORWARD + 0.55, offset * 1.6, 0);
+    // 指の節。爪の根元が肉に埋まっているように見せる
+    finger.add(place(kit.ball(radius * 1.5, length * 0.3, radius * 1.5, "hide", p.dark, 6), 0, length * 0.18, 0));
+    finger.add(kit.claw(length, radius * 1.35, 0.55, "plate", p.plate));
+    hand.add(finger);
+  }
+}
+
+/** 関節。骨の継ぎ目に球と輪を入れて、円柱の直結を隠す */
+function addJoint(kit: CreatureKit, joint: THREE.Object3D, y: number, radius: number, armored: boolean): void {
+  const p = kit.palette;
+  joint.add(place(kit.ball(radius, radius * 0.9, radius, "hide", p.dark, 8), 0, y, 0));
+  if (armored) {
+    // 膝・肘の当て金。外側だけを覆う板で、装甲の重なりを作る
+    joint.add(place(kit.lens(radius * 1.15, radius * 1.0, radius * 0.5, "metal", p.metal), 0, y, -radius * 0.75, 0.2, 0, 0));
+  }
+}
+
+/**
+ * 肋・腹の節。胴の側面に細い帯を並べて、一枚の塊に「節」を刻む。
+ * 遠目でも胴の丸みと向きが読めるようになる。
+ */
+function addRibs(kit: CreatureKit, torso: THREE.Object3D, count: number, y0: number, y1: number, radius: number, tube: number): void {
+  const p = kit.palette;
+  for (let i = 0; i < count; i++) {
+    const t = i / Math.max(1, count - 1);
+    const y = y0 + (y1 - y0) * t;
+    const r = radius * (0.82 + Math.sin((1 - t) * Math.PI * 0.6) * 0.22);
+    const rib = kit.band(r, tube, Math.PI * 1.05, "plate", p.plate, 12);
+    // 前(-Z)を向く半円にして、腹側にだけ節が出るようにする
+    place(rib, 0, y, 0, Math.PI / 2, -Math.PI * 0.52, 0);
+    torso.add(rib);
+  }
+}
+
+/** 装甲板を重ねて貼る。段差の影が「積み木」感を消す主役 */
+function addPlating(
+  kit: CreatureKit,
+  parent: THREE.Object3D,
+  count: number,
+  y0: number,
+  y1: number,
+  width: number,
+  z: number,
+  style: "metal" | "plate" = "metal",
+): void {
+  const p = kit.palette;
+  const color = style === "metal" ? p.metal : p.plate;
+  for (let i = 0; i < count; i++) {
+    const t = count === 1 ? 0 : i / (count - 1);
+    const y = y0 + (y1 - y0) * t;
+    const w = width * (1 - t * 0.18);
+    const plate = kit.lens(w, w * 0.34, w * 0.42, style, color, 10);
+    place(plate, 0, y, z, -0.25 + t * 0.1, 0, 0);
+    parent.add(plate);
   }
 }
 
@@ -181,25 +239,62 @@ function addTail(
   rig.pelvis.add(chain.root);
 }
 
-/** 羽根を扇状に並べた翼(ヒーラー用) */
+/**
+ * 羽毛の翼。
+ *
+ * 針状の羽根を1点から放射させると、扇ではなく「ウニ」に見える。
+ * 実際にそうなっていたので、次の3つで作り直した。
+ *   1. 前縁に腕の骨を通し、羽根の付け根をその骨に沿って散らす
+ *   2. 羽根は円錐ではなく、面積を持った木の葉形の板にする
+ *   3. 角度は「外向き〜真下」の範囲に収め、上には向けない
+ * さらに雨覆い(短い羽根)を手前に重ね、層の段差で厚みを出す。
+ */
 function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: number, count: number, length: number): void {
   const p = kit.palette;
-  for (let i = 0; i < count; i++) {
-    const t = i / (count - 1);
-    const feather = kit.spike(0.055 + t * 0.015, length * (1 - t * 0.42), 0.2, "membrane", p.membrane);
-    place(
-      feather,
-      side * (0.02 + t * 0.06),
-      t * 0.05,
-      0.02 + t * 0.07,
-      0.15 + t * 0.35,
-      0,
-      -side * (0.35 + t * 1.15),
-    );
-    wing.add(feather);
+  const s = side;
+  const L = length;
+
+  // 前縁の骨。肩→肘→手首→翼端と、弓なりに反りながら外へ伸びる
+  const bone: THREE.Vector3[] = [
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(s * 0.28 * L, 0.15 * L, 0.02 * L),
+    new THREE.Vector3(s * 0.60 * L, 0.23 * L, -0.01 * L),
+    new THREE.Vector3(s * 0.88 * L, 0.19 * L, -0.04 * L),
+  ];
+  const spine = new THREE.CatmullRomCurve3(bone);
+  wing.add(kit.taperedTube(bone, 0.05 * L, 0.014 * L, "fur", p.fur, 5, 8));
+  // 肩の羽毛のかたまり
+  wing.add(place(kit.ball(0.11 * L, 0.13 * L, 0.1 * L, "fur", p.fur, 10), s * 0.04 * L, 0.02 * L, 0.01 * L));
+
+  const point = new THREE.Vector3();
+  const rows: { u0: number; u1: number; len: number; color: THREE.Color; z: number; scale: number }[] = [
+    // 風切羽: 前縁の外側半分から、外向き〜下向きに長く伸びる
+    { u0: 0.22, u1: 0.99, len: 1, color: p.fur, z: -0.02, scale: 1 },
+    // 雨覆い: 手前に重ねる短い羽根。段差の影で層に見せる
+    { u0: 0.12, u1: 0.82, len: 0.42, color: p.dark, z: -0.05, scale: 0.85 },
+  ];
+
+  for (const row of rows) {
+    const n = Math.max(3, Math.round(count * row.scale));
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0 : i / (n - 1);
+      spine.getPointAt(row.u0 + (row.u1 - row.u0) * t, point);
+      const len = L * (0.30 + t * 0.30) * row.len;
+      const feather = kit.feather(len, len * 0.19, "fur", row.color, 0.1);
+      // 内側は真下へ、外側ほど外向きへ倒す(扇の要は肩ではなく前縁全体)
+      const angle = 2.45 - t * 0.72;
+      place(
+        feather,
+        point.x,
+        point.y,
+        point.z + row.z * L,
+        0.12 - t * 0.2,
+        -s * t * 0.28,
+        -s * angle,
+      );
+      wing.add(feather);
+    }
   }
-  // 翼の付け根の羽毛
-  wing.add(place(kit.ball(0.1, 0.12, 0.09, "hide", p.main), side * 0.03, 0.02, 0.02));
 }
 
 /** 指の骨と膜で作るコウモリ翼(ボス用) */
@@ -213,10 +308,17 @@ function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: 
   const wrist = v(1.02, 0.5, 0.02);
   const fingers = [v(1.72, 0.42, 0.12), v(1.5, -0.16, 0.2), v(1.05, -0.6, 0.22), v(0.5, -0.72, 0.18)];
 
+  // 腕の骨。付け根に筋肉の膨らみ、関節に球を入れて棒の直結を隠す
   wing.add(kit.link(shoulder, elbow, 0.075 * span, 0.06 * span, "plate", p.plate, 6));
   wing.add(kit.link(elbow, wrist, 0.06 * span, 0.045 * span, "plate", p.plate, 6));
+  wing.add(place(kit.ball(0.1 * span, 0.09 * span, 0.09 * span, "hide", p.main, 8), shoulder.x, shoulder.y, shoulder.z));
+  wing.add(place(kit.ball(0.065 * span, 0.06 * span, 0.06 * span, "hide", p.dark, 7), elbow.x, elbow.y, elbow.z));
+  wing.add(place(kit.ball(0.055 * span, 0.05 * span, 0.05 * span, "plate", p.plate, 7), wrist.x, wrist.y, wrist.z));
   for (const finger of fingers) {
     wing.add(kit.link(wrist, finger, 0.04 * span, 0.012 * span, "plate", p.plate, 5));
+    // 指の関節。膜の張った骨組みが節を持って見える
+    const mid = wrist.clone().lerp(finger, 0.42);
+    wing.add(place(kit.ball(0.028 * span, 0.028 * span, 0.022 * span, "plate", p.plate, 6), mid.x, mid.y, mid.z));
   }
   // 指の先の鉤爪
   const hook = kit.spike(0.04 * span, 0.2 * span, 0.6, "plate", p.plate);
