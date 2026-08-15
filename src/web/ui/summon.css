@@ -82,13 +82,16 @@
   justify-content: center;
 }
 
-/* 祭壇の直径。ルーンの軌道半径などもここから計算する */
+/* 祭壇の直径。ルーンの軌道半径や文字の大きさもここから計算するので、
+ * %(親や自分自身が基準になる)を混ぜてはいけない。
+ * font-size では親の文字サイズ、translateY では自分の高さ(=0)になってしまう。 */
 .altar {
-  --d: min(82vw, 100%, 46vh, 360px);
+  --d: min(82vw, 46vh, 360px);
 
   position: relative;
   width: var(--d);
   height: var(--d);
+  max-width: 100%;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -1232,7 +1235,7 @@
   }
 
   .altar {
-    --d: min(68vh, 100%, 290px);
+    --d: min(68vh, 290px);
   }
 
   /* --- 結果 --- */
