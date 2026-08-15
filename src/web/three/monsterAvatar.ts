@@ -175,7 +175,9 @@ export class MonsterAvatar {
   /** ダメージ表示などをぶら下げるための、頭上あたりのワールド座標 */
   getAnchorWorldPosition(target: THREE.Vector3): THREE.Vector3 {
     this.rig.core.getWorldPosition(target);
-    target.y += this.rig.height * 0.7;
+    // HPバーがこの位置に出るため、低すぎると顔がラベルで隠れる。
+    // 一方で被弾エフェクトの中心でもあるので、頭のすぐ下あたりに置く
+    target.y += this.rig.height * 0.86;
     return target;
   }
 

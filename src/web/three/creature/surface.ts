@@ -60,8 +60,10 @@ export function paletteFor(theme: ElementTheme): CreaturePalette {
     dark: shell.clone().multiplyScalar(0.5).lerp(new THREE.Color(0x0d1020), 0.45),
     deep: shell.clone().multiplyScalar(0.28).lerp(new THREE.Color(0x07080f), 0.6),
     plate: new THREE.Color(0xcfc7ae).lerp(theme.rim, 0.3).multiplyScalar(0.62),
-    // 金属は属性色に染めすぎず、鋼の暗い下地を残す。ハイライトで金属と分からせる
-    metal: new THREE.Color(0x424a5c).lerp(theme.shell, 0.3).multiplyScalar(0.62),
+    // 金属は属性色に染めすぎず、鋼の地色を残す。
+    // 暗くしすぎると装甲が「焦げた塊」に見えるので、中明度を保って
+    // 明暗はハイライトと映り込みで作る
+    metal: new THREE.Color(0x7d8698).lerp(theme.shell, 0.28).multiplyScalar(0.72),
     cloth: shell.clone().multiplyScalar(0.62).lerp(theme.rim, 0.14),
     // 羽根は面積が大きい。属性色を保ったまま、体より一段だけ明るくする
     fur: shell.clone().lerp(theme.rim, 0.34).multiplyScalar(0.78),

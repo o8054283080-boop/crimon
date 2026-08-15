@@ -98,7 +98,7 @@ function addPlating(
     const t = count === 1 ? 0 : i / (count - 1);
     const y = y0 + (y1 - y0) * t;
     const w = width * (1 - t * 0.18);
-    const plate = kit.lens(w, w * 0.34, w * 0.42, style, color, 10);
+    const plate = kit.lens(w, w * 0.30, w * 0.24, style, color, 10);
     place(plate, 0, y, z, -0.25 + t * 0.1, 0, 0);
     parent.add(plate);
   }
@@ -665,10 +665,10 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
           { x: cos * 0.32, y: -0.42, z: sin * 0.32 },
           { x: cos * 0.53, y: -1.0, z: sin * 0.53 },
         ],
-        0.022,
-        0.04,
+        0.026,
+        0.05,
         "cloth",
-        p.dark,
+        p.cloth,
         4,
         6,
       ),
@@ -730,7 +730,8 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
     if (side < 0) {
       // 杖。役割が一目で分かるシルエットの要になる縦線を1本立てる
       const staff = new THREE.Group();
-      place(staff, 0, -0.04, -0.02, 0.25, 0, 0.1);
+      // 手の向き(腕の回転の積)を打ち消して、杖が鉛直に立つようにする
+      place(staff, 0, -0.04, -0.02, -0.55, 0, -side * 0.4);
       staff.add(place(kit.link({ x: 0, y: -0.45, z: 0 }, { x: 0, y: 0.72, z: 0 }, 0.022, 0.018, "plate", p.plate, 6), 0, 0, 0));
       staff.add(place(kit.band(0.1, 0.018, Math.PI * 2, "metal", p.metal, 14), 0, 0.7, 0, Math.PI / 2, 0, 0));
       staff.add(place(kit.octa(0.07, 0.13, 0.07, "crystal", p.accent), 0, 0.78, 0));
