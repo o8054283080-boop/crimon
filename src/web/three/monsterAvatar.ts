@@ -111,8 +111,9 @@ export class MonsterAvatar {
     finalizeRig(this.rig, this.kit, builder.height, builder.float);
     this.uniforms.uHeight.value = this.rig.height;
 
-    // 正面(-Z)を敵へ向けたうえで、少しだけ斜に構えて立体感を出す
-    this.rig.root.rotation.y = (facing > 0 ? 0 : Math.PI) + 0.3;
+    // 正面(-Z)を敵へ向けたうえで、少しだけ斜に構えて立体感を出す。
+    // 四足のように前後へ長い骨格は、正面からだと胴が見えないので深く構える
+    this.rig.root.rotation.y = (facing > 0 ? 0 : Math.PI) + 0.3 + this.rig.yawBias;
     this.root.add(this.rig.root);
 
     const footprint = this.rig.height * 0.62;
@@ -331,6 +332,19 @@ export class MonsterAvatar {
         leanX += -strike * 0.5;
         headY += strike * 0.4;
         for (const arm of rig.arms) arm.root.rotation.x += strike * 1.3;
+      } else if (anim.attack === "pounce") {
+        // 四足の跳びかかり。腕を振るのではなく、体を沈めてから前へ跳ぶ。
+        // 着地の頭突き・噛みつきに重心が乗るよう、頭を大きく振り下ろす
+        offsetY += -windup * 0.1 + arc(attackT) * 0.3;
+        offsetZ += windup * 0.24 - strike * anim.lunge * 1.05;
+        leanX += windup * 0.24 - strike * 0.32;
+        headX += -windup * 0.4 + strike * 0.5;
+        for (const leg of rig.legs) {
+          // 前脚は伸ばして掴みかかり、後脚は蹴り出して畳む
+          leg.root.rotation.x += leg.front ? -windup * 0.5 + strike * 1.1 : windup * 0.4 - strike * 0.7;
+          if (leg.lower && leg.lowerRest) leg.lower.rotation.x += leg.front ? windup * 0.4 - strike * 0.6 : -windup * 0.3;
+        }
+        for (const wing of rig.wings) wing.root.rotation.z -= wing.side * (windup * 0.5 + strike * 0.3);
       } else if (anim.attack === "cast") {
         // 溜めてから前方へ放つ
         offsetZ += windup * 0.16 - strike * anim.lunge * 0.45;

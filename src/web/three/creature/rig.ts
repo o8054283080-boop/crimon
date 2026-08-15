@@ -16,6 +16,8 @@ export interface RigLimb {
   side: number;
   /** 揺れの位相をずらすための値 */
   phase: number;
+  /** 四足の前脚。後脚と役割が違うので、モーション側で区別する */
+  front?: boolean;
 }
 
 /** 尾・触手のような連鎖部位の1節 */
@@ -70,7 +72,7 @@ export interface AnimProfile {
   /** 攻撃時に踏み込む距離 */
   lunge: number;
   /** 攻撃モーションの型 */
-  attack: "lunge" | "slam" | "cast" | "dash";
+  attack: "lunge" | "slam" | "cast" | "dash" | "pounce";
 }
 
 export const DEFAULT_ANIM: AnimProfile = {
@@ -122,6 +124,16 @@ export class CreatureRig {
 
   /** 足を持たず宙に浮くタイプ */
   floats = false;
+  /**
+   * 立ち姿の追加ヨー。四足のように前後に長い骨格は、正面から見ると
+   * 潰れて読めなくなるため、役割ごとに斜に構える角度を変える。
+   */
+  yawBias = 0;
+  /**
+   * 翼を生やす位置(種別固有の造形が参照する)。
+   * 骨格によって背中の高さが違うため、役割ビルダー側から指定する。
+   */
+  wingAnchor = new THREE.Vector3(0.3, 0.62, 0.18);
   /** 正規化後の体高 */
   height = 2.4;
   anim: AnimProfile = { ...DEFAULT_ANIM };

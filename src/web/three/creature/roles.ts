@@ -22,7 +22,7 @@ import {
  */
 
 /** 連鎖から手足を登録する。関節はアニメーション対象としてマークする */
-function limbFrom(chain: ChainResult, side: number, phase: number): RigLimb {
+function limbFrom(chain: ChainResult, side: number, phase: number, front = false): RigLimb {
   markAnimated(...chain.joints);
   return {
     root: chain.joints[0],
@@ -32,6 +32,7 @@ function limbFrom(chain: ChainResult, side: number, phase: number): RigLimb {
     tip: chain.tip,
     side,
     phase,
+    front,
   };
 }
 
@@ -348,79 +349,129 @@ function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: 
   wing.add(membrane);
 }
 
-/** アタッカー: 前傾した四足獣。低く長く、棘と牙で「速そう」に見せる */
+/**
+ * アタッカー: 四足の獣。
+ *
+ * 以前は「前傾した二足」に小さな腕を付けただけで、他の役割と骨格が同じだった。
+ * ここでは背骨を水平に寝かせ、前脚も接地させた本物の四足に組み替えている。
+ * 前脚は rig.arms ではなく rig.legs に登録し、攻撃は腕を振るのではなく
+ * 体ごと跳びかかる型(pounce)にすることで、二足の役割と動きから別物にする。
+ */
 function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
-  rig.pelvis.position.y = 1.12;
-  rig.pelvis.add(place(kit.ball(0.28, 0.26, 0.34, "hide", p.main), 0, 0, 0.08));
+  // 前後に長い骨格は正面からだと潰れる。斜に構えて全長を見せる
+  rig.yawBias = 0.5;
+  rig.pelvis.position.y = 1.0;
 
+  // --- 腰 ---
+  rig.pelvis.add(place(kit.ball(0.30, 0.28, 0.34, "hide", p.main), 0, 0, 0.04));
+  rig.pelvis.add(place(kit.ball(0.25, 0.23, 0.22, "hide", p.dark), 0, -0.03, 0.24));
+  for (const side of [-1, 1]) {
+    // 腿の付け根の筋肉。四足は後脚の張り出しが速さの印象を作る
+    rig.pelvis.add(place(kit.ball(0.16, 0.19, 0.20, "hide", p.main), side * 0.24, -0.02, 0.10));
+  }
+
+  // --- 後脚(3節のデジティグレード) ---
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.44, r0: 0.17, r1: 0.12, rot: [0.36, 0, 0] },
-        { len: 0.42, r0: 0.12, r1: 0.085, rot: [-0.88, 0, 0] },
-        { len: 0.26, r0: 0.085, r1: 0.06, rot: [0.7, 0, 0] },
+        { len: 0.40, r0: 0.17, r1: 0.11, rot: [0.48, 0, 0] },
+        { len: 0.38, r0: 0.11, r1: 0.075, rot: [-1.06, 0, 0] },
+        { len: 0.26, r0: 0.075, r1: 0.06, rot: [0.72, 0, 0] },
       ],
       "hide",
       p.main,
     );
-    leg.root.position.set(side * 0.24, -0.02, 0.08);
-    leg.tip.add(place(kit.ball(0.09, 0.05, 0.13, "hide", p.dark), 0, -0.02, -0.05));
-    addClaws(kit, leg.tip, 3, 0.16, 0.035, 0.07);
+    leg.root.position.set(side * 0.23, -0.02, 0.12);
+    addJoint(kit, leg.joints[1], 0, 0.10, false);
+    addJoint(kit, leg.joints[2], 0, 0.075, false);
+    leg.tip.add(place(kit.ball(0.10, 0.055, 0.14, "hide", p.dark), 0, -0.02, -0.05));
+    addClaws(kit, leg.tip, 3, 0.15, 0.032, 0.07);
     rig.pelvis.add(leg.root);
     rig.legs.push(limbFrom(leg, side, side * 0.9));
   }
 
+  // --- 胴(水平な背骨。腰から前へ伸ばす) ---
   const torso = rig.torso;
-  place(torso, 0, 0.04, -0.04, -0.3, 0, 0);
-  torso.add(place(kit.ball(0.32, 0.30, 0.36, "hide", p.main), 0, 0.16, 0));
-  torso.add(place(kit.ball(0.38, 0.32, 0.38, "hide", p.main), 0, 0.52, -0.04));
-  torso.add(place(kit.ball(0.30, 0.20, 0.24, "hide", p.dark), 0, 0.30, -0.24));
+  place(torso, 0, 0.06, -0.40, 0.05, 0, 0);
+  torso.add(place(kit.ball(0.31, 0.30, 0.40, "hide", p.main), 0, 0.02, 0.10));
+  torso.add(place(kit.ball(0.34, 0.33, 0.34, "hide", p.main), 0, 0.02, -0.14));
+  // 腹。下側を暗い色にして、胴の丸みと接地側を分ける
+  torso.add(place(kit.ball(0.27, 0.20, 0.42, "hide", p.dark), 0, -0.14, 0.02));
+  addRibs(kit, torso, 4, -0.12, 0.14, 0.30, 0.016);
   for (const side of [-1, 1]) {
-    torso.add(place(kit.ball(0.15, 0.19, 0.16, "hide", p.main), side * 0.3, 0.6, 0.02));
+    torso.add(place(kit.ball(0.14, 0.17, 0.17, "hide", p.main), side * 0.26, 0.02, -0.18));
   }
-  // 背骨の棘。真後ろから見た時のシルエットを作る主役
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    const height = 0.14 + Math.sin(t * Math.PI) * 0.2;
-    const fin = kit.spike(0.05, height, 0.3, "plate", p.plate);
-    place(fin, 0, 0.1 + i * 0.13, 0.26 - t * 0.04, 0.55, Math.PI / 2, 0);
+
+  // 背骨の棘。真横・真後ろから見た時のシルエットを作る主役
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const height = 0.12 + Math.sin(t * Math.PI) * 0.20;
+    const fin = kit.spike(0.045, height, 0.3, "plate", p.plate);
+    place(fin, 0, 0.26 - t * 0.02, -0.24 + t * 0.62, 0.35 - t * 0.5, Math.PI / 2, 0);
     torso.add(fin);
   }
 
-  place(rig.neck, 0, 0.72, -0.14, -0.52, 0, 0);
-  rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.3, z: 0 }, 0.15, 0.11, "hide", p.main));
-  place(rig.head, 0, 0.3, 0, 0.8, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.16, 0.15, 0.19], snout: 0.26, jaw: true, horns: "swept", crest: 0, eye: 0.045 });
-
+  // --- 前脚 ---
   for (const side of [-1, 1]) {
-    const arm = kit.chain(
+    const leg = kit.chain(
       [
-        { len: 0.3, r0: 0.11, r1: 0.09, rot: [0.62, 0, side * 0.34] },
-        { len: 0.28, r0: 0.085, r1: 0.06, rot: [-0.95, 0, 0] },
+        { len: 0.36, r0: 0.15, r1: 0.105, rot: [0.26, 0, side * 0.05] },
+        { len: 0.34, r0: 0.10, r1: 0.075, rot: [-0.36, 0, 0] },
+        { len: 0.16, r0: 0.075, r1: 0.065, rot: [0.22, 0, 0] },
       ],
       "hide",
       p.main,
     );
-    arm.root.position.set(side * 0.28, 0.5, -0.12);
-    arm.tip.add(place(kit.ball(0.075, 0.06, 0.09, "hide", p.dark), 0, -0.03, -0.02));
-    addClaws(kit, arm.tip, 3, 0.19, 0.032, 0.075);
-    rig.torso.add(arm.root);
-    rig.arms.push(limbFrom(arm, side, side * 1.4));
+    leg.root.position.set(side * 0.24, -0.02, -0.24);
+    addJoint(kit, leg.joints[1], 0, 0.095, false);
+    leg.tip.add(place(kit.ball(0.095, 0.05, 0.13, "hide", p.dark), 0, -0.02, -0.05));
+    addClaws(kit, leg.tip, 3, 0.16, 0.032, 0.07);
+    torso.add(leg.root);
+    rig.legs.push(limbFrom(leg, side, side * 1.5, true));
   }
 
-  addTail(kit, rig, [0, 0.06, 0.26], 6, 0.21, 0.11, -1.7, -0.1, true);
+  // --- 首と頭(低く前へ突き出す) ---
+  place(rig.neck, 0, 0.16, -0.34, -0.62, 0, 0);
+  rig.neck.add(
+    kit.taperedTube(
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 0.16, z: -0.03 },
+        { x: 0, y: 0.32, z: -0.02 },
+      ],
+      0.15,
+      0.10,
+      "hide",
+      p.main,
+      7,
+      6,
+    ),
+  );
+  // 首筋のたてがみ状の棘
+  for (let i = 0; i < 3; i++) {
+    const fin = kit.spike(0.04, 0.18 - i * 0.03, 0.3, "plate", p.plate);
+    place(fin, 0, 0.06 + i * 0.10, 0.08, 0.9, Math.PI / 2, 0);
+    rig.neck.add(fin);
+  }
+  place(rig.head, 0, 0.32, 0, 0.92, 0, 0);
+  addBeastHead(kit, rig, { skull: [0.17, 0.16, 0.20], snout: 0.28, jaw: true, horns: "swept", crest: 2, eye: 0.045 });
+
+  addTail(kit, rig, [0, 0.10, 0.28], 6, 0.20, 0.10, -1.55, -0.12, true);
+
+  // 翼は背中の中ほど、前脚の付け根より少し後ろに生やす
+  rig.wingAnchor.set(0.22, 0.28, 0.02);
 
   rig.anim = {
-    idleSpeed: 1.35,
+    idleSpeed: 1.3,
     breath: 1,
-    bob: 0.03,
-    headSway: 1.3,
-    tailWave: 1.4,
+    bob: 0.026,
+    headSway: 1.25,
+    tailWave: 1.5,
     wingFlap: 0,
-    sway: 1.1,
-    lunge: 1.45,
-    attack: "lunge",
+    sway: 0.85,
+    lunge: 1.5,
+    attack: "pounce",
   };
 }
 
@@ -1115,10 +1166,11 @@ export function builderFor(role: string): { build: (kit: CreatureKit, rig: Creat
 const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => void> = {
   /** ドラゴン: 大きな皮膜の翼。畳まずに広げて、横幅のあるシルエットにする */
   dragon: (kit, rig) => {
+    const a = rig.wingAnchor;
     for (const side of [-1, 1]) {
       const wing = new THREE.Group();
       markAnimated(wing);
-      place(wing, side * 0.3, 0.62, 0.18, 0.16, -side * 0.42, side * 0.12);
+      place(wing, side * a.x, a.y, a.z, 0.16, -side * 0.42, side * 0.12);
       addBatWing(kit, wing, side, 1.3);
       rig.torso.add(wing);
       rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
@@ -1129,10 +1181,11 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
   /** グリフォン: 羽毛の翼と、頭の羽根飾り。鳥類寄りのシルエットにする */
   griffon: (kit, rig) => {
     const p = kit.palette;
+    const a = rig.wingAnchor;
     for (const side of [-1, 1]) {
       const wing = new THREE.Group();
       markAnimated(wing);
-      place(wing, side * 0.28, 0.58, 0.14, 0.24, -side * 0.5, 0);
+      place(wing, side * a.x, a.y, a.z - 0.04, 0.24, -side * 0.5, 0);
       addFeatherWing(kit, wing, side, 8, 1.15);
       rig.torso.add(wing);
       rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
@@ -1157,7 +1210,7 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
       ].entries()) {
         const wing = new THREE.Group();
         markAnimated(wing);
-        place(wing, side * 0.24, spec.y, 0.14, spec.pitch, -side * 0.46, 0);
+        place(wing, side * 0.24, rig.wingAnchor.y - 0.28 + spec.y, 0.14, spec.pitch, -side * 0.46, 0);
         addFeatherWing(kit, wing, side, 7, spec.span);
         rig.torso.add(wing);
         rig.wings.push({
