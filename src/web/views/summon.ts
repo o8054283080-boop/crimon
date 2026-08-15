@@ -172,12 +172,18 @@ function summaryChips(results: SummonResult[]): HTMLElement {
   return el("div", { className: "summon-summary" }, chips);
 }
 
-const BANNER_TEXT: Record<SummonGrade, string> = {
-  1: "召喚完了",
-  2: "レア枠が出た!",
-  3: "SSR級の輝き!!",
-  4: "最高レア出現!!!",
-};
+/**
+ * 出た瞬間の見出し。
+ * 同じ等級でも「星が高い」のか「レア枠(光/闇)を引いた」のかで嬉しさの理由が違うので、
+ * 主役の1体を見て言い分ける。
+ */
+function bannerText(best: SummonResult | undefined, grade: SummonGrade): string {
+  if (!best || grade === 1) return "召喚完了";
+  const rank = rarityLabel(best.star);
+  if (grade === 4) return `虹級! ${rank} レア枠!!!`;
+  if (best.isRare) return grade === 3 ? `レア枠の${rank}!!` : "レア枠が出た!";
+  return grade === 3 ? `${rank}出現!!` : `${rank}が出た!`;
+}
 
 function renderResult(props: SummonProps): HTMLElement {
   const { player, lastResults, onSummon, onDismissResults } = props;
@@ -234,7 +240,7 @@ function renderResult(props: SummonProps): HTMLElement {
 
   const omen = el("div", { className: "fx__omen" }, []);
   const banner = el("div", { className: "summon-banner" }, [
-    el("span", { className: "summon-banner__text" }, [BANNER_TEXT[grade]]),
+    el("span", { className: "summon-banner__text" }, [bannerText(results[bestIndex], grade)]),
   ]);
 
   const skip = el("button", { type: "button", className: "summon-skip", ariaLabel: "演出をスキップ" }, [

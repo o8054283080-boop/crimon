@@ -382,6 +382,7 @@
   --fx1: #bcd8ff;
   --fx2: #3a6fd8;
   --fx-soft: rgba(120, 180, 255, 0.5);
+  --ray: #5f93ff;
 
   /* 溜め中の色(段階で上書きされる) */
   --chg1: #bcd8ff;
@@ -392,18 +393,21 @@
   --fx1: #e6c2ff;
   --fx2: #7a2fd8;
   --fx-soft: rgba(200, 150, 255, 0.55);
+  --ray: #a86bff;
 }
 
 .summon-screen--result.g3 {
   --fx1: #ffe6a0;
   --fx2: #e08a10;
   --fx-soft: rgba(255, 205, 100, 0.6);
+  --ray: #ffbe3d;
 }
 
 .summon-screen--result.g4 {
   --fx1: #fff3d0;
   --fx2: #ff7a2f;
   --fx-soft: rgba(255, 215, 150, 0.68);
+  --ray: #ffab2e;
 }
 
 /* --- 溜めの段階(色がどこまで上がるかで当たりが読める)--- */
@@ -475,7 +479,7 @@
 .fx__rays > i {
   position: absolute;
   inset: 0;
-  background: repeating-conic-gradient(from 0deg, var(--fx1) 0deg 2.2deg, transparent 2.2deg 12deg);
+  background: repeating-conic-gradient(from 0deg, var(--ray) 0deg 2.2deg, transparent 2.2deg 12deg);
   -webkit-mask: radial-gradient(closest-side, #000 3%, rgba(0, 0, 0, 0.6) 12%, transparent 24%);
   mask: radial-gradient(closest-side, #000 3%, rgba(0, 0, 0, 0.6) 12%, transparent 24%);
   mix-blend-mode: screen;
@@ -886,7 +890,8 @@
   position: absolute;
   inset: -14%;
   border-radius: 22px;
-  background: radial-gradient(circle, var(--fx-soft), transparent 68%);
+  background: radial-gradient(circle, var(--fx-soft), transparent 66%);
+  filter: blur(14px);
   opacity: 0;
   transition: opacity 0.45s ease;
   pointer-events: none;
@@ -962,12 +967,18 @@
 
 .sparks__i {
   position: absolute;
+  z-index: 2;
   width: var(--size, 4px);
   height: var(--size, 4px);
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 0 10px var(--fx1);
   opacity: 0;
+}
+
+.pop--hero .sparks__i {
+  width: calc(var(--size, 4px) * 1.6);
+  height: calc(var(--size, 4px) * 1.6);
 }
 
 .pop.is-in .sparks__i {
@@ -1005,8 +1016,8 @@
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 50% 58%, rgba(255, 255, 255, 0.3), transparent 52%),
-    radial-gradient(circle at 50% 100%, var(--fx-soft), transparent 60%);
+    radial-gradient(circle at 50% 56%, rgba(255, 255, 255, 0.32), transparent 48%),
+    radial-gradient(circle at 50% 50%, transparent 42%, rgba(0, 0, 0, 0.5) 100%);
   pointer-events: none;
 }
 
