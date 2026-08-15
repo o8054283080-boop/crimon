@@ -543,9 +543,9 @@
 
 .fx__circle-c {
   inset: 26%;
-  background: conic-gradient(from 0deg, transparent, var(--chg1) 55deg, transparent 140deg, var(--chg1) 235deg, transparent 320deg);
-  -webkit-mask: radial-gradient(circle closest-side, transparent 82%, #000 86%, #000 100%);
-  mask: radial-gradient(circle closest-side, transparent 82%, #000 86%, #000 100%);
+  background: conic-gradient(from 0deg, transparent 10deg, var(--chg1) 70deg, transparent 130deg, transparent 190deg, var(--chg1) 250deg, transparent 310deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 88%, #000 93%, #000 100%);
+  mask: radial-gradient(circle closest-side, transparent 88%, #000 93%, #000 100%);
   animation: spin 3.4s linear infinite;
 }
 
@@ -755,6 +755,10 @@
 
 .phase-burst .fx__flash {
   animation: flash 0.6s ease-out forwards;
+}
+
+.g1 .fx__flash {
+  background: radial-gradient(circle at 50% 46%, #fff 0%, var(--fx1) 20%, transparent 48%);
 }
 
 .g1.phase-burst .fx__flash {
