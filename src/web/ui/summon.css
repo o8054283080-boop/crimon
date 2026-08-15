@@ -758,11 +758,12 @@
 }
 
 .g1 .fx__flash {
-  background: radial-gradient(circle at 50% 46%, #fff 0%, var(--fx1) 20%, transparent 48%);
+  background: radial-gradient(circle at 50% 46%, #fff 0%, var(--fx1) 18%, transparent 42%);
 }
 
+/* 低レアは周回で何度も見るので、画面全体を白く飛ばさず軽く光らせるだけにする */
 .g1.phase-burst .fx__flash {
-  animation-duration: 0.32s;
+  animation: flash-lite 0.34s ease-out forwards;
 }
 
 .g4.phase-burst .fx__flash {
@@ -1397,6 +1398,21 @@
   100% {
     opacity: 0;
     transform: scale(1.7);
+  }
+}
+
+@keyframes flash-lite {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  20% {
+    opacity: 0.72;
+    transform: scale(0.78);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
   }
 }
 
