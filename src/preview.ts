@@ -13,7 +13,7 @@
 import "./web/style.css";
 import { BattleEngine } from "./battle/engine.js";
 import { MonsterDefinition } from "./core/monster.js";
-import { findMonster } from "./data/monsters.js";
+import { MONSTER_DEX, findMonster } from "./data/monsters.js";
 import { renderBattleView } from "./web/views/battleView.js";
 import { renderAutoFarmResult } from "./web/views/autoFarmResult.js";
 import { renderStageResult } from "./web/views/stageResult.js";
@@ -117,19 +117,30 @@ const seed = Number(params.get("seed") ?? 12345);
 const paused = params.get("paused") === "1";
 const preTurns = Number(params.get("turns") ?? 0);
 
-const playerTeam: MonsterDefinition[] = [
-  must("dragon", "FIRE"),
-  must("seraph", "LIGHT"),
-  must("griffon", "ELECTRIC"),
-  must("fairy", "GRASS"),
-];
+/** "slime" または "slime:WATER" から1体を取り出す(造形の確認用) */
+function anyOf(spec: string): MonsterDefinition {
+  const [templateId, element] = spec.split(":");
+  const found = MONSTER_DEX.find((m) => m.templateId === templateId && (!element || m.element === element));
+  if (!found) throw new Error(`モンスターが見つかりません: ${spec}`);
+  return found;
+}
 
-const enemyTeam: MonsterDefinition[] = [
-  must("ancient_demon", "DARK"),
-  must("ancient_crystal", "WATER"),
-  must("ancient_crystal_curse", "DARK"),
-  must("golem", "WATER"),
-];
+// ?roster=slime,wolf,nemesis,golem|fairy,dragon,seraph,griffon
+// 造形の確認用に、味方4体・敵4体の種別を直接指定できるようにする
+const roster = params.get("roster");
+
+const playerTeam: MonsterDefinition[] = roster
+  ? (roster.split("|")[0] ?? "").split(",").filter(Boolean).map(anyOf)
+  : [must("dragon", "FIRE"), must("seraph", "LIGHT"), must("griffon", "ELECTRIC"), must("fairy", "GRASS")];
+
+const enemyTeam: MonsterDefinition[] = roster
+  ? (roster.split("|")[1] ?? "").split(",").filter(Boolean).map(anyOf)
+  : [
+      must("ancient_demon", "DARK"),
+      must("ancient_crystal", "WATER"),
+      must("ancient_crystal_curse", "DARK"),
+      must("golem", "WATER"),
+    ];
 
 const engine = new BattleEngine(playerTeam, enemyTeam, { rng: mulberry32(seed) });
 
