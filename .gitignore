@@ -1,3 +1,6 @@
 node_modules/
 dist/
 *.log
+
+# 見た目の確認に使う使い捨てのツール類。リポジトリには残さない
+*.tmp.mjs
