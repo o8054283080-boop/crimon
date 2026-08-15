@@ -582,53 +582,84 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
   rig.floats = true;
   rig.pelvis.position.y = 1.05;
 
-  // ローブ(下端は開いたまま=足が無いことを強調する)
+  // ローブ(下端は開いたまま=足が無いことを強調する)。
+  // 一枚の円錐だと「緑の三角コーン」にしか見えないので、
+  // 布の材質・縦の折り目・裾と腰の縁取りで、衣として読める情報を足す
   rig.pelvis.add(
     kit.lathe(
       [
-        [0.24, 0.1],
-        [0.3, -0.14],
-        [0.36, -0.46],
-        [0.46, -0.78],
-        [0.54, -1.0],
+        [0.22, 0.14],
+        [0.27, -0.08],
+        [0.31, -0.36],
+        [0.40, -0.68],
+        [0.50, -0.94],
+        [0.54, -1.02],
       ],
-      "membrane",
-      p.membrane,
-      20,
+      "cloth",
+      p.cloth,
+      22,
     ),
   );
+  // 縦の折り目。布の表面をわずかに膨らませて、平らな面を割る
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    rig.pelvis.add(
+      kit.taperedTube(
+        [
+          { x: cos * 0.23, y: 0.1, z: sin * 0.23 },
+          { x: cos * 0.32, y: -0.42, z: sin * 0.32 },
+          { x: cos * 0.53, y: -1.0, z: sin * 0.53 },
+        ],
+        0.022,
+        0.04,
+        "cloth",
+        p.dark,
+        4,
+        6,
+      ),
+    );
+  }
   // 裾の飾り
   for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    const petal = kit.spike(0.075, 0.24, 0.35, "membrane", p.membrane);
+    const angle = (i / 8) * Math.PI * 2 + 0.35;
+    const petal = kit.spike(0.075, 0.22, 0.35, "cloth", p.dark);
     place(petal, Math.cos(angle) * 0.5, -0.98, Math.sin(angle) * 0.5, 0, -angle, 0);
     petal.rotation.x = Math.PI - 0.25;
     rig.pelvis.add(petal);
   }
-  rig.pelvis.add(place(kit.ring(0.3, 0.028, "plate", p.plate), 0, 0.06, 0, Math.PI / 2, 0, 0));
+  // 裾と腰の縁取り。硬い materialを1本挟むと布の柔らかさが引き立つ
+  rig.pelvis.add(place(kit.band(0.52, 0.024, Math.PI * 2, "plate", p.plate, 22), 0, -0.96, 0, Math.PI / 2, 0, 0));
+  rig.pelvis.add(place(kit.band(0.26, 0.034, Math.PI * 2, "metal", p.metal, 18), 0, 0.04, 0, Math.PI / 2, 0, 0));
+  rig.pelvis.add(place(kit.octa(0.05, 0.08, 0.04, "glow", p.glow), 0, 0.04, -0.27));
 
   const torso = rig.torso;
   place(torso, 0, 0.06, 0, -0.05, 0, 0);
   torso.add(place(kit.ball(0.2, 0.26, 0.16, "hide", p.main), 0, 0.2, 0));
   torso.add(place(kit.ball(0.22, 0.16, 0.18, "hide", p.dark), 0, 0.34, -0.05));
-  // 肩を覆う衣
+  // 肩を覆う衣(ケープ)と、その縁
   torso.add(
     place(
       kit.lathe(
         [
-          [0.16, 0.5],
-          [0.34, 0.34],
-          [0.46, 0.12],
+          [0.15, 0.52],
+          [0.30, 0.38],
+          [0.44, 0.14],
+          [0.46, 0.06],
         ],
-        "membrane",
-        p.membrane,
-        18,
+        "cloth",
+        p.cloth,
+        20,
       ),
       0,
       0,
       0,
     ),
   );
+  torso.add(place(kit.band(0.45, 0.02, Math.PI * 2, "plate", p.plate, 20), 0, 0.08, 0, Math.PI / 2, 0, 0));
+  // 襟。首の後ろを立てて、背面から見た時の情報にする
+  torso.add(place(kit.lathe([[0.13, 0.44], [0.2, 0.62], [0.22, 0.7]], "cloth", p.dark, 16), 0, 0, 0.02));
   torso.add(place(kit.octa(0.07, 0.1, 0.05, "glow", p.glow), 0, 0.36, -0.16));
 
   for (const side of [-1, 1]) {
@@ -642,6 +673,21 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
     );
     arm.root.position.set(side * 0.2, 0.38, -0.02);
     arm.tip.add(place(kit.ball(0.055, 0.05, 0.055, "hide", p.dark), 0, -0.03, 0));
+
+    if (side < 0) {
+      // 杖。役割が一目で分かるシルエットの要になる縦線を1本立てる
+      const staff = new THREE.Group();
+      place(staff, 0, -0.04, -0.02, 0.25, 0, 0.1);
+      staff.add(place(kit.link({ x: 0, y: -0.45, z: 0 }, { x: 0, y: 0.72, z: 0 }, 0.022, 0.018, "plate", p.plate, 6), 0, 0, 0));
+      staff.add(place(kit.band(0.1, 0.018, Math.PI * 2, "metal", p.metal, 14), 0, 0.7, 0, Math.PI / 2, 0, 0));
+      staff.add(place(kit.octa(0.07, 0.13, 0.07, "crystal", p.accent), 0, 0.78, 0));
+      staff.add(place(kit.octa(0.035, 0.07, 0.035, "glow", p.glow), 0, 0.78, 0));
+      for (const dir of [-1, 1]) {
+        staff.add(place(kit.octa(0.02, 0.05, 0.02, "crystal", p.accent), dir * 0.09, 0.66, 0, 0, 0, dir * 0.4));
+      }
+      arm.tip.add(staff);
+    }
+
     // 長い袖。受動的に揺れる布として登録する
     const sleeve = new THREE.Group();
     markAnimated(sleeve);
@@ -652,11 +698,12 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
           [0.14, -0.2],
           [0.2, -0.46],
         ],
-        "membrane",
-        p.membrane,
-        12,
+        "cloth",
+        p.cloth,
+        14,
       ),
     );
+    sleeve.add(place(kit.band(0.19, 0.016, Math.PI * 2, "plate", p.plate, 16), 0, -0.44, 0, Math.PI / 2, 0, 0));
     arm.joints[1].add(sleeve);
     rig.cloth.push({ group: sleeve, rest: sleeve.rotation.clone(), phase: side, amount: 1 });
     rig.torso.add(arm.root);
@@ -666,13 +713,20 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
   place(rig.neck, 0, 0.5, -0.02, -0.02, 0, 0);
   place(rig.head, 0, 0.1, 0, 0.06, 0, 0);
   rig.head.add(place(kit.ball(0.15, 0.17, 0.15, "hide", p.dark), 0, 0.1, 0));
-  // フード
-  rig.head.add(place(kit.ball(0.19, 0.2, 0.21, "membrane", p.membrane), 0, 0.14, 0.05));
-  rig.head.add(place(kit.spike(0.11, 0.34, 0.6, "membrane", p.membrane), 0, 0.2, 0.14, 0.9, 0, 0));
+  // フード。後頭部を尖らせ、縁に硬い輪を回して開口部を作る
+  rig.head.add(place(kit.ball(0.19, 0.2, 0.21, "cloth", p.cloth), 0, 0.14, 0.05));
+  rig.head.add(place(kit.spike(0.11, 0.34, 0.6, "cloth", p.cloth), 0, 0.2, 0.14, 0.9, 0, 0));
+  rig.head.add(place(kit.band(0.16, 0.02, Math.PI * 1.3, "plate", p.plate, 14), 0, 0.12, -0.13, 0.25, 0, Math.PI * 0.85));
   addEyes(kit, rig.head, 0.06, 0.1, -0.13, 0.028);
-  // 光輪
-  const halo = kit.ring(0.22, 0.022, "glow", p.glow, 28);
-  place(halo, 0, 0.42, 0.06, Math.PI / 2, 0, 0);
+  // 頭飾り。味方は背面から見えるので、後ろ姿にも情報を置く
+  for (let i = 0; i < 3; i++) {
+    const crown = kit.octa(0.022, 0.09 - i * 0.015, 0.022, "crystal", p.accent);
+    place(crown, (i - 1) * 0.09, 0.3, 0.06, -0.3, 0, (i - 1) * -0.5);
+    rig.head.add(crown);
+  }
+  // 光輪。頭の上へ持ち上げ、どの角度からも輪として見えるようにする
+  const halo = kit.ring(0.21, 0.022, "glow", p.glow, 28);
+  place(halo, 0, 0.42, 0.02, Math.PI / 2 - 0.28, 0, 0);
   rig.head.add(halo);
   rig.spinners.push({ object: halo, axis: "z", speed: 0.6 });
 

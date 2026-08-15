@@ -87,6 +87,9 @@ export class MonsterAvatar {
   private readonly hitTrack = newTrack();
   private readonly castTrack = newTrack();
 
+  /** 前フレームの重心。尾や布を遅れて振るための慣性計算に使う */
+  private readonly previousOffset = new THREE.Vector3();
+  private readonly lag = new THREE.Vector3();
   private deathProgress = 0;
   private dying = false;
   private hpRatio = 1;
