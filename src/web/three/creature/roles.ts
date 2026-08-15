@@ -254,12 +254,13 @@ function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: number, co
   const s = side;
   const L = length;
 
-  // 前縁の骨。肩→肘→手首→翼端と、弓なりに反りながら外へ伸びる
+  // 前縁の骨。肩→肘→手首→翼端と、斜め上へ弓なりに反りながら外へ伸びる。
+  // 水平に張り出すと横幅を食うだけなので、持ち上げて縦の情報量に変える
   const bone: THREE.Vector3[] = [
     new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(s * 0.28 * L, 0.15 * L, 0.02 * L),
-    new THREE.Vector3(s * 0.60 * L, 0.23 * L, -0.01 * L),
-    new THREE.Vector3(s * 0.88 * L, 0.19 * L, -0.04 * L),
+    new THREE.Vector3(s * 0.30 * L, 0.26 * L, 0.04 * L),
+    new THREE.Vector3(s * 0.60 * L, 0.42 * L, 0.0),
+    new THREE.Vector3(s * 0.82 * L, 0.48 * L, -0.05 * L),
   ];
   const spine = new THREE.CatmullRomCurve3(bone);
   wing.add(kit.taperedTube(bone, 0.05 * L, 0.014 * L, "fur", p.fur, 5, 8));
@@ -271,7 +272,7 @@ function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: number, co
     // 風切羽: 前縁の外側半分から、外向き〜下向きに長く伸びる
     { u0: 0.22, u1: 0.99, len: 1, color: p.fur, z: -0.02, scale: 1 },
     // 雨覆い: 手前に重ねる短い羽根。段差の影で層に見せる
-    { u0: 0.12, u1: 0.82, len: 0.42, color: p.dark, z: -0.05, scale: 0.85 },
+    { u0: 0.10, u1: 0.80, len: 0.44, color: p.main, z: -0.06, scale: 0.85 },
   ];
 
   for (const row of rows) {
@@ -279,10 +280,10 @@ function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: number, co
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? 0 : i / (n - 1);
       spine.getPointAt(row.u0 + (row.u1 - row.u0) * t, point);
-      const len = L * (0.30 + t * 0.30) * row.len;
-      const feather = kit.feather(len, len * 0.19, "fur", row.color, 0.1);
+      const len = L * (0.30 + t * 0.26) * row.len;
+      const feather = kit.feather(len, len * 0.21, "fur", row.color, 0.1);
       // 内側は真下へ、外側ほど外向きへ倒す(扇の要は肩ではなく前縁全体)
-      const angle = 2.45 - t * 0.72;
+      const angle = 2.6 - t * 0.9;
       place(
         feather,
         point.x,
@@ -615,7 +616,7 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
     const wing = new THREE.Group();
     markAnimated(wing);
     place(wing, side * 0.18, 0.34, 0.12, 0.2, -side * 0.35, 0);
-    addFeatherWing(kit, wing, side, 6, 1.15);
+    addFeatherWing(kit, wing, side, 6, 0.95);
     rig.torso.add(wing);
     rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
   }
@@ -1118,7 +1119,7 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
       const wing = new THREE.Group();
       markAnimated(wing);
       place(wing, side * 0.3, 0.62, 0.18, 0.16, -side * 0.42, side * 0.12);
-      addBatWing(kit, wing, side, 1.5);
+      addBatWing(kit, wing, side, 1.3);
       rig.torso.add(wing);
       rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
     }
@@ -1132,7 +1133,7 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
       const wing = new THREE.Group();
       markAnimated(wing);
       place(wing, side * 0.28, 0.58, 0.14, 0.24, -side * 0.5, 0);
-      addFeatherWing(kit, wing, side, 8, 1.5);
+      addFeatherWing(kit, wing, side, 8, 1.15);
       rig.torso.add(wing);
       rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
     }
@@ -1151,8 +1152,8 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
     const p = kit.palette;
     for (const side of [-1, 1]) {
       for (const [index, spec] of [
-        { y: 0.72, span: 1.5, pitch: 0.1 },
-        { y: 0.44, span: 1.15, pitch: 0.5 },
+        { y: 0.72, span: 1.15, pitch: 0.1 },
+        { y: 0.44, span: 0.86, pitch: 0.5 },
       ].entries()) {
         const wing = new THREE.Group();
         markAnimated(wing);
