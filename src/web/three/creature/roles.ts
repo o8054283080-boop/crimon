@@ -359,13 +359,14 @@ function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: 
  */
 function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
-  // 前後に長い骨格は正面からだと潰れる。斜に構えて全長を見せる
-  rig.yawBias = 0.5;
+  // 前後に長い骨格は正面からだと潰れる。斜に構えて全長を見せる。
+  // ただし味方は敵の方(奥)を向くので、深く回すと尻しか見えなくなる
+  rig.yawBias = 0.32;
   rig.pelvis.position.y = 1.0;
 
   // --- 腰 ---
   rig.pelvis.add(place(kit.ball(0.30, 0.28, 0.34, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.25, 0.23, 0.22, "hide", p.dark), 0, -0.03, 0.24));
+  rig.pelvis.add(place(kit.ball(0.22, 0.21, 0.20, "hide", p.main), 0, -0.02, 0.22));
   for (const side of [-1, 1]) {
     // 腿の付け根の筋肉。四足は後脚の張り出しが速さの印象を作る
     rig.pelvis.add(place(kit.ball(0.16, 0.19, 0.20, "hide", p.main), side * 0.24, -0.02, 0.10));
@@ -432,15 +433,17 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 首と頭(低く前へ突き出す) ---
-  place(rig.neck, 0, 0.16, -0.34, -0.62, 0, 0);
+  // 首は立ち上げてから前へ送る。味方は背面から見えるので、
+  // 頭が背中の稜線より上に出ていないと顔がまったく読めない
+  place(rig.neck, 0, 0.22, -0.34, -0.18, 0, 0);
   rig.neck.add(
     kit.taperedTube(
       [
         { x: 0, y: 0, z: 0 },
-        { x: 0, y: 0.16, z: -0.03 },
-        { x: 0, y: 0.32, z: -0.02 },
+        { x: 0, y: 0.18, z: -0.05 },
+        { x: 0, y: 0.36, z: -0.02 },
       ],
-      0.15,
+      0.16,
       0.10,
       "hide",
       p.main,
@@ -454,13 +457,13 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
     place(fin, 0, 0.06 + i * 0.10, 0.08, 0.9, Math.PI / 2, 0);
     rig.neck.add(fin);
   }
-  place(rig.head, 0, 0.32, 0, 0.92, 0, 0);
+  place(rig.head, 0, 0.36, 0, 0.62, 0, 0);
   addBeastHead(kit, rig, { skull: [0.17, 0.16, 0.20], snout: 0.28, jaw: true, horns: "swept", crest: 2, eye: 0.045 });
 
   addTail(kit, rig, [0, 0.10, 0.28], 6, 0.20, 0.10, -1.55, -0.12, true);
 
   // 翼は背中の中ほど、前脚の付け根より少し後ろに生やす
-  rig.wingAnchor.set(0.22, 0.28, 0.02);
+  rig.wingAnchor.set(0.20, 0.34, -0.04);
 
   rig.anim = {
     idleSpeed: 1.3,
@@ -844,7 +847,7 @@ function buildDebuffer(kit: CreatureKit, rig: CreatureRig): void {
   // 中央の大きな一つ目
   rig.head.add(place(kit.ball(0.07, 0.06, 0.05, "glow", p.glow, 10), 0, 0.16, -0.19));
 
-  // 左右で長さの違う腕(非対称=歪んだ印象)
+  // 腕は大小2対の計4本。左右でも長さを変え、人型の左右対称から崩す
   for (const side of [-1, 1]) {
     const long = side > 0;
     const arm = kit.chain(
@@ -856,9 +859,28 @@ function buildDebuffer(kit: CreatureKit, rig: CreatureRig): void {
       p.dark,
     );
     arm.root.position.set(side * 0.25, 0.44, -0.04);
+    addJoint(kit, arm.joints[1], 0, 0.07, false);
+    // 骨ばった肘の棘
+    const elbowSpike = kit.spike(0.035, 0.16, 0.6, "plate", p.plate);
+    place(elbowSpike, 0, 0, 0.05, 2.5, 0, 0);
+    arm.joints[1].add(elbowSpike);
     addClaws(kit, arm.tip, 3, long ? 0.3 : 0.14, 0.03, long ? 0.075 : 0.05);
     rig.torso.add(arm.root);
     rig.arms.push(limbFrom(arm, side, side * 1.7));
+
+    // 胸の前で畳んだ小さな第2の腕。多腕であることを近くで見た時に効かせる
+    const small = kit.chain(
+      [
+        { len: 0.20, r0: 0.052, r1: 0.04, rot: [1.15, 0, side * 0.9], radial: 5 },
+        { len: 0.19, r0: 0.04, r1: 0.028, rot: [-1.6, 0, 0], radial: 5 },
+      ],
+      "hide",
+      p.dark,
+    );
+    small.root.position.set(side * 0.17, 0.24, -0.12);
+    addClaws(kit, small.tip, 3, 0.1, 0.018, 0.038);
+    rig.torso.add(small.root);
+    rig.arms.push(limbFrom(small, side, side * 2.4));
   }
 
   addTail(kit, rig, [0, 0.04, 0.2], 6, 0.18, 0.07, -1.35, -0.22, true);

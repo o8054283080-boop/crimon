@@ -202,6 +202,13 @@ void main() {
   float fill = max(dot(normal, FILL_DIR), 0.0);
   float back = max(dot(normal, BACK_DIR), 0.0);
 
+  #ifdef WRAP
+    // 羽根や葉のように薄い面は、裏を向いた瞬間に真っ黒になって
+    // 板の集まりに見えてしまう。光を回り込ませて面の向きの差を弱める。
+    key = key * 0.5 + (dot(normal, KEY_DIR) * 0.5 + 0.5) * 0.5;
+    fill = fill * 0.5 + (dot(normal, FILL_DIR) * 0.5 + 0.5) * 0.5;
+  #endif
+
   // 半球光(上は青空、下は床の紫)で暗部が潰れないようにする
   vec3 ambient = mix(vec3(0.10, 0.08, 0.13), vec3(0.20, 0.23, 0.36), normal.y * 0.5 + 0.5);
 
@@ -357,7 +364,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   },
   // 毛皮・羽毛: ハイライトを持たず、縁だけがふわりと光る
   fur: {
-    defines: { STRANDS: "" },
+    defines: { STRANDS: "", WRAP: "" },
     rimStrength: 0.85,
     emissive: 0,
     opacity: 1,
