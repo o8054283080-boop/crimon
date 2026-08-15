@@ -1062,7 +1062,16 @@ function buildDebuffer(kit: CreatureKit, rig: CreatureRig): void {
 function buildBalanced(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
   rig.pelvis.position.y = 1.1;
-  rig.pelvis.add(place(kit.box(0.34, 0.2, 0.26, "plate", p.plate), 0, -0.02, 0));
+  rig.pelvis.add(place(kit.lens(0.2, 0.14, 0.17, "metal", p.metal), 0, -0.02, 0));
+  rig.pelvis.add(place(kit.band(0.2, 0.032, Math.PI * 2, "metal", p.metal, 16), 0, 0.04, 0, Math.PI / 2, 0, 0));
+  rig.pelvis.add(place(kit.octa(0.05, 0.07, 0.035, "glow", p.glow), 0, 0.04, -0.19));
+  // 腰から下がる草摺(くさずり)。歩く時に脚と別に揺れる面を作る
+  for (let i = 0; i < 5; i++) {
+    const angle = -1.0 + (i / 4) * 2.0;
+    const tasset = kit.lens(0.075, 0.15, 0.05, "metal", p.metal, 8);
+    place(tasset, Math.sin(angle) * 0.21, -0.14, -Math.cos(angle) * 0.2, 0.12, -angle, 0);
+    rig.pelvis.add(tasset);
+  }
 
   for (const side of [-1, 1]) {
     const leg = kit.chain(
@@ -1074,8 +1083,12 @@ function buildBalanced(kit: CreatureKit, rig: CreatureRig): void {
       p.main,
     );
     leg.root.position.set(side * 0.17, -0.06, 0);
-    leg.joints[1].add(place(kit.box(0.15, 0.3, 0.14, "plate", p.plate), 0, -0.16, -0.02));
-    leg.tip.add(place(kit.box(0.15, 0.08, 0.3, "plate", p.plate), 0, -0.04, -0.06));
+    // 太腿・膝・脛の3枚に分けて装甲を重ねる
+    leg.joints[0].add(place(kit.lens(0.13, 0.18, 0.12, "metal", p.metal), 0, -0.22, -0.04, 0.05, 0, 0));
+    addJoint(kit, leg.joints[1], 0, 0.11, true);
+    leg.joints[1].add(place(kit.lens(0.12, 0.2, 0.11, "metal", p.metal), 0, -0.2, -0.03));
+    leg.tip.add(place(kit.box(0.15, 0.08, 0.3, "metal", p.metal), 0, -0.04, -0.06));
+    leg.tip.add(place(kit.lens(0.08, 0.06, 0.06, "metal", p.metal), 0, 0.0, -0.18, 0.4, 0, 0));
     rig.pelvis.add(leg.root);
     rig.legs.push(limbFrom(leg, side, side * 0.7));
   }
@@ -1083,14 +1096,24 @@ function buildBalanced(kit: CreatureKit, rig: CreatureRig): void {
   const torso = rig.torso;
   place(torso, 0, 0.08, 0, -0.06, 0, 0);
   torso.add(place(kit.ball(0.3, 0.34, 0.22, "hide", p.main), 0, 0.28, 0));
-  torso.add(place(kit.ball(0.32, 0.26, 0.16, "plate", p.plate), 0, 0.34, -0.12));
-  torso.add(place(kit.octa(0.07, 0.1, 0.05, "glow", p.glow), 0, 0.42, -0.2));
-  torso.add(place(kit.box(0.5, 0.1, 0.22, "plate", p.plate), 0, 0.56, 0));
+  // 胸甲を3枚重ね。板の縁が影を作り、平らな胴に厚みが出る
+  addPlating(kit, torso, 3, 0.2, 0.46, 0.29, -0.16);
+  torso.add(place(kit.lens(0.31, 0.2, 0.14, "metal", p.metal), 0, 0.5, -0.1, -0.1, 0, 0));
+  torso.add(place(kit.octa(0.07, 0.1, 0.05, "glow", p.glow), 0, 0.42, -0.22));
+  // 喉当てと鎖骨のライン
+  torso.add(place(kit.band(0.19, 0.028, Math.PI * 1.2, "metal", p.metal, 14), 0, 0.6, -0.02, Math.PI / 2, -Math.PI * 0.6, 0));
+  torso.add(place(kit.box(0.5, 0.1, 0.22, "metal", p.metal), 0, 0.56, 0));
 
   for (const side of [-1, 1]) {
-    torso.add(place(kit.rock(0.19, 0.16, 0.19, "plate", p.plate, 0.12), side * 0.38, 0.56, 0));
-    const pauldronSpike = kit.spike(0.06, 0.22, 0.7, "plate", p.plate);
-    place(pauldronSpike, side * 0.42, 0.6, 0.02, 0.2, 0, -side * 0.9);
+    // 肩当ては薄い板を3枚重ねる。1個の岩より「装備」に見える
+    for (let i = 0; i < 3; i++) {
+      const w = 0.2 - i * 0.035;
+      const pauldron = kit.lens(w, w * 0.62, w * 0.9, "metal", p.metal, 10);
+      place(pauldron, side * (0.38 + i * 0.02), 0.6 - i * 0.09, 0.0, 0, 0, -side * (0.2 + i * 0.18));
+      torso.add(pauldron);
+    }
+    const pauldronSpike = kit.spike(0.05, 0.24, 0.7, "plate", p.plate);
+    place(pauldronSpike, side * 0.44, 0.64, 0.02, 0.2, 0, -side * 0.9);
     torso.add(pauldronSpike);
 
     const arm = kit.chain(
@@ -1102,17 +1125,23 @@ function buildBalanced(kit: CreatureKit, rig: CreatureRig): void {
       p.main,
     );
     arm.root.position.set(side * 0.38, 0.5, 0);
-    arm.tip.add(place(kit.box(0.1, 0.1, 0.12, "plate", p.plate), 0, -0.04, -0.01));
+    addJoint(kit, arm.joints[1], 0, 0.085, true);
+    arm.joints[1].add(place(kit.lens(0.09, 0.16, 0.09, "metal", p.metal), 0, -0.18, -0.02));
+    arm.tip.add(place(kit.box(0.1, 0.1, 0.12, "metal", p.metal), 0, -0.04, -0.01));
     rig.torso.add(arm.root);
     rig.arms.push(limbFrom(arm, side, side * 0.9));
 
     if (side > 0) {
-      // 右手の剣。役割が一目で分かるシルエットの要
+      // 右手の剣。役割が一目で分かるシルエットの要。
+      // 刃を金属、柄を布と骨に分けて、1本の中でも材質を描き分ける
       const sword = new THREE.Group();
       place(sword, 0, -0.05, -0.02, -0.5, 0, 0);
-      sword.add(place(kit.box(0.24, 0.05, 0.06, "plate", p.plate), 0, 0.04, 0));
-      sword.add(place(kit.box(0.05, 0.16, 0.05, "hide", p.dark), 0, -0.06, 0));
-      sword.add(place(kit.spike(0.075, 0.92, 0.3, "plate", p.plate), 0, 0.06, 0, 0, Math.PI / 2, 0));
+      sword.add(place(kit.box(0.26, 0.05, 0.07, "metal", p.metal), 0, 0.04, 0));
+      sword.add(place(kit.lens(0.05, 0.03, 0.05, "metal", p.metal), 0, -0.16, 0));
+      sword.add(place(kit.box(0.045, 0.16, 0.045, "cloth", p.dark), 0, -0.06, 0));
+      sword.add(place(kit.spike(0.075, 0.94, 0.26, "metal", p.metal), 0, 0.06, 0, 0, Math.PI / 2, 0));
+      // 刃の中央の樋。細い光の筋が入って板の平面が割れる
+      sword.add(place(kit.box(0.018, 0.62, 0.02, "glow", p.glow), 0, 0.4, 0));
       sword.add(place(kit.octa(0.04, 0.05, 0.03, "glow", p.glow), 0, 0.06, 0));
       arm.tip.add(sword);
     }
