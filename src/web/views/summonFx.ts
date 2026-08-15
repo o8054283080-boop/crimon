@@ -96,7 +96,8 @@ function ringItems(className: string, count: number, glyphs?: string[]): HTMLEle
   });
 }
 
-const RUNES = ["✦", "✧", "◈", "❖", "✶", "⟡", "✥", "❉"];
+/** 末尾の U+FE0E は「絵文字ではなく文字として描け」の指定。付けないと色付きの絵文字になる字がある */
+const RUNES = ["✦︎", "✧︎", "◈︎", "❖︎", "✶︎", "⟡︎", "✥︎", "❉︎"];
 
 /**
  * 召喚の祭壇(引く前の画面の主役)。
