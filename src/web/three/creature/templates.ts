@@ -181,16 +181,17 @@ function addInsectWing(kit: CreatureKit, wing: THREE.Object3D, side: number, spa
       [0.52, -0.42],
     ];
     for (const [vx, vy] of veins) {
+      // 膜の縁からはみ出すと「触角の束」に見えるので、内側で止める
       wing.add(
         place(
           kit.taperedTube(
             [
               { x: 0, y: 0, z: 0 },
-              { x: s * L * vx * 0.5, y: W * (vy * 0.5 + 0.18), z: 0 },
-              { x: s * L * vx * 0.96, y: W * vy * 0.94, z: 0 },
+              { x: s * L * vx * 0.42, y: W * (vy * 0.42 + 0.15), z: 0 },
+              { x: s * L * vx * 0.80, y: W * vy * 0.78, z: 0 },
             ],
-            span * 0.022,
-            span * 0.004,
+            span * 0.016,
+            span * 0.003,
             "plate",
             p.plate,
             4,
@@ -706,8 +707,10 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
       // 「武器を持っている」ではなく「大鎌である」と一目で分かる必要があるので、
       // 柄は体高に近い長さ、刃は肩幅を超える大きさまで振り切る。
       // 湾曲した刃にすることで、直剣を持つバランス型とも混ざらない
+      // 前腕の傾き(肩+肘で約 -0.34 rad)を打ち消して、柄をほぼ鉛直に立てる。
+      // 寝かせると「棒を提げている」ようにしか見えず、刃が読めない
       const scythe = new THREE.Group();
-      place(scythe, 0, -0.06, -0.02, -0.52, 0.1, 0.16);
+      place(scythe, 0, -0.06, -0.02, 0.22, 0.12, 0.14);
       scythe.add(place(kit.link({ x: 0, y: -0.85, z: 0 }, { x: 0, y: 1.55, z: 0 }, 0.05, 0.038, "plate", p.plate, 6), 0, 0, 0));
       scythe.add(place(kit.band(0.07, 0.024, Math.PI * 2, "metal", p.metal, 12), 0, 0.5, 0, Math.PI / 2, 0, 0));
       scythe.add(place(kit.band(0.07, 0.024, Math.PI * 2, "metal", p.metal, 12), 0, -0.35, 0, Math.PI / 2, 0, 0));
