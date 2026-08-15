@@ -475,9 +475,10 @@
 .fx__rays > i {
   position: absolute;
   inset: 0;
-  background: repeating-conic-gradient(from 0deg, var(--fx1) 0deg 2.2deg, transparent 2.2deg 13deg);
-  -webkit-mask: radial-gradient(closest-side, #000 4%, rgba(0, 0, 0, 0.55) 13%, transparent 26%);
-  mask: radial-gradient(closest-side, #000 4%, rgba(0, 0, 0, 0.55) 13%, transparent 26%);
+  background: repeating-conic-gradient(from 0deg, var(--fx1) 0deg 2.2deg, transparent 2.2deg 12deg);
+  -webkit-mask: radial-gradient(closest-side, #000 3%, rgba(0, 0, 0, 0.6) 12%, transparent 24%);
+  mask: radial-gradient(closest-side, #000 3%, rgba(0, 0, 0, 0.6) 12%, transparent 24%);
+  mix-blend-mode: screen;
   animation: spin 34s linear infinite;
 }
 
@@ -504,8 +505,9 @@
   left: 50%;
   width: min(84vw, 74vh);
   height: min(84vw, 74vh);
-  transform: translate(-50%, -50%) scale(1.4);
+  transform: translate(-50%, -50%) scale(1.35);
   opacity: 0;
+  filter: drop-shadow(0 0 10px var(--chg-soft));
   transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, filter 0.4s ease;
 }
 
@@ -560,8 +562,8 @@
 }
 
 .phase-charge.charge-b .fx__circle {
-  transform: translate(-50%, -50%) scale(0.8) rotate(18deg);
-  filter: brightness(1.15);
+  transform: translate(-50%, -50%) scale(0.88) rotate(18deg);
+  filter: brightness(1.15) drop-shadow(0 0 16px var(--chg-soft));
 }
 
 .phase-charge.charge-b .fx__circle-core {
@@ -569,8 +571,8 @@
 }
 
 .phase-charge.charge-c .fx__circle {
-  transform: translate(-50%, -50%) scale(0.6) rotate(-22deg);
-  filter: brightness(1.35) saturate(1.25);
+  transform: translate(-50%, -50%) scale(0.78) rotate(-22deg);
+  filter: brightness(1.3) saturate(1.2) drop-shadow(0 0 24px var(--chg-soft));
 }
 
 .phase-charge.charge-c .fx__circle-core {
@@ -578,12 +580,12 @@
 }
 
 .phase-charge.charge-d .fx__circle {
-  transform: translate(-50%, -50%) scale(0.44) rotate(26deg);
-  filter: brightness(1.6) saturate(1.4);
+  transform: translate(-50%, -50%) scale(0.68) rotate(26deg);
+  filter: brightness(1.5) saturate(1.35) drop-shadow(0 0 34px var(--chg-soft));
 }
 
 .phase-charge.charge-d .fx__circle-core {
-  transform: scale(2.2);
+  transform: scale(2.9);
 }
 
 /* 最高等級の最終段階だけ、魔法陣が虹色になる */
@@ -663,6 +665,7 @@
   margin-left: -8.5vmin;
   background: linear-gradient(180deg, transparent, var(--chg-soft) 34%, var(--chg-soft) 66%, transparent);
   filter: blur(16px);
+  mix-blend-mode: screen;
   opacity: 0;
   transform: scaleX(0.25);
   transition: opacity 0.4s ease, transform 0.4s ease;
@@ -982,7 +985,7 @@
 }
 
 .hero__card {
-  width: clamp(150px, 54vmin, 250px);
+  width: clamp(150px, 58vmin, 260px);
 }
 
 /* 大きく出す時は中の絵も大きくする(小さい絵のまま引き伸ばすと安く見える) */
@@ -991,8 +994,27 @@
   border-radius: 16px;
 }
 
+.hero__card .mcard__portrait {
+  position: relative;
+}
+
+/* 肖像の中心に光だまりを作り、絵が浮いて見えるようにする */
+.hero__card .mcard__portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 58%, rgba(255, 255, 255, 0.3), transparent 52%),
+    radial-gradient(circle at 50% 100%, var(--fx-soft), transparent 60%);
+  pointer-events: none;
+}
+
 .hero__card .mcard__emoji {
-  font-size: clamp(2.6rem, 17vmin, 4.6rem);
+  position: relative;
+  z-index: 1;
+  font-size: clamp(3rem, 21vmin, 5.4rem);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
 }
 
 .hero__card .mcard__name {
