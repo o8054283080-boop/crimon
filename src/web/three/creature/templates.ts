@@ -303,66 +303,49 @@ function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
     ),
   );
 
-  // 床に広がった水たまりの縁。
-  // 粒を並べると「足の指」に見えてしまったので、薄い円盤で一度つないでから、
-  // その上に半分埋まった膨らみを重ねて、途切れない波打ちにする
-  rig.pelvis.add(
-    kit.lathe(
-      [
-        [0.001, 0.0],
-        [0.92, 0.0],
-        [0.90, 0.035],
-        [0.78, 0.075],
-        [0.66, 0.09],
-      ],
-      "hide",
-      p.dark,
-      26,
-    ),
-  );
-  for (let i = 0; i < 9; i++) {
-    const angle = (i / 9) * Math.PI * 2 + 0.4;
-    const bulge = 0.16 + Math.abs(Math.sin(i * 2.3)) * 0.07;
-    rig.pelvis.add(
-      place(
-        kit.ball(bulge * 1.4, bulge * 0.5, bulge * 1.4, "hide", p.main, 10),
-        Math.cos(angle) * 0.70,
-        0.03,
-        Math.sin(angle) * 0.70,
-      ),
-    );
+  // 床に広がった溜まり。
+  // 均等な粒を輪に並べると「足の指」や「石を敷いた台座」に見えたので、
+  // 大きさも位置もばらばらな平たい塊を重ねて、外周を非対称に崩す
+  for (const pool of [
+    { x: 0.0, z: 0.0, r: 0.86, h: 0.06 },
+    { x: 0.30, z: -0.22, r: 0.52, h: 0.05 },
+    { x: -0.36, z: 0.16, r: 0.46, h: 0.055 },
+    { x: 0.10, z: 0.42, r: 0.40, h: 0.045 },
+    { x: -0.22, z: -0.40, r: 0.36, h: 0.04 },
+    { x: 0.46, z: 0.28, r: 0.26, h: 0.035 },
+  ]) {
+    rig.pelvis.add(place(kit.lens(pool.r, pool.h, pool.r * 0.94, "hide", p.dark, 14), pool.x, pool.h * 0.55, pool.z));
   }
 
-  // 表面を伝う雫。輪郭からはみ出す太さにしないと、遠目では体に埋もれて見えない。
-  // 左右非対称に散らすことで、真後ろから見ても「流れている」向きが読める
-  for (const drip of [
-    { angle: 1.1, y: 0.72, len: 0.40 },
-    { angle: 2.5, y: 0.52, len: 0.30 },
-    { angle: -1.9, y: 0.64, len: 0.36 },
-    { angle: -0.35, y: 0.80, len: 0.26 },
-    { angle: 3.5, y: 0.78, len: 0.22 },
+  // 本体の膨らみ。真円のドームは「かまくら」に見えてしまうため、
+  // 大きさの違う塊を半分めり込ませて、どの角度からも輪郭が非対称になるようにする
+  for (const lump of [
+    { x: -0.44, y: 0.42, z: 0.26, r: 0.34 },
+    { x: 0.40, y: 0.30, z: -0.34, r: 0.38 },
+    { x: 0.22, y: 0.72, z: 0.34, r: 0.28 },
+    { x: -0.26, y: 0.78, z: -0.30, r: 0.24 },
+    { x: 0.52, y: 0.46, z: 0.22, r: 0.26 },
   ]) {
-    // 本体の輪郭より少し外側を通す
-    const radius = 0.86 - drip.y * 0.42;
-    const cos = Math.cos(drip.angle);
-    const sin = Math.sin(drip.angle);
+    rig.pelvis.add(place(kit.ball(lump.r, lump.r * 0.86, lump.r, "hide", p.main, 12), lump.x, lump.y, lump.z));
+  }
+
+  // 縁から垂れ落ちる雫。溜まりのすぐ上に丸い粒を並べ、
+  // 「体が床へ流れ落ちている」ことを、輪郭の途中に置いた粒で伝える
+  for (const drop of [
+    { angle: 1.0, y: 0.30, r: 0.13 },
+    { angle: 2.4, y: 0.22, r: 0.10 },
+    { angle: -1.7, y: 0.26, r: 0.115 },
+    { angle: -0.4, y: 0.18, r: 0.09 },
+    { angle: 3.6, y: 0.34, r: 0.10 },
+  ]) {
+    const radius = 0.78;
     rig.pelvis.add(
-      kit.taperedTube(
-        [
-          { x: cos * radius * 0.9, y: drip.y + 0.05, z: sin * radius * 0.9 },
-          { x: cos * (radius + 0.06), y: drip.y - drip.len * 0.55, z: sin * (radius + 0.06) },
-          { x: cos * (radius + 0.03), y: drip.y - drip.len, z: sin * (radius + 0.03) },
-        ],
-        0.115,
-        0.05,
-        "hide",
-        p.main,
-        7,
-        7,
+      place(
+        kit.ball(drop.r, drop.r * 1.3, drop.r, "hide", p.main, 10),
+        Math.cos(drop.angle) * radius,
+        drop.y,
+        Math.sin(drop.angle) * radius,
       ),
-    );
-    rig.pelvis.add(
-      place(kit.ball(0.075, 0.095, 0.075, "hide", p.main, 8), cos * (radius + 0.03), drip.y - drip.len - 0.04, sin * (radius + 0.03)),
     );
   }
 
