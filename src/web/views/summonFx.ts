@@ -140,10 +140,11 @@ export function buildFxStage(): HTMLElement {
     el("i", { className: "fx__backdrop" }, []),
     el("div", { className: "fx__rays" }, [el("i", {}, [])]),
     el("div", { className: "fx__circle" }, [
+      // 光の玉は一番奥。魔法陣の線がその上に重なって初めて「陣」に見える
+      el("i", { className: "fx__circle-core" }, []),
       el("i", { className: "fx__circle-a" }, []),
       el("i", { className: "fx__circle-b" }, []),
       el("i", { className: "fx__circle-c" }, []),
-      el("i", { className: "fx__circle-core" }, []),
     ]),
     el("div", { className: "fx__converge" }, ringItems("fx__spark", 14)),
     el("i", { className: "fx__beam" }, []),

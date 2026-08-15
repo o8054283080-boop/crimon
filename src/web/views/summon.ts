@@ -246,8 +246,9 @@ function renderResult(props: SummonProps): HTMLElement {
     omen,
     el("div", { className: "summon-result" }, [
       banner,
-      el("div", { className: "summon-result__body" }, [body]),
-      el("div", { className: "summon-foot" }, [summaryChips(results), actions]),
+      // 引きの内訳はカードの真下に置く。離すと「何が出たか」と結び付かない
+      el("div", { className: "summon-result__body" }, [body, summaryChips(results)]),
+      actions,
     ]),
     skip,
   ]);

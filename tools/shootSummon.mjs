@@ -99,8 +99,15 @@ function seq(tiers) {
   return tiers.flatMap((t, i) => [t, (i * 0.37) % 1, (i * 0.61) % 1]);
 }
 
+/** 召喚を実行し、押した時刻を基準に「何ms後に撮るか」で指定できるようにする */
 async function pull(page, selector) {
   await page.click(selector);
+  const started = Date.now();
+  return async (name, ms) => {
+    const wait = ms - (Date.now() - started);
+    if (wait > 0) await page.waitForTimeout(wait);
+    await shoot(page, name);
+  };
 }
 
 async function main() {
@@ -126,39 +133,38 @@ async function main() {
     await page.waitForTimeout(900);
     await shoot(page, "01-idle");
 
-    // --- 単発・低レア(星3通常) ---
+    // --- 単発・低レア(星3通常): 溜め620ms ---
     await stubRandom(page, seq([0.2]));
-    await pull(page, ".summon-cta__btn--single");
-    await page.waitForTimeout(300);
-    await shoot(page, "02-single-low-charge");
-    await page.waitForTimeout(700);
-    await shoot(page, "03-single-low-reveal");
+    let cut = await pull(page, ".summon-cta__btn--single");
+    await cut("02-low-charge", 300);
+    await cut("03-low-burst", 700);
+    await cut("04-low-reveal", 1300);
 
-    // --- 単発・最高レア(星5レア枠) ---
+    // --- 単発・SR(星4通常): 溜め1300ms、紫まで上がる ---
+    await reset(page);
+    await stubRandom(page, seq([0.6]));
+    cut = await pull(page, ".summon-cta__btn--single");
+    await cut("05-sr-charge-purple", 900);
+    await cut("06-sr-reveal", 2000);
+
+    // --- 単発・最高レア(星5レア枠): 溜め2900ms、虹まで上がる ---
     await reset(page);
     await stubRandom(page, seq([0.99]));
-    await pull(page, ".summon-cta__btn--single");
-    await page.waitForTimeout(500);
-    await shoot(page, "04-ssr-charge-early");
-    await page.waitForTimeout(1500);
-    await shoot(page, "05-ssr-charge-late");
-    await page.waitForTimeout(700);
-    await shoot(page, "06-ssr-burst");
-    await page.waitForTimeout(900);
-    await shoot(page, "07-ssr-reveal");
+    cut = await pull(page, ".summon-cta__btn--single");
+    await cut("07-ssr-charge-blue", 400);
+    await cut("08-ssr-charge-gold", 1700);
+    await cut("09-ssr-charge-rainbow", 2550);
+    await cut("10-ssr-burst", 3050);
+    await cut("11-ssr-reveal", 3900);
 
     // --- 10連(星5レア枠が最後に出る並び) ---
     await reset(page);
     await stubRandom(page, seq([0.2, 0.3, 0.45, 0.6, 0.85, 0.1, 0.4, 0.75, 0.55, 0.99]));
-    await pull(page, ".summon-cta__btn--ten");
-    await page.waitForTimeout(1200);
-    await shoot(page, "08-ten-charge");
-    await page.waitForTimeout(1500);
-    await shoot(page, "09-ten-burst");
-    await page.waitForTimeout(700);
-    await shoot(page, "10-ten-reveal-mid");
-    await page.waitForTimeout(1800);
-    await shoot(page, "11-ten-final");
+    cut = await pull(page, ".summon-cta__btn--ten");
+    await cut("12-ten-charge-gold", 1700);
+    await cut("13-ten-burst", 3050);
+    await cut("14-ten-reveal-mid", 3600);
+    await cut("15-ten-final", 5200);
 
     // --- スキップ(溜めの途中で飛ばす) ---
     await reset(page);
@@ -167,7 +173,7 @@ async function main() {
     await page.waitForTimeout(400);
     await page.click(".summon-skip");
     await page.waitForTimeout(700);
-    await shoot(page, "12-ten-skipped");
+    await shoot(page, "16-ten-skipped");
   } finally {
     await browser.close();
     server.kill("SIGTERM");

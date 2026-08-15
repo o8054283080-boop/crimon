@@ -475,7 +475,7 @@
 .fx__rays > i {
   position: absolute;
   inset: 0;
-  background: repeating-conic-gradient(from 0deg, var(--fx-soft) 0deg 2.4deg, transparent 2.4deg 13deg);
+  background: repeating-conic-gradient(from 0deg, var(--fx1) 0deg 2.2deg, transparent 2.2deg 13deg);
   -webkit-mask: radial-gradient(closest-side, #000 4%, rgba(0, 0, 0, 0.55) 13%, transparent 26%);
   mask: radial-gradient(closest-side, #000 4%, rgba(0, 0, 0, 0.55) 13%, transparent 26%);
   animation: spin 34s linear infinite;
@@ -515,34 +515,36 @@
   border-radius: 50%;
 }
 
+/* 外周の目盛り。マスクは closest-side にしないと
+ * 既定の farthest-corner(=対角線)基準になり、想定より内側に描かれる */
 .fx__circle-a {
   background: repeating-conic-gradient(from 0deg, var(--chg1) 0deg 1.4deg, transparent 1.4deg 9deg);
-  -webkit-mask: radial-gradient(circle, transparent 46%, #000 47.5%, #000 50%, transparent 51%);
-  mask: radial-gradient(circle, transparent 46%, #000 47.5%, #000 50%, transparent 51%);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 88%, #000 91%, #000 99%, transparent 100%);
+  mask: radial-gradient(circle closest-side, transparent 88%, #000 91%, #000 99%, transparent 100%);
   animation: spin 9s linear infinite;
 }
 
 .fx__circle-b {
-  inset: 15%;
+  inset: 13%;
   border: 2px dashed var(--chg1);
-  opacity: 0.8;
+  opacity: 0.85;
   animation: spin-rev 5s linear infinite;
 }
 
 .fx__circle-c {
-  inset: 30%;
+  inset: 26%;
   background: conic-gradient(from 0deg, transparent, var(--chg1) 55deg, transparent 140deg, var(--chg1) 235deg, transparent 320deg);
-  -webkit-mask: radial-gradient(circle, transparent 76%, #000 78%);
-  mask: radial-gradient(circle, transparent 76%, #000 78%);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 82%, #000 86%, #000 100%);
+  mask: radial-gradient(circle closest-side, transparent 82%, #000 86%, #000 100%);
   animation: spin 3.4s linear infinite;
 }
 
-/* 中心にたまっていく光の玉。これが弾けて召喚になる */
+/* 中心にたまっていく光の玉。これが弾けて召喚になる。
+ * 大きな影を付けると拡大時に画面全体が白く濁るので、光は背景の階調だけで作る */
 .fx__circle-core {
-  inset: 41%;
-  background: radial-gradient(circle at 50% 45%, #fff 0%, var(--chg1) 42%, transparent 72%);
-  box-shadow: 0 0 40px var(--chg-soft);
-  transform: scale(0.3);
+  inset: 42%;
+  background: radial-gradient(circle closest-side, #fff 0 24%, var(--chg1) 44%, var(--chg-soft) 62%, transparent 80%);
+  transform: scale(0.4);
   opacity: 0;
   transition: transform 0.5s cubic-bezier(0.3, 0, 0.2, 1), opacity 0.4s ease;
 }
@@ -563,7 +565,7 @@
 }
 
 .phase-charge.charge-b .fx__circle-core {
-  transform: scale(1.5);
+  transform: scale(1.35);
 }
 
 .phase-charge.charge-c .fx__circle {
@@ -572,7 +574,7 @@
 }
 
 .phase-charge.charge-c .fx__circle-core {
-  transform: scale(2.1);
+  transform: scale(1.75);
 }
 
 .phase-charge.charge-d .fx__circle {
@@ -581,7 +583,7 @@
 }
 
 .phase-charge.charge-d .fx__circle-core {
-  transform: scale(2.9);
+  transform: scale(2.2);
 }
 
 /* 最高等級の最終段階だけ、魔法陣が虹色になる */
@@ -660,24 +662,24 @@
   width: 26vmin;
   margin-left: -13vmin;
   background: linear-gradient(180deg, transparent, var(--chg-soft) 32%, var(--chg1) 50%, var(--chg-soft) 68%, transparent);
-  filter: blur(14px);
+  filter: blur(18px);
   opacity: 0;
   transform: scaleX(0.25);
   transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 .phase-charge.charge-b .fx__beam {
-  opacity: 0.35;
+  opacity: 0.26;
   transform: scaleX(0.55);
 }
 
 .phase-charge.charge-c .fx__beam {
-  opacity: 0.55;
+  opacity: 0.4;
   transform: scaleX(0.85);
 }
 
 .phase-charge.charge-d .fx__beam {
-  opacity: 0.75;
+  opacity: 0.55;
   transform: scaleX(1.15);
 }
 
@@ -852,16 +854,10 @@
   min-height: 0;
   width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.summon-foot {
-  display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  width: 100%;
+  justify-content: center;
+  gap: 14px;
 }
 
 /* --- カードの出現 ------------------------------------------------------- */
@@ -986,7 +982,7 @@
 }
 
 .hero__card {
-  width: clamp(150px, 50vmin, 230px);
+  width: clamp(150px, 54vmin, 250px);
 }
 
 /* 大きく出す時は中の絵も大きくする(小さい絵のまま引き伸ばすと安く見える) */
@@ -1087,6 +1083,15 @@
 }
 
 /* --- 10連: 5列2段 ------------------------------------------------------- */
+
+.grid10 .mcard__name {
+  font-size: 0.58rem;
+}
+
+.grid10 .mcard {
+  padding: 3px 3px 5px;
+  gap: 3px;
+}
 
 .grid10 {
   display: grid;
@@ -1226,12 +1231,6 @@
 
   .hero__plate {
     align-items: flex-start;
-  }
-
-  .summon-foot {
-    flex-direction: row;
-    justify-content: center;
-    gap: 14px;
   }
 
   .summon-actions {
