@@ -150,18 +150,20 @@ function addInsectWing(kit: CreatureKit, wing: THREE.Object3D, side: number, spa
   const p = kit.palette;
   const s = side;
   const petals: { len: number; width: number; lift: number; tilt: number }[] = [
-    { len: 1.0, width: 0.42, lift: 0.22, tilt: 0.0 },
-    { len: 0.66, width: 0.34, lift: -0.16, tilt: -0.5 },
+    { len: 1.0, width: 0.56, lift: 0.20, tilt: 0.1 },
+    { len: 0.62, width: 0.44, lift: -0.18, tilt: -0.55 },
   ];
 
   for (const petal of petals) {
     const L = span * petal.len;
     const W = span * petal.width;
+    // 先を尖らせると木の葉になってしまう。先端を丸く、根元を細く絞ると翅に見える
     const blade = kit.membrane(
       (shape) => {
         shape.moveTo(0, 0);
-        shape.bezierCurveTo(s * L * 0.32, W * 1.0, s * L * 0.86, W * 0.86, s * L, W * 0.16);
-        shape.bezierCurveTo(s * L * 0.84, -W * 0.5, s * L * 0.3, -W * 0.42, 0, 0);
+        shape.bezierCurveTo(s * L * 0.30, W * 0.86, s * L * 0.70, W * 1.02, s * L * 0.94, W * 0.44);
+        shape.bezierCurveTo(s * L * 1.06, W * 0.05, s * L * 0.92, -W * 0.42, s * L * 0.60, -W * 0.50);
+        shape.bezierCurveTo(s * L * 0.32, -W * 0.55, s * L * 0.12, -W * 0.22, 0, 0);
       },
       "membrane",
       p.membrane,
@@ -171,30 +173,38 @@ function addInsectWing(kit: CreatureKit, wing: THREE.Object3D, side: number, spa
     place(blade, 0, span * petal.lift, 0, 0, 0, s * petal.tilt);
     wing.add(blade);
 
-    // 翅脈。前縁に1本通すだけで、膜が「張られている」ように見える
-    wing.add(
-      place(
-        kit.taperedTube(
-          [
-            { x: 0, y: 0, z: 0 },
-            { x: s * L * 0.45, y: W * 0.42, z: 0 },
-            { x: s * L * 0.97, y: W * 0.18, z: 0 },
-          ],
-          span * 0.028,
-          span * 0.006,
-          "plate",
-          p.plate,
-          4,
-          8,
+    // 翅脈。前縁の1本だけだと葉脈に見えるので、根元から扇状に3本走らせる。
+    // 面を分割する線が入ることで、膜が骨組みに張られているように読める
+    const veins: [number, number][] = [
+      [0.94, 0.44],
+      [0.80, -0.10],
+      [0.52, -0.42],
+    ];
+    for (const [vx, vy] of veins) {
+      wing.add(
+        place(
+          kit.taperedTube(
+            [
+              { x: 0, y: 0, z: 0 },
+              { x: s * L * vx * 0.5, y: W * (vy * 0.5 + 0.18), z: 0 },
+              { x: s * L * vx * 0.96, y: W * vy * 0.94, z: 0 },
+            ],
+            span * 0.022,
+            span * 0.004,
+            "plate",
+            p.plate,
+            4,
+            8,
+          ),
+          0,
+          span * petal.lift,
+          -span * 0.012,
+          0,
+          0,
+          s * petal.tilt,
         ),
-        0,
-        span * petal.lift,
-        -span * 0.012,
-        0,
-        0,
-        s * petal.tilt,
-      ),
-    );
+      );
+    }
   }
   // 付け根の関節
   wing.add(place(kit.ball(span * 0.07, span * 0.07, span * 0.06, "plate", p.plate, 8), 0, 0, 0));
@@ -1092,12 +1102,13 @@ function buildFairy(kit: CreatureKit, rig: CreatureRig): void {
   const head = rig.head;
   head.add(place(kit.ball(0.20, 0.21, 0.19, "hide", p.main), 0, 0.14, 0));
   addRoundEyes(kit, head, 0.085, 0.14, -0.18, 0.062);
-  // 髪。房を後ろへ流して、丸い頭の輪郭を割る
+  // 髪。房を後ろへ流して、丸い頭の輪郭を割る。
+  // 上へ立てるとトサカになってしまうので、寝かせて後頭部から垂らす
   head.add(place(kit.ball(0.21, 0.19, 0.20, "fur", p.fur, 12), 0, 0.19, 0.03));
   for (let i = 0; i < 7; i++) {
     const t = i / 6 - 0.5;
-    const strand = kit.spike(0.05, 0.34 - Math.abs(t) * 0.12, 0.55, "fur", p.fur);
-    place(strand, t * 0.30, 0.24, 0.10 + Math.abs(t) * 0.05, 2.5, 0, -t * 1.3);
+    const strand = kit.spike(0.07, 0.30 - Math.abs(t) * 0.10, 0.8, "fur", p.fur);
+    place(strand, t * 0.28, 0.20, 0.12 + Math.abs(t) * 0.04, 2.9, 0, -t * 1.0);
     head.add(strand);
   }
   // 触角。先端の光点が視線を頭へ集める
@@ -1131,8 +1142,8 @@ function buildFairy(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const wing = new THREE.Group();
     markAnimated(wing);
-    place(wing, side * 0.10, 0.26, 0.10, 0.12, -side * 0.55, side * 0.25);
-    addInsectWing(kit, wing, side, 0.78);
+    place(wing, side * 0.10, 0.26, 0.10, 0.12, -side * 0.62, side * 0.30);
+    addInsectWing(kit, wing, side, 0.92);
     rig.torso.add(wing);
     rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
   }
@@ -1193,20 +1204,23 @@ function buildReincarnationPig(kit: CreatureKit, rig: CreatureRig): void {
   const torso = rig.torso;
   place(torso, 0, 0.06, -0.30, 0.02, 0, 0);
 
-  // 小さな羽根。体に対して小さいほど「おまけで飛んでいる」愛嬌が出る
+  // 小さな羽根。体に対して小さいほど「おまけで飛んでいる」愛嬌が出る。
+  // 枚数が少ないと1枚が大きくなって木の葉に見えるので、細かく多めに刻む
   for (const side of [-1, 1]) {
     const wing = new THREE.Group();
     markAnimated(wing);
-    place(wing, side * 0.16, 0.26, 0.28, 0.2, -side * 0.55, side * 0.1);
-    addFeatherWing(kit, wing, side, 5, 0.52);
+    place(wing, side * 0.14, 0.30, 0.24, 0.1, -side * 0.75, side * 0.2);
+    addFeatherWing(kit, wing, side, 9, 0.46);
     torso.add(wing);
     rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
   }
 
-  place(rig.neck, 0, 0.16, -0.30, -0.12, 0, 0);
-  rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.10, z: -0.04 }, 0.20, 0.18, "hide", p.main));
-  place(rig.head, 0, 0.14, -0.04, 0.24, 0, 0);
-  addPigHead(kit, rig.head, 1.0, 0.7);
+  // 首。豚は首が無いに等しいので、頭を胴に食い込ませて繋ぐ。
+  // 離すと「胴の上に頭が浮いている」ように見えてしまう
+  place(rig.neck, 0, 0.02, -0.38, 0.30, 0, 0);
+  rig.neck.add(kit.link({ x: 0, y: -0.06, z: 0.04 }, { x: 0, y: 0.14, z: -0.02 }, 0.26, 0.24, "hide", p.main));
+  place(rig.head, 0, 0.10, -0.02, 0.14, 0, 0);
+  addPigHead(kit, rig.head, 0.92, 0.7);
 
   // 光輪。輪は細く小さく保ち、体表を明るくせずに「転生」の記号だけを置く
   const halo = kit.ring(0.20, 0.018, "glow", p.glow, 26);
@@ -1279,15 +1293,17 @@ function buildExpPig(kit: CreatureKit, rig: CreatureRig): void {
   torso.add(place(kit.ball(0.34, 0.26, 0.30, "hide", p.dark), 0, 0.06, -0.14));
   torso.add(place(kit.band(0.34, 0.03, Math.PI * 1.2, "metal", p.metal, 14), 0, 0.10, -0.06, Math.PI / 2, -Math.PI * 0.6, 0));
 
-  // 背負った経験値の結晶。転生ピッグとの一番の見分けどころ
-  torso.add(place(kit.ball(0.26, 0.20, 0.18, "hide", p.dark, 10), 0, 0.34, 0.28));
+  // 背負った経験値の結晶。転生ピッグとの一番の見分けどころなので、
+  // 後ろ姿だけでも「何かを背負っている」と分かる大きさまで持ち上げる
+  torso.add(place(kit.ball(0.30, 0.22, 0.20, "hide", p.dark, 10), 0, 0.34, 0.28));
+  torso.add(place(kit.band(0.26, 0.035, Math.PI * 2, "metal", p.metal, 14), 0, 0.36, 0.28, 0.35, 0, 0));
   for (let i = 0; i < 3; i++) {
     const t = i - 1;
-    const gem = kit.octa(0.10 - Math.abs(t) * 0.03, 0.26 - Math.abs(t) * 0.09, 0.10 - Math.abs(t) * 0.03, "crystal", p.accent);
-    place(gem, t * 0.17, 0.48 - Math.abs(t) * 0.08, 0.30, -0.35, 0, -t * 0.55);
+    const gem = kit.octa(0.15 - Math.abs(t) * 0.04, 0.42 - Math.abs(t) * 0.14, 0.15 - Math.abs(t) * 0.04, "crystal", p.accent);
+    place(gem, t * 0.24, 0.62 - Math.abs(t) * 0.14, 0.32, -0.35, 0, -t * 0.5);
     torso.add(gem);
   }
-  torso.add(place(kit.octa(0.05, 0.13, 0.05, "glow", p.glow), 0, 0.50, 0.30, -0.35, 0, 0));
+  torso.add(place(kit.octa(0.05, 0.16, 0.05, "glow", p.glow), 0, 0.64, 0.34, -0.35, 0, 0));
 
   // 短い前脚。座っているので胸の前に垂らす
   for (const side of [-1, 1]) {
@@ -1305,10 +1321,13 @@ function buildExpPig(kit: CreatureKit, rig: CreatureRig): void {
     rig.arms.push(limbFrom(arm, side, side * 1.8));
   }
 
-  place(rig.neck, 0, 0.44, -0.10, -0.06, 0, 0);
-  rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.08, z: 0 }, 0.20, 0.19, "hide", p.main));
-  place(rig.head, 0, 0.12, 0, 0.06, 0, 0);
-  addPigHead(kit, rig.head, 1.05, 0.35);
+  // 首。座り姿なので頭は腹の真上。二段の球に見えないよう、
+  // 顎の下に肉を足して胴と繋げる
+  place(rig.neck, 0, 0.40, -0.12, 0.04, 0, 0);
+  rig.neck.add(kit.link({ x: 0, y: -0.06, z: 0.02 }, { x: 0, y: 0.10, z: -0.02 }, 0.26, 0.24, "hide", p.main));
+  place(rig.head, 0, 0.06, -0.02, 0.04, 0, 0);
+  rig.head.add(place(kit.ball(0.24, 0.14, 0.22, "hide", p.dark, 10), 0, 0.06, -0.04));
+  addPigHead(kit, rig.head, 1.0, 0.35);
 
   // とんがり帽子。座り姿と合わせて、遠目のシルエットを転生ピッグから分ける
   const hat = new THREE.Group();
