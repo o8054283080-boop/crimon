@@ -9,10 +9,11 @@ import "../ui/summon.css";
 import {
   buildAltar,
   buildFxStage,
+  buildSparkles,
   CHARGE_MS,
+  CHARGE_STEPS,
   gradeOfResult,
   gradeOfResults,
-  OMEN_TEXT,
   rarityLabel,
   SummonGrade,
 } from "./summonFx.js";
@@ -52,7 +53,7 @@ function renderIdle(props: SummonProps): HTMLElement {
       },
       [
         el("span", { className: "summon-cta__lead" }, ["10連召喚"]),
-        el("span", { className: "summon-cta__sub" }, ["レア確定"]),
+        el("span", { className: "summon-cta__sub" }, ["レア枠1体以上 確定"]),
         costChip("💎", SUMMON_COST_TEN),
       ],
     ),
@@ -64,7 +65,11 @@ function renderIdle(props: SummonProps): HTMLElement {
         disabled: !canSingle,
         onclick: () => onSummon(1),
       },
-      [el("span", { className: "summon-cta__lead" }, ["1回召喚"]), el("span", { className: "summon-cta__sub" }, ["星3以上確定"]), costChip("💎", SUMMON_COST_SINGLE)],
+      [
+        el("span", { className: "summon-cta__lead" }, ["1回召喚"]),
+        el("span", { className: "summon-cta__sub" }, ["★3以上 確定"]),
+        costChip("💎", SUMMON_COST_SINGLE),
+      ],
     ),
     el(
       "button",
@@ -90,34 +95,38 @@ function renderIdle(props: SummonProps): HTMLElement {
         el("span", { className: "summon-wallet summon-wallet--scroll" }, [`📜 ${player.summonScrolls}`]),
       ]),
     ]),
-    el("div", { className: "summon-stage" }, [
-      buildAltar(),
-      el("div", { className: "summon-stage__caption" }, [
+    el("div", { className: "summon-stage" }, [buildAltar()]),
+    el("div", { className: "summon-bottom" }, [
+      el("div", { className: "summon-rates" }, [
         el("span", { className: "summon-tag summon-tag--r" }, ["★3 R"]),
         el("span", { className: "summon-tag summon-tag--sr" }, ["★4 SR"]),
         el("span", { className: "summon-tag summon-tag--ssr" }, ["★5 SSR"]),
         el("span", { className: "summon-tag summon-tag--rare" }, ["光/闇 レア枠"]),
       ]),
+      el("p", { className: "summon-note" }, ["★3以上が確定。光・闇はレア枠で、10連では1体以上のレア枠が確定します。"]),
+      cta,
     ]),
-    el("p", { className: "summon-note" }, ["星3以上が確定。光・闇はレア枠で、10連では1体以上のレアが確定します。"]),
-    cta,
   ]);
 }
 
 /* ===== 出たあと ==========================================================
- * 溜め(魔法陣が収束)→ 閃光 → 出現 の順に見せる。
- * 等級(星とレア枠)で溜めの長さ・色・閃光の強さが変わり、
- * 最高レアのカードだけは最後に一拍おいて、専用の光をまとって出す。
+ * 溜め(魔法陣が収束し、青→紫→金→虹と色が上がる)→ 閃光 → 出現 の順に見せる。
+ * どこまで色が上がったかがそのまま等級なので、出る前に期待が持てる。
+ * 最高等級の1体は最後に一拍おいて、専用の光と粒をまとって出す。
  */
 
-/** 名前・星・レア度をまとめた銘板。単発の主役カードの下に敷く */
+/** 名前・星・レア度をまとめた銘板。単発の主役カードに添える */
 function heroPlate(r: SummonResult, name: string, element: string | null): HTMLElement {
   return el("div", { className: "hero__plate" }, [
-    el("div", { className: "hero__rarity" }, [
-      el("span", { className: `hero__rank hero__rank--${rarityLabel(r.star).toLowerCase()}` }, [rarityLabel(r.star)]),
-      r.isRare ? el("span", { className: "hero__rare-tag" }, ["レア枠"]) : null,
-      element ? el("span", { className: "hero__elem" }, [element]) : null,
-    ].filter(isEl)),
+    el(
+      "div",
+      { className: "hero__rarity" },
+      [
+        el("span", { className: `hero__rank hero__rank--${rarityLabel(r.star).toLowerCase()}` }, [rarityLabel(r.star)]),
+        r.isRare ? el("span", { className: "hero__rare-tag" }, ["レア枠"]) : null,
+        element ? el("span", { className: "hero__elem" }, [element]) : null,
+      ].filter(isEl),
+    ),
     el("div", { className: "hero__name" }, [name]),
     el("div", { className: "hero__stars" }, ["★".repeat(r.star)]),
   ]);
@@ -135,11 +144,17 @@ function popCard(r: SummonResult, opts: { hero?: boolean; star?: boolean }): HTM
   if (opts.star) classes.push("pop--star");
   if (opts.hero) classes.push("pop--hero");
 
-  return el("div", { className: classes.join(" ") }, [
-    el("div", { className: "pop__aura" }, []),
-    buildMonsterCard(dex, r.dexId, () => {}, { star: r.star as Star }),
-    r.star >= 4 ? el("span", { className: "pop__rank" }, [rarityLabel(r.star)]) : null,
-  ].filter(isEl));
+  return el(
+    "div",
+    { className: classes.join(" ") },
+    [
+      el("i", { className: "pop__aura" }, []),
+      el("i", { className: "pop__ring" }, []),
+      buildMonsterCard(dex, r.dexId, () => {}, { star: r.star as Star }),
+      r.star >= 4 ? el("span", { className: "pop__rank" }, [rarityLabel(r.star)]) : null,
+      grade >= 3 ? buildSparkles(opts.hero ? 12 : 6) : null,
+    ].filter(isEl),
+  );
 }
 
 function summaryChips(results: SummonResult[]): HTMLElement {
@@ -159,7 +174,7 @@ function summaryChips(results: SummonResult[]): HTMLElement {
 
 const BANNER_TEXT: Record<SummonGrade, string> = {
   1: "召喚完了",
-  2: "レアが出た!",
+  2: "レア枠が出た!",
   3: "SSR級の輝き!!",
   4: "最高レア出現!!!",
 };
@@ -168,23 +183,28 @@ function renderResult(props: SummonProps): HTMLElement {
   const { player, lastResults, onSummon, onDismissResults } = props;
   const results = lastResults ?? [];
   const grade = gradeOfResults(results);
-  const isSingle = results.length === 1;
+  const isSingle = results.length <= 1;
 
-  // 主役(最高等級の1体)は最後に、一拍おいて出す
-  let heroIndex = 0;
+  // 主役(最高等級の1体)は最後に、一拍おいて出す。
+  // 10連では並びの最後に置き直して、右下でトリを飾らせる。
+  let bestIndex = 0;
   let bestGrade: SummonGrade = 1;
   results.forEach((r, i) => {
     const g = gradeOfResult(r);
     if (g > bestGrade) {
       bestGrade = g;
-      heroIndex = i;
+      bestIndex = i;
     }
   });
+  const ordered = isSingle ? results : [...results.filter((_, i) => i !== bestIndex), results[bestIndex]];
+  const heroIndex = ordered.length - 1;
 
-  const pops: HTMLElement[] = results.map((r, i) => popCard(r, { hero: isSingle, star: i === heroIndex && bestGrade >= 2 }));
+  const pops: HTMLElement[] = ordered.map((r, i) =>
+    popCard(r, { hero: isSingle, star: i === heroIndex && bestGrade >= 2 }),
+  );
 
   let body: HTMLElement;
-  if (isSingle) {
+  if (isSingle && results.length === 1) {
     const r = results[0];
     const dex = findMonsterById(r.dexId);
     body = el("div", { className: "hero" }, [
@@ -217,14 +237,18 @@ function renderResult(props: SummonProps): HTMLElement {
     el("span", { className: "summon-banner__text" }, [BANNER_TEXT[grade]]),
   ]);
 
-  const skip = el("button", { type: "button", className: "summon-skip" }, [
+  const skip = el("button", { type: "button", className: "summon-skip", ariaLabel: "演出をスキップ" }, [
     el("span", { className: "summon-skip__pill" }, ["スキップ ▶▶"]),
   ]);
 
   const root = el("div", { className: `screen summon-screen summon-screen--result g${grade}` }, [
     buildFxStage(),
     omen,
-    el("div", { className: "summon-result" }, [banner, el("div", { className: "summon-result__body" }, [body]), summaryChips(results), actions]),
+    el("div", { className: "summon-result" }, [
+      banner,
+      el("div", { className: "summon-result__body" }, [body]),
+      el("div", { className: "summon-foot" }, [summaryChips(results), actions]),
+    ]),
     skip,
   ]);
 
@@ -242,15 +266,17 @@ interface SequenceOptions {
   isSingle: boolean;
 }
 
+const CHARGE_CLASSES = ["phase-charge", "charge-a", "charge-b", "charge-c", "charge-d"];
+
 /**
  * 溜め → 閃光 → 出現 の時間割を進める。
- * どの時点でも「スキップ」で最終状態へ飛べる(周回するゲームなので必須)。
+ * どの時点でも画面のどこかを押せば最終状態へ飛べる(周回するゲームなので必須)。
  */
 function startSequence(opts: SequenceOptions): void {
   const { root, skip, omen, pops, heroIndex, grade, isSingle } = opts;
   const charge = CHARGE_MS[grade];
-  const omenText = OMEN_TEXT[grade];
-  const stagger = isSingle ? 0 : 85;
+  const steps = CHARGE_STEPS[grade];
+  const stagger = isSingle ? 0 : 80;
   const timers: number[] = [];
   let done = false;
 
@@ -266,20 +292,16 @@ function startSequence(opts: SequenceOptions): void {
     omen.classList.add("is-on");
   };
 
-  const revealAll = (): void => {
-    for (const p of pops) p.classList.add("is-in");
-    pops[heroIndex]?.classList.add("is-lit");
-  };
-
   const finish = (): void => {
     if (done) return;
     done = true;
     for (const t of timers) window.clearTimeout(t);
     timers.length = 0;
     omen.classList.remove("is-on");
-    root.classList.remove("phase-charge", "charge-b", "charge-c");
+    root.classList.remove(...CHARGE_CLASSES);
     root.classList.add("phase-burst", "phase-reveal", "phase-done");
-    revealAll();
+    for (const p of pops) p.classList.add("is-in");
+    pops[heroIndex]?.classList.add("is-lit");
     skip.remove();
   };
 
@@ -287,36 +309,33 @@ function startSequence(opts: SequenceOptions): void {
 
   requestAnimationFrame(() => {
     root.classList.add("phase-charge");
-    showOmen(omenText[0]);
+    for (const step of steps) {
+      at(charge * step.at, () => {
+        root.classList.add(step.cls);
+        showOmen(step.text);
+      });
+    }
 
-    at(charge * 0.42, () => {
-      root.classList.add("charge-b");
-      if (omenText[1]) showOmen(omenText[1]);
-    });
-    at(charge * 0.74, () => {
-      root.classList.add("charge-c");
-      if (omenText[2]) showOmen(omenText[2]);
-    });
-
+    // --- 閃光 ---
     at(charge, () => {
-      root.classList.remove("phase-charge", "charge-b", "charge-c");
+      root.classList.remove(...CHARGE_CLASSES);
       root.classList.add("phase-burst");
       omen.classList.remove("is-on");
     });
 
-    // 閃光の白がピークを過ぎたところでカードを出す
-    at(charge + 150, () => {
+    // --- 出現(白がピークを過ぎたところでカードを出す)---
+    at(charge + 140, () => {
       root.classList.add("phase-reveal");
       pops.forEach((p, i) => {
         if (i === heroIndex && !isSingle) return;
         at(i * stagger, () => p.classList.add("is-in"));
       });
-      const heroDelay = isSingle ? 0 : pops.length * stagger + 260;
+      const heroDelay = isSingle ? 0 : (pops.length - 1) * stagger + 320;
       at(heroDelay, () => {
         root.classList.add("hero-in");
         pops[heroIndex]?.classList.add("is-in", "is-lit");
       });
-      at(heroDelay + 500, () => {
+      at(heroDelay + 420, () => {
         if (done) return;
         done = true;
         root.classList.add("phase-done");
