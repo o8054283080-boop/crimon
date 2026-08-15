@@ -480,8 +480,8 @@
   position: absolute;
   inset: 0;
   background: repeating-conic-gradient(from 0deg, var(--ray) 0deg 2.2deg, transparent 2.2deg 12deg);
-  -webkit-mask: radial-gradient(closest-side, transparent 2%, rgba(0, 0, 0, 0.85) 9%, rgba(0, 0, 0, 0.45) 17%, transparent 28%);
-  mask: radial-gradient(closest-side, transparent 2%, rgba(0, 0, 0, 0.85) 9%, rgba(0, 0, 0, 0.45) 17%, transparent 28%);
+  -webkit-mask: radial-gradient(closest-side, transparent 3%, rgba(0, 0, 0, 0.8) 11%, rgba(0, 0, 0, 0.34) 24%, transparent 44%);
+  mask: radial-gradient(closest-side, transparent 3%, rgba(0, 0, 0, 0.8) 11%, rgba(0, 0, 0, 0.34) 24%, transparent 44%);
   mix-blend-mode: screen;
   animation: spin 34s linear infinite;
 }
