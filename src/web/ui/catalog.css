@@ -11,40 +11,69 @@
 .stages-head {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  padding-bottom: 2px;
 }
 
 .stages-head__row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
 .stages-head__title {
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  background: var(--gold-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.8));
 }
 
-.stages-head__stamina,
-.stages-head__count,
+/* スタミナは「今いくつ残っているか」を最も頻繁に見るので、錠剤で独立させる */
+.stages-head__stamina {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #ffe9a8;
+  background: linear-gradient(180deg, #14192e, #080b16);
+  box-shadow: var(--inset-deep);
+}
+
+.stages-head__count {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #cfd8f5;
+  white-space: nowrap;
+}
+
 .stages-head__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 0.72rem;
   color: var(--text-dim);
 }
 
 .stages-head__legend {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  font-size: 0.62rem;
+  color: var(--text-dim);
 }
 
 .stages-head__legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: 5px;
+  padding: 3px 9px;
   border-radius: 999px;
   font-size: 0.62rem;
   color: var(--text-dim);
@@ -52,30 +81,70 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
+/* ===== 情報チップ ===== */
+/*
+ * 章の下に並ぶ「⚡5/回」「敵★1〜3」などの小札。
+ * 数が多いので、既定は控えめな彫り込み。意味の重いものだけ色を足す。
+ */
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  color: #c3cdea;
+  background: rgba(4, 6, 14, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.cat-chip--stamina {
+  color: #ffe08a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 200, 80, 0.32);
+}
+
+.cat-chip--threat {
+  color: #ffb9a6;
+}
+
+.cat-chip--gold {
+  color: #ffd98a;
+}
+
+.cat-chip--boss {
+  color: #2a1600;
+  background: linear-gradient(180deg, #ffe9a8, #f0a81c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.cat-chip--cleared {
+  color: #063018;
+  background: linear-gradient(180deg, #a8f5c0, #34b866);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
 /* ===== 章のカード ===== */
 
+/*
+ * 章のカード。上半分が「行き先の情景」、下半分が「札の棚」。
+ *
+ * 色は stages.ts が --ch / --ch2 で渡してくる。ここで別名を使うと
+ * 一切色が乗らないまま既定の紺一色になる(実際にそうなっていた)。
+ */
 .chapter-card {
-  --scenery-a: #3a4a7a;
-  --scenery-b: #141a2e;
-
-  appearance: none;
   position: relative;
   display: block;
   width: 100%;
-  padding: 0;
-  border: none;
   border-radius: 16px;
   overflow: hidden;
-  cursor: pointer;
   color: var(--text);
-  text-align: left;
-  background: linear-gradient(180deg, var(--surface-raised, #23253a), #12162a);
-  box-shadow: var(--edge-light, inset 0 1px 0 rgba(255, 255, 255, 0.18)), 0 6px 16px rgba(0, 0, 0, 0.45);
-  transition: transform 0.12s ease, box-shadow 0.18s ease;
-}
-
-.chapter-card:active {
-  transform: translateY(2px);
+  background: var(--grain), linear-gradient(180deg, #1e2338 0%, #101427 100%);
+  box-shadow: var(--bevel), var(--drop);
 }
 
 /*
@@ -89,21 +158,33 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 12px 10px;
+  gap: 7px;
+  padding: 12px 14px 11px;
   background:
-    radial-gradient(ellipse 80% 120% at 20% 110%, rgba(255, 255, 255, 0.18), transparent 60%),
-    linear-gradient(160deg, var(--scenery-a), var(--scenery-b));
+    radial-gradient(ellipse 70% 130% at 12% 120%, rgba(255, 255, 255, 0.2), transparent 62%),
+    linear-gradient(155deg, var(--ch, #3a4a7a) 0%, var(--ch2, #232a4c) 48%, #0e1224 100%);
+}
+
+/* 情景の下端。棚との境目を金の細線で切って、2層であることを示す */
+.chapter-card__banner::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 130, 0.5), transparent);
+  pointer-events: none;
 }
 
 /* 章ごとの情景。行き先の雰囲気を伝える飾りなので、操作は一切受けない */
 .chapter-card__scenery {
   position: absolute;
   top: 50%;
-  right: 14px;
+  right: 10px;
   transform: translateY(-50%);
-  font-size: 2.6rem;
-  opacity: 0.3;
+  font-size: 3.4rem;
+  opacity: 0.22;
   pointer-events: none;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
 }
@@ -111,25 +192,33 @@
 .chapter-card__head {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 9px;
 }
 
 .chapter-card__no {
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: #b9c6ea;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #0b0f1e;
+  background: linear-gradient(180deg, #e6eeff, #9fb2dd);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .chapter-card__title {
-  font-size: 1rem;
-  font-weight: 800;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+  font-size: 1.06rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95);
 }
 
 .chapter-card__count {
-  font-size: 0.66rem;
-  color: #cfd8f5;
+  font-size: 0.64rem;
+  font-weight: 800;
+  color: #e7eeff;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 .chapter-card__facts {
@@ -137,7 +226,7 @@
   align-items: center;
   /* 横に入り切らない情報は折り返す。横一列に押し込むと文字が重なる */
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .chapter-card__progress {
@@ -149,66 +238,193 @@
   white-space: nowrap;
 }
 
+/* 踏破した章は、金の縁と隅の光で「終わった場所」として区別する */
+.chapter-card--complete {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 205, 100, 0.55),
+    var(--bevel),
+    0 0 18px rgba(255, 180, 60, 0.16),
+    var(--drop);
+}
+
+.chapter-card--complete .chapter-card__count {
+  color: #ffe08a;
+}
+
 /* 進行度の帯 */
 .cat-bar {
+  position: relative;
   flex: 1;
-  height: 6px;
+  height: 7px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, #05070f, #10142a);
+  box-shadow: var(--inset-deep);
 }
 
 .cat-bar__fill {
+  position: relative;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #58e58a, #24a35a);
-  box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
-  transition: width 0.4s ease;
+  background: linear-gradient(180deg, #8dffb8 0%, #35c46c 45%, #178b4c 100%);
+  box-shadow: 0 0 9px rgba(46, 204, 113, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ===== ステージの並び ===== */
 
 .stage-rail {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   gap: 8px;
-  padding: 10px 12px 12px;
+  padding: 11px 12px 13px;
+  background: linear-gradient(180deg, rgba(4, 6, 14, 0.5), transparent 60%);
+}
+
+/*
+ * ステージ1つ分の札。石板を棚に立てた見立て。
+ * 未クリア・クリア済み・次に挑む所、の3状態が一目で分かることを最優先にする。
+ */
+.stage-tile {
+  position: relative;
+  appearance: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  aspect-ratio: 1;
+  padding: 4px 2px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #b9c4e4;
+  background: var(--grain), linear-gradient(180deg, #2b3252 0%, #1a1f38 55%, #12162a 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 3px 7px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.16s ease, color 0.16s ease;
+}
+
+.stage-tile:active {
+  transform: translateY(2px);
+  box-shadow: var(--inset-deep);
 }
 
 .stage-tile__no {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+/* クリア済みは緑の縁。踏破した数が棚を見渡すだけで数えられる */
+.stage-tile--cleared {
+  color: #dff7e8;
+  background: var(--grain), linear-gradient(180deg, #2c4a41 0%, #1a2c2c 55%, #101d22 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(70, 210, 140, 0.45),
+    0 3px 7px rgba(0, 0, 0, 0.5);
+}
+
+/* ボスの札は赤い石。棚の中で1つだけ違う素材に見せる */
+.stage-tile--boss {
+  color: #ffd9c6;
+  background: var(--grain), linear-gradient(180deg, #52293a 0%, #331a2a 55%, #1d1020 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 140, 110, 0.4),
+    0 3px 7px rgba(0, 0, 0, 0.5);
+}
+
+/* 次に挑む1枚だけ金で光らせ、脈打たせる。再開位置は迷わせない */
+.stage-tile--next {
+  color: #fff6d8;
+  background: var(--grain), linear-gradient(180deg, #6b5320 0%, #40300f 55%, #241906 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 210, 90, 0.75),
+    0 0 16px rgba(255, 190, 60, 0.45),
+    0 3px 8px rgba(0, 0, 0, 0.55);
+  animation: stage-tile-beckon 1.9s ease-in-out infinite;
+}
+
+@keyframes stage-tile-beckon {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.16);
+  }
 }
 
 .stage-tile__pips {
   display: flex;
-  gap: 2px;
-  font-size: 0.5rem;
-  color: #ffd23f;
+  gap: 3px;
+}
+
+/* 難易度3段のクリア状況。消灯時は彫り込んだ穴、点灯時は嵌まった宝石 */
+.stage-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.stage-pip--on.stage-pip--normal {
+  background: radial-gradient(circle at 34% 30%, #d8ffe6, #35c46c 60%, #146b3a 100%);
+  box-shadow: 0 0 6px rgba(60, 220, 130, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.stage-pip--on.stage-pip--hard {
+  background: radial-gradient(circle at 34% 30%, #ffe6c4, #ff9b3c 60%, #93410a 100%);
+  box-shadow: 0 0 6px rgba(255, 150, 60, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.stage-pip--on.stage-pip--hell {
+  background: radial-gradient(circle at 34% 30%, #ffd6f0, #e5559b 60%, #7a1146 100%);
+  box-shadow: 0 0 6px rgba(240, 90, 160, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .stage-tile__clear {
-  font-size: 0.6rem;
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 0.62rem;
+  font-weight: 900;
   color: #5dffa0;
+  text-shadow: 0 0 6px rgba(60, 220, 130, 0.9);
 }
 
 .stage-tile__boss {
-  font-size: 0.6rem;
-  color: #ff9a6b;
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.62rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
 
 .stage-tile__now {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  padding: 1px 5px;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
   border-radius: 999px;
-  font-size: 0.5rem;
-  font-weight: 800;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
   color: #1a1405;
   background: linear-gradient(180deg, #fff3bd, #ffd93b);
-  box-shadow: 0 0 10px rgba(255, 205, 40, 0.6);
+  box-shadow: 0 0 10px rgba(255, 205, 40, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 /* ===== ステージ詳細 ===== */
@@ -217,20 +433,31 @@
   gap: 12px;
 }
 
+/*
+ * ステージ詳細の見出し。章の情景色を大きく敷いて、
+ * 「今どこに立っているか」を一覧と同じ色で結び付ける。
+ */
 .stage-hero {
   position: relative;
-  padding: 14px 14px 12px;
+  padding: 12px 14px 13px;
   border-radius: 16px;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--surface-raised, #23253a), #12162a);
-  box-shadow: var(--edge-light, inset 0 1px 0 rgba(255, 255, 255, 0.18)), 0 6px 16px rgba(0, 0, 0, 0.45);
+  background:
+    radial-gradient(ellipse 70% 130% at 14% 125%, rgba(255, 255, 255, 0.2), transparent 62%),
+    linear-gradient(155deg, var(--ch, #3a4a7a) 0%, var(--ch2, #232a4c) 45%, #0d1122 100%);
+  box-shadow: var(--bevel), var(--drop);
 }
 
+/* 情景の絵文字。大きく薄く敷いて背景に溶かす */
 .stage-hero__scenery {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(160deg, var(--scenery-a, #3a4a7a), var(--scenery-b, #141a2e));
-  opacity: 0.55;
+  top: 50%;
+  right: -6px;
+  transform: translateY(-50%);
+  font-size: 5.2rem;
+  opacity: 0.16;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
 }
 
 .stage-hero__back {
@@ -238,31 +465,45 @@
   z-index: 1;
   appearance: none;
   border: none;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.68rem;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--text);
-  background: rgba(6, 9, 20, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  background: radial-gradient(circle at 35% 28%, #40496e, #1e2338 60%, #0d1020 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.6);
   cursor: pointer;
+}
+
+.stage-hero__back:active {
+  transform: scale(0.93);
 }
 
 .stage-hero__chapter {
   position: relative;
   z-index: 1;
-  margin-top: 8px;
-  font-size: 0.64rem;
-  letter-spacing: 0.1em;
-  color: #c6d2f2;
+  margin-top: 9px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #d3ddff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 .stage-hero__name {
   position: relative;
   z-index: 1;
-  font-size: 1.2rem;
+  margin: 2px 0 0;
+  font-size: 1.45rem;
   font-weight: 900;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
 }
 
 .stage-hero__tags {
@@ -271,12 +512,26 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 9px;
 }
 
-/* ===== 難易度の切り替え ===== */
+/* ===== 難易度の切り替え =====
+ *
+ * .diff-seg は3つのボタンを載せる「台」で、押せるのは .diff-seg__btn。
+ * 台の側にボタンの見た目を書くと、ボタンが素のまま縦積みになる
+ * (実際にそうなっていた)。役割を取り違えないこと。
+ */
 
 .diff-seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #080b18, #10142a);
+  box-shadow: var(--inset-deep);
+}
+
+.diff-seg__btn {
   flex: 1;
   appearance: none;
   border: none;
@@ -284,33 +539,69 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 6px;
-  border-radius: 12px;
+  padding: 9px 4px 7px;
+  border-radius: 10px;
   cursor: pointer;
-  color: var(--text-dim);
-  background: rgba(8, 11, 22, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  transition: color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  color: #8e99bd;
+  background: transparent;
+  box-shadow: none;
+  transition: color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, transform 0.1s ease;
 }
 
-.diff-seg[aria-pressed="true"] {
+.diff-seg__btn:active {
+  transform: translateY(1px);
+}
+
+/* 選ばれた1つだけ「持ち上がった駒」にする。難易度ごとに色を変えて手強さを示す */
+.diff-seg__btn--active {
   color: #fff;
-  background: linear-gradient(180deg, #3d5da8, #1d2c52);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(120, 170, 255, 0.5);
+  background: var(--grain), linear-gradient(180deg, var(--seg-a, #4a6cc0) 0%, var(--seg-b, #1d2c52) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px var(--seg-line, rgba(120, 170, 255, 0.7)),
+    0 3px 8px rgba(0, 0, 0, 0.55);
+}
+
+.diff-seg__btn--normal {
+  --seg-a: #2f9c62;
+  --seg-b: #10402c;
+  --seg-line: rgba(90, 225, 150, 0.7);
+}
+
+.diff-seg__btn--hard {
+  --seg-a: #c9702a;
+  --seg-b: #5a2a0c;
+  --seg-line: rgba(255, 165, 90, 0.7);
+}
+
+.diff-seg__btn--hell {
+  --seg-a: #b83a76;
+  --seg-b: #4d0f30;
+  --seg-line: rgba(255, 120, 185, 0.72);
 }
 
 .diff-seg__icon {
-  font-size: 1rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  filter: saturate(0.6) brightness(0.8);
+  transition: filter 0.15s ease;
+}
+
+.diff-seg__btn--active .diff-seg__icon {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
 }
 
 .diff-seg__name {
-  font-size: 0.7rem;
-  font-weight: 800;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
 }
 
 .diff-seg__state {
-  font-size: 0.55rem;
-  opacity: 0.85;
+  font-size: 0.54rem;
+  font-weight: 700;
+  opacity: 0.8;
 }
 
 /* ===== 挑戦パネル ===== */
@@ -344,22 +635,41 @@
 }
 
 .wave-card {
-  padding: 8px 10px;
+  position: relative;
+  padding: 9px 10px;
   border-radius: 12px;
-  background: rgba(8, 11, 22, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(10, 13, 26, 0.75), rgba(6, 8, 18, 0.6));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ボスのウェーブは左端に金の帯を立て、並びの中で終点だと分かるようにする */
+.wave-card--boss {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 190, 90, 0.32);
+}
+
+.wave-card--boss::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--gold-grad);
+  box-shadow: 0 0 8px rgba(255, 190, 60, 0.7);
 }
 
 .wave-card__head {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .wave-card__no {
-  font-size: 0.68rem;
-  font-weight: 800;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
   color: #c6d2f2;
 }
 
@@ -386,23 +696,42 @@
 .enemy-chip {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px 4px 4px;
+  gap: 7px;
+  padding: 4px 10px 4px 4px;
   border-radius: 999px;
-  background: rgba(20, 25, 44, 0.85);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, #232a48, #141830);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* ボスは金の縁で囲う。並んだ中から探さずに見つけられるようにする */
+.enemy-chip--boss {
+  background: linear-gradient(180deg, #48381c, #241a0c);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 200, 90, 0.6),
+    0 0 10px rgba(255, 180, 60, 0.25),
+    0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .enemy-chip__icon {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 0.85rem;
-  background: var(--elem, #3a4160);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  font-size: 0.9rem;
+  /* 属性色は下地。上から白い写り込みを乗せて球に見せる */
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.6), transparent 58%),
+    var(--elem, #3a4160);
+  box-shadow:
+    inset 0 -3px 6px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .enemy-chip__body {

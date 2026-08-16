@@ -19,7 +19,63 @@
   --drop: 0 6px 16px rgba(0, 0, 0, 0.45);
   --drop-soft: 0 3px 9px rgba(0, 0, 0, 0.35);
 
+  /* --- 手触りのトークン ---------------------------------------------------
+   * 「色を塗った矩形」から抜けるために、面を作る指定を3種類に分けて名前を付ける。
+   *   金属(metal): 上端に強い白、下端に黒。縁だけが光る
+   *   宝石(gem)  : 中の一点に白い写り込み。透けて見える
+   *   革(leather): 面全体に細かい起伏。光沢は出さない
+   * 個別の画面で影を書き下ろすと必ずばらけるので、必ずここを経由させる。
+   */
+
+  /* 金属の縁。厚み1pxの板ではなく、面取りされた金具に見せる */
+  --bevel:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  /* 深く彫り込まれた溝。ゲージやスロットの受け皿に使う */
+  --inset-deep:
+    inset 0 2px 4px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.11),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+  --drop-deep: 0 10px 26px rgba(0, 0, 0, 0.55), 0 2px 5px rgba(0, 0, 0, 0.5);
+
+  /* 革の目。低い振幅の斜め線を2枚重ねて、平面に細かい起伏を出す */
+  --grain:
+    repeating-linear-gradient(58deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-42deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 4px);
+  /* 磨いた金属の面。中央に幅の広い反射帯を通す */
+  --brushed: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.09) 42%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.05) 58%, transparent 100%);
+
+  /* 金。見出し・報酬・確定演出の主役色 */
+  --gold-1: #fff8dc;
+  --gold-2: #ffd970;
+  --gold-3: #d09a22;
+  --gold-4: #6f4a08;
+  --gold-grad: linear-gradient(180deg, var(--gold-1) 0%, var(--gold-2) 42%, var(--gold-3) 78%, var(--gold-4) 100%);
+
+  /* レア度。額縁・帯・光の色をここ1か所に集約する */
+  --rar-low-a: #98a2c2;
+  --rar-low-b: #3d4460;
+  --rar-3-a: #6fd0ff;
+  --rar-3-b: #12496f;
+  --rar-4-a: #cfa0ff;
+  --rar-4-b: #45217a;
+  --rar-5-a: #ffd76a;
+  --rar-5-b: #82520c;
+  --rar-6-a: #fff0a8;
+  --rar-6-b: #a8450a;
+
   color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 常時動く飾りは止める。押した時の手応えだけは残す */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 * {
@@ -60,13 +116,27 @@ body {
 }
 
 .app-header h1 {
+  position: relative;
   margin: 0;
-  font-size: 1.8rem;
-  letter-spacing: 0.04em;
-  background: linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71, #3498db, #6c3483);
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  /* 6属性の虹はにぎやかだが安っぽい。刻印された金の題字にする */
+  background: var(--gold-grad);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 14px rgba(255, 190, 70, 0.35));
+}
+
+/* 題字の下に細い金の罫を引き、両端を消して装飾に見せる */
+.app-header::after {
+  content: "";
+  display: block;
+  width: min(220px, 60%);
+  height: 1px;
+  margin: 8px auto 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 205, 100, 0.75), transparent);
 }
 
 .app-subtitle {
@@ -75,37 +145,55 @@ body {
   font-size: 0.9rem;
 }
 
+/*
+ * 板1枚。革張りの面に金具の縁が付いている、という見立てで作る。
+ * 下地(色)・目(grain)・縁(bevel)を分けているので、
+ * 中身を変えても手触りだけは全画面で揃う。
+ */
 .panel {
   position: relative;
-  background: var(--surface);
-  border: 1px solid var(--panel-border);
-  border-radius: 16px;
+  background: var(--grain), var(--surface);
+  border: none;
+  border-radius: 14px;
   padding: 14px;
-  box-shadow: var(--edge-light), var(--drop);
+  box-shadow: var(--bevel), var(--drop);
+}
+
+/* 上端に細い光の線を1本通す。板の「厚み」はこれで決まる */
+.panel::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: 1px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, rgba(180, 205, 255, 0.55) 25%, rgba(180, 205, 255, 0.55) 75%, transparent);
+  pointer-events: none;
 }
 
 .panel h2 {
   position: relative;
   margin: 0 0 10px;
-  padding-left: 10px;
-  font-size: 1rem;
-  color: #c6cfee;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  padding-left: 12px;
+  font-size: 0.95rem;
+  color: #d3ddff;
+  font-weight: 800;
+  letter-spacing: 0.06em;
 }
 
 .panel h2::before {
-  /* 見出しの左に光る棒を立てて、情報の区切りを分かりやすくする */
+  /* 見出しの左に立てる金具。三角に削って、ただの棒に見えないようにする */
   content: "";
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 0.95em;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #8fc0ff, #3f6fd8);
-  box-shadow: 0 0 8px rgba(79, 140, 255, 0.7);
+  width: 4px;
+  height: 1em;
+  clip-path: polygon(0 12%, 100% 0, 100% 100%, 0 88%);
+  background: var(--gold-grad);
+  box-shadow: 0 0 9px rgba(255, 200, 80, 0.75);
 }
 
 .panel-header {
@@ -174,47 +262,94 @@ body {
   color: #0c1020;
 }
 
+/*
+ * ボタンは「押せる金具」に見せる。
+ * 押せる/押せない/主役かどうかの3つが、色ではなく面の作りで伝わることを狙う。
+ */
 .btn {
+  position: relative;
   appearance: none;
   border: none;
-  border-radius: 12px;
+  border-radius: 11px;
   padding: 12px 16px;
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   cursor: pointer;
   min-height: 44px;
+  overflow: hidden;
   color: var(--text);
-  background: var(--surface-raised);
-  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+  background: var(--grain), var(--surface-raised);
+  box-shadow: var(--bevel), var(--drop-soft);
   transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
+/* 面を斜めに横切る反射。静止画でも金属だと分かるようにする */
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--brushed);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .btn:active {
-  transform: translateY(1px);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
-  filter: brightness(0.94);
+  transform: translateY(1.5px);
+  box-shadow: var(--inset-deep);
+  filter: brightness(0.93);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.75) brightness(0.62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.btn:disabled::after {
+  opacity: 0;
 }
 
 .btn--primary {
-  color: #071024;
-  background: linear-gradient(180deg, #8fc0ff 0%, #4f8cff 45%, #2a63d8 100%);
+  color: #06162e;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -10%, rgba(255, 255, 255, 0.55), transparent 70%),
+    linear-gradient(180deg, #9dc9ff 0%, #4f8cff 42%, #2455c4 82%, #14336f 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 0 18px rgba(79, 140, 255, 0.32),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(140, 190, 255, 0.6),
+    0 0 20px rgba(79, 140, 255, 0.35),
     var(--drop);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* 最上位のCTA(挑戦する・受け取る)は金。青の主役ボタンより一段上に置く */
+.btn--gold {
+  color: #2b1a00;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -10%, rgba(255, 255, 255, 0.6), transparent 70%),
+    var(--gold-grad);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -2px 0 rgba(90, 55, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 226, 150, 0.7),
+    0 0 22px rgba(255, 190, 60, 0.4),
+    var(--drop);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .btn--ghost {
-  background: var(--surface);
-  border: 1px solid var(--panel-border);
-  color: var(--text);
+  background: var(--grain), linear-gradient(180deg, #262b45 0%, #1a1e33 100%);
+  box-shadow: var(--bevel), var(--drop-soft);
+  color: #cfd8f5;
 }
 
 .btn--large {
   width: 100%;
-  font-size: 1.1rem;
-  padding: 16px;
+  font-size: 1.08rem;
+  padding: 15px;
+  border-radius: 13px;
 }
 
 /* --- バトル画面 -------------------------------------------------------
@@ -1133,16 +1268,37 @@ body {
 
 .currency-panel {
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  padding: 10px;
 }
 
+/* 所持数の錠剤。左の丸い受け皿にアイコンを落とし込む */
 .currency-chip {
-  background: var(--surface-raised);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 6px;
   border-radius: 999px;
-  padding: 8px 16px;
-  font-weight: 700;
-  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+  font-weight: 800;
+  font-size: 1rem;
   letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #10142a, #070a16);
+  box-shadow: var(--inset-deep);
+}
+
+.currency-chip > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  background: radial-gradient(circle at 34% 28%, #4f5b8a, #232945 60%, #10142a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.6),
+    0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .stamina-refill-row {
@@ -1168,12 +1324,13 @@ body {
 .party-slot {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 14px;
+  border-radius: 12px;
   /* 上端の光・内側のフチ・落ちる影で、板ではなく立体の駒に見せる */
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.42),
     inset 0 0 0 2px rgba(255, 255, 255, 0.2),
     inset 0 -10px 18px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(0, 0, 0, 0.6),
     var(--drop-soft);
   display: flex;
   align-items: flex-end;
