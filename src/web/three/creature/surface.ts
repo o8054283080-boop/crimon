@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ElementTheme } from "../elementTheme.js";
+import { ELEMENT_THEME, ElementTheme } from "../elementTheme.js";
 import { SIMPLEX_NOISE_3D } from "../shaderChunks.js";
 
 /**
@@ -32,6 +32,55 @@ export type SurfaceStyle =
   /** 目・コアなどの自発光。ライティングを受けない */
   | "glow";
 
+/**
+ * 属性ごとの「体の質」。
+ *
+ * 属性の差を色相だけで付けると、同じ人形を6色に塗り替えただけに見える。
+ * 実際に見分けが付くのは色ではなく**光の扱われ方**で、
+ * 火は溝の奥から熱が透け、水は濡れて空を映し、電気は表面を電位が這い、
+ * 闇は当たっていない面の光を吸う。ここはその強さを属性から決める。
+ *
+ * どれも加算合成に上乗せするので、値は「気づくが眩しくない」上限で抑える。
+ * 明るくして目立たせようとしないこと(過去に画面が白飛びしている)。
+ */
+export interface SurfaceTraits {
+  /** 溝の奥に残る熾火。陰になった側ほど目立つ(火) */
+  ember: number;
+  /** 縁と逆光で光を透かす厚み(草の葉・光・火) */
+  translucency: number;
+  /** 濡れた被膜。地色が沈み、鋭い映り込みと空の色が乗る(水) */
+  wet: number;
+  /** 表面を這う帯電の筋(電気) */
+  charge: number;
+  /** 光を吸う。光の当たらない面が黒へ落ちる(闇) */
+  absorb: number;
+}
+
+const NEUTRAL_TRAITS: SurfaceTraits = { ember: 0, translucency: 0.2, wet: 0.1, charge: 0, absorb: 0 };
+
+const ELEMENT_TRAITS: Record<keyof typeof ELEMENT_THEME, SurfaceTraits> = {
+  // 冷えかけた炭。表面は暗いのに割れ目の奥だけが赤い
+  FIRE: { ember: 1.0, translucency: 0.45, wet: 0, charge: 0.12, absorb: 0 },
+  // 濡れている。地色が沈むかわりに、上を向いた面が空を映す
+  WATER: { ember: 0, translucency: 0.35, wet: 1.0, charge: 0, absorb: 0 },
+  // 帯電。細い筋が体表を這い、わずかに熱を持つ
+  ELECTRIC: { ember: 0.35, translucency: 0.25, wet: 0.1, charge: 1.0, absorb: 0 },
+  // 葉のように光を通す。艶は蝋のように薄い
+  GRASS: { ember: 0, translucency: 0.85, wet: 0.3, charge: 0, absorb: 0 },
+  // 体そのものが薄く光を通す。影が浅い
+  LIGHT: { ember: 0.28, translucency: 1.0, wet: 0.18, charge: 0.1, absorb: 0 },
+  // 光を吸う。当たっていない面が急に沈み、輪郭だけが残る
+  DARK: { ember: 0, translucency: 0.05, wet: 0.12, charge: 0, absorb: 1.0 },
+};
+
+/** テーマの実体から属性を逆引きする(テーマは属性ごとの定数を共有している) */
+function traitsFor(theme: ElementTheme): SurfaceTraits {
+  for (const key of Object.keys(ELEMENT_THEME) as (keyof typeof ELEMENT_THEME)[]) {
+    if (ELEMENT_THEME[key] === theme) return ELEMENT_TRAITS[key];
+  }
+  return NEUTRAL_TRAITS;
+}
+
 /** 1体のモンスターが使う配色。属性テーマから機械的に導出する */
 export interface CreaturePalette {
   /** 体表のメインカラー */
@@ -54,26 +103,71 @@ export interface CreaturePalette {
   glow: THREE.Color;
   /** 翼膜 */
   membrane: THREE.Color;
+  /** 属性ごとの体の質(色ではなく光の扱われ方) */
+  traits: SurfaceTraits;
+}
+
+/**
+ * 色相・彩度・明度を相対的にずらす。
+ *
+ * 部位ごとの色を「元の色に別の色を混ぜる」で作ると、混ぜた先の色に引っ張られて
+ * 属性ごとの差が消える(何を混ぜても灰色に寄る)。HSLで動かせば、
+ * 属性の色相を保ったまま「濃さ」と「明るさ」だけを部位ごとに変えられる。
+ *
+ * **HSLは必ずsRGB空間で扱うこと。** three.js の色管理は既定で有効なので、
+ * `getHSL()` を引数なしで呼ぶと作業空間(リニア)のHSLが返る。
+ * リニアの明度は人の目の感じ方とかけ離れていて、1.3倍のつもりが
+ * 見た目では2倍以上明るくなる。実際にこれで腹が白く飛んだ。
+ */
+function tune(
+  color: THREE.Color,
+  hueShift: number,
+  satScale: number,
+  lightScale: number,
+  lightOffset = 0,
+  lightMax = 0.92,
+): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl, THREE.SRGBColorSpace);
+  const out = new THREE.Color();
+  out.setHSL(
+    (hsl.h + hueShift + 1) % 1,
+    Math.min(1, Math.max(0, hsl.s * satScale)),
+    Math.min(lightMax, Math.max(0, hsl.l * lightScale + lightOffset)),
+    THREE.SRGBColorSpace,
+  );
+  return out;
 }
 
 export function paletteFor(theme: ElementTheme): CreaturePalette {
   // ブルームで白飛びしないよう、体表は暗めに保ち、明るいのは差し色だけにする
   const shell = theme.shell.clone();
+  const main = shell.clone().lerp(theme.rim, 0.24);
   return {
-    main: shell.clone().lerp(theme.rim, 0.24),
+    main,
     dark: shell.clone().multiplyScalar(0.5).lerp(new THREE.Color(0x0d1020), 0.45),
     deep: shell.clone().multiplyScalar(0.28).lerp(new THREE.Color(0x07080f), 0.6),
-    plate: new THREE.Color(0xcfc7ae).lerp(theme.rim, 0.3).multiplyScalar(0.62),
+    // 角・爪・牙・嘴。属性色に染めると胴と同じ色になり、
+    // せっかく形で分けた部位が読めなくなる。ケラチンは属性を持たない
+    // 生成り色で、胴よりはっきり明るいのが正しい。差し色として一段だけ
+    // 属性を混ぜ、色相の帰属だけ残す
+    plate: new THREE.Color(0xd9cfb4).lerp(theme.rim, 0.22).multiplyScalar(0.48),
     // 金属は属性色に染めすぎず、鋼の地色を残す。
     // 暗くしすぎると装甲が「焦げた塊」に見えるので、中明度を保って
     // 明暗はハイライトと映り込みで作る
     metal: new THREE.Color(0x7d8698).lerp(theme.shell, 0.28).multiplyScalar(0.72),
-    cloth: shell.clone().multiplyScalar(0.62).lerp(theme.rim, 0.14),
-    // 羽根は面積が大きい。属性色を保ったまま、体より一段だけ明るくする
-    fur: shell.clone().lerp(theme.rim, 0.34).multiplyScalar(0.78),
+    // 布は染めたもの。地肌より彩度が低く、わずかに沈む
+    cloth: tune(main, 0.02, 0.62, 0.84),
+    // 毛皮・羽毛・たてがみ。同じ属性色のままだと胴に埋もれて、
+    // せっかくの面積が効かない。日に灼けた獣毛のように
+    // 彩度を落として明るく持ち上げ、胴との明暗差で読ませる
+    fur: tune(main, 0.015, 0.70, 1.40, 0, 0.70),
     accent: theme.rim.clone().multiplyScalar(0.85),
     glow: theme.core.clone(),
-    membrane: shell.clone().lerp(theme.rim, 0.42),
+    // 翼膜は薄く血が透ける。属性色のままだと「胴と同じ色の板」になるので、
+    // 赤側へ寄せて肉の膜であることを示す
+    membrane: shell.clone().lerp(theme.rim, 0.42).lerp(new THREE.Color(0x9c3a34), 0.32),
+    traits: traitsFor(theme),
   };
 }
 
@@ -162,6 +256,12 @@ uniform vec3 uBelly;
 uniform vec3 uDorsal;
 /** 腹背の塗り分けの強さ。材質ごとに変える(金属や結晶では効かせない) */
 uniform float uCounter;
+/** 属性ごとの体の質。SurfaceTraits を参照 */
+uniform float uEmber;
+uniform float uTranslucency;
+uniform float uWet;
+uniform float uCharge;
+uniform float uAbsorb;
 uniform vec3 uRim;
 uniform vec3 uGlow;
 uniform float uRimStrength;
@@ -195,7 +295,7 @@ ${SIMPLEX_NOISE_3D}
  * 下と前の中間に置いてある。四足でも喉と胸は前下がりなので、
  * 「腹・喉・顎の下・脚の内側」がまとめて明るくなる。
  */
-const vec3 VENTRAL_DIR = vec3(0.0, -0.815, -0.579);
+const vec3 VENTRAL_DIR = vec3(0.0, -0.906, -0.423);
 
 /**
  * 体表の起伏(高さ場)。材質ごとに違う形を返す。
@@ -394,11 +494,20 @@ void main() {
   float ventral = dot(vBodyNormal, VENTRAL_DIR);
   // 境目をノイズで崩す。まっすぐな帯だと塗り分けたペンキに見える
   ventral += (blotch - 0.5) * 0.30;
-  float belly = smoothstep(0.02, 0.80, ventral) * uCounter;
+  float belly = smoothstep(0.14, 0.86, ventral) * uCounter;
   float dorsal = smoothstep(-0.02, -0.72, ventral) * uCounter;
 
   vec3 albedo = mix(uColor, uBelly, belly);
   albedo = mix(albedo, uDorsal, dorsal);
+
+  // --- 色そのもののゆらぎ ---------------------------------------------
+  // 明るさだけを揺らすと、単色の面に灰色の汚れを乗せたようにしか見えない。
+  // 生き物の皮膚は場所によって色素の濃さが違うので、彩度と色相ごと動かす。
+  // 混ぜ先には腹と背の色をそのまま使う。無関係な色を混ぜないので、
+  // どれだけ揺らしても属性の色から外れない
+  float mottle = snoise(vWorld * 2.3 + 11.0);
+  albedo = mix(albedo, uDorsal, max(0.0, mottle) * 0.26);
+  albedo = mix(albedo, uBelly, max(0.0, -mottle) * 0.16);
 
   albedo *= 0.84 + blotch * 0.32;
   albedo *= 0.93 + grain * 0.14;
@@ -441,6 +550,10 @@ void main() {
   // 窪みの擬似的な陰り。大きなムラの暗い側をさらに沈めて締める
   float occlusion = 0.82 + smoothstep(0.15, 0.6, blotch) * 0.18;
   albedo *= occlusion;
+
+  // 濡れた体は地色が沈む。水を含んだ布や濡れた石と同じで、
+  // 明るさは失われ、そのぶんが鋭い映り込みに置き換わる
+  albedo *= 1.0 - uWet * 0.18;
 
   // 光の落ち方も材質で変える。硬い材質は3段のランプで面の向きを切り、
   // 毛は段を持たずになだらかに暗くなる
@@ -536,6 +649,50 @@ void main() {
     // ブルームに投げ込む光の量は増えない
     alpha = uOpacity * (0.32 + edge * 0.68);
   #endif
+
+  // --- 属性ごとの体の質 -----------------------------------------------
+  // ここまでは色相が違うだけで、火も水も同じ材質の色違いだった。
+  // 属性を「別の生き物」に見せるのは色ではなく光の扱われ方なので、
+  // 最後にその差を上乗せする。どれも加算なので、値は控えめに抑えてある
+  // (明るくして目立たせようとしないこと)。
+
+  // 熾火。溝の奥ほど、そして光の当たらない面ほど赤く残る。
+  // 明るい面で光らせると全身が発光体になってしまうので、影の側だけに出す
+  if (uEmber > 0.001) {
+    float pit = 1.0 - smoothstep(0.10, 0.60, height);
+    float shade = 1.0 - smoothstep(0.05, 0.55, key);
+    float breathe = 0.72 + 0.28 * sin(uTime * 1.1 + vBody.y * 3.0);
+    color += uGlow * uEmber * pit * shade * breathe * 0.16;
+  }
+
+  // 厚みを透かす。逆光側の縁が内側から色づき、体が中身の詰まった
+  // 一枚の材に見える。葉・炎・光の体はこれがあるかどうかで質が変わる
+  if (uTranslucency > 0.001) {
+    float thickness = pow(1.0 - facing, 2.6);
+    float behind = max(dot(-normal, KEY_DIR), 0.0);
+    color += albedo * mix(uRim, uGlow, 0.35) * uTranslucency * (thickness * 0.55 + behind * 0.30);
+  }
+
+  // 濡れた被膜。鋭いハイライトと、上を向いた面に映る空。
+  // 拡散の上に薄い層が1枚乗るので、地色は先に少し沈めてある
+  if (uWet > 0.001) {
+    float coat = pow(max(dot(normal, normalize(KEY_DIR + viewDir)), 0.0), 110.0);
+    color += mix(vec3(1.0), uRim, 0.28) * min(coat, 1.0) * uWet * 0.42;
+    color += vec3(0.20, 0.31, 0.48) * uWet * fresnel * smoothstep(-0.2, 0.8, normal.y) * 0.30;
+  }
+
+  // 帯電。細い筋が体表を這う。面積が小さいので薄くても目に付く
+  if (uCharge > 0.001) {
+    float arc = snoise(vBody * 9.0 + vec3(0.0, uTime * 1.7, uTime * 0.6));
+    float spark = smoothstep(0.80, 0.97, abs(arc));
+    color += mix(uGlow, uRim, 0.4) * spark * uCharge * 0.30;
+  }
+
+  // 吸光。光の当たっていない面が黒へ落ちる。
+  // 明るくせずに「暗さの質」だけで属性を語れる、いちばん安全な手
+  if (uAbsorb > 0.001) {
+    color *= 1.0 - uAbsorb * 0.34 * (1.0 - smoothstep(0.02, 0.50, key));
+  }
 #endif
 
   color += uGlow * uEmissive;
@@ -575,20 +732,16 @@ void main() {
  * さらにわずかに暖色へ寄せると、皮膚の下の血の色が透けたように見える。
  */
 function bellyOf(color: THREE.Color): THREE.Color {
-  const hsl = { h: 0, s: 0, l: 0 };
-  color.getHSL(hsl);
-  const out = new THREE.Color();
   // 色相をほんの少し暖色側へ。生々しさはこの数度で決まる
-  out.setHSL((hsl.h + 0.015) % 1, hsl.s * 0.42, Math.min(0.62, hsl.l * 1.75 + 0.16));
-  return out;
+  return tune(color, 0.015, 0.55, 1.34, 0.10, 0.56);
 }
 
 /** 地色から「背側の色」を作る。暗く、彩度は上げる(影ではなく色素の濃さ) */
 function dorsalOf(color: THREE.Color): THREE.Color {
   const hsl = { h: 0, s: 0, l: 0 };
-  color.getHSL(hsl);
+  color.getHSL(hsl, THREE.SRGBColorSpace);
   const out = new THREE.Color();
-  out.setHSL((hsl.h + 0.985) % 1, Math.min(1, hsl.s * 1.18 + 0.05), hsl.l * 0.58);
+  out.setHSL((hsl.h + 0.985) % 1, Math.min(1, hsl.s * 1.18 + 0.05), hsl.l * 0.62, THREE.SRGBColorSpace);
   return out;
 }
 
@@ -655,7 +808,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   // 骨・角・爪: 蝋のような、やや広くて強いハイライト
   plate: {
     defines: { SPECULAR: "", STREAKS: "" },
-    counter: 0.55,
+    counter: 0.34,
     rimStrength: 0.75,
     emissive: 0,
     opacity: 1,
@@ -847,6 +1000,11 @@ export class SurfaceSet {
         uBelly: { value: bellyOf(color) },
         uDorsal: { value: dorsalOf(color) },
         uCounter: { value: config.counter },
+        uEmber: { value: this.palette.traits.ember },
+        uTranslucency: { value: this.palette.traits.translucency },
+        uWet: { value: this.palette.traits.wet },
+        uCharge: { value: this.palette.traits.charge },
+        uAbsorb: { value: this.palette.traits.absorb },
         uRim: { value: this.palette.accent.clone() },
         uGlow: { value: this.palette.glow.clone() },
         uRimStrength: { value: config.rimStrength },

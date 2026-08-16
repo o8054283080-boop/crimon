@@ -543,8 +543,10 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 首まわりの毛(狼の見分けどころ) ---
-  // 首を立てると鹿になる。前へ低く送り出して、頭が肩より前に出るようにする
-  place(rig.neck, 0, 0.16, -0.40, 0.34, 0, 0);
+  // 首を立てると鹿になる。前へ低く送り出して、頭が肩より前に出るようにする。
+  // rotation.x は正で「のけぞる」向きなので、前へ送るには負を入れる
+  // (ここが正のままだと、狼が空を見上げた姿勢で固定されて顔が見えない)
+  place(rig.neck, 0, 0.16, -0.40, -0.30, 0, 0);
   rig.neck.add(
     kit.taperedTube(
       [
@@ -578,7 +580,8 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 頭(細長い鼻づら、立った耳) ---
-  place(rig.head, 0, 0.30, 0, 0.22, 0, 0);
+  // 鼻先をわずかに下げて、獲物を見据える角度にする
+  place(rig.head, 0, 0.30, 0, 0.16, 0, 0);
   addBeastHead(kit, rig, { skull: [0.16, 0.15, 0.21], snout: 0.36, jaw: true, horns: "none", crest: 0, eye: 0.042 });
   // 立った三角の耳。獣の種類を一番はっきり伝える部位
   for (const side of [-1, 1]) {
