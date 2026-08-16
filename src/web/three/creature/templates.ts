@@ -297,6 +297,8 @@ function addPigLegs(kit: CreatureKit, rig: CreatureRig, scale: number, spread: n
  */
 function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
+  // 粘体。半透明で内側の濁りが透ける
+  kit.skin = "gel";
   rig.pelvis.position.y = 0;
 
   // 本体。裾を一度外へ張り出させてから床へ落とし、
@@ -468,6 +470,8 @@ function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
  */
 function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
+  // 獣の毛皮。鱗が出ると狼に見えなくなる
+  kit.skin = "pelt";
   rig.yawBias = 0.34;
   rig.pelvis.position.y = 1.0;
 
@@ -1386,6 +1390,8 @@ function buildExpPig(kit: CreatureKit, rig: CreatureRig): void {
  */
 function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
+  // 体表は爬虫類の鱗。この指定が無いと既定のなめらかな肌になる
+  kit.skin = "scale";
   rig.yawBias = 0.3;
   // 脚を長く取ると馬やラクダに見える。ドラゴンは「胴が地面に近く、脚が短く太い」比率で読ませる
   rig.pelvis.position.y = 0.98;
@@ -1655,6 +1661,8 @@ function addTalonFoot(kit: CreatureKit, foot: THREE.Object3D, scale: number): vo
  */
 function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
+  // 前半身は羽毛、後半身は毛皮。鱗の材質と取り違えないよう肌質を毛に固定する
+  kit.skin = "pelt";
   rig.yawBias = 0.36;
   rig.pelvis.position.y = 0.92;
 
