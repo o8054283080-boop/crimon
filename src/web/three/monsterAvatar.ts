@@ -374,9 +374,9 @@ export class MonsterAvatar {
     // 体が沈む。バネなので、押し込まれた後に自分で戻る
     this.landSpring.velocity -= 4.5 - this.mass * 1.6;
     // 後ろへ突き飛ばされる。重いものは動かないかわりに、戻るまでが長い
-    this.staggerSpring.velocity += 5.2 - this.mass * 2.6;
+    this.staggerSpring.velocity += 7 - this.mass * 3.5;
     // 左右にも崩れる。毎回同じ向きへ下がると、連打された時に機械に見える
-    this.staggerSideSpring.velocity += (Math.random() - 0.5) * (4.4 - this.mass * 2.2);
+    this.staggerSideSpring.velocity += (Math.random() - 0.5) * (5.6 - this.mass * 2.8);
     this.flash = 1;
   }
 
@@ -802,23 +802,26 @@ export class MonsterAvatar {
     }
 
     // === 被弾 =============================================================
-    // 打たれた瞬間に大きく食い込み、指数的に収まりながら数回揺り戻す。
-    // 重い個体は振れ幅が小さいかわりに、収まるまでが長い
+    // 役割を2つに割る。ここ(hitTrack)は**速い震え**だけを持ち、
+    // 「押されて動いた」という位置の移動は下のよろけのバネが受け持つ。
+    // 以前は両方が同じくらいの強さで胴を前後させ、周期が違うために
+    // 打ち消し合って、打たれても3センチしか動かない状態になっていた
     const hitT = advance(this.hitTrack, dt);
     if (hitT !== null) {
-      const decay = Math.pow(1 - hitT, 1.7);
-      const shake = Math.cos(hitT * Math.PI * 3.2);
+      const decay = Math.pow(1 - hitT, 2.6);
+      const shake = Math.cos(hitT * Math.PI * 6);
       const power = 1 - mass * 0.5;
       const recoil = decay * shake * power;
-      // 打たれた向きへ押し出されるぶん(最初の食い込み)は揺り戻しと分ける
+      // 打たれた瞬間の食い込み。ここだけは短く鋭く出す
       const impact = Math.pow(1 - clamp01(hitT * 3.2), 2) * power;
-      offsetZ += recoil * 0.26 + impact * 0.16;
+      offsetZ += recoil * 0.07 + impact * 0.18;
       offsetY -= Math.abs(recoil) * 0.05;
-      leanX += recoil * 0.42 + impact * 0.2;
-      leanZ += recoil * 0.12 * this.deathTip;
-      headX += recoil * 0.6 + impact * 0.25;
-      headZ += recoil * 0.22;
-      hipY += recoil * 0.14;
+      leanX += recoil * 0.16 + impact * 0.24;
+      leanZ += recoil * 0.1 * this.deathTip;
+      // 頭は体より軽いので、震えがいちばん大きく出る場所になる
+      headX += recoil * 0.55 + impact * 0.3;
+      headZ += recoil * 0.24;
+      hipY += recoil * 0.16;
       jawOpen = Math.max(jawOpen, Math.abs(recoil) * 0.7);
       squash -= Math.abs(recoil) * 0.26;
       for (const arm of rig.arms) {
@@ -831,25 +834,25 @@ export class MonsterAvatar {
 
     // よろけ。振動が収まった後も、押された分を踏み止まって戻すのに時間がかかる。
     // 「打たれて動いた」ことは、震えではなくこの位置の移動でしか伝わらない
-    const stagger = this.staggerSpring.step(0, 1.5 - mass * 0.45, 0.52 + mass * 0.22, step);
-    const staggerSide = this.staggerSideSpring.step(0, 1.7 - mass * 0.5, 0.55 + mass * 0.2, step);
+    const stagger = this.staggerSpring.step(0, 1.25 - mass * 0.35, 0.46 + mass * 0.2, step);
+    const staggerSide = this.staggerSideSpring.step(0, 1.45 - mass * 0.4, 0.5 + mass * 0.18, step);
     if (Math.abs(stagger) > 1e-4 || Math.abs(staggerSide) > 1e-4) {
-      offsetZ += stagger * 0.42;
-      offsetX += staggerSide * 0.3;
+      offsetZ += stagger * 0.7;
+      offsetX += staggerSide * 0.5;
       // のけぞってから戻る。上体は足より遅れるので、腰より胴の方が深く振れる
-      leanX += stagger * 0.34;
-      leanZ += staggerSide * 0.4;
-      hipZ -= staggerSide * 0.18;
-      offsetY -= Math.abs(stagger) * 0.06;
+      leanX += stagger * 0.45;
+      leanZ += staggerSide * 0.5;
+      hipZ -= staggerSide * 0.22;
+      offsetY -= Math.abs(stagger) * 0.08;
       for (const leg of rig.legs) {
         // 押された向きへ脚を送って踏み止まる。前脚と後脚で送る向きが逆になる
-        leg.root.rotation.x += stagger * (leg.front ? 0.5 : -0.42);
-        leg.root.rotation.z += leg.side * staggerSide * 0.28;
-        if (leg.lower && leg.lowerRest) leg.lower.rotation.x -= stagger * 0.35;
+        leg.root.rotation.x += stagger * (leg.front ? 0.6 : -0.5);
+        leg.root.rotation.z += leg.side * staggerSide * 0.35;
+        if (leg.lower && leg.lowerRest) leg.lower.rotation.x -= stagger * 0.45;
       }
-      for (const arm of rig.arms) arm.root.rotation.x -= stagger * 0.55;
-      tailDriveX -= stagger * 0.3;
-      tailDriveY += staggerSide * 0.35;
+      for (const arm of rig.arms) arm.root.rotation.x -= stagger * 0.6;
+      tailDriveX -= stagger * 0.35;
+      tailDriveY += staggerSide * 0.4;
     }
 
     // === 撃破 =============================================================
