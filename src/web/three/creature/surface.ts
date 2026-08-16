@@ -161,16 +161,24 @@ ${SIMPLEX_NOISE_3D}
  * 階段状の高さ場は差分を取った瞬間に無限大の傾きを生み、縁が白く弾ける。
  */
 
-/** 鱗。互い違いに並んだ丸い盛り上がりで、境目が溝になる */
+/**
+ * 鱗。互い違いに並んだ、横に広く縦に浅い盛り上がり。
+ *
+ * 立方体のセルをそのまま丸めると、粒が均等に並んで「気泡緩衝材」に見える。
+ * 実際の鱗は横に広く、上下に重なって並んでいるので、Y方向の目を細かく取る。
+ * さらに一枚ごとの高さを揺らして、規則的な繰り返しに見えないようにする。
+ */
 float scaleHeight(vec3 p) {
-  vec3 q = p * 15.0;
+  vec3 q = p * vec3(11.0, 17.0, 11.0);
   // 段ごとに半個ずらす。格子のままだと市松模様に見えて生き物にならない
   q.xz += mod(floor(q.y), 2.0) * 0.5;
   vec3 f = fract(q) - 0.5;
-  float d = max(abs(f.x), max(abs(f.y) * 1.2, abs(f.z)));
-  float dome = smoothstep(0.5, 0.06, d);
-  // 完全な繰り返しに見えないよう、粗いノイズで高さを揺らす
-  return dome * (0.75 + (snoise(p * 9.0) * 0.5 + 0.5) * 0.5);
+  float d = max(abs(f.x), max(abs(f.y), abs(f.z)));
+  // 頂点を平らにしすぎない。中央から縁までなだらかに落として、
+  // 溝(セルの境目)だけがはっきり残るようにする
+  float dome = smoothstep(0.5, 0.14, d);
+  // 一枚ごとの高さの差。これが無いと、どの角度から見ても同じ粒に見える
+  return dome * (0.55 + (snoise(p * 7.0) * 0.5 + 0.5) * 0.7);
 }
 
 /** 岩の割れ。ノイズの零点に沿って溝が走り、面は平らに残る */
@@ -421,12 +429,14 @@ void main() {
     float edge = pow(1.0 - facing, 2.0);
     // 内部の層。見る向きでずれるので、中に奥行きがあるように見える
     float inner = sin(dot(vLocal, vec3(11.0, 17.0, 9.0)) - facing * 7.0 + uTime * 0.35) * 0.5 + 0.5;
-    vec3 core = mix(uColor * 0.42, uGlow * 0.5, inner * 0.7);
-    color = core + albedo * (0.22 + ramp(key) * 0.40) + uRim * edge * 0.8;
+    vec3 core = mix(uColor * 0.30, uGlow * 0.55, inner * 0.6);
+    color = core + albedo * (0.18 + ramp(key) * 0.34) + uRim * edge * 0.85;
     // 面の稜線だけが白く立つ。カットガラスの角の見え方
-    color += vec3(1.0) * pow(height, 8.0) * 0.12;
-    // 正面は透け、縁は詰まって見える。これが厚みの手がかりになる
-    alpha = uOpacity * (0.42 + edge * 0.58);
+    color += vec3(1.0) * pow(height, 8.0) * 0.16;
+    // 正面は透け、縁は詰まって見える。これが厚みの手がかりになる。
+    // 明るさではなく「向こうが見えること」で他の材質と差をつけるので、
+    // ブルームに投げ込む光の量は増えない
+    alpha = uOpacity * (0.32 + edge * 0.68);
   #endif
 #endif
 
