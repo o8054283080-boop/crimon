@@ -110,10 +110,22 @@ varying vec3 vLocal;
 varying vec3 vWorld;
 varying float vWorldY;
 
+// 骨による変形。SkinnedMesh に対して three.js が USE_SKINNING を立て、
+// bindMatrix / boneTexture も自動で流し込む。素の Mesh では丸ごと無効になる
+#include <skinning_pars_vertex>
+
 void main() {
-  vLocal = position;
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vNormalW = normalize(mat3(modelMatrix) * normal);
+  // three.js のスキニングのチャンクは transformed / objectNormal を書き換える約束なので、
+  // その名前で受けてから使う
+  vec3 transformed = position;
+  vec3 objectNormal = normal;
+  #include <skinbase_vertex>
+  #include <skinnormal_vertex>
+  #include <skinning_vertex>
+
+  vLocal = transformed;
+  vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+  vNormalW = normalize(mat3(modelMatrix) * objectNormal);
   vViewDir = normalize(cameraPosition - worldPosition.xyz);
   // 模様はワールド座標基準で描く。パーツごとに大きさが違っても
   // 鱗や筋の粗さが揃い、1体の生き物として見える
