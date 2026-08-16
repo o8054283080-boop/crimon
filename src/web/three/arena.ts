@@ -21,13 +21,19 @@ import { SIMPLEX_NOISE_3D } from "./shaderChunks.js";
 const FLOOR_RADIUS = 13.0;
 const TIER_INNER = 13.0;
 const TIER_OUTER = 18.4;
-const TIER_TOP_Y = 1.55;
+/**
+ * 観客席の頂点の高さ。ここが低いと段が床とほぼ同一平面に見え、
+ * 「闘技場の底で戦っている」感じが出ない。奥の段がカメラの上方へ
+ * せり上がるくらいまで起こして、画面上部の空白を情報で埋める。
+ */
+const TIER_TOP_Y = 3.05;
+const TIER_STEPS = 7;
 const COLUMN_RADIUS = 17.9;
 const COLUMN_COUNT = 24;
 const COLUMN_BASE_Y = TIER_TOP_Y;
 const COLUMN_SHAFT_H = 2.95;
 const WALL_RADIUS = 20.0;
-const WALL_HEIGHT = 8.4;
+const WALL_HEIGHT = 7.2;
 
 // --- 色 ---
 const STONE_LIGHT = "#6d7186";
@@ -56,6 +62,10 @@ uniform vec3 uZenith;
 uniform vec3 uMid;
 uniform vec3 uHaze;
 uniform vec3 uGlow;
+uniform vec3 uOrbColor;
+uniform vec3 uOrbDir;
+uniform float uOrbSize;
+uniform float uStars;
 uniform float uTime;
 varying vec3 vWorld;
 
@@ -76,13 +86,22 @@ void main() {
   float glow = pow(back, 3.0) * exp(-abs(h - 0.06) * 5.0);
   color += uGlow * glow * 0.85;
 
-  // ゆっくり流れる高層の雲
+  // 天体。空に一点だけ「光源の実体」があると、逆光の理由が画の中で完結する。
+  // 円盤そのものは小さく、外側の暈(かさ)を広く取って空気の厚みを見せる
+  float toOrb = max(0.0, dot(dir, normalize(uOrbDir)));
+  float disc = smoothstep(1.0 - uOrbSize, 1.0 - uOrbSize * 0.45, toOrb);
+  float halo = pow(toOrb, 26.0) * 0.55 + pow(toOrb, 5.0) * 0.16;
+  color += uOrbColor * (disc * 0.9 + halo);
+
+  // ゆっくり流れる高層の雲。天体の側だけ縁が光り、層の前後関係が出る
   float clouds = fbm(vec3(dir.xz * 1.7 + vec2(uTime * 0.006, 0.0), uTime * 0.01));
-  color += uMid * smoothstep(0.15, 0.8, clouds) * 0.35 * smoothstep(0.0, 0.45, h);
+  float deck = smoothstep(0.15, 0.8, clouds) * smoothstep(0.0, 0.45, h);
+  color += uMid * deck * 0.30;
+  color += uOrbColor * deck * pow(toOrb, 3.0) * 0.35;
 
   // 星。地平線近くは霞んで見えない
   float stars = snoise(dir * 120.0);
-  color += vec3(0.75, 0.82, 1.0) * smoothstep(0.955, 1.0, stars) * smoothstep(0.25, 0.85, h) * 0.55;
+  color += vec3(0.75, 0.82, 1.0) * smoothstep(0.955, 1.0, stars) * smoothstep(0.25, 0.85, h) * uStars;
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -493,7 +512,11 @@ export function createArena(): ArenaHandles {
         uZenith: { value: new THREE.Color(0x060814) },
         uMid: { value: new THREE.Color(0x1b2245) },
         uHaze: { value: new THREE.Color(0x2a3055) },
-        uGlow: { value: new THREE.Color(0x6c4a7a) },
+        uGlow: { value: new THREE.Color(0x8a5570) },
+        uOrbColor: { value: new THREE.Color(0xffc98f) },
+        uOrbDir: { value: new THREE.Vector3(-0.34, 0.15, -1).normalize() },
+        uOrbSize: { value: 0.014 },
+        uStars: { value: 0.55 },
         uTime: { value: 0 },
       },
       side: THREE.BackSide,
@@ -548,12 +571,15 @@ export function createArena(): ArenaHandles {
   // ============================== 観客席の段 ==============================
   // 内側から外側へ、4段の階段状に立ち上げる(LatheGeometryで一体成型)
   const tierProfile: THREE.Vector2[] = [];
-  const tierSteps = 4;
+  const tierSteps = TIER_STEPS;
+  /** i段目の踏み面の半径と高さ。観客の配置と共有する */
+  const tierAt = (i: number): { r: number; y: number } => ({
+    r: THREE.MathUtils.lerp(TIER_INNER, TIER_OUTER, i / tierSteps),
+    y: TIER_TOP_Y * (i / tierSteps),
+  });
   for (let i = 0; i <= tierSteps; i++) {
-    const t = i / tierSteps;
-    const r = THREE.MathUtils.lerp(TIER_INNER, TIER_OUTER, t);
-    const y = TIER_TOP_Y * t;
-    const rPrev = THREE.MathUtils.lerp(TIER_INNER, TIER_OUTER, Math.max(0, (i - 1) / tierSteps));
+    const { r, y } = tierAt(i);
+    const rPrev = tierAt(Math.max(0, i - 1)).r;
     if (i > 0) tierProfile.push(new THREE.Vector2(rPrev, y)); // 蹴上げ
     tierProfile.push(new THREE.Vector2(r, y)); // 踏み面
   }
@@ -571,6 +597,87 @@ export function createArena(): ArenaHandles {
   const tiers = new THREE.Mesh(tierGeometry, tierMaterial);
   tiers.receiveShadow = true;
   group.add(tiers);
+
+  // ============================== 観客 ==============================
+  // 段だけを立てても、それは「空っぽの階段」にしか見えない。
+  // 人影が乗って初めて奥行きの目盛りになる。1人ずつは判別できない距離なので、
+  // 形は作り込まず**背の高さと肩幅をばらけさせる**ことに全部を使う。
+  // 個体を動かすと1000近い行列を毎フレーム書くことになるので、
+  // 群衆は静止させ、動きは手持ちの灯り(下の点群)の明滅だけで見せる。
+  {
+    const crowdRandom = makeRandom(60313);
+    const bodies: { position: THREE.Vector3; scale: THREE.Vector3; angle: number }[] = [];
+    const torchPositions: number[] = [];
+    for (let i = 1; i <= tierSteps; i++) {
+      const { r, y } = tierAt(i);
+      // 半径に比例して人数を決め、どの段でも肩の詰まり具合が同じになるようにする
+      const seats = Math.round((2 * Math.PI * r) / 0.62);
+      for (let s = 0; s < seats; s++) {
+        // 席をわずかに乱して、整列した点線に見えないようにする
+        const angle = ((s + (crowdRandom() - 0.5) * 0.55) / seats) * Math.PI * 2;
+        const radius = r - 0.28 - crowdRandom() * 0.5;
+        const height = 0.62 + crowdRandom() * 0.42;
+        bodies.push({
+          position: new THREE.Vector3(Math.cos(angle) * radius, y + height * 0.5, Math.sin(angle) * radius),
+          scale: new THREE.Vector3(0.8 + crowdRandom() * 0.45, height / 0.9, 0.8 + crowdRandom() * 0.45),
+          angle,
+        });
+        // 12人に1人くらいが灯りを掲げている
+        if (crowdRandom() < 0.085) {
+          torchPositions.push(
+            Math.cos(angle) * (radius - 0.12),
+            y + height + 0.16,
+            Math.sin(angle) * (radius - 0.12),
+          );
+        }
+      }
+    }
+
+    const crowdGeometry = track(new THREE.CapsuleGeometry(0.19, 0.52, 3, 6));
+    const crowdMaterial = track(
+      new THREE.MeshStandardMaterial({ color: 0x1d1f2e, roughness: 0.95, metalness: 0.0 }),
+    );
+    const crowd = new THREE.InstancedMesh(crowdGeometry, crowdMaterial, bodies.length);
+    const crowdColor = new THREE.Color();
+    const crowdMatrix = new THREE.Matrix4();
+    const crowdQuat = new THREE.Quaternion();
+    const upAxis = new THREE.Vector3(0, 1, 0);
+    for (let i = 0; i < bodies.length; i++) {
+      const body = bodies[i];
+      crowdQuat.setFromAxisAngle(upAxis, -body.angle);
+      crowdMatrix.compose(body.position, crowdQuat, body.scale);
+      crowd.setMatrixAt(i, crowdMatrix);
+      // 濃さを散らす。全部同じ黒だと、切り絵を並べたように平らになる
+      const tone = 0.55 + crowdRandom() * 0.9;
+      crowdColor.setRGB(0.42 * tone, 0.40 * tone, 0.52 * tone);
+      crowd.setColorAt(i, crowdColor);
+    }
+    crowd.instanceMatrix.needsUpdate = true;
+    if (crowd.instanceColor) crowd.instanceColor.needsUpdate = true;
+    crowd.castShadow = false;
+    crowd.receiveShadow = true;
+    group.add(crowd);
+    disposables.push({ dispose: () => crowd.dispose() });
+
+    // 観客の手持ちの灯り。遠景に散った小さな暖色の点は、
+    // 「そこに人がいる」ことを形より確実に伝える
+    const torchGeometry = track(new THREE.BufferGeometry());
+    torchGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(torchPositions), 3));
+    const torchMaterial = track(
+      new THREE.PointsMaterial({
+        color: 0xffb469,
+        size: 0.24,
+        map: track(softDotTexture(32)),
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+      }),
+    );
+    const torches = new THREE.Points(torchGeometry, torchMaterial);
+    group.add(torches);
+  }
 
   // ============================== 外周の壁 ==============================
   const wallColor = track(textureFrom(drawWallTexture(512, 340, "color"), true));
@@ -602,6 +709,56 @@ export function createArena(): ArenaHandles {
   const parapet = new THREE.Mesh(parapetGeometry, parapetMaterial);
   parapet.position.y = TIER_TOP_Y + WALL_HEIGHT - 0.05;
   group.add(parapet);
+
+  // ============================== 遠景の尖塔 ==============================
+  // 空気遠近は「霞ませる」だけでは出ない。**霞の中に見えるもの**が要る。
+  // 壁の向こうに塔を立てると、そこまでの距離を測る目盛りになり、
+  // 同時に画面上部の空白が埋まる。近い塔は輪郭が立ち、遠い塔は霧に沈む
+  // ——この差そのものが奥行きの情報になる。
+  {
+    const spireRandom = makeRandom(31771);
+    const spireMaterial = track(
+      new THREE.MeshStandardMaterial({ color: 0x232741, roughness: 1.0, metalness: 0.0, flatShading: true }),
+    );
+    const spireGeometry = track(new THREE.CylinderGeometry(0.62, 1.05, 1, 6, 1));
+    const roofGeometry = track(new THREE.ConeGeometry(0.92, 1, 6, 1));
+    const spires: { x: number; z: number; h: number; w: number }[] = [];
+    for (let i = 0; i < 34; i++) {
+      const angle = spireRandom() * Math.PI * 2;
+      const radius = 27 + spireRandom() * 26;
+      spires.push({
+        x: Math.cos(angle) * radius,
+        z: Math.sin(angle) * radius,
+        // 遠いものほど高くないと壁に隠れるので、半径に応じて背を伸ばす
+        h: 11 + (radius - 27) * 0.55 + spireRandom() * 13,
+        w: 0.75 + spireRandom() * 1.5,
+      });
+    }
+    const spireMatrix = new THREE.Matrix4();
+    const spireQuat = new THREE.Quaternion();
+    const towers = new THREE.InstancedMesh(spireGeometry, spireMaterial, spires.length);
+    const roofs = new THREE.InstancedMesh(roofGeometry, spireMaterial, spires.length);
+    for (let i = 0; i < spires.length; i++) {
+      const s = spires[i];
+      spireQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), spireRandom() * Math.PI);
+      spireMatrix.compose(
+        new THREE.Vector3(s.x, s.h * 0.5, s.z),
+        spireQuat,
+        new THREE.Vector3(s.w, s.h, s.w),
+      );
+      towers.setMatrixAt(i, spireMatrix);
+      spireMatrix.compose(
+        new THREE.Vector3(s.x, s.h + s.w * 1.35, s.z),
+        spireQuat,
+        new THREE.Vector3(s.w, s.w * 2.7, s.w),
+      );
+      roofs.setMatrixAt(i, spireMatrix);
+    }
+    towers.instanceMatrix.needsUpdate = true;
+    roofs.instanceMatrix.needsUpdate = true;
+    group.add(towers, roofs);
+    disposables.push({ dispose: () => towers.dispose() }, { dispose: () => roofs.dispose() });
+  }
 
   // ============================== 列柱 ==============================
   // 基礎・柱身・柱頭をそれぞれInstancedMeshにして、描画回数を3回に抑える

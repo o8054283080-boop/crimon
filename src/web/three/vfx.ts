@@ -2,17 +2,24 @@ import * as THREE from "three";
 import { BillboardField } from "./fx/billboards.js";
 import {
   SPRITE,
+  chevronTexture,
+  crackDecalTexture,
   fireballTexture,
   flashStarTexture,
+  godRayTexture,
+  hexPanelTexture,
+  impactStarTexture,
   lightPillarTexture,
+  rippleRingsTexture,
   runeCircleTexture,
   shockRingTexture,
   smokePuffTexture,
+  voidCoreTexture,
   vortexTexture,
 } from "./fx/fxTextures.js";
 import { ParticleField } from "./fx/particles.js";
 import { StatusAura, StatusAuraKind } from "./fx/statusAuras.js";
-import { StripField, arcPath, helixPath, wavyPath, zigzagPath } from "./fx/strips.js";
+import { StripField, arcPath, helixPath, ringPath, wavyPath, zigzagPath } from "./fx/strips.js";
 
 export type { StatusAuraKind } from "./fx/statusAuras.js";
 
@@ -74,6 +81,10 @@ interface Projectile {
 }
 
 const GROUND_Y = 0.07;
+
+/** 地面に寝かせた輪を作るための基底(XZ平面) */
+const GROUND_RIGHT = new THREE.Vector3(1, 0, 0);
+const GROUND_UP = new THREE.Vector3(0, 0, 1);
 
 const WHITE = new THREE.Color(0xffffff);
 
@@ -196,80 +207,228 @@ export class VfxSystem {
   // 打撃感の共通土台
   // -------------------------------------------------------------------------
 
+  /** カメラ基準の平面ベクトル(斬撃やリングの向きに使う) */
+  private updateCameraBasis(): void {
+    this.camRight.set(1, 0, 0).applyQuaternion(this.cameraQuaternion);
+    this.camUp.set(0, 1, 0).applyQuaternion(this.cameraQuaternion);
+  }
+
+  /**
+   * 広がる(あるいは収束する)輪。
+   *
+   * 板ではなく帯で描く。板は面なので大きくすると加算合成で画面が白く飛ぶが、
+   * 輪は線なので半径をいくら広げても加算される面積はほとんど増えない。
+   * 打撃の「重さ」は、この輪がどれだけ速く出てどう減速するかで決まる。
+   */
+  private shockRing(
+    center: THREE.Vector3,
+    color: THREE.Color,
+    o: {
+      radius: number;
+      /** 寿命の終わりまでに半径が何倍になるか。1未満で収束する */
+      grow: number;
+      width: number;
+      life: number;
+      /** カメラ正対か、地面に寝かせるか、任意の面か */
+      plane?: "camera" | "ground";
+      basis?: { right: THREE.Vector3; up: THREE.Vector3 };
+      opacity?: number;
+      coreWhite?: number;
+      fadePower?: number;
+      jitter?: number;
+      segments?: number;
+      delay?: number;
+      /** 輪が一周描かれるまでの秒数(流れを見せたい時) */
+      revealSec?: number;
+      band?: number;
+    },
+  ): void {
+    const anchor =
+      o.plane === "ground" ? new THREE.Vector3(center.x, GROUND_Y + 0.03, center.z) : center.clone();
+    const emit = () => {
+      this.updateCameraBasis();
+      const basis =
+        o.basis ??
+        (o.plane === "ground"
+          ? { right: GROUND_RIGHT, up: GROUND_UP }
+          : { right: this.camRight, up: this.camUp });
+      this.strips.spawn(
+        {
+          points: ringPath(anchor, o.radius, basis, o.segments ?? 36, o.jitter ?? 0.07),
+          color,
+          width: o.width,
+          life: o.life,
+          opacity: o.opacity ?? 1,
+          grow: o.grow,
+          origin: anchor,
+          coreWhite: o.coreWhite ?? 0.55,
+          glow: o.revealSec ? 0.8 : 0,
+          revealSec: o.revealSec ?? 0,
+          band: o.band ?? 1.3,
+          fadePower: o.fadePower ?? 1.6,
+          widthProfile: "even",
+        },
+        this.cameraPosition,
+      );
+    };
+    if (o.delay) this.schedule(o.delay, emit);
+    else emit();
+  }
+
+  /**
+   * 外へ放射する尾を引いた粒。
+   * 粒の絵を進行方向へ倒すことで、同じ数でも「飛んでいる」ように見える。
+   */
+  private radialStreaks(
+    origin: THREE.Vector3,
+    color: THREE.Color,
+    o: {
+      count: number;
+      speed: number;
+      size: number;
+      life: number;
+      cell?: number;
+      direction?: THREE.Vector3 | null;
+      focus?: number;
+      gravity?: number;
+      drag?: number;
+      upBias?: number;
+      spread?: number;
+      fadePower?: number;
+    },
+  ): void {
+    this.updateCameraBasis();
+    const velocity = new THREE.Vector3();
+    for (let i = 0; i < o.count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      velocity.set(Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta));
+      if (o.direction && o.focus) velocity.lerp(o.direction, o.focus);
+      velocity.normalize().multiplyScalar(o.speed * (0.55 + Math.random() * 0.9));
+      velocity.y += o.upBias ?? 0;
+      // 速度をカメラ平面へ落として、画面上での向きを求める
+      const dx = velocity.dot(this.camRight);
+      const dy = velocity.dot(this.camUp);
+      this.particles.spawn({
+        position: new THREE.Vector3(
+          origin.x + (Math.random() - 0.5) * (o.spread ?? 0.2),
+          origin.y + (Math.random() - 0.5) * (o.spread ?? 0.2),
+          origin.z + (Math.random() - 0.5) * (o.spread ?? 0.2),
+        ),
+        velocity: velocity.clone(),
+        color,
+        size: o.size * (0.6 + Math.random() * 0.8),
+        life: o.life * (0.65 + Math.random() * 0.7),
+        cell: o.cell ?? SPRITE.STREAK,
+        gravity: o.gravity ?? 0,
+        drag: o.drag ?? 0.88,
+        rotation: -Math.atan2(dy, dx),
+        fadePower: o.fadePower ?? 1.2,
+      });
+    }
+  }
+
   /**
    * どの属性でも共通で走る「効いた」感の土台。
-   * 閃光 → 衝撃波 → 破片 → 砂埃 → 余韻の煙、の順に時間差で見える。
+   *
+   * 見せ方は三段に分けている。
+   *   衝撃(0〜0.1秒)  一点に集中した硬く白い形。ここが一番強い
+   *   波 (0.05〜0.35秒) 外へ抜けていく輪と破片。規模を伝える
+   *   余韻(0.2〜1.2秒) 落ちる破片・立ちのぼる煙。重さを残す
+   * 段が重ならないよう、それぞれの寿命を意図的にずらしてある。
    */
   private impactCore(position: THREE.Vector3, color: THREE.Color, s: number, options: ImpactOptions): void {
     const element = options.element ?? "NEUTRAL";
     const hot = this.accent(element, "hot");
-    const direction = options.direction ? this.tmp2.copy(options.direction).normalize() : null;
+    const dust = this.accent(element, "dust");
+    const direction = options.direction ? options.direction.clone().normalize() : null;
 
-    // 1) 白熱の閃光。ごく短時間だけ画面を刺す
+    // --- 衝撃 ---
+    // 十字の閃光。2〜4フレームだけ出る。長く残すと「爆発」になってしまい、
+    // 「叩かれた瞬間」の鋭さが消える
     this.billboards.spawn({
       position,
       texture: flashStarTexture(),
       color: hot,
-      life: 0.13,
-      startScale: 0.8 * s,
-      endScale: 4.6 * s,
+      life: 0.075,
+      startScale: 2.6 * s,
+      endScale: 4.3 * s,
       opacity: 1,
-      roll: Math.random() * Math.PI,
-      fadePower: 2.2,
+      roll: (Math.random() - 0.5) * 0.7,
+      fadePower: 2.4,
     });
-    // 2) 芯の光球
+    // とがった星形。丸い光だけでは「硬いものが当たった」に読めない
+    this.billboards.spawn({
+      position,
+      texture: impactStarTexture(),
+      color: color.clone().lerp(WHITE, 0.75),
+      life: 0.15,
+      startScale: 0.6 * s,
+      endScale: 3.1 * s,
+      spin: (Math.random() - 0.5) * 2.2,
+      scaleEase: "pop",
+      fadePower: 2.0,
+    });
+    // 芯だけは逆に縮む。外へ広がるものと逆向きの動きを1つ混ぜると、
+    // 「一点に力が集まった」ように見える
     this.billboards.spawn({
       position,
       texture: fireballTexture(),
-      color: color.clone().lerp(WHITE, 0.55),
-      life: 0.2,
-      startScale: 1.5 * s,
+      color: color.clone().lerp(WHITE, 0.5),
+      life: 0.22,
+      startScale: 1.7 * s,
       endScale: 0.3 * s,
-      fadePower: 1.6,
-    });
-    // 3) カメラ正対の衝撃波リング
-    this.billboards.spawn({
-      position,
-      texture: shockRingTexture(),
-      color: color.clone().lerp(WHITE, 0.4),
-      life: 0.3,
-      startScale: 0.5 * s,
-      endScale: 4.4 * s,
-      fadePower: 1.7,
-    });
-    // 4) 地面へ抜ける衝撃(接地感)
-    this.billboards.spawn({
-      position: this.ground(position),
-      texture: shockRingTexture(),
-      color: color.clone().lerp(WHITE, 0.2),
-      life: 0.45,
-      startScale: 0.8 * s,
-      endScale: 5.4 * s,
-      orient: "ground",
-      opacity: 0.75,
-      fadePower: 1.5,
+      fadePower: 1.2,
     });
 
-    // 5) 火花。指向性がある場合は攻撃方向へ抜ける
-    this.particles.burst(position, color.clone().lerp(hot, 0.5), {
-      count: this.count(20 * s),
-      speed: 7.5 * s,
-      focus: direction ? 0.45 : 0,
-      direction: direction ?? undefined,
-      size: 11 * s,
-      life: 0.42,
-      cell: SPRITE.SPARK,
-      gravity: -9,
-      drag: 0.85,
-      growth: 0.4,
-      fadePower: 1.5,
+    // --- 波 ---
+    this.shockRing(position, hot, {
+      radius: 0.45 * s,
+      grow: 4.2,
+      width: 1.5 * s,
+      life: 0.22,
+      coreWhite: 0.85,
+      fadePower: 1.7,
     });
-    // 6) 破片(通常合成なので「物」として見える)
-    this.particles.burst(position, this.accent(element, "dust"), {
+    this.shockRing(position, color, {
+      radius: 0.4 * s,
+      grow: 5.4,
+      width: 0.9 * s,
+      life: 0.3,
+      opacity: 0.65,
+      delay: 0.06,
+      fadePower: 1.4,
+    });
+    // 地面へ抜ける衝撃。接地感はここで出る
+    this.shockRing(position, color.clone().lerp(WHITE, 0.3), {
+      radius: 0.7 * s,
+      grow: 4.0,
+      width: 1.8 * s,
+      life: 0.38,
+      plane: "ground",
+      opacity: 0.75,
+      fadePower: 1.3,
+    });
+
+    // 火花。指向性がある場合は攻撃方向へ抜ける
+    this.radialStreaks(position, color.clone().lerp(hot, 0.6), {
+      count: this.count(16 * s),
+      speed: 8.5 * s,
+      size: 11 * s,
+      life: 0.34,
+      direction,
+      focus: direction ? 0.5 : 0,
+      gravity: -9,
+      drag: 0.84,
+    });
+
+    // --- 余韻 ---
+    // 破片(通常合成なので「物」として見える)
+    this.particles.burst(position, dust, {
       count: this.count(8 * s),
       speed: 5.5 * s,
       size: 9 * s,
-      life: 0.7,
+      life: 0.75,
       cell: SPRITE.SHARD,
       layer: "alpha",
       gravity: -12,
@@ -277,14 +436,14 @@ export class VfxSystem {
       randomSpin: 14,
       alpha: 0.9,
     });
-    // 7) 足元の砂埃
-    this.particles.ringBurst(this.ground(position), this.accent(element, "dust"), {
+    // 足元の砂埃
+    this.particles.ringBurst(this.ground(position), dust, {
       count: this.count(9 * s),
-      speed: 3.4 * s,
+      speed: 3.6 * s,
       radius: 0.25,
       upBias: 0.5,
       size: 26 * s,
-      life: 0.65,
+      life: 0.7,
       cell: SPRITE.SMOKE,
       layer: "alpha",
       alpha: 0.35,
@@ -293,119 +452,164 @@ export class VfxSystem {
       fadeIn: 0.06,
       randomSpin: 1.6,
     });
-    // 8) 余韻の煙。ゆっくり上がって消える
-    this.particles.burst(position, this.accent(element, "dust"), {
-      count: this.count(4 * s),
-      speed: 1.1 * s,
-      upBias: 0.7,
-      size: 30 * s,
+    // 当たった点の背後に暗い塊を置く。加算の光は、暗いものが隣にあって
+    // はじめて「明るい」と読める。ここを抜くと全部が同じ灰色に見える
+    this.particles.burst(position, dust.clone().multiplyScalar(0.5), {
+      count: this.count(5 * s),
+      speed: 1.6 * s,
+      upBias: 0.8,
+      size: 32 * s,
       life: 1.0,
       cell: SPRITE.SMOKE,
       layer: "alpha",
-      alpha: 0.28,
-      drag: 0.94,
-      growth: 2.4,
-      fadeIn: 0.12,
+      alpha: 0.4,
+      drag: 0.93,
+      growth: 2.6,
+      fadeIn: 0.1,
       randomSpin: 1.2,
     });
   }
 
-  /** カメラ基準の平面ベクトル(斬撃やリングの向きに使う) */
-  private updateCameraBasis(): void {
-    this.camRight.set(1, 0, 0).applyQuaternion(this.cameraQuaternion);
-    this.camUp.set(0, 1, 0).applyQuaternion(this.cameraQuaternion);
-  }
-
   // -------------------------------------------------------------------------
   // 属性別のヒット表現
+  //
+  // 色を変えるだけでは属性の違いは伝わらない。動きの質を変える。
+  //   炎  舐めるように外へ広がり、長く残る
+  //   水  流れる。速い立ち上がりを持たず、輪が滑る
+  //   雷  一瞬で刺さって消える。溜めも余韻もない
+  //   草  地面から生えて絡む
+  //   光  外から中心へ差し込む(唯一、収束する属性)
+  //   闇  吸い込んでから喰う
   // -------------------------------------------------------------------------
 
   private impactFire(position: THREE.Vector3, color: THREE.Color, s: number): void {
     const hot = this.accent("FIRE", "hot");
     const deep = this.accent("FIRE", "deep");
-    // 膨らむ火球を複数重ねて、輪郭が乱れた爆炎にする
-    for (let i = 0; i < 3; i++) {
-      const offset = new THREE.Vector3((Math.random() - 0.5) * 0.7 * s, (Math.random() - 0.2) * 0.6 * s, (Math.random() - 0.5) * 0.7 * s).add(position);
-      this.billboards.spawn({
-        position: offset,
-        texture: fireballTexture(),
-        color: i === 0 ? hot : color.clone().lerp(deep, i * 0.35),
-        life: 0.34 + i * 0.09,
-        startScale: 0.7 * s,
-        endScale: (2.6 + i * 0.7) * s,
-        roll: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 2.2,
-        fadePower: 1.5,
-        velocity: new THREE.Vector3(0, 0.7 + i * 0.3, 0),
+    this.updateCameraBasis();
+
+    // 火の舌。外へ向かって舐めるように伸びる。
+    // 伸びきる時間をずらすと、炎が「広がっていく」ように見える
+    const tongues = this.count(5);
+    for (let i = 0; i < tongues; i++) {
+      const angle = (i / tongues) * Math.PI * 2 + Math.random() * 0.8;
+      const length = (1.6 + Math.random() * 1.4) * s;
+      const end = new THREE.Vector3()
+        .copy(position)
+        .addScaledVector(this.camRight, Math.cos(angle) * length)
+        .addScaledVector(this.camUp, Math.sin(angle) * length * 0.75 + 0.5 * s);
+      this.schedule(i * 0.035, () => {
+        this.strips.spawn(
+          {
+            points: wavyPath(position, end, 9, 0.28 * s, this.cameraPosition, 1.2),
+            color: i % 2 === 0 ? hot : color.clone().lerp(deep, 0.4),
+            width: (1.5 - i * 0.12) * s,
+            life: 0.34,
+            revealSec: 0.12,
+            band: 0.9,
+            coreWhite: 0.45,
+            glow: 0.7,
+            widthProfile: "taperEnd",
+            fadePower: 1.9,
+          },
+          this.cameraPosition,
+        );
       });
     }
-    // 立ち上る黒煙(爆発の後に残る重さ)
-    for (let i = 0; i < 3; i++) {
-      this.billboards.spawn({
-        position: new THREE.Vector3(position.x + (Math.random() - 0.5) * 1.2 * s, position.y + 0.2, position.z + (Math.random() - 0.5) * 1.2 * s),
-        texture: smokePuffTexture(),
-        color: new THREE.Color(0x322730),
-        life: 1.3 + Math.random() * 0.5,
-        startScale: 1.0 * s,
-        endScale: 3.6 * s,
-        blending: THREE.NormalBlending,
-        opacity: 0.5,
-        fadeIn: 0.12,
-        fadePower: 1.2,
-        spin: (Math.random() - 0.5) * 0.9,
-        velocity: new THREE.Vector3((Math.random() - 0.5) * 0.4, 1.1, (Math.random() - 0.5) * 0.4),
-        drag: 0.97,
-      });
-    }
+    // 膨らむ火球。少し遅れて上へ抜ける
+    this.billboards.spawn({
+      position: new THREE.Vector3(position.x, position.y + 0.15 * s, position.z),
+      texture: fireballTexture(),
+      color: color.clone().lerp(hot, 0.35),
+      life: 0.42,
+      startScale: 0.9 * s,
+      endScale: 3.4 * s,
+      roll: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 1.6,
+      fadePower: 1.6,
+      velocity: new THREE.Vector3(0, 0.9, 0),
+    });
+    // 地面の焦げ跡。1秒以上残るものが1つあると、爆発に重さが出る
+    this.billboards.spawn({
+      position: this.ground(position).clone(),
+      texture: crackDecalTexture(),
+      color: deep,
+      life: 1.3,
+      startScale: 1.6 * s,
+      endScale: 2.4 * s,
+      orient: "ground",
+      opacity: 0.7,
+      roll: Math.random() * Math.PI,
+      fadePower: 1.8,
+    });
     // 火の粉。ゆっくり漂って落ちる
     this.particles.burst(position, color.clone().lerp(hot, 0.35), {
-      count: this.count(22 * s),
-      speed: 5.2 * s,
-      upBias: 1.6,
-      size: 13 * s,
-      life: 0.8,
+      count: this.count(20 * s),
+      speed: 4.6 * s,
+      upBias: 2.0,
+      size: 14 * s,
+      life: 0.9,
       cell: SPRITE.FLAME,
-      gravity: -1.4,
+      gravity: -1.2,
       drag: 0.9,
       growth: 0.5,
       randomSpin: 3,
       fadePower: 1.3,
     });
-    this.particles.burst(position, hot, {
-      count: this.count(10 * s),
-      speed: 9 * s,
-      size: 9 * s,
-      life: 0.55,
-      cell: SPRITE.STREAK,
-      gravity: -6,
-      drag: 0.88,
-      randomSpin: 6,
-    });
-    // 地面の焦げ跡
-    this.billboards.spawn({
-      position: this.ground(position),
-      texture: smokePuffTexture(),
-      color: deep,
-      life: 1.1,
-      startScale: 1.4 * s,
-      endScale: 3.0 * s,
-      orient: "ground",
-      opacity: 0.55,
-      fadePower: 1.6,
+    // 黒煙。炎の明るさは、この煙があってはじめて出る
+    this.particles.burst(position, new THREE.Color(0x2c2028), {
+      count: this.count(7 * s),
+      speed: 2.2 * s,
+      upBias: 1.8,
+      size: 34 * s,
+      life: 1.3,
+      cell: SPRITE.SMOKE,
+      layer: "alpha",
+      alpha: 0.5,
+      drag: 0.95,
+      growth: 2.4,
+      fadeIn: 0.12,
+      randomSpin: 1.1,
     });
   }
 
   private impactWater(position: THREE.Vector3, color: THREE.Color, s: number): void {
     const hot = this.accent("WATER", "hot");
-    // 水冠(クラウン)。上へ跳ね上がる飛沫
+    // 水は「弾ける」より「流れる」。輪を一周ぶん走らせて、
+    // 一気に開くのではなく回り込むように見せる
+    this.shockRing(position, hot, {
+      radius: 1.1 * s,
+      grow: 2.4,
+      width: 1.3 * s,
+      life: 0.55,
+      plane: "ground",
+      revealSec: 0.28,
+      band: 0.55,
+      opacity: 0.9,
+      fadePower: 1.2,
+      jitter: 0.03,
+    });
+    // 水面の波紋。細い輪が三重に広がる
+    this.billboards.spawn({
+      position: this.ground(position).clone(),
+      texture: rippleRingsTexture(),
+      color: hot,
+      life: 0.7,
+      startScale: 0.8 * s,
+      endScale: 4.6 * s,
+      orient: "ground",
+      opacity: 0.85,
+      scaleEase: "linear",
+      fadePower: 1.5,
+    });
+    // 水冠。上へ跳ね上がってから落ちてくる
     this.particles.ringBurst(position, hot, {
       count: this.count(20 * s),
-      speed: 3.6 * s,
-      radius: 0.2 * s,
-      upBias: 5.2 * s,
+      speed: 3.2 * s,
+      radius: 0.25 * s,
+      upBias: 5.6 * s,
       upJitter: 0.5,
       size: 12 * s,
-      life: 0.8,
+      life: 0.9,
       cell: SPRITE.DROP,
       layer: "alpha",
       gravity: -14,
@@ -413,10 +617,10 @@ export class VfxSystem {
       alpha: 0.95,
     });
     this.particles.burst(position, color, {
-      count: this.count(16 * s),
-      speed: 6.5 * s,
+      count: this.count(14 * s),
+      speed: 6.0 * s,
       size: 10 * s,
-      life: 0.6,
+      life: 0.65,
       cell: SPRITE.DROP,
       layer: "alpha",
       gravity: -13,
@@ -424,9 +628,9 @@ export class VfxSystem {
       alpha: 0.8,
       randomSpin: 3,
     });
-    // 氷片。ゆっくり回りながら散る
+    // 氷片
     this.particles.burst(position, hot, {
-      count: this.count(10 * s),
+      count: this.count(9 * s),
       speed: 4.5 * s,
       size: 14 * s,
       life: 0.7,
@@ -436,96 +640,64 @@ export class VfxSystem {
       randomSpin: 4,
       growth: 0.6,
     });
-    // 波紋。時間差で2枚出して水面らしさを出す
-    for (let i = 0; i < 2; i++) {
-      this.schedule(i * 0.09, () => {
-        this.billboards.spawn({
-          position: new THREE.Vector3(position.x, GROUND_Y + 0.01 * i, position.z),
-          texture: shockRingTexture(),
-          color: hot,
-          life: 0.55,
-          startScale: 0.6 * s,
-          endScale: (4.2 + i * 1.8) * s,
-          orient: "ground",
-          opacity: 0.8 - i * 0.25,
-          fadePower: 1.4,
-        });
-      });
-    }
-    // 霧
-    for (let i = 0; i < 2; i++) {
-      this.billboards.spawn({
-        position: new THREE.Vector3(position.x + (Math.random() - 0.5) * s, position.y - 0.2, position.z + (Math.random() - 0.5) * s),
-        texture: smokePuffTexture(),
-        color: color.clone().lerp(WHITE, 0.6),
-        life: 0.9,
-        startScale: 0.8 * s,
-        endScale: 2.8 * s,
-        opacity: 0.45,
-        fadeIn: 0.08,
-        blending: THREE.NormalBlending,
-        spin: (Math.random() - 0.5) * 0.6,
-      });
-    }
+    // 霧。横へ流れて消える
+    this.particles.burst(position, color.clone().lerp(WHITE, 0.55), {
+      count: this.count(6 * s),
+      speed: 2.6 * s,
+      flatten: 0.75,
+      size: 30 * s,
+      life: 0.95,
+      cell: SPRITE.SMOKE,
+      layer: "alpha",
+      alpha: 0.32,
+      drag: 0.94,
+      growth: 2.2,
+      fadeIn: 0.1,
+      randomSpin: 0.8,
+    });
   }
 
   private impactElectric(position: THREE.Vector3, color: THREE.Color, s: number): void {
     const hot = this.accent("ELECTRIC", "hot");
-    const bolts = this.count(6 * Math.min(1.6, s));
-    const target = new THREE.Vector3();
+    this.updateCameraBasis();
+    // 雷は溜めも余韻も持たない。0.2秒で始まって終わる。
+    // 数を出すと帯の上限に当たって間引かれ、かえって弱くなるので3本に絞る
+    const bolts = this.count(3);
     for (let i = 0; i < bolts; i++) {
-      const theta = (i / bolts) * Math.PI * 2 + Math.random() * 0.6;
-      const phi = (Math.random() - 0.35) * 1.6;
-      const length = (1.6 + Math.random() * 1.6) * s;
-      target.set(Math.cos(theta) * Math.cos(phi), Math.sin(phi) + 0.15, Math.sin(theta) * Math.cos(phi)).multiplyScalar(length).add(position);
-      const points = zigzagPath(position, target, 8, 0.3 * s, this.cameraPosition);
+      const theta = (i / bolts) * Math.PI * 2 + Math.random() * 0.9;
+      const length = (2.2 + Math.random() * 1.4) * s;
+      const target = new THREE.Vector3()
+        .copy(position)
+        .addScaledVector(this.camRight, Math.cos(theta) * length)
+        .addScaledVector(this.camUp, Math.sin(theta) * length);
+      const points = zigzagPath(position, target, 9, 0.45 * s, this.cameraPosition);
       this.strips.spawn(
         {
           points,
-          color: color.clone().lerp(hot, 0.4),
-          width: 0.16 * s,
-          life: 0.16 + Math.random() * 0.1,
-          coreWhite: 0.9,
+          color: i === 0 ? hot : color.clone().lerp(hot, 0.5),
+          width: 0.62 * s,
+          life: 0.15 + Math.random() * 0.08,
+          coreWhite: 0.95,
           glow: 0.5,
-          flicker: 0.45,
-          fadePower: 1.1,
+          flicker: 0.35,
+          fadePower: 1.0,
           widthProfile: "taperEnd",
         },
         this.cameraPosition,
       );
       // 枝分かれ
-      if (Math.random() < 0.6) {
-        const mid = points[Math.floor(points.length * 0.55)];
-        const branch = new THREE.Vector3(
-          mid.x + (Math.random() - 0.5) * 1.6 * s,
-          mid.y + (Math.random() - 0.2) * 1.2 * s,
-          mid.z + (Math.random() - 0.5) * 1.6 * s,
-        );
+      if (i === 0) {
+        const mid = points[Math.floor(points.length * 0.5)];
+        const branch = new THREE.Vector3()
+          .copy(mid)
+          .addScaledVector(this.camRight, (Math.random() - 0.5) * 2.2 * s)
+          .addScaledVector(this.camUp, (Math.random() - 0.5) * 2.2 * s);
         this.strips.spawn(
           {
-            points: zigzagPath(mid, branch, 5, 0.22 * s, this.cameraPosition),
+            points: zigzagPath(mid, branch, 5, 0.3 * s, this.cameraPosition),
             color: hot,
-            width: 0.1 * s,
-            life: 0.13,
-            coreWhite: 0.95,
-            flicker: 0.5,
-            widthProfile: "taperEnd",
-          },
-          this.cameraPosition,
-        );
-      }
-    }
-    // 残響のように、少し遅れてもう一度弾ける
-    this.schedule(0.12, () => {
-      for (let i = 0; i < this.count(3); i++) {
-        const theta = Math.random() * Math.PI * 2;
-        const end = new THREE.Vector3(Math.cos(theta), Math.random() * 0.8, Math.sin(theta)).multiplyScalar(2.2 * s).add(position);
-        this.strips.spawn(
-          {
-            points: zigzagPath(position, end, 7, 0.34 * s, this.cameraPosition),
-            color: hot,
-            width: 0.11 * s,
-            life: 0.12,
+            width: 0.34 * s,
+            life: 0.11,
             coreWhite: 1,
             flicker: 0.5,
             widthProfile: "taperEnd",
@@ -533,59 +705,81 @@ export class VfxSystem {
           this.cameraPosition,
         );
       }
-    });
-    // 帯電した細かい火花
-    this.particles.burst(position, hot, {
-      count: this.count(24 * s),
-      speed: 10 * s,
-      size: 7 * s,
-      life: 0.25,
-      cell: SPRITE.SPARK,
-      gravity: -2,
-      drag: 0.82,
-      fadePower: 0.7,
-    });
-    // 二度光るフラッシュ(電気らしい明滅)
-    this.schedule(0.07, () => {
+    }
+    // 明滅。ひと呼吸おいてもう一度光ると、電気らしい神経質さが出る
+    this.schedule(0.06, () => {
       this.billboards.spawn({
         position,
         texture: flashStarTexture(),
         color: hot,
-        life: 0.09,
-        startScale: 3.4 * s,
-        endScale: 1.6 * s,
+        life: 0.06,
+        startScale: 3.6 * s,
+        endScale: 2.2 * s,
         roll: Math.PI / 4,
-        fadePower: 1.2,
+        fadePower: 1.1,
       });
+    });
+    // 帯電した細かい火花。速く、短く
+    this.radialStreaks(position, hot, {
+      count: this.count(22 * s),
+      speed: 12 * s,
+      size: 7 * s,
+      life: 0.22,
+      cell: SPRITE.SPARK,
+      gravity: -2,
+      drag: 0.78,
+      fadePower: 0.8,
+    });
+    // 残響。消えたと思った直後に一度だけ弾ける
+    this.schedule(0.22, () => {
+      const theta = Math.random() * Math.PI * 2;
+      const end = new THREE.Vector3()
+        .copy(position)
+        .addScaledVector(this.camRight, Math.cos(theta) * 1.9 * s)
+        .addScaledVector(this.camUp, Math.sin(theta) * 1.9 * s);
+      this.strips.spawn(
+        {
+          points: zigzagPath(position, end, 7, 0.4 * s, this.cameraPosition),
+          color: hot,
+          width: 0.4 * s,
+          life: 0.1,
+          coreWhite: 1,
+          flicker: 0.5,
+          widthProfile: "taperEnd",
+        },
+        this.cameraPosition,
+      );
     });
   }
 
   private impactGrass(position: THREE.Vector3, color: THREE.Color, s: number): void {
     const hot = this.accent("GRASS", "hot");
     const deep = this.accent("GRASS", "deep");
-    // 地面から蔦が巻き上がる
-    const vines = this.count(4);
+    // 地面から蔦が巻き上がる。生える速さをずらすと絡みつくように見える
+    const vines = this.count(3);
     for (let i = 0; i < vines; i++) {
       const base = new THREE.Vector3(
-        position.x + (Math.random() - 0.5) * 0.8 * s,
+        position.x + (Math.random() - 0.5) * 0.9 * s,
         GROUND_Y,
-        position.z + (Math.random() - 0.5) * 0.8 * s,
+        position.z + (Math.random() - 0.5) * 0.9 * s,
       );
-      this.strips.spawn(
-        {
-          points: helixPath(base, (0.75 + Math.random() * 0.5) * s, (2.2 + Math.random() * 1.0) * s, 1.1 + Math.random() * 0.6, 26, Math.random() * 6.28),
-          color: i % 2 === 0 ? color : deep,
-          width: 0.2 * s,
-          life: 0.75,
-          revealSec: 0.2,
-          band: 1.4,
-          coreWhite: 0.25,
-          glow: 0.5,
-          widthProfile: "taperEnd",
-          fadePower: 1.8,
-        },
-        this.cameraPosition,
-      );
+      this.schedule(i * 0.05, () => {
+        this.strips.spawn(
+          {
+            points: helixPath(base, (0.7 + Math.random() * 0.5) * s, (2.4 + Math.random() * 0.9) * s, 1.1 + Math.random() * 0.6, 26, Math.random() * 6.28),
+            color: i % 2 === 0 ? color : deep,
+            width: 0.75 * s,
+            life: 0.8,
+            revealSec: 0.22,
+            band: 1.4,
+            coreWhite: 0.25,
+            glow: 0.5,
+            widthProfile: "taperEnd",
+            fadePower: 1.8,
+          },
+          this.cameraPosition,
+        );
+      });
     }
     // 葉が舞う
     this.particles.burst(position, color, {
@@ -613,81 +807,82 @@ export class VfxSystem {
       drag: 0.94,
       wobble: 0.5,
     });
-    this.billboards.spawn({
-      position: this.ground(position),
-      texture: shockRingTexture(),
-      color: hot,
-      life: 0.6,
-      startScale: 0.5 * s,
-      endScale: 4.0 * s,
-      orient: "ground",
+    this.shockRing(position, hot, {
+      radius: 0.9 * s,
+      grow: 3.0,
+      width: 1.2 * s,
+      life: 0.5,
+      plane: "ground",
       opacity: 0.8,
+      fadePower: 1.4,
     });
   }
 
   private impactLight(position: THREE.Vector3, color: THREE.Color, s: number): void {
     const hot = this.accent("LIGHT", "hot");
-    // 神々しい光の柱。地面から天へ抜ける
-    this.billboards.spawn({
-      position: new THREE.Vector3(position.x, GROUND_Y + 3.0 * s, position.z),
-      texture: lightPillarTexture(),
-      color: color.clone().lerp(hot, 0.5),
-      life: 0.6,
-      startScale: 0.8 * s,
-      endScale: 2.4 * s,
-      aspect: 3.0,
-      orient: "upright",
-      opacity: 0.95,
-      fadePower: 1.8,
-      scaleEase: "pop",
-    });
-    // 足元の魔法陣
-    this.billboards.spawn({
-      position: this.ground(position),
-      texture: runeCircleTexture(),
-      color: color.clone().lerp(hot, 0.3),
-      life: 0.85,
-      startScale: 1.2 * s,
-      endScale: 4.2 * s,
-      orient: "ground",
-      opacity: 0.9,
-      spin: 0.8,
-      fadePower: 1.5,
-    });
-    // 上昇する光輪(3枚を時間差で)
-    for (let i = 0; i < 3; i++) {
-      this.schedule(i * 0.08, () => {
-        this.billboards.spawn({
-          position: new THREE.Vector3(position.x, position.y - 0.8 * s + i * 0.5 * s, position.z),
-          texture: shockRingTexture(),
-          color: hot,
-          life: 0.5,
-          startScale: 3.2 * s,
-          endScale: 0.8 * s,
-          orient: "ground",
-          opacity: 0.9,
-          velocity: new THREE.Vector3(0, 2.4, 0),
-          fadePower: 1.4,
-        });
+    // 光だけは外から中へ「差し込む」。他の属性が広がるなかで
+    // 1つだけ収束するものがあると、それだけで別物に見える
+    for (let i = 0; i < 2; i++) {
+      this.shockRing(position, hot, {
+        radius: (3.2 + i * 1.1) * s,
+        grow: 0.12,
+        width: (1.1 - i * 0.3) * s,
+        life: 0.3,
+        coreWhite: 0.9,
+        opacity: 0.9 - i * 0.25,
+        delay: i * 0.07,
+        fadePower: 0.8,
+        jitter: 0.02,
       });
     }
-    // 大きな十字のフレア
+    // 放射する光条
     this.billboards.spawn({
       position,
-      texture: flashStarTexture(),
-      color: hot,
-      life: 0.35,
-      startScale: 1.2 * s,
-      endScale: 6.5 * s,
-      fadePower: 2.4,
+      texture: godRayTexture(),
+      color: color.clone().lerp(hot, 0.6),
+      life: 0.45,
+      startScale: 1.0 * s,
+      endScale: 4.4 * s,
+      spin: 0.5,
+      scaleEase: "pop",
+      fadePower: 2.2,
     });
-    // ゆっくり昇る光の粒
+    // 天から降りる柱。遅れて着くことで「差した」順序が読める
+    this.schedule(0.05, () => {
+      this.billboards.spawn({
+        position: new THREE.Vector3(position.x, GROUND_Y + 2.6 * s, position.z),
+        texture: lightPillarTexture(),
+        color: color.clone().lerp(hot, 0.55),
+        life: 0.5,
+        startScale: 1.9 * s,
+        endScale: 1.2 * s,
+        aspect: 3.2,
+        orient: "upright",
+        opacity: 0.95,
+        fadePower: 2.2,
+        scaleEase: "pop",
+      });
+    });
+    // 足元の陣
+    this.billboards.spawn({
+      position: this.ground(position).clone(),
+      texture: runeCircleTexture(),
+      color: color.clone().lerp(hot, 0.3),
+      life: 0.7,
+      startScale: 3.6 * s,
+      endScale: 2.2 * s,
+      orient: "ground",
+      opacity: 0.85,
+      spin: 0.9,
+      fadePower: 1.6,
+    });
+    // 抜けていく光の粒
     this.particles.burst(position, hot, {
-      count: this.count(22 * s),
-      speed: 2.2 * s,
-      upBias: 2.4,
+      count: this.count(20 * s),
+      speed: 2.0 * s,
+      upBias: 2.6,
       size: 11 * s,
-      life: 1.2,
+      life: 1.1,
       cell: SPRITE.FLARE,
       gravity: 1.2,
       drag: 0.97,
@@ -699,8 +894,10 @@ export class VfxSystem {
   private impactDark(position: THREE.Vector3, color: THREE.Color, s: number): void {
     const hot = this.accent("DARK", "hot");
     const deep = this.accent("DARK", "deep");
-    // 収縮 → 破裂。まず外から中心へ吸い込む
-    for (let i = 0; i < this.count(18 * s); i++) {
+    this.updateCameraBasis();
+
+    // 1) 吸い込む。周囲の粒が中心へ落ちていく
+    for (let i = 0; i < this.count(16 * s); i++) {
       const angle = Math.random() * Math.PI * 2;
       const radius = (1.8 + Math.random() * 1.2) * s;
       const height = (Math.random() - 0.5) * 2 * s;
@@ -709,7 +906,7 @@ export class VfxSystem {
         velocity: new THREE.Vector3(-Math.cos(angle) * 2.4, -height * 0.8, -Math.sin(angle) * 2.4),
         color: hot,
         size: 9 * s,
-        life: 0.3,
+        life: 0.32,
         cell: SPRITE.MOTE,
         attractor: position.clone(),
         attract: 9,
@@ -717,83 +914,89 @@ export class VfxSystem {
         fadePower: 0.6,
       });
     }
-    // 遅れて弾ける
-    this.schedule(0.16, () => {
+    // 収束する輪。閉じきったところで喰う
+    this.shockRing(position, hot, {
+      radius: 2.8 * s,
+      grow: 0.1,
+      width: 0.9 * s,
+      life: 0.17,
+      coreWhite: 0.4,
+      fadePower: 0.7,
+    });
+
+    // 2) 喰う。背景を黒く抜く塊を通常合成で置く。
+    // 加算の光だけでは「闇」は描けない。暗いものを実際に置く必要がある
+    this.schedule(0.15, () => {
+      this.billboards.spawn({
+        position,
+        texture: voidCoreTexture(),
+        color: new THREE.Color(0x0a0410),
+        life: 0.5,
+        startScale: 0.4 * s,
+        endScale: 3.0 * s,
+        blending: THREE.NormalBlending,
+        opacity: 0.9,
+        fadePower: 1.6,
+      });
       this.billboards.spawn({
         position,
         texture: vortexTexture(),
-        color: color,
-        life: 0.5,
-        startScale: 0.4 * s,
-        endScale: 4.2 * s,
-        spin: 4.5,
+        color: color.clone().lerp(hot, 0.5),
+        life: 0.45,
+        startScale: 0.5 * s,
+        endScale: 3.6 * s,
+        spin: 5.0,
+        fadePower: 1.8,
+      });
+      // 縁だけが光る
+      this.shockRing(position, hot, {
+        radius: 0.5 * s,
+        grow: 5.0,
+        width: 1.2 * s,
+        life: 0.28,
+        coreWhite: 0.7,
         fadePower: 1.5,
       });
-      this.particles.burst(position, color, {
-        count: this.count(18 * s),
-        speed: 7 * s,
-        size: 26 * s,
-        life: 0.75,
+      this.radialStreaks(position, hot, {
+        count: this.count(14 * s),
+        speed: 8 * s,
+        size: 10 * s,
+        life: 0.4,
+        gravity: -6,
+        drag: 0.88,
+      });
+      this.particles.burst(position, deep, {
+        count: this.count(12 * s),
+        speed: 6.5 * s,
+        size: 28 * s,
+        life: 0.8,
         cell: SPRITE.SMOKE,
         layer: "alpha",
-        alpha: 0.7,
+        alpha: 0.75,
         drag: 0.86,
         growth: 1.8,
         randomSpin: 3,
       });
-      this.particles.burst(position, hot, {
-        count: this.count(14 * s),
-        speed: 8 * s,
-        size: 10 * s,
-        life: 0.45,
-        cell: SPRITE.SPARK,
-        gravity: -6,
-        drag: 0.88,
-      });
     });
-    // 呪印が浮かんで消える
-    this.billboards.spawn({
-      position: new THREE.Vector3(position.x, position.y, position.z),
-      texture: runeCircleTexture(),
-      color: hot,
-      life: 0.6,
-      startScale: 2.6 * s,
-      endScale: 1.2 * s,
-      opacity: 0.85,
-      spin: -1.2,
-      fadePower: 2,
-    });
-    // 濃い靄が地面に溜まる
-    this.billboards.spawn({
-      position: this.ground(position),
-      texture: smokePuffTexture(),
-      color: deep,
-      life: 1.2,
-      startScale: 1.0 * s,
-      endScale: 4.0 * s,
-      orient: "ground",
-      opacity: 0.75,
-      blending: THREE.NormalBlending,
-      fadePower: 1.3,
-    });
-    // 内向きに刺す棘
-    this.updateCameraBasis();
-    for (let i = 0; i < this.count(5); i++) {
-      const angle = (i / 5) * Math.PI * 2 + Math.random();
+
+    // 内向きに喰いつく牙
+    for (let i = 0; i < this.count(4); i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.random();
       const outer = new THREE.Vector3()
         .copy(position)
-        .addScaledVector(this.camRight, Math.cos(angle) * 2.6 * s)
-        .addScaledVector(this.camUp, Math.sin(angle) * 2.6 * s);
+        .addScaledVector(this.camRight, Math.cos(angle) * 2.8 * s)
+        .addScaledVector(this.camUp, Math.sin(angle) * 2.8 * s);
       this.strips.spawn(
         {
-          points: [outer, position.clone()],
+          points: wavyPath(outer, position.clone(), 8, 0.35 * s, this.cameraPosition, 0.6),
           color: hot,
-          width: 0.3 * s,
-          life: 0.28,
-          revealSec: 0.09,
-          band: 1.2,
+          width: 0.85 * s,
+          life: 0.3,
+          revealSec: 0.12,
+          band: 0.7,
           widthProfile: "taperEnd",
           coreWhite: 0.5,
+          glow: 0.6,
           fadePower: 2,
         },
         this.cameraPosition,
@@ -802,12 +1005,11 @@ export class VfxSystem {
   }
 
   private impactNeutral(position: THREE.Vector3, color: THREE.Color, s: number): void {
-    this.particles.burst(position, color, {
-      count: this.count(14 * s),
-      speed: 6 * s,
-      size: 12 * s,
-      life: 0.5,
-      cell: SPRITE.GLOW,
+    this.radialStreaks(position, color, {
+      count: this.count(12 * s),
+      speed: 7 * s,
+      size: 10 * s,
+      life: 0.4,
       gravity: -7,
       drag: 0.87,
     });
@@ -839,6 +1041,139 @@ export class VfxSystem {
   }
 
   // -------------------------------------------------------------------------
+  // 当たり方(役割)別の表現
+  //
+  // 属性が「何で殴られたか」なら、こちらは「どう殴られたか」。
+  //   斬撃 面で切り裂く。弧が残る
+  //   打撃 一点で潰す。地面が割れ、遅れてもう一度響く
+  //   刺突 線で貫く。向きが全て
+  //   魔法 物理的な破片が出ない。幾何学的な記号が出る
+  // -------------------------------------------------------------------------
+
+  private styleImpact(style: HitStyle, position: THREE.Vector3, color: THREE.Color, s: number, options: ImpactOptions): void {
+    const element = options.element ?? "NEUTRAL";
+    switch (style) {
+      case "slash":
+        this.spawnSlash(position, color, { element, scale: s, count: options.crit ? 3 : 2 });
+        break;
+      case "blunt":
+        this.impactBlunt(position, color, s, options.direction);
+        break;
+      case "pierce":
+        this.spawnPierce(position, color, s, options.direction);
+        break;
+      default:
+        this.impactMagicStyle(position, color, s, element);
+    }
+  }
+
+  /** 打撃。潰す方向へ輪がつぶれ、地面が割れ、遅れてもう一度響く */
+  private impactBlunt(position: THREE.Vector3, color: THREE.Color, s: number, direction?: THREE.Vector3): void {
+    this.updateCameraBasis();
+    // 打撃方向へ押しつぶれた楕円の輪。真円だと「爆発」に見えてしまう
+    const dir = direction ? direction.clone().normalize() : null;
+    const right = dir ? this.camRight.clone().multiplyScalar(1.0) : this.camRight.clone();
+    const up = this.camUp.clone().multiplyScalar(0.45);
+    this.shockRing(position, WHITE, {
+      radius: 0.7 * s,
+      grow: 3.6,
+      width: 1.6 * s,
+      life: 0.24,
+      basis: { right, up },
+      coreWhite: 0.9,
+      fadePower: 1.8,
+    });
+    // 地面の亀裂。1秒残る「跡」が、打撃だけの手札
+    this.billboards.spawn({
+      position: this.ground(position).clone(),
+      texture: crackDecalTexture(),
+      color: color.clone().lerp(WHITE, 0.25),
+      life: 1.1,
+      startScale: 1.2 * s,
+      endScale: 2.8 * s,
+      orient: "ground",
+      opacity: 0.85,
+      roll: Math.random() * Math.PI,
+      fadePower: 2.2,
+    });
+    // 重い破片
+    this.particles.burst(position, this.accent("NEUTRAL", "dust"), {
+      count: this.count(9 * s),
+      speed: 6.5 * s,
+      upBias: 1.4,
+      size: 12 * s,
+      life: 0.9,
+      cell: SPRITE.SHARD,
+      layer: "alpha",
+      gravity: -16,
+      drag: 0.96,
+      randomSpin: 16,
+      alpha: 0.95,
+    });
+    // 遅れて響く二度目。打撃はここが効く
+    this.schedule(0.11, () => {
+      this.shockRing(position, color, {
+        radius: 0.5 * s,
+        grow: 4.4,
+        width: 1.0 * s,
+        life: 0.3,
+        plane: "ground",
+        opacity: 0.6,
+        fadePower: 1.2,
+      });
+      this.billboards.spawn({
+        position,
+        texture: impactStarTexture(),
+        color: color.clone().lerp(WHITE, 0.4),
+        life: 0.14,
+        startScale: 1.0 * s,
+        endScale: 2.4 * s,
+        spin: (Math.random() - 0.5) * 2,
+        fadePower: 2.2,
+      });
+    });
+  }
+
+  /** 魔法。物理的な破片ではなく、幾何学的な記号で当てる */
+  private impactMagicStyle(position: THREE.Vector3, color: THREE.Color, s: number, element: VfxElement): void {
+    const hot = this.accent(element, "hot");
+    // カメラへ正対する呪印が一瞬だけ立つ
+    this.billboards.spawn({
+      position,
+      texture: runeCircleTexture(),
+      color: hot,
+      life: 0.26,
+      startScale: 3.0 * s,
+      endScale: 1.2 * s,
+      opacity: 0.9,
+      spin: -1.6,
+      fadePower: 2.4,
+    });
+    // 同心の二重輪
+    this.shockRing(position, color.clone().lerp(hot, 0.5), {
+      radius: 1.5 * s,
+      grow: 2.2,
+      width: 0.8 * s,
+      life: 0.34,
+      opacity: 0.8,
+      delay: 0.04,
+      fadePower: 1.3,
+      jitter: 0.02,
+      segments: 30,
+    });
+    this.particles.burst(position, hot, {
+      count: this.count(10 * s),
+      speed: 4.5 * s,
+      size: 9 * s,
+      life: 0.55,
+      cell: SPRITE.RUNE,
+      drag: 0.9,
+      randomSpin: 5,
+      fadePower: 1.4,
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // 公開API: ヒット
   // -------------------------------------------------------------------------
 
@@ -850,98 +1185,84 @@ export class VfxSystem {
   spawnImpact(position: THREE.Vector3, color: THREE.Color, power = 1, options?: ImpactArg): void {
     const opt = normalizeImpactOptions(options);
     const element = opt.element ?? "NEUTRAL";
-    const s = Math.max(0.35, power) * (opt.aoe ? 1.35 : 1) * (opt.scale ?? 1) * (opt.crit ? 1.3 : 1);
+    const s = Math.max(0.35, power) * (opt.aoe ? 1.3 : 1) * (opt.scale ?? 1) * (opt.crit ? 1.25 : 1);
 
     this.impactCore(position, color, s, opt);
     this.elementImpact(element, position, color, s);
-
-    if (opt.hitStyle === "slash") this.spawnSlash(position, color, { element, scale: s, count: opt.crit ? 3 : 2 });
-    else if (opt.hitStyle === "pierce") this.spawnPierce(position, color, s, opt.direction);
+    this.styleImpact(opt.hitStyle ?? "magic", position, color, s, opt);
   }
 
-  /** クリティカル。別格に見えるよう、放射線・二重リング・交差斬撃を足す */
+  /** クリティカル。別格に見えるよう、三段の輪と放射線を足す */
   spawnCriticalImpact(position: THREE.Vector3, color: THREE.Color, options?: ImpactArg): void {
     const opt = normalizeImpactOptions(options);
     const element = opt.element ?? "NEUTRAL";
-    const s = 1.5 * (opt.aoe ? 1.3 : 1) * (opt.scale ?? 1);
+    const s = 1.45 * (opt.aoe ? 1.25 : 1) * (opt.scale ?? 1);
     const hot = this.accent(element, "hot");
     this.updateCameraBasis();
 
-    // 画面いっぱいの白い閃光
+    // 白い一撃。通常ヒットより短く、より白い
     this.billboards.spawn({
       position,
       texture: flashStarTexture(),
       color: WHITE,
-      life: 0.16,
-      startScale: 1.6 * s,
-      endScale: 8.0 * s,
+      life: 0.11,
+      startScale: 3.4 * s,
+      endScale: 5.4 * s,
       fadePower: 2.6,
-      roll: Math.random() * Math.PI,
+      roll: (Math.random() - 0.5) * 0.6,
     });
-    // 放射状の集中線。クリティカル固有の記号
-    const lines = this.count(12);
+    // 放射状の集中線。クリティカル固有の記号。
+    // 帯の同時生存数には上限があるので、本数ではなく長さで見せる
+    const lines = this.count(6);
     for (let i = 0; i < lines; i++) {
-      const angle = (i / lines) * Math.PI * 2 + Math.random() * 0.2;
+      const angle = (i / lines) * Math.PI * 2 + Math.random() * 0.3;
       const inner = new THREE.Vector3()
         .copy(position)
-        .addScaledVector(this.camRight, Math.cos(angle) * 0.7 * s)
-        .addScaledVector(this.camUp, Math.sin(angle) * 0.7 * s);
+        .addScaledVector(this.camRight, Math.cos(angle) * 0.8 * s)
+        .addScaledVector(this.camUp, Math.sin(angle) * 0.8 * s);
       const outer = new THREE.Vector3()
         .copy(position)
-        .addScaledVector(this.camRight, Math.cos(angle) * (3.4 + Math.random() * 2.2) * s)
-        .addScaledVector(this.camUp, Math.sin(angle) * (3.4 + Math.random() * 2.2) * s);
+        .addScaledVector(this.camRight, Math.cos(angle) * (4.2 + Math.random() * 2.4) * s)
+        .addScaledVector(this.camUp, Math.sin(angle) * (4.2 + Math.random() * 2.4) * s);
       this.strips.spawn(
         {
           points: [inner, outer],
           color: i % 3 === 0 ? WHITE : color.clone().lerp(hot, 0.5),
-          width: 0.22 * s,
-          life: 0.26,
-          revealSec: 0.06,
+          width: 0.9 * s,
+          life: 0.28,
+          revealSec: 0.05,
           band: 1.1,
           widthProfile: "taperEnd",
           coreWhite: 0.7,
+          glow: 0.9,
           fadePower: 2.2,
         },
         this.cameraPosition,
       );
     }
-    // 二重の衝撃波
-    this.billboards.spawn({
-      position,
-      texture: shockRingTexture(),
-      color: WHITE,
-      life: 0.26,
-      startScale: 0.6 * s,
-      endScale: 6.2 * s,
-      fadePower: 1.9,
-    });
-    this.schedule(0.06, () => {
-      this.billboards.spawn({
-        position,
-        texture: shockRingTexture(),
-        color: color.clone().lerp(hot, 0.4),
-        life: 0.42,
-        startScale: 0.5 * s,
-        endScale: 4.6 * s,
-        fadePower: 1.4,
-      });
-    });
 
     this.impactCore(position, color, s, { ...opt, element, crit: true });
-    this.elementImpact(element, position, color, s * 1.15);
-    // 交差する斬撃で「叩き込んだ」感を出す
-    this.spawnSlash(position, WHITE, { element, scale: s * 1.1, count: 2, cross: true });
-    // 遅れて散る二次破片
-    this.schedule(0.1, () => {
-      this.particles.burst(position, hot, {
-        count: this.count(16 * s),
-        speed: 9 * s,
+    this.elementImpact(element, position, color, s * 1.1);
+    this.styleImpact(opt.hitStyle ?? "magic", position, color, s, { ...opt, element, crit: true });
+
+    // 三段目の輪。通常ヒットは二段までなので、ここで格の違いが出る
+    this.schedule(0.16, () => {
+      this.shockRing(position, WHITE, {
+        radius: 0.6 * s,
+        grow: 7.0,
+        width: 1.1 * s,
+        life: 0.4,
+        opacity: 0.7,
+        coreWhite: 0.9,
+        fadePower: 1.2,
+      });
+      this.radialStreaks(position, hot, {
+        count: this.count(14 * s),
+        speed: 10 * s,
         size: 10 * s,
-        life: 0.6,
-        cell: SPRITE.STREAK,
+        life: 0.55,
         gravity: -10,
         drag: 0.88,
-        randomSpin: 8,
       });
     });
   }
@@ -958,75 +1279,94 @@ export class VfxSystem {
     const hot = this.accent(element, "hot");
     this.updateCameraBasis();
 
+    const baseAngle = options?.angle ?? Math.random() * Math.PI * 2;
     for (let i = 0; i < count; i++) {
-      const baseAngle = options?.angle ?? Math.random() * Math.PI * 2;
-      const angle = options?.cross ? baseAngle + (i * Math.PI) / 2 + 0.4 : baseAngle + i * 0.7;
-      const radius = (1.5 + Math.random() * 0.6) * s;
-      const sweep = 1.7 + Math.random() * 0.9;
-      const points = arcPath(position, radius, angle - sweep / 2, sweep, 22, { right: this.camRight, up: this.camUp }, 0.12);
-      this.strips.spawn(
-        {
-          points,
-          color: i === 0 ? WHITE : color.clone().lerp(hot, 0.5),
-          width: (0.75 - i * 0.18) * s,
-          life: 0.3,
-          revealSec: 0.075,
-          band: 0.85,
-          widthProfile: "blade",
-          coreWhite: 0.75,
-          glow: 0.9,
-          fadePower: 2.2,
-        },
-        this.cameraPosition,
-      );
-      // 弧に沿って火花を散らす
-      for (let p = 0; p < this.count(6); p++) {
-        const point = points[Math.floor(Math.random() * points.length)];
-        this.particles.spawn({
-          position: point,
-          velocity: new THREE.Vector3((Math.random() - 0.5) * 5, (Math.random() - 0.3) * 5, (Math.random() - 0.5) * 5),
-          color: hot,
-          size: 8 * s,
-          life: 0.3,
-          cell: SPRITE.CRESCENT,
-          gravity: -8,
-          drag: 0.85,
-          spin: (Math.random() - 0.5) * 10,
-        });
-      }
+      const angle = options?.cross ? baseAngle + (i * Math.PI) / 2 + 0.4 : baseAngle + i * 0.55;
+      const radius = (1.7 + Math.random() * 0.5) * s;
+      const sweep = 1.9 + Math.random() * 0.8;
+      const points = arcPath(position, radius, angle - sweep / 2, sweep, 24, { right: this.camRight, up: this.camUp }, 0.14);
+      // 振り抜く速さを1枚ごとにずらす。同時に出すと「模様」になってしまう
+      this.schedule(i * 0.055, () => {
+        this.strips.spawn(
+          {
+            points,
+            color: i === 0 ? WHITE : color.clone().lerp(hot, 0.55),
+            width: (1.5 - i * 0.3) * s,
+            life: 0.3,
+            revealSec: 0.06,
+            band: 0.8,
+            widthProfile: "blade",
+            coreWhite: 0.75,
+            glow: 1.0,
+            fadePower: 2.3,
+          },
+          this.cameraPosition,
+        );
+        // 刃が通った線に沿って火花が散る
+        for (let p = 0; p < this.count(5); p++) {
+          const point = points[Math.floor(Math.random() * points.length)];
+          this.particles.spawn({
+            position: point,
+            velocity: new THREE.Vector3((Math.random() - 0.5) * 5, (Math.random() - 0.3) * 5, (Math.random() - 0.5) * 5),
+            color: hot,
+            size: 8 * s,
+            life: 0.3,
+            cell: SPRITE.CRESCENT,
+            gravity: -8,
+            drag: 0.85,
+            spin: (Math.random() - 0.5) * 10,
+          });
+        }
+      });
     }
   }
 
   /** 刺突。攻撃方向へ細長い衝撃を貫通させる */
   private spawnPierce(position: THREE.Vector3, color: THREE.Color, s: number, direction?: THREE.Vector3): void {
-    const dir = direction ? direction.clone().normalize() : new THREE.Vector3(0, 0, 1);
-    const from = position.clone().addScaledVector(dir, -2.2 * s);
-    const to = position.clone().addScaledVector(dir, 2.2 * s);
+    this.updateCameraBasis();
+    const dir = direction ? direction.clone().normalize() : this.camRight.clone();
+    const from = position.clone().addScaledVector(dir, -2.6 * s);
+    const to = position.clone().addScaledVector(dir, 3.0 * s);
+    // 貫く線。走らせて見せるので revealSec を短く取る
     this.strips.spawn(
       {
-        points: wavyPath(from, to, 10, 0.05 * s, this.cameraPosition, 1),
-        color: color.clone().lerp(WHITE, 0.6),
-        width: 0.4 * s,
-        life: 0.24,
+        points: wavyPath(from, to, 10, 0.04 * s, this.cameraPosition, 1),
+        color: color.clone().lerp(WHITE, 0.65),
+        width: 1.2 * s,
+        life: 0.26,
         revealSec: 0.05,
-        band: 0.8,
+        band: 0.7,
         widthProfile: "spindle",
-        coreWhite: 0.8,
+        coreWhite: 0.85,
+        glow: 1.0,
         fadePower: 2.2,
       },
       this.cameraPosition,
     );
-    this.particles.burst(position, color, {
-      count: this.count(12 * s),
-      speed: 9 * s,
-      focus: 0.75,
-      direction: dir,
+    // 進行方向に垂直な輪。「貫通した面」がここで見える
+    const side = new THREE.Vector3().crossVectors(dir, this.camUp).normalize();
+    if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+    const up = new THREE.Vector3().crossVectors(side, dir).normalize();
+    this.shockRing(position, color.clone().lerp(WHITE, 0.4), {
+      radius: 0.4 * s,
+      grow: 3.4,
+      width: 1.0 * s,
+      life: 0.24,
+      basis: { right: side, up },
+      coreWhite: 0.8,
+      fadePower: 1.8,
+      segments: 28,
+    });
+    // 抜けた先へ吹き出す
+    this.radialStreaks(position, color.clone().lerp(WHITE, 0.3), {
+      count: this.count(14 * s),
+      speed: 11 * s,
       size: 9 * s,
-      life: 0.35,
-      cell: SPRITE.STREAK,
+      life: 0.32,
+      direction: dir,
+      focus: 0.85,
       gravity: -5,
       drag: 0.86,
-      randomSpin: 4,
     });
   }
 
@@ -1041,55 +1381,54 @@ export class VfxSystem {
     const hot = this.accent(element, "hot");
     const ground = new THREE.Vector3(center.x, GROUND_Y, center.z);
 
-    this.billboards.spawn({
-      position: ground,
-      texture: shockRingTexture(),
-      color: color.clone().lerp(WHITE, 0.35),
-      life: 0.7,
-      startScale: 1.0,
-      endScale: radius * 2.4,
-      orient: "ground",
+    // 地面を走る大波。板だと画面を覆って白飛びするが、輪なら広げられる
+    this.shockRing(ground, color.clone().lerp(WHITE, 0.4), {
+      radius: 0.8,
+      grow: radius * 1.9,
+      width: 2.6,
+      life: 0.75,
+      plane: "ground",
       opacity: 0.95,
+      coreWhite: 0.7,
       fadePower: 1.3,
+      jitter: 0.05,
     });
-    this.schedule(0.1, () => {
-      this.billboards.spawn({
-        position: ground,
-        texture: shockRingTexture(),
-        color: hot,
-        life: 0.8,
-        startScale: 0.8,
-        endScale: radius * 1.7,
-        orient: "ground",
-        opacity: 0.6,
-        fadePower: 1.2,
-      });
+    this.shockRing(ground, hot, {
+      radius: 0.6,
+      grow: radius * 2.6,
+      width: 1.6,
+      life: 0.9,
+      plane: "ground",
+      opacity: 0.6,
+      delay: 0.12,
+      fadePower: 1.1,
     });
     this.particles.ringBurst(ground, this.accent(element, "dust"), {
-      count: this.count(26),
-      speed: 7,
+      count: this.count(24),
+      speed: 8,
       radius: 0.6,
-      upBias: 1.6,
+      upBias: 1.8,
       size: 34,
-      life: 1.0,
+      life: 1.1,
       cell: SPRITE.SMOKE,
       layer: "alpha",
-      alpha: 0.4,
+      alpha: 0.42,
       drag: 0.92,
       growth: 2.4,
       fadeIn: 0.08,
       randomSpin: 1.4,
     });
-    // 周囲に散る小爆発。属性の絵を広い範囲に散らす
+    // 周囲に散る小爆発。外側ほど遅らせて、波が届いた順に見せる
     for (let i = 0; i < 4; i++) {
-      this.schedule(0.05 + i * 0.06, () => {
+      const distance = radius * (0.35 + (i / 4) * 0.5);
+      this.schedule(0.04 + distance * 0.055, () => {
         const angle = Math.random() * Math.PI * 2;
-        const distance = radius * (0.35 + Math.random() * 0.5);
         const spot = new THREE.Vector3(center.x + Math.cos(angle) * distance, center.y * 0.7 + 0.3, center.z + Math.sin(angle) * distance);
-        this.elementImpact(element, spot, color, 0.75);
+        this.elementImpact(element, spot, color, 0.7);
       });
     }
   }
+
 
   /** 連鎖する稲妻。チェイン攻撃や電撃スキルの見せ場に使う */
   spawnLightningBolt(

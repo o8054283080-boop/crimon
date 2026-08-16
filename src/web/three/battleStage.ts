@@ -212,8 +212,13 @@ export class BattleStage {
     const { width, height } = this.measure();
     this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 320);
 
-    // 霧の色は空のシェーダの地平線色と合わせてある。遠景がそのまま霞へ溶ける
-    this.scene.fog = new THREE.FogExp2(0x2a3055, 0.0165);
+    // 霧の色は空のシェーダの地平線色と合わせてある。遠景がそのまま霞へ溶ける。
+    //
+    // 濃さは「距離が読めるか」で決めた。**モンスターの体表シェーダには霧が
+    // かからない**(生のShaderMaterialで、fogを組み込んでいない)ので、
+    // ここを濃くしても手前のキャラが白むことはなく、闘技場だけが奥へ退く。
+    // これがキャラを背景から抜く一番安い方法でもある。
+    this.scene.fog = new THREE.FogExp2(0x2f3660, 0.0235);
     this.scene.add(this.arena.group);
     this.scene.add(this.vfx.root);
 

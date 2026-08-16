@@ -1,0 +1,1065 @@
+/* =========================================================================
+ * 戦闘中のHUD
+ *
+ * 一番長く見る画面なので、次の順で目立たせる序列をはっきり作る。
+ *   1. 誰の手番か      … 頭上の名札が金に変わる / 順番待ちの列の先頭が大きい
+ *   2. 誰が危ないか    … HPバーが赤く脈打つ
+ *   3. 何を押せるか    … 押せるスキルだけが金の縁で光る
+ *   4. 何が起きたか    … 数値・ログ(最も控えめ)
+ *
+ * 板を積んで画面を割ると戦場が痩せるので、情報はすべて3Dの上に浮かせる。
+ * ただし浮かせる=重なる なので、下にある操作を覆っていないかを
+ * 必ず elementFromPoint で確かめること(過去に報酬が押せなくなった)。
+ * ========================================================================= */
+
+.screen.battle-view {
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.battle-view .battle-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  aspect-ratio: auto;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+}
+
+/*
+ * 3Dの舞台。位置の基準をここに置くことが必須。
+ *
+ * この指定が無いと、中の canvas(position:absolute; inset:0)が
+ * 基準を見つけられず画面全体へ広がり、
+ *   - 画面下の「報酬を受け取る」ボタンを覆って押せなくする
+ *   - HPバーなど、舞台の枠を基準に置いているUIの位置がずれる
+ * という不具合になる。実際にその両方を出した。
+ */
+.battle-stage {
+  position: relative;
+}
+
+.battle-stage__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.battle-stage::after {
+  /* 画面周辺を落とすビネット。中央の戦闘に視線を集める */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 78% 68% at 50% 52%, transparent 55%, rgba(0, 0, 0, 0.62) 100%);
+  z-index: 3;
+}
+
+.battle-stage__overlay,
+.battle-stage__fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* --- 上部の帯: 名前と操作 ---------------------------------------------- */
+
+.battle-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 10px max(10px, env(safe-area-inset-left));
+  /* 上端だけ暗く落として文字を読ませる。板を置くと戦場が狭く見える */
+  background: linear-gradient(180deg, rgba(4, 6, 14, 0.85) 20%, rgba(4, 6, 14, 0.45) 60%, transparent);
+  pointer-events: none;
+}
+
+/* 進行中の場所は、彫り込んだ銘板に載せる */
+.battle-topbar__title {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #f2f6ff;
+  background: linear-gradient(180deg, rgba(30, 36, 62, 0.9), rgba(8, 11, 22, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+.battle-topbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+/* --- 順番待ちの列 -------------------------------------------------------
+ * サマナーズウォー流の要。「次に誰が動くか」が読めるかどうかで、
+ * 手動操作の面白さがまるごと変わる。
+ * ATBゲージと素早さから到達時刻を割り出して並べているので、
+ * バフ・デバフをかけた瞬間に列が並び替わり、効果が目に見える。
+ */
+.turn-order {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top)) + 34px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  max-width: calc(100% - 20px);
+  background: linear-gradient(180deg, rgba(10, 13, 26, 0.82), rgba(4, 6, 14, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 3px 10px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.turn-order:empty {
+  display: none;
+}
+
+/* 1体分の駒。属性色の球に、陣営の色の輪をはめる */
+.turn-chip {
+  position: relative;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 0.82rem;
+  line-height: 1;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.6), transparent 58%),
+    var(--elem, #3a4160);
+  box-shadow:
+    inset 0 -3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 0 0 1.5px var(--side, rgba(140, 170, 230, 0.75)),
+    0 2px 5px rgba(0, 0, 0, 0.7);
+  transition: width 0.25s ease, height 0.25s ease, opacity 0.25s ease;
+}
+
+.turn-chip--player {
+  --side: rgba(110, 180, 255, 0.9);
+}
+
+.turn-chip--enemy {
+  --side: rgba(255, 120, 100, 0.9);
+}
+
+/* 先頭(今まさに動く者)だけ一回り大きく、金の輪をはめて脈打たせる */
+.turn-chip--now {
+  width: 38px;
+  height: 38px;
+  font-size: 1.15rem;
+  box-shadow:
+    inset 0 -4px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 0 0 2px rgba(255, 214, 100, 0.95),
+    0 0 14px rgba(255, 190, 60, 0.7),
+    0 2px 6px rgba(0, 0, 0, 0.75);
+  animation: turn-chip-now 1.4s ease-in-out infinite;
+}
+
+@keyframes turn-chip-now {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+}
+
+/* 列の後ろほど薄くする。近い未来ほど確かだという当たり前を見た目に反映する */
+.turn-chip--far {
+  opacity: 0.55;
+}
+
+.turn-chip--farther {
+  opacity: 0.32;
+}
+
+/* 先頭と2番目の間に矢羽根を入れて、左から右へ進む列だと示す */
+.turn-order__arrow {
+  flex: 0 0 auto;
+  font-size: 0.5rem;
+  color: rgba(190, 208, 245, 0.55);
+}
+
+/* --- 下部のスキルドック ------------------------------------------------- */
+/*
+ * 決着後はスキルを選べない。残したままだと画面下で報酬のボタンに重なり、
+ * 横画面ではボタンが押せなくなる(ドックの z-index の方が上のため)
+ */
+.skill-dock.skill-dock--finished {
+  display: none;
+}
+
+.skill-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  background: linear-gradient(0deg, rgba(4, 6, 14, 0.88) 25%, rgba(4, 6, 14, 0.5) 65%, transparent);
+  pointer-events: none;
+}
+
+/* 誰のスキルを出しているかの名札。手番が来た時だけ金の下線が伸びる */
+.skill-dock__owner {
+  position: relative;
+  padding-bottom: 3px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #b9c6ea;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+  opacity: 0.7;
+}
+
+.skill-dock__owner::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-2), transparent);
+  transform: translateX(-50%);
+  transition: width 0.25s ease;
+}
+
+.skill-dock--active .skill-dock__owner {
+  color: #ffe27a;
+  opacity: 1;
+}
+
+.skill-dock--active .skill-dock__owner::after {
+  width: 100%;
+}
+
+.skill-dock__row {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.skill-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  color: #dbe4ff;
+}
+
+.skill-btn__face {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 属性色を芯に、外周は金属の縁。押せる時だけ光る */
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 22%, rgba(255, 255, 255, 0.5), transparent 62%),
+    linear-gradient(180deg, var(--elem, #4a5372) 0%, rgba(6, 9, 20, 0.92) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.16),
+    0 5px 12px rgba(0, 0, 0, 0.65);
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+/* 押せる時だけ金の二重縁。押せない時との差を色ではなく「光るか」で作る */
+.skill-dock--active .skill-btn:not(:disabled) .skill-btn__face {
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.28),
+    0 0 0 2.5px rgba(255, 214, 100, 0.9),
+    0 0 20px rgba(255, 190, 60, 0.55),
+    0 5px 12px rgba(0, 0, 0, 0.65);
+  animation: skill-btn-ready 1.6s ease-in-out infinite;
+}
+
+@keyframes skill-btn-ready {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.12);
+  }
+}
+
+.skill-btn:not(:disabled):active .skill-btn__face {
+  transform: translateY(2px);
+  filter: brightness(0.9);
+}
+
+.skill-btn__index {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
+}
+
+/* クールタイム中は暗い幕をかけ、残りターン数を大きく出す */
+.skill-btn--cooling .skill-btn__face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 15px;
+  background: rgba(3, 5, 12, 0.75);
+}
+
+.skill-btn__cool {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95);
+}
+
+.skill-btn--idle {
+  cursor: default;
+}
+
+.skill-btn--idle .skill-btn__face {
+  filter: saturate(0.5) brightness(0.65);
+}
+
+/* 名前は面の下に敷く小札。文字が背景に溶けて読めなくなるのを防ぐ */
+.skill-btn__name {
+  max-width: 78px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(4, 6, 14, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+/* --- ログは左上に小さく重ねる ------------------------------------------- */
+/*
+ * ログは画面上部の空きに寄せる。
+ * 下に置くとキャラクターに重なって、肝心の戦闘が見えなくなる。
+ * 板は敷かず、下端へ向かって消えるようにして存在感を抑える。
+ */
+.battle-logstrip {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  top: calc(max(8px, env(safe-area-inset-top)) + 84px);
+  z-index: 5;
+  width: min(300px, 46%);
+  max-height: 56px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.8;
+  mask-image: linear-gradient(180deg, #000 40%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent);
+}
+
+.battle-logstrip .battle-log {
+  max-height: 56px;
+  overflow: hidden;
+  font-size: 0.58rem;
+  line-height: 1.45;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 1), 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+/* --- 対象選び ------------------------------------------------------------ */
+
+.battle-view .action-panel-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 112px;
+  z-index: 7;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.battle-view .action-panel-slot:empty {
+  display: none;
+}
+
+.action-panel {
+  background: var(--grain), linear-gradient(180deg, rgba(34, 40, 68, 0.95), rgba(10, 13, 26, 0.96));
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow: var(--bevel), var(--drop-deep);
+}
+
+.action-panel__title {
+  font-weight: 800;
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.action-panel__hint {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* 対象選び: 一覧ではなく「今選ばれている相手」だけを出す */
+.action-panel__chosen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-weight: 800;
+  background: linear-gradient(180deg, rgba(255, 90, 74, 0.24), rgba(120, 30, 24, 0.28));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 1px rgba(255, 120, 100, 0.6),
+    0 0 14px rgba(255, 80, 60, 0.2);
+}
+
+.action-panel__chosen-hp {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #ffc9c0;
+}
+
+.action-panel__row {
+  display: flex;
+  gap: 8px;
+}
+
+.action-panel__row .btn {
+  flex: 1;
+  /* 「スキル選び直し」が途中で折り返して読みにくくなるのを防ぐ */
+  white-space: nowrap;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+/* 対象選びの札は、選んだ相手を隠さないよう幅を詰める */
+.battle-view .action-panel--target {
+  max-width: min(360px, 88vw);
+  gap: 7px;
+  padding: 10px 12px;
+}
+
+.battle-view .action-panel {
+  pointer-events: auto;
+  max-width: min(560px, 94vw);
+}
+
+/* --- 頭上のHUD ----------------------------------------------------------- */
+
+.unit-hud {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 80px;
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+  will-change: transform, left, top;
+}
+
+.unit-hud--dead {
+  opacity: 0;
+  filter: grayscale(1);
+}
+
+.unit-hud__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  min-height: 15px;
+}
+
+.unit-hud__name {
+  position: relative;
+  font-size: 0.54rem;
+  font-weight: 800;
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: #eaf0ff;
+  background: linear-gradient(180deg, rgba(40, 48, 78, 0.94), rgba(8, 11, 22, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px var(--side-line, rgba(255, 255, 255, 0.14)),
+    0 2px 5px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+/* 陣営は名札の縁の色で分ける。味方=青、敵=赤 */
+.unit-hud--player {
+  --side-line: rgba(120, 175, 255, 0.5);
+  --side-glow: rgba(90, 150, 255, 0.35);
+}
+
+.unit-hud--enemy {
+  --side-line: rgba(255, 130, 120, 0.5);
+  --side-glow: rgba(255, 90, 80, 0.35);
+  translate: 0 -14px;
+}
+
+/* 手番の者は金の名札。戦場のどこを見ていても目に入る */
+.unit-hud--active .unit-hud__name {
+  color: #1a1405;
+  background: var(--gold-grad);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 0 16px 3px rgba(255, 205, 40, 0.65);
+  animation: unit-hud-active-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes unit-hud-active-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18);
+  }
+}
+
+/*
+ * HPバー。ここだけは他のゲージより手を入れる。
+ * 層は下から順に
+ *   受け皿(彫り込み) → 追従帯(赤) → 本体 → シールド(水色) → 光沢 → 数値
+ * 削れた瞬間だけ赤が覗き、シールドは本体の上に積み増しで乗る。
+ */
+.unit-hud__hp {
+  position: relative;
+  width: 100%;
+  height: 11px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #05070f, #131829);
+  box-shadow:
+    inset 0 0 0 1px var(--side-line, rgba(255, 255, 255, 0.22)),
+    inset 0 2px 3px rgba(0, 0, 0, 0.95),
+    0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+/* 減った分を遅れて追いかける帯。被弾の瞬間だけ赤く覗いて手応えを出す */
+.unit-hud__hp-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffb0a0, #d63a2a);
+  box-shadow: 0 0 8px rgba(255, 70, 50, 0.6);
+  transition: width 0.55s cubic-bezier(0.33, 1, 0.68, 1) 0.22s;
+}
+
+/* 回復時は遅れて追う意味がないので即座に合わせる */
+.unit-hud__hp-trail--instant {
+  transition: none;
+}
+
+.unit-hud__hp-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #b6ffcf 0%, #4bdb84 34%, #23a95c 62%, #148044 100%);
+  box-shadow:
+    0 0 9px rgba(46, 204, 113, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+  transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 3割を切ったら赤へ。さらに脈打たせて「もう保たない」を伝える */
+.unit-hud__hp-fill--low {
+  background: linear-gradient(180deg, #ffb3a5 0%, #f0523c 40%, #b12a1c 100%);
+  box-shadow:
+    0 0 12px rgba(231, 76, 60, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  animation: unit-hp-danger 0.85s ease-in-out infinite;
+}
+
+@keyframes unit-hp-danger {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+/*
+ * シールド。HPの上に「積み増した分」として左から重ねる。
+ * HPとは別の色・別の質感(縞の入った氷)にして、回復と混同させない。
+ */
+.unit-hud__hp-shield {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.35) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #d8f2ff 0%, #58b6f5 45%, #2a6fb8 100%);
+  box-shadow:
+    0 0 10px rgba(90, 190, 255, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: width 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 被弾の瞬間だけバー全体を白く飛ばす。数値より先に「効いた」が伝わる */
+.unit-hud__hp--hit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  animation: unit-hp-flash 0.24s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes unit-hp-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.unit-hud__hp-text {
+  position: relative;
+  z-index: 1;
+  display: block;
+  text-align: center;
+  font-size: 0.5rem;
+  font-weight: 900;
+  line-height: 11px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 1), 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+/* ATBゲージ。HPより細く、色も金にして役割を取り違えないようにする */
+.unit-hud__gauge {
+  width: 74%;
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.unit-hud__gauge-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ffe9a8, var(--gauge));
+  box-shadow: 0 0 6px var(--gauge);
+  transition: width 0.3s linear;
+}
+
+/* --- 状態異常のバッジ ---------------------------------------------------- */
+
+.unit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 0.6rem;
+  line-height: 1;
+  padding: 2px 4px 2px 3px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #3b4468, #14172a);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.6);
+  cursor: default;
+}
+
+.unit-badge__turns {
+  font-weight: 900;
+  font-size: 0.58rem;
+}
+
+.unit-badge--buff {
+  color: #6cf09a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 0 0 1px rgba(70, 220, 130, 0.45), 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.unit-badge--debuff {
+  color: #ff8f7d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 0 0 1px rgba(230, 90, 70, 0.45), 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.unit-badge--stun {
+  color: #f1c40f;
+}
+
+.unit-badge--burn {
+  color: #ff9448;
+}
+
+.unit-badge--poison {
+  color: #bb7cff;
+}
+
+.unit-badge--shield {
+  color: #6fc8ff;
+}
+
+.unit-badge--blind {
+  color: #a99adf;
+}
+
+.unit-badge--immune {
+  color: #f4d35e;
+}
+
+/* --- 飛び出す数値 -------------------------------------------------------- */
+
+.floating-number {
+  position: absolute;
+  transform: translateX(-50%);
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  -webkit-text-stroke: 2px rgba(4, 6, 14, 0.9);
+  paint-order: stroke fill;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+  animation: floating-number-rise 1.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.floating-number--damage {
+  color: #ff8b7a;
+  text-shadow: 0 0 12px rgba(255, 90, 70, 0.75);
+}
+
+.floating-number--crit {
+  color: #ffd23f;
+  font-size: 1.75rem;
+  text-shadow: 0 0 18px rgba(255, 200, 40, 0.9), 0 0 34px rgba(255, 140, 0, 0.6);
+}
+
+.floating-number--heal {
+  color: #5dffa0;
+  text-shadow: 0 0 14px rgba(46, 204, 113, 0.8);
+}
+
+.floating-number--resist {
+  color: #c8d2e8;
+  font-size: 0.82rem;
+}
+
+@keyframes floating-number-rise {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-14px) scale(1.22);
+  }
+  26% {
+    transform: translateX(-50%) translateY(-20px) scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-58px) scale(1);
+  }
+}
+
+/* --- 戦闘中の操作ボタン --------------------------------------------------- */
+
+.battle-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 4px 0 2px;
+}
+
+.battle-icon-btn {
+  appearance: none;
+  cursor: pointer;
+  width: 42px;
+  height: 42px;
+  min-height: unset;
+  border-radius: 50%;
+  border: none;
+  color: var(--text);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 28%, #4c5476, #262a40 58%, #101322 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.6),
+    0 3px 8px rgba(0, 0, 0, 0.65);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.battle-icon-btn:active {
+  transform: scale(0.9);
+  filter: brightness(0.9);
+}
+
+.battle-icon-btn--play {
+  width: 52px;
+  height: 52px;
+  font-size: 1.35rem;
+  color: #241a02;
+  background: radial-gradient(circle at 35% 28%, #fff0b8, #e0ac22 58%, #8a6410 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -3px 6px rgba(120, 75, 0, 0.5),
+    0 0 16px rgba(255, 190, 60, 0.4),
+    0 3px 9px rgba(0, 0, 0, 0.65);
+}
+
+.battle-speed-btn {
+  appearance: none;
+  cursor: pointer;
+  min-width: 42px;
+  height: 32px;
+  min-height: unset;
+  padding: 0 11px;
+  border-radius: 9px;
+  border: none;
+  background: linear-gradient(180deg, #2a3050, #12162a);
+  color: #dbe4ff;
+  font-weight: 900;
+  font-size: 0.8rem;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.battle-speed-btn:active {
+  transform: translateY(1px);
+}
+
+.battle-controls__finish {
+  width: 100%;
+}
+
+.battle-controls__finish--hidden {
+  display: none;
+}
+
+/* --- 決着の帯 ------------------------------------------------------------ */
+
+.result-banner {
+  text-align: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--grain), linear-gradient(180deg, rgba(34, 40, 68, 0.95), rgba(10, 13, 26, 0.96));
+  box-shadow: var(--bevel), var(--drop);
+  animation: result-banner-pop 0.3s ease;
+}
+
+.result-banner--hidden {
+  display: none;
+}
+
+.result-banner__text {
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+@keyframes result-banner-pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* --- ログ本体 ------------------------------------------------------------ */
+
+.battle-log-panel {
+  opacity: 0.9;
+}
+
+.battle-log {
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(8, 11, 22, 0.6);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.battle-log__line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-dim);
+}
+
+.battle-log__line--skill {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.battle-log__line--damage {
+  color: #ff8080;
+}
+
+.battle-log__line--crit {
+  color: #ffd23f;
+  font-weight: 800;
+}
+
+.battle-log__line--heal {
+  color: #4fd88a;
+}
+
+.battle-log__line--buff {
+  color: #6cb6ff;
+}
+
+.battle-log__line--debuff {
+  color: #ff9f5a;
+}
+
+.battle-log__line--stun {
+  color: #d9a6ff;
+}
+
+.battle-log__line--burn {
+  color: #ff9448;
+}
+
+.battle-log__line--resist {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.battle-log__line--death {
+  color: #ff5252;
+  font-weight: 800;
+}
+
+/* --- 横画面 --------------------------------------------------------------
+ * 縦の余裕が無いので、上下に重ねる物をすべて薄く・低くする。
+ * ここを詰め忘れると、順番待ちの列がログや名札とぶつかる。
+ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .turn-order {
+    top: calc(max(6px, env(safe-area-inset-top)) + 30px);
+    padding: 4px 7px;
+    gap: 4px;
+  }
+
+  .turn-chip {
+    width: 22px;
+    height: 22px;
+    font-size: 0.7rem;
+  }
+
+  .turn-chip--now {
+    width: 30px;
+    height: 30px;
+    font-size: 0.92rem;
+  }
+
+  .battle-logstrip {
+    top: calc(max(6px, env(safe-area-inset-top)) + 72px);
+    max-height: 40px;
+    width: min(260px, 32%);
+  }
+
+  .battle-logstrip .battle-log {
+    max-height: 40px;
+  }
+
+  .skill-btn__face {
+    width: 48px;
+    height: 48px;
+    border-radius: 13px;
+  }
+
+  .skill-dock {
+    padding-top: 10px;
+  }
+
+  .battle-view .action-panel-slot {
+    bottom: 96px;
+  }
+}
