@@ -70,6 +70,17 @@ export interface StripSpec {
   widthProfile?: "spindle" | "taperEnd" | "even" | "blade";
   /** 生存中に膨らむ倍率 */
   expand?: number;
+  /**
+   * 経路そのものを origin から外へ広げる最終倍率(1で広がらない)。
+   *
+   * 板は「画面を覆うと白飛びする」ため大きさに上限があり、
+   * 大きな衝撃波を板で作ることはできない。帯は線であって面ではないので、
+   * 半径をいくら大きくしても加算される面積はほとんど増えない。
+   * 広がる輪はここで作る。1未満にすると逆に収束する(光の収束・闇の吸引)。
+   */
+  grow?: number;
+  /** grow の中心。省略すると経路の重心 */
+  origin?: THREE.Vector3;
   blending?: THREE.Blending;
 }
 
@@ -88,6 +99,8 @@ interface StripItem {
   fadePower: number;
   opacity: number;
   expand: number;
+  grow: number;
+  origin: THREE.Vector3;
   segments: number;
 }
 
@@ -167,6 +180,8 @@ export class StripField {
       fadePower: 1,
       opacity: 1,
       expand: 1,
+      grow: 1,
+      origin: new THREE.Vector3(),
       segments: 0,
     };
   }
@@ -238,6 +253,14 @@ export class StripField {
     item.fadePower = spec.fadePower ?? 1.4;
     item.opacity = spec.opacity ?? 1;
     item.expand = spec.expand ?? 1;
+    item.grow = spec.grow ?? 1;
+    if (spec.origin) {
+      item.origin.copy(spec.origin);
+    } else {
+      item.origin.set(0, 0, 0);
+      for (let i = 0; i < count; i++) item.origin.add(points[i]);
+      item.origin.divideScalar(count);
+    }
 
     item.material.uniforms.uColor.value.copy(spec.color);
     item.material.uniforms.uOpacity.value = item.opacity;
@@ -278,19 +301,28 @@ export class StripField {
       if (item.flicker > 0) opacity *= 1 - Math.random() * item.flicker;
       item.material.uniforms.uOpacity.value = opacity;
 
-      if (item.expand !== 1) {
-        // 中心線からの押し出し量を増やして、稲妻が太く弾けるようにする
-        const factor = 1 + (item.expand - 1) * t;
+      if (item.expand !== 1 || item.grow !== 1) {
+        // 幅: 中心線からの押し出し量(稲妻が太く弾ける)
+        const widthFactor = 1 + (item.expand - 1) * t;
+        // 半径: 経路そのものを origin から外へ押し出す(衝撃波が広がる)。
+        // 序盤を速く、末期をゆっくりにすると「弾けて減速する」重さが出る
+        const radialFactor = 1 + (item.grow - 1) * (1 - Math.pow(1 - t, 2.6));
         const count = item.segments + 1;
+        const ox = item.origin.x;
+        const oy = item.origin.y;
+        const oz = item.origin.z;
         for (let v = 0; v < count; v++) {
           const cx = item.centers[v * 3 + 0];
           const cy = item.centers[v * 3 + 1];
           const cz = item.centers[v * 3 + 2];
+          const gx = ox + (cx - ox) * radialFactor;
+          const gy = oy + (cy - oy) * radialFactor;
+          const gz = oz + (cz - oz) * radialFactor;
           for (let s = 0; s < 2; s++) {
             const base = v * 6 + s * 3;
-            item.positions[base + 0] = cx + (item.basePositions[base + 0] - cx) * factor;
-            item.positions[base + 1] = cy + (item.basePositions[base + 1] - cy) * factor;
-            item.positions[base + 2] = cz + (item.basePositions[base + 2] - cz) * factor;
+            item.positions[base + 0] = gx + (item.basePositions[base + 0] - cx) * widthFactor;
+            item.positions[base + 1] = gy + (item.basePositions[base + 1] - cy) * widthFactor;
+            item.positions[base + 2] = gz + (item.basePositions[base + 2] - cz) * widthFactor;
           }
         }
         (item.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
@@ -368,6 +400,35 @@ export function arcPath(
       .addScaledVector(basis.right, Math.cos(angle) * r)
       .addScaledVector(basis.up, Math.sin(angle) * r);
     points.push(point);
+  }
+  return points;
+}
+
+/**
+ * 閉じた輪の経路。`grow` と組み合わせて衝撃波の輪に使う。
+ * `jitter` を入れると真円でなくなり、手描きの勢いが出る。
+ */
+export function ringPath(
+  center: THREE.Vector3,
+  radius: number,
+  basis: { right: THREE.Vector3; up: THREE.Vector3 },
+  segments = 40,
+  jitter = 0,
+  phase = 0,
+): THREE.Vector3[] {
+  const points: THREE.Vector3[] = [];
+  const noise: number[] = [];
+  for (let i = 0; i < segments; i++) noise.push(1 + (Math.random() * 2 - 1) * jitter);
+  for (let i = 0; i <= segments; i++) {
+    const index = i % segments;
+    const angle = phase + (i / segments) * Math.PI * 2;
+    const r = radius * noise[index];
+    points.push(
+      new THREE.Vector3()
+        .copy(center)
+        .addScaledVector(basis.right, Math.cos(angle) * r)
+        .addScaledVector(basis.up, Math.sin(angle) * r),
+    );
   }
   return points;
 }
