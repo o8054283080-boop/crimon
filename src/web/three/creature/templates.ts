@@ -1379,7 +1379,8 @@ function buildExpPig(kit: CreatureKit, rig: CreatureRig): void {
 function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
   rig.yawBias = 0.3;
-  rig.pelvis.position.y = 1.2;
+  // 脚を長く取ると馬やラクダに見える。ドラゴンは「胴が地面に近く、脚が短く太い」比率で読ませる
+  rig.pelvis.position.y = 0.98;
 
   // --- 腰。後脚が太いぶん、狼より腰の塊を大きく取る ---
   rig.pelvis.add(place(kit.ball(0.3, 0.28, 0.36, "hide", p.main), 0, 0, 0.04));
@@ -1392,9 +1393,9 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.36, r0: 0.18, r1: 0.115, rot: [0.62, 0, 0], radial: 8 },
-        { len: 0.34, r0: 0.115, r1: 0.075, rot: [-1.28, 0, 0], radial: 8 },
-        { len: 0.24, r0: 0.075, r1: 0.062, rot: [0.84, 0, 0], radial: 8 },
+        { len: 0.29, r0: 0.19, r1: 0.125, rot: [0.66, 0, 0], radial: 8 },
+        { len: 0.27, r0: 0.125, r1: 0.082, rot: [-1.32, 0, 0], radial: 8 },
+        { len: 0.19, r0: 0.082, r1: 0.066, rot: [0.86, 0, 0], radial: 8 },
       ],
       "hide",
       p.main,
@@ -1410,7 +1411,7 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(前が重い三角形。胸を深く、腹を絞る) ---
   const torso = rig.torso;
   place(torso, 0, 0.08, -0.6, 0.04, 0, 0);
-  torso.add(place(kit.ball(0.32, 0.38, 0.4, "hide", p.main), 0, 0.02, -0.16));
+  torso.add(place(kit.ball(0.35, 0.42, 0.42, "hide", p.main), 0, 0.02, -0.16));
   torso.add(place(kit.ball(0.26, 0.27, 0.36, "hide", p.main), 0, 0.0, 0.22));
   torso.add(place(kit.ball(0.24, 0.2, 0.28, "hide", p.dark), 0, -0.2, -0.14));
   torso.add(place(kit.ball(0.18, 0.13, 0.34, "hide", p.dark), 0, -0.18, 0.16));
@@ -1427,9 +1428,9 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.34, r0: 0.14, r1: 0.09, rot: [0.16, 0, side * 0.05], radial: 8 },
-        { len: 0.3, r0: 0.09, r1: 0.065, rot: [-0.26, 0, 0], radial: 8 },
-        { len: 0.13, r0: 0.065, r1: 0.055, rot: [0.2, 0, 0], radial: 8 },
+        { len: 0.27, r0: 0.15, r1: 0.097, rot: [0.16, 0, side * 0.05], radial: 8 },
+        { len: 0.24, r0: 0.097, r1: 0.07, rot: [-0.26, 0, 0], radial: 8 },
+        { len: 0.12, r0: 0.07, r1: 0.058, rot: [0.2, 0, 0], radial: 8 },
       ],
       "hide",
       p.main,
@@ -1454,8 +1455,8 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
         { x: 0, y: 0.42, z: 0.02 },
         { x: 0, y: 0.58, z: -0.12 },
       ],
-      0.19,
-      0.1,
+      0.23,
+      0.135,
       "hide",
       p.main,
       8,
@@ -1485,11 +1486,36 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 頭(長い口先、後ろへ流れる角) ---
+  // 頭が小さいと、長い首と相まってリャマや馬の輪郭になる。
+  // 首の太さに負けない大きさまで頭蓋を上げ、口先も長く取る
   place(rig.head, 0, 0.6, -0.12, 0.62, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.17, 0.16, 0.22], snout: 0.42, jaw: true, horns: "swept", crest: 3, eye: 0.045 });
+  addBeastHead(kit, rig, { skull: [0.22, 0.2, 0.28], snout: 0.52, jaw: true, horns: "swept", crest: 4, eye: 0.052 });
   // 頬の張り出し。口先の細さと対比させて、噛む力があるように見せる
   for (const side of [-1, 1]) {
-    rig.head.add(place(kit.lens(0.08, 0.1, 0.06, "plate", p.plate, 8), side * 0.15, 0.13, 0.02, 0, 0, side * 0.3));
+    rig.head.add(place(kit.lens(0.1, 0.13, 0.07, "plate", p.plate, 8), side * 0.19, 0.15, 0.02, 0, 0, side * 0.3));
+  }
+  // 後頭部から伸びる2本の大角。横から見たときの輪郭を、獣ではなく竜側へ寄せる
+  for (const side of [-1, 1]) {
+    rig.head.add(
+      place(
+        kit.taperedTube(
+          [
+            { x: 0, y: 0, z: 0 },
+            { x: side * 0.06, y: 0.14, z: 0.16 },
+            { x: side * 0.16, y: 0.2, z: 0.34 },
+          ],
+          0.05,
+          0.01,
+          "plate",
+          p.plate,
+          6,
+          8,
+        ),
+        side * 0.11,
+        0.22,
+        0.12,
+      ),
+    );
   }
 
   // 胴より長い尾。先に刃を付けて、ただの紐に見えないようにする
@@ -1508,6 +1534,329 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.3,
     squash: 0,
     attack: "lunge",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// griffon: グリフォン
+// ---------------------------------------------------------------------------
+
+/**
+ * 羽根を扇状に並べる。冠羽・首の蓑毛・脚の飾り羽など、
+ * 「毛の房(addFurTuft)」では鳥に見えない場所に使う。
+ * 針状の棘ではなく面積のある板を重ねることで、羽毛の層として読める。
+ */
+function addFeatherFan(
+  kit: CreatureKit,
+  parent: THREE.Object3D,
+  count: number,
+  length: number,
+  origin: [number, number, number],
+  spread: number,
+  aim: [number, number, number],
+  fan = 0.9,
+): void {
+  const p = kit.palette;
+  for (let i = 0; i < count; i++) {
+    const t = count === 1 ? 0 : i / (count - 1) - 0.5;
+    const len = length * (1 - Math.abs(t) * 0.3);
+    const feather = kit.feather(len, len * 0.3, "fur", p.fur, 0.12);
+    place(
+      feather,
+      origin[0] + t * spread,
+      origin[1],
+      origin[2] + Math.abs(t) * spread * 0.22,
+      aim[0],
+      aim[1],
+      aim[2] + t * fan,
+    );
+    parent.add(feather);
+  }
+}
+
+/**
+ * 猛禽の足。
+ *
+ * 獣の足(丸い肉球+短い爪)と鳥の足を分けているのは、指の長さと配置。
+ * 前3本・後ろ1本の長い指を鱗の管で作り、その先に鉤爪を付けることで、
+ * 同じ四足でも前脚だけが「掴む脚」に見えるようにする。
+ */
+function addTalonFoot(kit: CreatureKit, foot: THREE.Object3D, scale: number): void {
+  const p = kit.palette;
+  const S = scale;
+  // 踵(足首)の塊。指の付け根が1点に集まるのを隠す
+  foot.add(place(kit.ball(0.06 * S, 0.055 * S, 0.07 * S, "plate", p.plate, 8), 0, -0.02 * S, -0.01 * S));
+
+  // 前3本 + 後ろ1本。後ろ指(蹴爪)は短く、掴む形の要になる
+  const toes: { yaw: number; len: number; claw: number }[] = [
+    { yaw: -0.62, len: 0.9, claw: 0.9 },
+    { yaw: 0, len: 1, claw: 1 },
+    { yaw: 0.62, len: 0.9, claw: 0.9 },
+    { yaw: Math.PI, len: 0.62, claw: 0.85 },
+  ];
+  for (const toe of toes) {
+    const group = new THREE.Group();
+    place(group, 0, -0.03 * S, 0, 0, toe.yaw, 0);
+    group.add(
+      kit.taperedTube(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: 0, y: -0.035 * S, z: -0.10 * S * toe.len },
+          { x: 0, y: -0.065 * S, z: -0.19 * S * toe.len },
+        ],
+        0.042 * S,
+        0.026 * S,
+        "plate",
+        p.plate,
+        5,
+        6,
+      ),
+    );
+    // 鉤爪。前へ出しながら下へ巻き込む向きに倒す
+    group.add(
+      place(
+        kit.claw(0.15 * S * toe.claw, 0.03 * S, 0.9, "plate", p.plate),
+        0,
+        -0.07 * S,
+        -0.19 * S * toe.len,
+        -2.15,
+        0,
+        0,
+      ),
+    );
+    foot.add(group);
+  }
+}
+
+/**
+ * グリフォン(SR)。
+ *
+ * 役割はアタッカーだが、四足獣の既定骨格をそのまま使うと狼やドラゴンと
+ * 同じ「胴が水平で首が前へ低く出た獣」になってしまう。
+ * 鷲の上半身とライオンの下半身が継ぎ目で入れ替わることが唯一の特徴なので、
+ * 次の4点で前後を描き分ける。
+ *
+ *   1. 前脚を長くまっすぐ、後脚を折り畳んだ獣脚にして、肩を腰よりはっきり高くする
+ *   2. 前脚の先は肉球ではなく、指の長い猛禽の足にする
+ *   3. 胸から前を羽毛(fur)、腰から後ろを毛皮(hide)に材質ごと切り替える
+ *   4. 首を立ててくちばしの頭を高く掲げ、尾はライオンの「細い紐+先の房」にする
+ *
+ * 羽毛の翼と冠羽は、以前は TEMPLATE_TRAITS.griffon が役割骨格へ足していたが、
+ * 肩の位置ごとこちらで決めるためビルダー側へ取り込んだ(traits 側からは削除済み)。
+ */
+function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
+  const p = kit.palette;
+  rig.yawBias = 0.36;
+  rig.pelvis.position.y = 0.98;
+
+  // --- 腰(ライオン。後ろは低く、腿の塊で幅を出す) ---
+  rig.pelvis.add(place(kit.ball(0.26, 0.27, 0.32, "hide", p.main), 0, 0, 0.04));
+  rig.pelvis.add(place(kit.ball(0.20, 0.20, 0.19, "hide", p.main), 0, -0.03, 0.24));
+  for (const side of [-1, 1]) {
+    rig.pelvis.add(place(kit.ball(0.16, 0.21, 0.23, "hide", p.main), side * 0.22, -0.02, 0.09));
+  }
+  // 腰の毛並み。後半身が獣であることを、輪郭の毛羽立ちで伝える
+  for (const side of [-1, 1]) {
+    addFurTuft(kit, rig.pelvis, 3, 0.07, 0.24, [side * 0.20, 0.02, 0.18], 0.12, [2.0, 0, side * 0.6]);
+  }
+
+  // --- 後脚(獣脚。深く折り畳んで、前脚との高さの差を作る) ---
+  for (const side of [-1, 1]) {
+    const leg = kit.chain(
+      [
+        { len: 0.32, r0: 0.17, r1: 0.11, rot: [0.62, 0, 0], radial: 7 },
+        { len: 0.31, r0: 0.10, r1: 0.072, rot: [-1.26, 0, 0], radial: 7 },
+        { len: 0.22, r0: 0.07, r1: 0.055, rot: [0.80, 0, 0], radial: 7 },
+      ],
+      "hide",
+      p.main,
+    );
+    leg.root.position.set(side * 0.20, -0.02, 0.11);
+    addJoint(kit, leg.joints[1], 0, 0.08, false);
+    // 肉球のある獣の足。前脚(猛禽の足)との違いがここで出る
+    leg.tip.add(place(kit.ball(0.09, 0.055, 0.13, "hide", p.dark), 0, -0.02, -0.05));
+    addClaws(kit, leg.tip, 3, 0.12, 0.026, 0.06);
+    addFurTuft(kit, leg.joints[0], 3, 0.075, 0.26, [0, -0.14, 0.09], 0.12, [1.95, 0, 0]);
+    rig.pelvis.add(leg.root);
+    rig.legs.push(limbFrom(leg, side, side * 0.9));
+  }
+
+  // --- 胴(前が高く、後ろへ落ちる。継ぎ目で材質が入れ替わる) ---
+  const torso = rig.torso;
+  // rotation.x を正に取ると前(-Z)が持ち上がる。鷲の胸を高く構える
+  place(torso, 0, 0.12, -0.52, 0.22, 0, 0);
+  // 後半身(獣)
+  torso.add(place(kit.ball(0.23, 0.24, 0.30, "hide", p.main), 0, -0.02, 0.24));
+  torso.add(place(kit.ball(0.24, 0.25, 0.26, "hide", p.main), 0, 0.0, 0.02));
+  torso.add(place(kit.ball(0.18, 0.14, 0.30, "hide", p.dark), 0, -0.16, 0.16));
+  // 前半身(鷲)。胸を深く前へ張り出させる
+  torso.add(place(kit.ball(0.28, 0.31, 0.30, "fur", p.fur), 0, 0.04, -0.22));
+  torso.add(place(kit.ball(0.22, 0.24, 0.20, "fur", p.fur), 0, -0.06, -0.38));
+  for (const side of [-1, 1]) {
+    torso.add(place(kit.ball(0.13, 0.18, 0.19, "fur", p.fur), side * 0.24, 0.10, -0.20));
+  }
+  // 胸の羽毛。小さな板を段違いに重ね、面ではなく層として見せる
+  for (let row = 0; row < 3; row++) {
+    const y = 0.10 - row * 0.14;
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4 - 0.5;
+      const feather = kit.feather(0.17, 0.055, "fur", row % 2 === 0 ? p.fur : p.main, 0.1);
+      place(feather, t * 0.26, y, -0.40 + Math.abs(t) * 0.10, 3.0, -t * 0.5, t * 0.35);
+      torso.add(feather);
+    }
+  }
+  // 背の継ぎ目。羽毛と毛皮の境目に飾り羽を寝かせ、前後が入れ替わる位置を示す
+  addFeatherFan(kit, torso, 5, 0.26, [0, 0.22, -0.06], 0.22, [1.5, Math.PI / 2, 0], 0.5);
+
+  // --- 前脚(鷲。長くまっすぐ下ろし、肩を高く保つ) ---
+  for (const side of [-1, 1]) {
+    const leg = kit.chain(
+      [
+        { len: 0.30, r0: 0.13, r1: 0.09, rot: [-0.16, 0, side * 0.05], radial: 7 },
+        // 足根(かかとから下)は鱗。羽毛の腿との材質差で鳥の脚に見える
+        { len: 0.28, r0: 0.075, r1: 0.055, rot: [0.20, 0, 0], radial: 7, style: "plate", color: p.plate },
+      ],
+      "hide",
+      p.main,
+    );
+    leg.root.position.set(side * 0.22, -0.02, -0.28);
+    // 腿を覆う飾り羽。鱗の脛との段差が「鳥のズボン」になる
+    addFeatherFan(kit, leg.joints[0], 4, 0.28, [0, -0.10, 0.04], 0.14, [2.7, 0, 0], 0.7);
+    // 足根の鱗の節
+    for (let i = 0; i < 4; i++) {
+      leg.joints[1].add(place(kit.band(0.065 - i * 0.004, 0.012, Math.PI * 2, "plate", p.plate, 8), 0, -0.05 - i * 0.06, 0, Math.PI / 2, 0, 0));
+    }
+    addTalonFoot(kit, leg.tip, 1.0);
+    torso.add(leg.root);
+    rig.legs.push(limbFrom(leg, side, side * 1.5, true));
+  }
+
+  // --- 首(立てて頭を肩より高く。付け根に蓑毛の襟) ---
+  place(rig.neck, 0, 0.26, -0.40, -0.16, 0, 0);
+  rig.neck.add(
+    kit.taperedTube(
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 0.16, z: -0.04 },
+        { x: 0, y: 0.32, z: -0.02 },
+      ],
+      0.15,
+      0.085,
+      "fur",
+      p.fur,
+      7,
+      6,
+    ),
+  );
+  // 蓑毛。首の付け根を1周する羽根の襟で、鷲の頭と胴を繋ぐ
+  for (let i = 0; i < 11; i++) {
+    const angle = (i / 11) * Math.PI * 2;
+    const len = 0.26 - Math.cos(angle) * 0.06;
+    const feather = kit.feather(len, len * 0.34, "fur", i % 2 === 0 ? p.fur : p.main, 0.14);
+    place(
+      feather,
+      Math.sin(angle) * 0.12,
+      0.06,
+      Math.cos(angle) * 0.12,
+      Math.PI * 0.72 + Math.cos(angle) * 0.35,
+      0,
+      -Math.sin(angle) * 1.2,
+    );
+    rig.neck.add(feather);
+  }
+
+  // --- 頭(くちばしのある鳥の頭) ---
+  place(rig.head, 0, 0.32, -0.02, 0.18, 0, 0);
+  const head = rig.head;
+  head.add(place(kit.ball(0.145, 0.14, 0.16, "fur", p.fur), 0, 0.10, 0.02));
+  // 眉庇。目の上に張り出させると、丸い頭でも猛禽の鋭さが出る
+  head.add(place(kit.lens(0.15, 0.045, 0.10, "plate", p.plate, 10), 0, 0.17, -0.09, -0.45, 0, 0));
+  for (const side of [-1, 1]) {
+    head.add(place(kit.lens(0.055, 0.03, 0.05, "plate", p.plate, 8), side * 0.10, 0.18, -0.07, -0.3, 0, -side * 0.6));
+  }
+  addEyes(kit, head, 0.095, 0.135, -0.09, 0.036);
+  // 蝋膜(くちばしの付け根)と鼻孔
+  head.add(place(kit.ball(0.075, 0.07, 0.07, "plate", p.plate, 8), 0, 0.10, -0.13));
+  for (const side of [-1, 1]) {
+    head.add(place(kit.ball(0.016, 0.02, 0.012, "hide", p.deep, 6), side * 0.035, 0.12, -0.18));
+  }
+  // 上くちばし。先を下へ巻き込ませるのが猛禽の見分けどころ
+  head.add(place(kit.claw(0.30, 0.075, 0.85, "plate", p.plate), 0, 0.10, -0.16, AIM_FORWARD - 0.12, 0, 0));
+  // 下くちばし。開閉できるよう顎として登録する
+  const jaw = new THREE.Group();
+  place(jaw, 0, 0.06, -0.13);
+  markAnimated(jaw);
+  jaw.add(
+    kit.taperedTube(
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: -0.005, z: -0.10 },
+        { x: 0, y: -0.02, z: -0.19 },
+      ],
+      0.06,
+      0.02,
+      "plate",
+      p.plate,
+      6,
+      6,
+    ),
+  );
+  head.add(jaw);
+  rig.jaw = jaw;
+  // 冠羽。後頭部から後ろへ倒して流す
+  addFeatherFan(kit, head, 5, 0.30, [0, 0.19, 0.08], 0.14, [1.35, Math.PI / 2, 0], 0.6);
+  // 頬の羽毛。細いくちばしとの対比で顔幅を作る
+  for (const side of [-1, 1]) {
+    addFeatherFan(kit, head, 3, 0.20, [side * 0.12, 0.08, 0.04], 0.07, [2.4, -side * 0.9, 0], 0.5);
+  }
+
+  // --- 翼(羽毛。肩の上に大きく立てる) ---
+  rig.wingAnchor.set(0.22, 0.24, -0.12);
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Group();
+    markAnimated(wing);
+    place(wing, side * 0.22, 0.22, -0.10, 0.20, -side * 0.52, side * 0.06);
+    addFeatherWing(kit, wing, side, 9, 1.25);
+    torso.add(wing);
+    rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
+  }
+
+  // --- 尾(ライオン。細い紐の先にだけ房を付ける) ---
+  const tail = kit.chain(
+    [
+      { len: 0.22, r0: 0.055, r1: 0.045, rot: [-1.15, 0, 0], radial: 6 },
+      { len: 0.21, r0: 0.045, r1: 0.038, rot: [-0.22, 0, 0], radial: 6 },
+      { len: 0.20, r0: 0.038, r1: 0.03, rot: [0.30, 0, 0], radial: 6 },
+      { len: 0.18, r0: 0.03, r1: 0.024, rot: [0.42, 0, 0], radial: 6 },
+    ],
+    "hide",
+    p.main,
+  );
+  tail.root.position.set(0, 0.10, 0.24);
+  markAnimated(...tail.joints);
+  for (let i = 0; i < tail.joints.length; i++) {
+    rig.tail.push({ group: tail.joints[i], rest: tail.rests[i] });
+  }
+  // 先端の房。ライオンの尾は、この一房があるかどうかで決まる
+  for (let k = 0; k < 6; k++) {
+    const angle = (k / 6) * Math.PI * 2 + 0.4;
+    const hair = kit.spike(0.05, 0.24 - Math.abs(Math.sin(k * 1.7)) * 0.05, 0.8, "fur", p.fur);
+    place(hair, Math.cos(angle) * 0.03, -0.02, Math.sin(angle) * 0.03, Math.PI - 0.2, 0, Math.cos(angle) * 0.45);
+    tail.tip.add(hair);
+  }
+  rig.pelvis.add(tail.root);
+
+  rig.anim = {
+    idleSpeed: 1.35,
+    breath: 0.9,
+    bob: 0.034,
+    headSway: 1.3,
+    tailWave: 1.5,
+    wingFlap: 0.9,
+    sway: 0.9,
+    lunge: 1.7,
+    squash: 0,
+    attack: "pounce",
   };
 }
 
@@ -1540,14 +1889,20 @@ export function templateBuilderFor(templateId: string): CreatureBuilder | null {
  * 骨格そのものは役割のままでよく、翼や飾りだけで見分けが付く種別に使う。
  */
 const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => void> = {
-  /** ドラゴン: 大きな皮膜の翼。畳まずに広げて、横幅のあるシルエットにする */
+  /**
+   * ドラゴン: 大きな皮膜の翼。
+   *
+   * 水平に大きく広げると、翼が画面を横に占領したうえに滑空機のように見えてしまう。
+   * 上へ立ち上げ(Z回転)ながら後ろへ流す(Y回転)ことで、体の横に畳みかけた
+   * 「休めているが、いつでも開ける」構えになり、胴の輪郭も隠れなくなる。
+   */
   dragon: (kit, rig) => {
     const a = rig.wingAnchor;
     for (const side of [-1, 1]) {
       const wing = new THREE.Group();
       markAnimated(wing);
-      place(wing, side * a.x, a.y, a.z, 0.16, -side * 0.42, side * 0.12);
-      addBatWing(kit, wing, side, 1.3);
+      place(wing, side * a.x, a.y, a.z, 0.2, -side * 0.62, side * 0.66);
+      addBatWing(kit, wing, side, 1.02);
       rig.torso.add(wing);
       rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
     }
