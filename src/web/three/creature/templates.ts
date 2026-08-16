@@ -1359,6 +1359,159 @@ function buildExpPig(kit: CreatureKit, rig: CreatureRig): void {
 }
 
 // ---------------------------------------------------------------------------
+// dragon: ドラゴン
+// ---------------------------------------------------------------------------
+
+/**
+ * ドラゴン(SSR)。
+ *
+ * 四足獣の役割骨格でも一応は成立するが、それだと狼と同じ
+ * 「胴が水平で、首が前へ低く出た獣」の輪郭になり、最高レアの風格が出ない。
+ *
+ * 見分けどころを3つに絞って作る。
+ *   1. 首をS字に立ち上げ、頭を肩よりはっきり高い位置へ持ち上げる
+ *   2. 胸を深く、腹をなだらかに絞る(横から見て前が重い三角形)
+ *   3. 尾を胴より長く取り、先に刃を付ける
+ * この3つで、横向きの構図でも狼と取り違えない輪郭になる。
+ *
+ * 皮膜の翼は TEMPLATE_TRAITS.dragon が wingAnchor に生やすので、ここでは作らない。
+ */
+function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
+  const p = kit.palette;
+  rig.yawBias = 0.3;
+  rig.pelvis.position.y = 1.2;
+
+  // --- 腰。後脚が太いぶん、狼より腰の塊を大きく取る ---
+  rig.pelvis.add(place(kit.ball(0.3, 0.28, 0.36, "hide", p.main), 0, 0, 0.04));
+  rig.pelvis.add(place(kit.ball(0.22, 0.2, 0.2, "hide", p.main), 0, -0.03, 0.25));
+  for (const side of [-1, 1]) {
+    rig.pelvis.add(place(kit.ball(0.16, 0.22, 0.23, "hide", p.main), side * 0.24, -0.01, 0.1));
+  }
+
+  // --- 後脚(体重を支える形。腿を太く、足先を大きく) ---
+  for (const side of [-1, 1]) {
+    const leg = kit.chain(
+      [
+        { len: 0.36, r0: 0.18, r1: 0.115, rot: [0.62, 0, 0], radial: 8 },
+        { len: 0.34, r0: 0.115, r1: 0.075, rot: [-1.28, 0, 0], radial: 8 },
+        { len: 0.24, r0: 0.075, r1: 0.062, rot: [0.84, 0, 0], radial: 8 },
+      ],
+      "hide",
+      p.main,
+    );
+    leg.root.position.set(side * 0.23, -0.01, 0.12);
+    addJoint(kit, leg.joints[1], 0, 0.1, true);
+    leg.tip.add(place(kit.ball(0.11, 0.06, 0.17, "hide", p.dark), 0, -0.02, -0.06));
+    addClaws(kit, leg.tip, 3, 0.17, 0.033, 0.075);
+    rig.pelvis.add(leg.root);
+    rig.legs.push(limbFrom(leg, side, side * 0.9));
+  }
+
+  // --- 胴(前が重い三角形。胸を深く、腹を絞る) ---
+  const torso = rig.torso;
+  place(torso, 0, 0.08, -0.6, 0.04, 0, 0);
+  torso.add(place(kit.ball(0.32, 0.38, 0.4, "hide", p.main), 0, 0.02, -0.16));
+  torso.add(place(kit.ball(0.26, 0.27, 0.36, "hide", p.main), 0, 0.0, 0.22));
+  torso.add(place(kit.ball(0.24, 0.2, 0.28, "hide", p.dark), 0, -0.2, -0.14));
+  torso.add(place(kit.ball(0.18, 0.13, 0.34, "hide", p.dark), 0, -0.18, 0.16));
+  for (const side of [-1, 1]) {
+    torso.add(place(kit.ball(0.13, 0.19, 0.19, "hide", p.main), side * 0.27, 0.12, -0.22));
+  }
+  // 腹の横板。爬虫類の腹甲。横一列に並べると硬さが出る
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    torso.add(place(kit.lens(0.15 - t * 0.03, 0.05, 0.05, "plate", p.plate, 8), 0, -0.24 + t * 0.03, -0.24 + t * 0.5));
+  }
+
+  // --- 前脚(後脚より短く、まっすぐ下ろす) ---
+  for (const side of [-1, 1]) {
+    const leg = kit.chain(
+      [
+        { len: 0.34, r0: 0.14, r1: 0.09, rot: [0.16, 0, side * 0.05], radial: 8 },
+        { len: 0.3, r0: 0.09, r1: 0.065, rot: [-0.26, 0, 0], radial: 8 },
+        { len: 0.13, r0: 0.065, r1: 0.055, rot: [0.2, 0, 0], radial: 8 },
+      ],
+      "hide",
+      p.main,
+    );
+    leg.root.position.set(side * 0.24, -0.04, -0.3);
+    addJoint(kit, leg.joints[1], 0, 0.08, true);
+    leg.tip.add(place(kit.ball(0.09, 0.05, 0.14, "hide", p.dark), 0, -0.02, -0.05));
+    addClaws(kit, leg.tip, 3, 0.15, 0.03, 0.065);
+    torso.add(leg.root);
+    rig.legs.push(limbFrom(leg, side, side * 1.5, true));
+  }
+
+  // --- 首(S字。ここがドラゴンらしさの本体) ---
+  // 狼は首を前へ低く送り出すが、ドラゴンは一度下げてから跳ね上げる。
+  // 頭が肩より高く来ることで、見上げる相手という関係が生まれる
+  place(rig.neck, 0, 0.28, -0.34, -0.5, 0, 0);
+  rig.neck.add(
+    kit.taperedTube(
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 0.2, z: 0.06 },
+        { x: 0, y: 0.42, z: 0.02 },
+        { x: 0, y: 0.58, z: -0.12 },
+      ],
+      0.19,
+      0.1,
+      "hide",
+      p.main,
+      8,
+      10,
+    ),
+  );
+  // 喉の輪。首の長さを目盛りとして見せる
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    rig.neck.add(
+      place(kit.lens(0.1 - t * 0.02, 0.045, 0.05, "plate", p.plate, 8), 0, 0.1 + t * 0.42, 0.09 - t * 0.14, -0.3, 0, 0),
+    );
+  }
+
+  // --- 背びれ。腰から首の付け根まで、山なりに大きさを変えて並べる ---
+  for (let i = 0; i < 9; i++) {
+    const t = i / 8;
+    const fin = kit.spike(0.045, 0.16 + Math.sin(t * Math.PI) * 0.17, 0.32, "plate", p.plate);
+    place(fin, 0, 0.3 - t * 0.04, -0.3 + t * 0.72, -0.12, Math.PI / 2, 0);
+    torso.add(fin);
+  }
+  for (let i = 0; i < 4; i++) {
+    const t = i / 3;
+    const fin = kit.spike(0.032, 0.13 - t * 0.03, 0.32, "plate", p.plate);
+    place(fin, 0, 0.14 + t * 0.4, 0.12 - t * 0.12, -0.34, Math.PI / 2, 0);
+    rig.neck.add(fin);
+  }
+
+  // --- 頭(長い口先、後ろへ流れる角) ---
+  place(rig.head, 0, 0.6, -0.12, 0.62, 0, 0);
+  addBeastHead(kit, rig, { skull: [0.17, 0.16, 0.22], snout: 0.42, jaw: true, horns: "swept", crest: 3, eye: 0.045 });
+  // 頬の張り出し。口先の細さと対比させて、噛む力があるように見せる
+  for (const side of [-1, 1]) {
+    rig.head.add(place(kit.lens(0.08, 0.1, 0.06, "plate", p.plate, 8), side * 0.15, 0.13, 0.02, 0, 0, side * 0.3));
+  }
+
+  // 胴より長い尾。先に刃を付けて、ただの紐に見えないようにする
+  addTail(kit, rig, [0, 0.06, 0.26], 6, 0.28, 0.11, -1.0, -0.08, true);
+
+  rig.wingAnchor.set(0.26, 0.42, -0.1);
+
+  rig.anim = {
+    idleSpeed: 0.75,
+    breath: 1.5,
+    bob: 0.04,
+    headSway: 1.1,
+    tailWave: 1.3,
+    wingFlap: 0.55,
+    sway: 0.7,
+    lunge: 1.3,
+    squash: 0,
+    attack: "lunge",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 登録
 // ---------------------------------------------------------------------------
 
@@ -1374,6 +1527,7 @@ const TEMPLATE_BUILDERS: Record<string, CreatureBuilder> = {
   fairy: { build: buildFairy, height: 1.72, float: 0.62 },
   reincarnation_pig: { build: buildReincarnationPig, height: 1.42, float: 0.08 },
   exp_pig: { build: buildExpPig, height: 1.34, float: 0 },
+  dragon: { build: buildDragon, height: 2.95, float: 0 },
 };
 
 /** 種別専用の骨格。無ければ null(役割の骨格を使う) */
