@@ -214,6 +214,37 @@ export interface SandboxOptions {
   quality?: number;
 }
 
+/**
+ * 実際のバトルステージと同じ「見え方の条件」。
+ * ここを合わせないと、サンドボックスでは良く見えるのに本番では
+ * 小さすぎる/白飛びする、という食い違いが起きる。
+ * (battleStage.ts の VFX_* と同じ値。あちらを変えたらここも合わせること)
+ */
+const STAGE_FOV = 24.5;
+const STAGE_VISIBLE_HEIGHT = 10.2;
+const STAGE_ELEVATION_DEG = 22.5;
+const VFX_REFERENCE_HEIGHT = 42;
+const VFX_DENSITY = 0.5;
+const VFX_OPACITY = 0.42;
+const VFX_MAX_SCREEN_RATIO = 0.16;
+
+/**
+ * ブラウザから直接呼べる取り付け口。
+ * 開発時に `import('/src/web/three/fx/vfxSandbox.ts').then(m => m.mountVfxSandbox({ set: 'impact' }))`
+ * とすれば、ページを用意しなくてもエフェクトだけを並べて確認できる。
+ */
+export function mountVfxSandbox(options: SandboxOptions): VfxSandbox {
+  const previous = document.querySelector<HTMLElement>("#vfx-sandbox");
+  previous?.remove();
+  const container = document.createElement("div");
+  container.id = "vfx-sandbox";
+  container.style.cssText = "position:fixed;inset:0;z-index:99999;background:#05060c;overflow:hidden";
+  document.body.append(container);
+  const sandbox = new VfxSandbox(container, options);
+  Object.assign(window, { __vfxSandbox: sandbox });
+  return sandbox;
+}
+
 export class VfxSandbox {
   readonly element: HTMLElement;
 
@@ -238,27 +269,38 @@ export class VfxSandbox {
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(width, height, false);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    // 露出とブルームも本番と揃える(battleStage.ts と同じ値)
+    this.renderer.toneMappingExposure = 0.92;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.append(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(0x090a14);
     this.scene.fog = new THREE.FogExp2(0x0a0a16, 0.016);
     this.scene.add(this.vfx.root);
-    this.vfx.setQuality(options.quality ?? 1);
 
     const pads = buildPads(options.set);
     const columns = pads.length <= 4 ? 2 : pads.length <= 6 ? 3 : 4;
     const rows = Math.ceil(pads.length / columns);
-    const spacingX = 7.0;
-    const spacingZ = 6.4;
+    const spacingX = 6.2;
+    const spacingZ = 4.6;
 
-    this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 250);
-    const extent = Math.max(columns * spacingX, rows * spacingZ);
-    this.camera.position.set(0, extent * 0.55 + 3, extent * 0.95 + 4);
-    this.camera.lookAt(0, 1.2, 0);
+    // 本番と同じ画角・距離・見下ろし角で組む。ここが違うと
+    // 「エフェクトがキャラクターに対してどれくらいの大きさか」が変わり、
+    // サンドボックスでの判断が本番に持ち込めなくなる。
+    const tanY = Math.tan((STAGE_FOV * Math.PI) / 360);
+    const distance = STAGE_VISIBLE_HEIGHT / (2 * tanY);
+    const elevation = (STAGE_ELEVATION_DEG * Math.PI) / 180;
+    this.camera = new THREE.PerspectiveCamera(STAGE_FOV, width / height, 0.1, 250);
+    this.camera.position.set(0, 1.3 + Math.sin(elevation) * distance, Math.cos(elevation) * distance);
+    this.camera.lookAt(0, 1.3, 0);
 
-    this.setupStage(extent);
+    // 大きさ・濃さ・密度の頭打ちも本番と同じ経路で入れる
+    this.vfx.setSizeScale(STAGE_VISIBLE_HEIGHT / VFX_REFERENCE_HEIGHT);
+    this.vfx.setMaxBillboardScale(STAGE_VISIBLE_HEIGHT * VFX_MAX_SCREEN_RATIO);
+    this.vfx.setQuality(options.quality ?? VFX_DENSITY);
+    this.vfx.setOpacityScale(VFX_OPACITY);
+
+    this.setupStage(Math.max(columns * spacingX, rows * spacingZ) + distance * 0.5);
 
     pads.forEach((pad, index) => {
       const col = index % columns;
@@ -276,7 +318,7 @@ export class VfxSandbox {
     this.composer.setPixelRatio(1);
     this.composer.setSize(width, height);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(width, height), 0.72, 0.62, 0.72));
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(width, height), 0.18, 0.5, 1.15));
     this.composer.addPass(new OutputPass());
 
     if (options.freezeAt != null) this.renderFrozen(options.freezeAt);

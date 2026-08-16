@@ -488,6 +488,207 @@ export function flashStarTexture(): THREE.Texture {
   });
 }
 
+/**
+ * 打撃の一撃を表す、輪郭のとがった星形。
+ * 丸い閃光だけだと「光った」で終わるが、角のある形を1枚重ねると
+ * 「硬いものがぶつかった」に読み替わる。
+ */
+export function impactStarTexture(): THREE.Texture {
+  return fromCanvas("fx-impact-star", 256, 256, (ctx, s) => {
+    const c = s / 2;
+    const rand = seeded(23);
+    const spikes = 11;
+    ctx.save();
+    ctx.filter = "blur(3px)";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.beginPath();
+    for (let i = 0; i < spikes * 2; i++) {
+      const a = (i / (spikes * 2)) * Math.PI * 2;
+      const long = i % 2 === 0;
+      const r = s * (long ? 0.3 + rand() * 0.2 : 0.09 + rand() * 0.05);
+      const x = c + Math.cos(a) * r;
+      const y = c + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    alphaGradient(ctx, c, c, s * 0.16, [
+      [0, 1],
+      [0.4, 0.5],
+      [1, 0],
+    ]);
+  });
+}
+
+/**
+ * 地面に走る亀裂。打撃・重い着弾のあとに残す。
+ * 光ではなく「跡」なので、余韻の時間を稼げる数少ない手札。
+ */
+export function crackDecalTexture(): THREE.Texture {
+  return fromCanvas("fx-crack", 256, 256, (ctx, s) => {
+    const c = s / 2;
+    const rand = seeded(61);
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineCap = "round";
+    const branch = (x: number, y: number, angle: number, length: number, width: number, depth: number) => {
+      if (depth <= 0 || length < s * 0.02) return;
+      const steps = 4;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      let cx = x;
+      let cy = y;
+      let a = angle;
+      for (let i = 0; i < steps; i++) {
+        a += (rand() - 0.5) * 0.7;
+        cx += Math.cos(a) * (length / steps);
+        cy += Math.sin(a) * (length / steps);
+        ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+      if (rand() < 0.75) branch(cx, cy, a + (rand() - 0.5) * 1.4, length * 0.55, width * 0.6, depth - 1);
+      if (rand() < 0.45) branch(cx, cy, a + (rand() - 0.5) * 1.8, length * 0.4, width * 0.5, depth - 1);
+    };
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + rand() * 0.4;
+      branch(c + Math.cos(a) * s * 0.04, c + Math.sin(a) * s * 0.04, a, s * (0.14 + rand() * 0.1), s * 0.022, 3);
+    }
+    // 中心の砕けた窪み
+    alphaGradient(ctx, c, c, s * 0.1, [
+      [0, 0.85],
+      [0.6, 0.3],
+      [1, 0],
+    ]);
+    // 外周を落として円形に収める
+    ctx.globalCompositeOperation = "destination-in";
+    alphaGradient(ctx, c, c, s * 0.5, [
+      [0, 1],
+      [0.6, 0.95],
+      [0.92, 0.2],
+      [1, 0],
+    ]);
+  });
+}
+
+/** 水面の波紋。細い輪が三重に広がる(単発のリングより「流れ」が出る) */
+export function rippleRingsTexture(): THREE.Texture {
+  return fromCanvas("fx-ripple", 256, 256, (ctx, s) => {
+    const c = s / 2;
+    ctx.save();
+    ctx.filter = "blur(2px)";
+    const ring = (radius: number, width: number, alpha: number) => {
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.arc(c, c, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    };
+    ring(s * 0.46, s * 0.022, 0.95);
+    ring(s * 0.36, s * 0.014, 0.5);
+    ring(s * 0.27, s * 0.01, 0.28);
+    ctx.restore();
+  });
+}
+
+/** 放射状の光条。光属性の「差す」感じを1枚で作る */
+export function godRayTexture(): THREE.Texture {
+  return fromCanvas("fx-godray", 256, 256, (ctx, s) => {
+    const c = s / 2;
+    const rand = seeded(13);
+    ctx.save();
+    ctx.filter = "blur(2px)";
+    for (let i = 0; i < 22; i++) {
+      const a = (i / 22) * Math.PI * 2 + rand() * 0.1;
+      const spread = 0.012 + rand() * 0.035;
+      const length = s * (0.28 + rand() * 0.22);
+      const g = ctx.createLinearGradient(c, c, c + Math.cos(a) * length, c + Math.sin(a) * length);
+      g.addColorStop(0, `rgba(255,255,255,${0.5 + rand() * 0.45})`);
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(c, c);
+      ctx.lineTo(c + Math.cos(a - spread) * length, c + Math.sin(a - spread) * length);
+      ctx.lineTo(c + Math.cos(a + spread) * length, c + Math.sin(a + spread) * length);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    alphaGradient(ctx, c, c, s * 0.22, [
+      [0, 1],
+      [0.25, 0.55],
+      [0.7, 0.08],
+      [1, 0],
+    ]);
+  });
+}
+
+/**
+ * 闇の「喰う」形。中心が黒く、縁だけが光る。
+ * 通常合成で置くと背景を食べ、そのぶん周りの加算光が締まって見える。
+ */
+export function voidCoreTexture(): THREE.Texture {
+  return fromCanvas("fx-void", 256, 256, (ctx, s) => {
+    const c = s / 2;
+    alphaGradient(ctx, c, c, s * 0.48, [
+      [0, 1],
+      [0.55, 0.95],
+      [0.78, 0.55],
+      [1, 0],
+    ]);
+  });
+}
+
+/** 上向きの山形(シェブロン)。強化・上昇の記号として使う */
+export function chevronTexture(): THREE.Texture {
+  return fromCanvas("fx-chevron", 256, 256, (ctx, s) => {
+    const c = s / 2;
+    ctx.save();
+    ctx.filter = "blur(2px)";
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const chevron = (y: number, halfWidth: number, height: number, width: number, alpha: number) => {
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(c - halfWidth, y + height);
+      ctx.lineTo(c, y);
+      ctx.lineTo(c + halfWidth, y + height);
+      ctx.stroke();
+    };
+    chevron(s * 0.16, s * 0.34, s * 0.2, s * 0.05, 0.95);
+    chevron(s * 0.42, s * 0.26, s * 0.16, s * 0.04, 0.6);
+    chevron(s * 0.64, s * 0.18, s * 0.12, s * 0.03, 0.3);
+    ctx.restore();
+  });
+}
+
+/** 六角形の板。結界の破片・魔法の記号に使う(粒より大きく見せたい時) */
+export function hexPanelTexture(): THREE.Texture {
+  return fromCanvas("fx-hexpanel", 256, 256, (ctx, s) => {
+    const c = s / 2;
+    ctx.save();
+    ctx.filter = "blur(1.5px)";
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 3;
+      const x = c + Math.cos(a) * s * 0.44;
+      const y = c + Math.sin(a) * s * 0.44;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.14)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = s * 0.035;
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
 /** 火球。乱れた輪郭を持つ炎の塊 */
 export function fireballTexture(): THREE.Texture {
   return fromCanvas("fx-fireball", 256, 256, (ctx, s) => {
