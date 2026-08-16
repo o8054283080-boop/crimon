@@ -78,7 +78,16 @@ export interface AnimProfile {
    */
   squash: number;
   /** 攻撃モーションの型 */
-  attack: "lunge" | "slam" | "cast" | "dash" | "pounce";
+  attack: "lunge" | "slam" | "cast" | "dash" | "pounce" | "breath" | "swipe" | "bless";
+  /**
+   * 待機中にごくたまに出る仕草。
+   *
+   * 待機モーションを正弦波の重ね合わせだけで作ると、周期が読めてしまい
+   * 「動いているが生きてはいない」見え方になる。数秒に一度、周期と無関係な
+   * 短い動作を挟むと、同じ骨格でも急に生き物として読めるようになる。
+   * 種別の性格を一番安く出せる場所でもあるので、造形と揃えて選ぶこと。
+   */
+  accent: "none" | "headShake" | "wingRuffle" | "tailFlick" | "stomp" | "shiver" | "roar" | "gaze";
 }
 
 export const DEFAULT_ANIM: AnimProfile = {
@@ -92,6 +101,7 @@ export const DEFAULT_ANIM: AnimProfile = {
   lunge: 1.1,
   squash: 0,
   attack: "lunge",
+  accent: "none",
 };
 
 /**

@@ -452,6 +452,7 @@ function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.5,
     squash: 1,
     attack: "dash",
+    accent: "shiver",
   };
 }
 
@@ -604,6 +605,7 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.8,
     squash: 0,
     attack: "pounce",
+    accent: "headShake",
   };
 }
 
@@ -846,6 +848,7 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.5,
     squash: 0,
     attack: "lunge",
+    accent: "roar",
   };
 }
 
@@ -1006,6 +1009,7 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 0.7,
     squash: 0,
     attack: "slam",
+    accent: "stomp",
   };
 }
 
@@ -1182,6 +1186,7 @@ function buildFairy(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 0.6,
     squash: 0,
     attack: "cast",
+    accent: "wingRuffle",
   };
 }
 
@@ -1262,6 +1267,7 @@ function buildReincarnationPig(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.2,
     squash: 0,
     attack: "dash",
+    accent: "headShake",
   };
 }
 
@@ -1356,6 +1362,7 @@ function buildExpPig(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 0.9,
     squash: 0,
     attack: "dash",
+    accent: "shiver",
   };
 }
 
@@ -1534,7 +1541,8 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
     sway: 0.7,
     lunge: 1.3,
     squash: 0,
-    attack: "lunge",
+    attack: "breath",
+    accent: "roar",
   };
 }
 
@@ -1867,7 +1875,8 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
     sway: 0.9,
     lunge: 1.7,
     squash: 0,
-    attack: "pounce",
+    attack: "swipe",
+    accent: "wingRuffle",
   };
 }
 
@@ -2016,7 +2025,8 @@ function buildAncientCrystalCurse(kit: CreatureKit, rig: CreatureRig): void {
     sway: 0.35,
     lunge: 1.0,
     squash: 0,
-    attack: "cast",
+    attack: "bless",
+    accent: "gaze",
   };
 }
 
@@ -2141,6 +2151,7 @@ function buildAncientDemon(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 0.9,
     squash: 0,
     attack: "cast",
+    accent: "gaze",
   };
 }
 
@@ -2377,6 +2388,7 @@ function buildSeraph(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.1,
     squash: 0,
     attack: "lunge",
+    accent: "roar",
   };
 }
 
