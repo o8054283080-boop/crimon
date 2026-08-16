@@ -35,6 +35,22 @@ export interface RigCloth {
   amount: number;
 }
 
+/**
+ * どこにも登録されていない可動グループ(耳・鰭・浮遊する刃など)。
+ *
+ * 役割・種別のビルダーが `markAnimated` しただけで rig のどの配列にも
+ * 入れていない部位は、今まで一度も動かされていなかった。
+ * これらは能動的に動かす必要はないが、**本体の動きに遅れて追従する**だけで
+ * 「垂れている物が付いている」ことが伝わるので、finalizeRig が自動で拾って
+ * 二次的な動きの対象にする。
+ */
+export interface RigFollower {
+  group: THREE.Object3D;
+  rest: THREE.Euler;
+  /** 揺れ幅の倍率。体高に対して長い部位ほど大きく振る */
+  amount: number;
+}
+
 /** 常時回転し続ける装飾(結晶の環など) */
 export interface RigSpinner {
   object: THREE.Object3D;
@@ -79,6 +95,15 @@ export interface AnimProfile {
   squash: number;
   /** 攻撃モーションの型 */
   attack: "lunge" | "slam" | "cast" | "dash" | "pounce" | "breath" | "swipe" | "bless";
+  /**
+   * 体感重量。0が羽のように軽い、1が岩の塊。
+   *
+   * ビルダー側では指定せず、`finalizeRig` が待機の速さ・上下動の幅・体高・
+   * 浮遊の有無から自動で導く(`deriveMass`)。これ1本で、加速の鈍さ・
+   * 予備動作の長さ・二次的な動きの周期と減衰・着地の沈み込みが一斉に変わる。
+   * ゴーレムと妖精が同じ速さの波で動いていた問題は、ここを起点に潰す。
+   */
+  mass?: number;
   /**
    * 待機中にごくたまに出る仕草。
    *
@@ -133,7 +158,10 @@ export class CreatureRig {
   readonly cloth: RigCloth[] = [];
   readonly spinners: RigSpinner[] = [];
   readonly orbiters: RigOrbiter[] = [];
+  /** finalizeRig が自動で拾う「受動的に揺れるだけ」の部位 */
+  readonly followers: RigFollower[] = [];
 
+  pelvisRest = new THREE.Euler();
   torsoRest = new THREE.Euler();
   neckRest = new THREE.Euler();
   headRest = new THREE.Euler();
@@ -166,11 +194,15 @@ export class CreatureRig {
     this.pelvis.add(this.torso);
     this.torso.add(this.neck);
     this.neck.add(this.head);
-    markAnimated(this.torso, this.neck, this.head);
+    // 腰も骨にする。骨を持たないと、腰を捻っても腰まわりの造形だけが
+    // 取り残されて胴と脚だけがずれる(重みは親の骨に焼かれているため)。
+    // 骨にしておけば、体重移動で腰を捻る「立ち方」が作れる
+    markAnimated(this.pelvis, this.torso, this.neck, this.head);
   }
 
   /** 姿勢の基準値を、現在の rotation から確定させる */
   captureRests(): void {
+    this.pelvisRest = this.pelvis.rotation.clone();
     this.torsoRest = this.torso.rotation.clone();
     this.neckRest = this.neck.rotation.clone();
     this.headRest = this.head.rotation.clone();
@@ -444,12 +476,84 @@ function buildSkinnedBody(rig: CreatureRig, kit: CreatureKit): boolean {
   return true;
 }
 
+function clamp01(value: number): number {
+  return value < 0 ? 0 : value > 1 ? 1 : value;
+}
+
+/**
+ * 待機の速さ・上下動の幅・体高・浮遊の有無から体感重量を導く。
+ *
+ * ビルダーが個別に重さを申告する作りにすると、13体分の値を揃える手間が
+ * 増えるうえ、造形を変えた時に更新が漏れる。「ゆっくり動く」「上下に跳ねない」
+ * 「背が高い」は重さの結果として現れる特徴なので、そこから逆算する。
+ */
+function deriveMass(rig: CreatureRig): number {
+  const anim = rig.anim;
+  const slow = clamp01((1.55 - anim.idleSpeed) / 1.05);
+  const grounded = clamp01((0.075 - anim.bob) / 0.06);
+  const big = clamp01((rig.height - 1.9) / 1.5);
+  const mass = slow * 0.45 + grounded * 0.25 + big * 0.3;
+  // 浮いているものは、どれだけ大きくても軽く漂う
+  return clamp01(rig.floats ? mass * 0.45 : mass);
+}
+
+/**
+ * どの配列にも登録されていない可動グループを拾って、受動的に揺れる部位にする。
+ * 対象は「子を持つグループ」だけ。メッシュそのものが動く装飾(環・破片)は
+ * 別経路で動かしているので触らない。
+ */
+function collectFollowers(rig: CreatureRig): void {
+  // 部位の長さは「体高に対する比率」で測る。ビルダーは実寸ではなく比率で
+  // 設計しているので、固定値のしきい値では骨格ごとに拾える物が変わってしまう
+  const body = new THREE.Box3().setFromObject(rig.core);
+  const refHeight = Math.max(0.001, body.max.y - body.min.y);
+  const claimed = new Set<THREE.Object3D>([rig.core, rig.pelvis, rig.torso, rig.neck, rig.head]);
+  // 手足の中に見つかる可動部は、末端の節(足首・指の付け根)。
+  // ここを大きく振ると接地が壊れるので、揺れ幅を強く絞る
+  const limbParts = new Set<THREE.Object3D>();
+  if (rig.jaw) claimed.add(rig.jaw);
+  for (const limb of [...rig.arms, ...rig.legs, ...rig.wings]) {
+    for (const part of [limb.root, limb.lower, limb.tip]) {
+      if (!part) continue;
+      claimed.add(part);
+      limbParts.add(part);
+    }
+  }
+  for (const joint of rig.tail) claimed.add(joint.group);
+  for (const cloth of rig.cloth) claimed.add(cloth.group);
+  for (const spinner of rig.spinners) claimed.add(spinner.object);
+  for (const orbiter of rig.orbiters) claimed.add(orbiter.object);
+
+  const box = new THREE.Box3();
+  const size = new THREE.Vector3();
+  const walk = (container: THREE.Object3D, inLimb: boolean): void => {
+    for (const child of container.children) {
+      if ((child as THREE.Mesh).isMesh) continue;
+      if (child.userData.animated && !claimed.has(child)) {
+        // 長い部位ほど大きく振れる。付け根の球ひとつのような小物は揺らさない
+        box.setFromObject(child);
+        box.getSize(size);
+        const span = Math.max(size.x, size.y, size.z) / Math.max(0.001, refHeight);
+        if (span > 0.05) {
+          const amount = Math.min(1.6, span * 6) * (inLimb ? 0.3 : 1);
+          rig.followers.push({ group: child, rest: child.rotation.clone(), amount });
+        }
+      }
+      walk(child, inLimb || limbParts.has(child));
+    }
+  };
+  walk(rig.core, false);
+}
+
 /**
  * 体高を目標値へ正規化し、足(または浮遊の下端)が地面に合うよう配置する。
  * 役割別ビルダーは実寸を気にせず「形の比率」だけを設計すればよくなる。
  */
 export function finalizeRig(rig: CreatureRig, kit: CreatureKit, targetHeight: number, floatGap = 0): void {
   rig.captureRests();
+  // 登録漏れの可動部を、揺れるだけの部位として拾う。
+  // ここは骨組みを立てる前(=剛体階層のまま)でないと、部位ごとの寸法が測れない
+  collectFollowers(rig);
   // 回り続ける環や、周囲を漂う破片は毎フレーム動かす。
   // マージで焼き込まれると、参照だけ残って画面から消えてしまう
   for (const spinner of rig.spinners) markAnimated(spinner.object);
@@ -477,4 +581,7 @@ export function finalizeRig(rig: CreatureRig, kit: CreatureKit, targetHeight: nu
     rig.skeleton.calculateInverses();
     for (const mesh of rig.skinnedMeshes) mesh.bind(rig.skeleton, mesh.matrixWorld.clone());
   }
+
+  // 体高が決まってから重さを導く(背の高さも重さの手がかりに使うため)
+  if (rig.anim.mass === undefined) rig.anim.mass = deriveMass(rig);
 }
