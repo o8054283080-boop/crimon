@@ -26,6 +26,12 @@ export interface ScreenAnchor {
   scale: number;
 }
 
+/**
+ * カメラの方位角(度)。負の値でユニットが向いている側へ回り込む。
+ * 0にすると自軍が真後ろからしか映らなくなるので、0へ戻さないこと。
+ */
+const CAMERA_AZIMUTH_DEG = -11;
+
 const PLAYER_LINE_Z = 3.8;
 const ENEMY_LINE_Z = -5.0;
 
@@ -329,9 +335,17 @@ export class BattleStage {
 
     const tanY = Math.tan(THREE.MathUtils.degToRad(fov / 2));
     const tanX = tanY * aspect;
-    const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch));
+    // 真正面から見ると、敵へ向き直った自軍は常に真後ろからしか映らず、
+    // 顔・角・仮面といった見分けどころが自分のモンスターだけ見えなくなる。
+    // ユニットが向いている側へカメラを回り込ませて、斜め後ろから見る構図にする。
+    // 副次的に、2つの列が画面上で斜めに並ぶ(正対だと前後の列が重なりやすい)
+    const azimuth = THREE.MathUtils.degToRad(CAMERA_AZIMUTH_DEG);
+    const yAxis = new THREE.Vector3(0, 1, 0);
+    const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch)).applyAxisAngle(yAxis, azimuth);
     const forward = dir.clone().negate();
-    const up = new THREE.Vector3(0, Math.cos(pitch), -Math.sin(pitch));
+    const up = new THREE.Vector3(0, Math.cos(pitch), -Math.sin(pitch)).applyAxisAngle(yAxis, azimuth);
+    // 収まり判定に使う画面横方向。方位角を入れるとワールドXとは一致しなくなる
+    const right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
     const box = this.frameBox;
     const corners: THREE.Vector3[] = [];
@@ -349,7 +363,7 @@ export class BattleStage {
         this.tmpRelative.copy(corner).sub(camera);
         const depth = this.tmpRelative.dot(forward);
         if (depth < 0.5) return false;
-        if (Math.abs(this.tmpRelative.x) * padding > tanX * depth) return false;
+        if (Math.abs(this.tmpRelative.dot(right)) * padding > tanX * depth) return false;
         if (Math.abs(this.tmpRelative.dot(up)) * padding > tanY * depth) return false;
       }
       return true;
