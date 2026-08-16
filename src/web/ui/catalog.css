@@ -78,43 +78,39 @@
   transform: translateY(2px);
 }
 
-/* 章ごとの情景。行き先の雰囲気を色で伝える */
-.chapter-card__scenery {
+/*
+ * 章の見出し。情景・章題・進捗・情報チップをまとめて積む器。
+ *
+ * ここを inset:0 の重ね物にしてはいけない。中身が全部絶対配置になって
+ * カードが高さを失い、下に並ぶステージ札の上に文字が重なったうえ、
+ * 札そのものが覆われて押せなくなる(実際にその不具合を出した)。
+ */
+.chapter-card__banner {
   position: relative;
-  height: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 10px;
   background:
-    radial-gradient(ellipse 80% 120% at 20% 110%, rgba(255, 255, 255, 0.22), transparent 60%),
+    radial-gradient(ellipse 80% 120% at 20% 110%, rgba(255, 255, 255, 0.18), transparent 60%),
     linear-gradient(160deg, var(--scenery-a), var(--scenery-b));
 }
 
-.chapter-card__scenery::after {
-  /* 下端を暗く落として文字を載せられるようにする */
-  content: "";
+/* 章ごとの情景。行き先の雰囲気を伝える飾りなので、操作は一切受けない */
+.chapter-card__scenery {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 40%, rgba(6, 9, 18, 0.85));
-}
-
-.chapter-card__banner {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.4rem;
-  opacity: 0.35;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  font-size: 2.6rem;
+  opacity: 0.3;
+  pointer-events: none;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
 }
 
 .chapter-card__head {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 8px;
-  z-index: 1;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: baseline;
   gap: 10px;
 }
 
@@ -139,11 +135,15 @@
 .chapter-card__facts {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px 10px;
+  /* 横に入り切らない情報は折り返す。横一列に押し込むと文字が重なる */
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .chapter-card__progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.66rem;
   color: var(--text-dim);
   white-space: nowrap;
@@ -173,6 +173,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   gap: 8px;
+  padding: 10px 12px 12px;
 }
 
 .stage-tile__no {
