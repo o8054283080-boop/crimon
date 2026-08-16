@@ -134,9 +134,9 @@ export class MonsterAvatar {
     finalizeRig(this.rig, this.kit, builder.height, builder.float);
     this.uniforms.uHeight.value = this.rig.height;
 
-    // 正面(-Z)を敵へ向けたうえで、少しだけ斜に構えて立体感を出す。
-    // 四足のように前後へ長い骨格は、正面からだと胴が見えないので深く構える
-    this.rig.root.rotation.y = (facing > 0 ? 0 : Math.PI) + 0.3 + this.rig.yawBias;
+    // 正面(-Z)を相手チーム側へ向ける。実際の向きは配置が決まったあとに
+    // faceToward() で相手チームの中心へ向け直す
+    this.rig.root.rotation.y = facing > 0 ? 0 : Math.PI;
     this.root.add(this.rig.root);
 
     const footprint = this.rig.height * 0.62;
@@ -239,6 +239,23 @@ export class MonsterAvatar {
     return this.dying;
   }
 
+  /**
+   * 指定した位置(相手チームの中心)へ体を向ける。
+   *
+   * 以前は両チームとも同じ向きへ一定角度だけ回して立体感を出していたが、
+   * 同じ向きに回すと両チームの正面がすれ違い、互いの脇を見ることになる。
+   * カメラ側に方位角を入れて斜めから見る構図になった今、
+   * 体を捻って立体感を作る必要はないので、素直に向かい合わせる。
+   * 端のユニットは相手の中心を向くぶん自然に内へ角度がつき、隊列に収束感が出る。
+   */
+  faceToward(x: number, z: number): void {
+    const dx = x - this.root.position.x;
+    const dz = z - this.root.position.z;
+    if (dx === 0 && dz === 0) return;
+    // 骨格の正面は -Z。Y軸まわりに a 回すと正面は (-sin a, 0, -cos a) を向く
+    this.rig.root.rotation.y = Math.atan2(-dx, -dz);
+  }
+
   update(dt: number, elapsed: number): void {
     const rig = this.rig;
     const anim = rig.anim;
@@ -272,9 +289,9 @@ export class MonsterAvatar {
       rig.neckRest.z,
     );
     let headX = rig.headRest.x + Math.sin(t * 1.21 + 1.1) * 0.05 * anim.headSway;
-    // 頭は敵の方(-Z)を見る。体を斜に構えている分だけ首を戻し、
-    // そこへゆっくりした「見回し」を重ねる。視線があるだけで生き物に見える
-    let headY = rig.headRest.y - rig.yawBias * 0.75 + Math.sin(t * 0.67) * 0.13 * anim.headSway;
+    // 体が相手を正面に捉えているので、首は戻さずゆっくり「見回す」だけでよい。
+    // 視線が動いているだけで生き物に見える
+    let headY = rig.headRest.y + Math.sin(t * 0.67) * 0.13 * anim.headSway;
     let headZ = rig.headRest.z + Math.sin(t * 0.89) * 0.04 * anim.headSway;
     // 体重が乗っている側へ、首も少し傾ぐ
     headZ -= shift * 0.05 * anim.headSway;
