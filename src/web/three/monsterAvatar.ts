@@ -183,6 +183,15 @@ export class MonsterAvatar {
   private readonly headSpring: Wobble = { a: new Spring(), b: new Spring() };
   /** 着地・被弾の沈み込み(縦の潰れ) */
   private readonly landSpring = new Spring();
+  /**
+   * よろけ。打たれて後ろへ流され、踏み止まって戻る。
+   *
+   * 被弾の振動(hitTrack)とは別に持つ。振動だけだと「その場で震える」に
+   * しかならず、押された・こらえた、が出ない。バネなので戻りに時間がかかる。
+   */
+  private readonly staggerSpring = new Spring();
+  /** よろけの左右成分。真後ろにだけ下がると、当たる度に同じ絵になる */
+  private readonly staggerSideSpring = new Spring();
 
   /** 前フレームの重心と傾き。速度を出して二次的な動きの入力にする */
   private readonly previousOffset = new THREE.Vector3();
@@ -200,6 +209,8 @@ export class MonsterAvatar {
   private readonly deathTip = Math.random() < 0.5 ? -1 : 1;
   private deathProgress = 0;
   private dying = false;
+  /** 倒れ切って地面に着いた瞬間を1度だけ拾うための印 */
+  private deathLanded = false;
   private hpRatio = 1;
   private activeGlow = 0;
   private targetActiveGlow = 0;
@@ -359,6 +370,10 @@ export class MonsterAvatar {
     trigger(this.hitTrack, 0.38 + this.mass * 0.34);
     // 体が沈む。バネなので、押し込まれた後に自分で戻る
     this.landSpring.velocity -= 4.5 - this.mass * 1.6;
+    // 後ろへ突き飛ばされる。重いものは動かないかわりに、戻るまでが長い
+    this.staggerSpring.velocity += 5.2 - this.mass * 2.6;
+    // 左右にも崩れる。毎回同じ向きへ下がると、連打された時に機械に見える
+    this.staggerSideSpring.velocity += (Math.random() - 0.5) * (4.4 - this.mass * 2.2);
     this.flash = 1;
   }
 
@@ -370,6 +385,7 @@ export class MonsterAvatar {
   revive(): void {
     this.dying = false;
     this.deathProgress = 0;
+    this.deathLanded = false;
   }
 
   isDying(): boolean {
@@ -626,11 +642,23 @@ export class MonsterAvatar {
       const e = this.attackTrack.elapsed;
       const w = this.attackWindup;
       const s = this.attackStrike;
-      const windup = e < w ? Math.pow(Math.sin((e / w) * Math.PI * 0.5), 0.55) : Math.max(0, 1 - (e - w) / (s * 0.45));
-      const swing = e < w ? 0 : Math.pow(Math.sin(clamp01((e - w) / s) * Math.PI), 0.5);
-      // 打ち終わりに、いったん行き過ぎてからゆっくり戻る
-      const follow = e < w + s ? 0 : Math.sin(clamp01((e - w - s) / this.attackRecover) * Math.PI) * 0.22;
+      // 溜め: 引ききって、打ち抜きが始まるまで保持する。
+      // 保持がある(=止まる)ことで、次に来る一撃が予告される
+      const windup = e < w ? Math.pow(Math.sin((e / w) * Math.PI * 0.5), 0.5) : Math.max(0, 1 - (e - w) / (s * 0.35));
+      // 打ち抜き: 立ち上がりを鋭く、抜けをゆるく。打点は打ち抜き区間の4割の位置。
+      // 山なりの正弦だと打点が中央に来てしまい、当たった瞬間が読めない
+      const u = clamp01((e - w) / s);
+      const swing = e < w ? 0 : u < 0.4 ? Math.sin((u / 0.4) * Math.PI * 0.5) : Math.pow(1 - (u - 0.4) / 0.6, 1.5);
+      // 余韻: 打ち終わりに行き過ぎ、減衰しながら揺り戻して収まる。
+      // 1山で戻すと「巻き戻し」に見えるので、必ず追い越してから収める
+      const r = e < w + s ? 0 : clamp01((e - w - s) / this.attackRecover);
+      const follow = e < w + s ? 0 : Math.sin(r * Math.PI * 1.7) * Math.pow(1 - r, 1.5) * 0.32;
       const strike = swing - follow;
+      // 予備動作の入り。動き出しの一瞬だけ逆へ沈む。
+      // いきなり引き始めると「巻き戻し」に見え、力を溜めたようには見えない
+      const settle = e < w * 0.5 ? Math.sin((e / (w * 0.5)) * Math.PI) : 0;
+      offsetY -= settle * 0.05 * (1 + mass * 0.6);
+      leanX += settle * 0.06;
       jawOpen = Math.max(jawOpen, swing * 0.9);
       // 溜めの瞬間に息を止める(呼吸を殺すと、溜めが読めるようになる)
       if (windup > 0.4) rig.torso.scale.setScalar(1);
@@ -794,13 +822,31 @@ export class MonsterAvatar {
         arm.root.rotation.z += arm.side * Math.abs(recoil) * 0.5;
         arm.root.rotation.x -= recoil * 0.4;
       }
-      // よろける。打たれた側の脚を後ろへ送って踏み止まる
-      for (const leg of rig.legs) {
-        leg.root.rotation.x -= recoil * 0.25 + (leg.front ? impact * 0.3 : -impact * 0.35);
-        if (leg.lower && leg.lowerRest) leg.lower.rotation.x += impact * 0.3;
-      }
       for (const wing of rig.wings) wing.root.rotation.z -= wing.side * Math.abs(recoil) * 0.6;
       tailDriveX += recoil * 0.22;
+    }
+
+    // よろけ。振動が収まった後も、押された分を踏み止まって戻すのに時間がかかる。
+    // 「打たれて動いた」ことは、震えではなくこの位置の移動でしか伝わらない
+    const stagger = this.staggerSpring.step(0, 1.5 - mass * 0.45, 0.52 + mass * 0.22, step);
+    const staggerSide = this.staggerSideSpring.step(0, 1.7 - mass * 0.5, 0.55 + mass * 0.2, step);
+    if (Math.abs(stagger) > 1e-4 || Math.abs(staggerSide) > 1e-4) {
+      offsetZ += stagger * 0.42;
+      offsetX += staggerSide * 0.3;
+      // のけぞってから戻る。上体は足より遅れるので、腰より胴の方が深く振れる
+      leanX += stagger * 0.34;
+      leanZ += staggerSide * 0.4;
+      hipZ -= staggerSide * 0.18;
+      offsetY -= Math.abs(stagger) * 0.06;
+      for (const leg of rig.legs) {
+        // 押された向きへ脚を送って踏み止まる。前脚と後脚で送る向きが逆になる
+        leg.root.rotation.x += stagger * (leg.front ? 0.5 : -0.42);
+        leg.root.rotation.z += leg.side * staggerSide * 0.28;
+        if (leg.lower && leg.lowerRest) leg.lower.rotation.x -= stagger * 0.35;
+      }
+      for (const arm of rig.arms) arm.root.rotation.x -= stagger * 0.55;
+      tailDriveX -= stagger * 0.3;
+      tailDriveY += staggerSide * 0.35;
     }
 
     // === 撃破 =============================================================
@@ -809,18 +855,27 @@ export class MonsterAvatar {
       this.deathProgress = Math.min(1, this.deathProgress + dt * (1.15 - mass * 0.35));
     }
     const death = this.deathProgress;
+    // 倒れ込みは腰から下ではなく体全体が回る。leanX は胴と腰で分け合う作りなので、
+    // そこへ足すと角度が半分に薄まり「崩れた」ではなく「傾いた」で終わる
+    let coreTilt = 0;
     if (death > 0) {
-      // 崩れる: 膝が抜ける(速い)→ 倒れる(重力なので加速)→ 着地して収まる
+      // 崩れる: 膝が抜ける(速い)→ 溜め(一拍ぶら下がる)→ 倒れる(加速)→ 着地
       const buckle = clamp01(death / 0.26);
-      const fall = Math.pow(clamp01((death - 0.16) / 0.84), 1.8);
+      const fall = Math.pow(clamp01((death - 0.22) / 0.78), 1.9);
       const tip = this.deathTip;
-      offsetY -= (buckle * 0.12 + fall * (rig.floats ? 0.5 : 0.32)) * this.rig.height * 0.28;
+      offsetY -= (buckle * 0.16 + fall * (rig.floats ? 0.55 : 0.4)) * this.rig.height * 0.28;
       leanX += buckle * 0.18 + fall * 0.95;
       leanZ += fall * 0.5 * tip;
+      coreTilt += fall * 0.95;
       headX += buckle * 0.35 + fall * 0.7;
       headZ += fall * 0.35 * tip;
       hipZ -= fall * 0.2 * tip;
       jawOpen = Math.max(jawOpen, buckle * 0.55);
+      // 地面に着く瞬間に一度だけ突き上げる。ここで尾も耳も一斉に跳ねる
+      if (!this.deathLanded && fall > 0.82) {
+        this.deathLanded = true;
+        this.landSpring.velocity -= 5.5 - mass * 1.5;
+      }
       // 粘体は倒れるのではなく、その場で潰れて広がる
       squash -= buckle * 0.2 + fall * 0.3;
       for (const leg of rig.legs) {
@@ -974,7 +1029,7 @@ export class MonsterAvatar {
 
     // === 姿勢の確定 =======================================================
     rig.core.position.set(offsetX, offsetY, offsetZ);
-    rig.core.rotation.set(leanX * 0.45, 0, leanZ);
+    rig.core.rotation.set(leanX * 0.45 + coreTilt, 0, leanZ);
     rig.pelvis.rotation.set(rig.pelvisRest.x, rig.pelvisRest.y + hipY, rig.pelvisRest.z + hipZ);
     if (anim.squash > 0) {
       // 体積を保つ(縦に伸びた分だけ横が細る)。
