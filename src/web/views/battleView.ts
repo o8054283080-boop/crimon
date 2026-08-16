@@ -97,6 +97,14 @@ function buildBadgesRow(snapshot: UnitSnapshot): HTMLElement[] {
       ),
     );
   }
+  if (snapshot.blindTurns > 0) {
+    badges.push(
+      el("span", { className: "unit-badge unit-badge--blind", title: `暗闇(残り${snapshot.blindTurns}ターン)` }, [
+        el("span", { className: "unit-badge__icon" }, ["🌑"]),
+        el("span", { className: "unit-badge__turns" }, [String(snapshot.blindTurns)]),
+      ]),
+    );
+  }
   if (snapshot.immuneTurns > 0) {
     badges.push(
       el("span", { className: "unit-badge unit-badge--immune", title: `状態異常免疫(残り${snapshot.immuneTurns}ターン)` }, [

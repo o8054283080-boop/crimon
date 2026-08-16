@@ -29,6 +29,11 @@ export interface HealEffect {
   scaleStat?: "atk" | "def";
   /** scaleStat省略時は対象の最大HPに対する割合、指定時は施術者のその能力値に対する割合 */
   healRate: number;
+  /**
+   * trueなら、スキルの対象ではなく術者自身を回復する。
+   * 「敵を殴りながら自分が回復する」ような、対象と回復先が食い違うスキルに使う。
+   */
+  toSelf?: boolean;
 }
 
 /** ライフスティール: 同じスキルのDAMAGE効果で与えたダメージの一部を自身が回復する */
@@ -44,6 +49,12 @@ export interface BuffEffect {
   /** 例: 0.3 で +30% */
   amount: number;
   durationTurns: number;
+  /**
+   * バフの適用先。省略時はスキルの対象。
+   * "SELF"は術者、"ALLIES"は術者の味方全体にかかる。
+   * 敵を攻撃しつつ味方を強化する、といったスキルに使う。
+   */
+  applyTo?: "SELF" | "ALLIES";
 }
 
 export interface DebuffEffect {
@@ -75,6 +86,11 @@ export interface BurnEffect {
 export interface GaugeEffect {
   kind: "GAUGE";
   amount: number;
+  /**
+   * trueなら「吸収」になり、対象から減らした分をそのまま術者へ移す。
+   * 相手を遅らせつつ自分が早く動けるので、単なる増減より強い。
+   */
+  drain?: boolean;
 }
 
 /** シールド(バリア): 対象の最大HPに対する割合でダメージ肩代わり用のバリアを張る。HPより先にダメージを吸収する */
@@ -108,6 +124,18 @@ export interface CooldownExtendEffect {
   turns: number;
 }
 
+/**
+ * 暗闇: かかっている間、そのモンスターの攻撃が当たらなくなることがある。
+ * 攻撃するたびに判定し、失敗するとダメージが大きく下がり、
+ * そのスキルの追加効果(デバフ・スタンなど)も一切乗らない。
+ */
+export interface BlindEffect {
+  kind: "BLIND";
+  durationTurns: number;
+  /** この効果が発動を試みる基礎確率(0-1)。省略時は常に発動を試みる */
+  chance?: number;
+}
+
 /** 毒: 1スタックにつき、対象の手番開始時に最大HPのdamageRatePerStack分のダメージを受ける(最大5スタックまで重複) */
 export interface PoisonEffect {
   kind: "POISON";
@@ -131,7 +159,8 @@ export type SkillEffect =
   | RegenEffect
   | CleanseEffect
   | CooldownExtendEffect
-  | PoisonEffect;
+  | PoisonEffect
+  | BlindEffect;
 
 export interface Skill {
   id: string;
@@ -211,6 +240,9 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
       }
       case "STUN":
         return effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
+      case "BLIND":
+        // 暗闇は攻撃を丸ごと潰しうるため、継続ターンは伸ばさず確率だけ成長させる
+        return effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
       case "BURN":
         return { ...effect, chance: growChance(effect.chance, growth) };
       case "GAUGE":
@@ -268,14 +300,18 @@ export function describeSkillEffect(effect: SkillEffect): string {
       const ignoreDefenseText = effect.ignoreDefense ? "(防御力無視)" : "";
       return `ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}`;
     }
-    case "HEAL":
-      if (effect.scaleStat === "atk") return `回復量 自身の攻撃力の${(effect.healRate * 100).toFixed(0)}%`;
-      if (effect.scaleStat === "def") return `回復量 自身の防御力の${(effect.healRate * 100).toFixed(0)}%`;
-      return `回復量 最大HPの${(effect.healRate * 100).toFixed(1)}%`;
+    case "HEAL": {
+      const who = effect.toSelf ? "自身を" : "";
+      if (effect.scaleStat === "atk") return `${who}回復 自身の攻撃力の${(effect.healRate * 100).toFixed(0)}%`;
+      if (effect.scaleStat === "def") return `${who}回復 自身の防御力の${(effect.healRate * 100).toFixed(0)}%`;
+      return `${who}回復 最大HPの${(effect.healRate * 100).toFixed(1)}%`;
+    }
     case "LIFESTEAL":
       return `与えたダメージの${(effect.healRate * 100).toFixed(0)}%を自身が回復`;
-    case "BUFF":
-      return `${BUFF_STAT_JA[effect.stat]}+${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
+    case "BUFF": {
+      const scope = effect.applyTo === "ALLIES" ? "味方全体の" : effect.applyTo === "SELF" ? "自身の" : "";
+      return `${scope}${BUFF_STAT_JA[effect.stat]}+${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
+    }
     case "DEBUFF":
       return `${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
     case "STUN":
@@ -283,6 +319,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "BURN":
       return `${chanceSuffix(effect.chance)}火傷 (${effect.durationTurns}ターン、自身のターン終了時に自身の攻撃力分のダメージ)`;
     case "GAUGE":
+      if (effect.drain) return `行動ゲージを${Math.round(effect.amount * 100)}%吸収`;
       return `行動ゲージ+${Math.round(effect.amount * 100)}%`;
     case "SHIELD":
       return `シールド 最大HPの${Math.round(effect.shieldRate * 100)}% (${effect.durationTurns}ターン、ダメージを肩代わり)`;
@@ -294,6 +331,8 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `デバフを解除`;
     case "COOLDOWN_EXTEND":
       return `敵の全スキルのクールタイムを${effect.turns}ターン延長`;
+    case "BLIND":
+      return `${chanceSuffix(effect.chance)}暗闇 (${effect.durationTurns}ターン、攻撃時50%でダメージ-75%・追加効果なし)`;
     case "POISON":
       return `${chanceSuffix(effect.chance)}毒 (1スタックにつき最大HPの${Math.round(effect.damageRatePerStack * 100)}%、最大5スタック、${effect.durationTurns}ターン)`;
   }

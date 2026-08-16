@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { Element } from "../../core/element.js";
 import { CreatureKit } from "./creature/kit.js";
 import { CreatureRig, finalizeRig } from "./creature/rig.js";
-import { applyTemplateTraits, builderFor } from "./creature/roles.js";
+import { builderFor } from "./creature/roles.js";
+import { applyTemplateTraits, templateBuilderFor } from "./creature/templates.js";
 import { CreatureUniforms, SurfaceSet, createCreatureUniforms, paletteFor } from "./creature/surface.js";
 import { ElementTheme, themeFor } from "./elementTheme.js";
 import { radialGlowTexture, shadowTexture, sigilTexture } from "./textures.js";
@@ -107,7 +108,10 @@ export class MonsterAvatar {
     this.kit = new CreatureKit(new SurfaceSet(palette, this.uniforms), palette);
     this.rig = new CreatureRig();
 
-    const builder = builderFor(role);
+    // 種別に専用の骨格があればそれを使い、無ければ役割の骨格を使う。
+    // スライムのように、役割(アタッカー=四足獣)の骨格が種別に対して
+    // そもそも不適切な場合があるため、種別側が骨格ごと差し替えられるようにしている
+    const builder = templateBuilderFor(templateId) ?? builderFor(role);
     builder.build(this.kit, this.rig);
     // 役割で組んだ骨格に、種別固有の特徴(翼・光輪・羽根飾りなど)を足す
     applyTemplateTraits(templateId, this.kit, this.rig);
@@ -259,6 +263,8 @@ export class MonsterAvatar {
     // 体重が乗っている側へ、首も少し傾ぐ
     headZ -= shift * 0.05 * anim.headSway;
     let jawOpen = 0;
+    // 粘体の伸縮。呼吸より速い周期で、たぷんと戻る非対称な波にする
+    let squash = anim.squash > 0 ? (Math.sin(t * 1.9) + Math.sin(t * 3.7) * 0.35) * 0.09 : 0;
 
     // 尾: 根元から先端へ遅れて伝わる波
     for (let i = 0; i < rig.tail.length; i++) {
@@ -343,6 +349,8 @@ export class MonsterAvatar {
         offsetY += arc(attackT) * 0.28;
         leanX += -strike * 0.5;
         headY += strike * 0.4;
+        // 沈み込んでから伸び上がる。粘体はこの1本で攻撃が読める
+        squash += -windup * 0.30 + strike * 0.34;
         for (const arm of rig.arms) arm.root.rotation.x += strike * 1.3;
       } else if (anim.attack === "pounce") {
         // 四足の跳びかかり。腕を振るのではなく、体を沈めてから前へ跳ぶ。
@@ -419,6 +427,7 @@ export class MonsterAvatar {
       headX += recoil * 0.55;
       headZ += recoil * 0.2;
       jawOpen = Math.max(jawOpen, Math.abs(recoil) * 0.7);
+      squash -= Math.abs(recoil) * 0.26;
       for (const arm of rig.arms) {
         arm.root.rotation.z += arm.side * Math.abs(recoil) * 0.5;
         arm.root.rotation.x -= recoil * 0.4;
@@ -440,6 +449,8 @@ export class MonsterAvatar {
       leanZ += fall * 0.35;
       headX += fall * 0.7;
       jawOpen = Math.max(jawOpen, fall * 0.5);
+      // 粘体は倒れるのではなく、その場で潰れて広がる
+      squash -= fall * 0.42;
       for (const leg of rig.legs) {
         leg.root.rotation.x += fall * 0.9;
         if (leg.lower && leg.lowerRest) leg.lower.rotation.x -= fall * 1.4;
@@ -485,6 +496,13 @@ export class MonsterAvatar {
     // === 姿勢の確定 =======================================================
     rig.core.position.set(offsetX, offsetY, offsetZ);
     rig.core.rotation.set(leanX * 0.45, 0, leanZ);
+    if (anim.squash > 0) {
+      // 体積を保つ(縦に伸びた分だけ横が細る)。
+      // 骨格の原点を接地面に置いてあるので、伸縮しても足元が浮かない
+      const stretch = Math.max(-0.42, Math.min(0.5, squash * anim.squash));
+      const lateral = 1 / Math.sqrt(1 + stretch);
+      rig.core.scale.set(lateral, 1 + stretch, lateral);
+    }
     rig.torso.rotation.x += leanX * 0.55;
     rig.head.rotation.set(headX, headY, headZ);
     if (rig.jaw) rig.jaw.rotation.x = rig.jawRest.x - jawOpen * 0.5;

@@ -71,6 +71,12 @@ export interface AnimProfile {
   sway: number;
   /** 攻撃時に踏み込む距離 */
   lunge: number;
+  /**
+   * 全身の潰れ・伸び。0で無効。
+   * 骨を持たない粘体(スライム)は、関節ではなく体積の変形でしか
+   * 生きているように見えないため、体全体をY方向に伸縮させる。
+   */
+  squash: number;
   /** 攻撃モーションの型 */
   attack: "lunge" | "slam" | "cast" | "dash" | "pounce";
 }
@@ -84,6 +90,7 @@ export const DEFAULT_ANIM: AnimProfile = {
   wingFlap: 0,
   sway: 1,
   lunge: 1.1,
+  squash: 0,
   attack: "lunge",
 };
 
@@ -256,6 +263,10 @@ function mergeRecursive(object: THREE.Object3D, kit: CreatureKit): void {
  */
 export function finalizeRig(rig: CreatureRig, kit: CreatureKit, targetHeight: number, floatGap = 0): void {
   rig.captureRests();
+  // 回り続ける環や、周囲を漂う破片は毎フレーム動かす。
+  // マージで焼き込まれると、参照だけ残って画面から消えてしまう
+  for (const spinner of rig.spinners) markAnimated(spinner.object);
+  for (const orbiter of rig.orbiters) markAnimated(orbiter.object);
   mergeRecursive(rig.core, kit);
 
   rig.root.updateMatrixWorld(true);

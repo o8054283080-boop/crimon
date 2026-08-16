@@ -22,7 +22,7 @@ import {
  */
 
 /** 連鎖から手足を登録する。関節はアニメーション対象としてマークする */
-function limbFrom(chain: ChainResult, side: number, phase: number, front = false): RigLimb {
+export function limbFrom(chain: ChainResult, side: number, phase: number, front = false): RigLimb {
   markAnimated(...chain.joints);
   return {
     root: chain.joints[0],
@@ -41,7 +41,7 @@ function limbFrom(chain: ChainResult, side: number, phase: number, front = false
  * 指の節(短い骨)を挟んでから鉤爪を付けることで、
  * 「手先に棘が生えている」ではなく「指の先の爪」に見える。
  */
-function addClaws(kit: CreatureKit, hand: THREE.Object3D, count: number, length: number, radius: number, spread: number): void {
+export function addClaws(kit: CreatureKit, hand: THREE.Object3D, count: number, length: number, radius: number, spread: number): void {
   const p = kit.palette;
   for (let i = 0; i < count; i++) {
     const offset = (i - (count - 1) / 2) * spread;
@@ -55,7 +55,7 @@ function addClaws(kit: CreatureKit, hand: THREE.Object3D, count: number, length:
 }
 
 /** 関節。骨の継ぎ目に球と輪を入れて、円柱の直結を隠す */
-function addJoint(kit: CreatureKit, joint: THREE.Object3D, y: number, radius: number, armored: boolean): void {
+export function addJoint(kit: CreatureKit, joint: THREE.Object3D, y: number, radius: number, armored: boolean): void {
   const p = kit.palette;
   joint.add(place(kit.ball(radius, radius * 0.9, radius, "hide", p.dark, 8), 0, y, 0));
   if (armored) {
@@ -68,7 +68,7 @@ function addJoint(kit: CreatureKit, joint: THREE.Object3D, y: number, radius: nu
  * 肋・腹の節。胴の側面に細い帯を並べて、一枚の塊に「節」を刻む。
  * 遠目でも胴の丸みと向きが読めるようになる。
  */
-function addRibs(kit: CreatureKit, torso: THREE.Object3D, count: number, y0: number, y1: number, radius: number, tube: number): void {
+export function addRibs(kit: CreatureKit, torso: THREE.Object3D, count: number, y0: number, y1: number, radius: number, tube: number): void {
   const p = kit.palette;
   for (let i = 0; i < count; i++) {
     const t = i / Math.max(1, count - 1);
@@ -82,7 +82,7 @@ function addRibs(kit: CreatureKit, torso: THREE.Object3D, count: number, y0: num
 }
 
 /** 装甲板を重ねて貼る。段差の影が「積み木」感を消す主役 */
-function addPlating(
+export function addPlating(
   kit: CreatureKit,
   parent: THREE.Object3D,
   count: number,
@@ -105,14 +105,14 @@ function addPlating(
 }
 
 /** 頭の左右に光る目を置く。奥に暗い眼窩を入れて発光を締める */
-function addEyes(kit: CreatureKit, head: THREE.Object3D, x: number, y: number, z: number, radius: number): void {
+export function addEyes(kit: CreatureKit, head: THREE.Object3D, x: number, y: number, z: number, radius: number): void {
   for (const side of [-1, 1]) {
     head.add(place(kit.ball(radius * 1.9, radius * 1.5, radius * 0.8, "hide", kit.palette.dark), side * x, y, z + radius * 0.6));
     head.add(place(kit.ball(radius, radius * 0.85, radius, "glow", kit.palette.glow, 8), side * x, y, z));
   }
 }
 
-interface BeastHeadOptions {
+export interface BeastHeadOptions {
   /** 頭蓋の半径(X, Y, Z) */
   skull: [number, number, number];
   /** 口先の長さ。0で無し */
@@ -131,7 +131,7 @@ interface BeastHeadOptions {
  * 獣型の頭。アタッカー/ボス/デバッファーで比率を変えて使い回し、
  * 「同じ世界のモンスター」としての統一感を出す。
  */
-function addBeastHead(kit: CreatureKit, rig: CreatureRig, o: BeastHeadOptions): void {
+export function addBeastHead(kit: CreatureKit, rig: CreatureRig, o: BeastHeadOptions): void {
   const p = kit.palette;
   const head = rig.head;
   const [sx, sy, sz] = o.skull;
@@ -251,7 +251,7 @@ function addBeastHead(kit: CreatureKit, rig: CreatureRig, o: BeastHeadOptions): 
 }
 
 /** 尾。節ごとにアニメーションできるよう連鎖として登録する */
-function addTail(
+export function addTail(
   kit: CreatureKit,
   rig: CreatureRig,
   origin: [number, number, number],
@@ -303,7 +303,7 @@ function addTail(
  *   3. 角度は「外向き〜真下」の範囲に収め、上には向けない
  * さらに雨覆い(短い羽根)を手前に重ね、層の段差で厚みを出す。
  */
-function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: number, count: number, length: number): void {
+export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: number, count: number, length: number): void {
   const p = kit.palette;
   const s = side;
   const L = length;
@@ -353,7 +353,7 @@ function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: number, co
 }
 
 /** 指の骨と膜で作るコウモリ翼(ボス用) */
-function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: number): void {
+export function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: number): void {
   const p = kit.palette;
   const s = side;
   const v = (x: number, y: number, z: number) => new THREE.Vector3(x * s * span, y * span, z * span);
@@ -527,6 +527,7 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0,
     sway: 0.85,
     lunge: 1.5,
+    squash: 0,
     attack: "pounce",
   };
 }
@@ -625,6 +626,7 @@ function buildDefender(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0,
     sway: 0.6,
     lunge: 0.8,
+    squash: 0,
     attack: "slam",
   };
 }
@@ -802,6 +804,7 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0.5,
     sway: 0.5,
     lunge: 0.55,
+    squash: 0,
     attack: "cast",
   };
 }
@@ -928,6 +931,7 @@ function buildSupport(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0,
     sway: 0.3,
     lunge: 0.7,
+    squash: 0,
     attack: "cast",
   };
 }
@@ -1054,6 +1058,7 @@ function buildDebuffer(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0,
     sway: 1.3,
     lunge: 1.1,
+    squash: 0,
     attack: "cast",
   };
 }
@@ -1193,6 +1198,7 @@ function buildBalanced(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0,
     sway: 1,
     lunge: 1.2,
+    squash: 0,
     attack: "lunge",
   };
 }
@@ -1286,6 +1292,7 @@ function buildBoss(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0.28,
     sway: 0.7,
     lunge: 1.0,
+    squash: 0,
     attack: "slam",
   };
 }
@@ -1346,11 +1353,25 @@ function buildCritter(kit: CreatureKit, rig: CreatureRig): void {
     wingFlap: 0,
     sway: 1.5,
     lunge: 1.3,
+    squash: 0,
     attack: "dash",
   };
 }
 
-const BUILDERS: Record<string, { build: (kit: CreatureKit, rig: CreatureRig) => void; height: number; float: number }> = {
+/**
+ * 1体分の骨格を組む手順。
+ * 役割(role)から引く既定の骨格と、種別(templateId)専用の骨格の
+ * どちらもこの形で表され、MonsterAvatarからは区別なく扱える。
+ */
+export interface CreatureBuilder {
+  build: (kit: CreatureKit, rig: CreatureRig) => void;
+  /** 正規化後の体高 */
+  height: number;
+  /** 地面から浮かせる高さ */
+  float: number;
+}
+
+const BUILDERS: Record<string, CreatureBuilder> = {
   アタッカー: { build: buildAttacker, height: 2.2, float: 0 },
   ディフェンダー: { build: buildDefender, height: 2.45, float: 0 },
   ヒーラー: { build: buildHealer, height: 2.25, float: 0.32 },
@@ -1361,90 +1382,7 @@ const BUILDERS: Record<string, { build: (kit: CreatureKit, rig: CreatureRig) => 
   素材: { build: buildCritter, height: 1.35, float: 0.05 },
 };
 
-export function builderFor(role: string): { build: (kit: CreatureKit, rig: CreatureRig) => void; height: number; float: number } {
+/** 役割から既定の骨格を引く。種別専用の骨格は creature/templates.ts 側で上書きされる */
+export function builderFor(role: string): CreatureBuilder {
   return BUILDERS[role] ?? BUILDERS["バランス型"];
-}
-
-/**
- * モンスター種別ごとの追加造形。
- *
- * シルエットを役割(role)だけで決めると、同じ役割の別モンスターが
- * 完全に同じ見た目になってしまう(例: ドラゴンとグリフォンはどちらも
- * 「アタッカー」なので、色以外に区別がつかない)。
- * そこで役割ビルダーで骨格を組んだあとに、種別固有の特徴を足して
- * 一目で見分けられるようにする。
- */
-const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => void> = {
-  /** ドラゴン: 大きな皮膜の翼。畳まずに広げて、横幅のあるシルエットにする */
-  dragon: (kit, rig) => {
-    const a = rig.wingAnchor;
-    for (const side of [-1, 1]) {
-      const wing = new THREE.Group();
-      markAnimated(wing);
-      place(wing, side * a.x, a.y, a.z, 0.16, -side * 0.42, side * 0.12);
-      addBatWing(kit, wing, side, 1.3);
-      rig.torso.add(wing);
-      rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
-    }
-    rig.anim.wingFlap = 0.55;
-  },
-
-  /** グリフォン: 羽毛の翼と、頭の羽根飾り。鳥類寄りのシルエットにする */
-  griffon: (kit, rig) => {
-    const p = kit.palette;
-    const a = rig.wingAnchor;
-    for (const side of [-1, 1]) {
-      const wing = new THREE.Group();
-      markAnimated(wing);
-      place(wing, side * a.x, a.y, a.z - 0.04, 0.24, -side * 0.5, 0);
-      addFeatherWing(kit, wing, side, 8, 1.15);
-      rig.torso.add(wing);
-      rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
-    }
-    // 後頭部の羽根飾り
-    for (let i = 0; i < 5; i++) {
-      const t = i / 4;
-      const crest = kit.spike(0.028, 0.2 + Math.sin(t * Math.PI) * 0.12, 0.5, "plate", p.plate);
-      place(crest, (t - 0.5) * 0.13, 0.13, 0.1, -0.5, Math.PI / 2, 0);
-      rig.head.add(crest);
-    }
-    rig.anim.wingFlap = 0.85;
-  },
-
-  /** セラフ: 二対の光の翼と光輪。天使的なシルエットで他と明確に分ける */
-  seraph: (kit, rig) => {
-    const p = kit.palette;
-    for (const side of [-1, 1]) {
-      for (const [index, spec] of [
-        { y: 0.72, span: 1.15, pitch: 0.1 },
-        { y: 0.44, span: 0.86, pitch: 0.5 },
-      ].entries()) {
-        const wing = new THREE.Group();
-        markAnimated(wing);
-        place(wing, side * 0.24, rig.wingAnchor.y - 0.28 + spec.y, 0.14, spec.pitch, -side * 0.46, 0);
-        addFeatherWing(kit, wing, side, 7, spec.span);
-        rig.torso.add(wing);
-        rig.wings.push({
-          root: wing,
-          rootRest: wing.rotation.clone(),
-          lower: null,
-          lowerRest: null,
-          tip: wing,
-          side,
-          // 上下の翼で位相をずらし、順に羽ばたいて見えるようにする
-          phase: index * 0.9,
-        });
-      }
-    }
-    const halo = kit.ring(0.26, 0.026, "glow", p.glow, 30);
-    place(halo, 0, 0.46, 0.04, Math.PI / 2, 0, 0);
-    rig.head.add(halo);
-    rig.spinners.push({ object: halo, axis: "z", speed: 0.5 });
-    rig.anim.wingFlap = 0.4;
-  },
-};
-
-/** 種別固有の造形を足す。該当がなければ何もしない(役割ビルダーのままになる) */
-export function applyTemplateTraits(templateId: string, kit: CreatureKit, rig: CreatureRig): void {
-  TEMPLATE_TRAITS[templateId]?.(kit, rig);
 }

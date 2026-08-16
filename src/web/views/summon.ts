@@ -53,7 +53,7 @@ function renderIdle(props: SummonProps): HTMLElement {
       },
       [
         el("span", { className: "summon-cta__lead" }, ["10連召喚"]),
-        el("span", { className: "summon-cta__sub" }, ["レア枠1体以上 確定"]),
+        el("span", { className: "summon-cta__sub" }, ["★4以上 1体確定"]),
         costChip("💎", SUMMON_COST_TEN),
       ],
     ),
@@ -103,7 +103,7 @@ function renderIdle(props: SummonProps): HTMLElement {
         el("span", { className: "summon-tag summon-tag--ssr" }, ["★5 SSR"]),
         el("span", { className: "summon-tag summon-tag--rare" }, ["光/闇 レア枠"]),
       ]),
-      el("p", { className: "summon-note" }, ["★3以上が確定。光・闇はレア枠で、10連では1体以上のレア枠が確定します。"]),
+      el("p", { className: "summon-note" }, ["★3以上が確定。10連では★4以上が1体確定します。光・闇のレア枠は確定枠に含まれないため、引き当てられれば貴重です。"]),
       cta,
     ]),
   ]);

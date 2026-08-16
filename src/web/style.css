@@ -669,6 +669,10 @@ body {
   color: #3498db;
 }
 
+.unit-badge--blind {
+  color: #8e7cc3;
+}
+
 .unit-badge--immune {
   color: #f4d35e;
 }

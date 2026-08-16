@@ -63,16 +63,27 @@ describe("ガチャ (summonMany)", () => {
     expect(results.some((r) => r.isRare && r.dexId.startsWith("dragon_"))).toBe(true);
   });
 
-  it("10連ではレアが1体も出なければ天井で1体確定する", () => {
-    // 常に通常枠(星3)しか引かないrngでも、10連なら天井でレアが1体保証される
-    const alwaysCommonRng = () => 0.5;
-    const results = summonMany(10, alwaysCommonRng);
-    expect(results.some((r) => r.isRare)).toBe(true);
+  it("10連では星4以上が1体も出なければ天井で1体確定する", () => {
+    // 常に星3しか引かないrngでも、10連なら天井で星4以上が1体保証される
+    const alwaysLowRng = () => 0.5;
+    const results = summonMany(10, alwaysLowRng);
+    expect(results.some((r) => r.star >= 4)).toBe(true);
+  });
+
+  it("天井はレア枠(光闇)を保証しない。光闇の価値を保つため、保証するのは星の高さだけ", () => {
+    // 星3しか出ないrngで何度引いても、天井で差し替わるのは星であって属性ではない。
+    // レア枠が必ず付いてくるのであれば、この呼び出しは毎回レアを含むはずである
+    const alwaysLowRng = () => 0.5;
+    let rareRuns = 0;
+    for (let i = 0; i < 20; i++) {
+      if (summonMany(10, alwaysLowRng).some((r) => r.isRare)) rareRuns += 1;
+    }
+    expect(rareRuns).toBeLessThan(20);
   });
 
   it("10回未満(天井の対象外)には天井が適用されない", () => {
-    const alwaysCommonRng = () => 0.5;
-    const results = summonMany(5, alwaysCommonRng);
-    expect(results.some((r) => r.isRare)).toBe(false);
+    const alwaysLowRng = () => 0.5;
+    const results = summonMany(5, alwaysLowRng);
+    expect(results.some((r) => r.star >= 4)).toBe(false);
   });
 });

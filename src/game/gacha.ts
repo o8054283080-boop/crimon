@@ -9,6 +9,9 @@ import {
 } from "../data/monsters.js";
 
 export const RARE_ELEMENTS: Element[] = ["LIGHT", "DARK"];
+
+/** 10連の天井で保証される最低の星。これ以上が1体も出なければ引き直す */
+export const GUARANTEED_MIN_STAR = 4;
 export const NORMAL_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
 
 export const SUMMON_COST_SINGLE = 100;
@@ -80,18 +83,27 @@ function rollOne(rng: () => number): SummonResult {
   return { dexId: resolveDexId(tier, rng), star: tier.star, isRare: tier.isRare };
 }
 
-const RARE_TIERS = GACHA_TABLE.filter((tier) => tier.isRare);
+/** 天井で引き直す対象。星4以上であれば、通常枠(火水電草)もレア枠(光闇)も含む */
+const GUARANTEED_TIERS = GACHA_TABLE.filter((tier) => tier.star >= GUARANTEED_MIN_STAR);
 
 /**
- * count体まとめて召喚する。10連以上のときは天井として、レア枠(光闇)が1体も
- * 出なければ末尾の1体を強制的にレア枠(星3/4/5のいずれか、レア枠内の比率で抽選)に差し替える。
+ * count体まとめて召喚する。
+ *
+ * 10連以上のときは天井として、星4以上が1体も出なければ末尾の1体を
+ * 星4以上に差し替える(星4/5・通常枠/レア枠のいずれになるかは、
+ * 該当する枠どうしの比率で抽選する)。
+ *
+ * 天井の条件を「レア枠(光闇)確定」ではなく「星4以上確定」にしてあるのは、
+ * 光闇を保証してしまうと引けば必ず手に入る枠になり、レア枠であることの
+ * 価値が薄れてしまうため。天井では星の高さだけを保証し、光闇はあくまで
+ * 運で引き当てるものとして残している。
  */
 export function summonMany(count: number, rng: () => number = Math.random): SummonResult[] {
   const results = Array.from({ length: count }, () => rollOne(rng));
 
-  if (count >= 10 && !results.some((r) => r.isRare)) {
-    const tier = pickTier(RARE_TIERS, rng);
-    results[results.length - 1] = { dexId: resolveDexId(tier, rng), star: tier.star, isRare: true };
+  if (count >= 10 && !results.some((r) => r.star >= GUARANTEED_MIN_STAR)) {
+    const tier = pickTier(GUARANTEED_TIERS, rng);
+    results[results.length - 1] = { dexId: resolveDexId(tier, rng), star: tier.star, isRare: tier.isRare };
   }
 
   return results;

@@ -27,20 +27,23 @@ const SLIME: MonsterTemplate = {
     {
       id: "slime_s2_a",
       name: "エレメンタルバースト",
-      description: "属性の力を込めて敵単体に攻撃力1.7倍のダメージを与える。",
+      description: "属性の力を込めて敵単体に攻撃力1.7倍のダメージを与え、50%で2ターン攻撃力を低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 1.7 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.7 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.5 },
+      ],
     },
     {
       id: "slime_s2_b",
       name: "どくづき",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、60%で3ターン毒(1スタック)を付与する。",
+      description: "敵単体に攻撃力1.3倍のダメージを与え、60%で2ターン毒(1スタック)を付与する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
-        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.6 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.6 },
       ],
     },
     {
@@ -61,26 +64,29 @@ const SLIME: MonsterTemplate = {
       name: "げんかいとっぱ",
       description: "限界を超えた力で敵全体に攻撃力1.3倍のダメージを与える。",
       target: "ALL_ENEMIES",
-      cooldownTurns: 5,
+      cooldownTurns: 4,
       effects: [{ kind: "DAMAGE", multiplier: 1.3 }],
     },
     {
       id: "slime_s3_b",
-      name: "スプラッシュウェイブ",
-      description: "敵全体に攻撃力1.1倍のダメージを2回与える。",
+      name: "毒噴射",
+      description: "毒液を撒き散らし、敵全体に攻撃力1.1倍のダメージを2回与え、70%で2ターン毒(1スタック)を付与する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 1.1, hits: 2 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.1, hits: 2 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 },
+      ],
     },
     {
       id: "slime_s3_c",
-      name: "しんかい一撃",
-      description: "敵単体に攻撃力2.0倍のダメージを与え、55%で防御力を大きく低下させる。",
-      target: "SINGLE_ENEMY",
-      cooldownTurns: 5,
+      name: "スラフラッシュ",
+      description: "眩い粘液を弾けさせ、敵全体に攻撃力1.2倍のダメージを与え、55%で2ターン暗闇を付与する。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.55 },
+        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "BLIND", durationTurns: 2, chance: 0.55 },
       ],
     },
   ],
@@ -104,10 +110,10 @@ const WOLF: MonsterTemplate = {
   skill1: {
     id: "wolf_s1",
     name: "かみつく",
-    description: "敵単体に攻撃力1.0倍のダメージを与える。",
+    description: "敵単体に攻撃力0.8倍のダメージを与える。自身の速度が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.0 }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", ratePerPoint: 0.004 } }],
   },
   skill2Variants: [
     {
@@ -121,21 +127,21 @@ const WOLF: MonsterTemplate = {
     {
       id: "wolf_s2_b",
       name: "いあつ",
-      description: "敵単体に攻撃力1.0倍のダメージを与え、60%で攻撃力を大きく低下させる。",
-      target: "SINGLE_ENEMY",
-      cooldownTurns: 2,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.0 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
-      ],
+      description: "威圧の咆哮で敵全体を怯ませ、70%で1ターン攻撃力を大きく低下させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 3,
+      effects: [{ kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 1, chance: 0.7 }],
     },
     {
       id: "wolf_s2_c",
       name: "するどいツメ",
-      description: "敵単体に攻撃力1.5倍のダメージを与える。",
+      description: "敵単体に攻撃力1.65倍のダメージを与え、1ターン毒(1スタック)を付与する。",
       target: "SINGLE_ENEMY",
-      cooldownTurns: 2,
-      effects: [{ kind: "DAMAGE", multiplier: 1.5 }],
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.65 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 1 },
+      ],
     },
   ],
   skill3Variants: [
@@ -152,21 +158,27 @@ const WOLF: MonsterTemplate = {
     },
     {
       id: "wolf_s3_b",
-      name: "れんげきづめ",
-      description: "敵単体に攻撃力1.0倍のダメージを3回与える。",
+      name: "ウルフスラッシュ",
+      description: "敵単体に攻撃力0.7倍のダメージを3回与え、1撃ごとに防御力を25%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
-      effects: [{ kind: "DAMAGE", multiplier: 1.0, hits: 3 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.7, hits: 3 },
+        // 3回斬るので、防御低下も1撃につき1つずつ、計3つ重ねてかける
+        { kind: "DEBUFF", stat: "def", amount: 0.25, durationTurns: 2 },
+        { kind: "DEBUFF", stat: "def", amount: 0.25, durationTurns: 2 },
+        { kind: "DEBUFF", stat: "def", amount: 0.25, durationTurns: 2 },
+      ],
     },
     {
       id: "wolf_s3_c",
       name: "はやての号令",
-      description: "味方全体の行動ゲージを20%進め、防御力を2ターン大きく上昇させる。",
+      description: "味方全体の行動ゲージを20%進め、速度を2ターン上昇させる。",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "GAUGE", amount: 0.2 },
-        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
       ],
     },
   ],
@@ -190,41 +202,53 @@ const GOLEM: MonsterTemplate = {
   skill1: {
     id: "golem_s1",
     name: "たいあたり",
-    description: "敵単体に攻撃力0.8倍のダメージを与える。",
+    description: "敵単体に攻撃力0.7倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.8 }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.7, scaleBonus: { stat: "def", ratePerPoint: 0.004 } }],
   },
   skill2Variants: [
     {
       id: "golem_s2_a",
-      name: "がんせきふる",
-      description: "巨岩を降らせ敵全体に攻撃力0.9倍のダメージを与える。",
+      name: "岩石落とし",
+      description: "巨岩を降らせ敵全体に攻撃力0.9倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.9 }],
+      effects: [{ kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "def", ratePerPoint: 0.003 } }],
     },
     {
       id: "golem_s2_b",
       name: "たいあたりラッシュ",
-      description: "敵全体に攻撃力0.6倍のダメージを2回与える。",
+      description: "敵全体に攻撃力0.45倍のダメージを3回与える。自身の防御力が高いほど威力が上がる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.6, hits: 2 }],
+      effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, scaleBonus: { stat: "def", ratePerPoint: 0.003 } }],
     },
     {
       id: "golem_s2_c",
       name: "いわくだき",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、60%で防御力を大きく低下させる。",
+      description: "敵単体に攻撃力1.3倍のダメージを与え、60%で1ターン防御力を大きく低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.6 },
+        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 1, chance: 0.6 },
       ],
     },
   ],
   skill3Variants: [
+    // 火のゴーレムが溶岩落としを覚えるよう、この並びを先頭に置いている
+    {
+      id: "golem_s3_b",
+      name: "溶岩落とし",
+      description: "溶岩を噴き上げ、敵全体に攻撃力1.2倍のダメージを与え、1ターン火傷させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "BURN", durationTurns: 1, chance: 1 },
+      ],
+    },
     {
       id: "golem_s3_a",
       name: "てっぺき",
@@ -234,20 +258,15 @@ const GOLEM: MonsterTemplate = {
       effects: [{ kind: "SHIELD", shieldRate: 0.2, durationTurns: 2 }],
     },
     {
-      id: "golem_s3_b",
-      name: "ようがん噴出",
-      description: "敵全体に攻撃力1.2倍のダメージを与える。",
-      target: "ALL_ENEMIES",
-      cooldownTurns: 4,
-      effects: [{ kind: "DAMAGE", multiplier: 1.2 }],
-    },
-    {
       id: "golem_s3_c",
       name: "きょじんのふんぬ",
-      description: "味方全体の攻撃力を大きく上昇させる。",
+      description: "味方全体の攻撃力と防御力を2ターン上昇させる。",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
-      effects: [{ kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 }],
+      effects: [
+        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
+      ],
     },
   ],
 };
@@ -270,10 +289,13 @@ const FAIRY: MonsterTemplate = {
   skill1: {
     id: "fairy_s1",
     name: "ちいさな一撃",
-    description: "敵単体に攻撃力1.2倍のダメージを与える。",
+    description: "敵単体に攻撃力0.7倍のダメージを与え、自身の最大HPの2%を回復する。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.2 }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.7 },
+      { kind: "HEAL", healRate: 0.02, toSelf: true },
+    ],
   },
   skill2Variants: [
     {
@@ -281,35 +303,41 @@ const FAIRY: MonsterTemplate = {
       name: "いやしのかぜ",
       description: "味方全体のHPを最大HPの22%回復する。",
       target: "ALL_ALLIES",
-      cooldownTurns: 3,
+      cooldownTurns: 4,
       effects: [{ kind: "HEAL", healRate: 0.22 }],
     },
     {
       id: "fairy_s2_b",
       name: "せいすいのしずく",
-      description: "味方単体のHPを最大HPの32%回復する。",
+      description: "味方単体のHPを最大HPの32%回復し、デバフを解除する。",
       target: "SINGLE_ALLY",
       cooldownTurns: 3,
-      effects: [{ kind: "HEAL", healRate: 0.32 }],
+      effects: [
+        { kind: "HEAL", healRate: 0.32 },
+        { kind: "CLEANSE" },
+      ],
     },
     {
       id: "fairy_s2_c",
       name: "せいめいの葉",
-      description: "味方全体に3ターンの間、毎ターン開始時に最大HPの6%回復する継続回復を付与する。",
+      description: "味方全体のHPを最大HPの10%回復し、3ターンの間、毎ターン開始時に最大HPの6%回復する継続回復を付与する。",
       target: "ALL_ALLIES",
-      cooldownTurns: 3,
-      effects: [{ kind: "REGEN", healRate: 0.06, durationTurns: 3 }],
+      cooldownTurns: 4,
+      effects: [
+        { kind: "HEAL", healRate: 0.1 },
+        { kind: "REGEN", healRate: 0.06, durationTurns: 3 },
+      ],
     },
   ],
   skill3Variants: [
     {
       id: "fairy_s3_a",
       name: "せいれいの加護",
-      description: "味方全体の攻撃力を大きく上昇させ、デバフを解除する。",
+      description: "味方全体の攻撃力を2ターン上昇させ、デバフを解除する。",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 },
+        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
         { kind: "CLEANSE" },
       ],
     },
@@ -318,18 +346,18 @@ const FAIRY: MonsterTemplate = {
       name: "だいちのめぐみ",
       description: "味方全体のHPを最大HPの35%回復する。",
       target: "ALL_ALLIES",
-      cooldownTurns: 4,
+      cooldownTurns: 5,
       effects: [{ kind: "HEAL", healRate: 0.35 }],
     },
     {
       id: "fairy_s3_c",
       name: "れいこんのもり",
-      description: "味方全体のHPを最大HPの15%回復し、防御力を大きく上昇させる。",
+      description: "味方全体のHPを最大HPの15%回復し、防御力を上昇させる。",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
         { kind: "HEAL", healRate: 0.15 },
-        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 2 },
+        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
       ],
     },
   ],
@@ -371,10 +399,13 @@ const GRIFFON: MonsterTemplate = {
     {
       id: "griffon_s2_a",
       name: "きりさく突風",
-      description: "鋭い風の刃で敵単体に攻撃力2.0倍のダメージを与える。",
+      description: "鋭い風の刃で敵単体に攻撃力2.0倍のダメージを与え、30%で1ターンスタンさせる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.0 },
+        { kind: "STUN", durationTurns: 1, chance: 0.3 },
+      ],
     },
     {
       id: "griffon_s2_b",
@@ -387,12 +418,12 @@ const GRIFFON: MonsterTemplate = {
     {
       id: "griffon_s2_c",
       name: "ダイブアタック",
-      description: "急降下して敵単体に攻撃力1.6倍のダメージを与え、60%で2ターン速度を25%低下させる。",
+      description: "急降下して敵単体に攻撃力1.6倍のダメージを与え、70%で2ターン速度を25%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.6 },
-        { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
+        { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.7 },
       ],
     },
   ],
@@ -400,12 +431,12 @@ const GRIFFON: MonsterTemplate = {
     {
       id: "griffon_s3_a",
       name: "嵐の一撃",
-      description: "渾身の一撃(2.8倍)を叩き込み、30%で相手をスタンさせる。",
+      description: "渾身の一撃(2.8倍)を叩き込み、55%で相手をスタンさせる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 2.8 },
-        { kind: "STUN", durationTurns: 1, chance: 0.3 },
+        { kind: "STUN", durationTurns: 1, chance: 0.55 },
       ],
     },
     {
@@ -419,10 +450,13 @@ const GRIFFON: MonsterTemplate = {
     {
       id: "griffon_s3_c",
       name: "猛禽の加護",
-      description: "味方全体の攻撃力を大きく上昇させる。",
+      description: "味方全体の攻撃力とクリティカルダメージを3ターン上昇させる。",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
-      effects: [{ kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 }],
+      effects: [
+        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 },
+        { kind: "BUFF", stat: "criDmg", amount: 0.3, durationTurns: 3 },
+      ],
     },
   ],
 };
@@ -453,9 +487,10 @@ const DRAGON: MonsterTemplate = {
       { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.25 },
     ],
   },
+  // 6件に揃えることで、属性の並び(火・草・電気・水・光・闇)と1対1で対応する
   skill2Variants: [
     {
-      id: "dragon_s2_a",
+      id: "dragon_s2_flame",
       name: "フレイムブレス",
       description: "灼熱の息を吐き、敵全体に攻撃力1.5倍のダメージを与え、65%で1ターン火傷させる。",
       target: "ALL_ENEMIES",
@@ -466,7 +501,7 @@ const DRAGON: MonsterTemplate = {
       ],
     },
     {
-      id: "dragon_s2_b",
+      id: "dragon_s2_claw",
       name: "ドラゴンクロー",
       description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を大きく低下させる。",
       target: "SINGLE_ENEMY",
@@ -477,17 +512,55 @@ const DRAGON: MonsterTemplate = {
       ],
     },
     {
-      id: "dragon_s2_c",
+      id: "dragon_s2_spirit",
       name: "りゅうの闘気",
-      description: "味方全体の2ターンクリティカルダメージを30%上昇させる。",
+      description: "味方全体のクリティカルダメージと速度を2ターン上昇させる。",
       target: "ALL_ALLIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "BUFF", stat: "criDmg", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
+      ],
+    },
+    {
+      id: "dragon_s2_w_claw",
+      name: "ドラゴンクロー",
+      description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を大きく低下させる。",
+      target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "BUFF", stat: "criDmg", amount: 0.3, durationTurns: 2 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.4 },
+        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.55 },
+      ],
+    },
+    {
+      id: "dragon_s2_l_spirit",
+      name: "りゅうの闘気",
+      description: "味方全体のクリティカルダメージと速度を2ターン上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "BUFF", stat: "criDmg", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
+      ],
+    },
+    {
+      id: "dragon_s2_d_flame",
+      name: "フレイムブレス",
+      description: "灼熱の息を吐き、敵全体に攻撃力1.5倍のダメージを与え、65%で1ターン火傷させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.5 },
+        { kind: "BURN", durationTurns: 1, chance: 0.65 },
+      ],
     },
   ],
+  // 属性の並び(火・草・電気・水・光・闇)と1対1で対応する。
+  // 光は シャイニングブレス、闇は 破壊の流星 という専用スキルになる
   skill3Variants: [
     {
-      id: "dragon_s3_a",
+      id: "dragon_s3_roar",
       name: "破滅の咆哮",
       description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
       target: "ALL_ENEMIES",
@@ -495,27 +568,55 @@ const DRAGON: MonsterTemplate = {
       effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
     },
     {
-      id: "dragon_s3_b",
+      id: "dragon_s3_scale",
       name: "竜神の逆鱗",
-      description: "渾身の一撃(3.6倍)を叩き込み、30%で相手をスタンさせる。",
+      description: "渾身の一撃(3.6倍)を叩き込み、味方全体の攻撃力を2ターン上昇させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 3.6 },
-        { kind: "STUN", durationTurns: 1, chance: 0.3 },
+        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2, applyTo: "ALLIES" },
       ],
     },
     {
-      id: "dragon_s3_c",
+      id: "dragon_s3_roar_e",
+      name: "破滅の咆哮",
+      description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
+    },
+    {
+      id: "dragon_s3_blessing",
       name: "古龍の加護",
-      description: "味方全体の攻撃力・防御力を3ターン大きく上昇させ、自身の防御力の150%のHPを回復する。",
+      description: "味方全体の攻撃力・防御力を3ターン上昇させ、自身の防御力の150%のHPを回復する。",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 },
-        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 },
+        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 },
         { kind: "HEAL", scaleStat: "def", healRate: 1.5 },
       ],
+    },
+    {
+      id: "dragon_s3_shining",
+      name: "シャイニングブレス",
+      description: "聖なる光の息を吐き、敵全体に攻撃力2.4倍のダメージを与え、75%で2ターン暗闇、60%で2ターン攻撃力低下を付与する。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.4 },
+        { kind: "BLIND", durationTurns: 2, chance: 0.75 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
+      ],
+    },
+    {
+      id: "dragon_s3_meteor",
+      name: "破壊の流星",
+      description: "闇の流星を降らせ、敵全体の防御力を無視して攻撃力1.5倍のダメージを与える。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [{ kind: "DAMAGE", multiplier: 1.5, ignoreDefense: true }],
     },
   ],
 };
@@ -550,30 +651,33 @@ const SERAPH: MonsterTemplate = {
     {
       id: "seraph_s2_a",
       name: "さばきの光",
-      description: "敵単体に攻撃力2.3倍のダメージを与える。",
+      description: "敵単体に攻撃力2.3倍のダメージを与え、85%で1ターン暗闇を付与する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 2.3 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.3 },
+        { kind: "BLIND", durationTurns: 1, chance: 0.85 },
+      ],
     },
     {
       id: "seraph_s2_b",
       name: "いやしの詠唱",
-      description: "自身の攻撃力に応じて味方単体のHPを回復し、2ターン攻撃力を大きく上昇させる。",
+      description: "自身の攻撃力に応じて味方単体のHPを回復し、2ターン攻撃力を上昇させる。",
       target: "SINGLE_ALLY",
       cooldownTurns: 3,
       effects: [
         { kind: "HEAL", scaleStat: "atk", healRate: 1.6 },
-        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 2 },
+        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
       ],
     },
     {
       id: "seraph_s2_c",
       name: "封印の光",
-      description: "敵単体に攻撃力1.6倍のダメージを与え、スキルのクールタイムを1ターン延長する。",
+      description: "敵単体に攻撃力1.8倍のダメージを与え、スキルのクールタイムを1ターン延長する。",
       target: "SINGLE_ENEMY",
-      cooldownTurns: 3,
+      cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.6 },
+        { kind: "DAMAGE", multiplier: 1.8 },
         { kind: "COOLDOWN_EXTEND", turns: 1 },
       ],
     },
@@ -595,7 +699,7 @@ const SERAPH: MonsterTemplate = {
       name: "聖なる守護陣",
       description: "自身の防御力に応じて味方全体のHPを回復し、2ターンの間状態異常を無効にする加護を与える。",
       target: "ALL_ALLIES",
-      cooldownTurns: 5,
+      cooldownTurns: 6,
       effects: [
         { kind: "HEAL", scaleStat: "def", healRate: 2.0 },
         { kind: "IMMUNITY", durationTurns: 2 },
@@ -604,11 +708,12 @@ const SERAPH: MonsterTemplate = {
     {
       id: "seraph_s3_c",
       name: "セラフィムの祝福",
-      description: "味方全体の攻撃力を大きく上昇させ、3ターン速度も上昇させる。",
+      description: "味方全体の行動ゲージを20%進め、攻撃力と速度を3ターン上昇させる。",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 },
+        { kind: "GAUGE", amount: 0.2 },
+        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 },
         { kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 3 },
       ],
     },
@@ -642,20 +747,23 @@ const NEMESIS: MonsterTemplate = {
     {
       id: "nemesis_s2_a",
       name: "冥府の炎",
-      description: "暗黒の炎で敵全体に攻撃力1.7倍のダメージを与える。",
+      description: "暗黒の炎で敵全体に攻撃力1.7倍のダメージを与え、1ターン火傷させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 1.7 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.7 },
+        { kind: "BURN", durationTurns: 1, chance: 1 },
+      ],
     },
     {
       id: "nemesis_s2_b",
       name: "デーモンクロー",
-      description: "敵単体に攻撃力2.7倍のダメージを与え、50%で防御力を大きく低下させる。",
+      description: "敵単体に攻撃力2.7倍のダメージを与え、75%で防御力を大きく低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 2.7 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.5 },
+        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.75 },
       ],
     },
     {
@@ -682,12 +790,12 @@ const NEMESIS: MonsterTemplate = {
     {
       id: "nemesis_s3_b",
       name: "冥王の激震",
-      description: "敵全体に攻撃力2.0倍のダメージを与え、40%で攻撃力を大きく低下させる。",
+      description: "敵全体に攻撃力1.15倍のダメージを2回与え、行動ゲージを10%吸収する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.4 },
+        { kind: "DAMAGE", multiplier: 1.15, hits: 2 },
+        { kind: "GAUGE", amount: 0.1, drain: true },
       ],
     },
     {
@@ -695,7 +803,7 @@ const NEMESIS: MonsterTemplate = {
       name: "加速の号令",
       description: "味方全体の行動ゲージを30%進め、2ターンクリティカル率を30%上昇させる。",
       target: "ALL_ALLIES",
-      cooldownTurns: 5,
+      cooldownTurns: 4,
       effects: [
         { kind: "GAUGE", amount: 0.3 },
         { kind: "BUFF", stat: "criRate", amount: 0.3, durationTurns: 2 },
@@ -791,10 +899,10 @@ export const ANCIENT_CRYSTAL: MonsterTemplate = {
     {
       id: "ancient_crystal_s2",
       name: "古代の加護",
-      description: "味方単体に古代の力を送り込み、2ターン攻撃力を大きく上昇させる。",
+      description: "味方単体に古代の力を送り込み、2ターン攻撃力を上昇させる。",
       target: "SINGLE_ALLY",
       cooldownTurns: 3,
-      effects: [{ kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 2 }],
+      effects: [{ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 }],
     },
   ],
   skill3Variants: [
@@ -806,7 +914,7 @@ export const ANCIENT_CRYSTAL: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "HEAL", scaleStat: "def", healRate: 1.2 },
-        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 },
       ],
     },
   ],
