@@ -265,9 +265,11 @@ export function paletteFor(theme: ElementTheme): CreaturePalette {
     fur: separate(tune(main, 0.015, skin.peltSat, 1.34, 0, 0.72), main, 0.15),
     accent: theme.rim.clone().multiplyScalar(0.85),
     glow: theme.core.clone(),
-    // 翼膜は薄く血が透ける。属性色のままだと「胴と同じ色の板」になるので、
-    // 赤側へ寄せて肉の膜であることを示す
-    membrane: shell.clone().lerp(theme.rim, 0.42).lerp(new THREE.Color(0x9c3a34), skin.flesh),
+    // 翼膜。地色ではなく**作り直した後の地色**から起こす。
+    // テーマの shell から直に作ると、胴の色を属性ごとに設計した意味が消えて
+    // 翼だけ元の色に取り残される(白い光属性のドラゴンに黄土色の翼が生えていた)。
+    // そのうえで赤側へ寄せ、薄く血が透ける肉の膜であることを示す
+    membrane: tune(main, 0, 0.9, 1.0, 0.04).lerp(new THREE.Color(0x9c3a34), skin.flesh),
     traits: skin.traits,
   };
 }
@@ -715,18 +717,41 @@ void main() {
   #endif
 
   #ifdef TRANSLUCENT
-    // 薄い膜。正面から見ると濃く、縁と逆光で明るく抜ける
+    // 薄い膜。
+    //
+    // ここを「一様に薄い板」として塗ると、どれだけ色を選んでも
+    // **色紙を切って貼った**ようにしか見えない。翼膜の質は色ではなく
+    // 「根元が厚く、外へ行くほど薄い」という厚みの勾配そのもの。
+    //
+    // 厚みは体の中心軸からの横の距離で測る。体高で割って正規化してあるので、
+    // 小さい妖精の耳でも大きい竜の翼でも同じ割合で薄くなる。
+    float span = clamp(abs(vBody.x) / max(0.5, uHeight * 0.55), 0.0, 1.0);
+    float thickness = 1.0 - span * 0.74;
     float thin = pow(1.0 - facing, 1.4);
-    color = albedo * (0.34 + ramp(key) * 0.5) + uRim * thin * 0.9;
-    color += uGlow * pow(max(dot(-normal, KEY_DIR), 0.0), 2.0) * 0.35;
-    alpha = uOpacity * (0.72 + thin * 0.28);
+    // 逆光で透ける量。薄いところほど多く通す
+    float through = max(dot(-normal, KEY_DIR), 0.0) * (1.25 - thickness * 0.55);
+    color = albedo * (0.52 + thickness * 0.48) * (0.34 + ramp(key) * 0.52);
+    // 透けた光は膜そのものの色に染まって出てくる。白い光を足すと紙になる
+    color += mix(albedo, uRim, 0.45) * through * 0.62;
+    color += uRim * thin * 0.58;
+    // 薄い縁ほど向こうが見える。ただし抜きすぎるとシルエットが痩せるので、
+    // 翼の先でも下地が読める濃さは残す
+    alpha = uOpacity * clamp(0.60 + thickness * 0.32 + thin * 0.10, 0.0, 1.0);
   #endif
 
   #ifdef VEINS
-    // 翼膜の血管。ローカル座標で描くので、羽ばたいても模様が流れない
-    float vein = 1.0 - smoothstep(0.0, 0.16, abs(snoise(vLocal * 7.0)));
-    color *= 1.0 - vein * 0.34;
-    color += uRim * vein * 0.10;
+    // 翼膜の血管。太い枝と細い枝を重ねて分岐に見せる。
+    // 1本の太さで描くと網戸の目になり、生き物の膜に見えない。
+    // ローカル座標で描くので、羽ばたいても模様が流れない
+    float trunk = 1.0 - smoothstep(0.0, 0.095, abs(snoise(vLocal * vec3(3.4, 5.0, 3.4))));
+    float twig = 1.0 - smoothstep(0.0, 0.05, abs(snoise(vLocal * vec3(10.0, 15.0, 10.0))));
+    float vein = clamp(trunk + twig * 0.6, 0.0, 1.0);
+    // 血管は膜の厚い側(根元)ほど太く濃い。先端まで同じ濃さで走ると
+    // 血が通っているのではなく「網目模様を印刷した板」に見える
+    float veinSpan = clamp(abs(vBody.x) / max(0.5, uHeight * 0.55), 0.0, 1.0);
+    vein *= 1.0 - veinSpan * 0.55;
+    color *= 1.0 - vein * 0.5;
+    color += mix(uRim, uGlow, 0.3) * vein * 0.09;
   #endif
 
   #ifdef GEL
@@ -987,7 +1012,9 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: false,
     specPower: 12,
     specStrength: 0,
-    bump: 0.0,
+    // 皮膜には細かい皺がある。凹凸を0にすると、どれだけ色を作り込んでも
+    // 光が一様に返ってきて「紙を切って貼った翼」に見える
+    bump: 0.005,
   },
   // 結晶: 正面が透けて縁が詰まる。明るさではなく透過で他と区別する
   crystal: {
