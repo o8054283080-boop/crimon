@@ -2145,6 +2145,242 @@ function buildAncientDemon(kit: CreatureKit, rig: CreatureRig): void {
 }
 
 // ---------------------------------------------------------------------------
+// seraph: セラフ
+// ---------------------------------------------------------------------------
+
+/**
+ * セラフ(SR)。
+ *
+ * 役割はバランス型で、既定の骨格は「剣とマントの人型の戦士」。
+ * そこへ翼と光輪だけを足すと、装甲の厚い戦士に羽が生えた姿になり、
+ * 同じ人型のネメシス(魔王)と重心も体格もほとんど同じになってしまう。
+ *
+ * ネメシスが「重い・広い・角がある」なら、セラフは逆側に振り切る。
+ *   1. 手足を細く長く取り、肩幅を胸の幅とほぼ同じにして縦線だけの体にする
+ *   2. 顔を作らない。目も口も無い一枚の面で覆い、頭の情報を光輪と冠に預ける
+ *   3. 剣は刃を下へ向けて構える(魔王は大鎌を上へ、戦士は剣を横に構える)
+ *   4. 二対の翼と、背から垂れる長い帯で、静止していても布と羽が動く
+ *
+ * 翼と光輪は以前 TEMPLATE_TRAITS.seraph が役割骨格へ足していたが、
+ * 肩の位置ごとこちらで決めるためビルダー側へ取り込んだ(traits 側からは削除済み)。
+ */
+function buildSeraph(kit: CreatureKit, rig: CreatureRig): void {
+  const p = kit.palette;
+  rig.pelvis.position.y = 1.30;
+
+  // --- 腰(細い。重い帯を巻かず、細い環と垂れ布だけで締める) ---
+  rig.pelvis.add(place(kit.ball(0.16, 0.15, 0.14, "hide", p.dark), 0, -0.02, 0));
+  rig.pelvis.add(place(kit.band(0.165, 0.022, Math.PI * 2, "metal", p.metal, 16), 0, 0.02, 0, Math.PI / 2, 0, 0));
+  rig.pelvis.add(place(kit.octa(0.045, 0.07, 0.03, "crystal", p.accent), 0, 0.02, -0.17));
+  rig.pelvis.add(place(kit.octa(0.02, 0.035, 0.015, "glow", p.glow), 0, 0.02, -0.18));
+
+  // 前後に垂れる細い布。スカートで一周させると裾が広がって重く見えるので、
+  // 板2枚だけを垂らし、その隙間から細い脚を見せる
+  for (const [index, dir] of [-1, 1].entries()) {
+    const panel = new THREE.Group();
+    markAnimated(panel);
+    place(panel, 0, -0.04, dir * 0.13, dir > 0 ? -0.12 : 0.12, 0, 0);
+    panel.add(
+      kit.membrane(
+        (shape) => {
+          shape.moveTo(-0.17, 0.04);
+          shape.lineTo(0.17, 0.04);
+          shape.lineTo(0.13, -0.62);
+          shape.lineTo(0.0, -0.78);
+          shape.lineTo(-0.13, -0.62);
+        },
+        "cloth",
+        p.cloth,
+        dir * 0.3,
+      ),
+    );
+    panel.add(place(kit.band(0.15, 0.014, Math.PI * 0.9, "metal", p.metal, 12), 0, -0.6, 0, Math.PI / 2, 0, Math.PI * 1.05));
+    rig.pelvis.add(panel);
+    rig.cloth.push({ group: panel, rest: panel.rotation.clone(), phase: index * 1.6, amount: 0.7 });
+  }
+
+  // --- 脚(細く長い。装甲は膝と脛の細い板だけに留める) ---
+  for (const side of [-1, 1]) {
+    const leg = kit.chain(
+      [
+        { len: 0.50, r0: 0.105, r1: 0.08, rot: [0.06, 0, side * 0.05] },
+        { len: 0.48, r0: 0.078, r1: 0.058, rot: [-0.10, 0, 0] },
+      ],
+      "hide",
+      p.main,
+    );
+    leg.root.position.set(side * 0.14, -0.06, 0);
+    addJoint(kit, leg.joints[1], 0, 0.075, false);
+    leg.joints[1].add(place(kit.lens(0.075, 0.16, 0.07, "metal", p.metal), 0, -0.18, -0.03));
+    // 足首から先。細身なので、靴も薄く小さく
+    leg.tip.add(place(kit.lens(0.08, 0.05, 0.17, "metal", p.metal), 0, -0.03, -0.04));
+    leg.tip.add(place(kit.band(0.075, 0.014, Math.PI * 2, "plate", p.plate, 12), 0, 0.0, 0, Math.PI / 2, 0, 0));
+    rig.pelvis.add(leg.root);
+    rig.legs.push(limbFrom(leg, side, side * 0.8));
+  }
+
+  // --- 胴(縦に長い。肩を張らず、胸から腰まで一本の線で落とす) ---
+  const torso = rig.torso;
+  place(torso, 0, 0.04, 0, -0.05, 0, 0);
+  torso.add(place(kit.ball(0.145, 0.20, 0.12, "hide", p.main), 0, 0.16, 0));
+  torso.add(place(kit.ball(0.22, 0.22, 0.16, "hide", p.main), 0, 0.44, 0));
+  // 胸当て。薄い板を3枚だけ重ね、装甲ではなく衣の留め具に見せる
+  addPlating(kit, torso, 3, 0.22, 0.50, 0.18, -0.10);
+  torso.add(place(kit.lens(0.21, 0.13, 0.09, "metal", p.metal), 0, 0.56, -0.06, -0.12, 0, 0));
+  torso.add(place(kit.octa(0.05, 0.08, 0.035, "crystal", p.accent), 0, 0.46, -0.16));
+  torso.add(place(kit.octa(0.024, 0.04, 0.018, "glow", p.glow), 0, 0.46, -0.17));
+  // 首まわりの襟。細い環を2本重ねるだけに留める
+  torso.add(place(kit.band(0.13, 0.018, Math.PI * 2, "metal", p.metal, 14), 0, 0.62, 0, Math.PI / 2, 0, 0));
+  torso.add(place(kit.band(0.155, 0.014, Math.PI * 1.2, "plate", p.plate, 14), 0, 0.58, -0.02, Math.PI / 2, -Math.PI * 0.6, 0));
+
+  for (const side of [-1, 1]) {
+    // 肩。薄い板1枚と小さな光。魔王の段付き肩当てと面積で差を付ける
+    torso.add(place(kit.lens(0.115, 0.075, 0.11, "metal", p.metal), side * 0.25, 0.56, 0, 0, 0, -side * 0.3));
+    torso.add(place(kit.octa(0.03, 0.05, 0.025, "crystal", p.accent), side * 0.29, 0.60, 0, 0, 0, -side * 0.4));
+
+    const arm = kit.chain(
+      [
+        { len: 0.38, r0: 0.075, r1: 0.058, rot: [0.14, 0, side * 0.16] },
+        { len: 0.36, r0: 0.056, r1: 0.045, rot: [-0.40, 0, 0] },
+      ],
+      "hide",
+      p.main,
+    );
+    arm.root.position.set(side * 0.25, 0.50, 0);
+    addJoint(kit, arm.joints[1], 0, 0.058, false);
+    arm.joints[1].add(place(kit.lens(0.06, 0.12, 0.055, "metal", p.metal), 0, -0.16, -0.02));
+    arm.tip.add(place(kit.ball(0.055, 0.055, 0.06, "hide", p.dark), 0, -0.03, 0));
+
+    if (side > 0) {
+      // 光の剣。刃を下へ向けて body の前に立てる。
+      // 魔王(大鎌を上へ)・戦士(剣を横へ)と、同じ「得物を持つ人型」の中で
+      // 構えだけで見分けが付くようにする
+      const sword = new THREE.Group();
+      // 肩+肘の傾き(約 -0.26 rad)を打ち消し、刃を鉛直に落とす
+      place(sword, 0, -0.05, -0.03, 0.26, 0, -side * 0.16);
+      sword.add(place(kit.box(0.04, 0.17, 0.04, "cloth", p.dark), 0, 0.07, 0));
+      sword.add(place(kit.octa(0.045, 0.055, 0.04, "metal", p.metal), 0, 0.18, 0));
+      // 鍔。左右に長く取ると、下向きの刃と十字を作って遠目にも剣と分かる
+      sword.add(place(kit.box(0.30, 0.035, 0.05, "metal", p.metal), 0, -0.03, 0));
+      for (const dir of [-1, 1]) {
+        sword.add(place(kit.octa(0.03, 0.045, 0.025, "crystal", p.accent), dir * 0.17, -0.03, 0));
+      }
+      sword.add(place(kit.spike(0.065, 0.92, 0.22, "metal", p.metal), 0, -0.06, 0, AIM_DOWN, 0, 0));
+      // 刃の中央の光。細い線に留め、加算で重なっても飛ばないようにする
+      sword.add(place(kit.box(0.016, 0.62, 0.018, "glow", p.glow), 0, -0.40, 0));
+      arm.tip.add(sword);
+    }
+    rig.torso.add(arm.root);
+    rig.arms.push(limbFrom(arm, side, side * 1.0));
+  }
+
+  // --- 背から垂れる長い帯。静止していても布が動き、天使の軽さを出す ---
+  for (const [index, side] of [-1, 1].entries()) {
+    const ribbon = new THREE.Group();
+    markAnimated(ribbon);
+    place(ribbon, side * 0.14, 0.58, 0.10, 0.12, 0, side * 0.15);
+    ribbon.add(
+      kit.membrane(
+        (shape) => {
+          shape.moveTo(-0.07, 0.02);
+          shape.lineTo(0.07, 0.02);
+          shape.lineTo(0.10, -0.62);
+          shape.lineTo(0.02, -1.02);
+          shape.lineTo(-0.06, -0.66);
+        },
+        "cloth",
+        p.cloth,
+        side * 0.22,
+      ),
+    );
+    rig.torso.add(ribbon);
+    rig.cloth.push({ group: ribbon, rest: ribbon.rotation.clone(), phase: 0.8 + index * 1.4, amount: 1.3 });
+  }
+
+  // --- 頭(顔を作らない。のっぺりした面と冠だけで神性を出す) ---
+  place(rig.neck, 0, 0.66, -0.01, -0.03, 0, 0);
+  rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.12, z: 0 }, 0.065, 0.06, "hide", p.dark));
+  place(rig.head, 0, 0.14, 0, 0.04, 0, 0);
+  const head = rig.head;
+  head.add(place(kit.ball(0.15, 0.17, 0.155, "hide", p.deep), 0, 0.10, 0));
+  // 面。目も口も置かず、頬の高さでわずかに前へ張り出す一枚の板にする。
+  // 発光で潰すと加算演出が乗った時に頭だけ白く飛ぶので、光は縁の細い線だけ
+  head.add(place(kit.lens(0.15, 0.185, 0.095, "plate", p.plate, 12), 0, 0.11, -0.06, -0.04, 0, 0));
+  head.add(place(kit.band(0.14, 0.013, Math.PI * 1.1, "metal", p.metal, 14), 0, 0.11, -0.11, Math.PI / 2, -Math.PI * 0.55, 0));
+  head.add(place(kit.octa(0.03, 0.055, 0.022, "glow", p.glow), 0, 0.21, -0.13));
+  // 後頭部を覆う頭巾。面と繋げて、頭全体を一続きの殻に見せる
+  head.add(place(kit.ball(0.16, 0.17, 0.165, "cloth", p.cloth), 0, 0.13, 0.03));
+  // 冠。細い結晶を放射させ、顔が無いぶんの情報を頭の輪郭に置く
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6 - 0.5;
+    const spire = kit.octa(0.018, 0.10 - Math.abs(t) * 0.05, 0.016, "crystal", p.accent);
+    place(spire, t * 0.22, 0.28 - Math.abs(t) * 0.03, 0.02 + Math.abs(t) * 0.06, -0.2, 0, -t * 1.6);
+    head.add(spire);
+  }
+
+  // 光輪。輪は細く保ち、面積ではなく形で「天使」を伝える
+  const halo = kit.ring(0.22, 0.02, "glow", p.glow, 30);
+  place(halo, 0, 0.34, 0.03, Math.PI / 2 - 0.12, 0, 0);
+  head.add(halo);
+  rig.spinners.push({ object: halo, axis: "z", speed: 0.5 });
+
+  // --- 二対の翼。上対を大きく立て、下対を小さく後ろへ流す ---
+  rig.wingAnchor.set(0.20, 0.60, 0.10);
+  for (const side of [-1, 1]) {
+    // 翼が体より大きいと、正規化で体が縮んで「羽根の塊」になる。
+    // 胴の高さと同じくらいに収め、後ろへ流して胴の輪郭を隠さないようにする
+    for (const [index, spec] of [
+      { y: 0.60, span: 1.0, yaw: 0.62, pitch: 0.06, roll: 0.40, count: 11 },
+      { y: 0.32, span: 0.74, yaw: 0.72, pitch: 0.36, roll: -0.10, count: 9 },
+    ].entries()) {
+      const wing = new THREE.Group();
+      markAnimated(wing);
+      place(wing, side * 0.16, spec.y, 0.12, spec.pitch, -side * spec.yaw, side * spec.roll);
+      addFeatherWing(kit, wing, side, spec.count, spec.span);
+      rig.torso.add(wing);
+      rig.wings.push({
+        root: wing,
+        rootRest: wing.rotation.clone(),
+        lower: null,
+        lowerRest: null,
+        tip: wing,
+        side,
+        // 上下の翼で位相をずらし、順に羽ばたいて見えるようにする
+        phase: index * 0.9,
+      });
+    }
+  }
+
+  // 周囲を巡る小さな光。体表を明るくせずに「光を纏っている」ことを示す
+  for (let i = 0; i < 5; i++) {
+    const mote = kit.octa(0.03, 0.055, 0.03, "crystal", p.accent);
+    rig.core.add(mote);
+    rig.orbiters.push({
+      object: mote,
+      radius: 0.66 + (i % 2) * 0.18,
+      height: 0.9 + i * 0.28,
+      speed: 0.45 + i * 0.05,
+      phase: (i / 5) * Math.PI * 2,
+      tilt: 0.3,
+      spin: 1.0,
+    });
+  }
+
+  rig.anim = {
+    idleSpeed: 0.9,
+    breath: 0.7,
+    bob: 0.05,
+    headSway: 0.7,
+    tailWave: 0,
+    wingFlap: 0.45,
+    sway: 0.6,
+    lunge: 1.1,
+    squash: 0,
+    attack: "lunge",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 登録
 // ---------------------------------------------------------------------------
 
@@ -2164,6 +2400,7 @@ const TEMPLATE_BUILDERS: Record<string, CreatureBuilder> = {
   ancient_crystal_curse: { build: buildAncientCrystalCurse, height: 2.55, float: 0.5 },
   ancient_demon: { build: buildAncientDemon, height: 3.25, float: 0.34 },
   griffon: { build: buildGriffon, height: 2.75, float: 0 },
+  seraph: { build: buildSeraph, height: 2.7, float: 0 },
 };
 
 /** 種別専用の骨格。無ければ null(役割の骨格を使う) */
@@ -2199,37 +2436,7 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
   // グリフォンの翼と冠羽は buildGriffon が肩の位置ごと組むので、ここには置かない
   // (両方に置くと翼が二重に生える)
 
-  /** セラフ: 二対の光の翼と光輪。天使的なシルエットで他と明確に分ける */
-  seraph: (kit, rig) => {
-    const p = kit.palette;
-    for (const side of [-1, 1]) {
-      for (const [index, spec] of [
-        { y: 0.72, span: 1.15, pitch: 0.1 },
-        { y: 0.44, span: 0.86, pitch: 0.5 },
-      ].entries()) {
-        const wing = new THREE.Group();
-        markAnimated(wing);
-        place(wing, side * 0.24, rig.wingAnchor.y - 0.28 + spec.y, 0.14, spec.pitch, -side * 0.46, 0);
-        addFeatherWing(kit, wing, side, 7, spec.span);
-        rig.torso.add(wing);
-        rig.wings.push({
-          root: wing,
-          rootRest: wing.rotation.clone(),
-          lower: null,
-          lowerRest: null,
-          tip: wing,
-          side,
-          // 上下の翼で位相をずらし、順に羽ばたいて見えるようにする
-          phase: index * 0.9,
-        });
-      }
-    }
-    const halo = kit.ring(0.26, 0.026, "glow", p.glow, 30);
-    place(halo, 0, 0.46, 0.04, Math.PI / 2, 0, 0);
-    rig.head.add(halo);
-    rig.spinners.push({ object: halo, axis: "z", speed: 0.5 });
-    rig.anim.wingFlap = 0.4;
-  },
+  // セラフの翼と光輪は buildSeraph が肩と頭の位置ごと組むので、ここには置かない
 
   /** 古代の魔人: 顔の周りに漂う呪符状の破片で、同じボス骨格の中でも「主」に見せる */
   ancient_demon: (kit, rig) => {
