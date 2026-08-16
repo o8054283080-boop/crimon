@@ -372,7 +372,7 @@ export class MonsterAvatar {
   playHit(): void {
     trigger(this.hitTrack, 0.38 + this.mass * 0.34);
     // 体が沈む。バネなので、押し込まれた後に自分で戻る
-    this.landSpring.velocity -= 4.5 - this.mass * 1.6;
+    this.landSpring.velocity -= 12 - this.mass * 4;
     // 後ろへ突き飛ばされる。重いものは動かないかわりに、戻るまでが長い
     this.staggerSpring.velocity += 7 - this.mass * 3.5;
     // 左右にも崩れる。毎回同じ向きへ下がると、連打された時に機械に見える
@@ -608,7 +608,7 @@ export class MonsterAvatar {
           leanZ += lift * 0.03;
           hipZ += lift * 0.06;
           // 踏み下ろした瞬間に全身が沈む。重さはここでしか出せない
-          if (impact > 0.85) this.landSpring.velocity = Math.min(this.landSpring.velocity, -2.2);
+          if (impact > 0.85) this.landSpring.velocity = Math.min(this.landSpring.velocity, -8);
           break;
         }
         case "shiver": {
@@ -778,7 +778,7 @@ export class MonsterAvatar {
       // 尾は溜めで逆へ張り、打ち抜きで振り抜かれる。あとはバネが引き継ぐ
       tailDriveX += windup * 0.16 - strike * 0.2;
       // 踏み込みの着地で沈む
-      if (e >= w && e < w + step * 1.5) this.landSpring.velocity -= 2.4 - mass * 0.6;
+      if (e >= w && e < w + step * 1.5) this.landSpring.velocity -= 7 - mass * 2;
     }
 
     // === 詠唱 =============================================================
@@ -880,7 +880,7 @@ export class MonsterAvatar {
       // 地面に着く瞬間に一度だけ突き上げる。ここで尾も耳も一斉に跳ねる
       if (!this.deathLanded && fall > 0.82) {
         this.deathLanded = true;
-        this.landSpring.velocity -= 5.5 - mass * 1.5;
+        this.landSpring.velocity -= 15 - mass * 4;
       }
       // 粘体は倒れるのではなく、その場で潰れて広がる
       squash -= buckle * 0.2 + fall * 0.3;
@@ -899,8 +899,13 @@ export class MonsterAvatar {
     // === 沈み込み =========================================================
     // 着地・被弾・踏み下ろしで押し込まれた分。バネなので自分で戻り、行き過ぎる
     const sink = this.landSpring.step(0, 2.6 - mass * 1.1, 0.42 + mass * 0.16, step);
-    offsetY += sink * 0.035;
-    squash += sink * 0.5;
+    offsetY += sink * 0.09;
+    squash += sink * 0.3;
+    // 沈んだ勢いは脚にも通す。膝が折れて受け止め、伸びて戻る
+    for (const leg of rig.legs) {
+      leg.root.rotation.x -= sink * 0.16;
+      if (leg.lower && leg.lowerRest) leg.lower.rotation.x += sink * 0.3;
+    }
 
     // === 本体の速度 =======================================================
     // 重心と傾きの変化量を平滑化して持つ。これが二次的な動きの入力になる
@@ -1033,14 +1038,30 @@ export class MonsterAvatar {
     headX -= leanX * gazeLock;
     headZ -= leanZ * gazeLock * 0.8;
 
+    // 足を地面に残す。体が横や前後へ流れた分だけ脚を逆へ倒すと、
+    // 足裏が滑らずに体重だけが動いて見える。踏み込みで大きく移動する時は
+    // 実際に足も運んでいるので、lag() で補正を頭打ちにして効かせすぎない
+    if (!rig.floats && rig.legs.length > 0) {
+      const plantZ = lag(offsetX, 1, 0.11);
+      const plantX = lag(offsetZ, 1, 0.14);
+      for (const leg of rig.legs) {
+        leg.root.rotation.z -= plantZ * 0.6;
+        leg.root.rotation.x -= plantX * 0.5;
+      }
+    }
+
     // === 姿勢の確定 =======================================================
     rig.core.position.set(offsetX, offsetY, offsetZ);
     rig.core.rotation.set(leanX * 0.45 + coreTilt, 0, leanZ);
     rig.pelvis.rotation.set(rig.pelvisRest.x, rig.pelvisRest.y + hipY, rig.pelvisRest.z + hipZ);
-    if (anim.squash > 0) {
-      // 体積を保つ(縦に伸びた分だけ横が細る)。
-      // 骨格の原点を接地面に置いてあるので、伸縮しても足元が浮かない
-      const stretch = Math.max(-0.42, Math.min(0.5, squash * anim.squash));
+    // 体積を保つ(縦に伸びた分だけ横が細る)。
+    // 骨格の原点を接地面に置いてあるので、伸縮しても足元が浮かない。
+    //
+    // 沈み込み(sink)は粘体以外にも必ず効かせる。以前は骨を持つ個体に対して
+    // 上下 0.013 単位しか動かず、着地も被弾も体で受け止めて見えなかった。
+    // 縦の潰れは「重さが乗った」を最も安く出せる表現なので、全員に配る
+    const stretch = clamp((anim.squash > 0 ? squash * anim.squash : 0) + sink * 0.13, -0.42, 0.5);
+    if (Math.abs(stretch) > 1e-4 || rig.core.scale.y !== 1) {
       const lateral = 1 / Math.sqrt(1 + stretch);
       rig.core.scale.set(lateral, 1 + stretch, lateral);
     }
