@@ -11,7 +11,11 @@ import { SIMPLEX_NOISE_3D } from "../shaderChunks.js";
  * 描き分ける。色を変えただけでは、属性色に染まった時に区別がつかなくなる。
  */
 export type SurfaceStyle =
-  /** 皮膚・鱗。マットで柔らかく、細かい鱗目が入る */
+  /**
+   * 地肌。マットで柔らかい。
+   * 既定は鱗も毛も持たない「なめらかな皮膚」で、鱗や毛皮が要る種別は
+   * ビルダーの先頭で `kit.skin` を指定して切り替える(SkinKind を参照)。
+   */
   | "hide"
   /** 毛皮・羽毛。ハイライトが立たず、縁が柔らかく光る */
   | "fur"
@@ -204,6 +208,19 @@ float weavePattern(vec3 p) {
   return warp * 0.5 + 0.5;
 }
 
+/**
+ * なめらかな皮膚。獣・粘体・人型の地肌。
+ * 鱗のような並びを持たず、ゆるい皺と細かい毛穴だけがある。
+ */
+float skinHeight(vec3 p) {
+  return (snoise(p * 8.5) * 0.66 + snoise(p * 27.0) * 0.34) * 0.5 + 0.5;
+}
+
+/** 粘体のうねり。表面張力で丸まった、大きく柔らかい起伏 */
+float gelHeight(vec3 p) {
+  return snoise(p * 5.5) * 0.5 + 0.5;
+}
+
 /** 結晶の面。低周波ノイズを丸めた段にして、平らな面と鋭い稜線を作る */
 float facetHeight(vec3 p) {
   float n = snoise(p * 4.6);
@@ -229,8 +246,10 @@ float surfaceHeight(vec3 p) {
   return brushedStreak(p);
 #elif defined(WEAVE)
   return weavePattern(p) * 0.5 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.5;
+#elif defined(GEL)
+  return gelHeight(p);
 #else
-  return snoise(p * 14.0) * 0.5 + 0.5;
+  return skinHeight(p);
 #endif
 }
 
@@ -329,8 +348,14 @@ void main() {
   albedo *= 0.70 + upness * 0.42;
 
   #ifdef SCALES
-    // 皮膚は鱗状に。境目が落ちることでパーツの丸みも読み取りやすくなる
+    // 爬虫類の鱗。境目が落ちることでパーツの丸みも読み取りやすくなる
     albedo *= 0.78 + height * 0.44;
+  #endif
+
+  #ifdef SKIN
+    // なめらかな地肌。模様を持たせず、皺のぶんだけ薄く濃淡を付ける。
+    // ここを強くすると、鱗でも毛でもない獣の胴が「編み物」に見えてしまう
+    albedo *= 0.90 + height * 0.18;
   #endif
 
   #ifdef CRACKS
@@ -422,6 +447,19 @@ void main() {
     color += uRim * vein * 0.10;
   #endif
 
+  #ifdef GEL
+    // 粘体。硬い面を持たず、内側に濁りが漂う。
+    // 結晶ほど透かすと中身が空に見えるので、向こうがうっすら見える程度に留める。
+    // 明るさではなく透過とぬめりで質感を出すので、ブルームの負担は増えない
+    float wet = pow(1.0 - facing, 2.2);
+    float murk = snoise(vLocal * 3.0 + vec3(0.0, uTime * 0.22, 0.0)) * 0.5 + 0.5;
+    // 内側の濁りが、体の奥のほうで固まって見える
+    color += uColor * murk * 0.20;
+    // 縁が厚く見えるのは、そこだけ粘体を長く通り抜けて見ているため
+    color += mix(uRim, vec3(1.0), 0.35) * wet * 0.30;
+    alpha = uOpacity * (0.70 + wet * 0.30);
+  #endif
+
   #ifdef CRYSTAL
     // 結晶は「向こうが透けること」で他の材質と区別する。
     // 明るくして目立たせるのではなく、正面を薄く・縁を厚く見せることで
@@ -491,9 +529,10 @@ interface StyleConfig {
 }
 
 const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
-  // 肉: ハイライトは広く弱い。生き物の湿り気だけを感じさせる
+  // 地肌: ハイライトは広く弱い。生き物の湿り気だけを感じさせる。
+  // 既定は模様を持たないなめらかな皮膚(鱗は kit.skin = "scale" で付ける)
   hide: {
-    defines: { SCALES: "", SPECULAR: "" },
+    defines: { SKIN: "", SPECULAR: "" },
     rimStrength: 0.55,
     emissive: 0,
     opacity: 1,
@@ -503,7 +542,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: true,
     specPower: 8,
     specStrength: 0.14,
-    bump: 0.009,
+    bump: 0.005,
   },
   // 毛皮・羽毛: ハイライトを持たず、光が繊維の中で散って柔らかく減衰する
   fur: {
@@ -609,23 +648,73 @@ export function styleCastsShadow(style: SurfaceStyle): boolean {
 }
 
 /**
- * 同じ材質でも「形の作り」で表面の割れ方が違う場合の枝分かれ。
- * 岩の塊(kit.rock)は皮膚と同じ "hide" で作られているが、
- * 鱗が並んでいてはただの大きなトカゲになる。ジオメトリを作る側が
- * 材質の中身を差し替えられるようにしておく。
+ * 「地肌が何でできているか」。
+ *
+ * 材質(SurfaceStyle)はパーツごとの指定なので、1体あたり数十箇所に散っている。
+ * 一方で「鱗か、毛皮か、粘体か」は個体まるごとの性質で、パーツごとに違わない。
+ * この2つを同じ軸で表そうとすると、ドラゴンの鱗を狼にも塗ってしまう。
+ * 肌質は個体の軸として分け、ビルダーの先頭で1回だけ指定する。
+ *
+ * 既定は "smooth"。鱗や毛皮は、それが要る種別だけが明示的に選ぶ。
+ * 逆(既定を鱗にする)にすると、指定を忘れた種別が全部トカゲになる。
  */
-export type SurfaceVariant = "default" | "rock";
+export type SkinKind =
+  /** なめらかな地肌。獣・人型・虫の胴。模様を持たない */
+  | "smooth"
+  /** 爬虫類の鱗。ドラゴンや蛇 */
+  | "scale"
+  /** 毛や羽毛に覆われた体。獣・鳥 */
+  | "pelt"
+  /** 粘体。半透明で、内側に濁りが漂う */
+  | "gel";
 
-/** 変種ごとの、材質定義への上書き */
+/**
+ * 材質の中身の差し替え。
+ * 個体の肌質(SkinKind)のほか、形の作りによる差し替え("rock")も扱う。
+ * 岩の塊(kit.rock)は皮膚と同じ "hide" で作られているが、
+ * 鱗が並んでいてはただの大きなトカゲになる。
+ */
+export type SurfaceVariant = SkinKind | "rock";
+
+/** 変種ごとの、材質定義への上書き。地肌("hide")にだけ効く */
 function applyVariant(config: StyleConfig, variant: SurfaceVariant): StyleConfig {
-  if (variant === "rock") {
-    const defines = { ...config.defines };
-    delete defines.SCALES;
-    defines.CRACKS = "";
-    // 割れ目は鱗よりずっと粗いので、凹凸も深く取る
-    return { ...config, defines, bump: 0.022 };
+  if (variant === "smooth") return config;
+
+  // 地肌の模様は排他。既定の SKIN を外してから、その肌質のものを入れる
+  const defines = { ...config.defines };
+  delete defines.SKIN;
+
+  switch (variant) {
+    case "rock":
+      // 割れ目は鱗よりずっと粗いので、凹凸も深く取る
+      return { ...config, defines: { ...defines, CRACKS: "" }, bump: 0.022 };
+    case "scale":
+      return { ...config, defines: { ...defines, SCALES: "" }, bump: 0.009 };
+    case "pelt":
+      // 毛に覆われた地肌。硬い段の付いた陰影にせず、光を柔らかく減衰させる
+      return {
+        ...config,
+        defines: { ...defines, STRANDS: "", SOFT: "" },
+        bump: 0.006,
+        specStrength: 0,
+        rimStrength: 0.7,
+      };
+    case "gel":
+      // 粘体。半透明にするので、材質の設定そのものを差し替える
+      return {
+        ...config,
+        defines: { ...defines, GEL: "", SPECULAR: "" },
+        transparent: true,
+        opacity: 0.92,
+        // ぬめった濡れ肌のハイライト。金属ほど点にはならない
+        specPower: 42,
+        specStrength: 0.5,
+        rimStrength: 0.8,
+        bump: 0.006,
+      };
+    default:
+      return config;
   }
-  return config;
 }
 
 /**
@@ -641,7 +730,7 @@ export class SurfaceSet {
     private readonly uniforms: CreatureUniforms,
   ) {}
 
-  get(style: SurfaceStyle, color: THREE.Color, variant: SurfaceVariant = "default"): THREE.ShaderMaterial {
+  get(style: SurfaceStyle, color: THREE.Color, variant: SurfaceVariant = "smooth"): THREE.ShaderMaterial {
     const key = `${style}:${variant}:${color.getHexString()}`;
     const cached = this.materials.get(key);
     if (cached) return cached;

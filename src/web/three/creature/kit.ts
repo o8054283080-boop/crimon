@@ -1,5 +1,12 @@
 import * as THREE from "three";
-import { CreaturePalette, SurfaceSet, SurfaceStyle, SurfaceVariant, styleCastsShadow } from "./surface.js";
+import {
+  CreaturePalette,
+  SkinKind,
+  SurfaceSet,
+  SurfaceStyle,
+  SurfaceVariant,
+  styleCastsShadow,
+} from "./surface.js";
 
 /** 骨1本分の指定。上端が原点で、-Y方向へ伸びる */
 export interface SegmentSpec {
@@ -60,6 +67,20 @@ function arcSegments(radius: number, min: number, max: number): number {
 export class CreatureKit {
   private readonly geometries: THREE.BufferGeometry[] = [];
 
+  /**
+   * この個体の地肌。ビルダーの先頭で1行指定する。
+   *
+   *   kit.skin = "scale";  // ドラゴンや蛇
+   *   kit.skin = "pelt";   // 狼やグリフォンのように毛に覆われた体
+   *   kit.skin = "gel";    // スライムのような粘体
+   *
+   * 体表の材質("hide")は1体につき数十箇所で指定されるが、
+   * 鱗か毛皮かは個体まるごとの性質なので、ここで一括して切り替える。
+   * 既定はなめらかな皮膚。指定を忘れた種別が鱗に覆われるより、
+   * 模様が無いほうが破綻が小さい。
+   */
+  skin: SkinKind = "smooth";
+
   constructor(
     readonly surfaces: SurfaceSet,
     readonly palette: CreaturePalette,
@@ -79,9 +100,12 @@ export class CreatureKit {
     geometry: THREE.BufferGeometry,
     style: SurfaceStyle,
     color: THREE.Color,
-    variant: SurfaceVariant = "default",
+    variant?: SurfaceVariant,
   ): THREE.Mesh {
-    const mesh = new THREE.Mesh(this.track(geometry), this.surfaces.get(style, color, variant));
+    // 地肌はこの個体の肌質で決まる。それ以外の材質(骨・金属・布など)は
+    // 個体によらず同じなので、肌質を掛けない
+    const resolved = variant ?? (style === "hide" ? this.skin : "smooth");
+    const mesh = new THREE.Mesh(this.track(geometry), this.surfaces.get(style, color, resolved));
     mesh.castShadow = styleCastsShadow(style);
     return mesh;
   }
