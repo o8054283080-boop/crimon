@@ -47,6 +47,41 @@ HUDはHTMLで、3D座標に毎フレーム追従させている。
 上限に当たって効かないか、他の演出を押しのけるだけになる。
 派手さが足りない時は、まず上記の共通パラメータを見直す。
 
+## 見た目・操作を確かめる手順(重要)
+
+**型チェックとテストは、CSSとWebGLの安全弁にならない。**
+重なり順の誤り、`position` の指定漏れ、GLSLのコンパイル失敗、
+束ね忘れによる実行時エラーは、`tsc --noEmit` も `vitest` も素通りする。
+実際にこの経路で「モンスターが全員消える」「ステージが押せない」
+「報酬が受け取れない」を出した。**必ず実ブラウザで確かめること。**
+
+確認には常駐サーバを使う。Vite とブラウザを立ち上げたまま保つので、
+2回目以降は数秒で終わる(起動し直す作りだと1回2〜8分かかっていた)。
+
+```
+node tools/harness.mjs &                       # 一度だけ起動して常駐させる
+node tools/probe.mjs goto /                    # アプリを開く
+node tools/probe.mjs goto /preview.html "seed=3&paused=1&roster=..."
+node tools/probe.mjs shot /tmp/a.png .battle-stage
+node tools/probe.mjs eval "window.__crimonStage.pickUnitAt(400, 200)"
+node tools/probe.mjs tap 450 200
+node tools/probe.mjs drag 450 200 -300         # カメラの回り込み
+```
+
+出力の `problems` が空でなければ、型チェックが通っていても壊れている。
+`probe.mjs` はその場合に終了コード2を返すので、確認の自動化にも使える。
+
+### 押せない・位置がずれる、を調べる時
+
+見た目だけでは分からないので、DOMに直接聞く。
+
+```
+node tools/probe.mjs eval "(() => { const n = document.querySelector('.stage-tile'); const r = n.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width/2, r.y + r.height/2); return { 自分が最前面か: n.contains(top) || n === top, 手前にあるもの: top.className }; })()"
+```
+
+「押せない」の正体はほぼ**別の要素が上に乗っている**か、
+**`position: relative` の付け忘れで子要素が画面全体へ広がっている**かのどちらか。
+
 ### 切り分けの手順
 
 画面が白い・何も見えない、といった描画の異常は `tools/diagnose.mjs` で調べる。
