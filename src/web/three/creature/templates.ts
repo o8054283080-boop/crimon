@@ -1648,13 +1648,14 @@ function addTalonFoot(kit: CreatureKit, foot: THREE.Object3D, scale: number): vo
 function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
   rig.yawBias = 0.36;
-  rig.pelvis.position.y = 0.98;
+  rig.pelvis.position.y = 0.92;
 
   // --- 腰(ライオン。後ろは低く、腿の塊で幅を出す) ---
-  rig.pelvis.add(place(kit.ball(0.26, 0.27, 0.32, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.20, 0.20, 0.19, "hide", p.main), 0, -0.03, 0.24));
+  rig.pelvis.add(place(kit.ball(0.23, 0.25, 0.32, "hide", p.main), 0, 0.01, 0.04));
+  rig.pelvis.add(place(kit.ball(0.18, 0.17, 0.17, "hide", p.main), 0, -0.05, 0.23));
+  // 腿の張り。丸い塊で覆うと脚が埋もれるので、外側へ寄せて縦長に取る
   for (const side of [-1, 1]) {
-    rig.pelvis.add(place(kit.ball(0.16, 0.21, 0.23, "hide", p.main), side * 0.22, -0.02, 0.09));
+    rig.pelvis.add(place(kit.ball(0.13, 0.20, 0.21, "hide", p.main), side * 0.21, -0.04, 0.08));
   }
   // 腰の毛並み。後半身が獣であることを、輪郭の毛羽立ちで伝える
   for (const side of [-1, 1]) {
@@ -1665,9 +1666,9 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.38, r0: 0.18, r1: 0.115, rot: [0.62, 0, 0], radial: 7 },
-        { len: 0.36, r0: 0.105, r1: 0.075, rot: [-1.26, 0, 0], radial: 7 },
-        { len: 0.25, r0: 0.072, r1: 0.058, rot: [0.80, 0, 0], radial: 7 },
+        { len: 0.36, r0: 0.18, r1: 0.115, rot: [0.62, 0, 0], radial: 7 },
+        { len: 0.34, r0: 0.105, r1: 0.075, rot: [-1.26, 0, 0], radial: 7 },
+        { len: 0.23, r0: 0.072, r1: 0.058, rot: [0.80, 0, 0], radial: 7 },
       ],
       "hide",
       p.main,
@@ -1685,9 +1686,9 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(前が高く、後ろへ落ちる。継ぎ目で材質が入れ替わる) ---
   const torso = rig.torso;
   // rotation.x を正に取ると前(-Z)が持ち上がる。鷲の胸を高く構える
-  place(torso, 0, 0.12, -0.52, 0.20, 0, 0);
+  place(torso, 0, 0.02, -0.52, 0.20, 0, 0);
   // 後半身(獣)
-  torso.add(place(kit.ball(0.23, 0.24, 0.30, "hide", p.main), 0, -0.02, 0.24));
+  torso.add(place(kit.ball(0.21, 0.22, 0.28, "hide", p.main), 0, -0.02, 0.24));
   torso.add(place(kit.ball(0.24, 0.25, 0.26, "hide", p.main), 0, 0.0, 0.02));
   torso.add(place(kit.ball(0.18, 0.14, 0.30, "hide", p.dark), 0, -0.16, 0.16));
   // 前半身(鷲)。胸を深く前へ張り出させ、竜骨のように下へ落とす
@@ -1715,9 +1716,9 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.48, r0: 0.16, r1: 0.10, rot: [0.10, 0, side * 0.04], radial: 7 },
+        { len: 0.42, r0: 0.17, r1: 0.115, rot: [0.10, 0, side * 0.04], radial: 7 },
         // 足根(かかとから下)は鱗。羽毛の腿との材質差で鳥の脚に見える
-        { len: 0.52, r0: 0.085, r1: 0.062, rot: [-0.42, 0, 0], radial: 7, style: "plate", color: p.plate },
+        { len: 0.46, r0: 0.095, r1: 0.07, rot: [-0.42, 0, 0], radial: 7, style: "plate", color: p.plate },
       ],
       "hide",
       p.main,
@@ -1726,8 +1727,8 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
     // 腿を覆う飾り羽。鱗の脛との段差が「鳥のズボン」になる
     addFeatherFan(kit, leg.joints[0], 5, 0.34, [0, -0.14, 0.04], 0.16, [2.75, 0, 0], 0.7);
     // 足根の鱗の節
-    for (let i = 0; i < 6; i++) {
-      leg.joints[1].add(place(kit.band(0.072 - i * 0.004, 0.013, Math.PI * 2, "plate", p.plate, 8), 0, -0.06 - i * 0.075, 0, Math.PI / 2, 0, 0));
+    for (let i = 0; i < 5; i++) {
+      leg.joints[1].add(place(kit.band(0.085 - i * 0.005, 0.014, Math.PI * 2, "plate", p.plate, 8), 0, -0.06 - i * 0.075, 0, Math.PI / 2, 0, 0));
     }
     addTalonFoot(kit, leg.tip, 1.1);
     torso.add(leg.root);
@@ -1770,35 +1771,37 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // --- 頭(くちばしのある鳥の頭) ---
-  place(rig.head, 0, 0.32, -0.02, 0.18, 0, 0);
+  // 頭が小さいと、首の細い水鳥になってしまう。胸の塊に対して
+  // 「掴めそうな大きさ」まで頭蓋を取り、くちばしもそれに見合う長さにする
+  place(rig.head, 0, 0.30, -0.02, 0.18, 0, 0);
   const head = rig.head;
-  head.add(place(kit.ball(0.145, 0.14, 0.16, "fur", p.fur), 0, 0.10, 0.02));
+  head.add(place(kit.ball(0.20, 0.185, 0.21, "fur", p.fur), 0, 0.12, 0.02));
   // 眉庇。目の上に張り出させると、丸い頭でも猛禽の鋭さが出る
-  head.add(place(kit.lens(0.15, 0.045, 0.10, "plate", p.plate, 10), 0, 0.17, -0.09, -0.45, 0, 0));
+  head.add(place(kit.lens(0.19, 0.055, 0.13, "plate", p.plate, 10), 0, 0.21, -0.11, -0.45, 0, 0));
   for (const side of [-1, 1]) {
-    head.add(place(kit.lens(0.055, 0.03, 0.05, "plate", p.plate, 8), side * 0.10, 0.18, -0.07, -0.3, 0, -side * 0.6));
+    head.add(place(kit.lens(0.07, 0.035, 0.06, "plate", p.plate, 8), side * 0.13, 0.22, -0.09, -0.3, 0, -side * 0.6));
   }
-  addEyes(kit, head, 0.095, 0.135, -0.09, 0.036);
+  addEyes(kit, head, 0.125, 0.165, -0.11, 0.045);
   // 蝋膜(くちばしの付け根)と鼻孔
-  head.add(place(kit.ball(0.075, 0.07, 0.07, "plate", p.plate, 8), 0, 0.10, -0.13));
+  head.add(place(kit.ball(0.095, 0.09, 0.09, "plate", p.plate, 8), 0, 0.12, -0.17));
   for (const side of [-1, 1]) {
-    head.add(place(kit.ball(0.016, 0.02, 0.012, "hide", p.deep, 6), side * 0.035, 0.12, -0.18));
+    head.add(place(kit.ball(0.02, 0.024, 0.014, "hide", p.deep, 6), side * 0.045, 0.14, -0.23));
   }
   // 上くちばし。先を下へ巻き込ませるのが猛禽の見分けどころ
-  head.add(place(kit.claw(0.30, 0.075, 0.85, "plate", p.plate), 0, 0.10, -0.16, AIM_FORWARD - 0.12, 0, 0));
+  head.add(place(kit.claw(0.38, 0.095, 0.85, "plate", p.plate), 0, 0.12, -0.20, AIM_FORWARD - 0.12, 0, 0));
   // 下くちばし。開閉できるよう顎として登録する
   const jaw = new THREE.Group();
-  place(jaw, 0, 0.06, -0.13);
+  place(jaw, 0, 0.07, -0.17);
   markAnimated(jaw);
   jaw.add(
     kit.taperedTube(
       [
         { x: 0, y: 0, z: 0 },
-        { x: 0, y: -0.005, z: -0.10 },
-        { x: 0, y: -0.02, z: -0.19 },
+        { x: 0, y: -0.005, z: -0.12 },
+        { x: 0, y: -0.025, z: -0.24 },
       ],
-      0.06,
-      0.02,
+      0.075,
+      0.024,
       "plate",
       p.plate,
       6,
@@ -1808,19 +1811,23 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   head.add(jaw);
   rig.jaw = jaw;
   // 冠羽。後頭部から後ろへ倒して流す
-  addFeatherFan(kit, head, 5, 0.30, [0, 0.19, 0.08], 0.14, [1.35, Math.PI / 2, 0], 0.6);
+  addFeatherFan(kit, head, 5, 0.36, [0, 0.24, 0.10], 0.17, [1.35, Math.PI / 2, 0], 0.6);
   // 頬の羽毛。細いくちばしとの対比で顔幅を作る
   for (const side of [-1, 1]) {
-    addFeatherFan(kit, head, 3, 0.20, [side * 0.12, 0.08, 0.04], 0.07, [2.4, -side * 0.9, 0], 0.5);
+    addFeatherFan(kit, head, 3, 0.26, [side * 0.16, 0.09, 0.04], 0.08, [2.4, -side * 0.9, 0], 0.5);
   }
 
-  // --- 翼(羽毛。肩の上に大きく立てる) ---
+  // --- 翼(羽毛) ---
+  // 水平に張ると、板を貼った標本のように見えるうえ横幅も食う。
+  // 前縁を上へ起こし(Z回転)ながら後ろへ流すと、肩の上に山ができて
+  // 四足の胴の輪郭を消さずに「飛べる獣」だと分かる。
+  // 羽根の枚数を増やさないと、櫛の歯のように隙間が空いて面にならない
   rig.wingAnchor.set(0.22, 0.24, -0.12);
   for (const side of [-1, 1]) {
     const wing = new THREE.Group();
     markAnimated(wing);
-    place(wing, side * 0.22, 0.22, -0.10, 0.20, -side * 0.52, side * 0.06);
-    addFeatherWing(kit, wing, side, 9, 1.25);
+    place(wing, side * 0.24, 0.24, -0.12, 0.16, -side * 0.58, side * 0.34);
+    addFeatherWing(kit, wing, side, 14, 1.2);
     torso.add(wing);
     rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
   }
@@ -1828,24 +1835,24 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 尾(ライオン。細い紐の先にだけ房を付ける) ---
   const tail = kit.chain(
     [
-      { len: 0.22, r0: 0.055, r1: 0.045, rot: [-1.15, 0, 0], radial: 6 },
-      { len: 0.21, r0: 0.045, r1: 0.038, rot: [-0.22, 0, 0], radial: 6 },
-      { len: 0.20, r0: 0.038, r1: 0.03, rot: [0.30, 0, 0], radial: 6 },
-      { len: 0.18, r0: 0.03, r1: 0.024, rot: [0.42, 0, 0], radial: 6 },
+      { len: 0.24, r0: 0.075, r1: 0.06, rot: [-0.95, 0, 0], radial: 6 },
+      { len: 0.23, r0: 0.06, r1: 0.05, rot: [-0.20, 0, 0], radial: 6 },
+      { len: 0.22, r0: 0.05, r1: 0.04, rot: [0.34, 0, 0], radial: 6 },
+      { len: 0.20, r0: 0.04, r1: 0.032, rot: [0.46, 0, 0], radial: 6 },
     ],
     "hide",
     p.main,
   );
-  tail.root.position.set(0, 0.10, 0.24);
+  tail.root.position.set(0, 0.06, 0.26);
   markAnimated(...tail.joints);
   for (let i = 0; i < tail.joints.length; i++) {
     rig.tail.push({ group: tail.joints[i], rest: tail.rests[i] });
   }
   // 先端の房。ライオンの尾は、この一房があるかどうかで決まる
-  for (let k = 0; k < 6; k++) {
-    const angle = (k / 6) * Math.PI * 2 + 0.4;
-    const hair = kit.spike(0.05, 0.24 - Math.abs(Math.sin(k * 1.7)) * 0.05, 0.8, "fur", p.fur);
-    place(hair, Math.cos(angle) * 0.03, -0.02, Math.sin(angle) * 0.03, Math.PI - 0.2, 0, Math.cos(angle) * 0.45);
+  for (let k = 0; k < 7; k++) {
+    const angle = (k / 7) * Math.PI * 2 + 0.4;
+    const hair = kit.spike(0.065, 0.34 - Math.abs(Math.sin(k * 1.7)) * 0.07, 0.85, "fur", p.fur);
+    place(hair, Math.cos(angle) * 0.04, 0.02, Math.sin(angle) * 0.04, Math.PI - 0.18, 0, Math.cos(angle) * 0.5);
     tail.tip.add(hair);
   }
   rig.pelvis.add(tail.root);
@@ -2014,6 +2021,130 @@ function buildAncientCrystalCurse(kit: CreatureKit, rig: CreatureRig): void {
 }
 
 // ---------------------------------------------------------------------------
+// ancient_demon: 古代の魔人
+// ---------------------------------------------------------------------------
+
+/**
+ * 古代の魔人(装備ダンジョン9・10階の専用ボス)。
+ *
+ * ボスの役割骨格のままだと、角のある人型に翼という構成がネメシス(魔王)と重なり、
+ * 「最終関門の主」なのに見分けが付かなかった。
+ *
+ * お供2体が結晶であることを手がかりに、同じ一族として次のように振り分ける。
+ *   1. 脚を持たせず、下半身を崩れた石塊の尾にして浮かせる
+ *      (歩く人型はネメシス側に譲る)
+ *   2. 腕を4本にする。ネメシスは両手で大鎌を構えるので、腕の本数で即座に分かれる
+ *   3. 胸に結晶の核を露出させ、お供のクリスタルと同じ素材でできていることを示す
+ * 顔まわりの呪符と第三の目は TEMPLATE_TRAITS.ancient_demon 側が足す。
+ */
+function buildAncientDemon(kit: CreatureKit, rig: CreatureRig): void {
+  const p = kit.palette;
+  rig.floats = true;
+  rig.pelvis.position.y = 1.32;
+
+  // --- 下半身。脚ではなく、崩れながら垂れ下がる石塊 ---
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    const chunk = kit.rock(0.3 - t * 0.19, 0.22 - t * 0.13, 0.28 - t * 0.18, "plate", t > 0.5 ? p.deep : p.dark, 0.3);
+    place(chunk, Math.sin(t * 4.1) * 0.12, -0.1 - t * 0.86, Math.cos(t * 3.3) * 0.08, t * 0.6, t * 1.7, t * 0.5);
+    rig.pelvis.add(chunk);
+  }
+  // 石塊のあいだに覗く光。中身が詰まっていないことを示す
+  rig.pelvis.add(place(kit.octa(0.07, 0.4, 0.07, "glow", p.glow), 0, -0.42, 0));
+
+  // --- 胴。肩を大きく張り出させ、胸に結晶の核を埋める ---
+  const torso = rig.torso;
+  place(torso, 0, 0.12, 0, -0.05, 0, 0);
+  torso.add(place(kit.ball(0.42, 0.4, 0.32, "hide", p.main), 0, 0.24, 0));
+  torso.add(place(kit.ball(0.3, 0.26, 0.26, "hide", p.dark), 0, -0.06, 0.02));
+  addPlating(kit, torso, 4, 0.44, -0.02, 0.3, -0.24, "metal");
+  // 胸の核。お供のクリスタルと同じ八面体で、素材の出どころを揃える
+  torso.add(place(kit.octa(0.15, 0.22, 0.12, "crystal", p.accent), 0, 0.2, -0.28));
+  torso.add(place(kit.octa(0.07, 0.13, 0.06, "glow", p.glow), 0, 0.2, -0.31));
+  // 肩の岩塊
+  for (const side of [-1, 1]) {
+    torso.add(place(kit.rock(0.2, 0.17, 0.19, "plate", p.plate, 0.24), side * 0.44, 0.36, 0));
+    for (let i = 0; i < 3; i++) {
+      torso.add(
+        place(kit.octa(0.04, 0.16, 0.04, "crystal", p.accent), side * (0.4 + i * 0.05), 0.5, (i - 1) * 0.1, 0, 0, side * 0.4),
+      );
+    }
+  }
+
+  // --- 腕4本。上の対を大きく、下の対を小さくして、増えた腕が飾りに見えないようにする ---
+  const armSpecs = [
+    { y: 0.32, x: 0.46, len: 0.42, radius: 0.115, drop: 0.5, swing: -0.5 },
+    { y: -0.02, x: 0.36, len: 0.32, radius: 0.08, drop: 0.9, swing: -0.3 },
+  ];
+  for (const side of [-1, 1]) {
+    armSpecs.forEach((spec, index) => {
+      const arm = kit.chain(
+        [
+          { len: spec.len, r0: spec.radius, r1: spec.radius * 0.72, rot: [spec.swing, 0, side * spec.drop], radial: 7 },
+          { len: spec.len * 0.9, r0: spec.radius * 0.72, r1: spec.radius * 0.56, rot: [0.75, 0, -side * 0.3], radial: 7 },
+        ],
+        "hide",
+        p.main,
+      );
+      arm.root.position.set(side * spec.x, spec.y, 0);
+      addJoint(kit, arm.joints[1], 0, spec.radius * 0.85, true);
+      addClaws(kit, arm.tip, 3, 0.16 - index * 0.04, 0.028, 0.06);
+      torso.add(arm.root);
+      rig.arms.push(limbFrom(arm, side, side * (1 + index * 0.8)));
+    });
+  }
+
+  // --- 首と頭。顔は面で覆い、角を上へ長く伸ばす ---
+  place(rig.neck, 0, 0.5, 0);
+  rig.neck.add(place(kit.link({ x: 0, y: -0.06, z: 0 }, { x: 0, y: 0.14, z: 0 }, 0.13, 0.11, "hide", p.dark, 8), 0, 0, 0));
+  place(rig.head, 0, 0.2, 0);
+  rig.head.add(place(kit.ball(0.23, 0.24, 0.23, "hide", p.dark), 0, 0.04, 0));
+  // 面。目鼻を作らず、板で塞ぐことで「素顔が無い古い存在」に見せる。
+  // 一文字の光だけを残し、発光面積を小さく保って加算エフェクトと喧嘩させない
+  rig.head.add(place(kit.lens(0.2, 0.23, 0.1, "metal", p.metal, 10), 0, 0.04, -0.15));
+  rig.head.add(place(kit.box(0.19, 0.03, 0.02, "glow", p.glow), 0, 0.06, -0.25));
+  // 角。細く長く上へ伸ばすと、遠目には「万歳した腕」に見えてしまう。
+  // 太く短く、後ろへ倒して、頭から生えていることが分かる形にする
+  for (const side of [-1, 1]) {
+    rig.head.add(
+      place(
+        kit.taperedTube(
+          [
+            { x: 0, y: 0, z: 0 },
+            { x: side * 0.11, y: 0.15, z: 0.14 },
+            { x: side * 0.13, y: 0.2, z: 0.34 },
+          ],
+          0.085,
+          0.012,
+          "plate",
+          p.plate,
+          6,
+          8,
+        ),
+        side * 0.14,
+        0.14,
+        0.04,
+      ),
+    );
+  }
+
+  rig.wingAnchor.set(0.34, 0.46, 0.12);
+
+  rig.anim = {
+    idleSpeed: 0.55,
+    breath: 0.7,
+    bob: 0.07,
+    headSway: 0.4,
+    tailWave: 0,
+    wingFlap: 0,
+    sway: 0.4,
+    lunge: 0.9,
+    squash: 0,
+    attack: "cast",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 登録
 // ---------------------------------------------------------------------------
 
@@ -2031,7 +2162,8 @@ const TEMPLATE_BUILDERS: Record<string, CreatureBuilder> = {
   exp_pig: { build: buildExpPig, height: 1.34, float: 0 },
   dragon: { build: buildDragon, height: 2.95, float: 0 },
   ancient_crystal_curse: { build: buildAncientCrystalCurse, height: 2.55, float: 0.5 },
-  griffon: { build: buildGriffon, height: 2.45, float: 0 },
+  ancient_demon: { build: buildAncientDemon, height: 3.25, float: 0.34 },
+  griffon: { build: buildGriffon, height: 2.75, float: 0 },
 };
 
 /** 種別専用の骨格。無ければ null(役割の骨格を使う) */
