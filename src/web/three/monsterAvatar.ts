@@ -53,6 +53,18 @@ function clamp01(value: number): number {
 }
 
 /**
+ * 本体の速度を、垂れている部位の「遅れ角」へ変える。
+ *
+ * 単純な比例だと、待機の遅い動きでは角度が小さすぎて何も見えないのに、
+ * 攻撃の踏み込みでは布が体を突き抜けるほど跳ねる。小さい入力には強く効かせ、
+ * 大きい入力では `max` へ滑らかに頭打ちさせることで、両方を1本で成立させる。
+ */
+function lag(velocity: number, gain: number, max: number): number {
+  const x = velocity * gain;
+  return (max * x) / (max + Math.abs(x));
+}
+
+/**
  * 減衰振動する1自由度。目標へ引かれ、**行き過ぎてから戻る**。
  *
  * 二次的な動き(尾・耳・翼・布・肉)の芯。正弦波で勝手に揺らすのではなく、
@@ -141,6 +153,11 @@ export class MonsterAvatar {
   private readonly disposables: { dispose: () => void }[] = [];
 
   private readonly phase = Math.random() * Math.PI * 2;
+  /**
+   * 待機の位相。`elapsed * テンポ` で作ると、テンポが変わった瞬間に
+   * 位相が(経過時間 × テンポ差)だけ飛ぶ。dtで積めばどう変えても連続する。
+   */
+  private idleClock = Math.random() * 40;
   private readonly attackTrack = newTrack();
   /** 待機中の仕草。周期運動と重ならないよう、専用のトラックで管理する */
   private readonly accentTrack = newTrack();
@@ -384,104 +401,135 @@ export class MonsterAvatar {
     // 撃破が進むほど生気が抜ける。倒れながら呼吸していては作り物に見える
     const alive = 1 - clamp01(this.deathProgress * 1.6);
     /**
-     * 待機の基本速度。
+     * 待機の速さ。
      *
-     * 以前は全部の波を idleSpeed 倍していたため、ゴーレム(0.5)は呼吸1回に
-     * 8秒、体重移動1周に30秒以上かかり、静止画と区別が付かなかった。
-     * 種別ごとの味は残しつつ、遅い側が止まって見えないところまで均す。
+     * 以前は全部の波を idleSpeed 倍していたため、遅い個体はすべての帯が
+     * 同時に間延びして静止画と区別が付かなかった。個体差は ±25% ほどに留め、
+     * 「重さ」の違いは帯ごとの周期(下の *Hz)で作る。
      */
-    const tempo = (0.55 + anim.idleSpeed * 0.45) * alive;
-    const tick = elapsed * tempo + this.phase;
+    const pace = 0.78 + anim.idleSpeed * 0.24;
+    // 位相は dt で積む。テンポを変えても波が飛ばない
+    this.idleClock += step * pace;
+    const T = (this.idleClock + this.phase) * Math.PI * 2;
+
+    /**
+     * 待機を作る波の「帯」。単位はHz(1秒あたりの往復回数)。
+     *
+     * 全部を1つのテンポ倍率で伸び縮みさせると、遅い個体はすべてが同時に
+     * 間延びして止まって見える。呼吸・体重移動・尾・羽ばたき・微振動は
+     * 実際の生き物でも周期が違うので、帯ごとに別々の速さを持たせる。
+     * ここを読めば「どれくらいの速さで動いているか」が秒で分かる。
+     */
+    const breathHz = 0.47 - mass * 0.17; // 重い個体ほど深くゆっくり吸う
+    const swayHz = 0.20 - mass * 0.06; // 体重の預け替え。いちばん遅い帯
+    const tailHz = 0.80 - mass * 0.30; // 尾のうねり。輪郭の外なので一番目に付く
+    const flapHz = 0.56 - mass * 0.18; // 翼の畳み直し
+    const microHz = 2.7 - mass * 0.9; // 立ち直しの微振動。振幅は極小
 
     // === 待機モーション ===================================================
     // 呼吸。吸う(速い)と吐く(遅い)を非対称にする。左右対称な正弦波のままだと
     // 「膨らんで縮む球」にしか見えず、肺の動きとして読めない
-    const breathPhase = tick * (1.5 - mass * 0.6);
+    const breathPhase = T * breathHz;
     const breath = Math.sin(breathPhase) * 0.72 + Math.sin(breathPhase * 2 + 0.9) * 0.28;
     const breathStrength = anim.breath * (0.55 + this.hpRatio * 0.45) * alive;
     rig.torso.rotation.set(
-      rig.torsoRest.x + breath * 0.035 * breathStrength,
+      rig.torsoRest.x + breath * 0.05 * breathStrength,
       rig.torsoRest.y,
       rig.torsoRest.z,
     );
-    rig.torso.scale.set(1 + breath * 0.022 * breathStrength, 1 + breath * 0.03 * breathStrength, 1 + breath * 0.022 * breathStrength);
+    rig.torso.scale.set(1 + breath * 0.03 * breathStrength, 1 + breath * 0.042 * breathStrength, 1 + breath * 0.03 * breathStrength);
 
     // 体重移動。重い個体ほどゆっくり、深く預ける。
     // 呼吸(速い)と重心移動(遅い)の2つの周期が重なることで生気が出る
-    const shift = Math.sin(elapsed * (1.5 - mass * 0.7) * 0.55 + this.phase) * alive;
+    const shift = Math.sin(T * swayHz) * alive;
+    // 前後の重心。接地しているものは踵と爪先の間で体重が行き来する。
+    // ここが0だと、二次的な動きの入力(前後の速度)が待機中ずっと0になり、
+    // 布も耳も攻撃の時しか動かない。生気の大半はこの1本から出ている
+    const rock = Math.sin(T * swayHz * 1.63 + 1.1) * alive;
+    // 立ち直しの微振動。重い個体ほど強く出す(支えきれずに揺り戻す)
+    const micro = Math.sin(T * microHz) * (0.3 + mass * 0.7) * alive;
     let offsetY = 0;
-    let offsetZ = 0;
-    let offsetX = shift * 0.05 * anim.sway;
-    let leanX = 0;
-    let leanZ = shift * 0.04 * anim.sway;
+    let offsetZ = rock * 0.03 * anim.sway;
+    let offsetX = shift * 0.07 * anim.sway;
+    let leanX = (rock * 0.055 + breath * 0.02) * anim.sway;
+    let leanZ = shift * 0.055 * anim.sway;
     // 腰と胴の捻り。腰が体重の乗った側へ傾き、胴が逆へ返す(コントラポスト)。
     // これが無いと、腕と脚を動かしても「一枚板が横に滑っている」ように見える
-    let hipZ = -shift * 0.07 * anim.sway;
-    let hipY = shift * 0.05 * anim.sway;
+    let hipZ = -shift * 0.095 * anim.sway;
+    let hipY = shift * 0.07 * anim.sway;
 
     if (rig.floats) {
       // 浮遊するものは足で支えていないので、常に微妙に漂い続ける。
       // 周期の合わない波を重ねて、戻ってくる場所を読ませない
-      offsetX += (Math.sin(tick * 0.62) * 0.07 + Math.sin(tick * 0.41 + 1.7) * 0.045) * alive;
-      offsetZ += (Math.sin(tick * 0.53 + 0.5) * 0.06 + Math.sin(tick * 0.33 + 2.4) * 0.035) * alive;
-      offsetY += (Math.sin(tick * 1.05) * anim.bob + Math.sin(tick * 0.47 + 1.1) * 0.035) * alive;
-      leanZ += Math.sin(tick * 0.44 + 0.8) * 0.06 * alive;
-      leanX += Math.sin(tick * 0.51 + 2.1) * 0.05 * alive;
+      offsetX += (Math.sin(T * 0.19) * 0.09 + Math.sin(T * 0.127 + 1.7) * 0.055) * alive;
+      offsetZ += (Math.sin(T * 0.163 + 0.5) * 0.075 + Math.sin(T * 0.101 + 2.4) * 0.045) * alive;
+      offsetY += (Math.sin(T * 0.29) * anim.bob * 1.3 + Math.sin(T * 0.147 + 1.1) * 0.045) * alive;
+      leanZ += Math.sin(T * 0.135 + 0.8) * 0.075 * alive;
+      leanX += Math.sin(T * 0.157 + 2.1) * 0.06 * alive;
+      // 向きもゆっくり流される。浮いているものが真っ直ぐ止まっていると重さが出る
+      hipY += Math.sin(T * 0.113 + 0.4) * 0.09 * alive;
     } else {
       // 接地するものは、体重が片脚に乗り切った時に腰が上がり、
-      // 乗せ替える瞬間に沈む。上下動を体重移動と噛み合わせて踏みしめて見せる
-      offsetY += (Math.sin(tick * (1.5 - mass * 0.6)) * anim.bob * 0.8 + (Math.abs(shift) - 0.62) * 0.075 * (1 - mass * 0.3)) * alive;
+      // 乗せ替える瞬間に沈む。体重移動の2倍の周期にすると噛み合う
+      offsetY += (Math.abs(shift) - 0.62) * 0.11 * (1 - mass * 0.3) * alive;
+      offsetY += Math.sin(T * breathHz + 0.6) * anim.bob * 0.85 * alive;
+      // 足が地面を捉えている感じは、この微小な上下の揺り返しから出る
+      offsetY += micro * 0.004;
+      leanZ += micro * 0.006;
     }
 
     // 首と頭。生き物らしさが一番出るので、周期をずらして複数の波を重ねる
     rig.neck.rotation.set(
-      rig.neckRest.x + breath * 0.03 * anim.headSway * alive,
-      rig.neckRest.y + Math.sin(tick * 0.61) * 0.06 * anim.headSway * alive,
-      rig.neckRest.z,
+      rig.neckRest.x + (breath * 0.045 - rock * 0.05) * anim.headSway * alive,
+      rig.neckRest.y + Math.sin(T * tailHz * 0.55) * 0.075 * anim.headSway * alive,
+      rig.neckRest.z - shift * 0.05 * anim.headSway,
     );
-    let headX = rig.headRest.x + Math.sin(tick * 1.21 + 1.1) * 0.045 * anim.headSway * alive;
+    let headX = rig.headRest.x + Math.sin(T * breathHz * 1.7 + 1.1) * 0.05 * anim.headSway * alive;
     // 見回す遅い波。視線が動いているだけで生き物に見える
-    let headY = rig.headRest.y + Math.sin(tick * 0.47 + 0.3) * 0.1 * anim.headSway * alive;
-    let headZ = rig.headRest.z - shift * 0.06 * anim.headSway;
+    let headY = rig.headRest.y + Math.sin(T * swayHz * 2.1 + 0.3) * 0.13 * anim.headSway * alive;
+    let headZ = rig.headRest.z - shift * 0.07 * anim.headSway;
     let jawOpen = 0;
     // 粘体の伸縮。呼吸より速い周期で、たぷんと戻る非対称な波にする
-    let squash = anim.squash > 0 ? (Math.sin(tick * 1.9) + Math.sin(tick * 3.7) * 0.35) * 0.09 * alive : 0;
+    let squash = anim.squash > 0 ? (Math.sin(T * breathHz * 1.8) + Math.sin(T * breathHz * 3.5) * 0.35) * 0.11 * alive : 0;
 
     // 尾・布・耳へ渡す「本体からの入力」。ここに溜めた値をバネで遅らせる。
     // 尾は輪郭の外に出ていて一番目に付くので、待機でもはっきり振らせる
-    let tailDriveX = Math.sin(tick * 1.15 - 0.7) * 0.07 * anim.tailWave * alive;
-    let tailDriveY = Math.sin(tick * (1.9 - mass * 0.7)) * 0.16 * anim.tailWave * alive;
+    let tailDriveX = Math.sin(T * tailHz * 0.62 - 0.7) * 0.1 * anim.tailWave * alive;
+    let tailDriveY = (Math.sin(T * tailHz) * 0.2 + Math.sin(T * tailHz * 2.35 + 1.4) * 0.055) * anim.tailWave * alive;
 
     // 翼: 羽ばたき。打ち下ろしが速く、戻しが遅い(空気を押している側が速い)
-    const flapPhase = tick * (1.35 - mass * 0.3);
+    const flapPhase = T * flapHz;
     const flapRaw = Math.sin(flapPhase);
     const flap = (flapRaw > 0 ? Math.pow(flapRaw, 0.6) : -Math.pow(-flapRaw, 1.5)) * anim.wingFlap;
     for (const wing of rig.wings) {
       wing.root.rotation.set(
-        wing.rootRest.x + Math.sin(flapPhase + 0.9) * 0.1 * anim.wingFlap * alive,
+        // 羽ばたかない(畳んでいる)翼でも、体の呼吸に合わせて必ず動かす。
+        // 大きい面が完全に止まっていると、それだけで作り物に見える
+        wing.rootRest.x + (Math.sin(flapPhase + 0.9) * 0.1 * anim.wingFlap + breath * 0.035) * alive,
         wing.rootRest.y,
-        wing.rootRest.z - wing.side * flap * 0.55 * alive,
+        wing.rootRest.z - wing.side * (flap * 0.55 + Math.sin(flapPhase * 0.7 + 1.3) * 0.045) * alive,
       );
     }
 
     // 手足の微動。接地している脚は「支える側」と「遊ぶ側」で役割を分ける
     for (const arm of rig.arms) {
       arm.root.rotation.set(
-        arm.rootRest.x + Math.sin(tick * 1.05 + arm.phase) * 0.055 * alive,
+        arm.rootRest.x + (Math.sin(T * breathHz * 1.5 + arm.phase) * 0.07 - rock * 0.05) * alive,
         arm.rootRest.y,
-        arm.rootRest.z + arm.side * Math.sin(tick * 0.83 + arm.phase) * 0.04 * alive,
+        arm.rootRest.z + arm.side * (Math.sin(T * breathHz * 1.2 + arm.phase) * 0.05 + breath * 0.03) * alive,
       );
       if (arm.lower && arm.lowerRest) {
-        arm.lower.rotation.x = arm.lowerRest.x + Math.sin(tick * 1.05 + arm.phase + 0.8) * 0.05 * alive;
+        arm.lower.rotation.x = arm.lowerRest.x + Math.sin(T * breathHz * 1.5 + arm.phase + 0.8) * 0.065 * alive;
       }
     }
     for (const leg of rig.legs) {
-      // 体重が乗っている脚は伸び、逆の脚は少し畳む。踏ん張りが読める
+      // 体重が乗っている脚は伸び、逆の脚は少し畳む。踏ん張りが読める。
+      // 前後の重心移動(rock)も足首まで通すと、地面を掴んでいるように見える
       const load = rig.floats ? 0 : clamp(shift * leg.side, -1, 1);
-      leg.root.rotation.x = leg.rootRest.x + (Math.sin(tick * 0.78 + leg.phase) * 0.025 - load * 0.035) * alive;
-      leg.root.rotation.z = leg.rootRest.z + load * 0.03 * alive;
+      leg.root.rotation.x = leg.rootRest.x + (Math.sin(T * breathHz + leg.phase) * 0.03 - load * 0.07 - rock * 0.045) * alive;
+      leg.root.rotation.z = leg.rootRest.z + load * 0.055 * alive;
       if (leg.lower && leg.lowerRest) {
-        leg.lower.rotation.x = leg.lowerRest.x + load * 0.06 * alive;
+        leg.lower.rotation.x = leg.lowerRest.x + (load * 0.1 + rock * 0.05 + micro * 0.012) * alive;
       }
     }
 
@@ -814,13 +862,18 @@ export class MonsterAvatar {
     // 減衰比を1より十分小さく取ることで、目標を追い越してから戻る
     const swingFreq = 1.85 - mass * 1.0;
     const swingDamp = 0.26 + mass * 0.2;
-    const drag = 0.055;
+    // 本体の速度から遅れ角を作る係数。待機の遅い動きでも見える強さにし、
+    // 攻撃で跳ねた分は lag() の頭打ちで抑える
+    const drag = 0.16;
+    const lagZ = lag(this.bodyVelocity.z, drag, 0.42);
+    const lagX = lag(this.bodyVelocity.x, drag, 0.42);
+    const lagY = lag(this.bodyVelocity.y, drag, 0.32);
 
     // 尾: 付け根に本体の動きを入れ、節ごとにバネで受け渡す。
     // 先の節ほど遅れて、追い越して戻る。これが「鞭のようにしなる」の正体
     {
-      let driveY = tailDriveY + this.bodyVelocity.x * drag;
-      let driveX = tailDriveX + this.bodyVelocity.z * drag + this.bodyVelocity.y * drag * 0.6 + this.bodyPitchRate * 0.02;
+      let driveY = tailDriveY + lagX;
+      let driveX = tailDriveX + lagZ + lagY * 0.6 + this.bodyPitchRate * 0.02;
       for (let i = 0; i < rig.tail.length; i++) {
         const joint = rig.tail[i];
         const spring = this.tailSprings[i];
@@ -839,8 +892,8 @@ export class MonsterAvatar {
       const wing = rig.wings[i];
       const spring = this.wingSprings[i];
       const lead = wing.root.rotation.z - wing.rootRest.z;
-      const trail = spring.a.step(-lead * 0.45 + this.bodyVelocity.y * 0.03 * wing.side, swingFreq * 1.15, swingDamp + 0.06, step);
-      const fold = spring.b.step(this.bodyVelocity.z * drag * 1.2 - this.bodyPitchRate * 0.02, swingFreq * 1.1, swingDamp + 0.06, step);
+      const trail = spring.a.step(-lead * 0.5 + lagY * 0.25 * wing.side, swingFreq * 1.15, swingDamp + 0.06, step);
+      const fold = spring.b.step(lagZ * 1.1 - this.bodyPitchRate * 0.02, swingFreq * 1.1, swingDamp + 0.06, step);
       if (wing.lower && wing.lowerRest) {
         wing.lower.rotation.set(wing.lowerRest.x + fold, wing.lowerRest.y, wing.lowerRest.z + trail);
       } else {
@@ -857,13 +910,13 @@ export class MonsterAvatar {
       const freq = swingFreq * 0.72;
       const damp = 0.2;
       const swayX = spring.a.step(
-        (this.bodyVelocity.z * drag * 1.6 - this.bodyVelocity.y * drag + Math.sin(tick * 0.7 + cloth.phase) * 0.05) * cloth.amount,
+        (lagZ * 1.4 - lagY * 0.9 + Math.sin(T * tailHz * 0.63 + cloth.phase) * 0.075 * alive) * cloth.amount,
         freq,
         damp,
         step,
       );
       const swayZ = spring.b.step(
-        (-this.bodyVelocity.x * drag * 1.8 + Math.sin(tick * 0.53 + cloth.phase * 1.7) * 0.04) * cloth.amount,
+        (-lagX * 1.6 + Math.sin(T * tailHz * 0.47 + cloth.phase * 1.7) * 0.06 * alive) * cloth.amount,
         freq * 0.9,
         damp,
         step,
@@ -871,14 +924,21 @@ export class MonsterAvatar {
       cloth.group.rotation.set(cloth.rest.x + swayX, cloth.rest.y, cloth.rest.z + swayZ);
     }
 
-    // 耳・鰭・足首など、登録されていない可動部。揺れるだけで「付いている」が伝わる
+    // 耳・鰭・浮遊する刃など、登録されていない可動部。
+    //
+    // 本体の速度だけを入力にしていた時は、待機中の重心移動が遅すぎて
+    // 遅れ角が0.005ラジアン(0.3度)にしかならず、一度も動いて見えなかった。
+    // 垂れている物・浮いている物は「本体が止まっていても揺れている」のが
+    // 自然なので、部位ごとに位相をずらした自前の波を必ず足す
     for (let i = 0; i < rig.followers.length; i++) {
       const follower = rig.followers[i];
       const spring = this.followerSprings[i];
       const freq = swingFreq * 1.25;
       const damp = 0.24 + mass * 0.12;
-      const swayX = spring.a.step((this.bodyVelocity.z * drag + this.bodyVelocity.y * drag * 0.8) * follower.amount, freq, damp, step);
-      const swayZ = spring.b.step(-this.bodyVelocity.x * drag * 1.4 * follower.amount, freq * 0.95, damp, step);
+      const idleX = Math.sin(T * tailHz * 0.9 + follower.phase) * 0.1 * alive;
+      const idleZ = Math.sin(T * tailHz * 0.66 + follower.phase * 1.6) * 0.07 * follower.side * alive;
+      const swayX = spring.a.step((lagZ + lagY * 0.8 + idleX) * follower.amount, freq, damp, step);
+      const swayZ = spring.b.step((-lagX * 1.2 + idleZ) * follower.amount, freq * 0.95, damp, step);
       follower.group.rotation.set(follower.rest.x + swayX, follower.rest.y, follower.rest.z + swayZ);
     }
 
@@ -886,8 +946,8 @@ export class MonsterAvatar {
     for (let i = 0; i < rig.arms.length; i++) {
       const arm = rig.arms[i];
       const spring = this.limbSprings[i];
-      arm.root.rotation.x += spring.a.step(this.bodyVelocity.z * drag * 1.2 + this.bodyVelocity.y * drag, swingFreq * 1.4, swingDamp + 0.12, step);
-      arm.root.rotation.z += arm.side * spring.b.step(-this.bodyVelocity.x * drag, swingFreq * 1.4, swingDamp + 0.12, step);
+      arm.root.rotation.x += spring.a.step(lagZ * 1.1 + lagY * 0.8, swingFreq * 1.4, swingDamp + 0.12, step);
+      arm.root.rotation.z += arm.side * spring.b.step(-lagX * 0.9, swingFreq * 1.4, swingDamp + 0.12, step);
     }
 
     // === 視線 =============================================================
@@ -926,7 +986,7 @@ export class MonsterAvatar {
     // 腰を捻ったぶん、胴は逆へ返す。全身が一枚板で回らないようにする
     rig.torso.rotation.x += leanX * 0.55;
     rig.torso.rotation.y = rig.torsoRest.y - hipY * 0.7;
-    rig.torso.rotation.z = rig.torsoRest.z - hipZ * 0.55 + Math.sin(tick * 0.73) * 0.025 * anim.sway * alive;
+    rig.torso.rotation.z = rig.torsoRest.z - hipZ * 0.55 + Math.sin(T * breathHz * 0.8) * 0.03 * anim.sway * alive;
     rig.head.rotation.set(headX, headY, headZ);
     if (rig.jaw) rig.jaw.rotation.x = rig.jawRest.x - jawOpen * 0.5;
 

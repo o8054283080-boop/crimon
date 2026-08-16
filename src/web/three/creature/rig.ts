@@ -49,6 +49,13 @@ export interface RigFollower {
   rest: THREE.Euler;
   /** 揺れ幅の倍率。体高に対して長い部位ほど大きく振る */
   amount: number;
+  /** 揺れの位相。左右の耳が同じ瞬間に同じ角度で揺れると作り物に見える */
+  phase: number;
+  /**
+   * 体の中心から見て外向きの符号(+1が右、-1が左)。
+   * 左右対の部位を同じ向きに振ると、片側だけ体にめり込む。
+   */
+  side: number;
 }
 
 /** 常時回転し続ける装飾(結晶の環など) */
@@ -526,6 +533,7 @@ function collectFollowers(rig: CreatureRig): void {
 
   const box = new THREE.Box3();
   const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
   const walk = (container: THREE.Object3D, inLimb: boolean): void => {
     for (const child of container.children) {
       if ((child as THREE.Mesh).isMesh) continue;
@@ -533,10 +541,16 @@ function collectFollowers(rig: CreatureRig): void {
         // 長い部位ほど大きく振れる。付け根の球ひとつのような小物は揺らさない
         box.setFromObject(child);
         box.getSize(size);
+        box.getCenter(center);
         const span = Math.max(size.x, size.y, size.z) / Math.max(0.001, refHeight);
         if (span > 0.05) {
           const amount = Math.min(1.6, span * 6) * (inLimb ? 0.3 : 1);
-          rig.followers.push({ group: child, rest: child.rotation.clone(), amount });
+          // 左右どちら側に付いているかで振る向きを分ける。中央のものは右扱い
+          const side = center.x < -0.001 ? -1 : 1;
+          // 位相は取り付け位置から決める。乱数にすると同じ骨格でも
+          // 生成のたびに揺れ方が変わり、直した結果を比べられなくなる
+          const phase = (center.x * 3.1 + center.y * 2.3 + center.z * 1.7) % (Math.PI * 2);
+          rig.followers.push({ group: child, rest: child.rotation.clone(), amount, phase, side });
         }
       }
       walk(child, inLimb || limbParts.has(child));
