@@ -26,7 +26,7 @@ export function renderPartySlots(members: readonly MonsterInstance[], slotCount:
     }
     const dex = findMonsterById(instance.dexId);
     return el("div", { className: "party-slot", style: dex ? `background:${dex.color}` : undefined }, [
-      withPortrait(el("span", { className: "party-slot__emoji" }, [dex ? dex.emoji : "❓"]), dex),
+      withPortrait(el("span", { className: "party-slot__emoji" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
       el("span", { className: "party-slot__star" }, [starLabel(instance.star)]),
     ]);
   });

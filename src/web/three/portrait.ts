@@ -20,8 +20,14 @@ import { MonsterAvatar } from "./monsterAvatar.js";
 const PORTRAIT_SIZE = 192;
 /** 肖像の画角。寄りの構図にするため、バトル画面より狭くしている */
 const PORTRAIT_FOV = 26;
-/** 体高のうち画面に収める割合。1で全身、小さくするほど顔に寄る */
-const PORTRAIT_COVERAGE = 0.62;
+/**
+ * 収める範囲の余白。1.0でぴったり、大きいほど周囲に余白ができる。
+ *
+ * 顔に寄せる構図も試したが、カードの表示は90px角ほどしかなく、
+ * 寄せると胴だけが写って何のモンスターか分からなくなった。
+ * この寸法では全身のシルエットの方が見分けが付く。
+ */
+const PORTRAIT_MARGIN = 1.08;
 /** 見る角度。真正面だと厚みが出ないので斜め前から見る */
 const PORTRAIT_YAW = 0.62;
 const PORTRAIT_PITCH = 0.16;
@@ -80,23 +86,24 @@ function bake(def: MonsterDefinition): string | null {
 
   try {
     const box = new THREE.Box3().setFromObject(avatar.root);
-    const height = Math.max(0.001, box.max.y - box.min.y);
     const center = box.getCenter(new THREE.Vector3());
-    // 顔まわりへ寄せる。全身の中心だと胴ばかりが写る
-    const focusY = box.min.y + height * 0.74;
-    const radius = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.5;
+    const size = box.getSize(new THREE.Vector3());
+    // 画像は正方形なので、縦横のうち大きい方が収まれば全体が入る。
+    // 翼を広げた種別は横に長いので、高さだけで決めると必ず切れる
+    const spread = Math.max(size.x, size.z);
+    const framed = Math.max(size.y, spread) * PORTRAIT_MARGIN;
 
     const camera = new THREE.PerspectiveCamera(PORTRAIT_FOV, 1, 0.1, 100);
-    const framed = height * PORTRAIT_COVERAGE;
-    const distance = framed / 2 / Math.tan(THREE.MathUtils.degToRad(PORTRAIT_FOV / 2)) + radius + 0.2;
+    // 手前側の厚みのぶんだけ余分に引く。引かないと手前の翼や角が枠を割る
+    const distance = framed / 2 / Math.tan(THREE.MathUtils.degToRad(PORTRAIT_FOV / 2)) + spread * 0.5;
     // 骨格の正面は -Z。斜め前・やや上から覗き込む位置へ置く
     const flat = Math.cos(PORTRAIT_PITCH) * distance;
     camera.position.set(
       center.x + Math.sin(PORTRAIT_YAW) * flat,
-      focusY + Math.sin(PORTRAIT_PITCH) * distance,
+      center.y + Math.sin(PORTRAIT_PITCH) * distance,
       center.z - Math.cos(PORTRAIT_YAW) * flat,
     );
-    camera.lookAt(center.x, focusY, center.z);
+    camera.lookAt(center.x, center.y, center.z);
 
     gl.render(scene, camera);
     return gl.domElement.toDataURL("image/png");
@@ -141,20 +148,45 @@ export function requestPortrait(def: MonsterDefinition): Promise<string | null> 
  * そのまま効くようにするため。焼き上がるまでは絵文字が見えており、
  * WebGLが使えない環境では絵文字のまま変わらない。
  */
-export function withPortrait<T extends HTMLElement>(target: T, def: MonsterDefinition | undefined): T {
-  applyPortrait(target, def);
+/**
+ * 肖像を敷く要素の性格。
+ *
+ * "box"  … その要素自体が寸法を持っている(96pxの丸など)。背景を敷くだけでよい
+ * "fill" … 寸法が絵文字の字面で決まっている。文字を消すと0×0に潰れるので、
+ *          親いっぱいへ広げてやる必要がある
+ */
+export type PortraitFit = "box" | "fill";
+
+export function withPortrait<T extends HTMLElement>(
+  target: T,
+  def: MonsterDefinition | undefined,
+  fit: PortraitFit = "box",
+): T {
+  applyPortrait(target, def, fit);
   return target;
 }
 
-export function applyPortrait(target: HTMLElement, def: MonsterDefinition | undefined): void {
+export function applyPortrait(target: HTMLElement, def: MonsterDefinition | undefined, fit: PortraitFit = "box"): void {
   if (!def) return;
   void requestPortrait(def).then((url) => {
     if (!url || !target.isConnected) return;
+
+    if (fit === "fill") {
+      // 絵文字を消した瞬間に潰れるので、先に親いっぱいへ広げてから消す。
+      // 親に位置指定が無いと inset が効かないので、その場合だけ基準にする
+      const parent = target.parentElement;
+      if (parent && getComputedStyle(parent).position === "static") parent.style.position = "relative";
+      target.style.position = "absolute";
+      target.style.inset = "0";
+      // 中央寄せに translate を使っている要素があるので打ち消す
+      target.style.transform = "none";
+    }
+
     target.style.backgroundImage = `url(${url})`;
     target.style.backgroundSize = "contain";
     target.style.backgroundPosition = "center";
     target.style.backgroundRepeat = "no-repeat";
-    // 肖像が乗ったら絵文字は不要。文字色を消すのではなく中身ごと空にする
+    // 肖像が乗ったら絵文字は不要
     target.textContent = "";
   });
 }

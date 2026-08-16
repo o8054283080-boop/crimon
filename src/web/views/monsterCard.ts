@@ -56,7 +56,7 @@ export function buildMonsterCard(
   if (bonus) classes.push("mcard--bonus");
 
   const portraitChildren: (HTMLElement | null)[] = [
-    withPortrait(el("span", { className: "mcard__emoji" }, [dex ? dex.emoji : "❓"]), dex),
+    withPortrait(el("span", { className: "mcard__emoji" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
     dex ? el("span", { className: "mcard__element", title: `${ELEMENT_JA[dex.element]}属性` }, [ELEMENT_JA[dex.element]]) : null,
     level !== undefined ? el("span", { className: "mcard__level" }, [`Lv${level}${maxLevel ? `/${maxLevel}` : ""}`]) : null,
     bonus ? el("span", { className: "mcard__bonus" }, ["★"]) : null,
