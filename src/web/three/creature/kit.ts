@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CreaturePalette, SurfaceSet, SurfaceStyle, styleCastsShadow } from "./surface.js";
+import { CreaturePalette, SurfaceSet, SurfaceStyle, SurfaceVariant, styleCastsShadow } from "./surface.js";
 
 /** 骨1本分の指定。上端が原点で、-Y方向へ伸びる */
 export interface SegmentSpec {
@@ -56,8 +56,13 @@ export class CreatureKit {
     return this.track(geometry);
   }
 
-  mesh(geometry: THREE.BufferGeometry, style: SurfaceStyle, color: THREE.Color): THREE.Mesh {
-    const mesh = new THREE.Mesh(this.track(geometry), this.surfaces.get(style, color));
+  mesh(
+    geometry: THREE.BufferGeometry,
+    style: SurfaceStyle,
+    color: THREE.Color,
+    variant: SurfaceVariant = "default",
+  ): THREE.Mesh {
+    const mesh = new THREE.Mesh(this.track(geometry), this.surfaces.get(style, color, variant));
     mesh.castShadow = styleCastsShadow(style);
     return mesh;
   }
@@ -91,7 +96,9 @@ export class CreatureKit {
     }
     geometry.scale(rx, ry, rz);
     geometry.computeVertexNormals();
-    return this.mesh(geometry, style, color);
+    // 岩は皮膚と同じ材質指定で作られることが多いが、表面は鱗ではなく
+    // 割れ目で覆われていてほしい。ここで材質の中身だけ差し替える
+    return this.mesh(geometry, style, color, "rock");
   }
 
   box(w: number, h: number, d: number, style: SurfaceStyle, color: THREE.Color): THREE.Mesh {

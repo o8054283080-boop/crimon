@@ -133,6 +133,8 @@ uniform float uEmissive;
 uniform float uOpacity;
 uniform float uSpecPower;
 uniform float uSpecStrength;
+/** 凹凸の高さ(ワールド単位)。0で法線を摂動しない */
+uniform float uBump;
 uniform float uTime;
 uniform float uFlash;
 uniform float uDissolve;
@@ -149,16 +151,33 @@ varying float vWorldY;
 ${SIMPLEX_NOISE_3D}
 
 /**
- * 鱗。格子状のセルごとに濃淡を変え、境目をわずかに暗く落とす。
- * テクスチャを持たずに「一枚の皮ではない」情報量を出すのが狙い。
+ * 体表の起伏(高さ場)。材質ごとに違う形を返す。
+ *
+ * ここで作った1つの高さから、色の濃淡と法線の傾きの両方を導く。
+ * 色だけで凹凸を描くと、光の向きが変わっても影が動かず「模様を印刷した球」に
+ * 見えてしまう。高さの勾配で法線を傾けることで、同じ模様が光に反応する。
+ *
+ * どの関数も 0..1 を返し、勾配が連続であること(floorで階段状にしないこと)が条件。
+ * 階段状の高さ場は差分を取った瞬間に無限大の傾きを生み、縁が白く弾ける。
  */
-float scalePattern(vec3 p) {
-  vec3 q = p * 16.0;
-  vec3 cell = floor(q);
+
+/** 鱗。互い違いに並んだ丸い盛り上がりで、境目が溝になる */
+float scaleHeight(vec3 p) {
+  vec3 q = p * 15.0;
+  // 段ごとに半個ずらす。格子のままだと市松模様に見えて生き物にならない
+  q.xz += mod(floor(q.y), 2.0) * 0.5;
   vec3 f = fract(q) - 0.5;
-  float tone = snoise(cell * 1.7) * 0.5 + 0.5;
-  float edge = smoothstep(0.34, 0.5, max(abs(f.x), max(abs(f.y), abs(f.z))));
-  return mix(tone, 0.25, edge);
+  float d = max(abs(f.x), max(abs(f.y) * 1.2, abs(f.z)));
+  float dome = smoothstep(0.5, 0.06, d);
+  // 完全な繰り返しに見えないよう、粗いノイズで高さを揺らす
+  return dome * (0.75 + (snoise(p * 9.0) * 0.5 + 0.5) * 0.5);
+}
+
+/** 岩の割れ。ノイズの零点に沿って溝が走り、面は平らに残る */
+float crackHeight(vec3 p) {
+  float n = snoise(p * 3.1) + snoise(p * 7.4) * 0.45;
+  // 溝(0)と面(1)の間を狭くして、割れ目を鋭く見せる
+  return smoothstep(0.0, 0.30, abs(n));
 }
 
 /** 磨いた金属の筋。一方向へ細長く伸ばしたノイズ */
@@ -177,6 +196,62 @@ float weavePattern(vec3 p) {
   return warp * 0.5 + 0.5;
 }
 
+/** 結晶の面。低周波ノイズを丸めた段にして、平らな面と鋭い稜線を作る */
+float facetHeight(vec3 p) {
+  float n = snoise(p * 4.6);
+  // floorで段を作ると勾配が飛ぶので、正弦を寝かせた「丸い段」にする
+  return smoothstep(-0.7, 0.7, sin(n * 6.0));
+}
+
+/**
+ * 材質ごとの高さ場をひとつに束ねる。
+ * 法線の摂動はこの関数を4回叩いて勾配を取るため、
+ * 中身は「安いこと」と「勾配が連続なこと」を最優先にしている。
+ */
+float surfaceHeight(vec3 p) {
+#if defined(CRACKS)
+  return crackHeight(p);
+#elif defined(SCALES)
+  return scaleHeight(p);
+#elif defined(STRANDS)
+  return strandPattern(p);
+#elif defined(FACETS)
+  return facetHeight(p);
+#elif defined(STREAKS)
+  return brushedStreak(p);
+#elif defined(WEAVE)
+  return weavePattern(p) * 0.5 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.5;
+#else
+  return snoise(p * 14.0) * 0.5 + 0.5;
+#endif
+}
+
+/**
+ * 高さ場の勾配で法線を傾ける。
+ *
+ * プロシージャル生成のジオメトリは接線ベクトルを持たないため、
+ * 接空間の法線マップは使えない。代わりに高さの3次元勾配から
+ * 面に沿った成分だけを取り出して法線を倒す(surface gradient 方式)。
+ * これなら球・円錐・チューブのどれに貼っても継ぎ目が出ない。
+ *
+ * amplitude は凹凸の高さをワールド単位で指定する。
+ */
+vec3 bumpNormal(vec3 n, vec3 p, float h0, float amplitude) {
+  if (amplitude < 0.0001) return n;
+  const float e = 0.012;
+  vec3 grad = vec3(
+    surfaceHeight(p + vec3(e, 0.0, 0.0)) - h0,
+    surfaceHeight(p + vec3(0.0, e, 0.0)) - h0,
+    surfaceHeight(p + vec3(0.0, 0.0, e)) - h0
+  ) / e;
+  // 法線方向の変化は面の傾きに寄与しないので取り除く
+  grad -= n * dot(n, grad);
+  // 傾けすぎると裏返って黒い点が散るため、勾配に頭打ちを入れる
+  float len = length(grad) * amplitude;
+  if (len > 0.9) grad *= 0.9 / len;
+  return normalize(n - grad * amplitude);
+}
+
 const vec3 KEY_DIR = vec3(0.401, 0.802, 0.442);
 const vec3 FILL_DIR = vec3(-0.771, 0.482, 0.417);
 const vec3 BACK_DIR = vec3(0.0, 0.446, -0.895);
@@ -190,16 +265,26 @@ float ramp(float x) {
 }
 
 void main() {
-  vec3 normal = normalize(vNormalW);
-  if (!gl_FrontFacing) normal = -normal;
+  vec3 geoNormal = normalize(vNormalW);
+  if (!gl_FrontFacing) geoNormal = -geoNormal;
   vec3 viewDir = normalize(vViewDir);
-  float facing = clamp(dot(normal, viewDir), 0.0, 1.0);
+  // 輪郭のフレネルは「幾何の」法線で取る。凹凸を混ぜると縁がちらつき、
+  // シルエットが溶けてしまう。凹凸は面の中の陰影だけに効かせる
+  float facing = clamp(dot(geoNormal, viewDir), 0.0, 1.0);
   float fresnel = pow(1.0 - facing, 3.0);
   float alpha = uOpacity;
+  vec3 normal = geoNormal;
 
 #ifdef UNLIT
   vec3 color = uGlow * (1.05 + 0.25 * sin(uTime * 3.4)) + uRim * fresnel * 0.6;
 #else
+  // --- 起伏 ----------------------------------------------------------
+  // 材質ごとの高さ場を1回だけ求め、色の濃淡と法線の傾きの両方に使う。
+  // これで「模様の暗い所」と「光が当たらない所」が一致し、
+  // 光の向きが変わると鱗や割れ目の影も一緒に動く。
+  float height = surfaceHeight(vWorld);
+  normal = bumpNormal(geoNormal, vWorld, height, uBump);
+
   float key = max(dot(normal, KEY_DIR), 0.0);
   float fill = max(dot(normal, FILL_DIR), 0.0);
   float back = max(dot(normal, BACK_DIR), 0.0);
@@ -237,17 +322,22 @@ void main() {
 
   #ifdef SCALES
     // 皮膚は鱗状に。境目が落ちることでパーツの丸みも読み取りやすくなる
-    albedo *= 0.78 + scalePattern(vWorld) * 0.44;
+    albedo *= 0.78 + height * 0.44;
+  #endif
+
+  #ifdef CRACKS
+    // 岩は面の色を保ったまま、割れ目だけを深く落とす
+    albedo *= 0.52 + height * 0.52;
   #endif
 
   #ifdef STRANDS
     // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる
-    albedo *= 0.80 + strandPattern(vWorld) * 0.34;
+    albedo *= 0.80 + height * 0.34;
   #endif
 
   #ifdef STREAKS
     // 角・装甲は研いだ金属のような細い筋を走らせる
-    albedo *= 0.88 + brushedStreak(vWorld) * 0.24;
+    albedo *= 0.88 + height * 0.24;
   #endif
 
   #ifdef WEAVE
@@ -259,24 +349,49 @@ void main() {
   float occlusion = 0.82 + smoothstep(0.15, 0.6, blotch) * 0.18;
   albedo *= occlusion;
 
-  vec3 color = albedo * (ambient + ramp(key) * 1.05);
+  // 光の落ち方も材質で変える。硬い材質は3段のランプで面の向きを切り、
+  // 毛は段を持たずになだらかに暗くなる
+  #ifdef SOFT
+    // 毛皮・羽毛は光が繊維の中で何度も散るので、明暗の境目が出ない。
+    // 落ちを長く取り、いちばん暗いところも沈めきらない
+    float diffuse = pow(key, 0.72) * 0.88 + 0.12;
+  #else
+    float diffuse = ramp(key) * 1.05;
+  #endif
+
+  vec3 color = albedo * (ambient + diffuse);
   color += albedo * vec3(0.38, 0.48, 1.0) * fill * 0.30;
   // 背後のリムライト(ステージのピンクライト)。暗い背景から輪郭を切り離す主役
   color += vec3(1.0, 0.48, 0.85) * pow(back, 1.6) * 0.42;
   color += uRim * fresnel * uRimStrength * (1.0 + uActive * 1.5);
 
+  #ifdef SOFT
+    // 毛先が逆光で透ける。輪郭が硬い縁ではなく、ふわりとした帯になる
+    color += albedo * mix(uRim, vec3(1.0), 0.3) * pow(1.0 - facing, 1.7) * 0.28;
+  #endif
+
   #ifdef METALLIC
     // 金属は拡散が弱く、上下の環境色を映し込む。
     // これがあるだけで、同じ色でも肉と金属が別物に見える
-    color *= 0.78;
+    color *= 0.70;
     vec3 sky = vec3(0.26, 0.30, 0.44);
     vec3 ground = vec3(0.14, 0.10, 0.16);
-    color += mix(ground, sky, smoothstep(-0.2, 0.6, normal.y)) * 0.34 * (0.4 + brushedStreak(vWorld) * 0.6);
+    // 映り込みは磨き筋に沿って途切れる。凹凸の高さがそのまま反射の粗さになる
+    color += mix(ground, sky, smoothstep(-0.2, 0.6, normal.y)) * 0.36 * (0.30 + height * 0.80);
   #endif
 
   #ifdef SPECULAR
     vec3 halfDir = normalize(KEY_DIR + viewDir);
-    color += mix(vec3(1.0), uRim, 0.35) * pow(max(dot(normal, halfDir), 0.0), uSpecPower) * uSpecStrength;
+    float spec = pow(max(dot(normal, halfDir), 0.0), uSpecPower) * uSpecStrength;
+    #ifdef METALLIC
+      // 金属は「点」で光る。磨き筋に沿ってハイライトを途切れさせ、
+      // さらにフィル側にも小さく鋭い2つ目を置く。反射が2つ見えると
+      // 面が板ではなく金属板として読める
+      spec *= 0.35 + height * 0.95;
+      spec += pow(max(dot(normal, normalize(FILL_DIR + viewDir)), 0.0), uSpecPower * 0.6) * uSpecStrength * 0.30;
+    #endif
+    // ブルームで白く飛ばないよう、ハイライトの合計に頭打ちを入れる
+    color += mix(vec3(1.0), uRim, 0.35) * min(spec, 1.5);
   #endif
 
   #ifdef SHEEN
@@ -299,10 +414,19 @@ void main() {
     color += uRim * vein * 0.10;
   #endif
 
-  #ifdef FACETS
-    // 結晶の内部。奥行き方向の縞が透けて、中身が詰まって見える
-    float inner = sin(dot(vLocal, vec3(9.0, 13.0, 7.0)) + uTime * 0.4) * 0.5 + 0.5;
-    color += uGlow * inner * 0.12;
+  #ifdef CRYSTAL
+    // 結晶は「向こうが透けること」で他の材質と区別する。
+    // 明るくして目立たせるのではなく、正面を薄く・縁を厚く見せることで
+    // 中身の詰まったガラスの塊にする(加算合成の飽和を増やさない)。
+    float edge = pow(1.0 - facing, 2.0);
+    // 内部の層。見る向きでずれるので、中に奥行きがあるように見える
+    float inner = sin(dot(vLocal, vec3(11.0, 17.0, 9.0)) - facing * 7.0 + uTime * 0.35) * 0.5 + 0.5;
+    vec3 core = mix(uColor * 0.42, uGlow * 0.5, inner * 0.7);
+    color = core + albedo * (0.22 + ramp(key) * 0.40) + uRim * edge * 0.8;
+    // 面の稜線だけが白く立つ。カットガラスの角の見え方
+    color += vec3(1.0) * pow(height, 8.0) * 0.12;
+    // 正面は透け、縁は詰まって見える。これが厚みの手がかりになる
+    alpha = uOpacity * (0.42 + edge * 0.58);
   #endif
 #endif
 
@@ -348,6 +472,12 @@ interface StyleConfig {
   specPower: number;
   /** ハイライトの強さ */
   specStrength: number;
+  /**
+   * 体表の凹凸の高さ(ワールド単位)。法線をこの分だけ傾ける。
+   * 模様の細かさと釣り合わない値にすると、面が裏返って黒い粒が散る。
+   * 鱗のように細かい模様ほど小さく、岩の割れのように粗い模様ほど大きくする。
+   */
+  bump: number;
 }
 
 const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
@@ -362,11 +492,12 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     depthWrite: true,
     castShadow: true,
     specPower: 8,
-    specStrength: 0.1,
+    specStrength: 0.14,
+    bump: 0.009,
   },
-  // 毛皮・羽毛: ハイライトを持たず、縁だけがふわりと光る
+  // 毛皮・羽毛: ハイライトを持たず、光が繊維の中で散って柔らかく減衰する
   fur: {
-    defines: { STRANDS: "", WRAP: "" },
+    defines: { STRANDS: "", WRAP: "", SOFT: "" },
     rimStrength: 0.85,
     emissive: 0,
     opacity: 1,
@@ -377,6 +508,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: true,
     specPower: 4,
     specStrength: 0,
+    bump: 0.005,
   },
   // 骨・角・爪: 蝋のような、やや広くて強いハイライト
   plate: {
@@ -390,8 +522,9 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: true,
     specPower: 26,
     specStrength: 0.5,
+    bump: 0.003,
   },
-  // 金属: 暗い下地・環境の映り込み・鋭いハイライト
+  // 金属: 暗い下地・環境の映り込み・点で光る鋭いハイライト
   metal: {
     defines: { SPECULAR: "", STREAKS: "", METALLIC: "" },
     rimStrength: 0.5,
@@ -401,8 +534,9 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     side: THREE.FrontSide,
     depthWrite: true,
     castShadow: true,
-    specPower: 90,
-    specStrength: 1.1,
+    specPower: 160,
+    specStrength: 1.2,
+    bump: 0.0025,
   },
   // 布: ハイライトは出ず、斜めから見た時だけ絹の光沢が乗る
   cloth: {
@@ -416,6 +550,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: true,
     specPower: 6,
     specStrength: 0,
+    bump: 0.002,
   },
   membrane: {
     defines: { TRANSLUCENT: "", VEINS: "" },
@@ -428,18 +563,21 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: false,
     specPower: 12,
     specStrength: 0,
+    bump: 0.0,
   },
+  // 結晶: 正面が透けて縁が詰まる。明るさではなく透過で他と区別する
   crystal: {
-    defines: { SPECULAR: "", TRANSLUCENT: "", FACETS: "" },
+    defines: { SPECULAR: "", CRYSTAL: "", FACETS: "" },
     rimStrength: 1.3,
-    emissive: 0.18,
-    opacity: 0.88,
+    emissive: 0.12,
+    opacity: 0.95,
     transparent: true,
     side: THREE.DoubleSide,
     depthWrite: true,
     castShadow: false,
-    specPower: 120,
-    specStrength: 0.9,
+    specPower: 200,
+    specStrength: 1.0,
+    bump: 0.012,
   },
   glow: {
     defines: { UNLIT: "" },
@@ -452,11 +590,32 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: false,
     specPower: 4,
     specStrength: 0,
+    bump: 0,
   },
 };
 
 export function styleCastsShadow(style: SurfaceStyle): boolean {
   return STYLE_CONFIG[style].castShadow;
+}
+
+/**
+ * 同じ材質でも「形の作り」で表面の割れ方が違う場合の枝分かれ。
+ * 岩の塊(kit.rock)は皮膚と同じ "hide" で作られているが、
+ * 鱗が並んでいてはただの大きなトカゲになる。ジオメトリを作る側が
+ * 材質の中身を差し替えられるようにしておく。
+ */
+export type SurfaceVariant = "default" | "rock";
+
+/** 変種ごとの、材質定義への上書き */
+function applyVariant(config: StyleConfig, variant: SurfaceVariant): StyleConfig {
+  if (variant === "rock") {
+    const defines = { ...config.defines };
+    delete defines.SCALES;
+    defines.CRACKS = "";
+    // 割れ目は鱗よりずっと粗いので、凹凸も深く取る
+    return { ...config, defines, bump: 0.022 };
+  }
+  return config;
 }
 
 /**
@@ -472,12 +631,12 @@ export class SurfaceSet {
     private readonly uniforms: CreatureUniforms,
   ) {}
 
-  get(style: SurfaceStyle, color: THREE.Color): THREE.ShaderMaterial {
-    const key = `${style}:${color.getHexString()}`;
+  get(style: SurfaceStyle, color: THREE.Color, variant: SurfaceVariant = "default"): THREE.ShaderMaterial {
+    const key = `${style}:${variant}:${color.getHexString()}`;
     const cached = this.materials.get(key);
     if (cached) return cached;
 
-    const config = STYLE_CONFIG[style];
+    const config = applyVariant(STYLE_CONFIG[style], variant);
     const material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
@@ -494,6 +653,7 @@ export class SurfaceSet {
         uOpacity: { value: config.opacity },
         uSpecPower: { value: config.specPower },
         uSpecStrength: { value: config.specStrength },
+        uBump: { value: config.bump },
         // 以下は1体で共有する参照(同じオブジェクトを渡すことで一括更新される)
         uTime: this.uniforms.uTime,
         uFlash: this.uniforms.uFlash,
