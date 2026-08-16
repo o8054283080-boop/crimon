@@ -595,8 +595,10 @@ void main() {
   float ventral = dot(vBodyNormal, VENTRAL_DIR);
   // 境目をノイズで崩す。まっすぐな帯だと塗り分けたペンキに見える
   ventral += (blotch - 0.5) * 0.30;
-  float belly = smoothstep(0.14, 0.86, ventral) * uCounter;
-  float dorsal = smoothstep(-0.02, -0.72, ventral) * uCounter;
+  // 腹はゆるく広く、背はきっぱりと。境目を左右で非対称にすると、
+  // 「上から塗料をかけた」ではなく「腹側の色素が薄い」ように見える
+  float belly = smoothstep(0.04, 0.74, ventral) * uCounter;
+  float dorsal = smoothstep(-0.06, -0.62, ventral) * uCounter;
 
   vec3 albedo = mix(uColor, uBelly, belly);
   albedo = mix(albedo, uDorsal, dorsal);
@@ -605,17 +607,23 @@ void main() {
   // 明るさだけを揺らすと、単色の面に灰色の汚れを乗せたようにしか見えない。
   // 生き物の皮膚は場所によって色素の濃さが違うので、彩度と色相ごと動かす。
   // 混ぜ先には腹と背の色をそのまま使う。無関係な色を混ぜないので、
-  // どれだけ揺らしても属性の色から外れない
-  float mottle = snoise(vWorld * 2.3 + 11.0);
-  albedo = mix(albedo, uDorsal, max(0.0, mottle) * 0.26);
-  albedo = mix(albedo, uBelly, max(0.0, -mottle) * 0.16);
+  // どれだけ揺らしても属性の色から外れない。
+  //
+  // 大きさの違う2つを重ねるのが要点。1つだけだと迷彩の斑になり、
+  // 生き物ではなく「塗り分けた布」に見える
+  float mottle = snoise(vWorld * 2.1 + 11.0);
+  float fleck = snoise(vWorld * 8.5 - 4.0);
+  albedo = mix(albedo, uDorsal, max(0.0, mottle) * 0.20 + max(0.0, fleck) * 0.09);
+  albedo = mix(albedo, uBelly, max(0.0, -mottle) * 0.14);
 
-  albedo *= 0.84 + blotch * 0.32;
-  albedo *= 0.93 + grain * 0.14;
-  albedo *= 0.78 + height01 * 0.30;
-  // 下向きの面を沈める擬似AO。腹側は地色で既に分離しているので、
-  // ここまで暗くすると塗り分けを打ち消してしまう。控えめに残す
-  albedo *= 0.78 + upness * 0.30;
+  // 明暗のゆらぎは色のゆらぎより弱くする。強いと迷彩に見える
+  albedo *= 0.90 + blotch * 0.20;
+  albedo *= 0.94 + grain * 0.12;
+  // 体の下ほど暗く。ただし**上を明るくはしない**。
+  // 上へ加算すると、背を暗く塗った意味が消えて「背が明るい生き物」になる
+  albedo *= 0.80 + height01 * 0.21;
+  // 下向きの面を沈める擬似AO。同じ理由で、上向きの面は素通しに留める
+  albedo *= 0.82 + upness * 0.19;
 
   #ifdef SCALES
     // 爬虫類の鱗。境目が落ちることでパーツの丸みも読み取りやすくなる
@@ -833,16 +841,32 @@ void main() {
  * さらにわずかに暖色へ寄せると、皮膚の下の血の色が透けたように見える。
  */
 function bellyOf(color: THREE.Color): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl, THREE.SRGBColorSpace);
+  // **腹は必ず地色より明るい。** 上限を固定値で置くと、地色が明るい属性(光)では
+  // 腹だけが暗くなり、塗り分けが裏返る(実際に光属性で腹が影のように沈んでいた)。
+  // 地色からの相対で決め、上限は白飛びしない範囲にだけ効かせる
+  const lit = Math.min(0.82, Math.max(hsl.l + 0.12, hsl.l * 1.26 + 0.09));
+  const out = new THREE.Color();
   // 色相をほんの少し暖色側へ。生々しさはこの数度で決まる
-  return tune(color, 0.015, 0.55, 1.34, 0.10, 0.56);
+  out.setHSL((hsl.h + 0.015) % 1, hsl.s * 0.55, lit, THREE.SRGBColorSpace);
+  return out;
 }
 
-/** 地色から「背側の色」を作る。暗く、彩度は上げる(影ではなく色素の濃さ) */
+/**
+ * 地色から「背側の色」を作る。暗く、彩度は上げる(影ではなく色素の濃さ)。
+ *
+ * ここは弱いと**まったく効かない**。背は上を向いているのでキーライトを正面から
+ * 受け、擬似AOでも持ち上がる。地色を少し暗くした程度では、その加算に全部
+ * 打ち消されて「背が明るい」という逆の絵になる。打ち消される分を見込んで落とす。
+ */
 function dorsalOf(color: THREE.Color): THREE.Color {
   const hsl = { h: 0, s: 0, l: 0 };
   color.getHSL(hsl, THREE.SRGBColorSpace);
   const out = new THREE.Color();
-  out.setHSL((hsl.h + 0.985) % 1, Math.min(1, hsl.s * 1.18 + 0.05), hsl.l * 0.62, THREE.SRGBColorSpace);
+  // 下限を置くのは闇属性のため。ここを 0 まで許すと背が黒く潰れて形が読めなくなる
+  const lit = Math.max(0.11, hsl.l * 0.52);
+  out.setHSL((hsl.h + 0.985) % 1, Math.min(1, hsl.s * 1.2 + 0.06), lit, THREE.SRGBColorSpace);
   return out;
 }
 
