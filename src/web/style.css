@@ -458,6 +458,51 @@ body {
   display: none;
 }
 
+/* 対象選び: 一覧ではなく「今選ばれている相手」だけを出す */
+.action-panel__hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.action-panel__chosen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-weight: 800;
+  background: rgba(255, 90, 74, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 120, 100, 0.5);
+}
+
+.action-panel__chosen-hp {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.action-panel__row {
+  display: flex;
+  gap: 8px;
+}
+
+.action-panel__row .btn {
+  flex: 1;
+  /* 「スキル選び直し」が途中で折り返して読みにくくなるのを防ぐ */
+  white-space: nowrap;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+/* 対象選びの札は、選んだ相手を隠さないよう幅を詰める */
+.battle-view .action-panel--target {
+  max-width: min(360px, 88vw);
+  gap: 6px;
+  padding: 10px 12px;
+}
+
 .battle-view .action-panel {
   pointer-events: auto;
   max-width: min(560px, 94vw);

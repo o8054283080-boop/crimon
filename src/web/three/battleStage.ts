@@ -167,6 +167,9 @@ export class BattleStage {
   private readonly desiredLookOffset = new THREE.Vector3();
   private readonly tmpVector = new THREE.Vector3();
   private readonly tmpRelative = new THREE.Vector3();
+  /** 画面のタップ位置から3Dの本体を拾うための道具 */
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly pointer = new THREE.Vector2();
 
   /** 両チームが必ず収まる箱。setupUnitsで実際のスロット位置から作る */
   private frameBox: FrameBox = { halfWidth: 5.4, zNear: 4.4, zFar: -4.9, yBottom: -0.1, yTop: 3.3 };
@@ -537,6 +540,37 @@ export class BattleStage {
   /** 回り込みを既定の構図へ戻す */
   resetOrbit(): void {
     this.orbitYawTarget = 0;
+  }
+
+  /**
+   * 画面上の座標にいるユニットを返す。対象を文字の一覧ではなく
+   * 3Dの本体そのものから選べるようにするために使う。
+   * 判定は姿を持たない箱で行うので、細い脚や翼の隙間で外れることはない。
+   */
+  pickUnitAt(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+
+    const proxies: THREE.Object3D[] = [];
+    const owners = new Map<THREE.Object3D, string>();
+    for (const [instanceId, avatar] of this.avatars) {
+      if (avatar.isDying()) continue;
+      proxies.push(avatar.hitArea);
+      owners.set(avatar.hitArea, instanceId);
+    }
+    const hits = this.raycaster.intersectObjects(proxies, false);
+    for (const hit of hits) {
+      const id = owners.get(hit.object);
+      if (id) return id;
+    }
+    return null;
+  }
+
+  /** 対象として選ばれているユニットを光らせる。nullで全部消す */
+  setTargetedUnit(instanceId: string | null): void {
+    for (const [id, avatar] of this.avatars) avatar.setTargeted(id === instanceId);
   }
 
   private updateCamera(dt: number): void {
