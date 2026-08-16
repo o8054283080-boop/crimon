@@ -4,6 +4,7 @@ import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../../data/monsters.js";
 import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillGrowthRows } from "./skillPanel.js";
+import { withPortrait } from "../three/portrait.js";
 
 export interface MonsterDexProps {
   selectedDexId: string | null;
@@ -40,7 +41,7 @@ function renderDetail(props: MonsterDexProps, dex: MonsterDefinition): HTMLEleme
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [dex.name])]),
     el("section", { className: "panel monster-detail" }, [
-      el("div", { className: "monster-detail__avatar", style: `background:${dex.color}` }, [dex.emoji]),
+      withPortrait(el("div", { className: "monster-detail__avatar", style: `background:${dex.color}` }, [dex.emoji]), dex),
       el("div", { className: "role-badge" }, [dex.role]),
       el("div", { className: "monster-detail__stats" }, statLines.map((line) => el("div", {}, [line]))),
       el("p", { className: "app-subtitle" }, ["基礎ステータス(星・レベル・育成・装備で変化します)"]),

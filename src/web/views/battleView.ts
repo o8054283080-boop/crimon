@@ -5,6 +5,7 @@ import { MonsterDefinition } from "../../core/monster.js";
 import { BUFF_STAT_JA, BuffStat, describeSkillEffect } from "../../core/skill.js";
 import { el } from "../dom.js";
 import { BattleStage, StageUnitInit } from "../three/battleStage.js";
+import { withPortrait } from "../three/portrait.js";
 
 export interface BattleViewProps {
   engine: BattleEngine;
@@ -521,7 +522,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
                 "button",
                 { type: "button", className: "action-target-btn", onclick: () => handleTargetPicked(unit, skillIndex, t.instanceId) },
                 [
-                  el("span", { className: "action-target-btn__avatar", style: `background:${t.def.color}` }, [t.def.emoji]),
+                  withPortrait(el("span", { className: "action-target-btn__avatar", style: `background:${t.def.color}` }, [t.def.emoji]), t.def),
                   el("span", { className: "action-target-btn__name" }, [t.def.name]),
                   el("span", { className: "action-target-btn__hp" }, [`${t.currentHp}/${t.maxHp}`]),
                 ],

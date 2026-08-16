@@ -2,6 +2,7 @@ import { ELEMENT_JA } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { Star } from "../../core/rarity.js";
 import { el } from "../dom.js";
+import { withPortrait } from "../three/portrait.js";
 
 /**
  * モンスターを表す共通のカード。
@@ -55,7 +56,7 @@ export function buildMonsterCard(
   if (bonus) classes.push("mcard--bonus");
 
   const portraitChildren: (HTMLElement | null)[] = [
-    el("span", { className: "mcard__emoji" }, [dex ? dex.emoji : "❓"]),
+    withPortrait(el("span", { className: "mcard__emoji" }, [dex ? dex.emoji : "❓"]), dex),
     dex ? el("span", { className: "mcard__element", title: `${ELEMENT_JA[dex.element]}属性` }, [ELEMENT_JA[dex.element]]) : null,
     level !== undefined ? el("span", { className: "mcard__level" }, [`Lv${level}${maxLevel ? `/${maxLevel}` : ""}`]) : null,
     bonus ? el("span", { className: "mcard__bonus" }, ["★"]) : null,
