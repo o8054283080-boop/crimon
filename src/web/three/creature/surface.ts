@@ -56,29 +56,105 @@ export interface SurfaceTraits {
   absorb: number;
 }
 
-const NEUTRAL_TRAITS: SurfaceTraits = { ember: 0, translucency: 0.2, wet: 0.1, charge: 0, absorb: 0 };
+/**
+ * 属性ごとの「体の作り」。
+ *
+ * 属性テーマ(elementTheme.ts)はUIやエフェクトと共有する色の定義で、
+ * そのまま地色にすると**どの属性も同じ明度・同じ彩度**の人形になる。
+ * 実際にそうなっていて、光属性は全身が同じカーキ色の塊になっていた。
+ *
+ * ここは「その属性の生き物はどういう体をしているか」を1属性1行で決める場所。
+ * 色相はテーマから受け継ぎ、濃さ・明るさ・部位の色・光の扱われ方だけを設計する。
+ */
+interface ElementSkin {
+  /**
+   * 地色の作り直し [色相ずらし, 彩度倍率, 明度倍率, 明度加算]。
+   * テーマの shell と rim から機械的に作った色を、ここで属性の性格へ寄せる。
+   */
+  body: [number, number, number, number];
+  /**
+   * 角・爪・牙・鰭のケラチン色。
+   * 地色が明るい属性(光)では**暗い**べきで、暗い属性では明るいべき。
+   * 属性色に染めると胴と同化するので、ここは属性色から独立して指定する。
+   */
+  keratin: number;
+  /** 毛皮・羽毛の彩度倍率。面積が大きいので、濃いと胴を食う */
+  peltSat: number;
+  /** 翼膜に透ける血の量。薄い膜は属性色ではなく肉の色をしている */
+  flesh: number;
+  /** 光の扱われ方 */
+  traits: SurfaceTraits;
+}
 
-const ELEMENT_TRAITS: Record<keyof typeof ELEMENT_THEME, SurfaceTraits> = {
-  // 冷えかけた炭。表面は暗いのに割れ目の奥だけが赤い
-  FIRE: { ember: 1.0, translucency: 0.45, wet: 0, charge: 0.12, absorb: 0 },
-  // 濡れている。地色が沈むかわりに、上を向いた面が空を映す
-  WATER: { ember: 0, translucency: 0.35, wet: 1.0, charge: 0, absorb: 0 },
-  // 帯電。細い筋が体表を這い、わずかに熱を持つ
-  ELECTRIC: { ember: 0.35, translucency: 0.25, wet: 0.1, charge: 1.0, absorb: 0 },
-  // 葉のように光を通す。艶は蝋のように薄い
-  GRASS: { ember: 0, translucency: 0.85, wet: 0.3, charge: 0, absorb: 0 },
-  // 体そのものが薄く光を通す。影が浅い
-  LIGHT: { ember: 0.28, translucency: 1.0, wet: 0.18, charge: 0.1, absorb: 0 },
-  // 光を吸う。当たっていない面が急に沈み、輪郭だけが残る
-  DARK: { ember: 0, translucency: 0.05, wet: 0.12, charge: 0, absorb: 1.0 },
+const NEUTRAL_SKIN: ElementSkin = {
+  body: [0, 1, 1, 0],
+  keratin: 0xded4bc,
+  peltSat: 0.7,
+  flesh: 0.28,
+  traits: { ember: 0, translucency: 0.2, wet: 0.1, charge: 0, absorb: 0 },
+};
+
+const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
+  // 冷えかけた炭。地色を暗く落とすことで、割れ目の奥の熾火が初めて「熱」に見える。
+  // 全身が明るい赤だと、どこが熱いのか分からない只のトマトになる
+  FIRE: {
+    body: [0, 0.94, 0.82, 0],
+    keratin: 0xe8dcc4,
+    peltSat: 0.55,
+    flesh: 0.36,
+    traits: { ember: 1.0, translucency: 0.45, wet: 0, charge: 0.12, absorb: 0 },
+  },
+  // 濡れている。深い水色を保ったまま、上を向いた面だけが空を映す
+  WATER: {
+    body: [0, 1.06, 0.92, 0],
+    keratin: 0xd7e3ea,
+    peltSat: 0.62,
+    flesh: 0.22,
+    traits: { ember: 0, translucency: 0.35, wet: 1.0, charge: 0, absorb: 0 },
+  },
+  // 帯電。地色は黄ではなく**焼けた青銅**にする。
+  // 体まで黄色いと、体表を走る電位の筋が地色に埋もれて見えなくなる
+  ELECTRIC: {
+    body: [-0.03, 1.0, 0.76, 0],
+    keratin: 0xf2e8cc,
+    peltSat: 0.58,
+    flesh: 0.28,
+    traits: { ember: 0.35, translucency: 0.25, wet: 0.1, charge: 1.0, absorb: 0 },
+  },
+  // 葉。彩度を上げて、光を通した時の緑が濁らないようにする
+  GRASS: {
+    body: [0.005, 1.22, 0.98, 0],
+    keratin: 0xe0dcc0,
+    peltSat: 0.6,
+    flesh: 0.3,
+    traits: { ember: 0, translucency: 0.85, wet: 0.3, charge: 0, absorb: 0 },
+  },
+  // 光。テーマの shell は鈍い黄土色で、そのまま塗ると泥人形になる。
+  // 彩度を大きく抜いて明度を上げ、磁器のような白へ。差し色は角と爪の**濃い金**が担う
+  LIGHT: {
+    body: [-0.012, 0.5, 1.0, 0.21],
+    keratin: 0x8a6a2c,
+    peltSat: 0.62,
+    flesh: 0.18,
+    traits: { ember: 0.28, translucency: 1.0, wet: 0.18, charge: 0.1, absorb: 0 },
+  },
+  // 闇。暗くしすぎると形が読めなくなるので、地色はむしろ保ち、
+  // 「暗さ」は光の当たらない面を沈める uAbsorb だけで作る
+  DARK: {
+    body: [0, 1.08, 1.0, 0.0],
+    keratin: 0xc9c0d2,
+    peltSat: 0.58,
+    flesh: 0.26,
+    traits: { ember: 0, translucency: 0.05, wet: 0.12, charge: 0, absorb: 1.0 },
+  },
 };
 
 /** テーマの実体から属性を逆引きする(テーマは属性ごとの定数を共有している) */
-function traitsFor(theme: ElementTheme): SurfaceTraits {
+function skinFor(theme: ElementTheme): ElementSkin {
   for (const key of Object.keys(ELEMENT_THEME) as (keyof typeof ELEMENT_THEME)[]) {
-    if (ELEMENT_THEME[key] === theme) return ELEMENT_TRAITS[key];
+    if (ELEMENT_THEME[key] === theme) return ELEMENT_SKIN[key];
   }
-  return NEUTRAL_TRAITS;
+  return NEUTRAL_SKIN;
 }
 
 /** 1体のモンスターが使う配色。属性テーマから機械的に導出する */
@@ -139,35 +215,60 @@ function tune(
   return out;
 }
 
+/**
+ * 部位の色が胴に埋もれないよう、明度の差を最低限だけ確保する。
+ *
+ * 属性が変わると地色の明度は0.28〜0.74まで動くので、部位の色を固定値で決めると
+ * ある属性では映え、別の属性では同化する。実際に光属性で
+ * **角・爪・鰭・翼が全部胴と同じカーキ色**になっていた。
+ *
+ * 色相と彩度はそのまま残し、明度だけを「余白の広いほう」へ逃がす。
+ * 元々十分離れている属性では何もしない。
+ */
+function separate(part: THREE.Color, body: THREE.Color, gap: number): THREE.Color {
+  const a = { h: 0, s: 0, l: 0 };
+  const b = { h: 0, s: 0, l: 0 };
+  part.getHSL(a, THREE.SRGBColorSpace);
+  body.getHSL(b, THREE.SRGBColorSpace);
+  const diff = a.l - b.l;
+  if (Math.abs(diff) >= gap) return part;
+  // 既に離れかけている向きを尊重し、真横に並んだ時だけ余白の広いほうへ
+  const away = diff === 0 ? (b.l < 0.5 ? 1 : -1) : Math.sign(diff);
+  const out = new THREE.Color();
+  out.setHSL(a.h, a.s, Math.min(0.9, Math.max(0.06, b.l + away * gap)), THREE.SRGBColorSpace);
+  return out;
+}
+
 export function paletteFor(theme: ElementTheme): CreaturePalette {
-  // ブルームで白飛びしないよう、体表は暗めに保ち、明るいのは差し色だけにする
+  const skin = skinFor(theme);
   const shell = theme.shell.clone();
-  const main = shell.clone().lerp(theme.rim, 0.24);
+  // テーマから機械的に作った地色を、属性ごとの「体の作り」で作り直す。
+  // ブルームで白飛びしないよう、明るいのは光属性だけに許している
+  const main = tune(shell.clone().lerp(theme.rim, 0.24), ...skin.body);
   return {
     main,
     dark: shell.clone().multiplyScalar(0.5).lerp(new THREE.Color(0x0d1020), 0.45),
     deep: shell.clone().multiplyScalar(0.28).lerp(new THREE.Color(0x07080f), 0.6),
-    // 角・爪・牙・嘴。属性色に染めると胴と同じ色になり、
-    // せっかく形で分けた部位が読めなくなる。ケラチンは属性を持たない
-    // 生成り色で、胴よりはっきり明るいのが正しい。差し色として一段だけ
-    // 属性を混ぜ、色相の帰属だけ残す
-    plate: new THREE.Color(0xd9cfb4).lerp(theme.rim, 0.22).multiplyScalar(0.48),
+    // 角・爪・牙・鰭。ケラチンは属性を持たない材質なので、属性色に染めない。
+    // 一段だけ差し色を混ぜて帰属を残し、胴との明度差は separate が保証する
+    // (指定した生成り色はそのまま使うと骨が白く浮くので、一段落として蝋の色にする)
+    plate: separate(tune(new THREE.Color(skin.keratin).lerp(theme.rim, 0.14), 0, 0.9, 0.72), main, 0.2),
     // 金属は属性色に染めすぎず、鋼の地色を残す。
     // 暗くしすぎると装甲が「焦げた塊」に見えるので、中明度を保って
     // 明暗はハイライトと映り込みで作る
-    metal: new THREE.Color(0x7d8698).lerp(theme.shell, 0.28).multiplyScalar(0.72),
+    metal: separate(new THREE.Color(0x7d8698).lerp(theme.shell, 0.28).multiplyScalar(0.72), main, 0.12),
     // 布は染めたもの。地肌より彩度が低く、わずかに沈む
     cloth: tune(main, 0.02, 0.62, 0.84),
     // 毛皮・羽毛・たてがみ。同じ属性色のままだと胴に埋もれて、
     // せっかくの面積が効かない。日に灼けた獣毛のように
-    // 彩度を落として明るく持ち上げ、胴との明暗差で読ませる
-    fur: tune(main, 0.015, 0.70, 1.40, 0, 0.70),
+    // 彩度を落とし、胴との明暗差で読ませる
+    fur: separate(tune(main, 0.015, skin.peltSat, 1.34, 0, 0.72), main, 0.15),
     accent: theme.rim.clone().multiplyScalar(0.85),
     glow: theme.core.clone(),
     // 翼膜は薄く血が透ける。属性色のままだと「胴と同じ色の板」になるので、
     // 赤側へ寄せて肉の膜であることを示す
-    membrane: shell.clone().lerp(theme.rim, 0.42).lerp(new THREE.Color(0x9c3a34), 0.32),
-    traits: traitsFor(theme),
+    membrane: shell.clone().lerp(theme.rim, 0.42).lerp(new THREE.Color(0x9c3a34), skin.flesh),
+    traits: skin.traits,
   };
 }
 
