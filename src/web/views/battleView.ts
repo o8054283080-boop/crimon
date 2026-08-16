@@ -581,6 +581,10 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     finishBtn.textContent = resultLabel(winner);
     finishBtn.classList.remove("battle-controls__finish--hidden");
     finishBtn.onclick = () => onFinish(winner);
+    // 決着後はスキルを選べないので、ドックごと下げる。
+    // 残したままだと、画面下に重なって報酬のボタンを覆い、
+    // 横画面では報酬を受け取れなくなる(実際にその不具合を出した)
+    skillDock.classList.add("skill-dock--finished");
   }
 
   function tick(): void {

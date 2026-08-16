@@ -275,6 +275,14 @@ body {
 }
 
 /* --- 下部のスキルドック --- */
+/*
+ * 決着後はスキルを選べない。残したままだと画面下で報酬のボタンに重なり、
+ * 横画面ではボタンが押せなくなる(ドックの z-index の方が上のため)
+ */
+.skill-dock.skill-dock--finished {
+  display: none;
+}
+
 .skill-dock {
   position: absolute;
   left: 0;
@@ -453,6 +461,19 @@ body {
 .battle-view .action-panel {
   pointer-events: auto;
   max-width: min(560px, 94vw);
+}
+
+/*
+ * 3Dの舞台。位置の基準をここに置くことが必須。
+ *
+ * この指定が無いと、中の canvas(position:absolute; inset:0)が
+ * 基準を見つけられず画面全体へ広がり、
+ *   - 画面下の「報酬を受け取る」ボタンを覆って押せなくする
+ *   - HPバーなど、舞台の枠を基準に置いているUIの位置がずれる
+ * という不具合になる。実際にその両方を出した。
+ */
+.battle-stage {
+  position: relative;
 }
 
 .battle-stage__canvas {
