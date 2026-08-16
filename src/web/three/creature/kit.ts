@@ -33,6 +33,25 @@ export interface ChainResult {
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
+ * 曲面をいくつに割るかを「そのパーツの大きさ」から決める。
+ *
+ * 輪郭の折れが見えるかどうかは、1分割あたりの弧の長さ、つまり
+ * 半径×角度で決まる。分割数を一律に上げると、13体×数十パーツの分だけ
+ * 頂点が増えるのに、増えた分のほとんどは元から折れの見えない
+ * 小さな装飾に費やされる。大きな曲面(頭・胴・尻・肩)だけを細かくする。
+ *
+ * radius が 0.08(指・牙)で min、0.5(胴)で max になる。
+ * 平方根を挟んで、中くらいの部位が早めに滑らかになるようにしている。
+ *
+ * 呼び出し側が分割数を明示している場合は、意図があってのことなので触らない
+ * (小さい装飾をわざと粗くしている指定が既に多数ある)。
+ */
+function arcSegments(radius: number, min: number, max: number): number {
+  const t = Math.min(1, Math.max(0, (radius - 0.08) / 0.42));
+  return Math.round(min + (max - min) * Math.sqrt(t));
+}
+
+/**
  * プロシージャルなモンスターの体パーツを作る道具箱。
  * three.jsの素のジオメトリを「生き物の部位」の語彙に翻訳し、
  * 役割別ビルダーが形の設計だけに集中できるようにする。
@@ -68,8 +87,10 @@ export class CreatureKit {
   }
 
   /** なめらかな楕円体。胴・頭・筋肉のかたまりに使う */
-  ball(rx: number, ry: number, rz: number, style: SurfaceStyle, color: THREE.Color, segments = 14): THREE.Mesh {
-    const geometry = new THREE.SphereGeometry(1, segments, Math.max(6, Math.round(segments * 0.7)));
+  ball(rx: number, ry: number, rz: number, style: SurfaceStyle, color: THREE.Color, segments?: number): THREE.Mesh {
+    // 胴や頭は輪郭がそのままシルエットになるので、大きいものほど細かく割る
+    const seg = segments ?? arcSegments(Math.max(rx, ry, rz), 14, 30);
+    const geometry = new THREE.SphereGeometry(1, seg, Math.max(6, Math.round(seg * 0.7)));
     geometry.scale(rx, ry, rz);
     return this.mesh(geometry, style, color);
   }
@@ -106,8 +127,9 @@ export class CreatureKit {
   }
 
   /** 根元が原点、+Y方向に尖る円錐。角・牙・突起に使う */
-  cone(radius: number, height: number, style: SurfaceStyle, color: THREE.Color, radial = 8): THREE.Mesh {
-    const geometry = new THREE.ConeGeometry(radius, height, radial, 1);
+  cone(radius: number, height: number, style: SurfaceStyle, color: THREE.Color, radial?: number): THREE.Mesh {
+    // 太い角は断面の多角形が見える。細い牙は8角のままで十分
+    const geometry = new THREE.ConeGeometry(radius, height, radial ?? arcSegments(radius, 8, 18), 1);
     geometry.translate(0, height / 2, 0);
     return this.mesh(geometry, style, color);
   }
@@ -130,14 +152,16 @@ export class CreatureKit {
   }
 
   /** 光輪・拘束環。XY平面に立つので、水平にするにはrotation.x = PI/2 */
-  ring(radius: number, tube: number, style: SurfaceStyle, color: THREE.Color, segments = 24): THREE.Mesh {
-    return this.mesh(new THREE.TorusGeometry(radius, tube, 6, segments), style, color);
+  ring(radius: number, tube: number, style: SurfaceStyle, color: THREE.Color, segments = 28): THREE.Mesh {
+    return this.mesh(new THREE.TorusGeometry(radius, tube, 8, segments), style, color);
   }
 
   /** 回転体。ローブ・スカート・襟に使う。profileは[半径, 高さ]の並び */
-  lathe(profile: [number, number][], style: SurfaceStyle, color: THREE.Color, segments = 18): THREE.Mesh {
+  lathe(profile: [number, number][], style: SurfaceStyle, color: THREE.Color, segments?: number): THREE.Mesh {
     const points = profile.map(([r, y]) => new THREE.Vector2(Math.max(0.001, r), y));
-    return this.mesh(new THREE.LatheGeometry(points, segments), style, color);
+    // ローブやスカートは面積が大きく、回転方向の折れがいちばん目立つ
+    const widest = profile.reduce((m, [r]) => Math.max(m, r), 0);
+    return this.mesh(new THREE.LatheGeometry(points, segments ?? arcSegments(widest, 18, 32)), style, color);
   }
 
   /** 2点を結ぶ円錐台。首・接続部・骨組みを座標指定だけで置ける */
@@ -148,13 +172,19 @@ export class CreatureKit {
     r1: number,
     style: SurfaceStyle,
     color: THREE.Color,
-    radial = 8,
+    radial?: number,
   ): THREE.Mesh {
     const a = new THREE.Vector3(from.x, from.y, from.z);
     const b = new THREE.Vector3(to.x, to.y, to.z);
     const direction = b.clone().sub(a);
     const length = direction.length();
-    const geometry = new THREE.CylinderGeometry(r1, r0, Math.max(length, 0.001), radial, 1);
+    const geometry = new THREE.CylinderGeometry(
+      r1,
+      r0,
+      Math.max(length, 0.001),
+      radial ?? arcSegments(Math.max(r0, r1), 8, 18),
+      1,
+    );
     const mesh = this.mesh(geometry, style, color);
     mesh.position.copy(a).add(b).multiplyScalar(0.5);
     mesh.quaternion.setFromUnitVectors(UP, direction.normalize());
@@ -162,8 +192,9 @@ export class CreatureKit {
   }
 
   /** 平たい装甲板・鱗板。閉じた立体なのでどこから見ても破綻しない */
-  lens(rx: number, ry: number, thickness: number, style: SurfaceStyle, color: THREE.Color, segments = 10): THREE.Mesh {
-    const geometry = new THREE.SphereGeometry(1, segments, Math.max(5, Math.round(segments * 0.6)));
+  lens(rx: number, ry: number, thickness: number, style: SurfaceStyle, color: THREE.Color, segments?: number): THREE.Mesh {
+    const seg = segments ?? arcSegments(Math.max(rx, ry), 10, 20);
+    const geometry = new THREE.SphereGeometry(1, seg, Math.max(5, Math.round(seg * 0.6)));
     geometry.scale(rx, ry, thickness);
     return this.mesh(geometry, style, color);
   }
@@ -178,9 +209,14 @@ export class CreatureKit {
     arc: number,
     style: SurfaceStyle,
     color: THREE.Color,
-    segments = 14,
+    segments?: number,
   ): THREE.Mesh {
-    return this.mesh(new THREE.TorusGeometry(radius, tube, 5, segments, arc), style, color);
+    // 肋や肩の輪は「輪の弧」の折れが目立つ。管の断面は小さいので6角で足りる
+    return this.mesh(
+      new THREE.TorusGeometry(radius, tube, 6, segments ?? arcSegments(radius, 14, 26), arc),
+      style,
+      color,
+    );
   }
 
   /**
@@ -194,11 +230,18 @@ export class CreatureKit {
     r1: number,
     style: SurfaceStyle,
     color: THREE.Color,
-    radial = 6,
-    segments = 10,
+    radial?: number,
+    segments?: number,
   ): THREE.Mesh {
     const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(p.x, p.y, p.z)));
-    const geometry = new THREE.TubeGeometry(curve, segments, 1, radial, false);
+    // 6角の管は、太い角や尾だと断面の角がはっきり出る。根元の太さで決める
+    const geometry = new THREE.TubeGeometry(
+      curve,
+      segments ?? Math.max(10, (points.length - 1) * 4),
+      1,
+      radial ?? arcSegments(r0, 6, 14),
+      false,
+    );
     const position = geometry.attributes.position as THREE.BufferAttribute;
     const uv = geometry.attributes.uv as THREE.BufferAttribute;
     const center = new THREE.Vector3();
@@ -288,7 +331,13 @@ export class CreatureKit {
       if (spec.rot) joint.rotation.set(spec.rot[0], spec.rot[1], spec.rot[2]);
       parent.add(joint);
 
-      const geometry = new THREE.CylinderGeometry(spec.r1, spec.r0, spec.len, spec.radial ?? 8, 1);
+      const geometry = new THREE.CylinderGeometry(
+        spec.r1,
+        spec.r0,
+        spec.len,
+        spec.radial ?? arcSegments(Math.max(spec.r0, spec.r1), 8, 18),
+        1,
+      );
       if (spec.flat !== undefined && spec.flat !== 1) geometry.scale(1, 1, spec.flat);
       geometry.translate(0, -spec.len / 2, 0);
       joint.add(this.mesh(geometry, spec.style ?? style, spec.color ?? color));
