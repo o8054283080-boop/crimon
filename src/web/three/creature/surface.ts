@@ -109,6 +109,8 @@ varying vec3 vViewDir;
 varying vec3 vLocal;
 varying vec3 vWorld;
 varying float vWorldY;
+varying vec3 vBody;
+varying vec3 vBodyNormal;
 
 // 骨による変形。SkinnedMesh に対して three.js が USE_SKINNING を立て、
 // bindMatrix / boneTexture も自動で流し込む。素の Mesh では丸ごと無効になる
@@ -119,6 +121,18 @@ void main() {
   // その名前で受けてから使う
   vec3 transformed = position;
   vec3 objectNormal = normal;
+
+  // バインド姿勢(スキニング前)の座標と法線。
+  //
+  // rig.ts は動かない部位を「rig.core から見た座標」へ焼き込んでから1本の
+  // スキンメッシュに束ねている。つまり素の position / normal は
+  // **その個体の体の座標系**(足元が原点、正面が -Z、上が +Y)にそろっている。
+  // ワールド座標は個体の立ち位置と向きで回るので、腹と背を見分ける用には使えない。
+  // 姿勢が変わっても動かないこの座標を使うことで、
+  // 腹の白さも部位ごとの塗り分けもモーション中に泳がない。
+  vBody = position;
+  vBodyNormal = normalize(normal);
+
   #include <skinbase_vertex>
   #include <skinnormal_vertex>
   #include <skinning_vertex>
@@ -142,6 +156,12 @@ void main() {
  */
 const FRAGMENT = /* glsl */ `
 uniform vec3 uColor;
+/** 腹側の色(明るく彩度を落とした地色) */
+uniform vec3 uBelly;
+/** 背側の色(暗く彩度を上げた地色) */
+uniform vec3 uDorsal;
+/** 腹背の塗り分けの強さ。材質ごとに変える(金属や結晶では効かせない) */
+uniform float uCounter;
 uniform vec3 uRim;
 uniform vec3 uGlow;
 uniform float uRimStrength;
@@ -163,8 +183,19 @@ varying vec3 vViewDir;
 varying vec3 vLocal;
 varying vec3 vWorld;
 varying float vWorldY;
+varying vec3 vBody;
+varying vec3 vBodyNormal;
 
 ${SIMPLEX_NOISE_3D}
+
+/**
+ * 腹側の向き。真下と正面のあいだを向く。
+ *
+ * 四足は腹が下を向き、二足は胸が前を向く。その両方を1本の向きで拾うために
+ * 下と前の中間に置いてある。四足でも喉と胸は前下がりなので、
+ * 「腹・喉・顎の下・脚の内側」がまとめて明るくなる。
+ */
+const vec3 VENTRAL_DIR = vec3(0.0, -0.815, -0.579);
 
 /**
  * 体表の起伏(高さ場)。材質ごとに違う形を返す。
@@ -353,11 +384,28 @@ void main() {
   // 下を向いた面を沈める。腹・顎下・腕の内側が落ちて、部位の丸みが分離する
   float upness = normal.y * 0.5 + 0.5;
 
-  vec3 albedo = uColor;
+  // --- 腹背の塗り分け -------------------------------------------------
+  // 実在の動物はほぼ例外なく「背が暗く腹が明るい」。上から来る光を打ち消して
+  // 立体を消す保護色だが、絵として見た時には逆に「設計された生き物」に見える。
+  // 単色の塊が、腹・喉・脚の内側で色が変わるだけで急に生物になる。
+  //
+  // 光の当たり方ではなく**地色そのもの**を変えるのが要点。陰影で暗くしただけでは
+  // 「影が濃い」としか読めず、模様として認識されない。
+  float ventral = dot(vBodyNormal, VENTRAL_DIR);
+  // 境目をノイズで崩す。まっすぐな帯だと塗り分けたペンキに見える
+  ventral += (blotch - 0.5) * 0.30;
+  float belly = smoothstep(0.02, 0.80, ventral) * uCounter;
+  float dorsal = smoothstep(-0.02, -0.72, ventral) * uCounter;
+
+  vec3 albedo = mix(uColor, uBelly, belly);
+  albedo = mix(albedo, uDorsal, dorsal);
+
   albedo *= 0.84 + blotch * 0.32;
   albedo *= 0.93 + grain * 0.14;
   albedo *= 0.78 + height01 * 0.30;
-  albedo *= 0.70 + upness * 0.42;
+  // 下向きの面を沈める擬似AO。腹側は地色で既に分離しているので、
+  // ここまで暗くすると塗り分けを打ち消してしまう。控えめに残す
+  albedo *= 0.78 + upness * 0.30;
 
   #ifdef SCALES
     // 爬虫類の鱗。境目が落ちることでパーツの丸みも読み取りやすくなる
@@ -519,8 +567,39 @@ void main() {
 }
 `;
 
+/**
+ * 地色から「腹側の色」を作る。
+ *
+ * 明るくするだけでは色が白茶けて、同じ色のライトを当てただけに見える。
+ * 実際の腹は色素そのものが薄いので、**彩度を落として明度を上げる**。
+ * さらにわずかに暖色へ寄せると、皮膚の下の血の色が透けたように見える。
+ */
+function bellyOf(color: THREE.Color): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  const out = new THREE.Color();
+  // 色相をほんの少し暖色側へ。生々しさはこの数度で決まる
+  out.setHSL((hsl.h + 0.015) % 1, hsl.s * 0.42, Math.min(0.62, hsl.l * 1.75 + 0.16));
+  return out;
+}
+
+/** 地色から「背側の色」を作る。暗く、彩度は上げる(影ではなく色素の濃さ) */
+function dorsalOf(color: THREE.Color): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  const out = new THREE.Color();
+  out.setHSL((hsl.h + 0.985) % 1, Math.min(1, hsl.s * 1.18 + 0.05), hsl.l * 0.58);
+  return out;
+}
+
 interface StyleConfig {
   defines: Record<string, string>;
+  /**
+   * 腹背の塗り分けの強さ。
+   * 生き物の地肌と毛皮でいちばん強く、硬い材質になるほど弱い。
+   * 金属や結晶は色素を持たないので効かせない(効かせると塗装に見える)。
+   */
+  counter: number;
   rimStrength: number;
   emissive: number;
   opacity: number;
@@ -545,6 +624,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   // 既定は模様を持たないなめらかな皮膚(鱗は kit.skin = "scale" で付ける)
   hide: {
     defines: { SKIN: "", SPECULAR: "" },
+    counter: 1.0,
     rimStrength: 0.55,
     emissive: 0,
     opacity: 1,
@@ -559,6 +639,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   // 毛皮・羽毛: ハイライトを持たず、光が繊維の中で散って柔らかく減衰する
   fur: {
     defines: { STRANDS: "", WRAP: "", SOFT: "" },
+    counter: 0.92,
     rimStrength: 0.85,
     emissive: 0,
     opacity: 1,
@@ -574,6 +655,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   // 骨・角・爪: 蝋のような、やや広くて強いハイライト
   plate: {
     defines: { SPECULAR: "", STREAKS: "" },
+    counter: 0.55,
     rimStrength: 0.75,
     emissive: 0,
     opacity: 1,
@@ -588,6 +670,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   // 金属: 暗い下地・環境の映り込み・点で光る鋭いハイライト
   metal: {
     defines: { SPECULAR: "", STREAKS: "", METALLIC: "" },
+    counter: 0.22,
     rimStrength: 0.5,
     emissive: 0,
     opacity: 1,
@@ -602,6 +685,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   // 布: ハイライトは出ず、斜めから見た時だけ絹の光沢が乗る
   cloth: {
     defines: { WEAVE: "", SHEEN: "" },
+    counter: 0.4,
     rimStrength: 0.35,
     emissive: 0,
     opacity: 1,
@@ -615,6 +699,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   },
   membrane: {
     defines: { TRANSLUCENT: "", VEINS: "" },
+    counter: 0.0,
     rimStrength: 0.9,
     emissive: 0.04,
     opacity: 0.94,
@@ -629,6 +714,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   // 結晶: 正面が透けて縁が詰まる。明るさではなく透過で他と区別する
   crystal: {
     defines: { SPECULAR: "", CRYSTAL: "", FACETS: "" },
+    counter: 0.0,
     rimStrength: 1.3,
     emissive: 0.12,
     opacity: 0.95,
@@ -642,6 +728,7 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   },
   glow: {
     defines: { UNLIT: "" },
+    counter: 0.0,
     rimStrength: 0.6,
     emissive: 0.6,
     opacity: 1,
@@ -757,6 +844,9 @@ export class SurfaceSet {
       depthWrite: config.depthWrite,
       uniforms: {
         uColor: { value: color.clone() },
+        uBelly: { value: bellyOf(color) },
+        uDorsal: { value: dorsalOf(color) },
+        uCounter: { value: config.counter },
         uRim: { value: this.palette.accent.clone() },
         uGlow: { value: this.palette.glow.clone() },
         uRimStrength: { value: config.rimStrength },
