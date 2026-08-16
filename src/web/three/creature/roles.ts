@@ -800,7 +800,7 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
     rig.neck.add(fin);
   }
   place(rig.head, 0, 0.36, 0, 0.62, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.17, 0.16, 0.20], snout: 0.28, jaw: true, horns: "swept", crest: 2, eye: 0.045 });
+  addBeastHead(kit, rig, { skull: [0.22, 0.21, 0.26], snout: 0.30, jaw: true, horns: "swept", crest: 2, eye: 0.062 });
 
   addTail(kit, rig, [0, 0.10, 0.28], 6, 0.20, 0.10, -1.55, -0.12, true);
 
@@ -1293,12 +1293,13 @@ function buildDebuffer(kit: CreatureKit, rig: CreatureRig): void {
   rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.26, z: 0 }, 0.1, 0.08, "hide", p.dark));
   place(rig.head, 0, 0.26, 0, 1.42, 0, 0);
   addBeastHead(kit, rig, {
-    skull: [0.13, 0.12, 0.2],
-    snout: 0.18,
+    skull: [0.17, 0.16, 0.24],
+    snout: 0.20,
     jaw: true,
     horns: "crown",
     crest: 0,
-    eye: 0.035,
+    eye: 0.048,
+    mood: "cold",
     color: p.dark,
   });
   // 中央の大きな一つ目
@@ -1569,7 +1570,7 @@ function buildBoss(kit: CreatureKit, rig: CreatureRig): void {
   place(rig.neck, 0, 1.0, -0.14, -0.35, 0, 0);
   rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.24, z: 0 }, 0.22, 0.17, "hide", p.main));
   place(rig.head, 0, 0.24, 0, 0.5, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.24, 0.22, 0.28], snout: 0.3, jaw: true, horns: "crown", crest: 3, eye: 0.055 });
+  addBeastHead(kit, rig, { skull: [0.30, 0.28, 0.34], snout: 0.32, jaw: true, horns: "crown", crest: 3, eye: 0.078, mood: "cold", slit: 0.5 });
   // 王冠のように後光を背負わせる
   const halo = kit.ring(0.52, 0.03, "crystal", p.accent, 26);
   place(halo, 0, 0.4, 0.34, -0.35, 0, 0);

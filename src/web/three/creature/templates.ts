@@ -582,7 +582,7 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   // --- 頭(細長い鼻づら、立った耳) ---
   // 鼻先をわずかに下げて、獲物を見据える角度にする
   place(rig.head, 0, 0.30, 0, 0.16, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.16, 0.15, 0.21], snout: 0.36, jaw: true, horns: "none", crest: 0, eye: 0.042 });
+  addBeastHead(kit, rig, { skull: [0.21, 0.20, 0.27], snout: 0.36, jaw: true, horns: "none", crest: 0, eye: 0.058 });
   // 立った三角の耳。獣の種類を一番はっきり伝える部位
   for (const side of [-1, 1]) {
     const ear = new THREE.Group();
@@ -1506,7 +1506,7 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   // 頭が小さいと、長い首と相まってリャマや馬の輪郭になる。
   // 首の太さに負けない大きさまで頭蓋を上げ、口先も長く取る
   place(rig.head, 0, 0.6, -0.12, 0.62, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.22, 0.2, 0.28], snout: 0.52, jaw: true, horns: "swept", crest: 4, eye: 0.052 });
+  addBeastHead(kit, rig, { skull: [0.28, 0.26, 0.35], snout: 0.50, jaw: true, horns: "swept", crest: 4, eye: 0.072, slit: 0.34 });
   // 頬の張り出し。口先の細さと対比させて、噛む力があるように見せる
   for (const side of [-1, 1]) {
     rig.head.add(place(kit.lens(0.1, 0.13, 0.07, "plate", p.plate, 8), side * 0.19, 0.15, 0.02, 0, 0, side * 0.3));
