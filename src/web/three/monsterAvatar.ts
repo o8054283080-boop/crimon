@@ -354,8 +354,11 @@ export class MonsterAvatar {
    * 打点はどの重さでもおおむね揃え、重い個体は**溜めを長く、余韻をさらに長く**する。
    */
   playAttack(): void {
-    this.attackWindup = 0.14 + this.mass * 0.11;
-    this.attackStrike = 0.16 + this.mass * 0.05;
+    this.attackWindup = 0.13 + this.mass * 0.08;
+    // 打ち抜きは「立ち上がり(全体の45%)+抜け」。以前は全体が0.17秒しかなく、
+    // 立ち上がりが4フレームで終わっていた。目で追えないほど速いと、
+    // 見ている側には移動ではなく瞬間移動として届く
+    this.attackStrike = 0.19 + this.mass * 0.09;
     this.attackRecover = 0.24 + this.mass * 0.6;
     trigger(this.attackTrack, this.attackWindup + this.attackStrike + this.attackRecover);
   }
@@ -648,7 +651,7 @@ export class MonsterAvatar {
       // 打ち抜き: 立ち上がりを鋭く、抜けをゆるく。打点は打ち抜き区間の4割の位置。
       // 山なりの正弦だと打点が中央に来てしまい、当たった瞬間が読めない
       const u = clamp01((e - w) / s);
-      const swing = e < w ? 0 : u < 0.4 ? Math.sin((u / 0.4) * Math.PI * 0.5) : Math.pow(1 - (u - 0.4) / 0.6, 1.5);
+      const swing = e < w ? 0 : u < 0.45 ? Math.sin((u / 0.45) * Math.PI * 0.5) : Math.pow(1 - (u - 0.45) / 0.55, 1.5);
       // 余韻: 打ち終わりに行き過ぎ、減衰しながら揺り戻して収まる。
       // 1山で戻すと「巻き戻し」に見えるので、必ず追い越してから収める
       const r = e < w + s ? 0 : clamp01((e - w - s) / this.attackRecover);
