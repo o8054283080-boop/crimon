@@ -46,7 +46,7 @@ const CHAPTER_LOOKS: Record<number, ChapterLook> = {
   1: { title: "はじまりの草原", color: "#3fd39a", color2: "#12694f", scenery: "🌿" },
   2: { title: "月夜の荒野", color: "#7b8cf6", color2: "#2b3286", scenery: "🌙" },
   3: { title: "灼けた岩窟", color: "#f0a03c", color2: "#8a4110", scenery: "🪨" },
-  4: { title: "星屑の花園", color: "#e druck", color2: "#6a1b7a", scenery: "✨" },
+  4: { title: "星屑の花園", color: "#c96ae0", color2: "#6a1b7a", scenery: "✨" },
 };
 
 const FALLBACK_LOOK: ChapterLook = { title: "未知の領域", color: "#8f9ec6", color2: "#333a5c", scenery: "❔" };
