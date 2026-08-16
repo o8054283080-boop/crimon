@@ -529,6 +529,7 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.5,
     squash: 0,
     attack: "pounce",
+    accent: "headShake",
   };
 }
 
@@ -628,6 +629,7 @@ function buildDefender(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 0.8,
     squash: 0,
     attack: "slam",
+    accent: "stomp",
   };
 }
 
@@ -806,6 +808,7 @@ function buildHealer(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 0.55,
     squash: 0,
     attack: "cast",
+    accent: "gaze",
   };
 }
 
@@ -933,6 +936,7 @@ function buildSupport(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 0.7,
     squash: 0,
     attack: "cast",
+    accent: "shiver",
   };
 }
 
@@ -1060,6 +1064,7 @@ function buildDebuffer(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.1,
     squash: 0,
     attack: "cast",
+    accent: "gaze",
   };
 }
 
@@ -1200,6 +1205,7 @@ function buildBalanced(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.2,
     squash: 0,
     attack: "lunge",
+    accent: "headShake",
   };
 }
 
@@ -1294,6 +1300,7 @@ function buildBoss(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.0,
     squash: 0,
     attack: "slam",
+    accent: "roar",
   };
 }
 
@@ -1355,6 +1362,7 @@ function buildCritter(kit: CreatureKit, rig: CreatureRig): void {
     lunge: 1.3,
     squash: 0,
     attack: "dash",
+    accent: "shiver",
   };
 }
 

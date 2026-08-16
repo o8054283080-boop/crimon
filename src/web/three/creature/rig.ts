@@ -78,7 +78,16 @@ export interface AnimProfile {
    */
   squash: number;
   /** 攻撃モーションの型 */
-  attack: "lunge" | "slam" | "cast" | "dash" | "pounce";
+  attack: "lunge" | "slam" | "cast" | "dash" | "pounce" | "breath" | "swipe" | "bless";
+  /**
+   * 待機中にごくたまに出る仕草。
+   *
+   * 待機モーションを正弦波の重ね合わせだけで作ると、周期が読めてしまい
+   * 「動いているが生きてはいない」見え方になる。数秒に一度、周期と無関係な
+   * 短い動作を挟むと、同じ骨格でも急に生き物として読めるようになる。
+   * 種別の性格を一番安く出せる場所でもあるので、造形と揃えて選ぶこと。
+   */
+  accent: "none" | "headShake" | "wingRuffle" | "tailFlick" | "stomp" | "shiver" | "roar" | "gaze";
 }
 
 export const DEFAULT_ANIM: AnimProfile = {
@@ -92,6 +101,7 @@ export const DEFAULT_ANIM: AnimProfile = {
   lunge: 1.1,
   squash: 0,
   attack: "lunge",
+  accent: "none",
 };
 
 /**
@@ -143,6 +153,10 @@ export class CreatureRig {
   wingAnchor = new THREE.Vector3(0.3, 0.62, 0.18);
   /** 正規化後の体高 */
   height = 2.4;
+  /** finalizeRig が組む骨組み。剛体へ落ちた場合はnull */
+  skeleton: THREE.Skeleton | null = null;
+  /** 骨で変形する本体メッシュ(材質ごとに1本) */
+  skinnedMeshes: THREE.SkinnedMesh[] = [];
   anim: AnimProfile = { ...DEFAULT_ANIM };
 
   constructor() {
@@ -257,6 +271,179 @@ function mergeRecursive(object: THREE.Object3D, kit: CreatureKit): void {
   }
 }
 
+/** 1つの骨と、それが対応する「動く部位」のグループ */
+interface BoneEntry {
+  container: THREE.Object3D;
+  bone: THREE.Bone;
+  parentIndex: number;
+}
+
+/**
+ * 「動く部位」のグループ1つにつき骨を1本、そのグループの子として置く。
+ *
+ * 骨をグループの子(変換なし)にしておくと、骨のワールド行列はグループの
+ * ワールド行列と常に一致する。アニメーション側は今までどおりグループの
+ * rotation を動かすだけでよく、13体分のビルダーもモーションのコードも
+ * 一切書き換えずにスキニングへ移行できる。
+ */
+function collectBones(container: THREE.Object3D, ownerIndex: number, entries: BoneEntry[]): void {
+  for (const child of container.children) {
+    if (child.userData.rigBone) continue;
+    // 回る環や漂う破片(それ自身がメッシュで動くもの)は骨にせず、剛体のまま残す
+    if ((child as THREE.Mesh).isMesh) continue;
+    if (child.userData.animated) {
+      const bone = new THREE.Bone();
+      bone.userData.rigBone = true;
+      child.add(bone);
+      const index = entries.length;
+      entries.push({ container: child, bone, parentIndex: ownerIndex });
+      collectBones(child, index, entries);
+    } else {
+      // 静止グループは骨を増やさず素通りする(座標は親の骨に含まれている)
+      collectBones(child, ownerIndex, entries);
+    }
+  }
+}
+
+interface SkinPiece {
+  mesh: THREE.Mesh;
+  boneIndex: number;
+}
+
+/** 骨に属するメッシュを集める。それ自身が動くメッシュ(装飾)は対象外 */
+function collectSkinPieces(container: THREE.Object3D, ownerIndex: number, out: SkinPiece[], entries: BoneEntry[]): void {
+  for (const child of container.children) {
+    if (child.userData.rigBone) continue;
+    if ((child as THREE.Mesh).isMesh) {
+      if (!child.userData.animated) out.push({ mesh: child as THREE.Mesh, boneIndex: ownerIndex });
+      continue;
+    }
+    if (child.userData.animated) {
+      const index = entries.findIndex((entry) => entry.container === child);
+      if (index >= 0) collectSkinPieces(child, index, out, entries);
+    } else {
+      collectSkinPieces(child, ownerIndex, out, entries);
+    }
+  }
+}
+
+/** 親の骨へ重みを分け始める距離。関節の付け根からこの範囲だけが溶ける */
+const SKIN_BLEND_RATIO = 0.45;
+/** 親の骨へ渡せる重みの上限。0.5を超えると部位が親に引きずられて形が崩れる */
+const SKIN_MAX_PARENT_WEIGHT = 0.5;
+
+/**
+ * 剛体の階層から、そのままスキン付きの1メッシュを組む。
+ *
+ * 部位ごとに別メッシュのままだと、関節を曲げたときに必ず継ぎ目が出る。
+ * かといって13体分の骨格を手で塗り直すのは現実的ではないので、
+ * 「その部位の骨に重み1」を基本にしつつ、**関節の付け根に近い頂点だけ**
+ * 親の骨と重みを分け合わせる。継ぎ目が出るのは付け根なので、そこだけ溶かせばよい。
+ */
+function buildSkinnedBody(rig: CreatureRig, kit: CreatureKit): boolean {
+  const entries: BoneEntry[] = [];
+  const rootBone = new THREE.Bone();
+  rootBone.userData.rigBone = true;
+  rig.core.add(rootBone);
+  entries.push({ container: rig.core, bone: rootBone, parentIndex: 0 });
+  collectBones(rig.core, 0, entries);
+  if (entries.length < 2) return false;
+
+  const pieces: SkinPiece[] = [];
+  collectSkinPieces(rig.core, 0, pieces, entries);
+  if (pieces.length === 0) return false;
+
+
+  rig.root.updateMatrixWorld(true);
+  const coreInverse = rig.core.matrixWorld.clone().invert();
+
+  // 各骨の付け根(関節の位置)を、rig.core から見た座標で持っておく
+  const pivots = entries.map((entry) => new THREE.Vector3().setFromMatrixPosition(entry.container.matrixWorld).applyMatrix4(coreInverse));
+
+  // 骨ごとに「付け根からいちばん遠い頂点までの距離」を測り、溶かす範囲の基準にする。
+  // 部位の大きさは体の場所によって桁が違うので、固定値では小さい部位が全部溶ける
+  const reach = new Array<number>(entries.length).fill(0);
+  const localGeometries = pieces.map(({ mesh, boneIndex }) => {
+    const matrix = coreInverse.clone().multiply(mesh.matrixWorld);
+    const cloned = mesh.geometry.clone().applyMatrix4(matrix);
+    const flat = cloned.index ? cloned.toNonIndexed() : cloned;
+    if (flat !== cloned) cloned.dispose();
+    for (const name of Object.keys(flat.attributes)) {
+      if (name !== "position" && name !== "normal" && name !== "uv") flat.deleteAttribute(name);
+    }
+    const position = flat.attributes.position as THREE.BufferAttribute;
+    const pivot = pivots[boneIndex];
+    const vertex = new THREE.Vector3();
+    for (let i = 0; i < position.count; i++) {
+      const distance = vertex.fromBufferAttribute(position, i).distanceTo(pivot);
+      if (distance > reach[boneIndex]) reach[boneIndex] = distance;
+    }
+    return flat;
+  });
+
+  // 重みを載せる
+  localGeometries.forEach((geometry, index) => {
+    const boneIndex = pieces[index].boneIndex;
+    const parentIndex = entries[boneIndex].parentIndex;
+    const pivot = pivots[boneIndex];
+    const blend = Math.max(1e-4, reach[boneIndex] * SKIN_BLEND_RATIO);
+    const position = geometry.attributes.position as THREE.BufferAttribute;
+    const skinIndex = new Uint16Array(position.count * 4);
+    const skinWeight = new Float32Array(position.count * 4);
+    const vertex = new THREE.Vector3();
+    for (let i = 0; i < position.count; i++) {
+      let parentWeight = 0;
+      if (parentIndex !== boneIndex) {
+        const distance = vertex.fromBufferAttribute(position, i).distanceTo(pivot);
+        const near = Math.max(0, 1 - distance / blend);
+        parentWeight = SKIN_MAX_PARENT_WEIGHT * near * near;
+      }
+      skinIndex[i * 4] = boneIndex;
+      skinIndex[i * 4 + 1] = parentIndex;
+      skinWeight[i * 4] = 1 - parentWeight;
+      skinWeight[i * 4 + 1] = parentWeight;
+    }
+    geometry.setAttribute("skinIndex", new THREE.BufferAttribute(skinIndex, 4));
+    geometry.setAttribute("skinWeight", new THREE.BufferAttribute(skinWeight, 4));
+  });
+
+  // 材質ごとに1本のスキンメッシュへまとめる
+  const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  localGeometries.forEach((geometry, index) => {
+    const material = pieces[index].mesh.material as THREE.Material;
+    const bucket = buckets.get(material);
+    if (bucket) bucket.push(geometry);
+    else buckets.set(material, [geometry]);
+  });
+
+  const skeleton = new THREE.Skeleton(entries.map((entry) => entry.bone));
+  for (const piece of pieces) piece.mesh.removeFromParent();
+
+  const skinned: THREE.SkinnedMesh[] = [];
+  for (const [material, geometries] of buckets) {
+    const merged = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries, false);
+    if (geometries.length > 1) for (const geometry of geometries) geometry.dispose();
+    if (!merged) continue;
+    const mesh = new THREE.SkinnedMesh(kit.adopt(merged), material);
+    mesh.castShadow = true;
+    // 骨は rig.core の下にぶら下がっているので、姿勢の二重掛けを避けるために
+    // スキンメッシュ自身は変換を持たせずそのまま core へ置く
+    mesh.frustumCulled = false;
+    rig.core.add(mesh);
+    // 束ねるのはこの後の正規化を挟んでからだが、束ねていないスキンメッシュに
+    // 外から触れる(体高を測るなど)と skeleton が未定義で落ちる。
+    // ここでいったん束ねておき、正規化後に束ね直す
+    mesh.updateMatrixWorld(true);
+    mesh.bind(skeleton, mesh.matrixWorld.clone());
+    skinned.push(mesh);
+  }
+  if (skinned.length === 0) return false;
+
+  rig.skeleton = skeleton;
+  rig.skinnedMeshes = skinned;
+  return true;
+}
+
 /**
  * 体高を目標値へ正規化し、足(または浮遊の下端)が地面に合うよう配置する。
  * 役割別ビルダーは実寸を気にせず「形の比率」だけを設計すればよくなる。
@@ -267,7 +454,11 @@ export function finalizeRig(rig: CreatureRig, kit: CreatureKit, targetHeight: nu
   // マージで焼き込まれると、参照だけ残って画面から消えてしまう
   for (const spinner of rig.spinners) markAnimated(spinner.object);
   for (const orbiter of rig.orbiters) markAnimated(orbiter.object);
-  mergeRecursive(rig.core, kit);
+
+  // 骨で滑らかに曲げられる形へ組み替える。骨が立たない構成(部位が1つしかない等)
+  // だけは、従来どおり材質ごとに焼き込んだ剛体へ落とす
+  const skinnedOk = buildSkinnedBody(rig, kit);
+  if (!skinnedOk) mergeRecursive(rig.core, kit);
 
   rig.root.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(rig.core);
@@ -277,4 +468,13 @@ export function finalizeRig(rig: CreatureRig, kit: CreatureKit, targetHeight: nu
   rig.scaler.scale.setScalar(scale);
   rig.scaler.position.y = floatGap - box.min.y * scale;
   rig.height = targetHeight + floatGap;
+
+  // bindMatrix と骨の逆行列は「束ねた時点の姿勢」を焼き込むので、
+  // 体高の正規化(scaler)まで済ませてから束ね直す。
+  // 正規化前の姿勢のままだと、拡大率のぶんだけ変形がずれる
+  if (rig.skeleton) {
+    rig.root.updateMatrixWorld(true);
+    rig.skeleton.calculateInverses();
+    for (const mesh of rig.skinnedMeshes) mesh.bind(rig.skeleton, mesh.matrixWorld.clone());
+  }
 }
