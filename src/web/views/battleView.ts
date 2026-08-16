@@ -5,6 +5,7 @@ import { MonsterDefinition } from "../../core/monster.js";
 import { BUFF_STAT_JA, BuffStat, describeSkillEffect } from "../../core/skill.js";
 import { el } from "../dom.js";
 import { BattleStage, StageUnitInit } from "../three/battleStage.js";
+import { withPortrait } from "../three/portrait.js";
 
 export interface BattleViewProps {
   engine: BattleEngine;
@@ -148,6 +149,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   let finished = false;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   let picker: PickerState = { phase: "NONE" };
+  /** 対象選びで今光らせている相手 */
+  let selectedTargetId: string | null = null;
   let activeInstanceId: string | null = null;
 
   const hudRefs = new Map<string, UnitHudRefs>();
@@ -510,39 +513,81 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       const { unit, skillIndex } = picker;
       const skill = unit.def.skills[skillIndex];
       const candidates = getTargetCandidates(unit, skill);
+      // 選んでいた相手が倒れていたら選び直させる
+      if (selectedTargetId && !candidates.some((t) => t.instanceId === selectedTargetId)) selectedTargetId = null;
+      // 迷わせないよう、最初の1体をあらかじめ選んでおく
+      if (!selectedTargetId && candidates.length > 0) selectedTargetId = candidates[0].instanceId;
+      stage.setTargetedUnit(selectedTargetId);
+
+      const chosen = candidates.find((t) => t.instanceId === selectedTargetId);
       actionPanelEl.append(
-        el("div", { className: "action-panel" }, [
+        el("div", { className: "action-panel action-panel--target" }, [
           el("div", { className: "action-panel__title" }, [`「${skill.name}」の対象を選んでください`]),
-          el(
-            "div",
-            { className: "action-panel__targets" },
-            candidates.map((t) =>
-              el(
-                "button",
-                { type: "button", className: "action-target-btn", onclick: () => handleTargetPicked(unit, skillIndex, t.instanceId) },
-                [
-                  el("span", { className: "action-target-btn__avatar", style: `background:${t.def.color}` }, [t.def.emoji]),
-                  el("span", { className: "action-target-btn__name" }, [t.def.name]),
-                  el("span", { className: "action-target-btn__hp" }, [`${t.currentHp}/${t.maxHp}`]),
-                ],
-              ),
-            ),
-          ),
-          el(
-            "button",
-            {
-              type: "button",
-              className: "btn btn--ghost",
-              onclick: () => {
-                picker = { phase: "SKILL", unit };
-                renderActionPanel();
+          el("div", { className: "action-panel__hint" }, ["敵をタップして選び、決定で発動します"]),
+          chosen
+            ? el("div", { className: "action-panel__chosen" }, [
+                el("span", { className: "action-panel__chosen-name" }, [chosen.def.name]),
+                el("span", { className: "action-panel__chosen-hp" }, [`${chosen.currentHp}/${chosen.maxHp}`]),
+              ])
+            : el("div", { className: "action-panel__chosen" }, ["対象が選ばれていません"]),
+          el("div", { className: "action-panel__row" }, [
+            el(
+              "button",
+              {
+                type: "button",
+                className: "btn btn--ghost",
+                onclick: () => {
+                  picker = { phase: "SKILL", unit };
+                  selectedTargetId = null;
+                  stage.setTargetedUnit(null);
+                  renderActionPanel();
+                },
               },
-            },
-            ["◀ スキル選び直し"],
-          ),
+              ["◀ スキル選び直し"],
+            ),
+            el(
+              "button",
+              {
+                type: "button",
+                className: "btn btn--primary",
+                disabled: !chosen,
+                onclick: () => {
+                  if (!selectedTargetId) return;
+                  const id = selectedTargetId;
+                  selectedTargetId = null;
+                  stage.setTargetedUnit(null);
+                  handleTargetPicked(unit, skillIndex, id);
+                },
+              },
+              ["決定"],
+            ),
+          ]),
         ]),
       );
+    } else {
+      // 対象選びを抜けたら光を消す。消し忘れると戦闘中ずっと光り続ける
+      if (selectedTargetId !== null) {
+        selectedTargetId = null;
+        stage.setTargetedUnit(null);
+      }
     }
+  }
+
+  /**
+   * 3Dの本体をタップして対象を選ぶ。
+   * 文字の一覧は画面を覆ってしまい、どれがどの敵か結び付かないので、
+   * 本体そのものを叩ける方が分かりやすい。
+   * 選ばれた相手は足元の紋様が警告色に変わって脈打つ。
+   */
+  function handleStageTap(event: PointerEvent): void {
+    if (picker.phase !== "TARGET") return;
+    const hit = stage.pickUnitAt(event.clientX, event.clientY);
+    if (!hit) return;
+    const { unit, skillIndex } = picker;
+    const candidates = getTargetCandidates(unit, unit.def.skills[skillIndex]);
+    if (!candidates.some((t) => t.instanceId === hit)) return;
+    selectedTargetId = hit;
+    renderActionPanel();
   }
 
   function handleSkillPicked(unit: BattleUnit, skillIndex: 0 | 1 | 2, skill: MonsterDefinition["skills"][number]): void {
@@ -580,6 +625,10 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     finishBtn.textContent = resultLabel(winner);
     finishBtn.classList.remove("battle-controls__finish--hidden");
     finishBtn.onclick = () => onFinish(winner);
+    // 決着後はスキルを選べないので、ドックごと下げる。
+    // 残したままだと、画面下に重なって報酬のボタンを覆い、
+    // 横画面では報酬を受け取れなくなる(実際にその不具合を出した)
+    skillDock.classList.add("skill-dock--finished");
   }
 
   function tick(): void {
@@ -721,6 +770,20 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   ]);
 
   const logStrip = el("div", { className: "battle-logstrip" }, [logEl]);
+
+  // 3Dの本体を叩いて対象を選べるようにする。
+  // 回り込みの指の滑りと区別するため、ほとんど動かなかった時だけ選択とみなす
+  let tapStartX = 0;
+  let tapStartY = 0;
+  stage.element.addEventListener("pointerdown", (event) => {
+    tapStartX = event.clientX;
+    tapStartY = event.clientY;
+  });
+  stage.element.addEventListener("pointerup", (event) => {
+    const moved = Math.hypot(event.clientX - tapStartX, event.clientY - tapStartY);
+    if (moved > 12) return;
+    handleStageTap(event);
+  });
 
   stageHost.append(topBar, actionPanelEl, skillDock, logStrip);
 

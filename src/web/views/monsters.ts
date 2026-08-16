@@ -8,6 +8,7 @@ import { checkRankUp } from "../../game/progression.js";
 import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillRows } from "./skillPanel.js";
+import { withPortrait } from "../three/portrait.js";
 
 export interface MonstersProps {
   player: PlayerState;
@@ -136,7 +137,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [dex ? dex.name : instance.dexId])]),
     el("section", { className: "panel monster-detail" }, [
-      el("div", { className: "monster-detail__avatar", style: dex ? `background:${dex.color}` : undefined }, [dex ? dex.emoji : "❓"]),
+      withPortrait(el("div", { className: "monster-detail__avatar", style: dex ? `background:${dex.color}` : undefined }, [dex ? dex.emoji : "❓"]), dex),
       el("div", { className: "monster-detail__star" }, [starLabel(instance.star)]),
       el("div", { className: "monster-detail__level" }, [`Lv ${instance.level} / ${maxLevel}`]),
       inParty ? el("div", { className: "role-badge" }, ["編成中"]) : null,

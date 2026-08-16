@@ -3,6 +3,7 @@ import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
+import { withPortrait } from "../three/portrait.js";
 
 /** パーティ編成画面用のモンスターカード。編成中(selected)の場合は「✅ 編成中」バッジを表示する */
 export function partyMemberCard(instance: MonsterInstance, selected: boolean, onClick: () => void): HTMLElement {
@@ -25,7 +26,7 @@ export function renderPartySlots(members: readonly MonsterInstance[], slotCount:
     }
     const dex = findMonsterById(instance.dexId);
     return el("div", { className: "party-slot", style: dex ? `background:${dex.color}` : undefined }, [
-      el("span", { className: "party-slot__emoji" }, [dex ? dex.emoji : "❓"]),
+      withPortrait(el("span", { className: "party-slot__emoji" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
       el("span", { className: "party-slot__star" }, [starLabel(instance.star)]),
     ]);
   });

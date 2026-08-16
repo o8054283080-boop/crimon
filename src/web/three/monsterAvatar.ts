@@ -8,6 +8,9 @@ import { CreatureUniforms, SurfaceSet, createCreatureUniforms, paletteFor } from
 import { ElementTheme, themeFor } from "./elementTheme.js";
 import { radialGlowTexture, shadowTexture, sigilTexture } from "./textures.js";
 
+/** 対象に選ばれている時の足元の紋様の色。属性色と混ざらない警告色にする */
+const TARGET_SIGIL_COLOR = new THREE.Color(0xff5a4a);
+
 /** 攻撃・被弾などの短時間アニメを、経過時間ベースで管理する簡易トラック */
 interface AnimTrack {
   elapsed: number;
@@ -92,6 +95,9 @@ export class MonsterAvatar {
 
   private readonly auraSprite: THREE.Sprite;
   private readonly sigilMesh: THREE.Mesh;
+  private readonly hitProxy: THREE.Mesh;
+  /** スキルの対象として選ばれているか */
+  private targeted = false;
   private readonly shadowMesh: THREE.Mesh;
   private readonly disposables: { dispose: () => void }[] = [];
 
@@ -157,6 +163,17 @@ export class MonsterAvatar {
     this.root.add(this.sigilMesh);
     this.disposables.push(sigilGeometry, sigilMaterial);
 
+    // --- 指の当たり判定 ---
+    // 体そのもので判定すると、細い脚や翼の隙間を突いてしまい狙いにくい。
+    // 姿を持たない箱を1つ被せ、その箱で受ける
+    const hitGeometry = new THREE.BoxGeometry(footprint * 1.15, this.rig.height * 1.05, footprint * 1.15);
+    const hitMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    this.hitProxy = new THREE.Mesh(hitGeometry, hitMaterial);
+    this.hitProxy.position.y = this.rig.height * 0.52;
+    this.hitProxy.renderOrder = -1;
+    this.root.add(this.hitProxy);
+    this.disposables.push(hitGeometry, hitMaterial);
+
     // --- 接地影 ---
     const shadowGeometry = new THREE.PlaneGeometry(footprint * 1.25, footprint * 1.25);
     const shadowMaterial = new THREE.MeshBasicMaterial({
@@ -204,6 +221,20 @@ export class MonsterAvatar {
   /** 行動順が回ってきた時のハイライト */
   setActive(active: boolean): void {
     this.targetActiveGlow = active ? 1 : 0;
+  }
+
+  /**
+   * スキルの対象として選ばれている状態。
+   * 行動中の光り方と同じ機構に乗せつつ、足元の紋様を警告色へ寄せて、
+   * 「今から殴られる相手」だと一目で分かるようにする。
+   */
+  setTargeted(targeted: boolean): void {
+    this.targeted = targeted;
+  }
+
+  /** 指の当たり判定に使う、姿を持たない箱。細かい形で判定すると狙いにくい */
+  get hitArea(): THREE.Object3D {
+    return this.hitProxy;
   }
 
   /** HP割合。低いほど表面の亀裂が強く光る */
@@ -662,7 +693,11 @@ export class MonsterAvatar {
 
     const fade = 1 - death;
     const sigilMaterial = this.sigilMesh.material as THREE.MeshBasicMaterial;
-    sigilMaterial.opacity = (0.26 + this.activeGlow * 0.55 + Math.sin(elapsed * 2.2) * 0.03) * fade;
+    // 対象に選ばれている間は、脈打たせて紋様を警告色へ寄せる。
+    // 行動中の光り方と混ざらないよう、点滅の速さを変えてある
+    const targetPulse = this.targeted ? 0.55 + Math.sin(elapsed * 6.5) * 0.25 : 0;
+    sigilMaterial.color.copy(this.targeted ? TARGET_SIGIL_COLOR : this.theme.ground);
+    sigilMaterial.opacity = (0.26 + this.activeGlow * 0.55 + targetPulse + Math.sin(elapsed * 2.2) * 0.03) * fade;
     this.sigilMesh.rotation.z += dt * (0.16 + this.activeGlow * 0.65);
     this.sigilMesh.scale.setScalar(1 + this.activeGlow * 0.06);
 
@@ -672,7 +707,7 @@ export class MonsterAvatar {
 
     this.uniforms.uTime.value = elapsed;
     this.uniforms.uFlash.value = this.flash;
-    this.uniforms.uActive.value = this.activeGlow;
+    this.uniforms.uActive.value = Math.max(this.activeGlow, this.targeted ? 0.85 : 0);
     this.uniforms.uWound.value = 1 - this.hpRatio;
     this.uniforms.uDissolve.value = death;
   }

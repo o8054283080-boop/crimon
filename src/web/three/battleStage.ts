@@ -32,6 +32,15 @@ export interface ScreenAnchor {
  */
 const CAMERA_AZIMUTH_DEG = -15;
 
+/** 指を横へ画面幅いっぱい滑らせた時に回る角度(ラジアン) */
+const ORBIT_SPEED = Math.PI * 1.1;
+/**
+ * 手で回せる範囲。真後ろまで回れると自陣と敵陣が入れ替わって
+ * どちらが自分か分からなくなるので、左右それぞれ100度で止める。
+ * 自分のモンスターの顔を覗き込むには十分な角度。
+ */
+const ORBIT_LIMIT = THREE.MathUtils.degToRad(100);
+
 const PLAYER_LINE_Z = 3.8;
 const ENEMY_LINE_Z = -5.0;
 
@@ -158,11 +167,25 @@ export class BattleStage {
   private readonly desiredLookOffset = new THREE.Vector3();
   private readonly tmpVector = new THREE.Vector3();
   private readonly tmpRelative = new THREE.Vector3();
+  /** 画面のタップ位置から3Dの本体を拾うための道具 */
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly pointer = new THREE.Vector2();
 
   /** 両チームが必ず収まる箱。setupUnitsで実際のスロット位置から作る */
   private frameBox: FrameBox = { halfWidth: 5.4, zNear: 4.4, zFar: -4.9, yBottom: -0.1, yTop: 3.3 };
   /** フレーミングで決まったカメラ距離。UIの遠近スケールの基準にも使う */
   private frameDistance = 20;
+
+  /** 手で回した角度(実際に適用されている値。目標へ滑らかに寄る) */
+  private orbitYaw = 0;
+  /** 手で回した角度の目標値 */
+  private orbitYawTarget = 0;
+  private dragPointerId: number | null = null;
+  private dragLastX = 0;
+  /** 最後にフレーミングをやり直した時の回り込み角 */
+  private framedYaw = 0;
+  private viewWidth = 1;
+  private viewHeight = 1;
 
   private shakeStrength = 0;
   private hitStopRemaining = 0;
@@ -216,6 +239,8 @@ export class BattleStage {
       tintStrength: 0.15,
     });
     this.composer.addPass(this.cinematicPass);
+
+    this.setupOrbitControl();
 
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(container);
@@ -353,7 +378,10 @@ export class BattleStage {
     // 顔・角・仮面といった見分けどころが自分のモンスターだけ見えなくなる。
     // ユニットが向いている側へカメラを回り込ませて、斜め後ろから見る構図にする。
     // 副次的に、2つの列が画面上で斜めに並ぶ(正対だと前後の列が重なりやすい)
-    const azimuth = THREE.MathUtils.degToRad(CAMERA_AZIMUTH_DEG);
+    //
+    // 手で回した角度もここに含める。回すと2つの列が横並びになって必要な幅が
+    // 変わるので、距離を測り直さないとユニットが画面の外へ押し出される
+    const azimuth = THREE.MathUtils.degToRad(CAMERA_AZIMUTH_DEG) + this.orbitYaw;
     const yAxis = new THREE.Vector3(0, 1, 0);
     const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch)).applyAxisAngle(yAxis, azimuth);
     const forward = dir.clone().negate();
@@ -415,6 +443,8 @@ export class BattleStage {
 
   private handleResize(): void {
     const { width, height } = this.measure();
+    this.viewWidth = width;
+    this.viewHeight = height;
     this.frameCamera(width, height);
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height);
@@ -459,6 +489,90 @@ export class BattleStage {
     this.composer.render();
   }
 
+  /**
+   * 画面を左右に滑らせて、闘技場を回り込めるようにする。
+   *
+   * 両チームを向かい合わせると、自軍はどうしても後ろ姿が中心になる。
+   * 構図の既定値をどこに置いても誰かの顔が見えないので、
+   * 「見たい角度は手で選べる」形にして解決する。
+   * 2本指や2回叩く操作で既定の構図へ戻せる。
+   */
+  private setupOrbitControl(): void {
+    const canvas = this.renderer.domElement;
+    // 指で回している最中にページごとスクロールしてしまうのを止める
+    canvas.style.touchAction = "none";
+    canvas.style.cursor = "grab";
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (this.dragPointerId !== null) return;
+      this.dragPointerId = event.pointerId;
+      this.dragLastX = event.clientX;
+      canvas.setPointerCapture(event.pointerId);
+      canvas.style.cursor = "grabbing";
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (this.dragPointerId !== event.pointerId) return;
+      const dx = event.clientX - this.dragLastX;
+      this.dragLastX = event.clientX;
+      const width = Math.max(1, canvas.clientWidth);
+      this.orbitYawTarget = THREE.MathUtils.clamp(
+        this.orbitYawTarget - (dx / width) * ORBIT_SPEED,
+        -ORBIT_LIMIT,
+        ORBIT_LIMIT,
+      );
+    });
+
+    const end = (event: PointerEvent) => {
+      if (this.dragPointerId !== event.pointerId) return;
+      this.dragPointerId = null;
+      canvas.style.cursor = "grab";
+    };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+
+    // 2回叩いたら既定の構図へ戻す。回しすぎて分からなくなった時の逃げ道
+    canvas.addEventListener("dblclick", () => {
+      this.orbitYawTarget = 0;
+    });
+  }
+
+  /** 回り込みを既定の構図へ戻す */
+  resetOrbit(): void {
+    this.orbitYawTarget = 0;
+  }
+
+  /**
+   * 画面上の座標にいるユニットを返す。対象を文字の一覧ではなく
+   * 3Dの本体そのものから選べるようにするために使う。
+   * 判定は姿を持たない箱で行うので、細い脚や翼の隙間で外れることはない。
+   */
+  pickUnitAt(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+
+    const proxies: THREE.Object3D[] = [];
+    const owners = new Map<THREE.Object3D, string>();
+    for (const [instanceId, avatar] of this.avatars) {
+      if (avatar.isDying()) continue;
+      proxies.push(avatar.hitArea);
+      owners.set(avatar.hitArea, instanceId);
+    }
+    const hits = this.raycaster.intersectObjects(proxies, false);
+    for (const hit of hits) {
+      const id = owners.get(hit.object);
+      if (id) return id;
+    }
+    return null;
+  }
+
+  /** 対象として選ばれているユニットを光らせる。nullで全部消す */
+  setTargetedUnit(instanceId: string | null): void {
+    for (const [id, avatar] of this.avatars) avatar.setTargeted(id === instanceId);
+  }
+
   private updateCamera(dt: number): void {
     // 注視点・カメラ位置ともに目標値へ滑らかに寄せる(急な切り替えを避ける)
     const follow = Math.min(1, dt * 3.2);
@@ -469,6 +583,15 @@ export class BattleStage {
     // フレーミングを壊さないよう、振れ幅は構図に影響しない範囲に抑える
     const idleX = Math.sin(this.elapsed * 0.19) * 0.16;
     const idleY = Math.sin(this.elapsed * 0.27 + 1.2) * 0.08;
+
+    // 手で回した角度を目標へ滑らかに寄せる(指を離しても急に止まらない)
+    this.orbitYaw += (this.orbitYawTarget - this.orbitYaw) * Math.min(1, dt * 9);
+    // 回すと2つの列の並び方が変わり、必要な画角も変わる。
+    // 一定以上動いたらフレーミングごとやり直して、端のユニットが切れないようにする
+    if (Math.abs(this.orbitYaw - this.framedYaw) > 0.008) {
+      this.framedYaw = this.orbitYaw;
+      this.frameCamera(this.viewWidth, this.viewHeight);
+    }
 
     this.camera.position.copy(this.cameraBase).add(this.cameraOffset);
     this.camera.position.x += idleX;
