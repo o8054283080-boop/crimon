@@ -781,18 +781,44 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.16, z: 0 }, 0.10, 0.09, "hide", p.dark));
   place(rig.head, 0, 0.18, 0, 0.08, 0, 0);
   const head = rig.head;
-  head.add(place(kit.ball(0.16, 0.19, 0.17, "hide", p.deep), 0, 0.10, 0));
-  // 面。目の高さで前へせり出す板が、影を落として表情を作る
-  head.add(place(kit.lens(0.16, 0.17, 0.10, "metal", p.metal), 0, 0.14, -0.09, -0.06, 0, 0));
-  head.add(place(kit.box(0.20, 0.04, 0.05, "glow", p.glow), 0, 0.11, -0.18));
-  head.add(place(kit.box(0.09, 0.10, 0.04, "metal", p.metal), 0, 0.11, -0.19));
+  head.add(place(kit.ball(0.17, 0.2, 0.18, "hide", p.deep), 0, 0.11, 0));
+  // 兜。頭頂から後頭部を覆う殻と、額の中央に立つ稜。
+  // 面をのっぺり1枚にすると、光る帯を貼った箱にしかならない(実際にそうなっていた)
+  head.add(place(kit.lens(0.175, 0.185, 0.15, "metal", p.metal), 0, 0.16, 0.0));
+  head.add(place(kit.spike(0.045, 0.26, 0.3, "metal", p.metal), 0, 0.28, 0.04, 0.4, Math.PI / 2, 0));
+  // 眉庇。左右に割れた鋭い庇。魔王の冷たさは、この庇の角度で決まる
+  for (const side of [-1, 1]) {
+    head.add(place(kit.lens(0.105, 0.032, 0.085, "metal", p.metal), side * 0.08, 0.185, -0.115, -0.55, 0, -side * 0.62));
+  }
+  // 目。冷たい細い光。眉庇があるので、目そのものの眉は切る
+  addFaceEyes(kit, head, {
+    x: 0.075,
+    y: 0.135,
+    z: -0.15,
+    size: 0.055,
+    mood: "cold",
+    splay: 0.3,
+    slit: 0.4,
+    skin: p.deep,
+    brow: false,
+  });
+  // 鼻梁と頬当て。面に段差が入ると、光る目が「顔の中」に見える
+  head.add(place(kit.lens(0.022, 0.06, 0.045, "metal", p.metal), 0, 0.135, -0.16));
+  for (const side of [-1, 1]) {
+    head.add(place(kit.lens(0.055, 0.095, 0.07, "metal", p.metal), side * 0.135, 0.08, -0.085, 0, side * 0.45, side * 0.2));
+  }
+  // 口を覆う面頬。歯を並べた面で、笑っているようにも噛みしめているようにも読める
+  head.add(place(kit.lens(0.11, 0.065, 0.08, "metal", p.metal), 0, 0.042, -0.105, 0.24, 0, 0));
+  for (let i = -2; i <= 2; i++) {
+    head.add(place(kit.box(0.013, 0.042, 0.02, "hide", p.deep), i * 0.029, 0.042, -0.175, 0.24, 0, 0));
+  }
   // 顎の牙
   for (const side of [-1, 1]) {
-    const fang = kit.spike(0.022, 0.09, 0.7, "plate", p.plate);
-    place(fang, side * 0.055, 0.0, -0.13, AIM_DOWN, 0, 0);
+    const fang = kit.spike(0.024, 0.1, 0.7, "plate", p.plate);
+    place(fang, side * 0.075, -0.012, -0.135, AIM_DOWN, 0, side * 0.14);
     head.add(fang);
   }
-  head.add(place(kit.lens(0.13, 0.07, 0.09, "hide", p.dark, 8), 0, 0.0, -0.10, 0.2, 0, 0));
+  head.add(place(kit.lens(0.115, 0.06, 0.08, "hide", p.dark, 8), 0, -0.03, -0.09, 0.24, 0, 0));
 
   // 巨大な角。外へ回り込みながら上へ立ち上がり、正面幅を稼ぐ
   for (const side of [-1, 1]) {
