@@ -514,10 +514,31 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 1.0;
 
   // --- 腰。狼は後ろが軽く、肩が高い ---
-  rig.pelvis.add(place(kit.ball(0.24, 0.24, 0.30, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.19, 0.18, 0.17, "hide", p.main), 0, -0.02, 0.20));
+  // 輪切りを積んだ1本。獣なので面の数は多め(10)にして角張らせないが、
+  // 球を並べるのはやめる。並べたぶんだけ輪郭が丸の連なりになる
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.11, rz: 0.11 },
+          { y: 0.14, r: 0.19, rz: 0.2 },
+          { y: 0.32, r: 0.24, rz: 0.24, ridge: 0.12 },
+          { y: 0.5, r: 0.2, rz: 0.22 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.3,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   for (const side of [-1, 1]) {
-    rig.pelvis.add(place(kit.ball(0.13, 0.17, 0.18, "hide", p.main), side * 0.19, -0.02, 0.10));
+    rig.pelvis.add(place(kit.ball(0.11, 0.16, 0.17, "hide", p.main), side * 0.19, -0.02, 0.10));
   }
 
   // --- 後脚(細く、踵が高いデジティグレード) ---
@@ -545,11 +566,32 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(深い胸、絞れた腹。前後に長く取る) ---
   const torso = rig.torso;
   place(torso, 0, 0.06, -0.54, 0.02, 0, 0);
-  // 胸郭。狼は前脚の間が深く、そこから腹へ向けて一気に絞れる
-  torso.add(place(kit.ball(0.25, 0.31, 0.36, "hide", p.main), 0, 0.0, -0.14));
-  torso.add(place(kit.ball(0.21, 0.23, 0.34, "hide", p.main), 0, 0.0, 0.20));
-  torso.add(place(kit.ball(0.18, 0.18, 0.24, "hide", p.dark), 0, -0.14, -0.14));
-  torso.add(place(kit.ball(0.15, 0.12, 0.34, "hide", p.dark), 0, -0.14, 0.14));
+  // 胸郭。狼は前脚の間が深く、そこから腹へ向けて一気に絞れる。
+  // 球を4つ並べると腰のくびれが「球と球の谷間」になり、体が数珠に見える。
+  // 輪切り1本なら、絞りがそのまま連続した輪郭として出る
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.17, rz: 0.18 },
+          { y: 0.16, r: 0.21, rz: 0.23, keel: 0.1 },
+          { y: 0.36, r: 0.19, rz: 0.22, keel: 0.16, ridge: 0.1 },
+          { y: 0.54, r: 0.24, rz: 0.3, keel: 0.24, ridge: 0.14 },
+          { y: 0.68, r: 0.25, rz: 0.3, keel: 0.16, ridge: 0.1 },
+          { y: 0.8, r: 0.17, rz: 0.2 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.34,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 肩甲骨の張り
   for (const side of [-1, 1]) {
     torso.add(place(kit.ball(0.11, 0.16, 0.17, "hide", p.main), side * 0.22, 0.08, -0.20));
