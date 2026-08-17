@@ -542,13 +542,27 @@ float brushedStreak(vec3 p) {
  *
  * どちらもY方向の目を粗く取ってあるので、模様は縦へ長く流れる。
  * 毛は生えた向きに寝ているので、これが無いと綿のかたまりになる。
+ *
+ * **そのうえで房に縁を付ける。** 鱗で効いたのと同じ理屈で、
+ * なだらかな濃淡を重ねただけでは「粒の集まり」から抜け出せない。
+ * 房と房の境目に溝が落ち、そのすぐ内側で縁の毛が起きて光を拾う。
+ * この2本の線があると、面が平らでも1房ずつを数えられる。
+ *
+ * 境目は房のノイズの**零点**で取る。閉じた曲線になるので、
+ * 1本の等高線がそのまま1房の輪郭になり、大小が自然に混ざる。
  */
 float strandPattern(vec3 p) {
   // 房。毛が寄って出来た大きな塊
-  float clump = snoise(p * vec3(7.5, 3.4, 7.5)) * 0.5 + 0.5;
+  float lock = snoise(p * vec3(7.5, 3.4, 7.5));
   // 房の中の毛束。房そのものの位置で歪ませ、房に沿って流れるようにする
-  float tuft = snoise(vec3(p.x * 26.0, p.y * 5.5, p.z * 26.0) + clump * 1.8) * 0.5 + 0.5;
-  return clamp(clump * 0.52 + tuft * 0.48, 0.0, 1.0);
+  float tuft = snoise(vec3(p.x * 26.0, p.y * 5.5, p.z * 26.0) + lock * 0.9) * 0.5 + 0.5;
+  // 房の輪郭。零点からの距離で溝と稜を作る。
+  // **帯は法線の摂動の刻み幅(0.012)より広く取ること。** これより細いと
+  // 勾配を取る4点が溝をまたいでしまい、凹凸が線ではなくちらつく粒になる
+  float outline = abs(lock);
+  float groove = 1.0 - smoothstep(0.0, 0.18, outline);
+  float crest = smoothstep(0.15, 0.34, outline) * smoothstep(0.62, 0.40, outline);
+  return clamp((lock * 0.5 + 0.5) * 0.42 + tuft * 0.38 + crest * 0.22 - groove * 0.26, 0.0, 1.0);
 }
 
 /**
@@ -806,6 +820,15 @@ void main() {
     // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる。
     // 弱いと均一な面に潰れて毛に見えないので、房の陰影ははっきり付ける
     albedo *= 0.66 + height * 0.56;
+    // 房の縁。鱗と同じで、ひとつの高さ場から溝と稜を閾値で取り出す。
+    // 房の目は鱗よりずっと粗いので、線が消え始める距離もそのぶん遠い
+    float furLod = detailFade(vWorld, 0.055);
+    float lockGap = (1.0 - smoothstep(0.0, 0.20, height)) * furLod;
+    float lockLit = smoothstep(0.70, 0.95, height) * furLod;
+    // 溝は毛の根元なので、鱗の溝ほど硬く落とさない
+    albedo *= 1.0 - lockGap * 0.34;
+    // 縁の毛だけが起きて光を拾う
+    albedo *= 1.0 + lockLit * 0.24;
     // 毛先。房の陰影より細かい段をもう1枚だけ重ねる。
     // 高さ場に入れると法線の摂動が4回叩かれて重くなるので、色にだけ効かせる
     float bristle = snoise(vec3(vWorld.x * 60.0, vWorld.y * 9.0, vWorld.z * 60.0)) * 0.5 + 0.5;
