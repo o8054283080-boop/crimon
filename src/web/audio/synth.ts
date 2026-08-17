@@ -149,10 +149,13 @@ export function buildImpulseResponse(ctx: BaseAudioContext, seconds = 1.9, decay
 
 /** 軽い飽和。生の正弦波は安っぽいので、低音の胴鳴りに歪みを少し足す */
 export function saturationCurve(amount = 8): Float32Array<ArrayBuffer> {
-  const samples = 1024;
+  // **奇数長にして中央を厳密に0に置く。**
+  // 偶数長だと入力0が2点の間に落ち、実測で 0.007 の直流が残った
+  // (音が鳴っていないのにバスに電圧が乗り続け、無駄に頭を削る)
+  const samples = 1025;
   const curve = new Float32Array(samples);
   for (let i = 0; i < samples; i++) {
-    const x = (i * 2) / samples - 1;
+    const x = (i / (samples - 1)) * 2 - 1;
     curve[i] = Math.tanh(x * amount) / Math.tanh(amount);
   }
   return curve;

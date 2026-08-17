@@ -26,7 +26,18 @@ export interface SfxAnalysis {
   lengthMs: number;
   /** スペクトル平坦度 0..1(高いほどノイズ的) */
   flatness: number;
-  /** 低域(<300Hz)/中域/高域(>4kHz)のエネルギー比 */
+  /**
+   * 200Hz〜8kHz に限ったスペクトル平坦度。
+   * 全帯域の平坦度はローパスを掛けただけで0へ落ちてしまい、
+   * 「ノイズかどうか」の判定に使えないため、聴感上重要な帯域だけを見る
+   */
+  bandFlatness: number;
+  /**
+   * 強いビン上位1%が全体エネルギーに占める割合。
+   * 純音や倍音列だと少数のビンに集中するので高くなる(=安っぽい方向)
+   */
+  tonalPeakRatio: number;
+  /** A特性で重み付けした 低域(<300Hz)/中域/高域(>4kHz) の比。聴こえ方に近い */
   band: { low: number; mid: number; high: number };
   /** 減衰が指数的か(対数振幅の直線当てはめの決定係数 R^2) */
   decayFitR2: number;
@@ -165,17 +176,39 @@ export function analyzeWaveform(name: SfxName, data: Float32Array, sampleRate = 
   let mid = 0;
   let high = 0;
   const binHz = sampleRate / (mags.length * 2);
+  // 200Hz〜8kHz に限った平坦度用の集計。全帯域だと、ローパスで削った
+  // 高域の空っぽのビンが対数平均を押し下げ、どんな音でも0付近に張り付く
+  let bandLogSum = 0;
+  let bandLinSum = 0;
+  let bandCount = 0;
+  const powers: number[] = [];
   for (let i = 1; i < mags.length; i++) {
     const power = mags[i] * mags[i] + 1e-12;
     logSum += Math.log(power);
     linSum += power;
     count += 1;
+    powers.push(power);
     const hz = i * binHz;
+    if (hz >= 200 && hz <= 8000) {
+      bandLogSum += Math.log(power);
+      bandLinSum += power;
+      bandCount += 1;
+    }
     if (hz < 300) low += power;
     else if (hz < 4000) mid += power;
     else high += power;
   }
   const flatness = count > 0 ? Math.exp(logSum / count) / (linSum / count) : 0;
+  const bandFlatness = bandCount > 0 ? Math.exp(bandLogSum / bandCount) / (bandLinSum / bandCount) : 0;
+
+  // 上位1%のビンが全体エネルギーのどれだけを占めるか。
+  // 純音・倍音列は少数のビンに集中するので高くなり、ノイズなら低いままになる
+  const sorted = powers.slice().sort((a, b) => b - a);
+  const topCount = Math.max(1, Math.floor(sorted.length * 0.01));
+  let topEnergy = 0;
+  for (let i = 0; i < topCount; i++) topEnergy += sorted[i];
+  const tonalPeakRatio = linSum > 0 ? topEnergy / linSum : 0;
+
   const total = low + mid + high + 1e-12;
 
   return {
@@ -186,6 +219,8 @@ export function analyzeWaveform(name: SfxName, data: Float32Array, sampleRate = 
     decayMs: dropTo(0.1),
     lengthMs: dropTo(0.001),
     flatness,
+    bandFlatness,
+    tonalPeakRatio,
     band: { low: low / total, mid: mid / total, high: high / total },
     decayFitR2: r2,
   };

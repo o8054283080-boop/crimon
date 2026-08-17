@@ -189,8 +189,12 @@ export class StripField {
   /** 帯の太さにかかる共通倍率(BillboardField/ParticleFieldと同じ考え方) */
   sizeScale = 1;
 
-  /** ビルボードと同じ考え方で、混雑してきたら新しい帯を間引く */
-  private readonly softLimit = 8;
+  /**
+   * ビルボードと同じ考え方で、混雑してきたら新しい帯を間引く。
+   * ただし帯は面ではなく線なので、同じ枚数でも板ほど加算が積み上がらない。
+   * 衝撃波の輪をここへ寄せている以上、板より緩くしないと輪が消える。
+   */
+  private readonly softLimit = 14;
 
   spawn(spec: StripSpec, cameraPosition: THREE.Vector3): void {
     if (this.items.length > this.softLimit) {

@@ -64,7 +64,14 @@ interface Voice {
 export function buildBus(ctx: BaseAudioContext, destination: AudioNode, reverbGain = 0.85): { bus: SoundBus; dryGain: GainNode } {
   const dryGain = ctx.createGain();
   dryGain.gain.value = 1;
-  dryGain.connect(destination);
+  // 直流を止める。歪みや非対称な波形が直流を残すと、鳴っていない間も
+  // 電圧が乗り続けて頭を削る(実測で見つけた)
+  const dcBlock = ctx.createBiquadFilter();
+  dcBlock.type = "highpass";
+  dcBlock.frequency.value = 26;
+  dcBlock.Q.value = 0.7;
+  dryGain.connect(dcBlock);
+  dcBlock.connect(destination);
 
   const convolver = ctx.createConvolver();
   convolver.buffer = buildImpulseResponse(ctx, 1.9, 3.6);
