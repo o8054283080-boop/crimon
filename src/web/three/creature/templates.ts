@@ -41,8 +41,14 @@ import {
 
 /**
  * 大きく丸い目。素材モンスターや妖精のように「可愛さ」で見せる種別に使う。
- * 白目を持たず、暗い眼窩+発光する虹彩+小さなハイライトの3層で作る。
- * 発光部の面積を小さく保ち、加算エフェクトが重なっても白飛びさせない。
+ *
+ * 以前は「暗い窪み+発光する球+ハイライト」の3層だった。これは
+ * **目の全面が発光する**ため、実際には白く飛んだ楕円が2つ並ぶだけで、
+ * 瞳孔も視線も生まれず、どの種別も同じ宇宙人の顔になっていた。
+ *
+ * いまは共通の目つき生成(addFaceEyes の round)へ委ねる。
+ * 明るい眼球・大きな虹彩・大きな瞳孔・2点のハイライト・まぶたの縁で、
+ * 発光面積を増やさずに「丸くて濡れた目」を作る。
  */
 function addRoundEyes(
   kit: CreatureKit,
@@ -51,14 +57,17 @@ function addRoundEyes(
   y: number,
   z: number,
   radius: number,
+  splay = 0.26,
 ): void {
-  const p = kit.palette;
-  for (const side of [-1, 1]) {
-    head.add(place(kit.ball(radius * 1.25, radius * 1.45, radius * 0.8, "hide", p.deep, 10), side * x, y, z + radius * 0.5));
-    head.add(place(kit.ball(radius, radius * 1.15, radius * 0.6, "glow", p.glow, 10), side * x, y, z));
-    // ハイライト。1点入るだけで、目が球として読めるようになる
-    head.add(place(kit.ball(radius * 0.3, radius * 0.3, radius * 0.2, "plate", p.plate, 6), side * (x + radius * 0.3), y + radius * 0.45, z - radius * 0.2));
-  }
+  addFaceEyes(kit, head, {
+    x,
+    y,
+    z,
+    size: radius * 1.15,
+    mood: "round",
+    splay,
+    skin: kit.palette.dark,
+  });
 }
 
 /** 毛の房。同じ向きの棘を少しずつずらして重ね、毛束の厚みを出す */

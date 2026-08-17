@@ -152,7 +152,10 @@ interface MoodSpec {
 const EYE_MOODS: Record<EyeMood, MoodSpec> = {
   fierce: { aspect: 0.50, tilt: 0.40, iris: 0.78, lid: 0.32, brow: 0.36, sclera: "dark" },
   cold: { aspect: 0.42, tilt: 0.34, iris: 0.72, lid: 0.30, brow: 0.26, sclera: "none" },
-  round: { aspect: 1.00, tilt: -0.05, iris: 0.62, lid: 0.08, brow: -0.10, sclera: "wet" },
+  // 可愛さは「虹彩が眼球をほとんど埋めていること」で決まる。
+  // 白目を広く残すと、大人びた・あるいは不気味な顔になる。
+  // まぶたは持たせない。丸い目に厚いまぶたを乗せると、目の上に肉の瘤が付く
+  round: { aspect: 1.00, tilt: -0.05, iris: 0.94, lid: 0, brow: -0.10, sclera: "wet" },
   gentle: { aspect: 0.70, tilt: -0.18, iris: 0.60, lid: 0.28, brow: -0.24, sclera: "wet" },
   blank: { aspect: 0.60, tilt: 0.14, iris: 0.90, lid: 0.00, brow: 0.20, sclera: "none" },
 };
@@ -188,8 +191,10 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
   const h = s * m.aspect;
   const skin = o.skin ?? p.dark;
   const slit = o.slit ?? 1;
-  // 虹彩は縦半径で決まるが、細い目では横にはみ出すので横幅でも頭打ちにする
-  const iris = Math.min(s * 0.66, h * m.iris);
+  // 虹彩は縦半径で決まるが、細い目では横にはみ出すので横幅でも頭打ちにする。
+  // 明るい眼球の種別だけは、虹彩が白目を押しのけて大きく取れるようにする
+  // (白目の面積が広いと、可愛い目つきにはならない)
+  const iris = Math.min(s * (m.sclera === "wet" ? 0.74 : 0.66), h * m.iris);
 
   for (const side of [-1, 1]) {
     const eye = new THREE.Group();
@@ -216,15 +221,26 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
     }
 
     // 虹彩・瞳孔・ハイライトは、必ず眼球の前面より手前へ順に重ねる。
-    // 眼球と同じ深さに置くと球に飲まれて、遠景では目が消える
-    eye.add(place(kit.lens(iris, iris, s * 0.14, "glow", p.glow, 10), 0, 0, -s * 0.4));
-    // 瞳孔。ここが無いと、どんなに形を整えても視線が生まれない
-    // 明るい眼球の種別は瞳孔を大きく取る。虹彩が輪として残り、
-    // 目全体が発光する「電球」にならずに済む
-    const pupil = m.sclera === "wet" ? 0.66 : 0.52;
-    eye.add(place(kit.lens(iris * pupil * slit, iris * (m.sclera === "wet" ? 0.94 : 0.84), s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
+    // 眼球と同じ深さに置くと球に飲まれて、遠景では目が消える。
+    if (m.sclera === "wet") {
+      // 明るい眼球の上では、**虹彩を暗くする**。
+      // 白い眼球に発光する円を乗せると白飛びした一枚の板になり、
+      // 瞳の色も視線も消える(実際にそうなっていた)。
+      // 大きな暗い虹彩・その中心の小さな光・白い眼球の三段で、
+      // 発光面積を増やさずに「丸くて濡れた目」を作る
+      eye.add(place(kit.lens(iris, iris * (h / s), s * 0.2, "hide", p.deep, 12), 0, 0, -s * 0.34));
+      eye.add(place(kit.lens(iris * 0.46 * slit, iris * 0.46 * (h / s), s * 0.12, "glow", p.glow, 10), 0, 0, -s * 0.46));
+    } else {
+      eye.add(place(kit.lens(iris, iris, s * 0.14, "glow", p.glow, 10), 0, 0, -s * 0.4));
+      // 瞳孔。ここが無いと、どんなに形を整えても視線が生まれない
+      eye.add(place(kit.lens(iris * 0.52 * slit, iris * 0.84, s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
+    }
     // ハイライト。1点入るだけで目が濡れた球として読める
     eye.add(place(kit.lens(iris * 0.30, iris * 0.30, s * 0.06, "plate", p.plate, 6), iris * 0.40, iris * 0.42, -s * 0.56));
+    if (m.sclera === "wet") {
+      // 反対の隅にもう1点。2点入ると目が「濡れて丸い」ことが決定的になる
+      eye.add(place(kit.lens(iris * 0.17, iris * 0.17, s * 0.05, "plate", p.plate, 6), -iris * 0.44, -iris * 0.48, -s * 0.54));
+    }
 
     // まぶたの縁。目の輪郭を暗い線で1周なぞると、10画素の大きさでも
     // 「点」ではなく「目の形」として読める。上を太く、下を細くする
