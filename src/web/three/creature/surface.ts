@@ -98,7 +98,7 @@ const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
   // 冷えかけた炭。地色を暗く落とすことで、割れ目の奥の熾火が初めて「熱」に見える。
   // 全身が明るい赤だと、どこが熱いのか分からない只のトマトになる
   FIRE: {
-    body: [0, 1.0, 0.74, 0],
+    body: [0, 1.14, 0.70, 0],
     keratin: 0xe8dcc4,
     peltSat: 0.55,
     flesh: 0.36,
@@ -842,12 +842,16 @@ void main() {
   // ノイズの零点に沿った**細い線**にして、体表を走る電位に見せる
   if (uCharge > 0.001) {
     float arc = snoise(vBody * 7.0 + vec3(0.0, uTime * 1.5, uTime * 0.5));
-    float filament = 1.0 - smoothstep(0.0, 0.075, abs(arc));
+    float filament = 1.0 - smoothstep(0.0, 0.045, abs(arc));
+    // **体の一部にだけ**出す。全面に走らせると閉じた輪が敷き詰められて、
+    // 電気ではなく「ひび割れ模様の釉薬」になる。
+    // 遅いノイズで区画を切り、その区画自体をゆっくり移動させる
+    float sparkArea = smoothstep(0.05, 0.55, snoise(vBody * 1.6 + vec3(uTime * 0.5, uTime * 0.3, 0.0)));
     // 明滅。全身が同時に光ると電飾になるので、体の高さで位相をずらす
     float flicker = 0.55 + 0.45 * sin(uTime * 9.0 + vBody.y * 5.0);
-    color += mix(uGlow, uRim, 0.4) * filament * flicker * uCharge * 0.42;
+    color += mix(uGlow, uRim, 0.4) * filament * sparkArea * flicker * uCharge * 0.5;
     // 筋の周りだけ地色が持ち上がる。線が体表に「乗っている」ように見える
-    color += uRim * smoothstep(0.30, 0.0, abs(arc)) * uCharge * 0.06;
+    color += uRim * smoothstep(0.26, 0.0, abs(arc)) * sparkArea * uCharge * 0.07;
   }
 
   // 吸光。光の当たっていない面が黒へ落ちる。

@@ -2400,12 +2400,29 @@ function buildSeraph(kit: CreatureKit, rig: CreatureRig): void {
   rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.12, z: 0 }, 0.065, 0.06, "hide", p.dark));
   place(rig.head, 0, 0.14, 0, 0.04, 0, 0);
   const head = rig.head;
-  head.add(place(kit.ball(0.15, 0.17, 0.155, "hide", p.deep), 0, 0.10, 0));
-  // 面。目も口も置かず、頬の高さでわずかに前へ張り出す一枚の板にする。
+  head.add(place(kit.ball(0.15, 0.17, 0.155, "hide", p.deep), 0, 0.1, 0));
+  // 面。頬の高さでわずかに前へ張り出す一枚の板。
   // 発光で潰すと加算演出が乗った時に頭だけ白く飛ぶので、光は縁の細い線だけ
   head.add(place(kit.lens(0.15, 0.185, 0.095, "plate", p.plate, 12), 0, 0.11, -0.06, -0.04, 0, 0));
+  // 目。「顔を作らない」は無表情ではなく、ただの卵になる。
+  // 伏し目がちの穏やかな目を置いて、そこに神性を宿らせる
+  addFaceEyes(kit, head, {
+    x: 0.056,
+    y: 0.13,
+    z: -0.148,
+    size: 0.042,
+    mood: "gentle",
+    splay: 0.22,
+    skin: p.plate,
+    brow: false,
+  });
+  // 眉庇の代わりに、額を横切る細い金の帯。塊を置くと瘤に見える
+  head.add(place(kit.band(0.085, 0.008, Math.PI * 0.8, "metal", p.metal, 14), 0, 0.175, -0.135, 0.1, 0, Math.PI * 0.1));
+  // 鼻梁と、閉じた唇の線。線1本で「静かに黙っている」に変わる
+  head.add(place(kit.lens(0.011, 0.032, 0.022, "plate", p.plate, 8), 0, 0.093, -0.152));
+  head.add(place(kit.lens(0.026, 0.006, 0.012, "hide", p.dark, 8), 0, 0.055, -0.149));
   head.add(place(kit.band(0.14, 0.013, Math.PI * 1.1, "metal", p.metal, 14), 0, 0.11, -0.11, Math.PI / 2, -Math.PI * 0.55, 0));
-  head.add(place(kit.octa(0.03, 0.055, 0.022, "glow", p.glow), 0, 0.21, -0.13));
+  head.add(place(kit.octa(0.03, 0.055, 0.022, "glow", p.glow), 0, 0.215, -0.125));
   // 後頭部を覆う頭巾。面と繋げて、頭全体を一続きの殻に見せる
   head.add(place(kit.ball(0.16, 0.17, 0.165, "cloth", p.cloth), 0, 0.13, 0.03));
   // 冠。細い結晶を放射させ、顔が無いぶんの情報を頭の輪郭に置く

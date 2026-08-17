@@ -152,8 +152,8 @@ interface MoodSpec {
 const EYE_MOODS: Record<EyeMood, MoodSpec> = {
   fierce: { aspect: 0.50, tilt: 0.40, iris: 0.78, lid: 0.32, brow: 0.36, sclera: "dark" },
   cold: { aspect: 0.42, tilt: 0.34, iris: 0.72, lid: 0.30, brow: 0.26, sclera: "none" },
-  round: { aspect: 1.00, tilt: -0.05, iris: 0.72, lid: 0.08, brow: -0.10, sclera: "wet" },
-  gentle: { aspect: 0.72, tilt: -0.18, iris: 0.68, lid: 0.24, brow: -0.24, sclera: "wet" },
+  round: { aspect: 1.00, tilt: -0.05, iris: 0.62, lid: 0.08, brow: -0.10, sclera: "wet" },
+  gentle: { aspect: 0.70, tilt: -0.18, iris: 0.60, lid: 0.28, brow: -0.24, sclera: "wet" },
   blank: { aspect: 0.60, tilt: 0.14, iris: 0.90, lid: 0.00, brow: 0.20, sclera: "none" },
 };
 
@@ -219,7 +219,10 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
     // 眼球と同じ深さに置くと球に飲まれて、遠景では目が消える
     eye.add(place(kit.lens(iris, iris, s * 0.14, "glow", p.glow, 10), 0, 0, -s * 0.4));
     // 瞳孔。ここが無いと、どんなに形を整えても視線が生まれない
-    eye.add(place(kit.lens(iris * 0.52 * slit, iris * 0.84, s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
+    // 明るい眼球の種別は瞳孔を大きく取る。虹彩が輪として残り、
+    // 目全体が発光する「電球」にならずに済む
+    const pupil = m.sclera === "wet" ? 0.66 : 0.52;
+    eye.add(place(kit.lens(iris * pupil * slit, iris * (m.sclera === "wet" ? 0.94 : 0.84), s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
     // ハイライト。1点入るだけで目が濡れた球として読める
     eye.add(place(kit.lens(iris * 0.30, iris * 0.30, s * 0.06, "plate", p.plate, 6), iris * 0.40, iris * 0.42, -s * 0.56));
 
