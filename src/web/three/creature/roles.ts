@@ -611,11 +611,15 @@ export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: num
   wing.add(place(kit.ball(0.11 * L, 0.13 * L, 0.1 * L, "fur", p.fur, 10), s * 0.04 * L, 0.02 * L, 0.01 * L));
 
   const point = new THREE.Vector3();
-  const rows: { u0: number; u1: number; len: number; color: THREE.Color; z: number; scale: number }[] = [
-    // 風切羽: 前縁の外側半分から、外向き〜下向きに長く伸びる
-    { u0: 0.22, u1: 0.99, len: 1, color: p.fur, z: -0.02, scale: 1 },
+  const rows: { u0: number; u1: number; len: number; color: THREE.Color; z: number; scale: number; width: number }[] = [
+    // 風切羽: 前縁の外側半分から、外向き〜下向きに長く伸びる。
+    // **幅が足りないと羽根同士に隙間が空き、翼ではなく櫛の歯に見える**。
+    // 実際にそうなっていたので、1枚の幅を広げて必ず隣と重ねる
+    { u0: 0.2, u1: 0.99, len: 1, color: p.fur, z: -0.02, scale: 1, width: 0.34 },
     // 雨覆い: 手前に重ねる短い羽根。段差の影で層に見せる
-    { u0: 0.10, u1: 0.80, len: 0.44, color: p.main, z: -0.06, scale: 0.85 },
+    { u0: 0.08, u1: 0.82, len: 0.46, color: p.main, z: -0.06, scale: 0.9, width: 0.44 },
+    // 小雨覆い: さらに手前の短い層。前縁の骨を隠して、肩から羽根が生えて見せる
+    { u0: 0.02, u1: 0.6, len: 0.24, color: p.fur, z: -0.1, scale: 0.6, width: 0.56 },
   ];
 
   for (const row of rows) {
@@ -624,7 +628,7 @@ export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: num
       const t = n === 1 ? 0 : i / (n - 1);
       spine.getPointAt(row.u0 + (row.u1 - row.u0) * t, point);
       const len = L * (0.30 + t * 0.26) * row.len;
-      const feather = kit.feather(len, len * 0.21, "fur", row.color, 0.1);
+      const feather = kit.feather(len, len * row.width, "fur", row.color, 0.1);
       // 内側は真下へ、外側ほど外向きへ倒す(扇の要は肩ではなく前縁全体)
       const angle = 2.6 - t * 0.9;
       place(

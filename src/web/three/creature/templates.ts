@@ -7,6 +7,7 @@ import {
   addBeastHead,
   addClaws,
   addEyes,
+  addFaceEyes,
   addFeatherWing,
   addJoint,
   addPlating,
@@ -1792,48 +1793,97 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 頭(くちばしのある鳥の頭) ---
   // 頭が小さいと、首の細い水鳥になってしまう。胸の塊に対して
   // 「掴めそうな大きさ」まで頭蓋を取り、くちばしもそれに見合う長さにする
-  place(rig.head, 0, 0.30, -0.02, 0.18, 0, 0);
+  place(rig.head, 0, 0.30, -0.02, 0.1, 0, 0);
   const head = rig.head;
-  head.add(place(kit.ball(0.20, 0.185, 0.21, "fur", p.fur), 0, 0.12, 0.02));
-  // 眉庇。目の上に張り出させると、丸い頭でも猛禽の鋭さが出る
-  head.add(place(kit.lens(0.19, 0.055, 0.13, "plate", p.plate, 10), 0, 0.21, -0.11, -0.45, 0, 0));
+  head.add(place(kit.ball(0.23, 0.215, 0.24, "fur", p.fur), 0, 0.14, 0.03));
+  // 後頭部。1つの球で終わらせると、真横から見た時に風船になる
+  head.add(place(kit.ball(0.19, 0.18, 0.16, "fur", p.fur, 12), 0, 0.16, 0.19));
+  // 眼窩の丘。猛禽は目の上の骨が前へ張り出していて、そこが「睨み」を作る。
+  // 平らな庇を1枚渡すと鴨のくちばしに見えるので、左右別々の塊にする
   for (const side of [-1, 1]) {
-    head.add(place(kit.lens(0.07, 0.035, 0.06, "plate", p.plate, 8), side * 0.13, 0.22, -0.09, -0.3, 0, -side * 0.6));
+    head.add(place(kit.ball(0.105, 0.1, 0.11, "fur", p.fur, 10), side * 0.095, 0.185, -0.16));
+    head.add(
+      place(kit.lens(0.105, 0.036, 0.08, "plate", p.plate, 10), side * 0.1, 0.255, -0.185, -0.52, 0, -side * 0.46),
+    );
   }
-  addEyes(kit, head, 0.125, 0.165, -0.11, 0.045);
+  // 猛禽の目は横ではなく**前**を向く。外へ回すと、頭の左右に目玉が乗った蛙になる
+  addFaceEyes(kit, head, { x: 0.1, y: 0.19, z: -0.235, size: 0.062, mood: "fierce", splay: 0.2, skin: p.fur });
   // 蝋膜(くちばしの付け根)と鼻孔
-  head.add(place(kit.ball(0.095, 0.09, 0.09, "plate", p.plate, 8), 0, 0.12, -0.17));
+  head.add(place(kit.ball(0.085, 0.085, 0.075, "plate", p.plate, 8), 0, 0.13, -0.19));
   for (const side of [-1, 1]) {
-    head.add(place(kit.ball(0.02, 0.024, 0.014, "hide", p.deep, 6), side * 0.045, 0.14, -0.23));
+    head.add(place(kit.lens(0.018, 0.022, 0.014, "hide", p.deep, 6), side * 0.042, 0.15, -0.25));
   }
-  // 上くちばし。先を下へ巻き込ませるのが猛禽の見分けどころ
-  head.add(place(kit.claw(0.38, 0.095, 0.85, "plate", p.plate), 0, 0.12, -0.20, AIM_FORWARD - 0.12, 0, 0));
+  // くちばし。**横に潰す**のが要。円い断面のまま伸ばすと鴨の平たい嘴になる。
+  // 上嘴は根元が深く、先で下へ巻き込む
+  const beak = new THREE.Group();
+  place(beak, 0, 0.13, -0.21);
+  beak.scale.set(0.62, 1, 1);
+  beak.add(place(kit.claw(0.27, 0.125, 0.52, "plate", p.plate), 0, 0, 0, AIM_FORWARD - 0.04, 0, 0));
+  head.add(beak);
+  // 嘴の稜線。上面に硬い筋を1本通すと、面が割れて厚みが出る
+  head.add(
+    kit.taperedTube(
+      [
+        { x: 0, y: 0.19, z: -0.18 },
+        { x: 0, y: 0.17, z: -0.3 },
+        { x: 0, y: 0.11, z: -0.4 },
+      ],
+      0.026,
+      0.008,
+      "plate",
+      p.plate,
+      5,
+      8,
+    ),
+  );
+  // 口の合わせ目。嘴が「上下2枚」であることが分かるだけで、造形が締まる
+  for (const side of [-1, 1]) {
+    head.add(
+      kit.taperedTube(
+        [
+          { x: side * 0.055, y: 0.1, z: -0.2 },
+          { x: side * 0.04, y: 0.09, z: -0.29 },
+          { x: side * 0.016, y: 0.06, z: -0.36 },
+        ],
+        0.016,
+        0.005,
+        "hide",
+        p.deep,
+        5,
+        8,
+      ),
+    );
+  }
   // 下くちばし。開閉できるよう顎として登録する
   const jaw = new THREE.Group();
-  place(jaw, 0, 0.07, -0.17);
+  place(jaw, 0, 0.09, -0.17);
   markAnimated(jaw);
-  jaw.add(
+  const lower = new THREE.Group();
+  lower.scale.set(0.62, 1, 1);
+  lower.add(
     kit.taperedTube(
       [
         { x: 0, y: 0, z: 0 },
-        { x: 0, y: -0.005, z: -0.12 },
-        { x: 0, y: -0.025, z: -0.24 },
+        { x: 0, y: -0.012, z: -0.11 },
+        { x: 0, y: -0.045, z: -0.21 },
       ],
-      0.075,
-      0.024,
+      0.1,
+      0.028,
       "plate",
       p.plate,
       6,
-      6,
+      8,
     ),
   );
+  jaw.add(lower);
   head.add(jaw);
   rig.jaw = jaw;
   // 冠羽。後頭部から後ろへ倒して流す
-  addFeatherFan(kit, head, 5, 0.36, [0, 0.24, 0.10], 0.17, [1.35, Math.PI / 2, 0], 0.6);
-  // 頬の羽毛。細いくちばしとの対比で顔幅を作る
+  addFeatherFan(kit, head, 5, 0.36, [0, 0.26, 0.14], 0.19, [1.5, Math.PI / 2, 0], 0.6);
+  // 頬の羽毛。細いくちばしとの対比で顔幅を作る。
+  // 前へ倒すと顔の前に板が渡って、目もくちばしも隠れる(実際にそうなっていた)
   for (const side of [-1, 1]) {
-    addFeatherFan(kit, head, 3, 0.26, [side * 0.16, 0.09, 0.04], 0.08, [2.4, -side * 0.9, 0], 0.5);
+    addFeatherFan(kit, head, 3, 0.22, [side * 0.19, 0.1, 0.06], 0.07, [2.75, -side * 1.15, 0], 0.4);
   }
 
   // --- 翼(羽毛) ---
