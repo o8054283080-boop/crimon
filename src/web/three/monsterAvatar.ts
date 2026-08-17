@@ -192,6 +192,21 @@ export class MonsterAvatar {
   private readonly staggerSpring = new Spring();
   /** よろけの左右成分。真後ろにだけ下がると、当たる度に同じ絵になる */
   private readonly staggerSideSpring = new Spring();
+  /**
+   * 浮遊するものの漂い。
+   *
+   * 正弦波を重ねただけの漂いは、どれだけ周期をずらしても必ず同じ場所へ
+   * 戻ってくるため、しばらく見ていると「決まった軌道をなぞる置物」に見える。
+   * 数秒おきに行き先を選び直し、そこへ**ゆっくり引かれる**バネにすると、
+   * 戻る場所が無くなり、水中を漂っているように読めるようになる。
+   */
+  private readonly driftX = new Spring();
+  private readonly driftY = new Spring();
+  private readonly driftZ = new Spring();
+  private readonly driftYaw = new Spring();
+  private readonly driftTarget = new THREE.Vector3();
+  private driftYawTarget = 0;
+  private driftTimer = Math.random() * 2;
 
   /** 前フレームの重心と傾き。速度を出して二次的な動きの入力にする */
   private readonly previousOffset = new THREE.Vector3();
@@ -495,15 +510,32 @@ export class MonsterAvatar {
     let hipY = shift * 0.09 * swayGain;
 
     if (rig.floats) {
-      // 浮遊するものは足で支えていないので、常に微妙に漂い続ける。
-      // 周期の合わない波を重ねて、戻ってくる場所を読ませない
-      offsetX += (Math.sin(T * 0.19) * 0.09 + Math.sin(T * 0.127 + 1.7) * 0.055) * alive;
-      offsetZ += (Math.sin(T * 0.163 + 0.5) * 0.075 + Math.sin(T * 0.101 + 2.4) * 0.045) * alive;
-      offsetY += (Math.sin(T * 0.29) * anim.bob * 1.3 + Math.sin(T * 0.147 + 1.1) * 0.045) * alive;
-      leanZ += Math.sin(T * 0.135 + 0.8) * 0.075 * alive;
-      leanX += Math.sin(T * 0.157 + 2.1) * 0.06 * alive;
+      // 漂いの行き先を数秒おきに選び直す。正弦波の重ね合わせだけで作ると
+      // 必ず同じ場所へ戻ってくるので、長く見ていると軌道を覚えられてしまう
+      this.driftTimer -= dt;
+      if (this.driftTimer <= 0) {
+        this.driftTimer = 1.5 + Math.random() * 2.8;
+        this.driftTarget.set(
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.34 + anim.bob * 1.6,
+          (Math.random() - 0.5) * 0.42,
+        );
+        this.driftYawTarget = (Math.random() - 0.5) * 0.42;
+      }
+      // 引かれる速さは重さで変える。軽いものはふらふら流され、
+      // 重い浮遊体(古代の魔人)は同じ場所に留まろうとする
+      const driftHz = 0.34 - mass * 0.1;
+      const driftDamp = 0.62 + mass * 0.2;
+      offsetX += this.driftX.step(this.driftTarget.x, driftHz, driftDamp, step) * alive;
+      offsetY += this.driftY.step(this.driftTarget.y, driftHz * 1.25, driftDamp, step) * alive;
+      offsetZ += this.driftZ.step(this.driftTarget.z, driftHz * 0.9, driftDamp, step) * alive;
       // 向きもゆっくり流される。浮いているものが真っ直ぐ止まっていると重さが出る
-      hipY += Math.sin(T * 0.113 + 0.4) * 0.09 * alive;
+      hipY += this.driftYaw.step(this.driftYawTarget, driftHz * 0.8, driftDamp, step) * alive;
+      // 漂いの上に、止まらない細かい呼吸を足す。バネが目標へ着いた瞬間に
+      // 完全に静止してしまうのを防ぐ(浮遊体は絶対に止まってはいけない)
+      offsetY += Math.sin(T * 0.31) * anim.bob * 0.9 * alive;
+      leanZ += (Math.sin(T * 0.135 + 0.8) * 0.06 - this.driftX.velocity * 0.09) * alive;
+      leanX += (Math.sin(T * 0.157 + 2.1) * 0.05 + this.driftZ.velocity * 0.1) * alive;
     } else {
       // 接地するものは、体重が片脚に乗り切った時に腰が上がり、
       // 乗せ替える瞬間に沈む。体重移動の2倍の周期にすると噛み合う
@@ -575,17 +607,38 @@ export class MonsterAvatar {
     }
 
     for (const spinner of rig.spinners) {
-      spinner.object.rotation[spinner.axis] += dt * spinner.speed;
+      // 等速で回る環は時計の秒針に見える。速さをゆっくり脈打たせると、
+      // 同じ回転でも「意志で回している」ように読める
+      spinner.object.rotation[spinner.axis] += dt * spinner.speed * (1 + Math.sin(elapsed * 0.37 + this.phase) * 0.35);
     }
+    /**
+     * 周囲を漂う破片。
+     *
+     * 等速・真円・一定の高さで回すと、どれだけ数を増やしても機械仕掛けの
+     * 飾りにしか見えない。次の3つを足すと、同じ部品のまま「引き寄せられて
+     * 浮いている石」に変わる。
+     *   1. 角速度をゆらす(近づくと速く、離れると遅い)
+     *   2. 軌道面を歳差させ、半径をゆっくり伸び縮みさせる
+     *   3. 本体が動いた分だけ遅れて付いてくる(慣性)
+     */
+    // 本体の速度は下で更新されるので、ここで読むのは1フレーム前の値。
+    // 遅れて付いてくる表現なので、1フレーム前で構わない
+    const orbitLagX = clamp(-this.bodyVelocity.x * 0.05, -0.3, 0.3);
+    const orbitLagY = clamp(-this.bodyVelocity.y * 0.04, -0.24, 0.24);
+    const orbitLagZ = clamp(-this.bodyVelocity.z * 0.05, -0.3, 0.3);
     for (const orbiter of rig.orbiters) {
-      const angle = elapsed * orbiter.speed + orbiter.phase;
+      const base = elapsed * orbiter.speed + orbiter.phase;
+      const angle = base + Math.sin(base * 0.41 + orbiter.phase) * 0.6;
+      const radius = orbiter.radius * (1 + Math.sin(base * 0.53 + orbiter.phase * 1.7) * 0.18);
+      const precess = Math.sin(base * 0.23 + orbiter.phase * 0.7) * 0.45;
       orbiter.object.position.set(
-        Math.cos(angle) * orbiter.radius,
-        orbiter.height + Math.sin(angle * 1.6 + orbiter.phase) * 0.18,
-        Math.sin(angle) * orbiter.radius * Math.cos(orbiter.tilt),
+        Math.cos(angle) * radius + orbitLagX,
+        orbiter.height + Math.sin(angle * 1.6 + orbiter.phase) * 0.18 + Math.sin(base * 0.29) * radius * 0.22 + orbitLagY,
+        Math.sin(angle) * radius * Math.cos(orbiter.tilt + precess) + orbitLagZ,
       );
       orbiter.object.rotation.y += dt * orbiter.spin;
       orbiter.object.rotation.x += dt * orbiter.spin * 0.6;
+      orbiter.object.rotation.z += dt * orbiter.spin * 0.23;
     }
 
     // === 待機中の仕草 =====================================================
