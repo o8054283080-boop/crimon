@@ -234,7 +234,9 @@ class ParticleLayer {
     this.colors[index * 3 + 0] = spec.color.r;
     this.colors[index * 3 + 1] = spec.color.g;
     this.colors[index * 3 + 2] = spec.color.b;
-    this.sizes[index] = spec.size;
+    // 共通倍率をかけた値を入れる。ここで素の spec.size を入れると、
+    // 最初の1フレームだけ粒が数倍に膨らんで白く弾けて見える
+    this.sizes[index] = particle.size * particle.growth;
     this.alphas[index] = spec.fadeIn && spec.fadeIn > 0 ? 0 : particle.alpha;
     this.rots[index] = spec.rotation ?? 0;
     this.cells[index] = spec.cell;

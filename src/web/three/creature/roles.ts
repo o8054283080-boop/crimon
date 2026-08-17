@@ -104,12 +104,174 @@ export function addPlating(
   }
 }
 
-/** 頭の左右に光る目を置く。奥に暗い眼窩を入れて発光を締める */
-export function addEyes(kit: CreatureKit, head: THREE.Object3D, x: number, y: number, z: number, radius: number): void {
+/**
+ * 目つき。
+ *
+ * 同じ骨格でも、目の「形」と「傾き」だけで性格が変わる。
+ * 光る球を2つ置くと、どの種別も同じ顔になり、生き物ではなく
+ * 電飾を付けた人形に見えてしまう。ここでは
+ *   1. 丸ではなくアーモンド形の強膜(白目)
+ *   2. その上に被さる上まぶた
+ *   3. 目尻の上がり下がり
+ * の3つで表情を作る。この3つは画面上で目が10pxしかなくても効く。
+ */
+export type EyeMood =
+  /** 吊り目・厚いまぶた。獣・竜 */
+  | "fierce"
+  /** 細く冷たい。魔王・不死者 */
+  | "cold"
+  /** 大きく丸い。小動物・妖精・粘体 */
+  | "round"
+  /** やや垂れ目。癒し手・天使 */
+  | "gentle"
+  /** 白目を持たない発光体。ゴーレム・結晶などの無機物 */
+  | "blank";
+
+interface MoodSpec {
+  /** 目の縦横比。小さいほど細い */
+  aspect: number;
+  /** 目尻の上がり(ラジアン)。正で吊り目、負で垂れ目 */
+  tilt: number;
+  /** 虹彩の大きさ(強膜の縦半径に対する比) */
+  iris: number;
+  /** 上まぶたの被さり。0.5で目の半分が隠れる */
+  lid: number;
+  /** 眉庇の傾き。目尻の傾きに足される */
+  brow: number;
+  /**
+   * 眼球の作り。**明色の面積をどれだけ許すか**の指定でもある。
+   *   "none"  眼球を持たない。暗い眼窩に虹彩だけが灯る(無機物・不死者)
+   *   "dark"  暗い眼球。獣・竜。虹彩だけが光り、そのまわりは沈む。
+   *           ここを生成り色にすると、目が「白い塊」になって顔が消える
+   *           (実際にそうなった。獣に人間の白目を付けてはいけない)
+   *   "wet"   つやのある明るい白目。可愛さ・神聖さを出す種別に使う
+   */
+  sclera: "none" | "dark" | "wet";
+}
+
+const EYE_MOODS: Record<EyeMood, MoodSpec> = {
+  fierce: { aspect: 0.50, tilt: 0.40, iris: 0.78, lid: 0.32, brow: 0.36, sclera: "dark" },
+  cold: { aspect: 0.42, tilt: 0.34, iris: 0.72, lid: 0.30, brow: 0.26, sclera: "none" },
+  round: { aspect: 1.00, tilt: -0.05, iris: 0.62, lid: 0.08, brow: -0.10, sclera: "wet" },
+  gentle: { aspect: 0.70, tilt: -0.18, iris: 0.60, lid: 0.28, brow: -0.24, sclera: "wet" },
+  blank: { aspect: 0.60, tilt: 0.14, iris: 0.90, lid: 0.00, brow: 0.20, sclera: "none" },
+};
+
+export interface EyeOptions {
+  /** 中心からの左右のずれ */
+  x: number;
+  y: number;
+  z: number;
+  /** 目の横半径 */
+  size: number;
+  mood?: EyeMood;
+  /** 顔の丸みに沿って外へ向ける角度 */
+  splay?: number;
+  /** 眉庇を出す。頭に別の庇や兜がある場合は切る */
+  brow?: boolean;
+  /** まぶたの色。既定は地肌の陰色 */
+  skin?: THREE.Color;
+  /** 瞳孔の細さ。1で丸、0.3で縦の裂け目(爬虫類) */
+  slit?: number;
+}
+
+/**
+ * 表情を持つ目。左右1対を組んで head に足す。
+ *
+ * 部品はすべて小さいので分割数を低く固定してある(顔まわりで頂点を
+ * 使い切ると、体のシルエットに回す余地が無くなる)。
+ */
+export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOptions): void {
+  const p = kit.palette;
+  const m = EYE_MOODS[o.mood ?? "fierce"];
+  const s = o.size;
+  const h = s * m.aspect;
+  const skin = o.skin ?? p.dark;
+  const slit = o.slit ?? 1;
+  // 虹彩は縦半径で決まるが、細い目では横にはみ出すので横幅でも頭打ちにする
+  const iris = Math.min(s * 0.66, h * m.iris);
+
   for (const side of [-1, 1]) {
-    head.add(place(kit.ball(radius * 1.9, radius * 1.5, radius * 0.8, "hide", kit.palette.dark), side * x, y, z + radius * 0.6));
-    head.add(place(kit.ball(radius, radius * 0.85, radius, "glow", kit.palette.glow, 8), side * x, y, z));
+    const eye = new THREE.Group();
+    place(eye, side * o.x, o.y, o.z, 0, -side * (o.splay ?? 0), side * m.tilt);
+
+    // 眼窩。目のまわりを一段暗く落として、目玉が顔に埋まって見えるようにする。
+    // 目より奥に置き、縁だけがはみ出して見えるようにするのが要
+    eye.add(place(kit.lens(s * 1.34, h * 1.5 + s * 0.16, s * 0.4, "hide", p.deep, 10), 0, 0, s * 0.2));
+
+    if (m.sclera === "none") {
+      // 眼球を持たない種別。窪みの底をもう一段落として、そこに虹彩だけを灯す
+      eye.add(place(kit.lens(s * 0.96, h * 1.06, s * 0.34, "hide", p.deep, 10), 0, 0, s * 0.02));
+    } else {
+      // 眼球。丸ではなくアーモンド形にすることで、初めて「目つき」が生まれる。
+      // 明色にしてよいのは "wet" の種別だけ。獣を明色にすると顔が白い塊になる
+      eye.add(
+        place(
+          kit.lens(s, h, s * 0.42, m.sclera === "wet" ? "plate" : "hide", m.sclera === "wet" ? p.plate : p.deep, 12),
+          0,
+          0,
+          0,
+        ),
+      );
+    }
+
+    // 虹彩・瞳孔・ハイライトは、必ず眼球の前面より手前へ順に重ねる。
+    // 眼球と同じ深さに置くと球に飲まれて、遠景では目が消える
+    eye.add(place(kit.lens(iris, iris, s * 0.14, "glow", p.glow, 10), 0, 0, -s * 0.4));
+    // 瞳孔。ここが無いと、どんなに形を整えても視線が生まれない
+    // 明るい眼球の種別は瞳孔を大きく取る。虹彩が輪として残り、
+    // 目全体が発光する「電球」にならずに済む
+    const pupil = m.sclera === "wet" ? 0.66 : 0.52;
+    eye.add(place(kit.lens(iris * pupil * slit, iris * (m.sclera === "wet" ? 0.94 : 0.84), s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
+    // ハイライト。1点入るだけで目が濡れた球として読める
+    eye.add(place(kit.lens(iris * 0.30, iris * 0.30, s * 0.06, "plate", p.plate, 6), iris * 0.40, iris * 0.42, -s * 0.56));
+
+    // まぶたの縁。目の輪郭を暗い線で1周なぞると、10画素の大きさでも
+    // 「点」ではなく「目の形」として読める。上を太く、下を細くする
+    const rimTop = kit.band(s * 1.02, s * 0.09, Math.PI, "hide", skin, 16);
+    rimTop.scale.set(1, h / s, 1);
+    place(rimTop, 0, 0, -s * 0.26);
+    eye.add(rimTop);
+    const rimLow = kit.band(s * 1.0, s * 0.055, Math.PI, "hide", skin, 14);
+    rimLow.scale.set(1, h / s, 1);
+    place(rimLow, 0, 0, -s * 0.24, 0, 0, Math.PI);
+    eye.add(rimLow);
+
+    if (m.lid > 0.001) {
+      // 上まぶた。目の上を覆う量が、そのまま「据わった目つき」の強さになる
+      const lidH = h * 1.0;
+      eye.add(
+        place(
+          kit.lens(s * 1.14, lidH, s * 0.62, "hide", skin, 10),
+          0,
+          h * (1 - 2 * m.lid) + lidH * 0.94,
+          -s * 0.04,
+          -0.26,
+          0,
+          0,
+        ),
+      );
+    }
+    // 下まぶた(涙袋)。目の下に段差が出ると、頬との境目が生まれる
+    eye.add(place(kit.lens(s * 0.98, h * 0.52, s * 0.56, "hide", skin, 8), 0, -h * 1.16, s * 0.02, 0.26, 0, 0));
+
+    if (o.brow !== false) {
+      // 眉庇。目の上に張り出して影を落とす。遠景で表情が読める最大の要因
+      const brow = new THREE.Group();
+      place(brow, 0, h * 1.1 + s * 0.2, -s * 0.06, -0.4, 0, side * m.brow);
+      brow.add(kit.lens(s * 1.14, s * 0.2, s * 0.5, "hide", skin, 10));
+      // 眉頭の盛り上がり。左右2本の庇が眉間で寄るとしかめ面になる
+      brow.add(place(kit.lens(s * 0.42, s * 0.24, s * 0.4, "hide", skin, 8), -side * s * 0.72, -s * 0.06, s * 0.02));
+      eye.add(brow);
+    }
+
+    head.add(eye);
   }
+}
+
+/** 旧来の呼び出し口。獣の目つきを既定にして、全種別の顔を底上げする */
+export function addEyes(kit: CreatureKit, head: THREE.Object3D, x: number, y: number, z: number, radius: number): void {
+  addFaceEyes(kit, head, { x, y, z, size: radius * 1.25, mood: "fierce" });
 }
 
 export interface BeastHeadOptions {
@@ -125,11 +287,19 @@ export interface BeastHeadOptions {
   crest: number;
   eye: number;
   color?: THREE.Color;
+  /** 目つき。種別の性格を一番安く出せる場所 */
+  mood?: EyeMood;
+  /** 瞳孔の細さ。竜や蛇は縦の裂け目にする */
+  slit?: number;
 }
 
 /**
  * 獣型の頭。アタッカー/ボス/デバッファーで比率を変えて使い回し、
  * 「同じ世界のモンスター」としての統一感を出す。
+ *
+ * 顔は「頭蓋の球+光る目」では絶対に生き物にならない。
+ * 鼻梁・眉間・頬骨・口の合わせ目・鼻孔という、影が落ちる境目を
+ * ひととおり刻んでおくことで、遠景でも顔として読める。
  */
 export function addBeastHead(kit: CreatureKit, rig: CreatureRig, o: BeastHeadOptions): void {
   const p = kit.palette;
@@ -137,33 +307,155 @@ export function addBeastHead(kit: CreatureKit, rig: CreatureRig, o: BeastHeadOpt
   const [sx, sy, sz] = o.skull;
   const skin = o.color ?? p.main;
 
-  head.add(place(kit.ball(sx, sy, sz, "hide", skin), 0, sy * 0.9, -sz * 0.1));
+  // 頭蓋の中心。以降の部位はすべてここを基準に組む。
+  // 「頭蓋の原点」を持たずに書くと、口先と目の上下関係が崩れて
+  // 口が目を飲み込む(実際にそうなっていた)
+  const cy = sy * 0.9;
+  const cz = -sz * 0.1;
+  // 口先。口角(頬の前)から先端まで
+  const mouthBack = cz - sz * 0.30;
+  const tipZ = cz - sz * 0.62 - o.snout;
+  const mLen = mouthBack - tipZ;
+  const at = (t: number) => mouthBack - mLen * t;
+  // 上顎の中心。**目より必ず下**に置く
+  const mY = cy - sy * 0.3;
+  // 目。眼窩の丘の上、口先の稜線より上に乗せる
+  const eyeX = sx * 0.6;
+  const eyeY = cy + sy * 0.34;
+  const eyeZ = cz - sz * 0.82;
+
+  head.add(place(kit.ball(sx, sy, sz, "hide", skin), 0, cy, cz));
+  // 後頭部。頭蓋を1つの球で終わらせると、真横から見た時に風船になる
+  head.add(place(kit.ball(sx * 0.84, sy * 0.8, sz * 0.62, "hide", skin, 12), 0, cy + sy * 0.08, cz + sz * 0.58));
+  // 側頭の窪みを挟んだ頬。頭蓋の球と口先のあいだに段を作る
+  for (const side of [-1, 1]) {
+    head.add(
+      place(kit.ball(sx * 0.42, sy * 0.34, sz * 0.34, "hide", skin, 10), side * sx * 0.7, cy - sy * 0.18, cz - sz * 0.24, 0, side * 0.3, side * 0.28),
+    );
+  }
+  // 眼窩の丘。目を乗せる土台。これが無いと、目が頭蓋の球面に貼った札に見える
+  for (const side of [-1, 1]) {
+    head.add(place(kit.ball(sx * 0.46, sy * 0.42, sz * 0.38, "hide", skin, 12), side * sx * 0.5, cy + sy * 0.28, cz - sz * 0.54));
+  }
+  // 眉間。左右の丘のあいだを一段低く残すため、細く高い稜線だけを通す
+  head.add(place(kit.ball(sx * 0.24, sy * 0.34, sz * 0.42, "hide", skin, 10), 0, cy + sy * 0.36, cz - sz * 0.5));
 
   if (o.snout > 0) {
-    head.add(place(kit.ball(sx * 0.66, sy * 0.6, o.snout * 0.6, "hide", skin), 0, sy * 0.72, -sz * 0.7 - o.snout * 0.3));
-    head.add(place(kit.ball(sx * 0.44, sy * 0.4, sx * 0.44, "plate", p.plate), 0, sy * 0.66, -sz * 0.7 - o.snout * 0.72));
-    // 上顎の牙
+    // 鼻づら。付け根から先へ3段で絞る。1つの楕円で伸ばすと管に見える。
+    // **上端(mY + ry)が目の下端を超えないこと**が唯一の制約
+    for (const seg of [
+      { t: 0.0, rx: 0.62, ry: 0.44, rz: 0.38, lift: 0.06 },
+      { t: 0.46, rx: 0.42, ry: 0.3, rz: 0.3, lift: 0.0 },
+      { t: 0.84, rx: 0.32, ry: 0.23, rz: 0.22, lift: -0.04 },
+    ]) {
+      head.add(
+        place(kit.ball(sx * seg.rx, sy * seg.ry, mLen * seg.rz, "hide", skin, 12), 0, mY + sy * seg.lift, at(seg.t)),
+      );
+    }
+    // 鼻梁。眉間から鼻先へ稜線を1本通すと、顔に「正面」ができる
+    head.add(
+      kit.taperedTube(
+        [
+          { x: 0, y: cy + sy * 0.42, z: cz - sz * 0.56 },
+          { x: 0, y: mY + sy * 0.26, z: at(0.3) },
+          { x: 0, y: mY + sy * 0.16, z: at(0.86) },
+        ],
+        sx * 0.2,
+        sx * 0.12,
+        "hide",
+        skin,
+        6,
+        8,
+      ),
+    );
+    // 鼻先の硬い部分と鼻孔。鼻鏡は口先の幅を超えないこと(超えると牛になる)
+    head.add(place(kit.lens(sx * 0.2, sy * 0.13, sx * 0.1, "plate", p.deep, 10), 0, mY + sy * 0.1, tipZ + sx * 0.04));
     for (const side of [-1, 1]) {
-      const fang = kit.spike(sx * 0.13, sy * 0.5, 0.8, "plate", p.plate);
-      place(fang, side * sx * 0.42, sy * 0.34, -sz * 0.7 - o.snout * 0.25, AIM_DOWN, 0, 0);
-      head.add(fang);
+      head.add(
+        place(kit.lens(sx * 0.055, sy * 0.05, sx * 0.05, "hide", p.deep, 6), side * sx * 0.1, mY + sy * 0.08, tipZ - sx * 0.02),
+      );
+    }
+    // 上唇の合わせ目。口の線が1本入るだけで、鼻づらが「筒」から「口」になる。
+    // 口角(奥)を厚く、先端を薄くして、開いた口の暗がりに見せる。
+    // 太くすると輪郭を割る黒い帯になるので、内側へ沈めた細い線に留める
+    for (const side of [-1, 1]) {
+      head.add(
+        kit.taperedTube(
+          [
+            { x: side * sx * 0.44, y: mY - sy * 0.28, z: at(-0.02) },
+            { x: side * sx * 0.34, y: mY - sy * 0.24, z: at(0.48) },
+            { x: side * sx * 0.18, y: mY - sy * 0.17, z: at(0.94) },
+          ],
+          sx * 0.075,
+          sx * 0.025,
+          "hide",
+          p.deep,
+          5,
+          8,
+        ),
+      );
+      // 口角の膨らみ。ここに段が出ると、口が「線」ではなく「開く場所」になる
+      head.add(
+        place(kit.lens(sx * 0.16, sy * 0.2, sz * 0.2, "hide", skin, 8), side * sx * 0.48, mY + sy * 0.02, at(-0.02), 0, side * 0.3, side * 0.3),
+      );
+    }
+    // 上顎の牙。口の合わせ目の線から下へ抜けるように出す
+    for (const side of [-1, 1]) {
+      for (const spec of [
+        { t: 0.24, len: 0.4, r: 0.1 },
+        { t: 0.58, len: 0.26, r: 0.07 },
+      ]) {
+        const fang = kit.spike(sx * spec.r, sy * spec.len, 0.8, "plate", p.plate);
+        place(fang, side * sx * 0.34, mY - sy * 0.22, at(spec.t), AIM_DOWN, 0, side * 0.12);
+        head.add(fang);
+      }
     }
   }
 
-  // 眉のプレート。目の上に影を落として表情を作る
-  head.add(place(kit.box(sx * 1.7, sy * 0.3, sz * 0.8, "plate", p.plate), 0, sy * 1.28, -sz * 0.55, -0.3, 0, 0));
+  // 頬骨。目の下から口角へ張り出す面。顔の幅がここで決まる
+  for (const side of [-1, 1]) {
+    head.add(
+      place(
+        kit.lens(sx * 0.4, sy * 0.34, sz * 0.36, "hide", skin, 9),
+        side * sx * 0.62,
+        cy - sy * 0.06,
+        cz - sz * 0.46,
+        0.1,
+        side * 0.5,
+        side * 0.34,
+      ),
+    );
+  }
 
-  addEyes(kit, head, sx * 0.6, sy * 0.98, -sz * 0.78, o.eye);
+  // 目は眼窩の丘の面へ乗せる。少しでも内側に入ると、遠景では目が消える
+  addFaceEyes(kit, head, {
+    x: eyeX,
+    y: eyeY,
+    z: eyeZ,
+    size: o.eye * 1.05,
+    mood: o.mood ?? "fierce",
+    splay: 0.42,
+    slit: o.slit,
+    skin,
+  });
 
   if (o.jaw) {
     const jaw = new THREE.Group();
-    place(jaw, 0, sy * 0.56, -sz * 0.3);
+    // 顎の回転軸は耳の下。ここを前へ出しすぎると、開いた時に顎が宙を切る
+    place(jaw, 0, mY - sy * 0.06, cz - sz * 0.2);
     markAnimated(jaw);
-    jaw.add(place(kit.ball(sx * 0.6, sy * 0.3, (sz + o.snout) * 0.6, "hide", p.dark), 0, -sy * 0.1, -(sz + o.snout) * 0.42));
+    // 下顎。上顎より細く、先へ向かって薄くなる
+    jaw.add(place(kit.ball(sx * 0.5, sy * 0.24, mLen * 0.42, "hide", p.dark, 12), 0, -sy * 0.14, -mLen * 0.34));
+    jaw.add(place(kit.ball(sx * 0.36, sy * 0.18, mLen * 0.26, "hide", p.dark, 10), 0, -sy * 0.16, -mLen * 0.74));
+    // 咬筋。顎の付け根を太らせると、噛む力があるように見える
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 2; i++) {
-        const tooth = kit.spike(sx * 0.1, sy * 0.34, 0.8, "plate", p.plate);
-        place(tooth, side * sx * 0.36, 0, -(sz + o.snout) * (0.35 + i * 0.3));
+      jaw.add(place(kit.lens(sx * 0.2, sy * 0.24, sz * 0.22, "hide", skin, 8), side * sx * 0.44, sy * 0.02, sz * 0.02, 0, 0, side * 0.24));
+      for (const spec of [
+        { t: 0.34, len: 0.3 },
+        { t: 0.66, len: 0.2 },
+      ]) {
+        const tooth = kit.spike(sx * 0.09, sy * spec.len, 0.8, "plate", p.plate);
+        place(tooth, side * sx * 0.32, -sy * 0.16, -mLen * spec.t);
         jaw.add(tooth);
       }
     }
@@ -322,11 +614,15 @@ export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: num
   wing.add(place(kit.ball(0.11 * L, 0.13 * L, 0.1 * L, "fur", p.fur, 10), s * 0.04 * L, 0.02 * L, 0.01 * L));
 
   const point = new THREE.Vector3();
-  const rows: { u0: number; u1: number; len: number; color: THREE.Color; z: number; scale: number }[] = [
-    // 風切羽: 前縁の外側半分から、外向き〜下向きに長く伸びる
-    { u0: 0.22, u1: 0.99, len: 1, color: p.fur, z: -0.02, scale: 1 },
+  const rows: { u0: number; u1: number; len: number; color: THREE.Color; z: number; scale: number; width: number }[] = [
+    // 風切羽: 前縁の外側半分から、外向き〜下向きに長く伸びる。
+    // **幅が足りないと羽根同士に隙間が空き、翼ではなく櫛の歯に見える**。
+    // 実際にそうなっていたので、1枚の幅を広げて必ず隣と重ねる
+    { u0: 0.2, u1: 0.99, len: 1, color: p.fur, z: -0.02, scale: 1, width: 0.34 },
     // 雨覆い: 手前に重ねる短い羽根。段差の影で層に見せる
-    { u0: 0.10, u1: 0.80, len: 0.44, color: p.main, z: -0.06, scale: 0.85 },
+    { u0: 0.08, u1: 0.82, len: 0.46, color: p.main, z: -0.06, scale: 0.9, width: 0.44 },
+    // 小雨覆い: さらに手前の短い層。前縁の骨を隠して、肩から羽根が生えて見せる
+    { u0: 0.02, u1: 0.6, len: 0.24, color: p.fur, z: -0.1, scale: 0.6, width: 0.56 },
   ];
 
   for (const row of rows) {
@@ -335,7 +631,7 @@ export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: num
       const t = n === 1 ? 0 : i / (n - 1);
       spine.getPointAt(row.u0 + (row.u1 - row.u0) * t, point);
       const len = L * (0.30 + t * 0.26) * row.len;
-      const feather = kit.feather(len, len * 0.21, "fur", row.color, 0.1);
+      const feather = kit.feather(len, len * row.width, "fur", row.color, 0.1);
       // 内側は真下へ、外側ほど外向きへ倒す(扇の要は肩ではなく前縁全体)
       const angle = 2.6 - t * 0.9;
       place(
@@ -511,7 +807,7 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
     rig.neck.add(fin);
   }
   place(rig.head, 0, 0.36, 0, 0.62, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.17, 0.16, 0.20], snout: 0.28, jaw: true, horns: "swept", crest: 2, eye: 0.045 });
+  addBeastHead(kit, rig, { skull: [0.22, 0.21, 0.26], snout: 0.30, jaw: true, horns: "swept", crest: 2, eye: 0.062 });
 
   addTail(kit, rig, [0, 0.10, 0.28], 6, 0.20, 0.10, -1.55, -0.12, true);
 
@@ -1004,12 +1300,13 @@ function buildDebuffer(kit: CreatureKit, rig: CreatureRig): void {
   rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.26, z: 0 }, 0.1, 0.08, "hide", p.dark));
   place(rig.head, 0, 0.26, 0, 1.42, 0, 0);
   addBeastHead(kit, rig, {
-    skull: [0.13, 0.12, 0.2],
-    snout: 0.18,
+    skull: [0.17, 0.16, 0.24],
+    snout: 0.20,
     jaw: true,
     horns: "crown",
     crest: 0,
-    eye: 0.035,
+    eye: 0.048,
+    mood: "cold",
     color: p.dark,
   });
   // 中央の大きな一つ目
@@ -1280,7 +1577,7 @@ function buildBoss(kit: CreatureKit, rig: CreatureRig): void {
   place(rig.neck, 0, 1.0, -0.14, -0.35, 0, 0);
   rig.neck.add(kit.link({ x: 0, y: 0, z: 0 }, { x: 0, y: 0.24, z: 0 }, 0.22, 0.17, "hide", p.main));
   place(rig.head, 0, 0.24, 0, 0.5, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.24, 0.22, 0.28], snout: 0.3, jaw: true, horns: "crown", crest: 3, eye: 0.055 });
+  addBeastHead(kit, rig, { skull: [0.30, 0.28, 0.34], snout: 0.32, jaw: true, horns: "crown", crest: 3, eye: 0.078, mood: "cold", slit: 0.5 });
   // 王冠のように後光を背負わせる
   const halo = kit.ring(0.52, 0.03, "crystal", p.accent, 26);
   place(halo, 0, 0.4, 0.34, -0.35, 0, 0);

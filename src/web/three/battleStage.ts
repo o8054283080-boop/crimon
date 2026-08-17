@@ -147,6 +147,8 @@ export class BattleStage {
   private readonly bloomPass: UnrealBloomPass;
   private readonly cinematicPass: CinematicPass;
   private readonly arena = createArena();
+  /** 闘技場から焼いた映り込み用の環境マップ。破棄時に手放す */
+  private environmentTarget: THREE.WebGLRenderTarget | null = null;
   private readonly vfx = new VfxSystem();
   private readonly avatars = new Map<string, MonsterAvatar>();
   /** エフェクトの出し分けに使う、ユニットごとの属性 */
@@ -216,6 +218,7 @@ export class BattleStage {
     this.scene.add(this.vfx.root);
 
     this.setupLights();
+    this.setupEnvironment();
     this.setupUnits(units);
 
     this.composer = new EffectComposer(this.renderer);
@@ -261,34 +264,97 @@ export class BattleStage {
   }
 
   private setupLights(): void {
-    // 環境光。空の青と床の暗さで色を分け、影が真っ黒に潰れない下地を作る
-    this.scene.add(new THREE.HemisphereLight(0x7d92e0, 0x191526, 0.5));
+    // ------------------------------------------------------------------
+    // 光の設計
+    //
+    // モンスターの体表シェーダ(creature/surface.ts)は自前の固定光源で
+    // 陰影を焼いており、シーンのライトは届かない。その固定光は
+    //   キー   = 右手前やや高め   normalize(0.401, 0.802, 0.442)
+    //   バック = 背後からの赤紫   vec3(1.0, 0.48, 0.85)
+    // になっている。**闘技場側の光をこれに揃えないと、キャラと背景で
+    // 光の来る方向が食い違い、合成写真のように浮いて見える。**
+    // 以下のライトはすべて、その固定光と同じ方位・同じ色温度に合わせてある。
+    //
+    // 強さの比は キー : フィル = 約 4:1。ここを 2:1 まで詰めると
+    // 面の向きが読めなくなり、立体が平らな絵に戻る。
+    // ------------------------------------------------------------------
 
-    // キーライト: 右奥やや高めから。影が手前左へ伸びるので、床に立体感が出る
-    const key = new THREE.DirectionalLight(0xfff1dc, 2.1);
-    key.position.set(10, 12.5, -4);
+    // 環境光。天が冷たい青、地が篝火の照り返しで暖色。
+    // 上下で色温度が割れていると、丸い面が回り込むだけで色が変わる
+    this.scene.add(new THREE.HemisphereLight(0x8ea6ee, 0x3a2418, 0.42));
+
+    // キーライト: 体表シェーダの KEY_DIR と同じ方向(右手前・高め)。
+    // 影は左奥へ伸び、カメラからは真横に見えるので接地が読める
+    const key = new THREE.DirectionalLight(0xffe7c2, 2.45);
+    key.position.set(8.8, 17.6, 9.7);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.near = 2;
-    key.shadow.camera.far = 46;
-    key.shadow.camera.left = -17;
-    key.shadow.camera.right = 17;
-    key.shadow.camera.top = 17;
-    key.shadow.camera.bottom = -17;
-    key.shadow.bias = -0.0009;
-    key.shadow.normalBias = 0.02;
+    // 影の解像度は「影が硬すぎない」ことより先に「輪郭が階段状にならない」
+    // ことを優先する。錐台を闘技床の広さまで絞ってテクセルを稼ぐ
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.near = 4;
+    key.shadow.camera.far = 52;
+    key.shadow.camera.left = -14;
+    key.shadow.camera.right = 14;
+    key.shadow.camera.top = 14;
+    key.shadow.camera.bottom = -14;
+    key.shadow.bias = -0.0006;
+    key.shadow.normalBias = 0.028;
     this.scene.add(key);
 
-    // フィルライト: カメラ側から。敵チームはこちらを向いて立つため、
-    // この光が敵の正面を照らす主光源になる(弱すぎると敵が黒く沈んで見えなくなる)
-    const fill = new THREE.DirectionalLight(0x93a7e8, 1.05);
-    fill.position.set(-9, 5.5, 12);
+    // フィルライト: キーの反対側から回り込む冷たい光。
+    // キーの陰になった面を「見える暗さ」に留めるためだけの弱い光で、
+    // ここを強くするとキーの方向感が消える
+    const fill = new THREE.DirectionalLight(0x8fa8f0, 0.62);
+    fill.position.set(-13, 6.0, 6.5);
     this.scene.add(fill);
 
-    // リムライト: 奥のゲート方向から。キャラの輪郭を光らせ、背景から抜く
-    const rim = new THREE.DirectionalLight(0xc9a6ff, 1.5);
-    rim.position.set(-2, 5.5, -14);
+    // リムライト: 奥のゲート方向から。体表シェーダの赤紫のバックライトと
+    // 同じ色にして、キャラの輪郭と闘技場の輪郭が同じ光で抜けるようにする
+    // 平行光は床にも一様にかかるので、**高い位置に置くと床が色かぶりして
+    // 全体が単調になる**。輪郭だけを舐めるよう、うんと低く寝かせてある
+    const rim = new THREE.DirectionalLight(0xff86c8, 1.7);
+    rim.position.set(-5.0, 3.4, -18);
     this.scene.add(rim);
+
+    // 逆リム: 反対の肩側にもう一本。片側だけだと輪郭の抜けが半分で終わる。
+    // 色は篝火寄りの暖色にして、赤紫のリムと寒暖で対にする
+    const rimWarm = new THREE.DirectionalLight(0xffab6a, 1.15);
+    rimWarm.position.set(16, 3.0, -12);
+    this.scene.add(rimWarm);
+
+    // 闘技床へ落とす天井光。中央だけを持ち上げて、戦う場所に視線を集める。
+    // 減衰を持つライトなので、周辺の観客席までは届かない
+    const centerPool = new THREE.PointLight(0xdfe7ff, 26, 17, 2.1);
+    centerPool.position.set(0.5, 9.5, 0.5);
+    this.scene.add(centerPool);
+  }
+
+  /**
+   * 闘技場そのものを一度だけキューブマップへ焼き、映り込みの元にする。
+   *
+   * 平行光だけで照らした石は、どの面も同じ色の「塗り」になって質感が出ない。
+   * 空・壁・篝火が映り込むと、磨いた床には空の青が、柱の丸みには
+   * 壁の暖色が乗り、面の向きごとに色が変わる。これが石を石に見せる。
+   *
+   * 生成元がすでに暗いシーンなので、環境光としてのエネルギーは小さい。
+   * 白飛びの心配はないが、強くしすぎると陰影が浅くなるので低めに留める。
+   */
+  private setupEnvironment(): void {
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    try {
+      // 霧は近景のためのもので、映り込みに効かせると全面が霧色に潰れる
+      const fog = this.scene.fog;
+      this.scene.fog = null;
+      const target = pmrem.fromScene(this.scene, 0.04, 1, 220);
+      this.scene.fog = fog;
+      this.scene.environment = target.texture;
+      this.scene.environmentIntensity = 0.5;
+      this.environmentTarget = target;
+    } catch {
+      // 環境マップは「あれば良くなる」もので、無くても絵は成立する
+      this.scene.environment = null;
+    }
+    pmrem.dispose();
   }
 
   private setupUnits(units: StageUnitInit[]): void {
@@ -862,6 +928,9 @@ export class BattleStage {
     this.avatars.clear();
     this.arena.dispose();
     this.vfx.dispose();
+    this.environmentTarget?.dispose();
+    this.environmentTarget = null;
+    this.scene.environment = null;
     this.composer.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

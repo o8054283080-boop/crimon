@@ -514,8 +514,12 @@ export function createArena(): ArenaHandles {
     new THREE.MeshStandardMaterial({
       map: floorMap,
       roughnessMap: floorRough,
-      roughness: 0.82,
-      metalness: 0.06,
+      // 磨かれた石。ここを 0.8 台に上げると床が紙のように沈み、
+      // 空や篝火の映り込みが一切出なくなる。0.5 前後が
+      // 「艶はあるが鏡ではない」ちょうどの値
+      roughness: 0.52,
+      metalness: 0.14,
+      envMapIntensity: 1.25,
       color: 0xffffff,
     }),
   );
