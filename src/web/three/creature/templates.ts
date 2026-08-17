@@ -2423,8 +2423,42 @@ function buildAncientCrystalCurse(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴。核を左右へ割り、あいだに光の筋を通す ---
   const torso = rig.torso;
   place(torso, 0, 0.22, 0);
+  // 核。正八面体は左右上下が同じで作り物に見えるので、
+  // 輪切りを積んだ多面体にして、根元・胴・肩の太さを別々に持たせる
   for (const side of [-1, 1]) {
-    torso.add(place(kit.octa(0.24, 0.54, 0.26, "crystal", p.main), side * 0.19, 0.1, 0, 0, 0, side * 0.2));
+    torso.add(
+      place(
+        kit.hull(
+          [
+            { y: -0.54, r: 0.03, rz: 0.03 },
+            { y: -0.24, r: 0.19, rz: 0.2 },
+            { y: 0.02, r: 0.25, rz: 0.27, twist: side * 0.2 },
+            { y: 0.3, r: 0.2, rz: 0.22, twist: side * 0.3 },
+            { y: 0.54, r: 0.03, rz: 0.03 },
+          ],
+          "crystal",
+          p.main,
+          { sides: 6 },
+        ),
+        side * 0.19,
+        0.1,
+        0,
+        0,
+        0,
+        side * 0.2,
+      ),
+    );
+    // 核の根元から生える小結晶の房
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 4,
+      length: 0.26,
+      radius: 0.05,
+      spread: 1.0,
+      scatter: 0.07,
+      minScale: 0.3,
+    });
+    place(cluster, side * 0.24, -0.1, 0.02, -0.4, 0, side * 1.1);
+    torso.add(cluster);
   }
   // 割れ目の光。面積を小さく保ち、加算エフェクトと重なっても白飛びさせない
   torso.add(place(kit.octa(0.06, 0.38, 0.07, "glow", p.glow), 0, 0.1, 0));
@@ -2498,13 +2532,18 @@ function buildAncientCrystalCurse(kit: CreatureKit, rig: CreatureRig): void {
   for (let i = 0; i < 3; i++) {
     rig.head.add(place(kit.ball(0.035, 0.022, 0.02, "glow", p.glow, 8), (i - 1) * 0.09, 0.01, -0.19));
   }
-  // 逆さの棘の冠。支援側は上向きに整列しているので、向きだけで敵味方の質が変わる
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    const spike = kit.octa(0.035, 0.16, 0.035, "crystal", p.accent);
-    place(spike, (t - 0.5) * 0.3, 0.2, 0.04, Math.PI + (t - 0.5) * 0.7, 0, (t - 0.5) * 1.1);
-    rig.head.add(spike);
-  }
+  // 逆さの棘の冠。支援側は上向きに整列しているので、向きだけで敵味方の質が変わる。
+  // こちらは大小を散らした房にして、整列した支援側とさらに離す
+  const crown = kit.shardCluster("crystal", p.accent, {
+    count: 6,
+    length: 0.24,
+    radius: 0.042,
+    spread: 0.55,
+    scatter: 0.1,
+    minScale: 0.35,
+  });
+  place(crown, 0, 0.2, 0.04, Math.PI, 0, 0);
+  rig.head.add(crown);
 
   // --- 周囲を漂う破片。支援側より数を絞り、鋭く長い形にする ---
   for (let i = 0; i < 4; i++) {
