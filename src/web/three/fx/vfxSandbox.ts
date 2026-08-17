@@ -282,7 +282,10 @@ export class VfxSandbox {
     const columns = pads.length <= 4 ? 2 : pads.length <= 6 ? 3 : 4;
     const rows = Math.ceil(pads.length / columns);
     const spacingX = 6.2;
-    const spacingZ = 4.6;
+    // 見下ろし角があるため、奥行きの間隔が狭いと前後の列が画面上で重なり、
+    // どの演出がどの台のものか判別できなくなる。判断できる間隔まで開ける。
+    // 列が3つ以上ある一覧は縦に収まらなくなるので、そちらは詰める。
+    const spacingZ = rows <= 2 ? 9.6 : 5.4;
 
     // 本番と同じ画角・距離・見下ろし角で組む。ここが違うと
     // 「エフェクトがキャラクターに対してどれくらいの大きさか」が変わり、
@@ -311,7 +314,9 @@ export class VfxSandbox {
       const anchor = new THREE.Vector3(x, ANCHOR_HEIGHT, z);
       this.pads.push({ pad, anchor, ground, id: `pad-${index}`, timer: 0 });
       if (pad.dummy !== false) this.addDummy(anchor, pad.color);
-      this.addLabel(pad.label, new THREE.Vector3(x, 3.3, z - 1.4));
+      // 札は台の真上の近いところへ。高く上げたり奥へずらしたりすると、
+      // 見下ろし角のせいで画面上では別の列の位置まで登ってしまう
+      this.addLabel(pad.label, new THREE.Vector3(x, 2.85, z));
     });
 
     this.composer = new EffectComposer(this.renderer);

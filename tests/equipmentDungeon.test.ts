@@ -6,9 +6,9 @@ import {
   getDungeonFloorDropRates,
 } from "../src/core/equipment.js";
 import { EQUIPMENT_DUNGEON_FLOORS, findDungeonFloor } from "../src/data/equipmentDungeon.js";
+import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import { MONSTER_TEMPLATES } from "../src/data/monsters.js";
 
-const BOSS_TEMPLATE_IDS = ["griffon", "seraph", "dragon", "nemesis"];
 const COMPANION_TEMPLATE_IDS = MONSTER_TEMPLATES.map((t) => t.templateId);
 const FINAL_BOSS_FLOOR_START = 9;
 
@@ -48,13 +48,40 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
-  it("1〜8階のボスはガチャ限定の高レアモンスター(グリフォン/セラフ/ドラゴン/ネメシス)から選ばれ、星6・Lv60で登場する", () => {
-    for (let floor = 1; floor < FINAL_BOSS_FLOOR_START; floor++) {
+  it("全10階のボスは専用モンスター「古代の魔人」で固定され、星6・Lv60で登場する", () => {
+    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
       const boss = findDungeonFloor(floor)!.enemies.find((e) => e.isBoss)!;
-      expect(BOSS_TEMPLATE_IDS).toContain(boss.templateId);
+      expect(boss.templateId).toBe("ancient_demon");
       expect(boss.star).toBe(6);
       expect(boss.level).toBe(60);
     }
+  });
+
+  it("ボスだけHPが5倍・素早さが1.3倍になり、お供には掛からない", () => {
+    for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
+      const enemies = findDungeonFloor(floor)!.enemies;
+      const boss = enemies.find((e) => e.isBoss)!;
+      expect(boss.hpMultiplier).toBe(5);
+      expect(boss.spdMultiplier).toBe(1.3);
+      for (const companion of enemies.filter((e) => !e.isBoss)) {
+        expect(companion.hpMultiplier).toBeUndefined();
+        expect(companion.spdMultiplier).toBeUndefined();
+      }
+    }
+  });
+
+  it("個体倍率は実際の戦闘ステータスに反映される(HPは5倍、素早さは1.3倍)", () => {
+    const floor = findDungeonFloor(1)!;
+    const [boss] = buildDungeonEnemyTeam(floor);
+    // 倍率を外した同じ個体と比べて、HPと素早さだけが伸びていることを確かめる
+    const plain = buildDungeonEnemyTeam({
+      ...floor,
+      enemies: [{ ...floor.enemies[0], hpMultiplier: undefined, spdMultiplier: undefined }],
+    })[0];
+    expect(boss.stats.hp / plain.stats.hp).toBeCloseTo(5, 1);
+    expect(boss.stats.spd / plain.stats.spd).toBeCloseTo(1.3, 1);
+    expect(boss.stats.atk).toBe(plain.stats.atk);
+    expect(boss.stats.def).toBe(plain.stats.def);
   });
 
   it("1〜8階のお供は通常モンスター種から選ばれ、星5・Lv50でボスより格下の強さになっている", () => {

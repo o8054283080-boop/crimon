@@ -2,17 +2,24 @@ import * as THREE from "three";
 import { BillboardField } from "./fx/billboards.js";
 import {
   SPRITE,
+  chevronTexture,
+  crackDecalTexture,
   fireballTexture,
   flashStarTexture,
+  godRayTexture,
+  hexPanelTexture,
+  impactStarTexture,
   lightPillarTexture,
+  rippleRingsTexture,
   runeCircleTexture,
   shockRingTexture,
   smokePuffTexture,
+  voidCoreTexture,
   vortexTexture,
 } from "./fx/fxTextures.js";
 import { ParticleField } from "./fx/particles.js";
 import { StatusAura, StatusAuraKind } from "./fx/statusAuras.js";
-import { StripField, arcPath, helixPath, wavyPath, zigzagPath } from "./fx/strips.js";
+import { StripField, arcPath, helixPath, ringPath, wavyPath, zigzagPath } from "./fx/strips.js";
 
 export type { StatusAuraKind } from "./fx/statusAuras.js";
 
@@ -77,6 +84,48 @@ const GROUND_Y = 0.07;
 
 const WHITE = new THREE.Color(0xffffff);
 
+/** 地面に寝かせた輪を作るときの基底。X-Z 平面 */
+const GROUND_RIGHT = new THREE.Vector3(1, 0, 0);
+const GROUND_UP = new THREE.Vector3(0, 0, 1);
+
+/**
+ * 溜めから衝撃までの間(秒)。
+ *
+ * 打撃の「一点集中」は明るさではなくこの間で作る。加算合成では
+ * 同時に出せる枚数に上限があるため、同じ瞬間に足すのではなく
+ * 時間をずらすことでしか密度は増やせない。
+ *
+ * 属性差もここに出す。雷だけは0で、溜めずに一撃で入る。
+ * 闇はいちばん長く吸い込んでから弾ける。
+ */
+const WINDUP_SEC: Record<VfxElement, number> = {
+  FIRE: 0.09,
+  WATER: 0.08,
+  ELECTRIC: 0,
+  GRASS: 0.1,
+  LIGHT: 0.09,
+  DARK: 0.14,
+  NEUTRAL: 0.07,
+};
+
+interface RingWaveSpec {
+  startRadius: number;
+  endRadius: number;
+  life: number;
+  /** 帯の太さ。共通の sizeScale が掛かるので、線として見せたいなら 0.3 以上 */
+  width: number;
+  /** "ground" は地面に寝た輪、既定はカメラ正対 */
+  orient?: "ground" | "camera";
+  /** 真円からの崩し。手描きの勢いが出る */
+  jitter?: number;
+  segments?: number;
+  opacity?: number;
+  coreWhite?: number;
+  fadePower?: number;
+  glow?: number;
+  delay?: number;
+}
+
 /** 属性ごとのアクセント色。渡された主色に対して、副次的な色を足して個性を出す */
 const ACCENT: Record<VfxElement, { hot: number; deep: number; dust: number }> = {
   FIRE: { hot: 0xffe3a0, deep: 0xff3a10, dust: 0x2a2028 },
@@ -115,7 +164,9 @@ export class VfxSystem {
   // ここを小さく保つことが「画面が白く飽和しない」ことの最終的な保証になる。
   // 上限に達すると古いものから順に置き換わるので、演出自体は途切れない。
   private readonly billboards = new BillboardField(14);
-  private readonly strips = new StripField(10);
+  // 帯は板と違って「線」なので、枚数が増えても加算される面積はほとんど増えない。
+  // 大きな輪・集中線・斬撃をすべて帯へ寄せた分、ここは板より緩くしてよい。
+  private readonly strips = new StripField(20);
   private readonly auras = new Map<string, Map<StatusAuraKind, StatusAura>>();
   private readonly auraRoot = new THREE.Group();
 
@@ -184,6 +235,12 @@ export class VfxSystem {
     this.scheduled.push({ delay, fn });
   }
 
+  /** 遅延0なら即時。1フレーム遅らせたくない「溜めなしの一撃」に使う */
+  private after(delay: number, fn: () => void): void {
+    if (delay <= 0) fn();
+    else this.scheduled.push({ delay, fn });
+  }
+
   private ground(position: THREE.Vector3): THREE.Vector3 {
     return this.tmp.set(position.x, GROUND_Y, position.z);
   }
@@ -192,20 +249,138 @@ export class VfxSystem {
     return new THREE.Color(ACCENT[element][key]);
   }
 
+  /**
+   * 輪や放射線の半径に使う倍率。
+   *
+   * 帯の座標はワールド単位そのままで、板のような上限が効かない。
+   * power やクリティカルの倍率をそのまま掛けると、輪が隣の味方まで
+   * 届く大きさになってしまう。効きを鈍らせて、常にキャラクター
+   * (背丈およそ2.2)に対して読める範囲へ収める。
+   */
+  private radiusScale(s: number): number {
+    return Math.pow(Math.max(0.3, s), 0.55);
+  }
+
   // -------------------------------------------------------------------------
   // 打撃感の共通土台
   // -------------------------------------------------------------------------
 
   /**
-   * どの属性でも共通で走る「効いた」感の土台。
-   * 閃光 → 衝撃波 → 破片 → 砂埃 → 余韻の煙、の順に時間差で見える。
+   * 広がる(あるいは締まる)輪を帯で描く。
+   *
+   * 板は加算合成で画面を覆うと白飛びするため大きさに上限があり、
+   * どれだけ大きな値を指定しても頭打ちになる。輪だけは帯で描く。
+   * 帯は線であって面ではないので、半径をいくら大きくしても
+   * 加算される面積がほとんど増えず、上限にも当たらない。
+   * 大きく鋭い輪が欲しい場合はこれを使うこと。
+   *
+   * 半径はワールド単位でそのまま効く(キャラクターの背丈が約2.2)。
+   * 太さのほうには共通の sizeScale が掛かる点に注意。
    */
-  private impactCore(position: THREE.Vector3, color: THREE.Color, s: number, options: ImpactOptions): void {
+  private ringWave(center: THREE.Vector3, color: THREE.Color, spec: RingWaveSpec): void {
+    const emit = (): void => {
+      const onGround = (spec.orient ?? "camera") === "ground";
+      if (!onGround) this.updateCameraBasis();
+      const basis = onGround ? { right: GROUND_RIGHT, up: GROUND_UP } : { right: this.camRight, up: this.camUp };
+      const start = Math.max(0.06, spec.startRadius);
+      this.strips.spawn(
+        {
+          points: ringPath(center, start, basis, spec.segments ?? 40, spec.jitter ?? 0.06, Math.random() * Math.PI * 2),
+          color,
+          width: spec.width,
+          life: spec.life,
+          grow: spec.endRadius / start,
+          origin: center.clone(),
+          band: 1.6,
+          widthProfile: "even",
+          coreWhite: spec.coreWhite ?? 0.45,
+          glow: spec.glow ?? 0,
+          opacity: spec.opacity ?? 1,
+          fadePower: spec.fadePower ?? 1.6,
+        },
+        this.cameraPosition,
+      );
+    };
+    if (spec.delay && spec.delay > 0) {
+      // 呼び出し側が使い回している一時ベクトルを掴んだままにしないよう複製する
+      const frozen = center.clone();
+      const frozenColor = color.clone();
+      this.schedule(spec.delay, () => this.ringWave(frozen, frozenColor, { ...spec, delay: 0 }));
+      return;
+    }
+    emit();
+  }
+
+  /**
+   * 打撃の一段目: 溜め。
+   *
+   * 衝撃の直前に、外から中心へ締まる輪と吸い込みを一度だけ見せる。
+   * ここで一瞬ためることで、次の一撃が「一点に集中した」に読める。
+   * 明るさを足さずに打撃感を作れる、いちばん安い手札。
+   */
+  private impactWindup(position: THREE.Vector3, s: number, element: VfxElement, windup: number): void {
+    if (windup <= 0) return;
+    const hot = this.accent(element, "hot");
+    const r = this.radiusScale(s);
+    this.ringWave(position, hot, {
+      startRadius: 1.9 * r,
+      endRadius: 0.3 * r,
+      life: windup + 0.06,
+      width: 0.3 * s,
+      segments: 32,
+      jitter: 0.07,
+      coreWhite: 0.15,
+      opacity: 0.5,
+      fadePower: 0.35,
+    });
+    for (let i = 0; i < this.count(6); i++) {
+      const angle = (i / 6) * Math.PI * 2 + Math.random();
+      const radius = (1.5 + Math.random() * 0.9) * s;
+      this.particles.spawn({
+        position: new THREE.Vector3(
+          position.x + Math.cos(angle) * radius,
+          position.y + (Math.random() - 0.5) * 1.2 * s,
+          position.z + Math.sin(angle) * radius,
+        ),
+        velocity: new THREE.Vector3(-Math.cos(angle) * 2.6, 0, -Math.sin(angle) * 2.6),
+        color: hot,
+        size: 8 * s,
+        life: windup + 0.04,
+        cell: SPRITE.MOTE,
+        attractor: position.clone(),
+        attract: 14,
+        drag: 1,
+        fadePower: 0.4,
+      });
+    }
+  }
+
+  /**
+   * 打撃の二段目: 衝撃。
+   *
+   * 角のある形を極短命で刺してから、輪が広がる。
+   * 輪は板ではなく帯なので、加算面積を増やさずに大きく鋭くできる。
+   */
+  private impactBurst(position: THREE.Vector3, color: THREE.Color, s: number, options: ImpactOptions): void {
     const element = options.element ?? "NEUTRAL";
     const hot = this.accent(element, "hot");
     const direction = options.direction ? this.tmp2.copy(options.direction).normalize() : null;
+    const ground = new THREE.Vector3(position.x, GROUND_Y, position.z);
 
-    // 1) 白熱の閃光。ごく短時間だけ画面を刺す
+    // 1) 角のある星。丸い閃光だけだと「光った」で終わるが、
+    //    尖った形が一瞬重なると「硬いものがぶつかった」に読み替わる
+    this.billboards.spawn({
+      position,
+      texture: impactStarTexture(),
+      color: hot,
+      life: 0.08,
+      startScale: 1.0 * s,
+      endScale: 4.4 * s,
+      roll: Math.random() * Math.PI,
+      fadePower: 2.8,
+      scaleEase: "pop",
+    });
+    // 2) 白熱の閃光。ごく短時間だけ画面を刺す
     this.billboards.spawn({
       position,
       texture: flashStarTexture(),
@@ -213,44 +388,47 @@ export class VfxSystem {
       life: 0.13,
       startScale: 0.8 * s,
       endScale: 4.6 * s,
-      opacity: 1,
+      opacity: 0.9,
       roll: Math.random() * Math.PI,
-      fadePower: 2.2,
+      fadePower: 2.4,
     });
-    // 2) 芯の光球
+    // 3) 芯の光球。すぐ縮んで消える
     this.billboards.spawn({
       position,
       texture: fireballTexture(),
       color: color.clone().lerp(WHITE, 0.55),
-      life: 0.2,
+      life: 0.18,
       startScale: 1.5 * s,
       endScale: 0.3 * s,
       fadePower: 1.6,
     });
-    // 3) カメラ正対の衝撃波リング
-    this.billboards.spawn({
-      position,
-      texture: shockRingTexture(),
-      color: color.clone().lerp(WHITE, 0.4),
+    // 4) カメラ正対の衝撃輪
+    const r = this.radiusScale(s);
+    this.ringWave(position, color.clone().lerp(WHITE, 0.5), {
+      startRadius: 0.28 * r,
+      endRadius: 1.55 * r,
       life: 0.3,
-      startScale: 0.5 * s,
-      endScale: 4.4 * s,
-      fadePower: 1.7,
+      width: 0.42 * s,
+      segments: 44,
+      jitter: 0.05,
+      coreWhite: 0.7,
+      fadePower: 2,
     });
-    // 4) 地面へ抜ける衝撃(接地感)
-    this.billboards.spawn({
-      position: this.ground(position),
-      texture: shockRingTexture(),
-      color: color.clone().lerp(WHITE, 0.2),
-      life: 0.45,
-      startScale: 0.8 * s,
-      endScale: 5.4 * s,
+    // 5) 地面へ抜ける輪(接地感)
+    this.ringWave(ground, color.clone().lerp(WHITE, 0.25), {
       orient: "ground",
-      opacity: 0.75,
+      startRadius: 0.35 * r,
+      endRadius: 2.1 * r,
+      life: 0.44,
+      width: 0.5 * s,
+      segments: 44,
+      jitter: 0.07,
+      coreWhite: 0.35,
+      opacity: 0.8,
       fadePower: 1.5,
     });
 
-    // 5) 火花。指向性がある場合は攻撃方向へ抜ける
+    // 6) 火花。指向性がある場合は攻撃方向へ抜ける
     this.particles.burst(position, color.clone().lerp(hot, 0.5), {
       count: this.count(20 * s),
       speed: 7.5 * s,
@@ -264,7 +442,7 @@ export class VfxSystem {
       growth: 0.4,
       fadePower: 1.5,
     });
-    // 6) 破片(通常合成なので「物」として見える)
+    // 7) 破片(通常合成なので「物」として見える)
     this.particles.burst(position, this.accent(element, "dust"), {
       count: this.count(8 * s),
       speed: 5.5 * s,
@@ -277,8 +455,8 @@ export class VfxSystem {
       randomSpin: 14,
       alpha: 0.9,
     });
-    // 7) 足元の砂埃
-    this.particles.ringBurst(this.ground(position), this.accent(element, "dust"), {
+    // 8) 足元の砂埃
+    this.particles.ringBurst(ground, this.accent(element, "dust"), {
       count: this.count(9 * s),
       speed: 3.4 * s,
       radius: 0.25,
@@ -293,8 +471,35 @@ export class VfxSystem {
       fadeIn: 0.06,
       randomSpin: 1.6,
     });
-    // 8) 余韻の煙。ゆっくり上がって消える
-    this.particles.burst(position, this.accent(element, "dust"), {
+  }
+
+  /**
+   * 打撃の三段目: 余韻。
+   *
+   * 地面に亀裂を1.2秒残す。跡は光ではないので、加算の飽和を
+   * まったく増やさずに時間を稼げる。通常合成で地面を暗く彫るため、
+   * むしろ周囲の加算光が締まって見える。
+   */
+  private impactAftermath(position: THREE.Vector3, s: number, element: VfxElement, strength = 1): void {
+    const dust = this.accent(element, "dust");
+    const ground = new THREE.Vector3(position.x, GROUND_Y, position.z);
+    this.billboards.spawn({
+      position: ground,
+      texture: crackDecalTexture(),
+      color: new THREE.Color(0x07060b).lerp(dust, 0.22),
+      life: 1.25,
+      startScale: 3.4 * s * strength,
+      endScale: 4.6 * s * strength,
+      orient: "ground",
+      roll: Math.random() * Math.PI,
+      opacity: 1,
+      blending: THREE.NormalBlending,
+      fadeIn: 0.04,
+      fadePower: 0.85,
+      renderOrder: 3,
+    });
+    // ゆっくり上がって消える煙。亀裂と合わせて着弾点を見失わせない
+    this.particles.burst(position, dust, {
       count: this.count(4 * s),
       speed: 1.1 * s,
       upBias: 0.7,
@@ -851,53 +1056,60 @@ export class VfxSystem {
     const opt = normalizeImpactOptions(options);
     const element = opt.element ?? "NEUTRAL";
     const s = Math.max(0.35, power) * (opt.aoe ? 1.35 : 1) * (opt.scale ?? 1) * (opt.crit ? 1.3 : 1);
+    // 打撃は重いぶん長くためる。斬撃・刺突は素早く入る
+    const windup = WINDUP_SEC[element] * (opt.hitStyle === "blunt" ? 1.9 : opt.hitStyle === "pierce" ? 0.7 : 1);
+    // 呼び出し側が使い回しているベクトルを掴んだままにしない
+    const at = position.clone();
+    const tint = color.clone();
 
-    this.impactCore(position, color, s, opt);
-    this.elementImpact(element, position, color, s);
-
-    if (opt.hitStyle === "slash") this.spawnSlash(position, color, { element, scale: s, count: opt.crit ? 3 : 2 });
-    else if (opt.hitStyle === "pierce") this.spawnPierce(position, color, s, opt.direction);
+    // 溜め → 衝撃 → 余韻。同時に足すのではなく時間をずらすことで、
+    // 加算の飽和を増やさずに一撃の密度を上げる
+    this.impactWindup(at, s, element, windup);
+    this.after(windup, () => {
+      this.impactBurst(at, tint, s, opt);
+      this.elementImpact(element, at, tint, s);
+      if (opt.hitStyle === "slash") this.spawnSlash(at, tint, { element, scale: s, count: opt.crit ? 3 : 2 });
+      else if (opt.hitStyle === "pierce") this.spawnPierce(at, tint, s, opt.direction);
+      else if (opt.hitStyle === "blunt") this.spawnBlunt(at, tint, s, element, opt.direction);
+    });
+    this.schedule(windup + 0.09, () => this.impactAftermath(at, s, element, opt.hitStyle === "blunt" ? 1.4 : 1));
   }
 
-  /** クリティカル。別格に見えるよう、放射線・二重リング・交差斬撃を足す */
+  /** クリティカル。溜めを長く取り、放射・二重の輪・交差斬撃で別格に見せる */
   spawnCriticalImpact(position: THREE.Vector3, color: THREE.Color, options?: ImpactArg): void {
     const opt = normalizeImpactOptions(options);
     const element = opt.element ?? "NEUTRAL";
     const s = 1.5 * (opt.aoe ? 1.3 : 1) * (opt.scale ?? 1);
     const hot = this.accent(element, "hot");
-    this.updateCameraBasis();
+    const at = position.clone();
+    const tint = color.clone();
+    // 通常より長くためる。ためた分だけ一撃が重く見える
+    const windup = Math.max(0.11, WINDUP_SEC[element] * 1.7);
 
-    // 画面いっぱいの白い閃光
-    this.billboards.spawn({
-      position,
-      texture: flashStarTexture(),
-      color: WHITE,
-      life: 0.16,
-      startScale: 1.6 * s,
-      endScale: 8.0 * s,
-      fadePower: 2.6,
-      roll: Math.random() * Math.PI,
-    });
-    // 放射状の集中線。クリティカル固有の記号
-    const lines = this.count(12);
+    const r = this.radiusScale(s);
+    this.impactWindup(at, s * 1.15, element, windup);
+    // 溜めの間に外から刺さってくる収束線。ここが「一点集中」の記号
+    this.updateCameraBasis();
+    const lines = this.count(6);
     for (let i = 0; i < lines; i++) {
-      const angle = (i / lines) * Math.PI * 2 + Math.random() * 0.2;
+      const angle = (i / lines) * Math.PI * 2 + Math.random() * 0.3;
+      const reach = (2.0 + Math.random() * 1.1) * r;
       const inner = new THREE.Vector3()
-        .copy(position)
-        .addScaledVector(this.camRight, Math.cos(angle) * 0.7 * s)
-        .addScaledVector(this.camUp, Math.sin(angle) * 0.7 * s);
+        .copy(at)
+        .addScaledVector(this.camRight, Math.cos(angle) * 0.45 * r)
+        .addScaledVector(this.camUp, Math.sin(angle) * 0.45 * r);
       const outer = new THREE.Vector3()
-        .copy(position)
-        .addScaledVector(this.camRight, Math.cos(angle) * (3.4 + Math.random() * 2.2) * s)
-        .addScaledVector(this.camUp, Math.sin(angle) * (3.4 + Math.random() * 2.2) * s);
+        .copy(at)
+        .addScaledVector(this.camRight, Math.cos(angle) * reach)
+        .addScaledVector(this.camUp, Math.sin(angle) * reach);
       this.strips.spawn(
         {
-          points: [inner, outer],
-          color: i % 3 === 0 ? WHITE : color.clone().lerp(hot, 0.5),
-          width: 0.22 * s,
-          life: 0.26,
-          revealSec: 0.06,
-          band: 1.1,
+          points: [outer, inner],
+          color: i % 3 === 0 ? WHITE : tint.clone().lerp(hot, 0.5),
+          width: 0.4 * s,
+          life: windup + 0.08,
+          revealSec: windup * 0.9,
+          band: 0.9,
           widthProfile: "taperEnd",
           coreWhite: 0.7,
           fadePower: 2.2,
@@ -905,43 +1117,147 @@ export class VfxSystem {
         this.cameraPosition,
       );
     }
-    // 二重の衝撃波
-    this.billboards.spawn({
-      position,
-      texture: shockRingTexture(),
-      color: WHITE,
-      life: 0.26,
-      startScale: 0.6 * s,
-      endScale: 6.2 * s,
-      fadePower: 1.9,
-    });
-    this.schedule(0.06, () => {
+
+    this.after(windup, () => {
+      // 画面を刺す白い閃光
       this.billboards.spawn({
-        position,
-        texture: shockRingTexture(),
-        color: color.clone().lerp(hot, 0.4),
+        position: at,
+        texture: flashStarTexture(),
+        color: WHITE,
+        life: 0.16,
+        startScale: 1.6 * s,
+        endScale: 8.0 * s,
+        fadePower: 2.6,
+        roll: Math.random() * Math.PI,
+      });
+      // 放射状の光条。板1枚で集中線の密度を出す(帯で描くと本数ぶん枠を食う)
+      this.billboards.spawn({
+        position: at,
+        texture: godRayTexture(),
+        color: tint.clone().lerp(hot, 0.6),
+        life: 0.3,
+        startScale: 1.0 * s,
+        endScale: 6.0 * s,
+        opacity: 0.85,
+        spin: 1.6,
+        roll: Math.random() * Math.PI,
+        fadePower: 2.2,
+      });
+      // 二重の衝撃輪。二枚目を遅らせて外へ抜けさせる
+      this.ringWave(at, WHITE, {
+        startRadius: 0.35 * r,
+        endRadius: 1.9 * r,
+        life: 0.26,
+        width: 0.5 * s,
+        segments: 44,
+        jitter: 0.04,
+        coreWhite: 0.85,
+        fadePower: 2.1,
+      });
+      this.ringWave(at, tint.clone().lerp(hot, 0.4), {
+        delay: 0.07,
+        startRadius: 0.4 * r,
+        endRadius: 2.8 * r,
         life: 0.42,
-        startScale: 0.5 * s,
-        endScale: 4.6 * s,
-        fadePower: 1.4,
+        width: 0.34 * s,
+        segments: 44,
+        jitter: 0.08,
+        coreWhite: 0.4,
+        opacity: 0.85,
+        fadePower: 1.5,
+      });
+
+      this.impactBurst(at, tint, s, { ...opt, element, crit: true });
+      this.elementImpact(element, at, tint, s * 1.15);
+      // 交差する斬撃で「叩き込んだ」感を出す
+      this.spawnSlash(at, WHITE, { element, scale: s * 1.1, count: 2, cross: true });
+      // 遅れて散る二次破片
+      this.schedule(0.1, () => {
+        this.particles.burst(at, hot, {
+          count: this.count(16 * s),
+          speed: 9 * s,
+          size: 10 * s,
+          life: 0.6,
+          cell: SPRITE.STREAK,
+          gravity: -10,
+          drag: 0.88,
+          randomSpin: 8,
+        });
       });
     });
+    this.schedule(windup + 0.1, () => this.impactAftermath(at, s, element, 1.5));
+  }
 
-    this.impactCore(position, color, s, { ...opt, element, crit: true });
-    this.elementImpact(element, position, color, s * 1.15);
-    // 交差する斬撃で「叩き込んだ」感を出す
-    this.spawnSlash(position, WHITE, { element, scale: s * 1.1, count: 2, cross: true });
-    // 遅れて散る二次破片
-    this.schedule(0.1, () => {
-      this.particles.burst(position, hot, {
-        count: this.count(16 * s),
-        speed: 9 * s,
-        size: 10 * s,
-        life: 0.6,
-        cell: SPRITE.STREAK,
-        gravity: -10,
-        drag: 0.88,
-        randomSpin: 8,
+  /**
+   * 打撃。鋭さではなく重さで見せる。
+   *
+   * 斬撃が「線」なのに対し、打撃は「潰す圧」。中心から短く太い帯を
+   * 押し出し、遅れて地面が沈む。余韻の亀裂もひと回り大きくする。
+   */
+  private spawnBlunt(position: THREE.Vector3, color: THREE.Color, s: number, element: VfxElement, direction?: THREE.Vector3): void {
+    const hot = this.accent(element, "hot");
+    const dust = this.accent(element, "dust");
+    const ground = new THREE.Vector3(position.x, GROUND_Y, position.z);
+    this.updateCameraBasis();
+
+    // 押し潰された方向へ短く太い圧の帯。線としてではなく塊として見せる
+    const r = this.radiusScale(s);
+    const push = direction ? direction.clone().normalize() : null;
+    const bias = push ? Math.atan2(push.y, push.x) : Math.random() * Math.PI * 2;
+    for (let i = 0; i < 4; i++) {
+      const angle = bias + (i / 4) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const reach = (1.0 + Math.random() * 0.5) * r;
+      const inner = new THREE.Vector3()
+        .copy(position)
+        .addScaledVector(this.camRight, Math.cos(angle) * 0.25 * r)
+        .addScaledVector(this.camUp, Math.sin(angle) * 0.25 * r);
+      const outer = new THREE.Vector3()
+        .copy(position)
+        .addScaledVector(this.camRight, Math.cos(angle) * reach)
+        .addScaledVector(this.camUp, Math.sin(angle) * reach);
+      this.strips.spawn(
+        {
+          points: [inner, outer],
+          color: i % 2 === 0 ? color.clone().lerp(hot, 0.6) : WHITE,
+          width: 0.9 * s,
+          life: 0.17,
+          revealSec: 0.045,
+          band: 1.0,
+          widthProfile: "blade",
+          coreWhite: 0.5,
+          fadePower: 2.6,
+        },
+        this.cameraPosition,
+      );
+    }
+    // 遅れて地面が沈む。低くて速い砂の輪
+    this.schedule(0.06, () => {
+      this.ringWave(ground, dust, {
+        orient: "ground",
+        startRadius: 0.5 * r,
+        endRadius: 2.6 * r,
+        life: 0.5,
+        width: 0.8 * s,
+        jitter: 0.14,
+        segments: 36,
+        coreWhite: 0.05,
+        opacity: 0.6,
+        fadePower: 1.2,
+      });
+      this.particles.ringBurst(ground, dust, {
+        count: this.count(12 * s),
+        speed: 6.0 * s,
+        radius: 0.4,
+        upBias: 0.25,
+        size: 30 * s,
+        life: 0.8,
+        cell: SPRITE.SMOKE,
+        layer: "alpha",
+        alpha: 0.4,
+        drag: 0.9,
+        growth: 2.6,
+        fadeIn: 0.05,
+        randomSpin: 1.4,
       });
     });
   }
