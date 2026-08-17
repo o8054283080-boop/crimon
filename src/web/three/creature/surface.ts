@@ -339,9 +339,15 @@ void main() {
   vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
   vNormalW = normalize(mat3(modelMatrix) * objectNormal);
   vViewDir = normalize(cameraPosition - worldPosition.xyz);
-  // 模様はワールド座標基準で描く。パーツごとに大きさが違っても
-  // 鱗や筋の粗さが揃い、1体の生き物として見える
-  vWorld = worldPosition.xyz;
+  // 模様はワールドの「向き」で描くが、原点はその個体の足元へ移す。
+  //
+  // 向きをワールドに揃えるのは、法線の摂動をこの座標の勾配から取るため
+  // (座標と法線が別の空間だと、向きを変えた個体で凹凸が裏返る)。
+  // 一方で原点まで world のままにすると、個体が踏み込んだ分だけ模様が
+  // 体の上を滑っていく。鱗が皮膚の上を泳ぐのは、静止画では気づかないが
+  // 動くと一目で作り物に見える。並進だけを引けば、勾配は変わらないまま
+  // 模様が皮膚に貼り付く。
+  vWorld = worldPosition.xyz - modelMatrix[3].xyz;
   vWorldY = worldPosition.y;
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }
@@ -413,23 +419,54 @@ const vec3 VENTRAL_DIR = vec3(0.0, -0.906, -0.423);
  */
 
 /**
- * 鱗。互い違いに並んだ、横に広く縦に浅い盛り上がり。
+ * 面に沿った2軸を選ぶための重み。法線に近い軸ほど小さくなる。
  *
- * 立方体のセルをそのまま丸めると、粒が均等に並んで「気泡緩衝材」に見える。
- * 実際の鱗は横に広く、上下に重なって並んでいるので、Y方向の目を細かく取る。
- * さらに一枚ごとの高さを揺らして、規則的な繰り返しに見えないようにする。
+ * 鱗や織り目のように「並び」を持つ模様を3次元の格子で作ると、
+ * 斜めの面はその格子を斜めに切ることになり、**どこを見ても
+ * 正方形が編み込まれた「かご」**に見える。実際にドラゴンの胸が
+ * 籐のかごになっていた。面に沿った2軸だけで模様を組み、
+ * 3枚を法線で混ぜれば、どの向きの面でも「面の上に並んだ鱗」になる。
+ *
+ * 指数を高くして混ざる帯を狭くしてある。広く混ぜると2枚の格子が
+ * 重なった領域が広がり、結局かご編みに戻る。
  */
-float scaleHeight(vec3 p) {
-  vec3 q = p * vec3(11.0, 17.0, 11.0);
+vec3 planarWeights(vec3 n) {
+  vec3 w = abs(n);
+  w = w * w;
+  w = w * w;
+  return w / max(0.0001, w.x + w.y + w.z);
+}
+
+/**
+ * 鱗1枚。互い違いに並んだ、横に広く縦に浅い盛り上がり。
+ * uv.y が体の縦方向にあたる面では、行がずれて重なった並びになる。
+ */
+float scaleCell(vec2 uv) {
   // 段ごとに半個ずらす。格子のままだと市松模様に見えて生き物にならない
-  q.xz += mod(floor(q.y), 2.0) * 0.5;
-  vec3 f = fract(q) - 0.5;
-  float d = max(abs(f.x), max(abs(f.y), abs(f.z)));
-  // 頂点を平らにしすぎない。中央から縁までなだらかに落として、
-  // 溝(セルの境目)だけがはっきり残るようにする
-  float dome = smoothstep(0.5, 0.14, d);
+  uv.x += mod(floor(uv.y), 2.0) * 0.5;
+  vec2 f = fract(uv) - 0.5;
+  // 鱗の縁は丸い。角のある距離(max)で測ると、そのままタイルになる。
+  // 縦を詰めて「横に広い」形にし、下側だけ深く落として重なりを作る
+  float d = length(f * vec2(1.0, 1.28));
+  float dome = smoothstep(0.60, 0.10, d);
+  // 下の縁だけ影を深くする。鱗は上の一枚が下の一枚に被さっているので、
+  // 溝が上下で同じ深さだと「並んだ粒」にしか見えない
+  float lip = smoothstep(0.10, 0.45, f.y) * 0.35;
+  return clamp(dome - lip, 0.0, 1.0);
+}
+
+/**
+ * 鱗。面に沿った並びを法線で選び、列そのものを低い周波数で曲げる。
+ * まっすぐな列は体の丸みを無視するので、平らなタイル貼りに見える。
+ */
+float scaleHeight(vec3 p, vec3 n) {
+  // 列を波打たせる。体の丸みに沿って流れているように見せるための歪み
+  vec3 warp = vec3(snoise(p * 2.4), snoise(p * 2.4 + 19.0), snoise(p * 2.4 - 23.0));
+  vec3 q = (p + warp * 0.045) * vec3(13.0, 19.0, 13.0);
+  vec3 w = planarWeights(n);
+  float h = scaleCell(q.zy) * w.x + scaleCell(q.xz) * w.y + scaleCell(q.xy) * w.z;
   // 一枚ごとの高さの差。これが無いと、どの角度から見ても同じ粒に見える
-  return dome * (0.55 + (snoise(p * 7.0) * 0.5 + 0.5) * 0.7);
+  return h * (0.55 + (snoise(p * 7.0) * 0.5 + 0.5) * 0.7);
 }
 
 /** 岩の割れ。ノイズの零点に沿って溝が走り、面は平らに残る */
@@ -449,10 +486,26 @@ float strandPattern(vec3 p) {
   return snoise(vec3(p.x * 34.0, p.y * 6.0, p.z * 34.0)) * 0.5 + 0.5;
 }
 
-/** 織り目。縦横2方向の細かい縞を掛け合わせる */
-float weavePattern(vec3 p) {
-  float warp = sin(p.x * 150.0) * sin(p.y * 150.0);
-  return warp * 0.5 + 0.5;
+/**
+ * 織り目。
+ *
+ * 縦横の縞を掛け合わせると**方眼紙**になる。実際の布で目に付くのは
+ * 格子ではなく、斜めに走る畝(綾織り)と、糸のむらによる不均一さ。
+ * 面に沿った2軸で斜めの畝を作り、低い周波数のむらで濃さを揺らす。
+ */
+float weaveCell(vec2 uv) {
+  // 斜めに走る主の畝と、それに直交する細い糸目
+  float twill = sin((uv.x + uv.y * 0.62) * 6.2831);
+  float thread = sin((uv.x * 0.5 - uv.y) * 6.2831 * 2.0);
+  return (twill * 0.62 + thread * 0.38) * 0.5 + 0.5;
+}
+
+float weavePattern(vec3 p, vec3 n) {
+  vec3 q = p * 46.0;
+  vec3 w = planarWeights(n);
+  float h = weaveCell(q.zy) * w.x + weaveCell(q.xz) * w.y + weaveCell(q.xy) * w.z;
+  // 糸のむら。均一な畝だけだと機械織りのビニールに見える
+  return mix(h, snoise(p * 9.0) * 0.5 + 0.5, 0.30);
 }
 
 /**
@@ -480,11 +533,11 @@ float facetHeight(vec3 p) {
  * 法線の摂動はこの関数を4回叩いて勾配を取るため、
  * 中身は「安いこと」と「勾配が連続なこと」を最優先にしている。
  */
-float surfaceHeight(vec3 p) {
+float surfaceHeight(vec3 p, vec3 n) {
 #if defined(CRACKS)
   return crackHeight(p);
 #elif defined(SCALES)
-  return scaleHeight(p);
+  return scaleHeight(p, n);
 #elif defined(STRANDS)
   return strandPattern(p);
 #elif defined(FACETS)
@@ -492,7 +545,7 @@ float surfaceHeight(vec3 p) {
 #elif defined(STREAKS)
   return brushedStreak(p);
 #elif defined(WEAVE)
-  return weavePattern(p) * 0.5 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.5;
+  return weavePattern(p, n) * 0.6 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.4;
 #elif defined(GEL)
   return gelHeight(p);
 #else
@@ -514,9 +567,9 @@ vec3 bumpNormal(vec3 n, vec3 p, float h0, float amplitude) {
   if (amplitude < 0.0001) return n;
   const float e = 0.012;
   vec3 grad = vec3(
-    surfaceHeight(p + vec3(e, 0.0, 0.0)) - h0,
-    surfaceHeight(p + vec3(0.0, e, 0.0)) - h0,
-    surfaceHeight(p + vec3(0.0, 0.0, e)) - h0
+    surfaceHeight(p + vec3(e, 0.0, 0.0), n) - h0,
+    surfaceHeight(p + vec3(0.0, e, 0.0), n) - h0,
+    surfaceHeight(p + vec3(0.0, 0.0, e), n) - h0
   ) / e;
   // 法線方向の変化は面の傾きに寄与しないので取り除く
   grad -= n * dot(n, grad);
@@ -556,7 +609,7 @@ void main() {
   // 材質ごとの高さ場を1回だけ求め、色の濃淡と法線の傾きの両方に使う。
   // これで「模様の暗い所」と「光が当たらない所」が一致し、
   // 光の向きが変わると鱗や割れ目の影も一緒に動く。
-  float height = surfaceHeight(vWorld);
+  float height = surfaceHeight(vWorld, geoNormal);
   normal = bumpNormal(geoNormal, vWorld, height, uBump);
 
   float key = max(dot(normal, KEY_DIR), 0.0);
@@ -656,7 +709,7 @@ void main() {
 
   #ifdef WEAVE
     // 布は細かい織り目。ローカル座標基準なので、揺れても模様が泳がない
-    albedo *= 0.90 + weavePattern(vLocal) * 0.16;
+    albedo *= 0.90 + weavePattern(vLocal, geoNormal) * 0.16;
   #endif
 
   // 窪みの擬似的な陰り。大きなムラの暗い側をさらに沈めて締める
