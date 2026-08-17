@@ -4,3 +4,6 @@ dist/
 
 # 見た目の確認に使う使い捨てのツール類。リポジトリには残さない
 *.tmp.mjs
+
+# 音を焼くためのPython環境。容量が大きいので持たない(tools/audio/README に作り方を残す)
+tools/audio/.venv/

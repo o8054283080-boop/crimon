@@ -148,15 +148,44 @@ function powerScaleForGlobalIndex(globalIndex: number): number {
   return Math.min(POWER_SCALE_MAX, POWER_SCALE_BASE + POWER_SCALE_STEP * (globalIndex - 1));
 }
 
-function buildWave(chapter: number, stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
-  const globalIndex = globalStageIndex(chapter, stageNumber);
+/** 1ウェーブに並ぶ敵の数 */
+const WAVE_SIZE = 4;
+
+/**
+ * そのウェーブに出す4体の種族を決める。
+ *
+ * 以前は「登場する全種族をそのまま4体並べる」実装だったため、
+ * 全20ステージ60ウェーブが**まったく同じ顔ぶれ**(スライム・ウルフ・ゴーレム・フェアリー)で、
+ * 変わるのは星とレベルだけだった。これがステージを安っぽく見せている最大の原因だったので、
+ * 種族を増やしたうえで、その中から毎ウェーブ違う4体を選ぶようにしている。
+ *
+ * 選び方は乱数ではなく通し番号による回転で、同じステージなら何度開いても同じ顔ぶれになる
+ * (敵の顔ぶれが開くたびに変わると、対策を立てて挑み直すことができなくなる)。
+ * そのチャプターのテーマ種族は必ず1体入れて、章ごとの色を残している。
+ */
+function waveTemplateIds(themeTemplateId: string, globalIndex: number, waveNumber: number): string[] {
+  const others = MONSTER_TEMPLATES.map((t) => t.templateId).filter((id) => id !== themeTemplateId);
+  // 通し番号とウェーブ番号で開始位置をずらし、そこから順に取る。
+  // ステージが進むごとに顔ぶれが少しずつ入れ替わり、同じ章の中でも3ウェーブすべて異なる。
+  const start = ((globalIndex - 1) * 2 + (waveNumber - 1) * 3) % Math.max(1, others.length);
+  const picked = [themeTemplateId];
+  for (let i = 0; picked.length < WAVE_SIZE && i < others.length; i++) {
+    picked.push(others[(start + i) % others.length]);
+  }
+  // 種族が4体に満たない場合(将来テンプレートを減らした時)は先頭から埋めて数を合わせる
+  while (picked.length < WAVE_SIZE) picked.push(picked[picked.length % Math.max(1, picked.length)]);
+  return picked;
+}
+
+function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
+  const globalIndex = globalStageIndex(theme.chapter, stageNumber);
   const baseStar = baseStarForGlobalIndex(globalIndex);
   const baseLevel = baseLevelForGlobalIndex(globalIndex, waveNumber);
 
-  const enemies: WaveEnemy[] = MONSTER_TEMPLATES.map((template, i) => {
+  const enemies: WaveEnemy[] = waveTemplateIds(theme.templateId, globalIndex, waveNumber).map((templateId, i) => {
     const element = NORMAL_ELEMENTS[(i + stageNumber + waveNumber) % NORMAL_ELEMENTS.length];
     return {
-      templateId: template.templateId,
+      templateId,
       element,
       star: baseStar,
       level: clampLevel(baseStar, baseLevel, STAR_MAX_LEVEL),
@@ -164,6 +193,8 @@ function buildWave(chapter: number, stageNumber: number, waveNumber: number, isB
   });
 
   if (isBossWave) {
+    // ボスはそのチャプターのテーマ種族(=先頭)。以前は常に配列の先頭=スライムだったため、
+    // どの章の章ボスもスライムになっていた
     const bossStar = Math.min(MAX_STAR, baseStar + 1) as Star;
     enemies[0] = {
       ...enemies[0],
@@ -184,7 +215,7 @@ const CHAPTER_REWARD_STEP = 0.6;
 
 function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
   const isFinalStage = stageNumber === 5;
-  const waves: Wave[] = [1, 2, 3].map((waveNumber) => buildWave(theme.chapter, stageNumber, waveNumber, isFinalStage && waveNumber === 3));
+  const waves: Wave[] = [1, 2, 3].map((waveNumber) => buildWave(theme, stageNumber, waveNumber, isFinalStage && waveNumber === 3));
   const chapterRewardMultiplier = 1 + CHAPTER_REWARD_STEP * (theme.chapter - 1);
 
   const rewards: StageRewards = {

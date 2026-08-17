@@ -363,7 +363,420 @@ const FAIRY: MonsterTemplate = {
   ],
 };
 
-export const MONSTER_TEMPLATES: MonsterTemplate[] = [SLIME, WOLF, GOLEM, FAIRY];
+/**
+ * インプ。素早さと命中に全振りした妨害役。
+ *
+ * 通常入手できるモンスターにデバッファーが1体も居らず、
+ * 「状態異常を入れて相手の手数を削る」という戦い方そのものが選べなかった。
+ * 火力は最下位クラスに置き、当てる能力(命中)で存在価値を出している。
+ */
+const IMP: MonsterTemplate = {
+  templateId: "imp",
+  baseName: "インプ",
+  emoji: "👿",
+  role: "デバッファー",
+  baseStats: {
+    hp: 1000,
+    atk: 110,
+    def: 62,
+    spd: 118,
+    criRate: 0.12,
+    criDmg: 1.5,
+    resistance: 0.15,
+    accuracy: 0.35,
+  },
+  skill1: {
+    id: "imp_s1",
+    name: "ひっかき",
+    description: "敵単体に攻撃力0.9倍のダメージを与え、30%で1ターン攻撃力を低下させる。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.9 },
+      { kind: "DEBUFF", stat: "atk", amount: 0.25, durationTurns: 1, chance: 0.3 },
+    ],
+  },
+  skill2Variants: [
+    {
+      id: "imp_s2_a",
+      name: "のろいのつめ",
+      description: "敵単体に攻撃力1.3倍のダメージを与え、70%で2ターン防御力を大きく低下させる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.3 },
+        { kind: "DEBUFF", stat: "def", amount: 0.45, durationTurns: 2, chance: 0.7 },
+      ],
+    },
+    {
+      id: "imp_s2_b",
+      name: "めつぶし",
+      description: "敵単体に攻撃力1.2倍のダメージを与え、65%で2ターン暗闇を付与する。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "BLIND", durationTurns: 2, chance: 0.65 },
+      ],
+    },
+    {
+      id: "imp_s2_c",
+      name: "あしばらい",
+      description: "敵単体に攻撃力1.2倍のダメージを与え、行動ゲージを15%奪い、70%で2ターン素早さを低下させる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "GAUGE", amount: -0.15, drain: true },
+        { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.7 },
+      ],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "imp_s3_a",
+      name: "あくいのばらまき",
+      description: "敵全体に攻撃力1.1倍のダメージを与え、55%で2ターン攻撃力を大きく低下させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.1 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.55 },
+      ],
+    },
+    {
+      id: "imp_s3_b",
+      name: "ふういんのわらい",
+      description: "敵全体に攻撃力0.8倍のダメージを与え、全員のスキルのクールタイムを1ターン延長する。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.8 },
+        { kind: "COOLDOWN_EXTEND", turns: 1 },
+      ],
+    },
+    {
+      id: "imp_s3_c",
+      name: "どくのきり",
+      description: "敵全体に攻撃力0.7倍のダメージを2回与え、65%で3ターン毒(1スタック)を付与する。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.7, hits: 2 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.65 },
+      ],
+    },
+  ],
+};
+
+/**
+ * ウィスプ。味方を強化することしかできない、純粋なサポート。
+ *
+ * 単体では何も倒せないが、スキル1の時点で味方全体に効果が乗るため、
+ * 長期戦のダンジョンでは1枠を割く価値が出る。
+ * 攻撃役を並べるだけの編成に、初めて「入れ替える理由」を作るための1体。
+ */
+const WISP: MonsterTemplate = {
+  templateId: "wisp",
+  baseName: "ウィスプ",
+  emoji: "🔮",
+  role: "サポート",
+  baseStats: {
+    hp: 1100,
+    atk: 80,
+    def: 82,
+    spd: 112,
+    criRate: 0.08,
+    criDmg: 1.5,
+    resistance: 0.3,
+    accuracy: 0.15,
+  },
+  skill1: {
+    id: "wisp_s1",
+    name: "ほのかなともしび",
+    description: "敵単体に攻撃力0.7倍のダメージを与え、味方全体の防御力を1ターン上昇させる。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.7 },
+      { kind: "BUFF", stat: "def", amount: 0.15, durationTurns: 1, applyTo: "ALLIES" },
+    ],
+  },
+  skill2Variants: [
+    {
+      id: "wisp_s2_a",
+      name: "まもりのりんこう",
+      description: "味方全体に最大HPの15%のシールドを3ターン張り、1ターン状態異常を無効にする。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+        { kind: "IMMUNITY", durationTurns: 1 },
+      ],
+    },
+    {
+      id: "wisp_s2_b",
+      name: "かそくのりんこう",
+      description: "味方全体の素早さを2ターン上昇させ、行動ゲージを15%進める。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
+        { kind: "GAUGE", amount: 0.15 },
+      ],
+    },
+    {
+      id: "wisp_s2_c",
+      name: "いやしのりんこう",
+      description: "味方全体のHPを最大HPの15%回復し、2ターンのあいだ毎ターン7%ずつ回復させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "HEAL", healRate: 0.15 },
+        { kind: "REGEN", healRate: 0.07, durationTurns: 2 },
+      ],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "wisp_s3_a",
+      name: "ほしくずのわ",
+      description: "味方全体の攻撃力とクリティカル率を2ターン上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 2 },
+        { kind: "BUFF", stat: "criRate", amount: 0.2, durationTurns: 2 },
+      ],
+    },
+    {
+      id: "wisp_s3_b",
+      name: "じょうかのひかり",
+      description: "味方全体のデバフを解除し、HPを最大HPの20%回復して2ターン状態異常を無効にする。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "CLEANSE" },
+        { kind: "HEAL", healRate: 0.2 },
+        { kind: "IMMUNITY", durationTurns: 2 },
+      ],
+    },
+    {
+      id: "wisp_s3_c",
+      name: "ときわたりのひかり",
+      description: "味方全体の行動ゲージを30%進め、素早さを2ターン上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "GAUGE", amount: 0.3 },
+        { kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 2 },
+      ],
+    },
+  ],
+};
+
+/**
+ * トレント。ゴーレムと同じ壁役だが、硬さではなくHPの多さで受ける。
+ *
+ * ゴーレムが「防御力を上げて一撃を軽くする」のに対し、
+ * こちらは「HPの絶対量と継続回復で削り切られない」方向。
+ * 防御無視や毒のように防御力が効かない相手に対して、はっきり別の答えになる。
+ */
+const TREANT: MonsterTemplate = {
+  templateId: "treant",
+  baseName: "トレント",
+  emoji: "🌳",
+  role: "ディフェンダー",
+  baseStats: {
+    hp: 1950,
+    atk: 85,
+    def: 96,
+    spd: 72,
+    criRate: 0.05,
+    criDmg: 1.5,
+    resistance: 0.4,
+    accuracy: 0.1,
+  },
+  skill1: {
+    id: "treant_s1",
+    name: "えだのひとふり",
+    description: "敵単体に攻撃力0.6倍のダメージを与える。自身の最大HPが高いほど威力が上がる。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 0.6, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
+  },
+  skill2Variants: [
+    {
+      id: "treant_s2_a",
+      name: "からみつくねっこ",
+      description: "敵単体に攻撃力0.8倍のダメージを与え、55%で1ターン行動不能にする。自身の最大HPが高いほど威力が上がる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
+        { kind: "STUN", durationTurns: 1, chance: 0.55 },
+      ],
+    },
+    {
+      id: "treant_s2_b",
+      name: "ねづよいかまえ",
+      description: "自身の防御力を3ターン上昇させ、最大HPの15%のシールドを3ターン張る。",
+      target: "SELF",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+        { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+      ],
+    },
+    {
+      id: "treant_s2_c",
+      name: "ようぶんきゅうしゅう",
+      description: "敵単体に攻撃力0.9倍のダメージを与え、与えたダメージの40%を回復する。自身の最大HPが高いほど威力が上がる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
+        { kind: "LIFESTEAL", healRate: 0.4 },
+      ],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "treant_s3_a",
+      name: "もりのゆりかご",
+      description: "味方全体のHPを最大HPの12%回復し、3ターンのあいだ毎ターン8%ずつ回復させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "HEAL", healRate: 0.12 },
+        { kind: "REGEN", healRate: 0.08, durationTurns: 3 },
+      ],
+    },
+    {
+      id: "treant_s3_b",
+      name: "たいじゅのいかり",
+      description: "敵全体に攻撃力0.8倍のダメージを与え、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が上がる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
+        { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
+      ],
+    },
+    {
+      id: "treant_s3_c",
+      name: "だいちのとりで",
+      description: "味方全体に最大HPの20%のシールドを3ターン張り、2ターン状態異常を無効にする。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 },
+        { kind: "IMMUNITY", durationTurns: 2 },
+      ],
+    },
+  ],
+};
+
+/**
+ * グレイヴナイト。攻守を1体で兼ねるバランス型。
+ *
+ * 尖った性能はないが、盾役と攻撃役の両方が足りない編成の穴埋めになる。
+ * 序盤に配りやすく、育てても腐らないことを狙った基準値のような1体。
+ */
+const KNIGHT: MonsterTemplate = {
+  templateId: "knight",
+  baseName: "グレイヴナイト",
+  emoji: "⚔️",
+  role: "バランス型",
+  baseStats: {
+    hp: 1350,
+    atk: 122,
+    def: 95,
+    spd: 96,
+    criRate: 0.15,
+    criDmg: 1.55,
+    resistance: 0.2,
+    accuracy: 0.15,
+  },
+  skill1: {
+    id: "knight_s1",
+    name: "なぎはらい",
+    description: "敵単体に攻撃力1.0倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 1.0, scaleBonus: { stat: "def", ratePerPoint: 0.002 } }],
+  },
+  skill2Variants: [
+    {
+      id: "knight_s2_a",
+      name: "かぶとわり",
+      description: "敵単体に攻撃力1.5倍のダメージを与え、65%で2ターン防御力を低下させる。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.5 },
+        { kind: "DEBUFF", stat: "def", amount: 0.35, durationTurns: 2, chance: 0.65 },
+      ],
+    },
+    {
+      id: "knight_s2_b",
+      name: "たてうけ",
+      description: "味方全体のデバフを解除し、自身の防御力を3ターン上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "CLEANSE" },
+        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3, applyTo: "SELF" },
+      ],
+    },
+    {
+      id: "knight_s2_c",
+      name: "れんげき",
+      description: "敵単体に攻撃力0.7倍のダメージを3回与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 3,
+      effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3 }],
+    },
+  ],
+  skill3Variants: [
+    {
+      id: "knight_s3_a",
+      name: "しんげきのごうれい",
+      description: "味方全体の攻撃力を2ターン上昇させ、敵単体に攻撃力1.8倍のダメージを与える。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 4,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.8 },
+        { kind: "BUFF", stat: "atk", amount: 0.4, durationTurns: 2, applyTo: "ALLIES" },
+      ],
+    },
+    {
+      id: "knight_s3_b",
+      name: "じゅうじざん",
+      description: "敵全体に攻撃力1.2倍のダメージを与え、50%で1ターン行動不能にする。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "STUN", durationTurns: 1, chance: 0.5 },
+      ],
+    },
+    {
+      id: "knight_s3_c",
+      name: "きしのちかい",
+      description: "味方全体に最大HPの12%のシールドを3ターン張り、防御力とクリティカル率を2ターン上昇させる。",
+      target: "ALL_ALLIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "SHIELD", shieldRate: 0.12, durationTurns: 3 },
+        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "criRate", amount: 0.15, durationTurns: 2 },
+      ],
+    },
+  ],
+};
+
+export const MONSTER_TEMPLATES: MonsterTemplate[] = [SLIME, WOLF, GOLEM, FAIRY, IMP, WISP, TREANT, KNIGHT];
 
 /**
  * ガチャ専用の高レア新規モンスター(星4=SR / 星5=SSR)。GRIFFON/DRAGON・SERAPH/NEMESISとも

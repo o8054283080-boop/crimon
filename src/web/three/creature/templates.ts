@@ -3166,6 +3166,170 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
     rig.head.add(place(kit.lens(0.11, 0.14, 0.06, "plate", p.plate, 8), 0, 0.34, -0.20, 0, 0, 0));
   },
 
+  /**
+   * インプ: 大きな皮膜の耳と、矢じりの付いた細い尾。
+   *
+   * デバッファーの骨格は「棘だらけの歪んだ影」で、棘を足しても情報が増えない。
+   * 面の広い耳を左右に張り出させると、棘の林とは別種の輪郭が生まれ、
+   * 遠目のシルエットだけで棘の獣と見分けが付く。
+   */
+  imp: (kit, rig) => {
+    const p = kit.palette;
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Group();
+      // 耳は動かさない。頭に付いたまま頭の動きへ追従させる(RigFollowerが拾う)
+      place(ear, side * 0.17, 0.2, 0.02, -0.25, side * 0.5, side * 0.55);
+      // 骨の見える膜。指の骨があると布ではなく生き物の皮膜に見える
+      const web = kit.ribbedMembrane(
+        {
+          hub: { x: 0, y: 0, z: 0 },
+          fingers: [
+            { x: 0.04, y: 0.44, z: -0.1 },
+            { x: 0.16, y: 0.38, z: 0.04 },
+            { x: 0.22, y: 0.2, z: 0.12 },
+          ],
+          leading: [{ x: -0.03, y: 0.14, z: -0.12 }],
+          sag: 0.14,
+          bone: 0.016,
+          curvature: 0.1,
+          veins: 1,
+        },
+        "plate",
+        p.plate,
+        "hide",
+        p.dark,
+      );
+      ear.add(web);
+      rig.head.add(ear);
+    }
+    // 額から後ろへ流れる小さな角。先を尖らせて玩具っぽさを消す
+    for (const side of [-1, 1]) {
+      const horn = kit.shard(0.24, 0.045, "plate", p.plate, 5);
+      place(horn, side * 0.09, 0.24, -0.08, -0.5, 0, side * 0.3);
+      rig.head.add(horn);
+    }
+    // 尾の先の矢じり。末端が硬いと全体が締まる
+    const tailTip = rig.tail[rig.tail.length - 1];
+    if (tailTip) {
+      const barb = kit.plate(0.16, 0.22, 0.03, "plate", p.plate, { notch: 0.75, shoulder: 0.5 });
+      place(barb, 0, 0, -0.12, Math.PI / 2, 0, 0);
+      tailTip.group.add(barb);
+    }
+  },
+
+  /**
+   * ウィスプ: 本体の周りを回る光の粒と、内側で灯る核。
+   *
+   * サポートの骨格(浮遊する結晶)そのままだと古代のクリスタルと見分けが付かない。
+   * 回る粒は静止画では効かないが、動いている戦闘画面では
+   * 「支援している何か」だと一目で分かる差になる。
+   */
+  wisp: (kit, rig) => {
+    const p = kit.palette;
+    for (let i = 0; i < 7; i++) {
+      const mote = kit.ball(0.05, 0.05, 0.05, "glow", p.glow, 8);
+      rig.core.add(mote);
+      rig.orbiters.push({
+        object: mote,
+        radius: 0.72 + (i % 3) * 0.26,
+        height: 0.7 + i * 0.19,
+        speed: 0.42 + (i % 2) * 0.22,
+        phase: (i / 7) * Math.PI * 2,
+        tilt: 0.28 + (i % 2) * 0.2,
+        spin: 0.9,
+      });
+    }
+    // 胸の内側で灯る核。外殻の結晶越しに透ける
+    rig.torso.add(place(kit.ball(0.12, 0.16, 0.12, "glow", p.glow, 12), 0, 0.12, 0));
+    // 核を抱える環。ゆっくり回して、結晶の柱に軸があることを見せる
+    for (let i = 0; i < 2; i++) {
+      const ring = kit.ring(0.3 + i * 0.09, 0.016, "metal", p.metal, 24);
+      place(ring, 0, 0.12, 0, Math.PI / 2 + i * 0.7, i * 0.5, 0);
+      rig.torso.add(ring);
+      rig.spinners.push({ object: ring, axis: i === 0 ? "y" : "z", speed: i === 0 ? 0.4 : -0.28 });
+    }
+  },
+
+  /**
+   * トレント: 頭上から伸びる枝角と、肩から垂れる葉叢。
+   *
+   * ディフェンダーの骨格は岩の巨人なので、そのままではゴーレムの色違いになる。
+   * 上へ枝が伸びると輪郭の最高点が岩の肩より上に来て、重心の読み方が変わる。
+   */
+  treant: (kit, rig) => {
+    const p = kit.palette;
+    const branch = (x: number, z: number, side: number) => {
+      const tube = kit.taperedTube(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: side * 0.1, y: 0.22, z: z * 0.4 },
+          { x: side * 0.26, y: 0.42, z: z * 0.9 },
+          { x: side * 0.34, y: 0.62, z: z * 1.1 },
+        ],
+        0.06,
+        0.016,
+        "hide",
+        p.dark,
+        6,
+      );
+      place(tube, x, 0.16, 0);
+      return tube;
+    };
+    for (const side of [-1, 1]) {
+      rig.head.add(branch(side * 0.1, 0.3, side));
+      rig.head.add(branch(side * 0.14, -0.5, side));
+    }
+    // 葉叢。1枚ずつ生やすと櫛になるので、房として大小を混ぜて置く
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const leaves = kit.rock(0.2 + i * 0.05, 0.13, 0.18, "hide", p.accent, 0.42, 1);
+        place(leaves, side * (0.28 + i * 0.1), 0.5 + i * 0.14, -0.1 + i * 0.16);
+        rig.head.add(leaves);
+      }
+      // 肩の苔。岩肌との色差で「生きている岩」に見せる
+      const moss = kit.rock(0.26, 0.12, 0.24, "hide", p.accent, 0.5, 1);
+      place(moss, side * 0.46, 0.3, 0.02);
+      rig.torso.add(moss);
+    }
+  },
+
+  /**
+   * グレイヴナイト: 積層した肩当てと、兜の面頬・前立て。
+   *
+   * バランス型の骨格(剣とマントの人型)はセラフと同じ土台なので、
+   * 硬い縁のある板を重ねて「鎧を着た人間」の側へ寄せる。
+   */
+  knight: (kit, rig) => {
+    const p = kit.palette;
+    for (const side of [-1, 1]) {
+      const pauldron = kit.plateStack("metal", p.metal, {
+        count: 3,
+        y0: 0.06,
+        y1: -0.16,
+        width: 0.42,
+        widthEnd: 0.3,
+        height: 0.18,
+        heightEnd: 0.14,
+        thickness: 0.03,
+        z: 0,
+        wrap: 0.34,
+        tilt: 0.18,
+        tiltEnd: 0.5,
+        notch: 0.5,
+      });
+      place(pauldron, side * 0.36, 0.52, 0, 0, side * 0.2, -side * 0.22);
+      rig.torso.add(pauldron);
+    }
+    // 兜の面頬。目の前に縦の隙間を残した板で、顔の情報を減らして鎧に見せる
+    const visor = kit.plate(0.26, 0.24, 0.035, "metal", p.metal, { notch: 0.55, shoulder: 0.78 });
+    place(visor, 0, 0.02, -0.2, 0.12, 0, 0);
+    rig.head.add(visor);
+    // 前立て。頭の最高点を作ると、立ち姿が伸びて見える
+    const crest = kit.plate(0.06, 0.3, 0.02, "plate", p.accent, { notch: 0.9, shoulder: 0.4 });
+    place(crest, 0, 0.3, 0.02, 0, Math.PI / 2, 0);
+    rig.head.add(crest);
+  },
+
   /** 古代の呪晶: 本体を縛る拘束環。同じ結晶系のサポートと役割の差を形で出す */
   ancient_crystal_curse: (kit, rig) => {
     const p = kit.palette;
