@@ -10,7 +10,6 @@ import {
   addFaceEyes,
   addFeatherWing,
   addJoint,
-  addPlating,
   addTail,
   limbFrom,
 } from "./roles.js";
