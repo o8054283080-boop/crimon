@@ -1647,16 +1647,29 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
         side * 1.3,
       ),
     );
-    // 肩の結晶の房。大小と向きを散らして群れにする。均等に生やすと櫛になる
+    // 肩の結晶の房。大小と向きを散らして群れにする。均等に生やすと櫛になる。
+    // 細く長いと針山になるので、太く短く、根元を寄せる
     const cluster = kit.shardCluster("crystal", p.accent, {
-      count: 5,
-      length: 0.34,
-      radius: 0.055,
-      spread: 0.72,
-      scatter: 0.07,
+      count: 6,
+      length: 0.26,
+      radius: 0.085,
+      spread: 0.8,
+      scatter: 0.09,
+      minScale: 0.35,
     });
-    place(cluster, side * 0.28, 0.24, -0.16, -0.5, 0, side * 0.5);
+    place(cluster, side * 0.3, 0.2, -0.2, -0.35, 0, side * 0.85);
     torso.add(cluster);
+    // 肘の房。硬いものは末端にも結晶を持つ
+    const elbow = kit.shardCluster("crystal", p.accent, {
+      count: 3,
+      length: 0.14,
+      radius: 0.05,
+      spread: 0.7,
+      scatter: 0.04,
+      minScale: 0.45,
+    });
+    place(elbow, side * 0.3, -0.12, -0.24, -0.2, 0, side * 1.5);
+    torso.add(elbow);
   }
 
   // --- 前脚(後脚より短く、まっすぐ下ろす) ---
@@ -1801,7 +1814,7 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // 胴より長い尾。先に刃を付けて、ただの紐に見えないようにする
-  addTail(kit, rig, [0, 0.06, 0.26], 6, 0.28, 0.11, -1.0, -0.08, true);
+  addTail(kit, rig, [0, 0.06, 0.26], 6, 0.28, 0.11, -1.0, -0.08, true, { hard: true, rings: true });
 
   rig.wingAnchor.set(0.26, 0.42, -0.1);
 

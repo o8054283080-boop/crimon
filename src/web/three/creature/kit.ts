@@ -540,27 +540,31 @@ export class CreatureKit {
       );
       knuckle.position.set(mid.x, mid.y, mid.z - lift * 1.6);
       group.add(knuckle);
-      // 膜に浮く筋。骨から縁へ細く枝分かれする
-      const veins = o.veins ?? 0;
-      for (let i = 0; i < veins; i++) {
-        const t = 0.3 + (i / Math.max(1, veins)) * 0.5;
-        const from = hub.clone().lerp(finger, t);
-        const to = hub.clone().lerp(finger, t + 0.22).addScaledVector(direction, 0.0);
-        // 縁の方(hubから遠ざかる向き)へ、少しだけ横へ振る
-        to.x += (finger.y - hub.y) * 0.12;
-        to.y -= (finger.x - hub.x) * 0.12;
+    }
+
+    // 膜に浮く筋。指と指のあいだの膜を、要から縁へ細く走る。
+    // 指そのものから枝を出すと膜の外へ飛び出すので、必ず**隣り合う指の間**へ引く
+    const veins = o.veins ?? 0;
+    for (let i = 0; i + 1 < fingers.length; i++) {
+      for (let k = 1; k <= veins; k++) {
+        const t = k / (veins + 1);
+        const edge = fingers[i].clone().lerp(fingers[i + 1], t);
+        // 縁は指の間で hub 側へ垂れている。筋もその垂れに従わせる
+        edge.lerp(hub, sag * 2 * (1 - Math.abs(t * 2 - 1)));
+        const tip = hub.clone().lerp(edge, 0.88);
         group.add(
           this.taperedTube(
             [
-              { x: from.x, y: from.y, z: from.z - lift * 0.5 },
-              { x: to.x, y: to.y, z: to.z - lift * 0.5 },
+              { x: hub.x, y: hub.y, z: hub.z - lift * 0.6 },
+              { x: (hub.x + tip.x) * 0.5, y: (hub.y + tip.y) * 0.5, z: (hub.z + tip.z) * 0.5 - lift * 0.8 },
+              { x: tip.x, y: tip.y, z: tip.z - lift * 0.4 },
             ],
-            bone * 0.3,
-            bone * 0.06,
+            bone * 0.26,
+            bone * 0.05,
             membraneStyle,
             boneColor,
             4,
-            4,
+            6,
           ),
         );
       }

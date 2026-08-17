@@ -610,6 +610,12 @@ export function addTail(
   baseAngle: number,
   curve: number,
   blade: boolean,
+  /**
+   * 硬い尾の指定。
+   *   hard  節を角柱にし、上面のひれを縁の立った板にする(竜・魔王・甲殻)
+   *   rings 節の継ぎ目に環を巻く。丸い節の連なりを断ち切る
+   */
+  o: { hard?: boolean; rings?: boolean } = {},
 ): void {
   const p = kit.palette;
   const specs = [];
@@ -620,6 +626,8 @@ export function addTail(
       r0: radius * (1 - t * 0.85),
       r1: radius * (1 - (t + 1 / count) * 0.85),
       rot: [i === 0 ? baseAngle : curve, 0, 0] as [number, number, number],
+      radial: o.hard ? 6 : undefined,
+      facet: o.hard,
     });
   }
   const chain = kit.chain(specs, "hide", p.main);
@@ -627,11 +635,28 @@ export function addTail(
   markAnimated(...chain.joints);
   for (let i = 0; i < chain.joints.length; i++) {
     rig.tail.push({ group: chain.joints[i], rest: chain.rests[i] });
-    // 背びれ状のトゲを尾の上面に立てる
+    const shrink = 1 - (i / count) * 0.85;
+    // 背びれ状のひれを尾の上面に立てる
     if (i > 0 && i < chain.joints.length - 1) {
-      const fin = kit.spike(radius * 0.28, length * 0.9 * (1 - i / count), 0.3, "plate", p.plate);
-      place(fin, 0, -length * 0.3, 0, Math.PI, Math.PI / 2, 0);
+      const height = length * 0.9 * (1 - i / count);
+      const fin = o.hard
+        ? place(
+            kit.plate(radius * 1.1 * shrink, height * 0.8, radius * 0.22, "plate", p.plate, { notch: 0.7, shoulder: 0.6 }),
+            0,
+            -length * 0.3,
+            0,
+            Math.PI,
+            Math.PI / 2,
+            Math.PI,
+          )
+        : place(kit.spike(radius * 0.28, height, 0.3, "plate", p.plate), 0, -length * 0.3, 0, Math.PI, Math.PI / 2, 0);
       chain.joints[i].add(fin);
+    }
+    // 節の環。丸い節が数珠に見えるのを断ち切る
+    if (o.rings && i < chain.joints.length - 1) {
+      const ring = kit.band(radius * shrink * 1.06, radius * 0.16 * shrink, Math.PI * 2, "plate", p.plate, 8);
+      place(ring, 0, -length * (1 - (i / count) * 0.35) * 0.92, 0, Math.PI / 2, 0, 0);
+      chain.joints[i].add(ring);
     }
   }
   if (blade) {
