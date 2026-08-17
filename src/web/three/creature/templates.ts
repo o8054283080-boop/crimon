@@ -1571,16 +1571,16 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
     place(
       kit.hull(
         [
-          { y: 0, r: 0.19, rz: 0.2 },
-          { y: 0.16, r: 0.23, rz: 0.24, ridge: 0.2, keel: 0.12 },
+          { y: 0, r: 0.18, rz: 0.19 },
+          { y: 0.16, r: 0.21, rz: 0.22, ridge: 0.2, keel: 0.12 },
           // くびれ。ここが細いほど、次の肋の深さが効く
-          { y: 0.34, r: 0.2, rz: 0.24, ridge: 0.26, keel: 0.2 },
-          { y: 0.54, r: 0.28, rz: 0.34, ridge: 0.3, keel: 0.34 },
+          { y: 0.34, r: 0.165, rz: 0.2, ridge: 0.3, keel: 0.22 },
+          { y: 0.54, r: 0.26, rz: 0.34, ridge: 0.34, keel: 0.36 },
           // 胸のいちばん深いところ
-          { y: 0.72, r: 0.33, rz: 0.42, ridge: 0.26, keel: 0.44 },
-          { y: 0.88, r: 0.34, rz: 0.4, ridge: 0.18, keel: 0.3 },
+          { y: 0.72, r: 0.33, rz: 0.46, ridge: 0.28, keel: 0.46 },
+          { y: 0.88, r: 0.35, rz: 0.42, ridge: 0.18, keel: 0.3 },
           { y: 1.02, r: 0.26, rz: 0.3, keel: 0.24 },
-          { y: 1.12, r: 0.16, rz: 0.19 },
+          { y: 1.12, r: 0.15, rz: 0.18 },
         ],
         "hide",
         p.main,
@@ -1687,11 +1687,12 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   rig.neck.add(
     kit.hull(
       [
-        { y: 0, r: 0.23, rz: 0.23 },
-        { y: 0.14, r: 0.21, rz: 0.22, z: 0.05, ridge: 0.18 },
-        { y: 0.3, r: 0.18, rz: 0.19, z: 0.06, ridge: 0.22 },
-        { y: 0.45, r: 0.16, rz: 0.17, z: 0.01, ridge: 0.2 },
-        { y: 0.58, r: 0.14, rz: 0.15, z: -0.12, ridge: 0.14 },
+        { y: 0, r: 0.22, rz: 0.23 },
+        { y: 0.16, r: 0.185, rz: 0.2, z: 0.06, ridge: 0.2 },
+        { y: 0.34, r: 0.15, rz: 0.16, z: 0.08, ridge: 0.26 },
+        { y: 0.52, r: 0.132, rz: 0.145, z: 0.04, ridge: 0.24 },
+        { y: 0.68, r: 0.125, rz: 0.14, z: -0.06, ridge: 0.18 },
+        { y: 0.8, r: 0.12, rz: 0.135, z: -0.16, ridge: 0.12 },
       ],
       "hide",
       p.main,
@@ -1703,13 +1704,13 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   rig.neck.add(
     place(
       kit.plateStack("plate", p.plate, {
-        count: 6,
+        count: 8,
         y0: 0,
-        y1: 0.42,
+        y1: 0.6,
         z: -0.02,
-        zEnd: 0.02,
+        zEnd: 0.04,
         width: 0.2,
-        widthEnd: 0.14,
+        widthEnd: 0.12,
         height: 0.11,
         heightEnd: 0.08,
         thickness: 0.022,
@@ -1726,24 +1727,50 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
     ),
   );
 
-  // --- 背びれ。腰から首の付け根まで、山なりに大きさを変えて並べる ---
-  for (let i = 0; i < 9; i++) {
-    const t = i / 8;
-    const fin = kit.spike(0.045, 0.16 + Math.sin(t * Math.PI) * 0.17, 0.32, "plate", p.plate);
-    place(fin, 0, 0.3 - t * 0.04, -0.3 + t * 0.72, -0.12, Math.PI / 2, 0);
+  // --- 背の峰。棒の棘を並べると櫛の歯になるので、縁の立った板を並べる ---
+  // [背の稜線のz, その高さ, 板の大きさ] を胴の輪郭に合わせて拾ってある。
+  // 板は (Y:90度, Z:180度) で立て、幅が背骨に沿い、尖りが上を向く
+  const crestLine: [number, number, number][] = [
+    [-0.42, 0.5, 0.6],
+    [-0.28, 0.58, 1.0],
+    [-0.14, 0.53, 0.94],
+    [0.0, 0.42, 0.78],
+    [0.13, 0.31, 0.6],
+    [0.25, 0.27, 0.46],
+    [0.37, 0.25, 0.32],
+  ];
+  for (const [z, y, scale] of crestLine) {
+    const height = 0.09 + scale * 0.2;
+    const fin = kit.plate(0.1 + scale * 0.09, height, 0.028, "plate", p.plate, { notch: 0.75, shoulder: 0.62 });
+    place(fin, 0, y + height * 0.32, z, 0, Math.PI / 2, Math.PI);
     torso.add(fin);
   }
-  for (let i = 0; i < 4; i++) {
-    const t = i / 3;
-    const fin = kit.spike(0.032, 0.13 - t * 0.03, 0.32, "plate", p.plate);
-    place(fin, 0, 0.14 + t * 0.4, 0.12 - t * 0.12, -0.34, Math.PI / 2, 0);
+  // 背の峰の根元に結晶の房。左右に散らして、峰が一列の櫛に見えないようにする
+  for (const side of [-1, 1]) {
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 4,
+      length: 0.2,
+      radius: 0.038,
+      spread: 0.85,
+      scatter: 0.08,
+    });
+    place(cluster, side * 0.1, 0.42, -0.06, 0.35, 0, side * 0.7);
+    torso.add(cluster);
+  }
+  // 首の峰。胴から続く同じ形を、細くしながら頭まで送る
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    const height = 0.15 - t * 0.06;
+    const fin = kit.plate(0.09 - t * 0.02, height, 0.022, "plate", p.plate, { notch: 0.7, shoulder: 0.62 });
+    // 首の背の稜線(zが 0.29 から 0.02 へ回り込む)に沿わせ、尖りを後ろへ倒す
+    place(fin, 0, 0.16 + t * 0.58, 0.29 - t * 0.27 + height * 0.2, 0.45, Math.PI / 2, Math.PI);
     rig.neck.add(fin);
   }
 
   // --- 頭(長い口先、後ろへ流れる角) ---
   // 頭が小さいと、長い首と相まってリャマや馬の輪郭になる。
   // 首の太さに負けない大きさまで頭蓋を上げ、口先も長く取る
-  place(rig.head, 0, 0.6, -0.12, 0.62, 0, 0);
+  place(rig.head, 0, 0.82, -0.16, 0.62, 0, 0);
   addBeastHead(kit, rig, { skull: [0.28, 0.26, 0.35], snout: 0.50, jaw: true, horns: "swept", crest: 4, eye: 0.072, slit: 0.34 });
   // 頬の張り出し。口先の細さと対比させて、噛む力があるように見せる
   for (const side of [-1, 1]) {

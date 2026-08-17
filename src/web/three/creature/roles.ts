@@ -705,7 +705,17 @@ export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: num
   }
 }
 
-/** 指の骨と膜で作るコウモリ翼(ボス用) */
+/**
+ * 指の骨と膜で作るコウモリ翼。
+ *
+ * 膜だけを張ると布に、骨だけを並べると傘の骨になる。**膜が骨に吊られている**
+ * ことが見えて初めて翼になるので、
+ *   1. 指の間で縁が内側へ垂れる(たるみ)
+ *   2. 骨が膜より手前へ浮き、節を持つ
+ *   3. 膜の上に細い筋が走る
+ * の3つを kit.ribbedMembrane が一括で作る。
+ * ここでは腕の骨・肩の肉・鉤爪・前縁の甲だけを足す。
+ */
 export function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: number): void {
   const p = kit.palette;
   const s = side;
@@ -714,45 +724,77 @@ export function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number,
   const shoulder = v(0, 0, 0);
   const elbow = v(0.5, 0.34, 0.1);
   const wrist = v(1.02, 0.5, 0.02);
-  const fingers = [v(1.72, 0.42, 0.12), v(1.5, -0.16, 0.2), v(1.05, -0.6, 0.22), v(0.5, -0.72, 0.18)];
+  const fingers = [v(1.78, 0.46, 0.12), v(1.58, -0.16, 0.2), v(1.1, -0.66, 0.22), v(0.5, -0.78, 0.18)];
 
-  // 腕の骨。付け根に筋肉の膨らみ、関節に球を入れて棒の直結を隠す
-  wing.add(kit.link(shoulder, elbow, 0.075 * span, 0.06 * span, "plate", p.plate, 6));
-  wing.add(kit.link(elbow, wrist, 0.06 * span, 0.045 * span, "plate", p.plate, 6));
-  wing.add(place(kit.ball(0.1 * span, 0.09 * span, 0.09 * span, "hide", p.main, 8), shoulder.x, shoulder.y, shoulder.z));
+  // 腕の骨。稜線のある角柱で通し、関節に節を入れて棒の直結を隠す
+  wing.add(kit.link(shoulder, elbow, 0.075 * span, 0.06 * span, "plate", p.plate, 5));
+  wing.add(kit.link(elbow, wrist, 0.06 * span, 0.045 * span, "plate", p.plate, 5));
+  wing.add(
+    place(
+      kit.hull(
+        [
+          { y: -0.1 * span, r: 0.06 * span },
+          { y: 0, r: 0.115 * span, rz: 0.09 * span },
+          { y: 0.12 * span, r: 0.07 * span },
+        ],
+        "hide",
+        p.main,
+        { sides: 6 },
+      ),
+      shoulder.x,
+      shoulder.y,
+      shoulder.z,
+      0,
+      0,
+      -s * 0.8,
+    ),
+  );
   wing.add(place(kit.ball(0.065 * span, 0.06 * span, 0.06 * span, "hide", p.dark, 7), elbow.x, elbow.y, elbow.z));
   wing.add(place(kit.ball(0.055 * span, 0.05 * span, 0.05 * span, "plate", p.plate, 7), wrist.x, wrist.y, wrist.z));
-  for (const finger of fingers) {
-    wing.add(kit.link(wrist, finger, 0.04 * span, 0.012 * span, "plate", p.plate, 5));
-    // 指の関節。膜の張った骨組みが節を持って見える
-    const mid = wrist.clone().lerp(finger, 0.42);
-    wing.add(place(kit.ball(0.028 * span, 0.028 * span, 0.022 * span, "plate", p.plate, 6), mid.x, mid.y, mid.z));
-  }
-  // 指の先の鉤爪
-  const hook = kit.spike(0.04 * span, 0.2 * span, 0.6, "plate", p.plate);
-  place(hook, fingers[0].x, fingers[0].y, fingers[0].z, 0, 0, -s * 1.2);
-  wing.add(hook);
 
-  const points = [shoulder, elbow, wrist, ...fingers, shoulder];
-  const membrane = kit.membrane(
-    (shape) => {
-      shape.moveTo(points[0].x, points[0].y);
-      shape.lineTo(points[1].x, points[1].y);
-      shape.lineTo(points[2].x, points[2].y);
-      for (let i = 3; i < points.length; i++) {
-        const previous = points[i - 1];
-        const current = points[i];
-        // 指の間を内側へえぐって、コウモリ翼らしい scalloped な縁にする
-        const mx = (previous.x + current.x) * 0.5 * 0.82;
-        const my = (previous.y + current.y) * 0.5 * 0.82;
-        shape.quadraticCurveTo(mx, my, current.x, current.y);
-      }
-    },
-    "membrane",
-    p.membrane,
-    -0.08 / span,
+  // 骨・たるんだ膜・筋。手首を要にして指が開く
+  wing.add(
+    kit.ribbedMembrane(
+      {
+        hub: wrist,
+        fingers,
+        leading: [shoulder, elbow],
+        sag: 0.17,
+        bone: 0.042 * span,
+        curvature: -0.085 / span,
+        veins: 2,
+      },
+      "plate",
+      p.plate,
+      "membrane",
+      p.membrane,
+    ),
   );
-  wing.add(membrane);
+
+  // 前縁の甲。肩から手首までの縁を硬く見せ、膜の縁が布に見えるのを防ぐ
+  for (const [from, to] of [
+    [shoulder, elbow],
+    [elbow, wrist],
+  ]) {
+    const mid = from.clone().lerp(to, 0.5);
+    const along = to.clone().sub(from);
+    wing.add(
+      place(
+        kit.plate(along.length() * 0.86, 0.11 * span, 0.02 * span, "plate", p.plate, { notch: 0.2, shoulder: 0.75 }),
+        mid.x,
+        mid.y,
+        mid.z - 0.03 * span,
+        0,
+        0,
+        Math.atan2(along.y, along.x) - Math.PI / 2,
+      ),
+    );
+  }
+
+  // 指の先の鉤爪。末端が硬いと玩具に見えない
+  const hook = kit.claw(0.24 * span, 0.05 * span, 0.5, "plate", p.plate);
+  place(hook, fingers[0].x, fingers[0].y, fingers[0].z, 0, 0, -s * 1.35);
+  wing.add(hook);
 }
 
 /**
