@@ -2571,20 +2571,69 @@ function buildAncientDemon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴。肩を大きく張り出させ、胸に結晶の核を埋める ---
   const torso = rig.torso;
   place(torso, 0, 0.12, 0, -0.05, 0, 0);
-  torso.add(place(kit.ball(0.42, 0.4, 0.32, "hide", p.main), 0, 0.24, 0));
-  torso.add(place(kit.ball(0.3, 0.26, 0.26, "hide", p.dark), 0, -0.06, 0.02));
-  addPlating(kit, torso, 4, 0.44, -0.02, 0.3, -0.24, "metal");
+  // 胴は輪切りを積んだ1本。腰でくびれ、肩で張るまでが連続した輪郭になる
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: -0.24, r: 0.22, rz: 0.2 },
+          { y: -0.06, r: 0.3, rz: 0.26, keel: 0.16 },
+          { y: 0.08, r: 0.28, rz: 0.24, keel: 0.24, ridge: 0.14 },
+          { y: 0.24, r: 0.38, rz: 0.3, keel: 0.3, ridge: 0.22 },
+          { y: 0.38, r: 0.42, rz: 0.3, keel: 0.14, ridge: 0.24 },
+          { y: 0.5, r: 0.3, rz: 0.22 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
+  // 胸腹の積層装甲。古い石の甲を下から上へ重ねる
+  torso.add(
+    place(
+      kit.plateStack("metal", p.metal, {
+        count: 6,
+        y0: -0.1,
+        y1: 0.4,
+        z: -0.24,
+        zEnd: -0.34,
+        width: 0.32,
+        widthEnd: 0.48,
+        height: 0.15,
+        heightEnd: 0.19,
+        thickness: 0.038,
+        wrap: 0.28,
+        wrapEnd: 0.36,
+        notch: 0.4,
+        tilt: 0.14,
+        tiltEnd: -0.1,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   // 胸の核。お供のクリスタルと同じ八面体で、素材の出どころを揃える
   torso.add(place(kit.octa(0.15, 0.22, 0.12, "crystal", p.accent), 0, 0.2, -0.28));
   torso.add(place(kit.octa(0.07, 0.13, 0.06, "glow", p.glow), 0, 0.2, -0.31));
   // 肩の岩塊
   for (const side of [-1, 1]) {
     torso.add(place(kit.rock(0.2, 0.17, 0.19, "plate", p.plate, 0.24), side * 0.44, 0.36, 0));
-    for (let i = 0; i < 3; i++) {
-      torso.add(
-        place(kit.octa(0.04, 0.16, 0.04, "crystal", p.accent), side * (0.4 + i * 0.05), 0.5, (i - 1) * 0.1, 0, 0, side * 0.4),
-      );
-    }
+    // 肩の結晶。3本を等間隔に立てると櫛になるので、房にして散らす
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 5,
+      length: 0.3,
+      radius: 0.06,
+      spread: 0.75,
+      scatter: 0.08,
+      minScale: 0.3,
+    });
+    place(cluster, side * 0.44, 0.44, 0, 0, 0, side * 0.5);
+    torso.add(cluster);
   }
 
   // --- 腕4本。上の対を大きく、下の対を小さくして、増えた腕が飾りに見えないようにする ---
@@ -2596,8 +2645,8 @@ function buildAncientDemon(kit: CreatureKit, rig: CreatureRig): void {
     armSpecs.forEach((spec, index) => {
       const arm = kit.chain(
         [
-          { len: spec.len, r0: spec.radius, r1: spec.radius * 0.72, rot: [spec.swing, 0, side * spec.drop], radial: 7 },
-          { len: spec.len * 0.9, r0: spec.radius * 0.72, r1: spec.radius * 0.56, rot: [0.75, 0, -side * 0.3], radial: 7 },
+          { len: spec.len, r0: spec.radius, r1: spec.radius * 0.72, rot: [spec.swing, 0, side * spec.drop], radial: 6, facet: true },
+          { len: spec.len * 0.9, r0: spec.radius * 0.72, r1: spec.radius * 0.56, rot: [0.75, 0, -side * 0.3], radial: 6, facet: true },
         ],
         "hide",
         p.main,
@@ -2739,10 +2788,53 @@ function buildSeraph(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(縦に長い。肩を張らず、胸から腰まで一本の線で落とす) ---
   const torso = rig.torso;
   place(torso, 0, 0.04, 0, -0.05, 0, 0);
-  torso.add(place(kit.ball(0.145, 0.20, 0.12, "hide", p.main), 0, 0.16, 0));
-  torso.add(place(kit.ball(0.22, 0.22, 0.16, "hide", p.main), 0, 0.44, 0));
-  // 胸当て。薄い板を3枚だけ重ね、装甲ではなく衣の留め具に見せる
-  addPlating(kit, torso, 3, 0.22, 0.50, 0.18, -0.10);
+  // 胴は輪切りを積んだ1本。細身なので面の数は多め(10)にして角張らせない。
+  // 球2つで作っていた時は、胸と腹の境目に必ずくびれの段が出ていた
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0.02, r: 0.13, rz: 0.11 },
+          { y: 0.16, r: 0.15, rz: 0.12, keel: 0.1 },
+          { y: 0.3, r: 0.17, rz: 0.13, keel: 0.16 },
+          { y: 0.44, r: 0.22, rz: 0.16, keel: 0.18, ridge: 0.12 },
+          { y: 0.56, r: 0.2, rz: 0.15 },
+          { y: 0.64, r: 0.12, rz: 0.1 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
+  // 胸当て。縁の立った薄い板を重ね、装甲ではなく衣の留め具に見せる
+  torso.add(
+    place(
+      kit.plateStack("metal", p.metal, {
+        count: 4,
+        y0: 0.22,
+        y1: 0.5,
+        z: -0.13,
+        zEnd: -0.18,
+        width: 0.19,
+        widthEnd: 0.26,
+        height: 0.1,
+        heightEnd: 0.11,
+        thickness: 0.02,
+        wrap: 0.16,
+        wrapEnd: 0.2,
+        notch: 0.35,
+        tilt: 0.1,
+        tiltEnd: -0.08,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   torso.add(place(kit.lens(0.21, 0.13, 0.09, "metal", p.metal), 0, 0.56, -0.06, -0.12, 0, 0));
   torso.add(place(kit.octa(0.05, 0.08, 0.035, "crystal", p.accent), 0, 0.46, -0.16));
   torso.add(place(kit.octa(0.024, 0.04, 0.018, "glow", p.glow), 0, 0.46, -0.17));
