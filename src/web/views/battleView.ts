@@ -23,9 +23,20 @@ export interface BattleViewHandle {
   dispose: () => void;
 }
 
-const SPEED_INTERVAL_MS: Record<string, number> = { "1": 650, "2": 300, "4": 120 };
+/**
+ * 再生速度ごとの、1行動あたりの間(ミリ秒)。
+ *
+ * 以前は 1倍=650 / 2倍=300 / 4倍=120 で、**倍率が名前どおりではなかった**
+ * (2倍は実際2.17倍、4倍は5.4倍速)。等倍が速すぎて何が起きたか追えない、
+ * という指摘を受けたので、等倍を落としたうえで倍率を名前と一致させた。
+ *
+ * 等倍を遅くすると最速も遅くなってしまうため、周回用に8倍を足してある。
+ * 従来の4倍(120ms)より速い水準を残すことで、速く回したい人の手を止めない。
+ */
+const SPEED_STEPS = ["1", "2", "4", "8"] as const;
+const SPEED_INTERVAL_MS: Record<string, number> = { "1": 1000, "2": 500, "4": 250, "8": 125 };
 /** 攻撃モーションを見せてから着弾させるまでの間(再生速度で縮む) */
-const IMPACT_DELAY_MS: Record<string, number> = { "1": 260, "2": 150, "4": 60 };
+const IMPACT_DELAY_MS: Record<string, number> = { "1": 320, "2": 160, "4": 80, "8": 40 };
 
 interface UnitHudRefs {
   card: HTMLElement;
@@ -718,7 +729,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       className: "battle-speed-btn",
       title: "再生速度",
       onclick: () => {
-        speed = speed === "1" ? "2" : speed === "2" ? "4" : "1";
+        speed = SPEED_STEPS[(SPEED_STEPS.indexOf(speed as (typeof SPEED_STEPS)[number]) + 1) % SPEED_STEPS.length];
         speedBtn.textContent = `x${speed}`;
       },
     },

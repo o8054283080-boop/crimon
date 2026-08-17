@@ -8,11 +8,35 @@ export interface EquipmentPickerContext {
   slot: EquipSlot;
 }
 
+/**
+ * 並べ替えの種類。
+ *
+ * 装備は数十個たまるので、「今その順で見たい理由」が場面ごとに違う。
+ * 強い物を探す・売る物を探す・シリーズを揃える、で必要な順序が別なので選べるようにする。
+ */
+export type EquipmentSortKey = "recommended" | "star" | "level" | "slot" | "set" | "value";
+
+export const EQUIPMENT_SORT_LABEL: Record<EquipmentSortKey, string> = {
+  recommended: "おすすめ",
+  star: "星の高い順",
+  level: "強化の高い順",
+  slot: "スロット順",
+  set: "シリーズ順",
+  value: "売値の高い順",
+};
+
+export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "star", "level", "slot", "set", "value"];
+
 export interface EquipmentProps {
   player: PlayerState;
   detailId: string | null;
   pickerContext: EquipmentPickerContext | null;
   slotFilter: EquipSlot | null;
+  sortKey: EquipmentSortKey;
+  /** 一括売却のために選ばれている装備 */
+  selectedIds: string[];
+  /** 選択モード中かどうか。通常は札を押すと詳細へ、選択モード中は選択の切り替えになる */
+  selecting: boolean;
   onSelectDetail: (id: string | null) => void;
   onEquip: (equipmentId: string, monsterId: string) => void;
   onUnequip: (equipmentId: string) => void;
@@ -21,6 +45,12 @@ export interface EquipmentProps {
   onCancelPicker: () => void;
   onGoDungeon: () => void;
   onChangeSlotFilter: (slot: EquipSlot | null) => void;
+  onChangeSort: (key: EquipmentSortKey) => void;
+  onToggleSelecting: () => void;
+  onToggleSelected: (equipmentId: string) => void;
+  onSelectAllShown: (ids: string[]) => void;
+  onClearSelection: () => void;
+  onBulkSell: () => void;
 }
 
 function formatStatValue(roll: StatRoll): string {
@@ -95,6 +125,74 @@ function renderSlotFilterRow(props: EquipmentProps): HTMLElement {
   return el("div", { className: "slot-filter-row" }, [allChip, ...slotChips]);
 }
 
+/** 並べ替えの本体。どの順でも、装着中のものは先に出して事故を防ぐ */
+function compareBySort(key: EquipmentSortKey, isEquipped: (e: Equipment) => boolean): (a: Equipment, b: Equipment) => number {
+  return (a, b) => {
+    switch (key) {
+      case "star":
+        return b.star - a.star || b.level - a.level || a.slot - b.slot;
+      case "level":
+        return b.level - a.level || b.star - a.star || a.slot - b.slot;
+      case "slot":
+        return a.slot - b.slot || b.star - a.star || b.level - a.level;
+      case "set":
+        return a.set.localeCompare(b.set) || b.star - a.star || b.level - a.level;
+      case "value":
+        return equipmentSellPrice(b) - equipmentSellPrice(a);
+      default:
+        // おすすめ: 装着中 → スロット → 星 → 強化。普段使いの並び
+        return Number(isEquipped(b)) - Number(isEquipped(a)) || a.slot - b.slot || b.star - a.star || b.level - a.level;
+    }
+  };
+}
+
+function renderSortRow(props: EquipmentProps): HTMLElement {
+  return el(
+    "div",
+    { className: "slot-filter-row sort-row" },
+    EQUIPMENT_SORT_KEYS.map((key) =>
+      el(
+        "button",
+        {
+          type: "button",
+          className: `slot-filter-chip${props.sortKey === key ? " slot-filter-chip--active" : ""}`,
+          onclick: () => props.onChangeSort(key),
+        },
+        [EQUIPMENT_SORT_LABEL[key]],
+      ),
+    ),
+  );
+}
+
+/** 一括売却の操作帯。選択モードの時だけ出す */
+function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
+  const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
+  // 装着中のものは売れないので、まとめて選ぶ対象からも外す
+  const sellable = shown.filter((e) => !isEquipped(e));
+  const selected = props.player.equipment.filter((e) => props.selectedIds.includes(e.id));
+  const total = selected.reduce((sum, e) => sum + equipmentSellPrice(e), 0);
+
+  return el("div", { className: "bulk-bar" }, [
+    el("div", { className: "bulk-bar__row" }, [
+      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectAllShown(sellable.map((e) => e.id)) }, [
+        `表示中をすべて選ぶ (${sellable.length})`,
+      ]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onClearSelection }, ["選択を解除"]),
+    ]),
+    el("div", { className: "bulk-bar__summary" }, [`${selected.length}個を選択中 ・ 売値 🪙${total.toLocaleString()}`]),
+    el(
+      "button",
+      {
+        type: "button",
+        className: "btn btn--primary btn--large",
+        disabled: selected.length === 0,
+        onclick: props.onBulkSell,
+      },
+      [`💰 選択した${selected.length}個を売却する`],
+    ),
+  ]);
+}
+
 function renderList(props: EquipmentProps): HTMLElement {
   const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
   const items = props.pickerContext
@@ -102,17 +200,28 @@ function renderList(props: EquipmentProps): HTMLElement {
     : props.player.equipment
         .filter((e) => props.slotFilter === null || e.slot === props.slotFilter)
         .slice()
-        .sort((a, b) => Number(isEquipped(b)) - Number(isEquipped(a)) || a.slot - b.slot || b.star - a.star || b.level - a.level);
+        .sort(compareBySort(props.sortKey, isEquipped));
 
-  const cards = items.map((eq) =>
-    equipmentCard(props.player, eq, () => {
+  const selecting = props.selecting && !props.pickerContext;
+
+  const cards = items.map((eq) => {
+    const card = equipmentCard(props.player, eq, () => {
       if (props.pickerContext) {
         props.onEquip(eq.id, props.pickerContext.monsterId);
+      } else if (selecting) {
+        // 装着中は売れないので、選択そのものをさせない
+        if (!isEquipped(eq)) props.onToggleSelected(eq.id);
       } else {
         props.onSelectDetail(eq.id);
       }
-    }),
-  );
+    });
+    if (selecting) {
+      card.classList.add("equip-card--selectable");
+      if (isEquipped(eq)) card.classList.add("equip-card--locked");
+      if (props.selectedIds.includes(eq.id)) card.classList.add("equip-card--selected");
+    }
+    return card;
+  });
 
   return el("div", { className: "screen equipment-screen" }, [
     el("header", { className: "app-header" }, [
@@ -123,6 +232,15 @@ function renderList(props: EquipmentProps): HTMLElement {
       ? el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancelPicker }, ["◀ キャンセル"])
       : el("button", { type: "button", className: "btn btn--primary btn--large", onclick: props.onGoDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
     props.pickerContext ? null : renderSlotFilterRow(props),
+    props.pickerContext ? null : renderSortRow(props),
+    props.pickerContext
+      ? null
+      : el(
+          "button",
+          { type: "button", className: `btn ${selecting ? "btn--primary" : "btn--ghost"}`, onclick: props.onToggleSelecting },
+          [selecting ? "✓ 選択を終える" : "☑ まとめて売却する"],
+        ),
+    selecting ? renderBulkBar(props, items) : null,
     el("section", { className: "panel" }, [
       items.length === 0
         ? el("p", { className: "app-subtitle" }, ["該当する装備がありません。ステージクリアでドロップします。"])

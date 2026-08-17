@@ -2648,3 +2648,77 @@ body {
   font-size: 0.66rem;
   color: #9fb0d8;
 }
+
+/* ===================================================================
+ * 装備のまとめ売却
+ *
+ * 取り消せない操作なので、「何を選んでいるか」と「いくらになるか」が
+ * 常に見えている状態を保つ。選択中の札は縁で示し、
+ * 装着中(売れない)ものは押しても反応しないことが分かるよう沈める。
+ * =================================================================== */
+
+.sort-row {
+  margin-top: -2px;
+}
+
+.bulk-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 210, 63, 0.1), rgba(0, 0, 0, 0.3));
+  box-shadow: inset 0 0 0 1px rgba(255, 210, 63, 0.28);
+}
+
+.bulk-bar__row {
+  display: flex;
+  gap: 8px;
+}
+
+.bulk-bar__row .btn {
+  flex: 1;
+  font-size: 0.72rem;
+}
+
+.bulk-bar__summary {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #ffe8a3;
+  font-variant-numeric: tabular-nums;
+}
+
+.equip-card--selectable {
+  cursor: pointer;
+}
+
+.equip-card--selected {
+  box-shadow:
+    inset 0 0 0 2px #ffd23f,
+    0 0 14px rgba(255, 210, 63, 0.45);
+}
+
+/* 選ばれた札に印を出す。枠の色だけだと、等級の色と紛れて数え間違える */
+.equip-card--selected::after {
+  content: "✓";
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #2a1c02;
+  background: linear-gradient(180deg, #ffe08a, #d9a520);
+}
+
+/* 装着中は売れない。押しても無駄だと分かるよう沈める */
+.equip-card--locked {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
