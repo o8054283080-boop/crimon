@@ -671,7 +671,23 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 1.25;
 
   // --- 腰。重い帯と、そこから下がる裂けた腰布 ---
-  rig.pelvis.add(place(kit.ball(0.26, 0.20, 0.22, "hide", p.dark), 0, -0.02, 0));
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: -0.2, r: 0.19, rz: 0.17 },
+          { y: -0.04, r: 0.26, rz: 0.22, keel: 0.12 },
+          { y: 0.1, r: 0.23, rz: 0.19 },
+        ],
+        "hide",
+        p.dark,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
   rig.pelvis.add(place(kit.band(0.25, 0.045, Math.PI * 2, "metal", p.metal, 16), 0, 0.02, 0, Math.PI / 2, 0, 0));
   rig.pelvis.add(place(kit.octa(0.08, 0.12, 0.05, "crystal", p.accent), 0, 0.02, -0.25));
   rig.pelvis.add(place(kit.octa(0.04, 0.06, 0.03, "glow", p.glow), 0, 0.02, -0.26));
@@ -686,9 +702,9 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.44, r0: 0.16, r1: 0.12, rot: [0.40, 0, side * 0.07] },
-        { len: 0.42, r0: 0.115, r1: 0.09, rot: [-0.86, 0, 0] },
-        { len: 0.26, r0: 0.09, r1: 0.08, rot: [0.55, 0, 0] },
+        { len: 0.44, r0: 0.16, r1: 0.12, rot: [0.40, 0, side * 0.07], radial: 7, facet: true },
+        { len: 0.42, r0: 0.115, r1: 0.09, rot: [-0.86, 0, 0], radial: 6, facet: true },
+        { len: 0.26, r0: 0.09, r1: 0.08, rot: [0.55, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -707,11 +723,56 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(逆三角形。肩が広く腰が細い) ---
   const torso = rig.torso;
   place(torso, 0, 0.06, 0, -0.08, 0, 0);
-  // 腹。ここが細いと、背後のマントが胴の隙間から透けて「前掛け」に見える
-  torso.add(place(kit.ball(0.24, 0.24, 0.21, "hide", p.dark), 0, 0.16, 0));
-  torso.add(place(kit.ball(0.27, 0.20, 0.22, "hide", p.main), 0, 0.32, -0.02));
-  torso.add(place(kit.ball(0.36, 0.32, 0.26, "hide", p.main), 0, 0.48, 0));
-  addPlating(kit, torso, 3, 0.30, 0.60, 0.30, -0.18);
+  // 胴は1本の面取り角柱。腰を締めて肩へ向かって開く逆三角形を、
+  // 球を積むのではなく輪切りの半径で作る。腹が細いと、背後のマントが
+  // 胴の隙間から透けて「前掛け」に見えるので、そこは落としすぎない
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0.04, r: 0.20, rz: 0.18 },
+          { y: 0.18, r: 0.23, rz: 0.2, keel: 0.16, ridge: 0.1 },
+          { y: 0.32, r: 0.26, rz: 0.22, keel: 0.26, ridge: 0.18 },
+          { y: 0.46, r: 0.32, rz: 0.26, keel: 0.3, ridge: 0.22 },
+          { y: 0.6, r: 0.36, rz: 0.27, keel: 0.18, ridge: 0.26 },
+          { y: 0.7, r: 0.3, rz: 0.22 },
+          { y: 0.78, r: 0.17, rz: 0.15 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
+  // 胸腹の積層装甲。下から上へ少しずつ重なる帯。参考画像でいちばん効いている要素で、
+  // 面が平らでも1枚ずつ縁が立つので情報量が出る
+  torso.add(
+    place(
+      kit.plateStack("metal", p.metal, {
+        count: 7,
+        y0: 0.12,
+        y1: 0.62,
+        z: -0.2,
+        zEnd: -0.3,
+        width: 0.3,
+        widthEnd: 0.46,
+        height: 0.14,
+        heightEnd: 0.18,
+        thickness: 0.034,
+        wrap: 0.24,
+        wrapEnd: 0.3,
+        notch: 0.45,
+        tilt: 0.12,
+        tiltEnd: -0.1,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   torso.add(place(kit.lens(0.34, 0.20, 0.16, "metal", p.metal), 0, 0.64, -0.10, -0.12, 0, 0));
   torso.add(place(kit.octa(0.09, 0.14, 0.06, "crystal", p.accent), 0, 0.56, -0.24));
   torso.add(place(kit.octa(0.045, 0.07, 0.03, "glow", p.glow), 0, 0.56, -0.25));
@@ -724,13 +785,28 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   for (const side of [-1, 1]) {
-    // 肩。岩塊ではなく、段の付いた大きな装甲にする
+    // 肩。丸い塊ではなく、縁の立った板を段違いに重ねた甲にする。
+    // 外へ倒した台(pauldron)の中で、板を下へずらしながら重ねる
+    const pauldron = new THREE.Group();
+    place(pauldron, side * 0.42, 0.68, 0, 0, 0, -side * 0.5);
     for (let i = 0; i < 3; i++) {
-      const w = 0.26 - i * 0.045;
-      const pauldron = kit.lens(w, w * 0.66, w * 0.95, "metal", p.metal, 10);
-      place(pauldron, side * (0.46 + i * 0.02), 0.70 - i * 0.11, 0, 0, 0, -side * (0.18 + i * 0.2));
-      torso.add(pauldron);
+      const w = 0.30 - i * 0.055;
+      const pad = kit.plate(w * 1.55, w * 0.85, 0.036, "metal", p.metal, { notch: 0.26, shoulder: 0.78, wrap: 0.32 });
+      place(pad, side * i * 0.022, -i * 0.125, 0, 0, (-side * Math.PI) / 2, 0);
+      pauldron.add(pad);
     }
+    torso.add(pauldron);
+    // 肩の結晶の房。装甲の上に群れで生やして、肩の質量を稼ぐ
+    const crest = kit.shardCluster("crystal", p.accent, {
+      count: 5,
+      length: 0.26,
+      radius: 0.06,
+      spread: 0.7,
+      scatter: 0.07,
+      minScale: 0.3,
+    });
+    place(crest, side * 0.44, 0.78, -0.02, 0, 0, -side * 0.75);
+    torso.add(crest);
     for (let i = 0; i < 2; i++) {
       const spike = kit.spike(0.055, 0.34 - i * 0.08, 0.7, "plate", p.plate);
       place(spike, side * 0.54, 0.76, -0.12 + i * 0.22, -0.3 + i * 0.35, 0, -side * 0.85);
@@ -739,8 +815,8 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
 
     const arm = kit.chain(
       [
-        { len: 0.42, r0: 0.13, r1: 0.10, rot: [0.16, 0, side * 0.22] },
-        { len: 0.40, r0: 0.10, r1: 0.085, rot: [-0.5, 0, 0] },
+        { len: 0.42, r0: 0.13, r1: 0.10, rot: [0.16, 0, side * 0.22], radial: 6, facet: true },
+        { len: 0.40, r0: 0.10, r1: 0.085, rot: [-0.5, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
