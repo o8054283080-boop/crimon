@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Element } from "../../core/element.js";
 import { CreatureKit } from "./creature/kit.js";
-import { CreatureRig, finalizeRig } from "./creature/rig.js";
+import { AccentKind, CreatureRig, finalizeRig } from "./creature/rig.js";
 import { builderFor } from "./creature/roles.js";
 import { applyTemplateTraits, templateBuilderFor } from "./creature/templates.js";
 import { CreatureUniforms, SurfaceSet, createCreatureUniforms, paletteFor } from "./creature/surface.js";
@@ -108,7 +108,7 @@ function newWobbles(count: number): Wobble[] {
 }
 
 /** 待機中の仕草の長さ(秒)。短すぎると見落とされ、長すぎると次の行動を待たせる */
-const ACCENT_DURATION: Record<string, number> = {
+const ACCENT_DURATION: Record<AccentKind, number> = {
   none: 0,
   headShake: 0.8,
   wingRuffle: 1.1,
@@ -117,6 +117,11 @@ const ACCENT_DURATION: Record<string, number> = {
   shiver: 0.6,
   roar: 1.4,
   gaze: 2.0,
+  shift: 1.5,
+  stretch: 1.7,
+  sniff: 1.3,
+  tilt: 1.9,
+  flare: 1.4,
 };
 
 export interface MonsterAvatarOptions {
@@ -163,6 +168,12 @@ export class MonsterAvatar {
   private readonly accentTrack = newTrack();
   /** 次に仕草を出す時刻。出すたびにばらつかせて、周期に聞こえないようにする */
   private nextAccentAt = 2 + Math.random() * 5;
+  /** この個体が出せる仕草の一覧。骨格から自動で組む(重複が多いほど出やすい) */
+  private readonly accentPool: AccentKind[] = [];
+  /** いま出している仕草。プールから引くので anim.accent とは限らない */
+  private accentKind: AccentKind = "none";
+  /** 直前に出した仕草。同じものを2回続けて引かないために覚えておく */
+  private lastAccent: AccentKind = "none";
   private readonly hitTrack = newTrack();
   private readonly castTrack = newTrack();
 
@@ -258,6 +269,7 @@ export class MonsterAvatar {
     this.clothSprings = newWobbles(this.rig.cloth.length);
     this.followerSprings = newWobbles(this.rig.followers.length);
     this.limbSprings = newWobbles(this.rig.arms.length + this.rig.legs.length);
+    this.buildAccentPool();
 
     // 正面(-Z)を相手チーム側へ向ける。実際の向きは配置が決まったあとに
     // faceToward() で相手チームの中心へ向け直す
@@ -321,6 +333,58 @@ export class MonsterAvatar {
     this.auraSprite.position.y = footprint * 0.25;
     this.root.add(this.auraSprite);
     this.disposables.push(auraMaterial);
+  }
+
+  /**
+   * この個体が出せる仕草の一覧を、骨格から組む。
+   *
+   * ビルダーが指定するのは代表の1種類だけで、そのまま使うと数十秒で
+   * 「またあれをやった」と気付かれる。尾があれば振れる、翼があれば畳み直せる、
+   * 脚があれば体重を踏み替えられる——持っている部位から出せる仕草は決まるので、
+   * ここで自動的に足す。代表の仕草は3回入れて、いちばん出やすくしておく。
+   */
+  private buildAccentPool(): void {
+    const rig = this.rig;
+    const pool = this.accentPool;
+    const signature = rig.anim.accent;
+    if (signature !== "none") pool.push(signature, signature, signature);
+    // 代表と同じものを脇からもう一度足すと、代表が出過ぎて結局1種類に戻る
+    const add = (kind: AccentKind, times = 1): void => {
+      if (kind === signature) return;
+      for (let i = 0; i < times; i++) pool.push(kind);
+    };
+    // どの骨格でも出せる仕草
+    add("gaze");
+    add("headShake");
+    add("stretch");
+    if (rig.tail.length > 0) add("tailFlick", 2);
+    if (rig.wings.length > 0) add("wingRuffle");
+    if (rig.jaw) add("roar");
+    // 開いて畳む仕草。腕か翼があれば出せるので、尾も脚も無い結晶にも配れる
+    if (rig.arms.length > 0 || rig.wings.length > 0) add("flare", 2);
+    if (rig.floats) {
+      // 浮いているものは足で踏み替えられないので、傾ぎで代える
+      add("tilt", 2);
+    } else {
+      if (rig.legs.length > 0) add("shift", 2);
+      add("sniff");
+      // 重い個体だけが「踏み下ろして地面を鳴らす」を持てる
+      if ((rig.anim.mass ?? 0) > 0.5 && rig.legs.length > 0) add("stomp");
+    }
+    // 粘体は震え、骨も脚も持たない無機物は共振する。どちらも同じ仕草で表せる
+    if (rig.anim.squash > 0 || (rig.legs.length === 0 && rig.tail.length === 0)) add("shiver", 2);
+    if (pool.length === 0) pool.push("gaze");
+  }
+
+  /** 次に出す仕草を引く。直前と同じものは引き直して、繰り返しに聞こえないようにする */
+  private pickAccent(): AccentKind {
+    const pool = this.accentPool;
+    let pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pick === this.lastAccent && pool.length > 1) {
+      pick = pool[Math.floor(Math.random() * pool.length)];
+    }
+    this.lastAccent = pick;
+    return pick;
   }
 
   /** 台座も含めた立ち位置 */
@@ -644,16 +708,21 @@ export class MonsterAvatar {
     // === 待機中の仕草 =====================================================
     // 攻撃・詠唱・被弾の最中には割り込ませない(演出の読み取りを邪魔するため)
     const busy = this.attackTrack.active || this.castTrack.active || this.hitTrack.active;
-    if (!busy && !this.dying && anim.accent !== "none" && !this.accentTrack.active && elapsed >= this.nextAccentAt) {
-      const duration = ACCENT_DURATION[anim.accent];
+    if (!busy && !this.dying && !this.accentTrack.active && elapsed >= this.nextAccentAt) {
+      this.accentKind = this.pickAccent();
+      const duration = ACCENT_DURATION[this.accentKind];
       trigger(this.accentTrack, duration);
-      // 次の間隔をばらつかせる。等間隔だと結局そこに周期を感じてしまう
-      this.nextAccentAt = elapsed + duration + 3.5 + Math.random() * 5.5;
+      // 間隔は等間隔にしない。等間隔だと、仕草の種類を増やしても
+      // 「一定のリズムで何かをする置物」として周期を感じ取られてしまう。
+      // 4回に1回ほどは、ほとんど間を空けずに次の仕草へ繋げる(仕草の重なり)。
+      // 生き物の動作は等間隔には出ず、固まって出ては長く止まる
+      const chain = Math.random() < 0.26;
+      this.nextAccentAt = elapsed + duration + (chain ? 0.15 + Math.random() * 0.7 : 3.2 + Math.random() * 7.5);
     }
     const accentT = busy || this.dying ? null : advance(this.accentTrack, dt);
     if (accentT !== null) {
       const env = arc(accentT);
-      switch (anim.accent) {
+      switch (this.accentKind) {
         case "headShake": {
           // 素早く頭を振る。獣がひと息つく仕草
           headY += Math.sin(accentT * Math.PI * 5) * 0.4 * env;
@@ -707,6 +776,88 @@ export class MonsterAvatar {
           const hold = accentT < 0.3 ? accentT / 0.3 : accentT > 0.75 ? (1 - accentT) / 0.25 : 1;
           headY += hold * 0.45;
           headX -= hold * 0.08;
+          break;
+        }
+        case "shift": {
+          // 体重を反対の脚へ預け替える。待機の周期的な体重移動と違い、
+          // 「一度どちらかへ寄せて、しばらくそこで立つ」ので止まって見える瞬間ができる
+          const to = this.deathTip;
+          const hold = accentT < 0.34 ? Math.sin((accentT / 0.34) * Math.PI * 0.5) : accentT > 0.72 ? Math.pow(1 - (accentT - 0.72) / 0.28, 1.4) : 1;
+          offsetX += to * hold * 0.13;
+          hipZ -= to * hold * 0.2;
+          leanZ += to * hold * 0.1;
+          headZ += to * hold * 0.09;
+          // 乗せ替える瞬間だけ腰が沈む
+          offsetY -= Math.sin(clamp01(accentT / 0.34) * Math.PI) * 0.03;
+          for (const leg of rig.legs) {
+            leg.root.rotation.z += leg.side * to * hold * 0.14;
+            leg.root.rotation.x += (leg.side === to ? -1 : 1) * hold * 0.1;
+          }
+          break;
+        }
+        case "stretch": {
+          // 伸びをする。反らす(遅い)→ 保持 → 一気に脱力(速い)。
+          // 最後に力を抜く落差があると、生き物が「気を抜いた」瞬間として読める
+          const pull = accentT < 0.62 ? Math.pow(Math.sin((accentT / 0.62) * Math.PI * 0.5), 0.8) : Math.pow(1 - (accentT - 0.62) / 0.38, 2.6);
+          offsetY += pull * 0.06;
+          leanX -= pull * 0.2;
+          headX -= pull * 0.26;
+          hipZ += pull * 0.05;
+          jawOpen = Math.max(jawOpen, pull * 0.35);
+          for (const arm of rig.arms) {
+            arm.root.rotation.x -= pull * 0.7;
+            arm.root.rotation.z += arm.side * pull * 0.35;
+          }
+          for (const wing of rig.wings) {
+            wing.root.rotation.z -= wing.side * pull * 0.7;
+            wing.root.rotation.x -= pull * 0.3;
+          }
+          tailDriveX -= pull * 0.22;
+          // 脱力した瞬間に体が落ちる
+          if (accentT > 0.62 && accentT < 0.62 + step / this.accentTrack.duration) this.landSpring.velocity -= 4;
+          break;
+        }
+        case "sniff": {
+          // 頭を下げて地面を嗅ぐ。下げてから小刻みに鼻を鳴らし、また上げる
+          const down = accentT < 0.3 ? Math.sin((accentT / 0.3) * Math.PI * 0.5) : accentT > 0.7 ? Math.pow(1 - (accentT - 0.7) / 0.3, 1.6) : 1;
+          headX += down * 0.5;
+          leanX += down * 0.1;
+          headY += Math.sin(accentT * Math.PI * 9) * 0.08 * down;
+          jawOpen = Math.max(jawOpen, Math.abs(Math.sin(accentT * Math.PI * 11)) * 0.18 * down);
+          offsetZ -= down * 0.05;
+          break;
+        }
+        case "tilt": {
+          // 浮いているものが、ゆっくり大きく傾いでから戻る。
+          // 足で支えていないので、こういう「一度姿勢を崩して戻る」動きが自然に出せる
+          const to = this.deathTip;
+          const swing = Math.sin(accentT * Math.PI) * Math.sin(accentT * Math.PI * 0.5 + 0.2);
+          leanZ += to * swing * 0.3;
+          leanX += swing * 0.12;
+          hipY += to * swing * 0.3;
+          headZ -= to * swing * 0.18;
+          offsetY += swing * 0.07;
+          offsetX += to * swing * 0.1;
+          break;
+        }
+        case "flare": {
+          // 部位を一斉に外へ開き、ゆっくり畳み直す。開くのが速く畳むのが遅い。
+          // 「威嚇」にも「力を確かめている」にも読める、部位さえあれば出せる仕草
+          const open = accentT < 0.28 ? Math.pow(accentT / 0.28, 0.6) : Math.pow(1 - (accentT - 0.28) / 0.72, 1.7);
+          for (const arm of rig.arms) {
+            arm.root.rotation.z += arm.side * open * 0.55;
+            arm.root.rotation.x -= open * 0.2;
+          }
+          for (const wing of rig.wings) {
+            wing.root.rotation.z -= wing.side * open * 0.6;
+            wing.root.rotation.x -= open * 0.15;
+          }
+          for (const spinner of rig.spinners) spinner.object.rotation[spinner.axis] += dt * open * 4;
+          squash += open * 0.05;
+          offsetY += open * 0.04;
+          leanX -= open * 0.08;
+          headX -= open * 0.12;
+          tailDriveY += open * 0.2;
           break;
         }
       }
