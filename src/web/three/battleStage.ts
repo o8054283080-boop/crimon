@@ -310,21 +310,32 @@ export class BattleStage {
 
     // リムライト: 奥のゲート方向から。体表シェーダの赤紫のバックライトと
     // 同じ色にして、キャラの輪郭と闘技場の輪郭が同じ光で抜けるようにする
-    // 平行光は床にも一様にかかるので、**高い位置に置くと床が色かぶりして
-    // 全体が単調になる**。輪郭だけを舐めるよう、うんと低く寝かせてある
-    const rim = new THREE.DirectionalLight(0xff86c8, 1.7);
-    rim.position.set(-5.0, 3.4, -18);
+    //
+    // 平行光は床にも一様にかかる。床が受ける量は**光の向きの縦成分だけ**で
+    // 決まる(y / |position|)ので、強さを保ったまま寝かせれば
+    // 「輪郭は抜けるが床は染まらない」を両立できる。
+    // 以前は y=3.4(縦成分 0.18)で、床全体が桃色にかぶり、
+    // 寄った時にモンスターの属性色まで食われていた。実測で、この2灯を切ると
+    // 6属性の色が目に見えてはっきりした。切るのではなく、寝かせて弱める
+    const rim = new THREE.DirectionalLight(0xff86c8, 1.45);
+    rim.position.set(-5.6, 1.5, -18);
     this.scene.add(rim);
 
     // 逆リム: 反対の肩側にもう一本。片側だけだと輪郭の抜けが半分で終わる。
     // 色は篝火寄りの暖色にして、赤紫のリムと寒暖で対にする
-    const rimWarm = new THREE.DirectionalLight(0xffab6a, 1.15);
-    rimWarm.position.set(16, 3.0, -12);
+    const rimWarm = new THREE.DirectionalLight(0xffab6a, 1.0);
+    rimWarm.position.set(16, 1.4, -12);
     this.scene.add(rimWarm);
 
     // 闘技床へ落とす天井光。中央だけを持ち上げて、戦う場所に視線を集める。
-    // 減衰を持つライトなので、周辺の観客席までは届かない
-    const centerPool = new THREE.PointLight(0xdfe7ff, 26, 17, 2.1);
+    // 減衰を持つライトなので、周辺の観客席までは届かない。
+    //
+    // **ここは「床を明るくする灯り」ではなく「中央と周辺の差」を作る灯り。**
+    // 強いと足元が白く飛び、そこに立つモンスターの下半身から色が抜ける。
+    // 届く範囲を狭めて減衰を急にし、明るさそのものは落とす。
+    // 中央が明るく見えるかどうかは絶対量ではなく周辺との比で決まるので、
+    // 周辺(霧とビネット)を沈めるほうで差を作る
+    const centerPool = new THREE.PointLight(0xdfe7ff, 15, 14, 2.4);
     centerPool.position.set(0.5, 9.5, 0.5);
     this.scene.add(centerPool);
   }
