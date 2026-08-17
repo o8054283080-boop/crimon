@@ -24,6 +24,33 @@ export interface SegmentSpec {
   style?: SurfaceStyle;
   color?: THREE.Color;
   radial?: number;
+  /**
+   * 稜線を立てる。断面の多角形を面ごとに分離して法線を折り、
+   * 円柱ではなく「面取りされた角柱」に見せる。硬い部位に使う
+   */
+  facet?: boolean;
+}
+
+/** hull() の輪切り1枚。-Y ではなく +Y 方向へ積み上がる */
+export interface HullStation {
+  /** 軸方向の位置 */
+  y: number;
+  /** 左右の半径 */
+  r: number;
+  /** 前後(Z)の半径。省略時は r */
+  rz?: number;
+  /** 断面の中心をずらす。曲がった胴・首・尾はこれで作る */
+  x?: number;
+  z?: number;
+  /** 断面のひねり(ラジアン) */
+  twist?: number;
+  /**
+   * 前(-Z)の稜線をどれだけ突き出すか。胸の竜骨・背の峰になる。
+   * 1.0で半径ぶん余計に張り出す
+   */
+  keel?: number;
+  /** 後ろ(+Z)の稜線の突き出し */
+  ridge?: number;
 }
 
 export interface ChainResult {
@@ -148,6 +175,390 @@ export class CreatureKit {
 
   box(w: number, h: number, d: number, style: SurfaceStyle, color: THREE.Color): THREE.Mesh {
     return this.mesh(new THREE.BoxGeometry(w, h, d), style, color);
+  }
+
+  /**
+   * 面取りされた角柱。輪切り(HullStation)を +Y 方向へ積んで、
+   * 稜線のある1本の立体を作る。**球を並べる代わりの主役**。
+   *
+   * 球をいくつ繋いでも輪郭は円弧の連なりにしかならないが、これは
+   *   - 断面が多角形なので、光が面ごとに切り替わって形が読める
+   *   - 1本の連続した立体なので、胸を張って腰で締める、が輪郭に出る
+   * 面は「周方向には割れ、長さ方向にはつながる」ように法線を作っている。
+   * つまり縦の稜線だけが立ち、長さ方向は滑らかに流れる。
+   *
+   * 断面の k=0 は必ず前(-Z)。keel / ridge で前後の稜線だけを突き出せるので、
+   * 胸の竜骨・背の峰・腹の合わせ目が1つのメッシュで出せる。
+   */
+  hull(
+    stations: HullStation[],
+    style: SurfaceStyle,
+    color: THREE.Color,
+    o: { sides?: number; capBottom?: boolean; capTop?: boolean; variant?: SurfaceVariant } = {},
+  ): THREE.Mesh {
+    const sides = Math.max(3, o.sides ?? 8);
+    const n = stations.length;
+    const positions: number[] = [];
+    const indices: number[] = [];
+
+    const put = (s: HullStation, k: number): number => {
+      const a = ((k % sides) / sides) * Math.PI * 2;
+      const twist = s.twist ?? 0;
+      const rz = s.rz ?? s.r;
+      // 稜線の張り出し。3乗して、隣の面にはほとんど効かないようにする
+      const front = Math.max(0, Math.cos(a)) ** 3;
+      const back = Math.max(0, -Math.cos(a)) ** 3;
+      const bulge = rz * ((s.keel ?? 0) * front + (s.ridge ?? 0) * back);
+      let x = Math.sin(a) * s.r;
+      let z = -Math.cos(a) * rz - Math.sign(Math.cos(a) || 1) * bulge;
+      if (twist !== 0) {
+        const c = Math.cos(twist);
+        const sn = Math.sin(twist);
+        const nx = x * c + z * sn;
+        z = -x * sn + z * c;
+        x = nx;
+      }
+      const index = positions.length / 3;
+      positions.push((s.x ?? 0) + x, s.y, (s.z ?? 0) + z);
+      return index;
+    };
+
+    // 側面。1面ぶんの帯ごとに頂点を独立させることで、
+    // 長さ方向は法線が平均されて滑らかに、面と面のあいだには稜線が立つ
+    for (let k = 0; k < sides; k++) {
+      const base = positions.length / 3;
+      for (const station of stations) {
+        put(station, k);
+        put(station, k + 1);
+      }
+      for (let i = 0; i < n - 1; i++) {
+        const a0 = base + i * 2;
+        const b0 = a0 + 1;
+        const a1 = a0 + 2;
+        const b1 = a0 + 3;
+        indices.push(a0, a1, b1, a0, b1, b0);
+      }
+    }
+
+    // 蓋。中心へ集める扇。中に埋まる端は capBottom/capTop を false にして省く
+    const capAt = (station: HullStation, up: boolean) => {
+      const center = positions.length / 3;
+      positions.push(station.x ?? 0, station.y, station.z ?? 0);
+      const ring: number[] = [];
+      for (let k = 0; k < sides; k++) ring.push(put(station, k));
+      for (let k = 0; k < sides; k++) {
+        const a = ring[k];
+        const b = ring[(k + 1) % sides];
+        if (up) indices.push(center, a, b);
+        else indices.push(center, b, a);
+      }
+    };
+    if ((o.capBottom ?? true) && stations[0].r > 0.0005) capAt(stations[0], false);
+    if ((o.capTop ?? true) && stations[n - 1].r > 0.0005) capAt(stations[n - 1], true);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return this.mesh(geometry, style, color, o.variant);
+  }
+
+  /**
+   * 装甲板1枚。下辺がV字に尖り、縁が面取りされた板。
+   *
+   * 平たい `lens` との違いは**縁が立つ**こと。押し出しの側面と面取りが
+   * 光を切り替えるので、板が1枚ずつ分かれて見える。積層した胸腹の装甲は、
+   * これを少しずつ重ねて並べて作る(plateStack)。
+   *
+   * wrap を指定すると、半径 wrap の円筒に沿って曲げる。板が胴に貼り付く。
+   */
+  plate(
+    width: number,
+    height: number,
+    thickness: number,
+    style: SurfaceStyle,
+    color: THREE.Color,
+    o: { notch?: number; wrap?: number; shoulder?: number } = {},
+  ): THREE.Mesh {
+    const w = width / 2;
+    const h = height / 2;
+    const notch = o.notch ?? 0.35;
+    const shoulder = o.shoulder ?? 0.86;
+    const shape = new THREE.Shape();
+    shape.moveTo(-w, h);
+    shape.lineTo(w, h);
+    shape.lineTo(w * shoulder, -h * 0.15);
+    shape.lineTo(0, -h - h * notch);
+    shape.lineTo(-w * shoulder, -h * 0.15);
+    shape.closePath();
+    const bevel = Math.min(thickness * 0.7, w * 0.28);
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: thickness,
+      bevelEnabled: true,
+      bevelThickness: thickness * 0.5,
+      bevelSize: bevel,
+      bevelOffset: 0,
+      bevelSegments: 1,
+      curveSegments: 1,
+    });
+    const wrap = o.wrap ?? 0;
+    if (wrap > 0) {
+      const position = geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < position.count; i++) {
+        const x = position.getX(i);
+        const z = position.getZ(i);
+        const theta = x / wrap;
+        const radius = wrap - z;
+        position.setXYZ(i, radius * Math.sin(theta), position.getY(i), wrap - radius * Math.cos(theta));
+      }
+      geometry.computeVertexNormals();
+    }
+    return this.mesh(geometry, style, color);
+  }
+
+  /**
+   * 積層した板。胸腹の装甲・尾の節・肩の重ね甲に使う。
+   *
+   * 1枚ずつ縁が立ち、下の板の上に次の板が少し被さる。
+   * 「丸を並べた胴」に貼るだけで、面が平らでも情報量が出る。
+   * 返すのはグループなので、place() で胴に貼り付ける。
+   */
+  plateStack(
+    style: SurfaceStyle,
+    color: THREE.Color,
+    o: {
+      count: number;
+      /** 1枚目と最後の板の中心(ローカルY) */
+      y0: number;
+      y1: number;
+      /** 板の幅。先細りさせる */
+      width: number;
+      widthEnd?: number;
+      /** 1枚の高さ。間隔より大きくすると重なる */
+      height: number;
+      heightEnd?: number;
+      thickness: number;
+      /** 前後位置 */
+      z?: number;
+      zEnd?: number;
+      /** 胴に沿わせる曲率半径 */
+      wrap?: number;
+      wrapEnd?: number;
+      /** 板の傾き(X軸)。上へ行くほど寝かせる、など */
+      tilt?: number;
+      tiltEnd?: number;
+      notch?: number;
+    },
+  ): THREE.Group {
+    const group = new THREE.Group();
+    const lerp = (a: number, b: number | undefined, t: number) => a + ((b ?? a) - a) * t;
+    for (let i = 0; i < o.count; i++) {
+      const t = o.count === 1 ? 0 : i / (o.count - 1);
+      const plate = this.plate(
+        lerp(o.width, o.widthEnd, t),
+        lerp(o.height, o.heightEnd, t),
+        o.thickness,
+        style,
+        color,
+        { notch: o.notch, wrap: lerp(o.wrap ?? 0, o.wrapEnd, t) },
+      );
+      plate.position.set(0, o.y0 + (o.y1 - o.y0) * t, lerp(o.z ?? 0, o.zEnd, t));
+      plate.rotation.x = lerp(o.tilt ?? 0, o.tiltEnd, t);
+      // 板の並びは「奥から手前へ」重ねる。描画順ではなく実際の前後で重ねる
+      group.add(plate);
+    }
+    return group;
+  }
+
+  /** 尖った結晶1本。断面が多角形なので、光が面ごとに切り替わる */
+  shard(length: number, radius: number, style: SurfaceStyle, color: THREE.Color, sides = 5): THREE.Mesh {
+    return this.hull(
+      [
+        { y: 0, r: radius * 0.72 },
+        { y: length * 0.17, r: radius },
+        { y: length * 0.55, r: radius * 0.52 },
+        { y: length, r: radius * 0.02 },
+      ],
+      style,
+      color,
+      { sides, capTop: false },
+    );
+  }
+
+  /**
+   * 結晶の房。肩・背・肘・尾に生やす。
+   *
+   * 1本ずつ均等に生やすと櫛の歯になる。大小を混ぜ、向きを散らし、
+   * 根元をひとかたまりに寄せて**群れ**にすることで初めて房に見える。
+   * 大きいものを1本だけ立て、残りをその周りに従わせるのが要点。
+   */
+  shardCluster(
+    style: SurfaceStyle,
+    color: THREE.Color,
+    o: {
+      count: number;
+      /** いちばん長い1本の長さ */
+      length: number;
+      radius: number;
+      /** 散らばる角度(ラジアン) */
+      spread?: number;
+      /** 根元の散らばり */
+      scatter?: number;
+      sides?: number;
+      /** 小さいものをどれだけ小さくするか(0.2で最小2割) */
+      minScale?: number;
+    },
+  ): THREE.Group {
+    const group = new THREE.Group();
+    const spread = o.spread ?? 0.6;
+    const scatter = o.scatter ?? o.radius * 1.4;
+    const minScale = o.minScale ?? 0.24;
+    for (let i = 0; i < o.count; i++) {
+      // 0本目を主役にして、以降は従属させる。等分しないので櫛にならない
+      const rank = i === 0 ? 1 : minScale + (1 - minScale) * Math.random() ** 1.7;
+      const length = o.length * rank;
+      const radius = o.radius * (0.45 + rank * 0.55);
+      const shard = this.shard(length, radius, style, color, o.sides ?? 5);
+      const azimuth = Math.random() * Math.PI * 2;
+      const tilt = i === 0 ? spread * 0.18 : spread * (0.35 + Math.random() * 0.85);
+      const reach = i === 0 ? 0 : scatter * (0.3 + Math.random() * 0.9);
+      shard.position.set(Math.cos(azimuth) * reach, -radius * 0.4, Math.sin(azimuth) * reach);
+      shard.rotation.set(Math.sin(azimuth) * tilt, Math.random() * Math.PI * 2, -Math.cos(azimuth) * tilt);
+      group.add(shard);
+    }
+    return group;
+  }
+
+  /**
+   * 骨組みの見える膜。翼・ひれ・帆に使う。
+   *
+   * 膜だけを張ると布に見え、骨だけを並べると傘の骨になる。
+   * ここでは「指の骨」「骨と骨のあいだで垂れる膜」「膜に浮く筋」を
+   * まとめて作り、**膜が骨に吊られている**関係を見せる。
+   *
+   * hub から fingers の各点へ骨が伸び、outline が縁を通る。
+   * 縁は指と指のあいだで sag のぶん内側へ垂れる。
+   */
+  ribbedMembrane(
+    o: {
+      hub: THREE.Vector3Like;
+      /** 骨の先。順に縁を作る */
+      fingers: THREE.Vector3Like[];
+      /** 縁の始点(肩など)。fingers の前に置かれる */
+      leading: THREE.Vector3Like[];
+      /** 指の間の垂れ(0で直線、0.2でよく垂れる) */
+      sag?: number;
+      /** 骨の太さ */
+      bone?: number;
+      /** 膜の反り */
+      curvature?: number;
+      /** 膜に浮かせる筋の本数(指1本あたり) */
+      veins?: number;
+    },
+    boneStyle: SurfaceStyle,
+    boneColor: THREE.Color,
+    membraneStyle: SurfaceStyle,
+    membraneColor: THREE.Color,
+  ): THREE.Group {
+    const group = new THREE.Group();
+    const hub = new THREE.Vector3(o.hub.x, o.hub.y, o.hub.z);
+    const fingers = o.fingers.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+    const lead = o.leading.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+    const sag = o.sag ?? 0.16;
+    const bone = o.bone ?? 0.03;
+
+    // 縁。指の間は内側へ垂れる
+    const membrane = this.membrane(
+      (shape) => {
+        const edge = [...lead, ...fingers];
+        shape.moveTo(edge[0].x, edge[0].y);
+        for (let i = 1; i < lead.length; i++) shape.lineTo(edge[i].x, edge[i].y);
+        for (let i = lead.length; i < edge.length; i++) {
+          const previous = edge[i - 1];
+          const current = edge[i];
+          const mx = (previous.x + current.x) * 0.5;
+          const my = (previous.y + current.y) * 0.5;
+          // 中点を hub 側へ引き寄せる。これが指の間のたるみになる
+          shape.quadraticCurveTo(
+            mx + (hub.x - mx) * sag * 2,
+            my + (hub.y - my) * sag * 2,
+            current.x,
+            current.y,
+          );
+        }
+        const last = edge[edge.length - 1];
+        shape.quadraticCurveTo(
+          (last.x + hub.x) * 0.5,
+          (last.y + hub.y) * 0.5,
+          edge[0].x,
+          edge[0].y,
+        );
+      },
+      membraneStyle,
+      membraneColor,
+      o.curvature ?? 0,
+    );
+    group.add(membrane);
+
+    // 指の骨。膜より手前へ少しだけ浮かせ、骨が膜を持ち上げているように見せる
+    const lift = bone * 0.9;
+    for (const finger of fingers) {
+      const direction = finger.clone().sub(hub);
+      const mid = hub.clone().addScaledVector(direction, 0.45);
+      group.add(
+        this.taperedTube(
+          [
+            { x: hub.x, y: hub.y, z: hub.z - lift },
+            { x: mid.x, y: mid.y, z: mid.z - lift * 1.6 },
+            { x: finger.x, y: finger.y, z: finger.z - lift },
+          ],
+          bone,
+          bone * 0.3,
+          boneStyle,
+          boneColor,
+          5,
+          8,
+        ),
+      );
+      // 指の関節。膜の張った骨組みが節を持って見える
+      const knuckle = this.hull(
+        [
+          { y: -bone * 0.8, r: bone * 0.5 },
+          { y: 0, r: bone * 1.25 },
+          { y: bone * 0.8, r: bone * 0.5 },
+        ],
+        boneStyle,
+        boneColor,
+        { sides: 5 },
+      );
+      knuckle.position.set(mid.x, mid.y, mid.z - lift * 1.6);
+      group.add(knuckle);
+      // 膜に浮く筋。骨から縁へ細く枝分かれする
+      const veins = o.veins ?? 0;
+      for (let i = 0; i < veins; i++) {
+        const t = 0.3 + (i / Math.max(1, veins)) * 0.5;
+        const from = hub.clone().lerp(finger, t);
+        const to = hub.clone().lerp(finger, t + 0.22).addScaledVector(direction, 0.0);
+        // 縁の方(hubから遠ざかる向き)へ、少しだけ横へ振る
+        to.x += (finger.y - hub.y) * 0.12;
+        to.y -= (finger.x - hub.x) * 0.12;
+        group.add(
+          this.taperedTube(
+            [
+              { x: from.x, y: from.y, z: from.z - lift * 0.5 },
+              { x: to.x, y: to.y, z: to.z - lift * 0.5 },
+            ],
+            bone * 0.3,
+            bone * 0.06,
+            membraneStyle,
+            boneColor,
+            4,
+            4,
+          ),
+        );
+      }
+    }
+    return group;
   }
 
   /** 根元が原点、+Y方向に尖る円錐。角・牙・突起に使う */
@@ -364,7 +775,15 @@ export class CreatureKit {
       );
       if (spec.flat !== undefined && spec.flat !== 1) geometry.scale(1, 1, spec.flat);
       geometry.translate(0, -spec.len / 2, 0);
-      joint.add(this.mesh(geometry, spec.style ?? style, spec.color ?? color));
+      if (spec.facet) {
+        // 面ごとに法線を折る。円柱ではなく角柱として読める
+        const faceted = geometry.toNonIndexed();
+        faceted.computeVertexNormals();
+        if (faceted !== geometry) geometry.dispose();
+        joint.add(this.mesh(faceted, spec.style ?? style, spec.color ?? color));
+      } else {
+        joint.add(this.mesh(geometry, spec.style ?? style, spec.color ?? color));
+      }
 
       const end = new THREE.Group();
       end.position.y = -spec.len;
