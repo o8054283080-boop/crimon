@@ -3258,39 +3258,78 @@ const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => vo
    */
   treant: (kit, rig) => {
     const p = kit.palette;
-    const branch = (x: number, z: number, side: number) => {
-      const tube = kit.taperedTube(
-        [
-          { x: 0, y: 0, z: 0 },
-          { x: side * 0.1, y: 0.22, z: z * 0.4 },
-          { x: side * 0.26, y: 0.42, z: z * 0.9 },
-          { x: side * 0.34, y: 0.62, z: z * 1.1 },
-        ],
-        0.06,
-        0.016,
-        "hide",
-        p.dark,
-        6,
+
+    /**
+     * 枝を1本。根元から伸ばし、途中で1回だけ枝分かれさせる。
+     * 分岐が無いと単なる棒になり、輪郭が「角」に見えて樹に見えない。
+     * 先端の葉叢もここで一緒に付ける(頭の周りに散らすと、ただの瘤になる)。
+     */
+    const branch = (o: { x: number; z: number; side: number; lean: number; length: number }) => {
+      const g = new THREE.Group();
+      const tip = { x: o.side * 0.42 * o.lean, y: o.length, z: o.z * o.length * 0.5 };
+      // 幹。色は体色ではなく骨・角の明色にする。体色のままだと胴に溶けて輪郭が出ない
+      g.add(
+        kit.taperedTube(
+          [
+            { x: 0, y: 0, z: 0 },
+            { x: tip.x * 0.22, y: o.length * 0.34, z: tip.z * 0.3 },
+            { x: tip.x * 0.62, y: o.length * 0.7, z: tip.z * 0.75 },
+            tip,
+          ],
+          0.075,
+          0.02,
+          "hide",
+          p.plate,
+          6,
+        ),
       );
-      place(tube, x, 0.16, 0);
-      return tube;
-    };
-    for (const side of [-1, 1]) {
-      rig.head.add(branch(side * 0.1, 0.3, side));
-      rig.head.add(branch(side * 0.14, -0.5, side));
-    }
-    // 葉叢。1枚ずつ生やすと櫛になるので、房として大小を混ぜて置く
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 3; i++) {
-        const leaves = kit.rock(0.2 + i * 0.05, 0.13, 0.18, "hide", p.accent, 0.42, 1);
-        place(leaves, side * (0.28 + i * 0.1), 0.5 + i * 0.14, -0.1 + i * 0.16);
-        rig.head.add(leaves);
+      // 分岐。途中から反対向きへ短く出して、枝が二股であることを見せる
+      const forkFrom = { x: tip.x * 0.5, y: o.length * 0.58, z: tip.z * 0.6 };
+      g.add(
+        kit.taperedTube(
+          [
+            forkFrom,
+            { x: forkFrom.x + o.side * 0.08, y: o.length * 0.78, z: forkFrom.z - 0.12 },
+            { x: forkFrom.x + o.side * 0.1, y: o.length * 0.95, z: forkFrom.z - 0.22 },
+          ],
+          0.035,
+          0.014,
+          "hide",
+          p.plate,
+          5,
+        ),
+      );
+      // 葉叢は先端に。1枚ずつ生やすと櫛になるので、房として大小を混ぜる。
+      // 数が少ないと房が4つ離れて浮くだけになり、樹冠にならない。
+      // 高さは足さず、横へ広げて塊にする(上へ伸ばすと正規化で胴が縮む)
+      for (let i = 0; i < 5; i++) {
+        const s = 1 - (i % 3) * 0.22;
+        const leaves = kit.rock(0.3 * s, 0.2 * s, 0.28 * s, "hide", p.accent, 0.5, 1);
+        place(
+          leaves,
+          tip.x + (i - 2) * 0.15,
+          tip.y + 0.02 + (i % 3) * 0.07,
+          tip.z + (i % 2 === 0 ? 0.14 : -0.16),
+        );
+        g.add(leaves);
       }
-      // 肩の苔。岩肌との色差で「生きている岩」に見せる
-      const moss = kit.rock(0.26, 0.12, 0.24, "hide", p.accent, 0.5, 1);
-      place(moss, side * 0.46, 0.3, 0.02);
+      place(g, o.x, 0.2, 0);
+      return g;
+    };
+
+    // 前後2組。前の枝を短く・後ろを長くすると、横から見た時に奥行きが出る
+    for (const side of [-1, 1]) {
+      rig.head.add(branch({ x: side * 0.1, z: 0.5, side, lean: 1.0, length: 0.62 }));
+      rig.head.add(branch({ x: side * 0.15, z: -0.7, side, lean: 1.35, length: 0.82 }));
+    }
+
+    // 肩と胴の苔。岩肌との色差で「生きている岩」に見せる
+    for (const side of [-1, 1]) {
+      const moss = kit.rock(0.28, 0.13, 0.26, "hide", p.accent, 0.55, 1);
+      place(moss, side * 0.5, 0.36, 0.02);
       rig.torso.add(moss);
     }
+    rig.torso.add(place(kit.rock(0.34, 0.12, 0.22, "hide", p.accent, 0.55, 1), 0, 0.86, -0.18));
   },
 
   /**
