@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ELEMENT_THEME, ElementTheme } from "../elementTheme.js";
 import { SIMPLEX_NOISE_3D } from "../shaderChunks.js";
+import { SURFACE_LIGHT_CHUNK } from "./shaderChunks.js";
 
 /**
  * モンスターの体を構成する「材質」の種類。
@@ -431,6 +432,7 @@ varying vec3 vBody;
 varying vec3 vBodyNormal;
 
 ${SIMPLEX_NOISE_3D}
+${SURFACE_LIGHT_CHUNK}
 
 /**
  * 腹側の向き。真下と正面のあいだを向く。
@@ -671,8 +673,9 @@ void main() {
     fill = fill * 0.5 + (dot(normal, FILL_DIR) * 0.5 + 0.5) * 0.5;
   #endif
 
-  // 半球光(上は青空、下は床の紫)で暗部が潰れないようにする
-  vec3 ambient = mix(vec3(0.10, 0.08, 0.13), vec3(0.20, 0.23, 0.36), normal.y * 0.5 + 0.5);
+  // 半球光。暗部が潰れないようにするだけでなく、**暗部を青くする**役目も持つ
+  // (SHADOW_LOW / SHADOW_HIGH は creature/shaderChunks.ts)
+  vec3 ambient = hemisphereAmbient(normal);
 
   // --- 体表のディテール ---------------------------------------------
   // 単色のままだとプラスチックの人形に見えるため、色ムラ・ざらつき・
@@ -790,10 +793,17 @@ void main() {
     float diffuse = ramp(key) * 1.05;
   #endif
 
-  vec3 color = albedo * (ambient + diffuse);
-  color += albedo * vec3(0.38, 0.48, 1.0) * fill * 0.30;
-  // 背後のリムライト(ステージのピンクライト)。暗い背景から輪郭を切り離す主役
-  color += vec3(1.0, 0.48, 0.85) * pow(back, 1.6) * 0.42;
+  // キーは温かい白、フィルは冷たい青。**寒暖を割る**のがここの主眼で、
+  // 明暗だけの陰影は、どれだけ段を作っても「灰色の濃淡」にしかならない
+  vec3 color = albedo * (ambient + diffuse * KEY_TINT);
+  color += albedo * FILL_TINT * fill * 0.30;
+  // 強く当たった面は色が抜けて白へ寄る。出る面積はごく狭いので、
+  // 加算の総量はほとんど増えないまま「光が当たっている」に見える
+  color += highlightBleach(albedo, key) * 0.22;
+  // 背後のリムライト(ステージのピンクライト)。暗い背景から輪郭を切り離す主役。
+  // **帯を細くしてある。** 広く乗せると背中一面が桃色に染まり、
+  // せっかく青く沈めた暗部も、腹背の塗り分けも、まとめて塗り潰される
+  color += vec3(1.0, 0.48, 0.85) * pow(back, 2.4) * 0.48;
   color += uRim * fresnel * uRimStrength * (1.0 + uActive * 1.5);
 
   #ifdef SOFT
