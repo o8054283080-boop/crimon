@@ -264,8 +264,17 @@ export class StripField {
 
     item.material.uniforms.uColor.value.copy(spec.color);
     item.material.uniforms.uOpacity.value = item.opacity;
-    item.material.uniforms.uHead.value = item.revealSec > 0 ? 0 : 1 + item.band;
-    item.material.uniforms.uBand.value = item.band;
+    if (item.revealSec > 0) {
+      item.material.uniforms.uHead.value = 0;
+      item.material.uniforms.uBand.value = item.band;
+    } else {
+      // 走らせない帯は、最初から終わりまで全体が見えていてほしい。
+      // 見える範囲は [uHead - uBand, uHead] なので、始点(0)より手前から
+      // 終点(1)より先までを覆う値を入れる。ここに 1 + band を入れると
+      // 窓が経路の外(1以降)へ出てしまい、帯が一度も描かれない。
+      item.material.uniforms.uHead.value = 1.1;
+      item.material.uniforms.uBand.value = Math.max(item.band, 1.4);
+    }
     item.material.uniforms.uGlow.value = spec.glow ?? 0.6;
     item.material.uniforms.uCoreWhite.value = spec.coreWhite ?? 0.45;
     item.material.blending = spec.blending ?? THREE.AdditiveBlending;
