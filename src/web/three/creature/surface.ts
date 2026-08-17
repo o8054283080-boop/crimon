@@ -123,7 +123,7 @@ const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
   },
   // 葉。彩度を上げて、光を通した時の緑が濁らないようにする
   GRASS: {
-    body: [0.005, 1.22, 0.98, 0],
+    body: [0.005, 1.12, 1.16, 0.02],
     keratin: 0xe0dcc0,
     peltSat: 0.6,
     flesh: 0.3,
@@ -141,7 +141,7 @@ const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
   // 闇。暗くしすぎると形が読めなくなるので、地色はむしろ保ち、
   // 「暗さ」は光の当たらない面を沈める uAbsorb だけで作る
   DARK: {
-    body: [0, 1.08, 1.0, 0.0],
+    body: [0, 0.92, 0.86, 0.0],
     keratin: 0xc9c0d2,
     peltSat: 0.58,
     flesh: 0.26,
@@ -232,10 +232,41 @@ function separate(part: THREE.Color, body: THREE.Color, gap: number): THREE.Colo
   body.getHSL(b, THREE.SRGBColorSpace);
   const diff = a.l - b.l;
   if (Math.abs(diff) >= gap) return part;
-  // 既に離れかけている向きを尊重し、真横に並んだ時だけ余白の広いほうへ
-  const away = diff === 0 ? (b.l < 0.5 ? 1 : -1) : Math.sign(diff);
+  // 既に離れかけている向きを尊重し、真横に並んだ時だけ余白の広いほうへ。
+  //
+  // ただし**その先に余白が無い時は反対へ逃がす**。地色が暗い属性(草・闇)では
+  // 「胴より暗い部位」を作ろうとした結果、押し下げた先が黒く潰れて
+  // 部位が分かれるどころか輪郭ごと消えていた(草属性の衣が真っ黒になっていた)。
+  // 分離が目的なのだから、どちら向きに離すかは譲ってよい。
+  let away = diff === 0 ? 0 : Math.sign(diff);
+  if (away < 0 && b.l - gap < 0.22) away = 1;
+  if (away > 0 && b.l + gap > 0.84) away = -1;
+  if (away === 0) away = b.l < 0.5 ? 1 : -1;
   const out = new THREE.Color();
-  out.setHSL(a.h, a.s, Math.min(0.9, Math.max(0.06, b.l + away * gap)), THREE.SRGBColorSpace);
+  out.setHSL(a.h, a.s, Math.min(0.9, Math.max(0.12, b.l + away * gap)), THREE.SRGBColorSpace);
+  return out;
+}
+
+/**
+ * 影になる部位の色を、地色から相対で作る。
+ *
+ * テーマの shell から機械的に作ると、地色が暗い属性(草・闇)ではほぼ黒になり、
+ * 腹も関節も口の中も同じ「黒い穴」になる。実際に草属性の胴が、
+ * 色の読めない暗い塊になっていた。
+ *
+ * 明度に下限を置いて必ず色が残るようにし、彩度はむしろ上げる。
+ * 影が濁って見えるのは光が減るからであって、色素が抜けるからではない。
+ */
+function shade(color: THREE.Color, scale: number, floor: number): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl, THREE.SRGBColorSpace);
+  const out = new THREE.Color();
+  out.setHSL(
+    (hsl.h + 0.985) % 1,
+    Math.min(1, hsl.s * 1.12 + 0.04),
+    Math.max(floor, hsl.l * scale),
+    THREE.SRGBColorSpace,
+  );
   return out;
 }
 
@@ -247,8 +278,11 @@ export function paletteFor(theme: ElementTheme): CreaturePalette {
   const main = tune(shell.clone().lerp(theme.rim, 0.24), ...skin.body);
   return {
     main,
-    dark: shell.clone().multiplyScalar(0.5).lerp(new THREE.Color(0x0d1020), 0.45),
-    deep: shell.clone().multiplyScalar(0.28).lerp(new THREE.Color(0x07080f), 0.6),
+    // 腹・関節・溝。テーマの shell からではなく**作り直した後の地色**から起こす。
+    // shell から作ると、地色を属性ごとに設計した意味が消えるうえ、
+    // 暗い属性では黒に張り付いて部位の区別が付かなくなる
+    dark: shade(main, 0.54, 0.17),
+    deep: shade(main, 0.32, 0.09),
     // 角・爪・牙・鰭。ケラチンは属性を持たない材質なので、属性色に染めない。
     // 一段だけ差し色を混ぜて帰属を残し、胴との明度差は separate が保証する
     // (指定した生成り色はそのまま使うと骨が白く浮くので、一段落として蝋の色にする)
