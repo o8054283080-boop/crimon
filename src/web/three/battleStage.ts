@@ -232,14 +232,28 @@ export class BattleStage {
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
 
-    // 仕上げはトーンマッピング後(sRGB)に適用する
+    // 仕上げはトーンマッピング後(sRGB)に適用する。
+    //
+    // **色調の設計はここで行う。** ライト側で寒暖を割ろうとすると、
+    // モンスターの体表シェーダが自前の固定光源で陰影を焼いている都合で
+    // キャラと背景の光がずれる(合成写真のように浮く)。合成後の1枚に
+    // 掛けるこちらなら、キャラも闘技場も同じ色調に乗る。
+    //
+    // 暗部は青緑寄りの冷たい色、明部は琥珀。以前は暗部が青紫で、
+    // 空の紫・桃色のリムと同じ方向を向いていたため、寒暖が割れずに
+    // 画面全体が「青紫一色」になっていた。暗部を紫から離すだけで、
+    // 明るさを一切足さずに寒暖の対が立つ
     this.cinematicPass = new CinematicPass({
-      vignette: 0.4,
+      vignette: 0.44,
       aberration: 1.0,
       grain: 0.045,
-      saturation: 1.06,
-      contrast: 0.12,
-      tintStrength: 0.15,
+      // 中間調の彩度はモンスターの属性色がいちばん効くところ。
+      // ライト側の色かぶりを落としたぶん、ここで少し戻す
+      saturation: 1.12,
+      contrast: 0.15,
+      tintStrength: 0.19,
+      shadowTint: 0x223d70,
+      highlightTint: 0xffdfae,
     });
     this.composer.addPass(this.cinematicPass);
 
