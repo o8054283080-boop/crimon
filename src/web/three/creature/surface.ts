@@ -849,16 +849,37 @@ void main() {
     // 映り込みの幅を広げる。ここが金属らしさの本体で、
     // 空と床の明るさが近いと、どれだけ磨いても曇った石膏にしかならない。
     // 平均を上げずに幅だけ広げる(床を落とし、空を上げる)ので加算の負担は増えない
-    vec3 sky = vec3(0.40, 0.50, 0.74);
-    vec3 ground = vec3(0.045, 0.035, 0.055);
+    // 空は上ほど明るい。一様な空を映すと、どの面も同じ明るさで返ってきて
+    // 「灰色に塗った板」に戻る
+    vec3 sky = mix(vec3(0.26, 0.34, 0.56), vec3(0.46, 0.58, 0.86), smoothstep(0.0, 0.85, normal.y));
+    vec3 ground = vec3(0.030, 0.026, 0.048);
     // 空と床の境目を鋭く切る。この「水平線」が磨いた金属のいちばんの手がかりで、
-    // なだらかに混ぜると曇った布のような面になる
-    vec3 env = mix(ground, sky, smoothstep(-0.03, 0.10, normal.y));
+    // なだらかに混ぜると曇った布のような面になる。
+    // **濡れた板ほどこの境目が硬い。** 幅を詰めるだけで、明るさを一切上げずに
+    // 「乾いた金属」から「濡れた金属」へ変わる
+    vec3 env = mix(ground, sky, smoothstep(-0.012, 0.038, normal.y));
     // 映り込みは磨き筋に沿って途切れる。凹凸の高さがそのまま反射の粗さになる
     color += env * tint * 0.72 * (0.20 + height * 0.90);
-    // 水平線のすぐ上に出る明るい帯。磨いた曲面が必ず持つ形
-    float band = max(0.0, 1.0 - abs(normal.y - 0.10) * 4.0);
-    color += mix(vec3(1.0), uRim, 0.4) * band * band * band * height * 0.20;
+    // 水平線のすぐ上に出る明るい帯。磨いた曲面が必ず持つ形。
+    // 帯を細く、そのぶん強くしてある(占める面積は 1/2 以下なので総量は減る)
+    float band = max(0.0, 1.0 - abs(normal.y - 0.06) * 9.0);
+    color += mix(vec3(1.0), uRim, 0.4) * band * band * band * height * 0.34;
+
+    // 装甲の継ぎ目。
+    //
+    // 金属板は必ず複数枚を接いだもので、一枚岩の金属というものは無い。
+    // 継ぎ目が無いと、どれだけ磨いても塗装したプラスチックの殻に見える
+    // (ネメシスの胴が、のっぺりした紫の樹脂に見えていた)。
+    // 溝を落とし、そのすぐ脇に薄い光を置くと、板の厚みまで読める。
+    //
+    // 高さ場ではなく色にだけ効かせる。高さ場へ入れると法線の摂動で
+    // 4回叩かれ、金属パーツの多い個体で重くなる
+    float seamNoise = snoise(vWorld * 2.6);
+    float seam = 1.0 - smoothstep(0.0, 0.040, abs(seamNoise));
+    float seamLip = smoothstep(0.105, 0.045, abs(seamNoise)) * (1.0 - seam);
+    color *= 1.0 - seam * 0.52;
+    color += env * tint * seamLip * 0.30;
+
     // 反射に属性色を回す。無彩色の反射だけだと鉄にしか見えず、
     // どの属性の装甲かも、格の高さも読めない
     color += uRim * fresnel * 0.22;
@@ -873,6 +894,17 @@ void main() {
       // 面が板ではなく金属板として読める
       spec *= 0.35 + height * 0.95;
       spec += pow(max(dot(normal, normalize(FILL_DIR + viewDir)), 0.0), uSpecPower * 0.6) * uSpecStrength * 0.30;
+      // 濡れたような芯。針のように細い一点だけを飽和させる。
+      // **同じ光の量でも、広くぼかせば樹脂の玉に、狭く固めれば濡れた金属になる。**
+      // 明るくして目立たせるのではなく、面積を絞って強度を上げる
+      spec += pow(max(dot(normal, halfDir), 0.0), uSpecPower * 5.0) * uSpecStrength * 0.55;
+      // 磨き筋に沿って伸びる映り込み。
+      // 法線の縦成分だけを寝かせた向きでハイライトを解くと、
+      // 筋と直交する向きには鋭く、筋に沿った向きには寝る。
+      // 丸い点ではなく細長い帯になるので、角度を変えると板の上を「走る」
+      vec3 alongGrain = normalize(vec3(normal.x, normal.y * 0.34, normal.z));
+      spec += pow(max(dot(alongGrain, halfDir), 0.0), uSpecPower * 0.22)
+            * uSpecStrength * 0.16 * (0.25 + height * 0.85);
     #endif
     // ブルームで白く飛ばないよう、ハイライトの合計に頭打ちを入れる
     color += mix(vec3(1.0), uRim, 0.35) * min(spec, 1.5);
