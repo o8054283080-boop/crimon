@@ -388,7 +388,8 @@ export class CreatureKit {
       ],
       style,
       color,
-      { sides, capTop: false },
+      // 先は尖っていて蓋が要らず、根元は必ず何かに埋まる
+      { sides, capTop: false, capBottom: false },
     );
   }
 
