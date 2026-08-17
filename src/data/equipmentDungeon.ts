@@ -5,10 +5,6 @@ import {
   ANCIENT_CRYSTAL,
   ANCIENT_CRYSTAL_CURSE,
   ANCIENT_DEMON,
-  GACHA_SR_COMMON_TEMPLATE,
-  GACHA_SR_RARE_TEMPLATE,
-  GACHA_SSR_COMMON_TEMPLATE,
-  GACHA_SSR_RARE_TEMPLATE,
   MONSTER_TEMPLATES,
   REINCARNATION_PIG_DEX,
 } from "./monsters.js";
@@ -20,6 +16,16 @@ export interface DungeonEnemy {
   level: number;
   /** 階層専用ボス(お供2体を連れて登場する)かどうか */
   isBoss?: boolean;
+  /**
+   * この個体だけに掛かる最大HP倍率。powerScale とは別枠で、階層全体ではなく
+   * 1体だけを分厚くしたい時に使う(ボスだけ殴り合いの時間を伸ばす、など)
+   */
+  hpMultiplier?: number;
+  /**
+   * この個体だけに掛かる素早さ倍率。powerScale は素早さに掛からないため、
+   * 手番の回り方を変えたい場合はこちらを使う
+   */
+  spdMultiplier?: number;
 }
 
 export interface DungeonFloor {
@@ -42,26 +48,52 @@ const DUNGEON_BOSS_STAR: Star = 6;
 const DUNGEON_BOSS_LEVEL = STAR_MAX_LEVEL[DUNGEON_BOSS_STAR];
 
 /**
- * 1〜8階のボスは、ガチャ限定の高レアモンスター(SR:グリフォン/セラフ、SSR:ドラゴン/ネメシス)を
- * 巡回で1体割り当てる。ステータスも通常モンスターよりベースが高く設定されているうえに星6で
- * 登場するため、お供2体とはっきり格の違うボスらしい強さになる。
+ * ボスは全10階すべて「古代の魔人」で固定する。
+ *
+ * 以前は1〜8階にガチャ限定の高レア(グリフォン/セラフ/ドラゴン/ネメシス)を巡回で置いていたが、
+ * 召喚で手に入る顔ぶれがそのままボス席に座っているため、ダンジョン専用の関門に見えなかった。
+ * 古代の魔人は召喚に一切出てこない専用の存在なので、全階をこれで通すと
+ * 「装備ダンジョンの主」として一貫する。階層ごとに属性は変わるので、色と弱点は巡回する。
  */
-const BOSS_TEMPLATES = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE];
+const BOSS_TEMPLATE = ANCIENT_DEMON;
 
 /**
- * 9・10階(ダンジョン最終盤の最終関門)だけは、装備ダンジョン専用のオリジナルボス
- * 「古代の魔人」が固定で登場する。ガチャには一切出現しない完全にダンジョン専用の存在で、
- * お供2体も同じく専用の「古代のクリスタル」「古代の呪晶」の組み合わせで固定になる。
+ * ボスだけに掛かる最大HP倍率。
+ *
+ * ボスがお供と大差ない速さで溶けてしまい、階層の関門として印象に残らなかった。
+ * powerScale を上げて厚くすると攻撃力も一緒に上がって事故死が増えるので、
+ * **HPだけ**を別枠で伸ばし、殴り合いの時間そのものを長くしている。
+ */
+const BOSS_HP_MULTIPLIER = 5;
+
+/**
+ * ボスだけに掛かる素早さ倍率。
+ *
+ * HPを5倍にすると戦闘が長引くぶん、手番が回ってこないボスは「ただの分厚い的」になる。
+ * powerScale は素早さに掛からない設計なので、ここで別枠で上げて手数を確保している。
+ */
+const BOSS_SPD_MULTIPLIER = 1.3;
+
+/**
+ * 9・10階(ダンジョン最終盤の最終関門)だけは、お供2体も専用の
+ * 「古代のクリスタル」「古代の呪晶」の組み合わせで固定になる
+ * (ボス自体は全階で古代の魔人。BOSS_TEMPLATE を参照)。
  * 古代のクリスタルは自ら攻めるよりも古代の魔人へのバフ・回復を優先するサポート役、
  * 古代の呪晶は逆に支援より全体攻撃・デバフでプレイヤー側を弱らせにくる攻撃寄りのお供で、
  * 支援と攻撃で役割がはっきり分かれた2体構成になっている。
  */
 const FINAL_BOSS_FLOOR_START = 9;
-const FINAL_BOSS_TEMPLATE = ANCIENT_DEMON;
 const FINAL_BOSS_COMPANION_TEMPLATES = [ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE];
 
 /**
- * 1階/8階の必要パワースケール。
+ * 1階/10階の必要パワースケール(END は10階の「ボーナス適用前」の値)。
+ *
+ * ボスのHPを5倍にした時点で、この値は全面的に置き直してある。
+ * ボスが5倍長く生き残るということは、ボスが与える総ダメージも5倍近く伸びるということで、
+ * 据え置きにすると難易度が跳ね上がる(実測で1階の勝率が0%になった)。
+ * 新しい値は `npx tsx tools/dungeonProbe.ts` で候補を振って実測し、
+ * テストが要求する水準を満たす範囲から選んでいる。勘で置かないこと。
+ *
  * 1階は「星3モンスターに星1装備」くらいの、まだ育成途中のパーティでも挑めるくらいまで下げてあり、
  * 装備ダンジョンの入り口として無理なく足を踏み入れられるようにしてある。
  * そこから階層を上がるごとになだらかに強くなっていく。
@@ -69,8 +101,8 @@ const FINAL_BOSS_COMPANION_TEMPLATES = [ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE];
  * モンスターごとのスキル2/3が属性ごとに異なる組み合わせになったことによる
  * 戦闘バランスの変化に合わせて、この値は都度調整してある。
  */
-const POWER_SCALE_START = 0.62;
-const POWER_SCALE_END = 1.7;
+const POWER_SCALE_START = 0.28;
+const POWER_SCALE_END = 1.215;
 
 /**
  * 9・10階はダンジョン最終盤の最終関門として、8階までの線形カーブに対してさらに
@@ -93,7 +125,7 @@ const POWER_SCALE_END = 1.7;
  * 装備を極めた通常モンスターだけの編成でも突破できる場合はあるが、
  * SR/SSR軸の編成と比べれば依然としてはっきり不利になるよう調整してある。
  */
-const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.62, 10: 1.9 };
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 9: 1.62, 10: 2.02 };
 
 function powerScaleForFloor(floor: number): number {
   const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
@@ -105,14 +137,22 @@ function buildFloor(floor: number): DungeonFloor {
   const floorElement = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
   const isFinalBossFloor = floor >= FINAL_BOSS_FLOOR_START;
 
-  const bossTemplateId = isFinalBossFloor ? FINAL_BOSS_TEMPLATE.templateId : BOSS_TEMPLATES[(floor - 1) % BOSS_TEMPLATES.length].templateId;
+  const bossTemplateId = BOSS_TEMPLATE.templateId;
   const companionTemplateIds = isFinalBossFloor
     ? FINAL_BOSS_COMPANION_TEMPLATES.map((t) => t.templateId)
     : [MONSTER_TEMPLATES[(floor - 1) % MONSTER_TEMPLATES.length].templateId, MONSTER_TEMPLATES[floor % MONSTER_TEMPLATES.length].templateId];
 
   // ボス1体+お供2体の3体編成。ボスを先頭に置く
   const enemies: DungeonEnemy[] = [
-    { templateId: bossTemplateId, element: floorElement, star: DUNGEON_BOSS_STAR, level: DUNGEON_BOSS_LEVEL, isBoss: true },
+    {
+      templateId: bossTemplateId,
+      element: floorElement,
+      star: DUNGEON_BOSS_STAR,
+      level: DUNGEON_BOSS_LEVEL,
+      isBoss: true,
+      hpMultiplier: BOSS_HP_MULTIPLIER,
+      spdMultiplier: BOSS_SPD_MULTIPLIER,
+    },
     ...companionTemplateIds.map((templateId) => ({
       templateId,
       element: floorElement,
