@@ -1,3 +1,4 @@
+import { ELEMENT_JA } from "../../core/element.js";
 import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
 import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
@@ -62,17 +63,26 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
     const equipment = equipmentId ? props.player.equipment.find((e) => e.id === equipmentId) : undefined;
 
     if (equipment) {
+      // 一覧のカードと同じ data 属性を持たせ、同じ色の規則で読めるようにする。
+      // 装備画面と詳細画面で見え方が違うと、同じ物だと気付けない
       return el(
         "button",
         {
           type: "button",
           className: "equip-slot equip-slot--filled",
           onclick: () => props.onViewEquippedSlot(equipment.id, instance.id),
+          "data-star": String(equipment.star),
+          "data-set": equipment.set,
+          "data-tier": equipment.level >= 12 ? "max" : equipment.level >= 6 ? "mid" : "low",
         },
         [
-          el("div", { className: "equip-slot__label" }, [`S${slot}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),
+          el("div", { className: "equip-slot__head" }, [
+            el("span", { className: "equip-slot__label" }, [`S${slot}`]),
+            el("span", { className: "equip-slot__level" }, [`+${equipment.level}`]),
+          ]),
           el("div", { className: "equip-slot__star" }, ["★".repeat(equipment.star)]),
           el("div", { className: "equip-slot__stat" }, [STAT_LABEL[equipment.mainStat.type]]),
+          el("div", { className: "equip-slot__set" }, [SET_LABEL[equipment.set]]),
         ],
       );
     }
@@ -124,28 +134,50 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const expNeeded = requiredExpForLevel(instance.level);
   const inParty = props.player.partyIds.includes(instance.id);
 
-  const statLines = effectiveStats
+  // 主要4項目と、それ以外を分ける。全部を同じ大きさで並べると、
+  // 何を見て強さを判断すればよいのかが伝わらない
+  const primaryStats: [string, string][] = effectiveStats
     ? [
-        `HP ${effectiveStats.hp}`,
-        `ATK ${effectiveStats.atk}`,
-        `DEF ${effectiveStats.def}`,
-        `SPD ${effectiveStats.spd}`,
-        ...formatExtraStatLines(effectiveStats),
+        ["HP", String(effectiveStats.hp)],
+        ["攻撃力", String(effectiveStats.atk)],
+        ["防御力", String(effectiveStats.def)],
+        ["速度", String(effectiveStats.spd)],
       ]
     : [];
+  const secondaryStats = effectiveStats ? formatExtraStatLines(effectiveStats) : [];
 
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [dex ? dex.name : instance.dexId])]),
-    el("section", { className: "panel monster-detail" }, [
-      withPortrait(el("div", { className: "monster-detail__avatar", style: dex ? `background:${dex.color}` : undefined }, [dex ? dex.emoji : "❓"]), dex),
-      el("div", { className: "monster-detail__star" }, [starLabel(instance.star)]),
-      el("div", { className: "monster-detail__level" }, [`Lv ${instance.level} / ${maxLevel}`]),
-      inParty ? el("div", { className: "role-badge" }, ["編成中"]) : null,
-      el("div", { className: "monster-detail__stats" }, statLines.map((line) => el("div", {}, [line]))),
+    el("section", { className: "panel monster-detail", "data-star": String(instance.star) }, [
+      // 集めたものを眺める画面なので、肖像を主役の大きさで出す
+      el("div", { className: "monster-detail__hero" }, [
+        withPortrait(
+          el("div", { className: "monster-detail__avatar", style: dex ? `background:${dex.color}` : undefined }, [dex ? dex.emoji : "❓"]),
+          dex,
+        ),
+        el("div", { className: "monster-detail__ident" }, [
+          dex ? el("span", { className: "monster-detail__element" }, [ELEMENT_JA[dex.element]]) : null,
+          el("span", { className: "monster-detail__star" }, [starLabel(instance.star)]),
+          el("span", { className: "monster-detail__level" }, [`Lv ${instance.level} / ${maxLevel}`]),
+          dex ? el("span", { className: "monster-detail__role" }, [dex.role]) : null,
+          inParty ? el("span", { className: "role-badge" }, ["編成中"]) : null,
+        ].filter((n): n is HTMLElement => n !== null)),
+      ]),
+      el(
+        "div",
+        { className: "monster-detail__stats" },
+        primaryStats.map(([label, value]) =>
+          el("div", { className: "stat-tile" }, [
+            el("span", { className: "stat-tile__label" }, [label]),
+            el("span", { className: "stat-tile__value" }, [value]),
+          ]),
+        ),
+      ),
+      el("div", { className: "monster-detail__substats" }, secondaryStats.map((line) => el("span", {}, [line]))),
       instance.level < maxLevel
         ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
-    ].filter((n): n is HTMLDivElement => n !== null)),
+    ]),
     renderSkillPanel(dex, instance, () => props.onGoMonsterTraining(instance.id)),
     el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
     renderSetBonusPanel(equippedItems),

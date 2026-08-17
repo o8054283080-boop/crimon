@@ -40,19 +40,33 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
   const ownerName = equipmentOwnerName(player, equipment);
   const subLines =
     equipment.subStats.length > 0
-      ? equipment.subStats.map((s) => el("div", { className: "equip-card__sub-line" }, [`・${formatStatValue(s)}`]))
+      ? equipment.subStats.map((s) => el("div", { className: "equip-card__sub-line" }, [formatStatValue(s)]))
       : [el("div", { className: "equip-card__sub-line equip-card__sub-line--empty" }, ["サブステータスなし"])];
 
+  // 等級・シリーズ・強化段階を data 属性で持たせ、色と縁取りはCSS側で当てる。
+  // 数十枚を並べる画面なので、文字を読まなくても強さの序列が分かることを優先する
   return el(
     "button",
-    { type: "button", className: "equip-card", onclick: onClick },
+    {
+      type: "button",
+      className: "equip-card",
+      onclick: onClick,
+      "data-star": String(equipment.star),
+      "data-set": equipment.set,
+      "data-tier": equipment.level >= 12 ? "max" : equipment.level >= 6 ? "mid" : "low",
+    },
     [
-      el("div", { className: "equip-card__slot" }, [`${SLOT_LABEL[equipment.slot]}${equipment.level > 0 ? ` +${equipment.level}` : ""}`]),
+      el("div", { className: "equip-card__head" }, [
+        el("span", { className: "equip-card__slot" }, [SLOT_LABEL[equipment.slot]]),
+        el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
+        el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
+      ]),
       el("div", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
-      el("div", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
-      el("div", { className: "equip-card__main" }, [`メイン: ${formatStatValue(equipment.mainStat)}`]),
+      el("div", { className: "equip-card__main" }, [formatStatValue(equipment.mainStat)]),
       el("div", { className: "equip-card__subs" }, subLines),
-      ownerName ? el("div", { className: "equip-card__owner" }, [`装着中: ${ownerName}`]) : el("div", { className: "equip-card__owner equip-card__owner--free" }, ["未装着"]),
+      ownerName
+        ? el("div", { className: "equip-card__owner" }, [ownerName])
+        : el("div", { className: "equip-card__owner equip-card__owner--free" }, ["未装着"]),
     ],
   );
 }

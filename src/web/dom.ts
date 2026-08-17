@@ -1,6 +1,12 @@
 type ElementProps<K extends keyof HTMLElementTagNameMap> = Partial<Omit<HTMLElementTagNameMap[K], "style">> & {
   className?: string;
   style?: string;
+  /**
+   * data-* 属性。見た目の分岐(等級・シリーズ・強化段階など)をCSS側へ渡すのに使う。
+   * 状態ごとにクラス名を増やすより、値そのものを属性で持たせた方が
+   * CSS変数で色を引けて、組み合わせが増えても破綻しない。
+   */
+  [key: `data-${string}`]: string | undefined;
 };
 
 /** 属性を割り当てつつ子要素を追加する簡易DOM生成ヘルパー */
@@ -14,6 +20,8 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     if (value === undefined) continue;
     if (key === "style") {
       node.setAttribute("style", value as string);
+    } else if (key.startsWith("data-")) {
+      node.setAttribute(key, value as string);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (node as any)[key] = value;
