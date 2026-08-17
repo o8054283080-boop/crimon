@@ -2056,8 +2056,27 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 0.92;
 
   // --- 腰(ライオン。後ろは低く、腿の塊で幅を出す) ---
-  rig.pelvis.add(place(kit.ball(0.23, 0.25, 0.32, "hide", p.main), 0, 0.01, 0.04));
-  rig.pelvis.add(place(kit.ball(0.18, 0.17, 0.17, "hide", p.main), 0, -0.05, 0.23));
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.11, rz: 0.11 },
+          { y: 0.14, r: 0.19, rz: 0.19 },
+          { y: 0.34, r: 0.23, rz: 0.25, ridge: 0.14 },
+          { y: 0.52, r: 0.2, rz: 0.23 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.32,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 腿の張り。丸い塊で覆うと脚が埋もれるので、外側へ寄せて縦長に取る
   for (const side of [-1, 1]) {
     rig.pelvis.add(place(kit.ball(0.13, 0.20, 0.21, "hide", p.main), side * 0.21, -0.04, 0.08));
@@ -2092,13 +2111,54 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   const torso = rig.torso;
   // rotation.x を正に取ると前(-Z)が持ち上がる。鷲の胸を高く構える
   place(torso, 0, 0.02, -0.52, 0.20, 0, 0);
-  // 後半身(獣)
-  torso.add(place(kit.ball(0.21, 0.22, 0.28, "hide", p.main), 0, -0.02, 0.24));
-  torso.add(place(kit.ball(0.24, 0.25, 0.26, "hide", p.main), 0, 0.0, 0.02));
-  torso.add(place(kit.ball(0.18, 0.14, 0.30, "hide", p.dark), 0, -0.16, 0.16));
+  // 胴は輪切りを積んだ1本。獣と鷲で材質が入れ替わるので2本に割るが、
+  // 継ぎ目は背の飾り羽で隠れる。球を並べていた時のような
+  // 「丸の連なり」にならず、腰から胸へ持ち上がる流れが輪郭に出る。
+  // 面の数は多め(10)。鳥と獣なので、竜のように角張らせてはいけない
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.14, rz: 0.14 },
+          { y: 0.13, r: 0.21, rz: 0.23, ridge: 0.12 },
+          { y: 0.28, r: 0.23, rz: 0.24, keel: 0.16 },
+          { y: 0.44, r: 0.25, rz: 0.26, keel: 0.24, ridge: 0.1 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10, capTop: false },
+      ),
+      0,
+      0,
+      0.35,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 前半身(鷲)。胸を深く前へ張り出させ、竜骨のように下へ落とす
-  torso.add(place(kit.ball(0.29, 0.32, 0.30, "fur", p.fur), 0, 0.02, -0.22));
-  torso.add(place(kit.ball(0.24, 0.28, 0.22, "fur", p.fur), 0, -0.10, -0.38));
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0.4, r: 0.25, rz: 0.26, keel: 0.22, ridge: 0.1 },
+          { y: 0.54, r: 0.28, rz: 0.3, keel: 0.36 },
+          { y: 0.66, r: 0.29, rz: 0.33, keel: 0.46 },
+          { y: 0.78, r: 0.24, rz: 0.29, keel: 0.4 },
+          { y: 0.88, r: 0.14, rz: 0.19, keel: 0.2 },
+        ],
+        "fur",
+        p.fur,
+        { sides: 10, capBottom: false },
+      ),
+      0,
+      0,
+      0.35,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   for (const side of [-1, 1]) {
     torso.add(place(kit.ball(0.14, 0.19, 0.20, "fur", p.fur), side * 0.25, 0.10, -0.20));
   }
