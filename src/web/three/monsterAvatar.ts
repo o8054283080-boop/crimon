@@ -537,9 +537,18 @@ export class MonsterAvatar {
      * 0.05ラジアンしか動いていなかった)。個体差は残しつつ、
      * 下限を約0.6に持ち上げる。
      */
-    const swayGain = 0.42 + anim.sway * 0.62;
-    const headGain = 0.42 + anim.headSway * 0.62;
-    const breathGain = 0.42 + anim.breath * 0.62;
+    /**
+     * 待機の「深さ」を、1〜3分かけてゆっくり変えるうねり。
+     *
+     * 波をいくつ重ねても、振幅が一定のまま揺れ続けるものは機械の周期に聞こえる。
+     * 生き物は落ち着いている時と気が立っている時で動きの大きさが違うので、
+     * 全部の帯にかかる倍率を、どの波よりも遅い周期で 0.7〜1.3 倍に振る。
+     * 位相が個体ごとに違うので、隊列の中で「今はこいつが静かだ」も生まれる。
+     */
+    const mood = 1 + Math.sin(this.idleClock * 0.083 + this.phase) * 0.2 + Math.sin(this.idleClock * 0.031 + 2.2) * 0.12;
+    const swayGain = (0.42 + anim.sway * 0.62) * mood;
+    const headGain = (0.42 + anim.headSway * 0.62) * mood;
+    const breathGain = (0.42 + anim.breath * 0.62) * mood;
 
     // === 待機モーション ===================================================
     // 呼吸。吸う(速い)と吐く(遅い)を非対称にする。左右対称な正弦波のままだと
@@ -631,8 +640,8 @@ export class MonsterAvatar {
 
     // 尾・布・耳へ渡す「本体からの入力」。ここに溜めた値をバネで遅らせる。
     // 尾は輪郭の外に出ていて一番目に付くので、待機でもはっきり振らせる
-    let tailDriveX = Math.sin(T * tailHz * 0.62 - 0.7) * 0.1 * anim.tailWave * alive;
-    let tailDriveY = (Math.sin(T * tailHz) * 0.2 + Math.sin(T * tailHz * 2.35 + 1.4) * 0.055) * anim.tailWave * alive;
+    let tailDriveX = Math.sin(T * tailHz * 0.62 - 0.7) * 0.1 * anim.tailWave * mood * alive;
+    let tailDriveY = (Math.sin(T * tailHz) * 0.2 + Math.sin(T * tailHz * 2.35 + 1.4) * 0.055) * anim.tailWave * mood * alive;
 
     // 翼: 羽ばたき。打ち下ろしが速く、戻しが遅い(空気を押している側が速い)
     const flapPhase = T * flapHz;
@@ -1185,12 +1194,17 @@ export class MonsterAvatar {
         const joint = rig.tail[i];
         const spring = this.tailSprings[i];
         const freq = swingFreq * Math.pow(0.9, i);
-        const ry = spring.a.step(driveY, freq, swingDamp, step);
-        const rx = spring.b.step(driveX, freq, swingDamp * 1.05, step);
+        // 減衰は先の節ほど強くする。減衰比0.26のバネは目標を4割行き過ぎるので、
+        // 同じ減衰のまま角度を受け渡すと節ごとに1.3倍ずつ増幅し、
+        // 5節目で尾が90度近く曲がってとぐろを巻いていた
+        const damp = swingDamp * (1 + i * 0.12);
+        const ry = spring.a.step(driveY, freq, damp, step);
+        const rx = spring.b.step(driveX, freq, damp * 1.05, step);
         joint.group.rotation.set(joint.rest.x + rx, joint.rest.y + ry, joint.rest.z);
-        // 次の節は、いま振れた角度を目標として受け取る(波が外へ伝わる)
-        driveY = ry * 0.92;
-        driveX = rx * 0.92;
+        // 次の節は、いま振れた角度を目標として受け取る(波が外へ伝わる)。
+        // 行き過ぎるぶんを見越して絞る。しなりは残るが、巻き込まなくなる
+        driveY = ry * 0.78;
+        driveX = rx * 0.78;
       }
     }
 
