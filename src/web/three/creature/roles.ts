@@ -838,8 +838,29 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 1.0;
 
   // --- 腰 ---
-  rig.pelvis.add(place(kit.ball(0.30, 0.28, 0.34, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.22, 0.21, 0.20, "hide", p.main), 0, -0.02, 0.22));
+  // 輪切りを積んだ1本。獣なので面の数は多め(10)にして角張らせないが、
+  // 球を並べるのはやめる。並べたぶんだけ輪郭が丸の連なりになるため
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.14, rz: 0.14 },
+          { y: 0.16, r: 0.23, rz: 0.22 },
+          { y: 0.38, r: 0.3, rz: 0.29, ridge: 0.12 },
+          { y: 0.58, r: 0.25, rz: 0.26 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.34,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   for (const side of [-1, 1]) {
     // 腿の付け根の筋肉。四足は後脚の張り出しが速さの印象を作る
     rig.pelvis.add(place(kit.ball(0.16, 0.19, 0.20, "hide", p.main), side * 0.24, -0.02, 0.10));
@@ -868,10 +889,32 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(水平な背骨。腰から前へ伸ばす) ---
   const torso = rig.torso;
   place(torso, 0, 0.06, -0.40, 0.05, 0, 0);
-  torso.add(place(kit.ball(0.31, 0.30, 0.40, "hide", p.main), 0, 0.02, 0.10));
-  torso.add(place(kit.ball(0.34, 0.33, 0.34, "hide", p.main), 0, 0.02, -0.14));
+  // 胴も1本。腰で締まって肩で張る流れが、継ぎ目なしの輪郭として出る
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.22, rz: 0.22 },
+          { y: 0.16, r: 0.29, rz: 0.28, keel: 0.1 },
+          { y: 0.36, r: 0.27, rz: 0.28, keel: 0.14, ridge: 0.1 },
+          { y: 0.56, r: 0.33, rz: 0.33, keel: 0.16, ridge: 0.14 },
+          { y: 0.72, r: 0.32, rz: 0.31, ridge: 0.1 },
+          { y: 0.86, r: 0.2, rz: 0.21 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0.02,
+      0.32,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 腹。下側を暗い色にして、胴の丸みと接地側を分ける
-  torso.add(place(kit.ball(0.27, 0.20, 0.42, "hide", p.dark), 0, -0.14, 0.02));
+  torso.add(place(kit.ball(0.25, 0.17, 0.40, "hide", p.dark), 0, -0.16, 0.02));
   addRibs(kit, torso, 4, -0.12, 0.14, 0.30, 0.016);
   for (const side of [-1, 1]) {
     torso.add(place(kit.ball(0.14, 0.17, 0.17, "hide", p.main), side * 0.26, 0.02, -0.18));
