@@ -610,7 +610,14 @@ float surfaceHeight(vec3 p, vec3 n) {
 #elif defined(STREAKS)
   return brushedStreak(p);
 #elif defined(WEAVE)
-  return weavePattern(p, n) * 0.6 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.4;
+  // 布は「織り目」と「襞」の2段でできている。
+  //
+  // 以前はここへ高い周波数の粒を重ねていたが、遠目には灰色に潰れるだけで、
+  // 布らしさには何も寄与していなかった。布が布に見えるのは、
+  // 重力で縦に長く落ちる襞のほう。縦の目を粗く取って、下へ伸ばす。
+  // 織り目と入れ替えたのでノイズを叩く回数は変わっていない
+  return weavePattern(p, n) * 0.42
+       + (snoise(vec3(p.x * 9.0, p.y * 1.6, p.z * 9.0)) * 0.5 + 0.5) * 0.58;
 #elif defined(GEL)
   return gelHeight(p);
 #else
@@ -811,8 +818,12 @@ void main() {
   #endif
 
   #ifdef WEAVE
-    // 布は細かい織り目。ローカル座標基準なので、揺れても模様が泳がない
-    albedo *= 0.90 + weavePattern(vLocal, geoNormal) * 0.16;
+    // 織り目と襞。襞は高さ場から来るので、光の向きが変わると陰影も動く。
+    // 色だけで襞を描くと、どの角度から見ても同じ場所が暗い「柄」になる。
+    //
+    // 以前はここで weavePattern をもう一度叩いていた(高さ場と合わせて
+    // 1画素あたり5回)。同じ高さを使い回せば済むので、その分を襞に充てた
+    albedo *= 0.76 + height * 0.42;
   #endif
 
   // 窪みの擬似的な陰り。大きなムラの暗い側をさらに沈めて締める
@@ -1274,7 +1285,9 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: true,
     specPower: 6,
     specStrength: 0,
-    bump: 0.002,
+    // 襞の深さ。織り目だけを描いていた頃はここを 0.002 にしていたが、
+    // それでは面が平らなままで、どれだけ目を細かくしても板に見える
+    bump: 0.009,
   },
   membrane: {
     defines: { TRANSLUCENT: "", VEINS: "" },
