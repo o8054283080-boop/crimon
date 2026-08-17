@@ -26,10 +26,20 @@ const CINEMATIC_SHADER = {
     uSaturation: { value: 1.08 },
     /** S字コントラストの強さ */
     uContrast: { value: 0.14 },
-    /** 暗部に乗せる色(寒色) */
-    uShadowTint: { value: new THREE.Color(0x2b3a6b) },
+    /**
+     * 暗部に乗せる色(寒色)。
+     *
+     * ここは**色調設計の本体**。ライト側で寒暖を割ろうとすると、
+     * モンスターの体表シェーダが自前の固定光源で陰影を焼いている都合で
+     * キャラと背景がずれる。合成後の1枚に対して掛けるこちらなら、
+     * 全部が同じ色調に乗る。
+     *
+     * シェーダ側で 2.0 倍してから掛けるので、0.5 より暗い成分は
+     * その分だけ暗部を沈める。接地感はここで作れる。
+     */
+    uShadowTint: { value: new THREE.Color(0x223d70) },
     /** 明部に乗せる色(暖色) */
-    uHighlightTint: { value: new THREE.Color(0xffe6c4) },
+    uHighlightTint: { value: new THREE.Color(0xffdfae) },
     /** スプリットトーンの効き */
     uTintStrength: { value: 0.16 },
   },
@@ -108,6 +118,10 @@ export interface CinematicOptions {
   saturation?: number;
   contrast?: number;
   tintStrength?: number;
+  /** 暗部に乗せる色。数値(0xRRGGBB)で指定する */
+  shadowTint?: number;
+  /** 明部に乗せる色 */
+  highlightTint?: number;
 }
 
 export class CinematicPass extends ShaderPass {
@@ -124,6 +138,8 @@ export class CinematicPass extends ShaderPass {
     if (options.saturation !== undefined) u.uSaturation.value = options.saturation;
     if (options.contrast !== undefined) u.uContrast.value = options.contrast;
     if (options.tintStrength !== undefined) u.uTintStrength.value = options.tintStrength;
+    if (options.shadowTint !== undefined) (u.uShadowTint.value as THREE.Color).setHex(options.shadowTint);
+    if (options.highlightTint !== undefined) (u.uHighlightTint.value as THREE.Color).setHex(options.highlightTint);
   }
 
   setResolution(width: number, height: number): void {

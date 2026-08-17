@@ -10,7 +10,6 @@ import {
   addFaceEyes,
   addFeatherWing,
   addJoint,
-  addPlating,
   addTail,
   limbFrom,
 } from "./roles.js";
@@ -515,10 +514,31 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 1.0;
 
   // --- 腰。狼は後ろが軽く、肩が高い ---
-  rig.pelvis.add(place(kit.ball(0.24, 0.24, 0.30, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.19, 0.18, 0.17, "hide", p.main), 0, -0.02, 0.20));
+  // 輪切りを積んだ1本。獣なので面の数は多め(10)にして角張らせないが、
+  // 球を並べるのはやめる。並べたぶんだけ輪郭が丸の連なりになる
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.11, rz: 0.11 },
+          { y: 0.14, r: 0.19, rz: 0.2 },
+          { y: 0.32, r: 0.24, rz: 0.24, ridge: 0.12 },
+          { y: 0.5, r: 0.2, rz: 0.22 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.3,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   for (const side of [-1, 1]) {
-    rig.pelvis.add(place(kit.ball(0.13, 0.17, 0.18, "hide", p.main), side * 0.19, -0.02, 0.10));
+    rig.pelvis.add(place(kit.ball(0.11, 0.16, 0.17, "hide", p.main), side * 0.19, -0.02, 0.10));
   }
 
   // --- 後脚(細く、踵が高いデジティグレード) ---
@@ -546,11 +566,32 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(深い胸、絞れた腹。前後に長く取る) ---
   const torso = rig.torso;
   place(torso, 0, 0.06, -0.54, 0.02, 0, 0);
-  // 胸郭。狼は前脚の間が深く、そこから腹へ向けて一気に絞れる
-  torso.add(place(kit.ball(0.25, 0.31, 0.36, "hide", p.main), 0, 0.0, -0.14));
-  torso.add(place(kit.ball(0.21, 0.23, 0.34, "hide", p.main), 0, 0.0, 0.20));
-  torso.add(place(kit.ball(0.18, 0.18, 0.24, "hide", p.dark), 0, -0.14, -0.14));
-  torso.add(place(kit.ball(0.15, 0.12, 0.34, "hide", p.dark), 0, -0.14, 0.14));
+  // 胸郭。狼は前脚の間が深く、そこから腹へ向けて一気に絞れる。
+  // 球を4つ並べると腰のくびれが「球と球の谷間」になり、体が数珠に見える。
+  // 輪切り1本なら、絞りがそのまま連続した輪郭として出る
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.17, rz: 0.18 },
+          { y: 0.16, r: 0.21, rz: 0.23, keel: 0.1 },
+          { y: 0.36, r: 0.19, rz: 0.22, keel: 0.16, ridge: 0.1 },
+          { y: 0.54, r: 0.24, rz: 0.3, keel: 0.24, ridge: 0.14 },
+          { y: 0.68, r: 0.25, rz: 0.3, keel: 0.16, ridge: 0.1 },
+          { y: 0.8, r: 0.17, rz: 0.2 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.34,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 肩甲骨の張り
   for (const side of [-1, 1]) {
     torso.add(place(kit.ball(0.11, 0.16, 0.17, "hide", p.main), side * 0.22, 0.08, -0.20));
@@ -671,7 +712,23 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 1.25;
 
   // --- 腰。重い帯と、そこから下がる裂けた腰布 ---
-  rig.pelvis.add(place(kit.ball(0.26, 0.20, 0.22, "hide", p.dark), 0, -0.02, 0));
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: -0.2, r: 0.19, rz: 0.17 },
+          { y: -0.04, r: 0.26, rz: 0.22, keel: 0.12 },
+          { y: 0.1, r: 0.23, rz: 0.19 },
+        ],
+        "hide",
+        p.dark,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
   rig.pelvis.add(place(kit.band(0.25, 0.045, Math.PI * 2, "metal", p.metal, 16), 0, 0.02, 0, Math.PI / 2, 0, 0));
   rig.pelvis.add(place(kit.octa(0.08, 0.12, 0.05, "crystal", p.accent), 0, 0.02, -0.25));
   rig.pelvis.add(place(kit.octa(0.04, 0.06, 0.03, "glow", p.glow), 0, 0.02, -0.26));
@@ -686,9 +743,9 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.44, r0: 0.16, r1: 0.12, rot: [0.40, 0, side * 0.07] },
-        { len: 0.42, r0: 0.115, r1: 0.09, rot: [-0.86, 0, 0] },
-        { len: 0.26, r0: 0.09, r1: 0.08, rot: [0.55, 0, 0] },
+        { len: 0.44, r0: 0.16, r1: 0.12, rot: [0.40, 0, side * 0.07], radial: 7, facet: true },
+        { len: 0.42, r0: 0.115, r1: 0.09, rot: [-0.86, 0, 0], radial: 6, facet: true },
+        { len: 0.26, r0: 0.09, r1: 0.08, rot: [0.55, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -707,11 +764,56 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(逆三角形。肩が広く腰が細い) ---
   const torso = rig.torso;
   place(torso, 0, 0.06, 0, -0.08, 0, 0);
-  // 腹。ここが細いと、背後のマントが胴の隙間から透けて「前掛け」に見える
-  torso.add(place(kit.ball(0.24, 0.24, 0.21, "hide", p.dark), 0, 0.16, 0));
-  torso.add(place(kit.ball(0.27, 0.20, 0.22, "hide", p.main), 0, 0.32, -0.02));
-  torso.add(place(kit.ball(0.36, 0.32, 0.26, "hide", p.main), 0, 0.48, 0));
-  addPlating(kit, torso, 3, 0.30, 0.60, 0.30, -0.18);
+  // 胴は1本の面取り角柱。腰を締めて肩へ向かって開く逆三角形を、
+  // 球を積むのではなく輪切りの半径で作る。腹が細いと、背後のマントが
+  // 胴の隙間から透けて「前掛け」に見えるので、そこは落としすぎない
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0.04, r: 0.20, rz: 0.18 },
+          { y: 0.18, r: 0.23, rz: 0.2, keel: 0.16, ridge: 0.1 },
+          { y: 0.32, r: 0.26, rz: 0.22, keel: 0.26, ridge: 0.18 },
+          { y: 0.46, r: 0.32, rz: 0.26, keel: 0.3, ridge: 0.22 },
+          { y: 0.6, r: 0.36, rz: 0.27, keel: 0.18, ridge: 0.26 },
+          { y: 0.7, r: 0.3, rz: 0.22 },
+          { y: 0.78, r: 0.17, rz: 0.15 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
+  // 胸腹の積層装甲。下から上へ少しずつ重なる帯。参考画像でいちばん効いている要素で、
+  // 面が平らでも1枚ずつ縁が立つので情報量が出る
+  torso.add(
+    place(
+      kit.plateStack("metal", p.metal, {
+        count: 7,
+        y0: 0.12,
+        y1: 0.62,
+        z: -0.2,
+        zEnd: -0.3,
+        width: 0.3,
+        widthEnd: 0.46,
+        height: 0.14,
+        heightEnd: 0.18,
+        thickness: 0.034,
+        wrap: 0.24,
+        wrapEnd: 0.3,
+        notch: 0.45,
+        tilt: 0.12,
+        tiltEnd: -0.1,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   torso.add(place(kit.lens(0.34, 0.20, 0.16, "metal", p.metal), 0, 0.64, -0.10, -0.12, 0, 0));
   torso.add(place(kit.octa(0.09, 0.14, 0.06, "crystal", p.accent), 0, 0.56, -0.24));
   torso.add(place(kit.octa(0.045, 0.07, 0.03, "glow", p.glow), 0, 0.56, -0.25));
@@ -724,13 +826,28 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   for (const side of [-1, 1]) {
-    // 肩。岩塊ではなく、段の付いた大きな装甲にする
+    // 肩。丸い塊ではなく、縁の立った板を段違いに重ねた甲にする。
+    // 外へ倒した台(pauldron)の中で、板を下へずらしながら重ねる
+    const pauldron = new THREE.Group();
+    place(pauldron, side * 0.42, 0.68, 0, 0, 0, -side * 0.5);
     for (let i = 0; i < 3; i++) {
-      const w = 0.26 - i * 0.045;
-      const pauldron = kit.lens(w, w * 0.66, w * 0.95, "metal", p.metal, 10);
-      place(pauldron, side * (0.46 + i * 0.02), 0.70 - i * 0.11, 0, 0, 0, -side * (0.18 + i * 0.2));
-      torso.add(pauldron);
+      const w = 0.30 - i * 0.055;
+      const pad = kit.plate(w * 1.55, w * 0.85, 0.036, "metal", p.metal, { notch: 0.26, shoulder: 0.78, wrap: 0.32 });
+      place(pad, side * i * 0.022, -i * 0.125, 0, 0, (-side * Math.PI) / 2, 0);
+      pauldron.add(pad);
     }
+    torso.add(pauldron);
+    // 肩の結晶の房。装甲の上に群れで生やして、肩の質量を稼ぐ
+    const crest = kit.shardCluster("crystal", p.accent, {
+      count: 5,
+      length: 0.26,
+      radius: 0.06,
+      spread: 0.7,
+      scatter: 0.07,
+      minScale: 0.3,
+    });
+    place(crest, side * 0.44, 0.78, -0.02, 0, 0, -side * 0.75);
+    torso.add(crest);
     for (let i = 0; i < 2; i++) {
       const spike = kit.spike(0.055, 0.34 - i * 0.08, 0.7, "plate", p.plate);
       place(spike, side * 0.54, 0.76, -0.12 + i * 0.22, -0.3 + i * 0.35, 0, -side * 0.85);
@@ -739,8 +856,8 @@ function buildNemesis(kit: CreatureKit, rig: CreatureRig): void {
 
     const arm = kit.chain(
       [
-        { len: 0.42, r0: 0.13, r1: 0.10, rot: [0.16, 0, side * 0.22] },
-        { len: 0.40, r0: 0.10, r1: 0.085, rot: [-0.5, 0, 0] },
+        { len: 0.42, r0: 0.13, r1: 0.10, rot: [0.16, 0, side * 0.22], radial: 6, facet: true },
+        { len: 0.40, r0: 0.10, r1: 0.085, rot: [-0.5, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -948,8 +1065,8 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.34, r0: 0.30, r1: 0.27, rot: [0.06, 0, side * 0.05], radial: 6 },
-        { len: 0.32, r0: 0.26, r1: 0.29, rot: [-0.08, 0, 0], radial: 6 },
+        { len: 0.34, r0: 0.30, r1: 0.27, rot: [0.06, 0, side * 0.05], radial: 6, facet: true },
+        { len: 0.32, r0: 0.26, r1: 0.29, rot: [-0.08, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -996,13 +1113,45 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   torso.add(place(kit.rock(0.26, 0.24, 0.16, "hide", p.dark, 0.3), 0, 0.62, -0.44));
   torso.add(place(kit.octa(0.14, 0.20, 0.12, "crystal", p.accent), 0, 0.62, -0.48));
   torso.add(place(kit.octa(0.06, 0.10, 0.05, "glow", p.glow), 0, 0.62, -0.50));
-  // 背に生えた結晶柱
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    const shard = kit.octa(0.09, 0.30 - Math.abs(t - 0.5) * 0.28, 0.09, "crystal", p.accent);
-    place(shard, (t - 0.5) * 0.78, 1.02 + Math.sin(t * Math.PI) * 0.16, 0.30, 0.55, 0, (t - 0.5) * 1.5);
-    torso.add(shard);
+  // 背に生えた結晶。1本ずつ均等に立てると櫛になるので、
+  // 大小と向きを散らした房を3か所に分けて生やす
+  for (let i = 0; i < 3; i++) {
+    const t = i / 2;
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 5,
+      length: 0.42 - Math.abs(t - 0.5) * 0.24,
+      radius: 0.1,
+      spread: 0.7,
+      scatter: 0.13,
+      minScale: 0.3,
+    });
+    place(cluster, (t - 0.5) * 0.76, 1.0, 0.3, 0.5, 0, (t - 0.5) * 1.4);
+    torso.add(cluster);
   }
+  // 胸の石板。岩の段の合わせ目に、縁の立った板を差し込む。
+  // 塊だけを積むと輪郭が丸い岩の連なりになるので、平らな面をひとつ通す
+  torso.add(
+    place(
+      kit.plateStack("plate", p.plate, {
+        count: 4,
+        y0: 0.34,
+        y1: 0.86,
+        z: -0.34,
+        zEnd: -0.44,
+        width: 0.5,
+        widthEnd: 0.66,
+        height: 0.2,
+        heightEnd: 0.24,
+        thickness: 0.06,
+        wrap: 0.4,
+        wrapEnd: 0.5,
+        notch: 0.3,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   // 肩に載る大岩
   for (const side of [-1, 1]) {
     torso.add(place(kit.rock(0.34, 0.32, 0.34, "hide", p.main, 0.3), side * 0.90, 1.02, 0));
@@ -1018,8 +1167,8 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const arm = kit.chain(
       [
-        { len: 0.58, r0: 0.27, r1: 0.23, rot: [0.16, 0, side * 0.12], radial: 6 },
-        { len: 0.56, r0: 0.23, r1: 0.26, rot: [-0.14, 0, 0], radial: 6 },
+        { len: 0.58, r0: 0.27, r1: 0.23, rot: [0.16, 0, side * 0.12], radial: 6, facet: true },
+        { len: 0.56, r0: 0.23, r1: 0.26, rot: [-0.14, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -1493,10 +1642,52 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 0.98;
 
   // --- 腰。後脚が太いぶん、狼より腰の塊を大きく取る ---
-  rig.pelvis.add(place(kit.ball(0.3, 0.28, 0.36, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.22, 0.2, 0.2, "hide", p.main), 0, -0.03, 0.25));
+  // 球を並べず、輪切りを積んだ1本の角柱で作る。稜線が通るので、
+  // 尻から腰へ絞る流れがそのまま輪郭に出る(球だと必ず丸の連なりになる)
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.16, rz: 0.15 },
+          { y: 0.14, r: 0.26, rz: 0.22, ridge: 0.25 },
+          { y: 0.34, r: 0.31, rz: 0.28, ridge: 0.3, keel: 0.15 },
+          { y: 0.56, r: 0.27, rz: 0.27, ridge: 0.25, keel: 0.2 },
+          { y: 0.7, r: 0.22, rz: 0.24 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0.34,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
+  // 腿の付け根。腰の角柱から外へ張り出す面。丸ではなく面で受ける
   for (const side of [-1, 1]) {
-    rig.pelvis.add(place(kit.ball(0.16, 0.22, 0.23, "hide", p.main), side * 0.24, -0.01, 0.1));
+    rig.pelvis.add(
+      place(
+        kit.hull(
+          [
+            { y: 0, r: 0.08, rz: 0.12 },
+            { y: 0.09, r: 0.17, rz: 0.23 },
+            { y: 0.2, r: 0.13, rz: 0.18 },
+          ],
+          "hide",
+          p.main,
+          { sides: 6 },
+        ),
+        side * 0.19,
+        -0.01,
+        0.1,
+        0,
+        0,
+        side * 1.35,
+      ),
+    );
   }
 
   // --- 後脚(体重を支える形。腿を太く、足先を大きく) ---
@@ -1521,26 +1712,122 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(前が重い三角形。胸を深く、腹を絞る) ---
   const torso = rig.torso;
   place(torso, 0, 0.08, -0.6, 0.04, 0, 0);
-  torso.add(place(kit.ball(0.35, 0.42, 0.42, "hide", p.main), 0, 0.02, -0.16));
-  torso.add(place(kit.ball(0.26, 0.27, 0.36, "hide", p.main), 0, 0.0, 0.22));
-  torso.add(place(kit.ball(0.24, 0.2, 0.28, "hide", p.dark), 0, -0.2, -0.14));
-  torso.add(place(kit.ball(0.18, 0.13, 0.34, "hide", p.dark), 0, -0.18, 0.16));
+  // 胴は1本の面取り角柱。輪切りの半径を変えるだけで
+  // 「腰で締まり、肋で深く、肩で重い」が連続した輪郭として出る。
+  // 球を5つ並べていた時は、どの断面も円だったので必ず数珠になっていた。
+  //   keel(前=回した後は下) 腹の合わせ目 / ridge(後=上) 背の峰
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.18, rz: 0.19 },
+          { y: 0.16, r: 0.21, rz: 0.22, ridge: 0.2, keel: 0.12 },
+          // くびれ。ここが細いほど、次の肋の深さが効く
+          { y: 0.34, r: 0.165, rz: 0.2, ridge: 0.3, keel: 0.22 },
+          { y: 0.54, r: 0.26, rz: 0.34, ridge: 0.34, keel: 0.36 },
+          // 胸のいちばん深いところ
+          { y: 0.72, r: 0.33, rz: 0.46, ridge: 0.28, keel: 0.46 },
+          { y: 0.88, r: 0.35, rz: 0.42, ridge: 0.18, keel: 0.3 },
+          { y: 1.02, r: 0.26, rz: 0.3, keel: 0.24 },
+          { y: 1.12, r: 0.15, rz: 0.18 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0.46,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
+  // 腹の積層板。1枚ずつ縁が立ち、下の板に次が被さる。
+  // 水平な胴の腹に貼るので、板の厚みが上(体の中)へ向くよう
+  // (X:+90度, Y:180度)で寝かせる。y0が胸側、y1が腰側
+  torso.add(
+    place(
+      kit.plateStack("plate", p.plate, {
+        count: 9,
+        y0: 0,
+        y1: 0.72,
+        // 板の面は腹の線をなぞる。胸側が深く下がっているので、その分だけ下げる
+        z: -0.38,
+        zEnd: 0.02,
+        width: 0.27,
+        widthEnd: 0.16,
+        height: 0.13,
+        heightEnd: 0.09,
+        thickness: 0.026,
+        // 腹の合わせ目は稜線なので、板もきつく折る(緩いと板が浮いて見える)
+        wrap: 0.2,
+        wrapEnd: 0.15,
+        notch: 0.5,
+      }),
+      0,
+      -0.2,
+      -0.24,
+      Math.PI / 2,
+      Math.PI,
+      0,
+    ),
+  );
+
+  // --- 肩。上半身に質量を寄せる。腰との差が「細い腰と重い肩」になる ---
   for (const side of [-1, 1]) {
-    torso.add(place(kit.ball(0.13, 0.19, 0.19, "hide", p.main), side * 0.27, 0.12, -0.22));
-  }
-  // 腹の横板。爬虫類の腹甲。横一列に並べると硬さが出る
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    torso.add(place(kit.lens(0.15 - t * 0.03, 0.05, 0.05, "plate", p.plate, 8), 0, -0.24 + t * 0.03, -0.24 + t * 0.5));
+    torso.add(
+      place(
+        kit.hull(
+          [
+            { y: 0, r: 0.09, rz: 0.14 },
+            { y: 0.1, r: 0.19, rz: 0.26, keel: 0.2 },
+            { y: 0.26, r: 0.15, rz: 0.2 },
+          ],
+          "hide",
+          p.main,
+          { sides: 6 },
+        ),
+        side * 0.22,
+        0.12,
+        -0.24,
+        0.2,
+        0,
+        side * 1.3,
+      ),
+    );
+    // 肩の結晶の房。大小と向きを散らして群れにする。均等に生やすと櫛になる。
+    // 細く長いと針山になるので、太く短く、根元を寄せる
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 6,
+      length: 0.26,
+      radius: 0.085,
+      spread: 0.8,
+      scatter: 0.09,
+      minScale: 0.35,
+    });
+    place(cluster, side * 0.3, 0.2, -0.2, -0.35, 0, side * 0.85);
+    torso.add(cluster);
+    // 肘の房。硬いものは末端にも結晶を持つ
+    const elbow = kit.shardCluster("crystal", p.accent, {
+      count: 3,
+      length: 0.14,
+      radius: 0.05,
+      spread: 0.7,
+      scatter: 0.04,
+      minScale: 0.45,
+    });
+    place(elbow, side * 0.3, -0.12, -0.24, -0.2, 0, side * 1.5);
+    torso.add(elbow);
   }
 
   // --- 前脚(後脚より短く、まっすぐ下ろす) ---
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.27, r0: 0.15, r1: 0.097, rot: [0.16, 0, side * 0.05], radial: 8 },
-        { len: 0.24, r0: 0.097, r1: 0.07, rot: [-0.26, 0, 0], radial: 8 },
-        { len: 0.12, r0: 0.07, r1: 0.058, rot: [0.2, 0, 0], radial: 8 },
+        { len: 0.27, r0: 0.15, r1: 0.097, rot: [0.16, 0, side * 0.05], radial: 7, facet: true },
+        { len: 0.24, r0: 0.097, r1: 0.07, rot: [-0.26, 0, 0], radial: 6, facet: true },
+        { len: 0.12, r0: 0.07, r1: 0.058, rot: [0.2, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -1557,48 +1844,95 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   // 狼は首を前へ低く送り出すが、ドラゴンは一度下げてから跳ね上げる。
   // 頭が肩より高く来ることで、見上げる相手という関係が生まれる
   place(rig.neck, 0, 0.28, -0.34, -0.5, 0, 0);
+  // 首も角柱。断面の中心をずらして S 字を作るので、円錐を継ぐ必要がない。
+  // ridge が背側(+Z)の稜線を立て、首の峰が1本通る
   rig.neck.add(
-    kit.taperedTube(
+    kit.hull(
       [
-        { x: 0, y: 0, z: 0 },
-        { x: 0, y: 0.2, z: 0.06 },
-        { x: 0, y: 0.42, z: 0.02 },
-        { x: 0, y: 0.58, z: -0.12 },
+        { y: 0, r: 0.22, rz: 0.23 },
+        { y: 0.16, r: 0.185, rz: 0.2, z: 0.06, ridge: 0.2 },
+        { y: 0.34, r: 0.15, rz: 0.16, z: 0.08, ridge: 0.26 },
+        { y: 0.52, r: 0.132, rz: 0.145, z: 0.04, ridge: 0.24 },
+        { y: 0.68, r: 0.125, rz: 0.14, z: -0.06, ridge: 0.18 },
+        { y: 0.8, r: 0.12, rz: 0.135, z: -0.16, ridge: 0.12 },
       ],
-      0.23,
-      0.135,
       "hide",
       p.main,
-      8,
-      10,
+      { sides: 8, capTop: false },
     ),
   );
-  // 喉の輪。首の長さを目盛りとして見せる
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    rig.neck.add(
-      place(kit.lens(0.1 - t * 0.02, 0.045, 0.05, "plate", p.plate, 8), 0, 0.1 + t * 0.42, 0.09 - t * 0.14, -0.3, 0, 0),
-    );
-  }
+  // 喉の積層板。首の前面を横帯で刻む。1枚ずつ縁が立つので、
+  // 遠目でも首の太さと向きが読める
+  rig.neck.add(
+    place(
+      kit.plateStack("plate", p.plate, {
+        count: 8,
+        y0: 0,
+        y1: 0.6,
+        z: -0.02,
+        zEnd: 0.04,
+        width: 0.2,
+        widthEnd: 0.12,
+        height: 0.11,
+        heightEnd: 0.08,
+        thickness: 0.022,
+        wrap: 0.2,
+        wrapEnd: 0.15,
+        notch: 0.35,
+      }),
+      0,
+      0.1,
+      -0.16,
+      -0.28,
+      0,
+      0,
+    ),
+  );
 
-  // --- 背びれ。腰から首の付け根まで、山なりに大きさを変えて並べる ---
-  for (let i = 0; i < 9; i++) {
-    const t = i / 8;
-    const fin = kit.spike(0.045, 0.16 + Math.sin(t * Math.PI) * 0.17, 0.32, "plate", p.plate);
-    place(fin, 0, 0.3 - t * 0.04, -0.3 + t * 0.72, -0.12, Math.PI / 2, 0);
+  // --- 背の峰。棒の棘を並べると櫛の歯になるので、縁の立った板を並べる ---
+  // [背の稜線のz, その高さ, 板の大きさ] を胴の輪郭に合わせて拾ってある。
+  // 板は (Y:90度, Z:180度) で立て、幅が背骨に沿い、尖りが上を向く
+  const crestLine: [number, number, number][] = [
+    [-0.42, 0.5, 0.6],
+    [-0.28, 0.58, 1.0],
+    [-0.14, 0.53, 0.94],
+    [0.0, 0.42, 0.78],
+    [0.13, 0.31, 0.6],
+    [0.25, 0.27, 0.46],
+    [0.37, 0.25, 0.32],
+  ];
+  for (const [z, y, scale] of crestLine) {
+    const height = 0.09 + scale * 0.2;
+    const fin = kit.plate(0.1 + scale * 0.09, height, 0.028, "plate", p.plate, { notch: 0.75, shoulder: 0.62 });
+    place(fin, 0, y + height * 0.32, z, 0, Math.PI / 2, Math.PI);
     torso.add(fin);
   }
-  for (let i = 0; i < 4; i++) {
-    const t = i / 3;
-    const fin = kit.spike(0.032, 0.13 - t * 0.03, 0.32, "plate", p.plate);
-    place(fin, 0, 0.14 + t * 0.4, 0.12 - t * 0.12, -0.34, Math.PI / 2, 0);
+  // 背の峰の根元に結晶の房。左右に散らして、峰が一列の櫛に見えないようにする
+  for (const side of [-1, 1]) {
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 4,
+      length: 0.2,
+      radius: 0.038,
+      spread: 0.85,
+      scatter: 0.08,
+    });
+    place(cluster, side * 0.1, 0.42, -0.06, 0.35, 0, side * 0.7);
+    torso.add(cluster);
+  }
+  // 首の峰。胴から続く同じ形を、細くしながら頭まで送る
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    const height = 0.15 - t * 0.06;
+    const fin = kit.plate(0.09 - t * 0.02, height, 0.022, "plate", p.plate, { notch: 0.7, shoulder: 0.62 });
+    // 首の背の稜線(zが 0.29 から 0.02 へ回り込む)に沿わせ、尖りを後ろへ倒す
+    place(fin, 0, 0.16 + t * 0.58, 0.29 - t * 0.27 + height * 0.2, 0.45, Math.PI / 2, Math.PI);
     rig.neck.add(fin);
   }
 
   // --- 頭(長い口先、後ろへ流れる角) ---
   // 頭が小さいと、長い首と相まってリャマや馬の輪郭になる。
   // 首の太さに負けない大きさまで頭蓋を上げ、口先も長く取る
-  place(rig.head, 0, 0.6, -0.12, 0.62, 0, 0);
+  place(rig.head, 0, 0.82, -0.16, 0.62, 0, 0);
   addBeastHead(kit, rig, { skull: [0.28, 0.26, 0.35], snout: 0.50, jaw: true, horns: "swept", crest: 4, eye: 0.072, slit: 0.34 });
   // 頬の張り出し。口先の細さと対比させて、噛む力があるように見せる
   for (const side of [-1, 1]) {
@@ -1629,7 +1963,7 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   }
 
   // 胴より長い尾。先に刃を付けて、ただの紐に見えないようにする
-  addTail(kit, rig, [0, 0.06, 0.26], 6, 0.28, 0.11, -1.0, -0.08, true);
+  addTail(kit, rig, [0, 0.06, 0.26], 6, 0.28, 0.11, -1.0, -0.08, true, { hard: true, rings: true });
 
   rig.wingAnchor.set(0.26, 0.42, -0.1);
 
@@ -1763,8 +2097,27 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 0.92;
 
   // --- 腰(ライオン。後ろは低く、腿の塊で幅を出す) ---
-  rig.pelvis.add(place(kit.ball(0.23, 0.25, 0.32, "hide", p.main), 0, 0.01, 0.04));
-  rig.pelvis.add(place(kit.ball(0.18, 0.17, 0.17, "hide", p.main), 0, -0.05, 0.23));
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.11, rz: 0.11 },
+          { y: 0.14, r: 0.19, rz: 0.19 },
+          { y: 0.34, r: 0.23, rz: 0.25, ridge: 0.14 },
+          { y: 0.52, r: 0.2, rz: 0.23 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.32,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 腿の張り。丸い塊で覆うと脚が埋もれるので、外側へ寄せて縦長に取る
   for (const side of [-1, 1]) {
     rig.pelvis.add(place(kit.ball(0.13, 0.20, 0.21, "hide", p.main), side * 0.21, -0.04, 0.08));
@@ -1799,13 +2152,54 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   const torso = rig.torso;
   // rotation.x を正に取ると前(-Z)が持ち上がる。鷲の胸を高く構える
   place(torso, 0, 0.02, -0.52, 0.20, 0, 0);
-  // 後半身(獣)
-  torso.add(place(kit.ball(0.21, 0.22, 0.28, "hide", p.main), 0, -0.02, 0.24));
-  torso.add(place(kit.ball(0.24, 0.25, 0.26, "hide", p.main), 0, 0.0, 0.02));
-  torso.add(place(kit.ball(0.18, 0.14, 0.30, "hide", p.dark), 0, -0.16, 0.16));
+  // 胴は輪切りを積んだ1本。獣と鷲で材質が入れ替わるので2本に割るが、
+  // 継ぎ目は背の飾り羽で隠れる。球を並べていた時のような
+  // 「丸の連なり」にならず、腰から胸へ持ち上がる流れが輪郭に出る。
+  // 面の数は多め(10)。鳥と獣なので、竜のように角張らせてはいけない
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.14, rz: 0.14 },
+          { y: 0.13, r: 0.21, rz: 0.23, ridge: 0.12 },
+          { y: 0.28, r: 0.23, rz: 0.24, keel: 0.16 },
+          { y: 0.44, r: 0.25, rz: 0.26, keel: 0.24, ridge: 0.1 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10, capTop: false },
+      ),
+      0,
+      0,
+      0.35,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 前半身(鷲)。胸を深く前へ張り出させ、竜骨のように下へ落とす
-  torso.add(place(kit.ball(0.29, 0.32, 0.30, "fur", p.fur), 0, 0.02, -0.22));
-  torso.add(place(kit.ball(0.24, 0.28, 0.22, "fur", p.fur), 0, -0.10, -0.38));
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0.4, r: 0.25, rz: 0.26, keel: 0.22, ridge: 0.1 },
+          { y: 0.54, r: 0.28, rz: 0.3, keel: 0.36 },
+          { y: 0.66, r: 0.29, rz: 0.33, keel: 0.46 },
+          { y: 0.78, r: 0.24, rz: 0.29, keel: 0.4 },
+          { y: 0.88, r: 0.14, rz: 0.19, keel: 0.2 },
+        ],
+        "fur",
+        p.fur,
+        { sides: 10, capBottom: false },
+      ),
+      0,
+      0,
+      0.35,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   for (const side of [-1, 1]) {
     torso.add(place(kit.ball(0.14, 0.19, 0.20, "fur", p.fur), side * 0.25, 0.10, -0.20));
   }
@@ -2070,8 +2464,42 @@ function buildAncientCrystalCurse(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴。核を左右へ割り、あいだに光の筋を通す ---
   const torso = rig.torso;
   place(torso, 0, 0.22, 0);
+  // 核。正八面体は左右上下が同じで作り物に見えるので、
+  // 輪切りを積んだ多面体にして、根元・胴・肩の太さを別々に持たせる
   for (const side of [-1, 1]) {
-    torso.add(place(kit.octa(0.24, 0.54, 0.26, "crystal", p.main), side * 0.19, 0.1, 0, 0, 0, side * 0.2));
+    torso.add(
+      place(
+        kit.hull(
+          [
+            { y: -0.54, r: 0.03, rz: 0.03 },
+            { y: -0.24, r: 0.19, rz: 0.2 },
+            { y: 0.02, r: 0.25, rz: 0.27, twist: side * 0.2 },
+            { y: 0.3, r: 0.2, rz: 0.22, twist: side * 0.3 },
+            { y: 0.54, r: 0.03, rz: 0.03 },
+          ],
+          "crystal",
+          p.main,
+          { sides: 6 },
+        ),
+        side * 0.19,
+        0.1,
+        0,
+        0,
+        0,
+        side * 0.2,
+      ),
+    );
+    // 核の根元から生える小結晶の房
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 4,
+      length: 0.26,
+      radius: 0.05,
+      spread: 1.0,
+      scatter: 0.07,
+      minScale: 0.3,
+    });
+    place(cluster, side * 0.24, -0.1, 0.02, -0.4, 0, side * 1.1);
+    torso.add(cluster);
   }
   // 割れ目の光。面積を小さく保ち、加算エフェクトと重なっても白飛びさせない
   torso.add(place(kit.octa(0.06, 0.38, 0.07, "glow", p.glow), 0, 0.1, 0));
@@ -2145,13 +2573,18 @@ function buildAncientCrystalCurse(kit: CreatureKit, rig: CreatureRig): void {
   for (let i = 0; i < 3; i++) {
     rig.head.add(place(kit.ball(0.035, 0.022, 0.02, "glow", p.glow, 8), (i - 1) * 0.09, 0.01, -0.19));
   }
-  // 逆さの棘の冠。支援側は上向きに整列しているので、向きだけで敵味方の質が変わる
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    const spike = kit.octa(0.035, 0.16, 0.035, "crystal", p.accent);
-    place(spike, (t - 0.5) * 0.3, 0.2, 0.04, Math.PI + (t - 0.5) * 0.7, 0, (t - 0.5) * 1.1);
-    rig.head.add(spike);
-  }
+  // 逆さの棘の冠。支援側は上向きに整列しているので、向きだけで敵味方の質が変わる。
+  // こちらは大小を散らした房にして、整列した支援側とさらに離す
+  const crown = kit.shardCluster("crystal", p.accent, {
+    count: 6,
+    length: 0.24,
+    radius: 0.042,
+    spread: 0.55,
+    scatter: 0.1,
+    minScale: 0.35,
+  });
+  place(crown, 0, 0.2, 0.04, Math.PI, 0, 0);
+  rig.head.add(crown);
 
   // --- 周囲を漂う破片。支援側より数を絞り、鋭く長い形にする ---
   for (let i = 0; i < 4; i++) {
@@ -2218,20 +2651,69 @@ function buildAncientDemon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴。肩を大きく張り出させ、胸に結晶の核を埋める ---
   const torso = rig.torso;
   place(torso, 0, 0.12, 0, -0.05, 0, 0);
-  torso.add(place(kit.ball(0.42, 0.4, 0.32, "hide", p.main), 0, 0.24, 0));
-  torso.add(place(kit.ball(0.3, 0.26, 0.26, "hide", p.dark), 0, -0.06, 0.02));
-  addPlating(kit, torso, 4, 0.44, -0.02, 0.3, -0.24, "metal");
+  // 胴は輪切りを積んだ1本。腰でくびれ、肩で張るまでが連続した輪郭になる
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: -0.24, r: 0.22, rz: 0.2 },
+          { y: -0.06, r: 0.3, rz: 0.26, keel: 0.16 },
+          { y: 0.08, r: 0.28, rz: 0.24, keel: 0.24, ridge: 0.14 },
+          { y: 0.24, r: 0.38, rz: 0.3, keel: 0.3, ridge: 0.22 },
+          { y: 0.38, r: 0.42, rz: 0.3, keel: 0.14, ridge: 0.24 },
+          { y: 0.5, r: 0.3, rz: 0.22 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
+  // 胸腹の積層装甲。古い石の甲を下から上へ重ねる
+  torso.add(
+    place(
+      kit.plateStack("metal", p.metal, {
+        count: 6,
+        y0: -0.1,
+        y1: 0.4,
+        z: -0.24,
+        zEnd: -0.34,
+        width: 0.32,
+        widthEnd: 0.48,
+        height: 0.15,
+        heightEnd: 0.19,
+        thickness: 0.038,
+        wrap: 0.28,
+        wrapEnd: 0.36,
+        notch: 0.4,
+        tilt: 0.14,
+        tiltEnd: -0.1,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   // 胸の核。お供のクリスタルと同じ八面体で、素材の出どころを揃える
   torso.add(place(kit.octa(0.15, 0.22, 0.12, "crystal", p.accent), 0, 0.2, -0.28));
   torso.add(place(kit.octa(0.07, 0.13, 0.06, "glow", p.glow), 0, 0.2, -0.31));
   // 肩の岩塊
   for (const side of [-1, 1]) {
     torso.add(place(kit.rock(0.2, 0.17, 0.19, "plate", p.plate, 0.24), side * 0.44, 0.36, 0));
-    for (let i = 0; i < 3; i++) {
-      torso.add(
-        place(kit.octa(0.04, 0.16, 0.04, "crystal", p.accent), side * (0.4 + i * 0.05), 0.5, (i - 1) * 0.1, 0, 0, side * 0.4),
-      );
-    }
+    // 肩の結晶。3本を等間隔に立てると櫛になるので、房にして散らす
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 5,
+      length: 0.3,
+      radius: 0.06,
+      spread: 0.75,
+      scatter: 0.08,
+      minScale: 0.3,
+    });
+    place(cluster, side * 0.44, 0.44, 0, 0, 0, side * 0.5);
+    torso.add(cluster);
   }
 
   // --- 腕4本。上の対を大きく、下の対を小さくして、増えた腕が飾りに見えないようにする ---
@@ -2243,8 +2725,8 @@ function buildAncientDemon(kit: CreatureKit, rig: CreatureRig): void {
     armSpecs.forEach((spec, index) => {
       const arm = kit.chain(
         [
-          { len: spec.len, r0: spec.radius, r1: spec.radius * 0.72, rot: [spec.swing, 0, side * spec.drop], radial: 7 },
-          { len: spec.len * 0.9, r0: spec.radius * 0.72, r1: spec.radius * 0.56, rot: [0.75, 0, -side * 0.3], radial: 7 },
+          { len: spec.len, r0: spec.radius, r1: spec.radius * 0.72, rot: [spec.swing, 0, side * spec.drop], radial: 6, facet: true },
+          { len: spec.len * 0.9, r0: spec.radius * 0.72, r1: spec.radius * 0.56, rot: [0.75, 0, -side * 0.3], radial: 6, facet: true },
         ],
         "hide",
         p.main,
@@ -2386,10 +2868,53 @@ function buildSeraph(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(縦に長い。肩を張らず、胸から腰まで一本の線で落とす) ---
   const torso = rig.torso;
   place(torso, 0, 0.04, 0, -0.05, 0, 0);
-  torso.add(place(kit.ball(0.145, 0.20, 0.12, "hide", p.main), 0, 0.16, 0));
-  torso.add(place(kit.ball(0.22, 0.22, 0.16, "hide", p.main), 0, 0.44, 0));
-  // 胸当て。薄い板を3枚だけ重ね、装甲ではなく衣の留め具に見せる
-  addPlating(kit, torso, 3, 0.22, 0.50, 0.18, -0.10);
+  // 胴は輪切りを積んだ1本。細身なので面の数は多め(10)にして角張らせない。
+  // 球2つで作っていた時は、胸と腹の境目に必ずくびれの段が出ていた
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0.02, r: 0.13, rz: 0.11 },
+          { y: 0.16, r: 0.15, rz: 0.12, keel: 0.1 },
+          { y: 0.3, r: 0.17, rz: 0.13, keel: 0.16 },
+          { y: 0.44, r: 0.22, rz: 0.16, keel: 0.18, ridge: 0.12 },
+          { y: 0.56, r: 0.2, rz: 0.15 },
+          { y: 0.64, r: 0.12, rz: 0.1 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0,
+    ),
+  );
+  // 胸当て。縁の立った薄い板を重ね、装甲ではなく衣の留め具に見せる
+  torso.add(
+    place(
+      kit.plateStack("metal", p.metal, {
+        count: 4,
+        y0: 0.22,
+        y1: 0.5,
+        z: -0.13,
+        zEnd: -0.18,
+        width: 0.19,
+        widthEnd: 0.26,
+        height: 0.1,
+        heightEnd: 0.11,
+        thickness: 0.02,
+        wrap: 0.16,
+        wrapEnd: 0.2,
+        notch: 0.35,
+        tilt: 0.1,
+        tiltEnd: -0.08,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   torso.add(place(kit.lens(0.21, 0.13, 0.09, "metal", p.metal), 0, 0.56, -0.06, -0.12, 0, 0));
   torso.add(place(kit.octa(0.05, 0.08, 0.035, "crystal", p.accent), 0, 0.46, -0.16));
   torso.add(place(kit.octa(0.024, 0.04, 0.018, "glow", p.glow), 0, 0.46, -0.17));

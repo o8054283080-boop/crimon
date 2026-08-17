@@ -212,8 +212,13 @@ export class BattleStage {
     const { width, height } = this.measure();
     this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 320);
 
-    // 霧の色は空のシェーダの地平線色と合わせてある。遠景がそのまま霞へ溶ける
-    this.scene.fog = new THREE.FogExp2(0x2a3055, 0.0165);
+    // 霧の色は空のシェーダの地平線色(arena.ts の uHaze)と合わせてある。
+    // 遠景がそのまま霞へ溶ける。**両方を同時に変えること。**
+    //
+    // 濃くしてある。体表シェーダは fog を組み込んでいないので、
+    // 濃くしても手前のモンスターは白まず、闘技場だけが奥へ退く。
+    // 空気遠近が付いて、観客席と列柱が「遠い」と読めるようになる
+    this.scene.fog = new THREE.FogExp2(0x2f3660, 0.0235);
     this.scene.add(this.arena.group);
     this.scene.add(this.vfx.root);
 
@@ -228,18 +233,37 @@ export class BattleStage {
 
     // ブルームは RenderPass 直後(=トーンマッピング前のリニアHDR)にかかる。
     // しきい値を1超えに置くことで、本当に明るい部分だけが滲むようにしている。
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.18, 0.5, 1.15);
+    //
+    // **上げるなら threshold ではなく strength。** しきい値を下げると、
+    // それまで滲まなかった中間調まで一斉に滲みだし、加算合成のVFXと
+    // 重なった瞬間に飽和する。強度なら「もともと滲んでいたもの」が
+    // 少し広がるだけなので、増え方が上限に対して線形で読める
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.24, 0.5, 1.15);
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
 
-    // 仕上げはトーンマッピング後(sRGB)に適用する
+    // 仕上げはトーンマッピング後(sRGB)に適用する。
+    //
+    // **色調の設計はここで行う。** ライト側で寒暖を割ろうとすると、
+    // モンスターの体表シェーダが自前の固定光源で陰影を焼いている都合で
+    // キャラと背景の光がずれる(合成写真のように浮く)。合成後の1枚に
+    // 掛けるこちらなら、キャラも闘技場も同じ色調に乗る。
+    //
+    // 暗部は青緑寄りの冷たい色、明部は琥珀。以前は暗部が青紫で、
+    // 空の紫・桃色のリムと同じ方向を向いていたため、寒暖が割れずに
+    // 画面全体が「青紫一色」になっていた。暗部を紫から離すだけで、
+    // 明るさを一切足さずに寒暖の対が立つ
     this.cinematicPass = new CinematicPass({
-      vignette: 0.4,
+      vignette: 0.44,
       aberration: 1.0,
       grain: 0.045,
-      saturation: 1.06,
-      contrast: 0.12,
-      tintStrength: 0.15,
+      // 中間調の彩度はモンスターの属性色がいちばん効くところ。
+      // ライト側の色かぶりを落としたぶん、ここで少し戻す
+      saturation: 1.12,
+      contrast: 0.15,
+      tintStrength: 0.19,
+      shadowTint: 0x223d70,
+      highlightTint: 0xffdfae,
     });
     this.composer.addPass(this.cinematicPass);
 
@@ -310,21 +334,32 @@ export class BattleStage {
 
     // リムライト: 奥のゲート方向から。体表シェーダの赤紫のバックライトと
     // 同じ色にして、キャラの輪郭と闘技場の輪郭が同じ光で抜けるようにする
-    // 平行光は床にも一様にかかるので、**高い位置に置くと床が色かぶりして
-    // 全体が単調になる**。輪郭だけを舐めるよう、うんと低く寝かせてある
-    const rim = new THREE.DirectionalLight(0xff86c8, 1.7);
-    rim.position.set(-5.0, 3.4, -18);
+    //
+    // 平行光は床にも一様にかかる。床が受ける量は**光の向きの縦成分だけ**で
+    // 決まる(y / |position|)ので、強さを保ったまま寝かせれば
+    // 「輪郭は抜けるが床は染まらない」を両立できる。
+    // 以前は y=3.4(縦成分 0.18)で、床全体が桃色にかぶり、
+    // 寄った時にモンスターの属性色まで食われていた。実測で、この2灯を切ると
+    // 6属性の色が目に見えてはっきりした。切るのではなく、寝かせて弱める
+    const rim = new THREE.DirectionalLight(0xff86c8, 1.45);
+    rim.position.set(-5.6, 1.5, -18);
     this.scene.add(rim);
 
     // 逆リム: 反対の肩側にもう一本。片側だけだと輪郭の抜けが半分で終わる。
     // 色は篝火寄りの暖色にして、赤紫のリムと寒暖で対にする
-    const rimWarm = new THREE.DirectionalLight(0xffab6a, 1.15);
-    rimWarm.position.set(16, 3.0, -12);
+    const rimWarm = new THREE.DirectionalLight(0xffab6a, 1.0);
+    rimWarm.position.set(16, 1.4, -12);
     this.scene.add(rimWarm);
 
     // 闘技床へ落とす天井光。中央だけを持ち上げて、戦う場所に視線を集める。
-    // 減衰を持つライトなので、周辺の観客席までは届かない
-    const centerPool = new THREE.PointLight(0xdfe7ff, 26, 17, 2.1);
+    // 減衰を持つライトなので、周辺の観客席までは届かない。
+    //
+    // **ここは「床を明るくする灯り」ではなく「中央と周辺の差」を作る灯り。**
+    // 強いと足元が白く飛び、そこに立つモンスターの下半身から色が抜ける。
+    // 届く範囲を狭めて減衰を急にし、明るさそのものは落とす。
+    // 中央が明るく見えるかどうかは絶対量ではなく周辺との比で決まるので、
+    // 周辺(霧とビネット)を沈めるほうで差を作る
+    const centerPool = new THREE.PointLight(0xdfe7ff, 15, 14, 2.4);
     centerPool.position.set(0.5, 9.5, 0.5);
     this.scene.add(centerPool);
   }

@@ -610,6 +610,12 @@ export function addTail(
   baseAngle: number,
   curve: number,
   blade: boolean,
+  /**
+   * 硬い尾の指定。
+   *   hard  節を角柱にし、上面のひれを縁の立った板にする(竜・魔王・甲殻)
+   *   rings 節の継ぎ目に環を巻く。丸い節の連なりを断ち切る
+   */
+  o: { hard?: boolean; rings?: boolean } = {},
 ): void {
   const p = kit.palette;
   const specs = [];
@@ -620,6 +626,8 @@ export function addTail(
       r0: radius * (1 - t * 0.85),
       r1: radius * (1 - (t + 1 / count) * 0.85),
       rot: [i === 0 ? baseAngle : curve, 0, 0] as [number, number, number],
+      radial: o.hard ? 6 : undefined,
+      facet: o.hard,
     });
   }
   const chain = kit.chain(specs, "hide", p.main);
@@ -627,11 +635,28 @@ export function addTail(
   markAnimated(...chain.joints);
   for (let i = 0; i < chain.joints.length; i++) {
     rig.tail.push({ group: chain.joints[i], rest: chain.rests[i] });
-    // 背びれ状のトゲを尾の上面に立てる
+    const shrink = 1 - (i / count) * 0.85;
+    // 背びれ状のひれを尾の上面に立てる
     if (i > 0 && i < chain.joints.length - 1) {
-      const fin = kit.spike(radius * 0.28, length * 0.9 * (1 - i / count), 0.3, "plate", p.plate);
-      place(fin, 0, -length * 0.3, 0, Math.PI, Math.PI / 2, 0);
+      const height = length * 0.9 * (1 - i / count);
+      const fin = o.hard
+        ? place(
+            kit.plate(radius * 1.1 * shrink, height * 0.8, radius * 0.22, "plate", p.plate, { notch: 0.7, shoulder: 0.6 }),
+            0,
+            -length * 0.3,
+            0,
+            Math.PI,
+            Math.PI / 2,
+            Math.PI,
+          )
+        : place(kit.spike(radius * 0.28, height, 0.3, "plate", p.plate), 0, -length * 0.3, 0, Math.PI, Math.PI / 2, 0);
       chain.joints[i].add(fin);
+    }
+    // 節の環。丸い節が数珠に見えるのを断ち切る
+    if (o.rings && i < chain.joints.length - 1) {
+      const ring = kit.band(radius * shrink * 1.06, radius * 0.16 * shrink, Math.PI * 2, "plate", p.plate, 8);
+      place(ring, 0, -length * (1 - (i / count) * 0.35) * 0.92, 0, Math.PI / 2, 0, 0);
+      chain.joints[i].add(ring);
     }
   }
   if (blade) {
@@ -705,7 +730,17 @@ export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: num
   }
 }
 
-/** 指の骨と膜で作るコウモリ翼(ボス用) */
+/**
+ * 指の骨と膜で作るコウモリ翼。
+ *
+ * 膜だけを張ると布に、骨だけを並べると傘の骨になる。**膜が骨に吊られている**
+ * ことが見えて初めて翼になるので、
+ *   1. 指の間で縁が内側へ垂れる(たるみ)
+ *   2. 骨が膜より手前へ浮き、節を持つ
+ *   3. 膜の上に細い筋が走る
+ * の3つを kit.ribbedMembrane が一括で作る。
+ * ここでは腕の骨・肩の肉・鉤爪・前縁の甲だけを足す。
+ */
 export function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: number): void {
   const p = kit.palette;
   const s = side;
@@ -714,45 +749,77 @@ export function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number,
   const shoulder = v(0, 0, 0);
   const elbow = v(0.5, 0.34, 0.1);
   const wrist = v(1.02, 0.5, 0.02);
-  const fingers = [v(1.72, 0.42, 0.12), v(1.5, -0.16, 0.2), v(1.05, -0.6, 0.22), v(0.5, -0.72, 0.18)];
+  const fingers = [v(1.78, 0.46, 0.12), v(1.58, -0.16, 0.2), v(1.1, -0.66, 0.22), v(0.5, -0.78, 0.18)];
 
-  // 腕の骨。付け根に筋肉の膨らみ、関節に球を入れて棒の直結を隠す
-  wing.add(kit.link(shoulder, elbow, 0.075 * span, 0.06 * span, "plate", p.plate, 6));
-  wing.add(kit.link(elbow, wrist, 0.06 * span, 0.045 * span, "plate", p.plate, 6));
-  wing.add(place(kit.ball(0.1 * span, 0.09 * span, 0.09 * span, "hide", p.main, 8), shoulder.x, shoulder.y, shoulder.z));
+  // 腕の骨。稜線のある角柱で通し、関節に節を入れて棒の直結を隠す
+  wing.add(kit.link(shoulder, elbow, 0.075 * span, 0.06 * span, "plate", p.plate, 5));
+  wing.add(kit.link(elbow, wrist, 0.06 * span, 0.045 * span, "plate", p.plate, 5));
+  wing.add(
+    place(
+      kit.hull(
+        [
+          { y: -0.1 * span, r: 0.06 * span },
+          { y: 0, r: 0.115 * span, rz: 0.09 * span },
+          { y: 0.12 * span, r: 0.07 * span },
+        ],
+        "hide",
+        p.main,
+        { sides: 6 },
+      ),
+      shoulder.x,
+      shoulder.y,
+      shoulder.z,
+      0,
+      0,
+      -s * 0.8,
+    ),
+  );
   wing.add(place(kit.ball(0.065 * span, 0.06 * span, 0.06 * span, "hide", p.dark, 7), elbow.x, elbow.y, elbow.z));
   wing.add(place(kit.ball(0.055 * span, 0.05 * span, 0.05 * span, "plate", p.plate, 7), wrist.x, wrist.y, wrist.z));
-  for (const finger of fingers) {
-    wing.add(kit.link(wrist, finger, 0.04 * span, 0.012 * span, "plate", p.plate, 5));
-    // 指の関節。膜の張った骨組みが節を持って見える
-    const mid = wrist.clone().lerp(finger, 0.42);
-    wing.add(place(kit.ball(0.028 * span, 0.028 * span, 0.022 * span, "plate", p.plate, 6), mid.x, mid.y, mid.z));
-  }
-  // 指の先の鉤爪
-  const hook = kit.spike(0.04 * span, 0.2 * span, 0.6, "plate", p.plate);
-  place(hook, fingers[0].x, fingers[0].y, fingers[0].z, 0, 0, -s * 1.2);
-  wing.add(hook);
 
-  const points = [shoulder, elbow, wrist, ...fingers, shoulder];
-  const membrane = kit.membrane(
-    (shape) => {
-      shape.moveTo(points[0].x, points[0].y);
-      shape.lineTo(points[1].x, points[1].y);
-      shape.lineTo(points[2].x, points[2].y);
-      for (let i = 3; i < points.length; i++) {
-        const previous = points[i - 1];
-        const current = points[i];
-        // 指の間を内側へえぐって、コウモリ翼らしい scalloped な縁にする
-        const mx = (previous.x + current.x) * 0.5 * 0.82;
-        const my = (previous.y + current.y) * 0.5 * 0.82;
-        shape.quadraticCurveTo(mx, my, current.x, current.y);
-      }
-    },
-    "membrane",
-    p.membrane,
-    -0.08 / span,
+  // 骨・たるんだ膜・筋。手首を要にして指が開く
+  wing.add(
+    kit.ribbedMembrane(
+      {
+        hub: wrist,
+        fingers,
+        leading: [shoulder, elbow],
+        sag: 0.17,
+        bone: 0.042 * span,
+        curvature: -0.085 / span,
+        veins: 2,
+      },
+      "plate",
+      p.plate,
+      "membrane",
+      p.membrane,
+    ),
   );
-  wing.add(membrane);
+
+  // 前縁の甲。肩から手首までの縁を硬く見せ、膜の縁が布に見えるのを防ぐ
+  for (const [from, to] of [
+    [shoulder, elbow],
+    [elbow, wrist],
+  ]) {
+    const mid = from.clone().lerp(to, 0.5);
+    const along = to.clone().sub(from);
+    wing.add(
+      place(
+        kit.plate(along.length() * 0.86, 0.11 * span, 0.02 * span, "plate", p.plate, { notch: 0.2, shoulder: 0.75 }),
+        mid.x,
+        mid.y,
+        mid.z - 0.03 * span,
+        0,
+        0,
+        Math.atan2(along.y, along.x) - Math.PI / 2,
+      ),
+    );
+  }
+
+  // 指の先の鉤爪。末端が硬いと玩具に見えない
+  const hook = kit.claw(0.24 * span, 0.05 * span, 0.5, "plate", p.plate);
+  place(hook, fingers[0].x, fingers[0].y, fingers[0].z, 0, 0, -s * 1.35);
+  wing.add(hook);
 }
 
 /**
@@ -771,8 +838,29 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 1.0;
 
   // --- 腰 ---
-  rig.pelvis.add(place(kit.ball(0.30, 0.28, 0.34, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.22, 0.21, 0.20, "hide", p.main), 0, -0.02, 0.22));
+  // 輪切りを積んだ1本。獣なので面の数は多め(10)にして角張らせないが、
+  // 球を並べるのはやめる。並べたぶんだけ輪郭が丸の連なりになるため
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.14, rz: 0.14 },
+          { y: 0.16, r: 0.23, rz: 0.22 },
+          { y: 0.38, r: 0.3, rz: 0.29, ridge: 0.12 },
+          { y: 0.58, r: 0.25, rz: 0.26 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0,
+      0.34,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   for (const side of [-1, 1]) {
     // 腿の付け根の筋肉。四足は後脚の張り出しが速さの印象を作る
     rig.pelvis.add(place(kit.ball(0.16, 0.19, 0.20, "hide", p.main), side * 0.24, -0.02, 0.10));
@@ -801,10 +889,32 @@ function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(水平な背骨。腰から前へ伸ばす) ---
   const torso = rig.torso;
   place(torso, 0, 0.06, -0.40, 0.05, 0, 0);
-  torso.add(place(kit.ball(0.31, 0.30, 0.40, "hide", p.main), 0, 0.02, 0.10));
-  torso.add(place(kit.ball(0.34, 0.33, 0.34, "hide", p.main), 0, 0.02, -0.14));
+  // 胴も1本。腰で締まって肩で張る流れが、継ぎ目なしの輪郭として出る
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.22, rz: 0.22 },
+          { y: 0.16, r: 0.29, rz: 0.28, keel: 0.1 },
+          { y: 0.36, r: 0.27, rz: 0.28, keel: 0.14, ridge: 0.1 },
+          { y: 0.56, r: 0.33, rz: 0.33, keel: 0.16, ridge: 0.14 },
+          { y: 0.72, r: 0.32, rz: 0.31, ridge: 0.1 },
+          { y: 0.86, r: 0.2, rz: 0.21 },
+        ],
+        "hide",
+        p.main,
+        { sides: 10 },
+      ),
+      0,
+      0.02,
+      0.32,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
   // 腹。下側を暗い色にして、胴の丸みと接地側を分ける
-  torso.add(place(kit.ball(0.27, 0.20, 0.42, "hide", p.dark), 0, -0.14, 0.02));
+  torso.add(place(kit.ball(0.25, 0.17, 0.40, "hide", p.dark), 0, -0.16, 0.02));
   addRibs(kit, torso, 4, -0.12, 0.14, 0.30, 0.016);
   for (const side of [-1, 1]) {
     torso.add(place(kit.ball(0.14, 0.17, 0.17, "hide", p.main), side * 0.26, 0.02, -0.18));

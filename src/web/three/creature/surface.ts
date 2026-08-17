@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ELEMENT_THEME, ElementTheme } from "../elementTheme.js";
 import { SIMPLEX_NOISE_3D } from "../shaderChunks.js";
+import { SURFACE_LIGHT_CHUNK } from "./shaderChunks.js";
 
 /**
  * モンスターの体を構成する「材質」の種類。
@@ -431,6 +432,7 @@ varying vec3 vBody;
 varying vec3 vBodyNormal;
 
 ${SIMPLEX_NOISE_3D}
+${SURFACE_LIGHT_CHUNK}
 
 /**
  * 腹側の向き。真下と正面のあいだを向く。
@@ -472,21 +474,34 @@ vec3 planarWeights(vec3 n) {
 }
 
 /**
- * 鱗1枚。互い違いに並んだ、横に広く縦に浅い盛り上がり。
- * uv.y が体の縦方向にあたる面では、行がずれて重なった並びになる。
+ * 鱗1枚。**平らな面と、その縁**でできている。
+ *
+ * 以前はここを丸い盛り上がり(ドーム)で作っていた。並べると、鱗ではなく
+ * **窪みの並んだゴルフボール**にしか見えない。丸い高さは中心から縁まで
+ * 連続して落ちるので、1枚と隣の1枚の境目がどこにも無いためで、
+ * 高さをいくら強くしても「粒の集まり」から抜け出せない。
+ *
+ * 参考にした高レアのカードで効いているのは、1枚1枚に縁があること。
+ * 面そのものは平らでよく、**縁だけで情報量が出る**。
+ * だからここは、内側を平らな台地にし、外周に細い稜を立て、
+ * 隣との間を溝まで落とす、という3つの段で作る。
  */
 float scaleCell(vec2 uv) {
   // 段ごとに半個ずらす。格子のままだと市松模様に見えて生き物にならない
   uv.x += mod(floor(uv.y), 2.0) * 0.5;
   vec2 f = fract(uv) - 0.5;
-  // 鱗の縁は丸い。角のある距離(max)で測ると、そのままタイルになる。
-  // 縦を詰めて「横に広い」形にし、下側だけ深く落として重なりを作る
+  // 鱗の輪郭は丸い。角のある距離(max)で測ると、そのままタイルになる。
+  // 縦を詰めて「横に広い」形にする
   float d = length(f * vec2(1.0, 1.28));
-  float dome = smoothstep(0.60, 0.10, d);
-  // 下の縁だけ影を深くする。鱗は上の一枚が下の一枚に被さっているので、
-  // 溝が上下で同じ深さだと「並んだ粒」にしか見えない
-  float lip = smoothstep(0.10, 0.45, f.y) * 0.35;
-  return clamp(dome - lip, 0.0, 1.0);
+  // 1枚の面。内側では高さが変わらないので、光が均一に返って「板」に見える
+  float face = smoothstep(0.60, 0.44, d);
+  // 縁の稜。輪郭のすぐ内側にだけ立つ細い帯。
+  // 2つの smoothstep を掛けて帯を作る(段を作らないので勾配は連続のまま)
+  float ridge = smoothstep(0.62, 0.52, d) * smoothstep(0.38, 0.50, d);
+  // 上の一枚が下の一枚に被さる。下側の縁だけ深く落として重なりを作る。
+  // 溝が上下で同じ深さだと、生えている向きが読めない
+  float overlap = smoothstep(0.06, 0.42, f.y) * 0.30;
+  return clamp(face * 0.62 + ridge * 0.52 - overlap, 0.0, 1.0);
 }
 
 /**
@@ -499,8 +514,10 @@ float scaleHeight(vec3 p, vec3 n) {
   vec3 q = (p + warp * 0.045) * vec3(13.0, 19.0, 13.0);
   vec3 w = planarWeights(n);
   float h = scaleCell(q.zy) * w.x + scaleCell(q.xz) * w.y + scaleCell(q.xy) * w.z;
-  // 一枚ごとの高さの差。これが無いと、どの角度から見ても同じ粒に見える
-  return h * (0.55 + (snoise(p * 7.0) * 0.5 + 0.5) * 0.7);
+  // 一枚ごとの高さの差。これが無いと、どの角度から見ても同じ粒に見える。
+  // **振れ幅は狭くしてある。** 色の側で「溝」と「縁の稜」を高さの閾値で
+  // 拾っているので、ここで大きく揺らすと閾値がまたいで縁の線が途切れる
+  return h * (0.74 + (snoise(p * 7.0) * 0.5 + 0.5) * 0.42);
 }
 
 /** 岩の割れ。ノイズの零点に沿って溝が走り、面は平らに残る */
@@ -525,13 +542,27 @@ float brushedStreak(vec3 p) {
  *
  * どちらもY方向の目を粗く取ってあるので、模様は縦へ長く流れる。
  * 毛は生えた向きに寝ているので、これが無いと綿のかたまりになる。
+ *
+ * **そのうえで房に縁を付ける。** 鱗で効いたのと同じ理屈で、
+ * なだらかな濃淡を重ねただけでは「粒の集まり」から抜け出せない。
+ * 房と房の境目に溝が落ち、そのすぐ内側で縁の毛が起きて光を拾う。
+ * この2本の線があると、面が平らでも1房ずつを数えられる。
+ *
+ * 境目は房のノイズの**零点**で取る。閉じた曲線になるので、
+ * 1本の等高線がそのまま1房の輪郭になり、大小が自然に混ざる。
  */
 float strandPattern(vec3 p) {
   // 房。毛が寄って出来た大きな塊
-  float clump = snoise(p * vec3(7.5, 3.4, 7.5)) * 0.5 + 0.5;
+  float lock = snoise(p * vec3(7.5, 3.4, 7.5));
   // 房の中の毛束。房そのものの位置で歪ませ、房に沿って流れるようにする
-  float tuft = snoise(vec3(p.x * 26.0, p.y * 5.5, p.z * 26.0) + clump * 1.8) * 0.5 + 0.5;
-  return clamp(clump * 0.52 + tuft * 0.48, 0.0, 1.0);
+  float tuft = snoise(vec3(p.x * 26.0, p.y * 5.5, p.z * 26.0) + lock * 0.9) * 0.5 + 0.5;
+  // 房の輪郭。零点からの距離で溝と稜を作る。
+  // **帯は法線の摂動の刻み幅(0.012)より広く取ること。** これより細いと
+  // 勾配を取る4点が溝をまたいでしまい、凹凸が線ではなくちらつく粒になる
+  float outline = abs(lock);
+  float groove = 1.0 - smoothstep(0.0, 0.18, outline);
+  float crest = smoothstep(0.15, 0.34, outline) * smoothstep(0.62, 0.40, outline);
+  return clamp((lock * 0.5 + 0.5) * 0.42 + tuft * 0.38 + crest * 0.22 - groove * 0.26, 0.0, 1.0);
 }
 
 /**
@@ -593,7 +624,14 @@ float surfaceHeight(vec3 p, vec3 n) {
 #elif defined(STREAKS)
   return brushedStreak(p);
 #elif defined(WEAVE)
-  return weavePattern(p, n) * 0.6 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.4;
+  // 布は「織り目」と「襞」の2段でできている。
+  //
+  // 以前はここへ高い周波数の粒を重ねていたが、遠目には灰色に潰れるだけで、
+  // 布らしさには何も寄与していなかった。布が布に見えるのは、
+  // 重力で縦に長く落ちる襞のほう。縦の目を粗く取って、下へ伸ばす。
+  // 織り目と入れ替えたのでノイズを叩く回数は変わっていない
+  return weavePattern(p, n) * 0.42
+       + (snoise(vec3(p.x * 9.0, p.y * 1.6, p.z * 9.0)) * 0.5 + 0.5) * 0.58;
 #elif defined(GEL)
   return gelHeight(p);
 #else
@@ -651,7 +689,19 @@ void main() {
   vec3 normal = geoNormal;
 
 #ifdef UNLIT
-  vec3 color = uGlow * (1.05 + 0.25 * sin(uTime * 3.4)) + uRim * fresnel * 0.6;
+  // 発光部は**面積を狭く、そのぶん強く**。
+  //
+  // 面の全体を同じ明るさで光らせていた。発光色(uGlow)はどの属性でも
+  // ほぼ白なので、塊ごとブルームに拾われて滲み、目も宝珠も
+  // 「白い光の玉」になって形が消えていた。属性の色も一緒に消える。
+  //
+  // こちらを向いた中心だけを白熱させ、外へ行くほど属性の色へ落とす。
+  // 中心は前より明るいが、出る面積が狭く縁が沈むので、
+  // 発光の総量はむしろ減っている(加算合成の飽和には効かない)。
+  float hotspot = pow(facing, 1.6);
+  vec3 emit = mix(uRim, uGlow, hotspot);
+  vec3 color = emit * (0.42 + hotspot * 0.78) * (1.0 + 0.18 * sin(uTime * 3.4));
+  color += uRim * fresnel * 0.5;
 #else
   // --- 起伏 ----------------------------------------------------------
   // 材質ごとの高さ場を1回だけ求め、色の濃淡と法線の傾きの両方に使う。
@@ -671,8 +721,9 @@ void main() {
     fill = fill * 0.5 + (dot(normal, FILL_DIR) * 0.5 + 0.5) * 0.5;
   #endif
 
-  // 半球光(上は青空、下は床の紫)で暗部が潰れないようにする
-  vec3 ambient = mix(vec3(0.10, 0.08, 0.13), vec3(0.20, 0.23, 0.36), normal.y * 0.5 + 0.5);
+  // 半球光。暗部が潰れないようにするだけでなく、**暗部を青くする**役目も持つ
+  // (SHADOW_LOW / SHADOW_HIGH は creature/shaderChunks.ts)
+  vec3 ambient = hemisphereAmbient(normal);
 
   // --- 体表のディテール ---------------------------------------------
   // 単色のままだとプラスチックの人形に見えるため、色ムラ・ざらつき・
@@ -735,8 +786,23 @@ void main() {
   albedo *= 0.82 + upness * 0.19 * lift;
 
   #ifdef SCALES
-    // 爬虫類の鱗。境目が落ちることでパーツの丸みも読み取りやすくなる
-    albedo *= 0.78 + height * 0.44;
+    // 爬虫類の鱗。**面には濃淡を付けない。**
+    // 面まで塗り分けると、1枚が丸く膨らんで見えて「並んだ粒」に戻る。
+    // 1枚1枚を数えられるようにするのは、境目の溝と縁に乗る光の2本の線だけ。
+    //
+    // 高さの低いほうが隣との溝、高いほうが縁の稜なので、
+    // ひとつの高さ場から両方を閾値で取り出せる(サンプルを増やさない)
+    //
+    // 引いた絵では線を寝かせる。1枚は 1/16 ワールド単位ほどなので、
+    // 画面上で数画素まで小さくなると線がちらつく粒に化ける
+    float scaleLod = detailFade(vWorld, 0.062);
+    float crease = (1.0 - smoothstep(0.0, 0.26, height)) * scaleLod;
+    float lipLit = smoothstep(0.74, 0.98, height) * scaleLod;
+    albedo *= 0.88 + height * 0.18;
+    // 溝。1枚1枚を切り分ける濃い線
+    albedo *= 1.0 - crease * 0.46;
+    // 縁の稜にだけ光が乗る。面が平らでも、この線があるだけで情報量が出る
+    albedo *= 1.0 + lipLit * 0.30;
   #endif
 
   #ifdef SKIN
@@ -754,6 +820,15 @@ void main() {
     // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる。
     // 弱いと均一な面に潰れて毛に見えないので、房の陰影ははっきり付ける
     albedo *= 0.66 + height * 0.56;
+    // 房の縁。鱗と同じで、ひとつの高さ場から溝と稜を閾値で取り出す。
+    // 房の目は鱗よりずっと粗いので、線が消え始める距離もそのぶん遠い
+    float furLod = detailFade(vWorld, 0.055);
+    float lockGap = (1.0 - smoothstep(0.0, 0.20, height)) * furLod;
+    float lockLit = smoothstep(0.70, 0.95, height) * furLod;
+    // 溝は毛の根元なので、鱗の溝ほど硬く落とさない
+    albedo *= 1.0 - lockGap * 0.34;
+    // 縁の毛だけが起きて光を拾う
+    albedo *= 1.0 + lockLit * 0.24;
     // 毛先。房の陰影より細かい段をもう1枚だけ重ねる。
     // 高さ場に入れると法線の摂動が4回叩かれて重くなるので、色にだけ効かせる
     float bristle = snoise(vec3(vWorld.x * 60.0, vWorld.y * 9.0, vWorld.z * 60.0)) * 0.5 + 0.5;
@@ -766,8 +841,12 @@ void main() {
   #endif
 
   #ifdef WEAVE
-    // 布は細かい織り目。ローカル座標基準なので、揺れても模様が泳がない
-    albedo *= 0.90 + weavePattern(vLocal, geoNormal) * 0.16;
+    // 織り目と襞。襞は高さ場から来るので、光の向きが変わると陰影も動く。
+    // 色だけで襞を描くと、どの角度から見ても同じ場所が暗い「柄」になる。
+    //
+    // 以前はここで weavePattern をもう一度叩いていた(高さ場と合わせて
+    // 1画素あたり5回)。同じ高さを使い回せば済むので、その分を襞に充てた
+    albedo *= 0.76 + height * 0.42;
   #endif
 
   // 窪みの擬似的な陰り。大きなムラの暗い側をさらに沈めて締める
@@ -790,10 +869,20 @@ void main() {
     float diffuse = ramp(key) * 1.05;
   #endif
 
-  vec3 color = albedo * (ambient + diffuse);
-  color += albedo * vec3(0.38, 0.48, 1.0) * fill * 0.30;
-  // 背後のリムライト(ステージのピンクライト)。暗い背景から輪郭を切り離す主役
-  color += vec3(1.0, 0.48, 0.85) * pow(back, 1.6) * 0.42;
+  // キーは温かい白、フィルは冷たい青。**寒暖を割る**のがここの主眼で、
+  // 明暗だけの陰影は、どれだけ段を作っても「灰色の濃淡」にしかならない
+  vec3 color = albedo * (ambient + diffuse * KEY_TINT);
+  color += albedo * FILL_TINT * fill * 0.30;
+  // 強く当たった面は色が抜けて白へ寄る。出る面積はごく狭いので、
+  // 加算の総量はほとんど増えないまま「光が当たっている」に見える。
+  //
+  // **強くしすぎない。** これは腹の色と重なって効く。腹は明るいので key の
+  // 5乗を越えやすく、腹と脇腹だけに白が二重で乗って中間調の彩度が抜ける
+  color += highlightBleach(albedo, key) * 0.16;
+  // 背後のリムライト(ステージのピンクライト)。暗い背景から輪郭を切り離す主役。
+  // **帯を細くしてある。** 広く乗せると背中一面が桃色に染まり、
+  // せっかく青く沈めた暗部も、腹背の塗り分けも、まとめて塗り潰される
+  color += vec3(1.0, 0.48, 0.85) * pow(back, 2.4) * 0.48;
   color += uRim * fresnel * uRimStrength * (1.0 + uActive * 1.5);
 
   #ifdef SOFT
@@ -813,16 +902,39 @@ void main() {
     // 映り込みの幅を広げる。ここが金属らしさの本体で、
     // 空と床の明るさが近いと、どれだけ磨いても曇った石膏にしかならない。
     // 平均を上げずに幅だけ広げる(床を落とし、空を上げる)ので加算の負担は増えない
-    vec3 sky = vec3(0.40, 0.50, 0.74);
-    vec3 ground = vec3(0.045, 0.035, 0.055);
+    // 空は上ほど明るい。一様な空を映すと、どの面も同じ明るさで返ってきて
+    // 「灰色に塗った板」に戻る
+    vec3 sky = mix(vec3(0.26, 0.34, 0.56), vec3(0.46, 0.58, 0.86), smoothstep(0.0, 0.85, normal.y));
+    vec3 ground = vec3(0.030, 0.026, 0.048);
     // 空と床の境目を鋭く切る。この「水平線」が磨いた金属のいちばんの手がかりで、
-    // なだらかに混ぜると曇った布のような面になる
-    vec3 env = mix(ground, sky, smoothstep(-0.03, 0.10, normal.y));
+    // なだらかに混ぜると曇った布のような面になる。
+    // **濡れた板ほどこの境目が硬い。** 幅を詰めるだけで、明るさを一切上げずに
+    // 「乾いた金属」から「濡れた金属」へ変わる
+    vec3 env = mix(ground, sky, smoothstep(-0.012, 0.038, normal.y));
     // 映り込みは磨き筋に沿って途切れる。凹凸の高さがそのまま反射の粗さになる
     color += env * tint * 0.72 * (0.20 + height * 0.90);
-    // 水平線のすぐ上に出る明るい帯。磨いた曲面が必ず持つ形
-    float band = max(0.0, 1.0 - abs(normal.y - 0.10) * 4.0);
-    color += mix(vec3(1.0), uRim, 0.4) * band * band * band * height * 0.20;
+    // 水平線のすぐ上に出る明るい帯。磨いた曲面が必ず持つ形。
+    // 帯を細く、そのぶん強くしてある(占める面積は 1/2 以下なので総量は減る)
+    float band = max(0.0, 1.0 - abs(normal.y - 0.06) * 9.0);
+    color += mix(vec3(1.0), uRim, 0.4) * band * band * band * height * 0.34;
+
+    // 装甲の継ぎ目。
+    //
+    // 金属板は必ず複数枚を接いだもので、一枚岩の金属というものは無い。
+    // 継ぎ目が無いと、どれだけ磨いても塗装したプラスチックの殻に見える
+    // (ネメシスの胴が、のっぺりした紫の樹脂に見えていた)。
+    // 溝を落とし、そのすぐ脇に薄い光を置くと、板の厚みまで読める。
+    //
+    // 高さ場ではなく色にだけ効かせる。高さ場へ入れると法線の摂動で
+    // 4回叩かれ、金属パーツの多い個体で重くなる
+    float seamNoise = snoise(vWorld * 2.6);
+    // 継ぎ目も線なので、引いた絵ではちらつく粒に化ける。画面上の太さで寝かせる
+    float seamLod = detailFade(vWorld, 0.030);
+    float seam = (1.0 - smoothstep(0.0, 0.040, abs(seamNoise))) * seamLod;
+    float seamLip = smoothstep(0.105, 0.045, abs(seamNoise)) * (1.0 - seam) * seamLod;
+    color *= 1.0 - seam * 0.52;
+    color += env * tint * seamLip * 0.30;
+
     // 反射に属性色を回す。無彩色の反射だけだと鉄にしか見えず、
     // どの属性の装甲かも、格の高さも読めない
     color += uRim * fresnel * 0.22;
@@ -837,6 +949,17 @@ void main() {
       // 面が板ではなく金属板として読める
       spec *= 0.35 + height * 0.95;
       spec += pow(max(dot(normal, normalize(FILL_DIR + viewDir)), 0.0), uSpecPower * 0.6) * uSpecStrength * 0.30;
+      // 濡れたような芯。針のように細い一点だけを飽和させる。
+      // **同じ光の量でも、広くぼかせば樹脂の玉に、狭く固めれば濡れた金属になる。**
+      // 明るくして目立たせるのではなく、面積を絞って強度を上げる
+      spec += pow(max(dot(normal, halfDir), 0.0), uSpecPower * 5.0) * uSpecStrength * 0.55;
+      // 磨き筋に沿って伸びる映り込み。
+      // 法線の縦成分だけを寝かせた向きでハイライトを解くと、
+      // 筋と直交する向きには鋭く、筋に沿った向きには寝る。
+      // 丸い点ではなく細長い帯になるので、角度を変えると板の上を「走る」
+      vec3 alongGrain = normalize(vec3(normal.x, normal.y * 0.34, normal.z));
+      spec += pow(max(dot(alongGrain, halfDir), 0.0), uSpecPower * 0.22)
+            * uSpecStrength * 0.16 * (0.25 + height * 0.85);
     #endif
     // ブルームで白く飛ばないよう、ハイライトの合計に頭打ちを入れる
     color += mix(vec3(1.0), uRim, 0.35) * min(spec, 1.5);
@@ -916,20 +1039,43 @@ void main() {
   #endif
 
   #ifdef CRYSTAL
-    // 結晶は「向こうが透けること」で他の材質と区別する。
-    // 明るくして目立たせるのではなく、正面を薄く・縁を厚く見せることで
-    // 中身の詰まったガラスの塊にする(加算合成の飽和を増やさない)。
-    float edge = pow(1.0 - facing, 2.0);
+    // 結晶は「内側から光り、縁で色が詰まる」ことで他の材質と区別する。
+    //
+    // 以前はここを**縁ほど白く光らせる**作りにしていた。それは氷砂糖や
+    // すりガラスの見え方で、中身の詰まった宝石には見えない。実際に、
+    // 水属性の結晶が色を失って灰色のプラスチックになっていた。
+    // 実物は逆で、見通す距離が長い縁ほど光が吸われて**色が濃く沈み**、
+    // まっすぐ見通せる中心だけが明るい。
+    //
+    // 中心を明るくしても加算の総量は増えない。出る面積が狭いうえ、
+    // 縁を沈めるぶんむしろ減る。
+    float thick = pow(1.0 - facing, 1.5);
+    // 地色から色味だけを取り出す。明るさは厚みの側で決めるので、
+    // 明るい差し色でも暗い地色でも同じ「濃くなり方」になる
+    float peak = max(uColor.r, max(uColor.g, uColor.b));
+    vec3 pigment = uColor / max(0.08, peak);
     // 内部の層。見る向きでずれるので、中に奥行きがあるように見える
     float inner = sin(dot(vLocal, vec3(11.0, 17.0, 9.0)) - facing * 7.0 + uTime * 0.35) * 0.5 + 0.5;
-    vec3 core = mix(uColor * 0.30, uGlow * 0.55, inner * 0.6);
-    color = core + albedo * (0.18 + ramp(key) * 0.34) + uRim * edge * 0.85;
-    // 面の稜線だけが白く立つ。カットガラスの角の見え方
-    color += vec3(1.0) * pow(height, 8.0) * 0.16;
-    // 正面は透け、縁は詰まって見える。これが厚みの手がかりになる。
-    // 明るさではなく「向こうが見えること」で他の材質と差をつけるので、
-    // ブルームに投げ込む光の量は増えない
-    alpha = uOpacity * (0.32 + edge * 0.68);
+    // 厚みを通った色。縁は濃く暗く、中心は薄く明るい
+    color = pigment * mix(0.62, 0.13, thick);
+    // 中に灯った明かり。まっすぐ見通せる正面だけに出る、狭くて強い光。
+    // 全面を光らせると発光体になり、透過しているようには見えなくなる。
+    //
+    // **灯りは結晶の色に染めて出す。** 発光色(uGlow)はどの属性でもほぼ白なので、
+    // そのまま足すと中心が白く抜け、せっかくの属性色が消える
+    // (水の結晶が灰色のプラスチックに見えていた原因はこれ)。
+    // 内側から出てくる光は、必ず自分の体の色を通ってくる
+    float lantern = pow(facing, 2.4) * (0.42 + inner * 0.58);
+    color += mix(uGlow * pigment, uGlow, 0.22) * lantern * 0.46;
+    // 外から当たる光の分。完全な透明ではないので、面の向きは残す
+    color += albedo * ramp(key) * 0.22;
+    // 面と面が切り替わる稜線。高さの中腹だけを細く拾う。
+    // 高いところを拾うと面が広く光ってしまい、カットではなく染みに見える
+    float facetEdge = 1.0 - smoothstep(0.0, 0.16, abs(height - 0.5));
+    color += mix(vec3(1.0), uRim, 0.55) * facetEdge * 0.24;
+    // 正面は透け、縁は詰まって見える。ここが厚みの唯一の手がかりなので、
+    // 中心はしっかり抜く。抜けていないと、ただの色の付いた塊になる
+    alpha = uOpacity * clamp(0.30 + thick * 0.66, 0.0, 1.0);
   #endif
 
   // --- 属性ごとの体の質 -----------------------------------------------
@@ -1031,6 +1177,12 @@ void main() {
  * 明るくするだけでは色が白茶けて、同じ色のライトを当てただけに見える。
  * 実際の腹は色素そのものが薄いので、**彩度を落として明度を上げる**。
  * さらにわずかに暖色へ寄せると、皮膚の下の血の色が透けたように見える。
+ *
+ * **ただし彩度を落としすぎない。** 腹の色は腹だけに使われるのではなく、
+ * 脇腹の中間調(belly の smoothstep が半分効く帯)と、色ムラの明るい側の
+ * 混ぜ先を兼ねている。ここを 0.55 まで抜くと、体の側面がまるごと
+ * 「彩度の無い明るい灰色」へ寄る。実際に水ドラゴンの脇腹が青灰色になり、
+ * 属性が色で読めなくなっていた。明度を上げるぶんは彩度で払わない。
  */
 function bellyOf(color: THREE.Color): THREE.Color {
   const hsl = { h: 0, s: 0, l: 0 };
@@ -1041,7 +1193,7 @@ function bellyOf(color: THREE.Color): THREE.Color {
   const lit = Math.min(0.82, Math.max(hsl.l + 0.12, hsl.l * 1.26 + 0.09));
   const out = new THREE.Color();
   // 色相をほんの少し暖色側へ。生々しさはこの数度で決まる
-  out.setHSL((hsl.h + 0.015) % 1, hsl.s * 0.55, lit, THREE.SRGBColorSpace);
+  out.setHSL((hsl.h + 0.015) % 1, hsl.s * 0.78, lit, THREE.SRGBColorSpace);
   return out;
 }
 
@@ -1165,7 +1317,9 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
     castShadow: true,
     specPower: 6,
     specStrength: 0,
-    bump: 0.002,
+    // 襞の深さ。織り目だけを描いていた頃はここを 0.002 にしていたが、
+    // それでは面が平らなままで、どれだけ目を細かくしても板に見える
+    bump: 0.009,
   },
   membrane: {
     defines: { TRANSLUCENT: "", VEINS: "" },
