@@ -759,8 +759,12 @@ void main() {
     //
     // 高さの低いほうが隣との溝、高いほうが縁の稜なので、
     // ひとつの高さ場から両方を閾値で取り出せる(サンプルを増やさない)
-    float crease = 1.0 - smoothstep(0.0, 0.26, height);
-    float lipLit = smoothstep(0.74, 0.98, height);
+    //
+    // 引いた絵では線を寝かせる。1枚は 1/16 ワールド単位ほどなので、
+    // 画面上で数画素まで小さくなると線がちらつく粒に化ける
+    float scaleLod = detailFade(vWorld, 0.062);
+    float crease = (1.0 - smoothstep(0.0, 0.26, height)) * scaleLod;
+    float lipLit = smoothstep(0.74, 0.98, height) * scaleLod;
     albedo *= 0.88 + height * 0.18;
     // 溝。1枚1枚を切り分ける濃い線
     albedo *= 1.0 - crease * 0.46;
@@ -875,8 +879,10 @@ void main() {
     // 高さ場ではなく色にだけ効かせる。高さ場へ入れると法線の摂動で
     // 4回叩かれ、金属パーツの多い個体で重くなる
     float seamNoise = snoise(vWorld * 2.6);
-    float seam = 1.0 - smoothstep(0.0, 0.040, abs(seamNoise));
-    float seamLip = smoothstep(0.105, 0.045, abs(seamNoise)) * (1.0 - seam);
+    // 継ぎ目も線なので、引いた絵ではちらつく粒に化ける。画面上の太さで寝かせる
+    float seamLod = detailFade(vWorld, 0.030);
+    float seam = (1.0 - smoothstep(0.0, 0.040, abs(seamNoise))) * seamLod;
+    float seamLip = smoothstep(0.105, 0.045, abs(seamNoise)) * (1.0 - seam) * seamLod;
     color *= 1.0 - seam * 0.52;
     color += env * tint * seamLip * 0.30;
 

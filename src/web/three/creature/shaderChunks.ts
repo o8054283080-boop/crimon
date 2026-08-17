@@ -54,4 +54,24 @@ vec3 hemisphereAmbient(vec3 n) {
 vec3 highlightBleach(vec3 albedo, float lit) {
   return mix(albedo, vec3(1.0), 0.75) * pow(lit, 5.0);
 }
+
+/**
+ * 細い線の模様を、画面上の大きさに応じて寝かせる係数。
+ *
+ * 鱗の縁や装甲の継ぎ目のような「線」は、遠くへ行くと線の幅が1画素を割る。
+ * そうなると、たまたま線に当たった画素だけが光り、隣の画素は素通しになるので、
+ * 模様ではなく**ちらつく粒**に見える。戦闘中のモンスターは画面上で
+ * 高さ100px前後しかないので、これは例外ではなく常態。
+ *
+ * ワールド座標の画素あたりの変化量(模様の足跡の大きさ)を測り、
+ * 模様の目より粗くなったところで線を消す。手続き的な模様に対する
+ * ミップマップの代わりで、寄れば線が出て、引けば面に戻る。
+ *
+ * 引数 feature は、その模様の目の細かさ(ワールド単位でのおおよその間隔)。
+ * ここはテンプレートリテラルの中なので、コード引用のバッククォートは使えない。
+ */
+float detailFade(vec3 p, float feature) {
+  float footprint = fwidth(p.x) + fwidth(p.y) + fwidth(p.z);
+  return 1.0 - smoothstep(feature * 0.35, feature * 1.4, footprint);
+}
 `;
