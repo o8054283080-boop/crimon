@@ -256,9 +256,10 @@ export function paletteFor(theme: ElementTheme): CreaturePalette {
     // 金属は属性色に染めすぎず、鋼の地色を残す。
     // 暗くしすぎると装甲が「焦げた塊」に見えるので、中明度を保って
     // 明暗はハイライトと映り込みで作る
-    metal: separate(new THREE.Color(0x7d8698).lerp(theme.shell, 0.28).multiplyScalar(0.72), main, 0.12),
-    // 布は染めたもの。地肌より彩度が低く、わずかに沈む
-    cloth: tune(main, 0.02, 0.62, 0.84),
+    metal: separate(new THREE.Color(0x7d8698).lerp(theme.shell, 0.28).multiplyScalar(0.72), main, 0.18),
+    // 布は染めたもの。地肌より彩度が低く、はっきり沈む。
+    // 地肌と同じ明るさだと、ローブなのか素肌なのか見分けが付かない
+    cloth: separate(tune(main, 0.02, 0.76, 0.72), main, 0.16),
     // 毛皮・羽毛・たてがみ。同じ属性色のままだと胴に埋もれて、
     // せっかくの面積が効かない。日に灼けた獣毛のように
     // 彩度を落とし、胴との明暗差で読ませる
@@ -688,13 +689,22 @@ void main() {
   #endif
 
   #ifdef METALLIC
-    // 金属は拡散が弱く、上下の環境色を映し込む。
-    // これがあるだけで、同じ色でも肉と金属が別物に見える
-    color *= 0.70;
-    vec3 sky = vec3(0.26, 0.30, 0.44);
-    vec3 ground = vec3(0.14, 0.10, 0.16);
+    // 金属は拡散をほとんど持たず、**映り込みだけ**で見えている。
+    // 拡散を残したまま明るくすると、同じ明るさでも灰色のプラスチックにしか見えない
+    color *= 0.52;
+    vec3 sky = vec3(0.30, 0.36, 0.52);
+    vec3 ground = vec3(0.16, 0.11, 0.14);
+    // 空と床の境目を鋭く切る。この「水平線」が磨いた金属のいちばんの手がかりで、
+    // なだらかに混ぜると曇った布のような面になる
+    vec3 env = mix(ground, sky, smoothstep(-0.05, 0.16, normal.y));
     // 映り込みは磨き筋に沿って途切れる。凹凸の高さがそのまま反射の粗さになる
-    color += mix(ground, sky, smoothstep(-0.2, 0.6, normal.y)) * 0.36 * (0.30 + height * 0.80);
+    color += env * 0.62 * (0.24 + height * 0.86);
+    // 水平線のすぐ上に出る明るい帯。磨いた曲面が必ず持つ形
+    float band = max(0.0, 1.0 - abs(normal.y - 0.10) * 4.0);
+    color += mix(vec3(1.0), uRim, 0.4) * band * band * band * height * 0.16;
+    // 反射に属性色を回す。無彩色の反射だけだと鉄にしか見えず、
+    // どの属性の装甲かも、格の高さも読めない
+    color += uRim * fresnel * 0.20;
   #endif
 
   #ifdef SPECULAR
@@ -714,6 +724,15 @@ void main() {
   #ifdef SHEEN
     // 布の光沢。面が寝ているほど強く、絹のように縁が明るくなる
     color += mix(uRim, vec3(1.0), 0.35) * pow(1.0 - facing, 3.5) * 0.30;
+  #endif
+
+  #ifdef WAXY
+    // 角・爪・牙・鰭。
+    // ケラチンは硬い材質の中で唯一「薄いところで中身が見える」。
+    // 縁が飴色に抜けることで、金属でも骨でもない、伸びて固まった材に見える
+    color += albedo * vec3(1.30, 1.02, 0.72) * pow(1.0 - facing, 2.2) * 0.32;
+    // 年輪。長さ方向に走る細かい段が、削り出しの棒と生えた角を分ける
+    color *= 0.92 + height * 0.16;
   #endif
 
   #ifdef TRANSLUCENT
@@ -957,9 +976,9 @@ const STYLE_CONFIG: Record<SurfaceStyle, StyleConfig> = {
   },
   // 骨・角・爪: 蝋のような、やや広くて強いハイライト
   plate: {
-    defines: { SPECULAR: "", STREAKS: "" },
+    defines: { SPECULAR: "", STREAKS: "", WAXY: "" },
     counter: 0.34,
-    rimStrength: 0.75,
+    rimStrength: 0.62,
     emissive: 0,
     opacity: 1,
     transparent: false,
