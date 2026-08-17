@@ -851,8 +851,11 @@ void main() {
   vec3 color = albedo * (ambient + diffuse * KEY_TINT);
   color += albedo * FILL_TINT * fill * 0.30;
   // 強く当たった面は色が抜けて白へ寄る。出る面積はごく狭いので、
-  // 加算の総量はほとんど増えないまま「光が当たっている」に見える
-  color += highlightBleach(albedo, key) * 0.22;
+  // 加算の総量はほとんど増えないまま「光が当たっている」に見える。
+  //
+  // **強くしすぎない。** これは腹の色と重なって効く。腹は明るいので key の
+  // 5乗を越えやすく、腹と脇腹だけに白が二重で乗って中間調の彩度が抜ける
+  color += highlightBleach(albedo, key) * 0.16;
   // 背後のリムライト(ステージのピンクライト)。暗い背景から輪郭を切り離す主役。
   // **帯を細くしてある。** 広く乗せると背中一面が桃色に染まり、
   // せっかく青く沈めた暗部も、腹背の塗り分けも、まとめて塗り潰される
@@ -1151,6 +1154,12 @@ void main() {
  * 明るくするだけでは色が白茶けて、同じ色のライトを当てただけに見える。
  * 実際の腹は色素そのものが薄いので、**彩度を落として明度を上げる**。
  * さらにわずかに暖色へ寄せると、皮膚の下の血の色が透けたように見える。
+ *
+ * **ただし彩度を落としすぎない。** 腹の色は腹だけに使われるのではなく、
+ * 脇腹の中間調(belly の smoothstep が半分効く帯)と、色ムラの明るい側の
+ * 混ぜ先を兼ねている。ここを 0.55 まで抜くと、体の側面がまるごと
+ * 「彩度の無い明るい灰色」へ寄る。実際に水ドラゴンの脇腹が青灰色になり、
+ * 属性が色で読めなくなっていた。明度を上げるぶんは彩度で払わない。
  */
 function bellyOf(color: THREE.Color): THREE.Color {
   const hsl = { h: 0, s: 0, l: 0 };
@@ -1161,7 +1170,7 @@ function bellyOf(color: THREE.Color): THREE.Color {
   const lit = Math.min(0.82, Math.max(hsl.l + 0.12, hsl.l * 1.26 + 0.09));
   const out = new THREE.Color();
   // 色相をほんの少し暖色側へ。生々しさはこの数度で決まる
-  out.setHSL((hsl.h + 0.015) % 1, hsl.s * 0.55, lit, THREE.SRGBColorSpace);
+  out.setHSL((hsl.h + 0.015) % 1, hsl.s * 0.78, lit, THREE.SRGBColorSpace);
   return out;
 }
 
