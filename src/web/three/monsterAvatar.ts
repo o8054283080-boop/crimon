@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Element } from "../../core/element.js";
 import { CreatureKit } from "./creature/kit.js";
-import { CreatureRig, finalizeRig } from "./creature/rig.js";
+import { AccentKind, AttackKind, CreatureRig, finalizeRig } from "./creature/rig.js";
 import { builderFor } from "./creature/roles.js";
 import { applyTemplateTraits, templateBuilderFor } from "./creature/templates.js";
 import { CreatureUniforms, SurfaceSet, createCreatureUniforms, paletteFor } from "./creature/surface.js";
@@ -108,7 +108,7 @@ function newWobbles(count: number): Wobble[] {
 }
 
 /** 待機中の仕草の長さ(秒)。短すぎると見落とされ、長すぎると次の行動を待たせる */
-const ACCENT_DURATION: Record<string, number> = {
+const ACCENT_DURATION: Record<AccentKind, number> = {
   none: 0,
   headShake: 0.8,
   wingRuffle: 1.1,
@@ -117,6 +117,44 @@ const ACCENT_DURATION: Record<string, number> = {
   shiver: 0.6,
   roar: 1.4,
   gaze: 2.0,
+  shift: 1.5,
+  stretch: 1.7,
+  sniff: 1.3,
+  tilt: 1.9,
+  flare: 1.4,
+};
+
+/**
+ * 攻撃の型ごとの「間」(秒)。溜め・打ち抜き・余韻の配分。
+ *
+ * 8種の型は、どの関節を動かすかだけを変えても「似た動作の色違い」に見える。
+ * 離れて見ても分かる差は**間の配分**から出る。
+ *   - 溜めが長い型(叩きつけ・祈り)は、止まって力を溜めている時間が読める
+ *   - 溜めが無い型(突進)は、予告なく消えるように出るから速く見える
+ *   - 打ち抜きが長い型(突進・薙ぎ払い)は、動作そのものを見せる
+ *   - 余韻が長い型(叩きつけ・祈り)は、撃ち終わりの重さを引きずる
+ *
+ * 打点は `溜め + 打ち抜き*0.45` の位置に来る。戦闘側の着弾は260ms前後なので、
+ * ここから大きく外さないこと。ただし**軽い型は少し早く、重い型は少し遅く**
+ * 当たる方が、重さの差として正しく読める(195〜330msに収まるよう組んである)。
+ */
+const ATTACK_TIMING: Record<AttackKind, [windup: number, strike: number, recover: number]> = {
+  /** 踏み込んで突く。標準的な配分 */
+  lunge: [0.17, 0.16, 0.3],
+  /** 振り上げて叩きつける。溜めが最長級で、落ちるのは一瞬、余韻を引きずる */
+  slam: [0.26, 0.09, 0.52],
+  /** 力を集めて放つ。溜めが長く、放った後は残心 */
+  cast: [0.24, 0.13, 0.38],
+  /** 突進。溜めがほぼ無く、動作そのものが長い。抜けた後も止まれない */
+  dash: [0.06, 0.3, 0.46],
+  /** 跳びかかり。沈んでから跳ぶので溜めは短く、滞空が長い */
+  pounce: [0.14, 0.24, 0.3],
+  /** ブレス。息を吸う時間が最長。吐いている間ずっと反動を受ける */
+  breath: [0.22, 0.16, 0.44],
+  /** 薙ぎ払い。素早く入って振り抜く。腕ではなく体の回転で見せる */
+  swipe: [0.1, 0.28, 0.26],
+  /** 祈り。掲げるまでが長く、降ろすのはもっと長い */
+  bless: [0.28, 0.1, 0.55],
 };
 
 export interface MonsterAvatarOptions {
@@ -163,6 +201,12 @@ export class MonsterAvatar {
   private readonly accentTrack = newTrack();
   /** 次に仕草を出す時刻。出すたびにばらつかせて、周期に聞こえないようにする */
   private nextAccentAt = 2 + Math.random() * 5;
+  /** この個体が出せる仕草の一覧。骨格から自動で組む(重複が多いほど出やすい) */
+  private readonly accentPool: AccentKind[] = [];
+  /** いま出している仕草。プールから引くので anim.accent とは限らない */
+  private accentKind: AccentKind = "none";
+  /** 直前に出した仕草。同じものを2回続けて引かないために覚えておく */
+  private lastAccent: AccentKind = "none";
   private readonly hitTrack = newTrack();
   private readonly castTrack = newTrack();
 
@@ -192,6 +236,21 @@ export class MonsterAvatar {
   private readonly staggerSpring = new Spring();
   /** よろけの左右成分。真後ろにだけ下がると、当たる度に同じ絵になる */
   private readonly staggerSideSpring = new Spring();
+  /**
+   * 浮遊するものの漂い。
+   *
+   * 正弦波を重ねただけの漂いは、どれだけ周期をずらしても必ず同じ場所へ
+   * 戻ってくるため、しばらく見ていると「決まった軌道をなぞる置物」に見える。
+   * 数秒おきに行き先を選び直し、そこへ**ゆっくり引かれる**バネにすると、
+   * 戻る場所が無くなり、水中を漂っているように読めるようになる。
+   */
+  private readonly driftX = new Spring();
+  private readonly driftY = new Spring();
+  private readonly driftZ = new Spring();
+  private readonly driftYaw = new Spring();
+  private readonly driftTarget = new THREE.Vector3();
+  private driftYawTarget = 0;
+  private driftTimer = Math.random() * 2;
 
   /** 前フレームの重心と傾き。速度を出して二次的な動きの入力にする */
   private readonly previousOffset = new THREE.Vector3();
@@ -243,6 +302,7 @@ export class MonsterAvatar {
     this.clothSprings = newWobbles(this.rig.cloth.length);
     this.followerSprings = newWobbles(this.rig.followers.length);
     this.limbSprings = newWobbles(this.rig.arms.length + this.rig.legs.length);
+    this.buildAccentPool();
 
     // 正面(-Z)を相手チーム側へ向ける。実際の向きは配置が決まったあとに
     // faceToward() で相手チームの中心へ向け直す
@@ -308,6 +368,58 @@ export class MonsterAvatar {
     this.disposables.push(auraMaterial);
   }
 
+  /**
+   * この個体が出せる仕草の一覧を、骨格から組む。
+   *
+   * ビルダーが指定するのは代表の1種類だけで、そのまま使うと数十秒で
+   * 「またあれをやった」と気付かれる。尾があれば振れる、翼があれば畳み直せる、
+   * 脚があれば体重を踏み替えられる——持っている部位から出せる仕草は決まるので、
+   * ここで自動的に足す。代表の仕草は3回入れて、いちばん出やすくしておく。
+   */
+  private buildAccentPool(): void {
+    const rig = this.rig;
+    const pool = this.accentPool;
+    const signature = rig.anim.accent;
+    if (signature !== "none") pool.push(signature, signature, signature);
+    // 代表と同じものを脇からもう一度足すと、代表が出過ぎて結局1種類に戻る
+    const add = (kind: AccentKind, times = 1): void => {
+      if (kind === signature) return;
+      for (let i = 0; i < times; i++) pool.push(kind);
+    };
+    // どの骨格でも出せる仕草
+    add("gaze");
+    add("headShake");
+    add("stretch");
+    if (rig.tail.length > 0) add("tailFlick", 2);
+    if (rig.wings.length > 0) add("wingRuffle");
+    if (rig.jaw) add("roar");
+    // 開いて畳む仕草。腕か翼があれば出せるので、尾も脚も無い結晶にも配れる
+    if (rig.arms.length > 0 || rig.wings.length > 0) add("flare", 2);
+    if (rig.floats) {
+      // 浮いているものは足で踏み替えられないので、傾ぎで代える
+      add("tilt", 2);
+    } else {
+      if (rig.legs.length > 0) add("shift", 2);
+      add("sniff");
+      // 重い個体だけが「踏み下ろして地面を鳴らす」を持てる
+      if ((rig.anim.mass ?? 0) > 0.5 && rig.legs.length > 0) add("stomp");
+    }
+    // 粘体は震え、骨も脚も持たない無機物は共振する。どちらも同じ仕草で表せる
+    if (rig.anim.squash > 0 || (rig.legs.length === 0 && rig.tail.length === 0)) add("shiver", 2);
+    if (pool.length === 0) pool.push("gaze");
+  }
+
+  /** 次に出す仕草を引く。直前と同じものは引き直して、繰り返しに聞こえないようにする */
+  private pickAccent(): AccentKind {
+    const pool = this.accentPool;
+    let pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pick === this.lastAccent && pool.length > 1) {
+      pick = pool[Math.floor(Math.random() * pool.length)];
+    }
+    this.lastAccent = pick;
+    return pick;
+  }
+
   /** 台座も含めた立ち位置 */
   setSlotPosition(x: number, z: number): void {
     this.root.position.set(x, 0, z);
@@ -354,12 +466,14 @@ export class MonsterAvatar {
    * 打点はどの重さでもおおむね揃え、重い個体は**溜めを長く、余韻をさらに長く**する。
    */
   playAttack(): void {
-    this.attackWindup = 0.13 + this.mass * 0.08;
+    const [windup, strike, recover] = ATTACK_TIMING[this.rig.anim.attack];
     // 打ち抜きは「立ち上がり(全体の45%)+抜け」。以前は全体が0.17秒しかなく、
     // 立ち上がりが4フレームで終わっていた。目で追えないほど速いと、
     // 見ている側には移動ではなく瞬間移動として届く
-    this.attackStrike = 0.19 + this.mass * 0.09;
-    this.attackRecover = 0.24 + this.mass * 0.6;
+    this.attackWindup = windup * (1 + this.mass * 0.25);
+    this.attackStrike = strike * (1 + this.mass * 0.2);
+    // 重い個体は余韻がいちばん伸びる。振り切った物を止められない、が重さ
+    this.attackRecover = recover * (1 + this.mass * 1.7);
     trigger(this.attackTrack, this.attackWindup + this.attackStrike + this.attackRecover);
   }
 
@@ -458,9 +572,18 @@ export class MonsterAvatar {
      * 0.05ラジアンしか動いていなかった)。個体差は残しつつ、
      * 下限を約0.6に持ち上げる。
      */
-    const swayGain = 0.42 + anim.sway * 0.62;
-    const headGain = 0.42 + anim.headSway * 0.62;
-    const breathGain = 0.42 + anim.breath * 0.62;
+    /**
+     * 待機の「深さ」を、1〜3分かけてゆっくり変えるうねり。
+     *
+     * 波をいくつ重ねても、振幅が一定のまま揺れ続けるものは機械の周期に聞こえる。
+     * 生き物は落ち着いている時と気が立っている時で動きの大きさが違うので、
+     * 全部の帯にかかる倍率を、どの波よりも遅い周期で 0.7〜1.3 倍に振る。
+     * 位相が個体ごとに違うので、隊列の中で「今はこいつが静かだ」も生まれる。
+     */
+    const mood = 1 + Math.sin(this.idleClock * 0.083 + this.phase) * 0.2 + Math.sin(this.idleClock * 0.031 + 2.2) * 0.12;
+    const swayGain = (0.42 + anim.sway * 0.62) * mood;
+    const headGain = (0.42 + anim.headSway * 0.62) * mood;
+    const breathGain = (0.42 + anim.breath * 0.62) * mood;
 
     // === 待機モーション ===================================================
     // 呼吸。吸う(速い)と吐く(遅い)を非対称にする。左右対称な正弦波のままだと
@@ -493,17 +616,42 @@ export class MonsterAvatar {
     // これが無いと、腕と脚を動かしても「一枚板が横に滑っている」ように見える
     let hipZ = -shift * 0.12 * swayGain;
     let hipY = shift * 0.09 * swayGain;
+    /**
+     * 体ごとの水平回転。
+     *
+     * 腰(hipY)は「腰を捻ると胴が逆へ返る」対の作りになっているため、
+     * 薙ぎ払いのように**全身で回る**動きに使うと打ち消し合ってほとんど動かない。
+     * 上下の倒れ込み(coreTilt)と同じく、腰より外側の core を直接回す軸を持つ。
+     */
+    let coreTwist = 0;
 
     if (rig.floats) {
-      // 浮遊するものは足で支えていないので、常に微妙に漂い続ける。
-      // 周期の合わない波を重ねて、戻ってくる場所を読ませない
-      offsetX += (Math.sin(T * 0.19) * 0.09 + Math.sin(T * 0.127 + 1.7) * 0.055) * alive;
-      offsetZ += (Math.sin(T * 0.163 + 0.5) * 0.075 + Math.sin(T * 0.101 + 2.4) * 0.045) * alive;
-      offsetY += (Math.sin(T * 0.29) * anim.bob * 1.3 + Math.sin(T * 0.147 + 1.1) * 0.045) * alive;
-      leanZ += Math.sin(T * 0.135 + 0.8) * 0.075 * alive;
-      leanX += Math.sin(T * 0.157 + 2.1) * 0.06 * alive;
+      // 漂いの行き先を数秒おきに選び直す。正弦波の重ね合わせだけで作ると
+      // 必ず同じ場所へ戻ってくるので、長く見ていると軌道を覚えられてしまう
+      this.driftTimer -= dt;
+      if (this.driftTimer <= 0) {
+        this.driftTimer = 1.5 + Math.random() * 2.8;
+        this.driftTarget.set(
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.34 + anim.bob * 1.6,
+          (Math.random() - 0.5) * 0.42,
+        );
+        this.driftYawTarget = (Math.random() - 0.5) * 0.42;
+      }
+      // 引かれる速さは重さで変える。軽いものはふらふら流され、
+      // 重い浮遊体(古代の魔人)は同じ場所に留まろうとする
+      const driftHz = 0.34 - mass * 0.1;
+      const driftDamp = 0.62 + mass * 0.2;
+      offsetX += this.driftX.step(this.driftTarget.x, driftHz, driftDamp, step) * alive;
+      offsetY += this.driftY.step(this.driftTarget.y, driftHz * 1.25, driftDamp, step) * alive;
+      offsetZ += this.driftZ.step(this.driftTarget.z, driftHz * 0.9, driftDamp, step) * alive;
       // 向きもゆっくり流される。浮いているものが真っ直ぐ止まっていると重さが出る
-      hipY += Math.sin(T * 0.113 + 0.4) * 0.09 * alive;
+      hipY += this.driftYaw.step(this.driftYawTarget, driftHz * 0.8, driftDamp, step) * alive;
+      // 漂いの上に、止まらない細かい呼吸を足す。バネが目標へ着いた瞬間に
+      // 完全に静止してしまうのを防ぐ(浮遊体は絶対に止まってはいけない)
+      offsetY += Math.sin(T * 0.31) * anim.bob * 0.9 * alive;
+      leanZ += (Math.sin(T * 0.135 + 0.8) * 0.06 - this.driftX.velocity * 0.09) * alive;
+      leanX += (Math.sin(T * 0.157 + 2.1) * 0.05 + this.driftZ.velocity * 0.1) * alive;
     } else {
       // 接地するものは、体重が片脚に乗り切った時に腰が上がり、
       // 乗せ替える瞬間に沈む。体重移動の2倍の周期にすると噛み合う
@@ -535,8 +683,8 @@ export class MonsterAvatar {
 
     // 尾・布・耳へ渡す「本体からの入力」。ここに溜めた値をバネで遅らせる。
     // 尾は輪郭の外に出ていて一番目に付くので、待機でもはっきり振らせる
-    let tailDriveX = Math.sin(T * tailHz * 0.62 - 0.7) * 0.1 * anim.tailWave * alive;
-    let tailDriveY = (Math.sin(T * tailHz) * 0.2 + Math.sin(T * tailHz * 2.35 + 1.4) * 0.055) * anim.tailWave * alive;
+    let tailDriveX = Math.sin(T * tailHz * 0.62 - 0.7) * 0.1 * anim.tailWave * mood * alive;
+    let tailDriveY = (Math.sin(T * tailHz) * 0.2 + Math.sin(T * tailHz * 2.35 + 1.4) * 0.055) * anim.tailWave * mood * alive;
 
     // 翼: 羽ばたき。打ち下ろしが速く、戻しが遅い(空気を押している側が速い)
     const flapPhase = T * flapHz;
@@ -575,32 +723,58 @@ export class MonsterAvatar {
     }
 
     for (const spinner of rig.spinners) {
-      spinner.object.rotation[spinner.axis] += dt * spinner.speed;
+      // 等速で回る環は時計の秒針に見える。速さをゆっくり脈打たせると、
+      // 同じ回転でも「意志で回している」ように読める
+      spinner.object.rotation[spinner.axis] += dt * spinner.speed * (1 + Math.sin(elapsed * 0.37 + this.phase) * 0.35);
     }
+    /**
+     * 周囲を漂う破片。
+     *
+     * 等速・真円・一定の高さで回すと、どれだけ数を増やしても機械仕掛けの
+     * 飾りにしか見えない。次の3つを足すと、同じ部品のまま「引き寄せられて
+     * 浮いている石」に変わる。
+     *   1. 角速度をゆらす(近づくと速く、離れると遅い)
+     *   2. 軌道面を歳差させ、半径をゆっくり伸び縮みさせる
+     *   3. 本体が動いた分だけ遅れて付いてくる(慣性)
+     */
+    // 本体の速度は下で更新されるので、ここで読むのは1フレーム前の値。
+    // 遅れて付いてくる表現なので、1フレーム前で構わない
+    const orbitLagX = clamp(-this.bodyVelocity.x * 0.05, -0.3, 0.3);
+    const orbitLagY = clamp(-this.bodyVelocity.y * 0.04, -0.24, 0.24);
+    const orbitLagZ = clamp(-this.bodyVelocity.z * 0.05, -0.3, 0.3);
     for (const orbiter of rig.orbiters) {
-      const angle = elapsed * orbiter.speed + orbiter.phase;
+      const base = elapsed * orbiter.speed + orbiter.phase;
+      const angle = base + Math.sin(base * 0.41 + orbiter.phase) * 0.6;
+      const radius = orbiter.radius * (1 + Math.sin(base * 0.53 + orbiter.phase * 1.7) * 0.18);
+      const precess = Math.sin(base * 0.23 + orbiter.phase * 0.7) * 0.45;
       orbiter.object.position.set(
-        Math.cos(angle) * orbiter.radius,
-        orbiter.height + Math.sin(angle * 1.6 + orbiter.phase) * 0.18,
-        Math.sin(angle) * orbiter.radius * Math.cos(orbiter.tilt),
+        Math.cos(angle) * radius + orbitLagX,
+        orbiter.height + Math.sin(angle * 1.6 + orbiter.phase) * 0.18 + Math.sin(base * 0.29) * radius * 0.22 + orbitLagY,
+        Math.sin(angle) * radius * Math.cos(orbiter.tilt + precess) + orbitLagZ,
       );
       orbiter.object.rotation.y += dt * orbiter.spin;
       orbiter.object.rotation.x += dt * orbiter.spin * 0.6;
+      orbiter.object.rotation.z += dt * orbiter.spin * 0.23;
     }
 
     // === 待機中の仕草 =====================================================
     // 攻撃・詠唱・被弾の最中には割り込ませない(演出の読み取りを邪魔するため)
     const busy = this.attackTrack.active || this.castTrack.active || this.hitTrack.active;
-    if (!busy && !this.dying && anim.accent !== "none" && !this.accentTrack.active && elapsed >= this.nextAccentAt) {
-      const duration = ACCENT_DURATION[anim.accent];
+    if (!busy && !this.dying && !this.accentTrack.active && elapsed >= this.nextAccentAt) {
+      this.accentKind = this.pickAccent();
+      const duration = ACCENT_DURATION[this.accentKind];
       trigger(this.accentTrack, duration);
-      // 次の間隔をばらつかせる。等間隔だと結局そこに周期を感じてしまう
-      this.nextAccentAt = elapsed + duration + 3.5 + Math.random() * 5.5;
+      // 間隔は等間隔にしない。等間隔だと、仕草の種類を増やしても
+      // 「一定のリズムで何かをする置物」として周期を感じ取られてしまう。
+      // 4回に1回ほどは、ほとんど間を空けずに次の仕草へ繋げる(仕草の重なり)。
+      // 生き物の動作は等間隔には出ず、固まって出ては長く止まる
+      const chain = Math.random() < 0.26;
+      this.nextAccentAt = elapsed + duration + (chain ? 0.15 + Math.random() * 0.7 : 3.2 + Math.random() * 7.5);
     }
     const accentT = busy || this.dying ? null : advance(this.accentTrack, dt);
     if (accentT !== null) {
       const env = arc(accentT);
-      switch (anim.accent) {
+      switch (this.accentKind) {
         case "headShake": {
           // 素早く頭を振る。獣がひと息つく仕草
           headY += Math.sin(accentT * Math.PI * 5) * 0.4 * env;
@@ -656,6 +830,88 @@ export class MonsterAvatar {
           headX -= hold * 0.08;
           break;
         }
+        case "shift": {
+          // 体重を反対の脚へ預け替える。待機の周期的な体重移動と違い、
+          // 「一度どちらかへ寄せて、しばらくそこで立つ」ので止まって見える瞬間ができる
+          const to = this.deathTip;
+          const hold = accentT < 0.34 ? Math.sin((accentT / 0.34) * Math.PI * 0.5) : accentT > 0.72 ? Math.pow(1 - (accentT - 0.72) / 0.28, 1.4) : 1;
+          offsetX += to * hold * 0.13;
+          hipZ -= to * hold * 0.2;
+          leanZ += to * hold * 0.1;
+          headZ += to * hold * 0.09;
+          // 乗せ替える瞬間だけ腰が沈む
+          offsetY -= Math.sin(clamp01(accentT / 0.34) * Math.PI) * 0.03;
+          for (const leg of rig.legs) {
+            leg.root.rotation.z += leg.side * to * hold * 0.14;
+            leg.root.rotation.x += (leg.side === to ? -1 : 1) * hold * 0.1;
+          }
+          break;
+        }
+        case "stretch": {
+          // 伸びをする。反らす(遅い)→ 保持 → 一気に脱力(速い)。
+          // 最後に力を抜く落差があると、生き物が「気を抜いた」瞬間として読める
+          const pull = accentT < 0.62 ? Math.pow(Math.sin((accentT / 0.62) * Math.PI * 0.5), 0.8) : Math.pow(1 - (accentT - 0.62) / 0.38, 2.6);
+          offsetY += pull * 0.06;
+          leanX -= pull * 0.2;
+          headX -= pull * 0.26;
+          hipZ += pull * 0.05;
+          jawOpen = Math.max(jawOpen, pull * 0.35);
+          for (const arm of rig.arms) {
+            arm.root.rotation.x -= pull * 0.7;
+            arm.root.rotation.z += arm.side * pull * 0.35;
+          }
+          for (const wing of rig.wings) {
+            wing.root.rotation.z -= wing.side * pull * 0.7;
+            wing.root.rotation.x -= pull * 0.3;
+          }
+          tailDriveX -= pull * 0.22;
+          // 脱力した瞬間に体が落ちる
+          if (accentT > 0.62 && accentT < 0.62 + step / this.accentTrack.duration) this.landSpring.velocity -= 4;
+          break;
+        }
+        case "sniff": {
+          // 頭を下げて地面を嗅ぐ。下げてから小刻みに鼻を鳴らし、また上げる
+          const down = accentT < 0.3 ? Math.sin((accentT / 0.3) * Math.PI * 0.5) : accentT > 0.7 ? Math.pow(1 - (accentT - 0.7) / 0.3, 1.6) : 1;
+          headX += down * 0.5;
+          leanX += down * 0.1;
+          headY += Math.sin(accentT * Math.PI * 9) * 0.08 * down;
+          jawOpen = Math.max(jawOpen, Math.abs(Math.sin(accentT * Math.PI * 11)) * 0.18 * down);
+          offsetZ -= down * 0.05;
+          break;
+        }
+        case "tilt": {
+          // 浮いているものが、ゆっくり大きく傾いでから戻る。
+          // 足で支えていないので、こういう「一度姿勢を崩して戻る」動きが自然に出せる
+          const to = this.deathTip;
+          const swing = Math.sin(accentT * Math.PI) * Math.sin(accentT * Math.PI * 0.5 + 0.2);
+          leanZ += to * swing * 0.3;
+          leanX += swing * 0.12;
+          hipY += to * swing * 0.3;
+          headZ -= to * swing * 0.18;
+          offsetY += swing * 0.07;
+          offsetX += to * swing * 0.1;
+          break;
+        }
+        case "flare": {
+          // 部位を一斉に外へ開き、ゆっくり畳み直す。開くのが速く畳むのが遅い。
+          // 「威嚇」にも「力を確かめている」にも読める、部位さえあれば出せる仕草
+          const open = accentT < 0.28 ? Math.pow(accentT / 0.28, 0.6) : Math.pow(1 - (accentT - 0.28) / 0.72, 1.7);
+          for (const arm of rig.arms) {
+            arm.root.rotation.z += arm.side * open * 0.55;
+            arm.root.rotation.x -= open * 0.2;
+          }
+          for (const wing of rig.wings) {
+            wing.root.rotation.z -= wing.side * open * 0.6;
+            wing.root.rotation.x -= open * 0.15;
+          }
+          for (const spinner of rig.spinners) spinner.object.rotation[spinner.axis] += dt * open * 4;
+          squash += open * 0.05;
+          offsetY += open * 0.04;
+          leanX -= open * 0.08;
+          headX -= open * 0.12;
+          tailDriveY += open * 0.2;
+          break;
+        }
       }
     }
 
@@ -688,65 +944,86 @@ export class MonsterAvatar {
       // 溜めの瞬間に息を止める(呼吸を殺すと、溜めが読めるようになる)
       if (windup > 0.4) rig.torso.scale.setScalar(1);
 
+      // 打点で体が沈む強さ。叩きつけは深く、放つ型は浅い
+      let landKick = 1;
+
       if (anim.attack === "slam") {
-        // 振り上げてから叩きつける。体は前へ出ず、上下に大きく動く
-        offsetY += windup * 0.16 - strike * 0.1;
-        offsetZ -= strike * anim.lunge * 0.5;
-        leanX += -windup * 0.18 + strike * 0.42;
-        headX += -windup * 0.25 + strike * 0.45;
-        hipZ += windup * 0.1 - strike * 0.12;
+        // 振り上げてから叩きつける。**前へは出ない**。上下の落差だけで見せる。
+        // 溜めで伸び上がり、打点で全身が落ちる
+        offsetY += windup * 0.28 - strike * 0.18;
+        offsetZ -= strike * anim.lunge * 0.4;
+        leanX += -windup * 0.24 + strike * 0.5;
+        headX += -windup * 0.3 + strike * 0.5;
+        hipZ += windup * 0.12 - strike * 0.14;
         for (const arm of rig.arms) {
-          arm.root.rotation.x += -windup * 1.5 + strike * 1.7;
-          arm.root.rotation.z += arm.side * windup * 0.5;
-          if (arm.lower && arm.lowerRest) arm.lower.rotation.x += -windup * 0.9 + strike * 0.6;
+          arm.root.rotation.x += -windup * 1.7 + strike * 1.9;
+          arm.root.rotation.z += arm.side * windup * 0.55;
+          if (arm.lower && arm.lowerRest) arm.lower.rotation.x += -windup * 1 + strike * 0.7;
         }
-        for (const leg of rig.legs) leg.root.rotation.x += windup * 0.16 - strike * 0.1;
+        for (const leg of rig.legs) leg.root.rotation.x += windup * 0.2 - strike * 0.12;
+        // 地面を叩く型だけが、自分の一撃で突き上げられる
+        landKick = 2.2;
       } else if (anim.attack === "dash") {
-        // 小さく跳ねて突っ込む
-        offsetZ += windup * 0.2 - strike * anim.lunge * 1.1;
-        offsetY += arc(attackT) * 0.28;
-        leanX += -strike * 0.5;
-        headY += strike * 0.4;
+        // 突進。跳ぶのではなく**低く直線で滑り込む**。溜めがほぼ無いぶん、
+        // 前後の距離をいちばん長く取り、抜けた後も止まれずに行き過ぎる。
+        // 弧を描いて飛びかかる pounce とは、上下の高さで型が分かれる
+        offsetZ += windup * 0.12 - strike * anim.lunge * 1.55;
+        offsetY += arc(attackT) * 0.09;
+        leanX += -windup * 0.08 - strike * 0.62;
+        headY += strike * 0.34;
         // 沈み込んでから伸び上がる。粘体はこの1本で攻撃が読める
-        squash += -windup * 0.3 + strike * 0.34;
-        for (const arm of rig.arms) arm.root.rotation.x += strike * 1.3;
+        squash += -windup * 0.34 + strike * 0.42;
+        for (const arm of rig.arms) arm.root.rotation.x += strike * 1.45;
+        // 前脚は畳み、後脚は蹴り抜く。低い姿勢のまま地を蹴っているように見せる
+        for (const leg of rig.legs) leg.root.rotation.x += leg.front ? -strike * 0.55 : strike * 0.95;
+        landKick = 0.6;
       } else if (anim.attack === "pounce") {
-        // 四足の跳びかかり。腕を振るのではなく、体を沈めてから前へ跳ぶ。
+        // 四足の跳びかかり。腕を振るのではなく、体を沈めてから**高く弧を描いて**跳ぶ。
         // 着地の頭突き・噛みつきに重心が乗るよう、頭を大きく振り下ろす
-        offsetY += -windup * 0.1 + arc(attackT) * 0.3;
-        offsetZ += windup * 0.24 - strike * anim.lunge * 1.05;
-        leanX += windup * 0.24 - strike * 0.32;
-        headX += -windup * 0.4 + strike * 0.5;
-        hipY += windup * 0.12 - strike * 0.1;
+        offsetY += -windup * 0.16 + arc(attackT) * 0.52;
+        offsetZ += windup * 0.28 - strike * anim.lunge * 1;
+        leanX += windup * 0.3 - strike * 0.44;
+        headX += -windup * 0.46 + strike * 0.6;
+        hipY += windup * 0.14 - strike * 0.12;
         for (const leg of rig.legs) {
           // 前脚は伸ばして掴みかかり、後脚は蹴り出して畳む
-          leg.root.rotation.x += leg.front ? -windup * 0.5 + strike * 1.1 : windup * 0.4 - strike * 0.7;
+          leg.root.rotation.x += leg.front ? -windup * 0.55 + strike * 1.2 : windup * 0.45 - strike * 0.8;
           if (leg.lower && leg.lowerRest) leg.lower.rotation.x += leg.front ? windup * 0.4 - strike * 0.6 : -windup * 0.3;
         }
         for (const wing of rig.wings) wing.root.rotation.z -= wing.side * (windup * 0.5 + strike * 0.3);
+        landKick = 1.5;
       } else if (anim.attack === "breath") {
-        // ブレス。踏み込まず、首を大きく引いてから顎を開いて前へ吐き出す。
-        // 前に出ないぶん、首と頭の振り幅で「溜めて放った」ことを読ませる
-        offsetZ += windup * 0.26 - strike * anim.lunge * 0.3;
-        offsetY += windup * 0.1;
-        leanX += -windup * 0.3 + strike * 0.24;
-        headX += -windup * 0.62 + strike * 0.72;
-        jawOpen = Math.max(jawOpen, windup * 0.4 + swing);
+        // ブレス。踏み込まず、息を吸ってから吐く。
+        // **吐いている間は反動で後ろへ押される**。近づいて殴る型との違いは、
+        // 前に出るか後ろに下がるかという、いちばん大きい差で読ませる。
+        // 骨格の正面は -Z なので、+Z へ動かすと後退になる
+        offsetZ += windup * 0.34 + strike * anim.lunge * 0.3;
+        offsetY += windup * 0.12;
+        leanX += -windup * 0.34 + strike * 0.3;
+        headX += -windup * 0.66 + strike * 0.78;
+        // 顎は打ち抜きの間ずっと開けたままにする。吹き出しは一瞬ではなく持続なので、
+        // swing に任せると打点の直後に口が閉じてブレスと合わなくなる
+        const venting = e >= w && e < w + s ? 1 : swing;
+        jawOpen = Math.max(jawOpen, windup * 0.4 + venting);
         for (const wing of rig.wings) {
-          wing.root.rotation.z -= wing.side * (windup * 0.9 + strike * 0.2);
+          // 翼を張って踏ん張る。反動を受け止めている姿になる
+          wing.root.rotation.z -= wing.side * (windup * 0.9 + strike * 0.55);
           wing.root.rotation.x -= windup * 0.25;
         }
-        for (const leg of rig.legs) leg.root.rotation.x += windup * 0.18;
+        for (const leg of rig.legs) leg.root.rotation.x += windup * 0.18 + strike * 0.22;
+        landKick = 0.5;
       } else if (anim.attack === "swipe") {
-        // 片腕(前脚)で薙ぎ払う。左右非対称に振ることで、
-        // 両腕を揃えて振る lunge/slam と型が分かれる
-        offsetZ += windup * 0.22 - strike * anim.lunge * 0.7;
-        offsetX += (-windup * 0.1 + strike * 0.14) * 0.6;
-        leanX += windup * 0.2 - strike * 0.3;
-        leanZ += -windup * 0.22 + strike * 0.34;
-        headX += -windup * 0.2 + strike * 0.3;
-        headY += -windup * 0.24 + strike * 0.36;
-        hipY += -windup * 0.18 + strike * 0.26;
+        // 薙ぎ払い。腕の振りではなく**体ごとの水平回転**が主役。
+        // 腰だけを捻ると胴が逆に返って打ち消し合うので、全身を回す(coreTwist)。
+        // 前へ突き込む lunge とは、軌道が縦か横かで完全に分かれる
+        coreTwist += -windup * 0.34 + strike * 0.66;
+        offsetZ += windup * 0.14 - strike * anim.lunge * 0.5;
+        offsetX += -windup * 0.14 + strike * 0.3;
+        leanX += windup * 0.14 - strike * 0.18;
+        leanZ += -windup * 0.3 + strike * 0.46;
+        headX += -windup * 0.16 + strike * 0.22;
+        headY += -windup * 0.34 + strike * 0.5;
+        hipY += -windup * 0.24 + strike * 0.36;
         for (const limb of rig.arms.length > 0 ? rig.arms : rig.legs.filter((l) => l.front)) {
           // 利き腕(side>0)だけを大きく振り、反対側は支えに回す
           const lead = limb.side > 0 ? 1 : 0.3;
@@ -755,12 +1032,14 @@ export class MonsterAvatar {
           if (limb.lower && limb.lowerRest) limb.lower.rotation.x += (windup * 0.6 - strike * 0.9) * lead;
         }
         for (const wing of rig.wings) wing.root.rotation.z -= wing.side * (windup * 0.6 + strike * 0.4);
+        landKick = 0.8;
       } else if (anim.attack === "bless") {
-        // 前へ出ず、その場で両腕を高く掲げて放つ。天使・術者の型。
-        // 敵に近づかないことで、支援・神聖の役どころが動きから読める
-        offsetY += windup * 0.1 + arc(attackT) * 0.16;
-        leanX -= windup * 0.1 + strike * 0.08;
-        headX -= windup * 0.3 + strike * 0.2;
+        // 前へ出ず、その場で**両腕を揃えて**高く掲げて放つ。天使・術者の型。
+        // 敵に近づかないことで、支援・神聖の役どころが動きから読める。
+        // 掲げ切ってから降ろすまでが長いので、余韻に光が乗る
+        offsetY += windup * 0.16 + arc(attackT) * 0.22;
+        leanX -= windup * 0.14 + strike * 0.1;
+        headX -= windup * 0.4 + strike * 0.3;
         for (const arm of rig.arms) {
           arm.root.rotation.z += arm.side * (windup * 0.5 + strike * 1.25);
           arm.root.rotation.x -= windup * 0.3 + strike * 0.55;
@@ -770,37 +1049,48 @@ export class MonsterAvatar {
           wing.root.rotation.z -= wing.side * (windup * 0.4 + strike * 0.95);
           wing.root.rotation.x -= strike * 0.2;
         }
+        landKick = 0.35;
       } else if (anim.attack === "cast") {
-        // 溜めてから前方へ放つ
-        offsetZ += windup * 0.16 - strike * anim.lunge * 0.45;
-        offsetY += windup * 0.12;
-        leanX += windup * 0.22 - strike * 0.3;
-        headX += -windup * 0.3 + strike * 0.25;
+        // 溜めて前方へ放つ。両手を揃えて上げる bless と分けるため、
+        // **利き手だけを前へ突き出し、逆の手は引いて構える**。
+        // 体を撃つ側へ送るので、その場で固まる bless とは重心の動きも違う
+        coreTwist += windup * 0.18 - strike * 0.3;
+        offsetZ += windup * 0.2 - strike * anim.lunge * 0.5;
+        offsetY += windup * 0.14;
+        leanX += windup * 0.26 - strike * 0.36;
+        headX += -windup * 0.3 + strike * 0.28;
         for (const arm of rig.arms) {
-          arm.root.rotation.z += arm.side * (windup * 0.7 - strike * 0.3);
-          arm.root.rotation.x += windup * 0.4 + strike * 1.0;
+          const lead = arm.side > 0 ? 1 : -0.55;
+          arm.root.rotation.z += arm.side * (windup * 0.7 - strike * 0.45);
+          arm.root.rotation.x += (windup * 0.45 + strike * 1.15) * lead;
+          if (arm.lower && arm.lowerRest) arm.lower.rotation.x -= (windup * 0.3 - strike * 0.35) * lead;
         }
         for (const wing of rig.wings) wing.root.rotation.z -= wing.side * (windup + strike) * 0.35;
+        landKick = 0.7;
       } else {
-        // 標準: 一度引いてから体ごと踏み込む
-        offsetZ += windup * 0.3 - strike * anim.lunge * 0.95;
-        offsetY += windup * 0.05 + strike * 0.1;
-        leanX += windup * 0.3 - strike * 0.5;
+        // 標準(突き): 一度引いてから体ごと踏み込んで**前へ真っ直ぐ突く**。
+        // 肩を送るために体を捻る。横へ薙ぐ swipe とは軌道が交わらない
+        coreTwist += windup * 0.16 - strike * 0.24;
+        offsetZ += windup * 0.34 - strike * anim.lunge * 1.05;
+        offsetY += windup * 0.06 + strike * 0.12;
+        leanX += windup * 0.34 - strike * 0.56;
         headX += -windup * 0.35 + strike * 0.4;
-        hipY += windup * 0.2 - strike * 0.3;
+        hipY += windup * 0.24 - strike * 0.36;
         for (const arm of rig.arms) {
-          arm.root.rotation.x += -windup * 0.8 + strike * 1.5;
+          arm.root.rotation.x += -windup * 0.85 + strike * 1.55;
           arm.root.rotation.z += arm.side * windup * 0.4;
           if (arm.lower && arm.lowerRest) arm.lower.rotation.x += windup * 0.5 - strike * 0.7;
         }
         for (const leg of rig.legs) leg.root.rotation.x += -windup * 0.2 + strike * 0.4;
         for (const wing of rig.wings) wing.root.rotation.z -= wing.side * strike * 0.5;
+        landKick = 1.2;
       }
 
       // 尾は溜めで逆へ張り、打ち抜きで振り抜かれる。あとはバネが引き継ぐ
       tailDriveX += windup * 0.16 - strike * 0.2;
-      // 踏み込みの着地で沈む
-      if (e >= w && e < w + step * 1.5) this.landSpring.velocity -= 7 - mass * 2;
+      tailDriveY += coreTwist * 0.6;
+      // 踏み込みの着地で沈む。深さは型ごとに変える(叩きつけは深く、放つ型は浅い)
+      if (e >= w && e < w + step * 1.5) this.landSpring.velocity -= (7 - mass * 2) * landKick;
     }
 
     // === 詠唱 =============================================================
@@ -981,12 +1271,17 @@ export class MonsterAvatar {
         const joint = rig.tail[i];
         const spring = this.tailSprings[i];
         const freq = swingFreq * Math.pow(0.9, i);
-        const ry = spring.a.step(driveY, freq, swingDamp, step);
-        const rx = spring.b.step(driveX, freq, swingDamp * 1.05, step);
+        // 減衰は先の節ほど強くする。減衰比0.26のバネは目標を4割行き過ぎるので、
+        // 同じ減衰のまま角度を受け渡すと節ごとに1.3倍ずつ増幅し、
+        // 5節目で尾が90度近く曲がってとぐろを巻いていた
+        const damp = swingDamp * (1 + i * 0.12);
+        const ry = spring.a.step(driveY, freq, damp, step);
+        const rx = spring.b.step(driveX, freq, damp * 1.05, step);
         joint.group.rotation.set(joint.rest.x + rx, joint.rest.y + ry, joint.rest.z);
-        // 次の節は、いま振れた角度を目標として受け取る(波が外へ伝わる)
-        driveY = ry * 0.92;
-        driveX = rx * 0.92;
+        // 次の節は、いま振れた角度を目標として受け取る(波が外へ伝わる)。
+        // 行き過ぎるぶんを見越して絞る。しなりは残るが、巻き込まなくなる
+        driveY = ry * 0.78;
+        driveX = rx * 0.78;
       }
     }
 
@@ -1089,7 +1384,7 @@ export class MonsterAvatar {
 
     // === 姿勢の確定 =======================================================
     rig.core.position.set(offsetX, offsetY, offsetZ);
-    rig.core.rotation.set(leanX * 0.45 + coreTilt, 0, leanZ);
+    rig.core.rotation.set(leanX * 0.45 + coreTilt, coreTwist, leanZ);
     rig.pelvis.rotation.set(rig.pelvisRest.x, rig.pelvisRest.y + hipY, rig.pelvisRest.z + hipZ);
     // 体積を保つ(縦に伸びた分だけ横が細る)。
     // 骨格の原点を接地面に置いてあるので、伸縮しても足元が浮かない。

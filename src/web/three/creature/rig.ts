@@ -101,7 +101,7 @@ export interface AnimProfile {
    */
   squash: number;
   /** 攻撃モーションの型 */
-  attack: "lunge" | "slam" | "cast" | "dash" | "pounce" | "breath" | "swipe" | "bless";
+  attack: AttackKind;
   /**
    * 体感重量。0が羽のように軽い、1が岩の塊。
    *
@@ -112,15 +112,57 @@ export interface AnimProfile {
    */
   mass?: number;
   /**
-   * 待機中にごくたまに出る仕草。
+   * 待機中にごくたまに出る仕草のうち、**その種別を代表する1つ**。
    *
    * 待機モーションを正弦波の重ね合わせだけで作ると、周期が読めてしまい
    * 「動いているが生きてはいない」見え方になる。数秒に一度、周期と無関係な
    * 短い動作を挟むと、同じ骨格でも急に生き物として読めるようになる。
    * 種別の性格を一番安く出せる場所でもあるので、造形と揃えて選ぶこと。
+   *
+   * ただし**これ1種類だけを繰り返すと、数十秒で「またあれをやった」と
+   * 気付かれる**。MonsterAvatar 側が、骨格から出せる仕草(尾があれば尾を振る、
+   * 翼があれば畳み直す、脚があれば体重を踏み替える)をここへ足して
+   * レパートリーを組み、この値をその中で厚めに引くようにしている。
+   * ビルダーが指定するのは「代表の1つ」だけでよい。
    */
-  accent: "none" | "headShake" | "wingRuffle" | "tailFlick" | "stomp" | "shiver" | "roar" | "gaze";
+  accent: AccentKind;
 }
+
+/**
+ * 攻撃モーションの型。
+ *
+ * 8種あるが、関節の動かし方だけを変えても「似た動作の色違い」にしかならない。
+ * 型の差は**間の配分**で作る(MonsterAvatar の ATTACK_TIMING)。
+ * 溜めが長いのか無いのか、打ち抜きが一瞬なのか持続するのか、
+ * 余韻を引きずるのか、が離れて見ても分かる差になる。
+ */
+export type AttackKind = "lunge" | "slam" | "cast" | "dash" | "pounce" | "breath" | "swipe" | "bless";
+
+/**
+ * 待機中の仕草の種類。
+ *
+ * 前半はビルダーが代表として指定するもの、後半(shift 以降)は
+ * MonsterAvatar が骨格を見て自動で足す「脇を固める」仕草。
+ */
+export type AccentKind =
+  | "none"
+  | "headShake"
+  | "wingRuffle"
+  | "tailFlick"
+  | "stomp"
+  | "shiver"
+  | "roar"
+  | "gaze"
+  /** 体重を反対の脚へ踏み替える。接地しているもの全員が持てる */
+  | "shift"
+  /** 伸びをする。胴を反らせ、腕と翼を伸ばしてから脱力する */
+  | "stretch"
+  /** 頭を下げて地面のにおいを嗅ぐ・覗き込む */
+  | "sniff"
+  /** 大きく傾いでから戻る。浮遊しているもの用 */
+  | "tilt"
+  /** 腕・翼・刃を一度外へ開いて畳み直す。尾も脚も無い結晶にも配れる */
+  | "flare";
 
 export const DEFAULT_ANIM: AnimProfile = {
   idleSpeed: 1,

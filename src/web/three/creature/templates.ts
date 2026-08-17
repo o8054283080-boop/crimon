@@ -41,8 +41,14 @@ import {
 
 /**
  * 大きく丸い目。素材モンスターや妖精のように「可愛さ」で見せる種別に使う。
- * 白目を持たず、暗い眼窩+発光する虹彩+小さなハイライトの3層で作る。
- * 発光部の面積を小さく保ち、加算エフェクトが重なっても白飛びさせない。
+ *
+ * 以前は「暗い窪み+発光する球+ハイライト」の3層だった。これは
+ * **目の全面が発光する**ため、実際には白く飛んだ楕円が2つ並ぶだけで、
+ * 瞳孔も視線も生まれず、どの種別も同じ宇宙人の顔になっていた。
+ *
+ * いまは共通の目つき生成(addFaceEyes の round)へ委ねる。
+ * 明るい眼球・大きな虹彩・大きな瞳孔・2点のハイライト・まぶたの縁で、
+ * 発光面積を増やさずに「丸くて濡れた目」を作る。
  */
 function addRoundEyes(
   kit: CreatureKit,
@@ -51,14 +57,19 @@ function addRoundEyes(
   y: number,
   z: number,
   radius: number,
+  splay = 0.26,
+  brow = true,
 ): void {
-  const p = kit.palette;
-  for (const side of [-1, 1]) {
-    head.add(place(kit.ball(radius * 1.25, radius * 1.45, radius * 0.8, "hide", p.deep, 10), side * x, y, z + radius * 0.5));
-    head.add(place(kit.ball(radius, radius * 1.15, radius * 0.6, "glow", p.glow, 10), side * x, y, z));
-    // ハイライト。1点入るだけで、目が球として読めるようになる
-    head.add(place(kit.ball(radius * 0.3, radius * 0.3, radius * 0.2, "plate", p.plate, 6), side * (x + radius * 0.3), y + radius * 0.45, z - radius * 0.2));
-  }
+  addFaceEyes(kit, head, {
+    x,
+    y,
+    z,
+    size: radius * 1.15,
+    mood: "round",
+    splay,
+    brow,
+    skin: kit.palette.dark,
+  });
 }
 
 /** 毛の房。同じ向きの棘を少しずつずらして重ね、毛束の厚みを出す */
@@ -303,26 +314,37 @@ function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 0;
 
   // 本体。裾を一度外へ張り出させてから床へ落とし、
-  // 「自重で潰れて広がっている」重さを輪郭に出す
+  // 「自重で潰れて広がっている」重さを輪郭に出す。
+  //
+  // 単調に細くなる釣鐘だと、遠景では「かまくら」か「置き傘」にしか見えない。
+  // 裾の張り出し → **くびれ** → 上の膨らみ、と段を作ることで、
+  // 輪郭線だけで「重い液体が2段に溜まっている」ことが読める
   rig.pelvis.add(
     kit.lathe(
       [
         [0.001, 0.0],
-        [0.54, 0.0],
-        [0.70, 0.03],
-        [0.79, 0.12],
-        [0.80, 0.30],
-        [0.72, 0.54],
-        [0.55, 0.79],
-        [0.32, 0.97],
-        [0.10, 1.06],
-        [0.001, 1.08],
+        [0.56, 0.0],
+        [0.74, 0.03],
+        [0.86, 0.10],
+        [0.85, 0.19],
+        // ここが張り出しの下端。外へ庇のように出た分だけ、下に影が落ちる
+        [0.72, 0.27],
+        [0.69, 0.34],
+        [0.75, 0.45],
+        [0.73, 0.60],
+        [0.58, 0.80],
+        [0.34, 0.98],
+        [0.11, 1.07],
+        [0.001, 1.09],
       ],
       "hide",
       p.main,
       26,
     ),
   );
+  // くびれに落ちる影。段の下側を一段暗い環でなぞると、
+  // 半透明の体でもくびれが「へこみ」として読める
+  rig.pelvis.add(place(kit.band(0.71, 0.035, Math.PI * 2, "hide", p.dark, 24), 0, 0.29, 0, Math.PI / 2, 0, 0));
 
   // 床に広がった溜まり。
   // 均等な粒を輪に並べると「足の指」や「石を敷いた台座」に見えたので、
@@ -435,14 +457,30 @@ function buildSlime(kit: CreatureKit, rig: CreatureRig): void {
     rig.arms.push(limbFrom(arm, side, side * 1.4));
   }
 
-  // 顔。頭の原点を体の中心に置き、目が表面をゆっくり動くようにする
+  // 顔。頭の原点を体の中心に置き、目が表面をゆっくり動くようにする。
+  //
+  // 目と口を球面へ直に貼ると「ゼリーの中に浮いた部品」になる。
+  // 先に**顔の面**を前へ張り出させ、その上に目・頬・口を並べる
   place(rig.neck, 0, 0.06, 0);
   place(rig.head, 0, 0, 0);
   const head = rig.head;
-  addRoundEyes(kit, head, 0.20, 0.10, -0.60, 0.10);
-  // 口。逆さの笠形を薄く貼って、開いた口の暗がりにする
-  head.add(place(kit.lens(0.13, 0.07, 0.05, "hide", p.deep, 10), 0, -0.12, -0.62, 0.2, 0, 0));
-  head.add(place(kit.band(0.16, 0.018, Math.PI * 0.9, "hide", p.dark, 12), 0, -0.06, -0.62, 0, 0, Math.PI * 1.05));
+  head.add(place(kit.ball(0.42, 0.36, 0.26, "hide", p.main, 16), 0, 0.02, -0.46));
+  // 眉の代わりの段。丸い目の上に細い棒を渡すと macaroni にしか見えないので、
+  // 額そのものをわずかに突き出して、目の上に影が落ちるようにする
+  head.add(place(kit.ball(0.34, 0.14, 0.16, "hide", p.main, 12), 0, 0.26, -0.52, 0.3, 0, 0));
+  // 頬。目の下から口の横へ張り出す膨らみ。顔の幅はここで決まる
+  for (const side of [-1, 1]) {
+    head.add(place(kit.ball(0.17, 0.15, 0.13, "hide", p.main, 10), side * 0.29, -0.08, -0.52, 0, side * 0.3, 0));
+  }
+  addRoundEyes(kit, head, 0.20, 0.09, -0.61, 0.105, 0.3, false);
+  // 口。細い線1本だと針金になる。開いた口の暗がり・下唇の段・口角のえくぼの
+  // 3つを重ねて、「開いている場所」として読ませる
+  head.add(place(kit.lens(0.19, 0.10, 0.07, "hide", p.deep, 12), 0, -0.21, -0.60, 0.16, 0, 0));
+  head.add(place(kit.lens(0.11, 0.05, 0.04, "hide", p.dark, 10), 0, -0.235, -0.63, 0.16, 0, 0));
+  head.add(place(kit.lens(0.20, 0.09, 0.09, "hide", p.main, 12), 0, -0.32, -0.56, 0.34, 0, 0));
+  for (const side of [-1, 1]) {
+    head.add(place(kit.ball(0.045, 0.05, 0.04, "hide", p.dark, 8), side * 0.17, -0.19, -0.56));
+  }
 
   rig.anim = {
     idleSpeed: 1.15,
@@ -1006,15 +1044,43 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   const head = rig.head;
   head.add(place(kit.rock(0.30, 0.24, 0.28, "hide", p.main, 0.26), 0, 0.10, 0));
   head.add(place(kit.rock(0.32, 0.11, 0.22, "hide", p.dark, 0.3), 0, 0.26, 0.02));
-  // 目は一本の光る裂け目。顔のパーツを作り込まない方が石らしい。
-  // 眉庇を前へ張り出させ、その影の中で光らせることで、小さくても顔の位置が分かる
-  head.add(place(kit.rock(0.30, 0.13, 0.10, "hide", p.deep, 0.2), 0, 0.06, -0.24));
-  head.add(place(kit.box(0.32, 0.055, 0.04, "glow", p.glow), 0, 0.07, -0.29));
-  head.add(place(kit.rock(0.34, 0.12, 0.20, "hide", p.main, 0.24), 0, 0.20, -0.20, -0.3, 0, 0));
+  // 顔。以前は横一文字に光る帯を1本渡しただけで、
+  // 「石の塊に蛍光灯を貼った」ようにしか見えなかった(生きていない)。
+  //
+  // 岩でも顔を作れる。要るのは眼球ではなく**影の落ちる境目**で、
+  // 庇 → 落ち窪んだ眼窩 → その底の光 → 鼻柱 → 割れた顎、と段を積む
+  head.add(place(kit.rock(0.31, 0.14, 0.12, "hide", p.deep, 0.18), 0, 0.09, -0.23));
+  // 眉庇。前へ深く突き出させ、目をその影の中へ入れる
+  head.add(place(kit.rock(0.34, 0.13, 0.22, "hide", p.main, 0.24), 0, 0.22, -0.22, -0.32, 0, 0));
+  head.add(place(kit.rock(0.30, 0.07, 0.11, "hide", p.dark, 0.3), 0, 0.17, -0.30, -0.5, 0, 0));
+  // 眼窩。左右を別々に彫り込むと、一本の裂け目が「2つの目」に変わる
+  for (const side of [-1, 1]) {
+    head.add(place(kit.rock(0.10, 0.075, 0.06, "hide", p.deep, 0.2), side * 0.155, 0.085, -0.29));
+  }
+  addFaceEyes(kit, head, {
+    x: 0.155,
+    y: 0.085,
+    z: -0.315,
+    size: 0.072,
+    mood: "blank",
+    splay: 0.3,
+    brow: false,
+    skin: p.deep,
+  });
+  // 鼻柱。左右の眼窩のあいだに岩を1本立てると、顔に「正面」ができる
+  head.add(place(kit.rock(0.055, 0.13, 0.075, "hide", p.main, 0.3), 0, 0.06, -0.28));
+  // 顎。頭蓋から割れて分かれた下の岩。合わせ目の暗がりが口になる
+  head.add(place(kit.rock(0.26, 0.045, 0.10, "hide", p.deep, 0.2), 0, -0.05, -0.24));
+  head.add(place(kit.rock(0.27, 0.10, 0.20, "hide", p.dark, 0.26), 0, -0.13, -0.16, 0.22, 0, 0));
+  for (let i = -1; i <= 1; i++) {
+    head.add(place(kit.rock(0.055, 0.05, 0.045, "hide", p.main, 0.3), i * 0.115, -0.075, -0.26, 0.2, 0, i * 0.3));
+  }
   for (const side of [-1, 1]) {
     const crag = kit.rock(0.10, 0.17, 0.10, "hide", p.main, 0.3);
     place(crag, side * 0.20, 0.24, 0.04, 0, 0, -side * 0.5);
     head.add(crag);
+    // 頬骨の岩。眼窩の外側を支えて、顔の幅を作る
+    head.add(place(kit.rock(0.09, 0.11, 0.09, "hide", p.main, 0.28), side * 0.245, 0.04, -0.19, 0, side * 0.4, side * 0.2));
   }
 
   // 周囲を漂う岩片。重い体が動かない分、周りが動いて生気を作る

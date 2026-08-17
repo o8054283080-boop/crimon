@@ -1,7 +1,7 @@
 import "./style.css";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
-import { EquipSlot } from "../core/equipment.js";
+import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor } from "../data/equipmentDungeon.js";
@@ -42,7 +42,7 @@ import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { renderDungeonParty } from "./views/dungeonParty.js";
-import { EquipmentPickerContext, renderEquipment } from "./views/equipment.js";
+import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
@@ -97,6 +97,11 @@ interface AppState {
   equipmentDetailId: string | null;
   equipmentPickerContext: EquipmentPickerContext | null;
   equipmentSlotFilter: EquipSlot | null;
+  equipmentSortKey: EquipmentSortKey;
+  /** まとめて売却するために選ばれている装備 */
+  equipmentSelectedIds: string[];
+  /** まとめ売却の選択モード中か */
+  equipmentSelecting: boolean;
   /** モンスターの装備スロットから装備詳細を開いた場合、戻る操作でこのモンスターの画面に戻るための参照 */
   equipmentReturnMonsterId: string | null;
   selectedDungeonFloor: number | null;
@@ -129,6 +134,9 @@ const state: AppState = {
   equipmentDetailId: null,
   equipmentPickerContext: null,
   equipmentSlotFilter: null,
+  equipmentSortKey: "recommended",
+  equipmentSelectedIds: [],
+  equipmentSelecting: false,
   equipmentReturnMonsterId: null,
   selectedDungeonFloor: null,
   dungeonRun: null,
@@ -250,6 +258,28 @@ function handleSellEquipment(equipmentId: string): void {
   if (!result.ok) return;
   savePlayerState(state.player);
   state.equipmentDetailId = null;
+  render();
+}
+
+/**
+ * 選択した装備をまとめて売却する。
+ *
+ * 一括操作は取り消せないので、**何個いくらで売れるのかを確認の文面に必ず出す**。
+ * 装着中のものは売れないため、選択の時点で弾いてある(ここでも念のため数を数え直す)。
+ */
+function handleBulkSellEquipment(): void {
+  const targets = state.player.equipment.filter((e) => state.equipmentSelectedIds.includes(e.id));
+  if (targets.length === 0) return;
+  const total = targets.reduce((sum, e) => sum + equipmentSellPrice(e), 0);
+  if (!window.confirm(`${targets.length}個の装備を売却して🪙${total.toLocaleString()}を得ます。この操作は取り消せません。`)) return;
+
+  let sold = 0;
+  for (const target of targets) {
+    const result = sellEquipment(state.player, target.id);
+    if (result.ok) sold += 1;
+  }
+  if (sold > 0) savePlayerState(state.player);
+  state.equipmentSelectedIds = [];
   render();
 }
 
@@ -992,6 +1022,35 @@ function renderEquipmentScreen(): HTMLElement {
       render();
     },
     onGoDungeon: () => navigate("EQUIP_DUNGEON"),
+    sortKey: state.equipmentSortKey,
+    selectedIds: state.equipmentSelectedIds,
+    selecting: state.equipmentSelecting,
+    onChangeSort: (key) => {
+      state.equipmentSortKey = key;
+      render();
+    },
+    onToggleSelecting: () => {
+      state.equipmentSelecting = !state.equipmentSelecting;
+      // 選択モードを抜ける時は選択も捨てる。残しておくと次に入った時に
+      // 身に覚えのない選択が残っていて事故になる
+      if (!state.equipmentSelecting) state.equipmentSelectedIds = [];
+      render();
+    },
+    onToggleSelected: (equipmentId) => {
+      state.equipmentSelectedIds = state.equipmentSelectedIds.includes(equipmentId)
+        ? state.equipmentSelectedIds.filter((id) => id !== equipmentId)
+        : [...state.equipmentSelectedIds, equipmentId];
+      render();
+    },
+    onSelectAllShown: (ids) => {
+      state.equipmentSelectedIds = ids;
+      render();
+    },
+    onClearSelection: () => {
+      state.equipmentSelectedIds = [];
+      render();
+    },
+    onBulkSell: handleBulkSellEquipment,
   });
 }
 

@@ -2378,3 +2378,347 @@ body {
   color: #06121f;
   background: linear-gradient(180deg, #ffffff, #bcd2f5);
 }
+
+/* ===================================================================
+ * 装備の見え方
+ *
+ * 数十個を並べる画面なので、**文字を読まなくても強さの序列が分かる**ことを
+ * 最優先にする。等級(星)で枠の色、強化段階で縁の輝き、シリーズで印の色を分ける。
+ * 一覧のカードと詳細画面のスロットで同じ規則を使い、同じ物だと分かるようにする。
+ * =================================================================== */
+
+/* 等級の色。星が上がるほど寒色→暖色→金へ寄せ、色相だけで序列が読めるようにする */
+[data-star="1"] { --eq-tone: #7c8aa6; --eq-glow: rgba(124, 138, 166, 0.35); }
+[data-star="2"] { --eq-tone: #56c1a4; --eq-glow: rgba(86, 193, 164, 0.4); }
+[data-star="3"] { --eq-tone: #4f9dff; --eq-glow: rgba(79, 157, 255, 0.45); }
+[data-star="4"] { --eq-tone: #b07bff; --eq-glow: rgba(176, 123, 255, 0.5); }
+[data-star="5"] { --eq-tone: #ff9f4a; --eq-glow: rgba(255, 159, 74, 0.55); }
+[data-star="6"] { --eq-tone: #ffd23f; --eq-glow: rgba(255, 210, 63, 0.6); }
+
+/* シリーズの色。セット効果はプレイヤーが指名して集めるものなので、名前より色で覚えさせる */
+[data-set="CRIT"] { --eq-set: #ff6b8a; }
+[data-set="POWER"] { --eq-set: #ff8a4a; }
+[data-set="GUARD"] { --eq-set: #6fb2ff; }
+[data-set="VITALITY"] { --eq-set: #5fd68a; }
+[data-set="ACCURACY_SET"] { --eq-set: #b48cff; }
+[data-set="RESIST_SET"] { --eq-set: #7fd6d2; }
+[data-set="SWIFT"] { --eq-set: #ffd166; }
+
+.equip-card {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--eq-tone, #4a5372) 55%, transparent);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--eq-tone, #4a5372) 16%, transparent), transparent 55%),
+    linear-gradient(180deg, #1d2136, #12162a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 10px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+/* 上端に等級の帯。並べた時にここだけ見れば序列が分かる */
+.equip-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--eq-tone, #4a5372), transparent);
+}
+
+/* 強化を極めた装備は縁が光る。育てた実感はここに出す */
+.equip-card[data-tier="max"] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 14px var(--eq-glow, transparent), 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+.equip-card__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.equip-card__slot {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.equip-card__set {
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--eq-set, #cfd8f5);
+  background: color-mix(in srgb, var(--eq-set, #cfd8f5) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--eq-set, #cfd8f5) 40%, transparent);
+}
+
+/* 強化段階。育成の中心なので、カードの中で一番目立つ数字にする */
+.equip-card__level {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--eq-tone, #cfd8f5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.equip-card[data-tier="max"] .equip-card__level {
+  color: #ffe8a3;
+  text-shadow: 0 0 8px var(--eq-glow, transparent), 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.equip-card__star {
+  font-size: 0.62rem;
+  letter-spacing: -0.04em;
+  color: var(--eq-tone, #ffd166);
+}
+
+.equip-card__main {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 2px 0 4px;
+}
+
+.equip-card__subs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.equip-card__sub-line {
+  font-size: 0.66rem;
+  color: #b9c6ea;
+}
+
+.equip-card__owner {
+  margin-top: 5px;
+  font-size: 0.58rem;
+  color: #8ea0c8;
+}
+
+/* 未装着は「余っている」という情報なので、装着中より目立たせない */
+.equip-card__owner--free {
+  color: #5c6a8c;
+}
+
+/* --- 詳細画面のスロット。一覧のカードと同じ色の規則で読ませる --- */
+.equip-slot--filled {
+  border: 1px solid color-mix(in srgb, var(--eq-tone, #4a5372) 65%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--eq-tone, #4a5372) 20%, transparent), transparent 60%),
+    var(--bg-alt);
+}
+
+.equip-slot--filled[data-tier="max"] {
+  box-shadow: 0 0 12px var(--eq-glow, transparent);
+}
+
+.equip-slot__head {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.equip-slot__level {
+  font-size: 0.72rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--eq-tone, #cfd8f5);
+}
+
+.equip-slot--filled .equip-slot__star {
+  color: var(--eq-tone, #ffd166);
+}
+
+.equip-slot__set {
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: var(--eq-set, #8ea0c8);
+}
+
+/* ===================================================================
+ * モンスター詳細
+ *
+ * 集めたものを眺める画面なので、肖像を主役の大きさで出す。
+ * ステータスは「主要4項目」と「それ以外」を分ける。
+ * 全部を同じ大きさで並べると、何を見て強さを判断すればよいか伝わらない。
+ * =================================================================== */
+
+.monster-detail__hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.monster-detail .monster-detail__avatar {
+  width: 132px;
+  height: 132px;
+  flex: 0 0 auto;
+  font-size: 3.6rem;
+  /* 等級の環。装備と同じ色の規則を使い、レア度の読み方を揃える */
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.14),
+    0 0 0 2px color-mix(in srgb, var(--eq-tone, #4a5372) 70%, transparent),
+    0 0 18px color-mix(in srgb, var(--eq-glow, transparent) 80%, transparent);
+}
+
+.monster-detail__ident {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.monster-detail__element {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: #0d1020;
+  background: linear-gradient(180deg, #ffffff, #cfd8f5);
+}
+
+.monster-detail .monster-detail__star {
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  color: var(--eq-tone, #ffd166);
+  text-shadow: 0 0 8px var(--eq-glow, transparent);
+}
+
+.monster-detail .monster-detail__level {
+  font-size: 1.15rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.monster-detail__role {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+/* 主要4項目。数字を大きく、名前を小さく。並べた時に数字だけを追える */
+.monster-detail .monster-detail__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 2px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.25));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.stat-tile__label {
+  font-size: 0.56rem;
+  font-weight: 700;
+  color: #8ea0c8;
+}
+
+.stat-tile__value {
+  font-size: 0.94rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+/* 副次的な数値は横に流す。主要4項目と同じ重みで並べない */
+.monster-detail__substats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  width: 100%;
+  margin-top: 8px;
+  font-size: 0.66rem;
+  color: #9fb0d8;
+}
+
+/* ===================================================================
+ * 装備のまとめ売却
+ *
+ * 取り消せない操作なので、「何を選んでいるか」と「いくらになるか」が
+ * 常に見えている状態を保つ。選択中の札は縁で示し、
+ * 装着中(売れない)ものは押しても反応しないことが分かるよう沈める。
+ * =================================================================== */
+
+.sort-row {
+  margin-top: -2px;
+}
+
+.bulk-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 210, 63, 0.1), rgba(0, 0, 0, 0.3));
+  box-shadow: inset 0 0 0 1px rgba(255, 210, 63, 0.28);
+}
+
+.bulk-bar__row {
+  display: flex;
+  gap: 8px;
+}
+
+.bulk-bar__row .btn {
+  flex: 1;
+  font-size: 0.72rem;
+}
+
+.bulk-bar__summary {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #ffe8a3;
+  font-variant-numeric: tabular-nums;
+}
+
+.equip-card--selectable {
+  cursor: pointer;
+}
+
+.equip-card--selected {
+  box-shadow:
+    inset 0 0 0 2px #ffd23f,
+    0 0 14px rgba(255, 210, 63, 0.45);
+}
+
+/* 選ばれた札に印を出す。枠の色だけだと、等級の色と紛れて数え間違える */
+.equip-card--selected::after {
+  content: "✓";
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #2a1c02;
+  background: linear-gradient(180deg, #ffe08a, #d9a520);
+}
+
+/* 装着中は売れない。押しても無駄だと分かるよう沈める */
+.equip-card--locked {
+  opacity: 0.42;
+  cursor: not-allowed;
+}

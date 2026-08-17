@@ -123,7 +123,7 @@ const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
   },
   // 葉。彩度を上げて、光を通した時の緑が濁らないようにする
   GRASS: {
-    body: [0.005, 1.22, 0.98, 0],
+    body: [0.005, 1.12, 1.16, 0.02],
     keratin: 0xe0dcc0,
     peltSat: 0.6,
     flesh: 0.3,
@@ -141,7 +141,7 @@ const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
   // 闇。暗くしすぎると形が読めなくなるので、地色はむしろ保ち、
   // 「暗さ」は光の当たらない面を沈める uAbsorb だけで作る
   DARK: {
-    body: [0, 1.08, 1.0, 0.0],
+    body: [0, 0.92, 0.86, 0.0],
     keratin: 0xc9c0d2,
     peltSat: 0.58,
     flesh: 0.26,
@@ -232,10 +232,41 @@ function separate(part: THREE.Color, body: THREE.Color, gap: number): THREE.Colo
   body.getHSL(b, THREE.SRGBColorSpace);
   const diff = a.l - b.l;
   if (Math.abs(diff) >= gap) return part;
-  // 既に離れかけている向きを尊重し、真横に並んだ時だけ余白の広いほうへ
-  const away = diff === 0 ? (b.l < 0.5 ? 1 : -1) : Math.sign(diff);
+  // 既に離れかけている向きを尊重し、真横に並んだ時だけ余白の広いほうへ。
+  //
+  // ただし**その先に余白が無い時は反対へ逃がす**。地色が暗い属性(草・闇)では
+  // 「胴より暗い部位」を作ろうとした結果、押し下げた先が黒く潰れて
+  // 部位が分かれるどころか輪郭ごと消えていた(草属性の衣が真っ黒になっていた)。
+  // 分離が目的なのだから、どちら向きに離すかは譲ってよい。
+  let away = diff === 0 ? 0 : Math.sign(diff);
+  if (away < 0 && b.l - gap < 0.22) away = 1;
+  if (away > 0 && b.l + gap > 0.84) away = -1;
+  if (away === 0) away = b.l < 0.5 ? 1 : -1;
   const out = new THREE.Color();
-  out.setHSL(a.h, a.s, Math.min(0.9, Math.max(0.06, b.l + away * gap)), THREE.SRGBColorSpace);
+  out.setHSL(a.h, a.s, Math.min(0.9, Math.max(0.12, b.l + away * gap)), THREE.SRGBColorSpace);
+  return out;
+}
+
+/**
+ * 影になる部位の色を、地色から相対で作る。
+ *
+ * テーマの shell から機械的に作ると、地色が暗い属性(草・闇)ではほぼ黒になり、
+ * 腹も関節も口の中も同じ「黒い穴」になる。実際に草属性の胴が、
+ * 色の読めない暗い塊になっていた。
+ *
+ * 明度に下限を置いて必ず色が残るようにし、彩度はむしろ上げる。
+ * 影が濁って見えるのは光が減るからであって、色素が抜けるからではない。
+ */
+function shade(color: THREE.Color, scale: number, floor: number): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl, THREE.SRGBColorSpace);
+  const out = new THREE.Color();
+  out.setHSL(
+    (hsl.h + 0.985) % 1,
+    Math.min(1, hsl.s * 1.12 + 0.04),
+    Math.max(floor, hsl.l * scale),
+    THREE.SRGBColorSpace,
+  );
   return out;
 }
 
@@ -247,8 +278,11 @@ export function paletteFor(theme: ElementTheme): CreaturePalette {
   const main = tune(shell.clone().lerp(theme.rim, 0.24), ...skin.body);
   return {
     main,
-    dark: shell.clone().multiplyScalar(0.5).lerp(new THREE.Color(0x0d1020), 0.45),
-    deep: shell.clone().multiplyScalar(0.28).lerp(new THREE.Color(0x07080f), 0.6),
+    // 腹・関節・溝。テーマの shell からではなく**作り直した後の地色**から起こす。
+    // shell から作ると、地色を属性ごとに設計した意味が消えるうえ、
+    // 暗い属性では黒に張り付いて部位の区別が付かなくなる
+    dark: shade(main, 0.54, 0.17),
+    deep: shade(main, 0.32, 0.09),
     // 角・爪・牙・鰭。ケラチンは属性を持たない材質なので、属性色に染めない。
     // 一段だけ差し色を混ぜて帰属を残し、胴との明度差は separate が保証する
     // (指定した生成り色はそのまま使うと骨が白く浮くので、一段落として蝋の色にする)
@@ -339,9 +373,15 @@ void main() {
   vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
   vNormalW = normalize(mat3(modelMatrix) * objectNormal);
   vViewDir = normalize(cameraPosition - worldPosition.xyz);
-  // 模様はワールド座標基準で描く。パーツごとに大きさが違っても
-  // 鱗や筋の粗さが揃い、1体の生き物として見える
-  vWorld = worldPosition.xyz;
+  // 模様はワールドの「向き」で描くが、原点はその個体の足元へ移す。
+  //
+  // 向きをワールドに揃えるのは、法線の摂動をこの座標の勾配から取るため
+  // (座標と法線が別の空間だと、向きを変えた個体で凹凸が裏返る)。
+  // 一方で原点まで world のままにすると、個体が踏み込んだ分だけ模様が
+  // 体の上を滑っていく。鱗が皮膚の上を泳ぐのは、静止画では気づかないが
+  // 動くと一目で作り物に見える。並進だけを引けば、勾配は変わらないまま
+  // 模様が皮膚に貼り付く。
+  vWorld = worldPosition.xyz - modelMatrix[3].xyz;
   vWorldY = worldPosition.y;
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }
@@ -413,23 +453,54 @@ const vec3 VENTRAL_DIR = vec3(0.0, -0.906, -0.423);
  */
 
 /**
- * 鱗。互い違いに並んだ、横に広く縦に浅い盛り上がり。
+ * 面に沿った2軸を選ぶための重み。法線に近い軸ほど小さくなる。
  *
- * 立方体のセルをそのまま丸めると、粒が均等に並んで「気泡緩衝材」に見える。
- * 実際の鱗は横に広く、上下に重なって並んでいるので、Y方向の目を細かく取る。
- * さらに一枚ごとの高さを揺らして、規則的な繰り返しに見えないようにする。
+ * 鱗や織り目のように「並び」を持つ模様を3次元の格子で作ると、
+ * 斜めの面はその格子を斜めに切ることになり、**どこを見ても
+ * 正方形が編み込まれた「かご」**に見える。実際にドラゴンの胸が
+ * 籐のかごになっていた。面に沿った2軸だけで模様を組み、
+ * 3枚を法線で混ぜれば、どの向きの面でも「面の上に並んだ鱗」になる。
+ *
+ * 指数を高くして混ざる帯を狭くしてある。広く混ぜると2枚の格子が
+ * 重なった領域が広がり、結局かご編みに戻る。
  */
-float scaleHeight(vec3 p) {
-  vec3 q = p * vec3(11.0, 17.0, 11.0);
+vec3 planarWeights(vec3 n) {
+  vec3 w = abs(n);
+  w = w * w;
+  w = w * w;
+  return w / max(0.0001, w.x + w.y + w.z);
+}
+
+/**
+ * 鱗1枚。互い違いに並んだ、横に広く縦に浅い盛り上がり。
+ * uv.y が体の縦方向にあたる面では、行がずれて重なった並びになる。
+ */
+float scaleCell(vec2 uv) {
   // 段ごとに半個ずらす。格子のままだと市松模様に見えて生き物にならない
-  q.xz += mod(floor(q.y), 2.0) * 0.5;
-  vec3 f = fract(q) - 0.5;
-  float d = max(abs(f.x), max(abs(f.y), abs(f.z)));
-  // 頂点を平らにしすぎない。中央から縁までなだらかに落として、
-  // 溝(セルの境目)だけがはっきり残るようにする
-  float dome = smoothstep(0.5, 0.14, d);
+  uv.x += mod(floor(uv.y), 2.0) * 0.5;
+  vec2 f = fract(uv) - 0.5;
+  // 鱗の縁は丸い。角のある距離(max)で測ると、そのままタイルになる。
+  // 縦を詰めて「横に広い」形にし、下側だけ深く落として重なりを作る
+  float d = length(f * vec2(1.0, 1.28));
+  float dome = smoothstep(0.60, 0.10, d);
+  // 下の縁だけ影を深くする。鱗は上の一枚が下の一枚に被さっているので、
+  // 溝が上下で同じ深さだと「並んだ粒」にしか見えない
+  float lip = smoothstep(0.10, 0.45, f.y) * 0.35;
+  return clamp(dome - lip, 0.0, 1.0);
+}
+
+/**
+ * 鱗。面に沿った並びを法線で選び、列そのものを低い周波数で曲げる。
+ * まっすぐな列は体の丸みを無視するので、平らなタイル貼りに見える。
+ */
+float scaleHeight(vec3 p, vec3 n) {
+  // 列を波打たせる。体の丸みに沿って流れているように見せるための歪み
+  vec3 warp = vec3(snoise(p * 2.4), snoise(p * 2.4 + 19.0), snoise(p * 2.4 - 23.0));
+  vec3 q = (p + warp * 0.045) * vec3(13.0, 19.0, 13.0);
+  vec3 w = planarWeights(n);
+  float h = scaleCell(q.zy) * w.x + scaleCell(q.xz) * w.y + scaleCell(q.xy) * w.z;
   // 一枚ごとの高さの差。これが無いと、どの角度から見ても同じ粒に見える
-  return dome * (0.55 + (snoise(p * 7.0) * 0.5 + 0.5) * 0.7);
+  return h * (0.55 + (snoise(p * 7.0) * 0.5 + 0.5) * 0.7);
 }
 
 /** 岩の割れ。ノイズの零点に沿って溝が走り、面は平らに残る */
@@ -444,15 +515,45 @@ float brushedStreak(vec3 p) {
   return snoise(vec3(p.x * 42.0, p.y * 3.5, p.z * 42.0)) * 0.5 + 0.5;
 }
 
-/** 毛の流れ。縦に細長いノイズで、束になった毛羽を表す */
+/**
+ * 毛の流れ。
+ *
+ * 細い筋を1段だけ描くと、遠目には均一なノイズに潰れて
+ * **つるりとしたゴムの塊**にしか見えない(狼の胴が紫のグミになっていた)。
+ * 実際の毛皮でいちばん目に付くのは1本ずつの毛ではなく、
+ * 毛が寄って出来た「房」の陰影。粗い房と、その中の毛束の2段で作る。
+ *
+ * どちらもY方向の目を粗く取ってあるので、模様は縦へ長く流れる。
+ * 毛は生えた向きに寝ているので、これが無いと綿のかたまりになる。
+ */
 float strandPattern(vec3 p) {
-  return snoise(vec3(p.x * 34.0, p.y * 6.0, p.z * 34.0)) * 0.5 + 0.5;
+  // 房。毛が寄って出来た大きな塊
+  float clump = snoise(p * vec3(7.5, 3.4, 7.5)) * 0.5 + 0.5;
+  // 房の中の毛束。房そのものの位置で歪ませ、房に沿って流れるようにする
+  float tuft = snoise(vec3(p.x * 26.0, p.y * 5.5, p.z * 26.0) + clump * 1.8) * 0.5 + 0.5;
+  return clamp(clump * 0.52 + tuft * 0.48, 0.0, 1.0);
 }
 
-/** 織り目。縦横2方向の細かい縞を掛け合わせる */
-float weavePattern(vec3 p) {
-  float warp = sin(p.x * 150.0) * sin(p.y * 150.0);
-  return warp * 0.5 + 0.5;
+/**
+ * 織り目。
+ *
+ * 縦横の縞を掛け合わせると**方眼紙**になる。実際の布で目に付くのは
+ * 格子ではなく、斜めに走る畝(綾織り)と、糸のむらによる不均一さ。
+ * 面に沿った2軸で斜めの畝を作り、低い周波数のむらで濃さを揺らす。
+ */
+float weaveCell(vec2 uv) {
+  // 斜めに走る主の畝と、それに直交する細い糸目
+  float twill = sin((uv.x + uv.y * 0.62) * 6.2831);
+  float thread = sin((uv.x * 0.5 - uv.y) * 6.2831 * 2.0);
+  return (twill * 0.62 + thread * 0.38) * 0.5 + 0.5;
+}
+
+float weavePattern(vec3 p, vec3 n) {
+  vec3 q = p * 46.0;
+  vec3 w = planarWeights(n);
+  float h = weaveCell(q.zy) * w.x + weaveCell(q.xz) * w.y + weaveCell(q.xy) * w.z;
+  // 糸のむら。均一な畝だけだと機械織りのビニールに見える
+  return mix(h, snoise(p * 9.0) * 0.5 + 0.5, 0.30);
 }
 
 /**
@@ -480,11 +581,11 @@ float facetHeight(vec3 p) {
  * 法線の摂動はこの関数を4回叩いて勾配を取るため、
  * 中身は「安いこと」と「勾配が連続なこと」を最優先にしている。
  */
-float surfaceHeight(vec3 p) {
+float surfaceHeight(vec3 p, vec3 n) {
 #if defined(CRACKS)
   return crackHeight(p);
 #elif defined(SCALES)
-  return scaleHeight(p);
+  return scaleHeight(p, n);
 #elif defined(STRANDS)
   return strandPattern(p);
 #elif defined(FACETS)
@@ -492,7 +593,7 @@ float surfaceHeight(vec3 p) {
 #elif defined(STREAKS)
   return brushedStreak(p);
 #elif defined(WEAVE)
-  return weavePattern(p) * 0.5 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.5;
+  return weavePattern(p, n) * 0.6 + (snoise(p * 20.0) * 0.5 + 0.5) * 0.4;
 #elif defined(GEL)
   return gelHeight(p);
 #else
@@ -514,9 +615,9 @@ vec3 bumpNormal(vec3 n, vec3 p, float h0, float amplitude) {
   if (amplitude < 0.0001) return n;
   const float e = 0.012;
   vec3 grad = vec3(
-    surfaceHeight(p + vec3(e, 0.0, 0.0)) - h0,
-    surfaceHeight(p + vec3(0.0, e, 0.0)) - h0,
-    surfaceHeight(p + vec3(0.0, 0.0, e)) - h0
+    surfaceHeight(p + vec3(e, 0.0, 0.0), n) - h0,
+    surfaceHeight(p + vec3(0.0, e, 0.0), n) - h0,
+    surfaceHeight(p + vec3(0.0, 0.0, e), n) - h0
   ) / e;
   // 法線方向の変化は面の傾きに寄与しないので取り除く
   grad -= n * dot(n, grad);
@@ -556,7 +657,7 @@ void main() {
   // 材質ごとの高さ場を1回だけ求め、色の濃淡と法線の傾きの両方に使う。
   // これで「模様の暗い所」と「光が当たらない所」が一致し、
   // 光の向きが変わると鱗や割れ目の影も一緒に動く。
-  float height = surfaceHeight(vWorld);
+  float height = surfaceHeight(vWorld, geoNormal);
   normal = bumpNormal(geoNormal, vWorld, height, uBump);
 
   float key = max(dot(normal, KEY_DIR), 0.0);
@@ -616,17 +717,22 @@ void main() {
   // 生き物ではなく「塗り分けた布」に見える
   float mottle = snoise(vWorld * 2.1 + 11.0);
   float fleck = snoise(vWorld * 8.5 - 4.0);
-  albedo = mix(albedo, uDorsal, max(0.0, mottle) * 0.20 + max(0.0, fleck) * 0.09);
-  albedo = mix(albedo, uBelly, max(0.0, -mottle) * 0.14);
+  albedo = mix(albedo, uDorsal, max(0.0, mottle) * 0.30 + max(0.0, fleck) * 0.13);
+  albedo = mix(albedo, uBelly, max(0.0, -mottle) * 0.22 + max(0.0, -fleck) * 0.08);
 
   // 明暗のゆらぎは色のゆらぎより弱くする。強いと迷彩に見える
   albedo *= 0.90 + blotch * 0.20;
   albedo *= 0.94 + grain * 0.12;
   // 体の下ほど暗く。ただし**上を明るくはしない**。
   // 上へ加算すると、背を暗く塗った意味が消えて「背が明るい生き物」になる
-  albedo *= 0.80 + height01 * 0.21;
+  //
+  // **背側では持ち上げを弱める。** 背は上を向いているので、この2行と
+  // キーライトの3つが同時に効き、せっかく暗く塗った背が明るく戻ってしまう。
+  // 実際に狼の背と脇腹が同じ明るさになり、腹背の塗り分けが消えていた
+  float lift = 1.0 - dorsal * 0.62;
+  albedo *= 0.80 + height01 * 0.21 * lift;
   // 下向きの面を沈める擬似AO。同じ理由で、上向きの面は素通しに留める
-  albedo *= 0.82 + upness * 0.19;
+  albedo *= 0.82 + upness * 0.19 * lift;
 
   #ifdef SCALES
     // 爬虫類の鱗。境目が落ちることでパーツの丸みも読み取りやすくなる
@@ -645,8 +751,13 @@ void main() {
   #endif
 
   #ifdef STRANDS
-    // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる
-    albedo *= 0.80 + height * 0.34;
+    // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる。
+    // 弱いと均一な面に潰れて毛に見えないので、房の陰影ははっきり付ける
+    albedo *= 0.66 + height * 0.56;
+    // 毛先。房の陰影より細かい段をもう1枚だけ重ねる。
+    // 高さ場に入れると法線の摂動が4回叩かれて重くなるので、色にだけ効かせる
+    float bristle = snoise(vec3(vWorld.x * 60.0, vWorld.y * 9.0, vWorld.z * 60.0)) * 0.5 + 0.5;
+    albedo *= 0.90 + bristle * 0.19;
   #endif
 
   #ifdef STREAKS
@@ -656,7 +767,7 @@ void main() {
 
   #ifdef WEAVE
     // 布は細かい織り目。ローカル座標基準なので、揺れても模様が泳がない
-    albedo *= 0.90 + weavePattern(vLocal) * 0.16;
+    albedo *= 0.90 + weavePattern(vLocal, geoNormal) * 0.16;
   #endif
 
   // 窪みの擬似的な陰り。大きなムラの暗い側をさらに沈めて締める
@@ -671,8 +782,10 @@ void main() {
   // 毛は段を持たずになだらかに暗くなる
   #ifdef SOFT
     // 毛皮・羽毛は光が繊維の中で何度も散るので、明暗の境目が出ない。
-    // 落ちを長く取り、いちばん暗いところも沈めきらない
-    float diffuse = pow(key, 0.72) * 0.88 + 0.12;
+    // 落ちを長く取り、いちばん暗いところも沈めきらない。
+    // ただし寝かせすぎると全面が同じ明るさになり、房を描いても
+    // 陰影が付かないまま「均一な毛の塊」に戻る
+    float diffuse = pow(key, 0.86) * 0.97 + 0.07;
   #else
     float diffuse = ramp(key) * 1.05;
   #endif
@@ -691,20 +804,28 @@ void main() {
   #ifdef METALLIC
     // 金属は拡散をほとんど持たず、**映り込みだけ**で見えている。
     // 拡散を残したまま明るくすると、同じ明るさでも灰色のプラスチックにしか見えない
-    color *= 0.52;
-    vec3 sky = vec3(0.30, 0.36, 0.52);
-    vec3 ground = vec3(0.16, 0.11, 0.14);
+    color *= 0.44;
+    // 金属は「色の付いた鏡」。反射を無彩色で足すと、金だろうが鋼だろうが
+    // 同じ灰色の粘土になる(実際に全属性の装甲が同じ灰色に見えていた)。
+    // 地色の**色味だけ**を取り出して反射に掛け、明るさは環境から取る
+    float peak = max(albedo.r, max(albedo.g, albedo.b));
+    vec3 tint = mix(vec3(1.0), albedo / max(0.001, peak), 0.8);
+    // 映り込みの幅を広げる。ここが金属らしさの本体で、
+    // 空と床の明るさが近いと、どれだけ磨いても曇った石膏にしかならない。
+    // 平均を上げずに幅だけ広げる(床を落とし、空を上げる)ので加算の負担は増えない
+    vec3 sky = vec3(0.40, 0.50, 0.74);
+    vec3 ground = vec3(0.045, 0.035, 0.055);
     // 空と床の境目を鋭く切る。この「水平線」が磨いた金属のいちばんの手がかりで、
     // なだらかに混ぜると曇った布のような面になる
-    vec3 env = mix(ground, sky, smoothstep(-0.05, 0.16, normal.y));
+    vec3 env = mix(ground, sky, smoothstep(-0.03, 0.10, normal.y));
     // 映り込みは磨き筋に沿って途切れる。凹凸の高さがそのまま反射の粗さになる
-    color += env * 0.62 * (0.24 + height * 0.86);
+    color += env * tint * 0.72 * (0.20 + height * 0.90);
     // 水平線のすぐ上に出る明るい帯。磨いた曲面が必ず持つ形
     float band = max(0.0, 1.0 - abs(normal.y - 0.10) * 4.0);
-    color += mix(vec3(1.0), uRim, 0.4) * band * band * band * height * 0.16;
+    color += mix(vec3(1.0), uRim, 0.4) * band * band * band * height * 0.20;
     // 反射に属性色を回す。無彩色の反射だけだと鉄にしか見えず、
     // どの属性の装甲かも、格の高さも読めない
-    color += uRim * fresnel * 0.20;
+    color += uRim * fresnel * 0.22;
   #endif
 
   #ifdef SPECULAR
@@ -730,9 +851,17 @@ void main() {
     // 角・爪・牙・鰭。
     // ケラチンは硬い材質の中で唯一「薄いところで中身が見える」。
     // 縁が飴色に抜けることで、金属でも骨でもない、伸びて固まった材に見える
-    color += albedo * vec3(1.30, 1.02, 0.72) * pow(1.0 - facing, 2.2) * 0.32;
-    // 年輪。長さ方向に走る細かい段が、削り出しの棒と生えた角を分ける
+    color += albedo * vec3(1.30, 1.02, 0.72) * pow(1.0 - facing, 2.2) * 0.34;
+    // 縦の磨き筋。長さ方向の繊維
     color *= 0.92 + height * 0.16;
+    // 成長の段。角も爪も牙も「伸びて固まった」材なので、
+    // 伸びた向きと直交する段が必ず入る。縦の筋だけだと削り出した棒に見え、
+    // 実際に角と翼の指が**厚紙を切って貼った**ように平たく見えていた。
+    // 段の間隔と深さを揺らして、機械で刻んだねじ山にならないようにする
+    float growth = sin(vWorld.y * 84.0 + snoise(vWorld * 2.6) * 3.6) * 0.5 + 0.5;
+    color *= 0.90 + growth * 0.13;
+    // 段の稜だけが光る。これが入ると、同じ明るさのままでも硬さが出る
+    color += mix(vec3(1.0), uRim, 0.45) * pow(growth, 6.0) * height * 0.10;
   #endif
 
   #ifdef TRANSLUCENT
@@ -928,7 +1057,7 @@ function dorsalOf(color: THREE.Color): THREE.Color {
   color.getHSL(hsl, THREE.SRGBColorSpace);
   const out = new THREE.Color();
   // 下限を置くのは闇属性のため。ここを 0 まで許すと背が黒く潰れて形が読めなくなる
-  const lit = Math.max(0.11, hsl.l * 0.52);
+  const lit = Math.max(0.10, hsl.l * 0.44);
   out.setHSL((hsl.h + 0.985) % 1, Math.min(1, hsl.s * 1.2 + 0.06), lit, THREE.SRGBColorSpace);
   return out;
 }
@@ -1137,7 +1266,7 @@ function applyVariant(config: StyleConfig, variant: SurfaceVariant): StyleConfig
       return {
         ...config,
         defines: { ...defines, STRANDS: "", SOFT: "" },
-        bump: 0.006,
+        bump: 0.011,
         specStrength: 0,
         rimStrength: 0.7,
       };

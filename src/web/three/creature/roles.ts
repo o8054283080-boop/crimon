@@ -152,7 +152,10 @@ interface MoodSpec {
 const EYE_MOODS: Record<EyeMood, MoodSpec> = {
   fierce: { aspect: 0.50, tilt: 0.40, iris: 0.78, lid: 0.32, brow: 0.36, sclera: "dark" },
   cold: { aspect: 0.42, tilt: 0.34, iris: 0.72, lid: 0.30, brow: 0.26, sclera: "none" },
-  round: { aspect: 1.00, tilt: -0.05, iris: 0.62, lid: 0.08, brow: -0.10, sclera: "wet" },
+  // 可愛さは「虹彩が眼球をほとんど埋めていること」で決まる。
+  // 白目を広く残すと、大人びた・あるいは不気味な顔になる。
+  // まぶたは持たせない。丸い目に厚いまぶたを乗せると、目の上に肉の瘤が付く
+  round: { aspect: 1.00, tilt: -0.05, iris: 0.94, lid: 0, brow: -0.10, sclera: "wet" },
   gentle: { aspect: 0.70, tilt: -0.18, iris: 0.60, lid: 0.28, brow: -0.24, sclera: "wet" },
   blank: { aspect: 0.60, tilt: 0.14, iris: 0.90, lid: 0.00, brow: 0.20, sclera: "none" },
 };
@@ -188,8 +191,10 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
   const h = s * m.aspect;
   const skin = o.skin ?? p.dark;
   const slit = o.slit ?? 1;
-  // 虹彩は縦半径で決まるが、細い目では横にはみ出すので横幅でも頭打ちにする
-  const iris = Math.min(s * 0.66, h * m.iris);
+  // 虹彩は縦半径で決まるが、細い目では横にはみ出すので横幅でも頭打ちにする。
+  // 明るい眼球の種別だけは、虹彩が白目を押しのけて大きく取れるようにする
+  // (白目の面積が広いと、可愛い目つきにはならない)
+  const iris = Math.min(s * (m.sclera === "wet" ? 0.74 : 0.66), h * m.iris);
 
   for (const side of [-1, 1]) {
     const eye = new THREE.Group();
@@ -216,15 +221,26 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
     }
 
     // 虹彩・瞳孔・ハイライトは、必ず眼球の前面より手前へ順に重ねる。
-    // 眼球と同じ深さに置くと球に飲まれて、遠景では目が消える
-    eye.add(place(kit.lens(iris, iris, s * 0.14, "glow", p.glow, 10), 0, 0, -s * 0.4));
-    // 瞳孔。ここが無いと、どんなに形を整えても視線が生まれない
-    // 明るい眼球の種別は瞳孔を大きく取る。虹彩が輪として残り、
-    // 目全体が発光する「電球」にならずに済む
-    const pupil = m.sclera === "wet" ? 0.66 : 0.52;
-    eye.add(place(kit.lens(iris * pupil * slit, iris * (m.sclera === "wet" ? 0.94 : 0.84), s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
+    // 眼球と同じ深さに置くと球に飲まれて、遠景では目が消える。
+    if (m.sclera === "wet") {
+      // 明るい眼球の上では、**虹彩を暗くする**。
+      // 白い眼球に発光する円を乗せると白飛びした一枚の板になり、
+      // 瞳の色も視線も消える(実際にそうなっていた)。
+      // 大きな暗い虹彩・その中心の小さな光・白い眼球の三段で、
+      // 発光面積を増やさずに「丸くて濡れた目」を作る
+      eye.add(place(kit.lens(iris, iris * (h / s), s * 0.2, "hide", p.deep, 12), 0, 0, -s * 0.34));
+      eye.add(place(kit.lens(iris * 0.46 * slit, iris * 0.46 * (h / s), s * 0.12, "glow", p.glow, 10), 0, 0, -s * 0.46));
+    } else {
+      eye.add(place(kit.lens(iris, iris, s * 0.14, "glow", p.glow, 10), 0, 0, -s * 0.4));
+      // 瞳孔。ここが無いと、どんなに形を整えても視線が生まれない
+      eye.add(place(kit.lens(iris * 0.52 * slit, iris * 0.84, s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
+    }
     // ハイライト。1点入るだけで目が濡れた球として読める
     eye.add(place(kit.lens(iris * 0.30, iris * 0.30, s * 0.06, "plate", p.plate, 6), iris * 0.40, iris * 0.42, -s * 0.56));
+    if (m.sclera === "wet") {
+      // 反対の隅にもう1点。2点入ると目が「濡れて丸い」ことが決定的になる
+      eye.add(place(kit.lens(iris * 0.17, iris * 0.17, s * 0.05, "plate", p.plate, 6), -iris * 0.44, -iris * 0.48, -s * 0.54));
+    }
 
     // まぶたの縁。目の輪郭を暗い線で1周なぞると、10画素の大きさでも
     // 「点」ではなく「目の形」として読める。上を太く、下を細くする
@@ -267,6 +283,47 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
 
     head.add(eye);
   }
+}
+
+/**
+ * 単眼。結晶・不死者・異形の「一つ目」を組む。
+ *
+ * 一つ目は「光る球を1つ置く」で済ませてしまいがちだが、それでは
+ * 顔ではなく**顔面に付いたランプ**になる。両目と同じで、
+ * 眼窩の窪み・暗い眼球・虹彩・裂けた瞳孔・まぶたの縁を順に重ねると、
+ * 1つしか無くても視線が生まれる。
+ */
+export function addCyclopsEye(
+  kit: CreatureKit,
+  head: THREE.Object3D,
+  o: { y: number; z: number; size: number; skin?: THREE.Color; slit?: number },
+): void {
+  const p = kit.palette;
+  const s = o.size;
+  const skin = o.skin ?? p.dark;
+  const slit = o.slit ?? 0.34;
+
+  // 眼窩。目より奥に広く落として、縁だけがはみ出すようにする
+  head.add(place(kit.lens(s * 1.5, s * 1.02, s * 0.5, "hide", p.deep, 16), 0, o.y, o.z + s * 0.34));
+  // 眼球。暗く沈めるのが要。ここを明るくすると顔が白い塊になる
+  head.add(place(kit.lens(s * 1.16, s * 0.78, s * 0.42, "hide", p.deep, 16), 0, o.y, o.z + s * 0.06));
+  // 虹彩と、縦に裂けた瞳孔
+  head.add(place(kit.lens(s * 0.62, s * 0.6, s * 0.2, "glow", p.glow, 12), 0, o.y, o.z - s * 0.26));
+  head.add(place(kit.lens(s * 0.62 * slit, s * 0.5, s * 0.12, "hide", p.deep, 8), 0, o.y, o.z - s * 0.4));
+  head.add(place(kit.lens(s * 0.17, s * 0.17, s * 0.08, "plate", p.plate, 6), s * 0.26, o.y + s * 0.22, o.z - s * 0.48));
+
+  // まぶたの縁。横長の目を1周なぞると、遠景でも「目の形」として残る
+  const rimTop = kit.band(s * 1.22, s * 0.085, Math.PI, "hide", skin, 20);
+  rimTop.scale.set(1, 0.72, 1);
+  place(rimTop, 0, o.y, o.z - s * 0.16);
+  head.add(rimTop);
+  const rimLow = kit.band(s * 1.2, s * 0.06, Math.PI, "hide", skin, 18);
+  rimLow.scale.set(1, 0.72, 1);
+  place(rimLow, 0, o.y, o.z - s * 0.14, 0, 0, Math.PI);
+  head.add(rimLow);
+  // 上まぶた。被さる量が「据わった目つき」になる
+  head.add(place(kit.lens(s * 1.3, s * 0.5, s * 0.6, "hide", skin, 12), 0, o.y + s * 0.72, o.z + s * 0.06, -0.24, 0, 0));
+  head.add(place(kit.lens(s * 1.2, s * 0.34, s * 0.5, "hide", skin, 10), 0, o.y - s * 0.7, o.z + s * 0.1, 0.24, 0, 0));
 }
 
 /** 旧来の呼び出し口。獣の目つきを既定にして、全種別の顔を底上げする */
@@ -1196,10 +1253,14 @@ function buildSupport(kit: CreatureKit, rig: CreatureRig): void {
   place(rig.neck, 0, 0.62, 0);
   place(rig.head, 0, 0.14, 0);
   rig.head.add(place(kit.octa(0.19, 0.2, 0.19, "crystal", p.plate), 0, 0, 0));
-  // 頭を締める金属の輪と、単眼。顔の情報を1点に集めて視線を作る
+  // 頭を締める金属の輪
   rig.head.add(place(kit.band(0.2, 0.022, Math.PI * 2, "metal", p.metal, 14), 0, 0, 0, 0.35, 0, 0));
-  rig.head.add(place(kit.ball(0.07, 0.05, 0.03, "hide", p.deep, 8), 0, 0.0, -0.17));
-  rig.head.add(place(kit.box(0.22, 0.035, 0.03, "glow", p.glow), 0, 0.0, -0.185));
+  // 顔。以前は光る帯を1本貼っただけで、顔面にランプを付けた置物だった。
+  // 面を一段前へ出し、その上に単眼を彫り込むと、結晶でも視線が生まれる
+  rig.head.add(place(kit.octa(0.15, 0.13, 0.09, "crystal", p.main), 0, 0.0, -0.15));
+  addCyclopsEye(kit, rig.head, { y: 0.0, z: -0.19, size: 0.085, skin: p.metal, slit: 0.3 });
+  // 眉庇にあたる庇板。単眼の上に一段の影を落として、目を顔の中へ収める
+  rig.head.add(place(kit.lens(0.15, 0.028, 0.075, "metal", p.metal, 12), 0, 0.085, -0.19, -0.45, 0, 0));
   for (let i = 0; i < 3; i++) {
     const crown = kit.octa(0.045, 0.18, 0.045, "crystal", p.accent);
     place(crown, (i - 1) * 0.14, 0.24, 0.02, 0, 0, (i - 1) * -0.45);
