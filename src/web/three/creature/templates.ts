@@ -1024,8 +1024,8 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.34, r0: 0.30, r1: 0.27, rot: [0.06, 0, side * 0.05], radial: 6 },
-        { len: 0.32, r0: 0.26, r1: 0.29, rot: [-0.08, 0, 0], radial: 6 },
+        { len: 0.34, r0: 0.30, r1: 0.27, rot: [0.06, 0, side * 0.05], radial: 6, facet: true },
+        { len: 0.32, r0: 0.26, r1: 0.29, rot: [-0.08, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -1072,13 +1072,45 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   torso.add(place(kit.rock(0.26, 0.24, 0.16, "hide", p.dark, 0.3), 0, 0.62, -0.44));
   torso.add(place(kit.octa(0.14, 0.20, 0.12, "crystal", p.accent), 0, 0.62, -0.48));
   torso.add(place(kit.octa(0.06, 0.10, 0.05, "glow", p.glow), 0, 0.62, -0.50));
-  // 背に生えた結晶柱
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    const shard = kit.octa(0.09, 0.30 - Math.abs(t - 0.5) * 0.28, 0.09, "crystal", p.accent);
-    place(shard, (t - 0.5) * 0.78, 1.02 + Math.sin(t * Math.PI) * 0.16, 0.30, 0.55, 0, (t - 0.5) * 1.5);
-    torso.add(shard);
+  // 背に生えた結晶。1本ずつ均等に立てると櫛になるので、
+  // 大小と向きを散らした房を3か所に分けて生やす
+  for (let i = 0; i < 3; i++) {
+    const t = i / 2;
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 5,
+      length: 0.42 - Math.abs(t - 0.5) * 0.24,
+      radius: 0.1,
+      spread: 0.7,
+      scatter: 0.13,
+      minScale: 0.3,
+    });
+    place(cluster, (t - 0.5) * 0.76, 1.0, 0.3, 0.5, 0, (t - 0.5) * 1.4);
+    torso.add(cluster);
   }
+  // 胸の石板。岩の段の合わせ目に、縁の立った板を差し込む。
+  // 塊だけを積むと輪郭が丸い岩の連なりになるので、平らな面をひとつ通す
+  torso.add(
+    place(
+      kit.plateStack("plate", p.plate, {
+        count: 4,
+        y0: 0.34,
+        y1: 0.86,
+        z: -0.34,
+        zEnd: -0.44,
+        width: 0.5,
+        widthEnd: 0.66,
+        height: 0.2,
+        heightEnd: 0.24,
+        thickness: 0.06,
+        wrap: 0.4,
+        wrapEnd: 0.5,
+        notch: 0.3,
+      }),
+      0,
+      0,
+      0,
+    ),
+  );
   // 肩に載る大岩
   for (const side of [-1, 1]) {
     torso.add(place(kit.rock(0.34, 0.32, 0.34, "hide", p.main, 0.3), side * 0.90, 1.02, 0));
@@ -1094,8 +1126,8 @@ function buildGolem(kit: CreatureKit, rig: CreatureRig): void {
   for (const side of [-1, 1]) {
     const arm = kit.chain(
       [
-        { len: 0.58, r0: 0.27, r1: 0.23, rot: [0.16, 0, side * 0.12], radial: 6 },
-        { len: 0.56, r0: 0.23, r1: 0.26, rot: [-0.14, 0, 0], radial: 6 },
+        { len: 0.58, r0: 0.27, r1: 0.23, rot: [0.16, 0, side * 0.12], radial: 6, facet: true },
+        { len: 0.56, r0: 0.23, r1: 0.26, rot: [-0.14, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
