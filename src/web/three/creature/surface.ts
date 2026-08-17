@@ -515,9 +515,23 @@ float brushedStreak(vec3 p) {
   return snoise(vec3(p.x * 42.0, p.y * 3.5, p.z * 42.0)) * 0.5 + 0.5;
 }
 
-/** 毛の流れ。縦に細長いノイズで、束になった毛羽を表す */
+/**
+ * 毛の流れ。
+ *
+ * 細い筋を1段だけ描くと、遠目には均一なノイズに潰れて
+ * **つるりとしたゴムの塊**にしか見えない(狼の胴が紫のグミになっていた)。
+ * 実際の毛皮でいちばん目に付くのは1本ずつの毛ではなく、
+ * 毛が寄って出来た「房」の陰影。粗い房と、その中の毛束の2段で作る。
+ *
+ * どちらもY方向の目を粗く取ってあるので、模様は縦へ長く流れる。
+ * 毛は生えた向きに寝ているので、これが無いと綿のかたまりになる。
+ */
 float strandPattern(vec3 p) {
-  return snoise(vec3(p.x * 34.0, p.y * 6.0, p.z * 34.0)) * 0.5 + 0.5;
+  // 房。毛が寄って出来た大きな塊
+  float clump = snoise(p * vec3(7.5, 3.4, 7.5)) * 0.5 + 0.5;
+  // 房の中の毛束。房そのものの位置で歪ませ、房に沿って流れるようにする
+  float tuft = snoise(vec3(p.x * 26.0, p.y * 5.5, p.z * 26.0) + clump * 1.8) * 0.5 + 0.5;
+  return clamp(clump * 0.52 + tuft * 0.48, 0.0, 1.0);
 }
 
 /**
@@ -703,17 +717,22 @@ void main() {
   // 生き物ではなく「塗り分けた布」に見える
   float mottle = snoise(vWorld * 2.1 + 11.0);
   float fleck = snoise(vWorld * 8.5 - 4.0);
-  albedo = mix(albedo, uDorsal, max(0.0, mottle) * 0.20 + max(0.0, fleck) * 0.09);
-  albedo = mix(albedo, uBelly, max(0.0, -mottle) * 0.14);
+  albedo = mix(albedo, uDorsal, max(0.0, mottle) * 0.30 + max(0.0, fleck) * 0.13);
+  albedo = mix(albedo, uBelly, max(0.0, -mottle) * 0.22 + max(0.0, -fleck) * 0.08);
 
   // 明暗のゆらぎは色のゆらぎより弱くする。強いと迷彩に見える
   albedo *= 0.90 + blotch * 0.20;
   albedo *= 0.94 + grain * 0.12;
   // 体の下ほど暗く。ただし**上を明るくはしない**。
   // 上へ加算すると、背を暗く塗った意味が消えて「背が明るい生き物」になる
-  albedo *= 0.80 + height01 * 0.21;
+  //
+  // **背側では持ち上げを弱める。** 背は上を向いているので、この2行と
+  // キーライトの3つが同時に効き、せっかく暗く塗った背が明るく戻ってしまう。
+  // 実際に狼の背と脇腹が同じ明るさになり、腹背の塗り分けが消えていた
+  float lift = 1.0 - dorsal * 0.62;
+  albedo *= 0.80 + height01 * 0.21 * lift;
   // 下向きの面を沈める擬似AO。同じ理由で、上向きの面は素通しに留める
-  albedo *= 0.82 + upness * 0.19;
+  albedo *= 0.82 + upness * 0.19 * lift;
 
   #ifdef SCALES
     // 爬虫類の鱗。境目が落ちることでパーツの丸みも読み取りやすくなる
@@ -732,8 +751,13 @@ void main() {
   #endif
 
   #ifdef STRANDS
-    // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる
-    albedo *= 0.80 + height * 0.34;
+    // 毛皮・羽毛は縦に流れる毛束。粒より粗く、方向を持たせる。
+    // 弱いと均一な面に潰れて毛に見えないので、房の陰影ははっきり付ける
+    albedo *= 0.66 + height * 0.56;
+    // 毛先。房の陰影より細かい段をもう1枚だけ重ねる。
+    // 高さ場に入れると法線の摂動が4回叩かれて重くなるので、色にだけ効かせる
+    float bristle = snoise(vec3(vWorld.x * 60.0, vWorld.y * 9.0, vWorld.z * 60.0)) * 0.5 + 0.5;
+    albedo *= 0.90 + bristle * 0.19;
   #endif
 
   #ifdef STREAKS
@@ -758,8 +782,10 @@ void main() {
   // 毛は段を持たずになだらかに暗くなる
   #ifdef SOFT
     // 毛皮・羽毛は光が繊維の中で何度も散るので、明暗の境目が出ない。
-    // 落ちを長く取り、いちばん暗いところも沈めきらない
-    float diffuse = pow(key, 0.72) * 0.88 + 0.12;
+    // 落ちを長く取り、いちばん暗いところも沈めきらない。
+    // ただし寝かせすぎると全面が同じ明るさになり、房を描いても
+    // 陰影が付かないまま「均一な毛の塊」に戻る
+    float diffuse = pow(key, 0.86) * 0.97 + 0.07;
   #else
     float diffuse = ramp(key) * 1.05;
   #endif
@@ -1031,7 +1057,7 @@ function dorsalOf(color: THREE.Color): THREE.Color {
   color.getHSL(hsl, THREE.SRGBColorSpace);
   const out = new THREE.Color();
   // 下限を置くのは闇属性のため。ここを 0 まで許すと背が黒く潰れて形が読めなくなる
-  const lit = Math.max(0.11, hsl.l * 0.52);
+  const lit = Math.max(0.10, hsl.l * 0.44);
   out.setHSL((hsl.h + 0.985) % 1, Math.min(1, hsl.s * 1.2 + 0.06), lit, THREE.SRGBColorSpace);
   return out;
 }
@@ -1240,7 +1266,7 @@ function applyVariant(config: StyleConfig, variant: SurfaceVariant): StyleConfig
       return {
         ...config,
         defines: { ...defines, STRANDS: "", SOFT: "" },
-        bump: 0.006,
+        bump: 0.011,
         specStrength: 0,
         rimStrength: 0.7,
       };

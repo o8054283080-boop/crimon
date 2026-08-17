@@ -285,6 +285,47 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
   }
 }
 
+/**
+ * 単眼。結晶・不死者・異形の「一つ目」を組む。
+ *
+ * 一つ目は「光る球を1つ置く」で済ませてしまいがちだが、それでは
+ * 顔ではなく**顔面に付いたランプ**になる。両目と同じで、
+ * 眼窩の窪み・暗い眼球・虹彩・裂けた瞳孔・まぶたの縁を順に重ねると、
+ * 1つしか無くても視線が生まれる。
+ */
+export function addCyclopsEye(
+  kit: CreatureKit,
+  head: THREE.Object3D,
+  o: { y: number; z: number; size: number; skin?: THREE.Color; slit?: number },
+): void {
+  const p = kit.palette;
+  const s = o.size;
+  const skin = o.skin ?? p.dark;
+  const slit = o.slit ?? 0.34;
+
+  // 眼窩。目より奥に広く落として、縁だけがはみ出すようにする
+  head.add(place(kit.lens(s * 1.5, s * 1.02, s * 0.5, "hide", p.deep, 16), 0, o.y, o.z + s * 0.34));
+  // 眼球。暗く沈めるのが要。ここを明るくすると顔が白い塊になる
+  head.add(place(kit.lens(s * 1.16, s * 0.78, s * 0.42, "hide", p.deep, 16), 0, o.y, o.z + s * 0.06));
+  // 虹彩と、縦に裂けた瞳孔
+  head.add(place(kit.lens(s * 0.62, s * 0.6, s * 0.2, "glow", p.glow, 12), 0, o.y, o.z - s * 0.26));
+  head.add(place(kit.lens(s * 0.62 * slit, s * 0.5, s * 0.12, "hide", p.deep, 8), 0, o.y, o.z - s * 0.4));
+  head.add(place(kit.lens(s * 0.17, s * 0.17, s * 0.08, "plate", p.plate, 6), s * 0.26, o.y + s * 0.22, o.z - s * 0.48));
+
+  // まぶたの縁。横長の目を1周なぞると、遠景でも「目の形」として残る
+  const rimTop = kit.band(s * 1.22, s * 0.085, Math.PI, "hide", skin, 20);
+  rimTop.scale.set(1, 0.72, 1);
+  place(rimTop, 0, o.y, o.z - s * 0.16);
+  head.add(rimTop);
+  const rimLow = kit.band(s * 1.2, s * 0.06, Math.PI, "hide", skin, 18);
+  rimLow.scale.set(1, 0.72, 1);
+  place(rimLow, 0, o.y, o.z - s * 0.14, 0, 0, Math.PI);
+  head.add(rimLow);
+  // 上まぶた。被さる量が「据わった目つき」になる
+  head.add(place(kit.lens(s * 1.3, s * 0.5, s * 0.6, "hide", skin, 12), 0, o.y + s * 0.72, o.z + s * 0.06, -0.24, 0, 0));
+  head.add(place(kit.lens(s * 1.2, s * 0.34, s * 0.5, "hide", skin, 10), 0, o.y - s * 0.7, o.z + s * 0.1, 0.24, 0, 0));
+}
+
 /** 旧来の呼び出し口。獣の目つきを既定にして、全種別の顔を底上げする */
 export function addEyes(kit: CreatureKit, head: THREE.Object3D, x: number, y: number, z: number, radius: number): void {
   addFaceEyes(kit, head, { x, y, z, size: radius * 1.25, mood: "fierce" });
@@ -1212,10 +1253,14 @@ function buildSupport(kit: CreatureKit, rig: CreatureRig): void {
   place(rig.neck, 0, 0.62, 0);
   place(rig.head, 0, 0.14, 0);
   rig.head.add(place(kit.octa(0.19, 0.2, 0.19, "crystal", p.plate), 0, 0, 0));
-  // 頭を締める金属の輪と、単眼。顔の情報を1点に集めて視線を作る
+  // 頭を締める金属の輪
   rig.head.add(place(kit.band(0.2, 0.022, Math.PI * 2, "metal", p.metal, 14), 0, 0, 0, 0.35, 0, 0));
-  rig.head.add(place(kit.ball(0.07, 0.05, 0.03, "hide", p.deep, 8), 0, 0.0, -0.17));
-  rig.head.add(place(kit.box(0.22, 0.035, 0.03, "glow", p.glow), 0, 0.0, -0.185));
+  // 顔。以前は光る帯を1本貼っただけで、顔面にランプを付けた置物だった。
+  // 面を一段前へ出し、その上に単眼を彫り込むと、結晶でも視線が生まれる
+  rig.head.add(place(kit.octa(0.15, 0.13, 0.09, "crystal", p.main), 0, 0.0, -0.15));
+  addCyclopsEye(kit, rig.head, { y: 0.0, z: -0.19, size: 0.085, skin: p.metal, slit: 0.3 });
+  // 眉庇にあたる庇板。単眼の上に一段の影を落として、目を顔の中へ収める
+  rig.head.add(place(kit.lens(0.15, 0.028, 0.075, "metal", p.metal, 12), 0, 0.085, -0.19, -0.45, 0, 0));
   for (let i = 0; i < 3; i++) {
     const crown = kit.octa(0.045, 0.18, 0.045, "crystal", p.accent);
     place(crown, (i - 1) * 0.14, 0.24, 0.02, 0, 0, (i - 1) * -0.45);

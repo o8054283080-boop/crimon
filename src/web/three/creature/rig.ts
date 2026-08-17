@@ -101,7 +101,7 @@ export interface AnimProfile {
    */
   squash: number;
   /** 攻撃モーションの型 */
-  attack: "lunge" | "slam" | "cast" | "dash" | "pounce" | "breath" | "swipe" | "bless";
+  attack: AttackKind;
   /**
    * 体感重量。0が羽のように軽い、1が岩の塊。
    *
@@ -127,6 +127,16 @@ export interface AnimProfile {
    */
   accent: AccentKind;
 }
+
+/**
+ * 攻撃モーションの型。
+ *
+ * 8種あるが、関節の動かし方だけを変えても「似た動作の色違い」にしかならない。
+ * 型の差は**間の配分**で作る(MonsterAvatar の ATTACK_TIMING)。
+ * 溜めが長いのか無いのか、打ち抜きが一瞬なのか持続するのか、
+ * 余韻を引きずるのか、が離れて見ても分かる差になる。
+ */
+export type AttackKind = "lunge" | "slam" | "cast" | "dash" | "pounce" | "breath" | "swipe" | "bless";
 
 /**
  * 待機中の仕草の種類。
