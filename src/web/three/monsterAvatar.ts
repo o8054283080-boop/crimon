@@ -445,12 +445,24 @@ export class MonsterAvatar {
     const flapHz = 0.56 - mass * 0.18; // 翼の畳み直し
     const microHz = 2.7 - mass * 0.9; // 立ち直しの微振動。振幅は極小
 
+    /**
+     * 役割ごとの振れ幅に下限を作る。
+     *
+     * ビルダーの指定は 0.3〜1.5 の幅があり、0.3 台をそのまま掛けると
+     * 首も腰も動かず、静止画と区別が付かなくなる(ゴーレムの頭が
+     * 0.05ラジアンしか動いていなかった)。個体差は残しつつ、
+     * 下限を約0.6に持ち上げる。
+     */
+    const swayGain = 0.42 + anim.sway * 0.62;
+    const headGain = 0.42 + anim.headSway * 0.62;
+    const breathGain = 0.42 + anim.breath * 0.62;
+
     // === 待機モーション ===================================================
     // 呼吸。吸う(速い)と吐く(遅い)を非対称にする。左右対称な正弦波のままだと
     // 「膨らんで縮む球」にしか見えず、肺の動きとして読めない
     const breathPhase = T * breathHz;
     const breath = Math.sin(breathPhase) * 0.72 + Math.sin(breathPhase * 2 + 0.9) * 0.28;
-    const breathStrength = anim.breath * (0.55 + this.hpRatio * 0.45) * alive;
+    const breathStrength = breathGain * (0.55 + this.hpRatio * 0.45) * alive;
     rig.torso.rotation.set(
       rig.torsoRest.x + breath * 0.05 * breathStrength,
       rig.torsoRest.y,
@@ -468,14 +480,14 @@ export class MonsterAvatar {
     // 立ち直しの微振動。重い個体ほど強く出す(支えきれずに揺り戻す)
     const micro = Math.sin(T * microHz) * (0.3 + mass * 0.7) * alive;
     let offsetY = 0;
-    let offsetZ = rock * 0.03 * anim.sway;
-    let offsetX = shift * 0.07 * anim.sway;
-    let leanX = (rock * 0.055 + breath * 0.02) * anim.sway;
-    let leanZ = shift * 0.055 * anim.sway;
+    let offsetZ = rock * 0.03 * swayGain;
+    let offsetX = shift * 0.085 * swayGain;
+    let leanX = (rock * 0.07 + breath * 0.025) * swayGain;
+    let leanZ = shift * 0.07 * swayGain;
     // 腰と胴の捻り。腰が体重の乗った側へ傾き、胴が逆へ返す(コントラポスト)。
     // これが無いと、腕と脚を動かしても「一枚板が横に滑っている」ように見える
-    let hipZ = -shift * 0.095 * anim.sway;
-    let hipY = shift * 0.07 * anim.sway;
+    let hipZ = -shift * 0.12 * swayGain;
+    let hipY = shift * 0.09 * swayGain;
 
     if (rig.floats) {
       // 浮遊するものは足で支えていないので、常に微妙に漂い続ける。
@@ -490,23 +502,23 @@ export class MonsterAvatar {
     } else {
       // 接地するものは、体重が片脚に乗り切った時に腰が上がり、
       // 乗せ替える瞬間に沈む。体重移動の2倍の周期にすると噛み合う
-      offsetY += (Math.abs(shift) - 0.62) * 0.11 * (1 - mass * 0.3) * alive;
+      offsetY += (Math.abs(shift) - 0.62) * 0.15 * (1 - mass * 0.3) * swayGain * alive;
       offsetY += Math.sin(T * breathHz + 0.6) * anim.bob * 0.85 * alive;
       // 足が地面を捉えている感じは、この微小な上下の揺り返しから出る
-      offsetY += micro * 0.004;
-      leanZ += micro * 0.006;
+      offsetY += micro * 0.011;
+      leanZ += micro * 0.014;
     }
 
     // 首と頭。生き物らしさが一番出るので、周期をずらして複数の波を重ねる
     rig.neck.rotation.set(
-      rig.neckRest.x + (breath * 0.045 - rock * 0.05) * anim.headSway * alive,
-      rig.neckRest.y + Math.sin(T * tailHz * 0.55) * 0.075 * anim.headSway * alive,
-      rig.neckRest.z - shift * 0.05 * anim.headSway,
+      rig.neckRest.x + (breath * 0.055 - rock * 0.06) * headGain * alive,
+      rig.neckRest.y + Math.sin(T * tailHz * 0.55) * 0.09 * headGain * alive,
+      rig.neckRest.z - shift * 0.06 * headGain,
     );
-    let headX = rig.headRest.x + Math.sin(T * breathHz * 1.7 + 1.1) * 0.05 * anim.headSway * alive;
+    let headX = rig.headRest.x + Math.sin(T * breathHz * 1.7 + 1.1) * 0.06 * headGain * alive;
     // 見回す遅い波。視線が動いているだけで生き物に見える
-    let headY = rig.headRest.y + Math.sin(T * swayHz * 2.1 + 0.3) * 0.13 * anim.headSway * alive;
-    let headZ = rig.headRest.z - shift * 0.07 * anim.headSway;
+    let headY = rig.headRest.y + Math.sin(T * swayHz * 2.1 + 0.3) * 0.16 * headGain * alive;
+    let headZ = rig.headRest.z - shift * 0.085 * headGain;
     let jawOpen = 0;
     // 粘体の伸縮。呼吸より速い周期で、たぷんと戻る非対称な波にする
     let squash = anim.squash > 0 ? (Math.sin(T * breathHz * 1.8) + Math.sin(T * breathHz * 3.5) * 0.35) * 0.11 * alive : 0;
@@ -1026,7 +1038,7 @@ export class MonsterAvatar {
       this.gazePitch = (Math.random() - 0.5) * 0.24;
     }
     const locked = busy || this.targeted || this.activeGlow > 0.35 || death > 0;
-    const gazeGain = anim.headSway * alive;
+    const gazeGain = headGain * alive;
     const wantYaw = locked ? 0 : this.gazeYaw * gazeGain;
     const wantPitch = locked ? -0.04 * gazeGain : this.gazePitch * gazeGain;
     // 頭は体より遅れて向きを変える。素早く振ると生き物の反射に見える
@@ -1068,7 +1080,7 @@ export class MonsterAvatar {
     // 腰を捻ったぶん、胴は逆へ返す。全身が一枚板で回らないようにする
     rig.torso.rotation.x += leanX * 0.55;
     rig.torso.rotation.y = rig.torsoRest.y - hipY * 0.7;
-    rig.torso.rotation.z = rig.torsoRest.z - hipZ * 0.55 + Math.sin(T * breathHz * 0.8) * 0.03 * anim.sway * alive;
+    rig.torso.rotation.z = rig.torsoRest.z - hipZ * 0.55 + Math.sin(T * breathHz * 0.8) * 0.038 * swayGain * alive;
     rig.head.rotation.set(headX, headY, headZ);
     if (rig.jaw) rig.jaw.rotation.x = rig.jawRest.x - jawOpen * 0.5;
 
