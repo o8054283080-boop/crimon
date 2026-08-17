@@ -233,7 +233,12 @@ export class BattleStage {
 
     // ブルームは RenderPass 直後(=トーンマッピング前のリニアHDR)にかかる。
     // しきい値を1超えに置くことで、本当に明るい部分だけが滲むようにしている。
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.18, 0.5, 1.15);
+    //
+    // **上げるなら threshold ではなく strength。** しきい値を下げると、
+    // それまで滲まなかった中間調まで一斉に滲みだし、加算合成のVFXと
+    // 重なった瞬間に飽和する。強度なら「もともと滲んでいたもの」が
+    // 少し広がるだけなので、増え方が上限に対して線形で読める
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.24, 0.5, 1.15);
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
 
