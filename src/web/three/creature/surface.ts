@@ -98,7 +98,7 @@ const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
   // 冷えかけた炭。地色を暗く落とすことで、割れ目の奥の熾火が初めて「熱」に見える。
   // 全身が明るい赤だと、どこが熱いのか分からない只のトマトになる
   FIRE: {
-    body: [0, 0.94, 0.82, 0],
+    body: [0, 1.0, 0.74, 0],
     keratin: 0xe8dcc4,
     peltSat: 0.55,
     flesh: 0.36,
@@ -115,7 +115,7 @@ const ELEMENT_SKIN: Record<keyof typeof ELEMENT_THEME, ElementSkin> = {
   // 帯電。地色は黄ではなく**焼けた青銅**にする。
   // 体まで黄色いと、体表を走る電位の筋が地色に埋もれて見えなくなる
   ELECTRIC: {
-    body: [-0.03, 1.0, 0.76, 0],
+    body: [-0.022, 0.72, 0.64, 0],
     keratin: 0xf2e8cc,
     peltSat: 0.58,
     flesh: 0.28,
@@ -812,10 +812,13 @@ void main() {
   // 熾火。溝の奥ほど、そして光の当たらない面ほど赤く残る。
   // 明るい面で光らせると全身が発光体になってしまうので、影の側だけに出す
   if (uEmber > 0.001) {
-    float pit = 1.0 - smoothstep(0.10, 0.60, height);
-    float shade = 1.0 - smoothstep(0.05, 0.55, key);
+    float pit = 1.0 - smoothstep(0.08, 0.55, height);
+    // 溝の奥は自分の縁に隠れて光が届かない。光の当たっている面でも
+    // 割れ目の底だけは熱が見える。ここを 0 にすると、正面から見た時に
+    // 熱がどこにも無い「ただの赤い生き物」になる
+    float shade = 0.30 + 0.70 * (1.0 - smoothstep(0.05, 0.55, key));
     float breathe = 0.72 + 0.28 * sin(uTime * 1.1 + vBody.y * 3.0);
-    color += uGlow * uEmber * pit * shade * breathe * 0.16;
+    color += mix(uGlow, uRim, 0.45) * uEmber * pit * shade * breathe * 0.24;
   }
 
   // 厚みを透かす。逆光側の縁が内側から色づき、体が中身の詰まった
@@ -834,17 +837,29 @@ void main() {
     color += vec3(0.20, 0.31, 0.48) * uWet * fresnel * smoothstep(-0.2, 0.8, normal.y) * 0.30;
   }
 
-  // 帯電。細い筋が体表を這う。面積が小さいので薄くても目に付く
+  // 帯電。細い筋が体表を這う。面積が小さいので薄くても目に付く。
+  // 太い筋を1本だけ出すと「光る模様」になるので、
+  // ノイズの零点に沿った**細い線**にして、体表を走る電位に見せる
   if (uCharge > 0.001) {
-    float arc = snoise(vBody * 9.0 + vec3(0.0, uTime * 1.7, uTime * 0.6));
-    float spark = smoothstep(0.80, 0.97, abs(arc));
-    color += mix(uGlow, uRim, 0.4) * spark * uCharge * 0.30;
+    float arc = snoise(vBody * 7.0 + vec3(0.0, uTime * 1.5, uTime * 0.5));
+    float filament = 1.0 - smoothstep(0.0, 0.075, abs(arc));
+    // 明滅。全身が同時に光ると電飾になるので、体の高さで位相をずらす
+    float flicker = 0.55 + 0.45 * sin(uTime * 9.0 + vBody.y * 5.0);
+    color += mix(uGlow, uRim, 0.4) * filament * flicker * uCharge * 0.42;
+    // 筋の周りだけ地色が持ち上がる。線が体表に「乗っている」ように見える
+    color += uRim * smoothstep(0.30, 0.0, abs(arc)) * uCharge * 0.06;
   }
 
   // 吸光。光の当たっていない面が黒へ落ちる。
-  // 明るくせずに「暗さの質」だけで属性を語れる、いちばん安全な手
+  // 明るくせずに「暗さの質」だけで属性を語れる、いちばん安全な手。
+  // 落とすのは陰の側だけで、キーライトの当たる面には触らない。
+  // 全体を暗くすると形が読めなくなり、闇属性だけ別ゲームの絵になる
   if (uAbsorb > 0.001) {
-    color *= 1.0 - uAbsorb * 0.34 * (1.0 - smoothstep(0.02, 0.50, key));
+    float lit = smoothstep(0.02, 0.50, key);
+    color *= 1.0 - uAbsorb * 0.44 * (1.0 - lit);
+    // 縁の光まで吸う。輪郭だけがかろうじて残る、という見え方になる
+    color -= uRim * fresnel * uAbsorb * 0.10 * (1.0 - lit);
+    color = max(color, vec3(0.0));
   }
 #endif
 
