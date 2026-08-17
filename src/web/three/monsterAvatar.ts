@@ -439,7 +439,12 @@ export class MonsterAvatar {
      * 実際の生き物でも周期が違うので、帯ごとに別々の速さを持たせる。
      * ここを読めば「どれくらいの速さで動いているか」が秒で分かる。
      */
-    const breathHz = 0.47 - mass * 0.17; // 重い個体ほど深くゆっくり吸う
+    /**
+     * 傷ついているほど呼吸が速く深くなり、頭が下がって構えが崩れる。
+     * HPバーを見ずに、立ち姿だけで劣勢が読めるようにする。
+     */
+    const hurt = 1 - this.hpRatio;
+    const breathHz = (0.47 - mass * 0.17) * (1 + hurt * 0.6); // 重い個体ほど深くゆっくり吸う
     const swayHz = 0.20 - mass * 0.06; // 体重の預け替え。いちばん遅い帯
     const tailHz = 0.80 - mass * 0.30; // 尾のうねり。輪郭の外なので一番目に付く
     const flapHz = 0.56 - mass * 0.18; // 翼の畳み直し
@@ -462,7 +467,7 @@ export class MonsterAvatar {
     // 「膨らんで縮む球」にしか見えず、肺の動きとして読めない
     const breathPhase = T * breathHz;
     const breath = Math.sin(breathPhase) * 0.72 + Math.sin(breathPhase * 2 + 0.9) * 0.28;
-    const breathStrength = breathGain * (0.55 + this.hpRatio * 0.45) * alive;
+    const breathStrength = breathGain * (0.85 + hurt * 0.45) * alive;
     rig.torso.rotation.set(
       rig.torsoRest.x + breath * 0.05 * breathStrength,
       rig.torsoRest.y,
@@ -519,6 +524,11 @@ export class MonsterAvatar {
     // 見回す遅い波。視線が動いているだけで生き物に見える
     let headY = rig.headRest.y + Math.sin(T * swayHz * 2.1 + 0.3) * 0.16 * headGain * alive;
     let headZ = rig.headRest.z - shift * 0.085 * headGain;
+    // 傷ついた分だけ頭が落ち、腰が沈む。呼吸が速くなるのと合わせて
+    // 「まだ立っているが、もう長くない」が姿勢で伝わる
+    headX += hurt * hurt * 0.16 * alive;
+    offsetY -= hurt * hurt * 0.035 * rig.height * 0.28 * alive;
+    leanX += hurt * hurt * 0.09 * alive;
     let jawOpen = 0;
     // 粘体の伸縮。呼吸より速い周期で、たぷんと戻る非対称な波にする
     let squash = anim.squash > 0 ? (Math.sin(T * breathHz * 1.8) + Math.sin(T * breathHz * 3.5) * 0.35) * 0.11 * alive : 0;
@@ -796,21 +806,36 @@ export class MonsterAvatar {
     // === 詠唱 =============================================================
     const castT = advance(this.castTrack, dt);
     if (castT !== null) {
-      const rise = arc(castT);
+      // 沈む(予備動作)→ 溜め上げて保持 → 放って余韻。
+      // 山なりの正弦1本だと「上がって下がる」だけで、力を溜めた実感が出ない
+      const brace = castT < 0.22 ? Math.sin((castT / 0.22) * Math.PI) : 0;
+      const charge =
+        castT < 0.22
+          ? 0
+          : castT < 0.7
+            ? Math.pow(Math.sin(((castT - 0.22) / 0.48) * Math.PI * 0.5), 0.7)
+            : Math.pow(1 - (castT - 0.7) / 0.3, 1.6);
+      // 力を保持している間だけ震える。止まっているのに力んでいる、が読める
+      const strain = castT > 0.3 && castT < 0.72 ? Math.sin(castT * Math.PI * 26) * 0.12 * charge : 0;
+      const rise = charge - brace * 0.35;
       offsetY += rise * (rig.floats ? 0.38 : 0.24);
-      leanX -= rise * 0.16;
-      headX -= rise * 0.3;
-      jawOpen = Math.max(jawOpen, rise * 0.4);
+      leanX -= rise * 0.16 - brace * 0.12;
+      headX -= rise * 0.3 - brace * 0.16;
+      jawOpen = Math.max(jawOpen, charge * 0.4);
       for (const arm of rig.arms) {
-        arm.root.rotation.z += arm.side * rise * 1.0;
-        arm.root.rotation.x += rise * 0.5;
+        arm.root.rotation.z += arm.side * (rise * 1.0 + strain * 0.3);
+        arm.root.rotation.x += rise * 0.5 + strain * 0.4;
         if (arm.lower && arm.lowerRest) arm.lower.rotation.x -= rise * 0.5;
       }
       for (const wing of rig.wings) {
-        wing.root.rotation.z -= wing.side * rise * 0.6;
+        wing.root.rotation.z -= wing.side * (rise * 0.6 + strain * 0.25);
         wing.root.rotation.x -= rise * 0.2;
       }
       tailDriveX -= rise * 0.12;
+      // 放った瞬間に体が下へ抜ける。撃ち終わりが「終わった」と読めるようになる
+      if (castT > 0.7 && castT < 0.7 + step / this.castTrack.duration) {
+        this.landSpring.velocity -= 6 - mass * 2;
+      }
     }
 
     // === 被弾 =============================================================
@@ -988,13 +1013,13 @@ export class MonsterAvatar {
       const freq = swingFreq * 0.72;
       const damp = 0.2;
       const swayX = spring.a.step(
-        (lagZ * 1.4 - lagY * 0.9 + Math.sin(T * tailHz * 0.63 + cloth.phase) * 0.075 * alive) * cloth.amount,
+        (lagZ * 1.4 - lagY * 0.9 + Math.sin(T * tailHz * 0.63 + cloth.phase) * 0.13 * alive) * cloth.amount,
         freq,
         damp,
         step,
       );
       const swayZ = spring.b.step(
-        (-lagX * 1.6 + Math.sin(T * tailHz * 0.47 + cloth.phase * 1.7) * 0.06 * alive) * cloth.amount,
+        (-lagX * 1.6 + Math.sin(T * tailHz * 0.47 + cloth.phase * 1.7) * 0.105 * alive) * cloth.amount,
         freq * 0.9,
         damp,
         step,
