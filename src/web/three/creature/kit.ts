@@ -199,7 +199,9 @@ export class CreatureKit {
     const sides = Math.max(3, o.sides ?? 8);
     const n = stations.length;
     const positions: number[] = [];
+    const uvs: number[] = [];
     const indices: number[] = [];
+    const span = Math.max(0.001, stations[n - 1].y - stations[0].y);
 
     const put = (s: HullStation, k: number): number => {
       const a = ((k % sides) / sides) * Math.PI * 2;
@@ -220,6 +222,9 @@ export class CreatureKit {
       }
       const index = positions.length / 3;
       positions.push((s.x ?? 0) + x, s.y, (s.z ?? 0) + z);
+      // 体表シェーダは模様をワールド座標で描くのでUVは使わないが、
+      // 静的パーツの統合(mergeGeometries)は属性の並びが揃っていないと落ちる
+      uvs.push(k / sides, (s.y - stations[0].y) / span);
       return index;
     };
 
@@ -244,6 +249,7 @@ export class CreatureKit {
     const capAt = (station: HullStation, up: boolean) => {
       const center = positions.length / 3;
       positions.push(station.x ?? 0, station.y, station.z ?? 0);
+      uvs.push(0.5, (station.y - stations[0].y) / span);
       const ring: number[] = [];
       for (let k = 0; k < sides; k++) ring.push(put(station, k));
       for (let k = 0; k < sides; k++) {
@@ -258,6 +264,7 @@ export class CreatureKit {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     return this.mesh(geometry, style, color, o.variant);

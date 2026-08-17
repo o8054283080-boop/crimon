@@ -1493,10 +1493,52 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   rig.pelvis.position.y = 0.98;
 
   // --- 腰。後脚が太いぶん、狼より腰の塊を大きく取る ---
-  rig.pelvis.add(place(kit.ball(0.3, 0.28, 0.36, "hide", p.main), 0, 0, 0.04));
-  rig.pelvis.add(place(kit.ball(0.22, 0.2, 0.2, "hide", p.main), 0, -0.03, 0.25));
+  // 球を並べず、輪切りを積んだ1本の角柱で作る。稜線が通るので、
+  // 尻から腰へ絞る流れがそのまま輪郭に出る(球だと必ず丸の連なりになる)
+  rig.pelvis.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.16, rz: 0.15 },
+          { y: 0.14, r: 0.26, rz: 0.22, ridge: 0.25 },
+          { y: 0.34, r: 0.31, rz: 0.28, ridge: 0.3, keel: 0.15 },
+          { y: 0.56, r: 0.27, rz: 0.27, ridge: 0.25, keel: 0.2 },
+          { y: 0.7, r: 0.22, rz: 0.24 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0.34,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
+  // 腿の付け根。腰の角柱から外へ張り出す面。丸ではなく面で受ける
   for (const side of [-1, 1]) {
-    rig.pelvis.add(place(kit.ball(0.16, 0.22, 0.23, "hide", p.main), side * 0.24, -0.01, 0.1));
+    rig.pelvis.add(
+      place(
+        kit.hull(
+          [
+            { y: 0, r: 0.08, rz: 0.12 },
+            { y: 0.09, r: 0.17, rz: 0.23 },
+            { y: 0.2, r: 0.13, rz: 0.18 },
+          ],
+          "hide",
+          p.main,
+          { sides: 6 },
+        ),
+        side * 0.19,
+        -0.01,
+        0.1,
+        0,
+        0,
+        side * 1.35,
+      ),
+    );
   }
 
   // --- 後脚(体重を支える形。腿を太く、足先を大きく) ---
@@ -1521,26 +1563,109 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   // --- 胴(前が重い三角形。胸を深く、腹を絞る) ---
   const torso = rig.torso;
   place(torso, 0, 0.08, -0.6, 0.04, 0, 0);
-  torso.add(place(kit.ball(0.35, 0.42, 0.42, "hide", p.main), 0, 0.02, -0.16));
-  torso.add(place(kit.ball(0.26, 0.27, 0.36, "hide", p.main), 0, 0.0, 0.22));
-  torso.add(place(kit.ball(0.24, 0.2, 0.28, "hide", p.dark), 0, -0.2, -0.14));
-  torso.add(place(kit.ball(0.18, 0.13, 0.34, "hide", p.dark), 0, -0.18, 0.16));
+  // 胴は1本の面取り角柱。輪切りの半径を変えるだけで
+  // 「腰で締まり、肋で深く、肩で重い」が連続した輪郭として出る。
+  // 球を5つ並べていた時は、どの断面も円だったので必ず数珠になっていた。
+  //   keel(前=回した後は下) 腹の合わせ目 / ridge(後=上) 背の峰
+  torso.add(
+    place(
+      kit.hull(
+        [
+          { y: 0, r: 0.19, rz: 0.2 },
+          { y: 0.16, r: 0.23, rz: 0.24, ridge: 0.2, keel: 0.12 },
+          // くびれ。ここが細いほど、次の肋の深さが効く
+          { y: 0.34, r: 0.2, rz: 0.24, ridge: 0.26, keel: 0.2 },
+          { y: 0.54, r: 0.28, rz: 0.34, ridge: 0.3, keel: 0.34 },
+          // 胸のいちばん深いところ
+          { y: 0.72, r: 0.33, rz: 0.42, ridge: 0.26, keel: 0.44 },
+          { y: 0.88, r: 0.34, rz: 0.4, ridge: 0.18, keel: 0.3 },
+          { y: 1.02, r: 0.26, rz: 0.3, keel: 0.24 },
+          { y: 1.12, r: 0.16, rz: 0.19 },
+        ],
+        "hide",
+        p.main,
+        { sides: 8 },
+      ),
+      0,
+      0,
+      0.46,
+      -Math.PI / 2,
+      0,
+      0,
+    ),
+  );
+  // 腹の積層板。1枚ずつ縁が立ち、下の板に次が被さる。
+  // 水平な胴の腹に貼るので、板の厚みが上(体の中)へ向くよう
+  // (X:+90度, Y:180度)で寝かせる。y0が胸側、y1が腰側
+  torso.add(
+    place(
+      kit.plateStack("plate", p.plate, {
+        count: 9,
+        y0: 0,
+        y1: 0.72,
+        // 板の面は腹の線をなぞる。胸側が深く下がっているので、その分だけ下げる
+        z: -0.38,
+        zEnd: 0.02,
+        width: 0.27,
+        widthEnd: 0.16,
+        height: 0.13,
+        heightEnd: 0.09,
+        thickness: 0.026,
+        // 腹の合わせ目は稜線なので、板もきつく折る(緩いと板が浮いて見える)
+        wrap: 0.2,
+        wrapEnd: 0.15,
+        notch: 0.5,
+      }),
+      0,
+      -0.2,
+      -0.24,
+      Math.PI / 2,
+      Math.PI,
+      0,
+    ),
+  );
+
+  // --- 肩。上半身に質量を寄せる。腰との差が「細い腰と重い肩」になる ---
   for (const side of [-1, 1]) {
-    torso.add(place(kit.ball(0.13, 0.19, 0.19, "hide", p.main), side * 0.27, 0.12, -0.22));
-  }
-  // 腹の横板。爬虫類の腹甲。横一列に並べると硬さが出る
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    torso.add(place(kit.lens(0.15 - t * 0.03, 0.05, 0.05, "plate", p.plate, 8), 0, -0.24 + t * 0.03, -0.24 + t * 0.5));
+    torso.add(
+      place(
+        kit.hull(
+          [
+            { y: 0, r: 0.09, rz: 0.14 },
+            { y: 0.1, r: 0.19, rz: 0.26, keel: 0.2 },
+            { y: 0.26, r: 0.15, rz: 0.2 },
+          ],
+          "hide",
+          p.main,
+          { sides: 6 },
+        ),
+        side * 0.22,
+        0.12,
+        -0.24,
+        0.2,
+        0,
+        side * 1.3,
+      ),
+    );
+    // 肩の結晶の房。大小と向きを散らして群れにする。均等に生やすと櫛になる
+    const cluster = kit.shardCluster("crystal", p.accent, {
+      count: 5,
+      length: 0.34,
+      radius: 0.055,
+      spread: 0.72,
+      scatter: 0.07,
+    });
+    place(cluster, side * 0.28, 0.24, -0.16, -0.5, 0, side * 0.5);
+    torso.add(cluster);
   }
 
   // --- 前脚(後脚より短く、まっすぐ下ろす) ---
   for (const side of [-1, 1]) {
     const leg = kit.chain(
       [
-        { len: 0.27, r0: 0.15, r1: 0.097, rot: [0.16, 0, side * 0.05], radial: 8 },
-        { len: 0.24, r0: 0.097, r1: 0.07, rot: [-0.26, 0, 0], radial: 8 },
-        { len: 0.12, r0: 0.07, r1: 0.058, rot: [0.2, 0, 0], radial: 8 },
+        { len: 0.27, r0: 0.15, r1: 0.097, rot: [0.16, 0, side * 0.05], radial: 7, facet: true },
+        { len: 0.24, r0: 0.097, r1: 0.07, rot: [-0.26, 0, 0], radial: 6, facet: true },
+        { len: 0.12, r0: 0.07, r1: 0.058, rot: [0.2, 0, 0], radial: 6, facet: true },
       ],
       "hide",
       p.main,
@@ -1557,29 +1682,49 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   // 狼は首を前へ低く送り出すが、ドラゴンは一度下げてから跳ね上げる。
   // 頭が肩より高く来ることで、見上げる相手という関係が生まれる
   place(rig.neck, 0, 0.28, -0.34, -0.5, 0, 0);
+  // 首も角柱。断面の中心をずらして S 字を作るので、円錐を継ぐ必要がない。
+  // ridge が背側(+Z)の稜線を立て、首の峰が1本通る
   rig.neck.add(
-    kit.taperedTube(
+    kit.hull(
       [
-        { x: 0, y: 0, z: 0 },
-        { x: 0, y: 0.2, z: 0.06 },
-        { x: 0, y: 0.42, z: 0.02 },
-        { x: 0, y: 0.58, z: -0.12 },
+        { y: 0, r: 0.23, rz: 0.23 },
+        { y: 0.14, r: 0.21, rz: 0.22, z: 0.05, ridge: 0.18 },
+        { y: 0.3, r: 0.18, rz: 0.19, z: 0.06, ridge: 0.22 },
+        { y: 0.45, r: 0.16, rz: 0.17, z: 0.01, ridge: 0.2 },
+        { y: 0.58, r: 0.14, rz: 0.15, z: -0.12, ridge: 0.14 },
       ],
-      0.23,
-      0.135,
       "hide",
       p.main,
-      8,
-      10,
+      { sides: 8, capTop: false },
     ),
   );
-  // 喉の輪。首の長さを目盛りとして見せる
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    rig.neck.add(
-      place(kit.lens(0.1 - t * 0.02, 0.045, 0.05, "plate", p.plate, 8), 0, 0.1 + t * 0.42, 0.09 - t * 0.14, -0.3, 0, 0),
-    );
-  }
+  // 喉の積層板。首の前面を横帯で刻む。1枚ずつ縁が立つので、
+  // 遠目でも首の太さと向きが読める
+  rig.neck.add(
+    place(
+      kit.plateStack("plate", p.plate, {
+        count: 6,
+        y0: 0,
+        y1: 0.42,
+        z: -0.02,
+        zEnd: 0.02,
+        width: 0.2,
+        widthEnd: 0.14,
+        height: 0.11,
+        heightEnd: 0.08,
+        thickness: 0.022,
+        wrap: 0.2,
+        wrapEnd: 0.15,
+        notch: 0.35,
+      }),
+      0,
+      0.1,
+      -0.16,
+      -0.28,
+      0,
+      0,
+    ),
+  );
 
   // --- 背びれ。腰から首の付け根まで、山なりに大きさを変えて並べる ---
   for (let i = 0; i < 9; i++) {
