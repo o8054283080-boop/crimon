@@ -212,8 +212,13 @@ export class BattleStage {
     const { width, height } = this.measure();
     this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 320);
 
-    // 霧の色は空のシェーダの地平線色と合わせてある。遠景がそのまま霞へ溶ける
-    this.scene.fog = new THREE.FogExp2(0x2a3055, 0.0165);
+    // 霧の色は空のシェーダの地平線色(arena.ts の uHaze)と合わせてある。
+    // 遠景がそのまま霞へ溶ける。**両方を同時に変えること。**
+    //
+    // 濃くしてある。体表シェーダは fog を組み込んでいないので、
+    // 濃くしても手前のモンスターは白まず、闘技場だけが奥へ退く。
+    // 空気遠近が付いて、観客席と列柱が「遠い」と読めるようになる
+    this.scene.fog = new THREE.FogExp2(0x2f3660, 0.0235);
     this.scene.add(this.arena.group);
     this.scene.add(this.vfx.root);
 

@@ -492,7 +492,9 @@ export function createArena(): ArenaHandles {
       uniforms: {
         uZenith: { value: new THREE.Color(0x060814) },
         uMid: { value: new THREE.Color(0x1b2245) },
-        uHaze: { value: new THREE.Color(0x2a3055) },
+        // 地平線の霞。battleStage.ts の FogExp2 の色と必ず揃えること。
+        // ずれると、遠景が霞へ溶けずに「空の前に別の色の板が立つ」
+        uHaze: { value: new THREE.Color(0x2f3660) },
         uGlow: { value: new THREE.Color(0x6c4a7a) },
         uTime: { value: 0 },
       },
