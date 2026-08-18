@@ -5,8 +5,17 @@ import { VitePWA } from "vite-plugin-pwa";
 // 環境変数 VITE_BASE_PATH が指定されていればそれを優先する(ローカル開発では "/" のまま)。
 const basePath = process.env.VITE_BASE_PATH ?? "/";
 
+/**
+ * ビルドの版。画面の隅に出して、どのビルドが動いているかを目で確かめられるようにする。
+ * 配信は成功しているのに古い画面が出ている、という切り分けに要る。
+ */
+const buildId = new Date().toISOString().slice(0, 16).replace("T", " ");
+
 export default defineConfig({
   base: basePath,
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+  },
   plugins: [
     VitePWA({
       registerType: "autoUpdate",
@@ -52,7 +61,13 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest}"],
+        // ogg/json を入れ忘れていたため、効果音がキャッシュの対象外だった
+        // (オフラインでは無音になり、ビルドの版とも紐づかない)
+        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest,ogg,json}"],
+        // 効果音が72個あるので、既定の上限(2MiB)だと取りこぼす
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        // 古い版のキャッシュを残さない。残ると更新後も旧ファイルを掴み続ける
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

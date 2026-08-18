@@ -2877,3 +2877,12 @@ body {
   font-size: 0.78rem;
   color: var(--text-dim);
 }
+
+/* 動いているビルドの版。更新が届いているかの切り分けに使う */
+.build-id {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  opacity: 0.6;
+}

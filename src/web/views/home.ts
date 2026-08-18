@@ -105,5 +105,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoEquipDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoLevelDungeon }, ["📈 レベル上げダンジョンに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoGoldDungeon }, ["🪙 ゴールドダンジョンに挑戦する"]),
+    // どのビルドが動いているかの表示。更新が反映されているかの切り分けに使う
+    el("p", { className: "build-id" }, [`版 ${__BUILD_ID__}`]),
   ].filter((n): n is HTMLElement => n !== null));
 }

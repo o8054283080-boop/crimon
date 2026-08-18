@@ -60,7 +60,41 @@ import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
 
-registerSW({ immediate: true });
+/**
+ * 更新の取り込み。
+ *
+ * `autoUpdate` にしていても、**新しいServiceWorkerが権利を取っただけでは
+ * すでに開いている画面は古いままになる**。実際にこれで、配信は成功しているのに
+ * 「音もショップも装備ダンジョンの変更も反映されていない」状態になった。
+ * 権利が入れ替わった時点で1度だけ読み込み直して、確実に新しい版へ乗せ替える。
+ */
+function installUpdateReload(): void {
+  if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+  // 初回訪問では「制御なし → 制御あり」で必ず1度発火する。
+  // そこで読み込み直すと無駄なちらつきになるので、すでに制御されていた時だけ乗せ替える
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+}
+
+installUpdateReload();
+
+registerSW({
+  immediate: true,
+  onRegisteredSW(_swUrl, registration) {
+    if (!registration) return;
+    // 開きっぱなしで遊んでいる間に配信された更新も拾えるよう、定期的に確認する
+    setInterval(() => void registration.update(), 30 * 60 * 1000);
+    // 画面に戻ってきた時も確認する。放置していた端末はこちらの方が早く気付く
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") void registration.update();
+    });
+  },
+});
 
 initAudio();
 
