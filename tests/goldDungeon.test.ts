@@ -9,10 +9,22 @@ import {
 import { applyGoldDungeonClearRewards } from "../src/game/rewards.js";
 
 describe("ゴールドダンジョンのデータ", () => {
-  it("3階まで存在し、階層が上がるほどゴールド報酬が大きい", () => {
-    expect(GOLD_DUNGEON_FLOORS).toHaveLength(3);
+  it("5階まで存在し、階層が上がるほどゴールド報酬が大きい", () => {
+    expect(GOLD_DUNGEON_FLOORS).toHaveLength(5);
     for (let i = 1; i < GOLD_DUNGEON_FLOORS.length; i++) {
       expect(GOLD_DUNGEON_FLOORS[i].goldReward).toBeGreaterThan(GOLD_DUNGEON_FLOORS[i - 1].goldReward);
+    }
+  });
+
+  it("各階層はプレイヤー側と同じ4体編成になる(モンスター種の追加で増えていないこと)", () => {
+    for (const floor of GOLD_DUNGEON_FLOORS) {
+      expect(floor.enemies).toHaveLength(4);
+    }
+  });
+
+  it("階層が上がるほど敵が強くなる", () => {
+    for (let i = 1; i < GOLD_DUNGEON_FLOORS.length; i++) {
+      expect(GOLD_DUNGEON_FLOORS[i].powerScale).toBeGreaterThan(GOLD_DUNGEON_FLOORS[i - 1].powerScale);
     }
   });
 });

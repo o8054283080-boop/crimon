@@ -1226,6 +1226,7 @@ body {
 
 .bottom-nav__btn {
   flex: 1;
+  min-width: 0;
   appearance: none;
   border: none;
   background: transparent;
@@ -1258,6 +1259,12 @@ body {
 .bottom-nav__label {
   font-size: 0.65rem;
   font-weight: 600;
+  /* タブが7つになり、狭い画面で「モンスター」が2行に折り返していた。
+     折り返さずに詰めて、行数がタブごとに変わらないようにする */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .screen {
@@ -2721,4 +2728,152 @@ body {
 .equip-card--locked {
   opacity: 0.42;
   cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- ショップ */
+
+.shop-timer {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.shop-notice {
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(90, 200, 140, 0.14);
+  border: 1px solid rgba(90, 200, 140, 0.34);
+  color: #bff0d2;
+  font-size: 0.88rem;
+}
+
+.shop-notice--none {
+  display: none;
+}
+
+/*
+ * 枠は最大10個。横に無理に詰めると1枚が小さくなりすぎて中身が読めないので、
+ * 幅に応じて2〜4列へ折り返す。
+ */
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(46, 54, 84, 0.72), rgba(22, 27, 46, 0.86));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 商品の種類で縁の色を変える。並んだ時に何が来ているか一目で分かる */
+.shop-card[data-kind="EQUIPMENT"] { border-color: rgba(120, 170, 255, 0.3); }
+.shop-card[data-kind="MONSTER"] { border-color: rgba(255, 160, 120, 0.3); }
+.shop-card[data-kind="SCROLL"] { border-color: rgba(200, 150, 255, 0.3); }
+
+.shop-card--sold {
+  opacity: 0.45;
+}
+
+.shop-card--locked {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-style: dashed;
+  background: rgba(20, 24, 40, 0.5);
+}
+
+.shop-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  flex: 1;
+}
+
+.shop-card__icon {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  font-size: 1.8rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+/* 肖像は枠の中だけを埋める。枠に直接 fill を掛けるとカード全体へ広がってしまう */
+.shop-card__portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  font-size: 1.8rem;
+  line-height: 56px;
+}
+
+.shop-card__stars {
+  font-size: 0.78rem;
+  letter-spacing: -1px;
+  color: var(--eq-tone, #ffd479);
+}
+
+.shop-card__title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.shop-card__sub {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
+.shop-card__stat {
+  font-size: 0.78rem;
+  color: #cfe0ff;
+}
+
+.shop-card__buy {
+  appearance: none;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 6px;
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: #10130f;
+  background: linear-gradient(180deg, #ffd479, #f0a83c);
+  cursor: pointer;
+}
+
+.shop-card__buy--crystal {
+  color: #0d1220;
+  background: linear-gradient(180deg, #8fd8ff, #4aa6e8);
+}
+
+/* 買えない理由が「金が足りない」場合は、押せないことと理由を色で分ける */
+.shop-card__buy--short {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+}
+
+.shop-card__buy:disabled {
+  cursor: default;
+  filter: saturate(0.5);
+}
+
+.shop-footnote {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }

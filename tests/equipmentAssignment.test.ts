@@ -33,6 +33,9 @@ function makeState(): PlayerState {
     loginBonusClaimCount: 0,
     goldDungeonChallengesToday: 0,
     lastGoldDungeonResetAt: null,
+    shopSlotsUnlocked: 5,
+    shopRotationKey: -1,
+    shopPurchasedSlots: [],
   };
 }
 

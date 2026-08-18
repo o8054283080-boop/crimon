@@ -21,7 +21,9 @@ import {
   PlayerState,
   addMonster,
   applyPassiveStaminaRegen,
+  buyShopEntry,
   equipToMonster,
+  getShop,
   getDungeonParty,
   getParty,
   loadPlayerState,
@@ -36,10 +38,12 @@ import {
   trySpendGoldDungeonChallenge,
   trySpendStamina,
   tryUseSummonScroll,
+  unlockShopSlot,
 } from "../game/playerState.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
+import { renderShop } from "./views/shop.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { renderDungeonParty } from "./views/dungeonParty.js";
@@ -120,6 +124,8 @@ interface AppState {
   equipmentSortKey: EquipmentSortKey;
   /** まとめて売却するために選ばれている装備 */
   equipmentSelectedIds: string[];
+  /** ショップで直前に買ったものの案内。次に何か操作したら消す */
+  shopNotice: string | null;
   /** まとめ売却の選択モード中か */
   equipmentSelecting: boolean;
   /** モンスターの装備スロットから装備詳細を開いた場合、戻る操作でこのモンスターの画面に戻るための参照 */
@@ -156,6 +162,7 @@ const state: AppState = {
   equipmentSlotFilter: null,
   equipmentSortKey: "recommended",
   equipmentSelectedIds: [],
+  shopNotice: null,
   equipmentSelecting: false,
   equipmentReturnMonsterId: null,
   selectedDungeonFloor: null,
@@ -728,6 +735,26 @@ function render(): void {
 
     case "EQUIPMENT":
       content = renderEquipmentScreen();
+      break;
+
+    case "SHOP":
+      content = renderShop({
+        player: state.player,
+        shop: getShop(state.player),
+        notice: state.shopNotice,
+        onBuy: (slotIndex) => {
+          const result = buyShopEntry(state.player, slotIndex);
+          state.shopNotice = result.ok ? (result.label ?? "購入しました") : (result.reason ?? "購入できませんでした");
+          if (result.ok) savePlayerState(state.player);
+          render();
+        },
+        onUnlockSlot: () => {
+          const result = unlockShopSlot(state.player);
+          state.shopNotice = result.ok ? "枠を1つ増やしました" : (result.reason ?? "開放できませんでした");
+          if (result.ok) savePlayerState(state.player);
+          render();
+        },
+      });
       break;
 
     case "PARTY":
