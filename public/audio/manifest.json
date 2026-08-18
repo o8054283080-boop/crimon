@@ -1,0 +1,122 @@
+{
+  "impact_slash": [
+    "impact_slash_0.ogg",
+    "impact_slash_1.ogg",
+    "impact_slash_2.ogg"
+  ],
+  "impact_blunt": [
+    "impact_blunt_0.ogg",
+    "impact_blunt_1.ogg",
+    "impact_blunt_2.ogg"
+  ],
+  "impact_pierce": [
+    "impact_pierce_0.ogg",
+    "impact_pierce_1.ogg",
+    "impact_pierce_2.ogg"
+  ],
+  "impact_magic": [
+    "impact_magic_0.ogg",
+    "impact_magic_1.ogg",
+    "impact_magic_2.ogg"
+  ],
+  "flavor_FIRE": [
+    "flavor_FIRE_0.ogg",
+    "flavor_FIRE_1.ogg",
+    "flavor_FIRE_2.ogg"
+  ],
+  "flavor_WATER": [
+    "flavor_WATER_0.ogg",
+    "flavor_WATER_1.ogg",
+    "flavor_WATER_2.ogg"
+  ],
+  "flavor_ELECTRIC": [
+    "flavor_ELECTRIC_0.ogg",
+    "flavor_ELECTRIC_1.ogg",
+    "flavor_ELECTRIC_2.ogg"
+  ],
+  "flavor_GRASS": [
+    "flavor_GRASS_0.ogg",
+    "flavor_GRASS_1.ogg",
+    "flavor_GRASS_2.ogg"
+  ],
+  "flavor_LIGHT": [
+    "flavor_LIGHT_0.ogg",
+    "flavor_LIGHT_1.ogg",
+    "flavor_LIGHT_2.ogg"
+  ],
+  "flavor_DARK": [
+    "flavor_DARK_0.ogg",
+    "flavor_DARK_1.ogg",
+    "flavor_DARK_2.ogg"
+  ],
+  "crit": [
+    "crit_0.ogg",
+    "crit_1.ogg",
+    "crit_2.ogg"
+  ],
+  "whiff": [
+    "whiff_0.ogg",
+    "whiff_1.ogg",
+    "whiff_2.ogg"
+  ],
+  "shield": [
+    "shield_0.ogg",
+    "shield_1.ogg",
+    "shield_2.ogg"
+  ],
+  "death": [
+    "death_0.ogg",
+    "death_1.ogg",
+    "death_2.ogg"
+  ],
+  "heal": [
+    "heal_0.ogg",
+    "heal_1.ogg",
+    "heal_2.ogg"
+  ],
+  "buff": [
+    "buff_0.ogg",
+    "buff_1.ogg",
+    "buff_2.ogg"
+  ],
+  "debuff": [
+    "debuff_0.ogg",
+    "debuff_1.ogg",
+    "debuff_2.ogg"
+  ],
+  "charge": [
+    "charge_0.ogg",
+    "charge_1.ogg",
+    "charge_2.ogg"
+  ],
+  "turnAlly": [
+    "turnAlly_0.ogg",
+    "turnAlly_1.ogg",
+    "turnAlly_2.ogg"
+  ],
+  "turnEnemy": [
+    "turnEnemy_0.ogg",
+    "turnEnemy_1.ogg",
+    "turnEnemy_2.ogg"
+  ],
+  "tap": [
+    "tap_0.ogg",
+    "tap_1.ogg",
+    "tap_2.ogg"
+  ],
+  "select": [
+    "select_0.ogg",
+    "select_1.ogg",
+    "select_2.ogg"
+  ],
+  "victory": [
+    "victory_0.ogg",
+    "victory_1.ogg",
+    "victory_2.ogg"
+  ],
+  "defeat": [
+    "defeat_0.ogg",
+    "defeat_1.ogg",
+    "defeat_2.ogg"
+  ]
+}

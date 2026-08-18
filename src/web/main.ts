@@ -1,4 +1,5 @@
 import "./style.css";
+import { initAudio, playSfx } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
@@ -56,6 +57,25 @@ import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/
 import { renderSummon } from "./views/summon.js";
 
 registerSW({ immediate: true });
+
+initAudio();
+
+/**
+ * ボタンやカードを押した時のUI音。
+ *
+ * 押した場所ごとに個別に鳴らすと付け忘れが必ず出るので、
+ * 文書全体で1回だけ拾って、押されたものの種類で音を選ぶ。
+ */
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    const target = (event.target as HTMLElement | null)?.closest("button, a, .stage-tile, .monster-card, .equipment-card");
+    if (!target) return;
+    // 決定系(ボタン)と選択系(カード)で音を分け、押した対象が伝わるようにする
+    playSfx(target.matches("button, a") ? "tap" : "select", 0.55);
+  },
+  { passive: true, capture: true },
+);
 
 interface StageRunState {
   stage: Stage;
