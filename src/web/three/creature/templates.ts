@@ -1929,38 +1929,14 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
     rig.neck.add(fin);
   }
 
-  // --- 頭(長い口先、後ろへ流れる角) ---
-  // 頭が小さいと、長い首と相まってリャマや馬の輪郭になる。
-  // 首の太さに負けない大きさまで頭蓋を上げ、口先も長く取る
-  place(rig.head, 0, 0.82, -0.16, 0.62, 0, 0);
-  addBeastHead(kit, rig, { skull: [0.28, 0.26, 0.35], snout: 0.50, jaw: true, horns: "swept", crest: 4, eye: 0.072, slit: 0.34 });
-  // 頬の張り出し。口先の細さと対比させて、噛む力があるように見せる
-  for (const side of [-1, 1]) {
-    rig.head.add(place(kit.lens(0.1, 0.13, 0.07, "plate", p.plate, 8), side * 0.19, 0.15, 0.02, 0, 0, side * 0.3));
-  }
-  // 後頭部から伸びる2本の大角。横から見たときの輪郭を、獣ではなく竜側へ寄せる
-  for (const side of [-1, 1]) {
-    rig.head.add(
-      place(
-        kit.taperedTube(
-          [
-            { x: 0, y: 0, z: 0 },
-            { x: side * 0.06, y: 0.14, z: 0.16 },
-            { x: side * 0.16, y: 0.2, z: 0.34 },
-          ],
-          0.05,
-          0.01,
-          "plate",
-          p.plate,
-          6,
-          8,
-        ),
-        side * 0.11,
-        0.22,
-        0.12,
-      ),
-    );
-  }
+  // --- 頭 ---
+  //
+  // **頭は大きめに取る。** 戦闘中のモンスターは画面上で数十ピクセルしかなく、
+  // 解剖学的に正しい比率にすると顔がただの点になって表情も種別も読めない。
+  // 参考にした絵も、実際のトカゲより頭がかなり大きい。
+  place(rig.head, 0, 0.8, -0.16, 0.56, 0, 0);
+  rig.head.scale.setScalar(1.42);
+  addDragonHead(kit, rig);
 
   // 胴より長い尾。先に刃を付けて、ただの紐に見えないようにする
   addTail(kit, rig, [0, 0.06, 0.26], 6, 0.28, 0.11, -1.0, -0.08, true, { hard: true, rings: true });
@@ -1980,6 +1956,169 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
     attack: "breath",
     accent: "roar",
   };
+}
+
+/**
+ * 竜の頭。
+ *
+ * 以前は共通の獣の頭(`addBeastHead`)を使っていたが、あれは**すべて球で組まれている**。
+ * 球はどこを切っても円弧なので、いくつ重ねても「丸の塊」にしかならず、
+ * 実際に拡大すると口先の無い蛙のような顔になっていた。
+ *
+ * 竜の顔が竜に見えるのは、次の4つが揃っている時だと判断した。
+ *
+ * 1. **前へ突き出した細い口先**。頭蓋との太さの差が「顎」を作る
+ * 2. **目の上に張り出した眉**。目そのものより、眉が落とす影が眼力を作る
+ * 3. **後ろへ流れる大きな角**。横から見た輪郭を獣ではなく竜にする
+ * 4. **並んだ牙**。口の線が「ただの溝」ではなく口だと分かる
+ *
+ * どれも球では作れないので、稜線の通る角柱(`hull`)と板と角錐で組んでいる。
+ */
+function addDragonHead(kit: CreatureKit, rig: CreatureRig): void {
+  const p = kit.palette;
+  const head = rig.head;
+
+  // 頭蓋。後頭部(z+)から口先(z-)へ向かって細く絞る。
+  // `hull` は y 方向に積むので、寝かせてから使う
+  const skull = kit.hull(
+    [
+      { y: 0, r: 0.13, rz: 0.11 },
+      { y: 0.1, r: 0.2, rz: 0.19, ridge: 0.2 },
+      { y: 0.24, r: 0.235, rz: 0.215, ridge: 0.3, keel: 0.12 },
+      { y: 0.4, r: 0.2, rz: 0.185, ridge: 0.28, keel: 0.18 },
+      // ここから口先。一気に細くして、頭蓋との段差を「顎」に見せる
+      { y: 0.52, r: 0.125, rz: 0.125, ridge: 0.24, keel: 0.2 },
+      { y: 0.72, r: 0.1, rz: 0.1, ridge: 0.2, keel: 0.2 },
+      { y: 0.9, r: 0.075, rz: 0.08, ridge: 0.16 },
+    ],
+    "hide",
+    p.main,
+    { sides: 7 },
+  );
+  // 寝かせて、口先を前(-z)へ向ける
+  place(skull, 0, 0.12, 0.18, Math.PI / 2, 0, 0);
+  head.add(skull);
+
+  // 下顎。頭蓋とは別の塊にして、口の線を作る。
+  // わずかに開けておくと、閉じた一枚岩に見えない
+  const jaw = kit.hull(
+    [
+      { y: 0, r: 0.1, rz: 0.08 },
+      { y: 0.16, r: 0.15, rz: 0.11, ridge: 0.2 },
+      { y: 0.5, r: 0.1, rz: 0.075, ridge: 0.2 },
+      { y: 0.82, r: 0.07, rz: 0.055 },
+    ],
+    "hide",
+    p.dark,
+    { sides: 6 },
+  );
+  place(jaw, 0, -0.02, 0.1, Math.PI / 2 - 0.12, 0, 0);
+  head.add(jaw);
+
+  // 口の中。開いた隙間の奥が明るいと、口が開いていないように見える
+  head.add(place(kit.box(0.16, 0.05, 0.42, "hide", p.deep), 0, 0.03, -0.16, -0.1, 0, 0));
+
+  // 牙。上下の顎に並べる。左右対称で本数を揃えると作り物に見えるので、
+  // 前ほど長く、後ろほど短くする
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const t = i / 3;
+      const z = -0.34 + t * 0.3;
+      const len = 0.075 - t * 0.032;
+      const upper = kit.spike(0.016, len, 0.7, "plate", p.plate, 4);
+      place(upper, side * (0.075 - t * 0.012), 0.055, z, Math.PI, 0, side * 0.12);
+      head.add(upper);
+      if (i < 3) {
+        const lower = kit.spike(0.014, len * 0.85, 0.7, "plate", p.plate, 4);
+        place(lower, side * (0.065 - t * 0.01), -0.02, z + 0.02, 0, 0, -side * 0.12);
+        head.add(lower);
+      }
+    }
+  }
+
+  // 鼻孔。小さな窪みだが、これが無いと口先がただの棒に見える
+  for (const side of [-1, 1]) {
+    head.add(place(kit.lens(0.028, 0.02, 0.014, "hide", p.deep, 8), side * 0.045, 0.1, -0.4, 0.3, 0, 0));
+  }
+
+  // 眉。**目より眉の方が眼力を作る。**
+  // 目の上へ前傾した板を張り出させて、目に影を落とす。
+  // 色は体色。ここを骨色にすると顔が淡い板の山になり、目が埋もれる
+  for (const side of [-1, 1]) {
+    const brow = kit.plate(0.15, 0.085, 0.038, "hide", p.main, { notch: 0.55, shoulder: 0.62 });
+    place(brow, side * 0.125, 0.215, -0.15, -0.55, side * 0.35, side * 0.5);
+    head.add(brow);
+  }
+
+  // 目。眉の下の影の中に置く。発光させて、暗い頭の中で一点だけ光らせる
+  // 眼窩は暗く落とし、光る部分は小さく絞る。
+  // 光る面を大きく取ると白い塊になって、眼力ではなく「白目」に見える
+  for (const side of [-1, 1]) {
+    head.add(place(kit.lens(0.07, 0.05, 0.032, "hide", p.deep, 10), side * 0.132, 0.148, -0.155, 0, side * 0.4, side * 0.35));
+    head.add(place(kit.lens(0.042, 0.024, 0.024, "glow", p.glow, 10), side * 0.136, 0.15, -0.176, 0, side * 0.4, side * 0.35));
+  }
+
+  // 頬の甲。口先の細さと対比させて、噛む力があるように見せる
+  for (const side of [-1, 1]) {
+    const cheek = kit.plate(0.15, 0.12, 0.04, "hide", p.main, { notch: 0.5, shoulder: 0.7 });
+    place(cheek, side * 0.17, 0.06, 0.02, 0.2, side * 0.5, side * 0.2);
+    head.add(cheek);
+  }
+
+  // 大角。後頭部から後ろへ流し、先を跳ね上げる。
+  // 途中で1度曲げないと、ただの棒になって輪郭が締まらない
+  for (const side of [-1, 1]) {
+    head.add(
+      place(
+        kit.taperedTube(
+          [
+            { x: 0, y: 0, z: 0 },
+            { x: side * 0.06, y: 0.06, z: 0.19 },
+            { x: side * 0.14, y: 0.07, z: 0.4 },
+            { x: side * 0.19, y: 0.18, z: 0.54 },
+          ],
+          0.055,
+          0.008,
+          "plate",
+          p.plate,
+          6,
+          10,
+        ),
+        side * 0.12,
+        0.22,
+        0.14,
+      ),
+    );
+    // 小角。大角の内側に短いものを添えると、1本きりより竜らしくなる
+    head.add(
+      place(
+        kit.taperedTube(
+          [
+            { x: 0, y: 0, z: 0 },
+            { x: side * 0.03, y: 0.07, z: 0.11 },
+            { x: side * 0.06, y: 0.09, z: 0.21 },
+          ],
+          0.03,
+          0.006,
+          "plate",
+          p.plate,
+          5,
+          8,
+        ),
+        side * 0.06,
+        0.26,
+        0.16,
+      ),
+    );
+    // 顎の角。下から跳ね上げると、横顔に刺々しさが出る
+    head.add(place(kit.spike(0.02, 0.11, 0.6, "hide", p.accent, 5), side * 0.125, -0.02, 0.06, -0.6, 0, side * 0.9));
+  }
+
+  // 後頭部から首へ続く鰭。頭と首の境目を隠しつつ、輪郭の最高点を作る
+  for (let i = 0; i < 4; i++) {
+    const t = i / 3;
+    head.add(place(kit.spike(0.018, 0.115 - t * 0.04, 0.55, "hide", p.accent, 5), 0, 0.275 - t * 0.06, 0.16 + t * 0.12, -0.35 - t * 0.1, 0, 0));
+  }
 }
 
 // ---------------------------------------------------------------------------
