@@ -7,6 +7,7 @@ import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
 import { el } from "../dom.js";
+import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
@@ -25,35 +26,59 @@ export interface MonstersProps {
   onViewEquippedSlot: (equipmentId: string, monsterId: string) => void;
   onGoMonsterTraining: (monsterId: string) => void;
   onGoMonsterDex: () => void;
+  sortKey: MonsterSortKey;
+  onChangeSort: (key: MonsterSortKey) => void;
 }
 
 export function monsterCard(
   instance: MonsterInstance,
   onClick: () => void,
-  extra?: { selected?: boolean; disabled?: boolean; bonus?: boolean },
+  extra?: { selected?: boolean; disabled?: boolean; bonus?: boolean; onLongPress?: () => void },
 ): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   return buildMonsterCard(dex, instance.dexId, onClick, {
     selected: extra?.selected,
     disabled: extra?.disabled,
     bonus: extra?.bonus,
+    onLongPress: extra?.onLongPress,
     star: instance.star,
     level: instance.level,
     maxLevel: STAR_MAX_LEVEL[instance.star],
   });
 }
 
+/** 並べ替えの切り替え。押した軸がそのまま並びに出るので、選択中を強調する */
+export function renderMonsterSortRow(current: MonsterSortKey, onChange: (key: MonsterSortKey) => void): HTMLElement {
+  return el(
+    "div",
+    // 装備の並べ替えと同じ見た目にする。画面ごとに操作の形が違うと迷う
+    { className: "slot-filter-row sort-row" },
+    MONSTER_SORT_KEYS.map((key) =>
+      el(
+        "button",
+        {
+          type: "button",
+          className: `slot-filter-chip${key === current ? " slot-filter-chip--active" : ""}`,
+          onclick: () => onChange(key),
+        },
+        [MONSTER_SORT_LABEL[key]],
+      ),
+    ),
+  );
+}
+
 function renderList(props: MonstersProps): HTMLElement {
-  const sortedMonsters = props.player.monsters
-    .slice()
-    .sort((a, b) => Number(props.player.partyIds.includes(b.id)) - Number(props.player.partyIds.includes(a.id)));
+  const sortedMonsters = sortMonsters(props.player.monsters, props.sortKey, { partyIds: props.player.partyIds });
   const cards = sortedMonsters.map((instance) => monsterCard(instance, () => props.onSelectDetail(instance.id)));
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["所持モンスター"]), el("p", { className: "app-subtitle" }, [`${props.player.monsters.length}体所持中`])]),
     el("section", { className: "panel" }, [
       el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onGoMonsterDex }, ["📖 モンスター図鑑を見る"]),
     ]),
-    el("section", { className: "panel" }, [el("div", { className: "monster-grid" }, cards)]),
+    el("section", { className: "panel" }, [
+      renderMonsterSortRow(props.sortKey, props.onChangeSort),
+      el("div", { className: "monster-grid" }, cards),
+    ]),
   ]);
 }
 
@@ -206,7 +231,11 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
   );
 
   const cards = candidates.map((c) =>
-    monsterCard(c, () => props.onToggleSacrifice(c.id), { selected: props.selectedSacrificeIds.includes(c.id) }),
+    // 素材選びの最中こそ「この子は誰だったか」を確かめたい。長押しで詳細へ送る
+    monsterCard(c, () => props.onToggleSacrifice(c.id), {
+      selected: props.selectedSacrificeIds.includes(c.id),
+      onLongPress: () => props.onSelectDetail(c.id),
+    }),
   );
 
   return el("div", { className: "screen monsters-screen" }, [

@@ -41,6 +41,7 @@ import {
   trySpendSummonScrolls,
   unlockShopSlot,
 } from "../game/playerState.js";
+import { MonsterSortKey } from "../game/monsterSort.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
@@ -159,6 +160,8 @@ interface AppState {
   equipmentPickerContext: EquipmentPickerContext | null;
   equipmentSlotFilter: EquipSlot | null;
   equipmentSortKey: EquipmentSortKey;
+  /** 所持モンスターの並べ替えの軸 */
+  monsterSortKey: MonsterSortKey;
   /** まとめて売却するために選ばれている装備 */
   equipmentSelectedIds: string[];
   /** ショップで直前に買ったものの案内。次に何か操作したら消す */
@@ -200,6 +203,7 @@ const state: AppState = {
   equipmentPickerContext: null,
   equipmentSlotFilter: null,
   equipmentSortKey: "recommended",
+  monsterSortKey: "recommended",
   equipmentSelectedIds: [],
   shopNotice: null,
   equipmentSelecting: false,
@@ -838,6 +842,17 @@ function render(): void {
           savePlayerState(state.player);
           render();
         },
+        sortKey: state.monsterSortKey,
+        onChangeSort: (key) => {
+          state.monsterSortKey = key;
+          render();
+        },
+        // 長押しは編成を変えずに詳細だけを見たい時の操作。所持一覧の詳細へ送る
+        onViewDetail: (instanceId) => {
+          state.monsterDetailId = instanceId;
+          state.screen = "MONSTERS";
+          render();
+        },
       });
       break;
 
@@ -1097,6 +1112,11 @@ function renderMonstersScreen(): HTMLElement {
     onGoMonsterDex: () => {
       state.selectedDexEntryId = null;
       state.screen = "MONSTER_DEX";
+      render();
+    },
+    sortKey: state.monsterSortKey,
+    onChangeSort: (key) => {
+      state.monsterSortKey = key;
       render();
     },
   });

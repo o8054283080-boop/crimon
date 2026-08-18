@@ -30,6 +30,70 @@ export interface MonsterCardOptions {
   caption?: string;
   /** 選択中に重ねるラベル */
   badge?: string;
+  /**
+   * 長押しした時の動作。押している間に指が動いたら取り消す。
+   * 発火した場合は、指を離した時のクリックを打ち消す
+   * (「詳細を見ようとしただけなのに編成が変わる」のを防ぐ)。
+   */
+  onLongPress?: () => void;
+}
+
+/** 長押しと判定するまでの時間(ミリ秒)。短すぎると普通のタップで暴発する */
+const LONG_PRESS_MS = 420;
+/** この距離(ピクセル)を超えて指が動いたら、スクロールとみなして取り消す */
+const LONG_PRESS_MOVE_TOLERANCE = 12;
+
+/**
+ * 長押しを仕込む。
+ *
+ * `contextmenu` を止めないと、端末によっては長押しで「画像を保存」などの
+ * メニューが出て操作を奪われる。
+ */
+function attachLongPress(node: HTMLElement, onLongPress: () => void): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let fired = false;
+  let startX = 0;
+  let startY = 0;
+
+  const cancel = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+
+  node.addEventListener("pointerdown", (event) => {
+    fired = false;
+    startX = event.clientX;
+    startY = event.clientY;
+    cancel();
+    timer = setTimeout(() => {
+      fired = true;
+      timer = null;
+      onLongPress();
+    }, LONG_PRESS_MS);
+  });
+
+  node.addEventListener("pointermove", (event) => {
+    if (timer === null) return;
+    if (Math.hypot(event.clientX - startX, event.clientY - startY) > LONG_PRESS_MOVE_TOLERANCE) cancel();
+  });
+
+  for (const type of ["pointerup", "pointercancel", "pointerleave"] as const) {
+    node.addEventListener(type, cancel);
+  }
+
+  // 長押しが成立した後のクリックは無かったことにする
+  node.addEventListener(
+    "click",
+    (event) => {
+      if (!fired) return;
+      fired = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    true,
+  );
+
+  node.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
 /** 星の数に応じた額縁の等級。並べた時にレア度が色で伝わるようにする */
@@ -48,7 +112,7 @@ export function buildMonsterCard(
   onClick: () => void,
   options: MonsterCardOptions = {},
 ): HTMLElement {
-  const { selected, disabled, bonus, star, level, maxLevel, caption, badge } = options;
+  const { selected, disabled, bonus, star, level, maxLevel, caption, badge, onLongPress } = options;
 
   const classes = ["mcard", rarityClass(star)];
   if (selected) classes.push("mcard--selected");
@@ -70,11 +134,13 @@ export function buildMonsterCard(
     badge ? el("span", { className: "mcard__badge" }, [badge]) : null,
   ];
 
-  return el(
+  const node = el(
     "button",
     { type: "button", className: classes.join(" "), disabled, onclick: onClick },
     children.filter(isElement),
   );
+  if (onLongPress && !disabled) attachLongPress(node, onLongPress);
+  return node;
 }
 
 /** 星を1つずつ要素にして、光沢を個別にかけられるようにする */
