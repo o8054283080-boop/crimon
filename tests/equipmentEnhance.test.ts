@@ -50,6 +50,7 @@ function makeState(): PlayerState {
     shopSlotsUnlocked: 5,
     shopRotationKey: -1,
     shopPurchasedSlots: [],
+    claimedCompensationIds: [],
   };
 }
 

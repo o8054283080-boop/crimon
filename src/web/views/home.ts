@@ -8,12 +8,15 @@ import {
   STAMINA_REFILL_PARTIAL_AMOUNT,
   STAMINA_REFILL_PARTIAL_COST,
 } from "../../game/playerState.js";
+import { CompensationClaim } from "../../game/compensation.js";
 import { el } from "../dom.js";
 import { renderPartySlots } from "./partyCard.js";
 
 export interface HomeProps {
   player: PlayerState;
   loginBonusResult: LoginBonusResult | null;
+  compensationClaims: CompensationClaim[];
+  onDismissCompensation: () => void;
   onDismissLoginBonus: () => void;
   onGoSummon: () => void;
   onGoStages: () => void;
@@ -62,6 +65,24 @@ function renderSaveDataPanel(props: HomeProps): HTMLElement {
   ]);
 }
 
+/** お詫びの配布を受け取った時の案内。何をお詫びしているのかも一緒に出す */
+function renderCompensationBanner(claims: CompensationClaim[], onDismiss: () => void): HTMLElement {
+  const rows: HTMLElement[] = [];
+  for (const { compensation } of claims) {
+    rows.push(el("p", { className: "compensation__title" }, [`🎁 ${compensation.title}`]));
+    rows.push(el("p", { className: "compensation__message" }, [compensation.message]));
+    const items: string[] = [];
+    if (compensation.crystal > 0) items.push(`💎 ダイヤ ${compensation.crystal.toLocaleString()}`);
+    if (compensation.gold > 0) items.push(`🪙 ゴールド ${compensation.gold.toLocaleString()}`);
+    if (compensation.summonScrolls > 0) items.push(`📜 召喚の書 ${compensation.summonScrolls}枚`);
+    rows.push(el("p", { className: "compensation__items" }, [items.join(" / ")]));
+  }
+  return el("section", { className: "panel compensation" }, [
+    ...rows,
+    el("button", { type: "button", className: "btn btn--ghost", onclick: onDismiss }, ["閉じる"]),
+  ]);
+}
+
 function renderLoginBonusBanner(result: LoginBonusResult, onDismiss: () => void): HTMLElement {
   const total = result.dailyCrystal + result.milestoneCrystal;
   const lines = [`🎁 ログインボーナスでダイヤ+${total}獲得!`];
@@ -97,6 +118,7 @@ export function renderHome(props: HomeProps): HTMLElement {
 
   return el("div", { className: "screen home-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["Crimon"]), el("p", { className: "app-subtitle" }, ["周回してモンスターを育てよう"])]),
+    props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
     el("section", { className: "panel currency-panel" }, [
       el("div", { className: "currency-chip" }, [el("span", {}, ["💎"]), ` ${player.crystal}`]),

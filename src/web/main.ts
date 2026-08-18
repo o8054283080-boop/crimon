@@ -46,6 +46,7 @@ import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
+import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { renderDungeonParty } from "./views/dungeonParty.js";
@@ -180,6 +181,8 @@ interface AppState {
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
   loginBonusResult: LoginBonusResult | null;
+  /** 起動時に受け取ったお詫び配布。閉じるまでホームに出す */
+  compensationClaims: CompensationClaim[];
 }
 
 const state: AppState = {
@@ -215,12 +218,19 @@ const state: AppState = {
   autoFarmResult: null,
   autoFarmTargetName: "",
   loginBonusResult: null,
+  compensationClaims: [],
 };
 
 {
   const loginBonus = claimDailyLoginBonus(state.player);
   if (loginBonus.claimed) {
     state.loginBonusResult = loginBonus;
+    savePlayerState(state.player);
+  }
+  // お詫びの配布。期間中に一度開けば自動で受け取れる(重複はしない)
+  const claims = claimCompensations(state.player);
+  if (claims.length > 0) {
+    state.compensationClaims = claims;
     savePlayerState(state.player);
   }
 }
@@ -731,6 +741,11 @@ function render(): void {
       content = renderHome({
         player: state.player,
         loginBonusResult: state.loginBonusResult,
+        compensationClaims: state.compensationClaims,
+        onDismissCompensation: () => {
+          state.compensationClaims = [];
+          render();
+        },
         onDismissLoginBonus: () => {
           state.loginBonusResult = null;
           render();

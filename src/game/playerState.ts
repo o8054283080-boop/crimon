@@ -54,6 +54,8 @@ export interface PlayerState {
   shopRotationKey: number;
   /** 今の品揃えで購入済みの枠の番号 */
   shopPurchasedSlots: number[];
+  /** 受け取り済みのお詫び配布のid。重複して配らないために残す */
+  claimedCompensationIds: string[];
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -98,6 +100,7 @@ export function createInitialState(): PlayerState {
     shopSlotsUnlocked: SHOP_INITIAL_SLOTS,
     shopRotationKey: -1,
     shopPurchasedSlots: [],
+    claimedCompensationIds: [],
   };
 }
 
@@ -147,6 +150,7 @@ function normalizeState(state: PlayerState): PlayerState {
   state.shopSlotsUnlocked = Math.max(SHOP_INITIAL_SLOTS, Math.min(SHOP_MAX_SLOTS, state.shopSlotsUnlocked));
   if (typeof state.shopRotationKey !== "number") state.shopRotationKey = -1;
   if (!Array.isArray(state.shopPurchasedSlots)) state.shopPurchasedSlots = [];
+  if (!Array.isArray(state.claimedCompensationIds)) state.claimedCompensationIds = [];
   return state;
 }
 
