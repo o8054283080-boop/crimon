@@ -10,6 +10,7 @@ import {
 } from "../../game/playerState.js";
 import { CompensationClaim } from "../../game/compensation.js";
 import { el } from "../dom.js";
+import { AudioSettingsProps, renderAudioSettings } from "./audioSettings.js";
 import { renderPartySlots } from "./partyCard.js";
 
 export interface HomeProps {
@@ -27,6 +28,7 @@ export interface HomeProps {
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
   onEditFighterName: () => void;
+  audioSettings: AudioSettingsProps;
   onExportSave: () => void;
   onImportSave: (file: File) => void;
 }
@@ -163,6 +165,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoEquipDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoLevelDungeon }, ["📈 レベル上げダンジョンに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoGoldDungeon }, ["🪙 ゴールドダンジョンに挑戦する"]),
+    renderAudioSettings(props.audioSettings),
     renderSaveDataPanel(props),
     // どのビルドが動いているかの表示。更新が反映されているかの切り分けに使う
     el("p", { className: "build-id" }, [`版 ${__BUILD_ID__}`]),

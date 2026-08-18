@@ -2940,3 +2940,63 @@ body {
   font-weight: 700;
   line-height: 1.8;
 }
+
+/* ------------------------------------------------------ 音の設定 */
+
+.audio-settings__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.audio-settings__label {
+  flex: 0 0 6.5em;
+  font-size: 0.86rem;
+}
+
+.audio-settings__slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent, #ffd479);
+}
+
+.audio-settings__value {
+  flex: 0 0 3em;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-settings__toggle {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent, #ffd479);
+}
+
+.audio-settings__actions {
+  margin-top: 10px;
+}
+
+.audio-settings__actions .btn {
+  width: 100%;
+}
+
+/* 鳴らせる状態かどうかを、色でも分かるようにする */
+.audio-settings__state {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: #ffcf8a;
+}
+
+.audio-settings__state--ok {
+  color: #9be6b4;
+}
+
+.audio-settings__note {
+  margin: 6px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
