@@ -6,10 +6,16 @@ import { buildMonsterCard } from "./monsterCard.js";
 import { withPortrait } from "../three/portrait.js";
 
 /** パーティ編成画面用のモンスターカード。編成中(selected)の場合は「✅ 編成中」バッジを表示する */
-export function partyMemberCard(instance: MonsterInstance, selected: boolean, onClick: () => void): HTMLElement {
+export function partyMemberCard(
+  instance: MonsterInstance,
+  selected: boolean,
+  onClick: () => void,
+  onLongPress?: () => void,
+): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   return buildMonsterCard(dex, instance.dexId, onClick, {
     selected,
+    onLongPress,
     star: instance.star,
     level: instance.level,
     maxLevel: STAR_MAX_LEVEL[instance.star],
