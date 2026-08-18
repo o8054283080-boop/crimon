@@ -62,6 +62,8 @@ class SfxPlayer {
   private live = 0;
   private lastPlayedAt = new Map<string, number>();
   private settings: AudioSettings = getAudioSettings();
+  /** 無音を鳴らして解錠済みか(操作のたびに鳴らす必要はない) */
+  private silentPrimed = false;
   private baseUrl: string;
 
   constructor() {
@@ -86,11 +88,37 @@ class SfxPlayer {
     if (typeof window === "undefined") return;
     const start = () => {
       void this.ensureReady();
-      window.removeEventListener("pointerdown", start);
-      window.removeEventListener("keydown", start);
+      // **操作のたびに呼ぶ。1回で外してはいけない。**
+      // 音声文脈は後から勝手に停止することがあり、外してしまうと
+      // 二度と鳴らせなくなる。動き出したことを確かめてから外す
+      this.unlockInGesture();
+      if (this.ctx?.state === "running") {
+        window.removeEventListener("pointerdown", start);
+        window.removeEventListener("keydown", start);
+      }
     };
     window.addEventListener("pointerdown", start, { passive: true });
     window.addEventListener("keydown", start, { passive: true });
+  }
+
+  /**
+   * 操作の中で同期的に呼ぶ解錠。
+   *
+   * `resume()` を待つ形にすると操作の文脈から外れてしまい、
+   * 端末によっては解錠として認められない。無音を1粒だけ即座に鳴らして、
+   * 「操作をきっかけに音を出した」という事実を作る。
+   */
+  private unlockInGesture(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    void ctx.resume();
+    if (this.silentPrimed) return;
+    this.silentPrimed = true;
+    const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
   }
 
   private async ensureReady(): Promise<void> {
@@ -102,6 +130,8 @@ class SfxPlayer {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.effectiveVolume();
       this.master.connect(this.ctx.destination);
+      // 作った直後は停止状態のことがある。**ここで動かさないと永久に鳴らない**
+      if (this.ctx.state !== "running") await this.ctx.resume().catch(() => undefined);
       try {
         const res = await fetch(`${this.baseUrl}manifest.json`);
         this.manifest = (await res.json()) as Manifest;
@@ -141,6 +171,9 @@ class SfxPlayer {
     if (this.effectiveVolume() <= 0) return;
     await this.ensureReady();
     if (!this.ctx || !this.master) return;
+    // 画面を離れている間などに勝手に止まることがある。鳴らす前に必ず起こす
+    if (this.ctx.state !== "running") await this.ctx.resume().catch(() => undefined);
+    if (this.ctx.state !== "running") return;
 
     const now = this.ctx.currentTime;
     const last = this.lastPlayedAt.get(name) ?? -1;
@@ -169,6 +202,14 @@ class SfxPlayer {
 
   play(name: SfxName, gain = 1): void {
     void this.emit(name, gain);
+  }
+
+  /**
+   * 音声文脈の状態。鳴らない時に真っ先に見る値。
+   * "suspended" のままなら、操作による解錠ができていない。
+   */
+  contextState(): string {
+    return this.ctx?.state ?? "未作成";
   }
 
   /**

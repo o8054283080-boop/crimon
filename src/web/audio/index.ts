@@ -25,17 +25,24 @@ export function initAudio(): void {
   initialized = true;
   sfxPlayer.unlock();
 
-  // 音は画面を見ても確かめられない。開発中は手元で鳴らせる窓口を出しておく
-  if (import.meta.env.DEV) {
-    (window as unknown as Record<string, unknown>).__crimonAudio = {
-      play: (name: SfxName, gain?: number) => sfxPlayer.play(name, gain),
-      hit: (options?: HitOptions) => sfxPlayer.playHit(options),
-      settings: getAudioSettings,
-      update: updateAudioSettings,
-      /** 実際の再生経路を通った音を測る(焼いたファイル単体ではなく、鳴っている音) */
-      measure: (name: SfxName, ms?: number) => sfxPlayer.measure(name, ms),
-    };
-  }
+  // 音は画面を見ても確かめられない。手元で鳴らして状態を見られる窓口を出しておく。
+  // **本番でも出す。** 「音が鳴らない」と言われた時、これが無いと
+  // 端末の音量なのか解錠なのか読み込み失敗なのかを切り分けられない
+  (window as unknown as Record<string, unknown>).__crimonAudio = {
+    play: (name: SfxName, gain?: number) => sfxPlayer.play(name, gain),
+    hit: (options?: HitOptions) => sfxPlayer.playHit(options),
+    settings: getAudioSettings,
+    update: updateAudioSettings,
+    /** 実際の再生経路を通った音を測る(焼いたファイル単体ではなく、鳴っている音) */
+    measure: (name: SfxName, ms?: number) => sfxPlayer.measure(name, ms),
+    /** 鳴らない時に真っ先に見る値。"suspended" なら解錠できていない */
+    contextState: () => sfxPlayer.contextState(),
+  };
+}
+
+/** 音声文脈の状態。"running" 以外なら、まだ音を出せる状態になっていない */
+export function audioContextState(): string {
+  return sfxPlayer.contextState();
 }
 
 /** 効果音を鳴らす。まだ操作されていない/設定で切られている時は静かに何もしない */

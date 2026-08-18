@@ -1,5 +1,5 @@
 import "./style.css";
-import { initAudio, playSfx } from "./audio/index.js";
+import { audioContextState, getAudioSettings, initAudio, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
@@ -776,6 +776,16 @@ function render(): void {
           setFighterName(state.player, name);
           savePlayerState(state.player);
           render();
+        },
+        audioSettings: {
+          settings: getAudioSettings(),
+          contextState: audioContextState(),
+          onChange: (patch) => {
+            updateAudioSettings(patch);
+            render();
+          },
+          // 試聴は、設定を変えた直後にその場で確かめられることが大事
+          onTest: () => playSfx("select", 1),
         },
         onExportSave: handleExportSave,
         onImportSave: handleImportSave,
