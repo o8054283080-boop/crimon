@@ -24,6 +24,42 @@ export interface HomeProps {
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
   onEditFighterName: () => void;
+  onExportSave: () => void;
+  onImportSave: (file: File) => void;
+}
+
+/**
+ * データの控え。
+ *
+ * 保存先はブラウザの中だけで、「サイトのデータを削除」やアプリの入れ直しで
+ * **予告なく全部消える**。実際にそれで手持ちを全て失う事故が起きた。
+ * 端末にファイルとして残せることを、目立つ場所で伝えておく。
+ */
+function renderSaveDataPanel(props: HomeProps): HTMLElement {
+  const input = el("input", {
+    type: "file",
+    accept: "application/json,.json",
+    className: "save-data__input",
+    onchange: (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (file) props.onImportSave(file);
+      // 同じファイルを続けて選び直せるようにする
+      target.value = "";
+    },
+  }) as HTMLInputElement;
+
+  return el("section", { className: "panel save-data" }, [
+    el("div", { className: "panel-header" }, [el("h2", {}, ["データの控え"])]),
+    el("p", { className: "save-data__warning" }, [
+      "このゲームのデータは、この端末のブラウザの中だけに保存されています。ブラウザの履歴やサイトデータを削除すると、いっしょに消えてしまいます。ときどき書き出して控えを取っておいてください。",
+    ]),
+    el("div", { className: "save-data__actions" }, [
+      el("button", { type: "button", className: "btn btn--primary", onclick: props.onExportSave }, ["⬇ データを書き出す"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: () => input.click() }, ["⬆ データを読み込む"]),
+      input,
+    ]),
+  ]);
 }
 
 function renderLoginBonusBanner(result: LoginBonusResult, onDismiss: () => void): HTMLElement {
@@ -105,6 +141,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoEquipDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoLevelDungeon }, ["📈 レベル上げダンジョンに挑戦する"]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoGoldDungeon }, ["🪙 ゴールドダンジョンに挑戦する"]),
+    renderSaveDataPanel(props),
     // どのビルドが動いているかの表示。更新が反映されているかの切り分けに使う
     el("p", { className: "build-id" }, [`版 ${__BUILD_ID__}`]),
   ].filter((n): n is HTMLElement => n !== null));

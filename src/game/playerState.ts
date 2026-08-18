@@ -150,6 +150,14 @@ function normalizeState(state: PlayerState): PlayerState {
   return state;
 }
 
+/**
+ * 外から読み込んだ状態(控えファイルなど)を、今の版で扱える形に整える。
+ * 古い版で書き出した控えには新しい項目が入っていないので、必ずここを通すこと。
+ */
+export function normalizeLoadedState(state: PlayerState): PlayerState {
+  return normalizeState(state);
+}
+
 export function loadPlayerState(): PlayerState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
