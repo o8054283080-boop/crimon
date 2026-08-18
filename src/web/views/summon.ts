@@ -23,7 +23,8 @@ export interface SummonProps {
   lastResults: SummonResult[] | null;
   onSummon: (count: number) => void;
   onDismissResults: () => void;
-  onUseSummonScroll: () => void;
+  /** 召喚の書で引く。枚数ぶん消費する */
+  onUseSummonScroll: (count: number) => void;
 }
 
 /* ===== 引く前 ============================================================
@@ -41,6 +42,7 @@ function renderIdle(props: SummonProps): HTMLElement {
   const canSingle = player.crystal >= SUMMON_COST_SINGLE;
   const canTen = player.crystal >= SUMMON_COST_TEN;
   const hasScroll = player.summonScrolls > 0;
+  const hasScrollTen = player.summonScrolls >= 10;
 
   const cta = el("div", { className: "summon-cta" }, [
     el(
@@ -76,13 +78,27 @@ function renderIdle(props: SummonProps): HTMLElement {
       {
         type: "button",
         className: "summon-cta__btn summon-cta__btn--scroll",
-        disabled: !hasScroll,
-        onclick: onUseSummonScroll,
+        disabled: !hasScrollTen,
+        onclick: () => onUseSummonScroll(10),
       },
       [
-        el("span", { className: "summon-cta__lead" }, ["召喚の書"]),
+        el("span", { className: "summon-cta__lead" }, ["書で10連"]),
+        el("span", { className: "summon-cta__sub" }, ["★4以上 1体確定"]),
+        costChip("📜", 10),
+      ],
+    ),
+    el(
+      "button",
+      {
+        type: "button",
+        className: "summon-cta__btn summon-cta__btn--scroll",
+        disabled: !hasScroll,
+        onclick: () => onUseSummonScroll(1),
+      },
+      [
+        el("span", { className: "summon-cta__lead" }, ["書で1回"]),
         el("span", { className: "summon-cta__sub" }, ["ダイヤ不要"]),
-        costChip("📜", player.summonScrolls),
+        costChip("📜", 1),
       ],
     ),
   ]);

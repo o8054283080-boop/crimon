@@ -23,6 +23,7 @@ import {
   addSummonScrolls,
   createInitialState,
   toggleDungeonPartyMember,
+  trySpendSummonScrolls,
   tryUseSummonScroll,
 } from "../src/game/playerState.js";
 
@@ -152,6 +153,27 @@ describe("召喚の書 (summonScrolls)", () => {
     expect(tryUseSummonScroll(state)).toBe(true);
     expect(state.summonScrolls).toBe(0);
     expect(tryUseSummonScroll(state)).toBe(false);
-    expect(state.summonScrolls).toBe(0);
+  });
+
+  it("召喚の書はまとめて消費できる(10連用)", () => {
+    const state = createInitialState();
+    addSummonScrolls(state, 12);
+    expect(trySpendSummonScrolls(state, 10)).toBe(true);
+    expect(state.summonScrolls).toBe(2);
+  });
+
+  it("枚数が足りない時は1枚も減らさない(引けないのに手持ちだけ消える事故を防ぐ)", () => {
+    const state = createInitialState();
+    addSummonScrolls(state, 9);
+    expect(trySpendSummonScrolls(state, 10)).toBe(false);
+    expect(state.summonScrolls).toBe(9);
+  });
+
+  it("0枚以下の指定は受け付けない", () => {
+    const state = createInitialState();
+    addSummonScrolls(state, 5);
+    expect(trySpendSummonScrolls(state, 0)).toBe(false);
+    expect(trySpendSummonScrolls(state, -3)).toBe(false);
+    expect(state.summonScrolls).toBe(5);
   });
 });
