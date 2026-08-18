@@ -27,6 +27,7 @@ import {
   getDungeonParty,
   getParty,
   loadPlayerState,
+  normalizeLoadedState,
   removeMonsters,
   savePlayerState,
   sellEquipment,
@@ -44,6 +45,7 @@ import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { renderShop } from "./views/shop.js";
+import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { renderDungeonParty } from "./views/dungeonParty.js";
@@ -756,6 +758,8 @@ function render(): void {
           savePlayerState(state.player);
           render();
         },
+        onExportSave: handleExportSave,
+        onImportSave: handleImportSave,
       });
       break;
 
@@ -1132,6 +1136,50 @@ function renderEquipmentScreen(): HTMLElement {
       render();
     },
     onBulkSell: handleBulkSellEquipment,
+  });
+}
+
+/**
+ * データを端末へ書き出す。
+ *
+ * 保存先がブラウザの中だけだと、「サイトのデータを削除」で予告なく全部消える。
+ * 実際にそれで手持ちを全て失う事故が起きたので、控えを取れる経路を必ず残す。
+ */
+function handleExportSave(): void {
+  const text = serializeSaveFile(state.player);
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = saveFileName();
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // 解放が早すぎると保存に失敗する端末があるので、少し待ってから捨てる
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+/**
+ * 控えから読み込む。
+ *
+ * **読み込みは今の手持ちを丸ごと置き換える。** 取り違えると二次被害になるので、
+ * 中身の概要を見せて確認を取ってから差し替える。
+ */
+function handleImportSave(file: File): void {
+  void file.text().then((text) => {
+    const result = parseSaveFile(text);
+    if (!result.ok) {
+      window.alert(`読み込めませんでした。\n\n${result.reason}`);
+      return;
+    }
+    const ok = window.confirm(
+      `このデータで今の状態を置き換えますか?\n\n${describeSaveFile(result.file)}\n\n※ 今遊んでいるデータは失われます。`,
+    );
+    if (!ok) return;
+    state.player = normalizeLoadedState(result.file.state);
+    savePlayerState(state.player);
+    render();
+    window.alert("データを読み込みました。");
   });
 }
 

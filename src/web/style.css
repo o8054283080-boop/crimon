@@ -2886,3 +2886,32 @@ body {
   color: var(--text-dim);
   opacity: 0.6;
 }
+
+/* ------------------------------------------------------ データの控え */
+
+.save-data__warning {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 190, 90, 0.12);
+  border: 1px solid rgba(255, 190, 90, 0.32);
+  color: #ffe0ab;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.save-data__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.save-data__actions .btn {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* ファイル選択欄そのものは出さず、ボタンから呼ぶ */
+.save-data__input {
+  display: none;
+}
