@@ -38,7 +38,7 @@ import {
   tryRefillStaminaPartial,
   trySpendGoldDungeonChallenge,
   trySpendStamina,
-  tryUseSummonScroll,
+  trySpendSummonScrolls,
   unlockShopSlot,
 } from "../game/playerState.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
@@ -367,9 +367,13 @@ function handleSummon(count: number): void {
   render();
 }
 
-function handleUseSummonScroll(): void {
-  if (!tryUseSummonScroll(state.player)) return;
-  const results = summonMany(1);
+/**
+ * 召喚の書で引く。10枚あれば10連にでき、ダイヤの10連と同じ★4以上確定が付く
+ * (書を10枚ためた人が、ばら引きより損をする形にはしない)。
+ */
+function handleUseSummonScroll(count: number): void {
+  if (!trySpendSummonScrolls(state.player, count)) return;
+  const results = summonMany(count);
   for (const r of results) addMonster(state.player, r.dexId, r.star);
   savePlayerState(state.player);
   state.summonResults = results;

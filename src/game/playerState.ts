@@ -449,8 +449,16 @@ export function addSummonScrolls(state: PlayerState, count = 1): void {
 
 /** 召喚の書を1個消費できるなら消費してtrueを返す(石を使わずに1回分の召喚権を得る) */
 export function tryUseSummonScroll(state: PlayerState): boolean {
-  if (state.summonScrolls <= 0) return false;
-  state.summonScrolls -= 1;
+  return trySpendSummonScrolls(state, 1);
+}
+
+/**
+ * 召喚の書をまとめて消費する。足りなければ**1枚も減らさずに**falseを返す。
+ * 中途半端に減らすと、引けないのに手持ちだけ消える事故になる。
+ */
+export function trySpendSummonScrolls(state: PlayerState, count: number): boolean {
+  if (count <= 0 || state.summonScrolls < count) return false;
+  state.summonScrolls -= count;
   return true;
 }
 

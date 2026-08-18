@@ -506,12 +506,14 @@ const WISP: MonsterTemplate = {
     {
       id: "wisp_s2_a",
       name: "まもりのりんこう",
-      description: "味方全体に最大HPの15%のシールドを3ターン張り、1ターン状態異常を無効にする。",
+      description: "味方全体のデバフを解除し、最大HPの15%のシールドを3ターン張る。",
       target: "ALL_ALLIES",
-      cooldownTurns: 4,
+      // シールドと状態異常無効が同時に乗ると、受けを一枚で成立させてしまい強すぎた。
+      // 無効を解除に置き換え、「先回りして防ぐ」のではなく「掛かった後に立て直す」役に寄せている
+      cooldownTurns: 5,
       effects: [
         { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
-        { kind: "IMMUNITY", durationTurns: 1 },
+        { kind: "CLEANSE" },
       ],
     },
     {
@@ -552,11 +554,12 @@ const WISP: MonsterTemplate = {
     {
       id: "wisp_s3_b",
       name: "じょうかのひかり",
-      description: "味方全体のデバフを解除し、HPを最大HPの20%回復して2ターン状態異常を無効にする。",
+      description: "味方全体のHPを最大HPの20%回復し、2ターン状態異常を無効にする。",
       target: "ALL_ALLIES",
-      cooldownTurns: 5,
+      // 解除・回復・無効の3つが1つに乗っていて、これ1枚で崩れなくなっていた。
+      // 解除は「まもりのりんこう」の役目に移し、こちらは回復と無効に絞る
+      cooldownTurns: 6,
       effects: [
-        { kind: "CLEANSE" },
         { kind: "HEAL", healRate: 0.2 },
         { kind: "IMMUNITY", durationTurns: 2 },
       ],
