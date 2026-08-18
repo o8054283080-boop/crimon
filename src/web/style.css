@@ -400,6 +400,15 @@ body {
   color: #eaf0ff;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
   letter-spacing: 0.02em;
+  /*
+   * 折り返させない。
+   * 縦画面では「ステージ 1-1 - ウェーブ1」が2行になって上帯が高くなり、
+   * 位置を固定していたログの帯と重なって、両方とも読めなくなっていた。
+   */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .battle-topbar__controls {
@@ -556,7 +565,12 @@ body {
 .battle-logstrip {
   position: absolute;
   left: max(10px, env(safe-area-inset-left));
-  top: 46px;
+  /*
+   * 上帯の**全体**の下へ置く。上帯の高さは中の丸ボタンで決まるので、
+   * 文字の高さを基準にすると足りない。安全領域のぶんも足しておかないと、
+   * 切り欠きのある端末で重なる
+   */
+  top: calc(max(8px, env(safe-area-inset-top)) + 70px);
   z-index: 5;
   width: min(300px, 44%);
   max-height: 58px;
