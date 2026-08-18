@@ -3,6 +3,7 @@ import { ActiveEffect } from "../../battle/unit.js";
 import { BattleUnit } from "../../battle/unit.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { BUFF_STAT_JA, BuffStat, describeSkillEffect } from "../../core/skill.js";
+import { hitStyleForRole, playHitSfx, playSfx, sfxElementOf } from "../audio/index.js";
 import { el } from "../dom.js";
 import { BattleStage, StageUnitInit } from "../three/battleStage.js";
 import { withPortrait } from "../three/portrait.js";
@@ -205,6 +206,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     ...enemyTeam.map((def, i) => ({ instanceId: `E${i + 1}`, def, team: "ENEMY" as const })),
   ];
   for (const unit of stageUnits) teamOf.set(unit.instanceId, unit.team);
+  /** 効果音は術者の属性と役割で鳴り方が変わるので、定義を引けるようにしておく */
+  const defOf = new Map<string, MonsterDefinition>(stageUnits.map((u) => [u.instanceId, u.def]));
 
   const stageHost = el("div", { className: "battle-stage" });
   const overlay = el("div", { className: "battle-stage__overlay" });
@@ -437,16 +440,28 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
         const isEnemyOfActor = teamOf.get(event.targetId) !== actorTeam;
         // 敵への攻撃は攻撃側の属性で、火傷や毒などの自傷は対象側の属性で弾ける
         stage.playDamage(event.targetId, event.isCrit === true, isEnemyOfActor ? actorId : undefined, aoe);
+        // 音も同じ理屈で、攻撃なら術者、自傷なら対象の属性・役割を使う
+        const source = defOf.get(isEnemyOfActor ? actorId : event.targetId);
+        playHitSfx({
+          element: sfxElementOf(source?.element),
+          hitStyle: hitStyleForRole(source?.role),
+          crit: event.isCrit === true,
+          // 全体攻撃は1体ずつ鳴らすと団子になるので、1発あたりを軽くする
+          power: aoe ? 0.8 : 1.1,
+        });
         break;
       }
       case "HEAL":
         stage.playHeal(event.targetId, aoe);
+        playSfx("heal", 0.85);
         break;
       case "DEATH":
         stage.playDeath(event.targetId);
+        playSfx("death");
         break;
       case "RESIST":
         stage.playShield(event.targetId);
+        playSfx("shield", 0.7);
         break;
     }
     spawnFloatingNumber(event);
@@ -456,11 +471,20 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   function playStatusVisuals(record: TurnRecord): void {
     for (const line of record.lines) {
       const buffTarget = /\[(?:味方|敵):([A-Z]\d+)\] .* が上昇/.exec(line);
-      if (buffTarget) stage.playBuff(buffTarget[1]);
+      if (buffTarget) {
+        stage.playBuff(buffTarget[1]);
+        playSfx("buff", 0.6);
+      }
       const debuffTarget = /\[(?:味方|敵):([A-Z]\d+)\] .* が低下/.exec(line);
-      if (debuffTarget) stage.playDebuff(debuffTarget[1]);
+      if (debuffTarget) {
+        stage.playDebuff(debuffTarget[1]);
+        playSfx("debuff", 0.6);
+      }
       const shieldTarget = /\[(?:味方|敵):([A-Z]\d+)\] .* にシールドが張られた/.exec(line);
-      if (shieldTarget) stage.playShield(shieldTarget[1]);
+      if (shieldTarget) {
+        stage.playShield(shieldTarget[1]);
+        playSfx("shield", 0.7);
+      }
     }
   }
 
@@ -481,6 +505,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
   function applyRecord(record: TurnRecord): void {
     setActive(record.actorId);
+    // 手番の合図。味方と敵で高さを変え、誰の番かを音だけで分かるようにする
+    playSfx(teamOf.get(record.actorId) === "PLAYER" ? "turnAlly" : "turnEnemy", 0.5);
     if (teamOf.get(record.actorId) === "PLAYER") {
       dockUnit = engine.getUnits().find((u) => u.instanceId === record.actorId) ?? dockUnit;
     }
@@ -493,7 +519,10 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     else stage.playCastMotion(record.actorId);
 
     // 必殺技は溜めを見せてから撃つ。カメラも寄せて「ここぞ」を作る
-    if (skillIndex === 2) stage.playUltimateIntro(record.actorId);
+    if (skillIndex === 2) {
+      stage.playUltimateIntro(record.actorId);
+      playSfx("charge", 0.8);
+    }
 
     // 踏み込みモーションを見せてから着弾させる
     const base = offensive ? IMPACT_DELAY_MS[speed] : Math.round(IMPACT_DELAY_MS[speed] * 0.6);
@@ -631,6 +660,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     renderActionPanel();
     resultBanner.classList.remove("result-banner--hidden");
     resultBanner.textContent = "";
+    if (winner === "PLAYER") playSfx("victory");
+    else if (winner === "ENEMY") playSfx("defeat");
     const text = winner === "PLAYER" ? "🎉 勝利！" : winner === "ENEMY" ? "💀 敗北…" : "🤝 引き分け";
     resultBanner.append(el("div", { className: "result-banner__text" }, [text]));
     finishBtn.textContent = resultLabel(winner);

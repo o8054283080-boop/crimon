@@ -1,16 +1,18 @@
 /**
  * 音の入口。ゲーム側はこのファイルだけを見ればよい。
  *
- * 音源ファイルは1つも持たず、すべて Web Audio API でその場で合成している
- * (3Dモデルもテクスチャも手続き生成なので、音だけ素材を持ち込むと方針が割れる)。
+ * 効果音は `tools/audio/render.py` で事前に焼いた ogg を同梱している。
+ * 以前はブラウザ上で毎回合成していたが、リアルタイムでは畳み込みリバーブなどの
+ * 重い処理が使えず、どう作っても安っぽさから抜けられなかったため方式を変えた。
+ *
+ * BGMはまだ入れていない。**質を確かめられないものは出さない**方針で、
+ * 安っぽいBGMを付けるくらいなら無い方がよい。
  */
-import { musicDirector, MusicScene } from "./bgm.js";
-import { SfxOptions, audioEngine } from "./engine.js";
-import { HitStyle, SfxElement, SfxName } from "./sfx.js";
+import { HitOptions, HitStyle, SfxElement, SfxName, sfxPlayer } from "./player.js";
 import { getAudioSettings, onAudioSettingsChange, updateAudioSettings } from "./settings.js";
 
-export type { MusicScene, SfxName, SfxOptions, SfxElement, HitStyle };
-export { audioEngine, getAudioSettings, updateAudioSettings, onAudioSettingsChange };
+export type { SfxName, SfxElement, HitStyle, HitOptions };
+export { getAudioSettings, updateAudioSettings, onAudioSettingsChange };
 
 let initialized = false;
 
@@ -21,41 +23,29 @@ let initialized = false;
 export function initAudio(): void {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
-  audioEngine.installUnlockHandlers();
+  sfxPlayer.unlock();
 
-  const wake = () => {
-    void audioEngine.resume().then(() => musicDirector.sync());
-  };
-  for (const type of ["pointerdown", "touchstart", "keydown"] as const) {
-    window.addEventListener(type, wake, { passive: true });
-  }
-
-  // 開発中は測定用の窓口を出しておく(音は画面では確かめられないため)
+  // 音は画面を見ても確かめられない。開発中は手元で鳴らせる窓口を出しておく
   if (import.meta.env.DEV) {
-    void import("./debug.js").then((debug) => {
-      (window as unknown as Record<string, unknown>).__crimonAudio = {
-        engine: audioEngine,
-        settings: getAudioSettings,
-        update: updateAudioSettings,
-        play: (name: SfxName, options?: SfxOptions) => audioEngine.play(name, options),
-        measure: (ms?: number) => audioEngine.measure(ms),
-        scene: (scene: MusicScene | null) => musicDirector.setScene(scene),
-        analyze: debug.analyzeSfx,
-        variance: debug.repeatVariance,
-        render: debug.renderSfxOffline,
-      };
-    });
+    (window as unknown as Record<string, unknown>).__crimonAudio = {
+      play: (name: SfxName, gain?: number) => sfxPlayer.play(name, gain),
+      hit: (options?: HitOptions) => sfxPlayer.playHit(options),
+      settings: getAudioSettings,
+      update: updateAudioSettings,
+      /** 実際の再生経路を通った音を測る(焼いたファイル単体ではなく、鳴っている音) */
+      measure: (name: SfxName, ms?: number) => sfxPlayer.measure(name, ms),
+    };
   }
 }
 
 /** 効果音を鳴らす。まだ操作されていない/設定で切られている時は静かに何もしない */
-export function playSfx(name: SfxName, options: SfxOptions = {}): void {
-  audioEngine.play(name, options);
+export function playSfx(name: SfxName, gain = 1): void {
+  sfxPlayer.play(name, gain);
 }
 
-/** 場面に合わせてBGMを切り替える。null で止める */
-export function setMusicScene(scene: MusicScene | null): void {
-  musicDirector.setScene(scene);
+/** 攻撃の着弾。当たり方・属性・会心を重ねて鳴らす */
+export function playHitSfx(options: HitOptions = {}): void {
+  sfxPlayer.playHit(options);
 }
 
 /** 3D側と同じ割り当て(役割で当たり方が変わる) */
