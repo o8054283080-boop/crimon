@@ -3121,23 +3121,81 @@ export function templateBuilderFor(templateId: string): CreatureBuilder | null {
  */
 const TEMPLATE_TRAITS: Record<string, (kit: CreatureKit, rig: CreatureRig) => void> = {
   /**
-   * ドラゴン: 大きな皮膜の翼。
+   * ドラゴン: 光る皮膜の翼・胸の積層板・結晶の房。
    *
-   * 水平に大きく広げると、翼が画面を横に占領したうえに滑空機のように見えてしまう。
-   * 上へ立ち上げ(Z回転)ながら後ろへ流す(Y回転)ことで、体の横に畳みかけた
-   * 「休めているが、いつでも開ける」構えになり、胴の輪郭も隠れなくなる。
+   * 依頼主から提示された高レアのドラゴンを参考にしている。
+   * あの絵で効いているのは、色でも造形の細かさでもなく、次の3つ。
+   *
+   * 1. **翼膜そのものが光っている**。画面上でいちばん強い見どころになっている
+   * 2. **胸から腹へ、明るい板がV字に積み重なっている**。暗い体との明度差が輪郭を作る
+   * 3. **肩・肘・腿に結晶が房として生えている**。1本ずつではなく束で、大小が混ざる
+   *
+   * 翼は水平に広げると画面を横に占領し、滑空機のようにも見えてしまうので、
+   * 上へ立ち上げながら開く。参考画像の翼も水平ではなく上へ向いている。
    */
   dragon: (kit, rig) => {
+    const p = kit.palette;
     const a = rig.wingAnchor;
     for (const side of [-1, 1]) {
       const wing = new THREE.Group();
       markAnimated(wing);
-      place(wing, side * a.x, a.y, a.z, 0.2, -side * 0.62, side * 0.66);
-      addBatWing(kit, wing, side, 1.02);
+      // 以前より開き気味にする(Y回転を浅く)。畳んでいると翼の面が見えず、
+      // 光らせても効果が出ない
+      place(wing, side * a.x, a.y, a.z, 0.16, -side * 0.34, side * 0.74);
+      addBatWing(kit, wing, side, 1.06, true);
       rig.torso.add(wing);
       rig.wings.push({ root: wing, rootRest: wing.rotation.clone(), lower: null, lowerRest: null, tip: wing, side, phase: 0 });
     }
     rig.anim.wingFlap = 0.55;
+
+    // --- 胸から腹へ落ちる積層板 ---
+    // 1枚ずつに縁があるので、面が平らでも情報量が出る。
+    // 体の暗色に対して明るい生成り色を置き、正面から見た時の芯にする
+    const chest = kit.plateStack("plate", p.plate, {
+      count: 7,
+      y0: 0.52,
+      y1: -0.34,
+      width: 0.46,
+      widthEnd: 0.26,
+      height: 0.19,
+      heightEnd: 0.13,
+      thickness: 0.035,
+      z: -0.2,
+      zEnd: -0.12,
+      wrap: 0.3,
+      wrapEnd: 0.22,
+      tilt: 0.1,
+      tiltEnd: 0.42,
+      notch: 0.62,
+    });
+    place(chest, 0, 0.34, 0, 0.12, 0, 0);
+    rig.torso.add(chest);
+
+    // --- 結晶の房 ---
+    // 束ねて大小を混ぜる。等間隔に1本ずつ生やすと櫛になる
+    const cluster = (parent: THREE.Object3D, x: number, y: number, z: number, length: number, tilt: number, side: number) => {
+      const group = kit.shardCluster("crystal", p.glow, {
+        count: 5,
+        length,
+        radius: length * 0.17,
+        spread: 0.7,
+        scatter: length * 0.28,
+        sides: 5,
+        minScale: 0.3,
+      });
+      place(group, x, y, z, tilt, 0, -side * 0.7);
+      parent.add(group);
+    };
+    for (const side of [-1, 1]) {
+      // 肩。参考画像で最も目立つ房
+      cluster(rig.torso, side * 0.34, 0.62, -0.02, 0.34, -0.2, side);
+      // 腰から腿へ
+      cluster(rig.pelvis, side * 0.26, 0.3, 0.16, 0.26, 0.1, side);
+    }
+    // 背骨に沿った房。横から見た時の輪郭を作る
+    for (let i = 0; i < 3; i++) {
+      cluster(rig.torso, 0, 0.5 - i * 0.18, 0.26 + i * 0.05, 0.22 - i * 0.03, -0.5, 1);
+    }
   },
 
   // グリフォンの翼と冠羽は buildGriffon が肩の位置ごと組むので、ここには置かない

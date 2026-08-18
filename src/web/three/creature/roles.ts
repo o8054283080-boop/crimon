@@ -741,7 +741,19 @@ export function addFeatherWing(kit: CreatureKit, wing: THREE.Object3D, side: num
  * の3つを kit.ribbedMembrane が一括で作る。
  * ここでは腕の骨・肩の肉・鉤爪・前縁の甲だけを足す。
  */
-export function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number, span: number): void {
+export function addBatWing(
+  kit: CreatureKit,
+  wing: THREE.Object3D,
+  side: number,
+  span: number,
+  /**
+   * 膜を発光させる。
+   * 参考にした高レアのドラゴンは、翼膜そのものが光源のように光っていて、
+   * それが画面上でいちばん強い見どころになっている。
+   * 既定は暗い皮膜のままにして、必要な種別だけ切り替える。
+   */
+  glowingMembrane = false,
+): void {
   const p = kit.palette;
   const s = side;
   const v = (x: number, y: number, z: number) => new THREE.Vector3(x * s * span, y * span, z * span);
@@ -791,8 +803,14 @@ export function addBatWing(kit: CreatureKit, wing: THREE.Object3D, side: number,
       },
       "plate",
       p.plate,
+      // 材質は膜のまま。`glow` に変えると透け方が変わって膜が消え、
+      // 骨だけが宙に浮いて見える(実際にそうなった)。
+      // 明るさは色で出す
       "membrane",
-      p.membrane,
+      // 参考画像の膜は「濃い青の面に、明るい青の筋が走る」。
+      // 明るい色をそのまま置くと白い布に見えてしまうので、
+      // 面は暗い体色寄りにして、明るさは筋(veins)に任せる
+      glowingMembrane ? p.dark.clone().lerp(p.glow, 0.42) : p.membrane,
     ),
   );
 
