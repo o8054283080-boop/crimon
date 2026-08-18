@@ -3,6 +3,14 @@ import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requ
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
+import {
+  ShopEntry,
+  SHOP_INITIAL_SLOTS,
+  SHOP_MAX_SLOTS,
+  buildShopLineup,
+  nextSlotUnlockCost,
+  rotationKeyAt,
+} from "./shop.js";
 import { Difficulty } from "../data/stages.js";
 
 export interface PlayerState {
@@ -40,6 +48,12 @@ export interface PlayerState {
   goldDungeonChallengesToday: number;
   /** ゴールドダンジョンの挑戦回数を最後にリセットした時刻(ミリ秒epoch)。日付が変わると回数がリセットされる */
   lastGoldDungeonResetAt: number | null;
+  /** ショップで開放済みの枠数(初期5、ダイヤで最大10まで) */
+  shopSlotsUnlocked: number;
+  /** 購入済みを記録している品揃えの識別子。品揃えが変わるとリセットする */
+  shopRotationKey: number;
+  /** 今の品揃えで購入済みの枠の番号 */
+  shopPurchasedSlots: number[];
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -81,6 +95,9 @@ export function createInitialState(): PlayerState {
     loginBonusClaimCount: 0,
     goldDungeonChallengesToday: 0,
     lastGoldDungeonResetAt: null,
+    shopSlotsUnlocked: SHOP_INITIAL_SLOTS,
+    shopRotationKey: -1,
+    shopPurchasedSlots: [],
   };
 }
 
@@ -126,6 +143,10 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.loginBonusClaimCount !== "number") state.loginBonusClaimCount = 0;
   if (typeof state.goldDungeonChallengesToday !== "number") state.goldDungeonChallengesToday = 0;
   if (typeof state.lastGoldDungeonResetAt !== "number") state.lastGoldDungeonResetAt = null;
+  if (typeof state.shopSlotsUnlocked !== "number") state.shopSlotsUnlocked = SHOP_INITIAL_SLOTS;
+  state.shopSlotsUnlocked = Math.max(SHOP_INITIAL_SLOTS, Math.min(SHOP_MAX_SLOTS, state.shopSlotsUnlocked));
+  if (typeof state.shopRotationKey !== "number") state.shopRotationKey = -1;
+  if (!Array.isArray(state.shopPurchasedSlots)) state.shopPurchasedSlots = [];
   return state;
 }
 
@@ -470,4 +491,82 @@ export function sellEquipment(state: PlayerState, equipmentId: string): SellEqui
   state.equipment = state.equipment.filter((e) => e.id !== equipmentId);
   state.gold += goldEarned;
   return { ok: true, goldEarned };
+}
+
+// ---------------------------------------------------------------- ショップ
+
+export interface ShopView {
+  entries: ShopEntry[];
+  /** 開いている枠の数 */
+  slots: number;
+  /** 今の品揃えで購入済みの枠の番号 */
+  purchasedSlots: number[];
+  /** 次の入れ替え時刻(ミリ秒epoch) */
+  nextRotationAt: number;
+  /** 次の枠を開けるのに要るダイヤ。もう開けられないなら null */
+  nextSlotCost: number | null;
+}
+
+/**
+ * 今のショップを取り出す。
+ *
+ * 品揃えは時刻から決定的に作るので保存しない。保存するのは
+ * 「どの品揃えの、どの枠を買ったか」だけで、時間帯が変わったら購入済みを流す。
+ */
+export function getShop(state: PlayerState, now = Date.now()): ShopView {
+  const key = rotationKeyAt(now);
+  if (state.shopRotationKey !== key) {
+    state.shopRotationKey = key;
+    state.shopPurchasedSlots = [];
+  }
+  const lineup = buildShopLineup(now, state.fighterLevel, state.shopSlotsUnlocked);
+  return {
+    entries: lineup.entries,
+    slots: state.shopSlotsUnlocked,
+    purchasedSlots: [...state.shopPurchasedSlots],
+    nextRotationAt: lineup.nextRotationAt,
+    nextSlotCost: nextSlotUnlockCost(state.shopSlotsUnlocked),
+  };
+}
+
+export interface ShopPurchaseResult {
+  ok: boolean;
+  reason?: string;
+  /** 買ったものの説明(結果表示用) */
+  label?: string;
+}
+
+/** ショップの1枠を買う。ゴールドを払って中身を所持品へ入れる */
+export function buyShopEntry(state: PlayerState, slotIndex: number, now = Date.now()): ShopPurchaseResult {
+  const shop = getShop(state, now);
+  const entry = shop.entries[slotIndex];
+  if (!entry) return { ok: false, reason: "その枠は開いていません" };
+  if (state.shopPurchasedSlots.includes(slotIndex)) return { ok: false, reason: "すでに購入済みです" };
+  if (state.gold < entry.price) return { ok: false, reason: "ゴールドが足りません" };
+
+  state.gold -= entry.price;
+  state.shopPurchasedSlots.push(slotIndex);
+
+  switch (entry.kind) {
+    case "EQUIPMENT":
+      addEquipment(state, entry.equipment);
+      return { ok: true, label: `星${entry.equipment.star}の装備を購入しました` };
+    case "MONSTER": {
+      addMonster(state, entry.dexId, entry.star);
+      return { ok: true, label: `星${entry.star}のモンスターを購入しました` };
+    }
+    case "SCROLL":
+      addSummonScrolls(state, entry.count);
+      return { ok: true, label: `召喚の書を${entry.count}個購入しました` };
+  }
+}
+
+/** ダイヤを払ってショップの枠を1つ増やす */
+export function unlockShopSlot(state: PlayerState): { ok: boolean; reason?: string } {
+  const cost = nextSlotUnlockCost(state.shopSlotsUnlocked);
+  if (cost === null) return { ok: false, reason: "これ以上は開放できません" };
+  if (state.crystal < cost) return { ok: false, reason: "ダイヤが足りません" };
+  state.crystal -= cost;
+  state.shopSlotsUnlocked += 1;
+  return { ok: true };
 }

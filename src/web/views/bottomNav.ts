@@ -17,6 +17,7 @@ export type ScreenName =
   | "GOLD_DUNGEON"
   | "GOLD_DUNGEON_BATTLE"
   | "MONSTER_DEX"
+  | "SHOP"
   | "MONSTER_TRAINING"
   | "AUTO_FARM_RESULT";
 
@@ -26,6 +27,7 @@ const TABS: { screen: ScreenName; icon: string; label: string }[] = [
   { screen: "MONSTERS", icon: "📖", label: "モンスター" },
   { screen: "EQUIPMENT", icon: "⚔️", label: "装備" },
   { screen: "PARTY", icon: "🛡", label: "パーティ" },
+  { screen: "SHOP", icon: "🛒", label: "ショップ" },
   { screen: "STAGES", icon: "🗺", label: "ステージ" },
 ];
 

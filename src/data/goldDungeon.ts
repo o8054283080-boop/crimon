@@ -5,10 +5,13 @@ import { MONSTER_TEMPLATES } from "./monsters.js";
 
 /**
  * ゴールドダンジョン: ゴールド稼ぎに特化した専用コンテンツ。
- * 固定で3階まであり、1日に挑戦できる回数は全階層合計で3回まで(日付が変わるとリセット)。
+ * 5階まであり、1日に挑戦できる回数は全階層合計で3回まで(日付が変わるとリセット)。
  * 装備ドロップや経験値ボーナスはなく、その代わりに他コンテンツよりゴールド報酬が大幅に大きい。
+ *
+ * ショップの追加で、ゴールドの使い道が装備の強化以外にも増えた。
+ * 稼ぐ側の上限が3階のままだと、並んだ品を眺めるだけで終わってしまうため5階まで伸ばしてある。
  */
-export const GOLD_DUNGEON_FLOOR_COUNT = 3;
+export const GOLD_DUNGEON_FLOOR_COUNT = 5;
 
 /** 1日に挑戦できる回数(全階層合計)。日付が変わるとリセットされる */
 export const GOLD_DUNGEON_DAILY_LIMIT = 3;
@@ -21,7 +24,10 @@ export interface GoldDungeonFloor {
   goldReward: number;
 }
 
-const FLOOR_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC"];
+const FLOOR_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS", "DARK"];
+
+/** 1階層に並ぶ敵の数。プレイヤー側と同じ4体 */
+const ENEMY_COUNT = 4;
 
 interface FloorConfig {
   star: Star;
@@ -35,12 +41,17 @@ const FLOOR_CONFIG: Record<number, FloorConfig> = {
   1: { star: 3, level: 30, powerScale: 0.7, goldReward: 3000 },
   2: { star: 4, level: 40, powerScale: 1.0, goldReward: 8000 },
   3: { star: 5, level: 50, powerScale: 1.4, goldReward: 20000 },
+  4: { star: 5, level: 50, powerScale: 1.9, goldReward: 45000 },
+  5: { star: 6, level: 60, powerScale: 2.3, goldReward: 90000 },
 };
 
 function buildEnemies(floor: number, star: Star, level: number): DungeonEnemy[] {
   const element = FLOOR_ELEMENTS[(floor - 1) % FLOOR_ELEMENTS.length];
-  return MONSTER_TEMPLATES.map((template) => ({
-    templateId: template.templateId,
+  // 通常モンスターの種類は8体に増えたので、そのまま並べると8体編成になってしまう。
+  // 階層ごとに開始位置をずらして4体だけ取り、階が変われば顔ぶれも変わるようにする
+  const templates = MONSTER_TEMPLATES;
+  return Array.from({ length: ENEMY_COUNT }, (_, i) => ({
+    templateId: templates[(floor - 1 + i) % templates.length].templateId,
     element,
     star,
     level,
