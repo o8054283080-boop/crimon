@@ -107,8 +107,9 @@ export function renderHome(props: HomeProps): HTMLElement {
   const isMaxFighterLevel = player.fighterLevel >= MAX_FIGHTER_LEVEL;
   const fighterExpNeeded = requiredExpForFighterLevel(player.fighterLevel);
   const isStaminaFull = player.stamina >= player.maxStamina;
+  const hasStarted = sessionStorage.getItem("crimon.started") === "1";
 
-  const menu = el("div", { className: "home-menu home-menu--hidden" }, [
+  const menu = el("div", { className: `home-menu ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
     props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
     el("section", { className: "home-topbar" }, [
@@ -151,6 +152,8 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("p", { className: "build-id" }, [`版 ${__BUILD_ID__}`]),
   ].filter((n): n is HTMLElement => n !== null));
 
+  if (hasStarted) return el("div", { className: "screen home-screen home-screen--menu-only" }, [menu]);
+
   const titleScreen = el("section", { className: "title-screen" }, [
     el("div", { className: "title-screen__logo" }, [
       el("span", {}, ["CREATE"]),
@@ -159,6 +162,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     ]),
     el("div", { className: "title-screen__line" }, []),
     el("button", { type: "button", className: "title-start", onclick: () => {
+      sessionStorage.setItem("crimon.started", "1");
       titleScreen.remove();
       menu.classList.remove("home-menu--hidden");
       menu.classList.add("home-menu--visible");
