@@ -10,20 +10,27 @@
     linear-gradient(180deg, #080b18 0%, #10162b 52%, #080b16 100%);
 }
 
-/* 起動時のタイトル画面 */
+/* 起動時のタイトル画面：STARTするまでゲームUIを完全に覆う */
 .title-screen {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100%;
+  height: 100dvh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 28px 22px;
+  padding: clamp(16px, 4vh, 36px) 12px;
   text-align: center;
-  position: relative;
+  overflow: hidden;
   isolation: isolate;
   background:
     radial-gradient(ellipse 70% 38% at 50% 38%, rgba(61, 125, 255, .24), transparent 72%),
-    radial-gradient(ellipse 90% 25% at 50% 100%, rgba(146, 73, 255, .14), transparent 75%);
+    radial-gradient(ellipse 90% 25% at 50% 100%, rgba(146, 73, 255, .14), transparent 75%),
+    linear-gradient(180deg, #080b18 0%, #10162b 52%, #080b16 100%);
 }
 
 .title-screen::before,
@@ -35,56 +42,71 @@
   width: min(520px, 90vw);
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(130, 180, 255, .6), transparent);
+  pointer-events: none;
 }
-.title-screen::before { top: 17%; }
-.title-screen::after { bottom: 15%; }
+.title-screen::before { top: 12%; }
+.title-screen::after { bottom: 10%; }
 
 .title-screen__logo {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
   line-height: .86;
-  letter-spacing: .13em;
+  letter-spacing: .06em;
   text-transform: uppercase;
   filter: drop-shadow(0 12px 30px rgba(0,0,0,.5));
 }
 .title-screen__logo span {
-  font-size: clamp(2rem, 10vw, 3.6rem);
+  max-width: 100%;
+  font-size: clamp(1.25rem, 7vw, 3.2rem);
   font-weight: 800;
   color: #dbe9ff;
+  white-space: nowrap;
 }
 .title-screen__logo strong {
+  max-width: 100%;
   margin-top: 4px;
-  font-size: clamp(3.4rem, 17vw, 6.4rem);
+  font-size: clamp(2.45rem, 14vw, 6rem);
   font-weight: 950;
-  letter-spacing: .06em;
+  letter-spacing: .025em;
+  line-height: .9;
   background: linear-gradient(180deg, #ffffff 0%, #9cc7ff 40%, #4d7cff 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   text-shadow: 0 0 38px rgba(77, 124, 255, .35);
+  white-space: nowrap;
 }
 .title-screen__logo small {
-  margin-top: 22px;
-  font-size: clamp(.85rem, 3.8vw, 1.15rem);
-  letter-spacing: .45em;
+  max-width: 100%;
+  margin-top: clamp(12px, 2.5vh, 22px);
+  font-size: clamp(.68rem, 3.2vw, 1.15rem);
+  letter-spacing: clamp(.08em, 1.8vw, .4em);
   color: #aebfe7;
   font-weight: 800;
+  white-space: nowrap;
 }
 .title-screen__line {
   width: min(280px, 65vw);
   height: 2px;
-  margin: 28px 0 34px;
+  flex: 0 0 auto;
+  margin: clamp(16px, 3.5vh, 28px) 0 clamp(18px, 4vh, 34px);
   background: linear-gradient(90deg, transparent, #76aaff, transparent);
   box-shadow: 0 0 16px rgba(95, 151, 255, .5);
 }
 .title-start {
-  min-width: min(300px, 78vw);
-  min-height: 68px;
+  width: min(300px, 78vw);
+  min-width: 0;
+  min-height: clamp(56px, 8vh, 68px);
+  flex: 0 0 auto;
   border: 1px solid rgba(176, 210, 255, .65);
   border-radius: 18px;
   background: linear-gradient(180deg, #82bbff 0%, #477ff0 48%, #254aa7 100%);
   color: #fff;
-  font-size: 1.18rem;
+  font-size: clamp(1rem, 4vw, 1.18rem);
   font-weight: 950;
   letter-spacing: .28em;
   box-shadow: 0 0 32px rgba(67, 126, 255, .32), 0 16px 35px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.7);
@@ -92,10 +114,11 @@
 }
 .title-start:active { transform: translateY(2px) scale(.99); }
 .title-screen__hint {
-  margin-top: 18px;
+  margin-top: 12px;
   color: rgba(186, 202, 235, .55);
-  font-size: .68rem;
-  letter-spacing: .28em;
+  font-size: clamp(.54rem, 2.4vw, .68rem);
+  letter-spacing: .18em;
+  white-space: nowrap;
 }
 
 /* START後のメニュー：基本操作を1画面に集約 */
@@ -207,6 +230,9 @@
 .home-menu .audio-settings { opacity: .75; }
 .home-menu .build-id { opacity: .3; margin: 0; text-align: center; font-size: .55rem; }
 
+/* タイトル画面中は固定ナビより前面に出し、START前のタブを見せない */
+body:has(.title-screen) { overflow: hidden; }
+
 @media (max-height: 720px) {
   .home-menu { gap: 6px; }
   .home-topbar { padding: 7px 9px; }
@@ -215,6 +241,20 @@
   .home-adventure__icon { width: 40px; height: 40px; font-size: 1.4rem; }
   .home-menu-tile { min-height: 53px; }
   .home-menu .audio-settings, .home-menu .save-data { display: none; }
+  .title-screen { padding-top: 12px; padding-bottom: 12px; }
+  .title-screen__logo span { font-size: clamp(1.1rem, 6.5vw, 2rem); }
+  .title-screen__logo strong { font-size: clamp(2.2rem, 13vw, 4.5rem); }
+  .title-screen__logo small { margin-top: 10px; }
+  .title-screen__line { margin-top: 13px; margin-bottom: 16px; }
+  .title-start { min-height: 54px; }
+  .title-screen__hint { margin-top: 8px; }
+}
+
+@media (max-width: 380px) {
+  .title-screen__logo span { font-size: 1.05rem; }
+  .title-screen__logo strong { font-size: clamp(2.05rem, 12.5vw, 3.4rem); letter-spacing: 0; }
+  .title-screen__logo small { font-size: .61rem; letter-spacing: .05em; }
+  .title-start { width: 76vw; }
 }
 
 @media (min-width: 600px) {
