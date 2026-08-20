@@ -33,13 +33,6 @@ export interface HomeProps {
   onImportSave: (file: File) => void;
 }
 
-/**
- * データの控え。
- *
- * 保存先はブラウザの中だけで、「サイトのデータを削除」やアプリの入れ直しで
- * **予告なく全部消える**。実際にそれで手持ちを全て失う事故が起きた。
- * 端末にファイルとして残せることを、目立つ場所で伝えておく。
- */
 function renderSaveDataPanel(props: HomeProps): HTMLElement {
   const input = el("input", {
     type: "file",
@@ -49,7 +42,6 @@ function renderSaveDataPanel(props: HomeProps): HTMLElement {
       const target = event.target as HTMLInputElement;
       const file = target.files?.[0];
       if (file) props.onImportSave(file);
-      // 同じファイルを続けて選び直せるようにする
       target.value = "";
     },
   }) as HTMLInputElement;
@@ -67,7 +59,6 @@ function renderSaveDataPanel(props: HomeProps): HTMLElement {
   ]);
 }
 
-/** お詫びの配布を受け取った時の案内。何をお詫びしているのかも一緒に出す */
 function renderCompensationBanner(claims: CompensationClaim[], onDismiss: () => void): HTMLElement {
   const rows: HTMLElement[] = [];
   for (const { compensation } of claims) {
@@ -113,61 +104,71 @@ export function renderHome(props: HomeProps): HTMLElement {
     onEditFighterName,
   } = props;
   const party = getParty(player);
-
   const isMaxFighterLevel = player.fighterLevel >= MAX_FIGHTER_LEVEL;
   const fighterExpNeeded = requiredExpForFighterLevel(player.fighterLevel);
   const isStaminaFull = player.stamina >= player.maxStamina;
 
-  return el("div", { className: "screen home-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["Crimon"]), el("p", { className: "app-subtitle" }, ["周回してモンスターを育てよう"])]),
+  const menu = el("div", { className: "home-menu" }, [
     props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
-    el("section", { className: "panel currency-panel" }, [
-      el("div", { className: "currency-chip" }, [el("span", {}, ["💎"]), ` ${player.crystal}`]),
-      el("div", { className: "currency-chip" }, [el("span", {}, ["🪙"]), ` ${player.gold}`]),
-    ]),
-    el("section", { className: "panel" }, [
-      el("div", { className: "panel-header" }, [
-        el("h2", {}, [`${player.fighterName} Lv.${player.fighterLevel}`]),
-        el("button", { type: "button", className: "btn btn--ghost fighter-name-edit-btn", onclick: onEditFighterName }, ["✎ 名前変更"]),
+    el("section", { className: "home-topbar" }, [
+      el("div", { className: "home-player" }, [
+        el("strong", {}, [`${player.fighterName} Lv.${player.fighterLevel}`]),
+        el("span", {}, [isMaxFighterLevel ? "MAX" : `EXP ${player.fighterExp}/${fighterExpNeeded}`]),
       ]),
-      el("p", { className: "app-subtitle" }, [isMaxFighterLevel ? "MAX" : `EXP ${player.fighterExp}/${fighterExpNeeded}`]),
-      el("p", {}, [`⚡ スタミナ ${player.stamina} / ${player.maxStamina}`]),
-      el("div", { className: "stamina-refill-row" }, [
-        el(
-          "button",
-          {
-            type: "button",
-            className: "btn btn--ghost",
-            disabled: isStaminaFull || player.crystal < STAMINA_REFILL_PARTIAL_COST,
-            onclick: onRefillStaminaPartial,
-          },
-          [`💎${STAMINA_REFILL_PARTIAL_COST}で+${STAMINA_REFILL_PARTIAL_AMOUNT}回復`],
-        ),
-        el(
-          "button",
-          {
-            type: "button",
-            className: "btn btn--ghost",
-            disabled: isStaminaFull || player.crystal < STAMINA_REFILL_FULL_COST,
-            onclick: onRefillStaminaFull,
-          },
-          [`💎${STAMINA_REFILL_FULL_COST}で全回復`],
-        ),
+      el("div", { className: "home-currencies" }, [
+        el("span", {}, [`💎 ${player.crystal}`]),
+        el("span", {}, [`🪙 ${player.gold}`]),
+        el("span", {}, [`⚡ ${player.stamina}/${player.maxStamina}`]),
       ]),
+      el("button", { type: "button", className: "btn btn--ghost home-name-btn", onclick: onEditFighterName }, ["✎"]),
     ]),
-    el("section", { className: "panel" }, [
-      el("div", { className: "panel-header" }, [el("h2", {}, ["現在のパーティ"]), el("button", { type: "button", className: "btn btn--ghost", onclick: onGoParty }, ["編成へ"])]),
+    el("section", { className: "home-party-card" }, [
+      el("div", { className: "home-section-title" }, [el("strong", {}, ["CURRENT PARTY"]), el("button", { type: "button", className: "btn btn--ghost", onclick: onGoParty }, ["編成"])]),
       renderPartySlots(party, 4),
     ]),
-    el("button", { type: "button", className: "btn btn--primary btn--large", onclick: onGoStages }, ["🗺 ステージに挑戦する"]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoSummon }, ["✨ モンスターを召喚する"]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoEquipDungeon }, ["🏰 装備ダンジョンに挑戦する"]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoLevelDungeon }, ["📈 レベル上げダンジョンに挑戦する"]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: onGoGoldDungeon }, ["🪙 ゴールドダンジョンに挑戦する"]),
+    el("button", { type: "button", className: "home-adventure", onclick: onGoStages }, [
+      el("span", { className: "home-adventure__icon" }, ["⚔"]),
+      el("span", { className: "home-adventure__text" }, [el("strong", {}, ["ADVENTURE"]), el("small", {}, ["ステージに挑戦する"])]),
+      el("span", { className: "home-adventure__arrow" }, ["›"]),
+    ]),
+    el("div", { className: "home-menu-grid" }, [
+      el("button", { type: "button", className: "home-menu-tile", onclick: onGoSummon }, ["✨", "召喚"]),
+      el("button", { type: "button", className: "home-menu-tile", onclick: onGoParty }, ["👥", "パーティ"]),
+      el("button", { type: "button", className: "home-menu-tile", onclick: onGoEquipDungeon }, ["🛡", "装備"]),
+      el("button", { type: "button", className: "home-menu-tile", onclick: onGoLevelDungeon }, ["📈", "育成"]),
+      el("button", { type: "button", className: "home-menu-tile", onclick: onGoGoldDungeon }, ["🪙", "ゴールド"]),
+      el("button", { type: "button", className: "home-menu-tile", onclick: () => {} }, ["📖", "図鑑"]),
+    ]),
+    el("section", { className: "home-utility" }, [
+      el("div", { className: "home-stamina" }, [el("span", {}, ["⚡ スタミナ"]), el("strong", {}, [`${player.stamina} / ${player.maxStamina}`])]),
+      el("div", { className: "home-stamina-actions" }, [
+        el("button", { type: "button", className: "btn btn--ghost", disabled: isStaminaFull || player.crystal < STAMINA_REFILL_PARTIAL_COST, onclick: onRefillStaminaPartial }, [`💎${STAMINA_REFILL_PARTIAL_COST} +${STAMINA_REFILL_PARTIAL_AMOUNT}`]),
+        el("button", { type: "button", className: "btn btn--ghost", disabled: isStaminaFull || player.crystal < STAMINA_REFILL_FULL_COST, onclick: onRefillStaminaFull }, [`💎${STAMINA_REFILL_FULL_COST} 全回復`]),
+      ]),
+    ]),
     renderAudioSettings(props.audioSettings),
     renderSaveDataPanel(props),
-    // どのビルドが動いているかの表示。更新が反映されているかの切り分けに使う
     el("p", { className: "build-id" }, [`版 ${__BUILD_ID__}`]),
   ].filter((n): n is HTMLElement => n !== null));
+
+  const startButton = el("button", { type: "button", className: "title-start", onclick: () => {
+    titleScreen.remove();
+    menu.classList.add("home-menu--visible");
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  } }, ["START"]);
+
+  const titleScreen = el("section", { className: "title-screen" }, [
+    el("div", { className: "title-screen__logo" }, [
+      el("span", {}, ["CREATE"]),
+      el("strong", {}, ["MONSTERS"]),
+      el("small", {}, ["クリエイトモンスターズ"]),
+    ]),
+    el("div", { className: "title-screen__line" }, []),
+    startButton,
+    el("p", { className: "title-screen__hint" }, ["MONSTER BATTLE ADVENTURE"]),
+  ]);
+
+  menu.classList.add("home-menu--hidden");
+  return el("div", { className: "screen home-screen" }, [titleScreen, menu]);
 }
