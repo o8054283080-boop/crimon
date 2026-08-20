@@ -212,7 +212,7 @@ const STAT_BASE_VALUE: Record<StatType, number> = {
 };
 
 /** サブステータスはメインステータスに対してこの比率分だけ弱くなる */
-const SUB_STAT_RATIO = 0.4;
+const SUB_STAT_RATIO = 0.2;
 
 /** 装備の最大強化レベル */
 export const EQUIP_MAX_LEVEL = 15;

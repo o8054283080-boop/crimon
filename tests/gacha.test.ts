@@ -30,13 +30,13 @@ describe("ガチャ (summonMany)", () => {
     }
   });
 
-  it("レア(光/闇)排出率はおおよそ設定値(12+7+3=22%)に近い", () => {
+  it("レア(光/闇)排出率はおおよそ設定重み(3+1.35+0.65)/(75+5)=6.25%に近い", () => {
     const rng = mulberry32(42);
     const results = summonMany(5000, rng);
     const rareCount = results.filter((r) => r.isRare).length;
     const rate = rareCount / results.length;
-    expect(rate).toBeGreaterThan(0.22 - 0.03);
-    expect(rate).toBeLessThan(0.22 + 0.03);
+    expect(rate).toBeGreaterThan(0.0625 - 0.015);
+    expect(rate).toBeLessThan(0.0625 + 0.015);
   });
 
   it("レア枠は光・闇属性のみ、通常枠は光・闇を含まない", () => {

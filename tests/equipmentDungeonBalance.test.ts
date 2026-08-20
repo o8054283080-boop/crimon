@@ -165,7 +165,7 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     expect(wins / trials).toBeLessThan(0.35);
   });
 
-  it("10階はSR/SSRを星6装備サブ4個までフルで固めれば安定して突破できるようになる(真の最終到達点)", () => {
+  it("10階はサブステータス弱体化とお供HP強化後、SR/SSRを星6装備サブ4個まで固めても安定突破できない", () => {
     let wins = 0;
     const trials = 150;
     for (let i = 0; i < trials; i++) {
@@ -176,10 +176,10 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
       const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
       if (engine.run().winner === "PLAYER") wins += 1;
     }
-    expect(wins / trials).toBeGreaterThan(0.75);
+    expect(wins / trials).toBeLessThan(0.1);
   });
 
-  it("9階は10階ほど厳しくなく、SR/SSR軸の編成なら十分勝機があるが、通常モンスターだけではまだ厳しい", () => {
+  it("9階は10階ほど厳しくなく、SR/SSR軸の編成なら勝機があるが、通常モンスターだけではまだ厳しい", () => {
     let srSsrWins = 0;
     let genericWins = 0;
     const trials = 150;
@@ -191,7 +191,7 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
       if (new BattleEngine(srSsrSetup.playerDefs, srSsrSetup.enemyDefs, { rng }).run().winner === "PLAYER") srSsrWins += 1;
     }
     const genericRate = winRate(9, 5, 50, 5, 2, 100, MAX_DUNGEON_PARTY_SIZE);
-    expect(srSsrWins / trials).toBeGreaterThan(0.5);
+    expect(srSsrWins / trials).toBeGreaterThan(0.35);
     expect(genericRate).toBeLessThan(0.15);
   });
 
