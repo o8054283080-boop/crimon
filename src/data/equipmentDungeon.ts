@@ -18,7 +18,7 @@ export interface DungeonEnemy {
   isBoss?: boolean;
   /**
    * この個体だけに掛かる最大HP倍率。powerScale とは別枠で、階層全体ではなく
-   * 1体だけを分厚くしたい時に使う(ボスだけ殴り合いの時間を伸ばす、など)
+   * 1体だけを分厚くしたい時に使う(ボスや最終階のお供だけ殴り合いの時間を伸ばす、など)
    */
   hpMultiplier?: number;
   /**
@@ -73,6 +73,9 @@ const BOSS_HP_MULTIPLIER = 5;
  * powerScale は素早さに掛からない設計なので、ここで別枠で上げて手数を確保している。
  */
 const BOSS_SPD_MULTIPLIER = 1.3;
+
+/** 10階のお供だけに掛かる最大HP倍率。サブステータス弱体化後も最終階の支援・妨害役が仕事をする時間を確保する */
+const FINAL_FLOOR_COMPANION_HP_MULTIPLIER = 3;
 
 /**
  * 9・10階(ダンジョン最終盤の最終関門)だけは、お供2体も専用の
@@ -141,6 +144,7 @@ function buildFloor(floor: number): DungeonFloor {
   const companionTemplateIds = isFinalBossFloor
     ? FINAL_BOSS_COMPANION_TEMPLATES.map((t) => t.templateId)
     : [MONSTER_TEMPLATES[(floor - 1) % MONSTER_TEMPLATES.length].templateId, MONSTER_TEMPLATES[floor % MONSTER_TEMPLATES.length].templateId];
+  const companionHpMultiplier = floor === DUNGEON_FLOOR_COUNT ? FINAL_FLOOR_COMPANION_HP_MULTIPLIER : undefined;
 
   // ボス1体+お供2体の3体編成。ボスを先頭に置く
   const enemies: DungeonEnemy[] = [
@@ -158,6 +162,7 @@ function buildFloor(floor: number): DungeonFloor {
       element: floorElement,
       star: DUNGEON_ENEMY_STAR,
       level: DUNGEON_ENEMY_LEVEL,
+      hpMultiplier: companionHpMultiplier,
     })),
   ];
 

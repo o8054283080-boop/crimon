@@ -34,12 +34,12 @@ interface GachaTier {
  * 全体的に排出率が低い。具体的な数値はコード上でのみ管理し、UIには表示しない。
  */
 const GACHA_TABLE: GachaTier[] = [
-  { star: 3, isRare: false, weight: 0.5 },
-  { star: 4, isRare: false, weight: 0.2 },
-  { star: 5, isRare: false, weight: 0.08 },
-  { star: 3, isRare: true, weight: 0.12 },
-  { star: 4, isRare: true, weight: 0.07 },
-  { star: 5, isRare: true, weight: 0.03 },
+  { star: 3, isRare: false, weight: 0.57 },
+  { star: 4, isRare: false, weight: 0.1365 },
+  { star: 5, isRare: false, weight: 0.0435 },
+  { star: 3, isRare: true, weight: 0.03 },
+  { star: 4, isRare: true, weight: 0.0135 },
+  { star: 5, isRare: true, weight: 0.0065 },
 ];
 
 function pick<T>(items: T[], rng: () => number): T {
