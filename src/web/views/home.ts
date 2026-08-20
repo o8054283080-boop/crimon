@@ -108,7 +108,7 @@ export function renderHome(props: HomeProps): HTMLElement {
   const fighterExpNeeded = requiredExpForFighterLevel(player.fighterLevel);
   const isStaminaFull = player.stamina >= player.maxStamina;
 
-  const menu = el("div", { className: "home-menu" }, [
+  const menu = el("div", { className: "home-menu home-menu--hidden" }, [
     props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
     el("section", { className: "home-topbar" }, [
@@ -138,7 +138,6 @@ export function renderHome(props: HomeProps): HTMLElement {
       el("button", { type: "button", className: "home-menu-tile", onclick: onGoEquipDungeon }, ["🛡", "装備"]),
       el("button", { type: "button", className: "home-menu-tile", onclick: onGoLevelDungeon }, ["📈", "育成"]),
       el("button", { type: "button", className: "home-menu-tile", onclick: onGoGoldDungeon }, ["🪙", "ゴールド"]),
-      el("button", { type: "button", className: "home-menu-tile", onclick: () => {} }, ["📖", "図鑑"]),
     ]),
     el("section", { className: "home-utility" }, [
       el("div", { className: "home-stamina" }, [el("span", {}, ["⚡ スタミナ"]), el("strong", {}, [`${player.stamina} / ${player.maxStamina}`])]),
@@ -152,12 +151,6 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("p", { className: "build-id" }, [`版 ${__BUILD_ID__}`]),
   ].filter((n): n is HTMLElement => n !== null));
 
-  const startButton = el("button", { type: "button", className: "title-start", onclick: () => {
-    titleScreen.remove();
-    menu.classList.add("home-menu--visible");
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-  } }, ["START"]);
-
   const titleScreen = el("section", { className: "title-screen" }, [
     el("div", { className: "title-screen__logo" }, [
       el("span", {}, ["CREATE"]),
@@ -165,10 +158,14 @@ export function renderHome(props: HomeProps): HTMLElement {
       el("small", {}, ["クリエイトモンスターズ"]),
     ]),
     el("div", { className: "title-screen__line" }, []),
-    startButton,
+    el("button", { type: "button", className: "title-start", onclick: () => {
+      titleScreen.remove();
+      menu.classList.remove("home-menu--hidden");
+      menu.classList.add("home-menu--visible");
+      window.scrollTo({ top: 0 });
+    } }, ["START"]),
     el("p", { className: "title-screen__hint" }, ["MONSTER BATTLE ADVENTURE"]),
   ]);
 
-  menu.classList.add("home-menu--hidden");
   return el("div", { className: "screen home-screen" }, [titleScreen, menu]);
 }
