@@ -100,13 +100,15 @@ const SLIME: MonsterTemplate = {
   lightSkill3: {
     id: "slime_s3_light",
     name: "セイントスラッシュ",
-    description: "聖なる粘液を弾けさせ、敵全体に攻撃力1.5倍のダメージを与え、70%で2ターン暗闇を付与する。味方全体のHPを最大HPの12%回復する。",
+    description: "聖なる粘液を弾けさせ、敵全体に攻撃力1.5倍のダメージを与え、70%で2ターン暗闇を付与し、与えたダメージの20%を回復する。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.5 },
       { kind: "BLIND", durationTurns: 2, chance: 0.7 },
-      { kind: "HEAL", healRate: 0.12, toSelf: false },
+      // 全体技なので、HEALではなくLIFESTEALで組む。
+      // HEALは対象(=敵)を回復してしまうし、toSelfにしても当たった数と噛み合わない
+      { kind: "LIFESTEAL", healRate: 0.2 },
     ],
   },
   darkSkill3: {
@@ -215,12 +217,13 @@ const WOLF: MonsterTemplate = {
   lightSkill3: {
     id: "wolf_s3_light",
     name: "ホーリーファング",
-    description: "光を纏った牙で敵単体に攻撃力3.6倍のダメージを与える。自身の速度が高いほど威力が上がり、行動ゲージを30%進める。",
+    description: "光を纏った牙で敵単体に攻撃力3.6倍のダメージを与え、行動ゲージを30%奪う。自身の速度が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 3.6, scaleBonus: { stat: "spd", ratePerPoint: 0.004 } },
-      { kind: "GAUGE", amount: 0.3 },
+      // 吸収にしないと、敵を狙う技なので相手のゲージを進めてしまう
+      { kind: "GAUGE", amount: 0.3, drain: true },
     ],
   },
   darkSkill3: {
@@ -451,7 +454,7 @@ const FAIRY: MonsterTemplate = {
   darkSkill3: {
     id: "fairy_s3_dark",
     name: "ナイトメアミスト",
-    description: "味方全体のHPを最大HPの25%回復し、敵全体の行動ゲージを25%奪う。",
+    description: "夢の霧で味方全体のHPを最大HPの25%回復し、素早さを2ターン上昇させ、行動ゲージを25%進める。",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
@@ -1070,6 +1073,59 @@ const GRIFFON: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "griffon_s3_light",
+    name: "テンペストジャッジ",
+    description: "光の暴風で敵全体に攻撃力2.4倍のダメージを与え、50%で1ターン行動不能にし、味方全体の攻撃力を3ターン上昇させる。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 2.4 },
+      { kind: "STUN", durationTurns: 1, chance: 0.5 },
+      { kind: "BUFF", stat: "atk", amount: 0.35, durationTurns: 3, applyTo: "ALLIES" },
+    ],
+  },
+  darkSkill3: {
+    id: "griffon_s3_dark",
+    name: "シャドウタロン",
+    description: "影の鉤爪で敵単体に攻撃力1.7倍のダメージを3回与え、70%で2ターン防御力を大きく低下させる。自身の速度が高いほど威力が上がる。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.7, hits: 3, scaleBonus: { stat: "spd", ratePerPoint: 0.003 } },
+      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+    ],
+  },
+};
+
+/**
+ * ドラゴンの光/闇スキル3。skill3Variants の並びと lightSkill3/darkSkill3 の両方から参照するため、
+ * 定義を1か所にまとめてある(詳細は skill3Variants 末尾のコメント)。
+ */
+const DRAGON_LIGHT_SKILL3: Skill = {
+  id: "dragon_s3_shining",
+  name: "シャイニングブレス",
+  description: "聖なる光の息を吐き、敵全体に攻撃力2.4倍のダメージを与え、75%で2ターン暗闇、60%で2ターン攻撃力低下を付与する。",
+  target: "ALL_ENEMIES",
+  cooldownTurns: 5,
+  effects: [
+    { kind: "DAMAGE", multiplier: 2.4 },
+    { kind: "BLIND", durationTurns: 2, chance: 0.75 },
+    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
+  ],
+};
+
+const DRAGON_DARK_SKILL3: Skill = {
+  id: "dragon_s3_meteor",
+  name: "破壊の流星",
+  description: "闇の流星を降らせ、敵全体の防御力を無視して攻撃力2.0倍のダメージを与え、与えたダメージの25%を回復する。",
+  target: "ALL_ENEMIES",
+  cooldownTurns: 5,
+  effects: [
+    // 防御無視は硬い相手にこそ効くが、1.5倍では他の候補(破滅の咆哮2.0倍+HP補正)に見劣りしていた
+    { kind: "DAMAGE", multiplier: 2.0, ignoreDefense: true },
+    { kind: "LIFESTEAL", healRate: 0.25 },
+  ],
 };
 
 const DRAGON: MonsterTemplate = {
@@ -1209,27 +1265,14 @@ const DRAGON: MonsterTemplate = {
         { kind: "HEAL", scaleStat: "def", healRate: 1.5 },
       ],
     },
-    {
-      id: "dragon_s3_shining",
-      name: "シャイニングブレス",
-      description: "聖なる光の息を吐き、敵全体に攻撃力2.4倍のダメージを与え、75%で2ターン暗闇、60%で2ターン攻撃力低下を付与する。",
-      target: "ALL_ENEMIES",
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.4 },
-        { kind: "BLIND", durationTurns: 2, chance: 0.75 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
-      ],
-    },
-    {
-      id: "dragon_s3_meteor",
-      name: "破壊の流星",
-      description: "闇の流星を降らせ、敵全体の防御力を無視して攻撃力1.5倍のダメージを与える。",
-      target: "ALL_ENEMIES",
-      cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 1.5, ignoreDefense: true }],
-    },
+    // 光/闇はこのあとの lightSkill3 / darkSkill3 が優先されるので、この2件が選ばれることはない。
+    // それでも残しているのは、pickSkillVariant が**配列の長さで添字を決める**ため。
+    // 6件から減らすと火・草・電気・水のスキル3まで別物に変わってしまう
+    DRAGON_LIGHT_SKILL3,
+    DRAGON_DARK_SKILL3,
   ],
+  lightSkill3: DRAGON_LIGHT_SKILL3,
+  darkSkill3: DRAGON_DARK_SKILL3,
 };
 
 const SERAPH: MonsterTemplate = {
@@ -1329,6 +1372,32 @@ const SERAPH: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "seraph_s3_light",
+    name: "エターナルヘイロー",
+    description:
+      "消えない光輪を掲げ、自身の防御力の220%ぶん味方全体のHPを回復し、デバフを解除して3ターン状態異常を無効にし、4ターンのあいだ毎ターン8%ずつ回復させる。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 6,
+    effects: [
+      { kind: "HEAL", scaleStat: "def", healRate: 2.2 },
+      { kind: "CLEANSE" },
+      { kind: "IMMUNITY", durationTurns: 3 },
+      { kind: "REGEN", healRate: 0.08, durationTurns: 4 },
+    ],
+  },
+  darkSkill3: {
+    id: "seraph_s3_dark",
+    name: "フォールンウィング",
+    description: "堕ちた翼で敵全体に攻撃力2.1倍のダメージを与え、80%で2ターン暗闇を付与し、与えたダメージの30%を回復する。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 2.1 },
+      { kind: "BLIND", durationTurns: 2, chance: 0.8 },
+      { kind: "LIFESTEAL", healRate: 0.3 },
+    ],
+  },
 };
 
 const NEMESIS: MonsterTemplate = {
@@ -1421,6 +1490,31 @@ const NEMESIS: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "nemesis_s3_light",
+    name: "ラストジャッジメント",
+    description:
+      "裁きの一撃(4.2倍)を叩き込み、75%で相手をスタンさせ、行動ゲージを40%奪う。自身の防御力が高いほど威力が上がる。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 4.2, scaleBonus: { stat: "def", ratePerPoint: 0.003 } },
+      { kind: "STUN", durationTurns: 1, chance: 0.75 },
+      { kind: "GAUGE", amount: 0.4, drain: true },
+    ],
+  },
+  darkSkill3: {
+    id: "nemesis_s3_dark",
+    name: "エンドオブオール",
+    description: "終焉の波動で敵全体に攻撃力1.4倍のダメージを2回与え、行動ゲージを20%吸収し、70%で2ターン防御力を大きく低下させる。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.4, hits: 2 },
+      { kind: "GAUGE", amount: 0.2, drain: true },
+      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+    ],
+  },
 };
 
 /**
@@ -1593,6 +1687,21 @@ export const GACHA_SR_RARE_TEMPLATE = SERAPH;
 /** ガチャの星5(SSR)テンプレート: 火水電草側 / 光闇側 */
 export const GACHA_SSR_COMMON_TEMPLATE = DRAGON;
 export const GACHA_SSR_RARE_TEMPLATE = NEMESIS;
+
+/**
+ * このファイルが定義する全テンプレート。検査用。
+ * 敵専用・素材専用も含めて、スキルの整合性チェックから漏れる原型を作らない。
+ */
+export const ALL_MONSTER_TEMPLATES: MonsterTemplate[] = [
+  ...MONSTER_TEMPLATES,
+  GRIFFON,
+  DRAGON,
+  SERAPH,
+  NEMESIS,
+  ANCIENT_DEMON,
+  ANCIENT_CRYSTAL,
+  ANCIENT_CRYSTAL_CURSE,
+];
 
 export const GACHA_SR_COMMON_DEX = createAllVariants(GRIFFON);
 export const GACHA_SSR_COMMON_DEX = createAllVariants(DRAGON);

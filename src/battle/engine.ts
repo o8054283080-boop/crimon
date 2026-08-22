@@ -1,6 +1,6 @@
 import { ELEMENT_JA } from "../core/element.js";
 import { MonsterDefinition } from "../core/monster.js";
-import { Skill } from "../core/skill.js";
+import { Skill, SkillEffect } from "../core/skill.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
 import { calcDamage } from "./damage.js";
 import {
@@ -26,6 +26,19 @@ const BLIND_MISS_CHANCE = 0.5;
 /** 暗闇で外した攻撃のダメージ減少率 */
 const BLIND_DAMAGE_REDUCTION = 0.75;
 const GAUGE_EPSILON = 1e-6;
+
+/**
+ * 「対象ではなく術者(またはその味方)に向いた効果」かどうか。
+ *
+ * 全体技は対象の数だけ効果解決が走るので、こうした効果をそのまま処理すると
+ * 敵4体の技で自己バフが4重にかかる。呼び出し側はこれを見て、
+ * 1回の使用につき1度だけ適用する。
+ */
+function isSourceScopedEffect(effect: SkillEffect): boolean {
+  if (effect.kind === "HEAL") return effect.toSelf === true;
+  if (effect.kind === "BUFF") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
+  return false;
+}
 
 export type BattleWinner = "PLAYER" | "ENEMY" | "DRAW";
 
@@ -320,9 +333,13 @@ export class BattleEngine {
       this.push(`  → ${this.label(unit)} は暗闇で手元が狂った！`);
     }
 
-    for (const target of targets) {
-      this.applySkillEffects(unit, target, skill, missed);
-    }
+    // 効果の解決は対象ごとに1回ずつ走る。そのため「術者や味方に向いた効果」
+    // (自己回復・applyToがSELF/ALLIESのバフ)を素直に処理すると、全体技では
+    // 対象の数だけ重ねがけされてしまう(敵4体なら4倍)。
+    // 向き先が対象でない効果は最初の1回だけ適用する。
+    targets.forEach((target, i) => {
+      this.applySkillEffects(unit, target, skill, missed, i === 0);
+    });
   }
 
   /** 火傷している場合、手番の最後(行動の有無・スタンの有無を問わず)に自分の攻撃力分のダメージを受ける */
@@ -370,13 +387,25 @@ export class BattleEngine {
     }
   }
 
-  private applySkillEffects(source: BattleUnit, target: BattleUnit, skill: Skill, missed = false): void {
+  /**
+   * @param sourceScoped この呼び出しで「術者/味方に向いた効果」を適用してよいか。
+   *   全体技では対象ごとにこの関数が呼ばれるため、最初の対象のときだけtrueになる。
+   *   ライフスティールは与えたダメージに比例するので、ここには含めず毎回適用する。
+   */
+  private applySkillEffects(
+    source: BattleUnit,
+    target: BattleUnit,
+    skill: Skill,
+    missed = false,
+    sourceScoped = true,
+  ): void {
     let damageDealtThisCall = 0;
 
     for (const effect of skill.effects) {
       if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL") continue;
       // 暗闇で外した場合、ダメージ以外の効果は一切乗らない
       if (missed && effect.kind !== "DAMAGE" && effect.kind !== "LIFESTEAL") continue;
+      if (!sourceScoped && isSourceScopedEffect(effect)) continue;
 
       switch (effect.kind) {
         case "DAMAGE": {
