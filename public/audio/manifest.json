@@ -182,5 +182,11 @@
     "denied_0.ogg",
     "denied_1.ogg",
     "denied_2.ogg"
+  ],
+  "bgm_home": [
+    "bgm_home.ogg"
+  ],
+  "bgm_battle": [
+    "bgm_battle.ogg"
   ]
 }
