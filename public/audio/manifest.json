@@ -2,22 +2,30 @@
   "impact_slash": [
     "impact_slash_0.ogg",
     "impact_slash_1.ogg",
-    "impact_slash_2.ogg"
+    "impact_slash_2.ogg",
+    "impact_slash_3.ogg",
+    "impact_slash_4.ogg"
   ],
   "impact_blunt": [
     "impact_blunt_0.ogg",
     "impact_blunt_1.ogg",
-    "impact_blunt_2.ogg"
+    "impact_blunt_2.ogg",
+    "impact_blunt_3.ogg",
+    "impact_blunt_4.ogg"
   ],
   "impact_pierce": [
     "impact_pierce_0.ogg",
     "impact_pierce_1.ogg",
-    "impact_pierce_2.ogg"
+    "impact_pierce_2.ogg",
+    "impact_pierce_3.ogg",
+    "impact_pierce_4.ogg"
   ],
   "impact_magic": [
     "impact_magic_0.ogg",
     "impact_magic_1.ogg",
-    "impact_magic_2.ogg"
+    "impact_magic_2.ogg",
+    "impact_magic_3.ogg",
+    "impact_magic_4.ogg"
   ],
   "flavor_FIRE": [
     "flavor_FIRE_0.ogg",
@@ -52,12 +60,14 @@
   "crit": [
     "crit_0.ogg",
     "crit_1.ogg",
-    "crit_2.ogg"
+    "crit_2.ogg",
+    "crit_3.ogg"
   ],
   "whiff": [
     "whiff_0.ogg",
     "whiff_1.ogg",
-    "whiff_2.ogg"
+    "whiff_2.ogg",
+    "whiff_3.ogg"
   ],
   "shield": [
     "shield_0.ogg",
@@ -92,22 +102,30 @@
   "turnAlly": [
     "turnAlly_0.ogg",
     "turnAlly_1.ogg",
-    "turnAlly_2.ogg"
+    "turnAlly_2.ogg",
+    "turnAlly_3.ogg",
+    "turnAlly_4.ogg"
   ],
   "turnEnemy": [
     "turnEnemy_0.ogg",
     "turnEnemy_1.ogg",
-    "turnEnemy_2.ogg"
+    "turnEnemy_2.ogg",
+    "turnEnemy_3.ogg",
+    "turnEnemy_4.ogg"
   ],
   "tap": [
     "tap_0.ogg",
     "tap_1.ogg",
-    "tap_2.ogg"
+    "tap_2.ogg",
+    "tap_3.ogg",
+    "tap_4.ogg"
   ],
   "select": [
     "select_0.ogg",
     "select_1.ogg",
-    "select_2.ogg"
+    "select_2.ogg",
+    "select_3.ogg",
+    "select_4.ogg"
   ],
   "victory": [
     "victory_0.ogg",
@@ -118,5 +136,40 @@
     "defeat_0.ogg",
     "defeat_1.ogg",
     "defeat_2.ogg"
+  ],
+  "summon": [
+    "summon_0.ogg",
+    "summon_1.ogg",
+    "summon_2.ogg"
+  ],
+  "summonRare": [
+    "summonRare_0.ogg",
+    "summonRare_1.ogg",
+    "summonRare_2.ogg"
+  ],
+  "levelUp": [
+    "levelUp_0.ogg",
+    "levelUp_1.ogg",
+    "levelUp_2.ogg"
+  ],
+  "enhance": [
+    "enhance_0.ogg",
+    "enhance_1.ogg",
+    "enhance_2.ogg"
+  ],
+  "enhanceFail": [
+    "enhanceFail_0.ogg",
+    "enhanceFail_1.ogg",
+    "enhanceFail_2.ogg"
+  ],
+  "stageClear": [
+    "stageClear_0.ogg",
+    "stageClear_1.ogg",
+    "stageClear_2.ogg"
+  ],
+  "denied": [
+    "denied_0.ogg",
+    "denied_1.ogg",
+    "denied_2.ogg"
   ]
 }

@@ -267,6 +267,10 @@ def tonality(x: np.ndarray, k: float = 4.0, win: int = 4096) -> float:
     150Hz 未満は数えない。この分解能では「DCから続く低い塊」と「低い正弦」を
     区別できず、しかも低音の胴は削りたくないところだから。
 
+    **窓ごとに測って、いちばん高いところを返す。** 平均や、いちばん大きい窓
+    だけを見ると、頭の一撃がノイズなら後ろで正弦が伸びていても見逃してしまう。
+    ただし消え際まで見ると尻尾の残響を拾うので、山の1割より小さい窓は数えない。
+
     目安(実測):
         正弦1本 1.00 / 非整数比の共振4本 0.96 / 共振とノイズ半々 0.51
         帯域ノイズ 0.00〜0.01 / 低域ノイズ 0.00〜0.05
@@ -275,20 +279,27 @@ def tonality(x: np.ndarray, k: float = 4.0, win: int = 4096) -> float:
     if n < win:
         x = np.pad(x, (0, win - n))
         n = win
-    # いちばん大きく鳴っている窓で測る。頭の静かなところを測っても意味がない
     hop = win // 2
     starts = list(range(0, n - win + 1, hop)) or [0]
-    s0 = starts[int(np.argmax([float(np.sum(x[s : s + win] ** 2)) for s in starts]))]
-    spec = np.abs(np.fft.rfft(x[s0 : s0 + win] * np.hanning(win))) ** 2
-    spec = np.convolve(spec, np.ones(5) / 5, mode="same")
-    m = len(spec)
-    env = np.empty(m)
-    for i in range(m):
-        half = max(20, int(i * 0.2))
-        env[i] = np.median(spec[max(0, i - half) : min(m, i + half + 1)])
+    energy = np.array([float(np.sum(x[s : s + win] ** 2)) for s in starts])
+    loud = energy >= energy.max() * 0.1
+
     band = np.fft.rfftfreq(win, 1 / SR) >= TONALITY_FLOOR_HZ
-    excess = np.maximum(0.0, spec - k * env)[band]
-    return float(np.sum(excess) / (np.sum(spec[band]) + 1e-20))
+    hann = np.hanning(win)
+    worst = 0.0
+    for s, keep in zip(starts, loud):
+        if not keep:
+            continue
+        spec = np.abs(np.fft.rfft(x[s : s + win] * hann)) ** 2
+        spec = np.convolve(spec, np.ones(5) / 5, mode="same")
+        m = len(spec)
+        env = np.empty(m)
+        for i in range(m):
+            half = max(20, int(i * 0.2))
+            env[i] = np.median(spec[max(0, i - half) : min(m, i + half + 1)])
+        excess = np.maximum(0.0, spec - k * env)[band]
+        worst = max(worst, float(np.sum(excess) / (np.sum(spec[band]) + 1e-20)))
+    return worst
 
 
 def analyze(x: np.ndarray) -> dict:
