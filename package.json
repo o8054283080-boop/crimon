@@ -15,6 +15,7 @@
     "tour": "node tools/tour.mjs",
     "audio:check": "node tools/audioCheck.mjs",
     "audio:render": "tools/audio/.venv/bin/python tools/audio/render.py",
+    "audio:bgm": "tools/audio/.venv/bin/python tools/audio/render_bgm.py",
     "balance": "tsx tools/dungeonProbe.ts",
     "check": "npm run typecheck && npm run test && npm run tour"
   },
