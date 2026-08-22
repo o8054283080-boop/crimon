@@ -1232,4 +1232,18 @@ function handleImportSave(file: File): void {
   });
 }
 
+/**
+ * 開発中だけ、状態を一発で作れる引き出しを出す。
+ * 「確認が面倒な場所ほど確認されない」を潰すための道具で、本番には入らない。
+ */
+if (import.meta.env.DEV) {
+  void import("./devMenu.js").then((m) =>
+    m.mountDevMenu({
+      player: state.player,
+      save: () => savePlayerState(state.player),
+      render,
+    }),
+  );
+}
+
 render();

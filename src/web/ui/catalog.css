@@ -198,7 +198,7 @@
 .chapter-card__no {
   padding: 2px 7px;
   border-radius: 4px;
-  font-size: 0.56rem;
+  font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.14em;
   color: #0b0f1e;
@@ -419,7 +419,7 @@
   transform: translateX(-50%);
   padding: 1px 6px;
   border-radius: 999px;
-  font-size: 0.48rem;
+  font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.06em;
   color: #1a1405;
@@ -599,7 +599,7 @@
 }
 
 .diff-seg__state {
-  font-size: 0.54rem;
+  font-size: 0.62rem;
   font-weight: 700;
   opacity: 0.8;
 }
@@ -681,7 +681,7 @@
 .wave-card__boss {
   padding: 1px 7px;
   border-radius: 999px;
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 800;
   color: #2a1600;
   background: linear-gradient(180deg, #ffe9a8, #f5b301);
@@ -747,7 +747,7 @@
 
 .enemy-chip__meta,
 .enemy-chip__elem {
-  font-size: 0.54rem;
+  font-size: 0.62rem;
   color: var(--text-dim);
 }
 
