@@ -25,6 +25,7 @@ import {
   equipToMonster,
   getShop,
   getDungeonParty,
+  MAX_DUNGEON_PARTY_SIZE,
   getParty,
   loadPlayerState,
   normalizeLoadedState,
@@ -42,7 +43,8 @@ import {
   unlockShopSlot,
   goldDungeonChallengesRemaining,
 } from "../game/playerState.js";
-import { MonsterSortKey } from "../game/monsterSort.js";
+import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
+import { findMonsterById } from "../data/monsters.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
@@ -53,7 +55,6 @@ import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { ResultAction } from "./views/resultActions.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
-import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
@@ -208,6 +209,8 @@ interface AppState {
   compensationClaims: CompensationClaim[];
   /** 直前に挑んだ場所。結果画面の「もう一度」の行き先になる */
   lastRun: LastRun | null;
+  /** 編成画面での直前の操作の結果。次の操作まで出しておく */
+  partyNotice: string | null;
 }
 
 const state: AppState = {
@@ -248,6 +251,7 @@ const state: AppState = {
   loginBonusResult: null,
   compensationClaims: [],
   lastRun: null,
+  partyNotice: null,
 };
 
 {
@@ -479,18 +483,78 @@ function handleConfirmMonsterTraining(): void {
   render();
 }
 
+const MAX_NORMAL_PARTY_SIZE = 4;
+
 function handleToggleParty(instanceId: string): void {
   const idx = state.player.partyIds.indexOf(instanceId);
   if (idx >= 0) {
     state.player.partyIds.splice(idx, 1);
+    state.partyNotice = null;
   } else {
-    if (state.player.partyIds.length >= 4) {
+    if (state.player.partyIds.length >= MAX_NORMAL_PARTY_SIZE) {
+      // 黙って何も起きないと「押したのに反応しない壊れた画面」に見える。
+      // 何が起きたか・どうすれば入るかを必ず出す
       playSfx("denied", 0.7);
+      state.partyNotice = `パーティは${MAX_NORMAL_PARTY_SIZE}体までです。上の枠を押して外してから選んでください。`;
+      render();
       return;
     }
     state.player.partyIds.push(instanceId);
+    state.partyNotice = null;
   }
   savePlayerState(state.player);
+  render();
+}
+
+function handleToggleDungeonPartyMember(instanceId: string): void {
+  const before = state.player.dungeonPartyIds.length;
+  const wasMember = state.player.dungeonPartyIds.includes(instanceId);
+  toggleDungeonPartyMember(state.player, instanceId);
+  if (!wasMember && state.player.dungeonPartyIds.length === before) {
+    playSfx("denied", 0.7);
+    state.partyNotice = `ダンジョン専用パーティは${MAX_DUNGEON_PARTY_SIZE}体までです。上の枠を押して外してから選んでください。`;
+    render();
+    return;
+  }
+  state.partyNotice = null;
+  savePlayerState(state.player);
+  render();
+}
+
+/**
+ * 空いている枠を、強い順に自動で埋める。
+ *
+ * 手持ちが数十体になると、1体ずつ選ぶだけで何十手もかかる。
+ * 素材専用のモンスター(転生ピッグなど)は編成しても意味が無いので外す。
+ */
+function handleAutoFillParty(): void {
+  const isDungeon = state.partyEditMode === "DUNGEON";
+  const ids = isDungeon ? state.player.dungeonPartyIds : state.player.partyIds;
+  const maxSize = isDungeon ? MAX_DUNGEON_PARTY_SIZE : MAX_NORMAL_PARTY_SIZE;
+
+  const candidates = state.player.monsters
+    .filter((m) => !ids.includes(m.id) && findMonsterById(m.dexId)?.role !== "素材")
+    .sort((a, b) => monsterPower(b) - monsterPower(a));
+
+  const added = candidates.slice(0, Math.max(0, maxSize - ids.length));
+  if (added.length === 0) {
+    playSfx("denied", 0.7);
+    state.partyNotice = "編成できるモンスターがいません。";
+    render();
+    return;
+  }
+  for (const monster of added) ids.push(monster.id);
+  savePlayerState(state.player);
+  state.partyNotice = `総合力の高い${added.length}体を編成しました。`;
+  render();
+}
+
+function handleClearParty(): void {
+  const isDungeon = state.partyEditMode === "DUNGEON";
+  const ids = isDungeon ? state.player.dungeonPartyIds : state.player.partyIds;
+  ids.length = 0;
+  savePlayerState(state.player);
+  state.partyNotice = "編成を全部外しました。";
   render();
 }
 
@@ -1052,11 +1116,10 @@ function render(): void {
           render();
         },
         onToggleParty: handleToggleParty,
-        onToggleDungeonMember: (id) => {
-          toggleDungeonPartyMember(state.player, id);
-          savePlayerState(state.player);
-          render();
-        },
+        onToggleDungeonMember: handleToggleDungeonPartyMember,
+        onAutoFill: handleAutoFillParty,
+        onClearParty: handleClearParty,
+        notice: state.partyNotice,
         sortKey: state.monsterSortKey,
         onChangeSort: (key) => {
           state.monsterSortKey = key;
@@ -1116,9 +1179,11 @@ function render(): void {
           render();
         },
         onStartFloor: startDungeonFloor,
+        // 専用の編成画面には絞り込みも並べ替えも無く、同じことを2か所で
+        // 別々にやらせていた。編成はすべて編成画面へ集約する
         onGoDungeonParty: () => {
-          state.screen = "DUNGEON_PARTY";
-          render();
+          state.partyEditMode = "DUNGEON";
+          navigate("PARTY");
         },
         autoFarmCount: state.autoFarmCount,
         onChangeAutoFarmCount: (count) => {
@@ -1126,21 +1191,6 @@ function render(): void {
           render();
         },
         onAutoFarm: handleAutoFarmDungeon,
-      });
-      break;
-
-    case "DUNGEON_PARTY":
-      content = renderDungeonParty({
-        player: state.player,
-        onToggleMember: (id) => {
-          toggleDungeonPartyMember(state.player, id);
-          savePlayerState(state.player);
-          render();
-        },
-        onBack: () => {
-          state.screen = "EQUIP_DUNGEON";
-          render();
-        },
       });
       break;
 

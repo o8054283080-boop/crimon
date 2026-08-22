@@ -18,6 +18,12 @@ export interface PartyProps {
   onChangeSort: (key: MonsterSortKey) => void;
   /** 長押しでそのモンスターの詳細を開く */
   onViewDetail: (instanceId: string) => void;
+  /** 強い順に空き枠を埋める。1体ずつ選ぶ手間を無くすための道 */
+  onAutoFill: () => void;
+  /** 編成を全部外す */
+  onClearParty: () => void;
+  /** 直前の操作の結果(満員で入らなかった等)。次の操作まで出しておく */
+  notice: string | null;
   filter: MonsterFilter;
   filterOpen: boolean;
   onChangeFilter: (filter: MonsterFilter) => void;
@@ -76,13 +82,37 @@ export function renderParty(props: PartyProps): HTMLElement {
       ),
     ]),
     el("section", { className: "panel" }, [
-      renderPartySlots(activeMembers, maxSize),
+      // 枠そのものを外すボタンにする。入れ替えのたびに一覧から本人を探し直さない
+      renderPartySlots(activeMembers, maxSize, onToggle),
+      props.notice ? el("p", { className: "party-notice" }, [props.notice]) : null,
+      el("div", { className: "party-actions" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--primary party-actions__btn",
+            disabled: player.monsters.length === 0 || activeIds.length >= maxSize,
+            onclick: props.onAutoFill,
+          },
+          ["🪄 おまかせ編成"],
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--ghost party-actions__btn",
+            disabled: activeIds.length === 0,
+            onclick: props.onClearParty,
+          },
+          ["🧹 全部外す"],
+        ),
+      ]),
       el("p", { className: "app-subtitle" }, [
         isDungeon
-          ? "装備ダンジョン専用の枠です。通常ステージのパーティとは別に覚えます(タップで編成/解除、長押しで詳細)。"
-          : "タップで編成/解除、長押しで詳細を見られます。",
+          ? "装備ダンジョン専用の枠です(通常ステージとは別に覚えます)。枠を押すと外れます。一覧はタップで編成、長押しで詳細。"
+          : "枠を押すと外れます。一覧はタップで編成、長押しで詳細。",
       ]),
-    ]),
+    ].filter((n): n is HTMLElement => n !== null)),
     el("section", { className: "panel" }, [
       player.monsters.length === 0
         ? el("p", { className: "app-subtitle" }, ["モンスターを所持していません。召喚してみましょう。"])
