@@ -1,4 +1,4 @@
-import { SET_LABEL, SLOT_LABEL, STAT_LABEL } from "../../core/equipment.js";
+import { SET_LABEL, SLOT_LABEL, formatStatValue } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState, ShopView } from "../../game/playerState.js";
 import { SHOP_MAX_SLOTS, ShopEntry, msUntilRotation } from "../../game/shop.js";
@@ -33,7 +33,7 @@ function renderEquipmentBody(entry: Extract<ShopEntry, { kind: "EQUIPMENT" }>): 
     starRow(eq.star),
     el("div", { className: "shop-card__title" }, [SLOT_LABEL[eq.slot]]),
     el("div", { className: "shop-card__sub" }, [`${SET_LABEL[eq.set]}シリーズ`]),
-    el("div", { className: "shop-card__stat" }, [`${STAT_LABEL[eq.mainStat.type]} +${eq.mainStat.value}`]),
+    el("div", { className: "shop-card__stat" }, [formatStatValue(eq.mainStat)]),
     el("div", { className: "shop-card__sub" }, [eq.subStats.length > 0 ? `サブ${eq.subStats.length}個` : "サブなし"]),
   ];
 }
