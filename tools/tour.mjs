@@ -124,6 +124,23 @@ const INSPECT = `(() => {
  * 描画が間に合わず「タブが無い」と誤って報告し、以降の画面が
  * 総崩れになることがあった。**準備できたことを確かめてから進む。**
  */
+/**
+ * 画面そのものが死んだかどうか。
+ *
+ * 常駐ブラウザは複数の作業で共有しているため、別の不具合(音の文脈を
+ * 無限に作り直す等)で描画プロセスごと落ちることがある。
+ * これを「ボタンが無い」と報告してしまうと、**触っていない画面の
+ * 指摘が並んで、本物の崩れが埋もれる。** 死んでいる時は作り直す。
+ */
+function isPageDead(message) {
+  return typeof message === "string" && /browser has been closed|context was destroyed|Target closed|Target page/.test(message);
+}
+
+async function revivePage(size) {
+  await call("goto", { path: "/", fresh: true, width: size.width, height: size.height });
+  return waitReady();
+}
+
 async function waitReady(timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -187,9 +204,11 @@ async function main() {
 
     for (const screen of SCREENS) {
       let moved = await goScreen(screen);
-      // 描画待ちで取りこぼした時のために一度だけやり直す
+      // 描画待ちで取りこぼした時のために一度だけやり直す。
+      // 頁ごと落ちていた時は作り直してから測り直す
       if (moved !== "ok") {
-        await waitReady(4000);
+        if (isPageDead(moved)) await revivePage(size);
+        else await waitReady(4000);
         moved = await goScreen(screen);
       }
       if (moved !== "ok") {
