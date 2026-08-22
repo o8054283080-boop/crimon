@@ -3497,3 +3497,51 @@ body {
   background: rgba(120, 80, 20, 0.28);
   box-shadow: inset 0 0 0 1px rgba(255, 200, 100, 0.3);
 }
+
+/* ===================================================================
+ * 指で押せる大きさを揃える(2026-08 追記)
+ *
+ * 実機は指で押す。実測すると、並べ替えの札が29〜34px、ショップの購入が31px、
+ * ホームの「編成」が28pxしかなかった。**買う・編成するという
+ * 取り返しのつかない操作ほど的が小さい**という逆転が起きていたので、
+ * 押せる最小の高さをここで底上げする。
+ * 巡回(tour)にも同じ基準の検査を入れてあるので、下回ると指摘が出る。
+ * =================================================================== */
+
+.slot-filter-chip {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 並べ替えの札。先に34pxで揃えていたが、それでも指には足りない */
+.sort-row .slot-filter-chip,
+.mfilter__chip,
+.autofarm__chip {
+  min-height: 36px;
+}
+
+/* ホームの帯は情報を詰めるために小さく作ってあるが、
+   押す物だけは指の大きさに戻す */
+.home-menu .save-data__actions .btn,
+.home-menu .home-stamina-actions .btn {
+  min-height: 40px;
+}
+
+.shop-card__buy {
+  min-height: 42px;
+}
+
+.home-section-title .btn {
+  min-height: 36px;
+  padding: 6px 14px;
+}
+
+.home-name-btn {
+  min-width: 40px;
+}
+
+.save-data__actions .btn {
+  min-height: 40px;
+}

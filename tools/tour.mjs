@@ -92,7 +92,22 @@ const INSPECT = `(() => {
     }
   }
 
-  // 3. 極端に小さい文字。実機で読めない
+  // 3. 指で押すには小さすぎる的。
+  //    実測したところ、並べ替えの札が29px、ショップの購入が31pxしかなく、
+  //    **買う・編成するという取り返しのつかない操作ほど的が小さい**
+  //    という逆転が起きていた。36pxを下回るものを拾う。
+  const TAP_MIN = 36;
+  for (const b of buttons) {
+    if (b.closest('.dev-menu')) continue;
+    const r = b.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    if (r.height < TAP_MIN || r.width < TAP_MIN) {
+      problems.push('指で押すには小さい (' + Math.round(r.width) + 'x' + Math.round(r.height) + '): ' + ((b.textContent || '').trim().slice(0, 12) || b.className));
+      break;
+    }
+  }
+
+  // 4. 極端に小さい文字。実機で読めない
   for (const el of document.querySelectorAll('p, span, div, button')) {
     if (!el.textContent || el.children.length > 0) continue;
     const size = parseFloat(getComputedStyle(el).fontSize);
@@ -102,7 +117,7 @@ const INSPECT = `(() => {
     }
   }
 
-  // 4. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
+  // 5. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
   const header = document.querySelector('.app-header h1, .battle-topbar__title');
   if (header) {
     const hr = header.getBoundingClientRect();
