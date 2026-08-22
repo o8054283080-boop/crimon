@@ -7,7 +7,9 @@ import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
 import { el } from "../dom.js";
-import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
+import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, sortMonsters } from "../../game/monsterSort.js";
+import { GEAR_SLOT_TOTAL, MonsterFilter, equippedCount, filterMonsters } from "../monsterFilter.js";
+import { renderMonsterFilterBar } from "./monsterFilterBar.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
@@ -28,12 +30,16 @@ export interface MonstersProps {
   onGoMonsterDex: () => void;
   sortKey: MonsterSortKey;
   onChangeSort: (key: MonsterSortKey) => void;
+  filter: MonsterFilter;
+  filterOpen: boolean;
+  onChangeFilter: (filter: MonsterFilter) => void;
+  onToggleFilterOpen: () => void;
 }
 
 export function monsterCard(
   instance: MonsterInstance,
   onClick: () => void,
-  extra?: { selected?: boolean; disabled?: boolean; bonus?: boolean; onLongPress?: () => void },
+  extra?: { selected?: boolean; disabled?: boolean; bonus?: boolean; onLongPress?: () => void; badge?: string },
 ): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   return buildMonsterCard(dex, instance.dexId, onClick, {
@@ -44,6 +50,12 @@ export function monsterCard(
     star: instance.star,
     level: instance.level,
     maxLevel: STAR_MAX_LEVEL[instance.star],
+    // 「誰を入れるか」を一覧のまま決められるよう、総合力と装備の埋まり具合を出す
+    power: monsterPower(instance),
+    gearCount: equippedCount(instance),
+    gearTotal: GEAR_SLOT_TOTAL,
+    badge: extra?.badge,
+    badgeCorner: extra?.badge !== undefined,
   });
 }
 
@@ -68,16 +80,35 @@ export function renderMonsterSortRow(current: MonsterSortKey, onChange: (key: Mo
 }
 
 function renderList(props: MonstersProps): HTMLElement {
-  const sortedMonsters = sortMonsters(props.player.monsters, props.sortKey, { partyIds: props.player.partyIds });
-  const cards = sortedMonsters.map((instance) => monsterCard(instance, () => props.onSelectDetail(instance.id)));
+  const context = { partyIds: props.player.partyIds };
+  const shown = filterMonsters(props.player.monsters, props.filter, context);
+  const sortedMonsters = sortMonsters(shown, props.sortKey, context);
+  const cards = sortedMonsters.map((instance) =>
+    monsterCard(instance, () => props.onSelectDetail(instance.id), {
+      badge: props.player.partyIds.includes(instance.id) ? "編成中" : undefined,
+    }),
+  );
+
   return el("div", { className: "screen monsters-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["所持モンスター"]), el("p", { className: "app-subtitle" }, [`${props.player.monsters.length}体所持中`])]),
-    el("section", { className: "panel" }, [
-      el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onGoMonsterDex }, ["📖 モンスター図鑑を見る"]),
+    // 見出しと図鑑への入口を1行にまとめる。縦画面では上の帯が厚いほど
+    // 「モンスターが1体も見えないまま画面が終わる」ため
+    el("header", { className: "app-header app-header--row" }, [
+      el("h1", {}, ["所持モンスター"]),
+      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: props.onGoMonsterDex }, ["📖 図鑑"]),
     ]),
     el("section", { className: "panel" }, [
+      renderMonsterFilterBar({
+        all: props.player.monsters,
+        shownCount: shown.length,
+        filter: props.filter,
+        open: props.filterOpen,
+        onToggleOpen: props.onToggleFilterOpen,
+        onChange: props.onChangeFilter,
+      }),
       renderMonsterSortRow(props.sortKey, props.onChangeSort),
-      el("div", { className: "monster-grid" }, cards),
+      cards.length === 0
+        ? el("p", { className: "app-subtitle" }, ["条件に当てはまるモンスターがいません。絞り込みを緩めてください。"])
+        : el("div", { className: "monster-grid" }, cards),
     ]),
   ]);
 }

@@ -1,6 +1,8 @@
 import { MonsterInstance, starLabel } from "../../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
+import { monsterPower } from "../../game/monsterSort.js";
+import { GEAR_SLOT_TOTAL, equippedCount } from "../monsterFilter.js";
 import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import { withPortrait } from "../three/portrait.js";
@@ -19,7 +21,13 @@ export function partyMemberCard(
     star: instance.star,
     level: instance.level,
     maxLevel: STAR_MAX_LEVEL[instance.star],
+    // 誰を入れるかは総合力と装備の埋まり具合で決まる。編成画面でこそ要る
+    power: monsterPower(instance),
+    gearCount: equippedCount(instance),
+    gearTotal: GEAR_SLOT_TOTAL,
     badge: selected ? "編成中" : undefined,
+    // 中央に出すとレベルの表示を覆ってしまうため、角に寄せる
+    badgeCorner: true,
   });
 }
 
