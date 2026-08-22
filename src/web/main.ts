@@ -1,5 +1,5 @@
 import "./style.css";
-import { audioContextState, getAudioSettings, initAudio, playSfx, updateAudioSettings } from "./audio/index.js";
+import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
@@ -331,8 +331,14 @@ function handleUnequipFromEquipmentScreen(equipmentId: string): void {
 
 function handleEnhanceEquipment(equipmentId: string): void {
   const result = tryEnhanceEquipment(state.player, equipmentId);
-  if (!result.ok) return;
+  if (!result.ok) {
+    // ゴールド不足や最大強化。**なぜ押せなかったかは画面に出ているので、
+    // 音は「効かなかった」ことだけを伝えればよい**
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
+  playSfx("enhance", 0.9);
   render();
 }
 
@@ -369,13 +375,29 @@ function handleBulkSellEquipment(): void {
 
 function handleSummon(count: number): void {
   const cost = count >= 10 ? SUMMON_COST_TEN : SUMMON_COST_SINGLE * count;
-  if (state.player.crystal < cost) return;
+  if (state.player.crystal < cost) {
+    playSfx("denied", 0.7);
+    return;
+  }
   state.player.crystal -= cost;
   const results = summonMany(count);
   for (const r of results) addMonster(state.player, r.dexId, r.star);
   savePlayerState(state.player);
   state.summonResults = results;
+  playSummonSfx(results);
   render();
+}
+
+/**
+ * 召喚の音。**当たった時だけ音が変わる**ようにする。
+ *
+ * 引く音が毎回同じだと、結果を見る前から「またハズレか」と分かってしまい、
+ * 逆に音が結果を先に漏らすと演出が死ぬ。ここでは開く音は共通にして、
+ * 高レアが入っている時だけ、開いたあとに層を重ねる。
+ */
+function playSummonSfx(results: SummonResult[]): void {
+  playSfx("summon", 0.9);
+  if (results.some((r) => r.star >= 5 || r.isRare)) playSfx("summonRare", 0.75);
 }
 
 /**
@@ -383,11 +405,15 @@ function handleSummon(count: number): void {
  * (書を10枚ためた人が、ばら引きより損をする形にはしない)。
  */
 function handleUseSummonScroll(count: number): void {
-  if (!trySpendSummonScrolls(state.player, count)) return;
+  if (!trySpendSummonScrolls(state.player, count)) {
+    playSfx("denied", 0.7);
+    return;
+  }
   const results = summonMany(count);
   for (const r of results) addMonster(state.player, r.dexId, r.star);
   savePlayerState(state.player);
   state.summonResults = results;
+  playSummonSfx(results);
   render();
 }
 
@@ -398,9 +424,13 @@ function handleConfirmRankUp(): void {
     .map((id) => state.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkRankUp(target, sacrifices, state.player.partyIds);
-  if (!check.ok) return;
+  if (!check.ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
 
   applyRankUp(target, sacrifices);
+  playSfx("levelUp");
   removeMonsters(state.player, state.rankUpSacrificeIds);
   savePlayerState(state.player);
   state.rankUpMode = false;
@@ -415,9 +445,13 @@ function handleConfirmMonsterTraining(): void {
     .map((id) => state.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkMonsterPowerUp(target, materials, state.player.partyIds);
-  if (!check.ok) return;
+  if (!check.ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
 
   applyMonsterPowerUp(target, materials);
+  playSfx("levelUp");
   removeMonsters(state.player, state.monsterTrainingMaterialIds);
   savePlayerState(state.player);
   state.monsterTrainingTargetId = null;
@@ -432,7 +466,10 @@ function handleToggleParty(instanceId: string): void {
   if (idx >= 0) {
     state.player.partyIds.splice(idx, 1);
   } else {
-    if (state.player.partyIds.length >= 4) return;
+    if (state.player.partyIds.length >= 4) {
+      playSfx("denied", 0.7);
+      return;
+    }
     state.player.partyIds.push(instanceId);
   }
   savePlayerState(state.player);
@@ -442,7 +479,10 @@ function handleToggleParty(instanceId: string): void {
 function startStage(stage: Stage, difficulty: Difficulty): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
-  if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
   state.stageRun = {
     stage,
@@ -455,6 +495,21 @@ function startStage(stage: Stage, difficulty: Difficulty): void {
     wavesCleared: 0,
   };
   state.screen = "BATTLE";
+  render();
+}
+
+/**
+ * 報酬画面へ移る。
+ *
+ * **ここで鳴らす。画面の描画側で鳴らしてはいけない。** 報酬画面は状態が
+ * 変わるたびに描き直されるので、描画のたびに鳴らすと同じ音が何度も出る。
+ *
+ * 負けた時は鳴らさない。戦闘が終わった時点で敗北の音が鳴っており、
+ * そこへ重ねても「終わった」以上のことは伝わらない。
+ */
+function enterStageResult(): void {
+  if (state.stageResult?.cleared) playSfx("stageClear");
+  state.screen = "STAGE_RESULT";
   render();
 }
 
@@ -487,14 +542,16 @@ function finishStage(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.stageRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function startDungeonFloor(floor: DungeonFloor): void {
   const party = getDungeonParty(state.player);
   if (party.length === 0) return;
-  if (!trySpendStamina(state.player, DUNGEON_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, DUNGEON_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
   state.dungeonRun = { floor, partyInstances: party };
   state.screen = "DUNGEON_BATTLE";
@@ -525,8 +582,7 @@ function finishDungeon(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.dungeonRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty): void {
@@ -553,7 +609,10 @@ function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
 function startLevelDungeonTier(def: LevelDungeonDef): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
-  if (!trySpendStamina(state.player, LEVEL_DUNGEON_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, LEVEL_DUNGEON_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
   state.levelDungeonRun = { def, partyInstances: party };
   state.screen = "LEVEL_DUNGEON_BATTLE";
@@ -584,8 +643,7 @@ function finishLevelDungeon(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.levelDungeonRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
@@ -602,7 +660,10 @@ function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!trySpendGoldDungeonChallenge(state.player).ok) return;
-  if (!trySpendStamina(state.player, GOLD_DUNGEON_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, GOLD_DUNGEON_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
   state.goldDungeonRun = { floor, partyInstances: party };
   state.screen = "GOLD_DUNGEON_BATTLE";
@@ -633,8 +694,7 @@ function finishGoldDungeon(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.goldDungeonRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function handleAutoFarmGoldDungeon(floor: GoldDungeonFloor, count: number): void {
@@ -1064,10 +1124,31 @@ function render(): void {
 
   root.append(content);
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
+  playBgm(bgmSceneOf(state.screen));
 
   const newRouteKey = routeKey();
   window.scrollTo(0, scrollPositions.get(newRouteKey) ?? 0);
   lastRouteKey = newRouteKey;
+}
+
+/**
+ * 画面ごとに敷くBGM。
+ *
+ * 焼いてあるのは2つだけで、戦闘とそれ以外で分ける。場面をこれ以上刻んでも、
+ * 中身の差を作れなければ切り替わりが目立つだけで良くならない。
+ *
+ * `playBgm` は同じ場面を何度渡しても鳴らし直さないので、
+ * 再描画のたびに呼んで構わない(むしろ、そう呼ぶ前提で作ってある)。
+ */
+const BATTLE_SCREENS = new Set<ScreenName>([
+  "BATTLE",
+  "DUNGEON_BATTLE",
+  "LEVEL_DUNGEON_BATTLE",
+  "GOLD_DUNGEON_BATTLE",
+]);
+
+function bgmSceneOf(screen: ScreenName): BgmScene {
+  return BATTLE_SCREENS.has(screen) ? "battle" : "home";
 }
 
 function renderSummonScreen(): HTMLElement {
