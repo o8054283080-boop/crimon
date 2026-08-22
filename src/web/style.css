@@ -3545,3 +3545,113 @@ body {
 .save-data__actions .btn {
   min-height: 40px;
 }
+
+/* ===================================================================
+ * ダンジョンの階層一覧(2026-08 追記)
+ *
+ * 3つのダンジョンはどれも、長い説明文の下に文字だけの行が縦に並び、
+ * 「装備ダンジョン 3 階」のように名前が途中で折れていた。
+ * 同じ一覧でも、ステージ選択(章のカード)とは別のゲームに見える。
+ * 3つとも同じ形の札にして、読むのではなく見て選べるようにする。
+ * =================================================================== */
+
+.floor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 560px) {
+  .floor-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.floor-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-height: 92px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fl) 28%, transparent), transparent 62%),
+    var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fl) 55%, transparent), var(--edge-light), var(--drop-soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.floor-tile:active {
+  transform: translateY(1px);
+}
+
+.floor-tile__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #0d1020;
+  background: var(--fl);
+}
+
+.floor-tile__title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.floor-tile__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.floor-tile__chip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: #ccd6f2;
+  background: rgba(6, 9, 20, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* 一覧の上の要約。段落で積むと肝心の行き先が画面の外へ出る */
+.dungeon-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dungeon-intro__summary {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.dungeon-intro__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dungeon-intro__warn {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #ffd7a0;
+  background: rgba(120, 70, 20, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 90, 0.32);
+}

@@ -1,9 +1,10 @@
-import { ELEMENT_JA } from "../../core/element.js";
+import { ELEMENT_COLOR, ELEMENT_JA } from "../../core/element.js";
 import { GOLD_DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
 import { GOLD_DUNGEON_DAILY_LIMIT, GOLD_DUNGEON_FLOORS, GoldDungeonFloor } from "../../data/goldDungeon.js";
 import { getParty, goldDungeonChallengesRemaining, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
 export interface GoldDungeonProps {
   player: PlayerState;
@@ -19,26 +20,28 @@ export interface GoldDungeonProps {
 function renderList(props: GoldDungeonProps): HTMLElement {
   const remaining = goldDungeonChallengesRemaining(props.player);
 
-  const cards = GOLD_DUNGEON_FLOORS.map((floor) =>
-    el(
-      "button",
-      { type: "button", className: "stage-card", onclick: () => props.onSelectFloor(floor.floor) },
-      [
-        el("div", { className: "stage-card__name" }, [floor.name]),
-        el("div", { className: "stage-card__meta" }, [`🪙 クリア報酬ゴールド ${floor.goldReward}`]),
-      ],
-    ),
-  );
+  const tiles = GOLD_DUNGEON_FLOORS.map((floor) => {
+    const element = floor.enemies[0].element;
+    return {
+      badge: `${floor.floor}F`,
+      title: `🪙${floor.goldReward.toLocaleString("ja-JP")}`,
+      color: ELEMENT_COLOR[element],
+      chips: [`敵 ${ELEMENT_JA[element]}`, `★${floor.enemies[0].star} Lv${floor.enemies[0].level}`],
+      onClick: () => props.onSelectFloor(floor.floor),
+    };
+  });
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header" }, [
+    el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["ゴールドダンジョン"]),
-      el("p", { className: "app-subtitle" }, [
-        "大量のゴールドが手に入る専用コンテンツです。装備ドロップやダイヤ報酬はありませんが、その分クリア報酬のゴールドが大幅に大きくなっています。1日に挑戦できる回数は全階層合計3回までで、日付が変わるとリセットされます。",
-      ]),
-      el("p", {}, [`本日の残り挑戦回数: ${remaining}/${GOLD_DUNGEON_DAILY_LIMIT}回`]),
+      el("span", { className: "head-note" }, [`残り ${remaining}/${GOLD_DUNGEON_DAILY_LIMIT}回`]),
     ]),
-    el("section", { className: "panel" }, [el("div", { className: "stage-list" }, cards)]),
+    renderDungeonIntro(
+      "ゴールド稼ぎ専用です。装備もダイヤも出ませんが、その分クリア報酬のゴールドが桁違いに大きくなっています。",
+      [`⚡${GOLD_DUNGEON_STAMINA_COST}/回`, `1日${GOLD_DUNGEON_DAILY_LIMIT}回まで(日付で回復)`],
+      remaining === 0 ? "⚠ 本日の挑戦回数を使い切りました。日付が変わると回復します。" : undefined,
+    ),
+    renderFloorGrid(tiles),
   ]);
 }
 

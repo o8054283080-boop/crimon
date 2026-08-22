@@ -4,6 +4,7 @@ import { LEVEL_DUNGEON_DEFS, LEVEL_DUNGEON_TIER_JA, LevelDungeonDef } from "../.
 import { getParty, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
 export interface LevelDungeonProps {
   player: PlayerState;
@@ -16,26 +17,32 @@ export interface LevelDungeonProps {
   onAutoFarm: (def: LevelDungeonDef, count: number) => void;
 }
 
+/** 段位ごとの色。難しくなるほど熱い色にして、選ぶ前に段の重さが伝わるようにする */
+const TIER_COLOR: Record<LevelDungeonDef["tier"], string> = {
+  BEGINNER: "#3fd39a",
+  INTERMEDIATE: "#f0a03c",
+  ADVANCED: "#e0556a",
+};
+
 function renderList(props: LevelDungeonProps): HTMLElement {
-  const cards = LEVEL_DUNGEON_DEFS.map((def) =>
-    el(
-      "button",
-      { type: "button", className: "stage-card", onclick: () => props.onSelectTier(def.tier) },
-      [
-        el("div", { className: "stage-card__name" }, [LEVEL_DUNGEON_TIER_JA[def.tier]]),
-        el("div", { className: "stage-card__meta" }, [`獲得経験値 ${def.expReward} / 経験ピッグ★${def.pigStar}`]),
-      ],
-    ),
-  );
+  const tiles = LEVEL_DUNGEON_DEFS.map((def) => ({
+    badge: LEVEL_DUNGEON_TIER_JA[def.tier],
+    title: `経験値 ${def.expReward.toLocaleString("ja-JP")}`,
+    color: TIER_COLOR[def.tier],
+    chips: [`🐖 ★${def.pigStar}`, `🪙${def.goldReward.toLocaleString("ja-JP")}`],
+    onClick: () => props.onSelectTier(def.tier),
+  }));
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header" }, [
-      el("h1", {}, ["レベル上げダンジョン"]),
-      el("p", { className: "app-subtitle" }, [
-        "モンスターの経験値稼ぎに特化したコンテンツです。通常ステージ・装備ダンジョンより消費スタミナは多いですが、直接もらえる経験値が大きく、クリアするたびに経験値フィード専用の「経験ピッグ」を確定で入手できます。難易度が高いほど経験値・経験ピッグの星ともに大きくなります。",
-      ]),
+    el("header", { className: "app-header app-header--row" }, [
+      el("h1", {}, ["育成ダンジョン"]),
+      el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
     ]),
-    el("section", { className: "panel" }, [el("div", { className: "stage-list" }, cards)]),
+    renderDungeonIntro(
+      "モンスターの経験値稼ぎ専用です。クリアするたびに、餌にすると経験値が入る「経験ピッグ」も必ず手に入ります。",
+      [`⚡${LEVEL_DUNGEON_STAMINA_COST}/回`, "段が上がるほど経験値もピッグの星も大きい"],
+    ),
+    renderFloorGrid(tiles),
   ]);
 }
 

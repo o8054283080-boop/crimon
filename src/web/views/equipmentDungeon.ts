@@ -1,11 +1,12 @@
 import { EquipStar } from "../../core/equipment.js";
-import { CYCLE_ELEMENTS, Element, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
+import { CYCLE_ELEMENTS, Element, ELEMENT_COLOR, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
 import { DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
 import { DungeonEnemy, DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
 import { findMonster } from "../../data/monsters.js";
 import { getDungeonParty, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
 export interface EquipmentDungeonProps {
   player: PlayerState;
@@ -41,29 +42,27 @@ function enemyDisplayName(enemy: DungeonEnemy): string {
 }
 
 function renderList(props: EquipmentDungeonProps): HTMLElement {
-  const cards = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
-    return el(
-      "button",
-      { type: "button", className: "stage-card", onclick: () => props.onSelectFloor(floor.floor) },
-      [
-        el("div", { className: "stage-card__name" }, [floor.name]),
-        el("div", { className: "stage-card__meta" }, [
-          `最高レア: ${starLabel(maxStarForFloor(floor))} / 敵属性: ${ELEMENT_JA[floorElement(floor)]}`,
-        ]),
-      ],
-    );
+  const tiles = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
+    const element = floorElement(floor);
+    return {
+      badge: `${floor.floor}F`,
+      title: `${ELEMENT_JA[element]}の階`,
+      color: ELEMENT_COLOR[element],
+      chips: [`最高 ${starLabel(maxStarForFloor(floor))}`, `🪙${floor.goldReward.toLocaleString("ja-JP")}`],
+      onClick: () => props.onSelectFloor(floor.floor),
+    };
   });
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header" }, [
+    el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["装備ダンジョン"]),
-      el("p", { className: "app-subtitle" }, [
-        "1〜3階は星4まで、4〜6階は星5まで、7〜10階は星6までの装備が出現します。階層が上がるほど高レアリティが出やすくなります。",
-      ]),
-      el("p", { className: "app-subtitle equip-dungeon__warning" }, [
-        "⚠ 最上級コンテンツです。星5の装備を6箇所すべてに装着した星5モンスターでなければ1階すら突破は困難です。",
-      ]),
+      el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
     ]),
+    renderDungeonIntro(
+      "階層が上がるほど高い星の装備が出ます。敵は階ごとに1属性で揃っているので、弱点を突ける子で挑むと楽になります。",
+      ["1〜3階 ★4まで", "4〜6階 ★5まで", "7〜10階 ★6まで"],
+      "⚠ 最上級コンテンツです。★5装備を6箇所すべてに着けた★5モンスターでなければ1階の突破も困難です。",
+    ),
     el("section", { className: "panel" }, [
       el(
         "button",
@@ -71,7 +70,7 @@ function renderList(props: EquipmentDungeonProps): HTMLElement {
         [`🧑‍🤝‍🧑 ダンジョン専用パーティ編成 (${getDungeonParty(props.player).length}/5)`],
       ),
     ]),
-    el("section", { className: "panel" }, [el("div", { className: "stage-list" }, cards)]),
+    renderFloorGrid(tiles),
   ]);
 }
 
