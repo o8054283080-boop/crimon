@@ -807,7 +807,7 @@ body {
   z-index: 1;
   display: block;
   text-align: center;
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   font-weight: 800;
   line-height: 9px;
   color: #fff;
@@ -2017,7 +2017,7 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  font-size: 0.55rem;
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   white-space: nowrap;
@@ -2033,7 +2033,7 @@ body {
   bottom: 3px;
   padding: 1px 5px;
   border-radius: 999px;
-  font-size: 0.55rem;
+  font-size: 0.62rem;
   font-weight: 800;
   color: #eaf1ff;
   background: rgba(6, 9, 20, 0.85);
@@ -2065,7 +2065,7 @@ body {
 }
 
 .mcard__star {
-  font-size: 0.55rem;
+  font-size: 0.62rem;
   line-height: 1.2;
   color: #ffd23f;
   text-shadow: 0 0 4px rgba(255, 190, 40, 0.85);
@@ -2556,7 +2556,7 @@ body {
 }
 
 .equip-slot__set {
-  font-size: 0.55rem;
+  font-size: 0.62rem;
   font-weight: 800;
   color: var(--eq-set, #8ea0c8);
 }
@@ -3013,4 +3013,67 @@ body {
   font-size: 0.74rem;
   line-height: 1.6;
   color: var(--text-dim);
+}
+
+/* ------------------------------------------------ 開発用メニュー(本番には出ない) */
+
+.dev-menu {
+  position: fixed;
+  right: 0;
+  top: 40%;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+}
+
+.dev-menu__toggle {
+  appearance: none;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  padding: 8px 5px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  writing-mode: vertical-rl;
+  color: #0d1220;
+  background: #7fd7ff;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.dev-menu__body {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: rgba(8, 12, 24, 0.96);
+  border: 1px solid rgba(127, 215, 255, 0.4);
+  border-radius: 0 0 0 10px;
+}
+
+.dev-menu--open .dev-menu__body {
+  display: flex;
+}
+
+.dev-menu--open .dev-menu__toggle {
+  opacity: 1;
+}
+
+.dev-menu__btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  color: #dfe9ff;
+  background: rgba(40, 50, 80, 0.9);
+  cursor: pointer;
+}
+
+.dev-menu__btn--danger {
+  border-color: rgba(255, 120, 120, 0.5);
+  color: #ffc9c9;
 }

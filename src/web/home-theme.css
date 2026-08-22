@@ -119,7 +119,7 @@
 .home-menu .save-data__actions { display: flex; gap: 6px; }
 .home-menu .save-data__actions .btn { min-height: 30px; padding: 5px 8px; font-size: .64rem; }
 .home-menu .audio-settings { opacity: .75; }
-.home-menu .build-id { opacity: .3; margin: 0; text-align: center; font-size: .55rem; }
+.home-menu .build-id { opacity: .3; margin: 0; text-align: center; font-size: .62rem; }
 body:has(.title-screen) { overflow: hidden; }
 
 @media (max-height: 720px) {

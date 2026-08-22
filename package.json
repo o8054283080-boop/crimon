@@ -10,7 +10,13 @@
     "typecheck": "tsc --noEmit",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "harness": "node tools/harness.mjs",
+    "tour": "node tools/tour.mjs",
+    "audio:check": "node tools/audioCheck.mjs",
+    "audio:render": "tools/audio/.venv/bin/python tools/audio/render.py",
+    "balance": "tsx tools/dungeonProbe.ts",
+    "check": "npm run typecheck && npm run test && npm run tour"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
