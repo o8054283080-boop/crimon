@@ -28,8 +28,24 @@ export interface MonsterCardOptions {
   maxLevel?: number;
   /** 星とレベルの代わりに出す補足(図鑑での役割名など) */
   caption?: string;
+  /**
+   * ざっくりした総合力。**「誰を入れるか」はこの数字で決まる**ので、
+   * 一覧のカードに出す。並べ替えの「総合力」と同じ数を使うこと
+   * (並びと数字が食い違うと、どちらも信用されなくなる)。
+   */
+  power?: number;
+  /** 着けている装備の数。「6」なら満載。装備の抜けを一覧のまま見つけるために出す */
+  gearCount?: number;
+  /** 装備スロットの総数。gearCountと併せて「3/6」と出す */
+  gearTotal?: number;
   /** 選択中に重ねるラベル */
   badge?: string;
+  /**
+   * ラベルを札の中央ではなく右上の角に出す。
+   * 中央に出すとレベルや星に重なって読めなくなるので、
+   * 一覧で常時出るもの(編成中など)はこちらを使う。
+   */
+  badgeCorner?: boolean;
   /**
    * 長押しした時の動作。押している間に指が動いたら取り消す。
    * 発火した場合は、指を離した時のクリックを打ち消す
@@ -112,7 +128,8 @@ export function buildMonsterCard(
   onClick: () => void,
   options: MonsterCardOptions = {},
 ): HTMLElement {
-  const { selected, disabled, bonus, star, level, maxLevel, caption, badge, onLongPress } = options;
+  const { selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress } =
+    options;
 
   const classes = ["mcard", rarityClass(star)];
   if (selected) classes.push("mcard--selected");
@@ -126,12 +143,31 @@ export function buildMonsterCard(
     bonus ? el("span", { className: "mcard__bonus" }, ["★"]) : null,
   ];
 
+  // 総合力と装備の数は、編成を決めるための2つの数字。並べて1行にまとめる
+  const infoParts: HTMLElement[] = [];
+  if (power !== undefined) {
+    infoParts.push(el("span", { className: "mcard__power", title: "総合力" }, [`⚔${power.toLocaleString("ja-JP")}`]));
+  }
+  if (gearCount !== undefined && gearTotal !== undefined) {
+    infoParts.push(
+      el(
+        "span",
+        {
+          className: `mcard__gear${gearCount === 0 ? " mcard__gear--none" : gearCount >= gearTotal ? " mcard__gear--full" : ""}`,
+          title: `装備 ${gearCount}/${gearTotal}`,
+        },
+        [`⚒${gearCount}/${gearTotal}`],
+      ),
+    );
+  }
+
   const children: (HTMLElement | null)[] = [
     el("span", { className: "mcard__portrait", style: dex ? `--elem:${dex.color}` : undefined }, portraitChildren.filter(isElement)),
     star ? el("span", { className: "mcard__stars" }, [starRow(star)]) : null,
     el("span", { className: "mcard__name" }, [dex ? dex.name : fallbackName]),
+    infoParts.length > 0 ? el("span", { className: "mcard__info" }, infoParts) : null,
     caption ? el("span", { className: "mcard__caption" }, [caption]) : null,
-    badge ? el("span", { className: "mcard__badge" }, [badge]) : null,
+    badge ? el("span", { className: `mcard__badge${badgeCorner ? " mcard__badge--corner" : ""}` }, [badge]) : null,
   ];
 
   const node = el(

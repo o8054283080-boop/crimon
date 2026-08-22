@@ -39,7 +39,9 @@ describe("闇ドラゴンのスキル3(破壊の流星)", () => {
     expect(skill3.name).toBe("破壊の流星");
     expect(skill3.target).toBe("ALL_ENEMIES");
     const damage = skill3.effects.find((e) => e.kind === "DAMAGE");
-    expect(damage).toMatchObject({ kind: "DAMAGE", multiplier: 1.5, ignoreDefense: true });
+    // 防御無視は硬い相手に効くが、1.5倍では他の候補(破滅の咆哮2.0倍+HP補正)に負けていたので引き上げた
+    expect(damage).toMatchObject({ kind: "DAMAGE", multiplier: 2.0, ignoreDefense: true });
+    expect(skill3.effects).toContainEqual({ kind: "LIFESTEAL", healRate: 0.25 });
   });
 });
 
@@ -76,14 +78,11 @@ describe("水ドラゴンのスキル3(古龍の加護)", () => {
 });
 
 describe("終焉の一撃のスタン確率(70%に変更)", () => {
-  it("FIRE/DARKネメシスのスキル3に含まれるSTUN効果のchanceが0.7", () => {
-    for (const element of ["FIRE", "DARK"] as const) {
-      const nemesis = findMonster("nemesis", element)!;
-      const skill3 = nemesis.skills[2];
-      expect(skill3.name).toBe("終焉の一撃");
-      const stun = skill3.effects.find((e) => e.kind === "STUN");
-      expect(stun).toMatchObject({ chance: 0.7 });
-    }
+  // 光/闇のネメシスは固有スキル3を持つようになったので、通常枠での確認は火で行う
+  it("火ネメシスのスキル3に含まれるSTUN効果のchanceが0.7", () => {
+    const skill3 = findMonster("nemesis", "FIRE")!.skills[2];
+    expect(skill3.name).toBe("終焉の一撃");
+    expect(skill3.effects.find((e) => e.kind === "STUN")).toMatchObject({ chance: 0.7 });
   });
 });
 
@@ -97,12 +96,29 @@ describe("血のいけにえに自身の防御力スケールダメージを追�
   });
 });
 
-describe("光ネメシスのスキル3(味方全体の行動ゲージ+クリ率バフ)", () => {
-  it("ALL_ALLIES対象でGAUGE効果とクリ率バフ2ターンを持つ", () => {
-    const nemesis = findMonster("nemesis", "LIGHT")!;
-    const skill3 = nemesis.skills[2];
-    expect(skill3.target).toBe("ALL_ALLIES");
-    expect(skill3.effects).toContainEqual({ kind: "GAUGE", amount: 0.3 });
-    expect(skill3.effects).toContainEqual({ kind: "BUFF", stat: "criRate", amount: 0.3, durationTurns: 2 });
+describe("光ネメシスのスキル3(ラストジャッジメント)", () => {
+  it("単体を殴る役割のまま、通常の終焉の一撃より強い", () => {
+    const light = findMonster("nemesis", "LIGHT")!.skills[2];
+    const normal = findMonster("nemesis", "FIRE")!.skills[2];
+
+    expect(light.name).toBe("ラストジャッジメント");
+    // 役割は変えない。「別のモンスター」になってしまうと、育ててきた意味が消える
+    expect(light.target).toBe("SINGLE_ENEMY");
+
+    const damageOf = (s: typeof light) => s.effects.find((e) => e.kind === "DAMAGE")!;
+    const stunOf = (s: typeof light) => s.effects.find((e) => e.kind === "STUN")!;
+    expect(damageOf(light).multiplier).toBeGreaterThan(damageOf(normal).multiplier);
+    expect(stunOf(light).chance!).toBeGreaterThan(stunOf(normal).chance!);
+    // ゲージ操作は吸収でなければ、敵を先に動かしてしまう
+    expect(light.effects).toContainEqual({ kind: "GAUGE", amount: 0.4, drain: true });
+  });
+});
+
+describe("闇ネメシスのスキル3(エンドオブオール)", () => {
+  it("全体攻撃にゲージ吸収と防御低下が乗る", () => {
+    const skill3 = findMonster("nemesis", "DARK")!.skills[2];
+    expect(skill3.name).toBe("エンドオブオール");
+    expect(skill3.target).toBe("ALL_ENEMIES");
+    expect(skill3.effects).toContainEqual({ kind: "GAUGE", amount: 0.2, drain: true });
   });
 });

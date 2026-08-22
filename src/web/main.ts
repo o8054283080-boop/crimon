@@ -42,6 +42,7 @@ import {
   unlockShopSlot,
 } from "../game/playerState.js";
 import { MonsterSortKey } from "../game/monsterSort.js";
+import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
@@ -162,6 +163,10 @@ interface AppState {
   equipmentSortKey: EquipmentSortKey;
   /** 所持モンスターの並べ替えの軸 */
   monsterSortKey: MonsterSortKey;
+  /** 所持モンスターの絞り込み条件。所持一覧と編成画面で共有する(同じ探し方で通す) */
+  monsterFilter: MonsterFilter;
+  /** 絞り込みの札を開いているか */
+  monsterFilterOpen: boolean;
   /** まとめて売却するために選ばれている装備 */
   equipmentSelectedIds: string[];
   /** ショップで直前に買ったものの案内。次に何か操作したら消す */
@@ -204,6 +209,8 @@ const state: AppState = {
   equipmentSlotFilter: null,
   equipmentSortKey: "recommended",
   monsterSortKey: "recommended",
+  monsterFilter: { ...EMPTY_MONSTER_FILTER },
+  monsterFilterOpen: false,
   equipmentSelectedIds: [],
   shopNotice: null,
   equipmentSelecting: false,
@@ -853,6 +860,10 @@ function render(): void {
           state.screen = "MONSTERS";
           render();
         },
+        filter: state.monsterFilter,
+        filterOpen: state.monsterFilterOpen,
+        onChangeFilter: handleChangeMonsterFilter,
+        onToggleFilterOpen: handleToggleMonsterFilterOpen,
       });
       break;
 
@@ -1119,7 +1130,25 @@ function renderMonstersScreen(): HTMLElement {
       state.monsterSortKey = key;
       render();
     },
+    filter: state.monsterFilter,
+    filterOpen: state.monsterFilterOpen,
+    onChangeFilter: handleChangeMonsterFilter,
+    onToggleFilterOpen: handleToggleMonsterFilterOpen,
   });
+}
+
+/**
+ * 絞り込みは所持一覧と編成画面で同じものを使う。
+ * 画面を移るたびに条件が消えると、「火の★6を探す」の続きができない。
+ */
+function handleChangeMonsterFilter(filter: MonsterFilter): void {
+  state.monsterFilter = filter;
+  render();
+}
+
+function handleToggleMonsterFilterOpen(): void {
+  state.monsterFilterOpen = !state.monsterFilterOpen;
+  render();
 }
 
 function renderEquipmentScreen(): HTMLElement {

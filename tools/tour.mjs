@@ -44,7 +44,7 @@ const SCREENS = [
   { name: "装備ダンジョン", tab: "ホーム", then: "🛡装備" },
   { name: "レベル上げダンジョン", tab: "ホーム", then: "📈育成" },
   { name: "ゴールドダンジョン", tab: "ホーム", then: "🪙ゴールド" },
-  { name: "モンスター図鑑", tab: "モンスター", then: "モンスター図鑑を見る" },
+  { name: "モンスター図鑑", tab: "モンスター", then: "📖 図鑑" },
 ];
 
 const SIZES = [
@@ -117,6 +117,23 @@ const INSPECT = `(() => {
   return { problems, ボタン数: buttons.length, 高さ: document.documentElement.scrollHeight };
 })()`;
 
+/**
+ * 画面が動かせる状態になるまで待つ。
+ *
+ * 固定の待ち時間だけで進めていたため、手持ちが多い保存データでは
+ * 描画が間に合わず「タブが無い」と誤って報告し、以降の画面が
+ * 総崩れになることがあった。**準備できたことを確かめてから進む。**
+ */
+async function waitReady(timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const res = await call("eval", { expression: `document.querySelectorAll('.bottom-nav__btn').length` });
+    if (res.ok && Number(res.value) > 0) return true;
+    if (Date.now() > deadline) return false;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
 async function goScreen(screen) {
   const clicked = await call("eval", {
     expression: `(async () => {
@@ -138,7 +155,8 @@ async function goScreen(screen) {
       return 'ok';
     })()`,
   });
-  return clicked.value;
+  // 失敗の理由を握り潰すと「undefined」としか出ず、原因を追えない
+  return clicked.ok ? clicked.value : `検査に失敗: ${clicked.error ?? "不明"}`;
 }
 
 async function main() {
@@ -161,10 +179,19 @@ async function main() {
     // 900x430(横)を2回検査しており、縦画面の崩れを1件も拾えていなかった。
     await call("size", { width: size.width, height: size.height });
     await call("goto", { path: "/", fresh: true, width: size.width, height: size.height });
-    await new Promise((r) => setTimeout(r, 1200));
+    if (!(await waitReady())) {
+      report.push({ 画面: "(起動)", 画面比: size.label, 結果: "下タブが出てこない。画面が開けていない" });
+      failures += 1;
+      continue;
+    }
 
     for (const screen of SCREENS) {
-      const moved = await goScreen(screen);
+      let moved = await goScreen(screen);
+      // 描画待ちで取りこぼした時のために一度だけやり直す
+      if (moved !== "ok") {
+        await waitReady(4000);
+        moved = await goScreen(screen);
+      }
       if (moved !== "ok") {
         report.push({ 画面: screen.name, 画面比: size.label, 結果: `移動できない: ${moved}` });
         failures += 1;

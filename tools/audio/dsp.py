@@ -49,6 +49,39 @@ def brown(n: int, rng: np.random.Generator) -> np.ndarray:
     return out / (np.max(np.abs(out)) + 1e-9)
 
 
+def loop_noise(n: int, rng: np.random.Generator, slope: float = 1.0) -> np.ndarray:
+    """**必ず周期が閉じる**ノイズ。BGMの土台に使う。
+
+    `noise()` や `pink()` をそのままループさせると、末尾と先頭がつながらず
+    継ぎ目でプツッと鳴る。ここでは長さ n のスペクトルから逆変換して作るので、
+    出来上がりは定義上ちょうど n サンプルで一周する。
+
+    slope は出力のパワーの傾き。0=白、1=ピンク、2=ブラウン。
+    """
+    spec = np.fft.rfft(rng.standard_normal(n))
+    freqs = np.fft.rfftfreq(n, 1 / SR)
+    freqs[0] = freqs[1]
+    spec *= (freqs / freqs[1]) ** (-slope / 2)
+    spec[0] = 0.0
+    x = np.fft.irfft(spec, n)
+    return x / (np.max(np.abs(x)) + 1e-9)
+
+
+def rms(x: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(np.square(x))))
+
+
+def at_rms(x: np.ndarray, level: float) -> np.ndarray:
+    """実効値をそろえる。
+
+    **層の配合は頭(ピーク)ではなく実効値で決める。** 正弦は頭と実効値が
+    近いがノイズは遠いので、頭で合わせると正弦だけが飛び出す。
+    BGMで持続音が浮いて「安いシンセ」に聞こえるのは、たいていこれが原因。
+    """
+    current = rms(x)
+    return x * (level / current) if current > 1e-12 else x
+
+
 def lowpass(x: np.ndarray, hz: float, order: int = 2) -> np.ndarray:
     return sosfilt(butter(order, min(hz, SR / 2 - 100), btype="low", fs=SR, output="sos"), x)
 
@@ -65,11 +98,8 @@ def bandpass(x: np.ndarray, lo: float, hi: float, order: int = 2) -> np.ndarray:
     return sosfilt(butter(order, [lo, hi], btype="band", fs=SR, output="sos"), x)
 
 
-def sweep_filter(x: np.ndarray, hz0: float, hz1: float, kind: str = "low", chunks: int = 96) -> np.ndarray:
-    """カットオフを時間方向に動かす。
-
-    打撃音の「当たった瞬間は明るく、すぐ暗くなる」は、包絡だけでは出ない。
-    固定フィルタで作った音は、何度聞いても同じ位置で同じ色に聞こえてしまう。
+def filter_curve(x: np.ndarray, hz: np.ndarray, kind: str = "low", chunk: int = 512) -> np.ndarray:
+    """カットオフを、与えた曲線どおりに動かす。
 
     **フィルタの内部状態を区間をまたいで持ち越すこと。** 以前は区間ごとに
     フィルタを掛け直しており、1秒あたり百回以上の不連続が乗っていた。
@@ -79,19 +109,29 @@ def sweep_filter(x: np.ndarray, hz0: float, hz1: float, kind: str = "low", chunk
     if n == 0:
         return x
     out = np.zeros(n)
-    size = max(1, n // chunks)
     zi: np.ndarray | None = None
-    for i in range(0, n, size):
-        end = min(n, i + size)
-        p = i / max(1, n - 1)
-        hz = hz0 * (hz1 / hz0) ** p
-        hz = float(np.clip(hz, 20.0, SR / 2 - 200))
-        sos = butter(2, hz, btype=kind, fs=SR, output="sos")
+    for i in range(0, n, chunk):
+        end = min(n, i + chunk)
+        cutoff = float(np.clip(hz[i], 20.0, SR / 2 - 200))
+        sos = butter(2, cutoff, btype=kind, fs=SR, output="sos")
         if zi is None:
             zi = sosfilt_zi(sos) * x[0]
         segment, zi = sosfilt(sos, x[i:end], zi=zi)
         out[i:end] = segment
     return out
+
+
+def sweep_filter(x: np.ndarray, hz0: float, hz1: float, kind: str = "low", chunks: int = 96) -> np.ndarray:
+    """カットオフを端から端へ滑らせる。
+
+    打撃音の「当たった瞬間は明るく、すぐ暗くなる」は、包絡だけでは出ない。
+    固定フィルタで作った音は、何度聞いても同じ位置で同じ色に聞こえてしまう。
+    """
+    n = len(x)
+    if n == 0:
+        return x
+    curve = hz0 * (hz1 / hz0) ** np.linspace(0.0, 1.0, n)
+    return filter_curve(x, curve, kind, chunk=max(1, n // chunks))
 
 
 def env_exp(n: int, decay: float, attack_ms: float = 1.0) -> np.ndarray:
@@ -250,6 +290,59 @@ def wrap_loop(x: np.ndarray, length: int) -> np.ndarray:
 TONALITY_FLOOR_HZ = 150.0
 
 
+def tonality_windows(x: np.ndarray, k: float = 4.0, win: int = 4096) -> np.ndarray:
+    """`tonality()` を窓ごとに返す。長い音(BGM)は、最大値ではなく分布で見る。
+
+    32秒のループには窓が千を超えるので、最大値を取ると「10秒に1度だけ鳴る
+    遠い鐘」のような、意図した1瞬だけで track 全体が失格になってしまう。
+    中央値や上位5%点で「ほとんどの時間どうなのか」を見ること。
+    """
+    n = len(x)
+    if n < win:
+        x = np.pad(x, (0, win - n))
+        n = win
+    hop = win // 2
+    starts = list(range(0, n - win + 1, hop)) or [0]
+    energy = np.array([float(np.sum(x[s : s + win] ** 2)) for s in starts])
+    loud = energy >= energy.max() * 0.1
+
+    band = np.fft.rfftfreq(win, 1 / SR) >= TONALITY_FLOOR_HZ
+    hann = np.hanning(win)
+    out = []
+    for s, keep in zip(starts, loud):
+        if not keep:
+            continue
+        spec = np.abs(np.fft.rfft(x[s : s + win] * hann)) ** 2
+        spec = np.convolve(spec, np.ones(5) / 5, mode="same")
+        m = len(spec)
+        env = np.empty(m)
+        for i in range(m):
+            half = max(20, int(i * 0.2))
+            env[i] = np.median(spec[max(0, i - half) : min(m, i + half + 1)])
+        excess = np.maximum(0.0, spec - k * env)[band]
+        out.append(float(np.sum(excess) / (np.sum(spec[band]) + 1e-20)))
+    return np.array(out) if out else np.zeros(1)
+
+
+def seam_error(x: np.ndarray) -> float:
+    """ループの継ぎ目の段差。**1に近ければつながっている。**
+
+    末尾と先頭の値をそのまま比べると、低音が強い音では正しくつながっていても
+    大きな差が出る(5ms のあいだに 30Hz の波はかなり動く)。
+    ここでは「末尾から先頭へ渡る1サンプルぶんの跳び」が、
+    曲中のふつうの1サンプルぶんの動きに比べてどれだけ大きいかを見る。
+    1前後なら継ぎ目は無い。10を超えていたらプツッと鳴っている。
+    """
+    if x.ndim == 1:
+        x = x[None, :]
+    worst = 0.0
+    for channel in x:
+        steps = np.abs(np.diff(channel))
+        typical = float(np.quantile(steps, 0.999)) + 1e-12
+        worst = max(worst, float(abs(channel[0] - channel[-1])) / typical)
+    return worst
+
+
 def tonality(x: np.ndarray, k: float = 4.0, win: int = 4096) -> float:
     """**純音らしさ。** 0に近いほどノイズ、1に近いほど発振器の音。
 
@@ -267,28 +360,15 @@ def tonality(x: np.ndarray, k: float = 4.0, win: int = 4096) -> float:
     150Hz 未満は数えない。この分解能では「DCから続く低い塊」と「低い正弦」を
     区別できず、しかも低音の胴は削りたくないところだから。
 
+    **窓ごとに測って、いちばん高いところを返す。** 平均や、いちばん大きい窓
+    だけを見ると、頭の一撃がノイズなら後ろで正弦が伸びていても見逃してしまう。
+    ただし消え際まで見ると尻尾の残響を拾うので、山の1割より小さい窓は数えない。
+
     目安(実測):
         正弦1本 1.00 / 非整数比の共振4本 0.96 / 共振とノイズ半々 0.51
         帯域ノイズ 0.00〜0.01 / 低域ノイズ 0.00〜0.05
     """
-    n = len(x)
-    if n < win:
-        x = np.pad(x, (0, win - n))
-        n = win
-    # いちばん大きく鳴っている窓で測る。頭の静かなところを測っても意味がない
-    hop = win // 2
-    starts = list(range(0, n - win + 1, hop)) or [0]
-    s0 = starts[int(np.argmax([float(np.sum(x[s : s + win] ** 2)) for s in starts]))]
-    spec = np.abs(np.fft.rfft(x[s0 : s0 + win] * np.hanning(win))) ** 2
-    spec = np.convolve(spec, np.ones(5) / 5, mode="same")
-    m = len(spec)
-    env = np.empty(m)
-    for i in range(m):
-        half = max(20, int(i * 0.2))
-        env[i] = np.median(spec[max(0, i - half) : min(m, i + half + 1)])
-    band = np.fft.rfftfreq(win, 1 / SR) >= TONALITY_FLOOR_HZ
-    excess = np.maximum(0.0, spec - k * env)[band]
-    return float(np.sum(excess) / (np.sum(spec[band]) + 1e-20))
+    return float(np.max(tonality_windows(x, k, win)))
 
 
 def analyze(x: np.ndarray) -> dict:

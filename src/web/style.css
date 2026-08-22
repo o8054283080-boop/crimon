@@ -3077,3 +3077,212 @@ body {
   border-color: rgba(255, 120, 120, 0.5);
   color: #ffc9c9;
 }
+
+/* ===================================================================
+ * 所持モンスターの絞り込み(2026-08 追記)
+ *
+ * 並べ替えだけでは、手持ちが数十体を超えると目当ての1体に辿り着けない。
+ * ただし条件を全部開いたまま置くと、縦画面(390x844)では
+ * **モンスターが1体も見えないまま画面が終わる**。
+ * そこで既定は1行に畳み、押した時だけ札を開く。
+ * =================================================================== */
+
+.mfilter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mfilter__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mfilter__toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* 実機は指で押す。札より一回り大きくして、確実に当たる的にする */
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mfilter__toggle--on {
+  border-color: var(--accent);
+  color: #dbe7ff;
+}
+
+.mfilter__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.mfilter__caret {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.mfilter__count {
+  flex: 1 1 auto;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.mfilter__clear {
+  appearance: none;
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 150, 150, 0.4);
+  background: rgba(90, 30, 40, 0.4);
+  color: #ffd5d5;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mfilter__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(8, 11, 24, 0.5);
+  box-shadow: var(--edge-line);
+}
+
+.mfilter__group {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mfilter__label {
+  flex: 0 0 auto;
+  width: 2.6em;
+  padding-top: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.mfilter__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 絞り込みの札は押し間違えると探し直しになる。指で押せる高さを確保する */
+.mfilter__chip,
+.sort-row .slot-filter-chip {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ===================================================================
+ * 見出しを1行にまとめる
+ *
+ * 題字 + 説明文 + 入口ボタンを縦に積むと、縦画面では中身が始まる前に
+ * 200px近くを使ってしまう。題字の右側に入口を寄せて、1行で済ませる。
+ * =================================================================== */
+
+.app-header--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  padding: 4px 0 2px;
+}
+
+.app-header--row h1 {
+  font-size: 1.35rem;
+  letter-spacing: 0.06em;
+}
+
+.app-header--row::after {
+  display: none;
+}
+
+.head-action {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.head-note {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+
+/* ===================================================================
+ * カードに「誰を入れるか」の判断材料を載せる
+ *
+ * 総合力と装備の埋まり具合が無いと、一覧を見ても選べず、
+ * 1体ずつ詳細を開いて戻る往復になっていた。
+ * =================================================================== */
+
+.mcard__info {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  /* 実機で読める下限は9px。0.6rem=9.6pxを下回らせない */
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.mcard__power {
+  color: #ffe9a8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.mcard__gear {
+  color: #b8c6ea;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+/* 装備が1つも無い個体は、一覧のまま見つかるように赤く沈める */
+.mcard__gear--none {
+  color: #ff9a9a;
+}
+
+.mcard__gear--full {
+  color: #8ef0b4;
+}
+
+/* 常時出るラベルは札の中央に置くとレベルや星を覆う。角に寄せる */
+.mcard__badge--corner {
+  top: 3px;
+  left: auto;
+  right: 3px;
+  transform: none;
+  padding: 1px 5px;
+  font-size: 0.6rem;
+  border-radius: 999px;
+}
