@@ -69,7 +69,7 @@ if (params.get("view") === "farm") {
           { dexId: "fairy_GRASS", star: 4 },
         ],
       },
-      onClose: () => location.reload(),
+      actions: [{ label: "🔁 もう一度", variant: "primary", run: () => location.reload() }],
     }),
   );
   Object.assign(window, { __crimonPreviewReady: true });
@@ -107,7 +107,7 @@ if (params.get("view") === "result") {
         pigDrop: { dexId: "reincarnation_pig_GRASS", star: 3 },
         fighterLevelsGained: 1,
       },
-      onClose: () => location.reload(),
+      actions: [{ label: "🔁 もう一度", variant: "primary", run: () => location.reload() }],
     }),
   );
   Object.assign(window, { __crimonPreviewReady: true });

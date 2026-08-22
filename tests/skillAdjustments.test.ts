@@ -8,7 +8,7 @@ describe("フェアリーのスキル1(攻撃しつつ自身を回復)", () => {
     expect(skill1.target).toBe("SINGLE_ENEMY");
     expect(skill1.effects.some((e) => e.kind === "DAMAGE")).toBe(true);
     // 敵を殴りながら自分だけが回復する。相手を回復させないことが要点
-    expect(skill1.effects.some((e) => e.kind === "HEAL" && e.toSelf === true)).toBe(true);
+    expect(skill1.effects.some((e) => e.kind === "HEAL" && e.applyTo === "SELF")).toBe(true);
   });
 });
 

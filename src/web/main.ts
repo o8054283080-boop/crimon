@@ -1,5 +1,5 @@
 import "./style.css";
-import { audioContextState, getAudioSettings, initAudio, playSfx, updateAudioSettings } from "./audio/index.js";
+import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
@@ -25,6 +25,7 @@ import {
   equipToMonster,
   getShop,
   getDungeonParty,
+  MAX_DUNGEON_PARTY_SIZE,
   getParty,
   loadPlayerState,
   normalizeLoadedState,
@@ -40,8 +41,10 @@ import {
   trySpendStamina,
   trySpendSummonScrolls,
   unlockShopSlot,
+  goldDungeonChallengesRemaining,
 } from "../game/playerState.js";
-import { MonsterSortKey } from "../game/monsterSort.js";
+import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
+import { findMonsterById } from "../data/monsters.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
@@ -50,8 +53,8 @@ import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
+import { ResultAction } from "./views/resultActions.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
-import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
@@ -146,6 +149,19 @@ interface GoldDungeonRunState {
   partyInstances: MonsterInstance[];
 }
 
+/**
+ * 直前に挑んだ場所。
+ *
+ * 結果画面から**同じ場所へ1手で戻る**ために覚えておく。
+ * これが無かったため、周回のたびに「ホーム → タブ → 一覧を探す → 選ぶ → 挑戦」と
+ * 4〜6手を繰り返させていた。
+ */
+type LastRun =
+  | { kind: "STAGE"; stage: Stage; difficulty: Difficulty }
+  | { kind: "EQUIP_DUNGEON"; floor: DungeonFloor }
+  | { kind: "LEVEL_DUNGEON"; def: LevelDungeonDef }
+  | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor };
+
 interface AppState {
   screen: ScreenName;
   player: PlayerState;
@@ -191,6 +207,10 @@ interface AppState {
   loginBonusResult: LoginBonusResult | null;
   /** 起動時に受け取ったお詫び配布。閉じるまでホームに出す */
   compensationClaims: CompensationClaim[];
+  /** 直前に挑んだ場所。結果画面の「もう一度」の行き先になる */
+  lastRun: LastRun | null;
+  /** 編成画面での直前の操作の結果。次の操作まで出しておく */
+  partyNotice: string | null;
 }
 
 const state: AppState = {
@@ -230,6 +250,8 @@ const state: AppState = {
   autoFarmTargetName: "",
   loginBonusResult: null,
   compensationClaims: [],
+  lastRun: null,
+  partyNotice: null,
 };
 
 {
@@ -331,8 +353,14 @@ function handleUnequipFromEquipmentScreen(equipmentId: string): void {
 
 function handleEnhanceEquipment(equipmentId: string): void {
   const result = tryEnhanceEquipment(state.player, equipmentId);
-  if (!result.ok) return;
+  if (!result.ok) {
+    // ゴールド不足や最大強化。**なぜ押せなかったかは画面に出ているので、
+    // 音は「効かなかった」ことだけを伝えればよい**
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
+  playSfx("enhance", 0.9);
   render();
 }
 
@@ -369,13 +397,29 @@ function handleBulkSellEquipment(): void {
 
 function handleSummon(count: number): void {
   const cost = count >= 10 ? SUMMON_COST_TEN : SUMMON_COST_SINGLE * count;
-  if (state.player.crystal < cost) return;
+  if (state.player.crystal < cost) {
+    playSfx("denied", 0.7);
+    return;
+  }
   state.player.crystal -= cost;
   const results = summonMany(count);
   for (const r of results) addMonster(state.player, r.dexId, r.star);
   savePlayerState(state.player);
   state.summonResults = results;
+  playSummonSfx(results);
   render();
+}
+
+/**
+ * 召喚の音。**当たった時だけ音が変わる**ようにする。
+ *
+ * 引く音が毎回同じだと、結果を見る前から「またハズレか」と分かってしまい、
+ * 逆に音が結果を先に漏らすと演出が死ぬ。ここでは開く音は共通にして、
+ * 高レアが入っている時だけ、開いたあとに層を重ねる。
+ */
+function playSummonSfx(results: SummonResult[]): void {
+  playSfx("summon", 0.9);
+  if (results.some((r) => r.star >= 5 || r.isRare)) playSfx("summonRare", 0.75);
 }
 
 /**
@@ -383,11 +427,15 @@ function handleSummon(count: number): void {
  * (書を10枚ためた人が、ばら引きより損をする形にはしない)。
  */
 function handleUseSummonScroll(count: number): void {
-  if (!trySpendSummonScrolls(state.player, count)) return;
+  if (!trySpendSummonScrolls(state.player, count)) {
+    playSfx("denied", 0.7);
+    return;
+  }
   const results = summonMany(count);
   for (const r of results) addMonster(state.player, r.dexId, r.star);
   savePlayerState(state.player);
   state.summonResults = results;
+  playSummonSfx(results);
   render();
 }
 
@@ -398,9 +446,13 @@ function handleConfirmRankUp(): void {
     .map((id) => state.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkRankUp(target, sacrifices, state.player.partyIds);
-  if (!check.ok) return;
+  if (!check.ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
 
   applyRankUp(target, sacrifices);
+  playSfx("levelUp");
   removeMonsters(state.player, state.rankUpSacrificeIds);
   savePlayerState(state.player);
   state.rankUpMode = false;
@@ -415,9 +467,13 @@ function handleConfirmMonsterTraining(): void {
     .map((id) => state.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkMonsterPowerUp(target, materials, state.player.partyIds);
-  if (!check.ok) return;
+  if (!check.ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
 
   applyMonsterPowerUp(target, materials);
+  playSfx("levelUp");
   removeMonsters(state.player, state.monsterTrainingMaterialIds);
   savePlayerState(state.player);
   state.monsterTrainingTargetId = null;
@@ -427,23 +483,90 @@ function handleConfirmMonsterTraining(): void {
   render();
 }
 
+const MAX_NORMAL_PARTY_SIZE = 4;
+
 function handleToggleParty(instanceId: string): void {
   const idx = state.player.partyIds.indexOf(instanceId);
   if (idx >= 0) {
     state.player.partyIds.splice(idx, 1);
+    state.partyNotice = null;
   } else {
-    if (state.player.partyIds.length >= 4) return;
+    if (state.player.partyIds.length >= MAX_NORMAL_PARTY_SIZE) {
+      // 黙って何も起きないと「押したのに反応しない壊れた画面」に見える。
+      // 何が起きたか・どうすれば入るかを必ず出す
+      playSfx("denied", 0.7);
+      state.partyNotice = `パーティは${MAX_NORMAL_PARTY_SIZE}体までです。上の枠を押して外してから選んでください。`;
+      render();
+      return;
+    }
     state.player.partyIds.push(instanceId);
+    state.partyNotice = null;
   }
   savePlayerState(state.player);
+  render();
+}
+
+function handleToggleDungeonPartyMember(instanceId: string): void {
+  const before = state.player.dungeonPartyIds.length;
+  const wasMember = state.player.dungeonPartyIds.includes(instanceId);
+  toggleDungeonPartyMember(state.player, instanceId);
+  if (!wasMember && state.player.dungeonPartyIds.length === before) {
+    playSfx("denied", 0.7);
+    state.partyNotice = `ダンジョン専用パーティは${MAX_DUNGEON_PARTY_SIZE}体までです。上の枠を押して外してから選んでください。`;
+    render();
+    return;
+  }
+  state.partyNotice = null;
+  savePlayerState(state.player);
+  render();
+}
+
+/**
+ * 空いている枠を、強い順に自動で埋める。
+ *
+ * 手持ちが数十体になると、1体ずつ選ぶだけで何十手もかかる。
+ * 素材専用のモンスター(転生ピッグなど)は編成しても意味が無いので外す。
+ */
+function handleAutoFillParty(): void {
+  const isDungeon = state.partyEditMode === "DUNGEON";
+  const ids = isDungeon ? state.player.dungeonPartyIds : state.player.partyIds;
+  const maxSize = isDungeon ? MAX_DUNGEON_PARTY_SIZE : MAX_NORMAL_PARTY_SIZE;
+
+  const candidates = state.player.monsters
+    .filter((m) => !ids.includes(m.id) && findMonsterById(m.dexId)?.role !== "素材")
+    .sort((a, b) => monsterPower(b) - monsterPower(a));
+
+  const added = candidates.slice(0, Math.max(0, maxSize - ids.length));
+  if (added.length === 0) {
+    playSfx("denied", 0.7);
+    state.partyNotice = "編成できるモンスターがいません。";
+    render();
+    return;
+  }
+  for (const monster of added) ids.push(monster.id);
+  savePlayerState(state.player);
+  state.partyNotice = `総合力の高い${added.length}体を編成しました。`;
+  render();
+}
+
+function handleClearParty(): void {
+  const isDungeon = state.partyEditMode === "DUNGEON";
+  const ids = isDungeon ? state.player.dungeonPartyIds : state.player.partyIds;
+  ids.length = 0;
+  savePlayerState(state.player);
+  state.partyNotice = "編成を全部外しました。";
   render();
 }
 
 function startStage(stage: Stage, difficulty: Difficulty): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
-  if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
+  state.lastRun = { kind: "STAGE", stage, difficulty };
   state.stageRun = {
     stage,
     difficulty,
@@ -456,6 +579,143 @@ function startStage(stage: Stage, difficulty: Difficulty): void {
   };
   state.screen = "BATTLE";
   render();
+}
+
+/**
+ * 報酬画面へ移る。
+ *
+ * **ここで鳴らす。画面の描画側で鳴らしてはいけない。** 報酬画面は状態が
+ * 変わるたびに描き直されるので、描画のたびに鳴らすと同じ音が何度も出る。
+ *
+ * 負けた時は鳴らさない。戦闘が終わった時点で敗北の音が鳴っており、
+ * そこへ重ねても「終わった」以上のことは伝わらない。
+ */
+function enterStageResult(): void {
+  if (state.stageResult?.cleared) playSfx("stageClear");
+  state.screen = "STAGE_RESULT";
+  render();
+}
+
+/** 直前に挑んだ場所の1回あたりの消費スタミナ */
+function lastRunStaminaCost(last: LastRun): number {
+  switch (last.kind) {
+    case "STAGE":
+      return STAGE_STAMINA_COST;
+    case "EQUIP_DUNGEON":
+      return DUNGEON_STAMINA_COST;
+    case "LEVEL_DUNGEON":
+      return LEVEL_DUNGEON_STAMINA_COST;
+    case "GOLD_DUNGEON":
+      return GOLD_DUNGEON_STAMINA_COST;
+  }
+}
+
+/**
+ * 「もう一度」が押せない理由。
+ *
+ * **押せないボタンだけを出して理由を伏せない。** スタミナ切れなのか
+ * 編成が空なのかが分からないと、次に何をすればいいかが決められない。
+ */
+function retryBlockedReason(last: LastRun): string | null {
+  const party = last.kind === "EQUIP_DUNGEON" ? getDungeonParty(state.player) : getParty(state.player);
+  if (party.length === 0) return "パーティが編成されていません";
+  const cost = lastRunStaminaCost(last);
+  if (state.player.stamina < cost) return `スタミナが足りません(⚡${cost}必要 / 手持ち⚡${state.player.stamina})`;
+  if (last.kind === "GOLD_DUNGEON" && goldDungeonChallengesRemaining(state.player) <= 0) {
+    return "本日の挑戦回数の上限に達しています";
+  }
+  return null;
+}
+
+/** 直前と同じ場所へもう一度挑む */
+function retryLastRun(): void {
+  const last = state.lastRun;
+  if (!last) return;
+  const before = state.screen;
+  switch (last.kind) {
+    case "STAGE":
+      startStage(last.stage, last.difficulty);
+      break;
+    case "EQUIP_DUNGEON":
+      startDungeonFloor(last.floor);
+      break;
+    case "LEVEL_DUNGEON":
+      startLevelDungeonTier(last.def);
+      break;
+    case "GOLD_DUNGEON":
+      startGoldDungeonFloor(last.floor);
+      break;
+  }
+  // 始められなかった時は結果画面に留める(黙って消えると何が起きたか分からない)
+  if (state.screen === before) render();
+}
+
+/** 直前に挑んだ場所の一覧へ戻る。別の階/別の難易度を選び直すための道 */
+function backToLastRunList(): void {
+  const last = state.lastRun;
+  if (!last) {
+    navigate("HOME");
+    return;
+  }
+  switch (last.kind) {
+    case "STAGE":
+      navigate("STAGES");
+      break;
+    case "EQUIP_DUNGEON":
+      navigate("EQUIP_DUNGEON");
+      break;
+    case "LEVEL_DUNGEON":
+      navigate("LEVEL_DUNGEON");
+      break;
+    case "GOLD_DUNGEON":
+      navigate("GOLD_DUNGEON");
+      break;
+  }
+}
+
+/**
+ * 結果画面の出口。
+ *
+ * 周回で押すのはほぼ「もう一度」なので、それを主役の位置に置く。
+ * オート周回の結果なら、同じ回数でもう一周できるようにする。
+ */
+function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
+  const last = state.lastRun;
+  const reason = last ? retryBlockedReason(last) : "挑戦した場所が分かりません";
+  const cost = last ? lastRunStaminaCost(last) : 0;
+
+  const actions: ResultAction[] = [];
+  if (last) {
+    actions.push({
+      label: fromAutoFarm ? `🔁 もう一度 ×${state.autoFarmCount}` : `🔁 もう一度 (⚡${cost})`,
+      variant: "primary",
+      disabled: reason !== null,
+      reason: reason ?? undefined,
+      run: () => {
+        if (!fromAutoFarm) {
+          retryLastRun();
+          return;
+        }
+        switch (last.kind) {
+          case "STAGE":
+            handleAutoFarmStage(last.stage, state.autoFarmCount, last.difficulty);
+            break;
+          case "EQUIP_DUNGEON":
+            handleAutoFarmDungeon(last.floor, state.autoFarmCount);
+            break;
+          case "LEVEL_DUNGEON":
+            handleAutoFarmLevelDungeon(last.def, state.autoFarmCount);
+            break;
+          case "GOLD_DUNGEON":
+            handleAutoFarmGoldDungeon(last.floor, state.autoFarmCount);
+            break;
+        }
+      },
+    });
+  }
+  actions.push({ label: "🗺 選び直す", run: backToLastRunList });
+  actions.push({ label: "🏠 ホーム", run: () => navigate("HOME") });
+  return actions;
 }
 
 function finishStage(cleared: boolean): void {
@@ -487,15 +747,18 @@ function finishStage(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.stageRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function startDungeonFloor(floor: DungeonFloor): void {
   const party = getDungeonParty(state.player);
   if (party.length === 0) return;
-  if (!trySpendStamina(state.player, DUNGEON_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, DUNGEON_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
+  state.lastRun = { kind: "EQUIP_DUNGEON", floor };
   state.dungeonRun = { floor, partyInstances: party };
   state.screen = "DUNGEON_BATTLE";
   render();
@@ -525,11 +788,11 @@ function finishDungeon(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.dungeonRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty): void {
+  state.lastRun = { kind: "STAGE", stage, difficulty };
   const result = runStageAutoFarm(state.player, stage, count, Math.random, difficulty);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -541,6 +804,7 @@ function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty
 }
 
 function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
+  state.lastRun = { kind: "EQUIP_DUNGEON", floor };
   const result = runDungeonAutoFarm(state.player, floor, count);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -553,8 +817,12 @@ function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
 function startLevelDungeonTier(def: LevelDungeonDef): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
-  if (!trySpendStamina(state.player, LEVEL_DUNGEON_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, LEVEL_DUNGEON_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
+  state.lastRun = { kind: "LEVEL_DUNGEON", def };
   state.levelDungeonRun = { def, partyInstances: party };
   state.screen = "LEVEL_DUNGEON_BATTLE";
   render();
@@ -584,11 +852,11 @@ function finishLevelDungeon(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.levelDungeonRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
+  state.lastRun = { kind: "LEVEL_DUNGEON", def };
   const result = runLevelDungeonAutoFarm(state.player, def, count);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -602,8 +870,12 @@ function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!trySpendGoldDungeonChallenge(state.player).ok) return;
-  if (!trySpendStamina(state.player, GOLD_DUNGEON_STAMINA_COST).ok) return;
+  if (!trySpendStamina(state.player, GOLD_DUNGEON_STAMINA_COST).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   savePlayerState(state.player);
+  state.lastRun = { kind: "GOLD_DUNGEON", floor };
   state.goldDungeonRun = { floor, partyInstances: party };
   state.screen = "GOLD_DUNGEON_BATTLE";
   render();
@@ -633,11 +905,11 @@ function finishGoldDungeon(cleared: boolean): void {
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
   state.goldDungeonRun = null;
-  state.screen = "STAGE_RESULT";
-  render();
+  enterStageResult();
 }
 
 function handleAutoFarmGoldDungeon(floor: GoldDungeonFloor, count: number): void {
+  state.lastRun = { kind: "GOLD_DUNGEON", floor };
   const result = runGoldDungeonAutoFarm(state.player, floor, count);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -844,11 +1116,10 @@ function render(): void {
           render();
         },
         onToggleParty: handleToggleParty,
-        onToggleDungeonMember: (id) => {
-          toggleDungeonPartyMember(state.player, id);
-          savePlayerState(state.player);
-          render();
-        },
+        onToggleDungeonMember: handleToggleDungeonPartyMember,
+        onAutoFill: handleAutoFillParty,
+        onClearParty: handleClearParty,
+        notice: state.partyNotice,
         sortKey: state.monsterSortKey,
         onChangeSort: (key) => {
           state.monsterSortKey = key;
@@ -908,9 +1179,11 @@ function render(): void {
           render();
         },
         onStartFloor: startDungeonFloor,
+        // 専用の編成画面には絞り込みも並べ替えも無く、同じことを2か所で
+        // 別々にやらせていた。編成はすべて編成画面へ集約する
         onGoDungeonParty: () => {
-          state.screen = "DUNGEON_PARTY";
-          render();
+          state.partyEditMode = "DUNGEON";
+          navigate("PARTY");
         },
         autoFarmCount: state.autoFarmCount,
         onChangeAutoFarmCount: (count) => {
@@ -918,21 +1191,6 @@ function render(): void {
           render();
         },
         onAutoFarm: handleAutoFarmDungeon,
-      });
-      break;
-
-    case "DUNGEON_PARTY":
-      content = renderDungeonParty({
-        player: state.player,
-        onToggleMember: (id) => {
-          toggleDungeonPartyMember(state.player, id);
-          savePlayerState(state.player);
-          render();
-        },
-        onBack: () => {
-          state.screen = "EQUIP_DUNGEON";
-          render();
-        },
       });
       break;
 
@@ -1046,7 +1304,7 @@ function render(): void {
         navigate("HOME");
         return;
       }
-      content = renderStageResult({ info, onClose: () => navigate("HOME") });
+      content = renderStageResult({ info, actions: buildResultActions(false) });
       break;
     }
 
@@ -1057,17 +1315,38 @@ function render(): void {
         navigate("HOME");
         return;
       }
-      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, onClose: () => navigate("HOME") });
+      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, actions: buildResultActions(true) });
       break;
     }
   }
 
   root.append(content);
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
+  playBgm(bgmSceneOf(state.screen));
 
   const newRouteKey = routeKey();
   window.scrollTo(0, scrollPositions.get(newRouteKey) ?? 0);
   lastRouteKey = newRouteKey;
+}
+
+/**
+ * 画面ごとに敷くBGM。
+ *
+ * 焼いてあるのは2つだけで、戦闘とそれ以外で分ける。場面をこれ以上刻んでも、
+ * 中身の差を作れなければ切り替わりが目立つだけで良くならない。
+ *
+ * `playBgm` は同じ場面を何度渡しても鳴らし直さないので、
+ * 再描画のたびに呼んで構わない(むしろ、そう呼ぶ前提で作ってある)。
+ */
+const BATTLE_SCREENS = new Set<ScreenName>([
+  "BATTLE",
+  "DUNGEON_BATTLE",
+  "LEVEL_DUNGEON_BATTLE",
+  "GOLD_DUNGEON_BATTLE",
+]);
+
+function bgmSceneOf(screen: ScreenName): BgmScene {
+  return BATTLE_SCREENS.has(screen) ? "battle" : "home";
 }
 
 function renderSummonScreen(): HTMLElement {

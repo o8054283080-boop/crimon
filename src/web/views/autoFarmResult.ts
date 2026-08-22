@@ -3,11 +3,13 @@ import { findMonsterById } from "../../data/monsters.js";
 import { AutoFarmResult } from "../../game/autoFarm.js";
 import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
+import { ResultAction, renderResultActions } from "./resultActions.js";
 
 export interface AutoFarmResultProps {
   result: AutoFarmResult;
   targetName: string;
-  onClose: () => void;
+  /** 次の行き先。同じ場所をもう一度回すのが最も多い操作 */
+  actions: ResultAction[];
 }
 
 const STOP_REASON_LABEL: Record<AutoFarmResult["stopReason"], string> = {
@@ -39,7 +41,7 @@ function rewardTile(icon: string, label: string, amount: string, modifier?: stri
 }
 
 export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
-  const { result, targetName, onClose } = props;
+  const { result, targetName } = props;
   const drops = groupDrops(result);
   const succeeded = result.cleared > 0;
 
@@ -88,6 +90,6 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
       el("span", { className: "result-banner-large__note" }, [STOP_REASON_LABEL[result.stopReason]]),
     ]),
     el("div", { className: "result-body" }, body.filter((n): n is HTMLElement => n !== null)),
-    el("button", { type: "button", className: "btn btn--primary result-confirm", onclick: onClose }, ["戻る"]),
+    renderResultActions(props.actions),
   ]);
 }

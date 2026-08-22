@@ -11,7 +11,6 @@ export type ScreenName =
   | "STAGE_RESULT"
   | "EQUIP_DUNGEON"
   | "DUNGEON_BATTLE"
-  | "DUNGEON_PARTY"
   | "LEVEL_DUNGEON"
   | "LEVEL_DUNGEON_BATTLE"
   | "GOLD_DUNGEON"

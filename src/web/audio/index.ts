@@ -5,13 +5,15 @@
  * 以前はブラウザ上で毎回合成していたが、リアルタイムでは畳み込みリバーブなどの
  * 重い処理が使えず、どう作っても安っぽさから抜けられなかったため方式を変えた。
  *
- * BGMはまだ入れていない。**質を確かめられないものは出さない**方針で、
- * 安っぽいBGMを付けるくらいなら無い方がよい。
+ * BGMは旋律を持たない。「環境音 + 持続音 + まばらな出来事」だけで場の空気を
+ * 敷いている。旋律を書くと8小節目で必ず「またこれか」になり、どれだけ凝っても
+ * 着信音の親戚に聞こえるため。詳しくは tools/audio/render_bgm.py の冒頭。
  */
+import { BgmScene, bgmPlayer } from "./bgm.js";
 import { HitOptions, HitStyle, SfxElement, SfxName, sfxPlayer } from "./player.js";
 import { getAudioSettings, onAudioSettingsChange, updateAudioSettings } from "./settings.js";
 
-export type { SfxName, SfxElement, HitStyle, HitOptions };
+export type { SfxName, SfxElement, HitStyle, HitOptions, BgmScene };
 export { getAudioSettings, updateAudioSettings, onAudioSettingsChange };
 
 let initialized = false;
@@ -35,6 +37,14 @@ export function initAudio(): void {
     update: updateAudioSettings,
     /** 実際の再生経路を通った音を測る(焼いたファイル単体ではなく、鳴っている音) */
     measure: (name: SfxName, ms?: number) => sfxPlayer.measure(name, ms),
+    /** 着弾を測る。属性の層が芯に埋もれていないかを確かめる時に使う */
+    measureHit: (options?: HitOptions, ms?: number) => sfxPlayer.measureHit(options, ms),
+    /** BGMの場面を切り替える。null で止まる */
+    bgm: (scene: BgmScene | null) => bgmPlayer.play(scene),
+    /** いま鳴っているBGMの場面 */
+    bgmScene: () => bgmPlayer.currentScene(),
+    /** ループが本当に閉じているか(復号後の余白と継ぎ目の跳び)を測る */
+    measureBgm: (scene: BgmScene, expectedSec?: number) => bgmPlayer.measureLoop(scene, expectedSec),
     /** 鳴らない時に真っ先に見る値。"suspended" なら解錠できていない */
     contextState: () => sfxPlayer.contextState(),
   };
@@ -53,6 +63,16 @@ export function playSfx(name: SfxName, gain = 1): void {
 /** 攻撃の着弾。当たり方・属性・会心を重ねて鳴らす */
 export function playHitSfx(options: HitOptions = {}): void {
   sfxPlayer.playHit(options);
+}
+
+/**
+ * BGMの場面を敷く。`null` で止める。
+ *
+ * 同じ場面を何度渡しても鳴らし直さないので、画面の再描画のたびに
+ * 呼んで構わない(むしろ、そう呼ぶ前提で作ってある)。
+ */
+export function playBgm(scene: BgmScene | null): void {
+  bgmPlayer.play(scene);
 }
 
 /** 3D側と同じ割り当て(役割で当たり方が変わる) */

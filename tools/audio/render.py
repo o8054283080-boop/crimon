@@ -30,12 +30,12 @@ import zlib
 from pathlib import Path
 
 import numpy as np
-import soundfile as sf
 from pedalboard import Compressor, HighpassFilter, HighShelfFilter, LowShelfFilter, Pedalboard, Reverb
 
 from dsp import (
     SR,
     analyze,
+    write_ogg,
     bandpass,
     brown,
     click,
@@ -60,6 +60,10 @@ OUT_DIR = Path(__file__).resolve().parents[2] / "public" / "audio"
 # 1つの音につき何通り焼くか。既定は3で、戦闘中に何度も鳴るものだけ増やす。
 # 同じ波形が続けて鳴ると、何よりも先に「機械が鳴らしている」と分かってしまう
 VARIATIONS = 3
+
+# 焼き直しで実際に中身が変わったファイル。最後に一覧で出す
+CHANGED: list[str] = []
+
 VARIATIONS_OF = {
     "tap": 5,
     "select": 5,
@@ -70,7 +74,6 @@ VARIATIONS_OF = {
     "impact_pierce": 5,
     "impact_magic": 5,
     "crit": 4,
-    "whiff": 4,
     "charge": 4,
     "heal": 4,
     "buff": 4,
@@ -266,20 +269,6 @@ def sfx_crit(rng: np.random.Generator) -> np.ndarray:
     ring = modal(n, [rng.uniform(700, 860), rng.uniform(1200, 1450)], [70.0, 95.0], rng, 0.45)
     ring *= env_exp(n, 10.0, attack_ms=2.0)
     return mix(crack * 1.1, shine * 0.45, ring * 0.35)
-
-
-def sfx_whiff(rng: np.random.Generator) -> np.ndarray:
-    """空振り。振り抜きは近づいて遠ざかるので、上げてから下げる。"""
-    n = secs(rng.uniform(0.28, 0.42))
-    half = int(n * rng.uniform(0.42, 0.58))
-    lo, hi = rng.uniform(320, 520), rng.uniform(4200, 6000)
-    top = rng.uniform(2400, 3900)
-    up = sweep_filter(bandpass(noise(half, rng), lo, hi), rng.uniform(700, 950), top, "high")
-    down = sweep_filter(bandpass(noise(n - half, rng), lo, hi), top, rng.uniform(750, 1050), "high")
-    swing = np.concatenate([up, down])
-    # 山を真ん中に置く。単調に上がるだけだと「風」ではなく「掃除機」になる
-    shape = np.sin(np.linspace(0, np.pi, n)) ** rng.uniform(1.3, 2.1)
-    return swing * shape
 
 
 def sfx_shield(rng: np.random.Generator) -> np.ndarray:
@@ -502,17 +491,6 @@ def sfx_enhance(rng: np.random.Generator) -> np.ndarray:
     return saturate(mix(attack, strike * 1.35, anvil * 0.5, plate * 0.4, steam * 0.18), 1.6)
 
 
-def sfx_enhance_fail(rng: np.random.Generator) -> np.ndarray:
-    """強化失敗。当たりはするが、鳴らずに落ちる。"""
-    n = secs(0.7)
-    attack = bandpass(noise(n, rng), 500, 4000) * env_exp(n, 200.0, attack_ms=0.5)
-    dull = lowpass(brown(n, rng), 170) * env_exp(n, 24.0, attack_ms=1.2)
-    # 響こうとしてすぐ止まる。減衰を極端に速くして「詰まった」音にする
-    choke = modal(n, [287.0, 431.0, 673.0], [140.0, 180.0, 230.0], rng, 0.5) * env_exp(n, 26.0, attack_ms=2.0)
-    fall = sweep_filter(bandpass(noise(n, rng), 150, 2500), 1800, 250, "low") * env_exp(n, 7.0, attack_ms=14.0)
-    return mix(attack * 0.4, dull * 1.0, choke * 0.35, fall * 0.5)
-
-
 def sfx_stage_clear(rng: np.random.Generator) -> np.ndarray:
     """ステージ踏破。勝利より短く、報酬を受け取る場面に置く。"""
     n = secs(1.3)
@@ -542,7 +520,6 @@ def sfx_denied(rng: np.random.Generator) -> np.ndarray:
 
 OTHERS = {
     "crit": sfx_crit,
-    "whiff": sfx_whiff,
     "shield": sfx_shield,
     "death": sfx_death,
     "heal": sfx_heal,
@@ -559,7 +536,6 @@ OTHERS = {
     "summonRare": sfx_summon_rare,
     "levelUp": sfx_level_up,
     "enhance": sfx_enhance,
-    "enhanceFail": sfx_enhance_fail,
     "stageClear": sfx_stage_clear,
     "denied": sfx_denied,
 }
@@ -628,7 +604,9 @@ def seed_of(name: str, index: int) -> int:
 def write(name: str, index: int, audio: np.ndarray) -> tuple[str, dict]:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{name}_{index}.ogg"
-    sf.write(OUT_DIR / filename, audio, SR, format="OGG", subtype="VORBIS")
+    # 中身が同じなら触らない(容器の数バイトだけが変わって差分が埋もれるため)
+    if write_ogg(OUT_DIR / filename, audio):
+        CHANGED.append(filename)
     return filename, analyze(audio)
 
 
@@ -675,7 +653,9 @@ def main() -> None:
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
 
     total = sum(f.stat().st_size for f in OUT_DIR.glob("*.ogg"))
-    print(f"{len(list(OUT_DIR.glob('*.ogg')))}個 / 合計 {total/1024:.0f} KB\n")
+    print(f"{len(list(OUT_DIR.glob('*.ogg')))}個 / 合計 {total/1024:.0f} KB")
+    print(f"中身が変わったもの: {len(CHANGED)}個" + (f" ({', '.join(CHANGED[:8])}...)" if len(CHANGED) > 8 else f" ({', '.join(CHANGED)})" if CHANGED else ""))
+    print()
     print(f"{'名前':<18}{'重心Hz':>8}{'純音らしさ':>10}{'低域比':>8}{'立上ms':>8}{'長さms':>8}{'KB':>7}")
     for name, s, size in report:
         flag = "  ←純音寄り" if s["純音らしさ"] > 0.5 else ""

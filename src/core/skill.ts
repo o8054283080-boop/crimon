@@ -8,14 +8,34 @@ export type TargetType =
 /** BUFF/DEBUFFで操作できる能力値。atk/def/spdは倍率(乗算)、criRate/criDmgは加算で効く */
 export type BuffStat = "atk" | "def" | "spd" | "criRate" | "criDmg";
 
+/**
+ * 補正の基準になるステータス値。終盤に装備込みで到達する水準に合わせてある。
+ *
+ * 補正を「能力値1につき+○倍」で書いていた頃は、3つのステータスの桁が違うせいで
+ * 意味が揃わなかった。HPは3万、防御は3500、速度は110なので、同じ係数を書いても
+ * HP補正は+72、速度補正は+0.4にしかならず、**説明文の倍率が無意味になっていた**
+ * (防御補正付きのゴーレムの通常攻撃と、ネメシスのCT5必殺技が同じダメージだった)。
+ * 基準に対する割合にすることで、どのステータスでも同じ読み方ができる。
+ */
+export const SCALE_REFERENCE: Record<"spd" | "def" | "hp", number> = {
+  hp: 30000,
+  def: 3500,
+  spd: 110,
+};
+
 export interface DamageEffect {
   kind: "DAMAGE";
   /** ATK に対する倍率。属性相性・防御力で更に補正される */
   multiplier: number;
   /** 命中回数 */
   hits?: number;
-  /** 追加ダメージ: 自身のいずれかの能力値が高いほど、その能力値1につきこの倍率が上乗せされる */
-  scaleBonus?: { stat: "spd" | "def" | "hp"; ratePerPoint: number };
+  /**
+   * 追加ダメージ: 自身の能力値が高いほど倍率が上乗せされる。
+   * `bonusAtReference` は**基準値のときに何倍ぶん上乗せするか**。
+   * 例) `{ stat: "hp", bonusAtReference: 0.8 }` は、HP30000のとき+0.8倍。
+   * HPがその半分なら+0.4倍になる。
+   */
+  scaleBonus?: { stat: "spd" | "def" | "hp"; bonusAtReference: number };
   /** trueの場合、相手の防御力を完全に無視してダメージを計算する */
   ignoreDefense?: boolean;
 }
@@ -30,10 +50,14 @@ export interface HealEffect {
   /** scaleStat省略時は対象の最大HPに対する割合、指定時は施術者のその能力値に対する割合 */
   healRate: number;
   /**
-   * trueなら、スキルの対象ではなく術者自身を回復する。
-   * 「敵を殴りながら自分が回復する」ような、対象と回復先が食い違うスキルに使う。
+   * 回復先。省略時はスキルの対象。
+   * "SELF"は術者、"ALLIES"は術者の味方全体。
+   *
+   * **敵を狙う技に回復を置くときは必ず指定すること。**省略すると敵を回復する
+   * (光スライムのセイントスラッシュが実際にそうなっていた)。
+   * バフの applyTo と同じ書き方に揃えてある。
    */
-  toSelf?: boolean;
+  applyTo?: "SELF" | "ALLIES";
 }
 
 /** ライフスティール: 同じスキルのDAMAGE効果で与えたダメージの一部を自身が回復する */
@@ -301,7 +325,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}`;
     }
     case "HEAL": {
-      const who = effect.toSelf ? "自身を" : "";
+      const who = effect.applyTo === "SELF" ? "自身を" : effect.applyTo === "ALLIES" ? "味方全体を" : "";
       if (effect.scaleStat === "atk") return `${who}回復 自身の攻撃力の${(effect.healRate * 100).toFixed(0)}%`;
       if (effect.scaleStat === "def") return `${who}回復 自身の防御力の${(effect.healRate * 100).toFixed(0)}%`;
       return `${who}回復 最大HPの${(effect.healRate * 100).toFixed(1)}%`;

@@ -3,6 +3,7 @@ import { Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
+import { ResultAction, renderResultActions } from "./resultActions.js";
 
 export interface StageResultLevelUp {
   instanceId: string;
@@ -31,7 +32,8 @@ export interface StageResultInfo {
 
 export interface StageResultProps {
   info: StageResultInfo;
-  onClose: () => void;
+  /** 次の行き先。周回で押すのはほぼ「もう一度」なので、それを主役に置く */
+  actions: ResultAction[];
 }
 
 /** 通貨などの「数が出るだけ」の報酬を、横に並ぶ小さな札で表す */
@@ -56,7 +58,7 @@ function equipmentTile(equipment: Equipment): HTMLElement {
 }
 
 export function renderStageResult(props: StageResultProps): HTMLElement {
-  const { info, onClose } = props;
+  const { info } = props;
   const dropDex = info.dropDexId ? findMonsterById(info.dropDexId) : undefined;
   const pigDex = info.pigDrop ? findMonsterById(info.pigDrop.dexId) : undefined;
 
@@ -119,6 +121,6 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
       ]),
     ]),
     el("div", { className: "result-body" }, body.filter((n): n is HTMLElement => n !== null)),
-    el("button", { type: "button", className: "btn btn--primary result-confirm", onclick: onClose }, ["ホームに戻る"]),
+    renderResultActions(props.actions),
   ]);
 }

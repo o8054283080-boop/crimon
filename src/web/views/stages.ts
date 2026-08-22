@@ -5,6 +5,7 @@ import { DIFFICULTIES, Difficulty, DIFFICULTY_JA, STAGES, Stage, Wave, WaveEnemy
 import { MONSTER_TEMPLATES } from "../../data/monsters.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { renderAutoFarmPanel } from "./autoFarmPanel.js";
 import "../ui/catalog.css";
 
 export interface StagesProps {
@@ -180,11 +181,35 @@ function chapterSection(props: StagesProps, chapter: number, stagesInChapter: St
   );
 }
 
+/**
+ * 再開の入口。
+ *
+ * 次に挑む場所は光らせてあったが、そこまで指でたどる必要があった。
+ * 章が増えるほど遠くなるので、一覧の先頭から1手で入れるようにする。
+ */
+function resumeButton(props: StagesProps, stage: Stage): HTMLElement {
+  const cleared = isStageCleared(props.player, stage.id);
+  return el(
+    "button",
+    { type: "button", className: "stages-resume", onclick: () => props.onSelectStage(stage.id) },
+    [
+      el("span", { className: "stages-resume__icon" }, [cleared ? "🔁" : "▶"]),
+      el("span", { className: "stages-resume__body" }, [
+        el("span", { className: "stages-resume__label" }, [cleared ? "つづきから" : "次はここ"]),
+        el("span", { className: "stages-resume__name" }, [stage.name]),
+      ]),
+      el("span", { className: "stages-resume__arrow" }, ["›"]),
+    ],
+  );
+}
+
 function renderList(props: StagesProps): HTMLElement {
   const chapters = Array.from(new Set(STAGES.map((s) => s.chapter))).sort((a, b) => a - b);
   const clearedTotal = STAGES.filter((s) => isStageCleared(props.player, s.id)).length;
   // 「次はここ」を1つだけ光らせて、再開位置が一目で分かるようにする
   const nextStage = STAGES.find((s) => !isStageCleared(props.player, s.id));
+  // 全部踏破していても周回先は要るので、最後のステージへ送る
+  const resumeStage = nextStage ?? STAGES[STAGES.length - 1];
 
   return el("div", { className: "screen stages-screen" }, [
     el("header", { className: "stages-head" }, [
@@ -206,6 +231,7 @@ function renderList(props: StagesProps): HTMLElement {
         ),
       ]),
     ]),
+    resumeButton(props, resumeStage),
     ...chapters.map((chapter) =>
       chapterSection(
         props,
@@ -338,6 +364,15 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
       ].filter((node) => node !== null),
     ),
 
+    renderAutoFarmPanel({
+      count: props.autoFarmCount,
+      onChangeCount: props.onChangeAutoFarmCount,
+      staminaCost: STAGE_STAMINA_COST,
+      stamina: props.player.stamina,
+      disabled: !canChallenge,
+      onStart: () => props.onAutoFarm(stage, props.autoFarmCount, props.selectedDifficulty),
+    }),
+
     el("section", { className: "panel" }, [
       el("h2", {}, ["出現する敵"]),
       el("div", { className: "wave-list" }, stage.waves.map(waveCard)),
@@ -358,36 +393,6 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
         ]),
         el("span", { className: "reward-drops__item" }, [`⚒ ${SET_LABEL[stage.rewards.equipmentSet]}シリーズ装備`]),
       ]),
-    ]),
-
-    el("section", { className: "panel auto-farm-panel" }, [
-      el("h2", {}, ["🔁 オート周回"]),
-      el("p", { className: "app-subtitle" }, ["指定した回数まで自動でウェーブを消化し、スタミナが尽きるか敗北したら中断します。"]),
-      el("div", { className: "auto-farm-count-row" }, [
-        el("input", {
-          type: "number",
-          min: "1",
-          max: "999",
-          value: String(props.autoFarmCount),
-          className: "auto-farm-count-input",
-          oninput: (e: Event) => {
-            const value = Math.max(1, Math.min(999, Number((e.target as HTMLInputElement).value) || 1));
-            props.onChangeAutoFarmCount(value);
-          },
-        }),
-        el("span", {}, ["回"]),
-        el("span", { className: "auto-farm-cost" }, [`= ⚡${STAGE_STAMINA_COST * props.autoFarmCount}`]),
-      ]),
-      el(
-        "button",
-        {
-          type: "button",
-          className: "btn btn--ghost btn--large",
-          disabled: !canChallenge,
-          onclick: () => props.onAutoFarm(stage, props.autoFarmCount, props.selectedDifficulty),
-        },
-        ["▶ オート周回開始"],
-      ),
     ]),
 
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectStage(null) }, ["◀ ステージ選択に戻る"]),

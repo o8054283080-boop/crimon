@@ -1,3 +1,4 @@
+import { scaledEnemyAtk } from "../battle/enemyPower.js";
 import { BattleEngine } from "../battle/engine.js";
 import { Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
@@ -27,7 +28,7 @@ function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number): MonsterDefiniti
   const stats = {
     ...base,
     hp: Math.round(base.hp * powerScale),
-    atk: Math.round(base.atk * powerScale),
+    atk: scaledEnemyAtk(base.atk * powerScale),
     def: Math.round(base.def * powerScale),
   };
   return {

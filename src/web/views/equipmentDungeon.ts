@@ -1,10 +1,12 @@
 import { EquipStar } from "../../core/equipment.js";
-import { CYCLE_ELEMENTS, Element, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
+import { CYCLE_ELEMENTS, Element, ELEMENT_COLOR, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
 import { DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
 import { DungeonEnemy, DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
 import { findMonster } from "../../data/monsters.js";
 import { getDungeonParty, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
 export interface EquipmentDungeonProps {
   player: PlayerState;
@@ -40,29 +42,27 @@ function enemyDisplayName(enemy: DungeonEnemy): string {
 }
 
 function renderList(props: EquipmentDungeonProps): HTMLElement {
-  const cards = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
-    return el(
-      "button",
-      { type: "button", className: "stage-card", onclick: () => props.onSelectFloor(floor.floor) },
-      [
-        el("div", { className: "stage-card__name" }, [floor.name]),
-        el("div", { className: "stage-card__meta" }, [
-          `最高レア: ${starLabel(maxStarForFloor(floor))} / 敵属性: ${ELEMENT_JA[floorElement(floor)]}`,
-        ]),
-      ],
-    );
+  const tiles = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
+    const element = floorElement(floor);
+    return {
+      badge: `${floor.floor}F`,
+      title: `${ELEMENT_JA[element]}の階`,
+      color: ELEMENT_COLOR[element],
+      chips: [`最高 ${starLabel(maxStarForFloor(floor))}`, `🪙${floor.goldReward.toLocaleString("ja-JP")}`],
+      onClick: () => props.onSelectFloor(floor.floor),
+    };
   });
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header" }, [
+    el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["装備ダンジョン"]),
-      el("p", { className: "app-subtitle" }, [
-        "1〜3階は星4まで、4〜6階は星5まで、7〜10階は星6までの装備が出現します。階層が上がるほど高レアリティが出やすくなります。",
-      ]),
-      el("p", { className: "app-subtitle equip-dungeon__warning" }, [
-        "⚠ 最上級コンテンツです。星5の装備を6箇所すべてに装着した星5モンスターでなければ1階すら突破は困難です。",
-      ]),
+      el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
     ]),
+    renderDungeonIntro(
+      "階層が上がるほど高い星の装備が出ます。敵は階ごとに1属性で揃っているので、弱点を突ける子で挑むと楽になります。",
+      ["1〜3階 ★4まで", "4〜6階 ★5まで", "7〜10階 ★6まで"],
+      "⚠ 最上級コンテンツです。★5装備を6箇所すべてに着けた★5モンスターでなければ1階の突破も困難です。",
+    ),
     el("section", { className: "panel" }, [
       el(
         "button",
@@ -70,7 +70,7 @@ function renderList(props: EquipmentDungeonProps): HTMLElement {
         [`🧑‍🤝‍🧑 ダンジョン専用パーティ編成 (${getDungeonParty(props.player).length}/5)`],
       ),
     ]),
-    el("section", { className: "panel" }, [el("div", { className: "stage-list" }, cards)]),
+    renderFloorGrid(tiles),
   ]);
 }
 
@@ -95,8 +95,46 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
     `低確率で転生ピッグ★${pigStar}(ランクアップ素材専用モンスター)もドロップします。`,
   ];
 
+  const blockers = [
+    party.length === 0 ? "ダンジョン専用パーティが編成されていません" : null,
+    !hasEnoughStamina ? `スタミナが足りません(⚡${DUNGEON_STAMINA_COST}必要)` : null,
+  ].filter((t): t is string => t !== null);
+
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, [floor.name])]),
+    el("header", { className: "app-header app-header--row" }, [
+      el("h1", {}, [floor.name]),
+      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: () => props.onSelectFloor(null) }, ["◀ 階層"]),
+    ]),
+
+    // 挑戦の入口を最初に置く。情報を読み終えないと挑めない並びだと、
+    // 2回目以降の周回で毎回スクロールさせることになる
+    el(
+      "section",
+      { className: "panel challenge-panel" },
+      ([
+        blockers.length > 0 ? el("p", { className: "challenge-panel__warn" }, [blockers.join(" / ")]) : null,
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--primary btn--large challenge-panel__go",
+            disabled: !canChallenge,
+            onclick: () => props.onStartFloor(floor),
+          },
+          [`⚔ 挑戦する (⚡${DUNGEON_STAMINA_COST})`],
+        ),
+      ] as (HTMLElement | null)[]).filter((n): n is HTMLElement => n !== null),
+    ),
+
+    renderAutoFarmPanel({
+      count: props.autoFarmCount,
+      onChangeCount: props.onChangeAutoFarmCount,
+      staminaCost: DUNGEON_STAMINA_COST,
+      stamina: props.player.stamina,
+      disabled: !canChallenge,
+      onStart: () => props.onAutoFarm(floor, props.autoFarmCount),
+    }),
+
     el(
       "section",
       { className: "panel" },
@@ -121,41 +159,6 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
     el("section", { className: "panel" }, [
       el("p", { className: "app-subtitle" }, [`ダンジョン専用パーティ: ${party.length}/5体`]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoDungeonParty }, ["編成を変更する"]),
-    ]),
-    party.length === 0 ? el("p", { className: "app-subtitle" }, ["ダンジョン専用パーティが編成されていません。先に編成してください。"]) : null,
-    !hasEnoughStamina ? el("p", { className: "app-subtitle" }, ["スタミナが足りません。"]) : null,
-    el(
-      "button",
-      { type: "button", className: "btn btn--primary btn--large", disabled: !canChallenge, onclick: () => props.onStartFloor(floor) },
-      [`⚔ 挑戦する (⚡${DUNGEON_STAMINA_COST})`],
-    ),
-    el("section", { className: "panel auto-farm-panel" }, [
-      el("h2", {}, ["🔁 オート周回"]),
-      el("p", { className: "app-subtitle" }, ["指定した回数まで自動で挑戦し、スタミナが尽きるか敗北したら中断します。"]),
-      el("div", { className: "auto-farm-count-row" }, [
-        el("input", {
-          type: "number",
-          min: "1",
-          max: "999",
-          value: String(props.autoFarmCount),
-          className: "auto-farm-count-input",
-          oninput: (e: Event) => {
-            const value = Math.max(1, Math.min(999, Number((e.target as HTMLInputElement).value) || 1));
-            props.onChangeAutoFarmCount(value);
-          },
-        }),
-        el("span", {}, ["回"]),
-      ]),
-      el(
-        "button",
-        {
-          type: "button",
-          className: "btn btn--primary btn--large",
-          disabled: !canChallenge,
-          onclick: () => props.onAutoFarm(floor, props.autoFarmCount),
-        },
-        [`▶ オート周回開始`],
-      ),
     ]),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectFloor(null) }, ["◀ 階層選択に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));

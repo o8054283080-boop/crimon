@@ -95,9 +95,24 @@ class AudioEngine {
     return () => this.readyListeners.delete(listener);
   }
 
+  /**
+   * 解錠を知らせる。**必ず今の同期処理が終わってから呼ぶこと。**
+   *
+   * その場で呼ぶと、`ensure()` の中から聞き手へ制御が渡る。聞き手(BGM)は
+   * まだ `ensure()` が返っていないので「まだ用意されていない」と判断して
+   * もう一度 `ensure()` を呼び、そこからまた聞き手へ……と無限に往復する。
+   * 実際に AudioContext を数百個作って「Maximum call stack size exceeded」で
+   * 止まり、音がまったく鳴らなくなった。
+   *
+   * 記憶(`starting` / `preparing`)への代入は同期処理の中で終わるので、
+   * 一拍ずらすだけで往復は起きなくなる。
+   */
   private notifyReady(): void {
     if (this.ctx?.state !== "running") return;
-    for (const listener of this.readyListeners) listener();
+    const listeners = [...this.readyListeners];
+    queueMicrotask(() => {
+      for (const listener of listeners) listener();
+    });
   }
 
   /** 鳴らない時に真っ先に見る値。"running" 以外なら、まだ音を出せていない */
@@ -193,23 +208,48 @@ export async function measureOutput(
 /** 150Hz 未満は数えない。この分解能では低い塊と低い正弦を区別できないため */
 const TONALITY_FLOOR_HZ = 150;
 
+/**
+ * 窓の幅は **ビン数ではなく Hz で決める。**
+ *
+ * ここを「20ビン以上」と書いていたせいで、焼いたファイルを測った値と
+ * 食い違っていた。tools/audio/dsp.py 側は 1ビン 11.7Hz なので 20ビン=234Hz、
+ * ブラウザ側は 1ビン 23.4Hz なので同じ 20ビンが 468Hz になる。
+ * 窓が広すぎると、低い帯域の塊(良い音)まで「飛び出た山」に数えてしまい、
+ * charge が 0.03(ファイル)に対し 0.67(ブラウザ)と出ていた。
+ */
+const ENVELOPE_MIN_HALF_HZ = 234;
+const SMOOTH_HZ = 58;
+
 function tonalityOf(power: number[], sampleRate: number, fftSize: number): number {
   const binHz = sampleRate / fftSize;
+  // 1ビンごとの揺れを落とす。幅は焼く側と同じ Hz にそろえる
+  const span = Math.max(1, Math.round(SMOOTH_HZ / binHz));
+  const smooth = power.map((_, i) => {
+    let sum = 0;
+    let count = 0;
+    for (let j = Math.max(0, i - span); j <= Math.min(power.length - 1, i + span); j += 1) {
+      sum += power[j];
+      count += 1;
+    }
+    return sum / count;
+  });
+
   const first = Math.ceil(TONALITY_FLOOR_HZ / binHz);
   let excess = 0;
   let total = 0;
-  for (let i = first; i < power.length; i += 1) {
+  for (let i = first; i < smooth.length; i += 1) {
     // その辺りの「地の高さ」を、1/5オクターブほどの窓の中央値で取る
-    const half = Math.max(20, Math.floor(i * 0.2));
+    const halfHz = Math.max(ENVELOPE_MIN_HALF_HZ, i * binHz * 0.2);
+    const half = Math.max(2, Math.round(halfHz / binHz));
     const window: number[] = [];
-    for (let j = Math.max(0, i - half); j < Math.min(power.length, i + half + 1); j += 1) {
-      window.push(power[j]);
+    for (let j = Math.max(0, i - half); j < Math.min(smooth.length, i + half + 1); j += 1) {
+      window.push(smooth[j]);
     }
     window.sort((a, b) => a - b);
     const floorLevel = window[window.length >> 1];
     // 地の4倍を超えた分だけを純音成分とみなす
-    excess += Math.max(0, power[i] - 4 * floorLevel);
-    total += power[i];
+    excess += Math.max(0, smooth[i] - 4 * floorLevel);
+    total += smooth[i];
   }
   return total > 0 ? excess / total : 0;
 }

@@ -31,18 +31,44 @@ export function partyMemberCard(
   });
 }
 
-/** 現在編成中のメンバーを、ホーム画面などと同じスロット表示で一覧できるサマリー */
-export function renderPartySlots(members: readonly MonsterInstance[], slotCount: number): HTMLElement {
+/**
+ * 現在編成中のメンバーを、ホーム画面などと同じスロット表示で一覧できるサマリー。
+ *
+ * `onRemove` を渡すとスロット自体が外すボタンになる。
+ * これが無かった頃は、入れ替えるのに**一覧の中から本人を探し直して**
+ * もう一度押す必要があり、手持ちが増えるほど遠くなっていた。
+ */
+export function renderPartySlots(
+  members: readonly MonsterInstance[],
+  slotCount: number,
+  onRemove?: (instanceId: string) => void,
+): HTMLElement {
   const slots = Array.from({ length: slotCount }, (_, i) => {
     const instance = members[i];
     if (!instance) {
       return el("div", { className: "party-slot party-slot--empty" }, ["+"]);
     }
     const dex = findMonsterById(instance.dexId);
-    return el("div", { className: "party-slot", style: dex ? `background:${dex.color}` : undefined }, [
+    const children = [
       withPortrait(el("span", { className: "party-slot__emoji" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
       el("span", { className: "party-slot__star" }, [starLabel(instance.star)]),
-    ]);
+      onRemove ? el("span", { className: "party-slot__remove" }, ["✕"]) : null,
+    ].filter((n): n is HTMLElement => n !== null);
+
+    if (!onRemove) {
+      return el("div", { className: "party-slot", style: dex ? `background:${dex.color}` : undefined }, children);
+    }
+    return el(
+      "button",
+      {
+        type: "button",
+        className: "party-slot party-slot--removable",
+        style: dex ? `background:${dex.color}` : undefined,
+        title: `${dex ? dex.name : instance.dexId}を編成から外す`,
+        onclick: () => onRemove(instance.id),
+      },
+      children,
+    );
   });
   return el("div", { className: "party-slots", style: `grid-template-columns: repeat(${slotCount}, 1fr)` }, slots);
 }

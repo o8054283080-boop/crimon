@@ -3286,3 +3286,372 @@ body {
   font-size: 0.6rem;
   border-radius: 999px;
 }
+
+/* ===================================================================
+ * 結果画面の出口(2026-08 追記)
+ *
+ * 出口が「ホームに戻る」しか無かったため、同じ場所をもう一度回るには
+ * ホーム → タブ → 一覧を探す → 選ぶ → 挑戦 と毎回4〜6手かかっていた。
+ * 周回で押すのはほぼ「もう一度」なので、それを一番大きく置く。
+ * =================================================================== */
+
+.result-actions {
+  flex: 0 0 auto;
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-actions__row {
+  display: flex;
+  gap: 8px;
+}
+
+.result-actions__btn {
+  flex: 1 1 0;
+  /* 指で押す的。押し間違えると1周分のスタミナが飛ぶので小さくしない */
+  min-height: 48px;
+  padding: 8px 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* 押してほしいものを一回り広く取る */
+.result-actions__btn.btn--primary {
+  flex: 1.7 1 0;
+}
+
+.result-actions__reason {
+  margin: 0;
+  font-size: 0.75rem;
+  text-align: center;
+  color: #ffc9c9;
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .result-actions__btn {
+    min-height: 40px;
+    font-size: 0.8rem;
+  }
+}
+
+/* ===================================================================
+ * オート周回の設定
+ *
+ * 数字入力欄しか無く、回数を変えるたびにソフトキーボードが立ち上がって
+ * 画面が半分隠れていた。よく使う回数は札にして1手で選べるようにする。
+ * =================================================================== */
+
+.autofarm__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.autofarm__head h2 {
+  margin: 0;
+}
+
+.autofarm__cost {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--gauge);
+}
+
+.autofarm__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.autofarm__chip {
+  /* 実機は指で押す。数字の札も的の大きさを確保する */
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.autofarm__warn {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #ffd7a0;
+}
+
+.autofarm__go {
+  width: 100%;
+}
+
+/* ===================================================================
+ * ステージ一覧の「つづきから」
+ *
+ * 再開位置は光らせてあったが、そこまで指でたどる必要があった。
+ * 一覧の先頭から1手で次のステージへ入れるようにする。
+ * =================================================================== */
+
+.stages-resume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #3f6be0 0%, #2a4bb0 60%, #1f3a8c 100%);
+  box-shadow: var(--edge-light), var(--drop);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stages-resume:active {
+  transform: translateY(1px);
+}
+
+.stages-resume__icon {
+  font-size: 1.3rem;
+}
+
+.stages-resume__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stages-resume__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
+.stages-resume__name {
+  font-size: 1rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stages-resume__arrow {
+  font-size: 1.4rem;
+  opacity: 0.8;
+}
+
+/* ===================================================================
+ * 編成の操作数を減らす(2026-08 追記)
+ *
+ * 入れ替えるのに一覧から本人を探し直させていた。枠そのものを
+ * 外すボタンにして、「外す→入れる」を隣り合った2手で済ませる。
+ * =================================================================== */
+
+.party-slot--removable {
+  appearance: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.party-slot--removable:active {
+  transform: translateY(1px);
+}
+
+.party-slot__remove {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(10, 12, 24, 0.8);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.party-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.party-actions__btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  font-size: 0.85rem;
+}
+
+/* 押した結果を必ず文字で返す。黙って何も起きないと壊れて見える */
+.party-notice {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  color: #ffe6b8;
+  background: rgba(120, 80, 20, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 200, 100, 0.3);
+}
+
+/* ===================================================================
+ * 指で押せる大きさを揃える(2026-08 追記)
+ *
+ * 実機は指で押す。実測すると、並べ替えの札が29〜34px、ショップの購入が31px、
+ * ホームの「編成」が28pxしかなかった。**買う・編成するという
+ * 取り返しのつかない操作ほど的が小さい**という逆転が起きていたので、
+ * 押せる最小の高さをここで底上げする。
+ * 巡回(tour)にも同じ基準の検査を入れてあるので、下回ると指摘が出る。
+ * =================================================================== */
+
+.slot-filter-chip {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 並べ替えの札。先に34pxで揃えていたが、それでも指には足りない */
+.sort-row .slot-filter-chip,
+.mfilter__chip,
+.autofarm__chip {
+  min-height: 36px;
+}
+
+/* ホームの帯は情報を詰めるために小さく作ってあるが、
+   押す物だけは指の大きさに戻す */
+.home-menu .save-data__actions .btn,
+.home-menu .home-stamina-actions .btn {
+  min-height: 40px;
+}
+
+.shop-card__buy {
+  min-height: 42px;
+}
+
+.home-section-title .btn {
+  min-height: 36px;
+  padding: 6px 14px;
+}
+
+.home-name-btn {
+  min-width: 40px;
+}
+
+.save-data__actions .btn {
+  min-height: 40px;
+}
+
+/* ===================================================================
+ * ダンジョンの階層一覧(2026-08 追記)
+ *
+ * 3つのダンジョンはどれも、長い説明文の下に文字だけの行が縦に並び、
+ * 「装備ダンジョン 3 階」のように名前が途中で折れていた。
+ * 同じ一覧でも、ステージ選択(章のカード)とは別のゲームに見える。
+ * 3つとも同じ形の札にして、読むのではなく見て選べるようにする。
+ * =================================================================== */
+
+.floor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 560px) {
+  .floor-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.floor-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-height: 92px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fl) 28%, transparent), transparent 62%),
+    var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fl) 55%, transparent), var(--edge-light), var(--drop-soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.floor-tile:active {
+  transform: translateY(1px);
+}
+
+.floor-tile__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #0d1020;
+  background: var(--fl);
+}
+
+.floor-tile__title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.floor-tile__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.floor-tile__chip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: #ccd6f2;
+  background: rgba(6, 9, 20, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* 一覧の上の要約。段落で積むと肝心の行き先が画面の外へ出る */
+.dungeon-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dungeon-intro__summary {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.dungeon-intro__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dungeon-intro__warn {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #ffd7a0;
+  background: rgba(120, 70, 20, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 90, 0.32);
+}

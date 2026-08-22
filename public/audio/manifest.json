@@ -69,12 +69,6 @@
     "crit_2.ogg",
     "crit_3.ogg"
   ],
-  "whiff": [
-    "whiff_0.ogg",
-    "whiff_1.ogg",
-    "whiff_2.ogg",
-    "whiff_3.ogg"
-  ],
   "shield": [
     "shield_0.ogg",
     "shield_1.ogg",
@@ -167,11 +161,6 @@
     "enhance_0.ogg",
     "enhance_1.ogg",
     "enhance_2.ogg"
-  ],
-  "enhanceFail": [
-    "enhanceFail_0.ogg",
-    "enhanceFail_1.ogg",
-    "enhanceFail_2.ogg"
   ],
   "stageClear": [
     "stageClear_0.ogg",

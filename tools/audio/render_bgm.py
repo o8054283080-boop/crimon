@@ -34,7 +34,6 @@ import zlib
 from pathlib import Path
 
 import numpy as np
-import soundfile as sf
 from pedalboard import HighpassFilter, HighShelfFilter, LowShelfFilter, Pedalboard, Reverb
 
 from dsp import (
@@ -54,6 +53,7 @@ from dsp import (
     t_of,
     tonality_windows,
     wrap_loop,
+    write_ogg,
 )
 
 OUT_DIR = Path(__file__).resolve().parents[2] / "public" / "audio"
@@ -298,7 +298,8 @@ def main() -> None:
         # 頭でそろえると、山の鋭い曲だけが小さく聞こえる(実際に14dBずれていた)
         wet = wet * (TARGET_RMS / (rms(wet) + 1e-12))
         filename = f"bgm_{name}.ogg"
-        sf.write(OUT_DIR / filename, wet.T, SR, format="OGG", subtype="VORBIS")
+        # 中身が同じなら触らない(容器の数バイトだけが変わって差分が埋もれるため)
+        write_ogg(OUT_DIR / filename, wet.T)
         manifest[f"bgm_{name}"] = [filename]
 
         profile = tonality_windows(wet.mean(axis=0))
