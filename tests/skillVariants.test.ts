@@ -18,13 +18,19 @@ describe("スキル2・3の属性別バリエーション", () => {
     }
   });
 
-  it("スキル2・スキル3は属性によって異なる組み合わせになる(6属性で3種類以上の見分けがつく)", () => {
+  it("スキル2は3種類の候補から、スキル3は光/闇の固有ぶんだけ種類が増える", () => {
     for (const template of MONSTER_TEMPLATES) {
       const variants = ELEMENTS.map((element) => findMonster(template.templateId, element)!);
       const skill2Ids = new Set(variants.map((v) => v.skills[1].id));
       const skill3Ids = new Set(variants.map((v) => v.skills[2].id));
       expect(skill2Ids.size).toBe(3);
-      expect(skill3Ids.size).toBe(3);
+      // 通常4属性は3候補から抽選され、光と闇は専用のものを持つ。
+      // 光/闇を用意していないテンプレートは従来どおり3種類のまま
+      const unique = (template.lightSkill3 ? 1 : 0) + (template.darkSkill3 ? 1 : 0);
+      const normalKinds = new Set(
+        ["FIRE", "WATER", "ELECTRIC", "GRASS"].map((e) => findMonster(template.templateId, e)!.skills[2].id),
+      ).size;
+      expect(skill3Ids.size).toBe(normalKinds + unique);
     }
   });
 
