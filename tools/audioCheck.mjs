@@ -75,5 +75,31 @@ const BGM = await page.evaluate(async () => {
   return { ...loops, 鳴っている場面 };
 });
 
+/**
+ * 合否を出す。**数値の羅列だけだと、誰も基準を覚えていないので見落とす。**
+ *
+ * - 最大音量が 0 → 出力まで音が届いていない(解錠か読み込みの失敗)
+ * - 純音らしさが 0.5 超 → 発振器の音に寄っている(安っぽい側)
+ *   ブラウザ側の物差しは分解能が粗く、焼いたファイルを直接測るより
+ *   高めに出る。0.5 は余裕を見た線
+ * - BGMの余白が 0ms でない → 復号で前後に隙間が付き、ループのたびに無音が入る
+ * - BGMの継ぎ目が 1 超 → 渡り際の跳びが曲中のふつうの動きより大きい(プツッと鳴る)
+ */
+const 失格 = [];
+for (const [name, m] of Object.entries(効果音 ?? {})) {
+  if (!m) 失格.push(`${name}: 測れなかった`);
+  else if (!(m.最大音量 > 0)) 失格.push(`${name}: 出力に音が届いていない`);
+  else if (m.純音らしさ > 0.5) 失格.push(`${name}: 純音らしさ ${m.純音らしさ}`);
+}
+for (const scene of ["home", "battle"]) {
+  const m = BGM?.[scene];
+  if (!m) { 失格.push(`bgm_${scene}: 測れなかった`); continue; }
+  if (Math.abs(m.余白ms) > 1) 失格.push(`bgm_${scene}: 復号の余白 ${m.余白ms}ms`);
+  if (m.継ぎ目 > 1) 失格.push(`bgm_${scene}: 継ぎ目の跳び ${m.継ぎ目}`);
+}
+if (after !== "running") 失格.push(`操作しても音声文脈が ${after} のまま`);
+
 console.log(JSON.stringify({ 操作前の状態: before, 操作後の状態: after, 効果音, BGM, problems }, null, 1));
+console.log(失格.length === 0 && problems.length === 0 ? "\n判定: 問題なし" : `\n判定: 要確認\n  ${[...失格, ...problems].join("\n  ")}`);
 await browser.close();
+process.exit(失格.length === 0 && problems.length === 0 ? 0 : 1);

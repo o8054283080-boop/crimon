@@ -64,14 +64,25 @@ class BgmPlayer {
     return this.settings.masterVolume * this.settings.bgmVolume;
   }
 
+  /**
+   * 出力へつなぐ枝を用意する。
+   *
+   * **記憶への代入を、本体を走らせる前に済ませること。** `audioEngine.ensure()`
+   * は解錠を知らせる時に聞き手(この組の `onReady`)を呼ぶので、代入が後だと
+   * 「まだ用意されていない」と見えて再入し、無限に往復する。
+   */
   private prepare(): Promise<void> {
     if (this.preparing) return this.preparing;
-    this.preparing = (async () => {
+    let done!: () => void;
+    this.preparing = new Promise<void>((resolve) => (done = resolve));
+    void (async () => {
       const ctx = await audioEngine.ensure();
-      if (!ctx) return;
-      this.master = ctx.createGain();
-      this.master.gain.value = this.effectiveVolume();
-      this.master.connect(ctx.destination);
+      if (ctx) {
+        this.master = ctx.createGain();
+        this.master.gain.value = this.effectiveVolume();
+        this.master.connect(ctx.destination);
+      }
+      done();
     })();
     return this.preparing;
   }
