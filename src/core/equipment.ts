@@ -75,6 +75,19 @@ export interface StatRoll {
 }
 
 /** 装備のシリーズ(セット)種類。同じシリーズを規定数まとめて装着するとセット効果が発動する */
+/**
+ * ステータス1行の表示文字列。
+ *
+ * **表示用の整形はここに集約すること。** 画面ごとに書くと必ずずれる。
+ * 実際に、ショップだけ生の値を出していて「クリ率% +0.106」「速度+ +19」と
+ * 表示され、桁が1/100に見える・記号が重なる、という不具合になった。
+ */
+export function formatStatValue(roll: StatRoll): string {
+  const isFlat = roll.type === "ATK_FLAT" || roll.type === "DEF_FLAT" || roll.type === "HP_FLAT" || roll.type === "SPD";
+  if (isFlat) return `${STAT_LABEL[roll.type]}${roll.value}`;
+  return `${STAT_LABEL[roll.type]}${(roll.value * 100).toFixed(1)}%`;
+}
+
 export type SetType = "CRIT" | "POWER" | "GUARD" | "VITALITY" | "ACCURACY_SET" | "RESIST_SET" | "SWIFT";
 
 export const SET_TYPES: SetType[] = ["CRIT", "POWER", "GUARD", "VITALITY", "ACCURACY_SET", "RESIST_SET", "SWIFT"];

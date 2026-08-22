@@ -1,4 +1,4 @@
-import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, StatRoll } from "../../core/equipment.js";
+import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, StatRoll, formatStatValue } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -51,12 +51,6 @@ export interface EquipmentProps {
   onSelectAllShown: (ids: string[]) => void;
   onClearSelection: () => void;
   onBulkSell: () => void;
-}
-
-function formatStatValue(roll: StatRoll): string {
-  const isFlat = roll.type === "ATK_FLAT" || roll.type === "DEF_FLAT" || roll.type === "HP_FLAT" || roll.type === "SPD";
-  if (isFlat) return `${STAT_LABEL[roll.type]}${roll.value}`;
-  return `${STAT_LABEL[roll.type]}${(roll.value * 100).toFixed(1)}%`;
 }
 
 function equipmentOwnerName(player: PlayerState, equipment: Equipment): string | null {
