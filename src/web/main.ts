@@ -40,6 +40,7 @@ import {
   trySpendStamina,
   trySpendSummonScrolls,
   unlockShopSlot,
+  goldDungeonChallengesRemaining,
 } from "../game/playerState.js";
 import { MonsterSortKey } from "../game/monsterSort.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
@@ -50,6 +51,7 @@ import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
+import { ResultAction } from "./views/resultActions.js";
 import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { renderDungeonParty } from "./views/dungeonParty.js";
 import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
@@ -146,6 +148,19 @@ interface GoldDungeonRunState {
   partyInstances: MonsterInstance[];
 }
 
+/**
+ * 直前に挑んだ場所。
+ *
+ * 結果画面から**同じ場所へ1手で戻る**ために覚えておく。
+ * これが無かったため、周回のたびに「ホーム → タブ → 一覧を探す → 選ぶ → 挑戦」と
+ * 4〜6手を繰り返させていた。
+ */
+type LastRun =
+  | { kind: "STAGE"; stage: Stage; difficulty: Difficulty }
+  | { kind: "EQUIP_DUNGEON"; floor: DungeonFloor }
+  | { kind: "LEVEL_DUNGEON"; def: LevelDungeonDef }
+  | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor };
+
 interface AppState {
   screen: ScreenName;
   player: PlayerState;
@@ -191,6 +206,8 @@ interface AppState {
   loginBonusResult: LoginBonusResult | null;
   /** 起動時に受け取ったお詫び配布。閉じるまでホームに出す */
   compensationClaims: CompensationClaim[];
+  /** 直前に挑んだ場所。結果画面の「もう一度」の行き先になる */
+  lastRun: LastRun | null;
 }
 
 const state: AppState = {
@@ -230,6 +247,7 @@ const state: AppState = {
   autoFarmTargetName: "",
   loginBonusResult: null,
   compensationClaims: [],
+  lastRun: null,
 };
 
 {
@@ -484,6 +502,7 @@ function startStage(stage: Stage, difficulty: Difficulty): void {
     return;
   }
   savePlayerState(state.player);
+  state.lastRun = { kind: "STAGE", stage, difficulty };
   state.stageRun = {
     stage,
     difficulty,
@@ -511,6 +530,128 @@ function enterStageResult(): void {
   if (state.stageResult?.cleared) playSfx("stageClear");
   state.screen = "STAGE_RESULT";
   render();
+}
+
+/** 直前に挑んだ場所の1回あたりの消費スタミナ */
+function lastRunStaminaCost(last: LastRun): number {
+  switch (last.kind) {
+    case "STAGE":
+      return STAGE_STAMINA_COST;
+    case "EQUIP_DUNGEON":
+      return DUNGEON_STAMINA_COST;
+    case "LEVEL_DUNGEON":
+      return LEVEL_DUNGEON_STAMINA_COST;
+    case "GOLD_DUNGEON":
+      return GOLD_DUNGEON_STAMINA_COST;
+  }
+}
+
+/**
+ * 「もう一度」が押せない理由。
+ *
+ * **押せないボタンだけを出して理由を伏せない。** スタミナ切れなのか
+ * 編成が空なのかが分からないと、次に何をすればいいかが決められない。
+ */
+function retryBlockedReason(last: LastRun): string | null {
+  const party = last.kind === "EQUIP_DUNGEON" ? getDungeonParty(state.player) : getParty(state.player);
+  if (party.length === 0) return "パーティが編成されていません";
+  const cost = lastRunStaminaCost(last);
+  if (state.player.stamina < cost) return `スタミナが足りません(⚡${cost}必要 / 手持ち⚡${state.player.stamina})`;
+  if (last.kind === "GOLD_DUNGEON" && goldDungeonChallengesRemaining(state.player) <= 0) {
+    return "本日の挑戦回数の上限に達しています";
+  }
+  return null;
+}
+
+/** 直前と同じ場所へもう一度挑む */
+function retryLastRun(): void {
+  const last = state.lastRun;
+  if (!last) return;
+  const before = state.screen;
+  switch (last.kind) {
+    case "STAGE":
+      startStage(last.stage, last.difficulty);
+      break;
+    case "EQUIP_DUNGEON":
+      startDungeonFloor(last.floor);
+      break;
+    case "LEVEL_DUNGEON":
+      startLevelDungeonTier(last.def);
+      break;
+    case "GOLD_DUNGEON":
+      startGoldDungeonFloor(last.floor);
+      break;
+  }
+  // 始められなかった時は結果画面に留める(黙って消えると何が起きたか分からない)
+  if (state.screen === before) render();
+}
+
+/** 直前に挑んだ場所の一覧へ戻る。別の階/別の難易度を選び直すための道 */
+function backToLastRunList(): void {
+  const last = state.lastRun;
+  if (!last) {
+    navigate("HOME");
+    return;
+  }
+  switch (last.kind) {
+    case "STAGE":
+      navigate("STAGES");
+      break;
+    case "EQUIP_DUNGEON":
+      navigate("EQUIP_DUNGEON");
+      break;
+    case "LEVEL_DUNGEON":
+      navigate("LEVEL_DUNGEON");
+      break;
+    case "GOLD_DUNGEON":
+      navigate("GOLD_DUNGEON");
+      break;
+  }
+}
+
+/**
+ * 結果画面の出口。
+ *
+ * 周回で押すのはほぼ「もう一度」なので、それを主役の位置に置く。
+ * オート周回の結果なら、同じ回数でもう一周できるようにする。
+ */
+function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
+  const last = state.lastRun;
+  const reason = last ? retryBlockedReason(last) : "挑戦した場所が分かりません";
+  const cost = last ? lastRunStaminaCost(last) : 0;
+
+  const actions: ResultAction[] = [];
+  if (last) {
+    actions.push({
+      label: fromAutoFarm ? `🔁 もう一度 ×${state.autoFarmCount}` : `🔁 もう一度 (⚡${cost})`,
+      variant: "primary",
+      disabled: reason !== null,
+      reason: reason ?? undefined,
+      run: () => {
+        if (!fromAutoFarm) {
+          retryLastRun();
+          return;
+        }
+        switch (last.kind) {
+          case "STAGE":
+            handleAutoFarmStage(last.stage, state.autoFarmCount, last.difficulty);
+            break;
+          case "EQUIP_DUNGEON":
+            handleAutoFarmDungeon(last.floor, state.autoFarmCount);
+            break;
+          case "LEVEL_DUNGEON":
+            handleAutoFarmLevelDungeon(last.def, state.autoFarmCount);
+            break;
+          case "GOLD_DUNGEON":
+            handleAutoFarmGoldDungeon(last.floor, state.autoFarmCount);
+            break;
+        }
+      },
+    });
+  }
+  actions.push({ label: "🗺 選び直す", run: backToLastRunList });
+  actions.push({ label: "🏠 ホーム", run: () => navigate("HOME") });
+  return actions;
 }
 
 function finishStage(cleared: boolean): void {
@@ -553,6 +694,7 @@ function startDungeonFloor(floor: DungeonFloor): void {
     return;
   }
   savePlayerState(state.player);
+  state.lastRun = { kind: "EQUIP_DUNGEON", floor };
   state.dungeonRun = { floor, partyInstances: party };
   state.screen = "DUNGEON_BATTLE";
   render();
@@ -586,6 +728,7 @@ function finishDungeon(cleared: boolean): void {
 }
 
 function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty): void {
+  state.lastRun = { kind: "STAGE", stage, difficulty };
   const result = runStageAutoFarm(state.player, stage, count, Math.random, difficulty);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -597,6 +740,7 @@ function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty
 }
 
 function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
+  state.lastRun = { kind: "EQUIP_DUNGEON", floor };
   const result = runDungeonAutoFarm(state.player, floor, count);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -614,6 +758,7 @@ function startLevelDungeonTier(def: LevelDungeonDef): void {
     return;
   }
   savePlayerState(state.player);
+  state.lastRun = { kind: "LEVEL_DUNGEON", def };
   state.levelDungeonRun = { def, partyInstances: party };
   state.screen = "LEVEL_DUNGEON_BATTLE";
   render();
@@ -647,6 +792,7 @@ function finishLevelDungeon(cleared: boolean): void {
 }
 
 function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
+  state.lastRun = { kind: "LEVEL_DUNGEON", def };
   const result = runLevelDungeonAutoFarm(state.player, def, count);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -665,6 +811,7 @@ function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
     return;
   }
   savePlayerState(state.player);
+  state.lastRun = { kind: "GOLD_DUNGEON", floor };
   state.goldDungeonRun = { floor, partyInstances: party };
   state.screen = "GOLD_DUNGEON_BATTLE";
   render();
@@ -698,6 +845,7 @@ function finishGoldDungeon(cleared: boolean): void {
 }
 
 function handleAutoFarmGoldDungeon(floor: GoldDungeonFloor, count: number): void {
+  state.lastRun = { kind: "GOLD_DUNGEON", floor };
   const result = runGoldDungeonAutoFarm(state.player, floor, count);
   savePlayerState(state.player);
   state.autoFarmResult = result;
@@ -1106,7 +1254,7 @@ function render(): void {
         navigate("HOME");
         return;
       }
-      content = renderStageResult({ info, onClose: () => navigate("HOME") });
+      content = renderStageResult({ info, actions: buildResultActions(false) });
       break;
     }
 
@@ -1117,7 +1265,7 @@ function render(): void {
         navigate("HOME");
         return;
       }
-      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, onClose: () => navigate("HOME") });
+      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, actions: buildResultActions(true) });
       break;
     }
   }

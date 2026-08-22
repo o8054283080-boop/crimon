@@ -3286,3 +3286,157 @@ body {
   font-size: 0.6rem;
   border-radius: 999px;
 }
+
+/* ===================================================================
+ * 結果画面の出口(2026-08 追記)
+ *
+ * 出口が「ホームに戻る」しか無かったため、同じ場所をもう一度回るには
+ * ホーム → タブ → 一覧を探す → 選ぶ → 挑戦 と毎回4〜6手かかっていた。
+ * 周回で押すのはほぼ「もう一度」なので、それを一番大きく置く。
+ * =================================================================== */
+
+.result-actions {
+  flex: 0 0 auto;
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-actions__row {
+  display: flex;
+  gap: 8px;
+}
+
+.result-actions__btn {
+  flex: 1 1 0;
+  /* 指で押す的。押し間違えると1周分のスタミナが飛ぶので小さくしない */
+  min-height: 48px;
+  padding: 8px 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* 押してほしいものを一回り広く取る */
+.result-actions__btn.btn--primary {
+  flex: 1.7 1 0;
+}
+
+.result-actions__reason {
+  margin: 0;
+  font-size: 0.75rem;
+  text-align: center;
+  color: #ffc9c9;
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .result-actions__btn {
+    min-height: 40px;
+    font-size: 0.8rem;
+  }
+}
+
+/* ===================================================================
+ * オート周回の設定
+ *
+ * 数字入力欄しか無く、回数を変えるたびにソフトキーボードが立ち上がって
+ * 画面が半分隠れていた。よく使う回数は札にして1手で選べるようにする。
+ * =================================================================== */
+
+.autofarm__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.autofarm__head h2 {
+  margin: 0;
+}
+
+.autofarm__cost {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--gauge);
+}
+
+.autofarm__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.autofarm__chip {
+  /* 実機は指で押す。数字の札も的の大きさを確保する */
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.autofarm__warn {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #ffd7a0;
+}
+
+.autofarm__go {
+  width: 100%;
+}
+
+/* ===================================================================
+ * ステージ一覧の「つづきから」
+ *
+ * 再開位置は光らせてあったが、そこまで指でたどる必要があった。
+ * 一覧の先頭から1手で次のステージへ入れるようにする。
+ * =================================================================== */
+
+.stages-resume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #3f6be0 0%, #2a4bb0 60%, #1f3a8c 100%);
+  box-shadow: var(--edge-light), var(--drop);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stages-resume:active {
+  transform: translateY(1px);
+}
+
+.stages-resume__icon {
+  font-size: 1.3rem;
+}
+
+.stages-resume__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stages-resume__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
+.stages-resume__name {
+  font-size: 1rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stages-resume__arrow {
+  font-size: 1.4rem;
+  opacity: 0.8;
+}
