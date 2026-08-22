@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 from scipy.signal import butter, lfilter, sosfilt, sosfilt_zi
 
@@ -65,6 +67,39 @@ def loop_noise(n: int, rng: np.random.Generator, slope: float = 1.0) -> np.ndarr
     spec[0] = 0.0
     x = np.fft.irfft(spec, n)
     return x / (np.max(np.abs(x)) + 1e-9)
+
+
+def write_ogg(path, audio: np.ndarray, channels_last: bool = True) -> bool:
+    """ogg を書く。**中身が変わっていなければ書かない。**
+
+    libsndfile は Ogg の通し番号を書くたびに選び直すので、まったく同じ音を
+    焼いても容器の数バイトが変わる。そのままだと `npm run audio:render` の
+    たびに百数十個のファイルが「変更あり」になり、**本当に変えた音が
+    その中に埋もれて見えなくなる**(実際、確認して初めて中身は同一で
+    容器だけが違うと分かった)。
+
+    符号化は非可逆なので、焼く前の波形と既存ファイルは直接比べられない。
+    いったん別の場所へ書き出し、双方を復号してから見比べる。
+
+    戻り値は「書き換えたか」。
+    """
+    import soundfile as sf  # 音の部品としては不要なので、ここでだけ読む
+
+    path = Path(path)
+    tmp = path.with_suffix(".tmp.ogg")
+    sf.write(tmp, audio, SR, format="OGG", subtype="VORBIS")
+    if path.exists():
+        try:
+            fresh, _ = sf.read(tmp)
+            current, _ = sf.read(path)
+            if fresh.shape == current.shape and np.array_equal(fresh, current):
+                tmp.unlink()
+                return False
+        except Exception:
+            # 読めない(壊れている)なら、素直に置き換える
+            pass
+    tmp.replace(path)
+    return True
 
 
 def rms(x: np.ndarray) -> float:

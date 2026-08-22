@@ -19,7 +19,6 @@ export type HitStyle = "slash" | "blunt" | "pierce" | "magic";
 
 /** 単体で鳴らせる音の名前。当たりの芯と属性の色は `playHit` 経由で重ねる */
 export type SfxName =
-  | "whiff"
   | "shield"
   | "death"
   | "heal"
@@ -37,7 +36,6 @@ export type SfxName =
   | "summonRare"
   | "levelUp"
   | "enhance"
-  | "enhanceFail"
   | "stageClear";
 
 export interface HitOptions {
