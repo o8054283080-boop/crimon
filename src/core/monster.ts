@@ -23,6 +23,16 @@ export interface MonsterTemplate {
    * ガチャ限定の光/闇専用モンスターなど、一部の属性でしか登場しないテンプレートに使う。
    */
   elements?: Element[];
+  /**
+   * 光/闇だけが持つ固有のスキル3。指定があれば skill3Variants より優先される。
+   *
+   * 光と闇はステージにも装備ダンジョンにも出ないため、召喚でしか手に入らない。
+   * その希少さに見合うよう、**同じ種族の他の属性より明確に強い**スキルを与えている。
+   * ただし「別のモンスター」になるほど役割を変えないこと。
+   * 同じ種族として育ててきた意味が消える。
+   */
+  lightSkill3?: Skill;
+  darkSkill3?: Skill;
 }
 
 /** 属性ごとの色違いバリエーションとして実体化されたモンスター定義(静的データ) */
@@ -72,7 +82,9 @@ function pickSkillVariant(variants: Skill[], element: Element, groupOffset: numb
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
   const flavoredStats = ELEMENT_STAT_FLAVOR[element](cloneStats(template.baseStats));
   const skill2 = pickSkillVariant(template.skill2Variants, element, 0);
-  const skill3 = pickSkillVariant(template.skill3Variants, element, 1);
+  // 光/闇に固有のスキル3があれば、候補からの抽選より優先する
+  const uniqueSkill3 = element === "LIGHT" ? template.lightSkill3 : element === "DARK" ? template.darkSkill3 : undefined;
+  const skill3 = uniqueSkill3 ?? pickSkillVariant(template.skill3Variants, element, 1);
   return {
     id: `${template.templateId}_${element}`,
     templateId: template.templateId,

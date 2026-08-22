@@ -1,4 +1,6 @@
 import { MonsterTemplate, createAllVariants } from "../core/monster.js";
+import { Skill } from "../core/skill.js";
+import { setCreatedSkillResolver } from "../core/monsterInstance.js";
 
 const SLIME: MonsterTemplate = {
   templateId: "slime",
@@ -90,6 +92,34 @@ const SLIME: MonsterTemplate = {
       ],
     },
   ],
+  /**
+   * 光/闇の固有スキル3。
+   * 光と闇は召喚でしか手に入らないため、同じ種族の他属性より明確に強くしてある。
+   * ただし役割は変えない(スライムは全体攻撃役のまま)。
+   */
+  lightSkill3: {
+    id: "slime_s3_light",
+    name: "セイントスラッシュ",
+    description: "聖なる粘液を弾けさせ、敵全体に攻撃力1.5倍のダメージを与え、70%で2ターン暗闇を付与する。味方全体のHPを最大HPの12%回復する。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 4,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.5 },
+      { kind: "BLIND", durationTurns: 2, chance: 0.7 },
+      { kind: "HEAL", healRate: 0.12, toSelf: false },
+    ],
+  },
+  darkSkill3: {
+    id: "slime_s3_dark",
+    name: "アビススラッジ",
+    description: "深淵の粘液で敵全体に攻撃力1.3倍のダメージを2回与え、80%で3ターン毒(1スタック)を付与する。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 4,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.3, hits: 2 },
+      { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.8 },
+    ],
+  },
 };
 
 const WOLF: MonsterTemplate = {
@@ -182,6 +212,28 @@ const WOLF: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "wolf_s3_light",
+    name: "ホーリーファング",
+    description: "光を纏った牙で敵単体に攻撃力3.6倍のダメージを与える。自身の速度が高いほど威力が上がり、行動ゲージを30%進める。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 4,
+    effects: [
+      { kind: "DAMAGE", multiplier: 3.6, scaleBonus: { stat: "spd", ratePerPoint: 0.004 } },
+      { kind: "GAUGE", amount: 0.3 },
+    ],
+  },
+  darkSkill3: {
+    id: "wolf_s3_dark",
+    name: "シャドウレンド",
+    description: "影から敵単体に攻撃力1.5倍のダメージを3回与え、与えたダメージの30%を回復する。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 4,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.5, hits: 3 },
+      { kind: "LIFESTEAL", healRate: 0.3 },
+    ],
+  },
 };
 
 const GOLEM: MonsterTemplate = {
@@ -269,6 +321,29 @@ const GOLEM: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "golem_s3_light",
+    name: "オーロラウォール",
+    description: "味方全体に最大HPの25%のシールドを3ターン張り、防御力を3ターン上昇させ、デバフを解除する。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 },
+      { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+      { kind: "CLEANSE" },
+    ],
+  },
+  darkSkill3: {
+    id: "golem_s3_dark",
+    name: "オブシディアンクラッシュ",
+    description: "敵全体に攻撃力1.4倍のダメージを与え、70%で2ターン防御力を大きく低下させる。自身の防御力が高いほど威力が上がる。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 4,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.4, scaleBonus: { stat: "def", ratePerPoint: 0.004 } },
+      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+    ],
+  },
 };
 
 const FAIRY: MonsterTemplate = {
@@ -361,6 +436,30 @@ const FAIRY: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "fairy_s3_light",
+    name: "セラフィックブレス",
+    description: "味方全体のHPを最大HPの40%回復し、デバフを解除して2ターン状態異常を無効にする。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "HEAL", healRate: 0.4 },
+      { kind: "CLEANSE" },
+      { kind: "IMMUNITY", durationTurns: 2 },
+    ],
+  },
+  darkSkill3: {
+    id: "fairy_s3_dark",
+    name: "ナイトメアミスト",
+    description: "味方全体のHPを最大HPの25%回復し、敵全体の行動ゲージを25%奪う。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "HEAL", healRate: 0.25 },
+      { kind: "BUFF", stat: "spd", amount: 0.35, durationTurns: 2 },
+      { kind: "GAUGE", amount: 0.25 },
+    ],
+  },
 };
 
 /**
@@ -467,6 +566,30 @@ const IMP: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "imp_s3_light",
+    name: "ジャッジメントヘイズ",
+    description: "敵全体に攻撃力1.4倍のダメージを与え、70%で2ターン攻撃力を大きく低下させ、60%で2ターン暗闇を付与する。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 4,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.4 },
+      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "BLIND", durationTurns: 2, chance: 0.6 },
+    ],
+  },
+  darkSkill3: {
+    id: "imp_s3_dark",
+    name: "サイレントカース",
+    description: "敵全体に攻撃力1.1倍のダメージを与え、全員のスキルのクールタイムを2ターン延長し、60%で3ターン毒(1スタック)を付与する。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.1 },
+      { kind: "COOLDOWN_EXTEND", turns: 2 },
+      { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.6 },
+    ],
+  },
 };
 
 /**
@@ -576,6 +699,30 @@ const WISP: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "wisp_s3_light",
+    name: "ラディアントブレッシング",
+    description: "味方全体の攻撃力とクリティカル率を3ターン上昇させ、行動ゲージを25%進める。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 6,
+    effects: [
+      { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 },
+      { kind: "BUFF", stat: "criRate", amount: 0.25, durationTurns: 3 },
+      { kind: "GAUGE", amount: 0.25 },
+    ],
+  },
+  darkSkill3: {
+    id: "wisp_s3_dark",
+    name: "ヴォイドシフト",
+    description: "味方全体の行動ゲージを35%進め、素早さを3ターン上昇させ、最大HPの15%のシールドを3ターン張る。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 6,
+    effects: [
+      { kind: "GAUGE", amount: 0.35 },
+      { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 3 },
+      { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+    ],
+  },
 };
 
 /**
@@ -678,6 +825,30 @@ const TREANT: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "treant_s3_light",
+    name: "ワールドツリー",
+    description: "味方全体のHPを最大HPの20%回復し、4ターンのあいだ毎ターン10%ずつ回復させ、デバフを解除する。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "HEAL", healRate: 0.2 },
+      { kind: "REGEN", healRate: 0.1, durationTurns: 4 },
+      { kind: "CLEANSE" },
+    ],
+  },
+  darkSkill3: {
+    id: "treant_s3_dark",
+    name: "ソウルルート",
+    description: "敵全体に攻撃力1.0倍のダメージを与え、与えたダメージの50%を回復し、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が上がる。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 4,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
+      { kind: "LIFESTEAL", healRate: 0.5 },
+      { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
+    ],
+  },
 };
 
 /**
@@ -777,6 +948,30 @@ const KNIGHT: MonsterTemplate = {
       ],
     },
   ],
+  lightSkill3: {
+    id: "knight_s3_light",
+    name: "セイクリッドオーダー",
+    description: "味方全体の攻撃力と防御力を3ターン上昇させ、最大HPの15%のシールドを3ターン張る。",
+    target: "ALL_ALLIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "BUFF", stat: "atk", amount: 0.45, durationTurns: 3 },
+      { kind: "BUFF", stat: "def", amount: 0.4, durationTurns: 3 },
+      { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+    ],
+  },
+  darkSkill3: {
+    id: "knight_s3_dark",
+    name: "ブラッドエッジ",
+    description: "敵全体に攻撃力1.5倍のダメージを与え、65%で1ターン行動不能にし、与えたダメージの25%を回復する。",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.5 },
+      { kind: "STUN", durationTurns: 1, chance: 0.65 },
+      { kind: "LIFESTEAL", healRate: 0.25 },
+    ],
+  },
 };
 
 export const MONSTER_TEMPLATES: MonsterTemplate[] = [SLIME, WOLF, GOLEM, FAIRY, IMP, WISP, TREANT, KNIGHT];
@@ -1550,3 +1745,20 @@ export function findMonster(templateId: string, element: string) {
 export function findMonsterById(dexId: string) {
   return MONSTER_DEX.find((m) => m.id === dexId);
 }
+
+/**
+ * スキルIDから実体を引く。クリエイト(スキル合成)で移し替えたスキルの復元に使う。
+ * 図鑑の全個体を1度だけ走査して索引を作る(毎回探すと合成のたびに数千件を舐める)。
+ */
+const SKILL_BY_ID = new Map<string, Skill>();
+for (const dex of MONSTER_DEX) {
+  for (const skill of dex.skills) SKILL_BY_ID.set(skill.id, skill);
+}
+
+export function findSkillById(skillId: string) {
+  return SKILL_BY_ID.get(skillId);
+}
+
+// 移し替えたスキルを戦闘用データへ反映できるようにする。
+// core は data を参照できない(層が逆流する)ので、data 側から差し込む
+setCreatedSkillResolver(findSkillById);

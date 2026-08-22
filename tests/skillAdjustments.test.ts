@@ -12,13 +12,23 @@ describe("フェアリーのスキル1(攻撃しつつ自身を回復)", () => {
   });
 });
 
-describe("光ウルフのスキル3(行動ゲージ+速度バフ)", () => {
-  it("ALL_ALLIES対象でGAUGE効果と速度バフを持つ", () => {
-    const wolf = findMonster("wolf", "LIGHT")!;
-    const skill3 = wolf.skills[2];
-    expect(skill3.target).toBe("ALL_ALLIES");
-    expect(skill3.effects).toContainEqual({ kind: "GAUGE", amount: 0.2 });
-    expect(skill3.effects).toContainEqual({ kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 });
+describe("光ウルフのスキル3(光/闇の固有スキルへ変更)", () => {
+  /**
+   * 光と闇はステージにも装備ダンジョンにも出ず、召喚でしか手に入らない。
+   * その希少さに見合うよう、同じ種族の他属性とは別の固有スキル3を持たせた。
+   * 以前は候補からの抽選(味方全体のゲージ+速度)だったが、専用のものに置き換えている。
+   */
+  it("他の属性とは違う固有のスキル3を持つ", () => {
+    const light = findMonster("wolf", "LIGHT")!;
+    const fire = findMonster("wolf", "FIRE")!;
+    const water = findMonster("wolf", "WATER")!;
+    expect(light.skills[2].id).toBe("wolf_s3_light");
+    expect(light.skills[2].id).not.toBe(fire.skills[2].id);
+    expect(light.skills[2].id).not.toBe(water.skills[2].id);
+  });
+
+  it("役割は変えない(ウルフは単体を殴る側のまま)", () => {
+    expect(findMonster("wolf", "LIGHT")!.skills[2].target).toBe("SINGLE_ENEMY");
   });
 });
 

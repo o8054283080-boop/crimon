@@ -156,8 +156,11 @@ async function main() {
   let failures = 0;
 
   for (const size of SIZES) {
+    // fresh:true は頁を作り直すので、**画面の大きさもここで渡さないと既定値へ戻る**。
+    // これを渡し忘れていたため、「縦(iPhone)」と名乗りながら実際には
+    // 900x430(横)を2回検査しており、縦画面の崩れを1件も拾えていなかった。
     await call("size", { width: size.width, height: size.height });
-    await call("goto", { path: "/", fresh: true });
+    await call("goto", { path: "/", fresh: true, width: size.width, height: size.height });
     await new Promise((r) => setTimeout(r, 1200));
 
     for (const screen of SCREENS) {

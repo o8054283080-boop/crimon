@@ -1,7 +1,23 @@
 import { Equipment, EquipSlot, applyEquipmentToStats, computeSetCombatModifiers } from "./equipment.js";
 import { MonsterDefinition } from "./monster.js";
 import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
-import { MAX_SKILL_LEVEL, computeLeveledSkill } from "./skill.js";
+import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
+
+/**
+ * 移し替えたスキルの実体を引く関数。
+ *
+ * `core` から `data` を直接参照すると層が逆流するので、
+ * 起動時に `data` 側から差し込む(`setCreatedSkillResolver`)。
+ */
+let createdSkillResolver: ((skillId: string) => Skill | undefined) | null = null;
+
+export function setCreatedSkillResolver(resolver: (skillId: string) => Skill | undefined): void {
+  createdSkillResolver = resolver;
+}
+
+function resolveCreatedSkill(skillId: string): Skill | undefined {
+  return createdSkillResolver?.(skillId);
+}
 
 /** プレイヤーが実際に所持しているモンスター1体分のデータ */
 export interface MonsterInstance {
@@ -14,6 +30,24 @@ export interface MonsterInstance {
   equipment: Partial<Record<EquipSlot, string>>;
   /** スキル1〜3それぞれのレベル(1〜5) */
   skillLevels: [number, number, number];
+  /**
+   * クリエイト(スキル合成)で上書きしたスキル。
+   *
+   * このゲーム独自の仕組みで、星6まで育てた別のモンスターを素材にすると、
+   * その素材のスキル2または3を、この個体の同じ枠へ移し替えられる。
+   * **持てるのは常に1つだけ**で、別のモンスターを合成すると置き換わる。
+   */
+  createdSkill?: CreatedSkill;
+}
+
+/** 移し替えたスキル1つ分の記録 */
+export interface CreatedSkill {
+  /** 上書きした枠。1=スキル2、2=スキル3(配列の添字) */
+  slot: 1 | 2;
+  /** 移し替えたスキルのID */
+  skillId: string;
+  /** どのモンスターから移したか(図鑑ID)。表示に使う */
+  sourceDexId: string;
 }
 
 let instanceCounter = 0;
@@ -83,6 +117,13 @@ export function toBattleDefinition(
     MonsterDefinition["skills"][1],
     MonsterDefinition["skills"][2],
   ];
+  // 移し替えたスキルがあれば、その枠だけ差し替える。
+  // レベルは元の枠のものをそのまま使う(枠を鍛えた分は無駄にしない)
+  const created = instance.createdSkill;
+  if (created) {
+    const source = resolveCreatedSkill(created.skillId);
+    if (source) skills[created.slot] = computeLeveledSkill(source, instance.skillLevels[created.slot]);
+  }
   return {
     ...dex,
     id: instance.id,
