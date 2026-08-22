@@ -30,32 +30,38 @@
   "flavor_FIRE": [
     "flavor_FIRE_0.ogg",
     "flavor_FIRE_1.ogg",
-    "flavor_FIRE_2.ogg"
+    "flavor_FIRE_2.ogg",
+    "flavor_FIRE_3.ogg"
   ],
   "flavor_WATER": [
     "flavor_WATER_0.ogg",
     "flavor_WATER_1.ogg",
-    "flavor_WATER_2.ogg"
+    "flavor_WATER_2.ogg",
+    "flavor_WATER_3.ogg"
   ],
   "flavor_ELECTRIC": [
     "flavor_ELECTRIC_0.ogg",
     "flavor_ELECTRIC_1.ogg",
-    "flavor_ELECTRIC_2.ogg"
+    "flavor_ELECTRIC_2.ogg",
+    "flavor_ELECTRIC_3.ogg"
   ],
   "flavor_GRASS": [
     "flavor_GRASS_0.ogg",
     "flavor_GRASS_1.ogg",
-    "flavor_GRASS_2.ogg"
+    "flavor_GRASS_2.ogg",
+    "flavor_GRASS_3.ogg"
   ],
   "flavor_LIGHT": [
     "flavor_LIGHT_0.ogg",
     "flavor_LIGHT_1.ogg",
-    "flavor_LIGHT_2.ogg"
+    "flavor_LIGHT_2.ogg",
+    "flavor_LIGHT_3.ogg"
   ],
   "flavor_DARK": [
     "flavor_DARK_0.ogg",
     "flavor_DARK_1.ogg",
-    "flavor_DARK_2.ogg"
+    "flavor_DARK_2.ogg",
+    "flavor_DARK_3.ogg"
   ],
   "crit": [
     "crit_0.ogg",
@@ -72,7 +78,8 @@
   "shield": [
     "shield_0.ogg",
     "shield_1.ogg",
-    "shield_2.ogg"
+    "shield_2.ogg",
+    "shield_3.ogg"
   ],
   "death": [
     "death_0.ogg",
@@ -82,22 +89,26 @@
   "heal": [
     "heal_0.ogg",
     "heal_1.ogg",
-    "heal_2.ogg"
+    "heal_2.ogg",
+    "heal_3.ogg"
   ],
   "buff": [
     "buff_0.ogg",
     "buff_1.ogg",
-    "buff_2.ogg"
+    "buff_2.ogg",
+    "buff_3.ogg"
   ],
   "debuff": [
     "debuff_0.ogg",
     "debuff_1.ogg",
-    "debuff_2.ogg"
+    "debuff_2.ogg",
+    "debuff_3.ogg"
   ],
   "charge": [
     "charge_0.ogg",
     "charge_1.ogg",
-    "charge_2.ogg"
+    "charge_2.ogg",
+    "charge_3.ogg"
   ],
   "turnAlly": [
     "turnAlly_0.ogg",
