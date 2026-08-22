@@ -107,7 +107,7 @@ const SLIME: MonsterTemplate = {
       { kind: "DAMAGE", multiplier: 1.5 },
       { kind: "BLIND", durationTurns: 2, chance: 0.7 },
       // 全体技なので、HEALではなくLIFESTEALで組む。
-      // HEALは対象(=敵)を回復してしまうし、toSelfにしても当たった数と噛み合わない
+      // HEALをそのまま置くと対象(=敵)を回復してしまう。当たった数に比例させたいのでLIFESTEALを使う
       { kind: "LIFESTEAL", healRate: 0.2 },
     ],
   },
@@ -145,7 +145,7 @@ const WOLF: MonsterTemplate = {
     description: "敵単体に攻撃力0.8倍のダメージを与える。自身の速度が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", ratePerPoint: 0.004 } }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }],
   },
   skill2Variants: [
     {
@@ -221,7 +221,7 @@ const WOLF: MonsterTemplate = {
     target: "SINGLE_ENEMY",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 3.6, scaleBonus: { stat: "spd", ratePerPoint: 0.004 } },
+      { kind: "DAMAGE", multiplier: 3.6, scaleBonus: { stat: "spd", bonusAtReference: 1.2 } },
       // 吸収にしないと、敵を狙う技なので相手のゲージを進めてしまう
       { kind: "GAUGE", amount: 0.3, drain: true },
     ],
@@ -260,7 +260,7 @@ const GOLEM: MonsterTemplate = {
     description: "敵単体に攻撃力0.7倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.7, scaleBonus: { stat: "def", ratePerPoint: 0.004 } }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.7, scaleBonus: { stat: "def", bonusAtReference: 0.3 } }],
   },
   skill2Variants: [
     {
@@ -269,7 +269,7 @@ const GOLEM: MonsterTemplate = {
       description: "巨岩を降らせ敵全体に攻撃力0.9倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "def", ratePerPoint: 0.003 } }],
+      effects: [{ kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "def", bonusAtReference: 0.6 } }],
     },
     {
       id: "golem_s2_b",
@@ -277,7 +277,7 @@ const GOLEM: MonsterTemplate = {
       description: "敵全体に攻撃力0.45倍のダメージを3回与える。自身の防御力が高いほど威力が上がる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, scaleBonus: { stat: "def", ratePerPoint: 0.003 } }],
+      effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, scaleBonus: { stat: "def", bonusAtReference: 0.3 } }],
     },
     {
       id: "golem_s2_c",
@@ -327,23 +327,25 @@ const GOLEM: MonsterTemplate = {
   lightSkill3: {
     id: "golem_s3_light",
     name: "オーロラウォール",
-    description: "味方全体に最大HPの25%のシールドを3ターン張り、防御力を3ターン上昇させ、デバフを解除する。",
+    description: "味方全体に最大HPの40%のシールドを3ターン張り、防御力を3ターン大きく上昇させ、3ターンのあいだ毎ターン8%ずつ回復させ、デバフを解除する。",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 },
-      { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+      // 攻撃を持たないぶん、量で釣り合わせないと通常のスキル3(溶岩落とし)に届かない
+      { kind: "SHIELD", shieldRate: 0.4, durationTurns: 3 },
+      { kind: "BUFF", stat: "def", amount: 0.8, durationTurns: 3 },
+      { kind: "REGEN", healRate: 0.08, durationTurns: 3 },
       { kind: "CLEANSE" },
     ],
   },
   darkSkill3: {
     id: "golem_s3_dark",
     name: "オブシディアンクラッシュ",
-    description: "敵全体に攻撃力1.4倍のダメージを与え、70%で2ターン防御力を大きく低下させる。自身の防御力が高いほど威力が上がる。",
+    description: "敵全体に攻撃力1.6倍のダメージを与え、70%で2ターン防御力を大きく低下させる。自身の防御力が高いほど威力が上がる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.4, scaleBonus: { stat: "def", ratePerPoint: 0.004 } },
+      { kind: "DAMAGE", multiplier: 1.6, scaleBonus: { stat: "def", bonusAtReference: 1.9 } },
       { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
     ],
   },
@@ -372,7 +374,7 @@ const FAIRY: MonsterTemplate = {
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.7 },
-      { kind: "HEAL", healRate: 0.02, toSelf: true },
+      { kind: "HEAL", healRate: 0.02, applyTo: "SELF" },
     ],
   },
   skill2Variants: [
@@ -552,11 +554,12 @@ const IMP: MonsterTemplate = {
     {
       id: "imp_s3_b",
       name: "ふういんのわらい",
-      description: "敵全体に攻撃力0.8倍のダメージを与え、全員のスキルのクールタイムを1ターン延長する。",
+      description: "敵全体に攻撃力1.1倍のダメージを与え、全員のスキルのクールタイムを1ターン延長する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8 },
+        // CT5でクールタイム延長1ターンだけでは、妨害役の目安にも届いていなかった
+        { kind: "DAMAGE", multiplier: 1.1 },
         { kind: "COOLDOWN_EXTEND", turns: 1 },
       ],
     },
@@ -759,7 +762,7 @@ const TREANT: MonsterTemplate = {
     description: "敵単体に攻撃力0.6倍のダメージを与える。自身の最大HPが高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.6, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.6, scaleBonus: { stat: "hp", bonusAtReference: 0.3 } }],
   },
   skill2Variants: [
     {
@@ -769,7 +772,7 @@ const TREANT: MonsterTemplate = {
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
+        { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "hp", bonusAtReference: 0.8 } },
         { kind: "STUN", durationTurns: 1, chance: 0.55 },
       ],
     },
@@ -791,7 +794,7 @@ const TREANT: MonsterTemplate = {
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
+        { kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "hp", bonusAtReference: 0.5 } },
         { kind: "LIFESTEAL", healRate: 0.4 },
       ],
     },
@@ -815,7 +818,7 @@ const TREANT: MonsterTemplate = {
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
+        { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "hp", bonusAtReference: 0.8 } },
         { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
       ],
     },
@@ -846,15 +849,19 @@ const TREANT: MonsterTemplate = {
   darkSkill3: {
     id: "treant_s3_dark",
     name: "ソウルルート",
-    description: "敵全体に攻撃力2.0倍のダメージを与え、与えたダメージの60%を回復し、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が大きく上がる。",
+    description:
+      "根を伸ばして敵全体に攻撃力2.0倍のダメージを与え、吸い上げた力で味方全体のHPを最大HPの15%回復し、防御力を3ターン上昇させる。与えたダメージの40%を自身が回復し、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が上がる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      // トレントは攻撃力が低くHPが高い。攻撃力倍率だけでは通常のスキル3に届かず、
-      // 実測で通常を0.30ぶん下回っていたので、種族の持ち味であるHP補正を厚くする
-      { kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0024 } },
-      { kind: "LIFESTEAL", healRate: 0.6 },
+      { kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", bonusAtReference: 1.4 } },
+      { kind: "LIFESTEAL", healRate: 0.4 },
       { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
+      // トレントは味方を保たせる種族。火力だけを積んでも、通常のスキル3(もりのゆりかご)を
+      // 外したぶんの穴が埋まらず、実測では30戦中29敗になっていた。
+      // **役割を捨てさせないこと。**吸った分を味方へ回す形にして、闇でも支え役として成立させる
+      { kind: "HEAL", healRate: 0.15, applyTo: "ALLIES" },
+      { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3, applyTo: "ALLIES" },
     ],
   },
 };
@@ -886,7 +893,7 @@ const KNIGHT: MonsterTemplate = {
     description: "敵単体に攻撃力1.0倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.0, scaleBonus: { stat: "def", ratePerPoint: 0.002 } }],
+    effects: [{ kind: "DAMAGE", multiplier: 1.0, scaleBonus: { stat: "def", bonusAtReference: 0.3 } }],
   },
   skill2Variants: [
     {
@@ -1032,7 +1039,7 @@ const GRIFFON: MonsterTemplate = {
       description: "敵単体に攻撃力0.95倍のダメージを2回与える。自身の素早さが高いほど威力が上がる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 2, scaleBonus: { stat: "spd", ratePerPoint: 0.003 } }],
+      effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }],
     },
     {
       id: "griffon_s2_c",
@@ -1097,7 +1104,7 @@ const GRIFFON: MonsterTemplate = {
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.7, hits: 3, scaleBonus: { stat: "spd", ratePerPoint: 0.003 } },
+      { kind: "DAMAGE", multiplier: 1.7, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
       { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
     ],
   },
@@ -1116,7 +1123,7 @@ const DRAGON_LIGHT_SKILL3: Skill = {
   effects: [
     // 比較相手の「破滅の咆哮」は2.0倍にHP補正(0.0003)が乗るので、育てるほど差が開く。
     // 固定倍率をいくら上げても追いつけないため、こちらにも一段厚いHP補正を持たせる
-    { kind: "DAMAGE", multiplier: 2.6, scaleBonus: { stat: "hp", ratePerPoint: 0.0004 } },
+    { kind: "DAMAGE", multiplier: 2.6, scaleBonus: { stat: "hp", bonusAtReference: 1.0 } },
     { kind: "BLIND", durationTurns: 2, chance: 0.75 },
     { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
   ],
@@ -1239,7 +1246,7 @@ const DRAGON: MonsterTemplate = {
       description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
+      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", bonusAtReference: 0.9 } }],
     },
     {
       id: "dragon_s3_scale",
@@ -1258,7 +1265,7 @@ const DRAGON: MonsterTemplate = {
       description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
+      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", bonusAtReference: 0.9 } }],
     },
     {
       id: "dragon_s3_blessing",
@@ -1459,7 +1466,7 @@ const NEMESIS: MonsterTemplate = {
       description: "敵単体に攻撃力1.2倍のダメージを2回与える。自身の防御力が高いほど威力が上がる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2, scaleBonus: { stat: "def", ratePerPoint: 0.003 } }],
+      effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2, scaleBonus: { stat: "def", bonusAtReference: 0.4 } }],
     },
   ],
   skill3Variants: [
@@ -1470,7 +1477,7 @@ const NEMESIS: MonsterTemplate = {
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 3.9, scaleBonus: { stat: "def", ratePerPoint: 0.003 } },
+        { kind: "DAMAGE", multiplier: 3.9, scaleBonus: { stat: "def", bonusAtReference: 1.0 } },
         { kind: "STUN", durationTurns: 1, chance: 0.7 },
       ],
     },
@@ -1501,11 +1508,11 @@ const NEMESIS: MonsterTemplate = {
     id: "nemesis_s3_light",
     name: "ラストジャッジメント",
     description:
-      "裁きの一撃(4.2倍)を叩き込み、75%で相手をスタンさせ、行動ゲージを40%奪う。自身の防御力が高いほど威力が上がる。",
+      "裁きの一撃(5.0倍)を叩き込み、75%で相手をスタンさせ、行動ゲージを40%奪う。自身の防御力が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 4.2, scaleBonus: { stat: "def", ratePerPoint: 0.003 } },
+      { kind: "DAMAGE", multiplier: 5.0, scaleBonus: { stat: "def", bonusAtReference: 1.6 } },
       { kind: "STUN", durationTurns: 1, chance: 0.75 },
       { kind: "GAUGE", amount: 0.4, drain: true },
     ],
@@ -1513,11 +1520,11 @@ const NEMESIS: MonsterTemplate = {
   darkSkill3: {
     id: "nemesis_s3_dark",
     name: "エンドオブオール",
-    description: "終焉の波動で敵全体に攻撃力1.4倍のダメージを2回与え、行動ゲージを20%吸収し、70%で2ターン防御力を大きく低下させる。",
+    description: "終焉の波動で敵全体に攻撃力1.8倍のダメージを2回与え、行動ゲージを20%吸収し、70%で2ターン防御力を大きく低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.4, hits: 2 },
+      { kind: "DAMAGE", multiplier: 1.8, hits: 2 },
       { kind: "GAUGE", amount: 0.2, drain: true },
       { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
     ],
@@ -1572,7 +1579,7 @@ export const ANCIENT_DEMON: MonsterTemplate = {
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "def", ratePerPoint: 0.002 } },
+        { kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "def", bonusAtReference: 1.0 } },
         { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.5 },
       ],
     },

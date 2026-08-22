@@ -1,3 +1,4 @@
+import { scaledEnemyAtk } from "../battle/enemyPower.js";
 import { Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
@@ -20,7 +21,7 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number): MonsterDe
     // hpMultiplier / spdMultiplier は個体単位の補正。powerScale が階層全体に掛かるのに対し、
     // こちらはボス1体だけを分厚くしたり手番を早めたりするために使う
     hp: Math.round(base.hp * powerScale * (enemy.hpMultiplier ?? 1)),
-    atk: Math.round(base.atk * powerScale),
+    atk: scaledEnemyAtk(base.atk * powerScale),
     def: Math.round(base.def * powerScale),
     spd: Math.round(base.spd * (enemy.spdMultiplier ?? 1)),
   };

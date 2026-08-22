@@ -180,7 +180,8 @@ for (const template of PROBED_TEMPLATES) {
     if (Number.isNaN(cell.value)) continue;
     tally[cell.verdict.key] += 1;
     if (cell.verdict.key !== "stronger") {
-      problems.push(`${template.baseName}の${cell.label}(${cell.delta >= 0 ? "+" : ""}${cell.delta.toFixed(2)})`);
+      const room = base > 0.65 ? `、伸びしろ${(1 - base).toFixed(2)}` : "";
+      problems.push(`${template.baseName}の${cell.label}(${cell.delta >= 0 ? "+" : ""}${cell.delta.toFixed(2)}${room})`);
     }
   }
 
@@ -188,8 +189,8 @@ for (const template of PROBED_TEMPLATES) {
   const deltas = cells.map((c) => (Number.isNaN(c.delta) ? "      — " : score(c.delta).padStart(8))).join("");
   const verdict = cells.map((c) => `${c.label}:${c.verdict.label}`).join(" ");
   // 通常スキルの時点でほぼ無傷の殲滅なら、上に伸ばせる幅がそもそも残っていない。
-  // ここを見落とすと「差が出ないから」と際限なく倍率を盛ってしまう
-  const headroom = base > 0.8 ? `  (伸びしろ ${(1 - base).toFixed(2)} しかない)` : "";
+  // ここを見落とすと「差が出ないから」と際限なく倍率を盛ることになる
+  const headroom = base > 0.65 ? `  (伸びしろ ${(1 - base).toFixed(2)})` : "";
   console.log(`${template.baseName.padEnd(12)}${score(base)}${values}${deltas}   ${verdict}${headroom}`);
 }
 

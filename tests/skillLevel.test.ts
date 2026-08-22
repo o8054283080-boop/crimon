@@ -188,7 +188,7 @@ describe("describeSkillEffect", () => {
   });
 
   it("scaleBonus付きのDAMAGE効果は説明文に能力値名が入る", () => {
-    const text = describeSkillEffect({ kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", ratePerPoint: 0.003 } });
+    const text = describeSkillEffect({ kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } });
     expect(text).toContain("速度");
   });
 });

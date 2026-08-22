@@ -87,7 +87,7 @@ describe("術者に向いた効果は1回だけ乗る", () => {
       description: "テスト用",
       target: "ALL_ENEMIES",
       cooldownTurns: 0,
-      effects: [{ kind: "HEAL", healRate: 0.1, toSelf: true }],
+      effects: [{ kind: "HEAL", healRate: 0.1, applyTo: "SELF" }],
     };
 
     const engine = new BattleEngine(

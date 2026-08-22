@@ -28,7 +28,7 @@ const HARMFUL: SkillEffect["kind"][] = ["DAMAGE", "DEBUFF", "STUN", "BURN", "POI
 /** 効果の向きが対象と合っていない場合に、その理由を返す */
 function misdirection(effect: SkillEffect, direction: Direction): string | undefined {
   // 向き先を自前で持つ効果は、対象と食い違っていて構わない
-  if (effect.kind === "HEAL" && effect.toSelf) return undefined;
+  if (effect.kind === "HEAL" && effect.applyTo) return undefined;
   if (effect.kind === "BUFF" && (effect.applyTo === "SELF" || effect.applyTo === "ALLIES")) return undefined;
   // ライフスティールは常に術者が回復する
   if (effect.kind === "LIFESTEAL") return undefined;
@@ -65,7 +65,7 @@ describe("スキルの効果の向き", () => {
   });
 
   it("正しい向きは通す", () => {
-    expect(misdirection({ kind: "HEAL", healRate: 0.12, toSelf: true }, "ENEMY")).toBeUndefined();
+    expect(misdirection({ kind: "HEAL", healRate: 0.12, applyTo: "SELF" }, "ENEMY")).toBeUndefined();
     expect(misdirection({ kind: "GAUGE", amount: 0.3, drain: true }, "ENEMY")).toBeUndefined();
     expect(misdirection({ kind: "LIFESTEAL", healRate: 0.2 }, "ENEMY")).toBeUndefined();
     expect(misdirection({ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2, applyTo: "ALLIES" }, "ENEMY")).toBeUndefined();

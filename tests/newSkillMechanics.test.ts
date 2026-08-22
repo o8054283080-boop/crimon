@@ -61,7 +61,7 @@ describe("最大HPスケーリングダメージ(scaleBonus stat:hp)", () => {
       description: "テスト用",
       target: "SINGLE_ENEMY",
       cooldownTurns: 0,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } }],
+      effects: [{ kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", bonusAtReference: 0.9 } }],
     };
     const plainDamageSkill: Skill = {
       id: "test_plain_damage",

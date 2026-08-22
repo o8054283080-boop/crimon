@@ -35,7 +35,7 @@ const GAUGE_EPSILON = 1e-6;
  * 1回の使用につき1度だけ適用する。
  */
 function isSourceScopedEffect(effect: SkillEffect): boolean {
-  if (effect.kind === "HEAL") return effect.toSelf === true;
+  if (effect.kind === "HEAL") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
   if (effect.kind === "BUFF") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
   return false;
 }
@@ -432,20 +432,27 @@ export class BattleEngine {
         }
 
         case "HEAL": {
-          // toSelfが立っている場合は、スキルの対象ではなく術者を回復する
-          const healTarget = effect.toSelf ? source : target;
-          if (!healTarget.alive) break;
-          const healBase =
-            effect.scaleStat === "atk"
-              ? getEffectiveStat(source, "atk")
-              : effect.scaleStat === "def"
-                ? getEffectiveStat(source, "def")
-                : healTarget.maxHp;
-          const healAmount = Math.round(healBase * effect.healRate);
-          if (healAmount <= 0) break;
-          applyHeal(healTarget, healAmount);
-          this.push(`  → ${this.label(healTarget)} のHPが ${healAmount} 回復！ (${healTarget.currentHp}/${healTarget.maxHp})`);
-          this.pushEvent({ targetId: healTarget.instanceId, kind: "HEAL", amount: healAmount });
+          // 回復先はスキルの対象とは限らない。敵を殴りながら味方を癒す技がある
+          const receivers =
+            effect.applyTo === "SELF"
+              ? [source]
+              : effect.applyTo === "ALLIES"
+                ? this.units.filter((u) => u.team === source.team && u.alive)
+                : [target];
+          for (const receiver of receivers) {
+            if (!receiver.alive) continue;
+            const healBase =
+              effect.scaleStat === "atk"
+                ? getEffectiveStat(source, "atk")
+                : effect.scaleStat === "def"
+                  ? getEffectiveStat(source, "def")
+                  : receiver.maxHp;
+            const healAmount = Math.round(healBase * effect.healRate);
+            if (healAmount <= 0) continue;
+            applyHeal(receiver, healAmount);
+            this.push(`  → ${this.label(receiver)} のHPが ${healAmount} 回復！ (${receiver.currentHp}/${receiver.maxHp})`);
+            this.pushEvent({ targetId: receiver.instanceId, kind: "HEAL", amount: healAmount });
+          }
           break;
         }
 
