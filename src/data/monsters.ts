@@ -442,11 +442,14 @@ const FAIRY: MonsterTemplate = {
   lightSkill3: {
     id: "fairy_s3_light",
     name: "セラフィックブレス",
-    description: "味方全体のHPを最大HPの40%回復し、デバフを解除して2ターン状態異常を無効にする。",
+    description: "味方全体のHPを最大HPの40%回復し、3ターンのあいだ毎ターン10%ずつ回復させ、デバフを解除して2ターン状態異常を無効にする。",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
       { kind: "HEAL", healRate: 0.4 },
+      // 通常の「だいちのめぐみ」が35%回復。40%では差が5ポイントしかなく、
+      // 実測でも通常と区別がつかなかったので、継続回復で厚みを付ける
+      { kind: "REGEN", healRate: 0.1, durationTurns: 3 },
       { kind: "CLEANSE" },
       { kind: "IMMUNITY", durationTurns: 2 },
     ],
@@ -454,13 +457,13 @@ const FAIRY: MonsterTemplate = {
   darkSkill3: {
     id: "fairy_s3_dark",
     name: "ナイトメアミスト",
-    description: "夢の霧で味方全体のHPを最大HPの25%回復し、素早さを2ターン上昇させ、行動ゲージを25%進める。",
+    description: "夢の霧で味方全体のHPを最大HPの30%回復し、素早さを3ターン上昇させ、行動ゲージを35%進める。",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "HEAL", healRate: 0.25 },
-      { kind: "BUFF", stat: "spd", amount: 0.35, durationTurns: 2 },
-      { kind: "GAUGE", amount: 0.25 },
+      { kind: "HEAL", healRate: 0.3 },
+      { kind: "BUFF", stat: "spd", amount: 0.35, durationTurns: 3 },
+      { kind: "GAUGE", amount: 0.35 },
     ],
   },
 };
@@ -843,12 +846,14 @@ const TREANT: MonsterTemplate = {
   darkSkill3: {
     id: "treant_s3_dark",
     name: "ソウルルート",
-    description: "敵全体に攻撃力1.0倍のダメージを与え、与えたダメージの50%を回復し、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が上がる。",
+    description: "敵全体に攻撃力2.0倍のダメージを与え、与えたダメージの60%を回復し、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が大きく上がる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0003 } },
-      { kind: "LIFESTEAL", healRate: 0.5 },
+      // トレントは攻撃力が低くHPが高い。攻撃力倍率だけでは通常のスキル3に届かず、
+      // 実測で通常を0.30ぶん下回っていたので、種族の持ち味であるHP補正を厚くする
+      { kind: "DAMAGE", multiplier: 2.0, scaleBonus: { stat: "hp", ratePerPoint: 0.0024 } },
+      { kind: "LIFESTEAL", healRate: 0.6 },
       { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
     ],
   },
@@ -966,11 +971,11 @@ const KNIGHT: MonsterTemplate = {
   darkSkill3: {
     id: "knight_s3_dark",
     name: "ブラッドエッジ",
-    description: "敵全体に攻撃力1.5倍のダメージを与え、65%で1ターン行動不能にし、与えたダメージの25%を回復する。",
+    description: "敵全体に攻撃力1.8倍のダメージを与え、65%で1ターン行動不能にし、与えたダメージの25%を回復する。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.5 },
+      { kind: "DAMAGE", multiplier: 1.8 },
       { kind: "STUN", durationTurns: 1, chance: 0.65 },
       { kind: "LIFESTEAL", healRate: 0.25 },
     ],
@@ -1105,11 +1110,13 @@ const GRIFFON: MonsterTemplate = {
 const DRAGON_LIGHT_SKILL3: Skill = {
   id: "dragon_s3_shining",
   name: "シャイニングブレス",
-  description: "聖なる光の息を吐き、敵全体に攻撃力2.4倍のダメージを与え、75%で2ターン暗闇、60%で2ターン攻撃力低下を付与する。",
+  description: "聖なる光の息を吐き、敵全体に攻撃力2.6倍のダメージを与え、75%で2ターン暗闇、60%で2ターン攻撃力低下を付与する。自身の最大HPが高いほど威力が上がる。",
   target: "ALL_ENEMIES",
   cooldownTurns: 5,
   effects: [
-    { kind: "DAMAGE", multiplier: 2.4 },
+    // 比較相手の「破滅の咆哮」は2.0倍にHP補正(0.0003)が乗るので、育てるほど差が開く。
+    // 固定倍率をいくら上げても追いつけないため、こちらにも一段厚いHP補正を持たせる
+    { kind: "DAMAGE", multiplier: 2.6, scaleBonus: { stat: "hp", ratePerPoint: 0.0004 } },
     { kind: "BLIND", durationTurns: 2, chance: 0.75 },
     { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
   ],
