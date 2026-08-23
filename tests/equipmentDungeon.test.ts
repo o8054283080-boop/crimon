@@ -57,14 +57,14 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
-  it("ボスはHPが5倍・素早さが1.3倍、10階のお供だけHPが3倍になる", () => {
+  it("ボスはHPが5倍・素早さが1.3倍、10階のお供だけHPが2倍になる", () => {
     for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
       const enemies = findDungeonFloor(floor)!.enemies;
       const boss = enemies.find((e) => e.isBoss)!;
       expect(boss.hpMultiplier).toBe(5);
       expect(boss.spdMultiplier).toBe(1.3);
       for (const companion of enemies.filter((e) => !e.isBoss)) {
-        expect(companion.hpMultiplier).toBe(floor === 10 ? 3 : undefined);
+        expect(companion.hpMultiplier).toBe(floor === 10 ? 2 : undefined);
         expect(companion.spdMultiplier).toBeUndefined();
       }
     }

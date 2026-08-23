@@ -180,25 +180,52 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
   });
 
   /**
-   * 7〜10階を引き上げた(「簡単すぎて楽にすぐ回れてしまう」との指摘)。
-   * 8階は最強編成でも11行動→35行動になり、9階も23行動→33行動。
-   * それに伴い、星5・装備サブ2程度の編成では9階に手が届かなくなっている。
-   * ここで見るのは**10階との落差**であって、絶対値ではない。
+   * 階層どうしの難易度を比べる時に**勝率を使ってはいけない**。
+   *
+   * 終盤を引き上げると勝率は全編成そろって0%へ張り付き、
+   * 「9階と10階のどちらが難しいか」すら読めなくなる(実際にそうなって、
+   * このテストは `0 > 0` で落ちた)。決着時点で敵をどれだけ削れたかは
+   * 常に0〜1の間に分布するので、勝率が飽和していても階層差が読める。
+   *
+   * 0に近いほど「敵を削り切った=易しい」、1に近いほど「歯が立たない=難しい」。
    */
+  const enemyHpLeftAt = (floorIndex: number, trials = 60): number => {
+    let sum = 0;
+    for (let i = 0; i < trials; i++) {
+      const rng = mulberry32(3500 + i);
+      const state = createInitialState();
+      const party = buildSrSsrParty(state, 6, 4, rng);
+      const setup = setupDungeonBattle(party, EQUIPMENT_DUNGEON_FLOORS[floorIndex], state.equipment);
+      const result = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng }).run();
+      const last = result.turns[result.turns.length - 1];
+      const enemies = last ? last.snapshot.filter((u) => u.team === "ENEMY") : [];
+      const maxHp = enemies.reduce((s, u) => s + u.maxHp, 0);
+      sum += maxHp > 0 ? enemies.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / maxHp : 0;
+    }
+    return sum / trials;
+  };
+
   it("9階は10階よりは易しい", () => {
-    const rateAt = (floorIndex: number) => {
-      let wins = 0;
-      const trials = 120;
-      for (let i = 0; i < trials; i++) {
-        const rng = mulberry32(3500 + i);
-        const state = createInitialState();
-        const party = buildSrSsrParty(state, 6, 4, rng);
-        const setup = setupDungeonBattle(party, EQUIPMENT_DUNGEON_FLOORS[floorIndex], state.equipment);
-        if (new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng }).run().winner === "PLAYER") wins += 1;
-      }
-      return wins / trials;
-    };
-    expect(rateAt(8)).toBeGreaterThan(rateAt(9));
+    expect(enemyHpLeftAt(8)).toBeLessThan(enemyHpLeftAt(9));
+  });
+
+  /**
+   * 難易度の単調増加は**実測で**確かめる。
+   *
+   * 以前は powerScale が単調増加であることをそのまま難易度の代わりにしていたが、
+   * これは成り立たない。10階のお供2体は9階と同じ専用モンスターでありながらHPが2倍で、
+   * 速度倍率も最速なので、**同じ powerScale でも10階の方がはるかに難しい**。
+   * 倍率まで単調増加にしようとすると、10階に合わせて9階を緩めるしかなくなり、
+   * 結局9階が締まらなくなる(実測で9階の勝率が100%から動かなかった)。
+   *
+   * powerScale はプレイヤーには一切見えない内部の調整値なので、
+   * 守るべきなのは倍率の並びではなく**実際の手応えの並び**の方。
+   */
+  it("**7階から10階まで、実際の手応えが一段ずつ重くなる**", () => {
+    const measured = [6, 7, 8, 9].map((floorIndex) => enemyHpLeftAt(floorIndex));
+    for (let i = 1; i < measured.length; i++) {
+      expect(measured[i], `${i + 8}階`).toBeGreaterThan(measured[i - 1]);
+    }
   });
 
   it("育成途中で1体だけそこそこ強いモンスターがいる程度の編成(5体)では、10階にはほぼ勝てない(バランス報告の回帰テスト)", () => {
@@ -234,32 +261,24 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     expect(floor10Rate).toBeLessThan(floor1Rate);
   });
 
-  /**
-   * 難しさは powerScale だけでは測れない。
-   *
-   * 速度は**手番の数**に直結するので、同じ powerScale でも敵が速ければ
-   * 受けるダメージの総量は増える。速度カーブを別に持たせた以上、
-   * 「階が進むほど厳しくなっているか」は両方を掛けた値で見る。
-   */
-  const difficultyOf = (floor: number) => {
-    const f = EQUIPMENT_DUNGEON_FLOORS[floor - 1];
-    return f.powerScale * f.speedScale;
-  };
-
   it("終盤(7階以降)は、6階までの線形カーブから大きく跳ね上がる", () => {
     // 以前は9・10階だけが跳ね上がる形だった。7・8階が緩すぎて
     // 「楽にすぐ回れてしまう」ため、跳ね上がりの開始を7階へ前倒ししてある
-    const linearStep = difficultyOf(6) - difficultyOf(5);
-    for (const floor of [7, 8, 9, 10]) {
-      expect(difficultyOf(floor) - difficultyOf(floor - 1), `${floor}階`).toBeGreaterThan(linearStep);
+    const powerAt = (floor: number) => EQUIPMENT_DUNGEON_FLOORS[floor - 1].powerScale;
+    const linearStep = powerAt(6) - powerAt(5);
+    for (const floor of [7, 8, 9]) {
+      expect(powerAt(floor) - powerAt(floor - 1), `${floor}階`).toBeGreaterThan(linearStep);
     }
   });
 
-  it("階層が上がるほど、硬さも速さも単調増加する", () => {
+  it("6階までは硬さが単調増加し、速さは最後まで単調増加する", () => {
+    // powerScale は10階だけ9階より低い。10階のお供はHPが2倍で速度倍率も最速なので、
+    // 同じ倍率だと9階より二段階難しくなってしまうため意図的に下げてある
+    // (実際の手応えが単調増加していることは別のテストで実測して確かめている)
     for (let i = 1; i < EQUIPMENT_DUNGEON_FLOORS.length; i++) {
       const prev = EQUIPMENT_DUNGEON_FLOORS[i - 1];
       const cur = EQUIPMENT_DUNGEON_FLOORS[i];
-      expect(cur.powerScale, `${i + 1}階のpowerScale`).toBeGreaterThan(prev.powerScale);
+      if (i + 1 <= 9) expect(cur.powerScale, `${i + 1}階のpowerScale`).toBeGreaterThan(prev.powerScale);
       expect(cur.speedScale, `${i + 1}階のspeedScale`).toBeGreaterThan(prev.speedScale);
     }
   });

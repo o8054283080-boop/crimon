@@ -2920,6 +2920,27 @@ body {
   color: #fff;
 }
 
+/* 装備でどれだけ伸びたかの内訳。
+ * 合計値だけを大きく出したうえで、その下に「素の値」と「装備の上昇分」を小さく添える。
+ * 上昇分だけを色で立たせているのは、装備を組み替える時に見たいのがそこだけだから */
+.stat-tile__breakdown {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.stat-tile__base {
+  color: #7285ac;
+}
+
+.stat-tile__gain {
+  font-weight: 800;
+  color: #6fe3a8;
+}
+
 /* 副次的な数値は横に流す。主要4項目と同じ重みで並べない */
 .monster-detail__substats {
   display: flex;
@@ -2930,6 +2951,21 @@ body {
   margin-top: 8px;
   font-size: 0.66rem;
   color: #9fb0d8;
+}
+
+/* 横に流す方は数字が短いので、上昇分は同じ行に続けて出す */
+.monster-detail__substats .stat-tile__gain {
+  margin-left: 3px;
+  font-size: 0.6rem;
+}
+
+.monster-detail__gear-note {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 0.6rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-dim);
 }
 
 /* ===================================================================
