@@ -36,16 +36,6 @@ const GAUGE_EPSILON = 1e-6;
  * 敵4体の技で自己バフが4重にかかる。呼び出し側はこれを見て、
  * 1回の使用につき1度だけ適用する。
  */
-/**
- * 継続ダメージ(毒・火傷)に掛かる倍率。
- *
- * 継続ダメージは**最大HPに対する割合**で入るので、HPを盛ったボスほどよく効く。
- * 毒を5重ねるだけでどんなボスも溶ける状態だったため、ボスにだけ耐性を持たせている。
- */
-function continuousDamageFactor(unit: BattleUnit): number {
-  return unit.def.bossTraits?.continuousDamageMultiplier ?? 1;
-}
-
 function isSourceScopedEffect(effect: SkillEffect): boolean {
   if (effect.kind === "HEAL") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
   if (effect.kind === "BUFF") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
@@ -359,7 +349,7 @@ export class BattleEngine {
   private applyBurnAtTurnEnd(unit: BattleUnit): void {
     if (unit.burnTurns <= 0 || !unit.alive) return;
     unit.burnTurns -= 1;
-    const burnDamage = Math.max(1, Math.round(getEffectiveStat(unit, "atk") * continuousDamageFactor(unit)));
+    const burnDamage = Math.max(1, Math.round(getEffectiveStat(unit, "atk")));
     applyDamage(unit, burnDamage);
     this.push(`  → ${this.label(unit)} は火傷でダメージを受けた！ ${burnDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: burnDamage });
@@ -390,7 +380,7 @@ export class BattleEngine {
       unit.poisonStacks = 0;
       unit.poisonDamageRate = 0;
     }
-    const poisonDamage = Math.max(1, Math.round(unit.maxHp * unit.poisonDamageRate * stacks * continuousDamageFactor(unit)));
+    const poisonDamage = Math.max(1, Math.round(unit.maxHp * unit.poisonDamageRate * stacks));
     applyDamage(unit, poisonDamage);
     this.push(`  → ${this.label(unit)} は毒(${stacks}スタック)でダメージを受けた！ ${poisonDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: poisonDamage });
