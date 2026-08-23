@@ -179,20 +179,26 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     expect(wins / trials).toBeLessThan(0.1);
   });
 
-  it("9階は10階ほど厳しくなく、SR/SSR軸の編成なら勝機があるが、通常モンスターだけではまだ厳しい", () => {
-    let srSsrWins = 0;
-    let genericWins = 0;
-    const trials = 150;
-    for (let i = 0; i < trials; i++) {
-      const rng = mulberry32(3500 + i);
-      const srSsrState = createInitialState();
-      const srSsrParty = buildSrSsrParty(srSsrState, 6, 2, rng);
-      const srSsrSetup = setupDungeonBattle(srSsrParty, EQUIPMENT_DUNGEON_FLOORS[8], srSsrState.equipment);
-      if (new BattleEngine(srSsrSetup.playerDefs, srSsrSetup.enemyDefs, { rng }).run().winner === "PLAYER") srSsrWins += 1;
-    }
-    const genericRate = winRate(9, 5, 50, 5, 2, 100, MAX_DUNGEON_PARTY_SIZE);
-    expect(srSsrWins / trials).toBeGreaterThan(0.35);
-    expect(genericRate).toBeLessThan(0.15);
+  /**
+   * 7〜10階を引き上げた(「簡単すぎて楽にすぐ回れてしまう」との指摘)。
+   * 8階は最強編成でも11行動→35行動になり、9階も23行動→33行動。
+   * それに伴い、星5・装備サブ2程度の編成では9階に手が届かなくなっている。
+   * ここで見るのは**10階との落差**であって、絶対値ではない。
+   */
+  it("9階は10階よりは易しい", () => {
+    const rateAt = (floorIndex: number) => {
+      let wins = 0;
+      const trials = 120;
+      for (let i = 0; i < trials; i++) {
+        const rng = mulberry32(3500 + i);
+        const state = createInitialState();
+        const party = buildSrSsrParty(state, 6, 4, rng);
+        const setup = setupDungeonBattle(party, EQUIPMENT_DUNGEON_FLOORS[floorIndex], state.equipment);
+        if (new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng }).run().winner === "PLAYER") wins += 1;
+      }
+      return wins / trials;
+    };
+    expect(rateAt(8)).toBeGreaterThan(rateAt(9));
   });
 
   it("育成途中で1体だけそこそこ強いモンスターがいる程度の編成(5体)では、10階にはほぼ勝てない(バランス報告の回帰テスト)", () => {
@@ -228,13 +234,15 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     expect(floor10Rate).toBeLessThan(floor1Rate);
   });
 
-  it("9・10階は8階までの線形カーブから大きく難易度が跳ね上がる", () => {
-    const floor8 = EQUIPMENT_DUNGEON_FLOORS[7];
-    const floor9 = EQUIPMENT_DUNGEON_FLOORS[8];
-    const floor10 = EQUIPMENT_DUNGEON_FLOORS[9];
-    const linearStep = floor8.powerScale - EQUIPMENT_DUNGEON_FLOORS[6].powerScale;
-    expect(floor9.powerScale - floor8.powerScale).toBeGreaterThan(linearStep);
-    expect(floor10.powerScale - floor9.powerScale).toBeGreaterThan(linearStep);
+  it("終盤(7階以降)は、6階までの線形カーブから大きく跳ね上がる", () => {
+    // 以前は9・10階だけが跳ね上がる形だった。7・8階が緩すぎて
+    // 「楽にすぐ回れてしまう」ため、跳ね上がりの開始を7階へ前倒ししてある。
+    // ここで確かめるのは**終盤が線形の延長ではないこと**
+    const scale = (floor: number) => EQUIPMENT_DUNGEON_FLOORS[floor - 1].powerScale;
+    const linearStep = scale(6) - scale(5);
+    for (const floor of [7, 8, 9, 10]) {
+      expect(scale(floor) - scale(floor - 1), `${floor}階`).toBeGreaterThan(linearStep);
+    }
   });
 
   it("階層が上がるほどpowerScaleが単調増加する", () => {

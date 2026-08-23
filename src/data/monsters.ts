@@ -554,13 +554,13 @@ const IMP: MonsterTemplate = {
     {
       id: "imp_s3_b",
       name: "ふういんのわらい",
-      description: "敵全体に攻撃力1.1倍のダメージを与え、全員のスキルのクールタイムを1ターン延長する。",
+      description: "敵全体に攻撃力1.1倍のダメージを与え、60%で全員のスキルのクールタイムを1ターン延長する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
         // CT5でクールタイム延長1ターンだけでは、妨害役の目安にも届いていなかった
         { kind: "DAMAGE", multiplier: 1.1 },
-        { kind: "COOLDOWN_EXTEND", turns: 1 },
+        { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.6 },
       ],
     },
     {
@@ -590,12 +590,13 @@ const IMP: MonsterTemplate = {
   darkSkill3: {
     id: "imp_s3_dark",
     name: "サイレントカース",
-    description: "敵全体に攻撃力1.1倍のダメージを与え、全員のスキルのクールタイムを2ターン延長し、60%で3ターン毒(1スタック)を付与する。",
+    description: "敵全体に攻撃力1.1倍のダメージを与え、70%で全員のスキルのクールタイムを1ターン延長し、60%で3ターン毒(1スタック)を付与する。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
       { kind: "DAMAGE", multiplier: 1.1 },
-      { kind: "COOLDOWN_EXTEND", turns: 2 },
+      // 2ターン延長は、当たった相手が2巡ぶん何もできなくなる。1ターンでも十分に重い
+      { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 },
       { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.6 },
     ],
   },
@@ -1341,12 +1342,12 @@ const SERAPH: MonsterTemplate = {
     {
       id: "seraph_s2_c",
       name: "封印の光",
-      description: "敵単体に攻撃力1.8倍のダメージを与え、スキルのクールタイムを1ターン延長する。",
+      description: "敵単体に攻撃力1.8倍のダメージを与え、70%でスキルのクールタイムを1ターン延長する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
         { kind: "DAMAGE", multiplier: 1.8 },
-        { kind: "COOLDOWN_EXTEND", turns: 1 },
+        { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 },
       ],
     },
   ],

@@ -574,6 +574,10 @@ export class BattleEngine {
 
         case "COOLDOWN_EXTEND": {
           if (!target.alive) break;
+          // 他のデバフと同じ判定を通す。ここを素通りさせると、
+          // 状態異常無効も抵抗も効かない唯一の妨害になってしまう
+          if (this.isImmune(target)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.cooldowns = target.cooldowns.map((c) => c + effect.turns) as [number, number, number];
           this.push(`  → ${this.label(target)} のスキルのクールタイムが ${effect.turns}ターン延長された！`);
           break;
