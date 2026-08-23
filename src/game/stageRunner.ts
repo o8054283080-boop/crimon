@@ -22,7 +22,7 @@ function applyDifficultyToEnemy(enemy: WaveEnemy, difficulty: Difficulty): WaveE
   return { ...enemy, star, level };
 }
 
-function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number): MonsterDefinition {
+function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number, speedScale: number): MonsterDefinition {
   const dex = resolveDex(`${enemy.templateId}_${enemy.element}`);
   const base = computeEffectiveStats(dex.stats, enemy.star, enemy.level);
   const stats = {
@@ -30,6 +30,7 @@ function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number): MonsterDefiniti
     hp: Math.round(base.hp * powerScale),
     atk: scaledEnemyAtk(base.atk * powerScale),
     def: Math.round(base.def * powerScale),
+    spd: Math.round(base.spd * speedScale),
   };
   return {
     ...dex,
@@ -42,7 +43,9 @@ function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number): MonsterDefiniti
 export function buildEnemyTeam(wave: Wave, difficulty: Difficulty = "NORMAL"): MonsterDefinition[] {
   const mod = DIFFICULTY_MODIFIERS[difficulty];
   const powerScale = wave.powerScale * mod.powerScaleMultiplier;
-  return wave.enemies.map((enemy) => defFromWaveEnemy(applyDifficultyToEnemy(enemy, difficulty), powerScale));
+  // 難易度(HARD/HELL)は星とレベルと powerScale を上げる。速度はそこに乗せない
+  // (速く"かつ"硬いを同時にやると、上の難易度が別のゲームになってしまう)
+  return wave.enemies.map((enemy) => defFromWaveEnemy(applyDifficultyToEnemy(enemy, difficulty), powerScale, wave.speedScale));
 }
 
 export interface WaveBattleSetup {

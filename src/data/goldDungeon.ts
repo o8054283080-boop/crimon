@@ -21,6 +21,8 @@ export interface GoldDungeonFloor {
   name: string;
   enemies: DungeonEnemy[];
   powerScale: number;
+  /** 敵の速度に掛かる倍率 */
+  speedScale: number;
   goldReward: number;
 }
 
@@ -33,16 +35,25 @@ interface FloorConfig {
   star: Star;
   level: number;
   powerScale: number;
+  /**
+   * 敵の速度に掛かる倍率。
+   *
+   * powerScale は速度に掛からないので、速度だけが据え置きだった。
+   * ただし**装備ダンジョンより弱くする**。ここは1日3回しか挑めない
+   * 稼ぎの場所で、手が止まると取り返しがつかない。
+   * 装備ダンジョンが最終階で1.85倍なのに対し、5階で1.2倍に留める。
+   */
+  speedScale: number;
   goldReward: number;
 }
 
 /** 階層が上がるほど敵は強くなるが、その分ゴールド報酬も大きく増える */
 const FLOOR_CONFIG: Record<number, FloorConfig> = {
-  1: { star: 3, level: 30, powerScale: 0.7, goldReward: 3000 },
-  2: { star: 4, level: 40, powerScale: 1.0, goldReward: 8000 },
-  3: { star: 5, level: 50, powerScale: 1.4, goldReward: 20000 },
-  4: { star: 5, level: 50, powerScale: 1.9, goldReward: 45000 },
-  5: { star: 6, level: 60, powerScale: 2.3, goldReward: 90000 },
+  1: { star: 3, level: 30, powerScale: 0.7, speedScale: 1, goldReward: 3000 },
+  2: { star: 4, level: 40, powerScale: 1.0, speedScale: 1.05, goldReward: 8000 },
+  3: { star: 5, level: 50, powerScale: 1.4, speedScale: 1.1, goldReward: 20000 },
+  4: { star: 5, level: 50, powerScale: 1.9, speedScale: 1.15, goldReward: 45000 },
+  5: { star: 6, level: 60, powerScale: 2.3, speedScale: 1.2, goldReward: 90000 },
 };
 
 function buildEnemies(floor: number, star: Star, level: number): DungeonEnemy[] {
@@ -66,6 +77,7 @@ export const GOLD_DUNGEON_FLOORS: GoldDungeonFloor[] = Array.from({ length: GOLD
     name: `ゴールドダンジョン ${floor}階`,
     enemies: buildEnemies(floor, cfg.star, cfg.level),
     powerScale: cfg.powerScale,
+    speedScale: cfg.speedScale,
     goldReward: cfg.goldReward,
   };
 });
