@@ -5225,3 +5225,346 @@ body {
 .equip-picker__cancel .icon {
   font-size: 18px;
 }
+
+/* ===================================================================
+ * アリーナ(対人戦)
+ *
+ * 判断に要るのは3つだけ。**今どこに居るか / あと何回挑めるか / 誰と戦うか。**
+ * この順に上から積む。編成は「挑む前に整えるもの」なので相手より上に置く。
+ *
+ * 階級の色は `--rank-color` として親から流し込み、帯・縁・進み具合の
+ * すべてに同じ色を使う。帯ごとの色が画面の中で一貫していないと、
+ * 「今どの階級か」を色で覚えられない。
+ * =================================================================== */
+
+.arena-screen .panel + .panel {
+  margin-top: 10px;
+}
+
+/* --- 階級と点数 --- */
+
+.arena-standing {
+  /* 左端に階級の色の帯を立てる。パネルを見た瞬間に今の階級が分かる */
+  border-left: 3px solid var(--rank-color, var(--accent));
+}
+
+.arena-standing__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arena-rank {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--rank-color, var(--text));
+  background: color-mix(in srgb, var(--rank-color, var(--accent)) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rank-color, var(--accent)) 55%, transparent);
+}
+
+.arena-rank--lg {
+  padding: 5px 14px;
+  font-size: 0.86rem;
+}
+
+.arena-standing__points {
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+/* 帯の中のどこに居るか。数字だけでは良い数字なのか分からない */
+.arena-standing__track {
+  position: relative;
+  height: 7px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: var(--edge-line);
+  overflow: hidden;
+}
+
+.arena-standing__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--rank-color, var(--accent)) 55%, #000),
+    var(--rank-color, var(--accent)));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--rank-color, var(--accent)) 45%, transparent);
+  transition: width 0.4s ease;
+}
+
+.arena-standing__note {
+  margin-top: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--rank-color, var(--text-dim));
+}
+
+/* 成績は横に流す。1行に詰めると「0勝 / 0戦今期の最高」のように読めなくなる */
+.arena-standing__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 0.64rem;
+  color: var(--text-dim);
+}
+
+/* --- 挑戦券 --- */
+
+.arena-tickets__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arena-tickets__label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+
+.arena-tickets__pips {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+}
+
+/* 残数は数字より粒の方が速く読める。消費した分は空の枠として残す */
+.arena-tickets__pip {
+  width: 14px;
+  height: 18px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.arena-tickets__pip.is-on {
+  background: linear-gradient(180deg, #ffd76a, #e0a32c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 8px rgba(240, 180, 60, 0.35);
+}
+
+.arena-tickets__count {
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.arena-tickets__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.arena-tickets__timer {
+  font-size: 0.64rem;
+  color: var(--text-dim);
+}
+
+/* --- 編成 --- */
+
+.arena-team__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arena-team__head h2 {
+  margin: 0;
+}
+
+.arena-team__note {
+  margin: 6px 0 10px;
+  font-size: 0.66rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+/* --- 挑戦相手 --- */
+
+.arena-opponents__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arena-opponents__head h2 {
+  margin: 0;
+}
+
+.arena-opponent {
+  border-left: 3px solid var(--rank-color, var(--accent));
+}
+
+.arena-opponent__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arena-opponent__ident {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.arena-opponent__name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.arena-opponent__rank {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--rank-color, var(--text-dim));
+}
+
+.arena-opponent__score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.arena-opponent__points {
+  font-size: 0.86rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 格上か格下かは、この一戦で動く点数に直結する。色で即断できるようにする */
+.arena-opponent__diff {
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.arena-opponent__diff.is-up {
+  color: #ffd08a;
+  background: rgba(224, 150, 40, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(224, 150, 40, 0.45);
+}
+
+.arena-opponent__diff.is-down {
+  color: #9fb0d8;
+  background: rgba(120, 140, 190, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(120, 140, 190, 0.35);
+}
+
+.arena-opponent__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 9px 0;
+}
+
+/* 顔ぶれは4体を横一列に。縦に積むと相手1人で画面が埋まる */
+.arena-opponent__units {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-bottom: 11px;
+}
+
+.arena-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 3px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.26));
+  box-shadow: var(--edge-line);
+  min-width: 0;
+}
+
+.arena-unit__emoji {
+  font-size: 1.24rem;
+  line-height: 1;
+}
+
+.arena-unit__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  width: 100%;
+}
+
+.arena-unit__name {
+  /* 巡回が拾える下限は9px。0.54remだと8.6pxで、読めない字を並べても場所の無駄になる */
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #d8e0f6;
+  /* 4体を並べると名前は必ず溢れる。切るより折り返して読めるようにする */
+  text-align: center;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.arena-unit__sub {
+  font-size: 0.58rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* --- 案内と期間の精算 --- */
+
+.arena-notice {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #ffd9a0;
+  border-left: 3px solid #e0a83c;
+}
+
+.arena-settlement {
+  text-align: center;
+}
+
+.arena-settlement__rank {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffd76a;
+}
+
+.arena-settlement__points {
+  margin: 6px 0 0;
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.arena-settlement__record {
+  margin: 4px 0 0;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.arena-settlement__rewards {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 14px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}

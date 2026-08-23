@@ -26,6 +26,7 @@ export interface HomeProps {
   onGoEquipDungeon: () => void;
   onGoLevelDungeon: () => void;
   onGoGoldDungeon: () => void;
+  onGoArena: () => void;
   onGoShop: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
@@ -540,6 +541,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     onGoEquipDungeon,
     onGoLevelDungeon,
     onGoGoldDungeon,
+    onGoArena,
     onGoShop,
     onRefillStaminaPartial,
     onRefillStaminaFull,
@@ -586,6 +588,8 @@ export function renderHome(props: HomeProps): HTMLElement {
     { name: "trainDungeon", label: "育成", sub: "ダンジョン", onClick: onGoLevelDungeon },
     { name: "goldDungeon", label: "ゴールド", sub: "ダンジョン", onClick: onGoGoldDungeon },
   ];
+  // 対人は「増やす」でも「鍛える」でもない、腕を試す場所。行を分けて独立させる
+  const compete: MenuTile[] = [{ name: "arena", label: "アリーナ", sub: "対人戦", onClick: onGoArena }];
 
   const menu = el("div", { className: `home-menu ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
     // タイトルと同じ世界の続きにする。背景だけ別物だと、STARTで別のゲームに移ったように見える
@@ -617,6 +621,10 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("section", { className: "home-group" }, [
       el("div", { className: "home-group__title" }, ["鍛える"]),
       el("div", { className: "home-menu-grid" }, dungeons.map(renderMenuTile)),
+    ]),
+    el("section", { className: "home-group" }, [
+      el("div", { className: "home-group__title" }, ["腕を試す"]),
+      el("div", { className: "home-menu-grid home-menu-grid--2" }, compete.map(renderMenuTile)),
     ]),
     settingsSheet,
   ].filter((n): n is HTMLElement => n !== null));

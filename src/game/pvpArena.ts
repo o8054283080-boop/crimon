@@ -365,6 +365,17 @@ export function arenaPointDelta(myPoints: number, opponentPoints: number, won: b
   return Math.min(-ARENA_MIN_LOSS, Math.round(ARENA_K_FACTOR * (0 - expected)));
 }
 
+/**
+ * 挑戦相手を引き直すために種を進める。
+ *
+ * 対戦後に自動で進めるほか、画面の「相手を変える」からも呼ぶ。
+ * **挑戦券を減らさずに引き直せる**のは意図した設計。並んだ3人が
+ * どれも噛み合わない時に、券を捨てて選び直させるのは理不尽なので。
+ */
+export function advanceArenaOpponentSeed(state: PlayerState): void {
+  state.arenaOpponentSeed = (state.arenaOpponentSeed * 1103515245 + 12345) & 0x7fffffff;
+}
+
 /* ==========================================================================
  * 対戦の決着
  * ========================================================================== */
@@ -426,7 +437,7 @@ export function resolveArenaMatch(
 
   // 次に並ぶ相手を変える。同じ相手が残り続けると、
   // 勝てる1人だけを繰り返し殴る形になる
-  state.arenaOpponentSeed = (state.arenaOpponentSeed * 1103515245 + 12345) & 0x7fffffff;
+  advanceArenaOpponentSeed(state);
 
   return {
     won,
