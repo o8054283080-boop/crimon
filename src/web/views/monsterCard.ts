@@ -57,6 +57,12 @@ export interface MonsterCardOptions {
    */
   onLongPress?: () => void;
   /**
+   * クリエイト(スキル合成)で中身を作り替えた個体。小さな印を出す。
+   * **同じ種族・同じ星でも持っている技が違う**ので、
+   * 印が無いと編成のときに見分けが付かない。
+   */
+  created?: boolean;
+  /**
    * 詳細を開くボタンを角に出す。
    *
    * 以前は長押しだけが入口で、画面の下に
@@ -140,7 +146,7 @@ export function buildMonsterCard(
   onClick: () => void,
   options: MonsterCardOptions = {},
 ): HTMLElement {
-  const { selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress, onDetail } =
+  const { selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress, onDetail, created } =
     options;
 
   const classes = ["mcard", rarityClass(star)];
@@ -180,6 +186,7 @@ export function buildMonsterCard(
     infoParts.length > 0 ? el("span", { className: "mcard__info" }, infoParts) : null,
     caption ? el("span", { className: "mcard__caption" }, [caption]) : null,
     badge ? el("span", { className: `mcard__badge${badgeCorner ? " mcard__badge--corner" : ""}` }, [badge]) : null,
+    created ? el("span", { className: "mcard__created", title: "クリエイト済み" }, [icon("summon", { size: 10 })]) : null,
     onDetail && !disabled
       ? el(
           "button",

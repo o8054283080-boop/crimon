@@ -14,6 +14,7 @@ import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, runDungeonAutoFarm, runGoldDungeonAutoFarm, runLevelDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
 import { applyDungeonClearRewards, applyGoldDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
+import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
 import {
   claimDailyLoginBonus,
   FIGHTER_NAME_MAX_LENGTH,
@@ -64,6 +65,7 @@ import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderMonsters } from "./views/monsters.js";
 import { PartyEditMode, renderParty } from "./views/party.js";
 import { renderMonsterTraining } from "./views/monsterTraining.js";
+import { renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
@@ -200,6 +202,11 @@ interface AppState {
   selectedDexEntryId: string | null;
   monsterTrainingTargetId: string | null;
   monsterTrainingMaterialIds: string[];
+  /** クリエイト(スキル合成)の対象・素材・移し替える枠 */
+  createTargetId: string | null;
+  createMaterialId: string | null;
+  createSlot: CreateSlot | null;
+  createNotice: string | null;
   partyEditMode: PartyEditMode;
   autoFarmCount: number;
   autoFarmResult: AutoFarmResult | null;
@@ -244,6 +251,10 @@ const state: AppState = {
   selectedDexEntryId: null,
   monsterTrainingTargetId: null,
   monsterTrainingMaterialIds: [],
+  createTargetId: null,
+  createMaterialId: null,
+  createSlot: null,
+  createNotice: null,
   partyEditMode: "NORMAL",
   autoFarmCount: 10,
   autoFarmResult: null,
@@ -457,6 +468,47 @@ function handleConfirmRankUp(): void {
   savePlayerState(state.player);
   state.rankUpMode = false;
   state.rankUpSacrificeIds = [];
+  render();
+}
+
+/**
+ * クリエイトを実行する。
+ *
+ * **素材は消える。**押した後で取り消せないので、断る時は理由を必ず言葉で返す
+ * (押せないボタンだけを出すと、何を満たせばよいのかが分からない)。
+ */
+function handleConfirmMonsterCreate(): void {
+  const target = state.player.monsters.find((m) => m.id === state.createTargetId);
+  const material = state.player.monsters.find((m) => m.id === state.createMaterialId);
+  const slot = state.createSlot;
+  if (!target || !material || slot === null) return;
+
+  const result = applyMonsterCreate(target, material, slot, state.player.partyIds, state.player.dungeonPartyIds);
+  if (!result.ok) {
+    playSfx("denied", 0.7);
+    state.createNotice = result.reason ?? "クリエイトできませんでした";
+    render();
+    return;
+  }
+
+  // 中核は対象の書き換えだけを行う。手持ちからの取り除きはこちらの責任
+  removeMonsters(state.player, [material.id]);
+  savePlayerState(state.player);
+  playSfx("levelUp");
+
+  const replaced = result.replaced ? `(${describeCreatedSkill(result.replaced)} は失われました)` : "";
+  state.createNotice = `${describeCreatedSkill(result.created!)} ${replaced}`.trim();
+  state.createMaterialId = null;
+  state.createSlot = null;
+  render();
+}
+
+function handleClearMonsterCreate(): void {
+  const target = state.player.monsters.find((m) => m.id === state.createTargetId);
+  if (!target || !clearMonsterCreate(target)) return;
+  savePlayerState(state.player);
+  playSfx("tap");
+  state.createNotice = "移し替えを取り消し、元のスキルへ戻しました";
   render();
 }
 
@@ -1298,6 +1350,47 @@ function render(): void {
       break;
     }
 
+    case "MONSTER_CREATE": {
+      const createTarget = state.player.monsters.find((m) => m.id === state.createTargetId);
+      if (!createTarget) {
+        navigate("MONSTERS");
+        return;
+      }
+      content = renderMonsterCreate({
+        target: createTarget,
+        monsters: state.player.monsters,
+        partyIds: state.player.partyIds,
+        dungeonPartyIds: state.player.dungeonPartyIds,
+        materialId: state.createMaterialId,
+        slot: state.createSlot,
+        sortKey: state.monsterSortKey,
+        notice: state.createNotice,
+        onSelectMaterial: (id) => {
+          state.createMaterialId = id;
+          // 素材が変われば出せるスキルも変わる。枠の選択は持ち越さない
+          state.createSlot = null;
+          state.createNotice = null;
+          render();
+        },
+        onSelectSlot: (slot) => {
+          state.createSlot = slot;
+          state.createNotice = null;
+          render();
+        },
+        onConfirm: handleConfirmMonsterCreate,
+        onClear: handleClearMonsterCreate,
+        onBack: () => {
+          state.createTargetId = null;
+          state.createMaterialId = null;
+          state.createSlot = null;
+          state.createNotice = null;
+          state.screen = "MONSTERS";
+          render();
+        },
+      });
+      break;
+    }
+
     case "STAGE_RESULT": {
       showNav = false;
       const info = state.stageResult;
@@ -1398,6 +1491,14 @@ function renderMonstersScreen(): HTMLElement {
       state.monsterTrainingTargetId = monsterId;
       state.monsterTrainingMaterialIds = [];
       state.screen = "MONSTER_TRAINING";
+      render();
+    },
+    onGoCreate: (monsterId) => {
+      state.createTargetId = monsterId;
+      state.createMaterialId = null;
+      state.createSlot = null;
+      state.createNotice = null;
+      state.screen = "MONSTER_CREATE";
       render();
     },
     onGoMonsterDex: () => {

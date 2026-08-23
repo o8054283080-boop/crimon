@@ -19,6 +19,7 @@ export type ScreenName =
   | "MONSTER_DEX"
   | "SHOP"
   | "MONSTER_TRAINING"
+  | "MONSTER_CREATE"
   | "AUTO_FARM_RESULT";
 
 /**
