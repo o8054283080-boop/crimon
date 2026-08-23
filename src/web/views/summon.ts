@@ -34,8 +34,51 @@ export interface SummonProps {
  * 操作は下端にまとめて、1画面で完結させる。
  */
 
-function costChip(name: IconName, amount: number): HTMLElement {
-  return el("span", { className: "summon-cta__cost" }, [icon(name), el("strong", {}, [amount.toLocaleString("ja-JP")])]);
+/**
+ * 押す場所の作り。
+ *
+ * 前は4つが同じ高さの矩形で2×2に並んでいて、**10連と1回の差が値段でしか
+ * 分からなかった**。ここでは「何で払うか」と「どれだけの重さか」を
+ * 見た目の階段にする:
+ *
+ *   1段目 ダイヤ10連 … 画面でいちばん明るい金の面。高さも一番ある
+ *   2段目 ダイヤ1回  … 冷たい鋼の面。金の下に付く
+ *   3段目 書の2つ    … 並べて小さく。持っている時だけ意味を持つ
+ *
+ * 中身の並びも縦積みをやめ、**左に名前・右に値段**の横並びにした。
+ * 値段が右端に揃うので、3つを見比べた時に高い安いが一瞬で分かる。
+ */
+interface CtaOptions {
+  className: string;
+  lead: string;
+  sub: string;
+  costIcon: IconName;
+  cost: number;
+  /** 払えるか。払えない時は値札だけを赤く光らせ、理由を値札の下に出す */
+  enough: boolean;
+  onClick: () => void;
+}
+
+function ctaButton(o: CtaOptions): HTMLElement {
+  return el(
+    "button",
+    {
+      type: "button",
+      className: `summon-cta__btn ${o.className}`,
+      disabled: !o.enough,
+      onclick: o.onClick,
+    },
+    [
+      el("span", { className: "summon-cta__text" }, [
+        el("span", { className: "summon-cta__lead" }, [o.lead]),
+        el("span", { className: "summon-cta__sub" }, [o.sub]),
+      ]),
+      el("span", { className: "summon-cta__cost" }, [
+        icon(o.costIcon),
+        el("strong", {}, [o.cost.toLocaleString("ja-JP")]),
+      ]),
+    ],
+  );
 }
 
 function renderIdle(props: SummonProps): HTMLElement {
@@ -46,81 +89,67 @@ function renderIdle(props: SummonProps): HTMLElement {
   const hasScrollTen = player.summonScrolls >= 10;
 
   const cta = el("div", { className: "summon-cta" }, [
-    el(
-      "button",
-      {
-        type: "button",
-        className: "summon-cta__btn summon-cta__btn--ten",
-        disabled: !canTen,
-        onclick: () => onSummon(10),
-      },
-      [
-        el("span", { className: "summon-cta__lead" }, ["10連召喚"]),
-        el("span", { className: "summon-cta__sub" }, ["★4以上 1体確定"]),
-        costChip("crystal", SUMMON_COST_TEN),
-      ],
-    ),
-    el(
-      "button",
-      {
-        type: "button",
-        className: "summon-cta__btn summon-cta__btn--single",
-        disabled: !canSingle,
-        onclick: () => onSummon(1),
-      },
-      [
-        el("span", { className: "summon-cta__lead" }, ["1回召喚"]),
-        el("span", { className: "summon-cta__sub" }, ["★3以上 確定"]),
-        costChip("crystal", SUMMON_COST_SINGLE),
-      ],
-    ),
-    el(
-      "button",
-      {
-        type: "button",
-        className: "summon-cta__btn summon-cta__btn--scroll",
-        disabled: !hasScrollTen,
-        onclick: () => onUseSummonScroll(10),
-      },
-      [
-        el("span", { className: "summon-cta__lead" }, ["書で10連"]),
-        el("span", { className: "summon-cta__sub" }, ["★4以上 1体確定"]),
-        costChip("scroll", 10),
-      ],
-    ),
-    el(
-      "button",
-      {
-        type: "button",
-        className: "summon-cta__btn summon-cta__btn--scroll",
-        disabled: !hasScroll,
-        onclick: () => onUseSummonScroll(1),
-      },
-      [
-        el("span", { className: "summon-cta__lead" }, ["書で1回"]),
-        el("span", { className: "summon-cta__sub" }, ["ダイヤ不要"]),
-        costChip("scroll", 1),
-      ],
-    ),
+    ctaButton({
+      className: "summon-cta__btn--ten",
+      lead: "10連召喚",
+      sub: "★4以上 1体確定",
+      costIcon: "crystal",
+      cost: SUMMON_COST_TEN,
+      enough: canTen,
+      onClick: () => onSummon(10),
+    }),
+    ctaButton({
+      className: "summon-cta__btn--single",
+      lead: "1回召喚",
+      sub: "★3以上 確定",
+      costIcon: "crystal",
+      cost: SUMMON_COST_SINGLE,
+      enough: canSingle,
+      onClick: () => onSummon(1),
+    }),
+    el("div", { className: "summon-cta__pair" }, [
+      ctaButton({
+        className: "summon-cta__btn--scroll",
+        lead: "書で10連",
+        sub: "★4以上 1体確定",
+        costIcon: "scroll",
+        cost: 10,
+        enough: hasScrollTen,
+        onClick: () => onUseSummonScroll(10),
+      }),
+      ctaButton({
+        className: "summon-cta__btn--scroll",
+        lead: "書で1回",
+        sub: "ダイヤ不要",
+        costIcon: "scroll",
+        cost: 1,
+        enough: hasScroll,
+        onClick: () => onUseSummonScroll(1),
+      }),
+    ]),
   ]);
 
   return el("div", { className: "screen summon-screen" }, [
     el("div", { className: "summon-top" }, [
-      el("h1", { className: "summon-top__title" }, ["召 喚"]),
+      el("h1", { className: "summon-top__title" }, ["召　喚"]),
       el("div", { className: "summon-top__wallet" }, [
         el("span", { className: "summon-wallet" }, [icon("crystal"), String(player.crystal.toLocaleString("ja-JP"))]),
         el("span", { className: "summon-wallet summon-wallet--scroll" }, [icon("scroll"), String(player.summonScrolls)]),
       ]),
     ]),
-    el("div", { className: "summon-stage" }, [buildAltar()]),
+    // 祭壇は「浮いている絵」ではなく「坩堝の上に立っているもの」にする。
+    // 台座と、その下から昇る熾火がホームの寒暖対比をこの画面へつなぐ
+    el("div", { className: "summon-stage" }, [buildAltar(), el("i", { className: "summon-stage__plinth" }, [])]),
     el("div", { className: "summon-bottom" }, [
       el("div", { className: "summon-rates" }, [
+        el("span", { className: "summon-rates__label" }, ["出現"]),
         el("span", { className: "summon-tag summon-tag--r" }, ["★3 R"]),
         el("span", { className: "summon-tag summon-tag--sr" }, ["★4 SR"]),
         el("span", { className: "summon-tag summon-tag--ssr" }, ["★5 SSR"]),
         el("span", { className: "summon-tag summon-tag--rare" }, ["光/闇 レア枠"]),
       ]),
-      el("p", { className: "summon-note" }, ["★3以上が確定。10連では★4以上が1体確定します。光・闇のレア枠は確定枠に含まれないため、引き当てられれば貴重です。"]),
+      // 確定の話はボタンの副題が言っている。ここに残すのは**そこに書けない1つ**だけ
+      el("p", { className: "summon-note" }, ["光・闇のレア枠は確定枠とは別に抽選されます"]),
       cta,
     ]),
   ]);
@@ -186,7 +215,12 @@ function summaryChips(results: SummonResult[]): HTMLElement {
     .filter((k) => counts.has(k))
     .map((k) => el("span", { className: `sum-chip sum-chip--${k.toLowerCase()}` }, [`${k} ×${counts.get(k)}`]));
   if (rareCount > 0) chips.push(el("span", { className: "sum-chip sum-chip--rare" }, [`レア枠 ×${rareCount}`]));
-  return el("div", { className: "summon-summary" }, chips);
+  // 色の付いた札が宙に浮いているだけでは「何の数字か」が読み取れない。
+  // 金の罫を持つ銘板に嵌めて、引きの内訳だと言い切る
+  return el("div", { className: "summon-summary" }, [
+    el("span", { className: "summon-summary__label" }, [`${results.length}体の内訳`]),
+    el("div", { className: "summon-summary__chips" }, chips),
+  ]);
 }
 
 /**
@@ -241,17 +275,23 @@ function renderResult(props: SummonProps): HTMLElement {
   const again = results.length >= 10 ? SUMMON_COST_TEN : SUMMON_COST_SINGLE;
   const canAgain = player.crystal >= again;
 
+  // 周回する遊びなので、次に押されるのはほぼ必ず「もう一度」。
+  // 前は「閉じる」と同じ幅・同じ高さで並んでいて、**次の一手が読めなかった**。
+  // 金の面を大きく取り、閉じるは脇へ寄せる。値段の💎も絵文字をやめて図に直す
   const actions = el("div", { className: "summon-actions" }, [
-    el("button", { type: "button", className: "btn btn--ghost summon-actions__btn", onclick: onDismissResults }, ["閉じる"]),
+    el("button", { type: "button", className: "btn btn--ghost summon-actions__close", onclick: onDismissResults }, ["閉じる"]),
     el(
       "button",
       {
         type: "button",
-        className: "btn btn--primary summon-actions__btn",
+        className: "btn btn--gold summon-actions__again",
         disabled: !canAgain,
         onclick: () => onSummon(results.length >= 10 ? 10 : 1),
       },
-      [`もう一度 💎${again}`],
+      [
+        el("span", { className: "summon-actions__again-lead" }, [results.length >= 10 ? "もう10連" : "もう一度"]),
+        el("span", { className: "summon-actions__again-cost" }, [icon("crystal"), el("strong", {}, [again.toLocaleString("ja-JP")])]),
+      ],
     ),
   ]);
 
@@ -260,8 +300,9 @@ function renderResult(props: SummonProps): HTMLElement {
     el("span", { className: "summon-banner__text" }, [bannerText(results[bestIndex], grade)]),
   ]);
 
+  // ▶ は端末によって色付きの絵文字で描かれる。同じ一式の線で描いた山括弧に直す
   const skip = el("button", { type: "button", className: "summon-skip", ariaLabel: "演出をスキップ" }, [
-    el("span", { className: "summon-skip__pill" }, ["スキップ ▶▶"]),
+    el("span", { className: "summon-skip__pill" }, ["スキップ", icon("chevron"), icon("chevron")]),
   ]);
 
   const root = el("div", { className: `screen summon-screen summon-screen--result g${grade}` }, [
@@ -269,8 +310,14 @@ function renderResult(props: SummonProps): HTMLElement {
     omen,
     el("div", { className: "summon-result" }, [
       banner,
-      // 引きの内訳はカードの真下に置く。離すと「何が出たか」と結び付かない
-      el("div", { className: "summon-result__body" }, [body, summaryChips(results)]),
+      // 引きの内訳はカードの真下に置く。離すと「何が出たか」と結び付かない。
+      // ただし1体だけの時は「1体の内訳 R×1」という**数える意味のない表**に
+      // なるので出さない。銘板が名前も星もレア度も既に言っている
+      el(
+        "div",
+        { className: "summon-result__body" },
+        results.length > 1 ? [body, summaryChips(results)] : [body],
+      ),
       actions,
     ]),
     skip,

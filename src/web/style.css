@@ -1924,12 +1924,6 @@ body {
   text-align: left;
 }
 
-.equip-card__slot {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--accent);
-}
-
 .equip-card__star {
   font-size: 0.7rem;
   color: #ffd166;
@@ -2731,12 +2725,6 @@ body {
   margin-bottom: 2px;
 }
 
-.equip-card__slot {
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-}
 
 .equip-card__set {
   font-size: 0.58rem;
@@ -4292,4 +4280,904 @@ body {
   flex: 1 1 auto;
   min-height: 38px;
   justify-content: center;
+}
+
+/* ==========================================================================
+ * 装備の画面を組み直す
+ *
+ * それまでの装備画面は、上から順に
+ *   幅いっぱいの「装備ダンジョンに挑戦する」(60px)
+ *   → 枠の絞り込み 7枚が2段(84px)
+ *   → 並べ替え 6枚が2段(84px)
+ *   → 幅いっぱいの「まとめて売却する」(48px)
+ * と積み上がり、**縦360px を使い切っても装備が1枚も見えなかった**。
+ * しかも絞り込みと並べ替えは同じ形・同じ青の札で、どこまでが1つの群れなのか
+ * 読み取れない。ここでは
+ *
+ *   行き先と整理を1段に(equip-toolbar)
+ *   枠は紋章の印にして1段に(equip-filter)
+ *   並べ替えは頭に名前を付けて金で選ぶ(equip-sort)
+ *
+ * と分けて、上のつまみを約180pxまで畳む。
+ * ========================================================================== */
+
+/* 手放す操作。青(主役)でも金(最上位)でもない**戻れない側**の色を1つ用意する。
+ * 今まで売却が「外す」「一覧に戻る」と同じ灰色の札だったので、
+ * 取り返しのつかない操作だけが持つ色が無かった */
+.btn--danger {
+  color: #ffe7e2;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -10%, rgba(255, 255, 255, 0.32), transparent 70%),
+    linear-gradient(180deg, #8c3524 0%, #5f2117 52%, #35120d 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 190, 170, 0.45),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(232, 120, 90, 0.42),
+    var(--drop-soft);
+}
+
+/* --- 上の操作帯 ---------------------------------------------------------- */
+
+.equip-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.equip-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 46px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+}
+
+.equip-toolbar .icon {
+  font-size: 18px;
+  flex: none;
+}
+
+.equip-toolbar__go .icon {
+  color: #5a3405;
+}
+
+/* まとめ売りは普段は使わない道具。選んでいる間だけ色が乗る */
+.equip-toolbar__select {
+  color: #b9c6e6;
+}
+
+.equip-toolbar__select .icon {
+  color: #7d8fb8;
+}
+
+.equip-toolbar__select--on {
+  color: #eaf3ff;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -10%, rgba(150, 200, 255, 0.28), transparent 68%),
+    linear-gradient(180deg, #33406b 0%, #212a4a 52%, #161c33 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(190, 220, 255, 0.42),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(130, 170, 240, 0.4),
+    var(--drop-soft);
+}
+
+.equip-toolbar__select--on .icon {
+  color: #8fd0ff;
+}
+
+/* --- 枠で絞る ------------------------------------------------------------
+ * 印は40pxの角丸の座に嵌める。指の的も40pxで、絵と的の大きさが一致する
+ */
+.equip-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.equip-filter__chip {
+  position: relative;
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 11px;
+  cursor: pointer;
+  color: #8b9ac0;
+  background: var(--grain), linear-gradient(180deg, #222941 0%, #161b2e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition: color 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease;
+}
+
+.equip-filter__chip .icon {
+  font-size: 20px;
+}
+
+/* 番号は印の右下に小さく添える。印だけだと6つを覚えるまで迷う */
+.equip-filter__chip small {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0.72;
+}
+
+.equip-filter__chip--all {
+  width: auto;
+  min-width: 52px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.equip-filter__chip:active {
+  transform: translateY(1px);
+}
+
+/* 選ばれている枠。面を起こして金の縁を回す */
+.equip-filter__chip--active {
+  color: #ffe7b8;
+  background:
+    radial-gradient(ellipse 80% 80% at 50% 0%, rgba(255, 214, 150, 0.24), transparent 70%),
+    linear-gradient(180deg, #3c3320 0%, #251d10 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 230, 180, 0.4),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.65),
+    0 0 14px rgba(255, 180, 70, 0.22);
+}
+
+/* --- 並べ替え ------------------------------------------------------------ */
+
+.equip-sort {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+/* 頭に何の帯かを置く。無いと絞り込みの帯と見分けが付かない */
+.equip-sort__label {
+  flex: none;
+  padding-top: 8px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #a98f63;
+  white-space: nowrap;
+}
+
+.equip-sort__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.equip-sort__chip {
+  appearance: none;
+  min-height: 36px;
+  padding: 6px 11px;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #93a2c6;
+  background: linear-gradient(180deg, rgba(30, 36, 58, 0.9), rgba(18, 22, 38, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition: color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.equip-sort__chip:active {
+  box-shadow: var(--inset-deep);
+}
+
+/* 選ばれている順。
+ *
+ * ここを明るい金の面にしていたが、そうすると1画面に
+ * 「装備ダンジョン(明るい金)」「おすすめ(明るい金)」「すべて(暗い金)」が並び、
+ * **押すと何かが起きる面**と**今こうなっている印**が同じ色で競っていた。
+ * 明るい金は行き先を示す1枚だけに残し、選ばれている印は
+ * 枠の絞り込みと同じ「暗い座に金の縁」に揃える。形(角丸の四角と錠剤)が
+ * 違うので、2つの帯を取り違えることはない。 */
+.equip-sort__chip--active {
+  color: #ffe7b8;
+  background:
+    radial-gradient(ellipse 80% 90% at 50% 0%, rgba(255, 214, 150, 0.22), transparent 70%),
+    linear-gradient(180deg, #3c3320 0%, #251d10 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 230, 180, 0.4),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.65),
+    0 0 12px rgba(255, 180, 70, 0.18);
+}
+
+/* --- 一覧の札 ------------------------------------------------------------ */
+
+.equip-card {
+  padding: 9px 10px 10px;
+  gap: 0;
+}
+
+.equip-card__head {
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+/* 枠の紋章。等級の色を纏わせて座に嵌める。
+ * **字を読まずに「どの枠の物か」が分かる**のがこの札の一番の仕事 */
+.equip-card__sigil {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--eq-tone, #9fb0d8);
+  background:
+    radial-gradient(ellipse 90% 90% at 50% 0%, color-mix(in srgb, var(--eq-tone, #4a5372) 26%, transparent), transparent 72%),
+    linear-gradient(180deg, rgba(10, 14, 28, 0.9), rgba(5, 8, 18, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px color-mix(in srgb, var(--eq-tone, #4a5372) 45%, transparent);
+}
+
+.equip-card__sigil .icon {
+  font-size: 19px;
+}
+
+.equip-card__head-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.equip-card__set {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 持ち主。前は最下行の小さな灰色の字だけで、
+ * **一覧でいちばん知りたいこと**がいちばん弱かった。頭に色の点を置く */
+.equip-card__owner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.equip-card__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: #5fd68a;
+  box-shadow: 0 0 7px rgba(95, 214, 138, 0.8);
+}
+
+.equip-card__owner--free .equip-card__dot {
+  background: #3d4560;
+  box-shadow: none;
+}
+
+/* --- 詳細 ----------------------------------------------------------------
+ * 文字を7行積んだだけの板だったので、主役の数字が埋もれていた。
+ * 紋章・メインの数値・強化の帯・サブ・持ち主、と役割で層に分ける。
+ */
+
+.equipment-screen--detail {
+  gap: 10px;
+}
+
+.equip-detail {
+  gap: 12px;
+  padding: 14px;
+}
+
+/* 板の上端の光を、その装備の等級の色に差し替える */
+.equip-detail::before {
+  background: linear-gradient(90deg, transparent, var(--eq-tone, rgba(180, 205, 255, 0.55)), transparent);
+}
+
+.equip-detail__top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.equip-detail__sigil {
+  width: 68px;
+  height: 68px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: var(--eq-tone, #9fb0d8);
+  background:
+    radial-gradient(ellipse 90% 90% at 50% 2%, color-mix(in srgb, var(--eq-tone, #4a5372) 30%, transparent), transparent 74%),
+    linear-gradient(180deg, rgba(10, 14, 28, 0.92), rgba(4, 7, 16, 0.96));
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px color-mix(in srgb, var(--eq-tone, #4a5372) 55%, transparent),
+    0 0 20px color-mix(in srgb, var(--eq-glow, transparent) 70%, transparent);
+}
+
+.equip-detail__sigil .icon {
+  font-size: 38px;
+}
+
+.equip-detail__ident {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.equip-detail__star {
+  font-size: 0.86rem;
+  letter-spacing: -0.02em;
+  color: var(--eq-tone, #ffd166);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--eq-glow, transparent) 80%, transparent);
+}
+
+.equip-detail__set {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--eq-set, #b9c6ea);
+}
+
+/* この装備を選ぶ理由。板の中でいちばん大きい字はここ1つだけ */
+.equip-detail__main {
+  margin-top: 2px;
+  font-size: 1.32rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* 強化。数字だけでは「あとどれだけ伸ばせるか」が伝わらない */
+.equip-detail__gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.equip-detail__gauge-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  color: #a98f63;
+}
+
+.equip-detail__gauge-head strong {
+  margin-left: auto;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: #ffe8a3;
+}
+
+.equip-detail__gauge-head small {
+  font-size: 0.66rem;
+  letter-spacing: 0;
+  color: #7d8fb8;
+}
+
+.equip-detail__track {
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(4, 8, 18, 0.85);
+  box-shadow: var(--inset-deep);
+  overflow: hidden;
+}
+
+.equip-detail__track i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--gold-grad);
+  box-shadow: 0 0 10px rgba(255, 190, 60, 0.55);
+}
+
+.equip-detail__subs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.equip-detail__subs-label {
+  margin-bottom: 2px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #a98f63;
+}
+
+.equip-detail__sub-line {
+  font-size: 0.8rem;
+  color: #cfd8f5;
+  font-variant-numeric: tabular-nums;
+}
+
+.equip-detail__sub-line--empty {
+  color: #6b7899;
+}
+
+.equip-detail__owner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 0.74rem;
+  color: #cfe6d8;
+}
+
+.equip-detail__owner--free {
+  color: #7d8fb8;
+}
+
+/* 育てる。この画面の主役なので金で、いちばん背が高い */
+.btn.equip-detail__enhance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+}
+
+.equip-detail__enhance .icon {
+  font-size: 19px;
+  color: #5a3405;
+}
+
+.equip-detail__enhance-lead {
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.equip-detail__enhance-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #ffeec2;
+  background: rgba(56, 26, 2, 0.62);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(255, 216, 150, 0.3);
+}
+
+.equip-detail__enhance-cost .icon {
+  font-size: 13px;
+  color: #f5c860;
+}
+
+.equip-detail__enhance-cost strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.equip-detail__maxed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px;
+  border-radius: 13px;
+  font-size: 0.82rem;
+  color: #e2c68e;
+  background: linear-gradient(180deg, rgba(38, 32, 20, 0.86), rgba(18, 15, 10, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 186, 0.28),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.3);
+}
+
+.equip-detail__maxed .icon {
+  font-size: 17px;
+  color: #ffd98a;
+}
+
+/* 付け外しと売却。主役より一段低く、それでも指の的は44pxを割らない */
+.btn.equip-detail__act {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  font-size: 0.88rem;
+}
+
+.equip-detail__act .icon {
+  font-size: 17px;
+}
+
+.equip-detail__sell-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.equip-detail__sell-price .icon {
+  font-size: 13px;
+  color: #f5c860;
+}
+
+.equip-detail__note {
+  margin: -2px 0 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #8b7a5e;
+}
+
+/* 戻るは操作ではなく出口。いちばん静かにする */
+.btn.equip-detail__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  font-size: 0.82rem;
+  color: #8b9ac0;
+  background: linear-gradient(180deg, rgba(26, 31, 50, 0.9), rgba(15, 19, 33, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.equip-detail__back .icon {
+  font-size: 16px;
+}
+
+.equip-detail__back::after {
+  opacity: 0.18;
+}
+
+/* --- まとめ売りの帯 ------------------------------------------------------ */
+
+.bulk-bar__price {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  color: #ffe0a0;
+}
+
+.bulk-bar__price .icon {
+  font-size: 14px;
+  color: #f5c860;
+}
+
+.btn.bulk-bar__go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bulk-bar__go .icon {
+  font-size: 17px;
+}
+
+/* 画面ぜんぶの間隔。既定の16pxのままだと、畳んだつまみの間に
+ * また余白が積もって元の高さに戻ってしまう */
+.equipment-screen {
+  gap: 10px;
+}
+
+/* ==========================================================================
+ * ショップを「棚」にする
+ *
+ * それまでは3行の説明文の下に灰色の札が並ぶだけで、**買う場所には見えなかった**。
+ * 装備はどれも「⚔」の1文字、鍵は黄色い南京錠の絵文字、値段は色の付いていない
+ * 板。売り切れは札が薄くなるだけで、何が起きたのか分からない。
+ *
+ *   帳場(持ち金 + 砂時計) → 棚(木口の縁) → 品札(紋章・値札・売切の判)
+ *
+ * の3層に分けて、店として成立させる。
+ * ========================================================================== */
+
+.shop-screen {
+  gap: 10px;
+}
+
+/* --- 帳場 ---------------------------------------------------------------- */
+
+.shop-counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 9px 13px;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse 70% 160% at 12% -30%, rgba(255, 236, 180, 0.12), transparent 62%),
+    linear-gradient(180deg, rgba(38, 32, 20, 0.82) 0%, rgba(18, 15, 10, 0.88) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 186, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.3),
+    var(--drop-soft);
+}
+
+.shop-counter__purse {
+  display: flex;
+  gap: 7px;
+}
+
+/* 持ち金。彫り込んだ受け皿。召喚画面の手持ちと同じ作りにして、
+ * 「払える物を確かめる場所」の見え方を画面ごとに変えない */
+.shop-purse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #ecf3ff;
+  background: linear-gradient(180deg, rgba(10, 13, 26, 0.9), rgba(5, 8, 18, 0.92));
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.26);
+}
+
+.shop-purse .icon { font-size: 15px; }
+.shop-purse--gold .icon { color: #f5c860; }
+.shop-purse--crystal .icon { color: #74d0ff; }
+
+/* 桁の多い所持金では2段に折り返す。space-between は折り返した行に効かないので、
+ * 砂時計側に margin-left:auto を持たせて**どちらの段でも右端に揃える** */
+.shop-counter__timer {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #ffe0a0;
+}
+
+.shop-counter__timer-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #a98f63;
+}
+
+.shop-counter__timer strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 買えた合図 ---------------------------------------------------------- */
+
+.shop-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 13px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(180deg, rgba(46, 104, 74, 0.5), rgba(20, 48, 34, 0.6));
+  box-shadow:
+    inset 0 1px 0 rgba(190, 255, 220, 0.28),
+    inset 0 0 0 1px rgba(95, 214, 138, 0.34);
+  color: #cdf3dd;
+  font-size: 0.84rem;
+}
+
+.shop-notice .icon {
+  font-size: 17px;
+  flex: none;
+  color: #7fe6a8;
+}
+
+/* --- 棚 ------------------------------------------------------------------ */
+
+/* 板の上端の光を金へ。ここから下は店の中、という切り替えになる */
+.shop-shelf::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 224, 170, 0.6) 22%, rgba(255, 224, 170, 0.6) 78%, transparent);
+}
+
+/* --- 品札 ---------------------------------------------------------------- */
+
+.shop-card {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px var(--shop-edge, rgba(255, 255, 255, 0.09)),
+    var(--drop-soft);
+}
+
+/* 品の種類で縁の色を変える。並んだ時に何が来ているか一目で分かる */
+.shop-card[data-kind="EQUIPMENT"] { --shop-edge: rgba(120, 170, 255, 0.34); }
+.shop-card[data-kind="MONSTER"] { --shop-edge: rgba(255, 160, 120, 0.34); }
+.shop-card[data-kind="SCROLL"] { --shop-edge: rgba(200, 150, 255, 0.34); }
+
+/* 品を置く座。等級の色をうっすら差して、絵が浮いて見えるようにする */
+.shop-card__icon {
+  color: var(--eq-tone, #b9c6ea);
+  background:
+    radial-gradient(ellipse 90% 90% at 50% 2%, color-mix(in srgb, var(--eq-tone, #4a5372) 26%, transparent), transparent 74%),
+    linear-gradient(180deg, rgba(8, 11, 22, 0.85), rgba(3, 5, 13, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--eq-tone, #4a5372) 38%, transparent);
+}
+
+.shop-card__icon .icon {
+  font-size: 30px;
+}
+
+.shop-card__icon--scroll { color: #d9b8ff; }
+.shop-card__icon--lock { color: #8b7a5e; }
+
+/* 値札。金貨の面に数字を打つ。押せる的は42px(共通の下限)を保つ */
+.shop-card__buy {
+  background:
+    radial-gradient(ellipse 90% 80% at 50% -10%, rgba(255, 255, 255, 0.5), transparent 70%),
+    linear-gradient(180deg, #ffe1a0 0%, #f0a83c 52%, #c2761a 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1.5px 0 rgba(110, 58, 4, 0.42),
+    inset 0 0 0 1px rgba(120, 62, 8, 0.34),
+    var(--drop-soft);
+  transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.shop-card__buy:active:not(:disabled) {
+  transform: translateY(1.5px);
+  box-shadow: var(--inset-deep);
+  filter: brightness(0.93);
+}
+
+.shop-card__buy .icon { color: #6b3f06; }
+
+.shop-card__buy--crystal {
+  background:
+    radial-gradient(ellipse 90% 80% at 50% -10%, rgba(255, 255, 255, 0.5), transparent 70%),
+    linear-gradient(180deg, #b8ecff 0%, #4aa6e8 52%, #1f6aa8 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -1.5px 0 rgba(4, 44, 76, 0.45),
+    inset 0 0 0 1px rgba(10, 62, 104, 0.34),
+    var(--drop-soft);
+}
+
+.shop-card__buy--crystal .icon { color: #08324f; }
+
+/* 買えない理由が「金が足りない」時。**押せないこと**と**足りないこと**は別。
+ * 面を落として朱の罫だけ残し、値段は読めるままにする */
+.shop-card__buy--short {
+  color: #d8a89a;
+  background: linear-gradient(180deg, rgba(46, 28, 26, 0.9), rgba(26, 16, 15, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 190, 170, 0.16),
+    inset 0 0 0 1px rgba(200, 96, 70, 0.36);
+}
+
+.shop-card__buy--short .icon { color: #c4705a; }
+
+.shop-card__buy:disabled {
+  cursor: default;
+  filter: none;
+}
+
+/* 売り切れ。札を薄くするだけでは「何も無い」と区別が付かないので判を1つ押す */
+.shop-card--sold {
+  opacity: 0.62;
+}
+
+.shop-card__sold-seal {
+  position: absolute;
+  top: 12px;
+  right: -30px;
+  width: 108px;
+  padding: 3px 0;
+  transform: rotate(34deg);
+  text-align: center;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
+  color: #ffdfd6;
+  background: linear-gradient(180deg, rgba(150, 52, 36, 0.92), rgba(96, 28, 18, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 190, 170, 0.4), 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.shop-card--sold .shop-card__buy {
+  background: linear-gradient(180deg, rgba(34, 40, 62, 0.9), rgba(18, 22, 38, 0.92));
+  color: #8b9ac0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.shop-card--sold .shop-card__buy .icon { color: #6f7f9f; }
+
+/* まだ開いていない棚。破線のままだと「壊れている枠」に見えるので、
+ * 金の点線にして**これから開く場所**だと分からせる */
+.shop-card--locked {
+  background: linear-gradient(180deg, rgba(24, 21, 14, 0.6), rgba(12, 11, 8, 0.7));
+  box-shadow: inset 0 0 0 1px rgba(226, 182, 110, 0.16);
+}
+
+.shop-card--locked .shop-card__icon {
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(226, 182, 110, 0.22);
+}
+
+/* 次に開ける1枠だけは金の縁を強め、そこが手を出せる場所だと示す */
+.shop-card--next {
+  box-shadow: inset 0 0 0 1px rgba(226, 182, 110, 0.45), 0 0 16px rgba(255, 180, 70, 0.12);
+}
+
+.shop-footnote {
+  margin: 12px 0 0;
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: #7d8fb8;
+}
+
+/* 装備の札を押した手応え。
+ *
+ * 札は button なのに :active が無く、**押しても何も返ってこなかった**。
+ * モンスターの札(.mcard)は既に沈むようにしてあるので、同じ返事を返す。
+ * 装着中で押せない札だけは沈ませない(押せると誤解させないため) */
+.equip-card:active:not(.equip-card--locked) {
+  transform: translateY(1px);
+  filter: brightness(0.94);
+}
+
+.equip-card {
+  transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.15s ease;
+}
+
+/* .icon は display:block なので、flex にしていないボタンの中に置くと
+ * **図だけが1行を占めて文字が下へ落ちる**。図を入れたボタンは必ず並べる */
+.btn.equip-picker__cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.equip-picker__cancel .icon {
+  font-size: 18px;
 }
