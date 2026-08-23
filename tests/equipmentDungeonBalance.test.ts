@@ -234,20 +234,41 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     expect(floor10Rate).toBeLessThan(floor1Rate);
   });
 
+  /**
+   * 難しさは powerScale だけでは測れない。
+   *
+   * 速度は**手番の数**に直結するので、同じ powerScale でも敵が速ければ
+   * 受けるダメージの総量は増える。速度カーブを別に持たせた以上、
+   * 「階が進むほど厳しくなっているか」は両方を掛けた値で見る。
+   */
+  const difficultyOf = (floor: number) => {
+    const f = EQUIPMENT_DUNGEON_FLOORS[floor - 1];
+    return f.powerScale * f.speedScale;
+  };
+
   it("終盤(7階以降)は、6階までの線形カーブから大きく跳ね上がる", () => {
     // 以前は9・10階だけが跳ね上がる形だった。7・8階が緩すぎて
-    // 「楽にすぐ回れてしまう」ため、跳ね上がりの開始を7階へ前倒ししてある。
-    // ここで確かめるのは**終盤が線形の延長ではないこと**
-    const scale = (floor: number) => EQUIPMENT_DUNGEON_FLOORS[floor - 1].powerScale;
-    const linearStep = scale(6) - scale(5);
+    // 「楽にすぐ回れてしまう」ため、跳ね上がりの開始を7階へ前倒ししてある
+    const linearStep = difficultyOf(6) - difficultyOf(5);
     for (const floor of [7, 8, 9, 10]) {
-      expect(scale(floor) - scale(floor - 1), `${floor}階`).toBeGreaterThan(linearStep);
+      expect(difficultyOf(floor) - difficultyOf(floor - 1), `${floor}階`).toBeGreaterThan(linearStep);
     }
   });
 
-  it("階層が上がるほどpowerScaleが単調増加する", () => {
+  it("階層が上がるほど、硬さも速さも単調増加する", () => {
     for (let i = 1; i < EQUIPMENT_DUNGEON_FLOORS.length; i++) {
-      expect(EQUIPMENT_DUNGEON_FLOORS[i].powerScale).toBeGreaterThan(EQUIPMENT_DUNGEON_FLOORS[i - 1].powerScale);
+      const prev = EQUIPMENT_DUNGEON_FLOORS[i - 1];
+      const cur = EQUIPMENT_DUNGEON_FLOORS[i];
+      expect(cur.powerScale, `${i + 1}階のpowerScale`).toBeGreaterThan(prev.powerScale);
+      expect(cur.speedScale, `${i + 1}階のspeedScale`).toBeGreaterThan(prev.speedScale);
     }
+  });
+
+  it("**速度はHPや攻撃力ほど急には伸ばさない**", () => {
+    // 速度は手番の数に直結する。同じ勢いで伸ばすと、こちらが動く前に
+    // 一方的に殴られる展開になる
+    const first = EQUIPMENT_DUNGEON_FLOORS[0];
+    const last = EQUIPMENT_DUNGEON_FLOORS[EQUIPMENT_DUNGEON_FLOORS.length - 1];
+    expect(last.speedScale / first.speedScale).toBeLessThan(last.powerScale / first.powerScale);
   });
 });

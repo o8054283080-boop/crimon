@@ -11,9 +11,15 @@ export interface DungeonLikeFloor {
   enemies: DungeonEnemy[];
   /** 敵の実効ステータスに掛かる倍率 */
   powerScale: number;
+  /**
+   * 敵の速度に掛かる倍率。省略時は1(据え置き)。
+   * **速度は手番の数に直結する**ので、HPや攻撃力と同じ倍率で伸ばすと
+   * 一方的に殴られる展開になる。階層ごとに別のカーブを持たせている。
+   */
+  speedScale?: number;
 }
 
-function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number): MonsterDefinition {
+function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale: number): MonsterDefinition {
   const dex = resolveDex(`${enemy.templateId}_${enemy.element}`);
   const base = computeEffectiveStats(dex.stats, enemy.star, enemy.level);
   const stats = {
@@ -23,7 +29,7 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number): MonsterDe
     hp: Math.round(base.hp * powerScale * (enemy.hpMultiplier ?? 1)),
     atk: scaledEnemyAtk(base.atk * powerScale),
     def: Math.round(base.def * powerScale),
-    spd: Math.round(base.spd * (enemy.spdMultiplier ?? 1)),
+    spd: Math.round(base.spd * (enemy.spdMultiplier ?? 1) * speedScale),
   };
   return {
     ...dex,
@@ -34,7 +40,7 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number): MonsterDe
 }
 
 export function buildDungeonEnemyTeam(floor: DungeonLikeFloor): MonsterDefinition[] {
-  return floor.enemies.map((enemy) => defFromDungeonEnemy(enemy, floor.powerScale));
+  return floor.enemies.map((enemy) => defFromDungeonEnemy(enemy, floor.powerScale, floor.speedScale ?? 1));
 }
 
 export interface DungeonBattleSetup {

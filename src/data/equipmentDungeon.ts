@@ -34,6 +34,8 @@ export interface DungeonFloor {
   enemies: DungeonEnemy[];
   /** 敵の実効ステータスに掛かる倍率。装備を整えた強いパーティ向けなので通常ステージより高めに設定 */
   powerScale: number;
+  /** 敵の速度に掛かる倍率。powerScale とは別にする(速度は手番の数に直結するため) */
+  speedScale: number;
   goldReward: number;
 }
 
@@ -128,7 +130,7 @@ const POWER_SCALE_END = 1.215;
  * 装備を極めた通常モンスターだけの編成でも突破できる場合はあるが、
  * SR/SSR軸の編成と比べれば依然としてはっきり不利になるよう調整してある。
  */
-const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 7: 1.55, 8: 2.18, 9: 2.15, 10: 2.10 };
+const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 7: 1.55, 8: 1.90, 9: 1.80, 10: 1.72 };
 
 /*
  * 2度目の引き上げ(「簡単すぎて楽にすぐ回れてしまう。とくに8・9・10階」との指摘)。
@@ -151,6 +153,27 @@ const LATE_FLOOR_POWER_BONUS: Partial<Record<number, number>> = { 7: 1.55, 8: 2.
  *   (★6Lv60+★6装備サブ4で3%/1%/0%)。設計の方針とはぶつかるので、
  *   ここを戻す判断をするなら7〜10階の倍率をまとめて下げること
  */
+
+/**
+ * 階層ごとの敵の速度倍率。
+ *
+ * **速度だけが階層に関係なく据え置きだった。**powerScale はHP・攻撃・防御に
+ * 掛かるが速度には掛からないため、1階の敵も10階の敵も同じ速さだった。
+ * 一方でプレイヤー側は★6装備の副効果を詰めると **300を超える**
+ * (素120のドラゴンが310)。結果、終盤では**こちらが敵の2〜3倍動く**状態になり、
+ * 実測でも速度を詰めるだけで10階の勝率が28%→83%へ跳ね上がっていた。
+ *
+ * 速度は「何回動けるか」に直結するので、HPや攻撃力と同じ勢いで上げると
+ * 手も足も出なくなる。**powerScaleよりずっと緩やかに**伸ばす。
+ * 10階で1.85倍(ボス153→283)。速度を詰めたプレイヤーと肩を並べる程度に留め、
+ * 詰めていない編成が置き去りにならないようにしてある。
+ */
+const SPEED_SCALE_START = 1;
+const SPEED_SCALE_END = 1.85;
+
+function speedScaleForFloor(floor: number): number {
+  return SPEED_SCALE_START + ((floor - 1) * (SPEED_SCALE_END - SPEED_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
+}
 
 function powerScaleForFloor(floor: number): number {
   const base = POWER_SCALE_START + ((floor - 1) * (POWER_SCALE_END - POWER_SCALE_START)) / (DUNGEON_FLOOR_COUNT - 1);
@@ -188,7 +211,14 @@ function buildFloor(floor: number): DungeonFloor {
     })),
   ];
 
-  return { floor, name: `装備ダンジョン ${floor}階`, enemies, powerScale: powerScaleForFloor(floor), goldReward: 60 * floor };
+  return {
+    floor,
+    name: `装備ダンジョン ${floor}階`,
+    enemies,
+    powerScale: powerScaleForFloor(floor),
+    speedScale: speedScaleForFloor(floor),
+    goldReward: 60 * floor,
+  };
 }
 
 export const EQUIPMENT_DUNGEON_FLOORS: DungeonFloor[] = Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildFloor(i + 1));

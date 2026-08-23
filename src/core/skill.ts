@@ -20,7 +20,12 @@ export type BuffStat = "atk" | "def" | "spd" | "criRate" | "criDmg";
 export const SCALE_REFERENCE: Record<"spd" | "def" | "hp", number> = {
   hp: 30000,
   def: 3500,
-  spd: 110,
+  // 速度の基準を110にしていたのは**素のステータスを見ていたから**で、
+  // 実態と合っていなかった。★6装備の副効果を速度に寄せると
+  // 素120のドラゴンが310まで伸びる(実測)。110を基準にすると、
+  // 速度補正付きのスキルが終盤で想定の3倍近く効いてしまう。
+  // 全員が速度を詰めるわけではないので、中間の200を基準に置く
+  spd: 200,
 };
 
 export interface DamageEffect {

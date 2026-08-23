@@ -590,14 +590,16 @@ const IMP: MonsterTemplate = {
   darkSkill3: {
     id: "imp_s3_dark",
     name: "サイレントカース",
-    description: "敵全体に攻撃力1.1倍のダメージを与え、70%で全員のスキルのクールタイムを1ターン延長し、60%で3ターン毒(1スタック)を付与する。",
+    description: "敵全体に攻撃力2.0倍のダメージを与え、70%で全員のスキルのクールタイムを1ターン延長し、85%で4ターン毒(1スタック)を付与する。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.1 },
+      // 延長を2ターン100%から1ターン70%へ落としたぶん、火力と毒で釣り合わせる
+      // (実測で通常のスキル3を0.17下回っていた)
+      { kind: "DAMAGE", multiplier: 2.0 },
       // 2ターン延長は、当たった相手が2巡ぶん何もできなくなる。1ターンでも十分に重い
       { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 },
-      { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.6 },
+      { kind: "POISON", damageRatePerStack: 0.08, durationTurns: 4, chance: 0.85 },
     ],
   },
 };
@@ -1101,11 +1103,11 @@ const GRIFFON: MonsterTemplate = {
   darkSkill3: {
     id: "griffon_s3_dark",
     name: "シャドウタロン",
-    description: "影の鉤爪で敵単体に攻撃力1.7倍のダメージを3回与え、70%で2ターン防御力を大きく低下させる。自身の速度が高いほど威力が上がる。",
+    description: "影の鉤爪で敵単体に攻撃力1.9倍のダメージを3回与え、70%で2ターン防御力を大きく低下させる。自身の速度が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.7, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
+      { kind: "DAMAGE", multiplier: 1.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } },
       { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
     ],
   },
