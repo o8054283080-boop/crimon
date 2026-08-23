@@ -61,32 +61,75 @@ function renderSaveDataPanel(props: HomeProps): HTMLElement {
   ]);
 }
 
+/* ==========================================================================
+ * 受け取りの帯(ログインボーナス・お詫びの配布)
+ *
+ * どちらもメニューの**最上段**という一等地に出る。ここが青枠に緑の文字の
+ * ままだと、せっかく金と熾火で組んだ画面の頭に、前の世界の紙が1枚
+ * 貼られているように見える。それ以前に、緑はこのゲームでは体力の色で、
+ * 「もらえた」という意味を運んでいない。
+ *
+ * 作りは2つとも同じにする:**封蝋(印)+ 中身 + 閉じる**。
+ * 貰った量は文中の数字ではなく、アイコンを添えた一行で立てる。
+ * ========================================================================== */
+
+interface RewardLine {
+  name: IconName;
+  amount: string;
+  unit: string;
+}
+
+/** 貰ったものを1行ずつ。数字を大きく、単位は添える程度に */
+function rewardList(lines: RewardLine[]): HTMLElement {
+  return el(
+    "ul",
+    { className: "reward-list" },
+    lines.map((line) =>
+      el("li", {}, [icon(line.name), el("strong", {}, [line.amount]), el("span", {}, [line.unit])]),
+    ),
+  );
+}
+
+/** 封蝋。金の丸に印を1つ落とす。帯の中で目が最初に止まる場所を作る */
+function rewardSeal(name: IconName): HTMLElement {
+  return el("div", { className: "reward-banner__seal", "aria-hidden": "true" }, [icon(name)]);
+}
+
 function renderCompensationBanner(claims: CompensationClaim[], onDismiss: () => void): HTMLElement {
   const rows: HTMLElement[] = [];
   for (const { compensation } of claims) {
-    rows.push(el("p", { className: "compensation__title" }, [`🎁 ${compensation.title}`]));
+    rows.push(el("p", { className: "compensation__title" }, [compensation.title]));
     rows.push(el("p", { className: "compensation__message" }, [compensation.message]));
-    const items: string[] = [];
-    if (compensation.crystal > 0) items.push(`💎 ダイヤ ${compensation.crystal.toLocaleString()}`);
-    if (compensation.gold > 0) items.push(`🪙 ゴールド ${compensation.gold.toLocaleString()}`);
-    if (compensation.summonScrolls > 0) items.push(`📜 召喚の書 ${compensation.summonScrolls}枚`);
-    rows.push(el("p", { className: "compensation__items" }, [items.join(" / ")]));
+    const items: RewardLine[] = [];
+    if (compensation.crystal > 0) items.push({ name: "crystal", amount: `+${compensation.crystal.toLocaleString("ja-JP")}`, unit: "ダイヤ" });
+    if (compensation.gold > 0) items.push({ name: "coin", amount: `+${compensation.gold.toLocaleString("ja-JP")}`, unit: "ゴールド" });
+    if (compensation.summonScrolls > 0) items.push({ name: "scroll", amount: `+${compensation.summonScrolls}`, unit: "召喚の書" });
+    if (items.length > 0) rows.push(rewardList(items));
   }
-  return el("section", { className: "panel compensation" }, [
-    ...rows,
-    el("button", { type: "button", className: "btn btn--ghost", onclick: onDismiss }, ["閉じる"]),
+  return el("section", { className: "panel reward-banner compensation" }, [
+    rewardSeal("scroll"),
+    el("div", { className: "reward-banner__body" }, [el("p", { className: "reward-banner__label" }, ["お詫びの配布"]), ...rows]),
+    el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
   ]);
 }
 
 function renderLoginBonusBanner(result: LoginBonusResult, onDismiss: () => void): HTMLElement {
   const total = result.dailyCrystal + result.milestoneCrystal;
-  const lines = [`🎁 ログインボーナスでダイヤ+${total}獲得!`];
+  const body: HTMLElement[] = [
+    el("p", { className: "reward-banner__label" }, ["ログインボーナス"]),
+    rewardList([{ name: "crystal", amount: `+${total.toLocaleString("ja-JP")}`, unit: "ダイヤ" }]),
+  ];
   if (result.milestoneCrystal > 0) {
-    lines.push(`✨ ${LOGIN_BONUS_MILESTONE_INTERVAL_DAYS}日分ログインで追加ボーナス+${result.milestoneCrystal}も獲得しました!`);
+    body.push(
+      el("p", { className: "reward-banner__note" }, [
+        `${LOGIN_BONUS_MILESTONE_INTERVAL_DAYS}日分ログインで追加ボーナス +${result.milestoneCrystal}`,
+      ]),
+    );
   }
-  return el("section", { className: "panel login-bonus-banner" }, [
-    ...lines.map((line) => el("p", {}, [line])),
-    el("button", { type: "button", className: "btn btn--ghost", onclick: onDismiss }, ["閉じる"]),
+  return el("section", { className: "panel reward-banner login-bonus-banner" }, [
+    rewardSeal("crystal"),
+    el("div", { className: "reward-banner__body" }, body),
+    el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
   ]);
 }
 

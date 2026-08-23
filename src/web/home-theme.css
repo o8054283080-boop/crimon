@@ -519,10 +519,7 @@
 .home-group__title { display: flex; align-items: center; gap: 7px; font-size: .62rem; letter-spacing: .2em; color: #a8b6d6; padding-left: 2px; }
 .home-menu-grid--2 { grid-template-columns: repeat(2, 1fr); }
 
-/* --- 下のタブ ------------------------------------------------------------
- * 7個から5個に減らしたぶん、1つあたりの幅が広がって文字が切れなくなった
- */
-.bottom-nav__icon { font-size: 21px; color: inherit; display: grid; place-items: center; }
+/* 下のタブは style.css に1か所でまとめてある(ここに書き足すと二重になる) */
 
 body:has(.title-screen) { overflow: hidden; }
 
