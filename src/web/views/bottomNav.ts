@@ -46,6 +46,9 @@ export function renderBottomNav(current: ScreenName, onNavigate: (screen: Screen
       {
         type: "button",
         className: "bottom-nav__btn" + (tab.screen === current ? " bottom-nav__btn--active" : ""),
+        // 巡回(tools/tour.mjs)がここを目印にする。**文言で探させると、
+        // ラベルを変えるたびに巡回が壊れて「画面の崩れ」と誤報する**
+        "data-tour": `tab:${tab.screen}`,
         onclick: () => onNavigate(tab.screen),
       },
       [

@@ -32,19 +32,28 @@ async function call(command, body = {}) {
  * 画面の一覧。`open` は、その画面へ移動するために画面上で行う操作。
  * 下部タブから行けるものはタブ名、そうでないものはボタンの文言で指定する。
  */
+/**
+ * 画面の一覧。
+ *
+ * `tab` / `tile` は画面に埋めた `data-tour` の値で指す。
+ * **文言で探すのはやめた。**ラベルを変えるたびに巡回が「移動できない」を出し、
+ * 画面が崩れているのか導線が変わっただけなのか区別が付かなくなる
+ * (実際に、タブの絵文字を外した回に10件の誤報が出た)。
+ * `then` だけは、対応する目印がまだ無い画面のために文言で残している。
+ */
 const SCREENS = [
-  { name: "ホーム", tab: "ホーム" },
-  { name: "召喚", tab: "召喚" },
-  { name: "モンスター", tab: "モンスター" },
-  { name: "装備", tab: "装備" },
-  { name: "パーティ", tab: "パーティ" },
-  { name: "ショップ", tab: "ショップ" },
-  { name: "ステージ", tab: "ステージ" },
-  // ホームのタイルは文言が変わりやすいので、先頭の絵文字で拾う
-  { name: "装備ダンジョン", tab: "ホーム", then: "🛡装備" },
-  { name: "レベル上げダンジョン", tab: "ホーム", then: "📈育成" },
-  { name: "ゴールドダンジョン", tab: "ホーム", then: "🪙ゴールド" },
-  { name: "モンスター図鑑", tab: "モンスター", then: "📖 図鑑" },
+  { name: "ホーム", tab: "HOME" },
+  { name: "モンスター", tab: "MONSTERS" },
+  { name: "装備", tab: "EQUIPMENT" },
+  { name: "パーティ", tab: "PARTY" },
+  { name: "ステージ", tab: "STAGES" },
+  // 下部タブは5つに絞ってあるので、残りはホームの一覧から入る
+  { name: "召喚", tab: "HOME", tile: "summon" },
+  { name: "ショップ", tab: "HOME", tile: "shop" },
+  { name: "装備ダンジョン", tab: "HOME", tile: "equipDungeon" },
+  { name: "レベル上げダンジョン", tab: "HOME", tile: "trainDungeon" },
+  { name: "ゴールドダンジョン", tab: "HOME", tile: "goldDungeon" },
+  { name: "モンスター図鑑", tab: "MONSTERS", then: "📖 図鑑" },
 ];
 
 const SIZES = [
@@ -170,14 +179,22 @@ async function goScreen(screen) {
   const clicked = await call("eval", {
     expression: `(async () => {
       const wait = (ms) => new Promise(r => setTimeout(r, ms));
-      const tab = [...document.querySelectorAll('.bottom-nav__btn')].find(b => b.textContent.includes(${JSON.stringify(screen.tab)}));
+      const tab = document.querySelector('[data-tour="tab:' + ${JSON.stringify(screen.tab)} + '"]');
       if (!tab) return 'タブが無い: ' + ${JSON.stringify(screen.tab)};
       tab.click();
       await wait(250);
       ${
+        screen.tile
+          ? `const tile = document.querySelector('[data-tour="tile:' + ${JSON.stringify(screen.tile)} + '"]');
+             if (!tile) return '一覧の枠が無い: ' + ${JSON.stringify(screen.tile)};
+             tile.click();
+             await wait(350);`
+          : ""
+      }
+      ${
         screen.then
           ? `const want = ${JSON.stringify(screen.then)};
-             const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim().startsWith(want)) 
+             const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim().startsWith(want))
                       || [...document.querySelectorAll('button')].find(b => b.textContent.includes(want));
              if (!btn) return 'ボタンが無い: ' + ${JSON.stringify(screen.then)};
              btn.click();

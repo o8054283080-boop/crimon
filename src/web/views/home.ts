@@ -158,7 +158,7 @@ function renderStamina(player: PlayerState, onPartial: () => void, onFull: () =>
           disabled: full || player.crystal < STAMINA_REFILL_PARTIAL_COST,
           onclick: onPartial,
         },
-        [`💎${STAMINA_REFILL_PARTIAL_COST} +${STAMINA_REFILL_PARTIAL_AMOUNT}`],
+        [icon("crystal"), `${STAMINA_REFILL_PARTIAL_COST} +${STAMINA_REFILL_PARTIAL_AMOUNT}`],
       ),
       el(
         "button",
@@ -168,7 +168,7 @@ function renderStamina(player: PlayerState, onPartial: () => void, onFull: () =>
           disabled: full || player.crystal < STAMINA_REFILL_FULL_COST,
           onclick: onFull,
         },
-        [`💎${STAMINA_REFILL_FULL_COST} 全回復`],
+        [icon("crystal"), `${STAMINA_REFILL_FULL_COST} 全回復`],
       ),
     ]),
   ]);
@@ -182,7 +182,8 @@ interface MenuTile {
 }
 
 function renderMenuTile(tile: MenuTile): HTMLElement {
-  return el("button", { type: "button", className: "home-tile", onclick: tile.onClick }, [
+  // data-tour は巡回(tools/tour.mjs)の目印。文言ではなくここを見てもらう
+  return el("button", { type: "button", className: "home-tile", "data-tour": `tile:${tile.name}`, onclick: tile.onClick }, [
     el("span", { className: "home-tile__icon" }, [icon(tile.name)]),
     el("span", { className: "home-tile__label" }, [tile.label]),
     el("span", { className: "home-tile__sub" }, [tile.sub]),

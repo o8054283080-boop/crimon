@@ -4,6 +4,7 @@ import { findMonsterById } from "../../data/monsters.js";
 import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult } from "../../game/gacha.js";
 import { PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { icon, IconName } from "../icons.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import "../ui/summon.css";
 import {
@@ -33,8 +34,8 @@ export interface SummonProps {
  * 操作は下端にまとめて、1画面で完結させる。
  */
 
-function costChip(icon: string, amount: number): HTMLElement {
-  return el("span", { className: "summon-cta__cost" }, [`${icon} ${amount}`]);
+function costChip(name: IconName, amount: number): HTMLElement {
+  return el("span", { className: "summon-cta__cost" }, [icon(name), el("strong", {}, [amount.toLocaleString("ja-JP")])]);
 }
 
 function renderIdle(props: SummonProps): HTMLElement {
@@ -56,7 +57,7 @@ function renderIdle(props: SummonProps): HTMLElement {
       [
         el("span", { className: "summon-cta__lead" }, ["10連召喚"]),
         el("span", { className: "summon-cta__sub" }, ["★4以上 1体確定"]),
-        costChip("💎", SUMMON_COST_TEN),
+        costChip("crystal", SUMMON_COST_TEN),
       ],
     ),
     el(
@@ -70,7 +71,7 @@ function renderIdle(props: SummonProps): HTMLElement {
       [
         el("span", { className: "summon-cta__lead" }, ["1回召喚"]),
         el("span", { className: "summon-cta__sub" }, ["★3以上 確定"]),
-        costChip("💎", SUMMON_COST_SINGLE),
+        costChip("crystal", SUMMON_COST_SINGLE),
       ],
     ),
     el(
@@ -84,7 +85,7 @@ function renderIdle(props: SummonProps): HTMLElement {
       [
         el("span", { className: "summon-cta__lead" }, ["書で10連"]),
         el("span", { className: "summon-cta__sub" }, ["★4以上 1体確定"]),
-        costChip("📜", 10),
+        costChip("scroll", 10),
       ],
     ),
     el(
@@ -98,7 +99,7 @@ function renderIdle(props: SummonProps): HTMLElement {
       [
         el("span", { className: "summon-cta__lead" }, ["書で1回"]),
         el("span", { className: "summon-cta__sub" }, ["ダイヤ不要"]),
-        costChip("📜", 1),
+        costChip("scroll", 1),
       ],
     ),
   ]);
@@ -107,8 +108,8 @@ function renderIdle(props: SummonProps): HTMLElement {
     el("div", { className: "summon-top" }, [
       el("h1", { className: "summon-top__title" }, ["召 喚"]),
       el("div", { className: "summon-top__wallet" }, [
-        el("span", { className: "summon-wallet" }, [`💎 ${player.crystal}`]),
-        el("span", { className: "summon-wallet summon-wallet--scroll" }, [`📜 ${player.summonScrolls}`]),
+        el("span", { className: "summon-wallet" }, [icon("crystal"), String(player.crystal.toLocaleString("ja-JP"))]),
+        el("span", { className: "summon-wallet summon-wallet--scroll" }, [icon("scroll"), String(player.summonScrolls)]),
       ]),
     ]),
     el("div", { className: "summon-stage" }, [buildAltar()]),
