@@ -28,6 +28,8 @@ export function partyMemberCard(
     badge: selected ? "編成中" : undefined,
     // 中央に出すとレベルの表示を覆ってしまうため、角に寄せる
     badgeCorner: true,
+    // 長押しは見えない。同じ詳細へ、目に見える入口も置く
+    onDetail: onLongPress,
   });
 }
 
@@ -51,7 +53,11 @@ export function renderPartySlots(
     const dex = findMonsterById(instance.dexId);
     const children = [
       withPortrait(el("span", { className: "party-slot__emoji" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
-      el("span", { className: "party-slot__star" }, [starLabel(instance.star)]),
+      // 星だけでは育ち具合が分からない。★6のLv1と★6のLv60が同じ見た目になっていた
+      el("span", { className: "party-slot__foot" }, [
+        el("span", { className: "party-slot__star" }, [starLabel(instance.star)]),
+        el("span", { className: "party-slot__lv" }, [`Lv${instance.level}`]),
+      ]),
       onRemove ? el("span", { className: "party-slot__remove" }, ["✕"]) : null,
     ].filter((n): n is HTMLElement => n !== null);
 

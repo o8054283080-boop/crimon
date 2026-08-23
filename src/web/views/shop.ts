@@ -3,6 +3,7 @@ import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState, ShopView } from "../../game/playerState.js";
 import { SHOP_MAX_SLOTS, ShopEntry, msUntilRotation } from "../../game/shop.js";
 import { el } from "../dom.js";
+import { icon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
 
 export interface ShopProps {
@@ -54,7 +55,7 @@ function renderMonsterBody(entry: Extract<ShopEntry, { kind: "MONSTER" }>): HTML
 
 function renderScrollBody(entry: Extract<ShopEntry, { kind: "SCROLL" }>): HTMLElement[] {
   return [
-    el("div", { className: "shop-card__icon shop-card__icon--scroll" }, ["📜"]),
+    el("div", { className: "shop-card__icon shop-card__icon--scroll" }, [icon("scroll")]),
     el("div", { className: "shop-card__title" }, [`召喚の書 ×${entry.count}`]),
     el("div", { className: "shop-card__sub" }, ["石を使わずに召喚できます"]),
   ];
@@ -67,7 +68,7 @@ function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElem
   const body =
     entry.kind === "EQUIPMENT" ? renderEquipmentBody(entry) : entry.kind === "MONSTER" ? renderMonsterBody(entry) : renderScrollBody(entry);
 
-  const buyLabel = purchased ? "購入済み" : `🪙 ${entry.price.toLocaleString()}`;
+  const buyLabel = purchased ? "購入済み" : entry.price.toLocaleString("ja-JP");
 
   return el(
     "div",
@@ -82,7 +83,7 @@ function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElem
           disabled: purchased || !affordable,
           onclick: () => props.onBuy(index),
         },
-        [buyLabel],
+        purchased ? [buyLabel] : [icon("coin"), el("strong", {}, [buyLabel])],
       ),
     ],
   );

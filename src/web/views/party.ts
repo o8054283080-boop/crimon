@@ -2,6 +2,7 @@ import { MAX_DUNGEON_PARTY_SIZE, PlayerState } from "../../game/playerState.js";
 import { MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
 import { MonsterFilter, filterMonsters } from "../monsterFilter.js";
 import { el } from "../dom.js";
+import { icon } from "../icons.js";
 import { renderMonsterSortRow } from "./monsters.js";
 import { renderMonsterFilterBar } from "./monsterFilterBar.js";
 import { partyMemberCard, renderPartySlots } from "./partyCard.js";
@@ -78,7 +79,7 @@ export function renderParty(props: PartyProps): HTMLElement {
           className: "mode-toggle__btn" + (isDungeon ? " mode-toggle__btn--active" : ""),
           onclick: () => props.onSetMode("DUNGEON"),
         },
-        ["🏰 装備ダンジョン専用"],
+        [icon("equipDungeon", { size: 15 }), "装備ダンジョン専用"],
       ),
     ]),
     el("section", { className: "panel" }, [
@@ -94,7 +95,7 @@ export function renderParty(props: PartyProps): HTMLElement {
             disabled: player.monsters.length === 0 || activeIds.length >= maxSize,
             onclick: props.onAutoFill,
           },
-          ["🪄 おまかせ編成"],
+          [icon("summon", { size: 15 }), "おまかせ編成"],
         ),
         el(
           "button",
@@ -104,14 +105,16 @@ export function renderParty(props: PartyProps): HTMLElement {
             disabled: activeIds.length === 0,
             onclick: props.onClearParty,
           },
-          ["🧹 全部外す"],
+          ["全部外す"],
         ),
       ]),
-      el("p", { className: "app-subtitle" }, [
-        isDungeon
-          ? "装備ダンジョン専用の枠です(通常ステージとは別に覚えます)。枠を押すと外れます。一覧はタップで編成、長押しで詳細。"
-          : "枠を押すと外れます。一覧はタップで編成、長押しで詳細。",
-      ]),
+      // **操作の説明文は置かない。**「枠を押すと外れます。一覧はタップで編成、
+      // 長押しで詳細。」と書かないと使えないなら、その操作は見つかっていない。
+      // 枠には✕、カードには詳細の丸ボタンを出して、見れば分かる形にした。
+      // ここに残すのは、操作ではなく**知りようのない決まりごと**だけ
+      isDungeon
+        ? el("p", { className: "app-subtitle" }, ["この枠は装備ダンジョン専用です。通常ステージの編成とは別に覚えます。"])
+        : null,
     ].filter((n): n is HTMLElement => n !== null)),
     el("section", { className: "panel" }, [
       player.monsters.length === 0

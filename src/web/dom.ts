@@ -7,6 +7,11 @@ type ElementProps<K extends keyof HTMLElementTagNameMap> = Partial<Omit<HTMLElem
    * CSS変数で色を引けて、組み合わせが増えても破綻しない。
    */
   [key: `data-${string}`]: string | undefined;
+  /**
+   * aria-* 属性。**絵で示すボタンには文字での名前が要る。**
+   * アイコンだけのボタンは、読み上げでは無名の押しものになってしまう。
+   */
+  [key: `aria-${string}`]: string | undefined;
 };
 
 /** 属性を割り当てつつ子要素を追加する簡易DOM生成ヘルパー */
@@ -20,7 +25,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     if (value === undefined) continue;
     if (key === "style") {
       node.setAttribute("style", value as string);
-    } else if (key.startsWith("data-")) {
+    } else if (key.startsWith("data-") || key.startsWith("aria-") || key === "role") {
       node.setAttribute(key, value as string);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

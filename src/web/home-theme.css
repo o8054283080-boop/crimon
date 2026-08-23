@@ -1,3 +1,20 @@
+/* ==========================================================================
+ * 共通の色。タイトルとメニューで**同じ絵の具**を使う。
+ * 別々に色を決めていたせいで、STARTを押した瞬間に別のゲームへ移ったように
+ * 見えていた。ここに集めておけば、片方だけ古い色のまま残ることがない。
+ * ========================================================================== */
+:root {
+  --crimon-void: #05060f;      /* いちばん奥 */
+  --crimon-deep: #0a1026;      /* 藍 */
+  --crimon-ash: #150f1c;       /* 藍と熾火の境目 */
+  --crimon-forge: #ff9d3c;     /* 坩堝の火 */
+  --crimon-gold: #e2b66e;      /* 罫・目盛り */
+  --crimon-gold-soft: rgba(226, 182, 110, .22);
+  --crimon-ink: #0a0912;       /* 縁取りの黒 */
+  /* 粒。写真を貼らずに面のざらつきを作る唯一の手 */
+  --crimon-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+}
+
 .home-screen {
   position: relative;
   min-height: 100dvh;
@@ -5,12 +22,23 @@
   padding: 0;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 50% 12%, rgba(80, 145, 255, .24), transparent 34%),
-    radial-gradient(circle at 20% 80%, rgba(115, 65, 220, .16), transparent 38%),
-    linear-gradient(180deg, #080b18 0%, #10162b 52%, #080b16 100%);
+    radial-gradient(ellipse 120% 40% at 50% 104%, rgba(255, 140, 45, .10), transparent 62%),
+    radial-gradient(circle at 50% 10%, rgba(80, 145, 255, .18), transparent 36%),
+    linear-gradient(180deg, var(--crimon-void) 0%, var(--crimon-deep) 52%, #06070f 100%);
 }
 
-/* 起動時のタイトル画面：STARTするまでゲームUIを完全に覆う */
+/* ==========================================================================
+ * タイトル画面
+ *
+ * 平らな1枚の背景に文字を置いても、大きくしただけの見出しにしかならない。
+ * ここは**奥から手前へ層を重ねる**:
+ *
+ *   坩堝の熾火(下から昇る暖色) → 回る錬成陣(2枚を逆回し)
+ *   → 火の粉 → 粒 → 隅の落ち込み → 紋章
+ *
+ * 冷たい藍の上半分と、暖かい橙の下半分。**寒暖を1画面に同居させる**のが
+ * 効いている。前は青一色で、どこを見ても同じ明るさだった。
+ * ========================================================================== */
 .title-screen {
   box-sizing: border-box;
   position: fixed;
@@ -23,125 +51,571 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: clamp(16px, 4vh, 36px) 12px;
+  padding: clamp(14px, 4vh, 36px) 12px;
   text-align: center;
   overflow: hidden;
   isolation: isolate;
+  opacity: 1;
+  transition: opacity .3s ease;
   background:
-    radial-gradient(circle at 18% 22%, rgba(90, 180, 255, .16), transparent 24%),
-    radial-gradient(circle at 82% 30%, rgba(150, 80, 255, .15), transparent 25%),
-    radial-gradient(ellipse 70% 38% at 50% 38%, rgba(61, 125, 255, .24), transparent 72%),
-    radial-gradient(ellipse 90% 25% at 50% 100%, rgba(146, 73, 255, .14), transparent 75%),
-    linear-gradient(180deg, #060914 0%, #0c1530 52%, #070a15 100%);
+    radial-gradient(ellipse 120% 52% at 50% 108%, rgba(255, 146, 42, .30), rgba(255, 90, 20, .08) 44%, transparent 68%),
+    radial-gradient(ellipse 86% 42% at 50% 30%, rgba(74, 126, 255, .20), transparent 70%),
+    radial-gradient(circle at 12% 10%, rgba(120, 190, 255, .12), transparent 32%),
+    radial-gradient(circle at 88% 16%, rgba(150, 100, 255, .12), transparent 30%),
+    linear-gradient(180deg, var(--crimon-void) 0%, var(--crimon-deep) 44%, var(--crimon-ash) 76%, #22110b 100%);
 }
-.title-screen::before {
+.title-screen--leaving { opacity: 0; pointer-events: none; }
+
+/* 坩堝。画面の下端で燃えているものの明かりだけが届いている、という置き方 */
+.title-screen__forge {
+  position: absolute;
+  left: 50%;
+  bottom: -16%;
+  width: min(170vw, 820px);
+  aspect-ratio: 2 / 1;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 182, 78, .45), rgba(255, 110, 30, .16) 42%, transparent 70%);
+  filter: blur(4px);
+  animation: crimon-breathe 7s ease-in-out infinite;
+}
+@keyframes crimon-breathe {
+  0%, 100% { opacity: .82; }
+  50% { opacity: 1; }
+}
+
+/* 錬成陣。2枚を逆向き・別の速さで回すと、輪が交差して奥行きが出る */
+.title-screen__rings, .home-menu__rings { position: absolute; inset: 0; pointer-events: none; }
+.arcane-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+}
+.arcane-ring--outer { width: min(150vw, 760px); animation: crimon-spin 200s linear infinite; }
+.arcane-ring--inner { width: min(104vw, 520px); animation: crimon-spin 130s linear infinite reverse; }
+@keyframes crimon-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.title-screen__rings {
+  opacity: .8;
+  /* 文字の後ろだけ薄くする。輪が字にかかると、どちらも読みにくくなる */
+  mask-image: radial-gradient(ellipse 62% 26% at 50% 44%, transparent 42%, #000 96%);
+}
+.title-screen__rings .arcane-ring { top: 44%; }
+
+/* 火の粉。数は少なく、速さと横揺れをばらす。揃っていると作り物に見える */
+.title-motes { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.title-motes i {
+  position: absolute;
+  bottom: -8px;
+  width: var(--mote-size, 3px);
+  height: var(--mote-size, 3px);
+  border-radius: 50%;
+  background: #ffd493;
+  box-shadow: 0 0 9px 2px rgba(255, 168, 60, .55);
+  opacity: 0;
+  animation-name: crimon-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes crimon-rise {
+  0% { transform: translate(0, 0) scale(.5); opacity: 0; }
+  14% { opacity: .85; }
+  70% { opacity: .6; }
+  100% { transform: translate(var(--mote-drift, 0), -78vh) scale(1); opacity: 0; }
+}
+
+/* 稜線。熾火の手前に岩の影を置くと、靄が「向こうで燃えている何か」になる */
+.title-ridge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(96px, 23vh, 240px);
+  pointer-events: none;
+}
+.title-ridge__art { width: 100%; height: 100%; display: block; }
+/* 稜線のすぐ上に細く強い光。ここが**地平線**になり、
+ * 靄でしかなかった下半分に「向こう側」が生まれる */
+.title-ridge::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 26%;
+  width: min(140vw, 640px);
+  height: 34%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 206, 130, .7), rgba(255, 122, 38, .22) 42%, transparent 74%);
+  filter: blur(6px);
+}
+
+.title-screen__grain {
+  position: absolute;
+  inset: -10%;
+  pointer-events: none;
+  opacity: .15;
+  mix-blend-mode: overlay;
+  background-image: var(--crimon-grain);
+}
+.title-screen__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 78% 62% at 50% 44%, transparent 46%, rgba(0, 0, 0, .58) 100%);
+}
+
+/* --- 紋章 ---------------------------------------------------------------- */
+.title-screen__logo {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+}
+/* 光条。核を光源にして、薄い放射を後ろへ敷く。
+ * 平らな面に絵を置いただけの感じが、これ1枚で「光っているものがある」に変わる */
+.title-screen__logo::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 24%;
+  z-index: -1;
+  width: min(160vw, 760px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(184, 216, 255, .085) 0deg 2.4deg, transparent 2.4deg 13deg);
+  mask-image: radial-gradient(circle, rgba(0,0,0,.85) 5%, rgba(0,0,0,.3) 28%, transparent 54%);
+  animation: crimon-spin 300s linear infinite;
+}
+
+.title-emblem {
+  /* 幅は画面・高さの両方で頭を押さえる。横画面で紋章だけが伸びて
+   * STARTを画面外へ押し出していた */
+  /* 92vw では390pxの画面で左右15pxしか残らず、「画面いっぱいに置いた」に見えた。
+   * 意図してその大きさにしたと分かる程度の余白を空ける */
+  width: min(560px, 84vw, 74vh);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 10px 26px rgba(0, 0, 0, .6));
+  animation: crimon-emblem-in .8s cubic-bezier(.2, .8, .3, 1) both;
+}
+@keyframes crimon-emblem-in {
+  from { opacity: 0; transform: translateY(10px) scale(.94); }
+  to { opacity: 1; transform: none; }
+}
+/* 核の呼吸。**画面のどこかが静かに動いている**だけで、絵が止まって見えなくなる。
+ * 速く動かすと1度目で飽きるので、6秒に1往復まで落とす */
+.title-emblem__halo {
+  transform-origin: 320px 76px;
+  animation: crimon-core 6s ease-in-out infinite;
+}
+@keyframes crimon-core {
+  0%, 100% { opacity: .7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.title-screen__jp {
+  margin: clamp(8px, 1.6vh, 16px) 0 0;
+  padding: 5px 16px;
+  border-top: 1px solid rgba(226, 182, 110, .38);
+  border-bottom: 1px solid rgba(226, 182, 110, .38);
+  background: linear-gradient(90deg, transparent, rgba(10, 8, 16, .55) 18%, rgba(10, 8, 16, .55) 82%, transparent);
+  color: #e8d6ad;
+  font-size: clamp(.66rem, 3vw, .82rem);
+  font-weight: 800;
+  letter-spacing: .3em;
+  text-indent: .3em;
+  white-space: nowrap;
+  animation: crimon-fade-in .7s .25s ease both;
+}
+
+/* --- START --------------------------------------------------------------
+ * 押す場所は1つしかない。**画面でいちばん明るい面**にして、
+ * 迷いようをなくす。金は紋章と同じ絵の具から取る
+ */
+.title-start {
+  position: relative;
+  z-index: 2;
+  width: min(300px, 78vw);
+  min-width: 0;
+  min-height: clamp(54px, 7.6vh, 64px);
+  flex: 0 0 auto;
+  margin-top: clamp(18px, 4.4vh, 40px);
+  border: 1px solid rgba(255, 226, 172, .75);
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #ffe9bb 0%, #f4b953 46%, #c87d1e 100%);
+  color: #2b1706;
+  font-size: clamp(1rem, 4vw, 1.16rem);
+  font-weight: 950;
+  letter-spacing: .3em;
+  text-indent: .3em;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow:
+    0 0 34px rgba(255, 152, 42, .3),
+    0 14px 30px rgba(0, 0, 0, .5),
+    inset 0 1px 0 rgba(255, 255, 255, .85),
+    inset 0 -2px 0 rgba(120, 60, 0, .35),
+    inset 0 0 0 1px rgba(112, 56, 6, .35);
+  animation: crimon-fade-in .7s .4s ease both;
+}
+/* 文字の左右に鋲。紋章と同じ菱形を置くと、離れていても同じ一式に見える */
+.title-start > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+.title-start > span::before, .title-start > span::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  transform: rotate(45deg);
+  background: rgba(74, 36, 2, .55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+
+/* 上を横切る光。1度だけでは寂しく、速いと落ち着かない。8秒に1度だけ通す */
+.title-start::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .55), transparent);
+  animation: crimon-sweep 8s ease-in-out infinite;
+}
+@keyframes crimon-sweep {
+  0%, 62% { left: -60%; }
+  86%, 100% { left: 118%; }
+}
+.title-start:active { transform: translateY(2px) scale(.99); }
+.title-screen__hint {
+  position: relative;
+  z-index: 2;
+  margin-top: clamp(10px, 1.8vh, 16px);
+  color: rgba(242, 217, 178, .6);
+  font-size: clamp(.6rem, 2.4vw, .68rem);
+  letter-spacing: .2em;
+  white-space: nowrap;
+  animation: crimon-fade-in .7s .55s ease both;
+}
+@keyframes crimon-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .title-emblem, .title-screen__jp, .title-start, .title-screen__hint,
+  .arcane-ring, .title-screen__forge, .title-motes i, .title-start::after,
+  .title-screen__logo::before, .title-emblem__halo {
+    animation: none;
+  }
+  .title-motes { display: none; }
+}
+
+/* START後のメニュー：基本操作を1画面に集約 */
+.home-menu { min-height: 100dvh; display: flex; flex-direction: column; gap: 10px; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); opacity: 1; position: relative; isolation: isolate; }
+/* 背景は3層。
+ * 1) 藍と熾火の地(::before)  2) 錬成陣(.home-menu__rings)  3) 粒と隅の影(::after)
+ * 平らな1枚を敷いていた頃は、どのカードも同じ暗さの上に浮いていて、
+ * 画面のどこを見ても手応えが無かった。 */
+.home-menu::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 88% 72% at 50% 40%, transparent 56%, rgba(0, 0, 0, .5) 100%),
+    radial-gradient(ellipse 116% 26% at 50% 97%, rgba(255, 148, 52, .22), rgba(255, 96, 24, .07) 46%, transparent 74%),
+    radial-gradient(circle at 10% 4%, rgba(78, 168, 255, .16), transparent 30%),
+    radial-gradient(circle at 92% 14%, rgba(164, 83, 255, .14), transparent 28%),
+    linear-gradient(180deg, var(--crimon-void) 0%, var(--crimon-deep) 46%, var(--crimon-ash) 82%, #1a1009 100%);
+}
+.home-menu__rings {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: .45;
+  mask-image: radial-gradient(ellipse 92% 62% at 50% 32%, #000 26%, transparent 80%);
+}
+.home-menu__rings .arcane-ring { top: 30%; }
+.home-menu__rings .arcane-ring--outer { width: min(150vw, 700px); }
+.home-menu__rings .arcane-ring--inner { width: min(96vw, 460px); }
+.home-menu::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .16;
+  mix-blend-mode: overlay;
+  background-image: var(--crimon-grain);
+}
+.home-menu--hidden { display: none; }
+.home-menu--visible { display: flex; }
+
+/* --- アイコン ------------------------------------------------------------
+ * 大きさは置いた場所が決める。アイコン側で固定すると、
+ * 文字の大きさが変わったときに1つだけ取り残される。
+ */
+.icon { width: 1em; height: 1em; display: block; flex: none; }
+
+/* ==========================================================================
+ * 面の質感
+ *
+ * これまでカードは**塗りつぶした角丸**でしかなかった。同じ暗さの矩形が
+ * 縦に並ぶと、背景をどれだけ作り込んでも「一覧の上に板を置いた」ようにしか
+ * 見えない。ここで全部の面に共通の作りを与える:
+ *
+ * - 上辺に淡い照り(光が上から当たっている)
+ * - 下辺に落ち込み(厚みがある)
+ * - ざらつきを1枚(のっぺりした塗りを殺す)
+ * - 枠は青ではなく**わずかに金へ寄せる**。タイトルの金と血がつながる
+ * ========================================================================== */
+.home-id, .home-party-card, .home-tile, .home-wallet__chip, .home-stamina-bar, .home-adventure {
+  position: relative;
+  overflow: hidden;
+}
+.home-id::after, .home-party-card::after, .home-tile::after,
+.home-wallet__chip::after, .home-stamina-bar::after, .home-adventure::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: .45;
-  background-image: linear-gradient(rgba(130,180,255,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(130,180,255,.055) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  opacity: .1;
+  mix-blend-mode: overlay;
+  background-image: var(--crimon-grain);
 }
-.title-screen::after {
+/* 面の頭に光を1本。これが無いと、厚みではなく色の違いにしか見えない */
+.home-id, .home-party-card, .home-tile, .home-wallet__chip, .home-stamina-bar {
+  border-color: rgba(150, 160, 200, .22);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, .34),
+    inset 0 1px 0 rgba(255, 240, 214, .14),
+    inset 0 -1px 0 rgba(0, 0, 0, .5);
+}
+
+/* 四隅の鉤。**枠を全部引くと窮屈になり、何も無いと安い。**
+ * 角だけ残すと、締まりが出るのに中身の邪魔をしない。
+ * 付けるのは**冒険へ**の1枚だけ。パーティの札は縁いっぱいまで絵があり、
+ * 鉤が札の裏に隠れて切れ端だけが残った。効く場所にしか置かない */
+.home-adventure::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  pointer-events: none;
+  border: 1px solid rgba(226, 182, 110, .42);
+  border-radius: 10px;
+  -webkit-mask:
+    linear-gradient(#000, #000) 0 0 / 18px 18px no-repeat,
+    linear-gradient(#000, #000) 100% 0 / 18px 18px no-repeat,
+    linear-gradient(#000, #000) 0 100% / 18px 18px no-repeat,
+    linear-gradient(#000, #000) 100% 100% / 18px 18px no-repeat;
+  mask:
+    linear-gradient(#000, #000) 0 0 / 18px 18px no-repeat,
+    linear-gradient(#000, #000) 100% 0 / 18px 18px no-repeat,
+    linear-gradient(#000, #000) 0 100% / 18px 18px no-repeat,
+    linear-gradient(#000, #000) 100% 100% / 18px 18px no-repeat;
+}
+.home-adventure::before { border-color: rgba(255, 214, 156, .55); }
+
+/* --- 身分証 --------------------------------------------------------------
+ * レベルを丸で立て、名前を主役に、EXPは帯で見せる。
+ * 数字を読ませるより、伸び具合が目に入る方が早い。
+ */
+.home-id { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid rgba(130, 160, 220, .22); border-radius: 16px; background: linear-gradient(135deg, rgba(30,43,78,.8), rgba(11,17,34,.78)); box-shadow: 0 8px 22px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.08); }
+.home-id__level { width: 50px; height: 50px; display: grid; place-items: center; align-content: center; border-radius: 50%; background: conic-gradient(from 210deg, #5b8dff, #8f6bff 55%, #4a6fd8); box-shadow: inset 0 0 0 3px rgba(8,12,26,.9), 0 4px 12px rgba(0,0,0,.4); }
+.home-id__level small { font-size: .5rem; letter-spacing: .1em; color: rgba(255,255,255,.75); line-height: 1; }
+.home-id__level strong { font-size: 1.2rem; line-height: 1.05; color: #fff; }
+.home-id__body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.home-id__name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.home-id__name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; }
+.home-id__edit { width: 28px; height: 28px; min-width: 28px; display: grid; place-items: center; padding: 0; border: 1px solid rgba(130,160,220,.28); border-radius: 9px; background: rgba(5,9,21,.5); color: #9db6e8; font-size: 15px; }
+.home-id__edit:active { filter: brightness(1.3); }
+.home-id__exp { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.home-id__bar { height: 7px; border-radius: 99px; background: rgba(4,8,18,.8); box-shadow: inset 0 1px 2px rgba(0,0,0,.7); overflow: hidden; }
+.home-id__bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #4f8cff, #8ab6ff); box-shadow: 0 0 8px rgba(90,150,255,.5); }
+.home-id__exp span { font-size: .63rem; color: #8fa4d0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* --- 財布 ----------------------------------------------------------------
+ * 通貨は2種類だけ。スタミナはここに混ぜない(下の帯が唯一の置き場)
+ */
+.home-wallet { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.home-wallet__chip { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 10px; border: 1px solid rgba(130,160,220,.18); border-radius: 13px; background: linear-gradient(145deg, rgba(36,48,82,.76), rgba(15,21,40,.8)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+.home-wallet__chip .icon { font-size: 17px; }
+.home-wallet__chip strong { font-size: .82rem; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.home-wallet__chip--crystal .icon { color: #74d0ff; }
+.home-wallet__chip--gold .icon { color: #f5c860; }
+
+/* --- スタミナ ------------------------------------------------------------ */
+.home-stamina-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 14px; background: rgba(13,18,35,.68); border: 1px solid rgba(150,160,200,.18); }
+.home-stamina-bar__head { display: flex; align-items: baseline; gap: 5px; color: #cfe0ff; }
+.home-stamina-bar__head .icon { font-size: 15px; color: #9fe870; align-self: center; }
+.home-stamina-bar__head strong { font-size: .88rem; font-variant-numeric: tabular-nums; }
+.home-stamina-bar__head span { font-size: .64rem; color: #8fa4d0; }
+.home-stamina-bar__track { height: 6px; border-radius: 99px; background: rgba(4,8,18,.85); box-shadow: inset 0 1px 2px rgba(0,0,0,.7); overflow: hidden; }
+.home-stamina-bar__track i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #5eb849, #9fe870); }
+.home-stamina-bar__actions { display: flex; gap: 5px; }
+.home-stamina-bar__actions .btn { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 4px 8px; font-size: .62rem; }
+.home-stamina-bar__actions .btn .icon { font-size: 12px; color: #74d0ff; }
+
+/* --- パーティ ------------------------------------------------------------ */
+.home-party-card { padding: 10px 11px; border: 1px solid rgba(130, 160, 220, .2); border-radius: 16px; background: linear-gradient(145deg, rgba(33,46,80,.8), rgba(16,22,43,.82)); box-shadow: 0 9px 22px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.07); }
+.home-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.home-section-title strong { display: flex; align-items: center; gap: 7px; font-size: .7rem; letter-spacing: .18em; color: #d9c393; }
+/* 見出しの頭に金の菱形。タイトルの罫と同じ印を使い回すと、画面が同じ一式に見える */
+.home-section-title strong::before, .home-group__title::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, #f3d18c, #b07f2a);
+}
+.home-section-title .btn { min-height: 28px; padding: 4px 9px; font-size: .65rem; }
+
+/* --- 冒険へ -------------------------------------------------------------- */
+.home-adventure { display: grid; grid-template-columns: 52px minmax(0,1fr) 26px; align-items: center; gap: 12px; min-height: 78px; padding: 10px 14px; border: 1px solid rgba(255, 205, 140, .5); border-radius: 18px; background: radial-gradient(circle at 16% 22%, rgba(255,214,150,.5), transparent 46%), linear-gradient(135deg, #a5511a 0%, #6b2c0e 46%, #33150a 100%); color: #fff5e6; text-align: left; box-shadow: 0 0 30px rgba(255, 138, 46, .22), 0 12px 26px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,231,196,.35), inset 0 -1px 0 rgba(0,0,0,.5); }
+.home-adventure__icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: rgba(255,236,206,.14); box-shadow: inset 0 0 0 1px rgba(255,215,160,.28); font-size: 27px; color: #ffeacd; }
+.home-adventure__text { display: flex; flex-direction: column; min-width: 0; }
+.home-adventure__text strong { font-size: 1.08rem; letter-spacing: .12em; }
+.home-adventure__text small { margin-top: 4px; color: #f0d2ab; font-size: .72rem; }
+.home-adventure__arrow { font-size: 24px; color: #f3cfa0; display: grid; place-items: center; }
+
+/* --- 主要メニュー --------------------------------------------------------
+ * 3列に5個を置くと最後の行が欠けて、意味のない空白が残っていた。
+ * 3列×2段の6個に揃え、余っていた枠に設定を入れて画面から追い出す。
+ */
+.home-menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.home-tile { min-height: clamp(72px, 12vh, 92px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 8px 4px; border: 1px solid rgba(130, 160, 220, .18); border-radius: 15px; background: linear-gradient(145deg, rgba(42,55,90,.82), rgba(21,28,52,.86)); color: #f3f6ff; box-shadow: 0 7px 15px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.07); }
+/* アイコンの下に金の細い座。タイトルの金と、遊ぶ側の面がつながる */
+.home-tile__icon { position: relative; font-size: 25px; color: #c3d4f5; line-height: 0; margin-bottom: 7px; }
+.home-tile__icon::after {
   content: "";
   position: absolute;
   left: 50%;
-  top: 50%;
-  width: min(620px, 110vw);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 1px solid rgba(120,175,255,.11);
-  box-shadow: 0 0 0 28px rgba(120,175,255,.025), 0 0 0 56px rgba(120,175,255,.018), inset 0 0 80px rgba(75,125,255,.08);
-  pointer-events: none;
+  bottom: -5px;
+  width: 22px;
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(226, 182, 110, .55), transparent);
 }
-.title-screen__logo {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: .86;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  filter: drop-shadow(0 12px 30px rgba(0,0,0,.5));
-  position: relative;
-  z-index: 1;
-}
-.title-screen__logo span { max-width: 100%; font-size: clamp(1.25rem, 7vw, 3.2rem); font-weight: 800; color: #dbe9ff; white-space: nowrap; }
-.title-screen__logo strong { max-width: 100%; margin-top: 4px; font-size: clamp(2.45rem, 14vw, 6rem); font-weight: 950; letter-spacing: .025em; line-height: .9; background: linear-gradient(180deg, #ffffff 0%, #9cc7ff 40%, #4d7cff 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 38px rgba(77, 124, 255, .35); white-space: nowrap; }
-.title-screen__logo small { max-width: 100%; margin-top: clamp(12px, 2.5vh, 22px); font-size: clamp(.68rem, 3.2vw, 1.15rem); letter-spacing: clamp(.08em, 1.8vw, .4em); color: #aebfe7; font-weight: 800; white-space: nowrap; }
-.title-screen__line { width: min(280px, 65vw); height: 2px; flex: 0 0 auto; margin: clamp(16px, 3.5vh, 28px) 0 clamp(18px, 4vh, 34px); background: linear-gradient(90deg, transparent, #76aaff, transparent); box-shadow: 0 0 16px rgba(95, 151, 255, .5); position: relative; z-index: 1; }
-.title-start { width: min(300px, 78vw); min-width: 0; min-height: clamp(56px, 8vh, 68px); flex: 0 0 auto; border: 1px solid rgba(176, 210, 255, .65); border-radius: 18px; background: linear-gradient(180deg, #82bbff 0%, #477ff0 48%, #254aa7 100%); color: #fff; font-size: clamp(1rem, 4vw, 1.18rem); font-weight: 950; letter-spacing: .28em; box-shadow: 0 0 32px rgba(67, 126, 255, .32), 0 16px 35px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.7); cursor: pointer; position: relative; z-index: 1; }
-.title-start:active { transform: translateY(2px) scale(.99); }
-.title-screen__hint { margin-top: 12px; color: rgba(186, 202, 235, .55); font-size: clamp(.54rem, 2.4vw, .68rem); letter-spacing: .18em; white-space: nowrap; position: relative; z-index: 1; }
+.home-tile__label { font-size: .76rem; font-weight: 800; letter-spacing: .02em; }
+.home-tile__sub { font-size: .58rem; color: #8194bd; letter-spacing: .04em; }
+.home-tile:active { transform: scale(.98); filter: brightness(1.12); }
 
-/* START後のメニュー：基本操作を1画面に集約 */
-.home-menu { min-height: 100dvh; display: flex; flex-direction: column; gap: 10px; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); opacity: 1; position: relative; isolation: isolate; }
-.home-menu::before { content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none; background: radial-gradient(circle at 12% 8%, rgba(78,168,255,.18), transparent 27%), radial-gradient(circle at 88% 18%, rgba(164,83,255,.16), transparent 28%), radial-gradient(circle at 50% 90%, rgba(48,96,210,.14), transparent 38%), linear-gradient(180deg, #070a15 0%, #10182e 48%, #090d19 100%); }
-.home-menu::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .3; background-image: linear-gradient(rgba(130,180,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(130,180,255,.04) 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent); }
-.home-menu--hidden { display: none; }
-.home-menu--visible { display: flex; }
+/* --- 設定シート ---------------------------------------------------------- */
+.home-sheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; }
+.home-sheet[hidden] { display: none; }
+.home-sheet__scrim { position: absolute; inset: 0; background: rgba(3,6,14,.72); backdrop-filter: blur(3px); }
+.home-sheet__panel { position: relative; width: 100%; max-height: 82dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 13px max(18px, env(safe-area-inset-bottom)); border-top: 1px solid rgba(150,180,240,.28); border-radius: 20px 20px 0 0; background: linear-gradient(180deg, #1a2340 0%, #10162b 100%); box-shadow: 0 -14px 40px rgba(0,0,0,.55); }
+.home-sheet__head { display: flex; align-items: center; justify-content: space-between; }
+.home-sheet__head strong { font-size: .82rem; letter-spacing: .16em; color: #9db6e8; }
+.home-sheet .audio-settings, .home-sheet .save-data { margin-top: 0; }
+.home-sheet .save-data__actions { display: flex; gap: 6px; }
+.home-sheet .save-data__actions .btn { min-height: 34px; padding: 6px 9px; font-size: .68rem; }
+.home-sheet .build-id { opacity: .35; margin: 0; text-align: center; font-size: .62rem; }
 
-.home-topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid rgba(130, 160, 220, .22); border-radius: 16px; background: linear-gradient(135deg, rgba(27,40,73,.94), rgba(11,17,34,.92)); box-shadow: 0 8px 22px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.08); }
-.home-player { min-width: 0; display: flex; flex-direction: column; }
-.home-player strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; }
-.home-player span { color: #8fa4d0; font-size: .67rem; margin-top: 2px; }
-.home-currencies { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
-.home-currencies span { padding: 6px 8px; border-radius: 10px; background: rgba(5,9,21,.5); font-size: .68rem; font-weight: 900; white-space: nowrap; }
-.home-name-btn { width: 34px; min-width: 34px; min-height: 34px; padding: 0; }
-.home-party-card { padding: 10px 11px; border: 1px solid rgba(130, 160, 220, .2); border-radius: 16px; background: linear-gradient(145deg, rgba(31,43,76,.92), rgba(16,22,43,.96)); box-shadow: 0 9px 22px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.07); }
-.home-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
-.home-section-title strong { font-size: .7rem; letter-spacing: .18em; color: #9db6e8; }
-.home-section-title .btn { min-height: 28px; padding: 4px 9px; font-size: .65rem; }
-.home-adventure { display: grid; grid-template-columns: 52px minmax(0,1fr) 30px; align-items: center; gap: 12px; min-height: 78px; padding: 10px 14px; border: 1px solid rgba(168, 209, 255, .55); border-radius: 18px; background: radial-gradient(circle at 18% 30%, rgba(126,181,255,.42), transparent 40%), linear-gradient(135deg, #315dc5, #162b68 70%, #101c43); color: white; text-align: left; box-shadow: 0 0 28px rgba(55, 112, 255, .2), 0 12px 25px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.25); }
-.home-adventure__icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: rgba(255,255,255,.12); font-size: 1.7rem; }
-.home-adventure__text { display: flex; flex-direction: column; min-width: 0; }
-.home-adventure__text strong { font-size: 1.08rem; letter-spacing: .12em; }
-.home-adventure__text small { margin-top: 4px; color: #c7d7ff; font-size: .72rem; }
-.home-adventure__arrow { font-size: 2rem; color: #d8e6ff; text-align: right; }
-.home-menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.home-menu-tile { min-height: clamp(58px, 10vh, 76px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 1px solid rgba(130, 160, 220, .18); border-radius: 15px; background: linear-gradient(145deg, rgba(40,52,84,.96), rgba(21,28,52,.98)); color: #f3f6ff; font-size: .72rem; font-weight: 800; box-shadow: 0 7px 15px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.07); }
-.home-menu-tile::first-line { font-size: 1.15rem; }
-.home-menu-tile:active { transform: scale(.98); filter: brightness(1.12); }
-.home-utility { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 14px; background: rgba(13,18,35,.8); border: 1px solid rgba(130,160,220,.14); }
-.home-stamina { display: flex; flex-direction: column; gap: 2px; font-size: .65rem; color: #9aadd4; }
-.home-stamina strong { color: #e7eeff; font-size: .78rem; }
-.home-stamina-actions { display: flex; gap: 5px; }
-.home-stamina-actions .btn { min-height: 30px; padding: 4px 7px; font-size: .62rem; }
-.home-menu .audio-settings, .home-menu .save-data { margin-top: 0; }
-.home-menu .save-data { padding: 10px; }
-.home-menu .save-data__warning { display: none; }
-.home-menu .save-data .panel-header { margin-bottom: 5px; }
-.home-menu .save-data__actions { display: flex; gap: 6px; }
-.home-menu .save-data__actions .btn { min-height: 30px; padding: 5px 8px; font-size: .64rem; }
-.home-menu .audio-settings { opacity: .75; }
-.home-menu .build-id { opacity: .3; margin: 0; text-align: center; font-size: .62rem; }
+
+/* 名前の右に並ぶ小さなボタン。歯車は主張しないよう一段暗くする */
+.home-id__gear { color: #7d8fb8; }
+
+/* --- 役割で分けた一覧 ---------------------------------------------------- */
+.home-group { display: flex; flex-direction: column; gap: 6px; }
+.home-group__title { display: flex; align-items: center; gap: 7px; font-size: .62rem; letter-spacing: .2em; color: #a8b6d6; padding-left: 2px; }
+.home-menu-grid--2 { grid-template-columns: repeat(2, 1fr); }
+
+/* 下のタブは style.css に1か所でまとめてある(ここに書き足すと二重になる) */
+
 body:has(.title-screen) { overflow: hidden; }
 
 @media (max-height: 720px) {
   .home-menu { gap: 6px; }
-  .home-topbar { padding: 7px 9px; }
+  .home-id { padding: 8px 10px; gap: 9px; }
+  .home-id__level { width: 42px; height: 42px; }
+  .home-id__level strong { font-size: 1rem; }
   .home-party-card { padding: 7px 9px; }
   .home-adventure { min-height: 62px; }
   .home-adventure__icon { width: 40px; height: 40px; font-size: 1.4rem; }
-  .home-menu-tile { min-height: 53px; }
-  .home-menu .audio-settings, .home-menu .save-data { display: none; }
-  .title-screen { padding-top: 12px; padding-bottom: 12px; }
-  .title-screen__logo span { font-size: clamp(1.1rem, 6.5vw, 2rem); }
-  .title-screen__logo strong { font-size: clamp(2.2rem, 13vw, 4.5rem); }
-  .title-screen__logo small { margin-top: 10px; }
-  .title-screen__line { margin-top: 13px; margin-bottom: 16px; }
-  .title-start { min-height: 54px; }
+  .home-tile { min-height: 62px; }
+  .home-tile__icon { font-size: 21px; }
+  
+  /* 低い画面。紋章の高さを先に削り、押す場所と余白を守る */
+  .title-screen { padding-top: 10px; padding-bottom: 10px; }
+  /* 光条。核を光源にして、薄い放射を後ろへ敷く。
+ * 平らな面に絵を置いただけの感じが、これ1枚で「光っているものがある」に変わる */
+.title-screen__logo::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 24%;
+  z-index: -1;
+  width: min(160vw, 760px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(184, 216, 255, .085) 0deg 2.4deg, transparent 2.4deg 13deg);
+  mask-image: radial-gradient(circle, rgba(0,0,0,.85) 5%, rgba(0,0,0,.3) 28%, transparent 54%);
+  animation: crimon-spin 300s linear infinite;
+}
+
+.title-emblem { width: min(500px, 84vw, 84vh); }
+  /* 核の呼吸。**画面のどこかが静かに動いている**だけで、絵が止まって見えなくなる。
+ * 速く動かすと1度目で飽きるので、6秒に1往復まで落とす */
+.title-emblem__halo {
+  transform-origin: 320px 76px;
+  animation: crimon-core 6s ease-in-out infinite;
+}
+@keyframes crimon-core {
+  0%, 100% { opacity: .7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.title-screen__jp { margin-top: 6px; padding: 3px 12px; letter-spacing: .22em; text-indent: .22em; }
+  .title-start { min-height: 50px; margin-top: 14px; }
   .title-screen__hint { margin-top: 8px; }
+  .title-screen__rings .arcane-ring { top: 46%; }
+  /* 横画面では稜線を低くする。高いままだと、STARTと注記が岩に飲まれる */
+  .title-ridge { height: clamp(56px, 15vh, 110px); }
 }
 @media (max-width: 380px) {
-  .title-screen__logo span { font-size: 1.05rem; }
-  .title-screen__logo strong { font-size: clamp(2.05rem, 12.5vw, 3.4rem); letter-spacing: 0; }
-  .title-screen__logo small { font-size: .61rem; letter-spacing: .05em; }
-  .title-start { width: 76vw; }
+  /* 光条。核を光源にして、薄い放射を後ろへ敷く。
+ * 平らな面に絵を置いただけの感じが、これ1枚で「光っているものがある」に変わる */
+.title-screen__logo::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 24%;
+  z-index: -1;
+  width: min(160vw, 760px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(184, 216, 255, .085) 0deg 2.4deg, transparent 2.4deg 13deg);
+  mask-image: radial-gradient(circle, rgba(0,0,0,.85) 5%, rgba(0,0,0,.3) 28%, transparent 54%);
+  animation: crimon-spin 300s linear infinite;
+}
+
+.title-emblem { width: 94vw; }
+  /* 核の呼吸。**画面のどこかが静かに動いている**だけで、絵が止まって見えなくなる。
+ * 速く動かすと1度目で飽きるので、6秒に1往復まで落とす */
+.title-emblem__halo {
+  transform-origin: 320px 76px;
+  animation: crimon-core 6s ease-in-out infinite;
+}
+@keyframes crimon-core {
+  0%, 100% { opacity: .7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.title-screen__jp { letter-spacing: .2em; text-indent: .2em; font-size: .64rem; }
+  .title-start { width: 78vw; }
 }
 @media (min-width: 600px) { .home-menu { max-width: 620px; width: 100%; margin: 0 auto; } }

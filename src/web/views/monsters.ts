@@ -11,6 +11,8 @@ import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, so
 import { GEAR_SLOT_TOTAL, MonsterFilter, equippedCount, filterMonsters } from "../monsterFilter.js";
 import { renderMonsterFilterBar } from "./monsterFilterBar.js";
 import { buildMonsterCard } from "./monsterCard.js";
+import { icon } from "../icons.js";
+import { CreateSlot, currentSkillOf, describeCreatedSkill } from "../../game/monsterCreate.js";
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
 
@@ -27,6 +29,8 @@ export interface MonstersProps {
   onSelectSlot: (monsterId: string, slot: EquipSlot) => void;
   onViewEquippedSlot: (equipmentId: string, monsterId: string) => void;
   onGoMonsterTraining: (monsterId: string) => void;
+  /** クリエイト(スキル合成)の画面へ */
+  onGoCreate: (monsterId: string) => void;
   onGoMonsterDex: () => void;
   sortKey: MonsterSortKey;
   onChangeSort: (key: MonsterSortKey) => void;
@@ -47,6 +51,8 @@ export function monsterCard(
     disabled: extra?.disabled,
     bonus: extra?.bonus,
     onLongPress: extra?.onLongPress,
+    // 長押しは見えない操作なので、同じ詳細へ丸ボタンからも辿れるようにする
+    onDetail: extra?.onLongPress,
     star: instance.star,
     level: instance.level,
     maxLevel: STAR_MAX_LEVEL[instance.star],
@@ -56,6 +62,9 @@ export function monsterCard(
     gearTotal: GEAR_SLOT_TOTAL,
     badge: extra?.badge,
     badgeCorner: extra?.badge !== undefined,
+    // 移し替え済みだと一目で分かるように。**同じ種族でも中身が違う**ので、
+    // 印が無いと編成の時にどれが作り替えた個体か見分けが付かない
+    created: instance.createdSkill !== undefined,
   });
 }
 
@@ -153,14 +162,35 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
   return el("div", { className: "equip-slot-grid" }, boxes);
 }
 
-function renderSkillPanel(dex: ReturnType<typeof findMonsterById>, instance: MonsterInstance, onGoMonsterTraining: () => void): HTMLElement | null {
+function renderSkillPanel(
+  dex: ReturnType<typeof findMonsterById>,
+  instance: MonsterInstance,
+  onGoMonsterTraining: () => void,
+  onGoCreate: () => void,
+): HTMLElement | null {
   if (!dex) return null;
 
+  // 移し替え済みの枠は、元のスキルではなく移した側を出す。
+  // ここが元のままだと、戦闘で出る技と説明が食い違う
+  const shown = dex.skills.map((skill, i) => (i === 0 ? skill : currentSkillOf(instance, i as CreateSlot) ?? skill));
+
   return el("section", { className: "panel" }, [
-    el("h2", {}, ["スキル"]),
-    ...renderSkillRows(dex.skills, instance.skillLevels),
+    el("div", { className: "panel-header" }, [
+      el("h2", {}, ["スキル"]),
+      instance.createdSkill ? el("span", { className: "create-mark" }, [icon("summon", { size: 12 }), "クリエイト済み"]) : null,
+    ].filter((n): n is HTMLElement => n !== null)),
+    ...renderSkillRows(shown as typeof dex.skills, instance.skillLevels),
+    instance.createdSkill
+      ? el("p", { className: "app-subtitle" }, [describeCreatedSkill(instance.createdSkill)])
+      : null,
     isSkillMaxLevel(instance) ? el("p", { className: "app-subtitle" }, ["スキルはすべて最大レベルです"]) : null,
-    el("button", { type: "button", className: "btn btn--ghost", onclick: onGoMonsterTraining }, ["💪 モンスター強化"]),
+    el("div", { className: "skill-panel__actions" }, [
+      el("button", { type: "button", className: "btn btn--ghost", onclick: onGoMonsterTraining }, ["モンスター強化"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: onGoCreate }, [
+        icon("summon", { size: 14 }),
+        instance.createdSkill ? "クリエイトし直す" : "クリエイト",
+      ]),
+    ]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 
@@ -234,7 +264,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
         ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
     ]),
-    renderSkillPanel(dex, instance, () => props.onGoMonsterTraining(instance.id)),
+    renderSkillPanel(dex, instance, () => props.onGoMonsterTraining(instance.id), () => props.onGoCreate(instance.id)),
     el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
     renderSetBonusPanel(equippedItems),
     rankReady
