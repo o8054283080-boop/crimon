@@ -25,6 +25,8 @@ export interface LevelDungeonDef {
   name: string;
   enemies: DungeonEnemy[];
   powerScale: number;
+  /** 敵の速度に掛かる倍率 */
+  speedScale: number;
   /** クリアで手持ちパーティに直接入る経験値 */
   expReward: number;
   goldReward: number;
@@ -50,12 +52,22 @@ interface TierConfig {
   expReward: number;
   goldReward: number;
   pigStar: Star;
+  /**
+   * 敵の速度に掛かる倍率。
+   *
+   * powerScale は速度に掛からないので、速度だけが据え置きだった
+   * (プレイヤー側は★6装備を詰めると300を超える)。
+   * ただし**装備ダンジョンより弱くする**。あちらは装備を詰めた人が挑む場所だが、
+   * ここは育てるために通う場所なので、周回の手が止まるほど上げてはいけない。
+   * 装備ダンジョンが最終階で1.85倍なのに対し、上級で1.25倍に留める。
+   */
+  speedScale: number;
 }
 
 const TIER_CONFIG: Record<LevelDungeonTier, TierConfig> = {
-  BEGINNER: { star: 2, level: 20, powerScale: 0.45, expReward: 400, goldReward: 150, pigStar: 2 },
-  INTERMEDIATE: { star: 4, level: 40, powerScale: 0.8, expReward: 1400, goldReward: 400, pigStar: 4 },
-  ADVANCED: { star: 5, level: 50, powerScale: 1.35, expReward: 3500, goldReward: 900, pigStar: 6 },
+  BEGINNER: { star: 2, level: 20, powerScale: 0.45, expReward: 400, goldReward: 150, pigStar: 2, speedScale: 1 },
+  INTERMEDIATE: { star: 4, level: 40, powerScale: 0.8, expReward: 1400, goldReward: 400, pigStar: 4, speedScale: 1.1 },
+  ADVANCED: { star: 5, level: 50, powerScale: 1.35, expReward: 3500, goldReward: 900, pigStar: 6, speedScale: 1.25 },
 };
 
 export const LEVEL_DUNGEON_DEFS: LevelDungeonDef[] = LEVEL_DUNGEON_TIERS.map((tier) => {
@@ -65,6 +77,7 @@ export const LEVEL_DUNGEON_DEFS: LevelDungeonDef[] = LEVEL_DUNGEON_TIERS.map((ti
     name: `レベル上げダンジョン(${LEVEL_DUNGEON_TIER_JA[tier]})`,
     enemies: buildEnemies(cfg.star, cfg.level),
     powerScale: cfg.powerScale,
+    speedScale: cfg.speedScale,
     expReward: cfg.expReward,
     goldReward: cfg.goldReward,
     pigStar: cfg.pigStar,

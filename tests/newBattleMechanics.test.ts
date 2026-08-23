@@ -325,26 +325,57 @@ describe("クリ率/クリダメバフ (criRate/criDmg)", () => {
 });
 
 describe("クールタイム延長 (COOLDOWN_EXTEND)", () => {
-  it("対象の全スキルのクールタイムが延長される", () => {
-    const cooldownExtendSkill: Skill = {
-      id: "test_cooldown_extend",
-      name: "テストクールタイム延長",
-      description: "テスト用",
-      target: "SINGLE_ENEMY",
-      cooldownTurns: 0,
-      effects: [{ kind: "COOLDOWN_EXTEND", turns: 2 }],
-    };
-    const caster = withSkills(findMonster("wolf", "FIRE")!, [cooldownExtendSkill, cooldownExtendSkill, cooldownExtendSkill]);
-    const target = findMonster("golem", "WATER")!;
+  const extendSkill = (extra: Partial<{ chance: number }> = {}): Skill => ({
+    id: "test_cooldown_extend",
+    name: "テストクールタイム延長",
+    description: "テスト用",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [{ kind: "COOLDOWN_EXTEND", turns: 2, ...extra }],
+  });
 
-    const engine = new BattleEngine([caster], [target], { rng: () => 0.999, maxTurns: 1 });
+  const immunitySkill: Skill = {
+    id: "test_immunity",
+    name: "テスト免疫",
+    description: "テスト用",
+    target: "SELF",
+    cooldownTurns: 0,
+    effects: [{ kind: "IMMUNITY", durationTurns: 3 }],
+  };
+
+  function setup(skill: Skill, rng: () => number) {
+    const caster = withSkills(findMonster("wolf", "FIRE")!, [skill, skill, skill]);
+    const target = withSkills(findMonster("golem", "WATER")!, [immunitySkill, immunitySkill, immunitySkill]);
+    const engine = new BattleEngine([caster], [target], { rng, maxTurns: 4 });
     const units = engine.getUnits();
-    const casterUnit = units.find((u) => u.team === "PLAYER")!;
-    const targetUnit = units.find((u) => u.team === "ENEMY")!;
+    return {
+      engine,
+      caster: units.find((u) => u.team === "PLAYER")!,
+      target: units.find((u) => u.team === "ENEMY")!,
+    };
+  }
 
-    expect(targetUnit.cooldowns).toEqual([0, 0, 0]);
-    engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
-    expect(targetUnit.cooldowns).toEqual([2, 2, 2]);
+  it("対象の全スキルのクールタイムが延長される", () => {
+    const { engine, caster, target } = setup(extendSkill(), () => 0);
+    expect(target.cooldowns).toEqual([0, 0, 0]);
+    engine.resolveTurn(caster, { skillIndex: 0, targetId: target.instanceId });
+    expect(target.cooldowns).toEqual([2, 2, 2]);
+  });
+
+  it("**確率を外すと掛からない**", () => {
+    // 以前は確率も抵抗も無く、必ず当たっていた
+    const { engine, caster, target } = setup(extendSkill({ chance: 0.5 }), () => 0.999);
+    engine.resolveTurn(caster, { skillIndex: 0, targetId: target.instanceId });
+    expect(target.cooldowns).toEqual([0, 0, 0]);
+  });
+
+  it("**状態異常無効に防がれる**", () => {
+    // ここが素通りしていたため、免疫を張っても抵抗を積んでも防げない
+    // 唯一の妨害になっていた
+    const { engine, caster, target } = setup(extendSkill(), () => 0);
+    target.immuneTurns = 2;
+    engine.resolveTurn(caster, { skillIndex: 0, targetId: target.instanceId });
+    expect(target.cooldowns).toEqual([0, 0, 0]);
   });
 });
 

@@ -3,7 +3,7 @@ import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState, ShopView } from "../../game/playerState.js";
 import { SHOP_MAX_SLOTS, ShopEntry, msUntilRotation } from "../../game/shop.js";
 import { el } from "../dom.js";
-import { icon } from "../icons.js";
+import { icon, slotIcon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
 
 export interface ShopProps {
@@ -29,8 +29,11 @@ function starRow(star: number): HTMLElement {
 
 function renderEquipmentBody(entry: Extract<ShopEntry, { kind: "EQUIPMENT" }>): HTMLElement[] {
   const eq = entry.equipment;
+  // 前はどの装備も「⚔」の1文字だった。スロット1もスロット4も同じ絵で、
+  // 棚に何が並んでいるのか**買う前には分からなかった**。
+  // 装備画面と同じ枠の紋章を出す。画面をまたいで同じ物が同じ印で呼ばれる
   return [
-    el("div", { className: "shop-card__icon shop-card__icon--equip" }, ["⚔"]),
+    el("div", { className: "shop-card__icon shop-card__icon--equip" }, [icon(slotIcon(eq.slot))]),
     starRow(eq.star),
     el("div", { className: "shop-card__title" }, [SLOT_LABEL[eq.slot]]),
     el("div", { className: "shop-card__sub" }, [`${SET_LABEL[eq.set]}シリーズ`]),
@@ -57,7 +60,8 @@ function renderScrollBody(entry: Extract<ShopEntry, { kind: "SCROLL" }>): HTMLEl
   return [
     el("div", { className: "shop-card__icon shop-card__icon--scroll" }, [icon("scroll")]),
     el("div", { className: "shop-card__title" }, [`召喚の書 ×${entry.count}`]),
-    el("div", { className: "shop-card__sub" }, ["石を使わずに召喚できます"]),
+    // 「石を使わずに召喚できます」は札の幅で「できま/す」と割れていた
+    el("div", { className: "shop-card__sub" }, ["ダイヤ不要で召喚"]),
   ];
 }
 
@@ -83,9 +87,11 @@ function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElem
           disabled: purchased || !affordable,
           onclick: () => props.onBuy(index),
         },
-        purchased ? [buyLabel] : [icon("coin"), el("strong", {}, [buyLabel])],
+        purchased ? [icon("check"), el("strong", {}, [buyLabel])] : [icon("coin"), el("strong", {}, [buyLabel])],
       ),
-    ],
+      // 売り切れは札を薄くするだけだった。棚に「売れた」と貼る
+      purchased ? el("span", { className: "shop-card__sold-seal" }, ["売切"]) : null,
+    ].filter((n): n is HTMLElement => n !== null),
   );
 }
 
@@ -93,13 +99,13 @@ function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElem
 function renderLockedSlot(props: ShopProps, cost: number | null, isNext: boolean): HTMLElement {
   if (!isNext || cost === null) {
     return el("div", { className: "shop-card shop-card--locked" }, [
-      el("div", { className: "shop-card__icon shop-card__icon--lock" }, ["🔒"]),
+      el("div", { className: "shop-card__icon shop-card__icon--lock" }, [icon("lock")]),
       el("div", { className: "shop-card__sub" }, ["前の枠を開くと解放できます"]),
     ]);
   }
   const affordable = props.player.crystal >= cost;
-  return el("div", { className: "shop-card shop-card--locked" }, [
-    el("div", { className: "shop-card__icon shop-card__icon--lock" }, ["🔒"]),
+  return el("div", { className: "shop-card shop-card--locked shop-card--next" }, [
+    el("div", { className: "shop-card__icon shop-card__icon--lock" }, [icon("lock")]),
     el("div", { className: "shop-card__title" }, ["枠を増やす"]),
     el(
       "button",
@@ -109,7 +115,7 @@ function renderLockedSlot(props: ShopProps, cost: number | null, isNext: boolean
         disabled: !affordable,
         onclick: () => props.onUnlockSlot(),
       },
-      [`💎 ${cost.toLocaleString()}`],
+      [icon("crystal"), el("strong", {}, [cost.toLocaleString("ja-JP")])],
     ),
   ]);
 }
@@ -124,19 +130,34 @@ export function renderShop(props: ShopProps): HTMLElement {
   }
 
   return el("div", { className: "screen shop-screen" }, [
-    el("header", { className: "app-header" }, [
-      el("h1", {}, ["ショップ"]),
-      el("p", { className: "app-subtitle" }, [
-        "品揃えは1時間ごとに入れ替わります。ファイターレベルが上がるほど、質の高い装備が並びやすくなります。",
+    el("header", { className: "app-header" }, [el("h1", {}, ["ショップ"])]),
+
+    /* 帳場。
+     * 前は3行の説明文と、その下に青い字で入れ替えまでの時間が置いてあるだけで、
+     * **買い物をする場所の空気が無かった**。持ち金と入れ替えまでの砂時計を
+     * 1枚の帯にまとめる。買う前に見るべき2つが、押す場所の手前に揃う。 */
+    el("div", { className: "shop-counter" }, [
+      el("div", { className: "shop-counter__purse" }, [
+        el("span", { className: "shop-purse shop-purse--gold" }, [icon("coin"), el("strong", {}, [props.player.gold.toLocaleString("ja-JP")])]),
+        el("span", { className: "shop-purse shop-purse--crystal" }, [
+          icon("crystal"),
+          el("strong", {}, [props.player.crystal.toLocaleString("ja-JP")]),
+        ]),
       ]),
-      el("p", { className: "shop-timer" }, [`次の入れ替えまで ${remaining}`]),
+      el("div", { className: "shop-counter__timer" }, [
+        el("span", { className: "shop-counter__timer-label" }, ["入れ替えまで"]),
+        el("strong", {}, [remaining]),
+      ]),
     ]),
-    props.notice ? el("p", { className: "shop-notice" }, [props.notice]) : el("span", { className: "shop-notice--none" }),
-    el("section", { className: "panel" }, [
+
+    props.notice ? el("p", { className: "shop-notice" }, [icon("check"), props.notice]) : el("span", { className: "shop-notice--none" }),
+
+    el("section", { className: "panel shop-shelf" }, [
       el("div", { className: "shop-grid" }, cards),
       el("p", { className: "shop-footnote" }, [
-        `枠は ${shop.slots}/${SHOP_MAX_SLOTS} 個`,
-        shop.nextSlotCost === null ? "(すべて解放済み)" : "(ダイヤで増やせます)",
+        `棚は ${shop.slots}/${SHOP_MAX_SLOTS} 段`,
+        shop.nextSlotCost === null ? "・すべて解放済み" : "・ダイヤで増やせます",
+        "　ファイターレベルが上がるほど、質の高い装備が並びます",
       ]),
     ]),
   ]);

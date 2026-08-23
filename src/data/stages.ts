@@ -40,6 +40,8 @@ export interface Wave {
   enemies: WaveEnemy[];
   /** 敵の実効ステータスに掛かる倍率。序盤ステージは1.0未満にして初心者でも確実に勝てるようにする */
   powerScale: number;
+  /** 敵の速度に掛かる倍率。powerScale とは別にする(速度は手番の数に直結するため) */
+  speedScale: number;
 }
 
 export interface StageRewards {
@@ -148,6 +150,30 @@ function powerScaleForGlobalIndex(globalIndex: number): number {
   return Math.min(POWER_SCALE_MAX, POWER_SCALE_BASE + POWER_SCALE_STEP * (globalIndex - 1));
 }
 
+/**
+ * 敵の速度に掛かる倍率。
+ *
+ * powerScale はHP・攻撃・防御にしか掛からないため、**速度だけが最初から最後まで
+ * 据え置き**だった。プレイヤー側は★6装備の副効果を速度に寄せると300を超えるので、
+ * 終盤では一方的に何度も動ける状態になる。
+ *
+ * ただし**装備ダンジョンより弱くする**。あちらは装備を詰めた人が挑む場所だが、
+ * ステージは物語を進める場所で、速度を詰めていない編成でも通れなければならない。
+ * 装備ダンジョンが最終階で1.85倍なのに対し、ここは最終ステージで1.32倍に留める。
+ */
+const SPEED_SCALE_BASE = 1;
+const SPEED_SCALE_MAX = 1.32;
+/**
+ * 通し番号は**ステージ単位**(全20)。ウェーブ単位(60)と取り違えると、
+ * 最終ステージでも倍率が3分の1しか伸びない
+ */
+const SPEED_SCALE_STAGES = 20;
+
+function speedScaleForGlobalIndex(globalIndex: number): number {
+  const t = Math.min(1, Math.max(0, (globalIndex - 1) / (SPEED_SCALE_STAGES - 1)));
+  return SPEED_SCALE_BASE + (SPEED_SCALE_MAX - SPEED_SCALE_BASE) * t;
+}
+
 /** 1ウェーブに並ぶ敵の数 */
 const WAVE_SIZE = 4;
 
@@ -206,8 +232,9 @@ function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number,
   }
 
   const powerScale = powerScaleForGlobalIndex(globalIndex);
+  const speedScale = speedScaleForGlobalIndex(globalIndex);
 
-  return { waveNumber, isBossWave, enemies, powerScale };
+  return { waveNumber, isBossWave, enemies, powerScale, speedScale };
 }
 
 /** チャプターが1つ上がるごとに、強くなった敵に見合うようウェーブ報酬(ゴールド・経験値)も底上げする */

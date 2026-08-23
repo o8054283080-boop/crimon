@@ -20,7 +20,12 @@ export type BuffStat = "atk" | "def" | "spd" | "criRate" | "criDmg";
 export const SCALE_REFERENCE: Record<"spd" | "def" | "hp", number> = {
   hp: 30000,
   def: 3500,
-  spd: 110,
+  // 速度の基準を110にしていたのは**素のステータスを見ていたから**で、
+  // 実態と合っていなかった。★6装備の副効果を速度に寄せると
+  // 素120のドラゴンが310まで伸びる(実測)。110を基準にすると、
+  // 速度補正付きのスキルが終盤で想定の3倍近く効いてしまう。
+  // 全員が速度を詰めるわけではないので、中間の200を基準に置く
+  spd: 200,
 };
 
 export interface DamageEffect {
@@ -142,10 +147,20 @@ export interface CleanseEffect {
   kind: "CLEANSE";
 }
 
-/** クールタイム延長: 対象の全スキルのクールタイムをこのターン数だけ延長する(封印効果) */
+/**
+ * クールタイム延長: 対象の全スキルのクールタイムをこのターン数だけ延長する(封印効果)。
+ *
+ * **これだけが免疫も抵抗も無視して必ず当たっていた。**他のデバフは
+ * `isImmune` と命中/抵抗の判定を通るのに、ここだけ素通りしていたため、
+ * 状態異常無効を張っても、抵抗を積んでも防げない唯一の妨害になっていた。
+ * しかもデバフ解除でも消せない(解除はDEBUFF効果だけを対象にする)。
+ * 確率を持たせ、他と同じ土俵に載せる。
+ */
 export interface CooldownExtendEffect {
   kind: "COOLDOWN_EXTEND";
   turns: number;
+  /** この効果が発動を試みる基礎確率(0-1)。省略時は常に発動を試みる(その後、命中率/抵抗率判定を経る) */
+  chance?: number;
 }
 
 /**
@@ -286,6 +301,9 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
         const withChance = withRate.chance !== undefined ? { ...withRate, chance: growChance(withRate.chance, growth) } : withRate;
         return isMaxLevel ? { ...withChance, durationTurns: withChance.durationTurns + 1 } : withChance;
       }
+      case "COOLDOWN_EXTEND":
+        // 延長ターン数は伸ばさない。1増えるだけで妨害の重さが跳ね上がる
+        return effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
       default:
         return effect;
     }
@@ -354,7 +372,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "CLEANSE":
       return `デバフを解除`;
     case "COOLDOWN_EXTEND":
-      return `敵の全スキルのクールタイムを${effect.turns}ターン延長`;
+      return `${chanceSuffix(effect.chance)}敵の全スキルのクールタイムを${effect.turns}ターン延長`;
     case "BLIND":
       return `${chanceSuffix(effect.chance)}暗闇 (${effect.durationTurns}ターン、攻撃時50%でダメージ-75%・追加効果なし)`;
     case "POISON":

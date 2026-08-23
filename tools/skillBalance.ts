@@ -6,7 +6,7 @@
  * 強すぎるのか弱すぎるのか判断できない。
  *
  * 基準ステータス(攻める側・受ける側とも同じ):
- *   HP 30000 / 攻撃 3500 / 防御 3500 / クリ率 60% / クリダメ 150%
+ *   HP 30000 / 攻撃 3500 / 防御 3500 / 速度 200 / クリ率 60% / クリダメ 150%
  *
  *   npx tsx tools/skillBalance.ts          全スキルの一覧
  *   npx tsx tools/skillBalance.ts --detail 気になる数字の内訳も出す
@@ -23,7 +23,7 @@ const BASELINE: Stats = {
   hp: 30000,
   atk: 3500,
   def: 3500,
-  spd: 110,
+  spd: 200,
   criRate: 0.6,
   // このゲームの criDmg は「与ダメージにかける倍率」。150% = 1.5倍
   criDmg: 1.5,
@@ -162,7 +162,7 @@ const plainHit = calcDamage(attacker, defender, { kind: "DAMAGE", multiplier: 1.
 // 実際の式を写さず、ダメージから逆算する。写し間違いで嘘の数字を出さないように
 const noMitigation = calcDamage(attacker, defender, { kind: "DAMAGE", multiplier: 1.0, ignoreDefense: true }, neverCrit).damage;
 const mitigation = 1 - plainHit / noMitigation;
-console.log("基準ステータス: HP30000 / 攻撃3500 / 防御3500 / クリ率60% / クリダメ150%");
+console.log("基準ステータス: HP30000 / 攻撃3500 / 防御3500 / 速度200 / クリ率60% / クリダメ150%");
 console.log(`防御3500による軽減率: ${(mitigation * 100).toFixed(1)}%  (攻撃3500に対して)`);
 console.log(`攻撃力1.0倍の非会心ダメージ: ${plainHit} (受ける側HPの ${((plainHit / BASELINE.hp) * 100).toFixed(2)}%)`);
 

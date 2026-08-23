@@ -29,6 +29,40 @@
   padding:
     max(10px, env(safe-area-inset-top)) 14px
     calc(var(--summon-nav) + max(6px, env(safe-area-inset-bottom)));
+  isolation: isolate;
+}
+
+/* 召喚の間。
+ *
+ * これまで祭壇は**素の暗闇に浮いた絵**でしかなかった。ホームとタイトルは
+ * 「上半分は冷たい藍・下半分は暖かい橙」という寒暖の対比で立っているのに、
+ * 押す場所がいちばん多いこの画面だけ、その背骨が抜けていた。
+ * 同じ絵の具で地を敷き直す。宝珠の青が上、押すボタンの金が下、
+ * その間を熾火がつなぐ。 */
+.screen.summon-screen::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 88% 70% at 50% 38%, transparent 54%, rgba(0, 0, 0, 0.52) 100%),
+    radial-gradient(ellipse 120% 26% at 50% 99%, rgba(255, 148, 52, 0.24), rgba(255, 96, 24, 0.08) 46%, transparent 76%),
+    radial-gradient(circle at 8% 6%, rgba(78, 168, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 94% 12%, rgba(164, 83, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, var(--crimon-void) 0%, var(--crimon-deep) 44%, var(--crimon-ash) 80%, #1a1009 100%);
+}
+
+/* 粒。これが無いと、どれだけ階調を作っても塗り絵のままになる */
+.screen.summon-screen::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.15;
+  mix-blend-mode: overlay;
+  background-image: var(--crimon-grain);
 }
 
 /* --- 上部: タイトルと所持数 ------------------------------------------- */
@@ -42,15 +76,31 @@
 }
 
 .summon-top__title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   margin: 0;
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: 0.22em;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  /* 字だけを金にする。background-clip を h1 全体に掛けると、
+   * 頭に置いた菱形まで文字の切り抜きに巻き込まれて消える */
+  color: transparent;
   background: linear-gradient(180deg, #fff6d0, #ffd76a 45%, #c08a1c);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+
+/* 見出しの頭に金の菱形。ホームの節見出しと同じ印を使い、同じ一式に見せる */
+.summon-top__title::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, #f3d18c, #b07f2a);
+  box-shadow: 0 0 8px rgba(255, 200, 90, 0.6);
 }
 
 .summon-top__wallet {
@@ -58,6 +108,8 @@
   gap: 6px;
 }
 
+/* 手持ち。**払う物**なので、押す場所と同じ材質にはしない。
+ * 彫り込んだ暗い受け皿に、金の細い罫を1本。数字だけが浮いて見える */
 .summon-wallet {
   display: inline-flex;
   align-items: center;
@@ -66,8 +118,14 @@
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 800;
-  background: var(--surface-raised);
-  box-shadow: var(--edge-light), var(--edge-line), var(--drop-soft);
+  font-variant-numeric: tabular-nums;
+  color: #ecf3ff;
+  background: linear-gradient(180deg, rgba(12, 16, 32, 0.88), rgba(6, 9, 20, 0.9));
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.28),
+    var(--drop-soft);
 }
 
 .summon-wallet .icon { font-size: 15px; color: #74d0ff; }
@@ -77,19 +135,68 @@
 /* --- 祭壇(引く前の主役)----------------------------------------------- */
 
 .summon-stage {
+  /* 祭壇の直径はここで決める。台座も同じ値から位置を出すので、
+   * .altar 側に置いたままだと台座が祭壇と無関係な場所に浮いてしまう */
+  --d: min(84vw, 48vh, 348px);
+
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  isolation: isolate;
+}
+
+/* 台座。
+ *
+ * 1周目は画面の下端に橙の靄を置いただけで、祭壇から離れた場所に
+ * **意味のない染み**が残っていた。位置を祭壇の直径から出し直し、
+ * 輪の足元にぴたりと敷く。これで「暗闇に浮いた円」が
+ * 「坩堝の上に立っている陣」になり、同時に上の冷たい宝珠と
+ * 下の金のボタンを橙でつなぐ継ぎ目にもなる。 */
+.summon-stage__plinth {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: -1;
+  width: calc(var(--d) * 1.3);
+  height: calc(var(--d) * 0.26);
+  /* 輪の下端(= 直径の半分 = 0.5)にほんの少しだけ食い込ませる。
+   * 2周目は 0.34 にしていたせいで**輪の内側に隠れて**、
+   * 台座ではなく祭壇の下半分を汚す染みになっていた */
+  transform: translate(-50%, calc(var(--d) * 0.46));
+  pointer-events: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 46%, rgba(255, 196, 112, 0.5), rgba(255, 116, 32, 0.17) 46%, transparent 72%);
+  /* ここで filter: blur() を掛けると**天板の金の弧まで一緒にぼける**。
+   * 階調は放射のグラデーションだけで十分やわらかい */
+  /* altar-breathe は transform: scale(1) を持つので使えない。
+   * 位置決めの translate ごと上書きされ、台座が明後日の場所へ飛ぶ。
+   * 明滅だけを担うタイトル画面の crimon-breathe を借りる */
+  animation: crimon-breathe 6.5s ease-in-out infinite;
+}
+
+/* 台座の天板。細い金の弧を1本だけ引く。
+ * 靄のままでは光にしか見えず、線が1本入って初めて「面の縁」になる */
+.summon-stage__plinth::after {
+  content: "";
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  top: 42%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 230, 184, 1) 26%, rgba(255, 230, 184, 1) 74%, transparent);
 }
 
 /* 祭壇の直径。ルーンの軌道半径や文字の大きさもここから計算するので、
  * %(親や自分自身が基準になる)を混ぜてはいけない。
  * font-size では親の文字サイズ、translateY では自分の高さ(=0)になってしまう。 */
 .altar {
-  --d: min(82vw, 46vh, 360px);
+  /* 直径は .summon-stage が決める。単独で置かれた時のために控えを持つ */
+  --d: min(84vw, 48vh, 348px);
 
   position: relative;
   width: var(--d);
@@ -169,12 +276,18 @@
 }
 
 /* 中心の宝珠。呼吸のように明滅させ、押したくなる焦点を作る */
+/* 中心の宝珠。
+ *
+ * 光源が上の1つだけだと、どれだけ磨いても**冷たい球のまま**で、
+ * この世界の「上は藍・下は熾火」から浮く。下端に台座の火の照り返しを
+ * 1本入れる。球ひとつの中で寒暖が出会い、周りの橙と血がつながる。 */
 .altar__orb {
   inset: 33%;
   background: radial-gradient(circle at 36% 30%, #ffffff 0%, #b7d8ff 18%, #5b8ef0 48%, #23306e 78%, #101430 100%);
   box-shadow:
     0 0 46px rgba(110, 160, 255, 0.55),
     inset 0 -12px 24px rgba(0, 0, 0, 0.45),
+    inset 0 -9px 16px rgba(255, 156, 62, 0.34),
     inset 0 8px 18px rgba(255, 255, 255, 0.35);
   animation: orb-float 3.6s ease-in-out infinite;
 }
@@ -219,18 +332,46 @@
 
 /* --- 下部: 排出の目安・注記・引くボタン --------------------------------- */
 
+/* 下半分。
+ *
+ * 1周目は割合の札も注記もボタンも、ただ順に積んであるだけで、
+ * どこから「操作の場所」が始まるのか分からなかった。
+ * 頭に金の罫を1本引いて棚の縁にする。祭壇の間と、手を出す場所が分かれる。 */
 .summon-bottom {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
+  padding-top: 10px;
+}
+
+.summon-bottom::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(240, 200, 130, 0.85) 24%, rgba(240, 200, 130, 0.85) 76%, transparent);
+  box-shadow: 0 0 8px rgba(255, 190, 90, 0.35);
 }
 
 .summon-rates {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 6px;
+}
+
+/* 「出現」の一語。色の付いた札が4つ並んでいるだけでは何の表なのか分からない */
+.summon-rates__label {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  color: #a98f63;
 }
 
 .summon-tag {
@@ -266,117 +407,236 @@
   line-height: 1.5;
 }
 
+/* --- 押す場所 -----------------------------------------------------------
+ *
+ * 4つを 2×2 に置いていた頃は、どれも同じ高さの矩形で、10連と1回の差が
+ * **値段の桁数でしか分からなかった**。並びを1列の階段に組み直す:
+ *
+ *   ダイヤ10連 … 高さ 68px / 金 / 光が走る   ← 画面でいちばん明るい面
+ *   ダイヤ1回  … 高さ 54px / 鋼             ← 金の下に付く
+ *   書の2つ    … 高さ 46px / 羊皮紙         ← 持っている時だけ意味を持つ
+ *
+ * 中身も縦積みをやめ、左に名前・右に値札の横並びにした。
+ * 値札が右端で揃うので、3段を上から見下ろすだけで重さの順が分かる。
+ */
 .summon-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.summon-cta__pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 7px;
 }
 
 .summon-cta__btn {
   appearance: none;
   position: relative;
   border: none;
-  border-radius: 14px;
-  padding: 10px 8px 9px;
-  display: flex;
-  flex-direction: column;
+  border-radius: 13px;
+  min-height: 46px;
+  padding: 8px 10px 8px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 2px;
+  gap: 10px;
   cursor: pointer;
   color: #f6f9ff;
-  background: var(--surface-raised);
-  box-shadow: var(--edge-light), var(--edge-line), var(--drop);
-  transition: transform 0.08s ease, filter 0.12s ease;
+  background: var(--grain), var(--surface-raised);
+  box-shadow: var(--bevel), var(--drop);
+  transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.12s ease;
   overflow: hidden;
+  text-align: left;
 }
 
+/* 押した手応え。面が沈んで彫り込みに変わる。共通の .btn と同じ挙動にして、
+ * 画面が違っても指が受け取る返事は同じにする */
 .summon-cta__btn:active:not(:disabled) {
-  transform: translateY(1px);
-  filter: brightness(0.94);
+  transform: translateY(1.5px);
+  box-shadow: var(--inset-deep);
+  filter: brightness(0.93);
 }
 
 .summon-cta__btn:disabled {
-  opacity: 0.45;
   cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.summon-cta__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .summon-cta__lead {
-  font-size: 1.02rem;
+  font-size: 0.98rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
 .summon-cta__sub {
-  font-size: 0.62rem;
+  font-size: 0.63rem;
   font-weight: 700;
-  opacity: 0.85;
+  opacity: 0.82;
+  letter-spacing: 0.02em;
 }
 
+/* 値札。**面に文字を置く**のではなく、彫り込んだ受け皿に嵌める。
+ * 3段の右端で同じ形が揃うと、値段どうしが比べ物になる */
 .summon-cta__cost {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 2px;
-  padding: 2px 10px;
+  gap: 6px;
+  flex: none;
+  padding: 5px 11px;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 800;
+  color: #ffe9c0;
   background: rgba(5, 8, 18, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
-}
-
-.summon-cta__cost .icon { font-size: 13px; }
-.summon-cta__cost strong { font-variant-numeric: tabular-nums; }
-
-/* 10連が主役。金色で一番大きく、光が走る */
-.summon-cta__btn--ten {
-  grid-column: 1 / -1;
-  padding: 13px 8px 12px;
-  color: #2a1a02;
-  background: linear-gradient(180deg, #ffe9a8 0%, #f0b93f 46%, #b9791a 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    0 0 22px rgba(255, 190, 70, 0.35),
-    var(--drop);
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
 
+.summon-cta__cost .icon { font-size: 14px; color: #8fd8ff; }
+.summon-cta__cost strong { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+
+/* --- 1段目: ダイヤ10連 -------------------------------------------------
+ * タイトルのSTARTと同じ金の作り(上辺の強い照り・下辺の落ち込み・
+ * 内側の焦げ茶の罫)にする。前の平らな黄土色は、押せる面に見えなかった
+ */
+.summon-cta__btn--ten {
+  min-height: 68px;
+  padding: 10px 12px 10px 16px;
+  color: #2b1706;
+  background: linear-gradient(180deg, #ffe9bb 0%, #f4b953 46%, #c87d1e 100%);
+  box-shadow:
+    0 0 30px rgba(255, 152, 42, 0.32),
+    0 12px 26px rgba(0, 0, 0, 0.48),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -2px 0 rgba(120, 60, 0, 0.35),
+    inset 0 0 0 1px rgba(112, 56, 6, 0.35);
+}
+
+/* 名前の頭に鋲。タイトルのSTARTと同じ菱形を置いて、同じ格の面だと分からせる */
 .summon-cta__btn--ten .summon-cta__lead {
-  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 1.18rem;
+  letter-spacing: 0.1em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
+.summon-cta__btn--ten .summon-cta__lead::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  transform: rotate(45deg);
+  background: rgba(74, 36, 2, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.summon-cta__btn--ten .summon-cta__sub {
+  padding-left: 16px;
+  opacity: 0.72;
+  color: #4a2c06;
+}
+
 .summon-cta__btn--ten .summon-cta__cost {
+  padding: 7px 13px;
+  font-size: 0.9rem;
   color: #ffeec2;
+  background: rgba(56, 26, 2, 0.62);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 1px rgba(255, 216, 150, 0.3);
 }
 
 .summon-cta__btn--ten::after {
-  /* 表面を斜めに走る光。押す前の期待を作る */
+  /* 表面を斜めに走る光。8秒に1度だけ通す。速いと落ち着かず、
+   * 常に光っていると光っていないのと同じになる */
   content: "";
   position: absolute;
   top: -60%;
   left: -40%;
-  width: 40%;
+  width: 34%;
   height: 220%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
   transform: rotate(18deg);
-  animation: sheen 3.6s ease-in-out infinite;
+  animation: sheen 5.2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .summon-cta__btn--ten:disabled::after {
   display: none;
 }
 
+/* --- 2段目: ダイヤ1回 ---------------------------------------------------
+ * 前は既定の青一色で、OSのボタンがそのまま置いてあるように見えた。
+ * 金の下に付く**冷たい鋼**にして、宝珠の青とだけ通じさせる
+ */
 .summon-cta__btn--single {
-  background: linear-gradient(180deg, #8fc0ff 0%, #4f8cff 45%, #2a63d8 100%);
-  color: #061024;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 0 16px rgba(79, 140, 255, 0.3), var(--drop);
+  min-height: 54px;
+  color: #e9f1ff;
+  background:
+    radial-gradient(ellipse 70% 140% at 12% -20%, rgba(150, 200, 255, 0.22), transparent 62%),
+    linear-gradient(180deg, #33406b 0%, #212a4a 52%, #161c33 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(190, 220, 255, 0.4),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(130, 170, 240, 0.28),
+    var(--drop);
 }
 
-.summon-cta__btn--scroll {
-  background: var(--surface);
-  box-shadow: var(--edge-light), inset 0 0 0 1px rgba(255, 255, 255, 0.14), var(--drop);
+.summon-cta__btn--single .summon-cta__cost {
+  color: #cfe6ff;
 }
+
+/* --- 3段目: 召喚の書 -----------------------------------------------------
+ * ダイヤの2段とは**払う物が違う**。金でも鋼でもない、くすんだ羊皮紙の面に
+ * して、同じ列にあっても別勘定だと分かるようにする
+ */
+.summon-cta__btn--scroll {
+  padding: 7px 8px 7px 11px;
+  gap: 6px;
+  color: #f0dcb4;
+  background:
+    var(--grain),
+    linear-gradient(180deg, #3a3020 0%, #29220f 55%, #1b160a 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 226, 170, 0.24),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.26),
+    var(--drop-soft);
+}
+
+.summon-cta__btn--scroll .summon-cta__lead {
+  font-size: 0.84rem;
+  letter-spacing: 0.03em;
+}
+
+.summon-cta__btn--scroll .summon-cta__sub {
+  font-size: 0.58rem;
+  color: #b9a077;
+  opacity: 1;
+}
+
+.summon-cta__btn--scroll .summon-cta__cost {
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  color: #ffe0a0;
+}
+
+.summon-cta__btn--scroll .summon-cta__cost .icon { color: #ffd98a; }
 
 /* =========================================================================
  * 結果画面(演出)
@@ -450,13 +710,18 @@
   overflow: hidden;
 }
 
-/* 画面全体を落とす暗幕。演出中はここが舞台の「暗さ」を作る */
+/* 画面全体を落とす暗幕。演出中はここが舞台の「暗さ」を作る。
+ *
+ * 前は青灰色の幕を1枚かぶせるだけで、**この画面だけ別のゲームの色**だった。
+ * ホームとタイトルと同じ地(上は藍・下は熾火)をここにも敷く。
+ * 光条を screen で重ねた時、下が濁った灰色か熾火かで仕上がりがまるで違う。 */
 .fx__backdrop {
   position: fixed;
   inset: -12px;
   background:
-    radial-gradient(ellipse 80% 62% at 50% 44%, rgba(10, 14, 34, 0.2), rgba(2, 3, 10, 0.9) 78%),
-    rgba(3, 4, 12, 0.55);
+    radial-gradient(ellipse 78% 60% at 50% 42%, rgba(10, 14, 34, 0.18), rgba(2, 3, 10, 0.92) 80%),
+    radial-gradient(ellipse 120% 24% at 50% 102%, rgba(255, 138, 46, 0.2), transparent 74%),
+    linear-gradient(180deg, #04050e 0%, #070c1e 46%, #100a12 80%, #150c07 100%);
   opacity: 0.85;
   transition: opacity 0.5s ease;
 }
@@ -485,30 +750,38 @@
   transition: opacity 0.7s ease;
 }
 
+/* 光条の抜き型。
+ *
+ * ここが**結果画面がのっぺりした藤色の壁に見えていた原因**だった。
+ * 中心に近いほど条の幅は細くなり、半径25pxの穴のすぐ外では
+ * 1本が数px。目には条ではなく**一様な紫の塗り**として届いていた。
+ * 穴を大きく取って、条が条として読める距離から描き始める。 */
 .fx__rays > i {
   position: absolute;
   inset: 0;
   background: repeating-conic-gradient(from 0deg, var(--ray) 0deg 2.2deg, transparent 2.2deg 12deg);
-  -webkit-mask: radial-gradient(closest-side, transparent 3%, rgba(0, 0, 0, 0.8) 11%, rgba(0, 0, 0, 0.34) 24%, transparent 44%);
-  mask: radial-gradient(closest-side, transparent 3%, rgba(0, 0, 0, 0.8) 11%, rgba(0, 0, 0, 0.34) 24%, transparent 44%);
+  -webkit-mask: radial-gradient(closest-side, transparent 11%, rgba(0, 0, 0, 0.85) 21%, rgba(0, 0, 0, 0.28) 33%, transparent 48%);
+  mask: radial-gradient(closest-side, transparent 11%, rgba(0, 0, 0, 0.85) 21%, rgba(0, 0, 0, 0.28) 33%, transparent 48%);
   mix-blend-mode: screen;
   animation: spin 34s linear infinite;
 }
 
+/* screen で重ねる層は、濃さがそのまま「地の暗さを殺す量」になる。
+ * 等級の差は残したまま、全体を一段落とす */
 .phase-reveal .fx__rays {
-  opacity: 0.5;
+  opacity: 0.34;
 }
 
 .g1.phase-reveal .fx__rays {
-  opacity: 0.22;
+  opacity: 0.15;
 }
 
 .g3.phase-reveal .fx__rays {
-  opacity: 0.62;
+  opacity: 0.44;
 }
 
 .g4.phase-reveal .fx__rays {
-  opacity: 0.66;
+  opacity: 0.5;
 }
 
 /* 収束する魔法陣。段階が上がるほど小さく速く、明るくなる */
@@ -775,6 +1048,26 @@
   animation-duration: 0.9s;
 }
 
+/* --- 演出の中心 ---------------------------------------------------------
+ *
+ * 光条も魔法陣も衝撃波も、画面のちょうど真ん中(50%)へ収束させていた。
+ * ところが縦画面では札が上寄りに出るので、**光は誰もいない下の空きへ
+ * 集まっていた**。光源と主役の位置が合っていないと、どれだけ層を重ねても
+ * 嘘に見える。中心を変数1つにまとめ、札の出る高さへ寄せる。
+ * (横画面は札が上下の真ん中に来るので 50% のまま)
+ */
+.summon-screen--result {
+  --fx-cy: 43%;
+}
+
+.fx__rays,
+.fx__circle,
+.fx__converge,
+.fx__shock,
+.fx__burst {
+  top: var(--fx-cy, 50%);
+}
+
 /* --- 溜め中の煽り文 ----------------------------------------------------- */
 
 .fx__omen {
@@ -818,14 +1111,29 @@
 }
 
 .summon-skip__pill {
-  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 12px 7px 15px;
   border-radius: 999px;
   font-size: 0.74rem;
   font-weight: 800;
+  letter-spacing: 0.06em;
   color: #dce7ff;
   background: rgba(8, 11, 24, 0.6);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(4px);
+}
+
+/* 二重山括弧。1つめを薄くすると、送りの向きが出る */
+.summon-skip__pill .icon {
+  font-size: 13px;
+  margin-left: -3px;
+}
+
+.summon-skip__pill .icon:first-of-type {
+  margin-left: 5px;
+  opacity: 0.55;
 }
 
 /* --- 結果の中身 --------------------------------------------------------- */
@@ -853,16 +1161,48 @@
   transform: none;
 }
 
+/* 出た瞬間の一言。
+ *
+ * 小さな白い錠剤に収めていたので、**大当たりでも小当たりでも同じ重さ**に
+ * 見えていた。左右へ罫を伸ばして横断幕にし、面には上辺の照りと
+ * 下辺の落ち込みを入れる。等級が上がるほど字も罫も強くなる。 */
+.summon-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 460px;
+}
+
+/* 幕の左右へ伸びる罫。中央の面だけでは「置いた札」に見える */
+.summon-banner::before,
+.summon-banner::after {
+  content: "";
+  flex: 1 1 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--fx-soft));
+}
+
+.summon-banner::after {
+  background: linear-gradient(270deg, transparent, var(--fx-soft));
+}
+
 .summon-banner__text {
   display: inline-block;
-  padding: 5px 18px;
+  flex: none;
+  padding: 6px 20px;
   border-radius: 999px;
-  font-size: 0.92rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-indent: 0.1em;
+  white-space: nowrap;
   color: #0c1020;
   background: linear-gradient(180deg, #fff, var(--fx1));
-  box-shadow: 0 0 22px var(--fx-soft), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 0 24px var(--fx-soft),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.28);
 }
 
 .g4 .summon-banner__text {
@@ -1042,8 +1382,11 @@
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
 }
 
+/* 単発の主役では、名前も星も**すぐ下の銘板が大きく言っている**。
+ * 札の中にも同じものを刷ると、同じ字が2回続けて並ぶだけになる。
+ * 札は絵に専念させ、読ませるのは銘板1か所にまとめる */
 .hero__card .mcard__name {
-  font-size: 0.86rem;
+  display: none;
 }
 
 .hero__card .mcard__star {
@@ -1129,10 +1472,15 @@
   text-shadow: 0 0 8px rgba(255, 190, 40, 0.85);
 }
 
-/* --- 10連: 5列2段 ------------------------------------------------------- */
-
+/* --- 10連: 5列2段 -------------------------------------------------------
+ *
+ * 390pxの幅を5つに割ると1枚66px。正方形の絵に合わせて札を組むと
+ * 高さも90px弱にしかならず、**縦に200pxの余りが上下へ残る**一方で
+ * 肝心のモンスターが親指の爪ほどの大きさになっていた。
+ * 絵の比を縦長に振り、余っていた高さを絵そのものへ回す。
+ */
 .grid10 .mcard__name {
-  font-size: 0.58rem;
+  font-size: 0.6rem;
 }
 
 .grid10 .mcard {
@@ -1140,23 +1488,59 @@
   gap: 3px;
 }
 
+/* 幅は5列で決まってしまうので、伸ばせるのは縦だけ。
+ * 5:6 にすると絵の面積が2割増え、札が「駒」から「札」になる */
+.grid10 .mcard__portrait {
+  aspect-ratio: 5 / 6;
+}
+
 .grid10 {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 9px;
   width: 100%;
   max-width: min(100%, 460px);
 }
 
 /* --- まとめ ------------------------------------------------------------- */
 
+/* 引きの内訳。
+ *
+ * 前は色札が4つ宙に浮いているだけで、何の数を言っているのか分からなかった。
+ * 受け取りの帯(.reward-banner)と同じ**金の罫を持つ銘板**に嵌める。
+ * 貰った物を数える場所は、この世界では金の面だと決まっている。 */
 .summon-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px 10px;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse 70% 150% at 16% -20%, rgba(255, 236, 180, 0.14), transparent 66%),
+    linear-gradient(180deg, rgba(38, 32, 20, 0.86) 0%, rgba(18, 15, 10, 0.9) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 186, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.34),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.4s ease 0.35s;
+}
+
+.summon-summary__label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  color: #d3b57e;
+}
+
+.summon-summary__chips {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  opacity: 0;
-  transition: opacity 0.4s ease 0.35s;
 }
 
 .phase-reveal .summon-summary {
@@ -1189,8 +1573,14 @@
 
 /* --- 下部の操作 --------------------------------------------------------- */
 
+/* 次の一手。
+ * 「閉じる」と「もう一度」を等分に並べていたので、周回する遊びなのに
+ * **どちらが本線か分からなかった**。もう一度を金で倍の幅に取り、
+ * 閉じるは押せる大きさ(44px)を保ったまま脇へ下がらせる。 */
 .summon-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(96px, 0.62fr) minmax(0, 1fr);
+  align-items: stretch;
   gap: 10px;
   width: 100%;
   max-width: 460px;
@@ -1206,15 +1596,86 @@
   transform: none;
 }
 
-.summon-actions__btn {
-  flex: 1 1 0;
+.summon-actions__close {
+  padding: 12px 10px;
+  font-size: 0.86rem;
+  color: #b9c6e6;
 }
+
+.summon-actions__again {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 14px;
+}
+
+.summon-actions__again-lead {
+  font-size: 1.02rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+/* 値札は召喚画面の3段と同じ作り。画面が変わっても値段の見え方は変えない */
+.summon-actions__again-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #ffeec2;
+  background: rgba(56, 26, 2, 0.6);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 1px rgba(255, 216, 150, 0.3);
+}
+
+.summon-actions__again-cost .icon { font-size: 13px; color: #8fd8ff; }
+.summon-actions__again-cost strong { font-variant-numeric: tabular-nums; }
 
 /* =========================================================================
  * 横画面(932x430)
  * 縦に積むと確実に溢れるので、祭壇と操作を左右に分ける。
  * 10連は1段10列にして、カードを小さくせずに1画面へ収める。
  * ========================================================================= */
+
+/* =========================================================================
+ * 低い縦画面(360x640 など)
+ *
+ * この画面は 100dvh + overflow:hidden で1画面に収める作りなので、
+ * 背の低い端末では**祭壇が押す場所を画面の外へ押し出す**。
+ * 高さが足りない時は、まず祭壇から削る。押す場所と値札は最後まで守る。
+ * ========================================================================= */
+@media (orientation: portrait) and (max-height: 720px) {
+  .summon-stage,
+  .altar {
+    --d: min(84vw, 40vh, 300px);
+  }
+
+  .summon-cta__btn--ten {
+    min-height: 60px;
+  }
+
+  .summon-cta__btn--ten .summon-cta__lead {
+    font-size: 1.08rem;
+  }
+
+  .summon-cta__btn--single {
+    min-height: 48px;
+  }
+
+  .summon-cta__btn {
+    min-height: 42px;
+  }
+
+  .summon-note {
+    font-size: 0.66rem;
+  }
+}
 
 @media (orientation: landscape) and (max-height: 560px) {
   .screen.summon-screen {
@@ -1244,13 +1705,32 @@
     gap: 10px;
   }
 
+  .summon-stage {
+    --d: min(62vh, 268px);
+  }
+
   .altar {
-    --d: min(68vh, 290px);
+    --d: min(62vh, 268px);
+  }
+
+  /* 横画面では下端に台座を敷く余裕が無い。棚の罫も左右に伸ばさない */
+  .summon-stage__plinth {
+    transform: translate(-50%, calc(var(--d) * 0.5));
+    opacity: 0.7;
+  }
+
+  .summon-bottom::before {
+    display: none;
   }
 
   /* --- 結果 --- */
   .screen.summon-screen--result {
     display: flex;
+  }
+
+  /* 横画面は札が上下の真ん中に出るので、光の収束点も真ん中でよい */
+  .summon-screen--result {
+    --fx-cy: 50%;
   }
 
   .summon-result {
