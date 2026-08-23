@@ -55,6 +55,28 @@ function startDevServer() {
   });
 }
 
+/**
+ * プレビューの描画が立ち上がるのを待つ。
+ *
+ * **Playwright の待ち受けAPIはどれもここでは使えなかった。**
+ * `waitForFunction` はページとは別のJSコンテキストで評価されるため、
+ * ページ側が window に生やした値が見えず永久に待つ。
+ * `waitForSelector` は DOM属性を見に行くので条件自体は満たすのに、
+ * ログに `locator resolved` と出たうえでタイムアウトする(state を attached にしても同じ)。
+ * WebGLの描画ループがメインスレッドを占有し、内部の待ち受けが完了を報告できないためと見られる。
+ *
+ * `evaluate` だけは通るので、自前で間隔を空けて叩く。
+ */
+async function waitForPreviewReady(page, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const ready = await page.evaluate(() => document.documentElement.getAttribute("data-crimon-preview-ready") === "1");
+    if (ready) return;
+    if (Date.now() > deadline) throw new Error("プレビューの描画が立ち上がりませんでした");
+    await page.waitForTimeout(250);
+  }
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
   const server = await startDevServer();
@@ -84,7 +106,9 @@ async function main() {
 
         await page.goto(`${BASE}?${scene.query}`, { waitUntil: "networkidle", timeout: 45000 });
         // WebGLの初回描画とアニメーションの立ち上がりを待つ
-        await page.waitForFunction(() => window.__crimonPreviewReady === true, null, { timeout: 20000 });
+        // window のプロパティではなくDOM属性で待つ。waitForFunction はページとは別の
+        // JSコンテキストで評価されるため、ページ側が window に生やした値が見えない
+        await waitForPreviewReady(page);
         await page.waitForTimeout(2600);
 
         const file = path.join(outDir, `${viewport.name}-${scene.name}.png`);
