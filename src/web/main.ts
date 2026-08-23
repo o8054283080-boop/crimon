@@ -1043,6 +1043,7 @@ function render(): void {
         onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
+        onGoShop: () => navigate("SHOP"),
         onRefillStaminaPartial: () => {
           if (!tryRefillStaminaPartial(state.player).ok) return;
           savePlayerState(state.player);
