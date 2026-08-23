@@ -159,6 +159,24 @@ export function buildMonsterCard(
     dex ? el("span", { className: "mcard__element", title: `${ELEMENT_JA[dex.element]}属性` }, [ELEMENT_JA[dex.element]]) : null,
     level !== undefined ? el("span", { className: "mcard__level" }, [`Lv${level}${maxLevel ? `/${maxLevel}` : ""}`]) : null,
     bonus ? el("span", { className: "mcard__bonus" }, ["★"]) : null,
+    // 肖像の左下に置く。左上は属性、右上は「編成中」、右下はレベルで埋まっている
+    onDetail && !disabled
+      ? el(
+          "button",
+          {
+            type: "button",
+            className: "mcard__detail",
+            title: "詳細を見る",
+            "aria-label": "詳細を見る",
+            onclick: (event: MouseEvent) => {
+              // カード自体の「編成する」を巻き添えにしない
+              event.stopPropagation();
+              onDetail();
+            },
+          },
+          [icon("info", { size: 13 })],
+        )
+      : null,
   ];
 
   // 総合力と装備の数は、編成を決めるための2つの数字。並べて1行にまとめる
@@ -187,23 +205,6 @@ export function buildMonsterCard(
     caption ? el("span", { className: "mcard__caption" }, [caption]) : null,
     badge ? el("span", { className: `mcard__badge${badgeCorner ? " mcard__badge--corner" : ""}` }, [badge]) : null,
     created ? el("span", { className: "mcard__created", title: "クリエイト済み" }, [icon("summon", { size: 10 })]) : null,
-    onDetail && !disabled
-      ? el(
-          "button",
-          {
-            type: "button",
-            className: "mcard__detail",
-            title: "詳細を見る",
-            "aria-label": "詳細を見る",
-            onclick: (event: MouseEvent) => {
-              // カード自体の「編成する」を巻き添えにしない
-              event.stopPropagation();
-              onDetail();
-            },
-          },
-          [icon("info", { size: 13 })],
-        )
-      : null,
   ];
 
   // 詳細ボタンを角に入れるため、外側は button ではなく div にする
