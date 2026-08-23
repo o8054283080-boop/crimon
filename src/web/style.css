@@ -5050,26 +5050,34 @@ body {
 .shop-card__icon--scroll { color: #d9b8ff; }
 .shop-card__icon--lock { color: #8b7a5e; }
 
-/* 値札。金貨の面に数字を打つ。押せる的は42px(共通の下限)を保つ */
+/* 値札。押せる的は42px(共通の下限)を保つ。
+ *
+ * **金は取っておく色にする。**明るい金は「いま行くべき場所」を指すために使う
+ * (ホームの冒険へ、召喚の10連)。棚の値札を全部その金で塗ると、
+ * 8枚並んだ時点で棚一面が金になり、**どれも同じ重さに見えて選べなくなる**。
+ * 金は縁と貨幣の印に留め、面は暗いまま。押した瞬間だけ金貨の面が起きる。
+ *
+ * なお同じ .shop-card__buy の指定がこのファイル内に3か所ある。
+ * ここが最後に来るので、ここだけが効く。触るならここ */
 .shop-card__buy {
-  background:
-    radial-gradient(ellipse 90% 80% at 50% -10%, rgba(255, 255, 255, 0.5), transparent 70%),
-    linear-gradient(180deg, #ffe1a0 0%, #f0a83c 52%, #c2761a 100%);
+  color: #ffdf9e;
+  background: linear-gradient(180deg, rgba(74, 55, 22, 0.92), rgba(38, 28, 12, 0.95));
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -1.5px 0 rgba(110, 58, 4, 0.42),
-    inset 0 0 0 1px rgba(120, 62, 8, 0.34),
+    inset 0 1px 0 rgba(255, 226, 160, 0.24),
+    inset 0 0 0 1px rgba(226, 182, 110, 0.5),
     var(--drop-soft);
   transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
 .shop-card__buy:active:not(:disabled) {
   transform: translateY(1.5px);
+  color: #10130f;
+  background: linear-gradient(180deg, #ffe1a0 0%, #f0a83c 52%, #c2761a 100%);
   box-shadow: var(--inset-deep);
-  filter: brightness(0.93);
 }
 
-.shop-card__buy .icon { color: #6b3f06; }
+.shop-card__buy .icon { color: #f5c860; }
+.shop-card__buy:active:not(:disabled) .icon { color: #6b3f06; }
 
 .shop-card__buy--crystal {
   background:
