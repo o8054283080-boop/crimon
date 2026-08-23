@@ -9,10 +9,13 @@ import {
   isEquipmentEquipped,
   sellEquipment,
   unequipFromMonster,
+  createInitialState,
 } from "../src/game/playerState.js";
 
 function makeState(): PlayerState {
   return {
+    // 項目が増えるたびにここを直す羽目になっていたので、既定値から作って上書きする形にした
+    ...createInitialState(),
     crystal: 0,
     gold: 0,
     monsters: [],
