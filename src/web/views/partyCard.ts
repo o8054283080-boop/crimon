@@ -28,6 +28,8 @@ export function partyMemberCard(
     badge: selected ? "編成中" : undefined,
     // 中央に出すとレベルの表示を覆ってしまうため、角に寄せる
     badgeCorner: true,
+    // 長押しは見えない。同じ詳細へ、目に見える入口も置く
+    onDetail: onLongPress,
   });
 }
 

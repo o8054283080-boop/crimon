@@ -2,6 +2,7 @@ import { ELEMENT_JA } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { Star } from "../../core/rarity.js";
 import { el } from "../dom.js";
+import { icon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
 
 /**
@@ -50,8 +51,19 @@ export interface MonsterCardOptions {
    * 長押しした時の動作。押している間に指が動いたら取り消す。
    * 発火した場合は、指を離した時のクリックを打ち消す
    * (「詳細を見ようとしただけなのに編成が変わる」のを防ぐ)。
+   *
+   * **長押しは見えない操作なので、これだけに頼らないこと。**
+   * 同じ動作は `onDetail` の丸ボタンからも辿れるようにしてある。
    */
   onLongPress?: () => void;
+  /**
+   * 詳細を開くボタンを角に出す。
+   *
+   * 以前は長押しだけが入口で、画面の下に
+   * 「一覧はタップで編成、長押しで詳細」と**文章で説明していた**。
+   * 操作を文章で教えないと使えない時点で、その操作は見つからない。
+   */
+  onDetail?: () => void;
 }
 
 /** 長押しと判定するまでの時間(ミリ秒)。短すぎると普通のタップで暴発する */
@@ -128,7 +140,7 @@ export function buildMonsterCard(
   onClick: () => void,
   options: MonsterCardOptions = {},
 ): HTMLElement {
-  const { selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress } =
+  const { selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress, onDetail } =
     options;
 
   const classes = ["mcard", rarityClass(star)];
@@ -146,7 +158,7 @@ export function buildMonsterCard(
   // 総合力と装備の数は、編成を決めるための2つの数字。並べて1行にまとめる
   const infoParts: HTMLElement[] = [];
   if (power !== undefined) {
-    infoParts.push(el("span", { className: "mcard__power", title: "総合力" }, [`⚔${power.toLocaleString("ja-JP")}`]));
+    infoParts.push(el("span", { className: "mcard__power", title: "総合力" }, [icon("equipment", { size: 11 }), power.toLocaleString("ja-JP")]));
   }
   if (gearCount !== undefined && gearTotal !== undefined) {
     infoParts.push(
@@ -156,7 +168,7 @@ export function buildMonsterCard(
           className: `mcard__gear${gearCount === 0 ? " mcard__gear--none" : gearCount >= gearTotal ? " mcard__gear--full" : ""}`,
           title: `装備 ${gearCount}/${gearTotal}`,
         },
-        [`⚒${gearCount}/${gearTotal}`],
+        [icon("equipDungeon", { size: 11 }), `${gearCount}/${gearTotal}`],
       ),
     );
   }
@@ -168,11 +180,44 @@ export function buildMonsterCard(
     infoParts.length > 0 ? el("span", { className: "mcard__info" }, infoParts) : null,
     caption ? el("span", { className: "mcard__caption" }, [caption]) : null,
     badge ? el("span", { className: `mcard__badge${badgeCorner ? " mcard__badge--corner" : ""}` }, [badge]) : null,
+    onDetail && !disabled
+      ? el(
+          "button",
+          {
+            type: "button",
+            className: "mcard__detail",
+            title: "詳細を見る",
+            "aria-label": "詳細を見る",
+            onclick: (event: MouseEvent) => {
+              // カード自体の「編成する」を巻き添えにしない
+              event.stopPropagation();
+              onDetail();
+            },
+          },
+          [icon("info", { size: 13 })],
+        )
+      : null,
   ];
 
+  // 詳細ボタンを角に入れるため、外側は button ではなく div にする
+  // (button の入れ子は成立せず、内側が押せなくなる)。
+  // 押せること・押した時の動きは role と tabindex で保つ
   const node = el(
-    "button",
-    { type: "button", className: classes.join(" "), disabled, onclick: onClick },
+    "div",
+    {
+      className: classes.join(" "),
+      role: "button",
+      tabIndex: disabled ? -1 : 0,
+      "data-disabled": disabled ? "1" : undefined,
+      onclick: disabled ? undefined : onClick,
+      onkeydown: disabled
+        ? undefined
+        : (event: KeyboardEvent) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            onClick();
+          },
+    },
     children.filter(isElement),
   );
   if (onLongPress && !disabled) attachLongPress(node, onLongPress);

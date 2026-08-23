@@ -47,6 +47,8 @@ export function monsterCard(
     disabled: extra?.disabled,
     bonus: extra?.bonus,
     onLongPress: extra?.onLongPress,
+    // 長押しは見えない操作なので、同じ詳細へ丸ボタンからも辿れるようにする
+    onDetail: extra?.onLongPress,
     star: instance.star,
     level: instance.level,
     maxLevel: STAR_MAX_LEVEL[instance.star],

@@ -35,6 +35,7 @@ export type IconName =
   | "stamina"
   | "pencil"
   | "scroll"
+  | "info"
   | "chevron";
 
 /**
@@ -77,6 +78,8 @@ const STROKE_PATHS: Record<IconName, string[]> = {
   pencil: ["M4 20 L4.9 16.4 L15.8 5.5 L18.5 8.2 L7.6 19.1 Z", "M14 7.3 L16.7 10"],
   // 巻物。召喚の書
   scroll: ["M7.5 4.5 H17 A2 2 0 0 1 19 6.5 V17.5 A2 2 0 0 1 17 19.5 H7 A2 2 0 0 1 5 17.5 V6.5 A2 2 0 0 1 7 4.5", "M5 8.5 H8.5", "M11 9.5 H16", "M11 13 H16", "M11 16 H14"],
+  // 丸に i。詳細を開く合図
+  info: ["M12 21 A9 9 0 1 1 12 3 A9 9 0 1 1 12 21", "M12 11 V16.5", "M12 7.4 V8.6"],
   // 山括弧
   chevron: ["M9.5 5.5 L16 12 L9.5 18.5"],
 };

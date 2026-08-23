@@ -1956,6 +1956,49 @@ body {
   filter: brightness(0.95);
 }
 
+/* 詳細を開く丸ボタン。
+ * **見た目は小さく、押せる範囲は大きく。** 的が36pxを下回ると指では狙えないが、
+ * 札の上に36pxの丸を描くと絵を覆ってしまう。
+ * 当たり判定は36px角のまま、描く丸だけを22pxに絞ってある。 */
+.mcard__detail {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #dbe6ff;
+  cursor: pointer;
+}
+
+.mcard__detail::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(6, 10, 22, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(180, 205, 255, 0.35);
+}
+
+.mcard__detail .icon {
+  position: relative;
+}
+
+.mcard__detail:active::before {
+  background: rgba(60, 100, 190, 0.85);
+}
+
+/* role="button" の札でも、押せない時は押せない見た目にする */
+.mcard[data-disabled="1"] {
+  cursor: default;
+}
+
 .mcard--disabled {
   opacity: 0.42;
   cursor: not-allowed;
@@ -3308,6 +3351,13 @@ body {
 }
 
 /* 常時出るラベルは札の中央に置くとレベルや星を覆う。角に寄せる */
+.mcard__power,
+.mcard__gear {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .mcard__badge--corner {
   top: 3px;
   left: auto;
