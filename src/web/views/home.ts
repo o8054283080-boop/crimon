@@ -468,16 +468,26 @@ function titleEmblem(): SVGSVGElement {
  * 何か」に変わる。奥と手前で2枚重ね、奥の縁だけに火の色を乗せる。
  */
 function forgeRidge(): HTMLElement {
-  const far = "M0 84 L26 62 L54 74 L88 36 L114 60 L140 52 L170 72 L198 30 L230 66 L258 56 L294 76 L320 44 L348 68 L374 58 L390 70 L390 120 L0 120 Z";
-  const near = "M0 106 L34 94 L64 102 L104 78 L138 98 L172 90 L208 102 L246 82 L288 100 L324 92 L360 104 L390 96 L390 120 L0 120 Z";
+  /*
+   * 山を3枚重ねる。
+   *
+   * 2枚だったときは**鋸の歯**に見えていた。峰の高さと間隔をばらしても
+   * 直らなかったのは、**傾きが全部同じ**だったから。自然の稜線は
+   * 片側が急でもう片側が緩い。ここでは長く登って短く落ちる形にしてある。
+   *
+   * いちばん奥は淡く青へ寄せる。遠いものほど大気で色が抜けるので、
+   * これだけで「遠い」と分かるようになる。
+   */
+  const distant = "M0 74 L44 58 L62 66 L118 30 L136 52 L190 40 L214 56 L272 22 L292 48 L336 38 L358 54 L390 44 L390 120 L0 120 Z";
+  const far = "M0 90 L38 74 L56 82 L102 44 L120 66 L164 56 L186 70 L232 36 L252 62 L296 52 L318 74 L344 50 L370 68 L390 60 L390 120 L0 120 Z";
+  const near = "M0 108 L36 96 L60 103 L108 80 L134 99 L176 91 L204 103 L250 84 L286 101 L322 93 L358 105 L390 97 L390 120 L0 120 Z";
+  const crest = (d: string) => d.slice(0, d.indexOf(" L390 120"));
+
   const ridge = svg("svg", { viewBox: "0 0 390 120", preserveAspectRatio: "none", class: "title-ridge__art", "aria-hidden": "true" }, [
+    svg("path", { d: distant, fill: "#151228", opacity: "0.75" }),
+    svg("path", { d: crest(distant), fill: "none", stroke: "rgba(150,180,255,.28)", "stroke-width": "1" }),
     svg("path", { d: far, fill: "#0a0812" }),
-    svg("path", {
-      d: far.slice(0, far.indexOf(" L390 120")),
-      fill: "none",
-      stroke: "rgba(255,170,84,.45)",
-      "stroke-width": "1.2",
-    }),
+    svg("path", { d: crest(far), fill: "none", stroke: "rgba(255,170,84,.45)", "stroke-width": "1.2" }),
     svg("path", { d: near, fill: "#040309" }),
   ]);
   return el("div", { className: "title-ridge", "aria-hidden": "true" }, [ridge]);

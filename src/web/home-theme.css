@@ -195,7 +195,9 @@
 .title-emblem {
   /* 幅は画面・高さの両方で頭を押さえる。横画面で紋章だけが伸びて
    * STARTを画面外へ押し出していた */
-  width: min(560px, 92vw, 74vh);
+  /* 92vw では390pxの画面で左右15pxしか残らず、「画面いっぱいに置いた」に見えた。
+   * 意図してその大きさにしたと分かる程度の余白を空ける */
+  width: min(560px, 84vw, 74vh);
   height: auto;
   display: block;
   filter: drop-shadow(0 10px 26px rgba(0, 0, 0, .6));
@@ -493,7 +495,18 @@
  */
 .home-menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .home-tile { min-height: clamp(72px, 12vh, 92px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 8px 4px; border: 1px solid rgba(130, 160, 220, .18); border-radius: 15px; background: linear-gradient(145deg, rgba(42,55,90,.82), rgba(21,28,52,.86)); color: #f3f6ff; box-shadow: 0 7px 15px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.07); }
-.home-tile__icon { font-size: 25px; color: #a9c6ff; line-height: 0; margin-bottom: 3px; }
+/* アイコンの下に金の細い座。タイトルの金と、遊ぶ側の面がつながる */
+.home-tile__icon { position: relative; font-size: 25px; color: #c3d4f5; line-height: 0; margin-bottom: 7px; }
+.home-tile__icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 22px;
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(226, 182, 110, .55), transparent);
+}
 .home-tile__label { font-size: .76rem; font-weight: 800; letter-spacing: .02em; }
 .home-tile__sub { font-size: .58rem; color: #8194bd; letter-spacing: .04em; }
 .home-tile:active { transform: scale(.98); filter: brightness(1.12); }
