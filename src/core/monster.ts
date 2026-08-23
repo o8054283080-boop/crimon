@@ -33,6 +33,8 @@ export interface MonsterTemplate {
    */
   lightSkill3?: Skill;
   darkSkill3?: Skill;
+  /** ボス固有の性質(反撃・継続ダメージ耐性)。実体化した定義へそのまま渡る */
+  bossTraits?: BossTraits;
 }
 
 /** 属性ごとの色違いバリエーションとして実体化されたモンスター定義(静的データ) */
@@ -49,6 +51,34 @@ export interface MonsterDefinition {
   skills: [Skill, Skill, Skill];
   /** 装備セット由来の戦闘専用効果。装備なし(敵など)ではundefined */
   combatMods?: CombatModifiers;
+  /**
+   * ボス固有の性質。ステータスを盛るだけでは作れない「戦い方の要求」をここで表す。
+   *
+   * サマナーズウォーの巨人ダンジョンを見ると、あの階が難しいのは数字ではなく
+   * **状態が刻々と悪化することと、特定の戦い方に代償があること**だった。
+   * こちらのボスは長らく「硬くて痛いだけの置物」で、
+   * 毒を重ねて耐久で待つだけで抜けられてしまっていた。
+   */
+  bossTraits?: BossTraits;
+}
+
+export interface BossTraits {
+  /**
+   * この回数だけ攻撃を受けると、即座に反撃する(0なら反撃しない)。
+   *
+   * **小さい攻撃を何度も当てる戦い方に代償を作る。**毒を重ねるにも、
+   * 多段攻撃で削るにも手数が要るので、そこに必ず反撃が返る。
+   */
+  counterAfterHits?: number;
+  /** 反撃のダメージ倍率 */
+  counterMultiplier?: number;
+  /**
+   * 毒・火傷など、手番ごとに入る継続ダメージに掛かる倍率(0.4なら6割減)。
+   *
+   * 継続ダメージは**最大HPに対する割合**で入るので、HPを盛ったボスほど
+   * 効いてしまう。毒を5重ねるだけでどんなボスも溶ける状態だった。
+   */
+  continuousDamageMultiplier?: number;
 }
 
 /**
@@ -95,6 +125,7 @@ export function createMonsterVariant(template: MonsterTemplate, element: Element
     emoji: template.emoji,
     stats: flavoredStats,
     skills: [template.skill1, skill2, skill3],
+    bossTraits: template.bossTraits,
   };
 }
 

@@ -1543,6 +1543,24 @@ export const ANCIENT_DEMON: MonsterTemplate = {
   baseName: "古代の魔人",
   emoji: "😈",
   role: "ボス",
+  /*
+   * 硬くて痛いだけの置物にしない。
+   *
+   * サマナーズウォーの巨人ダンジョンを見ると、あの階が難しいのは数字ではなく
+   * **特定の戦い方に代償があること**だった(7回殴られると反撃する、
+   * 左の結晶がボスの攻撃力を上げ続け、右がこちらの防御力を下げ続ける)。
+   *
+   * こちらは長らく数字だけで難易度を作っていたため、
+   * **毒を重ねて耐久で待つだけ**で抜けられていた。その2つに代償を作る。
+   */
+  bossTraits: {
+    // 手数で押す戦い方に代償を作る。毒を重ねるにも多段で削るにも手数が要る
+    counterAfterHits: 7,
+    counterMultiplier: 1.4,
+    // 継続ダメージは最大HPに対する割合で入るので、HPを盛ったボスほどよく効く。
+    // 毒を5重ねるだけで溶ける状態だったため、ここで頭を押さえる
+    continuousDamageMultiplier: 0.35,
+  },
   baseStats: {
     hp: 1400,
     atk: 210,
@@ -1621,10 +1639,12 @@ export const ANCIENT_CRYSTAL: MonsterTemplate = {
     {
       id: "ancient_crystal_s2",
       name: "古代の加護",
-      description: "味方単体に古代の力を送り込み、2ターン攻撃力を上昇させる。",
+      description: "味方単体に古代の力を送り込み、4ターン攻撃力を上昇させる。重ねがけで積み上がる。",
       target: "SINGLE_ALLY",
-      cooldownTurns: 3,
-      effects: [{ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 }],
+      cooldownTurns: 2,
+      // **積み上がることが肝。**バフは同じ能力値でも重ねた数だけ足し合わされるので、
+      // 長引くほど魔人の一撃が重くなる。耐久で待つ戦い方に「待てば待つほど不利」を作る
+      effects: [{ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 4 }],
     },
   ],
   skill3Variants: [
@@ -1680,6 +1700,8 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
       effects: [
         { kind: "DAMAGE", multiplier: 0.9 },
         { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.55 },
+        // 巨人ダンジョンの右の結晶にあたる役割。**張り続けたものを剥がし続ける**
+        { kind: "STRIP", chance: 0.5 },
       ],
     },
   ],
@@ -1693,6 +1715,9 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
       effects: [
         { kind: "DAMAGE", multiplier: 1.8 },
         { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.5 },
+        // **回復で粘る戦い方への答え。**9・10階にしか現れないので、
+        // ここに置けば序盤の階を巻き添えにしない
+        { kind: "HEAL_BLOCK", healMultiplier: 0.4, durationTurns: 3, chance: 0.7 },
       ],
     },
   ],

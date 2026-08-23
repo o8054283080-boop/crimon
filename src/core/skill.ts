@@ -142,6 +142,35 @@ export interface RegenEffect {
   durationTurns: number;
 }
 
+/**
+ * バフ解除: 対象にかかっている**有利な効果**を取り除く。
+ *
+ * デバフ解除の逆。シールド・状態異常無効・能力上昇を剥がす。
+ * これが無いと、**シールドを張り直し続けるだけの戦い方**が
+ * どんな相手にも通ってしまう(サマナーズウォーの巨人ダンジョンでも、
+ * ボス側の強化を剥がす役が攻略の要になっている)。
+ */
+export interface StripEffect {
+  kind: "STRIP";
+  /** この効果が発動を試みる基礎確率(0-1) */
+  chance?: number;
+}
+
+/**
+ * 治癒阻害: かかっている間、受ける回復量が減る。
+ *
+ * **耐久で押し切る戦い方への答え。**回復し続けて時間を稼ぐ相手に対して、
+ * 「削り切れない」を「削り切れる」に変えるための唯一の手段になる。
+ */
+export interface HealBlockEffect {
+  kind: "HEAL_BLOCK";
+  /** 回復量に掛かる倍率(0.5なら回復半減)。0にすると完全に回復できなくなる */
+  healMultiplier: number;
+  durationTurns: number;
+  /** この効果が発動を試みる基礎確率(0-1) */
+  chance?: number;
+}
+
 /** デバフ解除: 対象にかかっているデバフ(DEBUFF効果)を全て取り除く */
 export interface CleanseEffect {
   kind: "CLEANSE";
@@ -197,6 +226,8 @@ export type SkillEffect =
   | ImmunityEffect
   | RegenEffect
   | CleanseEffect
+  | StripEffect
+  | HealBlockEffect
   | CooldownExtendEffect
   | PoisonEffect
   | BlindEffect;
@@ -301,6 +332,12 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
         const withChance = withRate.chance !== undefined ? { ...withRate, chance: growChance(withRate.chance, growth) } : withRate;
         return isMaxLevel ? { ...withChance, durationTurns: withChance.durationTurns + 1 } : withChance;
       }
+      case "STRIP":
+        return effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
+      case "HEAL_BLOCK": {
+        const withChance = effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
+        return isMaxLevel ? { ...withChance, durationTurns: withChance.durationTurns + 1 } : withChance;
+      }
       case "COOLDOWN_EXTEND":
         // 延長ターン数は伸ばさない。1増えるだけで妨害の重さが跳ね上がる
         return effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
@@ -371,6 +408,10 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `継続回復 最大HPの${(effect.healRate * 100).toFixed(1)}% (${effect.durationTurns}ターン、自身のターン開始時)`;
     case "CLEANSE":
       return `デバフを解除`;
+    case "STRIP":
+      return `${chanceSuffix(effect.chance)}有利な効果(シールド・無効・能力上昇)を解除`;
+    case "HEAL_BLOCK":
+      return `${chanceSuffix(effect.chance)}治癒阻害 (${effect.durationTurns}ターン、受ける回復が${Math.round((1 - effect.healMultiplier) * 100)}%減る)`;
     case "COOLDOWN_EXTEND":
       return `${chanceSuffix(effect.chance)}敵の全スキルのクールタイムを${effect.turns}ターン延長`;
     case "BLIND":

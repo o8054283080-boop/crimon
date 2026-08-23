@@ -172,6 +172,8 @@ async function main() {
     const save = buildSave();
     await context.addInitScript((data) => {
       localStorage.setItem("crimon_save_v1", JSON.stringify(data));
+      // タイトル画面は画面全体を覆うので、立てておかないと以降の操作がすべて弾かれる
+      sessionStorage.setItem("crimon.started", "1");
     }, save);
 
     const page = await context.newPage();
@@ -203,6 +205,11 @@ async function main() {
     await shoot(page, "monster-detail");
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await shoot(page, "monster-detail-bottom");
+    await clickByText(page, "button", "一覧に戻る");
+    // 装備を着けている個体。ステータスの内訳(素の値と装備の上昇分)はここでしか見えない
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await clickByText(page, ".mcard", "ドラゴン");
+    await shoot(page, "monster-detail-geared");
     await clickByText(page, "button", "一覧に戻る");
 
     // --- 図鑑 ---

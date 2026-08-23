@@ -2,7 +2,7 @@ import { ELEMENT_JA } from "../../core/element.js";
 import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
 import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
-import { formatExtraStatLines } from "../../core/stats.js";
+import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "../../core/stats.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
@@ -221,16 +221,11 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const inParty = props.player.partyIds.includes(instance.id);
 
   // 主要4項目と、それ以外を分ける。全部を同じ大きさで並べると、
-  // 何を見て強さを判断すればよいのかが伝わらない
-  const primaryStats: [string, string][] = effectiveStats
-    ? [
-        ["HP", String(effectiveStats.hp)],
-        ["攻撃力", String(effectiveStats.atk)],
-        ["防御力", String(effectiveStats.def)],
-        ["速度", String(effectiveStats.spd)],
-      ]
-    : [];
-  const secondaryStats = effectiveStats ? formatExtraStatLines(effectiveStats) : [];
+  // 何を見て強さを判断すればよいのかが伝わらない。
+  // どちらも「素の値 / 装備で増えた分 / 合計」の内訳付きで出す
+  const primaryStats = growthStats && effectiveStats ? buildStatBreakdown(growthStats, effectiveStats, PRIMARY_STAT_FORMATS) : [];
+  const secondaryStats = growthStats && effectiveStats ? buildStatBreakdown(growthStats, effectiveStats, EXTRA_STAT_FORMATS) : [];
+  const gearedSlots = equippedItems.length;
 
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, [dex ? dex.name : instance.dexId])]),
@@ -252,14 +247,36 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
       el(
         "div",
         { className: "monster-detail__stats" },
-        primaryStats.map(([label, value]) =>
+        primaryStats.map((entry) =>
           el("div", { className: "stat-tile" }, [
-            el("span", { className: "stat-tile__label" }, [label]),
-            el("span", { className: "stat-tile__value" }, [value]),
-          ]),
+            el("span", { className: "stat-tile__label" }, [entry.label]),
+            el("span", { className: "stat-tile__value" }, [entry.total]),
+            // 合計だけ出すと、その数字のどこまでが装備のおかげなのかが分からない。
+            // 装備を組み替える判断はこの差分を見てするもの
+            entry.gain
+              ? el("span", { className: "stat-tile__breakdown" }, [
+                  el("span", { className: "stat-tile__base" }, [entry.base]),
+                  el("span", { className: "stat-tile__gain" }, [entry.gain]),
+                ])
+              : null,
+          ].filter((n): n is HTMLElement => n !== null)),
         ),
       ),
-      el("div", { className: "monster-detail__substats" }, secondaryStats.map((line) => el("span", {}, [line]))),
+      el(
+        "div",
+        { className: "monster-detail__substats" },
+        secondaryStats.map((entry) =>
+          el("span", {}, [
+            `${entry.label} ${entry.total}`,
+            entry.gain ? el("span", { className: "stat-tile__gain" }, [entry.gain]) : null,
+          ].filter((n): n is string | HTMLElement => n !== null)),
+        ),
+      ),
+      el("div", { className: "monster-detail__gear-note" }, [
+        gearedSlots > 0
+          ? `小さい数字は装備なしの値と、装備${gearedSlots}個で上がった分`
+          : "装備なし(着けると上がった分がここに出ます)",
+      ]),
       instance.level < maxLevel
         ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
         : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),

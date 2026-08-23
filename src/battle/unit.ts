@@ -44,6 +44,15 @@ export interface BattleUnit {
   poisonDamageRate: number;
   /** 暗闇の残りターン数。0より大きい間、攻撃するたびに外れ判定が入る */
   blindTurns: number;
+  /** 治癒阻害の残りターン。0より大きい間、受ける回復に healBlockMultiplier が掛かる */
+  healBlockTurns: number;
+  /** 治癒阻害中に受ける回復への倍率(0.5なら半減) */
+  healBlockMultiplier: number;
+  /**
+   * 受けた攻撃の回数。**反撃を持つ相手のためだけに数えている。**
+   * 手数で押す戦い方(小さい攻撃を何度も、毒を重ねる)に代償を作るための数。
+   */
+  hitsTaken: number;
 }
 
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
@@ -68,6 +77,9 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     poisonTurns: 0,
     poisonDamageRate: 0,
     blindTurns: 0,
+    healBlockTurns: 0,
+    healBlockMultiplier: 1,
+    hitsTaken: 0,
   };
 }
 
@@ -108,7 +120,11 @@ export function applyDamage(unit: BattleUnit, amount: number): void {
 
 export function applyHeal(unit: BattleUnit, amount: number): void {
   if (!unit.alive) return;
-  unit.currentHp = Math.min(unit.maxHp, unit.currentHp + amount);
+  // 治癒阻害がかかっている間は回復が減る。**回復し続けて時間を稼ぐ戦い方への答え**なので、
+  // 経路をここ1本に絞ってある(個別の回復処理で掛け忘れると効かなくなる)
+  const effective = unit.healBlockTurns > 0 ? Math.floor(amount * unit.healBlockMultiplier) : amount;
+  if (effective <= 0) return;
+  unit.currentHp = Math.min(unit.maxHp, unit.currentHp + effective);
 }
 
 /** そのユニットの手番開始時に呼ぶ。バフ/デバフの残りターンを減らし、失効したものを取り除く */
@@ -140,6 +156,31 @@ export function tickShieldAtTurnStart(unit: BattleUnit): void {
 /** そのユニットの手番開始時に呼ぶ。状態異常免疫の残りターンを減らす */
 export function tickImmunityAtTurnStart(unit: BattleUnit): void {
   if (unit.immuneTurns > 0) unit.immuneTurns -= 1;
+}
+
+/** そのユニットの手番開始時に呼ぶ。治癒阻害の残りターンを減らす */
+export function tickHealBlockAtTurnStart(unit: BattleUnit): void {
+  if (unit.healBlockTurns <= 0) return;
+  unit.healBlockTurns -= 1;
+  if (unit.healBlockTurns <= 0) unit.healBlockMultiplier = 1;
+}
+
+/**
+ * 有利な効果をすべて剥がす。
+ *
+ * シールド・状態異常無効・能力上昇が対象。**張り直すだけの戦い方**に
+ * 代償を作るための手段なので、中途半端に一部だけ残さない。
+ */
+export function stripBuffs(unit: BattleUnit): boolean {
+  const hadBuff = unit.effects.some((e) => e.kind === "BUFF");
+  const had = hadBuff || unit.shieldTurns > 0 || unit.immuneTurns > 0 || unit.regenTurns > 0;
+  unit.effects = unit.effects.filter((e) => e.kind !== "BUFF");
+  unit.shieldValue = 0;
+  unit.shieldTurns = 0;
+  unit.immuneTurns = 0;
+  unit.regenTurns = 0;
+  unit.regenRate = 0;
+  return had;
 }
 
 /** そのユニットの手番開始時に呼ぶ。暗闇の残りターンを減らす */

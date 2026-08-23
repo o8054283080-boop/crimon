@@ -16,7 +16,9 @@ import {
   tickEffectsAtTurnStart,
   tickBlindAtTurnStart,
   tickImmunityAtTurnStart,
+  tickHealBlockAtTurnStart,
   tickShieldAtTurnStart,
+  stripBuffs,
 } from "./unit.js";
 
 const ATB_THRESHOLD = 100;
@@ -34,6 +36,16 @@ const GAUGE_EPSILON = 1e-6;
  * 敵4体の技で自己バフが4重にかかる。呼び出し側はこれを見て、
  * 1回の使用につき1度だけ適用する。
  */
+/**
+ * 継続ダメージ(毒・火傷)に掛かる倍率。
+ *
+ * 継続ダメージは**最大HPに対する割合**で入るので、HPを盛ったボスほどよく効く。
+ * 毒を5重ねるだけでどんなボスも溶ける状態だったため、ボスにだけ耐性を持たせている。
+ */
+function continuousDamageFactor(unit: BattleUnit): number {
+  return unit.def.bossTraits?.continuousDamageMultiplier ?? 1;
+}
+
 function isSourceScopedEffect(effect: SkillEffect): boolean {
   if (effect.kind === "HEAL") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
   if (effect.kind === "BUFF") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
@@ -275,6 +287,7 @@ export class BattleEngine {
     tickCooldownsAtTurnStart(unit);
     tickShieldAtTurnStart(unit);
     tickImmunityAtTurnStart(unit);
+    tickHealBlockAtTurnStart(unit);
     tickBlindAtTurnStart(unit);
 
     const turnHealPercent = unit.def.combatMods?.turnHealPercent ?? 0;
@@ -346,7 +359,7 @@ export class BattleEngine {
   private applyBurnAtTurnEnd(unit: BattleUnit): void {
     if (unit.burnTurns <= 0 || !unit.alive) return;
     unit.burnTurns -= 1;
-    const burnDamage = Math.max(1, getEffectiveStat(unit, "atk"));
+    const burnDamage = Math.max(1, Math.round(getEffectiveStat(unit, "atk") * continuousDamageFactor(unit)));
     applyDamage(unit, burnDamage);
     this.push(`  → ${this.label(unit)} は火傷でダメージを受けた！ ${burnDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: burnDamage });
@@ -377,7 +390,7 @@ export class BattleEngine {
       unit.poisonStacks = 0;
       unit.poisonDamageRate = 0;
     }
-    const poisonDamage = Math.max(1, Math.round(unit.maxHp * unit.poisonDamageRate * stacks));
+    const poisonDamage = Math.max(1, Math.round(unit.maxHp * unit.poisonDamageRate * stacks * continuousDamageFactor(unit)));
     applyDamage(unit, poisonDamage);
     this.push(`  → ${this.label(unit)} は毒(${stacks}スタック)でダメージを受けた！ ${poisonDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: poisonDamage });
@@ -400,6 +413,9 @@ export class BattleEngine {
     sourceScoped = true,
   ): void {
     let damageDealtThisCall = 0;
+    // 反撃は効果の解決の途中に割り込ませない(解決中に相手が動くと、
+    // 残りの効果が誰に乗るのか分からなくなる)。数えておいて最後にまとめて返す
+    const counterTargets = new Set<BattleUnit>();
 
     for (const effect of skill.effects) {
       if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL") continue;
@@ -416,6 +432,8 @@ export class BattleEngine {
             if (missed) result.damage = Math.max(1, Math.round(result.damage * (1 - BLIND_DAMAGE_REDUCTION)));
             applyDamage(target, result.damage);
             damageDealtThisCall += result.damage;
+            target.hitsTaken += 1;
+            counterTargets.add(target);
             const critText = result.isCrit ? "会心の一撃！" : "";
             const affinityText =
               result.affinity === "ADVANTAGE" ? " 効果は抜群だ！" : result.affinity === "DISADVANTAGE" ? " 効果は今ひとつだ…" : "";
@@ -572,6 +590,27 @@ export class BattleEngine {
           break;
         }
 
+        case "STRIP": {
+          if (this.isImmune(target)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (stripBuffs(target)) {
+            this.push(`  → ${this.label(target)} の有利な効果が剥がされた！`);
+          }
+          break;
+        }
+
+        case "HEAL_BLOCK": {
+          if (this.isImmune(target)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          target.healBlockTurns = Math.max(target.healBlockTurns, effect.durationTurns);
+          // 複数から掛かったら、いちばんきついものが残る
+          target.healBlockMultiplier = Math.min(target.healBlockMultiplier, effect.healMultiplier);
+          this.push(
+            `  → ${this.label(target)} は治癒阻害を受けた！ (${effect.durationTurns}ターン、回復${Math.round((1 - effect.healMultiplier) * 100)}%減)`,
+          );
+          break;
+        }
+
         case "COOLDOWN_EXTEND": {
           if (!target.alive) break;
           // 他のデバフと同じ判定を通す。ここを素通りさせると、
@@ -593,6 +632,33 @@ export class BattleEngine {
           break;
         }
       }
+    }
+
+    for (const victim of counterTargets) this.tryCounter(victim, source);
+  }
+
+  /**
+   * 反撃。**手数で押す戦い方に代償を作る。**
+   *
+   * 小さい攻撃を何度も当てる、多段で削る、毒を重ねる——どれも手数が要る。
+   * 決めた回数を受けるたびに、受けた側が即座に殴り返す。
+   *
+   * 反撃そのものは反撃を呼ばない(呼ぶと相討ちが無限に続く)。
+   */
+  private tryCounter(defender: BattleUnit, attacker: BattleUnit): void {
+    const traits = defender.def.bossTraits;
+    const every = traits?.counterAfterHits ?? 0;
+    if (every <= 0 || !defender.alive || !attacker.alive) return;
+    if (defender.hitsTaken < every) return;
+
+    defender.hitsTaken -= every;
+    const result = calcDamage(defender, attacker, { kind: "DAMAGE", multiplier: traits?.counterMultiplier ?? 1.2 }, this.rng);
+    applyDamage(attacker, result.damage);
+    this.push(`  → ${this.label(defender)} の反撃！ ${this.label(attacker)} に ${result.damage} ダメージ (残りHP ${attacker.currentHp}/${attacker.maxHp})`);
+    this.pushEvent({ targetId: attacker.instanceId, kind: "DAMAGE", amount: result.damage, isCrit: result.isCrit });
+    if (!attacker.alive) {
+      this.push(`  → ${this.label(attacker)} は倒れた！`);
+      this.pushEvent({ targetId: attacker.instanceId, kind: "DEATH" });
     }
   }
 
