@@ -12,6 +12,8 @@ export const RARE_ELEMENTS: Element[] = ["LIGHT", "DARK"];
 
 /** 10連の天井で保証される最低の星。これ以上が1体も出なければ引き直す */
 export const GUARANTEED_MIN_STAR = 4;
+/** はじまりの10連で保証する星。通常の天井(星4)より1段上 */
+export const TUTORIAL_GUARANTEED_STAR = 5;
 export const NORMAL_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
 
 export const SUMMON_COST_SINGLE = 100;
@@ -98,6 +100,29 @@ const GUARANTEED_TIERS = GACHA_TABLE.filter((tier) => tier.star >= GUARANTEED_MI
  * 価値が薄れてしまうため。天井では星の高さだけを保証し、光闇はあくまで
  * 運で引き当てるものとして残している。
  */
+/**
+ * はじまりの10連。1度きり、ダイヤも書も要らない。
+ *
+ * 始めたばかりの手持ちは星1が4体で、そこから毎日200ずつ貯めて
+ * 900の10連に届くまで4日かかる。**最初の日に「引く」体験がまったく無い**のは
+ * このゲームの見せ場を1つ丸ごと後回しにすることになる。
+ *
+ * 通常の10連は「星4以上を1体」保証だが、こちらは**星5を1体**保証する。
+ * 最初の1体が編成の軸になるので、そこだけは運に任せない。
+ * 残り9体は通常と同じ抽選なので、引きの楽しみは残る。
+ */
+export function summonTutorial(rng: () => number = Math.random): SummonResult[] {
+  const results = Array.from({ length: 10 }, () => rollOne(rng));
+  if (!results.some((r) => r.star >= TUTORIAL_GUARANTEED_STAR)) {
+    const tier = pickTier(
+      GUARANTEED_TIERS.filter((t) => t.star >= TUTORIAL_GUARANTEED_STAR),
+      rng,
+    );
+    results[results.length - 1] = { dexId: resolveDexId(tier, rng), star: tier.star, isRare: tier.isRare };
+  }
+  return results;
+}
+
 export function summonMany(count: number, rng: () => number = Math.random): SummonResult[] {
   const results = Array.from({ length: count }, () => rollOne(rng));
 

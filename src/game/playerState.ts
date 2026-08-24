@@ -57,6 +57,8 @@ export interface PlayerState {
   shopPurchasedSlots: number[];
   /** 受け取り済みのお詫び配布のid。重複して配らないために残す */
   claimedCompensationIds: string[];
+  /** はじまりの10連を引いたか。1度きりなので使い切りの印として持つ */
+  tutorialSummonDone?: boolean;
   /**
    * 装備の速度を半分に見直した調整を、この控えに適用済みか。
    *
@@ -136,6 +138,7 @@ export function createInitialState(): PlayerState {
     shopRotationKey: -1,
     shopPurchasedSlots: [],
     claimedCompensationIds: [],
+    tutorialSummonDone: false,
     equipmentSpeedRebalanced: true,
     arenaDefenseIds: [],
     arenaOffenseIds: [],
@@ -197,6 +200,8 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.shopRotationKey !== "number") state.shopRotationKey = -1;
   if (!Array.isArray(state.shopPurchasedSlots)) state.shopPurchasedSlots = [];
   if (!Array.isArray(state.claimedCompensationIds)) state.claimedCompensationIds = [];
+  // 古い控えには無い。既に遊んでいる人にも1回だけ引かせる(印が無い＝未使用)
+  if (typeof state.tutorialSummonDone !== "boolean") state.tutorialSummonDone = false;
 
   /*
    * 装備の速度を半分に見直した調整の後追い。
@@ -499,6 +504,15 @@ export function addFighterExp(state: PlayerState, exp: number): FighterExpResult
 
 /** 毎日のログインボーナス(ダイヤ200)。10日分(累計)受け取るごとに追加でダイヤ1000がもらえる */
 export const LOGIN_BONUS_DAILY_CRYSTAL = 200;
+/**
+ * 初回だけの開始祝い。
+ *
+ * 始めたばかりの手持ちは星1が4体で、ステージ1-1でも危うい。
+ * そこから毎日200ずつ貯めて900の10連に届くまで4日かかるのでは、
+ * **最初の日に「引く」という体験がまったく無い。**
+ * 10連を3回分ぶん渡して、初日に手持ちを組めるようにする。
+ */
+export const LOGIN_BONUS_FIRST_TIME_CRYSTAL = 3000;
 export const LOGIN_BONUS_MILESTONE_CRYSTAL = 1000;
 export const LOGIN_BONUS_MILESTONE_INTERVAL_DAYS = 10;
 
@@ -506,6 +520,8 @@ export interface LoginBonusResult {
   claimed: boolean;
   dailyCrystal: number;
   milestoneCrystal: number;
+  /** 初回だけの開始祝い。2日目以降は0 */
+  firstTimeCrystal: number;
   claimCount: number;
 }
 
@@ -516,15 +532,23 @@ export interface LoginBonusResult {
 export function claimDailyLoginBonus(state: PlayerState, now: number = Date.now()): LoginBonusResult {
   const alreadyClaimedToday = state.lastLoginBonusAt !== null && new Date(state.lastLoginBonusAt).toDateString() === new Date(now).toDateString();
   if (alreadyClaimedToday) {
-    return { claimed: false, dailyCrystal: 0, milestoneCrystal: 0, claimCount: state.loginBonusClaimCount };
+    return { claimed: false, dailyCrystal: 0, milestoneCrystal: 0, firstTimeCrystal: 0, claimCount: state.loginBonusClaimCount };
   }
 
   state.lastLoginBonusAt = now;
   state.loginBonusClaimCount += 1;
   const milestoneCrystal = state.loginBonusClaimCount % LOGIN_BONUS_MILESTONE_INTERVAL_DAYS === 0 ? LOGIN_BONUS_MILESTONE_CRYSTAL : 0;
-  state.crystal += LOGIN_BONUS_DAILY_CRYSTAL + milestoneCrystal;
+  // 初回だけの開始祝い。10日目の節目と重なっても両方渡す(初日は1日目なので実際には重ならない)
+  const firstTimeCrystal = state.loginBonusClaimCount === 1 ? LOGIN_BONUS_FIRST_TIME_CRYSTAL : 0;
+  state.crystal += LOGIN_BONUS_DAILY_CRYSTAL + milestoneCrystal + firstTimeCrystal;
 
-  return { claimed: true, dailyCrystal: LOGIN_BONUS_DAILY_CRYSTAL, milestoneCrystal, claimCount: state.loginBonusClaimCount };
+  return {
+    claimed: true,
+    dailyCrystal: LOGIN_BONUS_DAILY_CRYSTAL,
+    milestoneCrystal,
+    firstTimeCrystal,
+    claimCount: state.loginBonusClaimCount,
+  };
 }
 
 export function addSummonScrolls(state: PlayerState, count = 1): void {

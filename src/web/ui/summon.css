@@ -592,6 +592,38 @@
  * **金の塗り(10連) > 紫の面(1回) > 羊皮紙(書)** の3段にする。
  * 紫は魔力の色なので、召喚の画面では地の色として筋が通る。
  */
+/*
+ * はじまりの10連。1度きりで無料なので、他のどの選択肢より前に出す。
+ *
+ * 金の塗りは10連(最上位の課金導線)に与えてあるので、ここは紫の光る面にして
+ * **別枠のもの**として見せる。同じ金にすると、どちらを押すべきか迷わせる。
+ */
+.summon-cta__btn--tutorial {
+  min-height: 64px;
+  color: #f8f0ff;
+  background:
+    radial-gradient(ellipse 80% 140% at 14% -20%, rgba(214, 164, 255, 0.4), transparent 64%),
+    linear-gradient(180deg, #6d3aa8 0%, #472270 52%, #2a1247 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(240, 214, 255, 0.5),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(198, 142, 255, 0.7),
+    0 0 26px rgba(150, 80, 220, 0.4),
+    var(--drop);
+}
+
+.summon-cta__btn--tutorial .summon-cta__lead {
+  font-size: 1.02rem;
+}
+
+.summon-cta__cost--free {
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #ffe9a8;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
+}
+
 .summon-cta__btn--single {
   min-height: 54px;
   color: #ede4f8;
@@ -1672,7 +1704,39 @@
     font-size: 1.08rem;
   }
 
-  .summon-cta__btn--single {
+  /*
+ * はじまりの10連。1度きりで無料なので、他のどの選択肢より前に出す。
+ *
+ * 金の塗りは10連(最上位の課金導線)に与えてあるので、ここは紫の光る面にして
+ * **別枠のもの**として見せる。同じ金にすると、どちらを押すべきか迷わせる。
+ */
+.summon-cta__btn--tutorial {
+  min-height: 64px;
+  color: #f8f0ff;
+  background:
+    radial-gradient(ellipse 80% 140% at 14% -20%, rgba(214, 164, 255, 0.4), transparent 64%),
+    linear-gradient(180deg, #6d3aa8 0%, #472270 52%, #2a1247 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(240, 214, 255, 0.5),
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(198, 142, 255, 0.7),
+    0 0 26px rgba(150, 80, 220, 0.4),
+    var(--drop);
+}
+
+.summon-cta__btn--tutorial .summon-cta__lead {
+  font-size: 1.02rem;
+}
+
+.summon-cta__cost--free {
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #ffe9a8;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
+}
+
+.summon-cta__btn--single {
     min-height: 48px;
   }
 

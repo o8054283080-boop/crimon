@@ -26,6 +26,8 @@ export interface SummonProps {
   onDismissResults: () => void;
   /** 召喚の書で引く。枚数ぶん消費する */
   onUseSummonScroll: (count: number) => void;
+  /** はじまりの10連。1度きり、無料 */
+  onTutorialSummon: () => void;
 }
 
 /* ===== 引く前 ============================================================
@@ -88,7 +90,21 @@ function renderIdle(props: SummonProps): HTMLElement {
   const hasScroll = player.summonScrolls > 0;
   const hasScrollTen = player.summonScrolls >= 10;
 
-  const cta = el("div", { className: "summon-cta" }, [
+  const ctaChildren: (HTMLElement | null)[] = [
+    // まだ引いていなければ、いちばん上に置く。**無料の1回は他のどれより重い**
+    !player.tutorialSummonDone
+      ? el(
+          "button",
+          { type: "button", className: "summon-cta__btn summon-cta__btn--tutorial", onclick: props.onTutorialSummon },
+          [
+            el("span", { className: "summon-cta__text" }, [
+              el("span", { className: "summon-cta__lead" }, ["はじまりの10連"]),
+              el("span", { className: "summon-cta__sub" }, ["★5を1体 確定 / 1度きり"]),
+            ]),
+            el("span", { className: "summon-cta__cost summon-cta__cost--free" }, ["無料"]),
+          ],
+        )
+      : null,
     ctaButton({
       className: "summon-cta__btn--ten",
       lead: "10連召喚",
@@ -127,7 +143,8 @@ function renderIdle(props: SummonProps): HTMLElement {
         onClick: () => onUseSummonScroll(1),
       }),
     ]),
-  ]);
+  ];
+  const cta = el("div", { className: "summon-cta" }, ctaChildren.filter((n): n is HTMLElement => n !== null));
 
   return el("div", { className: "screen summon-screen" }, [
     el("div", { className: "summon-top" }, [

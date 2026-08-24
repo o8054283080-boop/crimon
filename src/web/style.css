@@ -7136,3 +7136,92 @@ body::before {
   background: linear-gradient(180deg, rgba(74, 48, 108, 0.78), rgba(30, 19, 46, 0.88));
   box-shadow: inset 0 0 0 1px rgba(160, 116, 216, 0.5), inset 0 1px 0 rgba(214, 184, 250, 0.16);
 }
+
+/* はじまりの10連の見た目は src/web/ui/summon.css が持つ(そちらが後に読まれる) */
+
+/* --- 遊び方 -----------------------------------------------------------
+ * 読ませる画面なので、他とは行間と文字の大きさを変える。
+ * 一覧の札と同じ詰め方にすると、読む前に「多い」と感じて閉じられる。 */
+
+.howto-intro {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.75;
+  color: var(--text-dim);
+}
+
+.howto-card__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.howto-card__head h2 {
+  margin: 0;
+  padding-left: 0;
+  font-size: 0.94rem;
+}
+
+/* 見出しの左の金具は、アイコンと二重になるので消す */
+.howto-card__head h2::before {
+  display: none;
+}
+
+.howto-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: var(--gold-2);
+  background: linear-gradient(180deg, rgba(58, 42, 22, 0.7), rgba(18, 12, 8, 0.85));
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.5);
+}
+
+.howto-card__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.howto-card__lead {
+  margin: 9px 0 10px;
+  font-size: 0.72rem;
+  line-height: 1.75;
+  color: #d8d2e2;
+}
+
+.howto-card__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* 行頭にひし形。番号にすると順番があるように見えるが、ここは並列 */
+.howto-card__list li {
+  position: relative;
+  padding-left: 15px;
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+.howto-card__list li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  transform: rotate(45deg);
+  background: var(--gold-3);
+}
+
+.howto-card__list strong {
+  color: #f0e8d6;
+  font-weight: 800;
+}

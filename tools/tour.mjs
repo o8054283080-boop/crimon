@@ -54,6 +54,7 @@ const SCREENS = [
   { name: "レベル上げダンジョン", tab: "HOME", tile: "trainDungeon" },
   { name: "ゴールドダンジョン", tab: "HOME", tile: "goldDungeon" },
   { name: "アリーナ", tab: "HOME", tile: "arena" },
+  { name: "遊び方", tab: "HOME", tile: "info" },
   { name: "モンスター図鑑", tab: "MONSTERS", then: "📖 図鑑" },
 ];
 
