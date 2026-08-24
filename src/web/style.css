@@ -942,9 +942,11 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  min-width: 104px;
-  max-width: 148px;
-  padding: 4px 7px 4px 4px;
+  /* 4体が横に並ぶので、1枚が広いと必ず隣とぶつかる。
+   * 実測で横画面の右半分が札の壁になり、体が隠れていた */
+  min-width: 92px;
+  max-width: 124px;
+  padding: 3px 6px 3px 3px;
   border-radius: 7px;
   background:
     linear-gradient(180deg, rgba(48, 56, 88, 0.96) 0%, rgba(21, 26, 46, 0.97) 46%, rgba(9, 12, 24, 0.98) 100%),

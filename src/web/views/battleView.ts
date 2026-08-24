@@ -291,7 +291,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       // シールドはHPの上に重ねる。別の帯にすると札が1段高くなる
       const shieldRatio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.shieldValue / s.maxHp)) : 0;
       refs.hpShield.style.width = `${shieldRatio * 100}%`;
-      refs.hpText.textContent = String(s.currentHp);
+      // 現在値だけでは「あと何割か」が読めない。分母まで出す
+      refs.hpText.textContent = `${s.currentHp}/${s.maxHp}`;
       refs.hpText.title = `HP ${s.currentHp} / ${s.maxHp}`;
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
       refs.card.classList.toggle("unit-hud--dead", !s.alive);

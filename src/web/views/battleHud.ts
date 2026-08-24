@@ -261,7 +261,7 @@ export function buildHudCard(def: MonsterDefinition, team: "PLAYER" | "ENEMY"): 
   const hpTrail = el("div", { className: "unit-hud__hp-trail" });
   const hpFill = el("div", { className: "unit-hud__hp-fill" });
   const hpShield = el("div", { className: "unit-hud__hp-shield" });
-  const hpText = el("div", { className: "unit-hud__hp-text" }, [`${def.stats.hp}`]);
+  const hpText = el("div", { className: "unit-hud__hp-text" }, [`${def.stats.hp}/${def.stats.hp}`]);
   const gaugeFill = el("div", { className: "unit-hud__gauge-fill" });
 
   const plate = el("div", { className: "unit-hud__plate" }, [
