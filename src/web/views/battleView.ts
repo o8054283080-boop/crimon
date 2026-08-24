@@ -1,12 +1,12 @@
 import { BattleEngine, BattleEvent, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
-import { ActiveEffect } from "../../battle/unit.js";
 import { BattleUnit } from "../../battle/unit.js";
 import { MonsterDefinition } from "../../core/monster.js";
-import { BUFF_STAT_JA, BuffStat, describeSkillEffect } from "../../core/skill.js";
+import { describeSkillEffect } from "../../core/skill.js";
 import { hitStyleForRole, playHitSfx, playSfx, sfxElementOf } from "../audio/index.js";
 import { el } from "../dom.js";
 import { BattleStage, StageUnitInit } from "../three/battleStage.js";
 import { withPortrait } from "../three/portrait.js";
+import { FloatKind, UnitHudRefs, buildFloatingNumber, buildHudCard, buildStatusChips } from "./battleHud.js";
 
 export interface BattleViewProps {
   engine: BattleEngine;
@@ -39,118 +39,28 @@ const SPEED_INTERVAL_MS: Record<string, number> = { "1": 1000, "2": 500, "4": 25
 /** 攻撃モーションを見せてから着弾させるまでの間(再生速度で縮む) */
 const IMPACT_DELAY_MS: Record<string, number> = { "1": 320, "2": 160, "4": 80, "8": 40 };
 
-interface UnitHudRefs {
-  card: HTMLElement;
-  hpFill: HTMLElement;
-  /** 減った分を少し遅れて追いかける帯。どれだけ削られたかが目で分かる */
-  hpTrail: HTMLElement;
-  hpText: HTMLElement;
-  gaugeFill: HTMLElement;
-  badges: HTMLElement;
-}
-
-const STAT_ICON: Record<BuffStat, string> = { atk: "⚔", def: "🛡", spd: "💨", criRate: "🎯", criDmg: "💥" };
-
-function buildBadge(effect: ActiveEffect): HTMLElement {
-  const isBuff = effect.kind === "BUFF";
-  const arrow = isBuff ? "↑" : "↓";
-  const percent = Math.round(Math.abs(effect.amount) * 100);
-  return el(
-    "span",
-    {
-      className: `unit-badge ${isBuff ? "unit-badge--buff" : "unit-badge--debuff"}`,
-      title: `${BUFF_STAT_JA[effect.stat]}${arrow}${percent}% (残り${effect.remainingTurns}ターン)`,
-    },
-    [
-      el("span", { className: "unit-badge__icon" }, [`${STAT_ICON[effect.stat]}${arrow}`]),
-      el("span", { className: "unit-badge__turns" }, [String(effect.remainingTurns)]),
-    ],
-  );
-}
-
-function buildBadgesRow(snapshot: UnitSnapshot): HTMLElement[] {
-  const badges = snapshot.effects.map((e) => buildBadge(e));
-  if (snapshot.stunTurns > 0) {
-    badges.push(
-      el("span", { className: "unit-badge unit-badge--stun", title: `スタン中(残り${snapshot.stunTurns}ターン)` }, [
-        el("span", { className: "unit-badge__icon" }, ["💫"]),
-        el("span", { className: "unit-badge__turns" }, [String(snapshot.stunTurns)]),
-      ]),
-    );
-  }
-  if (snapshot.burnTurns > 0) {
-    badges.push(
-      el("span", { className: "unit-badge unit-badge--burn", title: `火傷(残り${snapshot.burnTurns}ターン)` }, [
-        el("span", { className: "unit-badge__icon" }, ["🔥"]),
-        el("span", { className: "unit-badge__turns" }, [String(snapshot.burnTurns)]),
-      ]),
-    );
-  }
-  if (snapshot.poisonStacks > 0) {
-    badges.push(
-      el(
-        "span",
-        {
-          className: "unit-badge unit-badge--poison",
-          title: `毒 ${snapshot.poisonStacks}スタック(残り${snapshot.poisonTurns}ターン)`,
-        },
-        [
-          el("span", { className: "unit-badge__icon" }, ["☠"]),
-          el("span", { className: "unit-badge__turns" }, [`${snapshot.poisonStacks}/${snapshot.poisonTurns}`]),
-        ],
-      ),
-    );
-  }
-  if (snapshot.shieldValue > 0) {
-    badges.push(
-      el(
-        "span",
-        { className: "unit-badge unit-badge--shield", title: `シールド ${snapshot.shieldValue}(残り${snapshot.shieldTurns}ターン)` },
-        [el("span", { className: "unit-badge__icon" }, ["🔵"]), el("span", { className: "unit-badge__turns" }, [String(snapshot.shieldTurns)])],
-      ),
-    );
-  }
-  if (snapshot.blindTurns > 0) {
-    badges.push(
-      el("span", { className: "unit-badge unit-badge--blind", title: `暗闇(残り${snapshot.blindTurns}ターン)` }, [
-        el("span", { className: "unit-badge__icon" }, ["🌑"]),
-        el("span", { className: "unit-badge__turns" }, [String(snapshot.blindTurns)]),
-      ]),
-    );
-  }
-  if (snapshot.immuneTurns > 0) {
-    badges.push(
-      el("span", { className: "unit-badge unit-badge--immune", title: `状態異常免疫(残り${snapshot.immuneTurns}ターン)` }, [
-        el("span", { className: "unit-badge__icon" }, ["✨"]),
-        el("span", { className: "unit-badge__turns" }, [String(snapshot.immuneTurns)]),
-      ]),
-    );
-  }
-  return badges;
-}
-
 type PickerState =
   | { phase: "NONE" }
   | { phase: "SKILL"; unit: BattleUnit }
   | { phase: "TARGET"; unit: BattleUnit; skillIndex: 0 | 1 | 2 };
 
-/** 3Dキャラの頭上に重ねる、名前/HP/ATBのHUDカードを作る */
-function buildHudCard(def: MonsterDefinition, teamClass: string): { card: HTMLElement; refs: UnitHudRefs } {
-  const badges = el("div", { className: "unit-hud__badges" });
-  const hpTrail = el("div", { className: "unit-hud__hp-trail" });
-  const hpFill = el("div", { className: "unit-hud__hp-fill" });
-  const hpText = el("div", { className: "unit-hud__hp-text" }, [`${def.stats.hp}`]);
-  const gaugeFill = el("div", { className: "unit-hud__gauge-fill" });
-  const card = el("div", { className: `unit-hud ${teamClass}` }, [
-    badges,
-    el("div", { className: "unit-hud__name" }, [def.name]),
-    // 追従バーは実バーの背面に置く。削られた瞬間だけ赤い帯として覗く
-    el("div", { className: "unit-hud__hp" }, [hpTrail, hpFill, hpText]),
-    el("div", { className: "unit-hud__gauge" }, [gaugeFill]),
-  ]);
-  card.style.setProperty("--unit-color", def.color);
-  return { card, refs: { card, hpFill, hpTrail, hpText, gaugeFill, badges } };
-}
+/**
+ * 札を本体の頭からどれだけ浮かせるか(拡大前の画素)。
+ * 0にすると札の底辺がキャラの頭に食い込み、角と輪郭が混ざって汚くなる。
+ */
+const HUD_LIFT = 10;
+
+/** 押し上げられた札から本体へ引く線を出す、最短の距離(この長さまでは線を出さない) */
+const LEADER_MIN = 18;
+
+/**
+ * 札の縮小の下限。
+ *
+ * 3D側は奥行きに応じて 0.78 まで縮めてくるが、その倍率をそのまま札へ掛けると
+ * 10.5pxの名前が8.2pxまで落ちて実機で読めない(巡回の「9px未満」の基準にも触れる)。
+ * 奥行きの手掛かりは残したいので、縮小そのものは残したうえで床を作る。
+ */
+const HUD_MIN_SCALE = 0.88;
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish } = props;
@@ -215,7 +125,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   stageHost.append(overlay, fxLayer);
 
   for (const unit of stageUnits) {
-    const { card, refs } = buildHudCard(unit.def, unit.team === "PLAYER" ? "unit-hud--player" : "unit-hud--enemy");
+    const { card, refs } = buildHudCard(unit.def, unit.team);
     hudRefs.set(unit.instanceId, refs);
     overlay.append(card);
   }
@@ -240,14 +150,16 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       if (!refs) continue;
 
       anchorPositions.set(anchor.instanceId, { x: anchor.x, y: anchor.y });
-      refs.card.style.transform = `translate(-50%, -100%) scale(${anchor.scale.toFixed(3)})`;
+      const scale = Math.max(HUD_MIN_SCALE, anchor.scale);
+      refs.card.style.transform = `translate(-50%, -100%) scale(${scale.toFixed(3)})`;
       refs.card.style.visibility = anchor.visible ? "visible" : "hidden";
 
       // カードは translate(-50%,-100%) で配置されるので、
       // アンカーの真上・左右中央に矩形が来る
-      const width = (refs.card.offsetWidth || 76) * anchor.scale;
-      const height = (refs.card.offsetHeight || 42) * anchor.scale;
-      let top = anchor.y - height;
+      const width = (refs.card.offsetWidth || 104) * scale;
+      const height = (refs.card.offsetHeight || 46) * scale;
+      const lift = HUD_LIFT * scale;
+      let top = anchor.y - lift - height;
 
       // 既に置いたカードと重なる間、少しずつ逃がす。
       // 隣り合うユニットの名前とHPが潰れて読めなくなるのを防ぐ。
@@ -262,12 +174,12 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       for (let guard = 0; guard < 8; guard++) {
         const hit = overlaps(top);
         if (!hit) break;
-        const above = hit.top - height - 2;
+        const above = hit.top - height - 3;
         if (above >= 2) {
           top = above;
         } else {
           // 上が詰まっているので、ぶつかった相手の下へ回す
-          top = hit.bottom + 2;
+          top = hit.bottom + 3;
         }
       }
       top = Math.max(2, top);
@@ -275,6 +187,17 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       placedCards.push({ left, right, top, bottom: top + height });
       refs.card.style.left = `${anchor.x}px`;
       refs.card.style.top = `${top + height}px`;
+
+      /*
+       * 逃がした札は、本体から離れる。**離れた札は誰のものか分からなくなる。**
+       * 4体が固まった時に「上に積まれた札」と「下にいる本体」が
+       * 対応付かず、誰のHPを見ているのか分からない、という指摘を受けた。
+       * 逃がした距離ぶんだけ細い線を下ろし、足元に小さな点を打つ。
+       * 距離は札の拡大率で割る(線は札の中にあるので一緒に拡大される)。
+       */
+      const lead = (anchor.y - (top + height)) / scale;
+      refs.card.classList.toggle("unit-hud--lifted", lead > LEADER_MIN);
+      refs.leader.style.height = `${Math.max(0, Math.min(320, lead))}px`;
     }
   }
   overlayFrame = requestAnimationFrame(syncOverlay);
@@ -349,21 +272,30 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     stage.focusOn(instanceId);
   }
 
-  function applySnapshot(snapshot: UnitSnapshot[]): void {
+  function applySnapshot(snapshot: UnitSnapshot[], immediate = false): void {
     for (const s of snapshot) {
       const refs = hudRefs.get(s.instanceId);
       if (!refs) continue;
       const ratio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.currentHp / s.maxHp)) : 0;
       refs.hpFill.style.width = `${ratio * 100}%`;
-      refs.hpFill.classList.toggle("unit-hud__hp-fill--low", ratio <= 0.3);
+      /*
+       * 残量で色を3段に切り替える。緑のままだと「あと少しで落ちる」が
+       * 帯の長さでしか伝わらず、4体ぶんを一度に見ている時に見落とす。
+       */
+      const band = ratio <= 0.25 ? "low" : ratio <= 0.55 ? "mid" : "high";
+      refs.plate.setAttribute("data-hp", band);
       // 回復時は追従バーを即座に合わせ、被弾時だけ遅れて追いつかせる
       const previous = Number.parseFloat(refs.hpTrail.style.width) || 100;
-      refs.hpTrail.classList.toggle("unit-hud__hp-trail--instant", ratio * 100 > previous);
+      refs.hpTrail.classList.toggle("unit-hud__hp-trail--instant", immediate || ratio * 100 > previous);
       refs.hpTrail.style.width = `${ratio * 100}%`;
+      // シールドはHPの上に重ねる。別の帯にすると札が1段高くなる
+      const shieldRatio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.shieldValue / s.maxHp)) : 0;
+      refs.hpShield.style.width = `${shieldRatio * 100}%`;
       refs.hpText.textContent = String(s.currentHp);
+      refs.hpText.title = `HP ${s.currentHp} / ${s.maxHp}`;
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
       refs.card.classList.toggle("unit-hud--dead", !s.alive);
-      refs.badges.replaceChildren(...buildBadgesRow(s));
+      refs.chips.replaceChildren(...buildStatusChips(s));
       stage.syncUnitState(s.instanceId, ratio, s.alive, {
         poison: s.poisonStacks > 0,
         burn: s.burnTurns > 0,
@@ -407,23 +339,30 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     const position = anchorPositions.get(event.targetId);
     if (!position) return;
 
-    const text = event.kind === "DAMAGE" ? `-${event.amount}` : event.kind === "HEAL" ? `+${event.amount}` : "MISS";
-    const kindClass =
+    const text = event.kind === "DAMAGE" ? `${event.amount}` : event.kind === "HEAL" ? `+${event.amount}` : "MISS";
+    /*
+     * 通した攻撃と食らった攻撃を色で分ける。
+     * どちらも同じ赤で出していたので、乱戦になると
+     * 「今の一撃はこちらが痛いのか、相手が痛いのか」が読めなかった。
+     */
+    const kind: FloatKind =
       event.kind === "DAMAGE"
         ? event.isCrit
-          ? "floating-number--crit"
-          : "floating-number--damage"
+          ? "crit"
+          : teamOf.get(event.targetId) === "PLAYER"
+            ? "damage-taken"
+            : "damage"
         : event.kind === "HEAL"
-          ? "floating-number--heal"
-          : "floating-number--resist";
+          ? "heal"
+          : "resist";
 
-    const popup = el("div", { className: `floating-number ${kindClass}` }, [event.isCrit ? `${text}!` : text]);
+    const popup = buildFloatingNumber(kind, text);
     // 同じ位置に重ならないよう、左右に少しばらけさせる
-    popup.style.left = `${position.x + (Math.random() - 0.5) * 36}px`;
-    popup.style.top = `${position.y - 18}px`;
+    popup.style.left = `${position.x + (Math.random() - 0.5) * 34}px`;
+    popup.style.top = `${position.y - 22}px`;
     fxLayer.append(popup);
     popup.addEventListener("animationend", () => popup.remove());
-    setTimeout(() => popup.remove(), 1400);
+    setTimeout(() => popup.remove(), 1600);
   }
 
   /** イベント列から、術者が「殴った」のか「唱えた」のかを判定する */
@@ -830,6 +769,35 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   stageHost.append(topBar, actionPanelEl, skillDock, logStrip);
 
   const container = el("div", { className: "screen battle-view" }, [stageHost, resultBanner, finishBtn]);
+
+  /*
+   * 開幕の状態を札へ写しておく。
+   *
+   * これまでは定義上の最大HPを一度書くだけで、**最初の手番が解決するまで
+   * 一度も同期していなかった。** ウェーブを持ち越して始まる戦闘(前の波で
+   * 削れたHPのまま始まる)では、満タンの帯が最初の1手でいきなり落ちる、
+   * という嘘の絵になっていた。状態異常の印も同じ理由で出ていなかった。
+   */
+  applySnapshot(
+    engine.getUnits().map((u) => ({
+      instanceId: u.instanceId,
+      team: u.team,
+      currentHp: u.currentHp,
+      maxHp: u.maxHp,
+      gauge: Math.round(u.gauge),
+      alive: u.alive,
+      effects: u.effects.map((e) => ({ ...e })),
+      stunTurns: u.stunTurns,
+      burnTurns: u.burnTurns,
+      shieldValue: u.shieldValue,
+      shieldTurns: u.shieldTurns,
+      immuneTurns: u.immuneTurns,
+      poisonStacks: u.poisonStacks,
+      poisonTurns: u.poisonTurns,
+      blindTurns: u.blindTurns,
+    })),
+    true,
+  );
 
   maybeScheduleTick();
 

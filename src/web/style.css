@@ -829,17 +829,97 @@ body {
   z-index: 4;
 }
 
+/* ==========================================================================
+ * 頭上の札(ネームプレート)
+ *
+ * ここは長らく「緑のカプセルに白い数字」だけで、3Dがどれだけ良くなっても
+ * **この札のせいで作りかけに見える**と指摘され続けた場所。
+ * 直したのは4点。
+ *
+ *   1. 板を作る。銘板の地・上端の等級の帯・外周の黒縁・落ちる影で厚みを出す
+ *   2. 名前を省略しない。属性・星・レベルは名前から外して、別の置き場所へ配る
+ *   3. HPを溝に沈める。目盛り・削れた分を追う残像・シールドの覆いを重ねる
+ *   4. 逃がした札からは本体まで線を引く。誰の札か迷わせない
+ *
+ * 色は他の画面と同じ絵の具(--rar-* / --gold-* / --grain / --inset-deep)を通す。
+ * 札だけ別の世界になると、画面全体が寄せ集めに見える。
+ * ========================================================================== */
+
 .unit-hud {
   position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  width: 76px;
+  gap: 3px;
+  width: max-content;
   transform: translate(-50%, -100%);
   transform-origin: 50% 100%;
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition: opacity 0.28s ease, filter 0.28s ease;
   will-change: transform, left, top;
+
+  /* 等級(星の格)。data-rank で差し替える。既定は「等級の情報が無い」場合 */
+  --frame-a: #9aa4c6;
+  --frame-b: #39405e;
+  --frame-glow: rgba(150, 165, 205, 0.22);
+  /* 属性の紋章の色。data-element で差し替える */
+  --elem-a: #7d88ad;
+  --elem-b: #2b3149;
+}
+
+/* --- 星の格。額縁の色と上端の帯にそのまま出す --- */
+.unit-hud[data-rank="3"] {
+  --frame-a: var(--rar-3-a);
+  --frame-b: var(--rar-3-b);
+  --frame-glow: rgba(90, 190, 255, 0.4);
+}
+
+.unit-hud[data-rank="4"] {
+  --frame-a: var(--rar-4-a);
+  --frame-b: var(--rar-4-b);
+  --frame-glow: rgba(180, 120, 255, 0.42);
+}
+
+.unit-hud[data-rank="5"] {
+  --frame-a: var(--rar-5-a);
+  --frame-b: var(--rar-5-b);
+  --frame-glow: rgba(255, 200, 70, 0.48);
+}
+
+.unit-hud[data-rank="6"] {
+  --frame-a: var(--rar-6-a);
+  --frame-b: var(--rar-6-b);
+  --frame-glow: rgba(255, 170, 60, 0.6);
+}
+
+/* --- 属性の紋章の色 --- */
+.unit-hud[data-element="FIRE"] {
+  --elem-a: #ff9d5c;
+  --elem-b: #96220a;
+}
+
+.unit-hud[data-element="WATER"] {
+  --elem-a: #7cd0ff;
+  --elem-b: #12508f;
+}
+
+.unit-hud[data-element="ELECTRIC"] {
+  --elem-a: #ffe27a;
+  --elem-b: #9a6b06;
+}
+
+.unit-hud[data-element="GRASS"] {
+  --elem-a: #94f0a8;
+  --elem-b: #146b3c;
+}
+
+.unit-hud[data-element="LIGHT"] {
+  --elem-a: #fff6cf;
+  --elem-b: #a8862c;
+}
+
+.unit-hud[data-element="DARK"] {
+  --elem-a: #c9a2ef;
+  --elem-b: #43146b;
 }
 
 .unit-hud--dead {
@@ -847,62 +927,170 @@ body {
   filter: grayscale(1);
 }
 
-.unit-hud__badges {
+/* --- 状態異常の印の列。札の上に載せる --- */
+.unit-hud__chips {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 2px;
-  min-height: 0;
+  gap: 3px;
+  max-width: 148px;
 }
 
+/* --- 銘板そのもの --- */
+.unit-hud__plate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 104px;
+  max-width: 148px;
+  padding: 4px 7px 4px 4px;
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(48, 56, 88, 0.96) 0%, rgba(21, 26, 46, 0.97) 46%, rgba(9, 12, 24, 0.98) 100%),
+    var(--grain);
+  /*
+   * 上端に等級の色を1本通す(装備カードの「等級の帯」と同じ規則)。
+   * 下端は黒く落とす。この2本だけで、塗った矩形ではなく厚みのある板になる。
+   */
+  box-shadow:
+    inset 0 1.6px 0 var(--frame-a),
+    inset 0 -1.4px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 0 0 1px rgba(5, 7, 16, 0.92),
+    0 3px 9px rgba(0, 0, 0, 0.6),
+    0 0 10px var(--frame-glow);
+}
+
+/* 敵の札は地を赤みへ振る。どちらの陣営かを色でも読ませる */
+.unit-hud--enemy .unit-hud__plate {
+  background:
+    linear-gradient(180deg, rgba(84, 42, 50, 0.96) 0%, rgba(36, 15, 22, 0.97) 46%, rgba(14, 6, 10, 0.98) 100%),
+    var(--grain);
+}
+
+/* --- 属性の紋章。左端の六角のキャップ --- */
+.unit-hud__crest {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0%, 100% 26%, 100% 74%, 50% 100%, 0% 74%, 0% 26%);
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 20%, rgba(255, 255, 255, 0.55), transparent 70%),
+    linear-gradient(180deg, var(--elem-a) 0%, var(--elem-b) 76%, #05070f 100%);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
+}
+
+.unit-hud__crest-face {
+  display: block;
+  width: 12px;
+  height: 12px;
+  color: #fff;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
+}
+
+.unit-hud__crest-face svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.unit-hud__col {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.unit-hud__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/*
+ * 名前。**省略しない。**
+ * 以前は `ドラゴン[火]★5 Lv30` を1本の文字列のまま流し込んでいたので、
+ * 幅が足りず「グリフォン[…」と、いちばん要る種族名の側が削れていた。
+ * 属性は紋章へ、星は右の封蝋へ、レベルは札から降ろした。
+ */
 .unit-hud__name {
-  font-size: 0.54rem;
-  font-weight: 700;
-  max-width: 76px;
-  white-space: nowrap;
+  min-width: 0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: #f1f5ff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.55);
+  /* 想定外に長い名前が来ても、切るのではなく2行へ折る */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 2px 8px;
-  border-radius: 999px;
-  color: #eaf0ff;
-  background: linear-gradient(180deg, rgba(38, 46, 74, 0.92), rgba(8, 11, 22, 0.94));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
-    0 2px 5px rgba(0, 0, 0, 0.6);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
 }
 
-.unit-hud--active .unit-hud__name {
-  color: #1a1405;
-  background: linear-gradient(180deg, #fff3bd 0%, #ffd93b 55%, #e0a000 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    0 0 14px 3px rgba(255, 205, 40, 0.6);
-  animation: unit-hud-active-pulse 1.3s ease-in-out infinite;
+/* --- 星の格。金の小さな封蝋 --- */
+.unit-hud__rank {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1.4;
+  color: #2c1c02;
+  background: var(--gold-grad);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
-@keyframes unit-hud-active-pulse {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.18);
-  }
+.unit-hud__rank-star {
+  font-size: 0.6rem;
+  transform: translateY(-0.5px);
 }
 
+.unit-hud__rank-num {
+  font-size: 0.6rem;
+}
+
+/* --- ボスの印。右下に少しはみ出させて、札の格の違いを出す --- */
+.unit-hud__boss {
+  position: absolute;
+  right: -4px;
+  bottom: -6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 0.575rem;
+  font-weight: 900;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  color: #2b0803;
+  background: linear-gradient(180deg, #ffe9a8 0%, #ff9f3c 45%, #d63d15 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 5px rgba(0, 0, 0, 0.75);
+}
+
+.unit-hud--boss {
+  --frame-a: var(--rar-6-a);
+  --frame-b: var(--rar-6-b);
+  --frame-glow: rgba(255, 130, 40, 0.6);
+}
+
+/* --- HP。溝に沈めた帯 --- */
 .unit-hud__hp {
   position: relative;
   width: 100%;
-  height: 10px;
-  border-radius: 999px;
+  height: 12px;
+  border-radius: 3px;
   overflow: hidden;
-  background: linear-gradient(180deg, #05070f, #131829);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-    inset 0 1px 2px rgba(0, 0, 0, 0.9),
-    0 1px 3px rgba(0, 0, 0, 0.8);
+  background: linear-gradient(180deg, #04060e, #111730);
+  box-shadow: var(--inset-deep);
 }
 
 /* 減った分を遅れて追いかける帯。被弾の瞬間だけ赤く覗いて手応えを出す */
@@ -910,12 +1098,11 @@ body {
   position: absolute;
   inset: 0;
   width: 100%;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #ff8f7a, #d63a2a);
+  background: linear-gradient(180deg, #ffb9a0 0%, #e8492c 55%, #7d1a0c 100%);
   transition: width 0.55s cubic-bezier(0.33, 1, 0.68, 1) 0.22s;
 }
 
-/* 回復時は遅れて追う意味がないので即座に合わせる */
+/* 回復時と開幕は遅れて追う意味がないので即座に合わせる */
 .unit-hud__hp-trail--instant {
   transition: none;
 }
@@ -924,157 +1111,498 @@ body {
   position: absolute;
   inset: 0;
   width: 100%;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #7bf0a4 0%, #35c46c 45%, #1d8b4c 100%);
-  box-shadow: 0 0 8px rgba(46, 204, 113, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease;
 }
 
-.unit-hud__hp-fill--low {
-  background: linear-gradient(180deg, #ff7a6b, #c0392b);
-  box-shadow: 0 0 8px rgba(231, 76, 60, 0.7);
+/*
+ * 残量で3段に塗り分ける。
+ * 緑一色だと「あと一撃で落ちる」が帯の長さでしか伝わらず、
+ * 8体ぶんを一度に見ている時に見落とす。
+ */
+.unit-hud__plate[data-hp="high"] .unit-hud__hp-fill {
+  background: linear-gradient(180deg, #b6ffd2 0%, #45d982 34%, #14a052 74%, #0a6634 100%);
+  box-shadow: 0 0 7px rgba(50, 210, 120, 0.5);
+}
+
+.unit-hud__plate[data-hp="mid"] .unit-hud__hp-fill {
+  background: linear-gradient(180deg, #fff0b8 0%, #ffc63f 36%, #cd8807 76%, #7d5203 100%);
+  box-shadow: 0 0 7px rgba(255, 190, 60, 0.5);
+}
+
+.unit-hud__plate[data-hp="low"] .unit-hud__hp-fill {
+  background: linear-gradient(180deg, #ffc0ad 0%, #ff5c3c 36%, #c4200c 78%, #6f1105 100%);
+  box-shadow: 0 0 9px rgba(255, 70, 40, 0.65);
+  animation: unit-hud-hp-critical 0.9s ease-in-out infinite;
+}
+
+@keyframes unit-hud-hp-critical {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+/* シールドはHPの上に斜線で覆う。別の帯を足すと札が1段高くなる */
+.unit-hud__hp-shield {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: repeating-linear-gradient(
+    118deg,
+    rgba(186, 236, 255, 0.9) 0 3px,
+    rgba(84, 168, 245, 0.6) 3px 6px
+  );
+  box-shadow: inset 0 0 0 1px rgba(200, 240, 255, 0.75), 0 0 8px rgba(90, 190, 255, 0.55);
+  transition: width 0.25s ease;
+}
+
+/* 目盛り。1/4ずつ刻むと、残量が「だいたい何割か」で読める */
+.unit-hud__hp-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(25% - 1px),
+    rgba(4, 6, 14, 0.55) calc(25% - 1px),
+    rgba(4, 6, 14, 0.55) 25%
+  );
+}
+
+/* 上半分の写り込み。ガラスの筒に見せる */
+.unit-hud__hp-gloss {
+  position: absolute;
+  inset: 0 0 52% 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.03));
 }
 
 .unit-hud__hp-text {
-  position: relative;
-  z-index: 1;
-  display: block;
-  text-align: center;
-  font-size: 0.6rem;
-  font-weight: 800;
-  line-height: 9px;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.85);
 }
 
+/* --- ATB。細い金の帯。先端だけが光る --- */
 .unit-hud__gauge {
-  width: 78%;
-  height: 3px;
-  border-radius: 999px;
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.6);
+  background: linear-gradient(180deg, #04060e, #131a2f);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(0, 0, 0, 0.7);
 }
 
 .unit-hud__gauge-fill {
+  position: relative;
   height: 100%;
   width: 0%;
-  background: var(--gauge);
-  box-shadow: 0 0 6px var(--gauge);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #fff4c6 0%, #ffcc3d 48%, #b47c0c 100%);
+  box-shadow: 0 0 6px rgba(255, 200, 60, 0.7);
   transition: width 0.3s linear;
 }
 
-.unit-hud--enemy {
-  translate: 0 -14px;
+.unit-hud__gauge-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  background: #fffbe8;
+  box-shadow: 0 0 6px rgba(255, 225, 130, 0.95);
 }
 
-.unit-hud--enemy .unit-hud__name {
-  box-shadow: inset 0 0 0 1px rgba(255, 120, 120, 0.35);
+/* --- 手番が回ってきた札 --- */
+.unit-hud--active {
+  z-index: 2;
 }
 
-.unit-hud__badges {
-  min-height: 15px;
+.unit-hud--active .unit-hud__plate {
+  --frame-a: var(--gold-1);
+  --frame-b: var(--gold-3);
+  --frame-glow: rgba(255, 205, 60, 0.55);
+  background:
+    linear-gradient(180deg, rgba(84, 68, 30, 0.96) 0%, rgba(38, 30, 12, 0.97) 50%, rgba(14, 11, 5, 0.98) 100%),
+    var(--grain);
 }
 
-.unit-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-  font-size: 0.6rem;
-  line-height: 1;
-  padding: 2px 4px 2px 3px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #333a58, #1b1e30);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+/* 面を横切る反射。明るさを上げるのではなく、光が滑ることで「今この人の番」を示す */
+.unit-hud--active .unit-hud__plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.5;
+  background: var(--brushed);
+  background-size: 240% 100%;
+  animation: unit-hud-shine 2.4s linear infinite;
+}
+
+@keyframes unit-hud-shine {
+  from {
+    background-position: 210% 0;
+  }
+  to {
+    background-position: -70% 0;
+  }
+}
+
+/*
+ * --- 逃がした札から本体へ引く線 ---
+ *
+ * 4体が寄ると札どうしがぶつかるので上へ逃がしている。
+ * 逃がしただけだと、**離れた札が誰のものか分からなくなる**。
+ * 逃がした距離ぶんだけ細い線を下ろし、足元に小さな菱形を打つ。
+ * 位置決めの外に置く(absolute)のは、線の長さが札の高さに混ざって
+ * 位置計算が自分自身を追いかけてしまうのを避けるため。
+ */
+.unit-hud__leader {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 2px;
+  height: 0;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: linear-gradient(180deg, var(--frame-a), rgba(255, 255, 255, 0));
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.unit-hud--lifted .unit-hud__leader {
+  opacity: 0.8;
+}
+
+.unit-hud__leader::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 5px;
+  height: 5px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--frame-a);
+  box-shadow: 0 0 6px var(--frame-glow);
+}
+
+/* ==========================================================================
+ * 状態異常の印
+ *
+ * 以前は「×3」「炎3」のような 10px 角のバッジで、**何がかかっているか
+ * 誰にも読めなかった。** 大きさを 24px まで上げ、
+ *   形(炎・雫・渦・六角の結界・閉じた目・輝き)
+ *   色(橙・紫・黄・水色・鈍色・金)
+ *   向き(強化は上向きの三角、弱体は下向き)
+ * の3つで区別する。色だけに頼らないので、暗い舞台でも取り違えない。
+ * ========================================================================== */
+
+.unit-chip {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--chip);
+  background:
+    radial-gradient(ellipse 85% 65% at 50% 16%, rgba(255, 255, 255, 0.22), transparent 72%),
+    linear-gradient(180deg, rgba(32, 38, 62, 0.97) 0%, rgba(9, 12, 22, 0.98) 100%);
+  box-shadow:
+    inset 0 0 0 1.5px var(--chip),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 0 7px var(--chip-glow),
+    0 2px 4px rgba(0, 0, 0, 0.7);
   cursor: default;
 }
 
-.unit-badge__turns {
-  font-weight: 800;
-  font-size: 0.58rem;
+.unit-chip__face {
+  display: block;
+  width: 14px;
+  height: 14px;
+  filter: drop-shadow(0 0 3px var(--chip-glow));
 }
 
-.unit-badge--buff {
-  color: #2ecc71;
+.unit-chip__face svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-.unit-badge--debuff {
-  color: #e74c3c;
+.unit-chip__turns {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.575rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #f2f6ff;
+  background: linear-gradient(180deg, #2a3150, #080b16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(4, 6, 14, 0.9);
 }
 
-.unit-badge--stun {
-  color: #f1c40f;
+/* 強化か弱体かは、色を見なくても三角の向きで分かる */
+.unit-chip__dir {
+  position: absolute;
+  left: -3px;
+  top: -4px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
 }
 
-.unit-badge--burn {
-  color: #e67e22;
+.unit-chip--buff .unit-chip__dir {
+  border-bottom: 5px solid #6ef2a4;
+  filter: drop-shadow(0 0 3px rgba(60, 220, 130, 0.9));
 }
 
-.unit-badge--poison {
-  color: #9b59b6;
+.unit-chip--debuff .unit-chip__dir {
+  border-top: 5px solid #ff8f7a;
+  filter: drop-shadow(0 0 3px rgba(255, 90, 70, 0.9));
 }
 
-.unit-badge--shield {
-  color: #3498db;
+.unit-chip--buff {
+  --chip: #5ce39a;
+  --chip-glow: rgba(60, 220, 140, 0.45);
 }
 
-.unit-badge--blind {
-  color: #8e7cc3;
+.unit-chip--debuff {
+  --chip: #ff7d68;
+  --chip-glow: rgba(255, 90, 70, 0.45);
 }
 
-.unit-badge--immune {
-  color: #f4d35e;
+.unit-chip--stun {
+  --chip: #ffd54a;
+  --chip-glow: rgba(255, 205, 60, 0.5);
 }
+
+.unit-chip--burn {
+  --chip: #ff9a3c;
+  --chip-glow: rgba(255, 130, 40, 0.5);
+}
+
+.unit-chip--poison {
+  --chip: #c98bff;
+  --chip-glow: rgba(170, 90, 255, 0.5);
+}
+
+.unit-chip--shield {
+  --chip: #5cc8ff;
+  --chip-glow: rgba(60, 180, 255, 0.5);
+}
+
+.unit-chip--blind {
+  --chip: #9aa6d8;
+  --chip-glow: rgba(120, 135, 200, 0.4);
+}
+
+.unit-chip--immune {
+  --chip: #ffeb9a;
+  --chip-glow: rgba(255, 225, 120, 0.55);
+}
+
+.unit-chip--more {
+  --chip: #aab6da;
+  --chip-glow: rgba(140, 155, 200, 0.28);
+  font-size: 0.6rem;
+  font-weight: 900;
+  color: #dbe3ff;
+}
+
+/* ==========================================================================
+ * 飛び出す数字
+ *
+ * 「重みが無い」という指摘への手当て。
+ *   - 縁取りは専用の複製へ逃がす(1枚に太い縁を掛けると字が潰れる)
+ *   - 会心は金で塗り、後ろに衝撃の輪を1枚敷き、跳ねる曲線で打ち出す
+ *   - 自軍の被弾は赤、敵へ通したダメージは白熱色。どちらが痛いかを色で分ける
+ * ========================================================================== */
 
 .floating-number {
   position: absolute;
+  display: grid;
+  justify-items: center;
   transform: translateX(-50%);
-  font-weight: 900;
-  font-size: 1.05rem;
-  letter-spacing: 0.02em;
-  -webkit-text-stroke: 2px rgba(4, 6, 14, 0.9);
-  paint-order: stroke fill;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 5;
-  animation: floating-number-rise 1.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  z-index: 6;
+  animation: floating-number-rise 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.floating-number--damage {
-  color: #ff8b7a;
-  text-shadow: 0 0 12px rgba(255, 90, 70, 0.75);
+.floating-number__text {
+  position: relative;
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
 }
 
+/* 後ろに同じ字を置いて縁取り専用にする。1枚に太い縁を掛けると中の字が潰れる */
+.floating-number__text::before {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: rgba(3, 4, 10, 0.95);
+  -webkit-text-stroke: 4px rgba(3, 4, 10, 0.95);
+}
+
+.floating-number--damage .floating-number__text {
+  background: linear-gradient(180deg, #fffdf4 0%, #ffdf9a 44%, #ff9c3a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(255, 155, 60, 0.5));
+}
+
+.floating-number--damage-taken .floating-number__text {
+  background: linear-gradient(180deg, #ffeae4 0%, #ff8a72 46%, #d42a12 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(255, 60, 40, 0.55));
+}
+
+.floating-number--heal .floating-number__text {
+  background: linear-gradient(180deg, #f2fff8 0%, #86ffb8 44%, #17a75c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(50, 220, 130, 0.5));
+}
+
+.floating-number--resist .floating-number__text {
+  font-size: 0.95rem;
+  color: #cbd5ee;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.8));
+}
+
+/* --- 会心。ここだけは別格の扱いにする --- */
 .floating-number--crit {
-  color: #ffd23f;
-  font-size: 1.7rem;
-  text-shadow: 0 0 18px rgba(255, 200, 40, 0.9), 0 0 34px rgba(255, 140, 0, 0.6);
+  animation: floating-number-crit 1.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.floating-number--heal {
-  color: #5dffa0;
-  text-shadow: 0 0 14px rgba(46, 204, 113, 0.8);
+.floating-number--crit .floating-number__text {
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #fffdf0 0%, #ffe58a 34%, #ffb02e 66%, #e06a09 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 12px rgba(255, 180, 40, 0.75));
 }
 
-.floating-number--resist {
-  color: #c8d2e8;
-  font-size: 0.82rem;
+.floating-number--crit .floating-number__text::before {
+  -webkit-text-stroke: 6px rgba(46, 8, 2, 0.95);
+  color: rgba(46, 8, 2, 0.95);
+}
+
+.floating-number__tag {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  text-indent: 0.22em;
+  color: #ffe9a8;
+  text-shadow: 0 0 7px rgba(255, 180, 40, 0.9), 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+.floating-number__burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 92px;
+  height: 92px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 224, 140, 0.5) 0%, rgba(255, 148, 40, 0.22) 38%, transparent 62%);
+  animation: floating-number-burst 0.5s ease-out forwards;
+}
+
+@keyframes floating-number-burst {
+  from {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.55);
+  }
 }
 
 @keyframes floating-number-rise {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(6px) scale(0.6);
+    transform: translateX(-50%) translateY(8px) scale(0.55);
   }
   12% {
     opacity: 1;
-    transform: translateX(-50%) translateY(-14px) scale(1.22);
+    transform: translateX(-50%) translateY(-16px) scale(1.24);
   }
-  26% {
-    transform: translateX(-50%) translateY(-20px) scale(0.98);
+  24% {
+    transform: translateX(-50%) translateY(-22px) scale(0.97);
+  }
+  33% {
+    transform: translateX(-50%) translateY(-25px) scale(1.03);
   }
   100% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-58px) scale(1);
+    transform: translateX(-50%) translateY(-64px) scale(1);
+  }
+}
+
+@keyframes floating-number-crit {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.34);
+  }
+  9% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-16px) scale(1.38) rotate(-2.5deg);
+  }
+  17% {
+    transform: translateX(-50%) translateY(-21px) scale(1) rotate(2deg);
+  }
+  25% {
+    transform: translateX(-50%) translateY(-26px) scale(1.14) rotate(-1deg);
+  }
+  36% {
+    transform: translateX(-50%) translateY(-30px) scale(1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-78px) scale(1);
   }
 }
 
