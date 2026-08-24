@@ -984,7 +984,9 @@ body {
   /* 4体が横に並ぶので、1枚が広いと必ず隣とぶつかる。
    * 実測で横画面の右半分が札の壁になり、体が隠れていた */
   min-width: 92px;
-  max-width: 124px;
+  /* 5桁のHP(★6Lv60に装備を積むと届く)を「現在/最大」で出すために少しだけ広げた。
+   * これ以上広げると4体が横に並んだ時に隣とぶつかる */
+  max-width: 146px;
   padding: 3px 6px 3px 3px;
   border-radius: 7px;
   background:
@@ -1127,6 +1129,10 @@ body {
 .unit-hud__hp {
   position: relative;
   width: 100%;
+  /* 最悪の桁(「17.9万/17.9万」)が9pxの字で収まる幅。
+   * 実測で59pxしかなく、9文字ですら溢れていた。
+   * 文字を小さくして逃げると読める下限(9px)を割るので、器の方を広げる */
+  min-width: 78px;
   height: 12px;
   border-radius: 3px;
   overflow: hidden;
@@ -1229,10 +1235,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.625rem;
+  /* 桁が増えても溢れないよう小さめに。字間も詰める。
+   * 実測で、箱は59pxしかないのに9文字で既に溢れていた */
+  /* 9pxが読める下限(巡回もこの値で弾く)。これ以上小さくしない */
+  font-size: 0.5625rem;
   font-weight: 900;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.85);

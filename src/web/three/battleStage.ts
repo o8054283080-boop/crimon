@@ -250,16 +250,39 @@ export class BattleStage {
   private shakeStrength = 0;
   private hitStopRemaining = 0;
   private frameHandle: number | null = null;
+  /**
+   * 描く画素の倍率。**端末の性能に合わせて動かす。**
+   *
+   * 以前は端末の値をそのまま(上限2)使っていた。今どきのスマホは3倍なので
+   * 2倍で描くことになり、430x932の画面が 860x1864 = 約160万画素。
+   * そこへHDRバッファ・ブルームの多段・ACESが乗るので、**画素の数がそのまま
+   * 重さになる。**見た目の差より、動きの滑らかさの方がずっと効く。
+   */
+  private pixelScale = 1;
+  /** 直近のフレーム時間の移動平均(ミリ秒)。可変解像度の判断に使う */
+  private frameMs = 16.7;
+  /** 解像度を下げた後、次に触るまでの猶予。毎フレーム上下すると画面がちらつく */
+  private pixelCooldown = 0;
   private disposed = false;
   private elapsed = 0;
 
   constructor(container: HTMLElement, units: StageUnitInit[]) {
     this.element = container;
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    /*
+     * **MSAAは切る。**描画はEffectComposerの自前バッファへ行くので、
+     * キャンバス側のアンチエイリアスはほぼ効かない。効かないものに
+     * サンプル数ぶんの帯域を払うことになる。輪郭はブルームと
+     * cinematicPass のコントラストで足りている。
+     */
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: "high-performance" });
+    this.renderer.setPixelRatio(this.targetPixelRatio());
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    /*
+     * PCFSoft はいちばん重い絞り方。影は接地の役目が果たせれば十分で、
+     * 縁の柔らかさに払う価値はスマホでは無い。
+     */
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // 露出は「白飛びしない」ことを最優先に、やや低めで固定する
     this.renderer.toneMappingExposure = 0.92;
@@ -292,7 +315,7 @@ export class BattleStage {
     this.setupUnits(units);
 
     this.composer = new EffectComposer(this.renderer);
-    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.composer.setPixelRatio(this.targetPixelRatio());
     this.composer.setSize(width, height);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
@@ -457,7 +480,7 @@ export class BattleStage {
     // ことを優先する。**錐台は隊列が入る広さまで絞る。**
     // 闘技床いっぱい(±14)まで広げるとテクセルが粗くなり、
     // 足元の影が四角い階段になって、かえって接地感を壊す
-    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.near = 6;
     key.shadow.camera.far = 46;
     key.shadow.camera.left = -11;
@@ -509,7 +532,7 @@ export class BattleStage {
     pool.castShadow = true;
     // 真上からの光なので影の面積は小さい。1024で足りる(2枚目の影マップは
     // モバイルでの負荷に直結するので、必要以上に上げないこと)
-    pool.shadow.mapSize.set(1024, 1024);
+    pool.shadow.mapSize.set(512, 512);
     pool.shadow.camera.near = 4;
     pool.shadow.camera.far = 34;
     pool.shadow.bias = -0.0009;
@@ -822,6 +845,53 @@ export class BattleStage {
     });
   }
 
+  /**
+   * 今フレームで使う画素倍率。
+   *
+   * 端末の倍率をそのまま使わない。1.5倍あれば、この画面の作り
+   * (暗い地・ブルーム・被写界深度なし)では粗はほとんど見えない。
+   * 2倍から1.5倍に落とすだけで**画素の数が44%減る。**
+   */
+  private targetPixelRatio(): number {
+    return Math.min(window.devicePixelRatio || 1, 1.5) * this.pixelScale;
+  }
+
+  /**
+   * フレーム時間を見て、重ければ描く画素を減らす。
+   *
+   * 端末の性能は事前に分からない。**測って合わせるしかない。**
+   * 下げる時は素早く、戻す時はゆっくりにして、境目で行ったり来たりさせない。
+   */
+  private adaptResolution(deltaMs: number): void {
+    // 移動平均。1フレームの跳ねで判断すると、演出のたびに解像度が動く
+    this.frameMs += (Math.min(deltaMs, 200) - this.frameMs) * 0.08;
+    if (this.pixelCooldown > 0) {
+      this.pixelCooldown -= 1;
+      return;
+    }
+
+    const before = this.pixelScale;
+    // 60fpsで16.7ms。24ms(約42fps)を超えたら重いと見なす
+    if (this.frameMs > 24 && this.pixelScale > 0.62) {
+      this.pixelScale = Math.max(0.62, this.pixelScale - 0.12);
+    } else if (this.frameMs < 15 && this.pixelScale < 1) {
+      // 戻すのは控えめに。上げた直後にまた重くなると振動する
+      this.pixelScale = Math.min(1, this.pixelScale + 0.06);
+    }
+
+    if (this.pixelScale !== before) {
+      const ratio = this.targetPixelRatio();
+      this.renderer.setPixelRatio(ratio);
+      this.composer.setPixelRatio(ratio);
+      const { width, height } = this.measure();
+      this.composer.setSize(width, height);
+      this.bloomPass.setSize(width, height);
+      // 変えた直後は測り直しが落ち着くまで待つ
+      this.frameMs = 16.7;
+      this.pixelCooldown = 45;
+    }
+  }
+
   private start(): void {
     const loop = () => {
       if (this.disposed) return;
@@ -833,6 +903,7 @@ export class BattleStage {
 
   private renderFrame(): void {
     const rawDelta = Math.min(this.clock.getDelta(), 0.05);
+    this.adaptResolution(rawDelta * 1000);
 
     // ヒットストップ: 命中の瞬間だけ時間を遅くして打撃感を出す
     let delta = rawDelta;

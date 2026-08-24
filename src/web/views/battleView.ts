@@ -1,4 +1,5 @@
 import { BattleEngine, BattleEvent, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
+import { formatHpPair } from "../../core/stats.js";
 import { BattleUnit } from "../../battle/unit.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { describeSkillEffect } from "../../core/skill.js";
@@ -292,7 +293,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       const shieldRatio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.shieldValue / s.maxHp)) : 0;
       refs.hpShield.style.width = `${shieldRatio * 100}%`;
       // 現在値だけでは「あと何割か」が読めない。分母まで出す
-      refs.hpText.textContent = `${s.currentHp}/${s.maxHp}`;
+      refs.hpText.textContent = formatHpPair(s.currentHp, s.maxHp);
       refs.hpText.title = `HP ${s.currentHp} / ${s.maxHp}`;
       refs.gaugeFill.style.width = `${Math.min(100, s.gauge)}%`;
       refs.card.classList.toggle("unit-hud--dead", !s.alive);
