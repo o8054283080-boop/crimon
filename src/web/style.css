@@ -7036,3 +7036,93 @@ body::before {
   background: rgba(16, 12, 26, 0.66);
   box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.14);
 }
+
+/* ===================================================================
+ * モンスターの札
+ *
+ * 一覧に並ぶ札の肖像が、属性色で**面ごと塗りつぶされていた**。
+ * 4枚並ぶと黄・青・赤・緑の色面が並び、画面が信号機のようになる。
+ * ホームのパーティ札で採った作りへ揃える。
+ *
+ *   地は暗いまま。属性は**上から差す光と細い縁**でだけ示す。
+ *
+ * 属性が読めなくなるわけではない。左上の属性章と縁の色は残っているので、
+ * 見分けはつく。塗る必要がないだけ。
+ * =================================================================== */
+
+.mcard__portrait {
+  background:
+    radial-gradient(ellipse 76% 58% at 50% 16%, color-mix(in srgb, var(--elem, #7a5ac8) 46%, transparent), transparent 68%),
+    linear-gradient(180deg, color-mix(in srgb, var(--elem, #7a5ac8) 18%, #0b0818) 0%, #06040e 82%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--elem, #7a5ac8) 40%, transparent),
+    inset 0 -12px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* 額縁も金属色の塗りをやめ、暗い面に細い縁だけにする */
+.mcard {
+  background: linear-gradient(180deg, rgba(26, 19, 40, 0.72), rgba(7, 5, 14, 0.86));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px color-mix(in srgb, var(--frame-a, #7a5ac8) 34%, transparent),
+    var(--drop-soft);
+}
+
+/* 星が上がるほど縁だけが強くなる。面は最後まで暗いまま */
+.mcard--rarity-5,
+.mcard--rarity-6 {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 190, 0.14),
+    inset 0 0 0 1px color-mix(in srgb, var(--frame-a, #ffd76a) 62%, transparent),
+    0 0 16px var(--frame-glow, rgba(224, 178, 84, 0.24)),
+    var(--drop-soft);
+}
+
+/* ===================================================================
+ * 切り替えタブ(通常パーティ / 装備ダンジョン専用 など)
+ *
+ * 選択中が明るい紫の塗りつぶしで、画面のどの要素よりも目立っていた。
+ * 選択の印は「今どちらを見ているか」を示すだけのものなので、
+ * 主役より前に出てはいけない。金の細枠で示す。
+ * =================================================================== */
+
+.mode-toggle__btn--active,
+.diff-seg.is-active,
+.seg__btn.is-active {
+  color: #f4e8cc;
+  background: linear-gradient(180deg, rgba(58, 42, 22, 0.7), rgba(20, 14, 8, 0.86));
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.62), inset 0 1px 0 rgba(255, 232, 190, 0.16);
+}
+
+/* ===================================================================
+ * 編成の駒(パーティ枠)
+ *
+ * 属性色を `background` へ直接流し込んでいたため、4枚並ぶと
+ * 赤・青・黄・緑の色面が並んでいた。色は属性を示す情報なので消さないが、
+ * 面を塗る必要はない。上から差す光と細い縁にする。
+ * =================================================================== */
+
+.party-slot {
+  background:
+    radial-gradient(ellipse 78% 58% at 50% 14%, color-mix(in srgb, var(--elem, #7a5ac8) 44%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--elem, #7a5ac8) 16%, #0b0818) 0%, #06040e 84%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px color-mix(in srgb, var(--elem, #7a5ac8) 42%, transparent),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.45),
+    var(--drop-soft);
+}
+
+/* 上半分の強い光沢は、塗った面に厚みを出すためのものだった。
+ * 面が暗くなった今は白く濁るだけなので弱める */
+.party-slot::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent);
+}
+
+/* 並べ替えの選択中。画面でいちばん明るい要素になっていた。
+ * 「今どの順で並んでいるか」を示すだけのものなので、主役より前に出さない */
+.slot-filter-chip--active {
+  color: #ede0ff;
+  background: linear-gradient(180deg, rgba(74, 48, 108, 0.78), rgba(30, 19, 46, 0.88));
+  box-shadow: inset 0 0 0 1px rgba(160, 116, 216, 0.5), inset 0 1px 0 rgba(214, 184, 250, 0.16);
+}

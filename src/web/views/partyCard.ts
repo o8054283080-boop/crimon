@@ -62,14 +62,18 @@ export function renderPartySlots(
     ].filter((n): n is HTMLElement => n !== null);
 
     if (!onRemove) {
-      return el("div", { className: "party-slot", style: dex ? `background:${dex.color}` : undefined }, children);
+      return el("div", { className: "party-slot", // 色をそのまま背景に流し込むと、属性色で面が塗り潰されて色札の列になる。
+      // 変数として渡し、暗さと縁の作りはCSS側に任せる
+      style: dex ? `--elem:${dex.color}` : undefined }, children);
     }
     return el(
       "button",
       {
         type: "button",
         className: "party-slot party-slot--removable",
-        style: dex ? `background:${dex.color}` : undefined,
+        // 色をそのまま背景に流し込むと、属性色で面が塗り潰されて色札の列になる。
+      // 変数として渡し、暗さと縁の作りはCSS側に任せる
+      style: dex ? `--elem:${dex.color}` : undefined,
         title: `${dex ? dex.name : instance.dexId}を編成から外す`,
         onclick: () => onRemove(instance.id),
       },
