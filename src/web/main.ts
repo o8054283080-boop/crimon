@@ -11,8 +11,14 @@ import { LevelDungeonDef, LevelDungeonTier } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
-import { AutoFarmResult, runDungeonAutoFarm, runGoldDungeonAutoFarm, runLevelDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
-import { applyDungeonClearRewards, applyGoldDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
+import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
+import {
+  ClearRewardResult,
+  applyDungeonClearRewards,
+  applyGoldDungeonClearRewards,
+  applyLevelDungeonClearRewards,
+  applyStageClearRewards,
+} from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
 import {
@@ -55,7 +61,7 @@ import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { ResultAction } from "./views/resultActions.js";
-import { BattleViewHandle, renderBattleView } from "./views/battleView.js";
+import { BattleChainInfo, BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
@@ -188,6 +194,24 @@ interface ArenaRun {
   partyInstances: MonsterInstance[];
 }
 
+/**
+ * 進行中の周回。
+ *
+ * 以前はここで戦闘を実行せずに決着だけ出して集計画面へ飛ばしていた。
+ * 10回まとめて挑むと**一瞬で終わり、戦闘画面を一度も見ないまま遊べた**ため取りやめ、
+ * 1戦ずつ実際に戦闘画面で戦って、勝つたびに自動で次の1戦へ送る形にした。
+ * 1戦ごとの成果は `result` に積み、最後にまとめて見せる。
+ */
+interface FarmRun {
+  /** まとめて挑むと決めた回数 */
+  total: number;
+  /** 集計画面に出す場所の名前(周回の途中で選び直せないよう、始めた時に固定する) */
+  targetName: string;
+  result: AutoFarmResult;
+  /** ⏹ が押された。今の1戦を終えたら切り上げる */
+  stopRequested: boolean;
+}
+
 interface AppState {
   screen: ScreenName;
   player: PlayerState;
@@ -240,6 +264,8 @@ interface AppState {
   createNotice: string | null;
   partyEditMode: PartyEditMode;
   autoFarmCount: number;
+  /** 周回の途中。null なら単発の挑戦 */
+  farmRun: FarmRun | null;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
   loginBonusResult: LoginBonusResult | null;
@@ -292,6 +318,7 @@ const state: AppState = {
   createNotice: null,
   partyEditMode: "NORMAL",
   autoFarmCount: 10,
+  farmRun: null,
   autoFarmResult: null,
   autoFarmTargetName: "",
   loginBonusResult: null,
@@ -368,6 +395,9 @@ function navigate(screen: ScreenName): void {
   state.monsterTrainingTargetId = null;
   state.monsterTrainingMaterialIds = [];
   state.autoFarmResult = null;
+  // 周回の途中で別の画面へ出たら、そこで周回は終わり。
+  // 残したままにすると、次に何かに挑んだ時が「周回の続き」として扱われる
+  state.farmRun = null;
   render();
 }
 
@@ -747,11 +777,8 @@ function retryBlockedReason(last: LastRun): string | null {
   return null;
 }
 
-/** 直前と同じ場所へもう一度挑む */
-function retryLastRun(): void {
-  const last = state.lastRun;
-  if (!last) return;
-  const before = state.screen;
+/** 同じ場所へもう1回挑む。始められなければ何もしない(理由は各 start が伝える) */
+function startFromLastRun(last: LastRun): void {
   switch (last.kind) {
     case "STAGE":
       startStage(last.stage, last.difficulty);
@@ -769,6 +796,14 @@ function retryLastRun(): void {
       startArenaMatch(last.opponent);
       break;
   }
+}
+
+/** 直前と同じ場所へもう一度挑む */
+function retryLastRun(): void {
+  const last = state.lastRun;
+  if (!last) return;
+  const before = state.screen;
+  startFromLastRun(last);
   // 始められなかった時は結果画面に留める(黙って消えると何が起きたか分からない)
   if (state.screen === before) render();
 }
@@ -849,6 +884,106 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
   return actions;
 }
 
+/* ============================================================
+ * 周回(まとめて何回も挑む)
+ * ============================================================ */
+
+/** いまの手持ちで、その場所へもう1回挑めるか(判定そのものは autoFarm.ts) */
+function farmBlockReasonFor(last: LastRun): AutoFarmStopReason | null {
+  const party = last.kind === "EQUIP_DUNGEON" ? getDungeonParty(state.player) : getParty(state.player);
+  return farmBlockReason({
+    partySize: party.length,
+    stamina: state.player.stamina,
+    staminaCost: lastRunStaminaCost(last),
+    challengesLeft: last.kind === "GOLD_DUNGEON" ? goldDungeonChallengesRemaining(state.player) : undefined,
+  });
+}
+
+/** 周回を終えて集計画面へ移す */
+function endFarmRun(farm: FarmRun, reason: AutoFarmStopReason): void {
+  farm.result.stopReason = reason;
+  state.autoFarmResult = farm.result;
+  state.autoFarmTargetName = farm.targetName;
+  state.farmRun = null;
+  state.selectedStageId = null;
+  state.selectedDungeonFloor = null;
+  state.selectedLevelDungeonTier = null;
+  state.selectedGoldDungeonFloor = null;
+  state.screen = "AUTO_FARM_RESULT";
+  render();
+}
+
+/**
+ * 周回の途中なら、1戦ぶんの成果を積んで次へ送る。
+ * 引き受けたら true(呼び出し元は単発の結果画面へ進まない)。
+ *
+ * `extraGold` はステージのウェーブ報酬のように、クリア報酬とは別に入るぶん。
+ * 負けた回でも受け取っているので、クリアできなくても集計へ足す。
+ */
+function advanceFarmRun(cleared: boolean, reward: ClearRewardResult | null, extraGold: number): boolean {
+  const farm = state.farmRun;
+  if (!farm) return false;
+
+  farm.result.attempts += 1;
+  if (cleared && reward) {
+    mergeReward(farm.result, reward, extraGold);
+    farm.result.cleared += 1;
+  } else {
+    farm.result.totalGold += extraGold;
+  }
+
+  const last = state.lastRun;
+  if (!cleared) {
+    endFarmRun(farm, "DEFEAT");
+    return true;
+  }
+  if (farm.stopRequested) {
+    endFarmRun(farm, "STOPPED");
+    return true;
+  }
+  if (farm.result.attempts >= farm.total || !last) {
+    endFarmRun(farm, "COMPLETED");
+    return true;
+  }
+  const blocked = farmBlockReasonFor(last);
+  if (blocked) {
+    endFarmRun(farm, blocked);
+    return true;
+  }
+
+  startFromLastRun(last);
+  return true;
+}
+
+/**
+ * 周回を始める。
+ *
+ * 1戦目が始められなければ周回そのものを取り消す。理由は挑戦する側が
+ * すでに伝えている(スタミナ切れの音、編成が空なら押せない)ので、
+ * ここで空の集計画面を出すと「0回中0回クリア」だけが残って邪魔になる。
+ */
+function beginFarmRun(count: number, targetName: string, last: LastRun): void {
+  state.farmRun = { total: Math.max(1, count), targetName, result: emptyResult(), stopRequested: false };
+  const before = state.screen;
+  startFromLastRun(last);
+  if (state.screen === before) state.farmRun = null;
+}
+
+/** 戦闘画面へ渡す、周回の進み具合。周回中でなければ undefined */
+function battleChainInfo(): BattleChainInfo | undefined {
+  const farm = state.farmRun;
+  if (!farm) return undefined;
+  return {
+    // attempts は1戦が終わるたびに増えるので、いま戦っているのは次の番号
+    index: farm.result.attempts + 1,
+    total: farm.total,
+    stopped: farm.stopRequested,
+    onStop: () => {
+      if (state.farmRun) state.farmRun.stopRequested = true;
+    },
+  };
+}
+
 function finishStage(cleared: boolean): void {
   const run = state.stageRun;
   if (!run) return;
@@ -860,6 +995,9 @@ function finishStage(cleared: boolean): void {
   const reward = cleared ? applyStageClearRewards(state.player, stage, run.wavesCleared, partyInstances, run.difficulty) : null;
   state.player.gold += run.goldEarned;
   savePlayerState(state.player);
+
+  state.stageRun = null;
+  if (advanceFarmRun(cleared, reward, run.goldEarned)) return;
 
   const difficultySuffix = run.difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[run.difficulty]}]`;
   state.stageResult = {
@@ -877,7 +1015,6 @@ function finishStage(cleared: boolean): void {
     summonScrollDropped: reward?.summonScrollDropped ?? false,
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
-  state.stageRun = null;
   enterStageResult();
 }
 
@@ -903,6 +1040,9 @@ function finishDungeon(cleared: boolean): void {
   const reward = cleared ? applyDungeonClearRewards(state.player, floor, run.partyInstances) : null;
   savePlayerState(state.player);
 
+  state.dungeonRun = null;
+  if (advanceFarmRun(cleared, reward, 0)) return;
+
   state.stageResult = {
     cleared,
     stageName: floor.name,
@@ -918,31 +1058,16 @@ function finishDungeon(cleared: boolean): void {
     summonScrollDropped: reward?.summonScrollDropped ?? false,
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
-  state.dungeonRun = null;
   enterStageResult();
 }
 
 function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty): void {
-  state.lastRun = { kind: "STAGE", stage, difficulty };
-  const result = runStageAutoFarm(state.player, stage, count, Math.random, difficulty);
-  savePlayerState(state.player);
-  state.autoFarmResult = result;
   const difficultySuffix = difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[difficulty]}]`;
-  state.autoFarmTargetName = `${stage.name}${difficultySuffix}`;
-  state.selectedStageId = null;
-  state.screen = "AUTO_FARM_RESULT";
-  render();
+  beginFarmRun(count, `${stage.name}${difficultySuffix}`, { kind: "STAGE", stage, difficulty });
 }
 
 function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
-  state.lastRun = { kind: "EQUIP_DUNGEON", floor };
-  const result = runDungeonAutoFarm(state.player, floor, count);
-  savePlayerState(state.player);
-  state.autoFarmResult = result;
-  state.autoFarmTargetName = floor.name;
-  state.selectedDungeonFloor = null;
-  state.screen = "AUTO_FARM_RESULT";
-  render();
+  beginFarmRun(count, floor.name, { kind: "EQUIP_DUNGEON", floor });
 }
 
 function startLevelDungeonTier(def: LevelDungeonDef): void {
@@ -967,6 +1092,9 @@ function finishLevelDungeon(cleared: boolean): void {
   const reward = cleared ? applyLevelDungeonClearRewards(state.player, def, run.partyInstances) : null;
   savePlayerState(state.player);
 
+  state.levelDungeonRun = null;
+  if (advanceFarmRun(cleared, reward, 0)) return;
+
   state.stageResult = {
     cleared,
     stageName: def.name,
@@ -982,19 +1110,11 @@ function finishLevelDungeon(cleared: boolean): void {
     summonScrollDropped: false,
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
-  state.levelDungeonRun = null;
   enterStageResult();
 }
 
 function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
-  state.lastRun = { kind: "LEVEL_DUNGEON", def };
-  const result = runLevelDungeonAutoFarm(state.player, def, count);
-  savePlayerState(state.player);
-  state.autoFarmResult = result;
-  state.autoFarmTargetName = def.name;
-  state.selectedLevelDungeonTier = null;
-  state.screen = "AUTO_FARM_RESULT";
-  render();
+  beginFarmRun(count, def.name, { kind: "LEVEL_DUNGEON", def });
 }
 
 function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
@@ -1020,6 +1140,9 @@ function finishGoldDungeon(cleared: boolean): void {
   const reward = cleared ? applyGoldDungeonClearRewards(state.player, floor, run.partyInstances) : null;
   savePlayerState(state.player);
 
+  state.goldDungeonRun = null;
+  if (advanceFarmRun(cleared, reward, 0)) return;
+
   state.stageResult = {
     cleared,
     stageName: floor.name,
@@ -1035,19 +1158,11 @@ function finishGoldDungeon(cleared: boolean): void {
     summonScrollDropped: false,
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
-  state.goldDungeonRun = null;
   enterStageResult();
 }
 
 function handleAutoFarmGoldDungeon(floor: GoldDungeonFloor, count: number): void {
-  state.lastRun = { kind: "GOLD_DUNGEON", floor };
-  const result = runGoldDungeonAutoFarm(state.player, floor, count);
-  savePlayerState(state.player);
-  state.autoFarmResult = result;
-  state.autoFarmTargetName = floor.name;
-  state.selectedGoldDungeonFloor = null;
-  state.screen = "AUTO_FARM_RESULT";
-  render();
+  beginFarmRun(count, floor.name, { kind: "GOLD_DUNGEON", floor });
 }
 
 function renderCurrentDungeonBattle(): BattleViewHandle {
@@ -1064,6 +1179,7 @@ function renderCurrentDungeonBattle(): BattleViewHandle {
     title: run.floor.name,
     resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
     onFinish: (winner) => finishDungeon(winner === "PLAYER"),
+    chain: battleChainInfo(),
   });
 }
 
@@ -1081,6 +1197,7 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
     title: run.def.name,
     resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
     onFinish: (winner) => finishLevelDungeon(winner === "PLAYER"),
+    chain: battleChainInfo(),
   });
 }
 
@@ -1186,6 +1303,7 @@ function renderCurrentGoldDungeonBattle(): BattleViewHandle {
     title: run.floor.name,
     resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "ダンジョンに戻る"),
     onFinish: (winner) => finishGoldDungeon(winner === "PLAYER"),
+    chain: battleChainInfo(),
   });
 }
 
@@ -1203,7 +1321,15 @@ function renderCurrentWaveBattle(): BattleViewHandle {
     engine,
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
-    title: `${run.stage.name}${difficultySuffix} - ウェーブ${wave.waveNumber}${wave.isBossWave ? "(BOSS)" : ""}`,
+    /*
+     * 上帯の名前。
+     *
+     * **「ステージ」の4文字を落としてある。**戦闘画面にいる時点でステージだと
+     * 分かっているうえ、縦画面(390px)では上帯の幅がぎりぎりで、
+     * この4文字があると周回の札と並んだ時に「ウェーブ1」の側が削れる。
+     * 章と番号、そして今が何ウェーブ目かの方が、ここでは要る情報。
+     */
+    title: `${run.stage.name.replace(/^ステージ\s*/, "")}${difficultySuffix} ・ ウェーブ${wave.waveNumber}${wave.isBossWave ? "(BOSS)" : ""}`,
     resultLabel: (winner) => {
       if (winner !== "PLAYER") return "ステージ選択に戻る";
       return isLastWave ? "🎁 報酬を受け取る" : "▶ 次のウェーブへ";
@@ -1225,6 +1351,7 @@ function renderCurrentWaveBattle(): BattleViewHandle {
         finishStage(false);
       }
     },
+    chain: battleChainInfo(),
   });
 }
 

@@ -1,114 +1,132 @@
 import { describe, expect, it } from "vitest";
-import { EQUIP_SLOTS, generateEquipment } from "../src/core/equipment.js";
-import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { STAGE_STAMINA_COST } from "../src/core/fighterLevel.js";
-import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
-import { STAGES } from "../src/data/stages.js";
-import { MAX_FIGHTER_LEVEL } from "../src/core/fighterLevel.js";
-import {
-  FIRST_CLEAR_CRYSTAL_REWARD,
-  REPEAT_CLEAR_CRYSTAL_REWARD,
-  addEquipment,
-  createInitialState,
-  equipToMonster,
-  toggleDungeonPartyMember,
-} from "../src/game/playerState.js";
-import { runDungeonAutoFarm, runStageAutoFarm } from "../src/game/autoFarm.js";
+import { emptyResult, farmBlockReason, mergeReward } from "../src/game/autoFarm.js";
+import { ClearRewardResult } from "../src/game/rewards.js";
 
-function mulberry32(seed: number): () => number {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+/*
+ * かつてここには「戦闘を実行せずに10回ぶんの決着だけ出す」関数のテストがあった。
+ * その関数ごと消してある(周回は1戦ずつ実際に戦闘画面で戦う形へ変えた)ので、
+ * 残った集計の側だけを見る。
+ *
+ * **集計は周回の成果そのもの**で、ここが狂うと「10回まわして何が手に入ったのか」が
+ * 丸ごと嘘になる。1戦ぶんの積み方をここで固定しておく。
+ */
+
+function reward(over: Partial<ClearRewardResult> = {}): ClearRewardResult {
+  return {
+    goldEarned: 0,
+    crystalEarned: 0,
+    expTotal: 0,
+    levelUps: [],
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop: null,
+    summonScrollDropped: false,
+    fighterLevelsGained: 0,
+    ...over,
   };
 }
 
-describe("ステージのオート周回 (runStageAutoFarm)", () => {
-  it("指定回数を消化し、1回目は初回クリア報酬(ダイヤ200)、2回目以降は低確率でダイヤ50が追加される", () => {
-    const state = createInitialState();
-    const stage = STAGES[0];
-
-    const result = runStageAutoFarm(state, stage, 5);
-
-    expect(result.attempts).toBe(5);
-    expect(result.cleared).toBe(5);
-    expect(result.stopReason).toBe("COMPLETED");
-    expect(result.totalCrystal).toBeGreaterThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD);
-    expect(result.totalCrystal).toBeLessThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD + 4 * REPEAT_CLEAR_CRYSTAL_REWARD);
-    expect(result.totalGold).toBeGreaterThan(0);
-    // ファイターレベルアップでスタミナが全回復することがあるため、消費した分だけ減っているとは限らない
-    expect(state.stamina).toBeLessThanOrEqual(150);
-    expect(state.stamina).toBeGreaterThanOrEqual(150 - 5 * STAGE_STAMINA_COST);
+describe("周回を続けられるか (farmBlockReason)", () => {
+  it("編成があってスタミナが足りていれば続けられる", () => {
+    expect(farmBlockReason({ partySize: 4, stamina: 10, staminaCost: 10 })).toBeNull();
   });
 
-  it("スタミナが尽きたら指定回数未満で中断する(ファイターレベル上限に達している場合)", () => {
-    const state = createInitialState();
-    const stage = STAGES[0];
-    // ファイターレベル上限にしておくことで、クリア時のレベルアップによるスタミナ全回復を防ぐ
-    state.fighterLevel = MAX_FIGHTER_LEVEL;
-    state.stamina = STAGE_STAMINA_COST * 2; // 2回分しかない
-    state.maxStamina = STAGE_STAMINA_COST * 2;
-
-    const result = runStageAutoFarm(state, stage, 10);
-
-    expect(result.attempts).toBe(2);
-    expect(result.cleared).toBe(2);
-    expect(result.stopReason).toBe("STAMINA");
-    expect(state.stamina).toBe(0);
+  it("スタミナが1回ぶんに足りなければ止まる", () => {
+    expect(farmBlockReason({ partySize: 4, stamina: 9, staminaCost: 10 })).toBe("STAMINA");
   });
 
-  it("パーティが編成されていなければ1回も挑戦せず中断する", () => {
-    const state = createInitialState();
-    state.partyIds = [];
-    const stage = STAGES[0];
+  it("編成が空なら止まる", () => {
+    expect(farmBlockReason({ partySize: 0, stamina: 999, staminaCost: 10 })).toBe("NO_PARTY");
+  });
 
-    const result = runStageAutoFarm(state, stage, 5);
+  it("1日の上限に達していたら止まる", () => {
+    expect(farmBlockReason({ partySize: 4, stamina: 999, staminaCost: 10, challengesLeft: 0 })).toBe("DAILY_LIMIT");
+  });
 
-    expect(result.attempts).toBe(0);
-    expect(result.cleared).toBe(0);
-    expect(result.stopReason).toBe("NO_PARTY");
+  it("上限とスタミナの両方が尽きていたら、先に消費する上限の方を理由にする", () => {
+    // ここが逆になると「スタミナを回復すれば回せる」と読めてしまい、直し方を間違える
+    expect(farmBlockReason({ partySize: 4, stamina: 0, staminaCost: 10, challengesLeft: 0 })).toBe("DAILY_LIMIT");
+  });
+
+  it("上限が無いコンテンツでは回数を見ない", () => {
+    expect(farmBlockReason({ partySize: 4, stamina: 999, staminaCost: 10 })).toBeNull();
   });
 });
 
-describe("装備ダンジョンのオート周回 (runDungeonAutoFarm)", () => {
-  it("十分な戦力なら指定回数を消化してクリアできる", () => {
-    const state = createInitialState();
-    const floor = EQUIPMENT_DUNGEON_FLOORS[0];
-    // 装備生成用と戦闘用でrngを分け、戦闘側は十分強いパーティで決着が安定する値を使う
-    const equipRng = mulberry32(1);
-    const battleRng = mulberry32(2);
-
-    const STARTER = [
-      { templateId: "slime", element: "FIRE" },
-      { templateId: "wolf", element: "WATER" },
-      { templateId: "golem", element: "ELECTRIC" },
-      { templateId: "fairy", element: "GRASS" },
-    ];
-    state.monsters = [];
-    state.partyIds = [];
-    state.dungeonPartyIds = [];
-    // 1階の推奨戦力(星3+星1装備)よりかなり高い戦力(星5満レベル+星3装備)にして、
-    // 乱数のブレによる偶発的な敗北を避け、テストの決定性を保つ
-    for (const s of STARTER) {
-      const instance = createMonsterInstance(`${s.templateId}_${s.element}`, 5, 50);
-      state.monsters.push(instance);
-      toggleDungeonPartyMember(state, instance.id);
-      for (const slot of EQUIP_SLOTS) {
-        const eq = generateEquipment({ slot, star: 3, subStatCount: 2, rng: equipRng });
-        addEquipment(state, eq);
-        equipToMonster(state, instance.id, eq.id);
-      }
-    }
-
-    const result = runDungeonAutoFarm(state, floor, 3, battleRng);
-
-    expect(result.attempts).toBe(3);
-    expect(result.cleared).toBe(3);
+describe("周回の集計 (mergeReward)", () => {
+  it("何も足していない集計は空で、止まった理由は「消化しきった」", () => {
+    const result = emptyResult();
+    expect(result.attempts).toBe(0);
+    expect(result.cleared).toBe(0);
     expect(result.stopReason).toBe("COMPLETED");
-    expect(result.totalCrystal).toBeGreaterThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD);
-    expect(result.totalCrystal).toBeLessThanOrEqual(FIRST_CLEAR_CRYSTAL_REWARD + 2 * REPEAT_CLEAR_CRYSTAL_REWARD);
+    expect(result.monsterDrops).toEqual([]);
+    expect(result.levelUps).toEqual([]);
+  });
+
+  it("数で出る報酬は回数ぶん積み上がる", () => {
+    const result = emptyResult();
+    for (let i = 0; i < 3; i++) {
+      mergeReward(result, reward({ goldEarned: 100, crystalEarned: 50, expTotal: 20, fighterLevelsGained: 1 }), 0);
+    }
+    expect(result.totalGold).toBe(300);
+    expect(result.totalCrystal).toBe(150);
+    expect(result.totalExp).toBe(60);
+    expect(result.totalFighterLevels).toBe(3);
+  });
+
+  it("ウェーブ報酬(extraGold)はクリア報酬とは別に足される", () => {
+    const result = emptyResult();
+    mergeReward(result, reward({ goldEarned: 100 }), 45);
+    expect(result.totalGold).toBe(145);
+  });
+
+  it("同じモンスターのレベルアップは1行にまとめる", () => {
+    // 10回まわして同じ子が10行並ぶと、結局何レベル上がったのかが読めない
+    const result = emptyResult();
+    mergeReward(result, reward({ levelUps: [{ instanceId: "a", name: "スライム", levels: 2 }] }), 0);
+    mergeReward(result, reward({ levelUps: [{ instanceId: "a", name: "スライム", levels: 3 }] }), 0);
+    mergeReward(result, reward({ levelUps: [{ instanceId: "b", name: "ウルフ", levels: 1 }] }), 0);
+
+    expect(result.levelUps).toHaveLength(2);
+    expect(result.levelUps.find((l) => l.instanceId === "a")?.levels).toBe(5);
+    expect(result.levelUps.find((l) => l.instanceId === "b")?.levels).toBe(1);
+  });
+
+  it("元の報酬のレベルアップを書き換えない(積み上げ先へ複製している)", () => {
+    // 同じ配列を掴んだままだと、集計へ足すたびに元のオブジェクトが太っていく
+    const result = emptyResult();
+    const source = reward({ levelUps: [{ instanceId: "a", name: "スライム", levels: 2 }] });
+    mergeReward(result, source, 0);
+    mergeReward(result, source, 0);
+    expect(source.levelUps[0].levels).toBe(2);
+    expect(result.levelUps[0].levels).toBe(4);
+  });
+
+  it("ドロップしたモンスターと豚は、どちらも手に入った一覧へ並ぶ", () => {
+    const result = emptyResult();
+    mergeReward(result, reward({ dropDexId: "slime_FIRE", dropStar: 3 }), 0);
+    mergeReward(result, reward({ pigDrop: { dexId: "pig_LIGHT", star: 4 } }), 0);
+
+    expect(result.pigDropCount).toBe(1);
+    expect(result.monsterDrops).toEqual([
+      { dexId: "slime_FIRE", star: 3 },
+      { dexId: "pig_LIGHT", star: 4 },
+    ]);
+  });
+
+  it("星が付いていないドロップは一覧に入れない", () => {
+    // dropDexId だけあって星が無い状態は、札を描く時に星0の空欄になる
+    const result = emptyResult();
+    mergeReward(result, reward({ dropDexId: "slime_FIRE", dropStar: null }), 0);
+    expect(result.monsterDrops).toEqual([]);
+  });
+
+  it("装備と召喚の書は個数だけ数える", () => {
+    const result = emptyResult();
+    mergeReward(result, reward({ equipmentDrop: { id: "e1" } as never, summonScrollDropped: true }), 0);
+    mergeReward(result, reward({ equipmentDrop: { id: "e2" } as never }), 0);
+    expect(result.equipmentDropCount).toBe(2);
+    expect(result.summonScrollCount).toBe(1);
   });
 });
