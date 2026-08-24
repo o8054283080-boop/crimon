@@ -9,10 +9,15 @@ import {
   STAMINA_REFILL_PARTIAL_COST,
 } from "../../game/playerState.js";
 import { CompensationClaim } from "../../game/compensation.js";
+import { ELEMENT_JA } from "../../core/element.js";
+import { MonsterInstance } from "../../core/monsterInstance.js";
+import { STAR_MAX_LEVEL } from "../../core/rarity.js";
+import { findMonsterById } from "../../data/monsters.js";
+import { monsterPower } from "../../game/monsterSort.js";
+import { withPortrait } from "../three/portrait.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
 import { AudioSettingsProps, renderAudioSettings } from "./audioSettings.js";
-import { renderPartySlots } from "./partyCard.js";
 
 export interface HomeProps {
   player: PlayerState;
@@ -26,6 +31,7 @@ export interface HomeProps {
   onGoEquipDungeon: () => void;
   onGoLevelDungeon: () => void;
   onGoGoldDungeon: () => void;
+  onGoArena: () => void;
   onGoShop: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
@@ -140,15 +146,27 @@ function renderLoginBonusBanner(result: LoginBonusResult, onDismiss: () => void)
  * 分からなかった。ここでは**レベルを丸で立て、名前を主役に、EXPは帯で見せる**。
  * 数字を読ませるのではなく、伸び具合を目で分かるようにする。
  */
-function renderIdentity(player: PlayerState, onEditFighterName: () => void, onOpenSettings: () => void): HTMLElement {
+function renderIdentity(
+  player: PlayerState,
+  onEditFighterName: () => void,
+  onOpenSettings: () => void,
+  lead: MonsterInstance | undefined,
+): HTMLElement {
   const isMax = player.fighterLevel >= MAX_FIGHTER_LEVEL;
   const needed = requiredExpForFighterLevel(player.fighterLevel);
   const ratio = isMax ? 1 : Math.max(0, Math.min(1, player.fighterExp / Math.max(1, needed)));
 
   return el("section", { className: "home-id" }, [
-    el("div", { className: "home-id__level" }, [
-      el("small", {}, ["Lv"]),
-      el("strong", {}, [String(player.fighterLevel)]),
+    // 肖像は円で、金の輪で囲う。ここが画面の中で唯一「自分」を指す場所なので、
+    // 一番手の込んだ縁を与える
+    el("div", { className: "home-id__crest" }, [
+      el("span", { className: "home-id__crestring" }, []),
+      // 顔は編成の先頭のモンスター。汎用のアイコンより、自分の手持ちが出る方が「自分」に見える
+      withPortrait(el("span", { className: "home-id__crestface" }, []), lead ? findMonsterById(lead.dexId) : undefined, "fill"),
+      el("span", { className: "home-id__level" }, [
+        el("small", {}, ["Lv"]),
+        el("strong", {}, [String(player.fighterLevel)]),
+      ]),
     ]),
     el("div", { className: "home-id__body" }, [
       el("div", { className: "home-id__name" }, [
@@ -170,52 +188,14 @@ function renderIdentity(player: PlayerState, onEditFighterName: () => void, onOp
   ]);
 }
 
-function currencyChip(name: IconName, value: number, modifier: string): HTMLElement {
+function currencyChip(name: IconName, value: number, modifier: string, suffix?: string): HTMLElement {
   return el("div", { className: `home-wallet__chip home-wallet__chip--${modifier}` }, [
     icon(name),
     el("strong", {}, [value.toLocaleString("ja-JP")]),
-  ]);
+    suffix ? el("span", { className: "home-wallet__suffix" }, [suffix]) : null,
+  ].filter((n): n is HTMLElement => n !== null));
 }
 
-/**
- * スタミナは**1か所にしか出さない。**
- * 以前は上部の通貨欄と下部の欄の2か所にあり、片方だけ見て
- * 「回復したのに増えていない」と誤解する余地があった。
- */
-function renderStamina(player: PlayerState, onPartial: () => void, onFull: () => void): HTMLElement {
-  const full = player.stamina >= player.maxStamina;
-  const ratio = Math.max(0, Math.min(1, player.stamina / Math.max(1, player.maxStamina)));
-  return el("section", { className: "home-stamina-bar" }, [
-    el("div", { className: "home-stamina-bar__head" }, [
-      icon("stamina"),
-      el("strong", {}, [`${player.stamina}`]),
-      el("span", {}, [`/ ${player.maxStamina}`]),
-    ]),
-    el("div", { className: "home-stamina-bar__track" }, [el("i", { style: `width:${(ratio * 100).toFixed(1)}%` }, [])]),
-    el("div", { className: "home-stamina-bar__actions" }, [
-      el(
-        "button",
-        {
-          type: "button",
-          className: "btn btn--ghost",
-          disabled: full || player.crystal < STAMINA_REFILL_PARTIAL_COST,
-          onclick: onPartial,
-        },
-        [icon("crystal"), `${STAMINA_REFILL_PARTIAL_COST} +${STAMINA_REFILL_PARTIAL_AMOUNT}`],
-      ),
-      el(
-        "button",
-        {
-          type: "button",
-          className: "btn btn--ghost",
-          disabled: full || player.crystal < STAMINA_REFILL_FULL_COST,
-          onclick: onFull,
-        },
-        [icon("crystal"), `${STAMINA_REFILL_FULL_COST} 全回復`],
-      ),
-    ]),
-  ]);
-}
 
 /* ==========================================================================
  * タイトルの紋章
@@ -520,6 +500,139 @@ interface MenuTile {
   onClick: () => void;
 }
 
+
+/**
+ * ホームのパーティ札。
+ *
+ * 以前は絵文字の小さな四角を4つ並べているだけで、**手持ちの主役が
+ * 画面の中でいちばん貧相**という状態だった。ここは「自分の4体」を
+ * 見せる場所なので、札そのものを主役の大きさにする。
+ *
+ * 肖像は Three.js で焼いた3Dの絵をそのまま札いっぱいに敷く。描き起こした
+ * イラストは持てないが、実際のモンスターが立っている絵はこちらで作れる。
+ */
+function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => void): HTMLElement {
+  if (!instance) {
+    return el("button", { type: "button", className: "hp-card hp-card--empty", onclick: onGoParty }, [
+      el("span", { className: "hp-card__plus" }, ["＋"]),
+      el("span", { className: "hp-card__emptytext" }, ["編成する"]),
+    ]);
+  }
+
+  const dex = findMonsterById(instance.dexId);
+  const stars = Array.from({ length: instance.star }, () => el("i", {}, []));
+
+  return el(
+    "button",
+    {
+      type: "button",
+      className: "hp-card",
+      style: dex ? `--el-color:${dex.color}` : undefined,
+      onclick: onGoParty,
+    },
+    [
+      withPortrait(el("span", { className: "hp-card__art" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
+      el("span", { className: "hp-card__shade" }, []),
+      dex
+        ? el("span", { className: "hp-card__gem", title: `${ELEMENT_JA[dex.element]}属性` }, [
+            el("i", {}, [ELEMENT_JA[dex.element]]),
+          ])
+        : null,
+      // 星は数字ではなく粒で出す。並べた時に格の差が一目で分かる
+      el("span", { className: "hp-card__stars" }, stars),
+      el("span", { className: "hp-card__level" }, [`Lv.${instance.level}`]),
+    ].filter((n): n is HTMLElement => n !== null),
+  );
+}
+
+/**
+ * 総戦力・所持ダイヤ・所持ゴールドと、スタミナ。
+ *
+ * 「今どれだけ強いか」を出す場所がどこにも無かった。手持ちを鍛えた手応えが
+ * 数字で返らないと、育てた甲斐が画面に現れない。
+ *
+ * スタミナは**ここ1か所にしか出さない。**以前は上部の通貨欄と下部の欄の
+ * 2か所にあり、片方だけ見て「回復したのに増えていない」と誤解する余地があった。
+ */
+function renderVitals(
+  player: PlayerState,
+  onPartial: () => void,
+  onFull: () => void,
+  party: readonly MonsterInstance[],
+): HTMLElement {
+  const power = party.reduce((sum, m) => sum + monsterPower(m), 0);
+  const full = player.stamina >= player.maxStamina;
+  const ratio = Math.max(0, Math.min(1, player.stamina / Math.max(1, player.maxStamina)));
+
+  const stat = (name: IconName, label: string, value: number): HTMLElement =>
+    el("div", { className: "home-stat" }, [
+      icon(name),
+      el("span", { className: "home-stat__body" }, [
+        el("small", {}, [label]),
+        el("strong", {}, [value.toLocaleString("ja-JP")]),
+      ]),
+    ]);
+
+  return el("section", { className: "panel panel--ornate home-vitals" }, [
+    el("div", { className: "home-vitals__stats" }, [
+      stat("arena", "総戦力", power),
+      stat("crystal", "所持ダイヤ", player.crystal),
+      stat("coin", "所持ゴールド", player.gold),
+    ]),
+    el("div", { className: "home-vitals__stamina" }, [
+      el("div", { className: "home-stamina" }, [
+        icon("stamina"),
+        el("span", { className: "home-stamina__body" }, [
+          el("small", {}, ["スタミナ"]),
+          el("span", { className: "home-stamina__num" }, [
+            el("strong", {}, [String(player.stamina)]),
+            el("span", {}, [`/ ${player.maxStamina}`]),
+          ]),
+        ]),
+        el("div", { className: "home-stamina__track" }, [el("i", { style: `width:${(ratio * 100).toFixed(1)}%` }, [])]),
+      ]),
+      el("div", { className: "home-vitals__actions" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--ghost",
+            disabled: full || player.crystal < STAMINA_REFILL_PARTIAL_COST,
+            onclick: onPartial,
+          },
+          [icon("crystal"), `${STAMINA_REFILL_PARTIAL_COST} で +${STAMINA_REFILL_PARTIAL_AMOUNT}`],
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--ghost",
+            disabled: full || player.crystal < STAMINA_REFILL_FULL_COST,
+            onclick: onFull,
+          },
+          [icon("crystal"), `${STAMINA_REFILL_FULL_COST} で全回復`],
+        ),
+      ]),
+    ]),
+  ]);
+}
+
+
+/**
+ * 節の見出し。
+ *
+ * 見出しごとに板を敷くと、画面が「札の列」になる。
+ * 背景の上に**刻印だけ**を置いて、囲わずに区切る。
+ */
+function sectionMark(text: string, action?: HTMLElement): HTMLElement {
+  return el("div", { className: "home-mark" }, [
+    el("span", { className: "home-mark__lozenge" }, []),
+    el("span", { className: "home-mark__text" }, [text]),
+    el("span", { className: "home-mark__rule" }, []),
+    action ?? null,
+  ].filter((n): n is HTMLElement => n !== null));
+}
+
 function renderMenuTile(tile: MenuTile): HTMLElement {
   // data-tour は巡回(tools/tour.mjs)の目印。文言ではなくここを見てもらう
   return el("button", { type: "button", className: "home-tile", "data-tour": `tile:${tile.name}`, onclick: tile.onClick }, [
@@ -540,6 +653,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     onGoEquipDungeon,
     onGoLevelDungeon,
     onGoGoldDungeon,
+    onGoArena,
     onGoShop,
     onRefillStaminaPartial,
     onRefillStaminaFull,
@@ -586,37 +700,56 @@ export function renderHome(props: HomeProps): HTMLElement {
     { name: "trainDungeon", label: "育成", sub: "ダンジョン", onClick: onGoLevelDungeon },
     { name: "goldDungeon", label: "ゴールド", sub: "ダンジョン", onClick: onGoGoldDungeon },
   ];
+  // 対人は「増やす」でも「鍛える」でもない、腕を試す場所。行を分けて独立させる
+  const compete: MenuTile[] = [{ name: "arena", label: "アリーナ", sub: "対人戦", onClick: onGoArena }];
 
   const menu = el("div", { className: `home-menu ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
     // タイトルと同じ世界の続きにする。背景だけ別物だと、STARTで別のゲームに移ったように見える
     arcaneRings("home-menu__rings"),
     props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
-    renderIdentity(player, onEditFighterName, openSettings),
-    el("section", { className: "home-wallet" }, [
-      currencyChip("crystal", player.crystal, "crystal"),
-      currencyChip("coin", player.gold, "gold"),
-    ]),
-    renderStamina(player, onRefillStaminaPartial, onRefillStaminaFull),
-    el("section", { className: "home-party-card" }, [
-      el("div", { className: "home-section-title" }, [
-        el("strong", {}, ["CURRENT PARTY"]),
-        el("button", { type: "button", className: "btn btn--ghost", onclick: onGoParty }, ["編成"]),
+    // 1. プレイヤー情報。板を敷かず、背景の絵の上に直接置く
+    el("div", { className: "home-crown" }, [
+      renderIdentity(player, onEditFighterName, openSettings, party[0]),
+      el("section", { className: "home-wallet" }, [
+        currencyChip("crystal", player.crystal, "crystal"),
+        currencyChip("coin", player.gold, "gold"),
+        currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`),
       ]),
-      renderPartySlots(party, 4),
     ]),
+    // 2. 現在のパーティ。最も装飾を厚くする面
+    el("section", { className: "home-party panel--ornate" }, [
+      sectionMark(
+        "CURRENT PARTY",
+        el("button", { type: "button", className: "btn-frame", onclick: onGoParty }, ["編成"]),
+      ),
+      el(
+        "div",
+        { className: "home-party-grid" },
+        Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], onGoParty)),
+      ),
+    ]),
+    // 一番行く場所なので、一番大きい面を与える。横長の帯では他のタイルに埋もれる
     el("button", { type: "button", className: "home-adventure", onclick: onGoStages }, [
-      el("span", { className: "home-adventure__icon" }, [icon("adventure")]),
-      el("span", { className: "home-adventure__text" }, [el("strong", {}, ["ADVENTURE"]), el("small", {}, ["ステージに挑戦する"])]),
+      el("span", { className: "home-adventure__sky", "aria-hidden": "true" }, []),
+      el("span", { className: "home-adventure__ridge", "aria-hidden": "true" }, []),
+      el("span", { className: "home-adventure__haze", "aria-hidden": "true" }, []),
+      el("span", { className: "home-adventure__text" }, [
+        el("strong", {}, ["ADVENTURE"]),
+        el("small", {}, ["冒険に出る"]),
+      ]),
       el("span", { className: "home-adventure__arrow" }, [icon("chevron")]),
     ]),
+    // 4. スタミナと所持。冒険のすぐ下に置く(出かける前に見る数字なので)
+    renderVitals(player, onRefillStaminaPartial, onRefillStaminaFull, party),
+    // 5. 召喚とショップ。絵を持つ2枚
     el("section", { className: "home-group" }, [
-      el("div", { className: "home-group__title" }, ["増やす"]),
-      el("div", { className: "home-menu-grid home-menu-grid--2" }, gather.map(renderMenuTile)),
+      sectionMark("コンテンツ"),
+      el("div", { className: "home-feature-grid" }, gather.map(renderMenuTile)),
     ]),
+    // 6. その他。**ここは小さく畳む。**全部を目立たせると何も目立たない
     el("section", { className: "home-group" }, [
-      el("div", { className: "home-group__title" }, ["鍛える"]),
-      el("div", { className: "home-menu-grid" }, dungeons.map(renderMenuTile)),
+      el("div", { className: "home-minor-grid" }, [...dungeons, ...compete].map(renderMenuTile)),
     ]),
     settingsSheet,
   ].filter((n): n is HTMLElement => n !== null));

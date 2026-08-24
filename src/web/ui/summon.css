@@ -584,21 +584,29 @@
  * 前は既定の青一色で、OSのボタンがそのまま置いてあるように見えた。
  * 金の下に付く**冷たい鋼**にして、宝珠の青とだけ通じさせる
  */
+/*
+ * 1回召喚。10連(金)の一段下。
+ *
+ * 以前は青い面だった。塗りつぶしの主役が金と青の2種類あると、
+ * どちらが上位なのかが読めない。序列は
+ * **金の塗り(10連) > 紫の面(1回) > 羊皮紙(書)** の3段にする。
+ * 紫は魔力の色なので、召喚の画面では地の色として筋が通る。
+ */
 .summon-cta__btn--single {
   min-height: 54px;
-  color: #e9f1ff;
+  color: #ede4f8;
   background:
-    radial-gradient(ellipse 70% 140% at 12% -20%, rgba(150, 200, 255, 0.22), transparent 62%),
-    linear-gradient(180deg, #33406b 0%, #212a4a 52%, #161c33 100%);
+    radial-gradient(ellipse 70% 140% at 12% -20%, rgba(186, 140, 240, 0.18), transparent 62%),
+    linear-gradient(180deg, rgba(52, 34, 78, 0.86) 0%, rgba(28, 18, 44, 0.9) 52%, rgba(14, 9, 24, 0.94) 100%);
   box-shadow:
-    inset 0 1.5px 0 rgba(190, 220, 255, 0.4),
-    inset 0 -1.5px 0 rgba(0, 0, 0, 0.6),
-    inset 0 0 0 1px rgba(130, 170, 240, 0.28),
+    inset 0 1px 0 rgba(214, 184, 250, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(150, 108, 208, 0.42),
     var(--drop);
 }
 
 .summon-cta__btn--single .summon-cta__cost {
-  color: #cfe6ff;
+  color: #dcc8f4;
 }
 
 /* --- 3段目: 召喚の書 -----------------------------------------------------

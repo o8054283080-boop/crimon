@@ -66,8 +66,8 @@ interface TierConfig {
 
 const TIER_CONFIG: Record<LevelDungeonTier, TierConfig> = {
   BEGINNER: { star: 2, level: 20, powerScale: 0.45, expReward: 400, goldReward: 150, pigStar: 2, speedScale: 1 },
-  INTERMEDIATE: { star: 4, level: 40, powerScale: 0.8, expReward: 1400, goldReward: 400, pigStar: 4, speedScale: 1.1 },
-  ADVANCED: { star: 5, level: 50, powerScale: 1.35, expReward: 3500, goldReward: 900, pigStar: 6, speedScale: 1.25 },
+  INTERMEDIATE: { star: 4, level: 40, powerScale: 0.8, expReward: 1400, goldReward: 400, pigStar: 4, speedScale: 1.06 },
+  ADVANCED: { star: 5, level: 50, powerScale: 1.35, expReward: 3500, goldReward: 900, pigStar: 6, speedScale: 1.12 },
 };
 
 export const LEVEL_DUNGEON_DEFS: LevelDungeonDef[] = LEVEL_DUNGEON_TIERS.map((tier) => {

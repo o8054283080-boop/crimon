@@ -162,7 +162,8 @@ function powerScaleForGlobalIndex(globalIndex: number): number {
  * 装備ダンジョンが最終階で1.85倍なのに対し、ここは最終ステージで1.32倍に留める。
  */
 const SPEED_SCALE_BASE = 1;
-const SPEED_SCALE_MAX = 1.32;
+// 装備の速度を半分にしたのに合わせて下げた(装備ダンジョンの1.28より緩く保つ)
+const SPEED_SCALE_MAX = 1.16;
 /**
  * 通し番号は**ステージ単位**(全20)。ウェーブ単位(60)と取り違えると、
  * 最終ステージでも倍率が3分の1しか伸びない

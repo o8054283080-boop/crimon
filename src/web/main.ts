@@ -62,6 +62,22 @@ import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
 import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
+import { renderPvpArena } from "./views/pvpArena.js";
+import { ArenaTeamSlot } from "./views/pvpArena.js";
+import {
+  advanceArenaOpponentSeed,
+  applyArenaTicketRegen,
+  ArenaOpponent,
+  ArenaPeriodSettlement,
+  generateArenaOpponents,
+  getArenaTeam,
+  resolveArenaMatch,
+  settleArenaPeriod,
+  setupArenaBattle,
+  toggleArenaTeamMember,
+  tryRefillArenaTickets,
+  trySpendArenaTicket,
+} from "../game/pvpArena.js";
 import { renderMonsters } from "./views/monsters.js";
 import { PartyEditMode, renderParty } from "./views/party.js";
 import { renderMonsterTraining } from "./views/monsterTraining.js";
@@ -162,7 +178,14 @@ type LastRun =
   | { kind: "STAGE"; stage: Stage; difficulty: Difficulty }
   | { kind: "EQUIP_DUNGEON"; floor: DungeonFloor }
   | { kind: "LEVEL_DUNGEON"; def: LevelDungeonDef }
-  | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor };
+  | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor }
+  | { kind: "ARENA"; opponent: ArenaOpponent };
+
+/** 進行中のアリーナ1戦 */
+interface ArenaRun {
+  opponent: ArenaOpponent;
+  partyInstances: MonsterInstance[];
+}
 
 interface AppState {
   screen: ScreenName;
@@ -200,6 +223,13 @@ interface AppState {
   selectedGoldDungeonFloor: number | null;
   goldDungeonRun: GoldDungeonRunState | null;
   selectedDexEntryId: string | null;
+  /* --- アリーナ --- */
+  /** 編成を編集中の枠。null なら対戦相手の一覧 */
+  arenaEditing: ArenaTeamSlot | null;
+  arenaRun: ArenaRun | null;
+  arenaNotice: string | null;
+  /** 期間が変わった時に出す前の期のまとめ報酬。受け取るまで残す */
+  arenaSettlement: ArenaPeriodSettlement | null;
   monsterTrainingTargetId: string | null;
   monsterTrainingMaterialIds: string[];
   /** クリエイト(スキル合成)の対象・素材・移し替える枠 */
@@ -249,6 +279,10 @@ const state: AppState = {
   selectedGoldDungeonFloor: null,
   goldDungeonRun: null,
   selectedDexEntryId: null,
+  arenaEditing: null,
+  arenaRun: null,
+  arenaNotice: null,
+  arenaSettlement: null,
   monsterTrainingTargetId: null,
   monsterTrainingMaterialIds: [],
   createTargetId: null,
@@ -277,6 +311,13 @@ const state: AppState = {
     state.compensationClaims = claims;
     savePlayerState(state.player);
   }
+
+  // アリーナ。期が変わっていれば前の期のまとめ報酬を精算し、
+  // 挑戦券の自然回復を反映する(起動のたびに1度だけ)
+  const settlement = settleArenaPeriod(state.player);
+  if (settlement) state.arenaSettlement = settlement;
+  applyArenaTicketRegen(state.player);
+  if (settlement) savePlayerState(state.player);
 }
 
 const rootCandidate = document.getElementById("app");
@@ -659,6 +700,9 @@ function lastRunStaminaCost(last: LastRun): number {
       return LEVEL_DUNGEON_STAMINA_COST;
     case "GOLD_DUNGEON":
       return GOLD_DUNGEON_STAMINA_COST;
+    case "ARENA":
+      // アリーナは挑戦券で回すのでスタミナは要らない
+      return 0;
   }
 }
 
@@ -669,6 +713,12 @@ function lastRunStaminaCost(last: LastRun): number {
  * 編成が空なのかが分からないと、次に何をすればいいかが決められない。
  */
 function retryBlockedReason(last: LastRun): string | null {
+  if (last.kind === "ARENA") {
+    if (getArenaTeam(state.player, "OFFENSE").length === 0) return "攻撃編成が組まれていません";
+    applyArenaTicketRegen(state.player);
+    if (state.player.arenaTickets <= 0) return "挑戦券が足りません(時間で回復します)";
+    return null;
+  }
   const party = last.kind === "EQUIP_DUNGEON" ? getDungeonParty(state.player) : getParty(state.player);
   if (party.length === 0) return "パーティが編成されていません";
   const cost = lastRunStaminaCost(last);
@@ -697,6 +747,9 @@ function retryLastRun(): void {
     case "GOLD_DUNGEON":
       startGoldDungeonFloor(last.floor);
       break;
+    case "ARENA":
+      startArenaMatch(last.opponent);
+      break;
   }
   // 始められなかった時は結果画面に留める(黙って消えると何が起きたか分からない)
   if (state.screen === before) render();
@@ -722,6 +775,9 @@ function backToLastRunList(): void {
     case "GOLD_DUNGEON":
       navigate("GOLD_DUNGEON");
       break;
+    case "ARENA":
+      navigate("ARENA");
+      break;
   }
 }
 
@@ -739,7 +795,12 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
   const actions: ResultAction[] = [];
   if (last) {
     actions.push({
-      label: fromAutoFarm ? `🔁 もう一度 ×${state.autoFarmCount}` : `🔁 もう一度 (⚡${cost})`,
+      // アリーナはスタミナではなく挑戦券で回す。⚡0 と出すと「無料で回せる」と読めてしまう
+      label: fromAutoFarm
+        ? `🔁 もう一度 ×${state.autoFarmCount}`
+        : last.kind === "ARENA"
+          ? `🔁 もう一度 (挑戦券1)`
+          : `🔁 もう一度 (⚡${cost})`,
       variant: "primary",
       disabled: reason !== null,
       reason: reason ?? undefined,
@@ -1005,6 +1066,94 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
   });
 }
 
+/* ==========================================================================
+ * アリーナ(対人戦)
+ * ========================================================================== */
+
+/** 今の点数帯から、並べる挑戦相手を作る。同じ点数・同じ種なら同じ顔ぶれになる */
+function currentArenaOpponents(): ArenaOpponent[] {
+  return generateArenaOpponents(state.player.arenaPoints, state.player.arenaOpponentSeed);
+}
+
+function startArenaMatch(opponent: ArenaOpponent): void {
+  const party = getArenaTeam(state.player, "OFFENSE");
+  if (party.length === 0) {
+    state.arenaNotice = "攻撃編成を組んでください";
+    render();
+    return;
+  }
+  // アリーナはスタミナではなく挑戦券で回す。育成の周回と取り合いにしないため
+  if (!trySpendArenaTicket(state.player).ok) {
+    state.arenaNotice = "挑戦券が足りません";
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  savePlayerState(state.player);
+  state.arenaNotice = null;
+  state.lastRun = { kind: "ARENA", opponent };
+  state.arenaRun = { opponent, partyInstances: party };
+  state.screen = "ARENA_BATTLE";
+  render();
+}
+
+function finishArenaMatch(won: boolean): void {
+  const run = state.arenaRun;
+  if (!run) return;
+
+  const result = resolveArenaMatch(state.player, run.opponent, won);
+  savePlayerState(state.player);
+
+  const rankLine =
+    result.rankChange === "UP"
+      ? `${result.rankAfter.name}へ昇格！`
+      : result.rankChange === "DOWN"
+        ? `${result.rankAfter.name}へ降格`
+        : null;
+
+  state.stageResult = {
+    cleared: won,
+    stageName: `アリーナ ${run.opponent.name}`,
+    goldEarned: result.goldEarned,
+    crystalEarned: result.crystalEarned,
+    wavesCleared: won ? 1 : 0,
+    totalWaves: 1,
+    levelUps: [],
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop: null,
+    summonScrollDropped: result.scrollEarned > 0,
+    fighterLevelsGained: 0,
+  };
+  // 点数の増減と昇降格は、勝敗そのものと同じくらい見たい情報
+  state.arenaNotice = [
+    `${result.pointDelta >= 0 ? "+" : ""}${result.pointDelta} pt (${result.pointsAfter} pt)`,
+    rankLine,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+  state.arenaRun = null;
+  enterStageResult();
+}
+
+function renderCurrentArenaBattle(): BattleViewHandle {
+  const run = state.arenaRun;
+  if (!run) throw new Error("arenaRun is not set");
+
+  const setup = setupArenaBattle(run.partyInstances, run.opponent, state.player.equipment);
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+
+  return renderBattleView({
+    engine,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    title: `vs ${run.opponent.name}`,
+    resultLabel: (winner) => (winner === "PLAYER" ? "🏆 結果を見る" : "アリーナに戻る"),
+    onFinish: (winner) => finishArenaMatch(winner === "PLAYER"),
+  });
+}
+
 function renderCurrentGoldDungeonBattle(): BattleViewHandle {
   const run = state.goldDungeonRun;
   if (!run) throw new Error("goldDungeonRun is not set");
@@ -1096,6 +1245,7 @@ function render(): void {
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
         onGoShop: () => navigate("SHOP"),
+        onGoArena: () => navigate("ARENA"),
         onRefillStaminaPartial: () => {
           if (!tryRefillStaminaPartial(state.player).ok) return;
           savePlayerState(state.player);
@@ -1309,6 +1459,57 @@ function render(): void {
       break;
     }
 
+    case "ARENA":
+      content = renderPvpArena({
+        player: state.player,
+        opponents: currentArenaOpponents(),
+        editing: state.arenaEditing,
+        notice: state.arenaNotice,
+        settlement: state.arenaSettlement,
+        onEdit: (slot) => {
+          state.arenaEditing = slot;
+          state.arenaNotice = null;
+          render();
+        },
+        onToggleMember: (slot, instanceId) => {
+          toggleArenaTeamMember(state.player, slot, instanceId);
+          savePlayerState(state.player);
+          render();
+        },
+        onChallenge: startArenaMatch,
+        onRefillTickets: () => {
+          const result = tryRefillArenaTickets(state.player);
+          state.arenaNotice = result.ok ? "挑戦券を回復しました" : (result.reason ?? "回復できませんでした");
+          if (result.ok) savePlayerState(state.player);
+          render();
+        },
+        onRerollOpponents: () => {
+          // 券は減らさない。並んだ3人がどれも噛み合わない時に
+          // 券を捨てて選び直させるのは理不尽なので
+          advanceArenaOpponentSeed(state.player);
+          savePlayerState(state.player);
+          render();
+        },
+        onDismissSettlement: () => {
+          state.arenaSettlement = null;
+          render();
+        },
+        onViewDetail: (instanceId) => {
+          state.monsterDetailId = instanceId;
+          state.screen = "MONSTERS";
+          render();
+        },
+      });
+      break;
+
+    case "ARENA_BATTLE": {
+      showNav = false;
+      const handle = renderCurrentArenaBattle();
+      disposeCurrentView = handle.dispose;
+      content = handle.element;
+      break;
+    }
+
     case "MONSTER_DEX":
       content = renderMonsterDex({
         selectedDexId: state.selectedDexEntryId,
@@ -1437,6 +1638,7 @@ const BATTLE_SCREENS = new Set<ScreenName>([
   "DUNGEON_BATTLE",
   "LEVEL_DUNGEON_BATTLE",
   "GOLD_DUNGEON_BATTLE",
+  "ARENA_BATTLE",
 ]);
 
 function bgmSceneOf(screen: ScreenName): BgmScene {

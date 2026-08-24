@@ -275,9 +275,12 @@ export class MonsterAvatar {
   private targetActiveGlow = 0;
   private flash = 0;
   private readonly tmpVector = new THREE.Vector3();
+  /** PLAYER側は+1(カメラのある手前側)、ENEMY側は-1。斜に構える向きを決める */
+  private readonly facing: 1 | -1;
 
   constructor(options: MonsterAvatarOptions) {
     const { element, role, templateId, facing } = options;
+    this.facing = facing;
     this.theme = themeFor(element);
 
     const palette = paletteFor(this.theme);
@@ -512,18 +515,37 @@ export class MonsterAvatar {
   /**
    * 指定した位置(相手チームの中心)へ体を向ける。
    *
-   * 以前は両チームとも同じ向きへ一定角度だけ回して立体感を出していたが、
-   * 同じ向きに回すと両チームの正面がすれ違い、互いの脇を見ることになる。
-   * カメラ側に方位角を入れて斜めから見る構図になった今、
-   * 体を捻って立体感を作る必要はないので、素直に向かい合わせる。
    * 端のユニットは相手の中心を向くぶん自然に内へ角度がつき、隊列に収束感が出る。
+   *
+   * **そのうえで、骨格ごとの「斜に構える角度」(rig.yawBias)を必ず足す。**
+   * カメラは手前チームの真後ろ寄り(方位15度)に居るので、相手と真正面から
+   * 向き合わせると、手前の4体は**背中しか見えない**。実際にセラフの頭が
+   * のっぺりした灰色の球にしか見えず、狼も竜も顔が一切読めなかった。
+   * 顔・胸・翼の付け根といった情報の集まっている面はすべて前側にあるので、
+   * そこがカメラへ向くまで体を回してやらないと、造形をどれだけ作り込んでも
+   * 画面には出てこない。
+   *
+   * 回す向きは手前チームと奥チームで逆(facing を掛ける)。両チームとも
+   * 「相手を視界の端に置いて半身に構える」姿勢になり、どちらも4分の3から
+   * 見えるようになる。踏み込みは体の正面(-Z)へ出るので、角度を付けすぎると
+   * 攻撃が的から逸れて見える。骨格ごとの値は 0.3〜0.62 に収めてある。
    */
   faceToward(x: number, z: number): void {
     const dx = x - this.root.position.x;
     const dz = z - this.root.position.z;
     if (dx === 0 && dz === 0) return;
     // 骨格の正面は -Z。Y軸まわりに a 回すと正面は (-sin a, 0, -cos a) を向く
-    this.rig.root.rotation.y = Math.atan2(-dx, -dz);
+    const aim = Math.atan2(-dx, -dz);
+    // 相手チームの真正面。ここを基準にしないと、隊列の左右で斜に構える角度が
+    // 「相手の中心を向く角度」と足し引きされ、片側だけ真後ろ向きに戻ってしまう
+    // (実際に、右端の狼は綺麗な半身になったのに左端の竜だけ背中を向いていた)
+    const ahead = this.facing > 0 ? 0 : Math.PI;
+    // 中心への収束は残すが、効かせるのは半分以下。隊列の収まりより
+    // 「全員の前面がカメラへ向いていること」を優先する
+    let converge = aim - ahead;
+    while (converge > Math.PI) converge -= Math.PI * 2;
+    while (converge < -Math.PI) converge += Math.PI * 2;
+    this.rig.root.rotation.y = ahead + converge * 0.4 + this.rig.yawBias * this.facing;
   }
 
   update(dt: number, elapsed: number): void {
@@ -1408,7 +1430,8 @@ export class MonsterAvatar {
     this.activeGlow += (this.targetActiveGlow - this.activeGlow) * Math.min(1, dt * 7);
     // 素早く消す。長く残ると、全体攻撃で全員が同時に光った時に
     // 画面がしばらく白いままになる
-    this.flash = Math.max(0, this.flash - dt * 9);
+    // 減衰は速く。長いと全体攻撃のたびに画面がしばらく白む
+    this.flash = Math.max(0, this.flash - dt * 13);
 
     const fade = 1 - death;
     const sigilMaterial = this.sigilMesh.material as THREE.MeshBasicMaterial;

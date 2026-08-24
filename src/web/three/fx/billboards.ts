@@ -4,7 +4,40 @@ import * as THREE from "three";
  * 板ポリ(1枚のPlane)を使う大物エフェクトのプール。
  * 閃光・火球・煙・衝撃波リング・光の柱・地面のデカールなど、
  * 粒では出せない「大きな面」を担当する。
+ *
+ * ## 合成(粒と同じ設計)
+ *
+ * 既定は**スクリーン合成**。`s + d*(1-s)` なので、何枚重ねても 1.0 を
+ * 超えない。板は面積が大きいぶん素の加算では最も飽和しやすい要素で、
+ * 「火球3枚+閃光+輪」を重ねただけで画面が白く潰れていた。
+ * スクリーンなら枚数を増やしても白い塊にはならず、代わりに
+ * 「濃くなる」方向へ寄っていく。
+ *
+ * ブルーム(しきい値1.15)へ載せたい芯だけ `blendMode: "add"` を使う。
+ * こちらは色に増幅を掛けて意図的に1を超えさせるので、
+ * **小さく短命なものにしか使わないこと。**
  */
+
+/**
+ * 合成方法を層ごとに設定する。
+ *
+ * **既定を加算にしてはいけない。** 板は面積が大きいので、素の加算だと
+ * 「閃光+光条+衝撃輪」を重ねただけで画面全体が1.0を大きく超え、
+ * ブルーム(しきい値1.15)が全面に広がってACESが高輝度を白へ寄せる。
+ * 実際に「被弾していない味方まで含めて8体全員が真っ白に飛ぶ」状態になっていた。
+ *
+ * スクリーン合成 `s + d*(1-s)` なら何枚重ねても1.0を超えない。
+ */
+function applyBlend(material: THREE.Material & { blendEquation: THREE.BlendingEquation; blendSrc: THREE.BlendingSrcFactor; blendDst: THREE.BlendingDstFactor; blendSrcAlpha: unknown; blendDstAlpha: unknown; premultipliedAlpha: boolean }, mode: "glow" | "add" | "alpha"): void {
+  material.blending = THREE.CustomBlending;
+  material.blendEquation = THREE.AddEquation;
+  material.blendSrc = THREE.OneFactor;
+  material.blendDst =
+    mode === "add" ? THREE.OneFactor : mode === "alpha" ? THREE.OneMinusSrcAlphaFactor : THREE.OneMinusSrcColorFactor;
+  material.blendSrcAlpha = THREE.OneFactor;
+  material.blendDstAlpha = mode === "add" ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor;
+  material.premultipliedAlpha = true;
+}
 
 export type BillboardOrient =
   /** 常にカメラへ正対 */
@@ -31,7 +64,11 @@ export interface BillboardSpec {
   /** 面内の回転(ラジアン) */
   roll?: number;
   spin?: number;
-  blending?: THREE.Blending;
+  /**
+   * 合成の層。既定は "glow"(スクリーン合成)。
+   * "add" はブルームへ載せたい**小さく短命な芯**にだけ使う。
+   */
+  blendMode?: "glow" | "add" | "alpha";
   fadeIn?: number;
   /** 不透明度の減衰カーブ。大きいほど早く消える */
   fadePower?: number;
@@ -147,7 +184,7 @@ export class BillboardField {
 
     item.material.map = spec.texture;
     item.material.color.copy(spec.color);
-    item.material.blending = spec.blending ?? THREE.AdditiveBlending;
+    applyBlend(item.material, spec.blendMode ?? "glow");
     item.material.opacity = spec.fadeIn ? 0 : (spec.opacity ?? 1) * this.opacityScale;
     item.material.needsUpdate = true;
     item.maxLife = Math.max(0.01, spec.life);

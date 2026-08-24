@@ -3,6 +3,7 @@ import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requ
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
+import { ARENA_START_POINTS, ARENA_TICKET_MAX } from "../data/pvpArena.js";
 import {
   ShopEntry,
   SHOP_INITIAL_SLOTS,
@@ -56,6 +57,40 @@ export interface PlayerState {
   shopPurchasedSlots: number[];
   /** 受け取り済みのお詫び配布のid。重複して配らないために残す */
   claimedCompensationIds: string[];
+  /**
+   * 装備の速度を半分に見直した調整を、この控えに適用済みか。
+   *
+   * 装備の数値は**引いた時に確定して控えに残る**ので、生成側の基準値を変えても
+   * 既に持っている装備には効かない。これが無いと、前から遊んでいる人だけ
+   * 倍の速度装備を持ち続けることになる。
+   */
+  equipmentSpeedRebalanced?: boolean;
+
+  /* --- アリーナ(対人戦) --- */
+  /**
+   * 防衛編成。**他プレイヤーが挑んでくる時にAIが動かす編成**なので、
+   * 攻撃編成とは別に持つ。同じ編成を使い回せると「攻めに強い＝守りにも強い」に
+   * なってしまい、編成を考える楽しみが消える
+   */
+  arenaDefenseIds: string[];
+  /** 攻撃編成。こちらから挑む時に使う */
+  arenaOffenseIds: string[];
+  /** アリーナ点数。勝てば上がり負ければ下がる。階級はこの値から決まる */
+  arenaPoints: number;
+  /** 残っている挑戦券 */
+  arenaTickets: number;
+  /** 挑戦券の自然回復を最後に計算した時刻(ミリ秒epoch) */
+  lastArenaTicketUpdateAt: number;
+  /** 挑戦相手を選ぶ乱数の種。挑むたびに進めるので、同じ相手が続けて出ない */
+  arenaOpponentSeed: number;
+  /** 期間報酬を最後に受け取った期の識別子(-1 = まだ一度も精算していない) */
+  arenaPeriodKey: number;
+  /** 今期の対戦回数 */
+  arenaSeasonBattles: number;
+  /** 今期の勝利数 */
+  arenaSeasonWins: number;
+  /** 今期の最高到達点数。期間報酬はこの値で決まる(下がっても取り上げない) */
+  arenaSeasonBestPoints: number;
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -101,6 +136,17 @@ export function createInitialState(): PlayerState {
     shopRotationKey: -1,
     shopPurchasedSlots: [],
     claimedCompensationIds: [],
+    equipmentSpeedRebalanced: true,
+    arenaDefenseIds: [],
+    arenaOffenseIds: [],
+    arenaPoints: ARENA_START_POINTS,
+    arenaTickets: ARENA_TICKET_MAX,
+    lastArenaTicketUpdateAt: Date.now(),
+    arenaOpponentSeed: 1,
+    arenaPeriodKey: -1,
+    arenaSeasonBattles: 0,
+    arenaSeasonWins: 0,
+    arenaSeasonBestPoints: ARENA_START_POINTS,
   };
 }
 
@@ -151,6 +197,44 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.shopRotationKey !== "number") state.shopRotationKey = -1;
   if (!Array.isArray(state.shopPurchasedSlots)) state.shopPurchasedSlots = [];
   if (!Array.isArray(state.claimedCompensationIds)) state.claimedCompensationIds = [];
+
+  /*
+   * 装備の速度を半分に見直した調整の後追い。
+   *
+   * 速度は手番の数に直結するので、装備で素の速度を覆せてしまうと
+   * モンスターごとの速さという個性が消える。生成側の基準値は半分にしたが、
+   * **既に持っている装備は控えに数値が焼かれている**ので、ここで揃える。
+   * 一度だけ走らせる(印が無い控えだけが対象)。
+   */
+  if (!state.equipmentSpeedRebalanced) {
+    for (const equipment of state.equipment) {
+      if (equipment.mainStat.type === "SPD") {
+        equipment.mainStat.value = Math.max(1, Math.round(equipment.mainStat.value / 2));
+      }
+      for (const sub of equipment.subStats) {
+        if (sub.type === "SPD") sub.value = Math.max(1, Math.round(sub.value / 2));
+      }
+    }
+    state.equipmentSpeedRebalanced = true;
+  }
+
+  // アリーナ。古い控えには丸ごと無いので、初参加と同じ状態から始める
+  if (!Array.isArray(state.arenaDefenseIds)) state.arenaDefenseIds = [];
+  if (!Array.isArray(state.arenaOffenseIds)) state.arenaOffenseIds = [];
+  if (typeof state.arenaPoints !== "number") state.arenaPoints = ARENA_START_POINTS;
+  if (typeof state.arenaTickets !== "number") state.arenaTickets = ARENA_TICKET_MAX;
+  if (typeof state.lastArenaTicketUpdateAt !== "number") state.lastArenaTicketUpdateAt = Date.now();
+  // 種が0のままだと相手の抽選が動かない(0に何を掛けても0のため)
+  if (typeof state.arenaOpponentSeed !== "number" || state.arenaOpponentSeed <= 0) state.arenaOpponentSeed = 1;
+  if (typeof state.arenaPeriodKey !== "number") state.arenaPeriodKey = -1;
+  if (typeof state.arenaSeasonBattles !== "number") state.arenaSeasonBattles = 0;
+  if (typeof state.arenaSeasonWins !== "number") state.arenaSeasonWins = 0;
+  if (typeof state.arenaSeasonBestPoints !== "number") state.arenaSeasonBestPoints = state.arenaPoints;
+
+  // 手放したモンスターが編成に残っていると、対戦の準備で必ず落ちる
+  const owned = new Set(state.monsters.map((m) => m.id));
+  state.arenaDefenseIds = state.arenaDefenseIds.filter((id) => owned.has(id));
+  state.arenaOffenseIds = state.arenaOffenseIds.filter((id) => owned.has(id));
   return state;
 }
 

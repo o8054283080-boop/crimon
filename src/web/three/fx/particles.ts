@@ -4,10 +4,34 @@ import { ATLAS_COLUMNS, particleAtlasTexture } from "./fxTextures.js";
 /**
  * 粒(Points)のプール。
  *
+ * ## 合成の設計(ここが「白い塊」を防ぐ要)
+ *
+ * 描画先は EffectComposer の半精度浮動小数バッファで、ブルームは
+ * しきい値 1.15 を超えた分だけを拾い、最後に ACES でトーンマップされる。
+ * つまり**1.0を超えた値がそのまま滲みの量になる。**
+ * 素の加算合成は重ねた枚数だけ線形に足し算されるので、20枚重なれば
+ * 平気で 8.0 に達し、ブルームが全面に広がり、ACESが高輝度を白へ寄せる。
+ * これが「回復を撃つと画面の上半分が真っ白なもや」の正体だった。
+ *
+ * そこで層を3枚に分ける。
+ *
+ * - `glow`(既定): **スクリーン合成**。`s + d*(1-s)` なので何枚重ねても
+ *   1.0を超えない。数も大きさも自由に盛れるが、決して飽和しない。
+ *   エフェクトの「体積」はすべてここで作る。
+ * - `add`: 素の加算に増幅を掛け、意図的に 1.15 を超えさせる。
+ *   ブルームで滲ませたい**芯だけ**が入る層。画素サイズに厳しい上限を
+ *   置いてあるので、飽和しても「小さく鋭い光点」にしかならない。
+ * - `alpha`: 通常合成。煙・破片・葉。光らない「物」を担当する。
+ *
+ * 出力はすべて乗算済みアルファ(premultiplied)に統一してある。
+ * スクリーン合成が `OneMinusSrcColor` を必要とするため、
+ * 色にアルファを掛けた状態で書き出さないと式が成立しない。
+ *
+ * ## その他
  * - スプライトはアトラス1枚に集約し、セル番号を頂点属性で切り替える
- * - 加算合成レイヤ(火花・光)と通常合成レイヤ(煙・破片・葉)の2枚を持つ
- *   加算だけだと煙が「光る雲」になってしまい、余韻の重さが出ないため
- * - 回転はフラグメントシェーダでUVを回して表現する(Pointsは板を回せないため)
+ * - 回転と縦横比はフラグメントシェーダでUVを歪めて表現する
+ *   (Pointsは板を回せないため)。速度方向へ伸ばした粒は
+ *   「飛沫」「火の粉」「電光」の質の差をそのまま画にする
  */
 
 const VERTEX = /* glsl */ `
@@ -15,16 +39,23 @@ attribute float aSize;
 attribute float aAlpha;
 attribute float aRot;
 attribute float aCell;
+attribute float aHot;
+attribute float aStretch;
 attribute vec3 aColor;
+uniform float uMaxPixel;
 varying float vAlpha;
 varying float vRot;
 varying float vCell;
+varying float vHot;
+varying float vStretch;
 varying vec3 vColor;
 
 void main() {
   vRot = aRot;
   vCell = aCell;
   vColor = aColor;
+  vHot = aHot;
+  vStretch = aStretch;
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 
   // ビュー空間の奥行き(前方が正)。カメラ位置に近づくほど点は大きく描かれる。
@@ -35,8 +66,8 @@ void main() {
   vAlpha = depth > 0.2 ? aAlpha : 0.0;
 
   // 遠近に応じた大きさ。分母を下限で守ったうえで、最終的な画素サイズにも
-  // 上限を設ける(1粒が画面を覆い尽くして白飛びするのを構造的に防ぐ)。
-  gl_PointSize = clamp(aSize * (300.0 / max(0.2, depth)), 0.0, 44.0);
+  // 層ごとの上限を設ける(芯の層だけは特に小さく抑える)。
+  gl_PointSize = clamp(aSize * (300.0 / max(0.2, depth)), 0.0, uMaxPixel);
   gl_Position = projectionMatrix * mvPosition;
 }
 `;
@@ -44,10 +75,12 @@ void main() {
 const FRAGMENT = /* glsl */ `
 uniform sampler2D uAtlas;
 uniform float uColumns;
-uniform float uWhiteHot;
+uniform float uGain;
 varying float vAlpha;
 varying float vRot;
 varying float vCell;
+varying float vHot;
+varying float vStretch;
 varying vec3 vColor;
 
 void main() {
@@ -56,7 +89,9 @@ void main() {
   vec2 p = vec2(gl_PointCoord.x, 1.0 - gl_PointCoord.y) - 0.5;
   float s = sin(vRot);
   float c = cos(vRot);
-  p = vec2(p.x * c - p.y * s, p.x * s + p.y * c) + 0.5;
+  p = vec2(p.x * c - p.y * s, p.x * s + p.y * c);
+  // 縦横比。1.0 なら等方、大きいほど回転後のローカルX方向へ細長く伸びる
+  p = vec2(p.x / vStretch, p.y * vStretch) + 0.5;
   if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard;
 
   float col = mod(vCell, uColumns);
@@ -65,13 +100,22 @@ void main() {
 
   vec4 tex = texture2D(uAtlas, uv);
   if (tex.a < 0.004) discard;
-  // 生まれたては白熱させる(uWhiteHot=0なら素の色のまま)
-  vec3 color = mix(vColor, vec3(1.0), clamp(uWhiteHot * pow(vAlpha, 2.0), 0.0, 1.0));
-  gl_FragColor = vec4(color, tex.a * vAlpha);
+  // 白熱は粒ごとに持たせる。一律に白を混ぜると、どの属性も同じ白い粒になる
+  vec3 color = mix(vColor, vec3(1.0), clamp(vHot, 0.0, 1.0));
+  float a = tex.a * vAlpha;
+  // 乗算済みアルファで書き出す(スクリーン合成の前提)
+  gl_FragColor = vec4(color * a * uGain, a);
 }
 `;
 
-export type ParticleLayerKind = "add" | "alpha";
+/**
+ * 粒を出す層。
+ *
+ * - `glow`: スクリーン合成。飽和しない発光。既定はこれ
+ * - `add`: 加算+増幅。ブルームを狙う「芯」専用。小さく短命なものだけ
+ * - `alpha`: 通常合成。煙・破片・葉
+ */
+export type ParticleLayerKind = "add" | "glow" | "alpha";
 
 export interface ParticleSpec {
   position: THREE.Vector3;
@@ -81,7 +125,7 @@ export interface ParticleSpec {
   size: number;
   life: number;
   cell: number;
-  /** 通常合成レイヤへ出す(煙・破片・葉など) */
+  /** 出す層。既定は飽和しない `glow` */
   layer?: ParticleLayerKind;
   gravity?: number;
   drag?: number;
@@ -103,6 +147,17 @@ export interface ParticleSpec {
   wobble?: number;
   /** 減衰カーブ。2で「最後にすっと消える」 */
   fadePower?: number;
+  /**
+   * 生まれた瞬間の白熱(0..1)。寿命とともに素の色へ戻る。
+   * 一律に白を混ぜると属性の色が消えるので、**芯にだけ**使うこと。
+   */
+  hot?: number;
+  /** 白熱が引くまでの秒数(既定は寿命の25%) */
+  hotDecay?: number;
+  /** 縦横比。1で等方、2で回転方向へ2倍細長い(飛沫・火の粉・電光) */
+  stretch?: number;
+  /** 速度の向きへ粒を寝かせる。stretch と組み合わせて「流れ」を作る */
+  alignVelocity?: boolean;
 }
 
 interface Particle {
@@ -120,9 +175,11 @@ interface Particle {
   wobble: number;
   wobblePhase: number;
   fadePower: number;
+  hot: number;
+  hotDecay: number;
   attractor: THREE.Vector3 | null;
   attract: number;
-  /** 原点からの水平距離(旋回計算に使う) */
+  align: boolean;
   active: boolean;
 }
 
@@ -136,9 +193,15 @@ class ParticleLayer {
   private readonly alphas: Float32Array;
   private readonly rots: Float32Array;
   private readonly cells: Float32Array;
+  private readonly hots: Float32Array;
+  private readonly stretches: Float32Array;
   private readonly particles: Particle[] = [];
   private cursor = 0;
   private liveCount = 0;
+
+  /** 速度方向を画面上の角度へ落とすためのカメラ基底 */
+  private readonly camRight = new THREE.Vector3(1, 0, 0);
+  private readonly camUp = new THREE.Vector3(0, 1, 0);
 
   constructor(
     private readonly capacity: number,
@@ -150,6 +213,8 @@ class ParticleLayer {
     this.alphas = new Float32Array(capacity);
     this.rots = new Float32Array(capacity);
     this.cells = new Float32Array(capacity);
+    this.hots = new Float32Array(capacity);
+    this.stretches = new Float32Array(capacity);
 
     for (let i = 0; i < capacity; i++) {
       this.particles.push({
@@ -167,11 +232,15 @@ class ParticleLayer {
         wobble: 0,
         wobblePhase: 0,
         fadePower: 1,
+        hot: 0,
+        hotDecay: 0.1,
         attractor: null,
         attract: 0,
+        align: false,
         active: false,
       });
       this.positions[i * 3 + 1] = -9999;
+      this.stretches[i] = 1;
     }
 
     this.geometry.setAttribute("position", new THREE.BufferAttribute(this.positions, 3));
@@ -180,6 +249,13 @@ class ParticleLayer {
     this.geometry.setAttribute("aAlpha", new THREE.BufferAttribute(this.alphas, 1));
     this.geometry.setAttribute("aRot", new THREE.BufferAttribute(this.rots, 1));
     this.geometry.setAttribute("aCell", new THREE.BufferAttribute(this.cells, 1));
+    this.geometry.setAttribute("aHot", new THREE.BufferAttribute(this.hots, 1));
+    this.geometry.setAttribute("aStretch", new THREE.BufferAttribute(this.stretches, 1));
+
+    // 層ごとの画素上限。芯の層だけは「小さく鋭い光点」に留める
+    const maxPixel = kind === "add" ? 24 : kind === "alpha" ? 130 : 62;
+    // 加算層だけは意図的にブルームのしきい値(1.15)を越えさせる
+    const gain = kind === "add" ? 2.1 : 1;
 
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,
@@ -187,21 +263,37 @@ class ParticleLayer {
       uniforms: {
         uAtlas: { value: particleAtlasTexture() },
         uColumns: { value: ATLAS_COLUMNS },
-        uWhiteHot: { value: kind === "add" ? 0.65 : 0.0 },
+        uGain: { value: gain },
+        uMaxPixel: { value: maxPixel },
       },
       transparent: true,
       depthWrite: false,
       depthTest: true,
-      blending: kind === "add" ? THREE.AdditiveBlending : THREE.NormalBlending,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      // 乗算済みアルファで書き出しているので、各層の合成は次のとおり。
+      //   glow : s + d*(1-s)  … スクリーン。1.0を越えない
+      //   add  : s + d        … 素の加算。芯だけが使う
+      //   alpha: s + d*(1-a)  … 通常合成
+      blendSrc: THREE.OneFactor,
+      blendDst:
+        kind === "add" ? THREE.OneFactor : kind === "alpha" ? THREE.OneMinusSrcAlphaFactor : THREE.OneMinusSrcColorFactor,
+      blendSrcAlpha: THREE.OneFactor,
+      blendDstAlpha: kind === "add" ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor,
     });
 
     this.points = new THREE.Points(this.geometry, this.material);
     this.points.frustumCulled = false;
-    this.points.renderOrder = kind === "add" ? 3 : 2;
+    this.points.renderOrder = kind === "add" ? 4 : kind === "glow" ? 3 : 2;
   }
 
   /** 粒の大きさにかかる共通倍率(BillboardFieldと同じ考え方) */
   sizeScale = 1;
+
+  setCameraBasis(right: THREE.Vector3, up: THREE.Vector3): void {
+    this.camRight.copy(right);
+    this.camUp.copy(up);
+  }
 
   spawn(spec: ParticleSpec): void {
     const index = this.cursor;
@@ -222,8 +314,11 @@ class ParticleLayer {
     particle.wobble = spec.wobble ?? 0;
     particle.wobblePhase = Math.random() * Math.PI * 2;
     particle.fadePower = spec.fadePower ?? 1;
+    particle.hot = spec.hot ?? 0;
+    particle.hotDecay = Math.max(0.02, spec.hotDecay ?? particle.maxLife * 0.25);
     particle.attractor = spec.attractor ?? null;
     particle.attract = spec.attract ?? 0;
+    particle.align = spec.alignVelocity ?? false;
     particle.active = true;
     if (spec.velocity) particle.velocity.copy(spec.velocity);
     else particle.velocity.set(0, 0, 0);
@@ -238,8 +333,18 @@ class ParticleLayer {
     // 最初の1フレームだけ粒が数倍に膨らんで白く弾けて見える
     this.sizes[index] = particle.size * particle.growth;
     this.alphas[index] = spec.fadeIn && spec.fadeIn > 0 ? 0 : particle.alpha;
-    this.rots[index] = spec.rotation ?? 0;
+    this.rots[index] = particle.align ? this.screenAngle(particle.velocity) : (spec.rotation ?? 0);
     this.cells[index] = spec.cell;
+    this.hots[index] = particle.hot;
+    this.stretches[index] = Math.max(0.2, spec.stretch ?? 1);
+  }
+
+  /** 速度ベクトルを、カメラから見た画面上の角度へ落とす */
+  private screenAngle(velocity: THREE.Vector3): number {
+    const x = velocity.dot(this.camRight);
+    const y = velocity.dot(this.camUp);
+    if (x * x + y * y < 1e-8) return 0;
+    return Math.atan2(y, x);
   }
 
   update(dt: number): void {
@@ -295,6 +400,12 @@ class ParticleLayer {
       this.alphas[i] = alpha;
       this.sizes[i] = particle.size * (1 + (particle.growth - 1) * (1 - t));
       if (particle.spin !== 0) this.rots[i] += particle.spin * dt;
+      else if (particle.align) this.rots[i] = this.screenAngle(particle.velocity);
+      if (particle.hot > 0) {
+        // 白熱は生まれた瞬間だけ。すぐ属性の色へ戻すことで
+        // 「閃いてから色が乗る」という順序が読める
+        this.hots[i] = particle.hot * Math.max(0, 1 - age / particle.hotDecay);
+      }
     }
     this.liveCount = live;
 
@@ -304,6 +415,8 @@ class ParticleLayer {
     this.geometry.attributes.aRot.needsUpdate = true;
     this.geometry.attributes.aColor.needsUpdate = true;
     this.geometry.attributes.aCell.needsUpdate = true;
+    this.geometry.attributes.aHot.needsUpdate = true;
+    this.geometry.attributes.aStretch.needsUpdate = true;
   }
 
   get activeCount(): number {
@@ -316,27 +429,38 @@ class ParticleLayer {
   }
 }
 
-/** 加算/通常の2レイヤをまとめて扱う窓口 */
+/** 加算(芯)/スクリーン(発光)/通常(物)の3レイヤをまとめて扱う窓口 */
 export class ParticleField {
   readonly root = new THREE.Group();
-  private readonly additive: ParticleLayer;
+  private readonly core: ParticleLayer;
+  private readonly glow: ParticleLayer;
   private readonly alpha: ParticleLayer;
 
-  constructor(additiveCapacity = 1700, alphaCapacity = 900) {
-    this.additive = new ParticleLayer(additiveCapacity, "add");
+  constructor(glowCapacity = 1700, alphaCapacity = 900, coreCapacity = 320) {
+    this.glow = new ParticleLayer(glowCapacity, "glow");
+    this.core = new ParticleLayer(coreCapacity, "add");
     this.alpha = new ParticleLayer(alphaCapacity, "alpha");
-    this.root.add(this.additive.points, this.alpha.points);
+    this.root.add(this.alpha.points, this.glow.points, this.core.points);
   }
 
-  /** 粒の大きさにかかる共通倍率。内部の2レイヤーへまとめて配る */
+  /** 粒の大きさにかかる共通倍率。内部のレイヤーへまとめて配る */
   setSizeScale(scale: number): void {
     this.alpha.sizeScale = scale;
-    this.additive.sizeScale = scale;
+    this.glow.sizeScale = scale;
+    this.core.sizeScale = scale;
+  }
+
+  /** 速度方向へ粒を寝かせるためのカメラ基底を配る */
+  setCameraBasis(right: THREE.Vector3, up: THREE.Vector3): void {
+    this.alpha.setCameraBasis(right, up);
+    this.glow.setCameraBasis(right, up);
+    this.core.setCameraBasis(right, up);
   }
 
   spawn(spec: ParticleSpec): void {
     if (spec.layer === "alpha") this.alpha.spawn(spec);
-    else this.additive.spawn(spec);
+    else if (spec.layer === "add") this.core.spawn(spec);
+    else this.glow.spawn(spec);
   }
 
   /** 球状/円錐状にまとめて撒く。方向を与えると指向性を持たせられる */
@@ -442,16 +566,18 @@ export class ParticleField {
   }
 
   update(dt: number): void {
-    this.additive.update(dt);
+    this.glow.update(dt);
+    this.core.update(dt);
     this.alpha.update(dt);
   }
 
   get activeCount(): number {
-    return this.additive.activeCount + this.alpha.activeCount;
+    return this.glow.activeCount + this.core.activeCount + this.alpha.activeCount;
   }
 
   dispose(): void {
-    this.additive.dispose();
+    this.glow.dispose();
+    this.core.dispose();
     this.alpha.dispose();
   }
 }

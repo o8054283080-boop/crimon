@@ -3,8 +3,10 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
-import { createArena } from "./arena.js";
+import { ArenaHandles, createArena } from "./arena.js";
+import { moodFor, StageMood } from "./elementTheme.js";
 import { MonsterAvatar } from "./monsterAvatar.js";
 import { CinematicPass } from "./postfx/cinematicPass.js";
 import { HitStyle, StatusAuraKind, VfxElement, VfxSystem } from "./vfx.js";
@@ -181,7 +183,18 @@ export class BattleStage {
   private readonly composer: EffectComposer;
   private readonly bloomPass: UnrealBloomPass;
   private readonly cinematicPass: CinematicPass;
-  private readonly arena = createArena();
+  /** そのバトルの空気(空・霞・石・灯りの色)。敵の顔ぶれから決まる */
+  private readonly mood: StageMood;
+  private readonly arena: ArenaHandles;
+  /**
+   * 接地影。**モンスターが床に立って見えるかは、ほぼこれで決まる。**
+   *
+   * 平行光の影だけだと、足元に集まる各種の光(属性ライト・足元のオーラ・
+   * 加算の霞)に持ち上げられて消える。乗算合成の板を1枚ずつ足元へ敷き、
+   * どんな光が来ても必ず床が暗くなるようにしている。
+   * (乗算は「掛け算」なので、上に光を足しても比率として残る)
+   */
+  private readonly contactShadows: { mesh: THREE.Mesh; avatar: MonsterAvatar }[] = [];
   /** 闘技場から焼いた映り込み用の環境マップ。破棄時に手放す */
   private environmentTarget: THREE.WebGLRenderTarget | null = null;
   private readonly vfx = new VfxSystem();
@@ -255,15 +268,22 @@ export class BattleStage {
     container.append(this.renderer.domElement);
 
     const { width, height } = this.measure();
-    this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 320);
+    this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 340);
+
+    // その戦いの空気を、敵チームで最も多い属性から決める。
+    // 空・霞・石・灯り・グレーディングまで一式がここから流れる。
+    // (以前は全ステージが同じ紫の室内で、どの戦いも同じ絵に見えていた)
+    this.mood = moodFor(units.filter((u) => u.team === "ENEMY").map((u) => u.def.element as Element));
+    this.arena = createArena(this.mood);
 
     // 霧の色は空のシェーダの地平線色(arena.ts の uHaze)と合わせてある。
     // 遠景がそのまま霞へ溶ける。**両方を同時に変えること。**
+    // どちらも StageMood から来るので、ここを固定色に戻さないこと。
     //
-    // 濃くしてある。体表シェーダは fog を組み込んでいないので、
-    // 濃くしても手前のモンスターは白まず、闘技場だけが奥へ退く。
-    // 空気遠近が付いて、観客席と列柱が「遠い」と読めるようになる
-    this.scene.fog = new THREE.FogExp2(0x2f3660, 0.0235);
+    // 体表シェーダは fog を組み込んでいないので、濃くしても手前の
+    // モンスターは白まず、闘技場だけが奥へ退く。空気遠近が付いて、
+    // 観客席と列柱が「遠い」と読めるようになる
+    this.scene.fog = new THREE.FogExp2(this.mood.haze.getHex(), this.mood.fogDensity);
     this.scene.add(this.arena.group);
     this.scene.add(this.vfx.root);
 
@@ -307,8 +327,10 @@ export class BattleStage {
       saturation: 1.12,
       contrast: 0.15,
       tintStrength: 0.19,
-      shadowTint: 0x223d70,
-      highlightTint: 0xffdfae,
+      // ステージの空気に合わせて寒暖を割る。**必ず対にすること。**
+      // 暗部と明部を同じ色相にすると、彩度をいくら上げても一色の絵になる
+      shadowTint: this.mood.gradeShadow,
+      highlightTint: this.mood.gradeHighlight,
     });
     this.composer.addPass(this.cinematicPass);
 
@@ -332,6 +354,77 @@ export class BattleStage {
     return { width: Math.max(1, rect.width), height: Math.max(1, rect.height) };
   }
 
+  /**
+   * 接地影の板。中心が暗く外へ向かって白へ抜ける乗算用の絵。
+   *
+   * 白(1.0)を掛けても床は変わらないので、外周は必ず白で終わらせること。
+   * ここに透明を使うと乗算合成では「掛ける値が0」になり、板の四角が
+   * まるごと真っ黒に落ちる。
+   */
+  private static contactShadowTexture(): THREE.Texture {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2Dコンテキストを取得できませんでした");
+    /*
+     * **暗さは色ではなくアルファで持つ。**
+     *
+     * 最初は「白い下地に灰色の円」を乗算合成で敷いていた。理屈の上では
+     * 縁(白)は素通し・中心(灰)だけが沈むはずだが、実際には
+     * **縁まで含めた四角い板が明るく塗られた**。この描画経路は
+     * EffectComposer の半精度浮動小数バッファを挟んでおり、
+     * 乗算合成がそのまま効かない。
+     *
+     * 透明な下地に黒を落としておけば、合成方法に頼らず必ず暗くなる。
+     * 四角い縁が出ることも原理的に起こらない(縁のアルファが0のため)。
+     */
+    ctx.clearRect(0, 0, 128, 128);
+    const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0.0, "rgba(4, 6, 14, 0.62)");
+    gradient.addColorStop(0.38, "rgba(4, 6, 14, 0.42)");
+    gradient.addColorStop(0.72, "rgba(4, 6, 14, 0.14)");
+    gradient.addColorStop(1.0, "rgba(4, 6, 14, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  /**
+   * 足元に接地影を敷く。
+   *
+   * 取りまとめ役の指摘「床の上に貼った絵のように浮いて見える」の本体はここ。
+   * 平行光の影は落ちていたが、足元には属性ライト・足元のオーラ・加算の霞が
+   * 重なっていて、影の分の暗さがそのぶん持ち上げられ、結果として
+   * 「足元だけ明るい」状態になっていた。乗算合成なら後から光を足されても
+   * 比率として暗さが残るので、必ず接地して見える。
+   */
+  private addContactShadow(avatar: MonsterAvatar): void {
+    const proxy = avatar.hitArea as THREE.Mesh;
+    const params = (proxy.geometry as THREE.BoxGeometry).parameters;
+    // 当たり判定の箱は footprint の 1.15 倍で作られている
+    const footprint = (params?.width ?? 1.4) / 1.15;
+    const geometry = new THREE.PlaneGeometry(footprint * 2.0, footprint * 2.0);
+    const material = new THREE.MeshBasicMaterial({
+      map: BattleStage.contactShadowTexture(),
+      transparent: true,
+      depthWrite: false,
+      // 影がブルームのしきい値を越えることはないので、トーンマップには乗せる。
+      // 外すと床だけ別の明るさの世界になり、境目が出る
+      toneMapped: true,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2;
+    // 床の魔法陣より上、体より下。ここを上げすぎると足首の高さで切れる
+    mesh.position.y = 0.02;
+    // 透明の列の先頭で敷く。後から来る加算の演出はこの上に乗る
+    mesh.renderOrder = -1;
+    this.scene.add(mesh);
+    this.contactShadows.push({ mesh, avatar });
+  }
+
   private setupLights(): void {
     // ------------------------------------------------------------------
     // 光の設計
@@ -348,32 +441,37 @@ export class BattleStage {
     // 面の向きが読めなくなり、立体が平らな絵に戻る。
     // ------------------------------------------------------------------
 
-    // 環境光。天が冷たい青、地が篝火の照り返しで暖色。
+    // 色はすべて StageMood から来る(属性ごとに空気を割るため)。
+    // ここに固定色を書き戻すと、ステージが変わっても光だけ変わらなくなる。
+
+    // 環境光。天が空の色、地が床と篝火の照り返し。
     // 上下で色温度が割れていると、丸い面が回り込むだけで色が変わる
-    this.scene.add(new THREE.HemisphereLight(0x8ea6ee, 0x3a2418, 0.42));
+    this.scene.add(new THREE.HemisphereLight(this.mood.hemiSky, this.mood.hemiGround, 0.4));
 
     // キーライト: 体表シェーダの KEY_DIR と同じ方向(右手前・高め)。
     // 影は左奥へ伸び、カメラからは真横に見えるので接地が読める
-    const key = new THREE.DirectionalLight(0xffe7c2, 2.45);
+    const key = new THREE.DirectionalLight(this.mood.keyLight, 2.6);
     key.position.set(8.8, 17.6, 9.7);
     key.castShadow = true;
     // 影の解像度は「影が硬すぎない」ことより先に「輪郭が階段状にならない」
-    // ことを優先する。錐台を闘技床の広さまで絞ってテクセルを稼ぐ
+    // ことを優先する。**錐台は隊列が入る広さまで絞る。**
+    // 闘技床いっぱい(±14)まで広げるとテクセルが粗くなり、
+    // 足元の影が四角い階段になって、かえって接地感を壊す
     key.shadow.mapSize.set(2048, 2048);
-    key.shadow.camera.near = 4;
-    key.shadow.camera.far = 52;
-    key.shadow.camera.left = -14;
-    key.shadow.camera.right = 14;
-    key.shadow.camera.top = 14;
-    key.shadow.camera.bottom = -14;
-    key.shadow.bias = -0.0006;
-    key.shadow.normalBias = 0.028;
+    key.shadow.camera.near = 6;
+    key.shadow.camera.far = 46;
+    key.shadow.camera.left = -11;
+    key.shadow.camera.right = 11;
+    key.shadow.camera.top = 11;
+    key.shadow.camera.bottom = -11;
+    key.shadow.bias = -0.00045;
+    key.shadow.normalBias = 0.024;
     this.scene.add(key);
 
     // フィルライト: キーの反対側から回り込む冷たい光。
     // キーの陰になった面を「見える暗さ」に留めるためだけの弱い光で、
     // ここを強くするとキーの方向感が消える
-    const fill = new THREE.DirectionalLight(0x8fa8f0, 0.62);
+    const fill = new THREE.DirectionalLight(this.mood.fillLight, 0.58);
     fill.position.set(-13, 6.0, 6.5);
     this.scene.add(fill);
 
@@ -386,27 +484,38 @@ export class BattleStage {
     // 以前は y=3.4(縦成分 0.18)で、床全体が桃色にかぶり、
     // 寄った時にモンスターの属性色まで食われていた。実測で、この2灯を切ると
     // 6属性の色が目に見えてはっきりした。切るのではなく、寝かせて弱める
-    const rim = new THREE.DirectionalLight(0xff86c8, 1.45);
+    const rim = new THREE.DirectionalLight(this.mood.rimLight, 1.5);
     rim.position.set(-5.6, 1.5, -18);
     this.scene.add(rim);
 
     // 逆リム: 反対の肩側にもう一本。片側だけだと輪郭の抜けが半分で終わる。
-    // 色は篝火寄りの暖色にして、赤紫のリムと寒暖で対にする
-    const rimWarm = new THREE.DirectionalLight(0xffab6a, 1.0);
+    // 色は篝火寄りの暖色にして、奥からのリムと寒暖で対にする
+    const rimWarm = new THREE.DirectionalLight(this.mood.rimWarmLight, 1.05);
     rimWarm.position.set(16, 1.4, -12);
     this.scene.add(rimWarm);
 
     // 闘技床へ落とす天井光。中央だけを持ち上げて、戦う場所に視線を集める。
-    // 減衰を持つライトなので、周辺の観客席までは届かない。
     //
-    // **ここは「床を明るくする灯り」ではなく「中央と周辺の差」を作る灯り。**
-    // 強いと足元が白く飛び、そこに立つモンスターの下半身から色が抜ける。
-    // 届く範囲を狭めて減衰を急にし、明るさそのものは落とす。
-    // 中央が明るく見えるかどうかは絶対量ではなく周辺との比で決まるので、
-    // 周辺(霧とビネット)を沈めるほうで差を作る
-    const centerPool = new THREE.PointLight(0xdfe7ff, 15, 14, 2.4);
-    centerPool.position.set(0.5, 9.5, 0.5);
-    this.scene.add(centerPool);
+    // **以前ここは影を落とさない点光源だった。それが接地感を殺していた。**
+    // 真上から降る光が影を落とさないと、足元だけが一様に明るくなり、
+    // モンスターが床から浮いて見える。真上からの影は輪郭がそのまま
+    // 足元に落ちるので、接地の手掛かりとして最も強い。
+    //
+    // 強さは「床を明るくする」ためではなく「中央と周辺の差」を作るため。
+    // 強いと足元が白く飛び、そこに立つモンスターの下半身から色が抜ける
+    const pool = new THREE.SpotLight(this.mood.hemiSky, 190, 42, 0.74, 0.72, 2);
+    pool.position.set(1.2, 15.5, 2.2);
+    pool.target.position.set(0, 0, -0.6);
+    pool.castShadow = true;
+    // 真上からの光なので影の面積は小さい。1024で足りる(2枚目の影マップは
+    // モバイルでの負荷に直結するので、必要以上に上げないこと)
+    pool.shadow.mapSize.set(1024, 1024);
+    pool.shadow.camera.near = 4;
+    pool.shadow.camera.far = 34;
+    pool.shadow.bias = -0.0009;
+    pool.shadow.normalBias = 0.03;
+    this.scene.add(pool);
+    this.scene.add(pool.target);
   }
 
   /**
@@ -466,9 +575,16 @@ export class BattleStage {
         maxZ = Math.max(maxZ, slots[index].z);
         minZ = Math.min(minZ, slots[index].z);
 
+        // 足元の接地影。**これが無いと床に貼った絵に見える**
+        this.addContactShadow(avatar);
+
         // 属性色のポイントライト。床への色移りで存在感を出すが、
-        // 台数が増えるとモバイルGPUで重くなるので範囲と強さは控えめにする
-        const light = new THREE.PointLight(avatar.theme.light, 4.5, 6.5, 2);
+        // 台数が増えるとモバイルGPUで重くなるので範囲と強さは控えめにする。
+        //
+        // **強さと届く範囲を絞ってある。** 以前は 4.5/6.5 で、8体ぶんの光が
+        // それぞれ自分の足元を照らし、自分が落とした影を自分で消していた。
+        // 属性の色移りは「床がほのかに染まる」程度で足りる
+        const light = new THREE.PointLight(avatar.theme.light, 2.6, 5.0, 2);
         light.position.set(slots[index].x, 1.5, slots[index].z);
         this.scene.add(light);
         // 画面比が変わったら組み直せるよう、誰がどの列の何番目かを残しておく
@@ -612,6 +728,12 @@ export class BattleStage {
     this.formationPortrait = portrait;
 
     const lateral = 1 - 0.18 * portrait;
+    /*
+     * 縦画面で前後を大きく広げて縦の余りを使わせる案を試したが、**逆効果だった。**
+     * 0.1 → 0.45 にすると2つの列の間に空の床の帯ができ、1体ずつも小さくなる。
+     * 縦が余って見えるのは隊列の広がりが足りないからではなく、
+     * 闘技場の客席が上に写り込んでいるため。直すならそちら側。
+     */
     const depth = 1 + 0.1 * portrait;
     // 縦長の画面では1チームを2段に折る。横一列のままだと、必要な「幅」で
     // カメラ距離が決まってしまい、モンスターが小さいまま縦が余る
@@ -674,6 +796,30 @@ export class BattleStage {
     this.bloomPass.setSize(width, height);
     const ratio = Math.min(window.devicePixelRatio, 2);
     this.cinematicPass.setResolution(width * ratio, height * ratio);
+    this.applyViewGrade(width / Math.max(1, height));
+  }
+
+  /**
+   * 画面比に応じて露出と周辺光量を変える。
+   *
+   * 縦長では「モンスターが小さく暗く、互いに重なって判別しづらい」という
+   * 指摘が出ていた。原因の半分は構図(隊列側で対処済み)だが、残り半分は光。
+   *
+   * 縦長では隊列が2段になって画面の**上下いっぱい**に広がるため、
+   * 横長と同じビネットを掛けると、いちばん見せたい前列と後列の端が
+   * そのまま周辺光量落ちの中に沈む。縦長ではビネットを浅くし、
+   * そのぶん露出をわずかに上げて、8体すべてが同じ明るさで読めるようにする。
+   */
+  private applyViewGrade(aspect: number): void {
+    const portrait = portraitAmount(aspect);
+    this.renderer.toneMappingExposure = 0.92 + 0.13 * portrait;
+    this.cinematicPass.configure({
+      vignette: 0.44 - 0.16 * portrait,
+      // 周辺のにじみも同じ理由で控える(端のユニットの輪郭が濁る)
+      aberration: 1.0 - 0.35 * portrait,
+      // 小さく映るぶん、輪郭のコントラストを少し立てて分離を助ける
+      contrast: 0.15 + 0.05 * portrait,
+    });
   }
 
   private start(): void {
@@ -698,6 +844,13 @@ export class BattleStage {
 
     this.arena.update(this.elapsed);
     for (const avatar of this.avatars.values()) avatar.update(delta, this.elapsed);
+    // 接地影は踏み込み・のけぞりで動く体に追従させる。
+    // 追従させないと、動いた瞬間だけ足元から影が離れて浮きが目立つ
+    for (const entry of this.contactShadows) {
+      const position = entry.avatar.root.position;
+      entry.mesh.position.set(position.x, 0.02, position.z);
+      entry.mesh.visible = !entry.avatar.isDying();
+    }
     // 継続エフェクトは、踏み込みなどで動くキャラの位置へ毎フレーム追従させる
     for (const [instanceId, kinds] of this.activeAuras) {
       if (kinds.size === 0) continue;
@@ -1081,6 +1234,13 @@ export class BattleStage {
     this.disposed = true;
     if (this.frameHandle !== null) cancelAnimationFrame(this.frameHandle);
     this.resizeObserver.disconnect();
+    for (const entry of this.contactShadows) {
+      entry.mesh.geometry.dispose();
+      const material = entry.mesh.material as THREE.MeshBasicMaterial;
+      material.map?.dispose();
+      material.dispose();
+    }
+    this.contactShadows.length = 0;
     for (const avatar of this.avatars.values()) avatar.dispose();
     this.avatars.clear();
     this.arena.dispose();

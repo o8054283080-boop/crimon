@@ -8,3 +8,6 @@ dist/
 # 音を焼くためのPython環境。容量が大きいので持たない(tools/audio/README に作り方を残す)
 tools/audio/.venv/
 __pycache__/
+
+# 見た目の変化を比べるための基準スクリーンショット(容量が大きいので持たない)
+reference-shots/

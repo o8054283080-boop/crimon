@@ -18,6 +18,19 @@ import { renderBattleView } from "./web/views/battleView.js";
 import { renderAutoFarmResult } from "./web/views/autoFarmResult.js";
 import { renderStageResult } from "./web/views/stageResult.js";
 
+/**
+ * 「描画が安定した」ことをスクリーンショット側へ伝える。
+ *
+ * **window のプロパティだけでは足りない。** Playwright の `waitForFunction` は
+ * ページとは別のJSコンテキストで評価されるため、ページ側が window に生やした値が見えない
+ * (`evaluate` では見えるのに `waitForFunction` だけが永久に待ち続ける、という形で刺さった)。
+ * DOM は両方のコンテキストで共有されるので、属性の方を待ち受けの目印にする。
+ */
+function markPreviewReady(): void {
+  Object.assign(window, { __crimonPreviewReady: true });
+  document.documentElement.setAttribute("data-crimon-preview-ready", "1");
+}
+
 function mulberry32(seed: number): () => number {
   let a = seed;
   return () => {
@@ -72,7 +85,7 @@ if (params.get("view") === "farm") {
       actions: [{ label: "🔁 もう一度", variant: "primary", run: () => location.reload() }],
     }),
   );
-  Object.assign(window, { __crimonPreviewReady: true });
+  markPreviewReady();
   throw new Error("周回結果のプレビューを表示しました");
 }
 
@@ -110,7 +123,7 @@ if (params.get("view") === "result") {
       actions: [{ label: "🔁 もう一度", variant: "primary", run: () => location.reload() }],
     }),
   );
-  Object.assign(window, { __crimonPreviewReady: true });
+  markPreviewReady();
   throw new Error("結果画面のプレビューを表示しました(以降のバトル初期化は行いません)");
 }
 const seed = Number(params.get("seed") ?? 12345);
@@ -170,4 +183,4 @@ if (paused) {
 }
 
 // スクリーンショット側から「描画が安定した」ことを判定できるようにする
-Object.assign(window, { __crimonPreviewReady: true });
+markPreviewReady();

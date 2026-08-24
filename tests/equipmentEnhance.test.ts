@@ -12,6 +12,7 @@ import {
   PlayerState,
   addEquipment,
   tryEnhanceEquipment,
+  createInitialState,
 } from "../src/game/playerState.js";
 
 function mulberry32(seed: number): () => number {
@@ -27,6 +28,8 @@ function mulberry32(seed: number): () => number {
 
 function makeState(): PlayerState {
   return {
+    // 項目が増えるたびにここを直す羽目になっていたので、既定値から作って上書きする形にした
+    ...createInitialState(),
     crystal: 0,
     gold: 1_000_000,
     monsters: [],

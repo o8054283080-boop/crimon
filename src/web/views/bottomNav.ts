@@ -20,7 +20,9 @@ export type ScreenName =
   | "SHOP"
   | "MONSTER_TRAINING"
   | "MONSTER_CREATE"
-  | "AUTO_FARM_RESULT";
+  | "AUTO_FARM_RESULT"
+  | "ARENA"
+  | "ARENA_BATTLE";
 
 /**
  * 下のタブ。
