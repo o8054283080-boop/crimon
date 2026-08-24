@@ -32,6 +32,7 @@ export interface HomeProps {
   onGoLevelDungeon: () => void;
   onGoGoldDungeon: () => void;
   onGoArena: () => void;
+  onGoHowToPlay: () => void;
   onGoShop: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
@@ -120,11 +121,20 @@ function renderCompensationBanner(claims: CompensationClaim[], onDismiss: () => 
 }
 
 function renderLoginBonusBanner(result: LoginBonusResult, onDismiss: () => void): HTMLElement {
-  const total = result.dailyCrystal + result.milestoneCrystal;
+  const total = result.dailyCrystal + result.milestoneCrystal + result.firstTimeCrystal;
+  const isFirst = result.firstTimeCrystal > 0;
   const body: HTMLElement[] = [
-    el("p", { className: "reward-banner__label" }, ["ログインボーナス"]),
+    el("p", { className: "reward-banner__label" }, [isFirst ? "はじめまして" : "ログインボーナス"]),
     rewardList([{ name: "crystal", amount: `+${total.toLocaleString("ja-JP")}`, unit: "ダイヤ" }]),
   ];
+  if (isFirst) {
+    // 何に使えるのかまで書く。数字だけ渡されても、初めての人には多いのか少ないのか分からない
+    body.push(
+      el("p", { className: "reward-banner__note" }, [
+        `開始のお祝いです。召喚の10連が3回ぶん引けます`,
+      ]),
+    );
+  }
   if (result.milestoneCrystal > 0) {
     body.push(
       el("p", { className: "reward-banner__note" }, [
@@ -654,6 +664,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     onGoLevelDungeon,
     onGoGoldDungeon,
     onGoArena,
+    onGoHowToPlay,
     onGoShop,
     onRefillStaminaPartial,
     onRefillStaminaFull,
@@ -701,7 +712,11 @@ export function renderHome(props: HomeProps): HTMLElement {
     { name: "goldDungeon", label: "ゴールド", sub: "ダンジョン", onClick: onGoGoldDungeon },
   ];
   // 対人は「増やす」でも「鍛える」でもない、腕を試す場所。行を分けて独立させる
-  const compete: MenuTile[] = [{ name: "arena", label: "アリーナ", sub: "対人戦", onClick: onGoArena }];
+  const compete: MenuTile[] = [
+    { name: "arena", label: "アリーナ", sub: "対人戦", onClick: onGoArena },
+    // 迷った時の行き先。奥にしまうと、いちばん要る人が見つけられない
+    { name: "info", label: "遊び方", sub: "はじめての方へ", onClick: onGoHowToPlay },
+  ];
 
   const menu = el("div", { className: `home-menu ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
     // タイトルと同じ世界の続きにする。背景だけ別物だと、STARTで別のゲームに移ったように見える

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { SUMMON_COST_TEN } from "../src/game/gacha.js";
 import {
   DEFAULT_FIGHTER_NAME,
   FIGHTER_NAME_MAX_LENGTH,
   LOGIN_BONUS_DAILY_CRYSTAL,
+  LOGIN_BONUS_FIRST_TIME_CRYSTAL,
   LOGIN_BONUS_MILESTONE_CRYSTAL,
   LOGIN_BONUS_MILESTONE_INTERVAL_DAYS,
   claimDailyLoginBonus,
@@ -44,7 +46,11 @@ describe("ファイター名 (setFighterName)", () => {
 });
 
 describe("ログインボーナス (claimDailyLoginBonus)", () => {
-  it("初回は必ずダイヤ200を受け取れる", () => {
+  it("**初回は開始祝いが上乗せされる**(初日に10連を引ける額を渡す)", () => {
+    /*
+     * 始めたばかりの手持ちは星1が4体。毎日200ずつ貯めて900の10連に届くまで
+     * 4日かかるのでは、最初の日に「引く」体験がまったく無い。
+     */
     const state = createInitialState();
     const crystalBefore = state.crystal;
     const result = claimDailyLoginBonus(state, Date.parse("2026-01-01T09:00:00Z"));
@@ -52,7 +58,10 @@ describe("ログインボーナス (claimDailyLoginBonus)", () => {
     expect(result.claimed).toBe(true);
     expect(result.dailyCrystal).toBe(LOGIN_BONUS_DAILY_CRYSTAL);
     expect(result.milestoneCrystal).toBe(0);
-    expect(state.crystal).toBe(crystalBefore + LOGIN_BONUS_DAILY_CRYSTAL);
+    expect(result.firstTimeCrystal).toBe(LOGIN_BONUS_FIRST_TIME_CRYSTAL);
+    expect(state.crystal).toBe(crystalBefore + LOGIN_BONUS_DAILY_CRYSTAL + LOGIN_BONUS_FIRST_TIME_CRYSTAL);
+    // 渡した額で10連が引けること。ここが崩れたら渡す意味が無い
+    expect(state.crystal).toBeGreaterThanOrEqual(SUMMON_COST_TEN);
     expect(state.loginBonusClaimCount).toBe(1);
   });
 

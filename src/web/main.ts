@@ -9,7 +9,7 @@ import { DungeonFloor } from "../data/equipmentDungeon.js";
 import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef, LevelDungeonTier } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
-import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
+import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, runDungeonAutoFarm, runGoldDungeonAutoFarm, runLevelDungeonAutoFarm, runStageAutoFarm } from "../game/autoFarm.js";
 import { applyDungeonClearRewards, applyGoldDungeonClearRewards, applyLevelDungeonClearRewards, applyStageClearRewards } from "../game/rewards.js";
@@ -63,6 +63,7 @@ import { renderHome } from "./views/home.js";
 import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderPvpArena } from "./views/pvpArena.js";
+import { renderHowToPlay } from "./views/howToPlay.js";
 import { ArenaTeamSlot } from "./views/pvpArena.js";
 import {
   advanceArenaOpponentSeed,
@@ -455,6 +456,23 @@ function handleSummon(count: number): void {
   }
   state.player.crystal -= cost;
   const results = summonMany(count);
+  for (const r of results) addMonster(state.player, r.dexId, r.star);
+  savePlayerState(state.player);
+  state.summonResults = results;
+  playSummonSfx(results);
+  render();
+}
+
+/**
+ * はじまりの10連。1度きり、無料。
+ *
+ * 引いた印は**結果を出す前に立てて保存する。**ここを後回しにすると、
+ * 演出中に閉じられた時に印だけが残らず、何度でも引けてしまう。
+ */
+function handleTutorialSummon(): void {
+  if (state.player.tutorialSummonDone) return;
+  state.player.tutorialSummonDone = true;
+  const results = summonTutorial();
   for (const r of results) addMonster(state.player, r.dexId, r.star);
   savePlayerState(state.player);
   state.summonResults = results;
@@ -1246,6 +1264,7 @@ function render(): void {
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
         onGoShop: () => navigate("SHOP"),
         onGoArena: () => navigate("ARENA"),
+        onGoHowToPlay: () => navigate("HOW_TO_PLAY"),
         onRefillStaminaPartial: () => {
           if (!tryRefillStaminaPartial(state.player).ok) return;
           savePlayerState(state.player);
@@ -1502,6 +1521,10 @@ function render(): void {
       });
       break;
 
+    case "HOW_TO_PLAY":
+      content = renderHowToPlay({ onBack: () => navigate("HOME") });
+      break;
+
     case "ARENA_BATTLE": {
       showNav = false;
       const handle = renderCurrentArenaBattle();
@@ -1655,6 +1678,7 @@ function renderSummonScreen(): HTMLElement {
       render();
     },
     onUseSummonScroll: handleUseSummonScroll,
+    onTutorialSummon: handleTutorialSummon,
   });
 }
 

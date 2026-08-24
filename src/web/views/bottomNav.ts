@@ -22,7 +22,8 @@ export type ScreenName =
   | "MONSTER_CREATE"
   | "AUTO_FARM_RESULT"
   | "ARENA"
-  | "ARENA_BATTLE";
+  | "ARENA_BATTLE"
+  | "HOW_TO_PLAY";
 
 /**
  * 下のタブ。
