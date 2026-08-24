@@ -32,6 +32,19 @@ const log = (...args) => console.log(`[${new Date().toISOString().slice(11, 19)}
  */
 const PIECES = [
   {
+    name: "home-hero",
+    width: 720,
+    height: 1560,
+    seed: 33.4,
+    // ホームの地。**霧の奥に巨大な何かが居る**構図。
+    // UIはこの絵の上に浮かぶので、絵そのものは暗く、輪郭だけを残す
+    palette: { sky: [0.05, 0.04, 0.11], far: [0.22, 0.11, 0.34], near: [0.03, 0.02, 0.07], glow: [0.46, 0.2, 0.62] },
+    horizon: 0.5,
+    ridges: 4,
+    starAmount: 0.7,
+    beast: 1,
+  },
+  {
     name: "home-bg",
     width: 620,
     height: 1344,
@@ -98,6 +111,7 @@ uniform vec3 uFar;
 uniform vec3 uNear;
 uniform vec3 uGlow;
 uniform float uAspect;
+uniform float uBeast;
 
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21) + uSeed);
@@ -155,6 +169,49 @@ void main() {
   float cloud = fbm(vec2(uv.x * 3.2, (uv.y - h) * 7.0) + uSeed, 6);
   cloud *= smoothstep(h - 0.02, h + 0.34, uv.y);
   color = mix(color, mix(uFar, uGlow, 0.35), cloud * 0.34);
+
+  // --- 霧の奥の廃墟。
+  //
+  // 参考にした画面には「背景に大きな竜がぼんやり居る」層があった。
+  // 竜を手続きで描こうとして頭と二本の角を置いたが、**兎の耳にしか見えなかった。**
+  // 生き物の輪郭は少しの狂いで別の生き物になる。建物ならその危険がない。
+  // 尖塔をいくつか立て、窓に灯りを入れて「まだ誰か居る廃墟」にする。
+  if (uBeast > 0.5) {
+    float towers = 0.0;
+    float windows = 0.0;
+    for (int t = 0; t < 4; t++) {
+      float ft = float(t);
+      // 等間隔に並べるとアンテナに見える。間隔も位置も崩す
+      float cx = 0.2 + ft * 0.2 + (hash(vec2(ft, 3.0)) - 0.5) * 0.16;
+      // 中央ほど高く、端は低い。並びに主従を作る
+      float tall = 0.16 + (1.0 - abs(cx - 0.5) * 1.6) * 0.3 + hash(vec2(ft, 9.0)) * 0.22;
+      float top = h + tall * 0.42;
+      // 針のように細いと塔に見えない。太さも大きくばらけさせる
+      float halfW = 0.026 + hash(vec2(ft, 5.0)) * 0.03;
+      // 上へ向かって細る
+      float taper = mix(1.0, 0.72, clamp((uv.y - h) / max(tall * 0.42, 0.001), 0.0, 1.0));
+      float dx = abs(uv.x - cx);
+      // 足元は地平よりずっと下から立ち上げる。手前の稜線に隠れて「奥にある」ことになる
+      if (uv.y > h - 0.34 && uv.y < top && dx < halfW * taper) towers = 1.0;
+      // 屋根。三角に尖らせる
+      float roofH = 0.04 + hash(vec2(ft, 7.0)) * 0.055;
+      if (uv.y >= top && uv.y < top + roofH) {
+        float k = (uv.y - top) / roofH;
+        if (dx < halfW * taper * (1.0 - k)) towers = 1.0;
+      }
+      // 窓。縦に並べる
+      float wy = fract((uv.y - h) * 26.0);
+      if (uv.y > h + 0.03 && uv.y < top - 0.02 && dx < halfW * taper * 0.3 && wy > 0.68) {
+        windows = max(windows, hash(vec2(ft, floor((uv.y - h) * 26.0))) > 0.45 ? 1.0 : 0.0);
+      }
+    }
+    if (towers > 0.5) {
+      // 霧の中なので暗く沈める。石肌だけ少し割る
+      float stone = fbm(vec2(uv.x * 40.0, uv.y * 40.0) + 6.0, 3);
+      color = mix(color, uNear * (0.5 + stone * 0.5), 0.88);
+      color += uGlow * windows * 0.9;
+    }
+  }
 
   // --- 稜線。奥から手前へ、暗く・大きく
   int ridgeCount = int(uRidges);
@@ -261,6 +318,7 @@ async function main() {
           gl.uniform1f(u("uRidges"), piece.ridges);
           gl.uniform1f(u("uStars"), piece.starAmount);
           gl.uniform1f(u("uAspect"), piece.width / piece.height);
+          gl.uniform1f(u("uBeast"), piece.beast ?? 0);
           gl.uniform3fv(u("uSky"), piece.palette.sky);
           gl.uniform3fv(u("uFar"), piece.palette.far);
           gl.uniform3fv(u("uNear"), piece.palette.near);

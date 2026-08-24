@@ -617,6 +617,22 @@ function renderVitals(
   ]);
 }
 
+
+/**
+ * 節の見出し。
+ *
+ * 見出しごとに板を敷くと、画面が「札の列」になる。
+ * 背景の上に**刻印だけ**を置いて、囲わずに区切る。
+ */
+function sectionMark(text: string, action?: HTMLElement): HTMLElement {
+  return el("div", { className: "home-mark" }, [
+    el("span", { className: "home-mark__lozenge" }, []),
+    el("span", { className: "home-mark__text" }, [text]),
+    el("span", { className: "home-mark__rule" }, []),
+    action ?? null,
+  ].filter((n): n is HTMLElement => n !== null));
+}
+
 function renderMenuTile(tile: MenuTile): HTMLElement {
   // data-tour は巡回(tools/tour.mjs)の目印。文言ではなくここを見てもらう
   return el("button", { type: "button", className: "home-tile", "data-tour": `tile:${tile.name}`, onclick: tile.onClick }, [
@@ -692,24 +708,27 @@ export function renderHome(props: HomeProps): HTMLElement {
     arcaneRings("home-menu__rings"),
     props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
-    renderIdentity(player, onEditFighterName, openSettings, party[0]),
-    el("section", { className: "home-wallet" }, [
-      currencyChip("crystal", player.crystal, "crystal"),
-      currencyChip("coin", player.gold, "gold"),
-      currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`),
-    ]),
-    el("section", { className: "home-party-card panel--ornate" }, [
-      el("div", { className: "home-section-title" }, [
-        el("strong", {}, ["CURRENT PARTY"]),
-        el("button", { type: "button", className: "btn btn--ghost", onclick: onGoParty }, ["編成"]),
+    // 1. プレイヤー情報。板を敷かず、背景の絵の上に直接置く
+    el("div", { className: "home-crown" }, [
+      renderIdentity(player, onEditFighterName, openSettings, party[0]),
+      el("section", { className: "home-wallet" }, [
+        currencyChip("crystal", player.crystal, "crystal"),
+        currencyChip("coin", player.gold, "gold"),
+        currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`),
       ]),
+    ]),
+    // 2. 現在のパーティ。最も装飾を厚くする面
+    el("section", { className: "home-party panel--ornate" }, [
+      sectionMark(
+        "CURRENT PARTY",
+        el("button", { type: "button", className: "btn-frame", onclick: onGoParty }, ["編成"]),
+      ),
       el(
         "div",
         { className: "home-party-grid" },
         Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], onGoParty)),
       ),
     ]),
-    renderVitals(player, onRefillStaminaPartial, onRefillStaminaFull, party),
     // 一番行く場所なので、一番大きい面を与える。横長の帯では他のタイルに埋もれる
     el("button", { type: "button", className: "home-adventure", onclick: onGoStages }, [
       el("span", { className: "home-adventure__sky", "aria-hidden": "true" }, []),
@@ -721,17 +740,16 @@ export function renderHome(props: HomeProps): HTMLElement {
       ]),
       el("span", { className: "home-adventure__arrow" }, [icon("chevron")]),
     ]),
+    // 4. スタミナと所持。冒険のすぐ下に置く(出かける前に見る数字なので)
+    renderVitals(player, onRefillStaminaPartial, onRefillStaminaFull, party),
+    // 5. 召喚とショップ。絵を持つ2枚
     el("section", { className: "home-group" }, [
-      el("div", { className: "home-group__title" }, ["増やす"]),
-      el("div", { className: "home-menu-grid home-menu-grid--2" }, gather.map(renderMenuTile)),
+      sectionMark("コンテンツ"),
+      el("div", { className: "home-feature-grid" }, gather.map(renderMenuTile)),
     ]),
+    // 6. その他。**ここは小さく畳む。**全部を目立たせると何も目立たない
     el("section", { className: "home-group" }, [
-      el("div", { className: "home-group__title" }, ["鍛える"]),
-      el("div", { className: "home-menu-grid" }, dungeons.map(renderMenuTile)),
-    ]),
-    el("section", { className: "home-group" }, [
-      el("div", { className: "home-group__title" }, ["腕を試す"]),
-      el("div", { className: "home-menu-grid home-menu-grid--2" }, compete.map(renderMenuTile)),
+      el("div", { className: "home-minor-grid" }, [...dungeons, ...compete].map(renderMenuTile)),
     ]),
     settingsSheet,
   ].filter((n): n is HTMLElement => n !== null));

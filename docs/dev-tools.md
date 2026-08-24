@@ -116,3 +116,29 @@ tools/audio/.venv/bin/python tools/crop.py /tmp/a.png /tmp/zoom.png 660 300 200 
 装備ダンジョンのボスHPを5倍にした時、`powerScale` を据え置いたら
 1階の勝率が0%になった。数値どうしが掛け算で効くので、
 1つ動かすと別のところが壊れる。
+
+## style.css を追記し続けると、Viteが黙ってCSSを配らなくなる
+
+常駐サーバを立てたまま `src/web/style.css` へ何度も追記していると、
+**Viteが中身の無いCSSモジュールを返すようになる。**画面はレイアウトだけが
+崩れた状態になり、原因がCSSの構文エラーに見える。
+
+見分け方:
+
+```
+curl -s "http://127.0.0.1:<vitePort>/src/web/style.css" | wc -c
+```
+
+数百バイトしか返らなければこれ。**中身は正しい**ので、
+`npx vite build` すると `dist/assets/*.css` にはちゃんと入っている。
+
+直し方は常駐サーバの立て直しだけ。
+
+```
+lsof -ti :<制御ポート> | xargs -r kill
+rm -rf node_modules/.vite
+HARNESS_VITE_PORT=... HARNESS_PORT=... node tools/harness.mjs &
+```
+
+2回踏んだ。**CSSが丸ごと効かなくなったら、まず配信されているバイト数を見ること。**
+波括弧の対応を数えても何も出てこない。
