@@ -6096,3 +6096,568 @@ body {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+
+/* ===================================================================
+ * ホーム画面の格上げ
+ *
+ * 参考にした画面と並べると、足りないのは絵の巧拙より**作りの密度**だった。
+ * 描き起こしたイラストは持てないが、以下は全部こちらで作れる:
+ *
+ *   - 金の装飾枠(四隅の飾り・二重の縁・上端の光)
+ *   - 情報の階層(見出し・仕切り線・単位の小文字)
+ *   - パーティ札を主役の大きさにして、3Dの肖像を敷く
+ *
+ * 「絵が無いから安っぽい」のではなく、**縁と階層が無いから安っぽかった。**
+ * =================================================================== */
+
+/* --- 金の装飾枠 ----------------------------------------------------
+ * 四隅にだけ金の角を出す。全周を金で囲うと安い額縁になるが、
+ * 角だけなら「留め具」に見えて、面そのものは静かなままでいられる。 */
+.panel--ornate {
+  position: relative;
+  border-color: rgba(198, 160, 84, 0.32);
+  box-shadow: var(--drop), inset 0 0 0 1px rgba(198, 160, 84, 0.14), inset 0 1px 0 rgba(255, 226, 168, 0.12);
+}
+
+.panel--ornate::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 8px;
+  pointer-events: none;
+  /* 四隅だけに線を出す。辺の中央は透明のまま抜く */
+  background:
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) left top / 14px 1px no-repeat,
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) left top / 1px 14px no-repeat,
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) right top / 14px 1px no-repeat,
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) right top / 1px 14px no-repeat,
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) left bottom / 14px 1px no-repeat,
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) left bottom / 1px 14px no-repeat,
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) right bottom / 14px 1px no-repeat,
+    linear-gradient(var(--gold-edge, #c9a75a), var(--gold-edge, #c9a75a)) right bottom / 1px 14px no-repeat;
+  opacity: 0.55;
+}
+
+/* --- 通貨の並び --------------------------------------------------- */
+
+.home-menu .home-wallet {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.home-wallet__chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.34));
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.24), inset 0 1px 0 rgba(255, 226, 168, 0.14), var(--drop-soft);
+  min-width: 0;
+}
+
+.home-wallet__chip svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.home-wallet__chip strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.home-wallet__suffix {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.home-wallet__chip--crystal svg { color: #7fd7ff; }
+.home-wallet__chip--gold svg { color: #ffd76a; }
+.home-wallet__chip--stamina svg { color: #8fe37a; }
+
+/* --- パーティ札 ----------------------------------------------------
+ * ここが主役。以前は絵文字の小さな四角で、手持ちの4体が画面の中で
+ * いちばん貧相だった。縦長の札にして3Dの肖像を敷き詰める。 */
+
+.home-party-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.hp-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* 縦長の比。正方形だと「札」ではなく「アイコン」に見える */
+  aspect-ratio: 3 / 4.4;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--el-color, #4f8cff) 34%, #10142a), #0a0d1c 78%);
+  /* 属性の色で縁取る。並べた時に色で見分けられる */
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--el-color, #4f8cff) 62%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--el-color, #4f8cff) 22%, transparent),
+    var(--drop-soft);
+}
+
+.hp-card__art {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+  background-size: cover;
+  background-position: center 22%;
+  background-repeat: no-repeat;
+}
+
+/* 下端を沈めて、星とレベルの字が肖像の明るい部分に乗っても読めるようにする */
+.hp-card__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 42%, rgba(4, 6, 16, 0.62) 74%, rgba(4, 6, 16, 0.92) 100%);
+  pointer-events: none;
+}
+
+/* 属性は左上の宝石。文字は1字だけ入れる */
+.hp-card__gem {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 19px;
+  height: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(45deg);
+  border-radius: 4px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--el-color, #4f8cff) 88%, #fff 12%), var(--el-color, #4f8cff));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.hp-card__gem i {
+  transform: rotate(-45deg);
+  font-style: normal;
+  font-size: 0.52rem;
+  font-weight: 900;
+  color: #08101f;
+}
+
+/* 星は数字ではなく粒。並べた時に格の差が一目で分かる */
+.hp-card__stars {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 17px;
+  display: flex;
+  justify-content: center;
+  gap: 1px;
+}
+
+.hp-card__stars i {
+  width: 5px;
+  height: 5px;
+  background: linear-gradient(180deg, #ffe9a8, #e8b53f);
+  box-shadow: 0 0 4px rgba(232, 181, 63, 0.6);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.hp-card__level {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 0 3px;
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #f2f6ff;
+  background: linear-gradient(180deg, rgba(6, 9, 20, 0.2), rgba(6, 9, 20, 0.86));
+}
+
+.hp-card--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+
+.hp-card__plus {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #5f6d92;
+}
+
+.hp-card__emptytext {
+  font-size: 0.54rem;
+  color: var(--text-dim);
+}
+
+/* --- 総戦力・所持・スタミナ ---------------------------------------- */
+
+.home-vitals__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
+}
+
+/* 仕切り線を入れる。3つの数字が地続きだと、どこまでが1項目か読めない */
+.home-vitals__stats .home-stat + .home-stat {
+  border-left: 1px solid rgba(198, 160, 84, 0.2);
+}
+
+.home-stat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
+.home-stat svg {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  color: #c9a75a;
+}
+
+.home-stat__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.home-stat__body small {
+  font-size: 0.52rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.home-stat__body strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.home-vitals__stamina {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(198, 160, 84, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.home-stamina {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.home-stamina svg {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  color: #8fe37a;
+}
+
+.home-stamina__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.home-stamina__body small {
+  font-size: 0.52rem;
+  color: var(--text-dim);
+}
+
+.home-stamina__num strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.home-stamina__num span {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.home-stamina__track {
+  flex: 1 1 60px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: var(--edge-line);
+  overflow: hidden;
+}
+
+.home-stamina__track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4e9c3c, #8fe37a);
+  box-shadow: 0 0 8px rgba(143, 227, 122, 0.35);
+}
+
+.home-vitals__actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.home-vitals__actions .btn {
+  font-size: 0.6rem;
+  padding: 6px 9px;
+}
+
+/* --- 自分の紋章(上部) ---------------------------------------------
+ * ここは画面の中で唯一「自分」を指す場所なので、一番手の込んだ縁を与える。
+ * 円 + 金の輪 + 下に食い込むレベル徽章、の3層で作る。 */
+
+.home-menu .home-id {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+/* 古い版ではレベル徽章そのものが50pxの丸だった(home-theme.css)。
+ * 新しい紋章はその中に入れ子で置くので、古い丸の指定を打ち消す */
+.home-menu .home-id__crest {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+.home-menu .home-id__crestface {
+  position: absolute;
+  inset: 4px;
+  background-size: cover;
+  background-position: center 20%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #4b3f7a, #241d43 62%, #14102a);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  color: #b9a4e8;
+}
+
+.home-menu .home-id__crestface svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* 金の輪。途切れさせず、上端だけ明るくして金属に見せる */
+.home-menu .home-id__crestring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #8a6d34, #f0d68f 18%, #c9a75a 34%, #7d6130 58%, #e8cd86 78%, #8a6d34);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.home-menu .home-id__crestring::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #0d1020;
+}
+
+/* レベルは輪の下端に食い込ませる。独立した札にすると要素が1つ増えて散らかる */
+.home-menu .home-id__crest .home-id__level {
+  position: absolute;
+  width: auto;
+  height: auto;
+  display: flex;
+  background: linear-gradient(180deg, #2b3050, #151932);
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2b3050, #151932);
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.55), 0 2px 5px rgba(0, 0, 0, 0.55);
+}
+
+.home-menu .home-id__crest .home-id__level small {
+  font-size: 0.46rem;
+  font-weight: 700;
+  color: #c9a75a;
+}
+
+.home-menu .home-id__crest .home-id__level strong {
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+/* --- ADVENTURE -----------------------------------------------------
+ * 一番行く場所なので、一番大きい面を与える。横長の帯では他のタイルに埋もれる。
+ * 絵は持てないので、空 → 稜線 → 靄 の3層を重ねて奥行きだけ作る。 */
+
+.home-menu .home-adventure {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 132px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #140f26;
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.3), var(--drop);
+}
+
+.home-adventure__sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 108%, rgba(214, 122, 255, 0.34), transparent 62%),
+    linear-gradient(180deg, #1b1136 0%, #2c1a4e 46%, #4a2168 78%, #6b2a72 100%);
+}
+
+/* 稜線。多角形を2枚重ねると、遠近の分だけ層に見える */
+.home-adventure__ridge {
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  bottom: 0;
+  height: 74px;
+  background: #150e2a;
+  clip-path: polygon(0 100%, 0 62%, 8% 48%, 15% 60%, 24% 34%, 33% 56%, 42% 40%, 52% 58%, 61% 30%, 70% 52%, 79% 38%, 88% 56%, 96% 44%, 100% 58%, 100% 100%);
+  opacity: 0.92;
+}
+
+.home-adventure__ridge::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46px;
+  background: #0d0819;
+  clip-path: polygon(0 100%, 0 70%, 12% 52%, 22% 68%, 34% 46%, 46% 66%, 58% 44%, 69% 64%, 80% 50%, 91% 66%, 100% 54%, 100% 100%);
+}
+
+/* 靄。稜線の足元を溶かして、切り絵に見えないようにする */
+.home-adventure__haze {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 58px;
+  background: linear-gradient(180deg, transparent, rgba(146, 84, 190, 0.32) 58%, rgba(28, 14, 48, 0.72));
+}
+
+.home-adventure__text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.home-adventure__text strong {
+  font-family: "Times New Roman", "Hiragino Mincho ProN", serif;
+  font-size: 1.9rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7), 0 0 26px rgba(226, 178, 255, 0.4);
+}
+
+.home-adventure__text small {
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  color: #e3d3f6;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+/* 矢印は下向き。「この下に続きがある」を指す */
+.home-menu .home-adventure__arrow {
+  position: absolute;
+  left: 50%;
+  bottom: 9px;
+  transform: translateX(-50%) rotate(90deg);
+  color: #d9c7f2;
+  opacity: 0.85;
+}
+
+.home-menu .home-adventure__arrow svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* --- コンテンツのタイル ---------------------------------------------
+ * 線のアイコンだけだと設定画面の項目に見える。面に色と光を持たせて、
+ * 「行き先」として押したくなる大きさにする。 */
+
+.home-menu .home-menu-grid--2 .home-tile {
+  min-height: 92px;
+}
+
+.home-menu .home-tile {
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.18), var(--drop-soft);
+}
+
+.home-menu .home-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(90% 70% at 50% 118%, var(--tile-glow, rgba(120, 96, 220, 0.42)), transparent 66%);
+  pointer-events: none;
+}
+
+.home-menu .home-tile > * {
+  position: relative;
+}
+
+.home-menu .home-tile[data-tour="tile:summon"] { --tile-glow: rgba(178, 96, 240, 0.5); }
+.home-menu .home-tile[data-tour="tile:shop"] { --tile-glow: rgba(90, 150, 240, 0.44); }
+.home-menu .home-tile[data-tour="tile:equipDungeon"] { --tile-glow: rgba(226, 168, 74, 0.38); }
+.home-menu .home-tile[data-tour="tile:trainDungeon"] { --tile-glow: rgba(96, 210, 160, 0.36); }
+.home-menu .home-tile[data-tour="tile:goldDungeon"] { --tile-glow: rgba(232, 190, 70, 0.4); }
+.home-menu .home-tile[data-tour="tile:arena"] { --tile-glow: rgba(232, 96, 96, 0.4); }
+
+/* --- 下のタブ ------------------------------------------------------
+ * 選択中がどれか分かりにくかった。金の枠で囲って、面ごと持ち上げる。 */
+
+.bottom-nav__btn--active {
+  position: relative;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(198, 160, 84, 0.2), rgba(198, 160, 84, 0.04));
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.55), inset 0 1px 0 rgba(255, 226, 168, 0.24);
+}
