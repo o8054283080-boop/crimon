@@ -472,18 +472,28 @@ body {
   opacity: 0;
 }
 
+/*
+ * 主役のボタン。
+ *
+ * 以前は明るい青の塗りつぶしだった。全画面の主役がこれだったので、
+ * どの画面を開いても**青いボタンが目に飛び込む**状態になっていた。
+ * 青は世界の色ではないうえ、塗りつぶしの主役が2種類(青と金)あると
+ * どちらが上位なのかが読めない。
+ *
+ * 暗い石の面に金の細枠、という形に変える。塗りつぶしの金(.btn--gold)は
+ * 最上位のCTAだけに残し、序列を「金の塗り > 金の枠 > 枠なし」の3段にする。
+ */
 .btn--primary {
-  color: #06162e;
+  color: #f4e8cc;
   background:
-    radial-gradient(ellipse 90% 70% at 50% -10%, rgba(255, 255, 255, 0.55), transparent 70%),
-    linear-gradient(180deg, #9dc9ff 0%, #4f8cff 42%, #2455c4 82%, #14336f 100%);
+    linear-gradient(180deg, rgba(64, 46, 24, 0.72) 0%, rgba(30, 21, 12, 0.86) 52%, rgba(14, 10, 6, 0.92) 100%);
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
-    inset 0 0 0 1px rgba(140, 190, 255, 0.6),
-    0 0 20px rgba(79, 140, 255, 0.35),
+    inset 0 1px 0 rgba(255, 232, 190, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(198, 160, 84, 0.62),
+    0 0 16px rgba(160, 120, 50, 0.16),
     var(--drop);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 /* 最上位のCTA(挑戦する・受け取る)は金。青の主役ボタンより一段上に置く */
@@ -4261,7 +4271,6 @@ body {
   padding: 10px 14px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(180deg, #3f6be0 0%, #2a4bb0 60%, #1f3a8c 100%);
   box-shadow: var(--edge-light), var(--drop);
   color: #fff;
   text-align: left;
@@ -6896,4 +6905,134 @@ body {
   border-radius: 9px;
   background: linear-gradient(180deg, rgba(198, 160, 84, 0.18), rgba(198, 160, 84, 0.03));
   box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.5), inset 0 1px 0 rgba(255, 232, 190, 0.2);
+}
+
+/* ===================================================================
+ * 全画面共通の地
+ *
+ * ホームだけが世界の中にあって、他の画面は暗い箱、では一つの製品に見えない。
+ * **どの画面にも同じ世界を敷く。**ホームより暗く静かにして、
+ * 前に置く面(黒硝子)の邪魔をしない濃さに留める。
+ *
+ * `position: fixed` で画面に貼り付ける。画面ごとに背景を持たせると
+ * スクロールのたびに地が動いて、世界が紙芝居に見える。
+ * =================================================================== */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(180deg, rgba(6, 5, 12, 0.3) 0%, rgba(6, 5, 12, 0.68) 34%, rgba(6, 5, 12, 0.92) 62%, var(--bg) 84%),
+    url("./assets/world-bg.jpg");
+  background-size: cover, cover;
+  background-position: center top, center top;
+  background-repeat: no-repeat, no-repeat;
+}
+
+/* ホームは自前の地(home-hero)を持つので、共通の地は要らない */
+.home-screen--menu-only ~ * body::before {
+  display: none;
+}
+
+/* ===================================================================
+ * 見出し
+ *
+ * 画面名は金の題字のまま。その下の節見出しを、板ではなく刻印に揃える。
+ * ホームで使ったひし形の印を全画面共通にして、「ここから別の話」を
+ * 囲まずに示す。
+ * =================================================================== */
+
+.panel h2::before {
+  /* 棒ではなくひし形。ホームの節見出しと同じ印にそろえる */
+  width: 7px;
+  height: 7px;
+  clip-path: none;
+  transform: translateY(-50%) rotate(45deg);
+  border-radius: 1px;
+  box-shadow: 0 0 7px rgba(224, 178, 84, 0.5);
+}
+
+/* ===================================================================
+ * 世界に馴染ませる細部
+ * =================================================================== */
+
+/* 一覧の札。青みを抜き、縁は細く */
+.floor-grid .floor-tile,
+.stage-card {
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.16), var(--drop-soft);
+}
+
+/* 選択中は金で示す。青で示すと世界の色から外れる */
+.stage-card--selected,
+.floor-tile--selected {
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.7), 0 0 18px rgba(198, 160, 84, 0.2), var(--drop);
+}
+
+/* 絞り込みなどの小さな札 */
+.cat-chip {
+  background: var(--panel-deep);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: #cfc6dc;
+}
+
+.cat-chip--hot {
+  color: #f0dfae;
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.5);
+}
+
+/* ===================================================================
+ * ステージ選択
+ *
+ * ここが最も「色を塗った札の列」に見える画面だった。
+ * 章ごとに彩度の高い帯(緑・青・橙・紫)を敷き、その上に青いCTAが乗る。
+ * 章の色は行き先を見分けるための情報なので**消してはいけない**が、
+ * 面を塗りつぶす必要はない。**細い線と、奥にごく薄く残る気配**に変える。
+ * =================================================================== */
+
+/* 章の見た目そのものは src/web/ui/catalog.css が持っている(そちらが後に読まれる) */
+
+/* --- 「次はここ」。画面で一番重い操作なので、金で示す --------------- */
+
+.stages-resume {
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse 80% 130% at 12% 130%, rgba(198, 160, 84, 0.22), transparent 66%),
+    linear-gradient(180deg, rgba(58, 42, 22, 0.66) 0%, rgba(22, 15, 9, 0.86) 62%, rgba(10, 7, 4, 0.92) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 190, 0.2),
+    inset 0 0 0 1px rgba(198, 160, 84, 0.6),
+    0 8px 24px rgba(0, 0, 0, 0.55);
+  color: #f4e8cc;
+}
+
+.stages-resume__label {
+  color: var(--gold-2);
+  letter-spacing: 0.14em;
+}
+
+.stages-resume__arrow {
+  color: var(--gold-3);
+}
+
+/* --- ステージの番号札 ------------------------------------------------ */
+
+.stage-tile {
+  border-radius: 9px;
+  background: var(--panel-deep);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/* 次に挑む1枚だけを金で光らせる。全部光ると何も目立たない */
+.stage-tile--next {
+  background: linear-gradient(180deg, rgba(66, 48, 22, 0.8), rgba(24, 17, 9, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.75), 0 0 18px rgba(198, 160, 84, 0.28);
+}
+
+.stage-tile--cleared {
+  background: rgba(16, 12, 26, 0.66);
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.14);
 }

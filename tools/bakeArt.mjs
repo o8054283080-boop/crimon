@@ -56,6 +56,19 @@ const PIECES = [
     starAmount: 0.85,
   },
   {
+    // どの画面にも共通で敷く地。ホームより暗く、静かに。
+    // 全画面が同じ世界の上にあると分かることで、UIが道具箱に見えなくなる
+    name: "world-bg",
+    width: 620,
+    height: 1344,
+    seed: 77.2,
+    palette: { sky: [0.035, 0.028, 0.075], far: [0.14, 0.075, 0.23], near: [0.022, 0.016, 0.05], glow: [0.3, 0.14, 0.44] },
+    horizon: 0.42,
+    ridges: 5,
+    starAmount: 0.55,
+    beast: 1,
+  },
+  {
     name: "adventure-bg",
     width: 1000,
     height: 420,
