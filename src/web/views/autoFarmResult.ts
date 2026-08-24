@@ -18,6 +18,7 @@ const STOP_REASON_LABEL: Record<AutoFarmResult["stopReason"], string> = {
   DEFEAT: "敗北したため中断しました",
   NO_PARTY: "パーティが編成されていないため中断しました",
   DAILY_LIMIT: "本日の挑戦回数の上限に達したため中断しました",
+  STOPPED: "周回を切り上げました",
 };
 
 function groupDrops(result: AutoFarmResult): { dexId: string; star: number; count: number }[] {

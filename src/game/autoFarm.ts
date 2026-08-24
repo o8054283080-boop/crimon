@@ -1,22 +1,18 @@
-import { BattleEngine } from "../battle/engine.js";
-import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
-import { DungeonFloor } from "../data/equipmentDungeon.js";
-import { GoldDungeonFloor } from "../data/goldDungeon.js";
-import { LevelDungeonDef } from "../data/levelDungeon.js";
-import { Difficulty, Stage } from "../data/stages.js";
-import { setupDungeonBattle } from "./dungeonRunner.js";
-import { getDungeonParty, getParty, PlayerState, trySpendGoldDungeonChallenge, trySpendStamina } from "./playerState.js";
-import {
-  ClearRewardResult,
-  LevelUpInfo,
-  applyDungeonClearRewards,
-  applyGoldDungeonClearRewards,
-  applyLevelDungeonClearRewards,
-  applyStageClearRewards,
-} from "./rewards.js";
-import { extractSurvivors, setupWaveBattle } from "./stageRunner.js";
+import { ClearRewardResult, LevelUpInfo } from "./rewards.js";
 
-export type AutoFarmStopReason = "COMPLETED" | "STAMINA" | "DEFEAT" | "NO_PARTY" | "DAILY_LIMIT";
+/**
+ * 周回(まとめて何回も挑む)の成果を積み上げる側。
+ *
+ * **かつてここには「戦闘を実行せずに決着だけ出す」関数が4つあった。**
+ * 10回まとめて挑むと一瞬で集計画面に着く作りで、
+ * 結果として**戦闘画面を一度も見ないまま遊べてしまっていた**。
+ * 依頼主の指摘で取りやめ、周回は1戦ずつ実際に戦闘画面で戦う形へ変えた
+ * (進行は `src/web/main.ts` の `farmRun`)。
+ *
+ * ここに残すのは集計だけ。1戦ぶんの報酬を受け取って足していく。
+ */
+
+export type AutoFarmStopReason = "COMPLETED" | "STAMINA" | "DEFEAT" | "NO_PARTY" | "DAILY_LIMIT" | "STOPPED";
 
 export interface AutoFarmDrop {
   dexId: string;
@@ -40,7 +36,7 @@ export interface AutoFarmResult {
   levelUps: LevelUpInfo[];
 }
 
-function emptyResult(): AutoFarmResult {
+export function emptyResult(): AutoFarmResult {
   return {
     attempts: 0,
     cleared: 0,
@@ -57,7 +53,42 @@ function emptyResult(): AutoFarmResult {
   };
 }
 
-function mergeReward(result: AutoFarmResult, reward: ClearRewardResult, extraGold: number): void {
+/** 次の1戦を始められるかを見るのに要るもの */
+export interface FarmContinueCheck {
+  /** 編成に入っている数 */
+  partySize: number;
+  stamina: number;
+  /** 1回あたりの消費スタミナ */
+  staminaCost: number;
+  /** 1日の残り挑戦回数。上限が無いコンテンツでは省略する */
+  challengesLeft?: number;
+}
+
+/**
+ * 次の1戦を始められない理由。始められるなら null。
+ *
+ * **見る順番は、実際に消費する順番と合わせてある。**
+ * ゴールドダンジョンは1日の上限を先に消費するので、
+ * 上限に達しているのに「スタミナ切れ」と出すと直し方を間違える。
+ *
+ * 「始めてみて駄目だった」を後から検出する形にはできない。周回は戦闘画面から
+ * 戦闘画面へ移るので、始まったかどうかを画面の変化では判定できない。
+ */
+export function farmBlockReason(check: FarmContinueCheck): AutoFarmStopReason | null {
+  if (check.partySize === 0) return "NO_PARTY";
+  if (check.challengesLeft !== undefined && check.challengesLeft <= 0) return "DAILY_LIMIT";
+  if (check.stamina < check.staminaCost) return "STAMINA";
+  return null;
+}
+
+/**
+ * 1戦ぶんのクリア報酬を集計へ足す。
+ *
+ * `extraGold` はステージのウェーブ報酬のように、クリア報酬とは別に
+ * 戦闘中へ入っているぶん。**同じモンスターのレベルアップは1行にまとめる**
+ * (10回まわして同じ子が10行並ぶと、何が何レベル上がったのか読めない)。
+ */
+export function mergeReward(result: AutoFarmResult, reward: ClearRewardResult, extraGold: number): void {
   result.totalGold += reward.goldEarned + extraGold;
   result.totalCrystal += reward.crystalEarned;
   result.totalExp += reward.expTotal;
@@ -77,195 +108,4 @@ function mergeReward(result: AutoFarmResult, reward: ClearRewardResult, extraGol
     if (existing) existing.levels += levelUp.levels;
     else result.levelUps.push({ ...levelUp });
   }
-}
-
-/**
- * ステージに指定回数まで自動で挑戦する(周回)。
- * スタミナが尽きる・敗北する・パーティが編成されていない場合はその時点で中断する。
- * 各回のバトルはBattleEngine.run()による全自動シミュレーションで即座に決着させる。
- */
-export function runStageAutoFarm(
-  state: PlayerState,
-  stage: Stage,
-  times: number,
-  rng: () => number = Math.random,
-  difficulty: Difficulty = "NORMAL",
-): AutoFarmResult {
-  const result = emptyResult();
-
-  for (let i = 0; i < times; i++) {
-    const originalParty = getParty(state);
-    if (originalParty.length === 0) {
-      result.stopReason = "NO_PARTY";
-      break;
-    }
-    if (!trySpendStamina(state, STAGE_STAMINA_COST).ok) {
-      result.stopReason = "STAMINA";
-      break;
-    }
-    result.attempts += 1;
-
-    let carryHp: Map<string, number> | null = null;
-    let currentParty = originalParty;
-    let wavesCleared = 0;
-    let waveGoldEarned = 0;
-    let cleared = true;
-
-    for (const wave of stage.waves) {
-      const setup = setupWaveBattle(currentParty, carryHp, wave, state.equipment, difficulty);
-      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp, rng });
-      const battleResult = engine.run();
-      if (battleResult.winner !== "PLAYER") {
-        cleared = false;
-        break;
-      }
-      const survivors = extractSurvivors(engine, currentParty);
-      waveGoldEarned += stage.rewards.waveGold;
-      wavesCleared += 1;
-      carryHp = survivors.survivorHp;
-      currentParty = survivors.survivorInstances;
-    }
-
-    state.gold += waveGoldEarned;
-
-    if (cleared) {
-      const reward = applyStageClearRewards(state, stage, wavesCleared, originalParty, difficulty, rng);
-      mergeReward(result, reward, 0);
-      result.cleared += 1;
-    } else {
-      result.totalGold += waveGoldEarned;
-      result.stopReason = "DEFEAT";
-      break;
-    }
-  }
-
-  return result;
-}
-
-/**
- * 装備ダンジョンの指定階層に指定回数まで自動で挑戦する(周回)。
- * ステージと異なり単発バトル・持ち越しHPなしで、毎回全回復状態から挑む。
- */
-export function runDungeonAutoFarm(
-  state: PlayerState,
-  floor: DungeonFloor,
-  times: number,
-  rng: () => number = Math.random,
-): AutoFarmResult {
-  const result = emptyResult();
-
-  for (let i = 0; i < times; i++) {
-    const party = getDungeonParty(state);
-    if (party.length === 0) {
-      result.stopReason = "NO_PARTY";
-      break;
-    }
-    if (!trySpendStamina(state, DUNGEON_STAMINA_COST).ok) {
-      result.stopReason = "STAMINA";
-      break;
-    }
-    result.attempts += 1;
-
-    const setup = setupDungeonBattle(party, floor, state.equipment);
-    const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
-    const battleResult = engine.run();
-
-    if (battleResult.winner === "PLAYER") {
-      const reward = applyDungeonClearRewards(state, floor, party, rng);
-      mergeReward(result, reward, 0);
-      result.cleared += 1;
-    } else {
-      result.stopReason = "DEFEAT";
-      break;
-    }
-  }
-
-  return result;
-}
-
-/**
- * レベル上げダンジョンの指定難易度に指定回数まで自動で挑戦する(周回)。
- * 装備ダンジョンと同じく単発バトル・持ち越しHPなしで、毎回全回復状態から挑む。
- * 通常パーティ(パーティ編成画面の4体)を使う点が装備ダンジョン専用パーティと異なる。
- */
-export function runLevelDungeonAutoFarm(
-  state: PlayerState,
-  def: LevelDungeonDef,
-  times: number,
-  rng: () => number = Math.random,
-): AutoFarmResult {
-  const result = emptyResult();
-
-  for (let i = 0; i < times; i++) {
-    const party = getParty(state);
-    if (party.length === 0) {
-      result.stopReason = "NO_PARTY";
-      break;
-    }
-    if (!trySpendStamina(state, LEVEL_DUNGEON_STAMINA_COST).ok) {
-      result.stopReason = "STAMINA";
-      break;
-    }
-    result.attempts += 1;
-
-    const setup = setupDungeonBattle(party, def, state.equipment);
-    const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
-    const battleResult = engine.run();
-
-    if (battleResult.winner === "PLAYER") {
-      const reward = applyLevelDungeonClearRewards(state, def, party, rng);
-      mergeReward(result, reward, 0);
-      result.cleared += 1;
-    } else {
-      result.stopReason = "DEFEAT";
-      break;
-    }
-  }
-
-  return result;
-}
-
-/**
- * ゴールドダンジョンの指定階層に指定回数まで自動で挑戦する(周回)。
- * 他コンテンツと異なり、スタミナに加えて1日の挑戦回数上限にも達すると中断する。
- */
-export function runGoldDungeonAutoFarm(
-  state: PlayerState,
-  floor: GoldDungeonFloor,
-  times: number,
-  rng: () => number = Math.random,
-): AutoFarmResult {
-  const result = emptyResult();
-
-  for (let i = 0; i < times; i++) {
-    const party = getParty(state);
-    if (party.length === 0) {
-      result.stopReason = "NO_PARTY";
-      break;
-    }
-    if (!trySpendGoldDungeonChallenge(state).ok) {
-      result.stopReason = "DAILY_LIMIT";
-      break;
-    }
-    if (!trySpendStamina(state, GOLD_DUNGEON_STAMINA_COST).ok) {
-      result.stopReason = "STAMINA";
-      break;
-    }
-    result.attempts += 1;
-
-    const setup = setupDungeonBattle(party, floor, state.equipment);
-    const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng });
-    const battleResult = engine.run();
-
-    if (battleResult.winner === "PLAYER") {
-      const reward = applyGoldDungeonClearRewards(state, floor, party);
-      mergeReward(result, reward, 0);
-      result.cleared += 1;
-    } else {
-      result.stopReason = "DEFEAT";
-      break;
-    }
-  }
-
-  return result;
 }

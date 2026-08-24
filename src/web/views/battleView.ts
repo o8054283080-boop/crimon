@@ -9,6 +9,18 @@ import { BattleStage, StageUnitInit } from "../three/battleStage.js";
 import { withPortrait } from "../three/portrait.js";
 import { FloatKind, UnitHudRefs, buildFloatingNumber, buildHudCard, buildStatusChips } from "./battleHud.js";
 
+/** 周回の途中であることを戦闘画面へ伝える */
+export interface BattleChainInfo {
+  /** 今が何戦目か(1始まり) */
+  index: number;
+  /** まとめて挑むと決めた総数 */
+  total: number;
+  /** すでに「この1戦で終える」が押されているか */
+  stopped: boolean;
+  /** ⏹ が押された。この1戦を終えたら周回を切り上げる */
+  onStop: () => void;
+}
+
 export interface BattleViewProps {
   engine: BattleEngine;
   playerTeam: MonsterDefinition[];
@@ -18,6 +30,8 @@ export interface BattleViewProps {
   resultLabel: (winner: BattleWinner) => string;
   /** 決着後、結果ボタンが押されたら呼ばれる */
   onFinish: (winner: BattleWinner) => void;
+  /** 周回の途中なら渡す。勝った時だけ自動で次の1戦へ送る */
+  chain?: BattleChainInfo;
 }
 
 export interface BattleViewHandle {
@@ -39,6 +53,43 @@ const SPEED_STEPS = ["1", "2", "4", "8"] as const;
 const SPEED_INTERVAL_MS: Record<string, number> = { "1": 1000, "2": 500, "4": 250, "8": 125 };
 /** 攻撃モーションを見せてから着弾させるまでの間(再生速度で縮む) */
 const IMPACT_DELAY_MS: Record<string, number> = { "1": 320, "2": 160, "4": 80, "8": 40 };
+
+/**
+ * 選んだ再生速度は覚えておき、次の戦闘へ持ち越す。
+ *
+ * 周回は戦闘画面を続けて何度も開く。戦闘ごとに等倍へ戻ると、
+ * **10回まとめて挑むたびに10回押し直す**ことになる。
+ * 速度は「その戦闘の設定」ではなく「その人の見たい速さ」なので、覚えておく。
+ *
+ * 効き幅が大きい。実測(装備ダンジョン5階)で1戦あたり x8 が約37秒、
+ * 等倍だとその8倍。10回まわす時にここが戻っていると、丸ごと別の遊びになる。
+ * だから起動をまたいでも残す。
+ */
+const SPEED_STORAGE_KEY = "crimon_battle_speed";
+
+function loadSharedSpeed(): (typeof SPEED_STEPS)[number] {
+  try {
+    const saved = localStorage.getItem(SPEED_STORAGE_KEY);
+    const found = SPEED_STEPS.find((step) => step === saved);
+    if (found) return found;
+  } catch {
+    // 端末の設定で localStorage が塞がれていることがある。速度が無くても遊べる
+  }
+  return "1";
+}
+
+function saveSharedSpeed(value: (typeof SPEED_STEPS)[number]): void {
+  try {
+    localStorage.setItem(SPEED_STORAGE_KEY, value);
+  } catch {
+    // 同上。保存できなくても、そのセッションの間は持ち越せている
+  }
+}
+
+let sharedSpeed: (typeof SPEED_STEPS)[number] = loadSharedSpeed();
+
+/** 勝った後、次の1戦へ送るまでの間。報酬の行を読める程度には置く */
+const CHAIN_ADVANCE_MS = 1400;
 
 type PickerState =
   | { phase: "NONE" }
@@ -64,13 +115,15 @@ const LEADER_MIN = 18;
 const HUD_MIN_SCALE = 0.88;
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
-  const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish } = props;
+  const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish, chain } = props;
 
   let mode: "AUTO" | "MANUAL" = "AUTO";
   let userPaused = false;
-  let speed = "1";
+  let speed: (typeof SPEED_STEPS)[number] = sharedSpeed;
   let finished = false;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  /** 周回で次の1戦へ送るための待ち。画面を離れる時に必ず止める */
+  let chainHandle: ReturnType<typeof setTimeout> | null = null;
   let picker: PickerState = { phase: "NONE" };
   /** 対象選びで今光らせている相手 */
   let selectedTargetId: string | null = null;
@@ -80,7 +133,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const teamOf = new Map<string, "PLAYER" | "ENEMY">();
   const anchorPositions = new Map<string, { x: number; y: number }>();
 
-  /** 着弾待ちなど、時間差で走る演出。スキップ時は即座に実行して整合を保つ */
+  /** 着弾待ちなど、時間差で走る演出。画面を離れる時にまとめて取り消す */
   const pendingEffects: { handle: ReturnType<typeof setTimeout>; run: () => void }[] = [];
 
   function later(run: () => void, ms: number): void {
@@ -97,14 +150,6 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       run,
     };
     pendingEffects.push(entry);
-  }
-
-  function flushPending(): void {
-    const entries = pendingEffects.splice(0, pendingEffects.length);
-    for (const entry of entries) {
-      clearTimeout(entry.handle);
-      entry.run();
-    }
   }
 
   function cancelPending(): void {
@@ -607,7 +652,24 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     resultBanner.append(el("div", { className: "result-banner__text" }, [text]));
     finishBtn.textContent = resultLabel(winner);
     finishBtn.classList.remove("battle-controls__finish--hidden");
-    finishBtn.onclick = () => onFinish(winner);
+    finishBtn.onclick = () => {
+      if (chainHandle !== null) clearTimeout(chainHandle);
+      onFinish(winner);
+    };
+
+    /*
+     * 周回で勝った時だけ、自分で次の1戦へ送る。
+     *
+     * 10回まとめて挑んだのに毎回ボタンを押させるのでは、まとめた意味が無い。
+     * **負けた時は送らない。**そこで周回は終わりで、何が起きて止まったのかを
+     * 見せないまま集計画面へ飛ばすと、負けたこと自体に気づけない。
+     */
+    if (chain && winner === "PLAYER") {
+      chainHandle = setTimeout(() => {
+        chainHandle = null;
+        onFinish(winner);
+      }, CHAIN_ADVANCE_MS);
+    }
     // 決着後はスキルを選べないので、ドックごと下げる。
     // 残したままだと、画面下に重なって報酬のボタンを覆い、
     // 横画面では報酬を受け取れなくなる(実際にその不具合を出した)
@@ -651,31 +713,6 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     }, SPEED_INTERVAL_MS[speed]);
   }
 
-  function skipToEnd(): void {
-    userPaused = true;
-    stopTimer();
-    cancelPending();
-    picker = { phase: "NONE" };
-    renderActionPanel();
-    let lastRecord: TurnRecord | null = null;
-    let guard = 0;
-    while (!finished && guard < 10000) {
-      guard += 1;
-      const winner = engine.getWinner();
-      if (winner) break;
-      const actor = engine.getNextActor();
-      if (!actor) break;
-      const record = engine.resolveTurn(actor);
-      appendLines(record.lines);
-      lastRecord = record;
-    }
-    if (lastRecord) {
-      setActive(lastRecord.actorId);
-      applySnapshot(lastRecord.snapshot);
-    }
-    showResult(engine.getWinner() ?? "DRAW");
-  }
-
   const playPauseBtn = el(
     "button",
     {
@@ -701,11 +738,13 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       className: "battle-speed-btn",
       title: "再生速度",
       onclick: () => {
-        speed = SPEED_STEPS[(SPEED_STEPS.indexOf(speed as (typeof SPEED_STEPS)[number]) + 1) % SPEED_STEPS.length];
+        speed = SPEED_STEPS[(SPEED_STEPS.indexOf(speed) + 1) % SPEED_STEPS.length];
+        sharedSpeed = speed;
+        saveSharedSpeed(speed);
         speedBtn.textContent = `x${speed}`;
       },
     },
-    ["x1"],
+    [`x${speed}`],
   );
 
   const modeBtn = el(
@@ -733,11 +772,33 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     ["🤖"],
   );
 
-  const skipBtn = el(
-    "button",
-    { type: "button", className: "battle-icon-btn", title: "結果までスキップ", onclick: skipToEnd },
-    ["⏭"],
-  );
+  /*
+   * 周回の進み具合と、その場で切り上げる手段。
+   *
+   * **周回に入ると、終わるまで戻る手段が無くなる。** 10回と決めて始めた後で
+   * 気が変わっても、負けるまで抜けられないのでは操作として成り立たない。
+   * 押すと今の1戦だけを見届けて周回を終える(戦闘の途中で成果を捨てさせない)。
+   *
+   * **短く保つこと。**縦画面(390px)では上帯の幅がぎりぎりで、
+   * ここを1文字太らせると場所の名前が「装備ダンジョ…」と削れる。
+   */
+  const chainBtn = chain
+    ? el(
+        "button",
+        {
+          type: "button",
+          className: "battle-chain-btn",
+          title: "この1戦で周回を終える",
+          disabled: chain.stopped,
+          onclick: () => {
+            chain.onStop();
+            chainBtn!.textContent = "最後";
+            chainBtn!.setAttribute("disabled", "");
+          },
+        },
+        [chain.stopped ? "最後" : `⏹ ${chain.index}/${chain.total}`],
+      )
+    : null;
 
   const finishBtn = el(
     "button",
@@ -749,7 +810,12 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   // 別々の帯に分けて縦に積むと戦場が痩せるうえ、目線も分散する。
   const topBar = el("div", { className: "battle-topbar" }, [
     el("div", { className: "battle-topbar__title" }, [title]),
-    el("div", { className: "battle-topbar__controls" }, [modeBtn, speedBtn, playPauseBtn, skipBtn]),
+    el("div", { className: "battle-topbar__controls" }, [
+      ...(chainBtn ? [chainBtn] : []),
+      modeBtn,
+      speedBtn,
+      playPauseBtn,
+    ]),
   ]);
 
   const logStrip = el("div", { className: "battle-logstrip" }, [logEl]);
@@ -807,6 +873,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     element: container,
     dispose: () => {
       stopTimer();
+      if (chainHandle !== null) clearTimeout(chainHandle);
       cancelPending();
       if (overlayFrame !== null) cancelAnimationFrame(overlayFrame);
       stage.dispose();

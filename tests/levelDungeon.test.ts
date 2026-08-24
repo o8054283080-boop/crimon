@@ -7,7 +7,8 @@ import { EXP_PIG, EXP_PIG_DEX, MONSTER_TEMPLATES, findMonsterById } from "../src
 import { setupDungeonBattle } from "../src/game/dungeonRunner.js";
 import { createInitialState, isLevelDungeonTierCleared, markLevelDungeonTierCleared } from "../src/game/playerState.js";
 import { applyLevelDungeonClearRewards } from "../src/game/rewards.js";
-import { runLevelDungeonAutoFarm } from "../src/game/autoFarm.js";
+import { farmBlockReason } from "../src/game/autoFarm.js";
+import { LEVEL_DUNGEON_STAMINA_COST } from "../src/core/fighterLevel.js";
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -127,22 +128,19 @@ describe("レベル上げダンジョンのバトル設定・オート周回", (
     expect(engine.run().winner).not.toBe("PLAYER");
   });
 
-  it("runLevelDungeonAutoFarmはパーティ未編成ならNO_PARTYで即中断する", () => {
+  it("周回はスタミナが1回ぶんに足りなくなった時点で止まる", () => {
     const state = createInitialState();
-    state.partyIds = [];
-    const def = findLevelDungeonDef("BEGINNER")!;
-    const result = runLevelDungeonAutoFarm(state, def, 5);
-    expect(result.stopReason).toBe("NO_PARTY");
-    expect(result.attempts).toBe(0);
+    state.stamina = LEVEL_DUNGEON_STAMINA_COST - 1;
+    expect(
+      farmBlockReason({
+        partySize: state.partyIds.length,
+        stamina: state.stamina,
+        staminaCost: LEVEL_DUNGEON_STAMINA_COST,
+      }),
+    ).toBe("STAMINA");
   });
 
-  it("runLevelDungeonAutoFarmはスタミナが尽きると中断する", () => {
-    const state = createInitialState();
-    state.stamina = 25;
-    state.maxStamina = 25;
-    const def = findLevelDungeonDef("BEGINNER")!;
-    const result = runLevelDungeonAutoFarm(state, def, 5, mulberry32(3));
-    expect(result.stopReason === "STAMINA" || result.stopReason === "DEFEAT").toBe(true);
-    expect(result.attempts).toBeLessThanOrEqual(1);
+  it("周回はパーティが空なら止まる", () => {
+    expect(farmBlockReason({ partySize: 0, stamina: 999, staminaCost: LEVEL_DUNGEON_STAMINA_COST })).toBe("NO_PARTY");
   });
 });

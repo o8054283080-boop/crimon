@@ -1712,6 +1712,31 @@ body {
   font-size: 0.82rem;
 }
 
+/*
+ * 周回の進み具合。「今が何戦目か」と「切り上げる」を1つの札で兼ねる。
+ * 速度や再生と同じ高さに揃えて、操作の列から浮かないようにする。
+ */
+.battle-chain-btn {
+  appearance: none;
+  cursor: pointer;
+  height: 34px;
+  min-height: unset;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 176, 92, 0.55);
+  background: rgba(18, 20, 30, 0.85);
+  color: #f0dfae;
+  font-weight: 800;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.battle-chain-btn:disabled {
+  cursor: default;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(240, 223, 174, 0.55);
+}
+
 .battle-controls__finish {
   width: 100%;
   background: linear-gradient(180deg, #ffe08a, #d9a520);
