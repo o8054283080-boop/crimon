@@ -6112,6 +6112,16 @@ body {
  * 「絵が無いから安っぽい」のではなく、**縁と階層が無いから安っぽかった。**
  * =================================================================== */
 
+/* 画面全体の地。単色だと、どれだけ枠を作っても「暗い箱の集まり」に見える */
+.home-screen--menu-only {
+  background-image:
+    linear-gradient(180deg, rgba(8, 10, 22, 0.82), rgba(8, 10, 22, 0.94) 46%, rgba(8, 10, 22, 0.99)),
+    url("./assets/home-bg.jpg");
+  background-size: cover, cover;
+  background-position: center top, center top;
+  background-attachment: scroll, scroll;
+}
+
 /* --- 金の装飾枠 ----------------------------------------------------
  * 四隅にだけ金の角を出す。全周を金で囲うと安い額縁になるが、
  * 角だけなら「留め具」に見えて、面そのものは静かなままでいられる。 */
@@ -6539,35 +6549,23 @@ body {
   box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.3), var(--drop);
 }
 
+/* 焼いた絵(tools/bakeArt.mjs)。CSSのグラデーションと多角形では
+ * 「図形の重ね合わせ」にしかならなかった。雲の房も岩肌のざらつきも
+ * ノイズを何層も積んで初めて出るので、一度だけ焼いてPNG…ではなくJPEGで持つ */
 .home-adventure__sky {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(120% 80% at 50% 108%, rgba(214, 122, 255, 0.34), transparent 62%),
-    linear-gradient(180deg, #1b1136 0%, #2c1a4e 46%, #4a2168 78%, #6b2a72 100%);
+  background-image: url("./assets/adventure-bg.jpg");
+  background-size: cover;
+  background-position: center 62%;
 }
 
 /* 稜線。多角形を2枚重ねると、遠近の分だけ層に見える */
+/* 稜線は絵の中に入ったので、ここは文字の下だけを沈める役に変えた */
 .home-adventure__ridge {
   position: absolute;
-  left: -4%;
-  right: -4%;
-  bottom: 0;
-  height: 74px;
-  background: #150e2a;
-  clip-path: polygon(0 100%, 0 62%, 8% 48%, 15% 60%, 24% 34%, 33% 56%, 42% 40%, 52% 58%, 61% 30%, 70% 52%, 79% 38%, 88% 56%, 96% 44%, 100% 58%, 100% 100%);
-  opacity: 0.92;
-}
-
-.home-adventure__ridge::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 46px;
-  background: #0d0819;
-  clip-path: polygon(0 100%, 0 70%, 12% 52%, 22% 68%, 34% 46%, 46% 66%, 58% 44%, 69% 64%, 80% 50%, 91% 66%, 100% 54%, 100% 100%);
+  inset: 0;
+  background: radial-gradient(70% 52% at 50% 46%, rgba(10, 6, 22, 0.5), transparent 72%);
 }
 
 /* 靄。稜線の足元を溶かして、切り絵に見えないようにする */
@@ -6576,8 +6574,8 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 58px;
-  background: linear-gradient(180deg, transparent, rgba(146, 84, 190, 0.32) 58%, rgba(28, 14, 48, 0.72));
+  height: 46px;
+  background: linear-gradient(180deg, transparent, rgba(18, 10, 34, 0.66));
 }
 
 .home-adventure__text {
@@ -6647,8 +6645,27 @@ body {
   position: relative;
 }
 
-.home-menu .home-tile[data-tour="tile:summon"] { --tile-glow: rgba(178, 96, 240, 0.5); }
-.home-menu .home-tile[data-tour="tile:shop"] { --tile-glow: rgba(90, 150, 240, 0.44); }
+.home-menu .home-tile[data-tour="tile:summon"] {
+  --tile-glow: rgba(178, 96, 240, 0.5);
+  background-image: url("./assets/summon-bg.jpg");
+  background-size: cover;
+  background-position: center 58%;
+}
+
+.home-menu .home-tile[data-tour="tile:shop"] {
+  --tile-glow: rgba(90, 150, 240, 0.44);
+  background-image: url("./assets/shop-bg.jpg");
+  background-size: cover;
+  background-position: center 58%;
+}
+
+/* 絵の上に字を置くので、下地を沈めて読めるようにする */
+.home-menu .home-tile[data-tour="tile:summon"]::before,
+.home-menu .home-tile[data-tour="tile:shop"]::before {
+  background:
+    radial-gradient(90% 70% at 50% 118%, var(--tile-glow), transparent 66%),
+    linear-gradient(180deg, rgba(6, 8, 20, 0.32), rgba(6, 8, 20, 0.78));
+}
 .home-menu .home-tile[data-tour="tile:equipDungeon"] { --tile-glow: rgba(226, 168, 74, 0.38); }
 .home-menu .home-tile[data-tour="tile:trainDungeon"] { --tile-glow: rgba(96, 210, 160, 0.36); }
 .home-menu .home-tile[data-tour="tile:goldDungeon"] { --tile-glow: rgba(232, 190, 70, 0.4); }
