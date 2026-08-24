@@ -57,6 +57,14 @@ export interface PlayerState {
   shopPurchasedSlots: number[];
   /** 受け取り済みのお詫び配布のid。重複して配らないために残す */
   claimedCompensationIds: string[];
+  /**
+   * 装備の速度を半分に見直した調整を、この控えに適用済みか。
+   *
+   * 装備の数値は**引いた時に確定して控えに残る**ので、生成側の基準値を変えても
+   * 既に持っている装備には効かない。これが無いと、前から遊んでいる人だけ
+   * 倍の速度装備を持ち続けることになる。
+   */
+  equipmentSpeedRebalanced?: boolean;
 
   /* --- アリーナ(対人戦) --- */
   /**
@@ -128,6 +136,7 @@ export function createInitialState(): PlayerState {
     shopRotationKey: -1,
     shopPurchasedSlots: [],
     claimedCompensationIds: [],
+    equipmentSpeedRebalanced: true,
     arenaDefenseIds: [],
     arenaOffenseIds: [],
     arenaPoints: ARENA_START_POINTS,
@@ -188,6 +197,26 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.shopRotationKey !== "number") state.shopRotationKey = -1;
   if (!Array.isArray(state.shopPurchasedSlots)) state.shopPurchasedSlots = [];
   if (!Array.isArray(state.claimedCompensationIds)) state.claimedCompensationIds = [];
+
+  /*
+   * 装備の速度を半分に見直した調整の後追い。
+   *
+   * 速度は手番の数に直結するので、装備で素の速度を覆せてしまうと
+   * モンスターごとの速さという個性が消える。生成側の基準値は半分にしたが、
+   * **既に持っている装備は控えに数値が焼かれている**ので、ここで揃える。
+   * 一度だけ走らせる(印が無い控えだけが対象)。
+   */
+  if (!state.equipmentSpeedRebalanced) {
+    for (const equipment of state.equipment) {
+      if (equipment.mainStat.type === "SPD") {
+        equipment.mainStat.value = Math.max(1, Math.round(equipment.mainStat.value / 2));
+      }
+      for (const sub of equipment.subStats) {
+        if (sub.type === "SPD") sub.value = Math.max(1, Math.round(sub.value / 2));
+      }
+    }
+    state.equipmentSpeedRebalanced = true;
+  }
 
   // アリーナ。古い控えには丸ごと無いので、初参加と同じ状態から始める
   if (!Array.isArray(state.arenaDefenseIds)) state.arenaDefenseIds = [];
