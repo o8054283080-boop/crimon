@@ -23,6 +23,8 @@ export type ScreenName =
   | "AUTO_FARM_RESULT"
   | "ARENA"
   | "ARENA_BATTLE"
+  | "TRIAL_TOWER"
+  | "TOWER_BATTLE"
   | "HOW_TO_PLAY";
 
 /**

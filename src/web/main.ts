@@ -12,6 +12,21 @@ import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
+import { TOWER_FLOOR_COUNT, TOWER_TRAIT_LABEL } from "../data/trialTower.js";
+import {
+  TowerBattleSetup,
+  TowerRewardResult,
+  applyTowerFloorResult,
+  beginTowerRun,
+  abandonTowerRun,
+  describeTowerRun,
+  getTowerParty,
+  nextTowerFloor,
+  setupTowerBattle,
+  spendTowerStamina,
+  towerBlockReason,
+} from "../game/trialTower.js";
+import { renderTrialTower } from "./views/trialTower.js";
 import {
   ClearRewardResult,
   applyDungeonClearRewards,
@@ -41,6 +56,7 @@ import {
   sellEquipment,
   setFighterName,
   toggleDungeonPartyMember,
+  toggleTowerPartyMember,
   tryEnhanceEquipment,
   tryRefillStaminaFull,
   tryRefillStaminaPartial,
@@ -195,6 +211,19 @@ interface ArenaRun {
 }
 
 /**
+ * 直前に登った階の決着。塔の画面はこれを見て「何が起きて戻ってきたか」を出す。
+ *
+ * **どれも「戻ってきた理由」が違う。**節を越えたのと力尽きたのを同じ扱いにすると、
+ * 次にやることが分からないまま同じボタンだけが残る。
+ */
+type TowerOutcome = {
+  kind: "CHECKPOINT" | "WIPED" | "COMPLETED" | "PAUSED";
+  /** その決着がついた階 */
+  floor: number;
+  reward: TowerRewardResult;
+};
+
+/**
  * 進行中の周回。
  *
  * 以前はここで戦闘を実行せずに決着だけ出して集計画面へ飛ばしていた。
@@ -266,6 +295,13 @@ interface AppState {
   autoFarmCount: number;
   /** 周回の途中。null なら単発の挑戦 */
   farmRun: FarmRun | null;
+  /* --- 試練の塔 --- */
+  /** 塔の画面に出す案内(スタミナ切れ・編成が空など)。次の操作まで残す */
+  towerNotice: string | null;
+  /** 直前の階の決着。塔の画面へ戻った理由と、受け取った報酬を伝える */
+  towerOutcome: TowerOutcome | null;
+  /** 戦闘画面の ⏹ が押された。今の階を終えたら登坂を止める */
+  towerStopRequested: boolean;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
   loginBonusResult: LoginBonusResult | null;
@@ -319,6 +355,9 @@ const state: AppState = {
   partyEditMode: "NORMAL",
   autoFarmCount: 10,
   farmRun: null,
+  towerNotice: null,
+  towerOutcome: null,
+  towerStopRequested: false,
   autoFarmResult: null,
   autoFarmTargetName: "",
   loginBonusResult: null,
@@ -398,6 +437,11 @@ function navigate(screen: ScreenName): void {
   // 周回の途中で別の画面へ出たら、そこで周回は終わり。
   // 残したままにすると、次に何かに挑んだ時が「周回の続き」として扱われる
   state.farmRun = null;
+  // 塔の案内は次の画面へ持ち越さない。**登坂そのもの(trialTowerRun)は消さない**
+  // ――あれは控えに残る進みで、画面を移っただけで捨ててはいけない
+  state.towerNotice = null;
+  state.towerOutcome = null;
+  state.towerStopRequested = false;
   render();
 }
 
@@ -662,16 +706,45 @@ function handleToggleDungeonPartyMember(instanceId: string): void {
   render();
 }
 
+function handleToggleTowerPartyMember(instanceId: string): void {
+  // 登坂の途中で顔ぶれが変わると、持ち越しているHPとクールタイムの持ち主が入れ替わる。
+  // **登坂中は編成を触らせない。**外した1体が塔の中でだけ生き続ける、という状態を作らない
+  if (state.player.trialTowerRun) {
+    playSfx("denied", 0.7);
+    state.partyNotice = "登坂の途中は編成を変えられません。塔の画面で登坂をやめてください。";
+    render();
+    return;
+  }
+  const before = state.player.towerPartyIds.length;
+  const wasMember = state.player.towerPartyIds.includes(instanceId);
+  toggleTowerPartyMember(state.player, instanceId);
+  if (!wasMember && state.player.towerPartyIds.length === before) {
+    playSfx("denied", 0.7);
+    state.partyNotice = `塔の編成は${MAX_DUNGEON_PARTY_SIZE}体までです。上の枠を押して外してから選んでください。`;
+    render();
+    return;
+  }
+  state.partyNotice = null;
+  savePlayerState(state.player);
+  render();
+}
+
 /**
  * 空いている枠を、強い順に自動で埋める。
  *
  * 手持ちが数十体になると、1体ずつ選ぶだけで何十手もかかる。
  * 素材専用のモンスター(転生ピッグなど)は編成しても意味が無いので外す。
  */
+/** いま編集している枠の中身。3つの枠(通常/装備ダンジョン/塔)で同じ操作を通す */
+function editingPartyIds(): string[] {
+  if (state.partyEditMode === "DUNGEON") return state.player.dungeonPartyIds;
+  if (state.partyEditMode === "TOWER") return state.player.towerPartyIds;
+  return state.player.partyIds;
+}
+
 function handleAutoFillParty(): void {
-  const isDungeon = state.partyEditMode === "DUNGEON";
-  const ids = isDungeon ? state.player.dungeonPartyIds : state.player.partyIds;
-  const maxSize = isDungeon ? MAX_DUNGEON_PARTY_SIZE : MAX_NORMAL_PARTY_SIZE;
+  const ids = editingPartyIds();
+  const maxSize = state.partyEditMode === "NORMAL" ? MAX_NORMAL_PARTY_SIZE : MAX_DUNGEON_PARTY_SIZE;
 
   const candidates = state.player.monsters
     .filter((m) => !ids.includes(m.id) && findMonsterById(m.dexId)?.role !== "素材")
@@ -691,8 +764,7 @@ function handleAutoFillParty(): void {
 }
 
 function handleClearParty(): void {
-  const isDungeon = state.partyEditMode === "DUNGEON";
-  const ids = isDungeon ? state.player.dungeonPartyIds : state.player.partyIds;
+  const ids = editingPartyIds();
   ids.length = 0;
   savePlayerState(state.player);
   state.partyNotice = "編成を全部外しました。";
@@ -1272,6 +1344,115 @@ function finishArenaMatch(won: boolean): void {
   enterStageResult();
 }
 
+/* ============================================================
+ * 試練の塔
+ * ============================================================ */
+
+/**
+ * 次の階へ挑む(登坂の開始も継続もここ)。
+ *
+ * 塔の1階ぶんは、他のコンテンツと同じ「1戦」だが、**戦闘の入り口で
+ * 持ち越しを渡す**点だけが違う。持ち越しの計算は `src/game/trialTower.ts` が持ち、
+ * ここは画面遷移とスタミナだけを見る。
+ */
+function startTowerFloor(): void {
+  const blocked = towerBlockReason(state.player);
+  if (blocked) {
+    state.towerNotice = blocked;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  const run = state.player.trialTowerRun ?? beginTowerRun(state.player);
+  if (!run) return;
+  if (!spendTowerStamina(state.player)) {
+    // 登坂そのものは残す。回復すれば続きから入れる
+    state.towerNotice = "スタミナが尽きました。回復すれば続きから登れます。";
+    playSfx("denied", 0.7);
+    savePlayerState(state.player);
+    state.screen = "TRIAL_TOWER";
+    render();
+    return;
+  }
+  state.towerNotice = null;
+  savePlayerState(state.player);
+  state.screen = "TOWER_BATTLE";
+  render();
+}
+
+/**
+ * 1階ぶんの決着を反映する。
+ *
+ * 勝てば持ち越して次の階へ**自動で進む**。周回と同じ考え方で、
+ * まとめてよいのは押す手数であって戦闘そのものではない。
+ * 節を越えた時と、負けた時と、登り切った時だけ画面を止める。
+ */
+function finishTowerFloor(cleared: boolean, setup: TowerBattleSetup, engine: BattleEngine): void {
+  const run = state.player.trialTowerRun;
+  if (!run) return;
+  const clearedFloor = run.floor;
+
+  const outcome = applyTowerFloorResult(state.player, run, setup, engine, cleared);
+  savePlayerState(state.player);
+
+  /** 塔の画面へ戻す。⏹ の押下は登坂ごとのものなので、ここで必ず畳む */
+  const backToTower = (kind: TowerOutcome["kind"], fanfare = false): void => {
+    state.towerStopRequested = false;
+    state.towerOutcome = { kind, floor: clearedFloor, reward: outcome.reward };
+    state.screen = "TRIAL_TOWER";
+    if (fanfare) playSfx("stageClear");
+    render();
+  };
+
+  if (outcome.wiped) return backToTower("WIPED");
+  if (outcome.completed) return backToTower("COMPLETED", true);
+  if (outcome.restored) return backToTower("CHECKPOINT", true);
+  // ⏹ が押されていたら、この階で止める。登坂は途中のまま残るので続きから入れる
+  if (state.towerStopRequested) return backToTower("PAUSED");
+
+  /*
+   * まだ節の途中。持ち越したまま次の階へ送る。
+   *
+   * **入り口を1つにする。**ここでスタミナを払ってしまうと、払った直後に
+   * 画面を離れた人がその階を戦わないまま次にもう一度払うことになる。
+   * 開始と継続で同じ `startTowerFloor` を通し、
+   * **戦闘が実際に始まる瞬間にだけ**払う形にしてある。
+   */
+  startTowerFloor();
+}
+
+function renderCurrentTowerBattle(): BattleViewHandle {
+  const run = state.player.trialTowerRun;
+  if (!run) throw new Error("trialTowerRun is not set");
+  const setup = setupTowerBattle(state.player, run);
+  if (!setup) throw new Error("試練の塔の編成を組めません");
+
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, {
+    initialPlayerHp: setup.initialPlayerHp,
+    initialCooldowns: setup.initialCooldowns,
+  });
+
+  const traitLabel = TOWER_TRAIT_LABEL[setup.floor.trait];
+  return renderBattleView({
+    engine,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    title: `塔 ${setup.floor.floor}階${traitLabel ? ` ${traitLabel}` : ""}`,
+    resultLabel: (winner) => (winner === "PLAYER" ? "▲ 次の階へ" : "塔に戻る"),
+    onFinish: (winner) => finishTowerFloor(winner === "PLAYER", setup, engine),
+    // 勝てば自動で次の階へ送る。負けた時は送らない(そこで登坂は終わりなので、見せずに飛ばさない)
+    chain: {
+      index: setup.floor.floor,
+      total: TOWER_FLOOR_COUNT,
+      stopped: state.towerStopRequested,
+      onStop: () => {
+        state.towerStopRequested = true;
+      },
+      stopTitle: "この階で登坂を終える(続きから再開できます)",
+    },
+  });
+}
+
 function renderCurrentArenaBattle(): BattleViewHandle {
   const run = state.arenaRun;
   if (!run) throw new Error("arenaRun is not set");
@@ -1391,6 +1572,7 @@ function render(): void {
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
         onGoShop: () => navigate("SHOP"),
         onGoArena: () => navigate("ARENA"),
+        onGoTrialTower: () => navigate("TRIAL_TOWER"),
         onGoHowToPlay: () => navigate("HOW_TO_PLAY"),
         onRefillStaminaPartial: () => {
           if (!tryRefillStaminaPartial(state.player).ok) return;
@@ -1466,6 +1648,7 @@ function render(): void {
         },
         onToggleParty: handleToggleParty,
         onToggleDungeonMember: handleToggleDungeonPartyMember,
+        onToggleTowerMember: handleToggleTowerPartyMember,
         onAutoFill: handleAutoFillParty,
         onClearParty: handleClearParty,
         notice: state.partyNotice,
@@ -1648,6 +1831,50 @@ function render(): void {
       });
       break;
 
+    case "TRIAL_TOWER": {
+      content = renderTrialTower({
+        bestFloor: state.player.trialTowerBestFloor,
+        nextFloor: nextTowerFloor(state.player),
+        run: describeTowerRun(state.player),
+        party: getTowerParty(state.player),
+        player: state.player,
+        claimedFloors: state.player.trialTowerClaimedFloors,
+        notice: state.towerNotice,
+        outcome: state.towerOutcome,
+        blockedReason: towerBlockReason(state.player),
+        onEditParty: () => {
+          state.partyEditMode = "TOWER";
+          state.towerOutcome = null;
+          navigate("PARTY");
+        },
+        onChallenge: () => {
+          state.towerOutcome = null;
+          startTowerFloor();
+        },
+        onAbandon: () => {
+          abandonTowerRun(state.player);
+          savePlayerState(state.player);
+          state.towerOutcome = null;
+          state.towerNotice = "登坂をやめました。次は節から登り直しになります。";
+          render();
+        },
+        onDismissOutcome: () => {
+          state.towerOutcome = null;
+          render();
+        },
+        onBack: () => navigate("HOME"),
+      });
+      break;
+    }
+
+    case "TOWER_BATTLE": {
+      showNav = false;
+      const handle = renderCurrentTowerBattle();
+      disposeCurrentView = handle.dispose;
+      content = handle.element;
+      break;
+    }
+
     case "HOW_TO_PLAY":
       content = renderHowToPlay({ onBack: () => navigate("HOME") });
       break;
@@ -1789,6 +2016,7 @@ const BATTLE_SCREENS = new Set<ScreenName>([
   "LEVEL_DUNGEON_BATTLE",
   "GOLD_DUNGEON_BATTLE",
   "ARENA_BATTLE",
+  "TOWER_BATTLE",
 ]);
 
 function bgmSceneOf(screen: ScreenName): BgmScene {

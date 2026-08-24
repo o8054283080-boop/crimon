@@ -93,6 +93,25 @@ export interface PlayerState {
   arenaSeasonWins: number;
   /** 今期の最高到達点数。期間報酬はこの値で決まる(下がっても取り上げない) */
   arenaSeasonBestPoints: number;
+
+  /* --- 試練の塔 --- */
+  /** 塔専用の編成。HPを持ち越して登る場所なので、耐久寄りに組み替えられるよう別枠で持つ */
+  towerPartyIds: string[];
+  /** 越えた階の最高。ここから節(10階ごと)を割り出して再開地点を決める */
+  trialTowerBestFloor: number;
+  /** 初回到達報酬を渡し済みの階。登り直しで二重に渡さないために残す */
+  trialTowerClaimedFloors: number[];
+  /**
+   * 登坂の途中経過。10戦を1度に登り切れるとは限らないので、
+   * **アプリを閉じても続きから入れる**ように途中のHPとクールタイムごと控えに残す。
+   */
+  trialTowerRun: TowerRunSave | null;
+}
+
+/** 保存する登坂の途中経過。`src/game/trialTower.ts` の TowerRun と同じ形 */
+export interface TowerRunSave {
+  floor: number;
+  members: { instanceId: string; hp: number; cooldowns: [number, number, number] }[];
 }
 
 const STORAGE_KEY = "crimon_save_v1";
@@ -150,6 +169,10 @@ export function createInitialState(): PlayerState {
     arenaSeasonBattles: 0,
     arenaSeasonWins: 0,
     arenaSeasonBestPoints: ARENA_START_POINTS,
+    towerPartyIds: [],
+    trialTowerBestFloor: 0,
+    trialTowerClaimedFloors: [],
+    trialTowerRun: null,
   };
 }
 
@@ -236,10 +259,24 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.arenaSeasonWins !== "number") state.arenaSeasonWins = 0;
   if (typeof state.arenaSeasonBestPoints !== "number") state.arenaSeasonBestPoints = state.arenaPoints;
 
+  if (!Array.isArray(state.towerPartyIds)) state.towerPartyIds = [];
+  if (typeof state.trialTowerBestFloor !== "number") state.trialTowerBestFloor = 0;
+  if (!Array.isArray(state.trialTowerClaimedFloors)) state.trialTowerClaimedFloors = [];
+  if (!state.trialTowerRun || !Array.isArray(state.trialTowerRun.members)) state.trialTowerRun = null;
+
   // 手放したモンスターが編成に残っていると、対戦の準備で必ず落ちる
   const owned = new Set(state.monsters.map((m) => m.id));
   state.arenaDefenseIds = state.arenaDefenseIds.filter((id) => owned.has(id));
   state.arenaOffenseIds = state.arenaOffenseIds.filter((id) => owned.has(id));
+  state.towerPartyIds = state.towerPartyIds.filter((id) => owned.has(id));
+  /*
+   * 登坂の途中で素材にされた仲間がいると、その階の並びが崩れる。
+   * **1体でも欠けたら登坂ごと捨てる。**残った顔ぶれで続けさせると、
+   * 「4体で登り始めたのに3体になっている」という説明のつかない状態になる。
+   */
+  if (state.trialTowerRun && state.trialTowerRun.members.some((m) => !owned.has(m.instanceId))) {
+    state.trialTowerRun = null;
+  }
   return state;
 }
 
@@ -301,6 +338,17 @@ export function toggleDungeonPartyMember(state: PlayerState, instanceId: string)
   }
   if (state.dungeonPartyIds.length >= MAX_DUNGEON_PARTY_SIZE) return;
   state.dungeonPartyIds.push(instanceId);
+}
+
+/** 試練の塔の編成。装備ダンジョンと同じ5体まで(持ち越しの塔なので控えが厚いほど粘れる) */
+export function toggleTowerPartyMember(state: PlayerState, instanceId: string): void {
+  const idx = state.towerPartyIds.indexOf(instanceId);
+  if (idx >= 0) {
+    state.towerPartyIds.splice(idx, 1);
+    return;
+  }
+  if (state.towerPartyIds.length >= MAX_DUNGEON_PARTY_SIZE) return;
+  state.towerPartyIds.push(instanceId);
 }
 
 /**

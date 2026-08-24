@@ -32,6 +32,7 @@ export interface HomeProps {
   onGoLevelDungeon: () => void;
   onGoGoldDungeon: () => void;
   onGoArena: () => void;
+  onGoTrialTower: () => void;
   onGoHowToPlay: () => void;
   onGoShop: () => void;
   onRefillStaminaPartial: () => void;
@@ -664,6 +665,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     onGoLevelDungeon,
     onGoGoldDungeon,
     onGoArena,
+    onGoTrialTower,
     onGoHowToPlay,
     onGoShop,
     onRefillStaminaPartial,
@@ -711,9 +713,12 @@ export function renderHome(props: HomeProps): HTMLElement {
     { name: "trainDungeon", label: "育成", sub: "ダンジョン", onClick: onGoLevelDungeon },
     { name: "goldDungeon", label: "ゴールド", sub: "ダンジョン", onClick: onGoGoldDungeon },
   ];
-  // 対人は「増やす」でも「鍛える」でもない、腕を試す場所。行を分けて独立させる
+  // 「増やす」でも「鍛える」でもない、腕を試す場所。行を分けて独立させる。
+  // 塔はここに置く。ダンジョンの列に混ぜると**周回する場所**に見えるが、
+  // 塔は登り切ったら終わりで、同じ階を何度も回す場所ではない
   const compete: MenuTile[] = [
     { name: "arena", label: "アリーナ", sub: "対人戦", onClick: onGoArena },
+    { name: "tower", label: "試練の塔", sub: "持ち越しで登る", onClick: onGoTrialTower },
     // 迷った時の行き先。奥にしまうと、いちばん要る人が見つけられない
     { name: "info", label: "遊び方", sub: "はじめての方へ", onClick: onGoHowToPlay },
   ];
