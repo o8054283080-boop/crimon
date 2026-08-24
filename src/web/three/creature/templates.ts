@@ -510,7 +510,8 @@ function buildWolf(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
   // 獣の毛皮。鱗が出ると狼に見えなくなる
   kit.skin = "pelt";
-  rig.yawBias = 0.34;
+  // 四足は前後に長い。真後ろ・真正面からでは団子になるので深く半身に構える
+  rig.yawBias = 0.58;
   rig.pelvis.position.y = 1.0;
 
   // --- 腰。狼は後ろが軽く、肩が高い ---
@@ -1449,7 +1450,7 @@ function buildFairy(kit: CreatureKit, rig: CreatureRig): void {
  */
 function buildReincarnationPig(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
-  rig.yawBias = 0.30;
+  rig.yawBias = 0.52;
   rig.pelvis.position.y = 0.62;
 
   // 樽のような胴。前後に長く、腹が下に垂れる
@@ -1637,7 +1638,8 @@ function buildDragon(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
   // 体表は爬虫類の鱗。この指定が無いと既定のなめらかな肌になる
   kit.skin = "scale";
-  rig.yawBias = 0.3;
+  // 竜は翼が横に張るので、深く回すと翼が画面を横切る。四足の中では浅め
+  rig.yawBias = 0.50;
   // 脚を長く取ると馬やラクダに見える。ドラゴンは「胴が地面に近く、脚が短く太い」比率で読ませる
   rig.pelvis.position.y = 0.98;
 
@@ -2232,7 +2234,7 @@ function buildGriffon(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
   // 前半身は羽毛、後半身は毛皮。鱗の材質と取り違えないよう肌質を毛に固定する
   kit.skin = "pelt";
-  rig.yawBias = 0.36;
+  rig.yawBias = 0.56;
   rig.pelvis.position.y = 0.92;
 
   // --- 腰(ライオン。後ろは低く、腿の塊で幅を出す) ---

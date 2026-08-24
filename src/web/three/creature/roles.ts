@@ -184,12 +184,43 @@ export interface EyeOptions {
  * 部品はすべて小さいので分割数を低く固定してある(顔まわりで頂点を
  * 使い切ると、体のシルエットに回す余地が無くなる)。
  */
+/**
+ * 目全体の拡大率。
+ *
+ * 戦闘中のモンスターは画面上で高さ100〜150px、頭はその1/6ほどしかない。
+ * 実物どおりの比率で目を作ると画面上で2〜3px にしかならず、
+ * まぶたも虹彩も1画素の中で平均されて消える。実際にセラフの頭が
+ * **のっぺりした灰色の球**にしか見えていなかった。
+ *
+ * この手のゲームのモンスターが例外なく目を大きく作っているのは
+ * 可愛くするためではなく、この解像度で顔が残る唯一の手だから。
+ */
+const EYE_GAIN = 1.24;
+
+/**
+ * 目のまわりの暗がりの色。
+ *
+ * 顔が読めるかどうかは、細部が描けているかではなく
+ * **数画素に潰れた時に明暗の差が残るか**で決まる。眼窩を地肌の陰色で作ると、
+ * 潰れた瞬間に顔全体が同じ明るさの塊になる。地肌が何色でも必ず暗くなるよう、
+ * 陰色をさらに黒へ寄せた専用の色を作る。
+ */
+function socketOf(color: THREE.Color): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl, THREE.SRGBColorSpace);
+  const out = new THREE.Color();
+  // 色相と彩度は残す(無彩色にすると煤で汚したように見える)。明度だけを深く落とす
+  out.setHSL(hsl.h, Math.min(1, hsl.s * 1.15 + 0.05), Math.min(0.16, hsl.l * 0.34), THREE.SRGBColorSpace);
+  return out;
+}
+
 export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOptions): void {
   const p = kit.palette;
   const m = EYE_MOODS[o.mood ?? "fierce"];
-  const s = o.size;
+  const s = o.size * EYE_GAIN;
   const h = s * m.aspect;
   const skin = o.skin ?? p.dark;
+  const socket = socketOf(p.deep);
   const slit = o.slit ?? 1;
   // 虹彩は縦半径で決まるが、細い目では横にはみ出すので横幅でも頭打ちにする。
   // 明るい眼球の種別だけは、虹彩が白目を押しのけて大きく取れるようにする
@@ -201,12 +232,22 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
     place(eye, side * o.x, o.y, o.z, 0, -side * (o.splay ?? 0), side * m.tilt);
 
     // 眼窩。目のまわりを一段暗く落として、目玉が顔に埋まって見えるようにする。
-    // 目より奥に置き、縁だけがはみ出して見えるようにするのが要
-    eye.add(place(kit.lens(s * 1.34, h * 1.5 + s * 0.16, s * 0.4, "hide", p.deep, 10), 0, 0, s * 0.2));
+    // 目より奥に置き、縁だけがはみ出して見えるようにするのが要。
+    //
+    // **地肌の陰色ではなく専用の暗色を使う。** 画面上で顔が20px前後まで
+    // 縮むと、眼窩・眼球・虹彩は1〜2画素に平均されてしまう。そこに残るのは
+    // 「顔の中に暗い帯があり、その中で1点だけ光っている」という明暗差だけで、
+    // 眼窩が地肌と同じ明るさだとその帯そのものが消える
+    eye.add(place(kit.lens(s * 1.42, h * 1.62 + s * 0.18, s * 0.42, "hide", socket, 10), 0, 0, s * 0.2));
+    // 目尻から頬へ流れる暗がり。眼窩だけだと暗い帯が目の幅で切れてしまい、
+    // 遠目には「顔に空いた2つの穴」になる。外へ引き伸ばすと目つきの向きが出る
+    eye.add(
+      place(kit.lens(s * 0.9, h * 0.62, s * 0.3, "hide", socket, 8), side * s * 1.1, -h * 0.3, s * 0.26, 0, side * 0.5, side * 0.5),
+    );
 
     if (m.sclera === "none") {
       // 眼球を持たない種別。窪みの底をもう一段落として、そこに虹彩だけを灯す
-      eye.add(place(kit.lens(s * 0.96, h * 1.06, s * 0.34, "hide", p.deep, 10), 0, 0, s * 0.02));
+      eye.add(place(kit.lens(s * 0.96, h * 1.06, s * 0.34, "hide", socket, 10), 0, 0, s * 0.02));
     } else {
       // 眼球。丸ではなくアーモンド形にすることで、初めて「目つき」が生まれる。
       // 明色にしてよいのは "wet" の種別だけ。獣を明色にすると顔が白い塊になる
@@ -228,12 +269,18 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
       // 瞳の色も視線も消える(実際にそうなっていた)。
       // 大きな暗い虹彩・その中心の小さな光・白い眼球の三段で、
       // 発光面積を増やさずに「丸くて濡れた目」を作る
+      // 虹彩の外周を締める暗い環。実物の目がはっきり見えるのは、
+      // 白目と虹彩の境目に必ずこの環があるから。無いと瞳が滲んで顔がぼやける
+      eye.add(place(kit.lens(iris * 1.14, iris * 1.14 * (h / s), s * 0.17, "hide", socket, 12), 0, 0, -s * 0.3));
       eye.add(place(kit.lens(iris, iris * (h / s), s * 0.2, "hide", p.deep, 12), 0, 0, -s * 0.34));
-      eye.add(place(kit.lens(iris * 0.46 * slit, iris * 0.46 * (h / s), s * 0.12, "glow", p.glow, 10), 0, 0, -s * 0.46));
+      eye.add(place(kit.lens(iris * 0.56 * slit, iris * 0.56 * (h / s), s * 0.12, "glow", p.glow, 10), 0, 0, -s * 0.46));
     } else {
+      // 暗い眼球の上では虹彩そのものが光る。**外周を暗い環で締める**のは同じで、
+      // これが無いと発光が眼窩へ滲んで、目ではなく「顔に付いたランプ」になる
+      eye.add(place(kit.lens(iris * 1.2, iris * 1.2, s * 0.16, "hide", socket, 10), 0, 0, -s * 0.34));
       eye.add(place(kit.lens(iris, iris, s * 0.14, "glow", p.glow, 10), 0, 0, -s * 0.4));
       // 瞳孔。ここが無いと、どんなに形を整えても視線が生まれない
-      eye.add(place(kit.lens(iris * 0.52 * slit, iris * 0.84, s * 0.09, "hide", p.deep, 7), 0, 0, -s * 0.5));
+      eye.add(place(kit.lens(iris * 0.52 * slit, iris * 0.84, s * 0.09, "hide", socket, 7), 0, 0, -s * 0.5));
     }
     // ハイライト。1点入るだけで目が濡れた球として読める
     eye.add(place(kit.lens(iris * 0.30, iris * 0.30, s * 0.06, "plate", p.plate, 6), iris * 0.40, iris * 0.42, -s * 0.56));
@@ -272,12 +319,19 @@ export function addFaceEyes(kit: CreatureKit, head: THREE.Object3D, o: EyeOption
     eye.add(place(kit.lens(s * 0.98, h * 0.52, s * 0.56, "hide", skin, 8), 0, -h * 1.16, s * 0.02, 0.26, 0, 0));
 
     if (o.brow !== false) {
-      // 眉庇。目の上に張り出して影を落とす。遠景で表情が読める最大の要因
+      // 眉庇。目の上に張り出して影を落とす。遠景で表情が読める最大の要因。
+      //
+      // **前へ突き出すこと**が要点。板を貼っただけでは、光の向きによっては
+      // 眉と目が同じ明るさで並び、しかめ面が消える。目より手前へ庇を出せば、
+      // どの方向から光が来ても目の上に必ず暗がりができる
       const brow = new THREE.Group();
-      place(brow, 0, h * 1.1 + s * 0.2, -s * 0.06, -0.4, 0, side * m.brow);
-      brow.add(kit.lens(s * 1.14, s * 0.2, s * 0.5, "hide", skin, 10));
+      place(brow, 0, h * 1.16 + s * 0.2, -s * 0.16, -0.46, 0, side * m.brow);
+      brow.add(kit.lens(s * 1.2, s * 0.24, s * 0.62, "hide", skin, 10));
       // 眉頭の盛り上がり。左右2本の庇が眉間で寄るとしかめ面になる
-      brow.add(place(kit.lens(s * 0.42, s * 0.24, s * 0.4, "hide", skin, 8), -side * s * 0.72, -s * 0.06, s * 0.02));
+      brow.add(place(kit.lens(s * 0.46, s * 0.28, s * 0.46, "hide", skin, 8), -side * s * 0.74, -s * 0.06, s * 0.02));
+      // 庇の下に置く暗がり。実際の影は光源しだいで消えるが、これは消えない。
+      // 「眉の下が暗い」は顔が数画素になっても最後まで残る手がかり
+      brow.add(place(kit.lens(s * 1.06, s * 0.16, s * 0.2, "hide", socket, 8), 0, -s * 0.2, -s * 0.16));
       eye.add(brow);
     }
 
@@ -299,17 +353,19 @@ export function addCyclopsEye(
   o: { y: number; z: number; size: number; skin?: THREE.Color; slit?: number },
 ): void {
   const p = kit.palette;
-  const s = o.size;
+  const s = o.size * EYE_GAIN;
   const skin = o.skin ?? p.dark;
+  const socket = socketOf(p.deep);
   const slit = o.slit ?? 0.34;
 
   // 眼窩。目より奥に広く落として、縁だけがはみ出すようにする
-  head.add(place(kit.lens(s * 1.5, s * 1.02, s * 0.5, "hide", p.deep, 16), 0, o.y, o.z + s * 0.34));
+  head.add(place(kit.lens(s * 1.5, s * 1.02, s * 0.5, "hide", socket, 16), 0, o.y, o.z + s * 0.34));
   // 眼球。暗く沈めるのが要。ここを明るくすると顔が白い塊になる
   head.add(place(kit.lens(s * 1.16, s * 0.78, s * 0.42, "hide", p.deep, 16), 0, o.y, o.z + s * 0.06));
-  // 虹彩と、縦に裂けた瞳孔
+  // 虹彩と、縦に裂けた瞳孔。虹彩の外周は暗い環で締める
+  head.add(place(kit.lens(s * 0.76, s * 0.72, s * 0.22, "hide", socket, 12), 0, o.y, o.z - s * 0.2));
   head.add(place(kit.lens(s * 0.62, s * 0.6, s * 0.2, "glow", p.glow, 12), 0, o.y, o.z - s * 0.26));
-  head.add(place(kit.lens(s * 0.62 * slit, s * 0.5, s * 0.12, "hide", p.deep, 8), 0, o.y, o.z - s * 0.4));
+  head.add(place(kit.lens(s * 0.62 * slit, s * 0.5, s * 0.12, "hide", socket, 8), 0, o.y, o.z - s * 0.4));
   head.add(place(kit.lens(s * 0.17, s * 0.17, s * 0.08, "plate", p.plate, 6), s * 0.26, o.y + s * 0.22, o.z - s * 0.48));
 
   // まぶたの縁。横長の目を1周なぞると、遠景でも「目の形」として残る
@@ -851,8 +907,9 @@ export function addBatWing(
 function buildAttacker(kit: CreatureKit, rig: CreatureRig): void {
   const p = kit.palette;
   // 前後に長い骨格は正面からだと潰れる。斜に構えて全長を見せる。
-  // ただし味方は敵の方(奥)を向くので、深く回すと尻しか見えなくなる
-  rig.yawBias = 0.32;
+  // 回す向きは手前チームと奥チームで反転するので(faceToward)、
+  // 深く取っても「尻だけが見える」側は生まれない
+  rig.yawBias = 0.56;
   rig.pelvis.position.y = 1.0;
 
   // --- 腰 ---
