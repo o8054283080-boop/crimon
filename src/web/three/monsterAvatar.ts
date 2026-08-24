@@ -1430,7 +1430,8 @@ export class MonsterAvatar {
     this.activeGlow += (this.targetActiveGlow - this.activeGlow) * Math.min(1, dt * 7);
     // 素早く消す。長く残ると、全体攻撃で全員が同時に光った時に
     // 画面がしばらく白いままになる
-    this.flash = Math.max(0, this.flash - dt * 9);
+    // 減衰は速く。長いと全体攻撃のたびに画面がしばらく白む
+    this.flash = Math.max(0, this.flash - dt * 13);
 
     const fade = 1 - death;
     const sigilMaterial = this.sigilMesh.material as THREE.MeshBasicMaterial;

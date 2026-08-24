@@ -493,7 +493,7 @@ export class VfxSystem {
       orient: "ground",
       roll: Math.random() * Math.PI,
       opacity: 1,
-      blending: THREE.NormalBlending,
+      blendMode: "alpha",
       fadeIn: 0.04,
       fadePower: 0.85,
       renderOrder: 3,
@@ -553,7 +553,7 @@ export class VfxSystem {
         life: 1.3 + Math.random() * 0.5,
         startScale: 1.0 * s,
         endScale: 3.6 * s,
-        blending: THREE.NormalBlending,
+        blendMode: "alpha",
         opacity: 0.5,
         fadeIn: 0.12,
         fadePower: 1.2,
@@ -668,7 +668,7 @@ export class VfxSystem {
         endScale: 2.8 * s,
         opacity: 0.45,
         fadeIn: 0.08,
-        blending: THREE.NormalBlending,
+        blendMode: "alpha",
         spin: (Math.random() - 0.5) * 0.6,
       });
     }
@@ -978,7 +978,7 @@ export class VfxSystem {
       endScale: 4.0 * s,
       orient: "ground",
       opacity: 0.75,
-      blending: THREE.NormalBlending,
+      blendMode: "alpha",
       fadePower: 1.3,
     });
     // 内向きに刺す棘
@@ -1120,14 +1120,17 @@ export class VfxSystem {
 
     this.after(windup, () => {
       // 画面を刺す白い閃光
+      // 命中の芯。**ここだけブルームへ載せる**ので、小さく短命に留める。
+      // 以前は 8.0 倍まで開いて画面を覆い、被弾していない味方まで白く飛ばしていた
       this.billboards.spawn({
         position: at,
         texture: flashStarTexture(),
         color: WHITE,
-        life: 0.16,
-        startScale: 1.6 * s,
-        endScale: 8.0 * s,
-        fadePower: 2.6,
+        blendMode: "add",
+        life: 0.12,
+        startScale: 1.2 * s,
+        endScale: 3.2 * s,
+        fadePower: 2.8,
         roll: Math.random() * Math.PI,
       });
       // 放射状の光条。板1枚で集中線の密度を出す(帯で描くと本数ぶん枠を食う)
@@ -1820,7 +1823,7 @@ export class VfxSystem {
         life: 1.4,
         startScale: 1.2 * s,
         endScale: 4.0 * s,
-        blending: THREE.NormalBlending,
+        blendMode: "alpha",
         opacity: 0.45,
         fadeIn: 0.1,
         velocity: new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.9, (Math.random() - 0.5) * 0.5),
