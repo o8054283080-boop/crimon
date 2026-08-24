@@ -110,3 +110,32 @@ export function buildStatBreakdown(base: Stats, total: Stats, formats: StatForma
     };
   });
 }
+
+/**
+ * 戦闘の札に出すHPの整形。
+ *
+ * **4桁までしか想定していなかった。**★6Lv60に装備を積むとHPは5桁に届き
+ * (実測でボス178,668)、札の幅(最大124px)に「現在/最大」が収まらず、
+ * 左右が切れて `7523/17866` のように**数字そのものが化けて見えていた**。
+ * 現在値が最大値より大きい、という有り得ない表示になっていた。
+ *
+ * 札を広げる手は採れない。4体が横に並ぶので、1枚を広げると隣とぶつかり、
+ * 実測で横画面の右半分が札の壁になって体が隠れた。
+ *
+ * そこで**桁が増えても文字数が増えない**形にする。
+ * 1万を超えたら「万」で丸める。正確な値は title 属性に残してあるので、
+ * 必要なら長押しで読める。
+ */
+export function formatHp(value: number): string {
+  const n = Math.max(0, Math.round(value));
+  if (n < 10_000) return String(n);
+  const man = n / 10_000;
+  // 100万を超えたら小数を落とす。「123.4万」は札からはみ出す。
+  // **丸めた後で判定する。**99.99を先に判定すると「100.0万」になって1文字はみ出す
+  return Number(man.toFixed(1)) >= 100 ? `${Math.round(man)}万` : `${man.toFixed(1)}万`;
+}
+
+/** 札に出す「現在/最大」。どちらも同じ規則で丸める */
+export function formatHpPair(current: number, max: number): string {
+  return `${formatHp(current)}/${formatHp(max)}`;
+}

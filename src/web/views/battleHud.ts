@@ -16,6 +16,7 @@
  * 上から下へ並ぶようにして、目が迷わないようにしている。
  */
 import { UnitSnapshot } from "../../battle/engine.js";
+import { formatHpPair } from "../../core/stats.js";
 import { ActiveEffect } from "../../battle/unit.js";
 import { ELEMENT_JA, Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
@@ -261,7 +262,7 @@ export function buildHudCard(def: MonsterDefinition, team: "PLAYER" | "ENEMY"): 
   const hpTrail = el("div", { className: "unit-hud__hp-trail" });
   const hpFill = el("div", { className: "unit-hud__hp-fill" });
   const hpShield = el("div", { className: "unit-hud__hp-shield" });
-  const hpText = el("div", { className: "unit-hud__hp-text" }, [`${def.stats.hp}/${def.stats.hp}`]);
+  const hpText = el("div", { className: "unit-hud__hp-text" }, [formatHpPair(def.stats.hp, def.stats.hp)]);
   const gaugeFill = el("div", { className: "unit-hud__gauge-fill" });
 
   const plate = el("div", { className: "unit-hud__plate" }, [
