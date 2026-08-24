@@ -263,6 +263,16 @@ export class BattleStage {
   private frameMs = 16.7;
   /** 解像度を下げた後、次に触るまでの猶予。毎フレーム上下すると画面がちらつく */
   private pixelCooldown = 0;
+  /** 構図から決まる演出の基準の大きさ。重い端末ではここから更に絞る */
+  private vfxSizeScale = 1;
+  /**
+   * 今の軽量化の段。0=そのまま / 1=後処理の飾りを止める / 2=にじみも止める。
+   *
+   * 画素を下限まで落としても追いつかない端末があるので、段を分けて更に降ろす。
+   * **見た目より、動きの滑らかさを優先する。**カクつく画面はどんなに綺麗でも
+   * 気持ちよく遊べない。
+   */
+  private downgradeStep = 0;
   private disposed = false;
   private elapsed = 0;
 
@@ -529,7 +539,7 @@ export class BattleStage {
     const pool = new THREE.SpotLight(this.mood.hemiSky, 190, 42, 0.74, 0.72, 2);
     pool.position.set(1.2, 15.5, 2.2);
     pool.target.position.set(0, 0, -0.6);
-    pool.castShadow = true;
+    pool.castShadow = false;
     // 真上からの光なので影の面積は小さい。1024で足りる(2枚目の影マップは
     // モバイルでの負荷に直結するので、必要以上に上げないこと)
     pool.shadow.mapSize.set(512, 512);
@@ -729,7 +739,8 @@ export class BattleStage {
     // 「大きめのエフェクト1つ分」の基準にする。こうしておくと、
     // 画角や距離を変えても演出が画面を覆って白飛びすることがない。
     const visibleHeight = 2 * high * tanY;
-    this.vfx.setSizeScale(visibleHeight / VFX_REFERENCE_HEIGHT);
+    this.vfxSizeScale = visibleHeight / VFX_REFERENCE_HEIGHT;
+    this.vfx.setSizeScale(this.vfxSizeScale);
     // どんな演出でも、1枚の板が画面の高さのこの割合を超えないようにする
     this.vfx.setMaxBillboardScale(visibleHeight * VFX_MAX_SCREEN_RATIO);
     // 粒の「数」も抑える。大きさだけ絞っても、加算合成では重なった総量で
@@ -879,7 +890,40 @@ export class BattleStage {
       this.pixelScale = Math.min(1, this.pixelScale + 0.06);
     }
 
+    /*
+     * 画素を下限まで落としてもまだ重い時は、**後処理を段階的に止める。**
+     *
+     * 画面いっぱいを何度も塗り直す処理(にじみ・周辺減光・色収差)は、
+     * 解像度を下げても比例して軽くなるだけで、枚数そのものは減らない。
+     * 実測(実機の録画)で、解像度を44%削った後もまだ31.5fpsだった。
+     */
+    if (this.pixelScale <= 0.62 + 1e-6 && this.frameMs > 27 && this.downgradeStep < 2) {
+      this.downgradeStep += 1;
+      this.applyDowngrade();
+      this.frameMs = 16.7;
+      this.pixelCooldown = 90;
+      return;
+    }
+    // 十分に軽くなっていれば飾りを戻す
+    if (this.downgradeStep > 0 && this.frameMs < 13) {
+      this.downgradeStep -= 1;
+      this.applyDowngrade();
+      this.frameMs = 16.7;
+      this.pixelCooldown = 120;
+      return;
+    }
+
     if (this.pixelScale !== before) {
+      /*
+       * 画素だけでなく**演出の量も**落とす。
+       *
+       * 重さの主因は塗り直しの量で、その大半は画面を覆う半透明の板が作る。
+       * 解像度を下げても、同じ枚数の板を同じ大きさで重ねれば効きが薄い。
+       * 端末が苦しい時は、粒の数と板の大きさも一緒に絞る。
+       */
+      this.vfx.setQuality(VFX_DENSITY * this.pixelScale);
+      this.vfx.setSizeScale(this.vfxSizeScale * (0.7 + 0.3 * this.pixelScale));
+
       const ratio = this.targetPixelRatio();
       this.renderer.setPixelRatio(ratio);
       this.composer.setPixelRatio(ratio);
@@ -892,6 +936,16 @@ export class BattleStage {
     }
   }
 
+  /** 今の段に合わせて後処理を入切する */
+  private applyDowngrade(): void {
+    // 1段目: 周辺減光と色収差を止める。画作りの味だが、無くても情報は失われない
+    this.cinematicPass.enabled = this.downgradeStep < 1;
+    // 2段目: にじみも止める。**最後まで残すのは形が読めることの方**
+    this.bloomPass.enabled = this.downgradeStep < 2;
+    // 影も2段目で落とす。接地影(板)は残るので、足元が浮くことはない
+    this.renderer.shadowMap.enabled = this.downgradeStep < 2;
+  }
+
   private start(): void {
     const loop = () => {
       if (this.disposed) return;
@@ -901,7 +955,24 @@ export class BattleStage {
     this.frameHandle = requestAnimationFrame(loop);
   }
 
+  /** 計測用。開発時に window から描画統計を読むための一時フック */
+  private exposeStats(): void {
+    Object.assign(window, {
+      __crimonStats: () => ({
+        calls: this.renderer.info.render.calls,
+        tris: this.renderer.info.render.triangles,
+        programs: this.renderer.info.programs?.length ?? 0,
+        textures: this.renderer.info.memory.textures,
+        geometries: this.renderer.info.memory.geometries,
+        pixelRatio: this.renderer.getPixelRatio(),
+      }),
+    });
+  }
+
   private renderFrame(): void {
+    // 合成は複数回の描画で成り立っている。自動初期化のままだと最後の1回しか見えない
+    this.renderer.info.autoReset = false;
+    this.renderer.info.reset();
     const rawDelta = Math.min(this.clock.getDelta(), 0.05);
     this.adaptResolution(rawDelta * 1000);
 
@@ -934,6 +1005,7 @@ export class BattleStage {
     this.cinematicPass.setTime(this.elapsed);
 
     this.composer.render();
+    this.exposeStats();
   }
 
   /**

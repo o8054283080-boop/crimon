@@ -142,3 +142,40 @@ HARNESS_VITE_PORT=... HARNESS_PORT=... node tools/harness.mjs &
 
 2回踏んだ。**CSSが丸ごと効かなくなったら、まず配信されているバイト数を見ること。**
 波括弧の対応を数えても何も出てこない。
+
+## 描画の重さを測る
+
+戦闘中に `window.__crimonStats()` を叩くと、その1フレームの描画統計が返る。
+
+```
+{ calls: 379, tris: 172515, programs: 82, textures: 55, geometries: 219, pixelRatio: 0.88 }
+```
+
+**スマホでのドローコールの目安は100〜150。**実測の内訳(装備ダンジョン10階、8体):
+
+| 状態 | calls | tris |
+|---|---|---|
+| 本体のみ(影なし) | 288 | 102,359 |
+| ＋キー光の影 | 379 | 172,515 |
+| ＋補助光の影 | 473 | 242,561 |
+
+**影を落とす光源が1つ増えるたびに、シーン全体をもう一度描き直す。**
+補助光の影を切って -94 calls / -29% ポリゴンになった。
+
+## 実機の録画から実効フレームレートを測る
+
+体感の「重い」を数字にする。iPhoneの画面録画はHEVCなので、この環境の
+Chromiumではデコードできない。ffmpegを入れて、**絵が実際に変わった回数**を数える。
+
+```
+pip install imageio-ffmpeg
+FF=$(python3 -c "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())")
+# 4秒間で絵が変わった回数
+$FF -ss 5 -t 4 -i rec.mov -vf mpdecimate -fps_mode passthrough -f null - 2>&1 | grep -oE "frame=\s*[0-9]+" | tail -1
+# 同じ4秒の総フレーム数
+$FF -ss 5 -t 4 -i rec.mov -f null - 2>&1 | grep -oE "frame=\s*[0-9]+" | tail -1
+```
+
+録画そのものが60fpsで撮れているとは限らない(端末が苦しいと録画側も落ちる)。
+**両方を見ること。**実測では 総175 / 変化126 = 実効31.5fps、
+録画の取りこぼしも 60→43.8fps だった。
