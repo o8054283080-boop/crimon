@@ -15,7 +15,7 @@ import {
   isTowerBossFloor,
   isTowerCheckpoint,
 } from "../../data/trialTower.js";
-import { PlayerState } from "../../game/playerState.js";
+import { MAX_TOWER_PARTY_SIZE, PlayerState } from "../../game/playerState.js";
 import { TowerRewardResult } from "../../game/trialTower.js";
 import { el } from "../dom.js";
 import { withPortrait } from "../three/portrait.js";
@@ -68,7 +68,7 @@ export interface TrialTowerProps {
 }
 
 /** 塔の編成に入れられる上限 */
-const TOWER_PARTY_SIZE = 5;
+
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((n): n is HTMLElement => n !== null);
@@ -462,7 +462,7 @@ function renderChallenge(props: TrialTowerProps): HTMLElement {
 
 function renderParty(props: TrialTowerProps): HTMLElement {
   const locked = props.run !== null;
-  const slots = Array.from({ length: TOWER_PARTY_SIZE }, (_, i) => {
+  const slots = Array.from({ length: MAX_TOWER_PARTY_SIZE }, (_, i) => {
     const instance = props.party[i];
     if (!instance) return el("div", { className: "tower-slot tower-slot--empty" }, ["＋"]);
     const dex = findMonsterById(instance.dexId);
@@ -478,7 +478,7 @@ function renderParty(props: TrialTowerProps): HTMLElement {
   return el("section", { className: "panel tower-party" }, [
     el("div", { className: "tower-party__head" }, [
       el("h2", {}, ["塔の編成"]),
-      el("span", { className: "tower-party__count" }, [`${props.party.length} / ${TOWER_PARTY_SIZE}`]),
+      el("span", { className: "tower-party__count" }, [`${props.party.length} / ${MAX_TOWER_PARTY_SIZE}`]),
     ]),
     el("div", { className: "tower-party__slots" }, slots),
     locked
@@ -486,7 +486,7 @@ function renderParty(props: TrialTowerProps): HTMLElement {
       : el(
           "button",
           { type: "button", className: "btn btn--ghost tower-party__edit", onclick: props.onEditParty },
-          ["編成を変える"],
+          [props.party.length === 0 ? "編成する" : "編成を変える"],
         ),
   ]);
 }
@@ -513,7 +513,11 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
     "div",
     { className: classes.join(" "), title: `${floor.name}${passed ? "(到達済み)" : ""}` },
     nodes([
-      check ? el("span", { className: "tower-step__flag" }, ["⚑"]) : boss ? el("span", { className: "tower-step__flag" }, ["👑"]) : null,
+      // 節はすべて関門でもある。片方だけ出すと、凡例と食い違って
+      // 「10階は関門ではない」と読めてしまうので、両方の印を並べる
+      boss || check
+        ? el("span", { className: "tower-step__flag" }, [`${boss ? "👑" : ""}${check ? "⚑" : ""}`])
+        : null,
       el("span", { className: "tower-step__no" }, [String(floor.floor)]),
       passed ? el("span", { className: "tower-step__check" }, ["✓"]) : null,
       now ? el("span", { className: "tower-step__now" }, ["今"]) : null,

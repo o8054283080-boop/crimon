@@ -116,6 +116,15 @@ export interface TowerRunSave {
 
 const STORAGE_KEY = "crimon_save_v1";
 
+/**
+ * 試練の塔の編成の最大人数。
+ *
+ * 装備ダンジョンと同じ5体。塔はHPを持ち越すので、**控えが厚いほど粘れる**。
+ * 別の定数にしてあるのは、片方だけを動かしたくなった時に
+ * もう片方を巻き込まないため(速度の時に片方だけ触って崩した経緯がある)。
+ */
+export const MAX_TOWER_PARTY_SIZE = 5;
+
 /** 装備ダンジョン専用パーティの最大人数(通常ステージの4体より1体多い) */
 export const MAX_DUNGEON_PARTY_SIZE = 5;
 
@@ -340,14 +349,13 @@ export function toggleDungeonPartyMember(state: PlayerState, instanceId: string)
   state.dungeonPartyIds.push(instanceId);
 }
 
-/** 試練の塔の編成。装備ダンジョンと同じ5体まで(持ち越しの塔なので控えが厚いほど粘れる) */
 export function toggleTowerPartyMember(state: PlayerState, instanceId: string): void {
   const idx = state.towerPartyIds.indexOf(instanceId);
   if (idx >= 0) {
     state.towerPartyIds.splice(idx, 1);
     return;
   }
-  if (state.towerPartyIds.length >= MAX_DUNGEON_PARTY_SIZE) return;
+  if (state.towerPartyIds.length >= MAX_TOWER_PARTY_SIZE) return;
   state.towerPartyIds.push(instanceId);
 }
 

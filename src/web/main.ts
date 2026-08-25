@@ -1366,8 +1366,9 @@ function startTowerFloor(): void {
   const run = state.player.trialTowerRun ?? beginTowerRun(state.player);
   if (!run) return;
   if (!spendTowerStamina(state.player)) {
-    // 登坂そのものは残す。回復すれば続きから入れる
-    state.towerNotice = "スタミナが尽きました。回復すれば続きから登れます。";
+    // 登坂そのものは残す。**理由(スタミナが足りない)はボタンの脇が伝える**ので、
+    // ここは「進みが消えていない」ことだけを言う
+    state.towerNotice = "登坂はそのまま残っています。スタミナが戻れば続きから登れます。";
     playSfx("denied", 0.7);
     savePlayerState(state.player);
     state.screen = "TRIAL_TOWER";
@@ -1832,6 +1833,7 @@ function render(): void {
       break;
 
     case "TRIAL_TOWER": {
+      const blockedReason = towerBlockReason(state.player);
       content = renderTrialTower({
         bestFloor: state.player.trialTowerBestFloor,
         nextFloor: nextTowerFloor(state.player),
@@ -1839,9 +1841,14 @@ function render(): void {
         party: getTowerParty(state.player),
         player: state.player,
         claimedFloors: state.player.trialTowerClaimedFloors,
-        notice: state.towerNotice,
+        /*
+         * 挑めない理由(`blockedReason`)はボタンの脇に必ず出る。
+         * 案内がそれと同じことを言っている時は**上の帯に出さない**。
+         * スタミナ切れで「上の帯」と「ボタンの赤字」に同じ文が2つ並んでいた
+         */
+        notice: state.towerNotice === blockedReason ? null : state.towerNotice,
         outcome: state.towerOutcome,
-        blockedReason: towerBlockReason(state.player),
+        blockedReason,
         onEditParty: () => {
           state.partyEditMode = "TOWER";
           state.towerOutcome = null;

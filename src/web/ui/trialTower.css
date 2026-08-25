@@ -142,7 +142,8 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.85));
+  /* 金の面に金の題字を置くので、影を二重に敷かないと上端が背景へ溶ける */
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 10px rgba(0, 0, 0, 0.8));
 }
 
 /* 中断。失敗でも達成でもないので、縁は付けず面だけ沈める */
@@ -1021,7 +1022,7 @@
   position: absolute;
   top: 2px;
   right: 3px;
-  font-size: 0.54rem;
+  font-size: 0.6rem;
   font-weight: 900;
   color: #7de3a4;
   text-shadow: 0 0 5px rgba(60, 220, 130, 0.8);
@@ -1032,7 +1033,7 @@
   position: absolute;
   top: 1px;
   left: 3px;
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   line-height: 1;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
@@ -1096,9 +1097,10 @@
   bottom: 1px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: 999px;
-  font-size: 0.5rem;
+  /* 9.6pxでは「今」の横棒が潰れて読めなかった。漢字は数字より大きさが要る */
+  font-size: 0.68rem;
   font-weight: 900;
   line-height: 1.5;
   color: #1a1405;
@@ -1151,23 +1153,46 @@
     grid-row: 1;
   }
 
-  .tower-screen > .tower-outcome {
+  .tower-screen > .tower-outcome,
+  .tower-screen > .tower-notice {
     grid-column: 1 / -1;
     grid-row: 2;
   }
 
-  .tower-screen > .tower-notice {
-    grid-column: 1 / -1;
-    grid-row: 3;
-  }
-
   .tower-screen > .tower-floor {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 2;
   }
 
   .tower-screen > .tower-ladder {
     grid-column: 2;
+    grid-row: 3 / span 20;
+  }
+
+  /*
+   * 知らせ(戻ってきた理由・案内)は幅いっぱいを使う。
+   * 出ている数だけ右列を下へずらす。ずらさずに固定の行へ置くと、
+   * 主役(到達階)と右列の先頭が食い違って、右上に大きな空白が空く。
+   */
+  .tower-screen:has(> .tower-outcome) > .tower-notice {
+    grid-row: 3;
+  }
+
+  .tower-screen:has(> .tower-outcome) > .tower-floor,
+  .tower-screen:has(> .tower-notice) > .tower-floor {
+    grid-row: 3;
+  }
+
+  .tower-screen:has(> .tower-outcome) > .tower-ladder,
+  .tower-screen:has(> .tower-notice) > .tower-ladder {
+    grid-row: 4 / span 20;
+  }
+
+  .tower-screen:has(> .tower-outcome):has(> .tower-notice) > .tower-floor {
+    grid-row: 4;
+  }
+
+  .tower-screen:has(> .tower-outcome):has(> .tower-notice) > .tower-ladder {
     grid-row: 5 / span 20;
   }
 }

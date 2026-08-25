@@ -19,6 +19,7 @@ import "./web/style.css";
 import { BattleEngine } from "./battle/engine.js";
 import { MonsterDefinition } from "./core/monster.js";
 import { createMonsterInstance } from "./core/monsterInstance.js";
+import { Star } from "./core/rarity.js";
 import { MONSTER_DEX, findMonster } from "./data/monsters.js";
 import { createInitialState } from "./game/playerState.js";
 import { emptyTowerRewardResult } from "./game/trialTower.js";
@@ -107,14 +108,14 @@ if (params.get("view") === "tower") {
   const player = createInitialState();
   player.stamina = blocked ? 1 : 62;
 
-  const roster: [string, number, number][] = [
+  const roster: [string, Star, number][] = [
     ["dragon_FIRE", 6, 40],
     ["seraph_LIGHT", 6, 40],
     ["fairy_GRASS", 5, 35],
     ["golem_WATER", 5, 35],
     ["wolf_ELECTRIC", 4, 30],
   ];
-  const party = empty ? [] : roster.map(([dexId, star, level]) => createMonsterInstance(dexId, star as 1, level));
+  const party = empty ? [] : roster.map(([dexId, star, level]) => createMonsterInstance(dexId, star, level));
 
   // HPは5桁まで伸びる。桁が増えても札からはみ出さないかを、ここで必ず見る
   const runMembers = [

@@ -4,7 +4,9 @@
  *   npx tsx tools/towerPressure.mjs            # 編成別の到達階(既定・30回ずつ登る)
  *   npx tsx tools/towerPressure.mjs --floors   # 1階ずつ全回復から挑んだ時の圧(単調性の確認)
  *   npx tsx tools/towerPressure.mjs --traits   # 傾向(癒やし/守り/群れ/疾風)が効いているか
+ *   npx tsx tools/towerPressure.mjs --trace     # 階ごとに何が起きたか(突破率・越えた時の残HP)
  *   npx tsx tools/towerPressure.mjs --climbs 60 --teams 通常,毒
+ *   npx tsx tools/towerPressure.mjs --gear 6 --tuned   # 装備を極めた人の目線で測る
  *
  * ## なぜ勝率で測らないか
  *
@@ -51,11 +53,18 @@ function mulberry32(seed) {
   };
 }
 
-/** 測定の育成度。全編成そろって同じにする(差が育成度から出たら比較にならない) */
+/**
+ * 測定の育成度。全編成そろって同じにする(差が育成度から出たら比較にならない)。
+ *
+ * 既定は★6 Lv60 + ★5装備。「装備を極めた人」は `--gear 6 --tuned` で測る。
+ * 塔の上の方が★5装備で誰にも届かないのは失敗ではなく、そこが**極めた人の領域**だという意味。
+ * それを確かめずに曲線を下げると、極めた人にとっての30階が消える。
+ */
 const PARTY_STAR = 6;
 const PARTY_LEVEL = 60;
-const GEAR_STAR = 5;
 const GEAR_SUBSTATS = 4;
+let gearStar = 5;
+let gearTuned = false;
 
 const NORMAL_TEMPLATE_IDS = MONSTER_TEMPLATES.map((t) => t.templateId);
 const HIGH_RARITY_TEMPLATE_IDS = ["griffon", "dragon", "seraph", "nemesis"];
@@ -95,29 +104,48 @@ const TEAMS = {
     ids: ["slime_GRASS", "slime_WATER", "imp_ELECTRIC", "wolf_ELECTRIC"],
     requires: { templates: ["slime", "imp", "wolf"], elements: OBTAINABLE_ELEMENTS, kinds: { POISON: 3 } },
   },
+  // 毒を3体、癒やし手を1体。**毒が浅いのは毒のせいか、回復が無いせいか**を切り分けるための編成。
+  // 上の「毒」との差が、そのまま持ち越しの塔における回復役の値打ちになる
+  "毒+癒やし": {
+    ids: ["slime_GRASS", "slime_WATER", "imp_ELECTRIC", "fairy_WATER"],
+    requires: {
+      templates: ["slime", "imp", "wolf", "fairy"],
+      elements: OBTAINABLE_ELEMENTS,
+      kinds: { POISON: 3, HEAL: 1 },
+    },
+  },
 };
 
-/** 傾向が効いているかを見るための編成。傾向への「答え」を持つ側と持たない側を並べる */
+/**
+ * 傾向が効いているかを見るための編成。傾向への「答え」を持つ側と持たない側を並べる。
+ *
+ * **両側とも通常モンスターだけで組む。**片方に高レアを混ぜると、出た差が
+ * 傾向のせいなのかステータスのせいなのか分からなくなる。
+ * 回復と盾も両側から外してある(持ち越しの強さが混ざるため)。
+ */
 const TRAIT_PROBE_TEAMS = {
-  // 妨害(気絶・暗闇・ゲージ)持ち。癒やし手を黙らせる/疾風の先手を崩す側
-  妨害あり: {
-    ids: ["griffon_WATER", "wolf_ELECTRIC", "imp_ELECTRIC", "nemesis_ELECTRIC"],
-    requires: { elements: OBTAINABLE_ELEMENTS, kinds: { STUN: 1, GAUGE: 2 } },
+  // 手番を奪う側。癒やし手を黙らせる/疾風の先手を崩す答えになりうる
+  気絶持ち: {
+    ids: ["wolf_FIRE", "knight_WATER", "knight_GRASS", "treant_WATER"],
+    requires: { elements: OBTAINABLE_ELEMENTS, kinds: { STUN: 4 }, forbidKinds: ["HEAL", "SHIELD"] },
   },
-  // 同じ育成度で、妨害をまったく持たない素殴り側
+  // 同じ育成度・同じ通常モンスターで、手番を奪う手段をまったく持たない側
   妨害なし: {
-    ids: ["dragon_GRASS", "knight_FIRE", "slime_FIRE", "imp_WATER"],
-    requires: { elements: OBTAINABLE_ELEMENTS, forbidKinds: ["STUN", "GAUGE", "BLIND"] },
+    ids: ["wolf_WATER", "knight_FIRE", "golem_ELECTRIC", "slime_FIRE"],
+    requires: {
+      elements: OBTAINABLE_ELEMENTS,
+      forbidKinds: ["STUN", "GAUGE", "BLIND", "COOLDOWN_EXTEND", "HEAL", "SHIELD"],
+    },
   },
   // 全体攻撃を全員が持つ側(群れの階の答え)
   全体攻撃: {
-    ids: ["slime_GRASS", "slime_WATER", "imp_GRASS", "wisp_ELECTRIC"],
-    requires: { elements: OBTAINABLE_ELEMENTS, allEnemySkills: 4 },
+    ids: ["slime_GRASS", "slime_FIRE", "imp_FIRE", "golem_FIRE"],
+    requires: { elements: OBTAINABLE_ELEMENTS, allEnemySkills: 4, forbidKinds: ["HEAL", "SHIELD"] },
   },
   // 単体攻撃しか持たない側
   単体のみ: {
-    ids: ["griffon_FIRE", "griffon_WATER", "knight_WATER", "wolf_FIRE"],
-    requires: { elements: OBTAINABLE_ELEMENTS, allEnemySkills: 0 },
+    ids: ["wolf_WATER", "wolf_FIRE", "knight_FIRE", "golem_ELECTRIC"],
+    requires: { elements: OBTAINABLE_ELEMENTS, allEnemySkills: 0, forbidKinds: ["HEAL", "SHIELD"] },
   },
 };
 
@@ -214,6 +242,22 @@ function printAudit(teams) {
  * 登坂
  * ============================================================ */
 
+/**
+ * 速度に寄せた副効果の装備を選び直す(実際のプレイヤーがやる装備の詰め方の再現)。
+ * ランダムに生成した装備をそのまま着けるだけでは、詰めた編成の強さを過小評価する。
+ */
+function tunedGear(rng) {
+  const best = {};
+  for (let r = 0; r < 30; r += 1) {
+    for (const slot of EQUIP_SLOTS) {
+      const eq = generateEquipment({ slot, star: gearStar, subStatCount: GEAR_SUBSTATS, rng });
+      const spd = [eq.mainStat, ...eq.subStats].reduce((s, x) => s + (x.type === "SPD" ? x.value : 0), 0);
+      if (!best[slot] || spd > best[slot].spd) best[slot] = { eq, spd };
+    }
+  }
+  return Object.values(best).map((b) => b.eq);
+}
+
 function buildClimber(ids, rng) {
   const state = createInitialState();
   // スタミナは塔の難易度と関係がない。ここでは切らさないようにしておく
@@ -221,8 +265,10 @@ function buildClimber(ids, rng) {
   const party = ids.map((id) => createMonsterInstance(id, PARTY_STAR, PARTY_LEVEL));
   state.monsters = party;
   for (const m of party) {
-    for (const slot of EQUIP_SLOTS) {
-      const eq = generateEquipment({ slot, star: GEAR_STAR, subStatCount: GEAR_SUBSTATS, rng });
+    const gear = gearTuned
+      ? tunedGear(rng)
+      : EQUIP_SLOTS.map((slot) => generateEquipment({ slot, star: gearStar, subStatCount: GEAR_SUBSTATS, rng }));
+    for (const eq of gear) {
       addEquipment(state, eq);
       equipToMonster(state, m.id, eq.id);
     }
@@ -310,6 +356,9 @@ export function measureClimbs(ids, climbs = 30, seedBase = 4200) {
     ownHealSeen += r.ownHealSeen;
   }
   const sorted = [...reached].sort((a, b) => a - b);
+  // 1階あたりの行動数。**長さもバランスのうち。**実測で1行動がx8再生の約1秒なので、
+  // 200手を超える階は1戦5分を超える。数字の上で成立していても、そこは遊べていない
+  const turns = runs.flatMap((r) => r.perFloor.map((f) => f.turns)).sort((a, b) => a - b);
   // どの階で止まったかを数える。中央値だけだと「詰まる場所」が見えない
   const stuck = new Map();
   for (const r of runs) {
@@ -326,6 +375,8 @@ export function measureClimbs(ids, climbs = 30, seedBase = 4200) {
     reach20: reached.filter((f) => f >= 20).length / reached.length,
     reach30: reached.filter((f) => f >= 30).length / reached.length,
     stuck: [...stuck.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3),
+    turnsMedian: quantile(turns, 0.5),
+    turnsMax: turns[turns.length - 1] ?? 0,
     maxPoisonOnEnemy,
     ownShieldSeen,
     ownHealSeen,
@@ -344,7 +395,11 @@ export function measureClimbs(ids, climbs = 30, seedBase = 4200) {
  * 勝率ではなく決着時点の敵残HP割合を使うので、勝てない階が続いても差が読める。
  */
 export function measureFloor(ids, floor, trials = 20, seedBase = 7700, traitOverride) {
-  const def = traitOverride ? buildTowerFloor(floor, traitOverride) : TRIAL_TOWER_FLOORS[floor - 1];
+  return measureFloorDef(ids, traitOverride ? buildTowerFloor(floor, traitOverride) : TRIAL_TOWER_FLOORS[floor - 1], trials, seedBase);
+}
+
+/** 階の定義を直に渡して測る。曲線の候補を振る時(scan)に使う */
+export function measureFloorDef(ids, def, trials = 20, seedBase = 7700) {
   let wins = 0;
   let enemyHpLeftSum = 0;
   let allyHpLeftSum = 0;
@@ -404,7 +459,9 @@ const pct = (v) => `${(v * 100).toFixed(0)}%`;
 
 function runClimbMode(teams, climbs) {
   printAudit(teams);
-  console.log(`=== 編成別の到達階(${climbs}回ずつ / ★${PARTY_STAR} Lv${PARTY_LEVEL} + ★${GEAR_STAR}装備) ===`);
+  console.log(
+    `=== 編成別の到達階(${climbs}回ずつ / ★${PARTY_STAR} Lv${PARTY_LEVEL} + ★${gearStar}装備${gearTuned ? "・速度に詰めたもの" : ""}) ===`,
+  );
   console.log(
     "編成".padEnd(8) +
       "中央値".padStart(8) +
@@ -415,6 +472,7 @@ function runClimbMode(teams, climbs) {
       "10階".padStart(7) +
       "20階".padStart(7) +
       "踏破".padStart(7) +
+      "  手数".padStart(11) +
       "  詰まった階",
   );
   const results = {};
@@ -431,6 +489,7 @@ function runClimbMode(teams, climbs) {
         pct(r.reach10).padStart(7) +
         pct(r.reach20).padStart(7) +
         pct(r.reach30).padStart(7) +
+        `${r.turnsMedian}/${r.turnsMax}`.padStart(11) +
         "  " +
         r.stuck.map(([f, n]) => `${f}階×${n}`).join(" "),
     );
@@ -439,6 +498,11 @@ function runClimbMode(teams, climbs) {
     }
     if (name.includes("耐久") && (r.ownShieldSeen === 0 || r.ownHealSeen === 0)) {
       console.log("  ⚠ 耐久編成が盾も回復も使えていない。この行は難易度ではなく編成ミスを測っている");
+    }
+    // 長さもバランスのうち。実測で1行動がx8再生の約1秒(装備ダンジョン5階で37手=37秒)なので、
+    // 中央値120手を超えると1階に2分かかる。数字の上で成立していても、そこは遊べていない
+    if (r.turnsMedian > 120) {
+      console.log(`  ⚠ 1階あたり中央値${r.turnsMedian}手。x8再生でも1階に2分以上かかる`);
     }
   }
   return results;
@@ -459,13 +523,52 @@ function runFloorMode(teams) {
   }
 }
 
+/**
+ * 登坂中に階ごとで何が起きているかを追う。
+ * 到達階だけを見ていると「どこでどれだけ削られたか」が読めず、
+ * 曲線を上げるべきなのか、ボス階だけを直すべきなのかが分からない。
+ */
+function runTraceMode(teams, climbs) {
+  for (const [name, team] of Object.entries(teams)) {
+    const r = measureClimbs(team.ids, climbs);
+    console.log(`\n=== ${name} の登坂(${climbs}回) 中央値${r.median}階 ===`);
+    console.log("階".padStart(3) + " 傾向".padEnd(9) + "挑戦".padStart(5) + "突破".padStart(6) + "越えた時の残HP".padStart(15) + "  生存".padStart(6));
+    const byFloor = new Map();
+    for (const run of r.runs) {
+      for (const f of run.perFloor) {
+        if (!byFloor.has(f.floor)) byFloor.set(f.floor, []);
+        byFloor.get(f.floor).push(f);
+      }
+    }
+    for (const floor of [...byFloor.keys()].sort((a, b) => a - b)) {
+      const rows = byFloor.get(floor);
+      const cleared = rows.filter((x) => x.cleared);
+      const def = TRIAL_TOWER_FLOORS[floor - 1];
+      const label = def.trait === "NONE" ? (floor % 5 === 0 ? "関門" : "-") : TOWER_TRAIT_LABEL[def.trait];
+      const hp = cleared.length > 0 ? cleared.reduce((s, x) => s + x.allyHpLeft, 0) / cleared.length : 0;
+      const alive = cleared.length > 0 ? cleared.reduce((s, x) => s + x.standing, 0) / cleared.length : 0;
+      console.log(
+        String(floor).padStart(3) +
+          " " +
+          label.padEnd(8) +
+          String(rows.length).padStart(5) +
+          pct(cleared.length / rows.length).padStart(6) +
+          pct(hp).padStart(15) +
+          alive.toFixed(1).padStart(8),
+      );
+    }
+  }
+}
+
 function runTraitMode() {
   printAudit(TRAIT_PROBE_TEAMS);
   const traits = ["NONE", "HEALER", "WARD", "SWARM", "SWIFT"];
   // 傾向だけを差し替え、階(=倍率)は固定する。そうしないと階の重さと混ざる
   for (const baseFloor of [12, 22]) {
-    console.log(`\n=== 傾向の効き(${baseFloor}階の倍率で固定 / 敵残HP・決着ターン) ===`);
+    console.log(`\n=== 傾向の効き(${baseFloor}階の倍率で固定 / 味方残HP・決着手数) ===`);
     const names = Object.keys(TRAIT_PROBE_TEAMS);
+    // 味方の残HPで見る。**敵残HPは勝てる階では0%に張り付いて何も語らない。**
+    // 傾向は「その階がいくら高くついたか」に出る
     console.log("傾向".padEnd(10) + names.map((n) => n.padStart(16)).join("") + "  敵回復  敵盾");
     for (const trait of traits) {
       const cells = [];
@@ -473,7 +576,7 @@ function runTraitMode() {
       let shield = 0;
       for (const n of names) {
         const r = measureFloor(TRAIT_PROBE_TEAMS[n].ids, baseFloor, 16, 7700, trait);
-        cells.push(`${pct(r.enemyHpLeft)}/${r.turns.toFixed(0)}T`.padStart(16));
+        cells.push(`${pct(r.allyHpLeft)}/${r.turns.toFixed(0)}T`.padStart(16));
         heal = Math.max(heal, r.enemyHeal);
         shield = Math.max(shield, r.enemyShieldMax);
       }
@@ -495,12 +598,15 @@ if (process.argv[1]?.endsWith("towerPressure.mjs")) {
     const i = argv.indexOf(flag);
     return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
   };
+  gearStar = Number(argValue("--gear", 5));
+  gearTuned = argv.includes("--tuned");
   const picked = argValue("--teams", null);
   const teams = picked
     ? Object.fromEntries(Object.entries(TEAMS).filter(([n]) => picked.split(",").includes(n)))
     : TEAMS;
 
   if (argv.includes("--traits")) runTraitMode();
+  else if (argv.includes("--trace")) runTraceMode(teams, Number(argValue("--climbs", 30)));
   else if (argv.includes("--floors")) runFloorMode(teams);
   else runClimbMode(teams, Number(argValue("--climbs", 30)));
 }
