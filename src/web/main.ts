@@ -12,6 +12,13 @@ import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
+import {
+  PersistState,
+  backupTakenAt,
+  ensurePersistentStorage,
+  readStartupBackup,
+  takeStartupBackup,
+} from "../game/saveDurability.js";
 import { TOWER_FLOOR_COUNT, TOWER_TRAIT_LABEL } from "../data/trialTower.js";
 import {
   TowerBattleSetup,
@@ -57,6 +64,8 @@ import {
   setFighterName,
   toggleDungeonPartyMember,
   toggleTowerPartyMember,
+  trySpendLevelDungeonChallenge,
+  levelDungeonChallengesRemaining,
   tryEnhanceEquipment,
   tryRefillStaminaFull,
   tryRefillStaminaPartial,
@@ -366,7 +375,24 @@ const state: AppState = {
   partyNotice: null,
 };
 
+/**
+ * ブラウザが勝手にデータを消さない設定になっているか。
+ *
+ * 頼む処理は非同期なので、最初の描画には間に合わない。
+ * 分かった時点で控えの案内だけを描き直す(画面全体を作り直す必要は無い)。
+ */
+let persistState: PersistState = "UNSUPPORTED";
+
 {
+  // **起動のたびに1回だけ**。保存のたびに取り直すと、壊れた状態で数回保存された時点で
+  // 控えまで壊れた状態に置き換わり、戻り先が無くなる
+  takeStartupBackup(state.player);
+  void ensurePersistentStorage().then((result) => {
+    if (result === persistState) return;
+    persistState = result;
+    render();
+  });
+
   const loginBonus = claimDailyLoginBonus(state.player);
   if (loginBonus.claimed) {
     state.loginBonusResult = loginBonus;
@@ -846,6 +872,9 @@ function retryBlockedReason(last: LastRun): string | null {
   if (last.kind === "GOLD_DUNGEON" && goldDungeonChallengesRemaining(state.player) <= 0) {
     return "本日の挑戦回数の上限に達しています";
   }
+  if (last.kind === "LEVEL_DUNGEON" && levelDungeonChallengesRemaining(state.player) <= 0) {
+    return "本日の挑戦回数の上限に達しています";
+  }
   return null;
 }
 
@@ -967,7 +996,12 @@ function farmBlockReasonFor(last: LastRun): AutoFarmStopReason | null {
     partySize: party.length,
     stamina: state.player.stamina,
     staminaCost: lastRunStaminaCost(last),
-    challengesLeft: last.kind === "GOLD_DUNGEON" ? goldDungeonChallengesRemaining(state.player) : undefined,
+    challengesLeft:
+      last.kind === "GOLD_DUNGEON"
+        ? goldDungeonChallengesRemaining(state.player)
+        : last.kind === "LEVEL_DUNGEON"
+          ? levelDungeonChallengesRemaining(state.player)
+          : undefined,
   });
 }
 
@@ -1145,6 +1179,11 @@ function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
 function startLevelDungeonTier(def: LevelDungeonDef): void {
   const party = getParty(state.player);
   if (party.length === 0) return;
+  // **1日の上限を先に見る。**スタミナを払ってから上限に弾かれると、払い損になる
+  if (!trySpendLevelDungeonChallenge(state.player).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
   if (!trySpendStamina(state.player, LEVEL_DUNGEON_STAMINA_COST).ok) {
     playSfx("denied", 0.7);
     return;
@@ -1604,6 +1643,9 @@ function render(): void {
         },
         onExportSave: handleExportSave,
         onImportSave: handleImportSave,
+        persistState,
+        backupAt: backupTakenAt(),
+        onRestoreBackup: handleRestoreBackup,
       });
       break;
 
@@ -2212,6 +2254,28 @@ function handleExportSave(): void {
  * **読み込みは今の手持ちを丸ごと置き換える。** 取り違えると二次被害になるので、
  * 中身の概要を見せて確認を取ってから差し替える。
  */
+/**
+ * 前回起動時の控えへ戻す。
+ *
+ * 読み込みを間違えた時・素材にする相手を間違えた時の、最後の綱。
+ * **今の状態は失われる**ので、何がどう変わるのかを見せてから確かめる。
+ */
+function handleRestoreBackup(): void {
+  const backup = readStartupBackup();
+  if (!backup) {
+    window.alert("戻せる控えがありません。");
+    return;
+  }
+  const ok = window.confirm(
+    `前回このアプリを開いた時の状態に戻しますか?\n\n${describeSaveFile(backup)}\n\n※ それ以降に進めた分は失われます。`,
+  );
+  if (!ok) return;
+  state.player = normalizeLoadedState(backup.state);
+  savePlayerState(state.player);
+  render();
+  window.alert("前回起動時の状態に戻しました。");
+}
+
 function handleImportSave(file: File): void {
   void file.text().then((text) => {
     const result = parseSaveFile(text);

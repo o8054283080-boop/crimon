@@ -15,6 +15,12 @@
  * 枠で囲って区切るほど、UIは世界から浮いて道具箱に見える。
  */
 :root {
+  /*
+   * 下のタブの高さ。**固定で画面の底に貼り付いているので、
+   * その上に何かを置く側は必ずこの分だけ床を上げる。**
+   * 設定シートの一番下のボタンがタブに覆われて押せなかった事故がある。
+   */
+  --bottom-nav-h: 64px;
   --bg: #06050c;
   --bg-alt: #0d0a16;
   /* 黒硝子。背景の絵を透かす。不透明な板にしないこと */
@@ -6333,33 +6339,48 @@ body {
   background: #0a0716;
 }
 
+/*
+ * 紋章の下のレベル札。
+ *
+ * **「Lv」が7.36pxで、読めずに潰れていた。**この案件では9px未満の文字を
+ * 巡回で機械的に弾いているのに、ここは巡回が見に行かない場所だったので残っていた。
+ * 潰れた「Lv」と数字が重なって「..1」のような塊にしか見えず、
+ * 自分のレベルという**画面の中で唯一「自分」を指す数字**が読めない状態だった。
+ *
+ * 札を縦に詰めすぎていたのも同じ原因。行の高さを明示して、
+ * 文字が入る分だけの高さを札に持たせる。
+ */
 .home-menu .home-id__crest .home-id__level {
   position: absolute;
   /* 輪と顔より上に出す。指定しないと金の輪に半分隠れる */
   z-index: 2;
   left: 50%;
-  bottom: -7px;
+  bottom: -9px;
   transform: translateX(-50%);
   width: auto;
   height: auto;
   display: flex;
   align-items: baseline;
-  gap: 2px;
-  padding: 1px 9px;
+  gap: 3px;
+  padding: 2px 9px 3px;
+  line-height: 1;
   border-radius: 999px;
   background: linear-gradient(180deg, #241a3c, #0d0918);
   box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.62), 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
 .home-menu .home-id__crest .home-id__level small {
-  font-size: 0.46rem;
+  /* 9px を下回らせない。下回った瞬間、読めない飾りになる */
+  font-size: 0.6rem;
   font-weight: 700;
+  line-height: 1;
   color: var(--gold-2);
 }
 
 .home-menu .home-id__crest .home-id__level strong {
-  font-size: 0.7rem;
+  font-size: 0.82rem;
   font-weight: 900;
+  line-height: 1;
   color: #fff;
 }
 

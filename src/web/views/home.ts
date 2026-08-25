@@ -9,6 +9,7 @@ import {
   STAMINA_REFILL_PARTIAL_COST,
 } from "../../game/playerState.js";
 import { CompensationClaim } from "../../game/compensation.js";
+import { PERSIST_STATE_NOTE, PersistState } from "../../game/saveDurability.js";
 import { ELEMENT_JA } from "../../core/element.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../../core/rarity.js";
@@ -41,6 +42,11 @@ export interface HomeProps {
   audioSettings: AudioSettingsProps;
   onExportSave: () => void;
   onImportSave: (file: File) => void;
+  /** ブラウザが勝手に消さない設定になっているか */
+  persistState: PersistState;
+  /** 前回起動時の控えを取った時刻。無ければ null */
+  backupAt: Date | null;
+  onRestoreBackup: () => void;
 }
 
 function renderSaveDataPanel(props: HomeProps): HTMLElement {
@@ -56,17 +62,40 @@ function renderSaveDataPanel(props: HomeProps): HTMLElement {
     },
   }) as HTMLInputElement;
 
-  return el("section", { className: "panel save-data" }, [
-    el("div", { className: "panel-header" }, [el("h2", {}, ["データの控え"])]),
+  /*
+   * **消え方は2つあって、打てる手が違う。**それを分けて書く。
+   * 一緒くたに「消えることがあります」とだけ書いても、何をすればいいのか分からない。
+   */
+  const rows: HTMLElement[] = [
     el("p", { className: "save-data__warning" }, [
       "このゲームのデータは、この端末のブラウザの中だけに保存されています。ブラウザの履歴やサイトデータを削除すると、いっしょに消えてしまいます。ときどき書き出して控えを取っておいてください。",
     ]),
+    el("p", { className: "save-data__note" }, [PERSIST_STATE_NOTE[props.persistState]]),
+  ];
+
+  // 前回起動時の状態。読み込みを間違えた時・操作を間違えた時に戻れる
+  if (props.backupAt) {
+    rows.push(
+      el("p", { className: "save-data__note" }, [
+        `前回このアプリを開いた時の控えがあります(${props.backupAt.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })})。`,
+      ]),
+    );
+  }
+
+  return el("section", { className: "panel save-data" }, [
+    el("div", { className: "panel-header" }, [el("h2", {}, ["データの控え"])]),
+    ...rows,
     el("div", { className: "save-data__actions" }, [
       el("button", { type: "button", className: "btn btn--primary", onclick: props.onExportSave }, ["⬇ データを書き出す"]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: () => input.click() }, ["⬆ データを読み込む"]),
       input,
     ]),
-  ]);
+    props.backupAt
+      ? el("button", { type: "button", className: "btn btn--ghost save-data__restore", onclick: props.onRestoreBackup }, [
+          "↩ 前回起動時の状態に戻す",
+        ])
+      : null,
+  ].filter((n): n is HTMLElement => n !== null));
 }
 
 /* ==========================================================================
