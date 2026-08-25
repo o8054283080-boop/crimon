@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "harness": "node tools/harness.mjs",
     "tour": "node tools/tour.mjs",
+    "scene": "tsx tools/scene.mts",
     "audio:check": "node tools/audioCheck.mjs",
     "audio:render": "tools/audio/.venv/bin/python tools/audio/render.py",
     "audio:bgm": "tools/audio/.venv/bin/python tools/audio/render_bgm.py",
