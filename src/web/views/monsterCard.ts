@@ -159,6 +159,15 @@ export function buildMonsterCard(
     dex ? el("span", { className: "mcard__element", title: `${ELEMENT_JA[dex.element]}属性` }, [ELEMENT_JA[dex.element]]) : null,
     level !== undefined ? el("span", { className: "mcard__level" }, [`Lv${level}${maxLevel ? `/${maxLevel}` : ""}`]) : null,
     bonus ? el("span", { className: "mcard__bonus" }, ["★"]) : null,
+    /*
+     * 選んだ印。
+     *
+     * **枠の色だけでは伝わらない。**以前は2pxの水色の線を回すだけだったが、
+     * ★3の額縁がほぼ同じ水色なので、選んだ札と選んでいない札が見分けられなかった
+     * (素材を3体選んだ状態を実際に撮って、どれが選ばれているのか読めなかった)。
+     * 肖像の上に暗幕を敷いて印を置く。**色ではなく明るさの差**で分ける。
+     */
+    selected ? el("span", { className: "mcard__pick", "aria-hidden": "true" }, ["✓"]) : null,
     // 肖像の左下に置く。左上は属性、右上は「編成中」、右下はレベルで埋まっている
     onDetail && !disabled
       ? el(

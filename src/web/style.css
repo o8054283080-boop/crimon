@@ -2815,13 +2815,46 @@ body {
   cursor: not-allowed;
 }
 
+/*
+ * 選んだ札。
+ *
+ * **水色の細い線を回すだけだった。**それだと ★3 の額縁(#6fd0ff)とほぼ同じ色なので、
+ * 素材を選んでも選んだ札が見分けられなかった。青はこの画面の決まりでも使わない色。
+ *
+ * 3つ重ねて、離れて見ても分かるようにする:
+ * 金の太い枠 / 肖像に暗幕 / 中央に大きな印。
+ * **色の違いだけに頼らない**(暗幕と印は明るさと形の差なので、色が見分けにくい人にも届く)。
+ */
 .mcard--selected {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-    0 0 0 2px #7fd4ff,
-    0 0 18px var(--frame-glow),
+    0 0 0 3px var(--gold-3, #d6b05c),
+    0 0 20px rgba(214, 176, 92, 0.55),
     0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.mcard--selected .mcard__name {
+  color: var(--gold-2, #f0dfae);
+}
+
+/* 肖像に敷く暗幕 + 中央の印。肖像そのものを沈めるので、遠目でも「取った」と分かる */
+.mcard__pick {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgba(6, 5, 12, 0.58);
+  color: var(--gold-2, #f0dfae);
+  /* 札は小さいので、印は思い切って大きく取る */
+  font-size: 1.9rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
 }
 
 /* --- レア度ごとの額縁 --- */
@@ -7270,4 +7303,38 @@ body::before {
 .howto-card__list strong {
   color: #f0e8d6;
   font-weight: 800;
+}
+
+/*
+ * 選んだ顔ぶれの並び(強化の素材・ランクアップの素材)。
+ *
+ * 選んだ数だけを出しても「誰を選んだか」は分からない。
+ * 確かめるには数十枚の一覧を上から探し直すしかなかった。
+ */
+.picked-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(214, 176, 92, 0.2);
+}
+
+.picked-row__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gold-2, #f0dfae);
+}
+
+/* 素材は数が決まっていないので、はみ出さずに折り返させる */
+.picked-row .party-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.picked-row .party-slot {
+  width: 58px;
+  min-width: 58px;
 }

@@ -4,6 +4,7 @@ import { PlayerState } from "../../game/playerState.js";
 import { checkMonsterPowerUp, feedExpValue, isSameElement, isSameSpecies } from "../../game/monsterPowerUp.js";
 import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
+import { renderPartySlots } from "./partyCard.js";
 
 export interface MonsterTrainingProps {
   player: PlayerState;
@@ -55,6 +56,17 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
       el("p", {}, [
         `${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体・同属性${sameElementCount}体) / 獲得予定経験値 ${totalExp}`,
       ]),
+      /*
+       * **選んだ顔ぶれをここに並べる。**
+       * 数だけ出しても「誰を選んだか」は分からず、確かめるには数十枚の一覧を
+       * 上から探し直すしかなかった。押せば外せるので、間違えた時も一覧へ戻らずに済む。
+       */
+      materials.length > 0
+        ? el("div", { className: "picked-row" }, [
+            el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
+            renderPartySlots(materials, materials.length, props.onToggleMaterial),
+          ])
+        : el("p", { className: "app-subtitle" }, ["下の一覧から素材を選んでください。選んだものはここに並びます。"]),
       materials.length > 0 && !check.ok && check.reason
         ? el("p", { className: "app-subtitle training-warning" }, [`⚠ ${check.reason}`])
         : null,
