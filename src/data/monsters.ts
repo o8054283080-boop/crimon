@@ -1695,7 +1695,7 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
     {
       id: "ancient_crystal_curse_s2",
       name: "呪縛の波動",
-      description: "敵全体に攻撃力0.9倍のダメージを与え、55%で攻撃力を大きく低下させる。",
+      description: "敵全体に攻撃力0.9倍のダメージを与え、55%で攻撃力を大きく低下させ、50%で強化効果を剥がす。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
@@ -1710,7 +1710,7 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
     {
       id: "ancient_crystal_curse_s3",
       name: "破滅の呪詛",
-      description: "敵全体に攻撃力1.8倍のダメージを与え、50%で防御力を大きく低下させる。",
+      description: "敵全体に攻撃力1.8倍のダメージを与え、50%で防御力を大きく低下させ、70%で3ターン回復封じを付与する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
