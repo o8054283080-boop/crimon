@@ -1,10 +1,16 @@
 name: Deploy to GitHub Pages
 
+# 公開は main からだけ行う。
+#
+# 以前は作業ブランチでも動かしていたが、**作業ブランチからの公開は必ず失敗する**
+# (ビルドは通るのに deploy が1秒で落ちる。Pages の環境が既定ブランチ以外からの
+# 公開を許していないため)。さらに下の concurrency で枠を取り合うので、
+# ブランチへ push した直後に main へマージすると**main側がキャンセルされ**、
+# 結果として公開中のページだけが古いまま取り残されていた。
 on:
   push:
     branches:
       - main
-      - claude/turn-based-battle-game-ioqjai
   workflow_dispatch: {}
 
 permissions:
@@ -12,9 +18,11 @@ permissions:
   pages: write
   id-token: write
 
+# 同じ枠に入った実行は待たせる。**途中で打ち切らない。**
+# 打ち切ると、最後に流した内容が公開されないまま終わることがある。
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
