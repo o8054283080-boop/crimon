@@ -11,6 +11,7 @@ import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, so
 import { GEAR_SLOT_TOTAL, MonsterFilter, equippedCount, filterMonsters } from "../monsterFilter.js";
 import { renderMonsterFilterBar } from "./monsterFilterBar.js";
 import { buildMonsterCard } from "./monsterCard.js";
+import { renderPartySlots } from "./partyCard.js";
 import { icon } from "../icons.js";
 import { CreateSlot, currentSkillOf, describeCreatedSkill } from "../../game/monsterCreate.js";
 import { renderSkillRows } from "./skillPanel.js";
@@ -302,11 +303,10 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
   const requiredCount = RANK_UP_SACRIFICE_COUNT[target.star];
   const candidates = props.player.monsters.filter((m) => m.id !== target.id && m.star === target.star && !props.player.partyIds.includes(m.id));
 
-  const check = checkRankUp(
-    target,
-    props.selectedSacrificeIds.map((id) => props.player.monsters.find((m) => m.id === id)!).filter(Boolean),
-    props.player.partyIds,
-  );
+  const sacrifices = props.selectedSacrificeIds
+    .map((id) => props.player.monsters.find((m) => m.id === id))
+    .filter((m): m is MonsterInstance => m !== undefined);
+  const check = checkRankUp(target, sacrifices, props.player.partyIds);
 
   const cards = candidates.map((c) =>
     // 素材選びの最中こそ「この子は誰だったか」を確かめたい。長押しで詳細へ送る
@@ -321,6 +321,15 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     el("section", { className: "panel" }, [
       el("p", {}, [`対象: ${dex ? dex.name : target.dexId} ${starLabel(target.star)} → ${starLabel((target.star + 1) as 1 | 2 | 3 | 4 | 5)}`]),
       el("p", {}, [`同じ星(${starLabel(target.star)})のモンスターを${requiredCount}体選択してください (${props.selectedSacrificeIds.length}/${requiredCount})`]),
+      /*
+       * **選んだ顔ぶれをここに並べる。**
+       * 数だけ出しても「誰を選んだか」は分からず、確かめるには一覧を探し直すしかなかった。
+       * 必要な数だけ枠を出すので、あと何体かも同時に分かる。押せば外せる。
+       */
+      el("div", { className: "picked-row" }, [
+        el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
+        renderPartySlots(sacrifices, requiredCount, props.onToggleSacrifice),
+      ]),
     ]),
     el("section", { className: "panel" }, [
       candidates.length === 0
