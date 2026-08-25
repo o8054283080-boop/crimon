@@ -102,6 +102,15 @@ export interface BattleEngineOptions {
    * playerTeamと同じ並び順で、そのユニットの開始時HPを上書きする(最大HPでクランプ)。
    */
   initialPlayerHp?: number[];
+  /**
+   * 試練の塔のように、階をまたいでスキルのクールタイムを持ち越す場合に指定する。
+   * playerTeamと同じ並び順で、そのユニットの開始時クールタイムを上書きする。
+   *
+   * **HPだけを持ち越すと、強い技を毎階の頭で撃ち直せてしまう。**
+   * 「強い技ほど間隔が長い」という決まりが階の境目で消え、
+   * 持ち越しの緊張感がHPの一本道になる。
+   */
+  initialCooldowns?: [number, number, number][];
 }
 
 /** 手動操作時にプレイヤーが選んだ行動。省略された場合はAIが代わりに決める */
@@ -135,6 +144,13 @@ export class BattleEngine {
         const unit = this.units[i];
         if (!unit) return;
         unit.currentHp = Math.max(1, Math.min(hp, unit.maxHp));
+      });
+    }
+    if (options.initialCooldowns) {
+      options.initialCooldowns.forEach((cooldowns, i) => {
+        const unit = this.units[i];
+        if (!unit) return;
+        unit.cooldowns = cooldowns.map((c) => Math.max(0, Math.round(c))) as [number, number, number];
       });
     }
     this.rng = options.rng ?? Math.random;

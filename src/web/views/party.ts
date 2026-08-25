@@ -7,7 +7,7 @@ import { renderMonsterSortRow } from "./monsters.js";
 import { renderMonsterFilterBar } from "./monsterFilterBar.js";
 import { partyMemberCard, renderPartySlots } from "./partyCard.js";
 
-export type PartyEditMode = "NORMAL" | "DUNGEON";
+export type PartyEditMode = "NORMAL" | "DUNGEON" | "TOWER";
 
 export interface PartyProps {
   player: PlayerState;
@@ -15,6 +15,7 @@ export interface PartyProps {
   onSetMode: (mode: PartyEditMode) => void;
   onToggleParty: (instanceId: string) => void;
   onToggleDungeonMember: (instanceId: string) => void;
+  onToggleTowerMember: (instanceId: string) => void;
   sortKey: MonsterSortKey;
   onChangeSort: (key: MonsterSortKey) => void;
   /** 長押しでそのモンスターの詳細を開く */
@@ -33,12 +34,52 @@ export interface PartyProps {
 
 const MAX_PARTY_SIZE = 4;
 
+/**
+ * 編成の枠は3つある。**同じ編成を使い回せない**のは意図したもので、
+ * 場所ごとに組み替えるのがこのゲームの考える所そのものだから。
+ *
+ * 札のラベルは短く保つこと。縦画面(390px)に3つ並ぶので、
+ * 説明を足すと文字が切れて、切れた文字はあるだけ無駄になる。
+ */
+interface ModeSpec {
+  mode: PartyEditMode;
+  label: string;
+  iconName: Parameters<typeof icon>[0] | null;
+  maxSize: number;
+  /** その枠でしか成り立たない決まりごと。操作の説明は書かない */
+  note: string | null;
+}
+
+const MODE_SPECS: ModeSpec[] = [
+  { mode: "NORMAL", label: "通常", iconName: null, maxSize: MAX_PARTY_SIZE, note: null },
+  {
+    mode: "DUNGEON",
+    label: "装備ダンジョン",
+    iconName: "equipDungeon",
+    maxSize: MAX_DUNGEON_PARTY_SIZE,
+    note: "この枠は装備ダンジョン専用です。通常ステージの編成とは別に覚えます。",
+  },
+  {
+    mode: "TOWER",
+    label: "試練の塔",
+    iconName: "tower",
+    maxSize: MAX_DUNGEON_PARTY_SIZE,
+    note: "塔はHPとクールタイムを持ち越します。倒れた仲間は節まで戻りません。",
+  },
+];
+
 export function renderParty(props: PartyProps): HTMLElement {
   const { player, mode } = props;
-  const isDungeon = mode === "DUNGEON";
-  const activeIds = isDungeon ? player.dungeonPartyIds : player.partyIds;
-  const maxSize = isDungeon ? MAX_DUNGEON_PARTY_SIZE : MAX_PARTY_SIZE;
-  const onToggle = isDungeon ? props.onToggleDungeonMember : props.onToggleParty;
+  const spec = MODE_SPECS.find((s) => s.mode === mode) ?? MODE_SPECS[0];
+  const activeIds =
+    mode === "DUNGEON" ? player.dungeonPartyIds : mode === "TOWER" ? player.towerPartyIds : player.partyIds;
+  const maxSize = spec.maxSize;
+  const onToggle =
+    mode === "DUNGEON"
+      ? props.onToggleDungeonMember
+      : mode === "TOWER"
+        ? props.onToggleTowerMember
+        : props.onToggleParty;
   const activeMembers = activeIds
     .map((id) => player.monsters.find((m) => m.id === id))
     .filter((m): m is NonNullable<typeof m> => m !== undefined);
@@ -62,26 +103,21 @@ export function renderParty(props: PartyProps): HTMLElement {
       el("h1", {}, ["パーティ編成"]),
       el("span", { className: "head-note" }, [`${activeIds.length} / ${maxSize}`]),
     ]),
-    el("section", { className: "panel mode-toggle" }, [
-      el(
-        "button",
-        {
-          type: "button",
-          className: "mode-toggle__btn" + (!isDungeon ? " mode-toggle__btn--active" : ""),
-          onclick: () => props.onSetMode("NORMAL"),
-        },
-        ["通常パーティ"],
+    el(
+      "section",
+      { className: "panel mode-toggle" },
+      MODE_SPECS.map((s) =>
+        el(
+          "button",
+          {
+            type: "button",
+            className: "mode-toggle__btn" + (s.mode === mode ? " mode-toggle__btn--active" : ""),
+            onclick: () => props.onSetMode(s.mode),
+          },
+          [...(s.iconName ? [icon(s.iconName, { size: 15 })] : []), s.label],
+        ),
       ),
-      el(
-        "button",
-        {
-          type: "button",
-          className: "mode-toggle__btn" + (isDungeon ? " mode-toggle__btn--active" : ""),
-          onclick: () => props.onSetMode("DUNGEON"),
-        },
-        [icon("equipDungeon", { size: 15 }), "装備ダンジョン専用"],
-      ),
-    ]),
+    ),
     el("section", { className: "panel" }, [
       // 枠そのものを外すボタンにする。入れ替えのたびに一覧から本人を探し直さない
       renderPartySlots(activeMembers, maxSize, onToggle),
@@ -112,9 +148,7 @@ export function renderParty(props: PartyProps): HTMLElement {
       // 長押しで詳細。」と書かないと使えないなら、その操作は見つかっていない。
       // 枠には✕、カードには詳細の丸ボタンを出して、見れば分かる形にした。
       // ここに残すのは、操作ではなく**知りようのない決まりごと**だけ
-      isDungeon
-        ? el("p", { className: "app-subtitle" }, ["この枠は装備ダンジョン専用です。通常ステージの編成とは別に覚えます。"])
-        : null,
+      spec.note ? el("p", { className: "app-subtitle" }, [spec.note]) : null,
     ].filter((n): n is HTMLElement => n !== null)),
     el("section", { className: "panel" }, [
       player.monsters.length === 0

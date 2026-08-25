@@ -17,8 +17,13 @@ export interface BattleChainInfo {
   total: number;
   /** すでに「この1戦で終える」が押されているか */
   stopped: boolean;
-  /** ⏹ が押された。この1戦を終えたら周回を切り上げる */
+  /** ⏹ が押された。この1戦を終えたら切り上げる */
   onStop: () => void;
+  /**
+   * ⏹ を長押しした時に出る説明。
+   * 周回と塔で**やめる対象が違う**ので、呼ぶ側が言葉を決める
+   */
+  stopTitle?: string;
 }
 
 export interface BattleViewProps {
@@ -788,7 +793,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
         {
           type: "button",
           className: "battle-chain-btn",
-          title: "この1戦で周回を終える",
+          title: chain.stopTitle ?? "この1戦で周回を終える",
           disabled: chain.stopped,
           onclick: () => {
             chain.onStop();

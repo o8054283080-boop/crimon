@@ -9,14 +9,24 @@
  *   ?turns=8      指定ターン数だけ即座に進めた状態から表示する
  *   ?view=result  バトルではなく戦闘結果画面を表示する(&lose=1 で敗北時)
  *   ?view=farm    オート周回の結果画面を表示する
+ *   ?view=tower   試練の塔の画面を表示する
+ *                 &run=1      登坂の途中(削られた顔ぶれ)にする
+ *                 &empty=1    塔の編成が空の状態にする
+ *                 &blocked=1  スタミナ切れで挑めない状態にする
+ *                 &outcome=checkpoint|wiped|completed|paused  戻ってきた理由を出す
  */
 import "./web/style.css";
 import { BattleEngine } from "./battle/engine.js";
 import { MonsterDefinition } from "./core/monster.js";
+import { createMonsterInstance } from "./core/monsterInstance.js";
+import { Star } from "./core/rarity.js";
 import { MONSTER_DEX, findMonster } from "./data/monsters.js";
+import { createInitialState } from "./game/playerState.js";
+import { emptyTowerRewardResult } from "./game/trialTower.js";
 import { renderBattleView } from "./web/views/battleView.js";
 import { renderAutoFarmResult } from "./web/views/autoFarmResult.js";
 import { renderStageResult } from "./web/views/stageResult.js";
+import { renderTrialTower, TrialTowerProps } from "./web/views/trialTower.js";
 
 /**
  * 「描画が安定した」ことをスクリーンショット側へ伝える。
@@ -87,6 +97,91 @@ if (params.get("view") === "farm") {
   );
   markPreviewReady();
   throw new Error("周回結果のプレビューを表示しました");
+}
+
+// 試練の塔のプレビュー。登坂前・登坂中の両方を、配線を待たずに見るために使う
+if (params.get("view") === "tower") {
+  const inRun = params.get("run") === "1";
+  const empty = params.get("empty") === "1";
+  const blocked = params.get("blocked") === "1";
+
+  const player = createInitialState();
+  player.stamina = blocked ? 1 : 62;
+
+  const roster: [string, Star, number][] = [
+    ["dragon_FIRE", 6, 40],
+    ["seraph_LIGHT", 6, 40],
+    ["fairy_GRASS", 5, 35],
+    ["golem_WATER", 5, 35],
+    ["wolf_ELECTRIC", 4, 30],
+  ];
+  const party = empty ? [] : roster.map(([dexId, star, level]) => createMonsterInstance(dexId, star, level));
+
+  // HPは5桁まで伸びる。桁が増えても札からはみ出さないかを、ここで必ず見る
+  const runMembers = [
+    { hp: 16317, maxHp: 23440, fallen: false },
+    { hp: 9820, maxHp: 21050, fallen: false },
+    { hp: 1204, maxHp: 18730, fallen: false },
+    { hp: 0, maxHp: 17600, fallen: true },
+    { hp: 0, maxHp: 15980, fallen: true },
+  ];
+
+  const outcomeKind = (params.get("outcome") ?? "").toUpperCase();
+  const reward = emptyTowerRewardResult();
+  if (outcomeKind === "CHECKPOINT" || outcomeKind === "COMPLETED") {
+    reward.crystal = outcomeKind === "COMPLETED" ? 500 : 200;
+    reward.summonScrolls = outcomeKind === "COMPLETED" ? 3 : 1;
+    reward.pigStar = 3;
+    reward.equipment = {
+      id: "eq_tower",
+      slot: 4,
+      star: outcomeKind === "COMPLETED" ? 6 : 5,
+      level: 0,
+      set: "CRIT",
+      mainStat: { type: "ATK_PERCENT", value: 12 },
+      subStats: [{ type: "SPD", value: 8 }],
+    };
+  }
+
+  const props: TrialTowerProps = {
+    bestFloor: 12,
+    nextFloor: inRun ? 14 : 11,
+    run: inRun
+      ? {
+          floor: 14,
+          members: party.map((instance, i) => ({
+            instanceId: instance.id,
+            name: MONSTER_DEX.find((m) => m.id === instance.dexId)?.name ?? instance.dexId,
+            dexId: instance.dexId,
+            hp: runMembers[i].hp,
+            maxHp: runMembers[i].maxHp,
+            fallen: runMembers[i].fallen,
+          })),
+        }
+      : null,
+    party,
+    player,
+    claimedFloors: Array.from({ length: 12 }, (_, i) => i + 1),
+    blockedReason: empty
+      ? "塔の編成が組まれていません"
+      : blocked
+        ? "スタミナが足りません(⚡4必要 / 手持ち⚡1)"
+        : null,
+    notice: blocked ? "スタミナが回復するまで待つか、ショップで補充してください。" : null,
+    outcome:
+      outcomeKind === "CHECKPOINT" || outcomeKind === "WIPED" || outcomeKind === "COMPLETED" || outcomeKind === "PAUSED"
+        ? { kind: outcomeKind, floor: outcomeKind === "COMPLETED" ? 30 : outcomeKind === "CHECKPOINT" ? 10 : 13, reward }
+        : null,
+    onDismissOutcome: () => location.reload(),
+    onEditParty: () => undefined,
+    onChallenge: () => undefined,
+    onAbandon: () => undefined,
+    onBack: () => undefined,
+  };
+
+  app?.append(renderTrialTower(props));
+  markPreviewReady();
+  throw new Error("試練の塔のプレビューを表示しました");
 }
 
 // 戦闘結果画面のプレビュー。報酬が一通り出た状態で、1画面に収まるかを見る

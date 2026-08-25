@@ -1,0 +1,1214 @@
+/**
+ * 試練の塔のスタイル。
+ *
+ * この場所の主題は「残量」。何階まで登ったか、今の顔ぶれがどれだけ削られているか。
+ * だから画面の重みも、到達階 → 顔ぶれのHP → 次の階の中身 の順に落とす。
+ * 同じ大きさの札を並べると、どれを先に読むべきか分からなくなる。
+ *
+ * 色の役割は style.css の芯に従う。金=重要な操作と報酬、紫=魔力、**青は使わない**。
+ * 生死だけは緑〜赤(HPの色)を使う。ここだけは意味が固定されている。
+ */
+
+.tower-screen {
+  gap: 13px;
+}
+
+/* ==========================================================================
+ * 戻ってきた理由
+ *
+ * 節を越えた / 力尽きた / 登り切った / 中断した の4つ。
+ * **同じ見た目にしない。**同じ面にしてしまうと、負けたのか達成したのかが
+ * 文字を読むまで分からず、次に何をすればいいのかが伝わらない。
+ * ======================================================================== */
+
+.tower-outcome {
+  position: relative;
+  overflow: hidden;
+  padding: 13px 14px 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(20, 15, 32, 0.8), rgba(6, 4, 12, 0.86));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), var(--drop);
+}
+
+.tower-outcome__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.tower-outcome__icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+}
+
+.tower-outcome__title {
+  font-size: 1.02rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.tower-outcome__lines {
+  margin-top: 7px;
+}
+
+.tower-outcome__lines p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: #cfc6dc;
+}
+
+.tower-outcome__reward {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(3, 2, 7, 0.55);
+  box-shadow: var(--inset-deep);
+}
+
+.tower-outcome__reward-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #c9b58a;
+}
+
+.btn.tower-outcome__close {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+}
+
+/* 節を越えた。達成なので緑の縁と、上端から差す光 */
+.tower-outcome--checkpoint {
+  box-shadow: inset 0 0 0 1px rgba(70, 210, 140, 0.55), 0 0 18px rgba(46, 204, 113, 0.14), var(--drop);
+}
+
+.tower-outcome--checkpoint::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(70, 210, 140, 0.22), transparent 70%);
+  pointer-events: none;
+}
+
+.tower-outcome--checkpoint .tower-outcome__title {
+  color: #b7f2cd;
+}
+
+/*
+ * 全滅。赤の縁で失敗だと分かるようにするが、**面までは赤く塗らない**。
+ * 節までの到達は消えていないので、全部を失った画面には見せない。
+ */
+.tower-outcome--wiped {
+  box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.5), var(--drop);
+}
+
+.tower-outcome--wiped .tower-outcome__title {
+  color: #ffb4a2;
+}
+
+/* 到達が残っていることを伝える1行目だけ、灰色に沈めない */
+.tower-outcome--wiped .tower-outcome__lines p:first-child {
+  color: #ffe0a0;
+  font-weight: 700;
+}
+
+/* 登り切り。塔でいちばん派手にしてよい唯一の面 */
+.tower-outcome--completed {
+  background:
+    radial-gradient(ellipse 90% 130% at 50% 120%, rgba(255, 190, 70, 0.28), transparent 66%),
+    linear-gradient(180deg, rgba(48, 34, 14, 0.85), rgba(10, 7, 16, 0.9));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 205, 100, 0.7),
+    inset 0 1px 0 rgba(255, 240, 200, 0.24),
+    0 0 30px rgba(255, 180, 60, 0.26),
+    var(--drop-deep);
+}
+
+.tower-outcome--completed .tower-outcome__icon {
+  font-size: 1.9rem;
+}
+
+.tower-outcome--completed .tower-outcome__title {
+  font-size: 1.16rem;
+  background: var(--gold-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* 金の面に金の題字を置くので、影を二重に敷かないと上端が背景へ溶ける */
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 10px rgba(0, 0, 0, 0.8));
+}
+
+/* 中断。失敗でも達成でもないので、縁は付けず面だけ沈める */
+.tower-outcome--paused {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), var(--drop-soft);
+}
+
+.tower-outcome--paused .tower-outcome__title {
+  color: #d9d2e6;
+}
+
+/* ==========================================================================
+ * 案内(スタミナ切れなど)
+ * ======================================================================== */
+
+.tower-notice {
+  padding: 9px 12px;
+  border-radius: 11px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: #ffe0a0;
+  background: rgba(6, 4, 12, 0.66);
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.4);
+}
+
+/* ==========================================================================
+ * 主役:今どこにいるか
+ *
+ * 板を置かず、暗がりの底から金の光が立ち上る面にする。
+ * ここだけ .panel を使わないのは、他の面と同じ縁を付けると
+ * 「同じ重さの札が7枚並ぶ画面」になるため。
+ * ======================================================================== */
+
+.tower-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 15px 16px 14px;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 80% 120% at 50% 118%, rgba(255, 190, 70, 0.2), transparent 66%),
+    radial-gradient(ellipse 70% 90% at 50% -20%, rgba(150, 90, 220, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(26, 18, 40, 0.66) 0%, rgba(9, 6, 16, 0.82) 60%, rgba(4, 3, 9, 0.9) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(198, 160, 84, 0.34),
+    inset 0 1px 0 rgba(255, 232, 190, 0.14),
+    var(--drop-deep);
+}
+
+/* 塔の気配。飾りなので操作は受けない */
+.tower-hero__glyph {
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 5.4rem;
+  opacity: 0.13;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.8));
+}
+
+.tower-hero__label {
+  position: relative;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: #c9b58a;
+}
+
+/* 到達階。刻印した金の数字。ここが画面で一番大きい */
+.tower-hero__best {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 1px;
+  line-height: 1;
+}
+
+.tower-hero__num {
+  font-size: 3.1rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  background: var(--gold-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 16px rgba(255, 190, 70, 0.35));
+}
+
+.tower-hero__unit {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #e8d6a8;
+}
+
+.tower-hero__total {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+
+/* 30階までの道のり。節の位置を刻んで、次の全回復地点を読めるようにする */
+.tower-hero__track {
+  position: relative;
+  height: 8px;
+  margin-top: 9px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #05040a, #120e1e);
+  box-shadow: var(--inset-deep);
+}
+
+.tower-hero__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8a5c12 0%, #d9a53a 60%, #ffe7a6 100%);
+  box-shadow: 0 0 10px rgba(255, 190, 70, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 節の刻み。越えた節は金、まだの節は彫り込んだ溝 */
+.tower-hero__notch {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.tower-hero__notch.is-passed {
+  background: linear-gradient(180deg, #fff3c8, #d09a22);
+  box-shadow: 0 0 8px rgba(255, 200, 80, 0.9);
+}
+
+.tower-hero__resume {
+  position: relative;
+  margin-top: 7px;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+/* 行き先。到達階の実績とは別物なので、彫り込んだ受け皿に載せて分ける */
+.tower-hero__next {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 8px 11px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(3, 2, 7, 0.72), rgba(14, 10, 24, 0.6));
+  box-shadow: var(--inset-deep);
+}
+
+.tower-hero__arrow {
+  font-size: 0.66rem;
+  color: #ffd970;
+  filter: drop-shadow(0 0 6px rgba(255, 190, 70, 0.8));
+  animation: tower-arrow-rise 2.1s ease-in-out infinite;
+}
+
+@keyframes tower-arrow-rise {
+  0%,
+  100% {
+    transform: translateY(1px);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+}
+
+.tower-hero__next-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.tower-hero__next-floor {
+  font-size: 1.16rem;
+  font-weight: 900;
+  color: #fff3d2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* 登り切った時だけ、面全体に金の余韻を足す */
+.tower-hero--complete {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 205, 100, 0.6),
+    inset 0 1px 0 rgba(255, 240, 200, 0.2),
+    0 0 26px rgba(255, 180, 60, 0.18),
+    var(--drop-deep);
+}
+
+/* ==========================================================================
+ * 傾向・関門・節の札
+ * ======================================================================== */
+
+.tower-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+  color: #d6c8ea;
+  background: rgba(4, 3, 10, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(176, 123, 224, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 関門は金。塔で最も重い1枚なので、他の札と同じ扱いにしない */
+.tower-tag--boss {
+  color: #2a1600;
+  background: var(--gold-grad);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 12px rgba(255, 190, 60, 0.4);
+}
+
+.tower-tag--check {
+  color: #b7f2cd;
+  box-shadow: inset 0 0 0 1px rgba(70, 210, 140, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================================================
+ * 塔の決まりごと
+ *
+ * 初めて来た人に「他と何が違うか」だけを伝える。2行に絞る。
+ * 面は敷かず、左端の細い金の線だけで塊に見せる。
+ * ======================================================================== */
+
+.tower-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 0 2px 10px;
+  border-left: 1px solid rgba(198, 160, 84, 0.4);
+}
+
+.tower-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.tower-rule__icon {
+  flex: 0 0 auto;
+  width: 1.15em;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: center;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+
+.tower-rule__body {
+  display: block;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.tower-rule__title {
+  color: #e8d6a8;
+  font-weight: 800;
+  margin-right: 6px;
+}
+
+.tower-rule__text {
+  color: var(--text-dim);
+}
+
+/* ==========================================================================
+ * 登坂中の顔ぶれ
+ * ======================================================================== */
+
+.tower-run__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tower-run__head h2 {
+  margin: 0 0 0 0;
+}
+
+.tower-run__count {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #d8e6da;
+  background: rgba(4, 6, 12, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* 残り1体は「あと1回倒れたら終わり」という状態。色で警告する */
+.tower-run__count.is-thin {
+  color: #ffbaa8;
+  box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.6);
+}
+
+.tower-run__list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.tower-member {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(12, 9, 22, 0.72), rgba(6, 4, 12, 0.6));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/*
+ * 倒れた仲間も必ず出す。節まで戻らないので、
+ * 「あと何体で次の階へ挑むのか」の判断材料そのものになる。
+ */
+.tower-member--fallen {
+  filter: grayscale(0.85);
+  opacity: 0.62;
+  box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.32);
+}
+
+.tower-member__face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  overflow: hidden;
+  font-size: 1.25rem;
+  background: radial-gradient(circle at 35% 26%, rgba(255, 255, 255, 0.16), transparent 60%), rgba(4, 3, 10, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 -3px 7px rgba(0, 0, 0, 0.5);
+}
+
+.tower-member__cross {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: rgba(255, 120, 100, 0.92);
+  background: rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+.tower-member__body {
+  flex: 1 1 auto;
+  /* これが無いと、長い名前が縮まずに右端の数字を押し出す */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tower-member__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tower-member__name {
+  font-size: 0.76rem;
+  font-weight: 800;
+  /* 名前は削ってよい。数字を削ると読み違いになる */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tower-member__state {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.tower-member__state--high {
+  color: #7de3a4;
+}
+.tower-member__state--mid {
+  color: #ffd970;
+}
+.tower-member__state--low {
+  color: #ff8f7a;
+}
+.tower-member__state--down {
+  color: #ff8f7a;
+}
+
+.tower-member__bar {
+  position: relative;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #05040a, #120e1e);
+  box-shadow: var(--inset-deep);
+}
+
+.tower-member__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8dffb8 0%, #35c46c 45%, #178b4c 100%);
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tower-member__bar[data-tone="mid"] .tower-member__fill {
+  background: linear-gradient(180deg, #ffe9a8 0%, #f1c40f 45%, #9a7a05 100%);
+  box-shadow: 0 0 8px rgba(241, 196, 15, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.tower-member__bar[data-tone="low"] .tower-member__fill {
+  background: linear-gradient(180deg, #ffb0a0 0%, #e74c3c 45%, #8c1f14 100%);
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/*
+ * HPの数字は帯の下の独立した行に置く。
+ *
+ * 名前の隣に押し込んで 16317/23440 が 6317/2344 に化けた事故がある
+ * (現在値が最大値より大きいという、有り得ない表示になっていた)。
+ * 桁が伸びても折り返さず、縮まず、はみ出さないことを最優先にする。
+ */
+.tower-member__hp {
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+ * 次に挑む階
+ * ======================================================================== */
+
+.tower-floor--boss {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 190, 90, 0.42),
+    inset 0 1px 0 rgba(255, 232, 190, 0.1),
+    0 0 18px rgba(255, 170, 50, 0.12),
+    var(--drop);
+}
+
+.tower-floor__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tower-floor__no {
+  font-size: 1.02rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #f2eee6;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.tower-floor__note {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.tower-floor__note--check {
+  color: #a5e6bf;
+}
+
+.tower-floor__enemies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* 敵1体。属性色は面を塗らず、左の丸だけに残す */
+.tower-enemy {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(24, 18, 38, 0.8), rgba(10, 7, 18, 0.7));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.tower-enemy--boss {
+  background: linear-gradient(180deg, rgba(72, 56, 28, 0.9), rgba(30, 21, 10, 0.85));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 0 1px rgba(255, 200, 90, 0.55),
+    0 0 12px rgba(255, 180, 60, 0.22),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.tower-enemy__icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: 0.9rem;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.55), transparent 58%),
+    var(--elem, #3a3050);
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.tower-enemy__body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.tower-enemy__name {
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.tower-enemy__meta {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* 報酬は確定。彫り込んだ棚に載せて「必ず手に入る物」として見せる */
+.tower-floor__reward {
+  margin-top: 11px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(3, 2, 7, 0.6), rgba(14, 10, 24, 0.52));
+  box-shadow: var(--inset-deep);
+}
+
+.tower-floor__reward-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #c9b58a;
+}
+
+.tower-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tower-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #e6dcc6;
+  background: rgba(6, 4, 12, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* 物(装備・素材・召喚の書)だけ金の縁。数字の報酬と序列を付ける */
+.tower-reward--strong {
+  color: #ffe9b8;
+  box-shadow:
+    inset 0 0 0 1px rgba(198, 160, 84, 0.6),
+    inset 0 1px 0 rgba(255, 232, 190, 0.18),
+    0 0 10px rgba(255, 180, 60, 0.14);
+}
+
+.tower-reward__icon {
+  font-size: 0.82rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+
+.tower-reward__text {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+ * 挑戦(主役のCTA)
+ * ======================================================================== */
+
+.tower-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.tower-cta__warn {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffb4a2;
+}
+
+.tower-cta__done {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #ffe0a0;
+}
+
+.tower-cta__go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.tower-cta__go-label {
+  font-size: 1.08rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+/* スタミナは押す前に見る数字。ラベルと同じ重さにすると行き先が読めなくなる */
+.tower-cta__go-cost {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+  color: #402800;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(90, 55, 0, 0.35);
+}
+
+/* ==========================================================================
+ * 塔の編成
+ * ======================================================================== */
+
+.tower-party__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tower-party__head h2 {
+  margin: 0;
+}
+
+.tower-party__count {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.tower-party__slots {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tower-slot {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 1.5rem;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 8%, color-mix(in srgb, var(--elem, #6a5a90) 26%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(20, 15, 32, 0.85), rgba(6, 4, 12, 0.8));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 2px 5px rgba(0, 0, 0, 0.45);
+}
+
+.tower-slot--empty {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: rgba(155, 147, 174, 0.5);
+  background: linear-gradient(180deg, rgba(4, 3, 9, 0.7), rgba(10, 7, 18, 0.6));
+  box-shadow: var(--inset-deep);
+}
+
+.tower-slot__emoji {
+  line-height: 1;
+}
+
+/* 星とレベルは面の下端に敷いた帯へ。絵の上に直接置くと読めない */
+.tower-slot__foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 3px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.78));
+}
+
+/*
+ * 星は「★6」と数で出す。★を並べていた頃は枠に入り切らず、
+ * ★6が★★★★に切り詰められて**星が2つ少なく見えていた**。
+ * 切り詰めを禁じるだけでは足りず、そもそも横幅が要らない形にする。
+ */
+.tower-slot__star {
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #ffd970;
+  white-space: nowrap;
+}
+
+.tower-slot__lv {
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #e8e2f0;
+  white-space: nowrap;
+}
+
+.tower-party__lock {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: #d8cbb0;
+  background: rgba(4, 3, 10, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.28);
+}
+
+.btn.tower-party__edit {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* ==========================================================================
+ * 階の一覧(30階)
+ *
+ * 節ごとに3つの帯へ割る。30枚を1枚の網に流すと、
+ * どこが全回復地点なのかが札の色差だけになって縦画面で読めない。
+ * ======================================================================== */
+
+.tower-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tower-ladder h2 {
+  margin: 0;
+}
+
+.tower-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tower-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  background: rgba(4, 3, 10, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.tower-band {
+  padding: 8px 9px 10px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(3, 2, 7, 0.5), rgba(12, 9, 22, 0.4));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* 抜けた節は金の縁。どこまで進んだかを帯の単位でも読めるようにする */
+.tower-band.is-passed {
+  box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.34);
+}
+
+.tower-band__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.tower-band__name {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #c9b58a;
+}
+
+.tower-band__range {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.tower-band__steps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+
+/* 階1枚。石段の見立て。未到達は暗い石、到達済みは灯った石 */
+.tower-step {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #7f7896;
+  background: linear-gradient(180deg, rgba(22, 17, 34, 0.85), rgba(8, 6, 14, 0.85));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.tower-step__no {
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* 到達済み。灯した石にして、登った跡が帯として見えるようにする */
+.tower-step--passed {
+  color: #ffe6b0;
+  background: linear-gradient(180deg, rgba(66, 48, 22, 0.9), rgba(26, 18, 9, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 190, 0.24),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(198, 160, 84, 0.45);
+}
+
+.tower-step__check {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  color: #7de3a4;
+  text-shadow: 0 0 5px rgba(60, 220, 130, 0.8);
+}
+
+/* 関門と節の印。左上に小さく出して、数字を邪魔しない */
+.tower-step__flag {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  font-size: 0.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+.tower-step--boss {
+  color: #ffcdb8;
+  background: linear-gradient(180deg, rgba(74, 32, 40, 0.9), rgba(28, 13, 20, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 140, 110, 0.4);
+}
+
+.tower-step--boss.tower-step--passed {
+  color: #ffe0cc;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 190, 0.24),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 170, 110, 0.7);
+}
+
+/* 節は緑の縁。全回復できる場所は、関門とは別の意味を持つ */
+.tower-step--check {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(70, 210, 140, 0.55);
+}
+
+.tower-step--check.tower-step--passed {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 190, 0.24),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(70, 210, 140, 0.75);
+}
+
+/* これから挑む1枚だけ光らせる。再開位置を探させない */
+.tower-step--now {
+  color: #fff6d8;
+  background: linear-gradient(180deg, #6b5320 0%, #40300f 55%, #241906 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 210, 90, 0.8),
+    0 0 14px rgba(255, 190, 60, 0.45);
+  animation: tower-step-beckon 1.9s ease-in-out infinite;
+}
+
+@keyframes tower-step-beckon {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18);
+  }
+}
+
+.tower-step__now {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 6px;
+  border-radius: 999px;
+  /* 9.6pxでは「今」の横棒が潰れて読めなかった。漢字は数字より大きさが要る */
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.5;
+  color: #1a1405;
+  background: linear-gradient(180deg, #fff3bd, #ffd93b);
+  box-shadow: 0 0 8px rgba(255, 205, 40, 0.8);
+}
+
+/* ==========================================================================
+ * やめる
+ *
+ * 捨てる操作なので、金にも主役にもしない。ただし探させもしない。
+ * ======================================================================== */
+
+.btn.tower-abandon {
+  width: 100%;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #e2a99c;
+  background: linear-gradient(180deg, rgba(38, 20, 22, 0.8), rgba(18, 10, 12, 0.8));
+  box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--drop-soft);
+}
+
+/* ==========================================================================
+ * 横長の画面
+ *
+ * 900x430 では縦に積むと1画面に何も入らない。
+ * 主役(到達階・顔ぶれ・CTA)を左、資料(階の中身・一覧)を右へ回す。
+ * ======================================================================== */
+
+@media (min-width: 760px) and (max-height: 560px) {
+  .tower-screen {
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 11px;
+  }
+
+  /*
+   * 行まで明示する。列だけ指定して自動配置に任せると、
+   * 幅いっぱいの知らせ(戻ってきた理由)が「両列が空いている行」を探して
+   * 一覧のはるか下まで落ちる。中身が無い行は高さ0に潰れる。
+   */
+  .tower-screen > * {
+    grid-column: 1;
+  }
+
+  .tower-screen > .app-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .tower-screen > .tower-outcome,
+  .tower-screen > .tower-notice {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .tower-screen > .tower-floor {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .tower-screen > .tower-ladder {
+    grid-column: 2;
+    grid-row: 3 / span 20;
+  }
+
+  /*
+   * 知らせ(戻ってきた理由・案内)は幅いっぱいを使う。
+   * 出ている数だけ右列を下へずらす。ずらさずに固定の行へ置くと、
+   * 主役(到達階)と右列の先頭が食い違って、右上に大きな空白が空く。
+   */
+  .tower-screen:has(> .tower-outcome) > .tower-notice {
+    grid-row: 3;
+  }
+
+  .tower-screen:has(> .tower-outcome) > .tower-floor,
+  .tower-screen:has(> .tower-notice) > .tower-floor {
+    grid-row: 3;
+  }
+
+  .tower-screen:has(> .tower-outcome) > .tower-ladder,
+  .tower-screen:has(> .tower-notice) > .tower-ladder {
+    grid-row: 4 / span 20;
+  }
+
+  .tower-screen:has(> .tower-outcome):has(> .tower-notice) > .tower-floor {
+    grid-row: 4;
+  }
+
+  .tower-screen:has(> .tower-outcome):has(> .tower-notice) > .tower-ladder {
+    grid-row: 5 / span 20;
+  }
+}
+
+/* 幅の狭い端末。5列の石段が潰れないよう、文字と余白だけを詰める */
+@media (max-width: 360px) {
+  .tower-hero__num {
+    font-size: 2.6rem;
+  }
+
+  .tower-band__steps,
+  .tower-party__slots {
+    gap: 4px;
+  }
+
+  .tower-step__no {
+    font-size: 0.74rem;
+  }
+}
