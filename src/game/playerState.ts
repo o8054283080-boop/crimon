@@ -3,6 +3,7 @@ import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requ
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
+import { LEGACY_LEVEL_DUNGEON_TIERS, LEVEL_DUNGEON_DAILY_LIMIT } from "../data/levelDungeon.js";
 import { ARENA_START_POINTS, ARENA_TICKET_MAX } from "../data/pvpArena.js";
 import {
   ShopEntry,
@@ -49,6 +50,10 @@ export interface PlayerState {
   goldDungeonChallengesToday: number;
   /** ゴールドダンジョンの挑戦回数を最後にリセットした時刻(ミリ秒epoch)。日付が変わると回数がリセットされる */
   lastGoldDungeonResetAt: number | null;
+  /** レベル上げダンジョンの本日の挑戦回数(1日LEVEL_DUNGEON_DAILY_LIMIT回まで) */
+  levelDungeonChallengesToday: number;
+  /** レベル上げダンジョンの挑戦回数を最後にリセットした時刻(ミリ秒epoch) */
+  lastLevelDungeonResetAt: number | null;
   /** ショップで開放済みの枠数(初期5、ダイヤで最大10まで) */
   shopSlotsUnlocked: number;
   /** 購入済みを記録している品揃えの識別子。品揃えが変わるとリセットする */
@@ -162,6 +167,8 @@ export function createInitialState(): PlayerState {
     loginBonusClaimCount: 0,
     goldDungeonChallengesToday: 0,
     lastGoldDungeonResetAt: null,
+    levelDungeonChallengesToday: 0,
+    lastLevelDungeonResetAt: null,
     shopSlotsUnlocked: SHOP_INITIAL_SLOTS,
     shopRotationKey: -1,
     shopPurchasedSlots: [],
@@ -227,6 +234,13 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.loginBonusClaimCount !== "number") state.loginBonusClaimCount = 0;
   if (typeof state.goldDungeonChallengesToday !== "number") state.goldDungeonChallengesToday = 0;
   if (typeof state.lastGoldDungeonResetAt !== "number") state.lastGoldDungeonResetAt = null;
+  if (typeof state.levelDungeonChallengesToday !== "number") state.levelDungeonChallengesToday = 0;
+  if (typeof state.lastLevelDungeonResetAt !== "number") state.lastLevelDungeonResetAt = null;
+  /*
+   * レベル上げダンジョンが3段階(初級/中級/上級)から5階へ変わった。
+   * **読み替えないと、前から遊んでいる人のクリア済みが全部消える。**
+   */
+  state.clearedLevelDungeonTiers = state.clearedLevelDungeonTiers.map((tier) => LEGACY_LEVEL_DUNGEON_TIERS[tier] ?? tier);
   if (typeof state.shopSlotsUnlocked !== "number") state.shopSlotsUnlocked = SHOP_INITIAL_SLOTS;
   state.shopSlotsUnlocked = Math.max(SHOP_INITIAL_SLOTS, Math.min(SHOP_MAX_SLOTS, state.shopSlotsUnlocked));
   if (typeof state.shopRotationKey !== "number") state.shopRotationKey = -1;
@@ -654,6 +668,32 @@ export function trySpendGoldDungeonChallenge(state: PlayerState, now: number = D
     return { ok: false, reason: "本日のゴールドダンジョン挑戦回数の上限に達しています" };
   }
   state.goldDungeonChallengesToday += 1;
+  return { ok: true };
+}
+
+/** 日付が変わっていたらレベル上げダンジョンの本日の挑戦回数をリセットする */
+function resetLevelDungeonChallengesIfNewDay(state: PlayerState, now: number): void {
+  const isNewDay =
+    state.lastLevelDungeonResetAt === null || new Date(state.lastLevelDungeonResetAt).toDateString() !== new Date(now).toDateString();
+  if (isNewDay) {
+    state.levelDungeonChallengesToday = 0;
+    state.lastLevelDungeonResetAt = now;
+  }
+}
+
+/** レベル上げダンジョンの本日の残り挑戦回数 */
+export function levelDungeonChallengesRemaining(state: PlayerState, now: number = Date.now()): number {
+  resetLevelDungeonChallengesIfNewDay(state, now);
+  return Math.max(0, LEVEL_DUNGEON_DAILY_LIMIT - state.levelDungeonChallengesToday);
+}
+
+/** レベル上げダンジョンへの挑戦権を1回消費する(スタミナとは別枠の1日の上限) */
+export function trySpendLevelDungeonChallenge(state: PlayerState, now: number = Date.now()): GoldDungeonChallengeResult {
+  resetLevelDungeonChallengesIfNewDay(state, now);
+  if (state.levelDungeonChallengesToday >= LEVEL_DUNGEON_DAILY_LIMIT) {
+    return { ok: false, reason: "本日のレベル上げダンジョン挑戦回数の上限に達しています" };
+  }
+  state.levelDungeonChallengesToday += 1;
   return { ok: true };
 }
 

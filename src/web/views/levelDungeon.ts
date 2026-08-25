@@ -1,7 +1,7 @@
 import { ELEMENT_JA } from "../../core/element.js";
 import { LEVEL_DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
-import { LEVEL_DUNGEON_DEFS, LEVEL_DUNGEON_TIER_JA, LevelDungeonDef } from "../../data/levelDungeon.js";
-import { getParty, PlayerState } from "../../game/playerState.js";
+import { LEVEL_DUNGEON_DAILY_LIMIT, LEVEL_DUNGEON_DEFS, LEVEL_DUNGEON_TIER_JA, LevelDungeonDef } from "../../data/levelDungeon.js";
+import { getParty, levelDungeonChallengesRemaining, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
@@ -17,11 +17,13 @@ export interface LevelDungeonProps {
   onAutoFarm: (def: LevelDungeonDef, count: number) => void;
 }
 
-/** 段位ごとの色。難しくなるほど熱い色にして、選ぶ前に段の重さが伝わるようにする */
+/** 階ごとの色。上へ行くほど熱い色にして、選ぶ前に階の重さが伝わるようにする */
 const TIER_COLOR: Record<LevelDungeonDef["tier"], string> = {
-  BEGINNER: "#3fd39a",
-  INTERMEDIATE: "#f0a03c",
-  ADVANCED: "#e0556a",
+  F1: "#3fd39a",
+  F2: "#8fc84a",
+  F3: "#f0a03c",
+  F4: "#e0776a",
+  F5: "#e0556a",
 };
 
 function renderList(props: LevelDungeonProps): HTMLElement {
@@ -40,7 +42,12 @@ function renderList(props: LevelDungeonProps): HTMLElement {
     ]),
     renderDungeonIntro(
       "モンスターの経験値稼ぎ専用です。クリアするたびに、餌にすると経験値が入る「経験ピッグ」も必ず手に入ります。",
-      [`⚡${LEVEL_DUNGEON_STAMINA_COST}/回`, "段が上がるほど経験値もピッグの星も大きい"],
+      [
+        `⚡${LEVEL_DUNGEON_STAMINA_COST}/回`,
+        // **回数が要点なので、階の説明より前に出す。**入ってから気づかせない
+        `本日の残り ${levelDungeonChallengesRemaining(props.player)}/${LEVEL_DUNGEON_DAILY_LIMIT}回`,
+        "上の階ほど経験値が大きい",
+      ],
     ),
     renderFloorGrid(tiles),
   ]);
@@ -49,7 +56,8 @@ function renderList(props: LevelDungeonProps): HTMLElement {
 function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLElement {
   const party = getParty(props.player);
   const hasEnoughStamina = props.player.stamina >= LEVEL_DUNGEON_STAMINA_COST;
-  const canChallenge = party.length > 0 && hasEnoughStamina;
+  const remaining = levelDungeonChallengesRemaining(props.player);
+  const canChallenge = party.length > 0 && hasEnoughStamina && remaining > 0;
 
   const enemyTags = def.enemies.map((e) =>
     el("span", { className: "enemy-tag" }, [`${e.templateId}[${ELEMENT_JA[e.element]}]★${e.star}Lv${e.level}`]),
@@ -58,6 +66,7 @@ function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLEleme
   const blockers = [
     party.length === 0 ? "パーティが編成されていません" : null,
     !hasEnoughStamina ? `スタミナが足りません(⚡${LEVEL_DUNGEON_STAMINA_COST}必要)` : null,
+    remaining <= 0 ? "本日の挑戦回数の上限に達しています(日付が変わると戻ります)" : null,
   ].filter((t): t is string => t !== null);
 
   return el("div", { className: "screen stages-screen" }, [
@@ -90,6 +99,8 @@ function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLEleme
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: LEVEL_DUNGEON_STAMINA_COST,
       stamina: props.player.stamina,
+      hardLimit: remaining,
+      hardLimitNote: `本日の残り挑戦回数: ${remaining}/${LEVEL_DUNGEON_DAILY_LIMIT}回`,
       disabled: !canChallenge,
       onStart: () => props.onAutoFarm(def, props.autoFarmCount),
     }),
@@ -100,15 +111,15 @@ function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLEleme
     ]),
     el("section", { className: "panel" }, [
       el("h2", {}, ["報酬"]),
-      el("p", {}, [`⭐ 獲得経験値: ${def.expReward}`]),
+      el("p", {}, [`⭐ 獲得経験値: ${def.expReward.toLocaleString("ja-JP")}(編成の1体ずつに入ります)`]),
       el("p", {}, [`🐖 経験ピッグ★${def.pigStar}を確定で入手`]),
-      el("p", {}, [`🪙 クリア報酬ゴールド: ${def.goldReward}`]),
+      el("p", {}, [`🪙 クリア報酬ゴールド: ${def.goldReward.toLocaleString("ja-JP")}`]),
     ]),
     el("section", { className: "panel" }, [
       el("p", { className: "app-subtitle" }, [`挑戦パーティ(通常パーティと共通): ${party.length}/4体`]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["編成を変更する"]),
     ]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectTier(null) }, ["◀ 難易度選択に戻る"]),
+    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectTier(null) }, ["◀ 階の一覧に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 

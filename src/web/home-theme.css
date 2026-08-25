@@ -515,7 +515,20 @@
 .home-sheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; }
 .home-sheet[hidden] { display: none; }
 .home-sheet__scrim { position: absolute; inset: 0; background: rgba(3,6,14,.72); backdrop-filter: blur(3px); }
-.home-sheet__panel { position: relative; width: 100%; max-height: 82dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 13px max(18px, env(safe-area-inset-bottom)); border-top: 1px solid rgba(150,180,240,.28); border-radius: 20px 20px 0 0; background: linear-gradient(180deg, #1a2340 0%, #10162b 100%); box-shadow: 0 -14px 40px rgba(0,0,0,.55); }
+/*
+ * 設定シートの下端。
+ *
+ * **下のタブの高さぶん、床を上げること。**
+ * シートは z-index 40、タブは 10 なので重なり順では勝っているつもりだったが、
+ * シートはホーム画面(独自の重なり文脈を作っている)の**中**にあるため、
+ * その外にいるタブの方が上に描かれる。結果、シートのいちばん下にある
+ * 「データを書き出す/読み込む」の2つのボタンがタブに覆われて**押せなかった**。
+ *
+ * 重なり順を直しにいくとホーム画面の合成に手が入るので、ここでは
+ * **タブの下へ潜り込ませない**方向で解いている。余白を積めば、
+ * 中身はタブの上まで巻き上がって必ず届く。
+ */
+.home-sheet__panel { position: relative; width: 100%; max-height: 82dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 13px calc(var(--bottom-nav-h) + max(18px, env(safe-area-inset-bottom))); border-top: 1px solid rgba(150,180,240,.28); border-radius: 20px 20px 0 0; background: linear-gradient(180deg, #1a2340 0%, #10162b 100%); box-shadow: 0 -14px 40px rgba(0,0,0,.55); }
 .home-sheet__head { display: flex; align-items: center; justify-content: space-between; }
 .home-sheet__head strong { font-size: .82rem; letter-spacing: .16em; color: #9db6e8; }
 .home-sheet .audio-settings, .home-sheet .save-data { margin-top: 0; }
@@ -619,3 +632,7 @@ body:has(.title-screen) { overflow: hidden; }
   .title-start { width: 78vw; }
 }
 @media (min-width: 600px) { .home-menu { max-width: 620px; width: 100%; margin: 0 auto; } }
+
+/* データの控え。消え方の説明と、戻す手段を分けて置く */
+.home-sheet .save-data__note { margin: 0; font-size: .68rem; line-height: 1.55; color: #9db6e8; }
+.home-sheet .save-data__restore { width: 100%; min-height: 34px; padding: 6px 9px; font-size: .68rem; }
