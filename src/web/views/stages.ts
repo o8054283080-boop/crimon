@@ -6,6 +6,7 @@ import { MONSTER_TEMPLATES } from "../../data/monsters.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { referenceRunTime } from "../../game/manualClearTimes.js";
 import "../ui/catalog.css";
 
 export interface StagesProps {
@@ -365,6 +366,7 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
     ),
 
     cleared ? renderAutoFarmPanel({
+      ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "STAGE", stage.id, props.selectedDifficulty); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: STAGE_STAMINA_COST,

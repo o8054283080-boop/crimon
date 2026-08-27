@@ -4,6 +4,7 @@ import { LEVEL_DUNGEON_DAILY_LIMIT, LEVEL_DUNGEON_DEFS, LEVEL_DUNGEON_TIER_JA, L
 import { getParty, isLevelDungeonTierCleared, levelDungeonChallengesRemaining, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
 export interface LevelDungeonProps {
@@ -95,6 +96,7 @@ function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLEleme
     ),
 
     isLevelDungeonTierCleared(props.player, def.tier) ? renderAutoFarmPanel({
+      ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "LEVEL_DUNGEON", def.tier); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: LEVEL_DUNGEON_STAMINA_COST,

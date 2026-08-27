@@ -16,10 +16,13 @@ import {
 } from "./shop.js";
 import { Difficulty } from "../data/stages.js";
 import { BackgroundFarmJob } from "./backgroundAutoFarm.js";
+import { FALLBACK_REFERENCE_SECONDS, ManualClearTimes } from "./manualClearTimes.js";
 
 export interface PlayerState {
   /** 保存型バックグラウンド周回。同時に1件だけ保持する。 */
   backgroundFarmJob: BackgroundFarmJob | null;
+  /** 場所・難易度ごとの、直近5回の手動戦闘クリア秒数。 */
+  recentManualClearTimes: ManualClearTimes;
   tutorialMissions: { claimedIds: string[]; partyChanged: boolean; createOpened: boolean };
   crystal: number;
   gold: number;
@@ -198,6 +201,7 @@ export function createInitialState(): PlayerState {
   const monsters = STARTER_MONSTERS.map((s) => createMonsterInstance(`${s.templateId}_${s.element}`, 1, 1));
   return {
     backgroundFarmJob: null,
+    recentManualClearTimes: {},
     tutorialMissions: { claimedIds: [], partyChanged: false, createOpened: false },
     crystal: 300,
     gold: 500,
@@ -272,6 +276,11 @@ function deterministicSetFromId(id: string): Equipment["set"] {
 /** 旧バージョンのセーブデータ(装備システム・強化レベル・セット・ダンジョン専用パーティ・召喚の書導入前)を読み込んでも壊れないよう不足フィールドを補う */
 function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState {
   if (!state.backgroundFarmJob) state.backgroundFarmJob = null;
+  if (!state.recentManualClearTimes || typeof state.recentManualClearTimes !== "object") state.recentManualClearTimes = {};
+  if (state.backgroundFarmJob && !(state.backgroundFarmJob.referenceRunSeconds > 0)) {
+    state.backgroundFarmJob.referenceRunSeconds = FALLBACK_REFERENCE_SECONDS[state.backgroundFarmJob.kind];
+    state.backgroundFarmJob.referenceFromManual = false;
+  }
   if (state.backgroundFarmJob?.status === "SETTLING") state.backgroundFarmJob.status = "RUNNING";
   if (!state.tutorialMissions || !Array.isArray(state.tutorialMissions.claimedIds)) {
     state.tutorialMissions = { claimedIds: [], partyChanged: false, createOpened: false };
