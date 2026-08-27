@@ -646,9 +646,9 @@ export const DUNGEON_FLOOR_STAR_WEIGHTS: Record<number, WeightedOption<EquipStar
     { value: 6, weight: 15 },
   ],
   10: [
-    { value: 4, weight: 30 },
-    { value: 5, weight: 47 },
-    { value: 6, weight: 23 },
+    { value: 4, weight: 20 },
+    { value: 5, weight: 48 },
+    { value: 6, weight: 32 },
   ],
 };
 

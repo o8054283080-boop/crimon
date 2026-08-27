@@ -20,6 +20,30 @@ function buildTeams() {
 }
 
 describe("BattleEngine のインタラクティブ操作API", () => {
+  it("勝利対象の死亡で護衛が生存していても勝利し、護衛だけ倒しても勝利しない", () => {
+    const player = findMonster("slime", "FIRE")!;
+    const boss = { ...findMonster("golem", "WATER")!, victoryTarget: true };
+    const guard = findMonster("wolf", "WATER")!;
+    const engine = new BattleEngine([player], [boss, guard]);
+    const units = engine.getUnits();
+    units.find((unit) => unit.instanceId === "E2")!.alive = false;
+    expect(engine.getWinner()).toBeNull();
+    units.find((unit) => unit.instanceId === "E1")!.alive = false;
+    expect(engine.getWinner()).toBe("PLAYER");
+  });
+
+  it("通常戦闘は敵全滅まで勝利せず、集中対象は指定・切替・再タップ解除できる", () => {
+    const { playerTeam, enemyTeam } = buildTeams();
+    const engine = new BattleEngine(playerTeam, enemyTeam);
+    expect(engine.setFocusTarget("E1")).toBe(true);
+    expect(engine.getFocusTarget()).toBe("E1");
+    engine.setFocusTarget("E2");
+    expect(engine.getFocusTarget()).toBe("E2");
+    engine.setFocusTarget("E2");
+    expect(engine.getFocusTarget()).toBeNull();
+    engine.getUnits().filter((unit) => unit.team === "ENEMY").slice(0, -1).forEach((unit) => { unit.alive = false; });
+    expect(engine.getWinner()).toBeNull();
+  });
   it("getWinnerは決着前はnull、決着後は正しい勝者を返す", () => {
     const { playerTeam, enemyTeam } = buildTeams();
     const engine = new BattleEngine(playerTeam, enemyTeam, { rng: mulberry32(1), maxTurns: 300 });

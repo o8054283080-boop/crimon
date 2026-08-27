@@ -1135,12 +1135,11 @@ const DRAGON_LIGHT_SKILL3: Skill = {
 const DRAGON_DARK_SKILL3: Skill = {
   id: "dragon_s3_meteor",
   name: "破壊の流星",
-  description: "闇の流星を降らせ、敵全体の防御力を無視して攻撃力2.0倍のダメージを与え、与えたダメージの25%を回復する。",
+  description: "闇の流星を降らせ、敵全体の防御力を無視して攻撃力1.2倍のダメージを与え、与えたダメージの25%を回復する。",
   target: "ALL_ENEMIES",
   cooldownTurns: 5,
   effects: [
-    // 防御無視は硬い相手にこそ効くが、1.5倍では他の候補(破滅の咆哮2.0倍+HP補正)に見劣りしていた
-    { kind: "DAMAGE", multiplier: 2.0, ignoreDefense: true },
+    { kind: "DAMAGE", multiplier: 1.2, ignoreDefense: true },
     { kind: "LIFESTEAL", healRate: 0.25 },
   ],
 };

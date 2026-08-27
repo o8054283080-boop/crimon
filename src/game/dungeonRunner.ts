@@ -36,6 +36,8 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale
     id: `${dex.id}_dungeon`,
     name: `${dex.name}★${enemy.star} Lv${enemy.level}${enemy.isBoss ? " 【BOSS】" : ""}`,
     stats,
+    victoryTarget: enemy.victoryTarget,
+    primaryTarget: enemy.primaryTarget,
   };
 }
 
