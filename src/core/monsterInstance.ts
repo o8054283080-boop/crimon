@@ -4,6 +4,7 @@ import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
 import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDevelopment.js";
+import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
 
 /**
  * 移し替えたスキルの実体を引く関数。
@@ -12,9 +13,17 @@ import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDe
  * 起動時に `data` 側から差し込む(`setCreatedSkillResolver`)。
  */
 let createdSkillResolver: ((skillId: string) => Skill | undefined) | null = null;
+let latentAbilityResolver: ((dexId: string, abilityId: string) => LatentAbilityCandidate | undefined) | null = null;
 
 export function setCreatedSkillResolver(resolver: (skillId: string) => Skill | undefined): void {
   createdSkillResolver = resolver;
+}
+
+/** data 層から安定IDの解決だけを注入し、core→data の依存逆流を避ける。 */
+export function setLatentAbilityResolver(
+  resolver: (dexId: string, abilityId: string) => LatentAbilityCandidate | undefined,
+): void {
+  latentAbilityResolver = resolver;
 }
 
 function resolveCreatedSkill(skillId: string): Skill | undefined {
@@ -158,6 +167,9 @@ export function toBattleDefinition(
     stats,
     skills,
     combatMods,
+    latentAbility: instance.development.latentAbilityId
+      ? latentAbilityResolver?.(instance.dexId, instance.development.latentAbilityId)
+      : undefined,
   };
 }
 

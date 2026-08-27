@@ -1,5 +1,6 @@
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "./monsters.js";
+import { setLatentAbilityResolver } from "../core/monsterInstance.js";
 
 type Draft = Omit<LatentAbilityCandidate, "id" | "skillSlot">;
 const d = (name: string, description: string, category: Draft["category"], effectType: Draft["effectType"], value: number,
@@ -8,7 +9,7 @@ const d = (name: string, description: string, category: Draft["category"], effec
 
 /**
  * 種族のS1に合わせた3方向の設計原本。属性ごとの安定IDへ展開する。
- * ⑧-2では選択・保存・表示までとし、この宣言データはBattleEngineから意図的に参照しない。
+ * 選択・保存されたIDは toBattleDefinition でこの宣言データへ解決され、BattleEngineへ渡る。
  */
 const BLUEPRINTS: Readonly<Record<string, readonly [Draft, Draft, Draft]>> = {
   slime: [
@@ -80,3 +81,6 @@ export const LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentA
     skillSlot: 0 as const,
   }))]));
 
+setLatentAbilityResolver((dexId, abilityId) =>
+  LATENT_ABILITY_CANDIDATES[dexId]?.find((candidate) => candidate.id === abilityId),
+);
