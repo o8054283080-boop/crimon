@@ -15,8 +15,11 @@ import {
   rotationKeyAt,
 } from "./shop.js";
 import { Difficulty } from "../data/stages.js";
+import { BackgroundFarmJob } from "./backgroundAutoFarm.js";
 
 export interface PlayerState {
+  /** 保存型バックグラウンド周回。同時に1件だけ保持する。 */
+  backgroundFarmJob: BackgroundFarmJob | null;
   tutorialMissions: { claimedIds: string[]; partyChanged: boolean; createOpened: boolean };
   crystal: number;
   gold: number;
@@ -27,6 +30,8 @@ export interface PlayerState {
   clearedDungeonFloors: number[];
   /** クリア済みのレベル上げダンジョン難易度(初回クリア判定・ダイヤ報酬用) */
   clearedLevelDungeonTiers: string[];
+  /** クリア済みのゴールドダンジョン階層 */
+  clearedGoldDungeonFloors: number[];
   equipment: Equipment[];
   /** 装備ダンジョン専用のパーティ編成(通常ステージのpartyIdsとは別枠、最大5体) */
   dungeonPartyIds: string[];
@@ -192,6 +197,7 @@ export function ensureTowerMonthlyState(state: PlayerState, now: Date = new Date
 export function createInitialState(): PlayerState {
   const monsters = STARTER_MONSTERS.map((s) => createMonsterInstance(`${s.templateId}_${s.element}`, 1, 1));
   return {
+    backgroundFarmJob: null,
     tutorialMissions: { claimedIds: [], partyChanged: false, createOpened: false },
     crystal: 300,
     gold: 500,
@@ -200,6 +206,7 @@ export function createInitialState(): PlayerState {
     clearedStageIds: [],
     clearedDungeonFloors: [],
     clearedLevelDungeonTiers: [],
+    clearedGoldDungeonFloors: [],
     equipment: [],
     dungeonPartyIds: [],
     summonScrolls: 0,
@@ -264,6 +271,8 @@ function deterministicSetFromId(id: string): Equipment["set"] {
 
 /** 旧バージョンのセーブデータ(装備システム・強化レベル・セット・ダンジョン専用パーティ・召喚の書導入前)を読み込んでも壊れないよう不足フィールドを補う */
 function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState {
+  if (!state.backgroundFarmJob) state.backgroundFarmJob = null;
+  if (state.backgroundFarmJob?.status === "SETTLING") state.backgroundFarmJob.status = "RUNNING";
   if (!state.tutorialMissions || !Array.isArray(state.tutorialMissions.claimedIds)) {
     state.tutorialMissions = { claimedIds: [], partyChanged: false, createOpened: false };
   }
@@ -308,6 +317,7 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];
   if (!state.clearedLevelDungeonTiers) state.clearedLevelDungeonTiers = [];
+  if (!state.clearedGoldDungeonFloors) state.clearedGoldDungeonFloors = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
@@ -436,7 +446,8 @@ export function addMonster(state: PlayerState, dexId: string, star: Star, level 
 }
 
 export function removeMonsters(state: PlayerState, instanceIds: readonly string[]): void {
-  const idSet = new Set(instanceIds);
+  const locked = new Set(state.backgroundFarmJob?.status === "RUNNING" ? state.backgroundFarmJob.partyIds : []);
+  const idSet = new Set(instanceIds.filter((id) => !locked.has(id)));
   state.monsters = state.monsters.filter((m) => !idSet.has(m.id));
   state.partyIds = state.partyIds.filter((id) => !idSet.has(id));
   state.dungeonPartyIds = state.dungeonPartyIds.filter((id) => !idSet.has(id));

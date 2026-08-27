@@ -86,7 +86,7 @@ function renderDetail(props: GoldDungeonProps, floor: GoldDungeonFloor): HTMLEle
       ] as (HTMLElement | null)[]).filter((n): n is HTMLElement => n !== null),
     ),
 
-    renderAutoFarmPanel({
+    props.player.clearedGoldDungeonFloors.includes(floor.floor) ? renderAutoFarmPanel({
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: GOLD_DUNGEON_STAMINA_COST,
@@ -96,7 +96,7 @@ function renderDetail(props: GoldDungeonProps, floor: GoldDungeonFloor): HTMLEle
       hardLimitNote: `本日の残り挑戦回数: ${remaining}/${GOLD_DUNGEON_DAILY_LIMIT}回`,
       disabled: !canChallenge,
       onStart: () => props.onAutoFarm(floor, props.autoFarmCount),
-    }),
+    }) : el("p", { className: "app-subtitle" }, ["バックグラウンド周回は、この階を一度クリアすると解放されます。"]),
 
     el("section", { className: "panel" }, [
       el("h2", {}, ["出現する敵"]),

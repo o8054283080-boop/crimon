@@ -5,13 +5,14 @@ import { BattleEngine } from "../battle/engine.js";
 import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
-import { DungeonFloor } from "../data/equipmentDungeon.js";
-import { GoldDungeonFloor } from "../data/goldDungeon.js";
-import { LevelDungeonDef, LevelDungeonTier } from "../data/levelDungeon.js";
-import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
+import { DungeonFloor, EQUIPMENT_DUNGEON_FLOORS } from "../data/equipmentDungeon.js";
+import { GoldDungeonFloor, GOLD_DUNGEON_FLOORS } from "../data/goldDungeon.js";
+import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/levelDungeon.js";
+import { Difficulty, DIFFICULTY_JA, Stage, STAGES } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
+import { BackgroundFarmJob, createBackgroundFarmJob, finishBackgroundFarm, jstDateKey, parseRequestedRuns } from "../game/backgroundAutoFarm.js";
 import {
   PersistState,
   backupTakenAt,
@@ -77,6 +78,9 @@ import {
   trySpendSummonScrolls,
   unlockShopSlot,
   goldDungeonChallengesRemaining,
+  isStageCleared,
+  isDungeonFloorCleared,
+  isLevelDungeonTierCleared,
 } from "../game/playerState.js";
 import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
 import { findMonsterById } from "../data/monsters.js";
@@ -121,6 +125,7 @@ import { CreateMenu, renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
+import { el } from "./dom.js";
 
 /**
  * 更新の取り込み。
@@ -468,8 +473,7 @@ function navigate(screen: ScreenName): void {
   state.monsterTrainingTargetId = null;
   state.monsterTrainingMaterialIds = [];
   state.autoFarmResult = null;
-  // 周回の途中で別の画面へ出たら、そこで周回は終わり。
-  // 残したままにすると、次に何かに挑んだ時が「周回の続き」として扱われる
+  // 旧式の戦闘画面連鎖だけを破棄する。保存型ジョブは別画面でも継続する。
   state.farmRun = null;
   // 塔の案内は次の画面へ持ち越さない。**登坂そのもの(trialTowerRun)は消さない**
   // ――あれは控えに残る進みで、画面を移っただけで捨ててはいけない
@@ -816,6 +820,7 @@ function handleClearParty(): void {
 }
 
 function startStage(stage: Stage, difficulty: Difficulty): void {
+  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) {
@@ -1007,6 +1012,102 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
  * 周回(まとめて何回も挑む)
  * ============================================================ */
 
+let backgroundFarmTimer: number | null = null;
+
+function backgroundParty(job: BackgroundFarmJob): MonsterInstance[] {
+  return job.partyIds.map((id) => state.player.monsters.find((m) => m.id === id)).filter((m): m is MonsterInstance => Boolean(m));
+}
+
+function backgroundFarmCost(job: BackgroundFarmJob): number {
+  if (job.kind === "STAGE") return STAGE_STAMINA_COST;
+  if (job.kind === "EQUIP_DUNGEON") return DUNGEON_STAMINA_COST;
+  if (job.kind === "LEVEL_DUNGEON") return LEVEL_DUNGEON_STAMINA_COST;
+  return GOLD_DUNGEON_STAMINA_COST;
+}
+
+function scheduleBackgroundFarm(delay = 80): void {
+  if (backgroundFarmTimer !== null) return;
+  backgroundFarmTimer = window.setTimeout(() => {
+    backgroundFarmTimer = null;
+    processBackgroundFarmOnce();
+  }, delay);
+}
+
+/** BattleEngine を1周だけ同期実行し、周と周の間は必ずイベントループへ戻す。 */
+function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance[]): { won: boolean; waves: number; extraGold: number } {
+  if (job.kind === "STAGE") {
+    const stage = STAGES.find((s) => s.id === job.targetId)!;
+    let alive = party;
+    let hp: Map<string, number> | null = null;
+    let waves = 0;
+    for (const wave of stage.waves) {
+      const setup = setupWaveBattle(alive, hp, wave, state.player.equipment, job.difficulty ?? "NORMAL");
+      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp });
+      if (engine.run().winner !== "PLAYER") return { won: false, waves, extraGold: waves * stage.rewards.waveGold };
+      const survivors = extractSurvivors(engine, alive);
+      alive = survivors.survivorInstances; hp = survivors.survivorHp; waves += 1;
+    }
+    return { won: true, waves, extraGold: waves * stage.rewards.waveGold };
+  }
+  const target = job.kind === "EQUIP_DUNGEON"
+    ? EQUIPMENT_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)
+    : job.kind === "LEVEL_DUNGEON"
+      ? LEVEL_DUNGEON_DEFS.find((f) => f.tier === job.targetId)
+      : GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId);
+  if (!target) return { won: false, waves: 0, extraGold: 0 };
+  const setup = setupDungeonBattle(party, target, state.player.equipment);
+  return { won: new BattleEngine(setup.playerDefs, setup.enemyDefs).run().winner === "PLAYER", waves: 1, extraGold: 0 };
+}
+
+function processBackgroundFarmOnce(): void {
+  const job = state.player.backgroundFarmJob;
+  if (!job || job.status !== "RUNNING") return;
+  if (job.completedRuns >= job.requestedRuns) { finishBackgroundFarm(job, "COMPLETED"); savePlayerState(state.player); render(); return; }
+  if (jstDateKey() !== job.sessionDate) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
+  const party = backgroundParty(job);
+  if (party.length !== job.partyIds.length || party.length === 0) { finishBackgroundFarm(job, "NO_PARTY"); savePlayerState(state.player); render(); return; }
+
+  if (!job.inFlight) {
+    const cost = backgroundFarmCost(job);
+    const remaining = job.kind === "LEVEL_DUNGEON" ? levelDungeonChallengesRemaining(state.player)
+      : job.kind === "GOLD_DUNGEON" ? goldDungeonChallengesRemaining(state.player) : undefined;
+    const blocked = farmBlockReason({ partySize: party.length, stamina: state.player.stamina, staminaCost: cost, challengesLeft: remaining });
+    if (blocked) { finishBackgroundFarm(job, blocked); savePlayerState(state.player); render(); return; }
+    if (job.kind === "LEVEL_DUNGEON") trySpendLevelDungeonChallenge(state.player);
+    if (job.kind === "GOLD_DUNGEON") trySpendGoldDungeonChallenge(state.player);
+    trySpendStamina(state.player, cost);
+    job.staminaSpent += cost;
+    job.inFlight = true;
+    job.status = "SETTLING";
+    savePlayerState(state.player); // 支払い済みマーカーを報酬より先に永続化
+    job.status = "RUNNING";
+  }
+
+  const battle = simulateBackgroundBattle(job, party);
+  job.result.attempts += 1;
+  if (!battle.won) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); render(); return; }
+  let reward: ClearRewardResult;
+  if (job.kind === "STAGE") reward = applyStageClearRewards(state.player, STAGES.find((s) => s.id === job.targetId)!, battle.waves, party, job.difficulty);
+  else if (job.kind === "EQUIP_DUNGEON") reward = applyDungeonClearRewards(state.player, EQUIPMENT_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
+  else if (job.kind === "LEVEL_DUNGEON") reward = applyLevelDungeonClearRewards(state.player, LEVEL_DUNGEON_DEFS.find((f) => f.tier === job.targetId)!, party);
+  else reward = applyGoldDungeonClearRewards(state.player, GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
+  state.player.gold += battle.extraGold;
+  mergeReward(job.result, reward, battle.extraGold);
+  job.result.cleared += 1; job.completedRuns += 1; job.inFlight = false; job.lastProcessedAt = Date.now();
+  savePlayerState(state.player);
+  render();
+  scheduleBackgroundFarm();
+}
+
+function beginBackgroundFarm(input: Omit<Parameters<typeof createBackgroundFarmJob>[0], "partyIds">, partyIds: string[], unlocked: boolean): void {
+  const count = parseRequestedRuns(input.requestedRuns);
+  if (count === null || !unlocked || state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
+  state.player.backgroundFarmJob = createBackgroundFarmJob({ ...input, requestedRuns: count, partyIds });
+  savePlayerState(state.player);
+  state.screen = "HOME";
+  render(); scheduleBackgroundFarm();
+}
+
 /** いまの手持ちで、その場所へもう1回挑めるか(判定そのものは autoFarm.ts) */
 function farmBlockReasonFor(last: LastRun): AutoFarmStopReason | null {
   const party = last.kind === "EQUIP_DUNGEON" ? getDungeonParty(state.player) : getParty(state.player);
@@ -1144,6 +1245,7 @@ function finishStage(cleared: boolean): void {
 }
 
 function startDungeonFloor(floor: DungeonFloor): void {
+  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getDungeonParty(state.player);
   if (party.length === 0) return;
   if (!trySpendStamina(state.player, DUNGEON_STAMINA_COST).ok) {
@@ -1189,14 +1291,15 @@ function finishDungeon(cleared: boolean): void {
 
 function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty): void {
   const difficultySuffix = difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[difficulty]}]`;
-  beginFarmRun(count, `${stage.name}${difficultySuffix}`, { kind: "STAGE", stage, difficulty });
+  beginBackgroundFarm({ kind: "STAGE", targetId: stage.id, targetName: `${stage.name}${difficultySuffix}`, difficulty, requestedRuns: count }, state.player.partyIds, isStageCleared(state.player, stage.id, difficulty));
 }
 
 function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
-  beginFarmRun(count, floor.name, { kind: "EQUIP_DUNGEON", floor });
+  beginBackgroundFarm({ kind: "EQUIP_DUNGEON", targetId: String(floor.floor), targetName: floor.name, requestedRuns: count }, state.player.dungeonPartyIds, isDungeonFloorCleared(state.player, floor.floor));
 }
 
 function startLevelDungeonTier(def: LevelDungeonDef): void {
+  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getParty(state.player);
   if (party.length === 0) return;
   // **1日の上限を先に見る。**スタミナを払ってから上限に弾かれると、払い損になる
@@ -1246,10 +1349,11 @@ function finishLevelDungeon(cleared: boolean): void {
 }
 
 function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
-  beginFarmRun(count, def.name, { kind: "LEVEL_DUNGEON", def });
+  beginBackgroundFarm({ kind: "LEVEL_DUNGEON", targetId: def.tier, targetName: def.name, requestedRuns: count }, state.player.partyIds, isLevelDungeonTierCleared(state.player, def.tier));
 }
 
 function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
+  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!trySpendGoldDungeonChallenge(state.player).ok) return;
@@ -1270,6 +1374,7 @@ function finishGoldDungeon(cleared: boolean): void {
   const floor = run.floor;
 
   const reward = cleared ? applyGoldDungeonClearRewards(state.player, floor, run.partyInstances) : null;
+  if (cleared && !state.player.clearedGoldDungeonFloors.includes(floor.floor)) state.player.clearedGoldDungeonFloors.push(floor.floor);
   savePlayerState(state.player);
 
   state.goldDungeonRun = null;
@@ -1295,7 +1400,7 @@ function finishGoldDungeon(cleared: boolean): void {
 }
 
 function handleAutoFarmGoldDungeon(floor: GoldDungeonFloor, count: number): void {
-  beginFarmRun(count, floor.name, { kind: "GOLD_DUNGEON", floor });
+  beginBackgroundFarm({ kind: "GOLD_DUNGEON", targetId: String(floor.floor), targetName: floor.name, requestedRuns: count }, state.player.partyIds, state.player.clearedGoldDungeonFloors.includes(floor.floor));
 }
 
 function renderCurrentDungeonBattle(): BattleViewHandle {
@@ -2143,6 +2248,24 @@ function render(): void {
   }
 
   root.append(content);
+  const backgroundJob = state.player.backgroundFarmJob;
+  if (backgroundJob) {
+    const remaining = Math.max(0, backgroundJob.requestedRuns - backgroundJob.completedRuns);
+    const status = backgroundJob.status === "RUNNING" ? "進行中" : backgroundJob.status === "COMPLETED" ? "完了" : "終了";
+    root.append(el("aside", { className: "background-farm-status" }, [
+      el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
+        if (backgroundJob.status !== "RUNNING") {
+          state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.screen = "AUTO_FARM_RESULT"; render();
+        }
+      } }, [`🔁 ${backgroundJob.targetName}　${backgroundJob.completedRuns} / ${backgroundJob.requestedRuns}周　${status}`]),
+      el("span", { className: "background-farm-status__detail" }, [`残り${remaining}周 / ⚡${backgroundJob.staminaSpent}消費 / EXP ${backgroundJob.result.totalExp} / 🪙${backgroundJob.result.totalGold} / 装備${backgroundJob.result.equipmentDropCount}個`]),
+      backgroundJob.status === "RUNNING" ? el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
+        finishBackgroundFarm(backgroundJob, "STOPPED"); savePlayerState(state.player); render();
+      } }, ["周回を終了"]) : el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
+        state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.screen = "AUTO_FARM_RESULT"; render();
+      } }, ["結果を見る"]),
+    ]));
+  }
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
   playBgm(bgmSceneOf(state.screen));
 
@@ -2414,3 +2537,10 @@ if (import.meta.env.DEV) {
 }
 
 render();
+scheduleBackgroundFarm(250);
+
+document.addEventListener("visibilitychange", () => {
+  savePlayerState(state.player);
+  if (document.visibilityState === "visible") scheduleBackgroundFarm(0);
+});
+window.addEventListener("pagehide", () => savePlayerState(state.player));

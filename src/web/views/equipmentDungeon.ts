@@ -3,7 +3,7 @@ import { CYCLE_ELEMENTS, Element, ELEMENT_COLOR, ELEMENT_JA, getElementAffinity 
 import { DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
 import { DungeonEnemy, DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
 import { findMonster } from "../../data/monsters.js";
-import { getDungeonParty, PlayerState } from "../../game/playerState.js";
+import { getDungeonParty, isDungeonFloorCleared, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
@@ -126,14 +126,14 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
       ] as (HTMLElement | null)[]).filter((n): n is HTMLElement => n !== null),
     ),
 
-    renderAutoFarmPanel({
+    isDungeonFloorCleared(props.player, floor.floor) ? renderAutoFarmPanel({
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: DUNGEON_STAMINA_COST,
       stamina: props.player.stamina,
       disabled: !canChallenge,
       onStart: () => props.onAutoFarm(floor, props.autoFarmCount),
-    }),
+    }) : el("p", { className: "app-subtitle" }, ["バックグラウンド周回は、この階を一度クリアすると解放されます。"]),
 
     el(
       "section",

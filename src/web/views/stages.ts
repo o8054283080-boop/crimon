@@ -364,14 +364,14 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
       ].filter((node) => node !== null),
     ),
 
-    renderAutoFarmPanel({
+    cleared ? renderAutoFarmPanel({
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: STAGE_STAMINA_COST,
       stamina: props.player.stamina,
       disabled: !canChallenge,
       onStart: () => props.onAutoFarm(stage, props.autoFarmCount, props.selectedDifficulty),
-    }),
+    }) : el("p", { className: "app-subtitle" }, ["バックグラウンド周回は、この難易度を一度クリアすると解放されます。"]),
 
     el("section", { className: "panel" }, [
       el("h2", {}, ["出現する敵"]),

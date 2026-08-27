@@ -24,7 +24,7 @@ export interface AutoFarmPanelProps {
   staminaCost: number;
   /** いま持っているスタミナ */
   stamina: number;
-  /** 回数の上限(ゴールドダンジョンの1日3回など)。省略すると999 */
+  /** 日次の実行可能数。希望回数の入力上限ではない。 */
   hardLimit?: number;
   /** 上限がある時、その説明(「本日の残り3回」など) */
   hardLimitNote?: string;
@@ -33,14 +33,12 @@ export interface AutoFarmPanelProps {
 }
 
 /** よく使う回数。1回・軽く・しっかり・まとめて、の4段 */
-const PRESETS = [1, 5, 10, 30];
-
-const ABSOLUTE_MAX = 999;
+const PRESETS = [1, 5, 10, 20];
 
 /** スタミナと上限から、実際に回しきれる回数を出す */
 export function affordableCount(stamina: number, staminaCost: number, hardLimit?: number): number {
-  const byStamina = staminaCost > 0 ? Math.floor(stamina / staminaCost) : ABSOLUTE_MAX;
-  return Math.max(1, Math.min(byStamina, hardLimit ?? ABSOLUTE_MAX, ABSOLUTE_MAX));
+  const byStamina = staminaCost > 0 ? Math.floor(stamina / staminaCost) : Number.MAX_SAFE_INTEGER;
+  return Math.max(1, Math.min(byStamina, hardLimit ?? Number.MAX_SAFE_INTEGER));
 }
 
 function countChip(label: string, active: boolean, onClick: () => void): HTMLElement {
@@ -81,6 +79,17 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
       el("span", { className: "autofarm__cost" }, [`⚡${totalCost}`]),
     ]),
     el("div", { className: "autofarm__chips" }, chips),
+    el("label", { className: "autofarm__input-label" }, [
+      "希望する周回回数",
+      el("input", {
+        className: "auto-farm-count-input", type: "number", inputMode: "numeric", min: "1", step: "1",
+        value: String(props.count),
+        oninput: (event: Event) => {
+          const input = event.currentTarget as HTMLInputElement;
+          if (/^[1-9]\d*$/.test(input.value)) props.onChangeCount(Number(input.value));
+        },
+      }),
+    ]),
     ...notes,
     el(
       "button",
@@ -93,8 +102,8 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
       [`▶ ${props.count}回まとめて挑戦`],
     ),
     el("p", { className: "app-subtitle" }, [
-      "1戦ずつ戦います。勝つと自動で次へ進み、最後にまとめて受け取ります(速度は戦闘画面で変えられます)。",
+      "クリア済みの場所を、戦闘画面を表示せず1戦ずつ安全に処理します。別画面を見ても進行します。",
     ]),
-    el("p", { className: "app-subtitle" }, ["敗北・スタミナ切れで中断します。途中でやめたい時は戦闘画面の ⏹ を押してください。"]),
+    el("p", { className: "app-subtitle" }, ["敗北・スタミナ切れ・日次上限で終了します。ダイヤによる自動回復は行いません。"]),
   ]);
 }
