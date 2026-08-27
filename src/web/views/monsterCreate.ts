@@ -239,9 +239,12 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
   }
   if (props.menu === "LATENT") {
     const candidates = LATENT_ABILITY_CANDIDATES[target.dexId] ?? [];
+    const selected = candidates.find((candidate) => candidate.id === target.development.latentAbilityId);
     return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, [
       el("h2", {}, ["潜在覚醒"]), el("p", {}, [`覚醒オーブ: ${props.awakeningOrbs}個`]),
-      target.development.latentAbilityId ? el("p", { className: "create-notice" }, [`覚醒済み: ${target.development.latentAbilityId}`]) :
+      target.development.latentAbilityId ? el("div", { className: "create-notice" }, selected
+        ? [`覚醒済み: ${selected.name}`, el("small", {}, [selected.description])]
+        : [`覚醒済み: ${target.development.latentAbilityId}`]) :
       candidates.length === 3 ? el("div", { className: "create-choices" }, candidates.map((candidate) => el("button", { type: "button", className: "create-choice", disabled: props.awakeningOrbs < 1, onclick: () => props.onAwaken(candidate.id) }, [candidate.name, el("small", {}, [candidate.description])]))) :
       el("p", { className: "app-subtitle" }, ["潜在能力候補は準備中です（スキル1強化・3候補を登録予定）。"]),
     ])]);

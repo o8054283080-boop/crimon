@@ -12,7 +12,9 @@ import {
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 
 const candidates: LatentAbilityCandidate[] = [1, 2, 3].map((n) => ({
-  id: `slime_skill1_latent_${n}`, name: `候補${n}`, description: "TODO: 効果未確定", skillSlot: 0,
+  id: `slime_skill1_latent_${n}`, name: `候補${n}`, description: "テスト候補", skillSlot: 0,
+  category: "OFFENSE", effectType: "DAMAGE_UP", value: .1, chance: 1, duration: 0,
+  target: "TARGET", resolution: "ALWAYS",
 }));
 
 describe("クリエイトシステム拡張", () => {

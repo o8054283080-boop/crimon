@@ -96,8 +96,8 @@ const ELEMENT_STAT_FLAVOR: Record<Element, (stats: Stats) => Stats> = {
   WATER: (s) => ({ ...s, def: Math.round(s.def * 1.1), hp: Math.round(s.hp * 1.05) }),
   ELECTRIC: (s) => ({ ...s, spd: Math.round(s.spd * 1.15) }),
   GRASS: (s) => ({ ...s, hp: Math.round(s.hp * 1.15) }),
-  LIGHT: (s) => ({ ...s, criRate: Math.min(1, s.criRate + 0.05) }),
-  DARK: (s) => ({ ...s, criDmg: s.criDmg + 0.1 }),
+  LIGHT: (s) => ({ ...s, criRate: Math.min(1, s.criRate + 0.03) }),
+  DARK: (s) => ({ ...s, criDmg: s.criDmg + 0.05 }),
 };
 
 /**
