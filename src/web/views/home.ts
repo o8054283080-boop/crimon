@@ -707,24 +707,35 @@ export function renderHome(props: HomeProps): HTMLElement {
   const party = getParty(player);
   const tutorialNext = nextTutorialMission(player);
   const tutorialClaimable = tutorialNext ? canClaimTutorialMission(player, tutorialNext) : false;
+  const milestoneTitle = (step: number): string | null => step === 10 ? "10ミッション達成報酬" : step === 20 ? "20ミッション達成報酬" : step === 30 ? "初心者ミッション完全制覇報酬" : null;
+  const rewardText = (mission: (typeof TUTORIAL_MISSIONS)[number]): string => [
+    mission.reward.gold ? `🪙${mission.reward.gold.toLocaleString()}` : null,
+    mission.reward.crystal ? `💎${mission.reward.crystal}` : null,
+    mission.reward.summonScrolls ? `📜通常召喚書 ×${mission.reward.summonScrolls}` : null,
+    mission.reward.fourStarSummonScrolls ? `🌟 ★4以上召喚書 ×${mission.reward.fourStarSummonScrolls}` : null,
+    mission.reward.lightDarkFourStarSummonScrolls ? `🌗 ★4以上光闇召喚書 ×${mission.reward.lightDarkFourStarSummonScrolls}` : null,
+    mission.reward.fiveStarSummonScrolls ? `✨ ★5召喚書 ×${mission.reward.fiveStarSummonScrolls}` : null,
+  ].filter(Boolean).join("　");
   const tutorialPanel = el("section", { className: "tutorial-roadmap panel--ornate" }, [
     el("div", { className: "tutorial-roadmap__head" }, [
       el("strong", {}, ["初心者ミッション"]),
       el("span", {}, [`${TUTORIAL_MISSIONS.filter(x => player.tutorialMissions.claimedIds.includes(x.id)).length} / ${TUTORIAL_MISSIONS.length}`]),
     ]),
-    tutorialNext ? el("div", { className: `tutorial-current${tutorialClaimable ? " tutorial-current--ready" : ""}` }, [
+    tutorialNext ? el("div", { className: `tutorial-current${tutorialClaimable ? " tutorial-current--ready" : ""}` }, ([
       el("small", {}, [`第${tutorialNext.chapter}章 ${tutorialNext.chapterTitle} ・ STEP ${tutorialNext.step} / 30`]),
       el("strong", {}, [tutorialClaimable ? "報酬を受け取れます！" : tutorialNext.title]),
       el("p", {}, [tutorialNext.condition]),
+      milestoneTitle(tutorialNext.step) ? el("div", { className: "tutorial-milestone" }, [milestoneTitle(tutorialNext.step)!]) : null,
+      el("div", { className: "tutorial-rewards" }, [rewardText(tutorialNext)]),
       el("div", { className: "tutorial-current__actions" }, ([
         el("button", { type:"button", className:"btn btn--ghost", onclick:()=>props.onGoTutorialDestination(tutorialNext.destination) }, ["移動する"]),
         tutorialClaimable ? el("button", { type:"button", className:"btn btn--primary", onclick:()=>props.onClaimTutorial(tutorialNext.id) }, ["報酬を受け取る"]) : null,
       ] as (HTMLElement | null)[]).filter((x): x is HTMLElement => x !== null)),
-    ]) : el("p", { className:"tutorial-complete" }, ["🎉 全30ミッション達成！ 基本育成ロードマップを制覇しました。"]),
+    ] as (HTMLElement | null)[]).filter((node): node is HTMLElement => node !== null)) : el("p", { className:"tutorial-complete" }, ["🎉 全30ミッション達成！ 基本育成ロードマップを制覇しました。"]),
     ...[1,2,3,4,5].map(chapter => el("details", { className:"tutorial-chapter", open: tutorialNext?.chapter===chapter }, [
       el("summary", {}, [`第${chapter}章 ${TUTORIAL_MISSIONS.find(x=>x.chapter===chapter)?.chapterTitle}`]),
-      ...TUTORIAL_MISSIONS.filter(x=>x.chapter===chapter).map(x=>el("div", { className:`tutorial-row${player.tutorialMissions.claimedIds.includes(x.id)?" tutorial-row--done":""}` }, [
-        el("span", {}, [`STEP ${x.step}`]), el("span", {}, [x.title]),
+      ...TUTORIAL_MISSIONS.filter(x=>x.chapter===chapter).map(x=>el("div", { className:`tutorial-row${player.tutorialMissions.claimedIds.includes(x.id)?" tutorial-row--done":""}${milestoneTitle(x.step)?" tutorial-row--milestone":""}` }, [
+        el("span", {}, [`STEP ${x.step}`]), el("span", {}, [milestoneTitle(x.step) ?? x.title]),
       ])),
     ])),
   ]);

@@ -2068,3 +2068,10 @@
     transform: translate(2px, 1px);
   }
 }
+
+.special-scrolls { margin-top: 14px; padding: 12px; border: 1px solid rgba(255,211,106,.55); border-radius: 10px; background: linear-gradient(135deg,rgba(75,46,112,.72),rgba(18,35,70,.88)); }
+.special-scrolls h2 { margin: 0 0 8px; color: #ffe69a; font-size: .9rem; letter-spacing: .08em; }
+.special-scroll { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid rgba(255,255,255,.12); }
+.special-scroll__copy strong,.special-scroll__copy span { display: block; }
+.special-scroll__copy strong { color: #fff0a8; }
+.special-scroll__copy span,.special-scroll__count { color: #cbd8ef; font-size: .72rem; }

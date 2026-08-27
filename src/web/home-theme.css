@@ -656,3 +656,6 @@ body:has(.title-screen) { overflow: hidden; }
 .tutorial-row { display:grid; grid-template-columns:58px 1fr; gap:6px; padding:4px 8px; }
 .tutorial-row--done { opacity:.48; text-decoration:line-through; }
 .tutorial-complete { color:#ffe08a; font-weight:700; }
+.tutorial-milestone { margin: 8px 0 4px; padding: 6px 9px; border: 1px solid rgba(255,211,106,.7); color:#ffe08a; background:rgba(117,75,20,.24); font-weight:800; letter-spacing:.04em; }
+.tutorial-rewards { margin: 5px 0 9px; color:#d9e7ff; font-size:.78rem; line-height:1.7; }
+.tutorial-row--milestone { color:#ffe08a; font-weight:700; background:rgba(255,211,106,.06); }
