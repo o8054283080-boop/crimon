@@ -4346,6 +4346,13 @@ body {
   width: 100%;
 }
 
+.autofarm__input-label { display: grid; gap: 6px; font-size: .8rem; font-weight: 800; }
+.autofarm__input-label input { width: 100%; min-height: 46px; font-size: 1rem; }
+.background-farm-status { position: fixed; z-index: 30; left: 8px; right: 8px; bottom: 72px; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 10px; border: 1px solid #d6a84a; border-radius: 12px; background: rgba(25,18,13,.96); box-shadow: 0 6px 22px #0009; }
+.background-farm-status__summary { border: 0; padding: 0; color: #ffe0a0; background: transparent; text-align: left; font-weight: 900; }
+.background-farm-status__detail { grid-column: 1; color: #ddd; font-size: .72rem; }
+.background-farm-status .btn { grid-column: 2; grid-row: 1 / span 2; min-height: 42px; }
+
 /* ===================================================================
  * ステージ一覧の「つづきから」
  *
