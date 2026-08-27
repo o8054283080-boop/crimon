@@ -39,6 +39,12 @@ export function jstDateKey(at: number = Date.now()): string {
   return new Date(at + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/** 日次挑戦枠を持つコンテンツだけは、開始日の翌日枠へ自動で食い込ませない。 */
+export function shouldStopForJstDateChange(job: Pick<BackgroundFarmJob, "kind" | "sessionDate">, now: number = Date.now()): boolean {
+  const hasDailyLimit = job.kind === "LEVEL_DUNGEON" || job.kind === "GOLD_DUNGEON";
+  return hasDailyLimit && jstDateKey(now) !== job.sessionDate;
+}
+
 export function createBackgroundFarmJob(input: {
   kind: BackgroundFarmKind; targetId: string; targetName: string; difficulty?: Difficulty;
   requestedRuns: number; partyIds: string[]; referenceRunSeconds?: number; referenceFromManual?: boolean; now?: number;

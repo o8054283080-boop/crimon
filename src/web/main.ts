@@ -12,7 +12,7 @@ import { Difficulty, DIFFICULTY_JA, Stage, STAGES } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
-import { BackgroundFarmJob, MAX_OFFLINE_FARM_MS, availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, jstDateKey, parseRequestedRuns } from "../game/backgroundAutoFarm.js";
+import { BackgroundFarmJob, MAX_OFFLINE_FARM_MS, availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange } from "../game/backgroundAutoFarm.js";
 import { manualClearKey, recordManualBattle, referenceRunTime } from "../game/manualClearTimes.js";
 import {
   PersistState,
@@ -1108,7 +1108,7 @@ function processBackgroundFarmOnce(): void {
   const job = state.player.backgroundFarmJob;
   if (!job || job.status !== "RUNNING") return;
   if (job.completedRuns >= job.requestedRuns) { finishBackgroundFarm(job, "COMPLETED"); savePlayerState(state.player); render(); return; }
-  if (jstDateKey() !== job.sessionDate) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
+  if (shouldStopForJstDateChange(job)) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
   const party = backgroundParty(job);
   if (party.length !== job.partyIds.length || party.length === 0) { finishBackgroundFarm(job, "NO_PARTY"); savePlayerState(state.player); render(); return; }
   // 完全終了が8時間を超えても、復帰時に持ち越せる処理権は最大8時間ぶん。

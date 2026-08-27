@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns } from "../src/game/backgroundAutoFarm.js";
+import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange } from "../src/game/backgroundAutoFarm.js";
 import { addManualClearTime, manualClearKey, medianSeconds, recordManualBattle, referenceRunTime } from "../src/game/manualClearTimes.js";
 import { affordableCount } from "../src/web/views/autoFarmPanel.js";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
@@ -17,6 +17,26 @@ describe("保存型バックグラウンド周回", () => {
     expect(job).toMatchObject({ requestedRuns: 47, completedRuns: 0, partyIds: ["a"], status: "RUNNING", inFlight: false });
     finishBackgroundFarm(job, "STOPPED");
     expect(job).toMatchObject({ status: "STOPPED", stopReason: "STOPPED" });
+  });
+});
+
+describe("JST日付変更時の周回停止", () => {
+  const beforeMidnight = Date.parse("2026-08-27T14:55:00Z"); // JST 23:55
+  const afterMidnight = Date.parse("2026-08-27T15:00:00Z"); // JST 翌日 00:00
+
+  it.each(["STAGE", "EQUIP_DUNGEON"] as const)("%s はJST 0:00を跨いでも継続する", (kind) => {
+    const job = createBackgroundFarmJob({ kind, targetId: "1", targetName: "target", requestedRuns: 50, partyIds: ["a"], now: beforeMidnight });
+    expect(shouldStopForJstDateChange(job, afterMidnight)).toBe(false);
+  });
+
+  it.each(["LEVEL_DUNGEON", "GOLD_DUNGEON"] as const)("%s は翌日の日次枠を使わず停止する", (kind) => {
+    const job = createBackgroundFarmJob({ kind, targetId: "1", targetName: "target", requestedRuns: 50, partyIds: ["a"], now: beforeMidnight });
+    expect(shouldStopForJstDateChange(job, afterMidnight)).toBe(true);
+  });
+
+  it("日次コンテンツも開始日中は停止しない", () => {
+    const job = createBackgroundFarmJob({ kind: "GOLD_DUNGEON", targetId: "1", targetName: "target", requestedRuns: 2, partyIds: ["a"], now: beforeMidnight });
+    expect(shouldStopForJstDateChange(job, beforeMidnight + 60_000)).toBe(false);
   });
 });
 
