@@ -1,6 +1,6 @@
 import { ElementAffinity, getElementAffinity, getElementMultiplier } from "../core/element.js";
 import { DamageEffect, SCALE_REFERENCE } from "../core/skill.js";
-import { BattleUnit, getEffectiveStat } from "./unit.js";
+import { BattleUnit, getEffectiveStat, hasStatus } from "./unit.js";
 import { applyDefenseE, calculateBaseDamage, roundNormalDamage } from "./damageFormula.js";
 
 /**
@@ -19,6 +19,13 @@ export interface DamageResult {
   damage: number;
   isCrit: boolean;
   affinity: ElementAffinity;
+}
+
+export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit): number {
+  const rate = getEffectiveStat(attacker, "criRate")
+    + (hasStatus(defender, "CRIT_RATE_UP") ? 0.5 : 0)
+    - (hasStatus(defender, "CRIT_RATE_DOWN") ? 0.3 : 0);
+  return Math.max(0, Math.min(1, rate));
 }
 
 export function calcDamage(
@@ -54,7 +61,7 @@ export function calcDamage(
   const affinity = getElementAffinity(attacker.def.element, defender.def.element);
   const elementMultiplier = getElementMultiplier(attacker.def.element, defender.def.element);
 
-  const isCrit = rng() < getEffectiveStat(attacker, "criRate");
+  const isCrit = rng() < getFinalCritRate(attacker, defender);
   const critMultiplier = isCrit ? getEffectiveStat(attacker, "criDmg") : 1;
 
   const dealtMultiplier = attacker.def.combatMods?.damageDealtMultiplier ?? 1;

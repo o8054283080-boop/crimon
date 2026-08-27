@@ -1,16 +1,19 @@
 import { ELEMENT_JA } from "../core/element.js";
 import { MonsterDefinition } from "../core/monster.js";
-import { Skill, SkillEffect } from "../core/skill.js";
+import { STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
 import { calcDamage } from "./damage.js";
 import {
   ActiveEffect,
   BattleUnit,
+  DamageApplicationResult,
   Team,
   applyDamage,
+  applyStatus,
   applyHeal,
   createBattleUnit,
   getEffectiveStat,
+  hasStatus,
   hpRatio,
   tickCooldownsAtTurnStart,
   tickEffectsAtTurnStart,
@@ -39,6 +42,7 @@ const GAUGE_EPSILON = 1e-6;
 function isSourceScopedEffect(effect: SkillEffect): boolean {
   if (effect.kind === "HEAL") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
   if (effect.kind === "BUFF") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
+  if (effect.kind === "STATUS") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
   return false;
 }
 
@@ -53,6 +57,7 @@ export interface UnitSnapshot {
   alive: boolean;
   /** 現在かかっているバフ/デバフ(演出用) */
   effects: ActiveEffect[];
+  statusEffects: BattleUnit["statusEffects"];
   /** スタン残りターン(0=スタンしていない) */
   stunTurns: number;
   /** 火傷残りターン(0=火傷していない) */
@@ -268,6 +273,7 @@ export class BattleEngine {
       gauge: Math.round(u.gauge),
       alive: u.alive,
       effects: u.effects.map((e) => ({ ...e })),
+      statusEffects: u.statusEffects.map((e) => ({ ...e })),
       stunTurns: u.stunTurns,
       burnTurns: u.burnTurns,
       shieldValue: u.shieldValue,
@@ -322,10 +328,13 @@ export class BattleEngine {
   private act(unit: BattleUnit, choice?: ManualChoice): void {
     let skill: Skill;
     let index: 0 | 1 | 2;
-    if (choice && unit.cooldowns[choice.skillIndex] === 0) {
+    if (choice && unit.cooldowns[choice.skillIndex] === 0 && (!hasStatus(unit, "SKILL_LOCK") || choice.skillIndex === 0)) {
       skill = unit.def.skills[choice.skillIndex];
       index = choice.skillIndex;
     } else {
+      if (choice && hasStatus(unit, "SKILL_LOCK") && choice.skillIndex !== 0) {
+        this.push(`  → ${this.label(unit)} はスキル使用不可のためスキル1を使用する！`);
+      }
       ({ skill, index } = chooseSkill(unit));
     }
 
@@ -335,6 +344,14 @@ export class BattleEngine {
       targets = explicitTarget ? [explicitTarget] : chooseTargets(unit, skill, this.units);
     } else {
       targets = chooseTargets(unit, skill, this.units);
+    }
+    if (skill.target === "SINGLE_ENEMY") {
+      const forced = chooseTargets(unit, skill, this.units)[0];
+      const taunt = unit.statusEffects.some((effect) => effect.type === "TAUNT");
+      if (taunt && forced && targets[0] !== forced) {
+        targets = [forced];
+        this.push(`  → 挑発により対象が ${this.label(forced)} へ変更された！`);
+      }
     }
     if (targets.length === 0) return;
 
@@ -436,21 +453,17 @@ export class BattleEngine {
             const result = calcDamage(source, target, effect, this.rng);
             // 暗闇で外した攻撃はかすり傷程度にしかならない
             if (missed) result.damage = Math.max(1, Math.round(result.damage * (1 - BLIND_DAMAGE_REDUCTION)));
-            applyDamage(target, result.damage);
-            damageDealtThisCall += result.damage;
+            const applied = this.applyIncomingDamage(target, result.damage, source, "normal");
+            damageDealtThisCall += applied.hpDamage;
             target.hitsTaken += 1;
             counterTargets.add(target);
             const critText = result.isCrit ? "会心の一撃！" : "";
             const affinityText =
               result.affinity === "ADVANTAGE" ? " 効果は抜群だ！" : result.affinity === "DISADVANTAGE" ? " 効果は今ひとつだ…" : "";
             this.push(
-              `  → ${this.label(target)} に ${result.damage} ダメージ！${critText}${affinityText} (残りHP ${target.currentHp}/${target.maxHp})`,
+              `  → ${this.label(target)} に ${applied.hpDamage} ダメージ！${critText}${affinityText} (残りHP ${target.currentHp}/${target.maxHp})`,
             );
-            this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: result.damage, isCrit: result.isCrit });
-            if (!target.alive) {
-              this.push(`  → ${this.label(target)} は倒れた！`);
-              this.pushEvent({ targetId: target.instanceId, kind: "DEATH" });
-            }
+            this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
           }
           break;
         }
@@ -499,6 +512,10 @@ export class BattleEngine {
                 ? this.units.filter((u) => u.team === source.team && u.alive)
                 : [target];
           for (const receiver of receivers) {
+            if (hasStatus(receiver, "BUFF_BLOCK")) {
+              this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`);
+              continue;
+            }
             receiver.effects.push({
               stat: effect.stat,
               amount: effect.amount,
@@ -520,6 +537,23 @@ export class BattleEngine {
             kind: "DEBUFF",
           });
           this.push(`  → ${this.label(target)} の ${effect.stat.toUpperCase()} が低下！ (${effect.durationTurns}ターン)`);
+          break;
+        }
+
+        case "STATUS": {
+          const category = STATUS_EFFECT_CATEGORY[effect.status];
+          const receivers = effect.applyTo === "SELF" ? [source] : effect.applyTo === "ALLIES"
+            ? this.units.filter((unit) => unit.team === source.team && unit.alive) : [target];
+          for (const receiver of receivers) {
+            if (category === "DEBUFF") {
+              if (this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
+            }
+            if (!applyStatus(receiver, effect.status, effect.durationTurns, source.instanceId)) {
+              this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`);
+              continue;
+            }
+            this.push(`  → ${this.label(receiver)} は${STATUS_EFFECT_JA[effect.status]}を得た！ (${effect.durationTurns}ターン)`);
+          }
           break;
         }
 
@@ -566,6 +600,7 @@ export class BattleEngine {
 
         case "SHIELD": {
           if (!target.alive) break;
+          if (hasStatus(target, "BUFF_BLOCK")) { this.push(`  → ${this.label(target)} は強化不可でBUFF付与を防いだ！`); break; }
           const shieldAmount = Math.round(target.maxHp * effect.shieldRate);
           target.shieldValue = Math.max(target.shieldValue, shieldAmount);
           target.shieldTurns = Math.max(target.shieldTurns, effect.durationTurns);
@@ -575,6 +610,7 @@ export class BattleEngine {
 
         case "IMMUNITY": {
           if (!target.alive) break;
+          if (hasStatus(target, "BUFF_BLOCK")) { this.push(`  → ${this.label(target)} は強化不可でBUFF付与を防いだ！`); break; }
           target.immuneTurns = Math.max(target.immuneTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} は状態異常免疫を得た！ (${effect.durationTurns}ターン)`);
           break;
@@ -582,6 +618,7 @@ export class BattleEngine {
 
         case "REGEN": {
           if (!target.alive) break;
+          if (hasStatus(target, "BUFF_BLOCK")) { this.push(`  → ${this.label(target)} は強化不可でBUFF付与を防いだ！`); break; }
           target.regenRate = Math.max(target.regenRate, effect.healRate);
           target.regenTurns = Math.max(target.regenTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} は継続回復を得た！ (${effect.durationTurns}ターン)`);
@@ -592,7 +629,9 @@ export class BattleEngine {
           if (!target.alive) break;
           const hadDebuff = target.effects.some((e) => e.kind === "DEBUFF");
           target.effects = target.effects.filter((e) => e.kind !== "DEBUFF");
-          if (hadDebuff) this.push(`  → ${this.label(target)} のデバフが解除された！`);
+          const hadStatusDebuff = target.statusEffects.some((e) => e.category === "DEBUFF");
+          target.statusEffects = target.statusEffects.filter((e) => e.category !== "DEBUFF");
+          if (hadDebuff || hadStatusDebuff) this.push(`  → ${this.label(target)} のデバフが解除された！`);
           break;
         }
 
@@ -641,6 +680,32 @@ export class BattleEngine {
     }
 
     for (const victim of counterTargets) this.tryCounter(victim, source);
+  }
+
+  /** 特殊ダメージにも共通の致死処理を通し、通常由来だけ反射を1段生成する。 */
+  private applyIncomingDamage(
+    target: BattleUnit,
+    amount: number,
+    source?: BattleUnit,
+    sourceType: "normal" | "reflect" | "periodic" = "normal",
+  ): DamageApplicationResult {
+    const applied = applyDamage(target, amount);
+    if (applied.invincible) this.push(`  → ${this.label(target)} は無敵でダメージを無効化した！`);
+    if (applied.endured) this.push(`  → ${this.label(target)} は我慢でHP1に踏みとどまった！`);
+    if (applied.revived) this.push(`  → ${this.label(target)} は最大HPの25%で復活した！`);
+    if (applied.died) {
+      this.push(`  → ${this.label(target)} は倒れた！`);
+      this.pushEvent({ targetId: target.instanceId, kind: "DEATH" });
+    }
+    if (sourceType === "normal" && source?.alive && applied.hpDamage > 0 && hasStatus(target, "REFLECT")) {
+      const reflected = Math.round(applied.hpDamage * 0.25);
+      if (reflected > 0) {
+        this.push(`  → ${this.label(target)} の反射！ ${this.label(source)} へ ${reflected} ダメージ！`);
+        const reflectedResult = this.applyIncomingDamage(source, reflected, target, "reflect");
+        this.pushEvent({ targetId: source.instanceId, kind: "DAMAGE", amount: reflectedResult.hpDamage });
+      }
+    }
+    return applied;
   }
 
   /**

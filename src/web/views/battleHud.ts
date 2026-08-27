@@ -20,7 +20,7 @@ import { formatHpPair } from "../../core/stats.js";
 import { ActiveEffect } from "../../battle/unit.js";
 import { ELEMENT_JA, Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
-import { BUFF_STAT_JA, BuffStat } from "../../core/skill.js";
+import { BUFF_STAT_JA, STATUS_EFFECT_JA, BuffStat } from "../../core/skill.js";
 import { el } from "../dom.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -132,6 +132,10 @@ function buildStatChip(effect: ActiveEffect): HTMLElement {
 export function buildStatusChips(snapshot: UnitSnapshot): HTMLElement[] {
   const chips: HTMLElement[] = [];
   for (const effect of snapshot.effects) chips.push(buildStatChip(effect));
+  for (const effect of snapshot.statusEffects) {
+    const tone = effect.category === "BUFF" ? "buff" : "debuff";
+    chips.push(buildChip(tone, STAT_GLYPH.criRate, String(effect.remainingTurns), `${STATUS_EFFECT_JA[effect.type]}(残り${effect.remainingTurns}ターン)`));
+  }
   if (snapshot.stunTurns > 0) {
     chips.unshift(buildChip("stun", CHIP_GLYPH.stun, String(snapshot.stunTurns), `${CHIP_LABEL.stun}(残り${snapshot.stunTurns}ターン)`));
   }

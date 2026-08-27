@@ -1,6 +1,6 @@
 import { getElementAffinity } from "../core/element.js";
 import { Skill } from "../core/skill.js";
-import { BattleUnit, hpRatio } from "./unit.js";
+import { BattleUnit, hasStatus, hpRatio } from "./unit.js";
 
 export interface SkillChoice {
   skill: Skill;
@@ -12,6 +12,7 @@ export interface SkillChoice {
  * skill 0 は常にクールタイム無しなので必ずフォールバックとして使用可能。
  */
 export function chooseSkill(unit: BattleUnit): SkillChoice {
+  if (hasStatus(unit, "SKILL_LOCK")) return { skill: unit.def.skills[0], index: 0 };
   for (let i = 2; i >= 1; i -= 1) {
     if (unit.cooldowns[i] === 0) {
       return { skill: unit.def.skills[i], index: i as 1 | 2 };
@@ -41,6 +42,12 @@ export function chooseTargets(unit: BattleUnit, skill: Skill, allUnits: BattleUn
     }
 
     case "SINGLE_ENEMY": {
+      const taunt = unit.statusEffects.find((effect) => effect.type === "TAUNT");
+      if (taunt?.sourceId) {
+        const source = enemies.find((enemy) => enemy.instanceId === taunt.sourceId);
+        if (source) return [source];
+        unit.statusEffects = unit.statusEffects.filter((effect) => effect !== taunt);
+      }
       const affinityScore = (target: BattleUnit): number => {
         const affinity = getElementAffinity(unit.def.element, target.def.element);
         if (affinity === "ADVANTAGE") return 0;

@@ -8,6 +8,32 @@ export type TargetType =
 /** BUFF/DEBUFFで操作できる能力値。atk/def/spdは倍率(乗算)、criRate/criDmgは加算で効く */
 export type BuffStat = "atk" | "def" | "spd" | "criRate" | "criDmg";
 
+export type StatusEffectType =
+  | "CRIT_RATE_DOWN"
+  | "ENDURE"
+  | "REFLECT"
+  | "REVIVE"
+  | "INVINCIBLE"
+  | "TAUNT"
+  | "BUFF_BLOCK"
+  | "SKILL_LOCK"
+  | "CRIT_RATE_UP";
+
+export type StatusEffectCategory = "BUFF" | "DEBUFF";
+
+export const STATUS_EFFECT_CATEGORY: Record<StatusEffectType, StatusEffectCategory> = {
+  CRIT_RATE_DOWN: "BUFF", ENDURE: "BUFF", REFLECT: "BUFF", REVIVE: "BUFF", INVINCIBLE: "BUFF",
+  TAUNT: "DEBUFF", BUFF_BLOCK: "DEBUFF", SKILL_LOCK: "DEBUFF", CRIT_RATE_UP: "DEBUFF",
+};
+
+export interface StatusEffect {
+  kind: "STATUS";
+  status: StatusEffectType;
+  durationTurns: number;
+  chance?: number;
+  applyTo?: "SELF" | "ALLIES";
+}
+
 /**
  * 補正の基準になるステータス値。終盤に装備込みで到達する水準に合わせてある。
  *
@@ -234,7 +260,8 @@ export type SkillEffect =
   | HealBlockEffect
   | CooldownExtendEffect
   | PoisonEffect
-  | BlindEffect;
+  | BlindEffect
+  | StatusEffect;
 
 export interface Skill {
   id: string;
@@ -308,6 +335,10 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
         return { ...effect, healRate: round3(effect.healRate * growth) };
       case "BUFF":
         return isMaxLevel ? { ...effect, durationTurns: effect.durationTurns + 1 } : effect;
+      case "STATUS": {
+        const withChance = effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
+        return isMaxLevel ? { ...withChance, durationTurns: withChance.durationTurns + 1 } : withChance;
+      }
       case "DEBUFF": {
         const withChance = effect.chance !== undefined ? { ...effect, chance: growChance(effect.chance, growth) } : effect;
         return isMaxLevel ? { ...withChance, durationTurns: withChance.durationTurns + 1 } : withChance;
@@ -363,6 +394,11 @@ export const BUFF_STAT_JA: Record<BuffStat, string> = {
   criDmg: "クリダメ",
 };
 
+export const STATUS_EFFECT_JA: Record<StatusEffectType, string> = {
+  CRIT_RATE_DOWN: "被クリ率ダウン", ENDURE: "我慢", REFLECT: "反射", REVIVE: "復活", INVINCIBLE: "無敵",
+  TAUNT: "挑発", BUFF_BLOCK: "強化不可", SKILL_LOCK: "スキル使用不可", CRIT_RATE_UP: "被クリ率アップ",
+};
+
 const SCALE_BONUS_STAT_JA: Record<"spd" | "def" | "hp", string> = {
   spd: "速度",
   def: "防御力",
@@ -401,6 +437,10 @@ export function describeSkillEffect(effect: SkillEffect): string {
     }
     case "DEBUFF":
       return `${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
+    case "STATUS": {
+      const scope = effect.applyTo === "ALLIES" ? "味方全体に" : effect.applyTo === "SELF" ? "自身に" : "";
+      return `${chanceSuffix(effect.chance)}${scope}${STATUS_EFFECT_JA[effect.status]} (${effect.durationTurns}ターン)`;
+    }
     case "STUN":
       return `${chanceSuffix(effect.chance)}スタン (${effect.durationTurns}ターン)`;
     case "BURN":

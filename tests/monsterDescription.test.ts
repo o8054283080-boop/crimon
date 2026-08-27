@@ -29,6 +29,7 @@ const REQUIRED_WORDS: Record<SkillEffect["kind"], string[]> = {
   DAMAGE: ["ダメージ", "一撃"],
   DEBUFF: ["低下"],
   BUFF: ["上昇", "高める"],
+  STATUS: [], // 本番モンスターへは次のバランス調整で割り当てる
   POISON: ["毒"],
   BURN: ["火傷", "やけど"],
   BLIND: ["暗闇"],
