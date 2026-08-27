@@ -13,6 +13,18 @@
   gap: 13px;
 }
 
+.tower-monthly { padding: 12px 14px; }
+.tower-monthly__head, .tower-monthly__row { display: flex; align-items: center; gap: 10px; }
+.tower-monthly__head h2 { margin: 0; flex: 1; }
+.tower-monthly__season, .tower-monthly__reset { color: #a99db6; font-size: 0.65rem; }
+.tower-monthly__row { margin-top: 8px; padding: 8px 10px; border-radius: 9px; background: rgba(4, 2, 9, 0.48); }
+.tower-monthly__floor { width: 38px; font-weight: 900; }
+.tower-monthly__reward { flex: 1; color: #f4d995; font-size: 0.75rem; }
+.tower-monthly__status { font-size: 0.68rem; font-weight: 800; color: #e4c864; }
+.tower-monthly__row.is-claimed { opacity: 0.62; }
+.tower-monthly__row.is-claimed .tower-monthly__status { color: #b9b1c2; }
+.tower-monthly__reset { margin: 8px 0 0; text-align: right; }
+
 /* ==========================================================================
  * 戻ってきた理由
  *

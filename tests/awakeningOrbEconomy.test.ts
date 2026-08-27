@@ -59,9 +59,10 @@ describe("覚醒オーブの達成報酬", () => {
 
     const reloaded = normalizeLoadedState(JSON.parse(JSON.stringify(migrated)));
     expect(reloaded.awakeningOrbs).toBe(5);
-    expect(claimTowerFloorReward(reloaded, 15).awakeningOrbs).toBe(0);
+    // 恒久の旧「初回」印とは別に、導入月の月間報酬を受け取れる。
+    expect(claimTowerFloorReward(reloaded, 15).awakeningOrbs).toBe(1);
     applyDungeonClearRewards(reloaded, EQUIPMENT_DUNGEON_FLOORS[9], reloaded.monsters);
-    expect(reloaded.awakeningOrbs).toBe(5);
+    expect(reloaded.awakeningOrbs).toBe(6);
   });
 
   it("達成履歴のない旧セーブは0個で安全に補完する", () => {

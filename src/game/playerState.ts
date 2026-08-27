@@ -118,6 +118,10 @@ export interface PlayerState {
   trialTowerBestFloor: number;
   /** 初回到達報酬を渡し済みの階。登り直しで二重に渡さないために残す */
   trialTowerClaimedFloors: number[];
+  /** 塔の月間シーズン。端末のタイムゾーンによらないJSTの YYYY-MM */
+  trialTowerSeason: string;
+  /** 今月の覚醒オーブ報酬を受け取った階 (15 / 30) */
+  trialTowerMonthlyOrbClaimedFloors: number[];
   /**
    * 登坂の途中経過。10戦を1度に登り切れるとは限らないので、
    * **アプリを閉じても続きから入れる**ように途中のHPとクールタイムごと控えに残す。
@@ -155,6 +159,35 @@ const STARTER_MONSTERS: { templateId: string; element: string }[] = [
 /** ファイター名の初期値・最大文字数 */
 export const DEFAULT_FIGHTER_NAME = "ファイター";
 export const FIGHTER_NAME_MAX_LENGTH = 12;
+
+/** UTC時刻をJST (+09:00) にずらし、塔の月間シーズン識別子へ変換する。 */
+export function towerSeasonKeyAt(now: Date = new Date()): string {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * JSTの月が変わった時だけ、塔に属する月間データを初期化する。
+ * 所持品や育成値などには一切触れない。旧セーブは現在月へ安全に参加させ、
+ * 既に到達済みの15/30階を今月もう一度受け取った扱いにして移行時の二重配布を防ぐ。
+ */
+export function ensureTowerMonthlyState(state: PlayerState, now: Date = new Date()): boolean {
+  const season = towerSeasonKeyAt(now);
+  if (typeof state.trialTowerSeason !== "string") {
+    state.trialTowerSeason = season;
+    state.trialTowerMonthlyOrbClaimedFloors = [15, 30].filter((floor) => state.trialTowerBestFloor >= floor);
+    return false;
+  }
+  if (!Array.isArray(state.trialTowerMonthlyOrbClaimedFloors)) state.trialTowerMonthlyOrbClaimedFloors = [];
+  if (state.trialTowerSeason === season) return false;
+
+  state.trialTowerSeason = season;
+  state.trialTowerBestFloor = 0;
+  state.trialTowerClaimedFloors = [];
+  state.trialTowerMonthlyOrbClaimedFloors = [];
+  state.trialTowerRun = null;
+  return true;
+}
 
 export function createInitialState(): PlayerState {
   const monsters = STARTER_MONSTERS.map((s) => createMonsterInstance(`${s.templateId}_${s.element}`, 1, 1));
@@ -206,6 +239,8 @@ export function createInitialState(): PlayerState {
     towerPartyIds: [],
     trialTowerBestFloor: 0,
     trialTowerClaimedFloors: [],
+    trialTowerSeason: towerSeasonKeyAt(),
+    trialTowerMonthlyOrbClaimedFloors: [],
     trialTowerRun: null,
   };
 }
@@ -228,7 +263,7 @@ function deterministicSetFromId(id: string): Equipment["set"] {
 }
 
 /** 旧バージョンのセーブデータ(装備システム・強化レベル・セット・ダンジョン専用パーティ・召喚の書導入前)を読み込んでも壊れないよう不足フィールドを補う */
-function normalizeState(state: PlayerState): PlayerState {
+function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState {
   if (!state.tutorialMissions || !Array.isArray(state.tutorialMissions.claimedIds)) {
     state.tutorialMissions = { claimedIds: [], partyChanged: false, createOpened: false };
   }
@@ -352,6 +387,7 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.trialTowerBestFloor !== "number") state.trialTowerBestFloor = 0;
   if (!Array.isArray(state.trialTowerClaimedFloors)) state.trialTowerClaimedFloors = [];
   if (!state.trialTowerRun || !Array.isArray(state.trialTowerRun.members)) state.trialTowerRun = null;
+  ensureTowerMonthlyState(state, now);
 
   // 手放したモンスターが編成に残っていると、対戦の準備で必ず落ちる
   const owned = new Set(state.monsters.map((m) => m.id));
@@ -373,8 +409,8 @@ function normalizeState(state: PlayerState): PlayerState {
  * 外から読み込んだ状態(控えファイルなど)を、今の版で扱える形に整える。
  * 古い版で書き出した控えには新しい項目が入っていないので、必ずここを通すこと。
  */
-export function normalizeLoadedState(state: PlayerState): PlayerState {
-  return normalizeState(state);
+export function normalizeLoadedState(state: PlayerState, now: Date = new Date()): PlayerState {
+  return normalizeState(state, now);
 }
 
 export function loadPlayerState(): PlayerState {

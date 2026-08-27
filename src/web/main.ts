@@ -54,6 +54,7 @@ import {
   applyPassiveStaminaRegen,
   buyShopEntry,
   equipToMonster,
+  ensureTowerMonthlyState,
   getShop,
   getDungeonParty,
   MAX_DUNGEON_PARTY_SIZE,
@@ -1908,6 +1909,7 @@ function render(): void {
       break;
 
     case "TRIAL_TOWER": {
+      if (ensureTowerMonthlyState(state.player)) savePlayerState(state.player);
       const blockedReason = towerBlockReason(state.player);
       content = renderTrialTower({
         bestFloor: state.player.trialTowerBestFloor,
