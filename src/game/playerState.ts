@@ -261,6 +261,10 @@ function normalizeState(state: PlayerState): PlayerState {
         && Object.values(mergedAllocation).reduce((sum, value) => sum + value, 0) <= abilityPointBudget(monster.star);
       monster.development.abilityPoints = valid ? mergedAllocation : defaults.abilityPoints;
       if (typeof monster.development.latentAbilityId !== "string") monster.development.latentAbilityId = null;
+      // 旧セーブには再選択待ちが無い。明示的なtrueだけを支払い済みとして引き継ぐ。
+      monster.development.latentReselectPending = monster.development.latentReselectPending === true;
+      // 壊れた控えで選択済みと待機中が同居した場合は、選択済みの潜在を優先する。
+      if (monster.development.latentAbilityId !== null) monster.development.latentReselectPending = false;
       if (!(monster.development.type === null || ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT", "BALANCE"].includes(monster.development.type))) {
         monster.development.type = null;
       }

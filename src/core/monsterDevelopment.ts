@@ -18,6 +18,8 @@ export interface MonsterDevelopment {
   abilityPoints: AbilityPointAllocation;
   /** 選択した潜在能力の安定ID。未覚醒ならnull */
   latentAbilityId: string | null;
+  /** 再覚醒の費用を支払い済みで、候補の再選択を待っている状態 */
+  latentReselectPending: boolean;
 }
 
 export const ABILITY_POINT_RESET_COST = 100_000;
@@ -103,5 +105,6 @@ export function createDefaultMonsterDevelopment(): MonsterDevelopment {
     type: null,
     abilityPoints: { hp: 0, atk: 0, def: 0, spd: 0 },
     latentAbilityId: null,
+    latentReselectPending: false,
   };
 }

@@ -10,6 +10,9 @@ import {
 import { MonsterInstance } from "../core/monsterInstance.js";
 export { LATENT_ABILITY_CANDIDATES } from "../data/latentAbilities.js";
 
+export const LATENT_REAWAKENING_ORB_COST = 2;
+export const LATENT_REAWAKENING_GOLD_COST = 100_000;
+
 export function usedAbilityPoints(allocation: AbilityPointAllocation): number {
   return Object.values(allocation).reduce((sum, value) => sum + value, 0);
 }
@@ -55,6 +58,7 @@ export function selectLatentAbility(
 ): boolean {
   if (candidates.length !== 3 || !candidates.some((candidate) => candidate.id === candidateId)) return false;
   instance.development.latentAbilityId = candidateId;
+  instance.development.latentReselectPending = false;
   return true;
 }
 
@@ -64,8 +68,33 @@ export function awakenLatentAbility(
   candidates: readonly LatentAbilityCandidate[],
   inventory: { awakeningOrbs: number },
 ): boolean {
-  if (instance.development.latentAbilityId !== null || inventory.awakeningOrbs < 1) return false;
+  if (instance.development.latentAbilityId !== null) return false;
+  const reselecting = instance.development.latentReselectPending;
+  if (!reselecting && inventory.awakeningOrbs < 1) return false;
   if (!selectLatentAbility(instance, candidateId, candidates)) return false;
-  inventory.awakeningOrbs -= 1;
+  if (!reselecting) inventory.awakeningOrbs -= 1;
+  return true;
+}
+
+export function canReawakenLatentAbility(
+  instance: MonsterInstance,
+  wallet: { awakeningOrbs: number; gold: number },
+): boolean {
+  return instance.development.latentAbilityId !== null
+    && !instance.development.latentReselectPending
+    && wallet.awakeningOrbs >= LATENT_REAWAKENING_ORB_COST
+    && wallet.gold >= LATENT_REAWAKENING_GOLD_COST;
+}
+
+/** 再覚醒費用を一度だけ支払い、現在の潜在を外して再選択待ちにする。 */
+export function reawakenLatentAbility(
+  instance: MonsterInstance,
+  wallet: { awakeningOrbs: number; gold: number },
+): boolean {
+  if (!canReawakenLatentAbility(instance, wallet)) return false;
+  wallet.awakeningOrbs -= LATENT_REAWAKENING_ORB_COST;
+  wallet.gold -= LATENT_REAWAKENING_GOLD_COST;
+  instance.development.latentAbilityId = null;
+  instance.development.latentReselectPending = true;
   return true;
 }

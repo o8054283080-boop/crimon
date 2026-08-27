@@ -22,6 +22,7 @@ describe("将来の個体育成データ", () => {
       type: null,
       abilityPoints: { hp: 0, atk: 0, def: 0, spd: 0 },
       latentAbilityId: null,
+      latentReselectPending: false,
     });
   });
 });
