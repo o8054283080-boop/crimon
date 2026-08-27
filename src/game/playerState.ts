@@ -17,6 +17,7 @@ import {
 import { Difficulty } from "../data/stages.js";
 
 export interface PlayerState {
+  tutorialMissions: { claimedIds: string[]; partyChanged: boolean; createOpened: boolean };
   crystal: number;
   gold: number;
   monsters: MonsterInstance[];
@@ -150,6 +151,7 @@ export const FIGHTER_NAME_MAX_LENGTH = 12;
 export function createInitialState(): PlayerState {
   const monsters = STARTER_MONSTERS.map((s) => createMonsterInstance(`${s.templateId}_${s.element}`, 1, 1));
   return {
+    tutorialMissions: { claimedIds: [], partyChanged: false, createOpened: false },
     crystal: 300,
     gold: 500,
     monsters,
@@ -215,6 +217,19 @@ function deterministicSetFromId(id: string): Equipment["set"] {
 
 /** 旧バージョンのセーブデータ(装備システム・強化レベル・セット・ダンジョン専用パーティ・召喚の書導入前)を読み込んでも壊れないよう不足フィールドを補う */
 function normalizeState(state: PlayerState): PlayerState {
+  if (!state.tutorialMissions || !Array.isArray(state.tutorialMissions.claimedIds)) {
+    state.tutorialMissions = { claimedIds: [], partyChanged: false, createOpened: false };
+  }
+  // ⑦版はミッションIDの命名が異なっていた。旧ID自体は監査用に残しつつ、
+  // 受取済み件数を新ロードマップの先頭へ引き継ぎ、同じ序盤報酬を取り直せなくする。
+  const canonicalPrefix = "tutorial-step-";
+  const legacyClaimCount = state.tutorialMissions.claimedIds.filter((id) => !id.startsWith(canonicalPrefix)).length;
+  for (let step = 1; step <= Math.min(10, legacyClaimCount); step += 1) {
+    const canonicalId = `${canonicalPrefix}${step}`;
+    if (!state.tutorialMissions.claimedIds.includes(canonicalId)) state.tutorialMissions.claimedIds.push(canonicalId);
+  }
+  state.tutorialMissions.partyChanged = state.tutorialMissions.partyChanged === true;
+  state.tutorialMissions.createOpened = state.tutorialMissions.createOpened === true;
   if (!state.equipment) state.equipment = [];
   for (const equipment of state.equipment) {
     if (typeof equipment.level !== "number") equipment.level = 0;

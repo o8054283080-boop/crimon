@@ -93,6 +93,7 @@ import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./vie
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
+import { TutorialDestination, claimTutorialMission } from "../game/tutorialMissions.js";
 import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderPvpArena } from "./views/pvpArena.js";
@@ -717,6 +718,7 @@ function handleToggleParty(instanceId: string): void {
     state.player.partyIds.push(instanceId);
     state.partyNotice = null;
   }
+  state.player.tutorialMissions.partyChanged = true;
   savePlayerState(state.player);
   render();
 }
@@ -1618,6 +1620,22 @@ function render(): void {
         onGoArena: () => navigate("ARENA"),
         onGoTrialTower: () => navigate("TRIAL_TOWER"),
         onGoHowToPlay: () => navigate("HOW_TO_PLAY"),
+        onGoTutorialDestination: (destination: TutorialDestination) => {
+          if (destination === "MONSTER_CREATE") {
+            const target = state.player.monsters.find(m => m.star === 6);
+            if (target) {
+              state.createTargetId = target.id; state.createMenu = "ABILITY";
+              state.player.tutorialMissions.createOpened = true; savePlayerState(state.player);
+              state.screen = "MONSTER_CREATE"; render(); return;
+            }
+            navigate("MONSTERS"); return;
+          }
+          navigate(destination);
+        },
+        onClaimTutorial: (id) => {
+          if (claimTutorialMission(state.player, id)) { savePlayerState(state.player); playSfx("stageClear"); }
+          render();
+        },
         onRefillStaminaPartial: () => {
           if (!tryRefillStaminaPartial(state.player).ok) return;
           savePlayerState(state.player);
@@ -2161,6 +2179,8 @@ function renderMonstersScreen(): HTMLElement {
       state.createNotice = null;
       state.createMenu = "SKILL";
       state.screen = "MONSTER_CREATE";
+      state.player.tutorialMissions.createOpened = true;
+      savePlayerState(state.player);
       render();
     },
     onGoMonsterDex: () => {
