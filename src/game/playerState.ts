@@ -1,6 +1,7 @@
 import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost, equipmentSellPrice } from "../core/equipment.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
+import { createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { Star } from "../core/rarity.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
 import { LEGACY_LEVEL_DUNGEON_TIERS, LEVEL_DUNGEON_DAILY_LIMIT } from "../data/levelDungeon.js";
@@ -219,6 +220,9 @@ function normalizeState(state: PlayerState): PlayerState {
   for (const monster of state.monsters) {
     if (!monster.equipment) monster.equipment = {};
     if (!monster.skillLevels) monster.skillLevels = [1, 1, 1];
+    // クリエイト拡張前の個体は「未転生・未振り分け・未覚醒」として安全に補完する。
+    // 補正値を推測して付けないため、既存個体の強さは変わらない。
+    if (!monster.development) monster.development = createDefaultMonsterDevelopment();
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];

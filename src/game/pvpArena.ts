@@ -13,6 +13,7 @@
 import { Equipment, EquipSlot, EQUIP_SLOTS, StatType, SLOT_MAIN_STAT_OPTIONS, enhanceEquipment, generateEquipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { MonsterInstance, createMonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
+import { createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import { MAX_SKILL_LEVEL } from "../core/skill.js";
 import {
@@ -320,6 +321,7 @@ function opponentUnitToDefinition(unit: ArenaOpponentUnit): MonsterDefinition {
     exp: 0,
     equipment: {},
     skillLevels: unit.skillLevels,
+    development: createDefaultMonsterDevelopment(),
   };
   const def = toBattleDefinition(instance, dex, unit.equipment);
   return { ...def, name: `${dex.name}★${unit.star} Lv${unit.level}` };
