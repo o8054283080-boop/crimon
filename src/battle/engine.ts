@@ -134,6 +134,8 @@ export class BattleEngine {
   private readonly turns: TurnRecord[] = [];
   /** getNextActor()/resolveTurn()による手動進行専用のキュー。run()は使わない */
   private interactiveQueue: BattleUnit[] = [];
+  /** プレイヤーAIの単体敵対スキルが優先する対象。 */
+  private focusTargetId: string | null = null;
 
   constructor(playerTeam: MonsterDefinition[], enemyTeam: MonsterDefinition[], options: BattleEngineOptions = {}) {
     if (playerTeam.length === 0 || enemyTeam.length === 0) {
@@ -222,6 +224,23 @@ export class BattleEngine {
     return this.checkWinner();
   }
 
+  setFocusTarget(instanceId: string | null): boolean {
+    if (instanceId === null || instanceId === this.focusTargetId) {
+      this.focusTargetId = null;
+      return true;
+    }
+    const target = this.units.find((unit) => unit.instanceId === instanceId && unit.team === "ENEMY" && unit.alive);
+    if (!target) return false;
+    this.focusTargetId = instanceId;
+    return true;
+  }
+
+  getFocusTarget(): string | null {
+    const target = this.units.find((unit) => unit.instanceId === this.focusTargetId && unit.alive);
+    if (!target) this.focusTargetId = null;
+    return this.focusTargetId;
+  }
+
   /**
    * 手動操作/ライブ進行用: 次に行動すべきユニットを返す(まだ行動は消費しない)。
    * 内部で必要な分だけ全ユニットのATBゲージを進める。勝敗が既についていればnullを返す。
@@ -287,7 +306,10 @@ export class BattleEngine {
 
   private checkWinner(): BattleWinner | null {
     const playerAlive = this.units.some((u) => u.team === "PLAYER" && u.alive);
-    const enemyAlive = this.units.some((u) => u.team === "ENEMY" && u.alive);
+    const victoryTargets = this.units.filter((u) => u.team === "ENEMY" && u.def.victoryTarget);
+    const enemyAlive = victoryTargets.length > 0
+      ? victoryTargets.some((u) => u.alive)
+      : this.units.some((u) => u.team === "ENEMY" && u.alive);
     if (!playerAlive && !enemyAlive) return "DRAW";
     if (!playerAlive) return "ENEMY";
     if (!enemyAlive) return "PLAYER";
@@ -335,7 +357,7 @@ export class BattleEngine {
       if (choice && hasStatus(unit, "SKILL_LOCK") && choice.skillIndex !== 0) {
         this.push(`  → ${this.label(unit)} はスキル使用不可のためスキル1を使用する！`);
       }
-      ({ skill, index } = chooseSkill(unit));
+      ({ skill, index } = chooseSkill(unit, this.units));
     }
 
     let targets: BattleUnit[];
@@ -344,6 +366,10 @@ export class BattleEngine {
       targets = explicitTarget ? [explicitTarget] : chooseTargets(unit, skill, this.units);
     } else {
       targets = chooseTargets(unit, skill, this.units);
+      if (unit.team === "PLAYER" && skill.target === "SINGLE_ENEMY" && !hasStatus(unit, "TAUNT")) {
+        const focused = this.units.find((candidate) => candidate.instanceId === this.getFocusTarget() && candidate.alive);
+        if (focused) targets = [focused];
+      }
     }
     if (skill.target === "SINGLE_ENEMY") {
       const forced = chooseTargets(unit, skill, this.units)[0];

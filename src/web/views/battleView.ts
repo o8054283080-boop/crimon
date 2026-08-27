@@ -178,6 +178,17 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   for (const unit of stageUnits) {
     const { card, refs } = buildHudCard(unit.def, unit.team);
     hudRefs.set(unit.instanceId, refs);
+    if (unit.team === "ENEMY") {
+      card.classList.add("unit-hud--focusable");
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-label", `${unit.def.name}を集中攻撃ターゲットに指定`);
+      card.addEventListener("pointerup", (event) => {
+        event.stopPropagation();
+        if (picker.phase === "TARGET") return;
+        engine.setFocusTarget(unit.instanceId);
+        syncFocusTarget();
+      });
+    }
     overlay.append(card);
   }
 
@@ -324,6 +335,14 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     stage.focusOn(instanceId);
   }
 
+  function syncFocusTarget(): void {
+    const focused = engine.getFocusTarget();
+    for (const [id, refs] of hudRefs) {
+      refs.card.classList.toggle("unit-hud--focused", id === focused);
+      refs.card.setAttribute("aria-pressed", String(id === focused));
+    }
+  }
+
   function applySnapshot(snapshot: UnitSnapshot[], immediate = false): void {
     for (const s of snapshot) {
       const refs = hudRefs.get(s.instanceId);
@@ -361,6 +380,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
         debuff: s.effects.some((e) => e.kind === "DEBUFF"),
       });
     }
+    syncFocusTarget();
   }
 
   const LOG_LINE_RULES: { match: RegExp; className: string }[] = [
@@ -612,9 +632,16 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 選ばれた相手は足元の紋様が警告色に変わって脈打つ。
    */
   function handleStageTap(event: PointerEvent): void {
-    if (picker.phase !== "TARGET") return;
     const hit = stage.pickUnitAt(event.clientX, event.clientY);
     if (!hit) return;
+    if (picker.phase !== "TARGET") {
+      const enemy = engine.getUnits().find((unit) => unit.instanceId === hit && unit.team === "ENEMY" && unit.alive);
+      if (enemy) {
+        engine.setFocusTarget(hit);
+        syncFocusTarget();
+      }
+      return;
+    }
     const { unit, skillIndex } = picker;
     const candidates = getTargetCandidates(unit, unit.def.skills[skillIndex]);
     if (!candidates.some((t) => t.instanceId === hit)) return;

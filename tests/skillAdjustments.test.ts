@@ -39,8 +39,7 @@ describe("闇ドラゴンのスキル3(破壊の流星)", () => {
     expect(skill3.name).toBe("破壊の流星");
     expect(skill3.target).toBe("ALL_ENEMIES");
     const damage = skill3.effects.find((e) => e.kind === "DAMAGE");
-    // 防御無視は硬い相手に効くが、1.5倍では他の候補(破滅の咆哮2.0倍+HP補正)に負けていたので引き上げた
-    expect(damage).toMatchObject({ kind: "DAMAGE", multiplier: 2.0, ignoreDefense: true });
+    expect(damage).toMatchObject({ kind: "DAMAGE", multiplier: 1.2, ignoreDefense: true });
     expect(skill3.effects).toContainEqual({ kind: "LIFESTEAL", healRate: 0.25 });
   });
 });

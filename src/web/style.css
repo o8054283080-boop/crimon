@@ -972,6 +972,23 @@ body {
   filter: grayscale(1);
 }
 
+.unit-hud--focusable { cursor: crosshair; touch-action: manipulation; }
+.unit-hud--focused .unit-hud__plate {
+  outline: 3px solid #ffcf4a;
+  outline-offset: 3px;
+  filter: drop-shadow(0 0 8px #ff4d35);
+}
+.unit-hud--focused::after {
+  content: "◎";
+  position: absolute;
+  right: -8px;
+  top: -10px;
+  color: #fff1a3;
+  font-size: 20px;
+  text-shadow: 0 0 4px #e22, 0 0 8px #e22;
+  pointer-events: none;
+}
+
 /* --- 状態異常の印の列。札の上に載せる --- */
 .unit-hud__chips {
   display: flex;

@@ -60,6 +60,10 @@ export interface MonsterDefinition {
    * 毒を重ねて耐久で待つだけで抜けられてしまっていた。
    */
   bossTraits?: BossTraits;
+  /** この敵の死亡を勝利条件にする。未指定の戦闘は従来通り敵全滅で勝利する。 */
+  victoryTarget?: boolean;
+  /** 支援AIが単体攻撃バフを優先する主要対象。 */
+  primaryTarget?: boolean;
 }
 
 export interface BossTraits {

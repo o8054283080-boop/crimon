@@ -16,6 +16,8 @@ export interface DungeonEnemy {
   level: number;
   /** 階層専用ボス(お供2体を連れて登場する)かどうか */
   isBoss?: boolean;
+  victoryTarget?: boolean;
+  primaryTarget?: boolean;
   /**
    * この個体だけに掛かる最大HP倍率。powerScale とは別枠で、階層全体ではなく
    * 1体だけを分厚くしたい時に使う(ボスや最終階のお供だけ殴り合いの時間を伸ばす、など)
@@ -83,7 +85,7 @@ const BOSS_SPD_MULTIPLIER = 1.3;
  * powerScale をいくら下げても10階が勝率0%から動かなくなっていた。
  * 難易度の出どころを倍率(powerScale・speedScale)側へ寄せ、この値は控えめにしてある。
  */
-const FINAL_FLOOR_COMPANION_HP_MULTIPLIER = 2;
+const FINAL_FLOOR_COMPANION_HP_MULTIPLIER = 4;
 
 /**
  * 9・10階(ダンジョン最終盤の最終関門)だけは、お供2体も専用の
@@ -243,7 +245,10 @@ function buildFloor(floor: number): DungeonFloor {
       star: DUNGEON_BOSS_STAR,
       level: DUNGEON_BOSS_LEVEL,
       isBoss: true,
-      hpMultiplier: BOSS_HP_MULTIPLIER,
+      victoryTarget: floor === DUNGEON_FLOOR_COUNT,
+      primaryTarget: true,
+      // 10階は魔人撃破で即勝利になるため、速攻が一択にならない約30万HPへ調整する
+      hpMultiplier: floor === DUNGEON_FLOOR_COUNT ? 8.5 : BOSS_HP_MULTIPLIER,
       spdMultiplier: BOSS_SPD_MULTIPLIER,
     },
     ...companionTemplateIds.map((templateId) => ({

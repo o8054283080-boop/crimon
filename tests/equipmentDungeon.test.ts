@@ -57,17 +57,23 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
-  it("ボスはHPが5倍・素早さが1.3倍、10階のお供だけHPが2倍になる", () => {
+  it("10階は魔人HP8.5倍・お供HP5倍、他階ボスはHP5倍になる", () => {
     for (let floor = 1; floor <= DUNGEON_FLOOR_COUNT; floor++) {
       const enemies = findDungeonFloor(floor)!.enemies;
       const boss = enemies.find((e) => e.isBoss)!;
-      expect(boss.hpMultiplier).toBe(5);
+      expect(boss.hpMultiplier).toBe(floor === 10 ? 8.5 : 5);
       expect(boss.spdMultiplier).toBe(1.3);
       for (const companion of enemies.filter((e) => !e.isBoss)) {
-        expect(companion.hpMultiplier).toBe(floor === 10 ? 2 : undefined);
+        expect(companion.hpMultiplier).toBe(floor === 10 ? 4 : undefined);
         expect(companion.spdMultiplier).toBeUndefined();
       }
     }
+  });
+
+  it("10階だけ古代の魔人が勝利対象として定義される", () => {
+    expect(findDungeonFloor(10)!.enemies.filter((enemy) => enemy.victoryTarget).map((enemy) => enemy.templateId))
+      .toEqual(["ancient_demon"]);
+    expect(findDungeonFloor(9)!.enemies.some((enemy) => enemy.victoryTarget)).toBe(false);
   });
 
   it("個体倍率は実際の戦闘ステータスに反映される(HPは5倍、素早さは1.3倍)", () => {
