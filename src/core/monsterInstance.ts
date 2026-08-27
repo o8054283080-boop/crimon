@@ -2,6 +2,7 @@ import { Equipment, EquipSlot, applyEquipmentToStats, computeSetCombatModifiers 
 import { MonsterDefinition } from "./monster.js";
 import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
+import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
 
 /**
  * 移し替えたスキルの実体を引く関数。
@@ -38,6 +39,8 @@ export interface MonsterInstance {
    * **持てるのは常に1つだけ**で、別のモンスターを合成すると置き換わる。
    */
   createdSkill?: CreatedSkill;
+  /** 将来のタイプ転生・能力ポイント・潜在覚醒をまとめた、個体固有の育成情報 */
+  development: MonsterDevelopment;
 }
 
 /** 移し替えたスキル1つ分の記録 */
@@ -58,7 +61,16 @@ function generateInstanceId(): string {
 }
 
 export function createMonsterInstance(dexId: string, star: Star, level = 1): MonsterInstance {
-  return { id: generateInstanceId(), dexId, star, level, exp: 0, equipment: {}, skillLevels: [1, 1, 1] };
+  return {
+    id: generateInstanceId(),
+    dexId,
+    star,
+    level,
+    exp: 0,
+    equipment: {},
+    skillLevels: [1, 1, 1],
+    development: createDefaultMonsterDevelopment(),
+  };
 }
 
 /** 全スキルが最大レベルに達しているか */
