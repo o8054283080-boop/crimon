@@ -1,10 +1,11 @@
 import {
-  ABILITY_POINT_BUDGET,
+  ABILITY_POINT_RESET_COST,
   ABILITY_POINT_VALUES,
   AbilityPointAllocation,
   AllocatableStat,
   LatentAbilityCandidate,
   MonsterType,
+  abilityPointBudget,
 } from "../core/monsterDevelopment.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 
@@ -24,15 +25,26 @@ export function abilityStatBonuses(allocation: AbilityPointAllocation): AbilityP
 export function setAbilityPoint(instance: MonsterInstance, stat: AllocatableStat, points: number): boolean {
   if (!Number.isInteger(points) || points < 0) return false;
   const next = { ...instance.development.abilityPoints, [stat]: points };
-  if (usedAbilityPoints(next) > ABILITY_POINT_BUDGET) return false;
+  if (usedAbilityPoints(next) > abilityPointBudget(instance.star)) return false;
   instance.development.abilityPoints = next;
   return true;
 }
 
-export function reincarnateMonsterType(instance: MonsterInstance, type: MonsterType): void {
+export function reincarnateMonsterType(instance: MonsterInstance, type: MonsterType): boolean {
+  if (instance.star !== 6) return false;
   instance.development.type = type;
   instance.level = 1;
   instance.exp = 0;
+  instance.development.abilityPoints = { hp: 0, atk: 0, def: 0, spd: 0 };
+  return true;
+}
+
+export function resetAbilityPoints(instance: MonsterInstance, wallet: { gold: number }): boolean {
+  // 配分済みであることも同じ同期処理内で検証し、連打で空配分へ二重課金しない。
+  if (instance.star !== 6 || usedAbilityPoints(instance.development.abilityPoints) === 0 || wallet.gold < ABILITY_POINT_RESET_COST) return false;
+  wallet.gold -= ABILITY_POINT_RESET_COST;
+  instance.development.abilityPoints = { hp: 0, atk: 0, def: 0, spd: 0 };
+  return true;
 }
 
 /**

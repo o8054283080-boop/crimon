@@ -45,6 +45,7 @@ describe("クリエイトシステム拡張", () => {
   it("旧セーブを補完し、新しい育成値と覚醒オーブをロード後も保持する", () => {
     const state = createInitialState();
     const monster = state.monsters[0];
+    monster.star = 6;
     reincarnateMonsterType(monster, "DEFENSE");
     setAbilityPoint(monster, "def", 100);
     monster.development.latentAbilityId = candidates[0].id;

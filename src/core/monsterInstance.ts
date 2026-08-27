@@ -124,7 +124,7 @@ export function toBattleDefinition(
 ): MonsterDefinition {
   const growthStats = computeEffectiveStats(dex.stats, instance.star, instance.level);
   const type = instance.development.type;
-  const multiplier = type ? MONSTER_TYPE_STAT_MULTIPLIERS[type] : { hp: 1, atk: 1, def: 1, spd: 1 };
+  const multiplier = type ? MONSTER_TYPE_STAT_MULTIPLIERS[type] : { hp: 1, atk: 1, def: 1, spd: 1, criRate: 0, accuracy: 0 };
   const points = instance.development.abilityPoints;
   const developedStats = {
     ...growthStats,
@@ -132,6 +132,8 @@ export function toBattleDefinition(
     atk: Math.round(growthStats.atk * multiplier.atk + points.atk * ABILITY_POINT_VALUES.atk),
     def: Math.round(growthStats.def * multiplier.def + points.def * ABILITY_POINT_VALUES.def),
     spd: Math.round(growthStats.spd * multiplier.spd + Math.floor(points.spd * ABILITY_POINT_VALUES.spd)),
+    criRate: Math.min(1, growthStats.criRate + multiplier.criRate),
+    accuracy: Math.min(1, growthStats.accuracy + multiplier.accuracy),
   };
   const stats = equippedItems.length > 0 ? applyEquipmentToStats(developedStats, equippedItems) : developedStats;
   const combatMods = equippedItems.length > 0 ? computeSetCombatModifiers(equippedItems) : undefined;
