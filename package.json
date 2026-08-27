@@ -19,6 +19,7 @@
     "audio:bgm": "tools/audio/.venv/bin/python tools/audio/render_bgm.py",
     "monster": "tsx tools/monsterDoctor.mts",
     "balance": "tsx tools/dungeonProbe.ts",
+    "stats:balance": "tsx tools/statBalance.ts",
     "check": "npm run typecheck && npm run test && npm run tour"
   },
   "devDependencies": {
