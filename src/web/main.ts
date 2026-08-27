@@ -43,6 +43,8 @@ import {
 } from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
+import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reincarnateMonsterType, setAbilityPoint } from "../game/monsterDevelopment.js";
+import { AllocatableStat, MonsterType } from "../core/monsterDevelopment.js";
 import {
   claimDailyLoginBonus,
   FIGHTER_NAME_MAX_LENGTH,
@@ -113,7 +115,7 @@ import {
 import { renderMonsters } from "./views/monsters.js";
 import { PartyEditMode, renderParty } from "./views/party.js";
 import { renderMonsterTraining } from "./views/monsterTraining.js";
-import { renderMonsterCreate } from "./views/monsterCreate.js";
+import { CreateMenu, renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
@@ -300,6 +302,7 @@ interface AppState {
   createMaterialId: string | null;
   createSlot: CreateSlot | null;
   createNotice: string | null;
+  createMenu: CreateMenu;
   partyEditMode: PartyEditMode;
   autoFarmCount: number;
   /** 周回の途中。null なら単発の挑戦 */
@@ -361,6 +364,7 @@ const state: AppState = {
   createMaterialId: null,
   createSlot: null,
   createNotice: null,
+  createMenu: "SKILL",
   partyEditMode: "NORMAL",
   autoFarmCount: 10,
   farmRun: null,
@@ -1992,6 +1996,33 @@ function render(): void {
         slot: state.createSlot,
         sortKey: state.monsterSortKey,
         notice: state.createNotice,
+        menu: state.createMenu,
+        awakeningOrbs: state.player.awakeningOrbs,
+        onSelectMenu: (menu) => {
+          state.createMenu = menu;
+          state.createNotice = null;
+          render();
+        },
+        onReincarnate: (type: MonsterType) => {
+          reincarnateMonsterType(createTarget, type);
+          state.createNotice = `タイプを変更し、Lv1へ転生しました`;
+          savePlayerState(state.player);
+          playSfx("levelUp");
+          render();
+        },
+        onSetAbilityPoint: (stat: AllocatableStat, points: number) => {
+          if (!setAbilityPoint(createTarget, stat, points)) return;
+          savePlayerState(state.player);
+          render();
+        },
+        onAwaken: (candidateId) => {
+          const candidates = LATENT_ABILITY_CANDIDATES[createTarget.dexId] ?? [];
+          if (!awakenLatentAbility(createTarget, candidateId, candidates, state.player)) return;
+          savePlayerState(state.player);
+          state.createNotice = "潜在能力を覚醒しました";
+          playSfx("levelUp");
+          render();
+        },
         onSelectMaterial: (id) => {
           state.createMaterialId = id;
           // 素材が変われば出せるスキルも変わる。枠の選択は持ち越さない
@@ -2128,6 +2159,7 @@ function renderMonstersScreen(): HTMLElement {
       state.createMaterialId = null;
       state.createSlot = null;
       state.createNotice = null;
+      state.createMenu = "SKILL";
       state.screen = "MONSTER_CREATE";
       render();
     },

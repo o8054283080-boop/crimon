@@ -4613,6 +4613,27 @@ body {
   gap: 10px;
 }
 
+.create-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.create-menu .btn { flex: 1 1 130px; }
+
+.create-points {
+  font-weight: 800;
+  color: var(--accent, #f5c451);
+}
+
+.create-allocation {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0;
+}
+
+.create-allocation input { width: 100%; }
+
 /* --- 作り替える相手 --- */
 .create-target {
   display: grid;

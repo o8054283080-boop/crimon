@@ -3,6 +3,7 @@ import { MonsterDefinition } from "./monster.js";
 import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
+import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDevelopment.js";
 
 /**
  * 移し替えたスキルの実体を引く関数。
@@ -122,7 +123,17 @@ export function toBattleDefinition(
   equippedItems: Equipment[] = [],
 ): MonsterDefinition {
   const growthStats = computeEffectiveStats(dex.stats, instance.star, instance.level);
-  const stats = equippedItems.length > 0 ? applyEquipmentToStats(growthStats, equippedItems) : growthStats;
+  const type = instance.development.type;
+  const multiplier = type ? MONSTER_TYPE_STAT_MULTIPLIERS[type] : { hp: 1, atk: 1, def: 1, spd: 1 };
+  const points = instance.development.abilityPoints;
+  const developedStats = {
+    ...growthStats,
+    hp: Math.round(growthStats.hp * multiplier.hp + points.hp * ABILITY_POINT_VALUES.hp),
+    atk: Math.round(growthStats.atk * multiplier.atk + points.atk * ABILITY_POINT_VALUES.atk),
+    def: Math.round(growthStats.def * multiplier.def + points.def * ABILITY_POINT_VALUES.def),
+    spd: Math.round(growthStats.spd * multiplier.spd + Math.floor(points.spd * ABILITY_POINT_VALUES.spd)),
+  };
+  const stats = equippedItems.length > 0 ? applyEquipmentToStats(developedStats, equippedItems) : developedStats;
   const combatMods = equippedItems.length > 0 ? computeSetCombatModifiers(equippedItems) : undefined;
   const skills = dex.skills.map((skill, i) => computeLeveledSkill(skill, instance.skillLevels[i])) as [
     MonsterDefinition["skills"][0],
