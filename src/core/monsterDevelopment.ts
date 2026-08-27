@@ -71,12 +71,30 @@ export const MONSTER_TYPE_LABELS: Readonly<Record<MonsterType, string>> = {
   ATTACK: "攻撃", HP: "体力", DEFENSE: "防御", SUPPORT: "補助", DISRUPT: "妨害", BALANCE: "バランス",
 };
 
-/** 潜在能力の候補。効果本体は未確定のため、安定IDと説明を分離して持つ。 */
+export type LatentAbilityCategory = "OFFENSE" | "DISRUPT" | "DURABILITY" | "SUPPORT" | "SPECIAL";
+export type LatentAbilityEffectType =
+  | "DAMAGE_UP" | "CRIT_TRIGGER" | "HP_SCALING" | "DEF_SCALING"
+  | "DEBUFF_CHANCE_UP" | "ADD_DEBUFF" | "TURN_METER_DOWN"
+  | "SELF_HEAL" | "ADD_BUFF" | "ALLY_SUPPORT" | "SHIELD" | "SPECIAL_TRIGGER";
+
+/** ⑧-3の戦闘実装へそのまま渡せる、スキル1専用の宣言的な候補データ。 */
 export interface LatentAbilityCandidate {
   id: string;
   name: string;
   description: string;
   skillSlot: 0;
+  category: LatentAbilityCategory;
+  effectType: LatentAbilityEffectType;
+  /** 倍率・係数・ゲージ量。効果に数値が不要な場合は0。 */
+  value: number;
+  /** 0～1。確定発動も1と明記する。 */
+  chance: number;
+  duration: number;
+  target: "SELF" | "TARGET" | "LOWEST_HP_ALLY" | "ALL_ALLIES";
+  /** ADD_DEBUFF / ADD_BUFF 等が扱う状態ID。 */
+  status?: string;
+  /** 既存S1効果とは別判定か、既存確率への加算か。 */
+  resolution: "ALWAYS" | "SEPARATE" | "ADD_TO_EXISTING" | "ON_CRIT" | "CONDITIONAL";
 }
 
 export function createDefaultMonsterDevelopment(): MonsterDevelopment {

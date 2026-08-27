@@ -8,6 +8,7 @@ import {
   abilityPointBudget,
 } from "../core/monsterDevelopment.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
+export { LATENT_ABILITY_CANDIDATES } from "../data/latentAbilities.js";
 
 export function usedAbilityPoints(allocation: AbilityPointAllocation): number {
   return Object.values(allocation).reduce((sum, value) => sum + value, 0);
@@ -46,12 +47,6 @@ export function resetAbilityPoints(instance: MonsterInstance, wallet: { gold: nu
   instance.development.abilityPoints = { hp: 0, atk: 0, def: 0, spd: 0 };
   return true;
 }
-
-/**
- * dexId別の候補登録口。具体的内容はゲームデザイン確定後に3件ずつ追加する。
- * TODO: 全モンスターのスキル1用候補をデータファイルから登録する。
- */
-export const LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentAbilityCandidate[]>> = {};
 
 export function selectLatentAbility(
   instance: MonsterInstance,
