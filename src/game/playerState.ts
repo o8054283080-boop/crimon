@@ -258,7 +258,7 @@ function normalizeState(state: PlayerState): PlayerState {
         && Object.values(mergedAllocation).reduce((sum, value) => sum + value, 0) <= abilityPointBudget(monster.star);
       monster.development.abilityPoints = valid ? mergedAllocation : defaults.abilityPoints;
       if (typeof monster.development.latentAbilityId !== "string") monster.development.latentAbilityId = null;
-      if (!(monster.development.type === null || ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT"].includes(monster.development.type))) {
+      if (!(monster.development.type === null || ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT", "BALANCE"].includes(monster.development.type))) {
         monster.development.type = null;
       }
     }

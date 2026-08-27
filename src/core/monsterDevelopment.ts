@@ -3,7 +3,7 @@
  *
  * 保存値とバランス設定の境界。調整中の倍率やコストを呼び出し側へ散らさないこと。
  */
-export type MonsterType = "ATTACK" | "HP" | "DEFENSE" | "SUPPORT" | "DISRUPT";
+export type MonsterType = "ATTACK" | "HP" | "DEFENSE" | "SUPPORT" | "DISRUPT" | "BALANCE";
 
 export type AllocatableStat = "hp" | "atk" | "def" | "spd";
 
@@ -44,27 +44,31 @@ export const ABILITY_POINT_VALUES: Readonly<Record<AllocatableStat, number>> = {
  */
 export interface MonsterTypeModifiers extends Record<AllocatableStat, number> {
   criRate: number;
+  criDmg: number;
   accuracy: number;
+  resistance: number;
 }
 
 export const MONSTER_TYPE_STAT_MULTIPLIERS: Readonly<Record<MonsterType, Readonly<MonsterTypeModifiers>>> = {
-  ATTACK: { hp: 0.95, atk: 1.15, def: 1, spd: 1, criRate: 0.05, accuracy: 0 },
-  HP: { hp: 1.15, atk: 0.95, def: 1, spd: 1, criRate: 0, accuracy: 0 },
-  DEFENSE: { hp: 1, atk: 1, def: 1.15, spd: 0.95, criRate: 0, accuracy: 0 },
-  SUPPORT: { hp: 1.05, atk: 1, def: 1, spd: 1.08, criRate: 0, accuracy: 0 },
-  DISRUPT: { hp: 1, atk: 0.95, def: 1, spd: 1.05, criRate: 0, accuracy: 0.10 },
+  ATTACK: { hp: 0.85, atk: 1.20, def: 0.90, spd: 1, criRate: 0.10, criDmg: 0, accuracy: 0, resistance: -0.10 },
+  HP: { hp: 1.20, atk: 0.85, def: 1, spd: 1, criRate: -0.05, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
+  DEFENSE: { hp: 1, atk: 0.90, def: 1.20, spd: 1, criRate: -0.10, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
+  SUPPORT: { hp: 1.10, atk: 0.85, def: 1, spd: 1.10, criRate: 0, criDmg: -0.15, accuracy: 0, resistance: 0.05 },
+  DISRUPT: { hp: 1, atk: 0.85, def: 1, spd: 1.08, criRate: 0, criDmg: -0.15, accuracy: 0.15, resistance: -0.05 },
+  BALANCE: { hp: 1, atk: 1, def: 1, spd: 1, criRate: 0, criDmg: 0, accuracy: 0, resistance: 0 },
 };
 
 export const MONSTER_TYPE_DESCRIPTIONS: Readonly<Record<MonsterType, string>> = {
-  ATTACK: "ATK+15%・クリ率+5% / HP-5%",
-  HP: "HP+15% / ATK-5%",
-  DEFENSE: "DEF+15% / SPD-5%",
-  SUPPORT: "SPD+8%・HP+5%",
-  DISRUPT: "SPD+5%・的中+10% / ATK-5%",
+  ATTACK: "長所: ATK +20%・クリ率 +10pt / 短所: HP -15%・DEF -10%・抵抗 -10pt",
+  HP: "長所: HP +20%・抵抗 +10pt / 短所: ATK -15%・クリ率 -5pt・クリダメ -10pt",
+  DEFENSE: "長所: DEF +20%・抵抗 +10pt / 短所: ATK -10%・クリ率 -10pt・クリダメ -10pt",
+  SUPPORT: "長所: SPD +10%・HP +10%・抵抗 +5pt / 短所: ATK -15%・クリダメ -15pt",
+  DISRUPT: "長所: SPD +8%・的中 +15pt / 短所: ATK -15%・クリダメ -15pt・抵抗 -5pt",
+  BALANCE: "すべての能力補正なし。長所も短所もない標準型",
 };
 
 export const MONSTER_TYPE_LABELS: Readonly<Record<MonsterType, string>> = {
-  ATTACK: "攻撃", HP: "体力", DEFENSE: "防御", SUPPORT: "補助", DISRUPT: "妨害",
+  ATTACK: "攻撃", HP: "体力", DEFENSE: "防御", SUPPORT: "補助", DISRUPT: "妨害", BALANCE: "バランス",
 };
 
 /** 潜在能力の候補。効果本体は未確定のため、安定IDと説明を分離して持つ。 */
