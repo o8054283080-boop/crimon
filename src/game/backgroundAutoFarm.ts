@@ -60,3 +60,14 @@ export function finishBackgroundFarm(job: BackgroundFarmJob, reason: AutoFarmSto
   job.lastProcessedAt = Date.now();
   job.inFlight = false;
 }
+
+/**
+ * 確認済みの結果通知だけを外す。報酬を持つ PlayerState の他フィールドには触れず、
+ * RUNNING/SETTLING は将来のオフライン精算も含めて絶対に削除しない。
+ */
+export function dismissFinishedBackgroundFarm(holder: { backgroundFarmJob: BackgroundFarmJob | null }, expectedJobId: string): boolean {
+  const job = holder.backgroundFarmJob;
+  if (!job || job.id !== expectedJobId || job.status === "RUNNING" || job.status === "SETTLING") return false;
+  holder.backgroundFarmJob = null;
+  return true;
+}

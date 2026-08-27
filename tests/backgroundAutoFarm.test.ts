@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createBackgroundFarmJob, finishBackgroundFarm, parseRequestedRuns } from "../src/game/backgroundAutoFarm.js";
+import { createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns } from "../src/game/backgroundAutoFarm.js";
 import { affordableCount } from "../src/web/views/autoFarmPanel.js";
 
 describe("保存型バックグラウンド周回", () => {
@@ -15,5 +15,23 @@ describe("保存型バックグラウンド周回", () => {
     expect(job).toMatchObject({ requestedRuns: 47, completedRuns: 0, partyIds: ["a"], status: "RUNNING", inFlight: false });
     finishBackgroundFarm(job, "STOPPED");
     expect(job).toMatchObject({ status: "STOPPED", stopReason: "STOPPED" });
+  });
+});
+
+describe("completed background farm notification", () => {
+  it("dismisses only the job and keeps already awarded resources", () => {
+    const job = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 1, partyIds: [] });
+    finishBackgroundFarm(job, "COMPLETED");
+    const player = { backgroundFarmJob: job, gold: 1234, diamonds: 56 };
+    expect(dismissFinishedBackgroundFarm(player, job.id)).toBe(true);
+    expect(player).toEqual({ backgroundFarmJob: null, gold: 1234, diamonds: 56 });
+  });
+
+  it.each(["RUNNING", "SETTLING"] as const)("does not dismiss a %s job", (status) => {
+    const job = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 1, partyIds: [] });
+    job.status = status;
+    const holder = { backgroundFarmJob: job };
+    expect(dismissFinishedBackgroundFarm(holder, job.id)).toBe(false);
+    expect(holder.backgroundFarmJob).toBe(job);
   });
 });

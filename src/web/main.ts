@@ -12,7 +12,7 @@ import { Difficulty, DIFFICULTY_JA, Stage, STAGES } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
-import { BackgroundFarmJob, createBackgroundFarmJob, finishBackgroundFarm, jstDateKey, parseRequestedRuns } from "../game/backgroundAutoFarm.js";
+import { BackgroundFarmJob, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, jstDateKey, parseRequestedRuns } from "../game/backgroundAutoFarm.js";
 import {
   PersistState,
   backupTakenAt,
@@ -92,6 +92,7 @@ import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
+import { loadNavigationState, saveNavigationState } from "./navigationState.js";
 import { ResultAction } from "./views/resultActions.js";
 import { BattleChainInfo, BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
@@ -144,6 +145,8 @@ function installUpdateReload(): void {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!hadController || reloading) return;
     reloading = true;
+    // 更新による強制リロードの直前にも保存し、最後の描画後の詳細選択を取りこぼさない。
+    persistNavigationState();
     window.location.reload();
   });
 }
@@ -324,6 +327,8 @@ interface AppState {
   towerStopRequested: boolean;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
+  /** 結果確認後に通知だけを閉じる対象。報酬データとは独立して扱う。 */
+  viewingBackgroundFarmJobId: string | null;
   loginBonusResult: LoginBonusResult | null;
   /** 起動時に受け取ったお詫び配布。閉じるまでホームに出す */
   compensationClaims: CompensationClaim[];
@@ -382,11 +387,33 @@ const state: AppState = {
   towerStopRequested: false,
   autoFarmResult: null,
   autoFarmTargetName: "",
+  viewingBackgroundFarmJobId: null,
   loginBonusResult: null,
   compensationClaims: [],
   lastRun: null,
   partyNotice: null,
 };
+
+// ゲームセーブとは別のキーから画面だけを復元する。対象が消えていた詳細画面は安全な一覧へ戻す。
+{
+  const restored = loadNavigationState();
+  if (restored) {
+    state.screen = restored.screen;
+    if (restored.monsterDetailId && state.player.monsters.some((m) => m.id === restored.monsterDetailId)) {
+      state.monsterDetailId = restored.monsterDetailId;
+    }
+    if (restored.equipmentDetailId && state.player.equipment.some((e) => e.id === restored.equipmentDetailId)) {
+      state.equipmentDetailId = restored.equipmentDetailId;
+    }
+    if (restored.selectedDexEntryId) state.selectedDexEntryId = restored.selectedDexEntryId;
+    if (restored.monsterTrainingTargetId && state.player.monsters.some((m) => m.id === restored.monsterTrainingTargetId)) {
+      state.monsterTrainingTargetId = restored.monsterTrainingTargetId;
+    } else if (state.screen === "MONSTER_TRAINING") state.screen = "MONSTERS";
+    if (restored.createTargetId && state.player.monsters.some((m) => m.id === restored.createTargetId)) {
+      state.createTargetId = restored.createTargetId;
+    } else if (state.screen === "MONSTER_CREATE") state.screen = "MONSTERS";
+  }
+}
 
 /**
  * ブラウザが勝手にデータを消さない設定になっているか。
@@ -454,6 +481,17 @@ function routeKey(): string {
   ]);
 }
 
+function persistNavigationState(): void {
+  saveNavigationState({
+    screen: state.screen,
+    monsterDetailId: state.monsterDetailId ?? undefined,
+    equipmentDetailId: state.equipmentDetailId ?? undefined,
+    selectedDexEntryId: state.selectedDexEntryId ?? undefined,
+    monsterTrainingTargetId: state.monsterTrainingTargetId ?? undefined,
+    createTargetId: state.createTargetId ?? undefined,
+  });
+}
+
 function navigate(screen: ScreenName): void {
   state.screen = screen;
   state.monsterDetailId = null;
@@ -473,6 +511,7 @@ function navigate(screen: ScreenName): void {
   state.monsterTrainingTargetId = null;
   state.monsterTrainingMaterialIds = [];
   state.autoFarmResult = null;
+  state.viewingBackgroundFarmJobId = null;
   // 旧式の戦闘画面連鎖だけを破棄する。保存型ジョブは別画面でも継続する。
   state.farmRun = null;
   // 塔の案内は次の画面へ持ち越さない。**登坂そのもの(trialTowerRun)は消さない**
@@ -1101,7 +1140,9 @@ function processBackgroundFarmOnce(): void {
 
 function beginBackgroundFarm(input: Omit<Parameters<typeof createBackgroundFarmJob>[0], "partyIds">, partyIds: string[], unlocked: boolean): void {
   const count = parseRequestedRuns(input.requestedRuns);
-  if (count === null || !unlocked || state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
+  const currentStatus = state.player.backgroundFarmJob?.status;
+  if (count === null || !unlocked || currentStatus === "RUNNING" || currentStatus === "SETTLING") { playSfx("denied", 0.7); return; }
+  // 完了通知はここで新しいジョブに置き換える。報酬は完了時に既に player へ保存済み。
   state.player.backgroundFarmJob = createBackgroundFarmJob({ ...input, requestedRuns: count, partyIds });
   savePlayerState(state.player);
   state.screen = "HOME";
@@ -1714,6 +1755,8 @@ function render(): void {
   applyPassiveStaminaRegen(state.player);
   if (state.player.stamina !== staminaBefore) savePlayerState(state.player);
 
+  persistNavigationState();
+
   let content: HTMLElement;
   let showNav = true;
 
@@ -2242,7 +2285,16 @@ function render(): void {
         navigate("HOME");
         return;
       }
-      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, actions: buildResultActions(true) });
+      const actions = buildResultActions(true);
+      if (state.viewingBackgroundFarmJobId) actions.push({ label: "✓ 確認して閉じる", variant: "primary", run: () => {
+        const job = state.player.backgroundFarmJob;
+        if (job?.id === state.viewingBackgroundFarmJobId && dismissFinishedBackgroundFarm(state.player, state.viewingBackgroundFarmJobId)) {
+          // 確定済み報酬には触れず、完了ジョブ（結果通知）だけを削除する。
+          savePlayerState(state.player);
+        }
+        navigate("HOME");
+      } });
+      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, actions });
       break;
     }
   }
@@ -2255,14 +2307,14 @@ function render(): void {
     root.append(el("aside", { className: "background-farm-status" }, [
       el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
         if (backgroundJob.status !== "RUNNING") {
-          state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.screen = "AUTO_FARM_RESULT"; render();
+          state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.viewingBackgroundFarmJobId = backgroundJob.id; state.screen = "AUTO_FARM_RESULT"; render();
         }
       } }, [`🔁 ${backgroundJob.targetName}　${backgroundJob.completedRuns} / ${backgroundJob.requestedRuns}周　${status}`]),
       el("span", { className: "background-farm-status__detail" }, [`残り${remaining}周 / ⚡${backgroundJob.staminaSpent}消費 / EXP ${backgroundJob.result.totalExp} / 🪙${backgroundJob.result.totalGold} / 装備${backgroundJob.result.equipmentDropCount}個`]),
       backgroundJob.status === "RUNNING" ? el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
         finishBackgroundFarm(backgroundJob, "STOPPED"); savePlayerState(state.player); render();
       } }, ["周回を終了"]) : el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
-        state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.screen = "AUTO_FARM_RESULT"; render();
+        state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.viewingBackgroundFarmJobId = backgroundJob.id; state.screen = "AUTO_FARM_RESULT"; render();
       } }, ["結果を見る"]),
     ]));
   }
