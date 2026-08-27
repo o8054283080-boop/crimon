@@ -20,6 +20,7 @@ describe("ステータスバランス再計算", () => {
     const base = { hp: 1000, atk: 100, def: 100, spd: 100 };
     expect(statsWithTypeProposal(base, 3, 1, "ATTACK").atk).toBeGreaterThan(statsWithTypeProposal(base, 3, 1, "HP").atk);
     expect(statsWithTypeProposal(base, 3, 1, "ATTACK").hp).toBeLessThan(statsWithTypeProposal(base, 3, 1, "HP").hp);
-    expect(Object.values(TYPE_PROPOSAL).every(({ base: b }) => Object.values(b).some((v) => v < 1))).toBe(true);
+    expect(Object.entries(TYPE_PROPOSAL).filter(([type]) => type !== "BALANCE").every(([, { base: b }]) => Object.values(b).some((v) => v < 1))).toBe(true);
+    expect(Object.values(TYPE_PROPOSAL).every(({ base: b }) => b.spd >= 1)).toBe(true);
   });
 });

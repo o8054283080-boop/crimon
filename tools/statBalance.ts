@@ -26,10 +26,11 @@ export const RARITY_POOLS: Readonly<Record<3 | 4 | 5, readonly MonsterDefinition
  */
 export const TYPE_PROPOSAL: Readonly<Record<MonsterType, { base: PrimaryStats; growth: PrimaryStats }>> = {
   ATTACK:  { base: { hp: 0.96, atk: 1.08, def: 0.96, spd: 1.00 }, growth: { hp: 0.98, atk: 1.08, def: 0.98, spd: 1.00 } },
-  HP:      { base: { hp: 1.08, atk: 0.96, def: 1.00, spd: 0.98 }, growth: { hp: 1.08, atk: 0.98, def: 1.00, spd: 1.00 } },
-  DEFENSE: { base: { hp: 1.00, atk: 0.95, def: 1.10, spd: 0.97 }, growth: { hp: 1.00, atk: 0.98, def: 1.10, spd: 1.00 } },
+  HP:      { base: { hp: 1.08, atk: 0.96, def: 1.00, spd: 1.00 }, growth: { hp: 1.08, atk: 0.98, def: 1.00, spd: 1.00 } },
+  DEFENSE: { base: { hp: 1.00, atk: 0.95, def: 1.10, spd: 1.00 }, growth: { hp: 1.00, atk: 0.98, def: 1.10, spd: 1.00 } },
   SUPPORT: { base: { hp: 1.04, atk: 0.96, def: 1.02, spd: 1.04 }, growth: { hp: 1.03, atk: 0.98, def: 1.02, spd: 1.00 } },
   DISRUPT: { base: { hp: 0.98, atk: 0.97, def: 0.98, spd: 1.07 }, growth: { hp: 1.00, atk: 0.99, def: 1.00, spd: 1.00 } },
+  BALANCE: { base: { hp: 1.00, atk: 1.00, def: 1.00, spd: 1.00 }, growth: { hp: 1.00, atk: 1.00, def: 1.00, spd: 1.00 } },
 };
 
 export function statsWithTypeProposal(base: PrimaryStats, star: Star, level: number, type: MonsterType): PrimaryStats {

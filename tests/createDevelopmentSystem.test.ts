@@ -65,7 +65,30 @@ describe("タイプ転生と実戦ステータス", () => {
     expect(actual.def).toBe(Math.round(neutral.def * mod.def));
     expect(actual.spd).toBe(Math.round(neutral.spd * mod.spd));
     expect(actual.criRate).toBeCloseTo(Math.min(1, neutral.criRate + mod.criRate));
+    expect(actual.criDmg).toBeCloseTo(Math.max(1, neutral.criDmg + mod.criDmg));
     expect(actual.accuracy).toBeCloseTo(Math.min(1, neutral.accuracy + mod.accuracy));
+    expect(actual.resistance).toBeCloseTo(Math.max(0, Math.min(1, neutral.resistance + mod.resistance)));
+  });
+  it("BALANCEは転生済みとして保存され、未転生と戦闘値だけが等しい", () => {
+    const monster = createMonsterInstance("slime_FIRE", 6, 60); const dex = findMonsterById(monster.dexId)!;
+    const before = toBattleDefinition(monster, dex).stats;
+    expect(reincarnateMonsterType(monster, "BALANCE")).toBe(true);
+    monster.level = 60;
+    expect(monster.development.type).toBe("BALANCE");
+    expect(toBattleDefinition(monster, dex).stats).toEqual(before);
+  });
+  it("全タイプはSPDを低下させず、BALANCEは全補正ゼロ", () => {
+    expect(Object.values(MONSTER_TYPE_STAT_MULTIPLIERS).every((modifier) => modifier.spd >= 1)).toBe(true);
+    expect(MONSTER_TYPE_STAT_MULTIPLIERS.BALANCE).toEqual({ hp: 1, atk: 1, def: 1, spd: 1, criRate: 0, criDmg: 0, accuracy: 0, resistance: 0 });
+  });
+  it("特殊能力値を安全範囲へclampする", () => {
+    const monster = createMonsterInstance("golem_FIRE", 6, 60); const dex = findMonsterById(monster.dexId)!;
+    monster.development.type = "DEFENSE";
+    const low = toBattleDefinition(monster, { ...dex, stats: { ...dex.stats, criRate: 0.01, criDmg: 1.02, accuracy: 0, resistance: 0 } }).stats;
+    expect(low.criRate).toBe(0); expect(low.criDmg).toBe(1); expect(low.accuracy).toBe(0);
+    monster.development.type = "ATTACK";
+    const high = toBattleDefinition(monster, { ...dex, stats: { ...dex.stats, criRate: 0.99, accuracy: 1, resistance: 0.01 } }).stats;
+    expect(high.criRate).toBe(1); expect(high.accuracy).toBe(1); expect(high.resistance).toBe(0);
   });
   it("type=nullは従来の成長値と一致する", () => {
     const monster = createMonsterInstance("golem_WATER", 6, 60); const dex = findMonsterById(monster.dexId)!;
@@ -76,6 +99,12 @@ describe("タイプ転生と実戦ステータス", () => {
 });
 
 describe("旧セーブmigration", () => {
+  it("旧5タイプと新BALANCEを維持する", () => {
+    for (const type of ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT", "BALANCE"] as const) {
+      const state = createInitialState(); state.monsters[0].development.type = type;
+      expect(normalizeLoadedState(state).monsters[0].development.type).toBe(type);
+    }
+  });
   it.each([[4, 21], [5, 51], [6, 101]] as const)("★%iの超過%iポイントは安全に0へ戻す", (star, points) => {
     const state = createInitialState(); state.monsters[0].star = star; state.monsters[0].development.abilityPoints.atk = points;
     expect(usedAbilityPoints(normalizeLoadedState(state).monsters[0].development.abilityPoints)).toBe(0);
