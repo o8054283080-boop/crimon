@@ -1132,6 +1132,7 @@ function finishStage(cleared: boolean): void {
     wavesCleared: run.wavesCleared,
     totalWaves: stage.waves.length,
     levelUps: reward?.levelUps ?? [],
+    expAwards: reward?.expAwards ?? [],
     dropDexId: reward?.dropDexId ?? null,
     dropStar: reward?.dropStar ?? null,
     equipmentDrop: reward?.equipmentDrop ?? null,
@@ -1175,6 +1176,7 @@ function finishDungeon(cleared: boolean): void {
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
     levelUps: reward?.levelUps ?? [],
+    expAwards: reward?.expAwards ?? [],
     dropDexId: null,
     dropStar: null,
     equipmentDrop: reward?.equipmentDrop ?? null,
@@ -1232,6 +1234,7 @@ function finishLevelDungeon(cleared: boolean): void {
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
     levelUps: reward?.levelUps ?? [],
+    expAwards: reward?.expAwards ?? [],
     dropDexId: null,
     dropStar: null,
     equipmentDrop: null,
@@ -1280,6 +1283,7 @@ function finishGoldDungeon(cleared: boolean): void {
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
     levelUps: reward?.levelUps ?? [],
+    expAwards: reward?.expAwards ?? [],
     dropDexId: null,
     dropStar: null,
     equipmentDrop: null,
@@ -2039,9 +2043,9 @@ function render(): void {
         },
         onReincarnate: (type: MonsterType) => {
           const label = MONSTER_TYPE_LABELS[type];
-          if (!window.confirm(`${label}タイプへ転生しますか？\n${MONSTER_TYPE_DESCRIPTIONS[type]}\nLv1・EXP0になり、能力ポイントがすべて0になります。`)) return;
-          if (!reincarnateMonsterType(createTarget, type)) return;
-          state.createNotice = `タイプを変更し、Lv1へ転生しました`;
+          if (!window.confirm(`${label}タイプへ転生しますか？\n${MONSTER_TYPE_DESCRIPTIONS[type]}\n費用：150,000G\nレベル・EXPは維持されます。\n能力ポイントはリセットされ、振り直せます。`)) return;
+          if (!reincarnateMonsterType(createTarget, type, state.player)) return;
+          state.createNotice = `150,000Gでタイプを変更しました（Lv・EXP維持）`;
           savePlayerState(state.player);
           playSfx("levelUp");
           render();

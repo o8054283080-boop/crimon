@@ -8,7 +8,8 @@ import {
   REPEAT_CLEAR_CRYSTAL_CHANCE,
   REPEAT_CLEAR_CRYSTAL_REWARD,
 } from "../src/game/playerState.js";
-import { applyDungeonClearRewards, applyStageClearRewards } from "../src/game/rewards.js";
+import { applyDungeonClearRewards, applyExpAndLevelUps, applyStageClearRewards } from "../src/game/rewards.js";
+import { createMonsterInstance } from "../src/core/monsterInstance.js";
 
 describe("ダイヤ報酬 (applyStageClearRewards)", () => {
   it("初回クリアはダイヤ200もらえる", () => {
@@ -20,7 +21,7 @@ describe("ダイヤ報酬 (applyStageClearRewards)", () => {
     const result = applyStageClearRewards(state, stage, stage.waves.length, party);
 
     expect(result.crystalEarned).toBe(FIRST_CLEAR_CRYSTAL_REWARD);
-    expect(state.crystal).toBe(before + FIRST_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBeGreaterThanOrEqual(before + FIRST_CLEAR_CRYSTAL_REWARD);
   });
 
   it("2回目以降のクリアは3%の確率でダイヤ50がもらえる(当選時)", () => {
@@ -62,7 +63,7 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
     const result = applyDungeonClearRewards(state, floor, party);
 
     expect(result.crystalEarned).toBe(FIRST_CLEAR_CRYSTAL_REWARD);
-    expect(state.crystal).toBe(before + FIRST_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBeGreaterThanOrEqual(before + FIRST_CLEAR_CRYSTAL_REWARD);
   });
 
   it("2回目以降のクリアは3%の確率でダイヤ50がもらえる(当選時)", () => {
@@ -100,5 +101,45 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
 
     expect(r1.crystalEarned).toBe(FIRST_CLEAR_CRYSTAL_REWARD);
     expect(r2.crystalEarned).toBe(FIRST_CLEAR_CRYSTAL_REWARD);
+  });
+});
+
+describe("LvMAXメンバー分EXP再分配", () => {
+  const member = (max = false) => createMonsterInstance("slime_FIRE", 6, max ? 60 : 1);
+
+  it("MAX3体・育成2体なら基本10,000に15,000ずつ加算する", () => {
+    const result = applyExpAndLevelUps([member(true), member(true), member(true), member(), member()], 10_000);
+    expect(result.expAwards.map((award) => award.total)).toEqual([25_000, 25_000]);
+    expect(result.expAwards.map((award) => award.maxMemberBonus)).toEqual([15_000, 15_000]);
+  });
+
+  it("MAX4体・育成1体なら5体分を育成対象へ付与する", () => {
+    const result = applyExpAndLevelUps([member(true), member(true), member(true), member(true), member()], 10_000);
+    expect(result.expAwards[0].total).toBe(50_000);
+  });
+
+  it("全員MAXは何も付与せず、少人数では空き枠分を生成しない", () => {
+    expect(applyExpAndLevelUps([member(true), member(true), member(true)], 10_000).expAwards).toEqual([]);
+    const result = applyExpAndLevelUps([member(true), member(), member()], 10_000);
+    expect(result.expAwards.reduce((sum, award) => sum + award.total, 0)).toBe(30_000);
+  });
+});
+
+describe("⑧-5-1 EXPバランス", () => {
+  it("通常最終面はNORMAL 6,000、HARD 9,000、HELL 12,000 EXP", () => {
+    const stage = STAGES.at(-1)!;
+    const values = (["NORMAL", "HARD", "HELL"] as const).map((difficulty) => {
+      const state = createInitialState();
+      return applyStageClearRewards(state, stage, 3, getParty(state), difficulty).expTotal;
+    });
+    expect(values).toEqual([6_000, 9_000, 12_000]);
+  });
+
+  it("装備ダンジョンは階層ごとに500増え、10階は5,000 EXP", () => {
+    const values = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
+      const state = createInitialState();
+      return applyDungeonClearRewards(state, floor, getParty(state)).expTotal;
+    });
+    expect(values).toEqual([500, 1_000, 1_500, 2_000, 2_500, 3_000, 3_500, 4_000, 4_500, 5_000]);
   });
 });

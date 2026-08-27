@@ -19,6 +19,7 @@ export interface StageResultInfo {
   wavesCleared: number;
   totalWaves: number;
   levelUps: StageResultLevelUp[];
+  expAwards?: { instanceId: string; name: string; total: number; maxMemberBonus: number }[];
   dropDexId: string | null;
   dropStar: number | null;
   equipmentDrop: Equipment | null;
@@ -103,10 +104,16 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
           info.levelUps.map((l) => el("span", { className: "result-levelups__item" }, [`${l.name} Lv+${l.levels}`])),
         )
       : null;
+  const expLine = info.expAwards && info.expAwards.length > 0
+    ? el("div", { className: "result-levelups" }, info.expAwards.map((award) => el("span", { className: "result-levelups__item" }, [
+        `${award.name} +${award.total.toLocaleString()} EXP${award.maxMemberBonus > 0 ? `（MAXメンバー分 +${award.maxMemberBonus.toLocaleString()}）` : ""}`,
+      ])))
+    : null;
 
   const body: (HTMLElement | null)[] = [
     tiles.length > 0 ? el("div", { className: "reward-tiles" }, tiles) : null,
     drops.length > 0 ? el("div", { className: "reward-drops" }, drops) : null,
+    expLine,
     levelUpLine,
     tiles.length === 0 && drops.length === 0 && !levelUpLine
       ? el("p", { className: "result-empty" }, ["獲得したものはありません"])

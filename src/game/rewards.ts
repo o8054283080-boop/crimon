@@ -5,7 +5,7 @@ import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDu
 import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef } from "../data/levelDungeon.js";
 import { EXP_PIG_DEX, findMonsterById } from "../data/monsters.js";
-import { Difficulty, Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
+import { DIFFICULTY_MODIFIERS, Difficulty, Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
 import {
   FIRST_CLEAR_CRYSTAL_REWARD,
   REPEAT_CLEAR_CRYSTAL_CHANCE,
@@ -35,12 +35,20 @@ export interface LevelUpInfo {
   levels: number;
 }
 
+export interface ExpAwardInfo {
+  instanceId: string;
+  name: string;
+  total: number;
+  maxMemberBonus: number;
+}
+
 export interface ClearRewardResult {
   /** ステージクリアボーナス/装備ダンジョンクリア報酬のゴールド(ウェーブ毎のゴールドは含まない) */
   goldEarned: number;
   crystalEarned: number;
   expTotal: number;
   levelUps: LevelUpInfo[];
+  expAwards?: ExpAwardInfo[];
   dropDexId: string | null;
   dropStar: number | null;
   equipmentDrop: Equipment | null;
@@ -49,16 +57,26 @@ export interface ClearRewardResult {
   fighterLevelsGained: number;
 }
 
-function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal: number): LevelUpInfo[] {
+export function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal: number): { levelUps: LevelUpInfo[]; expAwards: ExpAwardInfo[] } {
   const levelUps: LevelUpInfo[] = [];
-  for (const instance of partyInstances) {
-    const gained = addExp(instance, expTotal, STAR_MAX_LEVEL[instance.star]);
+  const expAwards: ExpAwardInfo[] = [];
+  const trainees = partyInstances.filter((instance) => instance.level < STAR_MAX_LEVEL[instance.star]);
+  if (trainees.length === 0) return { levelUps, expAwards };
+  const maxCount = partyInstances.length - trainees.length;
+  const pooledBonus = expTotal * maxCount;
+  const bonusEach = Math.floor(pooledBonus / trainees.length);
+  let bonusRemainder = pooledBonus % trainees.length;
+  for (const instance of trainees) {
+    const bonus = bonusEach + (bonusRemainder-- > 0 ? 1 : 0);
+    const awarded = expTotal + bonus;
+    const gained = addExp(instance, awarded, STAR_MAX_LEVEL[instance.star]);
+    const dex = findMonsterById(instance.dexId);
+    expAwards.push({ instanceId: instance.id, name: dex ? dex.name : instance.dexId, total: awarded, maxMemberBonus: bonus });
     if (gained > 0) {
-      const dex = findMonsterById(instance.dexId);
       levelUps.push({ instanceId: instance.id, name: dex ? dex.name : instance.dexId, levels: gained });
     }
   }
-  return levelUps;
+  return { levelUps, expAwards };
 }
 
 /**
@@ -76,8 +94,8 @@ export function applyStageClearRewards(
   const isFirstClear = !isStageCleared(state, stage.id, difficulty);
   markStageCleared(state, stage.id, difficulty);
 
-  const expTotal = wavesCleared * stage.rewards.waveExp;
-  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+  const expTotal = Math.round(wavesCleared * stage.rewards.waveExp * DIFFICULTY_MODIFIERS[difficulty].expMultiplier);
+  const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = stage.rewards.clearGold;
   const crystalEarned = rollClearCrystal(isFirstClear, rng);
@@ -100,6 +118,7 @@ export function applyStageClearRewards(
     crystalEarned,
     expTotal,
     levelUps,
+    expAwards,
     dropDexId: drop ? drop.dexId : null,
     dropStar: drop ? drop.star : null,
     equipmentDrop,
@@ -127,8 +146,8 @@ export function applyDungeonClearRewards(
     state.claimedAwakeningOrbRewardIds.push(orbRewardId);
   }
 
-  const expTotal = floor.floor * 20;
-  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+  const expTotal = floor.floor * 500;
+  const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = floor.goldReward;
   const crystalEarned = rollClearCrystal(isFirstClear, rng);
@@ -153,6 +172,7 @@ export function applyDungeonClearRewards(
     crystalEarned,
     expTotal,
     levelUps,
+    expAwards,
     dropDexId: null,
     dropStar: null,
     equipmentDrop,
@@ -177,7 +197,7 @@ export function applyLevelDungeonClearRewards(
   markLevelDungeonTierCleared(state, def.tier);
 
   const expTotal = def.expReward;
-  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+  const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = def.goldReward;
   const crystalEarned = rollClearCrystal(isFirstClear, rng);
@@ -196,6 +216,7 @@ export function applyLevelDungeonClearRewards(
     crystalEarned,
     expTotal,
     levelUps,
+    expAwards,
     dropDexId: null,
     dropStar: null,
     equipmentDrop: null,
@@ -216,7 +237,7 @@ export function applyGoldDungeonClearRewards(
   partyInstances: MonsterInstance[],
 ): ClearRewardResult {
   const expTotal = floor.floor * 20;
-  const levelUps = applyExpAndLevelUps(partyInstances, expTotal);
+  const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = floor.goldReward;
   const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
@@ -228,6 +249,7 @@ export function applyGoldDungeonClearRewards(
     crystalEarned: 0,
     expTotal,
     levelUps,
+    expAwards,
     dropDexId: null,
     dropStar: null,
     equipmentDrop: null,

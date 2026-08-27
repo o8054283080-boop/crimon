@@ -48,13 +48,24 @@ describe("星別能力ポイント", () => {
 
 describe("タイプ転生と実戦ステータス", () => {
   const types = Object.keys(MONSTER_TYPE_STAT_MULTIPLIERS) as MonsterType[];
-  it("★6転生はタイプ変更、Lv1、EXP0、能力0になる", () => {
+  it("★6転生は15万GでLv・EXPを維持し、能力だけリセットする", () => {
     const monster = createMonsterInstance("slime_FIRE", 6, 60); monster.exp = 99;
+    monster.equipment = { 1: "eq-1" };
+    monster.skillLevels = [4, 3, 2];
+    monster.development.latentAbilityId = "latent-test";
     setAbilityPoint(monster, "hp", 100);
-    expect(reincarnateMonsterType(monster, "ATTACK")).toBe(true);
-    expect([monster.star, monster.level, monster.exp, monster.development.type, usedAbilityPoints(monster.development.abilityPoints)]).toEqual([6, 1, 0, "ATTACK", 0]);
+    const wallet = { gold: 150_000 };
+    expect(reincarnateMonsterType(monster, "ATTACK", wallet)).toBe(true);
+    expect([monster.star, monster.level, monster.exp, monster.development.type, usedAbilityPoints(monster.development.abilityPoints)]).toEqual([6, 60, 99, "ATTACK", 0]);
+    expect(wallet.gold).toBe(0);
+    expect(monster.equipment).toEqual({ 1: "eq-1" });
+    expect(monster.skillLevels).toEqual([4, 3, 2]);
+    expect(monster.development.latentAbilityId).toBe("latent-test");
   });
-  it("★5以下は転生できない", () => expect(reincarnateMonsterType(createMonsterInstance("slime_FIRE", 5), "HP")).toBe(false));
+  it("★5以下・149,999G以下は転生できない", () => {
+    expect(reincarnateMonsterType(createMonsterInstance("slime_FIRE", 5), "HP", { gold: 150_000 })).toBe(false);
+    expect(reincarnateMonsterType(createMonsterInstance("slime_FIRE", 6), "HP", { gold: 149_999 })).toBe(false);
+  });
   it.each(types)("%s補正がtoBattleDefinitionへ反映される", (type) => {
     const monster = createMonsterInstance("imp_DARK", 6, 60); const dex = findMonsterById(monster.dexId)!;
     const neutral = toBattleDefinition(monster, dex).stats;
@@ -72,8 +83,7 @@ describe("タイプ転生と実戦ステータス", () => {
   it("BALANCEは転生済みとして保存され、未転生と戦闘値だけが等しい", () => {
     const monster = createMonsterInstance("slime_FIRE", 6, 60); const dex = findMonsterById(monster.dexId)!;
     const before = toBattleDefinition(monster, dex).stats;
-    expect(reincarnateMonsterType(monster, "BALANCE")).toBe(true);
-    monster.level = 60;
+    expect(reincarnateMonsterType(monster, "BALANCE", { gold: 150_000 })).toBe(true);
     expect(monster.development.type).toBe("BALANCE");
     expect(toBattleDefinition(monster, dex).stats).toEqual(before);
   });

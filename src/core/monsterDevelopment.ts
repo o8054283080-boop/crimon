@@ -23,6 +23,7 @@ export interface MonsterDevelopment {
 }
 
 export const ABILITY_POINT_RESET_COST = 100_000;
+export const TYPE_REINCARNATION_GOLD_COST = 150_000;
 
 /** 星ごとの配分上限。能力ポイントは星4で解放される。 */
 export const ABILITY_POINT_BUDGETS = { 1: 0, 2: 0, 3: 0, 4: 20, 5: 50, 6: 100 } as const;

@@ -28,12 +28,12 @@ describe("クリエイトシステム拡張", () => {
     expect(toBattleDefinition(monster, dex).stats.atk).toBeGreaterThan(dex.stats.atk);
   });
 
-  it("タイプ転生はタイプを変更しLv1・経験値0へ戻す", () => {
+  it("タイプ転生はタイプを変更しLv・経験値を維持する", () => {
     const monster = createMonsterInstance("slime_FIRE", 6, 40);
     monster.exp = 123;
-    reincarnateMonsterType(monster, "SUPPORT");
+    reincarnateMonsterType(monster, "SUPPORT", { gold: 150_000 });
     expect(monster.development.type).toBe("SUPPORT");
-    expect([monster.level, monster.exp]).toEqual([1, 0]);
+    expect([monster.level, monster.exp]).toEqual([40, 123]);
   });
 
   it("覚醒オーブを消費して3候補から選んだ安定IDを保存する", () => {
@@ -48,7 +48,7 @@ describe("クリエイトシステム拡張", () => {
     const state = createInitialState();
     const monster = state.monsters[0];
     monster.star = 6;
-    reincarnateMonsterType(monster, "DEFENSE");
+    reincarnateMonsterType(monster, "DEFENSE", state);
     setAbilityPoint(monster, "def", 100);
     monster.development.latentAbilityId = candidates[0].id;
     state.awakeningOrbs = 4;

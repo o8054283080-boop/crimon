@@ -1,5 +1,6 @@
 import {
   ABILITY_POINT_RESET_COST,
+  TYPE_REINCARNATION_GOLD_COST,
   ABILITY_POINT_VALUES,
   AbilityPointAllocation,
   AllocatableStat,
@@ -34,11 +35,10 @@ export function setAbilityPoint(instance: MonsterInstance, stat: AllocatableStat
   return true;
 }
 
-export function reincarnateMonsterType(instance: MonsterInstance, type: MonsterType): boolean {
-  if (instance.star !== 6) return false;
+export function reincarnateMonsterType(instance: MonsterInstance, type: MonsterType, wallet: { gold: number }): boolean {
+  if (instance.star !== 6 || wallet.gold < TYPE_REINCARNATION_GOLD_COST) return false;
+  wallet.gold -= TYPE_REINCARNATION_GOLD_COST;
   instance.development.type = type;
-  instance.level = 1;
-  instance.exp = 0;
   instance.development.abilityPoints = { hp: 0, atk: 0, def: 0, spd: 0 };
   return true;
 }
