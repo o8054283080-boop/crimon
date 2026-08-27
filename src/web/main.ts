@@ -12,7 +12,8 @@ import { Difficulty, DIFFICULTY_JA, Stage, STAGES } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
-import { BackgroundFarmJob, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, jstDateKey, parseRequestedRuns } from "../game/backgroundAutoFarm.js";
+import { BackgroundFarmJob, MAX_OFFLINE_FARM_MS, availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange } from "../game/backgroundAutoFarm.js";
+import { manualClearKey, recordManualBattle, referenceRunTime } from "../game/manualClearTimes.js";
 import {
   PersistState,
   backupTakenAt,
@@ -194,21 +195,25 @@ interface StageRunState {
   carryHp: Map<string, number> | null;
   goldEarned: number;
   wavesCleared: number;
+  manualStartedAt: number;
 }
 
 interface DungeonRunState {
   floor: DungeonFloor;
   partyInstances: MonsterInstance[];
+  manualStartedAt: number;
 }
 
 interface LevelDungeonRunState {
   def: LevelDungeonDef;
   partyInstances: MonsterInstance[];
+  manualStartedAt: number;
 }
 
 interface GoldDungeonRunState {
   floor: GoldDungeonFloor;
   partyInstances: MonsterInstance[];
+  manualStartedAt: number;
 }
 
 /**
@@ -877,6 +882,7 @@ function startStage(stage: Stage, difficulty: Difficulty): void {
     carryHp: null,
     goldEarned: 0,
     wavesCleared: 0,
+    manualStartedAt: Date.now(),
   };
   state.screen = "BATTLE";
   render();
@@ -1064,7 +1070,7 @@ function backgroundFarmCost(job: BackgroundFarmJob): number {
   return GOLD_DUNGEON_STAMINA_COST;
 }
 
-function scheduleBackgroundFarm(delay = 80): void {
+function scheduleBackgroundFarm(delay = 0): void {
   if (backgroundFarmTimer !== null) return;
   backgroundFarmTimer = window.setTimeout(() => {
     backgroundFarmTimer = null;
@@ -1102,9 +1108,17 @@ function processBackgroundFarmOnce(): void {
   const job = state.player.backgroundFarmJob;
   if (!job || job.status !== "RUNNING") return;
   if (job.completedRuns >= job.requestedRuns) { finishBackgroundFarm(job, "COMPLETED"); savePlayerState(state.player); render(); return; }
-  if (jstDateKey() !== job.sessionDate) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
+  if (shouldStopForJstDateChange(job)) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
   const party = backgroundParty(job);
   if (party.length !== job.partyIds.length || party.length === 0) { finishBackgroundFarm(job, "NO_PARTY"); savePlayerState(state.player); render(); return; }
+  // 完全終了が8時間を超えても、復帰時に持ち越せる処理権は最大8時間ぶん。
+  job.lastProcessedAt = Math.max(job.lastProcessedAt, Date.now() - MAX_OFFLINE_FARM_MS);
+  const available = availableBackgroundRuns(job, Date.now());
+  if (available < 1 && !job.inFlight) {
+    const nextAt = job.lastProcessedAt + job.referenceRunSeconds * 1000;
+    scheduleBackgroundFarm(Math.max(1, nextAt - Date.now()));
+    return;
+  }
 
   if (!job.inFlight) {
     const cost = backgroundFarmCost(job);
@@ -1132,10 +1146,14 @@ function processBackgroundFarmOnce(): void {
   else reward = applyGoldDungeonClearRewards(state.player, GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
   state.player.gold += battle.extraGold;
   mergeReward(job.result, reward, battle.extraGold);
-  job.result.cleared += 1; job.completedRuns += 1; job.inFlight = false; job.lastProcessedAt = Date.now();
+  job.result.cleared += 1; job.completedRuns += 1; job.inFlight = false;
+  // 実行にかかったCPU時間で権利を失わない。経過した基準時間を1周ぶんだけ消費する。
+  job.lastProcessedAt = Math.min(Date.now(), job.lastProcessedAt + job.referenceRunSeconds * 1000);
   savePlayerState(state.player);
   render();
-  scheduleBackgroundFarm();
+  scheduleBackgroundFarm(job.completedRuns >= job.requestedRuns || availableBackgroundRuns(job, Date.now()) > 0
+    ? 0
+    : Math.max(1, job.lastProcessedAt + job.referenceRunSeconds * 1000 - Date.now()));
 }
 
 function beginBackgroundFarm(input: Omit<Parameters<typeof createBackgroundFarmJob>[0], "partyIds">, partyIds: string[], unlocked: boolean): void {
@@ -1143,7 +1161,8 @@ function beginBackgroundFarm(input: Omit<Parameters<typeof createBackgroundFarmJ
   const currentStatus = state.player.backgroundFarmJob?.status;
   if (count === null || !unlocked || currentStatus === "RUNNING" || currentStatus === "SETTLING") { playSfx("denied", 0.7); return; }
   // 完了通知はここで新しいジョブに置き換える。報酬は完了時に既に player へ保存済み。
-  state.player.backgroundFarmJob = createBackgroundFarmJob({ ...input, requestedRuns: count, partyIds });
+  const timing = referenceRunTime(state.player.recentManualClearTimes, input.kind, input.targetId, input.difficulty);
+  state.player.backgroundFarmJob = createBackgroundFarmJob({ ...input, requestedRuns: count, partyIds, referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual });
   savePlayerState(state.player);
   state.screen = "HOME";
   render(); scheduleBackgroundFarm();
@@ -1254,6 +1273,7 @@ function finishStage(cleared: boolean): void {
   const run = state.stageRun;
   if (!run) return;
   const stage = run.stage;
+  if (cleared) recordManualBattle(state.player.recentManualClearTimes, manualClearKey("STAGE", stage.id, run.difficulty), run.manualStartedAt, Date.now());
 
   const partyInstances = run.originalPartyIds
     .map((id) => state.player.monsters.find((m) => m.id === id))
@@ -1295,7 +1315,7 @@ function startDungeonFloor(floor: DungeonFloor): void {
   }
   savePlayerState(state.player);
   state.lastRun = { kind: "EQUIP_DUNGEON", floor };
-  state.dungeonRun = { floor, partyInstances: party };
+  state.dungeonRun = { floor, partyInstances: party, manualStartedAt: Date.now() };
   state.screen = "DUNGEON_BATTLE";
   render();
 }
@@ -1304,6 +1324,7 @@ function finishDungeon(cleared: boolean): void {
   const run = state.dungeonRun;
   if (!run) return;
   const floor = run.floor;
+  if (cleared) recordManualBattle(state.player.recentManualClearTimes, manualClearKey("EQUIP_DUNGEON", String(floor.floor)), run.manualStartedAt, Date.now());
 
   const reward = cleared ? applyDungeonClearRewards(state.player, floor, run.partyInstances) : null;
   savePlayerState(state.player);
@@ -1354,7 +1375,7 @@ function startLevelDungeonTier(def: LevelDungeonDef): void {
   }
   savePlayerState(state.player);
   state.lastRun = { kind: "LEVEL_DUNGEON", def };
-  state.levelDungeonRun = { def, partyInstances: party };
+  state.levelDungeonRun = { def, partyInstances: party, manualStartedAt: Date.now() };
   state.screen = "LEVEL_DUNGEON_BATTLE";
   render();
 }
@@ -1363,6 +1384,7 @@ function finishLevelDungeon(cleared: boolean): void {
   const run = state.levelDungeonRun;
   if (!run) return;
   const def = run.def;
+  if (cleared) recordManualBattle(state.player.recentManualClearTimes, manualClearKey("LEVEL_DUNGEON", def.tier), run.manualStartedAt, Date.now());
 
   const reward = cleared ? applyLevelDungeonClearRewards(state.player, def, run.partyInstances) : null;
   savePlayerState(state.player);
@@ -1404,7 +1426,7 @@ function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
   }
   savePlayerState(state.player);
   state.lastRun = { kind: "GOLD_DUNGEON", floor };
-  state.goldDungeonRun = { floor, partyInstances: party };
+  state.goldDungeonRun = { floor, partyInstances: party, manualStartedAt: Date.now() };
   state.screen = "GOLD_DUNGEON_BATTLE";
   render();
 }
@@ -1413,6 +1435,7 @@ function finishGoldDungeon(cleared: boolean): void {
   const run = state.goldDungeonRun;
   if (!run) return;
   const floor = run.floor;
+  if (cleared) recordManualBattle(state.player.recentManualClearTimes, manualClearKey("GOLD_DUNGEON", String(floor.floor)), run.manualStartedAt, Date.now());
 
   const reward = cleared ? applyGoldDungeonClearRewards(state.player, floor, run.partyInstances) : null;
   if (cleared && !state.player.clearedGoldDungeonFloors.includes(floor.floor)) state.player.clearedGoldDungeonFloors.push(floor.floor);

@@ -29,6 +29,9 @@ export interface AutoFarmPanelProps {
   /** 上限がある時、その説明(「本日の残り3回」など) */
   hardLimitNote?: string;
   disabled: boolean;
+  referenceRunSeconds: number;
+  referenceFromManual: boolean;
+  recentManualClearTimes?: number[];
   onStart: () => void;
 }
 
@@ -39,6 +42,13 @@ const PRESETS = [1, 5, 10, 20];
 export function affordableCount(stamina: number, staminaCost: number, hardLimit?: number): number {
   const byStamina = staminaCost > 0 ? Math.floor(stamina / staminaCost) : Number.MAX_SAFE_INTEGER;
   return Math.max(1, Math.min(byStamina, hardLimit ?? Number.MAX_SAFE_INTEGER));
+}
+
+export function formatApproxDuration(seconds: number): string {
+  const rounded = Math.round(seconds);
+  const minutes = Math.floor(rounded / 60);
+  const rest = rounded % 60;
+  return minutes > 0 ? `${minutes}分${rest ? `${rest}秒` : ""}` : `${rest}秒`;
 }
 
 function countChip(label: string, active: boolean, onClick: () => void): HTMLElement {
@@ -79,6 +89,12 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
       el("span", { className: "autofarm__cost" }, [`⚡${totalCost}`]),
     ]),
     el("div", { className: "autofarm__chips" }, chips),
+    el("div", { className: "autofarm__timing" }, [
+      el("strong", {}, [props.referenceFromManual ? "実戦記録から算出" : "標準時間を使用"]),
+      el("span", {}, [`1周 約${formatApproxDuration(props.referenceRunSeconds)}`]),
+      el("span", {}, [`予想完了時間 約${formatApproxDuration(props.referenceRunSeconds * props.count)}`]),
+      ...(props.recentManualClearTimes?.length ? [el("small", {}, [`最近のクリア ${props.recentManualClearTimes.map(formatApproxDuration).join(" / ")}`])] : []),
+    ]),
     el("label", { className: "autofarm__input-label" }, [
       "希望する周回回数",
       el("input", {

@@ -4,6 +4,7 @@ import { GOLD_DUNGEON_DAILY_LIMIT, GOLD_DUNGEON_FLOORS, GoldDungeonFloor } from 
 import { getParty, goldDungeonChallengesRemaining, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
 export interface GoldDungeonProps {
@@ -87,6 +88,7 @@ function renderDetail(props: GoldDungeonProps, floor: GoldDungeonFloor): HTMLEle
     ),
 
     props.player.clearedGoldDungeonFloors.includes(floor.floor) ? renderAutoFarmPanel({
+      ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "GOLD_DUNGEON", String(floor.floor)); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: GOLD_DUNGEON_STAMINA_COST,

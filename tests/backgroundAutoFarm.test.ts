@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns } from "../src/game/backgroundAutoFarm.js";
+import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange } from "../src/game/backgroundAutoFarm.js";
+import { addManualClearTime, manualClearKey, medianSeconds, recordManualBattle, referenceRunTime } from "../src/game/manualClearTimes.js";
 import { affordableCount } from "../src/web/views/autoFarmPanel.js";
+import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 
 describe("保存型バックグラウンド周回", () => {
   it.each([1, 7, 25, 47, 100])("任意の正整数 %i を受理する", (value) => expect(parseRequestedRuns(value)).toBe(value));
@@ -15,6 +17,73 @@ describe("保存型バックグラウンド周回", () => {
     expect(job).toMatchObject({ requestedRuns: 47, completedRuns: 0, partyIds: ["a"], status: "RUNNING", inFlight: false });
     finishBackgroundFarm(job, "STOPPED");
     expect(job).toMatchObject({ status: "STOPPED", stopReason: "STOPPED" });
+  });
+});
+
+describe("JST日付変更時の周回停止", () => {
+  const beforeMidnight = Date.parse("2026-08-27T14:55:00Z"); // JST 23:55
+  const afterMidnight = Date.parse("2026-08-27T15:00:00Z"); // JST 翌日 00:00
+
+  it.each(["STAGE", "EQUIP_DUNGEON"] as const)("%s はJST 0:00を跨いでも継続する", (kind) => {
+    const job = createBackgroundFarmJob({ kind, targetId: "1", targetName: "target", requestedRuns: 50, partyIds: ["a"], now: beforeMidnight });
+    expect(shouldStopForJstDateChange(job, afterMidnight)).toBe(false);
+  });
+
+  it.each(["LEVEL_DUNGEON", "GOLD_DUNGEON"] as const)("%s は翌日の日次枠を使わず停止する", (kind) => {
+    const job = createBackgroundFarmJob({ kind, targetId: "1", targetName: "target", requestedRuns: 50, partyIds: ["a"], now: beforeMidnight });
+    expect(shouldStopForJstDateChange(job, afterMidnight)).toBe(true);
+  });
+
+  it("日次コンテンツも開始日中は停止しない", () => {
+    const job = createBackgroundFarmJob({ kind: "GOLD_DUNGEON", targetId: "1", targetName: "target", requestedRuns: 2, partyIds: ["a"], now: beforeMidnight });
+    expect(shouldStopForJstDateChange(job, beforeMidnight + 60_000)).toBe(false);
+  });
+});
+
+describe("実戦時間を基準にした周回速度", () => {
+  it("100秒の手動戦闘を100秒の基準にし、初回クリアも保存できる", () => {
+    const records = {};
+    expect(recordManualBattle(records, manualClearKey("STAGE", "1-1", "NORMAL"), 10_000, 110_000)).toBe(true);
+    expect(referenceRunTime(records, "STAGE", "1-1", "NORMAL")).toMatchObject({ seconds: 100, fromManual: true });
+  });
+  it("直近5件の中央値を使い、6件目で最古を捨てる", () => {
+    const records = { key: [] as number[] };
+    [20, 95, 100, 104, 160, 98].forEach((value) => addManualClearTime(records, "key", value));
+    expect(records.key).toEqual([95, 100, 104, 160, 98]);
+    expect(medianSeconds(records.key)).toBe(100);
+  });
+  it("偶数件は中央2件の平均を使う", () => expect(medianSeconds([90, 100])).toBe(95));
+  it("コンテンツ別の最低時間を適用する", () => {
+    expect(referenceRunTime({ "stage_1-1_NORMAL": [12] }, "STAGE", "1-1", "NORMAL").seconds).toBe(30);
+    expect(referenceRunTime({ equip_10: [20] }, "EQUIP_DUNGEON", "10").seconds).toBe(45);
+  });
+  it("記録なしは旧固定値へフォールバックする", () => {
+    expect(referenceRunTime({}, "STAGE", "1-1", "NORMAL")).toMatchObject({ seconds: 120, fromManual: false });
+    expect(referenceRunTime({}, "EQUIP_DUNGEON", "10").seconds).toBe(150);
+  });
+  it("異常値・時計逆行・10分超を保存しない", () => {
+    const records = {};
+    for (const value of [0, NaN, Infinity, 601]) expect(addManualClearTime(records, "x", value)).toBe(false);
+    expect(recordManualBattle(records, "x", 2_000, 1_000)).toBe(false);
+  });
+  it("99秒で0周、100秒で1周、200秒で2周（表示中・終了中で同じ計算）", () => {
+    const job = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 10, partyIds: ["a"], referenceRunSeconds: 100, now: 0 });
+    expect(availableBackgroundRuns(job, 99_000)).toBe(0);
+    expect(availableBackgroundRuns(job, 100_000)).toBe(1);
+    expect(availableBackgroundRuns(job, 200_000)).toBe(2);
+  });
+  it("ジョブ開始時の基準値は後から実戦記録が増えても固定される", () => {
+    const records = { "stage_1-1_NORMAL": [100] };
+    const first = referenceRunTime(records, "STAGE", "1-1", "NORMAL");
+    const job = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 2, partyIds: ["a"], referenceRunSeconds: first.seconds });
+    addManualClearTime(records, "stage_1-1_NORMAL", 40);
+    expect(job.referenceRunSeconds).toBe(100);
+    expect(referenceRunTime(records, "STAGE", "1-1", "NORMAL").seconds).toBe(70);
+  });
+  it("実戦記録フィールドのない旧セーブを空の記録としてロードできる", () => {
+    const legacy = createInitialState() as unknown as { recentManualClearTimes?: unknown };
+    delete legacy.recentManualClearTimes;
+    expect(normalizeLoadedState(legacy as never).recentManualClearTimes).toEqual({});
   });
 });
 

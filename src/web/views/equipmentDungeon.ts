@@ -6,6 +6,7 @@ import { findMonster } from "../../data/monsters.js";
 import { getDungeonParty, isDungeonFloorCleared, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
 export interface EquipmentDungeonProps {
@@ -127,6 +128,7 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
     ),
 
     isDungeonFloorCleared(props.player, floor.floor) ? renderAutoFarmPanel({
+      ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "EQUIP_DUNGEON", String(floor.floor)); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: DUNGEON_STAMINA_COST,

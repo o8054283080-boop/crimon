@@ -4328,6 +4328,10 @@ body {
   gap: 6px;
 }
 
+.autofarm__timing { display: grid; gap: 2px; padding: 9px 11px; border-radius: 10px; background: rgba(255,255,255,.045); font-size: .78rem; }
+.autofarm__timing strong { color: #ffe0a0; }
+.autofarm__timing small { color: var(--muted); }
+
 .autofarm__chip {
   /* 実機は指で押す。数字の札も的の大きさを確保する */
   min-height: 38px;
