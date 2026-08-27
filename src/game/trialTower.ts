@@ -58,10 +58,11 @@ export interface TowerRewardResult {
   equipment: Equipment | null;
   pigDexId: string | null;
   pigStar: Star | null;
+  awakeningOrbs: number;
 }
 
 export function emptyTowerRewardResult(): TowerRewardResult {
-  return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null };
+  return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null, awakeningOrbs: 0 };
 }
 
 /** 登坂を始められない理由。始められるなら null */
@@ -238,6 +239,14 @@ export function claimTowerFloorReward(state: PlayerState, floor: number, rng: ()
   state.trialTowerClaimedFloors.push(floor);
 
   const reward: TowerReward = def.firstClearReward;
+  if (reward.awakeningOrbs) {
+    const rewardId = `trial-tower-floor-${floor}`;
+    if (!state.claimedAwakeningOrbRewardIds.includes(rewardId)) {
+      state.awakeningOrbs += reward.awakeningOrbs;
+      state.claimedAwakeningOrbRewardIds.push(rewardId);
+      result.awakeningOrbs = reward.awakeningOrbs;
+    }
+  }
   if (reward.crystal) {
     state.crystal += reward.crystal;
     result.crystal = reward.crystal;

@@ -109,6 +109,7 @@ function rewardItems(reward: TowerReward): RewardItem[] {
   if (reward.summonScroll) items.push({ icon: "📜", text: `召喚の書 ${reward.summonScroll}`, strong: true });
   if (reward.equipmentStar) items.push({ icon: "⚔", text: `${starText(reward.equipmentStar)} 装備`, strong: true });
   if (reward.pigStar) items.push({ icon: "🐷", text: `転生ピッグ ${starText(reward.pigStar)}`, strong: true });
+  if (reward.awakeningOrbs) items.push({ icon: "🔮", text: `覚醒オーブ ${reward.awakeningOrbs}`, strong: true });
   return items;
 }
 
@@ -133,6 +134,7 @@ function claimedItems(reward: TowerRewardResult): RewardItem[] {
   if (reward.summonScrolls > 0) items.push({ icon: "📜", text: `召喚の書 ${reward.summonScrolls}`, strong: true });
   if (reward.equipment) items.push({ icon: "⚔", text: `${starText(reward.equipment.star)} 装備`, strong: true });
   if (reward.pigStar) items.push({ icon: "🐷", text: `転生ピッグ ${starText(reward.pigStar)}`, strong: true });
+  if (reward.awakeningOrbs > 0) items.push({ icon: "🔮", text: `覚醒オーブ ${reward.awakeningOrbs}`, strong: true });
   return items;
 }
 

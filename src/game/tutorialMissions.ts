@@ -1,7 +1,7 @@
 import type { PlayerState } from "./playerState.js";
 
 export type TutorialDestination = "STAGES" | "PARTY" | "MONSTERS" | "EQUIPMENT" | "EQUIP_DUNGEON" | "MONSTER_CREATE";
-export interface TutorialReward { gold?: number; crystal?: number; summonScrolls?: number; fourStarSummonScrolls?: number; lightDarkFourStarSummonScrolls?: number; fiveStarSummonScrolls?: number }
+export interface TutorialReward { gold?: number; crystal?: number; summonScrolls?: number; fourStarSummonScrolls?: number; lightDarkFourStarSummonScrolls?: number; fiveStarSummonScrolls?: number; awakeningOrbs?: number }
 export interface TutorialMission {
   id: string; step: number; chapter: number; chapterTitle: string; title: string;
   condition: string; reward: TutorialReward; destination: TutorialDestination;
@@ -46,11 +46,11 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   m(23,4,"中層を制覇","装備ダンジョン7階をクリア",{gold:70000,crystal:100,summonScrolls:2},"EQUIP_DUNGEON",p=>dungeon(p,7)),
   m(24,4,"★6進化の準備","★5モンスターをLv50にする",{gold:100000,crystal:80,summonScrolls:2},"MONSTERS",p=>maxStar(p,5,50)),
   m(25,4,"基本育成卒業・★6","★6モンスターを所持",{gold:200000,crystal:300,summonScrolls:15},"MONSTERS",p=>maxStar(p,6)),
-  m(26,5,"クリエイト入門","★6のクリエイト画面を開く",{gold:50000,crystal:50},"MONSTER_CREATE",p=>p.tutorialMissions.createOpened),
+  m(26,5,"クリエイト入門","★6のクリエイト画面を開く",{gold:50000,crystal:50,awakeningOrbs:1},"MONSTER_CREATE",p=>p.tutorialMissions.createOpened),
   m(27,5,"能力ポイント","能力ポイントを1以上使用",{gold:60000,crystal:60},"MONSTER_CREATE",abilityPoints),
   m(28,5,"タイプ転生","タイプ転生を1回行う",{gold:80000,crystal:80,summonScrolls:2},"MONSTER_CREATE",typed),
   m(29,5,"転生後の育成","タイプ転生済み★6をLv10以上",{gold:100000,crystal:100},"MONSTERS",p=>p.monsters.some(x=>x.star===6&&x.level>=10&&x.development.type!==null)),
-  m(30,5,"ロードマップ制覇","タイプ転生済み★6に能力ポイントを使用",{gold:150000,crystal:200,summonScrolls:5,fiveStarSummonScrolls:1},"MONSTER_CREATE",p=>p.monsters.some(x=>x.star===6&&x.development.type!==null&&Object.values(x.development.abilityPoints).some(v=>v>0))),
+  m(30,5,"ロードマップ制覇","タイプ転生済み★6に能力ポイントを使用",{gold:150000,crystal:200,summonScrolls:5,fiveStarSummonScrolls:1,awakeningOrbs:1},"MONSTER_CREATE",p=>p.monsters.some(x=>x.star===6&&x.development.type!==null&&Object.values(x.development.abilityPoints).some(v=>v>0))),
 ];
 
 export function nextTutorialMission(player: PlayerState): TutorialMission | undefined {
@@ -68,5 +68,9 @@ export function claimTutorialMission(player: PlayerState, id: string): boolean {
   player.fourStarSummonScrolls += mission.reward.fourStarSummonScrolls ?? 0;
   player.lightDarkFourStarSummonScrolls += mission.reward.lightDarkFourStarSummonScrolls ?? 0;
   player.fiveStarSummonScrolls += mission.reward.fiveStarSummonScrolls ?? 0;
+  if (mission.reward.awakeningOrbs && !player.claimedAwakeningOrbRewardIds.includes(id)) {
+    player.awakeningOrbs += mission.reward.awakeningOrbs;
+    player.claimedAwakeningOrbRewardIds.push(id);
+  }
   return true;
 }
