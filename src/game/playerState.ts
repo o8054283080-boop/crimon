@@ -15,7 +15,7 @@ import {
   rotationKeyAt,
 } from "./shop.js";
 import { Difficulty } from "../data/stages.js";
-import { BackgroundFarmJob } from "./backgroundAutoFarm.js";
+import { BackgroundFarmJob, referenceRunSeconds } from "./backgroundAutoFarm.js";
 
 export interface PlayerState {
   /** 保存型バックグラウンド周回。同時に1件だけ保持する。 */
@@ -273,6 +273,15 @@ function deterministicSetFromId(id: string): Equipment["set"] {
 function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState {
   if (!state.backgroundFarmJob) state.backgroundFarmJob = null;
   if (state.backgroundFarmJob?.status === "SETTLING") state.backgroundFarmJob.status = "RUNNING";
+  if (state.backgroundFarmJob) {
+    const job = state.backgroundFarmJob;
+    if (!Number.isFinite(job.referenceRunSeconds)) job.referenceRunSeconds = referenceRunSeconds(job.kind, [], job.difficulty);
+    if (!Number.isFinite(job.accumulatedOfflineSeconds)) job.accumulatedOfflineSeconds = 0;
+    if (!Array.isArray(job.recentClearTimes)) job.recentClearTimes = [];
+    if (!Number.isFinite(job.offlineProcessedRuns)) job.offlineProcessedRuns = 0;
+    if (!Number.isFinite(job.lastOfflineElapsedSeconds)) job.lastOfflineElapsedSeconds = 0;
+    if (!Number.isFinite(job.offlineStartedAt)) job.offlineStartedAt = null;
+  }
   if (!state.tutorialMissions || !Array.isArray(state.tutorialMissions.claimedIds)) {
     state.tutorialMissions = { claimedIds: [], partyChanged: false, createOpened: false };
   }

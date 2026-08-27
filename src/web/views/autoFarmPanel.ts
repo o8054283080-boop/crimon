@@ -102,7 +102,7 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
       [`▶ ${props.count}回まとめて挑戦`],
     ),
     el("p", { className: "app-subtitle" }, [
-      "クリア済みの場所を、戦闘画面を表示せず1戦ずつ安全に処理します。別画面を見ても進行します。",
+      "クリア済みの場所を1戦ずつ安全に処理します。アプリを閉じても、次回起動時に経過時間に応じて周回結果を処理します。",
     ]),
     el("p", { className: "app-subtitle" }, ["敗北・スタミナ切れ・日次上限で終了します。ダイヤによる自動回復は行いません。"]),
   ]);

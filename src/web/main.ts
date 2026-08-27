@@ -12,7 +12,7 @@ import { Difficulty, DIFFICULTY_JA, Stage, STAGES } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
-import { BackgroundFarmJob, createBackgroundFarmJob, finishBackgroundFarm, jstDateKey, parseRequestedRuns } from "../game/backgroundAutoFarm.js";
+import { BackgroundFarmJob, calculateOfflineProgress, createBackgroundFarmJob, finishBackgroundFarm, jstDateKey, parseRequestedRuns } from "../game/backgroundAutoFarm.js";
 import {
   PersistState,
   backupTakenAt,
@@ -1013,6 +1013,22 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
  * ============================================================ */
 
 let backgroundFarmTimer: number | null = null;
+let offlineRunsPending = 0;
+let offlineRunsPlanned = 0;
+
+/** 終了イベントが来なくても、保存済み最終時刻から非表示中の時間を一度だけ取り込む。 */
+function prepareOfflineFarm(now = Date.now()): void {
+  const job = state.player.backgroundFarmJob;
+  if (!job || job.status !== "RUNNING" || offlineRunsPending > 0) return;
+  const progress = calculateOfflineProgress(job, now);
+  job.lastProcessedAt = now; // 同じ時間を次回起動で再利用させない
+  job.accumulatedOfflineSeconds = progress.carriedSeconds;
+  job.lastOfflineElapsedSeconds = progress.elapsedSeconds;
+  job.offlineStartedAt = null;
+  offlineRunsPending = progress.availableRuns;
+  offlineRunsPlanned = progress.availableRuns;
+  savePlayerState(state.player);
+}
 
 function backgroundParty(job: BackgroundFarmJob): MonsterInstance[] {
   return job.partyIds.map((id) => state.player.monsters.find((m) => m.id === id)).filter((m): m is MonsterInstance => Boolean(m));
@@ -1060,10 +1076,12 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
 }
 
 function processBackgroundFarmOnce(): void {
+  if (document.visibilityState === "hidden") return;
   const job = state.player.backgroundFarmJob;
   if (!job || job.status !== "RUNNING") return;
   if (job.completedRuns >= job.requestedRuns) { finishBackgroundFarm(job, "COMPLETED"); savePlayerState(state.player); render(); return; }
-  if (jstDateKey() !== job.sessionDate) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
+  const dailyLimited = job.kind === "LEVEL_DUNGEON" || job.kind === "GOLD_DUNGEON";
+  if (dailyLimited && jstDateKey() !== job.sessionDate) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
   const party = backgroundParty(job);
   if (party.length !== job.partyIds.length || party.length === 0) { finishBackgroundFarm(job, "NO_PARTY"); savePlayerState(state.player); render(); return; }
 
@@ -1094,6 +1112,7 @@ function processBackgroundFarmOnce(): void {
   state.player.gold += battle.extraGold;
   mergeReward(job.result, reward, battle.extraGold);
   job.result.cleared += 1; job.completedRuns += 1; job.inFlight = false; job.lastProcessedAt = Date.now();
+  if (offlineRunsPending > 0) { offlineRunsPending -= 1; job.offlineProcessedRuns += 1; }
   savePlayerState(state.player);
   render();
   scheduleBackgroundFarm();
@@ -2242,7 +2261,13 @@ function render(): void {
         navigate("HOME");
         return;
       }
-      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, actions: buildResultActions(true) });
+      const resultJob = state.player.backgroundFarmJob;
+      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, actions: buildResultActions(true),
+        offline: resultJob && resultJob.targetName === state.autoFarmTargetName ? {
+          elapsedSeconds: resultJob.lastOfflineElapsedSeconds, processedRuns: resultJob.offlineProcessedRuns,
+          requestedRuns: resultJob.requestedRuns, completedRuns: resultJob.completedRuns,
+        } : undefined,
+      });
       break;
     }
   }
@@ -2258,7 +2283,9 @@ function render(): void {
           state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.screen = "AUTO_FARM_RESULT"; render();
         }
       } }, [`🔁 ${backgroundJob.targetName}　${backgroundJob.completedRuns} / ${backgroundJob.requestedRuns}周　${status}`]),
-      el("span", { className: "background-farm-status__detail" }, [`残り${remaining}周 / ⚡${backgroundJob.staminaSpent}消費 / EXP ${backgroundJob.result.totalExp} / 🪙${backgroundJob.result.totalGold} / 装備${backgroundJob.result.equipmentDropCount}個`]),
+      el("span", { className: "background-farm-status__detail" }, [offlineRunsPending > 0
+        ? `オフライン周回処理中 ${offlineRunsPlanned - offlineRunsPending} / ${offlineRunsPlanned}`
+        : `残り${remaining}周 / オフライン周回対応 / 基準時間 1周 約${Math.ceil(backgroundJob.referenceRunSeconds / 60)}分 / ⚡${backgroundJob.staminaSpent}消費 / EXP ${backgroundJob.result.totalExp} / 🪙${backgroundJob.result.totalGold} / 装備${backgroundJob.result.equipmentDropCount}個`]),
       backgroundJob.status === "RUNNING" ? el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
         finishBackgroundFarm(backgroundJob, "STOPPED"); savePlayerState(state.player); render();
       } }, ["周回を終了"]) : el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
@@ -2537,10 +2564,21 @@ if (import.meta.env.DEV) {
 }
 
 render();
+prepareOfflineFarm();
 scheduleBackgroundFarm(250);
 
 document.addEventListener("visibilitychange", () => {
+  const job = state.player.backgroundFarmJob;
+  if (document.visibilityState === "hidden" && job?.status === "RUNNING") {
+    job.offlineStartedAt = Date.now();
+    job.lastProcessedAt = Date.now();
+  }
   savePlayerState(state.player);
-  if (document.visibilityState === "visible") scheduleBackgroundFarm(0);
+  if (document.visibilityState === "visible") { prepareOfflineFarm(); render(); scheduleBackgroundFarm(0); }
 });
-window.addEventListener("pagehide", () => savePlayerState(state.player));
+window.addEventListener("pagehide", () => {
+  const job = state.player.backgroundFarmJob;
+  if (job?.status === "RUNNING") { job.offlineStartedAt = job.offlineStartedAt ?? Date.now(); job.lastProcessedAt = Date.now(); }
+  savePlayerState(state.player);
+});
+window.addEventListener("beforeunload", () => savePlayerState(state.player));

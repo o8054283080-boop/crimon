@@ -10,6 +10,7 @@ export interface AutoFarmResultProps {
   targetName: string;
   /** 次の行き先。同じ場所をもう一度回すのが最も多い操作 */
   actions: ResultAction[];
+  offline?: { elapsedSeconds: number; processedRuns: number; requestedRuns: number; completedRuns: number };
 }
 
 const STOP_REASON_LABEL: Record<AutoFarmResult["stopReason"], string> = {
@@ -74,6 +75,11 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
       : null;
 
   const body: (HTMLElement | null)[] = [
+    props.offline && props.offline.elapsedSeconds > 0 ? el("div", { className: "result-levelups" }, [
+      el("span", { className: "result-levelups__item" }, [`オフライン時間 ${Math.floor(props.offline.elapsedSeconds / 60)}分`]),
+      el("span", { className: "result-levelups__item" }, [`オフライン成功 ${props.offline.processedRuns}周`]),
+      el("span", { className: "result-levelups__item" }, [`進捗 ${props.offline.completedRuns} / ${props.offline.requestedRuns}周`]),
+    ]) : null,
     tiles.length > 0 ? el("div", { className: "reward-tiles" }, tiles) : null,
     dropCards.length > 0 ? el("div", { className: "reward-drops" }, dropCards) : null,
     levelUpLine,
