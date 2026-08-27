@@ -1,7 +1,7 @@
 import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost, equipmentSellPrice } from "../core/equipment.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
-import { createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
+import { ABILITY_POINT_BUDGET, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { Star } from "../core/rarity.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
 import { LEGACY_LEVEL_DUNGEON_TIERS, LEVEL_DUNGEON_DAILY_LIMIT } from "../data/levelDungeon.js";
@@ -31,6 +31,8 @@ export interface PlayerState {
   dungeonPartyIds: string[];
   /** 召喚の書の所持数。1個消費すると石を使わずに1回分の召喚ができる */
   summonScrolls: number;
+  /** 潜在覚醒で1個消費する素材 */
+  awakeningOrbs: number;
   /** プレイヤー(ファイター)自身のレベル。上限50 */
   fighterLevel: number;
   /** 次のファイターレベルまでの累積経験値 */
@@ -158,6 +160,7 @@ export function createInitialState(): PlayerState {
     equipment: [],
     dungeonPartyIds: [],
     summonScrolls: 0,
+    awakeningOrbs: 0,
     fighterLevel: 1,
     fighterExp: 0,
     stamina: INITIAL_MAX_STAMINA,
@@ -223,11 +226,23 @@ function normalizeState(state: PlayerState): PlayerState {
     // クリエイト拡張前の個体は「未転生・未振り分け・未覚醒」として安全に補完する。
     // 補正値を推測して付けないため、既存個体の強さは変わらない。
     if (!monster.development) monster.development = createDefaultMonsterDevelopment();
+    else {
+      const defaults = createDefaultMonsterDevelopment();
+      const allocation = monster.development.abilityPoints ?? defaults.abilityPoints;
+      const valid = Object.values(allocation).every((value) => Number.isInteger(value) && value >= 0)
+        && Object.values(allocation).reduce((sum, value) => sum + value, 0) <= ABILITY_POINT_BUDGET;
+      monster.development.abilityPoints = valid ? { ...defaults.abilityPoints, ...allocation } : defaults.abilityPoints;
+      if (typeof monster.development.latentAbilityId !== "string") monster.development.latentAbilityId = null;
+      if (!(monster.development.type === null || ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT"].includes(monster.development.type))) {
+        monster.development.type = null;
+      }
+    }
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];
   if (!state.clearedLevelDungeonTiers) state.clearedLevelDungeonTiers = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
+  if (typeof state.awakeningOrbs !== "number") state.awakeningOrbs = 0;
   if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
   if (typeof state.fighterExp !== "number") state.fighterExp = 0;
   if (typeof state.maxStamina !== "number") state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);

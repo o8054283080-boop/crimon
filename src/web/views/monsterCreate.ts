@@ -12,6 +12,16 @@ import { MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
+import {
+  ABILITY_POINT_BUDGET,
+  ABILITY_POINT_VALUES,
+  AllocatableStat,
+  MONSTER_TYPE_LABELS,
+  MonsterType,
+} from "../../core/monsterDevelopment.js";
+import { LATENT_ABILITY_CANDIDATES, abilityStatBonuses, usedAbilityPoints } from "../../game/monsterDevelopment.js";
+
+export type CreateMenu = "SKILL" | "TYPE" | "ABILITY" | "LATENT";
 
 /**
  * クリエイト(スキル合成)の画面。
@@ -44,6 +54,12 @@ export interface MonsterCreateProps {
   onBack: () => void;
   /** 直前の操作の結果。断った理由もここに出す */
   notice: string | null;
+  menu: CreateMenu;
+  awakeningOrbs: number;
+  onSelectMenu: (menu: CreateMenu) => void;
+  onReincarnate: (type: MonsterType) => void;
+  onSetAbilityPoint: (stat: AllocatableStat, points: number) => void;
+  onAwaken: (candidateId: string) => void;
 }
 
 const SLOT_LABEL: Record<CreateSlot, string> = { 1: "スキル2", 2: "スキル3" };
@@ -173,13 +189,56 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
   const material = props.materialId ? props.monsters.find((m) => m.id === props.materialId) : undefined;
   const ready = material !== undefined && props.slot !== null;
 
-  return el("div", { className: "screen create-screen" }, [
+  const menuItems: { id: CreateMenu; label: string }[] = [
+    { id: "SKILL", label: "スキル継承" }, { id: "TYPE", label: "タイプ転生" },
+    { id: "ABILITY", label: "能力付与" }, { id: "LATENT", label: "潜在覚醒" },
+  ];
+  const shared = [
     el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["クリエイト"]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onBack }, ["戻る"]),
     ]),
+    el("nav", { className: "create-menu", "aria-label": "クリエイトメニュー" }, menuItems.map((item) =>
+      el("button", { type: "button", className: `btn ${props.menu === item.id ? "btn--primary" : "btn--ghost"}`, onclick: () => props.onSelectMenu(item.id) }, [item.label]),
+    )),
+    el("section", { className: "panel create-target" }, [monsterFace(target), el("strong", {}, [targetDex ? targetDex.name : target.dexId])]),
+  ];
 
-    el("section", { className: "panel create-target" }, [
+  if (props.menu === "TYPE") {
+    return el("div", { className: "screen create-screen" }, [...shared,
+      el("section", { className: "panel" }, [
+        el("h2", {}, ["タイプ転生"]),
+        el("p", { className: "app-subtitle" }, [`現在: ${target.development.type ? MONSTER_TYPE_LABELS[target.development.type] : "未転生"} / Lv${target.level}`]),
+        el("p", {}, ["タイプを変更するとレベルと経験値が1へ戻ります。タイプ補正値は調整中です。"]),
+        el("div", { className: "create-menu" }, (Object.keys(MONSTER_TYPE_LABELS) as MonsterType[]).map((type) =>
+          el("button", { type: "button", className: "btn btn--ghost", disabled: target.development.type === type, onclick: () => props.onReincarnate(type) }, [MONSTER_TYPE_LABELS[type]]),
+        )),
+      ]), props.notice ? el("p", { className: "create-notice" }, [props.notice]) : null].filter(isEl));
+  }
+  if (props.menu === "ABILITY") {
+    const used = usedAbilityPoints(target.development.abilityPoints);
+    const bonuses = abilityStatBonuses(target.development.abilityPoints);
+    const labels: Record<AllocatableStat, string> = { hp: "最大HP", atk: "攻撃力", def: "防御力", spd: "速度" };
+    return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, [
+      el("h2", {}, ["能力付与"]), el("p", { className: "create-points" }, [`使用済み ${used} / 残り ${ABILITY_POINT_BUDGET - used}`]),
+      ...((Object.keys(labels) as AllocatableStat[]).map((stat) => el("label", { className: "create-allocation" }, [
+        el("span", {}, [`${labels[stat]}: ${target.development.abilityPoints[stat]}pt → +${bonuses[stat]} (1pt = +${ABILITY_POINT_VALUES[stat]})`]),
+        el("input", { type: "range", min: "0", max: String(ABILITY_POINT_BUDGET), value: String(target.development.abilityPoints[stat]), oninput: (event: Event) => props.onSetAbilityPoint(stat, Number((event.target as HTMLInputElement).value)) }, []),
+      ]))),
+    ])]);
+  }
+  if (props.menu === "LATENT") {
+    const candidates = LATENT_ABILITY_CANDIDATES[target.dexId] ?? [];
+    return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, [
+      el("h2", {}, ["潜在覚醒"]), el("p", {}, [`覚醒オーブ: ${props.awakeningOrbs}個`]),
+      target.development.latentAbilityId ? el("p", { className: "create-notice" }, [`覚醒済み: ${target.development.latentAbilityId}`]) :
+      candidates.length === 3 ? el("div", { className: "create-choices" }, candidates.map((candidate) => el("button", { type: "button", className: "create-choice", disabled: props.awakeningOrbs < 1, onclick: () => props.onAwaken(candidate.id) }, [candidate.name, el("small", {}, [candidate.description])]))) :
+      el("p", { className: "app-subtitle" }, ["潜在能力候補は準備中です（スキル1強化・3候補を登録予定）。"]),
+    ])]);
+  }
+
+  return el("div", { className: "screen create-screen" }, [...shared,
+    el("section", { className: "panel create-target create-target--skill" }, [
       monsterFace(target),
       el("div", { className: "create-target__body" }, [
         el("strong", {}, [targetDex ? targetDex.name : target.dexId]),
