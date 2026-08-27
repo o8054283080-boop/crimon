@@ -1,168 +1,208 @@
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MONSTER_DEX } from "../src/data/monsters.js";
-import { DamageEffect, SCALE_REFERENCE } from "../src/core/skill.js";
+import { DamageEffect } from "../src/core/skill.js";
 
-export type DefenseMode = "A" | "B" | "C" | "D";
+export type DefenseMode = "A" | "B" | "C" | "D" | "E";
 export interface DamageInput {
-  atk: number; def: number; multiplier: number; crit?: number; mode?: DefenseMode;
-  defenseRatio?: number; flatRatio?: number; ignoreDefense?: boolean;
+  atk: number;
+  def: number;
+  /** スキル全体の倍率（多段でもhit数を掛けない）。 */
+  skillMultiplier?: number;
+  /** 旧ツールとの互換名。skillMultiplierが優先される。 */
+  multiplier?: number;
+  critMultiplier?: number;
+  /** 旧ツールとの互換名。critMultiplierが優先される。 */
+  crit?: number;
+  mode?: DefenseMode;
+  defenseRatio?: number;
+  flatRatio?: number;
+  /** Eの固定軽減上限（割合軽減後ダメージに対する割合）。 */
+  flatCap?: number;
+  hp?: number;
+  hits?: number;
+  ignoreDefense?: boolean;
 }
 
+export interface DamageBreakdown {
+  base: number; afterRatio: number; flatReduction: number; beforeCrit: number;
+  damage: number; hpRatio: number; hits: number;
+}
+
+const clean = (value: number | undefined, fallback = 0): number =>
+  Number.isFinite(value) ? Math.max(0, value as number) : fallback;
+
 /** 比較専用の純粋関数。本番戦闘コードからは参照しない。 */
-export function simulatedDamage(input: DamageInput): number {
-  const atk = finiteNonNegative(input.atk);
-  const def = finiteNonNegative(input.def);
-  const base = atk * finiteNonNegative(input.multiplier);
-  const crit = finiteNonNegative(input.crit ?? 1);
-  if (input.ignoreDefense) return Math.max(1, Math.round(base * crit));
-  const mode = input.mode ?? "A";
-  const defenseRatio = finiteNonNegative(input.defenseRatio ?? 1.5);
-  const flat = def * finiteNonNegative(input.flatRatio ?? 0.25);
+export function simulatedDamageBreakdown(input: DamageInput): DamageBreakdown {
+  const atk = clean(input.atk);
+  const def = clean(input.def);
+  const multiplier = clean(input.skillMultiplier ?? input.multiplier);
+  const crit = clean(input.critMultiplier ?? input.crit, 1);
+  const hp = clean(input.hp);
+  const hits = Math.max(1, Math.floor(clean(input.hits, 1)));
+  const base = atk * multiplier;
+  if (input.ignoreDefense) {
+    const damage = Math.max(1, Math.round(base * crit));
+    return { base, afterRatio: base, flatReduction: 0, beforeCrit: base, damage, hpRatio: hp ? damage / hp : 0, hits };
+  }
+  const mode = input.mode ?? "C";
+  const defenseRatio = clean(input.defenseRatio, 1.5);
+  const flatRatio = clean(input.flatRatio, 0.25);
   const scaledDef = mode === "A" ? def : def * defenseRatio;
-  const afterRatio = base * (1 - (scaledDef <= 0 ? 0 : scaledDef / (scaledDef + Math.max(1, atk))));
-  const raw = mode === "C" ? Math.max(0, afterRatio - flat) * crit
-    : mode === "D" ? Math.max(0, afterRatio * crit - flat)
-      : afterRatio * crit;
-  return Math.max(1, Math.round(raw));
+  const denominator = scaledDef + Math.max(1, atk);
+  const afterRatio = denominator > 0 ? base * Math.max(1, atk) / denominator : base;
+  const unrestrictedFlat = def * flatRatio;
+  const flatReduction = mode === "C" || mode === "D" ? unrestrictedFlat
+    : mode === "E" ? Math.min(unrestrictedFlat, afterRatio * clean(input.flatCap, 0.25)) : 0;
+  const raw = mode === "D"
+    ? Math.max(0, afterRatio * crit - flatReduction)
+    : Math.max(0, afterRatio - flatReduction) * crit;
+  const damage = Math.max(1, Math.round(raw));
+  return { base, afterRatio, flatReduction, beforeCrit: Math.max(0, afterRatio - flatReduction), damage, hpRatio: hp ? damage / hp : 0, hits };
+}
+
+export function simulatedDamage(input: DamageInput): number {
+  return simulatedDamageBreakdown(input).damage;
+}
+
+/** 固定軽減をスキル全体に一度適用するため、同じ総倍率ならhit数に依存しない。 */
+export function multiHitDamage(input: DamageInput, hits = input.hits ?? 1, flatPerHit = false): number {
+  const count = Math.max(1, Math.floor(clean(hits, 1)));
+  if (!flatPerHit) return simulatedDamage({ ...input, hits: count });
+  const totalMultiplier = clean(input.skillMultiplier ?? input.multiplier);
+  return Array.from({ length: count }, () => simulatedDamage({ ...input, skillMultiplier: totalMultiplier / count, hits: 1 }))
+    .reduce((sum, damage) => sum + damage, 0);
 }
 
 export function dependentBase(atk: number, multiplier: number, stat: number, coefficient: number): number {
-  return finiteNonNegative(atk) * finiteNonNegative(multiplier) + finiteNonNegative(stat) * finiteNonNegative(coefficient);
+  return clean(atk) * clean(multiplier) + clean(stat) * clean(coefficient);
 }
 
-export function currentDependentBase(atk: number, effect: DamageEffect, stat: number): number {
-  const bonus = effect.scaleBonus
-    ? effect.scaleBonus.bonusAtReference * finiteNonNegative(stat) / SCALE_REFERENCE[effect.scaleBonus.stat]
-    : 0;
-  return finiteNonNegative(atk) * (finiteNonNegative(effect.multiplier) + bonus);
-}
-
-export function multiHitDamage(input: DamageInput, hits: number, flatPerHit: boolean): number {
-  const count = Math.max(1, Math.floor(hits));
-  if (flatPerHit || input.mode !== "C") {
-    return Array.from({ length: count }, () => simulatedDamage({ ...input, multiplier: input.multiplier / count })).reduce((a, b) => a + b, 0);
-  }
-  // 割合軽減は各hit（合計は同値）、固定軽減だけスキル全体へ一度。
-  const ratioOnly = simulatedDamage({ ...input, mode: "B", multiplier: input.multiplier / count, crit: 1 }) * count;
-  const raw = Math.max(0, ratioOnly - finiteNonNegative(input.def) * finiteNonNegative(input.flatRatio ?? 0.25));
-  return Math.max(1, Math.round(raw * finiteNonNegative(input.crit ?? 1)));
-}
-
-function finiteNonNegative(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
-type SkillRow = { monster: string; skill: string; effect: DamageEffect };
-export function auditedSkills(): { hp: SkillRow[]; def: SkillRow[]; ignore: SkillRow[] } {
+type SkillRow = { monster: string; skill: string; effect: DamageEffect; cooldown: number; target: string };
+export function auditedSkills(): { ignore: SkillRow[] } {
   const seen = new Set<string>();
   const rows: SkillRow[] = [];
   for (const monster of MONSTER_DEX) for (const skill of monster.skills) for (const effect of skill.effects) {
     if (effect.kind !== "DAMAGE") continue;
     const key = `${monster.templateId}:${skill.id}`;
     if (seen.has(key)) continue;
-    seen.add(key); rows.push({ monster: monster.name.replace(/\[[^\]]+\]/, ""), skill: skill.name, effect });
+    seen.add(key);
+    rows.push({ monster: monster.name.replace(/\[[^\]]+\]/, ""), skill: skill.name, effect, cooldown: skill.cooldownTurns, target: skill.target });
   }
-  return {
-    hp: rows.filter((r) => r.effect.scaleBonus?.stat === "hp"),
-    def: rows.filter((r) => r.effect.scaleBonus?.stat === "def"),
-    ignore: rows.filter((r) => r.effect.ignoreDefense),
-  };
+  return { ignore: rows.filter((row) => row.effect.ignoreDefense) };
 }
 
-const table = (headers: string[], rows: (string | number)[][]) =>
-  `| ${headers.join(" | ")} |\n|${headers.map(() => "---:").join("|")}|\n${rows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`;
+const table = (headers: string[], rows: (string | number)[][]): string =>
+  `| ${headers.join(" | ")} |\n|${headers.map(() => "---:").join("|")}|\n${rows.map((row) => `| ${row.join(" | ")} |`).join("\n")}`;
+const pct = (value: number): string => `${(value * 100).toFixed(1)}%`;
+const ce = (atk: number, def: number, mult: number, crit = 1, hp = 0) => {
+  const c = simulatedDamage({ atk, def, skillMultiplier: mult, critMultiplier: crit, hp, mode: "C" });
+  const e = simulatedDamage({ atk, def, skillMultiplier: mult, critMultiplier: crit, hp, mode: "E" });
+  return [c, e, `${((e / c - 1) * 100).toFixed(1)}%`];
+};
 
-function skillTable(rows: SkillRow[]): string {
-  return table(["モンスター", "スキル", "倍率", "hit", "現行補正"], rows.map(({ monster, skill, effect }) => [monster, skill, effect.multiplier, effect.hits ?? 1, effect.scaleBonus ? `${effect.scaleBonus.stat}基準+${effect.scaleBonus.bonusAtReference}` : "防御無視"]));
-}
+export function buildDefenseComparisonReport(): string {
+  const atks = [500, 1000, 1500, 2000, 3000, 4000, 6000, 10000];
+  const defs = [500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 6500];
+  const multipliers = [0.5, 1, 1.5, 2, 3, 5];
+  const focus = [[1000, 3000], [1000, 4000], [1000, 6500], [2000, 4000], [2000, 6500], [4000, 6500], [10000, 6500]];
+  const focusRows = focus.flatMap(([atk, def]) => multipliers.map((m) => [atk, def, m, ...ce(atk, def, m)]));
+  const oneRows = atks.map((atk) => {
+    const c = multipliers.flatMap((m) => defs.filter((def) => simulatedDamage({ atk, def, skillMultiplier: m, mode: "C" }) === 1).map((def) => `${m}x:${def}`));
+    const e = multipliers.flatMap((m) => defs.filter((def) => simulatedDamage({ atk, def, skillMultiplier: m, mode: "E" }) === 1).map((def) => `${m}x:${def}`));
+    return [atk, c.length, c.join(", ") || "なし", e.length, e.join(", ") || "なし"];
+  });
+  const critRows = [1, 1.5, 2, 2.5, 3].flatMap((crit) => [[2000, 4000], [6000, 6500]].map(([atk, def]) => [atk, def, `${crit * 100}%`, ...ce(atk, def, 3, crit)]));
+  const pointRows = [0, 50, 100].flatMap((points) => [2000, 4000].map((atk) => {
+    const def = 1398 + points * 3; return [atk, points, def, ...ce(atk, def, 3)];
+  }));
+  const hitRows = [1, 3, 6].map((hits) => [hits, 3 / hits, ...(["C", "E"] as const).map((mode) => multiHitDamage({ atk: 2000, def: 4000, skillMultiplier: 3, mode }, hits))]);
+  const ignoreRows = [3000, 4000, 6500].flatMap((def) => [
+    ["ウルフ/ふいうちの牙", 1000, def, 0.9, simulatedDamage({ atk: 1000, def, skillMultiplier: 0.9, mode: "C" }), simulatedDamage({ atk: 1000, def, skillMultiplier: 0.9, mode: "E" }), simulatedDamage({ atk: 1000, def, skillMultiplier: 0.9, ignoreDefense: true })],
+    ["ドラゴン/破壊の流星", 3000, def, 2, simulatedDamage({ atk: 3000, def, skillMultiplier: 2, mode: "C" }), simulatedDamage({ atk: 3000, def, skillMultiplier: 2, mode: "E" }), simulatedDamage({ atk: 3000, def, skillMultiplier: 2, ignoreDefense: true })],
+  ]);
+  const capRows = [0.15, 0.2, 0.25, 0.3, 0.35].map((cap) => [pct(cap), ...[[1000, 4000], [2000, 6500], [4000, 6500]].map(([atk, def]) => simulatedDamage({ atk, def, skillMultiplier: 1, mode: "E", flatCap: cap }))]);
+  const ratioRows = [1.25, 1.5, 1.75, 2].map((ratio) => [ratio, ...[[1000, 4000], [2000, 6500], [4000, 6500]].flatMap(([atk, def]) => [simulatedDamage({ atk, def, skillMultiplier: 1, mode: "C", defenseRatio: ratio }), simulatedDamage({ atk, def, skillMultiplier: 1, mode: "E", defenseRatio: ratio })])]);
+  const scenarios = [
+    ["装備なし", 1733, 1128, 15940], ["現実的な強装備", 6057, 3942, 55710], ["理論装備（破綻検出）", 10034, 6531, 92293],
+  ] as const;
+  const scenarioRows = scenarios.flatMap(([label, atk, def, hp]) => [1, 3].map((m) => {
+    const c = simulatedDamage({ atk, def, hp, skillMultiplier: m, mode: "C" });
+    const e = simulatedDamage({ atk, def, hp, skillMultiplier: m, mode: "E" });
+    return [label, atk, def, hp, m, c, pct(c / hp), Math.ceil(hp / c), e, pct(e / hp), Math.ceil(hp / e)];
+  }));
+  const realRows = [
+    ["低ATK: ゴーレム[火]", 1065, "高DEF: ゴーレム[火]", 1398, 17210],
+    ["平均ATK: スライム[火]", 1420, "平均DEF: スライム[水]", 828, 13553],
+    ["高ATK: ドラゴン[闇]", 2474, "低DEF: ウルフ[火]", 645, 11294],
+  ].flatMap(([attacker, atk, defender, def, hp]) => [1, 3].map((m) => {
+    const [c, e, diff] = ce(atk as number, def as number, m);
+    return [attacker, atk, defender, def, hp, m, c, e, diff];
+  }));
+  const audited = auditedSkills().ignore.map((r) => [r.monster, r.skill, r.effect.multiplier, r.effect.hits ?? 1, r.cooldown, r.target]);
+  return `# 防御式C vs E 数値比較レポート
 
-export function buildDamageReport(): string {
-  const skills = auditedSkills();
-  const atkValues = [1000, 2000, 3000, 6000, 10000], defs = [500, 750, 1000, 1500, 2000, 3000, 4000, 6500];
-  const threeRows = atkValues.flatMap((atk) => defs.map((def) => [atk, def, ...(["A", "B", "C", "D"] as const).map((mode) => simulatedDamage({ atk, def, multiplier: 3, mode }))]));
-  const hpCoefficients = [0.03, 0.05, 0.08, 0.10, 0.15], defCoefficients = [0.5, 1, 1.5, 2, 3];
-  const depRows = (rows: SkillRow[], stat: number, coeffs: number[]) => rows.map(({ monster, skill, effect }) => [monster, skill, Math.round(currentDependentBase(2000, effect, stat)), ...coeffs.map((c) => Math.round(dependentBase(2000, effect.multiplier, stat, c)))]);
-  const critRows = [1, 1.5, 2, 2.5, 3].flatMap((crit) => [1000, 3000, 6500].map((def) => [crit, def, ...(["A", "B", "C", "D"] as const).map((mode) => simulatedDamage({ atk: 6000, def, multiplier: 3, crit, mode }))]));
-  const pointRows = [2, 3, 4].flatMap((perPoint) => [0, 50, 100].map((points) => { const def = 1000 + perPoint * points; return [perPoint, points, def, ...(["A", "B", "C", "D"] as const).map((mode) => simulatedDamage({ atk: 3000, def, multiplier: 3, mode }))]; }));
-  const hitRows = [1, 3, 6].map((hits) => [hits, multiHitDamage({ atk: 3000, def: 2000, multiplier: 3, mode: "C" }, hits, true), multiHitDamage({ atk: 3000, def: 2000, multiplier: 3, mode: "C" }, hits, false)]);
-  const ignoreRows = [1000, 2000, 4000, 6500].map((def) => [def, simulatedDamage({ atk: 3000, def, multiplier: 1, mode: "C" }), simulatedDamage({ atk: 3000, def, multiplier: 3, mode: "C" }), simulatedDamage({ atk: 3000, def, multiplier: 3, crit: 2, mode: "C" }), simulatedDamage({ atk: 3000, def, multiplier: 3, mode: "C", ignoreDefense: true })]);
-  return `# ダメージバランス再計算レポート
+> 2026-08-27、検証専用。丸めはスキル全体の最後に1回、最低1。**本番式・能力ポイント・装備・スキルデータは未変更**。
 
-> 2026-08-27時点。これは比較シミュレーションであり、方式B/C/Dおよび新依存係数は未採用。
+## 式と読み方
+Cは割合軽減後から \`DEF×0.25\`、Eは \`min(DEF×0.25, R×25%)\` をクリティカル前に引く。Eは常にRの75%以上を残すため、ATK>0かつ倍率>0なら原理上1への張り付きがほぼない。「E差」は \`(E/C-1)×100\` で、C=1では最低値丸めを分母にするため非常に大きくなる。
 
-## 現行コードの式と処理順
+## 重点条件（非クリティカル）
+${table(["ATK", "DEF", "倍率", "C", "E", "E差"], focusRows)}
 
-実効ATKを \(P\)、実効DEFを \(Q\)、倍率を \(M\)、依存能力を \(S\)、基準値を \(R\)、基準時加算倍率を \(b\) とする。
+## 1ダメージ領域（全432条件）
+表記は \`倍率x:DEF\`。Cは ${oneRows.reduce((s, r) => s + Number(r[1]), 0)}/432、Eは ${oneRows.reduce((s, r) => s + Number(r[3]), 0)}/432 条件。
 
-1. 現行依存加算倍率 \(x=bS/R\)（HP: R=30000、DEF: R=3500）。
-2. 基礎値 \(B=P(M+x)\)。したがって現行HP/DEF依存は独立加算ではなく、依存能力でATK倍率を増幅する。
-3. 防御軽減率 \(q=Q/(Q+max(1,P))\)。防御無視なら q=0。防御後 \(B(1-q)\)。
-4. 属性倍率、クリティカル倍率、装備の与ダメ倍率、装備の被ダメ倍率を順に乗算。
-5. Math.round後、最低1ダメージ。多段は各hitでこの全処理（クリティカル抽選を含む）を独立実行。
+${table(["ATK", "C件数", "Cの条件", "E件数", "Eの条件"], oneRows)}
 
-よって1hitの最終値は \`max(1, round(P×(M+bS/R)×(1-q)×属性×クリ倍率×与ダメ補正×被ダメ補正))\`。
+## クリティカル
+${table(["ATK", "DEF", "クリ", "C", "E", "E差"], critRows)}
 
-## 対象スキル監査
+両方式とも固定軽減をクリ前に置くため、クリ倍率を上げてもE/C比はほぼ一定。Cの絶対軽減量もクリ倍率で拡大するので高DEFはクリティカル対策になるが、Cで0になった基礎は高クリでも1のまま。Eは残った75%がクリ倍率で伸びる。
 
-### HP依存（${skills.hp.length}件）
-${skillTable(skills.hp)}
+## DEF能力ポイント（1pt=+3、ゴーレム[火] ★6 Lv60の基礎DEF1398、総倍率3.0）
+${table(["攻撃ATK", "DEF pt", "最終DEF", "C", "E", "E差"], pointRows)}
 
-### DEF依存（${skills.def.length}件）
-${skillTable(skills.def)}
+## 1Hit / 3Hit / 6Hit（総倍率3.0、ATK2000 vs DEF4000）
+${table(["hit", "1hit倍率", "C", "E"], hitRows)}
 
-### 完全防御無視（${skills.ignore.length}件）
-${skillTable(skills.ignore)}
+固定軽減をスキル全体へ1回だけ適用するモデルでは総倍率が同じなら総ダメージも同じで、多段ペナルティはない。
 
-## 方式A/B/C/D・総倍率3.0（非クリティカル）
+## 完全防御無視と実スキル
+mainの監査結果は次の通り。
 
-A=現行、B=DEF×1.5割合のみ、C=同割合+DEF×0.25をクリ前、D=同割合+DEF×0.25をクリ後。CとDは非クリ時に一致する。
+${table(["モンスター", "スキル", "1hit倍率", "hit", "CT", "対象"], audited)}
 
-${table(["ATK", "DEF", "A", "B", "C", "D"], threeRows)}
+${table(["スキル", "仮ATK", "DEF", "総倍率", "通常C", "通常E", "完全無視"], ignoreRows)}
 
-## クリティカル比較（ATK6000、総倍率3.0）
-${table(["クリ倍率", "DEF", "A", "B", "C", "D"], critRows)}
+ドラゴンは全体2.0倍・CT5なので高DEFへの非常に強いカウンター。ウルフは単体・合計0.9倍・CT2で役割は明確だが即死級ではない。調整するなら防御式を弱めず、倍率・hit・CT・対象を個別に再査定する。
 
-Cは固定値もクリ倍率で増幅して差し引くため、高クリ時にDより低くなる。高DEFへのクリティカル対抗という目的にはCが整合する。現行実データの基礎クリダメはモンスター定義値と装備・バフの実効値であり、戦闘では上限クランプせずその値を使用する。
+## 実モンスター代表（★6 Lv60、装備なし）
+${table(["攻撃側", "ATK", "防御側", "DEF", "HP", "倍率", "C", "E", "E差"], realRows)}
 
-## HP依存係数（ATK2000、最大HP30000、軽減前）
-${table(["モンスター", "スキル", "現行", ...hpCoefficients.map(String)], depRows(skills.hp, 30000, hpCoefficients))}
+低・平均・高は現行データの実在個体から代表帯を選んだ。属性・装備セット最終補正は除き、防御式だけを比較した。
 
-HP 10000/15000/20000/30000/50000/90000はツール関数のstat引数で再計算できる。H=0.03〜0.05は耐久と火力の両立を抑え、0.10以上は理論HP装備で+9000以上となるため危険域。
+## 装備、HP割合、戦闘テンポ
+前回のスライム型候補（100pt極振り）を共通シナリオとして攻撃型ATK、防御型DEF、HP型最大HPを組み合わせた。
 
-## DEF依存係数（ATK2000、DEF3500、軽減前）
-${table(["モンスター", "スキル", "現行", ...defCoefficients.map(String)], depRows(skills.def, 3500, defCoefficients))}
+${table(["装備", "ATK", "DEF", "HP", "倍率", "C", "C/HP", "C耐久回数", "E", "E/HP", "E耐久回数"], scenarioRows)}
 
-D=0.5〜1.0を起点とし、2.0以上は高DEFと火力を同時に得る。理論DEF6500ならD=3で+19500となりATK型を容易に超える。
+通常1倍だけを連打する想定では、強装備同士でも両方式とも倒すまで十数回以上となり長期化警告。3倍主力なら現実装備帯は数回規模。理論装備は破綻検出専用で調整基準にしない。
 
-## DEF能力ポイント（基礎DEF1000、ATK3000・3倍被弾）
-${table(["DEF/pt", "pt", "最終DEF", "A", "B", "C", "D"], pointRows)}
+## E上限の補助比較（1.0倍）
+${table(["cap", "1000/4000", "2000/6500", "4000/6500"], capRows)}
 
-## 単発・多段（ATK3000、DEF2000、総倍率3.0、方式C）
-${table(["hit", "固定軽減を各hit", "スキル全体に1回"], hitRows)}
+capが小さいほど固定軽減上限が小さくダメージが増える。25%は「最低75%を残す」という説明可能な中間値で、15%はDEF投資感が薄く、35%は低ATK抑制が再び強い。
 
-各hit適用は6hitで固定軽減を6回受ける。固定軽減はスキル全体に一度を推奨する。ただし現行エンジンはhit単位で完結するため、採用時はスキル解決側の集約設計が必要。
+## 防御係数の補助比較（各欄C/E、1.0倍）
+${table(["係数", "1000/4000 C", "E", "2000/6500 C", "E", "4000/6500 C", "E"], ratioRows)}
 
-## 防御無視（ATK3000）
-${table(["DEF", "通常1倍C", "通常3倍C", "クリ2倍3倍C", "防御無視3倍"], ignoreRows)}
-
-完全防御無視が割合・固定の双方を無視するとDEF6500でも9000。強化後は相対価値が急増するため倍率、対象範囲、CTを個別再査定すべき。
-
-## 実ステータス帯と構成評価
-
-- 網羅グリッド: ATK 1000/1500/2000/3000/4000/6000/10000、DEF 500/750/1000/1500/2000/3000/4000/6500、HP 10000/15000/20000/30000/50000/90000を入力可能にし、代表3倍表は可読性のためATK5点×DEF8点を掲載した。
-- 前調査の★6 Lv60実測では初期★3/4/5で役割構成が違う。平均ATK差2.29倍を純レア差と断定せず、実在候補と装備なし・強装備・理論装備は stat-balance-report の値を併読する。
-- 攻撃型: 最高火力。防御強化の影響を受ける。体力型: H=0.03〜0.05なら高HPと補助火力。防御型: D=0.5〜1.0なら通常耐久と補助火力。両耐久型ともATK型最大火力と同等にしない。
-- 理論装備値（ATK10034/HP92293/DEF6531）は有限だが、H=0.15でHP項13844、D=3でDEF項19593となり破綻圧力が明白。本番基準にはしない。
-
-## 結論（提案、未確定）
-
-方式C（DEF×1.5割合+DEF×0.25固定、固定はクリ前かつスキル全体1回）を第一検証候補とする。HP係数0.03〜0.05、DEF係数0.5〜1.0からスキル別に調整する。長所は高DEFのクリ耐性と役割分離。短所は低倍率技・多段への最低1丸めの影響、防御無視の急激な価値上昇、ATK0付近で割合式がほぼ全軽減になる点。代替Eとして固定軽減に \`min(DEF×0.25, 割合軽減後ダメージ×0.25)\` の上限を置けば低倍率技の1固定化を緩和できるが、採用しない。
+係数を上げるとC/E双方が滑らかに低下する一方、Cだけの1固定化は残る。主因は1.5そのものではなく無上限の固定軽減である。
 `;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const report = buildDamageReport();
-  if (process.argv.includes("--write")) writeFileSync("docs/damage-balance-report.md", report);
+  const report = buildDefenseComparisonReport();
+  if (process.argv.includes("--write")) writeFileSync("docs/defense-c-vs-e-report.md", report);
   process.stdout.write(report);
 }
