@@ -19,6 +19,7 @@ import {
   addEquipment,
   addMonster,
   addSummonScrolls,
+  ensureTowerMonthlyState,
   trySpendStamina,
 } from "./playerState.js";
 import { resolveDex } from "./stageRunner.js";
@@ -97,6 +98,7 @@ export function isTowerCompleted(state: PlayerState): boolean {
  * 全員が最大HP・クールタイム0の状態で始まる。
  */
 export function beginTowerRun(state: PlayerState): TowerRun | null {
+  ensureTowerMonthlyState(state);
   if (towerBlockReason(state) !== null) return null;
   const party = getTowerParty(state);
   const run: TowerRun = {
@@ -232,6 +234,7 @@ export function applyTowerFloorResult(
  * 一番効率のいい遊び方になり、塔が塔でなくなる。
  */
 export function claimTowerFloorReward(state: PlayerState, floor: number, rng: () => number = Math.random): TowerRewardResult {
+  ensureTowerMonthlyState(state);
   const result = emptyTowerRewardResult();
   const def = findTowerFloor(floor);
   if (!def) return result;
@@ -239,13 +242,10 @@ export function claimTowerFloorReward(state: PlayerState, floor: number, rng: ()
   state.trialTowerClaimedFloors.push(floor);
 
   const reward: TowerReward = def.firstClearReward;
-  if (reward.awakeningOrbs) {
-    const rewardId = `trial-tower-floor-${floor}`;
-    if (!state.claimedAwakeningOrbRewardIds.includes(rewardId)) {
-      state.awakeningOrbs += reward.awakeningOrbs;
-      state.claimedAwakeningOrbRewardIds.push(rewardId);
-      result.awakeningOrbs = reward.awakeningOrbs;
-    }
+  if ((floor === 15 || floor === 30) && !state.trialTowerMonthlyOrbClaimedFloors.includes(floor)) {
+    state.awakeningOrbs += 1;
+    state.trialTowerMonthlyOrbClaimedFloors.push(floor);
+    result.awakeningOrbs = 1;
   }
   if (reward.crystal) {
     state.crystal += reward.crystal;

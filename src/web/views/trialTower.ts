@@ -67,6 +67,26 @@ export interface TrialTowerProps {
   onBack: () => void;
 }
 
+function renderMonthlyRewards(props: TrialTowerProps): HTMLElement {
+  const rewardRow = (floor: 15 | 30) => {
+    const claimed = props.player.trialTowerMonthlyOrbClaimedFloors.includes(floor);
+    return el("div", { className: `tower-monthly__row${claimed ? " is-claimed" : ""}` }, [
+      el("span", { className: "tower-monthly__floor" }, [`${floor}階`]),
+      el("span", { className: "tower-monthly__reward" }, ["🔮 覚醒オーブ ×1"]),
+      el("span", { className: "tower-monthly__status" }, [claimed ? "受取済み" : "未受取"]),
+    ]);
+  };
+  return el("section", { className: "panel tower-monthly" }, [
+    el("div", { className: "tower-monthly__head" }, [
+      el("h2", {}, ["今月の報酬"]),
+      el("span", { className: "tower-monthly__season" }, [props.player.trialTowerSeason]),
+    ]),
+    rewardRow(15),
+    rewardRow(30),
+    el("p", { className: "tower-monthly__reset" }, ["毎月1日 00:00（JST）リセット"]),
+  ]);
+}
+
 /** 塔の編成に入れられる上限 */
 
 
@@ -570,6 +590,7 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
     renderOutcome(props),
     props.notice ? el("div", { className: "tower-notice" }, [props.notice]) : null,
     renderHero(props),
+    renderMonthlyRewards(props),
     renderRules(),
     renderRun(props),
     floor ? renderNextFloor(props, floor) : null,
