@@ -18,6 +18,7 @@ import {
   AllocatableStat,
   MONSTER_TYPE_LABELS,
   MONSTER_TYPE_DESCRIPTIONS,
+  TYPE_REINCARNATION_GOLD_COST,
   MonsterType,
   abilityPointBudget,
 } from "../../core/monsterDevelopment.js";
@@ -247,9 +248,9 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
       el("section", { className: "panel" }, [
         el("h2", {}, ["タイプ転生"]),
         el("p", { className: "app-subtitle" }, [`現在: ${target.development.type ? MONSTER_TYPE_LABELS[target.development.type] : "未転生"} / Lv${target.level}`]),
-        el("p", {}, ["★6限定。転生するとLv1・EXP0となり、能力ポイントもすべて0になります。"]),
+        el("p", {}, [`★6限定・費用 ${TYPE_REINCARNATION_GOLD_COST.toLocaleString()}G。レベル・EXPは維持されます。能力ポイントはリセットされ、100ptを振り直せます。`]),
         el("div", { className: "create-menu" }, (Object.keys(MONSTER_TYPE_LABELS) as MonsterType[]).map((type) =>
-          el("button", { type: "button", className: "btn btn--ghost", disabled: target.star !== 6 || target.development.type === type, onclick: () => props.onReincarnate(type) }, [
+          el("button", { type: "button", className: "btn btn--ghost", disabled: target.star !== 6 || target.development.type === type || props.gold < TYPE_REINCARNATION_GOLD_COST, onclick: () => props.onReincarnate(type) }, [
             `${MONSTER_TYPE_LABELS[type]}: ${MONSTER_TYPE_DESCRIPTIONS[type]}`,
           ]),
         )),

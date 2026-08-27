@@ -17,13 +17,15 @@ interface DifficultyModifier {
   powerScaleMultiplier: number;
   /** ドロップする装備の星への加算値 */
   equipmentStarBonus: number;
+  /** モンスター・ファイター獲得EXP倍率 */
+  expMultiplier: number;
 }
 
 /** 難易度ごとの敵強化・装備ドロップ星ボーナス。具体的な倍率はゲーム内では非公開 */
 export const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifier> = {
-  NORMAL: { starBonus: 0, levelBonus: 0, powerScaleMultiplier: 1.0, equipmentStarBonus: 0 },
-  HARD: { starBonus: 1, levelBonus: 5, powerScaleMultiplier: 1.35, equipmentStarBonus: 1 },
-  HELL: { starBonus: 2, levelBonus: 10, powerScaleMultiplier: 1.8, equipmentStarBonus: 2 },
+  NORMAL: { starBonus: 0, levelBonus: 0, powerScaleMultiplier: 1.0, equipmentStarBonus: 0, expMultiplier: 1 },
+  HARD: { starBonus: 1, levelBonus: 5, powerScaleMultiplier: 1.35, equipmentStarBonus: 1, expMultiplier: 1.5 },
+  HELL: { starBonus: 2, levelBonus: 10, powerScaleMultiplier: 1.8, equipmentStarBonus: 2, expMultiplier: 2 },
 };
 
 export interface WaveEnemy {
@@ -238,7 +240,7 @@ function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number,
   return { waveNumber, isBossWave, enemies, powerScale, speedScale };
 }
 
-/** チャプターが1つ上がるごとに、強くなった敵に見合うようウェーブ報酬(ゴールド・経験値)も底上げする */
+/** チャプターが1つ上がるごとに、強くなった敵に見合うようゴールドも底上げする */
 const CHAPTER_REWARD_STEP = 0.6;
 
 function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
@@ -249,7 +251,9 @@ function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
   const rewards: StageRewards = {
     waveGold: Math.round(30 * stageNumber * chapterRewardMultiplier),
     clearGold: Math.round(150 * stageNumber * chapterRewardMultiplier),
-    waveExp: Math.round(25 * stageNumber * chapterRewardMultiplier),
+    // 全20面を通して300～6,000 EXP/周。後半周回にも意味を持たせつつ、
+    // HELL最終面でも育成D5階のEXP/スタミナを下回る。
+    waveExp: 100 * globalStageIndex(theme.chapter, stageNumber),
     dropRate: CHAPTER_MONSTER_DROP_RATE,
     dropStars: [1],
     dropTemplateId: theme.templateId,
