@@ -87,6 +87,8 @@ export interface TowerReward {
   pigStar?: Star;
   /** 装備を渡すなら、その星 */
   equipmentStar?: Star;
+  /** 初回突破で追加する覚醒オーブ */
+  awakeningOrbs?: number;
 }
 
 /** 全階数 */
@@ -324,7 +326,8 @@ function enemyLevelOf(floor: number): number {
  * 塔が装備の主要な供給源になって装備ダンジョンの居場所を奪う。
  */
 function rewardOf(floor: number): TowerReward {
-  if (floor === TOWER_FLOOR_COUNT) return { crystal: 500, gold: 30000, summonScroll: 3, equipmentStar: 6, pigStar: 3 };
+  if (floor === TOWER_FLOOR_COUNT) return { crystal: 500, gold: 30000, summonScroll: 3, equipmentStar: 6, pigStar: 3, awakeningOrbs: 1 };
+  if (floor === Math.ceil(TOWER_FLOOR_COUNT / 2)) return { crystal: 40 + floor * 2, gold: 1500 + floor * 200, equipmentStar: 4, awakeningOrbs: 1 };
   if (isTowerCheckpoint(floor)) {
     return { crystal: 100 + floor * 5, gold: 2000 + floor * 400, summonScroll: 1, equipmentStar: 5, pigStar: 3 };
   }

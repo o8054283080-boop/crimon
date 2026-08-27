@@ -242,6 +242,7 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
     const selected = candidates.find((candidate) => candidate.id === target.development.latentAbilityId);
     return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, [
       el("h2", {}, ["潜在覚醒"]), el("p", {}, [`覚醒オーブ: ${props.awakeningOrbs}個`]),
+      el("p", { className: "app-subtitle" }, ["主な入手先: 初心者ミッション / 装備ダンジョン10階 初回 / 試練の塔15階・30階 初回"]),
       target.development.latentAbilityId ? el("div", { className: "create-notice" }, selected
         ? [`覚醒済み: ${selected.name}`, el("small", {}, [selected.description])]
         : [`覚醒済み: ${target.development.latentAbilityId}`]) :

@@ -712,6 +712,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     mission.reward.gold ? `🪙${mission.reward.gold.toLocaleString()}` : null,
     mission.reward.crystal ? `💎${mission.reward.crystal}` : null,
     mission.reward.summonScrolls ? `📜通常召喚書 ×${mission.reward.summonScrolls}` : null,
+    mission.reward.awakeningOrbs ? `🔮覚醒オーブ ×${mission.reward.awakeningOrbs}` : null,
     mission.reward.fourStarSummonScrolls ? `🌟 ★4以上召喚書 ×${mission.reward.fourStarSummonScrolls}` : null,
     mission.reward.lightDarkFourStarSummonScrolls ? `🌗 ★4以上光闇召喚書 ×${mission.reward.lightDarkFourStarSummonScrolls}` : null,
     mission.reward.fiveStarSummonScrolls ? `✨ ★5召喚書 ×${mission.reward.fiveStarSummonScrolls}` : null,

@@ -121,6 +121,11 @@ export function applyDungeonClearRewards(
 ): ClearRewardResult {
   const isFirstClear = !isDungeonFloorCleared(state, floor.floor);
   markDungeonFloorCleared(state, floor.floor);
+  const orbRewardId = "equipment-dungeon-floor-10";
+  if (isFirstClear && floor.floor === 10 && !state.claimedAwakeningOrbRewardIds.includes(orbRewardId)) {
+    state.awakeningOrbs += 1;
+    state.claimedAwakeningOrbRewardIds.push(orbRewardId);
+  }
 
   const expTotal = floor.floor * 20;
   const levelUps = applyExpAndLevelUps(partyInstances, expTotal);

@@ -40,6 +40,8 @@ export interface PlayerState {
   fiveStarSummonScrolls: number;
   /** 潜在覚醒で1個消費する素材 */
   awakeningOrbs: number;
+  /** 覚醒オーブの達成報酬を受取済みのID。既存報酬の受取印とは分け、後付け報酬も安全に配る */
+  claimedAwakeningOrbRewardIds: string[];
   /** プレイヤー(ファイター)自身のレベル。上限50 */
   fighterLevel: number;
   /** 次のファイターレベルまでの累積経験値 */
@@ -172,6 +174,7 @@ export function createInitialState(): PlayerState {
     lightDarkFourStarSummonScrolls: 0,
     fiveStarSummonScrolls: 0,
     awakeningOrbs: 0,
+    claimedAwakeningOrbRewardIds: [],
     fighterLevel: 1,
     fighterExp: 0,
     stamina: INITIAL_MAX_STAMINA,
@@ -271,6 +274,18 @@ function normalizeState(state: PlayerState): PlayerState {
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
   if (typeof state.fiveStarSummonScrolls !== "number") state.fiveStarSummonScrolls = 0;
   if (typeof state.awakeningOrbs !== "number") state.awakeningOrbs = 0;
+  if (!Array.isArray(state.claimedAwakeningOrbRewardIds)) {
+    state.claimedAwakeningOrbRewardIds = [];
+    // ⑧-4A以前に条件を満たした控えにも、追加分を一度だけ追給する。
+    const retroactiveIds: string[] = [];
+    if (state.tutorialMissions.claimedIds.includes("tutorial-step-26")) retroactiveIds.push("tutorial-step-26");
+    if (state.tutorialMissions.claimedIds.includes("tutorial-step-30")) retroactiveIds.push("tutorial-step-30");
+    if (state.clearedDungeonFloors.some((floor) => floor >= 10)) retroactiveIds.push("equipment-dungeon-floor-10");
+    if (state.trialTowerBestFloor >= 15) retroactiveIds.push("trial-tower-floor-15");
+    if (state.trialTowerBestFloor >= 30) retroactiveIds.push("trial-tower-floor-30");
+    state.awakeningOrbs += retroactiveIds.length;
+    state.claimedAwakeningOrbRewardIds.push(...retroactiveIds);
+  }
   if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
   if (typeof state.fighterExp !== "number") state.fighterExp = 0;
   if (typeof state.maxStamina !== "number") state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
