@@ -62,7 +62,7 @@ describe("電気ドラゴンのスキル3(破滅の咆哮)", () => {
     const skill3 = dragon.skills[2];
     expect(skill3.name).toBe("破滅の咆哮");
     const damage = skill3.effects.find((e) => e.kind === "DAMAGE");
-    expect(damage).toMatchObject({ kind: "DAMAGE", scaleBonus: { stat: "hp" } });
+    expect(damage).toMatchObject({ kind: "DAMAGE", hpCoefficient: 0.05 });
   });
 });
 
@@ -87,12 +87,12 @@ describe("終焉の一撃のスタン確率(70%に変更)", () => {
 });
 
 describe("血のいけにえに自身の防御力スケールダメージを追加", () => {
-  it("防御力スケールのscaleBonusを持つ", () => {
+  it("独立した防御力係数を持つ", () => {
     const nemesis = findMonster("nemesis", "DARK")!;
     const skill2 = nemesis.skills[1];
     expect(skill2.name).toBe("血のいけにえ");
     const damage = skill2.effects.find((e) => e.kind === "DAMAGE");
-    expect(damage).toMatchObject({ kind: "DAMAGE", scaleBonus: { stat: "def" } });
+    expect(damage).toMatchObject({ kind: "DAMAGE", defCoefficient: 0.5 });
   });
 });
 

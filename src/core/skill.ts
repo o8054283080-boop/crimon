@@ -41,6 +41,10 @@ export interface DamageEffect {
    * HPがその半分なら+0.4倍になる。
    */
   scaleBonus?: { stat: "spd" | "def" | "hp"; bonusAtReference: number };
+  /** 最大HPをATKとは独立した基礎ダメージ項として加える係数。 */
+  hpCoefficient?: number;
+  /** 戦闘時点の実効DEFをATKとは独立した基礎ダメージ項として加える係数。 */
+  defCoefficient?: number;
   /** trueの場合、相手の防御力を完全に無視してダメージを計算する */
   ignoreDefense?: boolean;
 }
@@ -375,7 +379,11 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "DAMAGE": {
       const scaleText = effect.scaleBonus
         ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
-        : "";
+        : effect.hpCoefficient !== undefined
+          ? `(最大HP×${effect.hpCoefficient}を加算)`
+          : effect.defCoefficient !== undefined
+            ? `(防御力×${effect.defCoefficient}を加算)`
+            : "";
       const ignoreDefenseText = effect.ignoreDefense ? "(防御力無視)" : "";
       return `ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}`;
     }

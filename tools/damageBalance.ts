@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MONSTER_DEX } from "../src/data/monsters.js";
 import { DamageEffect } from "../src/core/skill.js";
+import { applyDefenseE, calculateBaseDamage } from "../src/battle/damageFormula.js";
 
 export type DefenseMode = "A" | "B" | "C" | "D" | "E";
 export interface DamageInput {
@@ -40,7 +41,7 @@ export function simulatedDamageBreakdown(input: DamageInput): DamageBreakdown {
   const crit = clean(input.critMultiplier ?? input.crit, 1);
   const hp = clean(input.hp);
   const hits = Math.max(1, Math.floor(clean(input.hits, 1)));
-  const base = atk * multiplier;
+  const base = calculateBaseDamage(atk, multiplier);
   if (input.ignoreDefense) {
     const damage = Math.max(1, Math.round(base * crit));
     return { base, afterRatio: base, flatReduction: 0, beforeCrit: base, damage, hpRatio: hp ? damage / hp : 0, hits };
@@ -48,6 +49,11 @@ export function simulatedDamageBreakdown(input: DamageInput): DamageBreakdown {
   const mode = input.mode ?? "C";
   const defenseRatio = clean(input.defenseRatio, 1.5);
   const flatRatio = clean(input.flatRatio, 0.25);
+  if (mode === "E" && defenseRatio === 1.5 && flatRatio === 0.25 && clean(input.flatCap, 0.25) === 0.25) {
+    const result = applyDefenseE(base, atk, def);
+    const damage = Math.max(1, Math.round(result.afterDefense * crit));
+    return { base, afterRatio: result.afterRatio, flatReduction: result.flatReduction, beforeCrit: result.afterDefense, damage, hpRatio: hp ? damage / hp : 0, hits };
+  }
   const scaledDef = mode === "A" ? def : def * defenseRatio;
   const denominator = scaledDef + Math.max(1, atk);
   const afterRatio = denominator > 0 ? base * Math.max(1, atk) / denominator : base;
@@ -75,7 +81,7 @@ export function multiHitDamage(input: DamageInput, hits = input.hits ?? 1, flatP
 }
 
 export function dependentBase(atk: number, multiplier: number, stat: number, coefficient: number): number {
-  return clean(atk) * clean(multiplier) + clean(stat) * clean(coefficient);
+  return calculateBaseDamage(clean(atk), clean(multiplier), clean(stat), clean(coefficient));
 }
 
 type SkillRow = { monster: string; skill: string; effect: DamageEffect; cooldown: number; target: string };
