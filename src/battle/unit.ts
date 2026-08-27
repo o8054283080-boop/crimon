@@ -1,5 +1,5 @@
 import { MonsterDefinition } from "../core/monster.js";
-import { BuffStat } from "../core/skill.js";
+import { BuffStat, STATUS_EFFECT_CATEGORY, StatusEffectCategory, StatusEffectType } from "../core/skill.js";
 
 export type Team = "PLAYER" | "ENEMY";
 
@@ -9,6 +9,14 @@ export interface ActiveEffect {
   amount: number;
   remainingTurns: number;
   kind: "BUFF" | "DEBUFF";
+}
+
+export interface ActiveStatusEffect {
+  type: StatusEffectType;
+  category: StatusEffectCategory;
+  remainingTurns: number;
+  /** 挑発だけが使用する。付与者のinstanceId。 */
+  sourceId?: string;
 }
 
 export interface BattleUnit {
@@ -25,6 +33,7 @@ export interface BattleUnit {
   /** 火傷の残りターン数。0より大きい間、自身の手番終了時に自分の攻撃力分のダメージを受ける */
   burnTurns: number;
   effects: ActiveEffect[];
+  statusEffects: ActiveStatusEffect[];
   alive: boolean;
   /** 現在保持しているシールド量(実HP)。ダメージはHPより先にここから減る */
   shieldValue: number;
@@ -67,6 +76,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     stunTurns: 0,
     burnTurns: 0,
     effects: [],
+    statusEffects: [],
     alive: true,
     shieldValue: 0,
     shieldTurns: 0,
@@ -106,16 +116,66 @@ export function hpRatio(unit: BattleUnit): number {
 }
 
 /** ダメージを与える。シールドがあれば先にシールドから減り、余った分だけHPに通る */
-export function applyDamage(unit: BattleUnit, amount: number): void {
-  let remaining = amount;
+export interface DamageApplicationResult {
+  attemptedDamage: number;
+  shieldAbsorbed: number;
+  hpDamage: number;
+  invincible: boolean;
+  endured: boolean;
+  revived: boolean;
+  died: boolean;
+}
+
+export function hasStatus(unit: BattleUnit, type: StatusEffectType): boolean {
+  return unit.statusEffects.some((effect) => effect.type === type && effect.remainingTurns > 0);
+}
+
+/** 同名はスタックせず、新しい付与で残りターンと挑発元を上書きする。 */
+export function applyStatus(unit: BattleUnit, type: StatusEffectType, durationTurns: number, sourceId?: string): boolean {
+  if (STATUS_EFFECT_CATEGORY[type] === "BUFF" && hasStatus(unit, "BUFF_BLOCK")) return false;
+  const next: ActiveStatusEffect = { type, category: STATUS_EFFECT_CATEGORY[type], remainingTurns: durationTurns };
+  if (type === "TAUNT") next.sourceId = sourceId;
+  const index = unit.statusEffects.findIndex((effect) => effect.type === type);
+  if (index >= 0) unit.statusEffects[index] = next;
+  else unit.statusEffects.push(next);
+  return true;
+}
+
+/** 無敵→シールド→HP→我慢→復活の共通致死処理。 */
+export function applyDamage(unit: BattleUnit, amount: number): DamageApplicationResult {
+  const attemptedDamage = Math.max(0, Math.round(amount));
+  const result: DamageApplicationResult = { attemptedDamage, shieldAbsorbed: 0, hpDamage: 0, invincible: false, endured: false, revived: false, died: false };
+  if (!unit.alive || attemptedDamage <= 0) return result;
+  if (hasStatus(unit, "INVINCIBLE")) {
+    result.invincible = true;
+    return result;
+  }
+  let remaining = attemptedDamage;
   if (unit.shieldValue > 0) {
     const absorbed = Math.min(unit.shieldValue, remaining);
+    result.shieldAbsorbed = absorbed;
     unit.shieldValue -= absorbed;
     remaining -= absorbed;
   }
-  if (remaining <= 0) return;
-  unit.currentHp = Math.max(0, unit.currentHp - remaining);
-  if (unit.currentHp === 0) unit.alive = false;
+  if (remaining <= 0) return result;
+  const before = unit.currentHp;
+  if (remaining >= before && hasStatus(unit, "ENDURE")) {
+    unit.currentHp = 1;
+    result.endured = true;
+  } else {
+    unit.currentHp = Math.max(0, before - remaining);
+  }
+  result.hpDamage = before - unit.currentHp;
+  if (unit.currentHp === 0 && hasStatus(unit, "REVIVE")) {
+    unit.statusEffects = unit.statusEffects.filter((effect) => effect.type !== "REVIVE");
+    unit.currentHp = Math.max(1, Math.round(unit.maxHp * 0.25));
+    unit.alive = true;
+    result.revived = true;
+  } else if (unit.currentHp === 0) {
+    unit.alive = false;
+    result.died = true;
+  }
+  return result;
 }
 
 export function applyHeal(unit: BattleUnit, amount: number): void {
@@ -138,6 +198,7 @@ export function tickEffectsAtTurnStart(unit: BattleUnit): ActiveEffect[] {
     }
     return true;
   });
+  unit.statusEffects = unit.statusEffects.filter((effect) => --effect.remainingTurns > 0);
   return expired;
 }
 
@@ -173,8 +234,10 @@ export function tickHealBlockAtTurnStart(unit: BattleUnit): void {
  */
 export function stripBuffs(unit: BattleUnit): boolean {
   const hadBuff = unit.effects.some((e) => e.kind === "BUFF");
-  const had = hadBuff || unit.shieldTurns > 0 || unit.immuneTurns > 0 || unit.regenTurns > 0;
+  const hadStatusBuff = unit.statusEffects.some((effect) => effect.category === "BUFF");
+  const had = hadBuff || hadStatusBuff || unit.shieldTurns > 0 || unit.immuneTurns > 0 || unit.regenTurns > 0;
   unit.effects = unit.effects.filter((e) => e.kind !== "BUFF");
+  unit.statusEffects = unit.statusEffects.filter((effect) => effect.category !== "BUFF");
   unit.shieldValue = 0;
   unit.shieldTurns = 0;
   unit.immuneTurns = 0;

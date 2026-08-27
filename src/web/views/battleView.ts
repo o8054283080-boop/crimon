@@ -285,7 +285,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
         unit.def.skills.map((skill, i) => {
           const idx = i as 0 | 1 | 2;
           const remaining = unit.cooldowns[idx];
-          const usable = active && remaining === 0;
+          const skillLocked = unit.statusEffects.some((effect) => effect.type === "SKILL_LOCK") && idx !== 0;
+          const usable = active && remaining === 0 && !skillLocked;
           const classes = ["skill-btn"];
           if (remaining > 0) classes.push("skill-btn--cooling");
           if (!usable) classes.push("skill-btn--idle");
@@ -860,6 +861,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       gauge: Math.round(u.gauge),
       alive: u.alive,
       effects: u.effects.map((e) => ({ ...e })),
+      statusEffects: u.statusEffects.map((e) => ({ ...e })),
       stunTurns: u.stunTurns,
       burnTurns: u.burnTurns,
       shieldValue: u.shieldValue,
