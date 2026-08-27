@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
+import { generateEquipment } from "../src/core/equipment.js";
 import { TUTORIAL_MISSIONS, claimTutorialMission, nextTutorialMission } from "../src/game/tutorialMissions.js";
 
 describe("30段階の初心者ロードマップ", () => {
@@ -41,6 +42,32 @@ describe("30段階の初心者ロードマップ", () => {
       gold: sum.gold + (x.reward.gold ?? 0), crystal: sum.crystal + (x.reward.crystal ?? 0),
       scrolls: sum.scrolls + (x.reward.summonScrolls ?? 0),
     }), { gold: 0, crystal: 0, scrolls: 0 });
-    expect(total).toEqual({ gold: 1_387_000, crystal: 1_690, scrolls: 25 });
+    expect(total).toEqual({ gold: 1_387_000, crystal: 1_690, scrolls: 55 });
+  });
+
+  it.each([
+    [10, "fourStarSummonScrolls", 1],
+    [20, "lightDarkFourStarSummonScrolls", 1],
+    [30, "fiveStarSummonScrolls", 1],
+  ] as const)("STEP%d大型報酬は保存再読込後も一度だけ", (step, field, amount) => {
+    const player = createInitialState();
+    player.tutorialMissions.claimedIds = TUTORIAL_MISSIONS.slice(0, step - 1).map((mission) => mission.id);
+    const mission = TUTORIAL_MISSIONS[step - 1];
+    // 条件だけを満たす代わりにテスト対象の判定を差し替えず、必要な進捗を用意する。
+    if (step === 10) { const equipment = generateEquipment({ star: 1, subStatCount: 0 }); equipment.level = 1; player.equipment.push(equipment); }
+    if (step === 20) player.monsters[0].star = 5;
+    if (step === 30) { player.monsters[0].star = 6; player.monsters[0].development.type = "ATTACK"; player.monsters[0].development.abilityPoints.hp = 1; }
+    expect(claimTutorialMission(player, mission.id)).toBe(true);
+    expect(player[field]).toBe(amount);
+    const loaded = normalizeLoadedState(JSON.parse(JSON.stringify(player)));
+    expect(claimTutorialMission(loaded, mission.id)).toBe(false);
+    expect(loaded[field]).toBe(amount);
+  });
+
+  it("STEP25まで★6育成、STEP26以降クリエイトの順序を維持する", () => {
+    expect(TUTORIAL_MISSIONS.map((mission) => mission.step)).toEqual(Array.from({ length: 30 }, (_, index) => index + 1));
+    expect(TUTORIAL_MISSIONS[24].condition).toContain("★6");
+    expect(TUTORIAL_MISSIONS.slice(25).map((mission) => mission.destination)).toContain("MONSTER_CREATE");
+    expect(TUTORIAL_MISSIONS[25].destination).toBe("MONSTER_CREATE");
   });
 });

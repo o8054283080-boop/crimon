@@ -1,5 +1,6 @@
 import { Element } from "../core/element.js";
 import { Star } from "../core/rarity.js";
+import { addMonster, PlayerState } from "./playerState.js";
 import {
   GACHA_SR_COMMON_TEMPLATE,
   GACHA_SR_RARE_TEMPLATE,
@@ -83,6 +84,35 @@ function resolveDexId(tier: GachaTier, rng: () => number): string {
 function rollOne(rng: () => number): SummonResult {
   const tier = pickTier(GACHA_TABLE, rng);
   return { dexId: resolveDexId(tier, rng), star: tier.star, isRare: tier.isRare };
+}
+
+export type SpecialSummonScroll = "FOUR_STAR" | "LIGHT_DARK_FOUR_STAR" | "FIVE_STAR";
+
+const SPECIAL_SCROLL_FIELD: Record<SpecialSummonScroll, "fourStarSummonScrolls" | "lightDarkFourStarSummonScrolls" | "fiveStarSummonScrolls"> = {
+  FOUR_STAR: "fourStarSummonScrolls",
+  LIGHT_DARK_FOUR_STAR: "lightDarkFourStarSummonScrolls",
+  FIVE_STAR: "fiveStarSummonScrolls",
+};
+
+/** 通常テーブルを条件付きで再利用し、各召喚書の保証を満たす1体を抽選する。 */
+export function summonWithSpecialScroll(type: SpecialSummonScroll, rng: () => number = Math.random): SummonResult {
+  const table = GACHA_TABLE.filter((tier) => {
+    if (type === "FOUR_STAR") return tier.star >= 4;
+    if (type === "LIGHT_DARK_FOUR_STAR") return tier.isRare && tier.star >= 4;
+    return tier.star === 5;
+  });
+  const tier = pickTier(table, rng);
+  return { dexId: resolveDexId(tier, rng), star: tier.star, isRare: tier.isRare };
+}
+
+/** 所持確認・追加・消費を一操作にまとめ、0枚や連打で残数が負にならないようにする。 */
+export function useSpecialSummonScroll(state: PlayerState, type: SpecialSummonScroll, rng: () => number = Math.random): SummonResult | null {
+  const field = SPECIAL_SCROLL_FIELD[type];
+  if (state[field] <= 0) return null;
+  const result = summonWithSpecialScroll(type, rng);
+  addMonster(state, result.dexId, result.star);
+  state[field] -= 1;
+  return result;
 }
 
 /** 天井で引き直す対象。星4以上であれば、通常枠(火水電草)もレア枠(光闇)も含む */

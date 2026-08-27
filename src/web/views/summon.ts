@@ -1,7 +1,7 @@
 import { ELEMENT_JA } from "../../core/element.js";
 import { Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
-import { SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult } from "../../game/gacha.js";
+import { SpecialSummonScroll, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult } from "../../game/gacha.js";
 import { PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
@@ -26,6 +26,7 @@ export interface SummonProps {
   onDismissResults: () => void;
   /** 召喚の書で引く。枚数ぶん消費する */
   onUseSummonScroll: (count: number) => void;
+  onUseSpecialSummonScroll: (type: SpecialSummonScroll) => void;
   /** はじまりの10連。1度きり、無料 */
   onTutorialSummon: () => void;
 }
@@ -145,6 +146,19 @@ function renderIdle(props: SummonProps): HTMLElement {
     ]),
   ];
   const cta = el("div", { className: "summon-cta" }, ctaChildren.filter((n): n is HTMLElement => n !== null));
+  const specialScrolls: { type: SpecialSummonScroll; name: string; description: string; count: number }[] = [
+    { type: "FOUR_STAR", name: "★4以上召喚書", description: "★4以上のモンスターを確定召喚", count: player.fourStarSummonScrolls },
+    { type: "LIGHT_DARK_FOUR_STAR", name: "★4以上光闇召喚書", description: "光・闇属性の★4以上を確定召喚", count: player.lightDarkFourStarSummonScrolls },
+    { type: "FIVE_STAR", name: "★5召喚書", description: "★5モンスターを確定召喚", count: player.fiveStarSummonScrolls },
+  ];
+  const specialPanel = specialScrolls.some((scroll) => scroll.count > 0) ? el("section", { className: "special-scrolls" }, [
+    el("h2", {}, ["特別召喚書"]),
+    ...specialScrolls.filter((scroll) => scroll.count > 0).map((scroll) => el("div", { className: "special-scroll" }, [
+      el("div", { className: "special-scroll__copy" }, [el("strong", {}, [scroll.name]), el("span", {}, [scroll.description])]),
+      el("span", { className: "special-scroll__count" }, [`所持 ${scroll.count}`]),
+      el("button", { type: "button", className: "btn btn--primary", onclick: () => props.onUseSpecialSummonScroll(scroll.type) }, ["召喚"]),
+    ])),
+  ]) : null;
 
   return el("div", { className: "screen summon-screen" }, [
     el("div", { className: "summon-top" }, [
@@ -157,7 +171,7 @@ function renderIdle(props: SummonProps): HTMLElement {
     // 祭壇は「浮いている絵」ではなく「坩堝の上に立っているもの」にする。
     // 台座と、その下から昇る熾火がホームの寒暖対比をこの画面へつなぐ
     el("div", { className: "summon-stage" }, [buildAltar(), el("i", { className: "summon-stage__plinth" }, [])]),
-    el("div", { className: "summon-bottom" }, [
+    el("div", { className: "summon-bottom" }, ([
       el("div", { className: "summon-rates" }, [
         el("span", { className: "summon-rates__label" }, ["出現"]),
         el("span", { className: "summon-tag summon-tag--r" }, ["★3 R"]),
@@ -168,7 +182,8 @@ function renderIdle(props: SummonProps): HTMLElement {
       // 確定の話はボタンの副題が言っている。ここに残すのは**そこに書けない1つ**だけ
       el("p", { className: "summon-note" }, ["光・闇のレア枠は確定枠とは別に抽選されます"]),
       cta,
-    ]),
+      specialPanel,
+    ] as (HTMLElement | null)[]).filter((node): node is HTMLElement => node !== null)),
   ]);
 }
 

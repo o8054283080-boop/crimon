@@ -32,6 +32,12 @@ export interface PlayerState {
   dungeonPartyIds: string[];
   /** 召喚の書の所持数。1個消費すると石を使わずに1回分の召喚ができる */
   summonScrolls: number;
+  /** ★4以上を保証する正式な召喚書 */
+  fourStarSummonScrolls: number;
+  /** 光・闇属性かつ★4以上を保証する正式な召喚書 */
+  lightDarkFourStarSummonScrolls: number;
+  /** ★5を保証する正式な召喚書 */
+  fiveStarSummonScrolls: number;
   /** 潜在覚醒で1個消費する素材 */
   awakeningOrbs: number;
   /** プレイヤー(ファイター)自身のレベル。上限50 */
@@ -162,6 +168,9 @@ export function createInitialState(): PlayerState {
     equipment: [],
     dungeonPartyIds: [],
     summonScrolls: 0,
+    fourStarSummonScrolls: 0,
+    lightDarkFourStarSummonScrolls: 0,
+    fiveStarSummonScrolls: 0,
     awakeningOrbs: 0,
     fighterLevel: 1,
     fighterExp: 0,
@@ -257,6 +266,9 @@ function normalizeState(state: PlayerState): PlayerState {
   if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];
   if (!state.clearedLevelDungeonTiers) state.clearedLevelDungeonTiers = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
+  if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
+  if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
+  if (typeof state.fiveStarSummonScrolls !== "number") state.fiveStarSummonScrolls = 0;
   if (typeof state.awakeningOrbs !== "number") state.awakeningOrbs = 0;
   if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
   if (typeof state.fighterExp !== "number") state.fighterExp = 0;

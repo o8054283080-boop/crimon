@@ -9,7 +9,7 @@ import { DungeonFloor } from "../data/equipmentDungeon.js";
 import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef, LevelDungeonTier } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage } from "../data/stages.js";
-import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany } from "../game/gacha.js";
+import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
 import {
@@ -611,6 +611,15 @@ function handleUseSummonScroll(count: number): void {
   savePlayerState(state.player);
   state.summonResults = results;
   playSummonSfx(results);
+  render();
+}
+
+function handleUseSpecialSummonScroll(type: SpecialSummonScroll): void {
+  const result = useSpecialSummonScroll(state.player, type);
+  if (!result) { playSfx("denied", 0.7); return; }
+  savePlayerState(state.player);
+  state.summonResults = [result];
+  playSummonSfx([result]);
   render();
 }
 
@@ -2131,6 +2140,7 @@ function renderSummonScreen(): HTMLElement {
       render();
     },
     onUseSummonScroll: handleUseSummonScroll,
+    onUseSpecialSummonScroll: handleUseSpecialSummonScroll,
     onTutorialSummon: handleTutorialSummon,
   });
 }
