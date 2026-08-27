@@ -21,7 +21,14 @@ import {
   MonsterType,
   abilityPointBudget,
 } from "../../core/monsterDevelopment.js";
-import { LATENT_ABILITY_CANDIDATES, abilityStatBonuses, usedAbilityPoints } from "../../game/monsterDevelopment.js";
+import {
+  LATENT_ABILITY_CANDIDATES,
+  LATENT_REAWAKENING_GOLD_COST,
+  LATENT_REAWAKENING_ORB_COST,
+  abilityStatBonuses,
+  canReawakenLatentAbility,
+  usedAbilityPoints,
+} from "../../game/monsterDevelopment.js";
 
 export type CreateMenu = "SKILL" | "TYPE" | "ABILITY" | "LATENT";
 
@@ -64,6 +71,10 @@ export interface MonsterCreateProps {
   onSetAbilityPoint: (stat: AllocatableStat, points: number) => void;
   onResetAbilityPoints: () => void;
   onAwaken: (candidateId: string) => void;
+  reawakenConfirmOpen: boolean;
+  onRequestReawaken: () => void;
+  onCancelReawaken: () => void;
+  onConfirmReawaken: () => void;
 }
 
 const SLOT_LABEL: Record<CreateSlot, string> = { 1: "スキル2", 2: "スキル3" };
@@ -74,6 +85,29 @@ function isEl(node: HTMLElement | null): node is HTMLElement {
 
 function skillLines(skill: Skill): HTMLElement[] {
   return skill.effects.map((effect) => el("li", {}, [describeSkillEffect(effect)]));
+}
+
+function latentEffect(candidate: (typeof LATENT_ABILITY_CANDIDATES)[string][number]): string {
+  const value = candidate.value !== 0 ? `効果量 ${candidate.value}` : "固有効果";
+  const chance = candidate.chance < 1 ? ` / 発動率 ${Math.round(candidate.chance * 100)}%` : " / 確定発動";
+  return `${value}${chance}`;
+}
+
+function latentChoices(props: MonsterCreateProps, candidates: (typeof LATENT_ABILITY_CANDIDATES)[string]): HTMLElement {
+  const reselecting = props.target.development.latentReselectPending;
+  return el("div", { className: "create-choices latent-choices" }, candidates.map((candidate) =>
+    el("article", { className: "create-choice latent-choice" }, [
+      el("strong", { className: "latent-choice__name" }, [candidate.name]),
+      el("span", { className: "latent-choice__description" }, [candidate.description]),
+      el("small", { className: "latent-choice__effect" }, [`効果: ${latentEffect(candidate)}`]),
+      el("button", {
+        type: "button",
+        className: "btn btn--primary latent-choice__select",
+        disabled: !reselecting && props.awakeningOrbs < 1,
+        onclick: () => props.onAwaken(candidate.id),
+      }, ["選択"]),
+    ]),
+  ));
 }
 
 /** スキル1つの札。移し替えの前後を並べて比べるために使う */
@@ -240,15 +274,44 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
   if (props.menu === "LATENT") {
     const candidates = LATENT_ABILITY_CANDIDATES[target.dexId] ?? [];
     const selected = candidates.find((candidate) => candidate.id === target.development.latentAbilityId);
+    const reselecting = target.development.latentReselectPending;
+    const orbShortage = props.awakeningOrbs < LATENT_REAWAKENING_ORB_COST;
+    const goldShortage = props.gold < LATENT_REAWAKENING_GOLD_COST;
+    const canReawaken = canReawakenLatentAbility(target, props);
     return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, [
-      el("h2", {}, ["潜在覚醒"]), el("p", {}, [`覚醒オーブ: ${props.awakeningOrbs}個`]),
+      el("h2", {}, ["潜在覚醒"]), el("p", {}, [`所持　覚醒オーブ ${props.awakeningOrbs}個 / ${props.gold.toLocaleString()}G`]),
       el("p", { className: "app-subtitle" }, ["主な入手先: 初心者ミッション / 装備ダンジョン10階 初回 / 試練の塔15階・30階 初回"]),
-      target.development.latentAbilityId ? el("div", { className: "create-notice" }, selected
-        ? [`覚醒済み: ${selected.name}`, el("small", {}, [selected.description])]
-        : [`覚醒済み: ${target.development.latentAbilityId}`]) :
-      candidates.length === 3 ? el("div", { className: "create-choices" }, candidates.map((candidate) => el("button", { type: "button", className: "create-choice", disabled: props.awakeningOrbs < 1, onclick: () => props.onAwaken(candidate.id) }, [candidate.name, el("small", {}, [candidate.description])]))) :
+      reselecting ? el("div", { className: "latent-reselect" }, [
+        el("p", { className: "create-notice" }, ["再覚醒済み", el("strong", {}, ["潜在能力を選び直してください"])]),
+        el("p", { className: "app-subtitle" }, ["再覚醒済み・候補を選択してください（追加コストはかかりません）"]),
+        candidates.length === 3 ? latentChoices(props, candidates) : null,
+      ].filter(isEl)) : target.development.latentAbilityId ? el("div", { className: "latent-awakened" }, [
+        el("div", { className: "create-notice" }, selected
+          ? [el("strong", {}, [`覚醒済み: ${selected.name}`]), el("span", {}, [selected.description]), el("small", {}, [`効果: ${latentEffect(selected)}`])]
+          : [`覚醒済み: ${target.development.latentAbilityId}`]),
+        el("div", { className: "latent-reawaken-cost" }, [
+          el("strong", {}, ["必要"]),
+          el("span", { className: orbShortage ? "latent-cost--short" : "" }, [`覚醒オーブ ×${LATENT_REAWAKENING_ORB_COST}（所持 ${props.awakeningOrbs}）${orbShortage ? "・不足" : ""}`]),
+          el("span", { className: goldShortage ? "latent-cost--short" : "" }, [`${LATENT_REAWAKENING_GOLD_COST.toLocaleString()}G（所持 ${props.gold.toLocaleString()}G）${goldShortage ? "・不足" : ""}`]),
+        ]),
+        el("button", { type: "button", className: "btn btn--primary latent-reawaken-button", disabled: !canReawaken, onclick: props.onRequestReawaken }, ["再覚醒"]),
+      ]) : candidates.length === 3 ? el("div", {}, [
+        el("p", { className: "create-notice" }, ["未覚醒：覚醒オーブ1個で潜在覚醒"]),
+        latentChoices(props, candidates),
+      ]) :
       el("p", { className: "app-subtitle" }, ["潜在能力候補は準備中です（スキル1強化・3候補を登録予定）。"]),
-    ])]);
+    ]), props.reawakenConfirmOpen ? el("div", { className: "latent-confirm-backdrop", role: "presentation" }, [
+      el("section", { className: "panel latent-confirm", role: "dialog", "aria-modal": "true", "aria-labelledby": "latent-confirm-title" }, [
+        el("h2", { id: "latent-confirm-title" }, ["潜在能力を再覚醒しますか？"]),
+        el("p", {}, [`現在の潜在：${selected?.name ?? target.development.latentAbilityId ?? "なし"}`]),
+        el("div", { className: "latent-reawaken-cost" }, [el("strong", {}, ["必要："]), el("span", {}, [`覚醒オーブ ×${LATENT_REAWAKENING_ORB_COST}`]), el("span", {}, [`${LATENT_REAWAKENING_GOLD_COST.toLocaleString()}G`])]),
+        el("p", {}, ["再覚醒すると現在の潜在能力を解除し、同じ3候補から選び直します。"]),
+        el("div", { className: "latent-confirm__actions" }, [
+          el("button", { type: "button", className: "btn btn--ghost", onclick: props.onCancelReawaken }, ["キャンセル"]),
+          el("button", { type: "button", className: "btn btn--primary", onclick: props.onConfirmReawaken }, ["再覚醒"]),
+        ]),
+      ]),
+    ]) : null].filter(isEl));
   }
 
   return el("div", { className: "screen create-screen" }, [...shared,

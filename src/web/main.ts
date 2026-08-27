@@ -43,7 +43,7 @@ import {
 } from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
-import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
+import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
 import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
 import {
   claimDailyLoginBonus,
@@ -304,6 +304,7 @@ interface AppState {
   createSlot: CreateSlot | null;
   createNotice: string | null;
   createMenu: CreateMenu;
+  reawakenConfirmOpen: boolean;
   partyEditMode: PartyEditMode;
   autoFarmCount: number;
   /** 周回の途中。null なら単発の挑戦 */
@@ -366,6 +367,7 @@ const state: AppState = {
   createSlot: null,
   createNotice: null,
   createMenu: "SKILL",
+  reawakenConfirmOpen: false,
   partyEditMode: "NORMAL",
   autoFarmCount: 10,
   farmRun: null,
@@ -2026,9 +2028,11 @@ function render(): void {
         menu: state.createMenu,
         awakeningOrbs: state.player.awakeningOrbs,
         gold: state.player.gold,
+        reawakenConfirmOpen: state.reawakenConfirmOpen,
         onSelectMenu: (menu) => {
           state.createMenu = menu;
           state.createNotice = null;
+          state.reawakenConfirmOpen = false;
           render();
         },
         onReincarnate: (type: MonsterType) => {
@@ -2054,9 +2058,31 @@ function render(): void {
         },
         onAwaken: (candidateId) => {
           const candidates = LATENT_ABILITY_CANDIDATES[createTarget.dexId] ?? [];
+          const wasReselecting = createTarget.development.latentReselectPending;
           if (!awakenLatentAbility(createTarget, candidateId, candidates, state.player)) return;
           savePlayerState(state.player);
-          state.createNotice = "潜在能力を覚醒しました";
+          state.createNotice = wasReselecting ? "潜在能力を再選択しました" : "潜在能力を覚醒しました";
+          playSfx("levelUp");
+          render();
+        },
+        onRequestReawaken: () => {
+          state.reawakenConfirmOpen = true;
+          render();
+        },
+        onCancelReawaken: () => {
+          state.reawakenConfirmOpen = false;
+          render();
+        },
+        onConfirmReawaken: () => {
+          if (!reawakenLatentAbility(createTarget, state.player)) {
+            state.reawakenConfirmOpen = false;
+            state.createNotice = "再覚醒に必要な資源が不足しています";
+            render();
+            return;
+          }
+          state.reawakenConfirmOpen = false;
+          state.createNotice = "再覚醒しました。潜在能力を選び直してください";
+          savePlayerState(state.player);
           playSfx("levelUp");
           render();
         },
@@ -2075,6 +2101,7 @@ function render(): void {
         onConfirm: handleConfirmMonsterCreate,
         onClear: handleClearMonsterCreate,
         onBack: () => {
+          state.reawakenConfirmOpen = false;
           state.createTargetId = null;
           state.createMaterialId = null;
           state.createSlot = null;
