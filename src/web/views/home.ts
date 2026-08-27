@@ -19,6 +19,7 @@ import { withPortrait } from "../three/portrait.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
 import { AudioSettingsProps, renderAudioSettings } from "./audioSettings.js";
+import { currentTutorialMission, tutorialMissionProgress } from "../../game/tutorialMissions.js";
 
 export interface HomeProps {
   player: PlayerState;
@@ -36,6 +37,7 @@ export interface HomeProps {
   onGoTrialTower: () => void;
   onGoHowToPlay: () => void;
   onGoShop: () => void;
+  onGoTutorialMissions: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
   onEditFighterName: () => void;
@@ -703,6 +705,7 @@ export function renderHome(props: HomeProps): HTMLElement {
   } = props;
   const party = getParty(player);
   const hasStarted = sessionStorage.getItem("crimon.started") === "1";
+  const tutorialMission = currentTutorialMission(player);
 
   /**
    * 設定は普段いらないものなので、ホームに出しっぱなしにしない。
@@ -765,6 +768,13 @@ export function renderHome(props: HomeProps): HTMLElement {
         currencyChip("coin", player.gold, "gold"),
         currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`),
       ]),
+    ]),
+    tutorialMission ? el("button", { type: "button", className: "home-tutorial", onclick: props.onGoTutorialMissions }, [
+      el("span", { className: "home-tutorial__label" }, ["初心者ミッション"]),
+      el("strong", {}, [tutorialMission.task]),
+      el("span", { className: "home-tutorial__progress" }, [`進捗 ${Math.min(tutorialMission.target, tutorialMissionProgress(player, tutorialMission))} / ${tutorialMission.target} ${tutorialMission.unit}`, "  ›"]),
+    ]) : el("button", { type: "button", className: "home-tutorial home-tutorial--complete", onclick: props.onGoTutorialMissions }, [
+      el("span", { className: "home-tutorial__label" }, ["初心者ミッション"]), el("strong", {}, ["第一段階 COMPLETE"]), el("span", {}, ["達成内容を見る ›"]),
     ]),
     // 2. 現在のパーティ。最も装飾を厚くする面
     el("section", { className: "home-party panel--ornate" }, [

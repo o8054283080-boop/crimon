@@ -15,6 +15,7 @@ import {
   rotationKeyAt,
 } from "./shop.js";
 import { Difficulty } from "../data/stages.js";
+import { createTutorialMissionSave, TutorialMissionSave } from "./tutorialMissions.js";
 
 export interface PlayerState {
   crystal: number;
@@ -75,6 +76,8 @@ export interface PlayerState {
    * 倍の速度装備を持ち続けることになる。
    */
   equipmentSpeedRebalanced?: boolean;
+  /** 順番に進む初心者ミッション。受取済みIDと、所持品から復元できない操作だけを保存する。 */
+  tutorialMissions: TutorialMissionSave;
 
   /* --- アリーナ(対人戦) --- */
   /**
@@ -179,6 +182,7 @@ export function createInitialState(): PlayerState {
     claimedCompensationIds: [],
     tutorialSummonDone: false,
     equipmentSpeedRebalanced: true,
+    tutorialMissions: createTutorialMissionSave(),
     arenaDefenseIds: [],
     arenaOffenseIds: [],
     arenaPoints: ARENA_START_POINTS,
@@ -267,6 +271,13 @@ function normalizeState(state: PlayerState): PlayerState {
   if (!Array.isArray(state.claimedCompensationIds)) state.claimedCompensationIds = [];
   // 古い控えには無い。既に遊んでいる人にも1回だけ引かせる(印が無い＝未使用)
   if (typeof state.tutorialSummonDone !== "boolean") state.tutorialSummonDone = false;
+  if (!state.tutorialMissions || !Array.isArray(state.tutorialMissions.claimedIds)) {
+    state.tutorialMissions = createTutorialMissionSave();
+    // 古い控えでも、専用編成やクリア記録があれば既にダンジョンへ挑んだと判断できる。
+    state.tutorialMissions.equipmentDungeonChallenged = state.dungeonPartyIds.length > 0 || state.clearedDungeonFloors.length > 0;
+  }
+  if (typeof state.tutorialMissions.partyEdited !== "boolean") state.tutorialMissions.partyEdited = false;
+  if (typeof state.tutorialMissions.equipmentDungeonChallenged !== "boolean") state.tutorialMissions.equipmentDungeonChallenged = state.clearedDungeonFloors.length > 0;
 
   /*
    * 装備の速度を半分に見直した調整の後追い。

@@ -119,6 +119,8 @@ import { CreateMenu, renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
+import { claimTutorialMission, TutorialMissionDefinition } from "../game/tutorialMissions.js";
+import { renderTutorialMissions } from "./views/tutorialMissions.js";
 
 /**
  * 更新の取り込み。
@@ -717,6 +719,7 @@ function handleToggleParty(instanceId: string): void {
     state.player.partyIds.push(instanceId);
     state.partyNotice = null;
   }
+  state.player.tutorialMissions.partyEdited = true;
   savePlayerState(state.player);
   render();
 }
@@ -732,6 +735,7 @@ function handleToggleDungeonPartyMember(instanceId: string): void {
     return;
   }
   state.partyNotice = null;
+  state.player.tutorialMissions.partyEdited = true;
   savePlayerState(state.player);
   render();
 }
@@ -755,6 +759,7 @@ function handleToggleTowerPartyMember(instanceId: string): void {
     return;
   }
   state.partyNotice = null;
+  state.player.tutorialMissions.partyEdited = true;
   savePlayerState(state.player);
   render();
 }
@@ -788,6 +793,7 @@ function handleAutoFillParty(): void {
     return;
   }
   for (const monster of added) ids.push(monster.id);
+  state.player.tutorialMissions.partyEdited = true;
   savePlayerState(state.player);
   state.partyNotice = `総合力の高い${added.length}体を編成しました。`;
   render();
@@ -796,6 +802,7 @@ function handleAutoFillParty(): void {
 function handleClearParty(): void {
   const ids = editingPartyIds();
   ids.length = 0;
+  state.player.tutorialMissions.partyEdited = true;
   savePlayerState(state.player);
   state.partyNotice = "編成を全部外しました。";
   render();
@@ -1135,6 +1142,7 @@ function startDungeonFloor(floor: DungeonFloor): void {
     playSfx("denied", 0.7);
     return;
   }
+  state.player.tutorialMissions.equipmentDungeonChallenged = true;
   savePlayerState(state.player);
   state.lastRun = { kind: "EQUIP_DUNGEON", floor };
   state.dungeonRun = { floor, partyInstances: party };
@@ -1618,6 +1626,7 @@ function render(): void {
         onGoArena: () => navigate("ARENA"),
         onGoTrialTower: () => navigate("TRIAL_TOWER"),
         onGoHowToPlay: () => navigate("HOW_TO_PLAY"),
+        onGoTutorialMissions: () => navigate("TUTORIAL_MISSIONS"),
         onRefillStaminaPartial: () => {
           if (!tryRefillStaminaPartial(state.player).ok) return;
           savePlayerState(state.player);
@@ -1930,6 +1939,39 @@ function render(): void {
 
     case "HOW_TO_PLAY":
       content = renderHowToPlay({ onBack: () => navigate("HOME") });
+      break;
+
+    case "TUTORIAL_MISSIONS":
+      content = renderTutorialMissions({
+        player: state.player,
+        onClaim: () => {
+          if (!claimTutorialMission(state.player)) return;
+          // 受取済み印と報酬を同じlocalStorage書き込みにまとめる。
+          savePlayerState(state.player);
+          playSfx("levelUp");
+          render();
+        },
+        onMove: (mission: TutorialMissionDefinition) => {
+          const firstMonster = state.player.monsters[0];
+          if (firstMonster && mission.id === "ability") {
+            state.createTargetId = firstMonster.id;
+            state.createMenu = "ABILITY";
+            state.screen = "MONSTER_CREATE";
+            render();
+          } else if (firstMonster && mission.id === "skill") {
+            state.monsterTrainingTargetId = firstMonster.id;
+            state.screen = "MONSTER_TRAINING";
+            render();
+          } else if (firstMonster && ["level_up", "rank_three", "equip"].includes(mission.id)) {
+            state.monsterDetailId = firstMonster.id;
+            state.screen = "MONSTERS";
+            render();
+          } else {
+            navigate(mission.destination);
+          }
+        },
+        onBack: () => navigate("HOME"),
+      });
       break;
 
     case "ARENA_BATTLE": {

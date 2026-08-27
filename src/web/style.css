@@ -7383,3 +7383,33 @@ body::before {
   width: 58px;
   min-width: 58px;
 }
+
+/* --- 初心者ミッション ------------------------------------------------- */
+.home-tutorial {
+  width: 100%; min-height: 82px; padding: 13px 16px; border: 1px solid rgba(238, 194, 91, .72);
+  border-radius: 13px; text-align: left; color: #fff7dc;
+  background: linear-gradient(135deg, rgba(83, 48, 13, .96), rgba(23, 25, 48, .96));
+  box-shadow: inset 0 0 18px rgba(255, 190, 62, .1), 0 5px 16px rgba(0, 0, 0, .3);
+  display: grid; gap: 5px;
+}
+.home-tutorial__label { color: #f4c967; font-size: .72rem; font-weight: 900; letter-spacing: .08em; }
+.home-tutorial strong { font-size: .92rem; }
+.home-tutorial__progress, .home-tutorial > span:last-child { color: #d7d2df; font-size: .75rem; }
+.home-tutorial--complete { border-color: rgba(103, 220, 163, .7); }
+
+.tutorial-screen { display: flex; flex-direction: column; gap: 12px; padding-bottom: 86px; }
+.tutorial-card { padding: 16px; border: 1px solid rgba(215, 172, 77, .4); border-radius: 14px; background: linear-gradient(150deg, rgba(31, 29, 46, .97), rgba(13, 15, 28, .97)); }
+.tutorial-card--claimed { opacity: .68; border-color: rgba(100, 198, 145, .45); }
+.tutorial-card--locked { opacity: .48; }
+.tutorial-card__step { color: #efc86d; font-size: .7rem; font-weight: 900; letter-spacing: .08em; }
+.tutorial-card h2 { margin: 6px 0; font-size: 1.05rem; }
+.tutorial-card__task { margin: 0 0 13px; color: #ddd8e5; font-size: .84rem; line-height: 1.55; }
+.tutorial-card__progress-head { display: flex; justify-content: space-between; font-size: .76rem; }
+.tutorial-card__bar { height: 9px; margin-top: 7px; overflow: hidden; border-radius: 9px; background: rgba(255,255,255,.1); }
+.tutorial-card__bar i { display: block; height: 100%; background: linear-gradient(90deg, #d79527, #ffe58d); }
+.tutorial-card__reward { display: flex; justify-content: space-between; gap: 8px; margin: 13px 0; font-size: .76rem; }
+.tutorial-card__reward strong { color: #ffe18a; }
+.tutorial-card__actions { display: grid; grid-template-columns: minmax(100px, .75fr) minmax(150px, 1.25fr); gap: 9px; }
+.tutorial-card__actions .btn { min-height: 46px; font-size: .78rem; }
+.tutorial-card__claim--ready { animation: tutorial-ready 1.4s ease-in-out infinite alternate; }
+@keyframes tutorial-ready { to { box-shadow: 0 0 18px rgba(255, 207, 77, .62); } }
