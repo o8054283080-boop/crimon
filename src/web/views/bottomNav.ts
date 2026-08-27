@@ -25,7 +25,8 @@ export type ScreenName =
   | "ARENA_BATTLE"
   | "TRIAL_TOWER"
   | "TOWER_BATTLE"
-  | "HOW_TO_PLAY";
+  | "HOW_TO_PLAY"
+  | "TUTORIAL_MISSIONS";
 
 /**
  * 下のタブ。
