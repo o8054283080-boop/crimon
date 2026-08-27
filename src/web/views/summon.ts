@@ -147,8 +147,8 @@ function renderIdle(props: SummonProps): HTMLElement {
   ];
   const cta = el("div", { className: "summon-cta" }, ctaChildren.filter((n): n is HTMLElement => n !== null));
   const specialScrolls: { type: SpecialSummonScroll; name: string; description: string; count: number }[] = [
-    { type: "FOUR_STAR", name: "★4以上召喚書", description: "★4以上のモンスターを確定召喚", count: player.fourStarSummonScrolls },
-    { type: "LIGHT_DARK_FOUR_STAR", name: "★4以上光闇召喚書", description: "光・闇属性の★4以上を確定召喚", count: player.lightDarkFourStarSummonScrolls },
+    { type: "FOUR_STAR", name: "★4以上召喚書", description: "★4 70% / ★5 12% / 光闇★4 15% / 光闇★5 3%", count: player.fourStarSummonScrolls },
+    { type: "LIGHT_DARK_FOUR_STAR", name: "★4以上光闇召喚書", description: "光闇★4 90% / 光闇★5 10%", count: player.lightDarkFourStarSummonScrolls },
     { type: "FIVE_STAR", name: "★5召喚書", description: "★5モンスターを確定召喚", count: player.fiveStarSummonScrolls },
   ];
   const specialPanel = specialScrolls.some((scroll) => scroll.count > 0) ? el("section", { className: "special-scrolls" }, [
