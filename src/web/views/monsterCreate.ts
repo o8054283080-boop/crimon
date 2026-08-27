@@ -13,11 +13,13 @@ import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
 import {
-  ABILITY_POINT_BUDGET,
+  ABILITY_POINT_RESET_COST,
   ABILITY_POINT_VALUES,
   AllocatableStat,
   MONSTER_TYPE_LABELS,
+  MONSTER_TYPE_DESCRIPTIONS,
   MonsterType,
+  abilityPointBudget,
 } from "../../core/monsterDevelopment.js";
 import { LATENT_ABILITY_CANDIDATES, abilityStatBonuses, usedAbilityPoints } from "../../game/monsterDevelopment.js";
 
@@ -56,9 +58,11 @@ export interface MonsterCreateProps {
   notice: string | null;
   menu: CreateMenu;
   awakeningOrbs: number;
+  gold: number;
   onSelectMenu: (menu: CreateMenu) => void;
   onReincarnate: (type: MonsterType) => void;
   onSetAbilityPoint: (stat: AllocatableStat, points: number) => void;
+  onResetAbilityPoints: () => void;
   onAwaken: (candidateId: string) => void;
 }
 
@@ -209,23 +213,29 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
       el("section", { className: "panel" }, [
         el("h2", {}, ["タイプ転生"]),
         el("p", { className: "app-subtitle" }, [`現在: ${target.development.type ? MONSTER_TYPE_LABELS[target.development.type] : "未転生"} / Lv${target.level}`]),
-        el("p", {}, ["タイプを変更するとレベルと経験値が1へ戻ります。タイプ補正値は調整中です。"]),
+        el("p", {}, ["★6限定。転生するとLv1・EXP0となり、能力ポイントもすべて0になります。"]),
         el("div", { className: "create-menu" }, (Object.keys(MONSTER_TYPE_LABELS) as MonsterType[]).map((type) =>
-          el("button", { type: "button", className: "btn btn--ghost", disabled: target.development.type === type, onclick: () => props.onReincarnate(type) }, [MONSTER_TYPE_LABELS[type]]),
+          el("button", { type: "button", className: "btn btn--ghost", disabled: target.star !== 6 || target.development.type === type, onclick: () => props.onReincarnate(type) }, [
+            `${MONSTER_TYPE_LABELS[type]}: ${MONSTER_TYPE_DESCRIPTIONS[type]}`,
+          ]),
         )),
       ]), props.notice ? el("p", { className: "create-notice" }, [props.notice]) : null].filter(isEl));
   }
   if (props.menu === "ABILITY") {
     const used = usedAbilityPoints(target.development.abilityPoints);
+    const budget = abilityPointBudget(target.star);
     const bonuses = abilityStatBonuses(target.development.abilityPoints);
     const labels: Record<AllocatableStat, string> = { hp: "最大HP", atk: "攻撃力", def: "防御力", spd: "速度" };
-    return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, [
-      el("h2", {}, ["能力付与"]), el("p", { className: "create-points" }, [`使用済み ${used} / 残り ${ABILITY_POINT_BUDGET - used}`]),
+    return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, ([
+      el("h2", {}, ["能力付与"]),
+      el("p", { className: "create-points" }, [`★${target.star}　使用 ${used} / ${budget}　残り ${budget - used}pt`]),
+      budget === 0 ? el("p", { className: "create-notice" }, ["能力ポイントは★4から解放されます"]) : null,
       ...((Object.keys(labels) as AllocatableStat[]).map((stat) => el("label", { className: "create-allocation" }, [
         el("span", {}, [`${labels[stat]}: ${target.development.abilityPoints[stat]}pt → +${bonuses[stat]} (1pt = +${ABILITY_POINT_VALUES[stat]})`]),
-        el("input", { type: "range", min: "0", max: String(ABILITY_POINT_BUDGET), value: String(target.development.abilityPoints[stat]), oninput: (event: Event) => props.onSetAbilityPoint(stat, Number((event.target as HTMLInputElement).value)) }, []),
+        el("input", { type: "range", min: "0", max: String(budget), disabled: budget === 0, value: String(target.development.abilityPoints[stat]), oninput: (event: Event) => props.onSetAbilityPoint(stat, Number((event.target as HTMLInputElement).value)) }, []),
       ]))),
-    ])]);
+      target.star === 6 ? el("button", { type: "button", className: "btn btn--ghost", disabled: used === 0 || props.gold < ABILITY_POINT_RESET_COST, onclick: props.onResetAbilityPoints }, [`能力ポイントリセット ${ABILITY_POINT_RESET_COST.toLocaleString()} GOLD`]) : null,
+    ] as (HTMLElement | null)[]).filter(isEl))]);
   }
   if (props.menu === "LATENT") {
     const candidates = LATENT_ABILITY_CANDIDATES[target.dexId] ?? [];

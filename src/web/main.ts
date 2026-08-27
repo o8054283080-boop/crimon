@@ -43,8 +43,8 @@ import {
 } from "../game/rewards.js";
 import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
 import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
-import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reincarnateMonsterType, setAbilityPoint } from "../game/monsterDevelopment.js";
-import { AllocatableStat, MonsterType } from "../core/monsterDevelopment.js";
+import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
+import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
 import {
   claimDailyLoginBonus,
   FIGHTER_NAME_MAX_LENGTH,
@@ -2025,13 +2025,16 @@ function render(): void {
         notice: state.createNotice,
         menu: state.createMenu,
         awakeningOrbs: state.player.awakeningOrbs,
+        gold: state.player.gold,
         onSelectMenu: (menu) => {
           state.createMenu = menu;
           state.createNotice = null;
           render();
         },
         onReincarnate: (type: MonsterType) => {
-          reincarnateMonsterType(createTarget, type);
+          const label = MONSTER_TYPE_LABELS[type];
+          if (!window.confirm(`${label}タイプへ転生しますか？\n${MONSTER_TYPE_DESCRIPTIONS[type]}\nLv1・EXP0になり、能力ポイントがすべて0になります。`)) return;
+          if (!reincarnateMonsterType(createTarget, type)) return;
           state.createNotice = `タイプを変更し、Lv1へ転生しました`;
           savePlayerState(state.player);
           playSfx("levelUp");
@@ -2039,6 +2042,13 @@ function render(): void {
         },
         onSetAbilityPoint: (stat: AllocatableStat, points: number) => {
           if (!setAbilityPoint(createTarget, stat, points)) return;
+          savePlayerState(state.player);
+          render();
+        },
+        onResetAbilityPoints: () => {
+          if (!window.confirm("能力ポイントをリセットしますか？\n能力ポイントがすべて0になります\n再び100ptを自由に振り直せます\n費用：100,000ゴールド")) return;
+          if (!resetAbilityPoints(createTarget, state.player)) return;
+          state.createNotice = "能力ポイントをリセットしました";
           savePlayerState(state.player);
           render();
         },

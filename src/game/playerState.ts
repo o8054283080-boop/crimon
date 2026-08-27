@@ -1,7 +1,7 @@
 import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost, equipmentSellPrice } from "../core/equipment.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
-import { ABILITY_POINT_BUDGET, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
+import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { Star } from "../core/rarity.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
 import { LEGACY_LEVEL_DUNGEON_TIERS, LEVEL_DUNGEON_DAILY_LIMIT } from "../data/levelDungeon.js";
@@ -253,9 +253,10 @@ function normalizeState(state: PlayerState): PlayerState {
     else {
       const defaults = createDefaultMonsterDevelopment();
       const allocation = monster.development.abilityPoints ?? defaults.abilityPoints;
-      const valid = Object.values(allocation).every((value) => Number.isInteger(value) && value >= 0)
-        && Object.values(allocation).reduce((sum, value) => sum + value, 0) <= ABILITY_POINT_BUDGET;
-      monster.development.abilityPoints = valid ? { ...defaults.abilityPoints, ...allocation } : defaults.abilityPoints;
+      const mergedAllocation = { ...defaults.abilityPoints, ...allocation };
+      const valid = Object.values(mergedAllocation).every((value) => Number.isInteger(value) && value >= 0)
+        && Object.values(mergedAllocation).reduce((sum, value) => sum + value, 0) <= abilityPointBudget(monster.star);
+      monster.development.abilityPoints = valid ? mergedAllocation : defaults.abilityPoints;
       if (typeof monster.development.latentAbilityId !== "string") monster.development.latentAbilityId = null;
       if (!(monster.development.type === null || ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT"].includes(monster.development.type))) {
         monster.development.type = null;
