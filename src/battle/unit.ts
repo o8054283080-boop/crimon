@@ -62,6 +62,8 @@ export interface BattleUnit {
    * 手数で押す戦い方(小さい攻撃を何度も、毒を重ねる)に代償を作るための数。
    */
   hitsTaken: number;
+  /** 戦闘中1回の潜在が消費済みか（永続化しない）。 */
+  latentOnceUsed: boolean;
 }
 
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
@@ -90,6 +92,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     healBlockTurns: 0,
     healBlockMultiplier: 1,
     hitsTaken: 0,
+    latentOnceUsed: false,
   };
 }
 

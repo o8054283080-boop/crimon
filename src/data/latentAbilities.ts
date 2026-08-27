@@ -1,5 +1,5 @@
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
-import { ALL_DISPLAYABLE_MONSTERS_DEX } from "./monsters.js";
+import { ELEMENTS } from "../core/element.js";
 
 type Draft = Omit<LatentAbilityCandidate, "id" | "skillSlot">;
 const d = (name: string, description: string, category: Draft["category"], effectType: Draft["effectType"], value: number,
@@ -8,7 +8,7 @@ const d = (name: string, description: string, category: Draft["category"], effec
 
 /**
  * 種族のS1に合わせた3方向の設計原本。属性ごとの安定IDへ展開する。
- * ⑧-2では選択・保存・表示までとし、この宣言データはBattleEngineから意図的に参照しない。
+ * BattleEngineへ渡す宣言データの原本。
  */
 const BLUEPRINTS: Readonly<Record<string, readonly [Draft, Draft, Draft]>> = {
   slime: [
@@ -74,9 +74,13 @@ const BLUEPRINTS: Readonly<Record<string, readonly [Draft, Draft, Draft]>> = {
 };
 
 export const LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentAbilityCandidate[]>> =
-  Object.fromEntries(ALL_DISPLAYABLE_MONSTERS_DEX.map((monster) => [monster.id, BLUEPRINTS[monster.templateId].map((draft, index) => ({
+  Object.fromEntries(Object.entries(BLUEPRINTS).flatMap(([templateId, drafts]) => ELEMENTS.map((element) => [`${templateId}_${element}`, drafts.map((draft, index) => ({
     ...draft,
-    id: `${monster.templateId}_${monster.element}_latent_${index + 1}`,
+    id: `${templateId}_${element}_latent_${index + 1}`,
     skillSlot: 0 as const,
-  }))]));
+  }))])));
 
+/** 戦闘定義化のたびに72体を走査しない、安定ID用O(1)索引。 */
+export const LATENT_ABILITY_BY_ID: ReadonlyMap<string, LatentAbilityCandidate> = new Map(
+  Object.values(LATENT_ABILITY_CANDIDATES).flat().map((candidate) => [candidate.id, candidate]),
+);

@@ -1,6 +1,7 @@
 import { ELEMENT_JA } from "../core/element.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
+import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
 import { calcDamage } from "./damage.js";
 import {
@@ -462,6 +463,10 @@ export class BattleEngine {
     sourceScoped = true,
   ): void {
     let damageDealtThisCall = 0;
+    let anyCrit = false;
+    let anyDebuffApplied = false;
+    const latent = source.def.latentAbility;
+    const isS1 = skill === source.def.skills[0] && latent?.skillSlot === 0;
     // 反撃は効果の解決の途中に割り込ませない(解決中に相手が動くと、
     // 残りの効果が誰に乗るのか分からなくなる)。数えておいて最後にまとめて返す
     const counterTargets = new Set<BattleUnit>();
@@ -476,7 +481,13 @@ export class BattleEngine {
         case "DAMAGE": {
           const hits = effect.hits ?? 1;
           for (let h = 0; h < hits && target.alive; h += 1) {
-            const result = calcDamage(source, target, effect, this.rng);
+            let latentDamageEffect = effect;
+            if (isS1 && latent?.effectType === "HP_SCALING") latentDamageEffect = { ...effect, hpCoefficient: (effect.hpCoefficient ?? 0) + latent.value };
+            if (isS1 && latent?.effectType === "DEF_SCALING") latentDamageEffect = { ...effect, defCoefficient: (effect.defCoefficient ?? 0) + latent.value };
+            const result = calcDamage(source, target, latentDamageEffect, this.rng);
+            if (isS1 && latent?.effectType === "DAMAGE_UP") result.damage = Math.max(1, Math.round(result.damage * (1 + latent.value)));
+            if (isS1 && latent?.effectType === "CRIT_TRIGGER" && result.isCrit) result.damage = Math.max(1, Math.round(result.damage * (1 + latent.value)));
+            anyCrit ||= result.isCrit;
             // 暗闇で外した攻撃はかすり傷程度にしかならない
             if (missed) result.damage = Math.max(1, Math.round(result.damage * (1 - BLIND_DAMAGE_REDUCTION)));
             const applied = this.applyIncomingDamage(target, result.damage, source, "normal");
@@ -555,7 +566,9 @@ export class BattleEngine {
 
         case "DEBUFF": {
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          const chance = isS1 && latent?.effectType === "DEBUFF_CHANCE_UP" && latent.status === `${effect.stat.toUpperCase()}_DOWN`
+            ? Math.min(1, (effect.chance ?? 1) + latent.value) : effect.chance;
+          if (!this.rollEffectSuccess(source, target, chance)) break;
           target.effects.push({
             stat: effect.stat,
             amount: -effect.amount,
@@ -563,6 +576,7 @@ export class BattleEngine {
             kind: "DEBUFF",
           });
           this.push(`  → ${this.label(target)} の ${effect.stat.toUpperCase()} が低下！ (${effect.durationTurns}ターン)`);
+          anyDebuffApplied = true;
           break;
         }
 
@@ -573,6 +587,7 @@ export class BattleEngine {
           for (const receiver of receivers) {
             if (category === "DEBUFF") {
               if (this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
+              anyDebuffApplied = true;
             }
             if (!applyStatus(receiver, effect.status, effect.durationTurns, source.instanceId)) {
               this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`);
@@ -587,6 +602,7 @@ export class BattleEngine {
           if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.stunTurns = Math.max(target.stunTurns, effect.durationTurns);
+          anyDebuffApplied = true;
           this.push(`  → ${this.label(target)} はスタンした！`);
           break;
         }
@@ -595,6 +611,7 @@ export class BattleEngine {
           if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.burnTurns = Math.max(target.burnTurns, effect.durationTurns);
+          anyDebuffApplied = true;
           this.push(`  → ${this.label(target)} は火傷を負った！ (${effect.durationTurns}ターン)`);
           break;
         }
@@ -620,6 +637,7 @@ export class BattleEngine {
           if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.blindTurns = Math.max(target.blindTurns, effect.durationTurns);
+          anyDebuffApplied = true;
           this.push(`  → ${this.label(target)} は暗闇に包まれた！ (${effect.durationTurns}ターン)`);
           break;
         }
@@ -676,6 +694,7 @@ export class BattleEngine {
           target.healBlockTurns = Math.max(target.healBlockTurns, effect.durationTurns);
           // 複数から掛かったら、いちばんきついものが残る
           target.healBlockMultiplier = Math.min(target.healBlockMultiplier, effect.healMultiplier);
+          anyDebuffApplied = true;
           this.push(
             `  → ${this.label(target)} は治癒阻害を受けた！ (${effect.durationTurns}ターン、回復${Math.round((1 - effect.healMultiplier) * 100)}%減)`,
           );
@@ -699,13 +718,61 @@ export class BattleEngine {
           target.poisonStacks = Math.min(5, target.poisonStacks + 1);
           target.poisonTurns = Math.max(target.poisonTurns, effect.durationTurns);
           target.poisonDamageRate = Math.max(target.poisonDamageRate, effect.damageRatePerStack);
+          anyDebuffApplied = true;
           this.push(`  → ${this.label(target)} は毒を受けた！ (${target.poisonStacks}スタック、${effect.durationTurns}ターン)`);
           break;
         }
       }
     }
 
+    if (isS1 && latent && sourceScoped) {
+      const applied = this.applyLatent(source, target, latent, missed, anyCrit);
+      anyDebuffApplied ||= applied;
+      if (latent.effectType === "SPECIAL_TRIGGER" && latent.resolution === "CONDITIONAL" && anyDebuffApplied) {
+        source.gauge += latent.value * ATB_THRESHOLD;
+        this.push(`  → ${latent.name}で自身の行動ゲージが${Math.round(latent.value * 100)}%増加！`);
+      }
+    }
+
     for (const victim of counterTargets) this.tryCounter(victim, source);
+  }
+
+  /** S1解決後に宣言データだけで共通処理する潜在効果。戻り値はデバフ付与成功。 */
+  private applyLatent(source: BattleUnit, target: BattleUnit, latent: LatentAbilityCandidate, missed: boolean, anyCrit: boolean): boolean {
+    const allies = this.units.filter((unit) => unit.team === source.team && unit.alive);
+    const lowest = [...allies].sort((a, b) => hpRatio(a) - hpRatio(b))[0] ?? source;
+    const receiver = latent.target === "SELF" ? source : latent.target === "LOWEST_HP_ALLY" ? lowest : target;
+    const onCrit = latent.resolution === "ON_CRIT";
+    if (onCrit && !anyCrit) return false;
+    if (latent.effectType === "ADD_DEBUFF") {
+      if (missed || this.isImmune(target) || !this.rollEffectSuccess(source, target, latent.chance)) return false;
+      const status = latent.status;
+      if (status === "SPD_DOWN" || status === "ATK_DOWN") {
+        target.effects.push({ stat: status === "SPD_DOWN" ? "spd" : "atk", amount: -0.3, remainingTurns: latent.duration, kind: "DEBUFF" });
+      } else if (status === "HEAL_BLOCK") {
+        target.healBlockTurns = Math.max(target.healBlockTurns, latent.duration); target.healBlockMultiplier = Math.min(target.healBlockMultiplier, .5);
+      } else if (status === "BLIND") target.blindTurns = Math.max(target.blindTurns, latent.duration);
+      else if (status && status in STATUS_EFFECT_CATEGORY) applyStatus(target, status as keyof typeof STATUS_EFFECT_CATEGORY, latent.duration, source.instanceId);
+      else return false;
+      this.push(`  → 潜在「${latent.name}」が発動！`);
+      return true;
+    }
+    if (latent.effectType === "TURN_METER_DOWN") {
+      if (!missed && this.rng() < latent.chance) { target.gauge = Math.max(0, target.gauge - latent.value * ATB_THRESHOLD); this.push(`  → ${latent.name}で行動ゲージが減少！`); }
+    } else if (latent.effectType === "SELF_HEAL" || (latent.effectType === "ALLY_SUPPORT" && !onCrit)) {
+      const healed = latent.effectType === "SELF_HEAL" ? source : receiver;
+      const amount = Math.round(healed.maxHp * latent.value); applyHeal(healed, amount); this.pushEvent({ targetId: healed.instanceId, kind: "HEAL", amount });
+    } else if (latent.effectType === "ALLY_SUPPORT" || (latent.effectType === "SPECIAL_TRIGGER" && onCrit)) {
+      receiver.gauge += latent.value * ATB_THRESHOLD;
+    } else if (latent.effectType === "SHIELD") {
+      if (!hasStatus(receiver, "BUFF_BLOCK")) { receiver.shieldValue = Math.max(receiver.shieldValue, Math.round(receiver.maxHp * latent.value)); receiver.shieldTurns = Math.max(receiver.shieldTurns, latent.duration); }
+    } else if (latent.effectType === "ADD_BUFF") {
+      const conditionalOnce = latent.resolution === "CONDITIONAL";
+      if ((!conditionalOnce || hpRatio(source) <= .3) && !source.latentOnceUsed && latent.status && latent.status in STATUS_EFFECT_CATEGORY) {
+        if (applyStatus(receiver, latent.status as keyof typeof STATUS_EFFECT_CATEGORY, latent.duration, source.instanceId)) source.latentOnceUsed = conditionalOnce;
+      }
+    }
+    return false;
   }
 
   /** 特殊ダメージにも共通の致死処理を通し、通常由来だけ反射を1段生成する。 */

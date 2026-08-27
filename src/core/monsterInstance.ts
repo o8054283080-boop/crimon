@@ -4,6 +4,7 @@ import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
 import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDevelopment.js";
+import { LATENT_ABILITY_BY_ID } from "../data/latentAbilities.js";
 
 /**
  * 移し替えたスキルの実体を引く関数。
@@ -158,6 +159,9 @@ export function toBattleDefinition(
     stats,
     skills,
     combatMods,
+    latentAbility: instance.development.latentAbilityId
+      ? LATENT_ABILITY_BY_ID.get(instance.development.latentAbilityId)
+      : undefined,
   };
 }
 

@@ -2,6 +2,7 @@ import { Element, ELEMENT_COLOR, ELEMENT_JA, ELEMENTS } from "./element.js";
 import { CombatModifiers } from "./equipment.js";
 import { Skill } from "./skill.js";
 import { Stats, cloneStats } from "./stats.js";
+import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
 
 /**
  * モンスターの「原型」。6属性の色違いバリエーションのベースとなる。
@@ -51,6 +52,8 @@ export interface MonsterDefinition {
   skills: [Skill, Skill, Skill];
   /** 装備セット由来の戦闘専用効果。装備なし(敵など)ではundefined */
   combatMods?: CombatModifiers;
+  /** 個体で選択済みのS1専用潜在。戦闘開始前に一度だけ解決する。 */
+  latentAbility?: LatentAbilityCandidate;
   /**
    * ボス固有の性質。ステータスを盛るだけでは作れない「戦い方の要求」をここで表す。
    *
