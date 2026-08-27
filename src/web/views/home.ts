@@ -19,6 +19,7 @@ import { withPortrait } from "../three/portrait.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
 import { AudioSettingsProps, renderAudioSettings } from "./audioSettings.js";
+import { TUTORIAL_MISSIONS, TutorialDestination, canClaimTutorialMission, nextTutorialMission } from "../../game/tutorialMissions.js";
 
 export interface HomeProps {
   player: PlayerState;
@@ -39,6 +40,8 @@ export interface HomeProps {
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
   onEditFighterName: () => void;
+  onGoTutorialDestination: (destination: TutorialDestination) => void;
+  onClaimTutorial: (id: string) => void;
   audioSettings: AudioSettingsProps;
   onExportSave: () => void;
   onImportSave: (file: File) => void;
@@ -702,6 +705,29 @@ export function renderHome(props: HomeProps): HTMLElement {
     onEditFighterName,
   } = props;
   const party = getParty(player);
+  const tutorialNext = nextTutorialMission(player);
+  const tutorialClaimable = tutorialNext ? canClaimTutorialMission(player, tutorialNext) : false;
+  const tutorialPanel = el("section", { className: "tutorial-roadmap panel--ornate" }, [
+    el("div", { className: "tutorial-roadmap__head" }, [
+      el("strong", {}, ["初心者ミッション"]),
+      el("span", {}, [`${TUTORIAL_MISSIONS.filter(x => player.tutorialMissions.claimedIds.includes(x.id)).length} / ${TUTORIAL_MISSIONS.length}`]),
+    ]),
+    tutorialNext ? el("div", { className: `tutorial-current${tutorialClaimable ? " tutorial-current--ready" : ""}` }, [
+      el("small", {}, [`第${tutorialNext.chapter}章 ${tutorialNext.chapterTitle} ・ STEP ${tutorialNext.step} / 30`]),
+      el("strong", {}, [tutorialClaimable ? "報酬を受け取れます！" : tutorialNext.title]),
+      el("p", {}, [tutorialNext.condition]),
+      el("div", { className: "tutorial-current__actions" }, ([
+        el("button", { type:"button", className:"btn btn--ghost", onclick:()=>props.onGoTutorialDestination(tutorialNext.destination) }, ["移動する"]),
+        tutorialClaimable ? el("button", { type:"button", className:"btn btn--primary", onclick:()=>props.onClaimTutorial(tutorialNext.id) }, ["報酬を受け取る"]) : null,
+      ] as (HTMLElement | null)[]).filter((x): x is HTMLElement => x !== null)),
+    ]) : el("p", { className:"tutorial-complete" }, ["🎉 全30ミッション達成！ 基本育成ロードマップを制覇しました。"]),
+    ...[1,2,3,4,5].map(chapter => el("details", { className:"tutorial-chapter", open: tutorialNext?.chapter===chapter }, [
+      el("summary", {}, [`第${chapter}章 ${TUTORIAL_MISSIONS.find(x=>x.chapter===chapter)?.chapterTitle}`]),
+      ...TUTORIAL_MISSIONS.filter(x=>x.chapter===chapter).map(x=>el("div", { className:`tutorial-row${player.tutorialMissions.claimedIds.includes(x.id)?" tutorial-row--done":""}` }, [
+        el("span", {}, [`STEP ${x.step}`]), el("span", {}, [x.title]),
+      ])),
+    ])),
+  ]);
   const hasStarted = sessionStorage.getItem("crimon.started") === "1";
 
   /**
@@ -757,6 +783,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     arcaneRings("home-menu__rings"),
     props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
+    tutorialPanel,
     // 1. プレイヤー情報。板を敷かず、背景の絵の上に直接置く
     el("div", { className: "home-crown" }, [
       renderIdentity(player, onEditFighterName, openSettings, party[0]),

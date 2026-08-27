@@ -643,3 +643,16 @@ body:has(.title-screen) { overflow: hidden; }
 /* データの控え。消え方の説明と、戻す手段を分けて置く */
 .home-sheet .save-data__note { margin: 0; font-size: .68rem; line-height: 1.55; color: #9db6e8; }
 .home-sheet .save-data__restore { width: 100%; min-height: 34px; padding: 6px 9px; font-size: .68rem; }
+
+.tutorial-roadmap { margin: 10px 0 16px; padding: 14px; color: #eaf2ff; background: rgba(8,18,42,.9); border: 1px solid rgba(123,174,255,.45); }
+.tutorial-roadmap__head { display:flex; justify-content:space-between; color:#a9cbff; letter-spacing:.04em; }
+.tutorial-current { margin:10px 0; padding:12px; border-left:3px solid #72aaff; background:rgba(78,126,210,.12); }
+.tutorial-current--ready { border-color:#ffd36a; box-shadow:0 0 16px rgba(255,203,81,.18); }
+.tutorial-current small,.tutorial-current strong { display:block; }
+.tutorial-current p { margin:5px 0 9px; font-size:.82rem; }
+.tutorial-current__actions { display:flex; gap:8px; }
+.tutorial-chapter { border-top:1px solid rgba(150,180,230,.18); padding:7px 0; font-size:.76rem; }
+.tutorial-chapter summary { cursor:pointer; font-weight:700; }
+.tutorial-row { display:grid; grid-template-columns:58px 1fr; gap:6px; padding:4px 8px; }
+.tutorial-row--done { opacity:.48; text-decoration:line-through; }
+.tutorial-complete { color:#ffe08a; font-weight:700; }
