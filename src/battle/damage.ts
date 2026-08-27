@@ -1,6 +1,7 @@
 import { ElementAffinity, getElementAffinity, getElementMultiplier } from "../core/element.js";
 import { DamageEffect, SCALE_REFERENCE } from "../core/skill.js";
 import { BattleUnit, getEffectiveStat } from "./unit.js";
+import { applyDefenseE, calculateBaseDamage, roundNormalDamage } from "./damageFormula.js";
 
 /**
  * 防御力による軽減は、**攻める側の攻撃力との比**で決める。
@@ -14,11 +15,6 @@ import { BattleUnit, getEffectiveStat } from "./unit.js";
  * 序盤の防御役も終盤の防御役も同じ意味を持つ。攻撃を積めば相手の防御を抜け、
  * 防御を積めば硬くなる、という関係が全編で成り立つ。
  */
-function defenseMitigation(atk: number, def: number): number {
-  if (def <= 0) return 0;
-  return def / (def + Math.max(1, atk));
-}
-
 export interface DamageResult {
   damage: number;
   isCrit: boolean;
@@ -43,9 +39,17 @@ export function calcDamage(
   const scaleBonus = effect.scaleBonus
     ? effect.scaleBonus.bonusAtReference * (scaleBonusStatValue / SCALE_REFERENCE[effect.scaleBonus.stat])
     : 0;
-  const base = atk * (effect.multiplier + scaleBonus);
-  const mitigation = effect.ignoreDefense ? 0 : defenseMitigation(atk, def);
-  const afterDefense = base * (1 - mitigation);
+  const dependentStat = effect.hpCoefficient !== undefined
+    ? attacker.maxHp
+    : effect.defCoefficient !== undefined
+      ? getEffectiveStat(attacker, "def")
+      : 0;
+  const coefficient = effect.hpCoefficient ?? effect.defCoefficient ?? 0;
+  const perHitBase = calculateBaseDamage(atk, effect.multiplier + scaleBonus, dependentStat, coefficient);
+  const hits = Math.max(1, Math.floor(effect.hits ?? 1));
+  // 割合軽減は線形なのでhitごとの結果と同じ。固定軽減だけは解決全体で算出し均等配賦する。
+  const resolutionDefense = applyDefenseE(perHitBase * hits, atk, def, effect.ignoreDefense);
+  const afterDefense = resolutionDefense.afterDefense / hits;
 
   const affinity = getElementAffinity(attacker.def.element, defender.def.element);
   const elementMultiplier = getElementMultiplier(attacker.def.element, defender.def.element);
@@ -57,7 +61,7 @@ export function calcDamage(
   const takenMultiplier = defender.def.combatMods?.damageTakenMultiplier ?? 1;
 
   const rawDamage = afterDefense * elementMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
-  const damage = Math.max(1, Math.round(rawDamage));
+  const damage = roundNormalDamage(rawDamage);
 
   return { damage, isCrit, affinity };
 }

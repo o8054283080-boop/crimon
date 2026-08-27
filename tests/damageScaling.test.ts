@@ -40,14 +40,14 @@ function unitWith(overrides: Partial<Stats>, team: "PLAYER" | "ENEMY" = "PLAYER"
 
 const noCrit = () => 0.999;
 
-describe("防御による軽減は攻撃力との比で決まる", () => {
-  it("攻撃と防御が同じなら、段階によらず半分になる", () => {
+describe("方式Eの防御軽減", () => {
+  it("攻撃と防御が同じなら、段階によらず同じ30%が残る", () => {
     for (const value of [200, 1000, 3500, 8000]) {
       const attacker = unitWith({ atk: value });
       const defender = unitWith({ def: value }, "ENEMY");
       const withDef = calcDamage(attacker, defender, { kind: "DAMAGE", multiplier: 1 }, noCrit).damage;
       const without = calcDamage(attacker, defender, { kind: "DAMAGE", multiplier: 1, ignoreDefense: true }, noCrit).damage;
-      expect(withDef / without).toBeCloseTo(0.5, 2);
+      expect(withDef / without).toBeCloseTo(0.3, 2);
     }
   });
 
