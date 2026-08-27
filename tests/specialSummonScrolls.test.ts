@@ -5,9 +5,56 @@ import { createInitialState, normalizeLoadedState } from "../src/game/playerStat
 
 const rng = (() => { let n = 1; return () => ((n++ * 2654435761) >>> 0) / 4294967296; })();
 
+function fixedTierRoll(roll: number): () => number {
+  let first = true;
+  return () => {
+    if (first) {
+      first = false;
+      return roll;
+    }
+    return 0;
+  };
+}
+
 describe("特別召喚書", () => {
+  it.each([
+    [0, 4, false],
+    [0.699999, 4, false],
+    [0.7, 5, false],
+    [0.819999, 5, false],
+    [0.82, 4, true],
+    [0.969999, 4, true],
+    [0.97, 5, true],
+    [0.999999, 5, true],
+  ] as const)("★4以上召喚書の境界値 %f を専用カテゴリへ割り当てる", (roll, star, isRare) => {
+    expect(summonWithSpecialScroll("FOUR_STAR", fixedTierRoll(roll))).toMatchObject({ star, isRare });
+  });
+
+  it.each([
+    [0, 4],
+    [0.899999, 4],
+    [0.9, 5],
+    [0.999999, 5],
+  ] as const)("★4以上光闇召喚書の境界値 %f を専用カテゴリへ割り当てる", (roll, star) => {
+    expect(summonWithSpecialScroll("LIGHT_DARK_FOUR_STAR", fixedTierRoll(roll))).toMatchObject({ star, isRare: true });
+  });
+
   it("★4以上召喚書は★4以上だけを排出する", () => {
     for (let i = 0; i < 500; i += 1) expect(summonWithSpecialScroll("FOUR_STAR", rng).star).toBeGreaterThanOrEqual(4);
+  });
+
+  it("大量抽選でも各専用テーブルにない星・属性を排出しない", () => {
+    for (let i = 0; i < 10_000; i += 1) {
+      const fourStar = summonWithSpecialScroll("FOUR_STAR", rng);
+      const fourStarElement = findMonsterById(fourStar.dexId)?.element;
+      expect([4, 5]).toContain(fourStar.star);
+      expect(fourStar.isRare ? ["LIGHT", "DARK"] : ["FIRE", "WATER", "ELECTRIC", "GRASS"]).toContain(fourStarElement);
+
+      const lightDark = summonWithSpecialScroll("LIGHT_DARK_FOUR_STAR", rng);
+      expect([4, 5]).toContain(lightDark.star);
+      expect(["LIGHT", "DARK"]).toContain(findMonsterById(lightDark.dexId)?.element);
+      expect(lightDark.isRare).toBe(true);
+    }
   });
 
   it("光闇★4以上召喚書は光闇かつ★4以上だけを排出し、両属性が出る", () => {

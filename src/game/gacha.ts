@@ -88,20 +88,48 @@ function rollOne(rng: () => number): SummonResult {
 
 export type SpecialSummonScroll = "FOUR_STAR" | "LIGHT_DARK_FOUR_STAR" | "FIVE_STAR";
 
+/**
+ * 特別召喚書専用の排出テーブル。通常召喚の確率とは独立して管理する。
+ * ★5召喚書は従来どおり、通常テーブルの★5枠と同じ通常/光闇比率 (87%/13%)。
+ */
+const SPECIAL_GACHA_TABLES: Record<SpecialSummonScroll, readonly GachaTier[]> = {
+  FOUR_STAR: [
+    { star: 4, isRare: false, weight: 0.7 },
+    { star: 5, isRare: false, weight: 0.12 },
+    { star: 4, isRare: true, weight: 0.15 },
+    { star: 5, isRare: true, weight: 0.03 },
+  ],
+  LIGHT_DARK_FOUR_STAR: [
+    { star: 4, isRare: true, weight: 0.9 },
+    { star: 5, isRare: true, weight: 0.1 },
+  ],
+  FIVE_STAR: [
+    { star: 5, isRare: false, weight: 0.0435 },
+    { star: 5, isRare: true, weight: 0.0065 },
+  ],
+};
+
+/** 0以上1未満の乱数を、上端を含まない明示的な確率区間へ割り当てる。 */
+function pickSpecialTier(table: readonly GachaTier[], rng: () => number): GachaTier {
+  const totalWeight = table.reduce((sum, tier) => sum + tier.weight, 0);
+  const roll = rng() * totalWeight;
+  let upperBound = 0;
+  for (const tier of table) {
+    upperBound += tier.weight;
+    if (roll < upperBound) return tier;
+  }
+  return table[table.length - 1];
+}
+
 const SPECIAL_SCROLL_FIELD: Record<SpecialSummonScroll, "fourStarSummonScrolls" | "lightDarkFourStarSummonScrolls" | "fiveStarSummonScrolls"> = {
   FOUR_STAR: "fourStarSummonScrolls",
   LIGHT_DARK_FOUR_STAR: "lightDarkFourStarSummonScrolls",
   FIVE_STAR: "fiveStarSummonScrolls",
 };
 
-/** 通常テーブルを条件付きで再利用し、各召喚書の保証を満たす1体を抽選する。 */
+/** 専用テーブルから排出カテゴリを決め、そのカテゴリ内を均等抽選する。 */
 export function summonWithSpecialScroll(type: SpecialSummonScroll, rng: () => number = Math.random): SummonResult {
-  const table = GACHA_TABLE.filter((tier) => {
-    if (type === "FOUR_STAR") return tier.star >= 4;
-    if (type === "LIGHT_DARK_FOUR_STAR") return tier.isRare && tier.star >= 4;
-    return tier.star === 5;
-  });
-  const tier = pickTier(table, rng);
+  const tier = pickSpecialTier(SPECIAL_GACHA_TABLES[type], rng);
   return { dexId: resolveDexId(tier, rng), star: tier.star, isRare: tier.isRare };
 }
 
