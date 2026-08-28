@@ -1673,6 +1673,7 @@ function renderCurrentTowerBattle(): BattleViewHandle {
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, {
     initialPlayerHp: setup.initialPlayerHp,
     initialCooldowns: setup.initialCooldowns,
+    trialTowerFloor: setup.floor.floor,
   });
 
   const traitLabel = TOWER_TRAIT_LABEL[setup.floor.trait];

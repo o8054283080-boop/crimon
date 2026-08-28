@@ -286,3 +286,25 @@ describe("モンスター図鑑データ", () => {
     expect(fireSlime.emoji).toBe(waterSlime.emoji);
   });
 });
+
+describe("スキルピッグ", () => {
+  it("異種族・LvMAXでもEXPを増やさず正式なスキル抽選を1回行う", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    const material = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    expect(checkMonsterPowerUp(target, [material], []).ok).toBe(true);
+    const before = [...target.skillLevels];
+    const result = applyMonsterPowerUp(target, [material], () => 0);
+    expect(result.expGained).toBe(0);
+    expect(result.leveledSkillIndices).toHaveLength(1);
+    expect(target.skillLevels.reduce((a, b) => a + b, 0)).toBe(before.reduce((a, b) => a + b, 0) + 1);
+  });
+
+  it("全スキルMAXには使用できず上限を越えない", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    target.skillLevels = [5, 5, 5];
+    const material = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    expect(checkMonsterPowerUp(target, [material], []).ok).toBe(false);
+  });
+});

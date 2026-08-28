@@ -3,7 +3,7 @@ import { Equipment, generateEquipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
-import { REINCARNATION_PIG_DEX } from "../data/monsters.js";
+import { REINCARNATION_PIG_DEX, SKILL_PIG_DEX } from "../data/monsters.js";
 import {
   TOWER_FLOOR_COUNT,
   TOWER_STAMINA_COST,
@@ -60,10 +60,14 @@ export interface TowerRewardResult {
   pigDexId: string | null;
   pigStar: Star | null;
   awakeningOrbs: number;
+  fourStarSummonScrolls: number;
+  lightDarkFourStarSummonScrolls: number;
+  fiveStarSummonScrolls: number;
+  skillPigs: number;
 }
 
 export function emptyTowerRewardResult(): TowerRewardResult {
-  return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null, awakeningOrbs: 0 };
+  return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null, awakeningOrbs: 0, fourStarSummonScrolls: 0, lightDarkFourStarSummonScrolls: 0, fiveStarSummonScrolls: 0, skillPigs: 0 };
 }
 
 /** 登坂を始められない理由。始められるなら null */
@@ -270,6 +274,21 @@ export function claimTowerFloorReward(state: PlayerState, floor: number, rng: ()
     result.pigDexId = dex.id;
     result.pigStar = reward.pigStar;
   }
+  if (reward.awakeningOrbs) {
+    state.awakeningOrbs += reward.awakeningOrbs;
+    result.awakeningOrbs += reward.awakeningOrbs;
+  }
+  for (let i = 0; i < (reward.skillPigs ?? 0); i++) {
+    const dex = SKILL_PIG_DEX[i % SKILL_PIG_DEX.length];
+    addMonster(state, dex.id, 1, 1);
+    result.skillPigs += 1;
+  }
+  state.fourStarSummonScrolls += reward.fourStarSummonScrolls ?? 0;
+  state.lightDarkFourStarSummonScrolls += reward.lightDarkFourStarSummonScrolls ?? 0;
+  state.fiveStarSummonScrolls += reward.fiveStarSummonScrolls ?? 0;
+  result.fourStarSummonScrolls = reward.fourStarSummonScrolls ?? 0;
+  result.lightDarkFourStarSummonScrolls = reward.lightDarkFourStarSummonScrolls ?? 0;
+  result.fiveStarSummonScrolls = reward.fiveStarSummonScrolls ?? 0;
   return result;
 }
 

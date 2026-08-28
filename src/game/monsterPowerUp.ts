@@ -1,6 +1,14 @@
 import { MonsterInstance, addExp, isSkillMaxLevel, rollSkillLevelUp } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, requiredExpForLevel } from "../core/rarity.js";
-import { findMonsterById } from "../data/monsters.js";
+import { findMonsterById, SKILL_PIG } from "../data/monsters.js";
+
+export function isSkillPig(material: MonsterInstance): boolean {
+  return findMonsterById(material.dexId)?.templateId === SKILL_PIG.templateId;
+}
+
+function isSkillMaterial(target: MonsterInstance, material: MonsterInstance): boolean {
+  return isSkillPig(material) || isSameSpecies(target, material);
+}
 
 export interface MonsterPowerUpCheck {
   ok: boolean;
@@ -23,7 +31,7 @@ export function checkMonsterPowerUp(
     return { ok: false, reason: "パーティに編成中のモンスターは素材にできません" };
   }
   if (target.level >= STAR_MAX_LEVEL[target.star]) {
-    if (materials.some((material) => !isSameSpecies(target, material))) {
+    if (materials.some((material) => !isSkillMaterial(target, material))) {
       return { ok: false, reason: "LvMAXでは経験値専用の素材は使用できません。スキル育成に有効な素材だけを選択してください。" };
     }
     if (isSkillMaxLevel(target)) {
@@ -55,6 +63,7 @@ export function isSameElement(target: MonsterInstance, material: MonsterInstance
  * さらに、素材の属性(色)が対象と同じ場合は経験値が1.5倍になる。
  */
 export function feedExpValue(target: MonsterInstance, material: MonsterInstance): number {
+  if (isSkillPig(material)) return 0;
   const base = FEED_EXP_BASE_PER_STAR[material.star] + requiredExpForLevel(material.level);
   const multiplier = isSameElement(target, material) ? SAME_ELEMENT_EXP_MULTIPLIER : 1;
   return Math.round(base * multiplier);
@@ -97,7 +106,7 @@ export function applyMonsterPowerUp(
 
   const leveledSkillIndices: number[] = [];
   for (const material of materials) {
-    if (!isSameSpecies(target, material)) continue;
+    if (!isSkillMaterial(target, material)) continue;
     const index = rollSkillLevelUp(target, rng);
     if (index >= 0) leveledSkillIndices.push(index);
   }
