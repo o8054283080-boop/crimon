@@ -31,6 +31,9 @@ export interface HomeProps {
   onGoSummon: () => void;
   onGoStages: () => void;
   onGoParty: () => void;
+  onGoMonsters: () => void;
+  onGoEquipment: () => void;
+  onGoMonsterDex: () => void;
   onViewPartyMonster: (instanceId: string) => void;
   onGoEquipDungeon: () => void;
   onGoLevelDungeon: () => void;
@@ -688,6 +691,13 @@ function renderMenuTile(tile: MenuTile): HTMLElement {
   ]);
 }
 
+/** Old saves may not contain tower fields; keep the home hero a read-only, total function. */
+export function homeTowerSummary(bestFloorValue: unknown): { bestFloor: number; nextFloor: number; status: string } {
+  const numeric = typeof bestFloorValue === "number" && Number.isFinite(bestFloorValue) ? bestFloorValue : 0;
+  const bestFloor = Math.max(0, Math.min(100, Math.floor(numeric)));
+  return { bestFloor, nextFloor: Math.min(100, bestFloor + 1), status: bestFloor >= 100 ? "100F COMPLETE" : `FLOOR ${bestFloor} / 100` };
+}
+
 export function renderHome(props: HomeProps): HTMLElement {
   const {
     player,
@@ -696,6 +706,9 @@ export function renderHome(props: HomeProps): HTMLElement {
     onGoSummon,
     onGoStages,
     onGoParty,
+    onGoMonsters,
+    onGoEquipment,
+    onGoMonsterDex,
     onViewPartyMonster,
     onGoEquipDungeon,
     onGoLevelDungeon,
@@ -744,8 +757,6 @@ export function renderHome(props: HomeProps): HTMLElement {
       ])),
     ])),
   ]);
-  const hasStarted = sessionStorage.getItem("crimon.started") === "1";
-
   /**
    * 設定は普段いらないものなので、ホームに出しっぱなしにしない。
    * 音量つまみとデータの書き出しが常に見えていると、
@@ -794,14 +805,17 @@ export function renderHome(props: HomeProps): HTMLElement {
     { name: "info", label: "遊び方", sub: "はじめての方へ", onClick: onGoHowToPlay },
   ];
 
-  const menu = el("div", { className: `home-menu ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
-    // タイトルと同じ世界の続きにする。背景だけ別物だと、STARTで別のゲームに移ったように見える
-    arcaneRings("home-menu__rings"),
+  const { bestFloor, nextFloor, status: heroStatus } = homeTowerSummary(player.trialTowerBestFloor);
+  const management: MenuTile[] = [
+    { name: "monsters", label: "モンスター", sub: "育成・詳細", onClick: onGoMonsters },
+    { name: "equipment", label: "装備", sub: "所持装備", onClick: onGoEquipment },
+    { name: "info", label: "図鑑", sub: "発見記録", onClick: onGoMonsterDex },
+  ];
+
+  const menu = el("main", { className: "home-layout home-menu home-menu--visible" }, [
     props.compensationClaims.length > 0 ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
     loginBonusResult ? renderLoginBonusBanner(loginBonusResult, onDismissLoginBonus) : null,
-    tutorialPanel,
-    // 1. プレイヤー情報。板を敷かず、背景の絵の上に直接置く
-    el("div", { className: "home-crown" }, [
+    el("header", { className: "home-resource-header" }, [
       renderIdentity(player, onEditFighterName, openSettings, party[0]),
       el("section", { className: "home-wallet" }, [
         currencyChip("crystal", player.crystal, "crystal"),
@@ -809,11 +823,24 @@ export function renderHome(props: HomeProps): HTMLElement {
         currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`),
       ]),
     ]),
-    // 2. 現在のパーティ。最も装飾を厚くする面
-    el("section", { className: "home-party panel--ornate" }, [
+    el("section", { className: "home-brand", "aria-label": "CRIMON" }, [
+      el("strong", { className: "home-brand__logo" }, ["CRIMON"]),
+      el("span", { className: "home-brand__subtitle" }, ["CREATE MONSTERS · BEGIN THE ADVENTURE"]),
+    ]),
+    el("button", { type: "button", className: "home-hero", onclick: onGoTrialTower, "data-tour": "tile:tower" }, [
+      el("span", { className: "home-hero__visual", "aria-hidden": "true" }, []),
+      el("span", { className: "home-hero__content" }, [
+        el("small", { className: "home-hero__eyebrow" }, ["TRIAL TOWER"]),
+        el("strong", { className: "home-hero__title" }, ["試練の塔"]),
+        el("span", { className: "home-hero__progress" }, [heroStatus]),
+        el("span", { className: "home-hero__next" }, [bestFloor >= 100 ? "塔を制覇しました" : `NEXT  ${nextFloor}F`]),
+        el("span", { className: "home-hero__cta" }, [player.trialTowerRun ? "登坂を続ける" : "挑戦する", icon("chevron")]),
+      ]),
+    ]),
+    el("section", { className: "home-party home-party-section panel--ornate" }, [
       sectionMark(
         "CURRENT PARTY",
-        el("button", { type: "button", className: "btn-frame", onclick: onGoParty }, ["編成"]),
+        el("button", { type: "button", className: "btn-frame", onclick: onGoParty }, ["編成 ›"]),
       ),
       el(
         "div",
@@ -821,8 +848,9 @@ export function renderHome(props: HomeProps): HTMLElement {
         Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], onGoParty, onViewPartyMonster)),
       ),
     ]),
-    // 一番行く場所なので、一番大きい面を与える。横長の帯では他のタイルに埋もれる
-    el("button", { type: "button", className: "home-adventure", onclick: onGoStages }, [
+    el("section", { className: "home-content home-content--primary" }, [
+      sectionMark("PRIMARY CONTENT"),
+      el("button", { type: "button", className: "home-adventure", onclick: onGoStages }, [
       el("span", { className: "home-adventure__sky", "aria-hidden": "true" }, []),
       el("span", { className: "home-adventure__ridge", "aria-hidden": "true" }, []),
       el("span", { className: "home-adventure__haze", "aria-hidden": "true" }, []),
@@ -831,51 +859,23 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("small", {}, ["冒険に出る"]),
       ]),
       el("span", { className: "home-adventure__arrow" }, [icon("chevron")]),
+      ]),
     ]),
-    // 4. スタミナと所持。冒険のすぐ下に置く(出かける前に見る数字なので)
     renderVitals(player, onRefillStaminaPartial, onRefillStaminaFull, party),
-    // 5. 召喚とショップ。絵を持つ2枚
-    el("section", { className: "home-group" }, [
-      sectionMark("コンテンツ"),
+    el("section", { className: "home-content home-content--feature home-group" }, [
+      sectionMark("GROWTH"),
       el("div", { className: "home-feature-grid" }, gather.map(renderMenuTile)),
     ]),
-    // 6. その他。**ここは小さく畳む。**全部を目立たせると何も目立たない
-    el("section", { className: "home-group" }, [
+    el("section", { className: "home-content home-content--secondary home-group" }, [
+      sectionMark("DUNGEONS & CHALLENGES"),
       el("div", { className: "home-minor-grid" }, [...dungeons, ...compete].map(renderMenuTile)),
     ]),
+    el("section", { className: "home-content home-content--utility home-group" }, [
+      sectionMark("MANAGEMENT"),
+      el("div", { className: "home-minor-grid home-minor-grid--management" }, management.map(renderMenuTile)),
+    ]),
+    tutorialPanel,
     settingsSheet,
   ].filter((n): n is HTMLElement => n !== null));
-
-  if (hasStarted) return el("div", { className: "screen home-screen home-screen--menu-only" }, [menu]);
-
-  /**
-   * タイトル画面。
-   *
-   * 背景は**層で作る**。1枚の平面に文字を置くと、どれだけ色を凝っても
-   * 「壁紙の前の文字」にしかならない。奥から順に、坩堝の熾火 → 回る錬成陣 →
-   * 火の粉 → 粒(ざらつき)→ 隅の落ち込み、と重ねて、その手前に紋章を置く。
-   */
-  const titleScreen = el("section", { className: "title-screen" }, [
-    el("div", { className: "title-screen__forge", "aria-hidden": "true" }, []),
-    arcaneRings("title-screen__rings"),
-    emberMotes(14),
-    forgeRidge(),
-    el("div", { className: "title-screen__grain", "aria-hidden": "true" }, []),
-    el("div", { className: "title-screen__vignette", "aria-hidden": "true" }, []),
-    el("div", { className: "title-screen__logo" }, [
-      titleEmblem(),
-      el("p", { className: "title-screen__jp" }, ["クリエイトモンスターズ"]),
-    ]),
-    el("button", { type: "button", className: "title-start", onclick: () => {
-      sessionStorage.setItem("crimon.started", "1");
-      titleScreen.classList.add("title-screen--leaving");
-      menu.classList.remove("home-menu--hidden");
-      menu.classList.add("home-menu--visible");
-      window.scrollTo({ top: 0 });
-      window.setTimeout(() => titleScreen.remove(), 320);
-    } }, [el("span", {}, ["START"])]),
-    el("p", { className: "title-screen__hint" }, ["MONSTER BATTLE ADVENTURE"]),
-  ]);
-
-  return el("div", { className: "screen home-screen" }, [titleScreen, menu]);
+  return el("div", { className: "screen home-screen home-screen--menu-only" }, [menu]);
 }
