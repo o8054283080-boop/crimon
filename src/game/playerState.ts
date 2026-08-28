@@ -299,6 +299,10 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   for (const equipment of state.equipment) {
     if (typeof equipment.level !== "number") equipment.level = 0;
     if (!equipment.set) equipment.set = deterministicSetFromId(equipment.id);
+    equipment.locked = equipment.locked === true;
+  }
+  if (state.backgroundFarmJob?.result && !Array.isArray(state.backgroundFarmJob.result.earnedEquipmentIds)) {
+    state.backgroundFarmJob.result.earnedEquipmentIds = [];
   }
   for (const monster of state.monsters) {
     if (!monster.equipment) monster.equipment = {};
@@ -825,10 +829,18 @@ export interface SellEquipmentResult {
   goldEarned: number;
 }
 
+export function setEquipmentLocked(state: PlayerState, equipmentId: string, locked: boolean): boolean {
+  const equipment = state.equipment.find((e) => e.id === equipmentId);
+  if (!equipment) return false;
+  equipment.locked = locked;
+  return true;
+}
+
 /** 装備を売却してゴールドを得る。装着中の装備は先に外す必要がある */
 export function sellEquipment(state: PlayerState, equipmentId: string): SellEquipmentResult {
   const equipment = state.equipment.find((e) => e.id === equipmentId);
   if (!equipment) return { ok: false, reason: "装備が見つかりません", goldEarned: 0 };
+  if (equipment.locked) return { ok: false, reason: "ロック中の装備は売却できません", goldEarned: 0 };
   if (isEquipmentEquipped(state, equipmentId)) {
     return { ok: false, reason: "装着中の装備は売却できません(先に外してください)", goldEarned: 0 };
   }

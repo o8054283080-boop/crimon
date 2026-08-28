@@ -10,6 +10,7 @@ export interface AutoFarmResultProps {
   targetName: string;
   /** 次の行き先。同じ場所をもう一度回すのが最も多い操作 */
   actions: ResultAction[];
+  onViewEquipment?: () => void;
 }
 
 const STOP_REASON_LABEL: Record<AutoFarmResult["stopReason"], string> = {
@@ -91,6 +92,9 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
       el("span", { className: "result-banner-large__note" }, [STOP_REASON_LABEL[result.stopReason]]),
     ]),
     el("div", { className: "result-body" }, body.filter((n): n is HTMLElement => n !== null)),
+    result.equipmentDropCount > 0 && props.onViewEquipment
+      ? el("button", { type: "button", className: "btn btn--gold btn--large", onclick: props.onViewEquipment }, ["獲得装備を見る"])
+      : null,
     renderResultActions(props.actions),
-  ]);
+  ].filter((node): node is HTMLElement => node !== null));
 }
