@@ -128,44 +128,35 @@ import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
 import { renderSummon } from "./views/summon.js";
 import { el } from "./dom.js";
+import { PwaUpdateController } from "./pwaUpdate.js";
 
-/**
- * 更新の取り込み。
- *
- * `autoUpdate` にしていても、**新しいServiceWorkerが権利を取っただけでは
- * すでに開いている画面は古いままになる**。実際にこれで、配信は成功しているのに
- * 「音もショップも装備ダンジョンの変更も反映されていない」状態になった。
- * 権利が入れ替わった時点で1度だけ読み込み直して、確実に新しい版へ乗せ替える。
- */
-function installUpdateReload(): void {
-  if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
-  // 初回訪問では「制御なし → 制御あり」で必ず1度発火する。
-  // そこで読み込み直すと無駄なちらつきになるので、すでに制御されていた時だけ乗せ替える
-  const hadController = Boolean(navigator.serviceWorker.controller);
-  let reloading = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!hadController || reloading) return;
-    reloading = true;
-    // 更新による強制リロードの直前にも保存し、最後の描画後の詳細選択を取りこぼさない。
-    persistNavigationState();
-    window.location.reload();
-  });
-}
+let appMounted = false;
+const pwaUpdate = new PwaUpdateController(
+  typeof navigator === "undefined" ? null : navigator.serviceWorker,
+  () => { if (appMounted) render(); },
+  () => window.location.reload(),
+);
 
-installUpdateReload();
-
-registerSW({
+const updateWorker = registerSW({
   immediate: true,
+  onNeedRefresh() { pwaUpdate.announce(); },
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return;
+    // 起動時点ですでに waiting なら、updatefound の再発火を待たず表示する。
+    if (registration.waiting) pwaUpdate.announce();
+    const checkForUpdate = () => {
+      // オフライン時の更新確認失敗はゲーム進行と無関係。未処理rejectionにしない。
+      void registration.update().catch(() => undefined);
+    };
     // 開きっぱなしで遊んでいる間に配信された更新も拾えるよう、定期的に確認する
-    setInterval(() => void registration.update(), 30 * 60 * 1000);
+    setInterval(checkForUpdate, 30 * 60 * 1000);
     // 画面に戻ってきた時も確認する。放置していた端末はこちらの方が早く気付く
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") void registration.update();
+      if (document.visibilityState === "visible") checkForUpdate();
     });
   },
 });
+pwaUpdate.setUpdateWorker(updateWorker);
 
 initAudio();
 
@@ -2323,6 +2314,26 @@ function render(): void {
   }
 
   root.append(content);
+  if (pwaUpdate.snapshot.available) {
+    const inBattle = BATTLE_SCREENS.has(state.screen);
+    const applying = pwaUpdate.snapshot.applying;
+    root.append(el("aside", { className: "pwa-update-banner", role: "status" }, [
+      el("div", { className: "pwa-update-banner__copy" }, [
+        el("strong", {}, ["新しいバージョンがあります"]),
+        ...(inBattle ? [el("span", {}, ["戦闘終了後にアップデートできます"])] : []),
+      ]),
+      el("button", {
+        type: "button",
+        className: "btn btn--primary pwa-update-banner__button",
+        disabled: inBattle || applying,
+        onclick: () => void pwaUpdate.apply(() => {
+          // PR #111の画面復帰用UI状態と、永続化済み周回ジョブを同じ時点で保存する。
+          persistNavigationState();
+          savePlayerState(state.player);
+        }),
+      }, [applying ? "更新中…" : "アップデート"]),
+    ]));
+  }
   const backgroundJob = state.player.backgroundFarmJob;
   if (backgroundJob) {
     const remaining = Math.max(0, backgroundJob.requestedRuns - backgroundJob.completedRuns);
@@ -2611,6 +2622,7 @@ if (import.meta.env.DEV) {
   );
 }
 
+appMounted = true;
 render();
 scheduleBackgroundFarm(250);
 

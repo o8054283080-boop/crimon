@@ -18,7 +18,8 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      registerType: "autoUpdate",
+      // waiting worker はユーザーがバナーのボタンを押すまで有効化しない。
+      registerType: "prompt",
       includeAssets: ["icons/favicon-32.png", "icons/apple-touch-icon.png"],
       manifest: {
         id: ".",
