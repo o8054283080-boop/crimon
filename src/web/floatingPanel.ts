@@ -16,7 +16,8 @@ export interface FloatingPanelOptions {
   label: string;
   placement: FloatingPanelPlacement;
   compact: HTMLElement;
-  docked: HTMLElement;
+  /** 旧呼び出し元は未指定でも動作する。指定時は従来どおりその内容を優先する。 */
+  docked?: HTMLElement;
   content: HTMLElement[];
   forceCompact?: boolean;
 }
@@ -145,6 +146,22 @@ function installResizeClamp(): void {
   }, { passive: true });
 }
 
+/**
+ * #119より前の呼び出し元にもドック表示を提供する後方互換。
+ * 明示された`docked`がある場合は一切使われない。
+ */
+function fallbackDockedContent(options: FloatingPanelOptions): HTMLElement {
+  const text = options.compact.textContent ?? "";
+  if (options.id === "background-farm") {
+    const progress = text.match(/(\d+\/\d+)\s*$/)?.[1];
+    return el("span", {}, [progress ? `🔄 ${progress}` : "🔄"]);
+  }
+  if (options.id === "tutorial-mission") {
+    return el("span", {}, [text.includes("達成") ? "🎯！" : "🎯"]);
+  }
+  return options.compact.cloneNode(true) as HTMLElement;
+}
+
 /** ドラッグ、クランプ、三状態の表示設定永続化を全パネルで共有するDOMファクトリ。 */
 export function createFloatingPanel(options: FloatingPanelOptions): HTMLElement {
   installResizeClamp();
@@ -212,7 +229,8 @@ export function createFloatingPanel(options: FloatingPanelOptions): HTMLElement 
   const compact = el("button", { type: "button", className: "floating-panel__compact", onclick: () => {
     if (!options.forceCompact) setDisplayState("expanded");
   } }, [options.compact]);
-  const docked = el("button", { type: "button", className: "floating-panel__docked", "aria-label": `${options.label}を開く`, onclick: () => setDisplayState("compact") }, [options.docked]);
+  const dockedContent = options.docked ?? fallbackDockedContent(options);
+  const docked = el("button", { type: "button", className: "floating-panel__docked", "aria-label": `${options.label}を開く`, onclick: () => setDisplayState("compact") }, [dockedContent]);
   const collapse = el("button", { type: "button", className: "floating-panel__collapse", "aria-label": `${options.label}を最小化`, onclick: () => setDisplayState("compact") }, ["−"]);
   const body = el("div", { className: "floating-panel__body" }, [collapse, ...options.content]);
   panel.append(handle, compact, docked, body);

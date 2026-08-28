@@ -1,0 +1,19 @@
+.farm-equip-sheet { position: fixed; inset: 0; z-index: 1200; display: grid; align-items: end; }
+.farm-equip-sheet__scrim { position: absolute; inset: 0; background: rgba(2, 4, 10, .78); }
+.farm-equip-sheet__panel { position: relative; max-height: 90dvh; overflow: auto; padding: 16px 14px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; border: 1px solid rgba(255, 215, 130, .35); background: linear-gradient(180deg, #1b223b, #0d1224); }
+.farm-equip-sheet__panel > header { display: flex; justify-content: space-between; gap: 10px; align-items: start; position: sticky; top: -16px; z-index: 2; padding: 14px 0 10px; background: #1b223b; }
+.farm-equip-sheet__panel h2, .farm-equip-sheet__panel p { margin: 0; }
+.farm-equip-sheet__panel header p { margin-top: 4px; color: var(--muted); font-size: .75rem; }
+.farm-equip-sheet__list { display: grid; gap: 10px; }
+.farm-equip-card { border: 1px solid rgba(150, 180, 240, .25); border-radius: 14px; padding: 10px; background: rgba(8, 12, 26, .72); }
+.farm-equip-card[data-locked="true"] { border-color: rgba(255, 211, 106, .65); }
+.farm-equip-card__detail { width: 100%; display: grid; gap: 4px; padding: 0; border: 0; background: none; color: inherit; text-align: left; }
+.farm-equip-card__stars { color: #ffd36a; letter-spacing: .05em; }
+.farm-equip-card__detail small { color: #b9c7e8; line-height: 1.45; }
+.farm-equip-card__actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
+.farm-equip-card__select { min-height: 40px; display: flex; align-items: center; }
+.farm-equip-card__select--disabled { opacity: .45; }
+.farm-equip-sheet__panel > footer { position: sticky; bottom: -20px; display: grid; gap: 8px; margin: 14px -2px -20px; padding: 12px 2px calc(20px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, #0d1224 16%); }
+.farm-equip-detail { position: fixed; z-index: 3; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 420px; margin: auto; padding: 18px; border: 1px solid #ffd36a; border-radius: 16px; background: #151c33; box-shadow: 0 20px 60px #000; }
+.farm-equip-detail h3 { margin-top: 0; }
+.farm-equip-detail .btn { width: 100%; margin-top: 10px; }

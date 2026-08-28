@@ -1,5 +1,6 @@
 import { Equipment, SET_LABEL, SLOT_LABEL, equipmentSellPrice, formatStatValue } from "../../core/equipment.js";
 import { el } from "../dom.js";
+import "../farmEquipmentResult.css";
 
 export interface FarmEquipmentResultProps {
   equipment: Equipment[];
