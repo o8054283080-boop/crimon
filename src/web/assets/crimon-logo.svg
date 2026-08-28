@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" role="img" aria-labelledby="title desc">
+  <title id="title">CRIMON</title><desc id="desc">紫の結晶と古代の金属紋章を組み合わせたCRIMONロゴ</desc>
+  <defs>
+    <linearGradient id="gold" x2="0" y2="1"><stop stop-color="#fff0b0"/><stop offset=".38" stop-color="#d7b45e"/><stop offset=".72" stop-color="#8c6828"/><stop offset="1" stop-color="#e1c16e"/></linearGradient>
+    <radialGradient id="magic"><stop stop-color="#e2c8ff"/><stop offset=".35" stop-color="#9c63ff"/><stop offset="1" stop-color="#5422ae"/></radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7"/></filter>
+  </defs>
+  <g transform="translate(320 62)">
+    <circle r="48" fill="none" stroke="#b9964d" stroke-width="2" opacity=".7"/><circle r="38" fill="none" stroke="#b9964d" stroke-dasharray="3 8" opacity=".75"/>
+    <path d="M0-56 12-25 43-36 25-10 56 0 25 10 43 36 12 25 0 56-12 25-43 36-25 10-56 0-25-10-43-36-12-25Z" fill="none" stroke="url(#gold)" stroke-width="3"/>
+    <path d="M0-31 19-8 10 28 0 39-10 28-19-8Z" fill="#7138d5" opacity=".5" filter="url(#glow)"/><path d="M0-31 19-8 10 28 0 39-10 28-19-8Z" fill="url(#magic)" stroke="#e1c16e" stroke-width="1.5"/>
+  </g>
+  <text x="320" y="176" text-anchor="middle" fill="url(#gold)" stroke="#18101f" stroke-width="3" paint-order="stroke" font-family="Georgia, 'Times New Roman', serif" font-size="77" font-weight="700" letter-spacing="12">CRIMON</text>
+  <path d="M72 194H248l22 8h100l22-8h176" fill="none" stroke="url(#gold)" stroke-width="2"/><path d="m320 193 9 9-9 9-9-9Z" fill="url(#magic)" stroke="#e1c16e"/>
+</svg>

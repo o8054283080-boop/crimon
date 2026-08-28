@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 600" role="img" aria-labelledby="title desc">
+  <title id="title">試練の塔</title><desc id="desc">紫の雷と霧に包まれた古代の塔。左側は文字を置ける暗い空間。</desc>
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#110d24"/><stop offset=".55" stop-color="#241348"/><stop offset="1" stop-color="#080812"/></linearGradient><radialGradient id="a"><stop stop-color="#9c63ff" stop-opacity=".48"/><stop offset="1" stop-color="#7138d5" stop-opacity="0"/></radialGradient><linearGradient id="fog"><stop stop-color="#a99acb" stop-opacity="0"/><stop offset=".5" stop-color="#9a80c1" stop-opacity=".18"/><stop offset="1" stop-color="#a99acb" stop-opacity="0"/></linearGradient></defs>
+  <rect width="1280" height="600" fill="url(#sky)"/><ellipse cx="990" cy="300" rx="370" ry="330" fill="url(#a)"/>
+  <path d="M1070 0 970 112l64-4-93 128 42-77-57 5Z" fill="none" stroke="#a979ff" stroke-width="6" opacity=".72"/><path d="M865 18 820 92l30-5-43 86" fill="none" stroke="#d7c3ff" stroke-width="3" opacity=".45"/>
+  <g fill="#090812" stroke="#554078" stroke-width="3"><path d="m1030 73 88 102-24 0 0 310H908V175h-25l91-102 28 32Z"/><path d="M870 242h260v243H870z"/><path d="M927 146h39v339h-39zM1035 146h39v339h-39z"/></g>
+  <g fill="#9c63ff" opacity=".75"><path d="M941 220h12v42h-12zM941 304h12v42h-12zM1048 220h12v42h-12zM1048 304h12v42h-12z"/></g>
+  <path d="M0 474q180-75 350 0t350 0 360 0 220-5v131H0Z" fill="#0b0915"/><path d="M0 430q240-62 460 16t420-8 400 20" fill="none" stroke="url(#fog)" stroke-width="70"/><path d="M720 506h430" stroke="#d5ad55" stroke-width="3" opacity=".32"/>
+  <rect width="1280" height="600" fill="url(#a)" opacity=".16"/>
+</svg>
