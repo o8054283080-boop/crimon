@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { constrainFloatingPosition } from "../src/web/floatingPanel.js";
+import { constrainFloatingPosition, edgeDockSide, normalizeFloatingPanelState } from "../src/web/floatingPanel.js";
 import { readFileSync } from "node:fs";
 
 describe("共通フローティングパネル", () => {
@@ -19,6 +19,26 @@ describe("共通フローティングパネル", () => {
     expect(source).toContain("Math.hypot(dx, dy) < DRAG_THRESHOLD");
     expect(source).toContain("`${STORAGE_PREFIX}${id}`");
     expect(source).toContain('window.addEventListener("resize"');
+  });
+
+  it("左右端40pxだけをDOCK判定する", () => {
+    expect(edgeDockSide(39, 390, { left: 0, right: 0 })).toBe("left");
+    expect(edgeDockSide(351, 390, { left: 0, right: 0 })).toBe("right");
+    expect(edgeDockSide(100, 390, { left: 0, right: 0 })).toBeNull();
+  });
+
+  it("三状態と左右の保存値を復元し、旧minimized形式も読み替える", () => {
+    expect(normalizeFloatingPanelState({ x: 10, y: 20, displayState: "docked", dockSide: "left" }))
+      .toEqual({ x: 10, y: 20, displayState: "docked", dockSide: "left" });
+    expect(normalizeFloatingPanelState({ minimized: true }).displayState).toBe("compact");
+    expect(normalizeFloatingPanelState({ minimized: false }).displayState).toBe("expanded");
+    expect(normalizeFloatingPanelState({ x: Number.NaN, displayState: "broken", dockSide: "broken" }))
+      .toEqual({ x: undefined, y: undefined, displayState: "expanded", dockSide: "right" });
+  });
+
+  it("戦闘時の強制compactは保存されたdocked状態より優先しない", () => {
+    const source = readFileSync(new URL("../src/web/floatingPanel.ts", import.meta.url), "utf8");
+    expect(source).toContain('options.forceCompact && state.displayState === "expanded" ? "compact" : state.displayState');
   });
 
   it("周回と初心者ミッションは別ID・別初期位置で同じ機構を使う", () => {
