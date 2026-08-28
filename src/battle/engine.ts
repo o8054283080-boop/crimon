@@ -164,6 +164,11 @@ export class BattleEngine {
     }
     this.rng = options.rng ?? Math.random;
     this.maxTurns = options.maxTurns ?? 300;
+
+    // 80Fだけは開幕から免疫。有限ターンであり、剥がした場合も次の再展開まで猶予がある。
+    for (const unit of this.units) {
+      if (unit.def.bossTraits?.trialBossFloor === 80) unit.immuneTurns = 3;
+    }
   }
 
   run(): BattleResult {
@@ -319,6 +324,7 @@ export class BattleEngine {
   }
 
   private takeTurn(unit: BattleUnit, choice?: ManualChoice): void {
+    this.applyTrialBossTurnStart(unit);
     tickEffectsAtTurnStart(unit);
     tickCooldownsAtTurnStart(unit);
     tickShieldAtTurnStart(unit);
@@ -347,6 +353,44 @@ export class BattleEngine {
     }
 
     this.applyBurnAtTurnEnd(unit);
+  }
+
+  /** 試練70/80/90/100Fだけの、小さな宣言的フック。通常戦闘の効果解決経路は変えない。 */
+  private applyTrialBossTurnStart(unit: BattleUnit): void {
+    const floor = unit.def.bossTraits?.trialBossFloor;
+    if (!floor || !unit.alive) return;
+    unit.bossTurnsTaken += 1;
+    const ratio = hpRatio(unit);
+
+    // 回復は被弾時ではなく自身の手番開始時。共通applyHealを通すため治癒阻害も通常通り効く。
+    const healRate = floor === 70 ? 0.72 : floor === 100 && ratio > 0.7 ? 0.6 : 0;
+    if (healRate > 0) {
+      const before = unit.currentHp;
+      applyHeal(unit, Math.round(unit.maxHp * healRate));
+      const healed = unit.currentHp - before;
+      this.push(`${this.label(unit)} の超再生！ HPが ${healed} 回復！ (${unit.currentHp}/${unit.maxHp})`);
+      if (healed > 0) this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount: healed });
+    }
+
+    // 80Fは4手ごと、100Fは70%以下に入ってから4手ごと。永久免疫にはせず2ターンだけ張る。
+    const usesImmunity = floor === 80 || (floor === 100 && ratio <= 0.7);
+    if (usesImmunity && unit.bossTurnsTaken % 4 === 0 && unit.immuneTurns === 0 && !hasStatus(unit, "BUFF_BLOCK")) {
+      unit.immuneTurns = 3; // この直後の共通tickを経て、表示上/実効上は2ターン
+      this.push(`${this.label(unit)} は試練の障壁で状態異常免疫を得た！ (2ターン)`);
+    }
+
+    // 90Fは長期戦、100Fは40%以下または長期戦で狂化。永続バフなので最終的に耐久不能になる。
+    const shouldEnrage = floor === 90
+      ? unit.bossTurnsTaken >= 8
+      : floor === 100 && (ratio <= 0.4 || unit.bossTurnsTaken >= 8);
+    if (shouldEnrage && !unit.bossPhases.includes("ENRAGED")) {
+      unit.bossPhases.push("ENRAGED");
+      this.push(`${this.label(unit)} は狂化した！ 攻撃力と速度が大幅に上昇！`);
+    }
+    if (floor === 100 && ratio <= 0.1 && !unit.bossPhases.includes("LAST_STAND")) {
+      unit.bossPhases.push("LAST_STAND");
+      this.push(`${this.label(unit)} は最終試練へ移行した！`);
+    }
   }
 
   private act(unit: BattleUnit, choice?: ManualChoice): void {
@@ -711,6 +755,8 @@ export class BattleEngine {
 
         case "GAUGE": {
           if (!target.alive) break;
+          // 行動ゲージ減少も妨害効果。免疫中の敵へは通常のデバフ同様に通さない。
+          if ((effect.drain || effect.amount < 0) && target.team !== source.team && this.isImmune(target)) break;
           if (effect.drain) {
             // 吸収: 対象から減らした分をそのまま術者へ移す
             const before = target.gauge;
@@ -773,7 +819,7 @@ export class BattleEngine {
         }
 
         case "STRIP": {
-          if (this.isImmune(target)) break;
+          // STRIPは免疫そのものへの対抗手段なので、免疫では防がれない。
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           if (stripBuffs(target)) {
             this.push(`  → ${this.label(target)} の有利な効果が剥がされた！`);
