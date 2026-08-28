@@ -43,7 +43,7 @@ import {
   applyLevelDungeonClearRewards,
   applyStageClearRewards,
 } from "../game/rewards.js";
-import { applyMonsterPowerUp, checkMonsterPowerUp } from "../game/monsterPowerUp.js";
+import { checkMonsterPowerUp, consumeMonsterPowerUp } from "../game/monsterPowerUp.js";
 import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
 import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
 import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
@@ -749,18 +749,18 @@ function handleClearMonsterCreate(): void {
 function handleConfirmMonsterTraining(): void {
   const target = state.player.monsters.find((m) => m.id === state.monsterTrainingTargetId);
   if (!target) return;
-  const materials = state.monsterTrainingMaterialIds
-    .map((id) => state.player.monsters.find((m) => m.id === id))
-    .filter((m): m is MonsterInstance => m !== undefined);
-  const check = checkMonsterPowerUp(target, materials, state.player.partyIds);
-  if (!check.ok) {
+  const result = consumeMonsterPowerUp(
+    state.player.monsters,
+    target.id,
+    state.monsterTrainingMaterialIds,
+    state.player.partyIds,
+  );
+  if (!result.ok) {
     playSfx("denied", 0.7);
     return;
   }
 
-  applyMonsterPowerUp(target, materials);
   playSfx("levelUp");
-  removeMonsters(state.player, state.monsterTrainingMaterialIds);
   savePlayerState(state.player);
   state.monsterTrainingTargetId = null;
   state.monsterTrainingMaterialIds = [];

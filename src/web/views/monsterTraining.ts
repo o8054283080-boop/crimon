@@ -3,7 +3,7 @@ import { ELEMENTS, ELEMENT_COLOR, ELEMENT_JA, Element } from "../../core/element
 import { STARS, STAR_MAX_LEVEL, Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
-import { checkMonsterPowerUp, isSameElement, isSameSpecies, monsterPowerUpExp } from "../../game/monsterPowerUp.js";
+import { checkMonsterPowerUp, isSameElement, isSameSpecies, isSkillGrowthMaterial, isSkillPig, monsterPowerUpExp } from "../../game/monsterPowerUp.js";
 import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
 import { renderPartySlots } from "./partyCard.js";
@@ -38,7 +38,7 @@ export function filterTrainingMaterials(
   return candidates.filter((candidate) => {
     if (filter.element !== "ALL" && findMonsterById(candidate.dexId)?.element !== filter.element) return false;
     if (filter.star !== "ALL" && candidate.star !== filter.star) return false;
-    if (filter.use === "SAME_SPECIES" && !isSameSpecies(target, candidate)) return false;
+    if (filter.use === "SAME_SPECIES" && !isSkillGrowthMaterial(target, candidate)) return false;
     if (filter.use === "SAME_ELEMENT" && !isSameElement(target, candidate)) return false;
     if (filter.use === "SELECTED" && !selectedIds.includes(candidate.id)) return false;
     return true;
@@ -67,14 +67,14 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
 
   const isLevelMax = target.level >= STAR_MAX_LEVEL[target.star];
   const totalExp = monsterPowerUpExp(target, materials);
-  const bonusCount = materials.filter((m) => isSameSpecies(target, m)).length;
+  const bonusCount = materials.filter((m) => isSkillGrowthMaterial(target, m)).length;
   const sameElementCount = materials.filter((m) => isSameElement(target, m)).length;
 
   const shownCandidates = filterTrainingMaterials(candidates, target, props.selectedMaterialIds, props.filter);
   const cards = shownCandidates.map((c) =>
     monsterCard(c, () => props.onToggleMaterial(c.id), {
       selected: props.selectedMaterialIds.includes(c.id),
-      bonus: isSameSpecies(target, c),
+      bonus: isSkillGrowthMaterial(target, c),
     }),
   );
 
@@ -87,13 +87,16 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         `現在のスキルレベル: ${target.skillLevels.map((lvl, i) => `スキル${i + 1} Lv.${lvl}`).join(" / ")}`,
       ]),
       el("p", { className: "app-subtitle" }, [
-        "どのモンスターでも素材にすると経験値になり、対象のレベルが上がります。★マーク付きは対象と同じ種族(属性違いも可)で、1体につきランダムでいずれか1つのスキルレベルも+1されます。対象と同じ属性(色)の素材は経験値が1.5倍になります。",
+        "どのモンスターでも素材にすると経験値になり、対象のレベルが上がります。★マーク付きは同種族、または万能スキル育成素材のスキルピッグで、1体につきランダムでいずれか1つのスキルレベルも+1されます。対象と同じ属性(色)の素材は経験値が1.5倍になります。",
       ]),
+      candidates.some(isSkillPig)
+        ? el("p", { className: "app-subtitle" }, ["🐽 スキルピッグ: EXPは増やさず、どの種族にも使える万能スキル育成素材です。全スキル最大の対象には使用できません。"])
+        : null,
       isLevelMax
         ? el("p", { className: "app-subtitle training-warning" }, ["LvMAXのため経験値は獲得できません。同種族素材でスキル育成できます。"])
         : null,
       el("p", {}, [
-        `${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体・同属性${sameElementCount}体) / 獲得予定経験値 ${totalExp}${isLevelMax ? "（LvMAX）" : ""}`,
+        `${props.selectedMaterialIds.length}体選択中(うちスキル育成${bonusCount}体・同属性${sameElementCount}体) / 獲得予定経験値 ${totalExp}${isLevelMax ? "（LvMAX）" : ""}`,
       ]),
       /*
        * **選んだ顔ぶれをここに並べる。**
@@ -129,7 +132,7 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         el("div", { className: "mfilter__group" }, [
           el("span", { className: "mfilter__label" }, ["素材用途"]),
           el("div", { className: "mfilter__chips" }, [
-            ...([["ALL", "すべて"], ["SAME_SPECIES", "同じ種族"], ["SAME_ELEMENT", "同じ属性"], ["SELECTED", "選択中"]] as const).map(([use, label]) => {
+            ...([["ALL", "すべて"], ["SAME_SPECIES", "スキル育成"], ["SAME_ELEMENT", "同じ属性"], ["SELECTED", "選択中"]] as const).map(([use, label]) => {
               return filterChip(label, props.filter.use === use, () => props.onChangeFilter({ ...props.filter, use }));
             }),
           ]),
