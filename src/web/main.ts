@@ -1772,7 +1772,6 @@ function buildBackgroundFarmStatus(job: BackgroundFarmJob): HTMLElement {
     placement: "bottom",
     forceCompact: BATTLE_SCREENS.has(state.screen),
     compact: el("span", {}, [`🔁 ${job.targetName} ${job.completedRuns}/${job.requestedRuns}`]),
-    docked: el("span", {}, [`🔄 ${job.completedRuns}/${job.requestedRuns}`]),
     content: [el("div", { className: "background-farm-status", "data-background-farm-status": "true" }, [
     el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
       if (job.status !== "RUNNING") {
@@ -1814,7 +1813,6 @@ function buildTutorialFloatingPanel(): HTMLElement | null {
     placement: "top",
     forceCompact: BATTLE_SCREENS.has(state.screen),
     compact: el("span", {}, [complete ? `🎯 STEP ${mission.step} 達成！` : `🎯 STEP ${mission.step}　${mission.title} ${progress.replaceAll(" ", "")}`]),
-    docked: el("span", {}, [complete ? "🎯！" : "🎯"]),
     content: [el("section", { className: `tutorial-floating${complete ? " tutorial-floating--ready" : ""}` }, [
       el("strong", {}, ["初心者ミッション"]),
       el("span", { className: "tutorial-floating__step" }, [`STEP ${mission.step}`]),
