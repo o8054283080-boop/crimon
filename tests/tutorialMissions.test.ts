@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 import { generateEquipment } from "../src/core/equipment.js";
-import { TUTORIAL_MISSIONS, claimTutorialMission, nextTutorialMission } from "../src/game/tutorialMissions.js";
+import { TUTORIAL_MISSIONS, claimTutorialMission, nextTutorialMission, tutorialMissionProgress } from "../src/game/tutorialMissions.js";
 
 describe("30段階の初心者ロードマップ", () => {
   it("新規データはSTEP 1から始まり、順番を飛ばせない", () => {
@@ -69,5 +69,22 @@ describe("30段階の初心者ロードマップ", () => {
     expect(TUTORIAL_MISSIONS[24].condition).toContain("★6");
     expect(TUTORIAL_MISSIONS.slice(25).map((mission) => mission.destination)).toContain("MONSTER_CREATE");
     expect(TUTORIAL_MISSIONS[25].destination).toBe("MONSTER_CREATE");
+  });
+
+  it("3種類クリア条件は既存のclearedStageIdsから途中進捗を表示する", () => {
+    const player = createInitialState();
+    const mission = TUTORIAL_MISSIONS[4];
+    player.clearedStageIds = ["1-1_NORMAL", "1-2_NORMAL"];
+    expect(tutorialMissionProgress(player, mission)).toEqual({ current: 2, target: 3 });
+    player.clearedStageIds.push("1-3_NORMAL", "1-4_NORMAL");
+    expect(tutorialMissionProgress(player, mission)).toEqual({ current: 3, target: 3 });
+  });
+
+  it("途中値を持たない条件は従来どおり0/1で表示する", () => {
+    const player = createInitialState();
+    const mission = TUTORIAL_MISSIONS[3];
+    expect(tutorialMissionProgress(player, mission)).toEqual({ current: 0, target: 1 });
+    player.tutorialMissions.partyChanged = true;
+    expect(tutorialMissionProgress(player, mission)).toEqual({ current: 1, target: 1 });
   });
 });

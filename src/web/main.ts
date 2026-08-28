@@ -100,7 +100,7 @@ import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./vie
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
-import { TutorialDestination, canClaimTutorialMission, claimTutorialMission, nextTutorialMission } from "../game/tutorialMissions.js";
+import { TutorialDestination, canClaimTutorialMission, claimTutorialMission, nextTutorialMission, tutorialMissionProgress } from "../game/tutorialMissions.js";
 import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderPvpArena } from "./views/pvpArena.js";
@@ -1805,7 +1805,8 @@ function buildTutorialFloatingPanel(): HTMLElement | null {
   const mission = nextTutorialMission(state.player);
   if (!mission) return null;
   const complete = canClaimTutorialMission(state.player, mission);
-  const progress = complete ? "1 / 1" : "0 / 1";
+  const missionProgress = tutorialMissionProgress(state.player, mission);
+  const progress = `${missionProgress.current} / ${missionProgress.target}`;
   return createFloatingPanel({
     id: "tutorial-mission",
     label: "初心者ミッション",
