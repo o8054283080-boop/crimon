@@ -1,4 +1,5 @@
 import "./style.css";
+import "./mobile-ux.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";

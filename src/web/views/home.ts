@@ -216,10 +216,10 @@ function renderIdentity(
     el("div", { className: "home-id__body" }, [
       el("div", { className: "home-id__name" }, [
         el("strong", {}, [player.fighterName]),
-        el("button", { type: "button", className: "home-id__edit", onclick: onEditFighterName, title: "名前を変える" }, [
+        el("button", { type: "button", className: "home-id__edit", onclick: onEditFighterName, title: "名前を変える", "aria-label": "プレイヤー名を変える" }, [
           icon("pencil"),
         ]),
-        el("button", { type: "button", className: "home-id__edit home-id__gear", onclick: onOpenSettings, title: "設定" }, [
+        el("button", { type: "button", className: "home-id__edit home-id__gear", onclick: onOpenSettings, title: "設定", "aria-label": "設定を開く" }, [
           icon("settings"),
         ]),
       ]),
@@ -558,7 +558,7 @@ interface MenuTile {
  */
 function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => void, onViewMonster: (id: string) => void): HTMLElement {
   if (!instance) {
-    return el("button", { type: "button", className: "hp-card hp-card--empty", onclick: onGoParty }, [
+    return el("button", { type: "button", className: "hp-card hp-card--empty", onclick: onGoParty, "aria-label": "空き枠にモンスターを編成する" }, [
       el("span", { className: "hp-card__plus" }, ["＋"]),
       el("span", { className: "hp-card__emptytext" }, ["編成する"]),
     ]);
@@ -574,7 +574,7 @@ function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => v
       className: "hp-card",
       style: dex ? `--el-color:${dex.color}` : undefined,
       onclick: partyCardAction(instance, onGoParty, onViewMonster),
-      ariaLabel: `${dex?.name ?? instance.dexId}の詳細と装備を見る`,
+      "aria-label": `${dex?.name ?? instance.dexId}の詳細と装備を見る`,
     },
     [
       withPortrait(el("span", { className: "hp-card__art" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
@@ -817,7 +817,7 @@ export function renderHome(props: HomeProps): HTMLElement {
       ),
       el(
         "div",
-        { className: "home-party-grid" },
+        { className: "home-party-grid", "aria-label": "現在のパーティ" },
         Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], onGoParty, onViewPartyMonster)),
       ),
     ]),

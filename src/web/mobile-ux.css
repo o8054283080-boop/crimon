@@ -1,0 +1,150 @@
+/* iPhone UX primitives. Screen-specific visual design remains in each view CSS. */
+:root {
+  --tap-target: 44px;
+  --motion-tap: 110ms;
+  --motion-enter: 220ms;
+  --safe-bottom-nav: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+}
+
+html {
+  min-width: 320px;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior-x: none;
+}
+
+button,
+[role="button"],
+a[href] {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a[href]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #f4cf83;
+  outline-offset: 2px;
+}
+
+/* Persistent navigation must clear the Home Indicator and remain a real 44px target. */
+.bottom-nav {
+  padding-right: max(6px, env(safe-area-inset-right));
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  padding-left: max(6px, env(safe-area-inset-left));
+}
+
+.bottom-nav__btn {
+  min-height: var(--tap-target);
+  transition: color var(--motion-tap) ease, background-color var(--motion-tap) ease,
+    transform var(--motion-tap) ease, opacity var(--motion-tap) ease;
+}
+
+.bottom-nav__btn:active,
+.home-adventure:active,
+.home-tile:active,
+.hp-card:active,
+.btn-frame:active,
+.home-id__edit:active {
+  transform: scale(.98);
+  opacity: .88;
+}
+
+/* Home controls and changing numbers retain their geometry as values change. */
+.home-id__edit,
+.btn-frame,
+.home-stamina-bar__actions .btn,
+.home-vitals__actions .btn {
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+}
+
+.home-id__name strong {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.home-wallet__chip strong,
+.home-wallet__suffix,
+.home-stat strong,
+.home-stamina__num,
+.home-id__level,
+.hp-card__level,
+.tower-floor {
+  font-variant-numeric: tabular-nums;
+}
+
+.home-wallet__chip,
+.home-stat,
+.home-stamina__num {
+  min-width: 0;
+}
+
+.home-wallet__chip strong,
+.home-wallet__suffix,
+.home-stat strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-party-grid {
+  align-items: stretch;
+}
+
+.hp-card {
+  min-height: var(--tap-target);
+  contain: layout paint;
+}
+
+.hp-card__art {
+  pointer-events: none;
+}
+
+/* Fixed navigation is accounted for even on screens that do not use .screen. */
+.screen {
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(96px, calc(var(--safe-bottom-nav) + 24px));
+  padding-left: max(16px, env(safe-area-inset-left));
+}
+
+.home-menu {
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(96px, calc(var(--safe-bottom-nav) + 24px));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+
+  .bottom-nav__btn:active,
+  .home-adventure:active,
+  .home-tile:active,
+  .hp-card:active,
+  .btn-frame:active,
+  .home-id__edit:active {
+    transform: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .bottom-nav__btn {
+    min-height: 40px;
+  }
+}

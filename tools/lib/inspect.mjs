@@ -45,8 +45,8 @@ export const INSPECT = `(() => {
   // 3. 指で押すには小さすぎる的。
   //    実測したところ、並べ替えの札が29px、ショップの購入が31pxしかなく、
   //    **買う・編成するという取り返しのつかない操作ほど的が小さい**
-  //    という逆転が起きていた。36pxを下回るものを拾う。
-  const TAP_MIN = 36;
+  //    という逆転が起きていた。iPhone向けの44px基準を下回るものを拾う。
+  const TAP_MIN = 44;
   for (const b of buttons) {
     if (b.closest('.dev-menu')) continue;
     const r = b.getBoundingClientRect();

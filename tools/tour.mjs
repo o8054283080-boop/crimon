@@ -60,7 +60,11 @@ const SCREENS = [
 ];
 
 const SIZES = [
-  { label: "縦(iPhone)", width: 390, height: 844 },
+  { label: "縦(iPhone SE相当)", width: 375, height: 812 },
+  { label: "縦(iPhone 14)", width: 390, height: 844 },
+  { label: "縦(iPhone 15 Pro)", width: 393, height: 852 },
+  { label: "縦(iPhone 16 Pro)", width: 402, height: 874 },
+  { label: "縦(iPhone Pro Max)", width: 430, height: 932 },
   { label: "横", width: 844, height: 390 },
 ];
 
