@@ -100,7 +100,7 @@ import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./vie
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
-import { TutorialDestination, claimTutorialMission } from "../game/tutorialMissions.js";
+import { TutorialDestination, canClaimTutorialMission, claimTutorialMission, nextTutorialMission, tutorialMissionProgress } from "../game/tutorialMissions.js";
 import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { renderPvpArena } from "./views/pvpArena.js";
@@ -129,6 +129,7 @@ import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/
 import { renderSummon } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
+import { createFloatingPanel } from "./floatingPanel.js";
 
 let appMounted = false;
 const pwaUpdate = new PwaUpdateController(
@@ -1765,7 +1766,13 @@ function renderCurrentWaveBattle(): BattleViewHandle {
 function buildBackgroundFarmStatus(job: BackgroundFarmJob): HTMLElement {
   const remaining = Math.max(0, job.requestedRuns - job.completedRuns);
   const status = job.status === "RUNNING" ? "進行中" : job.status === "COMPLETED" ? "完了" : "終了";
-  return el("aside", { className: "background-farm-status", "data-background-farm-status": "true" }, [
+  return createFloatingPanel({
+    id: "background-farm",
+    label: "自動周回",
+    placement: "bottom",
+    forceCompact: BATTLE_SCREENS.has(state.screen),
+    compact: el("span", {}, [`🔁 ${job.targetName} ${job.completedRuns}/${job.requestedRuns}`]),
+    content: [el("div", { className: "background-farm-status", "data-background-farm-status": "true" }, [
     el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
       if (job.status !== "RUNNING") {
         state.autoFarmResult = job.result; state.autoFarmTargetName = job.targetName; state.viewingBackgroundFarmJobId = job.id; state.screen = "AUTO_FARM_RESULT"; render();
@@ -1777,17 +1784,68 @@ function buildBackgroundFarmStatus(job: BackgroundFarmJob): HTMLElement {
     } }, ["周回を終了"]) : el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
       state.autoFarmResult = job.result; state.autoFarmTargetName = job.targetName; state.viewingBackgroundFarmJobId = job.id; state.screen = "AUTO_FARM_RESULT"; render();
     } }, ["結果を見る"]),
-  ]);
+    ])],
+  });
+}
+
+function goTutorialDestination(destination: TutorialDestination): void {
+  if (destination === "MONSTER_CREATE") {
+    const target = state.player.monsters.find(m => m.star === 6);
+    if (target) {
+      state.createTargetId = target.id; state.createMenu = "ABILITY";
+      state.player.tutorialMissions.createOpened = true; savePlayerState(state.player);
+      state.screen = "MONSTER_CREATE"; render(); return;
+    }
+    navigate("MONSTERS"); return;
+  }
+  navigate(destination);
+}
+
+function buildTutorialFloatingPanel(): HTMLElement | null {
+  const mission = nextTutorialMission(state.player);
+  if (!mission) return null;
+  const complete = canClaimTutorialMission(state.player, mission);
+  const missionProgress = tutorialMissionProgress(state.player, mission);
+  const progress = `${missionProgress.current} / ${missionProgress.target}`;
+  return createFloatingPanel({
+    id: "tutorial-mission",
+    label: "初心者ミッション",
+    placement: "top",
+    forceCompact: BATTLE_SCREENS.has(state.screen),
+    compact: el("span", {}, [complete ? `🎯 STEP ${mission.step} 達成！` : `🎯 STEP ${mission.step}　${mission.title} ${progress.replaceAll(" ", "")}`]),
+    content: [el("section", { className: `tutorial-floating${complete ? " tutorial-floating--ready" : ""}` }, [
+      el("strong", {}, ["初心者ミッション"]),
+      el("span", { className: "tutorial-floating__step" }, [`STEP ${mission.step}`]),
+      el("b", {}, [complete ? `🎯 STEP ${mission.step} 達成！` : mission.title]),
+      el("span", {}, [mission.condition]),
+      el("span", { className: "tutorial-floating__progress" }, [progress]),
+      el("div", { className: "tutorial-floating__actions" }, [
+        el("button", { type: "button", className: "btn btn--ghost", onclick: () => goTutorialDestination(mission.destination) }, ["移動する"]),
+        ...(complete ? [el("button", { type: "button", className: "btn btn--primary", onclick: () => {
+          if (claimTutorialMission(state.player, mission.id)) { savePlayerState(state.player); playSfx("stageClear"); }
+          render();
+        } }, ["報酬を受け取る"])] : []),
+      ]),
+    ])],
+  });
 }
 
 /** 前景画面には触れず、バックグラウンド周回カードだけを差分更新する。 */
 function refreshBackgroundFarmStatus(): void {
-  const current = root.querySelector<HTMLElement>("[data-background-farm-status]");
+  const current = root.querySelector<HTMLElement>("[data-floating-panel=\"background-farm\"]");
   const job = state.player.backgroundFarmJob;
-  if (!job) { current?.remove(); return; }
-  const next = buildBackgroundFarmStatus(job);
-  if (current) current.replaceWith(next);
-  else root.append(next);
+  if (job) {
+    const next = buildBackgroundFarmStatus(job);
+    if (current) current.replaceWith(next);
+    else root.append(next);
+  } else {
+    current?.remove();
+  }
+  const tutorialCurrent = root.querySelector<HTMLElement>("[data-floating-panel=\"tutorial-mission\"]");
+  const tutorialNext = buildTutorialFloatingPanel();
+  if (tutorialCurrent && tutorialNext) tutorialCurrent.replaceWith(tutorialNext);
+  else if (tutorialCurrent) tutorialCurrent.remove();
+  else if (tutorialNext) root.append(tutorialNext);
 }
 
 function render(): void {
@@ -1830,18 +1888,7 @@ function render(): void {
         onGoArena: () => navigate("ARENA"),
         onGoTrialTower: () => navigate("TRIAL_TOWER"),
         onGoHowToPlay: () => navigate("HOW_TO_PLAY"),
-        onGoTutorialDestination: (destination: TutorialDestination) => {
-          if (destination === "MONSTER_CREATE") {
-            const target = state.player.monsters.find(m => m.star === 6);
-            if (target) {
-              state.createTargetId = target.id; state.createMenu = "ABILITY";
-              state.player.tutorialMissions.createOpened = true; savePlayerState(state.player);
-              state.screen = "MONSTER_CREATE"; render(); return;
-            }
-            navigate("MONSTERS"); return;
-          }
-          navigate(destination);
-        },
+        onGoTutorialDestination: goTutorialDestination,
         onClaimTutorial: (id) => {
           if (claimTutorialMission(state.player, id)) { savePlayerState(state.player); playSfx("stageClear"); }
           render();
@@ -2376,6 +2423,8 @@ function render(): void {
   if (backgroundJob) {
     root.append(buildBackgroundFarmStatus(backgroundJob));
   }
+  const tutorialFloating = buildTutorialFloatingPanel();
+  if (tutorialFloating) root.append(tutorialFloating);
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
   playBgm(bgmSceneOf(state.screen));
 

@@ -4352,10 +4352,29 @@ body {
 
 .autofarm__input-label { display: grid; gap: 6px; font-size: .8rem; font-weight: 800; }
 .autofarm__input-label input { width: 100%; min-height: 46px; font-size: 1rem; }
-.background-farm-status { position: fixed; z-index: 30; left: 8px; right: 8px; bottom: 72px; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 10px; border: 1px solid #d6a84a; border-radius: 12px; background: rgba(25,18,13,.96); box-shadow: 0 6px 22px #0009; }
+.floating-panel-safe-probe { position: fixed; visibility: hidden; pointer-events: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.floating-panel { position: fixed; z-index: 31; width: min(360px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 16px)); border: 1px solid #d6a84a; border-radius: 12px; background: rgba(25,18,13,.96); box-shadow: 0 6px 22px #0009; overflow: hidden; }
+.floating-panel--top { top: calc(env(safe-area-inset-top) + 8px); left: calc(env(safe-area-inset-left) + 8px); }
+.floating-panel--bottom { right: calc(env(safe-area-inset-right) + 8px); bottom: calc(env(safe-area-inset-bottom) + 76px); }
+.floating-panel--dragging { opacity: .92; box-shadow: 0 10px 30px #000c; }
+.floating-panel__handle { display: block; width: 100%; height: 20px; padding: 0; border: 0; color: #baab96; background: transparent; font-size: .7rem; line-height: 18px; cursor: grab; touch-action: none; user-select: none; }
+.floating-panel__handle:active { cursor: grabbing; }
+.floating-panel__body { position: relative; }
+.floating-panel__collapse { position: absolute; z-index: 1; top: 1px; right: 4px; width: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 8px; color: #ffe0a0; background: #ffffff12; font-size: 1.2rem; }
+.floating-panel__compact { display: block; width: 100%; min-height: 36px; padding: 5px 10px 8px; overflow: hidden; border: 0; color: #ffe0a0; background: transparent; text-align: left; text-overflow: ellipsis; white-space: nowrap; font-weight: 900; }
+.floating-panel__compact[hidden], .floating-panel__body[hidden] { display: none; }
+.background-farm-status { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 2px 10px 10px; }
 .background-farm-status__summary { border: 0; padding: 0; color: #ffe0a0; background: transparent; text-align: left; font-weight: 900; }
 .background-farm-status__detail { grid-column: 1; color: #ddd; font-size: .72rem; }
 .background-farm-status .btn { grid-column: 2; grid-row: 1 / span 2; min-height: 42px; }
+.tutorial-floating { display: grid; gap: 3px; padding: 2px 42px 10px 10px; color: #eee; font-size: .78rem; }
+.tutorial-floating > strong { color: #ffd66b; }
+.tutorial-floating__step { color: #b9a8ff; font-weight: 900; }
+.tutorial-floating__progress { font-weight: 900; }
+.tutorial-floating--ready { border-left: 3px solid #76e39b; }
+.tutorial-floating--ready > b { color: #76e39b; }
+.tutorial-floating__actions { display: flex; gap: 6px; margin-top: 3px; }
+.tutorial-floating__actions .btn { min-height: 34px; padding: 5px 9px; font-size: .72rem; }
 
 /* 全画面共通。戦闘HUDを隠しにくいよう上端のsafe-area内へ小さく固定する。 */
 .pwa-update-banner {

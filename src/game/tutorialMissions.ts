@@ -6,6 +6,8 @@ export interface TutorialMission {
   id: string; step: number; chapter: number; chapterTitle: string; title: string;
   condition: string; reward: TutorialReward; destination: TutorialDestination;
   isComplete: (player: PlayerState) => boolean;
+  /** 途中経過を既存PlayerStateから算出できる条件だけが持つ表示用メタデータ。 */
+  progress?: (player: PlayerState) => { current: number; target: number };
 }
 
 const maxStar = (p: PlayerState, star: number, level = 1) => p.monsters.some((m) => m.star >= star && m.level >= level);
@@ -16,8 +18,8 @@ const abilityPoints = (p: PlayerState) => p.monsters.some((m) => Object.values(m
 const typed = (p: PlayerState) => p.monsters.some((m) => m.development.type !== null);
 
 const chapters = ["冒険の始まり", "モンスターを育てる", "装備と本格育成", "★6への道", "クリエイト入門"];
-const m = (step: number, chapter: number, title: string, condition: string, reward: TutorialReward, destination: TutorialDestination, isComplete: TutorialMission["isComplete"]): TutorialMission =>
-  ({ id: `tutorial-step-${step}`, step, chapter, chapterTitle: chapters[chapter - 1], title, condition, reward, destination, isComplete });
+const m = (step: number, chapter: number, title: string, condition: string, reward: TutorialReward, destination: TutorialDestination, isComplete: TutorialMission["isComplete"], progress?: TutorialMission["progress"]): TutorialMission =>
+  ({ id: `tutorial-step-${step}`, step, chapter, chapterTitle: chapters[chapter - 1], title, condition, reward, destination, isComplete, progress });
 
 /** 報酬・条件・移動先を一か所で監査できる、一本道の初心者ロードマップ。 */
 export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
@@ -25,7 +27,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   m(2,1,"Lv5を目指そう","モンスター1体をLv5以上",{gold:6000},"MONSTERS",p=>maxStar(p,1,5)),
   m(3,1,"Lv10を目指そう","モンスター1体をLv10以上",{gold:7000,crystal:20},"MONSTERS",p=>maxStar(p,1,10)),
   m(4,1,"編成を整えよう","パーティ編成を変更",{gold:5000},"PARTY",p=>p.tutorialMissions.partyChanged),
-  m(5,1,"冒険に慣れよう","通常ステージを3種類クリア",{gold:10000,crystal:30},"STAGES",p=>p.clearedStageIds.length>=3),
+  m(5,1,"冒険に慣れよう","通常ステージを3種類クリア",{gold:10000,crystal:30},"STAGES",p=>p.clearedStageIds.length>=3,p=>({current:p.clearedStageIds.length,target:3})),
   m(6,2,"初めての★3","★3以上のモンスターを所持",{gold:20000,crystal:40,summonScrolls:1},"MONSTERS",p=>maxStar(p,3)),
   m(7,2,"★3を育成","★3以上をLv10以上",{gold:12000},"MONSTERS",p=>maxStar(p,3,10)),
   m(8,2,"装備を着けよう","1体に装備を1個装着",{gold:10000,crystal:20},"MONSTERS",p=>equipped(p,1)),
@@ -59,6 +61,12 @@ export function nextTutorialMission(player: PlayerState): TutorialMission | unde
 export function canClaimTutorialMission(player: PlayerState, mission: TutorialMission): boolean {
   const next = nextTutorialMission(player);
   return next?.id === mission.id && mission.isComplete(player);
+}
+/** 新しいカウンターを持たず、ミッション定義が参照する既存状態から表示値を得る。 */
+export function tutorialMissionProgress(player: PlayerState, mission: TutorialMission): { current: number; target: number } {
+  if (!mission.progress) return { current: mission.isComplete(player) ? 1 : 0, target: 1 };
+  const progress = mission.progress(player);
+  return { current: Math.min(progress.target, Math.max(0, progress.current)), target: progress.target };
 }
 export function claimTutorialMission(player: PlayerState, id: string): boolean {
   const mission = TUTORIAL_MISSIONS.find((x) => x.id === id);
