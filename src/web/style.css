@@ -5161,6 +5161,16 @@ body {
 }
 
 .latent-choice__name { color: #ffe9a8; }
+.latent-choice__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.latent-choice__role {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #dce8ff;
+  background: rgba(80, 120, 190, 0.3);
+  font-size: 0.64rem;
+  font-weight: 800;
+}
 .latent-choice__description { font-size: 0.68rem; line-height: 1.5; }
 .latent-choice__effect { color: var(--text-dim); }
 .latent-choice__select { align-self: flex-end; min-width: 92px; }
@@ -5180,6 +5190,7 @@ body {
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
 }
+.latent-confirm .latent-choices { grid-template-columns: 1fr; }
 
 .latent-confirm p { font-size: 0.74rem; line-height: 1.6; }
 .latent-confirm__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }

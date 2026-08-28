@@ -5,7 +5,7 @@ import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterIn
 import { Skill } from "../src/core/skill.js";
 import { findMonster } from "../src/data/monsters.js";
 import { LATENT_ABILITY_CANDIDATES } from "../src/data/latentAbilities.js";
-import { awakenLatentAbility, reawakenLatentAbility } from "../src/game/monsterDevelopment.js";
+import { awakenLatentAbility, confirmLatentAwakening } from "../src/game/monsterDevelopment.js";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 import { setupDungeonBattle } from "../src/game/dungeonRunner.js";
 
@@ -77,8 +77,7 @@ describe("潜在能力のBattleEngine接続", () => {
     const wallet = { awakeningOrbs: 5, gold: 200_000 };
     expect(awakenLatentAbility(instance, candidates[0].id, candidates, wallet)).toBe(true);
     expect(toBattleDefinition(instance, findMonster("slime", "FIRE")!).latentAbility?.id).toBe(candidates[0].id);
-    expect(reawakenLatentAbility(instance, wallet)).toBe(true);
-    expect(awakenLatentAbility(instance, candidates[2].id, candidates, wallet)).toBe(true);
+    expect(confirmLatentAwakening(instance, candidates[2].id, candidates, wallet, candidates[0].id).ok).toBe(true);
     const state = createInitialState(); state.monsters[0] = instance;
     const loaded = normalizeLoadedState(JSON.parse(JSON.stringify(state))).monsters[0];
     expect(loaded.development.latentAbilityId).toBe(candidates[2].id);
