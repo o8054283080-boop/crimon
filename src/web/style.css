@@ -5379,20 +5379,54 @@ body {
 
 .equip-sort {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
 }
 
 /* 頭に何の帯かを置く。無いと絞り込みの帯と見分けが付かない */
 .equip-sort__label {
   flex: none;
-  padding-top: 8px;
   font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   color: #a98f63;
   white-space: nowrap;
 }
+
+.equip-sort__control {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+
+.equip-sort__select {
+  width: 100%;
+  min-height: 40px;
+  appearance: none;
+  border: 1px solid rgba(226, 182, 110, 0.5);
+  border-radius: 11px;
+  padding: 7px 38px 7px 12px;
+  color: #ffe7b8;
+  background: linear-gradient(180deg, #3c3320, #251d10);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 230, 180, 0.22);
+}
+
+.equip-sort__control::after {
+  content: "▾";
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  translate: 0 -50%;
+  color: #e2b66e;
+  pointer-events: none;
+}
+
+/* ネイティブselect自身が選択値を常時表示する。読み上げと二重にならない装飾用。 */
+.equip-sort__current { display: none; }
 
 .equip-sort__chips {
   display: flex;
@@ -5482,6 +5516,20 @@ body {
   gap: 2px;
 }
 
+.equip-card__meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.equip-card__slot {
+  flex: none;
+  font-size: 0.58rem;
+  font-weight: 900;
+  color: var(--eq-tone, #a9b8dc);
+}
+
 .equip-card__set {
   max-width: 100%;
   overflow: hidden;
@@ -5516,6 +5564,59 @@ body {
 .equip-card__owner--free .equip-card__dot {
   background: #3d4560;
   box-shadow: none;
+}
+
+/* メインは名称と数値を分け、比較の軸になる数値をカード最大の文字にする。 */
+.equip-card__main {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 3px 0 5px;
+}
+
+.equip-card__main-label {
+  min-width: 0;
+  font-size: 0.68rem;
+  color: #c8d2ed;
+  white-space: nowrap;
+}
+
+.equip-card__main-value {
+  font-size: 1.22rem;
+  line-height: 1;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow: 0 0 10px var(--eq-glow, transparent);
+  white-space: nowrap;
+}
+
+/* 4行の値は残したまま2列にして、縦方向の占有だけを半分にする。 */
+.equip-card__subs {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 6px;
+}
+
+.equip-card__sub-line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  .equipment-screen { gap: 8px; }
+  .equip-toolbar .btn { min-height: 42px; padding: 8px 9px; }
+  .equip-filter { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
+  .equip-filter::-webkit-scrollbar { display: none; }
+  .equip-filter__chip { width: 38px; height: 38px; }
+  .equip-filter__chip--all { width: auto; }
+  .equip-grid { gap: 8px; }
+  .equip-card { padding: 8px; }
 }
 
 /* --- 詳細 ----------------------------------------------------------------
