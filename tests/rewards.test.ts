@@ -3,6 +3,7 @@ import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
 import { STAGES } from "../src/data/stages.js";
 import {
   createInitialState,
+  FIGHTER_LEVEL_UP_CRYSTAL_REWARD,
   getParty,
   FIRST_CLEAR_CRYSTAL_REWARD,
   REPEAT_CLEAR_CRYSTAL_CHANCE,
@@ -21,7 +22,9 @@ describe("ダイヤ報酬 (applyStageClearRewards)", () => {
     const result = applyStageClearRewards(state, stage, stage.waves.length, party);
 
     expect(result.crystalEarned).toBe(FIRST_CLEAR_CRYSTAL_REWARD);
-    expect(state.crystal).toBeGreaterThanOrEqual(before + FIRST_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBe(
+      before + FIRST_CLEAR_CRYSTAL_REWARD + result.fighterLevelsGained * FIGHTER_LEVEL_UP_CRYSTAL_REWARD,
+    );
   });
 
   it("2回目以降のクリアは3%の確率でダイヤ50がもらえる(当選時)", () => {
@@ -33,10 +36,10 @@ describe("ダイヤ報酬 (applyStageClearRewards)", () => {
     const before = state.crystal;
     const result = applyStageClearRewards(state, stage, stage.waves.length, party, "NORMAL", () => 0);
 
-    // crystalEarnedがステージクリア分のダイヤ。state.crystalの増分にはこれに加えて
-    // ファイターレベルアップ報酬が乗ることがあるため、結果フィールド側だけを厳密に検証する
     expect(result.crystalEarned).toBe(REPEAT_CLEAR_CRYSTAL_REWARD);
-    expect(state.crystal).toBeGreaterThanOrEqual(before + REPEAT_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBe(
+      before + REPEAT_CLEAR_CRYSTAL_REWARD + result.fighterLevelsGained * FIGHTER_LEVEL_UP_CRYSTAL_REWARD,
+    );
   });
 
   it("2回目以降のクリアは外れれば0ダイヤになる", () => {
@@ -49,7 +52,7 @@ describe("ダイヤ報酬 (applyStageClearRewards)", () => {
     const result = applyStageClearRewards(state, stage, stage.waves.length, party, "NORMAL", () => REPEAT_CLEAR_CRYSTAL_CHANCE);
 
     expect(result.crystalEarned).toBe(0);
-    expect(state.crystal).toBeGreaterThanOrEqual(before);
+    expect(state.crystal).toBe(before + result.fighterLevelsGained * FIGHTER_LEVEL_UP_CRYSTAL_REWARD);
   });
 });
 
@@ -63,7 +66,9 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
     const result = applyDungeonClearRewards(state, floor, party);
 
     expect(result.crystalEarned).toBe(FIRST_CLEAR_CRYSTAL_REWARD);
-    expect(state.crystal).toBeGreaterThanOrEqual(before + FIRST_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBe(
+      before + FIRST_CLEAR_CRYSTAL_REWARD + result.fighterLevelsGained * FIGHTER_LEVEL_UP_CRYSTAL_REWARD,
+    );
   });
 
   it("2回目以降のクリアは3%の確率でダイヤ50がもらえる(当選時)", () => {
@@ -76,7 +81,9 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
     const result = applyDungeonClearRewards(state, floor, party, () => 0);
 
     expect(result.crystalEarned).toBe(REPEAT_CLEAR_CRYSTAL_REWARD);
-    expect(state.crystal).toBeGreaterThanOrEqual(before + REPEAT_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBe(
+      before + REPEAT_CLEAR_CRYSTAL_REWARD + result.fighterLevelsGained * FIGHTER_LEVEL_UP_CRYSTAL_REWARD,
+    );
   });
 
   it("2回目以降のクリアは外れれば0ダイヤになる", () => {
@@ -89,7 +96,7 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
     const result = applyDungeonClearRewards(state, floor, party, () => REPEAT_CLEAR_CRYSTAL_CHANCE);
 
     expect(result.crystalEarned).toBe(0);
-    expect(state.crystal).toBeGreaterThanOrEqual(before);
+    expect(state.crystal).toBe(before + result.fighterLevelsGained * FIGHTER_LEVEL_UP_CRYSTAL_REWARD);
   });
 
   it("階層が異なればそれぞれ初回扱いになる", () => {
