@@ -3,6 +3,7 @@ import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { icon, slotIcon } from "../icons.js";
+import { managementHeader } from "./managementHeader.js";
 
 export interface EquipmentPickerContext {
   monsterId: string;
@@ -80,7 +81,7 @@ function equipmentOwnerName(player: PlayerState, equipment: Equipment): string |
  *   中央に大きくメインの数値 ……………… その装備を選ぶ理由
  *   下にサブと持ち主 ………………………… 確かめる時だけ読む
  */
-function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () => void): HTMLElement {
+function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () => void, currentId?: string): HTMLElement {
   const ownerName = equipmentOwnerName(player, equipment);
   const subLines =
     equipment.subStats.length > 0
@@ -93,7 +94,7 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
     "button",
     {
       type: "button",
-      className: "equip-card",
+      className: `equip-card${equipment.id === currentId ? " equip-card--current" : ""}`,
       onclick: onClick,
       "data-star": String(equipment.star),
       "data-set": equipment.set,
@@ -109,6 +110,8 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
         ]),
         el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
       ]),
+      equipment.id === currentId ? el("span", { className: "equip-card__status" }, ["現在装備中"]) : null,
+      equipment.locked ? el("span", { className: "equip-card__lock" }, ["🔒 ロック"]) : null,
       el("div", { className: "equip-card__main" }, [formatStatValue(equipment.mainStat)]),
       el("div", { className: "equip-card__subs" }, subLines),
       ownerName
@@ -117,7 +120,7 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
             el("i", { className: "equip-card__dot" }, []),
             "未装着",
           ]),
-    ],
+    ].filter((node): node is HTMLElement => node !== null),
   );
 }
 
@@ -241,6 +244,12 @@ function renderList(props: EquipmentProps): HTMLElement {
         .sort(compareBySort(props.sortKey, isEquipped));
 
   const selecting = props.selecting && !props.pickerContext;
+  const pickerMonster = props.pickerContext
+    ? props.player.monsters.find((monster) => monster.id === props.pickerContext!.monsterId)
+    : undefined;
+  const currentEquipmentId = props.pickerContext && pickerMonster
+    ? pickerMonster.equipment[props.pickerContext.slot]
+    : undefined;
 
   const cards = items.map((eq) => {
     const card = equipmentCard(props.player, eq, () => {
@@ -252,7 +261,7 @@ function renderList(props: EquipmentProps): HTMLElement {
       } else {
         props.onSelectDetail(eq.id);
       }
-    });
+    }, currentEquipmentId);
     if (selecting) {
       card.classList.add("equip-card--selectable");
       if (isEquipped(eq) || eq.locked) card.classList.add("equip-card--locked");
@@ -266,10 +275,9 @@ function renderList(props: EquipmentProps): HTMLElement {
   // 縦に2枚並び、絞り込みの2段と合わせて**上から360pxが全部つまみ**だった。
   // 行き先(ダンジョン)と道具の整理(まとめ売り)を1段に並べる
   const toolbar = props.pickerContext
-    ? el("button", { type: "button", className: "btn btn--ghost btn--large equip-picker__cancel", onclick: props.onCancelPicker }, [
-        icon("back"),
-        "キャンセル",
-      ])
+    ? currentEquipmentId
+      ? el("div", { className: "equip-picker__current" }, ["枠内で比較中：", el("strong", {}, ["現在装備中"]), " の札を強調しています"])
+      : el("div", { className: "equip-picker__current" }, ["この枠は未装備です"])
     : el("div", { className: "equip-toolbar" }, [
         el("button", { type: "button", className: "btn btn--gold equip-toolbar__go", onclick: props.onGoDungeon }, [
           icon("equipDungeon"),
@@ -287,10 +295,14 @@ function renderList(props: EquipmentProps): HTMLElement {
       ]);
 
   return el("div", { className: "screen equipment-screen" }, [
-    el("header", { className: "app-header" }, [
+    props.pickerContext ? managementHeader(
+      `スロット${props.pickerContext.slot}を変更`,
+      props.onCancelPicker,
+      pickerMonster ? (findMonsterById(pickerMonster.dexId)?.name ?? pickerMonster.dexId) : "",
+    ) : el("header", { className: "app-header" }, [
       // 「スロット1の装備を選択」は390pxの幅で「…装備を / 選択」と2行に割れ、
       // 見出しだけで縦100pxを使っていた。同じことを1行で言う
-      el("h1", {}, [props.pickerContext ? `スロット${props.pickerContext.slot}に付ける` : "所持装備"]),
+      el("h1", {}, ["所持装備"]),
       el("p", { className: "app-subtitle" }, [`${items.length}個`]),
     ]),
     toolbar,
@@ -317,7 +329,7 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
   const progress = Math.max(0, Math.min(1, equipment.level / MAX_LEVEL));
 
   return el("div", { className: "screen equipment-screen equipment-screen--detail" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, [`スロット${equipment.slot}の装備`])]),
+    managementHeader(`スロット${equipment.slot}の装備`, () => props.onSelectDetail(null), ownerName ?? "装備詳細"),
 
     /* 銘板。
      * 前は文字を7行縦に積んだだけで、**どれが主役の数字か**が分からなかった。
@@ -403,10 +415,6 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
       [icon("tag"), `売却する`, el("span", { className: "equip-detail__sell-price" }, [icon("coin"), sellPrice.toLocaleString("ja-JP")])],
     ),
 
-    el("button", { type: "button", className: "btn equip-detail__back", onclick: () => props.onSelectDetail(null) }, [
-      icon("back"),
-      "一覧に戻る",
-    ]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 

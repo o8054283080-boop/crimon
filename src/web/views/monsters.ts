@@ -16,6 +16,7 @@ import { icon } from "../icons.js";
 import { CreateSlot, currentSkillOf, describeCreatedSkill } from "../../game/monsterCreate.js";
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
+import { managementHeader } from "./managementHeader.js";
 
 export interface MonstersProps {
   player: PlayerState;
@@ -136,7 +137,7 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
         {
           type: "button",
           className: "equip-slot equip-slot--filled",
-          onclick: () => props.onViewEquippedSlot(equipment.id, instance.id),
+          onclick: () => props.onSelectSlot(instance.id, slot),
           "data-star": String(equipment.star),
           "data-set": equipment.set,
           "data-tier": equipment.level >= 12 ? "max" : equipment.level >= 6 ? "mid" : "low",
@@ -229,7 +230,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const gearedSlots = equippedItems.length;
 
   return el("div", { className: "screen monsters-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, [dex ? dex.name : instance.dexId])]),
+    managementHeader(dex ? dex.name : instance.dexId, () => props.onSelectDetail(null), `${starLabel(instance.star)} Lv${instance.level}`),
     el("section", { className: "panel monster-detail", "data-star": String(instance.star) }, [
       // 集めたものを眺める画面なので、肖像を主役の大きさで出す
       el("div", { className: "monster-detail__hero" }, [
@@ -294,7 +295,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
       : el("div", { className: "panel rankup-hint" }, [
           instance.star >= 6 ? "最大ランクに到達しています" : `最大レベル(Lv${maxLevel})になるとランクアップできます`,
         ]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectDetail(null) }, ["◀ 一覧に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 
@@ -317,7 +317,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
   );
 
   return el("div", { className: "screen monsters-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["ランクアップ素材選択"])]),
+    managementHeader("ランクアップ", props.onCancelRankUp, dex ? dex.name : target.dexId),
     el("section", { className: "panel" }, [
       el("p", {}, [`対象: ${dex ? dex.name : target.dexId} ${starLabel(target.star)} → ${starLabel((target.star + 1) as 1 | 2 | 3 | 4 | 5)}`]),
       el("p", {}, [`同じ星(${starLabel(target.star)})のモンスターを${requiredCount}体選択してください (${props.selectedSacrificeIds.length}/${requiredCount})`]),

@@ -7,6 +7,7 @@ import { checkMonsterPowerUp, isSameElement, isSameSpecies, monsterPowerUpExp } 
 import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
 import { renderPartySlots } from "./partyCard.js";
+import { managementHeader } from "./managementHeader.js";
 
 export interface MonsterTrainingProps {
   player: PlayerState;
@@ -78,7 +79,7 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
   );
 
   return el("div", { className: "screen monsters-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["モンスター強化素材選択"])]),
+    managementHeader("モンスター強化", props.onCancel, dex ? dex.name : target.dexId),
     el("section", { className: "panel" }, [
       el("p", {}, [`対象: ${dex ? dex.name : target.dexId}`]),
       el("p", { className: "app-subtitle" }, [`現在 Lv${target.level} / 経験値${target.exp}`]),
@@ -146,6 +147,5 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
       { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
       ["💪 モンスター強化実行"],
     ),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancel }, ["キャンセル"]),
   ]);
 }
