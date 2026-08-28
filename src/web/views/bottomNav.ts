@@ -55,6 +55,8 @@ export function renderBottomNav(current: ScreenName, onNavigate: (screen: Screen
         // 巡回(tools/tour.mjs)がここを目印にする。**文言で探させると、
         // ラベルを変えるたびに巡回が壊れて「画面の崩れ」と誤報する**
         "data-tour": `tab:${tab.screen}`,
+        "aria-label": tab.label,
+        "aria-current": tab.screen === current ? "page" : undefined,
         onclick: () => onNavigate(tab.screen),
       },
       [
@@ -63,5 +65,5 @@ export function renderBottomNav(current: ScreenName, onNavigate: (screen: Screen
       ],
     ),
   );
-  return el("nav", { className: "bottom-nav" }, buttons);
+  return el("nav", { className: "bottom-nav", "aria-label": "メインナビゲーション" }, buttons);
 }
