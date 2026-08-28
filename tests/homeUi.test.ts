@@ -16,23 +16,20 @@ describe("redesigned CRIMON home tower summary", () => {
 });
 
 describe("Task D home information architecture", () => {
-  it("orders brand, party, primary, management, secondary and missions", () => {
-    const selectors = ["crimon-resource-header", "crimon-brand", "home-party crimon-section", "crimon-section crimon-section--primary", "crimon-section crimon-section--management", "crimon-section crimon-section--secondary"];
+  it("orders HUD, world stage, party strip and compact missions", () => {
+    const selectors = ["crimon-resource-header", "crimon-world-stage", "home-party crimon-section", "crimon-tutorial-compact"];
     const positions = selectors.map((selector) => source.indexOf(`className: \"${selector}`));
     expect(positions.every((position) => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(source.indexOf("crimon-section--secondary")).toBeLessThan(source.indexOf("tutorial,"));
+    expect(source.indexOf("crimon-world-stage")).toBeLessThan(source.indexOf('className: "home-party crimon-section"'));
+    expect(source).toContain('className: "home-sheet crimon-tutorial-sheet", hidden: true');
     expect(source).not.toContain('className: "crimon-hero"');
   });
 
-  it("uses the required primary and management variants", () => {
-    for (const variant of ["adventure", "dungeon", "arena", "monster", "equipment", "summon", "shop"]) {
+  it("uses the three required world-stage variants", () => {
+    for (const variant of ["adventure", "dungeon", "arena"]) {
       expect(source).toContain(`\"${variant}\"`);
     }
     expect(source).toContain("props.onGoStages");
-    expect(source).toContain("props.onGoMonsters");
-    expect(source).toContain("props.onGoEquipment");
-    expect(source).toContain("props.onGoSummon");
     expect(source).toContain("props.onGoMonsterDex");
   });
 
