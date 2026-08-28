@@ -14,6 +14,7 @@ import {
 import {
   applyMonsterPowerUp,
   checkMonsterPowerUp,
+  executeMonsterPowerUp,
   feedExpValue,
   isSameElement,
   isSameSpecies,
@@ -214,6 +215,55 @@ describe("applyMonsterPowerUp", () => {
   });
 });
 
+describe("executeMonsterPowerUp: 検証・成長・消費の一括処理", () => {
+  it("同じ素材IDの重複選択を拒否し、対象も所持リストも変更しない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("slime_WATER", 1, 1);
+    const monsters = [target, material];
+    const before = [...target.skillLevels];
+    const result = executeMonsterPowerUp(monsters, target.id, [material.id, material.id], [], () => 0);
+    expect(result.ok).toBe(false);
+    expect(target.skillLevels).toEqual(before);
+    expect(monsters).toContain(material);
+  });
+
+  it("成功時だけ成長して素材をちょうど1回削除し、再送信では二重消費しない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, STAR_MAX_LEVEL[1]);
+    const material = createMonsterInstance("slime_WATER", 1, 1);
+    const monsters = [target, material];
+    const first = executeMonsterPowerUp(monsters, target.id, [material.id], [], () => 0);
+    expect(first.ok).toBe(true);
+    expect(target.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(4);
+    expect(target.exp).toBe(0);
+    expect(monsters).toEqual([target]);
+
+    const second = executeMonsterPowerUp(monsters, target.id, [material.id], [], () => 0);
+    expect(second.ok).toBe(false);
+    expect(target.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(4);
+  });
+
+  it("LvMAXのスキルピッグはEXPなしで1スキルだけ上げて消費する", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    const pig = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    const monsters = [target, pig];
+    const result = executeMonsterPowerUp(monsters, target.id, [pig.id], [], () => 0);
+    expect(result).toMatchObject({ ok: true, result: { expGained: 0, levelsGained: 0 } });
+    expect(target.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(4);
+    expect(monsters).toEqual([target]);
+  });
+
+  it("全スキルMAXではスキルピッグを消費しない", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    target.skillLevels = [5, 5, 5];
+    const pig = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    const monsters = [target, pig];
+    expect(executeMonsterPowerUp(monsters, target.id, [pig.id], [], () => 0).ok).toBe(false);
+    expect(monsters).toEqual([target, pig]);
+  });
+});
+
 describe("モンスター図鑑データ", () => {
   it("全モンスター種×全属性が図鑑に掲載されている", () => {
     expect(MONSTER_TEMPLATES_DEX.length).toBeGreaterThan(0);
@@ -284,5 +334,27 @@ describe("モンスター図鑑データ", () => {
     const fireSlime = findMonsterById("slime_FIRE")!;
     const waterSlime = findMonsterById("slime_WATER")!;
     expect(fireSlime.emoji).toBe(waterSlime.emoji);
+  });
+});
+
+describe("スキルピッグ", () => {
+  it("異種族・LvMAXでもEXPを増やさず正式なスキル抽選を1回行う", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    const material = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    expect(checkMonsterPowerUp(target, [material], []).ok).toBe(true);
+    const before = [...target.skillLevels];
+    const result = applyMonsterPowerUp(target, [material], () => 0);
+    expect(result.expGained).toBe(0);
+    expect(result.leveledSkillIndices).toHaveLength(1);
+    expect(target.skillLevels.reduce((a, b) => a + b, 0)).toBe(before.reduce((a, b) => a + b, 0) + 1);
+  });
+
+  it("全スキルMAXには使用できず上限を越えない", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    target.skillLevels = [5, 5, 5];
+    const material = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    expect(checkMonsterPowerUp(target, [material], []).ok).toBe(false);
   });
 });

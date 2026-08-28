@@ -296,6 +296,7 @@ function climbOnce(ids, seed) {
       rng,
       initialPlayerHp: setup.initialPlayerHp,
       initialCooldowns: setup.initialCooldowns,
+      trialTowerFloor: setup.floor.floor,
     });
     const result = engine.run();
     const cleared = result.winner === "PLAYER";
@@ -414,7 +415,7 @@ export function measureFloorDef(ids, def, trials = 20, seedBase = 7700) {
       playerDefs: party.map((m) => toBattleDef(m, state)),
       enemyDefs: buildDungeonEnemyTeam(def),
     };
-    const result = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng }).run();
+    const result = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng, trialTowerFloor: def.floor }).run();
     if (result.winner === "PLAYER") wins += 1;
     turnsSum += result.turnsTaken;
     for (const turn of result.turns) {
@@ -518,7 +519,7 @@ function runFloorMode(teams) {
       const r = measureFloor(teams[n].ids, f, 12);
       return `${pct(r.enemyHpLeft)}/${pct(r.allyHpLeft)}`.padStart(14);
     });
-    const label = def.trait === "NONE" ? (f % 5 === 0 ? "関門" : "-") : TOWER_TRAIT_LABEL[def.trait];
+    const label = def.name.replace(`${f}階`, "").trim() || (def.trait === "NONE" ? "-" : TOWER_TRAIT_LABEL[def.trait]);
     console.log(String(f).padStart(3) + " " + label.padEnd(8) + def.powerScale.toFixed(2).padStart(7) + cells.join(""));
   }
 }
@@ -544,7 +545,7 @@ function runTraceMode(teams, climbs) {
       const rows = byFloor.get(floor);
       const cleared = rows.filter((x) => x.cleared);
       const def = TRIAL_TOWER_FLOORS[floor - 1];
-      const label = def.trait === "NONE" ? (floor % 5 === 0 ? "関門" : "-") : TOWER_TRAIT_LABEL[def.trait];
+      const label = def.name.replace(`${floor}階`, "").trim() || (def.trait === "NONE" ? "-" : TOWER_TRAIT_LABEL[def.trait]);
       const hp = cleared.length > 0 ? cleared.reduce((s, x) => s + x.allyHpLeft, 0) / cleared.length : 0;
       const alive = cleared.length > 0 ? cleared.reduce((s, x) => s + x.standing, 0) / cleared.length : 0;
       console.log(

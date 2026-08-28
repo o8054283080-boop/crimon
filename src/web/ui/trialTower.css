@@ -926,7 +926,7 @@
 }
 
 /* ==========================================================================
- * 階の一覧(30階)
+ * 階の一覧(100階)
  *
  * 節ごとに3つの帯へ割る。30枚を1枚の網に流すと、
  * どこが全回復地点なのかが札の色差だけになって縦画面で読めない。
@@ -968,6 +968,37 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
+/* 100枚を常時縦積みしない。現在の10階帯だけを開き、他は要約1行で確認する。 */
+.tower-band > summary {
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tower-band > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tower-band > summary::before {
+  content: "▸";
+  flex: 0 0 auto;
+  color: #9a8aac;
+  transition: transform 0.16s ease;
+}
+
+.tower-band[open] > summary::before {
+  transform: rotate(90deg);
+  color: #ffd970;
+}
+
+.tower-band.is-current {
+  box-shadow: inset 0 0 0 1px rgba(255, 205, 90, 0.72), 0 0 14px rgba(255, 180, 60, 0.12);
+}
+
+.tower-band.is-locked:not([open]) {
+  opacity: 0.66;
+}
+
 /* 抜けた節は金の縁。どこまで進んだかを帯の単位でも読めるようにする */
 .tower-band.is-passed {
   box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.34);
@@ -977,6 +1008,10 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+  margin-bottom: 0;
+}
+
+.tower-band[open] .tower-band__head {
   margin-bottom: 7px;
 }
 
@@ -990,6 +1025,28 @@
 .tower-band__range {
   font-size: 0.6rem;
   color: var(--text-dim);
+}
+
+.tower-band__boss {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 900;
+  color: #2a1600;
+  background: var(--gold-grad);
+  white-space: nowrap;
+}
+
+.tower-band__status {
+  margin-left: auto;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.tower-band.is-current .tower-band__status {
+  color: #ffe2a0;
 }
 
 .tower-band__steps {
@@ -1028,6 +1085,26 @@
     inset 0 1px 0 rgba(255, 232, 190, 0.24),
     inset 0 -2px 0 rgba(0, 0, 0, 0.5),
     inset 0 0 0 1px rgba(198, 160, 84, 0.45);
+}
+
+.tower-step--locked {
+  color: #514b60;
+  filter: saturate(0.45);
+}
+
+.tower-step__boss-name {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  overflow: hidden;
+  font-size: 0.46rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffd970;
 }
 
 .tower-step__check {

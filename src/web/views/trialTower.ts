@@ -130,6 +130,10 @@ function rewardItems(reward: TowerReward): RewardItem[] {
   if (reward.equipmentStar) items.push({ icon: "⚔", text: `${starText(reward.equipmentStar)} 装備`, strong: true });
   if (reward.pigStar) items.push({ icon: "🐷", text: `転生ピッグ ${starText(reward.pigStar)}`, strong: true });
   if (reward.awakeningOrbs) items.push({ icon: "🔮", text: `覚醒オーブ ${reward.awakeningOrbs}`, strong: true });
+  if (reward.fourStarSummonScrolls) items.push({ icon: "📕", text: `★4以上召喚書 ${reward.fourStarSummonScrolls}`, strong: true });
+  if (reward.lightDarkFourStarSummonScrolls) items.push({ icon: "🌗", text: `光闇★4以上召喚書 ${reward.lightDarkFourStarSummonScrolls}`, strong: true });
+  if (reward.fiveStarSummonScrolls) items.push({ icon: "📙", text: `★5召喚書 ${reward.fiveStarSummonScrolls}`, strong: true });
+  if (reward.skillPigs) items.push({ icon: "🐽", text: `スキルピッグ ${reward.skillPigs}`, strong: true });
   return items;
 }
 
@@ -155,6 +159,10 @@ function claimedItems(reward: TowerRewardResult): RewardItem[] {
   if (reward.equipment) items.push({ icon: "⚔", text: `${starText(reward.equipment.star)} 装備`, strong: true });
   if (reward.pigStar) items.push({ icon: "🐷", text: `転生ピッグ ${starText(reward.pigStar)}`, strong: true });
   if (reward.awakeningOrbs > 0) items.push({ icon: "🔮", text: `覚醒オーブ ${reward.awakeningOrbs}`, strong: true });
+  if (reward.fourStarSummonScrolls > 0) items.push({ icon: "📕", text: `★4以上召喚書 ${reward.fourStarSummonScrolls}`, strong: true });
+  if (reward.lightDarkFourStarSummonScrolls > 0) items.push({ icon: "🌗", text: `光闇★4以上召喚書 ${reward.lightDarkFourStarSummonScrolls}`, strong: true });
+  if (reward.fiveStarSummonScrolls > 0) items.push({ icon: "📙", text: `★5召喚書 ${reward.fiveStarSummonScrolls}`, strong: true });
+  if (reward.skillPigs > 0) items.push({ icon: "🐽", text: `スキルピッグ ${reward.skillPigs}`, strong: true });
   return items;
 }
 
@@ -522,6 +530,8 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
   const now = floor.floor === props.nextFloor;
   const boss = isTowerBossFloor(floor.floor);
   const check = isTowerCheckpoint(floor.floor);
+  const locked = floor.floor > props.nextFloor;
+  const bossName = floor.floor >= 70 && boss ? floor.name.replace(`${floor.floor}階 `, "") : "";
 
   const classes = [
     "tower-step",
@@ -529,11 +539,12 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
     now ? "tower-step--now" : "",
     boss ? "tower-step--boss" : "",
     check ? "tower-step--check" : "",
+    locked ? "tower-step--locked" : "",
   ].filter(Boolean);
 
   return el(
     "div",
-    { className: classes.join(" "), title: `${floor.name}${passed ? "(到達済み)" : ""}` },
+    { className: classes.join(" "), title: `${floor.name}${passed ? "（クリア済み）" : locked ? "（未解放）" : "（次の挑戦）"}`, "aria-label": `${floor.name} ${passed ? "クリア済み" : locked ? "未解放" : "次の挑戦"}` },
     nodes([
       // 節はすべて関門でもある。片方だけ出すと、凡例と食い違って
       // 「10階は関門ではない」と読めてしまうので、両方の印を並べる
@@ -543,6 +554,7 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
       el("span", { className: "tower-step__no" }, [String(floor.floor)]),
       passed ? el("span", { className: "tower-step__check" }, ["✓"]) : null,
       now ? el("span", { className: "tower-step__now" }, ["今"]) : null,
+      bossName ? el("span", { className: "tower-step__boss-name" }, [bossName]) : null,
     ]),
   );
 }
@@ -554,12 +566,19 @@ function renderLadder(props: TrialTowerProps): HTMLElement {
     const from = s * TOWER_CHECKPOINT_INTERVAL + 1;
     const to = Math.min(TOWER_FLOOR_COUNT, (s + 1) * TOWER_CHECKPOINT_INTERVAL);
     const floors = TRIAL_TOWER_FLOORS.filter((f) => f.floor >= from && f.floor <= to);
+    const active = props.nextFloor >= from && props.nextFloor <= to;
+    const passed = props.bestFloor >= to;
+    const locked = from > props.nextFloor;
+    const boss = floors.find((floor) => isTowerBossFloor(floor.floor));
+    const bossName = boss && boss.floor >= 70 ? boss.name.replace(`${boss.floor}階 `, "") : "";
     blocks.push(
-      el("div", { className: `tower-band${props.bestFloor >= to ? " is-passed" : ""}` }, [
-        el("div", { className: "tower-band__head" }, [
+      el("details", { className: `tower-band${passed ? " is-passed" : ""}${active ? " is-current" : ""}${locked ? " is-locked" : ""}`, open: active }, [
+        el("summary", { className: "tower-band__head" }, nodes([
           el("span", { className: "tower-band__name" }, [`第${s + 1}節`]),
           el("span", { className: "tower-band__range" }, [`${from} - ${to}階`]),
-        ]),
+          bossName ? el("span", { className: "tower-band__boss" }, [bossName]) : null,
+          el("span", { className: "tower-band__status" }, [passed ? "クリア済み" : active ? `次は${props.nextFloor}階` : "未解放"]),
+        ])),
         el("div", { className: "tower-band__steps" }, floors.map((f) => renderLadderTile(props, f))),
       ]),
     );
@@ -572,6 +591,7 @@ function renderLadder(props: TrialTowerProps): HTMLElement {
       el("span", { className: "tower-legend__item" }, ["👑 関門"]),
       el("span", { className: "tower-legend__item" }, ["⚑ 節(全回復)"]),
       el("span", { className: "tower-legend__item" }, ["今 これから挑む階"]),
+      el("span", { className: "tower-legend__item" }, ["暗色 未解放"]),
     ]),
     ...blocks,
   ]);

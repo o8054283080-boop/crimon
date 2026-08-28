@@ -117,6 +117,8 @@ export interface BattleEngineOptions {
    * 持ち越しの緊張感がHPの一本道になる。
    */
   initialCooldowns?: [number, number, number][];
+  /** 試練の塔だけが指定する階番号。通常戦闘へ特殊ボス規則を漏らさない。 */
+  trialTowerFloor?: number;
 }
 
 /** 手動操作時にプレイヤーが選んだ行動。省略された場合はAIが代わりに決める */
@@ -138,6 +140,8 @@ export class BattleEngine {
   /** プレイヤーAIの単体敵対スキルが優先する対象。 */
   private focusTargetId: string | null = null;
   private readonly consumedLatents = new Set<string>();
+  private readonly trialTowerFloor?: number;
+  private trialBossTurns = 0;
 
   constructor(playerTeam: MonsterDefinition[], enemyTeam: MonsterDefinition[], options: BattleEngineOptions = {}) {
     if (playerTeam.length === 0 || enemyTeam.length === 0) {
@@ -164,6 +168,8 @@ export class BattleEngine {
     }
     this.rng = options.rng ?? Math.random;
     this.maxTurns = options.maxTurns ?? 300;
+    this.trialTowerFloor = options.trialTowerFloor;
+    if (options.trialTowerFloor === 80) { const boss = this.trialBoss(); if (boss) boss.immuneTurns = 3; }
   }
 
   run(): BattleResult {
@@ -343,10 +349,48 @@ export class BattleEngine {
       unit.stunTurns -= 1;
       this.push(`${this.label(unit)} はスタン中で行動できない！`);
     } else {
+      this.applyTrialBossAction(unit);
       this.act(unit, choice);
     }
 
     this.applyBurnAtTurnEnd(unit);
+  }
+
+  private trialBoss(): BattleUnit | undefined {
+    return this.units.find((u) => u.team === "ENEMY" && u.def.victoryTarget);
+  }
+
+  /** 実際に行動できるボスターンだけ発火する。従ってスタン中は70F超再生も進行しない。 */
+  private applyTrialBossAction(unit: BattleUnit): void {
+    if (!this.trialTowerFloor || unit !== this.trialBoss()) return;
+    this.trialBossTurns += 1;
+    const ratio = hpRatio(unit);
+    const healing = this.trialTowerFloor === 70 || (this.trialTowerFloor === 100 && ratio >= 0.7);
+    if (healing) {
+      const before = unit.currentHp;
+      applyHeal(unit, Math.round(unit.maxHp * 0.72));
+      const amount = unit.currentHp - before;
+      this.push(`${this.label(unit)} の超再生が発動！ HPが ${amount} 回復！`);
+      this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount });
+    }
+    const immunity = this.trialTowerFloor === 80 || (this.trialTowerFloor === 100 && ratio < 0.7 && ratio >= 0.4);
+    if (immunity && (this.trialBossTurns === 1 || this.trialBossTurns % 4 === 0)) {
+      unit.immuneTurns = Math.max(unit.immuneTurns, 3);
+      this.push(`${this.label(unit)} は状態異常免疫を展開した！`);
+    }
+    const enrage = (this.trialTowerFloor === 90 && this.trialBossTurns === 8)
+      || (this.trialTowerFloor === 100 && ratio < 0.4 && !unit.effects.some((e) => e.remainingTurns === 999));
+    if (enrage) {
+      unit.effects.push({ kind: "BUFF", stat: "atk", amount: 2, remainingTurns: 999 });
+      unit.effects.push({ kind: "BUFF", stat: "spd", amount: 1, remainingTurns: 999 });
+      this.push(`${this.label(unit)} は狂化段階へ移行した！`);
+    }
+    if (this.trialTowerFloor === 100 && ratio < 0.1 && !unit.effects.some((e) => e.stat === "def" && e.remainingTurns === 998)) {
+      unit.effects.push({ kind: "BUFF", stat: "atk", amount: 2, remainingTurns: 998 });
+      unit.effects.push({ kind: "BUFF", stat: "def", amount: 2, remainingTurns: 998 });
+      unit.effects.push({ kind: "BUFF", stat: "spd", amount: 1, remainingTurns: 998 });
+      this.push(`${this.label(unit)} は最終強化段階へ移行した！`);
+    }
   }
 
   private act(unit: BattleUnit, choice?: ManualChoice): void {
@@ -773,7 +817,7 @@ export class BattleEngine {
         }
 
         case "STRIP": {
-          if (this.isImmune(target)) break;
+          // IMMUNITY自身はBUFF。対抗手段である強化解除を免疫で封じない。
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           if (stripBuffs(target)) {
             this.push(`  → ${this.label(target)} の有利な効果が剥がされた！`);

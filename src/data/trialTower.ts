@@ -89,10 +89,15 @@ export interface TowerReward {
   equipmentStar?: Star;
   /** 初回突破で追加する覚醒オーブ */
   awakeningOrbs?: number;
+  fourStarSummonScrolls?: number;
+  lightDarkFourStarSummonScrolls?: number;
+  fiveStarSummonScrolls?: number;
+  /** 万能スキル育成素材の実個体数 */
+  skillPigs?: number;
 }
 
 /** 全階数 */
-export const TOWER_FLOOR_COUNT = 30;
+export const TOWER_FLOOR_COUNT = 100;
 
 /**
  * 節(区切り)の間隔。
@@ -104,7 +109,7 @@ export const TOWER_FLOOR_COUNT = 30;
 export const TOWER_CHECKPOINT_INTERVAL = 10;
 
 /** ボス階の間隔 */
-export const TOWER_BOSS_INTERVAL = 5;
+export const TOWER_BOSS_INTERVAL = 10;
 
 /** 1階を挑むごとに消費するスタミナ */
 export const TOWER_STAMINA_COST = 4;
@@ -248,7 +253,13 @@ const TOWER_POWER_START = 3.0;
 const TOWER_POWER_GROWTH = 1.07;
 
 function towerPowerOf(floor: number): number {
-  return TOWER_POWER_START * TOWER_POWER_GROWTH ** (floor - 1);
+  if (floor <= 30) return TOWER_POWER_START * TOWER_POWER_GROWTH ** (floor - 1);
+  // 30Fまでを一切動かさず、50Fで装備D10級、70F以降を将来育成領域へ急峻化する。
+  const anchors: [number, number][] = [[30, 21.32], [40, 34], [50, 55], [60, 92], [70, 180], [80, 340], [90, 620], [100, 1100]];
+  const upper = anchors.findIndex(([f]) => floor <= f);
+  const [f1, p1] = anchors[Math.max(0, upper - 1)];
+  const [f2, p2] = anchors[upper];
+  return p1 * (p2 / p1) ** ((floor - f1) / (f2 - f1));
 }
 
 /**
@@ -267,7 +278,7 @@ const ENEMY_HP_RATIO_START = 1;
 const ENEMY_HP_RATIO_END = 0.65;
 
 function enemyHpRatioOf(floor: number): number {
-  const t = (floor - 1) / (TOWER_FLOOR_COUNT - 1);
+  const t = (Math.min(floor, 30) - 1) / 29;
   return ENEMY_HP_RATIO_START + (ENEMY_HP_RATIO_END - ENEMY_HP_RATIO_START) * t;
 }
 
@@ -293,7 +304,8 @@ function powerScaleOf(floor: number): number {
  * 末端も装備ダンジョンの1.28より控えめに置いてある。装備の速度を触ったらここも測り直すこと。
  */
 function speedScaleOf(floor: number): number {
-  return Number((0.92 + (floor - 1) * 0.0138).toFixed(3));
+  if (floor <= 30) return Number((0.92 + (floor - 1) * 0.0138).toFixed(3));
+  return Number((1.32 + (floor - 30) * 0.012).toFixed(3));
 }
 
 /**
@@ -326,13 +338,28 @@ function enemyLevelOf(floor: number): number {
  * 塔が装備の主要な供給源になって装備ダンジョンの居場所を奪う。
  */
 function rewardOf(floor: number): TowerReward {
-  if (floor === TOWER_FLOOR_COUNT) return { crystal: 500, gold: 30000, summonScroll: 3, equipmentStar: 6, pigStar: 3 };
-  if (floor === Math.ceil(TOWER_FLOOR_COUNT / 2)) return { crystal: 40 + floor * 2, gold: 1500 + floor * 200, equipmentStar: 4 };
-  if (isTowerCheckpoint(floor)) {
-    return { crystal: 100 + floor * 5, gold: 2000 + floor * 400, summonScroll: 1, equipmentStar: 5, pigStar: 3 };
+  // 100F化前の1〜30F報酬式を明示的に固定し、既存シーズンの受取印をそのまま使う。
+  if (floor <= 30) {
+    if (floor === 30) return { crystal: 500, gold: 30000, summonScroll: 3, equipmentStar: 6, pigStar: 3 };
+    if (floor === 15) return { crystal: 70, gold: 4500, equipmentStar: 4 };
+    if (floor % 10 === 0) return { crystal: 100 + floor * 5, gold: 2000 + floor * 400, summonScroll: 1, equipmentStar: 5, pigStar: 3 };
+    if (floor % 5 === 0) return { crystal: 40 + floor * 2, gold: 1500 + floor * 200, equipmentStar: 4 };
+    return { crystal: 10 + floor, gold: 400 + floor * 100 };
   }
-  if (isTowerBossFloor(floor)) return { crystal: 40 + floor * 2, gold: 1500 + floor * 200, equipmentStar: 4 };
-  return { crystal: 10 + floor, gold: 400 + floor * 100 };
+  const milestones: Partial<Record<number, TowerReward>> = {
+    40: { crystal: 100, summonScroll: 10 },
+    50: { crystal: 150, fourStarSummonScrolls: 1, awakeningOrbs: 2 },
+    60: { crystal: 200, summonScroll: 10, fourStarSummonScrolls: 1 },
+    70: { crystal: 250, fiveStarSummonScrolls: 1, skillPigs: 1 },
+    80: { crystal: 300, fourStarSummonScrolls: 3, lightDarkFourStarSummonScrolls: 1 },
+    90: { crystal: 350, skillPigs: 3, awakeningOrbs: 3 },
+    100: { crystal: 500, summonScroll: 30, lightDarkFourStarSummonScrolls: 3, fiveStarSummonScrolls: 1 },
+  };
+  if (milestones[floor]) return milestones[floor]!;
+  if (isTowerCheckpoint(floor)) {
+    return { gold: floor * 1000 };
+  }
+  return { gold: floor * 250 };
 }
 
 /**
@@ -457,7 +484,8 @@ function enemiesOf(floor: number, trait: TowerTrait): DungeonEnemy[] {
  */
 export function buildTowerFloor(floor: number, traitOverride?: TowerTrait): TowerFloor {
   const trait = traitOverride ?? traitOf(floor);
-  const label = isTowerBossFloor(floor) && traitOverride === undefined ? "関門" : TOWER_TRAIT_LABEL[trait] || "";
+  const bossLabels: Partial<Record<number, string>> = { 70: "超再生", 80: "免疫", 90: "狂化", 100: "最終試練" };
+  const label = bossLabels[floor] ?? (isTowerBossFloor(floor) && traitOverride === undefined ? "関門" : TOWER_TRAIT_LABEL[trait] || "");
   return {
     floor,
     name: `${floor}階${label ? ` ${label}` : ""}`,
