@@ -52,7 +52,7 @@ describe("節と再開地点 (towerStartFloor)", () => {
 
   it("節・ボス階の位置が決まりどおりに並んでいる", () => {
     const checkpoints = Array.from({ length: TOWER_FLOOR_COUNT }, (_, i) => i + 1).filter(isTowerCheckpoint);
-    expect(checkpoints).toEqual([10, 20, 30]);
+    expect(checkpoints).toEqual([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
   });
 });
 

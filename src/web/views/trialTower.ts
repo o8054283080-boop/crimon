@@ -130,6 +130,10 @@ function rewardItems(reward: TowerReward): RewardItem[] {
   if (reward.equipmentStar) items.push({ icon: "⚔", text: `${starText(reward.equipmentStar)} 装備`, strong: true });
   if (reward.pigStar) items.push({ icon: "🐷", text: `転生ピッグ ${starText(reward.pigStar)}`, strong: true });
   if (reward.awakeningOrbs) items.push({ icon: "🔮", text: `覚醒オーブ ${reward.awakeningOrbs}`, strong: true });
+  if (reward.fourStarSummonScroll) items.push({ icon: "📕", text: `★4以上召喚書 ${reward.fourStarSummonScroll}`, strong: true });
+  if (reward.lightDarkFourStarSummonScroll) items.push({ icon: "🌗", text: `★4以上光闇召喚書 ${reward.lightDarkFourStarSummonScroll}`, strong: true });
+  if (reward.fiveStarSummonScroll) items.push({ icon: "📙", text: `★5召喚書 ${reward.fiveStarSummonScroll}`, strong: true });
+  if (reward.skillPig) items.push({ icon: "🐷", text: `スキルピッグ ${reward.skillPig}`, strong: true });
   return items;
 }
 
@@ -155,6 +159,10 @@ function claimedItems(reward: TowerRewardResult): RewardItem[] {
   if (reward.equipment) items.push({ icon: "⚔", text: `${starText(reward.equipment.star)} 装備`, strong: true });
   if (reward.pigStar) items.push({ icon: "🐷", text: `転生ピッグ ${starText(reward.pigStar)}`, strong: true });
   if (reward.awakeningOrbs > 0) items.push({ icon: "🔮", text: `覚醒オーブ ${reward.awakeningOrbs}`, strong: true });
+  if (reward.fourStarSummonScrolls > 0) items.push({ icon: "📕", text: `★4以上召喚書 ${reward.fourStarSummonScrolls}`, strong: true });
+  if (reward.lightDarkFourStarSummonScrolls > 0) items.push({ icon: "🌗", text: `★4以上光闇召喚書 ${reward.lightDarkFourStarSummonScrolls}`, strong: true });
+  if (reward.fiveStarSummonScrolls > 0) items.push({ icon: "📙", text: `★5召喚書 ${reward.fiveStarSummonScrolls}`, strong: true });
+  if (reward.skillPigTokens > 0) items.push({ icon: "🐷", text: `スキルピッグ ${reward.skillPigTokens}`, strong: true });
   return items;
 }
 
@@ -555,12 +563,18 @@ function renderLadder(props: TrialTowerProps): HTMLElement {
     const to = Math.min(TOWER_FLOOR_COUNT, (s + 1) * TOWER_CHECKPOINT_INTERVAL);
     const floors = TRIAL_TOWER_FLOORS.filter((f) => f.floor >= from && f.floor <= to);
     blocks.push(
-      el("div", { className: `tower-band${props.bestFloor >= to ? " is-passed" : ""}` }, [
+      el("div", { className: `tower-band${props.bestFloor >= to ? " is-passed" : ""}${from > props.bestFloor + 10 ? " is-locked" : ""}` }, [
         el("div", { className: "tower-band__head" }, [
           el("span", { className: "tower-band__name" }, [`第${s + 1}節`]),
           el("span", { className: "tower-band__range" }, [`${from} - ${to}階`]),
         ]),
         el("div", { className: "tower-band__steps" }, floors.map((f) => renderLadderTile(props, f))),
+        to >= 70 && to % 10 === 0
+          ? el("div", { className: "tower-band__ability", "data-boss-floor": String(to) }, [
+              `⚠ ${to}F 特殊能力`,
+              el("span", { className: "tower-band__ability-detail" }, ["詳細はボス情報で確認"]),
+            ])
+          : el("span", { className: "tower-band__locked-label" }, [from > props.bestFloor + 10 ? "🔒 未解放" : ""]),
       ]),
     );
   }

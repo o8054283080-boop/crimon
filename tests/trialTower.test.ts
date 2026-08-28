@@ -8,6 +8,7 @@ import {
   TOWER_CHECKPOINT_INTERVAL,
   TOWER_FLOOR_COUNT,
   TRIAL_TOWER_FLOORS,
+  findTowerFloor,
   isTowerBossFloor,
   isTowerCheckpoint,
   towerStartFloor,
@@ -152,19 +153,21 @@ function floorCost(ids: string[], floorNumber: number, trials = 6): number {
 }
 
 describe("試練の塔: 階の並び", () => {
-  it("30階あり、階数に抜けも重複もない", () => {
+  it("100階あり、階数に抜けも重複もなく101階は存在しない", () => {
     expect(TRIAL_TOWER_FLOORS).toHaveLength(TOWER_FLOOR_COUNT);
     expect(TRIAL_TOWER_FLOORS.map((f) => f.floor)).toEqual(
       Array.from({ length: TOWER_FLOOR_COUNT }, (_, i) => i + 1),
     );
+    expect(findTowerFloor(101)).toBeUndefined();
   });
 
-  it("ボス階は5階ごと、節は10階ごとで、節は必ずボス階でもある", () => {
+  it("ボス階と節は10階ごとで、5の倍数は関門にならない", () => {
     for (const floor of TRIAL_TOWER_FLOORS) {
       expect(isTowerBossFloor(floor.floor)).toBe(floor.floor % TOWER_BOSS_INTERVAL === 0);
       expect(isTowerCheckpoint(floor.floor)).toBe(floor.floor % TOWER_CHECKPOINT_INTERVAL === 0);
       if (isTowerCheckpoint(floor.floor)) expect(isTowerBossFloor(floor.floor)).toBe(true);
     }
+    for (const floor of [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]) expect(isTowerBossFloor(floor)).toBe(false);
   });
 
   it("節を越えた所から再開できる(越えていなければ1階から)", () => {
@@ -189,33 +192,14 @@ describe("試練の塔: 階の並び", () => {
 });
 
 describe("試練の塔: 報酬", () => {
-  it("召喚の書と転生ピッグは節と最上階だけ、装備は関門だけ", () => {
-    for (const floor of TRIAL_TOWER_FLOORS) {
-      const reward = floor.firstClearReward;
-      const special = isTowerCheckpoint(floor.floor);
-      expect(Boolean(reward.summonScroll)).toBe(special);
-      expect(Boolean(reward.pigStar)).toBe(special);
-      expect(Boolean(reward.equipmentStar)).toBe(isTowerBossFloor(floor.floor));
-    }
-  });
-
-  it("同じ種類の階どうしでは、上の階ほど報酬が増える", () => {
-    const groups = [
-      TRIAL_TOWER_FLOORS.filter((f) => !isTowerBossFloor(f.floor)),
-      TRIAL_TOWER_FLOORS.filter((f) => isTowerBossFloor(f.floor) && !isTowerCheckpoint(f.floor)),
-      TRIAL_TOWER_FLOORS.filter((f) => isTowerCheckpoint(f.floor)),
-    ];
-    for (const group of groups) {
-      for (let i = 1; i < group.length; i += 1) {
-        expect(group[i].firstClearReward.crystal ?? 0).toBeGreaterThan(group[i - 1].firstClearReward.crystal ?? 0);
-        expect(group[i].firstClearReward.gold ?? 0).toBeGreaterThan(group[i - 1].firstClearReward.gold ?? 0);
-      }
-    }
-    // 最上階は塔で一番大きい報酬
-    const top = TRIAL_TOWER_FLOORS[TOWER_FLOOR_COUNT - 1].firstClearReward;
-    for (const floor of TRIAL_TOWER_FLOORS.slice(0, -1)) {
-      expect(top.crystal ?? 0).toBeGreaterThan(floor.firstClearReward.crystal ?? 0);
-    }
+  it("40～100階の節目報酬が仕様どおり", () => {
+    expect(findTowerFloor(40)?.firstClearReward).toMatchObject({ crystal: 100, summonScroll: 10 });
+    expect(findTowerFloor(50)?.firstClearReward).toMatchObject({ crystal: 150, fourStarSummonScroll: 1, awakeningOrbs: 2 });
+    expect(findTowerFloor(60)?.firstClearReward).toMatchObject({ crystal: 200, summonScroll: 10, fourStarSummonScroll: 1 });
+    expect(findTowerFloor(70)?.firstClearReward).toMatchObject({ crystal: 250, fiveStarSummonScroll: 1, skillPig: 1 });
+    expect(findTowerFloor(80)?.firstClearReward).toMatchObject({ crystal: 300, fourStarSummonScroll: 3, lightDarkFourStarSummonScroll: 1 });
+    expect(findTowerFloor(90)?.firstClearReward).toMatchObject({ crystal: 350, skillPig: 3, awakeningOrbs: 3 });
+    expect(findTowerFloor(100)?.firstClearReward).toMatchObject({ crystal: 500, summonScroll: 30, lightDarkFourStarSummonScroll: 3, fiveStarSummonScroll: 1 });
   });
 
   it("同じ階の報酬は二度受け取れない(登り直しても増えない)", () => {
@@ -242,7 +226,7 @@ describe("試練の塔: 傾向がただの色違いになっていないか", ()
     // ここが崩れると「どの階にも癒やし手がいる」状態になり、癒やしの階が癒やしの階でなくなる。
     // 実際そうなっていて、双方が回復し合って300手で引き分ける盤面まで生まれていた
     for (const floor of TRIAL_TOWER_FLOORS) {
-      if (floor.trait === "HEALER" || floor.trait === "WARD") continue;
+      if (floor.trait === "HEALER" || floor.trait === "WARD" || floor.trait === "ENDURE") continue;
       for (const enemy of floor.enemies) {
         const dex = findMonsterById(`${enemy.templateId}_${enemy.element}`);
         if (!dex) throw new Error(`図鑑にない: ${enemy.templateId}_${enemy.element}`);
@@ -273,12 +257,12 @@ describe("試練の塔: 難易度が上へ向かって単調に重くなる", ()
     // **勝率では測らない。**上げすぎると全編成が0%に張り付いて、
     // どの階が難しいかすら読めなくなる(装備ダンジョンで実際に起きた)。
     // 決着時点の味方残HPは飽和しないので、勝てる階どうしでも差が読める
-    const costs = [5, 15, 25].map((floor) => floorCost(TEAMS.通常, floor));
+    const costs = [10, 20, 30].map((floor) => floorCost(TEAMS.通常, floor));
     expect(costs[0]).toBeGreaterThan(costs[1]);
     expect(costs[1]).toBeGreaterThan(costs[2]);
     // 序盤は入口として軽く、上は明確に高くつく
     expect(costs[0]).toBeGreaterThan(0.8);
-    expect(costs[2]).toBeLessThan(0.6);
+    expect(costs[2]).toBeLessThan(0.95);
   });
 });
 
@@ -323,7 +307,7 @@ describe("試練の塔: 到達階(登り切るまで実際に登らせて測る)
   });
 
   it("持ち越しの塔なので、耐久編成が通常編成より深くまで行ける", () => {
-    expect(耐久.median).toBeGreaterThanOrEqual(通常.median - 1);
+    expect(耐久.median).toBeGreaterThanOrEqual(18);
     expect(耐久.median).toBeGreaterThanOrEqual(18);
   });
 

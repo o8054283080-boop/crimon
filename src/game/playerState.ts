@@ -46,6 +46,8 @@ export interface PlayerState {
   lightDarkFourStarSummonScrolls: number;
   /** ★5を保証する正式な召喚書 */
   fiveStarSummonScrolls: number;
+  /** スキルピッグ実装（タスクC）へ引き渡す未交換数 */
+  towerSkillPigTokens: number;
   /** 潜在覚醒で1個消費する素材 */
   awakeningOrbs: number;
   /** 覚醒オーブの達成報酬を受取済みのID。既存報酬の受取印とは分け、後付け報酬も安全に配る */
@@ -217,6 +219,7 @@ export function createInitialState(): PlayerState {
     fourStarSummonScrolls: 0,
     lightDarkFourStarSummonScrolls: 0,
     fiveStarSummonScrolls: 0,
+    towerSkillPigTokens: 0,
     awakeningOrbs: 0,
     claimedAwakeningOrbRewardIds: [],
     fighterLevel: 1,
@@ -335,6 +338,7 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
   if (typeof state.fiveStarSummonScrolls !== "number") state.fiveStarSummonScrolls = 0;
+  if (typeof state.towerSkillPigTokens !== "number" || !Number.isFinite(state.towerSkillPigTokens)) state.towerSkillPigTokens = 0;
   if (typeof state.awakeningOrbs !== "number") state.awakeningOrbs = 0;
   if (!Array.isArray(state.claimedAwakeningOrbRewardIds)) {
     state.claimedAwakeningOrbRewardIds = [];
@@ -411,8 +415,13 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
 
   if (!Array.isArray(state.towerPartyIds)) state.towerPartyIds = [];
   if (typeof state.trialTowerBestFloor !== "number") state.trialTowerBestFloor = 0;
+  state.trialTowerBestFloor = Math.max(0, Math.min(100, Math.floor(state.trialTowerBestFloor)));
   if (!Array.isArray(state.trialTowerClaimedFloors)) state.trialTowerClaimedFloors = [];
+  state.trialTowerClaimedFloors = [...new Set(state.trialTowerClaimedFloors.filter((floor) => Number.isInteger(floor) && floor >= 1 && floor <= 100))];
   if (!state.trialTowerRun || !Array.isArray(state.trialTowerRun.members)) state.trialTowerRun = null;
+  if (state.trialTowerRun && (!Number.isInteger(state.trialTowerRun.floor) || state.trialTowerRun.floor < 1 || state.trialTowerRun.floor > 100)) {
+    state.trialTowerRun = null;
+  }
   ensureTowerMonthlyState(state, now);
 
   // 手放したモンスターが編成に残っていると、対戦の準備で必ず落ちる

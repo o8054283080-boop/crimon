@@ -972,6 +972,10 @@
 .tower-band.is-passed {
   box-shadow: inset 0 0 0 1px rgba(198, 160, 84, 0.34);
 }
+.tower-band.is-locked { opacity: 0.58; }
+.tower-band__locked-label { display: block; margin-top: 5px; color: var(--text-dim); font-size: 0.6rem; text-align: right; }
+.tower-band__ability { margin-top: 7px; padding: 6px 8px; border-radius: 8px; color: #ffd0c4; background: rgba(90, 24, 35, 0.38); font-size: 0.64rem; font-weight: 800; }
+.tower-band__ability-detail { margin-left: 8px; color: #baacbe; font-weight: 500; }
 
 .tower-band__head {
   display: flex;
