@@ -299,10 +299,6 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   for (const equipment of state.equipment) {
     if (typeof equipment.level !== "number") equipment.level = 0;
     if (!equipment.set) equipment.set = deterministicSetFromId(equipment.id);
-    equipment.locked = equipment.locked === true;
-  }
-  if (state.backgroundFarmJob?.result && !Array.isArray(state.backgroundFarmJob.result.earnedEquipmentIds)) {
-    state.backgroundFarmJob.result.earnedEquipmentIds = [];
   }
   for (const monster of state.monsters) {
     if (!monster.equipment) monster.equipment = {};
@@ -348,13 +344,10 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
     state.awakeningOrbs += retroactiveIds.length;
     state.claimedAwakeningOrbRewardIds.push(...retroactiveIds);
   }
-  if (typeof state.fighterLevel !== "number" || !Number.isFinite(state.fighterLevel)) state.fighterLevel = 1;
-  state.fighterLevel = Math.max(1, Math.min(MAX_FIGHTER_LEVEL, Math.floor(state.fighterLevel)));
-  if (typeof state.fighterExp !== "number" || !Number.isFinite(state.fighterExp) || state.fighterExp < 0) state.fighterExp = 0;
-  if (state.fighterLevel >= MAX_FIGHTER_LEVEL) state.fighterExp = 0;
-  state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
-  if (typeof state.stamina !== "number" || !Number.isFinite(state.stamina)) state.stamina = state.maxStamina;
-  state.stamina = Math.max(0, Math.min(state.stamina, state.maxStamina));
+  if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
+  if (typeof state.fighterExp !== "number") state.fighterExp = 0;
+  if (typeof state.maxStamina !== "number") state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
+  if (typeof state.stamina !== "number") state.stamina = state.maxStamina;
   if (typeof state.lastStaminaUpdateAt !== "number") state.lastStaminaUpdateAt = Date.now();
   if (typeof state.fighterName !== "string" || state.fighterName.length === 0) state.fighterName = DEFAULT_FIGHTER_NAME;
   if (typeof state.lastLoginBonusAt !== "number") state.lastLoginBonusAt = null;
@@ -832,18 +825,10 @@ export interface SellEquipmentResult {
   goldEarned: number;
 }
 
-export function setEquipmentLocked(state: PlayerState, equipmentId: string, locked: boolean): boolean {
-  const equipment = state.equipment.find((e) => e.id === equipmentId);
-  if (!equipment) return false;
-  equipment.locked = locked;
-  return true;
-}
-
 /** 装備を売却してゴールドを得る。装着中の装備は先に外す必要がある */
 export function sellEquipment(state: PlayerState, equipmentId: string): SellEquipmentResult {
   const equipment = state.equipment.find((e) => e.id === equipmentId);
   if (!equipment) return { ok: false, reason: "装備が見つかりません", goldEarned: 0 };
-  if (equipment.locked) return { ok: false, reason: "ロック中の装備は売却できません", goldEarned: 0 };
   if (isEquipmentEquipped(state, equipmentId)) {
     return { ok: false, reason: "装着中の装備は売却できません(先に外してください)", goldEarned: 0 };
   }
