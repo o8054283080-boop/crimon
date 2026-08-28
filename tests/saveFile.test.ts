@@ -6,6 +6,7 @@ import {
   saveFileName,
   serializeSaveFile,
 } from "../src/game/saveFile.js";
+import { SKILL_PIG_DEX } from "../src/data/monsters.js";
 import { addMonster, createInitialState } from "../src/game/playerState.js";
 
 function sampleState() {
@@ -19,6 +20,14 @@ function sampleState() {
 }
 
 describe("セーブデータの書き出し", () => {
+  it("スキルピッグを所持したまま保存・読み込みできる", () => {
+    const state = sampleState();
+    addMonster(state, SKILL_PIG_DEX[0].id, 1, 1);
+    const result = parseSaveFile(serializeSaveFile(state));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.file.state.monsters.some((monster) => monster.dexId === SKILL_PIG_DEX[0].id)).toBe(true);
+  });
   it("書き出して読み込むと、中身がそのまま戻る", () => {
     const state = sampleState();
     const text = serializeSaveFile(state);

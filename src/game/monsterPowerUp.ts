@@ -1,6 +1,6 @@
 import { MonsterInstance, addExp, isSkillMaxLevel, rollSkillLevelUp } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, requiredExpForLevel } from "../core/rarity.js";
-import { findMonsterById } from "../data/monsters.js";
+import { SKILL_PIG, findMonsterById } from "../data/monsters.js";
 
 export interface MonsterPowerUpCheck {
   ok: boolean;
@@ -19,11 +19,17 @@ export function checkMonsterPowerUp(
   if (materials.some((m) => m.id === target.id)) {
     return { ok: false, reason: "対象自身は素材にできません" };
   }
+  if (new Set(materials.map((m) => m.id)).size !== materials.length) {
+    return { ok: false, reason: "同じ素材を二重に選択することはできません" };
+  }
   if (materials.some((m) => partyIds.includes(m.id))) {
     return { ok: false, reason: "パーティに編成中のモンスターは素材にできません" };
   }
+  if (materials.some(isSkillPig) && isSkillMaxLevel(target)) {
+    return { ok: false, reason: "すべてのスキルが最大Lvのため、スキルピッグを使用できません。" };
+  }
   if (target.level >= STAR_MAX_LEVEL[target.star]) {
-    if (materials.some((material) => !isSameSpecies(target, material))) {
+    if (materials.some((material) => !isSkillGrowthMaterial(target, material))) {
       return { ok: false, reason: "LvMAXでは経験値専用の素材は使用できません。スキル育成に有効な素材だけを選択してください。" };
     }
     if (isSkillMaxLevel(target)) {
@@ -55,6 +61,8 @@ export function isSameElement(target: MonsterInstance, material: MonsterInstance
  * さらに、素材の属性(色)が対象と同じ場合は経験値が1.5倍になる。
  */
 export function feedExpValue(target: MonsterInstance, material: MonsterInstance): number {
+  // 万能スキル素材を通常EXP目的で消費する利点は持たせない。
+  if (isSkillPig(material)) return 0;
   const base = FEED_EXP_BASE_PER_STAR[material.star] + requiredExpForLevel(material.level);
   const multiplier = isSameElement(target, material) ? SAME_ELEMENT_EXP_MULTIPLIER : 1;
   return Math.round(base * multiplier);
@@ -74,11 +82,54 @@ export function isSameSpecies(target: MonsterInstance, material: MonsterInstance
   return targetDex.templateId === materialDex.templateId;
 }
 
+/** スキルピッグか。図鑑IDの直書きではなく安定したtemplateIdで判定する。 */
+export function isSkillPig(material: MonsterInstance): boolean {
+  return findMonsterById(material.dexId)?.templateId === SKILL_PIG.templateId;
+}
+
+/** 正式な同種族スキル成長ルートへ進める素材か。 */
+export function isSkillGrowthMaterial(target: MonsterInstance, material: MonsterInstance): boolean {
+  return isSameSpecies(target, material) || isSkillPig(material);
+}
+
 export interface MonsterPowerUpResult {
   expGained: number;
   levelsGained: number;
   /** 上昇したスキルのindex(0-2)を、上がった順に記録したもの */
   leveledSkillIndices: number[];
+}
+
+export type ConsumeMonsterPowerUpResult =
+  | { ok: false; reason: string }
+  | ({ ok: true } & MonsterPowerUpResult);
+
+/**
+ * 所持リスト上で検証・成長・素材消費を一度に行う公開入口。
+ * IDの重複や消費済みIDを検証してから変更するため、再送されても二重成長・二重消費しない。
+ */
+export function consumeMonsterPowerUp(
+  monsters: MonsterInstance[],
+  targetId: string,
+  materialIds: readonly string[],
+  partyIds: readonly string[],
+  rng: () => number = Math.random,
+): ConsumeMonsterPowerUpResult {
+  const target = monsters.find((monster) => monster.id === targetId);
+  if (!target) return { ok: false, reason: "強化対象が見つかりません" };
+  const materials = materialIds
+    .map((id) => monsters.find((monster) => monster.id === id))
+    .filter((monster): monster is MonsterInstance => monster !== undefined);
+  if (materials.length !== materialIds.length) return { ok: false, reason: "素材が見つからないか、すでに消費されています" };
+
+  const check = checkMonsterPowerUp(target, materials, partyIds);
+  if (!check.ok) return { ok: false, reason: check.reason ?? "モンスターを強化できません" };
+
+  const result = applyMonsterPowerUp(target, materials, rng);
+  const consumedIds = new Set(materialIds);
+  for (let index = monsters.length - 1; index >= 0; index -= 1) {
+    if (consumedIds.has(monsters[index].id)) monsters.splice(index, 1);
+  }
+  return { ok: true, ...result };
 }
 
 /**
@@ -97,7 +148,7 @@ export function applyMonsterPowerUp(
 
   const leveledSkillIndices: number[] = [];
   for (const material of materials) {
-    if (!isSameSpecies(target, material)) continue;
+    if (!isSkillGrowthMaterial(target, material)) continue;
     const index = rollSkillLevelUp(target, rng);
     if (index >= 0) leveledSkillIndices.push(index);
   }

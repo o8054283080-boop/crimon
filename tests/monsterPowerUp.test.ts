@@ -9,14 +9,17 @@ import {
   EXP_PIG_DEX,
   MONSTER_TEMPLATES_DEX,
   REINCARNATION_PIG_DEX,
+  SKILL_PIG_DEX,
   findMonsterById,
 } from "../src/data/monsters.js";
 import {
   applyMonsterPowerUp,
   checkMonsterPowerUp,
+  consumeMonsterPowerUp,
   feedExpValue,
   isSameElement,
   isSameSpecies,
+  isSkillGrowthMaterial,
   monsterPowerUpExp,
 } from "../src/game/monsterPowerUp.js";
 
@@ -211,6 +214,61 @@ describe("applyMonsterPowerUp", () => {
     const result = applyMonsterPowerUp(target, materials, () => 0);
 
     expect(result.leveledSkillIndices).toHaveLength(1);
+  });
+});
+
+describe("スキルピッグ", () => {
+  it("異種族の通常モンスターにも正式な同種族素材と同じスキル成長処理を使える", () => {
+    const target = createMonsterInstance("slime_FIRE", 2, 1);
+    const pig = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    expect(isSameSpecies(target, pig)).toBe(false);
+    expect(isSkillGrowthMaterial(target, pig)).toBe(true);
+    const result = applyMonsterPowerUp(target, [pig], () => 0);
+    expect(result.leveledSkillIndices).toEqual([0]);
+    expect(target.skillLevels).toEqual([2, 1, 1]);
+    expect(result.expGained).toBe(0);
+  });
+
+  it("LvMAXでもEXPを増やさず使用でき、素材を確実に一度だけ消費する", () => {
+    const target = createMonsterInstance("wolf_WATER", 2, STAR_MAX_LEVEL[2]);
+    const pig = createMonsterInstance(SKILL_PIG_DEX[1].id, 1, 1);
+    const inventory = [target, pig];
+    const first = consumeMonsterPowerUp(inventory, target.id, [pig.id], [], () => 0.99);
+    expect(first).toMatchObject({ ok: true, expGained: 0, levelsGained: 0 });
+    expect(target.exp).toBe(0);
+    expect(inventory).toEqual([target]);
+
+    const levelsAfterFirstUse = [...target.skillLevels];
+    const second = consumeMonsterPowerUp(inventory, target.id, [pig.id], [], () => 0);
+    expect(second.ok).toBe(false);
+    expect(target.skillLevels).toEqual(levelsAfterFirstUse);
+  });
+
+  it("全スキルMAXなら通常Lvでも使用不可で、上限を超えない", () => {
+    const target = createMonsterInstance("golem_GRASS", 3, 10);
+    target.skillLevels = [5, 5, 5];
+    const pig = createMonsterInstance(SKILL_PIG_DEX[2].id, 1, 1);
+    const check = checkMonsterPowerUp(target, [pig], []);
+    expect(check.ok).toBe(false);
+    expect(check.reason).toContain("すべてのスキルが最大");
+    expect(target.skillLevels).toEqual([5, 5, 5]);
+  });
+
+  it("同じ素材IDの二重指定を拒否し、成長も消費も行わない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const pig = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    const inventory = [target, pig];
+    expect(consumeMonsterPowerUp(inventory, target.id, [pig.id, pig.id], []).ok).toBe(false);
+    expect(inventory).toHaveLength(2);
+    expect(target.skillLevels).toEqual([1, 1, 1]);
+  });
+});
+
+describe("プレイヤー使用可能な塔対策スキル", () => {
+  it("通常入手対象のウルフにSTRIPとHEAL_BLOCKが存在する", () => {
+    const playerUsableWolves = MONSTER_TEMPLATES_DEX.filter((monster) => monster.templateId === "wolf");
+    expect(playerUsableWolves.some((monster) => monster.skills.some((skill) => skill.effects.some((effect) => effect.kind === "STRIP")))).toBe(true);
+    expect(playerUsableWolves.some((monster) => monster.skills.some((skill) => skill.effects.some((effect) => effect.kind === "HEAL_BLOCK")))).toBe(true);
   });
 });
 

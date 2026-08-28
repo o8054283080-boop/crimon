@@ -159,20 +159,24 @@ const WOLF: MonsterTemplate = {
     {
       id: "wolf_s2_b",
       name: "いあつ",
-      description: "威圧の咆哮で敵全体を怯ませ、70%で1ターン攻撃力を大きく低下させる。",
+      description: "威圧の咆哮で敵全体の強化効果を1つ剥がし、70%で1ターン攻撃力を大きく低下させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 1, chance: 0.7 }],
+      effects: [
+        { kind: "STRIP" },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 1, chance: 0.7 },
+      ],
     },
     {
       id: "wolf_s2_c",
       name: "するどいツメ",
-      description: "敵単体に攻撃力1.65倍のダメージを与え、1ターン毒(1スタック)を付与する。",
+      description: "敵単体に攻撃力1.65倍のダメージを与え、1ターン毒(1スタック)と回復封じを付与する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.65 },
         { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 1 },
+        { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 1 },
       ],
     },
   ],
@@ -1853,6 +1857,30 @@ export const EXP_PIG: MonsterTemplate = {
   ],
 };
 
+/**
+ * スキルピッグ: 属性や種族を問わず、同種族素材と同じスキル育成判定を行う希少素材。
+ * 戦闘・経験値育成用ではないため、他の素材ピッグと同じ最低ステータスにしている。
+ */
+export const SKILL_PIG: MonsterTemplate = {
+  templateId: "skill_pig",
+  baseName: "スキルピッグ",
+  emoji: "🐽",
+  role: "素材",
+  baseStats: { hp: 200, atk: 15, def: 8, spd: 60, criRate: 0.02, criDmg: 1.2, resistance: 0.02, accuracy: 0.02 },
+  skill1: {
+    id: "skill_pig_s1", name: "おうえん", description: "敵単体に攻撃力0.2倍のダメージを与える。",
+    target: "SINGLE_ENEMY", cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.2 }],
+  },
+  skill2Variants: [{
+    id: "skill_pig_s2", name: "ひらめき", description: "敵単体に攻撃力0.2倍のダメージを与える。",
+    target: "SINGLE_ENEMY", cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.2 }],
+  }],
+  skill3Variants: [{
+    id: "skill_pig_s3", name: "まなびのこころ", description: "敵単体に攻撃力0.2倍のダメージを与える。",
+    target: "SINGLE_ENEMY", cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.2 }],
+  }],
+};
+
 /** テンプレート×6属性 = 24体の色違いモンスター図鑑(通常の召喚・ステージ対象) */
 export const MONSTER_TEMPLATES_DEX = MONSTER_TEMPLATES.flatMap((template) => createAllVariants(template));
 
@@ -1861,6 +1889,9 @@ export const REINCARNATION_PIG_DEX = createAllVariants(REINCARNATION_PIG);
 
 /** 経験ピッグの6属性色違いバリエーション(図鑑には含めるが、通常の召喚・ステージ抽選には出さない) */
 export const EXP_PIG_DEX = createAllVariants(EXP_PIG);
+
+/** スキルピッグの6属性バリエーション。塔などの報酬側から任意の属性を安全に付与できる。 */
+export const SKILL_PIG_DEX = createAllVariants(SKILL_PIG);
 
 /** 古代の魔人・古代のクリスタル・古代の呪晶の6属性色違いバリエーション(装備ダンジョン専用。召喚・図鑑表示には一切出さない) */
 export const ANCIENT_DEMON_DEX = createAllVariants(ANCIENT_DEMON);
@@ -1881,6 +1912,7 @@ export const MONSTER_DEX = [
   ...GACHA_EXCLUSIVE_DEX,
   ...REINCARNATION_PIG_DEX,
   ...EXP_PIG_DEX,
+  ...SKILL_PIG_DEX,
   ...ANCIENT_DEMON_DEX,
   ...ANCIENT_CRYSTAL_DEX,
   ...ANCIENT_CRYSTAL_CURSE_DEX,
