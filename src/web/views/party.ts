@@ -118,7 +118,11 @@ export function renderParty(props: PartyProps): HTMLElement {
         ),
       ),
     ),
-    el("section", { className: "panel" }, [
+    el("section", { className: "panel party-current" }, [
+      el("div", { className: "party-current__head" }, [
+        el("strong", {}, ["現在のパーティ"]),
+        el("span", {}, ["枠をタップすると外せます"]),
+      ]),
       // 枠そのものを外すボタンにする。入れ替えのたびに一覧から本人を探し直さない
       renderPartySlots(activeMembers, maxSize, onToggle),
       props.notice ? el("p", { className: "party-notice" }, [props.notice]) : null,
@@ -150,7 +154,8 @@ export function renderParty(props: PartyProps): HTMLElement {
       // ここに残すのは、操作ではなく**知りようのない決まりごと**だけ
       spec.note ? el("p", { className: "app-subtitle" }, [spec.note]) : null,
     ].filter((n): n is HTMLElement => n !== null)),
-    el("section", { className: "panel" }, [
+    el("section", { className: "panel party-roster" }, [
+      el("h2", { className: "party-roster__title" }, ["所持モンスター"]),
       player.monsters.length === 0
         ? el("p", { className: "app-subtitle" }, ["モンスターを所持していません。召喚してみましょう。"])
         : el("div", {}, [
