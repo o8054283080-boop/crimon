@@ -509,14 +509,14 @@ function runClimbMode(teams, climbs) {
 }
 
 function runFloorMode(teams) {
-  console.log("=== 1階ずつ全回復から挑んだ時の圧(敵残HP / 味方残HP) ===");
+  console.log("=== 1階ずつ全回復から挑んだ時の圧(勝率 / 敵残HP / 味方残HP) ===");
   const names = Object.keys(teams);
   console.log("階".padStart(3) + " 傾向".padEnd(9) + "倍率".padStart(7) + names.map((n) => n.padStart(14)).join(""));
   for (let f = 1; f <= TOWER_FLOOR_COUNT; f += 1) {
     const def = TRIAL_TOWER_FLOORS[f - 1];
     const cells = names.map((n) => {
       const r = measureFloor(teams[n].ids, f, 12);
-      return `${pct(r.enemyHpLeft)}/${pct(r.allyHpLeft)}`.padStart(14);
+      return `${pct(r.rate)}/${pct(r.enemyHpLeft)}/${pct(r.allyHpLeft)}`.padStart(14);
     });
     const label = def.trait === "NONE" ? (f % 5 === 0 ? "関門" : "-") : TOWER_TRAIT_LABEL[def.trait];
     console.log(String(f).padStart(3) + " " + label.padEnd(8) + def.powerScale.toFixed(2).padStart(7) + cells.join(""));
