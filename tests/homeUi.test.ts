@@ -4,6 +4,7 @@ import { vi } from "vitest";
 import { dungeonActions, homeTowerSummary, homeUtilityActions } from "../src/web/views/home.js";
 
 const source = readFileSync(new URL("../src/web/views/home.ts", import.meta.url), "utf8");
+const mainSource = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
 
 describe("redesigned CRIMON home tower summary", () => {
   it("uses real best and in-progress floor data", () => {
@@ -41,6 +42,7 @@ describe("Task D home information architecture", () => {
     expect(source).toContain("tutorialPanel.hidden = false");
     expect(source).toContain("tutorialPanel.hidden = true");
     expect(source).toContain("crimon-tutorial-panel__scrim");
+    expect(mainSource).toContain('state.screen === "HOME" ? null : buildTutorialFloatingPanel()');
   });
 
   it("preserves all dungeon chooser callbacks", () => {

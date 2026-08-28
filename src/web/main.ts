@@ -1897,7 +1897,9 @@ function refreshBackgroundFarmStatus(): void {
     current?.remove();
   }
   const tutorialCurrent = root.querySelector<HTMLElement>("[data-floating-panel=\"tutorial-mission\"]");
-  const tutorialNext = buildTutorialFloatingPanel();
+  // HOME has its own compact mission row. Never create the legacy expanded floating
+  // panel there: a fresh localStorage state defaults that panel to "expanded".
+  const tutorialNext = state.screen === "HOME" ? null : buildTutorialFloatingPanel();
   if (tutorialCurrent && tutorialNext) tutorialCurrent.replaceWith(tutorialNext);
   else if (tutorialCurrent) tutorialCurrent.remove();
   else if (tutorialNext) root.append(tutorialNext);
@@ -2555,7 +2557,10 @@ function render(): void {
   if (backgroundJob) {
     root.append(buildBackgroundFarmStatus(backgroundJob));
   }
-  const tutorialFloating = buildTutorialFloatingPanel();
+  // HOME renders a deliberately closed detail sheet and one compact row. Keeping
+  // the global floating mission panel off HOME also prevents its persisted/default
+  // expanded state from covering the player HUD on first paint.
+  const tutorialFloating = state.screen === "HOME" ? null : buildTutorialFloatingPanel();
   if (tutorialFloating) root.append(tutorialFloating);
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
   playBgm(bgmSceneOf(state.screen));

@@ -22,6 +22,15 @@ try {
     });
     await page.goto(baseUrl, { waitUntil: "networkidle" });
     await page.locator(".crimon-home").waitFor({ state: "visible", timeout: 15000 });
+    const detail = page.locator(".crimon-tutorial-panel");
+    if (await detail.count() !== 1 || await detail.isVisible()) {
+      throw new Error(`${viewport.name}: beginner mission detail must be hidden on initial HOME paint`);
+    }
+    if (await page.locator('[data-floating-panel="tutorial-mission"]').count() !== 0) {
+      throw new Error(`${viewport.name}: legacy tutorial floating panel must not be rendered on HOME`);
+    }
+    const hasVerticalScroll = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+    if (hasVerticalScroll) throw new Error(`${viewport.name}: HOME must fit without vertical scrolling`);
     await page.screenshot({ path: `${outDir}/${viewport.name}`, fullPage: false });
     await context.close();
   }
