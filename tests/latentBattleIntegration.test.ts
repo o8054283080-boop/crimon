@@ -86,3 +86,24 @@ describe("潜在能力のBattleEngine接続", () => {
     expect(setupDungeonBattle([loaded], floor).playerDefs[0].latentAbility?.id).toBe(candidates[2].id);
   });
 });
+
+describe("役割変更潜在", () => {
+  it("単体S1を主対象維持の全体攻撃へ変え、副対象倍率を下げる", () => {
+    const ability = latent("DAMAGE_UP", { value: 0, aoeConversion: { damageMultiplier: .5, nativeEffectTarget: "PRIMARY_ONLY" } });
+    const { player, enemy } = defs(ability); const second = { ...enemy, id: "enemy2" };
+    const engine = new BattleEngine([player], [enemy, second], { rng: () => .9 });
+    const actor = engine.getNextActor()!; const before = engine.getUnits().map((unit) => unit.currentHp);
+    engine.resolveTurn(actor, { skillIndex: 0, targetId: "E2" });
+    const primaryDamage = before[2] - engine.getUnits()[2].currentHp;
+    const secondaryDamage = before[1] - engine.getUnits()[1].currentHp;
+    expect(primaryDamage).toBeGreaterThan(secondaryDamage); expect(secondaryDamage).toBeGreaterThan(0);
+  });
+  it("多段の潜在妨害はスキル使用につき一度だけ解決する", () => {
+    const ability = latent("DAMAGE_UP", { value: 0, runtimeEffects: [{ kind: "DEBUFF", status: "POISON", chance: 1, duration: 2, value: .05 }] });
+    const setup = defs(ability, 4); setup.enemy.stats.resistance = 0;
+    const engine = new BattleEngine([setup.player], [setup.enemy], { rng: () => 0 });
+    const record = engine.resolveTurn(engine.getNextActor()!, { skillIndex: 0, targetId: "E1" });
+    expect(engine.getUnits()[1].poisonStacks).toBe(1);
+    expect(record.lines.filter((line) => line.includes("潜在能力"))).toHaveLength(1);
+  });
+});

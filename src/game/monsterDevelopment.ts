@@ -76,6 +76,30 @@ export function awakenLatentAbility(
   return true;
 }
 
+/** 初回・再覚醒・旧再選択を一つの原子的な入口で確定する。 */
+export function confirmLatentAwakening(
+  instance: MonsterInstance,
+  candidateId: string,
+  candidates: readonly LatentAbilityCandidate[],
+  wallet: { awakeningOrbs: number; gold: number },
+  expectedCurrentId: string | null,
+): boolean {
+  const current = instance.development.latentAbilityId;
+  if (current !== expectedCurrentId || candidates.length !== 3) return false;
+  const ids = new Set(candidates.map((candidate) => candidate.id));
+  if (ids.size !== 3 || !ids.has(candidateId) || candidateId === current) return false;
+  const legacyPaid = current === null && instance.development.latentReselectPending;
+  const orbCost = legacyPaid ? 0 : current === null ? 1 : LATENT_REAWAKENING_ORB_COST;
+  const goldCost = legacyPaid || current === null ? 0 : LATENT_REAWAKENING_GOLD_COST;
+  if (wallet.awakeningOrbs < orbCost || wallet.gold < goldCost) return false;
+  // 全検証後にだけ、同じ同期区間で資源とIDを変更する。
+  wallet.awakeningOrbs -= orbCost;
+  wallet.gold -= goldCost;
+  instance.development.latentAbilityId = candidateId;
+  instance.development.latentReselectPending = false;
+  return true;
+}
+
 export function canReawakenLatentAbility(
   instance: MonsterInstance,
   wallet: { awakeningOrbs: number; gold: number },

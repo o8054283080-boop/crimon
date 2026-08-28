@@ -80,6 +80,16 @@ export type LatentAbilityEffectType =
   | "DEBUFF_CHANCE_UP" | "ADD_DEBUFF" | "TURN_METER_DOWN"
   | "SELF_HEAL" | "ADD_BUFF" | "ALLY_SUPPORT" | "SHIELD" | "SPECIAL_TRIGGER";
 
+export type LatentRuntimeEffect =
+  | { kind: "DEBUFF"; status: "HEAL_BLOCK" | "SPD_DOWN" | "POISON" | "STUN" | "BUFF_BLOCK"; chance: number; duration: number; value?: number }
+  | { kind: "STRIP"; chance: number; count: number }
+  | { kind: "GAUGE_DOWN"; chance: number; value: number }
+  | { kind: "ALLY_GAUGE_UP"; chance: number; value: number }
+  | { kind: "DEBUFF_EXTEND"; chance: number; duration: number }
+  | { kind: "HEAL_CLEANSE"; value: number }
+  | { kind: "REGEN"; value: number; duration: number }
+  | { kind: "SHIELD"; value: number; duration: number };
+
 /** ⑧-3の戦闘実装へそのまま渡せる、スキル1専用の宣言的な候補データ。 */
 export interface LatentAbilityCandidate {
   id: string;
@@ -98,6 +108,16 @@ export interface LatentAbilityCandidate {
   status?: string;
   /** 既存S1効果とは別判定か、既存確率への加算か。 */
   resolution: "ALWAYS" | "SEPARATE" | "ADD_TO_EXISTING" | "ON_CRIT" | "CONDITIONAL";
+  /** S1使用単位で解決する追加効果。多段数には影響されない。 */
+  runtimeEffects?: readonly LatentRuntimeEffect[];
+  aoeConversion?: { damageMultiplier: number; secondaryEffectChanceMultiplier?: number; nativeEffectTarget?: "ALL" | "PRIMARY_ONLY" };
+  ignoreDefenseRatio?: number;
+  debuffDamageBonus?: { perDebuff: number; maxBonus: number };
+  hpMultiplier?: number;
+  defMultiplier?: number;
+  damageTakenMultiplier?: number;
+  /** 監査用の候補品質。戦闘倍率そのものではない。 */
+  grade?: "S" | "A" | "B" | "C";
 }
 
 export function createDefaultMonsterDevelopment(): MonsterDevelopment {

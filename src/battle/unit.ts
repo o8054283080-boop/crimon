@@ -65,12 +65,17 @@ export interface BattleUnit {
 }
 
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
+  const latent = def.latentAbility;
+  const hpMultiplier = Math.max(0.1, latent?.hpMultiplier ?? 1);
+  const defMultiplier = Math.max(0.1, latent?.defMultiplier ?? 1);
+  const effectiveDef = defMultiplier === 1 ? def : { ...def, stats: { ...def.stats, def: Math.round(def.stats.def * defMultiplier) } };
+  const maxHp = Math.round(def.stats.hp * hpMultiplier);
   return {
     instanceId,
-    def,
+    def: effectiveDef,
     team,
-    maxHp: def.stats.hp,
-    currentHp: def.stats.hp,
+    maxHp,
+    currentHp: maxHp,
     gauge: 0,
     cooldowns: [0, 0, 0],
     stunTurns: 0,

@@ -35,7 +35,8 @@ export function calcDamage(
   rng: () => number,
 ): DamageResult {
   const atk = getEffectiveStat(attacker, "atk");
-  const def = getEffectiveStat(defender, "def");
+  const ratio = Math.max(0, Math.min(1, effect.ignoreDefenseRatio ?? 0));
+  const def = getEffectiveStat(defender, "def") * (1 - ratio);
 
   const scaleBonusStatValue = effect.scaleBonus
     ? effect.scaleBonus.stat === "hp"
@@ -52,7 +53,12 @@ export function calcDamage(
       ? getEffectiveStat(attacker, "def")
       : 0;
   const coefficient = effect.hpCoefficient ?? effect.defCoefficient ?? 0;
-  const perHitBase = calculateBaseDamage(atk, effect.multiplier + scaleBonus, dependentStat, coefficient);
+  const debuffCount = defender.effects.filter((e) => e.kind === "DEBUFF").length
+    + defender.statusEffects.filter((e) => e.category === "DEBUFF").length
+    + Number(defender.poisonStacks > 0) + Number(defender.healBlockTurns > 0) + Number(defender.stunTurns > 0);
+  const debuffBonus = effect.debuffDamageBonus
+    ? Math.min(effect.debuffDamageBonus.maxBonus, debuffCount * effect.debuffDamageBonus.perDebuff) : 0;
+  const perHitBase = calculateBaseDamage(atk, (effect.multiplier + scaleBonus) * (1 + debuffBonus), dependentStat, coefficient);
   const hits = Math.max(1, Math.floor(effect.hits ?? 1));
   // 割合軽減は線形なのでhitごとの結果と同じ。固定軽減だけは解決全体で算出し均等配賦する。
   const resolutionDefense = applyDefenseE(perHitBase * hits, atk, def, effect.ignoreDefense);

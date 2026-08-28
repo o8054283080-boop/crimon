@@ -27,7 +27,7 @@ import {
   LATENT_REAWAKENING_GOLD_COST,
   LATENT_REAWAKENING_ORB_COST,
   abilityStatBonuses,
-  canReawakenLatentAbility,
+
   usedAbilityPoints,
 } from "../../game/monsterDevelopment.js";
 
@@ -89,7 +89,7 @@ function skillLines(skill: Skill): HTMLElement[] {
 }
 
 function latentEffect(candidate: (typeof LATENT_ABILITY_CANDIDATES)[string][number]): string {
-  const value = candidate.value !== 0 ? `効果量 ${candidate.value}` : "固有効果";
+  const value = candidate.aoeConversion ? `敵全体・威力${Math.round(candidate.aoeConversion.damageMultiplier * 100)}%` : candidate.ignoreDefenseRatio ? `防御${Math.round(candidate.ignoreDefenseRatio * 100)}%無視` : candidate.value !== 0 ? `効果量 ${candidate.value}` : "説明記載の固有効果";
   const chance = candidate.chance < 1 ? ` / 発動率 ${Math.round(candidate.chance * 100)}%` : " / 確定発動";
   return `${value}${chance}`;
 }
@@ -104,7 +104,7 @@ function latentChoices(props: MonsterCreateProps, candidates: (typeof LATENT_ABI
       el("button", {
         type: "button",
         className: "btn btn--primary latent-choice__select",
-        disabled: !reselecting && props.awakeningOrbs < 1,
+        disabled: candidate.id === props.target.development.latentAbilityId || (props.target.development.latentAbilityId ? (props.awakeningOrbs < LATENT_REAWAKENING_ORB_COST || props.gold < LATENT_REAWAKENING_GOLD_COST) : !reselecting && props.awakeningOrbs < 1),
         onclick: () => props.onAwaken(candidate.id),
       }, ["選択"]),
     ]),
@@ -278,14 +278,13 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
     const reselecting = target.development.latentReselectPending;
     const orbShortage = props.awakeningOrbs < LATENT_REAWAKENING_ORB_COST;
     const goldShortage = props.gold < LATENT_REAWAKENING_GOLD_COST;
-    const canReawaken = canReawakenLatentAbility(target, props);
     return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, [
       el("h2", {}, ["潜在覚醒"]), el("p", {}, [`所持　覚醒オーブ ${props.awakeningOrbs}個 / ${props.gold.toLocaleString()}G`]),
       el("p", { className: "app-subtitle" }, ["主な入手先: 初心者ミッション / 装備ダンジョン10階 初回 / 試練の塔15階・30階 初回"]),
       reselecting ? el("div", { className: "latent-reselect" }, [
         el("p", { className: "create-notice" }, ["再覚醒済み", el("strong", {}, ["潜在能力を選び直してください"])]),
         el("p", { className: "app-subtitle" }, ["再覚醒済み・候補を選択してください（追加コストはかかりません）"]),
-        candidates.length === 3 ? latentChoices(props, candidates) : null,
+        latentChoices(props, candidates),
       ].filter(isEl)) : target.development.latentAbilityId ? el("div", { className: "latent-awakened" }, [
         el("div", { className: "create-notice" }, selected
           ? [el("strong", {}, [`覚醒済み: ${selected.name}`]), el("span", {}, [selected.description]), el("small", {}, [`効果: ${latentEffect(selected)}`])]
@@ -295,7 +294,8 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
           el("span", { className: orbShortage ? "latent-cost--short" : "" }, [`覚醒オーブ ×${LATENT_REAWAKENING_ORB_COST}（所持 ${props.awakeningOrbs}）${orbShortage ? "・不足" : ""}`]),
           el("span", { className: goldShortage ? "latent-cost--short" : "" }, [`${LATENT_REAWAKENING_GOLD_COST.toLocaleString()}G（所持 ${props.gold.toLocaleString()}G）${goldShortage ? "・不足" : ""}`]),
         ]),
-        el("button", { type: "button", className: "btn btn--primary latent-reawaken-button", disabled: !canReawaken, onclick: props.onRequestReawaken }, ["再覚醒"]),
+        el("p", { className: "app-subtitle" }, ["新しい候補を選ぶと確認後に再覚醒します。現在能力は確定まで維持されます。"]),
+        latentChoices(props, candidates),
       ]) : candidates.length === 3 ? el("div", {}, [
         el("p", { className: "create-notice" }, ["未覚醒：覚醒オーブ1個で潜在覚醒"]),
         latentChoices(props, candidates),
