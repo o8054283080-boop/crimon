@@ -74,6 +74,12 @@ function equipmentOwnerName(player: PlayerState, equipment: Equipment): string |
   return dex ? dex.name : owner.dexId;
 }
 
+function formatMainStatNumber(stat: StatRoll): string {
+  return ["HP_FLAT", "ATK_FLAT", "DEF_FLAT", "SPD"].includes(stat.type)
+    ? String(stat.value)
+    : `${(stat.value * 100).toFixed(1)}%`;
+}
+
 /**
  * 一覧に並べる装備1枚。
  *
@@ -111,13 +117,19 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
         el("span", { className: "equip-card__sigil" }, [icon(slotIcon(equipment.slot))]),
         el("span", { className: "equip-card__head-text" }, [
           el("span", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
-          el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
+          el("span", { className: "equip-card__meta" }, [
+            el("span", { className: "equip-card__slot" }, [`枠${equipment.slot}`]),
+            el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
+          ]),
         ]),
         el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
       ]),
       equipment.id === currentId ? el("span", { className: "equip-card__status" }, ["現在装備中"]) : null,
       equipment.locked ? el("span", { className: "equip-card__lock" }, ["🔒 ロック"]) : null,
-      el("div", { className: "equip-card__main" }, [formatStatValue(equipment.mainStat)]),
+      el("div", { className: "equip-card__main" }, [
+        el("span", { className: "equip-card__main-label" }, [STAT_LABEL[equipment.mainStat.type]]),
+        el("strong", { className: "equip-card__main-value" }, [formatMainStatNumber(equipment.mainStat)]),
+      ]),
       el("div", { className: "equip-card__subs" }, subLines),
       ownerName
         ? el("div", { className: "equip-card__owner" }, [el("i", { className: "equip-card__dot" }, []), ownerName])
@@ -163,49 +175,58 @@ function renderSlotFilterRow(props: EquipmentProps): HTMLElement {
   return el("div", { className: "equip-filter" }, [allChip, ...slotChips]);
 }
 
-/** 並べ替えの本体。どの順でも、装着中のものは先に出して事故を防ぐ */
-function compareBySort(key: EquipmentSortKey, isEquipped: (e: Equipment) => boolean): (a: Equipment, b: Equipment) => number {
+/** 並べ替えの本体。各軸の同値条件をたどり、最後はIDで必ず決着させる。 */
+export function compareEquipmentBySort(key: EquipmentSortKey, isEquipped: (e: Equipment) => boolean = () => false): (a: Equipment, b: Equipment) => number {
   return (a, b) => {
+    let result: number;
     switch (key) {
       case "star":
-        return b.star - a.star || b.level - a.level || a.slot - b.slot;
+        result = b.star - a.star || b.level - a.level || a.slot - b.slot;
+        break;
       case "level":
-        return b.level - a.level || b.star - a.star || a.slot - b.slot;
+        result = b.level - a.level || b.star - a.star || a.slot - b.slot;
+        break;
       case "slot":
-        return a.slot - b.slot || b.star - a.star || b.level - a.level;
+        result = a.slot - b.slot || b.star - a.star || b.level - a.level;
+        break;
       case "set":
-        return a.set.localeCompare(b.set) || b.star - a.star || b.level - a.level;
+        result = a.set.localeCompare(b.set) || b.star - a.star || b.level - a.level;
+        break;
       case "value":
-        return equipmentSellPrice(b) - equipmentSellPrice(a);
+        result = equipmentSellPrice(b) - equipmentSellPrice(a);
+        break;
       case "HP_PERCENT": case "HP_FLAT": case "ATK_PERCENT": case "ATK_FLAT": case "DEF_PERCENT": case "DEF_FLAT":
       case "SPD": case "CRIT_RATE": case "CRIT_DMG": case "ACCURACY": case "RESISTANCE":
-        return equipmentStatTotal(b, key) - equipmentStatTotal(a, key) || b.star - a.star;
+        result = equipmentStatTotal(b, key) - equipmentStatTotal(a, key) || b.star - a.star || b.level - a.level;
+        break;
       default:
         // おすすめ: 装着中 → スロット → 星 → 強化。普段使いの並び
-        return Number(isEquipped(b)) - Number(isEquipped(a)) || a.slot - b.slot || b.star - a.star || b.level - a.level;
+        result = Number(isEquipped(b)) - Number(isEquipped(a)) || a.slot - b.slot || b.star - a.star || b.level - a.level;
     }
+    // すべての条件が同じでも、保存配列の偶然の順序に依存させない。
+    return result || a.id.localeCompare(b.id);
   };
 }
 
-/** 並べ替えの帯。頭に何の帯かを置き、選ばれている札だけ金にする */
+/** 通常一覧と装備候補一覧で必ず同じ比較器を通すための共通入口。 */
+export function sortEquipment(equipment: readonly Equipment[], key: EquipmentSortKey, isEquipped: (e: Equipment) => boolean = () => false): Equipment[] {
+  return equipment.slice().sort(compareEquipmentBySort(key, isEquipped));
+}
+
+/** iPhoneでも1段に収まり、現在値が常に見えるネイティブ選択欄。 */
 function renderSortRow(props: EquipmentProps): HTMLElement {
   return el("div", { className: "equip-sort" }, [
-    el("span", { className: "equip-sort__label" }, ["並べ替え"]),
-    el(
-      "div",
-      { className: "equip-sort__chips" },
-      EQUIPMENT_SORT_KEYS.map((key) =>
-        el(
-          "button",
-          {
-            type: "button",
-            className: `equip-sort__chip${props.sortKey === key ? " equip-sort__chip--active" : ""}`,
-            onclick: () => props.onChangeSort(key),
-          },
-          [EQUIPMENT_SORT_LABEL[key]],
-        ),
-      ),
-    ),
+    el("label", { className: "equip-sort__label", htmlFor: "equipment-sort" }, ["並べ替え"]),
+    el("div", { className: "equip-sort__control" }, [
+      el("select", {
+        id: "equipment-sort",
+        className: "equip-sort__select",
+        value: props.sortKey,
+        onchange: (event: Event) => props.onChangeSort((event.currentTarget as HTMLSelectElement).value as EquipmentSortKey),
+        ariaLabel: "装備の並べ替え",
+      }, EQUIPMENT_SORT_KEYS.map((key) => el("option", { value: key }, [EQUIPMENT_SORT_LABEL[key]]))),
+      el("span", { className: "equip-sort__current", ariaHidden: "true" }, [EQUIPMENT_SORT_LABEL[props.sortKey]]),
+    ]),
   ]);
 }
 
@@ -246,12 +267,10 @@ function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
 
 function renderList(props: EquipmentProps): HTMLElement {
   const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
-  const items = props.pickerContext
+  const filteredItems = props.pickerContext
     ? equipmentForSlot(props.player.equipment, props.pickerContext.slot)
-    : props.player.equipment
-        .filter((e) => props.slotFilter === null || e.slot === props.slotFilter)
-        .slice()
-        .sort(compareBySort(props.sortKey, isEquipped));
+    : props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter);
+  const items = sortEquipment(filteredItems, props.sortKey, isEquipped);
 
   const selecting = props.selecting && !props.pickerContext;
   const pickerMonster = props.pickerContext
