@@ -32,13 +32,14 @@ export interface FloatingBounds { x: number; y: number }
 /** DOMに依存しないクランプ計算。端末回転とSafe Areaの境界条件も単体試験できる。 */
 export function constrainFloatingPosition(input: {
   x: number; y: number; width: number; height: number; viewportWidth: number; viewportHeight: number;
-  safe: { top: number; right: number; bottom: number; left: number }; margin?: number;
+  safe: { top: number; right: number; bottom: number; left: number }; margin?: number; bottomObstruction?: number;
 }): FloatingBounds {
   const margin = input.margin ?? PANEL_MARGIN;
+  const bottomObstruction = Math.max(0, input.bottomObstruction ?? 0);
   const minX = input.safe.left + margin;
   const minY = input.safe.top + margin;
   const maxX = Math.max(minX, input.viewportWidth - input.safe.right - margin - input.width);
-  const maxY = Math.max(minY, input.viewportHeight - input.safe.bottom - margin - input.height);
+  const maxY = Math.max(minY, input.viewportHeight - input.safe.bottom - bottomObstruction - margin - input.height);
   return { x: Math.min(maxX, Math.max(minX, input.x)), y: Math.min(maxY, Math.max(minY, input.y)) };
 }
 
@@ -81,6 +82,14 @@ function safeInsets(): { top: number; right: number; bottom: number; left: numbe
   return result;
 }
 
+/** 実DOMを優先し、未生成時も共通CSS変数ぶんの下部ナビ領域を予約する。 */
+function bottomNavigationHeight(): number {
+  const nav = document.querySelector<HTMLElement>(".bottom-nav");
+  const measured = nav?.getBoundingClientRect().height ?? 0;
+  if (measured > 0) return measured;
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bottom-nav-h")) || 0;
+}
+
 function panelState(panel: HTMLElement): FloatingPanelState {
   return {
     x: Number.isFinite(Number(panel.dataset.normalX)) ? Number(panel.dataset.normalX) : undefined,
@@ -94,6 +103,7 @@ function panelState(panel: HTMLElement): FloatingPanelState {
 export function clampFloatingPanel(panel: HTMLElement): void {
   if (!panel.isConnected) return;
   const safe = safeInsets();
+  const bottomObstruction = bottomNavigationHeight();
   const rect = panel.getBoundingClientRect();
   const state = panelState(panel);
   let x = rect.left;
@@ -101,7 +111,7 @@ export function clampFloatingPanel(panel: HTMLElement): void {
   if (state.displayState === "docked") {
     x = state.dockSide === "left" ? safe.left : window.innerWidth - safe.right - rect.width;
     const bounds = constrainFloatingPosition({ x, y, width: rect.width, height: rect.height, viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight, safe, margin: 0 });
+      viewportHeight: window.innerHeight, safe, margin: 0, bottomObstruction: bottomObstruction + PANEL_MARGIN });
     x = state.dockSide === "left" ? safe.left : window.innerWidth - safe.right - rect.width;
     y = bounds.y;
     const occupied = [...document.querySelectorAll<HTMLElement>(`[data-floating-panel][data-display-state="docked"][data-dock-side="${state.dockSide}"]`)]
@@ -110,13 +120,13 @@ export function clampFloatingPanel(panel: HTMLElement): void {
     for (const other of occupied) {
       if (y < other.bottom + DOCK_COLLISION_GAP && y + rect.height > other.top - DOCK_COLLISION_GAP) {
         const below = other.bottom + DOCK_COLLISION_GAP;
-        const maxY = window.innerHeight - safe.bottom - rect.height;
+        const maxY = window.innerHeight - safe.bottom - bottomObstruction - PANEL_MARGIN - rect.height;
         y = below <= maxY ? below : Math.max(safe.top, other.top - rect.height - DOCK_COLLISION_GAP);
       }
     }
   } else {
     const bounds = constrainFloatingPosition({ x: rect.left, y: rect.top, width: rect.width, height: rect.height,
-      viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, safe });
+      viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, safe, bottomObstruction });
     x = bounds.x; y = bounds.y;
     panel.dataset.normalX = String(x); panel.dataset.normalY = String(y);
   }
@@ -182,7 +192,7 @@ export function createFloatingPanel(options: FloatingPanelOptions): HTMLElement 
     panel.style.left = `${originX + dx}px`; panel.style.top = `${originY + dy}px`; panel.style.right = "auto"; panel.style.bottom = "auto";
     const rect = panel.getBoundingClientRect();
     const position = constrainFloatingPosition({ x: rect.left, y: rect.top, width: rect.width, height: rect.height,
-      viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, safe: safeInsets() });
+      viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, safe: safeInsets(), bottomObstruction: bottomNavigationHeight() });
     panel.style.left = `${position.x}px`; panel.style.top = `${position.y}px`;
   });
   const finishPointer = (event: PointerEvent, allowDock: boolean): void => {

@@ -13,6 +13,13 @@ describe("共通フローティングパネル", () => {
     expect(constrainFloatingPosition({ x: 20, y: 20, width: 500, height: 900, viewportWidth: 390, viewportHeight: 844, safe: { top: 10, right: 0, bottom: 0, left: 0 } })).toEqual({ x: 8, y: 18 });
   });
 
+  it("Safe Areaとbottom navigationより上へDOCKEDタブを補正する", () => {
+    expect(constrainFloatingPosition({
+      x: 344, y: 999, width: 46, height: 46, viewportWidth: 390, viewportHeight: 844,
+      safe: { top: 47, right: 0, bottom: 34, left: 0 }, margin: 0, bottomObstruction: 72,
+    })).toEqual({ x: 344, y: 692 });
+  });
+
   it("Pointer Events、移動閾値、個別localStorage、resize補正を共通実装する", () => {
     const source = readFileSync(new URL("../src/web/floatingPanel.ts", import.meta.url), "utf8");
     expect(source).toContain('handle.addEventListener("pointerdown"');
