@@ -6,7 +6,7 @@ import type { ClearRewardResult } from "../src/game/rewards.js";
 
 function rewardWithEquipment(idSuffix: number): ClearRewardResult {
   const equipment = generateEquipment({ slot: ((idSuffix % 6) + 1) as 1 | 2 | 3 | 4 | 5 | 6, star: 5, subStatCount: 2 });
-  return { goldEarned: 0, crystalEarned: 0, expTotal: 0, levelUps: [], expAwards: [], dropDexId: null, dropStar: null, equipmentDrop: equipment, pigDrop: null, summonScrollDropped: false, fighterLevelsGained: 0 };
+  return { goldEarned: 0, crystalEarned: 0, expTotal: 0, fighterExp: 0, levelUps: [], expAwards: [], dropDexId: null, dropStar: null, equipmentDrop: equipment, pigDrop: null, summonScrollDropped: false, fighterLevelsGained: 0 };
 }
 
 describe("周回で獲得済みの装備ID追跡", () => {
