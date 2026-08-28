@@ -79,6 +79,8 @@ export interface BossTraits {
   counterAfterHits?: number;
   /** 反撃のダメージ倍率 */
   counterMultiplier?: number;
+  /** 試練の塔の特殊ボス。通常のボス・戦闘には指定しない。 */
+  trialBossFloor?: 70 | 80 | 90 | 100;
 }
 
 /*

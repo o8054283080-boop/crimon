@@ -62,6 +62,10 @@ export interface BattleUnit {
    * 手数で押す戦い方(小さい攻撃を何度も、毒を重ねる)に代償を作るための数。
    */
   hitsTaken: number;
+  /** 試練特殊ボス自身に回った手番数。通常ユニットでは参照されない。 */
+  bossTurnsTaken: number;
+  /** 試練特殊ボスの段階変化を一度だけ発動するための内部状態。 */
+  bossPhases: string[];
 }
 
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
@@ -90,15 +94,27 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     healBlockTurns: 0,
     healBlockMultiplier: 1,
     hitsTaken: 0,
+    bossTurnsTaken: 0,
+    bossPhases: [],
   };
 }
 
 /** バフ/デバフを反映した実効ステータス値を計算する。criRate/criDmgは加算、それ以外は乗算で効く */
 export function getEffectiveStat(unit: BattleUnit, stat: BuffStat): number {
   const base = unit.def.stats[stat];
-  const totalRate = unit.effects
+  let totalRate = unit.effects
     .filter((e) => e.stat === stat)
     .reduce((sum, e) => sum + e.amount, 0);
+
+  // 狂化は解除可能なBUFFではなくボスの段階変化。通常のバフ/デバフ計算へ倍率だけ合流させる。
+  if (unit.bossPhases.includes("ENRAGED")) {
+    if (stat === "atk") totalRate += unit.def.bossTraits?.trialBossFloor === 100 ? 2.5 : 2;
+    if (stat === "spd") totalRate += unit.def.bossTraits?.trialBossFloor === 100 ? 1.25 : 1;
+  }
+  if (unit.bossPhases.includes("LAST_STAND")) {
+    if (stat === "atk") totalRate += 1.5;
+    if (stat === "spd") totalRate += 0.75;
+  }
 
   if (stat === "criRate") {
     return Math.max(0, Math.min(1, base + totalRate));

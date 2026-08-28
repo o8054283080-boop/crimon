@@ -1,4 +1,5 @@
 import { BattleEngine } from "../battle/engine.js";
+import { BossTraits } from "../core/monster.js";
 import { Equipment, generateEquipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
@@ -131,6 +132,26 @@ export interface TowerBattleSetup {
 }
 
 /**
+ * 70階以降の関門だけに付く戦闘特性。
+ * 階データとは分離し、タスクAの100階データが統合されても通常階へ漏れないようにする。
+ */
+export function trialBossTraitsForFloor(floor: number): BossTraits | undefined {
+  if (floor === 70 || floor === 80 || floor === 90 || floor === 100) return { trialBossFloor: floor };
+  return undefined;
+}
+
+function attachTrialBossTrait(defs: MonsterDefinition[], floor: number): MonsterDefinition[] {
+  const trait = trialBossTraitsForFloor(floor);
+  if (!trait) return defs;
+  const bossIndex = defs.findIndex((def) => def.victoryTarget) >= 0
+    ? defs.findIndex((def) => def.victoryTarget)
+    : 0;
+  return defs.map((def, index) => index === bossIndex
+    ? { ...def, bossTraits: { ...def.bossTraits, ...trait } }
+    : def);
+}
+
+/**
  * この階の戦闘を組む。
  *
  * **倒れている仲間は連れて行かない。**HP0のまま並べると、
@@ -156,7 +177,7 @@ export function setupTowerBattle(state: PlayerState, run: TowerRun): TowerBattle
 
   return {
     playerDefs,
-    enemyDefs: buildDungeonEnemyTeam(floor),
+    enemyDefs: attachTrialBossTrait(buildDungeonEnemyTeam(floor), floor.floor),
     initialPlayerHp,
     initialCooldowns: standingMembers.map((m) => [...m.cooldowns] as [number, number, number]),
     standingMembers,
