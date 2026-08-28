@@ -13,6 +13,7 @@ export { LATENT_ABILITY_CANDIDATES } from "../data/latentAbilities.js";
 
 export const LATENT_REAWAKENING_ORB_COST = 2;
 export const LATENT_REAWAKENING_GOLD_COST = 100_000;
+export const LATENT_AWAKENING_ORB_COST = 1;
 
 export function usedAbilityPoints(allocation: AbilityPointAllocation): number {
   return Object.values(allocation).reduce((sum, value) => sum + value, 0);
@@ -76,6 +77,41 @@ export function awakenLatentAbility(
   return true;
 }
 
+export type LatentAwakeningResult =
+  | { ok: true; kind: "FIRST" | "REAWAKEN" | "LEGACY_RESELECT" }
+  | { ok: false; reason: "STALE" | "INVALID_CANDIDATES" | "INVALID_CANDIDATE" | "SAME_ABILITY" | "ORB_SHORTAGE" | "GOLD_SHORTAGE" };
+
+/**
+ * 潜在能力の選択・費用・個体更新を同期的な一入口で確定する。
+ * expectedCurrentId は候補画面を描画した時点の値で、古いボタンの連打・再送を拒否する。
+ * 検証がすべて終わるまで wallet と instance を一切変更しない。
+ */
+export function confirmLatentAwakening(
+  instance: MonsterInstance,
+  candidateId: string,
+  candidates: readonly LatentAbilityCandidate[],
+  wallet: { awakeningOrbs: number; gold: number },
+  expectedCurrentId: string | null,
+): LatentAwakeningResult {
+  if (instance.development.latentAbilityId !== expectedCurrentId) return { ok: false, reason: "STALE" };
+  if (candidates.length !== 3 || new Set(candidates.map(({ id }) => id)).size !== 3) return { ok: false, reason: "INVALID_CANDIDATES" };
+  if (!candidates.some(({ id }) => id === candidateId)) return { ok: false, reason: "INVALID_CANDIDATE" };
+  if (expectedCurrentId === candidateId) return { ok: false, reason: "SAME_ABILITY" };
+
+  const legacyReselect = expectedCurrentId === null && instance.development.latentReselectPending;
+  const kind = legacyReselect ? "LEGACY_RESELECT" : expectedCurrentId === null ? "FIRST" : "REAWAKEN";
+  const orbCost = kind === "FIRST" ? LATENT_AWAKENING_ORB_COST : kind === "REAWAKEN" ? LATENT_REAWAKENING_ORB_COST : 0;
+  const goldCost = kind === "REAWAKEN" ? LATENT_REAWAKENING_GOLD_COST : 0;
+  if (wallet.awakeningOrbs < orbCost) return { ok: false, reason: "ORB_SHORTAGE" };
+  if (wallet.gold < goldCost) return { ok: false, reason: "GOLD_SHORTAGE" };
+
+  wallet.awakeningOrbs -= orbCost;
+  wallet.gold -= goldCost;
+  instance.development.latentAbilityId = candidateId;
+  instance.development.latentReselectPending = false;
+  return { ok: true, kind };
+}
+
 export function canReawakenLatentAbility(
   instance: MonsterInstance,
   wallet: { awakeningOrbs: number; gold: number },
@@ -84,17 +120,4 @@ export function canReawakenLatentAbility(
     && !instance.development.latentReselectPending
     && wallet.awakeningOrbs >= LATENT_REAWAKENING_ORB_COST
     && wallet.gold >= LATENT_REAWAKENING_GOLD_COST;
-}
-
-/** 再覚醒費用を一度だけ支払い、現在の潜在を外して再選択待ちにする。 */
-export function reawakenLatentAbility(
-  instance: MonsterInstance,
-  wallet: { awakeningOrbs: number; gold: number },
-): boolean {
-  if (!canReawakenLatentAbility(instance, wallet)) return false;
-  wallet.awakeningOrbs -= LATENT_REAWAKENING_ORB_COST;
-  wallet.gold -= LATENT_REAWAKENING_GOLD_COST;
-  instance.development.latentAbilityId = null;
-  instance.development.latentReselectPending = true;
-  return true;
 }

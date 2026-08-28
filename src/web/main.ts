@@ -45,7 +45,7 @@ import {
 } from "../game/rewards.js";
 import { executeMonsterPowerUp } from "../game/monsterPowerUp.js";
 import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
-import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
+import { confirmLatentAwakening, LATENT_ABILITY_CANDIDATES, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
 import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
 import {
   claimDailyLoginBonus,
@@ -2286,6 +2286,8 @@ function render(): void {
         navigate("MONSTERS");
         return;
       }
+      // この描画の操作が前提とする潜在ID。古いDOMからの連打・再送はtransaction側で拒否する。
+      const latentExpectedId = createTarget.development.latentAbilityId;
       content = renderMonsterCreate({
         target: createTarget,
         monsters: state.player.monsters,
@@ -2328,10 +2330,20 @@ function render(): void {
         },
         onAwaken: (candidateId) => {
           const candidates = LATENT_ABILITY_CANDIDATES[createTarget.dexId] ?? [];
-          const wasReselecting = createTarget.development.latentReselectPending;
-          if (!awakenLatentAbility(createTarget, candidateId, candidates, state.player)) return;
+          const candidate = candidates.find(({ id }) => id === candidateId);
+          const isReawaken = latentExpectedId !== null;
+          const cost = isReawaken ? "覚醒オーブ ×2 と 100,000ゴールド" : "覚醒オーブ ×1";
+          if (!candidate || !window.confirm(`「${candidate.name}」を選択しますか？\n必要：${cost}\n確定後に費用を消費します。`)) return;
+          const result = confirmLatentAwakening(createTarget, candidateId, candidates, state.player, latentExpectedId);
+          if (!result.ok) {
+            state.createNotice = result.reason === "STALE" ? "すでに確定済みです（追加消費はありません）" : "潜在覚醒を確定できませんでした（費用は消費していません）";
+            state.reawakenConfirmOpen = false;
+            render();
+            return;
+          }
           savePlayerState(state.player);
-          state.createNotice = wasReselecting ? "潜在能力を再選択しました" : "潜在能力を覚醒しました";
+          state.reawakenConfirmOpen = false;
+          state.createNotice = result.kind === "FIRST" ? "潜在能力を覚醒しました" : "潜在能力を再覚醒しました";
           playSfx("levelUp");
           render();
         },
@@ -2341,19 +2353,6 @@ function render(): void {
         },
         onCancelReawaken: () => {
           state.reawakenConfirmOpen = false;
-          render();
-        },
-        onConfirmReawaken: () => {
-          if (!reawakenLatentAbility(createTarget, state.player)) {
-            state.reawakenConfirmOpen = false;
-            state.createNotice = "再覚醒に必要な資源が不足しています";
-            render();
-            return;
-          }
-          state.reawakenConfirmOpen = false;
-          state.createNotice = "再覚醒しました。潜在能力を選び直してください";
-          savePlayerState(state.player);
-          playSfx("levelUp");
           render();
         },
         onSelectMaterial: (id) => {

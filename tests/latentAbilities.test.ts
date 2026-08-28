@@ -3,7 +3,7 @@ import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../src/data/monsters.js";
 import {
   LATENT_ABILITY_CANDIDATES,
   awakenLatentAbility,
-  reawakenLatentAbility,
+  confirmLatentAwakening,
 } from "../src/game/monsterDevelopment.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
@@ -39,7 +39,7 @@ describe("潜在覚醒216候補", () => {
     expect(normalizeLoadedState(JSON.parse(JSON.stringify(state))).monsters[0].development.latentAbilityId).toBe(candidates[0].id);
   });
 
-  it("再覚醒費用を払い、同じ候補から追加料金なしで選び直せる", () => {
+  it("再覚醒は候補確定時だけ費用とIDをまとめて更新する", () => {
     const state = createInitialState();
     const instance = state.monsters[0];
     const candidates = LATENT_ABILITY_CANDIDATES[instance.dexId];
@@ -48,16 +48,17 @@ describe("潜在覚醒216候補", () => {
     state.awakeningOrbs = 3;
     state.gold = 150_000;
 
-    expect(reawakenLatentAbility(instance, state)).toBe(true);
+    const result = confirmLatentAwakening(instance, abilityB.id, candidates, state, abilityA.id);
+    expect(result.ok).toBe(true);
     expect(state.awakeningOrbs).toBe(1);
     expect(state.gold).toBe(50_000);
-    expect(instance.development.latentAbilityId).toBeNull();
-    expect(instance.development.latentReselectPending).toBe(true);
+    expect(instance.development.latentAbilityId).toBe(abilityB.id);
+    expect(instance.development.latentReselectPending).toBe(false);
 
     const loaded = normalizeLoadedState(JSON.parse(JSON.stringify(state)));
     const loadedInstance = loaded.monsters[0];
-    expect(loadedInstance.development.latentReselectPending).toBe(true);
-    expect(awakenLatentAbility(loadedInstance, abilityB.id, candidates, loaded)).toBe(true);
+    expect(loadedInstance.development.latentReselectPending).toBe(false);
+    expect(confirmLatentAwakening(loadedInstance, abilityB.id, candidates, loaded, abilityA.id)).toEqual({ ok: false, reason: "STALE" });
     expect(loaded.awakeningOrbs).toBe(1);
     expect(loaded.gold).toBe(50_000);
     expect(loadedInstance.development.latentAbilityId).toBe(abilityB.id);
@@ -68,10 +69,31 @@ describe("潜在覚醒216候補", () => {
     const instance = createMonsterInstance("slime_FIRE", 3);
     instance.development.latentAbilityId = LATENT_ABILITY_CANDIDATES[instance.dexId][0].id;
 
-    expect(reawakenLatentAbility(instance, { awakeningOrbs: 1, gold: 100_000 })).toBe(false);
-    expect(reawakenLatentAbility(instance, { awakeningOrbs: 2, gold: 99_999 })).toBe(false);
+    const candidates = LATENT_ABILITY_CANDIDATES[instance.dexId];
+    const current = instance.development.latentAbilityId;
+    const orbShort = { awakeningOrbs: 1, gold: 100_000 };
+    const goldShort = { awakeningOrbs: 2, gold: 99_999 };
+    expect(confirmLatentAwakening(instance, candidates[1].id, candidates, orbShort, current)).toEqual({ ok: false, reason: "ORB_SHORTAGE" });
+    expect(confirmLatentAwakening(instance, candidates[1].id, candidates, goldShort, current)).toEqual({ ok: false, reason: "GOLD_SHORTAGE" });
+    expect(orbShort).toEqual({ awakeningOrbs: 1, gold: 100_000 });
+    expect(goldShort).toEqual({ awakeningOrbs: 2, gold: 99_999 });
     expect(instance.development.latentAbilityId).not.toBeNull();
     expect(instance.development.latentReselectPending).toBe(false);
+  });
+
+  it("不正候補と同一処理再送では資源もIDも二重変更しない", () => {
+    const state = createInitialState();
+    const instance = state.monsters[0];
+    const candidates = LATENT_ABILITY_CANDIDATES[instance.dexId];
+    state.awakeningOrbs = 5;
+    state.gold = 300_000;
+    expect(confirmLatentAwakening(instance, "unknown", candidates, state, null).ok).toBe(false);
+    expect(state.awakeningOrbs).toBe(5);
+    expect(instance.development.latentAbilityId).toBeNull();
+    expect(confirmLatentAwakening(instance, candidates[0].id, candidates, state, null).ok).toBe(true);
+    expect(confirmLatentAwakening(instance, candidates[0].id, candidates, state, null)).toEqual({ ok: false, reason: "STALE" });
+    expect(state.awakeningOrbs).toBe(4);
+    expect(state.gold).toBe(300_000);
   });
 
   it("旧セーブの個体は再選択待ちではない状態に補完する", () => {
