@@ -16,24 +16,31 @@ describe("redesigned CRIMON home tower summary", () => {
 });
 
 describe("Task D home information architecture", () => {
-  it("orders brand, party, primary, management, secondary and missions", () => {
+  it("orders brand, party, primary, management, secondary and compact missions", () => {
     const selectors = ["crimon-resource-header", "crimon-brand", "home-party crimon-section", "crimon-section crimon-section--primary", "crimon-section crimon-section--management", "crimon-section crimon-section--secondary"];
     const positions = selectors.map((selector) => source.indexOf(`className: \"${selector}`));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(source.indexOf("crimon-section--secondary")).toBeLessThan(source.indexOf("tutorial,"));
+    expect(source.indexOf("crimon-section--secondary")).toBeLessThan(source.indexOf("tutorialCompact,"));
     expect(source).not.toContain('className: "crimon-hero"');
   });
 
-  it("uses the required primary and management variants", () => {
-    for (const variant of ["adventure", "dungeon", "arena", "monster", "equipment", "summon", "shop"]) {
+  it("uses the required three primary artwork variants and four utility actions", () => {
+    for (const variant of ["adventure", "dungeon", "arena"]) {
       expect(source).toContain(`\"${variant}\"`);
     }
     expect(source).toContain("props.onGoStages");
-    expect(source).toContain("props.onGoMonsters");
-    expect(source).toContain("props.onGoEquipment");
-    expect(source).toContain("props.onGoSummon");
+    expect(source).toContain('roundMenu("試練の塔"');
+    expect(source).toContain('roundMenu("初心者"');
     expect(source).toContain("props.onGoMonsterDex");
+    expect(source).toContain('roundMenu("遊び方"');
+  });
+
+  it("keeps the mission detail panel closed until an explicit compact-row action", () => {
+    expect(source).toContain('className: "crimon-tutorial-panel", hidden: true');
+    expect(source).toContain("tutorialPanel.hidden = false");
+    expect(source).toContain("tutorialPanel.hidden = true");
+    expect(source).toContain("crimon-tutorial-panel__scrim");
   });
 
   it("preserves all dungeon chooser callbacks", () => {

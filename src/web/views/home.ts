@@ -776,7 +776,9 @@ export function renderHome(props: HomeProps): HTMLElement {
   const tutorialClaimable = tutorialNext ? canClaimTutorialMission(player, tutorialNext) : false;
   const tutorialActions = tutorialNext ? tutorialMissionActions(props, tutorialNext) : null;
   const claimedCount = TUTORIAL_MISSIONS.filter((mission) => player.tutorialMissions.claimedIds.includes(mission.id)).length;
-  const tutorial = el("section", { className: "crimon-tutorial", ariaLabel: "初心者ミッション" }, [
+  const tutorialPanel = el("section", { className: "crimon-tutorial-panel", hidden: true, ariaLabel: "初心者ミッション詳細" }, []);
+  const closeTutorial = () => { tutorialPanel.hidden = true; };
+  const tutorialContent = el("div", { className: "crimon-tutorial" }, [
     el("div", { className: "crimon-tutorial__head" }, [
       el("span", {}, [el("small", {}, ["BEGINNER MISSIONS"]), el("strong", {}, [tutorialNext ? `STEP ${tutorialNext.step} / 30` : "COMPLETE 30 / 30"])]),
       el("span", { className: "crimon-tutorial__count" }, [`${claimedCount} / ${TUTORIAL_MISSIONS.length}`]),
@@ -795,10 +797,26 @@ export function renderHome(props: HomeProps): HTMLElement {
       ]),
     ]) : el("p", { className: "crimon-tutorial__complete" }, ["全30ミッション達成！ 基本育成ロードマップを制覇しました。"]),
   ]);
+  tutorialPanel.append(
+    el("button", { type: "button", className: "crimon-tutorial-panel__scrim", onclick: closeTutorial, ariaLabel: "初心者ミッションを閉じる" }, []),
+    el("div", { className: "crimon-tutorial-panel__body" }, [
+      el("button", { type: "button", className: "crimon-tutorial-panel__close", onclick: closeTutorial, ariaLabel: "閉じる" }, ["×"]),
+      tutorialContent,
+    ]),
+  );
+  const tutorialCompact = el("button", { type: "button", className: `crimon-tutorial-compact${tutorialClaimable ? " is-ready" : ""}`, onclick: () => { tutorialPanel.hidden = false; }, ariaLabel: "初心者ミッション詳細を開く" }, [
+    el("span", {}, [el("small", {}, ["初心者ミッション"]), el("strong", {}, [tutorialNext ? tutorialNext.title : "全30ミッション達成"])]),
+    el("b", {}, [tutorialNext ? `${claimedCount}/30` : "COMPLETE"]), icon("chevron"),
+  ]);
   const staminaSheet = el("div", { className: "home-sheet", hidden: true }, []);
   const closeStamina = () => { staminaSheet.hidden = true; };
   staminaSheet.append(el("div", { className: "home-sheet__scrim", onclick: closeStamina }, []), el("div", { className: "home-sheet__panel" }, [el("div", { className: "home-sheet__head" }, [el("strong", {}, ["スタミナ回復"]), el("button", { type: "button", className: "btn btn--ghost", onclick: closeStamina }, ["閉じる"])]), renderVitals(player, props.onRefillStaminaPartial, props.onRefillStaminaFull, party)]));
   const openStamina = () => { staminaSheet.hidden = false; };
+  const partyPower = party.reduce((sum, member) => sum + monsterPower(member), 0);
+  const partyPortraits = (modifier: string) => el("div", { className: `home-party-grid ${modifier}` }, Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], props.onGoParty, props.onViewPartyMonster)));
+  const roundMenu = (label: string, sub: string, iconName: IconName, onClick: () => void) => el("button", { type: "button", className: "crimon-round-menu", onclick: onClick, ariaLabel: label }, [
+    el("span", { className: "crimon-round-menu__orb" }, [icon(iconName)]), el("span", {}, [el("strong", {}, [label]), el("small", {}, [sub])]),
+  ]);
   const menu = el("main", { className: `home-menu crimon-home ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
       props.compensationClaims.length ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
       props.loginBonusResult ? renderLoginBonusBanner(props.loginBonusResult, props.onDismissLoginBonus) : null,
@@ -806,23 +824,21 @@ export function renderHome(props: HomeProps): HTMLElement {
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
-      el("section", { className: "crimon-brand", ariaLabel: "CRIMON" }, [
-        el("span", { className: "crimon-brand__mist", "aria-hidden": "true" }, []),
-        el("img", { src: new URL("../assets/crimon-logo.svg", import.meta.url).href, alt: "CRIMON", className: "crimon-brand__logo", onerror: (event) => { ((event as Event).currentTarget as HTMLImageElement).hidden = true; } }, []),
-        el("span", { className: "crimon-brand__fallback", "aria-hidden": "true" }, ["CRIMON"]),
-        el("img", { src: new URL("../assets/crimon-emblem.svg", import.meta.url).href, alt: "", "aria-hidden": "true", className: "crimon-brand__emblem" }, []),
+      el("section", { className: "crimon-brand", ariaLabel: "暗い幻想世界" }, []),
+      el("section", { className: "home-party crimon-section" }, [partyPortraits("home-party-grid--stage")]),
+      el("section", { className: "crimon-section crimon-section--primary" }, [el("div", { className: "crimon-primary-grid" }, [artCard("冒険", "物語を進める", "adventure", props.onGoStages), artCard("ダンジョン", "報酬を選ぶ", "dungeon", toggleDungeonChooser), artCard("闘技場", "強者との決闘", "arena", onGoArena)]), dungeonChooser]),
+      el("section", { className: "crimon-section crimon-section--management" }, [
+        roundMenu("試練の塔", `最高 ${tower.bestFloor}F`, "tower", props.onGoTrialTower),
+        roundMenu("初心者", `${claimedCount}/30`, "scroll", () => { tutorialPanel.hidden = false; }),
+        roundMenu("図鑑", "MONSTER DEX", "monsters", props.onGoMonsterDex),
+        roundMenu("遊び方", "GUIDE", "info", onGoHowToPlay),
       ]),
-      el("section", { className: "home-party crimon-section" }, [sectionMark("CURRENT PARTY", el("button", { type: "button", className: "btn-frame", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["編成"])), el("div", { className: "home-party-grid" }, Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], props.onGoParty, props.onViewPartyMonster)))]),
-      el("section", { className: "crimon-section crimon-section--primary" }, [sectionMark("PRIMARY CONTENT"), el("div", { className: "crimon-primary-grid" }, [artCard("ADVENTURE", "物語を進める", "adventure", props.onGoStages), artCard("DUNGEON", "報酬を選ぶ", "dungeon", toggleDungeonChooser), artCard("ARENA", "強者との決闘", "arena", onGoArena)]), dungeonChooser]),
-      el("section", { className: "crimon-section crimon-section--management" }, [sectionMark("MANAGEMENT"), el("div", { className: "crimon-management-grid" }, [artCard("MONSTER", "育成・編成", "monster", props.onGoMonsters, "monsters"), artCard("EQUIPMENT", "装備管理", "equipment", props.onGoEquipment, "equipment"), artCard("SUMMON", "新たな契約", "summon", props.onGoSummon, "summon"), artCard("SHOP", "アイテム購入", "shop", onGoShop, "shop")])]),
-      el("section", { className: "crimon-section crimon-section--secondary" }, [sectionMark("SECONDARY / PROGRESSION"),
-        el("button", { type: "button", className: "crimon-tower", onclick: props.onGoTrialTower, ariaLabel: "Trial Tower" }, [
-          el("img", { src: new URL("../assets/crimon-tower-hero.svg", import.meta.url).href, alt: "", "aria-hidden": "true" }, []),
-          el("span", {}, [el("strong", {}, ["TRIAL TOWER"]), el("small", {}, [`最高到達 ${tower.bestFloor}F${tower.isRunning ? ` ・ ${tower.floor}F挑戦中` : ""}`])]), icon("chevron"),
-        ]),
-        el("div", { className: "crimon-utility-grid" }, [artCard("MONSTER DEX", "図鑑", "utility", props.onGoMonsterDex), artCard("HOW TO PLAY", "遊び方", "utility", onGoHowToPlay)]),
+      el("section", { className: "crimon-section crimon-section--secondary" }, [
+        sectionMark("CURRENT PARTY"),
+        el("div", { className: "current-party-hud__body" }, [el("span", { className: "current-party-hud__power" }, [el("small", {}, ["総戦力"]), el("strong", {}, [partyPower.toLocaleString("ja-JP")])]), partyPortraits("home-party-grid--hud"), el("button", { type: "button", className: "btn-frame", onclick: props.onGoParty }, ["パーティ編成"])]),
       ]),
-      tutorial,
+      tutorialCompact,
+      tutorialPanel,
       staminaSheet,
       settingsSheet,
     ].filter((node): node is HTMLElement => node !== null));
