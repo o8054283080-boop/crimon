@@ -40,3 +40,27 @@ PR #100 は、216候補の `latentAbilityId` を戦闘定義へ引き渡し、S1
 ## 将来の `effects[]` 拡張
 
 使用前の合成と使用後の「単一潜在効果」解決を分離している。将来候補を `primaryEffect + secondaryEffect` または `effects[]` に移行するときは、S1使用単位で集約した `anyCrit` / `debuffApplied` を維持したまま、各effectについて単一効果関数を反復する。候補選択、安定ID、MonsterInstanceの保存形式、BattleEngineへの入口を変える必要はない。今回は⑧-6A提案の複合効果や強化値を216候補へ適用していない。
+
+## Task B: 宣言的ランタイム拡張
+
+`LatentAbilityCandidate` は従来の安定ID・単一 `effectType` を保持したまま、任意の
+`runtimeEffects[]`、`aoeConversion`、部分防御無視、デバフ数ダメージ、耐久補正を持てる。
+既存216候補の割り当てや保存形式は変更していない。新しい候補だけ `effectType: "RUNTIME"`
+を選べば、ゲージ増減、SPD DOWN、HEAL_BLOCK、STRIP、POISON、STUN、BUFF_BLOCK、
+デバフ延長、解除、回復、シールド、継続回復、能力バフを組み合わせられる。
+
+ランタイム入口は全対象・全hitの正式スキル解決が終わった後の一箇所である。
+したがって `hits: 3` でも潜在効果の基礎発動は3回にならない。既存スキル自身の
+hit/効果解決には手を加えない。STRIPはIMMUNITY判定より前に正式な命中・抵抗経路を
+通り、IMMUNITYそのものをBUFFとして解除できる。その後に並べた妨害は通常の免疫、
+命中、抵抗規則で解決される。
+
+`aoeConversion` は元が `SINGLE_ENEMY` の場合だけ対象列を敵全体へ展開する。ダメージは
+候補固有の `damageMultiplier` を掛け、既存の追加効果は `PRIMARY_ONLY` または副対象の
+`secondaryEffectChanceMultiplier` で制限できる。元から `ALL_ENEMIES` の技には倍率も
+対象変換も二重適用しない。対象列の先頭には手動選択またはAI選択した主対象を維持する。
+
+部分防御無視は別damage engineを作らず、既存 `calcDamage` が防御計算へ渡す実効防御だけを
+`ignoreDefenseRatio` 分減らす。HP/DEF/被ダメージ補正も既存 `BattleUnit`、実効ステータス、
+共通ダメージ適用へ合成する。塔の階数を参照する潜在分岐はなく、通常ステージ、ダンジョン、
+アリーナ、試練の塔で同じBattleEngine規則になる。
