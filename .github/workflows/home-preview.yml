@@ -1,0 +1,44 @@
+name: HOME visual preview
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/web/**"
+      - "tools/homePreview.mjs"
+      - ".github/workflows/home-preview.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start preview server
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/crimon-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/crimon-preview.log
+          exit 1
+      - name: Capture HOME screenshots
+        run: node tools/homePreview.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: home-preview-${{ github.event.pull_request.number || github.run_id }}
+          path: artifacts/home-preview/*.png
+          if-no-files-found: error
+          retention-days: 7
