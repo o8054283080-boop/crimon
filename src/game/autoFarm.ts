@@ -31,6 +31,8 @@ export interface AutoFarmResult {
   totalFighterLevels: number;
   monsterDrops: AutoFarmDrop[];
   equipmentDropCount: number;
+  /** その周回で既に所持品へ追加された装備のID。報酬を再生成するためには使わない。 */
+  earnedEquipmentIds?: string[];
   pigDropCount: number;
   summonScrollCount: number;
   levelUps: LevelUpInfo[];
@@ -47,6 +49,7 @@ export function emptyResult(): AutoFarmResult {
     totalFighterLevels: 0,
     monsterDrops: [],
     equipmentDropCount: 0,
+    earnedEquipmentIds: [],
     pigDropCount: 0,
     summonScrollCount: 0,
     levelUps: [],
@@ -96,7 +99,10 @@ export function mergeReward(result: AutoFarmResult, reward: ClearRewardResult, e
   if (reward.dropDexId && reward.dropStar) {
     result.monsterDrops.push({ dexId: reward.dropDexId, star: reward.dropStar });
   }
-  if (reward.equipmentDrop) result.equipmentDropCount += 1;
+  if (reward.equipmentDrop) {
+    result.equipmentDropCount += 1;
+    (result.earnedEquipmentIds ??= []).push(reward.equipmentDrop.id);
+  }
   if (reward.pigDrop) {
     result.pigDropCount += 1;
     result.monsterDrops.push({ dexId: reward.pigDrop.dexId, star: reward.pigDrop.star });

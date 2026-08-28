@@ -66,6 +66,7 @@ import {
   removeMonsters,
   savePlayerState,
   sellEquipment,
+  setEquipmentLocked,
   setFighterName,
   toggleDungeonPartyMember,
   toggleTowerPartyMember,
@@ -93,6 +94,7 @@ import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
+import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
 import { loadNavigationState, saveNavigationState } from "./navigationState.js";
 import { ResultAction } from "./views/resultActions.js";
 import { BattleChainInfo, BattleViewHandle, renderBattleView } from "./views/battleView.js";
@@ -282,6 +284,10 @@ interface AppState {
   monsterFilterOpen: boolean;
   /** まとめて売却するために選ばれている装備 */
   equipmentSelectedIds: string[];
+  farmEquipmentOpen: boolean;
+  farmEquipmentSelectedIds: string[];
+  farmEquipmentDetailId: string | null;
+  farmEquipmentSelling: boolean;
   /** ショップで直前に買ったものの案内。次に何か操作したら消す */
   shopNotice: string | null;
   /** まとめ売却の選択モード中か */
@@ -355,6 +361,10 @@ const state: AppState = {
   monsterFilter: { ...EMPTY_MONSTER_FILTER },
   monsterFilterOpen: false,
   equipmentSelectedIds: [],
+  farmEquipmentOpen: false,
+  farmEquipmentSelectedIds: [],
+  farmEquipmentDetailId: null,
+  farmEquipmentSelling: false,
   shopNotice: null,
   equipmentSelecting: false,
   equipmentReturnMonsterId: null,
@@ -585,6 +595,12 @@ function handleSellEquipment(equipmentId: string): void {
 function handleBulkSellEquipment(): void {
   const targets = state.player.equipment.filter((e) => state.equipmentSelectedIds.includes(e.id));
   if (targets.length === 0) return;
+  if (targets.some((e) => e.locked)) {
+    state.equipmentSelectedIds = state.equipmentSelectedIds.filter((id) => !state.player.equipment.find((e) => e.id === id)?.locked);
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
   const total = targets.reduce((sum, e) => sum + equipmentSellPrice(e), 0);
   if (!window.confirm(`${targets.length}個の装備を売却して🪙${total.toLocaleString()}を得ます。この操作は取り消せません。`)) return;
 
@@ -1772,7 +1788,6 @@ function buildBackgroundFarmStatus(job: BackgroundFarmJob): HTMLElement {
     placement: "bottom",
     forceCompact: BATTLE_SCREENS.has(state.screen),
     compact: el("span", {}, [`🔁 ${job.targetName} ${job.completedRuns}/${job.requestedRuns}`]),
-    docked: el("span", {}, [`🔄 ${job.completedRuns}/${job.requestedRuns}`]),
     content: [el("div", { className: "background-farm-status", "data-background-farm-status": "true" }, [
     el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
       if (job.status !== "RUNNING") {
@@ -1814,7 +1829,6 @@ function buildTutorialFloatingPanel(): HTMLElement | null {
     placement: "top",
     forceCompact: BATTLE_SCREENS.has(state.screen),
     compact: el("span", {}, [complete ? `🎯 STEP ${mission.step} 達成！` : `🎯 STEP ${mission.step}　${mission.title} ${progress.replaceAll(" ", "")}`]),
-    docked: el("span", {}, [complete ? "🎯！" : "🎯"]),
     content: [el("section", { className: `tutorial-floating${complete ? " tutorial-floating--ready" : ""}` }, [
       el("strong", {}, ["初心者ミッション"]),
       el("span", { className: "tutorial-floating__step" }, [`STEP ${mission.step}`]),
@@ -2395,7 +2409,58 @@ function render(): void {
         }
         navigate("HOME");
       } });
-      content = renderAutoFarmResult({ result, targetName: state.autoFarmTargetName, actions });
+      content = renderAutoFarmResult({
+        result,
+        targetName: state.autoFarmTargetName,
+        actions,
+        onViewEquipment: result.earnedEquipmentIds?.length ? () => {
+          state.farmEquipmentOpen = true;
+          render();
+        } : undefined,
+      });
+      if (state.farmEquipmentOpen) {
+        const earnedIds = new Set(result.earnedEquipmentIds ?? []);
+        const equipment = state.player.equipment.filter((item) => earnedIds.has(item.id));
+        const validIds = new Set(equipment.map((item) => item.id));
+        state.farmEquipmentSelectedIds = state.farmEquipmentSelectedIds.filter((id) => validIds.has(id));
+        content.append(renderFarmEquipmentResult({
+          equipment,
+          selectedIds: state.farmEquipmentSelectedIds,
+          detailId: state.farmEquipmentDetailId,
+          selling: state.farmEquipmentSelling,
+          onToggleLock: (id) => {
+            const item = state.player.equipment.find((entry) => entry.id === id);
+            if (!item || !setEquipmentLocked(state.player, id, !item.locked)) return;
+            if (item.locked) state.farmEquipmentSelectedIds = state.farmEquipmentSelectedIds.filter((selectedId) => selectedId !== id);
+            savePlayerState(state.player); render();
+          },
+          onToggleSelected: (id) => {
+            const item = state.player.equipment.find((entry) => entry.id === id);
+            if (!item || item.locked) return;
+            state.farmEquipmentSelectedIds = state.farmEquipmentSelectedIds.includes(id)
+              ? state.farmEquipmentSelectedIds.filter((selectedId) => selectedId !== id)
+              : [...state.farmEquipmentSelectedIds, id];
+            render();
+          },
+          onDetail: (id) => { state.farmEquipmentDetailId = id; render(); },
+          onSell: () => {
+            if (state.farmEquipmentSelling) return;
+            const targets = state.player.equipment.filter((item) => state.farmEquipmentSelectedIds.includes(item.id));
+            if (!targets.length || targets.some((item) => item.locked)) { state.farmEquipmentSelectedIds = []; render(); return; }
+            const total = targets.reduce((sum, item) => sum + equipmentSellPrice(item), 0);
+            if (!window.confirm(`選択した${targets.length}個の装備を${total.toLocaleString("ja-JP")}ゴールドで売却します。\nこの操作は取り消せません。`)) return;
+            // 確認後にも現在の所持品と正式ロック状態を再検証する。
+            const ids = targets.map((item) => item.id);
+            const current = state.player.equipment.filter((item) => ids.includes(item.id));
+            if (current.length !== ids.length || current.some((item) => item.locked)) { state.farmEquipmentSelectedIds = []; render(); return; }
+            state.farmEquipmentSelling = true;
+            for (const item of current) sellEquipment(state.player, item.id);
+            savePlayerState(state.player);
+            state.farmEquipmentSelling = false; state.farmEquipmentSelectedIds = []; state.farmEquipmentDetailId = null; render();
+          },
+          onClose: () => { state.farmEquipmentOpen = false; state.farmEquipmentDetailId = null; render(); },
+        }));
+      }
       break;
     }
   }

@@ -162,6 +162,8 @@ export const SET_PIECE_COUNTS = { TWO: 2, FOUR: 4 } as const;
 
 export interface Equipment {
   id: string;
+  /** 誤売却防止ロック。旧セーブでは未定義を false として扱う。 */
+  locked?: boolean;
   slot: EquipSlot;
   star: EquipStar;
   /** 強化レベル。0(無強化)〜15(最大) */

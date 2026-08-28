@@ -202,8 +202,8 @@ function renderSortRow(props: EquipmentProps): HTMLElement {
 function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
   const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
   // 装着中のものは売れないので、まとめて選ぶ対象からも外す
-  const sellable = shown.filter((e) => !isEquipped(e));
-  const selected = props.player.equipment.filter((e) => props.selectedIds.includes(e.id));
+  const sellable = shown.filter((e) => !isEquipped(e) && !e.locked);
+  const selected = props.player.equipment.filter((e) => props.selectedIds.includes(e.id) && !e.locked);
   const total = selected.reduce((sum, e) => sum + equipmentSellPrice(e), 0);
 
   return el("div", { className: "bulk-bar" }, [
@@ -248,14 +248,14 @@ function renderList(props: EquipmentProps): HTMLElement {
         props.onEquip(eq.id, props.pickerContext.monsterId);
       } else if (selecting) {
         // 装着中は売れないので、選択そのものをさせない
-        if (!isEquipped(eq)) props.onToggleSelected(eq.id);
+        if (!isEquipped(eq) && !eq.locked) props.onToggleSelected(eq.id);
       } else {
         props.onSelectDetail(eq.id);
       }
     });
     if (selecting) {
       card.classList.add("equip-card--selectable");
-      if (isEquipped(eq)) card.classList.add("equip-card--locked");
+      if (isEquipped(eq) || eq.locked) card.classList.add("equip-card--locked");
       if (props.selectedIds.includes(eq.id)) card.classList.add("equip-card--selected");
     }
     return card;
