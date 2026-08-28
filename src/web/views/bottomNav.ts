@@ -34,15 +34,15 @@ export type ScreenName =
  * 切れた文字は読めないので、あるだけ無駄になる。
  *
  * 5個に絞り、**いつでも戻りたい場所**だけを残した。
- * 召喚・ショップ・ダンジョンはホームの一覧から入る(あちらは
- * 「何をしに行くか」を選ぶ場所で、ここは「どこに居るか」を切り替える場所)。
+ * ステージとパーティはホーム内の大きな導線から入る。下部は日常的に
+ * 行き来する5画面に固定し、画面幅によって項目を入れ替えない。
  */
 const TABS: { screen: ScreenName; name: IconName; label: string }[] = [
   { screen: "HOME", name: "home", label: "ホーム" },
-  { screen: "STAGES", name: "map", label: "ステージ" },
   { screen: "MONSTERS", name: "monsters", label: "モンスター" },
   { screen: "EQUIPMENT", name: "equipment", label: "装備" },
-  { screen: "PARTY", name: "party", label: "パーティ" },
+  { screen: "SUMMON", name: "summon", label: "召喚" },
+  { screen: "SHOP", name: "shop", label: "ショップ" },
 ];
 
 export function renderBottomNav(current: ScreenName, onNavigate: (screen: ScreenName) => void): HTMLElement {

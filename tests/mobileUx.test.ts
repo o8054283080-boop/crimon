@@ -22,4 +22,11 @@ describe("home mobile UX contract", () => {
     expect(nav).toContain('ariaLabel: "メインナビゲーション"');
     expect(nav).toContain('ariaCurrent: tab.screen === current ? "page"');
   });
+  it("fixes the five bottom destinations without stage or party tabs", () => {
+    for (const label of ["ホーム", "モンスター", "装備", "召喚", "ショップ"]) {
+      expect(nav).toContain(`label: "${label}"`);
+    }
+    expect(nav).not.toContain('label: "ステージ"');
+    expect(nav).not.toContain('label: "パーティ"');
+  });
 });

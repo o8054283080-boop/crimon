@@ -2167,8 +2167,6 @@ body {
     0 0 18px rgba(255, 148, 44, 0.16);
 }
 
-/* 札の頭に打つ金の栓。**帯の上辺に置くと縁の線に溶けて消える**ので、
-   面の内側へ下ろして、暖色の面の上で光らせる */
 .bottom-nav__btn--active::before {
   content: "";
   position: absolute;
@@ -7714,3 +7712,101 @@ body::before {
 .equip-picker-card__lock { min-height:40px; }
 .equip-picker-card__delta { padding:4px 6px; border-radius:7px; background:rgba(7,11,24,.8); }
 .equip-picker-card__delta.is-up { color:#82e6a5; } .equip-picker-card__delta.is-down { color:#ff9c9c; }
+
+/* ===================================================================
+ * 2026 HOME cockpit — 390×844を基準に、1画面へ必要な導線を収める。
+ * =================================================================== */
+.home-screen--menu-only { height: 100dvh; min-height: 0; overflow: hidden; }
+.home-screen--menu-only .home-menu::before {
+  background-image:
+    linear-gradient(180deg, rgba(3, 2, 9, .02), rgba(8, 4, 16, .08) 55%, rgba(3, 2, 8, .3)),
+    url("./assets/crimon-brand-world.webp"), url("./assets/home-bg.jpg");
+  background-size: cover, auto 100%, cover;
+  background-position: center, center center, center;
+  background-repeat: no-repeat;
+}
+.crimon-home.home-menu {
+  box-sizing: border-box;
+  width: 100%; height: calc(100dvh - var(--bottom-nav-h)); min-height: 0;
+  padding: max(6px, env(safe-area-inset-top)) 7px 5px; gap: 5px;
+  display: grid; grid-template-columns: 70px minmax(0, 1fr) 112px;
+  grid-template-rows: 82px minmax(0, 1fr) 82px 42px;
+  grid-template-areas: "header header header" "left stage right" "party party party" "mission mission mission";
+  overflow: hidden;
+}
+.crimon-home .crimon-resource-header { grid-area: header; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 5px; min-width: 0; }
+.crimon-home .home-id { min-width: 0; gap: 7px; }
+.crimon-home .home-id__crest { width: 48px; height: 48px; }
+.crimon-home .home-id__name strong { font-size: .84rem; }
+.crimon-home .home-id__edit { width: 30px; min-width: 30px; min-height: 30px; padding: 4px; }
+.crimon-home .home-wallet { grid-template-columns: 1fr; gap: 0; padding: 2px 3px; }
+.crimon-home .home-wallet__chip { justify-content: flex-start; min-height: 23px; padding: 1px 3px; border-left: 0; border-top: 1px solid rgba(207,165,83,.13); }
+.crimon-home .home-wallet__chip:first-child { border-top: 0; }
+.crimon-home .home-wallet__chip strong { font-size: .68rem; }
+.crimon-home .crimon-brand { position: fixed; inset: 82px 0 190px; z-index: -1; pointer-events: none; background: radial-gradient(circle at 50% 12%, rgba(151,80,226,.16), transparent 33%); }
+
+.crimon-home .home-party { grid-area: stage; align-self: stretch; min-width: 0; padding: 0; display: grid; place-items: center; }
+.crimon-home .home-party-grid--stage { position: relative; width:calc(100% + 34px); height:100%; margin:0 -17px; display:block; overflow:visible; }
+.crimon-home .home-party-grid--stage::after { content:""; position:absolute; z-index:0; left:5%; right:5%; bottom:1%; height:17%; border-radius:50%; background:radial-gradient(ellipse, rgba(114,50,166,.18), rgba(8,4,16,.06) 62%, transparent 73%); box-shadow:0 0 20px rgba(104,44,164,.1); transform:perspective(120px) rotateX(62deg); }
+.crimon-home .home-party-grid--stage .hp-card { position:absolute; z-index:2; width:52%; max-width:none; height:61%; aspect-ratio:auto; border:0; border-radius:0; background:transparent; box-shadow:none; overflow:visible; }
+.crimon-home .home-party-grid--stage .hp-card__art { background-size:contain; filter:drop-shadow(0 8px 5px rgba(0,0,0,.75)); }
+.crimon-home .home-party-grid--stage .hp-card__shade { background:linear-gradient(180deg, transparent 72%, rgba(7,3,14,.45)); }
+.crimon-home .home-party-grid--stage .hp-card__gem { transform:scale(.72) rotate(45deg); }
+.crimon-home .home-party-grid--stage .hp-card__stars, .crimon-home .home-party-grid--stage .hp-card__level { display:none; }
+.crimon-home .home-party-grid--stage .hp-card:nth-child(1) { z-index:5; width:72%; height:76%; left:14%; bottom:-2%; }
+.crimon-home .home-party-grid--stage .hp-card:nth-child(2) { left:-4%; bottom:20%; }
+.crimon-home .home-party-grid--stage .hp-card:nth-child(3) { z-index:1; left:24%; bottom:36%; width:50%; height:57%; }
+.crimon-home .home-party-grid--stage .hp-card:nth-child(4) { right:-4%; bottom:20%; }
+
+.crimon-home .crimon-section--management { grid-area:left; display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; gap:3px; min-width:0; }
+.crimon-round-menu { width:100%; min-height:0!important; padding:0; border:0; color:#ead9b5; background:none; display:flex; flex-direction:column; align-items:center; gap:1px; }
+.crimon-round-menu__orb { position:relative; width:42px; height:42px; border-radius:50%; display:grid; place-items:center; color:#c5a2ee; background:radial-gradient(circle at 45% 35%, #38234f, #09070e 69%); border:1px solid #9d7432; box-shadow:inset 0 0 0 3px #09070e, inset 0 0 0 4px rgba(226,183,94,.52), 0 4px 10px rgba(0,0,0,.65); }
+.crimon-round-menu__orb::after { content:""; position:absolute; right:-3px; top:3px; width:7px; height:7px; transform:rotate(45deg); background:#8c36c8; border:1px solid #e0b866; box-shadow:0 0 7px #9d45da; }
+.crimon-round-menu svg { width:20px; height:20px; }
+.crimon-round-menu > span:last-child { display:flex; flex-direction:column; line-height:1.05; }
+.crimon-round-menu strong { font-size:.58rem; white-space:nowrap; }
+.crimon-round-menu small { font-size:.48rem; color:#9386a4; white-space:nowrap; }
+
+.crimon-home .crimon-section--primary { grid-area:right; min-width:0; align-self:stretch; }
+.crimon-home .crimon-primary-grid { height:100%; display:grid; grid-template-rows:repeat(3,1fr); gap:6px; }
+.crimon-home .crimon-content-card { position:relative; min-width:0; min-height:0!important; padding:5px; overflow:hidden; border:1px solid rgba(212,170,85,.65); border-radius:6px; display:flex; align-items:flex-end; color:#fff; background-size:cover; background-position:center; box-shadow:inset 0 0 0 2px rgba(4,2,8,.74), inset 0 0 0 3px rgba(215,169,77,.2), 0 4px 10px rgba(0,0,0,.55); }
+.crimon-home .crimon-content-card::before { content:""; position:absolute; inset:0; background:linear-gradient(180deg, transparent 20%, rgba(3,2,7,.8)); }
+.crimon-home .crimon-content-card--adventure { background-image:url("./assets/adventure-bg.jpg"); }
+.crimon-home .crimon-content-card--dungeon { background-image:url("./assets/crimon-dungeon-card.webp"); }
+.crimon-home .crimon-content-card--arena { background-image:url("./assets/crimon-arena-card.webp"); }
+.crimon-home .crimon-content-card__copy { position:relative; z-index:1; display:flex; flex-direction:column; text-align:left; }
+.crimon-home .crimon-content-card__copy strong { font:700 .76rem/1.15 "Hiragino Mincho ProN",serif; white-space:nowrap; text-shadow:0 2px 4px #000; }
+.crimon-home .crimon-content-card__copy small { font-size:.52rem; white-space:nowrap; color:#d5c8dd; }
+.crimon-home .crimon-content-card > .icon { display:none; }
+.crimon-home .crimon-dungeon-chooser { position:absolute; z-index:20; right:98px; top:38%; padding:4px; background:#0b0713; border:1px solid #b88a3f; }
+
+.crimon-home .crimon-section--secondary { grid-area:party; min-width:0; padding:6px 8px; border:1px solid rgba(206,163,76,.6); background:linear-gradient(100deg,rgba(2,2,5,.94),rgba(28,12,39,.92),rgba(3,2,7,.95)); box-shadow:inset 0 0 0 2px #09060d, inset 0 0 0 3px rgba(190,139,53,.24); }
+.crimon-home .crimon-section--secondary .home-mark { height:16px; }
+.crimon-home .current-party-hud__body { display:grid; grid-template-columns:54px 1fr 72px; align-items:center; gap:6px; height:52px; }
+.current-party-hud__power { display:flex; flex-direction:column; }
+.current-party-hud__power small { font-size:.5rem; color:#a994b9; }.current-party-hud__power strong { font-size:.76rem; color:#efd08a; }
+.crimon-home .home-party-grid--hud { display:grid; grid-template-columns:repeat(4,1fr); gap:3px; margin:0; height:46px; }
+.crimon-home .home-party-grid--hud .hp-card { height:46px; aspect-ratio:1; border-radius:50%; }
+.crimon-home .home-party-grid--hud .hp-card__stars,.crimon-home .home-party-grid--hud .hp-card__level,.crimon-home .home-party-grid--hud .hp-card__gem { display:none; }
+.crimon-home .current-party-hud__body .btn-frame { min-height:34px; padding:3px; font-size:.56rem; }
+
+.crimon-tutorial-compact { grid-area:mission; width:100%; min-height:0!important; padding:4px 9px; border:1px solid rgba(197,151,65,.55); color:#e9dec7; background:linear-gradient(90deg,rgba(8,5,12,.94),rgba(43,18,59,.92)); display:grid; grid-template-columns:1fr auto 16px; align-items:center; gap:7px; text-align:left; }
+.crimon-tutorial-compact > span { display:flex; flex-direction:column; min-width:0; }.crimon-tutorial-compact small{font-size:.48rem;color:#bfa2d8}.crimon-tutorial-compact strong{font-size:.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crimon-tutorial-compact b{font-size:.58rem;color:#d8b66c}.crimon-tutorial-compact svg{width:14px}.crimon-tutorial-compact.is-ready{box-shadow:inset 3px 0 #9c4bd1;}
+.crimon-home .crimon-tutorial-panel[hidden] { display:none!important; visibility:hidden!important; }
+.crimon-tutorial-panel { position:fixed; z-index:1100; inset:0; display:grid; place-items:end center; }
+.crimon-tutorial-panel__scrim { position:absolute; inset:0; width:100%; border:0; background:rgba(2,1,5,.72); }
+.crimon-tutorial-panel__body { position:relative; width:min(100%,520px); max-height:74dvh; overflow:auto; padding:24px 10px 10px; border:1px solid #bb8b3b; border-radius:15px 15px 0 0; background:linear-gradient(#21102d,#08050e); }
+.crimon-tutorial-panel__close { position:absolute; z-index:2; top:5px; right:7px; width:34px; min-width:34px!important; min-height:34px!important; border:1px solid #b58a43; border-radius:50%; color:#ead9b7; background:#0a070e; font-size:1.1rem; }
+
+@media (min-width: 420px) and (min-height: 880px) {
+  .crimon-home.home-menu { grid-template-columns:80px minmax(0,1fr) 126px; grid-template-rows:88px minmax(0,1fr) 92px 44px; padding-inline:9px; }
+  .crimon-round-menu__orb { width:48px;height:48px; }.crimon-round-menu strong{font-size:.64rem}.crimon-home .crimon-content-card__copy strong{font-size:.72rem}
+}
+@media (max-height: 820px) {
+  .crimon-home.home-menu { grid-template-rows:76px minmax(0,1fr) 76px 38px; }
+  .crimon-round-menu__orb { width:38px;height:38px; }.crimon-round-menu__orb svg{width:18px}.crimon-round-menu small{display:none}
+  .crimon-home .current-party-hud__body{height:46px}.crimon-home .home-party-grid--hud,.crimon-home .home-party-grid--hud .hp-card{height:40px}
+}
+
+/* 札の頭に打つ金の栓。**帯の上辺に置くと縁の線に溶けて消える**ので、
+   面の内側へ下ろして、暖色の面の上で光らせる */
