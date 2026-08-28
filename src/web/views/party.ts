@@ -6,6 +6,7 @@ import { icon } from "../icons.js";
 import { renderMonsterSortRow } from "./monsters.js";
 import { renderMonsterFilterBar } from "./monsterFilterBar.js";
 import { partyMemberCard, renderPartySlots } from "./partyCard.js";
+import { findMonsterById } from "../../data/monsters.js";
 
 export type PartyEditMode = "NORMAL" | "DUNGEON" | "TOWER";
 
@@ -30,6 +31,11 @@ export interface PartyProps {
   filterOpen: boolean;
   onChangeFilter: (filter: MonsterFilter) => void;
   onToggleFilterOpen: () => void;
+  selectedSlot: number | null;
+  onSelectSlot: (index: number) => void;
+  onChooseMonster: (instanceId: string) => void;
+  onComplete?: () => void;
+  returnLabel?: string;
 }
 
 const MAX_PARTY_SIZE = 4;
@@ -93,7 +99,7 @@ export function renderParty(props: PartyProps): HTMLElement {
     partyMemberCard(
       instance,
       activeIds.includes(instance.id),
-      () => onToggle(instance.id),
+      () => props.selectedSlot === null ? onToggle(instance.id) : props.onChooseMonster(instance.id),
       () => props.onViewDetail(instance.id),
     ),
   );
@@ -101,7 +107,7 @@ export function renderParty(props: PartyProps): HTMLElement {
   return el("div", { className: "screen party-screen" }, [
     el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["パーティ編成"]),
-      el("span", { className: "head-note" }, [`${activeIds.length} / ${maxSize}`]),
+      props.onComplete ? el("button", { type: "button", className: "btn btn--ghost", onclick: props.onComplete }, [`← ${props.returnLabel ?? "戻る"}`]) : el("span", { className: "head-note" }, [`${activeIds.length} / ${maxSize}`]),
     ]),
     el(
       "section",
@@ -121,10 +127,13 @@ export function renderParty(props: PartyProps): HTMLElement {
     el("section", { className: "panel party-current" }, [
       el("div", { className: "party-current__head" }, [
         el("strong", {}, ["現在のパーティ"]),
-        el("span", {}, ["枠をタップすると外せます"]),
+        el("span", {}, [props.selectedSlot === null ? "交換する枠をタップ" : `枠${props.selectedSlot + 1}の交換相手を選択`]),
       ]),
       // 枠そのものを外すボタンにする。入れ替えのたびに一覧から本人を探し直さない
-      renderPartySlots(activeMembers, maxSize, onToggle),
+      el("div", { className: "party-swap-slots" }, Array.from({ length: maxSize }, (_, index) => {
+        const member = activeMembers[index];
+        return el("button", { type: "button", className: `party-swap-slot${props.selectedSlot === index ? " is-selected" : ""}`, onclick: () => props.onSelectSlot(index) }, [member ? (findMonsterById(member.dexId)?.name ?? member.dexId) : "＋ 空き枠", el("small", {}, [member ? "交換する" : "追加する"])]);
+      })),
       props.notice ? el("p", { className: "party-notice" }, [props.notice]) : null,
       el("div", { className: "party-actions" }, [
         el(
@@ -153,7 +162,7 @@ export function renderParty(props: PartyProps): HTMLElement {
       // 枠には✕、カードには詳細の丸ボタンを出して、見れば分かる形にした。
       // ここに残すのは、操作ではなく**知りようのない決まりごと**だけ
       spec.note ? el("p", { className: "app-subtitle" }, [spec.note]) : null,
-    ].filter((n): n is HTMLElement => n !== null)),
+    ].filter(Boolean) as HTMLElement[]),
     el("section", { className: "panel party-roster" }, [
       el("h2", { className: "party-roster__title" }, ["所持モンスター"]),
       player.monsters.length === 0

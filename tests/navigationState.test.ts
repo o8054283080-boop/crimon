@@ -24,6 +24,19 @@ describe("navigation state", () => {
     expect(loadNavigationState(storage)).toEqual({ screen: "MONSTERS", monsterDetailId: "monster-1" });
   });
 
+  it("編成の深い画面でもダンジョンの戻り先と選択階を保持する", () => {
+    const storage = new MemoryStorage();
+    const returnContext = { screen: "EQUIP_DUNGEON" as const, label: "装備ダンジョン10F", selectedDungeonFloor: 10 };
+    saveNavigationState({ screen: "EQUIPMENT", monsterDetailId: "monster-1", returnContext }, storage);
+    expect(loadNavigationState(storage)?.returnContext).toEqual(returnContext);
+  });
+
+  it("旧形式や壊れたreturn contextは安全に無視する", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(NAVIGATION_STORAGE_KEY, JSON.stringify({ screen: "PARTY", returnContext: { screen: "REMOVED", label: 7 } }));
+    expect(loadNavigationState(storage)).toEqual({ screen: "PARTY", returnContext: undefined });
+  });
+
   it.each([
     ["BATTLE", "STAGES"], ["DUNGEON_BATTLE", "EQUIP_DUNGEON"], ["ARENA_BATTLE", "ARENA"],
     ["TOWER_BATTLE", "TRIAL_TOWER"],

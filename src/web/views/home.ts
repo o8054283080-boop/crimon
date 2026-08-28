@@ -16,6 +16,7 @@ import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { monsterPower } from "../../game/monsterSort.js";
 import { withPortrait } from "../three/portrait.js";
+import { partyCardAction } from "../uxHelpers.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
 import { AudioSettingsProps, renderAudioSettings } from "./audioSettings.js";
@@ -30,6 +31,7 @@ export interface HomeProps {
   onGoSummon: () => void;
   onGoStages: () => void;
   onGoParty: () => void;
+  onViewPartyMonster: (instanceId: string) => void;
   onGoEquipDungeon: () => void;
   onGoLevelDungeon: () => void;
   onGoGoldDungeon: () => void;
@@ -554,7 +556,7 @@ interface MenuTile {
  * 肖像は Three.js で焼いた3Dの絵をそのまま札いっぱいに敷く。描き起こした
  * イラストは持てないが、実際のモンスターが立っている絵はこちらで作れる。
  */
-function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => void): HTMLElement {
+function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => void, onViewMonster: (id: string) => void): HTMLElement {
   if (!instance) {
     return el("button", { type: "button", className: "hp-card hp-card--empty", onclick: onGoParty }, [
       el("span", { className: "hp-card__plus" }, ["＋"]),
@@ -571,7 +573,8 @@ function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => v
       type: "button",
       className: "hp-card",
       style: dex ? `--el-color:${dex.color}` : undefined,
-      onclick: onGoParty,
+      onclick: partyCardAction(instance, onGoParty, onViewMonster),
+      ariaLabel: `${dex?.name ?? instance.dexId}の詳細と装備を見る`,
     },
     [
       withPortrait(el("span", { className: "hp-card__art" }, [dex ? dex.emoji : "❓"]), dex, "fill"),
@@ -693,6 +696,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     onGoSummon,
     onGoStages,
     onGoParty,
+    onViewPartyMonster,
     onGoEquipDungeon,
     onGoLevelDungeon,
     onGoGoldDungeon,
@@ -814,7 +818,7 @@ export function renderHome(props: HomeProps): HTMLElement {
       el(
         "div",
         { className: "home-party-grid" },
-        Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], onGoParty)),
+        Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], onGoParty, onViewPartyMonster)),
       ),
     ]),
     // 一番行く場所なので、一番大きい面を与える。横長の帯では他のタイルに埋もれる

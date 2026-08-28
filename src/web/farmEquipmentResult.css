@@ -14,6 +14,7 @@
 .farm-equip-card__select { min-height: 40px; display: flex; align-items: center; }
 .farm-equip-card__select--disabled { opacity: .45; }
 .farm-equip-sheet__panel > footer { position: sticky; bottom: -20px; display: grid; gap: 8px; margin: 14px -2px -20px; padding: 12px 2px calc(20px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, #0d1224 16%); }
+.farm-equip-sheet__bulk { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .farm-equip-detail { position: fixed; z-index: 3; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 420px; margin: auto; padding: 18px; border: 1px solid #ffd36a; border-radius: 16px; background: #151c33; box-shadow: 0 20px 60px #000; }
 .farm-equip-detail h3 { margin-top: 0; }
 .farm-equip-detail .btn { width: 100%; margin-top: 10px; }
