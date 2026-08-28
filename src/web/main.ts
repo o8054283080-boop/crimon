@@ -122,7 +122,7 @@ import {
 } from "../game/pvpArena.js";
 import { renderMonsters } from "./views/monsters.js";
 import { PartyEditMode, renderParty } from "./views/party.js";
-import { renderMonsterTraining } from "./views/monsterTraining.js";
+import { EMPTY_MONSTER_TRAINING_FILTER, MonsterTrainingFilter, renderMonsterTraining } from "./views/monsterTraining.js";
 import { CreateMenu, renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
@@ -303,6 +303,7 @@ interface AppState {
   arenaSettlement: ArenaPeriodSettlement | null;
   monsterTrainingTargetId: string | null;
   monsterTrainingMaterialIds: string[];
+  monsterTrainingFilter: MonsterTrainingFilter;
   /** クリエイト(スキル合成)の対象・素材・移し替える枠 */
   createTargetId: string | null;
   createMaterialId: string | null;
@@ -369,6 +370,7 @@ const state: AppState = {
   arenaSettlement: null,
   monsterTrainingTargetId: null,
   monsterTrainingMaterialIds: [],
+  monsterTrainingFilter: { ...EMPTY_MONSTER_TRAINING_FILTER },
   createTargetId: null,
   createMaterialId: null,
   createSlot: null,
@@ -1098,10 +1100,10 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
 function processBackgroundFarmOnce(): void {
   const job = state.player.backgroundFarmJob;
   if (!job || job.status !== "RUNNING") return;
-  if (job.completedRuns >= job.requestedRuns) { finishBackgroundFarm(job, "COMPLETED"); savePlayerState(state.player); render(); return; }
-  if (shouldStopForJstDateChange(job)) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); render(); return; }
+  if (job.completedRuns >= job.requestedRuns) { finishBackgroundFarm(job, "COMPLETED"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
+  if (shouldStopForJstDateChange(job)) { finishBackgroundFarm(job, "DAILY_LIMIT"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
   const party = backgroundParty(job);
-  if (party.length !== job.partyIds.length || party.length === 0) { finishBackgroundFarm(job, "NO_PARTY"); savePlayerState(state.player); render(); return; }
+  if (party.length !== job.partyIds.length || party.length === 0) { finishBackgroundFarm(job, "NO_PARTY"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
   // 完全終了が8時間を超えても、復帰時に持ち越せる処理権は最大8時間ぶん。
   job.lastProcessedAt = Math.max(job.lastProcessedAt, Date.now() - MAX_OFFLINE_FARM_MS);
   const available = availableBackgroundRuns(job, Date.now());
@@ -1116,7 +1118,7 @@ function processBackgroundFarmOnce(): void {
     const remaining = job.kind === "LEVEL_DUNGEON" ? levelDungeonChallengesRemaining(state.player)
       : job.kind === "GOLD_DUNGEON" ? goldDungeonChallengesRemaining(state.player) : undefined;
     const blocked = farmBlockReason({ partySize: party.length, stamina: state.player.stamina, staminaCost: cost, challengesLeft: remaining });
-    if (blocked) { finishBackgroundFarm(job, blocked); savePlayerState(state.player); render(); return; }
+    if (blocked) { finishBackgroundFarm(job, blocked); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
     if (job.kind === "LEVEL_DUNGEON") trySpendLevelDungeonChallenge(state.player);
     if (job.kind === "GOLD_DUNGEON") trySpendGoldDungeonChallenge(state.player);
     trySpendStamina(state.player, cost);
@@ -1129,7 +1131,7 @@ function processBackgroundFarmOnce(): void {
 
   const battle = simulateBackgroundBattle(job, party);
   job.result.attempts += 1;
-  if (!battle.won) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); render(); return; }
+  if (!battle.won) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
   let reward: ClearRewardResult;
   if (job.kind === "STAGE") reward = applyStageClearRewards(state.player, STAGES.find((s) => s.id === job.targetId)!, battle.waves, party, job.difficulty);
   else if (job.kind === "EQUIP_DUNGEON") reward = applyDungeonClearRewards(state.player, EQUIPMENT_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
@@ -1141,7 +1143,9 @@ function processBackgroundFarmOnce(): void {
   // 実行にかかったCPU時間で権利を失わない。経過した基準時間を1周ぶんだけ消費する。
   job.lastProcessedAt = Math.min(Date.now(), job.lastProcessedAt + job.referenceRunSeconds * 1000);
   savePlayerState(state.player);
-  render();
+  // 周回の保存・報酬反映は上で完了済み。前景DOMは作り直さず、常駐カードだけ更新する。
+  // 召喚演出や入力、スクロールなど画面固有の状態をバックグラウンド処理から守る。
+  refreshBackgroundFarmStatus();
   scheduleBackgroundFarm(job.completedRuns >= job.requestedRuns || availableBackgroundRuns(job, Date.now()) > 0
     ? 0
     : Math.max(1, job.lastProcessedAt + job.referenceRunSeconds * 1000 - Date.now()));
@@ -1758,6 +1762,34 @@ function renderCurrentWaveBattle(): BattleViewHandle {
   });
 }
 
+function buildBackgroundFarmStatus(job: BackgroundFarmJob): HTMLElement {
+  const remaining = Math.max(0, job.requestedRuns - job.completedRuns);
+  const status = job.status === "RUNNING" ? "進行中" : job.status === "COMPLETED" ? "完了" : "終了";
+  return el("aside", { className: "background-farm-status", "data-background-farm-status": "true" }, [
+    el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
+      if (job.status !== "RUNNING") {
+        state.autoFarmResult = job.result; state.autoFarmTargetName = job.targetName; state.viewingBackgroundFarmJobId = job.id; state.screen = "AUTO_FARM_RESULT"; render();
+      }
+    } }, [`🔁 ${job.targetName}　${job.completedRuns} / ${job.requestedRuns}周　${status}`]),
+    el("span", { className: "background-farm-status__detail" }, [`残り${remaining}周 / ⚡${job.staminaSpent}消費 / EXP ${job.result.totalExp} / 🪙${job.result.totalGold} / 装備${job.result.equipmentDropCount}個`]),
+    job.status === "RUNNING" ? el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
+      finishBackgroundFarm(job, "STOPPED"); savePlayerState(state.player); refreshBackgroundFarmStatus();
+    } }, ["周回を終了"]) : el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
+      state.autoFarmResult = job.result; state.autoFarmTargetName = job.targetName; state.viewingBackgroundFarmJobId = job.id; state.screen = "AUTO_FARM_RESULT"; render();
+    } }, ["結果を見る"]),
+  ]);
+}
+
+/** 前景画面には触れず、バックグラウンド周回カードだけを差分更新する。 */
+function refreshBackgroundFarmStatus(): void {
+  const current = root.querySelector<HTMLElement>("[data-background-farm-status]");
+  const job = state.player.backgroundFarmJob;
+  if (!job) { current?.remove(); return; }
+  const next = buildBackgroundFarmStatus(job);
+  if (current) current.replaceWith(next);
+  else root.append(next);
+}
+
 function render(): void {
   if (lastRouteKey !== null) scrollPositions.set(lastRouteKey, window.scrollY);
 
@@ -2161,6 +2193,11 @@ function render(): void {
         player: state.player,
         targetId: state.monsterTrainingTargetId,
         selectedMaterialIds: state.monsterTrainingMaterialIds,
+        filter: state.monsterTrainingFilter,
+        onChangeFilter: (filter) => {
+          state.monsterTrainingFilter = filter;
+          render();
+        },
         onToggleMaterial: (id) => {
           const idx = state.monsterTrainingMaterialIds.indexOf(id);
           if (idx >= 0) state.monsterTrainingMaterialIds.splice(idx, 1);
@@ -2171,6 +2208,7 @@ function render(): void {
         onCancel: () => {
           state.monsterTrainingTargetId = null;
           state.monsterTrainingMaterialIds = [];
+          state.monsterTrainingFilter = { ...EMPTY_MONSTER_TRAINING_FILTER };
           state.screen = "MONSTERS";
           render();
         },
@@ -2336,21 +2374,7 @@ function render(): void {
   }
   const backgroundJob = state.player.backgroundFarmJob;
   if (backgroundJob) {
-    const remaining = Math.max(0, backgroundJob.requestedRuns - backgroundJob.completedRuns);
-    const status = backgroundJob.status === "RUNNING" ? "進行中" : backgroundJob.status === "COMPLETED" ? "完了" : "終了";
-    root.append(el("aside", { className: "background-farm-status" }, [
-      el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
-        if (backgroundJob.status !== "RUNNING") {
-          state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.viewingBackgroundFarmJobId = backgroundJob.id; state.screen = "AUTO_FARM_RESULT"; render();
-        }
-      } }, [`🔁 ${backgroundJob.targetName}　${backgroundJob.completedRuns} / ${backgroundJob.requestedRuns}周　${status}`]),
-      el("span", { className: "background-farm-status__detail" }, [`残り${remaining}周 / ⚡${backgroundJob.staminaSpent}消費 / EXP ${backgroundJob.result.totalExp} / 🪙${backgroundJob.result.totalGold} / 装備${backgroundJob.result.equipmentDropCount}個`]),
-      backgroundJob.status === "RUNNING" ? el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
-        finishBackgroundFarm(backgroundJob, "STOPPED"); savePlayerState(state.player); render();
-      } }, ["周回を終了"]) : el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
-        state.autoFarmResult = backgroundJob.result; state.autoFarmTargetName = backgroundJob.targetName; state.viewingBackgroundFarmJobId = backgroundJob.id; state.screen = "AUTO_FARM_RESULT"; render();
-      } }, ["結果を見る"]),
-    ]));
+    root.append(buildBackgroundFarmStatus(backgroundJob));
   }
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
   playBgm(bgmSceneOf(state.screen));
@@ -2431,6 +2455,7 @@ function renderMonstersScreen(): HTMLElement {
     onGoMonsterTraining: (monsterId) => {
       state.monsterTrainingTargetId = monsterId;
       state.monsterTrainingMaterialIds = [];
+      state.monsterTrainingFilter = { ...EMPTY_MONSTER_TRAINING_FILTER };
       state.screen = "MONSTER_TRAINING";
       render();
     },

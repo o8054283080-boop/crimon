@@ -1,4 +1,6 @@
 import { MonsterInstance } from "../../core/monsterInstance.js";
+import { ELEMENTS, ELEMENT_COLOR, ELEMENT_JA, Element } from "../../core/element.js";
+import { STARS, Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkMonsterPowerUp, feedExpValue, isSameElement, isSameSpecies } from "../../game/monsterPowerUp.js";
@@ -10,9 +12,40 @@ export interface MonsterTrainingProps {
   player: PlayerState;
   targetId: string;
   selectedMaterialIds: string[];
+  filter: MonsterTrainingFilter;
+  onChangeFilter: (filter: MonsterTrainingFilter) => void;
   onToggleMaterial: (id: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
+}
+
+export type MaterialUseFilter = "ALL" | "SAME_SPECIES" | "SAME_ELEMENT" | "SELECTED";
+export interface MonsterTrainingFilter {
+  element: Element | "ALL";
+  star: Star | "ALL";
+  use: MaterialUseFilter;
+}
+export const EMPTY_MONSTER_TRAINING_FILTER: MonsterTrainingFilter = { element: "ALL", star: "ALL", use: "ALL" };
+
+/** 素材の選択自体とは独立した表示条件。複数条件はすべてANDで適用する。 */
+export function filterTrainingMaterials(
+  candidates: readonly MonsterInstance[],
+  target: MonsterInstance,
+  selectedIds: readonly string[],
+  filter: MonsterTrainingFilter,
+): MonsterInstance[] {
+  return candidates.filter((candidate) => {
+    if (filter.element !== "ALL" && findMonsterById(candidate.dexId)?.element !== filter.element) return false;
+    if (filter.star !== "ALL" && candidate.star !== filter.star) return false;
+    if (filter.use === "SAME_SPECIES" && !isSameSpecies(target, candidate)) return false;
+    if (filter.use === "SAME_ELEMENT" && !isSameElement(target, candidate)) return false;
+    if (filter.use === "SELECTED" && !selectedIds.includes(candidate.id)) return false;
+    return true;
+  });
+}
+
+function filterChip(label: string, active: boolean, onclick: () => void, style?: string): HTMLElement {
+  return el("button", { type: "button", className: `slot-filter-chip mfilter__chip${active ? " slot-filter-chip--active" : ""}`, onclick, style }, [label]);
 }
 
 export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement {
@@ -35,7 +68,8 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
   const bonusCount = materials.filter((m) => isSameSpecies(target, m)).length;
   const sameElementCount = materials.filter((m) => isSameElement(target, m)).length;
 
-  const cards = candidates.map((c) =>
+  const shownCandidates = filterTrainingMaterials(candidates, target, props.selectedMaterialIds, props.filter);
+  const cards = shownCandidates.map((c) =>
     monsterCard(c, () => props.onToggleMaterial(c.id), {
       selected: props.selectedMaterialIds.includes(c.id),
       bonus: isSameSpecies(target, c),
@@ -72,8 +106,35 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         : null,
     ].filter((n): n is HTMLParagraphElement => n !== null)),
     el("section", { className: "panel" }, [
+      el("div", { className: "mfilter mfilter__body training-filter" }, [
+        el("div", { className: "mfilter__group" }, [
+          el("span", { className: "mfilter__label" }, ["属性"]),
+          el("div", { className: "mfilter__chips" }, [
+            filterChip("すべて", props.filter.element === "ALL", () => props.onChangeFilter({ ...props.filter, element: "ALL" })),
+            ...ELEMENTS.map((element) => filterChip(ELEMENT_JA[element], props.filter.element === element, () => props.onChangeFilter({ ...props.filter, element }), props.filter.element === element ? `background:${ELEMENT_COLOR[element]};border-color:${ELEMENT_COLOR[element]};color:#10131f` : undefined)),
+          ]),
+        ]),
+        el("div", { className: "mfilter__group" }, [
+          el("span", { className: "mfilter__label" }, ["★"]),
+          el("div", { className: "mfilter__chips" }, [
+            filterChip("すべて", props.filter.star === "ALL", () => props.onChangeFilter({ ...props.filter, star: "ALL" })),
+            ...STARS.map((star) => filterChip(`★${star}`, props.filter.star === star, () => props.onChangeFilter({ ...props.filter, star }))),
+          ]),
+        ]),
+        el("div", { className: "mfilter__group" }, [
+          el("span", { className: "mfilter__label" }, ["素材用途"]),
+          el("div", { className: "mfilter__chips" }, [
+            ...([["ALL", "すべて"], ["SAME_SPECIES", "同じ種族"], ["SAME_ELEMENT", "同じ属性"], ["SELECTED", "選択中"]] as const).map(([use, label]) => {
+              return filterChip(label, props.filter.use === use, () => props.onChangeFilter({ ...props.filter, use }));
+            }),
+          ]),
+        ]),
+        el("span", { className: "mfilter__count" }, [shownCandidates.length === candidates.length ? `${candidates.length}体` : `${candidates.length}体中 ${shownCandidates.length}体`]),
+      ]),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
+        : shownCandidates.length === 0
+          ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
         : el("div", { className: "monster-grid" }, cards),
     ]),
     el(
