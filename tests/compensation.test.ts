@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { COMPENSATIONS, claimCompensations, localDateString, pendingCompensations } from "../src/game/compensation.js";
 import { createInitialState } from "../src/game/playerState.js";
 
-const TARGET = COMPENSATIONS[0];
+const TARGET = COMPENSATIONS.find((c) => c.id === "2026-08-18-save-loss")!;
+const AUTOFARM_TARGET = COMPENSATIONS.find((c) => c.id === "2026-08-28-autofarm-summon-freeze")!;
 
 /** 端末のローカル日付で判定するので、テストもローカル時刻で日付を作る */
 function localNoonOn(date: string): Date {
@@ -78,5 +79,25 @@ describe("お詫びの配布", () => {
     expect(localDateString(justAfterLocalMidnight)).toBe("2026-08-18");
     const state = createInitialState();
     expect(claimCompensations(state, justAfterLocalMidnight)).toHaveLength(1);
+  });
+
+  it("自動周回＋召喚不具合のお詫びは期間中に900ダイヤだけを1度配る", () => {
+    const state = createInitialState();
+    // 同日に有効な別配布が将来追加されても、このIDだけを検証できるよう既存履歴を維持する。
+    state.claimedCompensationIds.push(TARGET.id);
+    const before = { crystal: state.crystal, gold: state.gold, scrolls: state.summonScrolls };
+    const when = localNoonOn("2026-08-28");
+
+    expect(claimCompensations(state, when).map((claim) => claim.compensation.id)).toEqual([AUTOFARM_TARGET.id]);
+    expect(state.crystal).toBe(before.crystal + 900);
+    expect(state.gold).toBe(before.gold);
+    expect(state.summonScrolls).toBe(before.scrolls);
+    expect(claimCompensations(state, when)).toHaveLength(0);
+    expect(state.claimedCompensationIds).toEqual([TARGET.id, AUTOFARM_TARGET.id]);
+  });
+
+  it("新しいお詫びは終了日を含み、期間外には配られない", () => {
+    expect(pendingCompensations(createInitialState(), localNoonOn("2026-09-30")).some((c) => c.id === AUTOFARM_TARGET.id)).toBe(true);
+    expect(pendingCompensations(createInitialState(), localNoonOn("2026-10-01")).some((c) => c.id === AUTOFARM_TARGET.id)).toBe(false);
   });
 });

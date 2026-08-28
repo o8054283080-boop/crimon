@@ -31,6 +31,16 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-08-28-autofarm-summon-freeze",
+    title: "不具合のお詫び",
+    message: "自動周回中に召喚を行うと操作できなくなる場合があった不具合のお詫びです。",
+    fromDate: "2026-08-28",
+    toDate: "2026-09-30",
+    crystal: 900,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-08-18-save-loss",
     title: "お詫びの配布",
     message: "更新の案内の不備でデータが失われた件のお詫びです。ご迷惑をおかけしました。",

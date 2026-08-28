@@ -3,8 +3,18 @@ import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgr
 import { addManualClearTime, manualClearKey, medianSeconds, recordManualBattle, referenceRunTime } from "../src/game/manualClearTimes.js";
 import { affordableCount } from "../src/web/views/autoFarmPanel.js";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
+import { readFileSync } from "node:fs";
 
 describe("保存型バックグラウンド周回", () => {
+  it("進捗時は前景を全体renderせず周回カードだけを差分更新する", () => {
+    const source = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+    const processBody = source.slice(source.indexOf("function processBackgroundFarmOnce"), source.indexOf("function beginBackgroundFarm"));
+    expect(processBody).toContain("refreshBackgroundFarmStatus()");
+    expect(processBody).not.toMatch(/\brender\(\)/);
+    expect(source).toContain("current.replaceWith(next)");
+    // 召喚結果はユーザーが閉じるまでAppStateに残り、周回カード更新からは変更されない。
+    expect(processBody).not.toContain("summonResults");
+  });
   it.each([1, 7, 25, 47, 100])("任意の正整数 %i を受理する", (value) => expect(parseRequestedRuns(value)).toBe(value));
   it.each([0, -1, 1.5, NaN, "", "abc"])("無効値 %s を拒否する", (value) => expect(parseRequestedRuns(value)).toBeNull());
   it("固定30周上限を持たず、資源で実行可能数を示す", () => {
