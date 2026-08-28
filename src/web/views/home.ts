@@ -738,7 +738,7 @@ function renderMenuTile(tile: MenuTile): HTMLElement {
 export function renderHome(props: HomeProps): HTMLElement {
   const { player } = props;
   const party = getParty(player);
-  const tower = homeTowerSummary(player);
+  const partyPower = party.reduce((sum, monster) => sum + monsterPower(monster), 0);
   const tutorialNext = nextTutorialMission(player);
   const hasStarted = hasStartedHome();
   const settingsSheet = el("div", { className: "home-sheet", hidden: true }, []);
@@ -776,13 +776,20 @@ export function renderHome(props: HomeProps): HTMLElement {
   const tutorialClaimable = tutorialNext ? canClaimTutorialMission(player, tutorialNext) : false;
   const tutorialActions = tutorialNext ? tutorialMissionActions(props, tutorialNext) : null;
   const claimedCount = TUTORIAL_MISSIONS.filter((mission) => player.tutorialMissions.claimedIds.includes(mission.id)).length;
-  const tutorial = el("section", { className: "crimon-tutorial", ariaLabel: "初心者ミッション" }, [
+  const tutorialSheet = el("div", { className: "home-sheet crimon-tutorial-sheet", hidden: true }, []);
+  const closeTutorial = () => { tutorialSheet.hidden = true; };
+  const openTutorial = () => { tutorialSheet.hidden = false; };
+  const tutorialPanel = el("section", { className: "crimon-tutorial", ariaLabel: "初心者ミッション詳細" }, [
+    el("div", { className: "crimon-tutorial__sheet-head" }, [
+      el("strong", {}, ["初心者ミッション"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: closeTutorial, ariaLabel: "初心者ミッションを閉じる" }, ["閉じる"]),
+    ]),
     el("div", { className: "crimon-tutorial__head" }, [
       el("span", {}, [el("small", {}, ["BEGINNER MISSIONS"]), el("strong", {}, [tutorialNext ? `STEP ${tutorialNext.step} / 30` : "COMPLETE 30 / 30"])]),
       el("span", { className: "crimon-tutorial__count" }, [`${claimedCount} / ${TUTORIAL_MISSIONS.length}`]),
     ]),
-    tutorialNext ? el("details", { className: `crimon-tutorial__current${tutorialClaimable ? " crimon-tutorial__current--ready" : ""}` }, [
-      el("summary", {}, [tutorialClaimable ? "報酬を受け取れます！" : tutorialNext.title]),
+    tutorialNext ? el("div", { className: `crimon-tutorial__current${tutorialClaimable ? " crimon-tutorial__current--ready" : ""}` }, [
+      el("strong", {}, [tutorialClaimable ? "報酬を受け取れます！" : tutorialNext.title]),
       el("p", {}, [tutorialNext.condition]),
       el("p", { className: "crimon-tutorial__rewards" }, [rewardText(tutorialNext)]),
       el("div", { className: "crimon-tutorial__actions" }, [
@@ -795,6 +802,16 @@ export function renderHome(props: HomeProps): HTMLElement {
       ]),
     ]) : el("p", { className: "crimon-tutorial__complete" }, ["全30ミッション達成！ 基本育成ロードマップを制覇しました。"]),
   ]);
+  tutorialSheet.append(
+    el("button", { type: "button", className: "home-sheet__scrim", onclick: closeTutorial, ariaLabel: "初心者ミッションを閉じる" }, []),
+    el("div", { className: "home-sheet__panel" }, [tutorialPanel]),
+  );
+  const tutorial = el("button", { type: "button", className: "crimon-tutorial-compact", onclick: openTutorial, ariaLabel: "初心者ミッションの詳細を開く" }, [
+    el("span", {}, [el("small", {}, ["初心者ミッション"]), el("strong", {}, [tutorialNext ? `STEP ${tutorialNext.step} / 30` : "COMPLETE 30 / 30"])]),
+    el("span", { className: "crimon-tutorial-compact__title" }, [tutorialNext?.title ?? "全ミッション達成"]),
+    el("span", { className: "crimon-tutorial-compact__count" }, [`${claimedCount} / ${TUTORIAL_MISSIONS.length}`]),
+    icon("chevron"),
+  ]);
   const staminaSheet = el("div", { className: "home-sheet", hidden: true }, []);
   const closeStamina = () => { staminaSheet.hidden = true; };
   staminaSheet.append(el("div", { className: "home-sheet__scrim", onclick: closeStamina }, []), el("div", { className: "home-sheet__panel" }, [el("div", { className: "home-sheet__head" }, [el("strong", {}, ["スタミナ回復"]), el("button", { type: "button", className: "btn btn--ghost", onclick: closeStamina }, ["閉じる"])]), renderVitals(player, props.onRefillStaminaPartial, props.onRefillStaminaFull, party)]));
@@ -806,23 +823,20 @@ export function renderHome(props: HomeProps): HTMLElement {
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
-      el("section", { className: "crimon-brand", ariaLabel: "CRIMON" }, [
-        el("span", { className: "crimon-brand__mist", "aria-hidden": "true" }, []),
-        el("img", { src: new URL("../assets/crimon-logo.svg", import.meta.url).href, alt: "CRIMON", className: "crimon-brand__logo", onerror: (event) => { ((event as Event).currentTarget as HTMLImageElement).hidden = true; } }, []),
-        el("span", { className: "crimon-brand__fallback", "aria-hidden": "true" }, ["CRIMON"]),
-        el("img", { src: new URL("../assets/crimon-emblem.svg", import.meta.url).href, alt: "", "aria-hidden": "true", className: "crimon-brand__emblem" }, []),
-      ]),
-      el("section", { className: "home-party crimon-section" }, [sectionMark("CURRENT PARTY", el("button", { type: "button", className: "btn-frame", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["編成"])), el("div", { className: "home-party-grid" }, Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], props.onGoParty, props.onViewPartyMonster)))]),
-      el("section", { className: "crimon-section crimon-section--primary" }, [sectionMark("PRIMARY CONTENT"), el("div", { className: "crimon-primary-grid" }, [artCard("ADVENTURE", "物語を進める", "adventure", props.onGoStages), artCard("DUNGEON", "報酬を選ぶ", "dungeon", toggleDungeonChooser), artCard("ARENA", "強者との決闘", "arena", onGoArena)]), dungeonChooser]),
-      el("section", { className: "crimon-section crimon-section--management" }, [sectionMark("MANAGEMENT"), el("div", { className: "crimon-management-grid" }, [artCard("MONSTER", "育成・編成", "monster", props.onGoMonsters, "monsters"), artCard("EQUIPMENT", "装備管理", "equipment", props.onGoEquipment, "equipment"), artCard("SUMMON", "新たな契約", "summon", props.onGoSummon, "summon"), artCard("SHOP", "アイテム購入", "shop", onGoShop, "shop")])]),
-      el("section", { className: "crimon-section crimon-section--secondary" }, [sectionMark("SECONDARY / PROGRESSION"),
-        el("button", { type: "button", className: "crimon-tower", onclick: props.onGoTrialTower, ariaLabel: "Trial Tower" }, [
-          el("img", { src: new URL("../assets/crimon-tower-hero.svg", import.meta.url).href, alt: "", "aria-hidden": "true" }, []),
-          el("span", {}, [el("strong", {}, ["TRIAL TOWER"]), el("small", {}, [`最高到達 ${tower.bestFloor}F${tower.isRunning ? ` ・ ${tower.floor}F挑戦中` : ""}`])]), icon("chevron"),
+      el("section", { className: "crimon-world-stage", ariaLabel: "現在のパーティ" }, [
+        el("div", { className: "crimon-side-menu" }, [
+          el("button", { type: "button", onclick: props.onGoTrialTower }, [icon("tower"), el("span", {}, ["試練の塔"])]),
+          el("button", { type: "button", onclick: openTutorial }, [icon("scroll"), el("span", {}, ["初心者"])]),
+          el("button", { type: "button", onclick: props.onGoMonsterDex }, [icon("monsters"), el("span", {}, ["図鑑"])]),
+          el("button", { type: "button", onclick: onGoHowToPlay }, [icon("info"), el("span", {}, ["遊び方"])]),
         ]),
-        el("div", { className: "crimon-utility-grid" }, [artCard("MONSTER DEX", "図鑑", "utility", props.onGoMonsterDex), artCard("HOW TO PLAY", "遊び方", "utility", onGoHowToPlay)]),
+        el("div", { className: "crimon-party-stage" }, Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], props.onGoParty, props.onViewPartyMonster))),
+        el("div", { className: "crimon-primary-grid" }, [artCard("冒険", "ADVENTURE", "adventure", props.onGoStages), artCard("ダンジョン", "DUNGEON", "dungeon", toggleDungeonChooser), artCard("闘技場", "ARENA", "arena", onGoArena)]),
+        dungeonChooser,
       ]),
+      el("section", { className: "home-party crimon-section" }, [sectionMark(`CURRENT PARTY　総戦力 ${partyPower.toLocaleString("ja-JP")}`, el("button", { type: "button", className: "btn-frame", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["パーティ編成"])), el("div", { className: "home-party-grid" }, Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], props.onGoParty, props.onViewPartyMonster)))]),
       tutorial,
+      tutorialSheet,
       staminaSheet,
       settingsSheet,
     ].filter((node): node is HTMLElement => node !== null));
