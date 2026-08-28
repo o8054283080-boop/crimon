@@ -69,8 +69,8 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     instanceId,
     def,
     team,
-    maxHp: def.stats.hp,
-    currentHp: def.stats.hp,
+    maxHp: Math.round(def.stats.hp * (def.latentAbility?.hpMultiplier ?? 1)),
+    currentHp: Math.round(def.stats.hp * (def.latentAbility?.hpMultiplier ?? 1)),
     gauge: 0,
     cooldowns: [0, 0, 0],
     stunTurns: 0,
@@ -95,7 +95,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
 
 /** バフ/デバフを反映した実効ステータス値を計算する。criRate/criDmgは加算、それ以外は乗算で効く */
 export function getEffectiveStat(unit: BattleUnit, stat: BuffStat): number {
-  const base = unit.def.stats[stat];
+  const base = unit.def.stats[stat] * (stat === "def" ? (unit.def.latentAbility?.defMultiplier ?? 1) : 1);
   const totalRate = unit.effects
     .filter((e) => e.stat === stat)
     .reduce((sum, e) => sum + e.amount, 0);

@@ -35,7 +35,7 @@ export function calcDamage(
   rng: () => number,
 ): DamageResult {
   const atk = getEffectiveStat(attacker, "atk");
-  const def = getEffectiveStat(defender, "def");
+  const def = getEffectiveStat(defender, "def") * (1 - Math.max(0, Math.min(1, effect.ignoreDefenseRatio ?? 0)));
 
   const scaleBonusStatValue = effect.scaleBonus
     ? effect.scaleBonus.stat === "hp"

@@ -78,7 +78,32 @@ export type LatentAbilityCategory = "OFFENSE" | "DISRUPT" | "DURABILITY" | "SUPP
 export type LatentAbilityEffectType =
   | "DAMAGE_UP" | "CRIT_TRIGGER" | "HP_SCALING" | "DEF_SCALING"
   | "DEBUFF_CHANCE_UP" | "ADD_DEBUFF" | "TURN_METER_DOWN"
-  | "SELF_HEAL" | "ADD_BUFF" | "ALLY_SUPPORT" | "SHIELD" | "SPECIAL_TRIGGER";
+  | "SELF_HEAL" | "ADD_BUFF" | "ALLY_SUPPORT" | "SHIELD" | "SPECIAL_TRIGGER"
+  | "RUNTIME";
+
+export type LatentRuntimeTarget = "PRIMARY" | "ALL_ENEMIES" | "SELF" | "ALL_ALLIES" | "LOWEST_GAUGE_ALLY" | "LOWEST_HP_ALLY";
+
+/** A skill-use scoped effect.  Runtime effects are never evaluated once per hit. */
+export type LatentRuntimeEffect =
+  | { kind: "GAUGE_DOWN"; amount: number; chance: number; target?: LatentRuntimeTarget }
+  | { kind: "GAUGE_UP"; amount: number; chance?: number; target: LatentRuntimeTarget }
+  | { kind: "DEBUFF"; status: "SPD_DOWN" | "ATK_DOWN" | "DEF_DOWN" | "HEAL_BLOCK" | "BUFF_BLOCK" | "POISON" | "STUN"; chance: number; duration: number; target?: LatentRuntimeTarget; amount?: number }
+  | { kind: "STRIP"; chance: number; count?: number; target?: LatentRuntimeTarget }
+  | { kind: "EXTEND_DEBUFF"; chance: number; turns: number; count?: number; target?: LatentRuntimeTarget }
+  | { kind: "CLEANSE"; count?: number; target: LatentRuntimeTarget; afterHeal?: boolean }
+  | { kind: "SHIELD"; rate: number; duration: number; target: LatentRuntimeTarget; afterHeal?: boolean }
+  | { kind: "HEAL"; rate: number; target: LatentRuntimeTarget; lowHpThreshold?: number; bonusRate?: number }
+  | { kind: "BUFF"; stat: "atk" | "def" | "spd"; amount: number; duration: number; target: LatentRuntimeTarget; lowHpThreshold?: number }
+  | { kind: "REGEN"; rate: number; duration: number; target: LatentRuntimeTarget; afterHeal?: boolean };
+
+export interface LatentAoeConversion {
+  /** Only SINGLE_ENEMY skills are converted; native AoE skills are left untouched. */
+  damageMultiplier: number;
+  /** Multiplier for the chance of native harmful skill effects on secondary targets. */
+  secondaryEffectChanceMultiplier?: number;
+  /** Native non-damage effects may instead be restricted to the selected primary target. */
+  nativeEffectTarget?: "ALL" | "PRIMARY_ONLY";
+}
 
 /** ⑧-3の戦闘実装へそのまま渡せる、スキル1専用の宣言的な候補データ。 */
 export interface LatentAbilityCandidate {
@@ -98,6 +123,14 @@ export interface LatentAbilityCandidate {
   status?: string;
   /** 既存S1効果とは別判定か、既存確率への加算か。 */
   resolution: "ALWAYS" | "SEPARATE" | "ADD_TO_EXISTING" | "ON_CRIT" | "CONDITIONAL";
+  /** Optional extensible runtime. Existing stable IDs and legacy fields remain valid. */
+  runtimeEffects?: readonly LatentRuntimeEffect[];
+  aoeConversion?: LatentAoeConversion;
+  ignoreDefenseRatio?: number;
+  debuffDamageBonus?: { perDebuff: number; max: number };
+  damageTakenMultiplier?: number;
+  defMultiplier?: number;
+  hpMultiplier?: number;
 }
 
 export function createDefaultMonsterDevelopment(): MonsterDevelopment {
