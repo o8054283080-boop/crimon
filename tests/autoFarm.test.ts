@@ -16,6 +16,7 @@ function reward(over: Partial<ClearRewardResult> = {}): ClearRewardResult {
     goldEarned: 0,
     crystalEarned: 0,
     expTotal: 0,
+    fighterExp: 0,
     levelUps: [],
     dropDexId: null,
     dropStar: null,

@@ -69,6 +69,7 @@ describe("ゴールドダンジョンクリア報酬 (applyGoldDungeonClearRewar
     const before = state.gold;
 
     const result = applyGoldDungeonClearRewards(state, floor, party);
+    expect(result.fighterExp).toBe(floor.floor * 20);
 
     expect(result.goldEarned).toBe(floor.goldReward);
     expect(state.gold).toBe(before + floor.goldReward);

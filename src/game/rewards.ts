@@ -47,6 +47,8 @@ export interface ClearRewardResult {
   goldEarned: number;
   crystalEarned: number;
   expTotal: number;
+  /** ファイターレベルへ入ったEXP。expTotalはモンスター用のため同額とは限らない */
+  fighterExp: number;
   levelUps: LevelUpInfo[];
   expAwards?: ExpAwardInfo[];
   dropDexId: string | null;
@@ -55,6 +57,26 @@ export interface ClearRewardResult {
   pigDrop: StageDrop | null;
   summonScrollDropped: boolean;
   fighterLevelsGained: number;
+}
+
+/** 通常ステージはモンスターEXPの25%。難易度倍率を含む値から算出する。 */
+export function stageFighterExp(monsterExp: number): number {
+  return Math.max(1, Math.round(monsterExp * 0.25));
+}
+
+/** 装備10階で750。モンスター育成用の floor * 500 とは分離する。 */
+export function equipmentDungeonFighterExp(floor: number): number {
+  return Math.max(1, Math.round(floor * 75));
+}
+
+/** 育成ダンジョンはモンスター育成が主目的。上階でもファイター最高効率にしない。 */
+export function levelDungeonFighterExp(tier: LevelDungeonDef["tier"]): number {
+  const floor = Number(tier.slice(1));
+  return 100 + Math.max(1, Math.min(5, floor)) * 60;
+}
+
+export function goldDungeonFighterExp(floor: number): number {
+  return Math.max(1, floor * 20);
 }
 
 export function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal: number): { levelUps: LevelUpInfo[]; expAwards: ExpAwardInfo[] } {
@@ -108,7 +130,8 @@ export function applyStageClearRewards(
   if (pigDrop) addMonster(state, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);
   const summonScrollDropped = rollStageSummonScroll();
   if (summonScrollDropped) addSummonScrolls(state, 1);
-  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+  const fighterExp = stageFighterExp(expTotal);
+  const fighterLevelsGained = addFighterExp(state, fighterExp).levelsGained;
 
   state.gold += goldEarned;
   state.crystal += crystalEarned;
@@ -117,6 +140,7 @@ export function applyStageClearRewards(
     goldEarned,
     crystalEarned,
     expTotal,
+    fighterExp,
     levelUps,
     expAwards,
     dropDexId: drop ? drop.dexId : null,
@@ -162,7 +186,8 @@ export function applyDungeonClearRewards(
     pigDrop = { dexId: pig.dexId, star: pig.star };
     addMonster(state, pig.dexId, pig.star, STAR_MAX_LEVEL[pig.star]);
   }
-  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+  const fighterExp = equipmentDungeonFighterExp(floor.floor);
+  const fighterLevelsGained = addFighterExp(state, fighterExp).levelsGained;
 
   state.gold += goldEarned;
   state.crystal += crystalEarned;
@@ -171,6 +196,7 @@ export function applyDungeonClearRewards(
     goldEarned,
     crystalEarned,
     expTotal,
+    fighterExp,
     levelUps,
     expAwards,
     dropDexId: null,
@@ -206,7 +232,8 @@ export function applyLevelDungeonClearRewards(
   const pigDrop: StageDrop = { dexId: pigVariant.id, star: def.pigStar };
   addMonster(state, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);
 
-  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+  const fighterExp = levelDungeonFighterExp(def.tier);
+  const fighterLevelsGained = addFighterExp(state, fighterExp).levelsGained;
 
   state.gold += goldEarned;
   state.crystal += crystalEarned;
@@ -215,6 +242,7 @@ export function applyLevelDungeonClearRewards(
     goldEarned,
     crystalEarned,
     expTotal,
+    fighterExp,
     levelUps,
     expAwards,
     dropDexId: null,
@@ -240,7 +268,8 @@ export function applyGoldDungeonClearRewards(
   const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);
 
   const goldEarned = floor.goldReward;
-  const fighterLevelsGained = addFighterExp(state, expTotal).levelsGained;
+  const fighterExp = goldDungeonFighterExp(floor.floor);
+  const fighterLevelsGained = addFighterExp(state, fighterExp).levelsGained;
 
   state.gold += goldEarned;
 
@@ -248,6 +277,7 @@ export function applyGoldDungeonClearRewards(
     goldEarned,
     crystalEarned: 0,
     expTotal,
+    fighterExp,
     levelUps,
     expAwards,
     dropDexId: null,
