@@ -60,10 +60,15 @@ export interface TowerRewardResult {
   pigDexId: string | null;
   pigStar: Star | null;
   awakeningOrbs: number;
+  fourStarSummonScrolls: number;
+  lightDarkFourStarSummonScrolls: number;
+  fiveStarSummonScrolls: number;
+  skillPigTokens: number;
 }
 
 export function emptyTowerRewardResult(): TowerRewardResult {
-  return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null, awakeningOrbs: 0 };
+  return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null, awakeningOrbs: 0,
+    fourStarSummonScrolls: 0, lightDarkFourStarSummonScrolls: 0, fiveStarSummonScrolls: 0, skillPigTokens: 0 };
 }
 
 /** 登坂を始められない理由。始められるなら null */
@@ -258,6 +263,26 @@ export function claimTowerFloorReward(state: PlayerState, floor: number, rng: ()
   if (reward.summonScroll) {
     addSummonScrolls(state, reward.summonScroll);
     result.summonScrolls = reward.summonScroll;
+  }
+  if (reward.fourStarSummonScroll) {
+    state.fourStarSummonScrolls += reward.fourStarSummonScroll;
+    result.fourStarSummonScrolls = reward.fourStarSummonScroll;
+  }
+  if (reward.lightDarkFourStarSummonScroll) {
+    state.lightDarkFourStarSummonScrolls += reward.lightDarkFourStarSummonScroll;
+    result.lightDarkFourStarSummonScrolls = reward.lightDarkFourStarSummonScroll;
+  }
+  if (reward.fiveStarSummonScroll) {
+    state.fiveStarSummonScrolls += reward.fiveStarSummonScroll;
+    result.fiveStarSummonScrolls = reward.fiveStarSummonScroll;
+  }
+  if (reward.awakeningOrbs) {
+    state.awakeningOrbs += reward.awakeningOrbs;
+    result.awakeningOrbs += reward.awakeningOrbs;
+  }
+  if (reward.skillPig) {
+    state.towerSkillPigTokens += reward.skillPig;
+    result.skillPigTokens = reward.skillPig;
   }
   if (reward.equipmentStar) {
     const equipment = generateEquipment({ star: reward.equipmentStar, subStatCount: 2, rng });

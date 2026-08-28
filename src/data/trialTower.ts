@@ -39,7 +39,12 @@ export type TowerTrait =
   /** 群れの階。敵の数が多い。全体攻撃・全体デバフに場面が回る(実測で最も差の出る傾向) */
   | "SWARM"
   /** 疾風の階。敵が速い。ゲージ操作・気絶・速度そのものに場面が回る */
-  | "SWIFT";
+  | "SWIFT"
+  /** 高層用の戦術札。編成名としてUIにも表示する */
+  | "POISON"
+  | "DISRUPT"
+  | "BRUTAL"
+  | "ENDURE";
 
 export const TOWER_TRAIT_LABEL: Record<TowerTrait, string> = {
   NONE: "",
@@ -47,6 +52,10 @@ export const TOWER_TRAIT_LABEL: Record<TowerTrait, string> = {
   WARD: "守りの階",
   SWARM: "群れの階",
   SWIFT: "疾風の階",
+  POISON: "毒霧の階",
+  DISRUPT: "妨害の階",
+  BRUTAL: "猛攻の階",
+  ENDURE: "耐久の階",
 };
 
 /** 傾向の説明。**何が起きるか**だけを書く。「◯◯を持って行け」とは書かない(編成は考える所) */
@@ -56,6 +65,10 @@ export const TOWER_TRAIT_NOTE: Record<TowerTrait, string> = {
   WARD: "敵が盾と免疫を張ります。素直に殴っても通りません。",
   SWARM: "敵の数が多く、手番が多く回ります。",
   SWIFT: "敵が速く、先に動いてきます。",
+  POISON: "継続ダメージを重ねる敵が待ち構えています。",
+  DISRUPT: "弱体効果と行動阻害を重ねる敵が待ち構えています。",
+  BRUTAL: "攻撃役を中心にした高火力編成です。",
+  ENDURE: "回復と防御を重ねる長期戦向けの編成です。",
 };
 
 export interface TowerFloor {
@@ -89,10 +102,15 @@ export interface TowerReward {
   equipmentStar?: Star;
   /** 初回突破で追加する覚醒オーブ */
   awakeningOrbs?: number;
+  fourStarSummonScroll?: number;
+  lightDarkFourStarSummonScroll?: number;
+  fiveStarSummonScroll?: number;
+  /** タスクCのスキルピッグ実体と安全に接続するための引換数 */
+  skillPig?: number;
 }
 
 /** 全階数 */
-export const TOWER_FLOOR_COUNT = 30;
+export const TOWER_FLOOR_COUNT = 100;
 
 /**
  * 節(区切り)の間隔。
@@ -104,7 +122,7 @@ export const TOWER_FLOOR_COUNT = 30;
 export const TOWER_CHECKPOINT_INTERVAL = 10;
 
 /** ボス階の間隔 */
-export const TOWER_BOSS_INTERVAL = 5;
+export const TOWER_BOSS_INTERVAL = 10;
 
 /** 1階を挑むごとに消費するスタミナ */
 export const TOWER_STAMINA_COST = 4;
@@ -124,7 +142,8 @@ export function isTowerBossFloor(floor: number): boolean {
  * 節を越えていれば節から、まだなら1階から。
  */
 export function towerStartFloor(bestFloor: number): number {
-  return Math.floor(bestFloor / TOWER_CHECKPOINT_INTERVAL) * TOWER_CHECKPOINT_INTERVAL + 1;
+  const safeBest = Number.isFinite(bestFloor) ? Math.max(0, Math.min(TOWER_FLOOR_COUNT, Math.floor(bestFloor))) : 0;
+  return Math.min(TOWER_FLOOR_COUNT, Math.floor(safeBest / TOWER_CHECKPOINT_INTERVAL) * TOWER_CHECKPOINT_INTERVAL + 1);
 }
 
 /* ============================================================
@@ -194,6 +213,10 @@ const TRAIT_ANCHORS: Record<TowerTrait, { templateId: string; element: Element }
     { templateId: "wolf", element: "ELECTRIC" },
     { templateId: "imp", element: "ELECTRIC" },
   ],
+  POISON: [{ templateId: "slime", element: "GRASS" }, { templateId: "slime", element: "WATER" }],
+  DISRUPT: [{ templateId: "imp", element: "ELECTRIC" }, { templateId: "wolf", element: "ELECTRIC" }],
+  BRUTAL: [{ templateId: "knight", element: "FIRE" }, { templateId: "wolf", element: "FIRE" }],
+  ENDURE: [{ templateId: "treant", element: "FIRE" }, { templateId: "golem", element: "GRASS" }],
 };
 
 /**
@@ -222,7 +245,9 @@ function traitOf(floor: number): TowerTrait {
    * 最初のボス(5階)を越えてから傾向を配り始める。
    */
   if (floor < TOWER_BOSS_INTERVAL) return "NONE";
-  const order: TowerTrait[] = ["NONE", "HEALER", "SWARM", "WARD", "SWIFT"];
+  const order: TowerTrait[] = floor <= 30
+    ? ["NONE", "HEALER", "SWARM", "WARD", "SWIFT"]
+    : ["HEALER", "WARD", "SWIFT", "SWARM", "POISON", "DISRUPT", "BRUTAL", "ENDURE", "NONE"];
   return order[floor % order.length];
 }
 
@@ -248,7 +273,11 @@ const TOWER_POWER_START = 3.0;
 const TOWER_POWER_GROWTH = 1.07;
 
 function towerPowerOf(floor: number): number {
-  return TOWER_POWER_START * TOWER_POWER_GROWTH ** (floor - 1);
+  // 旧30階までは完全に同じ曲線。50階を装備D10相当の基準点とし、以後は超高難度へ伸ばす。
+  const legacyTop = TOWER_POWER_START * TOWER_POWER_GROWTH ** 29;
+  if (floor <= 30) return TOWER_POWER_START * TOWER_POWER_GROWTH ** (floor - 1);
+  if (floor <= 50) return legacyTop * 1.035 ** (floor - 30);
+  return legacyTop * 1.035 ** 20 * 1.04 ** (floor - 50);
 }
 
 /**
@@ -326,13 +355,27 @@ function enemyLevelOf(floor: number): number {
  * 塔が装備の主要な供給源になって装備ダンジョンの居場所を奪う。
  */
 function rewardOf(floor: number): TowerReward {
-  if (floor === TOWER_FLOOR_COUNT) return { crystal: 500, gold: 30000, summonScroll: 3, equipmentStar: 6, pigStar: 3 };
-  if (floor === Math.ceil(TOWER_FLOOR_COUNT / 2)) return { crystal: 40 + floor * 2, gold: 1500 + floor * 200, equipmentStar: 4 };
-  if (isTowerCheckpoint(floor)) {
+  // 1～30階は旧版の内容を固定し、100階化で既存報酬を巻き戻さない。
+  if (floor === 30) return { crystal: 500, gold: 30000, summonScroll: 3, equipmentStar: 6, pigStar: 3 };
+  if (floor === 15) return { crystal: 70, gold: 4500, equipmentStar: 4 };
+  if (floor < 30 && isTowerCheckpoint(floor)) {
     return { crystal: 100 + floor * 5, gold: 2000 + floor * 400, summonScroll: 1, equipmentStar: 5, pigStar: 3 };
   }
-  if (isTowerBossFloor(floor)) return { crystal: 40 + floor * 2, gold: 1500 + floor * 200, equipmentStar: 4 };
-  return { crystal: 10 + floor, gold: 400 + floor * 100 };
+  if (floor < 30 && floor % 5 === 0) return { crystal: 40 + floor * 2, gold: 1500 + floor * 200, equipmentStar: 4 };
+  const milestones: Partial<Record<number, TowerReward>> = {
+    40: { crystal: 100, summonScroll: 10 },
+    50: { crystal: 150, fourStarSummonScroll: 1, awakeningOrbs: 2 },
+    60: { crystal: 200, summonScroll: 10, fourStarSummonScroll: 1 },
+    70: { crystal: 250, fiveStarSummonScroll: 1, skillPig: 1 },
+    80: { crystal: 300, fourStarSummonScroll: 3, lightDarkFourStarSummonScroll: 1 },
+    90: { crystal: 350, skillPig: 3, awakeningOrbs: 3 },
+    100: { crystal: 500, summonScroll: 30, lightDarkFourStarSummonScroll: 3, fiveStarSummonScroll: 1 },
+  };
+  if (milestones[floor]) return milestones[floor]!;
+  if (isTowerCheckpoint(floor)) {
+    return { crystal: 60 + floor * 2, gold: 5000 + floor * 250 };
+  }
+  return { crystal: 10 + Math.floor(floor / 2), gold: 800 + floor * 120 };
 }
 
 /**
@@ -378,6 +421,10 @@ const TRAIT_ANCHOR_HP: Record<TowerTrait, number> = {
   WARD: 1.4,
   SWARM: 1,
   SWIFT: 1.35,
+  POISON: 1.25,
+  DISRUPT: 1.2,
+  BRUTAL: 1.1,
+  ENDURE: 1.55,
 };
 
 /** 傾向を体現する1体の速度。癒やし手は手数がそのまま回復量になるので少しだけ速い */
@@ -387,6 +434,10 @@ const TRAIT_ANCHOR_SPD: Record<TowerTrait, number> = {
   WARD: 1,
   SWARM: 1,
   SWIFT: 1,
+  POISON: 1.15,
+  DISRUPT: 1.25,
+  BRUTAL: 1.1,
+  ENDURE: 0.95,
 };
 
 /** 疾風の階で、階の敵**全員**に掛かる速度倍率と、その中でも先頭に立つ1体の速度倍率 */
