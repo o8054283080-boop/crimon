@@ -56,6 +56,7 @@ import {
   applyPassiveStaminaRegen,
   buyShopEntry,
   equipToMonster,
+  findEquippedOwner,
   ensureTowerMonthlyState,
   getShop,
   getDungeonParty,
@@ -95,7 +96,7 @@ import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
-import { loadNavigationState, saveNavigationState } from "./navigationState.js";
+import { loadNavigationState, saveNavigationState, ReturnContext } from "./navigationState.js";
 import { ResultAction } from "./views/resultActions.js";
 import { BattleChainInfo, BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
@@ -340,6 +341,8 @@ interface AppState {
   lastRun: LastRun | null;
   /** 編成画面での直前の操作の結果。次の操作まで出しておく */
   partyNotice: string | null;
+  partySelectedSlot: number | null;
+  returnContext: ReturnContext | null;
 }
 
 const state: AppState = {
@@ -401,6 +404,8 @@ const state: AppState = {
   compensationClaims: [],
   lastRun: null,
   partyNotice: null,
+  partySelectedSlot: null,
+  returnContext: null,
 };
 
 // ゲームセーブとは別のキーから画面だけを復元する。対象が消えていた詳細画面は安全な一覧へ戻す。
@@ -408,6 +413,7 @@ const state: AppState = {
   const restored = loadNavigationState();
   if (restored) {
     state.screen = restored.screen;
+    state.returnContext = restored.returnContext ?? null;
     if (restored.monsterDetailId && state.player.monsters.some((m) => m.id === restored.monsterDetailId)) {
       state.monsterDetailId = restored.monsterDetailId;
     }
@@ -467,6 +473,7 @@ if (!rootCandidate) throw new Error("#app root element not found");
 const root: HTMLElement = rootCandidate;
 
 let disposeCurrentView: (() => void) | null = null;
+let farmEquipmentScrollTop = 0;
 
 /** 画面(+サブ状態)ごとのスクロール位置を記憶し、その画面に戻った時に復元する */
 const scrollPositions = new Map<string, number>();
@@ -498,6 +505,7 @@ function persistNavigationState(): void {
     selectedDexEntryId: state.selectedDexEntryId ?? undefined,
     monsterTrainingTargetId: state.monsterTrainingTargetId ?? undefined,
     createTargetId: state.createTargetId ?? undefined,
+    returnContext: state.returnContext ?? undefined,
   });
 }
 
@@ -531,6 +539,26 @@ function navigate(screen: ScreenName): void {
   render();
 }
 
+function openPartyFrom(context: ReturnContext, mode: PartyEditMode): void {
+  state.returnContext ??= context;
+  state.partyEditMode = mode;
+  state.partySelectedSlot = null;
+  state.screen = "PARTY";
+  render();
+}
+
+function returnFromParty(): void {
+  const context = state.returnContext;
+  state.returnContext = null;
+  if (!context) { navigate("HOME"); return; }
+  state.screen = context.screen;
+  state.selectedStageId = context.selectedStageId ?? null;
+  state.selectedDungeonFloor = context.selectedDungeonFloor ?? null;
+  state.selectedGoldDungeonFloor = context.selectedGoldDungeonFloor ?? null;
+  state.selectedLevelDungeonTier = (context.selectedLevelDungeonTier as LevelDungeonTier | undefined) ?? null;
+  render();
+}
+
 function handleSelectSlot(monsterId: string, slot: EquipSlot): void {
   state.equipmentPickerContext = { monsterId, slot };
   state.screen = "EQUIPMENT";
@@ -545,6 +573,11 @@ function handleViewEquippedSlot(equipmentId: string, monsterId: string): void {
 }
 
 function handleEquip(equipmentId: string, monsterId: string): void {
+  const owner = findEquippedOwner(state.player, equipmentId);
+  if (owner && owner.id !== monsterId) {
+    const ownerName = findMonsterById(owner.dexId)?.name ?? owner.dexId;
+    if (!window.confirm(`${ownerName}から外してこのモンスターへ装備しますか？`)) return;
+  }
   equipToMonster(state.player, monsterId, equipmentId);
   savePlayerState(state.player);
   state.equipmentPickerContext = null;
@@ -1867,6 +1900,7 @@ function refreshBackgroundFarmStatus(): void {
 
 function render(): void {
   if (lastRouteKey !== null) scrollPositions.set(lastRouteKey, window.scrollY);
+  farmEquipmentScrollTop = root.querySelector<HTMLElement>(".farm-equip-sheet__panel")?.scrollTop ?? farmEquipmentScrollTop;
 
   disposeCurrentView?.();
   disposeCurrentView = null;
@@ -1898,6 +1932,7 @@ function render(): void {
         onGoSummon: () => navigate("SUMMON"),
         onGoStages: () => navigate("STAGES"),
         onGoParty: () => navigate("PARTY"),
+        onViewPartyMonster: (id) => { state.monsterDetailId = id; state.screen = "MONSTERS"; render(); },
         onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
@@ -2006,6 +2041,20 @@ function render(): void {
         filterOpen: state.monsterFilterOpen,
         onChangeFilter: handleChangeMonsterFilter,
         onToggleFilterOpen: handleToggleMonsterFilterOpen,
+        selectedSlot: state.partySelectedSlot,
+        onSelectSlot: (index) => { state.partySelectedSlot = state.partySelectedSlot === index ? null : index; render(); },
+        onChooseMonster: (instanceId) => {
+          const ids = state.partyEditMode === "DUNGEON" ? state.player.dungeonPartyIds : state.partyEditMode === "TOWER" ? state.player.towerPartyIds : state.player.partyIds;
+          const slot = state.partySelectedSlot;
+          if (slot === null || ids.includes(instanceId)) return;
+          if (slot < ids.length) ids[slot] = instanceId;
+          else ids.push(instanceId);
+          state.partySelectedSlot = null;
+          savePlayerState(state.player);
+          render();
+        },
+        onComplete: state.returnContext ? returnFromParty : undefined,
+        returnLabel: state.returnContext?.label,
       });
       break;
 
@@ -2052,10 +2101,7 @@ function render(): void {
         onStartFloor: startDungeonFloor,
         // 専用の編成画面には絞り込みも並べ替えも無く、同じことを2か所で
         // 別々にやらせていた。編成はすべて編成画面へ集約する
-        onGoDungeonParty: () => {
-          state.partyEditMode = "DUNGEON";
-          navigate("PARTY");
-        },
+        onGoDungeonParty: () => openPartyFrom({ screen: "EQUIP_DUNGEON", label: `装備ダンジョン${state.selectedDungeonFloor ?? ""}F`, selectedDungeonFloor: state.selectedDungeonFloor ?? undefined }, "DUNGEON"),
         autoFarmCount: state.autoFarmCount,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
@@ -2082,7 +2128,7 @@ function render(): void {
           render();
         },
         onStartTier: startLevelDungeonTier,
-        onGoParty: () => navigate("PARTY"),
+        onGoParty: () => openPartyFrom({ screen: "LEVEL_DUNGEON", label: "レベルダンジョン", selectedLevelDungeonTier: state.selectedLevelDungeonTier ?? undefined }, "NORMAL"),
         autoFarmCount: state.autoFarmCount,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
@@ -2109,7 +2155,7 @@ function render(): void {
           render();
         },
         onStartFloor: startGoldDungeonFloor,
-        onGoParty: () => navigate("PARTY"),
+        onGoParty: () => openPartyFrom({ screen: "GOLD_DUNGEON", label: `ゴールドダンジョン${state.selectedGoldDungeonFloor ?? ""}F`, selectedGoldDungeonFloor: state.selectedGoldDungeonFloor ?? undefined }, "NORMAL"),
         autoFarmCount: state.autoFarmCount,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
@@ -2189,9 +2235,8 @@ function render(): void {
         outcome: state.towerOutcome,
         blockedReason,
         onEditParty: () => {
-          state.partyEditMode = "TOWER";
           state.towerOutcome = null;
-          navigate("PARTY");
+          openPartyFrom({ screen: "TRIAL_TOWER", label: `試練の塔${nextTowerFloor(state.player)}F` }, "TOWER");
         },
         onChallenge: () => {
           state.towerOutcome = null;
@@ -2461,6 +2506,8 @@ function render(): void {
             savePlayerState(state.player);
             state.farmEquipmentSelling = false; state.farmEquipmentSelectedIds = []; state.farmEquipmentDetailId = null; render();
           },
+          onSelectAll: (ids) => { state.farmEquipmentSelectedIds = ids; render(); },
+          onClearSelection: () => { state.farmEquipmentSelectedIds = []; render(); },
           onClose: () => { state.farmEquipmentOpen = false; state.farmEquipmentDetailId = null; render(); },
         }));
       }
@@ -2469,6 +2516,8 @@ function render(): void {
   }
 
   root.append(content);
+  const farmPanel = root.querySelector<HTMLElement>(".farm-equip-sheet__panel");
+  if (farmPanel) farmPanel.scrollTop = farmEquipmentScrollTop;
   if (pwaUpdate.snapshot.available) {
     const inBattle = BATTLE_SCREENS.has(state.screen);
     const applying = pwaUpdate.snapshot.applying;
@@ -2547,6 +2596,12 @@ function renderMonstersScreen(): HTMLElement {
     rankUpMode: state.rankUpMode,
     selectedSacrificeIds: state.rankUpSacrificeIds,
     onSelectDetail: (id) => {
+      if (id === null && state.returnContext) {
+        state.monsterDetailId = null;
+        state.screen = "PARTY";
+        render();
+        return;
+      }
       state.monsterDetailId = id;
       state.rankUpMode = false;
       state.rankUpSacrificeIds = [];
@@ -2683,6 +2738,13 @@ function renderEquipmentScreen(): HTMLElement {
       render();
     },
     onBulkSell: handleBulkSellEquipment,
+    onToggleLock: (equipmentId) => {
+      const item = state.player.equipment.find((entry) => entry.id === equipmentId);
+      if (!item || !setEquipmentLocked(state.player, equipmentId, !item.locked)) return;
+      if (item.locked) state.equipmentSelectedIds = state.equipmentSelectedIds.filter((id) => id !== equipmentId);
+      savePlayerState(state.player);
+      render();
+    },
   });
 }
 

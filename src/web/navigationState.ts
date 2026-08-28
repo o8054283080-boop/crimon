@@ -9,6 +9,23 @@ export interface NavigationState {
   selectedDexEntryId?: string;
   monsterTrainingTargetId?: string;
   createTargetId?: string;
+  returnContext?: ReturnContext;
+}
+
+export interface ReturnContext {
+  screen: ScreenName;
+  label: string;
+  selectedStageId?: string;
+  selectedDifficulty?: string;
+  selectedDungeonFloor?: number;
+  selectedLevelDungeonTier?: string;
+  selectedGoldDungeonFloor?: number;
+}
+
+export function isReturnContext(value: unknown): value is ReturnContext {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<ReturnContext>;
+  return typeof candidate.screen === "string" && SCREENS.has(candidate.screen as ScreenName) && typeof candidate.label === "string";
 }
 
 const SCREENS = new Set<ScreenName>([
@@ -43,7 +60,7 @@ export function loadNavigationState(storage: Storage = localStorage): Navigation
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<NavigationState>;
     if (typeof value.screen !== "string" || !SCREENS.has(value.screen as ScreenName)) return null;
-    return { ...value, screen: safeRestoredScreen(value.screen as ScreenName) } as NavigationState;
+    return { ...value, screen: safeRestoredScreen(value.screen as ScreenName), returnContext: isReturnContext(value.returnContext) ? value.returnContext : undefined } as NavigationState;
   } catch {
     return null;
   }

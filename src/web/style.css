@@ -7604,3 +7604,12 @@ body::before {
   width: 58px;
   min-width: 58px;
 }
+/* Tap-first party swapping: large targets remain usable on narrow iPhones. */
+.party-swap-slots { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.party-swap-slot { min-height:64px; padding:6px 2px; border:1px solid rgba(255,211,106,.35); border-radius:10px; color:inherit; background:rgba(8,12,26,.72); font-size:.72rem; }
+.party-swap-slot small { display:block; margin-top:4px; color:var(--muted); font-size:.58rem; }
+.party-swap-slot.is-selected { border-color:#ffd36a; box-shadow:0 0 0 2px rgba(255,211,106,.25); }
+.equip-picker-card { display:grid; gap:5px; min-width:0; }
+.equip-picker-card__lock { min-height:40px; }
+.equip-picker-card__delta { padding:4px 6px; border-radius:7px; background:rgba(7,11,24,.8); }
+.equip-picker-card__delta.is-up { color:#82e6a5; } .equip-picker-card__delta.is-down { color:#ff9c9c; }

@@ -11,6 +11,8 @@ export interface FarmEquipmentResultProps {
   onToggleSelected(id: string): void;
   onDetail(id: string | null): void;
   onSell(): void;
+  onSelectAll(ids: string[]): void;
+  onClearSelection(): void;
   onClose(): void;
 }
 
@@ -45,6 +47,7 @@ export function renderFarmEquipmentResult(props: FarmEquipmentResultProps): HTML
       cards.length ? el("div", { className: "farm-equip-sheet__list" }, cards) : el("p", { className: "result-empty" }, ["現在所持している今回の装備はありません"]),
       el("footer", {}, [
         el("span", {}, [`選択 ${selected.length}個　売却予定 +${total.toLocaleString("ja-JP")}G`]),
+        el("div", { className: "farm-equip-sheet__bulk" }, [el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectAll(props.equipment.filter((item) => !item.locked).map((item) => item.id)) }, ["全選択"]), el("button", { type: "button", className: "btn btn--ghost", onclick: props.onClearSelection }, ["選択解除"])]),
         el("button", { type: "button", className: "btn btn--danger", disabled: selected.length === 0 || props.selling, onclick: props.onSell }, [props.selling ? "売却中…" : `${selected.length}個を売却　+${total.toLocaleString("ja-JP")}G`]),
       ]),
     ]),
