@@ -1,9 +1,9 @@
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { ELEMENTS, ELEMENT_COLOR, ELEMENT_JA, Element } from "../../core/element.js";
-import { STARS, Star } from "../../core/rarity.js";
+import { STARS, STAR_MAX_LEVEL, Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
-import { checkMonsterPowerUp, feedExpValue, isSameElement, isSameSpecies } from "../../game/monsterPowerUp.js";
+import { checkMonsterPowerUp, isSameElement, isSameSpecies, monsterPowerUpExp } from "../../game/monsterPowerUp.js";
 import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
 import { renderPartySlots } from "./partyCard.js";
@@ -64,7 +64,8 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkMonsterPowerUp(target, materials, props.player.partyIds);
 
-  const totalExp = materials.reduce((sum, m) => sum + feedExpValue(target, m), 0);
+  const isLevelMax = target.level >= STAR_MAX_LEVEL[target.star];
+  const totalExp = monsterPowerUpExp(target, materials);
   const bonusCount = materials.filter((m) => isSameSpecies(target, m)).length;
   const sameElementCount = materials.filter((m) => isSameElement(target, m)).length;
 
@@ -87,8 +88,11 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
       el("p", { className: "app-subtitle" }, [
         "どのモンスターでも素材にすると経験値になり、対象のレベルが上がります。★マーク付きは対象と同じ種族(属性違いも可)で、1体につきランダムでいずれか1つのスキルレベルも+1されます。対象と同じ属性(色)の素材は経験値が1.5倍になります。",
       ]),
+      isLevelMax
+        ? el("p", { className: "app-subtitle training-warning" }, ["LvMAXのため経験値は獲得できません。同種族素材でスキル育成できます。"])
+        : null,
       el("p", {}, [
-        `${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体・同属性${sameElementCount}体) / 獲得予定経験値 ${totalExp}`,
+        `${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体・同属性${sameElementCount}体) / 獲得予定経験値 ${totalExp}${isLevelMax ? "（LvMAX）" : ""}`,
       ]),
       /*
        * **選んだ顔ぶれをここに並べる。**
