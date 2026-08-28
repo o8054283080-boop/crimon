@@ -19,6 +19,7 @@ import {
   tryRefillStaminaFull,
   tryRefillStaminaPartial,
   trySpendStamina,
+  normalizeLoadedState,
 } from "../src/game/playerState.js";
 
 describe("ファイターレベル・スタミナの初期状態", () => {
@@ -108,7 +109,7 @@ describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefill
 });
 
 describe("ファイター経験値とレベルアップ (addFighterExp)", () => {
-  it("必要経験値を満たすとレベルが上がり、スタミナが全回復・上限が+10される", () => {
+  it("必要経験値を満たすとレベルが上がり、スタミナが新上限まで全回復する", () => {
     const state = createInitialState();
     state.stamina = 10; // 減っている状態から検証する
     const needed = requiredExpForFighterLevel(1);
@@ -118,7 +119,7 @@ describe("ファイター経験値とレベルアップ (addFighterExp)", () => 
     expect(result.levelsGained).toBe(1);
     expect(state.fighterLevel).toBe(2);
     expect(state.maxStamina).toBe(maxStaminaForFighterLevel(2));
-    expect(state.maxStamina).toBe(160);
+    expect(state.maxStamina).toBe(155);
     expect(state.stamina).toBe(state.maxStamina); // 全回復
   });
 
@@ -154,11 +155,13 @@ describe("ファイター経験値とレベルアップ (addFighterExp)", () => 
     expect(state.crystal).toBe(crystalBefore + FIGHTER_LEVEL_UP_CRYSTAL_REWARD * result.levelsGained);
   });
 
-  it("ファイターレベルの上限は50", () => {
+  it("ファイターレベルの上限は100", () => {
     const state = createInitialState();
-    addFighterExp(state, 10_000_000);
+    const enoughForMax = Array.from({ length: MAX_FIGHTER_LEVEL - 1 }, (_, index) => requiredExpForFighterLevel(index + 1))
+      .reduce((sum, value) => sum + value, 0);
+    addFighterExp(state, enoughForMax * 2);
     expect(state.fighterLevel).toBe(MAX_FIGHTER_LEVEL);
-    expect(state.fighterLevel).toBe(50);
+    expect(state.fighterLevel).toBe(100);
   });
 
   it("上限到達後はそれ以上レベルが上がらない", () => {
@@ -167,6 +170,57 @@ describe("ファイター経験値とレベルアップ (addFighterExp)", () => 
     const result = addFighterExp(state, 999_999);
     expect(result.levelsGained).toBe(0);
     expect(state.fighterLevel).toBe(MAX_FIGHTER_LEVEL);
+  });
+});
+
+describe("長期育成EXPカーブ", () => {
+  it.each([1, 10, 30, 50, 75, 99])("Lv%dの必要EXPは有限の正数", (level) => {
+    expect(requiredExpForFighterLevel(level)).toBeGreaterThan(0);
+    expect(Number.isFinite(requiredExpForFighterLevel(level))).toBe(true);
+  });
+
+  it("Lv1〜99で単調増加し、帯の境界でも逆転しない", () => {
+    for (let level = 2; level < MAX_FIGHTER_LEVEL; level++) {
+      expect(requiredExpForFighterLevel(level)).toBeGreaterThan(requiredExpForFighterLevel(level - 1));
+    }
+  });
+
+  it.each([[49, 50], [50, 51], [99, 100]] as const)("Lv%d→%dへ成長できる", (from, to) => {
+    const state = createInitialState();
+    state.fighterLevel = from;
+    state.fighterExp = 0;
+    state.stamina = 1;
+    addFighterExp(state, requiredExpForFighterLevel(from));
+    expect(state.fighterLevel).toBe(to);
+    expect(state.stamina).toBe(maxStaminaForFighterLevel(to));
+    expect(state.stamina).toBeLessThanOrEqual(state.maxStamina);
+  });
+});
+
+describe("Lv100向けスタミナカーブ", () => {
+  it.each([[1, 150], [20, 245], [21, 248], [50, 335], [51, 337], [100, 435]] as const)("Lv%dは上限%d", (level, expected) => {
+    expect(maxStaminaForFighterLevel(level)).toBe(expected);
+  });
+
+  it("全レベルで単調増加する", () => {
+    for (let level = 2; level <= MAX_FIGHTER_LEVEL; level++) {
+      expect(maxStaminaForFighterLevel(level)).toBeGreaterThan(maxStaminaForFighterLevel(level - 1));
+    }
+  });
+});
+
+describe("旧Lv50セーブ互換性", () => {
+  it("レベルとfighterExpを巻き戻さず、新スタミナ上限へ安全に補正する", () => {
+    const state = createInitialState();
+    state.fighterLevel = 50;
+    state.fighterExp = 12_345;
+    state.maxStamina = 640;
+    state.stamina = 500;
+    normalizeLoadedState(state);
+    expect(state.fighterLevel).toBe(50);
+    expect(state.fighterExp).toBe(12_345);
+    expect(state.maxStamina).toBe(335);
+    expect(state.stamina).toBe(335);
   });
 });
 

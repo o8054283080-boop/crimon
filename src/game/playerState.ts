@@ -344,10 +344,13 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
     state.awakeningOrbs += retroactiveIds.length;
     state.claimedAwakeningOrbRewardIds.push(...retroactiveIds);
   }
-  if (typeof state.fighterLevel !== "number") state.fighterLevel = 1;
-  if (typeof state.fighterExp !== "number") state.fighterExp = 0;
-  if (typeof state.maxStamina !== "number") state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
-  if (typeof state.stamina !== "number") state.stamina = state.maxStamina;
+  if (typeof state.fighterLevel !== "number" || !Number.isFinite(state.fighterLevel)) state.fighterLevel = 1;
+  state.fighterLevel = Math.max(1, Math.min(MAX_FIGHTER_LEVEL, Math.floor(state.fighterLevel)));
+  if (typeof state.fighterExp !== "number" || !Number.isFinite(state.fighterExp) || state.fighterExp < 0) state.fighterExp = 0;
+  if (state.fighterLevel >= MAX_FIGHTER_LEVEL) state.fighterExp = 0;
+  state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
+  if (typeof state.stamina !== "number" || !Number.isFinite(state.stamina)) state.stamina = state.maxStamina;
+  state.stamina = Math.max(0, Math.min(state.stamina, state.maxStamina));
   if (typeof state.lastStaminaUpdateAt !== "number") state.lastStaminaUpdateAt = Date.now();
   if (typeof state.fighterName !== "string" || state.fighterName.length === 0) state.fighterName = DEFAULT_FIGHTER_NAME;
   if (typeof state.lastLoginBonusAt !== "number") state.lastLoginBonusAt = null;

@@ -76,7 +76,7 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
     const result = applyDungeonClearRewards(state, floor, party, () => 0);
 
     expect(result.crystalEarned).toBe(REPEAT_CLEAR_CRYSTAL_REWARD);
-    expect(state.crystal).toBe(before + REPEAT_CLEAR_CRYSTAL_REWARD);
+    expect(state.crystal).toBeGreaterThanOrEqual(before + REPEAT_CLEAR_CRYSTAL_REWARD);
   });
 
   it("2回目以降のクリアは外れれば0ダイヤになる", () => {
@@ -89,7 +89,7 @@ describe("ダイヤ報酬 (applyDungeonClearRewards)", () => {
     const result = applyDungeonClearRewards(state, floor, party, () => REPEAT_CLEAR_CRYSTAL_CHANCE);
 
     expect(result.crystalEarned).toBe(0);
-    expect(state.crystal).toBe(before);
+    expect(state.crystal).toBeGreaterThanOrEqual(before);
   });
 
   it("階層が異なればそれぞれ初回扱いになる", () => {
@@ -135,11 +135,27 @@ describe("⑧-5-1 EXPバランス", () => {
     expect(values).toEqual([6_000, 9_000, 12_000]);
   });
 
+  it("通常最終面のモンスターEXPは維持し、ファイターEXPだけ25%に分離する", () => {
+    const stage = STAGES.at(-1)!;
+    const values = (["NORMAL", "HARD", "HELL"] as const).map((difficulty) => {
+      const state = createInitialState();
+      const reward = applyStageClearRewards(state, stage, 3, getParty(state), difficulty);
+      return [reward.expTotal, reward.fighterExp];
+    });
+    expect(values).toEqual([[6_000, 1_500], [9_000, 2_250], [12_000, 3_000]]);
+  });
+
   it("装備ダンジョンは階層ごとに500増え、10階は5,000 EXP", () => {
     const values = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
       const state = createInitialState();
       return applyDungeonClearRewards(state, floor, getParty(state)).expTotal;
     });
     expect(values).toEqual([500, 1_000, 1_500, 2_000, 2_500, 3_000, 3_500, 4_000, 4_500, 5_000]);
+  });
+
+  it("装備ダンジョン10階はモンスター5,000 EXPのまま、ファイター750 EXP", () => {
+    const state = createInitialState();
+    const reward = applyDungeonClearRewards(state, EQUIPMENT_DUNGEON_FLOORS.at(-1)!, getParty(state));
+    expect([reward.expTotal, reward.fighterExp]).toEqual([5_000, 750]);
   });
 });

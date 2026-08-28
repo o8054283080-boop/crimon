@@ -89,12 +89,20 @@ describe("レベル上げダンジョンの報酬 (applyLevelDungeonClearRewards
     const result = applyLevelDungeonClearRewards(state, def, party, () => 0);
 
     expect(result.expTotal).toBe(def.expReward);
+    expect(result.fighterExp).toBe(160);
     expect(result.levelUps.length).toBeGreaterThan(0);
     expect(result.pigDrop).not.toBeNull();
     expect(result.pigDrop!.star).toBe(def.pigStar);
     expect(state.monsters.length).toBe(monstersBefore + 1);
     const addedPig = state.monsters[state.monsters.length - 1];
     expect(addedPig.level).toBe(STAR_MAX_LEVEL[def.pigStar]);
+  });
+
+  it("最高階でもモンスター52,000 EXPとファイター400 EXPを分離する", () => {
+    const state = createInitialState();
+    const def = findLevelDungeonDef("F5")!;
+    const result = applyLevelDungeonClearRewards(state, def, [], () => 0);
+    expect([result.expTotal, result.fighterExp]).toEqual([52_000, 400]);
   });
 
   it("初回クリアはダイヤ200、2回目以降は3%の確率でダイヤ50になる", () => {
