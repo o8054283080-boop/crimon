@@ -4,6 +4,7 @@ import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { icon, slotIcon } from "../icons.js";
 import { managementHeader } from "./managementHeader.js";
+import { compareEquipmentStats, equipmentForSlot, equipmentLockLabel, equipmentStatTotal, sellableEquipmentIds } from "../uxHelpers.js";
 
 export interface EquipmentPickerContext {
   monsterId: string;
@@ -16,7 +17,7 @@ export interface EquipmentPickerContext {
  * 装備は数十個たまるので、「今その順で見たい理由」が場面ごとに違う。
  * 強い物を探す・売る物を探す・シリーズを揃える、で必要な順序が別なので選べるようにする。
  */
-export type EquipmentSortKey = "recommended" | "star" | "level" | "slot" | "set" | "value" | "hp" | "atk" | "def" | "spd" | "critRate" | "effectHit" | "effectResist";
+export type EquipmentSortKey = "recommended" | "star" | "level" | "slot" | "set" | "value" | StatRoll["type"];
 
 /**
  * 並べ替えの札に出す文言。
@@ -32,10 +33,12 @@ export const EQUIPMENT_SORT_LABEL: Record<EquipmentSortKey, string> = {
   slot: "枠の順",
   set: "シリーズ",
   value: "売値順",
-  hp: "HP", atk: "攻撃", def: "防御", spd: "速度", critRate: "会心", effectHit: "効果命中", effectResist: "効果抵抗",
+  HP_PERCENT: "HP%", HP_FLAT: "HP実数", ATK_PERCENT: "攻撃%", ATK_FLAT: "攻撃実数",
+  DEF_PERCENT: "防御%", DEF_FLAT: "防御実数", SPD: "速度", CRIT_RATE: "会心率",
+  CRIT_DMG: "会心ダメージ", ACCURACY: "効果命中", RESISTANCE: "効果抵抗",
 };
 
-export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "level", "star", "hp", "atk", "def", "spd", "critRate", "effectHit", "effectResist", "slot", "set", "value"];
+export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "level", "star", "HP_PERCENT", "HP_FLAT", "ATK_PERCENT", "ATK_FLAT", "DEF_PERCENT", "DEF_FLAT", "SPD", "CRIT_RATE", "CRIT_DMG", "ACCURACY", "RESISTANCE", "slot", "set", "value"];
 
 export interface EquipmentProps {
   player: PlayerState;
@@ -62,11 +65,6 @@ export interface EquipmentProps {
   onClearSelection: () => void;
   onBulkSell: () => void;
   onToggleLock: (equipmentId: string) => void;
-}
-
-export function statTotal(equipment: Equipment, stat: string): number {
-  const aliases: Record<string, string[]> = { hp: ["HP_FLAT", "HP_PERCENT"], atk: ["ATK_FLAT", "ATK_PERCENT"], def: ["DEF_FLAT", "DEF_PERCENT"], spd: ["SPD"], critRate: ["CRIT_RATE", "CRIT_DMG"], effectHit: ["ACCURACY"], effectResist: ["RESISTANCE"] };
-  return [equipment.mainStat, ...equipment.subStats].filter((roll) => (aliases[stat] ?? []).includes(roll.type)).reduce((sum, roll) => sum + roll.value, 0);
 }
 
 function equipmentOwnerName(player: PlayerState, equipment: Equipment): string | null {
@@ -179,8 +177,9 @@ function compareBySort(key: EquipmentSortKey, isEquipped: (e: Equipment) => bool
         return a.set.localeCompare(b.set) || b.star - a.star || b.level - a.level;
       case "value":
         return equipmentSellPrice(b) - equipmentSellPrice(a);
-      case "hp": case "atk": case "def": case "spd": case "critRate": case "effectHit": case "effectResist":
-        return statTotal(b, key) - statTotal(a, key) || b.star - a.star;
+      case "HP_PERCENT": case "HP_FLAT": case "ATK_PERCENT": case "ATK_FLAT": case "DEF_PERCENT": case "DEF_FLAT":
+      case "SPD": case "CRIT_RATE": case "CRIT_DMG": case "ACCURACY": case "RESISTANCE":
+        return equipmentStatTotal(b, key) - equipmentStatTotal(a, key) || b.star - a.star;
       default:
         // おすすめ: 装着中 → スロット → 星 → 強化。普段使いの並び
         return Number(isEquipped(b)) - Number(isEquipped(a)) || a.slot - b.slot || b.star - a.star || b.level - a.level;
@@ -214,7 +213,9 @@ function renderSortRow(props: EquipmentProps): HTMLElement {
 function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
   const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
   // 装着中のものは売れないので、まとめて選ぶ対象からも外す
-  const sellable = shown.filter((e) => !isEquipped(e) && !e.locked);
+  const equippedIds = new Set(shown.filter(isEquipped).map((item) => item.id));
+  const sellableIds = sellableEquipmentIds(shown, equippedIds);
+  const sellable = shown.filter((item) => sellableIds.includes(item.id));
   const selected = props.player.equipment.filter((e) => props.selectedIds.includes(e.id) && !e.locked);
   const total = selected.reduce((sum, e) => sum + equipmentSellPrice(e), 0);
 
@@ -246,7 +247,7 @@ function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
 function renderList(props: EquipmentProps): HTMLElement {
   const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
   const items = props.pickerContext
-    ? props.player.equipment.filter((e) => e.slot === props.pickerContext!.slot)
+    ? equipmentForSlot(props.player.equipment, props.pickerContext.slot)
     : props.player.equipment
         .filter((e) => props.slotFilter === null || e.slot === props.slotFilter)
         .slice()
@@ -276,13 +277,18 @@ function renderList(props: EquipmentProps): HTMLElement {
       if (isEquipped(eq) || eq.locked) card.classList.add("equip-card--locked");
       if (props.selectedIds.includes(eq.id)) card.classList.add("equip-card--selected");
     }
-    if (!props.pickerContext) return el("div", { className: "equip-picker-card" }, [card, el("button", { type: "button", className: "btn btn--ghost equip-picker-card__lock", onclick: () => props.onToggleLock(eq.id) }, [eq.locked ? "🔒 ロック解除" : "🔓 ロック"])]);
+    if (!props.pickerContext) return el("div", { className: "equip-picker-card" }, [card, el("button", { type: "button", className: "btn btn--ghost equip-picker-card__lock", onclick: () => props.onToggleLock(eq.id) }, [equipmentLockLabel(eq)])]);
     const current = props.player.equipment.find((item) => item.id === currentEquipmentId);
-    const delta = current ? eq.mainStat.value - (current.mainStat.type === eq.mainStat.type ? current.mainStat.value : 0) : eq.mainStat.value;
+    const comparisons = compareEquipmentStats(current, eq);
     return el("div", { className: "equip-picker-card" }, [
       card,
-      current && eq.id !== current.id ? el("small", { className: `equip-picker-card__delta ${delta >= 0 ? "is-up" : "is-down"}` }, [`${STAT_LABEL[eq.mainStat.type]} ${current.mainStat.type === eq.mainStat.type ? current.mainStat.value : "—"} → ${eq.mainStat.value} (${delta >= 0 ? "+" : ""}${delta})`]) : null,
-      el("button", { type: "button", className: "btn btn--ghost equip-picker-card__lock", onclick: (event: Event) => { event.stopPropagation(); props.onToggleLock(eq.id); } }, [eq.locked ? "🔒 解除" : "🔓 ロック"]),
+      current && eq.id !== current.id && comparisons.length ? el("div", { className: "equip-picker-card__comparison" }, comparisons.map((row) => {
+        const percent = !["HP_FLAT", "ATK_FLAT", "DEF_FLAT", "SPD"].includes(row.type);
+        const show = (value: number | null) => value === null ? "—" : percent ? `${Math.round(value * 100)}%` : `${Math.round(value)}`;
+        const delta = percent ? `${Math.round(row.delta * 100)}%` : `${Math.round(row.delta)}`;
+        return el("small", { className: `equip-picker-card__delta ${row.delta >= 0 ? "is-up" : "is-down"}` }, [`${row.label} ${show(row.current)} → ${show(row.candidate)} (${row.delta >= 0 ? "+" : ""}${delta})`]);
+      })) : null,
+      el("button", { type: "button", className: "btn btn--ghost equip-picker-card__lock", onclick: (event: Event) => { event.stopPropagation(); props.onToggleLock(eq.id); } }, [equipmentLockLabel(eq, true)]),
     ].filter((node): node is HTMLElement => node !== null));
   });
 
@@ -423,7 +429,7 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
         ])
       : null,
 
-    el("button", { type: "button", className: "btn btn--ghost equip-detail__act", onclick: () => props.onToggleLock(equipment.id) }, [equipment.locked ? "🔒 ロック解除" : "🔓 ロックする"]),
+    el("button", { type: "button", className: "btn btn--ghost equip-detail__act", onclick: () => props.onToggleLock(equipment.id) }, [equipmentLockLabel(equipment)]),
 
     isEquipped ? el("p", { className: "equip-detail__note" }, ["装着中は売却できません。先に外してください"]) : null,
 

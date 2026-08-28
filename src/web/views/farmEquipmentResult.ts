@@ -1,6 +1,7 @@
 import { Equipment, SET_LABEL, SLOT_LABEL, equipmentSellPrice, formatStatValue } from "../../core/equipment.js";
 import { el } from "../dom.js";
 import "../farmEquipmentResult.css";
+import { equipmentLockLabel, sellableEquipmentIds } from "../uxHelpers.js";
 
 export interface FarmEquipmentResultProps {
   equipment: Equipment[];
@@ -32,7 +33,7 @@ export function renderFarmEquipmentResult(props: FarmEquipmentResultProps): HTML
       el("small", {}, [item.subStats.length ? `サブ：${item.subStats.map(formatStatValue).join(" / ")}` : "サブステータスなし"]),
     ]),
     el("div", { className: "farm-equip-card__actions" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onToggleLock(item.id) }, [item.locked ? "🔒 ロック解除" : "🔓 ロック"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onToggleLock(item.id) }, [equipmentLockLabel(item)]),
       el("label", { className: `farm-equip-card__select${item.locked ? " farm-equip-card__select--disabled" : ""}` }, [
         el("input", { type: "checkbox", disabled: item.locked === true, checked: props.selectedIds.includes(item.id), onchange: () => props.onToggleSelected(item.id) }),
         " 売却選択",
@@ -47,7 +48,7 @@ export function renderFarmEquipmentResult(props: FarmEquipmentResultProps): HTML
       cards.length ? el("div", { className: "farm-equip-sheet__list" }, cards) : el("p", { className: "result-empty" }, ["現在所持している今回の装備はありません"]),
       el("footer", {}, [
         el("span", {}, [`選択 ${selected.length}個　売却予定 +${total.toLocaleString("ja-JP")}G`]),
-        el("div", { className: "farm-equip-sheet__bulk" }, [el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectAll(props.equipment.filter((item) => !item.locked).map((item) => item.id)) }, ["全選択"]), el("button", { type: "button", className: "btn btn--ghost", onclick: props.onClearSelection }, ["選択解除"])]),
+        el("div", { className: "farm-equip-sheet__bulk" }, [el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectAll(sellableEquipmentIds(props.equipment)) }, ["全選択"]), el("button", { type: "button", className: "btn btn--ghost", onclick: props.onClearSelection }, ["選択解除"])]),
         el("button", { type: "button", className: "btn btn--danger", disabled: selected.length === 0 || props.selling, onclick: props.onSell }, [props.selling ? "売却中…" : `${selected.length}個を売却　+${total.toLocaleString("ja-JP")}G`]),
       ]),
     ]),

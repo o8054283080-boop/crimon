@@ -1,4 +1,7 @@
 import { ScreenName } from "./views/bottomNav.js";
+import { DIFFICULTIES } from "../data/stages.js";
+import { LEVEL_DUNGEON_TIERS } from "../data/levelDungeon.js";
+import type { DungeonReturnContext } from "./uxHelpers.js";
 
 export const NAVIGATION_STORAGE_KEY = "crimon.ui.navigation.v1";
 
@@ -9,23 +12,16 @@ export interface NavigationState {
   selectedDexEntryId?: string;
   monsterTrainingTargetId?: string;
   createTargetId?: string;
-  returnContext?: ReturnContext;
+  returnContext?: DungeonReturnContext;
 }
 
-export interface ReturnContext {
-  screen: ScreenName;
-  label: string;
-  selectedStageId?: string;
-  selectedDifficulty?: string;
-  selectedDungeonFloor?: number;
-  selectedLevelDungeonTier?: string;
-  selectedGoldDungeonFloor?: number;
-}
-
-export function isReturnContext(value: unknown): value is ReturnContext {
+export function isReturnContext(value: unknown): value is DungeonReturnContext {
   if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<ReturnContext>;
-  return typeof candidate.screen === "string" && SCREENS.has(candidate.screen as ScreenName) && typeof candidate.label === "string";
+  const candidate = value as Partial<DungeonReturnContext>;
+  return typeof candidate.screen === "string" && SCREENS.has(candidate.screen as ScreenName)
+    && typeof candidate.label === "string"
+    && (candidate.selectedDifficulty === undefined || DIFFICULTIES.includes(candidate.selectedDifficulty))
+    && (candidate.selectedLevelDungeonTier === undefined || LEVEL_DUNGEON_TIERS.includes(candidate.selectedLevelDungeonTier));
 }
 
 const SCREENS = new Set<ScreenName>([

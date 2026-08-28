@@ -16,6 +16,7 @@ import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { monsterPower } from "../../game/monsterSort.js";
 import { withPortrait } from "../three/portrait.js";
+import { partyCardAction } from "../uxHelpers.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
 import { AudioSettingsProps, renderAudioSettings } from "./audioSettings.js";
@@ -572,7 +573,7 @@ function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => v
       type: "button",
       className: "hp-card",
       style: dex ? `--el-color:${dex.color}` : undefined,
-      onclick: () => onViewMonster(instance.id),
+      onclick: partyCardAction(instance, onGoParty, onViewMonster),
       ariaLabel: `${dex?.name ?? instance.dexId}の詳細と装備を見る`,
     },
     [

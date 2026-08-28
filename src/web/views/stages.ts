@@ -19,6 +19,7 @@ export interface StagesProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (stage: Stage, count: number, difficulty: Difficulty) => void;
+  onGoParty: () => void;
 }
 
 const DIFFICULTY_DESCRIPTION: Record<Difficulty, string> = {
@@ -362,6 +363,7 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
           },
           [`⚔ ${DIFFICULTY_JA[props.selectedDifficulty]}に挑戦する (⚡${STAGE_STAMINA_COST})`],
         ),
+        el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["編成・装備を変更する"]),
       ].filter((node) => node !== null),
     ),
 
