@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="title">
+  <title id="title">CRIMON crystal emblem</title><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#f2d987"/><stop offset=".5" stop-color="#9a742f"/><stop offset="1" stop-color="#e1c16e"/></linearGradient><radialGradient id="p"><stop stop-color="#eadcff"/><stop offset=".4" stop-color="#9c63ff"/><stop offset="1" stop-color="#5422ae"/></radialGradient></defs>
+  <circle cx="100" cy="100" r="75" fill="none" stroke="url(#g)" stroke-width="4"/><circle cx="100" cy="100" r="59" fill="none" stroke="#b9964d" stroke-width="2" stroke-dasharray="5 9"/>
+  <path d="M100 10l13 45 42-20-20 42 45 13-45 13 20 42-42-20-13 45-13-45-42 20 20-42-45-13 45-13-20-42 42 20Z" fill="none" stroke="url(#g)" stroke-width="3"/>
+  <path d="m100 43 29 40-13 49-16 22-16-22-13-49Z" fill="url(#p)" stroke="#f2d987" stroke-width="3"/><path d="m100 43-4 88-25-48Z" fill="#d8b9ff" opacity=".55"/>
+</svg>

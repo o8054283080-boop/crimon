@@ -1,0 +1,93 @@
+/* CRIMON visual foundation. Components opt in so feature screens keep their semantic colours. */
+:root {
+  --crimon-bg: #0d0b18;
+  --crimon-bg-deep: #080812;
+  --crimon-surface: rgba(20, 17, 38, 0.82);
+  --crimon-surface-raised: rgba(27, 23, 48, 0.92);
+  --crimon-gold: #c6a457;
+  --crimon-gold-bright: #e1c16e;
+  --crimon-gold-muted: rgba(185, 150, 77, 0.42);
+  --crimon-purple: #7138d5;
+  --crimon-purple-bright: #9c63ff;
+  --crimon-purple-glow: rgba(132, 73, 235, 0.28);
+  --crimon-text: #f5f2ff;
+  --crimon-text-muted: #aaa4ba;
+  --crimon-border: rgba(185, 150, 77, 0.28);
+  --crimon-border-strong: rgba(225, 193, 110, 0.62);
+  --crimon-shadow: 0 8px 24px rgba(2, 1, 8, 0.42);
+  --crimon-shadow-raised: 0 14px 38px rgba(2, 1, 8, 0.58), 0 0 24px rgba(111, 53, 216, 0.08);
+  --crimon-radius-sm: 6px;
+  --crimon-radius-md: 12px;
+  --crimon-radius-lg: 18px;
+  --crimon-home-background: url("./assets/home-bg.jpg");
+  --crimon-tower-hero: url("./assets/crimon-tower-hero.svg");
+  --crimon-ornament: url("./assets/crimon-corner-ornament.svg");
+}
+
+.crimon-panel {
+  position: relative;
+  color: var(--crimon-text);
+  border: 1px solid var(--crimon-border);
+  border-radius: var(--crimon-radius-md);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), transparent 18%),
+    linear-gradient(135deg, var(--crimon-purple-glow), transparent 38%),
+    var(--crimon-surface);
+  box-shadow: inset 0 1px rgba(255,255,255,.07), var(--crimon-shadow);
+}
+
+.crimon-panel--hero {
+  min-height: 160px;
+  overflow: hidden;
+  background-color: var(--crimon-bg-deep);
+  background-image:
+    linear-gradient(90deg, rgba(8,8,18,.96) 0%, rgba(8,8,18,.72) 42%, rgba(8,8,18,.16) 76%),
+    var(--crimon-tower-hero);
+  background-position: center;
+  background-size: cover;
+  box-shadow: inset 0 1px rgba(255,255,255,.08), var(--crimon-shadow-raised);
+}
+
+.crimon-gold-frame { border-color: var(--crimon-border-strong); }
+.crimon-gold-frame::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  background: var(--crimon-ornament) left top / 42px 42px no-repeat,
+              var(--crimon-ornament) right bottom / 42px 42px no-repeat;
+  opacity: .82;
+}
+
+.crimon-section-title {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  color: var(--crimon-text);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.crimon-section-title::before { content: ""; width: 18px; height: 1px; background: var(--crimon-gold-bright); box-shadow: 0 0 8px var(--crimon-purple-glow); }
+
+.crimon-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border: 1px solid var(--crimon-border);
+  border-radius: 999px;
+  color: var(--crimon-text-muted);
+  background: rgba(8, 8, 18, .72);
+  font-size: .68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.crimon-glow { position: relative; isolation: isolate; }
+.crimon-glow::before { content: ""; position: absolute; z-index: -1; inset: -20%; pointer-events: none; background: radial-gradient(circle, var(--crimon-purple-glow), transparent 68%); opacity: .7; }
+.crimon-number { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .crimon-glow::before { animation: none !important; }
+}
