@@ -90,6 +90,43 @@ export interface MonsterPowerUpResult {
   leveledSkillIndices: number[];
 }
 
+export type MonsterPowerUpTransaction =
+  | { ok: true; result: MonsterPowerUpResult }
+  | { ok: false; reason: string };
+
+/**
+ * 所持リスト上の素材IDを一度だけ消費して強化する正式な入口。
+ * 検証がすべて終わるまで対象も所持リストも変更せず、成功時だけ
+ * 成長→素材削除の順で確定する。UIが同じIDを二重送信しても二重成長させない。
+ */
+export function executeMonsterPowerUp(
+  monsters: MonsterInstance[],
+  targetId: string,
+  materialIds: readonly string[],
+  partyIds: readonly string[],
+  rng: () => number = Math.random,
+): MonsterPowerUpTransaction {
+  if (new Set(materialIds).size !== materialIds.length) {
+    return { ok: false, reason: "同じ素材が重複して選択されています" };
+  }
+  const target = monsters.find((monster) => monster.id === targetId);
+  if (!target) return { ok: false, reason: "強化対象が見つかりません" };
+  const materials = materialIds.map((id) => monsters.find((monster) => monster.id === id));
+  if (materials.some((material) => material === undefined)) {
+    return { ok: false, reason: "所持していない素材が含まれています" };
+  }
+  const resolved = materials as MonsterInstance[];
+  const check = checkMonsterPowerUp(target, resolved, partyIds);
+  if (!check.ok) return { ok: false, reason: check.reason ?? "強化できません" };
+
+  const result = applyMonsterPowerUp(target, resolved, rng);
+  const consumed = new Set(materialIds);
+  for (let index = monsters.length - 1; index >= 0; index -= 1) {
+    if (consumed.has(monsters[index].id)) monsters.splice(index, 1);
+  }
+  return { ok: true, result };
+}
+
 /**
  * モンスター強化を実行する。素材はすべて経験値に変換され、対象のレベルが上がる。
  * さらに、対象と同じ種族(属性・色違いでも可)の素材は1体につき、まだ最大レベルに達していない

@@ -14,6 +14,7 @@ import {
 import {
   applyMonsterPowerUp,
   checkMonsterPowerUp,
+  executeMonsterPowerUp,
   feedExpValue,
   isSameElement,
   isSameSpecies,
@@ -211,6 +212,55 @@ describe("applyMonsterPowerUp", () => {
     const result = applyMonsterPowerUp(target, materials, () => 0);
 
     expect(result.leveledSkillIndices).toHaveLength(1);
+  });
+});
+
+describe("executeMonsterPowerUp: 検証・成長・消費の一括処理", () => {
+  it("同じ素材IDの重複選択を拒否し、対象も所持リストも変更しない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, 1);
+    const material = createMonsterInstance("slime_WATER", 1, 1);
+    const monsters = [target, material];
+    const before = [...target.skillLevels];
+    const result = executeMonsterPowerUp(monsters, target.id, [material.id, material.id], [], () => 0);
+    expect(result.ok).toBe(false);
+    expect(target.skillLevels).toEqual(before);
+    expect(monsters).toContain(material);
+  });
+
+  it("成功時だけ成長して素材をちょうど1回削除し、再送信では二重消費しない", () => {
+    const target = createMonsterInstance("slime_FIRE", 1, STAR_MAX_LEVEL[1]);
+    const material = createMonsterInstance("slime_WATER", 1, 1);
+    const monsters = [target, material];
+    const first = executeMonsterPowerUp(monsters, target.id, [material.id], [], () => 0);
+    expect(first.ok).toBe(true);
+    expect(target.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(4);
+    expect(target.exp).toBe(0);
+    expect(monsters).toEqual([target]);
+
+    const second = executeMonsterPowerUp(monsters, target.id, [material.id], [], () => 0);
+    expect(second.ok).toBe(false);
+    expect(target.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(4);
+  });
+
+  it("LvMAXのスキルピッグはEXPなしで1スキルだけ上げて消費する", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    const pig = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    const monsters = [target, pig];
+    const result = executeMonsterPowerUp(monsters, target.id, [pig.id], [], () => 0);
+    expect(result).toMatchObject({ ok: true, result: { expGained: 0, levelsGained: 0 } });
+    expect(target.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(4);
+    expect(monsters).toEqual([target]);
+  });
+
+  it("全スキルMAXではスキルピッグを消費しない", async () => {
+    const { SKILL_PIG_DEX } = await import("../src/data/monsters.js");
+    const target = createMonsterInstance("wolf_FIRE", 6, STAR_MAX_LEVEL[6]);
+    target.skillLevels = [5, 5, 5];
+    const pig = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    const monsters = [target, pig];
+    expect(executeMonsterPowerUp(monsters, target.id, [pig.id], [], () => 0).ok).toBe(false);
+    expect(monsters).toEqual([target, pig]);
   });
 });
 
