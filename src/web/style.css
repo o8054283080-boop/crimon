@@ -4357,6 +4357,31 @@ body {
 .background-farm-status__detail { grid-column: 1; color: #ddd; font-size: .72rem; }
 .background-farm-status .btn { grid-column: 2; grid-row: 1 / span 2; min-height: 42px; }
 
+/* 全画面共通。戦闘HUDを隠しにくいよう上端のsafe-area内へ小さく固定する。 */
+.pwa-update-banner {
+  position: fixed;
+  z-index: 80;
+  top: max(6px, env(safe-area-inset-top));
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  max-width: 430px;
+  margin-inline: auto;
+  padding: 7px 8px 7px 12px;
+  border: 1px solid rgba(214, 168, 74, .72);
+  border-radius: 11px;
+  background: rgba(18, 12, 24, .96);
+  box-shadow: 0 5px 18px #000a, inset 0 1px rgba(255, 255, 255, .08);
+}
+
+.pwa-update-banner__copy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.pwa-update-banner__copy strong { color: #ffe7a8; font-size: .76rem; line-height: 1.25; }
+.pwa-update-banner__copy span { color: #c9c1d2; font-size: .62rem; line-height: 1.25; }
+.pwa-update-banner__button { flex: 0 0 auto; min-height: 34px; padding: 6px 10px; font-size: .7rem; }
+
 /* ===================================================================
  * ステージ一覧の「つづきから」
  *
