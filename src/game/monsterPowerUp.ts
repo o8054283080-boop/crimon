@@ -1,4 +1,4 @@
-import { MonsterInstance, addExp, rollSkillLevelUp } from "../core/monsterInstance.js";
+import { MonsterInstance, addExp, isSkillMaxLevel, rollSkillLevelUp } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, requiredExpForLevel } from "../core/rarity.js";
 import { findMonsterById } from "../data/monsters.js";
 
@@ -23,7 +23,12 @@ export function checkMonsterPowerUp(
     return { ok: false, reason: "パーティに編成中のモンスターは素材にできません" };
   }
   if (target.level >= STAR_MAX_LEVEL[target.star]) {
-    return { ok: false, reason: "対象は現在の星の最大レベルに達しています(素材を無駄にしないよう、ランクアップしてください)" };
+    if (materials.some((material) => !isSameSpecies(target, material))) {
+      return { ok: false, reason: "LvMAXでは経験値専用の素材は使用できません。スキル育成に有効な素材だけを選択してください。" };
+    }
+    if (isSkillMaxLevel(target)) {
+      return { ok: false, reason: "すべてのスキルが最大Lvのため、スキル育成素材を使用できません。" };
+    }
   }
   return { ok: true };
 }
@@ -55,6 +60,12 @@ export function feedExpValue(target: MonsterInstance, material: MonsterInstance)
   return Math.round(base * multiplier);
 }
 
+/** 強化で対象が実際に獲得する経験値。LvMAXなら素材の属性や価値によらず0になる。 */
+export function monsterPowerUpExp(target: MonsterInstance, materials: readonly MonsterInstance[]): number {
+  if (target.level >= STAR_MAX_LEVEL[target.star]) return 0;
+  return materials.reduce((sum, material) => sum + feedExpValue(target, material), 0);
+}
+
 /** 素材が対象と同じ種族(テンプレートID)かどうか。属性(色)が違っていても種族が同じならtrue */
 export function isSameSpecies(target: MonsterInstance, material: MonsterInstance): boolean {
   const targetDex = findMonsterById(target.dexId);
@@ -81,7 +92,7 @@ export function applyMonsterPowerUp(
   materials: MonsterInstance[],
   rng: () => number = Math.random,
 ): MonsterPowerUpResult {
-  const expGained = materials.reduce((sum, m) => sum + feedExpValue(target, m), 0);
+  const expGained = monsterPowerUpExp(target, materials);
   const levelsGained = addExp(target, expGained, STAR_MAX_LEVEL[target.star]);
 
   const leveledSkillIndices: number[] = [];
