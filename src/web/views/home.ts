@@ -799,6 +799,26 @@ export function renderHome(props: HomeProps): HTMLElement {
   const closeStamina = () => { staminaSheet.hidden = true; };
   staminaSheet.append(el("div", { className: "home-sheet__scrim", onclick: closeStamina }, []), el("div", { className: "home-sheet__panel" }, [el("div", { className: "home-sheet__head" }, [el("strong", {}, ["スタミナ回復"]), el("button", { type: "button", className: "btn btn--ghost", onclick: closeStamina }, ["閉じる"])]), renderVitals(player, props.onRefillStaminaPartial, props.onRefillStaminaFull, party)]));
   const openStamina = () => { staminaSheet.hidden = false; };
+  const stageMonster = (instance: MonsterInstance | undefined, index: number): HTMLElement => {
+    if (!instance) return el("button", { type: "button", className: `lobby-monster lobby-monster--${index + 1} lobby-monster--empty`, onclick: props.onGoParty, ariaLabel: "パーティにモンスターを追加" }, [el("span", {}, ["＋"])]);
+    const dex = findMonsterById(instance.dexId);
+    return el("button", {
+      type: "button",
+      className: `lobby-monster lobby-monster--${index + 1}${index === 0 ? " lobby-monster--leader" : ""}`,
+      onclick: () => props.onViewPartyMonster(instance.id),
+      ariaLabel: `${dex?.name ?? instance.dexId} Lv.${instance.level} の詳細`,
+      style: dex ? `--monster-color:${dex.color}` : undefined,
+    }, [
+      el("span", { className: "lobby-monster__sigil", "aria-hidden": "true" }, []),
+      withPortrait(el("span", { className: "lobby-monster__portrait" }, [dex?.emoji ?? "❓"]), dex, "fill"),
+      el("span", { className: "lobby-monster__level" }, [`Lv.${instance.level}`]),
+    ]);
+  };
+  const sideAction = (label: string, name: IconName, onClick: () => void, modifier = "secondary") =>
+    el("button", { type: "button", className: `lobby-action lobby-action--${modifier}`, onclick: onClick, ariaLabel: label }, [
+      el("span", { className: "lobby-action__icon" }, [icon(name)]), el("span", {}, [label]),
+    ]);
+  const partyPower = party.reduce((sum, monster) => sum + monsterPower(monster), 0);
   const menu = el("main", { className: `home-menu crimon-home ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
       props.compensationClaims.length ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
       props.loginBonusResult ? renderLoginBonusBanner(props.loginBonusResult, props.onDismissLoginBonus) : null,
@@ -806,21 +826,28 @@ export function renderHome(props: HomeProps): HTMLElement {
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
-      el("section", { className: "crimon-brand", ariaLabel: "CRIMON" }, [
-        el("span", { className: "crimon-brand__mist", "aria-hidden": "true" }, []),
-        el("img", { src: new URL("../assets/crimon-logo.svg", import.meta.url).href, alt: "CRIMON", className: "crimon-brand__logo", onerror: (event) => { ((event as Event).currentTarget as HTMLImageElement).hidden = true; } }, []),
-        el("span", { className: "crimon-brand__fallback", "aria-hidden": "true" }, ["CRIMON"]),
-        el("img", { src: new URL("../assets/crimon-emblem.svg", import.meta.url).href, alt: "", "aria-hidden": "true", className: "crimon-brand__emblem" }, []),
-      ]),
-      el("section", { className: "home-party crimon-section" }, [sectionMark("CURRENT PARTY", el("button", { type: "button", className: "btn-frame", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["編成"])), el("div", { className: "home-party-grid" }, Array.from({ length: 4 }, (_, i) => homePartyCard(party[i], props.onGoParty, props.onViewPartyMonster)))]),
-      el("section", { className: "crimon-section crimon-section--primary" }, [sectionMark("PRIMARY CONTENT"), el("div", { className: "crimon-primary-grid" }, [artCard("ADVENTURE", "物語を進める", "adventure", props.onGoStages), artCard("DUNGEON", "報酬を選ぶ", "dungeon", toggleDungeonChooser), artCard("ARENA", "強者との決闘", "arena", onGoArena)]), dungeonChooser]),
-      el("section", { className: "crimon-section crimon-section--management" }, [sectionMark("MANAGEMENT"), el("div", { className: "crimon-management-grid" }, [artCard("MONSTER", "育成・編成", "monster", props.onGoMonsters, "monsters"), artCard("EQUIPMENT", "装備管理", "equipment", props.onGoEquipment, "equipment"), artCard("SUMMON", "新たな契約", "summon", props.onGoSummon, "summon"), artCard("SHOP", "アイテム購入", "shop", onGoShop, "shop")])]),
-      el("section", { className: "crimon-section crimon-section--secondary" }, [sectionMark("SECONDARY / PROGRESSION"),
-        el("button", { type: "button", className: "crimon-tower", onclick: props.onGoTrialTower, ariaLabel: "Trial Tower" }, [
-          el("img", { src: new URL("../assets/crimon-tower-hero.svg", import.meta.url).href, alt: "", "aria-hidden": "true" }, []),
-          el("span", {}, [el("strong", {}, ["TRIAL TOWER"]), el("small", {}, [`最高到達 ${tower.bestFloor}F${tower.isRunning ? ` ・ ${tower.floor}F挑戦中` : ""}`])]), icon("chevron"),
+      el("section", { className: "lobby-world", ariaLabel: "現在のパーティと冒険メニュー" }, [
+        el("nav", { className: "lobby-side lobby-side--left", ariaLabel: "副次機能" }, [
+          sideAction("試練の塔", "tower", props.onGoTrialTower),
+          sideAction("初心者", "scroll", () => tutorial.querySelector("details")?.toggleAttribute("open")),
+          sideAction("図鑑", "monsters", props.onGoMonsterDex),
+          sideAction("遊び方", "settings", onGoHowToPlay),
         ]),
-        el("div", { className: "crimon-utility-grid" }, [artCard("MONSTER DEX", "図鑑", "utility", props.onGoMonsterDex), artCard("HOW TO PLAY", "遊び方", "utility", onGoHowToPlay)]),
+        el("div", { className: "lobby-stage" }, [
+          el("span", { className: "lobby-stage__moon", "aria-hidden": "true" }, []),
+          ...Array.from({ length: 4 }, (_, index) => stageMonster(party[index], index)),
+        ]),
+        el("nav", { className: "lobby-side lobby-side--right", ariaLabel: "プレイメニュー" }, [
+          sideAction("冒険", "map", props.onGoStages, "adventure"),
+          sideAction("ダンジョン", "equipDungeon", toggleDungeonChooser, "dungeon"),
+          sideAction("闘技場", "arena", onGoArena, "arena"),
+          dungeonChooser,
+        ]),
+      ]),
+      el("section", { className: "lobby-party-strip" }, [
+        el("div", { className: "lobby-party-strip__title" }, [el("small", {}, ["CURRENT PARTY"]), el("strong", {}, [`総戦力 ${partyPower.toLocaleString("ja-JP")}`])]),
+        el("div", { className: "lobby-party-strip__portraits" }, party.map((monster) => homePartyCard(monster, props.onGoParty, props.onViewPartyMonster))),
+        el("button", { type: "button", className: "btn-frame", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["パーティ編成"]),
       ]),
       tutorial,
       staminaSheet,

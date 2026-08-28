@@ -659,3 +659,85 @@ body:has(.title-screen) { overflow: hidden; }
 .tutorial-milestone { margin: 8px 0 4px; padding: 6px 9px; border: 1px solid rgba(255,211,106,.7); color:#ffe08a; background:rgba(117,75,20,.24); font-weight:800; letter-spacing:.04em; }
 .tutorial-rewards { margin: 5px 0 9px; color:#d9e7ff; font-size:.78rem; line-height:1.7; }
 .tutorial-row--milestone { color:#ffe08a; font-weight:700; background:rgba(255,211,106,.06); }
+
+/* HOME lobby: one continuous world, not a stack of web cards. */
+.home-screen--menu-only { height: 100dvh; min-height: 100dvh; overflow: hidden; }
+.home-screen--menu-only .home-menu {
+  box-sizing: border-box;
+  width: 100%; max-width: 520px; height: 100dvh; min-height: 0; margin: 0 auto;
+  gap: 6px; overflow: hidden;
+  padding: max(6px, env(safe-area-inset-top)) 8px calc(var(--bottom-nav-h) + max(8px, env(safe-area-inset-bottom)));
+}
+.home-screen--menu-only .home-menu::before {
+  background-image:
+    radial-gradient(ellipse 84% 52% at 50% 42%, transparent 35%, rgba(3,2,9,.38) 76%, rgba(2,1,6,.9) 100%),
+    linear-gradient(180deg, rgba(4,3,10,.72) 0%, rgba(11,5,22,.12) 18%, rgba(3,2,8,.18) 62%, rgba(3,2,8,.88) 100%),
+    url("./assets/home-bg.jpg");
+  background-size: cover, cover, cover;
+  background-position: center, center, center;
+}
+.crimon-resource-header { flex: 0 0 74px; display: grid; grid-template-columns: minmax(135px, 1.05fr) minmax(185px, 1.4fr); gap: 5px; align-items: center; padding: 3px 5px; border-bottom: 1px solid rgba(190,151,77,.35); background: linear-gradient(90deg,rgba(3,3,9,.88),rgba(15,8,27,.72),rgba(3,3,9,.88)); }
+.home-menu .home-id { gap: 7px; }
+.home-menu .home-id__crest { width: 48px; height: 48px; }
+.home-menu .home-id__name { gap: 1px; }
+.home-menu .home-id__name strong { font-size: .78rem; }
+.home-menu .home-id__edit { width: 24px; min-width: 24px; height: 36px; padding: 0; }
+.home-menu .home-id__exp span { display: none; }
+.home-menu .home-wallet { padding: 5px 0; }
+.home-menu .home-wallet__chip { flex-direction: column; gap: 1px; min-height: 38px; padding: 1px; }
+.home-menu .home-wallet__chip strong { font-size: .66rem; }
+.home-menu .home-wallet__suffix { font-size: .48rem; }
+
+.lobby-world { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; isolation: isolate; }
+.lobby-world::after { content:""; position:absolute; inset:auto 8% 3% 8%; height:18%; z-index:-1; background:radial-gradient(ellipse,rgba(121,65,190,.34),transparent 68%); filter:blur(8px); }
+.lobby-stage { position: absolute; inset: 0 56px 0 56px; }
+.lobby-stage__moon { position:absolute; left:50%; bottom:8%; width:82%; aspect-ratio:2.5/1; transform:translateX(-50%); border:1px solid rgba(194,151,73,.25); border-radius:50%; background:radial-gradient(ellipse,rgba(112,54,171,.28),rgba(19,7,37,.1) 58%,transparent 72%); box-shadow:0 0 22px rgba(112,54,171,.25); }
+.lobby-monster { position:absolute; width:46%; aspect-ratio:1/1.25; padding:0; border:0; background:none; color:#eadcae; filter:drop-shadow(0 10px 6px rgba(0,0,0,.72)); }
+.lobby-monster__portrait { position:absolute; inset:0; background-size:contain; background-position:center bottom; background-repeat:no-repeat; }
+.lobby-monster__sigil { position:absolute; left:8%; right:8%; bottom:4%; aspect-ratio:2/1; border:1px solid color-mix(in srgb,var(--monster-color,#8b55b5) 50%,#c49b55); border-radius:50%; transform:rotateX(64deg); box-shadow:0 0 14px var(--monster-color,#704098),inset 0 0 10px rgba(143,78,205,.4); }
+.lobby-monster__level { position:absolute; left:50%; bottom:1px; transform:translateX(-50%); padding:1px 5px; border:1px solid rgba(207,168,91,.36); border-radius:9px; background:rgba(3,2,8,.76); font-size:.55rem; font-weight:800; white-space:nowrap; }
+.lobby-monster--1 { z-index:4; left:28%; bottom:-1%; width:52%; }
+.lobby-monster--2 { z-index:2; left:1%; bottom:19%; }
+.lobby-monster--3 { z-index:2; right:0; bottom:20%; }
+.lobby-monster--4 { z-index:1; left:29%; bottom:37%; width:43%; }
+.lobby-monster--empty { display:grid; place-items:center; min-height:44px; opacity:.45; border:1px dashed rgba(200,164,89,.5); border-radius:50%; }
+
+.lobby-side { position:absolute; z-index:8; top:4%; bottom:5%; display:flex; flex-direction:column; justify-content:space-around; }
+.lobby-side--left { left:0; width:58px; }
+.lobby-side--right { right:0; width:76px; }
+.lobby-action { min-height:52px; padding:2px 1px; border:0; background:none; color:#ddd3bd; text-shadow:0 2px 4px #000; font-size:.55rem; font-weight:800; }
+.lobby-action__icon { width:38px; height:38px; margin:0 auto 2px; display:grid; place-items:center; border:1px solid rgba(199,158,78,.62); border-radius:50%; background:radial-gradient(circle at 40% 30%,rgba(82,54,110,.88),rgba(5,5,12,.94)); box-shadow:inset 0 0 0 2px #08070d,0 0 9px rgba(116,62,169,.35); font-size:1.18rem; }
+.lobby-action--adventure,.lobby-action--dungeon,.lobby-action--arena { min-height:66px; font-size:.65rem; }
+.lobby-action--adventure .lobby-action__icon,.lobby-action--dungeon .lobby-action__icon,.lobby-action--arena .lobby-action__icon { width:50px; height:50px; border-radius:12px 12px 20px 20px; background-size:cover; background-position:center; box-shadow:inset 0 0 0 2px rgba(2,2,7,.7),0 5px 12px #000; }
+.lobby-action--adventure .lobby-action__icon { background-image:linear-gradient(#08041055,#08041099),url("./assets/adventure-bg.jpg"); }
+.lobby-action--dungeon .lobby-action__icon { background-image:linear-gradient(#08041044,#08041099),url("./assets/crimon-dungeon-card.webp"); }
+.lobby-action--arena .lobby-action__icon { background-image:linear-gradient(#08041044,#08041099),url("./assets/crimon-arena-card.webp"); }
+.lobby-side .crimon-dungeon-chooser { position:fixed; z-index:30; left:50%; bottom:calc(var(--bottom-nav-h) + 82px); width:min(280px,72vw); transform:translateX(-50%); padding:8px; grid-template-columns:repeat(3,1fr); background:rgba(5,3,12,.96); border:1px solid rgba(200,159,79,.65); }
+
+.lobby-party-strip { flex:0 0 76px; display:grid; grid-template-columns:82px 1fr 78px; gap:5px; align-items:center; padding:5px 7px; border:1px solid rgba(190,149,70,.55); background:linear-gradient(110deg,rgba(4,3,10,.94),rgba(29,13,43,.9),rgba(4,3,10,.94)); box-shadow:inset 0 0 0 2px rgba(0,0,0,.55),0 0 13px rgba(79,38,115,.3); }
+.lobby-party-strip__title { display:flex; flex-direction:column; gap:3px; }
+.lobby-party-strip__title small { color:#cba865; font-size:.52rem; letter-spacing:.08em; }
+.lobby-party-strip__title strong { font-size:.61rem; white-space:nowrap; }
+.lobby-party-strip__portraits { display:grid; grid-template-columns:repeat(4,1fr); gap:3px; min-width:0; }
+.lobby-party-strip .hp-card { aspect-ratio:1; border-radius:50%; }
+.lobby-party-strip .hp-card__stars,.lobby-party-strip .hp-card__gem { display:none; }
+.lobby-party-strip .hp-card__level { font-size:.48rem; }
+.lobby-party-strip .btn-frame { min-height:44px; padding:3px 5px; font-size:.58rem; }
+.home-menu > .crimon-tutorial { flex:0 0 47px; min-height:0; margin:0; padding:5px 9px; overflow:visible; border:1px solid rgba(190,149,70,.35); background:rgba(5,3,12,.88); }
+.home-menu > .crimon-tutorial .crimon-tutorial__head { min-height:35px; }
+.home-menu > .crimon-tutorial .crimon-tutorial__current { position:fixed; z-index:31; left:10px; right:10px; bottom:calc(var(--bottom-nav-h) + 12px); max-height:55dvh; overflow:auto; padding:10px; background:#0b0715; border:1px solid #b58b43; }
+.home-menu > .crimon-tutorial .crimon-tutorial__current:not([open]) { position:static; border:0; padding:0; background:none; }
+.home-menu > .reward-banner { position:fixed; z-index:32; top:max(8px,env(safe-area-inset-top)); left:8px; right:8px; max-height:40dvh; overflow:auto; }
+
+.bottom-nav { background:linear-gradient(180deg,rgba(11,9,17,.96),rgba(2,2,6,.99)); border-top-color:rgba(194,151,72,.55); }
+.bottom-nav__btn--active { color:#f1e5ff; background:radial-gradient(ellipse at 50% 100%,rgba(126,61,184,.58),transparent 74%); box-shadow:inset 0 1px rgba(235,198,118,.4),0 0 16px rgba(119,56,177,.4); }
+.bottom-nav__btn--active .bottom-nav__icon { filter:drop-shadow(0 0 7px #a76dd7); }
+
+@media (max-height: 830px) {
+  .crimon-resource-header { flex-basis:66px; }
+  .lobby-party-strip { flex-basis:68px; }
+  .home-menu > .crimon-tutorial { flex-basis:43px; }
+  .lobby-action { min-height:47px; }
+  .lobby-action--adventure,.lobby-action--dungeon,.lobby-action--arena { min-height:59px; }
+  .lobby-action--adventure .lobby-action__icon,.lobby-action--dungeon .lobby-action__icon,.lobby-action--arena .lobby-action__icon { width:46px;height:46px; }
+}

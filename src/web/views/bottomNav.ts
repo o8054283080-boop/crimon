@@ -39,10 +39,10 @@ export type ScreenName =
  */
 const TABS: { screen: ScreenName; name: IconName; label: string }[] = [
   { screen: "HOME", name: "home", label: "ホーム" },
-  { screen: "STAGES", name: "map", label: "ステージ" },
   { screen: "MONSTERS", name: "monsters", label: "モンスター" },
   { screen: "EQUIPMENT", name: "equipment", label: "装備" },
-  { screen: "PARTY", name: "party", label: "パーティ" },
+  { screen: "SUMMON", name: "summon", label: "召喚" },
+  { screen: "SHOP", name: "shop", label: "ショップ" },
 ];
 
 export function renderBottomNav(current: ScreenName, onNavigate: (screen: ScreenName) => void): HTMLElement {
