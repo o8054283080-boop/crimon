@@ -73,6 +73,10 @@ export interface DamageEffect {
   defCoefficient?: number;
   /** trueの場合、相手の防御力を完全に無視してダメージを計算する */
   ignoreDefense?: boolean;
+  /** 0～1の部分防御無視率。 */
+  ignoreDefenseRatio?: number;
+  /** 対象に付与済みの弱体効果数による倍率（上限必須）。 */
+  debuffDamageBonus?: { perDebuff: number; maxBonus: number };
 }
 
 export interface HealEffect {

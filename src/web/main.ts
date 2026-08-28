@@ -45,7 +45,7 @@ import {
 } from "../game/rewards.js";
 import { executeMonsterPowerUp } from "../game/monsterPowerUp.js";
 import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
-import { awakenLatentAbility, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
+import { awakenLatentAbility, confirmLatentAwakening, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
 import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
 import {
   claimDailyLoginBonus,
@@ -2328,10 +2328,12 @@ function render(): void {
         },
         onAwaken: (candidateId) => {
           const candidates = LATENT_ABILITY_CANDIDATES[createTarget.dexId] ?? [];
-          const wasReselecting = createTarget.development.latentReselectPending;
-          if (!awakenLatentAbility(createTarget, candidateId, candidates, state.player)) return;
+          const expectedCurrentId = createTarget.development.latentAbilityId;
+          const wasReawakening = expectedCurrentId !== null || createTarget.development.latentReselectPending;
+          if (expectedCurrentId !== null && !window.confirm("現在の潜在能力を維持したまま再覚醒を確定しますか？\n覚醒オーブ×2 / 100,000G")) return;
+          if (!confirmLatentAwakening(createTarget, candidateId, candidates, state.player, expectedCurrentId)) return;
           savePlayerState(state.player);
-          state.createNotice = wasReselecting ? "潜在能力を再選択しました" : "潜在能力を覚醒しました";
+          state.createNotice = wasReawakening ? "潜在能力を再選択しました" : "潜在能力を覚醒しました";
           playSfx("levelUp");
           render();
         },

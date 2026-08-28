@@ -80,3 +80,28 @@ describe("潜在覚醒216候補", () => {
     expect(normalizeLoadedState(state).monsters[0].development.latentReselectPending).toBe(false);
   });
 });
+
+describe("原子的な潜在確定", () => {
+  it("初回1個、再覚醒2個+100,000G、STALE/連打は無消費", async () => {
+    const { confirmLatentAwakening } = await import("../src/game/monsterDevelopment.js");
+    const instance = createMonsterInstance("slime_FIRE", 6);
+    const candidates = LATENT_ABILITY_CANDIDATES[instance.dexId];
+    const wallet = { awakeningOrbs: 4, gold: 200_000 };
+    expect(confirmLatentAwakening(instance, candidates[0].id, candidates, wallet, null)).toBe(true);
+    expect(wallet).toEqual({ awakeningOrbs: 3, gold: 200_000 });
+    const stale = { ...wallet };
+    expect(confirmLatentAwakening(instance, candidates[1].id, candidates, wallet, null)).toBe(false);
+    expect(wallet).toEqual(stale);
+    expect(confirmLatentAwakening(instance, candidates[1].id, candidates, wallet, candidates[0].id)).toBe(true);
+    expect(wallet).toEqual({ awakeningOrbs: 1, gold: 100_000 });
+    expect(confirmLatentAwakening(instance, candidates[2].id, candidates, wallet, candidates[0].id)).toBe(false);
+    expect(wallet).toEqual({ awakeningOrbs: 1, gold: 100_000 });
+  });
+  it("支払済みlegacy reselectは追加課金しない", async () => {
+    const { confirmLatentAwakening } = await import("../src/game/monsterDevelopment.js");
+    const instance = createMonsterInstance("slime_FIRE", 6); instance.development.latentReselectPending = true;
+    const candidates = LATENT_ABILITY_CANDIDATES[instance.dexId]; const wallet = { awakeningOrbs: 0, gold: 0 };
+    expect(confirmLatentAwakening(instance, candidates[2].id, candidates, wallet, null)).toBe(true);
+    expect(wallet).toEqual({ awakeningOrbs: 0, gold: 0 });
+  });
+});

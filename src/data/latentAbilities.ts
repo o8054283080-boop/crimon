@@ -1,86 +1,60 @@
-import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
+import { LatentAbilityCandidate, LatentRuntimeEffect } from "../core/monsterDevelopment.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "./monsters.js";
 import { setLatentAbilityResolver } from "../core/monsterInstance.js";
 
-type Draft = Omit<LatentAbilityCandidate, "id" | "skillSlot">;
-const d = (name: string, description: string, category: Draft["category"], effectType: Draft["effectType"], value: number,
-  chance: number, duration: number, target: Draft["target"], resolution: Draft["resolution"], status?: string): Draft =>
-  ({ name, description, category, effectType, value, chance, duration, target, resolution, status });
-
-/**
- * 種族のS1に合わせた3方向の設計原本。属性ごとの安定IDへ展開する。
- * 選択・保存されたIDは toBattleDefinition でこの宣言データへ解決され、BattleEngineへ渡る。
- */
-const BLUEPRINTS: Readonly<Record<string, readonly [Draft, Draft, Draft]>> = {
-  slime: [
-    d("弾ける体当たり", "S1ダメージ+15%。", "OFFENSE", "DAMAGE_UP", .15, 1, 0, "TARGET", "ALWAYS"),
-    d("粘液の足止め", "S1命中時、別判定30%でSPD低下を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .3, 1, "TARGET", "SEPARATE", "SPD_DOWN"),
-    d("分裂保護", "S1使用後、HP割合が最も低い味方へ最大HP8%のシールドを1ターン付与。", "SUPPORT", "SHIELD", .08, 1, 1, "LOWEST_HP_ALLY", "ALWAYS", "SHIELD"),
-  ],
-  wolf: [
-    d("急所狩り", "S1クリティカル時のダメージ+18%。", "OFFENSE", "CRIT_TRIGGER", .18, 1, 0, "TARGET", "ON_CRIT"),
-    d("裂傷の牙", "S1命中時、別判定30%で回復阻害を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .3, 1, "TARGET", "SEPARATE", "HEAL_BLOCK"),
-    d("群れの号令", "S1クリティカル時、HP割合が最も低い味方の行動ゲージを8%増加。", "SUPPORT", "ALLY_SUPPORT", .08, 1, 0, "LOWEST_HP_ALLY", "ON_CRIT"),
-  ],
-  golem: [
-    d("岩芯打", "S1へ防御力12%分の追加係数。", "OFFENSE", "DEF_SCALING", .12, 1, 0, "TARGET", "ALWAYS"),
-    d("重圧", "S1命中時、別判定25%で挑発を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .25, 1, "TARGET", "SEPARATE", "TAUNT"),
-    d("石化外殻", "S1使用後、自身へ最大HP8%のシールドを1ターン付与。", "DURABILITY", "SHIELD", .08, 1, 1, "SELF", "ALWAYS", "SHIELD"),
-  ],
-  fairy: [
-    d("光羽の一撃", "S1ダメージ+12%。", "OFFENSE", "DAMAGE_UP", .12, 1, 0, "TARGET", "ALWAYS"),
-    d("惑わしの燐粉", "S1命中時、別判定30%で暗闇を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .3, 1, "TARGET", "SEPARATE", "BLIND"),
-    d("癒やしの羽音", "S1使用後、HP割合が最も低い味方を最大HP6%回復。", "SUPPORT", "ALLY_SUPPORT", .06, 1, 0, "LOWEST_HP_ALLY", "ALWAYS"),
-  ],
-  imp: [
-    d("悪戯の追撃", "S1ダメージ+14%。", "OFFENSE", "DAMAGE_UP", .14, 1, 0, "TARGET", "ALWAYS"),
-    d("封印針", "S1命中時、別判定20%でスキル使用不可を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .2, 1, "TARGET", "SEPARATE", "SKILL_LOCK"),
-    d("盗気", "S1でデバフ付与に成功した時、自身の行動ゲージを8%増加。", "SPECIAL", "SPECIAL_TRIGGER", .08, 1, 0, "SELF", "CONDITIONAL"),
-  ],
-  wisp: [
-    d("魂火", "S1ダメージ+12%。", "OFFENSE", "DAMAGE_UP", .12, 1, 0, "TARGET", "ALWAYS"),
-    d("消魂", "S1命中時、別判定25%で強化不可を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .25, 1, "TARGET", "SEPARATE", "BUFF_BLOCK"),
-    d("残光", "S1使用後、自身を最大HP7%回復。", "DURABILITY", "SELF_HEAL", .07, 1, 0, "SELF", "ALWAYS"),
-  ],
-  treant: [
-    d("年輪打", "S1へ最大HP8%分の追加係数。", "OFFENSE", "HP_SCALING", .08, 1, 0, "TARGET", "ALWAYS"),
-    d("絡み根", "S1命中時、別判定30%でATK低下を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .3, 1, "TARGET", "SEPARATE", "ATK_DOWN"),
-    d("再生樹皮", "S1使用後、自身を最大HP6%回復。", "DURABILITY", "SELF_HEAL", .06, 1, 0, "SELF", "ALWAYS"),
-  ],
-  knight: [
-    d("墓守の剣", "S1へ防御力10%分の追加係数。", "OFFENSE", "DEF_SCALING", .1, 1, 0, "TARGET", "ALWAYS"),
-    d("呪鎧砕き", "S1の既存DEF低下発動率へ+15pt（上限100%）。", "DISRUPT", "DEBUFF_CHANCE_UP", .15, 1, 0, "TARGET", "ADD_TO_EXISTING", "DEF_DOWN"),
-    d("死線の構え", "S1使用時HP30%以下なら、自身へ我慢を1ターン付与（戦闘中1回）。", "SPECIAL", "ADD_BUFF", 0, 1, 1, "SELF", "CONDITIONAL", "ENDURE"),
-  ],
-  griffon: [
-    d("烈風爪", "S1ダメージ+16%。", "OFFENSE", "DAMAGE_UP", .16, 1, 0, "TARGET", "ALWAYS"),
-    d("風圧", "S1命中時、別判定30%で対象の行動ゲージを10%減少。", "DISRUPT", "TURN_METER_DOWN", .1, .3, 0, "TARGET", "SEPARATE"),
-    d("追い風", "S1クリティカル時、自身の行動ゲージを7%増加。", "SPECIAL", "SPECIAL_TRIGGER", .07, 1, 0, "SELF", "ON_CRIT"),
-  ],
-  dragon: [
-    d("竜牙研磨", "S1ダメージ+12%。S2/S3には影響しない。", "OFFENSE", "DAMAGE_UP", .12, 1, 0, "TARGET", "ALWAYS"),
-    d("崩鱗", "S1の既存DEF低下発動率へ+15pt（上限100%）。", "DISRUPT", "DEBUFF_CHANCE_UP", .15, 1, 0, "TARGET", "ADD_TO_EXISTING", "DEF_DOWN"),
-    d("竜鱗", "S1使用後、自身へ最大HP7%のシールドを1ターン付与。", "DURABILITY", "SHIELD", .07, 1, 1, "SELF", "ALWAYS", "SHIELD"),
-  ],
-  seraph: [
-    d("裁きの光", "S1ダメージ+10%。", "OFFENSE", "DAMAGE_UP", .1, 1, 0, "TARGET", "ALWAYS"),
-    d("戒め", "S1命中時、別判定25%で被クリ率アップを1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .25, 1, "TARGET", "SEPARATE", "CRIT_RATE_UP"),
-    d("守護の祈り", "S1使用後、HP割合が最も低い味方へ被クリ率ダウンを1ターン付与。", "SUPPORT", "ADD_BUFF", 0, 1, 1, "LOWEST_HP_ALLY", "ALWAYS", "CRIT_RATE_DOWN"),
-  ],
-  nemesis: [
-    d("復讐の刃", "S1ダメージ+10%。高火力な既存性能を考慮した下限値。", "OFFENSE", "DAMAGE_UP", .1, 1, 0, "TARGET", "ALWAYS"),
-    d("報いの刻印", "S1命中時、別判定20%で強化不可を1ターン付与。", "DISRUPT", "ADD_DEBUFF", 0, .2, 1, "TARGET", "SEPARATE", "BUFF_BLOCK"),
-    d("逆境反射", "S1使用時HP30%以下なら、自身へ反射を1ターン付与（戦闘中1回）。", "SPECIAL", "ADD_BUFF", 0, 1, 1, "SELF", "CONDITIONAL", "REFLECT"),
-  ],
+const ELEMENT_LABEL: Record<string, string> = { FIRE: "炎", WATER: "水", GRASS: "翠", ELECTRIC: "雷", LIGHT: "光", DARK: "闇" };
+const SPECIES_LABEL: Record<string, string> = {
+  slime: "スライム", wolf: "ウルフ", golem: "ゴーレム", fairy: "フェアリー", imp: "インプ", wisp: "ウィスプ",
+  treant: "トレント", knight: "ナイト", griffon: "グリフォン", dragon: "ドラゴン", seraph: "セラフ", nemesis: "ネメシス",
 };
+const DISRUPTIONS: readonly { label: string; description: string; effect: LatentRuntimeEffect }[] = [
+  { label: "治癒封じ", description: "80%の確率で2ターン回復を阻害", effect: { kind: "DEBUFF", status: "HEAL_BLOCK", chance: .8, duration: 2 } },
+  { label: "時奪い", description: "80%の確率で行動ゲージを15%減少", effect: { kind: "GAUGE_DOWN", chance: .8, value: .15 } },
+  { label: "浄破", description: "80%の確率で強化効果を1個解除", effect: { kind: "STRIP", chance: .8, count: 1 } },
+  { label: "鈍化", description: "75%の確率で2ターン素早さを低下", effect: { kind: "DEBUFF", status: "SPD_DOWN", chance: .75, duration: 2 } },
+  { label: "侵蝕毒", description: "70%の確率で2ターン毒を1つ付与", effect: { kind: "DEBUFF", status: "POISON", chance: .7, duration: 2, value: .05 } },
+  { label: "衝撃", description: "45%の確率で1ターン行動不能", effect: { kind: "DEBUFF", status: "STUN", chance: .45, duration: 1 } },
+  { label: "強化封印", description: "70%の確率で2ターン強化効果を受けられなくする", effect: { kind: "DEBUFF", status: "BUFF_BLOCK", chance: .7, duration: 2 } },
+];
+const SUPPORTS: readonly { label: string; description: string; effect: LatentRuntimeEffect; stats?: Partial<LatentAbilityCandidate> }[] = [
+  { label: "先導", description: "味方全体の行動ゲージを8%増加", effect: { kind: "ALLY_GAUGE_UP", chance: 1, value: .08 } },
+  { label: "呪縛継承", description: "80%の確率で対象の弱体効果を1ターン延長", effect: { kind: "DEBUFF_EXTEND", chance: .8, duration: 1 } },
+  { label: "清癒", description: "最もHP割合が低い味方を8%回復し弱体効果を1個解除", effect: { kind: "HEAL_CLEANSE", value: .08 } },
+  { label: "再生結界", description: "最もHP割合が低い味方へ2ターン5%継続回復", effect: { kind: "REGEN", value: .05, duration: 2 } },
+  { label: "守護膜", description: "最もHP割合が低い味方へ最大HP10%のシールドを2ターン付与", effect: { kind: "SHIELD", value: .1, duration: 2 } },
+  { label: "不屈装甲", description: "最大HP+10%、防御力+12%、受けるダメージ8%軽減。スキル1後、最もHP割合が低い味方へ最大HP6%のシールドを1ターン付与", effect: { kind: "SHIELD", value: .06, duration: 1 }, stats: { hpMultiplier: 1.1, defMultiplier: 1.12, damageTakenMultiplier: .92 } },
+];
+function grade(index: number): "S" | "A" | "B" | "C" { return index < 6 ? "S" : index < 48 ? "A" : index < 156 ? "B" : "C"; }
 
-export const LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentAbilityCandidate[]>> =
-  Object.fromEntries(ALL_DISPLAYABLE_MONSTERS_DEX.map((monster) => [monster.id, BLUEPRINTS[monster.templateId].map((draft, index) => ({
-    ...draft,
-    id: `${monster.templateId}_${monster.element}_latent_${index + 1}`,
-    skillSlot: 0 as const,
-  }))]));
-
-setLatentAbilityResolver((dexId, abilityId) =>
-  LATENT_ABILITY_CANDIDATES[dexId]?.find((candidate) => candidate.id === abilityId),
+/** 72個体それぞれを属性・既存S1の役割に合わせ、安定IDの三方向へ展開する。 */
+export const LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentAbilityCandidate[]>> = Object.fromEntries(
+  ALL_DISPLAYABLE_MONSTERS_DEX.map((monster, monsterIndex) => {
+    const prefix = `${ELEMENT_LABEL[monster.element]}の${SPECIES_LABEL[monster.templateId]}`;
+    const offenseMode = monsterIndex % 3;
+    const offense: LatentAbilityCandidate = {
+      id: `${monster.templateId}_${monster.element}_latent_1`, name: `${prefix}・攻勢`, skillSlot: 0, category: "OFFENSE",
+      effectType: "DAMAGE_UP", value: 0, chance: 1, duration: 0, target: "TARGET", resolution: "ALWAYS",
+      description: offenseMode === 0 ? "スキル1を威力70%の敵全体攻撃へ変化（主対象を維持）" : offenseMode === 1
+        ? "スキル1で対象の防御力を20%無視" : "敵の弱体効果1個につきダメージ+5%（最大25%）",
+      ...(offenseMode === 0 ? { aoeConversion: { damageMultiplier: .7, secondaryEffectChanceMultiplier: .65, nativeEffectTarget: "PRIMARY_ONLY" as const } }
+        : offenseMode === 1 ? { ignoreDefenseRatio: .2 } : { debuffDamageBonus: { perDebuff: .05, maxBonus: .25 } }),
+      grade: grade(monsterIndex * 3),
+    };
+    const disrupt = DISRUPTIONS[monsterIndex % DISRUPTIONS.length];
+    const control: LatentAbilityCandidate = {
+      id: `${monster.templateId}_${monster.element}_latent_2`, name: `${prefix}・${disrupt.label}`, description: `スキル1命中後、${disrupt.description}（多段でも1回）`,
+      skillSlot: 0, category: "DISRUPT", effectType: "DAMAGE_UP", value: 0, chance: 1, duration: 0, target: "TARGET", resolution: "SEPARATE",
+      runtimeEffects: [disrupt.effect], grade: grade(monsterIndex * 3 + 1),
+    };
+    const support = SUPPORTS[monsterIndex % SUPPORTS.length];
+    const utility: LatentAbilityCandidate = {
+      id: `${monster.templateId}_${monster.element}_latent_3`, name: `${prefix}・${support.label}`, description: `スキル1使用後、${support.description}`,
+      skillSlot: 0, category: monsterIndex % 2 ? "DURABILITY" : "SUPPORT", effectType: "DAMAGE_UP", value: 0, chance: 1, duration: 0,
+      target: support.effect.kind === "ALLY_GAUGE_UP" ? "ALL_ALLIES" : "LOWEST_HP_ALLY", resolution: "ALWAYS", runtimeEffects: [support.effect],
+      ...support.stats, grade: grade(monsterIndex * 3 + 2),
+    };
+    return [monster.id, [offense, control, utility] as const];
+  }),
 );
+
+setLatentAbilityResolver((dexId, abilityId) => LATENT_ABILITY_CANDIDATES[dexId]?.find((candidate) => candidate.id === abilityId));

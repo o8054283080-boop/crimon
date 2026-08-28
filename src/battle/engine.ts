@@ -12,6 +12,7 @@ import {
   applyDamage,
   applyStatus,
   applyHeal,
+  cleanseDebuffs,
   createBattleUnit,
   getEffectiveStat,
   hasStatus,
@@ -406,6 +407,8 @@ export class BattleEngine {
       ({ skill, index } = chooseSkill(unit, this.units));
     }
 
+    const latent = index === 0 && unit.def.latentAbility?.skillSlot === 0 ? unit.def.latentAbility : undefined;
+    const resolvedSkill = latent ? this.applyLatentToSkill(skill, latent) : skill;
     let targets: BattleUnit[];
     if (choice?.targetId && (skill.target === "SINGLE_ENEMY" || skill.target === "SINGLE_ALLY")) {
       const explicitTarget = this.units.find((u) => u.instanceId === choice.targetId && u.alive);
@@ -425,6 +428,11 @@ export class BattleEngine {
         this.push(`  → 挑発により対象が ${this.label(forced)} へ変更された！`);
       }
     }
+    const aoeConverted = Boolean(latent?.aoeConversion && skill.target === "SINGLE_ENEMY");
+    if (aoeConverted && targets[0]) {
+      const primary = targets[0];
+      targets = [primary, ...this.units.filter((candidate) => candidate.team !== unit.team && candidate.alive && candidate !== primary)];
+    }
     if (targets.length === 0) return;
 
     if (skill.cooldownTurns > 0) {
@@ -432,8 +440,6 @@ export class BattleEngine {
     }
 
     this.push(`${this.label(unit)} の「${skill.name}」！`);
-    const latent = index === 0 && unit.def.latentAbility?.skillSlot === 0 ? unit.def.latentAbility : undefined;
-    const resolvedSkill = latent ? this.applyLatentToSkill(skill, latent) : skill;
 
     // 暗闇がかかっていると、攻撃するたびに外れ判定が入る。
     // 外れた場合はこの手番のあいだ、ダメージが大きく下がり追加効果も乗らない。
@@ -450,7 +456,14 @@ export class BattleEngine {
     let anyCrit = false;
     let debuffApplied = false;
     targets.forEach((target, i) => {
-      const result = this.applySkillEffects(unit, target, resolvedSkill, missed, i === 0, latent);
+      const targetSkill = aoeConverted && latent?.aoeConversion ? { ...resolvedSkill, effects: resolvedSkill.effects
+        .filter((effect) => i === 0 || latent.aoeConversion?.nativeEffectTarget !== "PRIMARY_ONLY" || effect.kind === "DAMAGE")
+        .map((effect) => {
+          if (effect.kind === "DAMAGE") return { ...effect, multiplier: effect.multiplier * latent.aoeConversion!.damageMultiplier };
+          if (i > 0 && "chance" in effect && typeof effect.chance === "number") return { ...effect, chance: effect.chance * (latent.aoeConversion!.secondaryEffectChanceMultiplier ?? 1) };
+          return effect;
+        }) } : resolvedSkill;
+      const result = this.applySkillEffects(unit, target, targetSkill, missed, i === 0, latent);
       anyCrit ||= result.anyCrit;
       debuffApplied ||= result.debuffApplied;
     });
@@ -461,9 +474,10 @@ export class BattleEngine {
   private applyLatentToSkill(skill: Skill, latent: LatentAbilityCandidate): Skill {
     return { ...skill, effects: skill.effects.map((effect) => {
       if (effect.kind === "DAMAGE") {
-        if (latent.effectType === "DAMAGE_UP") return { ...effect, multiplier: effect.multiplier * (1 + latent.value) };
+        if (latent.effectType === "DAMAGE_UP") return { ...effect, multiplier: effect.multiplier * (1 + latent.value), ignoreDefenseRatio: latent.ignoreDefenseRatio, debuffDamageBonus: latent.debuffDamageBonus };
         if (latent.effectType === "HP_SCALING") return { ...effect, hpCoefficient: (effect.hpCoefficient ?? 0) + latent.value };
         if (latent.effectType === "DEF_SCALING") return { ...effect, defCoefficient: (effect.defCoefficient ?? 0) + latent.value };
+        return { ...effect, ignoreDefenseRatio: latent.ignoreDefenseRatio, debuffDamageBonus: latent.debuffDamageBonus };
       }
       if (latent.effectType === "DEBUFF_CHANCE_UP" && latent.status === "DEF_DOWN"
         && effect.kind === "DEBUFF" && effect.stat === "def") {
@@ -489,6 +503,34 @@ export class BattleEngine {
     const receiver = latent.target === "SELF" ? source : latent.target === "LOWEST_HP_ALLY" ? lowestAlly : target;
     const proc = () => this.rng() < latent.chance;
     const announce = () => this.push(`  → 潜在能力「${latent.name}」が発動！`);
+
+    for (const effect of latent.runtimeEffects ?? []) {
+      if (effect.kind === "STRIP") {
+        if (receiver.alive && this.rollEffectSuccess(source, receiver, effect.chance) && stripBuffs(receiver, effect.count)) announce();
+      } else if (effect.kind === "GAUGE_DOWN") {
+        if (receiver.alive && this.rng() < effect.chance) { receiver.gauge = Math.max(0, receiver.gauge - effect.value * ATB_THRESHOLD); announce(); }
+      } else if (effect.kind === "DEBUFF") {
+        if (!receiver.alive || this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
+        if (effect.status === "HEAL_BLOCK") { receiver.healBlockTurns = Math.max(receiver.healBlockTurns, effect.duration); receiver.healBlockMultiplier = 0; }
+        else if (effect.status === "SPD_DOWN") receiver.effects.push({ stat: "spd", amount: -.3, remainingTurns: effect.duration, kind: "DEBUFF" });
+        else if (effect.status === "POISON") { receiver.poisonStacks = Math.min(5, receiver.poisonStacks + 1); receiver.poisonTurns = Math.max(receiver.poisonTurns, effect.duration); receiver.poisonDamageRate = effect.value ?? .05; }
+        else if (effect.status === "STUN") receiver.stunTurns = Math.max(receiver.stunTurns, effect.duration);
+        else applyStatus(receiver, "BUFF_BLOCK", effect.duration, source.instanceId);
+        announce();
+      } else if (effect.kind === "ALLY_GAUGE_UP") {
+        if (this.rng() < effect.chance) { for (const ally of allies) ally.gauge = Math.min(ATB_THRESHOLD, ally.gauge + effect.value * ATB_THRESHOLD); announce(); }
+      } else if (effect.kind === "DEBUFF_EXTEND") {
+        if (receiver.alive && this.rng() < effect.chance) { receiver.effects.filter((e) => e.kind === "DEBUFF").forEach((e) => e.remainingTurns += effect.duration); receiver.statusEffects.filter((e) => e.category === "DEBUFF").forEach((e) => e.remainingTurns += effect.duration); if (receiver.poisonTurns) receiver.poisonTurns += effect.duration; if (receiver.healBlockTurns) receiver.healBlockTurns += effect.duration; announce(); }
+      } else if (effect.kind === "HEAL_CLEANSE") {
+        applyHeal(lowestAlly, Math.round(lowestAlly.maxHp * effect.value));
+        cleanseDebuffs(lowestAlly, 1);
+        announce();
+      } else if (effect.kind === "REGEN" && !hasStatus(lowestAlly, "BUFF_BLOCK")) {
+        lowestAlly.regenRate = Math.max(lowestAlly.regenRate, effect.value); lowestAlly.regenTurns = Math.max(lowestAlly.regenTurns, effect.duration); announce();
+      } else if (effect.kind === "SHIELD" && !hasStatus(lowestAlly, "BUFF_BLOCK")) {
+        lowestAlly.shieldValue = Math.max(lowestAlly.shieldValue, Math.round(lowestAlly.maxHp * effect.value)); lowestAlly.shieldTurns = Math.max(lowestAlly.shieldTurns, effect.duration); announce();
+      }
+    }
 
     switch (latent.effectType) {
       case "DAMAGE_UP": case "CRIT_TRIGGER": case "HP_SCALING": case "DEF_SCALING": case "DEBUFF_CHANCE_UP":
@@ -808,11 +850,7 @@ export class BattleEngine {
 
         case "CLEANSE": {
           if (!target.alive) break;
-          const hadDebuff = target.effects.some((e) => e.kind === "DEBUFF");
-          target.effects = target.effects.filter((e) => e.kind !== "DEBUFF");
-          const hadStatusDebuff = target.statusEffects.some((e) => e.category === "DEBUFF");
-          target.statusEffects = target.statusEffects.filter((e) => e.category !== "DEBUFF");
-          if (hadDebuff || hadStatusDebuff) this.push(`  → ${this.label(target)} のデバフが解除された！`);
+          if (cleanseDebuffs(target) > 0) this.push(`  → ${this.label(target)} のデバフが解除された！`);
           break;
         }
 
@@ -873,7 +911,8 @@ export class BattleEngine {
     source?: BattleUnit,
     sourceType: "normal" | "reflect" | "periodic" = "normal",
   ): DamageApplicationResult {
-    const applied = applyDamage(target, amount);
+    const multiplier = Math.max(0, Math.min(1, target.def.latentAbility?.damageTakenMultiplier ?? 1));
+    const applied = applyDamage(target, Math.round(amount * multiplier));
     if (applied.invincible) this.push(`  → ${this.label(target)} は無敵でダメージを無効化した！`);
     if (applied.endured) this.push(`  → ${this.label(target)} は我慢でHP1に踏みとどまった！`);
     if (applied.revived) this.push(`  → ${this.label(target)} は最大HPの25%で復活した！`);
