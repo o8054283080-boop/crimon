@@ -88,10 +88,28 @@ function skillLines(skill: Skill): HTMLElement[] {
   return skill.effects.map((effect) => el("li", {}, [describeSkillEffect(effect)]));
 }
 
-function latentEffect(candidate: (typeof LATENT_ABILITY_CANDIDATES)[string][number]): string {
-  const value = candidate.aoeConversion ? `敵全体・威力${Math.round(candidate.aoeConversion.damageMultiplier * 100)}%` : candidate.ignoreDefenseRatio ? `防御${Math.round(candidate.ignoreDefenseRatio * 100)}%無視` : candidate.value !== 0 ? `効果量 ${candidate.value}` : "説明記載の固有効果";
-  const chance = candidate.chance < 1 ? ` / 発動率 ${Math.round(candidate.chance * 100)}%` : " / 確定発動";
-  return `${value}${chance}`;
+export function describeLatentEffect(candidate: (typeof LATENT_ABILITY_CANDIDATES)[string][number]): string {
+  const lines: string[] = [];
+  if (candidate.aoeConversion) lines.push(`対象：敵全体、主対象・副対象とも威力${Math.round(candidate.aoeConversion.damageMultiplier * 100)}%`);
+  if (candidate.ignoreDefenseRatio) lines.push(`対象：選択した敵、防御力を${Math.round(candidate.ignoreDefenseRatio * 100)}%無視`);
+  if (candidate.debuffDamageBonus) lines.push(`対象：選択した敵、弱体効果1個につきダメージ+${Math.round(candidate.debuffDamageBonus.perDebuff * 100)}%（最大${Math.round(candidate.debuffDamageBonus.maxBonus * 100)}%）`);
+  for (const effect of candidate.runtimeEffects ?? []) {
+    const chance = "chance" in effect ? `${Math.round(effect.chance * 100)}%の確率で` : "確定で";
+    if (effect.kind === "DEBUFF") {
+      const label = { HEAL_BLOCK: "回復を阻害", SPD_DOWN: "素早さを低下", POISON: "毒を1つ付与", STUN: "行動不能", BUFF_BLOCK: "強化効果を受けられなくする" }[effect.status];
+      lines.push(`対象：選択した敵、${chance}${effect.duration}ターン${label}`);
+    } else if (effect.kind === "STRIP") lines.push(`対象：選択した敵、${chance}強化効果を${effect.count}個解除`);
+    else if (effect.kind === "GAUGE_DOWN") lines.push(`対象：選択した敵、${chance}行動ゲージを${Math.round(effect.value * 100)}%減少`);
+    else if (effect.kind === "ALLY_GAUGE_UP") lines.push(`対象：味方全体、${chance}行動ゲージを${Math.round(effect.value * 100)}%増加`);
+    else if (effect.kind === "DEBUFF_EXTEND") lines.push(`対象：選択した敵、${chance}弱体効果を${effect.duration}ターン延長`);
+    else if (effect.kind === "HEAL_CLEANSE") lines.push(`対象：HP割合が最も低い味方、最大HPの${Math.round(effect.value * 100)}%回復＋弱体効果を1個解除`);
+    else if (effect.kind === "REGEN") lines.push(`対象：HP割合が最も低い味方、${effect.duration}ターン最大HPの${Math.round(effect.value * 100)}%継続回復`);
+    else if (effect.kind === "SHIELD") lines.push(`対象：HP割合が最も低い味方、最大HPの${Math.round(effect.value * 100)}%シールド（${effect.duration}ターン）`);
+  }
+  if (candidate.hpMultiplier) lines.push(`自身の最大HP+${Math.round((candidate.hpMultiplier - 1) * 100)}%`);
+  if (candidate.defMultiplier) lines.push(`自身の防御力+${Math.round((candidate.defMultiplier - 1) * 100)}%`);
+  if (candidate.damageTakenMultiplier) lines.push(`自身が受けるダメージ-${Math.round((1 - candidate.damageTakenMultiplier) * 100)}%`);
+  return lines.join(" / ") || candidate.description;
 }
 
 function latentChoices(props: MonsterCreateProps, candidates: (typeof LATENT_ABILITY_CANDIDATES)[string]): HTMLElement {
@@ -100,7 +118,7 @@ function latentChoices(props: MonsterCreateProps, candidates: (typeof LATENT_ABI
     el("article", { className: "create-choice latent-choice" }, [
       el("strong", { className: "latent-choice__name" }, [candidate.name]),
       el("span", { className: "latent-choice__description" }, [candidate.description]),
-      el("small", { className: "latent-choice__effect" }, [`効果: ${latentEffect(candidate)}`]),
+      el("small", { className: "latent-choice__effect" }, [`効果: ${describeLatentEffect(candidate)}`]),
       el("button", {
         type: "button",
         className: "btn btn--primary latent-choice__select",
@@ -287,7 +305,7 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
         latentChoices(props, candidates),
       ].filter(isEl)) : target.development.latentAbilityId ? el("div", { className: "latent-awakened" }, [
         el("div", { className: "create-notice" }, selected
-          ? [el("strong", {}, [`覚醒済み: ${selected.name}`]), el("span", {}, [selected.description]), el("small", {}, [`効果: ${latentEffect(selected)}`])]
+          ? [el("strong", {}, [`覚醒済み: ${selected.name}`]), el("span", {}, [selected.description]), el("small", {}, [`効果: ${describeLatentEffect(selected)}`])]
           : [`覚醒済み: ${target.development.latentAbilityId}`]),
         el("div", { className: "latent-reawaken-cost" }, [
           el("strong", {}, ["必要"]),

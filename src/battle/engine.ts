@@ -12,6 +12,7 @@ import {
   applyDamage,
   applyStatus,
   applyHeal,
+  cleanseDebuffs,
   createBattleUnit,
   getEffectiveStat,
   hasStatus,
@@ -427,7 +428,8 @@ export class BattleEngine {
         this.push(`  → 挑発により対象が ${this.label(forced)} へ変更された！`);
       }
     }
-    if (latent?.aoeConversion && skill.target === "SINGLE_ENEMY" && targets[0]) {
+    const aoeConverted = Boolean(latent?.aoeConversion && skill.target === "SINGLE_ENEMY");
+    if (aoeConverted && targets[0]) {
       const primary = targets[0];
       targets = [primary, ...this.units.filter((candidate) => candidate.team !== unit.team && candidate.alive && candidate !== primary)];
     }
@@ -454,9 +456,13 @@ export class BattleEngine {
     let anyCrit = false;
     let debuffApplied = false;
     targets.forEach((target, i) => {
-      const targetSkill = i > 0 && latent?.aoeConversion ? { ...resolvedSkill, effects: resolvedSkill.effects
-        .filter((effect) => latent.aoeConversion?.nativeEffectTarget !== "PRIMARY_ONLY" || effect.kind === "DAMAGE")
-        .map((effect) => effect.kind === "DAMAGE" ? { ...effect, multiplier: effect.multiplier * latent.aoeConversion!.damageMultiplier } : effect) } : resolvedSkill;
+      const targetSkill = aoeConverted && latent?.aoeConversion ? { ...resolvedSkill, effects: resolvedSkill.effects
+        .filter((effect) => i === 0 || latent.aoeConversion?.nativeEffectTarget !== "PRIMARY_ONLY" || effect.kind === "DAMAGE")
+        .map((effect) => {
+          if (effect.kind === "DAMAGE") return { ...effect, multiplier: effect.multiplier * latent.aoeConversion!.damageMultiplier };
+          if (i > 0 && "chance" in effect && typeof effect.chance === "number") return { ...effect, chance: effect.chance * (latent.aoeConversion!.secondaryEffectChanceMultiplier ?? 1) };
+          return effect;
+        }) } : resolvedSkill;
       const result = this.applySkillEffects(unit, target, targetSkill, missed, i === 0, latent);
       anyCrit ||= result.anyCrit;
       debuffApplied ||= result.debuffApplied;
@@ -500,7 +506,7 @@ export class BattleEngine {
 
     for (const effect of latent.runtimeEffects ?? []) {
       if (effect.kind === "STRIP") {
-        if (receiver.alive && this.rollEffectSuccess(source, receiver, effect.chance) && stripBuffs(receiver)) announce();
+        if (receiver.alive && this.rollEffectSuccess(source, receiver, effect.chance) && stripBuffs(receiver, effect.count)) announce();
       } else if (effect.kind === "GAUGE_DOWN") {
         if (receiver.alive && this.rng() < effect.chance) { receiver.gauge = Math.max(0, receiver.gauge - effect.value * ATB_THRESHOLD); announce(); }
       } else if (effect.kind === "DEBUFF") {
@@ -512,13 +518,12 @@ export class BattleEngine {
         else applyStatus(receiver, "BUFF_BLOCK", effect.duration, source.instanceId);
         announce();
       } else if (effect.kind === "ALLY_GAUGE_UP") {
-        if (this.rng() < effect.chance) { for (const ally of allies) ally.gauge += effect.value * ATB_THRESHOLD; announce(); }
+        if (this.rng() < effect.chance) { for (const ally of allies) ally.gauge = Math.min(ATB_THRESHOLD, ally.gauge + effect.value * ATB_THRESHOLD); announce(); }
       } else if (effect.kind === "DEBUFF_EXTEND") {
         if (receiver.alive && this.rng() < effect.chance) { receiver.effects.filter((e) => e.kind === "DEBUFF").forEach((e) => e.remainingTurns += effect.duration); receiver.statusEffects.filter((e) => e.category === "DEBUFF").forEach((e) => e.remainingTurns += effect.duration); if (receiver.poisonTurns) receiver.poisonTurns += effect.duration; if (receiver.healBlockTurns) receiver.healBlockTurns += effect.duration; announce(); }
       } else if (effect.kind === "HEAL_CLEANSE") {
         applyHeal(lowestAlly, Math.round(lowestAlly.maxHp * effect.value));
-        const statIndex = lowestAlly.effects.findIndex((e) => e.kind === "DEBUFF");
-        if (statIndex >= 0) lowestAlly.effects.splice(statIndex, 1); else { const statusIndex = lowestAlly.statusEffects.findIndex((e) => e.category === "DEBUFF"); if (statusIndex >= 0) lowestAlly.statusEffects.splice(statusIndex, 1); }
+        cleanseDebuffs(lowestAlly, 1);
         announce();
       } else if (effect.kind === "REGEN" && !hasStatus(lowestAlly, "BUFF_BLOCK")) {
         lowestAlly.regenRate = Math.max(lowestAlly.regenRate, effect.value); lowestAlly.regenTurns = Math.max(lowestAlly.regenTurns, effect.duration); announce();
@@ -845,11 +850,7 @@ export class BattleEngine {
 
         case "CLEANSE": {
           if (!target.alive) break;
-          const hadDebuff = target.effects.some((e) => e.kind === "DEBUFF");
-          target.effects = target.effects.filter((e) => e.kind !== "DEBUFF");
-          const hadStatusDebuff = target.statusEffects.some((e) => e.category === "DEBUFF");
-          target.statusEffects = target.statusEffects.filter((e) => e.category !== "DEBUFF");
-          if (hadDebuff || hadStatusDebuff) this.push(`  → ${this.label(target)} のデバフが解除された！`);
+          if (cleanseDebuffs(target) > 0) this.push(`  → ${this.label(target)} のデバフが解除された！`);
           break;
         }
 

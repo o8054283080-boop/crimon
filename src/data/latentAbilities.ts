@@ -21,8 +21,8 @@ const SUPPORTS: readonly { label: string; description: string; effect: LatentRun
   { label: "呪縛継承", description: "80%の確率で対象の弱体効果を1ターン延長", effect: { kind: "DEBUFF_EXTEND", chance: .8, duration: 1 } },
   { label: "清癒", description: "最もHP割合が低い味方を8%回復し弱体効果を1個解除", effect: { kind: "HEAL_CLEANSE", value: .08 } },
   { label: "再生結界", description: "最もHP割合が低い味方へ2ターン5%継続回復", effect: { kind: "REGEN", value: .05, duration: 2 } },
-  { label: "守護膜", description: "最もHP割合が低い味方へ最大HP10%のシールドを2ターン付与", effect: { kind: "SHIELD", value: .1, duration: 2 }, stats: { hpMultiplier: 1.1 } },
-  { label: "不屈装甲", description: "最大HP+10%、防御力+12%、受けるダメージ8%軽減", effect: { kind: "SHIELD", value: .06, duration: 1 }, stats: { hpMultiplier: 1.1, defMultiplier: 1.12, damageTakenMultiplier: .92 } },
+  { label: "守護膜", description: "最もHP割合が低い味方へ最大HP10%のシールドを2ターン付与", effect: { kind: "SHIELD", value: .1, duration: 2 } },
+  { label: "不屈装甲", description: "最大HP+10%、防御力+12%、受けるダメージ8%軽減。スキル1後、最もHP割合が低い味方へ最大HP6%のシールドを1ターン付与", effect: { kind: "SHIELD", value: .06, duration: 1 }, stats: { hpMultiplier: 1.1, defMultiplier: 1.12, damageTakenMultiplier: .92 } },
 ];
 function grade(index: number): "S" | "A" | "B" | "C" { return index < 6 ? "S" : index < 48 ? "A" : index < 156 ? "B" : "C"; }
 
@@ -33,7 +33,7 @@ export const LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentA
     const offenseMode = monsterIndex % 3;
     const offense: LatentAbilityCandidate = {
       id: `${monster.templateId}_${monster.element}_latent_1`, name: `${prefix}・攻勢`, skillSlot: 0, category: "OFFENSE",
-      effectType: "DAMAGE_UP", value: .08, chance: 1, duration: 0, target: "TARGET", resolution: "ALWAYS",
+      effectType: "DAMAGE_UP", value: 0, chance: 1, duration: 0, target: "TARGET", resolution: "ALWAYS",
       description: offenseMode === 0 ? "スキル1を威力70%の敵全体攻撃へ変化（主対象を維持）" : offenseMode === 1
         ? "スキル1で対象の防御力を20%無視" : "敵の弱体効果1個につきダメージ+5%（最大25%）",
       ...(offenseMode === 0 ? { aoeConversion: { damageMultiplier: .7, secondaryEffectChanceMultiplier: .65, nativeEffectTarget: "PRIMARY_ONLY" as const } }

@@ -231,24 +231,51 @@ export function tickHealBlockAtTurnStart(unit: BattleUnit): void {
   if (unit.healBlockTurns <= 0) unit.healBlockMultiplier = 1;
 }
 
-/**
- * 有利な効果をすべて剥がす。
- *
- * シールド・状態異常無効・能力上昇が対象。**張り直すだけの戦い方**に
- * 代償を作るための手段なので、中途半端に一部だけ残さない。
- */
-export function stripBuffs(unit: BattleUnit): boolean {
-  const hadBuff = unit.effects.some((e) => e.kind === "BUFF");
-  const hadStatusBuff = unit.statusEffects.some((effect) => effect.category === "BUFF");
-  const had = hadBuff || hadStatusBuff || unit.shieldTurns > 0 || unit.immuneTurns > 0 || unit.regenTurns > 0;
-  unit.effects = unit.effects.filter((e) => e.kind !== "BUFF");
-  unit.statusEffects = unit.statusEffects.filter((effect) => effect.category !== "BUFF");
-  unit.shieldValue = 0;
-  unit.shieldTurns = 0;
-  unit.immuneTurns = 0;
-  unit.regenTurns = 0;
-  unit.regenRate = 0;
-  return had;
+/** 有利な効果を指定個数だけ解除する。省略時は既存STRIP互換ですべて解除する。 */
+export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): boolean {
+  let remaining = Math.max(0, Math.floor(count));
+  let removed = 0;
+  // IMMUNITYを最優先にすることで、解除後に続くデバフが正式な免疫判定へ進める。
+  if (remaining > 0 && unit.immuneTurns > 0) { unit.immuneTurns = 0; remaining -= 1; removed += 1; }
+  if (remaining > 0 && unit.shieldTurns > 0) { unit.shieldValue = 0; unit.shieldTurns = 0; remaining -= 1; removed += 1; }
+  if (remaining > 0 && unit.regenTurns > 0) { unit.regenTurns = 0; unit.regenRate = 0; remaining -= 1; removed += 1; }
+  while (remaining > 0) {
+    const index = unit.effects.findIndex((effect) => effect.kind === "BUFF");
+    if (index < 0) break;
+    unit.effects.splice(index, 1); remaining -= 1; removed += 1;
+  }
+  while (remaining > 0) {
+    const index = unit.statusEffects.findIndex((effect) => effect.category === "BUFF");
+    if (index < 0) break;
+    unit.statusEffects.splice(index, 1); remaining -= 1; removed += 1;
+  }
+  return removed > 0;
+}
+
+/** フィールド別に保持されるものも含め、弱体効果を指定個数だけ正式解除する。 */
+export function cleanseDebuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): number {
+  let remaining = Math.max(0, Math.floor(count));
+  let removed = 0;
+  const take = (condition: boolean, clear: () => void) => {
+    if (!condition || remaining <= 0) return;
+    clear(); remaining -= 1; removed += 1;
+  };
+  while (remaining > 0) {
+    const index = unit.effects.findIndex((effect) => effect.kind === "DEBUFF");
+    if (index < 0) break;
+    unit.effects.splice(index, 1); remaining -= 1; removed += 1;
+  }
+  while (remaining > 0) {
+    const index = unit.statusEffects.findIndex((effect) => effect.category === "DEBUFF");
+    if (index < 0) break;
+    unit.statusEffects.splice(index, 1); remaining -= 1; removed += 1;
+  }
+  take(unit.poisonStacks > 0 || unit.poisonTurns > 0, () => { unit.poisonStacks = 0; unit.poisonTurns = 0; unit.poisonDamageRate = 0; });
+  take(unit.healBlockTurns > 0, () => { unit.healBlockTurns = 0; unit.healBlockMultiplier = 1; });
+  take(unit.stunTurns > 0, () => { unit.stunTurns = 0; });
+  take(unit.burnTurns > 0, () => { unit.burnTurns = 0; });
+  take(unit.blindTurns > 0, () => { unit.blindTurns = 0; });
+  return removed;
 }
 
 /** そのユニットの手番開始時に呼ぶ。暗闇の残りターンを減らす */
