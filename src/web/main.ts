@@ -1,4 +1,6 @@
 import "./style.css";
+import "./crimon-visual-system.css";
+import "./mobile-ux.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
@@ -1933,6 +1935,9 @@ function render(): void {
           render();
         },
         onGoSummon: () => navigate("SUMMON"),
+        onGoMonsters: () => navigate("MONSTERS"),
+        onGoEquipment: () => navigate("EQUIPMENT"),
+        onGoMonsterDex: () => navigate("MONSTER_DEX"),
         onGoStages: () => navigate("STAGES"),
         onGoParty: () => navigate("PARTY"),
         onViewPartyMonster: (id) => { state.monsterDetailId = id; state.screen = "MONSTERS"; render(); },
