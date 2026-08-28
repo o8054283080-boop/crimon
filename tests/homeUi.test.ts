@@ -16,24 +16,23 @@ describe("redesigned CRIMON home tower summary", () => {
 });
 
 describe("Task D home information architecture", () => {
-  it("orders brand, party, primary, management, secondary and missions", () => {
-    const selectors = ["crimon-resource-header", "crimon-brand", "home-party crimon-section", "crimon-section crimon-section--primary", "crimon-section crimon-section--management", "crimon-section crimon-section--secondary"];
+  it("orders HUD, world stage, party strip and compact missions without a HOME brand logo", () => {
+    const selectors = ["crimon-resource-header", "lobby-world", "lobby-party-strip", "crimon-tutorial"];
     const positions = selectors.map((selector) => source.indexOf(`className: \"${selector}`));
     expect(positions.every((position) => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(source.indexOf("crimon-section--secondary")).toBeLessThan(source.indexOf("tutorial,"));
+    expect(source.indexOf('el("section", { className: "lobby-world"')).toBeLessThan(source.indexOf('el("section", { className: "lobby-party-strip"'));
+    expect(source.indexOf('el("section", { className: "lobby-party-strip"')).toBeLessThan(source.indexOf("      tutorial,"));
+    expect(source).not.toContain('className: "crimon-brand"');
     expect(source).not.toContain('className: "crimon-hero"');
   });
 
-  it("uses the required primary and management variants", () => {
-    for (const variant of ["adventure", "dungeon", "arena", "monster", "equipment", "summon", "shop"]) {
+  it("uses the required lobby action variants and preserves destinations", () => {
+    for (const variant of ["adventure", "dungeon", "arena"]) {
       expect(source).toContain(`\"${variant}\"`);
     }
     expect(source).toContain("props.onGoStages");
-    expect(source).toContain("props.onGoMonsters");
-    expect(source).toContain("props.onGoEquipment");
-    expect(source).toContain("props.onGoSummon");
     expect(source).toContain("props.onGoMonsterDex");
+    expect(source).toContain("props.onGoTrialTower");
   });
 
   it("preserves all dungeon chooser callbacks", () => {

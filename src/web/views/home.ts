@@ -776,13 +776,14 @@ export function renderHome(props: HomeProps): HTMLElement {
   const tutorialClaimable = tutorialNext ? canClaimTutorialMission(player, tutorialNext) : false;
   const tutorialActions = tutorialNext ? tutorialMissionActions(props, tutorialNext) : null;
   const claimedCount = TUTORIAL_MISSIONS.filter((mission) => player.tutorialMissions.claimedIds.includes(mission.id)).length;
-  const tutorial = el("section", { className: "crimon-tutorial", ariaLabel: "初心者ミッション" }, [
-    el("div", { className: "crimon-tutorial__head" }, [
-      el("span", {}, [el("small", {}, ["BEGINNER MISSIONS"]), el("strong", {}, [tutorialNext ? `STEP ${tutorialNext.step} / 30` : "COMPLETE 30 / 30"])]),
-      el("span", { className: "crimon-tutorial__count" }, [`${claimedCount} / ${TUTORIAL_MISSIONS.length}`]),
-    ]),
-    tutorialNext ? el("details", { className: `crimon-tutorial__current${tutorialClaimable ? " crimon-tutorial__current--ready" : ""}` }, [
-      el("summary", {}, [tutorialClaimable ? "報酬を受け取れます！" : tutorialNext.title]),
+  const tutorialSheet = el("div", { className: "tutorial-lobby-sheet", hidden: true }, []);
+  const closeTutorial = () => { tutorialSheet.hidden = true; };
+  tutorialSheet.append(
+    el("button", { type: "button", className: "tutorial-lobby-sheet__scrim", onclick: closeTutorial, ariaLabel: "初心者ミッションを閉じる" }, []),
+    el("section", { className: "tutorial-lobby-sheet__panel" }, [
+      el("div", { className: "tutorial-lobby-sheet__head" }, [el("strong", {}, ["初心者ミッション"]), el("button", { type: "button", className: "btn btn--ghost", onclick: closeTutorial }, ["閉じる"])]),
+      tutorialNext ? el("div", { className: `crimon-tutorial__current${tutorialClaimable ? " crimon-tutorial__current--ready" : ""}` }, [
+      el("strong", {}, [tutorialClaimable ? "報酬を受け取れます！" : tutorialNext.title]),
       el("p", {}, [tutorialNext.condition]),
       el("p", { className: "crimon-tutorial__rewards" }, [rewardText(tutorialNext)]),
       el("div", { className: "crimon-tutorial__actions" }, [
@@ -794,6 +795,17 @@ export function renderHome(props: HomeProps): HTMLElement {
         ...TUTORIAL_MISSIONS.map((mission) => el("div", { className: player.tutorialMissions.claimedIds.includes(mission.id) ? "is-complete" : "" }, [`STEP ${mission.step}　${mission.title}`])),
       ]),
     ]) : el("p", { className: "crimon-tutorial__complete" }, ["全30ミッション達成！ 基本育成ロードマップを制覇しました。"]),
+    ]),
+  );
+  const openTutorial = () => { tutorialSheet.hidden = false; };
+  const tutorial = el("section", { className: `crimon-tutorial${tutorialClaimable ? " crimon-tutorial--ready" : ""}`, ariaLabel: "初心者ミッション" }, [
+    el("button", { type: "button", className: "crimon-tutorial__compact", onclick: openTutorial }, [
+      el("span", {}, [el("small", {}, ["初心者ミッション"]), el("strong", {}, [tutorialNext ? `STEP ${tutorialNext.step} / 30` : "COMPLETE 30 / 30"])]),
+      el("span", { className: "crimon-tutorial__mission" }, [tutorialNext?.title ?? "全ミッション達成"]),
+      el("span", { className: "crimon-tutorial__count" }, [tutorialNext ? `${tutorialClaimable ? 1 : 0} / 1` : `${claimedCount} / ${TUTORIAL_MISSIONS.length}`]),
+      icon("chevron"),
+    ]),
+    tutorialSheet,
   ]);
   const staminaSheet = el("div", { className: "home-sheet", hidden: true }, []);
   const closeStamina = () => { staminaSheet.hidden = true; };
@@ -829,7 +841,7 @@ export function renderHome(props: HomeProps): HTMLElement {
       el("section", { className: "lobby-world", ariaLabel: "現在のパーティと冒険メニュー" }, [
         el("nav", { className: "lobby-side lobby-side--left", ariaLabel: "副次機能" }, [
           sideAction("試練の塔", "tower", props.onGoTrialTower),
-          sideAction("初心者", "scroll", () => tutorial.querySelector("details")?.toggleAttribute("open")),
+          sideAction("初心者", "scroll", openTutorial),
           sideAction("図鑑", "monsters", props.onGoMonsterDex),
           sideAction("遊び方", "settings", onGoHowToPlay),
         ]),
