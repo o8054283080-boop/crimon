@@ -67,28 +67,35 @@ jobs:
             exit 1
           fi
 
-      - name: 常駐サーバを起こす
+      # 常駐サーバの起動と巡回は**同じステップで行う**。
+      #
+      # 別ステップで `&` を付けて起こしたら、そのステップが終わらなくなった。
+      # runner はステップの標準出力が閉じるまで待つので、繋いだままの
+      # バックグラウンドのプロセスがいると、そこで止まり続ける。
+      # `nohup` と `< /dev/null` で入出力を切り離し、1ステップに畳む。
+      #
+      # 撮影も同じステップに置く。ここで撮らないと、失敗した時の絵が残らない。
+      - name: 全画面を巡回する
+        timeout-minutes: 12
+        env:
+          HARNESS_PORT: "5391"
         run: |
-          HARNESS_VITE_PORT=5390 HARNESS_PORT=5391 node tools/harness.mjs > /tmp/harness.log 2>&1 &
-          for i in $(seq 1 40); do
-            if curl -fsS http://127.0.0.1:5391/health >/dev/null 2>&1; then exit 0; fi
+          HARNESS_VITE_PORT=5390 HARNESS_PORT=5391 \
+            nohup node tools/harness.mjs > harness.log 2>&1 < /dev/null &
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:5391/health >/dev/null 2>&1 && break
             sleep 1
           done
-          cat /tmp/harness.log
+          if ! curl -fsS http://127.0.0.1:5391/health >/dev/null 2>&1; then
+            echo "::error::常駐サーバが起きてこない"
+            cat harness.log
+            exit 1
+          fi
+          node tools/tour.mjs && exit 0
+          # 落ちた時に何が起きていたのかを見られるようにする。
+          # 文字だけの報告では「押せないボタン」の絵が分からない
+          node tools/tour.mjs --shots artifacts/tour || true
           exit 1
-
-      - name: 全画面を巡回する
-        env:
-          HARNESS_PORT: "5391"
-        run: node tools/tour.mjs
-
-      # 落ちた時に何が起きていたのかを見られるようにする。
-      # 文字だけの報告では「押せないボタン」の絵が分からない
-      - name: 崩れた画面を撮る
-        if: failure()
-        env:
-          HARNESS_PORT: "5391"
-        run: node tools/tour.mjs --shots artifacts/tour || true
 
       - uses: actions/upload-artifact@v4
         if: failure()
