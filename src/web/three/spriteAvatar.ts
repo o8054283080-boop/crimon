@@ -422,6 +422,20 @@ export class SpriteAvatar {
     this.root.add(this.hitProxy);
   }
 
+  /**
+   * カメラの見下ろし角に合わせて板を後ろへ倒す。
+   *
+   * **正投影で深く見下ろすと、真っ直ぐ立った板は縦に縮んで見える。**
+   * 50度見下ろせば、板の高さは cos50 = 0.64 まで潰れる。
+   * カメラの角度ぶんだけ倒しておけば、常に正対して縮まない。
+   *
+   * 足元(y=0)を軸に倒すので、**接地はずれない。**
+   * 地面に落ちる影は寝たままなので、影との関係も変わらない。
+   */
+  setCameraPitch(pitch: number): void {
+    this.mesh.rotation.x = -pitch;
+  }
+
   setSlotPosition(x: number, z: number): void {
     this.slotX = x;
     this.slotZ = z;

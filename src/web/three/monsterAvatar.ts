@@ -424,6 +424,14 @@ export class MonsterAvatar {
   }
 
   /** 台座も含めた立ち位置 */
+  /**
+   * カメラの見下ろし角。3Dモデルは立体なので何もしない。
+   * 2Dの `SpriteAvatar` と**同じ約束事**を保つために口だけ用意しておく。
+   */
+  setCameraPitch(_pitch: number): void {
+    // 立体はどの角度から見ても立体なので、傾ける必要が無い
+  }
+
   setSlotPosition(x: number, z: number): void {
     this.root.position.set(x, 0, z);
   }

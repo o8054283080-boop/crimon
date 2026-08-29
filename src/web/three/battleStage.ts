@@ -75,9 +75,18 @@ function portraitAmount(aspect: number): number {
  * 画面の左右の端はHPと行動ゲージの札が使うので、**本体はやや内側**に立たせる。
  * 外へ出すと札と場所を取り合い、モンスターが札の裏へ隠れる。
  */
-const LANE_X = 1.58;
+const LANE_X = 1.9;
 /** 横長の画面で列を離す追加ぶん。横に余るので、その余りを列の間隔に使う */
 const LANE_X_WIDE = 3.1;
+
+/**
+ * 板の半幅の見込み。
+ *
+ * 実際の幅は絵の縦横比で決まる。最大は横長のゴーレム(512×420)で、
+ * 背丈2.45 × 縦横比1.22 ÷ 2 = 1.49。少し余裕を足してある。
+ * ここが足りないと、列が画面の端で切れる(実際にゴーレムが切れた)。
+ */
+const SPRITE_HALF_WIDTH = 1.65;
 
 /**
  * 立ち位置。**左右に分かれて縦に並ぶ。**
@@ -85,17 +94,16 @@ const LANE_X_WIDE = 3.1;
  * 味方は左の列、敵は右の列。列の中は手前(+Z)から奥(-Z)へ順に置く。
  * カメラは斜め上から見下ろすので、前後の隔たりが画面の上下になる。
  *
- * 遠近で奥のものは画面中央へ寄って見える。そのままだと列が
- * ハの字に潰れるので、**奥ほど外へ押し出して縦の列に見せる**
- * (`skew`)。押しすぎると今度は外へ開くので、実際に見て決めた値。
+ * カメラは正投影(遠近なし)なので、奥に立っても小さくならず、
+ * 画面中央へ寄りもしない。**4体が同じ大きさでまっすぐ縦に並ぶ。**
  */
 function slotPositions(
   count: number,
   team: "PLAYER" | "ENEMY",
   /** 前後の間隔。縦に余裕のある画面では広げる */
   spacing = 2.25,
-  /** 奥へ行くほど外へ押し出す量。遠近で内側へ寄るのを打ち消す */
-  skew = 0.34,
+  /** 奥へ行くほど外へ押し出す量。正投影では0でよい(透視投影の名残) */
+  skew = 0,
   /** 2つの列の間隔。横長の画面では離す */
   laneX = LANE_X,
 ): { x: number; z: number }[] {
@@ -176,7 +184,19 @@ export class BattleStage {
 
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera: THREE.PerspectiveCamera;
+  /**
+   * 見る目。**正投影(遠近なし)。**
+   *
+   * 透視投影では、奥に立つモンスターほど小さく映る。左右2列の隊列だと
+   * 「同じ列なのに1番目と4番目で大きさが違う」ことになり、
+   * 実測で手前のスライムが奥のフェアリーの2.5倍あった。
+   * 望遠に寄せて誤魔化していたが、寄せるほどカメラが遠のいて舞台が窮屈になる。
+   *
+   * 正投影なら**距離が大きさに一切関係しない。**
+   * 4体が同じ大きさで、列がまっすぐ縦に並ぶ。
+   * 2Dの絵を並べる画面には、そもそもこちらが正しい。
+   */
+  private readonly camera: THREE.OrthographicCamera;
   private readonly composer: EffectComposer;
   private readonly bloomPass: UnrealBloomPass;
   private readonly cinematicPass: CinematicPass;
@@ -298,7 +318,10 @@ export class BattleStage {
     container.append(this.renderer.domElement);
 
     const { width, height } = this.measure();
-    this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 340);
+    // 表示範囲は frameCamera が毎回決める。ここは仮の値
+    this.camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 340);
+    void width;
+    void height;
 
     // その戦いの空気を、敵チームで最も多い属性から決める。
     // 空・霞・石・灯り・グレーディングまで一式がここから流れる。
@@ -660,98 +683,113 @@ export class BattleStage {
    */
   private frameCamera(width: number, height: number): void {
     const aspect = width / height;
-    const portraitFov = portraitAmount(aspect);
-    /*
-     * 画角。**左右に分かれた配置では望遠寄りにする。**
-     *
-     * 以前は縦画面ほど広角にしていた。両チームを横一列に広げていた頃は、
-     * 必要な「幅」を稼ぐために広角でないとカメラが極端に引いたため。
-     * いま盤面は縦に深いので、広角のままだと**手前と奥で大きさが2倍以上変わり、
-     * 奥の列が豆粒になる**(実測で手前のスライムが奥のフェアリーの2.5倍あった)。
-     * 望遠に寄せると前後の大きさが揃い、列として読める。
-     */
-    const fov = THREE.MathUtils.clamp(34 - (aspect - 0.6) * 9 + 2 * portraitFov, 24.5, 38);
-    // 見下ろし角。浅いと前後の列が画面上で潰れて重なるので、
-    // 奥行きが縦方向の距離に変換される程度まで見下ろす。
-    // 縦長の画面ではさらに深くする。余っている縦方向へ前後の列を展開して、
-    // 床と壁だけの空白を埋めるため
     const portrait = portraitAmount(aspect);
     /*
-     * 見下ろし角。浅いと前後の列が画面上で潰れて重なる。
-     * 一方で深すぎると、盤面の手前に**床だけの空白**が広く映る
-     * (縦画面で画面の1/4が床になっていた)。前後が分かれる程度に留める。
+     * 見下ろし角。
+     *
+     * 浅いと前後の列が画面上で潰れて重なり、深いと真上からの見取り図になる。
+     * 正投影では遠近が無いので、この角度が**そのまま盤面の見え方**を決める。
+     * 横長の画面では縦の余地が390pxしかないので深めに、
+     * 縦長の画面では縦に余裕があるので浅めにする。
      */
     /*
-     * 横長の画面では**深く見下ろす**。縦の余地が390pxしかないので、
-     * 浅いと1チーム4体が画面上でほとんど同じ高さに重なる(実際に重なった)。
-     * 縦長の画面は縦に余裕があるので、そこまで深くしなくても分かれる。
+     * **正投影では、この角度が奥行きを縦へ変換する唯一の手段。**
+     * 透視投影の頃は距離でも奥行きが読めたが、正投影には遠近が無い。
+     * 浅い(24度)と sin24 = 0.41 しか縦へ変わらず、4体並べても
+     * 画面上でほとんど離れなかった(実際にそうなった)。深く見下ろす。
+     *
+     * 深いぶん、立った板は縮んで見える。これは各アバターに
+     * `setCameraPitch` で同じ角度だけ倒させて打ち消す。
      */
-    const pitchMax = 31 - 3 * portrait;
-    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(fov / 2 + 11 - 3 * portrait, 18, pitchMax));
+    const pitchDeg = 48 - 4 * portrait;
+    const pitch = THREE.MathUtils.degToRad(pitchDeg);
+    /*
+     * 方位角。左右に分かれた配置なので0(正面)。
+     * 回すと列が斜めに傾いて左右の対称が崩れる。手で回す ぶんだけは効かせる。
+     */
+    const azimuth = THREE.MathUtils.degToRad(CAMERA_AZIMUTH_DEG) + this.orbitYaw;
 
-    const tanY = Math.tan(THREE.MathUtils.degToRad(fov / 2));
-    const tanX = tanY * aspect;
-    // 真正面から見ると、敵へ向き直った自軍は常に真後ろからしか映らず、
-    // 顔・角・仮面といった見分けどころが自分のモンスターだけ見えなくなる。
-    // ユニットが向いている側へカメラを回り込ませて、斜め後ろから見る構図にする。
-    // 副次的に、2つの列が画面上で斜めに並ぶ(正対だと前後の列が重なりやすい)
-    //
-    // 手で回した角度もここに含める。回すと2つの列が横並びになって必要な幅が
-    // 変わるので、距離を測り直さないとユニットが画面の外へ押し出される
-    // 斜めから見ると、奥行きの分だけ**横方向にも**場所を取る
-    // (回した軸で見ると、遠くの列が横にはみ出す)。
-    // 縦画面は幅が足りないので、正面寄りに戻して奥行きが幅を食わないようにする
-    const azimuth = THREE.MathUtils.degToRad(CAMERA_AZIMUTH_DEG * (1 - 0.72 * portrait)) + this.orbitYaw;
     const yAxis = new THREE.Vector3(0, 1, 0);
     const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch)).applyAxisAngle(yAxis, azimuth);
     const forward = dir.clone().negate();
     const up = new THREE.Vector3(0, Math.cos(pitch), -Math.sin(pitch)).applyAxisAngle(yAxis, azimuth);
-    // 収まり判定に使う画面横方向。方位角を入れるとワールドXとは一致しなくなる
     const right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
+    /*
+     * 収まりを測る。**正投影は距離で大きさが変わらないので、二分探索が要らない。**
+     * 盤面の箱の8隅を画面の縦横へ投影し、その最大値がそのまま表示範囲になる。
+     * 透視投影の頃はここでカメラ距離を26回の二分探索で求めていた。
+     */
     const box = this.frameBox;
-    const corners: THREE.Vector3[] = [];
+    /*
+     * 注視点は**毎回、盤面の中心から作り直す。**
+     * 前回の値へ足し込むと、画面を回すたびにずれが積み上がる。
+     */
+    const center = this.cameraTarget.set(0, (box.yBottom + box.yTop) / 2, (box.zFar + box.zNear) / 2);
+    /*
+     * 盤面の8隅を画面の縦横へ投影して、映すべき範囲を測る。
+     *
+     * **中心からの片側だけを見ない。** 見下ろすと盤面は画面の上下で
+     * 非対称になるので、片側の最大値で対称に取ると必ず余るか切れる。
+     * 上端と下端を別々に持ち、その中央へカメラを向け直す。
+     */
+    let minRight = Infinity;
+    let maxRight = -Infinity;
+    let minUp = Infinity;
+    let maxUp = -Infinity;
     for (const x of [-box.halfWidth, box.halfWidth]) {
       for (const y of [box.yBottom, box.yTop]) {
-        for (const z of [box.zFar, box.zNear]) corners.push(new THREE.Vector3(x, y, z));
+        for (const z of [box.zFar, box.zNear]) {
+          this.tmpRelative.set(x, y, z).sub(center);
+          const r = this.tmpRelative.dot(right);
+          const u = this.tmpRelative.dot(up);
+          minRight = Math.min(minRight, r);
+          maxRight = Math.max(maxRight, r);
+          minUp = Math.min(minUp, u);
+          maxUp = Math.max(maxUp, u);
+        }
       }
     }
+    // ずれたぶんだけ注視点を動かして、盤面を画面の中央へ置く
+    center.addScaledVector(right, (minRight + maxRight) / 2);
+    center.addScaledVector(up, (minUp + maxUp) / 2);
+    let halfW = (maxRight - minRight) / 2;
+    let halfH = (maxUp - minUp) / 2;
 
-    const padding = 1.04;
-    const camera = new THREE.Vector3();
-    const fits = (distance: number): boolean => {
-      camera.copy(this.cameraTarget).addScaledVector(dir, distance);
-      for (const corner of corners) {
-        this.tmpRelative.copy(corner).sub(camera);
-        const depth = this.tmpRelative.dot(forward);
-        if (depth < 0.5) return false;
-        if (Math.abs(this.tmpRelative.dot(right)) * padding > tanX * depth) return false;
-        if (Math.abs(this.tmpRelative.dot(up)) * padding > tanY * depth) return false;
-      }
-      return true;
-    };
+    // 縁ぎりぎりだと影や光がはみ出して見えるので、少しだけ広げる
+    const padding = 1.06;
+    halfW *= padding;
+    halfH *= padding;
+    // 画面比に合わせて、足りない方を広げる。狭めると盤面が切れる
+    if (halfW / halfH < aspect) halfW = halfH * aspect;
+    else halfH = halfW / aspect;
 
-    let low = 4;
-    let high = 120;
-    for (let i = 0; i < 26; i++) {
-      const mid = (low + high) / 2;
-      if (fits(mid)) high = mid;
-      else low = mid;
-    }
-
-    this.frameDistance = high;
-    this.cameraBase.copy(this.cameraTarget).addScaledVector(dir, high);
-    this.camera.fov = fov;
-    this.camera.aspect = aspect;
+    /*
+     * カメラ本体の位置。正投影なので**距離は絵に影響しない**が、
+     * 近すぎると手前の物が near 面で切れる。盤面を必ず内側へ収める距離に置く。
+     */
+    const distance = 40;
+    this.frameDistance = distance;
+    this.cameraBase.copy(center).addScaledVector(dir, distance);
+    this.camera.left = -halfW;
+    this.camera.right = halfW;
+    this.camera.top = halfH;
+    this.camera.bottom = -halfH;
+    this.camera.near = 0.1;
+    this.camera.far = distance * 2 + 80;
     this.camera.updateProjectionMatrix();
     this.camera.position.copy(this.cameraBase);
     this.camera.lookAt(this.cameraTarget);
 
+    // 板をカメラの角度へ倒して正対させる。倒さないと縦に潰れて見える
+    for (const avatar of this.avatars.values()) avatar.setCameraPitch(pitch);
+
+    // 画面の縦がワールド何単位ぶん映っているか。正投影ではそのまま表示範囲の高さ
+    const visibleHeight = halfH * 2;
+
     // エフェクトの大きさを、いまの構図に対して相対的に決める。
-    // 画面の縦がワールド何単位ぶん映っているかを求め、その一定割合を
-    // 「大きめのエフェクト1つ分」の基準にする。こうしておくと、
-    // 画角や距離を変えても演出が画面を覆って白飛びすることがない。
-    const visibleHeight = 2 * high * tanY;
+    // 画面の縦がワールド何単位ぶん映っているかを基準にすると、
+    // 表示範囲を変えても演出が画面を覆って白飛びすることがない。
     this.vfxSizeScale = visibleHeight / VFX_REFERENCE_HEIGHT;
     this.vfx.setSizeScale(this.vfxSizeScale);
     // どんな演出でも、1枚の板が画面の高さのこの割合を超えないようにする
@@ -788,15 +826,14 @@ export class BattleStage {
      */
     // 縦長の画面ほど前後を広げる。左右に分かれた配置では余るのは常に縦なので、
     // ここを広げるほど画面が埋まり、モンスターも大きく映る
-    const spacing = 2.75 + 0.9 * portrait;
+    const spacing = 3.1 + 1.6 * portrait;
     /*
-     * 奥へ行くほど外へ押し出す量。
+     * 奥へ行くほど外へ押し出す量。**正投影にしたので0。**
      *
-     * **強くしすぎると必要な横幅が膨らみ、カメラが引いてモンスターが豆粒になる。**
-     * 実際に0.3で試したら、盤面の幅が7を超えて画面の上半分に小さく固まった。
-     * 遠近による内寄りを完全に打ち消す必要はない。ゆるい台形で十分に列に見える。
+     * 透視投影では奥のものが画面中央へ寄るため、押し出して打ち消していた。
+     * 正投影にはその寄りが無いので、押し出すと逆に外へ開いてしまう。
      */
-    const skew = 0.085;
+    const skew = 0;
     /*
      * 2つの列の間隔。**縦画面では詰め、横画面では離す。**
      * 縦画面は横が足りないので詰めて縦へ展開し、
@@ -840,11 +877,24 @@ export class BattleStage {
     // カメラを引かせる原因になるので削る(実測で占有率が2倍以上変わる)
     this.frameBox = {
       // 横は2つの列の外側だけ。左右に分かれた配置では、ここが幅を決める
-      halfWidth: maxAbsX + 0.7 - 0.32 * portrait,
-      zNear: maxZ + 1.1 - 0.7 * portrait,
-      zFar: minZ - 1.1 + 0.5 * portrait,
-      yBottom: -0.1,
-      yTop: 2.7 - 0.4 * portrait,
+      /*
+       * 横。**立ち位置だけでなく、板の幅を足す。**
+       *
+       * 板の幅は絵の縦横比で決まり、横長のゴーレムで半幅1.5ほどある。
+       * 立ち位置だけで枠を決めていたら、左右の列が画面の外へはみ出した。
+       * 左右に分かれた配置では、ここが盤面の大きさを決める。
+       */
+      halfWidth: maxAbsX + SPRITE_HALF_WIDTH - 0.15 * portrait,
+      zNear: maxZ + 1.0 - 0.5 * portrait,
+      /*
+       * 奥側だけ広く取る。**板をカメラの角度へ倒すと、頭が奥へ動く。**
+       * 背丈2.6の板を44度倒せば、頭は奥へ 2.6 × sin44 ≒ 1.8 移動する。
+       * ここを足さないと、一番奥の1体の頭が画面の上で切れる(実際に切れた)。
+       */
+      zFar: minZ - 3.0 + 0.5 * portrait,
+      yBottom: -0.3,
+      // 倒したぶん板は縦に縮む(2.6 × cos44 ≒ 1.9)ので、上は低くてよい
+      yTop: 2.2,
     };
   }
 

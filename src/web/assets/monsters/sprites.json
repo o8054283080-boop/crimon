@@ -15,6 +15,10 @@
     "bodyHue": 0.098,
     "aspect": 1.219
   },
+  "golem-GRASS": {
+    "bodyHue": 0.3,
+    "aspect": 1.219
+  },
   "griffon": {
     "bodyHue": 0.092,
     "aspect": 1.156
@@ -53,6 +57,10 @@
   },
   "wolf": {
     "bodyHue": 0.687,
+    "aspect": 1.089
+  },
+  "wolf-WATER": {
+    "bodyHue": 0.64,
     "aspect": 1.089
   }
 }

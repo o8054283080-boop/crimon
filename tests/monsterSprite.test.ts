@@ -102,6 +102,8 @@ describe("2Dと3Dの約束事", () => {
     // 勝利と、演出の畳み込み
     "playVictory",
     "resetMotion",
+    // カメラの見下ろし角(2Dは板を倒し、3Dは何もしない)
+    "setCameraPitch",
   ];
 
   const sources = {
