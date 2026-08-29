@@ -1857,6 +1857,7 @@ function goTutorialDestination(destination: TutorialDestination): void {
 }
 
 function buildTutorialFloatingPanel(): HTMLElement | null {
+  if (state.screen === "HOME") return null;
   const mission = nextTutorialMission(state.player);
   if (!mission) return null;
   const complete = canClaimTutorialMission(state.player, mission);
