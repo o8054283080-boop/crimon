@@ -1,0 +1,72 @@
+/* PR #155 final polish: no new image assets. Improve perceived sharpness of the
+   existing HOME raster art, strengthen press feedback, and lift the party. */
+
+/* Keep browser interpolation smooth and add a small contrast/saturation lift so
+   the existing WebP detail reads more cleanly without replacing the artwork. */
+.world-actions--left .world-action>img,
+.world-actions--right .world-action>img{
+  image-rendering:auto!important;
+  backface-visibility:hidden!important;
+  -webkit-font-smoothing:antialiased!important;
+  transform:translateZ(0)!important;
+  filter:contrast(1.08) saturate(1.05) brightness(1.025) drop-shadow(0 6px 8px rgba(0,0,0,.76))!important;
+  transition:transform .08s ease,filter .08s ease!important;
+}
+
+/* Make the side destinations visually a little larger, but avoid aggressive
+   raster upscaling. The hit areas grow more than the source image itself. */
+.world-actions--left{width:102px!important}
+.world-actions--left .world-action{width:100px!important;min-width:100px!important;height:84px!important;min-height:84px!important}
+.world-actions--left .world-action>img{width:96%!important;height:96%!important;left:2%!important;top:2%!important}
+
+.world-actions--right{width:108px!important;right:-2px!important}
+.world-actions--right .world-action{width:106px!important;min-width:106px!important;height:104px!important;min-height:104px!important;margin:-2px 0!important}
+.world-actions--right .world-action>img{width:96%!important;height:96%!important;left:2%!important;top:2%!important}
+
+/* Strong, unmistakable tap state. */
+.world-actions--left .world-action:active>img,
+.world-actions--right .world-action:active>img{
+  transform:translateY(3px) scale(.91) translateZ(0)!important;
+  filter:contrast(1.12) saturate(1.1) brightness(1.24) drop-shadow(0 2px 3px rgba(0,0,0,.9))!important;
+}
+.world-actions--left .world-action:active,
+.world-actions--right .world-action:active{
+  opacity:.9!important;
+}
+
+/* Reduce the soft veil over the world art and add a very fine non-raster
+   texture layer. This preserves the existing background while making edges and
+   masonry read less muddy on high-DPI phones. */
+.home-world{
+  background-position:center 48%!important;
+  image-rendering:auto!important;
+}
+.home-world::before{
+  filter:contrast(1.05) saturate(1.04)!important;
+}
+.home-world::after{
+  background-image:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.008) 0 1px,transparent 1px 4px)!important;
+  mix-blend-mode:soft-light!important;
+  opacity:.28!important;
+}
+.world-atmosphere__moonbeam{filter:blur(2px)!important}
+.world-atmosphere__haze{filter:blur(1px)!important;opacity:.72!important}
+
+/* Lift the entire monster formation so the front monster clears CURRENT PARTY. */
+.world-party{transform:translateY(-24px)!important}
+
+@media(max-width:405px){
+  .world-actions--left{width:94px!important;left:-3px!important}
+  .world-actions--left .world-action{width:92px!important;min-width:92px!important;height:76px!important;min-height:76px!important}
+  .world-actions--right{width:102px!important;right:-4px!important}
+  .world-actions--right .world-action{width:100px!important;min-width:100px!important;height:96px!important;min-height:96px!important}
+  .world-party{transform:translateY(-28px)!important}
+}
+
+@media(max-height:860px){
+  .world-actions--left .world-action{height:72px!important;min-height:72px!important}
+  .world-actions--right .world-action{height:88px!important;min-height:88px!important;margin:-2px 0!important}
+  .world-party{transform:translateY(-30px)!important}
+}
