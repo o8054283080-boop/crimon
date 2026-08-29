@@ -125,6 +125,29 @@
 /* All 30 rewards claimed: remove the HOME beginner-mission item completely. */
 .home-screen .crimon-tutorial:has(.crimon-tutorial__complete) { display: none !important; }
 
+/* Monster dex: show the real three latent-awakening destinations for Skill 1. */
+.dex-latent h2 { margin-bottom: 6px; }
+.dex-latent__choices { display: grid; gap: 8px; margin-top: 10px; }
+.dex-latent__choice {
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border: 1px solid rgba(192, 139, 255, .3);
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(79, 47, 105, .22), rgba(15, 11, 25, .52));
+}
+.dex-latent__choice strong { color: #f2ddff; font-size: .88rem; }
+.dex-latent__choice p { margin: 0; color: #d7cfdf; font-size: .76rem; line-height: 1.5; }
+.dex-latent__number {
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #e8c8ff;
+  background: rgba(151, 89, 204, .18);
+  font-size: .64rem;
+  font-weight: 900;
+}
+
 @media (max-width: 410px), (max-height: 860px) {
   .home-screen .crimon-tutorial {
     left: max(88px, calc(env(safe-area-inset-left) + 88px));
