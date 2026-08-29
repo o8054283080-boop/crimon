@@ -29,10 +29,17 @@ export interface ScreenAnchor {
 }
 
 /**
- * カメラの方位角(度)。負の値でユニットが向いている側へ回り込む。
- * 0にすると自軍が真後ろからしか映らなくなるので、0へ戻さないこと。
+ * カメラの方位角(度)。
+ *
+ * **左右に分かれた配置になったので0にしてある。**
+ * 以前は手前が味方・奥が敵という奥行きの配置で、真正面から見ると
+ * 自軍が真後ろからしか映らなかったため、回り込んで斜めから見ていた。
+ * いま両チームは左右に立ち、どちらも横向きの姿を見せているので、
+ * 回すと**列が斜めに傾いて左右の対称が崩れる**だけになる。
+ *
+ * 手で回す `orbitYaw` はそのまま効く(自分のモンスターを覗き込むため)。
  */
-const CAMERA_AZIMUTH_DEG = -15;
+const CAMERA_AZIMUTH_DEG = 0;
 
 /** 指を横へ画面幅いっぱい滑らせた時に回る角度(ラジアン) */
 const ORBIT_SPEED = Math.PI * 1.1;
@@ -43,75 +50,65 @@ const ORBIT_SPEED = Math.PI * 1.1;
  */
 const ORBIT_LIMIT = THREE.MathUtils.degToRad(100);
 
-const PLAYER_LINE_Z = 3.8;
-const ENEMY_LINE_Z = -5.0;
+/** 演出の中心に使う、盤面のおおよその奥行き */
+const FIELD_DEPTH = 4.0;
 
 /**
  * 画面の縦長さの度合い(0=横長、1=かなり縦長)。
  *
- * 縦画面では、両チームを横一列に広げた構図がまったく合わない。
- * 必要な「幅」でカメラ距離が決まってしまうため、カメラが大きく引き、
- * 余った縦方向が床と壁だけの空白になる(実機の縦持ちで実際にそうなった)。
- *
- * そこで縦長の画面では**隊列そのものを組み直す**。
- * 横を詰めて必要な幅を減らし、前後を広げて余った縦を使う。
+ * 左右に分かれた配置では、必要な幅は「2つの列の間隔」で決まって動かない。
+ * 余るのは常に縦方向なので、**縦長の画面ほど前後の間隔を広げて**
+ * 余った縦を使う。逆に横長の画面では詰める。
  */
 function portraitAmount(aspect: number): number {
   return THREE.MathUtils.clamp((0.8 - aspect) / 0.4, 0, 1);
 }
 
 /**
- * 奥の列を広げる倍率。
+ * 味方と敵を分ける左右の距離。**味方が左、敵が右。**
  *
- * 遠くのものは透視投影で中央へ寄るため、両チームを同じ間隔で置くと
- * 奥の列が画面上で詰まり、手前の列の真後ろに隠れてしまう。
- * (カメラ距離 ÷ 奥の列までの距離)のおおよその比で、あらかじめ
- * 奥の列だけ横に広げておき、画面上で同じ間隔に見えるようにする。
+ * 以前は手前(+Z)が味方・奥(-Z)が敵という奥行きの配置だった。
+ * 3Dモデルなら成立するが、2Dの絵は横向きの姿しか持たないので、
+ * 奥行きで分けると**両チームが同じ方を向いて並ぶ**ことになる。
+ * 左右に分ければ、絵の向きがそのまま「向かい合っている」に読める。
+ *
+ * 画面の左右の端はHPと行動ゲージの札が使うので、**本体はやや内側**に立たせる。
+ * 外へ出すと札と場所を取り合い、モンスターが札の裏へ隠れる。
  */
-const ENEMY_SPREAD = 1.24;
+const LANE_X = 1.58;
+/** 横長の画面で列を離す追加ぶん。横に余るので、その余りを列の間隔に使う */
+const LANE_X_WIDE = 3.1;
 
 /**
- * 隊列の並び。
+ * 立ち位置。**左右に分かれて縦に並ぶ。**
  *
- * 望遠寄りのカメラだと前後の列が画面上で重なりやすいので、
- * 奥の列を「手前の列の隙間」に来るよう半歩ずらしたうえで、
- * 上記の ENEMY_SPREAD で遠近による詰まりを打ち消す。
- * さらに端のユニットをわずかに前後させ、直線的な整列を崩して奥行きを出す。
+ * 味方は左の列、敵は右の列。列の中は手前(+Z)から奥(-Z)へ順に置く。
+ * カメラは斜め上から見下ろすので、前後の隔たりが画面の上下になる。
+ *
+ * 遠近で奥のものは画面中央へ寄って見える。そのままだと列が
+ * ハの字に潰れるので、**奥ほど外へ押し出して縦の列に見せる**
+ * (`skew`)。押しすぎると今度は外へ開くので、実際に見て決めた値。
  */
 function slotPositions(
   count: number,
-  lineZ: number,
   team: "PLAYER" | "ENEMY",
-  /** 横の詰め具合。縦長の画面では1未満にして、必要な画角の幅を減らす */
-  lateral = 1,
-  /** 1チームを何段に折るか。縦長の画面では2段にして横幅を半分にする */
-  rows = 1,
-  /** 奥の列を広げる倍率。縦画面では正面寄りに見るので、広げる必要が薄れる */
-  enemySpread = ENEMY_SPREAD,
+  /** 前後の間隔。縦に余裕のある画面では広げる */
+  spacing = 2.25,
+  /** 奥へ行くほど外へ押し出す量。遠近で内側へ寄るのを打ち消す */
+  skew = 0.34,
+  /** 2つの列の間隔。横長の画面では離す */
+  laneX = LANE_X,
 ): { x: number; z: number }[] {
   if (count <= 0) return [];
-  const isEnemy = team === "ENEMY";
-  const perRow = Math.ceil(count / rows);
-  const baseSpacing = (perRow <= 4 ? 2.5 : 2.24) * lateral;
-  const spacing = baseSpacing * (isEnemy ? enemySpread : 1);
-  // 半スロット分ずらして、奥の列が手前の列の隙間に覗くようにする
-  const shift = (isEnemy ? 1 : -1) * (baseSpacing / 4) * (isEnemy ? enemySpread : 1);
-  // 段の間隔。詰めすぎると後ろの段が前の段に隠れる
-  const rowGap = 2.05;
+  const side = team === "PLAYER" ? -1 : 1;
+  const total = (count - 1) * spacing;
 
   return Array.from({ length: count }, (_, i) => {
-    const row = Math.floor(i / perRow);
-    const inRow = i % perRow;
-    const rowCount = Math.min(perRow, count - row * perRow);
-    const totalWidth = (rowCount - 1) * spacing;
-    // 後ろの段は半スロットずらして、前の段の隙間から覗くようにする
-    const rowShift = row % 2 === 1 ? spacing / 2 : 0;
-    const x = -totalWidth / 2 + inRow * spacing + shift + rowShift;
-    // 手前の列は端ほど奥へ、奥の列は端ほど手前へ。ゆるい弧を描かせる
-    const arc = Math.abs(x) * (isEnemy ? 0.09 : -0.1);
-    // 段が増えるぶんは、そのチームが「奥へ」伸びる向きに置く
-    const rowDepth = row * rowGap * (isEnemy ? -1 : 1);
-    return { x, z: lineZ + arc + rowDepth };
+    // 先頭(i=0)が手前。奥へ向かって並ぶ
+    const z = total / 2 - i * spacing;
+    // 奥(zが小さい)ほど外側へ
+    const push = (total / 2 - z) * skew;
+    return { x: side * (laneX + push), z };
   });
 }
 
@@ -588,8 +585,8 @@ export class BattleStage {
     let minZ = Infinity;
 
     const placed: { avatar: BattleAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
-    const place = (list: StageUnitInit[], lineZ: number, team: "PLAYER" | "ENEMY") => {
-      const slots = slotPositions(list.length, lineZ, team);
+    const place = (list: StageUnitInit[], team: "PLAYER" | "ENEMY") => {
+      const slots = slotPositions(list.length, team);
       list.forEach((unit, index) => {
         const avatar = createBattleAvatar({
           element: unit.def.element,
@@ -625,8 +622,8 @@ export class BattleStage {
       });
     };
 
-    place(players, PLAYER_LINE_Z, "PLAYER");
-    place(enemies, ENEMY_LINE_Z, "ENEMY");
+    place(players, "PLAYER");
+    place(enemies, "ENEMY");
 
     // 配置が確定してから、相手チームの中心へ向け直す。
     // 両チームを同じ向きへ回すと正面がすれ違って互いの脇を見てしまうので、
@@ -664,17 +661,33 @@ export class BattleStage {
   private frameCamera(width: number, height: number): void {
     const aspect = width / height;
     const portraitFov = portraitAmount(aspect);
-    // 横長ほど望遠に、縦長では収まりを優先して広角にする。
-    // 縦画面で望遠のままだと、必要な幅を稼ぐためにカメラが極端に引き、
-    // モンスターが豆粒になる。多少の遠近の誇張より、大きく映る方が価値がある
-    const fov = THREE.MathUtils.clamp(34 - (aspect - 0.6) * 9 + 9 * portraitFov, 24.5, 45);
+    /*
+     * 画角。**左右に分かれた配置では望遠寄りにする。**
+     *
+     * 以前は縦画面ほど広角にしていた。両チームを横一列に広げていた頃は、
+     * 必要な「幅」を稼ぐために広角でないとカメラが極端に引いたため。
+     * いま盤面は縦に深いので、広角のままだと**手前と奥で大きさが2倍以上変わり、
+     * 奥の列が豆粒になる**(実測で手前のスライムが奥のフェアリーの2.5倍あった)。
+     * 望遠に寄せると前後の大きさが揃い、列として読める。
+     */
+    const fov = THREE.MathUtils.clamp(34 - (aspect - 0.6) * 9 + 2 * portraitFov, 24.5, 38);
     // 見下ろし角。浅いと前後の列が画面上で潰れて重なるので、
     // 奥行きが縦方向の距離に変換される程度まで見下ろす。
     // 縦長の画面ではさらに深くする。余っている縦方向へ前後の列を展開して、
     // 床と壁だけの空白を埋めるため
     const portrait = portraitAmount(aspect);
-    const pitchMax = 27 + 9 * portrait;
-    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(fov / 2 + 6 + 8 * portrait, 18, pitchMax));
+    /*
+     * 見下ろし角。浅いと前後の列が画面上で潰れて重なる。
+     * 一方で深すぎると、盤面の手前に**床だけの空白**が広く映る
+     * (縦画面で画面の1/4が床になっていた)。前後が分かれる程度に留める。
+     */
+    /*
+     * 横長の画面では**深く見下ろす**。縦の余地が390pxしかないので、
+     * 浅いと1チーム4体が画面上でほとんど同じ高さに重なる(実際に重なった)。
+     * 縦長の画面は縦に余裕があるので、そこまで深くしなくても分かれる。
+     */
+    const pitchMax = 31 - 3 * portrait;
+    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(fov / 2 + 11 - 3 * portrait, 18, pitchMax));
 
     const tanY = Math.tan(THREE.MathUtils.degToRad(fov / 2));
     const tanX = tanY * aspect;
@@ -768,13 +781,29 @@ export class BattleStage {
      * 縦が余って見えるのは隊列の広がりが足りないからではなく、
      * 闘技場の客席が上に写り込んでいるため。直すならそちら側。
      */
-    const depth = 1 + 0.1 * portrait;
-    // 縦長の画面では1チームを2段に折る。横一列のままだと、必要な「幅」で
-    // カメラ距離が決まってしまい、モンスターが小さいまま縦が余る
-    const rows = portrait > 0.5 ? 2 : 1;
-    // 縦画面ではカメラを正面寄りに戻すので、遠近による詰まりが小さくなる。
-    // 奥の列を広げる必要が薄れるぶん、必要な幅も削れる
-    const enemySpread = ENEMY_SPREAD - (ENEMY_SPREAD - 1.06) * portrait;
+    /*
+     * 縦に余裕のある画面では前後の間隔を広げる。
+     * 左右に分かれた配置では、**余る方向は常に縦**なので、
+     * 横を詰めて縦へ展開するのが素直になった。
+     */
+    // 縦長の画面ほど前後を広げる。左右に分かれた配置では余るのは常に縦なので、
+    // ここを広げるほど画面が埋まり、モンスターも大きく映る
+    const spacing = 2.75 + 0.9 * portrait;
+    /*
+     * 奥へ行くほど外へ押し出す量。
+     *
+     * **強くしすぎると必要な横幅が膨らみ、カメラが引いてモンスターが豆粒になる。**
+     * 実際に0.3で試したら、盤面の幅が7を超えて画面の上半分に小さく固まった。
+     * 遠近による内寄りを完全に打ち消す必要はない。ゆるい台形で十分に列に見える。
+     */
+    const skew = 0.085;
+    /*
+     * 2つの列の間隔。**縦画面では詰め、横画面では離す。**
+     * 縦画面は横が足りないので詰めて縦へ展開し、
+     * 横画面は横が余るので離して縦の不足を補う。
+     * どちらも「余っている方向へ盤面を伸ばす」という同じ考え方。
+     */
+    const laneX = LANE_X + LANE_X_WIDE * (1 - portrait);
 
     let maxAbsX = 0;
     let maxZ = -Infinity;
@@ -784,8 +813,7 @@ export class BattleStage {
     for (const team of ["PLAYER", "ENEMY"] as const) {
       const members = this.formation.filter((entry) => entry.team === team);
       if (members.length === 0) continue;
-      const lineZ = (team === "PLAYER" ? PLAYER_LINE_Z : ENEMY_LINE_Z) * depth;
-      const slots = slotPositions(members[0].count, lineZ, team, lateral, rows, enemySpread);
+      const slots = slotPositions(members[0].count, team, spacing, skew, laneX);
       for (const entry of members) {
         const slot = slots[entry.index];
         if (!slot) continue;
@@ -811,11 +839,12 @@ export class BattleStage {
     // 収まり判定に足す余白。縦画面では、この余白そのものが
     // カメラを引かせる原因になるので削る(実測で占有率が2倍以上変わる)
     this.frameBox = {
-      halfWidth: maxAbsX + 0.85 - 0.45 * portrait,
-      zNear: maxZ + 1.6 - 0.9 * portrait,
-      zFar: minZ - 1.6 + 0.9 * portrait,
+      // 横は2つの列の外側だけ。左右に分かれた配置では、ここが幅を決める
+      halfWidth: maxAbsX + 0.7 - 0.32 * portrait,
+      zNear: maxZ + 1.1 - 0.7 * portrait,
+      zFar: minZ - 1.1 + 0.5 * portrait,
       yBottom: -0.1,
-      yTop: 2.9 - 0.5 * portrait,
+      yTop: 2.7 - 0.4 * portrait,
     };
   }
 
@@ -1308,7 +1337,7 @@ export class BattleStage {
     if (!avatar) return;
 
     // 衝撃は術者ではなく戦場の中央から広げ、盤面全体が揺れたように見せる
-    const center = this.tmpVector.set(0, 0.12, aoe ? 0 : ENEMY_LINE_Z * 0.6);
+    const center = this.tmpVector.set(0, 0.12, aoe ? 0 : -FIELD_DEPTH * 0.35);
     this.vfx.spawnAoeImpact(center, avatar.theme.vfx, {
       element: this.elementOf(actorId),
       aoe: true,

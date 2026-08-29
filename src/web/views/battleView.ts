@@ -199,12 +199,28 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   /** 重なり回避のために積み上げた、このフレームで確定済みのカード矩形 */
   const placedCards: { left: number; right: number; top: number; bottom: number }[] = [];
 
+  /**
+   * HPと行動ゲージの札を、**画面の左右の端に固定した2列**へ並べる。
+   *
+   * 以前は各モンスターの真上に浮かせていた。4体が固まると札どうしがぶつかり、
+   * 逃がし合った結果「上に積まれた札」と「下にいる本体」の対応が付かなくなる、
+   * という指摘を受けていた。逃がした距離ぶんの引き出し線まで足したが、
+   * 根本の問題は**札が本体と同じ場所を取り合っていること**だった。
+   *
+   * 味方が左・敵が右に立つ配置になったので、札も左右の端へ寄せる。
+   * 縦の位置だけを本体に合わせれば、**列の中の並び順で誰の札かが分かる。**
+   * 本体の上は空くので、モンスターが札に隠れない。
+   */
+  const HUD_EDGE = 6;
+
   function syncOverlay(): void {
     overlayFrame = requestAnimationFrame(syncOverlay);
     placedCards.length = 0;
 
-    // 奥(画面の上)にいるユニットから先に置く。手前のカードは
-    // ぶつかったら上へ逃がすので、奥のものを基準にした方が動きが小さい
+    const viewWidth = overlay.clientWidth || stageHost.clientWidth || 390;
+
+    // 画面の上にいるものから順に置く。ぶつかったら下へ送るので、
+    // 上から詰めた方が並び順が本体の並びと一致する
     const anchors = stage.computeScreenAnchors().sort((a, b) => a.y - b.y);
 
     for (const anchor of anchors) {
@@ -213,53 +229,42 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
       anchorPositions.set(anchor.instanceId, { x: anchor.x, y: anchor.y });
       const scale = Math.max(HUD_MIN_SCALE, anchor.scale);
-      refs.card.style.transform = `translate(-50%, -100%) scale(${scale.toFixed(3)})`;
+      const isPlayer = teamOf.get(anchor.instanceId) !== "ENEMY";
+      // 端の列では隣とぶつからないので、札を細くしてよい。
+      // **細くしたぶんだけ真ん中が空き、モンスターが大きく映る**
+      refs.card.classList.add("unit-hud--rail");
+      // 味方は左端から右へ、敵は右端から左へ伸ばす
+      refs.card.style.transform = `translate(${isPlayer ? "0" : "-100%"}, -50%) scale(${scale.toFixed(3)})`;
+      refs.card.style.transformOrigin = isPlayer ? "left center" : "right center";
       refs.card.style.visibility = anchor.visible ? "visible" : "hidden";
 
-      // カードは translate(-50%,-100%) で配置されるので、
-      // アンカーの真上・左右中央に矩形が来る
       const width = (refs.card.offsetWidth || 104) * scale;
       const height = (refs.card.offsetHeight || 46) * scale;
-      const lift = HUD_LIFT * scale;
-      let top = anchor.y - lift - height;
+      const anchorX = isPlayer ? HUD_EDGE : viewWidth - HUD_EDGE;
+      const left = isPlayer ? anchorX : anchorX - width;
+      const right = left + width;
 
-      // 既に置いたカードと重なる間、少しずつ逃がす。
-      // 隣り合うユニットの名前とHPが潰れて読めなくなるのを防ぐ。
-      // 上に空きが無くなったら下側へ回す(上端で潰し合うのを避ける)
-      const left = anchor.x - width / 2;
-      const right = anchor.x + width / 2;
+      // 縦は本体の高さに合わせ、ぶつかったぶんだけ下へ送る。
+      // 横は固定なので、同じ列の中でしかぶつからない
+      let top = anchor.y - height / 2;
       const overlaps = (candidate: number) =>
         placedCards.find(
           (r) => left < r.right - 2 && right > r.left + 2 && candidate < r.bottom - 2 && candidate + height > r.top + 2,
         );
-
       for (let guard = 0; guard < 8; guard++) {
         const hit = overlaps(top);
         if (!hit) break;
-        const above = hit.top - height - 3;
-        if (above >= 2) {
-          top = above;
-        } else {
-          // 上が詰まっているので、ぶつかった相手の下へ回す
-          top = hit.bottom + 3;
-        }
+        top = hit.bottom + 3;
       }
       top = Math.max(2, top);
 
       placedCards.push({ left, right, top, bottom: top + height });
-      refs.card.style.left = `${anchor.x}px`;
-      refs.card.style.top = `${top + height}px`;
+      refs.card.style.left = `${anchorX}px`;
+      refs.card.style.top = `${top + height / 2}px`;
 
-      /*
-       * 逃がした札は、本体から離れる。**離れた札は誰のものか分からなくなる。**
-       * 4体が固まった時に「上に積まれた札」と「下にいる本体」が
-       * 対応付かず、誰のHPを見ているのか分からない、という指摘を受けた。
-       * 逃がした距離ぶんだけ細い線を下ろし、足元に小さな点を打つ。
-       * 距離は札の拡大率で割る(線は札の中にあるので一緒に拡大される)。
-       */
-      const lead = (anchor.y - (top + height)) / scale;
-      refs.card.classList.toggle("unit-hud--lifted", lead > LEADER_MIN);
-      refs.leader.style.height = `${Math.max(0, Math.min(320, lead))}px`;
+      // 端に並べた札は本体と場所を取り合わないので、引き出し線は要らない
+      refs.card.classList.remove("unit-hud--lifted");
+      refs.leader.style.height = "0px";
     }
   }
   overlayFrame = requestAnimationFrame(syncOverlay);
