@@ -1,0 +1,87 @@
+/* HOME Phase 4 fix — show the generated 2x2 plate sprite cleanly. */
+.world-actions--right{
+  right:2px!important;
+  width:96px!important;
+  gap:2px!important;
+  align-items:center!important;
+}
+.world-actions--right .world-action{
+  position:relative!important;
+  width:94px!important;
+  min-height:92px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+  transform:none!important;
+}
+.world-actions--right .world-action::before{
+  content:""!important;
+  position:absolute!important;
+  inset:-3px!important;
+  width:auto!important;
+  height:auto!important;
+  left:-3px!important;
+  top:-3px!important;
+  border:0!important;
+  border-radius:0!important;
+  clip-path:none!important;
+  transform:none!important;
+  background-color:transparent!important;
+  background-repeat:no-repeat!important;
+  background-size:200% 200%!important;
+  box-shadow:none!important;
+  filter:drop-shadow(0 7px 9px rgba(0,0,0,.75))!important;
+  opacity:1!important;
+  z-index:3!important;
+  pointer-events:none!important;
+}
+.world-actions--right .world-action:nth-child(1)::before{background-position:0 0!important}
+.world-actions--right .world-action:nth-child(2)::before{background-position:100% 0!important}
+.world-actions--right .world-action:nth-child(3)::before{background-position:0 100%!important}
+.world-actions--right .world-action:nth-child(4)::before{background-position:100% 100%!important}
+.world-actions--right .world-action::after{display:none!important;content:none!important}
+.world-actions--right .world-action>img,
+.world-actions--right .world-action>span{visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+.world-actions--right .world-action:nth-child(1){min-height:99px!important;margin-bottom:-2px!important}
+.world-actions--right .world-action:nth-child(1)::before{
+  inset:-7px!important;
+  left:-7px!important;
+  top:-7px!important;
+  filter:drop-shadow(0 8px 10px rgba(0,0,0,.78)) drop-shadow(0 0 6px rgba(255,166,79,.32))!important;
+}
+.world-actions--right .world-action:active{transform:scale(.96)!important;filter:brightness(1.08)!important}
+.world-actions--right .world-action:focus-visible{outline:2px solid #f6d28e!important;outline-offset:-7px!important;border-radius:16px!important}
+.crimon-dungeon-chooser{
+  right:100px!important;
+  top:101px!important;
+  width:142px!important;
+  padding:7px!important;
+  gap:5px!important;
+  border:1px solid #7458a4!important;
+  border-radius:7px!important;
+  background:linear-gradient(145deg,#171121f7,#08070df5)!important;
+  box-shadow:inset 0 0 0 1px #c6a6ff24,0 12px 28px #000e,0 0 18px #6f4db449!important;
+  backdrop-filter:blur(8px)!important;
+}
+.crimon-dungeon-chooser button{
+  min-height:39px!important;
+  border:1px solid #56446f!important;
+  border-radius:5px!important;
+  background:linear-gradient(90deg,#241a34,#0f0c17)!important;
+  color:#f0e9f8!important;
+}
+@media(max-width:405px){
+  .world-actions--right{right:0!important;width:92px!important}
+  .world-actions--right .world-action{width:90px!important;min-height:88px!important}
+  .world-actions--right .world-action:nth-child(1){min-height:94px!important}
+  .crimon-dungeon-chooser{right:94px!important}
+}
+@media(max-height:860px){
+  .world-actions--right{gap:0!important}
+  .world-actions--right .world-action{min-height:82px!important}
+  .world-actions--right .world-action:nth-child(1){min-height:88px!important}
+  .crimon-dungeon-chooser{top:90px!important}
+}
