@@ -67,4 +67,3 @@ export function renderBottomNav(current: ScreenName, onNavigate: (screen: Screen
   );
   return el("nav", { className: "bottom-nav", ariaLabel: "メインナビゲーション" }, buttons);
 }
-
