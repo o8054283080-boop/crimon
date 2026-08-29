@@ -1,5 +1,6 @@
 import { MonsterDefinition } from "../../core/monster.js";
 import { formatExtraStatLines } from "../../core/stats.js";
+import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../../data/monsters.js";
 import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
@@ -29,6 +30,23 @@ function renderList(props: MonsterDexProps): HTMLElement {
   ]);
 }
 
+function renderLatentSkillChoices(dex: MonsterDefinition): HTMLElement {
+  const candidates = LATENT_ABILITY_CANDIDATES[dex.id] ?? [];
+  return el("section", { className: "panel dex-latent" }, [
+    el("h2", {}, ["潜在覚醒：スキル1強化"]),
+    el("p", { className: "app-subtitle" }, [
+      `${dex.skills[0]?.name ?? "スキル1"}は潜在覚醒すると、下の3つから強化先を1つ選べます。`,
+    ]),
+    el("div", { className: "dex-latent__choices" }, candidates.map((candidate, index) =>
+      el("article", { className: "dex-latent__choice" }, [
+        el("span", { className: "dex-latent__number" }, [`候補 ${index + 1}`]),
+        el("strong", {}, [candidate.name]),
+        el("p", {}, [candidate.description]),
+      ]),
+    )),
+  ]);
+}
+
 function renderDetail(props: MonsterDexProps, dex: MonsterDefinition): HTMLElement {
   const statLines = [
     `HP ${dex.stats.hp}`,
@@ -53,6 +71,7 @@ function renderDetail(props: MonsterDexProps, dex: MonsterDefinition): HTMLEleme
       ]),
       ...renderSkillGrowthRows(dex.skills),
     ]),
+    renderLatentSkillChoices(dex),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectEntry(null) }, ["◀ 図鑑一覧に戻る"]),
   ]);
 }
