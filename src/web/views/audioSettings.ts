@@ -9,7 +9,7 @@ export interface AudioSettingsProps {
   onTest: () => void;
 }
 
-function slider(label: string, value: number, disabled: boolean, onInput: (v: number) => void): HTMLElement {
+function slider(label: string, value: number, disabled: boolean, onCommit: (v: number) => void): HTMLElement {
   const percent = Math.round(value * 100);
   const readout = el("span", { className: "audio-settings__value" }, [`${percent}%`]);
   const input = el("input", {
@@ -23,7 +23,11 @@ function slider(label: string, value: number, disabled: boolean, onInput: (v: nu
     oninput: (event: Event) => {
       const next = Number((event.target as HTMLInputElement).value);
       readout.textContent = `${next}%`;
-      onInput(next / 100);
+    },
+    onchange: (event: Event) => {
+      const next = Number((event.target as HTMLInputElement).value);
+      readout.textContent = `${next}%`;
+      onCommit(next / 100);
     },
   });
   return el("label", { className: "audio-settings__row" }, [
