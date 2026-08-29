@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { MonsterDefinition } from "../../core/monster.js";
 import { MonsterAvatar } from "./monsterAvatar.js";
+import { ELEMENT_TINT, SPRITE_TINT, isElementSpecific, spriteUrlFor } from "./spriteArt.js";
+import { Element } from "../../core/element.js";
 
 /**
  * モンスターの肖像(アイコン)を、バトル画面と同じ3Dモデルから焼く。
@@ -115,6 +117,68 @@ function bake(def: MonsterDefinition): string | null {
   }
 }
 
+/** HSV → RGB。戦闘画面のシェーダ(spriteAvatar.ts)と同じ変換 */
+function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
+  const i = Math.floor(h * 6);
+  const f = h * 6 - i;
+  const p = v * (1 - s);
+  const q = v * (1 - f * s);
+  const t = v * (1 - (1 - f) * s);
+  switch (i % 6) {
+    case 0: return [v, t, p];
+    case 1: return [q, v, p];
+    case 2: return [p, v, t];
+    case 3: return [p, q, v];
+    case 4: return [t, p, v];
+    default: return [v, p, q];
+  }
+}
+
+/**
+ * 基本の絵を属性色へ寄せる。
+ *
+ * 式は戦闘画面のシェーダ(spriteAvatar.ts)と同じ。
+ * **混ぜるのではなく色相を差し替える。** 明暗と艶が残ったまま色だけ動く。
+ * 単純に色を混ぜると、濃い色の絵は変わらないか、量を上げると平たくなる。
+ */
+async function tintSprite(url: string, element: Element): Promise<string | null> {
+  try {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("読めない"));
+      image.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(image, 0, 0);
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { data } = frame;
+    const { hue, sat } = ELEMENT_TINT[element];
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] === 0) continue;
+      const r = data[i] / 255;
+      const g = data[i + 1] / 255;
+      const b = data[i + 2] / 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const s2 = max === 0 ? 0 : (max - min) / max;
+      const [nr, ng, nb] = hsvToRgb(hue, Math.min(1, s2 * sat), max);
+      data[i] += (nr * 255 - data[i]) * SPRITE_TINT;
+      data[i + 1] += (ng * 255 - data[i + 1]) * SPRITE_TINT;
+      data[i + 2] += (nb * 255 - data[i + 2]) * SPRITE_TINT;
+    }
+    ctx.putImageData(frame, 0, 0);
+    return canvas.toDataURL("image/webp", 0.9);
+  } catch {
+    return null;
+  }
+}
+
 /** 次のフレームまで待つ。焼く処理を1フレーム1体に散らして、操作を止めないため */
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
@@ -128,6 +192,36 @@ export function requestPortrait(def: MonsterDefinition): Promise<string | null> 
   const key = keyOf(def);
   const done = cache.get(key);
   if (done) return Promise.resolve(done);
+
+  /*
+   * 2Dの絵がある種族は、それをそのまま使う。
+   *
+   * **カードも図鑑もホームのロビーも、ここから絵をもらっている。**
+   * 3Dから焼いていた頃は、カード1枚ごとにWebGLで1体組み立てて撮っていた。
+   * 2Dの絵があるなら焼く必要がない。戦闘で見る姿とカードの姿も、
+   * 同じ1枚なので確実に一致する。
+   */
+  const sprite = spriteUrlFor(def.templateId, def.element);
+  if (sprite) {
+    if (isElementSpecific(def.templateId, def.element)) {
+      // その属性のために描かれた絵。色はもう付いているので、そのまま使う
+      cache.set(key, sprite);
+      return Promise.resolve(sprite);
+    }
+    // 基本の絵は全属性で共有しているので、属性色へ寄せてから使う。
+    // **寄せないと「スライム[火]」が青いまま並ぶ。**
+    // 戦闘画面のシェーダ(spriteAvatar.ts)と同じ式にしてあり、
+    // カードで見た色と戦闘で見た色が食い違わない
+    const task = tintSprite(sprite, def.element).then((url) => {
+      pending.delete(key);
+      const result = url ?? sprite;
+      cache.set(key, result);
+      return result;
+    });
+    pending.set(key, task);
+    return task;
+  }
+
   const running = pending.get(key);
   if (running) return running;
 

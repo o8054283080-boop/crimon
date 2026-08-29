@@ -7,7 +7,7 @@ import { Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { ArenaHandles, createArena } from "./arena.js";
 import { moodFor, StageMood } from "./elementTheme.js";
-import { MonsterAvatar } from "./monsterAvatar.js";
+import { BattleAvatar, createBattleAvatar } from "./avatarFactory.js";
 import { CinematicPass } from "./postfx/cinematicPass.js";
 import { HitStyle, StatusAuraKind, VfxElement, VfxSystem } from "./vfx.js";
 
@@ -194,11 +194,11 @@ export class BattleStage {
    * どんな光が来ても必ず床が暗くなるようにしている。
    * (乗算は「掛け算」なので、上に光を足しても比率として残る)
    */
-  private readonly contactShadows: { mesh: THREE.Mesh; avatar: MonsterAvatar }[] = [];
+  private readonly contactShadows: { mesh: THREE.Mesh; avatar: BattleAvatar }[] = [];
   /** 闘技場から焼いた映り込み用の環境マップ。破棄時に手放す */
   private environmentTarget: THREE.WebGLRenderTarget | null = null;
   private readonly vfx = new VfxSystem();
-  private readonly avatars = new Map<string, MonsterAvatar>();
+  private readonly avatars = new Map<string, BattleAvatar>();
   /** エフェクトの出し分けに使う、ユニットごとの属性 */
   private readonly unitElements = new Map<string, VfxElement>();
   /** 当たり方の質感。役割から決める(前衛は斬撃、重量級は打撃、後衛は魔法) */
@@ -225,7 +225,7 @@ export class BattleStage {
   private frameBox: FrameBox = { halfWidth: 5.4, zNear: 4.4, zFar: -4.9, yBottom: -0.1, yTop: 3.3 };
   /** 画面比が変わった時に隊列を組み直すための控え */
   private formation: {
-    avatar: MonsterAvatar;
+    avatar: BattleAvatar;
     light: THREE.PointLight;
     team: "PLAYER" | "ENEMY";
     index: number;
@@ -434,7 +434,7 @@ export class BattleStage {
    * 「足元だけ明るい」状態になっていた。乗算合成なら後から光を足されても
    * 比率として暗さが残るので、必ず接地して見える。
    */
-  private addContactShadow(avatar: MonsterAvatar): void {
+  private addContactShadow(avatar: BattleAvatar): void {
     const proxy = avatar.hitArea as THREE.Mesh;
     const params = (proxy.geometry as THREE.BoxGeometry).parameters;
     // 当たり判定の箱は footprint の 1.15 倍で作られている
@@ -587,11 +587,11 @@ export class BattleStage {
     let maxZ = -Infinity;
     let minZ = Infinity;
 
-    const placed: { avatar: MonsterAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
+    const placed: { avatar: BattleAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
     const place = (list: StageUnitInit[], lineZ: number, team: "PLAYER" | "ENEMY") => {
       const slots = slotPositions(list.length, lineZ, team);
       list.forEach((unit, index) => {
-        const avatar = new MonsterAvatar({
+        const avatar = createBattleAvatar({
           element: unit.def.element,
           role: unit.def.role,
           templateId: unit.def.templateId,
@@ -779,7 +779,7 @@ export class BattleStage {
     let maxAbsX = 0;
     let maxZ = -Infinity;
     let minZ = Infinity;
-    const placed: { avatar: MonsterAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
+    const placed: { avatar: BattleAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
 
     for (const team of ["PLAYER", "ENEMY"] as const) {
       const members = this.formation.filter((entry) => entry.team === team);
@@ -1145,7 +1145,7 @@ export class BattleStage {
     this.desiredLookOffset.set(position.x * 0.2, 0.12, position.z * 0.1);
   }
 
-  getAvatar(instanceId: string): MonsterAvatar | undefined {
+  getAvatar(instanceId: string): BattleAvatar | undefined {
     return this.avatars.get(instanceId);
   }
 
