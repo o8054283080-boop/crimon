@@ -1,5 +1,6 @@
 /* Final screenshot-fit overrides for PR #151. */
 .home-world{height:calc(100dvh - var(--bottom-nav-h) - 138px)!important}
-.crimon-home>.reward-banner{width:150px!important}
+.crimon-home{background:radial-gradient(ellipse 92% 22% at 50% 86%,#6d348b2e,transparent 72%),repeating-linear-gradient(90deg,#d2ad5b0a 0 1px,transparent 1px 52px),linear-gradient(180deg,#030207 0%,#030207 76%,#0a0610 100%)!important}
+.crimon-home>.reward-banner{width:170px!important}
 @media(min-height:880px){.home-world{height:calc(100dvh - var(--bottom-nav-h) - 122px)!important}}
-@media(max-height:860px){.crimon-home>.reward-banner{width:144px!important}}
+@media(max-height:860px){.crimon-home>.reward-banner{width:164px!important}}
