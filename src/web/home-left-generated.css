@@ -1,13 +1,13 @@
 /* HOME left utilities — generated plate pass.
-   Keep the existing four plate assets; only fix their crop and spacing. */
+   Keep the existing four plate assets; only fix crop, spacing, size and press feedback. */
 .world-actions--left{
   display:flex!important;
   flex-direction:column!important;
   visibility:visible!important;
   opacity:1!important;
-  left:-2px!important;
-  width:92px!important;
-  gap:4px!important;
+  left:-5px!important;
+  width:102px!important;
+  gap:2px!important;
   align-items:center!important;
   z-index:39!important;
 }
@@ -16,10 +16,10 @@
   display:block!important;
   visibility:visible!important;
   opacity:1!important;
-  width:90px!important;
-  min-width:90px!important;
-  height:82px!important;
-  min-height:82px!important;
+  width:100px!important;
+  min-width:100px!important;
+  height:88px!important;
+  min-height:88px!important;
   padding:0!important;
   margin:0!important;
   border:0!important;
@@ -31,37 +31,17 @@
   clip-path:none!important;
   transform:none!important;
   isolation:isolate!important;
+  transition:transform .08s ease,filter .08s ease!important;
 }
 .world-actions--left .world-action::before,
-.world-actions--left .world-action::after{
-  content:none!important;
-  display:none!important;
-  background:none!important;
-  background-image:none!important;
-}
+.world-actions--left .world-action::after{content:none!important;display:none!important;background:none!important;background-image:none!important}
 .world-actions--left .world-action>img{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-  position:absolute!important;
-  inset:0!important;
-  width:100%!important;
-  height:100%!important;
-  max-width:none!important;
-  max-height:none!important;
-  margin:0!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:none!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  z-index:2!important;
-  pointer-events:none!important;
-  filter:drop-shadow(0 5px 7px rgba(0,0,0,.72))!important;
-  transform:none!important;
-  /* The source WebPs include a faint square fringe. Fade only that fringe;
-     the ornate plate itself stays fully opaque. */
+  display:block!important;visibility:visible!important;opacity:1!important;
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+  background:none!important;object-fit:contain!important;object-position:center!important;z-index:2!important;pointer-events:none!important;
+  filter:contrast(1.06) saturate(1.04) drop-shadow(0 6px 8px rgba(0,0,0,.76))!important;
+  transform:translateZ(0)!important;image-rendering:auto!important;
   -webkit-mask-image:radial-gradient(ellipse 49% 47% at 50% 50%,#000 0 72%,rgba(0,0,0,.98) 78%,rgba(0,0,0,.72) 86%,rgba(0,0,0,.18) 94%,transparent 100%)!important;
   mask-image:radial-gradient(ellipse 49% 47% at 50% 50%,#000 0 72%,rgba(0,0,0,.98) 78%,rgba(0,0,0,.72) 86%,rgba(0,0,0,.18) 94%,transparent 100%)!important;
 }
@@ -69,32 +49,10 @@
 .world-actions--left .world-action:nth-child(2)>img{content:url('/src/web/assets/home/home-left-dex.webp')!important}
 .world-actions--left .world-action:nth-child(3)>img{content:url('/src/web/assets/home/home-left-ranking.webp')!important}
 .world-actions--left .world-action:nth-child(4)>img{content:url('/src/web/assets/home/home-left-help.webp')!important}
-
-/* Generated plates already carry their visible labels. Keep DOM text for semantics only. */
-.world-actions--left .world-action>span{
-  position:absolute!important;
-  width:1px!important;
-  height:1px!important;
-  padding:0!important;
-  margin:-1px!important;
-  overflow:hidden!important;
-  clip:rect(0 0 0 0)!important;
-  white-space:nowrap!important;
-  border:0!important;
-  background:none!important;
-  box-shadow:none!important;
-  opacity:0!important;
-  pointer-events:none!important;
-}
-.world-actions--left .world-action:active>img{transform:scale(.96)!important;filter:brightness(1.08) drop-shadow(0 5px 7px rgba(0,0,0,.78))!important}
+.world-actions--left .world-action>span{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important;background:none!important;box-shadow:none!important;opacity:0!important;pointer-events:none!important}
+.world-actions--left .world-action:active{transform:translateY(2px) scale(.91)!important;filter:brightness(1.2)!important}
+.world-actions--left .world-action:active>img{transform:scale(.96)!important;filter:brightness(1.25) contrast(1.1) drop-shadow(0 2px 3px rgba(0,0,0,.9))!important}
 .world-actions--left .world-action:focus-visible{outline:2px solid #e6c58a!important;outline-offset:-6px!important}
 .world-actions--left .world-action:disabled{opacity:.72!important;filter:saturate(.72)!important}
-
-@media(max-width:405px){
-  .world-actions--left{left:-4px!important;width:86px!important;gap:3px!important}
-  .world-actions--left .world-action{width:84px!important;min-width:84px!important;height:76px!important;min-height:76px!important;margin:0!important}
-}
-@media(max-height:860px){
-  .world-actions--left{gap:2px!important}
-  .world-actions--left .world-action{height:70px!important;min-height:70px!important;margin:0!important}
-}
+@media(max-width:405px){.world-actions--left{left:-7px!important;width:96px!important;gap:1px!important}.world-actions--left .world-action{width:94px!important;min-width:94px!important;height:80px!important;min-height:80px!important}}
+@media(max-height:860px){.world-actions--left{gap:0!important}.world-actions--left .world-action{height:74px!important;min-height:74px!important}}
