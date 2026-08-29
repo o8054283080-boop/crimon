@@ -15,7 +15,7 @@
  * 常駐サーバ(harness.mjs)が要る。HARNESS_PORT で待ち受け先を変えられる。
  */
 import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { resolve } from "node:path";
 
 const PORT = Number(process.env.HARNESS_PORT ?? 5311);
 
@@ -42,21 +42,25 @@ async function call(command, body = {}) {
  * `then` だけは、対応する目印がまだ無い画面のために文言で残している。
  */
 const SCREENS = [
+  // 下部タブから直接行ける5つ
   { name: "ホーム", tab: "HOME" },
   { name: "モンスター", tab: "MONSTERS" },
   { name: "装備", tab: "EQUIPMENT" },
-  { name: "パーティ", tab: "PARTY" },
-  { name: "ステージ", tab: "STAGES" },
-  // 下部タブは5つに絞ってあるので、残りはホームの一覧から入る
-  { name: "召喚", tab: "HOME", tile: "summon" },
-  { name: "ショップ", tab: "HOME", tile: "shop" },
-  { name: "装備ダンジョン", tab: "HOME", tile: "equipDungeon" },
-  { name: "レベル上げダンジョン", tab: "HOME", tile: "trainDungeon" },
-  { name: "ゴールドダンジョン", tab: "HOME", tile: "goldDungeon" },
+  { name: "召喚", tab: "SUMMON" },
+  { name: "ショップ", tab: "SHOP" },
+  // ホームの世界(左右の縦列)から入るもの。
+  // **目印は絵の名前から機械的に作られる**(menu-dex → tile:dex)ので、
+  // ここの名前も絵に合わせること
+  { name: "ステージ", tab: "HOME", tile: "adventure" },
+  { name: "パーティ", tab: "HOME", tile: "party" },
   { name: "アリーナ", tab: "HOME", tile: "arena" },
   { name: "試練の塔", tab: "HOME", tile: "tower" },
-  { name: "遊び方", tab: "HOME", tile: "info" },
-  { name: "モンスター図鑑", tab: "MONSTERS", then: "📖 図鑑" },
+  { name: "遊び方", tab: "HOME", tile: "help" },
+  { name: "モンスター図鑑", tab: "HOME", tile: "dex" },
+  // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く
+  { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
+  { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
+  { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },
 ];
 
 const SIZES = [
@@ -106,6 +110,27 @@ async function waitReady(timeoutMs = 15000) {
   }
 }
 
+/**
+ * タイトル(START)を実際に押して、ホームを露出させる。
+ *
+ * **これが無いと巡回が嘘をつく。** タイトルは全面を覆う固定要素なので、
+ * その裏にある下タブは `querySelector` でも `.click()` でも掴めてしまう
+ * (プログラムからのクリックは覆われていても成功する)。
+ * その結果「ホーム = 問題なし」と報告しながら、実際に見ていたのは
+ * タイトル画面だった。ホームは巡回の一番目なので、丸ごと素通りしていた。
+ */
+async function pressStart() {
+  const res = await call("eval", {
+    expression: `(async () => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      const start = document.querySelector('[data-tour="start"]');
+      if (start) { start.click(); await wait(500); }
+      return document.querySelector(".title-screen") ? "タイトルが消えない" : "ok";
+    })()`,
+  });
+  return res.ok ? res.value : `検査に失敗: ${res.error ?? "不明"}`;
+}
+
 async function goScreen(screen) {
   const clicked = await call("eval", {
     expression: `(async () => {
@@ -119,6 +144,14 @@ async function goScreen(screen) {
           ? `const tile = document.querySelector('[data-tour="tile:' + ${JSON.stringify(screen.tile)} + '"]');
              if (!tile) return '一覧の枠が無い: ' + ${JSON.stringify(screen.tile)};
              tile.click();
+             await wait(350);`
+          : ""
+      }
+      ${
+        screen.tile2
+          ? `const tile2 = document.querySelector('[data-tour="tile:' + ${JSON.stringify(screen.tile2)} + '"]');
+             if (!tile2) return '2段目の枠が無い: ' + ${JSON.stringify(screen.tile2)};
+             tile2.click();
              await wait(350);`
           : ""
       }
@@ -164,6 +197,12 @@ async function main() {
       failures += 1;
       continue;
     }
+    const started = await pressStart();
+    if (started !== "ok") {
+      report.push({ 画面: "(タイトル)", 画面比: size.label, 結果: started });
+      failures += 1;
+      continue;
+    }
 
     for (const screen of SCREENS) {
       let moved = await goScreen(screen);
@@ -186,7 +225,8 @@ async function main() {
       const found = [...(inspected.value?.problems ?? []), ...runtime];
 
       if (shotDir) {
-        await call("shot", { path: join(process.cwd(), shotDir, `${size.width}x${size.height}-${screen.name}.png`) });
+        // 絶対パスで渡された時に cwd を前置しない(join だと /home/... の下へ潜り込む)
+        await call("shot", { path: resolve(shotDir, `${size.width}x${size.height}-${screen.name}.png`) });
       }
 
       if (found.length > 0) failures += found.length;

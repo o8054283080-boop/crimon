@@ -531,7 +531,6 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
   const boss = isTowerBossFloor(floor.floor);
   const check = isTowerCheckpoint(floor.floor);
   const locked = floor.floor > props.nextFloor;
-  const bossName = floor.floor >= 70 && boss ? floor.name.replace(`${floor.floor}階 `, "") : "";
 
   const classes = [
     "tower-step",
@@ -554,7 +553,9 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
       el("span", { className: "tower-step__no" }, [String(floor.floor)]),
       passed ? el("span", { className: "tower-step__check" }, ["✓"]) : null,
       now ? el("span", { className: "tower-step__now" }, ["今"]) : null,
-      bossName ? el("span", { className: "tower-step__boss-name" }, [bossName]) : null,
+      // 関門の名前(超再生・免疫…)はここには出さない。
+      // 1辺30pxの石に入れると7pxまで縮み、実機で読めなかった。
+      // 名前は節の見出し(.tower-band__boss)と、この石の title / aria-label が持つ
     ]),
   );
 }

@@ -1092,21 +1092,6 @@
   filter: saturate(0.45);
 }
 
-.tower-step__boss-name {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  bottom: 2px;
-  overflow: hidden;
-  font-size: 0.46rem;
-  font-weight: 900;
-  line-height: 1;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #ffd970;
-}
-
 .tower-step__check {
   position: absolute;
   top: 2px;

@@ -25,6 +25,22 @@ export const ELEMENT_JA: Record<Element, string> = {
   DARK: "闇",
 };
 
+/**
+ * 1文字に収めた属性の印。**狭い枠に入れる時だけ**使う。
+ *
+ * 「電気」は2文字あるので、18px角の宝石に入れると枠から溢れる。
+ * 溢れても型もテストも通り、画面では**枠の外に文字が出ているだけ**に見える。
+ * 文言そのものは `ELEMENT_JA` を使うこと。
+ */
+export const ELEMENT_MARK: Record<Element, string> = {
+  FIRE: "火",
+  GRASS: "草",
+  ELECTRIC: "雷",
+  WATER: "水",
+  LIGHT: "光",
+  DARK: "闇",
+};
+
 /** UI表示用の属性カラー(色違いモンスター表現に使用) */
 export const ELEMENT_COLOR: Record<Element, string> = {
   FIRE: "#e74c3c",

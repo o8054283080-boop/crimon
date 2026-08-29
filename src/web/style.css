@@ -825,7 +825,7 @@ body {
 
 .skill-btn__name {
   max-width: 74px;
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   font-weight: 700;
   text-align: center;
   white-space: nowrap;
@@ -3668,7 +3668,7 @@ body {
 }
 
 .stat-tile__label {
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   font-weight: 700;
   color: #8ea0c8;
 }
@@ -3687,7 +3687,7 @@ body {
   display: flex;
   align-items: baseline;
   gap: 3px;
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
@@ -4461,7 +4461,8 @@ body {
 .floating-panel--docked[data-dock-side="left"] { border-left-width: 0; border-radius: 0 10px 10px 0; }
 .floating-panel--docked[data-dock-side="right"] { border-right-width: 0; border-radius: 10px 0 0 10px; }
 .floating-panel--docked .floating-panel__handle { display: none; }
-.floating-panel__handle { display: block; width: 100%; height: 20px; padding: 0; border: 0; color: #baab96; background: transparent; font-size: .7rem; line-height: 18px; cursor: grab; touch-action: none; user-select: none; }
+/* 掴む所は36pxを下回らせない。20pxだと指で掴めず、巡回も小さすぎる的として拾う */
+.floating-panel__handle { display: block; width: 100%; height: 36px; padding: 0; border: 0; color: #baab96; background: transparent; font-size: .7rem; line-height: 36px; cursor: grab; touch-action: none; user-select: none; }
 .floating-panel__handle:active { cursor: grabbing; }
 .floating-panel__body { position: relative; }
 .floating-panel__collapse { position: absolute; z-index: 1; top: 1px; right: 4px; width: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 8px; color: #ffe0a0; background: #ffffff12; font-size: 1.2rem; }
@@ -4473,14 +4474,7 @@ body {
 .background-farm-status__summary { border: 0; padding: 0; color: #ffe0a0; background: transparent; text-align: left; font-weight: 900; }
 .background-farm-status__detail { grid-column: 1; color: #ddd; font-size: .72rem; }
 .background-farm-status .btn { grid-column: 2; grid-row: 1 / span 2; min-height: 42px; }
-.tutorial-floating { display: grid; gap: 3px; padding: 2px 42px 10px 10px; color: #eee; font-size: .78rem; }
-.tutorial-floating > strong { color: #ffd66b; }
-.tutorial-floating__step { color: #b9a8ff; font-weight: 900; }
-.tutorial-floating__progress { font-weight: 900; }
-.tutorial-floating--ready { border-left: 3px solid #76e39b; }
-.tutorial-floating--ready > b { color: #76e39b; }
-.tutorial-floating__actions { display: flex; gap: 6px; margin-top: 3px; }
-.tutorial-floating__actions .btn { min-height: 34px; padding: 5px 9px; font-size: .72rem; }
+/* 初心者ミッションは浮遊パネルをやめて画面へ流し込んだ。src/web/ui/tutorialBar.css */
 
 /* 全画面共通。戦闘HUDを隠しにくいよう上端のsafe-area内へ小さく固定する。 */
 .pwa-update-banner {
@@ -4923,14 +4917,14 @@ body {
 }
 
 .create-face__star {
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   line-height: 1;
   color: #ffe27a;
   letter-spacing: -0.05em;
 }
 
 .create-face__lv {
-  font-size: 0.53rem;
+  font-size: 0.6rem;
   line-height: 1;
   font-weight: 800;
   color: #eaf1ff;
@@ -4994,7 +4988,7 @@ body {
 }
 
 .create-candidate__why {
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   color: #ff9f9f;
   text-align: center;
   line-height: 1.3;
@@ -5085,7 +5079,7 @@ body {
 }
 
 .create-skill__heading {
-  font-size: 0.55rem;
+  font-size: 0.6rem;
   letter-spacing: 0.16em;
   color: #8fa4d0;
 }
@@ -6941,8 +6935,8 @@ body {
   position: absolute;
   top: 4px;
   left: 4px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6955,7 +6949,7 @@ body {
 .hp-card__gem i {
   transform: rotate(-45deg);
   font-style: normal;
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   font-weight: 900;
   color: #07050f;
 }
@@ -7010,7 +7004,7 @@ body {
 }
 
 .hp-card__emptytext {
-  font-size: 0.54rem;
+  font-size: 0.6rem;
   color: var(--text-dim);
 }
 
@@ -7163,7 +7157,7 @@ body {
 }
 
 .home-stat__body small {
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   letter-spacing: 0.06em;
   color: var(--text-dim);
   white-space: nowrap;
@@ -7208,7 +7202,7 @@ body {
 }
 
 .home-stamina__body small {
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   color: var(--text-dim);
 }
 
@@ -7315,7 +7309,7 @@ body {
 }
 
 .home-feature-grid .home-tile small {
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   color: #c9bfd6;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }

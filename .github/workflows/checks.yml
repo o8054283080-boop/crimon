@@ -1,0 +1,99 @@
+name: 検査
+
+# 型・テスト・巡回をPRで自動的に通す。
+#
+# **巡回はこの案件で唯一の安全網**で、はみ出し・押せないボタン・小さすぎる文字を拾う。
+# 型チェックとテストはCSSの崩れを1件も拾わないので、これが無いと素通りする。
+#
+# 今まで巡回は「人が最後に手で流す」ものだった。実際にそれで漏れた:
+# ホームの作り替えで巡回の目印が外れ、28画面のうち22画面が検査されないまま、
+# 押せないボタンが複数そのままmainへ入った。**記憶に頼らせない。**
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  types-and-tests:
+    name: 型とテスト
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 型チェック
+        run: npx tsc --noEmit
+      - name: テスト
+        run: npx vitest run
+      - name: モンスターのデータ検診
+        run: npx tsx tools/monsterDoctor.mts
+
+  tour:
+    name: 巡回(画面の崩れ)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # 目印の数を先に見る。**巡回が画面へ辿り着けなくなる壊れ方**は、
+      # 巡回自身の「移動できない」としてしか現れず、見落としやすい。
+      # 減った時点で、はっきり落とす。
+      - name: 巡回の目印が残っているか
+        run: |
+          COUNT=$(grep -ro 'data-tour' src/web/ | wc -l)
+          echo "data-tour の目印: $COUNT 箇所"
+          if [ "$COUNT" -lt 8 ]; then
+            echo "::error::巡回の目印が減っています。画面を作り替えた時は data-tour を新しいボタンへ引き継いでください(AGENTS.md 参照)"
+            exit 1
+          fi
+
+      - name: 常駐サーバを起こす
+        run: |
+          HARNESS_VITE_PORT=5390 HARNESS_PORT=5391 node tools/harness.mjs > /tmp/harness.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:5391/health >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/harness.log
+          exit 1
+
+      - name: 全画面を巡回する
+        env:
+          HARNESS_PORT: "5391"
+        run: node tools/tour.mjs
+
+      # 落ちた時に何が起きていたのかを見られるようにする。
+      # 文字だけの報告では「押せないボタン」の絵が分からない
+      - name: 崩れた画面を撮る
+        if: failure()
+        env:
+          HARNESS_PORT: "5391"
+        run: node tools/tour.mjs --shots artifacts/tour || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: tour-${{ github.event.pull_request.number || github.run_id }}
+          path: artifacts/tour/*.png
+          if-no-files-found: ignore
+          retention-days: 7

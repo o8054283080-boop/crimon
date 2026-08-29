@@ -48,11 +48,21 @@ describe("共通フローティングパネル", () => {
     expect(source).toContain('options.forceCompact && state.displayState === "expanded" ? "compact" : state.displayState');
   });
 
-  it("周回と初心者ミッションは別ID・別初期位置で同じ機構を使う", () => {
+  it("周回の進捗は右下に浮かせる", () => {
     const source = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
     expect(source).toContain('id: "background-farm"');
     expect(source).toContain('placement: "bottom"');
-    expect(source).toContain('id: "tutorial-mission"');
-    expect(source).toContain('placement: "top"');
+  });
+
+  it("初心者ミッションは浮かせず、画面の流れの中へ差し込む", () => {
+    /*
+     * **浮遊パネルは、位置が固定なので必ず下の何かを覆う。**
+     * 初心者ミッションを左上に浮かせていた間、モンスター画面の絞り込みと
+     * 並べ替え、装備画面のボタン、ステージの「次はここ」が押せなかった。
+     * 型もテストも全部通り、巡回だけが拾えた。同じ形へ戻さないよう見張る。
+     */
+    const source = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+    expect(source).not.toContain('id: "tutorial-mission"');
+    expect(source).toContain("content.prepend(bar)");
   });
 });
