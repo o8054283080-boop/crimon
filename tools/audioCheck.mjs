@@ -19,12 +19,13 @@
  *   node tools/audioCheck.mjs [URL]
  */
 import { chromium } from "playwright";
+import { chromiumExecutablePath } from "./lib/chromium.mjs";
 
 // 既定は常駐サーバ(harness.mjs)の Vite と同じ番号にしておくこと。
 // ここがずれていると、道具を素直に呼んだ人が「音が確かめられない」で止まる
 const url = process.argv[2] ?? `http://127.0.0.1:${process.env.HARNESS_VITE_PORT ?? 5310}/`;
 const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+  executablePath: chromiumExecutablePath(),
   args: [
     "--no-sandbox",
     // 本番のブラウザと同じ条件にする。ここが要

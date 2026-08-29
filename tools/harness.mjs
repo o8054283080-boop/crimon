@@ -17,10 +17,11 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { chromium } from "playwright";
+import { CHROMIUM_GL_ARGS, chromiumExecutablePath } from "./lib/chromium.mjs";
 
 const VITE_PORT = Number(process.env.HARNESS_VITE_PORT ?? 5310);
 const CONTROL_PORT = Number(process.env.HARNESS_PORT ?? 5311);
-const CHROMIUM = process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const CHROMIUM = chromiumExecutablePath();
 
 const log = (message) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${message}`);
 
@@ -38,7 +39,7 @@ log(`vite 起動 (${VITE_PORT})`);
 
 const browser = await chromium.launch({
   executablePath: CHROMIUM,
-  args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--no-sandbox"],
+  args: CHROMIUM_GL_ARGS,
 });
 let page = await browser.newPage({ viewport: { width: 900, height: 430 }, deviceScaleFactor: 1 });
 
