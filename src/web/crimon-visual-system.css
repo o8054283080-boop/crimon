@@ -28,3 +28,42 @@
 .crimon-home>.reward-banner{position:absolute!important;z-index:20;left:8px;right:8px;top:78px}
 @media(max-height:830px){.home-world{min-height:398px}.world-party__figure{height:170px!important}.world-party__figure--3{bottom:57px}.world-action{min-height:70px}.world-action--right{min-height:86px}.world-action--right img{width:64px;height:64px}}
 @media(min-width:410px){.world-actions--left{left:10px}.world-actions--right{right:10px}.world-party{inset-inline:73px}.world-party__figure{width:142px!important}.current-party-panel{grid-template-columns:112px minmax(0,1fr) 60px}}
+
+/*
+ * Tall phones give their extra room to the world, never to the utility panels.
+ * The stage already owns the flexible track; these layers make the additional
+ * depth visible as floor perspective rather than an empty strip of night.
+ */
+.home-world::before{content:"";position:absolute;z-index:1;left:-12%;right:-12%;bottom:-5%;height:43%;pointer-events:none;background:radial-gradient(ellipse at 50% 61%,#a96ddd38 0 7%,#70439820 18%,transparent 49%),repeating-radial-gradient(ellipse at 50% 76%,transparent 0 34px,#a977cf12 35px 36px,transparent 37px 64px);mask-image:linear-gradient(transparent,#000 28%,#000)}
+.world-party::before,.world-party::after{content:"";position:absolute;left:50%;pointer-events:none;transform:translateX(-50%);border-radius:50%}
+.world-party::before{z-index:0;bottom:1px;width:min(238px,80vw);height:56px;border:1px solid #b57ce966;background:radial-gradient(ellipse,#b471e548 0 8%,#7745a32b 31%,transparent 69%);box-shadow:0 0 18px #985ed347,inset 0 0 16px #b37be633}
+.world-party::after{z-index:5;bottom:-2px;width:min(205px,70vw);height:31px;background:radial-gradient(ellipse,#08060dc7 7%,#09070ba3 39%,transparent 72%);filter:blur(2px);mix-blend-mode:multiply}
+.world-party__figure--1 .hp-card__art{filter:drop-shadow(0 13px 7px #000c) drop-shadow(0 0 13px #a869dc91)!important}
+.world-party__figure--2 .hp-card__art,.world-party__figure--4 .hp-card__art{filter:drop-shadow(0 11px 7px #000c) drop-shadow(0 0 8px #7441a25c)!important}
+
+/* The medallions stay inside a quiet edge gutter and gain a common metal seat. */
+.world-action img{border-radius:50%;filter:drop-shadow(0 5px 3px #000c) drop-shadow(0 0 5px #8d5aba66)}
+.world-action strong{padding:2px 7px 3px;border-block:1px solid #ad8b4b61;background:linear-gradient(90deg,transparent,#09070ed9 20% 80%,transparent);text-shadow:0 2px 4px #000,0 0 7px #000}
+
+/* Ornate party frame: header, portraits and edit action read as one object. */
+.current-party-panel{position:relative;border-color:#9b7b3f;box-shadow:inset 0 0 0 2px #050409,inset 0 0 0 3px #c8a65a25,inset 0 0 20px #000,0 -5px 19px #000}
+.current-party-panel::before,.current-party-panel::after{content:"◆";position:absolute;z-index:2;top:50%;transform:translateY(-50%);color:#d1ac5f;font-size:8px;text-shadow:0 0 7px #9d62d2}
+.current-party-panel::before{left:2px}.current-party-panel::after{right:2px}
+.current-party-panel__portraits .hp-card{box-shadow:inset 0 0 0 1px #e1bd6f24,0 0 7px #74439b35}
+
+/* Compact reward notice; the close glyph cannot inherit the generic large button. */
+.crimon-home>.reward-banner .reward-banner__close{min-width:36px!important;width:36px!important;height:36px!important;min-height:36px!important;margin-right:0!important;border-radius:50%!important}
+
+@media(min-height:880px){
+  .world-party{top:92px;bottom:13px}
+  .world-party__figure{width:146px!important;height:211px!important}
+  .world-party__figure--1{transform:translateX(-50%) scale(1.17)}
+  .world-party__figure--2,.world-party__figure--4{bottom:45px;transform:scale(.86)}
+  .world-party__figure--3{bottom:80px;transform:translateX(-50%) scale(.78)}
+  .world-party::before{width:260px;height:64px}
+}
+
+@media(max-height:860px){
+  .home-world::before{height:39%;opacity:.78}
+  .world-party::before{width:218px;height:50px}
+}
