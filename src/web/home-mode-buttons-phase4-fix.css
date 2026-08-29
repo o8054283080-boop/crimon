@@ -1,4 +1,5 @@
-/* HOME Phase 4 — standalone generated destination plates. */
+/* HOME Phase 4 final — render the generated plates on the real DOM <img> elements.
+   No sprite, no pseudo-element artwork. */
 .world-actions--right{
   display:flex!important;
   flex-direction:column!important;
@@ -6,94 +7,86 @@
   opacity:1!important;
   pointer-events:auto!important;
   right:0!important;
-  width:96px!important;
-  gap:1px!important;
+  width:100px!important;
+  gap:0!important;
   align-items:center!important;
   z-index:40!important;
 }
 .world-actions--right .world-action{
   position:relative!important;
-  display:flex!important;
-  align-items:flex-end!important;
-  justify-content:center!important;
+  display:block!important;
   visibility:visible!important;
   opacity:1!important;
   pointer-events:auto!important;
-  width:94px!important;
-  min-width:94px!important;
-  height:92px!important;
-  min-height:92px!important;
-  padding:0 5px 5px!important;
-  margin:0!important;
+  width:98px!important;
+  min-width:98px!important;
+  height:100px!important;
+  min-height:100px!important;
+  padding:0!important;
+  margin:-3px 0!important;
   border:0!important;
-  border-radius:12px!important;
-  background:transparent!important;
+  border-radius:0!important;
+  background:none!important;
+  background-image:none!important;
   box-shadow:none!important;
   overflow:visible!important;
   transform:none!important;
   clip-path:none!important;
   isolation:isolate!important;
 }
-.world-actions--right .world-action::before{
-  content:""!important;
+.world-actions--right .world-action::before,
+.world-actions--right .world-action::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  background-image:none!important;
+}
+.world-actions--right .world-action>img{
   display:block!important;
   visibility:visible!important;
   opacity:1!important;
   position:absolute!important;
-  inset:-5px -4px -3px!important;
-  background-repeat:no-repeat!important;
-  background-position:center!important;
-  background-size:contain!important;
-  filter:drop-shadow(0 6px 8px rgba(0,0,0,.76))!important;
-  z-index:1!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  z-index:2!important;
   pointer-events:none!important;
+  filter:drop-shadow(0 7px 9px rgba(0,0,0,.8))!important;
+  transform:none!important;
+  clip-path:none!important;
 }
-.world-actions--right .world-action:nth-child(1)::before{background-image:url('/src/assets/home/home-mode-adventure.webp')!important;filter:drop-shadow(0 7px 9px rgba(0,0,0,.78)) drop-shadow(0 0 7px rgba(235,145,55,.28))!important}
-.world-actions--right .world-action:nth-child(2)::before{background-image:url('/src/assets/home/home-mode-dungeon.webp')!important}
-.world-actions--right .world-action:nth-child(3)::before{background-image:url('/src/assets/home/home-mode-arena.webp')!important}
-.world-actions--right .world-action:nth-child(4)::before{background-image:url('/src/assets/home/home-mode-tower.webp')!important}
-.world-actions--right .world-action::after{display:none!important;content:none!important}
-.world-actions--right .world-action>img{display:none!important}
+.world-actions--right .world-action:nth-child(1)>img{content:url('/src/web/assets/home/home-mode-adventure.webp')!important}
+.world-actions--right .world-action:nth-child(2)>img{content:url('/src/web/assets/home/home-mode-dungeon.webp')!important}
+.world-actions--right .world-action:nth-child(3)>img{content:url('/src/web/assets/home/home-mode-arena.webp')!important}
+.world-actions--right .world-action:nth-child(4)>img{content:url('/src/web/assets/home/home-mode-tower.webp')!important}
+
+/* The generated plate already contains its visual label. Keep semantic HTML for
+   accessibility, but do not cover the artwork with the old CSS label plate. */
 .world-actions--right .world-action>span{
-  position:relative!important;
-  z-index:3!important;
-  display:flex!important;
-  visibility:visible!important;
-  opacity:1!important;
-  width:80px!important;
-  min-height:18px!important;
-  align-items:center!important;
-  justify-content:center!important;
-  gap:2px!important;
-  padding:2px 3px!important;
-  border:1px solid rgba(224,187,116,.7)!important;
-  border-radius:5px!important;
-  background:linear-gradient(180deg,rgba(33,21,18,.90),rgba(8,7,10,.94))!important;
-  box-shadow:inset 0 1px rgba(255,240,205,.16),0 2px 6px rgba(0,0,0,.7)!important;
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  padding:0!important;
+  margin:-1px!important;
+  overflow:hidden!important;
+  clip:rect(0 0 0 0)!important;
+  white-space:nowrap!important;
+  border:0!important;
+  background:none!important;
+  box-shadow:none!important;
+  opacity:0!important;
   pointer-events:none!important;
 }
-.world-actions--right .world-action strong{
-  display:block!important;
-  color:#fff4dc!important;
-  font-size:10px!important;
-  line-height:1.05!important;
-  font-weight:900!important;
-  white-space:nowrap!important;
-  text-align:center!important;
-  text-shadow:0 1px 3px #000,0 0 5px #000!important;
-}
-.world-actions--right .world-action small{display:none!important}
-.world-actions--right .world-action:nth-child(1){height:100px!important;min-height:100px!important;margin-bottom:-3px!important}
-.world-actions--right .world-action:nth-child(1)::before{inset:-7px -6px -4px!important}
-.world-actions--right .world-action:nth-child(1)>span{border-color:rgba(241,185,78,.9)!important;background:linear-gradient(180deg,rgba(91,36,22,.92),rgba(28,11,10,.96))!important}
-.world-actions--right .world-action:nth-child(2)>span{border-color:rgba(145,105,205,.82)!important;background:linear-gradient(180deg,rgba(49,29,74,.92),rgba(14,10,22,.96))!important}
-.world-actions--right .world-action:nth-child(3)>span{border-color:rgba(185,78,65,.82)!important;background:linear-gradient(180deg,rgba(75,28,29,.92),rgba(18,9,11,.96))!important}
-.world-actions--right .world-action:nth-child(4)>span{border-color:rgba(77,169,174,.84)!important;background:linear-gradient(180deg,rgba(20,67,72,.92),rgba(7,19,21,.96))!important}
-.world-actions--right .world-action:active{transform:scale(.96)!important;filter:brightness(1.08)!important}
-.world-actions--right .world-action:focus-visible{outline:2px solid #f6d28e!important;outline-offset:-5px!important}
+.world-actions--right .world-action:active>img{transform:scale(.96)!important;filter:brightness(1.08) drop-shadow(0 6px 8px rgba(0,0,0,.8))!important}
+.world-actions--right .world-action:focus-visible{outline:2px solid #f6d28e!important;outline-offset:-6px!important}
+
 .crimon-dungeon-chooser{
-  right:100px!important;
-  top:101px!important;
+  right:102px!important;
+  top:105px!important;
   width:142px!important;
   padding:7px!important;
   gap:5px!important;
@@ -104,20 +97,14 @@
   backdrop-filter:blur(8px)!important;
 }
 .crimon-dungeon-chooser button{min-height:39px!important;border:1px solid #56446f!important;border-radius:5px!important;background:linear-gradient(90deg,#241a34,#0f0c17)!important;color:#f0e9f8!important}
+
 @media(max-width:405px){
-  .world-actions--right{right:-1px!important;width:92px!important;gap:0!important}
-  .world-actions--right .world-action{width:90px!important;min-width:90px!important;height:84px!important;min-height:84px!important}
-  .world-actions--right .world-action:nth-child(1){height:92px!important;min-height:92px!important}
-  .world-actions--right .world-action>span{width:76px!important}
-  .crimon-dungeon-chooser{right:94px!important}
+  .world-actions--right{right:-2px!important;width:94px!important}
+  .world-actions--right .world-action{width:92px!important;min-width:92px!important;height:94px!important;min-height:94px!important;margin:-4px 0!important}
+  .crimon-dungeon-chooser{right:95px!important}
 }
 @media(max-height:860px){
-  .world-actions--right{gap:-1px!important}
-  .world-actions--right .world-action{height:77px!important;min-height:77px!important}
-  .world-actions--right .world-action:nth-child(1){height:85px!important;min-height:85px!important}
-  .world-actions--right .world-action::before{inset:-3px -3px -1px!important}
-  .world-actions--right .world-action:nth-child(1)::before{inset:-5px -4px -2px!important}
-  .world-actions--right .world-action>span{min-height:17px!important;padding:2px!important}
-  .world-actions--right .world-action strong{font-size:9px!important}
-  .crimon-dungeon-chooser{top:88px!important}
+  .world-actions--right .world-action{height:86px!important;min-height:86px!important;margin:-5px 0!important}
+  .world-actions--right .world-action:first-child{margin-top:0!important}
+  .crimon-dungeon-chooser{top:90px!important}
 }
