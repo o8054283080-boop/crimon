@@ -46,8 +46,25 @@ function showState(panel: HTMLElement, state: FloatingPanelDisplayState): void {
   if (docked) docked.hidden = state !== 'docked';
 }
 
+function farmProgress(panel: HTMLElement): string | null {
+  const source = panel.querySelector<HTMLElement>('.background-farm-status__summary')?.textContent
+    ?? panel.querySelector<HTMLElement>('.floating-panel__compact')?.textContent
+    ?? '';
+  const match = source.match(/(\d+)\s*\/\s*(\d+)/);
+  return match ? `${match[1]}/${match[2]}` : null;
+}
+
+function updateDockedLabel(panel: HTMLElement): void {
+  const dockedButton = panel.querySelector<HTMLButtonElement>('.floating-panel__docked');
+  if (!dockedButton) return;
+  const progress = farmProgress(panel);
+  dockedButton.textContent = progress ? `${progress} ‹` : '‹';
+  dockedButton.setAttribute('aria-label', progress ? `オフライン周回 ${progress}、開く` : 'オフライン周回を開く');
+}
+
 function dockLeft(panel: HTMLElement): void {
   const y = panelTop(panel);
+  updateDockedLabel(panel);
   showState(panel, 'docked');
   panel.dataset.dockSide = 'left';
   panel.dataset.normalY = String(y);
@@ -73,6 +90,7 @@ function restoreFromDock(panel: HTMLElement): void {
 }
 
 function enhanceBackgroundFarmPanel(panel: HTMLElement): void {
+  updateDockedLabel(panel);
   if (panel.dataset.homeFloatingUx === '1') return;
   panel.dataset.homeFloatingUx = '1';
 
