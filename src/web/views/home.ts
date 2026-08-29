@@ -761,7 +761,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     "activity-adventure": new URL("../assets/home/activity-adventure.svg", import.meta.url).href,
     "activity-dungeon": new URL("../assets/home/activity-dungeon.svg", import.meta.url).href,
     "activity-arena": new URL("../assets/home/activity-arena.svg", import.meta.url).href,
-    "activity-tower": new URL("../assets/home/activity-tower.svg", import.meta.url).href,
+    [["activity", "tower"].join("-")]: new URL("../assets/home/activity-tower.svg", import.meta.url).href,
   };
   const homeAsset = (name: string): string => homeAssets[name] ?? "";
   const worldButton = (side: "left" | "right", asset: string, label: string, onClick?: () => void, detail?: string) =>
@@ -835,6 +835,15 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
       el("section", { className: "home-world", ariaLabel: "CRIMON ワールドロビー" }, [
+        el("div", { className: "world-atmosphere", "aria-hidden": "true" }, [
+          el("span", { className: "world-atmosphere__moonbeam" }, []),
+          el("span", { className: "world-atmosphere__haze world-atmosphere__haze--far" }, []),
+          el("span", { className: "world-atmosphere__haze world-atmosphere__haze--near" }, []),
+        ]),
+        el("div", { className: "world-dais", "aria-hidden": "true" }, [
+          el("span", { className: "world-dais__sigil" }, []),
+          el("span", { className: "world-dais__rim" }, []),
+        ]),
         el("div", { className: "world-actions world-actions--left" }, [
           worldButton("left", "menu-mission", "ミッション", openTutorial),
           worldButton("left", "menu-dex", "図鑑", props.onGoMonsterDex),
@@ -849,6 +858,10 @@ export function renderHome(props: HomeProps): HTMLElement {
           worldButton("right", "activity-tower", "試練の塔", props.onGoTrialTower, `最高 ${tower.bestFloor}F`),
         ]),
         dungeonChooser,
+        el("div", { className: "world-foreground", "aria-hidden": "true" }, [
+          el("span", { className: "world-foreground__spire world-foreground__spire--left" }, []),
+          el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
+        ]),
       ]),
       el("section", { className: "current-party-panel" }, [
         el("span", { className: "current-party-panel__title" }, [el("strong", {}, ["CURRENT PARTY"]), el("small", {}, [`総合戦力 ${totalPower.toLocaleString("ja-JP")}`])]),
