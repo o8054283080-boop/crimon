@@ -1,96 +1,87 @@
-/* HOME Phase 4 reliable destination plates — keep real controls visible and use the existing icon assets as the visual core. */
+/* HOME Phase 4 generated plate integration — keep the stable real buttons, render the generated 2x2 plate sprite inside each one. */
 .world-actions--right{
   display:flex!important;
   flex-direction:column!important;
   visibility:visible!important;
   opacity:1!important;
   pointer-events:auto!important;
-  right:2px!important;
-  width:92px!important;
-  gap:4px!important;
+  right:1px!important;
+  width:94px!important;
+  gap:2px!important;
   align-items:center!important;
   z-index:40!important;
 }
 .world-actions--right .world-action{
   position:relative!important;
   display:flex!important;
-  flex-direction:column!important;
-  align-items:center!important;
-  justify-content:flex-start!important;
+  align-items:flex-end!important;
+  justify-content:center!important;
   visibility:visible!important;
   opacity:1!important;
   pointer-events:auto!important;
-  width:88px!important;
-  min-width:88px!important;
-  height:82px!important;
-  min-height:82px!important;
-  padding:7px 5px 6px!important;
+  width:92px!important;
+  min-width:92px!important;
+  height:88px!important;
+  min-height:88px!important;
+  padding:0 4px 5px!important;
   margin:0!important;
-  border:1px solid rgba(203,162,92,.74)!important;
-  border-radius:15px!important;
-  background:linear-gradient(180deg,rgba(27,19,19,.96),rgba(7,7,11,.94))!important;
-  box-shadow:inset 0 0 0 1px rgba(255,230,180,.08),inset 0 12px 22px rgba(255,255,255,.025),0 5px 12px rgba(0,0,0,.68)!important;
-  overflow:hidden!important;
+  border:0!important;
+  border-radius:10px!important;
+  background-color:transparent!important;
+  background-image:none!important;
+  box-shadow:none!important;
+  overflow:visible!important;
   transform:none!important;
   clip-path:none!important;
   isolation:isolate!important;
 }
+/* The generated sprite image itself is defined in home-mode-buttons-phase4.css.
+   Do not replace background-image here: only make that existing image visible and map its four quadrants. */
 .world-actions--right .world-action::before{
   content:""!important;
-  position:absolute!important;
-  inset:3px!important;
-  border:1px solid rgba(255,225,168,.2)!important;
-  border-radius:11px!important;
-  clip-path:none!important;
-  background:radial-gradient(circle at 50% 32%,rgba(255,213,120,.13),transparent 47%)!important;
-  opacity:1!important;
-  z-index:0!important;
-  pointer-events:none!important;
-}
-.world-actions--right .world-action::after{
-  content:""!important;
-  display:block!important;
-  position:absolute!important;
-  left:50%!important;
-  top:7px!important;
-  width:43px!important;
-  height:43px!important;
-  transform:translateX(-50%) rotate(45deg)!important;
-  border:1px solid rgba(230,193,125,.55)!important;
-  border-radius:9px!important;
-  background:linear-gradient(145deg,rgba(74,47,33,.7),rgba(8,8,12,.82))!important;
-  box-shadow:inset 0 0 10px rgba(255,210,120,.08),0 3px 8px rgba(0,0,0,.72)!important;
-  z-index:0!important;
-  pointer-events:none!important;
-}
-.world-actions--right .world-action>img{
   display:block!important;
   visibility:visible!important;
   opacity:1!important;
-  position:relative!important;
-  z-index:2!important;
-  width:34px!important;
-  height:34px!important;
-  margin:4px 0 6px!important;
-  object-fit:contain!important;
-  filter:drop-shadow(0 2px 4px rgba(0,0,0,.85)) brightness(1.18)!important;
+  position:absolute!important;
+  inset:-5px -5px -2px!important;
+  width:auto!important;
+  height:auto!important;
+  left:-5px!important;
+  top:-5px!important;
+  border:0!important;
+  border-radius:0!important;
+  clip-path:none!important;
+  transform:none!important;
+  background-color:transparent!important;
+  background-repeat:no-repeat!important;
+  background-size:200% 200%!important;
+  filter:drop-shadow(0 6px 8px rgba(0,0,0,.72))!important;
+  box-shadow:none!important;
+  z-index:1!important;
   pointer-events:none!important;
 }
+.world-actions--right .world-action:nth-child(1)::before{background-position:0% 0%!important;filter:drop-shadow(0 7px 9px rgba(0,0,0,.76)) drop-shadow(0 0 6px rgba(232,146,60,.28))!important}
+.world-actions--right .world-action:nth-child(2)::before{background-position:100% 0%!important}
+.world-actions--right .world-action:nth-child(3)::before{background-position:0% 100%!important}
+.world-actions--right .world-action:nth-child(4)::before{background-position:100% 100%!important}
+.world-actions--right .world-action::after{display:none!important;content:none!important}
+.world-actions--right .world-action>img{display:none!important}
+/* Keep live HTML labels above the generated art so Japanese text and tower details never disappear. */
 .world-actions--right .world-action>span{
   position:relative!important;
   z-index:3!important;
   display:flex!important;
   visibility:visible!important;
   opacity:1!important;
-  width:76px!important;
-  min-height:20px!important;
+  width:80px!important;
+  min-height:19px!important;
   align-items:center!important;
   justify-content:center!important;
-  padding:3px 3px 2px!important;
-  border:1px solid rgba(214,176,105,.66)!important;
+  padding:2px 3px!important;
+  border:1px solid rgba(224,187,116,.72)!important;
   border-radius:5px!important;
-  background:linear-gradient(180deg,rgba(38,24,21,.97),rgba(10,8,11,.98))!important;
-  box-shadow:inset 0 1px rgba(255,240,200,.16),0 2px 6px rgba(0,0,0,.68)!important;
+  background:linear-gradient(180deg,rgba(33,21,18,.94),rgba(8,7,10,.96))!important;
+  box-shadow:inset 0 1px rgba(255,240,205,.18),0 2px 6px rgba(0,0,0,.72)!important;
   pointer-events:none!important;
 }
 .world-actions--right .world-action strong{
@@ -99,36 +90,23 @@
   opacity:1!important;
   color:#fff4dc!important;
   font-size:10px!important;
-  line-height:1.1!important;
+  line-height:1.05!important;
   font-weight:900!important;
   white-space:nowrap!important;
   text-align:center!important;
   text-shadow:0 1px 3px #000,0 0 5px #000!important;
 }
 .world-actions--right .world-action small{display:none!important}
-.world-actions--right .world-action:nth-child(1){
-  height:90px!important;
-  min-height:90px!important;
-  border-color:rgba(238,183,82,.95)!important;
-  background:linear-gradient(180deg,rgba(81,33,20,.98),rgba(25,11,10,.97))!important;
-  box-shadow:inset 0 0 0 1px rgba(255,235,180,.1),0 6px 14px rgba(0,0,0,.72),0 0 12px rgba(227,126,52,.17)!important;
-}
-.world-actions--right .world-action:nth-child(1)::after{border-color:rgba(255,199,86,.88)!important;background:linear-gradient(145deg,rgba(117,58,28,.9),rgba(25,10,9,.9))!important}
-.world-actions--right .world-action:nth-child(1)>span{border-color:rgba(240,184,77,.92)!important;background:linear-gradient(180deg,rgba(105,42,24,.97),rgba(34,12,10,.98))!important}
-.world-actions--right .world-action:nth-child(2){border-color:rgba(125,91,185,.86)!important;background:linear-gradient(180deg,rgba(44,28,64,.97),rgba(12,9,19,.97))!important}
-.world-actions--right .world-action:nth-child(2)::after{border-color:rgba(155,111,226,.78)!important;background:linear-gradient(145deg,rgba(66,39,97,.88),rgba(14,9,24,.9))!important}
-.world-actions--right .world-action:nth-child(2)>span{border-color:rgba(143,104,203,.82)!important;background:linear-gradient(180deg,rgba(51,30,75,.97),rgba(14,10,22,.98))!important}
-.world-actions--right .world-action:nth-child(3){border-color:rgba(170,73,62,.86)!important;background:linear-gradient(180deg,rgba(68,28,27,.97),rgba(17,9,10,.97))!important}
-.world-actions--right .world-action:nth-child(3)::after{border-color:rgba(201,84,65,.78)!important;background:linear-gradient(145deg,rgba(101,39,32,.88),rgba(23,10,10,.9))!important}
-.world-actions--right .world-action:nth-child(3)>span{border-color:rgba(182,78,66,.82)!important;background:linear-gradient(180deg,rgba(76,29,29,.97),rgba(18,9,11,.98))!important}
-.world-actions--right .world-action:nth-child(4){border-color:rgba(62,148,154,.9)!important;background:linear-gradient(180deg,rgba(18,55,60,.97),rgba(7,17,20,.97))!important}
-.world-actions--right .world-action:nth-child(4)::after{border-color:rgba(77,183,188,.8)!important;background:linear-gradient(145deg,rgba(23,79,84,.88),rgba(8,22,24,.9))!important}
-.world-actions--right .world-action:nth-child(4)>span{border-color:rgba(77,169,174,.84)!important;background:linear-gradient(180deg,rgba(20,68,72,.97),rgba(7,19,21,.98))!important}
-.world-actions--right .world-action:active{transform:scale(.97)!important;filter:brightness(1.08)!important}
-.world-actions--right .world-action:focus-visible{outline:2px solid #f6d28e!important;outline-offset:-4px!important}
+.world-actions--right .world-action:nth-child(1){height:96px!important;min-height:96px!important;margin-bottom:-2px!important}
+.world-actions--right .world-action:nth-child(1)>span{border-color:rgba(241,185,78,.9)!important;background:linear-gradient(180deg,rgba(91,36,22,.95),rgba(28,11,10,.97))!important}
+.world-actions--right .world-action:nth-child(2)>span{border-color:rgba(145,105,205,.82)!important;background:linear-gradient(180deg,rgba(49,29,74,.95),rgba(14,10,22,.97))!important}
+.world-actions--right .world-action:nth-child(3)>span{border-color:rgba(185,78,65,.82)!important;background:linear-gradient(180deg,rgba(75,28,29,.95),rgba(18,9,11,.97))!important}
+.world-actions--right .world-action:nth-child(4)>span{border-color:rgba(77,169,174,.84)!important;background:linear-gradient(180deg,rgba(20,67,72,.95),rgba(7,19,21,.97))!important}
+.world-actions--right .world-action:active{transform:scale(.96)!important;filter:brightness(1.08)!important}
+.world-actions--right .world-action:focus-visible{outline:2px solid #f6d28e!important;outline-offset:-5px!important}
 .crimon-dungeon-chooser{
-  right:98px!important;
-  top:98px!important;
+  right:100px!important;
+  top:101px!important;
   width:142px!important;
   padding:7px!important;
   gap:5px!important;
@@ -140,19 +118,18 @@
 }
 .crimon-dungeon-chooser button{min-height:39px!important;border:1px solid #56446f!important;border-radius:5px!important;background:linear-gradient(90deg,#241a34,#0f0c17)!important;color:#f0e9f8!important}
 @media(max-width:405px){
-  .world-actions--right{right:0!important;width:88px!important;gap:3px!important}
-  .world-actions--right .world-action{width:84px!important;min-width:84px!important;height:78px!important;min-height:78px!important}
-  .world-actions--right .world-action:nth-child(1){height:86px!important;min-height:86px!important}
-  .world-actions--right .world-action>span{width:72px!important}
-  .crimon-dungeon-chooser{right:92px!important}
+  .world-actions--right{right:0!important;width:90px!important;gap:1px!important}
+  .world-actions--right .world-action{width:88px!important;min-width:88px!important;height:82px!important;min-height:82px!important}
+  .world-actions--right .world-action:nth-child(1){height:90px!important;min-height:90px!important}
+  .world-actions--right .world-action>span{width:76px!important}
+  .crimon-dungeon-chooser{right:94px!important}
 }
 @media(max-height:860px){
-  .world-actions--right{gap:2px!important}
-  .world-actions--right .world-action{height:74px!important;min-height:74px!important;padding-top:5px!important}
-  .world-actions--right .world-action:nth-child(1){height:82px!important;min-height:82px!important}
-  .world-actions--right .world-action>img{width:30px!important;height:30px!important;margin:3px 0 5px!important}
-  .world-actions--right .world-action::after{width:39px!important;height:39px!important;top:6px!important}
-  .world-actions--right .world-action>span{min-height:18px!important;padding:2px!important}
+  .world-actions--right{gap:0!important}
+  .world-actions--right .world-action{height:76px!important;min-height:76px!important}
+  .world-actions--right .world-action:nth-child(1){height:84px!important;min-height:84px!important}
+  .world-actions--right .world-action::before{inset:-3px -3px -1px!important;left:-3px!important;top:-3px!important}
+  .world-actions--right .world-action>span{min-height:17px!important;padding:2px!important}
   .world-actions--right .world-action strong{font-size:9px!important}
-  .crimon-dungeon-chooser{top:86px!important}
+  .crimon-dungeon-chooser{top:88px!important}
 }
