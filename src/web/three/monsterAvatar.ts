@@ -501,11 +501,40 @@ export class MonsterAvatar {
     this.dying = true;
   }
 
+  /**
+   * 勝利。小さく2回跳ねる。
+   *
+   * 3Dは待機の仕草(accentTrack)で体を弾ませる仕組みを既に持っているので、
+   * そこへ「踏み鳴らす」を流し込む。2Dの `SpriteAvatar` と**同じ約束事**を
+   * 保つために、こちらにも口を用意しておく
+   * (片方にだけ足すと、絵のある種族と無い種族で挙動が分かれる)。
+   */
+  playVictory(): void {
+    if (this.dying || this.accentTrack.active) return;
+    this.accentKind = "stomp";
+    this.lastAccent = "stomp";
+    trigger(this.accentTrack, ACCENT_DURATION.stomp);
+  }
+
+  /**
+   * 進行中の演出を全部畳んで素立ちへ戻す。
+   * 戦闘が終わった時・復活した時に呼ぶ。
+   */
+  resetMotion(): void {
+    this.attackTrack.active = false;
+    this.hitTrack.active = false;
+    this.castTrack.active = false;
+    this.accentTrack.active = false;
+    this.accentKind = "none";
+    this.deathProgress = 0;
+    this.deathLanded = false;
+    this.flash = 0;
+  }
+
   /** 撃破状態から復帰させる(復活・再挑戦時) */
   revive(): void {
     this.dying = false;
-    this.deathProgress = 0;
-    this.deathLanded = false;
+    this.resetMotion();
   }
 
   isDying(): boolean {

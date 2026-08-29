@@ -681,6 +681,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     resultBanner.textContent = "";
     if (winner === "PLAYER") playSfx("victory");
     else if (winner === "ENEMY") playSfx("defeat");
+    // 勝った側が小さく跳ねる。引き分けはどちらも跳ねない
+    if (winner === "PLAYER" || winner === "ENEMY") stage.playVictoryMotion(winner);
     const text = winner === "PLAYER" ? "🎉 勝利！" : winner === "ENEMY" ? "💀 敗北…" : "🤝 引き分け";
     resultBanner.append(el("div", { className: "result-banner__text" }, [text]));
     finishBtn.textContent = resultLabel(winner);

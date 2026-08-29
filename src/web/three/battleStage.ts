@@ -1168,6 +1168,28 @@ export class BattleStage {
     this.avatars.get(actorId)?.playAttack();
   }
 
+  /**
+   * 勝った側だけを跳ねさせる。
+   *
+   * **倒れているものは跳ねない。** 全滅寸前で勝った時に、
+   * 倒れた仲間まで一緒に跳ねると事故に見える。
+   */
+  playVictoryMotion(team: "PLAYER" | "ENEMY"): void {
+    for (const entry of this.formation) {
+      if (entry.team !== team) continue;
+      if (entry.avatar.isDying()) continue;
+      entry.avatar.playVictory();
+    }
+  }
+
+  /**
+   * 全員の演出を畳んで素立ちへ戻す。
+   * 戦闘が終わって次へ進む時に呼ぶ。**戻し忘れると次の戦闘へ姿勢が残る。**
+   */
+  resetAllMotions(): void {
+    for (const avatar of this.avatars.values()) avatar.resetMotion();
+  }
+
   playCastMotion(actorId: string): void {
     const avatar = this.avatars.get(actorId);
     if (!avatar) return;

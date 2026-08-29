@@ -1,0 +1,58 @@
+{
+  "dragon": {
+    "bodyHue": 0.472,
+    "aspect": 1.252
+  },
+  "exp_pig": {
+    "bodyHue": 0.036,
+    "aspect": 1.041
+  },
+  "fairy": {
+    "bodyHue": 0.26,
+    "aspect": 0.875
+  },
+  "golem": {
+    "bodyHue": 0.098,
+    "aspect": 1.219
+  },
+  "griffon": {
+    "bodyHue": 0.092,
+    "aspect": 1.156
+  },
+  "imp": {
+    "bodyHue": 0.798,
+    "aspect": 1.125
+  },
+  "knight": {
+    "bodyHue": 0.773,
+    "aspect": 1.064
+  },
+  "nemesis": {
+    "bodyHue": 0.871,
+    "aspect": 0.887
+  },
+  "reincarnation_pig": {
+    "bodyHue": 0.946,
+    "aspect": 0.965
+  },
+  "seraph": {
+    "bodyHue": 0.072,
+    "aspect": 0.938
+  },
+  "slime": {
+    "bodyHue": 0.553,
+    "aspect": 0.926
+  },
+  "treant": {
+    "bodyHue": 0.126,
+    "aspect": 1.099
+  },
+  "wisp": {
+    "bodyHue": 0.591,
+    "aspect": 0.66
+  },
+  "wolf": {
+    "bodyHue": 0.687,
+    "aspect": 1.089
+  }
+}

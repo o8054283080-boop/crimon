@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { ELEMENTS } from "../src/core/element.js";
-import { ALL_MONSTER_TEMPLATES } from "../src/data/monsters.js";
+import { ALL_MONSTER_TEMPLATES, EXP_PIG, REINCARNATION_PIG, SKILL_PIG } from "../src/data/monsters.js";
 
 /*
  * モンスターの2Dの絵まわり。
@@ -18,7 +18,20 @@ import { ALL_MONSTER_TEMPLATES } from "../src/data/monsters.js";
  */
 
 const SPRITE_DIR = "src/web/assets/monsters";
-const TEMPLATE_IDS = new Set(ALL_MONSTER_TEMPLATES.map((t) => t.templateId));
+/*
+ * 絵を持てる種族の全部。
+ *
+ * **ピッグ3種は `ALL_MONSTER_TEMPLATES` に入っていない。**
+ * ガチャにもステージにも出ない特別枠なので、そちらの一覧からは外れている。
+ * ここでそれを忘れると、正しく置いた絵を「使われない絵」と誤って落とす
+ * (実際に一度落ちた)。
+ */
+const TEMPLATE_IDS = new Set([
+  ...ALL_MONSTER_TEMPLATES.map((t) => t.templateId),
+  EXP_PIG.templateId,
+  REINCARNATION_PIG.templateId,
+  SKILL_PIG.templateId,
+]);
 const ELEMENT_NAMES = new Set<string>(ELEMENTS);
 const POSES = new Set(["attack", "hit", "cast"]);
 
@@ -65,6 +78,7 @@ describe("2Dの絵のファイル名", () => {
 describe("2Dと3Dの約束事", () => {
   /**
    * 戦闘画面がモンスターに求めること。**ここが2つの実装の契約。**
+   * 増やす時は必ず両方へ足す。
    * 片方にだけ足すと、絵のある種族と無い種族で挙動が分かれる。
    */
   const CONTRACT = [
@@ -85,6 +99,9 @@ describe("2Dと3Dの約束事", () => {
     "faceToward",
     "update",
     "dispose",
+    // 勝利と、演出の畳み込み
+    "playVictory",
+    "resetMotion",
   ];
 
   const sources = {
@@ -93,7 +110,7 @@ describe("2Dと3Dの約束事", () => {
   };
 
   for (const [label, source] of Object.entries(sources)) {
-    it(`${label} が13個の約束を全部持っている`, () => {
+    it(`${label} が約束事を全部持っている`, () => {
       const missing = CONTRACT.filter((name) => !new RegExp(`(^|[^\\w.])${name}\\b`, "m").test(source));
       expect(missing, `${label} に無い: ${missing.join(", ")}`).toEqual([]);
     });
@@ -107,6 +124,40 @@ describe("色を寄せる設定", () => {
     for (const element of ELEMENTS) {
       expect(source, `ELEMENT_TINT に ${element} が無い`).toContain(`${element}:`);
     }
+  });
+
+  it("6属性すべてに明度の作り方が決まっている", () => {
+    // 光を白に、闇を黒にするには明度の指定が要る。
+    // 欠けると「色相だけ違う同じ明るさ」になり、光と闇が読めない
+    const source = readFileSync("src/web/three/spriteArt.ts", "utf8");
+    for (const element of ELEMENTS) {
+      const line = source.split("\n").find((l) => l.trim().startsWith(`${element}:`));
+      expect(line, `ELEMENT_TINT に ${element} が無い`).toBeDefined();
+      expect(line, `${element} に valueMul が無い`).toContain("valueMul");
+      expect(line, `${element} に valueAdd が無い`).toContain("valueAdd");
+    }
+  });
+
+  it("光は明るく、闇は暗くなる向きに設定されている", () => {
+    /*
+     * 依頼主の指定は「光=白 / 闇=黒、ただし潰さず陰影を残す」。
+     * 向きを取り違えると光が黒くなるので、符号だけは機械で見張る。
+     */
+    const source = readFileSync("src/web/three/spriteArt.ts", "utf8");
+    const light = source.split("\n").find((l) => l.trim().startsWith("LIGHT:")) ?? "";
+    const dark = source.split("\n").find((l) => l.trim().startsWith("DARK:")) ?? "";
+    const valueAdd = (line: string) => Number(/valueAdd:\s*([0-9.]+)/.exec(line)?.[1] ?? "0");
+    const valueMul = (line: string) => Number(/valueMul:\s*([0-9.]+)/.exec(line)?.[1] ?? "1");
+    expect(valueAdd(light), "光は明度を持ち上げる").toBeGreaterThan(0.05);
+    expect(valueMul(dark), "闇は明度を落とす").toBeLessThan(0.7);
+    // 真っ黒に潰すと影絵になる。陰影が残る余地を必ず持たせる
+    expect(valueMul(dark), "闇を潰しすぎない").toBeGreaterThan(0.15);
+  });
+
+  it("転生ピッグは属性で色を変えない", () => {
+    const source = readFileSync("src/web/three/spriteArt.ts", "utf8");
+    expect(source).toContain("NO_TINT_TEMPLATES");
+    expect(source).toContain("reincarnation_pig");
   });
 
   it("戦闘画面とカードで、寄せる強さを共有している", () => {
