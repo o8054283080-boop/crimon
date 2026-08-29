@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import { chromiumExecutablePath } from "./lib/chromium.mjs";
 
 const outDir = process.argv[2] ?? "shots";
 // 複数の作業を並行させる時にポートが衝突しないよう、環境変数で変えられるようにする
@@ -84,7 +85,7 @@ async function main() {
   await new Promise((r) => setTimeout(r, 1500));
 
   const browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    executablePath: chromiumExecutablePath(),
     args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--no-sandbox"],
   });
 

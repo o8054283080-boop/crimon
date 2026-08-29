@@ -13,6 +13,7 @@
  * 「常に左が新しい」といった当てずっぽうが効かない。
  */
 import { chromium } from "playwright";
+import { chromiumExecutablePath } from "./lib/chromium.mjs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -47,7 +48,7 @@ async function main() {
   log(`${shared.length}組を比較します`);
 
   const browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    executablePath: chromiumExecutablePath(),
     args: ["--no-sandbox"],
   });
 

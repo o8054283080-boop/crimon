@@ -20,6 +20,7 @@
  * 焼いたPNGは `src/web/assets/` に置き、CSSから background-image で参照する。
  */
 import { chromium } from "playwright";
+import { chromiumExecutablePath } from "./lib/chromium.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -277,7 +278,7 @@ async function main() {
   await mkdir(outDir, { recursive: true });
 
   const browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    executablePath: chromiumExecutablePath(),
     args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--no-sandbox"],
   });
 

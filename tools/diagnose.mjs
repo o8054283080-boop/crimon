@@ -10,6 +10,7 @@
 import { spawn } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
+import { chromiumExecutablePath } from "./lib/chromium.mjs";
 
 const outFile = process.argv[2] ?? "diagnose.json";
 // 調べたい場面をクエリで切り替える(例: "seed=777&turns=4" で進行中のバトル)
@@ -189,7 +190,7 @@ async function main() {
   log("vite 起動完了");
 
   const browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    executablePath: chromiumExecutablePath(),
     args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--no-sandbox"],
   });
   log("chromium 起動完了");
