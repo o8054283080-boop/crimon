@@ -1,5 +1,5 @@
 /* HOME left utilities — generated plate pass.
-   Mirrors the right-side implementation: real DOM <img>, no sprite/pseudo artwork. */
+   Keep the existing four plate assets; only fix their crop and spacing. */
 .world-actions--left{
   display:flex!important;
   flex-direction:column!important;
@@ -7,7 +7,7 @@
   opacity:1!important;
   left:-2px!important;
   width:92px!important;
-  gap:0!important;
+  gap:4px!important;
   align-items:center!important;
   z-index:39!important;
 }
@@ -18,10 +18,10 @@
   opacity:1!important;
   width:90px!important;
   min-width:90px!important;
-  height:92px!important;
-  min-height:92px!important;
+  height:82px!important;
+  min-height:82px!important;
   padding:0!important;
-  margin:-4px 0!important;
+  margin:0!important;
   border:0!important;
   border-radius:0!important;
   background:none!important;
@@ -58,9 +58,12 @@
   object-position:center!important;
   z-index:2!important;
   pointer-events:none!important;
-  filter:drop-shadow(0 6px 8px rgba(0,0,0,.76))!important;
+  filter:drop-shadow(0 5px 7px rgba(0,0,0,.72))!important;
   transform:none!important;
-  clip-path:none!important;
+  /* The source WebPs include a faint square fringe. Fade only that fringe;
+     the ornate plate itself stays fully opaque. */
+  -webkit-mask-image:radial-gradient(ellipse 49% 47% at 50% 50%,#000 0 72%,rgba(0,0,0,.98) 78%,rgba(0,0,0,.72) 86%,rgba(0,0,0,.18) 94%,transparent 100%)!important;
+  mask-image:radial-gradient(ellipse 49% 47% at 50% 50%,#000 0 72%,rgba(0,0,0,.98) 78%,rgba(0,0,0,.72) 86%,rgba(0,0,0,.18) 94%,transparent 100%)!important;
 }
 .world-actions--left .world-action:nth-child(1)>img{content:url('/src/web/assets/home/home-left-mission.webp')!important}
 .world-actions--left .world-action:nth-child(2)>img{content:url('/src/web/assets/home/home-left-dex.webp')!important}
@@ -88,10 +91,10 @@
 .world-actions--left .world-action:disabled{opacity:.72!important;filter:saturate(.72)!important}
 
 @media(max-width:405px){
-  .world-actions--left{left:-4px!important;width:86px!important}
-  .world-actions--left .world-action{width:84px!important;min-width:84px!important;height:86px!important;min-height:86px!important;margin:-5px 0!important}
+  .world-actions--left{left:-4px!important;width:86px!important;gap:3px!important}
+  .world-actions--left .world-action{width:84px!important;min-width:84px!important;height:76px!important;min-height:76px!important;margin:0!important}
 }
 @media(max-height:860px){
-  .world-actions--left .world-action{height:78px!important;min-height:78px!important;margin:-6px 0!important}
-  .world-actions--left .world-action:first-child{margin-top:0!important}
+  .world-actions--left{gap:2px!important}
+  .world-actions--left .world-action{height:70px!important;min-height:70px!important;margin:0!important}
 }
