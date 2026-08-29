@@ -1,10 +1,12 @@
 const BACKGROUND_FARM_PANEL = '[data-floating-panel="background-farm"]';
 const STORAGE_KEY = 'crimon.floating-panel.v1.background-farm';
 
+type FloatingPanelDisplayState = 'expanded' | 'compact' | 'docked';
+
 interface FloatingPanelUiState {
   x?: number;
   y?: number;
-  displayState?: 'expanded' | 'compact' | 'docked';
+  displayState?: FloatingPanelDisplayState;
   dockSide?: 'left' | 'right';
 }
 
@@ -21,13 +23,18 @@ function writeUiState(state: FloatingPanelUiState): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* UI state must never block play. */ }
 }
 
+function currentDisplayState(panel: HTMLElement): FloatingPanelDisplayState {
+  const value = panel.dataset.displayState;
+  return value === 'compact' || value === 'docked' || value === 'expanded' ? value : 'expanded';
+}
+
 function panelTop(panel: HTMLElement): number {
   const rect = panel.getBoundingClientRect();
   const max = Math.max(8, window.innerHeight - rect.height - 80);
   return Math.min(max, Math.max(8, rect.top || Math.round(window.innerHeight * 0.28)));
 }
 
-function showState(panel: HTMLElement, state: 'expanded' | 'compact' | 'docked'): void {
+function showState(panel: HTMLElement, state: FloatingPanelDisplayState): void {
   const body = panel.querySelector<HTMLElement>('.floating-panel__body');
   const compact = panel.querySelector<HTMLElement>('.floating-panel__compact');
   const docked = panel.querySelector<HTMLElement>('.floating-panel__docked');
@@ -96,9 +103,9 @@ function enhanceBackgroundFarmPanel(panel: HTMLElement): void {
   }
 
   const saved = readUiState();
-  if (saved.x === undefined && saved.y === undefined && panel.dataset.displayState !== 'docked') {
+  if (saved.x === undefined && saved.y === undefined && currentDisplayState(panel) !== 'docked') {
     requestAnimationFrame(() => {
-      if (!panel.isConnected || panel.dataset.displayState === 'docked') return;
+      if (!panel.isConnected || currentDisplayState(panel) === 'docked') return;
       const y = Math.max(8, Math.round(window.innerHeight * 0.29));
       panel.dataset.normalX = '8';
       panel.dataset.normalY = String(y);
@@ -107,7 +114,7 @@ function enhanceBackgroundFarmPanel(panel: HTMLElement): void {
       panel.style.right = 'auto';
       panel.style.top = `${y}px`;
       panel.style.bottom = 'auto';
-      writeUiState({ x: 8, y, displayState: panel.dataset.displayState as FloatingPanelUiState['displayState'] ?? 'expanded', dockSide: 'left' });
+      writeUiState({ x: 8, y, displayState: currentDisplayState(panel), dockSide: 'left' });
     });
   }
 }
