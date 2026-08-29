@@ -25,9 +25,15 @@
 .crimon-home>.reward-banner .reward-banner__close{box-sizing:border-box!important;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin:0!important;padding:0!important;border:1px solid #785a31!important;border-radius:2px!important;background:#0b0710!important;box-shadow:inset 0 0 0 1px #d6b15a20!important;line-height:18px!important;align-self:center!important;transform:none!important}
 .crimon-home>.reward-banner .reward-banner__close:after{font-size:11px!important;line-height:18px!important}
 .current-party-panel{margin-top:-1px!important;box-shadow:0 -6px 22px #000e,0 0 14px #743d9750!important}
-.crimon-tutorial{margin-top:5px!important;margin-bottom:clamp(28px,5.5vh,50px)!important;box-shadow:0 7px 18px #000b,0 0 14px #5e31742d!important}
-.crimon-tutorial:after{content:"";position:absolute;left:8%;right:8%;bottom:calc(-1 * clamp(22px,4.5vh,42px));height:clamp(20px,4vh,36px);pointer-events:none;background:radial-gradient(ellipse at 50% 0,#8e4bb12b,transparent 70%);border-top:1px solid #6f502b42}
-.home-world{box-shadow:inset 0 18px 28px #0201068c,inset 0 -42px 44px #020105,0 -1px #b9914c4f,0 14px 24px #000b}
+.crimon-tutorial{margin-top:5px!important;margin-bottom:0!important;box-shadow:0 7px 18px #000b,0 0 14px #5e31742d!important}
+.crimon-tutorial:after{display:none!important}
+.home-world{box-shadow:inset 0 18px 28px #0201068c,inset 0 -42px 44px #020105,0 -1px #b9914c4f,0 14px 24px #000b;height:calc(100dvh - var(--bottom-nav-h) - 188px)!important}
 .world-party:before{background:radial-gradient(ellipse,#8e43bd58 0%,#4d246d2e 45%,transparent 70%);box-shadow:inset 0 0 24px #c16df62b,0 0 22px #713c9445!important}
 .world-party:after{background:radial-gradient(ellipse,#c56aff64,transparent 65%);filter:blur(8px)!important}
-@media(max-height:860px){.crimon-home>.reward-banner{top:80px!important;width:114px!important}.crimon-tutorial{margin-bottom:32px!important}.crimon-tutorial:after{bottom:-27px!important;height:24px!important}}
+
+/* PR #152 integration: keep Phase 1 assets, adopt the useful depth cues. */
+.home-world:before{background:radial-gradient(circle at 50% 14%,#b86cf42c,transparent 24%),radial-gradient(ellipse at 50% 76%,#a96ddd38 0 7%,#70439820 18%,transparent 49%),repeating-radial-gradient(ellipse at 50% 82%,transparent 0 34px,#a977cf12 35px 36px,transparent 37px 64px),linear-gradient(90deg,#02010676,transparent 16% 84%,#02010676)}
+.world-party__figure--1 .hp-card__art{filter:drop-shadow(0 15px 8px #000e) drop-shadow(0 0 13px #a869dc91) drop-shadow(0 -2px 2px #e1c5ff42)!important}
+.world-party__figure--2 .hp-card__art,.world-party__figure--4 .hp-card__art{filter:drop-shadow(0 13px 8px #000e) drop-shadow(0 0 9px #7441a26b)!important}
+@media(min-height:880px){.home-world{height:calc(100dvh - var(--bottom-nav-h) - 172px)!important}.world-party{inset:96px 78px 24px!important}.world-party__figure--1{transform:translateX(-50%) scale(.98)!important}.world-party__figure--2,.world-party__figure--4{bottom:46px!important;transform:scale(.77)!important}.world-party__figure--3{bottom:78px!important;transform:translateX(-50%) scale(.72)!important}}
+@media(max-height:860px){.crimon-home>.reward-banner{top:80px!important;width:114px!important}.home-world:before{opacity:.9}}
