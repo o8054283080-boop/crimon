@@ -9,7 +9,7 @@ export interface AudioSettingsProps {
   onTest: () => void;
 }
 
-function slider(label: string, value: number, disabled: boolean, onCommit: (v: number) => void): HTMLElement {
+function slider(label: string, value: number, onCommit: (v: number) => void): HTMLElement {
   const percent = Math.round(value * 100);
   const readout = el("span", { className: "audio-settings__value" }, [`${percent}%`]);
   const input = el("input", {
@@ -19,7 +19,6 @@ function slider(label: string, value: number, disabled: boolean, onCommit: (v: n
     step: "5",
     value: String(percent),
     className: "audio-settings__slider",
-    disabled,
     oninput: (event: Event) => {
       const next = Number((event.target as HTMLInputElement).value);
       readout.textContent = `${next}%`;
@@ -46,7 +45,6 @@ function slider(label: string, value: number, disabled: boolean, onCommit: (v: n
  */
 export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
   const { settings } = props;
-  const muted = !settings.sfxEnabled;
 
   // ブラウザは画面を一度も触っていない間は音を出せない。その旨をそのまま伝える
   const ready = props.contextState === "running";
@@ -71,8 +69,8 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
         }),
       ],
     ),
-    slider("全体の音量", settings.masterVolume, muted, (v) => props.onChange({ masterVolume: v })),
-    slider("効果音の音量", settings.sfxVolume, muted, (v) => props.onChange({ sfxVolume: v })),
+    slider("全体の音量", settings.masterVolume, (v) => props.onChange({ masterVolume: v })),
+    slider("効果音の音量", settings.sfxVolume, (v) => props.onChange({ sfxVolume: v })),
     el("div", { className: "audio-settings__actions" }, [
       el("button", { type: "button", className: "btn btn--primary", onclick: props.onTest }, ["♪ 音を試す"]),
     ]),
