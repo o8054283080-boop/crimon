@@ -1,48 +1,97 @@
 /* HOME floating panel polish: keep progress UI out of the center stage. */
 
-/* Background auto-farm: compact vertical card, with one-tap left docking. */
+/* Background auto-farm: compact horizontal card with one-tap left docking. */
 .floating-panel[data-floating-panel="background-farm"]:not(.floating-panel--docked) {
-  width: min(188px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 24px));
+  width: min(248px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 24px));
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(34, 24, 18, .97), rgba(17, 12, 15, .97));
   box-shadow: 0 10px 28px rgba(0, 0, 0, .62), inset 0 1px rgba(255, 239, 190, .09);
 }
 
 .floating-panel[data-floating-panel="background-farm"] .floating-panel__handle {
-  height: 26px;
-  line-height: 24px;
+  height: 22px;
+  line-height: 20px;
   color: rgba(244, 215, 157, .72);
   background: linear-gradient(180deg, rgba(255,255,255,.035), transparent);
 }
 
-.floating-panel[data-floating-panel="background-farm"] .floating-panel__body { min-height: 184px; }
+.floating-panel[data-floating-panel="background-farm"] .floating-panel__body { min-height: 0; }
 .floating-panel[data-floating-panel="background-farm"] .floating-panel__collapse {
-  top: 4px; right: 5px; width: 34px; min-height: 34px;
+  top: 3px; right: 5px; width: 30px; min-height: 30px;
   border: 1px solid rgba(214, 168, 74, .34);
   background: rgba(255, 255, 255, .07);
 }
-.background-farm-status { display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 12px 42px; }
-.background-farm-status__summary { width: 100%; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
-.background-farm-status__detail { color: #ddd2c6; font-size: .72rem; line-height: 1.55; white-space: normal; }
-.background-farm-status .btn { width: 100%; min-height: 44px; margin-top: 2px; }
+
+.background-farm-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 8px;
+  align-items: center;
+  padding: 8px 8px 10px 38px;
+}
+.background-farm-status__summary {
+  grid-column: 1 / -1;
+  width: 100%;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: .78rem;
+}
+.background-farm-status__detail {
+  grid-column: 1;
+  color: #ddd2c6;
+  font-size: .67rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+.background-farm-status .btn {
+  grid-column: 2;
+  width: auto;
+  min-width: 72px;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: .68rem;
+  line-height: 1.2;
+}
 
 .floating-panel__quick-dock {
-  position: absolute; z-index: 3; top: 8px; left: 5px;
-  width: 32px; min-height: 58px; padding: 0;
+  position: absolute; z-index: 3; top: 7px; left: 5px;
+  width: 28px; min-height: 50px; padding: 0;
   border: 1px solid rgba(214, 168, 74, .52); border-radius: 9px;
   color: #ffe2a0;
   background: linear-gradient(180deg, rgba(99, 62, 26, .72), rgba(35, 24, 28, .92));
   box-shadow: inset 0 1px rgba(255,255,255,.1);
-  font-size: 1.35rem; font-weight: 900; touch-action: manipulation;
+  font-size: 1.25rem; font-weight: 900; touch-action: manipulation;
 }
 .floating-panel__quick-dock:active { transform: translateX(-1px) scale(.96); filter: brightness(1.15); }
 
+/* Docked state: only progress + open arrow, never wrap. */
 .floating-panel[data-floating-panel="background-farm"].floating-panel--docked {
-  width: 42px; min-width: 42px; border-radius: 0 11px 11px 0;
+  width: 76px; min-width: 76px; border-radius: 0 11px 11px 0;
 }
 .floating-panel[data-floating-panel="background-farm"].floating-panel--docked .floating-panel__docked {
-  width: 40px; min-width: 40px; height: 56px; font-size: .76rem;
+  width: 74px; min-width: 74px; height: 48px;
+  padding: 0 7px;
+  font-size: .8rem;
+  font-weight: 900;
+  white-space: nowrap;
+  letter-spacing: .01em;
 }
+
+/* HOME world clarity: keep the existing artwork, but remove the soft veil/noise that
+   was making it look blurrier on high-DPI phones. No new image asset is introduced. */
+.home-world {
+  background-size: auto, auto, cover !important;
+  background-position: center, center, center 48% !important;
+  background-repeat: no-repeat !important;
+}
+.home-world::after {
+  opacity: .06 !important;
+  mix-blend-mode: normal !important;
+}
+.world-atmosphere__moonbeam { filter: none !important; opacity: .72 !important; }
+.world-atmosphere__haze { filter: none !important; opacity: .38 !important; }
 
 /* Beginner missions: a small independent window above the party, not over the monsters. */
 .home-screen .crimon-tutorial {
@@ -83,6 +132,6 @@
     width: min(190px, calc(100vw - 176px));
     max-height: 205px;
   }
-  .floating-panel[data-floating-panel="background-farm"]:not(.floating-panel--docked) { width: 176px; }
-  .background-farm-status { padding-left: 40px; }
+  .floating-panel[data-floating-panel="background-farm"]:not(.floating-panel--docked) { width: 232px; }
+  .background-farm-status { padding-left: 36px; }
 }
