@@ -1,0 +1,216 @@
+/* HOME Phase 4 — mode buttons become destination emblems, not generic icon chips. */
+.world-actions--right{
+  right:8px!important;
+  width:100px!important;
+  gap:10px!important;
+}
+.world-actions--right .world-action{
+  width:96px!important;
+  min-height:86px!important;
+  display:grid!important;
+  grid-template-columns:58px 1fr!important;
+  grid-template-rows:1fr!important;
+  align-items:center!important;
+  justify-items:start!important;
+  padding:7px 5px 7px 8px!important;
+  border:1px solid #6f5335!important;
+  border-radius:5px 2px 2px 5px!important;
+  background:
+    linear-gradient(90deg,#0a0a0ecc 0%,#171117f2 56%,#09090de8 100%)!important;
+  box-shadow:
+    inset 0 0 0 1px #e1b56b18,
+    inset 0 9px 16px #ffffff08,
+    inset 0 -14px 22px #0007,
+    -6px 7px 16px #000b!important;
+  overflow:visible!important;
+  transform:none!important;
+}
+.world-actions--right .world-action:before{
+  content:""!important;
+  position:absolute!important;
+  left:8px!important;
+  top:50%!important;
+  width:56px!important;
+  height:56px!important;
+  border:1px solid #a47a48!important;
+  border-radius:50%!important;
+  transform:translateY(-50%)!important;
+  background:
+    radial-gradient(circle at 40% 30%,#4c3a3190 0 8%,transparent 22%),
+    radial-gradient(circle,#1e171c 0 54%,#08080b 56% 100%)!important;
+  box-shadow:
+    inset 0 0 0 3px #07070a,
+    inset 0 0 0 4px #d6a45b3d,
+    0 0 0 1px #151018,
+    0 6px 12px #000d!important;
+  z-index:0!important;
+}
+.world-actions--right .world-action:after{
+  content:"";
+  position:absolute;
+  top:6px;
+  bottom:6px;
+  right:-3px;
+  width:4px;
+  border-radius:2px;
+  background:linear-gradient(#322536,#d6ad68 30%,#5a3f2f 72%,#171016);
+  box-shadow:0 0 8px #000;
+}
+.world-actions--right .world-action img{
+  position:relative!important;
+  z-index:1!important;
+  grid-column:1!important;
+  width:49px!important;
+  height:49px!important;
+  margin:0!important;
+  object-fit:contain!important;
+  filter:drop-shadow(0 4px 3px #000) saturate(1.04)!important;
+}
+.world-actions--right .world-action>span{
+  position:relative!important;
+  z-index:1!important;
+  grid-column:2!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  gap:2px!important;
+  transform:translateX(-1px)!important;
+}
+.world-actions--right .world-action strong{
+  min-width:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:none!important;
+  box-shadow:none!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+  letter-spacing:.02em!important;
+  white-space:normal!important;
+  text-align:left!important;
+  text-shadow:0 2px 5px #000!important;
+}
+.world-actions--right .world-action small{
+  color:#c8b79e!important;
+  font-size:7px!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+}
+/* Adventure — the main route. Warm expedition seal with stronger gilded frame. */
+.world-actions--right .world-action:nth-child(1){
+  border-color:#d0a45f!important;
+  background:
+    linear-gradient(90deg,#291814f2,#3e2117ef 58%,#120d0df5),
+    radial-gradient(circle at 12% 50%,#de73482e,transparent 42%)!important;
+  box-shadow:
+    inset 0 0 0 1px #ffe0a83b,
+    inset 0 12px 18px #e6773f17,
+    0 0 0 1px #4f2f20,
+    -7px 8px 19px #000d,
+    0 0 16px #d85d303d!important;
+}
+.world-actions--right .world-action:nth-child(1):before{
+  border-color:#e7b967!important;
+  background:
+    radial-gradient(circle at 40% 30%,#ffc56c52 0 7%,transparent 21%),
+    radial-gradient(circle,#5b2a1b 0 48%,#1b0e0d 50% 100%)!important;
+  box-shadow:inset 0 0 0 3px #100a0a,inset 0 0 0 4px #f1c1718c,0 0 17px #e46b3e5c,0 6px 13px #000!important;
+}
+.world-actions--right .world-action:nth-child(1) strong{color:#fff0c7!important;font-size:12px!important;letter-spacing:.08em!important}
+.world-actions--right .world-action:nth-child(1):after{background:linear-gradient(#6e3a25,#ffd184 34%,#9a6038 68%,#26140f)!important;box-shadow:0 0 9px #e67b434d!important}
+/* Dungeon — cold violet gate. */
+.world-actions--right .world-action:nth-child(2){
+  border-color:#66548d!important;
+  background:linear-gradient(90deg,#11101cf0,#241b35ef 56%,#0c0b12f4)!important;
+}
+.world-actions--right .world-action:nth-child(2):before{
+  border-color:#8270b2!important;
+  background:radial-gradient(circle at 42% 30%,#c7a7ff31,transparent 20%),radial-gradient(circle,#251b3c 0 50%,#090810 52% 100%)!important;
+  box-shadow:inset 0 0 0 3px #08070d,inset 0 0 0 4px #ac91e34b,0 0 14px #7657b85f,0 6px 12px #000!important;
+}
+.world-actions--right .world-action:nth-child(2):after{background:linear-gradient(#231a35,#8d70c8 35%,#493363 72%,#100c18)!important}
+/* Arena — iron-red crest. */
+.world-actions--right .world-action:nth-child(3){
+  border-color:#8d4d46!important;
+  background:linear-gradient(90deg,#1c0f12f2,#35171aef 56%,#100a0cf4)!important;
+}
+.world-actions--right .world-action:nth-child(3):before{
+  border-color:#a65b50!important;
+  background:radial-gradient(circle at 42% 30%,#ff95702f,transparent 20%),radial-gradient(circle,#40171b 0 49%,#10080a 51% 100%)!important;
+  box-shadow:inset 0 0 0 3px #0c0708,inset 0 0 0 4px #d4786554,0 0 14px #9d392f55,0 6px 12px #000!important;
+}
+.world-actions--right .world-action:nth-child(3):after{background:linear-gradient(#321316,#b86050 34%,#70352f 70%,#17090b)!important}
+/* Trial tower — ancient teal/bronze sigil. */
+.world-actions--right .world-action:nth-child(4){
+  border-color:#61766e!important;
+  background:linear-gradient(90deg,#0d1718f0,#152b2bef 57%,#091010f4)!important;
+}
+.world-actions--right .world-action:nth-child(4):before{
+  border-color:#75948a!important;
+  background:radial-gradient(circle at 42% 30%,#b6eee138,transparent 20%),radial-gradient(circle,#173331 0 49%,#08100f 51% 100%)!important;
+  box-shadow:inset 0 0 0 3px #07100f,inset 0 0 0 4px #8eb9a94c,0 0 14px #4e89795a,0 6px 12px #000!important;
+}
+.world-actions--right .world-action:nth-child(4):after{background:linear-gradient(#17302d,#7fa89a 34%,#456c62 70%,#0c1715)!important}
+.world-actions--right .world-action:active{transform:translateX(2px) scale(.985)!important;filter:brightness(1.15)!important}
+.world-actions--right .world-action:focus-visible{outline:2px solid #f4d18e!important;outline-offset:2px!important}
+/* Dungeon chooser should look like a portal submenu attached to the dungeon crest. */
+.crimon-dungeon-chooser{
+  right:106px!important;
+  top:123px!important;
+  width:138px!important;
+  padding:7px!important;
+  gap:5px!important;
+  border:1px solid #735fa0!important;
+  border-radius:6px!important;
+  background:linear-gradient(145deg,#171322f7,#09080df7)!important;
+  box-shadow:inset 0 0 0 1px #c7a7ff20,0 11px 30px #000e,0 0 19px #7657b842!important;
+  backdrop-filter:blur(8px)!important;
+}
+.crimon-dungeon-chooser:before{
+  content:"DUNGEON";
+  display:block;
+  margin:0 2px 3px;
+  color:#bca6df;
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.18em;
+  text-align:center;
+}
+.crimon-dungeon-chooser button{
+  min-height:40px!important;
+  border:1px solid #51436f!important;
+  border-radius:4px!important;
+  background:linear-gradient(90deg,#211a30,#0f0d16)!important;
+  color:#eee7f8!important;
+  box-shadow:inset 0 1px #e4d6ff16!important;
+}
+.crimon-dungeon-chooser button:active{background:#33264c!important}
+/* Left utility side is intentionally quieter than the four destinations. */
+.world-actions--left .world-action{
+  opacity:.88!important;
+}
+.world-actions--left .world-action:before{
+  border-radius:50%!important;
+  border-color:#5e4b36!important;
+  background:radial-gradient(circle,#171419,#08080a 72%)!important;
+}
+.world-actions--left .world-action strong{
+  border-color:#5e4b36!important;
+  background:linear-gradient(90deg,#08080acb,#171217e8,#08080acb)!important;
+  color:#cabda9!important;
+}
+@media(max-width:405px){
+  .world-actions--right{right:4px!important;width:94px!important}
+  .world-actions--right .world-action{width:90px!important;grid-template-columns:54px 1fr!important;padding-left:6px!important}
+  .world-actions--right .world-action:before{left:6px!important;width:52px!important;height:52px!important}
+  .world-actions--right .world-action img{width:45px!important;height:45px!important}
+  .world-actions--right .world-action strong{font-size:9px!important}
+  .world-actions--right .world-action:nth-child(1) strong{font-size:11px!important}
+  .crimon-dungeon-chooser{right:99px!important}
+}
+@media(max-height:860px){
+  .world-actions--right{gap:6px!important}
+  .world-actions--right .world-action{min-height:75px!important}
+  .crimon-dungeon-chooser{top:106px!important}
+}
