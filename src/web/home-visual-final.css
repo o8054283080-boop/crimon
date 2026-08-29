@@ -1,0 +1,5 @@
+/* Final screenshot-fit overrides for PR #151. */
+.home-world{height:calc(100dvh - var(--bottom-nav-h) - 138px)!important}
+.crimon-home>.reward-banner{width:150px!important}
+@media(min-height:880px){.home-world{height:calc(100dvh - var(--bottom-nav-h) - 122px)!important}}
+@media(max-height:860px){.crimon-home>.reward-banner{width:144px!important}}
