@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 640" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#050407"/>
+      <stop offset=".46" stop-color="#12080b"/>
+      <stop offset="1" stop-color="#030305"/>
+    </linearGradient>
+    <radialGradient id="eclipse" cx="50%" cy="46%" r="58%">
+      <stop offset="0" stop-color="#fff0c8"/>
+      <stop offset=".25" stop-color="#ffce82"/>
+      <stop offset=".55" stop-color="#e84c2f"/>
+      <stop offset=".78" stop-color="#7e1016"/>
+      <stop offset="1" stop-color="#150307"/>
+    </radialGradient>
+    <radialGradient id="floorGlow" cx="50%" cy="0" r="90%">
+      <stop offset="0" stop-color="#e9553555"/>
+      <stop offset=".42" stop-color="#9a1e2730"/>
+      <stop offset="1" stop-color="#03030500"/>
+    </radialGradient>
+    <linearGradient id="pillar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#070709"/>
+      <stop offset=".46" stop-color="#272128"/>
+      <stop offset=".62" stop-color="#4c3431"/>
+      <stop offset="1" stop-color="#070709"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171216"/>
+      <stop offset="1" stop-color="#050507"/>
+    </linearGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="stone" width="78" height="38" patternUnits="userSpaceOnUse" patternTransform="skewX(-8)">
+      <rect width="78" height="38" fill="none" stroke="#5f4b4630" stroke-width="1"/>
+      <path d="M39 0v38" stroke="#6a514a1f"/>
+    </pattern>
+  </defs>
+  <rect width="430" height="640" fill="url(#sky)"/>
+  <ellipse cx="215" cy="118" rx="128" ry="88" fill="#7e10162b" filter="url(#blur)"/>
+  <circle cx="215" cy="118" r="79" fill="url(#eclipse)" filter="url(#glow)" opacity=".92"/>
+  <circle cx="219" cy="112" r="66" fill="#09070b"/>
+  <path d="M104 244C125 171 151 149 179 133c-17 44-16 75 1 111zM326 244c-21-73-47-95-75-111 17 44 16 75-1 111z" fill="#070609" opacity=".9"/>
+  <g opacity=".92">
+    <path d="M0 0h69v640H0z" fill="url(#pillar)"/>
+    <path d="M361 0h69v640h-69z" fill="url(#pillar)"/>
+    <path d="M22 0h24v640H22zM384 0h24v640h-24z" fill="#0a090c"/>
+    <path d="M7 177h57v18H7zM366 177h57v18h-57z" fill="#594744" opacity=".7"/>
+    <path d="M8 363h56v15H8zM366 363h56v15h-56z" fill="#4f4140" opacity=".55"/>
+  </g>
+  <g fill="#09080b" stroke="#76534a" stroke-width="2" opacity=".9">
+    <path d="M55 0v78c0 88 48 120 95 133-50 17-80 54-83 103V640H0V0z"/>
+    <path d="M375 0v78c0 88-48 120-95 133 50 17 80 54 83 103V640h67V0z"/>
+  </g>
+  <g opacity=".28" stroke="#e3b780" stroke-width="1.2" fill="none">
+    <path d="M74 214c43-29 91-41 141-41s98 12 141 41"/>
+    <path d="M91 231c36-22 78-33 124-33s88 11 124 33"/>
+    <path d="M67 309h296"/>
+  </g>
+  <path d="M54 372h322l54 268H0z" fill="url(#floor)"/>
+  <path d="M54 372h322l54 268H0z" fill="url(#stone)" opacity=".72"/>
+  <ellipse cx="215" cy="404" rx="145" ry="46" fill="url(#floorGlow)" filter="url(#blur)"/>
+  <g stroke="#a62a2d" fill="none" opacity=".55">
+    <ellipse cx="215" cy="455" rx="122" ry="42"/>
+    <ellipse cx="215" cy="455" rx="93" ry="31"/>
+    <path d="M110 455h210M215 418v74M140 431l150 48M290 431l-150 48"/>
+  </g>
+  <g fill="#b37b42" opacity=".78" filter="url(#glow)">
+    <circle cx="92" cy="392" r="3"/><circle cx="338" cy="392" r="3"/>
+    <circle cx="125" cy="424" r="2"/><circle cx="305" cy="424" r="2"/>
+  </g>
+  <g filter="url(#blur)" opacity=".34" fill="#b9a9a6">
+    <ellipse cx="120" cy="348" rx="95" ry="18"/>
+    <ellipse cx="318" cy="325" rx="110" ry="16"/>
+    <ellipse cx="220" cy="510" rx="165" ry="25"/>
+  </g>
+  <path d="M0 562c82-32 149-26 214 4 64-31 132-35 216-1v75H0z" fill="#030305" opacity=".9"/>
+</svg>
