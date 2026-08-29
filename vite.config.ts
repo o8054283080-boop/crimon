@@ -62,6 +62,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // 緊急復旧: 壊れた旧PWAキャッシュが真っ暗画面を保持し続けないよう、
+        // 新しいworkerを待機させず即時有効化し、開いているページも新workerへ切り替える。
+        skipWaiting: true,
+        clientsClaim: true,
         // ogg/json を入れ忘れていたため、効果音がキャッシュの対象外だった
         // (オフラインでは無音になり、ビルドの版とも紐づかない)
         globPatterns: ["**/*.{js,css,html,png,svg,webmanifest,ogg,json}"],
