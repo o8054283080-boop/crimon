@@ -27,7 +27,7 @@ describe("NEW TITLE → NEW HOME regression contract", () => {
     const actions = homeUtilityActions({ onGoArena: callbacks[0], onGoShop: callbacks[1], onGoHowToPlay: callbacks[2] });
     actions.forEach((action) => action());
     callbacks.forEach((callback) => expect(callback).toHaveBeenCalledOnce());
-    expect(source).toContain('sectionMark("SECONDARY / PROGRESSION")');
+    expect(source).toContain('worldButton("left", "menu-help", "遊び方", onGoHowToPlay)');
   });
 
   it("wires tutorial destination and claim once", () => {
@@ -48,9 +48,9 @@ describe("NEW TITLE → NEW HOME regression contract", () => {
   });
 
   it("keeps CURRENT PARTY monster detail and moves Trial Tower after management", () => {
-    expect(source).toContain("homePartyCard(party[i], props.onGoParty, props.onViewPartyMonster)");
+    expect(source).toContain("homePartyCard(member, props.onGoParty, props.onViewPartyMonster)");
     expect(source).not.toContain('className: "crimon-hero"');
-    expect(source.indexOf('className: "home-party crimon-section"')).toBeLessThan(source.indexOf('className: "crimon-tower"'));
+    expect(source.indexOf('className: "world-party"')).toBeLessThan(source.indexOf('"activity-tower"'));
     expect(source).toContain("props.onGoTrialTower");
   });
 });
