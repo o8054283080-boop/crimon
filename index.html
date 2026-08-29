@@ -13,6 +13,37 @@
     <meta name="apple-mobile-web-app-title" content="Crimon" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <script>
+      // Emergency iOS Home Screen recovery. This intentionally touches only
+      // Service Worker registrations and CacheStorage. localStorage and
+      // IndexedDB (game save candidates) are never cleared here.
+      (() => {
+        const standalone =
+          window.matchMedia?.('(display-mode: standalone)').matches ||
+          window.navigator.standalone === true;
+        const marker = 'crimon-pwa-recovery-v2';
+        if (!standalone || sessionStorage.getItem(marker) === 'done') return;
+
+        sessionStorage.setItem(marker, 'done');
+        window.addEventListener('DOMContentLoaded', async () => {
+          try {
+            if ('serviceWorker' in navigator) {
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(registrations.map((registration) => registration.unregister()));
+            }
+            if ('caches' in window) {
+              const names = await caches.keys();
+              await Promise.all(names.map((name) => caches.delete(name)));
+            }
+            const url = new URL(window.location.href);
+            url.searchParams.set('pwa-recovered', Date.now().toString());
+            window.location.replace(url.toString());
+          } catch (error) {
+            console.error('[CRIMON] PWA recovery failed', error);
+          }
+        }, { once: true });
+      })();
+    </script>
     <link rel="stylesheet" href="/src/web/home-theme.css" />
     <link rel="stylesheet" href="/src/web/home-visual-extreme.css" />
     <link rel="stylesheet" href="/src/web/home-generated-background.css" />
