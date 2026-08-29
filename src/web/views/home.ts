@@ -10,7 +10,7 @@ import {
 } from "../../game/playerState.js";
 import { CompensationClaim } from "../../game/compensation.js";
 import { PERSIST_STATE_NOTE, PersistState } from "../../game/saveDurability.js";
-import { ELEMENT_JA } from "../../core/element.js";
+import { ELEMENT_JA, ELEMENT_MARK } from "../../core/element.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
@@ -628,7 +628,8 @@ function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => v
       el("span", { className: "hp-card__shade" }, []),
       dex
         ? el("span", { className: "hp-card__gem", title: `${ELEMENT_JA[dex.element]}属性` }, [
-            el("i", {}, [ELEMENT_JA[dex.element]]),
+            // 18px角の宝石なので1文字しか入らない(「電気」は溢れる)
+            el("i", {}, [ELEMENT_MARK[dex.element]]),
           ])
         : null,
       // 星は数字ではなく粒で出す。並べた時に格の差が一目で分かる
@@ -636,6 +637,20 @@ function homePartyCard(instance: MonsterInstance | undefined, onGoParty: () => v
       el("span", { className: "hp-card__level" }, [`Lv.${instance.level}`]),
     ].filter((n): n is HTMLElement => n !== null),
   );
+}
+
+/**
+ * ロビーの背景に立つ姿だけを作る(押せない)。
+ *
+ * `homePartyCard` と見た目は同じだが、`button` ではなく `div` で返す。
+ * 重ねて配置しているので押せる的にはできない。**押せない `button` を
+ * 置くくらいなら、最初から的にしない。**
+ */
+function homePartyFigure(instance: MonsterInstance | undefined): HTMLElement {
+  const card = homePartyCard(instance, () => {}, () => {});
+  const figure = el("div", { className: card.className, style: card.getAttribute("style") ?? undefined, "aria-hidden": "true" }, []);
+  figure.append(...card.childNodes);
+  return figure;
 }
 
 /**
@@ -768,6 +783,13 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("button", {
       type: "button",
       className: `world-action world-action--${side}`,
+      /*
+       * 巡回(tools/tour.mjs)の目印。**文言ではなくここを見てもらう。**
+       * 絵の名前(menu-dex / activity-tower)から機械的に作るので、
+       * ボタンを増やしても目印の付け忘れが起きない。
+       * これが外れると巡回がその画面へ辿り着けず、安全網が黙って外れる。
+       */
+      "data-tour": `tile:${asset.replace(/^(menu|activity)-/, "")}`,
       onclick: onClick,
       disabled: onClick ? undefined : true,
       ariaLabel: onClick ? label : `${label}（準備中）`,
@@ -776,9 +798,9 @@ export function renderHome(props: HomeProps): HTMLElement {
       el("span", {}, [el("strong", {}, [label]), detail ? el("small", {}, [detail]) : null].filter((node): node is HTMLElement => node !== null)),
     ]);
   const dungeonChooser = el("div", { className: "crimon-dungeon-chooser", hidden: true, ariaLabel: "ダンジョンを選択" }, [
-    el("button", { type: "button", onclick: onGoEquipDungeon }, [icon("equipDungeon"), el("span", {}, ["装備"])]),
-    el("button", { type: "button", onclick: onGoLevelDungeon }, [icon("trainDungeon"), el("span", {}, ["育成"])]),
-    el("button", { type: "button", onclick: onGoGoldDungeon }, [icon("goldDungeon"), el("span", {}, ["ゴールド"])]),
+    el("button", { type: "button", "data-tour": "tile:equipDungeon", onclick: onGoEquipDungeon }, [icon("equipDungeon"), el("span", {}, ["装備"])]),
+    el("button", { type: "button", "data-tour": "tile:trainDungeon", onclick: onGoLevelDungeon }, [icon("trainDungeon"), el("span", {}, ["育成"])]),
+    el("button", { type: "button", "data-tour": "tile:goldDungeon", onclick: onGoGoldDungeon }, [icon("goldDungeon"), el("span", {}, ["ゴールド"])]),
   ]);
   const toggleDungeonChooser = () => { dungeonChooser.hidden = !dungeonChooser.hidden; };
   const rewardText = (mission: (typeof TUTORIAL_MISSIONS)[number]): string => [
@@ -822,18 +844,38 @@ export function renderHome(props: HomeProps): HTMLElement {
     if (current) current.open = true;
     tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
+  const banners = [
+    props.compensationClaims.length ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
+    props.loginBonusResult ? renderLoginBonusBanner(props.loginBonusResult, props.onDismissLoginBonus) : null,
+  ].filter((node): node is HTMLElement => node !== null);
+
+  /*
+   * ロビーに立つ4体は**見せるだけ**。押せる的にはしない。
+   *
+   * 手前の1体を大きく重ねる配置なので、2〜4体目は中心を覆われていて
+   * 実際には押せなかった(巡回が3件まとめて拾った)。
+   * 「押せそうに見えるのに押せない」より、「見るだけ」の方がよい。
+   * 触る先はすぐ下の CURRENT PARTY の札で、そちらは4体とも重なっていない。
+   */
   const partyFigures = party.map((member, index) => {
-    const figure = homePartyCard(member, props.onGoParty, props.onViewPartyMonster);
+    const figure = homePartyFigure(member);
     figure.classList.add("world-party__figure", `world-party__figure--${index + 1}`);
     return figure;
   });
   const menu = el("main", { className: `home-menu crimon-home ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
-      props.compensationClaims.length ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
-      props.loginBonusResult ? renderLoginBonusBanner(props.loginBonusResult, props.onDismissLoginBonus) : null,
       el("header", { className: "crimon-resource-header" }, [
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
+      /*
+       * ログインボーナスと補填の札。**世界の上へ浮かせない。**
+       *
+       * `position:absolute; top:78px` で世界へ被せていたため、
+       * 2枚同時に出た時は下の札の「閉じる」が押せず、
+       * 左右の縦列(ミッション・図鑑・冒険・ダンジョン・闘技場)も覆っていた。
+       * 上から順に押し下げる並びなら、何も隠さない。
+       */
+      banners.length ? el("div", { className: "reward-banner-stack" }, banners) : null,
       el("section", { className: "home-world", ariaLabel: "CRIMON ワールドロビー" }, [
         el("div", { className: "world-atmosphere", "aria-hidden": "true" }, [
           el("span", { className: "world-atmosphere__moonbeam" }, []),
@@ -866,7 +908,7 @@ export function renderHome(props: HomeProps): HTMLElement {
       el("section", { className: "current-party-panel" }, [
         el("span", { className: "current-party-panel__title" }, [el("strong", {}, ["CURRENT PARTY"]), el("small", {}, [`総合戦力 ${totalPower.toLocaleString("ja-JP")}`])]),
         el("div", { className: "current-party-panel__portraits" }, party.map((member) => homePartyCard(member, props.onGoParty, props.onViewPartyMonster))),
-        el("button", { type: "button", className: "current-party-panel__edit", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["編成", icon("chevron")]),
+        el("button", { type: "button", className: "current-party-panel__edit", "data-tour": "tile:party", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["編成", icon("chevron")]),
       ]),
       tutorial,
       staminaSheet,
@@ -886,7 +928,8 @@ export function renderHome(props: HomeProps): HTMLElement {
       el("span", { className: "crimon-title-screen__fallback", "aria-hidden": "true" }, ["CRIMON"]),
       el("p", {}, ["DARK FANTASY MONSTER RPG"]),
     ]),
-    el("button", { type: "button", className: "title-start crimon-title-start", ariaLabel: "ゲームを開始", onclick: () => {
+    // 巡回はここを押さないと、タイトルに覆われたホームを「問題なし」と報告してしまう
+    el("button", { type: "button", className: "title-start crimon-title-start", "data-tour": "start", ariaLabel: "ゲームを開始", onclick: () => {
       startHome();
       titleScreen.classList.add("title-screen--leaving");
       homeScreen.classList.add("home-screen--menu-only");

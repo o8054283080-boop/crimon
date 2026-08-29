@@ -156,9 +156,6 @@ function fallbackDockedContent(options: FloatingPanelOptions): HTMLElement {
     const progress = text.match(/(\d+\/\d+)\s*$/)?.[1];
     return el("span", {}, [progress ? `🔄 ${progress}` : "🔄"]);
   }
-  if (options.id === "tutorial-mission") {
-    return el("span", {}, [text.includes("達成") ? "🎯！" : "🎯"]);
-  }
   return options.compact.cloneNode(true) as HTMLElement;
 }
 

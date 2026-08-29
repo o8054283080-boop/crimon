@@ -1,6 +1,7 @@
 import "./style.css";
 import "./crimon-visual-system.css";
 import "./mobile-ux.css";
+import "./ui/tutorialBar.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
@@ -1856,34 +1857,56 @@ function goTutorialDestination(destination: TutorialDestination): void {
   navigate(destination);
 }
 
-function buildTutorialFloatingPanel(): HTMLElement | null {
-  if (state.screen === "HOME") return null;
+/**
+ * 初心者ミッションの案内。
+ *
+ * **浮かせない。画面の流れの中に置く。**
+ *
+ * 以前はドラッグできる浮遊パネルにしていた。位置は画面の左上に固定なので、
+ * モンスター画面の絞り込みと並べ替え、装備画面のボタン、ステージの「次はここ」を
+ * 覆って**押せなくしていた**。型もテストも全部通っていた(巡回だけが拾えた)。
+ *
+ * 浮いている限り、下にある何かを必ず覆う。ドラッグで避けられるのは
+ * 「気づいた人」だけで、案内が要る初心者ほど気づけない。だから流し込みへ変えた。
+ */
+function buildTutorialBar(): HTMLElement | null {
+  if (state.screen === "HOME") return null; // ホームは専用の大きな札を持っている
+  if (BATTLE_SCREENS.has(state.screen)) return null; // 戦闘中に出す用事は無い
   const mission = nextTutorialMission(state.player);
   if (!mission) return null;
   const complete = canClaimTutorialMission(state.player, mission);
   const missionProgress = tutorialMissionProgress(state.player, mission);
   const progress = `${missionProgress.current} / ${missionProgress.target}`;
-  return createFloatingPanel({
-    id: "tutorial-mission",
-    label: "初心者ミッション",
-    placement: "top",
-    forceCompact: BATTLE_SCREENS.has(state.screen),
-    compact: el("span", {}, [complete ? `🎯 STEP ${mission.step} 達成！` : `🎯 STEP ${mission.step}　${mission.title} ${progress.replaceAll(" ", "")}`]),
-    content: [el("section", { className: `tutorial-floating${complete ? " tutorial-floating--ready" : ""}` }, [
-      el("strong", {}, ["初心者ミッション"]),
-      el("span", { className: "tutorial-floating__step" }, [`STEP ${mission.step}`]),
-      el("b", {}, [complete ? `🎯 STEP ${mission.step} 達成！` : mission.title]),
-      el("span", {}, [mission.condition]),
-      el("span", { className: "tutorial-floating__progress" }, [progress]),
-      el("div", { className: "tutorial-floating__actions" }, [
-        el("button", { type: "button", className: "btn btn--ghost", onclick: () => goTutorialDestination(mission.destination) }, ["移動する"]),
-        ...(complete ? [el("button", { type: "button", className: "btn btn--primary", onclick: () => {
-          if (claimTutorialMission(state.player, mission.id)) { savePlayerState(state.player); playSfx("stageClear"); }
-          render();
-        } }, ["報酬を受け取る"])] : []),
+  return el("section", {
+    className: `tutorial-bar${complete ? " tutorial-bar--ready" : ""}`,
+    "data-tutorial-bar": "",
+    "aria-label": "初心者ミッション",
+  }, [
+    el("div", { className: "tutorial-bar__badge" }, [
+      el("span", {}, ["STEP"]),
+      el("strong", {}, [String(mission.step)]),
+    ]),
+    el("div", { className: "tutorial-bar__text" }, [
+      el("div", { className: "tutorial-bar__title" }, [complete ? `🎯 ${mission.title} 達成！` : mission.title]),
+      el("div", { className: "tutorial-bar__cond" }, [
+        el("span", {}, [mission.condition]),
+        el("span", { className: "tutorial-bar__progress" }, [progress]),
       ]),
-    ])],
-  });
+    ]),
+    el("div", { className: "tutorial-bar__actions" }, [
+      el("button", { type: "button", className: "btn btn--ghost", onclick: () => goTutorialDestination(mission.destination) }, ["移動する"]),
+      ...(complete ? [el("button", { type: "button", className: "btn btn--primary", onclick: () => {
+        if (claimTutorialMission(state.player, mission.id)) { savePlayerState(state.player); playSfx("stageClear"); }
+        render();
+      } }, ["報酬を受け取る"])] : []),
+    ]),
+  ]);
+}
+
+/** 画面の一番上へ差し込む。`.screen` を持たない画面(戦闘)へは入れない。 */
+function mountTutorialBar(content: HTMLElement): void {
+  const bar = buildTutorialBar();
+  if (bar) content.prepend(bar);
 }
 
 /** 前景画面には触れず、バックグラウンド周回カードだけを差分更新する。 */
@@ -1897,11 +1920,13 @@ function refreshBackgroundFarmStatus(): void {
   } else {
     current?.remove();
   }
-  const tutorialCurrent = root.querySelector<HTMLElement>("[data-floating-panel=\"tutorial-mission\"]");
-  const tutorialNext = buildTutorialFloatingPanel();
-  if (tutorialCurrent && tutorialNext) tutorialCurrent.replaceWith(tutorialNext);
-  else if (tutorialCurrent) tutorialCurrent.remove();
-  else if (tutorialNext) root.append(tutorialNext);
+  // 進捗の数字だけが動くので、既に出ている案内を差し替える。
+  // まだ出ていない場合は次の描画に任せる(差し込み先を推測しない)。
+  const tutorialCurrent = root.querySelector<HTMLElement>("[data-tutorial-bar]");
+  if (!tutorialCurrent) return;
+  const tutorialNext = buildTutorialBar();
+  if (tutorialNext) tutorialCurrent.replaceWith(tutorialNext);
+  else tutorialCurrent.remove();
 }
 
 function render(): void {
@@ -2529,6 +2554,7 @@ function render(): void {
     }
   }
 
+  mountTutorialBar(content);
   root.append(content);
   const farmPanel = root.querySelector<HTMLElement>(".farm-equip-sheet__panel");
   restoreScrollTop(farmPanel, farmEquipmentScrollTop);
@@ -2556,8 +2582,6 @@ function render(): void {
   if (backgroundJob) {
     root.append(buildBackgroundFarmStatus(backgroundJob));
   }
-  const tutorialFloating = buildTutorialFloatingPanel();
-  if (tutorialFloating) root.append(tutorialFloating);
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
   playBgm(bgmSceneOf(state.screen));
 
