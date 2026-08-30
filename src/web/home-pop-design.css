@@ -247,7 +247,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   .crimon-home .reward-banner .reward-list .icon { width: 12px !important; height: 12px !important; }
   .crimon-home .reward-banner .reward-list strong { font-size: 1.08rem !important; }
   .crimon-home .reward-banner .reward-list span { font-size: .6rem !important; }
-  .crimon-home .reward-banner .reward-banner__close { width: 34px !important; min-width: 34px !important; height: 34px !important; }
+  .crimon-home .reward-banner .reward-banner__close { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
   .world-party { inset-inline: 78px !important; }
   .world-party__figure { width: 106px !important; height: 152px !important; }
   .world-action--right { transform-origin: top right !important; }
@@ -269,7 +269,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   .crimon-home .reward-banner .reward-list .icon { width: 12px !important; height: 12px !important; }
   .crimon-home .reward-banner .reward-list strong { font-size: 1.08rem !important; }
   .crimon-home .reward-banner .reward-list span { font-size: .6rem !important; }
-  .crimon-home .reward-banner .reward-banner__close { width: 34px !important; min-width: 34px !important; height: 34px !important; }
+  .crimon-home .reward-banner .reward-banner__close { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
 }
 
 @media (max-height: 860px) {
