@@ -5,6 +5,7 @@ import { el } from "../dom.js";
 import { icon, slotIcon } from "../icons.js";
 import { managementHeader } from "./managementHeader.js";
 import { compareEquipmentStats, equipmentForSlot, equipmentLockLabel, equipmentStatTotal, sellableEquipmentIds } from "../uxHelpers.js";
+import "../ui/equipmentList.css";
 
 export interface EquipmentPickerContext {
   monsterId: string;
@@ -125,7 +126,6 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
         el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
       ]),
       equipment.id === currentId ? el("span", { className: "equip-card__status" }, ["現在装備中"]) : null,
-      equipment.locked ? el("span", { className: "equip-card__lock" }, ["🔒 ロック"]) : null,
       el("div", { className: "equip-card__main" }, [
         el("span", { className: "equip-card__main-label" }, [STAT_LABEL[equipment.mainStat.type]]),
         el("strong", { className: "equip-card__main-value" }, [formatMainStatNumber(equipment.mainStat)]),
@@ -296,7 +296,24 @@ function renderList(props: EquipmentProps): HTMLElement {
       if (isEquipped(eq) || eq.locked) card.classList.add("equip-card--locked");
       if (props.selectedIds.includes(eq.id)) card.classList.add("equip-card--selected");
     }
-    if (!props.pickerContext) return el("div", { className: "equip-picker-card" }, [card, el("button", { type: "button", className: "btn btn--ghost equip-picker-card__lock", onclick: () => props.onToggleLock(eq.id) }, [equipmentLockLabel(eq)])]);
+    const lockButton = el(
+      "button",
+      {
+        type: "button",
+        className: `equip-card__lock-button${eq.locked ? " equip-card__lock-button--locked" : ""}`,
+        ariaLabel: equipmentLockLabel(eq),
+        "aria-pressed": String(eq.locked),
+        title: equipmentLockLabel(eq),
+        onclick: (event: Event) => {
+          // 鍵は札と別の操作。親の選択・詳細表示へ絶対に伝播させない。
+          event.preventDefault();
+          event.stopPropagation();
+          props.onToggleLock(eq.id);
+        },
+      },
+      [icon("lock")],
+    );
+    if (!props.pickerContext) return el("div", { className: "equip-picker-card" }, [card, lockButton]);
     const current = props.player.equipment.find((item) => item.id === currentEquipmentId);
     const comparisons = compareEquipmentStats(current, eq);
     return el("div", { className: "equip-picker-card" }, [
@@ -307,7 +324,7 @@ function renderList(props: EquipmentProps): HTMLElement {
         const delta = percent ? `${Math.round(row.delta * 100)}%` : `${Math.round(row.delta)}`;
         return el("small", { className: `equip-picker-card__delta ${row.delta >= 0 ? "is-up" : "is-down"}` }, [`${row.label} ${show(row.current)} → ${show(row.candidate)} (${row.delta >= 0 ? "+" : ""}${delta})`]);
       })) : null,
-      el("button", { type: "button", className: "btn btn--ghost equip-picker-card__lock", onclick: (event: Event) => { event.stopPropagation(); props.onToggleLock(eq.id); } }, [equipmentLockLabel(eq, true)]),
+      lockButton,
     ].filter((node): node is HTMLElement => node !== null));
   });
 

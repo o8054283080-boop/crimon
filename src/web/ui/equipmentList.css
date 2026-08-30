@@ -1,0 +1,88 @@
+/* 装備一覧だけに適用する。既存のロック状態・切替処理は変えず、操作面だけを札へ重ねる。 */
+.equipment-screen .equip-picker-card {
+  position: relative;
+}
+
+/* 見た目は小さく、指の的は44px。札本体とは兄弟要素なので入れ子のbuttonにもならない。 */
+.equipment-screen .equip-card__lock-button {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  right: 3px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  color: #697697;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.equipment-screen .equip-card__lock-button .icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.58;
+}
+
+.equipment-screen .equip-card__lock-button--locked {
+  color: #ffd36a;
+  background: radial-gradient(circle, rgba(255, 211, 106, 0.16), transparent 68%);
+  filter: drop-shadow(0 0 5px rgba(255, 190, 70, 0.55));
+}
+
+.equipment-screen .equip-card__lock-button--locked .icon {
+  opacity: 1;
+}
+
+.equipment-screen .equip-card__lock-button:focus-visible {
+  outline: 2px solid #ffe7a3;
+  outline-offset: -3px;
+}
+
+/* 鍵の的と強化値を重ねず、右上の情報を一度に読めるようにする。 */
+.equipment-screen .equip-card__head {
+  width: 100%;
+  padding-right: 37px;
+}
+
+/* まとめ売りの選択印も鍵の下へ隠さず、左隣へ退避する。 */
+.equipment-screen .equip-card--selected::after {
+  right: 43px;
+}
+
+/* 数値を途中で切らない。最大4行でも、廃止したロック専用ボタンより低く収める。 */
+.equipment-screen .equip-card__subs {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+}
+
+.equipment-screen .equip-card__sub-line {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+/* サブ効果と装着状態の境界を保ちつつ、長い固有名だけを安全に省略する。 */
+.equipment-screen .equip-card__owner {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 430px) {
+  .equipment-screen .equip-card__head {
+    gap: 5px;
+    padding-right: 35px;
+  }
+
+  .equipment-screen .equip-card__sigil {
+    width: 28px;
+    height: 28px;
+  }
+}
