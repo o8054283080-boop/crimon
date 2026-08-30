@@ -77,7 +77,8 @@
 .mcard--compact .mcard__badge--corner {
   top: 22px;
   right: 3px;
-  font-size: 0.56rem;
+  /* 巡回と可読性テストが共有する下限(9px)を下回らせない */
+  font-size: 0.57rem;
 }
 
 /* fixed の基準をビューポートに統一し、高さと予約領域を同じ変数で結ぶ。 */
