@@ -94,16 +94,47 @@ describe("背景と盤面の釣り合い", () => {
     expect(top + bottom).toBeLessThan(0.34);
   });
 
-  it("エフェクトの基準が、広げた表示範囲に合わせてある", () => {
+  it("隊列が片側2列の千鳥になっている", () => {
+    /*
+     * 依頼主の示した参考画面(AFK Arena)の構図。
+     * 1列に戻すと盤面が倍の深さになり、カメラが引いて1体が半分になる。
+     */
+    expect(stage, "段ごとに列を替えていない").toMatch(/i % 2 === 0 \? laneGap : 0/);
+    const inner = Number(/const LANE_INNER = ([0-9.]+)/.exec(stage)?.[1] ?? "0");
+    const gap = Number(/const LANE_GAP = ([0-9.]+)/.exec(stage)?.[1] ?? "0");
+    expect(inner, "内側の列が無い").toBeGreaterThan(0);
+    expect(gap, "2列に分かれていない").toBeGreaterThan(0.5);
+  });
+
+  it("枠が板の幅を丸ごと数えている", () => {
+    /*
+     * 縦画面で枠を削ってカメラを寄せる細工が入っていた。
+     * 千鳥にして外側の列が画面の端まで来たので、削ったぶんだけ
+     * **外側の列が画面の外へはみ出した。**
+     */
+    expect(stage).toMatch(/halfWidth: maxAbsX \+ SPRITE_HALF_WIDTH,/);
+  });
+
+  it("エフェクトの大きさが、画面ではなく本体の背丈から決まる", () => {
     /*
      * **片方だけ触らない。**
-     * 帯を避けて表示範囲を広げると、画面の縦を基準にしたエフェクトだけが
-     * 勝手に大きくなる。守りのドームが本体を丸ごと覆う白い泡になった。
-     * 装備の速度と敵の速度カーブの時と同じ事故。
+     *
+     * 画面の縦を基準にしていた頃、構図を変えるたびにエフェクトが動いた。
+     * 2回続けて壊している。
+     *   1. UIの帯を避けて表示範囲を1.35倍にしたら、守りのドームが
+     *      本体を丸ごと覆う白い泡になった
+     *   2. 隊列を千鳥にして表示範囲が半分になったら、今度は全部が半分になった
+     *
+     * 本体の背丈に比例させておけば、構図をどう変えても釣り合いが動かない。
+     * 画面を覆わないための**上限だけ**は画面の縦から掛ける。
      */
-    const reference = Number(/const VFX_REFERENCE_HEIGHT = ([0-9.]+)/.exec(stage)?.[1] ?? "0");
-    expect(reference, "VFX_REFERENCE_HEIGHT が読めない").toBeGreaterThan(0);
-    // 帯を避けたぶん(約1.35倍)と、絵を縮めたぶん(0.88)の積を織り込んだ値
-    expect(reference, "エフェクトが本体より大きくなる").toBeGreaterThan(55);
+    expect(stage, "本体の背丈から決めていない").toMatch(
+      /this\.vfxSizeScale = SPRITE_MAX_HEIGHT \* VFX_PER_SPRITE_HEIGHT/,
+    );
+    expect(stage, "画面の縦を大きさそのものに使っている").not.toMatch(
+      /vfxSizeScale = visibleHeight/,
+    );
+    // 画面を覆わないための上限は、引き続き画面の縦から掛ける
+    expect(stage).toMatch(/setMaxBillboardScale\(visibleHeight \* VFX_MAX_SCREEN_RATIO\)/);
   });
 });

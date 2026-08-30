@@ -7,6 +7,7 @@ import { Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { ArenaHandles, createArena } from "./arena.js";
 import { BackdropHandles, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
+import { SPRITE_MAX_HEIGHT } from "./spriteAvatar.js";
 import { dominantElement, moodFor, StageMood } from "./elementTheme.js";
 import { BattleAvatar, createBattleAvatar } from "./avatarFactory.js";
 import { CinematicPass } from "./postfx/cinematicPass.js";
@@ -83,26 +84,52 @@ const MAX_TEAM_SIZE = 5;
  * 奥行きで分けると**両チームが同じ方を向いて並ぶ**ことになる。
  * 左右に分ければ、絵の向きがそのまま「向かい合っている」に読める。
  *
- * 画面の左右の端はHPと行動ゲージの札が使うので、**本体はやや内側**に立たせる。
- * 外へ出すと札と場所を取り合い、モンスターが札の裏へ隠れる(実際に隠れた)。
+ * ## 1列ではなく、片側2列の千鳥にする
  *
- * 盤面の縦が表示範囲を決めているので、ここを詰めても
- * モンスターが大きくなることはない。**中央へ寄るだけ。**
+ * 依頼主の示した参考画面(AFK Arena)は、**片側が2列で、
+ * 手前の列が奥の列の半歩ぶん下へずれている。** 一列に縦へ並べていた時と比べて
+ *
+ *   - 盤面の縦が半分になる。カメラが寄れるので**1体が大きく映る**
+ *   - 前衛と後衛が絵として読める
+ *   - 隣どうしが少し重なる。参考画面でも重なっていて、それが密度になっている
+ *
+ * `LANE_INNER` が中央寄りの列、`LANE_INNER + LANE_GAP` が外側の列。
+ * 画面の左右の端はHPと行動ゲージの札が使うので、外側の列でも端までは出さない。
  */
-const LANE_X = 1.55;
-/** 横長の画面で列を離す追加ぶん。横に余るので、その余りを列の間隔に使う */
-const LANE_X_WIDE = 3.1;
+const LANE_INNER = 1.0;
+/** 内側の列と外側の列の隔たり */
+const LANE_GAP = 1.15;
+/** 横長の画面で左右へ広げる追加ぶん。横に余るので、その余りを列の間隔に使う */
+const LANE_X_WIDE = 2.4;
+
+/**
+ * 千鳥の段の間隔(前後方向)。
+ *
+ * **隣り合う段は別の列に入る**ので、ここは「同じ列の間隔の半分」にあたる。
+ * 段の間隔は画面上の高さでいうと約79px、モンスターの背丈が約91px。
+ * 隣どうしが少し重なるが、別の列なので横にずれており、参考画面と同じ密度になる。
+ */
+const RUNG = 2.5;
+
+/**
+ * 見下ろし角(44〜48度)の cos の見込み。
+ *
+ * 盤面の枠を決める時、まだカメラの角度が確定していない
+ * (角度は表示範囲から決まり、表示範囲は枠から決まる)。
+ * 角度の振れ幅は4度しかないので、真ん中の値で見込んでおけば足りる。
+ */
+const TILT_COS = 0.70;
 
 /**
  * 板の半幅の見込み。
  *
  * 実際の幅は絵の縦横比で決まる。最大は横長のゴーレム(512×420)で、
- * 背丈2.45 × 表示倍率0.88 × 縦横比1.22 ÷ 2 = 1.32。少し余裕を足してある。
+ * 背丈2.45 × 表示倍率0.68 × 縦横比1.22 ÷ 2 = 1.02。少し余裕を足してある。
  * ここが足りないと、列が画面の端で切れる(実際にゴーレムが切れた)。
  *
  * **`spriteAvatar.ts` の `SPRITE_SCALE` と対で決まる。**片方だけ触らない。
  */
-const SPRITE_HALF_WIDTH = 1.45;
+const SPRITE_HALF_WIDTH = 1.05;
 
 /**
  * 背景の絵を暗く落とす量。
@@ -124,42 +151,63 @@ const BACKDROP_EDGE = 0.34;
 /**
  * 画面の上でUIが覆う割合。盤面はここを避けて収める。
  *
- * 上は階層名と自動・速度・再生の並び。下はスキルの操作欄。
- * **手動戦闘での高さで測る。**自動では操作欄が畳まれるが、
+ * 上は階層名と自動・速度・再生の並び(`.battle-topbar` の実測が76px = 0.090)。
+ * 下はスキルの操作欄(`.skill-dock` の手動時が約110px = 0.130)。
+ *
+ * **手動戦闘での高さで測る。**自動では操作欄が22pxまで畳まれるが、
  * 畳まれた高さで組むと、自動へ切り替えた瞬間に盤面が跳ねる。
  */
 const SAFE_BAND_TOP = 0.09;
-const SAFE_BAND_BOTTOM = 0.17;
+const SAFE_BAND_BOTTOM = 0.13;
 
 /**
- * 立ち位置。**左右に分かれて縦に並ぶ。**
+ * 立ち位置。**左右に分かれ、片側は2列の千鳥に並ぶ。**
  *
- * 味方は左の列、敵は右の列。列の中は手前(+Z)から奥(-Z)へ順に置く。
- * カメラは斜め上から見下ろすので、前後の隔たりが画面の上下になる。
+ * 味方は左、敵は右。片側の中は「段」を手前(+Z)から奥(-Z)へ数え、
+ * **段ごとに外側の列と内側の列を交互に使う。**
+ *
+ * ```
+ *   外側の列  内側の列              ← 味方(左)
+ *     ●                            段0(手前)
+ *              ●                   段1
+ *     ●                            段2
+ *              ●                   段3
+ *     ●                            段4(奥)
+ * ```
+ *
+ * 5体なら外側に3体・内側に2体が入り、参考画面(AFK Arena)と同じ形になる。
+ * 4体なら2体ずつ。**人数が変わっても段の間隔は変えない**ので、
+ * 4体の戦いと5体の戦いでモンスターの大きさが変わらない。
  *
  * カメラは正投影(遠近なし)なので、奥に立っても小さくならず、
- * 画面中央へ寄りもしない。**4体が同じ大きさでまっすぐ縦に並ぶ。**
+ * 画面中央へ寄りもしない。どの段の1体も同じ大きさで映る。
  */
 function slotPositions(
   count: number,
   team: "PLAYER" | "ENEMY",
-  /** 前後の間隔。縦に余裕のある画面では広げる */
-  spacing = 2.25,
-  /** 奥へ行くほど外へ押し出す量。正投影では0でよい(透視投影の名残) */
-  skew = 0,
-  /** 2つの列の間隔。横長の画面では離す */
-  laneX = LANE_X,
+  /** 段の間隔(前後方向) */
+  rung = RUNG,
+  /** 中央寄りの列までの距離 */
+  laneInner = LANE_INNER,
+  /** 内側の列と外側の列の隔たり */
+  laneGap = LANE_GAP,
 ): { x: number; z: number }[] {
   if (count <= 0) return [];
   const side = team === "PLAYER" ? -1 : 1;
-  const total = (count - 1) * spacing;
+  const total = (count - 1) * rung;
 
   return Array.from({ length: count }, (_, i) => {
-    // 先頭(i=0)が手前。奥へ向かって並ぶ
-    const z = total / 2 - i * spacing;
-    // 奥(zが小さい)ほど外側へ
-    const push = (total / 2 - z) * skew;
-    return { x: side * (laneX + push), z };
+    // 先頭(i=0)が手前。奥へ向かって段が進む
+    const z = total / 2 - i * rung;
+    /*
+     * 偶数段を外側、奇数段を内側へ。
+     *
+     * **先頭を外側から始める。** 内側から始めると5体の時に
+     * 内側が3体・外側が2体になり、内側の列が中央へ寄りすぎて
+     * 敵の列とぶつかる(390pxの画面では実際にぶつかる)。
+     */
+    const x = side * (laneInner + (i % 2 === 0 ? laneGap : 0));
+    return { x, z };
   });
 }
 
@@ -180,18 +228,25 @@ const HIT_STYLE_BY_ROLE: Record<string, HitStyle> = {
 };
 
 /**
- * エフェクトの大きさを決める基準の高さ(ワールド単位)。
- * 画面の縦にこの高さが収まっている時、各エフェクトは指定どおりの寸法で描かれる。
- * 実際の画角がこれより狭ければ、その比率でエフェクトも小さくなる。
+ * エフェクトの大きさを、**モンスターの背丈から**決める係数。
  *
- * **モンスターの大きさと対で決まる。**
- * ここは「画面の縦」を基準にしているので、UIの帯を避けて表示範囲を広げると
- * エフェクトだけが勝手に大きくなる。モンスターを0.88へ縮め、
- * 表示範囲を1.35倍へ広げた時、**守りのドームが本体を丸ごと覆う白い泡**になった。
- * 装備の速度と敵の速度カーブの時と同じ、片方だけ触った事故。
- * 表示範囲を変えたら、必ずここも測り直す。
+ * ## 画面の縦を基準にするのをやめた理由
+ *
+ * 以前は「画面の縦がワールド何単位ぶん映っているか」を基準にしていた。
+ * これだと**構図を変えるたびにエフェクトの大きさが勝手に動く。**
+ * 実際に2回続けて壊した。
+ *
+ *   1. UIの帯を避けて表示範囲を1.35倍に広げたら、エフェクトだけが1.35倍になり、
+ *      守りのドームが本体を丸ごと覆う白い泡になった
+ *   2. 隊列を千鳥にして表示範囲が半分になったら、今度は全部が半分になった
+ *
+ * エフェクトは**本体に付くもの**なので、本体の背丈に比例させる。
+ * こうすれば構図をどう変えても、本体との釣り合いは動かない。
+ * 画面を覆わないための上限だけは、引き続き画面の縦から掛ける。
+ *
+ * 値は、3Dモデル(背丈2.45)の頃に見て決めた寸法から逆算してある。
  */
-const VFX_REFERENCE_HEIGHT = 64;
+const VFX_PER_SPRITE_HEIGHT = 0.175;
 
 /**
  * パーティクルの密度。1未満にすると粒の数が減る。
@@ -502,7 +557,11 @@ export class BattleStage {
    * ここに透明を使うと乗算合成では「掛ける値が0」になり、板の四角が
    * まるごと真っ黒に落ちる。
    */
-  private static contactShadowTexture(): THREE.Texture {
+  private static readonly padTextures = new Map<string, THREE.Texture>();
+
+  private static contactShadowTexture(rim: string): THREE.Texture {
+    const cached = BattleStage.padTextures.get(rim);
+    if (cached) return cached;
     const canvas = document.createElement("canvas");
     canvas.width = 128;
     canvas.height = 128;
@@ -528,13 +587,46 @@ export class BattleStage {
     gradient.addColorStop(1.0, "rgba(4, 6, 14, 0)");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 128, 128);
+
+    /*
+     * 陣営色の縁取り。**参考画面(AFK Arena)で最も効いている部品。**
+     *
+     * 影だけだと、明るい石畳の上では「そこに立っている」ことは分かっても
+     * **味方か敵かが分からない。**千鳥に組んで左右が近づいたぶん、
+     * どちらの列かを色で言い切れる手掛かりが要る。
+     *
+     * 内側へ向けてぼかすので、輪(リング)ではなく淡い台座に見える。
+     */
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = 7;
+    ctx.shadowColor = rim;
+    ctx.shadowBlur = 9;
+    ctx.beginPath();
+    ctx.arc(64, 64, 52, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
+    BattleStage.padTextures.set(rim, texture);
     return texture;
   }
 
   /**
-   * 足元に接地影を敷く。
+   * 陣営ごとの台座の縁の色。
+   *
+   * 味方は青緑、敵は琥珀。**属性色は使わない。**
+   * 属性色にすると、火属性の味方と火属性の敵が同じ色の台座に立つ。
+   * 台座に持たせたい情報は属性ではなく「どちらの側か」。
+   */
+  private static padRim(team: "PLAYER" | "ENEMY"): string {
+    return team === "PLAYER" ? "rgba(122, 235, 205, 0.72)" : "rgba(255, 172, 88, 0.72)";
+  }
+
+  /**
+   * 足元に台座を敷く。中心の影と、陣営色の縁取り。
    *
    * 取りまとめ役の指摘「床の上に貼った絵のように浮いて見える」の本体はここ。
    * 平行光の影は落ちていたが、足元には属性ライト・足元のオーラ・加算の霞が
@@ -542,14 +634,14 @@ export class BattleStage {
    * 「足元だけ明るい」状態になっていた。乗算合成なら後から光を足されても
    * 比率として暗さが残るので、必ず接地して見える。
    */
-  private addContactShadow(avatar: BattleAvatar): void {
+  private addContactShadow(avatar: BattleAvatar, team: "PLAYER" | "ENEMY"): void {
     const proxy = avatar.hitArea as THREE.Mesh;
     const params = (proxy.geometry as THREE.BoxGeometry).parameters;
     // 当たり判定の箱は footprint の 1.15 倍で作られている
     const footprint = (params?.width ?? 1.4) / 1.15;
     const geometry = new THREE.PlaneGeometry(footprint * 2.0, footprint * 2.0);
     const material = new THREE.MeshBasicMaterial({
-      map: BattleStage.contactShadowTexture(),
+      map: BattleStage.contactShadowTexture(BattleStage.padRim(team)),
       transparent: true,
       depthWrite: false,
       // 影がブルームのしきい値を越えることはないので、トーンマップには乗せる。
@@ -717,7 +809,7 @@ export class BattleStage {
         minZ = Math.min(minZ, slots[index].z);
 
         // 足元の接地影。**これが無いと床に貼った絵に見える**
-        this.addContactShadow(avatar);
+        this.addContactShadow(avatar, unit.team);
 
         // 属性色のポイントライト。床への色移りで存在感を出すが、
         // 台数が増えるとモバイルGPUで重くなるので範囲と強さは控えめにする。
@@ -905,10 +997,9 @@ export class BattleStage {
     // 画面の縦がワールド何単位ぶん映っているか。正投影ではそのまま表示範囲の高さ
     const visibleHeight = halfH * 2;
 
-    // エフェクトの大きさを、いまの構図に対して相対的に決める。
-    // 画面の縦がワールド何単位ぶん映っているかを基準にすると、
-    // 表示範囲を変えても演出が画面を覆って白飛びすることがない。
-    this.vfxSizeScale = visibleHeight / VFX_REFERENCE_HEIGHT;
+    // エフェクトの大きさは**本体の背丈**から決める。
+    // 構図を変えても、本体との釣り合いが動かない
+    this.vfxSizeScale = SPRITE_MAX_HEIGHT * VFX_PER_SPRITE_HEIGHT;
     this.vfx.setSizeScale(this.vfxSizeScale);
     // どんな演出でも、1枚の板が画面の高さのこの割合を超えないようにする
     this.vfx.setMaxBillboardScale(visibleHeight * VFX_MAX_SCREEN_RATIO);
@@ -930,42 +1021,22 @@ export class BattleStage {
     if (Math.abs(portrait - this.formationPortrait) < 0.02) return;
     this.formationPortrait = portrait;
 
-    const lateral = 1 - 0.18 * portrait;
     /*
-     * 縦画面で前後を大きく広げて縦の余りを使わせる案を試したが、**逆効果だった。**
-     * 0.1 → 0.45 にすると2つの列の間に空の床の帯ができ、1体ずつも小さくなる。
-     * 縦が余って見えるのは隊列の広がりが足りないからではなく、
-     * 闘技場の客席が上に写り込んでいるため。直すならそちら側。
-     */
-    /*
-     * 縦に余裕のある画面では前後の間隔を広げる。
-     * 左右に分かれた配置では、**余る方向は常に縦**なので、
-     * 横を詰めて縦へ展開するのが素直になった。
-     */
-    // 縦長の画面ほど前後を広げる。左右に分かれた配置では余るのは常に縦なので、
-    // ここを広げるほど画面が埋まり、モンスターも大きく映る
-    /*
-     * 前後の間隔。**ここがモンスターの大きさを決める。**
+     * 段の間隔。**ここがモンスターの大きさを決める。**
      *
      * 盤面が縦に長いほど、同じ画面に収めるためカメラの表示範囲が広がり、
-     * 1体あたりは小さく映る。装備ダンジョンの5体を無理なく並べ、
-     * 上下に舞台が見える余裕を残す値にしてある。
+     * 1体あたりは小さく映る。一列に縦へ並べていた頃はここが6.0あり、
+     * 5体で盤面が24の深さになって、1体が画面の縦の7%まで縮んでいた。
+     * 千鳥にして段を交互の列へ振ったので、同じ人数でも盤面は半分の深さで済む。
      */
-    const spacing = 3.6 + 2.4 * portrait;
+    const rung = RUNG;
     /*
-     * 奥へ行くほど外へ押し出す量。**正投影にしたので0。**
-     *
-     * 透視投影では奥のものが画面中央へ寄るため、押し出して打ち消していた。
-     * 正投影にはその寄りが無いので、押し出すと逆に外へ開いてしまう。
-     */
-    const skew = 0;
-    /*
-     * 2つの列の間隔。**縦画面では詰め、横画面では離す。**
+     * 中央寄りの列までの距離。**縦画面では詰め、横画面では離す。**
      * 縦画面は横が足りないので詰めて縦へ展開し、
      * 横画面は横が余るので離して縦の不足を補う。
      * どちらも「余っている方向へ盤面を伸ばす」という同じ考え方。
      */
-    const laneX = LANE_X + LANE_X_WIDE * (1 - portrait);
+    const laneInner = LANE_INNER + LANE_X_WIDE * (1 - portrait);
 
     let maxAbsX = 0;
     let maxZ = -Infinity;
@@ -981,7 +1052,7 @@ export class BattleStage {
        * モンスターの大きさが変わってしまう。
        * 中央に寄せて、余った席を前後に空ける。
        */
-      const slots = slotPositions(MAX_TEAM_SIZE, team, spacing, skew, laneX);
+      const slots = slotPositions(MAX_TEAM_SIZE, team, rung, laneInner, LANE_GAP);
       const offset = Math.floor((MAX_TEAM_SIZE - members[0].count) / 2);
       /*
        * 盤面の広さも**席の全部**から測る。実際に立っている数で測ると、
@@ -1023,17 +1094,31 @@ export class BattleStage {
        * 立ち位置だけで枠を決めていたら、左右の列が画面の外へはみ出した。
        * 左右に分かれた配置では、ここが盤面の大きさを決める。
        */
-      halfWidth: maxAbsX + SPRITE_HALF_WIDTH - 0.15 * portrait,
-      zNear: maxZ + 1.0 - 0.5 * portrait,
       /*
-       * 奥側だけ広く取る。**板をカメラの角度へ倒すと、頭が奥へ動く。**
-       * 背丈2.6の板を44度倒せば、頭は奥へ 2.6 × sin44 ≒ 1.8 移動する。
-       * ここを足さないと、一番奥の1体の頭が画面の上で切れる(実際に切れた)。
+       * 横。**立ち位置だけでなく、板の幅を丸ごと足す。**
+       *
+       * 縦画面では枠を削ってカメラを寄せていた(`- 0.15 * portrait`)が、
+       * 千鳥にして外側の列が画面の端まで来たので、その削りぶんだけ
+       * **外側の列が画面の外へはみ出した。**寄せるための削りは、
+       * 端に何も立っていなかった頃の名残。
        */
-      zFar: minZ - 3.0 + 0.5 * portrait,
+      halfWidth: maxAbsX + SPRITE_HALF_WIDTH,
+      zNear: maxZ + 0.3,
+      zFar: minZ - 0.3,
       yBottom: -0.3,
-      // 倒したぶん板は縦に縮む(2.6 × cos44 ≒ 1.9)ので、上は低くてよい
-      yTop: 2.2,
+      /*
+       * 上。**板はカメラへ正対するよう倒してあるので、背丈がまるごと縦へ映る。**
+       *
+       * 以前は「上に yTop、奥に zFar」と別々に余白を積んでいたが、
+       * 枠は箱なので**その2つの角(高さも奥行きも最大)まで数えてしまう。**
+       * 実際にそこには何も無いぶんカメラが引き、
+       * 盤面が画面の上へ押し上げられて**下に床だけの帯ができた。**
+       *
+       * 一番奥の1体の頭が画面上で届く高さは、足元から背丈ぶん。
+       * 見下ろし角ぶんを割り戻した高さをここへ入れれば、
+       * 枠の角がちょうど頭の位置に来る。
+       */
+      yTop: SPRITE_MAX_HEIGHT / TILT_COS,
     };
   }
 
