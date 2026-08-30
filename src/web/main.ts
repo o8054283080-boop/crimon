@@ -150,6 +150,7 @@ const pwaUpdate = new PwaUpdateController(
   () => window.location.reload(),
   {
     inspectUpdate: () => ({
+      registration: pwaRegistration,
       controller: navigator.serviceWorker?.controller ?? null,
       active: pwaRegistration?.active ?? null,
       waiting: pwaRegistration?.waiting ?? null,
@@ -2597,6 +2598,7 @@ function render(): void {
       el("div", { className: "pwa-update-banner__copy" }, [
         el("strong", {}, ["新しいバージョンがあります"]),
         ...(inBattle ? [el("span", {}, ["戦闘終了後にアップデートできます"])] : []),
+        ...(pwaUpdate.snapshot.failed ? [el("span", {}, ["更新できませんでした。もう一度お試しください"])] : []),
       ]),
       el("button", {
         type: "button",

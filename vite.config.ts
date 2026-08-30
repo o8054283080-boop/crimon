@@ -62,9 +62,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // 緊急復旧: 壊れた旧PWAキャッシュが真っ暗画面を保持し続けないよう、
-        // 新しいworkerを待機させず即時有効化し、開いているページも新workerへ切り替える。
-        skipWaiting: true,
+        // prompt更新では、ユーザーが更新ボタンを押すまで新workerをwaitingに保つ。
+        // falseなら生成SWにSKIP_WAITINGメッセージのlistenerが入り、registerSWが返す
+        // updateSW()から公式のmessageSkipWaiting()経由で安全に有効化できる。
+        skipWaiting: false,
         clientsClaim: true,
         /*
          * ogg/json を入れ忘れていたため、効果音がキャッシュの対象外だった

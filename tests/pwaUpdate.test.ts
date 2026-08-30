@@ -6,6 +6,7 @@ function setup(timeoutMs = 10_000, inspectUpdate?: () => {
   active: object | null;
   waiting: object | null;
   installing: object | null;
+  registration: object | null;
 }) {
   let controllerChange: (() => void) | undefined;
   const reload = vi.fn();
@@ -24,11 +25,16 @@ describe("PWA update controller", () => {
   it("keeps an announced update available", () => {
     const { controller } = setup();
     controller.announce();
-    expect(controller.snapshot).toEqual({ available: true, applying: false });
+    expect(controller.snapshot).toEqual({ available: true, applying: false, failed: false });
   });
 
   it("applies only after the user request and reloads once", async () => {
-    const { controller, controllerChange, reload } = setup();
+    const activeWorker = {};
+    const waitingWorker = {};
+    const { controller, controllerChange, reload } = setup(10_000, () => ({
+      registration: {}, controller: activeWorker, active: activeWorker,
+      waiting: waitingWorker, installing: null,
+    }));
     const updateWorker = vi.fn().mockResolvedValue(undefined);
     const persist = vi.fn();
     controller.setUpdateWorker(updateWorker);
@@ -54,19 +60,24 @@ describe("PWA update controller", () => {
     controller.setUpdateWorker(vi.fn().mockRejectedValue(new Error("offline")));
     controller.announce();
     expect(await controller.apply(vi.fn())).toBe(false);
-    expect(controller.snapshot).toEqual({ available: true, applying: false });
+    expect(controller.snapshot).toEqual({ available: true, applying: false, failed: true });
   });
 
   it("returns to a retryable state when controllerchange never arrives", async () => {
     vi.useFakeTimers();
-    const { controller, changed, reload } = setup();
+    const waitingWorker = {};
+    const activeWorker = {};
+    const { controller, changed, reload } = setup(10_000, () => ({
+      registration: {}, controller: activeWorker, active: activeWorker,
+      waiting: waitingWorker, installing: null,
+    }));
     controller.setUpdateWorker(vi.fn().mockResolvedValue(undefined));
     controller.announce();
 
     await controller.apply(vi.fn());
     await vi.advanceTimersByTimeAsync(10_000);
 
-    expect(controller.snapshot).toEqual({ available: true, applying: false });
+    expect(controller.snapshot).toEqual({ available: true, applying: false, failed: true });
     expect(changed).toHaveBeenCalledTimes(3);
     expect(reload).not.toHaveBeenCalled();
     vi.useRealTimers();
@@ -85,6 +96,27 @@ describe("PWA update controller", () => {
     finish?.();
     await first;
     controllerChange();
+  });
+
+  it("reloads by the fallback when waiting disappears and the new worker activates", async () => {
+    vi.useFakeTimers();
+    const oldWorker = {};
+    const newWorker = {};
+    let status = {
+      registration: {}, controller: oldWorker, active: oldWorker,
+      waiting: {} as object | null, installing: null,
+    };
+    const { controller, reload } = setup(10_000, () => status);
+    controller.setUpdateWorker(vi.fn().mockImplementation(async () => {
+      status = { ...status, active: newWorker, waiting: null };
+    }));
+    controller.announce();
+
+    await controller.apply(vi.fn());
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(reload).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 
   it("ignores a late controllerchange after timeout recovery", async () => {
@@ -107,6 +139,7 @@ describe("PWA update controller", () => {
     const newWorker = {};
     let active = oldWorker;
     const { controller, controllerChange, reload } = setup(10_000, () => ({
+      registration: {},
       controller: oldWorker,
       active,
       waiting: null,
@@ -128,5 +161,37 @@ describe("PWA update controller", () => {
     const controller = new PwaUpdateController(null, changed, vi.fn());
     controller.announce();
     expect(await controller.apply(vi.fn())).toBe(false);
+  });
+
+  it("fails safely when registration is unavailable and does not persist", async () => {
+    const persist = vi.fn();
+    const { controller } = setup(10_000, () => ({
+      registration: null, controller: null, active: null, waiting: null, installing: null,
+    }));
+    controller.setUpdateWorker(vi.fn());
+    controller.announce();
+
+    expect(await controller.apply(persist)).toBe(false);
+    expect(persist).not.toHaveBeenCalled();
+    expect(controller.snapshot.failed).toBe(true);
+  });
+
+  it("reloads only once when timeout fallback and controllerchange compete", async () => {
+    vi.useFakeTimers();
+    const oldWorker = {};
+    const newWorker = {};
+    let active = oldWorker;
+    const { controller, controllerChange, reload } = setup(10_000, () => ({
+      registration: {}, controller: oldWorker, active, waiting: null, installing: null,
+    }));
+    controller.setUpdateWorker(vi.fn().mockImplementation(async () => { active = newWorker; }));
+    controller.announce();
+    await controller.apply(vi.fn());
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    controllerChange();
+
+    expect(reload).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 });
