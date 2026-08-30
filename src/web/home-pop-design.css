@@ -208,8 +208,9 @@ body:has(.crimon-home) .crimon-bottom-nav {
   gap: 0 !important;
   padding: 9px 18px calc(6px + env(safe-area-inset-bottom)) !important;
   border: 0 !important;
-  background: url("./assets/home/home-bottom-nav-frame-v3.webp") center / 100% 100% no-repeat !important;
-  background-color: var(--home-navy-950) !important;
+  background:
+    url("./assets/home/home-bottom-nav-frame-v3.webp") center / 100% 100% no-repeat,
+    linear-gradient(var(--home-navy-950), var(--home-navy-950)) center / 100% 100% no-repeat !important;
   box-shadow: none !important;
 }
 
