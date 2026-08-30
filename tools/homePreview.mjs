@@ -34,6 +34,16 @@ try {
       path: `${outDir}/${viewport.name.replace(".png", "-no-rewards.png")}`,
       fullPage: false,
     });
+
+    // Playwright の通常コンテキストは iPhone の下部safe-areaが 0px になる。
+    // 実機で編成パネルが固定ナビの裏へ潜らないことを、代表値 34px で確認する。
+    await page.addStyleTag({
+      content: "body:has(.crimon-home) { --home-safe-bottom: 34px !important; }",
+    });
+    await page.screenshot({
+      path: `${outDir}/${viewport.name.replace(".png", "-no-rewards-safe-bottom.png")}`,
+      fullPage: false,
+    });
     await context.close();
   }
 } finally {
