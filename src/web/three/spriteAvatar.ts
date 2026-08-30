@@ -536,7 +536,18 @@ export class SpriteAvatar {
    * ダメージの数字は殴られた場所に出したいので、あちらは追従したままにする。
    */
   getSlotAnchorWorldPosition(target: THREE.Vector3): THREE.Vector3 {
-    target.set(this.slotX, this.height * 0.88 + this.floatHeight, this.slotZ);
+    /*
+     * **絵の上端(背丈の100%)を使う。**
+     *
+     * ダメージ用の基準は背丈の88%を指している。3Dモデルの頃は
+     * 「頭のすぐ下」でちょうどよかったが、2Dの板では
+     * **残り12%がそのまま札の下へ潜る。**背丈80pxなら約10px。
+     * 実機の画面で札がモンスターの頭に食い込んでいると指摘を受けた。
+     *
+     * 絵は `tools/prepareSprites.mjs` が透明部分で切り抜いてから
+     * 3%の余白を足しているので、板の上端＝絵の中身のほぼ上端になる。
+     */
+    target.set(this.slotX, this.height + this.floatHeight, this.slotZ);
     this.root.parent?.localToWorld(target);
     return target;
   }

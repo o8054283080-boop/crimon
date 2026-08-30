@@ -448,7 +448,8 @@ export class MonsterAvatar {
    * 絵のある種族と無い種族で札の落ち着き方が変わる。
    */
   getSlotAnchorWorldPosition(target: THREE.Vector3): THREE.Vector3 {
-    target.set(this.slotX, this.rig.height * 0.86, this.slotZ);
+    // 2D側と同じく、頭のてっぺんを使う。0.86だと札が頭に食い込む
+    target.set(this.slotX, this.rig.height, this.slotZ);
     this.root.parent?.localToWorld(target);
     return target;
   }

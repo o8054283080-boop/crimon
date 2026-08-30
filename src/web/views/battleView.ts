@@ -222,8 +222,14 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 上へ逃がすのは、下だと隣の本体の顔に掛かるため。
    * 上なら掛かるのは足元で、見た目の損が小さい。
    */
-  /** 札の下端と本体の頭のあいだに空ける隙間(px) */
-  const HUD_HEAD_GAP = 4;
+  /**
+   * 札の下端と本体の頭のあいだに空ける隙間(px)。
+   *
+   * 4pxでは足りなかった。本体は待機で前後に漂い、画面上では上下に動く
+   * (浮遊型で±3px)。札は立ち位置に固定してあるので、
+   * **漂って上へ来た本体が札へ届く。**その振れ幅ぶんを見込む。
+   */
+  const HUD_HEAD_GAP = 8;
   /** 札が画面の端からはみ出さないよう残す余白(px) */
   const HUD_EDGE = 4;
   /*
@@ -288,8 +294,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       /*
        * 縦は**本体の頭のすぐ上**に置き、ぶつかったぶんだけ下へ送る。
        *
-       * `anchor.y` は本体の背丈の88%あたり(頭のあたり)を指す。
-       * そこを札の下端にすると、札は頭に触れずに真上へ乗る。
+       * `anchor.slotY` は本体の絵の上端を指す。
+       * そこから隙間ぶん上を札の下端にすると、札は頭に触れない。
        */
       let top = anchor.slotY - height - HUD_HEAD_GAP;
       const overlaps = (candidate: number) =>

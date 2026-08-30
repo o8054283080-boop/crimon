@@ -155,9 +155,10 @@ describe("背景と盤面の釣り合い", () => {
     /*
      * 札の高さ。style.css の `.unit-hud--slim` の実寸から積む。
      *   状態異常18 + 隙間2 + HP 7 + 隙間2 + ゲージ4 = 33
-     * 本体の頭との隙間(HUD_HEAD_GAP)4pxを足して37px。
+     * 本体の頭との隙間(HUD_HEAD_GAP)8pxを足して41px。
+     * 隙間は、待機で漂った本体が札へ届かないための余裕でもある。
      */
-    const plateHeightPx = 37;
+    const plateHeightPx = 41;
 
     expect(
       Math.round(rungPx - bodyPx),
