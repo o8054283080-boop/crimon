@@ -97,10 +97,10 @@ body:has(.crimon-home) {
   box-shadow: inset 0 1px rgba(170,231,255,.22), 0 2px 5px rgba(0,8,20,.38) !important;
 }
 
-.crimon-resource-header .home-wallet { align-self:center !important; height:62px !important; box-sizing:border-box !important; grid-template-rows:22px 22px !important; gap:3px !important; padding:7px 5px !important; background:#07172d url("./assets/home/home-resource-cluster-v1.webp") center / 100% 100% no-repeat !important; }
-.crimon-resource-header .home-wallet__chip { height:22px !important; padding:1px 3px !important; border:0 !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; }
-.crimon-resource-header .home-wallet__chip strong { font-size:10px !important; }
-.crimon-resource-header .home-wallet__chip strong { font-size: 11px !important; }
+.crimon-resource-header .home-wallet { align-self:center !important; height:62px !important; box-sizing:border-box !important; grid-template-rows:24px 24px !important; gap:2px !important; padding:6px 5px !important; background:#07172d url("./assets/home/home-resource-cluster-v1.webp") center / 100% 100% no-repeat !important; }
+.crimon-resource-header .home-wallet__chip { height:24px !important; padding:1px 3px !important; border:0 !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; display:flex !important; align-items:center !important; line-height:1 !important; }
+.crimon-resource-header .home-wallet__chip strong { font-size:10px !important; line-height:1 !important; }
+.crimon-resource-header .home-wallet__chip--stamina { justify-content:center !important; gap:4px !important; }
 
 .crimon-resource-header .home-wallet__chip svg { color: var(--home-crystal) !important; }
 .crimon-resource-header .home-wallet__chip--crystal svg { color: #84dcff !important; }
@@ -111,7 +111,7 @@ body:has(.crimon-home) {
 /* 画像の明るい世界をHOMEの主役にする。上部は空、中央はモンスターの余白、
  * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。 */
 .home-world {
-  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 5px - var(--home-banner-h, 0px)) !important;
+  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 17px - var(--home-banner-h, 0px)) !important;
   min-height: 356px !important;
   margin: -1px 0 0 !important;
   border-inline: 0 !important;
@@ -276,7 +276,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 }
 
 @media (max-height: 860px) {
-  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 5px - var(--home-banner-h, 0px)) !important; }
+  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 17px - var(--home-banner-h, 0px)) !important; }
   .world-party { inset: 88px 80px 84px !important; }
   .world-party__figure { width: 104px !important; height: 148px !important; }
   .world-party__figure--1 { bottom: 6px !important; }
