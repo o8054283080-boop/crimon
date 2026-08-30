@@ -74,11 +74,61 @@
   font-size: 0.6rem;
 }
 
-.mcard--compact .mcard__badge--corner {
-  top: 22px;
+.monsters-list-panel .mcard--compact .mcard__badge--corner {
+  top: 39px;
   right: 3px;
   /* 巡回と可読性テストが共有する下限(9px)を下回らせない */
   font-size: 0.57rem;
+}
+
+/* 所持一覧のカードだけに重ねる。見た目は小さく、指の判定は44pxを確保する。 */
+.monsters-list-panel .monster-list-card__lock {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0 5px 15px 15px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: rgba(222, 230, 242, 0.58);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.monsters-list-panel .monster-list-card__lock-glyph {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(5, 9, 18, 0.72);
+  font-size: 0.72rem;
+  line-height: 1;
+  filter: grayscale(1);
+}
+
+.monsters-list-panel .monster-list-card__lock.is-locked {
+  color: #ffd75a;
+}
+
+.monsters-list-panel .monster-list-card__lock.is-locked .monster-list-card__lock-glyph {
+  background: rgba(43, 31, 5, 0.88);
+  box-shadow: 0 0 0 1px rgba(255, 215, 90, 0.76);
+  filter: none;
+}
+
+.monsters-list-panel .monster-list-card--locked {
+  box-shadow: inset 0 0 0 1px rgba(255, 215, 90, 0.48);
+}
+
+.monsters-list-panel .monster-list-card__lock:focus-visible {
+  outline: 2px solid #fff1a8;
+  outline-offset: -4px;
+  border-radius: 9px;
 }
 
 /* fixed の基準をビューポートに統一し、高さと予約領域を同じ変数で結ぶ。 */

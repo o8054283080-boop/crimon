@@ -99,12 +99,15 @@ function renderList(props: MonstersProps): HTMLElement {
   const context = { partyIds: props.player.partyIds };
   const shown = filterMonsters(props.player.monsters, props.filter, context);
   const sortedMonsters = sortMonsters(shown, props.sortKey, context);
-  const cards = sortedMonsters.map((instance) =>
-    monsterCard(instance, () => props.onSelectDetail(instance.id), {
+  const cards = sortedMonsters.map((instance) => {
+    const card = monsterCard(instance, () => props.onSelectDetail(instance.id), {
       compact: true,
       badge: props.player.partyIds.includes(instance.id) ? "編成中" : undefined,
-    }),
-  );
+    });
+    card.classList.toggle("monster-list-card--locked", instance.locked === true);
+    card.append(renderMonsterListLock(instance, props.onToggleLock));
+    return card;
+  });
 
   return el("div", { className: "screen monsters-screen" }, [
     // 見出しと図鑑への入口を1行にまとめる。縦画面では上の帯が厚いほど
@@ -128,6 +131,39 @@ function renderList(props: MonstersProps): HTMLElement {
         : el("div", { className: "monster-grid" }, cards),
     ]),
   ]);
+}
+
+/** 所持一覧専用の鍵。カードの詳細遷移とは独立した操作として扱う。 */
+export function renderMonsterListLock(instance: MonsterInstance, onToggleLock: (monsterId: string) => void): HTMLButtonElement {
+  const view = monsterListLockView(instance);
+  return el(
+    "button",
+    {
+      type: "button",
+      className: `monster-list-card__lock${view.locked ? " is-locked" : ""}`,
+      title: view.title,
+      ariaLabel: view.label,
+      "aria-pressed": String(view.locked),
+      onclick: (event: MouseEvent) => handleMonsterListLockClick(event, instance.id, onToggleLock),
+    },
+    [el("span", { className: "monster-list-card__lock-glyph", "aria-hidden": "true" }, [view.glyph])],
+  );
+}
+
+export function monsterListLockView(instance: Pick<MonsterInstance, "locked">): { locked: boolean; label: string; title: string; glyph: string } {
+  const locked = instance.locked === true;
+  return {
+    locked,
+    label: locked ? "モンスターのロックを解除" : "モンスターをロック",
+    title: locked ? "ロック中" : "未ロック",
+    glyph: locked ? "🔒" : "🔓",
+  };
+}
+
+export function handleMonsterListLockClick(event: Pick<Event, "preventDefault" | "stopPropagation">, monsterId: string, onToggleLock: (monsterId: string) => void): void {
+  event.preventDefault();
+  event.stopPropagation();
+  onToggleLock(monsterId);
 }
 
 function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLElement {
