@@ -6,7 +6,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { ArenaHandles, createArena } from "./arena.js";
-import { BackdropHandles, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
+import { BackdropHandles, BattleVenue, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
 import { SPRITE_MAX_HEIGHT } from "./spriteAvatar.js";
 import { dominantElement, moodFor, StageMood } from "./elementTheme.js";
 import { BattleAvatar, createBattleAvatar } from "./avatarFactory.js";
@@ -22,8 +22,18 @@ export interface StageUnitInit {
 /** バトル画面のHTML側が知りたい、各ユニットの画面上の位置(HPバー等の追従用) */
 export interface ScreenAnchor {
   instanceId: string;
+  /** いまの本体の頭上。**モーションで動く。**ダメージの数字はここへ出す */
   x: number;
   y: number;
+  /**
+   * 立ち位置から見た頭上。**モーションで動かない。**
+   *
+   * HPの札はこちらを使う。動く方に合わせていたら、待機の漂いと
+   * 攻撃の踏み込みがそのまま札へ伝わり、**画面全体がガタついて読めなかった**
+   * (依頼主から「キャラの位置が動いていて見づらい」と指摘を受けた)。
+   */
+  slotX: number;
+  slotY: number;
   /** カメラ後方など、画面に映っていない場合はfalse */
   visible: boolean;
   /** 遠いユニットのUIを少し小さくするための倍率 */
@@ -106,10 +116,16 @@ const LANE_X_WIDE = 2.4;
  * 千鳥の段の間隔(前後方向)。
  *
  * **隣り合う段は別の列に入る**ので、ここは「同じ列の間隔の半分」にあたる。
- * 段の間隔は画面上の高さでいうと約79px、モンスターの背丈が約91px。
- * 隣どうしが少し重なるが、別の列なので横にずれており、参考画面と同じ密度になる。
+ *
+ * **札が本体に重ならない値にしてある。**依頼主から
+ * 「HPバーがモンスターと被っている」という指摘を受けた。
+ * 段の間隔(画面上で約121px)から本体の背丈(約80px)を引いた残り41pxに、
+ * 細い帯の札(状態異常18px + HP 7px + ゲージ4px + 隙間4px = 33px)が入る。
+ *
+ * `SPRITE_SCALE` と対で決まる。**片方だけ触ると必ずまた重なる。**
+ * `tests/stageBackdrop.test.ts` が両者の比を見張っている。
  */
-const RUNG = 2.5;
+const RUNG = 2.78;
 
 /**
  * 見下ろし角(44〜48度)の cos の見込み。
@@ -124,29 +140,35 @@ const TILT_COS = 0.70;
  * 板の半幅の見込み。
  *
  * 実際の幅は絵の縦横比で決まる。最大は横長のゴーレム(512×420)で、
- * 背丈2.45 × 表示倍率0.68 × 縦横比1.22 ÷ 2 = 1.02。少し余裕を足してある。
+ * 背丈2.45 × 表示倍率0.52 × 縦横比1.22 ÷ 2 = 0.78。少し余裕を足してある。
  * ここが足りないと、列が画面の端で切れる(実際にゴーレムが切れた)。
  *
  * **`spriteAvatar.ts` の `SPRITE_SCALE` と対で決まる。**片方だけ触らない。
  */
-const SPRITE_HALF_WIDTH = 1.05;
+const SPRITE_HALF_WIDTH = 0.80;
 
 /**
  * 背景の絵を暗く落とす量。
  *
- * **届いた闘技場は床の明るさが0.75あった**(`tools/prepareBackgrounds.mjs` が測る)。
- * 砂色の石畳の上に彩度の高いデフォルメの絵を置くと、輪郭が埋もれる。
- * 描き直しを頼むより、載せる側で落とす方が速く、他の絵が届いても効く。
+ * 最初に届いた闘技場は床の明るさが0.75あり(`tools/prepareBackgrounds.mjs` が測る)、
+ * 砂色の石畳の上でモンスターの輪郭が埋もれたので0.24まで落としていた。
+ *
+ * **8属性ぶんが揃った時、絵の側が既に暗く描かれていた**(明るさ0.62以下)。
+ * 落としすぎると今度は舞台が真っ黒になり、せっかくの絵が見えない。
+ * 明るい絵が1枚混ざっても耐えられる程度に留める。
  */
-const BACKDROP_DIM = 0.24;
+const BACKDROP_DIM = 0.10;
 /**
  * 背景の左右の端と下を落とす量。
  *
- * HPと行動ゲージの札が左右の端に乗る。明るい石畳の上に白い文字が来ると読めない。
- * `docs/battle-background-art.md` では絵の側にも頼んでいるが、
- * **届いた絵は落ちていなかった。**約束が守られない前提で、載せる側でも落とす。
+ * 最初に届いた1枚は端が落ちておらず、載せる側で0.34まで落としていた。
+ * **8属性ぶんは絵の側で落として描かれていた**ので、二重に落とすと
+ * 画面の左右が黒い帯になる。ここは仕上げの締めだけに使う。
+ *
+ * 札も細い帯になり、端に固定するのをやめた(本体の頭の上へ移した)ので、
+ * 「札を読ませるために端を暗くする」という当初の理由自体が薄れている。
  */
-const BACKDROP_EDGE = 0.34;
+const BACKDROP_EDGE = 0.14;
 
 /**
  * 画面の上でUIが覆う割合。盤面はここを避けて収める。
@@ -247,6 +269,19 @@ const HIT_STYLE_BY_ROLE: Record<string, HitStyle> = {
  * 値は、3Dモデル(背丈2.45)の頃に見て決めた寸法から逆算してある。
  */
 const VFX_PER_SPRITE_HEIGHT = 0.175;
+
+/**
+ * 状態異常のオーラ(守りのドーム・免疫・気絶・継続回復)の大きさ。
+ *
+ * **ここだけ、画面にもモンスターにも一切追従していなかった。**
+ * 大きさを渡さずに呼んでいたので、既定の1のまま固定されていた。
+ * 守りのドームは半径1.35で、絵を0.52倍にした本体(背丈1.27)の
+ * **2倍以上の白い球**になり、味方5体が丸ごと泡に包まれた。
+ *
+ * 基準は3Dの骨格でいちばん背の高いボス(2.95)。
+ * そこからの縮み具合をそのままオーラへ渡せば、本体を軽く包む大きさになる。
+ */
+const AURA_SCALE = SPRITE_MAX_HEIGHT / 2.95;
 
 /**
  * パーティクルの密度。1未満にすると粒の数が減る。
@@ -405,7 +440,7 @@ export class BattleStage {
   private disposed = false;
   private elapsed = 0;
 
-  constructor(container: HTMLElement, units: StageUnitInit[]) {
+  constructor(container: HTMLElement, units: StageUnitInit[], venue?: BattleVenue) {
     this.element = container;
 
     /*
@@ -458,7 +493,7 @@ export class BattleStage {
      * 見えないものに描画回数を払うのは、この案件でいちばん避けたい形
      * (実効31.5fpsまで落ちた原因がまさにそれだった)。
      */
-    const backdropUrl = backdropUrlFor(stageElement);
+    const backdropUrl = backdropUrlFor(stageElement, venue);
     this.backdrop = backdropUrl
       ? createBackdrop({ url: backdropUrl, dim: BACKDROP_DIM, edge: BACKDROP_EDGE })
       : null;
@@ -1668,7 +1703,7 @@ export class BattleStage {
     const anchor = this.anchorOf(instanceId);
     for (const kind of wanted) {
       if (!current.has(kind) && anchor) {
-        this.vfx.attachStatusAura(instanceId, kind, anchor);
+        this.vfx.attachStatusAura(instanceId, kind, anchor, { scale: AURA_SCALE });
       }
     }
     for (const kind of current) {
@@ -1686,10 +1721,17 @@ export class BattleStage {
       const distance = this.camera.position.distanceTo(this.tmpVector);
       this.tmpVector.project(this.camera);
       const visible = this.tmpVector.z < 1;
+      const x = (this.tmpVector.x * 0.5 + 0.5) * width;
+      const y = (-this.tmpVector.y * 0.5 + 0.5) * height;
+
+      // 札用の、モーションで動かない座標
+      avatar.getSlotAnchorWorldPosition(this.tmpRelative).project(this.camera);
       anchors.push({
         instanceId,
-        x: (this.tmpVector.x * 0.5 + 0.5) * width,
-        y: (-this.tmpVector.y * 0.5 + 0.5) * height,
+        x,
+        y,
+        slotX: (this.tmpRelative.x * 0.5 + 0.5) * width,
+        slotY: (-this.tmpRelative.y * 0.5 + 0.5) * height,
         visible,
         // カメラ距離を基準にした相対スケール。極端にならないよう範囲を絞る
         scale: THREE.MathUtils.clamp(this.frameDistance / distance, 0.78, 1.12),

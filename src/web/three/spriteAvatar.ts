@@ -57,7 +57,7 @@ import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, is
  * `ROLE_HEIGHT` を直接下げずに倍率で持つのは、あの表が
  * 3Dの骨格(`creature/roles.ts`)と同じ値だという対応を残すため。
  */
-const SPRITE_SCALE = 0.68;
+const SPRITE_SCALE = 0.52;
 
 /**
  * いちばん背の高い絵の、実際の背丈(ワールド単位)。
@@ -172,14 +172,27 @@ interface MotionTuning {
   impact: number;
 }
 
+/*
+ * 待機の漂い(bob)は**元の4割**にしてある。
+ *
+ * 依頼主から「キャラの位置が動いていて見づらい」という指摘を受けた。
+ * 主因は札が本体に追従して一緒に揺れていたことで、そちらは
+ * 立ち位置から札を置くことで直した(`getSlotAnchorWorldPosition`)。
+ * ただし本体そのものの漂いも、5体が別々の位相で前後に動くと
+ * 画面全体がざわついて的が絞れない。
+ *
+ * **止めはしない。** 完全に静止すると紙芝居になる。
+ * 呼吸(breathe)は位置を動かさず縦に伸び縮みするだけなので、そのまま残す。
+ * 生きている感じは主にそちらが担っている。
+ */
 const MOTION_TUNING: Record<MotionStyle, MotionTuning> = {
   //          bob   bobHz breathe bHz  sway  wobbleX windup dash impact
-  standard: { bob: 0.055, bobHz: 0.58, breathe: 0.022, breatheHz: 0.62, sway: 0.045, wobbleX: 0, windup: 0.26, dash: 1.0, impact: 0.10 },
-  floaty:   { bob: 0.130, bobHz: 0.42, breathe: 0.014, breatheHz: 0.45, sway: 0.090, wobbleX: 0, windup: 0.18, dash: 0.9, impact: 0.06 },
-  heavy:    { bob: 0.032, bobHz: 0.40, breathe: 0.012, breatheHz: 0.42, sway: 0.022, wobbleX: 0, windup: 0.40, dash: 0.8, impact: 0.20 },
-  beast:    { bob: 0.050, bobHz: 0.66, breathe: 0.020, breatheHz: 0.70, sway: 0.050, wobbleX: 0, windup: 0.24, dash: 1.35, impact: 0.12 },
-  blob:     { bob: 0.045, bobHz: 0.52, breathe: 0.045, breatheHz: 0.55, sway: 0.030, wobbleX: 0.055, windup: 0.22, dash: 1.0, impact: 0.16 },
-  critter:  { bob: 0.062, bobHz: 0.78, breathe: 0.026, breatheHz: 0.82, sway: 0.050, wobbleX: 0.012, windup: 0.20, dash: 1.0, impact: 0.10 },
+  standard: { bob: 0.022, bobHz: 0.58, breathe: 0.022, breatheHz: 0.62, sway: 0.045, wobbleX: 0, windup: 0.26, dash: 1.0, impact: 0.10 },
+  floaty:   { bob: 0.052, bobHz: 0.42, breathe: 0.014, breatheHz: 0.45, sway: 0.090, wobbleX: 0, windup: 0.18, dash: 0.9, impact: 0.06 },
+  heavy:    { bob: 0.013, bobHz: 0.40, breathe: 0.012, breatheHz: 0.42, sway: 0.022, wobbleX: 0, windup: 0.40, dash: 0.8, impact: 0.20 },
+  beast:    { bob: 0.020, bobHz: 0.66, breathe: 0.020, breatheHz: 0.70, sway: 0.050, wobbleX: 0, windup: 0.24, dash: 1.35, impact: 0.12 },
+  blob:     { bob: 0.018, bobHz: 0.52, breathe: 0.045, breatheHz: 0.55, sway: 0.030, wobbleX: 0.055, windup: 0.22, dash: 1.0, impact: 0.16 },
+  critter:  { bob: 0.025, bobHz: 0.78, breathe: 0.026, breatheHz: 0.82, sway: 0.050, wobbleX: 0.012, windup: 0.20, dash: 1.0, impact: 0.10 },
 };
 
 /**
@@ -504,10 +517,27 @@ export class SpriteAvatar {
     this.mesh.renderOrder = Math.round(100 - z * 10);
   }
 
-  /** ダメージ表示やHPバーをぶら下げる、頭上あたりのワールド座標 */
+  /** ダメージ表示をぶら下げる、頭上あたりのワールド座標。**モーションで動く** */
   getAnchorWorldPosition(target: THREE.Vector3): THREE.Vector3 {
     this.root.getWorldPosition(target);
     target.y += this.height * 0.88 + this.floatHeight;
+    return target;
+  }
+
+  /**
+   * HPの札を置く、頭上あたりのワールド座標。**モーションで動かない。**
+   *
+   * `getAnchorWorldPosition` は本体の現在位置を返すので、待機の漂いや
+   * 攻撃の踏み込みがそのまま札へ伝わる。依頼主から
+   * **「キャラの位置が動いていて見づらい」**という指摘を受けた原因がこれ。
+   * 本体が揺れること自体より、**札が一緒に揺れて数字が読めない**方が痛い。
+   *
+   * 札は立ち位置(スロット)から決めて、画面上で完全に静止させる。
+   * ダメージの数字は殴られた場所に出したいので、あちらは追従したままにする。
+   */
+  getSlotAnchorWorldPosition(target: THREE.Vector3): THREE.Vector3 {
+    target.set(this.slotX, this.height * 0.88 + this.floatHeight, this.slotZ);
+    this.root.parent?.localToWorld(target);
     return target;
   }
 

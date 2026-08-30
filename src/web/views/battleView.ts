@@ -6,6 +6,7 @@ import { describeSkillEffect } from "../../core/skill.js";
 import { hitStyleForRole, playHitSfx, playSfx, sfxElementOf } from "../audio/index.js";
 import { el } from "../dom.js";
 import { BattleStage, StageUnitInit } from "../three/battleStage.js";
+import { BattleVenue } from "../three/stageBackdrop.js";
 import { withPortrait } from "../three/portrait.js";
 import { FloatKind, UnitHudRefs, buildFloatingNumber, buildHudCard, buildStatusChips } from "./battleHud.js";
 
@@ -37,6 +38,11 @@ export interface BattleViewProps {
   onFinish: (winner: BattleWinner) => void;
   /** 周回の途中なら渡す。勝った時だけ自動で次の1戦へ送る */
   chain?: BattleChainInfo;
+  /**
+   * 舞台が決まっている戦いだけ渡す(試練の塔・対人戦)。
+   * 省略すると、敵チームで最も多い属性から舞台が決まる。
+   */
+  venue?: BattleVenue;
 }
 
 export interface BattleViewHandle {
@@ -120,7 +126,7 @@ const LEADER_MIN = 18;
 const HUD_MIN_SCALE = 0.88;
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
-  const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish, chain } = props;
+  const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish, chain, venue } = props;
 
   let mode: "AUTO" | "MANUAL" = "AUTO";
   let userPaused = false;
@@ -192,7 +198,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     overlay.append(card);
   }
 
-  const stage = new BattleStage(stageHost, stageUnits);
+  const stage = new BattleStage(stageHost, stageUnits, venue);
 
   // 3Dの座標に合わせてHUDカードを毎フレーム追従させる
   let overlayFrame: number | null = null;
@@ -220,8 +226,17 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const HUD_HEAD_GAP = 4;
   /** 札が画面の端からはみ出さないよう残す余白(px) */
   const HUD_EDGE = 4;
-  /** 札を列のずれの向きへ余分に寄せる量(px)。列の隔たりは画面上で約68px */
-  const HUD_LANE_SHIFT = 34;
+  /*
+   * 札は**本体の真上**に置く。横へ逃がさない。
+   *
+   * 名前とHPの数字を積んでいた頃(高さ74px)は、上の段の本体に掛かるので
+   * 列のずれの向きへ34px逃がしていた。細い帯(33px)にしたことで
+   *
+   *   本体の頭の上4px から 37px ぶんが札 → 上の段の足元まであと4px
+   *
+   * となり、**縦で完全に逃げ切れる**ようになった。逃がすのをやめると、
+   * 帯がどの本体のものかが真上で読める。
+   */
 
   function syncOverlay(): void {
     overlayFrame = requestAnimationFrame(syncOverlay);
@@ -231,20 +246,12 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
     // 画面の上にいるものから順に置く。ぶつかったら下へ送るので、
     // 上から詰めた方が並び順が本体の並びと一致する
-    const anchors = stage.computeScreenAnchors().sort((a, b) => a.y - b.y);
-
     /*
-     * チームごとの立ち位置の平均。**どちらの列にいるかを読むために使う。**
-     *
-     * 千鳥では、札の真上にはひとつ上の段の本体がいる(横に72pxずれた別の列)。
-     * 札を列と反対側へ寄せると、その本体から離れて空いた床の上に乗る。
-     * 隊列の定数を画面側へ持ち込まずに済むよう、立ち位置そのものから読む。
+     * **立ち位置(slotX/slotY)で並べる。**
+     * 本体の現在位置で並べると、待機の漂いで並び順が入れ替わった瞬間に
+     * 札が飛ぶ。順序も位置も、動かない値から決める。
      */
-    const teamMeanX = new Map<"PLAYER" | "ENEMY", number>();
-    for (const team of ["PLAYER", "ENEMY"] as const) {
-      const own = anchors.filter((a) => (teamOf.get(a.instanceId) ?? "PLAYER") === team);
-      if (own.length > 0) teamMeanX.set(team, own.reduce((sum, a) => sum + a.x, 0) / own.length);
-    }
+    const anchors = stage.computeScreenAnchors().sort((a, b) => a.slotY - b.slotY);
 
     for (const anchor of anchors) {
       const refs = hudRefs.get(anchor.instanceId);
@@ -253,9 +260,12 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       anchorPositions.set(anchor.instanceId, { x: anchor.x, y: anchor.y });
       const scale = Math.max(HUD_MIN_SCALE, anchor.scale);
       const isPlayer = teamOf.get(anchor.instanceId) !== "ENEMY";
-      // 隣とぶつからないので、札は細いままでよい。
-      // **細くしたぶんだけ画面が空き、モンスターが大きく映る**
-      refs.card.classList.add("unit-hud--rail");
+      /*
+       * 細い帯(HPバーと行動ゲージの2本だけ)。
+       * 名前・★・紋章・HPの数字は出さない。**段の間隔に入らない。**
+       * 詳しくは style.css の `.unit-hud--slim` の説明を読むこと。
+       */
+      refs.card.classList.add("unit-hud--slim");
       // 本体の真上に、中央を合わせて置く
       refs.card.style.transform = `translate(-50%, -100%) scale(${scale.toFixed(3)})`;
       refs.card.style.transformOrigin = "center bottom";
@@ -268,22 +278,9 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
        * 外側の列は画面の端まで来るので、そのまま中央を合わせると
        * 札の左半分が切れて、HPの数字が読めなくなる。
        */
-      /*
-       * さらに、**自分の列と反対側へ少し寄せる。**
-       * 札の真上にいるのはひとつ上の段の本体で、それは反対の列にいる。
-       * 逆へ寄せれば、札が乗るのは空いた床になる。
-       */
-      const mean = teamMeanX.get(isPlayer ? "PLAYER" : "ENEMY") ?? anchor.x;
-      /*
-       * 列のずれを**そのまま強める向き**へ寄せる。
-       * 外側の列(平均より外)の札はさらに外へ、内側の列の札は中央へ。
-       * 符号を逆にすると2つの列の札が真ん中で重なり、
-       * どちらの本体も覆う(実際に逆にして重なった)。
-       */
-      const outward = anchor.x < mean ? -1 : 1;
       const anchorX = Math.min(
         viewWidth - HUD_EDGE - width / 2,
-        Math.max(HUD_EDGE + width / 2, anchor.x + outward * HUD_LANE_SHIFT),
+        Math.max(HUD_EDGE + width / 2, anchor.slotX),
       );
       const left = anchorX - width / 2;
       const right = anchorX + width / 2;
@@ -294,7 +291,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
        * `anchor.y` は本体の背丈の88%あたり(頭のあたり)を指す。
        * そこを札の下端にすると、札は頭に触れずに真上へ乗る。
        */
-      let top = anchor.y - height - HUD_HEAD_GAP;
+      let top = anchor.slotY - height - HUD_HEAD_GAP;
       const overlaps = (candidate: number) =>
         placedCards.find(
           (r) => left < r.right - 2 && right > r.left + 2 && candidate < r.bottom - 2 && candidate + height > r.top + 2,

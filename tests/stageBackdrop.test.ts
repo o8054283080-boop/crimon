@@ -106,6 +106,92 @@ describe("背景と盤面の釣り合い", () => {
     expect(gap, "2列に分かれていない").toBeGreaterThan(0.5);
   });
 
+  it("段の間隔に、本体の背丈とHPの札の両方が収まる", () => {
+    /*
+     * 依頼主から**「HPバーがモンスターと被っている」**という指摘を受けた。
+     *
+     * 段の間隔・絵の表示倍率・列の隔たり・札の高さは、**4つで1組**。
+     * どれか1つを触ると、画面上の余地が変わって必ずまた被る。
+     * 目で見て気づくしかない類の壊れ方なので、ここで数値にして見張る。
+     *
+     * 計算は縦持ちの実機(390×844)に対して行う。横持ちは廃止済み。
+     */
+    const sprite = readFileSync("src/web/three/spriteAvatar.ts", "utf8");
+    const num = (source: string, name: string) =>
+      Number(new RegExp(`const ${name} = ([0-9.]+)`).exec(source)?.[1] ?? "0");
+
+    const rung = num(stage, "RUNG");
+    const laneInner = num(stage, "LANE_INNER");
+    const laneGap = num(stage, "LANE_GAP");
+    const spriteHalfWidth = num(stage, "SPRITE_HALF_WIDTH");
+    const safeTop = num(stage, "SAFE_BAND_TOP");
+    const safeBottom = num(stage, "SAFE_BAND_BOTTOM");
+    const scale = num(sprite, "SPRITE_SCALE");
+    for (const [name, value] of Object.entries({ rung, laneInner, laneGap, spriteHalfWidth, scale })) {
+      expect(value, `${name} が読めない`).toBeGreaterThan(0);
+    }
+
+    const screenW = 390;
+    const screenH = 844;
+    const aspect = screenW / screenH;
+    // 見下ろし角44〜48度ぶんの、奥行き→画面の縦への変換率(battleStage の TILT_COS と対)
+    const tiltUp = 0.695;
+    const padding = 1.06;
+    const seats = 5;
+
+    // 盤面の広さ。幅と縦の必要量を出し、大きい方が表示範囲を決める
+    const halfWidthNeed = (laneInner + laneGap + spriteHalfWidth) * padding;
+    const halfDepth = ((seats - 1) * rung) / 2;
+    const spriteHeight = 2.95 * scale; // いちばん背の高いボスを基準にする
+    const boardUp = (spriteHeight / 0.70) * 0.719 + (halfDepth + 0.3) * tiltUp + 0.3 * 0.719 + (halfDepth + 0.3) * tiltUp;
+    const halfHeightNeed = (boardUp / 2) * padding / (1 - safeTop - safeBottom);
+
+    const halfW = Math.max(halfWidthNeed, halfHeightNeed * aspect);
+    const pxPerWorld = screenW / (2 * halfW);
+
+    // ディフェンダー(背丈2.45)がいちばん幅を食う。段の中身はこれで測る
+    const bodyPx = 2.45 * scale * pxPerWorld;
+    const rungPx = rung * tiltUp * pxPerWorld;
+    /*
+     * 札の高さ。style.css の `.unit-hud--slim` の実寸から積む。
+     *   状態異常18 + 隙間2 + HP 7 + 隙間2 + ゲージ4 = 33
+     * 本体の頭との隙間(HUD_HEAD_GAP)4pxを足して37px。
+     */
+    const plateHeightPx = 37;
+
+    expect(
+      Math.round(rungPx - bodyPx),
+      `段の間隔${rungPx.toFixed(0)}pxに、本体${bodyPx.toFixed(0)}px＋札${plateHeightPx}pxが入らない`,
+    ).toBeGreaterThanOrEqual(plateHeightPx);
+  });
+
+  it("HPの札は、モーションで動かない立ち位置から置く", () => {
+    /*
+     * 依頼主から**「キャラの位置が動いていて見づらい」**という指摘を受けた。
+     * 本体の現在位置に札を合わせていたので、待機の漂いと攻撃の踏み込みが
+     * そのまま札へ伝わり、画面全体がガタついていた。
+     *
+     * ダメージの数字は殴られた場所に出したいので、あちらは追従したまま。
+     * **2つを取り違えると、直したはずの揺れが戻る。**
+     */
+    const view = readFileSync("src/web/views/battleView.ts", "utf8");
+    expect(view, "札の縦位置が本体の現在位置のまま").toMatch(/let top = anchor\.slotY/);
+    expect(view, "札の横位置が本体の現在位置のまま").toMatch(/Math\.max\(HUD_EDGE \+ width \/ 2, anchor\.slotX\)/);
+    // 並び順も動かない値から決める。現在位置だと漂いで順序が入れ替わって札が飛ぶ
+    expect(view, "並び順が本体の現在位置のまま").toMatch(/sort\(\(a, b\) => a\.slotY - b\.slotY\)/);
+  });
+
+  it("状態異常のオーラも本体の背丈に合わせてある", () => {
+    /*
+     * **3件目の「片方だけ触らない」。**
+     * オーラだけ大きさを渡さずに呼んでいたので、既定の1のまま固定されていた。
+     * 絵を0.52倍にした時、守りのドームが本体の2倍以上の白い球になり、
+     * 味方5体が丸ごと泡に包まれた。
+     */
+    expect(stage).toMatch(/attachStatusAura\([^)]*\{ scale: AURA_SCALE \}\)/);
+    expect(stage).toMatch(/const AURA_SCALE = SPRITE_MAX_HEIGHT \/ 2\.95;/);
+  });
+
   it("枠が板の幅を丸ごと数えている", () => {
     /*
      * 縦画面で枠を削ってカメラを寄せる細工が入っていた。

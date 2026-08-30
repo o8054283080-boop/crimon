@@ -1740,6 +1740,8 @@ function renderCurrentTowerBattle(): BattleViewHandle {
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
     title: `塔 ${setup.floor.floor}階${traitLabel ? ` ${traitLabel}` : ""}`,
+    // 塔は上っていく1つの場所。階ごとに舞台が変わると上っている感じが消える
+    venue: "tower",
     resultLabel: (winner) => (winner === "PLAYER" ? "▲ 次の階へ" : "塔に戻る"),
     onFinish: (winner) => finishTowerFloor(winner === "PLAYER", setup, engine),
     // 勝てば自動で次の階へ送る。負けた時は送らない(そこで登坂は終わりなので、見せずに飛ばさない)
@@ -1767,6 +1769,8 @@ function renderCurrentArenaBattle(): BattleViewHandle {
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
     title: `vs ${run.opponent.name}`,
+    // 対人戦は観客のいる闘技場。それ自体がアリーナの空気になっている
+    venue: "duel",
     resultLabel: (winner) => (winner === "PLAYER" ? "🏆 結果を見る" : "アリーナに戻る"),
     onFinish: (winner) => finishArenaMatch(winner === "PLAYER"),
   });
