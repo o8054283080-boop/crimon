@@ -15,6 +15,8 @@ import { withPortrait } from "../three/portrait.js";
  * 並べた時に強いモンスターが一目で分かる。
  */
 export interface MonsterCardOptions {
+  /** 所持一覧向け。画像と識別情報だけを残した省スペース表示 */
+  compact?: boolean;
   /** 選択中(編成済みなど)。額縁が光る */
   selected?: boolean;
   /** 押せない状態 */
@@ -146,10 +148,11 @@ export function buildMonsterCard(
   onClick: () => void,
   options: MonsterCardOptions = {},
 ): HTMLElement {
-  const { selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress, onDetail, created } =
+  const { compact, selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress, onDetail, created } =
     options;
 
   const classes = ["mcard", rarityClass(star)];
+  if (compact) classes.push("mcard--compact");
   if (selected) classes.push("mcard--selected");
   if (disabled) classes.push("mcard--disabled");
   if (bonus) classes.push("mcard--bonus");
@@ -208,7 +211,7 @@ export function buildMonsterCard(
 
   const children: (HTMLElement | null)[] = [
     el("span", { className: "mcard__portrait", style: dex ? `--elem:${dex.color}` : undefined }, portraitChildren.filter(isElement)),
-    star ? el("span", { className: "mcard__stars" }, [starRow(star)]) : null,
+    star ? el("span", { className: "mcard__stars" }, [compact ? `★${star}` : starRow(star)]) : null,
     el("span", { className: "mcard__name" }, [dex ? dex.name : fallbackName]),
     infoParts.length > 0 ? el("span", { className: "mcard__info" }, infoParts) : null,
     caption ? el("span", { className: "mcard__caption" }, [caption]) : null,

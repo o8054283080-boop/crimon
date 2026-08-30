@@ -45,10 +45,11 @@ export interface MonstersProps {
 export function monsterCard(
   instance: MonsterInstance,
   onClick: () => void,
-  extra?: { selected?: boolean; disabled?: boolean; bonus?: boolean; onLongPress?: () => void; badge?: string },
+  extra?: { compact?: boolean; selected?: boolean; disabled?: boolean; bonus?: boolean; onLongPress?: () => void; badge?: string },
 ): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   return buildMonsterCard(dex, instance.dexId, onClick, {
+    compact: extra?.compact,
     selected: extra?.selected,
     disabled: extra?.disabled,
     bonus: extra?.bonus,
@@ -57,11 +58,11 @@ export function monsterCard(
     onDetail: extra?.onLongPress,
     star: instance.star,
     level: instance.level,
-    maxLevel: STAR_MAX_LEVEL[instance.star],
-    // 「誰を入れるか」を一覧のまま決められるよう、総合力と装備の埋まり具合を出す
-    power: monsterPower(instance),
-    gearCount: equippedCount(instance),
-    gearTotal: GEAR_SLOT_TOTAL,
+    maxLevel: extra?.compact ? undefined : STAR_MAX_LEVEL[instance.star],
+    // 所持一覧では識別情報だけに絞る。他の選択画面では従来の判断材料を保つ。
+    power: extra?.compact ? undefined : monsterPower(instance),
+    gearCount: extra?.compact ? undefined : equippedCount(instance),
+    gearTotal: extra?.compact ? undefined : GEAR_SLOT_TOTAL,
     badge: extra?.badge,
     badgeCorner: extra?.badge !== undefined,
     // 移し替え済みだと一目で分かるように。**同じ種族でも中身が違う**ので、
@@ -96,6 +97,7 @@ function renderList(props: MonstersProps): HTMLElement {
   const sortedMonsters = sortMonsters(shown, props.sortKey, context);
   const cards = sortedMonsters.map((instance) =>
     monsterCard(instance, () => props.onSelectDetail(instance.id), {
+      compact: true,
       badge: props.player.partyIds.includes(instance.id) ? "編成中" : undefined,
     }),
   );
@@ -107,7 +109,7 @@ function renderList(props: MonstersProps): HTMLElement {
       el("h1", {}, ["所持モンスター"]),
       el("button", { type: "button", className: "btn btn--ghost head-action", onclick: props.onGoMonsterDex }, ["📖 図鑑"]),
     ]),
-    el("section", { className: "panel" }, [
+    el("section", { className: "panel monsters-list-panel" }, [
       renderMonsterFilterBar({
         all: props.player.monsters,
         shownCount: shown.length,

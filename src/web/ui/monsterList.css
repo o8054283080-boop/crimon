@@ -1,0 +1,97 @@
+/* 所持一覧だけを小型化する。編成・育成など共通カードを使う画面の情報は削らない。 */
+.monsters-screen:not(:has(.management-header)) {
+  gap: 8px;
+  padding-inline: 10px;
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 14px);
+}
+
+.monsters-screen .monsters-list-panel {
+  padding: 8px;
+}
+
+.monsters-list-panel .mfilter__summary,
+.monsters-list-panel .slot-filter-row {
+  margin-bottom: 6px;
+}
+
+.monsters-list-panel .monster-grid {
+  gap: 6px;
+}
+
+/* 肖像を主役にしつつ、識別情報を肖像直下の1行へ集約する。 */
+.mcard--compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "portrait portrait"
+    "name stars";
+  gap: 2px 4px;
+  min-width: 0;
+  padding: 3px 3px 4px;
+  border-radius: 9px;
+}
+
+.mcard--compact .mcard__portrait {
+  grid-area: portrait;
+  height: 78px;
+  aspect-ratio: auto;
+  border-radius: 7px;
+}
+
+.mcard--compact .mcard__name {
+  grid-area: name;
+  min-width: 0;
+  padding-left: 2px;
+  text-align: left;
+  font-size: 0.67rem;
+  line-height: 18px;
+}
+
+.mcard--compact .mcard__stars {
+  grid-area: stars;
+  align-self: center;
+  min-width: 25px;
+  padding: 1px 4px;
+  color: #ffd23f;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 14px;
+}
+
+.mcard--compact .mcard__element {
+  top: 3px;
+  left: 3px;
+  height: 16px;
+  min-width: 16px;
+  padding-inline: 4px;
+  font-size: 0.58rem;
+}
+
+.mcard--compact .mcard__level {
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 4px;
+  font-size: 0.6rem;
+}
+
+.mcard--compact .mcard__badge--corner {
+  top: 22px;
+  right: 3px;
+  /* 巡回と可読性テストが共有する下限(9px)を下回らせない */
+  font-size: 0.57rem;
+}
+
+/* fixed の基準をビューポートに統一し、高さと予約領域を同じ変数で結ぶ。 */
+.bottom-nav {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  min-height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  margin: 0;
+}
+
+@media (min-width: 400px) {
+  .mcard--compact .mcard__portrait {
+    height: 84px;
+  }
+}
