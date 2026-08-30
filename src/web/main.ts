@@ -3,6 +3,7 @@ import "./crimon-visual-system.css";
 import "./mobile-ux.css";
 import "./ui/tutorialBar.css";
 import "./ui/portraitOnly.css";
+import "./ui/monsterList.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
