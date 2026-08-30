@@ -120,7 +120,7 @@
 .world-dais__rim { border-bottom-color: rgba(8,48,78,.42) !important; box-shadow: 0 12px 16px rgba(1,20,39,.24) !important; }
 
 /* 中央のモンスターは背景の白い余白とテラスの境目へ置く。各PNGの比率は変更しない。 */
-.world-party { z-index: 5 !important; inset: 108px 86px 22px !important; pointer-events: none !important; }
+.world-party { z-index: 5 !important; inset: 108px 86px 38px !important; pointer-events: none !important; }
 .world-party__figure { width: 112px !important; height: 160px !important; pointer-events: none !important; }
 .world-party__figure::after { background: rgba(3,28,48,.66) !important; box-shadow: 0 0 13px 4px rgba(82,205,255,.38) !important; }
 .world-party__figure .hp-card__art { inset: -8px -18px -12px !important; filter: drop-shadow(0 10px 7px rgba(0,22,38,.42)) drop-shadow(0 0 7px rgba(117,220,255,.30)) !important; }
@@ -203,7 +203,7 @@ body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
 
 @media (max-height: 860px) {
   .home-world { height: calc(100dvh - var(--bottom-nav-h) - 72px - 82px - 48px - 5px - var(--home-banner-h, 0px)) !important; }
-  .world-party { inset: 96px 80px 16px !important; }
+  .world-party { inset: 96px 80px 42px !important; }
   .world-party__figure { width: 104px !important; height: 148px !important; }
   .world-party__figure--1 { bottom: 6px !important; }
   .world-party__figure--2,
