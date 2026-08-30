@@ -162,6 +162,42 @@ describe("色を寄せる設定", () => {
     expect(source).toContain("reincarnation_pig");
   });
 
+  it("絵ごとに彩度と明度が測ってある", () => {
+    /*
+     * この2つが無いと、守り判定の境目が全部の絵で同じになる。
+     * **淡い絵はそれで丸ごと守られ、6属性が同じ色に見える**
+     * (フェアリーが実際にそうなり、図鑑で6枚並べて発覚した)。
+     * 絵を足した人が `tools/prepareSprites.mjs` を通し忘れると起きる。
+     */
+    const manifest = JSON.parse(readFileSync(`${SPRITE_DIR}/sprites.json`, "utf8")) as Record<string, unknown>;
+    const missing: string[] = [];
+    for (const file of spriteFiles()) {
+      const name = file.replace(/\.webp$/, "");
+      const entry = manifest[name] as { bodySat?: number; bodyVal?: number } | undefined;
+      if (!entry) missing.push(`${name}: sprites.json に無い`);
+      else if (typeof entry.bodySat !== "number") missing.push(`${name}: bodySat が無い`);
+      else if (typeof entry.bodyVal !== "number") missing.push(`${name}: bodyVal が無い`);
+    }
+    expect(missing, `測り直しが要る:\n${missing.join("\n")}`).toEqual([]);
+  });
+
+  it("淡い絵ほど守りの境目が下がる(ただし濃い絵より緩くはしない)", async () => {
+    /*
+     * 向きを取り違えると、濃い絵の陰が染まらなくなるか、
+     * 淡い絵の白目まで染まるかのどちらかになる。符号だけは機械で見張る。
+     */
+    const { TINT_MASK, tintThresholdsFor } = await import("../src/web/three/spriteArt.js");
+    // フェアリーは彩度0.22・明度0.96の淡い絵。境目は下がる
+    const pale = tintThresholdsFor("fairy", "FIRE");
+    expect(pale.satHigh, "淡い絵は彩度の境目が下がる").toBeLessThan(TINT_MASK.satHigh);
+    expect(pale.hiLow, "淡い絵は明部の境目が上がる").toBeGreaterThan(TINT_MASK.hiLow);
+    // スライムは彩度0.69の濃い絵。今までどおりの境目のまま
+    const vivid = tintThresholdsFor("slime", "FIRE");
+    expect(vivid.satHigh, "濃い絵は緩めない").toBe(TINT_MASK.satHigh);
+    // どの絵でも、白目・歯(彩度ほぼ0)は守られたままでなければならない
+    expect(pale.satLow, "白目を染めない下限は残す").toBeGreaterThan(0.02);
+  });
+
   it("戦闘画面とカードで、寄せる強さを共有している", () => {
     /*
      * 別々に持つと、カードで見た色と戦闘で見た色が食い違う。

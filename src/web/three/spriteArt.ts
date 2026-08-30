@@ -42,7 +42,18 @@ for (const [path, url] of Object.entries(SPRITE_URLS)) {
  * 絵ごとに測った「体の主色」。`tools/prepareSprites.mjs` が書く。
  * -1 は無彩色の絵(守る色相が無い)。
  */
-const MANIFEST = manifest as Record<string, { bodyHue: number; aspect: number }>;
+const MANIFEST = manifest as Record<string, {
+  bodyHue: number;
+  /** その絵の彩度の中央値。守り判定の境目をここから作る */
+  bodySat: number;
+  /** その絵の明度の中央値 */
+  bodyVal: number;
+  aspect: number;
+}>;
+
+function entryFor(templateId: string, element: Element) {
+  return MANIFEST[`${templateId}-${element}`] ?? MANIFEST[templateId];
+}
 
 /**
  * その種族の絵の「体の主色」(0〜1)。無彩色や未測定なら -1。
@@ -51,11 +62,7 @@ const MANIFEST = manifest as Record<string, { bodyHue: number; aspect: number }>
  * 道具が書いた値だけを使う。
  */
 export function bodyHueFor(templateId: string, element: Element): number {
-  return (
-    MANIFEST[`${templateId}-${element}`]?.bodyHue ??
-    MANIFEST[templateId]?.bodyHue ??
-    -1
-  );
+  return entryFor(templateId, element)?.bodyHue ?? -1;
 }
 
 /**
@@ -135,6 +142,50 @@ export const TINT_MASK = {
   hueNear: 0.085,
   hueFar: 0.19,
 } as const;
+
+/**
+ * その絵に合わせた、色替えの守り判定の境目。
+ *
+ * ## 固定の値ではいけない理由
+ *
+ * `TINT_MASK` の値は「ふつうの濃さの絵」を前提にしている。
+ * **フェアリーは薄荷色の淡い絵で、体の彩度の中央値が0.22、明度が0.96だった。**
+ * 固定の境目(彩度0.07〜0.26、明部0.86〜)では
+ *
+ *   - 彩度が低いので「白目や歯」と同じ扱いで守られ
+ *   - 明るいので「白いハイライト」としても守られる
+ *
+ * という二重の守りが掛かり、**染まった量が2割しか残らなかった。**
+ * 6属性を並べても全部同じ薄荷色で、依頼主の指定した「主要色を変える」が
+ * 効いていなかった(図鑑で6枚を並べて確認)。
+ *
+ * ## どう決めるか
+ *
+ * その絵の彩度・明度の**中央値**を基準にして境目を寄せる。
+ * ただし**元の値より緩くはしない。** 濃い絵(スライム・トレント)では
+ * 今までどおりの境目のまま、淡い絵だけが下がる。
+ * 緩める向きにも動かすと、濃い絵の陰の部分が染まらなくなる。
+ *
+ * 白目・歯は彩度がほぼ0なので、下げた境目でも守られたままになる。
+ */
+export interface TintThresholds {
+  satLow: number;
+  satHigh: number;
+  hiLow: number;
+}
+
+export function tintThresholdsFor(templateId: string, element: Element): TintThresholds {
+  const entry = entryFor(templateId, element);
+  const sat = entry?.bodySat;
+  const val = entry?.bodyVal;
+  return {
+    // 中央値の3割を下限、中央値そのものを上限に置くと、体の半分以上が完全に染まる
+    satLow: sat && sat > 0 ? Math.min(TINT_MASK.satLow, sat * 0.3) : TINT_MASK.satLow,
+    satHigh: sat && sat > 0 ? Math.min(TINT_MASK.satHigh, sat * 1.05) : TINT_MASK.satHigh,
+    // 体の明度より上だけを「ハイライト」とみなす。1.0まで上げると守りが消える
+    hiLow: val && val > 0 ? Math.max(TINT_MASK.hiLow, Math.min(0.98, val + 0.03)) : TINT_MASK.hiLow,
+  };
+}
 
 /**
  * 属性による色替えをしない種族。

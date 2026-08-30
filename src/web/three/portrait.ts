@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { MonsterDefinition } from "../../core/monster.js";
 import { MonsterAvatar } from "./monsterAvatar.js";
-import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, isElementSpecific, spriteUrlFor } from "./spriteArt.js";
+import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, isElementSpecific, spriteUrlFor, tintThresholdsFor } from "./spriteArt.js";
 import { Element } from "../../core/element.js";
 
 /**
@@ -166,6 +166,8 @@ async function tintSprite(url: string, templateId: string, element: Element): Pr
     const { data } = frame;
     const tint = ELEMENT_TINT[element];
     const bodyHue = bodyHueFor(templateId, element);
+    // 淡い絵は境目が下がる。戦闘画面(spriteAvatar.ts)と同じ関数から取る
+    const th = tintThresholdsFor(templateId, element);
 
     for (let i = 0; i < data.length; i += 4) {
       if (data[i + 3] === 0) continue;
@@ -178,9 +180,9 @@ async function tintSprite(url: string, templateId: string, element: Element): Pr
       const sat = max === 0 ? 0 : delta / max;
 
       // 染める量。戦闘画面のシェーダと同じ4条件
-      let mask = smoothstep(TINT_MASK.satLow, TINT_MASK.satHigh, sat);
+      let mask = smoothstep(th.satLow, th.satHigh, sat);
       mask *= smoothstep(TINT_MASK.valLow, TINT_MASK.valHigh, max);
-      mask *= 1 - smoothstep(TINT_MASK.hiLow, TINT_MASK.hiHigh, max) * (1 - sat);
+      mask *= 1 - smoothstep(th.hiLow, TINT_MASK.hiHigh, max) * (1 - sat);
       if (bodyHue >= 0 && delta > 1e-6) {
         let hue: number;
         if (max === r) hue = (((g - b) / delta) % 6 + 6) % 6;

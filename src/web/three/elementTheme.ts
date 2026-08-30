@@ -328,7 +328,19 @@ export const STAGE_MOOD: Record<Element, StageMood> = {
  * 挑めば空が焼ける」という対応が自然に付き、戦うたびに絵が変わる。
  */
 export function moodFor(enemyElements: Element[]): StageMood {
-  if (enemyElements.length === 0) return STAGE_MOOD.DARK;
+  return STAGE_MOOD[dominantElement(enemyElements) ?? "DARK"];
+}
+
+/**
+ * その戦いを代表する属性(敵チームで最も多いもの)。
+ *
+ * 空気の色も背景の絵もここから決まる。**両方が同じ答えを使うこと。**
+ * 別々に数えると、青い空気の中で溶岩の背景が出るような食い違いが起きる。
+ *
+ * 敵が1体もいなければ null(呼び出し側が既定を選ぶ)。
+ */
+export function dominantElement(enemyElements: Element[]): Element | null {
+  if (enemyElements.length === 0) return null;
   const counts = new Map<Element, number>();
   for (const element of enemyElements) counts.set(element, (counts.get(element) ?? 0) + 1);
   let best: Element = enemyElements[0];
@@ -339,5 +351,5 @@ export function moodFor(enemyElements: Element[]): StageMood {
       bestCount = count;
     }
   }
-  return STAGE_MOOD[best];
+  return best;
 }

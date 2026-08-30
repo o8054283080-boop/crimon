@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Element } from "../../core/element.js";
 import { ElementTheme, themeFor } from "./elementTheme.js";
-import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, isElementSpecific, loadSpriteTexture, spriteUrlFor } from "./spriteArt.js";
+import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, isElementSpecific, loadSpriteTexture, spriteUrlFor, tintThresholdsFor } from "./spriteArt.js";
 
 /**
  * 2Dの絵で立つモンスター。
@@ -33,6 +33,28 @@ import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, is
  * 潰した時は横へ逃がして体積を保つ(`1/sqrt(squash)`)。
  * ここを省くと「縦に縮んだ絵」にしか見えず、弾力が出ない。
  */
+
+/**
+ * 絵全体の表示倍率。**5体が縦に並ぶ列に収めるための唯一のつまみ。**
+ *
+ * 装備ダンジョンは敵が5体いる。3Dの骨格から引き継いだ背丈のままだと、
+ * 縦に5つ並べた時に上下が画面の外へ出て、いちばん上と下が切れていた。
+ *
+ * 隊列の間隔(`battleStage.ts` の spacing)を詰める手もあるが、
+ * **あちらを詰めても盤面が縦に縮むだけで、カメラが寄るので大きさは変わらない。**
+ * 実際に間隔だけを詰めて、モンスターが同じ大きさのまま近づいただけになった。
+ * 絵そのものを小さくしないと、余白は生まれない。
+ *
+ * **`battleStage.ts` の SAFE_BAND_* と対で決まる。**
+ * あちらでUIの帯を避けるぶん表示範囲が広がり、1体あたりは既に小さくなる。
+ * 両方を強く効かせると縮みすぎた(0.72 で golem が横40pxになり、
+ * 何の種族か読めなくなった)。1行あたりの余地(約119px)から
+ * 札の高さ(約34px)を引いた残りに、背丈が収まる値を置いている。
+ *
+ * `ROLE_HEIGHT` を直接下げずに倍率で持つのは、あの表が
+ * 3Dの骨格(`creature/roles.ts`)と同じ値だという対応を残すため。
+ */
+const SPRITE_SCALE = 0.88;
 
 /** 役割ごとの背丈。3Dの骨格(creature/roles.ts)と同じ値を使い、並べた時の格を揃える */
 const ROLE_HEIGHT: Record<string, number> = {
@@ -196,6 +218,14 @@ export class SpriteAvatar {
     uTintValueAdd: { value: 0 },
     uTintAmount: { value: 0 },
     uBodyHue: { value: -1 },
+    /*
+     * 守り判定の境目。**絵ごとに違う**ので uniform で持つ。
+     * シェーダへ直接埋め込むと、絵の数だけシェーダが別物になって
+     * コンパイルの回数が増える(customProgramCacheKey が効かなくなる)。
+     */
+    uSatLow: { value: TINT_MASK.satLow as number },
+    uSatHigh: { value: TINT_MASK.satHigh as number },
+    uHiLow: { value: TINT_MASK.hiLow as number },
     uFlash: { value: 0 },
     uGlow: { value: 0 },
     uGlowColor: { value: new THREE.Color(1, 1, 1) },
@@ -249,8 +279,16 @@ export class SpriteAvatar {
 
     this.tuning = MOTION_TUNING[MOTION_BY_TEMPLATE[templateId] ?? "standard"];
     this.motionScale = reducedMotionScale();
-    this.height = ROLE_HEIGHT[role] ?? 2.2;
-    this.floatHeight = FLOATING_TEMPLATES.has(templateId) ? Math.max(0.34, ROLE_FLOAT[role] ?? 0) : (ROLE_FLOAT[role] ?? 0);
+    /*
+     * 背丈を倍率ごと `this.height` に畳み込む。**表示だけを縮めない。**
+     * 当たり判定の箱も、ダメージ数字が出る位置も、足元の影も
+     * すべてこの値から作られている。板だけを縮めると、
+     * 数字が頭の上に浮き、影が絵より大きく残る。
+     */
+    this.height = (ROLE_HEIGHT[role] ?? 2.2) * SPRITE_SCALE;
+    const float = FLOATING_TEMPLATES.has(templateId) ? Math.max(0.34, ROLE_FLOAT[role] ?? 0) : (ROLE_FLOAT[role] ?? 0);
+    // 浮かせる高さも一緒に縮める。縮めないと、小さくなった絵が不釣り合いに高く浮く
+    this.floatHeight = float * SPRITE_SCALE;
 
     // 画像の縦横比から幅を出す。**全部同じ幅にすると、翼を広げた種族が潰れる。**
     // 読み込みが終わるまで比が分からないので、まず正方形で置いて後から直す
@@ -275,6 +313,11 @@ export class SpriteAvatar {
     this.uniforms.uTintValueMul.value = tint.valueMul;
     this.uniforms.uTintValueAdd.value = tint.valueAdd;
     this.uniforms.uBodyHue.value = bodyHueFor(templateId, element);
+    // 淡い絵は境目が下がる。カード(portrait.ts)と同じ関数から取る
+    const thresholds = tintThresholdsFor(templateId, element);
+    this.uniforms.uSatLow.value = thresholds.satLow;
+    this.uniforms.uSatHigh.value = thresholds.satHigh;
+    this.uniforms.uHiLow.value = thresholds.hiLow;
 
     this.material = new THREE.MeshBasicMaterial({
       map: texture,
@@ -316,6 +359,9 @@ export class SpriteAvatar {
         uniform float uTintValueAdd;
         uniform float uTintAmount;
         uniform float uBodyHue;
+        uniform float uSatLow;
+        uniform float uSatHigh;
+        uniform float uHiLow;
         uniform float uFlash;
         uniform float uGlow;
         uniform vec3 uGlowColor;
@@ -353,11 +399,11 @@ export class SpriteAvatar {
              vec3 _hsv = _rgb2hsv(diffuseColor.rgb);
 
              // 1. 彩度が低いもの(白目・歯・銀・骨)は守る
-             float _mask = smoothstep(${TINT_MASK.satLow.toFixed(3)}, ${TINT_MASK.satHigh.toFixed(3)}, _hsv.y);
+             float _mask = smoothstep(uSatLow, uSatHigh, _hsv.y);
              // 2. 潰れた暗部(輪郭線)は守る
              _mask *= smoothstep(${TINT_MASK.valLow.toFixed(3)}, ${TINT_MASK.valHigh.toFixed(3)}, _hsv.z);
              // 3. 白いハイライトは守る(色の付いた明部は守らない)
-             _mask *= 1.0 - smoothstep(${TINT_MASK.hiLow.toFixed(3)}, ${TINT_MASK.hiHigh.toFixed(3)}, _hsv.z) * (1.0 - _hsv.y);
+             _mask *= 1.0 - smoothstep(uHiLow, ${TINT_MASK.hiHigh.toFixed(3)}, _hsv.z) * (1.0 - _hsv.y);
              // 4. 体の主色から色相が離れたもの(装備・宝石)は守る。
              //    主色は絵ごとに tools/prepareSprites.mjs が測って sprites.json にある
              if (uBodyHue >= 0.0) {

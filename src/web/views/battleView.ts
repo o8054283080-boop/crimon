@@ -212,6 +212,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 本体の上は空くので、モンスターが札に隠れない。
    */
   const HUD_EDGE = 6;
+  /** 札の下端と本体の頭のあいだに空ける隙間(px) */
+  const HUD_HEAD_GAP = 4;
 
   function syncOverlay(): void {
     overlayFrame = requestAnimationFrame(syncOverlay);
@@ -233,9 +235,19 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       // 端の列では隣とぶつからないので、札を細くしてよい。
       // **細くしたぶんだけ真ん中が空き、モンスターが大きく映る**
       refs.card.classList.add("unit-hud--rail");
-      // 味方は左端から右へ、敵は右端から左へ伸ばす
-      refs.card.style.transform = `translate(${isPlayer ? "0" : "-100%"}, -50%) scale(${scale.toFixed(3)})`;
-      refs.card.style.transformOrigin = isPlayer ? "left center" : "right center";
+      /*
+       * 味方は左端から右へ、敵は右端から左へ伸ばす。
+       *
+       * 縦は**本体の頭より上**へ逃がす(`-100%`)。
+       * 頭の高さに合わせて置いていたが、端に寄せてもなお
+       * **本体の左半分に札が重なっていた。**モンスターを2Dの絵にして
+       * 小さくしたぶん本体が端へ近づき、端へ寄せるだけでは足りなくなった。
+       *
+       * 上下の隔たりは1体あたり160px前後あり、本体の背丈は70px前後。
+       * 上へ逃がしても、ひとつ上の本体とはぶつからない。
+       */
+      refs.card.style.transform = `translate(${isPlayer ? "0" : "-100%"}, -100%) scale(${scale.toFixed(3)})`;
+      refs.card.style.transformOrigin = isPlayer ? "left bottom" : "right bottom";
       refs.card.style.visibility = anchor.visible ? "visible" : "hidden";
 
       const width = (refs.card.offsetWidth || 104) * scale;
@@ -244,9 +256,14 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       const left = isPlayer ? anchorX : anchorX - width;
       const right = left + width;
 
-      // 縦は本体の高さに合わせ、ぶつかったぶんだけ下へ送る。
-      // 横は固定なので、同じ列の中でしかぶつからない
-      let top = anchor.y - height / 2;
+      /*
+       * 縦は**本体の頭のすぐ上**に置き、ぶつかったぶんだけ下へ送る。
+       * 横は固定なので、同じ列の中でしかぶつからない。
+       *
+       * `anchor.y` は本体の背丈の88%あたり(頭のあたり)を指す。
+       * そこを札の下端にすると、札は頭に触れずに真上へ乗る。
+       */
+      let top = anchor.y - height - HUD_HEAD_GAP;
       const overlaps = (candidate: number) =>
         placedCards.find(
           (r) => left < r.right - 2 && right > r.left + 2 && candidate < r.bottom - 2 && candidate + height > r.top + 2,
@@ -260,7 +277,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
       placedCards.push({ left, right, top, bottom: top + height });
       refs.card.style.left = `${anchorX}px`;
-      refs.card.style.top = `${top + height / 2}px`;
+      // transform が `-100%` なので、指定するのは札の**下端**
+      refs.card.style.top = `${top + height}px`;
 
       // 端に並べた札は本体と場所を取り合わないので、引き出し線は要らない
       refs.card.classList.remove("unit-hud--lifted");

@@ -6,7 +6,8 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { ArenaHandles, createArena } from "./arena.js";
-import { moodFor, StageMood } from "./elementTheme.js";
+import { BackdropHandles, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
+import { dominantElement, moodFor, StageMood } from "./elementTheme.js";
 import { BattleAvatar, createBattleAvatar } from "./avatarFactory.js";
 import { CinematicPass } from "./postfx/cinematicPass.js";
 import { HitStyle, StatusAuraKind, VfxElement, VfxSystem } from "./vfx.js";
@@ -96,10 +97,39 @@ const LANE_X_WIDE = 3.1;
  * 板の半幅の見込み。
  *
  * 実際の幅は絵の縦横比で決まる。最大は横長のゴーレム(512×420)で、
- * 背丈2.45 × 縦横比1.22 ÷ 2 = 1.49。少し余裕を足してある。
+ * 背丈2.45 × 表示倍率0.88 × 縦横比1.22 ÷ 2 = 1.32。少し余裕を足してある。
  * ここが足りないと、列が画面の端で切れる(実際にゴーレムが切れた)。
+ *
+ * **`spriteAvatar.ts` の `SPRITE_SCALE` と対で決まる。**片方だけ触らない。
  */
-const SPRITE_HALF_WIDTH = 1.65;
+const SPRITE_HALF_WIDTH = 1.45;
+
+/**
+ * 背景の絵を暗く落とす量。
+ *
+ * **届いた闘技場は床の明るさが0.75あった**(`tools/prepareBackgrounds.mjs` が測る)。
+ * 砂色の石畳の上に彩度の高いデフォルメの絵を置くと、輪郭が埋もれる。
+ * 描き直しを頼むより、載せる側で落とす方が速く、他の絵が届いても効く。
+ */
+const BACKDROP_DIM = 0.24;
+/**
+ * 背景の左右の端と下を落とす量。
+ *
+ * HPと行動ゲージの札が左右の端に乗る。明るい石畳の上に白い文字が来ると読めない。
+ * `docs/battle-background-art.md` では絵の側にも頼んでいるが、
+ * **届いた絵は落ちていなかった。**約束が守られない前提で、載せる側でも落とす。
+ */
+const BACKDROP_EDGE = 0.34;
+
+/**
+ * 画面の上でUIが覆う割合。盤面はここを避けて収める。
+ *
+ * 上は階層名と自動・速度・再生の並び。下はスキルの操作欄。
+ * **手動戦闘での高さで測る。**自動では操作欄が畳まれるが、
+ * 畳まれた高さで組むと、自動へ切り替えた瞬間に盤面が跳ねる。
+ */
+const SAFE_BAND_TOP = 0.09;
+const SAFE_BAND_BOTTOM = 0.17;
 
 /**
  * 立ち位置。**左右に分かれて縦に並ぶ。**
@@ -153,10 +183,15 @@ const HIT_STYLE_BY_ROLE: Record<string, HitStyle> = {
  * エフェクトの大きさを決める基準の高さ(ワールド単位)。
  * 画面の縦にこの高さが収まっている時、各エフェクトは指定どおりの寸法で描かれる。
  * 実際の画角がこれより狭ければ、その比率でエフェクトも小さくなる。
- * 値はキャラクターの背丈(約2.2)の10倍強で、大きめの演出でも画面の
- * 半分程度に収まるよう選んである。
+ *
+ * **モンスターの大きさと対で決まる。**
+ * ここは「画面の縦」を基準にしているので、UIの帯を避けて表示範囲を広げると
+ * エフェクトだけが勝手に大きくなる。モンスターを0.88へ縮め、
+ * 表示範囲を1.35倍へ広げた時、**守りのドームが本体を丸ごと覆う白い泡**になった。
+ * 装備の速度と敵の速度カーブの時と同じ、片方だけ触った事故。
+ * 表示範囲を変えたら、必ずここも測り直す。
  */
-const VFX_REFERENCE_HEIGHT = 42;
+const VFX_REFERENCE_HEIGHT = 64;
 
 /**
  * パーティクルの密度。1未満にすると粒の数が減る。
@@ -215,7 +250,16 @@ export class BattleStage {
   private readonly cinematicPass: CinematicPass;
   /** そのバトルの空気(空・霞・石・灯りの色)。敵の顔ぶれから決まる */
   private readonly mood: StageMood;
-  private readonly arena: ArenaHandles;
+  /** 3Dで組んだ闘技場。**1枚絵の舞台がある時は組まない**ので null */
+  private readonly arena: ArenaHandles | null;
+  /**
+   * 1枚絵の舞台。絵がある時だけ作られ、その時は3Dの闘技場を出さない。
+   *
+   * **どちらを出すかは「絵があるかどうか」で決める。**
+   * 旗で切り替える形にすると、絵が1枚も無い状態で旗を立てて
+   * 真っ黒な戦闘画面になる。絵の有無で決めれば、その事故が起きない。
+   */
+  private readonly backdrop: BackdropHandles | null;
   /**
    * 接地影。**モンスターが床に立って見えるかは、ほぼこれで決まる。**
    *
@@ -339,8 +383,9 @@ export class BattleStage {
     // その戦いの空気を、敵チームで最も多い属性から決める。
     // 空・霞・石・灯り・グレーディングまで一式がここから流れる。
     // (以前は全ステージが同じ紫の室内で、どの戦いも同じ絵に見えていた)
-    this.mood = moodFor(units.filter((u) => u.team === "ENEMY").map((u) => u.def.element as Element));
-    this.arena = createArena(this.mood);
+    const enemyElements = units.filter((u) => u.team === "ENEMY").map((u) => u.def.element as Element);
+    this.mood = moodFor(enemyElements);
+    const stageElement = dominantElement(enemyElements);
 
     // 霧の色は空のシェーダの地平線色(arena.ts の uHaze)と合わせてある。
     // 遠景がそのまま霞へ溶ける。**両方を同時に変えること。**
@@ -350,7 +395,37 @@ export class BattleStage {
     // モンスターは白まず、闘技場だけが奥へ退く。空気遠近が付いて、
     // 観客席と列柱が「遠い」と読めるようになる
     this.scene.fog = new THREE.FogExp2(this.mood.haze.getHex(), this.mood.fogDensity);
-    this.scene.add(this.arena.group);
+
+    /*
+     * 舞台。**1枚絵があればそちらを出し、3Dの闘技場は出さない。**
+     *
+     * 両方出すと、絵の後ろに隠れる列柱や観客席を描き続けることになる。
+     * 見えないものに描画回数を払うのは、この案件でいちばん避けたい形
+     * (実効31.5fpsまで落ちた原因がまさにそれだった)。
+     */
+    const backdropUrl = backdropUrlFor(stageElement);
+    this.backdrop = backdropUrl
+      ? createBackdrop({ url: backdropUrl, dim: BACKDROP_DIM, edge: BACKDROP_EDGE })
+      : null;
+    /*
+     * 3Dの闘技場は**絵が無い時だけ組む。**
+     * 作ってから足さない選択にすると、床のテクスチャを毎回焼き、
+     * 観客席のインスタンスを積んだうえで捨てることになる。
+     */
+    this.arena = this.backdrop ? null : createArena(this.mood);
+    if (this.backdrop) {
+      /*
+       * カメラの子にする。カメラ自身は scene に入っていないので、
+       * **カメラも scene へ足す。**忘れると背景だけが描かれない
+       * (three は scene の木を辿って描くものを集める)。
+       */
+      this.camera.add(this.backdrop.mesh);
+      this.scene.add(this.camera);
+      // 霧は3Dの闘技場を奥へ退かせるための仕掛け。絵にすると全体が霞むだけ
+      this.scene.fog = null;
+    } else if (this.arena) {
+      this.scene.add(this.arena.group);
+    }
     this.scene.add(this.vfx.root);
 
     this.setupLights();
@@ -773,9 +848,35 @@ export class BattleStage {
     const padding = 1.06;
     halfW *= padding;
     halfH *= padding;
+
+    /*
+     * **UIが覆う帯を避ける。**
+     *
+     * 画面の上には階層名と操作の並び、下にはスキルの操作欄が乗る。
+     * 画面いっぱいに盤面を収めると、いちばん手前と奥の1体が
+     * その下へ潜って見えなくなる(実際に5体の戦いで上下が切れた)。
+     *
+     * 表示範囲を帯のぶんだけ広げてから、盤面を**見える帯の中央へ**寄せる。
+     * 広げるので1体あたりは小さくなるが、5体が確実に見える方を取る。
+     *
+     * 自動戦闘では操作欄が畳まれるが、**畳まれた時の高さで測らない。**
+     * 自動と手動を切り替えるたびに盤面の大きさが跳ねる。
+     */
+    const usable = 1 - SAFE_BAND_TOP - SAFE_BAND_BOTTOM;
+    halfH /= usable;
+
     // 画面比に合わせて、足りない方を広げる。狭めると盤面が切れる
     if (halfW / halfH < aspect) halfW = halfH * aspect;
     else halfH = halfW / aspect;
+
+    /*
+     * 見える帯の中央へ寄せる。
+     *
+     * 注視点は画面の中央に来る点なので、**盤面を上げたい時は注視点を下げる。**
+     * 符号を取り違えると、避けたかった帯へ盤面を押し込むことになる。
+     */
+    const bandCenter = (1 + SAFE_BAND_TOP - SAFE_BAND_BOTTOM) / 2;
+    center.addScaledVector(up, -(0.5 - bandCenter) * 2 * halfH);
 
     /*
      * カメラ本体の位置。正投影なので**距離は絵に影響しない**が、
@@ -793,6 +894,10 @@ export class BattleStage {
     this.camera.updateProjectionMatrix();
     this.camera.position.copy(this.cameraBase);
     this.camera.lookAt(this.cameraTarget);
+
+    // 背景の板を新しい表示範囲へ合わせ直す。**表示範囲を変えたら必ず呼ぶ。**
+    // 忘れると、画面の回転や盤面の組み直しのあとに背景が縮んで縁が見える
+    this.backdrop?.fit(this.camera);
 
     // 板をカメラの角度へ倒して正対させる。倒さないと縦に潰れて見える
     for (const avatar of this.avatars.values()) avatar.setCameraPitch(pitch);
@@ -1097,7 +1202,7 @@ export class BattleStage {
     }
     this.elapsed += delta;
 
-    this.arena.update(this.elapsed);
+    this.arena?.update(this.elapsed);
     for (const avatar of this.avatars.values()) avatar.update(delta, this.elapsed);
     // 接地影は踏み込み・のけぞりで動く体に追従させる。
     // 追従させないと、動いた瞬間だけ足元から影が離れて浮きが目立つ
@@ -1521,7 +1626,8 @@ export class BattleStage {
     this.contactShadows.length = 0;
     for (const avatar of this.avatars.values()) avatar.dispose();
     this.avatars.clear();
-    this.arena.dispose();
+    this.arena?.dispose();
+    this.backdrop?.dispose();
     this.vfx.dispose();
     this.environmentTarget?.dispose();
     this.environmentTarget = null;
