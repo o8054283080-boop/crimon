@@ -9,6 +9,7 @@ import {
   describeTowerRun,
   nextTowerFloor,
   setupTowerBattle,
+  spendTowerStamina,
   towerBlockReason,
 } from "../src/game/trialTower.js";
 
@@ -57,6 +58,24 @@ describe("節と再開地点 (towerStartFloor)", () => {
 });
 
 describe("登坂の開始 (beginTowerRun)", () => {
+  it("表示・挑戦判定・実消費がすべてスタミナ2で一致する", () => {
+    expect(TOWER_STAMINA_COST).toBe(2);
+
+    const short = stateWithTowerParty();
+    short.stamina = 1;
+    expect(towerBlockReason(short)).toContain("⚡2必要");
+    expect(beginTowerRun(short)).toBeNull();
+    expect(spendTowerStamina(short)).toBe(false);
+    expect(short.stamina).toBe(1);
+
+    const exact = stateWithTowerParty();
+    exact.stamina = 2;
+    expect(towerBlockReason(exact)).toBeNull();
+    expect(beginTowerRun(exact)).not.toBeNull();
+    expect(spendTowerStamina(exact)).toBe(true);
+    expect(exact.stamina).toBe(0);
+  });
+
   it("編成が空なら始められない", () => {
     const state = createInitialState();
     state.towerPartyIds = [];

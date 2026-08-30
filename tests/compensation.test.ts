@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { COMPENSATIONS, claimCompensations, localDateString, pendingCompensations } from "../src/game/compensation.js";
-import { createInitialState } from "../src/game/playerState.js";
+import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 
 const TARGET = COMPENSATIONS.find((c) => c.id === "2026-08-18-save-loss")!;
 const AUTOFARM_TARGET = COMPENSATIONS.find((c) => c.id === "2026-08-28-autofarm-summon-freeze")!;
+const TRANSITION_2D_TARGET = COMPENSATIONS.find((c) => c.id === "2026-08-30-2d-transition")!;
 
 /** 端末のローカル日付で判定するので、テストもローカル時刻で日付を作る */
 function localNoonOn(date: string): Date {
@@ -12,6 +13,39 @@ function localNoonOn(date: string): Date {
 }
 
 describe("お詫びの配布", () => {
+  it("2D化のお詫びは新規ユーザーへダイヤ3000だけを1度配る", () => {
+    const state = createInitialState();
+    // 同日に有効な既存配布を受取済みにし、今回の配布だけを検証する。
+    state.claimedCompensationIds.push(TARGET.id, AUTOFARM_TARGET.id);
+    const before = { crystal: state.crystal, gold: state.gold, scrolls: state.summonScrolls };
+    const when = localNoonOn(TRANSITION_2D_TARGET.fromDate);
+
+    expect(claimCompensations(state, when).map((claim) => claim.compensation.id)).toEqual([TRANSITION_2D_TARGET.id]);
+    expect(state.crystal).toBe(before.crystal + 3000);
+    expect(state.gold).toBe(before.gold);
+    expect(state.summonScrolls).toBe(before.scrolls);
+    expect(claimCompensations(state, when)).toHaveLength(0);
+  });
+
+  it("2D化のお詫びは既存セーブを読み直しても二重配布されない", () => {
+    const legacy = createInitialState() as Partial<ReturnType<typeof createInitialState>>;
+    delete legacy.claimedCompensationIds;
+    const loaded = normalizeLoadedState(JSON.parse(JSON.stringify(legacy)) as ReturnType<typeof createInitialState>);
+    loaded.claimedCompensationIds.push(TARGET.id, AUTOFARM_TARGET.id);
+    const when = localNoonOn(TRANSITION_2D_TARGET.fromDate);
+    const before = loaded.crystal;
+
+    expect(claimCompensations(loaded, when)).toHaveLength(1);
+    expect(loaded.crystal).toBe(before + 3000);
+
+    // 保存→ロードと、HOME再入場・画面遷移相当の再呼び出しをまとめて確認する。
+    const reloaded = normalizeLoadedState(JSON.parse(JSON.stringify(loaded)));
+    expect(claimCompensations(reloaded, when)).toHaveLength(0);
+    expect(claimCompensations(reloaded, when)).toHaveLength(0);
+    expect(reloaded.crystal).toBe(before + 3000);
+    expect(reloaded.claimedCompensationIds).toContain(TRANSITION_2D_TARGET.id);
+  });
+
   it("期間中に開くと受け取れて、所持品が増える", () => {
     const state = createInitialState();
     const before = { crystal: state.crystal, gold: state.gold, scrolls: state.summonScrolls };
