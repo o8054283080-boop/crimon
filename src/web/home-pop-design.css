@@ -24,6 +24,7 @@ body:has(.crimon-home) {
   --home-header-h: 106px;
   --home-nav-base-h: 82px;
   --bottom-nav-h: calc(var(--home-nav-base-h) + env(safe-area-inset-bottom));
+  background: var(--home-navy-950) !important;
 }
 
 .home-screen {
