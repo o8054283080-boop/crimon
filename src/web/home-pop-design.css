@@ -136,6 +136,7 @@
 .world-action strong { border-color: rgba(224,187,101,.82) !important; border-radius: 4px !important; color: var(--home-text) !important; background: linear-gradient(180deg, rgba(15,45,79,.97), rgba(4,18,38,.98)) !important; box-shadow: 0 3px 6px rgba(0,17,34,.42), inset 0 1px rgba(145,224,255,.12) !important; }
 .world-action small { color: var(--home-gold-bright) !important; }
 .world-action--right:first-child::before { border-color: var(--home-gold-bright) !important; box-shadow: inset 0 0 0 3px #06182f, inset 0 0 0 4px rgba(117,216,255,.55), 0 0 18px rgba(240,202,109,.42), 0 9px 14px rgba(0,19,35,.38) !important; }
+.world-actions--right { right: 10px !important; }
 
 /* CURRENT PARTY は明るい背景を受け止める濃紺の情報パネル。 */
 .current-party-panel {
@@ -199,6 +200,10 @@ body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
   .world-party { inset-inline: 78px !important; }
   .world-party__figure { width: 106px !important; height: 152px !important; }
   .world-action--right { transform-origin: top right !important; }
+}
+
+@media (min-width: 410px) {
+  .world-actions--right { right: 12px !important; }
 }
 
 @media (max-height: 860px) {
