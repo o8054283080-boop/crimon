@@ -5,9 +5,11 @@ export interface ServiceWorkerEvents {
 export interface PwaUpdateState {
   available: boolean;
   applying: boolean;
+  failed: boolean;
 }
 
 export interface ServiceWorkerUpdateStatus {
+  registration: object | null;
   controller: object | null;
   active: object | null;
   waiting: object | null;
@@ -33,7 +35,7 @@ export class PwaUpdateController {
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private readonly timeoutMs: number;
   private readonly inspectUpdate: (() => ServiceWorkerUpdateStatus) | null;
-  private state: PwaUpdateState = { available: false, applying: false };
+  private state: PwaUpdateState = { available: false, applying: false, failed: false };
 
   constructor(
     serviceWorkers: ServiceWorkerEvents | null,
@@ -57,29 +59,32 @@ export class PwaUpdateController {
 
   announce(): void {
     if (this.state.available) return;
-    this.state = { available: true, applying: false };
+    this.state = { available: true, applying: false, failed: false };
     this.onChange();
   }
 
   async apply(persistSafeState: () => void): Promise<boolean> {
     if (!this.state.available || this.state.applying || !this.updateWorker) return false;
-    persistSafeState();
     const applyId = ++this.applyId;
     const before = this.inspectUpdate?.() ?? null;
+    // registerSWの登録完了前や、非対応環境ではメッセージの宛先がない。
+    if (this.inspectUpdate && !before?.registration) {
+      this.failApply();
+      return false;
+    }
+    persistSafeState();
     this.reloadRequested = true;
-    this.state = { available: true, applying: true };
+    this.state = { available: true, applying: true, failed: false };
     this.onChange();
     this.timeoutId = setTimeout(() => this.recoverFromTimeout(applyId, before), this.timeoutMs);
     try {
-      // false: ライブラリ自身にはreloadさせず、controllerchange側へ一本化する。
+      // vite-plugin-pwa 1.3では引数自体は互換用で、prompt時はwaitingへ
+      // messageSkipWaiting()を送る。reloadはこのcontrollerの切替確認後だけ行う。
       await this.updateWorker(false);
       return true;
     } catch {
       if (applyId !== this.applyId || !this.state.applying) return false;
-      this.clearApplyTimeout();
-      this.reloadRequested = false;
-      this.state = { available: true, applying: false };
-      this.onChange();
+      this.failApply();
       return false;
     }
   }
@@ -104,9 +109,7 @@ export class PwaUpdateController {
     }
 
     // Promiseの完了はactivate完了を意味しない。確認できなければ再試行可能に戻す。
-    this.reloadRequested = false;
-    this.state = { available: true, applying: false };
-    this.onChange();
+    this.failApply();
   }
 
   private requestReload(): void {
@@ -120,5 +123,12 @@ export class PwaUpdateController {
     if (this.timeoutId === null) return;
     clearTimeout(this.timeoutId);
     this.timeoutId = null;
+  }
+
+  private failApply(): void {
+    this.clearApplyTimeout();
+    this.reloadRequested = false;
+    this.state = { available: true, applying: false, failed: true };
+    this.onChange();
   }
 }
