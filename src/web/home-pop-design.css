@@ -24,7 +24,11 @@ html:has(.crimon-home),
 body:has(.crimon-home) {
   --home-header-h: 106px;
   --home-nav-base-h: 82px;
-  --bottom-nav-h: calc(var(--home-nav-base-h) + env(safe-area-inset-bottom));
+  /* 実機ではノッチ／ホームインジケーターの高さが入る。previewではこの変数を
+   * 一時的に差し替え、safe-area がある状態も検査できるようにする。 */
+  --home-safe-top: env(safe-area-inset-top);
+  --home-safe-bottom: env(safe-area-inset-bottom);
+  --bottom-nav-h: calc(var(--home-nav-base-h) + var(--home-safe-bottom));
   background: var(--home-navy-950) !important;
 }
 
@@ -207,13 +211,14 @@ body:has(.crimon-home) .bottom-nav,
 body:has(.crimon-home) .crimon-bottom-nav {
   height: var(--bottom-nav-h) !important;
   box-sizing: border-box !important;
+  align-items: stretch !important;
   gap: 0 !important;
-  padding: 9px 18px calc(6px + env(safe-area-inset-bottom)) !important;
+  padding: 7px 8px calc(6px + var(--home-safe-bottom)) !important;
   border: 0 !important;
   background:
-    linear-gradient(rgba(2, 13, 29, .16), rgba(2, 13, 29, .16)),
-    url("./assets/home/home-bottom-nav-frame-v5.webp") center / 100% 100% no-repeat !important;
-  box-shadow: none !important;
+    radial-gradient(ellipse 76% 120% at 50% 112%, rgba(49, 151, 214, .22), transparent 72%),
+    linear-gradient(180deg, #0c294b 0%, #06182f 38%, #041225 100%) !important;
+  box-shadow: inset 0 1px rgba(255, 237, 181, .52), 0 -5px 17px rgba(1, 12, 29, .36) !important;
 }
 
 body:has(.crimon-home) .bottom-nav::before,
@@ -221,25 +226,88 @@ body:has(.crimon-home) .bottom-nav::after { display: none !important; }
 
 body:has(.crimon-home) .bottom-nav__btn,
 body:has(.crimon-home) .crimon-bottom-nav button {
+  position: relative !important;
+  display: flex !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
   z-index: 1 !important;
-  gap: 4px !important;
-  padding: 5px 0 3px !important;
-  border-radius: 8px !important;
+  gap: 3px !important;
+  padding: 5px 1px 4px !important;
+  border: 1px solid rgba(218, 180, 95, .34) !important;
+  border-radius: 7px 7px 4px 4px !important;
   color: #d2e0ec !important;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(92, 194, 246, .15), transparent 54%),
+    linear-gradient(180deg, rgba(17, 55, 91, .86), rgba(4, 20, 40, .9)) !important;
+  box-shadow: inset 0 1px rgba(191, 229, 255, .15), inset 0 0 0 1px rgba(2, 12, 27, .52) !important;
 }
 
-body:has(.crimon-home) .bottom-nav__icon { font-size: 1.36rem !important; }
-body:has(.crimon-home) .bottom-nav__label { font-size: .63rem !important; letter-spacing: .01em !important; }
+body:has(.crimon-home) .bottom-nav__btn + .bottom-nav__btn,
+body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 3px !important; }
+
+body:has(.crimon-home) .bottom-nav__icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  font-size: 1.28rem !important;
+  line-height: 1 !important;
+}
+
+body:has(.crimon-home) .bottom-nav__label {
+  display: block !important;
+  min-height: 13px !important;
+  margin: 0 !important;
+  font-size: .62rem !important;
+  line-height: 1.08 !important;
+  letter-spacing: .01em !important;
+  text-align: center !important;
+}
 
 body:has(.crimon-home) .bottom-nav__btn--active,
 body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
   color: var(--home-gold-bright) !important;
   text-shadow: 0 0 9px rgba(105,215,255,.65) !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  background:
+    radial-gradient(ellipse 86% 72% at 50% 104%, rgba(238, 189, 78, .4), transparent 72%),
+    linear-gradient(180deg, #1d5b91, #0a2748 58%, #071b34) !important;
+  border-color: rgba(255, 220, 132, .9) !important;
+  box-shadow: inset 0 1px rgba(255, 247, 210, .52), inset 0 0 0 1px rgba(129, 213, 255, .29), 0 0 12px rgba(76, 185, 244, .22) !important;
 }
 
 body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !important; }
+
+/* ミッション達成後は tutorial を表示しない。その時だけ HOME 自体を
+ * 「ヘッダー → 世界 → 現在のパーティ」の固定レーンにし、iPhone の
+ * safe-area と固定ナビの間へ編成パネルを必ず収める。 */
+.crimon-home:has(.crimon-tutorial__complete) {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  padding: max(12px, var(--home-safe-top)) 0 var(--bottom-nav-h) !important;
+  overflow: hidden !important;
+}
+
+.crimon-home:has(.crimon-tutorial__complete) .crimon-resource-header,
+.crimon-home:has(.crimon-tutorial__complete) .reward-banner-stack,
+.crimon-home:has(.crimon-tutorial__complete) .current-party-panel {
+  flex: 0 0 auto !important;
+}
+
+.crimon-home:has(.crimon-tutorial__complete) .home-world {
+  height: auto !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.crimon-home:has(.crimon-tutorial__complete) .current-party-panel {
+  margin: 0 6px 7px !important;
+}
 
 @media (max-width: 405px) {
   body:has(.crimon-home) { --home-header-h: 100px; --home-nav-base-h: 78px; }
@@ -287,6 +355,10 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   .world-party__figure--2,
   .world-party__figure--4 { bottom: 37px !important; }
   .world-party__figure--3 { bottom: 64px !important; }
+}
+
+@media (max-height: 860px) {
+  .crimon-home:has(.crimon-tutorial__complete) .home-world { height: auto !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
