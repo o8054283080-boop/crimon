@@ -1,0 +1,75 @@
+/* 所持モンスター詳細だけの高密度レイアウト。共通panel/button/navには影響させない。 */
+.monster-detail-screen {
+  gap: 6px;
+  padding: max(6px, env(safe-area-inset-top)) 8px max(92px, calc(env(safe-area-inset-bottom) + 82px));
+}
+
+.monster-detail-head {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 44px;
+  align-items: center;
+  min-height: 44px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.monster-detail-head h1 { margin: 0; overflow: hidden; font-size: 1.05rem; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.monster-detail-head button { min-height: 44px; border: 0; background: transparent; color: var(--text); }
+.monster-detail-head__back { display: flex; align-items: center; gap: 2px; padding: 0; font-weight: 800; }
+.monster-detail-head__lock { display: grid; place-items: center; min-width: 44px; opacity: .55; }
+.monster-detail-head__lock.is-locked { color: #ffd45d; opacity: 1; filter: drop-shadow(0 0 5px #dcae3e88); }
+
+.monster-detail-layout { display: grid; gap: 5px; }
+.monster-detail-summary, .monster-detail-section { border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(15,20,39,.78); }
+.monster-detail-summary { display: grid; grid-template-columns: 98px minmax(0, 1fr); gap: 4px 8px; padding: 6px; }
+.monster-detail-summary .monster-detail__hero { grid-column: 1 / -1; gap: 8px; }
+.monster-detail-summary .monster-detail__avatar { width: 94px; height: 94px; font-size: 2.5rem; }
+.monster-detail-summary .monster-detail__ident { flex: 1; display: grid; grid-template-columns: auto 1fr; align-content: center; gap: 2px 7px; }
+.monster-detail-summary .monster-detail__element { justify-self: start; }
+.monster-detail-summary .monster-detail__star { align-self: center; font-size: .88rem; white-space: nowrap; }
+.monster-detail-summary .monster-detail__level { grid-column: 1 / -1; font-size: .95rem; }
+.monster-detail__meta { grid-column: 1 / -1; display: flex; align-items: center; gap: 5px; min-height: 18px; }
+.monster-detail__power { grid-column: 1 / -1; font-size: .75rem; color: #dce5ff; }
+.monster-detail__exp-compact { grid-column: 1 / -1; display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 5px; font-size: .62rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.monster-detail__exp-track { height: 4px; overflow: hidden; border-radius: 4px; background: #303950; }
+.monster-detail__exp-track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#58c98e,#8ee6b5); }
+.monster-detail-summary .monster-detail__stats { grid-column: 1 / -1; gap: 4px; margin-top: 0; }
+.monster-detail-summary .stat-tile { min-width: 0; padding: 3px 1px; border-radius: 6px; }
+.monster-detail-summary .stat-tile__value { font-size: .82rem; }
+.monster-detail-summary .stat-tile__breakdown { font-size: .57rem; }
+.monster-detail-summary .monster-detail__substats { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4,1fr); gap: 2px; margin: 0; font-size: .6rem; text-align: center; }
+.monster-detail-summary .monster-detail__gear-note { grid-column: 1 / -1; margin: 0; font-size: .58rem; line-height: 1.2; }
+
+.monster-detail-section { padding: 5px 6px; }
+.monster-detail-section h2 { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 4px; font-size: .72rem; color: #dce5ff; }
+.monster-detail-section h2 small { font-size: .56rem; font-weight: 500; color: var(--text-dim); }
+.monster-detail-skills__grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; }
+.monster-skill-compact { min-width: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: rgba(0,0,0,.2); }
+.monster-skill-compact summary { position: relative; display: flex; flex-direction: column; min-height: 74px; gap: 1px; padding: 4px; overflow: hidden; list-style: none; cursor: pointer; }
+.monster-skill-compact summary::-webkit-details-marker { display: none; }
+.monster-skill-compact__slot { position: absolute; top: 3px; right: 3px; font-size: .58rem; font-weight: 900; color: var(--accent); }
+.monster-skill-compact strong { min-height: 25px; padding-right: 16px; font-size: .66rem; line-height: 1.15; overflow-wrap: anywhere; }
+.monster-skill-compact__level { font-size: .58rem; color: #aebce0; }
+.monster-skill-compact__effect { display: -webkit-box; overflow: hidden; font-size: .58rem; line-height: 1.2; color: #79dba5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.monster-skill-compact__full { grid-column: 1 / -1; padding: 5px; border-top: 1px solid rgba(255,255,255,.08); font-size: .65rem; line-height: 1.35; color: #c8d3ee; }
+.monster-skill-compact__full p { margin: 0 0 3px; }
+.monster-detail-latent > div { display: grid; grid-template-columns: minmax(90px,auto) 1fr; gap: 6px; font-size: .62rem; line-height: 1.25; }
+.monster-detail-latent strong { color: #f2d477; }
+.monster-detail-empty { margin: 0; font-size: .62rem; color: var(--text-dim); }
+
+.monster-detail-equipment .equip-slot-grid { grid-template-columns: repeat(6,minmax(0,1fr)); gap: 3px; }
+.monster-detail-equipment .equip-slot { justify-content: center; min-width: 0; min-height: 42px; padding: 2px 1px; gap: 0; border-radius: 6px; }
+.monster-detail-equipment .equip-slot__head { gap: 2px; }
+.monster-detail-equipment .equip-slot__star { max-width: 100%; overflow: hidden; font-size: .5rem; white-space: nowrap; }
+.monster-detail-equipment .equip-slot__stat, .monster-detail-equipment .equip-slot__set { max-width: 100%; overflow: hidden; font-size: .53rem; text-overflow: ellipsis; white-space: nowrap; }
+.monster-detail-equipment .equip-slot__level { font-size: .58rem; }
+.monster-detail-equipment .equip-slot__plus { font-size: .8rem; }
+.monster-detail-equipment__sets { margin: 3px 0 0; font-size: .57rem; line-height: 1.2; color: #79dba5; }
+.monster-detail-actions { display: grid; grid-template-columns: repeat(2,1fr); gap: 4px; }
+.monster-detail-actions .btn { min-height: 44px; padding: 5px; font-size: .72rem; }
+.monster-detail-actions__hint { grid-column: 1 / -1; text-align: center; font-size: .58rem; color: var(--text-dim); }
+
+@media (min-width: 420px) and (min-height: 880px) {
+  .monster-detail-layout { gap: 7px; }
+  .monster-detail-summary { grid-template-columns: 108px 1fr; padding: 8px; }
+  .monster-detail-summary .monster-detail__avatar { width: 104px; height: 104px; }
+  .monster-skill-compact summary { min-height: 80px; }
+}

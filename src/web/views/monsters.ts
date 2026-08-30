@@ -17,6 +17,9 @@ import { CreateSlot, currentSkillOf, describeCreatedSkill } from "../../game/mon
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
 import { managementHeader } from "./managementHeader.js";
+import { computeLeveledSkill, describeSkillEffect, MAX_SKILL_LEVEL } from "../../core/skill.js";
+import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
+import "../ui/monsterDetail.css";
 
 export interface MonstersProps {
   player: PlayerState;
@@ -25,6 +28,7 @@ export interface MonstersProps {
   selectedSacrificeIds: string[];
   onSelectDetail: (id: string | null) => void;
   onStartRankUp: () => void;
+  onToggleLock: (monsterId: string) => void;
   onToggleSacrifice: (id: string) => void;
   onConfirmRankUp: () => void;
   onCancelRankUp: () => void;
@@ -231,9 +235,24 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const secondaryStats = growthStats && effectiveStats ? buildStatBreakdown(growthStats, effectiveStats, EXTRA_STAT_FORMATS) : [];
   const gearedSlots = equippedItems.length;
 
-  return el("div", { className: "screen monsters-screen" }, [
-    managementHeader(dex ? dex.name : instance.dexId, () => props.onSelectDetail(null), `${starLabel(instance.star)} Lv${instance.level}`),
-    el("section", { className: "panel monster-detail", "data-star": String(instance.star) }, [
+  const expRatio = instance.level < maxLevel && expNeeded > 0 ? Math.min(100, Math.max(0, instance.exp / expNeeded * 100)) : 100;
+  const skills = dex?.skills.map((skill, index) => index === 0 ? skill : currentSkillOf(instance, index as CreateSlot) ?? skill) ?? [];
+  const latentId = instance.development?.latentAbilityId ?? null;
+  const latent = latentId ? LATENT_ABILITY_CANDIDATES[instance.dexId]?.find((candidate) => candidate.id === latentId) : undefined;
+  const activeSets = getActiveSetBonuses(equippedItems);
+
+  return el("div", { className: "screen monsters-screen monster-detail-screen" }, [
+    el("header", { className: "monster-detail-head" }, [
+      el("button", { type: "button", className: "monster-detail-head__back", onclick: () => props.onSelectDetail(null), ariaLabel: "所持モンスター一覧へ戻る" }, [icon("back", { size: 17 }), "戻る"]),
+      el("h1", {}, [dex?.name ?? instance.dexId ?? "名称未設定"]),
+      el("button", {
+        type: "button", className: `monster-detail-head__lock${instance.locked ? " is-locked" : ""}`,
+        onclick: (event: MouseEvent) => { event.stopPropagation(); props.onToggleLock(instance.id); },
+        ariaLabel: instance.locked ? "モンスターのロックを解除" : "モンスターをロック", title: instance.locked ? "ロック中" : "未ロック",
+      }, [icon("lock", { size: 19 })]),
+    ]),
+    el("main", { className: "monster-detail-layout" }, [
+    el("section", { className: "monster-detail monster-detail-summary", "data-star": String(instance.star) }, [
       // 集めたものを眺める画面なので、肖像を主役の大きさで出す
       el("div", { className: "monster-detail__hero" }, [
         withPortrait(
@@ -244,8 +263,16 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
           dex ? el("span", { className: "monster-detail__element" }, [ELEMENT_JA[dex.element]]) : null,
           el("span", { className: "monster-detail__star" }, [starLabel(instance.star)]),
           el("span", { className: "monster-detail__level" }, [`Lv ${instance.level} / ${maxLevel}`]),
-          dex ? el("span", { className: "monster-detail__role" }, [dex.role]) : null,
-          inParty ? el("span", { className: "role-badge" }, ["編成中"]) : null,
+          el("span", { className: "monster-detail__meta" }, [
+            dex ? el("span", { className: "monster-detail__role" }, [dex.role || "役割未設定"]) : null,
+            inParty ? el("span", { className: "role-badge" }, ["編成中"]) : null,
+            instance.createdSkill ? el("span", { className: "create-mark" }, ["クリエイト済"]) : null,
+          ].filter((n): n is HTMLElement => n !== null)),
+          el("strong", { className: "monster-detail__power" }, [`戦闘力 ${monsterPower(instance).toLocaleString()}`]),
+          el("div", { className: "monster-detail__exp-compact" }, [
+            el("span", {}, [instance.level < maxLevel ? `${instance.exp} / ${expNeeded}` : "経験値 MAX"]),
+            el("span", { className: "monster-detail__exp-track" }, [el("span", { style: `width:${expRatio}%` }, [])]),
+          ]),
         ].filter((n): n is HTMLElement => n !== null)),
       ]),
       el(
@@ -276,27 +303,47 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
           ].filter((n): n is string | HTMLElement => n !== null)),
         ),
       ),
-      el("div", { className: "monster-detail__gear-note" }, [
-        gearedSlots > 0
-          ? `小さい数字は装備なしの値と、装備${gearedSlots}個で上がった分`
-          : "装備なし(着けると上がった分がここに出ます)",
-      ]),
-      instance.level < maxLevel
-        ? el("div", { className: "monster-detail__exp" }, [`経験値 ${instance.exp} / ${expNeeded}`])
-        : el("div", { className: "monster-detail__exp" }, ["経験値 MAX"]),
+      el("div", { className: "monster-detail__gear-note" }, [gearedSlots ? `装備補正：${gearedSlots}枠（緑字）` : "装備補正：なし"]),
     ]),
-    renderSkillPanel(dex, instance, () => props.onGoMonsterTraining(instance.id), () => props.onGoCreate(instance.id)),
-    el("section", { className: "panel" }, [el("h2", {}, ["装備"]), renderSlotGrid(props, instance)]),
-    renderSetBonusPanel(equippedItems),
-    rankReady
-      ? el(
-          "button",
-          { type: "button", className: "btn btn--primary btn--large", onclick: props.onStartRankUp },
-          [`⭐ ランクアップ (素材${RANK_UP_SACRIFICE_COUNT[instance.star]}体必要)`],
-        )
-      : el("div", { className: "panel rankup-hint" }, [
-          instance.star >= 6 ? "最大ランクに到達しています" : `最大レベル(Lv${maxLevel})になるとランクアップできます`,
-        ]),
+    el("section", { className: "monster-detail-section monster-detail-skills" }, [
+      el("h2", {}, ["スキル", el("small", {}, ["タップで完全説明"])]),
+      el("div", { className: "monster-detail-skills__grid" }, skills.length ? skills.map((skill, index) => {
+        const level = instance.skillLevels?.[index] ?? 1;
+        const leveled = computeLeveledSkill(skill, level);
+        const effects = leveled.effects?.map(describeSkillEffect) ?? [];
+        return el("details", { className: "monster-skill-compact" }, [
+          el("summary", {}, [
+            el("span", { className: "monster-skill-compact__slot" }, [`S${index + 1}`]),
+            el("strong", {}, [skill.name || "名称未設定"]),
+            el("span", { className: "monster-skill-compact__level" }, [`Lv${level}/${MAX_SKILL_LEVEL} · ${leveled.cooldownTurns ? `CT${leveled.cooldownTurns}` : "CTなし"}`]),
+            el("span", { className: "monster-skill-compact__effect" }, [effects.length ? effects.join(" / ") : "効果データなし"]),
+          ]),
+          el("div", { className: "monster-skill-compact__full" }, [
+            el("p", {}, [skill.description || "説明未登録"]), el("p", {}, [effects.length ? effects.join(" / ") : "効果データなし"]),
+          ]),
+        ]);
+      }) : [el("p", { className: "monster-detail-empty" }, ["スキル未設定"])]),
+    ]),
+    el("section", { className: "monster-detail-section monster-detail-latent" }, [
+      el("h2", {}, ["◆ 潜在覚醒"]),
+      latent ? el("div", {}, [el("strong", {}, [latent.name || "名称未設定"]), el("span", {}, [latent.description || "説明未登録"])])
+        : el("span", { className: "monster-detail-empty" }, [latentId ? "潜在覚醒：未設定" : "🔒 未解放"]),
+    ]),
+    el("section", { className: "monster-detail-section monster-detail-equipment" }, [
+      el("h2", {}, ["装備"]), renderSlotGrid(props, instance),
+      activeSets.length ? el("p", { className: "monster-detail-equipment__sets" }, [activeSets.flatMap((bonus) => {
+        const description = SET_BONUS_DESCRIPTION[bonus.set];
+        return [`${SET_LABEL[bonus.set]}：${description.two}${bonus.fourActive ? ` / ${description.four}` : ""}`];
+      }).join("　")]) : null,
+    ].filter((node): node is HTMLElement => node !== null)),
+    el("section", { className: "monster-detail-actions" }, [
+      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoMonsterTraining(instance.id) }, ["強化"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoCreate(instance.id) }, [instance.createdSkill ? "クリエイトし直す" : "クリエイト"]),
+      rankReady ? el("button", { type: "button", className: "btn btn--primary", onclick: props.onStartRankUp }, [`ランクアップ（素材${RANK_UP_SACRIFICE_COUNT[instance.star]}体）`]) : null,
+      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectSlot(instance.id, 1) }, ["装備変更"]),
+      el("small", { className: "monster-detail-actions__hint" }, [rankReady ? "ランクアップ可能" : instance.star >= 6 ? "最大ランク到達" : `ランクアップ：Lv${maxLevel}で解放`]),
+    ].filter((n): n is HTMLElement => n !== null)),
+    ]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 

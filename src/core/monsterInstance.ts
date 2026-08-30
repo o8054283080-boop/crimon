@@ -41,6 +41,8 @@ export interface MonsterInstance {
   equipment: Partial<Record<EquipSlot, string>>;
   /** スキル1〜3それぞれのレベル(1〜5) */
   skillLevels: [number, number, number];
+  /** 素材への誤使用を防ぐ保護。未設定の旧セーブは未ロックとして扱う。 */
+  locked?: boolean;
   /**
    * クリエイト(スキル合成)で上書きしたスキル。
    *
