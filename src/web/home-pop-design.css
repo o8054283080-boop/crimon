@@ -112,7 +112,7 @@ body:has(.crimon-home) {
 /* 画像の明るい世界をHOMEの主役にする。上部は空、中央はモンスターの余白、
  * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。 */
 .home-world {
-  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 17px - var(--home-banner-h, 0px)) !important;
+  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 23px - var(--home-banner-h, 0px)) !important;
   min-height: 356px !important;
   margin: -1px 0 0 !important;
   border-inline: 0 !important;
@@ -161,13 +161,15 @@ body:has(.crimon-home) {
 /* CURRENT PARTY は明るい背景を受け止める濃紺の情報パネル。 */
 .current-party-panel {
   height: 86px !important;
-  margin: 0 6px !important;
+  margin: 0 6px 6px !important;
   padding: 7px !important;
   border: 1px solid var(--home-gold-line) !important;
   border-radius: 8px !important;
   color: var(--home-text) !important;
-  background: linear-gradient(110deg, rgba(5,18,38,.98), rgba(13,42,75,.98) 50%, rgba(5,18,38,.98)) !important;
-  box-shadow: var(--home-panel-shadow), inset 0 0 0 2px rgba(82,195,244,.12), inset 0 1px rgba(255,244,201,.22) !important;
+  background:
+    radial-gradient(ellipse at 50% -28%, rgba(102,213,255,.20), transparent 58%),
+    linear-gradient(110deg, #061a34, #103c68 50%, #061a34) !important;
+  box-shadow: 0 7px 15px rgba(1,12,28,.42), inset 0 0 0 2px rgba(82,195,244,.14), inset 0 1px rgba(255,244,201,.28), 0 0 0 1px rgba(3,12,28,.35) !important;
 }
 
 .current-party-panel::before,
@@ -209,8 +211,8 @@ body:has(.crimon-home) .crimon-bottom-nav {
   padding: 9px 18px calc(6px + env(safe-area-inset-bottom)) !important;
   border: 0 !important;
   background:
-    url("./assets/home/home-bottom-nav-frame-v3.webp") center / 100% 100% no-repeat,
-    linear-gradient(var(--home-navy-950), var(--home-navy-950)) center / 100% 100% no-repeat !important;
+    linear-gradient(rgba(2, 13, 29, .16), rgba(2, 13, 29, .16)),
+    url("./assets/home/home-bottom-nav-frame-v5.webp") center / 100% 100% no-repeat !important;
   box-shadow: none !important;
 }
 
@@ -278,7 +280,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 }
 
 @media (max-height: 860px) {
-  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 17px - var(--home-banner-h, 0px)) !important; }
+  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 23px - var(--home-banner-h, 0px)) !important; }
   .world-party { inset: 88px 80px 84px !important; }
   .world-party__figure { width: 104px !important; height: 148px !important; }
   .world-party__figure--1 { bottom: 6px !important; }
