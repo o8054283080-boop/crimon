@@ -141,10 +141,19 @@ import { PwaUpdateController } from "./pwaUpdate.js";
 import { createFloatingPanel } from "./floatingPanel.js";
 
 let appMounted = false;
+let pwaRegistration: ServiceWorkerRegistration | null = null;
 const pwaUpdate = new PwaUpdateController(
   typeof navigator === "undefined" ? null : navigator.serviceWorker,
   () => { if (appMounted) render(); },
   () => window.location.reload(),
+  {
+    inspectUpdate: () => ({
+      controller: navigator.serviceWorker?.controller ?? null,
+      active: pwaRegistration?.active ?? null,
+      waiting: pwaRegistration?.waiting ?? null,
+      installing: pwaRegistration?.installing ?? null,
+    }),
+  },
 );
 
 const updateWorker = registerSW({
@@ -152,6 +161,7 @@ const updateWorker = registerSW({
   onNeedRefresh() { pwaUpdate.announce(); },
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return;
+    pwaRegistration = registration;
     // 起動時点ですでに waiting なら、updatefound の再発火を待たず表示する。
     if (registration.waiting) pwaUpdate.announce();
     const checkForUpdate = () => {
