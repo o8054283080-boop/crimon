@@ -234,6 +234,18 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 
 @media (max-width: 405px) {
   body:has(.crimon-home) { --home-header-h: 100px; --home-nav-base-h: 78px; }
+  /* 390px幅でも、お詫び／ミッションの獲得数を切らずに読める密度にする。 */
+  .crimon-home .reward-banner { gap: 4px !important; padding-inline: 5px !important; }
+  .crimon-home .reward-banner .reward-banner__seal { width: 28px !important; height: 28px !important; min-width: 28px !important; font-size: 16px !important; }
+  .crimon-home .reward-banner .reward-banner__body { gap: 3px !important; }
+  .crimon-home .reward-banner .compensation__title,
+  .crimon-home .reward-banner .reward-banner__label { font-size: 9px !important; }
+  .crimon-home .reward-banner .reward-list { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list li { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list .icon { width: 12px !important; height: 12px !important; }
+  .crimon-home .reward-banner .reward-list strong { font-size: 1.08rem !important; }
+  .crimon-home .reward-banner .reward-list span { font-size: .6rem !important; }
+  .crimon-home .reward-banner .reward-banner__close { width: 34px !important; min-width: 34px !important; height: 34px !important; }
   .world-party { inset-inline: 78px !important; }
   .world-party__figure { width: 106px !important; height: 152px !important; }
   .world-action--right { transform-origin: top right !important; }
