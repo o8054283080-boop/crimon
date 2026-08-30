@@ -194,6 +194,8 @@ body:has(.crimon-home) {
 .crimon-home .reward-banner-stack { margin-inline: 6px !important; }
 .crimon-home .reward-banner { border-color: var(--home-gold-line) !important; border-radius: 7px !important; color: var(--home-text) !important; background: linear-gradient(90deg, #071a34, #123d67, #071a34) !important; box-shadow: var(--home-panel-shadow) !important; }
 .crimon-home .reward-banner .reward-banner__close { color: var(--home-gold-bright) !important; }
+/* 外側の「お詫びの配布」で意味は足りるため、同じ内容の内側タイトルは畳む。 */
+.crimon-home .reward-banner .compensation__title { display: none !important; }
 
 /* HOMEにいる時だけ下部ナビを濃紺＋金にする。他画面の導線へは影響させない。 */
 body:has(.crimon-home) .bottom-nav,
