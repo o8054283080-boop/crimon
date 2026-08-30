@@ -112,7 +112,7 @@ export const TOWER_CHECKPOINT_INTERVAL = 10;
 export const TOWER_BOSS_INTERVAL = 10;
 
 /** 1階を挑むごとに消費するスタミナ */
-export const TOWER_STAMINA_COST = 4;
+export const TOWER_STAMINA_COST = 2;
 
 /** その階が節(越えると全回復し、次回はここから再開できる)か */
 export function isTowerCheckpoint(floor: number): boolean {
