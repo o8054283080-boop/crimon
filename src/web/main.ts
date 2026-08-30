@@ -1,5 +1,6 @@
 import "./style.css";
 import "./crimon-visual-system.css";
+import "./home-pop-design.css";
 import "./mobile-ux.css";
 import "./ui/tutorialBar.css";
 import "./ui/portraitOnly.css";

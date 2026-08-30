@@ -23,6 +23,17 @@ try {
     await page.goto(baseUrl, { waitUntil: "networkidle" });
     await page.locator(".crimon-home").waitFor({ state: "visible", timeout: 15000 });
     await page.screenshot({ path: `${outDir}/${viewport.name}`, fullPage: false });
+
+    // お詫び・ログイン報酬を受け取った後も、背景ステージが自然に伸びて
+    // CURRENT PARTY や下部ナビとの間に空白が生まれないことを確認する。
+    while (await page.locator(".reward-banner__close").count()) {
+      await page.locator(".reward-banner__close").first().click();
+      await page.waitForTimeout(80);
+    }
+    await page.screenshot({
+      path: `${outDir}/${viewport.name.replace(".png", "-no-rewards.png")}`,
+      fullPage: false,
+    });
     await context.close();
   }
 } finally {
