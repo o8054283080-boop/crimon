@@ -1,0 +1,122 @@
+{
+  "ancient_crystal": {
+    "bodyHue": 0.012,
+    "bodySat": 0.74,
+    "bodyVal": 0.71,
+    "aspect": 0.773
+  },
+  "ancient_crystal_curse": {
+    "bodyHue": 0.995,
+    "bodySat": 0.87,
+    "bodyVal": 0.45,
+    "aspect": 0.873
+  },
+  "ancient_demon": {
+    "bodyHue": 0.014,
+    "bodySat": 0.66,
+    "bodyVal": 0.43,
+    "aspect": 0.791
+  },
+  "dragon": {
+    "bodyHue": 0.472,
+    "bodySat": 0.81,
+    "bodyVal": 0.62,
+    "aspect": 1.252
+  },
+  "exp_pig": {
+    "bodyHue": 0.036,
+    "bodySat": 0.48,
+    "bodyVal": 0.97,
+    "aspect": 1.041
+  },
+  "fairy": {
+    "bodyHue": 0.26,
+    "bodySat": 0.22,
+    "bodyVal": 0.96,
+    "aspect": 0.875
+  },
+  "golem": {
+    "bodyHue": 0.098,
+    "bodySat": 0.21,
+    "bodyVal": 0.62,
+    "aspect": 1.219
+  },
+  "golem-GRASS": {
+    "bodyHue": 0.3,
+    "bodySat": 0.54,
+    "bodyVal": 0.54,
+    "aspect": 1.219
+  },
+  "griffon": {
+    "bodyHue": 0.092,
+    "bodySat": 0.53,
+    "bodyVal": 0.87,
+    "aspect": 1.156
+  },
+  "imp": {
+    "bodyHue": 0.798,
+    "bodySat": 0.48,
+    "bodyVal": 0.65,
+    "aspect": 1.125
+  },
+  "knight": {
+    "bodyHue": 0.773,
+    "bodySat": 0.27,
+    "bodyVal": 0.45,
+    "aspect": 1.064
+  },
+  "nemesis": {
+    "bodyHue": 0.871,
+    "bodySat": 0.22,
+    "bodyVal": 0.4,
+    "aspect": 0.887
+  },
+  "reincarnation_pig": {
+    "bodyHue": 0.946,
+    "bodySat": 0.27,
+    "bodyVal": 0.96,
+    "aspect": 0.965
+  },
+  "seraph": {
+    "bodyHue": 0.072,
+    "bodySat": 0.17,
+    "bodyVal": 0.96,
+    "aspect": 0.938
+  },
+  "skill_pig": {
+    "bodyHue": 0.015,
+    "bodySat": 0.63,
+    "bodyVal": 0.84,
+    "aspect": 1.018
+  },
+  "slime": {
+    "bodyHue": 0.553,
+    "bodySat": 0.69,
+    "bodyVal": 0.99,
+    "aspect": 0.926
+  },
+  "treant": {
+    "bodyHue": 0.126,
+    "bodySat": 0.82,
+    "bodyVal": 0.63,
+    "aspect": 1.099
+  },
+  "wisp": {
+    "bodyHue": 0.591,
+    "bodySat": 0.67,
+    "bodyVal": 0.99,
+    "aspect": 0.66
+  },
+  "wolf": {
+    "bodyHue": 0.687,
+    "bodySat": 0.29,
+    "bodyVal": 0.63,
+    "aspect": 1.089
+  },
+  "wolf-WATER": {
+    "bodyHue": 0.64,
+    "bodySat": 0.66,
+    "bodyVal": 0.64,
+    "aspect": 1.089
+  }
+}

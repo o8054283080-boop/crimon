@@ -63,9 +63,19 @@ const SCREENS = [
   { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },
 ];
 
+/*
+ * 検査する画面の大きさ。**縦だけ。**
+ *
+ * このゲームは縦持ち専用になった(manifest の orientation: "portrait"、
+ * ブラウザで横にされた時は `ui/portraitOnly.css` が縦へ戻すよう伝える)。
+ * 横向きは「遊べる状態」ではないので、崩れを検査する意味が無い。
+ *
+ * 2Dのモンスターを左右2列で縦に並べる構図にしたため、横に倒すと
+ * 5体を収める高さが無くなり、1チームぶんが画面上で重なる。
+ * 縦横どちらでも成立させようとすると、どちらも中途半端になる。
+ */
 const SIZES = [
   { label: "縦(iPhone)", width: 390, height: 844 },
-  { label: "横", width: 844, height: 390 },
 ];
 
 /**

@@ -1129,6 +1129,27 @@ body {
 }
 
 /* 敵の札は地を赤みへ振る。どちらの陣営かを色でも読ませる */
+/*
+ * 画面の左右の端へ寄せた時の札。
+ *
+ * 端の列では**隣の札とぶつからない**ので、横並びを前提にした広さは要らない。
+ * 細くしたぶんだけ画面の真ん中が空き、モンスターが大きく映る。
+ * 390px幅の実機で、札2枚が220pxを占めていたのを190pxまで削った。
+ */
+.unit-hud--rail .unit-hud__plate {
+  min-width: 84px;
+  max-width: 112px;
+  gap: 4px;
+  padding: 2px 5px 2px 2px;
+}
+.unit-hud--rail .unit-hud__crest {
+  width: 16px;
+  height: 19px;
+}
+.unit-hud--rail .unit-hud__name {
+  font-size: 0.6rem;
+}
+
 .unit-hud--enemy .unit-hud__plate {
   background:
     linear-gradient(180deg, rgba(84, 42, 50, 0.96) 0%, rgba(36, 15, 22, 0.97) 46%, rgba(14, 6, 10, 0.98) 100%),

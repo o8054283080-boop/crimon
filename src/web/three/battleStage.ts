@@ -6,8 +6,9 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { ArenaHandles, createArena } from "./arena.js";
-import { moodFor, StageMood } from "./elementTheme.js";
-import { MonsterAvatar } from "./monsterAvatar.js";
+import { BackdropHandles, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
+import { dominantElement, moodFor, StageMood } from "./elementTheme.js";
+import { BattleAvatar, createBattleAvatar } from "./avatarFactory.js";
 import { CinematicPass } from "./postfx/cinematicPass.js";
 import { HitStyle, StatusAuraKind, VfxElement, VfxSystem } from "./vfx.js";
 
@@ -29,10 +30,17 @@ export interface ScreenAnchor {
 }
 
 /**
- * カメラの方位角(度)。負の値でユニットが向いている側へ回り込む。
- * 0にすると自軍が真後ろからしか映らなくなるので、0へ戻さないこと。
+ * カメラの方位角(度)。
+ *
+ * **左右に分かれた配置になったので0にしてある。**
+ * 以前は手前が味方・奥が敵という奥行きの配置で、真正面から見ると
+ * 自軍が真後ろからしか映らなかったため、回り込んで斜めから見ていた。
+ * いま両チームは左右に立ち、どちらも横向きの姿を見せているので、
+ * 回すと**列が斜めに傾いて左右の対称が崩れる**だけになる。
+ *
+ * 手で回す `orbitYaw` はそのまま効く(自分のモンスターを覗き込むため)。
  */
-const CAMERA_AZIMUTH_DEG = -15;
+const CAMERA_AZIMUTH_DEG = 0;
 
 /** 指を横へ画面幅いっぱい滑らせた時に回る角度(ラジアン) */
 const ORBIT_SPEED = Math.PI * 1.1;
@@ -43,75 +51,115 @@ const ORBIT_SPEED = Math.PI * 1.1;
  */
 const ORBIT_LIMIT = THREE.MathUtils.degToRad(100);
 
-const PLAYER_LINE_Z = 3.8;
-const ENEMY_LINE_Z = -5.0;
+/** 演出の中心に使う、盤面のおおよその奥行き */
+const FIELD_DEPTH = 4.0;
 
 /**
  * 画面の縦長さの度合い(0=横長、1=かなり縦長)。
  *
- * 縦画面では、両チームを横一列に広げた構図がまったく合わない。
- * 必要な「幅」でカメラ距離が決まってしまうため、カメラが大きく引き、
- * 余った縦方向が床と壁だけの空白になる(実機の縦持ちで実際にそうなった)。
- *
- * そこで縦長の画面では**隊列そのものを組み直す**。
- * 横を詰めて必要な幅を減らし、前後を広げて余った縦を使う。
+ * 左右に分かれた配置では、必要な幅は「2つの列の間隔」で決まって動かない。
+ * 余るのは常に縦方向なので、**縦長の画面ほど前後の間隔を広げて**
+ * 余った縦を使う。逆に横長の画面では詰める。
  */
 function portraitAmount(aspect: number): number {
   return THREE.MathUtils.clamp((0.8 - aspect) / 0.4, 0, 1);
 }
 
 /**
- * 奥の列を広げる倍率。
+ * 1チームの最大人数。**装備ダンジョンは敵が5体。**
  *
- * 遠くのものは透視投影で中央へ寄るため、両チームを同じ間隔で置くと
- * 奥の列が画面上で詰まり、手前の列の真後ろに隠れてしまう。
- * (カメラ距離 ÷ 奥の列までの距離)のおおよその比で、あらかじめ
- * 奥の列だけ横に広げておき、画面上で同じ間隔に見えるようにする。
+ * 4体しか想定していないと、5体目が画面の外へ出る。
+ * 盤面の大きさは常にこの人数で決めるので、
+ * 4体の戦いでも5体の戦いでもモンスターの大きさが変わらない。
+ * 戦うたびに縮んだり伸びたりすると、格が変わったように見える。
  */
-const ENEMY_SPREAD = 1.24;
+const MAX_TEAM_SIZE = 5;
 
 /**
- * 隊列の並び。
+ * 味方と敵を分ける左右の距離。**味方が左、敵が右。**
  *
- * 望遠寄りのカメラだと前後の列が画面上で重なりやすいので、
- * 奥の列を「手前の列の隙間」に来るよう半歩ずらしたうえで、
- * 上記の ENEMY_SPREAD で遠近による詰まりを打ち消す。
- * さらに端のユニットをわずかに前後させ、直線的な整列を崩して奥行きを出す。
+ * 以前は手前(+Z)が味方・奥(-Z)が敵という奥行きの配置だった。
+ * 3Dモデルなら成立するが、2Dの絵は横向きの姿しか持たないので、
+ * 奥行きで分けると**両チームが同じ方を向いて並ぶ**ことになる。
+ * 左右に分ければ、絵の向きがそのまま「向かい合っている」に読める。
+ *
+ * 画面の左右の端はHPと行動ゲージの札が使うので、**本体はやや内側**に立たせる。
+ * 外へ出すと札と場所を取り合い、モンスターが札の裏へ隠れる(実際に隠れた)。
+ *
+ * 盤面の縦が表示範囲を決めているので、ここを詰めても
+ * モンスターが大きくなることはない。**中央へ寄るだけ。**
+ */
+const LANE_X = 1.55;
+/** 横長の画面で列を離す追加ぶん。横に余るので、その余りを列の間隔に使う */
+const LANE_X_WIDE = 3.1;
+
+/**
+ * 板の半幅の見込み。
+ *
+ * 実際の幅は絵の縦横比で決まる。最大は横長のゴーレム(512×420)で、
+ * 背丈2.45 × 表示倍率0.88 × 縦横比1.22 ÷ 2 = 1.32。少し余裕を足してある。
+ * ここが足りないと、列が画面の端で切れる(実際にゴーレムが切れた)。
+ *
+ * **`spriteAvatar.ts` の `SPRITE_SCALE` と対で決まる。**片方だけ触らない。
+ */
+const SPRITE_HALF_WIDTH = 1.45;
+
+/**
+ * 背景の絵を暗く落とす量。
+ *
+ * **届いた闘技場は床の明るさが0.75あった**(`tools/prepareBackgrounds.mjs` が測る)。
+ * 砂色の石畳の上に彩度の高いデフォルメの絵を置くと、輪郭が埋もれる。
+ * 描き直しを頼むより、載せる側で落とす方が速く、他の絵が届いても効く。
+ */
+const BACKDROP_DIM = 0.24;
+/**
+ * 背景の左右の端と下を落とす量。
+ *
+ * HPと行動ゲージの札が左右の端に乗る。明るい石畳の上に白い文字が来ると読めない。
+ * `docs/battle-background-art.md` では絵の側にも頼んでいるが、
+ * **届いた絵は落ちていなかった。**約束が守られない前提で、載せる側でも落とす。
+ */
+const BACKDROP_EDGE = 0.34;
+
+/**
+ * 画面の上でUIが覆う割合。盤面はここを避けて収める。
+ *
+ * 上は階層名と自動・速度・再生の並び。下はスキルの操作欄。
+ * **手動戦闘での高さで測る。**自動では操作欄が畳まれるが、
+ * 畳まれた高さで組むと、自動へ切り替えた瞬間に盤面が跳ねる。
+ */
+const SAFE_BAND_TOP = 0.09;
+const SAFE_BAND_BOTTOM = 0.17;
+
+/**
+ * 立ち位置。**左右に分かれて縦に並ぶ。**
+ *
+ * 味方は左の列、敵は右の列。列の中は手前(+Z)から奥(-Z)へ順に置く。
+ * カメラは斜め上から見下ろすので、前後の隔たりが画面の上下になる。
+ *
+ * カメラは正投影(遠近なし)なので、奥に立っても小さくならず、
+ * 画面中央へ寄りもしない。**4体が同じ大きさでまっすぐ縦に並ぶ。**
  */
 function slotPositions(
   count: number,
-  lineZ: number,
   team: "PLAYER" | "ENEMY",
-  /** 横の詰め具合。縦長の画面では1未満にして、必要な画角の幅を減らす */
-  lateral = 1,
-  /** 1チームを何段に折るか。縦長の画面では2段にして横幅を半分にする */
-  rows = 1,
-  /** 奥の列を広げる倍率。縦画面では正面寄りに見るので、広げる必要が薄れる */
-  enemySpread = ENEMY_SPREAD,
+  /** 前後の間隔。縦に余裕のある画面では広げる */
+  spacing = 2.25,
+  /** 奥へ行くほど外へ押し出す量。正投影では0でよい(透視投影の名残) */
+  skew = 0,
+  /** 2つの列の間隔。横長の画面では離す */
+  laneX = LANE_X,
 ): { x: number; z: number }[] {
   if (count <= 0) return [];
-  const isEnemy = team === "ENEMY";
-  const perRow = Math.ceil(count / rows);
-  const baseSpacing = (perRow <= 4 ? 2.5 : 2.24) * lateral;
-  const spacing = baseSpacing * (isEnemy ? enemySpread : 1);
-  // 半スロット分ずらして、奥の列が手前の列の隙間に覗くようにする
-  const shift = (isEnemy ? 1 : -1) * (baseSpacing / 4) * (isEnemy ? enemySpread : 1);
-  // 段の間隔。詰めすぎると後ろの段が前の段に隠れる
-  const rowGap = 2.05;
+  const side = team === "PLAYER" ? -1 : 1;
+  const total = (count - 1) * spacing;
 
   return Array.from({ length: count }, (_, i) => {
-    const row = Math.floor(i / perRow);
-    const inRow = i % perRow;
-    const rowCount = Math.min(perRow, count - row * perRow);
-    const totalWidth = (rowCount - 1) * spacing;
-    // 後ろの段は半スロットずらして、前の段の隙間から覗くようにする
-    const rowShift = row % 2 === 1 ? spacing / 2 : 0;
-    const x = -totalWidth / 2 + inRow * spacing + shift + rowShift;
-    // 手前の列は端ほど奥へ、奥の列は端ほど手前へ。ゆるい弧を描かせる
-    const arc = Math.abs(x) * (isEnemy ? 0.09 : -0.1);
-    // 段が増えるぶんは、そのチームが「奥へ」伸びる向きに置く
-    const rowDepth = row * rowGap * (isEnemy ? -1 : 1);
-    return { x, z: lineZ + arc + rowDepth };
+    // 先頭(i=0)が手前。奥へ向かって並ぶ
+    const z = total / 2 - i * spacing;
+    // 奥(zが小さい)ほど外側へ
+    const push = (total / 2 - z) * skew;
+    return { x: side * (laneX + push), z };
   });
 }
 
@@ -135,10 +183,15 @@ const HIT_STYLE_BY_ROLE: Record<string, HitStyle> = {
  * エフェクトの大きさを決める基準の高さ(ワールド単位)。
  * 画面の縦にこの高さが収まっている時、各エフェクトは指定どおりの寸法で描かれる。
  * 実際の画角がこれより狭ければ、その比率でエフェクトも小さくなる。
- * 値はキャラクターの背丈(約2.2)の10倍強で、大きめの演出でも画面の
- * 半分程度に収まるよう選んである。
+ *
+ * **モンスターの大きさと対で決まる。**
+ * ここは「画面の縦」を基準にしているので、UIの帯を避けて表示範囲を広げると
+ * エフェクトだけが勝手に大きくなる。モンスターを0.88へ縮め、
+ * 表示範囲を1.35倍へ広げた時、**守りのドームが本体を丸ごと覆う白い泡**になった。
+ * 装備の速度と敵の速度カーブの時と同じ、片方だけ触った事故。
+ * 表示範囲を変えたら、必ずここも測り直す。
  */
-const VFX_REFERENCE_HEIGHT = 42;
+const VFX_REFERENCE_HEIGHT = 64;
 
 /**
  * パーティクルの密度。1未満にすると粒の数が減る。
@@ -179,13 +232,34 @@ export class BattleStage {
 
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera: THREE.PerspectiveCamera;
+  /**
+   * 見る目。**正投影(遠近なし)。**
+   *
+   * 透視投影では、奥に立つモンスターほど小さく映る。左右2列の隊列だと
+   * 「同じ列なのに1番目と4番目で大きさが違う」ことになり、
+   * 実測で手前のスライムが奥のフェアリーの2.5倍あった。
+   * 望遠に寄せて誤魔化していたが、寄せるほどカメラが遠のいて舞台が窮屈になる。
+   *
+   * 正投影なら**距離が大きさに一切関係しない。**
+   * 4体が同じ大きさで、列がまっすぐ縦に並ぶ。
+   * 2Dの絵を並べる画面には、そもそもこちらが正しい。
+   */
+  private readonly camera: THREE.OrthographicCamera;
   private readonly composer: EffectComposer;
   private readonly bloomPass: UnrealBloomPass;
   private readonly cinematicPass: CinematicPass;
   /** そのバトルの空気(空・霞・石・灯りの色)。敵の顔ぶれから決まる */
   private readonly mood: StageMood;
-  private readonly arena: ArenaHandles;
+  /** 3Dで組んだ闘技場。**1枚絵の舞台がある時は組まない**ので null */
+  private readonly arena: ArenaHandles | null;
+  /**
+   * 1枚絵の舞台。絵がある時だけ作られ、その時は3Dの闘技場を出さない。
+   *
+   * **どちらを出すかは「絵があるかどうか」で決める。**
+   * 旗で切り替える形にすると、絵が1枚も無い状態で旗を立てて
+   * 真っ黒な戦闘画面になる。絵の有無で決めれば、その事故が起きない。
+   */
+  private readonly backdrop: BackdropHandles | null;
   /**
    * 接地影。**モンスターが床に立って見えるかは、ほぼこれで決まる。**
    *
@@ -194,11 +268,11 @@ export class BattleStage {
    * どんな光が来ても必ず床が暗くなるようにしている。
    * (乗算は「掛け算」なので、上に光を足しても比率として残る)
    */
-  private readonly contactShadows: { mesh: THREE.Mesh; avatar: MonsterAvatar }[] = [];
+  private readonly contactShadows: { mesh: THREE.Mesh; avatar: BattleAvatar }[] = [];
   /** 闘技場から焼いた映り込み用の環境マップ。破棄時に手放す */
   private environmentTarget: THREE.WebGLRenderTarget | null = null;
   private readonly vfx = new VfxSystem();
-  private readonly avatars = new Map<string, MonsterAvatar>();
+  private readonly avatars = new Map<string, BattleAvatar>();
   /** エフェクトの出し分けに使う、ユニットごとの属性 */
   private readonly unitElements = new Map<string, VfxElement>();
   /** 当たり方の質感。役割から決める(前衛は斬撃、重量級は打撃、後衛は魔法) */
@@ -225,7 +299,7 @@ export class BattleStage {
   private frameBox: FrameBox = { halfWidth: 5.4, zNear: 4.4, zFar: -4.9, yBottom: -0.1, yTop: 3.3 };
   /** 画面比が変わった時に隊列を組み直すための控え */
   private formation: {
-    avatar: MonsterAvatar;
+    avatar: BattleAvatar;
     light: THREE.PointLight;
     team: "PLAYER" | "ENEMY";
     index: number;
@@ -301,13 +375,17 @@ export class BattleStage {
     container.append(this.renderer.domElement);
 
     const { width, height } = this.measure();
-    this.camera = new THREE.PerspectiveCamera(27, width / height, 1, 340);
+    // 表示範囲は frameCamera が毎回決める。ここは仮の値
+    this.camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 340);
+    void width;
+    void height;
 
     // その戦いの空気を、敵チームで最も多い属性から決める。
     // 空・霞・石・灯り・グレーディングまで一式がここから流れる。
     // (以前は全ステージが同じ紫の室内で、どの戦いも同じ絵に見えていた)
-    this.mood = moodFor(units.filter((u) => u.team === "ENEMY").map((u) => u.def.element as Element));
-    this.arena = createArena(this.mood);
+    const enemyElements = units.filter((u) => u.team === "ENEMY").map((u) => u.def.element as Element);
+    this.mood = moodFor(enemyElements);
+    const stageElement = dominantElement(enemyElements);
 
     // 霧の色は空のシェーダの地平線色(arena.ts の uHaze)と合わせてある。
     // 遠景がそのまま霞へ溶ける。**両方を同時に変えること。**
@@ -317,7 +395,37 @@ export class BattleStage {
     // モンスターは白まず、闘技場だけが奥へ退く。空気遠近が付いて、
     // 観客席と列柱が「遠い」と読めるようになる
     this.scene.fog = new THREE.FogExp2(this.mood.haze.getHex(), this.mood.fogDensity);
-    this.scene.add(this.arena.group);
+
+    /*
+     * 舞台。**1枚絵があればそちらを出し、3Dの闘技場は出さない。**
+     *
+     * 両方出すと、絵の後ろに隠れる列柱や観客席を描き続けることになる。
+     * 見えないものに描画回数を払うのは、この案件でいちばん避けたい形
+     * (実効31.5fpsまで落ちた原因がまさにそれだった)。
+     */
+    const backdropUrl = backdropUrlFor(stageElement);
+    this.backdrop = backdropUrl
+      ? createBackdrop({ url: backdropUrl, dim: BACKDROP_DIM, edge: BACKDROP_EDGE })
+      : null;
+    /*
+     * 3Dの闘技場は**絵が無い時だけ組む。**
+     * 作ってから足さない選択にすると、床のテクスチャを毎回焼き、
+     * 観客席のインスタンスを積んだうえで捨てることになる。
+     */
+    this.arena = this.backdrop ? null : createArena(this.mood);
+    if (this.backdrop) {
+      /*
+       * カメラの子にする。カメラ自身は scene に入っていないので、
+       * **カメラも scene へ足す。**忘れると背景だけが描かれない
+       * (three は scene の木を辿って描くものを集める)。
+       */
+      this.camera.add(this.backdrop.mesh);
+      this.scene.add(this.camera);
+      // 霧は3Dの闘技場を奥へ退かせるための仕掛け。絵にすると全体が霞むだけ
+      this.scene.fog = null;
+    } else if (this.arena) {
+      this.scene.add(this.arena.group);
+    }
     this.scene.add(this.vfx.root);
 
     this.setupLights();
@@ -434,7 +542,7 @@ export class BattleStage {
    * 「足元だけ明るい」状態になっていた。乗算合成なら後から光を足されても
    * 比率として暗さが残るので、必ず接地して見える。
    */
-  private addContactShadow(avatar: MonsterAvatar): void {
+  private addContactShadow(avatar: BattleAvatar): void {
     const proxy = avatar.hitArea as THREE.Mesh;
     const params = (proxy.geometry as THREE.BoxGeometry).parameters;
     // 当たり判定の箱は footprint の 1.15 倍で作られている
@@ -587,11 +695,11 @@ export class BattleStage {
     let maxZ = -Infinity;
     let minZ = Infinity;
 
-    const placed: { avatar: MonsterAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
-    const place = (list: StageUnitInit[], lineZ: number, team: "PLAYER" | "ENEMY") => {
-      const slots = slotPositions(list.length, lineZ, team);
+    const placed: { avatar: BattleAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
+    const place = (list: StageUnitInit[], team: "PLAYER" | "ENEMY") => {
+      const slots = slotPositions(list.length, team);
       list.forEach((unit, index) => {
-        const avatar = new MonsterAvatar({
+        const avatar = createBattleAvatar({
           element: unit.def.element,
           role: unit.def.role,
           templateId: unit.def.templateId,
@@ -625,8 +733,8 @@ export class BattleStage {
       });
     };
 
-    place(players, PLAYER_LINE_Z, "PLAYER");
-    place(enemies, ENEMY_LINE_Z, "ENEMY");
+    place(players, "PLAYER");
+    place(enemies, "ENEMY");
 
     // 配置が確定してから、相手チームの中心へ向け直す。
     // 両チームを同じ向きへ回すと正面がすれ違って互いの脇を見てしまうので、
@@ -663,82 +771,143 @@ export class BattleStage {
    */
   private frameCamera(width: number, height: number): void {
     const aspect = width / height;
-    const portraitFov = portraitAmount(aspect);
-    // 横長ほど望遠に、縦長では収まりを優先して広角にする。
-    // 縦画面で望遠のままだと、必要な幅を稼ぐためにカメラが極端に引き、
-    // モンスターが豆粒になる。多少の遠近の誇張より、大きく映る方が価値がある
-    const fov = THREE.MathUtils.clamp(34 - (aspect - 0.6) * 9 + 9 * portraitFov, 24.5, 45);
-    // 見下ろし角。浅いと前後の列が画面上で潰れて重なるので、
-    // 奥行きが縦方向の距離に変換される程度まで見下ろす。
-    // 縦長の画面ではさらに深くする。余っている縦方向へ前後の列を展開して、
-    // 床と壁だけの空白を埋めるため
     const portrait = portraitAmount(aspect);
-    const pitchMax = 27 + 9 * portrait;
-    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(fov / 2 + 6 + 8 * portrait, 18, pitchMax));
+    /*
+     * 見下ろし角。
+     *
+     * 浅いと前後の列が画面上で潰れて重なり、深いと真上からの見取り図になる。
+     * 正投影では遠近が無いので、この角度が**そのまま盤面の見え方**を決める。
+     * 横長の画面では縦の余地が390pxしかないので深めに、
+     * 縦長の画面では縦に余裕があるので浅めにする。
+     */
+    /*
+     * **正投影では、この角度が奥行きを縦へ変換する唯一の手段。**
+     * 透視投影の頃は距離でも奥行きが読めたが、正投影には遠近が無い。
+     * 浅い(24度)と sin24 = 0.41 しか縦へ変わらず、4体並べても
+     * 画面上でほとんど離れなかった(実際にそうなった)。深く見下ろす。
+     *
+     * 深いぶん、立った板は縮んで見える。これは各アバターに
+     * `setCameraPitch` で同じ角度だけ倒させて打ち消す。
+     */
+    const pitchDeg = 48 - 4 * portrait;
+    const pitch = THREE.MathUtils.degToRad(pitchDeg);
+    /*
+     * 方位角。左右に分かれた配置なので0(正面)。
+     * 回すと列が斜めに傾いて左右の対称が崩れる。手で回す ぶんだけは効かせる。
+     */
+    const azimuth = THREE.MathUtils.degToRad(CAMERA_AZIMUTH_DEG) + this.orbitYaw;
 
-    const tanY = Math.tan(THREE.MathUtils.degToRad(fov / 2));
-    const tanX = tanY * aspect;
-    // 真正面から見ると、敵へ向き直った自軍は常に真後ろからしか映らず、
-    // 顔・角・仮面といった見分けどころが自分のモンスターだけ見えなくなる。
-    // ユニットが向いている側へカメラを回り込ませて、斜め後ろから見る構図にする。
-    // 副次的に、2つの列が画面上で斜めに並ぶ(正対だと前後の列が重なりやすい)
-    //
-    // 手で回した角度もここに含める。回すと2つの列が横並びになって必要な幅が
-    // 変わるので、距離を測り直さないとユニットが画面の外へ押し出される
-    // 斜めから見ると、奥行きの分だけ**横方向にも**場所を取る
-    // (回した軸で見ると、遠くの列が横にはみ出す)。
-    // 縦画面は幅が足りないので、正面寄りに戻して奥行きが幅を食わないようにする
-    const azimuth = THREE.MathUtils.degToRad(CAMERA_AZIMUTH_DEG * (1 - 0.72 * portrait)) + this.orbitYaw;
     const yAxis = new THREE.Vector3(0, 1, 0);
     const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch)).applyAxisAngle(yAxis, azimuth);
     const forward = dir.clone().negate();
     const up = new THREE.Vector3(0, Math.cos(pitch), -Math.sin(pitch)).applyAxisAngle(yAxis, azimuth);
-    // 収まり判定に使う画面横方向。方位角を入れるとワールドXとは一致しなくなる
     const right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
+    /*
+     * 収まりを測る。**正投影は距離で大きさが変わらないので、二分探索が要らない。**
+     * 盤面の箱の8隅を画面の縦横へ投影し、その最大値がそのまま表示範囲になる。
+     * 透視投影の頃はここでカメラ距離を26回の二分探索で求めていた。
+     */
     const box = this.frameBox;
-    const corners: THREE.Vector3[] = [];
+    /*
+     * 注視点は**毎回、盤面の中心から作り直す。**
+     * 前回の値へ足し込むと、画面を回すたびにずれが積み上がる。
+     */
+    const center = this.cameraTarget.set(0, (box.yBottom + box.yTop) / 2, (box.zFar + box.zNear) / 2);
+    /*
+     * 盤面の8隅を画面の縦横へ投影して、映すべき範囲を測る。
+     *
+     * **中心からの片側だけを見ない。** 見下ろすと盤面は画面の上下で
+     * 非対称になるので、片側の最大値で対称に取ると必ず余るか切れる。
+     * 上端と下端を別々に持ち、その中央へカメラを向け直す。
+     */
+    let minRight = Infinity;
+    let maxRight = -Infinity;
+    let minUp = Infinity;
+    let maxUp = -Infinity;
     for (const x of [-box.halfWidth, box.halfWidth]) {
       for (const y of [box.yBottom, box.yTop]) {
-        for (const z of [box.zFar, box.zNear]) corners.push(new THREE.Vector3(x, y, z));
+        for (const z of [box.zFar, box.zNear]) {
+          this.tmpRelative.set(x, y, z).sub(center);
+          const r = this.tmpRelative.dot(right);
+          const u = this.tmpRelative.dot(up);
+          minRight = Math.min(minRight, r);
+          maxRight = Math.max(maxRight, r);
+          minUp = Math.min(minUp, u);
+          maxUp = Math.max(maxUp, u);
+        }
       }
     }
+    // ずれたぶんだけ注視点を動かして、盤面を画面の中央へ置く
+    center.addScaledVector(right, (minRight + maxRight) / 2);
+    center.addScaledVector(up, (minUp + maxUp) / 2);
+    let halfW = (maxRight - minRight) / 2;
+    let halfH = (maxUp - minUp) / 2;
 
-    const padding = 1.04;
-    const camera = new THREE.Vector3();
-    const fits = (distance: number): boolean => {
-      camera.copy(this.cameraTarget).addScaledVector(dir, distance);
-      for (const corner of corners) {
-        this.tmpRelative.copy(corner).sub(camera);
-        const depth = this.tmpRelative.dot(forward);
-        if (depth < 0.5) return false;
-        if (Math.abs(this.tmpRelative.dot(right)) * padding > tanX * depth) return false;
-        if (Math.abs(this.tmpRelative.dot(up)) * padding > tanY * depth) return false;
-      }
-      return true;
-    };
+    // 縁ぎりぎりだと影や光がはみ出して見えるので、少しだけ広げる
+    const padding = 1.06;
+    halfW *= padding;
+    halfH *= padding;
 
-    let low = 4;
-    let high = 120;
-    for (let i = 0; i < 26; i++) {
-      const mid = (low + high) / 2;
-      if (fits(mid)) high = mid;
-      else low = mid;
-    }
+    /*
+     * **UIが覆う帯を避ける。**
+     *
+     * 画面の上には階層名と操作の並び、下にはスキルの操作欄が乗る。
+     * 画面いっぱいに盤面を収めると、いちばん手前と奥の1体が
+     * その下へ潜って見えなくなる(実際に5体の戦いで上下が切れた)。
+     *
+     * 表示範囲を帯のぶんだけ広げてから、盤面を**見える帯の中央へ**寄せる。
+     * 広げるので1体あたりは小さくなるが、5体が確実に見える方を取る。
+     *
+     * 自動戦闘では操作欄が畳まれるが、**畳まれた時の高さで測らない。**
+     * 自動と手動を切り替えるたびに盤面の大きさが跳ねる。
+     */
+    const usable = 1 - SAFE_BAND_TOP - SAFE_BAND_BOTTOM;
+    halfH /= usable;
 
-    this.frameDistance = high;
-    this.cameraBase.copy(this.cameraTarget).addScaledVector(dir, high);
-    this.camera.fov = fov;
-    this.camera.aspect = aspect;
+    // 画面比に合わせて、足りない方を広げる。狭めると盤面が切れる
+    if (halfW / halfH < aspect) halfW = halfH * aspect;
+    else halfH = halfW / aspect;
+
+    /*
+     * 見える帯の中央へ寄せる。
+     *
+     * 注視点は画面の中央に来る点なので、**盤面を上げたい時は注視点を下げる。**
+     * 符号を取り違えると、避けたかった帯へ盤面を押し込むことになる。
+     */
+    const bandCenter = (1 + SAFE_BAND_TOP - SAFE_BAND_BOTTOM) / 2;
+    center.addScaledVector(up, -(0.5 - bandCenter) * 2 * halfH);
+
+    /*
+     * カメラ本体の位置。正投影なので**距離は絵に影響しない**が、
+     * 近すぎると手前の物が near 面で切れる。盤面を必ず内側へ収める距離に置く。
+     */
+    const distance = 40;
+    this.frameDistance = distance;
+    this.cameraBase.copy(center).addScaledVector(dir, distance);
+    this.camera.left = -halfW;
+    this.camera.right = halfW;
+    this.camera.top = halfH;
+    this.camera.bottom = -halfH;
+    this.camera.near = 0.1;
+    this.camera.far = distance * 2 + 80;
     this.camera.updateProjectionMatrix();
     this.camera.position.copy(this.cameraBase);
     this.camera.lookAt(this.cameraTarget);
 
+    // 背景の板を新しい表示範囲へ合わせ直す。**表示範囲を変えたら必ず呼ぶ。**
+    // 忘れると、画面の回転や盤面の組み直しのあとに背景が縮んで縁が見える
+    this.backdrop?.fit(this.camera);
+
+    // 板をカメラの角度へ倒して正対させる。倒さないと縦に潰れて見える
+    for (const avatar of this.avatars.values()) avatar.setCameraPitch(pitch);
+
+    // 画面の縦がワールド何単位ぶん映っているか。正投影ではそのまま表示範囲の高さ
+    const visibleHeight = halfH * 2;
+
     // エフェクトの大きさを、いまの構図に対して相対的に決める。
-    // 画面の縦がワールド何単位ぶん映っているかを求め、その一定割合を
-    // 「大きめのエフェクト1つ分」の基準にする。こうしておくと、
-    // 画角や距離を変えても演出が画面を覆って白飛びすることがない。
-    const visibleHeight = 2 * high * tanY;
+    // 画面の縦がワールド何単位ぶん映っているかを基準にすると、
+    // 表示範囲を変えても演出が画面を覆って白飛びすることがない。
     this.vfxSizeScale = visibleHeight / VFX_REFERENCE_HEIGHT;
     this.vfx.setSizeScale(this.vfxSizeScale);
     // どんな演出でも、1枚の板が画面の高さのこの割合を超えないようにする
@@ -768,33 +937,68 @@ export class BattleStage {
      * 縦が余って見えるのは隊列の広がりが足りないからではなく、
      * 闘技場の客席が上に写り込んでいるため。直すならそちら側。
      */
-    const depth = 1 + 0.1 * portrait;
-    // 縦長の画面では1チームを2段に折る。横一列のままだと、必要な「幅」で
-    // カメラ距離が決まってしまい、モンスターが小さいまま縦が余る
-    const rows = portrait > 0.5 ? 2 : 1;
-    // 縦画面ではカメラを正面寄りに戻すので、遠近による詰まりが小さくなる。
-    // 奥の列を広げる必要が薄れるぶん、必要な幅も削れる
-    const enemySpread = ENEMY_SPREAD - (ENEMY_SPREAD - 1.06) * portrait;
+    /*
+     * 縦に余裕のある画面では前後の間隔を広げる。
+     * 左右に分かれた配置では、**余る方向は常に縦**なので、
+     * 横を詰めて縦へ展開するのが素直になった。
+     */
+    // 縦長の画面ほど前後を広げる。左右に分かれた配置では余るのは常に縦なので、
+    // ここを広げるほど画面が埋まり、モンスターも大きく映る
+    /*
+     * 前後の間隔。**ここがモンスターの大きさを決める。**
+     *
+     * 盤面が縦に長いほど、同じ画面に収めるためカメラの表示範囲が広がり、
+     * 1体あたりは小さく映る。装備ダンジョンの5体を無理なく並べ、
+     * 上下に舞台が見える余裕を残す値にしてある。
+     */
+    const spacing = 3.6 + 2.4 * portrait;
+    /*
+     * 奥へ行くほど外へ押し出す量。**正投影にしたので0。**
+     *
+     * 透視投影では奥のものが画面中央へ寄るため、押し出して打ち消していた。
+     * 正投影にはその寄りが無いので、押し出すと逆に外へ開いてしまう。
+     */
+    const skew = 0;
+    /*
+     * 2つの列の間隔。**縦画面では詰め、横画面では離す。**
+     * 縦画面は横が足りないので詰めて縦へ展開し、
+     * 横画面は横が余るので離して縦の不足を補う。
+     * どちらも「余っている方向へ盤面を伸ばす」という同じ考え方。
+     */
+    const laneX = LANE_X + LANE_X_WIDE * (1 - portrait);
 
     let maxAbsX = 0;
     let maxZ = -Infinity;
     let minZ = Infinity;
-    const placed: { avatar: MonsterAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
+    const placed: { avatar: BattleAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
 
     for (const team of ["PLAYER", "ENEMY"] as const) {
       const members = this.formation.filter((entry) => entry.team === team);
       if (members.length === 0) continue;
-      const lineZ = (team === "PLAYER" ? PLAYER_LINE_Z : ENEMY_LINE_Z) * depth;
-      const slots = slotPositions(members[0].count, lineZ, team, lateral, rows, enemySpread);
+      /*
+       * **人数に関わらず、常に5体ぶんの間隔で並べる。**
+       * 実際の人数で詰めると、4体の戦いと5体の戦いで
+       * モンスターの大きさが変わってしまう。
+       * 中央に寄せて、余った席を前後に空ける。
+       */
+      const slots = slotPositions(MAX_TEAM_SIZE, team, spacing, skew, laneX);
+      const offset = Math.floor((MAX_TEAM_SIZE - members[0].count) / 2);
+      /*
+       * 盤面の広さも**席の全部**から測る。実際に立っている数で測ると、
+       * 4体の戦いだけカメラが寄ってモンスターが大きくなる。
+       * 席が空いていても盤面の広さは変えない。
+       */
+      for (const slot of slots) {
+        maxAbsX = Math.max(maxAbsX, Math.abs(slot.x));
+        maxZ = Math.max(maxZ, slot.z);
+        minZ = Math.min(minZ, slot.z);
+      }
       for (const entry of members) {
-        const slot = slots[entry.index];
+        const slot = slots[entry.index + offset];
         if (!slot) continue;
         entry.avatar.setSlotPosition(slot.x, slot.z);
         entry.light.position.set(slot.x, 1.5, slot.z);
         placed.push({ avatar: entry.avatar, x: slot.x, z: slot.z, team });
-        maxAbsX = Math.max(maxAbsX, Math.abs(slot.x));
-        maxZ = Math.max(maxZ, slot.z);
-        minZ = Math.min(minZ, slot.z);
       }
     }
 
@@ -811,11 +1015,25 @@ export class BattleStage {
     // 収まり判定に足す余白。縦画面では、この余白そのものが
     // カメラを引かせる原因になるので削る(実測で占有率が2倍以上変わる)
     this.frameBox = {
-      halfWidth: maxAbsX + 0.85 - 0.45 * portrait,
-      zNear: maxZ + 1.6 - 0.9 * portrait,
-      zFar: minZ - 1.6 + 0.9 * portrait,
-      yBottom: -0.1,
-      yTop: 2.9 - 0.5 * portrait,
+      // 横は2つの列の外側だけ。左右に分かれた配置では、ここが幅を決める
+      /*
+       * 横。**立ち位置だけでなく、板の幅を足す。**
+       *
+       * 板の幅は絵の縦横比で決まり、横長のゴーレムで半幅1.5ほどある。
+       * 立ち位置だけで枠を決めていたら、左右の列が画面の外へはみ出した。
+       * 左右に分かれた配置では、ここが盤面の大きさを決める。
+       */
+      halfWidth: maxAbsX + SPRITE_HALF_WIDTH - 0.15 * portrait,
+      zNear: maxZ + 1.0 - 0.5 * portrait,
+      /*
+       * 奥側だけ広く取る。**板をカメラの角度へ倒すと、頭が奥へ動く。**
+       * 背丈2.6の板を44度倒せば、頭は奥へ 2.6 × sin44 ≒ 1.8 移動する。
+       * ここを足さないと、一番奥の1体の頭が画面の上で切れる(実際に切れた)。
+       */
+      zFar: minZ - 3.0 + 0.5 * portrait,
+      yBottom: -0.3,
+      // 倒したぶん板は縦に縮む(2.6 × cos44 ≒ 1.9)ので、上は低くてよい
+      yTop: 2.2,
     };
   }
 
@@ -984,7 +1202,7 @@ export class BattleStage {
     }
     this.elapsed += delta;
 
-    this.arena.update(this.elapsed);
+    this.arena?.update(this.elapsed);
     for (const avatar of this.avatars.values()) avatar.update(delta, this.elapsed);
     // 接地影は踏み込み・のけぞりで動く体に追従させる。
     // 追従させないと、動いた瞬間だけ足元から影が離れて浮きが目立つ
@@ -1145,7 +1363,7 @@ export class BattleStage {
     this.desiredLookOffset.set(position.x * 0.2, 0.12, position.z * 0.1);
   }
 
-  getAvatar(instanceId: string): MonsterAvatar | undefined {
+  getAvatar(instanceId: string): BattleAvatar | undefined {
     return this.avatars.get(instanceId);
   }
 
@@ -1166,6 +1384,28 @@ export class BattleStage {
 
   playAttackMotion(actorId: string): void {
     this.avatars.get(actorId)?.playAttack();
+  }
+
+  /**
+   * 勝った側だけを跳ねさせる。
+   *
+   * **倒れているものは跳ねない。** 全滅寸前で勝った時に、
+   * 倒れた仲間まで一緒に跳ねると事故に見える。
+   */
+  playVictoryMotion(team: "PLAYER" | "ENEMY"): void {
+    for (const entry of this.formation) {
+      if (entry.team !== team) continue;
+      if (entry.avatar.isDying()) continue;
+      entry.avatar.playVictory();
+    }
+  }
+
+  /**
+   * 全員の演出を畳んで素立ちへ戻す。
+   * 戦闘が終わって次へ進む時に呼ぶ。**戻し忘れると次の戦闘へ姿勢が残る。**
+   */
+  resetAllMotions(): void {
+    for (const avatar of this.avatars.values()) avatar.resetMotion();
   }
 
   playCastMotion(actorId: string): void {
@@ -1286,7 +1526,7 @@ export class BattleStage {
     if (!avatar) return;
 
     // 衝撃は術者ではなく戦場の中央から広げ、盤面全体が揺れたように見せる
-    const center = this.tmpVector.set(0, 0.12, aoe ? 0 : ENEMY_LINE_Z * 0.6);
+    const center = this.tmpVector.set(0, 0.12, aoe ? 0 : -FIELD_DEPTH * 0.35);
     this.vfx.spawnAoeImpact(center, avatar.theme.vfx, {
       element: this.elementOf(actorId),
       aoe: true,
@@ -1386,7 +1626,8 @@ export class BattleStage {
     this.contactShadows.length = 0;
     for (const avatar of this.avatars.values()) avatar.dispose();
     this.avatars.clear();
-    this.arena.dispose();
+    this.arena?.dispose();
+    this.backdrop?.dispose();
     this.vfx.dispose();
     this.environmentTarget?.dispose();
     this.environmentTarget = null;

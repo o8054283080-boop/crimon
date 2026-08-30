@@ -1,0 +1,70 @@
+/*
+ * このゲームは**縦持ち専用**。
+ *
+ * モンスターを2Dの絵にしたことで、戦闘画面は左右2列の縦長の構図になった。
+ * 横に倒すと、縦に並べた5体を収める高さが無くなり、
+ * 1チームぶんが画面上でほとんど同じ高さに重なる(実際に重なった)。
+ * 縦横どちらでも成立させようとすると、どちらも中途半端になる。
+ *
+ * インストール済みのPWAは manifest の `orientation: "portrait"` で
+ * 縦に固定されるが、**ブラウザで開いた場合は効かない。**
+ * その時は無理に描かず、縦へ戻すよう伝える。
+ *
+ * 全面を覆うが、これは意図した動作。横向きの間は何も操作させない。
+ */
+
+.rotate-notice {
+  display: none;
+}
+
+/*
+ * 横向き、かつ縦の余地が乏しい時だけ出す。
+ * 高さの条件を付けないと、大きな画面の横向き(タブレットやPCの窓)まで
+ * 覆ってしまう。開発中に画面を並べて見ることもできなくなる。
+ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .rotate-notice {
+    position: fixed;
+    z-index: 9000;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    gap: 14px;
+    padding: 24px;
+    text-align: center;
+    background: radial-gradient(ellipse 80% 60% at 50% 40%, #1b1430, #06050c 78%);
+    color: #f0e6d2;
+  }
+
+  .rotate-notice__icon {
+    font-size: 46px;
+    line-height: 1;
+    animation: rotate-notice-turn 2.6s ease-in-out infinite;
+  }
+
+  .rotate-notice__title {
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    color: #ffd98a;
+  }
+
+  .rotate-notice__body {
+    max-width: 24em;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: #cbbfae;
+  }
+}
+
+/* 端末側で「視差効果を減らす」を選んでいる人には回さない */
+@media (prefers-reduced-motion: reduce) {
+  .rotate-notice__icon {
+    animation: none;
+  }
+}
+
+@keyframes rotate-notice-turn {
+  0%, 45% { transform: rotate(0deg); }
+  70%, 100% { transform: rotate(-90deg); }
+}
