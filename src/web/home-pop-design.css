@@ -20,6 +20,7 @@
 }
 
 /* HOMEでは、生成した専用フレームに必要な高さを先に確保する。 */
+html:has(.crimon-home),
 body:has(.crimon-home) {
   --home-header-h: 106px;
   --home-nav-base-h: 82px;
