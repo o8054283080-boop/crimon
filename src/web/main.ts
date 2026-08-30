@@ -74,6 +74,7 @@ import {
   savePlayerState,
   sellEquipment,
   setEquipmentLocked,
+  setMonsterLocked,
   setFighterName,
   toggleDungeonPartyMember,
   toggleTowerPartyMember,
@@ -2679,6 +2680,12 @@ function renderMonstersScreen(): HTMLElement {
     onStartRankUp: () => {
       state.rankUpMode = true;
       state.rankUpSacrificeIds = [];
+      render();
+    },
+    onToggleLock: (monsterId) => {
+      const monster = state.player.monsters.find((entry) => entry.id === monsterId);
+      if (!monster || !setMonsterLocked(state.player, monsterId, !monster.locked)) return;
+      savePlayerState(state.player);
       render();
     },
     onToggleSacrifice: (id) => {

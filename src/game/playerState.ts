@@ -305,6 +305,7 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
     state.backgroundFarmJob.result.earnedEquipmentIds = [];
   }
   for (const monster of state.monsters) {
+    monster.locked = monster.locked === true;
     if (!monster.equipment) monster.equipment = {};
     if (!monster.skillLevels) monster.skillLevels = [1, 1, 1];
     // クリエイト拡張前の個体は「未転生・未振り分け・未覚醒」として安全に補完する。
@@ -429,6 +430,14 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
     state.trialTowerRun = null;
   }
   return state;
+}
+
+/** 所持モンスターの保護状態を更新する。装備ロックと同じく個体へ保存する。 */
+export function setMonsterLocked(state: PlayerState, monsterId: string, locked: boolean): boolean {
+  const monster = state.monsters.find((entry) => entry.id === monsterId);
+  if (!monster) return false;
+  monster.locked = locked;
+  return true;
 }
 
 /**
