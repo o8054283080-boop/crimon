@@ -200,20 +200,28 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const placedCards: { left: number; right: number; top: number; bottom: number }[] = [];
 
   /**
-   * HPと行動ゲージの札を、**画面の左右の端に固定した2列**へ並べる。
+   * HPと行動ゲージの札を、**それぞれの本体の頭の真上**へ置く。
    *
-   * 以前は各モンスターの真上に浮かせていた。4体が固まると札どうしがぶつかり、
-   * 逃がし合った結果「上に積まれた札」と「下にいる本体」の対応が付かなくなる、
-   * という指摘を受けていた。逃がした距離ぶんの引き出し線まで足したが、
-   * 根本の問題は**札が本体と同じ場所を取り合っていること**だった。
+   * ## 画面の端に固定するのをやめた理由
    *
-   * 味方が左・敵が右に立つ配置になったので、札も左右の端へ寄せる。
-   * 縦の位置だけを本体に合わせれば、**列の中の並び順で誰の札かが分かる。**
-   * 本体の上は空くので、モンスターが札に隠れない。
+   * 隊列を片側2列の千鳥にしたら、**端の列が画面の左端まで来た。**
+   * 390pxの画面に4列(味方2・敵2)を並べると、外側の列は x=4〜118 を占める。
+   * 端に置いた札(x=6〜118)とちょうど同じ場所で、
+   * どこへ寄せても札が本体を覆う。**両立できない。**
+   *
+   * 頭の上へ戻す。以前この形をやめたのは、4体が固まった時に札どうしが
+   * ぶつかって対応が付かなくなったからだが、千鳥では
+   * **隣り合う段が横に72pxずれている**ので、そもそも重なりが浅い。
+   *
+   * 上へ逃がすのは、下だと隣の本体の顔に掛かるため。
+   * 上なら掛かるのは足元で、見た目の損が小さい。
    */
-  const HUD_EDGE = 6;
   /** 札の下端と本体の頭のあいだに空ける隙間(px) */
   const HUD_HEAD_GAP = 4;
+  /** 札が画面の端からはみ出さないよう残す余白(px) */
+  const HUD_EDGE = 4;
+  /** 札を列のずれの向きへ余分に寄せる量(px)。列の隔たりは画面上で約68px */
+  const HUD_LANE_SHIFT = 34;
 
   function syncOverlay(): void {
     overlayFrame = requestAnimationFrame(syncOverlay);
@@ -225,6 +233,19 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     // 上から詰めた方が並び順が本体の並びと一致する
     const anchors = stage.computeScreenAnchors().sort((a, b) => a.y - b.y);
 
+    /*
+     * チームごとの立ち位置の平均。**どちらの列にいるかを読むために使う。**
+     *
+     * 千鳥では、札の真上にはひとつ上の段の本体がいる(横に72pxずれた別の列)。
+     * 札を列と反対側へ寄せると、その本体から離れて空いた床の上に乗る。
+     * 隊列の定数を画面側へ持ち込まずに済むよう、立ち位置そのものから読む。
+     */
+    const teamMeanX = new Map<"PLAYER" | "ENEMY", number>();
+    for (const team of ["PLAYER", "ENEMY"] as const) {
+      const own = anchors.filter((a) => (teamOf.get(a.instanceId) ?? "PLAYER") === team);
+      if (own.length > 0) teamMeanX.set(team, own.reduce((sum, a) => sum + a.x, 0) / own.length);
+    }
+
     for (const anchor of anchors) {
       const refs = hudRefs.get(anchor.instanceId);
       if (!refs) continue;
@@ -232,33 +253,43 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       anchorPositions.set(anchor.instanceId, { x: anchor.x, y: anchor.y });
       const scale = Math.max(HUD_MIN_SCALE, anchor.scale);
       const isPlayer = teamOf.get(anchor.instanceId) !== "ENEMY";
-      // 端の列では隣とぶつからないので、札を細くしてよい。
-      // **細くしたぶんだけ真ん中が空き、モンスターが大きく映る**
+      // 隣とぶつからないので、札は細いままでよい。
+      // **細くしたぶんだけ画面が空き、モンスターが大きく映る**
       refs.card.classList.add("unit-hud--rail");
-      /*
-       * 味方は左端から右へ、敵は右端から左へ伸ばす。
-       *
-       * 縦は**本体の頭より上**へ逃がす(`-100%`)。
-       * 頭の高さに合わせて置いていたが、端に寄せてもなお
-       * **本体の左半分に札が重なっていた。**モンスターを2Dの絵にして
-       * 小さくしたぶん本体が端へ近づき、端へ寄せるだけでは足りなくなった。
-       *
-       * 上下の隔たりは1体あたり160px前後あり、本体の背丈は70px前後。
-       * 上へ逃がしても、ひとつ上の本体とはぶつからない。
-       */
-      refs.card.style.transform = `translate(${isPlayer ? "0" : "-100%"}, -100%) scale(${scale.toFixed(3)})`;
-      refs.card.style.transformOrigin = isPlayer ? "left bottom" : "right bottom";
+      // 本体の真上に、中央を合わせて置く
+      refs.card.style.transform = `translate(-50%, -100%) scale(${scale.toFixed(3)})`;
+      refs.card.style.transformOrigin = "center bottom";
       refs.card.style.visibility = anchor.visible ? "visible" : "hidden";
 
       const width = (refs.card.offsetWidth || 104) * scale;
       const height = (refs.card.offsetHeight || 46) * scale;
-      const anchorX = isPlayer ? HUD_EDGE : viewWidth - HUD_EDGE;
-      const left = isPlayer ? anchorX : anchorX - width;
-      const right = left + width;
+      /*
+       * 横は本体の真上。ただし**画面の外へ出さない。**
+       * 外側の列は画面の端まで来るので、そのまま中央を合わせると
+       * 札の左半分が切れて、HPの数字が読めなくなる。
+       */
+      /*
+       * さらに、**自分の列と反対側へ少し寄せる。**
+       * 札の真上にいるのはひとつ上の段の本体で、それは反対の列にいる。
+       * 逆へ寄せれば、札が乗るのは空いた床になる。
+       */
+      const mean = teamMeanX.get(isPlayer ? "PLAYER" : "ENEMY") ?? anchor.x;
+      /*
+       * 列のずれを**そのまま強める向き**へ寄せる。
+       * 外側の列(平均より外)の札はさらに外へ、内側の列の札は中央へ。
+       * 符号を逆にすると2つの列の札が真ん中で重なり、
+       * どちらの本体も覆う(実際に逆にして重なった)。
+       */
+      const outward = anchor.x < mean ? -1 : 1;
+      const anchorX = Math.min(
+        viewWidth - HUD_EDGE - width / 2,
+        Math.max(HUD_EDGE + width / 2, anchor.x + outward * HUD_LANE_SHIFT),
+      );
+      const left = anchorX - width / 2;
+      const right = anchorX + width / 2;
 
       /*
        * 縦は**本体の頭のすぐ上**に置き、ぶつかったぶんだけ下へ送る。
-       * 横は固定なので、同じ列の中でしかぶつからない。
        *
        * `anchor.y` は本体の背丈の88%あたり(頭のあたり)を指す。
        * そこを札の下端にすると、札は頭に触れずに真上へ乗る。
@@ -280,7 +311,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       // transform が `-100%` なので、指定するのは札の**下端**
       refs.card.style.top = `${top + height}px`;
 
-      // 端に並べた札は本体と場所を取り合わないので、引き出し線は要らない
+      // ぶつかって下へ送られた時だけ、本体まで線を引いて対応を示す
       refs.card.classList.remove("unit-hud--lifted");
       refs.leader.style.height = "0px";
     }
