@@ -2,6 +2,7 @@ import "./style.css";
 import "./crimon-visual-system.css";
 import "./mobile-ux.css";
 import "./ui/tutorialBar.css";
+import "./ui/portraitOnly.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
@@ -475,6 +476,24 @@ let persistState: PersistState = "UNSUPPORTED";
 const rootCandidate = document.getElementById("app");
 if (!rootCandidate) throw new Error("#app root element not found");
 const root: HTMLElement = rootCandidate;
+
+/*
+ * 横持ちの案内。**このゲームは縦持ち専用。**
+ *
+ * インストール済みのPWAは manifest で縦に固定されるが、
+ * ブラウザで開いた場合は効かない。その時は無理に描かず、縦へ戻すよう伝える。
+ * 出す・出さないの判定はCSS(`ui/portraitOnly.css`)が持つので、
+ * ここは置くだけ。JSで画面の向きを見張ると、回すたびに描き直しが走る。
+ */
+document.body.append(
+  el("div", { className: "rotate-notice", role: "status" }, [
+    el("div", { className: "rotate-notice__icon", "aria-hidden": "true" }, ["📱"]),
+    el("div", { className: "rotate-notice__title" }, ["縦向きでお楽しみください"]),
+    el("div", { className: "rotate-notice__body" }, [
+      "クリエイトモンスターズは縦持ち専用です。端末を縦に戻すと続きから遊べます。",
+    ]),
+  ]),
+);
 
 let disposeCurrentView: (() => void) | null = null;
 let farmEquipmentScrollTop = 0;

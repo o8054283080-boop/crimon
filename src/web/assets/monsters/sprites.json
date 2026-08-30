@@ -1,4 +1,16 @@
 {
+  "ancient_crystal": {
+    "bodyHue": 0.012,
+    "aspect": 0.773
+  },
+  "ancient_crystal_curse": {
+    "bodyHue": 0.995,
+    "aspect": 0.873
+  },
+  "ancient_demon": {
+    "bodyHue": 0.015,
+    "aspect": 1
+  },
   "dragon": {
     "bodyHue": 0.472,
     "aspect": 1.252
@@ -42,6 +54,10 @@
   "seraph": {
     "bodyHue": 0.072,
     "aspect": 0.938
+  },
+  "skill_pig": {
+    "bodyHue": 0.015,
+    "aspect": 1.018
   },
   "slime": {
     "bodyHue": 0.553,

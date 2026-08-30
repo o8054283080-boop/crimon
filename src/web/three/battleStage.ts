@@ -65,6 +65,16 @@ function portraitAmount(aspect: number): number {
 }
 
 /**
+ * 1チームの最大人数。**装備ダンジョンは敵が5体。**
+ *
+ * 4体しか想定していないと、5体目が画面の外へ出る。
+ * 盤面の大きさは常にこの人数で決めるので、
+ * 4体の戦いでも5体の戦いでもモンスターの大きさが変わらない。
+ * 戦うたびに縮んだり伸びたりすると、格が変わったように見える。
+ */
+const MAX_TEAM_SIZE = 5;
+
+/**
  * 味方と敵を分ける左右の距離。**味方が左、敵が右。**
  *
  * 以前は手前(+Z)が味方・奥(-Z)が敵という奥行きの配置だった。
@@ -73,9 +83,12 @@ function portraitAmount(aspect: number): number {
  * 左右に分ければ、絵の向きがそのまま「向かい合っている」に読める。
  *
  * 画面の左右の端はHPと行動ゲージの札が使うので、**本体はやや内側**に立たせる。
- * 外へ出すと札と場所を取り合い、モンスターが札の裏へ隠れる。
+ * 外へ出すと札と場所を取り合い、モンスターが札の裏へ隠れる(実際に隠れた)。
+ *
+ * 盤面の縦が表示範囲を決めているので、ここを詰めても
+ * モンスターが大きくなることはない。**中央へ寄るだけ。**
  */
-const LANE_X = 1.9;
+const LANE_X = 1.55;
 /** 横長の画面で列を離す追加ぶん。横に余るので、その余りを列の間隔に使う */
 const LANE_X_WIDE = 3.1;
 
@@ -826,7 +839,14 @@ export class BattleStage {
      */
     // 縦長の画面ほど前後を広げる。左右に分かれた配置では余るのは常に縦なので、
     // ここを広げるほど画面が埋まり、モンスターも大きく映る
-    const spacing = 3.1 + 1.6 * portrait;
+    /*
+     * 前後の間隔。**ここがモンスターの大きさを決める。**
+     *
+     * 盤面が縦に長いほど、同じ画面に収めるためカメラの表示範囲が広がり、
+     * 1体あたりは小さく映る。装備ダンジョンの5体を無理なく並べ、
+     * 上下に舞台が見える余裕を残す値にしてある。
+     */
+    const spacing = 3.6 + 2.4 * portrait;
     /*
      * 奥へ行くほど外へ押し出す量。**正投影にしたので0。**
      *
@@ -850,16 +870,30 @@ export class BattleStage {
     for (const team of ["PLAYER", "ENEMY"] as const) {
       const members = this.formation.filter((entry) => entry.team === team);
       if (members.length === 0) continue;
-      const slots = slotPositions(members[0].count, team, spacing, skew, laneX);
+      /*
+       * **人数に関わらず、常に5体ぶんの間隔で並べる。**
+       * 実際の人数で詰めると、4体の戦いと5体の戦いで
+       * モンスターの大きさが変わってしまう。
+       * 中央に寄せて、余った席を前後に空ける。
+       */
+      const slots = slotPositions(MAX_TEAM_SIZE, team, spacing, skew, laneX);
+      const offset = Math.floor((MAX_TEAM_SIZE - members[0].count) / 2);
+      /*
+       * 盤面の広さも**席の全部**から測る。実際に立っている数で測ると、
+       * 4体の戦いだけカメラが寄ってモンスターが大きくなる。
+       * 席が空いていても盤面の広さは変えない。
+       */
+      for (const slot of slots) {
+        maxAbsX = Math.max(maxAbsX, Math.abs(slot.x));
+        maxZ = Math.max(maxZ, slot.z);
+        minZ = Math.min(minZ, slot.z);
+      }
       for (const entry of members) {
-        const slot = slots[entry.index];
+        const slot = slots[entry.index + offset];
         if (!slot) continue;
         entry.avatar.setSlotPosition(slot.x, slot.z);
         entry.light.position.set(slot.x, 1.5, slot.z);
         placed.push({ avatar: entry.avatar, x: slot.x, z: slot.z, team });
-        maxAbsX = Math.max(maxAbsX, Math.abs(slot.x));
-        maxZ = Math.max(maxZ, slot.z);
-        minZ = Math.min(minZ, slot.z);
       }
     }
 

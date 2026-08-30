@@ -66,9 +66,16 @@ export default defineConfig({
         // 新しいworkerを待機させず即時有効化し、開いているページも新workerへ切り替える。
         skipWaiting: true,
         clientsClaim: true,
-        // ogg/json を入れ忘れていたため、効果音がキャッシュの対象外だった
-        // (オフラインでは無音になり、ビルドの版とも紐づかない)
-        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest,ogg,json}"],
+        /*
+         * ogg/json を入れ忘れていたため、効果音がキャッシュの対象外だった
+         * (オフラインでは無音になり、ビルドの版とも紐づかない)。
+         *
+         * **webp も同じ穴が開いていた。** モンスターの2Dの絵も、
+         * ホームの絵札もすべて webp なので、入れないと
+         * オフラインでモンスターが1体も出ない。
+         * 拡張子を増やしたら必ずここへ足すこと。
+         */
+        globPatterns: ["**/*.{js,css,html,png,webp,jpg,svg,webmanifest,ogg,json}"],
         // 効果音が72個あるので、既定の上限(2MiB)だと取りこぼす
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // 古い版のキャッシュを残さない。残ると更新後も旧ファイルを掴み続ける
