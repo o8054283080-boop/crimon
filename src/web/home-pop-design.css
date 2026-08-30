@@ -255,6 +255,21 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   .world-actions--right { right: 12px !important; }
 }
 
+/* 大きな数値が並ぶ報酬行だけは、430px幅でも一行に収める。 */
+@media (min-width: 406px) and (max-width: 480px) {
+  .crimon-home .reward-banner { gap: 4px !important; padding-inline: 5px !important; }
+  .crimon-home .reward-banner .reward-banner__seal { width: 28px !important; height: 28px !important; min-width: 28px !important; font-size: 16px !important; }
+  .crimon-home .reward-banner .reward-banner__body { gap: 3px !important; }
+  .crimon-home .reward-banner .compensation__title,
+  .crimon-home .reward-banner .reward-banner__label { font-size: 9px !important; }
+  .crimon-home .reward-banner .reward-list { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list li { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list .icon { width: 12px !important; height: 12px !important; }
+  .crimon-home .reward-banner .reward-list strong { font-size: 1.08rem !important; }
+  .crimon-home .reward-banner .reward-list span { font-size: .6rem !important; }
+  .crimon-home .reward-banner .reward-banner__close { width: 34px !important; min-width: 34px !important; height: 34px !important; }
+}
+
 @media (max-height: 860px) {
   .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 5px - var(--home-banner-h, 0px)) !important; }
   .world-party { inset: 88px 80px 84px !important; }
