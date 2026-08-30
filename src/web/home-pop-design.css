@@ -70,7 +70,7 @@ body:has(.crimon-home) {
 .crimon-resource-header .home-id { height: 78px !important; gap: 7px !important; }
 .crimon-resource-header .home-id__name strong { font-size: 14px !important; }
 .crimon-resource-header .home-id__name { gap: 1px !important; }
-.crimon-resource-header .home-id__edit { width: 28px !important; min-width: 28px !important; height: 28px !important; min-height: 28px !important; margin: 0 !important; padding: 0 !important; display: grid !important; place-items: center !important; }
+.crimon-resource-header .home-id__edit { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; margin: -8px -6px !important; padding: 0 !important; display: grid !important; place-items: center !important; }
 .crimon-resource-header .home-id__edit svg { width: 14px !important; height: 14px !important; }
 .crimon-resource-header .home-id__level { bottom: -7px !important; }
 .crimon-resource-header .home-id__level strong { font-size: 13px !important; }
