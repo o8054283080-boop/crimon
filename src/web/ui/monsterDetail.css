@@ -40,7 +40,7 @@
 
 .monster-detail-section { padding: 5px 6px; }
 .monster-detail-section h2 { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 4px; font-size: .72rem; color: #dce5ff; }
-.monster-detail-section h2 small { font-size: .56rem; font-weight: 500; color: var(--text-dim); }
+.monster-detail-section h2 small { font-size: .57rem; font-weight: 500; color: var(--text-dim); }
 .monster-detail-skills__grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; }
 .monster-skill-compact { min-width: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: rgba(0,0,0,.2); }
 .monster-skill-compact summary { position: relative; display: flex; flex-direction: column; min-height: 74px; gap: 1px; padding: 4px; overflow: hidden; list-style: none; cursor: pointer; }
@@ -58,8 +58,8 @@
 .monster-detail-equipment .equip-slot-grid { grid-template-columns: repeat(6,minmax(0,1fr)); gap: 3px; }
 .monster-detail-equipment .equip-slot { justify-content: center; min-width: 0; min-height: 42px; padding: 2px 1px; gap: 0; border-radius: 6px; }
 .monster-detail-equipment .equip-slot__head { gap: 2px; }
-.monster-detail-equipment .equip-slot__star { max-width: 100%; overflow: hidden; font-size: .5rem; white-space: nowrap; }
-.monster-detail-equipment .equip-slot__stat, .monster-detail-equipment .equip-slot__set { max-width: 100%; overflow: hidden; font-size: .53rem; text-overflow: ellipsis; white-space: nowrap; }
+.monster-detail-equipment .equip-slot__star { max-width: 100%; overflow: hidden; font-size: .57rem; white-space: nowrap; }
+.monster-detail-equipment .equip-slot__stat, .monster-detail-equipment .equip-slot__set { max-width: 100%; overflow: hidden; font-size: .57rem; text-overflow: ellipsis; white-space: nowrap; }
 .monster-detail-equipment .equip-slot__level { font-size: .58rem; }
 .monster-detail-equipment .equip-slot__plus { font-size: .8rem; }
 .monster-detail-equipment__sets { margin: 3px 0 0; font-size: .57rem; line-height: 1.2; color: #79dba5; }
