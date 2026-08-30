@@ -1,0 +1,199 @@
+/*
+ * HOME visual direction — bright monster fantasy.
+ *
+ * This file is intentionally scoped to .crimon-home and .home-screen.  The
+ * battle view shares the global entry point, so its palette and layout must
+ * not be changed by the HOME redesign.
+ */
+:root {
+  --crimon-home-ink: #18324b;
+  --crimon-home-ink-soft: #557087;
+  --crimon-home-navy: #173b63;
+  --crimon-home-blue: #2f80b8;
+  --crimon-home-sky: #8ed8ef;
+  --crimon-home-mint: #b9e5cb;
+  --crimon-home-leaf: #3e9b6a;
+  --crimon-home-ivory: #fff9eb;
+  --crimon-home-paper: #fffdf6;
+  --crimon-home-line: #d8b56a;
+  --crimon-home-shadow: 0 8px 20px rgba(23, 59, 99, .18);
+}
+
+.home-screen {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, .7), transparent 42%),
+    linear-gradient(180deg, #dff7f4 0%, #bce6e3 52%, #87c3ae 100%);
+}
+
+.crimon-home {
+  color: var(--crimon-home-ink);
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255,255,255,.88) 0 4%, transparent 15%),
+    radial-gradient(circle at 84% 18%, rgba(255,255,255,.68) 0 3%, transparent 16%),
+    linear-gradient(180deg, #dff8f4 0%, #b7e6e5 38%, #8dc9b1 100%);
+}
+
+.crimon-home::before {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.1), transparent 44%, rgba(25,93,78,.14) 100%),
+    radial-gradient(ellipse at 50% 58%, rgba(255,250,218,.48), transparent 42%);
+}
+
+.crimon-resource-header {
+  height: 76px;
+  margin: 0 6px;
+  padding: 5px 8px;
+  border: 1px solid rgba(216,181,106,.9);
+  border-radius: 0 0 16px 16px;
+  background: linear-gradient(135deg, rgba(255,253,246,.98), rgba(240,250,246,.97));
+  box-shadow: var(--crimon-home-shadow), inset 0 -2px 0 rgba(255,255,255,.8);
+}
+
+.crimon-resource-header::before,
+.crimon-resource-header::after {
+  width: 6px;
+  border-color: var(--crimon-home-line);
+  background: linear-gradient(#fff2bd, #d8b56a 52%, #fff4c7);
+  box-shadow: 0 0 8px rgba(216,181,106,.28);
+}
+
+.crimon-resource-header .home-id__crest {
+  border: 2px solid var(--crimon-home-line);
+  background: linear-gradient(145deg, #d9f4ef, #fff9eb);
+  box-shadow: 0 3px 10px rgba(39,93,104,.2), inset 0 0 0 3px rgba(255,255,255,.72);
+}
+
+.crimon-resource-header .home-id__name strong,
+.crimon-resource-header .home-id__level strong {
+  color: var(--crimon-home-navy);
+  text-shadow: none;
+}
+
+.crimon-resource-header .home-id__level { color: var(--crimon-home-blue); }
+.crimon-resource-header .home-id__exp span { color: var(--crimon-home-ink-soft); }
+.crimon-resource-header .home-id__bar { background: #d8ece9; border-color: #a8d5cf; }
+.crimon-resource-header .home-id__bar i { background: linear-gradient(90deg, #45b9bf, #3e9b6a); }
+
+.crimon-resource-header .home-wallet__chip {
+  color: var(--crimon-home-ink);
+  border: 1px solid rgba(104,153,157,.38);
+  border-radius: 9px;
+  background: rgba(255,255,255,.68);
+  box-shadow: inset 0 1px rgba(255,255,255,.9);
+}
+
+.crimon-resource-header .home-wallet__chip svg { color: var(--crimon-home-blue); }
+.crimon-resource-header .home-wallet__chip--crystal svg { color: #e39b43; }
+.crimon-resource-header .home-wallet__chip--stamina svg { color: var(--crimon-home-leaf); }
+
+.home-world {
+  height: calc(100dvh - var(--bottom-nav-h) - 72px - 86px - 48px - 5px - var(--home-banner-h, 0px));
+  min-height: 356px;
+  margin: -1px 0 0;
+  border-inline: 0;
+  background:
+    linear-gradient(180deg, rgba(225,249,247,.62) 0%, rgba(172,225,215,.38) 44%, rgba(53,128,98,.45) 72%, rgba(37,99,79,.75) 100%),
+    url("./assets/home/home-world.svg") center 58% / cover no-repeat;
+  background-blend-mode: screen, normal;
+  box-shadow: inset 0 18px 26px rgba(255,255,255,.28), inset 0 -34px 30px rgba(27,94,75,.38);
+}
+
+.home-world::before {
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(255,255,255,.55), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,.18) 0 45%, transparent 64%, rgba(27,93,71,.18));
+  mix-blend-mode: screen;
+}
+
+.home-world::after {
+  box-shadow: inset 0 16px 20px rgba(255,255,255,.2), inset 0 -32px 30px rgba(31,96,74,.42);
+}
+
+.world-atmosphere__moonbeam { opacity: .18; background: linear-gradient(105deg, transparent 28%, rgba(255,255,255,.5) 50%, transparent 69%); }
+.world-atmosphere__haze { background: radial-gradient(ellipse, rgba(255,255,255,.38), rgba(103,190,159,.18) 40%, transparent 72%); opacity: .58; }
+
+.world-dais::before {
+  border-color: rgba(216,181,106,.72);
+  background: radial-gradient(ellipse, rgba(255,246,190,.65) 0 12%, rgba(101,175,133,.52) 38%, rgba(33,102,83,.72) 72%);
+  box-shadow: 0 18px 25px rgba(30,83,67,.32), inset 0 4px 8px rgba(255,255,255,.48);
+}
+
+.world-dais__sigil {
+  border-color: rgba(216,181,106,.74);
+  background: repeating-conic-gradient(from 10deg, transparent 0 21deg, rgba(255,245,185,.38) 22deg 23deg, transparent 24deg 44deg), radial-gradient(circle, transparent 36%, rgba(255,239,166,.38) 37% 39%, transparent 40% 59%, rgba(255,239,166,.42) 60% 61%, transparent 62%);
+  box-shadow: 0 0 22px rgba(255,226,132,.4), inset 0 0 18px rgba(255,255,255,.32);
+}
+
+.world-dais__rim { border-bottom-color: rgba(59,127,91,.72); box-shadow: 0 12px 16px rgba(26,78,65,.35); }
+
+.world-action {
+  color: var(--crimon-home-navy);
+  text-shadow: 0 1px 2px rgba(255,255,255,.9);
+}
+
+.world-action::before {
+  border-color: rgba(216,181,106,.86);
+  background: radial-gradient(circle at 50% 34%, rgba(255,255,255,.98), rgba(224,246,237,.96) 62%, rgba(144,202,179,.94) 65%);
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,.82), inset 0 0 0 4px rgba(91,156,137,.28), 0 6px 10px rgba(26,83,76,.24);
+}
+
+.world-action strong {
+  border-color: rgba(216,181,106,.9);
+  border-radius: 9px;
+  color: var(--crimon-home-navy);
+  background: rgba(255,253,246,.9);
+  box-shadow: 0 3px 6px rgba(28,85,79,.18);
+}
+
+.world-action small { color: var(--crimon-home-leaf); }
+.world-action--right:first-child::before { border-color: #d8b56a; box-shadow: inset 0 0 0 3px rgba(255,255,255,.8), 0 0 18px rgba(255,214,114,.35), 0 9px 14px rgba(26,83,76,.24); }
+
+.current-party-panel {
+  height: 86px;
+  margin: 0 6px;
+  padding: 7px;
+  border: 1px solid rgba(216,181,106,.92);
+  border-radius: 16px;
+  color: var(--crimon-home-ink);
+  background: linear-gradient(110deg, rgba(255,253,246,.98), rgba(229,247,239,.96) 48%, rgba(255,253,246,.98));
+  box-shadow: var(--crimon-home-shadow), inset 0 0 0 2px rgba(255,255,255,.72);
+}
+
+.current-party-panel::before,
+.current-party-panel::after { color: var(--crimon-home-line); text-shadow: none; }
+.current-party-panel__title strong { color: var(--crimon-home-navy); text-shadow: none; }
+.current-party-panel__title small { color: var(--crimon-home-ink-soft); }
+.current-party-panel__portraits .hp-card { border-color: rgba(102,164,146,.65); border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.56), 0 3px 8px rgba(28,85,79,.18); }
+.current-party-panel__edit { border-color: var(--crimon-home-line); border-radius: 10px; background: var(--crimon-home-ivory); color: var(--crimon-home-navy); box-shadow: 0 2px 6px rgba(28,85,79,.16); }
+
+.crimon-tutorial {
+  margin: 2px 6px 0;
+  border: 1px solid rgba(104,153,157,.55);
+  border-radius: 13px;
+  color: var(--crimon-home-ink);
+  background: rgba(255,253,246,.86);
+  box-shadow: 0 4px 12px rgba(29,94,82,.12), inset 0 1px rgba(255,255,255,.8);
+}
+.crimon-tutorial__head small { color: var(--crimon-home-blue); }
+.crimon-tutorial__count { color: var(--crimon-home-ink-soft); border-color: rgba(104,153,157,.35); }
+.crimon-tutorial__current { background: rgba(226,245,237,.7); border-left-color: var(--crimon-home-leaf); }
+.crimon-tutorial__rewards { color: #bd7b2e !important; }
+
+.crimon-home .reward-banner-stack { margin-inline: 6px; }
+.crimon-home .reward-banner { border-color: rgba(216,181,106,.9) !important; border-radius: 13px !important; color: var(--crimon-home-ink); background: rgba(255,253,246,.94) !important; box-shadow: var(--crimon-home-shadow) !important; }
+.crimon-home .reward-banner .reward-banner__close { color: var(--crimon-home-navy); }
+
+.bottom-nav,
+.crimon-bottom-nav { background: rgba(255,253,246,.97) !important; border-top: 1px solid rgba(216,181,106,.9) !important; box-shadow: 0 -6px 18px rgba(28,85,79,.16) !important; }
+.bottom-nav__btn,
+.crimon-bottom-nav button { color: var(--crimon-home-ink-soft) !important; }
+.bottom-nav__btn--active,
+.bottom-nav button[aria-current="page"] { color: var(--crimon-home-blue) !important; text-shadow: none !important; background: rgba(185,229,203,.42) !important; }
+
+@media (max-height: 860px) {
+  .home-world { height: calc(100dvh - var(--bottom-nav-h) - 72px - 82px - 48px - 5px - var(--home-banner-h, 0px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crimon-home * { animation-duration: .01ms !important; }
+}
