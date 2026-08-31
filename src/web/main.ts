@@ -1,8 +1,10 @@
 import "./style.css";
 import "./crimon-visual-system.css";
+import "./home-pop-design.css";
 import "./mobile-ux.css";
 import "./ui/tutorialBar.css";
 import "./ui/portraitOnly.css";
+import "./ui/monsterList.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
@@ -72,6 +74,7 @@ import {
   savePlayerState,
   sellEquipment,
   setEquipmentLocked,
+  setMonsterLocked,
   setFighterName,
   toggleDungeonPartyMember,
   toggleTowerPartyMember,
@@ -140,10 +143,20 @@ import { PwaUpdateController } from "./pwaUpdate.js";
 import { createFloatingPanel } from "./floatingPanel.js";
 
 let appMounted = false;
+let pwaRegistration: ServiceWorkerRegistration | null = null;
 const pwaUpdate = new PwaUpdateController(
   typeof navigator === "undefined" ? null : navigator.serviceWorker,
   () => { if (appMounted) render(); },
   () => window.location.reload(),
+  {
+    inspectUpdate: () => ({
+      registration: pwaRegistration,
+      controller: navigator.serviceWorker?.controller ?? null,
+      active: pwaRegistration?.active ?? null,
+      waiting: pwaRegistration?.waiting ?? null,
+      installing: pwaRegistration?.installing ?? null,
+    }),
+  },
 );
 
 const updateWorker = registerSW({
@@ -151,6 +164,7 @@ const updateWorker = registerSW({
   onNeedRefresh() { pwaUpdate.announce(); },
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return;
+    pwaRegistration = registration;
     // 起動時点ですでに waiting なら、updatefound の再発火を待たず表示する。
     if (registration.waiting) pwaUpdate.announce();
     const checkForUpdate = () => {
@@ -2588,6 +2602,7 @@ function render(): void {
       el("div", { className: "pwa-update-banner__copy" }, [
         el("strong", {}, ["新しいバージョンがあります"]),
         ...(inBattle ? [el("span", {}, ["戦闘終了後にアップデートできます"])] : []),
+        ...(pwaUpdate.snapshot.failed ? [el("span", {}, ["更新できませんでした。もう一度お試しください"])] : []),
       ]),
       el("button", {
         type: "button",
@@ -2671,6 +2686,12 @@ function renderMonstersScreen(): HTMLElement {
     onStartRankUp: () => {
       state.rankUpMode = true;
       state.rankUpSacrificeIds = [];
+      render();
+    },
+    onToggleLock: (monsterId) => {
+      const monster = state.player.monsters.find((entry) => entry.id === monsterId);
+      if (!monster || !setMonsterLocked(state.player, monsterId, !monster.locked)) return;
+      savePlayerState(state.player);
       render();
     },
     onToggleSacrifice: (id) => {

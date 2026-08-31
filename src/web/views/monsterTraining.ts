@@ -4,6 +4,7 @@ import { STARS, STAR_MAX_LEVEL, Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkMonsterPowerUp, isSameElement, isSameSpecies, monsterPowerUpExp } from "../../game/monsterPowerUp.js";
+import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
 import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
 import { renderPartySlots } from "./partyCard.js";
@@ -21,12 +22,15 @@ export interface MonsterTrainingProps {
 }
 
 export type MaterialUseFilter = "ALL" | "SAME_SPECIES" | "SAME_ELEMENT" | "SELECTED";
+export type MonsterTrainingMaterialSort = Extract<MaterialMonsterSort, "DEFAULT" | "EXP_PIG_FIRST">;
 export interface MonsterTrainingFilter {
   element: Element | "ALL";
   star: Star | "ALL";
   use: MaterialUseFilter;
+  /** 既存状態との互換性のため省略時は通常順として扱う。 */
+  sort?: MonsterTrainingMaterialSort;
 }
-export const EMPTY_MONSTER_TRAINING_FILTER: MonsterTrainingFilter = { element: "ALL", star: "ALL", use: "ALL" };
+export const EMPTY_MONSTER_TRAINING_FILTER: MonsterTrainingFilter = { element: "ALL", star: "ALL", use: "ALL", sort: "DEFAULT" };
 
 /** 素材の選択自体とは独立した表示条件。複数条件はすべてANDで適用する。 */
 export function filterTrainingMaterials(
@@ -35,7 +39,7 @@ export function filterTrainingMaterials(
   selectedIds: readonly string[],
   filter: MonsterTrainingFilter,
 ): MonsterInstance[] {
-  return candidates.filter((candidate) => {
+  const filtered = candidates.filter((candidate) => {
     if (filter.element !== "ALL" && findMonsterById(candidate.dexId)?.element !== filter.element) return false;
     if (filter.star !== "ALL" && candidate.star !== filter.star) return false;
     if (filter.use === "SAME_SPECIES" && !isSameSpecies(target, candidate)) return false;
@@ -43,6 +47,7 @@ export function filterTrainingMaterials(
     if (filter.use === "SELECTED" && !selectedIds.includes(candidate.id)) return false;
     return true;
   });
+  return sortMaterialMonsters(filtered, filter.sort ?? "DEFAULT");
 }
 
 function filterChip(label: string, active: boolean, onclick: () => void, style?: string): HTMLElement {
@@ -132,6 +137,13 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
             ...([["ALL", "すべて"], ["SAME_SPECIES", "同じ種族"], ["SAME_ELEMENT", "同じ属性"], ["SELECTED", "選択中"]] as const).map(([use, label]) => {
               return filterChip(label, props.filter.use === use, () => props.onChangeFilter({ ...props.filter, use }));
             }),
+          ]),
+        ]),
+        el("div", { className: "mfilter__group" }, [
+          el("span", { className: "mfilter__label" }, ["並び順"]),
+          el("div", { className: "mfilter__chips" }, [
+            filterChip("通常", (props.filter.sort ?? "DEFAULT") === "DEFAULT", () => props.onChangeFilter({ ...props.filter, sort: "DEFAULT" })),
+            filterChip("経験豚優先", props.filter.sort === "EXP_PIG_FIRST", () => props.onChangeFilter({ ...props.filter, sort: "EXP_PIG_FIRST" })),
           ]),
         ]),
         el("span", { className: "mfilter__count" }, [shownCandidates.length === candidates.length ? `${candidates.length}体` : `${candidates.length}体中 ${shownCandidates.length}体`]),

@@ -31,6 +31,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-08-30-2d-transition",
+    title: "2D化のお詫び",
+    message: "モンスターグラフィックの2D化に伴うお詫びです。",
+    fromDate: "2026-08-30",
+    // 新規・既存を問わず全ユーザーが1アカウントにつき1度受け取れるよう、終了日は設けない。
+    toDate: "9999-12-31",
+    crystal: 3000,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-08-28-autofarm-summon-freeze",
     title: "不具合のお詫び",
     message: "自動周回中に召喚を行うと操作できなくなる場合があった不具合のお詫びです。",

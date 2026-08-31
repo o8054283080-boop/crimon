@@ -1,0 +1,371 @@
+/*
+ * HOME visual direction — bright sky-island fantasy + navy and gold UI.
+ *
+ * HOMEだけに閉じた上書きにしている。戦闘画面は同じエントリーポイントから
+ * 読み込まれるため、ここから戦闘用の色・レイアウトへは触れない。
+ */
+:root {
+  --home-navy-950: #061326;
+  --home-navy-900: #081b35;
+  --home-navy-800: #0d294b;
+  --home-navy-700: #153d66;
+  --home-gold: #d7b15e;
+  --home-gold-bright: #ffe09a;
+  --home-gold-line: rgba(224, 187, 101, .78);
+  --home-sky-blue: #66c9f1;
+  --home-crystal: #81dcff;
+  --home-text: #f9f5e9;
+  --home-text-muted: #b7c9db;
+  --home-panel-shadow: 0 7px 18px rgba(1, 12, 28, .44);
+}
+
+/* HOMEでは、生成した専用フレームに必要な高さを先に確保する。 */
+html:has(.crimon-home),
+body:has(.crimon-home) {
+  --home-header-h: 106px;
+  --home-nav-base-h: 82px;
+  /* 実機ではノッチ／ホームインジケーターの高さが入る。previewではこの変数を
+   * 一時的に差し替え、safe-area がある状態も検査できるようにする。 */
+  --home-safe-top: env(safe-area-inset-top);
+  --home-safe-bottom: env(safe-area-inset-bottom);
+  --bottom-nav-h: calc(var(--home-nav-base-h) + var(--home-safe-bottom));
+  background: var(--home-navy-950) !important;
+}
+
+.home-screen {
+  background: linear-gradient(180deg, #7fd3f2, #e4f8ff 46%, #75b98f) !important;
+}
+
+.crimon-home {
+  color: var(--home-text) !important;
+  background: linear-gradient(180deg, #75ccec, #e9f8ff 48%, #57896e) !important;
+}
+
+.crimon-home::before {
+  background: linear-gradient(180deg, rgba(255,255,255,.16), transparent 42%, rgba(4,29,41,.18)) !important;
+}
+
+/* 上部は情報を読むための濃紺。外周の金と青い結晶色を細く使い、
+ * 背景世界と競合させずに引き締める。 */
+.crimon-resource-header {
+  height: var(--home-header-h) !important;
+  margin: 0 !important;
+  padding: 13px 14px 10px 11px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--home-text) !important;
+  /* 生成フレームのアイコン左側と数値右側を分け、最大桁のゴールドも収める。 */
+  grid-template-columns: minmax(0, 1fr) 162px !important;
+  gap: 7px !important;
+  background: url("./assets/home/home-resource-frame-v2.webp") center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+}
+
+.crimon-resource-header::before,
+.crimon-resource-header::after {
+  display: none !important;
+}
+
+.crimon-resource-header .home-id__crest {
+  width: 58px !important;
+  height: 58px !important;
+  border: 2px solid rgba(255,226,150,.86) !important;
+  background: radial-gradient(circle at 38% 28%, #2b6a99, var(--home-navy-950) 70%) !important;
+  box-shadow: 0 0 0 3px rgba(75,195,244,.38), 0 4px 10px rgba(0,0,0,.42) !important;
+}
+
+.crimon-resource-header .home-id { height: 78px !important; gap: 7px !important; }
+.crimon-resource-header .home-id__name strong { font-size: 14px !important; }
+.crimon-resource-header .home-id__name { gap: 1px !important; }
+.crimon-resource-header .home-id__edit { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; margin: -8px -6px !important; padding: 0 !important; display: grid !important; place-items: center !important; }
+.crimon-resource-header .home-id__edit svg { width: 14px !important; height: 14px !important; }
+.crimon-resource-header .home-id__level { bottom: -7px !important; }
+.crimon-resource-header .home-id__level strong { font-size: 13px !important; }
+.crimon-resource-header .home-id__exp { margin-top: 7px !important; gap: 5px !important; }
+
+.crimon-resource-header .home-id__name strong,
+.crimon-resource-header .home-id__level strong,
+.crimon-resource-header .home-id__level small {
+  color: var(--home-text) !important;
+  text-shadow: 0 1px 3px #000 !important;
+}
+
+.crimon-resource-header .home-id__edit { color: var(--home-gold-bright) !important; }
+.crimon-resource-header .home-id__exp span { color: var(--home-text-muted) !important; }
+.crimon-resource-header .home-id__bar { height: 7px !important; border: 1px solid #387ca8 !important; background: #061226 !important; box-shadow: inset 0 1px 3px rgba(0,0,0,.6) !important; }
+.crimon-resource-header .home-id__bar i { background: linear-gradient(90deg, #44bfe9, #b4efff 76%, #fff0a4) !important; box-shadow: 0 0 7px rgba(113,223,255,.65) !important; }
+
+.crimon-resource-header .home-wallet__chip {
+  border: 1px solid rgba(218,181,97,.52) !important;
+  border-radius: 6px !important;
+  color: var(--home-text) !important;
+  background: linear-gradient(180deg, rgba(31,76,119,.94), rgba(5,20,42,.96)) !important;
+  box-shadow: inset 0 1px rgba(170,231,255,.22), 0 2px 5px rgba(0,8,20,.38) !important;
+}
+
+.crimon-resource-header .home-wallet { position:relative !important; align-self:center !important; height:62px !important; box-sizing:border-box !important; grid-template-rows:24px 24px !important; gap:2px !important; padding:6px 5px !important; background:#07172d url("./assets/home/home-resource-cluster-v1.webp") center / 100% 100% no-repeat !important; }
+.crimon-resource-header .home-wallet__chip { height:24px !important; min-height:24px !important; min-width:0 !important; padding:1px 3px !important; border:0 !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; display:flex !important; align-items:center !important; line-height:1 !important; }
+.crimon-resource-header .home-wallet__chip strong { min-width:0 !important; overflow:visible !important; font-size:10px !important; line-height:1 !important; font-variant-numeric:tabular-nums !important; text-overflow:clip !important; white-space:nowrap !important; }
+/* 通貨マークは生成フレーム内にある。数値をその右へ固定し、中央寄せで
+ * アイコンへ寄る／長いゴールドがはみ出すことを防ぐ。 */
+.crimon-resource-header .home-wallet__chip--crystal,
+.crimon-resource-header .home-wallet__chip--gold { justify-content:flex-end !important; padding:1px 3px 1px 19px !important; }
+.crimon-resource-header .home-wallet__chip--crystal strong,
+.crimon-resource-header .home-wallet__chip--gold strong { font-size:clamp(7.5px, 2vw, 9.5px) !important; letter-spacing:-.06em !important; text-align:right !important; }
+/* 見える数字は下段の24pxフレームへ置き、ボタン本体だけは44pxを確保する。 */
+.crimon-resource-header .home-wallet__chip--stamina { position:absolute !important; z-index:1 !important; top:20px !important; right:5px !important; left:5px !important; width:auto !important; height:44px !important; min-height:44px !important; box-sizing:border-box !important; align-items:flex-start !important; justify-content:center !important; gap:4px !important; padding:19px 3px 1px !important; }
+
+/* リソース枠の生成素材には各属性の絵が含まれているため、HTMLの同一アイコンは重ねない。 */
+.crimon-resource-header .home-wallet__chip svg { display:none !important; }
+.crimon-resource-header .home-wallet__chip--crystal svg { color: #84dcff !important; }
+.crimon-resource-header .home-wallet__chip--gold svg { color: var(--home-gold-bright) !important; }
+.crimon-resource-header .home-wallet__chip--stamina svg { color: #b8f19e !important; }
+.crimon-resource-header .home-wallet__suffix { color: var(--home-text-muted) !important; }
+
+/* 画像の明るい世界をHOMEの主役にする。上部は空、中央はモンスターの余白、
+ * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。 */
+.home-world {
+  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 23px - var(--home-banner-h, 0px)) !important;
+  min-height: 356px !important;
+  margin: -1px 0 0 !important;
+  border-inline: 0 !important;
+  background: url("./assets/home/home-sky-isles-v2.jpg") center 58% / cover no-repeat !important;
+  box-shadow: inset 0 16px 24px rgba(255,255,255,.22), inset 0 -28px 34px rgba(2,19,39,.22) !important;
+}
+
+.home-world::before {
+  background:
+    linear-gradient(180deg, rgba(4,20,43,.15) 0%, transparent 23%, transparent 65%, rgba(3,19,40,.18) 100%),
+    radial-gradient(ellipse at 50% 64%, rgba(255,255,255,.11), transparent 43%) !important;
+  mix-blend-mode: normal !important;
+}
+
+.home-world::after {
+  box-shadow: inset 0 12px 18px rgba(255,255,255,.16), inset 0 -26px 30px rgba(3,18,37,.26) !important;
+}
+
+/* 旧来の月光・紫の靄は消し、空気感は背景画像に任せる。 */
+.world-atmosphere__moonbeam { display: none !important; }
+.world-atmosphere__haze { background: radial-gradient(ellipse, rgba(255,255,255,.32), transparent 70%) !important; opacity: .22 !important; }
+
+/* ステージは背景画像へ一本化する。二重の魔法陣・黒い尖塔は残さない。 */
+.world-dais,
+.world-foreground { display: none !important; }
+
+/* 中央のモンスターは背景の白い余白とテラスの境目へ置く。各PNGの比率は変更しない。 */
+.world-party { z-index: 5 !important; inset: 92px 86px 82px !important; pointer-events: none !important; }
+.world-party__figure { width: 112px !important; height: 160px !important; pointer-events: none !important; }
+.world-party__figure::after { height: 22px !important; bottom: -4px !important; background: rgba(3,28,48,.56) !important; box-shadow: 0 0 13px 4px rgba(82,205,255,.32) !important; }
+.world-party__figure .hp-card__art { inset: -8px -18px -12px !important; filter: drop-shadow(0 10px 7px rgba(0,22,38,.42)) drop-shadow(0 0 7px rgba(117,220,255,.30)) !important; }
+.world-party__figure--1 { bottom: 8px !important; transform: translateX(-50%) scale(1) !important; }
+.world-party__figure--2 { left: -8px !important; bottom: 43px !important; transform: scale(.63) !important; }
+.world-party__figure--3 { bottom: 76px !important; transform: translateX(-50%) scale(.53) !important; filter: saturate(.88) brightness(.9) !important; }
+.world-party__figure--4 { right: -8px !important; bottom: 43px !important; transform: scale(.63) !important; }
+
+/* 既存の左右導線は維持し、世界の上に濃紺と金の独自メニューとして載せる。 */
+.world-action { color: var(--home-text) !important; text-shadow: 0 1px 3px #000 !important; }
+.world-action::before { border-color: var(--home-gold) !important; background: radial-gradient(circle at 50% 35%, #1d527f, #0b2749 62%, #041328 65%) !important; box-shadow: inset 0 0 0 3px #06182f, inset 0 0 0 4px rgba(117,216,255,.46), 0 6px 11px rgba(0,19,35,.38) !important; }
+.world-action img { filter: drop-shadow(0 2px 2px #000) drop-shadow(0 0 4px rgba(147,225,255,.55)) !important; }
+.world-action strong { border-color: rgba(224,187,101,.82) !important; border-radius: 4px !important; color: var(--home-text) !important; background: linear-gradient(180deg, rgba(15,45,79,.97), rgba(4,18,38,.98)) !important; box-shadow: 0 3px 6px rgba(0,17,34,.42), inset 0 1px rgba(145,224,255,.12) !important; }
+.world-action small { color: var(--home-gold-bright) !important; }
+.world-action--right:first-child::before { border-color: var(--home-gold-bright) !important; box-shadow: inset 0 0 0 3px #06182f, inset 0 0 0 4px rgba(117,216,255,.55), 0 0 18px rgba(240,202,109,.42), 0 9px 14px rgba(0,19,35,.38) !important; }
+.world-actions--right { right: 10px !important; }
+
+/* CURRENT PARTY は明るい背景を受け止める濃紺の情報パネル。 */
+.current-party-panel {
+  height: 86px !important;
+  margin: 0 6px 6px !important;
+  padding: 7px !important;
+  border: 1px solid var(--home-gold-line) !important;
+  border-radius: 8px !important;
+  color: var(--home-text) !important;
+  background:
+    radial-gradient(ellipse at 50% -28%, rgba(102,213,255,.20), transparent 58%),
+    linear-gradient(110deg, #061a34, #103c68 50%, #061a34) !important;
+  box-shadow: 0 7px 15px rgba(1,12,28,.42), inset 0 0 0 2px rgba(82,195,244,.14), inset 0 1px rgba(255,244,201,.28), 0 0 0 1px rgba(3,12,28,.35) !important;
+}
+
+.current-party-panel::before,
+.current-party-panel::after { color: var(--home-gold-bright) !important; text-shadow: 0 0 7px rgba(83,206,255,.72) !important; }
+.current-party-panel__title strong { color: var(--home-gold-bright) !important; text-shadow: none !important; }
+.current-party-panel__title small { color: var(--home-text-muted) !important; }
+.current-party-panel__portraits .hp-card { border-color: rgba(221,181,95,.72) !important; border-radius: 4px !important; background: #07172d !important; box-shadow: inset 0 0 0 1px rgba(133,219,255,.22), 0 3px 8px rgba(0,9,24,.38) !important; }
+.current-party-panel__edit { border-color: var(--home-gold) !important; border-radius: 5px !important; color: var(--home-gold-bright) !important; background: linear-gradient(180deg, #174570, #071b36) !important; box-shadow: inset 0 1px rgba(165,228,255,.22), 0 2px 6px rgba(0,8,22,.38) !important; }
+
+/* 初心者ミッションは白いカードに戻さず、情報の優先度を濃紺＋金で整理する。 */
+.crimon-tutorial {
+  margin: 2px 6px 0 !important;
+  border: 1px solid var(--home-gold-line) !important;
+  border-radius: 7px !important;
+  color: var(--home-text) !important;
+  background: linear-gradient(100deg, rgba(5,18,38,.98), rgba(12,39,70,.98) 50%, rgba(5,18,38,.98)) !important;
+  box-shadow: 0 4px 12px rgba(0,13,31,.40), inset 0 1px rgba(133,219,255,.16) !important;
+}
+.crimon-tutorial__head::before { color: var(--home-gold-bright) !important; text-shadow: 0 0 8px rgba(86,208,255,.58) !important; }
+.crimon-tutorial__head small { color: var(--home-gold-bright) !important; }
+.crimon-tutorial__head strong { color: var(--home-text) !important; }
+.crimon-tutorial__count { color: var(--home-text-muted) !important; border-color: rgba(224,187,101,.42) !important; }
+.crimon-tutorial__current { color: var(--home-text) !important; background: rgba(2,14,31,.66) !important; border-left-color: var(--home-crystal) !important; }
+.crimon-tutorial__current p { color: var(--home-text-muted) !important; }
+.crimon-tutorial__rewards { color: var(--home-gold-bright) !important; }
+
+.crimon-home .reward-banner-stack { margin-inline: 6px !important; }
+.crimon-home .reward-banner { border-color: var(--home-gold-line) !important; border-radius: 7px !important; color: var(--home-text) !important; background: linear-gradient(90deg, #071a34, #123d67, #071a34) !important; box-shadow: var(--home-panel-shadow) !important; }
+.crimon-home .reward-banner .reward-banner__close { color: var(--home-gold-bright) !important; }
+/* 外側の「お詫びの配布」で意味は足りるため、同じ内容の内側タイトルは畳む。 */
+.crimon-home .reward-banner .compensation__title { display: none !important; }
+
+/* HOMEにいる時だけ下部ナビを濃紺＋金にする。他画面の導線へは影響させない。 */
+body:has(.crimon-home) .bottom-nav,
+body:has(.crimon-home) .crimon-bottom-nav {
+  height: var(--bottom-nav-h) !important;
+  box-sizing: border-box !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: url("./assets/home/home-bottom-nav-frame-v5.webp") center / 100% 100% no-repeat !important;
+  box-shadow: 0 -5px 17px rgba(1, 12, 29, .36) !important;
+}
+
+body:has(.crimon-home) .bottom-nav::before,
+body:has(.crimon-home) .bottom-nav::after { display: none !important; }
+
+body:has(.crimon-home) .bottom-nav__btn,
+body:has(.crimon-home) .crimon-bottom-nav button {
+  position: relative !important;
+  display: flex !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 1 !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: #d2e0ec !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body:has(.crimon-home) .bottom-nav__btn + .bottom-nav__btn,
+body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 0 !important; }
+
+body:has(.crimon-home) .bottom-nav__icon {
+  /* 画像側の大きなシンボルを使う。HTMLアイコンは二重表示しない。 */
+  display: none !important;
+}
+
+body:has(.crimon-home) .bottom-nav__label {
+  position: absolute !important;
+  right: 2px !important;
+  bottom: calc(7px + var(--home-safe-bottom)) !important;
+  left: 2px !important;
+  display: block !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  font-size: .63rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: .01em !important;
+  text-align: center !important;
+  text-shadow: 0 1px 3px #000, 0 0 5px #000 !important;
+}
+
+body:has(.crimon-home) .bottom-nav__btn--active,
+body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
+  color: var(--home-gold-bright) !important;
+  text-shadow: 0 0 9px rgba(105,215,255,.65) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !important; }
+
+/* ミッション達成後は tutorial を表示しない。その時だけ HOME 自体を
+ * 「ヘッダー → 世界 → 現在のパーティ」の固定レーンにし、iPhone の
+ * safe-area と固定ナビの間へ編成パネルを必ず収める。 */
+.crimon-home:has(.crimon-tutorial__complete) {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  padding: max(12px, var(--home-safe-top)) 0 var(--bottom-nav-h) !important;
+  overflow: hidden !important;
+}
+
+.crimon-home:has(.crimon-tutorial__complete) .crimon-resource-header,
+.crimon-home:has(.crimon-tutorial__complete) .reward-banner-stack,
+.crimon-home:has(.crimon-tutorial__complete) .current-party-panel {
+  flex: 0 0 auto !important;
+}
+
+.crimon-home:has(.crimon-tutorial__complete) .home-world {
+  height: auto !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.crimon-home:has(.crimon-tutorial__complete) .current-party-panel {
+  margin: 0 6px 7px !important;
+}
+
+@media (max-width: 405px) {
+  body:has(.crimon-home) { --home-header-h: 100px; --home-nav-base-h: 78px; }
+  .crimon-resource-header { grid-template-columns: minmax(0, 1fr) 154px !important; }
+  /* 390px幅でも、お詫び／ミッションの獲得数を切らずに読める密度にする。 */
+  .crimon-home .reward-banner { gap: 4px !important; padding-inline: 5px !important; }
+  .crimon-home .reward-banner .reward-banner__seal { width: 28px !important; height: 28px !important; min-width: 28px !important; font-size: 16px !important; }
+  .crimon-home .reward-banner .reward-banner__body { gap: 3px !important; }
+  .crimon-home .reward-banner .compensation__title,
+  .crimon-home .reward-banner .reward-banner__label { font-size: 9px !important; }
+  .crimon-home .reward-banner .reward-list { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list li { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list .icon { width: 12px !important; height: 12px !important; }
+  .crimon-home .reward-banner .reward-list strong { font-size: 1.08rem !important; }
+  .crimon-home .reward-banner .reward-list span { font-size: .6rem !important; }
+  .crimon-home .reward-banner .reward-banner__close { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
+  .world-party { inset-inline: 78px !important; }
+  .world-party__figure { width: 106px !important; height: 152px !important; }
+  .world-action--right { transform-origin: top right !important; }
+}
+
+@media (min-width: 410px) {
+  .world-actions--right { right: 12px !important; }
+}
+
+/* 大きな数値が並ぶ報酬行だけは、430px幅でも一行に収める。 */
+@media (min-width: 406px) and (max-width: 480px) {
+  .crimon-home .reward-banner { gap: 4px !important; padding-inline: 5px !important; }
+  .crimon-home .reward-banner .reward-banner__seal { width: 28px !important; height: 28px !important; min-width: 28px !important; font-size: 16px !important; }
+  .crimon-home .reward-banner .reward-banner__body { gap: 3px !important; }
+  .crimon-home .reward-banner .compensation__title,
+  .crimon-home .reward-banner .reward-banner__label { font-size: 9px !important; }
+  .crimon-home .reward-banner .reward-list { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list li { gap: 2px !important; }
+  .crimon-home .reward-banner .reward-list .icon { width: 12px !important; height: 12px !important; }
+  .crimon-home .reward-banner .reward-list strong { font-size: 1.08rem !important; }
+  .crimon-home .reward-banner .reward-list span { font-size: .6rem !important; }
+  .crimon-home .reward-banner .reward-banner__close { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
+}
+
+@media (max-height: 860px) {
+  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 23px - var(--home-banner-h, 0px)) !important; }
+  .world-party { inset: 88px 80px 84px !important; }
+  .world-party__figure { width: 104px !important; height: 148px !important; }
+  .world-party__figure--1 { bottom: 6px !important; }
+  .world-party__figure--2,
+  .world-party__figure--4 { bottom: 37px !important; }
+  .world-party__figure--3 { bottom: 64px !important; }
+}
+
+@media (max-height: 860px) {
+  .crimon-home:has(.crimon-tutorial__complete) .home-world { height: auto !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crimon-home * { animation-duration: .01ms !important; }
+}
