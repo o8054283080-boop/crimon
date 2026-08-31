@@ -108,7 +108,8 @@ body:has(.crimon-home) {
 /* 見える数字は下段の24pxフレームへ置き、ボタン本体だけは44pxを確保する。 */
 .crimon-resource-header .home-wallet__chip--stamina { position:absolute !important; z-index:1 !important; top:20px !important; right:5px !important; left:5px !important; width:auto !important; height:44px !important; min-height:44px !important; box-sizing:border-box !important; align-items:flex-start !important; justify-content:center !important; gap:4px !important; padding:19px 3px 1px !important; }
 
-.crimon-resource-header .home-wallet__chip svg { color: var(--home-crystal) !important; }
+/* リソース枠の生成素材には各属性の絵が含まれているため、HTMLの同一アイコンは重ねない。 */
+.crimon-resource-header .home-wallet__chip svg { display:none !important; }
 .crimon-resource-header .home-wallet__chip--crystal svg { color: #84dcff !important; }
 .crimon-resource-header .home-wallet__chip--gold svg { color: var(--home-gold-bright) !important; }
 .crimon-resource-header .home-wallet__chip--stamina svg { color: #b8f19e !important; }
