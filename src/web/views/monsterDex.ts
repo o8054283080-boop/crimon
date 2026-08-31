@@ -1,6 +1,6 @@
 import { ELEMENT_JA } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
-import { describeSkillEffect } from "../../core/skill.js";
+import { describeSkillLines } from "../../core/skill.js";
 import { formatExtraStatLines } from "../../core/stats.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../../data/monsters.js";
@@ -56,7 +56,7 @@ function renderSkills(dex: MonsterDefinition): HTMLElement {
         el("span", {}, [skill.cooldownTurns ? `CT${skill.cooldownTurns}` : "通常"]),
       ]),
       el("p", {}, [skill.description || "説明未登録"]),
-      el("small", {}, [skill.effects.length ? skill.effects.map(describeSkillEffect).join(" / ") : "効果データなし"]),
+      el("small", {}, [describeSkillLines(skill).join(" / ") || "効果データなし"]),
     ])),
   ]);
 }

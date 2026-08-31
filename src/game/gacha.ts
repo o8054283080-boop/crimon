@@ -2,11 +2,9 @@ import { Element } from "../core/element.js";
 import { Star } from "../core/rarity.js";
 import { addMonster, PlayerState } from "./playerState.js";
 import {
-  GACHA_SR_COMMON_TEMPLATE,
-  GACHA_SR_RARE_TEMPLATE,
-  GACHA_SSR_COMMON_TEMPLATE,
-  GACHA_SSR_RARE_TEMPLATE,
-  MONSTER_TEMPLATES,
+  GACHA_STAR3_TEMPLATES,
+  GACHA_STAR4_TEMPLATES,
+  GACHA_STAR5_TEMPLATES,
 } from "../data/monsters.js";
 
 export const RARE_ELEMENTS: Element[] = ["LIGHT", "DARK"];
@@ -69,15 +67,13 @@ function resolveDexId(tier: GachaTier, rng: () => number): string {
   const elements = tier.isRare ? RARE_ELEMENTS : NORMAL_ELEMENTS;
   const element = pick(elements, rng);
 
-  if (tier.star === 3) {
-    const template = pick(MONSTER_TEMPLATES, rng);
-    return `${template.templateId}_${element}`;
-  }
-  if (tier.star === 4) {
-    const template = pick([GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE], rng);
-    return `${template.templateId}_${element}`;
-  }
-  const template = pick([GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE], rng);
+  /*
+   * **星ごとの排出比率(GACHA_TABLE)は一切触っていない。** ここで変わるのは
+   * 「その星を引いた時に、どの種族が出るか」だけ。星3/4/5の合計確率は
+   * 追加前と同じままで、種族の顔ぶれだけが増える。
+   */
+  const pool = tier.star === 3 ? GACHA_STAR3_TEMPLATES : tier.star === 4 ? GACHA_STAR4_TEMPLATES : GACHA_STAR5_TEMPLATES;
+  const template = pick(pool, rng);
   return `${template.templateId}_${element}`;
 }
 

@@ -62,11 +62,21 @@ export function checkMonsterCreate(
   return { ok: true };
 }
 
-/** 素材が提供できるスキル(枠と中身)。UIの選択肢に使う */
+/**
+ * 素材が提供できるスキル(枠と中身)。UIの選択肢に使う。
+ *
+ * **パッシブは移し元に出さない。** 常時効いている効果や、決まった出来事で
+ * 自動発動する効果は、別の種族へ持って行くと前提ごと崩れる
+ * (「敵が毒ダメージを受けるたび」を毒を1つも持たない編成へ渡しても
+ * 何も起きない枠になるだけ)。
+ *
+ * 逆向きは許す。**パッシブが入っている枠へ、別の継承できるスキルを移すのは可能。**
+ * こちらは枠の中身が置き換わるだけなので、`applyMonsterCreate` は何も禁じない。
+ */
 export function creatableSkills(material: MonsterInstance): { slot: CreateSlot; skill: Skill }[] {
   const dex = findMonsterById(material.dexId);
   if (!dex) return [];
-  return CREATE_SLOTS.map((slot) => ({ slot, skill: dex.skills[slot] }));
+  return CREATE_SLOTS.map((slot) => ({ slot, skill: dex.skills[slot] })).filter(({ skill }) => !skill.passive);
 }
 
 /** いま対象に入っているスキル(移し替え済みなら、その中身) */
@@ -108,6 +118,7 @@ export function applyMonsterCreate(
   const materialDex = findMonsterById(material.dexId);
   const skill = materialDex?.skills[slot];
   if (!skill) return { ok: false, reason: "素材のスキルが見つかりません" };
+  if (skill.passive) return { ok: false, reason: "パッシブスキルは移し替えの元にできません" };
 
   const targetDex = findMonsterById(target.dexId);
   if (targetDex && targetDex.skills[slot].id === skill.id && !target.createdSkill) {

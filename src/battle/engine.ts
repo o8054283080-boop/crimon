@@ -112,8 +112,8 @@ const GAUGE_EPSILON = 1e-6;
 function isSourceScopedEffect(effect: SkillEffect): boolean {
   switch (effect.kind) {
     case "HEAL": case "BUFF": case "STATUS": case "GAUGE": case "SHIELD":
-    case "REGEN": case "MITIGATE": case "CLEANSE": case "COOLDOWN_REDUCE":
-      return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
+    case "REGEN": case "MITIGATE": case "CLEANSE": case "COOLDOWN_REDUCE": case "GAUGE_ON_HIT":
+      return effect.applyTo !== undefined;
     // 協力攻撃・反撃態勢は術者そのものに1度だけかかる
     case "COOP_ATTACK": case "COUNTER_STANCE":
       return true;

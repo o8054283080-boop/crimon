@@ -1,6 +1,7 @@
 import { MonsterTemplate, createAllVariants } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
 import { setCreatedSkillResolver } from "../core/monsterInstance.js";
+import { NEW_MONSTER_TEMPLATES, NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES } from "./newMonsters/index.js";
 
 const SLIME: MonsterTemplate = {
   templateId: "slime",
@@ -1744,7 +1745,24 @@ export const ALL_MONSTER_TEMPLATES: MonsterTemplate[] = [
   ANCIENT_DEMON,
   ANCIENT_CRYSTAL,
   ANCIENT_CRYSTAL_CURSE,
+  ...NEW_MONSTER_TEMPLATES,
 ];
+
+/*
+ * 召喚の抽選プール。
+ *
+ * **`MONSTER_TEMPLATES` そのものは増やしていない。** あちらはステージの敵構成・
+ * レベル上げダンジョンの階割り・装備ダンジョンのお供・ショップの品揃えの
+ * 土台になっていて、要素を1つ足すだけで**既存コンテンツの中身が全部ずれる。**
+ * 召喚に出したいだけなら、召喚のプールを別に持つ方が安全。
+ */
+
+/** 星3の抽選対象。既存8種 + 今回の3種 */
+export const GACHA_STAR3_TEMPLATES: MonsterTemplate[] = [...MONSTER_TEMPLATES, ...NEW_STAR3_TEMPLATES];
+/** 星4の抽選対象。既存2種 + 今回の4種 */
+export const GACHA_STAR4_TEMPLATES: MonsterTemplate[] = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, ...NEW_STAR4_TEMPLATES];
+/** 星5の抽選対象。既存2種 + 今回の4種 */
+export const GACHA_STAR5_TEMPLATES: MonsterTemplate[] = [GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE, ...NEW_STAR5_TEMPLATES];
 
 export const GACHA_SR_COMMON_DEX = createAllVariants(GRIFFON);
 export const GACHA_SSR_COMMON_DEX = createAllVariants(DRAGON);
@@ -1886,10 +1904,14 @@ export const GACHA_EXCLUSIVE_DEX = [
   ...GACHA_SSR_RARE_DEX,
 ];
 
+/** 今回追加した11種の全6属性(66体)。図鑑にも召喚にも通常のモンスターとして出る */
+export const NEW_MONSTERS_DEX = NEW_MONSTER_TEMPLATES.flatMap((template) => createAllVariants(template));
+
 /** 検索用の全モンスター図鑑(通常モンスター + ガチャ限定高レア + 転生ピッグ + 経験ピッグ + 装備ダンジョン専用ボス/お供) */
 export const MONSTER_DEX = [
   ...MONSTER_TEMPLATES_DEX,
   ...GACHA_EXCLUSIVE_DEX,
+  ...NEW_MONSTERS_DEX,
   ...REINCARNATION_PIG_DEX,
   ...EXP_PIG_DEX,
   ...SKILL_PIG_DEX,
@@ -1899,7 +1921,7 @@ export const MONSTER_DEX = [
 ];
 
 /** モンスター図鑑UI表示用(転生ピッグは素材専用のため除外) */
-export const ALL_DISPLAYABLE_MONSTERS_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX];
+export const ALL_DISPLAYABLE_MONSTERS_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...NEW_MONSTERS_DEX];
 
 export function findMonster(templateId: string, element: string) {
   return MONSTER_DEX.find((m) => m.templateId === templateId && m.element === element);

@@ -4,8 +4,8 @@ import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../src/data/monsters.js";
 const rarity = (templateId: string) => ["griffon", "seraph"].includes(templateId) ? 4 : ["dragon", "nemesis"].includes(templateId) ? 5 : 3;
 
 describe("⑧-2 クリティカル最終平準化", () => {
-  it("全プレイヤー72体が属性補正後もCR15～23%、CD150～170%に入る", () => {
-    expect(ALL_DISPLAYABLE_MONSTERS_DEX).toHaveLength(72);
+  it("図鑑の全個体が属性補正後もCR15～23%、CD150～170%に入る", () => {
+    expect(ALL_DISPLAYABLE_MONSTERS_DEX.length).toBeGreaterThanOrEqual(72);
     for (const monster of ALL_DISPLAYABLE_MONSTERS_DEX) {
       expect(monster.stats.criRate, monster.id).toBeGreaterThanOrEqual(.15);
       expect(monster.stats.criRate, monster.id).toBeLessThanOrEqual(.23);
