@@ -31,23 +31,16 @@ const SCREENS = new Set<ScreenName>([
   "AUTO_FARM_RESULT", "ARENA", "ARENA_BATTLE", "TRIAL_TOWER", "TOWER_BATTLE", "HOW_TO_PLAY",
 ]);
 
-/** 戦闘エンジンを復元せず、保存済みのゲーム進行から再開できる安全な親画面へ戻す。 */
-export function safeRestoredScreen(screen: ScreenName): ScreenName {
-  switch (screen) {
-    // パーティ編成は終了直前の一時的な編集画面なので、アプリを完全終了して
-    // 次回起動した時まで居残らせない。バックグラウンド復帰では再読込されないため
-    // この分岐はタスキル／再起動時だけ効く。
-    case "PARTY": return "HOME";
-    case "BATTLE": return "STAGES";
-    case "DUNGEON_BATTLE": return "EQUIP_DUNGEON";
-    case "LEVEL_DUNGEON_BATTLE": return "LEVEL_DUNGEON";
-    case "GOLD_DUNGEON_BATTLE": return "GOLD_DUNGEON";
-    case "ARENA_BATTLE": return "ARENA";
-    case "TOWER_BATTLE": return "TRIAL_TOWER";
-    case "STAGE_RESULT":
-    case "AUTO_FARM_RESULT": return "HOME";
-    default: return screen;
-  }
+/**
+ * 完全終了・再読込後は必ずHOMEから始める。
+ *
+ * 画面位置はゲーム進行ではないため、古いUI状態や途中の編集状態を復元して
+ * 操作不能画面へ張り付く危険を負うより、常に安全なHOMEへ戻す。
+ * バックグラウンドからの通常復帰ではページ自体が再読込されないので、
+ * 遊んでいる最中の画面はそのまま維持される。
+ */
+export function safeRestoredScreen(_screen: ScreenName): ScreenName {
+  return "HOME";
 }
 
 export function saveNavigationState(value: NavigationState, storage: Storage = localStorage): void {
@@ -60,7 +53,10 @@ export function loadNavigationState(storage: Storage = localStorage): Navigation
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<NavigationState>;
     if (typeof value.screen !== "string" || !SCREENS.has(value.screen as ScreenName)) return null;
-    return { ...value, screen: safeRestoredScreen(value.screen as ScreenName), returnContext: isReturnContext(value.returnContext) ? value.returnContext : undefined } as NavigationState;
+
+    // UIの途中状態は本体セーブではない。完全終了後に復元しないことで、
+    // 壊れた詳細画面・編成画面・古い画面状態による起動ループを防ぐ。
+    return { screen: "HOME" };
   } catch {
     return null;
   }
