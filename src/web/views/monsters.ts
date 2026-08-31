@@ -6,6 +6,7 @@ import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "..
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
+import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
 import { el } from "../dom.js";
 import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, sortMonsters } from "../../game/monsterSort.js";
 import { GEAR_SLOT_TOTAL, MonsterFilter, equippedCount, filterMonsters } from "../monsterFilter.js";
@@ -383,6 +384,8 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   ].filter((n): n is HTMLElement => n !== null));
 }
 
+let rankUpMaterialSort: Extract<MaterialMonsterSort, "DEFAULT" | "REINCARNATION_PIG_FIRST"> = "DEFAULT";
+
 function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElement {
   const dex = findMonsterById(target.dexId);
   const requiredCount = RANK_UP_SACRIFICE_COUNT[target.star];
@@ -393,13 +396,30 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkRankUp(target, sacrifices, props.player.partyIds);
 
-  const cards = candidates.map((c) =>
+  const buildCards = (): HTMLElement[] => sortMaterialMonsters(candidates, rankUpMaterialSort).map((c) =>
     // 素材選びの最中こそ「この子は誰だったか」を確かめたい。長押しで詳細へ送る
     monsterCard(c, () => props.onToggleSacrifice(c.id), {
       selected: props.selectedSacrificeIds.includes(c.id),
       onLongPress: () => props.onSelectDetail(c.id),
     }),
   );
+  const grid = el("div", { className: "monster-grid" }, buildCards());
+  const normalSortButton = el("button", {
+    type: "button",
+    className: `slot-filter-chip${rankUpMaterialSort === "DEFAULT" ? " slot-filter-chip--active" : ""}`,
+  }, ["通常"]) as HTMLButtonElement;
+  const reincarnationSortButton = el("button", {
+    type: "button",
+    className: `slot-filter-chip${rankUpMaterialSort === "REINCARNATION_PIG_FIRST" ? " slot-filter-chip--active" : ""}`,
+  }, ["転生豚優先"]) as HTMLButtonElement;
+  const applyMaterialSort = (sort: typeof rankUpMaterialSort): void => {
+    rankUpMaterialSort = sort;
+    normalSortButton.classList.toggle("slot-filter-chip--active", sort === "DEFAULT");
+    reincarnationSortButton.classList.toggle("slot-filter-chip--active", sort === "REINCARNATION_PIG_FIRST");
+    grid.replaceChildren(...buildCards());
+  };
+  normalSortButton.onclick = () => applyMaterialSort("DEFAULT");
+  reincarnationSortButton.onclick = () => applyMaterialSort("REINCARNATION_PIG_FIRST");
 
   return el("div", { className: "screen monsters-screen" }, [
     managementHeader("ランクアップ", props.onCancelRankUp, dex ? dex.name : target.dexId),
@@ -417,9 +437,13 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       ]),
     ]),
     el("section", { className: "panel" }, [
+      el("div", { className: "mfilter__group" }, [
+        el("span", { className: "mfilter__label" }, ["並び順"]),
+        el("div", { className: "mfilter__chips" }, [normalSortButton, reincarnationSortButton]),
+      ]),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
-        : el("div", { className: "monster-grid" }, cards),
+        : grid,
     ]),
     el(
       "button",
@@ -439,6 +463,7 @@ export function renderMonsters(props: MonstersProps): HTMLElement {
   const target = props.detailId ? props.player.monsters.find((m) => m.id === props.detailId) : undefined;
 
   if (target && props.rankUpMode) return renderRankUp(props, target);
+  rankUpMaterialSort = "DEFAULT";
   if (target) return renderDetail(props, target);
   return renderList(props);
 }

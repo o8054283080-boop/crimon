@@ -31,15 +31,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - name: 型チェック
-        run: npx tsc --noEmit
+        run: npm run typecheck
       - name: テスト
-        run: npx vitest run
+        run: npm test
+      - name: ビルド
+        run: npm run build
+      - name: 差分の空白検査
+        run: |
+          git diff --check
+          git diff --check origin/main...HEAD
       - name: モンスターのデータ検診
         run: npx tsx tools/monsterDoctor.mts
 
