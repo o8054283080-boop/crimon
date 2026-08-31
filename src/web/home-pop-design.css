@@ -103,7 +103,7 @@ body:has(.crimon-home) {
 }
 
 .crimon-resource-header .home-wallet { align-self:center !important; height:62px !important; box-sizing:border-box !important; grid-template-rows:24px 24px !important; gap:2px !important; padding:6px 5px !important; background:#07172d url("./assets/home/home-resource-cluster-v1.webp") center / 100% 100% no-repeat !important; }
-.crimon-resource-header .home-wallet__chip { height:24px !important; padding:1px 3px !important; border:0 !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; display:flex !important; align-items:center !important; line-height:1 !important; }
+.crimon-resource-header .home-wallet__chip { height:24px !important; min-height:24px !important; min-width:0 !important; padding:1px 3px !important; border:0 !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; display:flex !important; align-items:center !important; line-height:1 !important; }
 .crimon-resource-header .home-wallet__chip strong { font-size:10px !important; line-height:1 !important; }
 .crimon-resource-header .home-wallet__chip--stamina { justify-content:center !important; gap:4px !important; }
 
