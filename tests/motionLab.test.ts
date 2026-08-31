@@ -2,11 +2,21 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createPngSequenceZip } from "../src/web/motion-lab/export.js";
 import { estimateRig, resolvePose } from "../src/web/motion-lab/rig.js";
+import { analyzeFrameBounds, deformMesh, extractSilhouette, generateMesh, placeHandles } from "../src/web/motion-lab/mesh.js";
 import type { MotionGenerationResult } from "../src/web/motion-lab/types.js";
 
 const transparentPng = new Blob([Uint8Array.of(137, 80, 78, 71)], { type: "image/png" });
 
 describe("CRIMON Motion Lab のローカル自動リグ", () => {
+  const silhouette=extractSilhouette((()=>{const p=new Uint8ClampedArray(20*24*4);for(let y=3;y<22;y++)for(let x=4;x<17;x++)p[(y*20+x)*4+3]=255;return p;})(),20,24);
+
+  it("シルエット全体へ隙間のない共有頂点メッシュを生成する",()=>{const mesh=generateMesh(silhouette,"humanoid",8,10);expect(mesh.vertices).toHaveLength(99);expect(mesh.triangles).toHaveLength(160);const first=[mesh.triangles[0].a,mesh.triangles[0].b,mesh.triangles[0].c],second=[mesh.triangles[1].a,mesh.triangles[1].b,mesh.triangles[1].c];expect(first.filter(i=>second.includes(i))).toHaveLength(2);});
+
+  it.each(["slime","humanoid","quadruped","floating","heavy","dragon"] as const)("%s 用の制御点を配置する",type=>{const handles=placeHandles(silhouette,type);expect(handles.some(h=>h.name==="head")).toBe(true);expect(handles.some(h=>h.name==="root")).toBe(true);if(type==="dragon"||type==="quadruped")expect(handles.some(h=>h.name==="tail")).toBe(true);});
+
+  it("重み付き変形を連続化し、顔の移動量を抑える",()=>{const mesh=generateMesh(silhouette,"slime",8,10),frame=deformMesh(mesh,"attack","slime",5,12);expect(frame.some((v,i)=>Math.abs(v.x-mesh.vertices[i].x)>.1)).toBe(true);const face=mesh.vertices.reduce((best,v,i)=>v.faceProtection>mesh.vertices[best].faceProtection?i:best,0),unprotected={...mesh,vertices:mesh.vertices.map(v=>({...v,faceProtection:0}))},raw=deformMesh(unprotected,"attack","slime",5,12);expect(Math.hypot(frame[face].x-mesh.vertices[face].x,frame[face].y-mesh.vertices[face].y)).toBeLessThan(Math.hypot(raw[face].x-mesh.vertices[face].x,raw[face].y-mesh.vertices[face].y));});
+
+  it("安全余白に触れるフレーム境界を検出する",()=>{const mesh=generateMesh(silhouette,"heavy",4,4);expect(analyzeFrameBounds(mesh.vertices,30,30,2).clipped).toBe(false);const shifted=mesh.vertices.map(v=>({...v,x:v.x-5}));expect(analyzeFrameBounds(shifted,30,30,2).clipped).toBe(true);});
   it("透明シルエットから境界・重心・頭胴四肢の制御領域を推定する", () => {
     const pixels=new Uint8ClampedArray(10*12*4);
     for(let y=2;y<11;y++) for(let x=2;x<8;x++) pixels[(y*10+x)*4+3]=255;
