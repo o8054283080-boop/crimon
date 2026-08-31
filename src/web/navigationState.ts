@@ -34,6 +34,10 @@ const SCREENS = new Set<ScreenName>([
 /** 戦闘エンジンを復元せず、保存済みのゲーム進行から再開できる安全な親画面へ戻す。 */
 export function safeRestoredScreen(screen: ScreenName): ScreenName {
   switch (screen) {
+    // パーティ編成は終了直前の一時的な編集画面なので、アプリを完全終了して
+    // 次回起動した時まで居残らせない。バックグラウンド復帰では再読込されないため
+    // この分岐はタスキル／再起動時だけ効く。
+    case "PARTY": return "HOME";
     case "BATTLE": return "STAGES";
     case "DUNGEON_BATTLE": return "EQUIP_DUNGEON";
     case "LEVEL_DUNGEON_BATTLE": return "LEVEL_DUNGEON";
