@@ -126,3 +126,5 @@ function scan(): void {
 const observer = new MutationObserver(scan);
 observer.observe(document.documentElement, { childList: true, subtree: true });
 scan();
+
+export {};
