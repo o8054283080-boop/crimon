@@ -71,6 +71,14 @@
     "bodyVal": 0.4,
     "aspect": 0.887
   },
+  "nemesis-idle": {
+    "sheet": {
+      "cols": 6,
+      "rows": 6,
+      "frames": 36
+    },
+    "aspect": 0.922
+  },
   "reincarnation_pig": {
     "bodyHue": 0.946,
     "bodySat": 0.27,

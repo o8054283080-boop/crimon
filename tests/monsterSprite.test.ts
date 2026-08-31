@@ -269,3 +269,26 @@ describe("コマ送りの待機アニメ", () => {
     expect(avatar).toMatch(/if \(this\.sheet && !this\.dead\)/);
   });
 });
+
+describe("コマ送りの動きの測り方", () => {
+  it("輪郭の変化ではなく、コマ間の画素差で判定する", () => {
+    /*
+     * **一度これで間違えている。**
+     *
+     * 外接矩形の伸び縮みで測ると、ネメシスは4.4%、スライムは24%となり、
+     * ネメシスを「ほとんど動いていない」と判断してシートを外した。
+     * 依頼主の「動きは少ないが待機している感はある」という指摘で
+     * 測り直したら、コマ間の画素差はネメシス22.1・スライム32.7だった。
+     *
+     * **輪郭が硬い造形ほど、輪郭で測ると過小評価される。**
+     * マントの揺れも、目の光の明滅も、外接矩形は1つも拾わない。
+     */
+    const tool = readFileSync("tools/prepareSpriteSheets.mjs", "utf8");
+    expect(tool, "画素差を測っていない").toContain("pixelMotion");
+    expect(tool, "判定が画素差になっていない").toMatch(/result\.pixelMotion < MOTION_FLOOR/);
+    // 輪郭の変化(0〜1の割合)を判定に使うと、また鎧を切り捨てる
+    expect(tool, "輪郭の割合で判定に戻っている").not.toMatch(
+      /const motion = Math\.max\(result\.widthMotion, result\.heightMotion\);\s*\n\s*if \(motion < MOTION_FLOOR\)/,
+    );
+  });
+});

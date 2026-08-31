@@ -43,13 +43,27 @@ const CELL = 128;
 const WEBP_QUALITY = 0.85;
 
 /**
- * 「動いている」と認める、コマ間の寸法の変化。
+ * 「動いている」と認める、**コマ間の画素差**。
  *
- * 1コマの画素数に対する割合。0.06 は、画面80pxの表示で
- * **5px以上は変わる**という水準。これを下回るシートは、
- * 入れても静止画と区別が付かない。
+ * ## 外接矩形の変化で測って間違えた
+ *
+ * 最初は「体の外接矩形がどれだけ伸び縮みするか」で測っていた。
+ * その基準ではネメシスが4.4%、スライムが24%となり、
+ * **ネメシスを「ほとんど動いていない」と切り捨てた。**
+ *
+ * 依頼主の指摘で測り直したら逆だった。
+ *
+ *   ネメシス … 輪郭の変化 4.4% / **コマ間の画素差 22.1**
+ *   スライム … 輪郭の変化 24%  / コマ間の画素差 32.7
+ *
+ * ネメシスは**輪郭がほとんど変わらないまま、中身が動いていた。**
+ * マントの揺れ、鎌の微動、目の光の明滅。外接矩形はそれを1つも拾わない。
+ * 鎧や岩のように輪郭が硬い造形ほど、この測り方だと過小評価される。
+ *
+ * 0〜255のスケールで、不透明な画素だけの平均。完全な静止画なら0になる。
+ * 6は「隣のコマと見比べて違いが分かる」下限。
  */
-const MOTION_FLOOR = 0.06;
+const MOTION_FLOOR = 6;
 
 const log = (...args) => console.log(`[${new Date().toTimeString().slice(0, 8)}]`, ...args);
 
@@ -95,6 +109,44 @@ const PREPARE = `async (dataUrl, options) => {
   }
   const filled = boxes.filter(Boolean);
   if (filled.length === 0) return { error: "全部が透明。コマが入っていない" };
+
+  /*
+   * コマ間の画素差。**縮小した後の解像度で測る。**
+   * 元の960pxのまま測ると、画面に出ない細部のノイズまで「動き」に数える。
+   */
+  const probeCell = 128;
+  const fc = document.createElement("canvas");
+  fc.width = probeCell;
+  fc.height = probeCell;
+  const fctx = fc.getContext("2d", { willReadFrequently: true });
+  fctx.imageSmoothingQuality = "high";
+  const small = [];
+  for (let i = 0; i < cols * rows; i++) {
+    const rx = i % cols, ry = Math.floor(i / cols);
+    fctx.clearRect(0, 0, probeCell, probeCell);
+    fctx.drawImage(image, rx * srcW, ry * srcH, srcW, srcH, 0, 0, probeCell, probeCell);
+    small.push(fctx.getImageData(0, 0, probeCell, probeCell).data);
+  }
+  let diffSum = 0;
+  let diffPairs = 0;
+  for (let i = 0; i < small.length; i++) {
+    const a = small[i];
+    const b = small[(i + 1) % small.length];
+    let diff = 0;
+    let n = 0;
+    for (let p = 0; p < a.length; p += 4) {
+      // どちらも透明な場所は数えない。背景の広さで薄まってしまう
+      if (a[p + 3] < 40 && b[p + 3] < 40) continue;
+      const rgb = (Math.abs(a[p] - b[p]) + Math.abs(a[p + 1] - b[p + 1]) + Math.abs(a[p + 2] - b[p + 2])) / 3;
+      diff += Math.max(rgb, Math.abs(a[p + 3] - b[p + 3]));
+      n++;
+    }
+    if (n > 0) {
+      diffSum += diff / n;
+      diffPairs++;
+    }
+  }
+  const pixelMotion = diffPairs > 0 ? diffSum / diffPairs : 0;
 
   const centers = filled.map((b) => (b.minX + b.maxX) / 2);
   const feet = filled.map((b) => b.maxY);
@@ -149,9 +201,10 @@ const PREPARE = `async (dataUrl, options) => {
     // 揃っているか(コマ間のブレ。元画像の画素で)
     centerSpread: Math.round(spread(centers)),
     footSpread: Math.round(spread(feet)),
-    // どれだけ動くか(1コマの画素数に対する割合)
+    // どれだけ動くか。**輪郭と中身は別々に測る**(片方だけでは見落とす)
     widthMotion: Math.round((spread(widths) / srcW) * 1000) / 1000,
     heightMotion: Math.round((spread(heights) / srcH) * 1000) / 1000,
+    pixelMotion: Math.round(pixelMotion * 100) / 100,
     aspect: Math.round((drawW / drawH) * 1000) / 1000,
   };
 }`;
@@ -211,13 +264,14 @@ async function main() {
     // ずれは元画像の画素で見る。20pxを超えると再生時に跳ねて見える
     if (result.centerSpread > 20) warn.push(`中心が${result.centerSpread}pxずれている`);
     if (result.footSpread > 20) warn.push(`足元が${result.footSpread}pxずれている`);
-    const motion = Math.max(result.widthMotion, result.heightMotion);
-    if (motion < MOTION_FLOOR) {
-      warn.push(`ほとんど動いていない(変化${(motion * 100).toFixed(1)}%)。シェーダ変形に任せた方がよい`);
+    const outline = Math.max(result.widthMotion, result.heightMotion);
+    if (result.pixelMotion < MOTION_FLOOR) {
+      warn.push(`ほとんど動いていない(画素差${result.pixelMotion})。シェーダ変形に任せた方がよい`);
     }
     log(
       `${base}.webp  ${result.width}x${result.height}  ${result.frames}コマ  ` +
-      `${before}KB → ${after}KB  動き${(motion * 100).toFixed(1)}%` +
+      `${before}KB → ${after}KB  ` +
+      `動き 中身${result.pixelMotion} / 輪郭${(outline * 100).toFixed(1)}%` +
       (warn.length > 0 ? `  ※ ${warn.join(" / ")}` : ""),
     );
   }
