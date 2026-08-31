@@ -34,6 +34,35 @@ try {
       path: `${outDir}/${viewport.name.replace(".png", "-no-rewards.png")}`,
       fullPage: false,
     });
+
+    // Playwright の通常コンテキストは iPhone の下部safe-areaが 0px になる。
+    // 実機で編成パネルが固定ナビの裏へ潜らないことを、代表値 34px で確認する。
+    await page.addStyleTag({
+      content: "body:has(.crimon-home) { --home-safe-bottom: 34px !important; }",
+    });
+    await page.screenshot({
+      path: `${outDir}/${viewport.name.replace(".png", "-no-rewards-safe-bottom.png")}`,
+      fullPage: false,
+    });
+
+    // 実データで起こり得る最大級の所持数を入れ、生成フレーム内のアイコンと
+    // 数値が重ならず、右端からもはみ出さないことを両サイズで確認する。
+    await page.locator(".home-wallet__chip--crystal strong").evaluate((node) => {
+      node.textContent = "11,300";
+    });
+    await page.locator(".home-wallet__chip--gold strong").evaluate((node) => {
+      node.textContent = "2,136,000";
+    });
+    await page.locator(".home-wallet__chip--stamina strong").evaluate((node) => {
+      node.textContent = "308";
+    });
+    await page.locator(".home-wallet__chip--stamina .home-wallet__suffix").evaluate((node) => {
+      node.textContent = "/ 308";
+    });
+    await page.screenshot({
+      path: `${outDir}/${viewport.name.replace(".png", "-no-rewards-safe-bottom-long-resources.png")}`,
+      fullPage: false,
+    });
     await context.close();
   }
 } finally {
