@@ -8,12 +8,13 @@ import {
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 
-describe("潜在覚醒216候補", () => {
-  it("プレイヤー72体へ有効な3候補を重複なく登録する", () => {
-    expect(ALL_DISPLAYABLE_MONSTERS_DEX).toHaveLength(72);
+describe("潜在覚醒の候補", () => {
+  it("図鑑に載る全個体へ有効な3候補を重複なく登録する", () => {
+    // 体数はモンスターを足すたびに増える。**数そのものではなく「全員に3つある」ことを見る**
+    expect(ALL_DISPLAYABLE_MONSTERS_DEX.length).toBeGreaterThanOrEqual(72);
     const candidates = ALL_DISPLAYABLE_MONSTERS_DEX.flatMap((monster) => LATENT_ABILITY_CANDIDATES[monster.id] ?? []);
-    expect(candidates).toHaveLength(216);
-    expect(new Set(candidates.map(({ id }) => id))).toHaveProperty("size", 216);
+    expect(candidates).toHaveLength(ALL_DISPLAYABLE_MONSTERS_DEX.length * 3);
+    expect(new Set(candidates.map(({ id }) => id))).toHaveProperty("size", ALL_DISPLAYABLE_MONSTERS_DEX.length * 3);
     for (const candidate of candidates) {
       expect(candidate.name.trim()).not.toBe("");
       expect(candidate.description.trim()).not.toBe("");

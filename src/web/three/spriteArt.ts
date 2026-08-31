@@ -43,12 +43,14 @@ for (const [path, url] of Object.entries(SPRITE_URLS)) {
  * -1 は無彩色の絵(守る色相が無い)。
  */
 const MANIFEST = manifest as Record<string, {
-  bodyHue: number;
+  bodyHue?: number;
   /** その絵の彩度の中央値。守り判定の境目をここから作る */
-  bodySat: number;
+  bodySat?: number;
   /** その絵の明度の中央値 */
-  bodyVal: number;
-  aspect: number;
+  bodyVal?: number;
+  aspect?: number;
+  /** コマ送りの待機アニメ。格子状に並んだシートの割り方 */
+  sheet?: { cols: number; rows: number; frames: number };
 }>;
 
 function entryFor(templateId: string, element: Element) {
@@ -218,7 +220,73 @@ export function spriteUrlFor(templateId: string, element: Element, pose: SpriteP
   );
 }
 
-/** その種族に2Dの絵があるか(基本の絵の有無で判定する) */
+/**
+ * コマ送りの待機アニメ(スプライトシート)。
+ *
+ * ## いつ使うか
+ *
+ * 1枚の絵を変形させる方式には限界がある。板の高さを手がかりに
+ * 呼吸させ、遅らせ、頷かせることはできても、**コードは絵のどこが
+ * 腕で、どこが尻尾なのかを知らない。** 腕を振る動きは作れない。
+ *
+ * コマ送りなら、描かれた絵がそのまま動く。ただし**全部の種族で
+ * 有効とは限らない。** 生成側は硬い造形(鎧・岩)をほとんど動かさず、
+ * 画面80pxまで縮めると数pxしか変わらない。
+ * `tools/prepareSpriteSheets.mjs` が動きの量を測って警告を出す。
+ *
+ * ## 無い種族はどうなるか
+ *
+ * ここが null を返すと、従来のシェーダ変形が待機を担う。
+ * **絵が届いた種族から順に切り替わる**ので、20体を揃えないと
+ * 何も出せない、という形にはしない(モンスターの絵の時と同じ考え方)。
+ */
+export interface SpriteSheet {
+  url: string;
+  cols: number;
+  rows: number;
+  frames: number;
+}
+
+export function idleSheetFor(templateId: string, element: Element): SpriteSheet | null {
+  for (const name of [`${templateId}-${element}-idle`, `${templateId}-idle`]) {
+    const url = BY_NAME.get(name);
+    const sheet = MANIFEST[name]?.sheet;
+    if (url && sheet) return { url, ...sheet };
+  }
+  return null;
+}
+
+/**
+ * コマ送り用のテクスチャ。**個体ごとに複製して返す。**
+ *
+ * `repeat` と `offset` でコマを切り出すので、テクスチャを共有すると
+ * 同じ種族が2体並んだ時に**互いのコマ位置を上書きし合う。**
+ * three.js の `clone()` は画像データ(`source`)を共有したまま
+ * テクスチャだけを複製するので、GPUへ送る絵は1枚のまま済む。
+ */
+export function loadSheetTexture(url: string, cols: number, rows: number): THREE.Texture {
+  const texture = loadSpriteTexture(url).clone();
+  texture.needsUpdate = true;
+  /*
+   * **ミップマップを切る。**
+   *
+   * コマの境目でミップが隣のコマを拾い、輪郭に別のコマの色がにじむ。
+   * 1コマ128pxに対して画面の表示は80px前後。縮小率が小さいので、
+   * ミップが無くてもざらつかない。
+   */
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.repeat.set(1 / cols, 1 / rows);
+  return texture;
+}
+
+/**
+ * その種族に2Dの絵があるか(基本の絵の有無で判定する)。
+ *
+ * **コマ送りのシートは数えない。** カード・図鑑・ホームのロビーは
+ * 1枚絵(`portrait.ts`)から作るので、シートしか無い種族が出ると
+ * そちらが空になる。シートを足す時は、**必ず1枚絵も一緒に置く。**
+ */
 export function hasSprite(templateId: string, element: Element): boolean {
   return spriteUrlFor(templateId, element, "idle") !== null;
 }

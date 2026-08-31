@@ -3,8 +3,9 @@ import { auditLatentAwakening } from "../tools/latentAwakeningAudit.js";
 
 describe("潜在覚醒216候補監査", () => {
   const audit = auditLatentAwakening();
-  it("72体へ重複のない216候補を3つずつ提供する", () => {
-    expect(audit.monsterCount).toBe(72); expect(audit.candidateCount).toBe(216); expect(audit.duplicateIds).toEqual([]);
+  it("図鑑の全個体へ重複のない候補を3つずつ提供する", () => {
+    // モンスターを足すたびに増える数。**3つずつ揃っていることと、idが重複しないこと**を見る
+    expect(audit.monsterCount).toBeGreaterThanOrEqual(72); expect(audit.candidateCount).toBe(audit.monsterCount * 3); expect(audit.duplicateIds).toEqual([]);
     expect(Object.values(audit.candidatesPerMonster).every((count) => count === 3)).toBe(true);
   });
   it("主要な役割変更カテゴリを欠かさない", () => {

@@ -2,7 +2,7 @@ import { BattleEngine, BattleEvent, BattleWinner, ManualChoice, TurnRecord, Unit
 import { formatHpPair } from "../../core/stats.js";
 import { BattleUnit } from "../../battle/unit.js";
 import { MonsterDefinition } from "../../core/monster.js";
-import { describeSkillEffect } from "../../core/skill.js";
+import { describeSkillLines } from "../../core/skill.js";
 import { hitStyleForRole, playHitSfx, playSfx, sfxElementOf } from "../audio/index.js";
 import { el } from "../dom.js";
 import { BattleStage, StageUnitInit } from "../three/battleStage.js";
@@ -372,7 +372,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
               type: "button",
               className: classes.join(" "),
               disabled: !usable,
-              title: skill.effects.map((e) => describeSkillEffect(e)).join(" / "),
+              title: describeSkillLines(skill).join(" / "),
               onclick: () => {
                 if (usable) handleSkillPicked(unit, idx, skill);
               },

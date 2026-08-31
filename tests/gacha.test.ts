@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { summonMany } from "../src/game/gacha.js";
-import { findMonsterById } from "../src/data/monsters.js";
+import { GACHA_STAR3_TEMPLATES, GACHA_STAR4_TEMPLATES, GACHA_STAR5_TEMPLATES, findMonsterById } from "../src/data/monsters.js";
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -49,12 +49,22 @@ describe("ガチャ (summonMany)", () => {
     }
   });
 
-  it("星4はグリフォンかセラフ、星5はドラゴンかネメシスが排出される(属性のレア度とは独立)", () => {
+  it("星ごとの抽選プールから出る(属性のレア度とは独立)", () => {
+    /*
+     * **星の抽選比率(GACHA_TABLE)と、その星の顔ぶれ(プール)は別のもの。**
+     * モンスターを足すとプールだけが増える。ここではプールの中身を
+     * `GACHA_STAR*_TEMPLATES` から引いて見るので、追加のたびに書き換えなくてよい。
+     */
     const rng = mulberry32(11);
     const results = summonMany(4000, rng);
+    const idsOf = (pool: { templateId: string }[]) => new Set(pool.map((t) => t.templateId));
+    const star3 = idsOf(GACHA_STAR3_TEMPLATES);
+    const star4 = idsOf(GACHA_STAR4_TEMPLATES);
+    const star5 = idsOf(GACHA_STAR5_TEMPLATES);
     for (const r of results) {
-      if (r.star === 4) expect(r.dexId.startsWith("griffon_") || r.dexId.startsWith("seraph_")).toBe(true);
-      if (r.star === 5) expect(r.dexId.startsWith("dragon_") || r.dexId.startsWith("nemesis_")).toBe(true);
+      const templateId = findMonsterById(r.dexId)!.templateId;
+      const pool = r.star === 3 ? star3 : r.star === 4 ? star4 : star5;
+      expect(pool.has(templateId), `${r.star}★ の ${templateId}`).toBe(true);
     }
     // 通常枠(火水電草)でもセラフ/ネメシスが、レア枠(光闇)でもグリフォン/ドラゴンが出ることを確認する
     expect(results.some((r) => !r.isRare && r.dexId.startsWith("seraph_"))).toBe(true);

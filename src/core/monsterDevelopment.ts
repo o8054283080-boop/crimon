@@ -1,3 +1,5 @@
+import type { BuffStat, EffectCondition } from "./skill.js";
+
 /**
  * クリエイト拡張で個体ごとに保存する育成情報。
  *
@@ -81,14 +83,69 @@ export type LatentAbilityEffectType =
   | "SELF_HEAL" | "ADD_BUFF" | "ALLY_SUPPORT" | "SHIELD" | "SPECIAL_TRIGGER";
 
 export type LatentRuntimeEffect =
-  | { kind: "DEBUFF"; status: "HEAL_BLOCK" | "SPD_DOWN" | "POISON" | "STUN" | "BUFF_BLOCK"; chance: number; duration: number; value?: number }
+  | { kind: "DEBUFF"; status: "HEAL_BLOCK" | "SPD_DOWN" | "ATK_DOWN" | "DEF_DOWN" | "POISON" | "STUN" | "BUFF_BLOCK"; chance: number; duration: number; value?: number }
   | { kind: "STRIP"; chance: number; count: number }
   | { kind: "GAUGE_DOWN"; chance: number; value: number }
   | { kind: "ALLY_GAUGE_UP"; chance: number; value: number }
   | { kind: "DEBUFF_EXTEND"; chance: number; duration: number }
   | { kind: "HEAL_CLEANSE"; value: number }
   | { kind: "REGEN"; value: number; duration: number }
-  | { kind: "SHIELD"; value: number; duration: number };
+  | { kind: "SHIELD"; value: number; duration: number }
+  /* ---- ここから下は11種の追加で足したもの ---- */
+  /** 自身の行動ゲージを増やす */
+  | { kind: "SELF_GAUGE"; value: number }
+  /** 自身のHPを最大HPの割合で回復する */
+  | { kind: "SELF_HEAL"; value: number }
+  /** このスキルで与えたダメージの割合ぶん自身が回復する */
+  | { kind: "LIFESTEAL"; value: number }
+  /** 自身の弱体効果を解除する。内部クールタイムを持たせられる */
+  | { kind: "SELF_CLEANSE"; count: number; internalCooldown?: number }
+  /** HP割合が最も低い味方を回復する */
+  | { kind: "LOWEST_ALLY_HEAL"; value: number }
+  /** HP割合が最も低い味方の行動ゲージを増やす。閾値を切っていればさらに増やす */
+  | { kind: "LOWEST_ALLY_GAUGE"; value: number; whenAllyHpBelow?: number; extra?: number }
+  /** HP割合が最も低い味方の弱体効果を解除する */
+  | { kind: "LOWEST_ALLY_CLEANSE"; count: number; internalCooldown?: number }
+  /** HP割合が最も低い味方へ、自身の最大HPを基準にしたシールドを張る */
+  | { kind: "LOWEST_ALLY_SHIELD"; value: number; duration: number }
+  /** HP割合が最も低い味方へ被ダメージ軽減を与える */
+  | { kind: "LOWEST_ALLY_MITIGATE"; value: number; duration: number }
+  /** HP割合が最も低い味方へ能力上昇を与える */
+  | { kind: "LOWEST_ALLY_BUFF"; stat: BuffStat; amount: number; duration: number }
+  /** 味方全体を回復する */
+  | { kind: "ALLY_HEAL"; value: number }
+  /** 自身へシールドを張る */
+  | { kind: "SELF_SHIELD"; value: number; duration: number }
+  /** このスキルで減らした相手のゲージのうち、この割合を自身が吸収する */
+  | { kind: "GAUGE_DRAIN_SHARE"; value: number }
+  /** 相手の強化効果を1個奪って自身に付ける */
+  | { kind: "STEAL_BUFF"; count: number; duration?: number };
+
+/**
+ * 潜在能力を出す条件。
+ *
+ * **「S1で毒が入った時」「HP50%以下の相手を殴った時」のような、
+ * その一撃で何が起きたかに紐づく発動**を書けるようにするためのもの。
+ * 依頼主の指定どおり、**低確率で体感しづらいものを増やすのではなく、
+ * 条件を満たせば確実に効くもの**を主にしている。
+ */
+export type LatentCondition =
+  | { kind: "ALWAYS" }
+  /** このスキルでクリティカルしたら。atLeastでクリティカル回数の下限を指定できる */
+  | { kind: "ON_CRIT"; atLeast?: number }
+  /** このスキルでその弱体効果/解除が実際に入ったら */
+  | { kind: "ON_APPLIED"; status: LatentAppliedStatus }
+  /** このスキルで相手を倒したら */
+  | { kind: "ON_KILL" }
+  /** 対象のHPがこの割合以下なら */
+  | { kind: "TARGET_HP_BELOW"; ratio: number }
+  /** 対象が特定の状態なら */
+  | { kind: "TARGET_STATE"; state: EffectCondition };
+
+/** 潜在能力の発動条件で見る「実際に入ったもの」 */
+export type LatentAppliedStatus =
+  | "POISON" | "SPD_DOWN" | "ATK_DOWN" | "DEF_DOWN" | "TAUNT"
+  | "HEAL_BLOCK" | "STUN" | "BLIND" | "STRIP" | "ANY_DEBUFF";
 
 /** ⑧-3の戦闘実装へそのまま渡せる、スキル1専用の宣言的な候補データ。 */
 export interface LatentAbilityCandidate {
@@ -110,6 +167,40 @@ export interface LatentAbilityCandidate {
   resolution: "ALWAYS" | "SEPARATE" | "ADD_TO_EXISTING" | "ON_CRIT" | "CONDITIONAL";
   /** S1使用単位で解決する追加効果。多段数には影響されない。 */
   runtimeEffects?: readonly LatentRuntimeEffect[];
+  /**
+   * `runtimeEffects` を出すための条件。省略時は常に出す。
+   * **多段でも1スキル使用につき1回しか判定しない**(依頼主の指定)。
+   */
+  condition?: LatentCondition;
+  /** 内部クールタイム(ターン)。0より大きいと、発動後その間は出ない */
+  internalCooldown?: number;
+  /** S1の最終ダメージへの素の上乗せ(条件なし) */
+  flatDamageBonus?: number;
+  /** 条件を満たした時だけ乗る、S1の最終ダメージへの上乗せ */
+  damageBonusWhen?: readonly { when: EffectCondition; bonus: number }[];
+  /** S1が持つ「対象HP割合による上乗せ」を、この内容で置き換える */
+  replaceTargetHpBonus?: readonly { hpRatio: number; bonus: number }[];
+  /** S1のDAMAGE効果へ、対象HP割合による防御無視を足す */
+  addTargetHpIgnoreDefense?: readonly { hpRatio: number; ratio: number }[];
+  /** S1のDAMAGE効果へ、能力比例の上乗せを足す(速度比例など) */
+  scaleBonusAdd?: { stat: "spd" | "def" | "hp"; bonusAtReference: number };
+  /**
+   * ダメージ系の上乗せを、S1の**何番目のDAMAGE効果**に限るか(0始まり)。
+   * 省略時は全部にかかる。「2撃目だけ強くなる」型の潜在に使う。
+   */
+  damageEffectIndex?: number;
+  /** S1のGAUGE効果の増減量を、この値で置き換える */
+  gaugeAmountOverride?: number;
+  /** S1が持つ特定の効果の発動確率へ加算する */
+  chanceBonus?: { effectKind: "POISON" | "DEBUFF" | "STUN" | "STATUS" | "BURN" | "BLIND" | "HEAL_BLOCK"; stat?: BuffStat; value: number };
+  /** 攻撃を受けるたびに溜まり、次のスキル1で使い切る上乗せ */
+  chargeOnHit?: { perHit: number; maxBonus: number };
+  /** クリティカルするたびに溜まり、次のスキル1で使い切る上乗せ */
+  chargeOnCrit?: { perHit: number; maxBonus: number };
+  /** クリティカルするたびに増え、戦闘中ずっと残るクリダメ */
+  critDmgGrowth?: { perCrit: number; maxBonus: number };
+  /** スキル1の後、次に受けるダメージを1回だけ軽減する量 */
+  oneShotMitigate?: number;
   aoeConversion?: { damageMultiplier: number; secondaryEffectChanceMultiplier?: number; nativeEffectTarget?: "ALL" | "PRIMARY_ONLY" };
   ignoreDefenseRatio?: number;
   debuffDamageBonus?: { perDebuff: number; maxBonus: number };

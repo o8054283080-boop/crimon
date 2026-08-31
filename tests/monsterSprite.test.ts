@@ -33,7 +33,11 @@ const TEMPLATE_IDS = new Set([
   SKILL_PIG.templateId,
 ]);
 const ELEMENT_NAMES = new Set<string>(ELEMENTS);
-const POSES = new Set(["attack", "hit", "cast"]);
+/*
+ * ポーズの接尾辞。`idle` は**コマ送りのシート**を指す
+ * (1枚絵の待機は接尾辞を持たない)。
+ */
+const POSES = new Set(["attack", "hit", "cast", "idle"]);
 
 function spriteFiles(): string[] {
   try {
@@ -173,6 +177,12 @@ describe("色を寄せる設定", () => {
     const missing: string[] = [];
     for (const file of spriteFiles()) {
       const name = file.replace(/\.webp$/, "");
+      /*
+       * コマ送りのシートは測らない。**色替えの基準は対になる1枚絵から取る**
+       * (`entryFor` が `slime-idle` ではなく `slime` を見る)。
+       * シートは同じ種族の同じ体色なので、基準を2つ持つ意味が無い。
+       */
+      if (name.endsWith("-idle")) continue;
       const entry = manifest[name] as { bodySat?: number; bodyVal?: number } | undefined;
       if (!entry) missing.push(`${name}: sprites.json に無い`);
       else if (typeof entry.bodySat !== "number") missing.push(`${name}: bodySat が無い`);
@@ -209,5 +219,76 @@ describe("色を寄せる設定", () => {
     expect(card).toContain("SPRITE_TINT");
     expect(battle).toContain("ELEMENT_TINT");
     expect(card).toContain("ELEMENT_TINT");
+  });
+});
+
+describe("コマ送りの待機アニメ", () => {
+  const manifest = JSON.parse(readFileSync(`${SPRITE_DIR}/sprites.json`, "utf8")) as Record<string, unknown>;
+
+  it("シートには必ず割り方が書いてある", () => {
+    /*
+     * `<種族>-idle.webp` は格子状に並んだシート。何列何行かを知らないと、
+     * **1コマ目だけを引き伸ばした静止画**になる。エラーにはならない。
+     * `tools/prepareSpriteSheets.mjs` を通し忘れると起きる。
+     */
+    const missing: string[] = [];
+    for (const file of spriteFiles()) {
+      const name = file.replace(/\.webp$/, "");
+      if (!name.endsWith("-idle")) continue;
+      const entry = manifest[name] as { sheet?: { cols: number; rows: number; frames: number } } | undefined;
+      if (!entry?.sheet) missing.push(`${name}: sprites.json に sheet が無い`);
+      else if (!(entry.sheet.cols > 0 && entry.sheet.rows > 0 && entry.sheet.frames > 0)) {
+        missing.push(`${name}: sheet の値がおかしい`);
+      }
+    }
+    expect(missing, `コマ送りとして読めない:\n${missing.join("\n")}`).toEqual([]);
+  });
+
+  it("シートのある種族には1枚絵も置いてある", () => {
+    /*
+     * カード・図鑑・ホームのロビーは1枚絵から焼く(`portrait.ts`)。
+     * **シートだけ置くと、戦闘では動くのにカードが空になる。**
+     */
+    const orphan: string[] = [];
+    const names = new Set(spriteFiles().map((f) => f.replace(/\.webp$/, "")));
+    for (const name of names) {
+      if (!name.endsWith("-idle")) continue;
+      const base = name.slice(0, -"-idle".length);
+      if (!names.has(base)) orphan.push(`${name}: 対になる ${base}.webp が無い`);
+    }
+    expect(orphan, `カードが空になる:\n${orphan.join("\n")}`).toEqual([]);
+  });
+
+  it("コマ送りの再生に必要な仕掛けが揃っている", () => {
+    const avatar = readFileSync("src/web/three/spriteAvatar.ts", "utf8");
+    // テクスチャを複製しないと、同じ種族が2体並んだ時にコマを奪い合う
+    expect(readFileSync("src/web/three/spriteArt.ts", "utf8")).toContain("loadSpriteTexture(url).clone()");
+    // three.js のUVは左下が原点。行を反転しないと上下が逆順で再生される
+    expect(avatar).toMatch(/1 - \(row \+ 1\) \/ rows/);
+    // 倒れている間は止める。息をしながら崩れると死んだように見えない
+    expect(avatar).toMatch(/if \(this\.sheet && !this\.dead\)/);
+  });
+});
+
+describe("コマ送りの動きの測り方", () => {
+  it("輪郭の変化ではなく、コマ間の画素差で判定する", () => {
+    /*
+     * **一度これで間違えている。**
+     *
+     * 外接矩形の伸び縮みで測ると、ネメシスは4.4%、スライムは24%となり、
+     * ネメシスを「ほとんど動いていない」と判断してシートを外した。
+     * 依頼主の「動きは少ないが待機している感はある」という指摘で
+     * 測り直したら、コマ間の画素差はネメシス22.1・スライム32.7だった。
+     *
+     * **輪郭が硬い造形ほど、輪郭で測ると過小評価される。**
+     * マントの揺れも、目の光の明滅も、外接矩形は1つも拾わない。
+     */
+    const tool = readFileSync("tools/prepareSpriteSheets.mjs", "utf8");
+    expect(tool, "画素差を測っていない").toContain("pixelMotion");
+    expect(tool, "判定が画素差になっていない").toMatch(/result\.pixelMotion < MOTION_FLOOR/);
+    // 輪郭の変化(0〜1の割合)を判定に使うと、また鎧を切り捨てる
+    expect(tool, "輪郭の割合で判定に戻っている").not.toMatch(
+      /const motion = Math\.max\(result\.widthMotion, result\.heightMotion\);\s*\n\s*if \(motion < MOTION_FLOOR\)/,
+    );
   });
 });

@@ -42,8 +42,15 @@ const REQUIRED_WORDS: Record<SkillEffect["kind"], string[]> = {
   IMMUNITY: ["無効", "免疫"],
   LIFESTEAL: ["回復", "吸収"],
   COOLDOWN_EXTEND: ["クールタイム", "待ち時間"],
-  STRIP: ["剥が", "はが", "打ち消", "取り除"],
-  HEAL_BLOCK: ["回復封じ", "回復不能", "回復を封"],
+  STRIP: ["剥が", "はが", "打ち消", "取り除", "解除"],
+  HEAL_BLOCK: ["回復封じ", "回復不能", "回復を封", "回復阻害"],
+  MITIGATE: ["軽減"],
+  PROTECT: ["保護", "かば", "肩代わり"],
+  COUNTER_STANCE: ["反撃"],
+  COOLDOWN_REDUCE: ["クールタイム", "CT"],
+  STEAL_BUFF: ["奪"],
+  COOP_ATTACK: ["協力攻撃"],
+  GAUGE_ON_HIT: ["ゲージ"],
 };
 
 function allSkills(t: MonsterTemplate): { where: string; skill: Skill }[] {

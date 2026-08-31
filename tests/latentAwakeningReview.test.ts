@@ -6,6 +6,15 @@ describe("潜在候補の表示と宣言値の整合", () => {
   const all = Object.values(LATENT_ABILITY_CANDIDATES).flat();
   it("攻勢候補に説明外の一律damage bonusがない", () => {
     for (const candidate of all.filter((value) => value.id.endsWith("_latent_1"))) {
+      /*
+       * 能力比例を伸ばす候補(HP比例・防御比例)は、**説明文でそう言っている**ので
+       * ここでは通す。見張りたいのは「説明に無い一律のダメージ増」なので、
+       * 素の DAMAGE_UP に紛れ込んだ value != 0 だけを落とす。
+       */
+      if (candidate.effectType === "HP_SCALING" || candidate.effectType === "DEF_SCALING") {
+        expect(candidate.description, candidate.id).toContain("比例");
+        continue;
+      }
       expect(candidate.effectType).toBe("DAMAGE_UP");
       expect(candidate.value).toBe(0);
     }

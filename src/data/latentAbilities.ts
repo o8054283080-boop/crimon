@@ -1,5 +1,6 @@
 import { LatentAbilityCandidate, LatentRuntimeEffect } from "../core/monsterDevelopment.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "./monsters.js";
+import { NEW_LATENT_ABILITY_CANDIDATES } from "./newLatentAbilities.js";
 import { setLatentAbilityResolver } from "../core/monsterInstance.js";
 
 const ELEMENT_LABEL: Record<string, string> = { FIRE: "炎", WATER: "水", GRASS: "翠", ELECTRIC: "雷", LIGHT: "光", DARK: "闇" };
@@ -29,6 +30,13 @@ function grade(index: number): "S" | "A" | "B" | "C" { return index < 6 ? "S" : 
 /** 72個体それぞれを属性・既存S1の役割に合わせ、安定IDの三方向へ展開する。 */
 export const LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentAbilityCandidate[]>> = Object.fromEntries(
   ALL_DISPLAYABLE_MONSTERS_DEX.map((monster, monsterIndex) => {
+    /*
+     * 追加11種は**手書きの表**を持っている(`newLatentAbilities.ts`)。
+     * ここの自動生成は「どの種族にも当てはまる汎用の3方向」を配る作りで、
+     * その種族のスキル1が何をするかを見ていない。書いてある方を優先する。
+     */
+    const authored = NEW_LATENT_ABILITY_CANDIDATES[monster.id];
+    if (authored) return [monster.id, authored] as const;
     const prefix = `${ELEMENT_LABEL[monster.element]}の${SPECIES_LABEL[monster.templateId]}`;
     const offenseMode = monsterIndex % 3;
     const offense: LatentAbilityCandidate = {

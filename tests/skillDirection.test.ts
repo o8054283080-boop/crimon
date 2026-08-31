@@ -21,17 +21,21 @@ function directionOf(target: TargetType): Direction {
 }
 
 /** 味方に向けてこそ意味がある効果(敵を狙う技に置くと敵を利する) */
-const HELPFUL: SkillEffect["kind"][] = ["HEAL", "SHIELD", "IMMUNITY", "REGEN", "CLEANSE", "BUFF"];
+const HELPFUL: SkillEffect["kind"][] = ["HEAL", "SHIELD", "IMMUNITY", "REGEN", "CLEANSE", "BUFF", "MITIGATE", "PROTECT", "COOLDOWN_REDUCE"];
 /** 敵に向けてこそ意味がある効果(味方を狙う技に置くと味方を害する) */
-const HARMFUL: SkillEffect["kind"][] = ["DAMAGE", "DEBUFF", "STUN", "BURN", "POISON", "BLIND", "COOLDOWN_EXTEND"];
+const HARMFUL: SkillEffect["kind"][] = ["DAMAGE", "DEBUFF", "STUN", "BURN", "POISON", "BLIND", "COOLDOWN_EXTEND", "STRIP", "STEAL_BUFF", "HEAL_BLOCK"];
 
 /** 効果の向きが対象と合っていない場合に、その理由を返す */
 function misdirection(effect: SkillEffect, direction: Direction): string | undefined {
-  // 向き先を自前で持つ効果は、対象と食い違っていて構わない
-  if (effect.kind === "HEAL" && effect.applyTo) return undefined;
-  if (effect.kind === "BUFF" && (effect.applyTo === "SELF" || effect.applyTo === "ALLIES")) return undefined;
-  // ライフスティールは常に術者が回復する
-  if (effect.kind === "LIFESTEAL") return undefined;
+  /*
+   * **`applyTo` が書いてある時点で、向き先は宣言されている。**
+   * スキルの対象と食い違っていても、それは食い違いではなく指定。
+   * 効果の種類ごとに書き写していた頃は、新しく applyTo を持てるようにした
+   * 種類だけが検査から漏れた(GAUGEとCLEANSEで実際に起きた)。
+   */
+  if ("applyTo" in effect && effect.applyTo !== undefined) return undefined;
+  // ライフスティール・反撃態勢・協力攻撃は、常に術者そのものに向く
+  if (effect.kind === "LIFESTEAL" || effect.kind === "COUNTER_STANCE" || effect.kind === "COOP_ATTACK") return undefined;
 
   if (effect.kind === "GAUGE") {
     // 吸収は相手から奪う動作なので敵向き、素の増加は味方向き

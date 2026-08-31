@@ -18,7 +18,7 @@ import { CreateSlot, currentSkillOf, describeCreatedSkill } from "../../game/mon
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
 import { managementHeader } from "./managementHeader.js";
-import { computeLeveledSkill, describeSkillEffect, MAX_SKILL_LEVEL } from "../../core/skill.js";
+import { computeLeveledSkill, describeSkillLines, MAX_SKILL_LEVEL } from "../../core/skill.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import "../ui/monsterDetail.css";
 
@@ -347,7 +347,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
       el("div", { className: "monster-detail-skills__grid" }, skills.length ? skills.map((skill, index) => {
         const level = instance.skillLevels?.[index] ?? 1;
         const leveled = computeLeveledSkill(skill, level);
-        const effects = leveled.effects?.map(describeSkillEffect) ?? [];
+        const effects = describeSkillLines(leveled);
         return el("details", { className: "monster-skill-compact" }, [
           el("summary", {}, [
             el("span", { className: "monster-skill-compact__slot" }, [`S${index + 1}`]),
