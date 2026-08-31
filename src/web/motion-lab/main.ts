@@ -1,5 +1,5 @@
 import "./motionLab.css";
-import { ExternalAIMotionProvider } from "./externalProvider.js";
+import { AutoRigMotionProvider } from "./autoRigProvider.js";
 import { createPngSequenceZip, createSpriteSheet } from "./export.js";
 import type { CharacterType, FrameCount, MotionFps, MotionGenerationResult, MotionType, OutputSize } from "./types.js";
 
@@ -12,17 +12,17 @@ const characters: Array<[CharacterType, string]> = [["slime", "slime"], ["humano
 let source: File | null = null; let sourceUrl = ""; let result: MotionGenerationResult | null = null; let playing = false; let timer = 0; let frameIndex = 0; let aborter: AbortController | null = null;
 
 root.innerHTML = `<main class="motion-lab">
-  <header class="motion-lab__hero"><a href="../" class="motion-lab__back">← ゲームへ戻る</a><p class="motion-lab__eyebrow">CRIMON ASSET PIPELINE</p><h1>Motion Lab</h1><p>透明PNGから、AIがキャラクター固有の動きを描くゲーム素材を生成します。</p></header>
+  <header class="motion-lab__hero"><a href="../" class="motion-lab__back">← ゲームへ戻る</a><p class="motion-lab__eyebrow">CRIMON ASSET PIPELINE</p><h1>Motion Lab</h1><p>1枚の透明PNGを自動リグでパーツ化。外部送信も利用料もなく、ブラウザ内でモーション素材を生成します。</p></header>
   <div class="motion-lab__grid"><section class="motion-lab__controls">
-    <fieldset><legend><b>1</b> 画像入力</legend><label class="motion-lab__drop"><input id="source" type="file" accept="image/png"><span>透明背景PNGを選択</span><small>画像は選択したAI APIにだけ送信されます</small></label><div id="source-preview" class="motion-lab__source-preview">未選択</div></fieldset>
+    <fieldset><legend><b>1</b> 画像入力</legend><label class="motion-lab__drop"><input id="source" type="file" accept="image/png"><span>透明背景PNGを選択</span><small>画像はこの端末のブラウザ内だけで処理します</small></label><div id="source-preview" class="motion-lab__source-preview">未選択</div></fieldset>
     <fieldset><legend><b>2</b> モーション種別</legend><div class="motion-lab__choices" id="motions">${motions.map(([v,l],i)=>`<label><input type="radio" name="motion" value="${v}" ${i===0?"checked":""}><span>${l}</span></label>`).join("")}</div></fieldset>
     <fieldset><legend><b>3</b> キャラクタータイプ</legend><div class="motion-lab__choices" id="characters">${characters.map(([v,l],i)=>`<label><input type="radio" name="character" value="${v}" ${i===0?"checked":""}><span>${l}</span></label>`).join("")}</div></fieldset>
     <fieldset><legend><b>4</b> 生成設定</legend><div class="motion-lab__settings">
       <label>フレーム数<select id="frames"><option>12</option><option>24</option><option selected>36</option></select></label>
       <label>FPS<select id="fps"><option>8</option><option>12</option><option selected>16</option><option>20</option><option>24</option></select></label>
       <label>1フレーム<select id="size"><option>256</option><option selected>384</option><option>512</option></select></label>
-    </div><label>補助指示<textarea id="extra" rows="3" placeholder="例: 杖を振る動きを強調（任意）"></textarea></label></fieldset>
-    <fieldset><legend><b>5</b> AI接続</legend><label>OpenAI APIキー<input id="key" type="password" autocomplete="off" placeholder="sk-…"></label><p class="motion-lab__note">キーはメモリ内だけで使用し、保存しません。OpenAI Images Edit APIへ各フレームを順番に送ります。生成はAPI利用料が発生します。</p><label class="motion-lab__consent"><input id="consent" type="checkbox"><span>送信先と課金の可能性を理解して実行する</span></label><button id="generate" class="motion-lab__primary">AIでモーション生成</button><button id="cancel" class="motion-lab__secondary" hidden>生成を中止</button><p id="status" role="status" aria-live="polite"></p></fieldset>
+    </div></fieldset>
+    <fieldset><legend><b>5</b> ローカル生成</legend><p class="motion-lab__note">透明境界・重心・体型から頭、胴、下半身、左右の突出部を推定し、制御点ごとに回転・位相差・局所ワープを適用します。APIキーや通信は不要です。</p><button id="generate" class="motion-lab__primary">無料でモーション生成</button><button id="cancel" class="motion-lab__secondary" hidden>生成を中止</button><p id="status" role="status" aria-live="polite"></p></fieldset>
   </section><section class="motion-lab__result"><div class="motion-lab__result-head"><div><p class="motion-lab__eyebrow">PREVIEW</p><h2>生成結果</h2></div><button id="play" disabled>▶ 再生</button></div><div id="stage" class="motion-lab__stage"><p>生成したフレームがここに表示されます</p></div><div id="info" class="motion-lab__info">フレーム — ・サイズ — ・容量 —</div><div id="film" class="motion-lab__film"></div>
     <div class="motion-lab__exports"><h3>書き出し</h3><button id="sheet" disabled>Sprite sheet PNG</button><button id="sequence" disabled>PNG連番（ZIP）</button><button disabled title="ブラウザ標準APIでは透過アニメーションを安定生成できません">Animated WebP（準備中）</button><p id="export-info"></p></div></section></div></main>`;
 
@@ -38,14 +38,13 @@ $("#source").addEventListener("change", async (event) => {
 
 $("#generate").addEventListener("click", async () => {
   if (!source) { status.textContent = "先に透明背景PNGを選択してください。"; return; }
-  const key=$("#key") as HTMLInputElement; if (!key.value.trim()) { status.textContent="APIキーを入力してください。キーは保存されません。"; key.focus(); return; }
-  if (!(($("#consent") as HTMLInputElement).checked)) { status.textContent="送信と課金に関する確認へチェックしてください。"; return; }
+
   cleanupResult(); aborter = new AbortController(); toggleBusy(true); const frames = Number(($("#frames") as HTMLSelectElement).value) as FrameCount;
   try {
-    status.textContent=`AI生成を開始しました（0 / ${frames}）。完了までこの画面を開いたままにしてください。`;
-    const provider=new ExternalAIMotionProvider({apiKey:key.value});
-    result=await provider.generate({image:source,fileName:source.name,motion:checked<MotionType>("motion"),characterType:checked<CharacterType>("character"),frameCount:frames,fps:Number(($("#fps") as HTMLSelectElement).value) as MotionFps,size:Number(($("#size") as HTMLSelectElement).value) as OutputSize,extraInstruction:($("#extra") as HTMLTextAreaElement).value,signal:aborter.signal});
-    renderResult(); status.textContent="AIモーションの生成が完了しました。";
+    status.textContent=`自動リグを推定し、${frames}フレームをローカル生成中です。`;
+    const provider=new AutoRigMotionProvider();
+    result=await provider.generate({image:source,fileName:source.name,motion:checked<MotionType>("motion"),characterType:checked<CharacterType>("character"),frameCount:frames,fps:Number(($("#fps") as HTMLSelectElement).value) as MotionFps,size:Number(($("#size") as HTMLSelectElement).value) as OutputSize,extraInstruction:"",signal:aborter.signal});
+    renderResult(); status.textContent="ローカルモーションの生成が完了しました。";
   } catch(error) { status.textContent=error instanceof Error ? error.message : "生成に失敗しました。"; } finally { aborter=null; toggleBusy(false); }
 });
 $("#cancel").addEventListener("click",()=>aborter?.abort());

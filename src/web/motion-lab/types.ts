@@ -1,3 +1,5 @@
+import type { AutoRig } from "./rig.js";
+
 export type MotionType = "idle" | "attack" | "heal" | "hit" | "buff" | "debuff" | "defend" | "victory" | "defeat" | "skill";
 export type CharacterType = "slime" | "humanoid" | "quadruped" | "floating" | "heavy" | "dragon";
 export type FrameCount = 12 | 24 | 36;
@@ -23,6 +25,7 @@ export interface MotionGenerationResult {
   width: number;
   height: number;
   provider: string;
+  rig?: AutoRig;
 }
 
 export interface MotionGeneratorProvider {
