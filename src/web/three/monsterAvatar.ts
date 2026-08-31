@@ -176,6 +176,9 @@ export interface MonsterAvatarOptions {
  */
 export class MonsterAvatar {
   readonly root = new THREE.Group();
+  /** 立ち位置。モーションで動く現在位置と違い、**ここは戦闘中ずっと変わらない** */
+  private slotX = 0;
+  private slotZ = 0;
   readonly theme: ElementTheme;
 
   private readonly kit: CreatureKit;
@@ -433,7 +436,22 @@ export class MonsterAvatar {
   }
 
   setSlotPosition(x: number, z: number): void {
+    this.slotX = x;
+    this.slotZ = z;
     this.root.position.set(x, 0, z);
+  }
+
+  /**
+   * HPの札を置く、頭上あたりのワールド座標。**モーションで動かない。**
+   *
+   * 2D側(`spriteAvatar.ts`)と同じ約束事。片方にだけ足すと、
+   * 絵のある種族と無い種族で札の落ち着き方が変わる。
+   */
+  getSlotAnchorWorldPosition(target: THREE.Vector3): THREE.Vector3 {
+    // 2D側と同じく、頭のてっぺんを使う。0.86だと札が頭に食い込む
+    target.set(this.slotX, this.rig.height, this.slotZ);
+    this.root.parent?.localToWorld(target);
+    return target;
   }
 
   /** ダメージ表示などをぶら下げるための、頭上あたりのワールド座標 */

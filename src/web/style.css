@@ -1130,24 +1130,90 @@ body {
 
 /* 敵の札は地を赤みへ振る。どちらの陣営かを色でも読ませる */
 /*
- * 画面の左右の端へ寄せた時の札。
+ * ============================================================
+ * 本体の頭の上に置く、細い帯の札(--slim)
+ * ============================================================
  *
- * 端の列では**隣の札とぶつからない**ので、横並びを前提にした広さは要らない。
- * 細くしたぶんだけ画面の真ん中が空き、モンスターが大きく映る。
- * 390px幅の実機で、札2枚が220pxを占めていたのを190pxまで削った。
+ * ## なぜ名前もHPの数字も出さないのか
+ *
+ * 隊列を片側2列の千鳥にしたら、390pxの画面に4列(味方2・敵2)が並んだ。
+ * 段の間隔は画面上で120pxしかなく、そこへ本体の背丈(83px)と札が入る。
+ * **名前・★・紋章・HPの数字を積んだ札は74pxあり、どう置いても本体に重なる。**
+ * 依頼主から「HPバーがモンスターと被っている」と指摘を受けた。
+ *
+ * 依頼主が2度にわたって描いた図は、どちらも**緑の線と黄の線の2本だけ**
+ * だった。名前も数字も無い。それが答えなので、そのとおりにする。
+ *
+ * 消える情報の行き先:
+ *   - 名前と属性 → モンスターの絵そのもの。2Dの絵になって判別が上がった
+ *   - HPの数字   → 減った量は飛び出す数字で見える。残量は帯の長さで読む
+ *   - ★の等級    → 戦闘中に使う情報ではない(編成画面で見る)
+ *
+ * 高さは13px(HP 7px + 隙間2px + ゲージ4px)。74pxから61px削った。
  */
-.unit-hud--rail .unit-hud__plate {
-  min-width: 84px;
-  max-width: 112px;
-  gap: 4px;
-  padding: 2px 5px 2px 2px;
+.unit-hud--slim .unit-hud__plate {
+  display: block;
+  min-width: 0;
+  max-width: none;
+  width: 76px;
+  padding: 0;
+  gap: 0;
+  border-radius: 3px;
+  background: none;
+  /* 帯そのものが枠を持つので、板の額縁は要らない */
+  box-shadow: none;
 }
-.unit-hud--rail .unit-hud__crest {
-  width: 16px;
-  height: 19px;
+.unit-hud--slim .unit-hud__crest,
+.unit-hud--slim .unit-hud__head,
+.unit-hud--slim .unit-hud__hp-text,
+.unit-hud--slim .unit-hud__hp-ticks,
+.unit-hud--slim .unit-hud__boss {
+  display: none;
 }
-.unit-hud--rail .unit-hud__name {
-  font-size: 0.6rem;
+.unit-hud--slim .unit-hud__col {
+  display: block;
+  min-width: 0;
+  width: 100%;
+}
+.unit-hud--slim .unit-hud__hp {
+  height: 7px;
+  border-radius: 3px;
+  /* 明るい石畳の背景でも帯の両端が読めるよう、縁を1本入れる */
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.72),
+    0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.unit-hud--slim .unit-hud__gauge {
+  height: 4px;
+  margin-top: 2px;
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.72),
+    0 1px 2px rgba(0, 0, 0, 0.6);
+}
+/*
+ * 状態異常のアイコン。**帯より小さくする。**
+ * ここが大きいと、削った61pxがそのまま戻ってきて本体に重なる。
+ */
+.unit-hud--slim .unit-hud__chips {
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.unit-hud--slim .unit-chip {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+/*
+ * 残りターン数は9pxを下回らせない。**実機で読めなくなる。**
+ * `tests/cssReadability.test.ts` が9px未満を機械的に落とす。
+ * 小さくしたいからといってここを削ると、毒があと1ターンなのか
+ * 3ターンなのかが読めず、戦術の判断そのものが消える。
+ */
+.unit-hud--slim .unit-chip__turns {
+  font-size: 9px;
+  min-width: 10px;
+  padding: 0 1px;
 }
 
 .unit-hud--enemy .unit-hud__plate {

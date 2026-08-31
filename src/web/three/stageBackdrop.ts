@@ -54,15 +54,33 @@ const ELEMENT_BACKDROP: Record<Element, string> = {
 };
 
 /**
+ * 舞台そのものが決まっている戦い。
+ *
+ * 試練の塔と対人戦は、**敵の属性ではなく「その場所」で舞台が決まる。**
+ * 塔は同じ塔を上っていくのに階ごとに舞台が変わっては上っている感じが出ないし、
+ * アリーナは観客のいる闘技場であることが対人戦の空気そのもの。
+ */
+export type BattleVenue = "tower" | "duel";
+
+const VENUE_BACKDROP: Record<BattleVenue, string> = {
+  tower: "arena-tower",
+  duel: "arena-duel",
+};
+
+/**
  * その戦いの背景を探す。
  *
- * **属性専用 → 闘技場(万能の代役)** の順。
+ * **場所が決まっている戦い → 属性専用 → 闘技場(万能の代役)** の順。
  * 6属性ぶんを描き切らないと何も出せない、という形にしない。
  * 絵が届いた属性から順に、その属性だけが専用の絵へ切り替わる。
  *
  * 1枚も無ければ null。呼び出し側はその時だけ3Dの闘技場のままになる。
  */
-export function backdropUrlFor(element: Element | null): string | null {
+export function backdropUrlFor(element: Element | null, venue?: BattleVenue): string | null {
+  if (venue) {
+    const own = BY_NAME.get(VENUE_BACKDROP[venue]);
+    if (own) return own;
+  }
   if (element) {
     const own = BY_NAME.get(ELEMENT_BACKDROP[element]);
     if (own) return own;

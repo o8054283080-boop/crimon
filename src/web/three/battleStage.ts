@@ -6,7 +6,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { Element } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { ArenaHandles, createArena } from "./arena.js";
-import { BackdropHandles, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
+import { BackdropHandles, BattleVenue, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
 import { SPRITE_MAX_HEIGHT } from "./spriteAvatar.js";
 import { dominantElement, moodFor, StageMood } from "./elementTheme.js";
 import { BattleAvatar, createBattleAvatar } from "./avatarFactory.js";
@@ -22,8 +22,18 @@ export interface StageUnitInit {
 /** バトル画面のHTML側が知りたい、各ユニットの画面上の位置(HPバー等の追従用) */
 export interface ScreenAnchor {
   instanceId: string;
+  /** いまの本体の頭上。**モーションで動く。**ダメージの数字はここへ出す */
   x: number;
   y: number;
+  /**
+   * 立ち位置から見た頭上。**モーションで動かない。**
+   *
+   * HPの札はこちらを使う。動く方に合わせていたら、待機の漂いと
+   * 攻撃の踏み込みがそのまま札へ伝わり、**画面全体がガタついて読めなかった**
+   * (依頼主から「キャラの位置が動いていて見づらい」と指摘を受けた)。
+   */
+  slotX: number;
+  slotY: number;
   /** カメラ後方など、画面に映っていない場合はfalse */
   visible: boolean;
   /** 遠いユニットのUIを少し小さくするための倍率 */
@@ -106,10 +116,17 @@ const LANE_X_WIDE = 2.4;
  * 千鳥の段の間隔(前後方向)。
  *
  * **隣り合う段は別の列に入る**ので、ここは「同じ列の間隔の半分」にあたる。
- * 段の間隔は画面上の高さでいうと約79px、モンスターの背丈が約91px。
- * 隣どうしが少し重なるが、別の列なので横にずれており、参考画面と同じ密度になる。
+ *
+ * **札が本体に重ならない値にしてある。**依頼主から
+ * 「HPバーがモンスターと被っている」という指摘を受けた。
+ * 段の間隔(画面上で約124px)から本体の背丈(約72px)を引いた残り52pxに、
+ * 細い帯の札(状態異常18px + HP 7px + ゲージ4px + 内側の隙間4px = 33px)と、
+ * 本体の頭との隙間16pxが入る。
+ *
+ * `SPRITE_SCALE` と対で決まる。**片方だけ触ると必ずまた重なる。**
+ * `tests/stageBackdrop.test.ts` が両者の比を見張っている。
  */
-const RUNG = 2.5;
+const RUNG = 3.15;
 
 /**
  * 見下ろし角(44〜48度)の cos の見込み。
@@ -124,29 +141,35 @@ const TILT_COS = 0.70;
  * 板の半幅の見込み。
  *
  * 実際の幅は絵の縦横比で決まる。最大は横長のゴーレム(512×420)で、
- * 背丈2.45 × 表示倍率0.68 × 縦横比1.22 ÷ 2 = 1.02。少し余裕を足してある。
+ * 背丈2.45 × 表示倍率0.52 × 縦横比1.22 ÷ 2 = 0.78。少し余裕を足してある。
  * ここが足りないと、列が画面の端で切れる(実際にゴーレムが切れた)。
  *
  * **`spriteAvatar.ts` の `SPRITE_SCALE` と対で決まる。**片方だけ触らない。
  */
-const SPRITE_HALF_WIDTH = 1.05;
+const SPRITE_HALF_WIDTH = 0.80;
 
 /**
  * 背景の絵を暗く落とす量。
  *
- * **届いた闘技場は床の明るさが0.75あった**(`tools/prepareBackgrounds.mjs` が測る)。
- * 砂色の石畳の上に彩度の高いデフォルメの絵を置くと、輪郭が埋もれる。
- * 描き直しを頼むより、載せる側で落とす方が速く、他の絵が届いても効く。
+ * 最初に届いた闘技場は床の明るさが0.75あり(`tools/prepareBackgrounds.mjs` が測る)、
+ * 砂色の石畳の上でモンスターの輪郭が埋もれたので0.24まで落としていた。
+ *
+ * **8属性ぶんが揃った時、絵の側が既に暗く描かれていた**(明るさ0.62以下)。
+ * 落としすぎると今度は舞台が真っ黒になり、せっかくの絵が見えない。
+ * 明るい絵が1枚混ざっても耐えられる程度に留める。
  */
-const BACKDROP_DIM = 0.24;
+const BACKDROP_DIM = 0.10;
 /**
  * 背景の左右の端と下を落とす量。
  *
- * HPと行動ゲージの札が左右の端に乗る。明るい石畳の上に白い文字が来ると読めない。
- * `docs/battle-background-art.md` では絵の側にも頼んでいるが、
- * **届いた絵は落ちていなかった。**約束が守られない前提で、載せる側でも落とす。
+ * 最初に届いた1枚は端が落ちておらず、載せる側で0.34まで落としていた。
+ * **8属性ぶんは絵の側で落として描かれていた**ので、二重に落とすと
+ * 画面の左右が黒い帯になる。ここは仕上げの締めだけに使う。
+ *
+ * 札も細い帯になり、端に固定するのをやめた(本体の頭の上へ移した)ので、
+ * 「札を読ませるために端を暗くする」という当初の理由自体が薄れている。
  */
-const BACKDROP_EDGE = 0.34;
+const BACKDROP_EDGE = 0.14;
 
 /**
  * 画面の上でUIが覆う割合。盤面はここを避けて収める。
@@ -247,6 +270,19 @@ const HIT_STYLE_BY_ROLE: Record<string, HitStyle> = {
  * 値は、3Dモデル(背丈2.45)の頃に見て決めた寸法から逆算してある。
  */
 const VFX_PER_SPRITE_HEIGHT = 0.175;
+
+/**
+ * 状態異常のオーラ(守りのドーム・免疫・気絶・継続回復)の大きさ。
+ *
+ * **ここだけ、画面にもモンスターにも一切追従していなかった。**
+ * 大きさを渡さずに呼んでいたので、既定の1のまま固定されていた。
+ * 守りのドームは半径1.35で、絵を0.52倍にした本体(背丈1.27)の
+ * **2倍以上の白い球**になり、味方5体が丸ごと泡に包まれた。
+ *
+ * 基準は3Dの骨格でいちばん背の高いボス(2.95)。
+ * そこからの縮み具合をそのままオーラへ渡せば、本体を軽く包む大きさになる。
+ */
+const AURA_SCALE = SPRITE_MAX_HEIGHT / 2.95;
 
 /**
  * パーティクルの密度。1未満にすると粒の数が減る。
@@ -405,7 +441,7 @@ export class BattleStage {
   private disposed = false;
   private elapsed = 0;
 
-  constructor(container: HTMLElement, units: StageUnitInit[]) {
+  constructor(container: HTMLElement, units: StageUnitInit[], venue?: BattleVenue) {
     this.element = container;
 
     /*
@@ -458,7 +494,7 @@ export class BattleStage {
      * 見えないものに描画回数を払うのは、この案件でいちばん避けたい形
      * (実効31.5fpsまで落ちた原因がまさにそれだった)。
      */
-    const backdropUrl = backdropUrlFor(stageElement);
+    const backdropUrl = backdropUrlFor(stageElement, venue);
     this.backdrop = backdropUrl
       ? createBackdrop({ url: backdropUrl, dim: BACKDROP_DIM, edge: BACKDROP_EDGE })
       : null;
@@ -1401,11 +1437,21 @@ export class BattleStage {
     this.cameraOffset.lerp(this.desiredCameraOffset, follow);
     this.cameraLookOffset.lerp(this.desiredLookOffset, follow);
 
-    // 待機中もわずかに揺らして静止画に見せない。
-    // フレーミングを壊さないよう、振れ幅は構図に影響しない範囲に抑える
-    const idleX = Math.sin(this.elapsed * 0.19) * 0.16;
-    const idleY = Math.sin(this.elapsed * 0.27 + 1.2) * 0.08;
-
+    /*
+     * 待機中のカメラの揺れは**やめた。**
+     *
+     * 3Dの頃は、揺らすと手前と奥がずれて視差が出るので「静止画に見えない」
+     * 効果があった。**正投影の2Dでは視差が出ない。**画面の全部が
+     * 同じだけ平行移動するだけで、背景も本体も札もまとめてずれる。
+     *
+     * 実測で、一時停止しているのに札が横に12px揺れていた。
+     * 依頼主から「キャラの位置が動いていて見づらい」
+     * 「HPバーも動いているとごちゃごちゃして見にくい」という指摘を
+     * 2度受けたが、札を立ち位置へ固定してもまだ揺れていた真犯人がここ。
+     *
+     * 「静止画に見えない」役目は、モンスター1体ずつの呼吸と漂いが担う。
+     * そちらは**個別に**動くので、画面全体は静かなまま生気が出る。
+     */
     // 手で回した角度を目標へ滑らかに寄せる(指を離しても急に止まらない)
     this.orbitYaw += (this.orbitYawTarget - this.orbitYaw) * Math.min(1, dt * 9);
     // 回すと2つの列の並び方が変わり、必要な画角も変わる。
@@ -1416,8 +1462,6 @@ export class BattleStage {
     }
 
     this.camera.position.copy(this.cameraBase).add(this.cameraOffset);
-    this.camera.position.x += idleX;
-    this.camera.position.y += idleY;
 
     if (this.shakeStrength > 0.0005) {
       this.camera.position.x += (Math.random() - 0.5) * this.shakeStrength;
@@ -1442,10 +1486,22 @@ export class BattleStage {
     const avatar = this.avatars.get(instanceId);
     if (!avatar) return;
 
-    const position = avatar.root.position;
-    // 行動者の方向へ少しだけパン+寄り。全員が読める構図を壊さない程度に留める
-    this.desiredCameraOffset.set(position.x * 0.12, -0.12, -0.9);
-    this.desiredLookOffset.set(position.x * 0.2, 0.12, position.z * 0.1);
+    /*
+     * **行動者へのパンと寄りもやめた。**
+     *
+     * 行動者の方向へカメラを振ると、画面上では左右の列が25pxほど平行移動する。
+     * 誰かが動くたびに**8体ぶんの札が全部ずれる**ので、
+     * 何が起きたのかを追う前に目が振り回される。
+     *
+     * 誰の番かは本体の発光(`setActive`)と、その本体だけが踏み込む
+     * モーションで足りている。カメラまで動かす必要は無かった。
+     *
+     * 着弾の揺れ(`shakeStrength`)は残してある。あれは一瞬で収まるし、
+     * 盤面が静止しているからこそ「効いた」と分かる。
+     */
+    void avatar;
+    this.desiredCameraOffset.set(0, 0, 0);
+    this.desiredLookOffset.set(0, 0, 0);
   }
 
   getAvatar(instanceId: string): BattleAvatar | undefined {
@@ -1599,10 +1655,18 @@ export class BattleStage {
     avatar.playCast();
     this.vfx.spawnCastCharge(anchor, avatar.theme.vfx, { element: this.elementOf(actorId), scale: 1.3 });
 
-    // 通常のfocusOnより一段強く寄る。着弾時にshakeが入ると自然に戻る
-    const position = avatar.root.position;
-    this.desiredCameraOffset.set(position.x * 0.3, -1.1, position.z * 0.16 - 2.4);
-    this.desiredLookOffset.set(position.x * 0.36, 0.25, position.z * 0.22);
+    /*
+     * **カメラは寄せない。**
+     *
+     * 「通常より一段強く寄る」つもりの設定だったが、正投影では
+     * **カメラを近づけても大きさが変わらない。**残るのは横の平行移動だけで、
+     * 見せ場を作るどころか画面全体が振れて8体ぶんの札がずれる。
+     *
+     * 正投影で本当に寄るには `camera.zoom` を上げる必要がある。
+     * それは別の作りなので、いまは入れない。必殺技の「ここぞ」は
+     * 溜めのエフェクト(spawnCastCharge)と本体のモーション、
+     * 着弾の揺れ(shakeStrength)で足りている。
+     */
   }
 
   /** 必殺技の着弾。地面を走る衝撃と、強い揺れ・時間停止を重ねる */
@@ -1668,7 +1732,7 @@ export class BattleStage {
     const anchor = this.anchorOf(instanceId);
     for (const kind of wanted) {
       if (!current.has(kind) && anchor) {
-        this.vfx.attachStatusAura(instanceId, kind, anchor);
+        this.vfx.attachStatusAura(instanceId, kind, anchor, { scale: AURA_SCALE });
       }
     }
     for (const kind of current) {
@@ -1686,13 +1750,34 @@ export class BattleStage {
       const distance = this.camera.position.distanceTo(this.tmpVector);
       this.tmpVector.project(this.camera);
       const visible = this.tmpVector.z < 1;
+      const x = (this.tmpVector.x * 0.5 + 0.5) * width;
+      const y = (-this.tmpVector.y * 0.5 + 0.5) * height;
+      void distance;
+
+      // 札用の、モーションで動かない座標
+      avatar.getSlotAnchorWorldPosition(this.tmpRelative).project(this.camera);
       anchors.push({
         instanceId,
-        x: (this.tmpVector.x * 0.5 + 0.5) * width,
-        y: (-this.tmpVector.y * 0.5 + 0.5) * height,
+        x,
+        y,
+        slotX: (this.tmpRelative.x * 0.5 + 0.5) * width,
+        slotY: (-this.tmpRelative.y * 0.5 + 0.5) * height,
         visible,
         // カメラ距離を基準にした相対スケール。極端にならないよう範囲を絞る
-        scale: THREE.MathUtils.clamp(this.frameDistance / distance, 0.78, 1.12),
+        /*
+         * **1で固定する。**
+         *
+         * 透視投影の頃は、奥のユニットの札を小さくして遠さを出していた。
+         * 正投影にしたので**奥も手前も同じ大きさで映る**ようになり、
+         * 札だけ縮める理由が無くなった。
+         *
+         * それ以上に悪かったのは、この距離が**本体の現在位置**までの
+         * ものだったこと。待機で漂うたびに距離が変わり、札が毎フレーム
+         * わずかに伸び縮みしていた。位置を固定しても、大きさが脈打てば
+         * 結局ちらついて読めない(依頼主から「HPバーも動いていて
+         * ごちゃごちゃして見にくい」という指摘を受けた)。
+         */
+        scale: 1,
       });
     }
     return anchors;
