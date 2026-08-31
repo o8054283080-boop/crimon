@@ -119,14 +119,14 @@ const LANE_X_WIDE = 2.4;
  *
  * **札が本体に重ならない値にしてある。**依頼主から
  * 「HPバーがモンスターと被っている」という指摘を受けた。
- * 段の間隔(画面上で約123px)から本体の背丈(約75px)を引いた残り48pxに、
- * 細い帯の札(状態異常18px + HP 7px + ゲージ4px = 33px)と、
- * 本体の頭との隙間8pxが入る。
+ * 段の間隔(画面上で約124px)から本体の背丈(約72px)を引いた残り52pxに、
+ * 細い帯の札(状態異常18px + HP 7px + ゲージ4px + 内側の隙間4px = 33px)と、
+ * 本体の頭との隙間16pxが入る。
  *
  * `SPRITE_SCALE` と対で決まる。**片方だけ触ると必ずまた重なる。**
  * `tests/stageBackdrop.test.ts` が両者の比を見張っている。
  */
-const RUNG = 3.0;
+const RUNG = 3.15;
 
 /**
  * 見下ろし角(44〜48度)の cos の見込み。
@@ -1437,11 +1437,21 @@ export class BattleStage {
     this.cameraOffset.lerp(this.desiredCameraOffset, follow);
     this.cameraLookOffset.lerp(this.desiredLookOffset, follow);
 
-    // 待機中もわずかに揺らして静止画に見せない。
-    // フレーミングを壊さないよう、振れ幅は構図に影響しない範囲に抑える
-    const idleX = Math.sin(this.elapsed * 0.19) * 0.16;
-    const idleY = Math.sin(this.elapsed * 0.27 + 1.2) * 0.08;
-
+    /*
+     * 待機中のカメラの揺れは**やめた。**
+     *
+     * 3Dの頃は、揺らすと手前と奥がずれて視差が出るので「静止画に見えない」
+     * 効果があった。**正投影の2Dでは視差が出ない。**画面の全部が
+     * 同じだけ平行移動するだけで、背景も本体も札もまとめてずれる。
+     *
+     * 実測で、一時停止しているのに札が横に12px揺れていた。
+     * 依頼主から「キャラの位置が動いていて見づらい」
+     * 「HPバーも動いているとごちゃごちゃして見にくい」という指摘を
+     * 2度受けたが、札を立ち位置へ固定してもまだ揺れていた真犯人がここ。
+     *
+     * 「静止画に見えない」役目は、モンスター1体ずつの呼吸と漂いが担う。
+     * そちらは**個別に**動くので、画面全体は静かなまま生気が出る。
+     */
     // 手で回した角度を目標へ滑らかに寄せる(指を離しても急に止まらない)
     this.orbitYaw += (this.orbitYawTarget - this.orbitYaw) * Math.min(1, dt * 9);
     // 回すと2つの列の並び方が変わり、必要な画角も変わる。
@@ -1452,8 +1462,6 @@ export class BattleStage {
     }
 
     this.camera.position.copy(this.cameraBase).add(this.cameraOffset);
-    this.camera.position.x += idleX;
-    this.camera.position.y += idleY;
 
     if (this.shakeStrength > 0.0005) {
       this.camera.position.x += (Math.random() - 0.5) * this.shakeStrength;
@@ -1478,10 +1486,22 @@ export class BattleStage {
     const avatar = this.avatars.get(instanceId);
     if (!avatar) return;
 
-    const position = avatar.root.position;
-    // 行動者の方向へ少しだけパン+寄り。全員が読める構図を壊さない程度に留める
-    this.desiredCameraOffset.set(position.x * 0.12, -0.12, -0.9);
-    this.desiredLookOffset.set(position.x * 0.2, 0.12, position.z * 0.1);
+    /*
+     * **行動者へのパンと寄りもやめた。**
+     *
+     * 行動者の方向へカメラを振ると、画面上では左右の列が25pxほど平行移動する。
+     * 誰かが動くたびに**8体ぶんの札が全部ずれる**ので、
+     * 何が起きたのかを追う前に目が振り回される。
+     *
+     * 誰の番かは本体の発光(`setActive`)と、その本体だけが踏み込む
+     * モーションで足りている。カメラまで動かす必要は無かった。
+     *
+     * 着弾の揺れ(`shakeStrength`)は残してある。あれは一瞬で収まるし、
+     * 盤面が静止しているからこそ「効いた」と分かる。
+     */
+    void avatar;
+    this.desiredCameraOffset.set(0, 0, 0);
+    this.desiredLookOffset.set(0, 0, 0);
   }
 
   getAvatar(instanceId: string): BattleAvatar | undefined {
@@ -1635,10 +1655,18 @@ export class BattleStage {
     avatar.playCast();
     this.vfx.spawnCastCharge(anchor, avatar.theme.vfx, { element: this.elementOf(actorId), scale: 1.3 });
 
-    // 通常のfocusOnより一段強く寄る。着弾時にshakeが入ると自然に戻る
-    const position = avatar.root.position;
-    this.desiredCameraOffset.set(position.x * 0.3, -1.1, position.z * 0.16 - 2.4);
-    this.desiredLookOffset.set(position.x * 0.36, 0.25, position.z * 0.22);
+    /*
+     * **カメラは寄せない。**
+     *
+     * 「通常より一段強く寄る」つもりの設定だったが、正投影では
+     * **カメラを近づけても大きさが変わらない。**残るのは横の平行移動だけで、
+     * 見せ場を作るどころか画面全体が振れて8体ぶんの札がずれる。
+     *
+     * 正投影で本当に寄るには `camera.zoom` を上げる必要がある。
+     * それは別の作りなので、いまは入れない。必殺技の「ここぞ」は
+     * 溜めのエフェクト(spawnCastCharge)と本体のモーション、
+     * 着弾の揺れ(shakeStrength)で足りている。
+     */
   }
 
   /** 必殺技の着弾。地面を走る衝撃と、強い揺れ・時間停止を重ねる */
@@ -1724,6 +1752,7 @@ export class BattleStage {
       const visible = this.tmpVector.z < 1;
       const x = (this.tmpVector.x * 0.5 + 0.5) * width;
       const y = (-this.tmpVector.y * 0.5 + 0.5) * height;
+      void distance;
 
       // 札用の、モーションで動かない座標
       avatar.getSlotAnchorWorldPosition(this.tmpRelative).project(this.camera);
@@ -1735,7 +1764,20 @@ export class BattleStage {
         slotY: (-this.tmpRelative.y * 0.5 + 0.5) * height,
         visible,
         // カメラ距離を基準にした相対スケール。極端にならないよう範囲を絞る
-        scale: THREE.MathUtils.clamp(this.frameDistance / distance, 0.78, 1.12),
+        /*
+         * **1で固定する。**
+         *
+         * 透視投影の頃は、奥のユニットの札を小さくして遠さを出していた。
+         * 正投影にしたので**奥も手前も同じ大きさで映る**ようになり、
+         * 札だけ縮める理由が無くなった。
+         *
+         * それ以上に悪かったのは、この距離が**本体の現在位置**までの
+         * ものだったこと。待機で漂うたびに距離が変わり、札が毎フレーム
+         * わずかに伸び縮みしていた。位置を固定しても、大きさが脈打てば
+         * 結局ちらついて読めない(依頼主から「HPバーも動いていて
+         * ごちゃごちゃして見にくい」という指摘を受けた)。
+         */
+        scale: 1,
       });
     }
     return anchors;
