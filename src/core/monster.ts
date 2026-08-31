@@ -36,6 +36,22 @@ export interface MonsterTemplate {
   darkSkill3?: Skill;
   /** ボス固有の性質(反撃・継続ダメージ耐性)。実体化した定義へそのまま渡る */
   bossTraits?: BossTraits;
+  /**
+   * 属性ごとに、どの変種を使うかを明示する。添字は `skill2Variants` / `skill3Variants` のもの。
+   *
+   * **省略した属性は、今までどおり `pickSkillVariant` が決める。**
+   * 既存の8種+ガチャ限定4種はここを持たないので、組み合わせは1つも変わらない。
+   *
+   * 明示できる形にしたのは、種族ごとに「この属性はこの役割」という設計が
+   * 先にあるモンスターが出てきたため。自動割り当ては**候補の並び順を変えた瞬間に
+   * 全属性の組み合わせが入れ替わる**ので、意図した表がある時はそれを書く方が安全。
+   */
+  skillAssignment?: Partial<Record<Element, { skill2?: number; skill3?: number }>>;
+  /**
+   * 召喚で出る時の星。ガチャの抽選プールを組むのに使う。
+   * 未指定のテンプレートは、従来どおり呼び出し側が並べたプールで扱う。
+   */
+  gachaStar?: 3 | 4 | 5;
 }
 
 /** 属性ごとの色違いバリエーションとして実体化されたモンスター定義(静的データ) */
@@ -120,10 +136,13 @@ function pickSkillVariant(variants: Skill[], element: Element, groupOffset: numb
 
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
   const flavoredStats = ELEMENT_STAT_FLAVOR[element](cloneStats(template.baseStats));
-  const skill2 = pickSkillVariant(template.skill2Variants, element, 0);
+  const assignment = template.skillAssignment?.[element];
+  const skill2 = template.skill2Variants[assignment?.skill2 ?? -1] ?? pickSkillVariant(template.skill2Variants, element, 0);
   // 光/闇に固有のスキル3があれば、候補からの抽選より優先する
   const uniqueSkill3 = element === "LIGHT" ? template.lightSkill3 : element === "DARK" ? template.darkSkill3 : undefined;
-  const skill3 = uniqueSkill3 ?? pickSkillVariant(template.skill3Variants, element, 1);
+  const skill3 = uniqueSkill3
+    ?? template.skill3Variants[assignment?.skill3 ?? -1]
+    ?? pickSkillVariant(template.skill3Variants, element, 1);
   return {
     id: `${template.templateId}_${element}`,
     templateId: template.templateId,

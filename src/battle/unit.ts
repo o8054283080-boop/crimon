@@ -1,5 +1,6 @@
 import { MonsterDefinition } from "../core/monster.js";
-import { BuffStat, STATUS_EFFECT_CATEGORY, StatusEffectCategory, StatusEffectType } from "../core/skill.js";
+import { PassiveLevelEffect, PassiveSpec, passiveAtLevel } from "../core/passive.js";
+import { BuffStat, STATUS_EFFECT_CATEGORY, Skill, StatusEffectCategory, StatusEffectType } from "../core/skill.js";
 
 export type Team = "PLAYER" | "ENEMY";
 
@@ -62,6 +63,100 @@ export interface BattleUnit {
    * 手数で押す戦い方(小さい攻撃を何度も、毒を重ねる)に代償を作るための数。
    */
   hitsTaken: number;
+
+  /* ---- ここから下は今回の11種で足した状態。**どれも戦闘中だけのもので、セーブには出ない** ---- */
+
+  /** 被ダメージ軽減の残りターン */
+  mitigateTurns: number;
+  /** 被ダメージ軽減の割合(0.15で15%減) */
+  mitigateAmount: number;
+  /** 挑発状態の相手から受けるダメージへの追加軽減 */
+  mitigateVsTaunted: number;
+  /** 自分を守ってくれている味方のinstanceId(かばう) */
+  protectorId?: string;
+  /** かばわれている残りターン */
+  protectTurns: number;
+  /** かばう側が肩代わりする割合 */
+  protectShare: number;
+  /** 反撃態勢の残りターン */
+  counterTurns: number;
+  /** 反撃のATK倍率 */
+  counterMultiplier: number;
+  /** 反撃へ加える最大HP比例の係数 */
+  counterHpCoefficient: number;
+  /** 反撃1回ごとに自身が回復する最大HP割合 */
+  counterHealRate: number;
+  /** パッシブの内部クールタイム(残りターン)。0で使える */
+  passiveCooldown: number;
+  /** 潜在能力の内部クールタイム(残りターン)。0で使える */
+  latentCooldown: number;
+  /**
+   * 潜在能力で溜まる「次のスキル1への上乗せ」。
+   * 被弾や会心のたびに増え、**スキル1を使うと0に戻る。**
+   */
+  latentChargeBonus: number;
+  /** 戦闘中ずっと残る、潜在能力によるクリダメの上乗せ */
+  latentCritDmgBonus: number;
+  /** 1回だけ受けるダメージを軽減する量(被弾で消える) */
+  latentOneShotMitigate: number;
+  /** 被弾するたびに行動ゲージが進む状態の残りターン */
+  hitGaugeTurns: number;
+  /** 被弾1回ごとに進む行動ゲージ */
+  hitGaugeAmount: number;
+}
+
+/** 空の状態から作る時に使う、今回足した状態の初期値 */
+function freshExtendedState() {
+  return {
+    mitigateTurns: 0,
+    mitigateAmount: 0,
+    mitigateVsTaunted: 0,
+    protectTurns: 0,
+    protectShare: 0,
+    counterTurns: 0,
+    counterMultiplier: 0,
+    counterHpCoefficient: 0,
+    counterHealRate: 0,
+    passiveCooldown: 0,
+    latentCooldown: 0,
+    latentChargeBonus: 0,
+    latentCritDmgBonus: 0,
+    latentOneShotMitigate: 0,
+    hitGaugeTurns: 0,
+    hitGaugeAmount: 0,
+  };
+}
+
+/** そのユニットが持つパッシブ(あれば)。3つの枠のうち最初に見つかったもの */
+export function passiveSkillOf(unit: BattleUnit): Skill | undefined {
+  return unit.def.skills.find((skill) => skill.passive !== undefined);
+}
+
+/** そのユニットのパッシブの、現在のレベルでの中身 */
+export function passiveEffectOf(unit: BattleUnit): PassiveLevelEffect | undefined {
+  const skill = passiveSkillOf(unit);
+  if (!skill?.passive) return undefined;
+  return passiveAtLevel(skill.passive as PassiveSpec, skill.passiveLevel ?? 1);
+}
+
+/**
+ * パッシブによる能力値の上乗せ。
+ *
+ * **バフ/デバフとは別枠**にしてある。強化解除で剥がされるものではないし、
+ * 「強化不可」でも止まらない。常にそのモンスターの一部として効く。
+ */
+export function passiveStatBonus(unit: BattleUnit, stat: BuffStat): { multiplier: number; add: number } {
+  const effect = passiveEffectOf(unit);
+  if (!effect) return { multiplier: 1, add: 0 };
+  if (effect.kind === "LAST_STAND" && stat === "def") {
+    return unit.currentHp / unit.maxHp <= effect.hpRatio ? { multiplier: 1 + effect.defUp, add: 0 } : { multiplier: 1, add: 0 };
+  }
+  if (effect.kind === "THUNDER_INSTINCT") {
+    if (stat === "criDmg") return { multiplier: 1, add: effect.critDmg };
+    if (stat === "spd") return { multiplier: 1, add: effect.spd };
+  }
+  if (effect.kind === "PACK_INSTINCT" && stat === "criDmg") return { multiplier: 1, add: effect.critDmg };
+  return { multiplier: 1, add: 0 };
 }
 
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
@@ -95,24 +190,26 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     healBlockTurns: 0,
     healBlockMultiplier: 1,
     hitsTaken: 0,
+    ...freshExtendedState(),
   };
 }
 
 /** バフ/デバフを反映した実効ステータス値を計算する。criRate/criDmgは加算、それ以外は乗算で効く */
 export function getEffectiveStat(unit: BattleUnit, stat: BuffStat): number {
-  const base = unit.def.stats[stat];
+  const passive = passiveStatBonus(unit, stat);
+  const base = unit.def.stats[stat] + (stat === "spd" ? passive.add : 0);
   const totalRate = unit.effects
     .filter((e) => e.stat === stat)
     .reduce((sum, e) => sum + e.amount, 0);
 
   if (stat === "criRate") {
-    return Math.max(0, Math.min(1, base + totalRate));
+    return Math.max(0, Math.min(1, base + totalRate + passive.add));
   }
   if (stat === "criDmg") {
-    return Math.max(0, base + totalRate);
+    return Math.max(0, base + totalRate + passive.add + unit.latentCritDmgBonus);
   }
 
-  const multiplier = Math.max(0.1, 1 + totalRate);
+  const multiplier = Math.max(0.1, 1 + totalRate) * passive.multiplier;
   return Math.max(1, Math.round(base * multiplier));
 }
 
@@ -231,8 +328,8 @@ export function tickHealBlockAtTurnStart(unit: BattleUnit): void {
   if (unit.healBlockTurns <= 0) unit.healBlockMultiplier = 1;
 }
 
-/** 有利な効果を指定個数だけ解除する。省略時は既存STRIP互換ですべて解除する。 */
-export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): boolean {
+/** 有利な効果を指定個数だけ解除する。省略時は既存STRIP互換ですべて解除する。実際に解除できた個数を返す。 */
+export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): number {
   let remaining = Math.max(0, Math.floor(count));
   let removed = 0;
   // IMMUNITYを最優先にすることで、解除後に続くデバフが正式な免疫判定へ進める。
@@ -249,7 +346,68 @@ export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): 
     if (index < 0) break;
     unit.statusEffects.splice(index, 1); remaining -= 1; removed += 1;
   }
-  return removed > 0;
+  return removed;
+}
+
+/**
+ * 有利な効果を奪う。**取り除くだけでなく、そのまま受け手へ移す。**
+ *
+ * 解除(stripBuffs)との違いはここだけ。相手の準備が自分の準備になるので、
+ * 支えを重ねる相手ほど痛い一手になる。奪えた個数を返す。
+ */
+export function stealBuffs(from: BattleUnit, to: BattleUnit, count = 1): number {
+  let remaining = Math.max(0, Math.floor(count));
+  let stolen = 0;
+  const give = () => { remaining -= 1; stolen += 1; };
+  if (remaining > 0 && from.immuneTurns > 0) {
+    to.immuneTurns = Math.max(to.immuneTurns, from.immuneTurns);
+    from.immuneTurns = 0; give();
+  }
+  if (remaining > 0 && from.shieldTurns > 0) {
+    to.shieldValue = Math.max(to.shieldValue, from.shieldValue);
+    to.shieldTurns = Math.max(to.shieldTurns, from.shieldTurns);
+    from.shieldValue = 0; from.shieldTurns = 0; give();
+  }
+  if (remaining > 0 && from.regenTurns > 0) {
+    to.regenRate = Math.max(to.regenRate, from.regenRate);
+    to.regenTurns = Math.max(to.regenTurns, from.regenTurns);
+    from.regenRate = 0; from.regenTurns = 0; give();
+  }
+  while (remaining > 0) {
+    const index = from.effects.findIndex((effect) => effect.kind === "BUFF");
+    if (index < 0) break;
+    const [moved] = from.effects.splice(index, 1);
+    to.effects.push({ ...moved });
+    give();
+  }
+  while (remaining > 0) {
+    const index = from.statusEffects.findIndex((effect) => effect.category === "BUFF");
+    if (index < 0) break;
+    const [moved] = from.statusEffects.splice(index, 1);
+    applyStatus(to, moved.type, moved.remainingTurns, moved.sourceId);
+    give();
+  }
+  return stolen;
+}
+
+/** その相手が有利な効果を持っているか。奪取・解除の条件判定に使う */
+export function hasAnyBuff(unit: BattleUnit): boolean {
+  return unit.immuneTurns > 0
+    || unit.shieldTurns > 0
+    || unit.regenTurns > 0
+    || unit.effects.some((effect) => effect.kind === "BUFF")
+    || unit.statusEffects.some((effect) => effect.category === "BUFF");
+}
+
+/** その相手が持っている弱体効果の数。ダメージ倍率や条件判定に使う */
+export function countDebuffs(unit: BattleUnit): number {
+  return unit.effects.filter((e) => e.kind === "DEBUFF").length
+    + unit.statusEffects.filter((e) => e.category === "DEBUFF").length
+    + Number(unit.poisonStacks > 0)
+    + Number(unit.healBlockTurns > 0)
+    + Number(unit.stunTurns > 0)
+    + Number(unit.burnTurns > 0)
+    + Number(unit.blindTurns > 0);
 }
 
 /** フィールド別に保持されるものも含め、弱体効果を指定個数だけ正式解除する。 */
@@ -281,4 +439,61 @@ export function cleanseDebuffs(unit: BattleUnit, count = Number.POSITIVE_INFINIT
 /** そのユニットの手番開始時に呼ぶ。暗闇の残りターンを減らす */
 export function tickBlindAtTurnStart(unit: BattleUnit): void {
   if (unit.blindTurns > 0) unit.blindTurns -= 1;
+}
+
+/**
+ * そのユニットの手番開始時に呼ぶ。今回足した状態の残りターンをまとめて減らす。
+ *
+ * **1つの関数にまとめてある。** 個別に足していくと、新しい状態を増やした人が
+ * 手番開始の呼び出し側に足し忘れ、その状態だけ永久に切れなくなる。
+ */
+export function tickExtendedStateAtTurnStart(unit: BattleUnit): void {
+  if (unit.mitigateTurns > 0) {
+    unit.mitigateTurns -= 1;
+    if (unit.mitigateTurns <= 0) { unit.mitigateAmount = 0; unit.mitigateVsTaunted = 0; }
+  }
+  if (unit.protectTurns > 0) {
+    unit.protectTurns -= 1;
+    if (unit.protectTurns <= 0) { unit.protectorId = undefined; unit.protectShare = 0; }
+  }
+  if (unit.counterTurns > 0) {
+    unit.counterTurns -= 1;
+    if (unit.counterTurns <= 0) { unit.counterMultiplier = 0; unit.counterHpCoefficient = 0; unit.counterHealRate = 0; }
+  }
+  if (unit.hitGaugeTurns > 0) {
+    unit.hitGaugeTurns -= 1;
+    if (unit.hitGaugeTurns <= 0) unit.hitGaugeAmount = 0;
+  }
+  if (unit.passiveCooldown > 0) unit.passiveCooldown -= 1;
+  if (unit.latentCooldown > 0) unit.latentCooldown -= 1;
+}
+
+/**
+ * そのユニットが受けるダメージに掛かる倍率。
+ * 軽減(MITIGATE)と、HPが減るほど硬くなるパッシブをここ1本にまとめてある。
+ *
+ * @param fromTaunted 攻撃者が挑発状態か。挑発状態の相手からは追加で軽減する技がある
+ */
+export function damageTakenMultiplier(unit: BattleUnit, fromTaunted = false): number {
+  let reduction = unit.mitigateTurns > 0 ? unit.mitigateAmount : 0;
+  if (fromTaunted && unit.mitigateTurns > 0) reduction += unit.mitigateVsTaunted;
+  const passive = passiveEffectOf(unit);
+  const ratio = unit.currentHp / unit.maxHp;
+  if (passive?.kind === "LAST_STAND" && ratio <= passive.hpRatio) reduction += passive.damageTaken;
+  if (passive?.kind === "ANCIENT_BEHEMOTH") {
+    // 段階は重複しない。**当てはまるうち最も低い閾値の段だけ**が効く
+    const tier = [...passive.tiers].sort((a, b) => a.hpRatio - b.hpRatio).find((t) => ratio <= t.hpRatio);
+    if (tier) reduction += tier.damageTaken;
+  }
+  if (unit.latentOneShotMitigate > 0) reduction += unit.latentOneShotMitigate;
+  return Math.max(0.05, 1 - Math.min(0.9, reduction));
+}
+
+/** ベヒモスの「古代巨獣」による、最大HP比例ダメージの上乗せ */
+export function passiveHpDamageBonus(unit: BattleUnit): number {
+  const passive = passiveEffectOf(unit);
+  if (passive?.kind !== "ANCIENT_BEHEMOTH") return 0;
+  const ratio = unit.currentHp / unit.maxHp;
+  const tier = [...passive.tiers].sort((a, b) => a.hpRatio - b.hpRatio).find((t) => ratio <= t.hpRatio);
+  return tier?.hpDamageUp ?? 0;
 }

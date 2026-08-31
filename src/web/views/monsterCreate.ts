@@ -96,8 +96,11 @@ export function describeLatentEffect(candidate: (typeof LATENT_ABILITY_CANDIDATE
   for (const effect of candidate.runtimeEffects ?? []) {
     const chance = "chance" in effect ? `${Math.round(effect.chance * 100)}%の確率で` : "確定で";
     if (effect.kind === "DEBUFF") {
-      const label = { HEAL_BLOCK: "回復を阻害", SPD_DOWN: "素早さを低下", POISON: "毒を1つ付与", STUN: "行動不能", BUFF_BLOCK: "強化効果を受けられなくする" }[effect.status];
-      lines.push(`対象：選択した敵、${chance}${effect.duration}ターン${label}`);
+      const label: Record<typeof effect.status, string> = {
+        HEAL_BLOCK: "回復を阻害", SPD_DOWN: "素早さを低下", ATK_DOWN: "攻撃力を低下", DEF_DOWN: "防御力を低下",
+        POISON: "毒を1つ付与", STUN: "行動不能", BUFF_BLOCK: "強化効果を受けられなくする",
+      };
+      lines.push(`対象：選択した敵、${chance}${effect.duration}ターン${label[effect.status]}`);
     } else if (effect.kind === "STRIP") lines.push(`対象：選択した敵、${chance}強化効果を${effect.count}個解除`);
     else if (effect.kind === "GAUGE_DOWN") lines.push(`対象：選択した敵、${chance}行動ゲージを${Math.round(effect.value * 100)}%減少`);
     else if (effect.kind === "ALLY_GAUGE_UP") lines.push(`対象：味方全体、${chance}行動ゲージを${Math.round(effect.value * 100)}%増加`);
@@ -105,6 +108,20 @@ export function describeLatentEffect(candidate: (typeof LATENT_ABILITY_CANDIDATE
     else if (effect.kind === "HEAL_CLEANSE") lines.push(`対象：HP割合が最も低い味方、最大HPの${Math.round(effect.value * 100)}%回復＋弱体効果を1個解除`);
     else if (effect.kind === "REGEN") lines.push(`対象：HP割合が最も低い味方、${effect.duration}ターン最大HPの${Math.round(effect.value * 100)}%継続回復`);
     else if (effect.kind === "SHIELD") lines.push(`対象：HP割合が最も低い味方、最大HPの${Math.round(effect.value * 100)}%シールド（${effect.duration}ターン）`);
+    else if (effect.kind === "SELF_GAUGE") lines.push(`対象：自身、行動ゲージを${Math.round(effect.value * 100)}%増加`);
+    else if (effect.kind === "SELF_HEAL") lines.push(`対象：自身、最大HPの${Math.round(effect.value * 100)}%回復`);
+    else if (effect.kind === "LIFESTEAL") lines.push(`対象：自身、与えたダメージの${Math.round(effect.value * 100)}%を回復`);
+    else if (effect.kind === "SELF_CLEANSE") lines.push(`対象：自身、弱体効果を${effect.count}個解除`);
+    else if (effect.kind === "SELF_SHIELD") lines.push(`対象：自身、最大HPの${Math.round(effect.value * 100)}%シールド（${effect.duration}ターン）`);
+    else if (effect.kind === "LOWEST_ALLY_HEAL") lines.push(`対象：HP割合が最も低い味方、最大HPの${Math.round(effect.value * 100)}%回復`);
+    else if (effect.kind === "LOWEST_ALLY_GAUGE") lines.push(`対象：HP割合が最も低い味方、行動ゲージを${Math.round(effect.value * 100)}%増加`);
+    else if (effect.kind === "LOWEST_ALLY_CLEANSE") lines.push(`対象：HP割合が最も低い味方、弱体効果を${effect.count}個解除`);
+    else if (effect.kind === "LOWEST_ALLY_SHIELD") lines.push(`対象：HP割合が最も低い味方、自身の最大HPの${Math.round(effect.value * 100)}%シールド（${effect.duration}ターン）`);
+    else if (effect.kind === "LOWEST_ALLY_MITIGATE") lines.push(`対象：HP割合が最も低い味方、${effect.duration}ターン受けるダメージ-${Math.round(effect.value * 100)}%`);
+    else if (effect.kind === "LOWEST_ALLY_BUFF") lines.push(`対象：HP割合が最も低い味方、${effect.duration}ターン能力上昇`);
+    else if (effect.kind === "ALLY_HEAL") lines.push(`対象：味方全体、最大HPの${Math.round(effect.value * 100)}%回復`);
+    else if (effect.kind === "GAUGE_DRAIN_SHARE") lines.push(`対象：自身、減らした行動ゲージの${Math.round(effect.value * 100)}%を吸収`);
+    else if (effect.kind === "STEAL_BUFF") lines.push(`対象：選択した敵、強化効果を${effect.count}個奪う`);
   }
   if (candidate.hpMultiplier) lines.push(`自身の最大HP+${Math.round((candidate.hpMultiplier - 1) * 100)}%`);
   if (candidate.defMultiplier) lines.push(`自身の防御力+${Math.round((candidate.defMultiplier - 1) * 100)}%`);

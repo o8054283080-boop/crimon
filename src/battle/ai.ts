@@ -18,6 +18,8 @@ export function chooseSkill(unit: BattleUnit, allUnits: BattleUnit[] = [unit]): 
   for (let i = 2; i >= 1; i -= 1) {
     if (unit.cooldowns[i] === 0) {
       const skill = unit.def.skills[i];
+      // パッシブは「使う」ものではない。手番の行動として選ばない
+      if (skill.passive) continue;
       const hasHeal = skill.effects.some((effect) => effect.kind === "HEAL");
       const allies = allUnits.filter((candidate) => candidate.team === unit.team && candidate.alive);
       if (hasHeal && allies.every((ally) => hpRatio(ally) >= HEAL_SKILL_HP_THRESHOLD)) continue;
@@ -60,6 +62,14 @@ export function chooseTargets(unit: BattleUnit, skill: Skill, allUnits: BattleUn
         if (source) return [source];
         unit.statusEffects = unit.statusEffects.filter((effect) => effect !== taunt);
       }
+      /*
+       * ターゲット集中。**単体攻撃の狙い先だけを引き受ける。**
+       * 挑発の後に見るのは、挑発が「かけた本人に向かせる」強制で、
+       * こちらは「自分に向けさせる」宣言だから。両方かかっている時は
+       * 先に受けた強制のほうを優先する。全体攻撃には影響しない。
+       */
+      const focused = enemies.find((enemy) => hasStatus(enemy, "FOCUS"));
+      if (focused) return [focused];
       const affinityScore = (target: BattleUnit): number => {
         const affinity = getElementAffinity(unit.def.element, target.def.element);
         if (affinity === "ADVANTAGE") return 0;

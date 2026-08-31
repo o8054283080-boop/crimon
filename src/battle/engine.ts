@@ -1,9 +1,10 @@
 import { ELEMENT_JA } from "../core/element.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
-import { STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
+import { PassiveLevelEffect } from "../core/passive.js";
+import { EffectApplyTo, EffectCondition, STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
-import { calcDamage } from "./damage.js";
+import { calcDamage, evaluateTargetCondition } from "./damage.js";
 import {
   ActiveEffect,
   BattleUnit,
@@ -13,13 +14,19 @@ import {
   applyStatus,
   applyHeal,
   cleanseDebuffs,
+  countDebuffs,
   createBattleUnit,
+  damageTakenMultiplier,
   getEffectiveStat,
+  hasAnyBuff,
   hasStatus,
   hpRatio,
+  passiveEffectOf,
+  stealBuffs,
   tickCooldownsAtTurnStart,
   tickEffectsAtTurnStart,
   tickBlindAtTurnStart,
+  tickExtendedStateAtTurnStart,
   tickImmunityAtTurnStart,
   tickHealBlockAtTurnStart,
   tickShieldAtTurnStart,
@@ -27,6 +34,67 @@ import {
 } from "./unit.js";
 
 const ATB_THRESHOLD = 100;
+
+/**
+ * 1回の追加ターンの連鎖に許す上限。
+ *
+ * フェンリルの「群狼の本能」は**回数制限なし**が仕様(依頼主の指定)なので、
+ * ここは遊びの制限ではなく**暴走の止め金**。倒すたびに追加ターンが来るので、
+ * 何かの拍子に「倒していないのに倒したと数える」不具合が入ると
+ * その場で無限ループになり、画面が固まって原因も分からなくなる。
+ */
+const MAX_CHAINED_EXTRA_TURNS = 20;
+
+/**
+ * スキル1回の解決の中で起きたことを覚えておく入れ物。
+ *
+ * **多段攻撃で追加効果が何度も出ないようにするための要。**
+ * 依頼主の指定どおり、ゲージ吸収・追加デバフ・潜在能力の追加効果は
+ * 明記が無いかぎり**1スキル使用につき1回**しか判定しない。
+ * 「何回当たったか」ではなく「何が起きたか」をここに集めて、
+ * 解決の最後に1度だけ使う。
+ */
+interface SkillResolution {
+  /** 1回でもクリティカルしたか */
+  anyCrit: boolean;
+  /** クリティカルした回数 */
+  critCount: number;
+  /** 弱体効果を1つでも入れられたか */
+  debuffApplied: boolean;
+  /** 直前のスタンが失敗したか(確率・免疫・抵抗のいずれでも) */
+  stunFailed: boolean;
+  /** このスキルで奪った強化効果の数 */
+  stolenBuffs: number;
+  /** このスキルで解除に成功した相手の数 */
+  strippedTargets: number;
+  /** このスキルで与えたHPダメージの合計 */
+  damageDealt: number;
+  /** このスキルで倒した相手の数 */
+  kills: number;
+  /** 術者側のパッシブで「1スキル1回」のものを、もう使ったか */
+  sourcePassiveUsed: boolean;
+  /** 受け手側のパッシブを既に出した相手(instanceId)。全体技でも1体につき1回に保つ */
+  readonly victimPassiveUsed: Set<string>;
+  /** このスキルで実際に入った弱体効果/解除の種類。潜在能力の発動条件に使う */
+  readonly applied: Set<string>;
+  /** このスキルで相手から減らした行動ゲージの合計(0〜1の割合) */
+  gaugeRemoved: number;
+  /**
+   * 解決を始めた時点の、対象ごとのHP割合。
+   * **倒した後のHPは0なので、「HP50%以下の相手に当てたら」という条件が
+   * 必ず真になってしまう。** 殴る前の状態で判定するために控えておく。
+   */
+  readonly targetHpBefore: Map<string, number>;
+}
+
+function newResolution(): SkillResolution {
+  return {
+    anyCrit: false, critCount: 0, debuffApplied: false, stunFailed: false,
+    stolenBuffs: 0, strippedTargets: 0, damageDealt: 0, kills: 0,
+    sourcePassiveUsed: false, victimPassiveUsed: new Set(), applied: new Set(), gaugeRemoved: 0,
+    targetHpBefore: new Map(),
+  };
+}
 
 /** 暗闇がかかっている時、攻撃が外れる確率 */
 const BLIND_MISS_CHANCE = 0.5;
@@ -42,10 +110,16 @@ const GAUGE_EPSILON = 1e-6;
  * 1回の使用につき1度だけ適用する。
  */
 function isSourceScopedEffect(effect: SkillEffect): boolean {
-  if (effect.kind === "HEAL") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
-  if (effect.kind === "BUFF") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
-  if (effect.kind === "STATUS") return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
-  return false;
+  switch (effect.kind) {
+    case "HEAL": case "BUFF": case "STATUS": case "GAUGE": case "SHIELD":
+    case "REGEN": case "MITIGATE": case "CLEANSE": case "COOLDOWN_REDUCE":
+      return effect.applyTo === "SELF" || effect.applyTo === "ALLIES";
+    // 協力攻撃・反撃態勢は術者そのものに1度だけかかる
+    case "COOP_ATTACK": case "COUNTER_STANCE":
+      return true;
+    default:
+      return false;
+  }
 }
 
 export type BattleWinner = "PLAYER" | "ENEMY" | "DRAW";
@@ -143,6 +217,12 @@ export class BattleEngine {
   private readonly consumedLatents = new Set<string>();
   private readonly trialTowerFloor?: number;
   private trialBossTurns = 0;
+  /** 撃破で得た追加ターン待ちのユニット。手番の直後にまとめて処理する */
+  private pendingExtraTurns: BattleUnit[] = [];
+  /** 協力攻撃の入れ子の深さ。0でないときは協力攻撃を呼ばない(無限に連鎖するため) */
+  private coopDepth = 0;
+  /** いま解決中のスキル。パッシブの「1スキル1回」を数えるのに使う */
+  private resolution: SkillResolution | null = null;
 
   constructor(playerTeam: MonsterDefinition[], enemyTeam: MonsterDefinition[], options: BattleEngineOptions = {}) {
     if (playerTeam.length === 0 || enemyTeam.length === 0) {
@@ -193,22 +273,42 @@ export class BattleEngine {
           return { winner: winnerMidLoop, log: this.log, turnsTaken, turns: this.turns };
         }
 
-        const linesBefore = this.log.length;
-        const eventsBefore = this.events.length;
-        this.takeTurn(unit);
-        this.turns.push({
-          actorId: unit.instanceId,
-          lines: this.log.slice(linesBefore),
-          events: this.events.slice(eventsBefore),
-          snapshot: this.snapshotUnits(),
-        });
-
+        this.recordTurn(unit);
         turnsTaken += 1;
+        if (turnsTaken >= this.maxTurns) break;
+
+        // 撃破で得た追加ターンは、次の人へ回さずその場で続けて動く。
+        // 「倒したから、もう一度動ける」という手応えは、順番が飛ぶと消える
+        let chained = 0;
+        while (this.pendingExtraTurns.length > 0 && chained < MAX_CHAINED_EXTRA_TURNS && turnsTaken < this.maxTurns) {
+          const extra = this.pendingExtraTurns.shift()!;
+          if (!extra.alive) continue;
+          this.push(`${this.label(extra)} は追加ターンを得た！`);
+          this.recordTurn(extra);
+          turnsTaken += 1;
+          chained += 1;
+        }
+        this.pendingExtraTurns = [];
         if (turnsTaken >= this.maxTurns) break;
       }
     }
 
     return { winner: this.checkWinner() ?? "DRAW", log: this.log, turnsTaken, turns: this.turns };
+  }
+
+  /** 1手番を解決し、演出用の記録を1件積む */
+  private recordTurn(unit: BattleUnit, choice?: ManualChoice): TurnRecord {
+    const linesBefore = this.log.length;
+    const eventsBefore = this.events.length;
+    this.takeTurn(unit, choice);
+    const record: TurnRecord = {
+      actorId: unit.instanceId,
+      lines: this.log.slice(linesBefore),
+      events: this.events.slice(eventsBefore),
+      snapshot: this.snapshotUnits(),
+    };
+    this.turns.push(record);
+    return record;
   }
 
   /** 生存ユニットのATBゲージを、次に誰かが行動可能になるまで進め、行動可能になったユニット(行動順)を返す */
@@ -275,16 +375,14 @@ export class BattleEngine {
     if (idx >= 0) this.interactiveQueue.splice(idx, 1);
     unit.gauge -= ATB_THRESHOLD;
 
-    const linesBefore = this.log.length;
-    const eventsBefore = this.events.length;
-    this.takeTurn(unit, choice);
-    const record: TurnRecord = {
-      actorId: unit.instanceId,
-      lines: this.log.slice(linesBefore),
-      events: this.events.slice(eventsBefore),
-      snapshot: this.snapshotUnits(),
-    };
-    this.turns.push(record);
+    const record = this.recordTurn(unit, choice);
+    // 追加ターンは列の先頭へ戻す。ライブ進行でも「続けてもう一度動く」を保つ
+    while (this.pendingExtraTurns.length > 0) {
+      const extra = this.pendingExtraTurns.pop()!;
+      if (!extra.alive) continue;
+      extra.gauge += ATB_THRESHOLD;
+      this.interactiveQueue.unshift(extra);
+    }
     return record;
   }
 
@@ -332,6 +430,7 @@ export class BattleEngine {
     tickImmunityAtTurnStart(unit);
     tickHealBlockAtTurnStart(unit);
     tickBlindAtTurnStart(unit);
+    tickExtendedStateAtTurnStart(unit);
 
     const turnHealPercent = unit.def.combatMods?.turnHealPercent ?? 0;
     if (turnHealPercent > 0 && unit.alive) {
@@ -355,6 +454,120 @@ export class BattleEngine {
     }
 
     this.applyBurnAtTurnEnd(unit);
+    this.onUnitActed(unit);
+  }
+
+  /* ============================ パッシブ ============================ */
+
+  /**
+   * 誰かが1手番を終えた時に呼ぶ。「味方が行動するたび」「敵が行動するたび」の
+   * パッシブをここ1か所で捌く。
+   *
+   * **手番の単位で1回。** 行動の中の1発ごとに数えると、多段攻撃を持つ相手が
+   * 動いただけでゲージが満ちてしまう。
+   */
+  private onUnitActed(actor: BattleUnit): void {
+    for (const holder of this.units) {
+      if (!holder.alive || holder === actor) continue;
+      const passive = passiveEffectOf(holder);
+      if (!passive) continue;
+      if (passive.kind === "TIME_KEEPER" && holder.team === actor.team) {
+        this.gainGauge(holder, passive.allyGauge, `${this.label(holder)} の「時の管理者」で行動ゲージが進んだ！`);
+      }
+      if (passive.kind === "GAUGE_ON_SLOWED_ENEMY_ACT" && holder.team !== actor.team) {
+        const slowed = actor.effects.some((effect) => effect.kind === "DEBUFF" && effect.stat === "spd");
+        if (slowed) this.gainGauge(holder, passive.gauge, `${this.label(holder)} の「蛇王の支配」で行動ゲージが進んだ！`);
+      }
+    }
+  }
+
+  /** 敵が毒ダメージを受けた時に呼ぶ。**その敵の手番につき1回**(毒は手番開始時にしか刻まれない) */
+  private onPoisonDamage(victim: BattleUnit): void {
+    for (const holder of this.units) {
+      if (!holder.alive || holder.team === victim.team) continue;
+      const passive = passiveEffectOf(holder);
+      if (passive?.kind !== "GAUGE_ON_ENEMY_POISON") continue;
+      this.gainGauge(holder, passive.gauge, `${this.label(holder)} の「菌糸支配」で行動ゲージが進んだ！`);
+    }
+  }
+
+  /**
+   * 攻撃を受けた時に呼ぶ。**1回の攻撃(=攻撃者の1行動)につき1度だけ。**
+   * 多段で殴られるたびに回復や反撃が返ると、手数の多い相手ほど損をする。
+   */
+  private onDamaged(victim: BattleUnit, attacker: BattleUnit | undefined, resolutionKey: SkillResolution | null): void {
+    // 潜在能力で溜まる「次のスキル1への上乗せ」は、被弾のたびに1段ずつ増える
+    const latent = victim.def.latentAbility;
+    if (latent?.chargeOnHit) {
+      victim.latentChargeBonus = Math.min(latent.chargeOnHit.maxBonus, victim.latentChargeBonus + latent.chargeOnHit.perHit);
+    }
+    if (victim.hitGaugeTurns > 0 && victim.alive) this.gainGauge(victim, victim.hitGaugeAmount);
+    if (!attacker?.alive || !victim.alive) return;
+    const passive = passiveEffectOf(victim);
+    const already = resolutionKey?.victimPassiveUsed.has(victim.instanceId) ?? false;
+    if (passive?.kind === "FALSE_TREASURE" && !already) {
+      resolutionKey?.victimPassiveUsed.add(victim.instanceId);
+      const healAmount = Math.round(victim.maxHp * passive.heal);
+      applyHeal(victim, healAmount);
+      this.push(`  → ${this.label(victim)} の「偽りの財宝」でHPが ${healAmount} 回復！ (${victim.currentHp}/${victim.maxHp})`);
+      this.pushEvent({ targetId: victim.instanceId, kind: "HEAL", amount: healAmount });
+      if (!this.isImmune(attacker) && this.rollEffectSuccess(victim, attacker, passive.chance)) {
+        attacker.effects.push({ stat: "atk", amount: -passive.atkDown, remainingTurns: passive.duration, kind: "DEBUFF" });
+        this.push(`  → ${this.label(attacker)} の ATK が低下！ (${passive.duration}ターン)`);
+      }
+    }
+  }
+
+  /** 味方(自分を含む)がHP閾値を割った時に呼ぶ。ヴァルキリアの「戦乙女の誓い」 */
+  private onAllyHpThreshold(victim: BattleUnit): void {
+    if (!victim.alive) return;
+    for (const holder of this.units) {
+      if (!holder.alive || holder.team !== victim.team) continue;
+      const passive = passiveEffectOf(holder);
+      if (passive?.kind !== "VALKYRIE_OATH") continue;
+      if (holder.passiveCooldown > 0) continue;
+      if (hpRatio(victim) > passive.hpRatio) continue;
+      holder.passiveCooldown = passive.internalCooldown;
+      // 無敵は1ターン固定。Lv5でも伸ばさない(依頼主の指定)
+      applyStatus(victim, "INVINCIBLE", 1, holder.instanceId);
+      const healAmount = Math.round(holder.maxHp * passive.heal);
+      applyHeal(victim, healAmount);
+      this.push(`  → ${this.label(holder)} の「戦乙女の誓い」！ ${this.label(victim)} は1ターン無敵になり、HPが ${healAmount} 回復！`);
+      this.pushEvent({ targetId: victim.instanceId, kind: "HEAL", amount: healAmount });
+      return;
+    }
+  }
+
+  /** 敵を倒した時に呼ぶ。フェンリルの「群狼の本能」は倒すたびに追加ターンを得る */
+  private onKill(killer: BattleUnit | undefined): void {
+    if (!killer?.alive) return;
+    const passive = passiveEffectOf(killer);
+    if (passive?.kind !== "PACK_INSTINCT") return;
+    this.pendingExtraTurns.push(killer);
+  }
+
+  /**
+   * 効果の向き先から、実際の受け手を決める。
+   *
+   * **ここ1本に集約してある。** 効果ごとに三項演算子を書き写していた頃は、
+   * 新しい向き先を足すたびに書き漏らした場所だけが古い挙動のまま残った。
+   */
+  private receiversFor(source: BattleUnit, target: BattleUnit, applyTo: EffectApplyTo | undefined): BattleUnit[] {
+    if (applyTo === "SELF") return [source];
+    if (applyTo === "ALLIES") return this.units.filter((unit) => unit.team === source.team && unit.alive);
+    if (applyTo === "LOWEST_HP_ALLY") {
+      const allies = this.units.filter((unit) => unit.team === source.team && unit.alive);
+      if (allies.length === 0) return [];
+      return [allies.reduce((lowest, unit) => (hpRatio(unit) < hpRatio(lowest) ? unit : lowest), allies[0])];
+    }
+    return [target];
+  }
+
+  /** ゲージを増やす。100を超えて溜め込まないよう、増やす側は必ずここを通す */
+  private gainGauge(unit: BattleUnit, amount: number, message?: string): void {
+    if (!unit.alive || amount === 0) return;
+    unit.gauge = Math.max(0, Math.min(ATB_THRESHOLD, unit.gauge + amount * ATB_THRESHOLD));
+    if (message) this.push(`  → ${message}`);
   }
 
   private trialBoss(): BattleUnit | undefined {
@@ -397,7 +610,9 @@ export class BattleEngine {
   private act(unit: BattleUnit, choice?: ManualChoice): void {
     let skill: Skill;
     let index: 0 | 1 | 2;
-    if (choice && unit.cooldowns[choice.skillIndex] === 0 && (!hasStatus(unit, "SKILL_LOCK") || choice.skillIndex === 0)) {
+    // パッシブの枠は「使う」ものではない。手で選ばれてもAIの判断へ落とす
+    const passiveChoice = choice !== undefined && unit.def.skills[choice.skillIndex]?.passive !== undefined;
+    if (!passiveChoice && choice && unit.cooldowns[choice.skillIndex] === 0 && (!hasStatus(unit, "SKILL_LOCK") || choice.skillIndex === 0)) {
       skill = unit.def.skills[choice.skillIndex];
       index = choice.skillIndex;
     } else {
@@ -408,7 +623,13 @@ export class BattleEngine {
     }
 
     const latent = index === 0 && unit.def.latentAbility?.skillSlot === 0 ? unit.def.latentAbility : undefined;
-    const resolvedSkill = latent ? this.applyLatentToSkill(skill, latent) : skill;
+    /*
+     * 潜在能力で溜めた「次のスキル1への上乗せ」は、**スキル1を撃った時に使い切る。**
+     * 溜まったまま他の技へ持ち越すと、被弾を重ねてから必殺技、という一方通行になる。
+     */
+    const charge = index === 0 ? unit.latentChargeBonus : 0;
+    const resolvedSkill = this.applyChargeToSkill(latent ? this.applyLatentToSkill(skill, latent) : skill, charge);
+    if (index === 0) unit.latentChargeBonus = 0;
     let targets: BattleUnit[];
     if (choice?.targetId && (skill.target === "SINGLE_ENEMY" || skill.target === "SINGLE_ALLY")) {
       const explicitTarget = this.units.find((u) => u.instanceId === choice.targetId && u.alive);
@@ -453,8 +674,9 @@ export class BattleEngine {
     // (自己回復・applyToがSELF/ALLIESのバフ)を素直に処理すると、全体技では
     // 対象の数だけ重ねがけされてしまう(敵4体なら4倍)。
     // 向き先が対象でない効果は最初の1回だけ適用する。
-    let anyCrit = false;
-    let debuffApplied = false;
+    const resolution = newResolution();
+    const previousResolution = this.resolution;
+    this.resolution = resolution;
     targets.forEach((target, i) => {
       const targetSkill = aoeConverted && latent?.aoeConversion ? { ...resolvedSkill, effects: resolvedSkill.effects
         .filter((effect) => i === 0 || latent.aoeConversion?.nativeEffectTarget !== "PRIMARY_ONLY" || effect.kind === "DAMAGE")
@@ -463,21 +685,172 @@ export class BattleEngine {
           if (i > 0 && "chance" in effect && typeof effect.chance === "number") return { ...effect, chance: effect.chance * (latent.aoeConversion!.secondaryEffectChanceMultiplier ?? 1) };
           return effect;
         }) } : resolvedSkill;
-      const result = this.applySkillEffects(unit, target, targetSkill, missed, i === 0, latent);
-      anyCrit ||= result.anyCrit;
-      debuffApplied ||= result.debuffApplied;
+      this.applySkillEffects(unit, target, targetSkill, missed, i === 0, latent, resolution);
     });
-    if (latent && !missed) this.applyLatentAfterSkill(unit, targets[0], latent, anyCrit, debuffApplied);
+
+    // 攻撃スキルに乗るパッシブは、対象を全部処理してから1度だけ判定する
+    if (!missed) this.applyAttackPassives(unit, targets, resolution);
+    if (latent && !missed) this.applyLatentAfterSkill(unit, targets[0], latent, resolution);
+    this.applyCoopAttack(unit, resolvedSkill, targets[0]);
+    this.resolution = previousResolution;
+  }
+
+  /** 溜めた上乗せを、そのスキルのダメージ効果へ差し込む */
+  private applyChargeToSkill(skill: Skill, charge: number): Skill {
+    if (charge <= 0) return skill;
+    return { ...skill, effects: skill.effects.map((effect) => (
+      effect.kind === "DAMAGE" ? { ...effect, finalDamageBonus: (effect.finalDamageBonus ?? 0) + charge } : effect
+    )) };
+  }
+
+  /**
+   * 攻撃スキルの使用に紐づくパッシブ。**1スキル使用につき1回**しか判定しない。
+   *
+   * ここを対象ごとに回すと、全体技を持つモンスターだけが4倍おいしくなる。
+   * 依頼主の指定どおり、ゲージ吸収も追加デバフも1回に固定してある。
+   */
+  private applyAttackPassives(source: BattleUnit, targets: BattleUnit[], resolution: SkillResolution): void {
+    const passive = passiveEffectOf(source);
+    if (!passive || resolution.sourcePassiveUsed) return;
+    const primary = targets.find((target) => target.alive && target.team !== source.team) ?? targets[0];
+    if (!primary || primary.team === source.team) return;
+
+    if (passive.kind === "THUNDER_INSTINCT" && resolution.anyCrit) {
+      resolution.sourcePassiveUsed = true;
+      this.drainGauge(source, primary, passive.drain);
+      this.push(`  → ${this.label(source)} の「雷の本能」で行動ゲージを吸収した！`);
+    }
+    if (passive.kind === "TIME_KEEPER" && resolution.damageDealt > 0) {
+      resolution.sourcePassiveUsed = true;
+      this.drainGauge(source, primary, passive.drain);
+      this.push(`  → ${this.label(source)} の「時の管理者」で行動ゲージを吸収した！`);
+      if (primary.alive && !this.isImmune(primary) && this.rollEffectSuccess(source, primary, passive.stunChance)) {
+        primary.stunTurns = Math.max(primary.stunTurns, 1);
+        this.push(`  → ${this.label(primary)} はスタンした！`);
+      }
+    }
+    if (passive.kind === "REAPER_HARVEST" && resolution.damageDealt > 0 && primary.alive) {
+      resolution.sourcePassiveUsed = true;
+      let landed = false;
+      if (!this.isImmune(primary)) {
+        // 強化阻害・回復阻害はどちらも1ターン固定(依頼主の指定)
+        if (this.rollEffectSuccess(source, primary, passive.chance) && applyStatus(primary, "BUFF_BLOCK", 1, source.instanceId)) {
+          this.push(`  → ${this.label(primary)} は強化不可になった！ (1ターン)`);
+          landed = true;
+        }
+        if (this.rollEffectSuccess(source, primary, passive.chance)) {
+          primary.healBlockTurns = Math.max(primary.healBlockTurns, 1);
+          primary.healBlockMultiplier = Math.min(primary.healBlockMultiplier, 0.5);
+          this.push(`  → ${this.label(primary)} は治癒阻害を受けた！ (1ターン)`);
+          landed = true;
+        }
+      }
+      if (landed) {
+        const healAmount = Math.round(source.maxHp * passive.heal);
+        applyHeal(source, healAmount);
+        this.pushEvent({ targetId: source.instanceId, kind: "HEAL", amount: healAmount });
+        this.gainGauge(source, passive.gauge);
+        this.push(`  → ${this.label(source)} の「死神の収穫」でHPが ${healAmount} 回復し、行動ゲージが進んだ！`);
+      }
+    }
+  }
+
+  /** 相手のゲージを減らし、減らした分をそのまま自分へ移す */
+  private drainGauge(source: BattleUnit, target: BattleUnit, ratio: number): number {
+    if (!target.alive || ratio <= 0) return 0;
+    const before = target.gauge;
+    target.gauge = Math.max(0, target.gauge - ratio * ATB_THRESHOLD);
+    const stolen = before - target.gauge;
+    source.gauge = Math.max(0, Math.min(ATB_THRESHOLD, source.gauge + stolen));
+    return stolen / ATB_THRESHOLD;
+  }
+
+  /**
+   * 協力攻撃。呼ばれた味方は**それぞれのスキル1**で同じ相手を殴る。
+   *
+   * `coopDepth` で入れ子を止めている。呼ばれた側のスキル1が
+   * また協力攻撃を呼べる形にすると、編成次第で無限に連鎖する。
+   */
+  private applyCoopAttack(source: BattleUnit, skill: Skill, target: BattleUnit | undefined): void {
+    const coop = skill.effects.find((effect): effect is Extract<SkillEffect, { kind: "COOP_ATTACK" }> => effect.kind === "COOP_ATTACK");
+    if (!coop || !target || this.coopDepth > 0) return;
+    const helpers = this.units
+      .filter((unit) => unit.team === source.team && unit.alive && unit !== source && unit.stunTurns <= 0)
+      .sort((a, b) => getEffectiveStat(b, "atk") - getEffectiveStat(a, "atk"))
+      .slice(0, Math.max(0, coop.allies));
+    if (helpers.length === 0) return;
+
+    this.coopDepth += 1;
+    try {
+      for (const helper of helpers) {
+        if (!target.alive) break;
+        this.push(`  → ${this.label(helper)} が協力攻撃に加わった！`);
+        const helperSkill = helper.def.skills[0];
+        const helperLatent = helper.def.latentAbility?.skillSlot === 0 ? helper.def.latentAbility : undefined;
+        const resolved = this.applyChargeToSkill(
+          helperLatent ? this.applyLatentToSkill(helperSkill, helperLatent) : helperSkill,
+          helper.latentChargeBonus,
+        );
+        helper.latentChargeBonus = 0;
+        const resolution = newResolution();
+        const previous = this.resolution;
+        this.resolution = resolution;
+        this.applySkillEffects(helper, target, resolved, false, true, helperLatent, resolution);
+        this.applyAttackPassives(helper, [target], resolution);
+        if (helperLatent) this.applyLatentAfterSkill(helper, target, helperLatent, resolution);
+        this.resolution = previous;
+        if (coop.allyCooldownReduce) {
+          helper.cooldowns = helper.cooldowns.map((c) => Math.max(0, c - coop.allyCooldownReduce!)) as [number, number, number];
+        }
+      }
+    } finally {
+      this.coopDepth -= 1;
+    }
   }
 
   /** ダメージ式・既存デバフ確率へ入る潜在だけを、元のS1を変更せず合成する。 */
   private applyLatentToSkill(skill: Skill, latent: LatentAbilityCandidate): Skill {
+    let damageIndex = -1;
     return { ...skill, effects: skill.effects.map((effect) => {
       if (effect.kind === "DAMAGE") {
-        if (latent.effectType === "DAMAGE_UP") return { ...effect, multiplier: effect.multiplier * (1 + latent.value), ignoreDefenseRatio: latent.ignoreDefenseRatio, debuffDamageBonus: latent.debuffDamageBonus };
-        if (latent.effectType === "HP_SCALING") return { ...effect, hpCoefficient: (effect.hpCoefficient ?? 0) + latent.value };
-        if (latent.effectType === "DEF_SCALING") return { ...effect, defCoefficient: (effect.defCoefficient ?? 0) + latent.value };
-        return { ...effect, ignoreDefenseRatio: latent.ignoreDefenseRatio, debuffDamageBonus: latent.debuffDamageBonus };
+        damageIndex += 1;
+        // 「2撃目だけ強くなる」型は、指定された順番のダメージ効果にしか乗らない
+        if (latent.damageEffectIndex !== undefined && latent.damageEffectIndex !== damageIndex) return effect;
+        // 「対象のHPが低いほど痛い」型の潜在は、元の段を置き換える。
+        // 足すと元の段と二重に乗り、書いてある数字より大きく跳ねる
+        const withStatic = {
+          ...effect,
+          ignoreDefenseRatio: latent.ignoreDefenseRatio ?? effect.ignoreDefenseRatio,
+          debuffDamageBonus: latent.debuffDamageBonus ?? effect.debuffDamageBonus,
+          finalDamageBonus: (effect.finalDamageBonus ?? 0) + (latent.flatDamageBonus ?? 0),
+          conditionalBonus: latent.damageBonusWhen
+            ? [...(effect.conditionalBonus ?? []), ...latent.damageBonusWhen]
+            : effect.conditionalBonus,
+          targetHpBonus: latent.replaceTargetHpBonus ?? effect.targetHpBonus,
+          targetHpIgnoreDefense: latent.addTargetHpIgnoreDefense
+            ? [...(effect.targetHpIgnoreDefense ?? []), ...latent.addTargetHpIgnoreDefense]
+            : effect.targetHpIgnoreDefense,
+          scaleBonus: latent.scaleBonusAdd
+            ? {
+              stat: latent.scaleBonusAdd.stat,
+              bonusAtReference: (effect.scaleBonus?.stat === latent.scaleBonusAdd.stat ? effect.scaleBonus.bonusAtReference : 0)
+                + latent.scaleBonusAdd.bonusAtReference,
+            }
+            : effect.scaleBonus,
+        };
+        if (latent.effectType === "DAMAGE_UP") return { ...withStatic, multiplier: effect.multiplier * (1 + latent.value) };
+        if (latent.effectType === "HP_SCALING") return { ...withStatic, hpCoefficient: (effect.hpCoefficient ?? 0) + latent.value };
+        if (latent.effectType === "DEF_SCALING") return { ...withStatic, defCoefficient: (effect.defCoefficient ?? 0) + latent.value };
+        return withStatic;
+      }
+      if (effect.kind === "GAUGE" && latent.gaugeAmountOverride !== undefined) {
+        // 符号は元のまま。減らす技の潜在で、うっかり増やす技へ化けないようにする
+        const sign = effect.amount < 0 ? -1 : 1;
+        return { ...effect, amount: sign * Math.abs(latent.gaugeAmountOverride) };
+      }
+      const bonus = latent.chanceBonus;
+      if (bonus && effect.kind === bonus.effectKind && (bonus.stat === undefined || ("stat" in effect && effect.stat === bonus.stat))) {
+        return { ...effect, chance: Math.min(1, (("chance" in effect ? effect.chance : undefined) ?? 1) + bonus.value) };
       }
       if (latent.effectType === "DEBUFF_CHANCE_UP" && latent.status === "DEF_DOWN"
         && effect.kind === "DEBUFF" && effect.stat === "def") {
@@ -485,6 +858,26 @@ export class BattleEngine {
       }
       return effect;
     }) };
+  }
+
+  /** 潜在能力の発動条件を、その1回の解決で起きたことに照らして判定する */
+  private latentConditionMet(
+    latent: LatentAbilityCandidate,
+    source: BattleUnit,
+    target: BattleUnit,
+    resolution: SkillResolution,
+  ): boolean {
+    const condition = latent.condition;
+    if (!condition || condition.kind === "ALWAYS") return true;
+    switch (condition.kind) {
+      case "ON_CRIT": return resolution.critCount >= (condition.atLeast ?? 1);
+      case "ON_KILL": return resolution.kills > 0;
+      case "ON_APPLIED":
+        return condition.status === "ANY_DEBUFF" ? resolution.debuffApplied : resolution.applied.has(condition.status);
+      case "TARGET_HP_BELOW":
+        return (resolution.targetHpBefore.get(target.instanceId) ?? target.currentHp / target.maxHp) <= condition.ratio;
+      case "TARGET_STATE": return evaluateTargetCondition(condition.state, source, target);
+    }
   }
 
   /**
@@ -495,17 +888,91 @@ export class BattleEngine {
     source: BattleUnit,
     target: BattleUnit,
     latent: LatentAbilityCandidate,
-    anyCrit: boolean,
-    debuffApplied: boolean,
+    resolution: SkillResolution,
   ): void {
+    const anyCrit = resolution.anyCrit;
+    const debuffApplied = resolution.debuffApplied;
     const allies = this.units.filter((unit) => unit.team === source.team && unit.alive);
     const lowestAlly = allies.reduce((lowest, unit) => hpRatio(unit) < hpRatio(lowest) ? unit : lowest, source);
     const receiver = latent.target === "SELF" ? source : latent.target === "LOWEST_HP_ALLY" ? lowestAlly : target;
     const proc = () => this.rng() < latent.chance;
     const announce = () => this.push(`  → 潜在能力「${latent.name}」が発動！`);
 
+    // クリティカルで溜まる上乗せ・戦闘中ずっと残るクリダメは、条件判定より先に処理する
+    if (latent.chargeOnCrit && resolution.critCount > 0) {
+      source.latentChargeBonus = Math.min(latent.chargeOnCrit.maxBonus, source.latentChargeBonus + latent.chargeOnCrit.perHit);
+    }
+    if (latent.critDmgGrowth && resolution.critCount > 0) {
+      source.latentCritDmgBonus = Math.min(
+        latent.critDmgGrowth.maxBonus,
+        source.latentCritDmgBonus + latent.critDmgGrowth.perCrit * resolution.critCount,
+      );
+    }
+    if (latent.oneShotMitigate) source.latentOneShotMitigate = latent.oneShotMitigate;
+
+    // 条件と内部クールタイムは**1スキル使用につき1回**だけ見る。多段でも増えない
+    if (!this.latentConditionMet(latent, source, target, resolution)) return;
+    if (latent.internalCooldown && source.latentCooldown > 0) return;
+    if (latent.internalCooldown && (latent.runtimeEffects?.length ?? 0) > 0) source.latentCooldown = latent.internalCooldown;
+
     for (const effect of latent.runtimeEffects ?? []) {
-      if (effect.kind === "STRIP") {
+      if (effect.kind === "SELF_GAUGE") {
+        this.gainGauge(source, effect.value); announce();
+      } else if (effect.kind === "SELF_HEAL") {
+        const amount = Math.round(source.maxHp * effect.value);
+        applyHeal(source, amount);
+        this.pushEvent({ targetId: source.instanceId, kind: "HEAL", amount });
+        announce();
+      } else if (effect.kind === "LIFESTEAL") {
+        if (resolution.damageDealt > 0) {
+          const amount = Math.round(resolution.damageDealt * effect.value);
+          applyHeal(source, amount);
+          this.pushEvent({ targetId: source.instanceId, kind: "HEAL", amount });
+          announce();
+        }
+      } else if (effect.kind === "SELF_CLEANSE") {
+        if (cleanseDebuffs(source, effect.count) > 0) announce();
+      } else if (effect.kind === "SELF_SHIELD") {
+        source.shieldValue = Math.max(source.shieldValue, Math.round(source.maxHp * effect.value));
+        source.shieldTurns = Math.max(source.shieldTurns, effect.duration);
+        announce();
+      } else if (effect.kind === "LOWEST_ALLY_HEAL") {
+        const amount = Math.round(lowestAlly.maxHp * effect.value);
+        applyHeal(lowestAlly, amount);
+        this.pushEvent({ targetId: lowestAlly.instanceId, kind: "HEAL", amount });
+        announce();
+      } else if (effect.kind === "LOWEST_ALLY_GAUGE") {
+        const extra = effect.whenAllyHpBelow !== undefined && hpRatio(lowestAlly) <= effect.whenAllyHpBelow ? (effect.extra ?? 0) : 0;
+        this.gainGauge(lowestAlly, effect.value + extra); announce();
+      } else if (effect.kind === "LOWEST_ALLY_CLEANSE") {
+        if (cleanseDebuffs(lowestAlly, effect.count) > 0) announce();
+      } else if (effect.kind === "LOWEST_ALLY_SHIELD") {
+        if (!hasStatus(lowestAlly, "BUFF_BLOCK")) {
+          lowestAlly.shieldValue = Math.max(lowestAlly.shieldValue, Math.round(source.maxHp * effect.value));
+          lowestAlly.shieldTurns = Math.max(lowestAlly.shieldTurns, effect.duration);
+          announce();
+        }
+      } else if (effect.kind === "LOWEST_ALLY_MITIGATE") {
+        lowestAlly.mitigateAmount = Math.max(lowestAlly.mitigateAmount, effect.value);
+        lowestAlly.mitigateTurns = Math.max(lowestAlly.mitigateTurns, effect.duration);
+        announce();
+      } else if (effect.kind === "LOWEST_ALLY_BUFF") {
+        if (!hasStatus(lowestAlly, "BUFF_BLOCK")) {
+          lowestAlly.effects.push({ stat: effect.stat, amount: effect.amount, remainingTurns: effect.duration, kind: "BUFF" });
+          announce();
+        }
+      } else if (effect.kind === "ALLY_HEAL") {
+        for (const ally of allies) {
+          const amount = Math.round(ally.maxHp * effect.value);
+          applyHeal(ally, amount);
+          this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount });
+        }
+        announce();
+      } else if (effect.kind === "GAUGE_DRAIN_SHARE") {
+        if (resolution.gaugeRemoved > 0) { this.gainGauge(source, resolution.gaugeRemoved * effect.value); announce(); }
+      } else if (effect.kind === "STEAL_BUFF") {
+        if (receiver.alive && stealBuffs(receiver, source, effect.count) > 0) announce();
+      } else if (effect.kind === "STRIP") {
         if (receiver.alive && this.rollEffectSuccess(source, receiver, effect.chance) && stripBuffs(receiver, effect.count)) announce();
       } else if (effect.kind === "GAUGE_DOWN") {
         if (receiver.alive && this.rng() < effect.chance) { receiver.gauge = Math.max(0, receiver.gauge - effect.value * ATB_THRESHOLD); announce(); }
@@ -513,6 +980,9 @@ export class BattleEngine {
         if (!receiver.alive || this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
         if (effect.status === "HEAL_BLOCK") { receiver.healBlockTurns = Math.max(receiver.healBlockTurns, effect.duration); receiver.healBlockMultiplier = 0; }
         else if (effect.status === "SPD_DOWN") receiver.effects.push({ stat: "spd", amount: -.3, remainingTurns: effect.duration, kind: "DEBUFF" });
+        // 攻撃DOWN・防御DOWNは50%固定(依頼主の指定)
+        else if (effect.status === "ATK_DOWN") receiver.effects.push({ stat: "atk", amount: -.5, remainingTurns: effect.duration, kind: "DEBUFF" });
+        else if (effect.status === "DEF_DOWN") receiver.effects.push({ stat: "def", amount: -.5, remainingTurns: effect.duration, kind: "DEBUFF" });
         else if (effect.status === "POISON") { receiver.poisonStacks = Math.min(5, receiver.poisonStacks + 1); receiver.poisonTurns = Math.max(receiver.poisonTurns, effect.duration); receiver.poisonDamageRate = effect.value ?? .05; }
         else if (effect.status === "STUN") receiver.stunTurns = Math.max(receiver.stunTurns, effect.duration);
         else applyStatus(receiver, "BUFF_BLOCK", effect.duration, source.instanceId);
@@ -630,6 +1100,7 @@ export class BattleEngine {
     applyDamage(unit, poisonDamage);
     this.push(`  → ${this.label(unit)} は毒(${stacks}スタック)でダメージを受けた！ ${poisonDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: poisonDamage });
+    this.onPoisonDamage(unit);
     if (!unit.alive) {
       this.push(`  → ${this.label(unit)} は倒れた！`);
       this.pushEvent({ targetId: unit.instanceId, kind: "DEATH" });
@@ -648,31 +1119,58 @@ export class BattleEngine {
     missed = false,
     sourceScoped = true,
     latent?: LatentAbilityCandidate,
+    resolution: SkillResolution = newResolution(),
   ): { anyCrit: boolean; debuffApplied: boolean } {
     let damageDealtThisCall = 0;
-    let anyCrit = false;
-    let debuffApplied = false;
     // 反撃は効果の解決の途中に割り込ませない(解決中に相手が動くと、
     // 残りの効果が誰に乗るのか分からなくなる)。数えておいて最後にまとめて返す
     const counterTargets = new Set<BattleUnit>();
+    if (!resolution.targetHpBefore.has(target.instanceId)) {
+      resolution.targetHpBefore.set(target.instanceId, target.currentHp / target.maxHp);
+    }
+    /** 解決の途中の結果まで含めて、条件が満たされているかを見る */
+    const met = (condition: EffectCondition | undefined): boolean => {
+      if (!condition) return true;
+      if (condition === "ANY_CRIT") return resolution.critCount >= 1;
+      if (condition === "CRITS_AT_LEAST_2") return resolution.critCount >= 2;
+      if (condition === "CRITS_AT_LEAST_3") return resolution.critCount >= 3;
+      if (condition === "STUN_FAILED") return resolution.stunFailed;
+      if (condition === "KILLED_TARGET") return resolution.kills > 0;
+      return evaluateTargetCondition(condition, source, target);
+    };
 
     for (const effect of skill.effects) {
-      if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL") continue;
+      if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL" && !isSourceScopedEffect(effect)) continue;
       // 暗闇で外した場合、ダメージ以外の効果は一切乗らない
       if (missed && effect.kind !== "DAMAGE" && effect.kind !== "LIFESTEAL") continue;
       if (!sourceScoped && isSourceScopedEffect(effect)) continue;
 
       switch (effect.kind) {
         case "DAMAGE": {
+          if (!met(effect.requires)) break;
+          // 「奪った強化1個につき」は解決の途中の結果を見るので、ここで足してから撃つ
+          const stolenBonus = effect.stolenBuffBonus
+            ? Math.min(effect.stolenBuffBonus.maxBonus, resolution.stolenBuffs * effect.stolenBuffBonus.perBuff)
+            : 0;
+          const damageEffect = stolenBonus > 0
+            ? { ...effect, finalDamageBonus: (effect.finalDamageBonus ?? 0) + stolenBonus }
+            : effect;
           const hits = effect.hits ?? 1;
           for (let h = 0; h < hits && target.alive; h += 1) {
-            const result = calcDamage(source, target, effect, this.rng);
-            anyCrit ||= result.isCrit;
+            const result = calcDamage(source, target, damageEffect, this.rng);
+            if (result.isCrit) {
+              resolution.anyCrit = true;
+              resolution.critCount += 1;
+              // 「各ヒットのクリティカルで」と明記された技だけ、ヒットごとに得る
+              if (effect.gaugeOnCritPerHit) this.gainGauge(source, effect.gaugeOnCritPerHit);
+            }
             if (result.isCrit && latent?.effectType === "CRIT_TRIGGER") result.damage = Math.round(result.damage * (1 + latent.value));
             // 暗闇で外した攻撃はかすり傷程度にしかならない
             if (missed) result.damage = Math.max(1, Math.round(result.damage * (1 - BLIND_DAMAGE_REDUCTION)));
-            const applied = this.applyIncomingDamage(target, result.damage, source, "normal");
+            const applied = this.applyIncomingDamage(target, result.damage, source, "normal", resolution);
             damageDealtThisCall += applied.hpDamage;
+            resolution.damageDealt += applied.hpDamage;
+            if (applied.died) { resolution.kills += 1; this.onKill(source); }
             target.hitsTaken += 1;
             counterTargets.add(target);
             const critText = result.isCrit ? "会心の一撃！" : "";
@@ -688,12 +1186,7 @@ export class BattleEngine {
 
         case "HEAL": {
           // 回復先はスキルの対象とは限らない。敵を殴りながら味方を癒す技がある
-          const receivers =
-            effect.applyTo === "SELF"
-              ? [source]
-              : effect.applyTo === "ALLIES"
-                ? this.units.filter((u) => u.team === source.team && u.alive)
-                : [target];
+          const receivers = this.receiversFor(source, target, effect.applyTo);
           for (const receiver of receivers) {
             if (!receiver.alive) continue;
             const healBase =
@@ -713,7 +1206,10 @@ export class BattleEngine {
 
         case "LIFESTEAL": {
           if (!source.alive || damageDealtThisCall <= 0) break;
-          const healAmount = Math.round(damageDealtThisCall * effect.healRate);
+          const lowExtra = effect.selfLowHpExtra && hpRatio(source) <= effect.selfLowHpExtra.hpRatio
+            ? effect.selfLowHpExtra.extra
+            : 0;
+          const healAmount = Math.round(damageDealtThisCall * (effect.healRate + lowExtra));
           if (healAmount <= 0) break;
           applyHeal(source, healAmount);
           this.push(`  → ${this.label(source)} は与えたダメージの一部でHPが ${healAmount} 回復！ (${source.currentHp}/${source.maxHp})`);
@@ -723,12 +1219,7 @@ export class BattleEngine {
 
         case "BUFF": {
           // 適用先を選べる。敵を攻撃しつつ味方を強化するスキルなどで使う
-          const receivers =
-            effect.applyTo === "SELF"
-              ? [source]
-              : effect.applyTo === "ALLIES"
-                ? this.units.filter((u) => u.team === source.team && u.alive)
-                : [target];
+          const receivers = this.receiversFor(source, target, effect.applyTo);
           for (const receiver of receivers) {
             if (hasStatus(receiver, "BUFF_BLOCK")) {
               this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`);
@@ -754,15 +1245,15 @@ export class BattleEngine {
             remainingTurns: effect.durationTurns,
             kind: "DEBUFF",
           });
-          debuffApplied = true;
+          resolution.debuffApplied = true;
+          resolution.applied.add(`${effect.stat.toUpperCase()}_DOWN`);
           this.push(`  → ${this.label(target)} の ${effect.stat.toUpperCase()} が低下！ (${effect.durationTurns}ターン)`);
           break;
         }
 
         case "STATUS": {
           const category = STATUS_EFFECT_CATEGORY[effect.status];
-          const receivers = effect.applyTo === "SELF" ? [source] : effect.applyTo === "ALLIES"
-            ? this.units.filter((unit) => unit.team === source.team && unit.alive) : [target];
+          const receivers = this.receiversFor(source, target, effect.applyTo);
           for (const receiver of receivers) {
             if (category === "DEBUFF") {
               if (this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
@@ -772,16 +1263,21 @@ export class BattleEngine {
               continue;
             }
             this.push(`  → ${this.label(receiver)} は${STATUS_EFFECT_JA[effect.status]}を得た！ (${effect.durationTurns}ターン)`);
-            if (category === "DEBUFF") debuffApplied = true;
+            if (category === "DEBUFF") { resolution.debuffApplied = true; resolution.applied.add(effect.status); }
           }
           break;
         }
 
         case "STUN": {
-          if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!met(effect.requires)) break;
+          if (this.isImmune(target) || !this.rollEffectSuccess(source, target, effect.chance)) {
+            // 「スタンが失敗したら代わりにゲージを削る」型の技のために、外れたことを覚えておく
+            resolution.stunFailed = true;
+            break;
+          }
           target.stunTurns = Math.max(target.stunTurns, effect.durationTurns);
-          debuffApplied = true;
+          resolution.debuffApplied = true;
+          resolution.applied.add("STUN");
           this.push(`  → ${this.label(target)} はスタンした！`);
           break;
         }
@@ -790,25 +1286,32 @@ export class BattleEngine {
           if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.burnTurns = Math.max(target.burnTurns, effect.durationTurns);
-          debuffApplied = true;
+          resolution.debuffApplied = true;
+          resolution.applied.add("BURN");
           this.push(`  → ${this.label(target)} は火傷を負った！ (${effect.durationTurns}ターン)`);
           break;
         }
 
         case "GAUGE": {
-          if (!target.alive) break;
-          if (effect.drain) {
-            // 吸収: 対象から減らした分をそのまま術者へ移す
-            const before = target.gauge;
-            target.gauge = Math.max(0, target.gauge - effect.amount * ATB_THRESHOLD);
-            const stolen = before - target.gauge;
-            source.gauge = Math.max(0, source.gauge + stolen);
-            this.push(`  → ${this.label(source)} が ${this.label(target)} の行動ゲージを吸収した！`);
-            break;
+          if (!met(effect.requires)) break;
+          const receivers = this.receiversFor(source, target, effect.applyTo);
+          for (const receiver of receivers) {
+            if (!receiver.alive) continue;
+            let amount = effect.amount;
+            if (effect.conditionalExtra && met(effect.conditionalExtra.when)) amount += effect.conditionalExtra.amount;
+            if (effect.lowHpExtra && hpRatio(receiver) <= effect.lowHpExtra.hpRatio) amount += effect.lowHpExtra.amount;
+            if (effect.drain) {
+              // 吸収: 対象から減らした分をそのまま術者へ移す
+              resolution.gaugeRemoved += this.drainGauge(source, receiver, amount);
+              this.push(`  → ${this.label(source)} が ${this.label(receiver)} の行動ゲージを吸収した！`);
+              continue;
+            }
+            const before = receiver.gauge;
+            receiver.gauge = Math.max(0, Math.min(ATB_THRESHOLD, receiver.gauge + amount * ATB_THRESHOLD));
+            if (amount < 0) resolution.gaugeRemoved += (before - receiver.gauge) / ATB_THRESHOLD;
+            const verb = amount >= 0 ? "進んだ" : "後退した";
+            this.push(`  → ${this.label(receiver)} の行動ゲージが${verb}！`);
           }
-          target.gauge = Math.max(0, target.gauge + effect.amount * ATB_THRESHOLD);
-          const verb = effect.amount >= 0 ? "進んだ" : "後退した";
-          this.push(`  → ${this.label(target)} の行動ゲージが${verb}！`);
           break;
         }
 
@@ -816,18 +1319,24 @@ export class BattleEngine {
           if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.blindTurns = Math.max(target.blindTurns, effect.durationTurns);
-          debuffApplied = true;
+          resolution.debuffApplied = true;
+          resolution.applied.add("BLIND");
           this.push(`  → ${this.label(target)} は暗闇に包まれた！ (${effect.durationTurns}ターン)`);
           break;
         }
 
         case "SHIELD": {
-          if (!target.alive) break;
-          if (hasStatus(target, "BUFF_BLOCK")) { this.push(`  → ${this.label(target)} は強化不可でBUFF付与を防いだ！`); break; }
-          const shieldAmount = Math.round(target.maxHp * effect.shieldRate);
-          target.shieldValue = Math.max(target.shieldValue, shieldAmount);
-          target.shieldTurns = Math.max(target.shieldTurns, effect.durationTurns);
-          this.push(`  → ${this.label(target)} にシールドが張られた！ (${shieldAmount}、${effect.durationTurns}ターン)`);
+          const receivers = this.receiversFor(source, target, effect.applyTo);
+          for (const receiver of receivers) {
+            if (!receiver.alive) continue;
+            if (hasStatus(receiver, "BUFF_BLOCK")) { this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`); continue; }
+            // タンクの守りは「自分の頑丈さを配る」形。基準を術者のHPに切り替えられる
+            const base = effect.fromSourceHp ? source.maxHp : receiver.maxHp;
+            const shieldAmount = Math.round(base * effect.shieldRate);
+            receiver.shieldValue = Math.max(receiver.shieldValue, shieldAmount);
+            receiver.shieldTurns = Math.max(receiver.shieldTurns, effect.durationTurns);
+            this.push(`  → ${this.label(receiver)} にシールドが張られた！ (${shieldAmount}、${effect.durationTurns}ターン)`);
+          }
           break;
         }
 
@@ -840,34 +1349,122 @@ export class BattleEngine {
         }
 
         case "REGEN": {
-          if (!target.alive) break;
-          if (hasStatus(target, "BUFF_BLOCK")) { this.push(`  → ${this.label(target)} は強化不可でBUFF付与を防いだ！`); break; }
-          target.regenRate = Math.max(target.regenRate, effect.healRate);
-          target.regenTurns = Math.max(target.regenTurns, effect.durationTurns);
-          this.push(`  → ${this.label(target)} は継続回復を得た！ (${effect.durationTurns}ターン)`);
+          const receivers = this.receiversFor(source, target, effect.applyTo);
+          for (const receiver of receivers) {
+            if (!receiver.alive) continue;
+            if (hasStatus(receiver, "BUFF_BLOCK")) { this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`); continue; }
+            receiver.regenRate = Math.max(receiver.regenRate, effect.healRate);
+            receiver.regenTurns = Math.max(receiver.regenTurns, effect.durationTurns);
+            this.push(`  → ${this.label(receiver)} は継続回復を得た！ (${effect.durationTurns}ターン)`);
+          }
           break;
         }
 
         case "CLEANSE": {
-          if (!target.alive) break;
-          if (cleanseDebuffs(target) > 0) this.push(`  → ${this.label(target)} のデバフが解除された！`);
+          const receivers = this.receiversFor(source, target, effect.applyTo);
+          for (const receiver of receivers) {
+            if (!receiver.alive) continue;
+            if (cleanseDebuffs(receiver, effect.count ?? Number.POSITIVE_INFINITY) > 0) {
+              this.push(`  → ${this.label(receiver)} のデバフが解除された！`);
+            }
+          }
           break;
         }
 
         case "STRIP": {
           // IMMUNITY自身はBUFF。対抗手段である強化解除を免疫で封じない。
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
-          if (stripBuffs(target)) {
+          const removed = stripBuffs(target, effect.count ?? Number.POSITIVE_INFINITY);
+          if (removed > 0) {
+            resolution.strippedTargets += 1;
+            resolution.applied.add("STRIP");
             this.push(`  → ${this.label(target)} の有利な効果が剥がされた！`);
+            if (effect.selfGaugePerRemoved) this.gainGauge(source, effect.selfGaugePerRemoved * removed);
           }
           break;
         }
+
+        case "STEAL_BUFF": {
+          if (!target.alive) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          const stolen = stealBuffs(target, source, effect.count ?? 1);
+          if (stolen > 0) {
+            resolution.stolenBuffs += stolen;
+            resolution.applied.add("STRIP");
+            this.push(`  → ${this.label(source)} が ${this.label(target)} の有利な効果を ${stolen}個 奪った！`);
+          }
+          break;
+        }
+
+        case "MITIGATE": {
+          const receivers = this.receiversFor(source, target, effect.applyTo);
+          for (const receiver of receivers) {
+            if (!receiver.alive) continue;
+            receiver.mitigateAmount = Math.max(receiver.mitigateAmount, effect.amount);
+            receiver.mitigateVsTaunted = Math.max(receiver.mitigateVsTaunted, effect.vsTauntedExtra ?? 0);
+            receiver.mitigateTurns = Math.max(receiver.mitigateTurns, effect.durationTurns);
+            this.push(`  → ${this.label(receiver)} は受けるダメージが軽減された！ (${effect.durationTurns}ターン)`);
+          }
+          break;
+        }
+
+        case "PROTECT": {
+          // 自分を自分でかばうことはできない。その時はHP割合が最も低い別の味方を守る
+          const others = this.units.filter((unit) => unit.team === source.team && unit.alive && unit !== source);
+          const guarded = target !== source && target.alive
+            ? target
+            : others.reduce<BattleUnit | undefined>((lowest, unit) => (!lowest || hpRatio(unit) < hpRatio(lowest) ? unit : lowest), undefined);
+          if (!guarded) break;
+          guarded.protectorId = source.instanceId;
+          guarded.protectShare = effect.share;
+          guarded.protectTurns = Math.max(guarded.protectTurns, effect.durationTurns);
+          this.push(`  → ${this.label(source)} が ${this.label(guarded)} を守る構えを取った！ (${effect.durationTurns}ターン)`);
+          break;
+        }
+
+        case "COUNTER_STANCE": {
+          source.counterTurns = Math.max(source.counterTurns, effect.durationTurns);
+          source.counterMultiplier = Math.max(source.counterMultiplier, effect.multiplier);
+          source.counterHpCoefficient = Math.max(source.counterHpCoefficient, effect.hpCoefficient ?? 0);
+          source.counterHealRate = Math.max(source.counterHealRate, effect.healRate ?? 0);
+          this.push(`  → ${this.label(source)} は反撃の構えを取った！ (${effect.durationTurns}ターン)`);
+          break;
+        }
+
+        case "COOLDOWN_REDUCE": {
+          if (!met(effect.requires)) break;
+          const receivers = this.receiversFor(source, target, effect.applyTo);
+          for (const receiver of receivers) {
+            if (!receiver.alive) continue;
+            // 0未満にはしない。負に振れると「常時使える必殺技」ができてしまう
+            receiver.cooldowns = receiver.cooldowns.map((c, slot) => (
+              effect.slot !== undefined && effect.slot !== slot ? c : Math.max(0, c - effect.turns)
+            )) as [number, number, number];
+            this.push(`  → ${this.label(receiver)} のスキルのクールタイムが ${effect.turns}ターン短縮された！`);
+          }
+          break;
+        }
+
+        case "GAUGE_ON_HIT": {
+          for (const receiver of this.receiversFor(source, target, effect.applyTo)) {
+            if (!receiver.alive) continue;
+            receiver.hitGaugeAmount = Math.max(receiver.hitGaugeAmount, effect.amount);
+            receiver.hitGaugeTurns = Math.max(receiver.hitGaugeTurns, effect.durationTurns);
+            this.push(`  → ${this.label(receiver)} は攻撃を受けるたび行動ゲージが進むようになった！`);
+          }
+          break;
+        }
+
+        // 協力攻撃は対象ごとの解決ではなく、スキル全体の解決の最後で処理する
+        case "COOP_ATTACK":
+          break;
 
         case "HEAL_BLOCK": {
           if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
           target.healBlockTurns = Math.max(target.healBlockTurns, effect.durationTurns);
-          debuffApplied = true;
+          resolution.debuffApplied = true;
+          resolution.applied.add("HEAL_BLOCK");
           // 複数から掛かったら、いちばんきついものが残る
           target.healBlockMultiplier = Math.min(target.healBlockMultiplier, effect.healMultiplier);
           this.push(
@@ -890,8 +1487,12 @@ export class BattleEngine {
         case "POISON": {
           if (this.isImmune(target)) break;
           if (!this.rollEffectSuccess(source, target, effect.chance)) break;
-          target.poisonStacks = Math.min(5, target.poisonStacks + 1);
-          debuffApplied = true;
+          // 「既に毒状態ならさらに重ねる」は、判定より先に今の状態を見る
+          const alreadyPoisoned = target.poisonStacks > 0;
+          const stacks = (effect.stacks ?? 1) + (alreadyPoisoned ? (effect.extraStacksIfPoisoned ?? 0) : 0);
+          target.poisonStacks = Math.min(5, target.poisonStacks + stacks);
+          resolution.debuffApplied = true;
+          resolution.applied.add("POISON");
           target.poisonTurns = Math.max(target.poisonTurns, effect.durationTurns);
           target.poisonDamageRate = Math.max(target.poisonDamageRate, effect.damageRatePerStack);
           this.push(`  → ${this.label(target)} は毒を受けた！ (${target.poisonStacks}スタック、${effect.durationTurns}ターン)`);
@@ -901,7 +1502,7 @@ export class BattleEngine {
     }
 
     for (const victim of counterTargets) this.tryCounter(victim, source);
-    return { anyCrit, debuffApplied };
+    return { anyCrit: resolution.anyCrit, debuffApplied: resolution.debuffApplied };
   }
 
   /** 特殊ダメージにも共通の致死処理を通し、通常由来だけ反射を1段生成する。 */
@@ -910,9 +1511,37 @@ export class BattleEngine {
     amount: number,
     source?: BattleUnit,
     sourceType: "normal" | "reflect" | "periodic" = "normal",
+    resolution: SkillResolution | null = null,
   ): DamageApplicationResult {
-    const multiplier = Math.max(0, Math.min(1, target.def.latentAbility?.damageTakenMultiplier ?? 1));
-    const applied = applyDamage(target, Math.round(amount * multiplier));
+    const equipmentMultiplier = Math.max(0, Math.min(1, target.def.latentAbility?.damageTakenMultiplier ?? 1));
+    const hpBefore = hpRatio(target);
+    // 軽減とパッシブによる被ダメージ減は、無敵・シールドより手前で1度だけ掛ける
+    let incoming = Math.round(amount * equipmentMultiplier * damageTakenMultiplier(target, source ? hasStatus(source, "TAUNT") : false));
+    if (target.latentOneShotMitigate > 0) target.latentOneShotMitigate = 0;
+
+    /*
+     * かばう。**軽減のあと、致死処理の前**に割り込む。
+     * 先に肩代わりすると守る側が軽減の恩恵を受けられず、
+     * 後に回すと守られた側が一度倒れてから肩代わりが起きてしまう。
+     */
+    const protector = target.protectTurns > 0
+      ? this.units.find((unit) => unit.instanceId === target.protectorId && unit.alive)
+      : undefined;
+    if (protector && protector !== target && sourceType === "normal" && incoming > 0) {
+      const shared = Math.round(incoming * target.protectShare);
+      if (shared > 0) {
+        incoming -= shared;
+        const taken = applyDamage(protector, Math.round(shared * damageTakenMultiplier(protector)));
+        this.push(`  → ${this.label(protector)} が ${this.label(target)} をかばった！ ${taken.hpDamage} ダメージ (残りHP ${protector.currentHp}/${protector.maxHp})`);
+        this.pushEvent({ targetId: protector.instanceId, kind: "DAMAGE", amount: taken.hpDamage });
+        if (taken.died) {
+          this.push(`  → ${this.label(protector)} は倒れた！`);
+          this.pushEvent({ targetId: protector.instanceId, kind: "DEATH" });
+        }
+      }
+    }
+
+    const applied = applyDamage(target, incoming);
     if (applied.invincible) this.push(`  → ${this.label(target)} は無敵でダメージを無効化した！`);
     if (applied.endured) this.push(`  → ${this.label(target)} は我慢でHP1に踏みとどまった！`);
     if (applied.revived) this.push(`  → ${this.label(target)} は最大HPの25%で復活した！`);
@@ -920,6 +1549,12 @@ export class BattleEngine {
       this.push(`  → ${this.label(target)} は倒れた！`);
       this.pushEvent({ targetId: target.instanceId, kind: "DEATH" });
     }
+    if (sourceType === "normal" && applied.hpDamage > 0) {
+      this.onDamaged(target, source, resolution);
+      this.tryCounterStance(target, source);
+    }
+    // HP閾値を「またいだ瞬間」だけ拾う。下回り続けている間ずっと出続けないようにする
+    if (target.alive && hpBefore > 0.3 && hpRatio(target) <= 0.3) this.onAllyHpThreshold(target);
     if (sourceType === "normal" && source?.alive && applied.hpDamage > 0 && hasStatus(target, "REFLECT")) {
       const reflected = Math.round(applied.hpDamage * 0.25);
       if (reflected > 0) {
@@ -939,6 +1574,28 @@ export class BattleEngine {
    *
    * 反撃そのものは反撃を呼ばない(呼ぶと相討ちが無限に続く)。
    */
+  /**
+   * 反撃態勢による反撃。ボスの `counterAfterHits` と違い**回数を溜めずに毎回返す**。
+   * 反撃そのものは反撃を呼ばない(相討ちが無限に続く)。
+   */
+  private tryCounterStance(defender: BattleUnit, attacker: BattleUnit | undefined): void {
+    if (defender.counterTurns <= 0 || !defender.alive || !attacker?.alive) return;
+    if (attacker.team === defender.team) return;
+    const result = calcDamage(defender, attacker, {
+      kind: "DAMAGE",
+      multiplier: defender.counterMultiplier,
+      hpCoefficient: defender.counterHpCoefficient > 0 ? defender.counterHpCoefficient : undefined,
+    }, this.rng);
+    const applied = this.applyIncomingDamage(attacker, result.damage, defender, "reflect");
+    this.push(`  → ${this.label(defender)} の反撃！ ${this.label(attacker)} に ${applied.hpDamage} ダメージ (残りHP ${attacker.currentHp}/${attacker.maxHp})`);
+    this.pushEvent({ targetId: attacker.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
+    if (defender.counterHealRate > 0) {
+      const healAmount = Math.round(defender.maxHp * defender.counterHealRate);
+      applyHeal(defender, healAmount);
+      this.pushEvent({ targetId: defender.instanceId, kind: "HEAL", amount: healAmount });
+    }
+  }
+
   private tryCounter(defender: BattleUnit, attacker: BattleUnit): void {
     const traits = defender.def.bossTraits;
     const every = traits?.counterAfterHits ?? 0;
