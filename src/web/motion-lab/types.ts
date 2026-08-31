@@ -1,4 +1,5 @@
 import type { AutoRig } from "./rig.js";
+import type { ContinuousMesh, FrameBounds } from "./mesh.js";
 
 export type MotionType = "idle" | "attack" | "heal" | "hit" | "buff" | "debuff" | "defend" | "victory" | "defeat" | "skill";
 export type CharacterType = "slime" | "humanoid" | "quadruped" | "floating" | "heavy" | "dragon";
@@ -26,6 +27,10 @@ export interface MotionGenerationResult {
   height: number;
   provider: string;
   rig?: AutoRig;
+  mesh?: ContinuousMesh;
+  bounds?: FrameBounds[];
+  safetyMargin?: number;
+  clippingPrevented?: boolean;
 }
 
 export interface MotionGeneratorProvider {
