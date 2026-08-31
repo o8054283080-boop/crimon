@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Element } from "../../core/element.js";
 import { ElementTheme, themeFor } from "./elementTheme.js";
-import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, isElementSpecific, loadSpriteTexture, spriteUrlFor, tintThresholdsFor } from "./spriteArt.js";
+import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, SpriteSheet, TINT_MASK, bodyHueFor, idleSheetFor, isElementSpecific, loadSheetTexture, loadSpriteTexture, spriteUrlFor, tintThresholdsFor } from "./spriteArt.js";
 
 /**
  * 2Dの絵で立つモンスター。
@@ -115,6 +115,23 @@ const ATTACK_STRIKE = 0.19;
 const ATTACK_RECOVER = 0.26;
 const ATTACK_TOTAL = ATTACK_WINDUP + ATTACK_STRIKE + ATTACK_RECOVER;
 
+/**
+ * コマ送りの待機の速さ(1秒あたりのコマ数)。
+ *
+ * 36コマのシートで15fpsなら2.4秒で1周。呼吸としてちょうどよい拍になる。
+ * 種族ごとの速さ(`bobHz`)を掛けるので、重い種族は遅く、小動物は速くなる。
+ */
+const SHEET_FPS = 15;
+
+/**
+ * コマ送りがある種族で、シェーダの待機をどれだけ残すか。
+ *
+ * **0にはしない。** 15fpsのコマ送りは、止めて見ると1コマずつの段差が見える。
+ * わずかに変形を重ねると、その段差が滑らかに繋がる。
+ * 逆に1のままだと、描かれた動きと変形が二重に効いて酔う。
+ */
+const SHEET_IDLE_MIX = 0.22;
+
 const HIT_DURATION = 0.42;
 const CAST_DURATION = 0.68;
 const VICTORY_DURATION = 1.05;
@@ -170,29 +187,64 @@ interface MotionTuning {
   dash: number;
   /** 着地・打点の潰し */
   impact: number;
+
+  /* --- ここから下は待機の「生きている感じ」。高さごとに効き方が違う --- */
+
+  /**
+   * 胸のあたりが膨らむ量。**位置は動かさず、体の中で膨らみが動く。**
+   * 足元と頭は動かないので、呼吸として読める
+   */
+  chest: number;
+  /**
+   * 横揺れが上へ伝わる時の**遅れ**(ラジアン)。
+   * 0だと板が硬いまま傾くだけ。大きいほど柔らかいものに見える
+   */
+  lag: number;
+  /** 頭のあたりだけの小さな上下(頷き)。視線が動いて見える */
+  nod: number;
 }
 
 /*
- * 待機の漂い(bob)は**元の4割**にしてある。
+ * ## 待機を「生きている」に見せる3つ
  *
- * 依頼主から「キャラの位置が動いていて見づらい」という指摘を受けた。
- * 主因は札が本体に追従して一緒に揺れていたことで、そちらは
- * 立ち位置から札を置くことで直した(`getSlotAnchorWorldPosition`)。
- * ただし本体そのものの漂いも、5体が別々の位相で前後に動くと
- * 画面全体がざわついて的が絞れない。
+ * 依頼主の言葉:**「いまだと静止画が上下しているだけ」。**
+ * そのとおりで、以前の待機は板全体を同じだけ潰し、同じだけ動かしていた。
+ * 一様な変形は、どれだけ強めても「絵が丸ごと動いている」にしかならない。
  *
- * **止めはしない。** 完全に静止すると紙芝居になる。
- * 呼吸(breathe)は位置を動かさず縦に伸び縮みするだけなので、そのまま残す。
- * 生きている感じは主にそちらが担っている。
+ * 生き物に見えるかどうかは、**体の部位が別々に動くか**で決まる。
+ * コードは絵のどこが腕かを知らないが、**高さは知っている。**
+ * そこを手がかりに3つを組み立てた(実装は頂点シェーダ)。
+ *
+ *   1. 呼吸 — 胸のあたり(高さ0.52)だけが膨らむ。足元と頭は動かない
+ *   2. 遅れ — 横揺れが下から上へ**遅れて**伝わる。板が硬いまま傾くのと違う
+ *   3. 頷き — 頭のあたりだけ、体と違う周期で小さく上下する
+ *
+ * ## 位置は動かさない
+ *
+ * 漂い(bob)は**0にした。**依頼主から「キャラの位置が動いていて見づらい」
+ * という指摘を受けており、位置を動かす方向で生気を出す道は塞がっている。
+ * 上の3つはどれも**足元を固定したまま形だけを変える**ので、
+ * 立ち位置は1pxも動かない。両立する。
  */
 const MOTION_TUNING: Record<MotionStyle, MotionTuning> = {
-  //          bob   bobHz breathe bHz  sway  wobbleX windup dash impact
-  standard: { bob: 0.022, bobHz: 0.58, breathe: 0.022, breatheHz: 0.62, sway: 0.045, wobbleX: 0, windup: 0.26, dash: 1.0, impact: 0.10 },
-  floaty:   { bob: 0.052, bobHz: 0.42, breathe: 0.014, breatheHz: 0.45, sway: 0.090, wobbleX: 0, windup: 0.18, dash: 0.9, impact: 0.06 },
-  heavy:    { bob: 0.013, bobHz: 0.40, breathe: 0.012, breatheHz: 0.42, sway: 0.022, wobbleX: 0, windup: 0.40, dash: 0.8, impact: 0.20 },
-  beast:    { bob: 0.020, bobHz: 0.66, breathe: 0.020, breatheHz: 0.70, sway: 0.050, wobbleX: 0, windup: 0.24, dash: 1.35, impact: 0.12 },
-  blob:     { bob: 0.018, bobHz: 0.52, breathe: 0.045, breatheHz: 0.55, sway: 0.030, wobbleX: 0.055, windup: 0.22, dash: 1.0, impact: 0.16 },
-  critter:  { bob: 0.025, bobHz: 0.78, breathe: 0.026, breatheHz: 0.82, sway: 0.050, wobbleX: 0.012, windup: 0.20, dash: 1.0, impact: 0.10 },
+  //          bob bobHz breathe bHz  sway wobbleX windup dash impact | chest  lag  nod
+  standard: { bob: 0, bobHz: 0.58, breathe: 0.022, breatheHz: 0.62, sway: 0.060, wobbleX: 0, windup: 0.26, dash: 1.0, impact: 0.10,
+              chest: 0.080, lag: 1.5, nod: 0.030 },
+  // 浮遊型。全身がゆらりと大きく流れる。呼吸は浅く、遅れは小さい(空気には抵抗が無い)
+  floaty:   { bob: 0, bobHz: 0.42, breathe: 0.014, breatheHz: 0.45, sway: 0.115, wobbleX: 0, windup: 0.18, dash: 0.9, impact: 0.06,
+              chest: 0.044, lag: 0.9, nod: 0.062 },
+  // 重量型。呼吸は浅いが遅れが大きい。重いものは動き出しも止まりも遅れる
+  heavy:    { bob: 0, bobHz: 0.40, breathe: 0.012, breatheHz: 0.42, sway: 0.030, wobbleX: 0, windup: 0.40, dash: 0.8, impact: 0.20,
+              chest: 0.055, lag: 2.4, nod: 0.013 },
+  // 獣型。呼吸がはっきりして、頭がよく動く
+  beast:    { bob: 0, bobHz: 0.66, breathe: 0.020, breatheHz: 0.70, sway: 0.066, wobbleX: 0, windup: 0.24, dash: 1.35, impact: 0.12,
+              chest: 0.100, lag: 1.7, nod: 0.046 },
+  // 粘体。全身が呼吸する。遅れが最大で、上へ行くほどぐにゃりと付いてくる
+  blob:     { bob: 0, bobHz: 0.52, breathe: 0.045, breatheHz: 0.55, sway: 0.040, wobbleX: 0.055, windup: 0.22, dash: 1.0, impact: 0.16,
+              chest: 0.165, lag: 3.2, nod: 0.015 },
+  // 小動物。速く小刻みに。頷きが多くて落ち着きが無い
+  critter:  { bob: 0, bobHz: 0.78, breathe: 0.026, breatheHz: 0.82, sway: 0.066, wobbleX: 0.012, windup: 0.20, dash: 1.0, impact: 0.10,
+              chest: 0.115, lag: 1.9, nod: 0.054 },
 };
 
 /**
@@ -238,6 +290,21 @@ export class SpriteAvatar {
     uScale: { value: 1 },
     uBend: { value: 0 },
     uHeight: { value: 1 },
+    /*
+     * 待機の「生きている感じ」。**GPUの中で高さごとに違う動きを作る。**
+     *
+     * JS側で値を1つ計算して板全体へ一様にかけていた頃は、
+     * 依頼主の言うとおり「静止画が上下しているだけ」だった。
+     * 時間そのものを渡して頂点シェーダで組み立てると、
+     * 胸だけ膨らむ・頭だけ遅れる、といった部位ごとの動きが出せる。
+     * 頂点は1体133個しかないので、負荷はほぼ増えない。
+     */
+    uIdleTime: { value: 0 },
+    uBreathe: { value: 0 },
+    uSwayAmp: { value: 0 },
+    uSwayHz: { value: 0 },
+    uLag: { value: 0 },
+    uNod: { value: 0 },
     uTintHue: { value: 0 },
     uTintSat: { value: 1 },
     uTintValueMul: { value: 1 },
@@ -292,6 +359,13 @@ export class SpriteAvatar {
   /** 倒れる向き。全員が同じ方へ崩れると作り物に見える */
   private readonly deathTip = Math.random() < 0.5 ? -1 : 1;
 
+  /**
+   * コマ送りの待機アニメ。無ければ null(シェーダ変形が待機を担う)。
+   */
+  private readonly sheet: SpriteSheet | null;
+  /** いま何コマ目か(小数のまま持ち、描く時に切り捨てる) */
+  private frameClock = 0;
+
   private readonly disposables: { dispose: () => void }[] = [];
 
   constructor(options: SpriteAvatarOptions) {
@@ -299,9 +373,23 @@ export class SpriteAvatar {
     this.facing = facing;
     this.theme = themeFor(element);
 
-    const url = spriteUrlFor(templateId, element, "idle");
-    if (!url) throw new Error(`2Dの絵が無い: ${templateId}[${element}]`);
-    const texture = loadSpriteTexture(url);
+    /*
+     * コマ送りの待機アニメがあれば、そちらを使う。
+     * 無ければ1枚の絵。**絵が届いた種族から順に切り替わる。**
+     */
+    this.sheet = idleSheetFor(templateId, element);
+    let texture: THREE.Texture;
+    if (this.sheet) {
+      texture = loadSheetTexture(this.sheet.url, this.sheet.cols, this.sheet.rows);
+      // 個体ごとに複製したテクスチャなので、画面を離れる時に捨てる
+      this.disposables.push(texture);
+      // 全員が同じコマから始まると、5体が一斉に同じ形で息をする
+      this.frameClock = Math.random() * this.sheet.frames;
+    } else {
+      const url = spriteUrlFor(templateId, element, "idle");
+      if (!url) throw new Error(`2Dの絵が無い: ${templateId}[${element}]`);
+      texture = loadSpriteTexture(url);
+    }
 
     this.tuning = MOTION_TUNING[MOTION_BY_TEMPLATE[templateId] ?? "standard"];
     this.motionScale = reducedMotionScale();
@@ -318,7 +406,16 @@ export class SpriteAvatar {
 
     // 画像の縦横比から幅を出す。**全部同じ幅にすると、翼を広げた種族が潰れる。**
     // 読み込みが終わるまで比が分からないので、まず正方形で置いて後から直す
-    const geometry = new THREE.PlaneGeometry(this.height, this.height, 1, 14);
+    /*
+     * 縦の分割は待機の変形のため。**14 → 22 へ増やした。**
+     *
+     * 呼吸は胸のあたりだけを膨らませるので、そこに頂点が数個しか無いと
+     * 膨らみが角ばって「折れた紙」に見える。横も1分割では、
+     * 上下で違う方向へ捻る動きが作れない。
+     *
+     * 7×23 = 161頂点。1体1回の描画に変わりはなく、負荷はほぼ増えない。
+     */
+    const geometry = new THREE.PlaneGeometry(this.height, this.height, 6, 22);
     // 原点を足元へ移す。以後どれだけ変形させても y=0 が接地面のままになる
     geometry.translate(0, this.height / 2, 0);
     this.disposables.push(geometry);
@@ -362,6 +459,12 @@ export class SpriteAvatar {
         uniform float uScale;
         uniform float uBend;
         uniform float uHeight;
+        uniform float uIdleTime;
+        uniform float uBreathe;
+        uniform float uSwayAmp;
+        uniform float uSwayHz;
+        uniform float uLag;
+        uniform float uNod;
         ${shader.vertexShader}
       `.replace(
         "#include <begin_vertex>",
@@ -369,13 +472,47 @@ export class SpriteAvatar {
          // 足元(y=0)を固定し、上ほど大きく動かす。
          // これを守ると、どれだけ変形させても接地が外れない
          float _t = clamp(transformed.y / uHeight, 0.0, 1.0);
-         transformed.y *= uSquash;
+
+         /*
+          * ここからが待機の「生きている感じ」。
+          *
+          * **一様な変形をやめて、高さごとに違う動きにする。**
+          * 板全体を同じだけ潰して同じだけ動かしていた頃は、
+          * 依頼主の言うとおり「静止画が上下しているだけ」だった。
+          *
+          * 絵のどこが腕でどこが頭かをコードは知らない。**知っているのは高さだけ。**
+          * だから高さを手がかりに、部位ごとに違う動きを組み立てる。
+          */
+
+         // 1. 呼吸。**胸のあたりだけ**を膨らませる。
+         //    足元と頭は動かないので、体の中で膨らみが動いて見える
+         float _wave = sin(uIdleTime * 3.6);
+         float _chest = exp(-pow((_t - 0.52) / 0.30, 2.0));
+         float _breath = _wave * uBreathe * _chest;
+         // 息を吸うと**上体が持ち上がる。**胸が膨らむだけだと風船に見える。
+         //    持ち上がるのは胸より上だけで、足元は動かない
+         float _above = smoothstep(0.42, 1.0, _t);
+         float _rise = _wave * uBreathe * uHeight * 0.42 * _above;
+
+         // 2. 横揺れ。**上へ行くほど遅れて付いてくる。**
+         //    同じ位相で曲げると板が硬いまま傾くだけ。位相をずらすと、
+         //    下の動きが遅れて上へ伝わる「柔らかいもの」に見える
+         float _swayPhase = uIdleTime * uSwayHz - _t * uLag;
+         float _sway = sin(_swayPhase) * uSwayAmp * _t * _t;
+
+         // 3. 頷き。**頭のあたりだけ**、体と違う周期で小さく上下する。
+         //    これが入ると視線が動いて見える
+         float _head = smoothstep(0.62, 1.0, _t);
+         float _nod = sin(uIdleTime * 2.3 + 1.1) * uNod * _head;
+
+         transformed.y *= uSquash * (1.0 - _breath * 0.35);
+         transformed.y += _nod + _rise;
          // 潰したぶんは横へ逃がして体積を保つ。無いと弾力が出ない
-         transformed.x *= inversesqrt(max(uSquash, 0.05)) * uStretchX;
+         transformed.x *= inversesqrt(max(uSquash, 0.05)) * uStretchX * (1.0 + _breath);
          // スキル発動時などの、縦横そろえた拡大
          transformed.xy *= uScale;
          // 撓み。上ほど大きく流れるので、鞭のようにしなる
-         transformed.x += uBend * _t * _t;
+         transformed.x += uBend * _t * _t + _sway;
         `,
       );
       shader.fragmentShader = `
@@ -475,7 +612,14 @@ export class SpriteAvatar {
     const applyAspect = () => {
       const image = texture.image as { width?: number; height?: number } | undefined;
       if (!image?.width || !image?.height) return;
-      this.mesh.scale.x = (image.width / image.height) * (facing === 1 ? 1 : -1);
+      /*
+       * **シートは1コマの比で見る。**シート全体の比(6×6なら1.0)を使うと、
+       * 横長の種族が正方形に潰れる。
+       */
+      const cols = this.sheet?.cols ?? 1;
+      const rows = this.sheet?.rows ?? 1;
+      const ratio = (image.width / cols) / (image.height / rows);
+      this.mesh.scale.x = ratio * (facing === 1 ? 1 : -1);
     };
     if (texture.image) applyAspect();
     else texture.addEventListener("update" as never, applyAspect as never);
@@ -656,15 +800,52 @@ export class SpriteAvatar {
     const m = this.tuning;
     const scale = this.motionScale;
 
-    // --- 待機。呼吸・漂い・撓み ---------------------------------------
-    // 位相は個体ごとにずらしてある。全員が同じ拍で息をすると機械に見える
+    // --- 待機。呼吸・遅れ・頷き ---------------------------------------
+    /*
+     * **板全体への一様な変形は、ここではもう作らない。**
+     * 時間だけをシェーダへ渡し、高さごとに違う動きを頂点シェーダが組み立てる。
+     * 位相は個体ごとにずらしてある。全員が同じ拍で息をすると機械に見える。
+     */
+    /*
+     * コマ送りのシートがある種族では、シェーダの待機を**大きく弱める。**
+     * 描かれた動きの上に呼吸と撓みを重ねると二重に動いて酔う。
+     * 完全に0にはしない。わずかに残すと、コマの切り替わりの段差が
+     * なだらかに繋がって見える。
+     */
+    const idleMix = this.sheet ? SHEET_IDLE_MIX : 1;
+    this.uniforms.uIdleTime.value = this.idleClock * m.breatheHz + this.bobPhase;
+    this.uniforms.uBreathe.value = m.chest * scale * idleMix;
+    this.uniforms.uSwayAmp.value = m.sway * scale * idleMix;
+    this.uniforms.uSwayHz.value = m.bobHz * Math.PI * 2 / Math.max(0.001, m.breatheHz);
+    this.uniforms.uLag.value = m.lag;
+    this.uniforms.uNod.value = m.nod * this.height * scale * idleMix;
+
+    /*
+     * コマを進める。**倒れている間は止める。**
+     * 息をしながら崩れ落ちると、死んだように見えない。
+     */
+    if (this.sheet && !this.dead) {
+      const { cols, rows, frames } = this.sheet;
+      this.frameClock = (this.frameClock + dt * SHEET_FPS * m.bobHz / 0.58 * scale) % frames;
+      const index = Math.floor(this.frameClock);
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      /*
+       * three.js のUVは**左下が原点**だが、シートは左上から並んでいる。
+       * 行を反転しないと、上下がひっくり返った順で再生される。
+       */
+      const map = this.material.map;
+      if (map) map.offset.set(col / cols, 1 - (row + 1) / rows);
+    }
+
     const breath = Math.sin(this.idleClock * m.breatheHz * Math.PI * 2 + this.bobPhase);
     let squash = 1 + breath * m.breathe * scale;
     // 粘体は縦に縮んだぶんだけ横へ広がる。他は0なので効かない
     let stretchX = 1 - breath * m.wobbleX * scale;
-    let bend = Math.sin(this.idleClock * m.bobHz * 1.4 * Math.PI * 2 + this.bobPhase * 1.7) * m.sway * scale;
-    let lift = this.floatHeight
-      + Math.sin(this.idleClock * m.bobHz * Math.PI * 2 + this.bobPhase) * m.bob * scale;
+    // 撓みは攻撃・被弾のためだけに残す。待機のぶんはシェーダ側が持つ
+    let bend = 0;
+    // 漂いは0。位置を動かさずに生気を出す(依頼主の「位置は固定して」)
+    let lift = this.floatHeight;
     let push = 0;
     let tilt = 0;
     let flash = 0;

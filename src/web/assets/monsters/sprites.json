@@ -95,6 +95,14 @@
     "bodyVal": 0.99,
     "aspect": 0.926
   },
+  "slime-idle": {
+    "sheet": {
+      "cols": 6,
+      "rows": 6,
+      "frames": 36
+    },
+    "aspect": 1.024
+  },
   "treant": {
     "bodyHue": 0.126,
     "bodySat": 0.82,
