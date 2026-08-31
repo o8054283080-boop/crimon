@@ -31,14 +31,20 @@ describe("navigation state", () => {
     expect(loadNavigationState(storage)?.returnContext).toEqual(returnContext);
   });
 
-  it("旧形式や壊れたreturn contextは安全に無視する", () => {
+  it("旧形式や壊れたreturn contextは安全に無視し、パーティ編成はHOMEへ戻す", () => {
     const storage = new MemoryStorage();
     storage.setItem(NAVIGATION_STORAGE_KEY, JSON.stringify({ screen: "PARTY", returnContext: { screen: "REMOVED", label: 7 } }));
-    expect(loadNavigationState(storage)).toEqual({ screen: "PARTY", returnContext: undefined });
+    expect(loadNavigationState(storage)).toEqual({ screen: "HOME", returnContext: undefined });
+  });
+
+  it("アプリ再起動時にパーティ編成へ張り付かない", () => {
+    const storage = new MemoryStorage();
+    saveNavigationState({ screen: "PARTY" }, storage);
+    expect(loadNavigationState(storage)?.screen).toBe("HOME");
   });
 
   it.each([
-    ["BATTLE", "STAGES"], ["DUNGEON_BATTLE", "EQUIP_DUNGEON"], ["ARENA_BATTLE", "ARENA"],
+    ["PARTY", "HOME"], ["BATTLE", "STAGES"], ["DUNGEON_BATTLE", "EQUIP_DUNGEON"], ["ARENA_BATTLE", "ARENA"],
     ["TOWER_BATTLE", "TRIAL_TOWER"],
   ] as const)("falls back from %s to %s", (screen, parent) => expect(safeRestoredScreen(screen)).toBe(parent));
 
