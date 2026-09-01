@@ -1,26 +1,17 @@
 /**
  * BGMを鳴らす。
  *
- * 焼いたループ(`tools/audio/render_bgm.py`)をそのまま繰り返す。
- * ファイルは数学的に周期が閉じるように作ってあるので、継ぎ目をまたぐ処理は
- * ここでは何もしない。**クロスフェードで無理につなごうとしないこと。**
- * そこで何かが起きたと必ず分かってしまう。
- *
- * 旋律は持たない。「環境音 + 持続音 + まばらな出来事」だけで場の空気を敷く。
- * 理由は render_bgm.py の冒頭に書いてある。
- *
+ * ゲーム用に調整済みのループ音源をそのまま繰り返す。
  * 音声文脈は `context.ts` の `audioEngine` が持つ。効果音と同じものを使う。
  */
 import { audioEngine, loadAudioBuffer, loadAudioManifest } from "./context.js";
 import { AudioSettings, getAudioSettings, onAudioSettingsChange } from "./settings.js";
 
-/** 場面。焼いてあるのは2つだけで、戦闘以外はすべて拠点の音を敷く */
-export type BgmScene = "home" | "battle";
+/** 場面。拠点・通常戦闘・ボス戦の3系統 */
+export type BgmScene = "home" | "battle" | "boss";
 
 /**
  * 場面を切り替える時の重なり(秒)。
- *
- * 短いと切り替わりが目立ち、長いと2曲が混ざって濁る。
  * 戦闘に入る瞬間は「切り替わった」と分かってよいので、やや短めに取る。
  */
 const CROSSFADE_SEC = 1.6;
@@ -65,6 +56,17 @@ class BgmPlayer {
   }
 
   /**
+   * 通常戦闘として呼ばれていても、戦闘HUDにBOSS札があればボス曲へ切り替える。
+   * `main.ts` は画面描画後にBGMを指定するため、その時点ではHUDの判定が使える。
+   * Wave2→ボスWave3のように同じ戦闘画面のまま遷移しても、実効sceneが変わるので
+   * きちんとクロスフェードされる。
+   */
+  private resolveScene(scene: BgmScene | null): BgmScene | null {
+    if (scene !== "battle" || typeof document === "undefined") return scene;
+    return document.querySelector(".unit-hud--enemy.unit-hud--boss") ? "boss" : "battle";
+  }
+
+  /**
    * 出力へつなぐ枝を用意する。
    *
    * **記憶への代入を、本体を走らせる前に済ませること。** `audioEngine.ensure()`
@@ -104,7 +106,8 @@ class BgmPlayer {
    * 同じ場面を何度渡しても鳴らし直さない。画面の再描画のたびに呼ばれても
    * 曲が頭から鳴り直さないようにするため。
    */
-  play(scene: BgmScene | null): void {
+  play(requestedScene: BgmScene | null): void {
+    const scene = this.resolveScene(requestedScene);
     if (this.wanted === scene) return;
     this.wanted = scene;
     void this.apply(scene);
@@ -141,7 +144,6 @@ class BgmPlayer {
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    // 焼いた時点で周期が閉じているので、端をまたいでそのまま繰り返してよい
     source.loop = true;
     source.loopStart = 0;
     source.loopEnd = buffer.duration;
@@ -173,10 +175,7 @@ class BgmPlayer {
 
   /**
    * ループが本当に閉じているかを確かめる。
-   *
-   * ogg の復号は、符号化の都合で前後に余白が付くことがある。余白が残ると
-   * ループのたびにそこだけ無音になり、**焼く側でどれだけ丁寧に周期を
-   * 閉じても意味がなくなる。** 焼いた長さと復号後の長さを突き合わせる。
+   * ogg復号後の長さと継ぎ目の跳びを測るデバッグ用。
    */
   async measureLoop(scene: BgmScene, expectedSec = 32): Promise<Record<string, number> | null> {
     await this.prepare();
@@ -186,7 +185,6 @@ class BgmPlayer {
     if (!buffer) return null;
 
     const data = buffer.getChannelData(0);
-    // 継ぎ目の跳びを、曲中のふつうの1サンプルぶんの動きと比べる
     const steps: number[] = [];
     for (let i = 1; i < data.length; i += 97) steps.push(Math.abs(data[i] - data[i - 1]));
     steps.sort((a, b) => a - b);

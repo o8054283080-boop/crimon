@@ -42,6 +42,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-01-bgm-home-battle-boss-volume",
+    title: "9/1 BGM・音量調整アップデート",
+    message: "新しいBGMとして、ホーム用・通常戦闘用・ボス戦用の3曲を追加しました。通常戦闘では専用曲を再生し、戦闘画面にBOSSが登場するバトルではボス戦用BGMへ自動で切り替わります。あわせて音量スライダーを5%刻みから1%刻みに変更し、小さい音量へより細かく調整できるようにしました。",
+    kind: "UPDATE",
+    fromDate: "2026-09-01",
+    toDate: "9999-12-31",
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-09-01-result-party-level-reward-fx",
     title: "9/1 リザルト・報酬演出アップデート",
     message: "バトルのリザルト画面に、戦闘後の現在パーティ4体のレベルを一覧表示するようにしました。レベルMAXのメンバーも確認できます。あわせてミッション報酬を受け取った時に、獲得内容が中央に浮かび上がる専用の入手演出を追加しました。演出は表示専用で、報酬の付与処理や受取済み判定には影響しません。",
