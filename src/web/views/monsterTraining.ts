@@ -9,6 +9,7 @@ import { el } from "../dom.js";
 import { monsterCard } from "./monsters.js";
 import { renderPartySlots } from "./partyCard.js";
 import { managementHeader } from "./managementHeader.js";
+import { stickyActions } from "./stickyActions.js";
 
 export interface MonsterTrainingProps {
   player: PlayerState;
@@ -153,11 +154,17 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         : shownCandidates.length === 0
           ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
         : el("div", { className: "monster-grid" }, cards),
+      el("div", { className: "sticky-actions__spacer" }, []),
     ]),
-    el(
-      "button",
-      { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
-      ["💪 モンスター強化実行"],
-    ),
+    stickyActions({
+      status: check.ok
+        ? `${props.selectedMaterialIds.length}体で 経験値 ${totalExp}`
+        : check.reason ?? "下の一覧から素材を選んでください",
+      primary: el(
+        "button",
+        { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
+        ["💪 モンスター強化実行"],
+      ),
+    }),
   ]);
 }
