@@ -22,7 +22,10 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["icons/favicon-32.png", "icons/apple-touch-icon.png"],
       manifest: {
-        id: ".",
+        // iOS のホーム画面追加で旧 GitHub Pages 版と新配信先を
+        // 同一Webアプリ扱いされないよう、相対 "." ではなく明示的なIDを持たせる。
+        // basePath を含めることで GitHub Pages のサブパス配信でも同一オリジン内に収まる。
+        id: `${basePath}crimon-pwa-v2`,
         name: "Crimon - モンスターバトル",
         short_name: "Crimon",
         description: "6属性の色違いモンスターで戦う4vs4ターン制コマンドバトル",
