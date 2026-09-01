@@ -15,6 +15,8 @@ interface DifficultyModifier {
   levelBonus: number;
   /** 敵の実効ステータス倍率(powerScale)にさらに掛かる倍率 */
   powerScaleMultiplier: number;
+  /** 敵の速度に掛かる難易度倍率。終盤でも速度育成に意味を持たせる */
+  speedScaleMultiplier: number;
   /** ドロップする装備の星への加算値 */
   equipmentStarBonus: number;
   /** モンスター・ファイター獲得EXP倍率 */
@@ -23,9 +25,9 @@ interface DifficultyModifier {
 
 /** 難易度ごとの敵強化・装備ドロップ星ボーナス。具体的な倍率はゲーム内では非公開 */
 export const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifier> = {
-  NORMAL: { starBonus: 0, levelBonus: 0, powerScaleMultiplier: 1.0, equipmentStarBonus: 0, expMultiplier: 1 },
-  HARD: { starBonus: 1, levelBonus: 5, powerScaleMultiplier: 1.35, equipmentStarBonus: 1, expMultiplier: 1.5 },
-  HELL: { starBonus: 2, levelBonus: 10, powerScaleMultiplier: 1.8, equipmentStarBonus: 2, expMultiplier: 2 },
+  NORMAL: { starBonus: 0, levelBonus: 0, powerScaleMultiplier: 1.0, speedScaleMultiplier: 1.0, equipmentStarBonus: 0, expMultiplier: 1 },
+  HARD: { starBonus: 1, levelBonus: 5, powerScaleMultiplier: 1.35, speedScaleMultiplier: 1.1, equipmentStarBonus: 1, expMultiplier: 1.5 },
+  HELL: { starBonus: 2, levelBonus: 10, powerScaleMultiplier: 1.8, speedScaleMultiplier: 1.2, equipmentStarBonus: 2, expMultiplier: 2 },
 };
 
 export interface WaveEnemy {
@@ -34,6 +36,12 @@ export interface WaveEnemy {
   star: Star;
   level: number;
   isBoss?: boolean;
+  /** ボスなど、図鑑名とは別の敵専用表示名 */
+  displayName?: string;
+  /** NORMAL時に使う最終速度。指定時はウェーブspeedScaleより優先する */
+  speedOverride?: number;
+  /** 難易度ごとの反撃までの被弾回数。主に古代守護ゴーレム用 */
+  bossCounterAfterHits?: Partial<Record<Difficulty, number>>;
 }
 
 export interface Wave {
@@ -67,7 +75,7 @@ export interface StageRewards {
 
 export interface Stage {
   id: string;
-  /** チャプター番号(1〜4)。チャプターごとにドロップするモンスター種族・装備シリーズのテーマが決まっている */
+  /** チャプター番号(1〜8)。チャプターごとにドロップ種族・装備シリーズのテーマが決まっている */
   chapter: number;
   stageNumber: number;
   name: string;
@@ -77,22 +85,71 @@ export interface Stage {
 
 const NORMAL_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
 
-/**
- * チャプター(ステージ1〜4)ごとのテーマ。各チャプターをクリアすると、
- * このテーマ種族(星1)とテーマ装備シリーズ(星1)が固定で出やすくなる。
- */
 interface ChapterTheme {
   chapter: number;
   templateId: string;
   equipmentSet: SetType;
 }
 
+/**
+ * 5〜8章では新規高レアを敵として積極的に登場させる一方、ステージ周回だけで
+ * ガチャ高レアが量産されないよう、章ドロップは従来の通常種族8体を一巡させる。
+ */
 const CHAPTER_THEMES: ChapterTheme[] = [
   { chapter: 1, templateId: "slime", equipmentSet: "CRIT" },
   { chapter: 2, templateId: "wolf", equipmentSet: "POWER" },
   { chapter: 3, templateId: "golem", equipmentSet: "GUARD" },
   { chapter: 4, templateId: "fairy", equipmentSet: "VITALITY" },
+  { chapter: 5, templateId: "treant", equipmentSet: "ACCURACY_SET" },
+  { chapter: 6, templateId: "knight", equipmentSet: "RESIST_SET" },
+  { chapter: 7, templateId: "imp", equipmentSet: "SWIFT" },
+  { chapter: 8, templateId: "wisp", equipmentSet: "CRIT" },
 ];
+
+/** 5〜8章の道中編成。各ステージ3Wave×4体を固定し、対策を立てて再挑戦できるようにする。 */
+const LATE_STAGE_WAVES: Record<string, string[][]> = {
+  "5-1": [["mushroon", "slime", "wolf", "imp"], ["mushroon", "mushroon", "fairy", "wisp"], ["mushroon", "kobold", "imp", "slime"]],
+  "5-2": [["shellturtle", "wolf", "fairy", "golem"], ["shellturtle", "mushroon", "wisp", "imp"], ["shellturtle", "shellturtle", "kobold", "fairy"]],
+  "5-3": [["basilisk", "mushroon", "imp", "slime"], ["basilisk", "wisp", "kobold", "wolf"], ["basilisk", "basilisk", "mushroon", "fairy"]],
+  "5-4": [["mushroon", "shellturtle", "kobold", "basilisk"], ["shellturtle", "basilisk", "fairy", "wisp"], ["basilisk", "mushroon", "kobold", "imp"]],
+  "5-5": [["mushroon", "shellturtle", "basilisk", "fairy"], ["basilisk", "kobold", "imp", "wisp"], ["mushroon", "treant", "shellturtle", "fairy"]],
+
+  "6-1": [["mimic", "golem", "kobold", "wolf"], ["mimic", "shellturtle", "fairy", "basilisk"], ["mimic", "valkyria", "golem", "kobold"]],
+  "6-2": [["valkyria", "fairy", "wolf", "shellturtle"], ["valkyria", "mimic", "basilisk", "wisp"], ["valkyria", "valkyria", "kobold", "fairy"]],
+  "6-3": [["thunderbeast", "wolf", "wisp", "kobold"], ["thunderbeast", "valkyria", "basilisk", "mimic"], ["thunderbeast", "thunderbeast", "shellturtle", "fairy"]],
+  "6-4": [["mimic", "valkyria", "thunderbeast", "basilisk"], ["shellturtle", "mimic", "valkyria", "fairy"], ["thunderbeast", "basilisk", "kobold", "mimic"]],
+  "6-5": [["mimic", "shellturtle", "valkyria", "golem"], ["thunderbeast", "basilisk", "mimic", "wisp"], ["mimic", "golem", "valkyria", "shellturtle"]],
+
+  "7-1": [["abyssreaper", "mimic", "imp", "basilisk"], ["abyssreaper", "mushroon", "fairy", "kobold"], ["abyssreaper", "fenrir", "mimic", "wisp"]],
+  "7-2": [["fenrir", "wolf", "kobold", "thunderbeast"], ["fenrir", "basilisk", "mimic", "fairy"], ["fenrir", "fenrir", "abyssreaper", "imp"]],
+  "7-3": [["abyssreaper", "fenrir", "valkyria", "basilisk"], ["abyssreaper", "mimic", "thunderbeast", "wisp"], ["fenrir", "abyssreaper", "mushroon", "fairy"]],
+  "7-4": [["abyssreaper", "fenrir", "mimic", "basilisk"], ["fenrir", "valkyria", "thunderbeast", "wisp"], ["abyssreaper", "fenrir", "kobold", "mimic"]],
+  "7-5": [["abyssreaper", "fenrir", "mimic", "fairy"], ["abyssreaper", "basilisk", "thunderbeast", "wisp"], ["abyssreaper", "abyssreaper", "fenrir", "mimic"]],
+
+  "8-1": [["chronos", "wisp", "basilisk", "fairy"], ["chronos", "abyssreaper", "kobold", "mimic"], ["chronos", "fenrir", "thunderbeast", "valkyria"]],
+  "8-2": [["behemoth", "mimic", "shellturtle", "fairy"], ["behemoth", "basilisk", "abyssreaper", "wisp"], ["behemoth", "behemoth", "fenrir", "chronos"]],
+  "8-3": [["fenrir", "thunderbeast", "kobold", "abyssreaper"], ["chronos", "basilisk", "fenrir", "valkyria"], ["abyssreaper", "chronos", "fenrir", "behemoth"]],
+  "8-4": [["chronos", "abyssreaper", "basilisk", "mimic"], ["fenrir", "thunderbeast", "valkyria", "behemoth"], ["chronos", "abyssreaper", "fenrir", "behemoth"]],
+  "8-5": [["chronos", "basilisk", "abyssreaper", "wisp"], ["fenrir", "thunderbeast", "behemoth", "valkyria"], ["chronos", "chronos", "abyssreaper", "behemoth"]],
+};
+
+interface BossProfile {
+  templateId: string;
+  displayName: string;
+  normalSpeed: number;
+  /** 特定属性のスキル構成をボスに使いたい場合のみ指定する。 */
+  element?: Element;
+  counterAfterHits?: Partial<Record<Difficulty, number>>;
+}
+
+/** 5〜8章の章ボス。速度はNORMALの最終実効値を直接指定する。 */
+const BOSS_PROFILES: Partial<Record<number, BossProfile>> = {
+  5: { templateId: "treant", displayName: "腐食トレント", normalSpeed: 120 },
+  6: { templateId: "golem", displayName: "古代守護ゴーレム", normalSpeed: 125, counterAfterHits: { NORMAL: 5, HARD: 4, HELL: 3 } },
+  7: { templateId: "abyssreaper", displayName: "奈落の死神", normalSpeed: 145 },
+  // 水クロノスは強化済み「時空崩壊」(ダメージ後70%でゲージ100%減少)を持つ。
+  8: { templateId: "chronos", displayName: "時空の支配者", normalSpeed: 155, element: "WATER" },
+};
 
 /** チャプターテーマのモンスター(星1)がステージクリア時にドロップする確率。ゲーム内では非公開 */
 const CHAPTER_MONSTER_DROP_RATE = 0.15;
@@ -105,23 +162,13 @@ function clampLevel(star: Star, level: number, max: Record<Star, number>): numbe
 
 const MAX_STAR: Star = 6;
 
-/**
- * 全4チャプター×5ステージを通しで並べた「グローバルステージ番号」(1〜20)。
- * チャプターをまたいでも強さがリセットされないよう、星・レベル・powerScaleは
- * すべてこの通し番号を基準に連続的に上昇させる(同じステージ番号でもチャプターが
- * 上がれば必ず明確に強くなる)。
- */
+/** 全8チャプター×5ステージを通した番号(1〜40)。 */
 function globalStageIndex(chapter: number, stageNumber: number): number {
   return (chapter - 1) * 5 + stageNumber;
 }
 
-/**
- * グローバルステージ番号がこの値に到達した時点で、敵の基本星がその添字+1になる(星1〜5)。
- * 4ステージごとに星が1つ上がる均等な刻みにしてあり、チャプターをまたぐたびに必ず星が変わる。
- * 星6は基本星としては出現せず、各チャプター最終ステージのボス個体(+1される)だけが到達できる
- * 特別な星として、20ステージ目(最終チャプターのボス)で初めて到達するようにしてある。
- */
-const STAR_BREAKPOINTS = [1, 5, 9, 13, 17];
+/** 5章までは★5、6章から通常敵も★6へ移行する。 */
+const STAR_BREAKPOINTS = [1, 5, 9, 13, 17, 26];
 
 function baseStarForGlobalIndex(globalIndex: number): Star {
   let star = 1;
@@ -131,79 +178,62 @@ function baseStarForGlobalIndex(globalIndex: number): Star {
       break;
     }
   }
-  return star as Star;
+  return Math.min(MAX_STAR, star) as Star;
 }
 
-/** グローバルステージ番号が1つ上がるごとにレベルが+2される(ウェーブ内でもさらに+1ずつ) */
+/** グローバルステージ番号が1つ上がるごとにレベルが+2される(上限は星ごとにクランプ)。 */
 function baseLevelForGlobalIndex(globalIndex: number, waveNumber: number): number {
   return 1 + (globalIndex - 1) * 2 + (waveNumber - 1);
 }
 
-/**
- * 敵の実効ステータス倍率(powerScale)。ステージ1-1の0.5倍から始まり、全20ステージを通して滑らかに上昇する。
- * 星の上昇(最大で1.4^4≒3.8倍)だけでも十分に強い上昇カーブになるため、powerScaleの上げ幅は
- * 控えめ(最大でも1.0倍=据え置き相当)に留め、星と掛け合わさって難易度が跳ね上がりすぎないようにしてある。
- */
+/** 1〜4章は従来値を維持し、5章以降だけ滑らかに1.55倍まで引き上げる。 */
 const POWER_SCALE_BASE = 0.5;
 const POWER_SCALE_STEP = 0.031;
-const POWER_SCALE_MAX = 1.12;
+const LEGACY_STAGE_COUNT = 20;
+const LEGACY_POWER_AT_20 = POWER_SCALE_BASE + POWER_SCALE_STEP * (LEGACY_STAGE_COUNT - 1);
+const LATE_POWER_SCALE_MAX = 1.55;
 
 function powerScaleForGlobalIndex(globalIndex: number): number {
-  return Math.min(POWER_SCALE_MAX, POWER_SCALE_BASE + POWER_SCALE_STEP * (globalIndex - 1));
+  if (globalIndex <= LEGACY_STAGE_COUNT) {
+    return Math.min(1.12, POWER_SCALE_BASE + POWER_SCALE_STEP * (globalIndex - 1));
+  }
+  const t = Math.min(1, (globalIndex - LEGACY_STAGE_COUNT) / 20);
+  return LEGACY_POWER_AT_20 + (LATE_POWER_SCALE_MAX - LEGACY_POWER_AT_20) * t;
 }
 
 /**
- * 敵の速度に掛かる倍率。
- *
- * powerScale はHP・攻撃・防御にしか掛からないため、**速度だけが最初から最後まで
- * 据え置き**だった。プレイヤー側は★6装備の副効果を速度に寄せると300を超えるので、
- * 終盤では一方的に何度も動ける状態になる。
- *
- * ただし**装備ダンジョンより弱くする**。あちらは装備を詰めた人が挑む場所だが、
- * ステージは物語を進める場所で、速度を詰めていない編成でも通れなければならない。
- * 装備ダンジョンが最終階で1.85倍なのに対し、ここは最終ステージで1.32倍に留める。
+ * 速度は1〜4章の従来カーブ(1.00→1.16)を保ち、5〜8章で1.40まで伸ばす。
+ * これによりCh5の高速役が約145、Ch8の高速役が約165〜170になる。
  */
 const SPEED_SCALE_BASE = 1;
-// 装備の速度を半分にしたのに合わせて下げた(装備ダンジョンの1.28より緩く保つ)
-const SPEED_SCALE_MAX = 1.16;
-/**
- * 通し番号は**ステージ単位**(全20)。ウェーブ単位(60)と取り違えると、
- * 最終ステージでも倍率が3分の1しか伸びない
- */
-const SPEED_SCALE_STAGES = 20;
+const LEGACY_SPEED_SCALE_MAX = 1.16;
+const LATE_SPEED_SCALE_MAX = 1.4;
 
 function speedScaleForGlobalIndex(globalIndex: number): number {
-  const t = Math.min(1, Math.max(0, (globalIndex - 1) / (SPEED_SCALE_STAGES - 1)));
-  return SPEED_SCALE_BASE + (SPEED_SCALE_MAX - SPEED_SCALE_BASE) * t;
+  if (globalIndex <= LEGACY_STAGE_COUNT) {
+    const t = Math.min(1, Math.max(0, (globalIndex - 1) / (LEGACY_STAGE_COUNT - 1)));
+    return SPEED_SCALE_BASE + (LEGACY_SPEED_SCALE_MAX - SPEED_SCALE_BASE) * t;
+  }
+  const t = Math.min(1, (globalIndex - LEGACY_STAGE_COUNT) / 20);
+  return LEGACY_SPEED_SCALE_MAX + (LATE_SPEED_SCALE_MAX - LEGACY_SPEED_SCALE_MAX) * t;
 }
 
-/** 1ウェーブに並ぶ敵の数 */
 const WAVE_SIZE = 4;
 
-/**
- * そのウェーブに出す4体の種族を決める。
- *
- * 以前は「登場する全種族をそのまま4体並べる」実装だったため、
- * 全20ステージ60ウェーブが**まったく同じ顔ぶれ**(スライム・ウルフ・ゴーレム・フェアリー)で、
- * 変わるのは星とレベルだけだった。これがステージを安っぽく見せている最大の原因だったので、
- * 種族を増やしたうえで、その中から毎ウェーブ違う4体を選ぶようにしている。
- *
- * 選び方は乱数ではなく通し番号による回転で、同じステージなら何度開いても同じ顔ぶれになる
- * (敵の顔ぶれが開くたびに変わると、対策を立てて挑み直すことができなくなる)。
- * そのチャプターのテーマ種族は必ず1体入れて、章ごとの色を残している。
- */
-function waveTemplateIds(themeTemplateId: string, globalIndex: number, waveNumber: number): string[] {
+function rotatingWaveTemplateIds(themeTemplateId: string, globalIndex: number, waveNumber: number): string[] {
   const others = MONSTER_TEMPLATES.map((t) => t.templateId).filter((id) => id !== themeTemplateId);
-  // 通し番号とウェーブ番号で開始位置をずらし、そこから順に取る。
-  // ステージが進むごとに顔ぶれが少しずつ入れ替わり、同じ章の中でも3ウェーブすべて異なる。
   const start = ((globalIndex - 1) * 2 + (waveNumber - 1) * 3) % Math.max(1, others.length);
   const picked = [themeTemplateId];
   for (let i = 0; picked.length < WAVE_SIZE && i < others.length; i++) {
     picked.push(others[(start + i) % others.length]);
   }
-  // 種族が4体に満たない場合(将来テンプレートを減らした時)は先頭から埋めて数を合わせる
   while (picked.length < WAVE_SIZE) picked.push(picked[picked.length % Math.max(1, picked.length)]);
   return picked;
+}
+
+function waveTemplateIds(theme: ChapterTheme, stageNumber: number, waveNumber: number): string[] {
+  const fixed = LATE_STAGE_WAVES[`${theme.chapter}-${stageNumber}`]?.[waveNumber - 1];
+  return fixed ? [...fixed] : rotatingWaveTemplateIds(theme.templateId, globalStageIndex(theme.chapter, stageNumber), waveNumber);
 }
 
 function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
@@ -211,7 +241,7 @@ function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number,
   const baseStar = baseStarForGlobalIndex(globalIndex);
   const baseLevel = baseLevelForGlobalIndex(globalIndex, waveNumber);
 
-  const enemies: WaveEnemy[] = waveTemplateIds(theme.templateId, globalIndex, waveNumber).map((templateId, i) => {
+  const enemies: WaveEnemy[] = waveTemplateIds(theme, stageNumber, waveNumber).map((templateId, i) => {
     const element = NORMAL_ELEMENTS[(i + stageNumber + waveNumber) % NORMAL_ELEMENTS.length];
     return {
       templateId,
@@ -222,22 +252,43 @@ function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number,
   });
 
   if (isBossWave) {
-    // ボスはそのチャプターのテーマ種族(=先頭)。以前は常に配列の先頭=スライムだったため、
-    // どの章の章ボスもスライムになっていた
     const bossStar = Math.min(MAX_STAR, baseStar + 1) as Star;
-    enemies[0] = {
-      ...enemies[0],
-      element: "DARK",
-      star: bossStar,
-      level: clampLevel(bossStar, baseLevel + 5, STAR_MAX_LEVEL),
-      isBoss: true,
-    };
+    const profile = BOSS_PROFILES[theme.chapter];
+
+    if (profile) {
+      // 4体編成には完全な中央がないため、中央寄りの2番目へ固定する。
+      enemies[1] = {
+        ...enemies[1],
+        templateId: profile.templateId,
+        element: profile.element ?? "DARK",
+        star: bossStar,
+        level: clampLevel(bossStar, baseLevel + 5, STAR_MAX_LEVEL),
+        isBoss: true,
+        displayName: profile.displayName,
+        speedOverride: profile.normalSpeed,
+        bossCounterAfterHits: profile.counterAfterHits,
+      };
+    } else {
+      // 1〜4章も表示位置を統一する。テーマ種族(先頭)を2番目へ移し、既存の能力は変えない。
+      const themeEnemy = enemies[0];
+      enemies[0] = enemies[1];
+      enemies[1] = {
+        ...themeEnemy,
+        element: "DARK",
+        star: bossStar,
+        level: clampLevel(bossStar, baseLevel + 5, STAR_MAX_LEVEL),
+        isBoss: true,
+      };
+    }
   }
 
-  const powerScale = powerScaleForGlobalIndex(globalIndex);
-  const speedScale = speedScaleForGlobalIndex(globalIndex);
-
-  return { waveNumber, isBossWave, enemies, powerScale, speedScale };
+  return {
+    waveNumber,
+    isBossWave,
+    enemies,
+    powerScale: powerScaleForGlobalIndex(globalIndex),
+    speedScale: speedScaleForGlobalIndex(globalIndex),
+  };
 }
 
 /** チャプターが1つ上がるごとに、強くなった敵に見合うようゴールドも底上げする */
@@ -251,9 +302,8 @@ function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
   const rewards: StageRewards = {
     waveGold: Math.round(30 * stageNumber * chapterRewardMultiplier),
     clearGold: Math.round(150 * stageNumber * chapterRewardMultiplier),
-    // 全20面を通して300～6,000 EXP/周。後半周回にも意味を持たせつつ、
-    // HELL最終面でも育成D5階のEXP/スタミナを下回る。
-    waveExp: 100 * globalStageIndex(theme.chapter, stageNumber),
+    // 4-5で到達した従来の上限(2,000/Wave=6,000/周)を維持し、育成Dの役割を侵食しない。
+    waveExp: Math.min(2_000, 100 * globalStageIndex(theme.chapter, stageNumber)),
     dropRate: CHAPTER_MONSTER_DROP_RATE,
     dropStars: [1],
     dropTemplateId: theme.templateId,

@@ -22,30 +22,45 @@ function applyDifficultyToEnemy(enemy: WaveEnemy, difficulty: Difficulty): WaveE
   return { ...enemy, star, level };
 }
 
-function defFromWaveEnemy(enemy: WaveEnemy, powerScale: number, speedScale: number): MonsterDefinition {
+function defFromWaveEnemy(
+  enemy: WaveEnemy,
+  powerScale: number,
+  speedScale: number,
+  difficulty: Difficulty,
+): MonsterDefinition {
   const dex = resolveDex(`${enemy.templateId}_${enemy.element}`);
   const base = computeEffectiveStats(dex.stats, enemy.star, enemy.level);
+  const difficultySpeed = DIFFICULTY_MODIFIERS[difficulty].speedScaleMultiplier;
+  // ボスのspeedOverrideはNORMAL時の最終実効速度。通常敵だけウェーブの速度カーブを使う。
+  const normalSpeed = enemy.speedOverride ?? base.spd * speedScale;
   const stats = {
     ...base,
     hp: Math.round(base.hp * powerScale),
     atk: scaledEnemyAtk(base.atk * powerScale),
     def: Math.round(base.def * powerScale),
-    spd: Math.round(base.spd * speedScale),
+    spd: Math.round(normalSpeed * difficultySpeed),
   };
+
+  const counterAfterHits = enemy.bossCounterAfterHits?.[difficulty];
+  const bossTraits = counterAfterHits
+    ? { ...dex.bossTraits, counterAfterHits, counterMultiplier: dex.bossTraits?.counterMultiplier ?? 1.4 }
+    : dex.bossTraits;
+
   return {
     ...dex,
     id: `${dex.id}_wave`,
-    name: `${dex.name}★${enemy.star} Lv${enemy.level}${enemy.isBoss ? " 【BOSS】" : ""}`,
+    name: `${enemy.displayName ?? dex.name}★${enemy.star} Lv${enemy.level}${enemy.isBoss ? " 【BOSS】" : ""}`,
     stats,
+    bossTraits,
   };
 }
 
 export function buildEnemyTeam(wave: Wave, difficulty: Difficulty = "NORMAL"): MonsterDefinition[] {
   const mod = DIFFICULTY_MODIFIERS[difficulty];
   const powerScale = wave.powerScale * mod.powerScaleMultiplier;
-  // 難易度(HARD/HELL)は星とレベルと powerScale を上げる。速度はそこに乗せない
-  // (速く"かつ"硬いを同時にやると、上の難易度が別のゲームになってしまう)
-  return wave.enemies.map((enemy) => defFromWaveEnemy(applyDifficultyToEnemy(enemy, difficulty), powerScale, wave.speedScale));
+  return wave.enemies.map((enemy) =>
+    defFromWaveEnemy(applyDifficultyToEnemy(enemy, difficulty), powerScale, wave.speedScale, difficulty),
+  );
 }
 
 export interface WaveBattleSetup {
