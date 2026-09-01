@@ -8,6 +8,7 @@ import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
 import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
 import { el } from "../dom.js";
+import { createIncrementalGrid } from "../incrementalGrid.js";
 import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, sortMonsters } from "../../game/monsterSort.js";
 import { GEAR_SLOT_TOTAL, MonsterFilter, equippedCount, filterMonsters } from "../monsterFilter.js";
 import { renderMonsterFilterBar } from "./monsterFilterBar.js";
@@ -101,14 +102,19 @@ function renderList(props: MonstersProps): HTMLElement {
   const context = { partyIds: props.player.partyIds };
   const shown = filterMonsters(props.player.monsters, props.filter, context);
   const sortedMonsters = sortMonsters(shown, props.sortKey, context);
-  const cards = sortedMonsters.map((instance) => {
-    const card = monsterCard(instance, () => props.onSelectDetail(instance.id), {
-      compact: true,
-      badge: props.player.partyIds.includes(instance.id) ? "編成中" : undefined,
-    });
-    card.classList.toggle("monster-list-card--locked", instance.locked === true);
-    card.append(renderMonsterListLock(instance, props.onToggleLock));
-    return card;
+  const monsterGrid = createIncrementalGrid({
+    className: "monster-grid",
+    items: sortedMonsters,
+    renderItem: (instance) => {
+      const card = monsterCard(instance, () => props.onSelectDetail(instance.id), {
+        compact: true,
+        badge: props.player.partyIds.includes(instance.id) ? "編成中" : undefined,
+      });
+      card.classList.toggle("monster-list-card--locked", instance.locked === true);
+      card.append(renderMonsterListLock(instance, props.onToggleLock));
+      return card;
+    },
+    moreLabel: (shownCount, total) => `モンスターをさらに表示（${shownCount} / ${total}）`,
   });
 
   return el("div", { className: "screen monsters-screen" }, [
@@ -128,9 +134,9 @@ function renderList(props: MonstersProps): HTMLElement {
         onChange: props.onChangeFilter,
       }),
       renderMonsterSortRow(props.sortKey, props.onChangeSort),
-      cards.length === 0
+      sortedMonsters.length === 0
         ? el("p", { className: "app-subtitle" }, ["条件に当てはまるモンスターがいません。絞り込みを緩めてください。"])
-        : el("div", { className: "monster-grid" }, cards),
+        : monsterGrid.element,
     ]),
   ]);
 }
@@ -411,17 +417,19 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
 
   // 軸で並べてから、転生ピッグだけを先頭へ寄せる。
   // 逆にすると寄せた並びを軸が壊すので、順番は入れ替えられない
-  const buildCards = (): HTMLElement[] => sortMaterialMonsters(
+  const buildItems = (): MonsterInstance[] => sortMaterialMonsters(
     sortMonsters(candidates, rankUpSortKey, { partyIds: props.player.partyIds }),
     rankUpMaterialSort,
-  ).map((c) =>
-    // 素材選びの最中こそ「この子は誰だったか」を確かめたい。長押しで詳細へ送る
-    monsterCard(c, () => props.onToggleSacrifice(c.id), {
-      selected: props.selectedSacrificeIds.includes(c.id),
-      onLongPress: () => props.onSelectDetail(c.id),
-    }),
   );
-  const grid = el("div", { className: "monster-grid" }, buildCards());
+  const grid = createIncrementalGrid({
+    className: "monster-grid",
+    items: buildItems(),
+    renderItem: (candidate) => monsterCard(candidate, () => props.onToggleSacrifice(candidate.id), {
+      selected: props.selectedSacrificeIds.includes(candidate.id),
+      onLongPress: () => props.onSelectDetail(candidate.id),
+    }),
+    moreLabel: (shown, total) => `素材をさらに表示（${shown} / ${total}）`,
+  });
 
   /*
    * 札は作り直さず、押された時に印だけ付け替える。
@@ -437,7 +445,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       for (const [i, other] of sortButtons.entries()) {
         other.classList.toggle("slot-filter-chip--active", MONSTER_SORT_KEYS[i] === key);
       }
-      grid.replaceChildren(...buildCards());
+      grid.reset(buildItems());
     };
     return button;
   });
@@ -454,7 +462,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     rankUpMaterialSort = sort;
     normalSortButton.classList.toggle("slot-filter-chip--active", sort === "DEFAULT");
     reincarnationSortButton.classList.toggle("slot-filter-chip--active", sort === "REINCARNATION_PIG_FIRST");
-    grid.replaceChildren(...buildCards());
+    grid.reset(buildItems());
   };
   normalSortButton.onclick = () => applyMaterialSort("DEFAULT");
   reincarnationSortButton.onclick = () => applyMaterialSort("REINCARNATION_PIG_FIRST");
@@ -485,7 +493,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       ]),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
-        : grid,
+        : grid.element,
       el("div", { className: "sticky-actions__spacer" }, []),
     ]),
     /*
