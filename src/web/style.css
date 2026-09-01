@@ -7840,3 +7840,43 @@ body::before {
 
 /* 中身を押し下げて、ボタンの下に隠れるものを作らない */
 body.has-global-back .screen { padding-top: calc(var(--global-back-h) + 10px); }
+
+/* ------------------------------------------------------ 下に貼り付く実行バー
+
+   素材選びの画面は一覧が数十枚あり、実行ボタンだけが最後に置かれていた。
+   選び終わっているのに押すためだけに巻き下ろすことになるので、
+   ボタンを下へ貼り付ける。
+
+   `fixed` ではなく `sticky` なのは、**画面の流れの中に居場所を残す**ため。
+   一番下まで巻けば元の位置へ収まり、最後の行と重ならない。 */
+.sticky-actions {
+  position: sticky;
+  /* 下のタブの上に載せる。タブが無い画面では 0 に落ちる */
+  bottom: calc(var(--bottom-nav-h, 0px) + 8px);
+  z-index: 30;
+  display: grid;
+  gap: 6px;
+  margin: 10px -4px 0;
+  padding: 9px 10px 10px;
+  border: 1px solid rgba(226, 182, 110, 0.3);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(12, 16, 34, 0.94), rgba(7, 10, 23, 0.97));
+  box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.sticky-actions .btn--large { margin: 0; }
+
+/* 押せない理由と進み具合。**押す場所のすぐ隣に置く**
+   ——画面の外にあると、押せないボタンを見ても何が足りないのか分からない */
+.sticky-actions__status {
+  margin: 0;
+  text-align: center;
+  /* 9px未満は実機で読めない(tests/cssReadability.test.ts が見張っている) */
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: #d8bd93;
+}
+
+/* 一覧の最後の1枚がバーの裏へ入り込まないよう、高さぶんの余白を置く */
+.sticky-actions__spacer { height: 64px; }

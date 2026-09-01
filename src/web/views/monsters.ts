@@ -18,6 +18,7 @@ import { CreateSlot, currentSkillOf, describeCreatedSkill } from "../../game/mon
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
 import { managementHeader } from "./managementHeader.js";
+import { stickyActions } from "./stickyActions.js";
 import { computeLeveledSkill, describeSkillLines, MAX_SKILL_LEVEL } from "../../core/skill.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import "../ui/monsterDetail.css";
@@ -485,17 +486,27 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : grid,
+      el("div", { className: "sticky-actions__spacer" }, []),
     ]),
-    el(
-      "button",
-      {
-        type: "button",
-        className: "btn btn--primary btn--large",
-        disabled: !check.ok,
-        onclick: props.onConfirmRankUp,
-      },
-      ["⭐ ランクアップ実行"],
-    ),
+    /*
+     * 実行は下に貼り付ける。素材は一覧の上の方で選び終わっているのに、
+     * 押すためだけに数十枚を巻き下ろすことになっていた。
+     */
+    stickyActions({
+      status: check.ok
+        ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
+        : check.reason ?? `あと ${Math.max(0, requiredCount - props.selectedSacrificeIds.length)} 体選んでください`,
+      primary: el(
+        "button",
+        {
+          type: "button",
+          className: "btn btn--primary btn--large",
+          disabled: !check.ok,
+          onclick: props.onConfirmRankUp,
+        },
+        ["⭐ ランクアップ実行"],
+      ),
+    }),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancelRankUp }, ["キャンセル"]),
   ]);
 }
