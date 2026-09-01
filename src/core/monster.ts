@@ -1,6 +1,6 @@
 import { Element, ELEMENT_COLOR, ELEMENT_JA, ELEMENTS } from "./element.js";
 import { CombatModifiers } from "./equipment.js";
-import { Skill } from "./skill.js";
+import { Skill, SkillEffect } from "./skill.js";
 import { Stats, cloneStats } from "./stats.js";
 import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
 
@@ -120,6 +120,114 @@ const ELEMENT_STAT_FLAVOR: Record<Element, (stats: Stats) => Stats> = {
 };
 
 /**
+ * 既存の弱いスキルだけを対象にした2026-09-01の底上げ。
+ *
+ * 原型配列の並び順は属性ごとのスキル割り当てに使われているため、データ本体を並べ替えず
+ * 実体化の直前にIDで差し替える。光/闇固有技や新規高レアには一切波及しない。
+ */
+function applyLegacySkillBalance(skill: Skill): Skill {
+  switch (skill.id) {
+    case "slime_s3_a":
+      return {
+        ...skill,
+        description: "限界を超えた力で敵全体に攻撃力1.8倍のダメージを与える。この攻撃で敵を倒していた場合、自身の行動ゲージを20%進める。",
+        effects: [
+          { kind: "DAMAGE", multiplier: 1.8 },
+          { kind: "GAUGE", amount: 0.2, applyTo: "SELF", requires: "KILLED_TARGET" },
+        ],
+      };
+    case "slime_s3_c":
+      return {
+        ...skill,
+        description: "眩い粘液を弾けさせ、敵全体に攻撃力1.5倍のダメージを与え、75%で2ターン暗闇を付与する。",
+        effects: [
+          { kind: "DAMAGE", multiplier: 1.5 },
+          { kind: "BLIND", durationTurns: 2, chance: 0.75 },
+        ],
+      };
+    case "wolf_s3_a":
+      return {
+        ...skill,
+        description: "渾身の一撃(2.8倍)を叩き込み、50%で相手をスタンさせる。",
+        effects: [
+          { kind: "DAMAGE", multiplier: 2.8 },
+          { kind: "STUN", durationTurns: 1, chance: 0.5 },
+        ],
+      };
+    case "wolf_s3_b":
+      return {
+        ...skill,
+        description: "敵単体に攻撃力0.85倍のダメージを3回与え、1撃ごとに防御力を25%低下させる。",
+        effects: skill.effects.map((effect) => effect.kind === "DAMAGE" ? { ...effect, multiplier: 0.85 } : effect),
+      };
+    case "imp_s3_a":
+      return {
+        ...skill,
+        description: "敵全体に攻撃力1.1倍のダメージを与え、75%で2ターン攻撃力を大きく低下させ、行動ゲージを15%減少させる。",
+        effects: [
+          { kind: "DAMAGE", multiplier: 1.1 },
+          { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.75 },
+          { kind: "GAUGE", amount: -0.15 },
+        ],
+      };
+    case "imp_s3_b":
+      return {
+        ...skill,
+        description: "敵全体に攻撃力1.1倍のダメージを与え、75%で全員のスキルのクールタイムを1ターン延長する。",
+        cooldownTurns: 4,
+        effects: [
+          { kind: "DAMAGE", multiplier: 1.1 },
+          { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.75 },
+        ],
+      };
+    case "wisp_s2_b":
+      return {
+        ...skill,
+        description: "味方全体の素早さを2ターン上昇させ、行動ゲージを25%進める。",
+        effects: skill.effects.map((effect) => effect.kind === "GAUGE" ? { ...effect, amount: 0.25 } : effect),
+      };
+    case "fairy_s3_c":
+      return {
+        ...skill,
+        description: "味方全体のHPを最大HPの25%回復し、防御力を2ターン上昇させる。",
+        cooldownTurns: 4,
+        effects: [
+          { kind: "HEAL", healRate: 0.25 },
+          { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
+        ],
+      };
+    case "knight_s3_b":
+      return {
+        ...skill,
+        description: "敵全体に攻撃力1.5倍のダメージを与え、60%で1ターン行動不能にする。",
+        effects: [
+          { kind: "DAMAGE", multiplier: 1.5 },
+          { kind: "STUN", durationTurns: 1, chance: 0.6 },
+        ],
+      };
+    case "chronos_s3_b": {
+      /*
+       * GAUGEには基礎発動率フィールドが無いため、0ターンSTUNを発動判定だけの印として使う。
+       * 成功時(70%、命中/抵抗判定込み)はSTUN_FAILEDが立たず-100%、失敗時は+100%を相殺して0%。
+       * duration=0なのでスタンそのものは一切残らない。
+       */
+      const procMarker = { kind: "STUN", durationTurns: 0, chance: 0.7 } as SkillEffect;
+      return {
+        ...skill,
+        description: "時空が軋み、敵全体に攻撃力1.0倍のダメージを与える。ダメージのあと70%で敵の行動ゲージを100%減少させる。",
+        effects: [
+          { kind: "DAMAGE", multiplier: 1.0 },
+          procMarker,
+          { kind: "GAUGE", amount: -1, conditionalExtra: { when: "STUN_FAILED", amount: 1 } },
+        ],
+      };
+    }
+    default:
+      return skill;
+  }
+}
+
+/**
  * 属性(ELEMENTS配列中の並び順)に応じて、スキル候補の中から1つを決定的に選ぶ。
  * candidateCountより属性数が多い場合、単純な剰余だけだと複数の属性が同じ添字に
  * 揃ってしまう(例: 候補3種×属性6なら2属性ずつ完全に同じ組み合わせになる)。
@@ -137,12 +245,16 @@ function pickSkillVariant(variants: Skill[], element: Element, groupOffset: numb
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
   const flavoredStats = ELEMENT_STAT_FLAVOR[element](cloneStats(template.baseStats));
   const assignment = template.skillAssignment?.[element];
-  const skill2 = template.skill2Variants[assignment?.skill2 ?? -1] ?? pickSkillVariant(template.skill2Variants, element, 0);
+  const skill2 = applyLegacySkillBalance(
+    template.skill2Variants[assignment?.skill2 ?? -1] ?? pickSkillVariant(template.skill2Variants, element, 0),
+  );
   // 光/闇に固有のスキル3があれば、候補からの抽選より優先する
   const uniqueSkill3 = element === "LIGHT" ? template.lightSkill3 : element === "DARK" ? template.darkSkill3 : undefined;
-  const skill3 = uniqueSkill3
-    ?? template.skill3Variants[assignment?.skill3 ?? -1]
-    ?? pickSkillVariant(template.skill3Variants, element, 1);
+  const skill3 = applyLegacySkillBalance(
+    uniqueSkill3
+      ?? template.skill3Variants[assignment?.skill3 ?? -1]
+      ?? pickSkillVariant(template.skill3Variants, element, 1),
+  );
   return {
     id: `${template.templateId}_${element}`,
     templateId: template.templateId,
@@ -152,7 +264,7 @@ export function createMonsterVariant(template: MonsterTemplate, element: Element
     role: template.role,
     emoji: template.emoji,
     stats: flavoredStats,
-    skills: [template.skill1, skill2, skill3],
+    skills: [applyLegacySkillBalance(template.skill1), skill2, skill3],
     bossTraits: template.bossTraits,
   };
 }
