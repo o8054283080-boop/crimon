@@ -3,7 +3,6 @@ import { createInitialState } from "./playerState.js";
 import { serializeSaveFile } from "./saveFile.js";
 import {
   CLOUD_RESTORE_BACKUP_KEY,
-  CloudRecoveryError,
   currentSaveEnvelope,
   registerRecovery,
   restoreBeforeCloudRecovery,
@@ -68,7 +67,7 @@ describe("cloud recovery", () => {
       savedAt: "2026-09-01T00:00:00.000Z",
       lastUploadedSave: "different",
     };
-    await expect(uploadCloudSave(meta, envelope())).rejects.toMatchObject<Partial<CloudRecoveryError>>({ code: "STALE_REVISION" });
+    await expect(uploadCloudSave(meta, envelope())).rejects.toMatchObject({ code: "STALE_REVISION" });
     expect(meta.revision).toBe(7);
   });
 
