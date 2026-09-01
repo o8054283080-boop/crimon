@@ -146,9 +146,14 @@ function renderIdle(props: SummonProps): HTMLElement {
     ]),
   ];
   const cta = el("div", { className: "summon-cta" }, ctaChildren.filter((n): n is HTMLElement => n !== null));
+  /*
+   * **排出率の数字は画面に出さない**(依頼主との約束)。
+   * ここには「何が保証されるか」だけを書く。%を並べていた頃は、
+   * ガチャの内訳をそのまま画面へ写していた。
+   */
   const specialScrolls: { type: SpecialSummonScroll; name: string; description: string; count: number }[] = [
-    { type: "FOUR_STAR", name: "★4以上召喚書", description: "★4 70% / ★5 12% / 光闇★4 15% / 光闇★5 3%", count: player.fourStarSummonScrolls },
-    { type: "LIGHT_DARK_FOUR_STAR", name: "★4以上光闇召喚書", description: "光闇★4 90% / 光闇★5 10%", count: player.lightDarkFourStarSummonScrolls },
+    { type: "FOUR_STAR", name: "★4以上召喚書", description: "★4以上を確定召喚。まれに光闇や★5が出る", count: player.fourStarSummonScrolls },
+    { type: "LIGHT_DARK_FOUR_STAR", name: "★4以上光闇召喚書", description: "光闇属性の★4以上を確定召喚。まれに★5が出る", count: player.lightDarkFourStarSummonScrolls },
     { type: "FIVE_STAR", name: "★5召喚書", description: "★5モンスターを確定召喚", count: player.fiveStarSummonScrolls },
   ];
   const specialPanel = specialScrolls.some((scroll) => scroll.count > 0) ? el("section", { className: "special-scrolls" }, [

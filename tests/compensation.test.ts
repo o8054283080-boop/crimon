@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMPENSATIONS, claimCompensations, localDateString, pendingCompensations } from "../src/game/compensation.js";
+import { COMPENSATIONS, claimCompensations, compensationBannerLabel, localDateString, pendingCompensations } from "../src/game/compensation.js";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 
 const TARGET = COMPENSATIONS.find((c) => c.id === "2026-08-18-save-loss")!;
@@ -133,5 +133,62 @@ describe("お詫びの配布", () => {
   it("新しいお詫びは終了日を含み、期間外には配られない", () => {
     expect(pendingCompensations(createInitialState(), localNoonOn("2026-09-30")).some((c) => c.id === AUTOFARM_TARGET.id)).toBe(true);
     expect(pendingCompensations(createInitialState(), localNoonOn("2026-10-01")).some((c) => c.id === AUTOFARM_TARGET.id)).toBe(false);
+  });
+});
+
+describe("新モンスター追加の記念配布", () => {
+  const CELEBRATION = COMPENSATIONS.find((c) => c.id === "2026-09-01-new-monsters")!;
+
+  /** その日に有効な他の配布を受取済みにして、この配布だけを見る */
+  function only(state: ReturnType<typeof createInitialState>): void {
+    for (const c of COMPENSATIONS) if (c.id !== CELEBRATION.id) state.claimedCompensationIds.push(c.id);
+  }
+
+  it("ダイヤ1500・召喚の書30枚・★4以上召喚書2枚を1度だけ配る", () => {
+    const state = createInitialState();
+    only(state);
+    const before = {
+      crystal: state.crystal, gold: state.gold,
+      scrolls: state.summonScrolls, fourStar: state.fourStarSummonScrolls,
+    };
+    const when = localNoonOn(CELEBRATION.fromDate);
+
+    expect(claimCompensations(state, when).map((claim) => claim.compensation.id)).toEqual([CELEBRATION.id]);
+    expect(state.crystal).toBe(before.crystal + 1500);
+    expect(state.summonScrolls).toBe(before.scrolls + 30);
+    expect(state.fourStarSummonScrolls).toBe(before.fourStar + 2);
+    expect(state.gold).toBe(before.gold);
+
+    // 何度開いても二重には配られない
+    expect(claimCompensations(state, when)).toHaveLength(0);
+    expect(state.crystal).toBe(before.crystal + 1500);
+  });
+
+  it("既存セーブを読み直しても二重配布されない", () => {
+    const legacy = createInitialState() as Partial<ReturnType<typeof createInitialState>>;
+    delete legacy.claimedCompensationIds;
+    const loaded = normalizeLoadedState(JSON.parse(JSON.stringify(legacy)) as ReturnType<typeof createInitialState>);
+    only(loaded);
+    const when = localNoonOn(CELEBRATION.fromDate);
+
+    expect(claimCompensations(loaded, when)).toHaveLength(1);
+    const reloaded = normalizeLoadedState(JSON.parse(JSON.stringify(loaded)));
+    expect(claimCompensations(reloaded, when)).toHaveLength(0);
+    expect(reloaded.fourStarSummonScrolls).toBe(2);
+  });
+
+  it("終了日を設けていないので、後から始めた人にも届く", () => {
+    const state = createInitialState();
+    only(state);
+    expect(pendingCompensations(state, localNoonOn("2027-06-15")).map((c) => c.id)).toEqual([CELEBRATION.id]);
+  });
+
+  it("記念の配布に「お詫び」とは書かない", () => {
+    // 祝いの配布へお詫びと書くと、受け取った人は不具合があったと誤解する
+    expect(compensationBannerLabel([{ compensation: CELEBRATION }])).toBe("記念の配布");
+    const apology = COMPENSATIONS.find((c) => c.id === "2026-08-18-save-loss")!;
+    expect(compensationBannerLabel([{ compensation: apology }])).toBe("お詫びの配布");
+    // 混ざった時は、どちらの言葉も嘘になるので中立にする
+    expect(compensationBannerLabel([{ compensation: CELEBRATION }, { compensation: apology }])).toBe("配布のお知らせ");
   });
 });
