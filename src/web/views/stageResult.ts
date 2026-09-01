@@ -2,6 +2,7 @@ import { Equipment, STAT_LABEL } from "../../core/equipment.js";
 import { Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { el } from "../dom.js";
+import "../ui/resultEnhancements.css";
 import { buildMonsterCard } from "./monsterCard.js";
 import { ResultAction, renderResultActions } from "./resultActions.js";
 
@@ -19,7 +20,7 @@ export interface StageResultInfo {
   wavesCleared: number;
   totalWaves: number;
   levelUps: StageResultLevelUp[];
-  expAwards?: { instanceId: string; name: string; total: number; maxMemberBonus: number }[];
+  expAwards?: { instanceId: string; name: string; level: number; maxLevel: number; total: number; maxMemberBonus: number }[];
   dropDexId: string | null;
   dropStar: number | null;
   equipmentDrop: Equipment | null;
@@ -104,8 +105,23 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
           info.levelUps.map((l) => el("span", { className: "result-levelups__item" }, [`${l.name} Lv+${l.levels}`])),
         )
       : null;
-  const expLine = info.expAwards && info.expAwards.length > 0
-    ? el("div", { className: "result-levelups" }, info.expAwards.map((award) => el("span", { className: "result-levelups__item" }, [
+
+  const partyLine = info.expAwards && info.expAwards.length > 0
+    ? el("section", { className: "result-party-levels", ariaLabel: "現在のパーティレベル" }, [
+        el("div", { className: "result-party-levels__title" }, ["現在のパーティ"]),
+        el("div", { className: "result-party-levels__grid" }, info.expAwards.map((award) =>
+          el("div", { className: `result-party-levels__member${award.level >= award.maxLevel ? " is-max" : ""}` }, [
+            el("span", { className: "result-party-levels__name" }, [award.name]),
+            el("strong", { className: "result-party-levels__level" }, [`Lv.${award.level}`]),
+            award.level >= award.maxLevel ? el("small", { className: "result-party-levels__max" }, ["MAX"]) : null,
+          ].filter((node): node is HTMLElement => node !== null)),
+        )),
+      ])
+    : null;
+
+  const expReceiving = info.expAwards?.filter((award) => award.total > 0) ?? [];
+  const expLine = expReceiving.length > 0
+    ? el("div", { className: "result-levelups" }, expReceiving.map((award) => el("span", { className: "result-levelups__item" }, [
         `${award.name} +${award.total.toLocaleString()} EXP${award.maxMemberBonus > 0 ? `（MAXメンバー分 +${award.maxMemberBonus.toLocaleString()}）` : ""}`,
       ])))
     : null;
@@ -113,6 +129,7 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
   const body: (HTMLElement | null)[] = [
     tiles.length > 0 ? el("div", { className: "reward-tiles" }, tiles) : null,
     drops.length > 0 ? el("div", { className: "reward-drops" }, drops) : null,
+    partyLine,
     expLine,
     levelUpLine,
     tiles.length === 0 && drops.length === 0 && !levelUpLine
