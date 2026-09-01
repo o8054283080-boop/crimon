@@ -8,4 +8,5 @@ if (motionLabPath.test(window.location.pathname) || new URLSearchParams(window.l
   void import("./main.js");
   void import("./home-floating-ux.js");
   void import("./missionUi.js");
+  void import("./noticeUi.js");
 }
