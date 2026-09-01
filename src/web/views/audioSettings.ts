@@ -16,7 +16,9 @@ function slider(label: string, value: number, onCommit: (v: number) => void): HT
     type: "range",
     min: "0",
     max: "100",
-    step: "5",
+    // 以前は5%刻みで、最小の非ミュート音量が5%と大きかった。
+    // 1%刻みにして、SE/BGMが大きく感じる端末でも細かく下げられるようにする。
+    step: "1",
     value: String(percent),
     className: "audio-settings__slider",
     oninput: (event: Event) => {
