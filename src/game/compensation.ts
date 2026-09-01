@@ -42,6 +42,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-01-stage-wave-auto-advance",
+    title: "9/1 ステージ進行テンポ改善",
+    message: "通常ステージでウェーブ勝利後に表示していた「次のウェーブへ」ボタンをなくし、勝利表示のあと次のウェーブへ自動で進むようにしました。最終ウェーブ後の報酬受け取りや、敗北時のステージ終了はこれまで通りです。",
+    kind: "UPDATE",
+    fromDate: "2026-09-01",
+    toDate: "9999-12-31",
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-09-01-bgm-home-battle-boss-volume",
     title: "9/1 BGM・音量調整アップデート",
     message: "新しいBGMとして、ホーム用・通常戦闘用・ボス戦用の3曲を追加しました。通常戦闘では専用曲を再生し、戦闘画面にBOSSが登場するバトルではボス戦用BGMへ自動で切り替わります。あわせて音量スライダーを5%刻みから1%刻みに変更し、小さい音量へより細かく調整できるようにしました。",
