@@ -99,6 +99,23 @@ const TEAMS = {
       anyKinds: [["CLEANSE", "IMMUNITY"]],
     },
   },
+  /*
+   * 追加11種で組んだ編成。**塔の穴を埋められたかを見るためだけにある。**
+   *
+   * 「癒やしの階」(敵が回復し続ける)と「守りの階」(敵が強化を張り直す)は、
+   * プレイヤー側に解除と回復阻害が1つも無かったせいで、
+   * 答えのある試練ではなく、ただ長くて痛いだけの階になっていた。
+   * アビスリーパー(S1に解除)とマッシュルン(回復阻害)がそこへの答えなので、
+   * この2体を軸に、支える回復役と守り役を足して測る。
+   */
+  新種: {
+    ids: ["abyssreaper_FIRE", "mushroon_GRASS", "valkyria_GRASS", "shellturtle_WATER"],
+    requires: {
+      templates: ["abyssreaper", "mushroon", "valkyria", "shellturtle"],
+      elements: OBTAINABLE_ELEMENTS,
+      kinds: { STRIP: 1, HEAL_BLOCK: 1, HEAL: 1 },
+    },
+  },
   // **毒を持つのは属性違いのごく一部だけ。**適当に選ぶと毒を一度も撒けない
   毒: {
     ids: ["slime_GRASS", "slime_WATER", "imp_ELECTRIC", "wolf_ELECTRIC"],
