@@ -41,6 +41,19 @@ export interface GlobalBackButtonProps {
  * 場所によって変わり、目が毎回それを読み直すことになる。
  */
 export function renderGlobalBackButton(props: GlobalBackButtonProps): HTMLElement {
+  /*
+   * モンスター詳細は独自の `.monster-detail-head__back` をすでに持っている。
+   * 外側の判定は `.management-header` だけを見ているため、詳細画面では以前
+   * 左上に「戻る」が二重で存在していた。強化/ランクアップから戻った直後は
+   * iPhone上で同じ位置に別の戻る操作が現れ、編成画面まで一気に戻ったように
+   * 見える経路ができる。独自ヘッダーが見えている時は共通ボタンを描かない。
+   *
+   * 判定時点では `content` が root に追加済みなので、DOMから安全に確認できる。
+   */
+  if (document.querySelector(".monster-detail-head")) {
+    return el("span", { hidden: true, ariaHidden: "true" }, []);
+  }
+
   return el("button", {
     type: "button",
     className: "global-back",
