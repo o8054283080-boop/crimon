@@ -104,13 +104,25 @@ export function rollSkillLevelUp(instance: MonsterInstance, rng: () => number = 
   return index;
 }
 
+/**
+ * 転生ピッグはランクアップ素材を作りやすくする専用モンスター。
+ * ランクアップ後にLv1へ戻っても再育成が苦痛にならないよう、必要経験値を通常の3分の1にする。
+ * core層からdata層へ依存を逆流させないため、安定している図鑑IDのprefixだけで判定する。
+ */
+export function requiredExpForMonsterLevel(instance: MonsterInstance): number {
+  const base = requiredExpForLevel(instance.level);
+  return instance.dexId.startsWith("reincarnation_pig_") ? Math.max(1, Math.ceil(base / 3)) : base;
+}
+
 /** 経験値を加算し、可能な限りレベルアップさせる。実際に上がったレベル数を返す */
 export function addExp(instance: MonsterInstance, exp: number, maxLevel: number): number {
   if (instance.level >= maxLevel) return 0;
   instance.exp += exp;
   let levelsGained = 0;
-  while (instance.level < maxLevel && instance.exp >= requiredExpForLevel(instance.level)) {
-    instance.exp -= requiredExpForLevel(instance.level);
+  while (instance.level < maxLevel) {
+    const required = requiredExpForMonsterLevel(instance);
+    if (instance.exp < required) break;
+    instance.exp -= required;
     instance.level += 1;
     levelsGained += 1;
   }
