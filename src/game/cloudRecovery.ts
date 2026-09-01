@@ -149,7 +149,7 @@ export async function logoutRecovery(meta: CloudRecoveryMeta): Promise<void> {
 
 export function restoreCloudSave(save: CloudSaveEnvelope, storage: Pick<Storage, "getItem" | "setItem"> = localStorage): void {
   const parsed = parseSaveFile(JSON.stringify(save));
-  if (!parsed.ok) throw new Error(parsed.error);
+  if (!parsed.ok) throw new Error(parsed.reason);
   const current = storage.getItem(PLAYER_STORAGE_KEY);
   if (current) {
     storage.setItem(CLOUD_RESTORE_BACKUP_KEY, current);
