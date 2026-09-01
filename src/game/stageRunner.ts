@@ -1,6 +1,6 @@
 import { scaledEnemyAtk } from "../battle/enemyPower.js";
 import { BattleEngine } from "../battle/engine.js";
-import { Equipment } from "../core/equipment.js";
+import { DEFAULT_COMBAT_MODIFIERS, Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, computeEffectiveStats } from "../core/rarity.js";
@@ -36,7 +36,7 @@ function bossCombatMods(enemy: WaveEnemy, dex: MonsterDefinition, difficulty: Di
     HELL: 0.07,
   };
   return {
-    ...dex.combatMods,
+    ...(dex.combatMods ?? DEFAULT_COMBAT_MODIFIERS),
     turnHealPercent: turnHealPercent[difficulty],
   };
 }
