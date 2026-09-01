@@ -1,4 +1,5 @@
 import type { PlayerState } from "./playerState.js";
+import { registerMissionPlayer } from "./missions.js";
 
 export type TutorialDestination = "STAGES" | "PARTY" | "MONSTERS" | "EQUIPMENT" | "EQUIP_DUNGEON" | "MONSTER_CREATE";
 export interface TutorialReward { gold?: number; crystal?: number; summonScrolls?: number; fourStarSummonScrolls?: number; lightDarkFourStarSummonScrolls?: number; fiveStarSummonScrolls?: number; awakeningOrbs?: number }
@@ -56,6 +57,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
 ];
 
 export function nextTutorialMission(player: PlayerState): TutorialMission | undefined {
+  registerMissionPlayer(player);
   return TUTORIAL_MISSIONS.find((mission) => !player.tutorialMissions.claimedIds.includes(mission.id));
 }
 export function canClaimTutorialMission(player: PlayerState, mission: TutorialMission): boolean {
