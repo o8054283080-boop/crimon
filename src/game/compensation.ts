@@ -42,6 +42,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-01-pwa-app-icon-blue-dragon",
+    title: "9/1 アプリアイコン刷新のお知らせ",
+    message: "スマホのホーム画面に追加した時に表示されるCRIMONのアプリアイコンを、青いドラゴンを主役にした新デザインへ刷新しました。iPhone用のホーム画面アイコンに加え、PWA用の192px・512pxアイコンとブラウザ用ファビコンも同じデザインへ統一しています。",
+    kind: "UPDATE",
+    fromDate: "2026-09-01",
+    toDate: "9999-12-31",
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-09-01-inventory-list-performance",
     title: "9/1 所持品一覧 軽量化アップデート",
     message: "所持モンスター・所持装備・モンスター強化の素材一覧・ランクアップの素材一覧を軽量化しました。大量に所持している場合でも全カードを一度に画面へ生成せず、最初の48件から段階的に表示する方式へ変更しています。所持数やセーブデータの形式は変更していません。",
