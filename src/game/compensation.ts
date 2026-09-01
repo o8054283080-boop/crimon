@@ -42,6 +42,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-01-monster-management-back-equipment-enhance",
+    title: "9/1 モンスター管理・装備変更の操作改善",
+    message: "モンスター強化・ランクアップから戻った直後に、左上の戻る操作が二重に現れて編成画面まで戻ってしまう場合があった問題を修正しました。あわせて、モンスターの装備変更画面で候補装備ごとに強化ボタンを追加し、装着する前でもその場で装備を強化できるようにしました。",
+    kind: "UPDATE",
+    fromDate: "2026-09-01",
+    toDate: "9999-12-31",
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-09-01-stage-late-monster-japanese-names",
     title: "9/1 ステージ敵名の表示修正",
     message: "第5章以降のステージ詳細にある「出現する敵」で、追加モンスターの名前が mushroon・kobold など内部IDの英字で表示されていた不具合を修正しました。マッシュルン・コボルトなど正式な日本語名と本来のアイコンで表示されます。",
@@ -149,7 +160,7 @@ export const COMPENSATIONS: Compensation[] = [
     title: "2D化のお詫び",
     message: "モンスターグラフィックの2D化に伴うお詫びです。",
     fromDate: "2026-08-30",
-    // 新規・既存を問わず全ユーザーが1アカウントにつき1度受け取れるよう、終了日は設けない。
+    // 新規・既存を問わず1アカウントにつき1度受け取れるよう、終了日は設けない。
     toDate: "9999-12-31",
     crystal: 3000,
     gold: 0,
