@@ -10,13 +10,7 @@ import { AudioSettings, getAudioSettings, onAudioSettingsChange } from "./settin
 /** 場面。拠点・通常戦闘・ボス戦の3系統 */
 export type BgmScene = "home" | "battle" | "boss";
 
-/**
- * 場面を切り替える時の重なり(秒)。
- * 戦闘に入る瞬間は「切り替わった」と分かってよいので、やや短めに取る。
- */
 const CROSSFADE_SEC = 1.6;
-
-/** 鳴り始めの立ち上がり。無音から一気に出すと、そこだけ事故のように聞こえる */
 const FADE_IN_SEC = 2.2;
 
 interface Playing {
@@ -33,7 +27,6 @@ class BgmPlayer {
   /** いま鳴らしたい場面。まだ解錠されていない間もここに覚えておく */
   private wanted: BgmScene | null = null;
   private settings: AudioSettings = getAudioSettings();
-  /** 読み込み中の場面。同じものを二重に取りに行かないようにする */
   private inflight: BgmScene | null = null;
 
   constructor() {
@@ -41,10 +34,11 @@ class BgmPlayer {
       const wasEnabled = this.settings.bgmEnabled;
       this.settings = next;
       if (this.master) this.master.gain.value = this.effectiveVolume();
-      // 設定で切ってから戻した時は、鳴らし直さないと二度と始まらない
       if (!wasEnabled && next.bgmEnabled && this.wanted) void this.apply(this.wanted);
     });
-    // 解錠は最初のタップまで来ない。来た時点で、待っていた場面を鳴らし始める
+
+    // iOSでは初回タップだけでなく、バックグラウンド復帰後にもreadyが来る。
+    // 鳴っていない時はその都度「鳴らしたかった場面」を拾い直す。
     audioEngine.onReady(() => {
       if (this.wanted && !this.playing) void this.apply(this.wanted);
     });
@@ -55,24 +49,11 @@ class BgmPlayer {
     return this.settings.masterVolume * this.settings.bgmVolume;
   }
 
-  /**
-   * 通常戦闘として呼ばれていても、戦闘HUDにBOSS札があればボス曲へ切り替える。
-   * `main.ts` は画面描画後にBGMを指定するため、その時点ではHUDの判定が使える。
-   * Wave2→ボスWave3のように同じ戦闘画面のまま遷移しても、実効sceneが変わるので
-   * きちんとクロスフェードされる。
-   */
   private resolveScene(scene: BgmScene | null): BgmScene | null {
     if (scene !== "battle" || typeof document === "undefined") return scene;
     return document.querySelector(".unit-hud--enemy.unit-hud--boss") ? "boss" : "battle";
   }
 
-  /**
-   * 出力へつなぐ枝を用意する。
-   *
-   * **記憶への代入を、本体を走らせる前に済ませること。** `audioEngine.ensure()`
-   * は解錠を知らせる時に聞き手(この組の `onReady`)を呼ぶので、代入が後だと
-   * 「まだ用意されていない」と見えて再入し、無限に往復する。
-   */
   private prepare(): Promise<void> {
     if (this.preparing) return this.preparing;
     let done!: () => void;
@@ -101,14 +82,16 @@ class BgmPlayer {
   }
 
   /**
-   * 場面を指定する。`null` で止める。
-   *
-   * 同じ場面を何度渡しても鳴らし直さない。画面の再描画のたびに呼ばれても
-   * 曲が頭から鳴り直さないようにするため。
+   * 同じ場面でも「wantedだけ残っていて実際には鳴っていない」なら再試行する。
+   * 以前は `wanted === scene` だけで return していたため、初回の解錠や通信が一度
+   * 失敗した端末では、その後何度描画しても二度とBGM開始処理へ入れなかった。
    */
   play(requestedScene: BgmScene | null): void {
     const scene = this.resolveScene(requestedScene);
-    if (this.wanted === scene) return;
+    if (this.wanted === scene) {
+      if (scene !== null && !this.playing && this.inflight !== scene) void this.apply(scene);
+      return;
+    }
     this.wanted = scene;
     void this.apply(scene);
   }
@@ -130,7 +113,6 @@ class BgmPlayer {
     }
     const buffer = await this.load(ctx, scene);
     this.inflight = null;
-    // 読んでいる間に別の場面へ移っていたら、それはもう要らない
     if (!buffer || this.wanted !== scene) return;
     if (this.playing?.scene === scene) return;
 
@@ -139,7 +121,6 @@ class BgmPlayer {
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    // 音量の変化は指数で。直線で動かすと、途中で音が大きくなったように聞こえる
     gain.gain.exponentialRampToValueAtTime(1, ctx.currentTime + fade);
 
     const source = ctx.createBufferSource();
@@ -150,6 +131,11 @@ class BgmPlayer {
     source.connect(gain).connect(this.master);
     source.start();
 
+    // 端末側でソースが予期せず終了した場合も、次回描画/タップで再開できる状態へ戻す。
+    source.onended = () => {
+      if (this.playing?.source === source) this.playing = null;
+      gain.disconnect();
+    };
     this.playing = { scene, source, gain };
   }
 
@@ -163,9 +149,7 @@ class BgmPlayer {
     current.gain.gain.cancelScheduledValues(now);
     current.gain.gain.setValueAtTime(level, now);
     current.gain.gain.exponentialRampToValueAtTime(0.0001, now + fade);
-    // 消えてから止める。止めてから消すと、そこでプツッと鳴る
     current.source.stop(now + fade + 0.05);
-    current.source.onended = () => current.gain.disconnect();
   }
 
   /** いま鳴っている場面。鳴っていなければ null */

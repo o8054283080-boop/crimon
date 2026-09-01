@@ -15,39 +15,36 @@ class AudioEngine {
   /** 無音を鳴らして解錠済みか(操作のたびに鳴らす必要はない) */
   private primed = false;
   private readyListeners = new Set<Listener>();
+  private unlockInstalled = false;
 
   /**
-   * 音を使えるようにする。**ブラウザは操作前に音を出せない**ので、
-   * ここでは仕掛けを置くだけで、実際に鳴り始めるのは最初のタップから。
+   * 音を使えるようにする。iPhone/PWAでは一度 running になっても、
+   * 画面ロック・バックグラウンド移動・出力先変更などで後から suspended に戻る。
+   * そのため解錠イベントは一度成功しても外さず、以後の操作でも必要なら resume する。
    */
   installUnlock(): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || this.unlockInstalled) return;
+    this.unlockInstalled = true;
     const start = () => {
       void this.ensure();
-      // **操作のたびに呼ぶ。1回で外してはいけない。**
-      // 音声文脈は後から勝手に停止することがあり、外してしまうと
-      // 二度と鳴らせなくなる。動き出したことを確かめてから外す
       this.unlockInGesture();
-      if (this.ctx?.state === "running") {
-        window.removeEventListener("pointerdown", start);
-        window.removeEventListener("keydown", start);
-      }
     };
     window.addEventListener("pointerdown", start, { passive: true });
     window.addEventListener("keydown", start, { passive: true });
+
+    // iOSはホーム画面PWAへ戻った時に AudioContext を suspended にすることがある。
+    // gesture外なので必ず成功するとは限らないが、成功した端末はここで即復帰できる。
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") void this.resume();
+    });
+    window.addEventListener("pageshow", () => void this.resume());
   }
 
-  /**
-   * 操作の中で同期的に呼ぶ解錠。
-   *
-   * `resume()` を待つ形にすると操作の文脈から外れてしまい、
-   * 端末によっては解錠として認められない。無音を1粒だけ即座に鳴らして、
-   * 「操作をきっかけに音を出した」という事実を作る。
-   */
+  /** 利用者の操作の中で同期的に解錠を試す。 */
   private unlockInGesture(): void {
     const ctx = this.ctx;
     if (!ctx) return;
-    void ctx.resume().then(() => this.notifyReady());
+    void ctx.resume().then(() => this.notifyReady()).catch(() => undefined);
     if (this.primed) return;
     this.primed = true;
     const source = ctx.createBufferSource();
@@ -67,7 +64,6 @@ class AudioEngine {
             (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Ctor) return null;
       this.ctx = new Ctor();
-      // 作った直後は停止状態のことがある。**ここで動かさないと永久に鳴らない**
       if (this.ctx.state !== "running") await this.ctx.resume().catch(() => undefined);
       this.notifyReady();
       return this.ctx;
@@ -75,38 +71,27 @@ class AudioEngine {
     return this.starting;
   }
 
-  /**
-   * 鳴らす直前に呼ぶ。画面を離れている間などに勝手に止まることがあるので、
-   * 毎回起こしてから鳴らす。
-   */
-  async running(): Promise<AudioContext | null> {
+  /** 停止している既存文脈を再開する。BGMの再試行通知もここで行う。 */
+  async resume(): Promise<AudioContext | null> {
     const ctx = await this.ensure();
     if (!ctx) return null;
     if (ctx.state !== "running") await ctx.resume().catch(() => undefined);
+    if (ctx.state === "running") this.notifyReady();
     return ctx.state === "running" ? ctx : null;
   }
 
-  /**
-   * 解錠されたら呼ばれる。BGMは「鳴らせるようになった時点で始める」必要が
-   * あるので、要求された時に止まっていた場合はここで拾い直す。
-   */
+  /** 鳴らす直前にも毎回起こす。 */
+  async running(): Promise<AudioContext | null> {
+    return this.resume();
+  }
+
+  /** 解錠・再開されたら呼ばれる。 */
   onReady(listener: Listener): () => void {
     this.readyListeners.add(listener);
     return () => this.readyListeners.delete(listener);
   }
 
-  /**
-   * 解錠を知らせる。**必ず今の同期処理が終わってから呼ぶこと。**
-   *
-   * その場で呼ぶと、`ensure()` の中から聞き手へ制御が渡る。聞き手(BGM)は
-   * まだ `ensure()` が返っていないので「まだ用意されていない」と判断して
-   * もう一度 `ensure()` を呼び、そこからまた聞き手へ……と無限に往復する。
-   * 実際に AudioContext を数百個作って「Maximum call stack size exceeded」で
-   * 止まり、音がまったく鳴らなくなった。
-   *
-   * 記憶(`starting` / `preparing`)への代入は同期処理の中で終わるので、
-   * 一拍ずらすだけで往復は起きなくなる。
-   */
+  /** 再入を避けるため通知は必ずmicrotaskへ送る。 */
   private notifyReady(): void {
     if (this.ctx?.state !== "running") return;
     const listeners = [...this.readyListeners];
@@ -125,9 +110,7 @@ export const audioEngine = new AudioEngine();
 
 /**
  * 焼いた音を読む。読めなくてもゲームは動くべきなので、失敗は静かに握る。
- *
- * Vite の base は GitHub Pages のサブパス配信で空でない値になるため、
- * 絶対パスを直書きしないこと。
+ * Vite の base は GitHub Pages のサブパス配信で空でない値になるため、絶対パスを直書きしない。
  */
 export const AUDIO_BASE_URL = `${import.meta.env.BASE_URL ?? "/"}audio/`.replace(/\/{2,}/g, "/");
 
@@ -152,25 +135,22 @@ export function loadAudioManifest(): Promise<AudioManifest | null> {
     manifestPromise = (async () => {
       try {
         const response = await fetch(`${AUDIO_BASE_URL}manifest.json`);
+        if (!response.ok) return null;
         return (await response.json()) as AudioManifest;
       } catch {
         return null;
       }
-    })();
+    })().then((manifest) => {
+      // 一時的な通信失敗を永久キャッシュしない。次の描画/タップで取り直せるようにする。
+      if (!manifest) manifestPromise = null;
+      return manifest;
+    });
   }
   return manifestPromise;
 }
 
 /**
  * 実際に出力へ届いた音を測る。
- *
- * **焼いたファイル単体ではなく、再生経路を通った後**を測ることが要。
- * 音量・重ね方・端末の出力まで通した結果でないと裏付けにならない。
- *
- * `純音らしさ` は tools/audio/dsp.py の tonality() と同じ考え方で、
- * 「周りより飛び出た山」だけを数える。以前は「上位1%のビンのエネルギー比」で
- * 測っていたが、それは狭い音を測っているだけで純音を測っておらず、
- * 低音の効いた打撃(良い音)と正弦(悪い音)がどちらも 0.98 前後になっていた。
  */
 export async function measureOutput(
   ctx: AudioContext,
@@ -180,7 +160,6 @@ export async function measureOutput(
 ): Promise<Record<string, number> | null> {
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
-  // 既定では前のフレームと混ざる。測る時は混ぜない
   analyser.smoothingTimeConstant = 0;
   master.connect(analyser);
 
@@ -196,7 +175,6 @@ export async function measureOutput(
     const power = Array.from(bins, (db) => 10 ** (db / 10));
     const rms = Math.sqrt(power.reduce((sum, v) => sum + v, 0) / power.length);
     if (rms > peakRms) peakRms = rms;
-    // 静かなフレームは測らない。消え際の残響で判断を誤る
     if (rms < peakRms * 0.3) continue;
     worstTonality = Math.max(worstTonality, tonalityOf(power, ctx.sampleRate, analyser.fftSize));
   }
@@ -205,24 +183,12 @@ export async function measureOutput(
   return { 純音らしさ: +worstTonality.toFixed(3), 最大音量: +peakRms.toFixed(5) };
 }
 
-/** 150Hz 未満は数えない。この分解能では低い塊と低い正弦を区別できないため */
 const TONALITY_FLOOR_HZ = 150;
-
-/**
- * 窓の幅は **ビン数ではなく Hz で決める。**
- *
- * ここを「20ビン以上」と書いていたせいで、焼いたファイルを測った値と
- * 食い違っていた。tools/audio/dsp.py 側は 1ビン 11.7Hz なので 20ビン=234Hz、
- * ブラウザ側は 1ビン 23.4Hz なので同じ 20ビンが 468Hz になる。
- * 窓が広すぎると、低い帯域の塊(良い音)まで「飛び出た山」に数えてしまい、
- * charge が 0.03(ファイル)に対し 0.67(ブラウザ)と出ていた。
- */
 const ENVELOPE_MIN_HALF_HZ = 234;
 const SMOOTH_HZ = 58;
 
 function tonalityOf(power: number[], sampleRate: number, fftSize: number): number {
   const binHz = sampleRate / fftSize;
-  // 1ビンごとの揺れを落とす。幅は焼く側と同じ Hz にそろえる
   const span = Math.max(1, Math.round(SMOOTH_HZ / binHz));
   const smooth = power.map((_, i) => {
     let sum = 0;
@@ -238,7 +204,6 @@ function tonalityOf(power: number[], sampleRate: number, fftSize: number): numbe
   let excess = 0;
   let total = 0;
   for (let i = first; i < smooth.length; i += 1) {
-    // その辺りの「地の高さ」を、1/5オクターブほどの窓の中央値で取る
     const halfHz = Math.max(ENVELOPE_MIN_HALF_HZ, i * binHz * 0.2);
     const half = Math.max(2, Math.round(halfHz / binHz));
     const window: number[] = [];
@@ -247,7 +212,6 @@ function tonalityOf(power: number[], sampleRate: number, fftSize: number): numbe
     }
     window.sort((a, b) => a - b);
     const floorLevel = window[window.length >> 1];
-    // 地の4倍を超えた分だけを純音成分とみなす
     excess += Math.max(0, smooth[i] - 4 * floorLevel);
     total += smooth[i];
   }
