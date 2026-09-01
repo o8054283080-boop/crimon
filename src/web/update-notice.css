@@ -1,9 +1,11 @@
 /*
  * HOMEの配布帯は通常は1行に畳むが、アップデート本文まで同じ扱いにすると
- * タイトルしか見えず更新内容を読めない。本文を省略せず、iPhone幅でも
- * 縦に読めるようにする。既存の配布・お詫びも本文が読める形で統一する。
+ * タイトルしか見えず更新内容を読めない。
+ *
+ * 報酬付きの配布・お詫びは従来どおりコンパクトに保ち、reward-list を持たない
+ * 純粋なお知らせだけを縦展開する。現行データでは9/1アップデート告知が該当する。
  */
-.crimon-home .reward-banner.compensation {
+.crimon-home .reward-banner.compensation:not(:has(.reward-list)) {
   min-height: 72px !important;
   height: auto !important;
   align-items: flex-start !important;
@@ -11,11 +13,11 @@
   padding: 8px 7px !important;
 }
 
-.crimon-home .reward-banner.compensation .reward-banner__seal {
+.crimon-home .reward-banner.compensation:not(:has(.reward-list)) .reward-banner__seal {
   margin-top: 2px !important;
 }
 
-.crimon-home .reward-banner.compensation .reward-banner__body {
+.crimon-home .reward-banner.compensation:not(:has(.reward-list)) .reward-banner__body {
   min-width: 0 !important;
   display: flex !important;
   flex: 1 1 auto !important;
@@ -26,15 +28,15 @@
   overflow: visible !important;
 }
 
-.crimon-home .reward-banner.compensation .reward-banner__label,
-.crimon-home .reward-banner.compensation .compensation__title {
+.crimon-home .reward-banner.compensation:not(:has(.reward-list)) .reward-banner__label,
+.crimon-home .reward-banner.compensation:not(:has(.reward-list)) .compensation__title {
   max-width: 100% !important;
   overflow: visible !important;
   text-overflow: clip !important;
   white-space: normal !important;
 }
 
-.crimon-home .reward-banner.compensation .compensation__message {
+.crimon-home .reward-banner.compensation:not(:has(.reward-list)) .compensation__message {
   display: block !important;
   margin: 1px 0 0 !important;
   max-width: 100% !important;
@@ -46,23 +48,18 @@
   color: #e9eef6 !important;
 }
 
-.crimon-home .reward-banner.compensation .reward-list {
-  flex-wrap: wrap !important;
-  white-space: normal !important;
-}
-
-.crimon-home .reward-banner.compensation .reward-banner__close {
+.crimon-home .reward-banner.compensation:not(:has(.reward-list)) .reward-banner__close {
   align-self: flex-start !important;
   margin-top: 1px !important;
 }
 
 @media (max-width: 390px) {
-  .crimon-home .reward-banner.compensation {
+  .crimon-home .reward-banner.compensation:not(:has(.reward-list)) {
     gap: 5px !important;
     padding-inline: 6px !important;
   }
 
-  .crimon-home .reward-banner.compensation .compensation__message {
+  .crimon-home .reward-banner.compensation:not(:has(.reward-list)) .compensation__message {
     font-size: 10.5px !important;
     line-height: 1.5 !important;
   }
