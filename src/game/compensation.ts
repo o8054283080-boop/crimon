@@ -42,6 +42,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-01-result-party-level-reward-fx",
+    title: "9/1 リザルト・報酬演出アップデート",
+    message: "バトルのリザルト画面に、戦闘後の現在パーティ4体のレベルを一覧表示するようにしました。レベルMAXのメンバーも確認できます。あわせてミッション報酬を受け取った時に、獲得内容が中央に浮かび上がる専用の入手演出を追加しました。演出は表示専用で、報酬の付与処理や受取済み判定には影響しません。",
+    kind: "UPDATE",
+    fromDate: "2026-09-01",
+    toDate: "9999-12-31",
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-09-01-pwa-app-icon-blue-dragon",
     title: "9/1 アプリアイコン刷新のお知らせ",
     message: "スマホのホーム画面に追加した時に表示されるCRIMONのアプリアイコンを、青いドラゴンを主役にした新デザインへ刷新しました。iPhone用のホーム画面アイコンに加え、PWA用の192px・512pxアイコンとブラウザ用ファビコンも同じデザインへ統一しています。",
