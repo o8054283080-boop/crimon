@@ -110,7 +110,7 @@ function installNoticeButton(): void {
   button.onclick = null;
 
   const image = button.querySelector<HTMLImageElement>("img");
-  if (image) image.src = new URL("./assets/home/menu-notice.svg", import.meta.url).href;
+  if (image) image.src = new URL("./assets/home/home-left-notice.svg", import.meta.url).href;
 
   const label = button.querySelector<HTMLElement>("span") ?? button.querySelector<HTMLElement>("strong");
   if (label) label.textContent = "お知らせ";
