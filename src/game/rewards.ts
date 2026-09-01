@@ -35,16 +35,25 @@ export interface LevelUpInfo {
   levels: number;
 }
 
+export interface PartyLevelInfo {
+  instanceId: string;
+  name: string;
+  level: number;
+  maxLevel: number;
+}
+
 export interface ExpAwardInfo {
   instanceId: string;
   name: string;
-  /** リザルト表示時点（EXP反映後）の現在レベル */
-  level: number;
-  maxLevel: number;
-  /** この戦闘で実際に入ったEXP。MAXメンバーは0 */
   total: number;
   maxMemberBonus: number;
 }
+
+/**
+ * EXP受取メンバーだけを配列要素として持つ従来契約は維持する。
+ * partyLevels はリザルト表示専用の非列挙メタデータで、配列比較やEXP集計には混ざらない。
+ */
+export type ExpAwardList = ExpAwardInfo[] & { partyLevels?: PartyLevelInfo[] };
 
 export interface ClearRewardResult {
   /** ステージクリアボーナス/装備ダンジョンクリア報酬のゴールド(ウェーブ毎のゴールドは含まない) */
@@ -54,8 +63,7 @@ export interface ClearRewardResult {
   /** ファイターレベルへ入ったEXP。expTotalはモンスター用のため同額とは限らない */
   fighterExp: number;
   levelUps: LevelUpInfo[];
-  /** パーティ全員をスロット順で保持する。MAXメンバーもtotal=0で含む */
-  expAwards?: ExpAwardInfo[];
+  expAwards?: ExpAwardList;
   dropDexId: string | null;
   dropStar: number | null;
   equipmentDrop: Equipment | null;
@@ -84,11 +92,28 @@ export function goldDungeonFighterExp(floor: number): number {
   return Math.max(1, floor * 20);
 }
 
-export function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal: number): { levelUps: LevelUpInfo[]; expAwards: ExpAwardInfo[] } {
-  const levelUps: LevelUpInfo[] = [];
-  const awardedById = new Map<string, { total: number; maxMemberBonus: number }>();
-  const trainees = partyInstances.filter((instance) => instance.level < STAR_MAX_LEVEL[instance.star]);
+function attachPartyLevels(expAwards: ExpAwardList, partyInstances: readonly MonsterInstance[]): void {
+  const partyLevels = partyInstances.map((instance) => {
+    const dex = findMonsterById(instance.dexId);
+    return {
+      instanceId: instance.id,
+      name: dex ? dex.name : instance.dexId,
+      level: instance.level,
+      maxLevel: STAR_MAX_LEVEL[instance.star],
+    };
+  });
+  Object.defineProperty(expAwards, "partyLevels", {
+    value: partyLevels,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+}
 
+export function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal: number): { levelUps: LevelUpInfo[]; expAwards: ExpAwardList } {
+  const levelUps: LevelUpInfo[] = [];
+  const expAwards: ExpAwardList = [];
+  const trainees = partyInstances.filter((instance) => instance.level < STAR_MAX_LEVEL[instance.star]);
   if (trainees.length > 0) {
     const maxCount = partyInstances.length - trainees.length;
     const pooledBonus = expTotal * maxCount;
@@ -98,28 +123,15 @@ export function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal:
       const bonus = bonusEach + (bonusRemainder-- > 0 ? 1 : 0);
       const awarded = expTotal + bonus;
       const gained = addExp(instance, awarded, STAR_MAX_LEVEL[instance.star]);
-      awardedById.set(instance.id, { total: awarded, maxMemberBonus: bonus });
+      const dex = findMonsterById(instance.dexId);
+      expAwards.push({ instanceId: instance.id, name: dex ? dex.name : instance.dexId, total: awarded, maxMemberBonus: bonus });
       if (gained > 0) {
-        const dex = findMonsterById(instance.dexId);
         levelUps.push({ instanceId: instance.id, name: dex ? dex.name : instance.dexId, levels: gained });
       }
     }
   }
-
-  // UIで「現在のパーティLv」を必ず4枠分確認できるよう、MAXメンバーも含めて返す。
-  // EXP分配そのものは上のtraineesだけに行うため、従来の育成計算は変わらない。
-  const expAwards = partyInstances.map((instance) => {
-    const dex = findMonsterById(instance.dexId);
-    const awarded = awardedById.get(instance.id);
-    return {
-      instanceId: instance.id,
-      name: dex ? dex.name : instance.dexId,
-      level: instance.level,
-      maxLevel: STAR_MAX_LEVEL[instance.star],
-      total: awarded?.total ?? 0,
-      maxMemberBonus: awarded?.maxMemberBonus ?? 0,
-    };
-  });
+  // addExp反映後のレベルを、EXP配列の意味を変えずにリザルトへ渡す。
+  attachPartyLevels(expAwards, partyInstances);
   return { levelUps, expAwards };
 }
 
