@@ -132,3 +132,49 @@ export function extractSurvivors(engine: BattleEngine, partyInstances: MonsterIn
 
   return { survivorInstances, survivorHp };
 }
+
+/**
+ * ステージの中間ウェーブ勝利は、結果ボタンを押させず短い間だけ「勝利」を見せて
+ * 次のウェーブへ送る。最終ウェーブの報酬ボタンや敗北ボタンは対象外。
+ *
+ * 戦闘ビュー側の既存 onFinish をそのまま発火させるため、HP持ち越し・waveGold・
+ * wavesCleared の更新経路は従来と同じで、報酬を二重に付与する別経路を作らない。
+ */
+const STAGE_WAVE_AUTO_ADVANCE_MS = 550;
+const STAGE_WAVE_FINISH_SELECTOR = ".battle-controls__finish:not(.battle-controls__finish--hidden)";
+
+export function isIntermediateStageWaveResultLabel(label: string): boolean {
+  return label.includes("次のウェーブへ");
+}
+
+function installStageWaveAutoAdvance(): void {
+  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+
+  const scan = () => {
+    const buttons = document.querySelectorAll<HTMLButtonElement>(STAGE_WAVE_FINISH_SELECTOR);
+    for (const button of buttons) {
+      if (!isIntermediateStageWaveResultLabel(button.textContent ?? "")) continue;
+      if (button.dataset.stageWaveAutoAdvance === "scheduled") continue;
+
+      button.dataset.stageWaveAutoAdvance = "scheduled";
+      // 「次のウェーブへ」は操作として不要。勝利表示だけ残し、ボタン自体は見せない。
+      button.classList.add("battle-controls__finish--hidden");
+      window.setTimeout(() => {
+        // 画面を離れた/別ウェーブへ進んだ後の古いボタンは絶対に押さない。
+        if (!button.isConnected) return;
+        button.click();
+      }, STAGE_WAVE_AUTO_ADVANCE_MS);
+    }
+  };
+
+  const observer = new MutationObserver(scan);
+  observer.observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  scan();
+}
+
+installStageWaveAutoAdvance();
