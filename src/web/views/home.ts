@@ -8,7 +8,7 @@ import {
   STAMINA_REFILL_PARTIAL_AMOUNT,
   STAMINA_REFILL_PARTIAL_COST,
 } from "../../game/playerState.js";
-import { CompensationClaim } from "../../game/compensation.js";
+import { CompensationClaim, compensationBannerLabel } from "../../game/compensation.js";
 import { PERSIST_STATE_NOTE, PersistState } from "../../game/saveDurability.js";
 import { ELEMENT_JA, ELEMENT_MARK } from "../../core/element.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
@@ -181,22 +181,37 @@ function rewardSeal(name: IconName): HTMLElement {
   return el("div", { className: "reward-banner__seal", "aria-hidden": "true" }, [icon(name)]);
 }
 
-function renderCompensationBanner(claims: CompensationClaim[], onDismiss: () => void): HTMLElement {
-  const rows: HTMLElement[] = [];
-  for (const { compensation } of claims) {
-    rows.push(el("p", { className: "compensation__title" }, [compensation.title]));
-    rows.push(el("p", { className: "compensation__message" }, [compensation.message]));
+/**
+ * 受け取った配布の帯。**1件につき1本**にする。
+ *
+ * 以前は複数の配布を1本の帯へ詰め込んでいた。ホームの帯は
+ * 「見出し + 数字」を横一列に並べる細い作りなので、2件を超えた瞬間に
+ * **入りきらない分が黙って切り落とされていた**(実際、新モンスターの記念配布を
+ * 足したら「+1,500ダイヤ」が上下に切れて重なった)。
+ * 1件1本なら、増えても縦に伸びるだけで何も欠けない。
+ */
+function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () => void): HTMLElement[] {
+  const label = compensationBannerLabel(claims);
+  return claims.map(({ compensation }, index) => {
     const items: RewardLine[] = [];
     if (compensation.crystal > 0) items.push({ name: "crystal", amount: `+${compensation.crystal.toLocaleString("ja-JP")}`, unit: "ダイヤ" });
     if (compensation.gold > 0) items.push({ name: "coin", amount: `+${compensation.gold.toLocaleString("ja-JP")}`, unit: "ゴールド" });
     if (compensation.summonScrolls > 0) items.push({ name: "scroll", amount: `+${compensation.summonScrolls}`, unit: "召喚の書" });
-    if (items.length > 0) rows.push(rewardList(items));
-  }
-  return el("section", { className: "panel reward-banner compensation" }, [
-    rewardSeal("scroll"),
-    el("div", { className: "reward-banner__body" }, [el("p", { className: "reward-banner__label" }, ["お詫びの配布"]), ...rows]),
-    el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
-  ]);
+    if ((compensation.fourStarSummonScrolls ?? 0) > 0) {
+      items.push({ name: "scroll", amount: `+${compensation.fourStarSummonScrolls}`, unit: "★4以上召喚書" });
+    }
+    return el("section", { className: "panel reward-banner compensation" }, [
+      rewardSeal("scroll"),
+      el("div", { className: "reward-banner__body" }, [
+        // 見出しは先頭の1本にだけ出す。同じ言葉が縦に並ぶと、何本あるのか読みにくい
+        index === 0 ? el("p", { className: "reward-banner__label" }, [label]) : null,
+        el("p", { className: "compensation__title" }, [compensation.title]),
+        el("p", { className: "compensation__message" }, [compensation.message]),
+        items.length > 0 ? rewardList(items) : null,
+      ].filter((node): node is HTMLElement => node !== null)),
+      el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
+    ]);
+  });
 }
 
 function renderLoginBonusBanner(result: LoginBonusResult, onDismiss: () => void): HTMLElement {
@@ -845,7 +860,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
   const banners = [
-    props.compensationClaims.length ? renderCompensationBanner(props.compensationClaims, props.onDismissCompensation) : null,
+    ...renderCompensationBanners(props.compensationClaims, props.onDismissCompensation),
     props.loginBonusResult ? renderLoginBonusBanner(props.loginBonusResult, props.onDismissLoginBonus) : null,
   ].filter((node): node is HTMLElement => node !== null);
 

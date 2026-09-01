@@ -213,7 +213,10 @@ body:has(.crimon-home) {
 .crimon-home .reward-banner { border-color: var(--home-gold-line) !important; border-radius: 7px !important; color: var(--home-text) !important; background: linear-gradient(90deg, #071a34, #123d67, #071a34) !important; box-shadow: var(--home-panel-shadow) !important; }
 .crimon-home .reward-banner .reward-banner__close { color: var(--home-gold-bright) !important; }
 /* 外側の「お詫びの配布」で意味は足りるため、同じ内容の内側タイトルは畳む。 */
-.crimon-home .reward-banner .compensation__title { display: none !important; }
+/* 配布の見出しは出す。1件1本の帯にしたので、**これが無いと2本目以降が
+   「+3,000ダイヤ」とだけ書かれた、何の配布か分からない札になる**。
+   幅が足りない時は crimon-visual-system.css 側の省略記号で畳まれる */
+.crimon-home .reward-banner .compensation__title { font-size: 11px !important; color: var(--home-gold-bright) !important; }
 
 /* HOMEにいる時だけ下部ナビを濃紺＋金にする。他画面の導線へは影響させない。 */
 body:has(.crimon-home) .bottom-nav,
