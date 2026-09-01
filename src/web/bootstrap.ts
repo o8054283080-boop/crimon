@@ -1,3 +1,5 @@
+import "./update-notice.css";
+
 const motionLabPath = /\/(?:motion-lab|tools\/motion-generator)\/?$/;
 
 if (motionLabPath.test(window.location.pathname) || new URLSearchParams(window.location.search).has("motion-lab")) {
