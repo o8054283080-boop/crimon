@@ -315,8 +315,35 @@ function renderList(props: EquipmentProps): HTMLElement {
       [icon("lock")],
     );
     if (!props.pickerContext) return el("div", { className: "equip-picker-card" }, [card, lockButton]);
+
     const current = props.player.equipment.find((item) => item.id === currentEquipmentId);
     const comparisons = compareEquipmentStats(current, eq);
+    const enhanceable = canEnhanceEquipment(eq);
+    const enhanceCost = enhanceable ? enhanceEquipmentCost(eq) : 0;
+    const canAffordEnhance = !enhanceable || props.player.gold >= enhanceCost;
+    const enhanceButton = el(
+      "button",
+      {
+        type: "button",
+        className: `btn equip-picker-card__enhance${enhanceable ? " btn--gold" : " btn--ghost"}`,
+        disabled: !enhanceable || !canAffordEnhance,
+        title: enhanceable
+          ? canAffordEnhance
+            ? `この装備を+${eq.level + 1}へ強化`
+            : `ゴールドが足りません（${enhanceCost.toLocaleString("ja-JP")}必要）`
+          : "最大まで強化済み",
+        onclick: (event: Event) => {
+          // 強化は「装備する」とは別操作。札本体の装着処理へ絶対に伝播させない。
+          event.preventDefault();
+          event.stopPropagation();
+          if (enhanceable && canAffordEnhance) props.onEnhance(eq.id);
+        },
+      },
+      enhanceable
+        ? [icon("arrowUp", { size: 14 }), `+${eq.level + 1}へ強化`, el("span", { className: "equip-picker-card__enhance-cost" }, [icon("coin", { size: 13 }), enhanceCost.toLocaleString("ja-JP")])]
+        : [icon("check", { size: 14 }), "MAX強化済み"],
+    );
+
     return el("div", { className: "equip-picker-card" }, [
       card,
       current && eq.id !== current.id && comparisons.length ? el("div", { className: "equip-picker-card__comparison" }, comparisons.map((row) => {
@@ -325,6 +352,7 @@ function renderList(props: EquipmentProps): HTMLElement {
         const delta = percent ? `${Math.round(row.delta * 100)}%` : `${Math.round(row.delta)}`;
         return el("small", { className: `equip-picker-card__delta ${row.delta >= 0 ? "is-up" : "is-down"}` }, [`${row.label} ${show(row.current)} → ${show(row.candidate)} (${row.delta >= 0 ? "+" : ""}${delta})`]);
       })) : null,
+      enhanceButton,
       lockButton,
     ].filter((node): node is HTMLElement => node !== null));
   };
@@ -342,8 +370,8 @@ function renderList(props: EquipmentProps): HTMLElement {
   // 行き先(ダンジョン)と道具の整理(まとめ売り)を1段に並べる
   const toolbar = props.pickerContext
     ? currentEquipmentId
-      ? el("div", { className: "equip-picker__current" }, ["枠内で比較中：", el("strong", {}, ["現在装備中"]), " の札を強調しています"])
-      : el("div", { className: "equip-picker__current" }, ["この枠は未装備です"])
+      ? el("div", { className: "equip-picker__current" }, ["枠内で比較中：", el("strong", {}, ["現在装備中"]), " の札を強調しています。各装備はその場で強化できます"])
+      : el("div", { className: "equip-picker__current" }, ["この枠は未装備です。候補を装着する前にその場で強化できます"])
     : el("div", { className: "equip-toolbar" }, [
         el("button", { type: "button", className: "btn btn--gold equip-toolbar__go", onclick: props.onGoDungeon }, [
           icon("equipDungeon"),
