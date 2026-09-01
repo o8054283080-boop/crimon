@@ -12,6 +12,9 @@ import { icon } from "../icons.js";
  * 「どこから来たか」はアプリ全体が知っている情報なので、
  * 画面に書かせるのではなく、外側が1つ持つ方が漏れない。
  *
+ * 文言はどこでも「戻る」で、ホームには出さない(ホームは遊びの入口で、
+ * 戻る先ではない)。
+ *
  * ## `position: fixed` にしている理由
  *
  * この案件では**浮かせた部品が下の何かを覆う事故を3回出している**
@@ -28,18 +31,23 @@ import { icon } from "../icons.js";
 export interface GlobalBackButtonProps {
   /** 押した時に1つ前へ戻る */
   onBack: () => void;
-  /** 戻り先の名前。「ホームへ」のように、どこへ帰るのかを見せる */
-  label: string;
 }
 
+/*
+ * 文言は**どこでも「戻る」**。
+ *
+ * 最初は戻り先の名前(「ホーム」「図鑑」)を出していたが、依頼主の指定で
+ * 一本化した。画面ごとに幅の違う言葉が入ると、左上のボタンの大きさが
+ * 場所によって変わり、目が毎回それを読み直すことになる。
+ */
 export function renderGlobalBackButton(props: GlobalBackButtonProps): HTMLElement {
   return el("button", {
     type: "button",
     className: "global-back",
     onclick: props.onBack,
-    ariaLabel: `${props.label}へ戻る`,
+    ariaLabel: "1つ前へ戻る",
   }, [
     icon("back", { size: 16 }),
-    el("span", { className: "global-back__label" }, [props.label]),
+    el("span", { className: "global-back__label" }, ["戻る"]),
   ]);
 }

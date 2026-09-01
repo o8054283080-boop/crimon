@@ -578,19 +578,16 @@ let lastRouteState: RouteState | null = null;
 /** 戻っている最中。この間は積まない(戻った先をまた積むと前に進めなくなる) */
 let restoringRoute = false;
 
-/** 戻り先の呼び名。どこへ帰るのかが分かる短い言葉にする */
-const SCREEN_LABEL: Partial<Record<ScreenName, string>> = {
-  HOME: "ホーム", SUMMON: "召喚", MONSTERS: "モンスター", EQUIPMENT: "装備",
-  PARTY: "編成", STAGES: "冒険", EQUIP_DUNGEON: "装備ダンジョン",
-  LEVEL_DUNGEON: "レベルダンジョン", GOLD_DUNGEON: "ゴールドダンジョン",
-  MONSTER_DEX: "図鑑", SHOP: "ショップ", MONSTER_TRAINING: "強化",
-  MONSTER_CREATE: "クリエイト", ARENA: "アリーナ", TRIAL_TOWER: "試練の塔",
-  HOW_TO_PLAY: "遊び方",
-};
-
 function canGoBack(): boolean {
   // 戦闘の最中に「戻る」を出さない。抜けた戦いがどう扱われるのかが決まっていない
-  return routeHistory.length > 0 && !BATTLE_SCREENS.has(state.screen);
+  if (BATTLE_SCREENS.has(state.screen)) return false;
+  /*
+   * ホームには出さない。**ここが遊びの入口で、戻る先ではない。**
+   * 履歴の有無で決めていた頃は、ホーム→召喚→ホームと下のタブで回ると
+   * ホームにも「戻る」が出ていた(依頼主の指摘)。
+   */
+  if (state.screen === "HOME") return false;
+  return routeHistory.length > 0;
 }
 
 /** 1つ前に見ていた場所へ戻す */
@@ -2713,8 +2710,7 @@ function render(): void {
    * 一覧で持つと足し忘れるので、描き上がった中身をそのまま見て決める。
    */
   if (canGoBack() && !content.querySelector(".management-header")) {
-    const previous = routeHistory[routeHistory.length - 1];
-    root.append(renderGlobalBackButton({ onBack: goBack, label: SCREEN_LABEL[previous.screen] ?? "戻る" }));
+    root.append(renderGlobalBackButton({ onBack: goBack }));
     document.body.classList.add("has-global-back");
   } else {
     document.body.classList.remove("has-global-back");
