@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { STAGES } from "../src/data/stages.js";
-import { extractSurvivors, setupWaveBattle } from "../src/game/stageRunner.js";
+import { extractSurvivors, isIntermediateStageWaveResultLabel, setupWaveBattle } from "../src/game/stageRunner.js";
 
 const STARTER_PARTY = [
   { templateId: "slime", element: "FIRE" },
@@ -50,5 +50,13 @@ describe("HP持ち越し (setupWaveBattle)", () => {
 
     const setup = setupWaveBattle(party, null, wave);
     expect(setup.initialPlayerHp).toBeUndefined();
+  });
+});
+
+describe("ステージの中間ウェーブ自動進行", () => {
+  it("中間ウェーブの結果ラベルだけを自動進行対象にする", () => {
+    expect(isIntermediateStageWaveResultLabel("▶ 次のウェーブへ")).toBe(true);
+    expect(isIntermediateStageWaveResultLabel("🎁 報酬を受け取る")).toBe(false);
+    expect(isIntermediateStageWaveResultLabel("ステージ選択に戻る")).toBe(false);
   });
 });
