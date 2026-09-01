@@ -137,6 +137,8 @@ interface BossProfile {
   templateId: string;
   displayName: string;
   normalSpeed: number;
+  /** 特定属性のスキル構成をボスに使いたい場合のみ指定する。 */
+  element?: Element;
   counterAfterHits?: Partial<Record<Difficulty, number>>;
 }
 
@@ -145,7 +147,8 @@ const BOSS_PROFILES: Partial<Record<number, BossProfile>> = {
   5: { templateId: "treant", displayName: "腐食トレント", normalSpeed: 120 },
   6: { templateId: "golem", displayName: "古代守護ゴーレム", normalSpeed: 125, counterAfterHits: { NORMAL: 5, HARD: 4, HELL: 3 } },
   7: { templateId: "abyssreaper", displayName: "奈落の死神", normalSpeed: 145 },
-  8: { templateId: "chronos", displayName: "時空の支配者", normalSpeed: 155 },
+  // 水クロノスは強化済み「時空崩壊」(ダメージ後70%でゲージ100%減少)を持つ。
+  8: { templateId: "chronos", displayName: "時空の支配者", normalSpeed: 155, element: "WATER" },
 };
 
 /** チャプターテーマのモンスター(星1)がステージクリア時にドロップする確率。ゲーム内では非公開 */
@@ -253,11 +256,11 @@ function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number,
     const profile = BOSS_PROFILES[theme.chapter];
 
     if (profile) {
-      // 4体編成には完全な中央がないため、ユーザーから見て中央寄りの2番目へ固定する。
+      // 4体編成には完全な中央がないため、中央寄りの2番目へ固定する。
       enemies[1] = {
         ...enemies[1],
         templateId: profile.templateId,
-        element: "DARK",
+        element: profile.element ?? "DARK",
         star: bossStar,
         level: clampLevel(bossStar, baseLevel + 5, STAR_MAX_LEVEL),
         isBoss: true,
@@ -299,7 +302,8 @@ function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
   const rewards: StageRewards = {
     waveGold: Math.round(30 * stageNumber * chapterRewardMultiplier),
     clearGold: Math.round(150 * stageNumber * chapterRewardMultiplier),
-    waveExp: 100 * globalStageIndex(theme.chapter, stageNumber),
+    // 4-5で到達した従来の上限(2,000/Wave=6,000/周)を維持し、育成Dの役割を侵食しない。
+    waveExp: Math.min(2_000, 100 * globalStageIndex(theme.chapter, stageNumber)),
     dropRate: CHAPTER_MONSTER_DROP_RATE,
     dropStars: [1],
     dropTemplateId: theme.templateId,
