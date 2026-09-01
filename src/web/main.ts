@@ -101,6 +101,7 @@ import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
+import { renderGlobalBackButton } from "./views/backButton.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
 import { loadNavigationState, saveNavigationState } from "./navigationState.js";
@@ -516,22 +517,98 @@ let farmEquipmentScrollTop = 0;
 const scrollPositions = new Map<string, number>();
 let lastRouteKey: string | null = null;
 
+/**
+ * 「今どこを見ているか」を決めている値だけを取り出したもの。
+ *
+ * **戦闘や周回の進行そのものは入れない。** 戻るで巻き戻していいのは
+ * 見ている場所であって、進んだ戦いではない。ここに `stageRun` を混ぜると
+ * 「戻る」で決着済みの戦闘が生き返る。
+ */
+interface RouteState {
+  screen: ScreenName;
+  monsterDetailId: string | null;
+  rankUpMode: boolean;
+  equipmentDetailId: string | null;
+  equipmentPickerContext: EquipmentPickerContext | null;
+  equipmentSlotFilter: EquipSlot | null;
+  equipmentReturnMonsterId: string | null;
+  equipmentSelecting: boolean;
+  farmEquipmentOpen: boolean;
+  farmEquipmentDetailId: string | null;
+  selectedStageId: string | null;
+  selectedDifficulty: Difficulty;
+  selectedDungeonFloor: number | null;
+  selectedDexEntryId: string | null;
+  monsterTrainingTargetId: string | null;
+  selectedLevelDungeonTier: LevelDungeonTier | null;
+  selectedGoldDungeonFloor: number | null;
+  arenaEditing: ArenaTeamSlot | null;
+  createTargetId: string | null;
+  createMenu: CreateMenu;
+  partyEditMode: PartyEditMode;
+}
+
+const ROUTE_FIELDS = [
+  "screen", "monsterDetailId", "rankUpMode", "equipmentDetailId", "equipmentPickerContext",
+  "equipmentSlotFilter", "equipmentReturnMonsterId", "equipmentSelecting", "farmEquipmentOpen",
+  "farmEquipmentDetailId", "selectedStageId", "selectedDifficulty", "selectedDungeonFloor",
+  "selectedDexEntryId", "monsterTrainingTargetId", "selectedLevelDungeonTier",
+  "selectedGoldDungeonFloor", "arenaEditing", "createTargetId", "createMenu", "partyEditMode",
+] as const satisfies readonly (keyof RouteState)[];
+
+function routeState(): RouteState {
+  return Object.fromEntries(ROUTE_FIELDS.map((field) => [field, state[field]])) as unknown as RouteState;
+}
+
 function routeKey(): string {
-  return JSON.stringify([
-    state.screen,
-    state.monsterDetailId,
-    state.rankUpMode,
-    state.equipmentDetailId,
-    state.equipmentPickerContext,
-    state.equipmentSlotFilter,
-    state.selectedStageId,
-    state.selectedDifficulty,
-    state.selectedDungeonFloor,
-    state.selectedDexEntryId,
-    state.monsterTrainingTargetId,
-    state.selectedLevelDungeonTier,
-    state.selectedGoldDungeonFloor,
-  ]);
+  return JSON.stringify(ROUTE_FIELDS.map((field) => state[field]));
+}
+
+/**
+ * 通ってきた場所。**戻るのはここから取り出す。**
+ *
+ * `render()` が呼ばれるたびに、見ている場所が変わっていれば1つ積む。
+ * 画面遷移の呼び出し側へ手を入れないのは、遷移が数十か所に散らばっていて
+ * **1か所でも書き忘れると、そこだけ戻れない画面になる**ため。
+ */
+const routeHistory: RouteState[] = [];
+/** 積み上げの上限。深く潜り続けても、記憶が無限には増えないようにする */
+const ROUTE_HISTORY_MAX = 40;
+let lastRouteState: RouteState | null = null;
+/** 戻っている最中。この間は積まない(戻った先をまた積むと前に進めなくなる) */
+let restoringRoute = false;
+
+/** 戻り先の呼び名。どこへ帰るのかが分かる短い言葉にする */
+const SCREEN_LABEL: Partial<Record<ScreenName, string>> = {
+  HOME: "ホーム", SUMMON: "召喚", MONSTERS: "モンスター", EQUIPMENT: "装備",
+  PARTY: "編成", STAGES: "冒険", EQUIP_DUNGEON: "装備ダンジョン",
+  LEVEL_DUNGEON: "レベルダンジョン", GOLD_DUNGEON: "ゴールドダンジョン",
+  MONSTER_DEX: "図鑑", SHOP: "ショップ", MONSTER_TRAINING: "強化",
+  MONSTER_CREATE: "クリエイト", ARENA: "アリーナ", TRIAL_TOWER: "試練の塔",
+  HOW_TO_PLAY: "遊び方",
+};
+
+function canGoBack(): boolean {
+  // 戦闘の最中に「戻る」を出さない。抜けた戦いがどう扱われるのかが決まっていない
+  return routeHistory.length > 0 && !BATTLE_SCREENS.has(state.screen);
+}
+
+/** 1つ前に見ていた場所へ戻す */
+function goBack(): void {
+  const previous = routeHistory.pop();
+  if (!previous) return;
+  for (const field of ROUTE_FIELDS) {
+    (state as unknown as Record<string, unknown>)[field] = previous[field];
+  }
+  // 場所に紐づく一時的な案内は持ち越さない。前の画面の言葉が残ると嘘になる
+  state.shopNotice = null;
+  state.createNotice = null;
+  state.partyNotice = null;
+  state.arenaNotice = null;
+  state.towerNotice = null;
+  restoringRoute = true;
+  render();
+  restoringRoute = false;
 }
 
 function persistNavigationState(): void {
@@ -1968,6 +2045,16 @@ function refreshBackgroundFarmStatus(): void {
 
 function render(): void {
   if (lastRouteKey !== null) scrollPositions.set(lastRouteKey, window.scrollY);
+  /*
+   * 通ってきた場所を積むのは**描き始める前**。
+   * 描き終えてから積むと、移った当回はまだ履歴が空で、
+   * その1回だけ「戻る」が出ない画面になる(実際にそうなった)。
+   */
+  if (lastRouteState !== null && !restoringRoute && routeKey() !== lastRouteKey) {
+    routeHistory.push(lastRouteState);
+    if (routeHistory.length > ROUTE_HISTORY_MAX) routeHistory.shift();
+    lastRouteState = null;
+  }
   farmEquipmentScrollTop = rememberedScrollTop(root.querySelector<HTMLElement>(".farm-equip-sheet__panel"), farmEquipmentScrollTop);
 
   disposeCurrentView?.();
@@ -2621,11 +2708,23 @@ function render(): void {
     root.append(buildBackgroundFarmStatus(backgroundJob));
   }
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
+  /*
+   * 共通の「戻る」。**自前の見出しを持つ画面には出さない。**
+   * 一覧で持つと足し忘れるので、描き上がった中身をそのまま見て決める。
+   */
+  if (canGoBack() && !content.querySelector(".management-header")) {
+    const previous = routeHistory[routeHistory.length - 1];
+    root.append(renderGlobalBackButton({ onBack: goBack, label: SCREEN_LABEL[previous.screen] ?? "戻る" }));
+    document.body.classList.add("has-global-back");
+  } else {
+    document.body.classList.remove("has-global-back");
+  }
   playBgm(bgmSceneOf(state.screen));
 
   const newRouteKey = routeKey();
   window.scrollTo(0, scrollPositions.get(newRouteKey) ?? 0);
   lastRouteKey = newRouteKey;
+  lastRouteState = routeState();
 }
 
 /**
