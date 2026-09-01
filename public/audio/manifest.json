@@ -63,119 +63,26 @@
     "flavor_DARK_2.ogg",
     "flavor_DARK_3.ogg"
   ],
-  "crit": [
-    "crit_0.ogg",
-    "crit_1.ogg",
-    "crit_2.ogg",
-    "crit_3.ogg"
-  ],
-  "shield": [
-    "shield_0.ogg",
-    "shield_1.ogg",
-    "shield_2.ogg",
-    "shield_3.ogg"
-  ],
-  "death": [
-    "death_0.ogg",
-    "death_1.ogg",
-    "death_2.ogg"
-  ],
-  "heal": [
-    "heal_0.ogg",
-    "heal_1.ogg",
-    "heal_2.ogg",
-    "heal_3.ogg"
-  ],
-  "buff": [
-    "buff_0.ogg",
-    "buff_1.ogg",
-    "buff_2.ogg",
-    "buff_3.ogg"
-  ],
-  "debuff": [
-    "debuff_0.ogg",
-    "debuff_1.ogg",
-    "debuff_2.ogg",
-    "debuff_3.ogg"
-  ],
-  "charge": [
-    "charge_0.ogg",
-    "charge_1.ogg",
-    "charge_2.ogg",
-    "charge_3.ogg"
-  ],
-  "turnAlly": [
-    "turnAlly_0.ogg",
-    "turnAlly_1.ogg",
-    "turnAlly_2.ogg",
-    "turnAlly_3.ogg",
-    "turnAlly_4.ogg"
-  ],
-  "turnEnemy": [
-    "turnEnemy_0.ogg",
-    "turnEnemy_1.ogg",
-    "turnEnemy_2.ogg",
-    "turnEnemy_3.ogg",
-    "turnEnemy_4.ogg"
-  ],
-  "tap": [
-    "tap_0.ogg",
-    "tap_1.ogg",
-    "tap_2.ogg",
-    "tap_3.ogg",
-    "tap_4.ogg"
-  ],
-  "select": [
-    "select_0.ogg",
-    "select_1.ogg",
-    "select_2.ogg",
-    "select_3.ogg",
-    "select_4.ogg"
-  ],
-  "victory": [
-    "victory_0.ogg",
-    "victory_1.ogg",
-    "victory_2.ogg"
-  ],
-  "defeat": [
-    "defeat_0.ogg",
-    "defeat_1.ogg",
-    "defeat_2.ogg"
-  ],
-  "summon": [
-    "summon_0.ogg",
-    "summon_1.ogg",
-    "summon_2.ogg"
-  ],
-  "summonRare": [
-    "summonRare_0.ogg",
-    "summonRare_1.ogg",
-    "summonRare_2.ogg"
-  ],
-  "levelUp": [
-    "levelUp_0.ogg",
-    "levelUp_1.ogg",
-    "levelUp_2.ogg"
-  ],
-  "enhance": [
-    "enhance_0.ogg",
-    "enhance_1.ogg",
-    "enhance_2.ogg"
-  ],
-  "stageClear": [
-    "stageClear_0.ogg",
-    "stageClear_1.ogg",
-    "stageClear_2.ogg"
-  ],
-  "denied": [
-    "denied_0.ogg",
-    "denied_1.ogg",
-    "denied_2.ogg"
-  ],
-  "bgm_home": [
-    "bgm_home.ogg"
-  ],
-  "bgm_battle": [
-    "bgm_battle.ogg"
-  ]
+  "crit": ["crit_0.ogg", "crit_1.ogg", "crit_2.ogg", "crit_3.ogg"],
+  "shield": ["shield_0.ogg", "shield_1.ogg", "shield_2.ogg", "shield_3.ogg"],
+  "death": ["death_0.ogg", "death_1.ogg", "death_2.ogg"],
+  "heal": ["heal_0.ogg", "heal_1.ogg", "heal_2.ogg", "heal_3.ogg"],
+  "buff": ["buff_0.ogg", "buff_1.ogg", "buff_2.ogg", "buff_3.ogg"],
+  "debuff": ["debuff_0.ogg", "debuff_1.ogg", "debuff_2.ogg", "debuff_3.ogg"],
+  "charge": ["charge_0.ogg", "charge_1.ogg", "charge_2.ogg", "charge_3.ogg"],
+  "turnAlly": ["turnAlly_0.ogg", "turnAlly_1.ogg", "turnAlly_2.ogg", "turnAlly_3.ogg", "turnAlly_4.ogg"],
+  "turnEnemy": ["turnEnemy_0.ogg", "turnEnemy_1.ogg", "turnEnemy_2.ogg", "turnEnemy_3.ogg", "turnEnemy_4.ogg"],
+  "tap": ["tap_0.ogg", "tap_1.ogg", "tap_2.ogg", "tap_3.ogg", "tap_4.ogg"],
+  "select": ["select_0.ogg", "select_1.ogg", "select_2.ogg", "select_3.ogg", "select_4.ogg"],
+  "victory": ["victory_0.ogg", "victory_1.ogg", "victory_2.ogg"],
+  "defeat": ["defeat_0.ogg", "defeat_1.ogg", "defeat_2.ogg"],
+  "summon": ["summon_0.ogg", "summon_1.ogg", "summon_2.ogg"],
+  "summonRare": ["summonRare_0.ogg", "summonRare_1.ogg", "summonRare_2.ogg"],
+  "levelUp": ["levelUp_0.ogg", "levelUp_1.ogg", "levelUp_2.ogg"],
+  "enhance": ["enhance_0.ogg", "enhance_1.ogg", "enhance_2.ogg"],
+  "stageClear": ["stageClear_0.ogg", "stageClear_1.ogg", "stageClear_2.ogg"],
+  "denied": ["denied_0.ogg", "denied_1.ogg", "denied_2.ogg"],
+  "bgm_home": ["bgm_home.ogg"],
+  "bgm_battle": ["bgm_battle.ogg"],
+  "bgm_boss": ["bgm_boss.ogg"]
 }
