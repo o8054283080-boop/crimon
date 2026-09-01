@@ -1,6 +1,6 @@
 import { scaledEnemyAtk } from "../battle/enemyPower.js";
 import { BattleEngine } from "../battle/engine.js";
-import { Equipment } from "../core/equipment.js";
+import { DEFAULT_COMBAT_MODIFIERS, Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, computeEffectiveStats } from "../core/rarity.js";
@@ -20,6 +20,25 @@ function applyDifficultyToEnemy(enemy: WaveEnemy, difficulty: Difficulty): WaveE
   const star = Math.min(6, enemy.star + mod.starBonus) as Star;
   const level = Math.min(enemy.level + mod.levelBonus, STAR_MAX_LEVEL[star]);
   return { ...enemy, star, level };
+}
+
+/**
+ * 章ボス固有の戦闘補正。
+ * 腐食トレントは「遅い代わりに、手番を渡すほど再生する」ボスとして成立させる。
+ * 装備由来のcombatModsとは独立した敵専用定義だが、BattleEngineの既存ターン回復処理を
+ * そのまま使うためセーブ形式や通常モンスターの挙動には影響しない。
+ */
+function bossCombatMods(enemy: WaveEnemy, dex: MonsterDefinition, difficulty: Difficulty): MonsterDefinition["combatMods"] {
+  if (enemy.displayName !== "腐食トレント") return dex.combatMods;
+  const turnHealPercent: Record<Difficulty, number> = {
+    NORMAL: 0.03,
+    HARD: 0.05,
+    HELL: 0.07,
+  };
+  return {
+    ...(dex.combatMods ?? DEFAULT_COMBAT_MODIFIERS),
+    turnHealPercent: turnHealPercent[difficulty],
+  };
 }
 
 function defFromWaveEnemy(
@@ -51,6 +70,7 @@ function defFromWaveEnemy(
     id: `${dex.id}_wave`,
     name: `${enemy.displayName ?? dex.name}★${enemy.star} Lv${enemy.level}${enemy.isBoss ? " 【BOSS】" : ""}`,
     stats,
+    combatMods: bossCombatMods(enemy, dex, difficulty),
     bossTraits,
   };
 }
