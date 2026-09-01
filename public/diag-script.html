@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crimon Script Test</title>
+    <script>
+      (() => {
+        const standalone =
+          window.matchMedia?.('(display-mode: standalone)').matches ||
+          window.navigator.standalone === true;
+        if (standalone) {
+          document.documentElement.dataset.standalone = 'true';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <h1>Crimon Script Test</h1>
+    <p>bare.html にホーム画面起動判定の JavaScript だけを追加した診断ページです。</p>
+  </body>
+</html>
