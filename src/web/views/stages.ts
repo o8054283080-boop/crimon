@@ -50,6 +50,10 @@ const CHAPTER_LOOKS: Record<number, ChapterLook> = {
   2: { title: "月夜の荒野", color: "#7b8cf6", color2: "#2b3286", scenery: "🌙" },
   3: { title: "灼けた岩窟", color: "#f0a03c", color2: "#8a4110", scenery: "🪨" },
   4: { title: "星屑の花園", color: "#c96ae0", color2: "#6a1b7a", scenery: "✨" },
+  5: { title: "瘴気の深森", color: "#69b66a", color2: "#274c2a", scenery: "🌲" },
+  6: { title: "忘却の古代遺跡", color: "#c7a65b", color2: "#51411f", scenery: "🏛️" },
+  7: { title: "奈落の境界", color: "#a35bc7", color2: "#32143f", scenery: "🌑" },
+  8: { title: "崩壊する時空", color: "#5ea8df", color2: "#252c69", scenery: "⏳" },
 };
 
 const FALLBACK_LOOK: ChapterLook = { title: "未知の領域", color: "#8f9ec6", color2: "#333a5c", scenery: "❔" };
@@ -259,7 +263,7 @@ function enemyChip(enemy: WaveEnemy): HTMLElement {
       el("span", { className: "enemy-chip__body" }, [
         el("span", { className: "enemy-chip__name" }, [
           enemy.isBoss ? "👑" : "",
-          speciesLabel(enemy.templateId),
+          enemy.displayName ?? speciesLabel(enemy.templateId),
           el("span", { className: "enemy-chip__elem" }, [ELEMENT_JA[enemy.element]]),
         ]),
         el("span", { className: "enemy-chip__meta" }, [`★${enemy.star} · Lv${enemy.level}`]),
