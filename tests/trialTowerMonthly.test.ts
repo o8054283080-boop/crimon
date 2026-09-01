@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, ensureTowerMonthlyState, normalizeLoadedState, towerSeasonKeyAt } from "../src/game/playerState.js";
 import { claimTowerFloorReward } from "../src/game/trialTower.js";
 
 const AUGUST = new Date("2026-08-31T14:59:59.999Z");
 const SEPTEMBER = new Date("2026-08-31T15:00:00.000Z");
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("試練の塔のJST月間シーズン", () => {
   it("JSTの毎月1日00:00を境にYYYY-MMを切り替える", () => {
@@ -39,6 +43,8 @@ describe("試練の塔のJST月間シーズン", () => {
   });
 
   it("15階と30階を各月1回だけ受け取り、翌月は再取得できる", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(AUGUST);
     const state = createInitialState();
     state.trialTowerSeason = "2026-08";
     expect(claimTowerFloorReward(state, 15).awakeningOrbs).toBe(1);
@@ -46,9 +52,8 @@ describe("試練の塔のJST月間シーズン", () => {
     expect(claimTowerFloorReward(state, 30).awakeningOrbs).toBe(1);
     expect(state.awakeningOrbs).toBe(2);
 
-    ensureTowerMonthlyState(state, SEPTEMBER);
-    // claim関数の実時刻依存を避け、現在実行月をテストシーズンとして扱う。
-    state.trialTowerSeason = towerSeasonKeyAt();
+    vi.setSystemTime(SEPTEMBER);
+    expect(ensureTowerMonthlyState(state, SEPTEMBER)).toBe(true);
     expect(claimTowerFloorReward(state, 15).awakeningOrbs).toBe(1);
     expect(claimTowerFloorReward(state, 30).awakeningOrbs).toBe(1);
     expect(state.awakeningOrbs).toBe(4);
