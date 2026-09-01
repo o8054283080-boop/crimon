@@ -6,6 +6,11 @@ import "../ui/resultEnhancements.css";
 import { buildMonsterCard } from "./monsterCard.js";
 import { ResultAction, renderResultActions } from "./resultActions.js";
 
+type StageResultPartyLevel = { instanceId: string; name: string; level: number; maxLevel: number };
+type StageResultExpAwards = ({ instanceId: string; name: string; total: number; maxMemberBonus: number }[] & {
+  partyLevels?: StageResultPartyLevel[];
+});
+
 export interface StageResultLevelUp {
   instanceId: string;
   name: string;
@@ -20,7 +25,7 @@ export interface StageResultInfo {
   wavesCleared: number;
   totalWaves: number;
   levelUps: StageResultLevelUp[];
-  expAwards?: { instanceId: string; name: string; level: number; maxLevel: number; total: number; maxMemberBonus: number }[];
+  expAwards?: StageResultExpAwards;
   dropDexId: string | null;
   dropStar: number | null;
   equipmentDrop: Equipment | null;
@@ -106,22 +111,22 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
         )
       : null;
 
-  const partyLine = info.expAwards && info.expAwards.length > 0
-    ? el("section", { className: "result-party-levels", ariaLabel: "現在のパーティレベル" }, [
+  const partyLevels = info.expAwards?.partyLevels ?? [];
+  const partyLine = partyLevels.length > 0
+    ? el("section", { className: "result-party-levels", "aria-label": "現在のパーティレベル" }, [
         el("div", { className: "result-party-levels__title" }, ["現在のパーティ"]),
-        el("div", { className: "result-party-levels__grid" }, info.expAwards.map((award) =>
-          el("div", { className: `result-party-levels__member${award.level >= award.maxLevel ? " is-max" : ""}` }, [
-            el("span", { className: "result-party-levels__name" }, [award.name]),
-            el("strong", { className: "result-party-levels__level" }, [`Lv.${award.level}`]),
-            award.level >= award.maxLevel ? el("small", { className: "result-party-levels__max" }, ["MAX"]) : null,
+        el("div", { className: "result-party-levels__grid" }, partyLevels.map((member) =>
+          el("div", { className: `result-party-levels__member${member.level >= member.maxLevel ? " is-max" : ""}` }, [
+            el("span", { className: "result-party-levels__name" }, [member.name]),
+            el("strong", { className: "result-party-levels__level" }, [`Lv.${member.level}`]),
+            member.level >= member.maxLevel ? el("small", { className: "result-party-levels__max" }, ["MAX"]) : null,
           ].filter((node): node is HTMLElement => node !== null)),
         )),
       ])
     : null;
 
-  const expReceiving = info.expAwards?.filter((award) => award.total > 0) ?? [];
-  const expLine = expReceiving.length > 0
-    ? el("div", { className: "result-levelups" }, expReceiving.map((award) => el("span", { className: "result-levelups__item" }, [
+  const expLine = info.expAwards && info.expAwards.length > 0
+    ? el("div", { className: "result-levelups" }, info.expAwards.map((award) => el("span", { className: "result-levelups__item" }, [
         `${award.name} +${award.total.toLocaleString()} EXP${award.maxMemberBonus > 0 ? `（MAXメンバー分 +${award.maxMemberBonus.toLocaleString()}）` : ""}`,
       ])))
     : null;
