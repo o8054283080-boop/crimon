@@ -7795,3 +7795,48 @@ body::before {
 .equip-picker-card__lock { min-height:40px; }
 .equip-picker-card__delta { padding:4px 6px; border-radius:7px; background:rgba(7,11,24,.8); }
 .equip-picker-card__delta.is-up { color:#82e6a5; } .equip-picker-card__delta.is-down { color:#ff9c9c; }
+
+/* ------------------------------------------------------ 共通の「戻る」
+
+   画面のどこを巻いていても左上に残る。**浮かせた部品は下の何かを覆う**
+   ので、`body.has-global-back` の時だけ画面の中身へ逃げ場を空けている
+   (この案件では覆って押せなくする事故を3回出している)。 */
+:root { --global-back-h: 42px; }
+
+.global-back {
+  position: fixed;
+  top: calc(max(6px, env(safe-area-inset-top)) + 4px);
+  left: calc(max(8px, env(safe-area-inset-left)) + 4px);
+  z-index: 60;
+  appearance: none;
+  min-height: var(--global-back-h);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 46vw;
+  padding: 6px 12px 6px 9px;
+  border: 1px solid rgba(226, 182, 110, 0.45);
+  border-radius: 999px;
+  color: #f5d48a;
+  background: linear-gradient(180deg, rgba(14, 18, 38, 0.96), rgba(7, 10, 23, 0.94));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  font: inherit;
+  /* 9px未満は実機で読めない(tests/cssReadability.test.ts が見張っている) */
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.global-back:active { transform: translateY(1px); }
+
+.global-back__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 中身を押し下げて、ボタンの下に隠れるものを作らない */
+body.has-global-back .screen { padding-top: calc(var(--global-back-h) + 10px); }

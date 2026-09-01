@@ -205,6 +205,9 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  /* 祭壇そのものも飾り。中に押すものは1つも無いので、丸ごと押し抜けさせる。
+     子だけを透かした時は、親の丸が残って下のボタンを覆っていた */
+  pointer-events: none;
 }
 
 /*

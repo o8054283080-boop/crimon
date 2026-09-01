@@ -385,6 +385,18 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
 }
 
 let rankUpMaterialSort: Extract<MaterialMonsterSort, "DEFAULT" | "REINCARNATION_PIG_FIRST"> = "DEFAULT";
+/**
+ * ランクアップの素材選びで使う並べ替えの軸。
+ *
+ * **所持一覧と同じ軸をそのまま出す。** 素材を選ぶ時に見たいものは
+ * 一覧を見る時と変わらない(弱い順に処分したい・種族で揃えたい・
+ * 引いたばかりの子を避けたい)。ここだけ別の言葉にすると、
+ * 同じことをするのに2つの操作を覚えることになる。
+ *
+ * 画面を離れたら「おすすめ」へ戻す(`renderMonsters` の末尾)。
+ * 素材選びは一度きりの作業なので、前回の軸を持ち越す意味がない。
+ */
+let rankUpSortKey: MonsterSortKey = "recommended";
 
 function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElement {
   const dex = findMonsterById(target.dexId);
@@ -396,7 +408,12 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkRankUp(target, sacrifices, props.player.partyIds);
 
-  const buildCards = (): HTMLElement[] => sortMaterialMonsters(candidates, rankUpMaterialSort).map((c) =>
+  // 軸で並べてから、転生ピッグだけを先頭へ寄せる。
+  // 逆にすると寄せた並びを軸が壊すので、順番は入れ替えられない
+  const buildCards = (): HTMLElement[] => sortMaterialMonsters(
+    sortMonsters(candidates, rankUpSortKey, { partyIds: props.player.partyIds }),
+    rankUpMaterialSort,
+  ).map((c) =>
     // 素材選びの最中こそ「この子は誰だったか」を確かめたい。長押しで詳細へ送る
     monsterCard(c, () => props.onToggleSacrifice(c.id), {
       selected: props.selectedSacrificeIds.includes(c.id),
@@ -404,6 +421,26 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     }),
   );
   const grid = el("div", { className: "monster-grid" }, buildCards());
+
+  /*
+   * 札は作り直さず、押された時に印だけ付け替える。
+   * 画面ごと描き直すと、選んだ素材と巻物の位置が毎回先頭へ戻ってしまう。
+   */
+  const sortButtons = MONSTER_SORT_KEYS.map((key) => {
+    const button = el("button", {
+      type: "button",
+      className: `slot-filter-chip${rankUpSortKey === key ? " slot-filter-chip--active" : ""}`,
+    }, [MONSTER_SORT_LABEL[key]]) as HTMLButtonElement;
+    button.onclick = () => {
+      rankUpSortKey = key;
+      for (const [i, other] of sortButtons.entries()) {
+        other.classList.toggle("slot-filter-chip--active", MONSTER_SORT_KEYS[i] === key);
+      }
+      grid.replaceChildren(...buildCards());
+    };
+    return button;
+  });
+
   const normalSortButton = el("button", {
     type: "button",
     className: `slot-filter-chip${rankUpMaterialSort === "DEFAULT" ? " slot-filter-chip--active" : ""}`,
@@ -411,7 +448,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
   const reincarnationSortButton = el("button", {
     type: "button",
     className: `slot-filter-chip${rankUpMaterialSort === "REINCARNATION_PIG_FIRST" ? " slot-filter-chip--active" : ""}`,
-  }, ["転生豚優先"]) as HTMLButtonElement;
+  }, ["転生ピッグ優先"]) as HTMLButtonElement;
   const applyMaterialSort = (sort: typeof rankUpMaterialSort): void => {
     rankUpMaterialSort = sort;
     normalSortButton.classList.toggle("slot-filter-chip--active", sort === "DEFAULT");
@@ -439,6 +476,10 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     el("section", { className: "panel" }, [
       el("div", { className: "mfilter__group" }, [
         el("span", { className: "mfilter__label" }, ["並び順"]),
+        el("div", { className: "mfilter__chips" }, sortButtons),
+      ]),
+      el("div", { className: "mfilter__group" }, [
+        el("span", { className: "mfilter__label" }, ["素材"]),
         el("div", { className: "mfilter__chips" }, [normalSortButton, reincarnationSortButton]),
       ]),
       candidates.length === 0
@@ -464,6 +505,7 @@ export function renderMonsters(props: MonstersProps): HTMLElement {
 
   if (target && props.rankUpMode) return renderRankUp(props, target);
   rankUpMaterialSort = "DEFAULT";
+  rankUpSortKey = "recommended";
   if (target) return renderDetail(props, target);
   return renderList(props);
 }
