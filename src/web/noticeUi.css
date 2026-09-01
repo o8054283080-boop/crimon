@@ -1,0 +1,133 @@
+body.notice-sheet-open{overflow:hidden!important}
+
+/* 遊び方の直下に5つ目の常設項目を置く。既存4項目と同じサイズ・間隔を使う。 */
+.world-actions--left .world-action:nth-child(5)>img{
+  content:url('/src/web/assets/home/menu-notice.svg')!important;
+}
+
+.notice-sheet{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:grid;
+  place-items:end center;
+  padding:0;
+}
+.notice-sheet__backdrop{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  padding:0;
+  border:0;
+  background:rgba(1,8,20,.72);
+  backdrop-filter:blur(4px);
+}
+.notice-sheet__panel{
+  position:relative;
+  z-index:1;
+  width:min(100%,430px);
+  max-height:min(82dvh,760px);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border:1px solid rgba(224,187,101,.82);
+  border-bottom:0;
+  border-radius:18px 18px 0 0;
+  color:#f9f5e9;
+  background:linear-gradient(180deg,#0d294b 0%,#081b35 20%,#061326 100%);
+  box-shadow:0 -10px 34px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.08);
+}
+.notice-sheet__header{
+  flex:0 0 auto;
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px 8px 16px;
+  border-bottom:1px solid rgba(224,187,101,.36);
+  background:linear-gradient(180deg,rgba(21,61,102,.96),rgba(8,27,53,.96));
+}
+.notice-sheet__header h2{
+  margin:0;
+  color:#ffe09a;
+  font-size:1.1rem;
+  letter-spacing:.08em;
+}
+.notice-sheet__close{
+  min-width:64px;
+  min-height:42px;
+  padding:7px 12px;
+  border:1px solid rgba(224,187,101,.58);
+  border-radius:9px;
+  color:#ffe09a;
+  background:rgba(6,19,38,.86);
+  font:inherit;
+  font-size:.78rem;
+  font-weight:800;
+}
+.notice-sheet__list{
+  min-height:0;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding:12px 12px calc(18px + env(safe-area-inset-bottom));
+}
+.notice-card{
+  margin:0 0 10px;
+  padding:12px;
+  border:1px solid rgba(183,201,219,.19);
+  border-left:3px solid #81dcff;
+  border-radius:10px;
+  background:linear-gradient(145deg,rgba(18,61,103,.72),rgba(6,19,38,.84));
+  box-shadow:0 4px 12px rgba(0,0,0,.24);
+}
+.notice-card--celebration{border-left-color:#ffe09a}
+.notice-card--apology{border-left-color:#c7a5ff}
+.notice-card__meta{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:6px;
+  color:#b7c9db;
+  font-size:.68rem;
+}
+.notice-card__category{
+  display:inline-flex;
+  padding:3px 7px;
+  border:1px solid rgba(129,220,255,.28);
+  border-radius:999px;
+  color:#dff7ff;
+  background:rgba(14,57,94,.72);
+  font-weight:800;
+}
+.notice-card h3{
+  margin:0 0 7px;
+  color:#fff2c4;
+  font-size:.92rem;
+  line-height:1.4;
+}
+.notice-card p{
+  margin:0;
+  color:#edf3f7;
+  font-size:.78rem;
+  line-height:1.68;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.notice-card__reward{
+  margin-top:9px!important;
+  padding-top:8px;
+  border-top:1px solid rgba(224,187,101,.22);
+  color:#ffe09a!important;
+  font-weight:800;
+}
+
+@media(max-width:390px){
+  .notice-sheet__panel{max-height:86dvh}
+  .notice-sheet__list{padding-inline:10px}
+  .notice-card{padding:10px}
+  .notice-card p{font-size:.75rem}
+}
