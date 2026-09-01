@@ -2,6 +2,7 @@ import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipmen
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon, slotIcon } from "../icons.js";
 import { managementHeader } from "./managementHeader.js";
 import { compareEquipmentStats, equipmentForSlot, equipmentLockLabel, equipmentStatTotal, sellableEquipmentIds } from "../uxHelpers.js";
@@ -280,7 +281,7 @@ function renderList(props: EquipmentProps): HTMLElement {
     ? pickerMonster.equipment[props.pickerContext.slot]
     : undefined;
 
-  const cards = items.map((eq) => {
+  const renderItem = (eq: Equipment): HTMLElement => {
     const card = equipmentCard(props.player, eq, () => {
       if (props.pickerContext) {
         props.onEquip(eq.id, props.pickerContext.monsterId);
@@ -326,6 +327,13 @@ function renderList(props: EquipmentProps): HTMLElement {
       })) : null,
       lockButton,
     ].filter((node): node is HTMLElement => node !== null));
+  };
+
+  const equipmentGrid = createIncrementalGrid({
+    className: "equip-grid",
+    items,
+    renderItem,
+    moreLabel: (shown, total) => `装備をさらに表示（${shown} / ${total}）`,
   });
 
   // 操作の帯。
@@ -370,7 +378,7 @@ function renderList(props: EquipmentProps): HTMLElement {
     el("section", { className: "panel" }, [
       items.length === 0
         ? el("p", { className: "app-subtitle" }, ["該当する装備がありません。ステージクリアでドロップします。"])
-        : el("div", { className: "equip-grid" }, cards),
+        : equipmentGrid.element,
     ]),
   ].filter((n): n is HTMLElement => n !== null));
 }

@@ -6,6 +6,7 @@ import { PlayerState } from "../../game/playerState.js";
 import { checkMonsterPowerUp, isSameElement, isSameSpecies, monsterPowerUpExp } from "../../game/monsterPowerUp.js";
 import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
 import { el } from "../dom.js";
+import { createIncrementalGrid } from "../incrementalGrid.js";
 import { monsterCard } from "./monsters.js";
 import { renderPartySlots } from "./partyCard.js";
 import { managementHeader } from "./managementHeader.js";
@@ -77,12 +78,15 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
   const sameElementCount = materials.filter((m) => isSameElement(target, m)).length;
 
   const shownCandidates = filterTrainingMaterials(candidates, target, props.selectedMaterialIds, props.filter);
-  const cards = shownCandidates.map((c) =>
-    monsterCard(c, () => props.onToggleMaterial(c.id), {
-      selected: props.selectedMaterialIds.includes(c.id),
-      bonus: isSameSpecies(target, c),
+  const materialGrid = createIncrementalGrid({
+    className: "monster-grid",
+    items: shownCandidates,
+    renderItem: (candidate) => monsterCard(candidate, () => props.onToggleMaterial(candidate.id), {
+      selected: props.selectedMaterialIds.includes(candidate.id),
+      bonus: isSameSpecies(target, candidate),
     }),
-  );
+    moreLabel: (shown, total) => `素材をさらに表示（${shown} / ${total}）`,
+  });
 
   return el("div", { className: "screen monsters-screen" }, [
     managementHeader("モンスター強化", props.onCancel, dex ? dex.name : target.dexId),
@@ -153,7 +157,7 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : shownCandidates.length === 0
           ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
-        : el("div", { className: "monster-grid" }, cards),
+          : materialGrid.element,
       el("div", { className: "sticky-actions__spacer" }, []),
     ]),
     stickyActions({
