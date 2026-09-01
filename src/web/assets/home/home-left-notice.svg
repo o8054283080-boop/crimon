@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 104" role="img" aria-label="お知らせ">
+  <defs>
+    <linearGradient id="frame" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff0a6"/><stop offset=".32" stop-color="#d89a35"/><stop offset=".7" stop-color="#7b4217"/><stop offset="1" stop-color="#f2c66e"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8e552b"/><stop offset=".48" stop-color="#3f2118"/><stop offset="1" stop-color="#180e16"/></linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff5ce"/><stop offset="1" stop-color="#cda563"/></linearGradient>
+    <radialGradient id="aura"><stop stop-color="#87eaff" stop-opacity=".8"/><stop offset=".45" stop-color="#7654e8" stop-opacity=".42"/><stop offset="1" stop-color="#251344" stop-opacity="0"/></radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <ellipse cx="60" cy="48" rx="56" ry="45" fill="url(#aura)"/>
+  <path d="M17 22 28 9l10 7h44l10-7 11 13-6 9v49l-10 11H33L23 80V31z" fill="url(#wood)" stroke="#160c13" stroke-width="5"/>
+  <path d="M18 22 28 9l10 7h44l10-7 11 13-6 9v49l-10 11H33L23 80V31z" fill="none" stroke="url(#frame)" stroke-width="3"/>
+  <path d="m60 7 7 7-7 7-7-7z" fill="#68ddff" stroke="#f6d784" stroke-width="2" filter="url(#glow)"/>
+  <path d="M32 27h56v50H32z" fill="#24172a" stroke="#d7a14a" stroke-width="2"/>
+  <path d="M39 31h42l4 5-3 35H38l-3-35z" fill="url(#paper)" stroke="#7c481f" stroke-width="1.5"/>
+  <path d="M45 43h30M45 51h25M45 59h30" stroke="#704222" stroke-width="3" stroke-linecap="round" opacity=".78"/>
+  <circle cx="76" cy="68" r="10" fill="#51319a" stroke="#f5d075" stroke-width="2"/>
+  <path d="m76 61 2.1 4.5 4.9.6-3.6 3.4.9 4.8-4.3-2.4-4.3 2.4.9-4.8-3.6-3.4 4.9-.6z" fill="#8ee9ff" filter="url(#glow)"/>
+  <path d="M23 36 11 43l11 5M97 36l12 7-11 5" fill="none" stroke="#d9a049" stroke-width="3" stroke-linecap="round"/>
+  <path d="M34 87 25 98h70L86 87" fill="#2d1820" stroke="url(#frame)" stroke-width="3"/>
+  <text x="60" y="96" text-anchor="middle" fill="#fff0c2" font-family="serif" font-size="9" font-weight="700">お知らせ</text>
+</svg>

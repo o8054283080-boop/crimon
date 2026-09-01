@@ -2,7 +2,7 @@ body.notice-sheet-open{overflow:hidden!important}
 
 /* 遊び方の直下に5つ目の常設項目を置く。既存4項目と同じサイズ・間隔を使う。 */
 .world-actions--left .world-action:nth-child(5)>img{
-  content:url('/src/web/assets/home/menu-notice.svg')!important;
+  content:url('/src/web/assets/home/home-left-notice.svg')!important;
 }
 
 .notice-sheet{

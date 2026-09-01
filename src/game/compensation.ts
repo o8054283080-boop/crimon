@@ -42,6 +42,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-01-home-mode-icons",
+    title: "9/1 HOMEアイコン刷新のお知らせ",
+    message: "HOME画面の各モードアイコンを高品質版へ刷新しました。ミッション・冒険・図鑑・ダンジョン・ランキング・闘技場・遊び方・お知らせ・試練の塔を、それぞれの行き先がひと目で伝わるファンタジー紋章へ統一しています。",
+    kind: "UPDATE",
+    fromDate: "2026-09-01",
+    toDate: "9999-12-31",
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-09-01-pwa-app-icon-blue-dragon",
     title: "9/1 アプリアイコン刷新のお知らせ",
     message: "スマホのホーム画面に追加した時に表示されるCRIMONのアプリアイコンを、青いドラゴンを主役にした新デザインへ刷新しました。iPhone用のホーム画面アイコンに加え、PWA用の192px・512pxアイコンとブラウザ用ファビコンも同じデザインへ統一しています。",

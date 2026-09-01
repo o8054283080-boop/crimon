@@ -784,14 +784,14 @@ export function renderHome(props: HomeProps): HTMLElement {
   const [onGoArena, onGoShop, onGoHowToPlay] = homeUtilityActions(props);
   const [onGoEquipDungeon, onGoLevelDungeon, onGoGoldDungeon] = dungeonActions(props);
   const homeAssets: Record<string, string> = {
-    "menu-mission": new URL("../assets/home/menu-mission.svg", import.meta.url).href,
-    "menu-dex": new URL("../assets/home/menu-dex.svg", import.meta.url).href,
-    "menu-ranking": new URL("../assets/home/menu-ranking.svg", import.meta.url).href,
-    "menu-help": new URL("../assets/home/menu-help.svg", import.meta.url).href,
-    "activity-adventure": new URL("../assets/home/activity-adventure.svg", import.meta.url).href,
-    "activity-dungeon": new URL("../assets/home/activity-dungeon.svg", import.meta.url).href,
-    "activity-arena": new URL("../assets/home/activity-arena.svg", import.meta.url).href,
-    [["activity", "tower"].join("-")]: new URL("../assets/home/activity-tower.svg", import.meta.url).href,
+    "menu-mission": new URL("../assets/home/home-left-mission.webp", import.meta.url).href,
+    "menu-dex": new URL("../assets/home/home-left-dex.webp", import.meta.url).href,
+    "menu-ranking": new URL("../assets/home/home-left-ranking.webp", import.meta.url).href,
+    "menu-help": new URL("../assets/home/home-left-help.webp", import.meta.url).href,
+    "activity-adventure": new URL("../assets/home/home-mode-adventure.webp", import.meta.url).href,
+    "activity-dungeon": new URL("../assets/home/home-mode-dungeon.webp", import.meta.url).href,
+    "activity-arena": new URL("../assets/home/home-mode-arena.webp", import.meta.url).href,
+    [["activity", "tower"].join("-")]: new URL("../assets/home/home-mode-tower.webp", import.meta.url).href,
   };
   const homeAsset = (name: string): string => homeAssets[name] ?? "";
   const worldButton = (side: "left" | "right", asset: string, label: string, onClick?: () => void, detail?: string) =>
