@@ -7,13 +7,10 @@ import { STAGES } from "../src/data/stages.js";
 /**
  * 敵の速度が場所ごとにどこまで伸びるかの取り決め。
  *
- * `powerScale` はHP・攻撃・防御にしか掛からず、**速度だけが据え置き**だった。
- * プレイヤー側は★6装備の副効果を速度に寄せると300を超えるので、
- * 終盤では一方的に何度も動ける状態になっていた。
- *
- * 場所ごとに別のカーブを持たせてある。**装備ダンジョンがいちばん急**で、
- * ほかはそれより緩い。装備を詰めた人が挑む場所と、
- * 育てるために通う場所・物語を進める場所を同じ厳しさにしてはいけない。
+ * 1〜4章は従来どおり装備ダンジョンより緩い物語導線を守る。
+ * 5〜8章は育成後の編成を受け止める終盤冒険として別枠にし、プレイヤー側の
+ * 速度150前後でも常に先手にならないよう、最大1.40まで段階的に伸ばす。
+ * ゴールド/レベル上げダンジョンは育成場所なので、引き続き装備ダンジョンより緩く保つ。
  */
 
 const equipTop = EQUIPMENT_DUNGEON_FLOORS[EQUIPMENT_DUNGEON_FLOORS.length - 1].speedScale;
@@ -26,14 +23,17 @@ describe("敵の速度カーブ", () => {
     expect(STAGES[0].waves[0].speedScale).toBe(1);
   });
 
-  it("**装備ダンジョンがいちばん急で、ほかはそれより弱い**", () => {
-    const stageTop = STAGES[STAGES.length - 1].waves[0].speedScale;
+  it("1〜4章と育成用ダンジョンは装備ダンジョンより緩く、5〜8章だけ終盤用に上回る", () => {
+    const legacyStageTop = STAGES.find((s) => s.id === "4-5")!.waves[0].speedScale;
+    const lateStageTop = STAGES[STAGES.length - 1].waves[0].speedScale;
     const goldTop = GOLD_DUNGEON_FLOORS[GOLD_DUNGEON_FLOORS.length - 1].speedScale;
     const levelTop = LEVEL_DUNGEON_DEFS[LEVEL_DUNGEON_DEFS.length - 1].speedScale;
 
-    expect(stageTop, "ステージ").toBeLessThan(equipTop);
+    expect(legacyStageTop, "1〜4章").toBeLessThan(equipTop);
     expect(goldTop, "ゴールド").toBeLessThan(equipTop);
     expect(levelTop, "レベル上げ").toBeLessThan(equipTop);
+    expect(lateStageTop, "5〜8章").toBeGreaterThan(equipTop);
+    expect(lateStageTop).toBeCloseTo(1.4, 5);
   });
 
   it("進むほど速くなる(どの場所でも後退しない)", () => {
@@ -51,15 +51,12 @@ describe("敵の速度カーブ", () => {
   });
 
   it("**速度はHPや攻撃力ほど急には伸ばさない**", () => {
-    // 速度は手番の数に直結する。同じ勢いで伸ばすと、こちらが動く前に
-    // 一方的に殴られる展開になる
     const first = EQUIPMENT_DUNGEON_FLOORS[0];
     const last = EQUIPMENT_DUNGEON_FLOORS[EQUIPMENT_DUNGEON_FLOORS.length - 1];
     expect(last.speedScale / first.speedScale).toBeLessThan(last.powerScale / first.powerScale);
   });
 
   it("ステージの速度倍率は、章をまたいでも巻き戻らない", () => {
-    // 章ごとに作り直す実装だと、章の頭で1.0へ戻ってしまう
     const all = STAGES.flatMap((s) => s.waves.map((w) => w.speedScale));
     for (let i = 1; i < all.length; i++) {
       expect(all[i]).toBeGreaterThanOrEqual(all[i - 1]);
