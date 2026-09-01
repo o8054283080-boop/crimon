@@ -54,7 +54,7 @@ function input(type: string, placeholder: string, autocomplete?: string): HTMLIn
   node.type = type;
   node.placeholder = placeholder;
   node.className = "cloud-recovery__input";
-  if (autocomplete) node.autocomplete = autocomplete;
+  if (autocomplete) node.setAttribute("autocomplete", autocomplete);
   return node;
 }
 
@@ -98,19 +98,17 @@ async function syncNow(showUnchanged = false): Promise<void> {
 }
 
 function showRecoveryKey(panel: HTMLElement, recoveryId: string, recoveryKey: string) {
-  const existing = panel.querySelector(".cloud-recovery__key-box");
-  existing?.remove();
+  panel.querySelector(".cloud-recovery__key-box")?.remove();
   const box = document.createElement("div");
   box.className = "cloud-recovery__key-box";
   box.innerHTML = `<strong>登録完了：復旧キーを必ず控えてください</strong><p>復旧ID：<code></code></p><p>復旧キー：<code></code></p><small>このキーはパスワードを忘れた時の最後の手段です。スクリーンショット等で安全な場所へ保存してください。</small>`;
   const codes = box.querySelectorAll("code");
   codes[0].textContent = recoveryId;
   codes[1].textContent = recoveryKey;
-  const copy = button("復旧情報をコピー", "btn btn--ghost", async () => {
+  box.append(button("復旧情報をコピー", "btn btn--ghost", async () => {
     await navigator.clipboard?.writeText(`CRIMON 復旧ID: ${recoveryId}\n復旧キー: ${recoveryKey}`);
     setStatus("復旧情報をコピーしました。", "ok");
-  });
-  box.append(copy);
+  }));
   panel.append(box);
 }
 
