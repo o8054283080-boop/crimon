@@ -75,6 +75,31 @@
   min-width: 0;
 }
 
+/*
+ * モンスターの装備変更中だけ、札の下に「その場で強化」を置く。
+ * 札本体を押す操作は装着なので、強化ボタンを兄弟要素に分離して誤装着を防ぐ。
+ */
+.equipment-screen .equip-picker-card__enhance {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 4px;
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.equipment-screen .equip-picker-card__enhance-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 430px) {
   .equipment-screen .equip-card__head {
     gap: 5px;
@@ -84,5 +109,11 @@
   .equipment-screen .equip-card__sigil {
     width: 28px;
     height: 28px;
+  }
+
+  .equipment-screen .equip-picker-card__enhance {
+    min-height: 36px;
+    padding-inline: 6px;
+    font-size: 0.68rem;
   }
 }
