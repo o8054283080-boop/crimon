@@ -42,6 +42,17 @@ export interface Compensation {
  */
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-01-stage-late-monster-japanese-names",
+    title: "9/1 ステージ敵名の表示修正",
+    message: "第5章以降のステージ詳細にある「出現する敵」で、追加モンスターの名前が mushroon・kobold など内部IDの英字で表示されていた不具合を修正しました。マッシュルン・コボルトなど正式な日本語名と本来のアイコンで表示されます。",
+    kind: "UPDATE",
+    fromDate: "2026-09-01",
+    toDate: "9999-12-31",
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
+  {
     id: "2026-09-01-stage-wave-auto-advance",
     title: "9/1 ステージ進行テンポ改善",
     message: "通常ステージでウェーブ勝利後に表示していた「次のウェーブへ」ボタンをなくし、勝利表示のあと次のウェーブへ自動で進むようにしました。最終ウェーブ後の報酬受け取りや、敗北時のステージ終了はこれまで通りです。",

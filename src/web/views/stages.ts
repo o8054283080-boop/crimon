@@ -3,6 +3,7 @@ import { SET_LABEL } from "../../core/equipment.js";
 import { STAGE_STAMINA_COST } from "../../core/fighterLevel.js";
 import { DIFFICULTIES, Difficulty, DIFFICULTY_JA, STAGES, Stage, Wave, WaveEnemy } from "../../data/stages.js";
 import { MONSTER_TEMPLATES } from "../../data/monsters.js";
+import { NEW_MONSTER_TEMPLATES } from "../../data/newMonsters/index.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAutoFarmPanel } from "./autoFarmPanel.js";
@@ -62,8 +63,10 @@ function chapterLook(chapter: number): ChapterLook {
   return CHAPTER_LOOKS[chapter] ?? FALLBACK_LOOK;
 }
 
+const STAGE_MONSTER_TEMPLATES = [...MONSTER_TEMPLATES, ...NEW_MONSTER_TEMPLATES];
+
 function template(templateId: string) {
-  return MONSTER_TEMPLATES.find((t) => t.templateId === templateId);
+  return STAGE_MONSTER_TEMPLATES.find((t) => t.templateId === templateId);
 }
 
 function speciesLabel(templateId: string): string {
