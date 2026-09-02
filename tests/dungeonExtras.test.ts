@@ -105,7 +105,7 @@ describe("装備ダンジョンのボーナスドロップ", () => {
   });
 });
 
-describe("装備ダンジョンのドロップは渋め(高難易度の割に高星装備は出にくい)", () => {
+describe("装備ダンジョンの高レア排出方針", () => {
   it("星6は7〜10階でしか出現せず、10階でも半分未満の出現率にとどまる", () => {
     for (let floor = 1; floor <= 6; floor++) {
       const stars = DUNGEON_FLOOR_STAR_WEIGHTS[floor].map((w) => w.value);
@@ -117,11 +117,10 @@ describe("装備ダンジョンのドロップは渋め(高難易度の割に高
     expect(star6Percent).toBeLessThan(50);
   });
 
-  it("1階は星1の出現率が過半数を占めるくらい渋い(1階の攻略難易度が下がった分、もらえる装備の質は低め)", () => {
-    const weights = DUNGEON_FLOOR_STAR_WEIGHTS[1];
-    const total = weights.reduce((sum, w) => sum + w.weight, 0);
-    const star1Percent = (weights.find((w) => w.value === 1)!.weight / total) * 100;
-    expect(star1Percent).toBeGreaterThan(50);
+  it("1階でも星1は出現せず、星2以上が確定する", () => {
+    const stars = DUNGEON_FLOOR_STAR_WEIGHTS[1].map((w) => w.value);
+    expect(stars).not.toContain(1);
+    expect(Math.min(...stars)).toBe(2);
   });
 });
 

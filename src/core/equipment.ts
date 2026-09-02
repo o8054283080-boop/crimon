@@ -582,74 +582,63 @@ export function generateThemedStageEquipment(set: SetType, rng: () => number = M
 
 /**
  * 装備ダンジョン(1〜10階)向けの階層別・星ドロップ率テーブル。
- * 1〜3階は星4まで、4〜6階は星5まで、7〜10階は星6までが出現し、
+ * 1〜3階は星2〜4、4〜6階は星3〜5、7〜9階は星4〜6、10階は星5〜6が出現し、
  * 階層が上がるほどそのグループ内で最高レアリティの出現率が上がっていく。
  * 各階の重みの合計は100になっているため、weightそのものをドロップ%として扱える。
  *
- * 1階の攻略難易度自体は「星3モンスター+星1装備」くらいまで下げてあるため、
- * 誰でも足を踏み入れやすい代わりに、もらえる装備の質はかなり渋め(特に序盤の階層ほど
- * 低い星に大きく偏る)にしてあり、良い装備を狙うにはより深い階層への挑戦が必要になる。
+ * 各グループの最低レアリティを除外した分は、残った星へ従来の比率に沿って再配分している。
+ * 7〜10階の星6率だけは従来値(5% / 9% / 15% / 32%)を固定し、除外分を星6へ回さない。
  */
 export const DUNGEON_FLOOR_COUNT = 10;
 
 export const DUNGEON_FLOOR_STAR_WEIGHTS: Record<number, WeightedOption<EquipStar>[]> = {
   1: [
-    { value: 1, weight: 65 },
-    { value: 2, weight: 26 },
-    { value: 3, weight: 8 },
-    { value: 4, weight: 1 },
+    { value: 2, weight: 74 },
+    { value: 3, weight: 23 },
+    { value: 4, weight: 3 },
   ],
   2: [
-    { value: 1, weight: 50 },
-    { value: 2, weight: 31 },
-    { value: 3, weight: 15 },
-    { value: 4, weight: 4 },
-  ],
-  3: [
-    { value: 1, weight: 35 },
-    { value: 2, weight: 33 },
-    { value: 3, weight: 24 },
+    { value: 2, weight: 62 },
+    { value: 3, weight: 30 },
     { value: 4, weight: 8 },
   ],
+  3: [
+    { value: 2, weight: 51 },
+    { value: 3, weight: 37 },
+    { value: 4, weight: 12 },
+  ],
   4: [
-    { value: 2, weight: 45 },
-    { value: 3, weight: 32 },
-    { value: 4, weight: 18 },
-    { value: 5, weight: 5 },
+    { value: 3, weight: 58 },
+    { value: 4, weight: 33 },
+    { value: 5, weight: 9 },
   ],
   5: [
-    { value: 2, weight: 32 },
-    { value: 3, weight: 32 },
-    { value: 4, weight: 26 },
-    { value: 5, weight: 10 },
+    { value: 3, weight: 47 },
+    { value: 4, weight: 38 },
+    { value: 5, weight: 15 },
   ],
   6: [
-    { value: 2, weight: 15 },
-    { value: 3, weight: 28 },
-    { value: 4, weight: 37 },
-    { value: 5, weight: 20 },
+    { value: 3, weight: 33 },
+    { value: 4, weight: 44 },
+    { value: 5, weight: 23 },
   ],
   7: [
-    { value: 3, weight: 32 },
-    { value: 4, weight: 33 },
-    { value: 5, weight: 30 },
+    { value: 4, weight: 50 },
+    { value: 5, weight: 45 },
     { value: 6, weight: 5 },
   ],
   8: [
-    { value: 3, weight: 24 },
-    { value: 4, weight: 30 },
-    { value: 5, weight: 37 },
+    { value: 4, weight: 41 },
+    { value: 5, weight: 50 },
     { value: 6, weight: 9 },
   ],
   9: [
-    { value: 3, weight: 16 },
-    { value: 4, weight: 26 },
-    { value: 5, weight: 43 },
+    { value: 4, weight: 32 },
+    { value: 5, weight: 53 },
     { value: 6, weight: 15 },
   ],
   10: [
-    { value: 4, weight: 20 },
-    { value: 5, weight: 48 },
+    { value: 5, weight: 68 },
     { value: 6, weight: 32 },
   ],
 };
