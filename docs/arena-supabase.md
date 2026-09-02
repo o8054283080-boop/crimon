@@ -29,15 +29,82 @@ Supabase 固有の部分(JWT の発行、`auth.users` の実装、既定の
 
 ```
 supabase/
-  README.md                      適用手順(短い版)
-  migrations/20260902170000_arena_schema.sql      表・索引・制約
-  migrations/20260902170100_arena_rls.sql  RLS と権限
-  migrations/20260902172000_arena_rpc.sql  RPC(security definer)
+  README.md                                        適用手順(短い版)
+  migrations/20260902170000_arena_schema.sql       表・索引・制約
+  migrations/20260902170100_arena_rls.sql          RLS と権限
+  migrations/20260902171818_arena_catalog_*.sql    **生成物**。検分に使うゲーム定義
+  migrations/20260902172000_arena_rpc.sql          RPC(security definer)
+  migrations/20260902172100_arena_seed.sql         ACTIVE シーズン・棚・報酬額
+  migrations/20260902172200_arena_match_integrity.sql  検分と、勝敗のサーバ確定
+  functions/arena-settle/index.ts                  **勝敗を決める場所**
+src/net/arenaAuth.ts             匿名ログイン(GoTrue を素の fetch で)
 src/net/arenaSync.ts             クライアント層(素の fetch。SDKは足していない)
-tests/arenaSync.test.ts          通信せずに確かめるテスト(33件)
+tools/exportArenaCatalog.mts     ゲーム定義 → 照合用SQL の書き出し
+tests/arenaAuth.test.ts          匿名ログインのテスト(16件)
+tests/arenaSync.test.ts          通信せずに確かめるテスト(36件)
+tests/arenaCatalog.test.ts       照合表の抜けと上限のテスト(10件)
+tests/arenaSecurity.test.ts      守りが書かれているかのテスト(19件)
+tests/arenaConfigParity.test.ts  サーバとクライアントの値の一致(13件)
 ```
 
-`package.json` は触っていない。`@supabase/supabase-js` は入れていない。
+`@supabase/supabase-js` は入れていない。`package.json` に足したのは
+`build:edge`(Edge Function 向けの組み立て)と `arena:catalog`(照合表の書き出し)の
+2つのスクリプトだけ。
+
+### 適用の順番
+
+migration はファイル名の順に流す。**照合表がRPCより先**であること。
+RPC は `arena_catalog_*` を読むので、順番が逆だと存在しない表を指す。
+
+### Edge Function を配る
+
+```
+npm run build:edge                        # 共有コードを supabase/functions/_shared/ へ
+supabase functions deploy arena-settle
+```
+
+`_shared/` は生成物なので `.gitignore` に入れてある。**焼き付けると必ず古くなる。**
+
+---
+
+## 1.5 勝敗はどこで決まるか
+
+**クライアントは勝敗を送らない。送る欄が無い。**
+
+```
+  クライアント                    Postgres                 Edge Function
+  ─────────────────────────────────────────────────────────────────────
+  arena_begin_match  ────────▶  挑戦券を1枚引く
+                                対戦IDと nonce を作る
+                                乱数の種を作る(サーバが決める)
+                                相手の編成を控える
+                     ◀────────  { matchId, nonce, battleSeed, ... }
+
+  その種で戦闘を再生
+  (見せるためだけ)
+
+  arena-settle       ──────────────────────────────────▶  同じ種・同じ編成で
+  { matchId, nonce }                                      戦闘を回し直す
+                                                          ↓
+                                arena_settle_match  ◀──── 出た勝敗で精算
+                                (service_role 限定)
+                     ◀────────  { won, rating, coins, ... }
+```
+
+戦闘エンジンは種を渡せば完全に決定的なので、**画面で見た決着とサーバの
+判定が食い違うことはない**(同じ入力から同じ結果しか出ない)。
+
+`arena_report_match`(勝敗の自己申告)は残してあるが、
+誰にも `execute` を許していない。呼べば `SELF_REPORT_DISABLED` が返る。
+消さないのは、古いクライアントが「関数が無い」で静かに失敗すると
+原因が追えなくなるため。
+
+### 残っている限界
+
+攻撃編成の**所有**までは確かめられない。手持ちをサーバへ同期していないので、
+「作れるはずの編成」であることまでしか見られない。検分は通るが実際には
+持っていない編成で挑むことは、いまの作りでは止まらない。
+止めるには手持ちの同期が要る。
 
 ---
 

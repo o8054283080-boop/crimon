@@ -138,7 +138,7 @@ describe("鍵が無い時", () => {
     await expect(fetchArenaState()).resolves.toBeNull();
     await expect(claimArenaWeeklyReward()).resolves.toBeNull();
     await expect(claimArenaSeasonReward("S1")).resolves.toBeNull();
-    await expect(purchaseArenaShopItem("rune_pack")).resolves.toBeNull();
+    await expect(purchaseArenaShopItem("summon_scroll")).resolves.toBeNull();
 
     // **1回も外に出ない。** 未接続で叩きに行くと、鍵の無い人の端末で
     // 毎回タイムアウトを待つことになる
@@ -155,7 +155,7 @@ describe("通信が失敗した時", () => {
     await expect(beginArenaMatch({ kind: "PLAYER", attackerSnapshot: snapshot(), opponentId: "u2" })).resolves.toBeNull();
     await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(claimArenaWeeklyReward()).resolves.toBeNull();
-    await expect(purchaseArenaShopItem("rune_pack")).resolves.toBeNull();
+    await expect(purchaseArenaShopItem("summon_scroll")).resolves.toBeNull();
   });
 
   it("HTTPが失敗した時も既定値", async () => {
@@ -361,7 +361,7 @@ describe("サーバの答えの読み取り", () => {
     await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
     await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
-    await expect(purchaseArenaShopItem("rune_pack")).resolves.toBeNull();
+    await expect(purchaseArenaShopItem("summon_scroll")).resolves.toBeNull();
   });
 
   it("二重受取の返事はそのまま伝える", async () => {

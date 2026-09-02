@@ -51,6 +51,18 @@ jobs:
       - name: モンスターのデータ検診
         run: npx tsx tools/monsterDoctor.mts
 
+      # サーバ側の検分に使う定義表は、ゲームのデータから生成している。
+      # **データを触って生成し直すのを忘れると、検分が古い定義で動く。**
+      # 図鑑を1体足しただけで、その1体を使う人が防衛を登録できなくなる。
+      - name: アリーナの照合表が最新か
+        run: npm run arena:catalog -- --check
+
+      # Edge Function はクライアントと**同じ戦闘エンジン**を使う。
+      # 組み立てられないと、勝敗を決める場所が動かない。
+      # ここで落としておかないと、気づくのは本番へ配った後になる。
+      - name: Edge Function 向けの組み立て
+        run: npm run build:edge
+
   tour:
     name: 巡回(画面の崩れ)
     runs-on: ubuntu-latest
