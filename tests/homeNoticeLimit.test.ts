@@ -94,6 +94,7 @@ describe("ホームに出すお知らせを絞る", () => {
     // お知らせの枠と、いちばん新しい配布は必ず出ている
     expect(shown.some(({ compensation }) => !hasReward(compensation))).toBe(true);
     expect(shown.some(({ compensation }) => hasReward(compensation))).toBe(true);
+    expect(shown.some(({ compensation }) => compensation.id === "2026-09-02-stage-5-8-rebalance")).toBe(true);
   });
 
   it("畳んだ件数はホームに1行で出す(消えたように見せない)", () => {
