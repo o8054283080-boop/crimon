@@ -279,46 +279,62 @@ VITE_SUPABASE_ANON_KEY=<anon key>
 `auth.uid()` と3つのロールのスタブを作って確かめた。**
 Supabase の既定権限を模すため、`alter default privileges ... grant all on
 tables to anon, authenticated, service_role` も入れてある
-(0002 の `revoke` が効いているかを見るため)。
+(RLSの `revoke` が効いているかを見るため)。
 
 確かめたこと:
 
-- 3つの migration が**この順で通る**。空のDBに何度流しても同じ結果になる
+- migration が**この順で通る**。空のDBに何度流しても同じ結果になる
 - `authenticated` から次がすべて `permission denied` になる:
   `arena_standings` の update / `arena_wallets` の update /
   `arena_reward_claims` の insert / `arena_config` の select /
-  他人の `arena_defenses` の update / 内部関数4つの execute /
+  他人の `arena_defenses` の update / 内部関数の execute /
   `arena_close_season` の execute
 - 他人の財布が見えない(自分の1行だけ)
 - 表示名は自分で直せる。他人の行は0行更新
-- `arena_report_match`:同格の勝ちで +15、相手は -5(防衛は半分)
-- NPC のレートに 99999 を申告しても、**自分の +300 に丸められた**
-  (ratingDelta は +25 で頭打ち、コインも NPC 係数がかかる)
 - 週間報酬:1回目 ok、**2回目は `ALREADY_CLAIMED`**
 - ショップ:週の上限超過で `OVER_WEEKLY_LIMIT`、1回の個数超過で `OVER_ORDER_LIMIT`
 - 対戦履歴が**攻撃側からも防衛側からも1行として引ける**
 - 防衛スナップショット:`version` が文字列、`units` が空 → 例外で弾かれる
 - `anon` は**ランキングだけ読めて**、対戦候補・防衛・財布・履歴は `permission denied`
 - シーズン締め:順位が焼かれ、次シーズンへレートがソフトリセットで持ち越された
-  (1040 → 1020、995 → 997)
 - **レート式が `src/data/arena/rating.ts` と 924 通りすべて一致**
   (レート800〜2600 × レート差 -600〜+600 × 勝敗)
 - **ランク判定が `src/data/arena/ranks.ts` と 429 通りすべて一致**(0〜3000)
 
-`tests/arenaSync.test.ts`(33件)はクライアント層を**通信せずに**確かめる。
-とくに次の1件は回帰よけとして残してある:
+**ここまでは、勝敗の確定をサーバへ移す前に確かめたもの。**
+移した後の `arena_begin_match` / `arena_settle_match` /
+`arena__validate_snapshot` は、**手元のDBでは流し直していない。**
+確かめてあるのは、SQLの本文が守りを書いていること
+(`tests/arenaSecurity.test.ts` 21件)と、TS側で戦闘が決定的であること
+(`tests/arenaMatchIntegrity.test.ts` 12件)まで。
 
-> `reportArenaMatch` が送る本文の鍵は
-> `p_opponent_kind / p_won / p_opponent_id / p_opponent_seed /
-> p_opponent_name / p_opponent_rating` の6つだけで、
-> **`delta` も `coin` も含まれない。**
+### 通信せずに確かめているもの
+
+| テスト | 件数 | 見ているもの |
+|---|---|---|
+| `arenaAuth` | 16 | 匿名ログイン。**起動のたびに別人にならない**こと |
+| `arenaSync` | 36 | 通信層。**勝敗を送る欄が無い**こと |
+| `arenaCatalog` | 10 | 照合表の抜けと、上限が本物の装備を弾かないこと |
+| `arenaSecurity` | 21 | 誰が何を呼べるか。鍵がフロントに無いこと |
+| `arenaConfigParity` | 13 | サーバとクライアントの値の一致 |
+| `arenaMatchIntegrity` | 12 | 画面とサーバが**同じ戦い**を戦うこと |
+
+とくに次の2件は回帰よけとして残してある:
+
+> `arena_begin_match` へ送る本文の鍵は
+> `p_opponent_kind / p_attacker_snapshot / p_opponent_id /
+> p_opponent_seed / p_opponent_index / p_opponent_count / p_opponent_name`
+> だけで、**`won` も `delta` も `coin` も `rating` も含まれない。**
+
+> 同じ種で3回まわして、経過(ログの行数)まで完全に一致する。
+> 種を変えると結果が変わる——**つまり種が効いている。**
 
 ---
 
 ## 7. 適用したら最初に試すこと
 
-migration を流し、シーズンを1つ開けたうえで、**自分のアカウントで**
-次を SQL エディタから実行して、想定どおり弾かれることを確かめてほしい。
+migration を流したうえで、**自分のアカウントで**次を SQL エディタから
+実行して、想定どおり弾かれることを確かめてほしい。
 (SQL エディタは所有者権限なので、`set local role authenticated` で降りる)
 
 ```sql
@@ -326,35 +342,66 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '<自分のuser_id>', true);
 
--- どれも permission denied になるはず
+-- どれも permission denied / 例外 になるはず
 update public.arena_standings set rating = 9999 where user_id = auth.uid();
 update public.arena_wallets    set coins  = 999999 where user_id = auth.uid();
 select * from public.arena_config;
+select public.arena_settle_match('00000000-0000-0000-0000-000000000000'::uuid, true);
+select public.arena_report_match('NPC', true);
+rollback;
+```
+
+最後の2つが**通ってしまったら、勝敗を自己申告できる状態**なので、
+そこで止めてほしい。
+
+検分が効いているかは、わざと壊した編成で見る:
+
+```sql
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '<自分のuser_id>', true);
+
+-- ABILITY_POINTS_OVER_BUDGET で弾かれるはず(星3に能力ポイント100)
+select public.arena_set_defense('{
+  "version":1,"capturedAt":0,
+  "units":[{"instance":{"id":"x","dexId":"slime_FIRE","star":3,"level":30,
+    "exp":0,"equipment":{},"skillLevels":[1,1,1],
+    "development":{"schemaVersion":1,"type":null,
+      "abilityPoints":{"hp":100,"atk":0,"def":0,"spd":0},
+      "latentAbilityId":null,"latentReselectPending":false}},
+    "equipment":[]}]}'::jsonb);
 rollback;
 ```
 
 `permission denied` 以外が返ったら、**Supabase の既定権限がスタブと違う。**
-その場合は 0002 の `revoke` に足りない行がある(まずそこを疑う)。
+その場合はRLSの `revoke` に足りない行がある(まずそこを疑う)。
 
 ---
 
 ## 8. 依頼主がやる必要のあること
 
 1. **migration を流す**(`supabase/README.md` の手順)
-2. **シーズンを1つ ACTIVE にする。** 無いと対戦もランキングも空のまま
-3. **ショップの商品を入れる。** 価格・在庫・上限はDBが唯一の出どころ
-4. **上の「7.」の確認を実際に走らせる**
-5. **Supabase Auth を入れる。** ここがいちばん大きい。
-   いまアプリは Auth を使っておらず(復旧ID + セッショントークン)、
-   `auth.uid()` が null のままでは**書き込み系のRPCが全部弾かれる**。
-   匿名サインインを入れて、取れたトークンを
-   `setArenaSyncAccessToken(token)` に渡すのが最短。
-   既存の復旧IDとの紐づけをどうするかは、まだ決めていない
-6. `.env`(または配信先の環境変数)に `VITE_SUPABASE_URL` /
+2. **Authentication → Providers で Anonymous sign-ins を有効にする。**
+   これが無いと `auth.uid()` が生えず、書き込み系のRPCが全部弾かれる
+3. **Edge Function を配る。** `npm run build:edge` →
+   `supabase functions deploy arena-settle`。
+   **配らないとオンラインの対戦が1つも精算されない**
+4. `.env`(または配信先の環境変数)に `VITE_SUPABASE_URL` /
    `VITE_SUPABASE_ANON_KEY` を置く。**`service_role` は置かない**
-7. `src/data/arena/rating.ts` の数字を変えたら、
-   `public.arena_config` の `rating` も同じ値に直す。
-   `src/data/arena/ranks.ts` に行を足したら `public.arena_tiers` にも足す。
-   **片方だけ触ると、画面の予告と実際の増減がずれる**
-8. シーズンを締める運用(`arena_close_season`)を、Edge Function か
+5. **上の「7.」の確認を実際に走らせる**
+6. シーズンを締める運用(`arena_close_season`)を、Edge Function か
    スケジュール実行のどちらに載せるか決める。`service_role` が要る
+
+シーズンも棚も報酬額も seed に入っているので、**手で入れる作業は無い。**
+値を変えたい時は `src/data/arena/` を直して、
+`tests/arenaConfigParity.test.ts` が通ることを確かめてから
+SQL 側も直す(片方だけ触ると、繋いだ瞬間に数字が飛ぶ)。
+
+モンスターや装備の定義を触った時は、**照合表を作り直す**:
+
+```
+npm run arena:catalog
+```
+
+忘れると、足したモンスターを使う人だけが防衛を登録できなくなる
+(CI の「アリーナの照合表が最新か」がこれを見張っている)。
