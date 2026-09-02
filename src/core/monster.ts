@@ -37,6 +37,14 @@ export interface MonsterTemplate {
   /** ボス固有の性質(反撃・継続ダメージ耐性)。実体化した定義へそのまま渡る */
   bossTraits?: BossTraits;
   /**
+   * 図鑑に出す説明。**戦い方ではなく「何のために居るのか」を書く。**
+   *
+   * 素材専用のモンスターは、スキルとステータスを見ても用途が分からない。
+   * 「ぷいぷい(攻撃力0.3倍)」を読んでも、それが**戦うための数字ではない**ことは
+   * どこにも書いていなかった。使い道と入手先はここで言う。
+   */
+  dexNote?: string;
+  /**
    * 属性ごとに、どの変種を使うかを明示する。添字は `skill2Variants` / `skill3Variants` のもの。
    *
    * **省略した属性は、今までどおり `pickSkillVariant` が決める。**
@@ -83,6 +91,8 @@ export interface MonsterDefinition {
   victoryTarget?: boolean;
   /** 支援AIが単体攻撃バフを優先する主要対象。 */
   primaryTarget?: boolean;
+  /** 図鑑に出す説明。テンプレートの `dexNote` がそのまま渡る */
+  dexNote?: string;
 }
 
 export interface BossTraits {
@@ -266,6 +276,7 @@ export function createMonsterVariant(template: MonsterTemplate, element: Element
     stats: flavoredStats,
     skills: [applyLegacySkillBalance(template.skill1), skill2, skill3],
     bossTraits: template.bossTraits,
+    dexNote: template.dexNote,
   };
 }
 
