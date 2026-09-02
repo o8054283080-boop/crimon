@@ -4,6 +4,7 @@ import { describeSkillLines } from "../../core/skill.js";
 import { formatExtraStatLines } from "../../core/stats.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX } from "../../data/monsters.js";
+import { DEX_SORT_KEYS, DEX_SORT_LABEL, DexSortKey, sortDexEntries } from "../../game/monsterDexSort.js";
 import { el } from "../dom.js";
 import { withPortrait } from "../three/portrait.js";
 import "../ui/monsterDex.css";
@@ -14,6 +15,8 @@ const LATENT_CATEGORY_LABEL = { OFFENSE: "攻勢", DISRUPT: "妨害", DURABILITY
 
 export interface MonsterDexProps {
   selectedDexId: string | null;
+  sortKey: DexSortKey;
+  onChangeSort: (key: DexSortKey) => void;
   onSelectEntry: (dexId: string | null) => void;
   onBack: () => void;
 }
@@ -32,13 +35,38 @@ function dexCard(dex: MonsterDefinition, index: number, onClick: () => void): HT
   return buildMonsterCard(dex, dex.id, onClick, { caption: `No.${String(index + 1).padStart(3, "0")} · ${dex.role}`, compact: true });
 }
 
+/**
+ * 並べ替えの帯。所持モンスターの一覧と同じ札の形にしてある
+ * (`renderMonsterSortRow`)。同じ操作は同じ見た目で置く。
+ */
+function renderDexSortRow(props: MonsterDexProps): HTMLElement {
+  return el("div", { className: "slot-filter-row sort-row monster-dex__sort" }, [
+    el("span", { className: "sort-row__label" }, ["並べ替え"]),
+    ...DEX_SORT_KEYS.map((key) =>
+      el("button", {
+        type: "button",
+        className: `slot-filter-chip${props.sortKey === key ? " slot-filter-chip--active" : ""}`,
+        onclick: () => props.onChangeSort(key),
+      }, [DEX_SORT_LABEL[key]]),
+    ),
+  ]);
+}
+
 function renderList(props: MonsterDexProps): HTMLElement {
-  const cards = ALL_DISPLAYABLE_MONSTERS_DEX.map((dex, index) => dexCard(dex, index, () => props.onSelectEntry(dex.id)));
+  /*
+   * **番号は並べ替えても動かさない。**
+   * 「No.007」はその種を指す名前なので、表示の順番で振り直すと、
+   * 図鑑を見ながら話が通じなくなる。番号は必ず元の並びから引く。
+   */
+  const numbers = new Map(ALL_DISPLAYABLE_MONSTERS_DEX.map((dex, index) => [dex.id, index]));
+  const entries = sortDexEntries(ALL_DISPLAYABLE_MONSTERS_DEX, props.sortKey);
+  const cards = entries.map((dex) => dexCard(dex, numbers.get(dex.id) ?? 0, () => props.onSelectEntry(dex.id)));
   return el("div", { className: "screen monster-dex monster-dex--list" }, [
     el("header", { className: "app-header monster-dex__header" }, [
       el("div", {}, [el("h1", {}, ["モンスター図鑑"]), el("p", { className: "app-subtitle" }, [`全${cards.length}体 · タップで能力を確認`])]),
       el("button", { type: "button", className: "btn btn--ghost monster-dex__back", onclick: props.onBack }, ["閉じる"]),
     ]),
+    renderDexSortRow(props),
     el("section", { className: "panel monster-dex__catalog" }, [el("div", { className: "monster-grid monster-dex__grid" }, cards)]),
   ]);
 }

@@ -1,9 +1,18 @@
 /* 図鑑だけの高密度レイアウト。他画面の .panel / button には漏らさない。 */
 .monster-dex { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
 .monster-dex__header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.monster-dex__header h1 { margin:0; font-size:1.3rem; }
-.monster-dex__header .app-subtitle { margin:2px 0 0; }
+/* 「モンスター / 図鑑」と語の途中で折れていた。見出しは1行で読ませる */
+.monster-dex__header h1 { margin:0; font-size:1.15rem; white-space:nowrap; }
+/* 「タップで能 / 力を確認」と折れて「閉じる」の下へ回り込んでいた */
+.monster-dex__header .app-subtitle { margin:2px 0 0; font-size:.68rem; white-space:nowrap; }
 .monster-dex__back { flex:0 0 auto; padding:7px 12px; }
+/*
+ * 並べ替えの帯。札の形は所持モンスターの一覧と同じ(`slot-filter-chip`)。
+ * 「属性」だけだと絞り込みと読めるので、何をする列なのかを頭に添える。
+ * 9px未満は実機で読めない(tests/cssReadability.test.ts が落とす)。
+ */
+.monster-dex__sort { align-items:center; }
+.monster-dex__sort .sort-row__label { flex:0 0 auto; margin-right:2px; color:var(--text-dim); font-size:.7rem; font-weight:800; }
 .monster-dex__catalog { padding:8px; }
 .monster-dex__grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
 .monster-dex__grid .mcard { min-width:0; }

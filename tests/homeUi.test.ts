@@ -12,8 +12,17 @@ describe("CRIMON world lobby", () => {
     expect(homeTowerSummary({ trialTowerBestFloor: 999, trialTowerRun: { floor: -8, members: [] } })).toEqual({ bestFloor: 100, floor: 1, progress: 100, isRunning: true });
   });
 
-  it("orders HUD, world, compact party, and beginner mission", () => {
-    const selectors = ["crimon-resource-header", "home-world", "current-party-panel", "tutorial,"];
+  it("身分証 → 編成 → 世界 → 初心者ミッション の順に積む", () => {
+    /*
+     * **編成は世界の枠より上。**
+     *
+     * 世界の枠は `min-height: 356px` で縮まない(縮めると左右の縦列が
+     * `overflow:hidden` に切り落とされ「試練の塔」が押せなくなる。実際に出した事故)。
+     * その結果、上に札や自動周回の帯が増えるたび**編成が画面の外へ押し出されて**
+     * いた。実測で 390x844 でも下端の外(944px地点)まで落ちている。
+     * 世界を縮めずに編成を必ず見せるには、順番を入れ替えるしかない。
+     */
+    const selectors = ["crimon-resource-header", "current-party-panel", "home-world", "tutorial,"];
     const positions = selectors.map((selector) => source.indexOf(selector));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));

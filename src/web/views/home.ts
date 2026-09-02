@@ -937,6 +937,24 @@ export function renderHome(props: HomeProps): HTMLElement {
        * 上から順に押し下げる並びなら、何も隠さない。
        */
       bannerStack,
+      /*
+       * 編成は**世界の枠より上**に置く。
+       *
+       * 世界の枠は `min-height: 356px` で縮まない(縮めると左右の縦列が
+       * `overflow:hidden` に切り落とされ、「試練の塔」が押せなくなる。
+       * 過去に出している事故なので、ここを縮める選択は取れない)。
+       * その結果、**上に何か増えるたび編成が画面の外へ押し出されていた。**
+       * 実測では札が出ている間はどの端末でも下端の外(390x844で944px地点)、
+       * 自動周回の帯が出ている時も同じ。
+       *
+       * 世界を縮めずに編成を必ず見せるには、順番を入れ替えるしかない。
+       * 上から「自分 → 手持ち → 行き先」と読める並びでもある。
+       */
+      el("section", { className: "current-party-panel" }, [
+        el("span", { className: "current-party-panel__title" }, [el("strong", {}, ["CURRENT PARTY"]), el("small", {}, [`総合戦力 ${totalPower.toLocaleString("ja-JP")}`])]),
+        el("div", { className: "current-party-panel__portraits" }, party.map((member) => homePartyCard(member, props.onGoParty, props.onViewPartyMonster))),
+        el("button", { type: "button", className: "current-party-panel__edit", "data-tour": "tile:party", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["編成", icon("chevron")]),
+      ]),
       el("section", { className: "home-world", ariaLabel: "CRIMON ワールドロビー" }, [
         el("div", { className: "world-atmosphere", "aria-hidden": "true" }, [
           el("span", { className: "world-atmosphere__moonbeam" }, []),
@@ -965,11 +983,6 @@ export function renderHome(props: HomeProps): HTMLElement {
           el("span", { className: "world-foreground__spire world-foreground__spire--left" }, []),
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
         ]),
-      ]),
-      el("section", { className: "current-party-panel" }, [
-        el("span", { className: "current-party-panel__title" }, [el("strong", {}, ["CURRENT PARTY"]), el("small", {}, [`総合戦力 ${totalPower.toLocaleString("ja-JP")}`])]),
-        el("div", { className: "current-party-panel__portraits" }, party.map((member) => homePartyCard(member, props.onGoParty, props.onViewPartyMonster))),
-        el("button", { type: "button", className: "current-party-panel__edit", "data-tour": "tile:party", onclick: props.onGoParty, ariaLabel: "パーティ編成" }, ["編成", icon("chevron")]),
       ]),
       tutorial,
       staminaSheet,

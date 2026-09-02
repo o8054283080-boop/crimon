@@ -115,6 +115,7 @@ import { renderHome } from "./views/home.js";
 import { TutorialDestination, canClaimTutorialMission, claimTutorialMission, nextTutorialMission, tutorialMissionProgress } from "../game/tutorialMissions.js";
 import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
+import { DexSortKey } from "../game/monsterDexSort.js";
 import { renderPvpArena } from "./views/pvpArena.js";
 import { renderHowToPlay } from "./views/howToPlay.js";
 import { ArenaTeamSlot } from "./views/pvpArena.js";
@@ -321,6 +322,8 @@ interface AppState {
   selectedGoldDungeonFloor: number | null;
   goldDungeonRun: GoldDungeonRunState | null;
   selectedDexEntryId: string | null;
+  /** 図鑑の並べ替え。66体を番号だけで並べると目当ての1体まで延々たどることになる */
+  dexSortKey: DexSortKey;
   /* --- アリーナ --- */
   /** 編成を編集中の枠。null なら対戦相手の一覧 */
   arenaEditing: ArenaTeamSlot | null;
@@ -397,6 +400,7 @@ const state: AppState = {
   selectedGoldDungeonFloor: null,
   goldDungeonRun: null,
   selectedDexEntryId: null,
+  dexSortKey: "number",
   arenaEditing: null,
   arenaRun: null,
   arenaNotice: null,
@@ -2547,6 +2551,11 @@ function render(): void {
     case "MONSTER_DEX":
       content = renderMonsterDex({
         selectedDexId: state.selectedDexEntryId,
+        sortKey: state.dexSortKey,
+        onChangeSort: (key) => {
+          state.dexSortKey = key;
+          render();
+        },
         onSelectEntry: (id) => {
           state.selectedDexEntryId = id;
           render();
