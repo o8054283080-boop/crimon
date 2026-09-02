@@ -36,11 +36,22 @@
   white-space: normal !important;
 }
 
+/*
+ * 本文は**2行で止める。**
+ *
+ * 全文を出していたので、この1本だけで4行(約110px)を占めていた。
+ * ホームは高さを分け合う縦並びなので、そのぶん世界の絵が縮む。
+ * 始めたばかりの人が最初に見る画面が、更新履歴の壁になっていた。
+ *
+ * 切った先が読めなくなるわけではない。ホーム左の「お知らせ」に全文がある。
+ */
 .crimon-home .reward-banner.compensation:not(:has(.reward-list)) .compensation__message {
-  display: block !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   margin: 1px 0 0 !important;
   max-width: 100% !important;
-  overflow: visible !important;
+  overflow: hidden !important;
   white-space: normal !important;
   overflow-wrap: anywhere !important;
   font-size: 11px !important;

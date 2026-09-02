@@ -137,6 +137,57 @@ export function compensationBannerLabel(claims: readonly CompensationClaim[]): s
   return kinds.has("CELEBRATION") ? "記念の配布" : "お詫びの配布";
 }
 
+/** 受け取ったモノがあるか。ダイヤ・ゴールド・召喚の書のどれか */
+export function hasReward(compensation: Compensation): boolean {
+  return compensation.crystal > 0 || compensation.gold > 0
+    || compensation.summonScrolls > 0 || (compensation.fourStarSummonScrolls ?? 0) > 0;
+}
+
+export interface HomeBannerSelection {
+  /** ホームに札として出すもの */
+  shown: CompensationClaim[];
+  /** 出さずに畳んだお知らせの件数 */
+  hiddenCount: number;
+}
+
+/** ホームに出す札の上限。ここを超えたら世界の絵とメニューが押し出される */
+export const HOME_BANNER_LIMIT = 3;
+
+/**
+ * ホームに出す札を選ぶ。
+ *
+ * **始めたばかりの人は、過去のアップデート履歴を全部まとめて受け取る。**
+ * 実機では11本の札がホームを埋め、世界の絵もメニューも下へ押し出されていた。
+ * 初めて開いた画面が更新履歴の壁になっていて、何をする場所なのか分からない。
+ *
+ * ただし**単純に1件へ絞ると、配布を見落とす。** 「ダイヤ1500と召喚の書30枚を
+ * 受け取った」は、読み飛ばされてよい情報ではない。そこで:
+ *
+ * - **モノの無いお知らせ**は、いちばん新しい1件ぶんの枠を必ず取る
+ * - 残りの枠は**モノを受け取ったもの**を新しい順に埋める
+ * - 合計は {@link HOME_BANNER_LIMIT} 本まで
+ *
+ * 上限を置くのは、**放っておくと必ず増えるから**。「全部出す」は今日は2本でも、
+ * 半年後には10本になる。同じ事故を二度出さないよう本数側で止める。
+ *
+ * 畳んだぶんは消えるわけではない。受け取りはすでに済んでいて、
+ * 中身はホーム左の「お知らせ」から全部読める。
+ */
+export function selectHomeBanners(claims: readonly CompensationClaim[]): HomeBannerSelection {
+  // 並び順は当てにしない。日付の新しい順に見て、先頭を「最新」とする
+  const byNewest = (a: CompensationClaim, b: CompensationClaim) =>
+    b.compensation.fromDate.localeCompare(a.compensation.fromDate);
+  const plain = claims.filter(({ compensation }) => !hasReward(compensation)).sort(byNewest);
+  const gifts = claims.filter(({ compensation }) => hasReward(compensation)).sort(byNewest);
+
+  const keep = new Set(plain.slice(0, 1).map(({ compensation }) => compensation.id));
+  for (const { compensation } of gifts.slice(0, HOME_BANNER_LIMIT - keep.size)) keep.add(compensation.id);
+
+  // 出す順は元の並びのまま。日付順に並べ替えると、見出しの位置が動いて読みにくい
+  const shown = claims.filter(({ compensation }) => keep.has(compensation.id));
+  return { shown, hiddenCount: claims.length - shown.length };
+}
+
 export function claimCompensations(state: PlayerState, now: Date = new Date()): CompensationClaim[] {
   const claims: CompensationClaim[] = [];
   for (const compensation of pendingCompensations(state, now)) {

@@ -141,7 +141,6 @@ import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/
 import { renderSummon } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
-import { createFloatingPanel } from "./floatingPanel.js";
 
 let appMounted = false;
 let pwaRegistration: ServiceWorkerRegistration | null = null;
@@ -1930,29 +1929,60 @@ function renderCurrentWaveBattle(): BattleViewHandle {
   });
 }
 
-function buildBackgroundFarmStatus(job: BackgroundFarmJob): HTMLElement {
-  const remaining = Math.max(0, job.requestedRuns - job.completedRuns);
-  const status = job.status === "RUNNING" ? "進行中" : job.status === "COMPLETED" ? "完了" : "終了";
-  return createFloatingPanel({
-    id: "background-farm",
-    label: "自動周回",
-    placement: "bottom",
-    forceCompact: BATTLE_SCREENS.has(state.screen),
-    compact: el("span", {}, [`🔁 ${job.targetName} ${job.completedRuns}/${job.requestedRuns}`]),
-    content: [el("div", { className: "background-farm-status", "data-background-farm-status": "true" }, [
-    el("button", { type: "button", className: "background-farm-status__summary", onclick: () => {
-      if (job.status !== "RUNNING") {
-        state.autoFarmResult = job.result; state.autoFarmTargetName = job.targetName; state.viewingBackgroundFarmJobId = job.id; state.screen = "AUTO_FARM_RESULT"; render();
-      }
-    } }, [`🔁 ${job.targetName}　${job.completedRuns} / ${job.requestedRuns}周　${status}`]),
-    el("span", { className: "background-farm-status__detail" }, [`残り${remaining}周 / ⚡${job.staminaSpent}消費 / EXP ${job.result.totalExp} / 🪙${job.result.totalGold} / 装備${job.result.equipmentDropCount}個`]),
-    job.status === "RUNNING" ? el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
-      finishBackgroundFarm(job, "STOPPED"); savePlayerState(state.player); refreshBackgroundFarmStatus();
-    } }, ["周回を終了"]) : el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
-      state.autoFarmResult = job.result; state.autoFarmTargetName = job.targetName; state.viewingBackgroundFarmJobId = job.id; state.screen = "AUTO_FARM_RESULT"; render();
-    } }, ["結果を見る"]),
-    ])],
-  });
+/**
+ * 自動周回の進捗。**浮かせない。画面の流れの中に置く。**
+ *
+ * ここはドラッグとドック(左端へ収納)まで持つ浮遊パネルだった。
+ * 実機ではホームの左に幅176pxで貼り付き、収納ボタンのぶん左を40px空けるので
+ * 文字の入る幅が130px弱しか残らない。`overflow-wrap:anywhere` と合わさって
+ * **「ステ / ージ / 3- / 5 0 / 5周 / 行中」と1〜3文字ずつ折り返していた**。
+ * 同時に「お知らせ」のボタンと世界の絵も覆っていた。
+ *
+ * 浮かせる限り、位置は画面の大きさと無関係な固定値になり、下の何かを必ず覆う。
+ * 共通の帯(`.tutorial-bar`)へ寄せる。横一列で、幅は画面いっぱい、
+ * 押す的は40px以上、はみ出したら巡回が拾う。
+ */
+function buildBackgroundFarmBar(job: BackgroundFarmJob): HTMLElement {
+  const running = job.status === "RUNNING";
+  const status = running ? "進行中" : job.status === "COMPLETED" ? "完了" : "終了";
+  const openResult = () => {
+    state.autoFarmResult = job.result;
+    state.autoFarmTargetName = job.targetName;
+    state.viewingBackgroundFarmJobId = job.id;
+    state.screen = "AUTO_FARM_RESULT";
+    render();
+  };
+  return el("section", {
+    className: `tutorial-bar tutorial-bar--farm${running ? "" : " tutorial-bar--farm-done"}`,
+    "data-background-farm-bar": "",
+    "aria-label": "自動周回の進捗",
+  }, [
+    el("div", { className: "tutorial-bar__badge" }, [
+      el("small", {}, ["周回"]),
+      el("strong", {}, [`${job.completedRuns}/${job.requestedRuns}`]),
+    ]),
+    el("div", { className: "tutorial-bar__text" }, [
+      el("div", { className: "tutorial-bar__title" }, [`🔁 ${job.targetName}　${status}`]),
+      /*
+       * 進んだ数は札(3/10)が持っているので、ここには**稼ぎだけ**を出す。
+       * 「残り7周」を並べると同じ話が二度出て、そのぶん稼ぎの数字が
+       * 末尾から切り落とされる(実機で「装備5」が「装…」になっていた)。
+       */
+      el("div", { className: "tutorial-bar__cond" }, [
+        el("span", {}, [
+          `⚡${job.staminaSpent} / EXP ${job.result.totalExp.toLocaleString("ja-JP")}`
+          + ` / 🪙${job.result.totalGold.toLocaleString("ja-JP")} / 装備${job.result.equipmentDropCount}`,
+        ]),
+      ]),
+    ]),
+    el("div", { className: "tutorial-bar__actions" }, [
+      running
+        ? el("button", { type: "button", className: "btn btn--ghost", onclick: () => {
+          finishBackgroundFarm(job, "STOPPED"); savePlayerState(state.player); refreshBackgroundFarmStatus();
+        } }, ["終了"])
+        : el("button", { type: "button", className: "btn btn--primary", onclick: openResult }, ["結果"]),
+    ]),
+  ]);
 }
 
 function goTutorialDestination(destination: TutorialDestination): void {
@@ -2014,20 +2044,38 @@ function buildTutorialBar(): HTMLElement | null {
   ]);
 }
 
-/** 画面の一番上へ差し込む。`.screen` を持たない画面(戦闘)へは入れない。 */
+/** 戦闘中は出さない。戦闘画面は自前の全画面配置なので、帯を差し込む場所が無い */
+function buildFarmBar(): HTMLElement | null {
+  if (BATTLE_SCREENS.has(state.screen)) return null;
+  const job = state.player.backgroundFarmJob;
+  return job ? buildBackgroundFarmBar(job) : null;
+}
+
+/**
+ * 案内と進捗の帯を、画面の一番上へ差し込む。
+ * `.screen` を持たない画面(戦闘)へは入れない。
+ *
+ * **ホームだけは差し込み先が違う。** ホームは `100dvh` を分け合う縦並びで、
+ * 一番外の `.crimon-home` の外へ足すと画面からはみ出す。世界の枠と同じ親へ入れて、
+ * 高さは `--home-farm-h` で申告する(申告しないと `.home-world` が黙って潰れ、
+ * 「試練の塔」が切り落とされて押せなくなる。過去に出している事故)。
+ */
 function mountTutorialBar(content: HTMLElement): void {
   const bar = buildTutorialBar();
   if (bar) content.prepend(bar);
+  const farm = buildFarmBar();
+  if (!farm) return;
+  const world = content.querySelector(".home-world");
+  if (world) world.before(farm); else content.prepend(farm);
 }
 
-/** 前景画面には触れず、バックグラウンド周回カードだけを差分更新する。 */
+/** 前景画面には触れず、周回の帯だけを差分更新する。 */
 function refreshBackgroundFarmStatus(): void {
-  const current = root.querySelector<HTMLElement>("[data-floating-panel=\"background-farm\"]");
-  const job = state.player.backgroundFarmJob;
-  if (job) {
-    const next = buildBackgroundFarmStatus(job);
+  const current = root.querySelector<HTMLElement>("[data-background-farm-bar]");
+  const next = buildFarmBar();
+  if (next) {
+    // まだ出ていない時は次の描画へ任せる。差し込み先を推測しない
     if (current) current.replaceWith(next);
-    else root.append(next);
   } else {
     current?.remove();
   }
@@ -2699,10 +2747,6 @@ function render(): void {
         }),
       }, [applying ? "更新中…" : "アップデート"]),
     ]));
-  }
-  const backgroundJob = state.player.backgroundFarmJob;
-  if (backgroundJob) {
-    root.append(buildBackgroundFarmStatus(backgroundJob));
   }
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
   /*

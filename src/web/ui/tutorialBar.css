@@ -1,8 +1,10 @@
 /*
- * 初心者ミッションの案内(画面の一番上に流し込む帯)。
+ * 案内と進捗の帯(画面の一番上に流し込む)。
+ * 初心者ミッションと、自動周回の進捗が同じ形を使う。
  *
- * 以前は浮遊パネルだった。浮いている限り下の何かを必ず覆うので、
- * モンスター画面の絞り込み・並べ替えが押せない状態でmainへ入っていた。
+ * 以前はどちらも浮遊パネルだった。浮いている限り下の何かを必ず覆うので、
+ * 初心者ミッションはモンスター画面の絞り込み・並べ替えを、
+ * 自動周回はホームの「お知らせ」ボタンと世界の絵を押せなくしていた。
  * ここは **position を持たない**。それがこの部品の要点。
  */
 
@@ -99,7 +101,46 @@
   white-space: nowrap;
 }
 
-/* 縦に細い端末では、条件文を畳んで札そのものを低くする */
+/*
+ * 自動周回。動いている最中は青、終わったら緑にする。
+ * 初心者ミッション(金)と並んでも、どちらの話か色で分かる。
+ */
+.tutorial-bar--farm {
+  border-left-color: #6aa8ff;
+  border-color: rgba(106, 168, 255, 0.4);
+  background: linear-gradient(90deg, rgba(20, 30, 48, 0.92), rgba(14, 17, 26, 0.92));
+}
+
+.tutorial-bar--farm .tutorial-bar__badge {
+  color: #9dc4ff;
+}
+
+.tutorial-bar--farm .tutorial-bar__badge strong {
+  color: #d8e9ff;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tutorial-bar--farm .tutorial-bar__title {
+  color: #d8e9ff;
+}
+
+.tutorial-bar--farm-done {
+  border-left-color: #76e39b;
+  border-color: rgba(118, 227, 155, 0.4);
+}
+
+.tutorial-bar--farm-done .tutorial-bar__title {
+  color: #9ff0bd;
+}
+
+/*
+ * 縦に細い端末では、条件文を畳んで札そのものを低くする。
+ *
+ * **周回の帯では畳まない。** ここに出ているのは進捗そのもの(消費⚡・EXP・
+ * ゴールド・装備の数)で、消すと帯が何も伝えなくなる。
+ * 代わりに文字を小さくして収める(9pxは下回らせない。巡回が落とす)。
+ */
 @media (max-width: 380px) {
   .tutorial-bar {
     gap: 8px;
@@ -108,5 +149,12 @@
 
   .tutorial-bar__cond > span:first-child {
     display: none;
+  }
+
+  .tutorial-bar--farm .tutorial-bar__cond > span:first-child {
+    display: block;
+    overflow: hidden;
+    font-size: 0.65rem;
+    text-overflow: ellipsis;
   }
 }

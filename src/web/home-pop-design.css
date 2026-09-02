@@ -125,7 +125,7 @@ body:has(.crimon-home) {
 /* 画像の明るい世界をHOMEの主役にする。上部は空、中央はモンスターの余白、
  * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。 */
 .home-world {
-  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 23px - var(--home-banner-h, 0px)) !important;
+  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
   min-height: 356px !important;
   margin: -1px 0 0 !important;
   border-inline: 0 !important;
@@ -356,7 +356,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 }
 
 @media (max-height: 860px) {
-  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 23px - var(--home-banner-h, 0px)) !important; }
+  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important; }
   .world-party { inset: 88px 80px 84px !important; }
   .world-party__figure { width: 104px !important; height: 148px !important; }
   .world-party__figure--1 { bottom: 6px !important; }

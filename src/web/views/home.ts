@@ -8,7 +8,7 @@ import {
   STAMINA_REFILL_PARTIAL_AMOUNT,
   STAMINA_REFILL_PARTIAL_COST,
 } from "../../game/playerState.js";
-import { CompensationClaim, compensationBannerLabel } from "../../game/compensation.js";
+import { CompensationClaim, compensationBannerLabel, selectHomeBanners } from "../../game/compensation.js";
 import { PERSIST_STATE_NOTE, PersistState } from "../../game/saveDurability.js";
 import { ELEMENT_JA, ELEMENT_MARK } from "../../core/element.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
@@ -191,8 +191,15 @@ function rewardSeal(name: IconName): HTMLElement {
  * 1件1本なら、増えても縦に伸びるだけで何も欠けない。
  */
 function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () => void): HTMLElement[] {
-  const label = compensationBannerLabel(claims);
-  return claims.map(({ compensation }, index) => {
+  /*
+   * **始めたばかりの人は、過去のアップデート履歴を全部まとめて受け取る。**
+   * 実機では11本の札がホームを埋め、世界の絵もメニューも下へ押し出されていた。
+   * 出すのは「モノを受け取ったもの」と「いちばん新しいお知らせ1件」だけ。
+   * 畳んだぶんは消えていない(ホーム左の「お知らせ」から全部読める)。
+   */
+  const { shown, hiddenCount } = selectHomeBanners(claims);
+  const label = compensationBannerLabel(shown);
+  const banners = shown.map(({ compensation }, index) => {
     const items: RewardLine[] = [];
     if (compensation.crystal > 0) items.push({ name: "crystal", amount: `+${compensation.crystal.toLocaleString("ja-JP")}`, unit: "ダイヤ" });
     if (compensation.gold > 0) items.push({ name: "coin", amount: `+${compensation.gold.toLocaleString("ja-JP")}`, unit: "ゴールド" });
@@ -212,6 +219,42 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
       el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
     ]);
   });
+  return banners;
+}
+
+/** 畳んだぶんの行。**「消えた」と読ませない**ので、受け取り済みだと明示する */
+function renderHiddenNoticeLine(claims: CompensationClaim[]): HTMLElement | null {
+  const { hiddenCount } = selectHomeBanners(claims);
+  if (hiddenCount === 0) return null;
+  return el("p", { className: "reward-banner-stack__rest" }, [
+    `ほかに${hiddenCount}件のお知らせがあります（配布は受け取り済み。左の「お知らせ」から読めます）`,
+  ]);
+}
+
+/**
+ * 札の高さを、世界の枠へ**実測で**申告する。
+ *
+ * ホームは `100dvh` を分け合う縦並びで、世界の枠の高さは
+ * `calc(100dvh - ... - var(--home-banner-h))` で決まる。ここが実際より小さいと
+ * 世界がその分はみ出し、`overflow:hidden` に切り落とされて
+ * **「試練の塔」「お知らせ」「遊び方」が押せなくなる。**
+ *
+ * これまでは札の枚数から `:has()` で52px刻みに当てていた。当たらない。
+ * アップデート告知は本文を出すので72px以上あり、文の長さでも変わる。
+ * 実際に測ったところ**申告188pxに対し本物は365px**で、右下の3つが消えていた。
+ *
+ * 枚数や中身が変わっても勝手に追従するよう、当てるのをやめて測る。
+ * (`:has()` の指定は残してあるが、こちらのインラインが必ず優先される。
+ *  ResizeObserver が無い環境での保険としてだけ効く)
+ */
+function declareBannerStackHeight(home: HTMLElement, stack: HTMLElement): void {
+  const apply = () => {
+    // 上の余白ぶん(4px)も込みで申告する
+    home.style.setProperty("--home-banner-h", `${Math.ceil(stack.getBoundingClientRect().height) + 4}px`);
+  };
+  if (typeof ResizeObserver === "undefined") { apply(); return; }
+  // observe した時点で1回発火するので、DOMへ入る前に測って0を書き込む必要は無い
+  new ResizeObserver(apply).observe(stack);
 }
 
 function renderLoginBonusBanner(result: LoginBonusResult, onDismiss: () => void): HTMLElement {
@@ -862,7 +905,10 @@ export function renderHome(props: HomeProps): HTMLElement {
   const banners = [
     ...renderCompensationBanners(props.compensationClaims, props.onDismissCompensation),
     props.loginBonusResult ? renderLoginBonusBanner(props.loginBonusResult, props.onDismissLoginBonus) : null,
+    // 畳んだ件数は札の一番下。札の途中に挟むと、下の札が別扱いに見える
+    renderHiddenNoticeLine(props.compensationClaims),
   ].filter((node): node is HTMLElement => node !== null);
+  const bannerStack = banners.length ? el("div", { className: "reward-banner-stack" }, banners) : null;
 
   /*
    * ロビーに立つ4体は**見せるだけ**。押せる的にはしない。
@@ -890,7 +936,7 @@ export function renderHome(props: HomeProps): HTMLElement {
        * 左右の縦列(ミッション・図鑑・冒険・ダンジョン・闘技場)も覆っていた。
        * 上から順に押し下げる並びなら、何も隠さない。
        */
-      banners.length ? el("div", { className: "reward-banner-stack" }, banners) : null,
+      bannerStack,
       el("section", { className: "home-world", ariaLabel: "CRIMON ワールドロビー" }, [
         el("div", { className: "world-atmosphere", "aria-hidden": "true" }, [
           el("span", { className: "world-atmosphere__moonbeam" }, []),
@@ -929,6 +975,7 @@ export function renderHome(props: HomeProps): HTMLElement {
       staminaSheet,
       settingsSheet,
     ].filter((node): node is HTMLElement => node !== null));
+  if (bannerStack) declareBannerStackHeight(menu, bannerStack);
   if (hasStarted) return el("div", { className: "screen home-screen home-screen--menu-only" }, [menu]);
 
   const homeScreen = el("div", { className: "screen home-screen" }, []);
