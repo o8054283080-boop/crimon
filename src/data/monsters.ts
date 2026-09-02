@@ -1781,6 +1781,7 @@ export const REINCARNATION_PIG: MonsterTemplate = {
   baseName: "転生ピッグ",
   emoji: "🐷",
   role: "素材",
+  dexNote: "ランクアップ(星を上げる)の素材にするためのモンスターです。星を1つ上げるには、上げたい星と同じ星の仲間を並べる必要があります。育てた仲間を差し出さずに済むよう、その頭数をこのピッグで埋められます。装備ダンジョン・通常ステージ・試練の塔の報酬で手に入り、装備ダンジョンは7階から上で星3が出ます。戦力にはなりません(ステータスは他のモンスターよりはるかに低く、スキルも属性で変わりません)。",
   baseStats: {
     hp: 200,
     atk: 15,
@@ -1832,6 +1833,7 @@ export const EXP_PIG: MonsterTemplate = {
   baseName: "経験ピッグ",
   emoji: "🐖",
   role: "素材",
+  dexNote: "モンスター強化(経験値を与える)の素材にするためのモンスターです。常にその星のレベル上限で手に入るので、星が高いほど渡せる経験値が大きくなります。レベル上げダンジョンで手に入り、上の階ほど星の高いものが出ます。戦力にはなりません(ステータスは他のモンスターよりはるかに低く、スキルも属性で変わりません)。",
   baseStats: {
     hp: 200,
     atk: 15,
@@ -1878,6 +1880,7 @@ export const SKILL_PIG: MonsterTemplate = {
   templateId: "skill_pig",
   baseName: "スキルピッグ",
   emoji: "🐽",
+  dexNote: "スキルレベルを上げるためのモンスターです。素材にするとスキルレベルだけが上がり、経験値は一切入りません。同じ種族の仲間を素材にしなくてもスキルを伸ばせるよう、どの種族にも使えます。試練の塔の報酬で手に入ります。戦力にはなりません(ステータスは他のモンスターよりはるかに低く、スキルも属性で変わりません)。",
   skill1: { ...EXP_PIG.skill1, id: "skill_pig_s1", name: "おうえん" },
 };
 
@@ -1920,8 +1923,46 @@ export const MONSTER_DEX = [
   ...ANCIENT_CRYSTAL_CURSE_DEX,
 ];
 
-/** モンスター図鑑UI表示用(転生ピッグは素材専用のため除外) */
+/**
+ * 戦力になるモンスターの全体。
+ *
+ * **潜在覚醒の候補はこの並びから生成される**(`latentAbilities.ts`)。
+ * 添字が候補のIDに効くので、**末尾に足す以外の並べ替えをしないこと。**
+ * 素材専用のピッグをここへ入れてはいけない——覚醒できない相手に
+ * 候補が3つ生えて、図鑑が嘘をつく。
+ */
 export const ALL_DISPLAYABLE_MONSTERS_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...NEW_MONSTERS_DEX];
+
+/** 素材専用のモンスター。戦力にはならないが、使い道が分からないままなので図鑑には載せる */
+export const MATERIAL_PIG_DEX = [...REINCARNATION_PIG_DEX, ...EXP_PIG_DEX, ...SKILL_PIG_DEX];
+
+/**
+ * 図鑑の画面に並べるもの。
+ *
+ * ピッグは長らく図鑑に出していなかった。素材専用で戦力にならないからだが、
+ * **手持ちには入るのに図鑑に無い**ので、何のために居るのかを確かめる場所が
+ * どこにも無かった(スキルの「ぷいぷい(0.3倍)」を読んでも分からない)。
+ * `dexNote` で用途と入手先を書いたうえで載せる。
+ *
+ * 覚醒候補の生成元(`ALL_DISPLAYABLE_MONSTERS_DEX`)とは分けてある。
+ */
+export const MONSTER_DEX_ENTRIES = [...ALL_DISPLAYABLE_MONSTERS_DEX, ...MATERIAL_PIG_DEX];
+
+/**
+ * 図鑑の「入手先」で使う分け方。
+ *
+ * `GACHA_EXCLUSIVE_DEX` から引くのではなく**テンプレートを名指しする。**
+ * 11種の新モンスターも召喚に出るが、ステージにも出るので「召喚限定」ではない。
+ * 集合の作り方を間違えると、画面の札が黙って嘘をつく。
+ */
+export const GACHA_ONLY_TEMPLATE_IDS: ReadonlySet<string> = new Set(
+  [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE]
+    .map((template) => template.templateId),
+);
+
+export const MATERIAL_TEMPLATE_IDS: ReadonlySet<string> = new Set(
+  [REINCARNATION_PIG, EXP_PIG, SKILL_PIG].map((template) => template.templateId),
+);
 
 export function findMonster(templateId: string, element: string) {
   return MONSTER_DEX.find((m) => m.templateId === templateId && m.element === element);

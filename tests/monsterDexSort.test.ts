@@ -94,7 +94,7 @@ describe("図鑑の並べ替え", () => {
      * 図鑑を見ながら話が通じなくなる。番号は必ず元の並びから引く。
      */
     const view = readFileSync(new URL("../src/web/views/monsterDex.ts", import.meta.url), "utf8");
-    expect(view).toContain("const numbers = new Map(ALL_DISPLAYABLE_MONSTERS_DEX.map((dex, index) => [dex.id, index]))");
+    expect(view).toContain("const numbers = new Map(MONSTER_DEX_ENTRIES.map((dex, index) => [dex.id, index]))");
     expect(view).toContain("numbers.get(dex.id)");
     // 並べ替えた配列の添字を番号に使っていない
     expect(view).not.toMatch(/entries\.map\(\(dex, index\) => dexCard\(dex, index/);
