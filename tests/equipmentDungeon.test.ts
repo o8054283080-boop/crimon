@@ -120,19 +120,31 @@ describe("装備ダンジョン フロアデータ", () => {
     }
   });
 
-  it("1〜3階は星4まで、4〜6階は星5まで、7〜10階は星6までしか出現しない", () => {
+  it("階層グループごとの最低レアリティ未満は出現しない", () => {
     for (let floor = 1; floor <= 3; floor++) {
       const stars = DUNGEON_FLOOR_STAR_WEIGHTS[floor].map((w) => w.value);
+      expect(Math.min(...stars)).toBe(2);
       expect(Math.max(...stars)).toBeLessThanOrEqual(4);
     }
     for (let floor = 4; floor <= 6; floor++) {
       const stars = DUNGEON_FLOOR_STAR_WEIGHTS[floor].map((w) => w.value);
+      expect(Math.min(...stars)).toBe(3);
       expect(Math.max(...stars)).toBeLessThanOrEqual(5);
       expect(Math.max(...stars)).toBe(5);
     }
-    for (let floor = 7; floor <= 10; floor++) {
+    for (let floor = 7; floor <= 9; floor++) {
       const stars = DUNGEON_FLOOR_STAR_WEIGHTS[floor].map((w) => w.value);
+      expect(Math.min(...stars)).toBe(4);
       expect(Math.max(...stars)).toBe(6);
+    }
+    expect(DUNGEON_FLOOR_STAR_WEIGHTS[10].map((w) => w.value)).toEqual([5, 6]);
+  });
+
+  it("7〜10階の星6確率は変更前の値を維持する", () => {
+    const expectedRates = { 7: 5, 8: 9, 9: 15, 10: 32 };
+    for (const [floor, expectedPercent] of Object.entries(expectedRates)) {
+      const rate = getDungeonFloorDropRates(Number(floor)).find((entry) => entry.star === 6);
+      expect(rate?.percent).toBe(expectedPercent);
     }
   });
 
