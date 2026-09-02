@@ -604,6 +604,21 @@ interface RouteState {
   createTargetId: string | null;
   createMenu: CreateMenu;
   partyEditMode: PartyEditMode;
+  /*
+   * アリーナは1つの画面の中でさらに6つに分かれる。**ここに入れ忘れていた。**
+   *
+   * 巡回をアリーナの中まで広げて分かった不具合が2つある。どちらもこれが原因:
+   *
+   *   1. 中の画面で「戻る」を押すと、アリーナのトップを飛ばしてホームまで戻る
+   *      (トップ→対戦候補で見ている場所が変わっていないことになり、履歴が積まれない)
+   *   2. ホームから入り直しても、前に開いた中の画面がそのまま出る
+   *      (`navigate` が畳んでいない)
+   *
+   * 画面の中で行き先が分かれるなら、その行き先も「見ている場所」の一部にする。
+   */
+  arenaView: ArenaViewName;
+  arenaDetailIndex: number | null;
+  arenaUnitIndex: number;
 }
 
 const ROUTE_FIELDS = [
@@ -612,6 +627,7 @@ const ROUTE_FIELDS = [
   "farmEquipmentDetailId", "selectedStageId", "selectedDifficulty", "selectedDungeonFloor",
   "selectedDexEntryId", "monsterTrainingTargetId", "selectedLevelDungeonTier",
   "selectedGoldDungeonFloor", "createTargetId", "createMenu", "partyEditMode",
+  "arenaView", "arenaDetailIndex", "arenaUnitIndex",
 ] as const satisfies readonly (keyof RouteState)[];
 
 function routeState(): RouteState {
@@ -698,6 +714,15 @@ function navigate(screen: ScreenName): void {
   state.monsterTrainingMaterialIds = [];
   state.autoFarmResult = null;
   state.viewingBackgroundFarmJobId = null;
+  /*
+   * アリーナは中で6画面に分かれる。**畳んでから入る。**
+   * 畳まないと、ホームから入り直しても前に開いた中の画面がそのまま出る
+   * (巡回をアリーナの中まで広げて見つかった)。
+   */
+  state.arenaView = "TOP";
+  state.arenaDetailIndex = null;
+  state.arenaUnitIndex = 0;
+  state.arenaNotice = null;
   // 旧式の戦闘画面連鎖だけを破棄する。保存型ジョブは別画面でも継続する。
   state.farmRun = null;
   // 塔の案内は次の画面へ持ち越さない。**登坂そのもの(trialTowerRun)は消さない**
