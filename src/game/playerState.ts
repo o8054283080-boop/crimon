@@ -7,6 +7,7 @@ import type { ArenaDefenseSnapshot, ArenaMatchRecord } from "./arena/types.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
 import { LEGACY_LEVEL_DUNGEON_TIERS, LEVEL_DUNGEON_DAILY_LIMIT } from "../data/levelDungeon.js";
 import { ARENA_START_POINTS, ARENA_TICKET_MAX } from "../data/pvpArena.js";
+import { ARENA_NOT_CLAIMED } from "../data/arena/season.js";
 
 /** アリーナの記録として残す件数。増やし続けると控えが太る */
 export const ARENA_HISTORY_MAX = 30;
@@ -149,9 +150,9 @@ export interface PlayerState {
   arenaMatchHistory: ArenaMatchRecord[];
   /** 直近で候補に出した相手。同じ顔ぶれが続かないようにする */
   arenaRecentOpponentIds: string[];
-  /** 週間報酬を受け取った週。二重受取はここで弾く(-1 = 未受取) */
+  /** 週間報酬を受け取った週。二重受取はここで弾く(`ARENA_NOT_CLAIMED` = 未受取) */
   arenaWeeklyClaimedWeek: number;
-  /** シーズン報酬を受け取ったシーズン番号(-1 = 未受取) */
+  /** シーズン報酬を受け取ったシーズン番号(`ARENA_NOT_CLAIMED` = 未受取) */
   arenaSeasonClaimedNumber: number;
   /** いま進行中のシーズン番号。ここが変わったらソフトリセットを掛ける */
   arenaSeasonNumber: number;
@@ -296,8 +297,8 @@ export function createInitialState(): PlayerState {
     arenaDefenseSnapshot: null,
     arenaMatchHistory: [],
     arenaRecentOpponentIds: [],
-    arenaWeeklyClaimedWeek: -1,
-    arenaSeasonClaimedNumber: -1,
+    arenaWeeklyClaimedWeek: ARENA_NOT_CLAIMED,
+    arenaSeasonClaimedNumber: ARENA_NOT_CLAIMED,
     arenaSeasonNumber: 0,
     arenaShopPurchases: [],
     arenaCosmetics: [],
@@ -474,8 +475,8 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (!Array.isArray(state.arenaMatchHistory)) state.arenaMatchHistory = [];
   if (state.arenaMatchHistory.length > ARENA_HISTORY_MAX) state.arenaMatchHistory.length = ARENA_HISTORY_MAX;
   if (!Array.isArray(state.arenaRecentOpponentIds)) state.arenaRecentOpponentIds = [];
-  if (typeof state.arenaWeeklyClaimedWeek !== "number") state.arenaWeeklyClaimedWeek = -1;
-  if (typeof state.arenaSeasonClaimedNumber !== "number") state.arenaSeasonClaimedNumber = -1;
+  if (typeof state.arenaWeeklyClaimedWeek !== "number") state.arenaWeeklyClaimedWeek = ARENA_NOT_CLAIMED;
+  if (typeof state.arenaSeasonClaimedNumber !== "number") state.arenaSeasonClaimedNumber = ARENA_NOT_CLAIMED;
   if (typeof state.arenaSeasonNumber !== "number") state.arenaSeasonNumber = 0;
   if (!Array.isArray(state.arenaShopPurchases)) state.arenaShopPurchases = [];
   if (!Array.isArray(state.arenaCosmetics)) state.arenaCosmetics = [];

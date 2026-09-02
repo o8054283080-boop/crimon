@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ARENA_TIERS, arenaNextTier, arenaTierForRating } from "../src/data/arena/ranks.js";
 import { ARENA_RATING_RULES, applyArenaDefenseRating, applyArenaRating, arenaRatingDelta } from "../src/data/arena/rating.js";
 import {
+  ARENA_NOT_CLAIMED,
+  ARENA_SEASON_EPOCH_UTC,
   ARENA_SEASON_WEEKS,
   arenaSeasonNumber,
   arenaSoftResetRating,
@@ -162,6 +164,23 @@ describe("シーズン", () => {
 });
 
 describe("報酬の二重受取", () => {
+  it("未受取の目印が、実在しうる週番号と衝突しない", () => {
+    /*
+     * **実際にこれで壊れた。** 目印に -1 を使っていたため、
+     * 週の通し番号が -1 になる時期に「受け取り済み」と判定され、
+     * 実機で「今週のランク報酬は受け取り済みです」と出た。
+     * シーズンの起点は必ず過去なので、週番号は0以上にしかならない。
+     */
+    expect(ARENA_NOT_CLAIMED).toBeLessThan(-1000);
+    expect(arenaWeekIndex(Date.now())).toBeGreaterThanOrEqual(0);
+    expect(arenaSeasonNumber(Date.now())).toBeGreaterThanOrEqual(1);
+  });
+
+  it("シーズンの起点は過去にある", () => {
+    // 未来にすると週番号が負になり、シーズンが0のまま進まない
+    expect(ARENA_SEASON_EPOCH_UTC).toBeLessThan(Date.now());
+  });
+
   it("週間報酬は同じ週に2回受け取れない", () => {
     const state = createInitialState();
     expect(canClaimArenaWeekly(state, SEASON1)).toBe(true);

@@ -65,7 +65,7 @@ import {
   arenaNpcBandForRating,
 } from "../../data/arena/npcConfig.js";
 import { ARENA_NPC_NAME_CLANS, ARENA_NPC_NAME_CORES, ARENA_NPC_NAME_DECORATIONS } from "../../data/arena/npcNames.js";
-import { ArenaNpcTeam, ArenaNpcTeamMember, arenaNpcTeamsForTiers } from "../../data/arena/npcTeams.js";
+import { ARENA_NPC_TEAMS, ArenaNpcTeam, ArenaNpcTeamMember, arenaNpcTeamsForTiers } from "../../data/arena/npcTeams.js";
 import { ARENA_SNAPSHOT_VERSION, ArenaDefenseSnapshot, ArenaOpponentEntry, ArenaUnitSnapshot } from "./types.js";
 
 /* ==========================================================================
@@ -314,14 +314,26 @@ function unitSeed(seed: number, index: number): number {
  * (`ARENA_NPC_RATING_OFFSETS`)。育ち具合は**乗せたあとのレート**の帯で決まるので、
  * 帯をまたいだ相手が並ぶこともある。それは実際のプレイヤーの一覧でも起きること。
  */
-export function buildArenaNpc(rating: number, seed: number, index: number): ArenaOpponentEntry {
+export function buildArenaNpc(
+  rating: number,
+  seed: number,
+  index: number,
+  /**
+   * すでに並んでいる編成。**同じ顔ぶれを続けて出さないため**に避ける。
+   * 候補を使い切ったら重複を許す——「同じ相手を避ける」ために枠が空くのは、
+   * 避けるより悪い(候補一覧の混ぜ方と同じ考え方)。
+   */
+  excludeTeamIds?: ReadonlySet<string>,
+): ArenaOpponentEntry {
   const rng = arenaNpcRng(unitSeed(seed, index));
   const offset = ARENA_NPC_RATING_OFFSETS[index % ARENA_NPC_RATING_OFFSETS.length];
   const jitter = Math.round((rng() * 2 - 1) * ARENA_NPC_RATING_JITTER);
   const opponentRating = Math.max(0, Math.round(rating + offset + jitter));
 
   const band = arenaNpcBandForRating(opponentRating);
-  const team = pick(arenaNpcTeamsForTiers(band.teamTiers), rng);
+  const pool = arenaNpcTeamsForTiers(band.teamTiers);
+  const fresh = excludeTeamIds ? pool.filter((entry) => !excludeTeamIds.has(entry.id)) : pool;
+  const team = pick(fresh.length > 0 ? fresh : pool, rng);
   const name = buildNpcName(rng);
   const id = `npc_${seed >>> 0}_${index}`;
 
@@ -352,5 +364,34 @@ export function buildArenaNpc(rating: number, seed: number, index: number): Aren
 
 /** NPCを並べる。種が同じなら必ず同じ顔ぶれになる */
 export function buildArenaNpcs(rating: number, seed: number, count = ARENA_NPC_DEFAULT_COUNT): ArenaOpponentEntry[] {
-  return Array.from({ length: count }, (_, index) => buildArenaNpc(rating, seed, index));
+  /*
+   * **編成が重ならないように配る。**
+   *
+   * 1人ずつ独立に抽選すると、候補が3つしかない帯では5人中3人が
+   * 同じ編成になる(実機でそうなった)。並んだ相手がどれも同じ顔ぶれだと、
+   * 「どれに挑むか」を選ぶ意味そのものが消える。
+   *
+   * すでに出した編成を避けながら順に配る。同じ種なら同じ結果になる
+   * (避ける集合も順番も決まっているので、決定性は崩れない)。
+   */
+  const used = new Set<string>();
+  const list: ArenaOpponentEntry[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const entry = buildArenaNpc(rating, seed, index, used);
+    const id = entry.archetypeName ? (teamIdByName(entry.archetypeName) ?? entry.archetypeName) : "";
+    /*
+     * **使い切ったら数え直す。** 避ける集合を持ち越したままだと、
+     * 候補が尽きた後は毎回同じ1つを引き続ける(実機で 石垣 が3回並んだ)。
+     * ここで空にすると2周目が始まり、同じ編成は多くても2回までになる。
+     */
+    if (id && used.has(id)) used.clear();
+    if (id) used.add(id);
+    list.push(entry);
+  }
+  return list;
+}
+
+/** 表示名から編成IDを引く。名前は編成ごとに一意(テストが見張っている) */
+function teamIdByName(name: string): string | null {
+  return ARENA_NPC_TEAMS.find((team) => team.name === name)?.id ?? null;
 }

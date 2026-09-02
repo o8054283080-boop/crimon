@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ARENA_NPC_TEAMS, ArenaTeamClaim } from "../src/data/arena/npcTeams.js";
+import { buildArenaNpcs } from "../src/game/arena/npc.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX, findMonsterById } from "../src/data/monsters.js";
 import { Skill, SkillEffect } from "../src/core/skill.js";
 
@@ -160,7 +161,35 @@ describe("NPCの編成テンプレート", () => {
     expect(normalOnly.length, "段3が高レアだけで埋まっている").toBeGreaterThan(0);
   });
 
-  it("編成IDが重複していない", () => {
+  it("編成IDも表示名も重複していない", () => {
+    // 表示名は並べる時の識別にも使う。重なると「同じ編成」と誤判定する
     expect(new Set(ARENA_NPC_TEAMS.map((t) => t.id)).size).toBe(ARENA_NPC_TEAMS.length);
+    expect(new Set(ARENA_NPC_TEAMS.map((t) => t.name)).size).toBe(ARENA_NPC_TEAMS.length);
+  });
+
+  it("並べた相手の編成が重ならない", () => {
+    /*
+     * **実機で5人中3人が同じ編成になった。** 1人ずつ独立に抽選していたため、
+     * 候補が3つしかない帯では衝突が普通に起きる。並んだ相手がどれも同じ
+     * 顔ぶれだと、「どれに挑むか」を選ぶ意味そのものが消える。
+     */
+    for (const rating of [900, 1000, 1350, 1650, 1950, 2250, 2600]) {
+      const npcs = buildArenaNpcs(rating, 12345, 5);
+      const names = npcs.map((entry) => entry.archetypeName ?? "");
+      const distinct = new Set(names).size;
+      expect(distinct, `レート${rating}: ${names.join(" / ")}`).toBeGreaterThanOrEqual(3);
+      // 同じ編成が3回以上並ばない。使い切ったら数え直すので2周目までで収まる
+      for (const name of new Set(names)) {
+        const times = names.filter((entry) => entry === name).length;
+        expect(times, `レート${rating}で「${name}」が${times}回: ${names.join(" / ")}`).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it("編成を配り直しても、同じ種なら同じ結果になる", () => {
+    // 描き直すたびに相手がすり替わると、「この相手に挑む」判断が成立しない
+    const a = buildArenaNpcs(1500, 999, 5).map((e) => `${e.name}/${e.archetypeName}/${e.rating}`);
+    const b = buildArenaNpcs(1500, 999, 5).map((e) => `${e.name}/${e.archetypeName}/${e.rating}`);
+    expect(b).toEqual(a);
   });
 });

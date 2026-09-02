@@ -3,6 +3,7 @@ import "./crimon-visual-system.css";
 import "./home-pop-design.css";
 import "./mobile-ux.css";
 import "./ui/tutorialBar.css";
+import "./ui/arena.css";
 import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
@@ -119,17 +120,27 @@ import { DexSortKey } from "../game/monsterDexSort.js";
 import { DexFilter, EMPTY_DEX_FILTER } from "../game/monsterDexFilter.js";
 import { renderPvpArena } from "./views/pvpArena.js";
 import { renderHowToPlay } from "./views/howToPlay.js";
-import { ArenaTeamSlot } from "./views/pvpArena.js";
+import type { ArenaViewName } from "./views/pvpArena.js";
+import { buildArenaEntryBattle } from "./views/arena/model.js";
+import { buildArenaNpcs } from "../game/arena/npc.js";
+import { buildArenaCandidates } from "../game/arena/matchmaking.js";
+import { captureArenaDefense } from "../game/arena/snapshot.js";
+import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, recordArenaMatch } from "../game/arena/match.js";
+import { applyArenaSeasonRollover, claimArenaWeeklyReward } from "../game/arena/progress.js";
+import { arenaShopRows, buyArenaShopItem } from "../game/arena/shop.js";
+import { ARENA_TICKET_MAX_V2 } from "../data/arena/shop.js";
+import { arenaTierForRating } from "../data/arena/ranks.js";
+import type { ArenaOpponentEntry } from "../game/arena/types.js";
+import { arenaSyncAvailable, fetchArenaOpponents, fetchArenaRanking, fetchArenaRankingAround, pushArenaDefense } from "../net/arenaSync.js";
+import type { ArenaRankingEntry } from "../net/arenaSync.js";
 import {
+  ARENA_TEAM_SIZE,
   advanceArenaOpponentSeed,
   applyArenaTicketRegen,
-  ArenaOpponent,
   ArenaPeriodSettlement,
-  generateArenaOpponents,
+  arenaNextTicketAt,
   getArenaTeam,
-  resolveArenaMatch,
   settleArenaPeriod,
-  setupArenaBattle,
   toggleArenaTeamMember,
   tryRefillArenaTickets,
   trySpendArenaTicket,
@@ -244,13 +255,7 @@ type LastRun =
   | { kind: "EQUIP_DUNGEON"; floor: DungeonFloor }
   | { kind: "LEVEL_DUNGEON"; def: LevelDungeonDef }
   | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor }
-  | { kind: "ARENA"; opponent: ArenaOpponent };
-
-/** 進行中のアリーナ1戦 */
-interface ArenaRun {
-  opponent: ArenaOpponent;
-  partyInstances: MonsterInstance[];
-}
+  | { kind: "ARENA"; entry: ArenaOpponentEntry };
 
 /**
  * 直前に登った階の決着。塔の画面はこれを見て「何が起きて戻ってきたか」を出す。
@@ -331,8 +336,24 @@ interface AppState {
   dexFilterOpen: boolean;
   /* --- アリーナ --- */
   /** 編成を編集中の枠。null なら対戦相手の一覧 */
-  arenaEditing: ArenaTeamSlot | null;
-  arenaRun: ArenaRun | null;
+  /** アリーナの中のどこを見ているか */
+  arenaView: ArenaViewName;
+  /** 詳細を開いている相手の並び位置。開いていなければ null */
+  arenaDetailIndex: number | null;
+  /** 検分している1体の位置 */
+  arenaUnitIndex: number;
+  /** 防衛に登録しようとしている顔ぶれ(まだ焼いていない) */
+  arenaDefenseDraftIds: string[];
+  /** いま並べている対戦候補。実プレイヤーとNPCが混ざる */
+  arenaCandidates: ArenaOpponentEntry[];
+  arenaCandidatesLoading: boolean;
+  arenaRankingTop: ArenaRankingEntry[];
+  arenaRankingAround: ArenaRankingEntry[];
+  arenaRankingLoading: boolean;
+  /** 自分の全国順位。未接続・未掲載なら null */
+  arenaMyRank: number | null;
+  /** いま挑んでいる相手。焼いた防衛からしか戦闘を組まない */
+  arenaEntry: ArenaOpponentEntry | null;
   arenaNotice: string | null;
   /** 期間が変わった時に出す前の期のまとめ報酬。受け取るまで残す */
   arenaSettlement: ArenaPeriodSettlement | null;
@@ -408,8 +429,17 @@ const state: AppState = {
   dexSortKey: "number",
   dexFilter: { ...EMPTY_DEX_FILTER },
   dexFilterOpen: false,
-  arenaEditing: null,
-  arenaRun: null,
+  arenaView: "TOP",
+  arenaDetailIndex: null,
+  arenaUnitIndex: 0,
+  arenaDefenseDraftIds: [],
+  arenaCandidates: [],
+  arenaCandidatesLoading: false,
+  arenaRankingTop: [],
+  arenaRankingAround: [],
+  arenaRankingLoading: false,
+  arenaMyRank: null,
+  arenaEntry: null,
   arenaNotice: null,
   arenaSettlement: null,
   monsterTrainingTargetId: null,
@@ -552,7 +582,6 @@ interface RouteState {
   monsterTrainingTargetId: string | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
   selectedGoldDungeonFloor: number | null;
-  arenaEditing: ArenaTeamSlot | null;
   createTargetId: string | null;
   createMenu: CreateMenu;
   partyEditMode: PartyEditMode;
@@ -563,7 +592,7 @@ const ROUTE_FIELDS = [
   "equipmentSlotFilter", "equipmentReturnMonsterId", "equipmentSelecting", "farmEquipmentOpen",
   "farmEquipmentDetailId", "selectedStageId", "selectedDifficulty", "selectedDungeonFloor",
   "selectedDexEntryId", "monsterTrainingTargetId", "selectedLevelDungeonTier",
-  "selectedGoldDungeonFloor", "arenaEditing", "createTargetId", "createMenu", "partyEditMode",
+  "selectedGoldDungeonFloor", "createTargetId", "createMenu", "partyEditMode",
 ] as const satisfies readonly (keyof RouteState)[];
 
 function routeState(): RouteState {
@@ -1128,7 +1157,8 @@ function startFromLastRun(last: LastRun): void {
       startGoldDungeonFloor(last.floor);
       break;
     case "ARENA":
-      startArenaMatch(last.opponent);
+      // 同じ相手へもう一度。焼いた防衛を持っているので、そのまま組み直せる
+      startArenaMatch(last.entry);
       break;
   }
 }
@@ -1675,15 +1705,76 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
  * アリーナ(対人戦)
  * ========================================================================== */
 
-/** 今の点数帯から、並べる挑戦相手を作る。同じ点数・同じ種なら同じ顔ぶれになる */
-function currentArenaOpponents(): ArenaOpponent[] {
-  return generateArenaOpponents(state.player.arenaPoints, state.player.arenaOpponentSeed);
+/** 何人並べるか。実プレイヤーが足りない分はNPCで埋める */
+const ARENA_CANDIDATE_COUNT = 5;
+
+/** 自分の識別子。まだ認証が無いので、控えの種を安定した文字列として使う */
+function arenaSelfId(): string {
+  return `local_${state.player.arenaOpponentSeed}`;
 }
 
-function startArenaMatch(opponent: ArenaOpponent): void {
+/**
+ * 対戦候補を組み直す。
+ *
+ * **実プレイヤーを先に、足りない分をNPCで埋める。** 人口が少ない前提なので、
+ * 実プレイヤーが0人でも必ず5人並ぶ。未接続なら `fetchArenaOpponents` が
+ * 通信せず空を返すので、そのままNPCだけになる。
+ */
+async function refreshArenaCandidates(): Promise<void> {
+  const rating = state.player.arenaPoints;
+  const seed = state.player.arenaOpponentSeed;
+  const npcs = buildArenaNpcs(rating, seed, ARENA_CANDIDATE_COUNT * 2);
+  // まずNPCだけで即座に並べる。通信を待つ間、画面が空にならないようにする
+  state.arenaCandidates = buildArenaCandidates([], npcs, {
+    count: ARENA_CANDIDATE_COUNT,
+    selfId: arenaSelfId(),
+    recentIds: state.player.arenaRecentOpponentIds,
+  });
+  if (!arenaSyncAvailable()) return;
+  state.arenaCandidatesLoading = true;
+  const players = await fetchArenaOpponents(arenaSelfId(), rating, ARENA_CANDIDATE_COUNT);
+  state.arenaCandidatesLoading = false;
+  // 戻ってくる頃に別の画面へ移っていることがある。その時は捨てる
+  if (state.screen !== "ARENA") return;
+  state.arenaCandidates = buildArenaCandidates(players, npcs, {
+    count: ARENA_CANDIDATE_COUNT,
+    selfId: arenaSelfId(),
+    recentIds: state.player.arenaRecentOpponentIds,
+  });
+  render();
+}
+
+/** ランキングを引き直す。未接続なら何もしない(嘘の順位を出さないため) */
+async function refreshArenaRanking(): Promise<void> {
+  if (!arenaSyncAvailable()) {
+    state.arenaRankingTop = [];
+    state.arenaRankingAround = [];
+    state.arenaMyRank = null;
+    return;
+  }
+  state.arenaRankingLoading = true;
+  render();
+  const [top, around] = await Promise.all([
+    fetchArenaRanking(100),
+    fetchArenaRankingAround(arenaSelfId(), 5),
+  ]);
+  state.arenaRankingLoading = false;
+  state.arenaRankingTop = top;
+  state.arenaRankingAround = around;
+  state.arenaMyRank = around.find((entry) => entry.userId === arenaSelfId())?.rank ?? null;
+  render();
+}
+
+function startArenaMatch(entry: ArenaOpponentEntry): void {
   const party = getArenaTeam(state.player, "OFFENSE");
   if (party.length === 0) {
     state.arenaNotice = "攻撃編成を組んでください";
+    render();
+    return;
+  }
+  if (entry.defense.units.length === 0) {
+    state.arenaNotice = "この相手は防衛編成を登録していません";
+    playSfx("denied", 0.7);
     render();
     return;
   }
@@ -1696,31 +1787,40 @@ function startArenaMatch(opponent: ArenaOpponent): void {
   }
   savePlayerState(state.player);
   state.arenaNotice = null;
-  state.lastRun = { kind: "ARENA", opponent };
-  state.arenaRun = { opponent, partyInstances: party };
+  state.lastRun = { kind: "ARENA", entry };
+  state.arenaEntry = entry;
   state.screen = "ARENA_BATTLE";
   render();
 }
 
+/**
+ * 決着を反映する。
+ *
+ * **画面はレートもコインも触らない。** どちらもいくら動くかは
+ * `recordArenaMatch` が決める(`game/arena/match.ts`)。
+ * ここがやるのは、その結果を見せることだけ。
+ */
 function finishArenaMatch(won: boolean): void {
-  const run = state.arenaRun;
-  if (!run) return;
+  const entry = state.arenaEntry;
+  if (!entry) return;
 
-  const result = resolveArenaMatch(state.player, run.opponent, won);
+  const before = arenaTierForRating(state.player.arenaPoints);
+  const outcome = recordArenaMatch(state.player, { opponent: entry, won, side: "OFFENSE" });
+  const after = arenaTierForRating(outcome.ratingAfter);
   savePlayerState(state.player);
 
-  const rankLine =
-    result.rankChange === "UP"
-      ? `${result.rankAfter.name}へ昇格！`
-      : result.rankChange === "DOWN"
-        ? `${result.rankAfter.name}へ降格`
-        : null;
+  const rankLine = outcome.tierChanged
+    ? outcome.ratingAfter > outcome.ratingBefore
+      ? `${after.name}へ昇格！`
+      : `${after.name}へ降格`
+    : null;
+  void before;
 
   state.stageResult = {
     cleared: won,
-    stageName: `アリーナ ${run.opponent.name}`,
-    goldEarned: result.goldEarned,
-    crystalEarned: result.crystalEarned,
+    stageName: `アリーナ ${entry.name}`,
+    goldEarned: 0,
+    crystalEarned: 0,
     wavesCleared: won ? 1 : 0,
     totalWaves: 1,
     levelUps: [],
@@ -1728,17 +1828,19 @@ function finishArenaMatch(won: boolean): void {
     dropStar: null,
     equipmentDrop: null,
     pigDrop: null,
-    summonScrollDropped: result.scrollEarned > 0,
+    summonScrollDropped: false,
     fighterLevelsGained: 0,
   };
-  // 点数の増減と昇降格は、勝敗そのものと同じくらい見たい情報
+  // レートの増減と昇降格は、勝敗そのものと同じくらい見たい情報
   state.arenaNotice = [
-    `${result.pointDelta >= 0 ? "+" : ""}${result.pointDelta} pt (${result.pointsAfter} pt)`,
+    `${outcome.record.ratingDelta >= 0 ? "+" : ""}${outcome.record.ratingDelta} レート（${outcome.ratingAfter}）`,
+    `アリーナコイン +${outcome.record.coins}`,
     rankLine,
   ]
     .filter(Boolean)
     .join(" / ");
-  state.arenaRun = null;
+  state.arenaEntry = null;
+  state.arenaCandidates = [];
   enterStageResult();
 }
 
@@ -1856,17 +1958,22 @@ function renderCurrentTowerBattle(): BattleViewHandle {
 }
 
 function renderCurrentArenaBattle(): BattleViewHandle {
-  const run = state.arenaRun;
-  if (!run) throw new Error("arenaRun is not set");
+  const entry = state.arenaEntry;
+  if (!entry) throw new Error("arenaEntry is not set");
 
-  const setup = setupArenaBattle(run.partyInstances, run.opponent, state.player.equipment);
+  /*
+   * **敵側は焼いた防衛からしか作らない。**
+   * 相手の手持ちを今から読み直すと、登録後に本人が装備を外しただけで
+   * 相手の画面の編成が崩れる。
+   */
+  const setup = buildArenaEntryBattle(getArenaTeam(state.player, "OFFENSE"), entry, state.player.equipment);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
 
   return renderBattleView({
     engine,
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
-    title: `vs ${run.opponent.name}`,
+    title: `vs ${entry.name}`,
     // 対人戦は観客のいる闘技場。それ自体がアリーナの空気になっている
     venue: "duel",
     resultLabel: (winner) => (winner === "PLAYER" ? "🏆 結果を見る" : "アリーナに戻る"),
@@ -2450,48 +2557,153 @@ function render(): void {
       break;
     }
 
-    case "ARENA":
+    case "ARENA": {
+      /*
+       * シーズンが変わっていたら、開いた時に締める。
+       * **画面を開く前に必ず通る場所でやる。** 遊んでいる最中に
+       * レートが勝手に変わると、何が起きたのか分からない。
+       */
+      if (applyArenaSeasonRollover(state.player).changed) savePlayerState(state.player);
+      if (state.arenaCandidates.length === 0 && !state.arenaCandidatesLoading) void refreshArenaCandidates();
       content = renderPvpArena({
         player: state.player,
-        opponents: currentArenaOpponents(),
-        editing: state.arenaEditing,
+        view: state.arenaView,
         notice: state.arenaNotice,
-        settlement: state.arenaSettlement,
-        onEdit: (slot) => {
-          state.arenaEditing = slot;
+        online: arenaSyncAvailable(),
+        myRank: state.arenaMyRank,
+        ticketMax: ARENA_TICKET_MAX_V2,
+        nextTicketAt: arenaNextTicketAt(state.player),
+        candidates: state.arenaCandidates,
+        candidatesLoading: state.arenaCandidatesLoading,
+        detailEntry: state.arenaDetailIndex === null ? null : (state.arenaCandidates[state.arenaDetailIndex] ?? null),
+        unitIndex: state.arenaUnitIndex,
+        ranking: {
+          loading: state.arenaRankingLoading,
+          top: state.arenaRankingTop,
+          around: state.arenaRankingAround,
+          myUserId: arenaSyncAvailable() ? arenaSelfId() : null,
+        },
+        shopRows: arenaShopRows(state.player),
+        history: arenaDefenseHistory(state.player).map((record) => ({
+          record,
+          block: arenaRevengeBlock(record, state.player.arenaTickets),
+        })),
+        defenseDraftIds: state.arenaDefenseDraftIds,
+        offenseMembers: getArenaTeam(state.player, "OFFENSE"),
+        onGo: (view) => {
+          state.arenaView = view;
           state.arenaNotice = null;
+          if (view !== "OPPONENT_DETAIL") state.arenaDetailIndex = null;
+          if (view === "RANKING" && state.arenaRankingTop.length === 0) void refreshArenaRanking();
+          if (view === "DEFENSE" && state.arenaDefenseDraftIds.length === 0) {
+            // 登録済みの顔ぶれを下敷きにする。ゼロから選び直させない
+            state.arenaDefenseDraftIds = [...state.player.arenaDefenseIds];
+          }
           render();
         },
-        onToggleMember: (slot, instanceId) => {
-          toggleArenaTeamMember(state.player, slot, instanceId);
-          savePlayerState(state.player);
+        onOpenOpponent: (entry) => {
+          state.arenaDetailIndex = entry.index;
+          state.arenaUnitIndex = 0;
+          state.arenaView = "OPPONENT_DETAIL";
+          render();
+        },
+        onSelectUnit: (index) => {
+          state.arenaUnitIndex = index;
           render();
         },
         onChallenge: startArenaMatch,
+        onReroll: () => {
+          // 券は減らさない。並んだ相手がどれも噛み合わない時に
+          // 券を捨てて選び直させるのは理不尽なので
+          advanceArenaOpponentSeed(state.player);
+          savePlayerState(state.player);
+          state.arenaCandidates = [];
+          void refreshArenaCandidates();
+          render();
+        },
         onRefillTickets: () => {
           const result = tryRefillArenaTickets(state.player);
           state.arenaNotice = result.ok ? "挑戦券を回復しました" : (result.reason ?? "回復できませんでした");
           if (result.ok) savePlayerState(state.player);
           render();
         },
-        onRerollOpponents: () => {
-          // 券は減らさない。並んだ3人がどれも噛み合わない時に
-          // 券を捨てて選び直させるのは理不尽なので
-          advanceArenaOpponentSeed(state.player);
+        onClaimWeekly: () => {
+          const result = claimArenaWeeklyReward(state.player);
+          state.arenaNotice = result.ok
+            ? `${result.tierName} の週間報酬を受け取りました`
+            : (result.reason ?? "受け取れませんでした");
+          if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
+          render();
+        },
+        onToggleOffenseMember: (instanceId) => {
+          toggleArenaTeamMember(state.player, "OFFENSE", instanceId);
           savePlayerState(state.player);
           render();
         },
-        onDismissSettlement: () => {
-          state.arenaSettlement = null;
+        onToggleDefenseDraft: (instanceId) => {
+          const index = state.arenaDefenseDraftIds.indexOf(instanceId);
+          if (index >= 0) state.arenaDefenseDraftIds.splice(index, 1);
+          else if (state.arenaDefenseDraftIds.length < ARENA_TEAM_SIZE) state.arenaDefenseDraftIds.push(instanceId);
           render();
         },
-        onViewDetail: (instanceId) => {
+        onRegisterDefense: () => {
+          const members = state.arenaDefenseDraftIds
+            .map((id) => state.player.monsters.find((m) => m.id === id))
+            .filter((m): m is NonNullable<typeof m> => m !== undefined);
+          if (members.length === 0) {
+            state.arenaNotice = "防衛編成を選んでください";
+            playSfx("denied", 0.7);
+            render();
+            return;
+          }
+          /*
+           * **登録した瞬間の姿を焼く。** 焼いた後に本人が装備を外しても
+           * 売っても、相手の画面の防衛は1バイトも変わらない。
+           */
+          state.player.arenaDefenseIds = [...state.arenaDefenseDraftIds];
+          state.player.arenaDefenseSnapshot = captureArenaDefense(members, state.player.equipment);
+          savePlayerState(state.player);
+          // 繋がっていれば上げる。失敗しても控えには残っているので進行は止めない
+          void pushArenaDefense(state.player.arenaDefenseSnapshot);
+          state.arenaNotice = `防衛編成を登録しました（${members.length}体）`;
+          playSfx("stageClear");
+          render();
+        },
+        onBuy: (itemId) => {
+          const result = buyArenaShopItem(state.player, itemId);
+          state.arenaNotice = result.ok
+            ? `${result.item?.name ?? "商品"}を購入しました`
+            : (result.reason ?? "購入できませんでした");
+          if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
+          else playSfx("denied", 0.7);
+          render();
+        },
+        onRevenge: (record) => {
+          if (arenaRevengeBlock(record, state.player.arenaTickets) !== null) {
+            playSfx("denied", 0.7);
+            return;
+          }
+          /*
+           * **戦う前に印を付ける。** 結果で変えると、負けた時に
+           * 何度でも挑み直せてしまう。
+           */
+          if (!markArenaRevenged(state.player, record.id)) return;
+          savePlayerState(state.player);
+          const target = state.arenaCandidates.find((entry) => entry.name === record.opponentName);
+          if (target) { startArenaMatch(target); return; }
+          state.arenaNotice = "相手が見つかりませんでした。対戦候補から挑んでください";
+          state.arenaView = "OPPONENTS";
+          render();
+        },
+        onReloadRanking: () => { void refreshArenaRanking(); },
+        onViewMonster: (instanceId) => {
           state.monsterDetailId = instanceId;
           state.screen = "MONSTERS";
           render();
         },
       });
       break;
+    }
 
     case "TRIAL_TOWER": {
       if (ensureTowerMonthlyState(state.player)) savePlayerState(state.player);
