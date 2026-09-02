@@ -132,7 +132,17 @@ import { arenaShopRows, buyArenaShopItem } from "../game/arena/shop.js";
 import { ARENA_TICKET_MAX_V2 } from "../data/arena/shop.js";
 import { arenaTierForRating } from "../data/arena/ranks.js";
 import type { ArenaOpponentEntry } from "../game/arena/types.js";
-import { arenaSyncAvailable, fetchArenaOpponents, fetchArenaRanking, fetchArenaRankingAround, pushArenaDefense, reportArenaMatch } from "../net/arenaSync.js";
+import {
+  arenaSyncAvailable,
+  claimArenaWeeklyReward as claimArenaWeeklyRewardRemote,
+  ensureArenaProfile,
+  fetchArenaOpponents,
+  fetchArenaRanking,
+  fetchArenaRankingAround,
+  purchaseArenaShopItem,
+  pushArenaDefense,
+  reportArenaMatch,
+} from "../net/arenaSync.js";
 import type { ArenaRankingEntry } from "../net/arenaSync.js";
 import {
   ARENA_TEAM_SIZE,
@@ -1746,6 +1756,8 @@ async function refreshArenaCandidates(): Promise<void> {
     recentIds: state.player.arenaRecentOpponentIds,
   });
   if (!arenaSyncAvailable()) return;
+  // 繋がった最初の1回だけ、順位表に載るためのプロフィールを作る
+  void ensureArenaProfile(state.player.fighterName || "プレイヤー");
   state.arenaCandidatesLoading = true;
   const players = await fetchArenaOpponents(arenaSelfId(), rating, ARENA_CANDIDATE_COUNT);
   state.arenaCandidatesLoading = false;
@@ -2693,12 +2705,26 @@ function render(): void {
           render();
         },
         onClaimWeekly: () => {
-          const result = claimArenaWeeklyReward(state.player);
-          state.arenaNotice = result.ok
-            ? `${result.tierName} の週間報酬を受け取りました`
-            : (result.reason ?? "受け取れませんでした");
-          if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
-          render();
+          /*
+           * **繋がっている時は、先にサーバへ通す。**
+           * 二重受取はサーバの一意制約が止める。そこが通ってから配る。
+           */
+          void (async () => {
+            if (arenaSyncAvailable()) {
+              const remote = await claimArenaWeeklyRewardRemote();
+              if (!remote) {
+                state.arenaNotice = "受け取れませんでした（受け取り済みの可能性があります）";
+                render();
+                return;
+              }
+            }
+            const result = claimArenaWeeklyReward(state.player);
+            state.arenaNotice = result.ok
+              ? `${result.tierName} の週間報酬を受け取りました`
+              : (result.reason ?? "受け取れませんでした");
+            if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
+            render();
+          })();
         },
         onToggleOffenseMember: (instanceId) => {
           toggleArenaTeamMember(state.player, "OFFENSE", instanceId);
@@ -2735,13 +2761,31 @@ function render(): void {
           render();
         },
         onBuy: (itemId) => {
-          const result = buyArenaShopItem(state.player, itemId);
-          state.arenaNotice = result.ok
-            ? `${result.item?.name ?? "商品"}を購入しました`
-            : (result.reason ?? "購入できませんでした");
-          if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
-          else playSfx("denied", 0.7);
-          render();
+          /*
+           * **繋がっている時は、先にサーバへ通す。**
+           *
+           * コインは対戦でサーバが決めた値を持っている。購入だけローカルで
+           * 引くと、残高が両側で食い違う(サーバは減っていない)。
+           * 価格・在庫・上限・残高はサーバが見るので、そこが通ってから配る。
+           */
+          void (async () => {
+            if (arenaSyncAvailable()) {
+              const remote = await purchaseArenaShopItem(itemId);
+              if (!remote) {
+                state.arenaNotice = "購入できませんでした（上限・残高・在庫を確認してください）";
+                playSfx("denied", 0.7);
+                render();
+                return;
+              }
+            }
+            const result = buyArenaShopItem(state.player, itemId);
+            state.arenaNotice = result.ok
+              ? `${result.item?.name ?? "商品"}を購入しました`
+              : (result.reason ?? "購入できませんでした");
+            if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
+            else playSfx("denied", 0.7);
+            render();
+          })();
         },
         onRevenge: (record) => {
           if (arenaRevengeBlock(record, state.player.arenaTickets) !== null) {

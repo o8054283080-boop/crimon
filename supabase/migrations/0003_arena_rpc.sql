@@ -130,9 +130,9 @@ declare
   v_coins numeric;
 begin
   v_rules := public.arena__config('match_coins',
-    '{"win_base":30,"loss_base":8,"upset_step":50,"upset_max":20}'::jsonb);
+    '{"win_base":10,"loss_base":3,"upset_step":50,"upset_max":0}'::jsonb);
   v_npc := public.arena__config('npc',
-    '{"rating_band":300,"rating_scale":1.0,"coin_scale":0.5}'::jsonb);
+    '{"rating_band":300,"rating_scale":1.0,"coin_scale":1.0}'::jsonb);
 
   if p_won then
     v_coins := (v_rules ->> 'win_base')::numeric;
@@ -221,7 +221,7 @@ declare
   v_wallet public.arena_wallets%rowtype;
   v_gain   integer;
 begin
-  v_rules := public.arena__config('tickets', '{"max":10,"refill_minutes":30,"cost_per_match":1}'::jsonb);
+  v_rules := public.arena__config('tickets', '{"max":10,"refill_minutes":60,"cost_per_match":1}'::jsonb);
   v_minutes := greatest(1::numeric, (v_rules ->> 'refill_minutes')::numeric);
 
   select * into v_wallet from public.arena_wallets w where w.user_id = p_user for update;
@@ -295,7 +295,7 @@ begin
     raise exception 'INVALID_DISPLAY_NAME';
   end if;
   v_name := left(v_name, 24);
-  v_rules := public.arena__config('tickets', '{"max":10,"refill_minutes":30,"cost_per_match":1}'::jsonb);
+  v_rules := public.arena__config('tickets', '{"max":10,"refill_minutes":60,"cost_per_match":1}'::jsonb);
 
   insert into public.arena_profiles (user_id, display_name, icon_key)
   values (v_uid, v_name, coalesce(nullif(btrim(p_icon_key), ''), 'default'))
@@ -526,9 +526,9 @@ begin
     raise exception 'SELF_MATCH';
   end if;
 
-  v_ticket := public.arena__config('tickets', '{"max":10,"refill_minutes":30,"cost_per_match":1}'::jsonb);
+  v_ticket := public.arena__config('tickets', '{"max":10,"refill_minutes":60,"cost_per_match":1}'::jsonb);
   v_limit  := public.arena__config('match_limit', '{"min_seconds":3}'::jsonb);
-  v_npc    := public.arena__config('npc', '{"rating_band":300,"rating_scale":1.0,"coin_scale":0.5}'::jsonb);
+  v_npc    := public.arena__config('npc', '{"rating_band":300,"rating_scale":1.0,"coin_scale":1.0}'::jsonb);
   v_defense := public.arena__config('defense', '{"scale":0.5,"daily_loss_cap":60}'::jsonb);
   v_cost := greatest(0, (v_ticket ->> 'cost_per_match')::integer);
 
