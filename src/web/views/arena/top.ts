@@ -12,8 +12,8 @@ import { el } from "../../dom.js";
 import { renderPartySlots } from "../partyCard.js";
 import { buildArenaTopView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
+import { ARENA_TEAM_SIZE } from "../../../data/pvpArena.js";
 
-const ARENA_TEAM_SIZE = 4;
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);

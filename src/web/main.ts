@@ -139,11 +139,13 @@ import {
   fetchArenaOpponents,
   fetchArenaRanking,
   fetchArenaRankingAround,
+  fetchArenaState,
   purchaseArenaShopItem,
   pushArenaDefense,
   reportArenaMatch,
 } from "../net/arenaSync.js";
 import type { ArenaRankingEntry } from "../net/arenaSync.js";
+import { arenaAuthUserId, ensureArenaAuth } from "../net/arenaAuth.js";
 import {
   ARENA_TEAM_SIZE,
   advanceArenaOpponentSeed,
@@ -1759,8 +1761,69 @@ const ARENA_CANDIDATE_COUNT = 5;
  * 押すたびに自分のIDが変わってしまい、自分を候補から外す判定も
  * ランキングの自分判定も成立しなくなる。控えに焼いたUUIDを使う。
  */
+/**
+ * 自分のアリーナID。
+ *
+ * **繋がっている時は `auth.uid()` が正。** 端末が作ったUUIDは、
+ * オフラインで自分を候補から外すためだけの器で、名乗るだけで誰にでもなれる。
+ * サーバ側の判定(自分除外・順位表の自分・防衛の持ち主)は
+ * すべて `auth.uid()` で行うので、画面もそれに合わせないと
+ * 「サーバは他人だと言っているのに、画面では自分」がすれ違う。
+ */
 function arenaSelfId(): string {
-  return state.player.arenaLocalId;
+  return arenaAuthUserId() ?? state.player.arenaLocalId;
+}
+
+/**
+ * サーバに繋ぐ。**アリーナを開いた時に1度だけ。**
+ *
+ * 順番に意味がある:
+ *
+ *   1. 匿名ログイン    …… `auth.uid()` が無いと、書き込み系のRPCは全て弾かれる
+ *   2. プロフィール    …… 順位表に載るための行。無いと自分だけ表に出ない
+ *   3. サーバの状態     …… レート・コイン・挑戦券は**サーバが正**。
+ *                          ここで引き寄せないと、画面だけ古い数字を出し続ける
+ *
+ * どれも失敗してよい。失敗したらオフラインのアリーナとして動く。
+ * **`connected` が false の間は、通貨を動かす操作をサーバへ送らない。**
+ */
+let arenaConnecting: Promise<boolean> | null = null;
+
+async function connectArena(): Promise<boolean> {
+  if (!arenaSyncAvailable()) return false;
+  if (arenaConnecting) return arenaConnecting;
+  arenaConnecting = (async () => {
+    const auth = await ensureArenaAuth();
+    if (!auth) return false;
+    await ensureArenaProfile(state.player.fighterName || "プレイヤー");
+    const remote = await fetchArenaState();
+    if (remote) applyArenaServerState(remote);
+    return true;
+  })().finally(() => { arenaConnecting = null; });
+  return arenaConnecting;
+}
+
+/**
+ * サーバが持っている数字を控えへ写す。
+ *
+ * **画面の数字はサーバの値に合わせる。** ローカルで進めた値を残すと、
+ * 「買ったのに減っていない」「勝ったのに上がっていない」がその場では
+ * 起きないまま、次に開いた時にまとめて飛ぶ。ずれは早く潰す。
+ */
+function applyArenaServerState(remote: Record<string, unknown>): void {
+  const num = (key: string): number | null => {
+    const value = remote[key];
+    return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+  };
+  const rating = num("rating");
+  const coins = num("coins");
+  const tickets = num("tickets");
+  if (rating !== null) state.player.arenaPoints = Math.max(0, rating);
+  if (coins !== null) state.player.arenaCoins = Math.max(0, coins);
+  if (tickets !== null) state.player.arenaTickets = Math.max(0, tickets);
+  const season = num("seasonNumber");
+  if (season !== null) state.player.arenaSeasonNumber = season;
+  savePlayerState(state.player);
 }
 
 /**
@@ -1780,9 +1843,7 @@ async function refreshArenaCandidates(): Promise<void> {
     selfId: arenaSelfId(),
     recentIds: state.player.arenaRecentOpponentIds,
   });
-  if (!arenaSyncAvailable()) return;
-  // 繋がった最初の1回だけ、順位表に載るためのプロフィールを作る
-  void ensureArenaProfile(state.player.fighterName || "プレイヤー");
+  if (!(await connectArena())) return;
   state.arenaCandidatesLoading = true;
   const players = await fetchArenaOpponents(arenaSelfId(), rating, ARENA_CANDIDATE_COUNT);
   state.arenaCandidatesLoading = false;
