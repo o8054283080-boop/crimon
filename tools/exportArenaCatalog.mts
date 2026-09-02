@@ -52,6 +52,8 @@ import { ARENA_TEAM_SIZE } from "../src/data/pvpArena.js";
 const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
 /** 生成したファイルの名前に必ず入れる印。**これで自分の作ったものを見分ける** */
 const CATALOG_MARK = "arena_catalog";
+/** 1つ目の刻。RLS(170100)より後・RPC(172000)より前に置く */
+const FIRST_CATALOG_STAMP = "20260902171818";
 
 /* ==========================================================================
  * 上限の求め方
@@ -333,7 +335,12 @@ function timestamp(): string {
 }
 
 function main(): void {
-  const sql = buildSql() + "\n";
+  /*
+   * **末尾の空行を残さない。**
+   * `git diff --check` が "new blank line at EOF" で落ちる。
+   * 組み立ての最後に区切りの空行を積んでいるので、ここで削る。
+   */
+  const sql = buildSql().replace(/\n+$/, "") + "\n";
   const mark = fingerprint(sql);
   const files = existingCatalogFiles();
   const current = files.length > 0 ? readFileSync(join(MIGRATIONS_DIR, files[files.length - 1]), "utf8") : null;
@@ -352,7 +359,17 @@ function main(): void {
   }
 
   mkdirSync(MIGRATIONS_DIR, { recursive: true });
-  const name = `${timestamp()}_${CATALOG_MARK}_${mark}.sql`;
+  /*
+   * **1つ目だけは、RPCより前の刻を使う。**
+   *
+   * 表を作るのは1つ目のファイルなので、そこがRPCの後ろに回ると
+   * 「照合表より先にRPC」という並びになり、読む人が混乱する
+   * (動きは変わらない——plpgsql の本文は作る時に表を確かめないので)。
+   * 2つ目以降は**定義の入れ替え**で、表はもう在る。素直に後ろへ積む。
+   */
+  const name = files.length === 0
+    ? `${FIRST_CATALOG_STAMP}_${CATALOG_MARK}_${mark}.sql`
+    : `${timestamp()}_${CATALOG_MARK}_${mark}.sql`;
   writeFileSync(join(MIGRATIONS_DIR, name), sql, "utf8");
   console.log(`書き出しました: supabase/migrations/${name}`);
   if (files.length > 0) {

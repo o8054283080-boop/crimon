@@ -1762,4 +1762,3 @@ insert into public.arena_catalog_limits (key, value) values
   ('skill_count', 3),
   ('team_size', 4),
   ('star_max', 6);
-
