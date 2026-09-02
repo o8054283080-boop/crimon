@@ -81,8 +81,33 @@ describe("勝敗を申告する道が無いこと", () => {
 
   it("乱数の種はサーバが作る", () => {
     // クライアントに選ばせると、勝つまで引き直せる
-    expect(integrity).toContain("gen_random_bytes");
+    expect(integrity).toContain("v_seed := (('x' || substr(replace(gen_random_uuid()");
     expect(integrity).not.toContain("p_battle_seed");
+  });
+
+  it("置き場所が環境で変わる拡張に頼らない", () => {
+    /*
+     * `gen_random_bytes` は pgcrypto の関数で、スキーマの置き場所が環境で違う。
+     * `set search_path = ''` にしてあるので場所を書く必要があり、
+     * **書いた場所と違えばその場で落ちる。**
+     * `gen_random_uuid()` は組み込みなので、どこにも依存しない。
+     */
+    const statements = integrity
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("*") && !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(statements).not.toContain("extensions.");
+    expect(statements).not.toContain("gen_random_bytes");
+  });
+
+  it("照合表は読めるが、書き換えられない", () => {
+    // ここを書き換えられると、検分そのものを緩められる
+    for (const table of ["monsters", "latents", "slot_mains", "stat_caps", "star_rules", "sets", "limits"]) {
+      expect(integrity, `arena_catalog_${table} の revoke`)
+        .toMatch(new RegExp(`revoke all on public\\.arena_catalog_${table}\\s+from anon, authenticated;`));
+      expect(integrity, `arena_catalog_${table} の grant`)
+        .toMatch(new RegExp(`grant select on public\\.arena_catalog_${table}\\s+to anon, authenticated;`));
+    }
   });
 
   it("対戦の卓そのものは誰にも触らせない", () => {

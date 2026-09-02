@@ -541,9 +541,19 @@ begin
     v_npc := null;
   end if;
 
-  v_nonce := encode(extensions.gen_random_bytes(18), 'hex');
+  /*
+   * nonce と種。**`gen_random_uuid()` だけで作る。**
+   *
+   * `gen_random_bytes` は pgcrypto の関数で、Supabase では `extensions`
+   * スキーマに入っている——**が、それは環境によって違う。**
+   * `set search_path = ''` にしてあるので置き場所を書く必要があり、
+   * 書いた場所と違えばこの関数はその場で落ちる。
+   * `gen_random_uuid()` は PG13 以降の組み込みなので、どこにも依存しない。
+   */
+  v_nonce := replace(gen_random_uuid()::text, '-', '')
+          || replace(gen_random_uuid()::text, '-', '');
   -- 種もサーバが作る。**クライアントに選ばせると、勝つまで引き直せる**
-  v_seed := (('x' || encode(extensions.gen_random_bytes(4), 'hex'))::bit(32)::bigint);
+  v_seed := (('x' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))::bit(32)::bigint);
 
   insert into public.arena_match_sessions
     (attacker_id, season_id, opponent_kind, defender_id, npc_seed, npc_name,
@@ -880,3 +890,26 @@ where s.season_id = (select x.id from public.arena_seasons x where x.status = 'A
   and s.user_id <> auth.uid();
 
 grant select on public.arena_opponent_pool to authenticated;
+
+-- =====================================================================
+-- 照合表の権限
+--
+-- 中身はゲームの定義そのもので、**クライアントの中にも同じものが入っている。**
+-- 隠す意味は無いので読みは開ける。ただし**書き込みは誰にも渡さない**——
+-- ここを書き換えられると、検分そのものを緩められる。
+-- =====================================================================
+revoke all on public.arena_catalog_monsters   from anon, authenticated;
+revoke all on public.arena_catalog_latents    from anon, authenticated;
+revoke all on public.arena_catalog_slot_mains from anon, authenticated;
+revoke all on public.arena_catalog_stat_caps  from anon, authenticated;
+revoke all on public.arena_catalog_star_rules from anon, authenticated;
+revoke all on public.arena_catalog_sets       from anon, authenticated;
+revoke all on public.arena_catalog_limits     from anon, authenticated;
+
+grant select on public.arena_catalog_monsters   to anon, authenticated;
+grant select on public.arena_catalog_latents    to anon, authenticated;
+grant select on public.arena_catalog_slot_mains to anon, authenticated;
+grant select on public.arena_catalog_stat_caps  to anon, authenticated;
+grant select on public.arena_catalog_star_rules to anon, authenticated;
+grant select on public.arena_catalog_sets       to anon, authenticated;
+grant select on public.arena_catalog_limits     to anon, authenticated;
