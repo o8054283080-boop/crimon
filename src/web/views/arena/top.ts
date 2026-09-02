@@ -2,7 +2,7 @@
  * アリーナのトップ。
  *
  * **一目で分かるべきもの**を上に固めてある:
- * 現在ランク / 現在レート / 現在順位 / 挑戦権(残数と次の回復) / シーズン終了まで。
+ * 現在ランク / 現在レート / 現在順位 / 挑戦券(残数と次の回復) / シーズン終了まで。
  * その下に行き先(対戦・防衛・ランキング・ショップ・防衛履歴)を置く。
  *
  * 順位は**繋がっていない時に数字を出さない**。「—」も出さない
@@ -41,7 +41,7 @@ function renderStanding(view: ReturnType<typeof buildArenaTopView>): HTMLElement
   ]);
 }
 
-/** 挑戦権。残数と、次の1枚までの時間を同じ場所に置く */
+/** 挑戦券。残数と、次の1枚までの時間を同じ場所に置く */
 function renderTickets(props: PvpArenaProps, view: ReturnType<typeof buildArenaTopView>): HTMLElement {
   const pips = Array.from({ length: view.tickets.max }, (_, index) =>
     el("span", { className: `ar-tickets__pip${index < view.tickets.count ? " is-on" : ""}` }, []),
@@ -49,7 +49,7 @@ function renderTickets(props: PvpArenaProps, view: ReturnType<typeof buildArenaT
   const full = view.tickets.count >= view.tickets.max;
   return el("section", { className: "panel ar-tickets" }, [
     el("div", { className: "ar-tickets__row" }, [
-      el("span", { className: "ar-tickets__label" }, ["挑戦権"]),
+      el("span", { className: "ar-tickets__label" }, ["挑戦券"]),
       el("span", { className: "ar-tickets__count" }, [`${view.tickets.count} / ${view.tickets.max}`]),
     ]),
     el("div", { className: "ar-tickets__pips" }, pips),
@@ -103,7 +103,7 @@ function renderPeriod(props: PvpArenaProps, view: ReturnType<typeof buildArenaTo
 function renderMenu(props: PvpArenaProps, view: ReturnType<typeof buildArenaTopView>): HTMLElement {
   const rows: { view: Parameters<PvpArenaProps["onGo"]>[0]; icon: string; label: string; note: string; tour: string }[] = [
     { view: "OPPONENTS", icon: "⚔️", label: "対戦", note: "挑戦相手を選んで挑む", tour: "arena:opponents" },
-    { view: "DEFENSE", icon: "🛡️", label: "防衛", note: view.defense.registered ? `登録済み（${view.defense.capturedText}）` : "未登録。登録すると挑まれるようになる", tour: "arena:defense" },
+    { view: "DEFENSE", icon: "🛡️", label: "防衛", note: view.defense.registered ? `登録済み（${view.defense.capturedText}）` : "未登録。登録すると留守の間に挑まれる", tour: "arena:defense" },
     { view: "RANKING", icon: "🏆", label: "ランキング", note: props.online ? "上位100人と自分の周辺" : "オンライン接続時のみ", tour: "arena:ranking" },
     { view: "SHOP", icon: "🎫", label: "アリーナショップ", note: `所持 ${view.coins.toLocaleString("ja-JP")} コイン`, tour: "arena:shop" },
     { view: "HISTORY", icon: "📜", label: "防衛履歴", note: view.defenseLosses > 0 ? `破られた記録 ${view.defenseLosses} 件` : "攻められた記録とリベンジ", tour: "arena:history" },

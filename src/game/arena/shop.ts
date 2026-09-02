@@ -13,11 +13,16 @@ import { Star } from "../../core/rarity.js";
 import { EXP_PIG_DEX, REINCARNATION_PIG_DEX } from "../../data/monsters.js";
 import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { ARENA_SHOP_ITEMS, ArenaShopItem, ArenaShopPeriod, findArenaShopItem } from "../../data/arena/shop.js";
+import { ARENA_SEASON_EPOCH_UTC } from "../../data/arena/season.js";
 import { PlayerState, addMonster, addSummonScrolls } from "../playerState.js";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-/** 週の区切りに使う原点。`data/arena/season.ts` と揃えてある */
-const WEEK_EPOCH_UTC = Date.UTC(2026, 8, 7, 19, 0, 0);
+/*
+ * 週の区切りに使う原点。**`data/arena/season.ts` から直接もらう。**
+ * 同じ日付を書き写していて8日ずれていた——トップの「今週の締めまで」を見て
+ * ショップへ行くと、上限の数え直しが1日後だった。写さず参照する。
+ */
+const WEEK_EPOCH_UTC = ARENA_SEASON_EPOCH_UTC;
 
 /** その周期の通し番号。番号が変われば上限が数え直しになる */
 export function arenaShopPeriodKey(period: ArenaShopPeriod, now: number = Date.now()): number {

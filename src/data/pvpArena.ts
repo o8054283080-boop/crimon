@@ -260,9 +260,9 @@ export function nextArenaRank(rank: ArenaRank): ArenaRank | null {
  * 周回そのものが止まる。逆にアリーナ側も「今日はもう周回で使い切った」で
  * 触れなくなる。どちらの遊びも相手の都合で止まらないように分ける。
  */
-export const ARENA_TICKET_MAX = 5;
+export const ARENA_TICKET_MAX = 10;
 /** 挑戦券が1枚回復するまでの実時間(分) */
-export const ARENA_TICKET_REGEN_MINUTES = 30;
+export const ARENA_TICKET_REGEN_MINUTES = 60;
 /** ダイヤを払って挑戦券を全回復する時の価格 */
 export const ARENA_TICKET_REFILL_COST = 100;
 

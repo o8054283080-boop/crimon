@@ -127,20 +127,19 @@ import { buildArenaCandidates } from "../game/arena/matchmaking.js";
 import { captureArenaDefense } from "../game/arena/snapshot.js";
 import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, recordArenaMatch } from "../game/arena/match.js";
 import { applyArenaSeasonRollover, claimArenaWeeklyReward } from "../game/arena/progress.js";
+import { runPendingDefenseAttacks } from "../game/arena/defenseSim.js";
 import { arenaShopRows, buyArenaShopItem } from "../game/arena/shop.js";
 import { ARENA_TICKET_MAX_V2 } from "../data/arena/shop.js";
 import { arenaTierForRating } from "../data/arena/ranks.js";
 import type { ArenaOpponentEntry } from "../game/arena/types.js";
-import { arenaSyncAvailable, fetchArenaOpponents, fetchArenaRanking, fetchArenaRankingAround, pushArenaDefense } from "../net/arenaSync.js";
+import { arenaSyncAvailable, fetchArenaOpponents, fetchArenaRanking, fetchArenaRankingAround, pushArenaDefense, reportArenaMatch } from "../net/arenaSync.js";
 import type { ArenaRankingEntry } from "../net/arenaSync.js";
 import {
   ARENA_TEAM_SIZE,
   advanceArenaOpponentSeed,
   applyArenaTicketRegen,
-  ArenaPeriodSettlement,
   arenaNextTicketAt,
   getArenaTeam,
-  settleArenaPeriod,
   toggleArenaTeamMember,
   tryRefillArenaTickets,
   trySpendArenaTicket,
@@ -356,7 +355,6 @@ interface AppState {
   arenaEntry: ArenaOpponentEntry | null;
   arenaNotice: string | null;
   /** 期間が変わった時に出す前の期のまとめ報酬。受け取るまで残す */
-  arenaSettlement: ArenaPeriodSettlement | null;
   monsterTrainingTargetId: string | null;
   monsterTrainingMaterialIds: string[];
   monsterTrainingFilter: MonsterTrainingFilter;
@@ -441,7 +439,6 @@ const state: AppState = {
   arenaMyRank: null,
   arenaEntry: null,
   arenaNotice: null,
-  arenaSettlement: null,
   monsterTrainingTargetId: null,
   monsterTrainingMaterialIds: [],
   monsterTrainingFilter: { ...EMPTY_MONSTER_TRAINING_FILTER },
@@ -520,12 +517,24 @@ let persistState: PersistState = "UNSUPPORTED";
     savePlayerState(state.player);
   }
 
-  // アリーナ。期が変わっていれば前の期のまとめ報酬を精算し、
-  // 挑戦券の自然回復を反映する(起動のたびに1度だけ)
-  const settlement = settleArenaPeriod(state.player);
-  if (settlement) state.arenaSettlement = settlement;
+  /*
+   * アリーナ。挑戦券の自然回復だけを反映する(起動のたびに1度だけ)。
+   *
+   * **旧アリーナの週次精算(`settleArenaPeriod`)はここから外した。**
+   * 新しいシーズン制と二重に走っていて、実測でこうなっていた:
+   *
+   *   - 旧の週次報酬(💎3,400 / 30万G / 召喚の書8)が**画面に一言も出ずに**入る
+   *     (`state.arenaSettlement` はどこにも描画されていなかった)
+   *   - `arenaSeasonBestPoints` を今のレートまで潰す。新の週間報酬は
+   *     「下がっても取り上げない」ために最高レートで等級を決めているので、
+   *     **マスター→プラチナIIへ降格**していた
+   *   - `arenaSeasonBattles/Wins` を毎週0に戻す。画面は「今シーズンの戦績」と
+   *     出しているのに、実際は週で消えていた
+   *
+   * 週の区切りも3つ(旧=木曜/新=月曜/ショップ=火曜)に割れていた。
+   * 精算はシーズン制の側(`applyArenaSeasonRollover` と週間報酬)に一本化する。
+   */
   applyArenaTicketRegen(state.player);
-  if (settlement) savePlayerState(state.player);
 }
 
 const rootCandidate = document.getElementById("app");
@@ -1708,9 +1717,15 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
 /** 何人並べるか。実プレイヤーが足りない分はNPCで埋める */
 const ARENA_CANDIDATE_COUNT = 5;
 
-/** 自分の識別子。まだ認証が無いので、控えの種を安定した文字列として使う */
+/**
+ * 自分の識別子。
+ *
+ * **対戦の種を流用しない。** 種は「相手を変える」で進むので、
+ * 押すたびに自分のIDが変わってしまい、自分を候補から外す判定も
+ * ランキングの自分判定も成立しなくなる。控えに焼いたUUIDを使う。
+ */
 function arenaSelfId(): string {
-  return `local_${state.player.arenaOpponentSeed}`;
+  return state.player.arenaLocalId;
 }
 
 /**
@@ -1809,6 +1824,40 @@ function finishArenaMatch(won: boolean): void {
   const after = arenaTierForRating(outcome.ratingAfter);
   savePlayerState(state.player);
 
+  /*
+   * **繋がっていればサーバへ報告し、返ってきた値を正とする。**
+   *
+   * 送るのは「誰と / 勝ったか」だけで、増減幅はサーバが決める
+   * (`arena_report_match`)。ここでローカルの計算を送りつけると、
+   * 画面が「レート+500」と言い張れる経路をわざわざ作ることになる。
+   *
+   * 失敗しても進行は止めない。ローカルの記録だけで遊べる状態を保つ。
+   */
+  void (async () => {
+    const report = await reportArenaMatch({
+      kind: entry.kind,
+      won,
+      opponentId: entry.kind === "PLAYER" ? entry.id : null,
+      opponentSeed: entry.kind === "NPC" ? entry.id : null,
+      opponentName: entry.name,
+      opponentRating: entry.rating,
+    });
+    if (!report) return;
+    state.player.arenaPoints = report.rating;
+    state.player.arenaCoins = report.coinBalance;
+    state.player.arenaTickets = report.tickets;
+    if (state.player.arenaPoints > state.player.arenaSeasonBestPoints) {
+      state.player.arenaSeasonBestPoints = state.player.arenaPoints;
+    }
+    const record = state.player.arenaMatchHistory.find((item) => item.id === outcome.record.id);
+    if (record) {
+      record.ratingDelta = report.ratingDelta;
+      record.ratingAfter = report.rating;
+      record.coins = report.coins;
+    }
+    savePlayerState(state.player);
+  })();
+
   const rankLine = outcome.tierChanged
     ? outcome.ratingAfter > outcome.ratingBefore
       ? `${after.name}へ昇格！`
@@ -1816,9 +1865,15 @@ function finishArenaMatch(won: boolean): void {
     : null;
   void before;
 
+  /*
+   * 結果画面は `goldEarned` などが全部0だと「獲得したものはありません」と出る。
+   * アリーナで手に入るのはレートとコインなので、**場所の名前に添えて必ず見せる。**
+   * (レートの増減はアリーナ画面へ戻るまで出ない `arenaNotice` にしか無かった)
+   */
+  const gainLine = `${outcome.record.ratingDelta >= 0 ? "+" : ""}${outcome.record.ratingDelta} レート ・ 🎫+${outcome.record.coins}`;
   state.stageResult = {
     cleared: won,
-    stageName: `アリーナ ${entry.name}`,
+    stageName: `アリーナ ${entry.name}（${gainLine}）`,
     goldEarned: 0,
     crystalEarned: 0,
     wavesCleared: won ? 1 : 0,
@@ -2564,6 +2619,16 @@ function render(): void {
        * レートが勝手に変わると、何が起きたのか分からない。
        */
       if (applyArenaSeasonRollover(state.player).changed) savePlayerState(state.player);
+      /*
+       * 留守中に攻められた分をさばく。**防衛を登録している時だけ**起きる。
+       * ここでやるのは、アリーナを開いた時が「結果を見に来た時」だから。
+       */
+      const defended = runPendingDefenseAttacks(state.player);
+      if (defended.attacks > 0) {
+        savePlayerState(state.player);
+        state.arenaNotice = `留守中に${defended.attacks}回攻められました（${defended.held}回退けた / `
+          + `${defended.ratingDelta >= 0 ? "+" : ""}${defended.ratingDelta} レート）`;
+      }
       if (state.arenaCandidates.length === 0 && !state.arenaCandidatesLoading) void refreshArenaCandidates();
       content = renderPvpArena({
         player: state.player,
@@ -2687,13 +2752,29 @@ function render(): void {
            * **戦う前に印を付ける。** 結果で変えると、負けた時に
            * 何度でも挑み直せてしまう。
            */
-          if (!markArenaRevenged(state.player, record.id)) return;
-          savePlayerState(state.player);
           const target = state.arenaCandidates.find((entry) => entry.name === record.opponentName);
-          if (target) { startArenaMatch(target); return; }
-          state.arenaNotice = "相手が見つかりませんでした。対戦候補から挑んでください";
-          state.arenaView = "OPPONENTS";
-          render();
+          if (!target) {
+            // **印を付けずに戻す。** 挑めていないのに1回きりの権利を使わせない
+            state.arenaNotice = "相手が見つかりませんでした。対戦候補から挑んでください";
+            state.arenaView = "OPPONENTS";
+            render();
+            return;
+          }
+          /*
+           * **戦う前に印を付ける。** 結果で変えると、負けた時に何度でも挑み直せる。
+           * ただし挑めなかった時(編成未設定・挑戦券切れ)は戻す
+           * ——挑んでいないのに1回きりの権利が消えるのは、防ぎたい不正とは別の話。
+           */
+          if (!markArenaRevenged(state.player, record.id)) return;
+          const ticketsBefore = state.player.arenaTickets;
+          savePlayerState(state.player);
+          startArenaMatch(target);
+          if (state.screen !== "ARENA_BATTLE") {
+            record.revenged = false;
+            state.player.arenaTickets = ticketsBefore;
+            savePlayerState(state.player);
+            render();
+          }
         },
         onReloadRanking: () => { void refreshArenaRanking(); },
         onViewMonster: (instanceId) => {

@@ -12,6 +12,19 @@ import { ARENA_NOT_CLAIMED } from "../data/arena/season.js";
 /** アリーナの記録として残す件数。増やし続けると控えが太る */
 export const ARENA_HISTORY_MAX = 30;
 
+/**
+ * この端末の識別子を作る。
+ *
+ * **形はUUIDに揃える。** サーバ側の `user_id` は uuid 型なので、
+ * `local_1` のような文字列を送ると PostgREST がキャストで落として
+ * 400を返す——実プレイヤーが1人も並ばず、順位も常に「未掲載」になる。
+ * 認証が入ったらそのユーザIDへ差し替える。
+ */
+export function newArenaLocalId(): string {
+  const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${hex(8)}-${hex(4)}-4${hex(3)}-${["8", "9", "a", "b"][Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}`;
+}
+
 /** アリーナショップの購入回数1件ぶん */
 export interface ArenaShopPurchaseRecord {
   itemId: string;
@@ -160,6 +173,17 @@ export interface PlayerState {
   arenaShopPurchases: ArenaShopPurchaseRecord[];
   /** 手に入れた見た目の報酬(称号・フレーム・アイコン) */
   arenaCosmetics: string[];
+  /**
+   * この端末の識別子。
+   *
+   * **対戦の種(`arenaOpponentSeed`)を流用してはいけない。** 種は
+   * 「相手を変える」で進むので、押すたびに自分のIDが変わってしまう。
+   * 自分を候補から外す判定も、ランキングの自分判定も、それでは成立しない。
+   * 認証が入るまでの仮の識別子で、**一度決めたら変えない**。
+   */
+  arenaLocalId: string;
+  /** 留守中の防衛戦を最後にさばいた時刻。0 なら「今から数え始める」 */
+  arenaLastDefenseCheckAt: number;
   /** 今日、防衛で失ったレート。寝ている間に落ち続けないよう上限を掛ける */
   arenaDefenseLossToday: number;
   /** 上の値を数えている日(JSTの日付文字列) */
@@ -302,6 +326,8 @@ export function createInitialState(): PlayerState {
     arenaSeasonNumber: 0,
     arenaShopPurchases: [],
     arenaCosmetics: [],
+    arenaLocalId: newArenaLocalId(),
+    arenaLastDefenseCheckAt: 0,
     arenaDefenseLossToday: 0,
     arenaDefenseLossDate: "",
     towerPartyIds: [],
@@ -480,6 +506,8 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.arenaSeasonNumber !== "number") state.arenaSeasonNumber = 0;
   if (!Array.isArray(state.arenaShopPurchases)) state.arenaShopPurchases = [];
   if (!Array.isArray(state.arenaCosmetics)) state.arenaCosmetics = [];
+  if (typeof state.arenaLocalId !== "string" || state.arenaLocalId.length < 8) state.arenaLocalId = newArenaLocalId();
+  if (typeof state.arenaLastDefenseCheckAt !== "number") state.arenaLastDefenseCheckAt = 0;
   if (typeof state.arenaDefenseLossToday !== "number") state.arenaDefenseLossToday = 0;
   if (typeof state.arenaDefenseLossDate !== "string") state.arenaDefenseLossDate = "";
 

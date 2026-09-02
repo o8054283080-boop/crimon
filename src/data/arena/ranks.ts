@@ -25,7 +25,7 @@ export interface ArenaTier {
  * ランクの表。**昇順**に並べること(`arenaTierForRating` が後ろから探す)。
  *
  * 境界は依頼の初期案そのまま。ここを触る時は
- * `tests/arenaRank.test.ts` が昇順と抜けを見張っている。
+ * `tests/arenaCore.test.ts` が昇順と抜けを見張っている。
  */
 export const ARENA_TIERS: readonly ArenaTier[] = [
   { id: "BRONZE_3", name: "ブロンズIII", minRating: 0, color: "#b1764a" },

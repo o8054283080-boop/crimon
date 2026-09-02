@@ -124,7 +124,7 @@ export function renderArenaDefense(props: PvpArenaProps): HTMLElement {
     : el("section", { className: "panel" }, [
         el("h2", {}, ["登録中の防衛編成"]),
         el("p", { className: "ar-empty" }, [
-          "まだ登録していません。登録すると、他のプレイヤーから挑まれるようになります（登録しなくてもアリーナは遊べます）",
+          "まだ登録していません。登録すると、留守の間に挑まれるようになります（登録しなくてもアリーナは遊べます）",
         ]),
       ]);
 

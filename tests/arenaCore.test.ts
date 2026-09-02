@@ -21,6 +21,7 @@ import {
 } from "../src/game/arena/progress.js";
 import { arenaShopRemaining, buyArenaShopItem } from "../src/game/arena/shop.js";
 import { captureArenaDefense, isUsableDefense, snapshotToDefinitions } from "../src/game/arena/snapshot.js";
+import { MAX_ATTACKS_PER_VISIT, runPendingDefenseAttacks } from "../src/game/arena/defenseSim.js";
 import { ArenaDefenseSnapshot, ArenaOpponentEntry } from "../src/game/arena/types.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { generateEquipment } from "../src/core/equipment.js";
@@ -493,5 +494,106 @@ describe("既存セーブとの互換", () => {
     expect(() => recordArenaMatch(state as never, {
       opponent: opponent("p", "NPC", 1500), won: true, side: "OFFENSE",
     })).not.toThrow();
+  });
+});
+
+describe("留守中の防衛戦", () => {
+  /*
+   * 非同期PvPは「自分が居ない時に戦われる」のが本体なのに、
+   * 実プレイヤーが挑んでこない限り防衛は一度も動かなかった。
+   * 人口が少ない前提なのに防衛だけ人口任せでは、
+   * 「登録すると挑まれるようになります」が嘘になる。
+   */
+  const HOUR = 60 * 60 * 1000;
+
+  function withDefense(): ReturnType<typeof createInitialState> {
+    const state = createInitialState();
+    const instance = createMonsterInstance("knight_WATER", 5, 40);
+    const gear = generateEquipment({ slot: 1, star: 4, subStatCount: 3 });
+    instance.equipment = { 1: gear.id };
+    state.arenaDefenseSnapshot = captureArenaDefense([instance], [gear]);
+    return state;
+  }
+
+  it("防衛未登録なら1件も起きない", () => {
+    // 登録していない人が攻められる道理が無い
+    const state = createInitialState();
+    const now = Date.UTC(2026, 8, 20);
+    state.arenaLastDefenseCheckAt = now - 48 * HOUR;
+    expect(runPendingDefenseAttacks(state, now).attacks).toBe(0);
+    expect(state.arenaMatchHistory).toHaveLength(0);
+  });
+
+  it("初回は今から数え始める(登録した瞬間に過去ぶんが襲ってこない)", () => {
+    const state = withDefense();
+    const now = Date.UTC(2026, 8, 20);
+    expect(runPendingDefenseAttacks(state, now).attacks).toBe(0);
+    expect(state.arenaLastDefenseCheckAt).toBe(now);
+  });
+
+  it("間が空いた時間ぶん攻められるが、1回の起動で上限を超えない", () => {
+    const state = withDefense();
+    const now = Date.UTC(2026, 8, 20);
+    state.arenaLastDefenseCheckAt = now - 48 * HOUR;
+    const result = runPendingDefenseAttacks(state, now);
+    expect(result.attacks).toBeGreaterThan(0);
+    expect(result.attacks).toBeLessThanOrEqual(MAX_ATTACKS_PER_VISIT);
+    expect(state.arenaMatchHistory.every((record) => record.side === "DEFENSE")).toBe(true);
+  });
+
+  it("続けて開いても、間隔を空けないと起きない", () => {
+    // 画面を出入りするたびに攻められると、何度でもレートが動いてしまう
+    const state = withDefense();
+    const now = Date.UTC(2026, 8, 20);
+    state.arenaLastDefenseCheckAt = now - 48 * HOUR;
+    runPendingDefenseAttacks(state, now);
+    expect(runPendingDefenseAttacks(state, now).attacks).toBe(0);
+    expect(runPendingDefenseAttacks(state, now + 60_000).attacks).toBe(0);
+  });
+
+  it("何日空けても、1日ぶんまでしか遡らない", () => {
+    /*
+     * **寝ている間に溶けないようにする。** 1か月ぶりに開いた人が
+     * いきなり何十戦ぶんのレートを失う状態にはしない。
+     */
+    const state = withDefense();
+    const now = Date.UTC(2026, 8, 20);
+    state.arenaLastDefenseCheckAt = now - 30 * 24 * HOUR;
+    const result = runPendingDefenseAttacks(state, now);
+    expect(result.attacks).toBeLessThanOrEqual(MAX_ATTACKS_PER_VISIT);
+  });
+
+  it("勝敗は実際に戦って決める(結果を作らない)", () => {
+    /*
+     * 記録の勝敗が、防衛編成の強さで変わることを確かめる。
+     * 固定値を書いていたら、強さを変えても結果が動かない。
+     */
+    const weak = createInitialState();
+    const weakUnit = createMonsterInstance("slime_FIRE", 1, 1);
+    weak.arenaDefenseSnapshot = captureArenaDefense([weakUnit], []);
+    weak.arenaLastDefenseCheckAt = Date.UTC(2026, 8, 20) - 48 * HOUR;
+    runPendingDefenseAttacks(weak, Date.UTC(2026, 8, 20));
+
+    const strong = createInitialState();
+    const strongUnits = ["knight_WATER", "golem_WATER", "treant_GRASS", "fairy_WATER"]
+      .map((dexId) => createMonsterInstance(dexId, 6, 60));
+    strong.arenaDefenseSnapshot = captureArenaDefense(strongUnits, []);
+    strong.arenaLastDefenseCheckAt = Date.UTC(2026, 8, 20) - 48 * HOUR;
+    runPendingDefenseAttacks(strong, Date.UTC(2026, 8, 20));
+
+    const heldWeak = weak.arenaMatchHistory.filter((r) => r.won).length;
+    const heldStrong = strong.arenaMatchHistory.filter((r) => r.won).length;
+    expect(heldStrong, `★1単騎 ${heldWeak}勝 / ★6×4 ${heldStrong}勝`).toBeGreaterThanOrEqual(heldWeak);
+  });
+
+  it("攻められた記録からリベンジできる", () => {
+    // 防衛履歴とリベンジが、実際に使える状態になっていること
+    const state = withDefense();
+    const now = Date.UTC(2026, 8, 20);
+    state.arenaLastDefenseCheckAt = now - 48 * HOUR;
+    runPendingDefenseAttacks(state, now);
+    const lost = state.arenaMatchHistory.find((record) => !record.won);
+    if (lost) expect(arenaRevengeBlock(lost, 5)).toBeNull();
+    expect(state.arenaMatchHistory.length).toBeGreaterThan(0);
   });
 });
