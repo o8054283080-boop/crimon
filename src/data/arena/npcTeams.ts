@@ -35,6 +35,25 @@ export interface ArenaNpcTeamMember {
   role: ArenaNpcRole;
 }
 
+/**
+ * その編成が**実際にできると名乗っていること**。
+ *
+ * 名前と説明は飾りにできてしまう。「毒編成」と名乗る4体が毒を1つも
+ * 持っていなくても、型もテストも何も言わない——この案件では実際に
+ * **毒を1体も持たない3体を「毒編成」として測り、まるごと嘘の結論を出した**
+ * (CLAUDE.md)。名乗りをデータとして書き、`tests/arenaNpcTeams.test.ts` が
+ * 全員のスキルを実際にたどって裏を取る。
+ */
+export type ArenaTeamClaim =
+  | "POISON"    // 毒を撒ける
+  | "STRIP"     // 強化を剥がせる
+  | "HEAL"      // 回復できる
+  | "CONTROL"   // 手番を奪える(スタン・ゲージ減少・クールタイム延長)
+  | "GUARD"     // 守りを固められる(盾・免疫・解除・庇う・軽減)
+  | "DEBUFF"    // 弱体を入れられる
+  | "SPEED"     // 先に動ける(素早さ上昇・ゲージ増加)
+  | "BURST";    // 一撃が重い(倍率2.0以上の攻撃を持つ)
+
 export interface ArenaNpcTeam {
   id: string;
   /** 相手カードに出す編成名 */
@@ -45,6 +64,11 @@ export interface ArenaNpcTeam {
   tier: number;
   /** 4体。順番は隊列の並びとして意味を持たせない */
   members: readonly ArenaNpcTeamMember[];
+  /**
+   * この編成が名乗っていること。**説明文と必ず揃えること。**
+   * 空でよいのは「特に名乗っていない」編成だけ。
+   */
+  claims: readonly ArenaTeamClaim[];
   /**
    * 編成としてそろえるシリーズ。指定するとその型の全員が
    * 4個セットをこれで組む(役割ごとの既定より優先)。
@@ -60,6 +84,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   /* ---------------- 段0: 覚えたての編成。役割は揃っているが噛み合いは浅い ---------------- */
   {
     id: "starter_pack",
+    claims: [],
     name: "手探りの4体",
     note: "殴る係と守る係を1体ずつ置いただけの編成",
     tier: 0,
@@ -72,6 +97,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "stone_wall",
+    claims: ["HEAL", "GUARD"],
     name: "石垣",
     note: "硬い前衛で受けて、回復でしのぐ",
     tier: 0,
@@ -84,6 +110,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "swamp_start",
+    claims: ["POISON", "DEBUFF"],
     name: "沼地の使い",
     note: "毒と弱体を重ねて削り切る",
     tier: 0,
@@ -98,8 +125,15 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   /* ---------------- 段1: 戦い方が1つに決まっている編成 ---------------- */
   {
     id: "gale_hunt",
+    /*
+     * **「動く前に落とす」とは名乗れない。** この4体は最大倍率が1.65で、
+     * スタンもゲージ減少も持っていない。できるのは「全員が先に動く」ことと
+     * 「弱らせること」だけなので、名乗りも説明もそこへ合わせてある
+     * (`tests/arenaNpcTeams.test.ts` が実際のスキルをたどって拾った)。
+     */
+    claims: ["SPEED", "DEBUFF"],
     name: "疾風の狩り",
-    note: "電気で固めて先に動き、動く前に落とす",
+    note: "電気で固めて全員が先に動き、弱らせてから削る",
     tier: 1,
     set: "SWIFT",
     members: [
@@ -111,6 +145,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "bulwark",
+    claims: ["HEAL", "GUARD"],
     name: "城壁",
     note: "落ちない前衛と回復で、時間を味方にする",
     tier: 1,
@@ -124,6 +159,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "chain_venom",
+    claims: ["POISON", "CONTROL"],
     name: "鎖と毒",
     note: "手番を奪いながら毒を積む",
     tier: 1,
@@ -139,6 +175,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   /* ---------------- 段2: 役割が噛み合い始める編成 ---------------- */
   {
     id: "sky_raid",
+    claims: ["BURST", "SPEED"],
     name: "翼の急襲",
     note: "高い攻撃力を先手で押し付ける",
     tier: 2,
@@ -152,6 +189,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "sanctuary",
+    claims: ["HEAL", "GUARD"],
     name: "聖域",
     note: "回復と防壁を切らさず、削り負けない",
     tier: 2,
@@ -164,6 +202,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "hex_breaker",
+    claims: ["STRIP"],
     name: "解呪の刃",
     note: "強化を剥がしてから殴る",
     tier: 2,
@@ -178,6 +217,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   /* ---------------- 段3: 戦術が完成している編成 ---------------- */
   {
     id: "dragonfire_verdict",
+    claims: ["BURST"],
     name: "竜火の断罪",
     note: "支えを固めた上での、一撃必殺",
     tier: 3,
@@ -191,6 +231,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "time_thief",
+    claims: ["CONTROL", "STRIP"],
     name: "時を止める者",
     note: "手番を奪い、強化を剥がし、返す手を残さない",
     tier: 3,
@@ -203,6 +244,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "fang_sprint",
+    claims: ["SPEED"],
     name: "狼牙の疾走",
     note: "全員が先に動く。返す手番を作らせない",
     tier: 3,
@@ -216,6 +258,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
   },
   {
     id: "honed_regular",
+    claims: [],
     name: "研ぎ澄ました常連",
     note: "通常モンスターだけ。育成と装備で最上位に居座る",
     tier: 3,
