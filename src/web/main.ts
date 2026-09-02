@@ -123,7 +123,7 @@ import { renderPvpArena } from "./views/pvpArena.js";
 import { renderHowToPlay } from "./views/howToPlay.js";
 import type { ArenaViewName } from "./views/pvpArena.js";
 import { buildArenaEntryBattle } from "./views/arena/model.js";
-import { buildArenaNpcs } from "../game/arena/npc.js";
+import { arenaNpcRng, buildArenaNpcs } from "../game/arena/npc.js";
 import { buildArenaCandidates } from "../game/arena/matchmaking.js";
 import { captureArenaDefense } from "../game/arena/snapshot.js";
 import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, recordArenaMatch } from "../game/arena/match.js";
@@ -136,7 +136,7 @@ import { runPendingDefenseAttacks } from "../game/arena/defenseSim.js";
 import { arenaShopRows, buyArenaShopItem } from "../game/arena/shop.js";
 import { ARENA_TICKET_MAX_V2 } from "../data/arena/shop.js";
 import { arenaTierForRating } from "../data/arena/ranks.js";
-import type { ArenaOpponentEntry } from "../game/arena/types.js";
+import type { ArenaDefenseSnapshot, ArenaOpponentEntry } from "../game/arena/types.js";
 import {
   arenaSyncAvailable,
   claimArenaWeeklyReward as claimArenaWeeklyRewardRemote,
@@ -380,6 +380,8 @@ interface AppState {
   arenaTicket: ArenaMatchTicket | null;
   /** サーバの戦績を1度引いたか。開くたびに引き直さない */
   arenaHistoryLoaded: boolean;
+  /** サーバへ送った攻撃編成。画面もこれから組む(別のステータスで戦わないため) */
+  arenaAttackerSnapshot: ArenaDefenseSnapshot | null;
   arenaNotice: string | null;
   /** 期間が変わった時に出す前の期のまとめ報酬。受け取るまで残す */
   monsterTrainingTargetId: string | null;
@@ -457,6 +459,7 @@ const state: AppState = {
   arenaView: "TOP",
   arenaTicket: null,
   arenaHistoryLoaded: false,
+  arenaAttackerSnapshot: null,
   arenaDetailIndex: null,
   arenaUnitIndex: 0,
   arenaDefenseDraftIds: [],
@@ -1970,46 +1973,77 @@ function startArenaMatch(entry: ArenaOpponentEntry): void {
     return;
   }
   // アリーナはスタミナではなく挑戦券で回す。育成の周回と取り合いにしないため
-  if (!trySpendArenaTicket(state.player).ok) {
+  applyArenaTicketRegen(state.player);
+  if (state.player.arenaTickets <= 0) {
     state.arenaNotice = "挑戦券が足りません";
     playSfx("denied", 0.7);
     render();
     return;
   }
-  savePlayerState(state.player);
+
   state.arenaNotice = null;
   state.lastRun = { kind: "ARENA", entry };
   state.arenaEntry = entry;
   state.arenaTicket = null;
-  state.screen = "ARENA_BATTLE";
-  render();
+  state.arenaAttackerSnapshot = null;
 
   /*
-   * **繋がっているなら、サーバに1戦を発行してもらう。**
+   * **繋がっているなら、始める前にサーバへ1戦を発行してもらう。**
    *
-   * 返ってくるのは対戦ID・nonce・サーバが決めた乱数の種、そして
+   * 返ってくるのは対戦ID・nonce・**サーバが決めた乱数の種**、そして
    * 相手が実プレイヤーならサーバが持っている防衛編成。
-   * これで「画面に出た戦い」と「あとでサーバが回し直す戦い」が同じものになる。
    *
-   * 発行を待たずに画面を進めるのは、通信が遅い時に**戦闘が始まらない**
-   * のを避けるため。発行が間に合わなければローカルの記録だけで進む。
+   * ここを待たずに戦闘を始めていた頃は、画面が `Math.random` で戦い、
+   * サーバは別の種で戦い直していた。**同じ戦いを2回やっているつもりで、
+   * 実際には別の戦いだった。** 勝ったのに負け、が普通に起きる。
+   * だから待つ。待つ間は「準備しています」と出す。
+   *
+   * 発行できなければ(未接続・通信断)ローカルだけで進む。
+   * その時は勝敗も手元の計算になる——オフラインで遊べる状態は壊さない。
    */
-  if (!arenaSyncAvailable()) return;
+  if (!arenaSyncAvailable()) {
+    trySpendArenaTicket(state.player);
+    savePlayerState(state.player);
+    state.screen = "ARENA_BATTLE";
+    render();
+    return;
+  }
+
+  state.arenaNotice = "対戦を準備しています…";
+  render();
+
+  // 攻撃編成も防衛と同じ形で焼く。**サーバは同じ検分をかける**
+  const attackerSnapshot = captureArenaDefense(party, state.player.equipment);
+
   void (async () => {
-    if (!(await connectArena())) return;
-    // 攻撃編成も防衛と同じ形で焼く。**サーバは同じ検分をかける**
-    const snapshot = captureArenaDefense(party, state.player.equipment);
-    if (snapshot.units.length === 0) return;
-    const ticket = await beginArenaMatch({
-      kind: entry.kind,
-      attackerSnapshot: snapshot,
-      opponentId: entry.kind === "PLAYER" ? entry.id : null,
-      opponentSeed: entry.kind === "NPC" ? String(state.player.arenaOpponentSeed) : null,
-      opponentIndex: entry.kind === "NPC" ? entry.index : null,
-      opponentCount: entry.kind === "NPC" ? ARENA_CANDIDATE_COUNT * 2 : null,
-      opponentName: entry.name,
-    });
-    if (ticket) state.arenaTicket = ticket;
+    const ticket = (await connectArena())
+      ? await beginArenaMatch({
+        kind: entry.kind,
+        attackerSnapshot,
+        opponentId: entry.kind === "PLAYER" ? entry.id : null,
+        opponentSeed: entry.kind === "NPC" ? String(state.player.arenaOpponentSeed) : null,
+        opponentIndex: entry.kind === "NPC" ? entry.index : null,
+        opponentCount: entry.kind === "NPC" ? ARENA_CANDIDATE_COUNT * 2 : null,
+        opponentName: entry.name,
+      })
+      : null;
+
+    // 待っている間に別の画面へ移っていることがある。その時は始めない
+    if (state.arenaEntry !== entry) return;
+
+    if (ticket) {
+      // 挑戦券はサーバが引いた。**手元で二重に引かない**
+      state.arenaTicket = ticket;
+      state.arenaAttackerSnapshot = attackerSnapshot;
+      state.player.arenaTickets = ticket.tickets;
+    } else {
+      state.arenaNotice = null;
+      trySpendArenaTicket(state.player);
+    }
+    savePlayerState(state.player);
+    state.arenaNotice = null;
+    state.screen = "ARENA_BATTLE";
+    render();
   })();
 }
 
@@ -2053,6 +2087,9 @@ function finishArenaMatch(won: boolean): void {
     }
     const record = state.player.arenaMatchHistory.find((item) => item.id === outcome.record.id);
     if (record) {
+      // **勝敗もサーバの答えを控える。** 種と編成が同じなので普通は一致するが、
+      // 一致しなかった時に手元の言い分だけが残るのはおかしい
+      record.won = report.won;
       record.ratingDelta = report.ratingDelta;
       record.ratingAfter = report.rating;
       record.coins = report.coins;
@@ -2223,8 +2260,27 @@ function renderCurrentArenaBattle(): BattleViewHandle {
    * 相手の手持ちを今から読み直すと、登録後に本人が装備を外しただけで
    * 相手の画面の編成が崩れる。
    */
-  const setup = buildArenaEntryBattle(getArenaTeam(state.player, "OFFENSE"), entry, state.player.equipment);
-  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+  /*
+   * **相手はサーバが控えた編成を優先する。**
+   * 発行の時点で固定してあるので、待っている間に相手が防衛を替えても
+   * この対戦の相手は替わらない。
+   */
+  const ticket = state.arenaTicket;
+  const opponent = ticket?.defenderSnapshot
+    ? { ...entry, defense: ticket.defenderSnapshot }
+    : entry;
+  const setup = buildArenaEntryBattle(
+    getArenaTeam(state.player, "OFFENSE"), opponent, state.player.equipment, state.arenaAttackerSnapshot);
+  /*
+   * **乱数の種もサーバのものを使う。**
+   *
+   * ここを `Math.random` のままにしていた時は、画面とサーバが
+   * 別々の戦いをしていた(同じ戦いを2回やっているつもりで)。
+   * 戦闘エンジンは種を渡せば決定的なので、同じ種なら同じ経過になる。
+   * 未接続なら種は無い——その時は勝敗も手元の計算なので、食い違いようがない。
+   */
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs,
+    ticket ? { rng: arenaNpcRng(ticket.battleSeed | 0) } : {});
 
   return renderBattleView({
     engine,

@@ -618,7 +618,22 @@ export function buildArenaEntryBattle(
   offenseInstances: readonly MonsterInstance[],
   entry: ArenaOpponentEntry,
   allEquipment: readonly Equipment[],
+  /**
+   * サーバへ送った攻撃編成。
+   *
+   * **渡されたらこちらを使う。** 手持ちから組み直すのと同じ結果になるはずだが、
+   * 「はず」で済ませると、装備の解決が1か所でも違った時に
+   * **画面とサーバで別のステータスで戦う。** サーバが検分して控えたのは
+   * この焼き付けなので、画面もこれから組む。
+   */
+  attackerSnapshot?: ArenaDefenseSnapshot | null,
 ): ArenaBattleSetupV2 {
+  if (attackerSnapshot && attackerSnapshot.units.length > 0) {
+    return {
+      playerDefs: snapshotToDefinitions(attackerSnapshot).map(withArenaSpeed),
+      enemyDefs: snapshotToDefinitions(entry.defense).map(withArenaSpeed),
+    };
+  }
   const playerDefs: MonsterDefinition[] = [];
   for (const instance of offenseInstances) {
     const dex = findMonsterById(instance.dexId);
