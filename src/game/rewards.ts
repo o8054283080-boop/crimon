@@ -5,7 +5,18 @@ import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDu
 import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef } from "../data/levelDungeon.js";
 import { EXP_PIG_DEX, findMonsterById } from "../data/monsters.js";
-import { DIFFICULTY_MODIFIERS, Difficulty, Stage, StageDrop, rollStageDrop, rollStageEquipment, rollStageReincarnationPig, rollStageSummonScroll } from "../data/stages.js";
+import {
+  DIFFICULTY_MODIFIERS,
+  Difficulty,
+  Stage,
+  StageDrop,
+  rollStageDrop,
+  rollStageEquipment,
+  rollStageReincarnationPigs,
+  rollStageSummonScroll,
+  stageClearExp,
+  stageClearGold,
+} from "../data/stages.js";
 import {
   FIRST_CLEAR_CRYSTAL_REWARD,
   REPEAT_CLEAR_CRYSTAL_CHANCE,
@@ -68,6 +79,8 @@ export interface ClearRewardResult {
   dropStar: number | null;
   equipmentDrop: Equipment | null;
   pigDrop: StageDrop | null;
+  /** 星2通常抽選とボス階の星3抽選。既存のpigDropは先頭1件を指し、旧呼び出し側との互換を保つ。 */
+  pigDrops?: StageDrop[];
   summonScrollDropped: boolean;
   fighterLevelsGained: number;
 }
@@ -150,19 +163,22 @@ export function applyStageClearRewards(
   const isFirstClear = !isStageCleared(state, stage.id, difficulty);
   markStageCleared(state, stage.id, difficulty);
 
-  const expTotal = Math.round(wavesCleared * stage.rewards.waveExp * DIFFICULTY_MODIFIERS[difficulty].expMultiplier);
+  const expTotal = wavesCleared === stage.waves.length
+    ? stageClearExp(stage, difficulty)
+    : Math.round(wavesCleared * stage.rewards.waveExp * DIFFICULTY_MODIFIERS[difficulty].expMultiplier);
   const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);
 
-  const goldEarned = stage.rewards.clearGold;
+  const goldEarned = stageClearGold(stage, difficulty);
   const crystalEarned = rollClearCrystal(isFirstClear, rng);
 
-  const drop = rollStageDrop(stage);
+  const drop = rollStageDrop(stage, rng);
   if (drop) addMonster(state, drop.dexId, drop.star);
-  const equipmentDrop = rollStageEquipment(stage, Math.random, difficulty);
+  const equipmentDrop = rollStageEquipment(stage, rng, difficulty);
   if (equipmentDrop) addEquipment(state, equipmentDrop);
-  const pigDrop = rollStageReincarnationPig();
-  if (pigDrop) addMonster(state, pigDrop.dexId, pigDrop.star, STAR_MAX_LEVEL[pigDrop.star]);
-  const summonScrollDropped = rollStageSummonScroll();
+  const pigDrops = rollStageReincarnationPigs(stage, difficulty, rng);
+  for (const pig of pigDrops) addMonster(state, pig.dexId, pig.star, STAR_MAX_LEVEL[pig.star]);
+  const pigDrop = pigDrops[0] ?? null;
+  const summonScrollDropped = rollStageSummonScroll(rng);
   if (summonScrollDropped) addSummonScrolls(state, 1);
   const fighterExp = stageFighterExp(expTotal);
   const fighterLevelsGained = addFighterExp(state, fighterExp).levelsGained;
@@ -181,6 +197,7 @@ export function applyStageClearRewards(
     dropStar: drop ? drop.star : null,
     equipmentDrop,
     pigDrop,
+    pigDrops,
     summonScrollDropped,
     fighterLevelsGained,
   };
