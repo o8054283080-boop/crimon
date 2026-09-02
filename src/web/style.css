@@ -7779,11 +7779,18 @@ body::before {
    画面のどこを巻いていても左上に残る。**浮かせた部品は下の何かを覆う**
    ので、`body.has-global-back` の時だけ画面の中身へ逃げ場を空けている
    (この案件では覆って押せなくする事故を3回出している)。 */
-:root { --global-back-h: 42px; }
+/*
+ * ボタンの上端を**変数で1か所に持つ**。逃げ場の計算と別々に書いていたせいで
+ * 実機だけズレた(下の `body.has-global-back .screen` の注記)。
+ */
+:root {
+  --global-back-h: 42px;
+  --global-back-top: calc(max(6px, env(safe-area-inset-top)) + 4px);
+}
 
 .global-back {
   position: fixed;
-  top: calc(max(6px, env(safe-area-inset-top)) + 4px);
+  top: var(--global-back-top);
   left: calc(max(8px, env(safe-area-inset-left)) + 4px);
   z-index: 60;
   appearance: none;
@@ -7816,8 +7823,22 @@ body::before {
   white-space: nowrap;
 }
 
-/* 中身を押し下げて、ボタンの下に隠れるものを作らない */
-body.has-global-back .screen { padding-top: calc(var(--global-back-h) + 10px); }
+/*
+ * 中身を押し下げて、ボタンの下に隠れるものを作らない。
+ *
+ * **ここは実機だけで壊れていた。** 元は `calc(var(--global-back-h) + 10px)`、
+ * つまり52pxしか空けていなかった。`.screen` の素の上余白は
+ * `max(16px, env(safe-area-inset-top))` なので、この指定は
+ * **ノッチぶんの余白を上書きして消してしまう**。
+ * iPhoneでは inset が約59pxあり、ボタンの下端は 59+4+42=105px。
+ * 逃げ場52pxとの差ぶん、自動周回の帯の左上に「戻る」が乗っていた。
+ * 画面の枠が0だけの環境(巡回のChromium)では inset が0なので再現しない。
+ *
+ * ボタンの上端と同じ変数から積み上げて、二度とズレないようにする。
+ */
+body.has-global-back .screen {
+  padding-top: calc(var(--global-back-top) + var(--global-back-h) + 10px);
+}
 
 /* ------------------------------------------------------ 下に貼り付く実行バー
 

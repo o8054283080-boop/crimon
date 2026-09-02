@@ -1942,9 +1942,27 @@ function renderCurrentWaveBattle(): BattleViewHandle {
  * 共通の帯(`.tutorial-bar`)へ寄せる。横一列で、幅は画面いっぱい、
  * 押す的は40px以上、はみ出したら巡回が拾う。
  */
+/**
+ * 周回の帯を畳んだままにするか。
+ *
+ * 起動をまたいで残す。周回は何十分も続くので、開くたび畳み直すのでは
+ * 畳めるようにした意味が無い。**セーブには入れない**——これは端末ごとの
+ * 見た目の好みで、進行ではない。
+ */
+const FARM_BAR_FOLD_KEY = "crimon.farm-bar.folded.v1";
+
+function farmBarFolded(): boolean {
+  try { return localStorage.getItem(FARM_BAR_FOLD_KEY) === "1"; } catch { return false; }
+}
+
+function setFarmBarFolded(folded: boolean): void {
+  try { localStorage.setItem(FARM_BAR_FOLD_KEY, folded ? "1" : "0"); } catch { /* 見た目の設定はゲームを止めない */ }
+}
+
 function buildBackgroundFarmBar(job: BackgroundFarmJob): HTMLElement {
   const running = job.status === "RUNNING";
   const status = running ? "進行中" : job.status === "COMPLETED" ? "完了" : "終了";
+  const folded = farmBarFolded();
   const openResult = () => {
     state.autoFarmResult = job.result;
     state.autoFarmTargetName = job.targetName;
@@ -1952,28 +1970,47 @@ function buildBackgroundFarmBar(job: BackgroundFarmJob): HTMLElement {
     state.screen = "AUTO_FARM_RESULT";
     render();
   };
-  return el("section", {
-    className: `tutorial-bar tutorial-bar--farm${running ? "" : " tutorial-bar--farm-done"}`,
+  const toggleFold = () => { setFarmBarFolded(!folded); refreshBackgroundFarmStatus(); };
+  const shell = (children: HTMLElement[]) => el("section", {
+    className: `tutorial-bar tutorial-bar--farm${running ? "" : " tutorial-bar--farm-done"}${folded ? " tutorial-bar--farm-folded" : ""}`,
     "data-background-farm-bar": "",
     "aria-label": "自動周回の進捗",
-  }, [
+  }, children);
+
+  /*
+   * 畳んだ姿。**帯ごと1つの的にする。**
+   *
+   * 中に小さな開くボタンを置く形も試したが、押す的は40pxを下回らせないので
+   * 帯の高さが58→50pxまでしか縮まず、畳んだ意味がほとんど無かった。
+   * 帯そのものをボタンにすれば、40pxの下限が帯の高さと一致する。
+   *
+   * **畳んでも消さない。** 周回は何十分も動き続けるので、完全に消せると
+   * 「回っていることを忘れた」状態が作れてしまう。
+   * 畳んだ姿でも行き先と進み具合(3/10)は残す。
+   */
+  if (folded) {
+    return shell([
+      el("button", {
+        type: "button",
+        className: "tutorial-bar__unfold",
+        "aria-label": "自動周回の詳細を開く",
+        "aria-expanded": "false",
+        onclick: toggleFold,
+      }, [
+        el("span", { className: "tutorial-bar__unfold-count" }, [`${job.completedRuns}/${job.requestedRuns}`]),
+        el("span", { className: "tutorial-bar__unfold-title" }, [`🔁 ${job.targetName}　${status}`]),
+        el("span", { className: "tutorial-bar__unfold-chevron", "aria-hidden": "true" }, ["▾"]),
+      ]),
+    ]);
+  }
+
+  return shell([
     el("div", { className: "tutorial-bar__badge" }, [
       el("small", {}, ["周回"]),
       el("strong", {}, [`${job.completedRuns}/${job.requestedRuns}`]),
     ]),
     el("div", { className: "tutorial-bar__text" }, [
       el("div", { className: "tutorial-bar__title" }, [`🔁 ${job.targetName}　${status}`]),
-      /*
-       * 進んだ数は札(3/10)が持っているので、ここには**稼ぎだけ**を出す。
-       * 「残り7周」を並べると同じ話が二度出て、そのぶん稼ぎの数字が
-       * 末尾から切り落とされる(実機で「装備5」が「装…」になっていた)。
-       */
-      el("div", { className: "tutorial-bar__cond" }, [
-        el("span", {}, [
-          `⚡${job.staminaSpent} / EXP ${job.result.totalExp.toLocaleString("ja-JP")}`
-          + ` / 🪙${job.result.totalGold.toLocaleString("ja-JP")} / 装備${job.result.equipmentDropCount}`,
-        ]),
-      ]),
     ]),
     el("div", { className: "tutorial-bar__actions" }, [
       running
@@ -1981,6 +2018,27 @@ function buildBackgroundFarmBar(job: BackgroundFarmJob): HTMLElement {
           finishBackgroundFarm(job, "STOPPED"); savePlayerState(state.player); refreshBackgroundFarmStatus();
         } }, ["終了"])
         : el("button", { type: "button", className: "btn btn--primary", onclick: openResult }, ["結果"]),
+      el("button", {
+        type: "button",
+        className: "tutorial-bar__fold",
+        "aria-label": "自動周回を畳む",
+        "aria-expanded": "true",
+        onclick: toggleFold,
+      }, ["▴"]),
+    ]),
+    /*
+     * 稼ぎは**2段目に丸ごと回す。**
+     *
+     * 進んだ数は札(3/10)が持っているので、ここには稼ぎだけを出す。
+     * それでも1行目に同居させると、行き先と終了ボタンと畳む的で幅を取り合い、
+     * 末尾から切り落とされる(実機で「🪙246,000 / 装備15」が「246,…」になった)。
+     * 2段目なら幅の取り合いが起きないので、桁が伸びても切れない。
+     */
+    el("div", { className: "tutorial-bar__cond tutorial-bar__cond--full" }, [
+      el("span", {}, [
+        `⚡${job.staminaSpent} / EXP ${job.result.totalExp.toLocaleString("ja-JP")}`
+        + ` / 🪙${job.result.totalGold.toLocaleString("ja-JP")} / 装備${job.result.equipmentDropCount}`,
+      ]),
     ]),
   ]);
 }
