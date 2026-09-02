@@ -329,10 +329,11 @@ set search_path = ''
 as $$
 declare
   v_uid     uuid := auth.uid();
-  v_count   integer;
-  v_version integer;
-  v_at      timestamptz;
-  v_lead    jsonb;
+  v_count       integer;
+  v_version     integer;
+  v_max_version integer;
+  v_at          timestamptz;
+  v_lead        jsonb;
 begin
   if v_uid is null then
     raise exception 'NOT_AUTHENTICATED';
@@ -345,8 +346,19 @@ begin
     raise exception 'INVALID_SNAPSHOT_VERSION';
   end if;
   v_version := (p_snapshot ->> 'version')::integer;
-  if v_version < 1 then
-    raise exception 'INVALID_SNAPSHOT_VERSION';
+  /*
+   * **未来から来た編成を受け取らない。**
+   *
+   * 焼き付けの形を変えた時、配信の途中では新旧のクライアントが同時に動く。
+   * 読み方が変わっているのに古いサーバが受け取ると、
+   * それを引いた**相手の画面で編成が崩れる**(本人には見えない事故)。
+   * 古い版は受け取る——読めるし、読めなくなった1体は閲覧側が黙って落とす。
+   */
+  v_max_version := (public.arena__config('snapshot', '{"max_version":1}'::jsonb)
+                    ->> 'max_version')::integer;
+  if v_version < 1 or v_version > v_max_version then
+    raise exception 'UNSUPPORTED_SNAPSHOT_VERSION: % (受け取れるのは % まで)',
+      v_version, v_max_version;
   end if;
 
   -- capturedAt はクライアント時刻なので、未来には置かせない

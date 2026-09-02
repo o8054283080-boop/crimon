@@ -147,6 +147,7 @@ describe("編成の検分", () => {
       "DUPLICATE_SUB_STAT",        // サブOPの重複
       "SUB_STAT_OVER_CAP",         // サブOPの値
       "INVALID_MONSTER_TYPE",      // タイプ転生
+      "UNSUPPORTED_SNAPSHOT_VERSION", // 知らない版の焼き付け
     ]) {
       expect(integrity, `${marker} を見ていない`).toContain(marker);
     }

@@ -117,3 +117,26 @@ insert into public.arena_reward_rules (kind, tier_id, coins) values
   ('SEASON', 'PLATINUM_3', 550), ('SEASON', 'PLATINUM_2', 620), ('SEASON', 'PLATINUM_1', 700),
   ('SEASON', 'MASTER',     850), ('SEASON', 'LEGEND',    1000)
 on conflict (kind, tier_id) do update set coins = excluded.coins;
+
+-- ---------------------------------------------------------------------
+-- スナップショットの版
+--
+-- **未来から来た編成を受け取らない。**
+--
+-- 焼き付けの形を変えた時、新しい版を名乗る編成が先に届くことがある
+-- (配信の途中で、新旧のクライアントが同時に動く)。
+-- 中身の読み方が変わっているのに古いサーバが受け取ると、
+-- **それを引いた相手の画面で編成が崩れる**——本人には見えない事故になる。
+--
+-- 古い版は受け取る。読めるからで、読めなくなった1体は
+-- 閲覧側が黙って落とす(`snapshotToDefinitions`)。
+-- 拒むのは「こちらが知らない版」だけにする。
+--
+-- `src/game/arena/types.ts` の `ARENA_SNAPSHOT_VERSION` と同じ値にすること。
+-- `tests/arenaConfigParity.test.ts` が見張っている。
+-- ---------------------------------------------------------------------
+insert into public.arena_config (key, value, note) values
+  ('snapshot',
+   '{"max_version":1}'::jsonb,
+   'ARENA_SNAPSHOT_VERSION と同じ値にすること。これより新しい版の編成は受け取らない')
+on conflict (key) do update set value = excluded.value, note = excluded.note;

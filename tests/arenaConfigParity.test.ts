@@ -12,6 +12,7 @@ import {
   arenaWeeklyReward,
 } from "../src/data/arena/season.js";
 import { ARENA_SHOP_ITEMS } from "../src/data/arena/shop.js";
+import { ARENA_SNAPSHOT_VERSION } from "../src/game/arena/types.js";
 
 /*
  * サーバ側の設定と、クライアント側の定数が同じ値か。
@@ -192,10 +193,40 @@ describe("報酬・シーズン・棚がクライアントと同じ値である�
 
   it("seed に無い商品を売っていない", () => {
     // サーバだけにある商品は、買った人の手元で何も起きない
-    const ids = [...sqlSeed.matchAll(/^\s{2}\('([a-z0-9_]+)',\s*'/gm)].map((m) => m[1]);
+    /*
+     * **棚の挿入だけを見る。** seed には他の insert も並んでいるので、
+     * ファイル全体から拾うと設定の鍵まで「商品」として数えてしまう
+     * (`snapshot` を商品だと言って落ちた)。
+     */
+    const from = sqlSeed.indexOf("insert into public.arena_shop_items");
+    const block = sqlSeed.slice(from, sqlSeed.indexOf("on conflict", from));
+    const ids = [...block.matchAll(/^\s{2}\('([a-z0-9_]+)',\s*'/gm)].map((m) => m[1]);
     const known = new Set(ARENA_SHOP_ITEMS.map((item) => item.id));
     for (const id of ids) {
       expect(known.has(id), `${id} は実装に無い商品`).toBe(true);
     }
+  });
+});
+
+describe("スナップショットの版", () => {
+  it("サーバが受け取れる上限が、クライアントの版と同じ", () => {
+    /*
+     * ここがクライアントより**低い**と、配信した直後に
+     * 誰も防衛を登録できなくなる(全員が新しい版で焼いてくる)。
+     * **高い**と、読み方の分からない編成を受け取ってしまい、
+     * それを引いた相手の画面で崩れる。同じ値でなければならない。
+     */
+    const found = sqlSeed.match(/'\{"max_version":(\d+)\}'::jsonb/);
+    expect(found, "snapshot の設定が seed に無い").not.toBeNull();
+    expect(Number(found![1])).toBe(ARENA_SNAPSHOT_VERSION);
+  });
+
+  it("検分の既定値も同じ版", () => {
+    // 設定を入れ忘れた環境で、静かに別の版を通さないため
+    const integrity = readFileSync(
+      new URL("../supabase/migrations/20260902172200_arena_match_integrity.sql", import.meta.url), "utf8");
+    const fallback = integrity.match(/arena__config\('snapshot', '\{"max_version":(\d+)\}'::jsonb\)/);
+    expect(fallback, "検分に snapshot の既定値が無い").not.toBeNull();
+    expect(Number(fallback![1])).toBe(ARENA_SNAPSHOT_VERSION);
   });
 });
