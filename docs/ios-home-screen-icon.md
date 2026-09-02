@@ -59,17 +59,24 @@ base64の一部しか書けなかった、途中のNULバイトで切れた、�
 
 ## 直し方
 
-### 1. SVGから焼く
+### 1. 元絵から焼く
 
-`tools/bakeAppIcons.mjs` を足した。`src/web/assets/crimon-emblem.svg` を
+`tools/bakeAppIcons.mjs` を足した。`src/web/assets/app-icon.png` を
 Chromiumのcanvasで描き、**canvasが出したbase64をBufferで直接書き出す**。
 途中に文字列としての加工が入らないので、同じ壊れ方をしない。
-
-元をSVGにしてあるのは、SVGが文字だから。壊れたら差分で分かる。
 
 ```
 node tools/bakeAppIcons.mjs
 ```
+
+元絵は透過つきなので、**必ず背景(`#171826`)を敷いてから描く。**
+iOSはアイコンを角丸で切り抜くだけで、透過部分は黒く残る。
+元絵自体が壊れていないことも `tests/pngIntegrity.test.ts` が見張っている
+(`src/web/assets` も検査の対象)。
+
+**アイコンを差し替える時は、`src/web/assets/app-icon.png` を置き換えて
+この道具を回すだけ。** `public/icons/` のPNGを手で作らないこと——
+5回壊れたのは、そこを手で作った時だけ起きている。
 
 ### 2. 壊れたら必ず落ちるようにする
 
