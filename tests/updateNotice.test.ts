@@ -3,6 +3,7 @@ import { COMPENSATIONS, claimCompensations, compensationBannerLabel } from "../s
 import { createInitialState } from "../src/game/playerState.js";
 
 const UPDATE_NOTICE = COMPENSATIONS.find((c) => c.id === "2026-09-01-update-missions-and-training")!;
+const STAGE_REBALANCE_NOTICE = COMPENSATIONS.find((c) => c.id === "2026-09-02-stage-5-8-rebalance")!;
 
 function localNoonOn(date: string): Date {
   const [y, m, d] = date.split("-").map(Number);
@@ -36,5 +37,17 @@ describe("9/1アップデートのお知らせ", () => {
   it("記念配布などと同時に出る時は中立の見出しにする", () => {
     const celebration = COMPENSATIONS.find((c) => c.id === "2026-09-01-new-monsters")!;
     expect(compensationBannerLabel([{ compensation: UPDATE_NOTICE }, { compensation: celebration }])).toBe("お知らせ");
+  });
+});
+
+describe("9/2 第5〜8章アップデートのお知らせ", () => {
+  it("今回の報酬・難易度変更をHOMEで確認できる", () => {
+    expect(STAGE_REBALANCE_NOTICE).toBeDefined();
+    expect(STAGE_REBALANCE_NOTICE.kind).toBe("UPDATE");
+    expect(STAGE_REBALANCE_NOTICE.message).toContain("第5〜8章");
+    expect(STAGE_REBALANCE_NOTICE.message).toContain("NORMALで15,000");
+    expect(STAGE_REBALANCE_NOTICE.message).toContain("最大★5");
+    expect(STAGE_REBALANCE_NOTICE.message).toContain("★3転生ピッグ");
+    expect(STAGE_REBALANCE_NOTICE.message).toContain("8-5 HELL");
   });
 });
