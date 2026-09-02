@@ -76,10 +76,18 @@ function equipmentOwnerName(player: PlayerState, equipment: Equipment): string |
   return dex ? dex.name : owner.dexId;
 }
 
+/** 割合で持つ値かどうか。表示の桁と単位がここで分かれる */
+function isPercentStat(type: StatRoll["type"]): boolean {
+  return !["HP_FLAT", "ATK_FLAT", "DEF_FLAT", "SPD"].includes(type);
+}
+
 function formatMainStatNumber(stat: StatRoll): string {
-  return ["HP_FLAT", "ATK_FLAT", "DEF_FLAT", "SPD"].includes(stat.type)
-    ? String(stat.value)
-    : `${(stat.value * 100).toFixed(1)}%`;
+  return isPercentStat(stat.type) ? `${(stat.value * 100).toFixed(1)}%` : String(stat.value);
+}
+
+/** サブの数値だけ。名前は呼ぶ側が別の枠に出す */
+function formatSubStatNumber(stat: StatRoll): string {
+  return formatMainStatNumber(stat);
 }
 
 /**
@@ -96,9 +104,19 @@ function formatMainStatNumber(stat: StatRoll): string {
  */
 function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () => void, currentId?: string): HTMLElement {
   const ownerName = equipmentOwnerName(player, equipment);
+  /*
+   * サブは**名前と数値を分ける。**
+   *
+   * `formatStatValue` は「攻撃力%3.8%」と1つの文字列で返す。並べると
+   * どこまでが名前でどこからが数値なのか目で切れず、数十枚を見比べる画面で
+   * いちばん読み違えるところだった。名前は左、数値は右端で揃える。
+   */
   const subLines =
     equipment.subStats.length > 0
-      ? equipment.subStats.map((s) => el("div", { className: "equip-card__sub-line" }, [formatStatValue(s)]))
+      ? equipment.subStats.map((s) => el("div", { className: "equip-card__sub-line" }, [
+        el("span", { className: "equip-card__sub-label" }, [STAT_LABEL[s.type]]),
+        el("span", { className: "equip-card__sub-value" }, [formatSubStatNumber(s)]),
+      ]))
       : [el("div", { className: "equip-card__sub-line equip-card__sub-line--empty" }, ["サブステータスなし"])];
 
   // 等級・シリーズ・強化段階を data 属性で持たせ、色と縁取りはCSS側で当てる。
@@ -340,19 +358,46 @@ function renderList(props: EquipmentProps): HTMLElement {
         },
       },
       enhanceable
-        ? [icon("arrowUp", { size: 14 }), `+${eq.level + 1}へ強化`, el("span", { className: "equip-picker-card__enhance-cost" }, [icon("coin", { size: 13 }), enhanceCost.toLocaleString("ja-JP")])]
-        : [icon("check", { size: 14 }), "MAX強化済み"],
+        ? [icon("arrowUp", { size: 13 }), `強化+${eq.level + 1}`, el("span", { className: "equip-picker-card__enhance-cost" }, [icon("coin", { size: 12 }), enhanceCost.toLocaleString("ja-JP")])]
+        : [icon("check", { size: 13 }), "MAX"],
     );
 
-    return el("div", { className: "equip-picker-card" }, [
+    /*
+     * 差分は**1項目1行の表**にする。
+     *
+     * 前は「攻撃力+ 36 → 37 (+1)」を色付きの `<small>` で並べていただけで、
+     * 折り返しの都合で行の途中に次の項目が始まり、**5行の色の帯**になっていた。
+     * 名前・変化・差、と列を決めれば、目は差の列だけを縦に追える。
+     */
+    const comparisonRows = comparisons.map((row) => {
+      const percent = isPercentStat(row.type);
+      const show = (value: number | null) => value === null ? "—" : percent ? `${Math.round(value * 100)}%` : `${Math.round(value)}`;
+      const delta = percent ? `${Math.round(row.delta * 100)}%` : `${Math.round(row.delta)}`;
+      return el("div", { className: `equip-cmp__row ${row.delta >= 0 ? "is-up" : "is-down"}` }, [
+        el("span", { className: "equip-cmp__label" }, [row.label]),
+        el("span", { className: "equip-cmp__move" }, [`${show(row.current)}→${show(row.candidate)}`]),
+        el("span", { className: "equip-cmp__delta" }, [`${row.delta >= 0 ? "+" : ""}${delta}`]),
+      ]);
+    });
+
+    /*
+     * 札・差分・強化を**1つの枠に収める。**
+     *
+     * 前は枠(`.equip-card`)の外に差分と画面幅いっぱいの金色の強化ボタンを
+     * 積んでいたので、どこまでが1つの装備なのか切れ目が分からなかった。
+     * 枠を外側(`.equip-picker-card`)へ移し、中身を上から
+     * 「装備そのもの → 今との差 → 強化」の順に置く。
+     * 等級の色は `data-star` で決まるので、枠を移した先にも同じ印を持たせる。
+     */
+    return el("div", {
+      className: `equip-picker-card equip-picker-card--framed${eq.id === currentEquipmentId ? " equip-picker-card--current" : ""}`,
+      "data-star": String(eq.star),
+      "data-set": eq.set,
+      "data-tier": eq.level >= 12 ? "max" : eq.level >= 6 ? "mid" : "low",
+    }, [
       card,
-      current && eq.id !== current.id && comparisons.length ? el("div", { className: "equip-picker-card__comparison" }, comparisons.map((row) => {
-        const percent = !["HP_FLAT", "ATK_FLAT", "DEF_FLAT", "SPD"].includes(row.type);
-        const show = (value: number | null) => value === null ? "—" : percent ? `${Math.round(value * 100)}%` : `${Math.round(value)}`;
-        const delta = percent ? `${Math.round(row.delta * 100)}%` : `${Math.round(row.delta)}`;
-        return el("small", { className: `equip-picker-card__delta ${row.delta >= 0 ? "is-up" : "is-down"}` }, [`${row.label} ${show(row.current)} → ${show(row.candidate)} (${row.delta >= 0 ? "+" : ""}${delta})`]);
-      })) : null,
-      enhanceButton,
+      comparisonRows.length ? el("div", { className: "equip-cmp" }, comparisonRows) : null,
+      el("div", { className: "equip-picker-card__foot" }, [enhanceButton]),
       lockButton,
     ].filter((node): node is HTMLElement => node !== null));
   };
@@ -370,8 +415,9 @@ function renderList(props: EquipmentProps): HTMLElement {
   // 行き先(ダンジョン)と道具の整理(まとめ売り)を1段に並べる
   const toolbar = props.pickerContext
     ? currentEquipmentId
-      ? el("div", { className: "equip-picker__current" }, ["枠内で比較中：", el("strong", {}, ["現在装備中"]), " の札を強調しています。各装備はその場で強化できます"])
-      : el("div", { className: "equip-picker__current" }, ["この枠は未装備です。候補を装着する前にその場で強化できます"])
+      // 何をどう読む画面かを1行で言う。2行に割れると、その下の札が半分隠れる
+      ? el("div", { className: "equip-picker__current" }, [el("strong", {}, ["金の縁"]), "が今ついている装備。札を押すと着け替え、右下から強化できます"])
+      : el("div", { className: "equip-picker__current" }, ["この枠は未装備です。札を押すと装着、右下から強化できます"])
     : el("div", { className: "equip-toolbar" }, [
         el("button", { type: "button", className: "btn btn--gold equip-toolbar__go", onclick: props.onGoDungeon }, [
           icon("equipDungeon"),

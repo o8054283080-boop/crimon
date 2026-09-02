@@ -60,12 +60,35 @@
   gap: 1px;
 }
 
+/*
+ * サブは**名前を左、数値を右端で揃える。**
+ *
+ * 前は「攻撃力%3.8%」と1つの文字列だった。どこまでが名前でどこからが数値か
+ * 目で切れず、数十枚を見比べる画面でいちばん読み違えるところだった。
+ * 数値の列が縦に揃えば、札をまたいで大小を見比べられる。
+ */
 .equipment-screen .equip-card__sub-line {
-  overflow: visible;
-  text-overflow: clip;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
   white-space: nowrap;
   font-size: 0.68rem;
   line-height: 1.35;
+}
+
+.equipment-screen .equip-card__sub-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #93a2c4;
+}
+
+.equipment-screen .equip-card__sub-value {
+  margin-left: auto;
+  flex: none;
+  color: #dbe4fb;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -75,28 +98,138 @@
   min-width: 0;
 }
 
-/*
- * モンスターの装備変更中だけ、札の下に「その場で強化」を置く。
- * 札本体を押す操作は装着なので、強化ボタンを兄弟要素に分離して誤装着を防ぐ。
- */
-.equipment-screen .equip-picker-card__enhance {
-  width: 100%;
-  min-height: 38px;
-  margin-top: 4px;
-  padding: 5px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ==========================================================================
+ * 装備変更(スロットの入れ替え)の札
+ *
+ * ## 何が読めなかったか
+ *
+ * 枠(`.equip-card`)の**外**に、差分の文字列と画面幅いっぱいの金色の
+ * 強化ボタンを積んでいた。実機ではこうなっていた:
+ *
+ *   - 差分は「攻撃力+ 36 → 37 (+1)」を色付きの小文字で並べただけなので、
+ *     折り返しの途中から次の項目が始まる。**5行の色の帯**になって、
+ *     どれが1項目なのか目で切れない
+ *   - 強化ボタンが札より目立つ。ここは装備を**選ぶ**画面で、
+ *     強化はついでにできる操作でしかない
+ *   - 枠の外に2つ積むので、**どこまでが1つの装備か**分からない
+ *
+ * ## どう直したか
+ *
+ * 枠を外側(`.equip-picker-card`)へ移し、中身を上から
+ * 「装備そのもの → 今との差 → 強化」の順に1つの箱へ収めた。
+ * 差分は1項目1行の表にして、差の列だけを縦に追えるようにした。
+ * 強化は右下の小さな札にした。
+ * ========================================================================== */
+
+.equipment-screen .equip-picker-card--framed {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  /* 等級の色は data-star から。枠を移したので、印もこちらに持たせてある */
+  border: 1px solid color-mix(in srgb, var(--eq-tone, #4a5372) 55%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1d2136, #12162a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+
+.equipment-screen .equip-picker-card--framed[data-tier="max"] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 14px var(--eq-glow, transparent), 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* 今その枠に着いている札。選ぶ時の基準なので、縁の色そのものを変える */
+.equipment-screen .equip-picker-card--current {
+  border-color: rgba(255, 211, 106, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 0 1px rgba(255, 211, 106, 0.2), 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* 中の札は枠を持たない。枠は外側が1つだけ持つ */
+.equipment-screen .equip-picker-card--framed > .equip-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--eq-tone, #4a5372) 16%, transparent), transparent 55%);
+}
+
+.equipment-screen .equip-picker-card--framed > .equip-card::before {
+  /* 等級の帯は枠の一番上に1本だけ。中の札にも出すと二重線になる */
+  z-index: 1;
+}
+
+/* --- 今との差 ------------------------------------------------------------ */
+
+.equipment-screen .equip-cmp {
+  display: grid;
+  gap: 1px;
+  margin: 0 8px;
+  padding: 5px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.equipment-screen .equip-cmp__row {
+  display: grid;
+  /* 名前 / 変化 / 差。**差は必ず右端**で、そこだけを縦に追える */
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
   gap: 5px;
-  font-size: 0.72rem;
+  /* 9px未満は実機で読めない(tests/cssReadability.test.ts が落とす) */
+  font-size: 0.63rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.equipment-screen .equip-cmp__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #97a5c6;
+}
+
+.equipment-screen .equip-cmp__move {
+  color: #7d8cae;
+}
+
+.equipment-screen .equip-cmp__delta {
+  min-width: 34px;
+  text-align: right;
+  font-weight: 900;
+}
+
+.equipment-screen .equip-cmp__row.is-up .equip-cmp__delta { color: #7ce7a6; }
+.equipment-screen .equip-cmp__row.is-down .equip-cmp__delta { color: #ff9c9c; }
+
+/* --- その場で強化 --------------------------------------------------------
+ * ここは装備を**選ぶ**画面。強化はついでにできる操作でしかないので、
+ * 札より目立たせない。右下の小さな札にして、押す的だけは36pxを守る。
+ * 札本体を押す操作は装着なので、要素は兄弟に分けたまま(誤装着を防ぐ)。
+ */
+
+.equipment-screen .equip-picker-card__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 8px 8px;
+}
+
+.equipment-screen .equip-picker-card__enhance {
+  min-height: 36px;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 9px;
+  font-size: 0.68rem;
+  font-weight: 800;
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 .equipment-screen .equip-picker-card__enhance-cost {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
+  padding-left: 5px;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
   font-variant-numeric: tabular-nums;
 }
 
@@ -112,8 +245,34 @@
   }
 
   .equipment-screen .equip-picker-card__enhance {
-    min-height: 36px;
-    padding-inline: 6px;
-    font-size: 0.68rem;
+    padding-inline: 7px;
+    font-size: 0.66rem;
+  }
+}
+
+/*
+ * 狭い端末では**変化の列を落とし、名前に幅を返す。**
+ *
+ * 360pxで測ると項目名が206行中26行で切れていて、「効果命…」「効果抵…」の
+ * ように**名前で見分けられない行**が出ていた。落とすなら名前ではなく
+ * 「36→43」の方——今の値も候補の値も、札そのものに大きく出ている。
+ * 差(+7)は決め手なので、こちらは何があっても残す。
+ */
+@media (max-width: 380px) {
+  .equipment-screen .equip-cmp__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .equipment-screen .equip-cmp__move {
+    display: none;
+  }
+
+  /*
+   * シリーズ名(会心・守護・抵抗…)が「会…」と1文字で切れていた。
+   * **どの系統の装備かが読めない**のは、枠の番号が読めないより痛い。
+   * 枠は左の紋章が字を読まずに伝えているので、番号の方を落とす。
+   */
+  .equipment-screen .equip-card__slot {
+    display: none;
   }
 }
