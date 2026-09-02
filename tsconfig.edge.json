@@ -1,0 +1,45 @@
+/*
+ * Edge Function(Deno)へ持っていく共有コードを組み立てるための設定。
+ *
+ * ## なぜ別の設定が要るのか
+ *
+ * サーバ側で戦闘をやり直すには、**クライアントと同じ戦闘エンジン**が要る。
+ * 書き写した2つ目のエンジンを持つのは論外で(必ずずれる)、
+ * かといって Deno は `./foo.js` を `foo.ts` へは繋いでくれない。
+ *
+ * そこで `src/` をそのままの相対指定で JS へ落とす。
+ * もともと取り込みが `.js` で書いてあるので、出てきた `.js` と噛み合う。
+ *
+ * ## 使い方
+ *
+ *   npm run build:edge     # supabase/functions/_shared/ へ出す
+ *
+ * `supabase functions deploy` の前に必ず走らせる。出力は生成物なので
+ * `.gitignore` に入れてある(**リポジトリに焼き付けると、必ず古くなる**)。
+ */
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": [],
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": false,
+    "sourceMap": false,
+    "removeComments": false,
+    "outDir": "supabase/functions/_shared",
+    "rootDir": "src"
+  },
+  /*
+   * 戦闘に要るものだけを持っていく。画面(`src/web`)や
+   * Three.js を触るものを含めると、Deno で読み込めない取り込みが混ざる。
+   */
+  "include": [
+    "src/battle/engine.ts",
+    "src/game/arena/npc.ts",
+    "src/game/arena/snapshot.ts",
+    "src/game/arena/types.ts"
+  ]
+}

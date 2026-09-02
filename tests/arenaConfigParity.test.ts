@@ -26,8 +26,8 @@ import { ARENA_TIERS } from "../src/data/arena/ranks.js";
  * **配布されるSQLがずれていない**ことはここで保証できる。
  */
 
-const sql0001 = readFileSync(new URL("../supabase/migrations/0001_arena.sql", import.meta.url), "utf8");
-const sql0003 = readFileSync(new URL("../supabase/migrations/0003_arena_rpc.sql", import.meta.url), "utf8");
+const sql0001 = readFileSync(new URL("../supabase/migrations/20260902170000_arena_schema.sql", import.meta.url), "utf8");
+const sql0003 = readFileSync(new URL("../supabase/migrations/20260902172000_arena_rpc.sql", import.meta.url), "utf8");
 
 /** `arena_config` に入れている初期値を1件取り出す */
 function seededConfig(key: string): Record<string, number> {

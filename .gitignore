@@ -11,3 +11,7 @@ __pycache__/
 
 # 見た目の変化を比べるための基準スクリーンショット(容量が大きいので持たない)
 reference-shots/
+
+# Edge Function へ持っていく共有コード(生成物)。
+# **焼き付けると必ず古くなる。** `npm run build:edge` で作る
+supabase/functions/_shared/

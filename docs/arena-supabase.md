@@ -30,9 +30,9 @@ Supabase 固有の部分(JWT の発行、`auth.users` の実装、既定の
 ```
 supabase/
   README.md                      適用手順(短い版)
-  migrations/0001_arena.sql      表・索引・制約
-  migrations/0002_arena_rls.sql  RLS と権限
-  migrations/0003_arena_rpc.sql  RPC(security definer)
+  migrations/20260902170000_arena_schema.sql      表・索引・制約
+  migrations/20260902170100_arena_rls.sql  RLS と権限
+  migrations/20260902172000_arena_rpc.sql  RPC(security definer)
 src/net/arenaSync.ts             クライアント層(素の fetch。SDKは足していない)
 tests/arenaSync.test.ts          通信せずに確かめるテスト(33件)
 ```

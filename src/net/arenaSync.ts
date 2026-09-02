@@ -21,7 +21,7 @@
  *
  * ## 送ってよいもの・送っても意味がないもの
  *
- * レートもコインも**サーバが決める**(`supabase/migrations/0003_arena_rpc.sql`)。
+ * レートもコインも**サーバが決める**(`supabase/migrations/20260902172000_arena_rpc.sql`)。
  * ここから「レート+500」を送る道はそもそも無い。送れるのは
  * 「誰と戦って勝ったか負けたか」だけ。
  */
@@ -71,6 +71,8 @@ export interface ArenaRankingEntry {
 /** 1戦の報告に対するサーバの答え */
 export interface ArenaMatchReport {
   matchId: string;
+  /** **サーバが回し直して出した勝敗。** 画面はこれに従う */
+  won: boolean;
   ratingBefore: number;
   ratingDelta: number;
   rating: number;
@@ -81,19 +83,35 @@ export interface ArenaMatchReport {
   opponentRating: number;
 }
 
-export interface ArenaReportMatchInput {
+export interface ArenaBeginMatchInput {
   kind: ArenaOpponentKind;
-  won: boolean;
+  /** 自分の攻撃編成。**サーバが同じ検分を通す** */
+  attackerSnapshot: ArenaDefenseSnapshot;
   /** 実プレイヤーならその識別子 */
   opponentId?: string | null;
-  /** NPCなら生成に使った種 */
-  opponentSeed?: string | null;
-  opponentName?: string | null;
   /**
-   * NPCの見かけのレート。**実プレイヤーでは送っても捨てられる**
-   * (サーバがDBの値を使う)。NPCでも自分のレート±一定幅に丸められる。
+   * NPCの生成に使った種と、並びの中の位置・件数。
+   *
+   * **レートは送らない。** 送っていた頃は、丸めた値と画面に出ていた
+   * NPCがずれて、「見ていた相手」と「サーバが戦わせる相手」が別物になった。
+   * 生成の基準はサーバが持っている自分のレートだけにしてある。
    */
-  opponentRating?: number | null;
+  opponentSeed?: string | null;
+  opponentIndex?: number | null;
+  opponentCount?: number | null;
+  opponentName?: string | null;
+}
+
+/** 発行された1戦。**種も相手もサーバが決めたもの** */
+export interface ArenaMatchTicket {
+  matchId: string;
+  nonce: string;
+  battleSeed: number;
+  /** 実プレイヤー戦なら相手の防衛編成。NPC戦は null(種から組み直す) */
+  defenderSnapshot: ArenaDefenseSnapshot | null;
+  defenderRating: number;
+  attackerRating: number;
+  tickets: number;
 }
 
 const TIER_IDS = new Set<string>(ARENA_TIERS.map((tier) => tier.id));
@@ -390,23 +408,88 @@ export async function pushArenaDefense(snapshot: ArenaDefenseSnapshot): Promise<
 }
 
 /**
- * 1戦の結果を報告する。**レートもコインもサーバが決める。**
- * 失敗したら null(ローカルの記録だけで進める)。
+ * 挑む許可をもらう。**ここで挑戦券が引かれる。**
+ *
+ * 返ってくるのは対戦ID・nonce・**サーバが決めた乱数の種**、そして
+ * 相手が実プレイヤーならサーバが持っている防衛編成。
+ * クライアントはこの種とこの編成で戦闘を再生する——
+ * つまり**画面に出るのは、あとでサーバが回し直すのと同じ戦い**になる。
+ *
+ * 失敗したら null。呼ぶ側はローカルだけで進める。
  */
-export async function reportArenaMatch(input: ArenaReportMatchInput): Promise<ArenaMatchReport | null> {
+export async function beginArenaMatch(input: ArenaBeginMatchInput): Promise<ArenaMatchTicket | null> {
   try {
     if (!arenaSyncAvailable()) return null;
-    const result = await callRpc("arena_report_match", {
+    const result = await callRpc("arena_begin_match", {
       p_opponent_kind: input.kind,
-      p_won: input.won === true,
-      p_opponent_id: input.opponentId ?? null,
-      p_opponent_seed: input.opponentSeed ?? null,
+      p_attacker_snapshot: input.attackerSnapshot,
+      p_opponent_id: input.kind === "PLAYER" ? (input.opponentId ?? null) : null,
+      p_opponent_seed: input.kind === "NPC" ? (input.opponentSeed ?? null) : null,
       p_opponent_name: input.opponentName ?? null,
-      p_opponent_rating: typeof input.opponentRating === "number" ? Math.round(input.opponentRating) : null,
+      p_opponent_index: input.kind === "NPC" ? (input.opponentIndex ?? null) : null,
+      p_opponent_count: input.kind === "NPC" ? (input.opponentCount ?? null) : null,
     });
     if (!isRecord(result) || result.ok !== true) return null;
+    const matchId = asText(result.matchId, "");
+    const nonce = asText(result.nonce, "");
+    if (!matchId || !nonce) return null;
     return {
-      matchId: asText(result.matchId, ""),
+      matchId,
+      nonce,
+      battleSeed: Math.round(asFiniteNumber(result.battleSeed, 0)),
+      defenderSnapshot: toDefenseSnapshot(result.defenderSnapshot),
+      defenderRating: Math.max(0, Math.round(asFiniteNumber(result.defenderRating, 0))),
+      attackerRating: Math.max(0, Math.round(asFiniteNumber(result.attackerRating, 0))),
+      tickets: Math.max(0, Math.round(asFiniteNumber(result.tickets, 0))),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 精算する。**勝敗を送る欄が無いことに意味がある。**
+ *
+ * 送るのは「この対戦を精算してくれ」だけ。Edge Function が
+ * 同じ種・同じ編成で戦闘を回し直し、そこで出た勝敗で確定する。
+ *
+ * `rest/v1` ではなく `functions/v1` を叩くので、`request` は通さない。
+ */
+export async function settleArenaMatch(matchId: string, nonce: string): Promise<ArenaMatchReport | null> {
+  const config = arenaSyncConfig();
+  if (!config || !matchId || !nonce) return null;
+  const fetchImpl = config.fetchImpl ?? (globalThis as { fetch?: typeof fetch }).fetch;
+  if (typeof fetchImpl !== "function") return null;
+
+  let controller: AbortController | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    if (typeof AbortController === "function") {
+      controller = new AbortController();
+      // 戦闘を回し直すぶん、読み取りより長めに待つ
+      timer = setTimeout(() => controller?.abort(), (config.timeoutMs ?? DEFAULT_TIMEOUT_MS) * 2);
+    }
+  } catch {
+    controller = null;
+  }
+
+  try {
+    const response = await fetchImpl(`${config.url}/functions/v1/arena-settle`, {
+      method: "POST",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.accessToken || config.anonKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ matchId, nonce }),
+      signal: controller?.signal,
+    });
+    if (!response || typeof response !== "object") return null;
+    const result = await (response as Response).json().catch(() => null);
+    if (!isRecord(result) || result.ok !== true) return null;
+    return {
+      matchId: asText(result.matchId, matchId),
+      won: result.won === true,
       ratingBefore: Math.round(asFiniteNumber(result.ratingBefore, 0)),
       ratingDelta: Math.round(asFiniteNumber(result.ratingDelta, 0)),
       rating: Math.max(0, Math.round(asFiniteNumber(result.rating, 0))),
@@ -418,6 +501,8 @@ export async function reportArenaMatch(input: ArenaReportMatchInput): Promise<Ar
     };
   } catch {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

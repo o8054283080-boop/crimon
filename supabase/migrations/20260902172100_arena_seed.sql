@@ -1,0 +1,87 @@
+--
+-- アリーナ: 開けるための初期データ
+--
+-- ## なぜ別ファイルなのか
+--
+-- 表を作っただけでは**アリーナは1つも動かない。**
+--
+--   ・`arena_seasons` に ACTIVE が無いと、`arena_current_season()` が
+--     何も返さず、順位表も報酬も対戦の記録も全部止まる
+--   ・`arena_shop_items` が空だと、購入は必ず「その商品はありません」になる
+--
+-- 表の定義(構造)と、動かすための中身(データ)は寿命が違う。
+-- シーズンは4週ごとに足すし、棚は入れ替える。だから分けてある。
+--
+-- ## 並んでいるのは実在するものだけ
+--
+-- **プレイヤーが実際に持てる7種**しか置かない。
+-- 召喚の書 / ★4以上召喚書 / 光闇★4以上召喚書 / 経験ピッグ /
+-- 転生ピッグ / ゴールド / 覚醒オーブ。
+-- ここに無いものを増やすと、買えたのに手元に増えない道具が生まれる。
+-- 値も中身も `src/data/arena/shop.ts` と同じで、
+-- `tests/arenaConfigParity.test.ts` が突き合わせを見張っている。
+--
+
+-- ---------------------------------------------------------------------
+-- シーズン
+--
+-- 区切りは `src/data/arena/season.ts` の
+--   ARENA_SEASON_EPOCH_UTC = 2026-08-30T19:00:00Z(= 2026-08-31 04:00 JST 月曜)
+--   ARENA_SEASON_WEEKS     = 4
+-- と揃える。**ここがずれると「今シーズンの締めまで」が嘘になる。**
+--
+-- ソフトリセットも TS 側と同じ:
+--   ARENA_SOFT_RESET = { anchor: 1450, keep: 1/3 }
+--   new = 1450 + round((rating - 1450) / 3)
+-- ---------------------------------------------------------------------
+insert into public.arena_seasons
+  (id, name, starts_at, ends_at, status, soft_reset_base, soft_reset_factor)
+values
+  ('S1',
+   'シーズン1',
+   '2026-08-30T19:00:00Z',
+   '2026-09-27T19:00:00Z',
+   'ACTIVE',
+   1450,
+   (1.0 / 3.0))
+on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------
+-- ショップ
+--
+-- `payload` は「何を何個渡すか」。渡す側(クライアント)が読む形にしてある。
+--   kind   … SUMMON_SCROLL / FOUR_STAR_SCROLL / LIGHT_DARK_SCROLL /
+--             GOLD / AWAKENING_ORB / EXP_PIG / REINCARNATION_PIG
+--   amount … 1回の購入で渡す数
+--   star   … ピッグの星(それ以外では使わない)
+--
+-- 値付けの考え方(`src/data/arena/shop.ts` と同じ):
+--   ・1戦で 10 / 3 コイン。挑戦券は1日に最大24枚ぶん回復する(上限10)
+--   ・週の上限を全部買うと約700コイン。**普通に遊んで届く範囲**
+--   ・転生ピッグだけ別格に高い。ランクアップの頭数をそのまま買えるので、
+--     安いと育成の順番そのものが壊れる
+-- ---------------------------------------------------------------------
+insert into public.arena_shop_items
+  (id, name, description, price, payload, limit_per_week, limit_per_month, max_per_order, active, sort_order)
+values
+  ('summon_scroll', '召喚の書', '通常召喚を1回ぶん', 60,
+   '{"kind":"SUMMON_SCROLL","amount":1}'::jsonb, 5, null, 1, true, 10),
+
+  ('gold_small', 'ゴールド 50,000', '強化と装備の費用に', 25,
+   '{"kind":"GOLD","amount":50000}'::jsonb, 10, null, 1, true, 20),
+
+  ('exp_pig_3', '経験ピッグ★3', 'モンスター強化の素材', 45,
+   '{"kind":"EXP_PIG","amount":1,"star":3}'::jsonb, 3, null, 1, true, 30),
+
+  ('awakening_orb', '覚醒オーブ', '潜在覚醒の候補を1つ選べる', 120,
+   '{"kind":"AWAKENING_ORB","amount":1}'::jsonb, 2, null, 1, true, 40),
+
+  ('four_star_scroll', '★4以上召喚書', '★4以上が確定で出る', 400,
+   '{"kind":"FOUR_STAR_SCROLL","amount":1}'::jsonb, null, 1, 1, true, 50),
+
+  ('light_dark_scroll', '光闇★4以上召喚書', '光か闇の★4以上が確定で出る', 600,
+   '{"kind":"LIGHT_DARK_SCROLL","amount":1}'::jsonb, null, 1, 1, true, 60),
+
+  ('reincarnation_pig_4', '転生ピッグ★4', 'ランクアップの素材。レベル上限で届く', 700,
+   '{"kind":"REINCARNATION_PIG","amount":1,"star":4}'::jsonb, null, 1, 1, true, 70)
+on conflict (id) do nothing;

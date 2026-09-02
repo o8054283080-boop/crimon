@@ -141,10 +141,11 @@ import {
   fetchArenaRankingAround,
   fetchArenaState,
   purchaseArenaShopItem,
+  beginArenaMatch,
   pushArenaDefense,
-  reportArenaMatch,
+  settleArenaMatch,
 } from "../net/arenaSync.js";
-import type { ArenaRankingEntry } from "../net/arenaSync.js";
+import type { ArenaMatchTicket, ArenaRankingEntry } from "../net/arenaSync.js";
 import { arenaAuthUserId, ensureArenaAuth } from "../net/arenaAuth.js";
 import {
   ARENA_TEAM_SIZE,
@@ -365,6 +366,11 @@ interface AppState {
   arenaMyRank: number | null;
   /** いま挑んでいる相手。焼いた防衛からしか戦闘を組まない */
   arenaEntry: ArenaOpponentEntry | null;
+  /**
+   * サーバが発行した1戦。**精算に要る対戦IDと nonce。**
+   * 未接続なら null で、その時はローカルの記録だけで進む。
+   */
+  arenaTicket: ArenaMatchTicket | null;
   arenaNotice: string | null;
   /** 期間が変わった時に出す前の期のまとめ報酬。受け取るまで残す */
   monsterTrainingTargetId: string | null;
@@ -440,6 +446,7 @@ const state: AppState = {
   dexFilter: { ...EMPTY_DEX_FILTER },
   dexFilterOpen: false,
   arenaView: "TOP",
+  arenaTicket: null,
   arenaDetailIndex: null,
   arenaUnitIndex: 0,
   arenaDefenseDraftIds: [],
@@ -1902,8 +1909,37 @@ function startArenaMatch(entry: ArenaOpponentEntry): void {
   state.arenaNotice = null;
   state.lastRun = { kind: "ARENA", entry };
   state.arenaEntry = entry;
+  state.arenaTicket = null;
   state.screen = "ARENA_BATTLE";
   render();
+
+  /*
+   * **繋がっているなら、サーバに1戦を発行してもらう。**
+   *
+   * 返ってくるのは対戦ID・nonce・サーバが決めた乱数の種、そして
+   * 相手が実プレイヤーならサーバが持っている防衛編成。
+   * これで「画面に出た戦い」と「あとでサーバが回し直す戦い」が同じものになる。
+   *
+   * 発行を待たずに画面を進めるのは、通信が遅い時に**戦闘が始まらない**
+   * のを避けるため。発行が間に合わなければローカルの記録だけで進む。
+   */
+  if (!arenaSyncAvailable()) return;
+  void (async () => {
+    if (!(await connectArena())) return;
+    // 攻撃編成も防衛と同じ形で焼く。**サーバは同じ検分をかける**
+    const snapshot = captureArenaDefense(party, state.player.equipment);
+    if (snapshot.units.length === 0) return;
+    const ticket = await beginArenaMatch({
+      kind: entry.kind,
+      attackerSnapshot: snapshot,
+      opponentId: entry.kind === "PLAYER" ? entry.id : null,
+      opponentSeed: entry.kind === "NPC" ? String(state.player.arenaOpponentSeed) : null,
+      opponentIndex: entry.kind === "NPC" ? entry.index : null,
+      opponentCount: entry.kind === "NPC" ? ARENA_CANDIDATE_COUNT * 2 : null,
+      opponentName: entry.name,
+    });
+    if (ticket) state.arenaTicket = ticket;
+  })();
 }
 
 /**
@@ -1923,23 +1959,20 @@ function finishArenaMatch(won: boolean): void {
   savePlayerState(state.player);
 
   /*
-   * **繋がっていればサーバへ報告し、返ってきた値を正とする。**
+   * **繋がっていれば、勝敗そのものをサーバに決めてもらう。**
    *
-   * 送るのは「誰と / 勝ったか」だけで、増減幅はサーバが決める
-   * (`arena_report_match`)。ここでローカルの計算を送りつけると、
-   * 画面が「レート+500」と言い張れる経路をわざわざ作ることになる。
+   * 送るのは「この対戦を精算してくれ」だけ。勝敗を送る欄が無い。
+   * Edge Function が発行時の種と編成で戦闘を回し直し、そこで出た
+   * 勝敗で確定する。同じ入力からは同じ結果しか出ないので、
+   * 画面で見た決着と食い違うことはない。
    *
    * 失敗しても進行は止めない。ローカルの記録だけで遊べる状態を保つ。
    */
   void (async () => {
-    const report = await reportArenaMatch({
-      kind: entry.kind,
-      won,
-      opponentId: entry.kind === "PLAYER" ? entry.id : null,
-      opponentSeed: entry.kind === "NPC" ? entry.id : null,
-      opponentName: entry.name,
-      opponentRating: entry.rating,
-    });
+    const ticket = state.arenaTicket;
+    state.arenaTicket = null;
+    if (!ticket) return;
+    const report = await settleArenaMatch(ticket.matchId, ticket.nonce);
     if (!report) return;
     state.player.arenaPoints = report.rating;
     state.player.arenaCoins = report.coinBalance;

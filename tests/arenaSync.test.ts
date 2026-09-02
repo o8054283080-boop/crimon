@@ -31,7 +31,8 @@ import {
   fetchArenaState,
   purchaseArenaShopItem,
   pushArenaDefense,
-  reportArenaMatch,
+  beginArenaMatch,
+  settleArenaMatch,
   setArenaSyncAccessToken,
 } from "../src/net/arenaSync.js";
 
@@ -131,7 +132,8 @@ describe("鍵が無い時", () => {
     await expect(fetchArenaRankingAround("me")).resolves.toEqual([]);
     await expect(fetchArenaMatchHistory("me")).resolves.toEqual([]);
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
-    await expect(reportArenaMatch({ kind: "NPC", won: true })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+    await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(ensureArenaProfile("あかり")).resolves.toBeNull();
     await expect(fetchArenaState()).resolves.toBeNull();
     await expect(claimArenaWeeklyReward()).resolves.toBeNull();
@@ -150,7 +152,8 @@ describe("通信が失敗した時", () => {
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
     await expect(fetchArenaRanking()).resolves.toEqual([]);
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
-    await expect(reportArenaMatch({ kind: "PLAYER", won: true, opponentId: "u2" })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "PLAYER", attackerSnapshot: snapshot(), opponentId: "u2" })).resolves.toBeNull();
+    await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(claimArenaWeeklyReward()).resolves.toBeNull();
     await expect(purchaseArenaShopItem("rune_pack")).resolves.toBeNull();
   });
@@ -159,14 +162,14 @@ describe("通信が失敗した時", () => {
     connect(stubFetch({ message: "permission denied" }, false));
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
-    await expect(reportArenaMatch({ kind: "NPC", won: false })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
   });
 
   it("本文がJSONでなくても既定値", async () => {
     connect(vi.fn(async () => ({ ok: true, json: async () => { throw new SyntaxError("not json"); } })));
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
     await expect(fetchArenaRanking()).resolves.toEqual([]);
-    await expect(reportArenaMatch({ kind: "NPC", won: true })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
   });
 
   it("fetch が無い実行環境でも落ちない", async () => {
@@ -276,21 +279,42 @@ describe("送っている中身", () => {
     expect(headers.Authorization).toBe("Bearer anon-key");
   });
 
-  it("**勝敗と相手しか送らない。** レートやコインの申告が混ざっていない", async () => {
-    const fetchImpl = stubFetch({ ok: true, rating: 1215, ratingDelta: 15 });
+  it("**勝敗を送る欄がそもそも無い。** 発行にも精算にも", async () => {
+    /*
+     * ここがこの層のいちばん大事な性質。
+     * 以前は `p_won` を送っていた——「勝った」と言えば勝ちだった。
+     * いまは発行(誰に挑むか)と精算(この対戦を締めてくれ)に分かれていて、
+     * **どちらにも勝敗・レート・コインを入れる場所がない。**
+     */
+    const fetchImpl = stubFetch({ ok: true, matchId: "m1", nonce: "n1", battleSeed: 42 });
     connect(fetchImpl);
-    await reportArenaMatch({ kind: "PLAYER", won: true, opponentId: "u2", opponentName: "ひかる" });
+    await beginArenaMatch({
+      kind: "PLAYER", attackerSnapshot: snapshot(), opponentId: "u2", opponentName: "ひかる",
+    });
 
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://example.test/rest/v1/rpc/arena_report_match");
+    expect(url).toBe("https://example.test/rest/v1/rpc/arena_begin_match");
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
     expect(Object.keys(body).sort()).toEqual([
-      "p_opponent_id", "p_opponent_kind", "p_opponent_name",
-      "p_opponent_rating", "p_opponent_seed", "p_won",
+      "p_attacker_snapshot", "p_opponent_count", "p_opponent_id",
+      "p_opponent_index", "p_opponent_kind", "p_opponent_name", "p_opponent_seed",
     ]);
-    // 増減もコインも「こうなったはず」を送る口が無い
-    expect(JSON.stringify(body)).not.toContain("delta");
-    expect(JSON.stringify(body)).not.toContain("coin");
+    const sent = JSON.stringify(body);
+    expect(sent).not.toContain("won");
+    expect(sent).not.toContain("delta");
+    expect(sent).not.toContain("coin");
+    expect(sent).not.toContain("rating");
+  });
+
+  it("精算は対戦IDと nonce だけを送る", async () => {
+    const fetchImpl = stubFetch({ ok: true, won: true, rating: 1215 });
+    connect(fetchImpl);
+    await settleArenaMatch("m1", "n1");
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    // **RPCではなく Edge Function。** 戦闘を回し直せる場所はそこだけ
+    expect(url).toBe("https://example.test/functions/v1/arena-settle");
+    expect(JSON.parse(String(init.body))).toEqual({ matchId: "m1", nonce: "n1" });
   });
 
   it("防衛はスナップショットが空なら送りもしない", async () => {
@@ -302,21 +326,40 @@ describe("送っている中身", () => {
 });
 
 describe("サーバの答えの読み取り", () => {
-  it("1戦の結果を数値に均す", async () => {
+  it("1戦の結果を数値に均す。**勝敗もサーバの答えから読む**", async () => {
     connect(stubFetch({
-      ok: true, matchId: "m1", ratingBefore: 1200, ratingDelta: 15, rating: 1215,
+      ok: true, matchId: "m1", won: true, ratingBefore: 1200, ratingDelta: 15, rating: 1215,
       tierId: "SILVER_2", coins: 30, coinBalance: 330, tickets: 9, opponentRating: 1205,
     }));
-    const report = await reportArenaMatch({ kind: "PLAYER", won: true, opponentId: "u2" });
+    const report = await settleArenaMatch("m1", "n1");
     expect(report).toEqual({
-      matchId: "m1", ratingBefore: 1200, ratingDelta: 15, rating: 1215,
+      matchId: "m1", won: true, ratingBefore: 1200, ratingDelta: 15, rating: 1215,
       tierId: "SILVER_2", coins: 30, coinBalance: 330, tickets: 9, opponentRating: 1205,
     });
   });
 
+  it("発行の答えを読む", async () => {
+    connect(stubFetch({
+      ok: true, matchId: "m1", nonce: "n1", battleSeed: 12345,
+      defenderSnapshot: null, defenderRating: 1180, attackerRating: 1200, tickets: 9,
+    }));
+    const ticket = await beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() });
+    expect(ticket).toEqual({
+      matchId: "m1", nonce: "n1", battleSeed: 12345,
+      defenderSnapshot: null, defenderRating: 1180, attackerRating: 1200, tickets: 9,
+    });
+  });
+
+  it("対戦IDか nonce が欠けた答えは受け取らない", async () => {
+    // どちらかが無いと精算できない。**「発行できた」ことにしない**
+    connect(stubFetch({ ok: true, matchId: "m1", battleSeed: 1 }));
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+  });
+
   it("ok が false の答えは null(勝手に成功にしない)", async () => {
     connect(stubFetch({ ok: false, code: "NO_TICKET" }));
-    await expect(reportArenaMatch({ kind: "NPC", won: true })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+    await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
     await expect(purchaseArenaShopItem("rune_pack")).resolves.toBeNull();
   });

@@ -12,9 +12,9 @@
 supabase db push
 
 # あるいは SQL エディタに、この順で貼って実行する
-#   1. migrations/0001_arena.sql   表・索引・制約
-#   2. migrations/0002_arena_rls.sql  RLS と権限
-#   3. migrations/0003_arena_rpc.sql  RPC
+#   1. migrations/20260902170000_arena_schema.sql   表・索引・制約
+#   2. migrations/20260902170100_arena_rls.sql  RLS と権限
+#   3. migrations/20260902172000_arena_rpc.sql  RPC
 ```
 
 **順番を守ること。** 0002 は 0001 の表に、0003 は両方に依存している。
