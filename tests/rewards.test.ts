@@ -133,13 +133,13 @@ describe("LvMAXメンバー分EXP再分配", () => {
 });
 
 describe("⑧-5-1 EXPバランス", () => {
-  it("通常最終面はNORMAL 6,000、HARD 9,000、HELL 12,000 EXP", () => {
+  it("通常最終面はNORMAL 15,000、HARD 22,500、HELL 30,000 EXP", () => {
     const stage = STAGES.at(-1)!;
     const values = (["NORMAL", "HARD", "HELL"] as const).map((difficulty) => {
       const state = createInitialState();
       return applyStageClearRewards(state, stage, 3, getParty(state), difficulty).expTotal;
     });
-    expect(values).toEqual([6_000, 9_000, 12_000]);
+    expect(values).toEqual([15_000, 22_500, 30_000]);
   });
 
   it("通常最終面のモンスターEXPは維持し、ファイターEXPだけ25%に分離する", () => {
@@ -149,7 +149,7 @@ describe("⑧-5-1 EXPバランス", () => {
       const reward = applyStageClearRewards(state, stage, 3, getParty(state), difficulty);
       return [reward.expTotal, reward.fighterExp];
     });
-    expect(values).toEqual([[6_000, 1_500], [9_000, 2_250], [12_000, 3_000]]);
+    expect(values).toEqual([[15_000, 3_750], [22_500, 5_625], [30_000, 7_500]]);
   });
 
   it("装備ダンジョンは階層ごとに500増え、10階は5,000 EXP", () => {

@@ -33,6 +33,8 @@ export interface StageResultInfo {
   summonScrollDropped?: boolean;
   /** 転生ピッグのボーナスドロップ(通常の一般モンスタードロップとは別枠) */
   pigDrop?: { dexId: string; star: number } | null;
+  /** 星2通常抽選とボス階星3抽選が同時当選した場合を含む全転生ピッグ */
+  pigDrops?: { dexId: string; star: number }[];
   /** このクリアでファイターレベルが何レベル上がったか */
   fighterLevelsGained?: number;
 }
@@ -67,7 +69,7 @@ function equipmentTile(equipment: Equipment): HTMLElement {
 export function renderStageResult(props: StageResultProps): HTMLElement {
   const { info } = props;
   const dropDex = info.dropDexId ? findMonsterById(info.dropDexId) : undefined;
-  const pigDex = info.pigDrop ? findMonsterById(info.pigDrop.dexId) : undefined;
+  const pigDrops = info.pigDrops ?? (info.pigDrop ? [info.pigDrop] : []);
 
   // --- 数で表せる報酬は札にして横並びにする ---
   const tiles: HTMLElement[] = [];
@@ -88,11 +90,13 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
       ]),
     );
   }
-  if (pigDex && info.pigDrop) {
+  for (const pigDrop of pigDrops) {
+    const pigDex = findMonsterById(pigDrop.dexId);
+    if (!pigDex) continue;
     drops.push(
       el("div", { className: "reward-drop" }, [
-        buildMonsterCard(pigDex, pigDex.id, () => {}, { star: info.pigDrop.star as Star }),
-        el("div", { className: "reward-drop__tag reward-drop__tag--bonus" }, ["ボーナス"]),
+        buildMonsterCard(pigDex, pigDex.id, () => {}, { star: pigDrop.star as Star }),
+        el("div", { className: "reward-drop__tag reward-drop__tag--bonus" }, [pigDrop.star >= 3 ? "ボスボーナス" : "ボーナス"]),
       ]),
     );
   }

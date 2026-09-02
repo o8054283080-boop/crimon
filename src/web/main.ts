@@ -14,7 +14,7 @@ import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor, EQUIPMENT_DUNGEON_FLOORS } from "../data/equipmentDungeon.js";
 import { GoldDungeonFloor, GOLD_DUNGEON_FLOORS } from "../data/goldDungeon.js";
 import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/levelDungeon.js";
-import { Difficulty, DIFFICULTY_JA, Stage, STAGES } from "../data/stages.js";
+import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
@@ -1248,17 +1248,18 @@ function scheduleBackgroundFarm(delay = 0): void {
 function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance[]): { won: boolean; waves: number; extraGold: number } {
   if (job.kind === "STAGE") {
     const stage = STAGES.find((s) => s.id === job.targetId)!;
+    const difficulty = job.difficulty ?? "NORMAL";
     let alive = party;
     let hp: Map<string, number> | null = null;
     let waves = 0;
     for (const wave of stage.waves) {
-      const setup = setupWaveBattle(alive, hp, wave, state.player.equipment, job.difficulty ?? "NORMAL");
+      const setup = setupWaveBattle(alive, hp, wave, state.player.equipment, difficulty);
       const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp });
-      if (engine.run().winner !== "PLAYER") return { won: false, waves, extraGold: waves * stage.rewards.waveGold };
+      if (engine.run().winner !== "PLAYER") return { won: false, waves, extraGold: waves * stageWaveGold(stage, difficulty) };
       const survivors = extractSurvivors(engine, alive);
       alive = survivors.survivorInstances; hp = survivors.survivorHp; waves += 1;
     }
-    return { won: true, waves, extraGold: waves * stage.rewards.waveGold };
+    return { won: true, waves, extraGold: waves * stageWaveGold(stage, difficulty) };
   }
   const target = job.kind === "EQUIP_DUNGEON"
     ? EQUIPMENT_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)
@@ -1467,6 +1468,7 @@ function finishStage(cleared: boolean): void {
     dropStar: reward?.dropStar ?? null,
     equipmentDrop: reward?.equipmentDrop ?? null,
     pigDrop: reward?.pigDrop ?? null,
+    pigDrops: reward?.pigDrops,
     summonScrollDropped: reward?.summonScrollDropped ?? false,
     fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
   };
@@ -1922,7 +1924,7 @@ function renderCurrentWaveBattle(): BattleViewHandle {
     onFinish: (winner) => {
       if (winner === "PLAYER") {
         const { survivorInstances, survivorHp } = extractSurvivors(engine, run.currentPartyInstances);
-        run.goldEarned += run.stage.rewards.waveGold;
+        run.goldEarned += stageWaveGold(run.stage, run.difficulty);
         run.wavesCleared += 1;
         run.carryHp = survivorHp;
         run.currentPartyInstances = survivorInstances;

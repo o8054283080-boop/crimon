@@ -1,5 +1,5 @@
 import { Element } from "../core/element.js";
-import { Equipment, SetType, generateThemedStageEquipment } from "../core/equipment.js";
+import { Equipment, EquipStar, SetType, generateThemedStageEquipment } from "../core/equipment.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import { MONSTER_TEMPLATES, REINCARNATION_PIG_DEX } from "./monsters.js";
 
@@ -21,14 +21,25 @@ interface DifficultyModifier {
   equipmentStarBonus: number;
   /** モンスター・ファイター獲得EXP倍率 */
   expMultiplier: number;
+  /** ウェーブ・クリア報酬のゴールド倍率 */
+  goldMultiplier: number;
+  /** 星2転生ピッグのドロップ率倍率(最終的に上限12%) */
+  reincarnationPigDropMultiplier: number;
 }
 
 /** 難易度ごとの敵強化・装備ドロップ星ボーナス。具体的な倍率はゲーム内では非公開 */
 export const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifier> = {
-  NORMAL: { starBonus: 0, levelBonus: 0, powerScaleMultiplier: 1.0, speedScaleMultiplier: 1.0, equipmentStarBonus: 0, expMultiplier: 1 },
-  HARD: { starBonus: 1, levelBonus: 5, powerScaleMultiplier: 1.35, speedScaleMultiplier: 1.1, equipmentStarBonus: 1, expMultiplier: 1.5 },
-  HELL: { starBonus: 2, levelBonus: 10, powerScaleMultiplier: 1.8, speedScaleMultiplier: 1.2, equipmentStarBonus: 2, expMultiplier: 2 },
+  NORMAL: { starBonus: 0, levelBonus: 0, powerScaleMultiplier: 1.0, speedScaleMultiplier: 1.0, equipmentStarBonus: 0, expMultiplier: 1, goldMultiplier: 1, reincarnationPigDropMultiplier: 1 },
+  HARD: { starBonus: 1, levelBonus: 5, powerScaleMultiplier: 1.35, speedScaleMultiplier: 1.1, equipmentStarBonus: 1, expMultiplier: 1.5, goldMultiplier: 1.5, reincarnationPigDropMultiplier: 1.5 },
+  HELL: { starBonus: 2, levelBonus: 10, powerScaleMultiplier: 1.8, speedScaleMultiplier: 1.2, equipmentStarBonus: 2, expMultiplier: 2, goldMultiplier: 2, reincarnationPigDropMultiplier: 2 },
 };
+
+export interface EnemyPrimaryStatOverride {
+  hp?: number;
+  atk?: number;
+  def?: number;
+  spd?: number;
+}
 
 export interface WaveEnemy {
   templateId: string;
@@ -42,6 +53,8 @@ export interface WaveEnemy {
   speedOverride?: number;
   /** 難易度ごとの反撃までの被弾回数。主に古代守護ゴーレム用 */
   bossCounterAfterHits?: Partial<Record<Difficulty, number>>;
+  /** 特定の難易度だけ最終ステータスを直接調整する。章の最終関門など、全体倍率で合わせにくい敵に使う。 */
+  statOverrides?: Partial<Record<Difficulty, EnemyPrimaryStatOverride>>;
 }
 
 export interface Wave {
@@ -71,6 +84,10 @@ export interface StageRewards {
   equipmentDropRate: number;
   /** ドロップする装備のシリーズ(このチャプターのテーマシリーズ固定) */
   equipmentSet: SetType;
+  /** 星2転生ピッグの基礎ドロップ率。難易度補正後も12%を上限とする */
+  reincarnationPigDropRate: number;
+  /** ボス階だけ独立抽選する星3転生ピッグのドロップ率 */
+  bossReincarnationPigDropRate: number;
 }
 
 export interface Stage {
@@ -151,10 +168,77 @@ const BOSS_PROFILES: Partial<Record<number, BossProfile>> = {
   8: { templateId: "chronos", displayName: "時空の支配者", normalSpeed: 155, element: "WATER" },
 };
 
+/**
+ * 8-5 HELL最終Waveの確定値。
+ * 4体同時なので道中3体は現状比およそ1割増に留め、難易度上昇の中心をボスの耐久へ置く。
+ */
+const CHAPTER_8_FINAL_HELL_STATS: EnemyPrimaryStatOverride[] = [
+  { hp: 42_000, atk: 2_400, def: 2_650, spd: 198 },
+  { hp: 110_000, atk: 3_500, def: 3_400, spd: 195 },
+  { hp: 43_000, atk: 3_700, def: 2_500, spd: 190 },
+  { hp: 60_000, atk: 2_700, def: 2_900, spd: 150 },
+];
+
 /** チャプターテーマのモンスター(星1)がステージクリア時にドロップする確率。ゲーム内では非公開 */
 const CHAPTER_MONSTER_DROP_RATE = 0.15;
 /** チャプターテーマの装備(星1)がステージクリア時にドロップする確率。ゲーム内では非公開 */
 const CHAPTER_EQUIPMENT_DROP_RATE = 0.5;
+/** 1〜4章を含む通常ステージでの転生ピッグ(星2)基礎ドロップ率。他のドロップとは独立した抽選 */
+export const STAGE_REINCARNATION_PIG_DROP_RATE = 0.05;
+/** 通常ステージでの召喚の書ドロップ率。他のドロップとは独立した抽選 */
+export const STAGE_SUMMON_SCROLL_DROP_RATE = 0.01;
+
+interface LateChapterRewardProfile {
+  /** その章をNORMALで3Waveクリアした時の1体あたりEXP */
+  normalClearExp: number;
+  /** 章ボス(ステージ5)をNORMALでクリアした時の総ゴールド */
+  finalStageGold: number;
+  monsterDropRate: number;
+  monsterDropStars: Star[];
+  equipmentDropRate: number;
+  reincarnationPigDropRate: number;
+  bossReincarnationPigDropRate: number;
+}
+
+/** 5〜8章は、進むほど育成・装備集めの効率が明確に伸びる。確率はゲーム画面には表示しない。 */
+const LATE_CHAPTER_REWARD_PROFILES: Partial<Record<number, LateChapterRewardProfile>> = {
+  5: { normalClearExp: 7_500, finalStageGold: 6_000, monsterDropRate: 0.15, monsterDropStars: [1], equipmentDropRate: 0.55, reincarnationPigDropRate: 0.05, bossReincarnationPigDropRate: 0.01 },
+  6: { normalClearExp: 9_000, finalStageGold: 8_000, monsterDropRate: 0.17, monsterDropStars: [1], equipmentDropRate: 0.60, reincarnationPigDropRate: 0.06, bossReincarnationPigDropRate: 0.015 },
+  7: { normalClearExp: 12_000, finalStageGold: 10_000, monsterDropRate: 0.20, monsterDropStars: [1, 2], equipmentDropRate: 0.65, reincarnationPigDropRate: 0.07, bossReincarnationPigDropRate: 0.02 },
+  8: { normalClearExp: 15_000, finalStageGold: 12_500, monsterDropRate: 0.20, monsterDropStars: [2], equipmentDropRate: 0.70, reincarnationPigDropRate: 0.08, bossReincarnationPigDropRate: 0.03 },
+};
+
+interface WeightedEquipmentStar {
+  star: EquipStar;
+  weight: number;
+}
+
+/**
+ * 通常ステージ後半の装備品質。星6は含めず、星5も低確率に留める。
+ * 星6厳選は装備ダンジョン、星4中心の育成装備は冒険8章という役割を守る。
+ */
+const LATE_STAGE_EQUIPMENT_STAR_WEIGHTS: Partial<Record<number, Record<Difficulty, WeightedEquipmentStar[]>>> = {
+  5: {
+    NORMAL: [{ star: 2, weight: 80 }, { star: 3, weight: 18 }, { star: 4, weight: 2 }],
+    HARD: [{ star: 2, weight: 45 }, { star: 3, weight: 45 }, { star: 4, weight: 10 }],
+    HELL: [{ star: 3, weight: 60 }, { star: 4, weight: 40 }],
+  },
+  6: {
+    NORMAL: [{ star: 3, weight: 85 }, { star: 4, weight: 15 }],
+    HARD: [{ star: 3, weight: 65 }, { star: 4, weight: 34 }, { star: 5, weight: 1 }],
+    HELL: [{ star: 3, weight: 40 }, { star: 4, weight: 59 }, { star: 5, weight: 1 }],
+  },
+  7: {
+    NORMAL: [{ star: 3, weight: 65 }, { star: 4, weight: 34 }, { star: 5, weight: 1 }],
+    HARD: [{ star: 3, weight: 35 }, { star: 4, weight: 62 }, { star: 5, weight: 3 }],
+    HELL: [{ star: 4, weight: 95 }, { star: 5, weight: 5 }],
+  },
+  8: {
+    NORMAL: [{ star: 3, weight: 25 }, { star: 4, weight: 72 }, { star: 5, weight: 3 }],
+    HARD: [{ star: 4, weight: 94 }, { star: 5, weight: 6 }],
+    HELL: [{ star: 4, weight: 90 }, { star: 5, weight: 10 }],
+  },
+};
 
 function clampLevel(star: Star, level: number, max: Record<Star, number>): number {
   return Math.min(level, max[star]);
@@ -282,6 +366,12 @@ function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number,
     }
   }
 
+  if (theme.chapter === 8 && stageNumber === 5 && waveNumber === 3) {
+    enemies.forEach((enemy, index) => {
+      enemy.statOverrides = { HELL: CHAPTER_8_FINAL_HELL_STATS[index] };
+    });
+  }
+
   return {
     waveNumber,
     isBossWave,
@@ -298,17 +388,25 @@ function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
   const isFinalStage = stageNumber === 5;
   const waves: Wave[] = [1, 2, 3].map((waveNumber) => buildWave(theme, stageNumber, waveNumber, isFinalStage && waveNumber === 3));
   const chapterRewardMultiplier = 1 + CHAPTER_REWARD_STEP * (theme.chapter - 1);
+  const lateProfile = LATE_CHAPTER_REWARD_PROFILES[theme.chapter];
+
+  // 後半章のゴールド表は各章5面を基準にし、1→5面で80%→100%へ滑らかに増やす。
+  const lateStageGoldTotal = lateProfile
+    ? Math.round(lateProfile.finalStageGold * (0.8 + (stageNumber - 1) * 0.05))
+    : 0;
+  const lateWaveGold = Math.round((lateStageGoldTotal * 0.48) / 3);
 
   const rewards: StageRewards = {
-    waveGold: Math.round(30 * stageNumber * chapterRewardMultiplier),
-    clearGold: Math.round(150 * stageNumber * chapterRewardMultiplier),
-    // 4-5で到達した従来の上限(2,000/Wave=6,000/周)を維持し、育成Dの役割を侵食しない。
-    waveExp: Math.min(2_000, 100 * globalStageIndex(theme.chapter, stageNumber)),
-    dropRate: CHAPTER_MONSTER_DROP_RATE,
-    dropStars: [1],
+    waveGold: lateProfile ? lateWaveGold : Math.round(30 * stageNumber * chapterRewardMultiplier),
+    clearGold: lateProfile ? lateStageGoldTotal - lateWaveGold * 3 : Math.round(150 * stageNumber * chapterRewardMultiplier),
+    waveExp: lateProfile ? lateProfile.normalClearExp / 3 : Math.min(2_000, 100 * globalStageIndex(theme.chapter, stageNumber)),
+    dropRate: lateProfile?.monsterDropRate ?? CHAPTER_MONSTER_DROP_RATE,
+    dropStars: lateProfile?.monsterDropStars ?? [1],
     dropTemplateId: theme.templateId,
-    equipmentDropRate: CHAPTER_EQUIPMENT_DROP_RATE,
+    equipmentDropRate: lateProfile?.equipmentDropRate ?? CHAPTER_EQUIPMENT_DROP_RATE,
     equipmentSet: theme.equipmentSet,
+    reincarnationPigDropRate: lateProfile?.reincarnationPigDropRate ?? STAGE_REINCARNATION_PIG_DROP_RATE,
+    bossReincarnationPigDropRate: isFinalStage ? lateProfile?.bossReincarnationPigDropRate ?? 0 : 0,
   };
 
   return {
@@ -325,6 +423,21 @@ export const STAGES: Stage[] = CHAPTER_THEMES.flatMap((theme) => [1, 2, 3, 4, 5]
 
 export function findStage(stageId: string): Stage | undefined {
   return STAGES.find((s) => s.id === stageId);
+}
+
+/** 選択中の難易度を反映したウェーブ報酬ゴールド。 */
+export function stageWaveGold(stage: Stage, difficulty: Difficulty = "NORMAL"): number {
+  return Math.round(stage.rewards.waveGold * DIFFICULTY_MODIFIERS[difficulty].goldMultiplier);
+}
+
+/** 選択中の難易度を反映したクリア報酬ゴールド。 */
+export function stageClearGold(stage: Stage, difficulty: Difficulty = "NORMAL"): number {
+  return Math.round(stage.rewards.clearGold * DIFFICULTY_MODIFIERS[difficulty].goldMultiplier);
+}
+
+/** 全Waveクリア時に参加モンスター1体へ入るEXP。 */
+export function stageClearExp(stage: Stage, difficulty: Difficulty = "NORMAL"): number {
+  return Math.round(stage.waves.length * stage.rewards.waveExp * DIFFICULTY_MODIFIERS[difficulty].expMultiplier);
 }
 
 export interface StageDrop {
@@ -350,22 +463,54 @@ const BOSS_STAGE_EQUIPMENT_STAR_BONUS_RATE = 0.25;
  */
 export function rollStageEquipment(stage: Stage, rng: () => number = Math.random, difficulty: Difficulty = "NORMAL"): Equipment | null {
   if (rng() >= stage.rewards.equipmentDropRate) return null;
+  const lateWeights = LATE_STAGE_EQUIPMENT_STAR_WEIGHTS[stage.chapter]?.[difficulty];
+  if (lateWeights) {
+    const totalWeight = lateWeights.reduce((sum, option) => sum + option.weight, 0);
+    let roll = rng() * totalWeight;
+    let selectedStar = lateWeights[lateWeights.length - 1].star;
+    for (const option of lateWeights) {
+      if (roll < option.weight) {
+        selectedStar = option.star;
+        break;
+      }
+      roll -= option.weight;
+    }
+    return generateThemedStageEquipment(stage.rewards.equipmentSet, rng, selectedStar - 1);
+  }
   const isBossStage = stage.stageNumber === 5;
   const bossBonus = isBossStage && rng() < BOSS_STAGE_EQUIPMENT_STAR_BONUS_RATE ? 1 : 0;
   const starBonus = bossBonus + DIFFICULTY_MODIFIERS[difficulty].equipmentStarBonus;
   return generateThemedStageEquipment(stage.rewards.equipmentSet, rng, starBonus);
 }
 
-/** 通常ステージでの転生ピッグ(星2)ドロップ率。他のドロップとは独立した抽選 */
-export const STAGE_REINCARNATION_PIG_DROP_RATE = 0.05;
-/** 通常ステージでの召喚の書ドロップ率。他のドロップとは独立した抽選 */
-export const STAGE_SUMMON_SCROLL_DROP_RATE = 0.01;
-
 /** ステージクリア報酬として、低確率で転生ピッグ(星2固定)がドロップする(なければnull) */
-export function rollStageReincarnationPig(rng: () => number = Math.random): StageDrop | null {
-  if (rng() >= STAGE_REINCARNATION_PIG_DROP_RATE) return null;
+export function rollStageReincarnationPig(
+  stage: Stage,
+  difficulty: Difficulty = "NORMAL",
+  rng: () => number = Math.random,
+): StageDrop | null {
+  const rate = Math.min(0.12, stage.rewards.reincarnationPigDropRate * DIFFICULTY_MODIFIERS[difficulty].reincarnationPigDropMultiplier);
+  if (rng() >= rate) return null;
   const variant = REINCARNATION_PIG_DEX[Math.floor(rng() * REINCARNATION_PIG_DEX.length)];
   return { dexId: variant.id, star: 2 };
+}
+
+/** 各章のボス階で、星2抽選とは独立して星3転生ピッグを追加抽選する。 */
+export function rollStageBossReincarnationPig(stage: Stage, rng: () => number = Math.random): StageDrop | null {
+  if (stage.stageNumber !== 5 || rng() >= stage.rewards.bossReincarnationPigDropRate) return null;
+  const variant = REINCARNATION_PIG_DEX[Math.floor(rng() * REINCARNATION_PIG_DEX.length)];
+  return { dexId: variant.id, star: 3 };
+}
+
+/** 星2とボス階の星3を独立抽選し、両方当選した場合も失わず返す。 */
+export function rollStageReincarnationPigs(
+  stage: Stage,
+  difficulty: Difficulty = "NORMAL",
+  rng: () => number = Math.random,
+): StageDrop[] {
+  return [rollStageReincarnationPig(stage, difficulty, rng), rollStageBossReincarnationPig(stage, rng)].filter(
+    (drop): drop is StageDrop => drop !== null,
+  );
 }
 
 /** ステージクリア報酬として、低確率で召喚の書がドロップする */
