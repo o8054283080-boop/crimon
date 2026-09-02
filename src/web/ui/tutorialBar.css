@@ -106,6 +106,9 @@
  * 初心者ミッション(金)と並んでも、どちらの話か色で分かる。
  */
 .tutorial-bar--farm {
+  /* 2段になるので、段の間は詰める(既定の10pxだと帯だけ背が高くなる) */
+  row-gap: 0;
+  padding: 6px 10px;
   border-left-color: #6aa8ff;
   border-color: rgba(106, 168, 255, 0.4);
   background: linear-gradient(90deg, rgba(20, 30, 48, 0.92), rgba(14, 17, 26, 0.92));
@@ -125,9 +128,120 @@
   color: #d8e9ff;
 }
 
+/*
+ * 稼ぎの行は**2段目を丸ごと使う。**
+ * 1段目に同居させると、行き先・終了・畳む的と幅を取り合って
+ * 桁の多い数字が末尾から切り落とされる。
+ */
+.tutorial-bar__cond--full {
+  grid-column: 1 / -1;
+}
+
+.tutorial-bar__cond--full > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .tutorial-bar--farm-done {
   border-left-color: #76e39b;
   border-color: rgba(118, 227, 155, 0.4);
+}
+
+/*
+ * 畳む的。
+ *
+ * 周回は何十分も動き続けるので、**開きっぱなしだと上に居座り続ける**。
+ * 畳んでも消さない——消せると「回っていることを忘れた」状態が作れる。
+ * 畳んだ姿でも行き先と進み具合(3/10)は残す。
+ */
+.tutorial-bar__fold {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 1px solid rgba(106, 168, 255, 0.4);
+  border-radius: 9px;
+  color: #bcd8ff;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tutorial-bar__fold:active {
+  transform: translateY(1px);
+}
+
+.tutorial-bar--farm-done .tutorial-bar__fold {
+  border-color: rgba(118, 227, 155, 0.4);
+  color: #b6f0cd;
+}
+
+/*
+ * 畳んだ姿。行き先と進み具合だけを1行で残す。
+ *
+ * **帯ごと1つの的にする。** 中に小さな開くボタンを置く形では、
+ * 押す的の下限(40px)が効いて58→50pxまでしか縮まなかった。
+ * 帯そのものをボタンにすれば、その40pxが帯の高さと一致する。
+ */
+.tutorial-bar--farm-folded {
+  display: block;
+  padding: 0;
+}
+
+.tutorial-bar__unfold {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  color: #d8e9ff;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tutorial-bar__unfold:active {
+  transform: translateY(1px);
+}
+
+.tutorial-bar__unfold-count {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #9dc4ff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.tutorial-bar__unfold-title {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutorial-bar__unfold-chevron {
+  color: #9dc4ff;
+  font-size: 0.9rem;
+}
+
+.tutorial-bar--farm-done .tutorial-bar__unfold {
+  color: #9ff0bd;
+}
+
+.tutorial-bar--farm-done .tutorial-bar__unfold-count,
+.tutorial-bar--farm-done .tutorial-bar__unfold-chevron {
+  color: #8fe0ac;
 }
 
 .tutorial-bar--farm-done .tutorial-bar__title {

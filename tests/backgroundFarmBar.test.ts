@@ -64,6 +64,67 @@ describe("自動周回の進捗は浮かせない", () => {
     expect(main).toContain('state.screen = "AUTO_FARM_RESULT"');
   });
 
+  it("畳める。畳んだ状態は起動をまたいで残す", () => {
+    /*
+     * 周回は何十分も動き続けるので、開くたび畳み直すのでは意味が無い。
+     * ただし**セーブには入れない**——端末ごとの見た目の好みで、進行ではない。
+     */
+    expect(main).toContain('const FARM_BAR_FOLD_KEY = "crimon.farm-bar.folded.v1"');
+    expect(main).toContain("localStorage.getItem(FARM_BAR_FOLD_KEY)");
+    expect(main).toMatch(/function setFarmBarFolded[\s\S]{0,200}localStorage\.setItem\(FARM_BAR_FOLD_KEY/);
+    // 保存に失敗してもゲームは止めない
+    expect(main).toMatch(/function farmBarFolded\(\)[\s\S]{0,160}catch \{ return false; \}/);
+  });
+
+  it("畳んでも消さない。行き先と進み具合は残す", () => {
+    /*
+     * 完全に消せると「回っていることを忘れた」状態が作れてしまう。
+     * スタミナを使い続けるものを、画面から消せてはいけない。
+     */
+    expect(main).toContain("tutorial-bar__unfold-count");
+    expect(main).toContain("tutorial-bar__unfold-title");
+    expect(main).toContain('"aria-expanded": "false"');
+  });
+
+  it("畳んだ姿は帯ごと1つの的にする", () => {
+    /*
+     * 中に小さな開くボタンを置く形では、押す的の下限(40px)が効いて
+     * 帯の高さが58→50pxまでしか縮まず、畳んだ意味がほとんど無かった。
+     * 帯そのものをボタンにすれば、その40pxが帯の高さと一致する(実測42px)。
+     */
+    const css = readFileSync(new URL("../src/web/ui/tutorialBar.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.tutorial-bar__unfold \{[^}]*width: 100%;/);
+    expect(css).toMatch(/\.tutorial-bar__unfold \{[^}]*min-height: 40px;/);
+    expect(css).toMatch(/\.tutorial-bar--farm-folded \{[^}]*padding: 0;/);
+    // 畳んだぶんは世界の枠にも申告する
+    const home = readFileSync(new URL("../src/web/crimon-visual-system.css", import.meta.url), "utf8");
+    expect(home).toContain(".crimon-home:has(.tutorial-bar--farm-folded){--home-farm-h:");
+  });
+
+  it("稼ぎの行は2段目を丸ごと使う", () => {
+    /*
+     * 1段目に同居させると、行き先・終了・畳む的と幅を取り合って
+     * 桁の多い数字が末尾から切れる(実機で「🪙246,000 / 装備15」が「246,…」)。
+     */
+    expect(main).toContain("tutorial-bar__cond--full");
+    const css = readFileSync(new URL("../src/web/ui/tutorialBar.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.tutorial-bar__cond--full \{[^}]*grid-column: 1 \/ -1;/);
+  });
+
+  it("左上の「戻る」の逃げ場を、ボタンの上端と同じ変数から積む", () => {
+    /*
+     * **実機だけで壊れていた。** 逃げ場は `var(--global-back-h) + 10px` = 52pxで、
+     * `.screen` の素の上余白 `max(16px, env(safe-area-inset-top))` を上書きして
+     * ノッチぶんを消していた。iPhoneでは inset が約59pxあり、
+     * ボタンの下端は 59+4+42=105px。差ぶん、自動周回の帯に「戻る」が乗っていた。
+     * 巡回のChromiumは inset が0なので再現しない。だから式で見張る。
+     */
+    const css = readFileSync(new URL("../src/web/style.css", import.meta.url), "utf8");
+    expect(css).toContain("--global-back-top: calc(max(6px, env(safe-area-inset-top)) + 4px)");
+    expect(css).toMatch(/\.global-back \{[^}]*top: var\(--global-back-top\);/);
+    expect(css).toContain("padding-top: calc(var(--global-back-top) + var(--global-back-h) + 10px)");
+  });
+
   it("狭い端末でも周回の中身は畳まない", () => {
     /*
      * 初心者ミッションは条件文を畳んでよい(タイトルだけで用が足りる)。

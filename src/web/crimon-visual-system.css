@@ -41,7 +41,8 @@
  * 浮遊パネルだった頃は左端に幅176pxで貼り付き、「お知らせ」のボタンごと覆っていた。
  */
 .crimon-home .tutorial-bar--farm{margin:4px 0 0}
-.crimon-home:has(.tutorial-bar--farm){--home-farm-h:62px}
+.crimon-home:has(.tutorial-bar--farm){--home-farm-h:73px}
+.crimon-home:has(.tutorial-bar--farm-folded){--home-farm-h:46px}
 @media(max-height:830px){.home-world{min-height:398px}.world-party__figure{height:170px!important}.world-party__figure--3{bottom:57px}.world-action{min-height:70px}.world-action--right{min-height:86px}.world-action--right img{width:64px;height:64px}}
 @media(min-width:410px){.world-actions--left{left:10px}.world-actions--right{right:10px}.world-party{inset-inline:73px}.world-party__figure{width:142px!important}.current-party-panel{grid-template-columns:112px minmax(0,1fr) 60px}}
 
