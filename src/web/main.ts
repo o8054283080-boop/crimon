@@ -55,6 +55,7 @@ import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkil
 import { awakenLatentAbility, confirmLatentAwakening, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
 import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
 import {
+  ARENA_HISTORY_MAX,
   claimDailyLoginBonus,
   FIGHTER_NAME_MAX_LENGTH,
   LoginBonusResult,
@@ -126,7 +127,11 @@ import { buildArenaNpcs } from "../game/arena/npc.js";
 import { buildArenaCandidates } from "../game/arena/matchmaking.js";
 import { captureArenaDefense } from "../game/arena/snapshot.js";
 import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, recordArenaMatch } from "../game/arena/match.js";
-import { applyArenaSeasonRollover, claimArenaWeeklyReward } from "../game/arena/progress.js";
+import {
+  applyArenaSeasonRollover,
+  claimArenaSeasonReward as claimArenaSeasonRewardLocal,
+  claimArenaWeeklyReward,
+} from "../game/arena/progress.js";
 import { runPendingDefenseAttacks } from "../game/arena/defenseSim.js";
 import { arenaShopRows, buyArenaShopItem } from "../game/arena/shop.js";
 import { ARENA_TICKET_MAX_V2 } from "../data/arena/shop.js";
@@ -138,8 +143,10 @@ import {
   ensureArenaProfile,
   fetchArenaOpponents,
   fetchArenaRanking,
+  fetchArenaMatchHistory,
   fetchArenaRankingAround,
   fetchArenaState,
+  claimArenaSeasonReward,
   purchaseArenaShopItem,
   beginArenaMatch,
   pushArenaDefense,
@@ -371,6 +378,8 @@ interface AppState {
    * 未接続なら null で、その時はローカルの記録だけで進む。
    */
   arenaTicket: ArenaMatchTicket | null;
+  /** サーバの戦績を1度引いたか。開くたびに引き直さない */
+  arenaHistoryLoaded: boolean;
   arenaNotice: string | null;
   /** 期間が変わった時に出す前の期のまとめ報酬。受け取るまで残す */
   monsterTrainingTargetId: string | null;
@@ -447,6 +456,7 @@ const state: AppState = {
   dexFilterOpen: false,
   arenaView: "TOP",
   arenaTicket: null,
+  arenaHistoryLoaded: false,
   arenaDetailIndex: null,
   arenaUnitIndex: 0,
   arenaDefenseDraftIds: [],
@@ -1818,19 +1828,39 @@ async function connectArena(): Promise<boolean> {
  * 起きないまま、次に開いた時にまとめて飛ぶ。ずれは早く潰す。
  */
 function applyArenaServerState(remote: Record<string, unknown>): void {
-  const num = (key: string): number | null => {
-    const value = remote[key];
+  /*
+   * `arena_state()` は入れ子で返る:
+   *   { seasonId, profile, standing: { rating, best_rating, ... },
+   *     wallet: { coins, tickets, ... } }
+   *
+   * **平らだと思って読んでいて、1つも取り込めていなかった。**
+   * 形が違えば黙って何もしないので、気づく手がかりも出なかった。
+   */
+  const nested = (group: string, key: string): number | null => {
+    const box = remote[group];
+    if (typeof box !== "object" || box === null) return null;
+    const value = (box as Record<string, unknown>)[key];
     return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
   };
-  const rating = num("rating");
-  const coins = num("coins");
-  const tickets = num("tickets");
+
+  const rating = nested("standing", "rating");
+  const best = nested("standing", "best_rating");
+  const coins = nested("wallet", "coins");
+  const tickets = nested("wallet", "tickets");
   if (rating !== null) state.player.arenaPoints = Math.max(0, rating);
+  if (best !== null) state.player.arenaSeasonBestPoints = Math.max(0, best);
   if (coins !== null) state.player.arenaCoins = Math.max(0, coins);
   if (tickets !== null) state.player.arenaTickets = Math.max(0, tickets);
-  const season = num("seasonNumber");
-  if (season !== null) state.player.arenaSeasonNumber = season;
   savePlayerState(state.player);
+}
+
+/** 繋がっている時の残高は**サーバの値が正**。受け取ったら必ず合わせる */
+function adoptArenaCoinBalance(remote: Record<string, unknown> | null): void {
+  if (!remote) return;
+  const balance = remote.coinBalance;
+  if (typeof balance === "number" && Number.isFinite(balance)) {
+    state.player.arenaCoins = Math.max(0, Math.round(balance));
+  }
 }
 
 /**
@@ -1861,6 +1891,47 @@ async function refreshArenaCandidates(): Promise<void> {
     selfId: arenaSelfId(),
     recentIds: state.player.arenaRecentOpponentIds,
   });
+  render();
+}
+
+/**
+ * シーズン報酬を受け取る。
+ *
+ * **繋がっていればサーバが先。** 二重受取はサーバの一意制約
+ * (`arena_reward_claims_once`)が物理的に止める。そこが通ってから手元へ配る。
+ * 未接続なら手元だけで完結する(オフラインでも遊べる状態を壊さない)。
+ */
+async function claimArenaSeasonRewardBoth(bestRatingOfEndedSeason: number): Promise<void> {
+  let remote: Record<string, unknown> | null = null;
+  if (await connectArena()) {
+    const state0 = await fetchArenaState();
+    const seasonId = typeof state0?.seasonId === "string" ? state0.seasonId : "";
+    if (seasonId) {
+      const claimed = await claimArenaSeasonReward(seasonId);
+      // 受け取り済みなら手元でも配らない。**サーバの答えに従う**
+      if (claimed && !claimed.ok) return;
+      if (claimed) remote = { coinBalance: claimed.coinBalance };
+    }
+  }
+  const result = claimArenaSeasonRewardLocal(state.player, bestRatingOfEndedSeason);
+  if (!result.ok) return;
+  adoptArenaCoinBalance(remote);
+  savePlayerState(state.player);
+  state.arenaNotice = `${result.tierName} のシーズン報酬を受け取りました`;
+  render();
+}
+
+/**
+ * サーバの戦績を控えへ写す。
+ *
+ * 繋がっている時、防衛の記録を作るのは**攻めてきた相手**であって自分ではない。
+ * だから手元では作れない。サーバの `arena_matches` から引いてくる。
+ */
+async function refreshArenaHistory(): Promise<void> {
+  const records = await fetchArenaMatchHistory(arenaSelfId(), ARENA_HISTORY_MAX);
+  if (records.length === 0) return;
+  state.player.arenaMatchHistory = records.slice(0, ARENA_HISTORY_MAX);
+  savePlayerState(state.player);
   render();
 }
 
@@ -2749,16 +2820,34 @@ function render(): void {
        * **画面を開く前に必ず通る場所でやる。** 遊んでいる最中に
        * レートが勝手に変わると、何が起きたのか分からない。
        */
-      if (applyArenaSeasonRollover(state.player).changed) savePlayerState(state.player);
-      /*
-       * 留守中に攻められた分をさばく。**防衛を登録している時だけ**起きる。
-       * ここでやるのは、アリーナを開いた時が「結果を見に来た時」だから。
-       */
-      const defended = runPendingDefenseAttacks(state.player);
-      if (defended.attacks > 0) {
+      const rollover = applyArenaSeasonRollover(state.player);
+      if (rollover.changed) {
         savePlayerState(state.player);
-        state.arenaNotice = `留守中に${defended.attacks}回攻められました（${defended.held}回退けた / `
-          + `${defended.ratingDelta >= 0 ? "+" : ""}${defended.ratingDelta} レート）`;
+        // 締まったシーズンの報酬を受け取る。**繋がっていればサーバが先**
+        void claimArenaSeasonRewardBoth(rollover.ratingBefore);
+      }
+      /*
+       * 留守中に攻められた分をさばく。
+       *
+       * **繋がっている時はやらない。** 繋がっていれば、攻めてくるのは
+       * 本物のプレイヤーで、その結果はサーバの `arena_matches` に積まれる。
+       * その上でこちらでもNPCに攻めさせると、**サーバが知らないレートの増減**が
+       * 手元だけで起きて、次に開いた時にまとめて飛ぶ。
+       *
+       * オフラインでだけ、NPCが防衛へ挑んでくる。人口任せにすると
+       * 「登録すると攻められるようになります」が嘘になるので。
+       */
+      if (!arenaSyncAvailable()) {
+        const defended = runPendingDefenseAttacks(state.player);
+        if (defended.attacks > 0) {
+          savePlayerState(state.player);
+          state.arenaNotice = `留守中に${defended.attacks}回攻められました（${defended.held}回退けた / `
+            + `${defended.ratingDelta >= 0 ? "+" : ""}${defended.ratingDelta} レート）`;
+        }
+      } else if (!state.arenaHistoryLoaded) {
+        // 繋がっている時の戦績は**サーバの記録が正**。攻めも守りも同じ表から来る
+        state.arenaHistoryLoaded = true;
+        void refreshArenaHistory();
       }
       if (state.arenaCandidates.length === 0 && !state.arenaCandidatesLoading) void refreshArenaCandidates();
       content = renderPvpArena({
@@ -2829,15 +2918,20 @@ function render(): void {
            * 二重受取はサーバの一意制約が止める。そこが通ってから配る。
            */
           void (async () => {
-            if (arenaSyncAvailable()) {
-              const remote = await claimArenaWeeklyRewardRemote();
-              if (!remote) {
-                state.arenaNotice = "受け取れませんでした（受け取り済みの可能性があります）";
+            let remote: Record<string, unknown> | null = null;
+            if (await connectArena()) {
+              const claimed = await claimArenaWeeklyRewardRemote();
+              if (!claimed || !claimed.ok) {
+                state.arenaNotice = claimed?.code === "ALREADY_CLAIMED"
+                  ? "今週のランク報酬は受け取り済みです"
+                  : "受け取れませんでした（時間をおいて試してください）";
                 render();
                 return;
               }
+              remote = { coinBalance: claimed.coinBalance };
             }
             const result = claimArenaWeeklyReward(state.player);
+            adoptArenaCoinBalance(remote);
             state.arenaNotice = result.ok
               ? `${result.tierName} の週間報酬を受け取りました`
               : (result.reason ?? "受け取れませんでした");
@@ -2888,8 +2982,9 @@ function render(): void {
            * 価格・在庫・上限・残高はサーバが見るので、そこが通ってから配る。
            */
           void (async () => {
-            if (arenaSyncAvailable()) {
-              const remote = await purchaseArenaShopItem(itemId);
+            let remote: Record<string, unknown> | null = null;
+            if (await connectArena()) {
+              remote = await purchaseArenaShopItem(itemId);
               if (!remote) {
                 state.arenaNotice = "購入できませんでした（上限・残高・在庫を確認してください）";
                 playSfx("denied", 0.7);
@@ -2898,6 +2993,8 @@ function render(): void {
               }
             }
             const result = buyArenaShopItem(state.player, itemId);
+            // 品物は手元(ローカル)に足す。**残高はサーバの数え方に合わせる**
+            adoptArenaCoinBalance(remote);
             state.arenaNotice = result.ok
               ? `${result.item?.name ?? "商品"}を購入しました`
               : (result.reason ?? "購入できませんでした");

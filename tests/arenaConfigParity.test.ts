@@ -4,6 +4,14 @@ import { ARENA_DEFENSE_DAILY_LOSS_CAP, ARENA_DEFENSE_RATING_SCALE, ARENA_RATING_
 import { ARENA_COIN_LOSS, ARENA_COIN_WIN } from "../src/data/arena/shop.js";
 import { ARENA_TICKET_MAX, ARENA_TICKET_REGEN_MINUTES } from "../src/data/pvpArena.js";
 import { ARENA_TIERS } from "../src/data/arena/ranks.js";
+import {
+  ARENA_SEASON_EPOCH_UTC,
+  ARENA_SEASON_WEEKS,
+  ARENA_SOFT_RESET,
+  arenaSeasonReward,
+  arenaWeeklyReward,
+} from "../src/data/arena/season.js";
+import { ARENA_SHOP_ITEMS } from "../src/data/arena/shop.js";
 
 /*
  * サーバ側の設定と、クライアント側の定数が同じ値か。
@@ -28,6 +36,7 @@ import { ARENA_TIERS } from "../src/data/arena/ranks.js";
 
 const sql0001 = readFileSync(new URL("../supabase/migrations/20260902170000_arena_schema.sql", import.meta.url), "utf8");
 const sql0003 = readFileSync(new URL("../supabase/migrations/20260902172000_arena_rpc.sql", import.meta.url), "utf8");
+const sqlSeed = readFileSync(new URL("../supabase/migrations/20260902172100_arena_seed.sql", import.meta.url), "utf8");
 
 /** `arena_config` に入れている初期値を1件取り出す */
 function seededConfig(key: string): Record<string, number> {
@@ -110,6 +119,83 @@ describe("サーバ設定とクライアント定数が同じ値であること"
       expect(sql0001, `${tier.id} がSQLに無い`).toContain(`'${tier.id}'`);
       expect(sql0001, `${tier.id} の境界 ${tier.minRating} がSQLに無い`)
         .toMatch(new RegExp(`'${tier.id}'[^\\n]*\\b${tier.minRating}\\b`));
+    }
+  });
+});
+
+describe("報酬・シーズン・棚がクライアントと同じ値であること", () => {
+  /** seed の `('WEEKLY', 'GOLD_1', 85)` を拾う */
+  function seededReward(kind: "WEEKLY" | "SEASON", tierId: string): number | null {
+    const found = sqlSeed.match(
+      new RegExp(`\\('${kind}',\\s*'${tierId}',\\s*(\\d+)\\)`),
+    );
+    return found ? Number(found[1]) : null;
+  }
+
+  it("週間報酬のコインが一致する", () => {
+    /*
+     * **桁が1つ違っていた。** サーバの表は 200〜3000、
+     * クライアントは 20〜210。繋いだ瞬間に10倍のコインが配られる。
+     */
+    for (const tier of ARENA_TIERS) {
+      expect(seededReward("WEEKLY", tier.id), `週・${tier.name}`)
+        .toBe(arenaWeeklyReward(tier.id).arenaCoins ?? 0);
+    }
+  });
+
+  it("シーズン報酬のコインが一致する", () => {
+    for (const tier of ARENA_TIERS) {
+      expect(seededReward("SEASON", tier.id), `季・${tier.name}`)
+        .toBe(arenaSeasonReward(tier.id).arenaCoins ?? 0);
+    }
+  });
+
+  it("ソフトリセットの基準と残す割合が一致する", () => {
+    /*
+     * 締めのたびにレートが動く式。ずれると、**同じ順位の人が
+     * サーバとクライアントで違うレートから次のシーズンを始める。**
+     */
+    const base = sqlSeed.match(/'ACTIVE',\s*\n?\s*(\d+),/);
+    expect(base, "soft_reset_base が読めない").not.toBeNull();
+    expect(Number(base![1])).toBe(ARENA_SOFT_RESET.anchor);
+    // 1/3 は小数で書くと丸めがずれるので、SQL側も割り算のまま持たせている
+    expect(sqlSeed).toContain("(1.0 / 3.0)");
+    expect(ARENA_SOFT_RESET.keep).toBeCloseTo(1 / 3, 12);
+  });
+
+  it("シーズンの開始と長さが一致する", () => {
+    // ここがずれると「今シーズンの締めまで」が嘘になる
+    const starts = sqlSeed.match(/'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)',\s*\n?\s*'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)'/);
+    expect(starts, "シーズンの期間が読めない").not.toBeNull();
+    expect(Date.parse(starts![1])).toBe(ARENA_SEASON_EPOCH_UTC);
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    expect(Date.parse(starts![2]) - Date.parse(starts![1])).toBe(ARENA_SEASON_WEEKS * weekMs);
+  });
+
+  it("棚に並ぶのは実在する商品だけで、値段も上限も一致する", () => {
+    /*
+     * seed が空のままだと、購入は必ず「その商品はありません」になる。
+     * 逆に、実装に無いものを置くと**買えたのに手元に増えない道具**が生まれる。
+     */
+    for (const item of ARENA_SHOP_ITEMS) {
+      // 行の終わりは `),` か `)` +改行。**最後の1件だけ `,` が無い**
+      const row = sqlSeed.match(new RegExp(`\\('${item.id}',[^)]{0,400}\\)`));
+      expect(row, `${item.id} が seed に無い`).not.toBeNull();
+      const text = row![0];
+      expect(text, `${item.id} の値段`).toContain(`, ${item.price},`);
+      expect(text, `${item.id} の中身`).toContain(`"kind":"${item.kind}"`);
+      expect(text, `${item.id} の個数`).toContain(`"amount":${item.amount}`);
+      const limits = item.period === "WEEKLY" ? `${item.limit}, null` : `null, ${item.limit}`;
+      expect(text, `${item.id} の上限(${item.period})`).toContain(limits);
+    }
+  });
+
+  it("seed に無い商品を売っていない", () => {
+    // サーバだけにある商品は、買った人の手元で何も起きない
+    const ids = [...sqlSeed.matchAll(/^\s{2}\('([a-z0-9_]+)',\s*'/gm)].map((m) => m[1]);
+    const known = new Set(ARENA_SHOP_ITEMS.map((item) => item.id));
+    for (const id of ids) {
+      expect(known.has(id), `${id} は実装に無い商品`).toBe(true);
     }
   });
 });

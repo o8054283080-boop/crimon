@@ -85,3 +85,35 @@ values
   ('reincarnation_pig_4', '転生ピッグ★4', 'ランクアップの素材。レベル上限で届く', 700,
    '{"kind":"REINCARNATION_PIG","amount":1,"star":4}'::jsonb, null, 1, 1, true, 70)
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 報酬のアリーナコイン
+--
+-- **サーバとクライアントで全く違う値が入っていた。**
+--
+--   週・ブロンズIII   サーバ 200 / クライアント 20
+--   季・レジェンド    サーバ 10000 / クライアント 1000
+--
+-- 桁が1つ違う。繋いだ瞬間に「受け取ったコインが10倍」になる。
+-- `src/data/arena/season.ts` の `arenaCoins` と同じ値へ揃える。
+--
+-- クリスタル・ゴールド・召喚書・称号はサーバの表に入れない。
+-- **手持ちをサーバへ同期していないから。** ここに置くと、
+-- 「サーバは配ったつもり・手元には無い」が生まれる。
+-- コインだけはサーバが残高を持っているので、サーバが配る。
+--
+-- `do update` にしてあるのは、**古い値が入った環境を直すため**
+-- (`do nothing` だと、既に間違った値が入っている所だけが直らない)。
+-- ---------------------------------------------------------------------
+insert into public.arena_reward_rules (kind, tier_id, coins) values
+  ('WEEKLY', 'BRONZE_3',    20), ('WEEKLY', 'BRONZE_2',    25), ('WEEKLY', 'BRONZE_1',    30),
+  ('WEEKLY', 'SILVER_3',    40), ('WEEKLY', 'SILVER_2',    45), ('WEEKLY', 'SILVER_1',    50),
+  ('WEEKLY', 'GOLD_3',      65), ('WEEKLY', 'GOLD_2',      75), ('WEEKLY', 'GOLD_1',      85),
+  ('WEEKLY', 'PLATINUM_3', 105), ('WEEKLY', 'PLATINUM_2', 120), ('WEEKLY', 'PLATINUM_1', 135),
+  ('WEEKLY', 'MASTER',     170), ('WEEKLY', 'LEGEND',     210),
+  ('SEASON', 'BRONZE_3',   100), ('SEASON', 'BRONZE_2',   120), ('SEASON', 'BRONZE_1',   150),
+  ('SEASON', 'SILVER_3',   200), ('SEASON', 'SILVER_2',   240), ('SEASON', 'SILVER_1',   280),
+  ('SEASON', 'GOLD_3',     350), ('SEASON', 'GOLD_2',     400), ('SEASON', 'GOLD_1',     450),
+  ('SEASON', 'PLATINUM_3', 550), ('SEASON', 'PLATINUM_2', 620), ('SEASON', 'PLATINUM_1', 700),
+  ('SEASON', 'MASTER',     850), ('SEASON', 'LEGEND',    1000)
+on conflict (kind, tier_id) do update set coins = excluded.coins;
