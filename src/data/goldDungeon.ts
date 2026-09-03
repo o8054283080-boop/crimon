@@ -47,13 +47,24 @@ interface FloorConfig {
   goldReward: number;
 }
 
-/** 階層が上がるほど敵は強くなるが、その分ゴールド報酬も大きく増える */
+/**
+ * 階層が上がるほど敵は強くなるが、その分ゴールド報酬も大きく増える。
+ *
+ * ## 報酬額の根拠
+ *
+ * 装備の強化費が★6で +0→+15 に 1,346,000G かかる。**1日で装備1つを
+ * 仕上げ切れない**が、数日で1つは仕上がる、という比になるよう置いてある。
+ * 5階を1日3回で最大 1,140,000G/日(依頼主の指定)。
+ *
+ * **階層を増やさない。1日3回の制限も外さない。** ここは稼ぎの場所で、
+ * 上限が無いと他の遊びが全部「ゴールドを稼ぐための前準備」に化ける。
+ */
 const FLOOR_CONFIG: Record<number, FloorConfig> = {
-  1: { star: 3, level: 30, powerScale: 0.7, speedScale: 1, goldReward: 3000 },
-  2: { star: 4, level: 40, powerScale: 1.0, speedScale: 1.03, goldReward: 8000 },
-  3: { star: 5, level: 50, powerScale: 1.4, speedScale: 1.06, goldReward: 20000 },
-  4: { star: 5, level: 50, powerScale: 1.9, speedScale: 1.1, goldReward: 45000 },
-  5: { star: 6, level: 60, powerScale: 2.3, speedScale: 1.2, goldReward: 90000 },
+  1: { star: 3, level: 30, powerScale: 0.7, speedScale: 1, goldReward: 50_000 },
+  2: { star: 4, level: 40, powerScale: 1.0, speedScale: 1.03, goldReward: 100_000 },
+  3: { star: 5, level: 50, powerScale: 1.4, speedScale: 1.06, goldReward: 180_000 },
+  4: { star: 5, level: 50, powerScale: 1.9, speedScale: 1.1, goldReward: 250_000 },
+  5: { star: 6, level: 60, powerScale: 2.3, speedScale: 1.2, goldReward: 380_000 },
 };
 
 function buildEnemies(floor: number, star: Star, level: number): DungeonEnemy[] {

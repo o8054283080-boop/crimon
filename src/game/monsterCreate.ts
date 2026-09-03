@@ -29,6 +29,15 @@ export const CREATE_SLOTS: CreateSlot[] = [1, 2];
 /** 素材に要求する星。ここを下げると仕組み全体の重みが失われる */
 export const CREATE_MATERIAL_STAR = 6;
 
+/**
+ * スキルを移し替える費用。
+ *
+ * **モンスターの★では変えない**(依頼主の指定)。素材は★6と決まっているので、
+ * 移し先の★で値段を変えると「安いうちに移しておく」だけの遊びになる。
+ * 一律にすれば、いつ移しても同じ重さの決断になる。
+ */
+export const CREATE_GOLD_COST = 500_000;
+
 export interface CreateCheck {
   ok: boolean;
   reason?: string;
@@ -111,9 +120,18 @@ export function applyMonsterCreate(
   slot: CreateSlot,
   partyIds: readonly string[],
   dungeonPartyIds: readonly string[] = [],
+  /**
+   * 支払い先。**渡さない呼び出しは無料のまま**にしてある——
+   * 道具やテストから「費用の話ぬきで移し替えだけ試す」道を残すため。
+   * 画面からは必ず渡すこと。
+   */
+  wallet?: { gold: number },
 ): CreateResult {
   const check = checkMonsterCreate(target, material, partyIds, dungeonPartyIds);
   if (!check.ok) return { ok: false, reason: check.reason };
+  if (wallet && wallet.gold < CREATE_GOLD_COST) {
+    return { ok: false, reason: `ゴールドが足りません（${CREATE_GOLD_COST.toLocaleString("ja-JP")}G 必要）` };
+  }
 
   const materialDex = findMonsterById(material.dexId);
   const skill = materialDex?.skills[slot];
@@ -124,6 +142,13 @@ export function applyMonsterCreate(
   if (targetDex && targetDex.skills[slot].id === skill.id && !target.createdSkill) {
     return { ok: false, reason: "同じスキルなので、移し替える意味がありません" };
   }
+
+  /*
+   * **払うのは、断る理由が全部消えてから。**
+   * 上の検査より先に引くと、「同じスキルなので意味がありません」で
+   * 弾かれた時にもゴールドだけ減る。
+   */
+  if (wallet) wallet.gold -= CREATE_GOLD_COST;
 
   const replaced = target.createdSkill;
   target.createdSkill = { slot, skillId: skill.id, sourceDexId: material.dexId };

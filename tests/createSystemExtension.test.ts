@@ -31,7 +31,7 @@ describe("クリエイトシステム拡張", () => {
   it("タイプ転生はタイプを変更しLv・経験値を維持する", () => {
     const monster = createMonsterInstance("slime_FIRE", 6, 40);
     monster.exp = 123;
-    reincarnateMonsterType(monster, "SUPPORT", { gold: 150_000 });
+    reincarnateMonsterType(monster, "SUPPORT", { gold: 300_000 });
     expect(monster.development.type).toBe("SUPPORT");
     expect([monster.level, monster.exp]).toEqual([40, 123]);
   });

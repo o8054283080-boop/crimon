@@ -2,9 +2,16 @@ import { SET_LABEL, SLOT_LABEL, formatStatValue } from "../../core/equipment.js"
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState, ShopView } from "../../game/playerState.js";
 import { SHOP_MAX_SLOTS, ShopEntry, msUntilRotation } from "../../game/shop.js";
+import { CRYSTAL_SHOP_CATEGORY_LABEL, CrystalShopCategory } from "../../data/crystalShop.js";
+import { CrystalShopRow } from "../../game/crystalShop.js";
 import { el } from "../dom.js";
 import { icon, slotIcon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
+
+/** null を落として並べる。この画面だけの小道具(他の画面も同じ形で持っている) */
+function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
+  return items.filter((item): item is HTMLElement => item !== null);
+}
 
 export interface ShopProps {
   player: PlayerState;
@@ -13,6 +20,9 @@ export interface ShopProps {
   notice: string | null;
   onBuy: (slotIndex: number) => void;
   onUnlockSlot: () => void;
+  /** ダイヤショップの1行ぶん。値段も残り回数も `game/crystalShop.ts` が決める */
+  crystalRows: CrystalShopRow[];
+  onBuyCrystalItem: (itemId: string) => void;
 }
 
 function formatRemaining(ms: number): string {
@@ -160,5 +170,78 @@ export function renderShop(props: ShopProps): HTMLElement {
         "　ファイターレベルが上がるほど、質の高い装備が並びます",
       ]),
     ]),
+
+    ...renderCrystalShop(props),
   ]);
+}
+
+
+/* ==========================================================================
+ * ダイヤショップ
+ *
+ * **入れ替わらない棚。** 上のゴールドの棚は時間で品揃えが変わるが、
+ * こちらはいつ来ても同じものが並ぶ。だから「今日はどうかな」と
+ * 覗く場所ではなく、「あれを買いに来た」場所として作る。
+ * ========================================================================== */
+
+/** 残り回数の一行。**無制限に「残り∞」は出さない**(数える意味が無い) */
+function remainingLabel(row: CrystalShopRow): HTMLElement | null {
+  if (row.remaining === null) return null;
+  const limit = row.item.limit ?? 0;
+  const period = row.item.period === "WEEKLY" ? "今週" : "今月";
+  return el("div", {
+    className: `cshop-card__limit${row.remaining <= 0 ? " cshop-card__limit--out" : ""}`,
+  }, [`${period} 残り ${row.remaining} / ${limit}`]);
+}
+
+function renderCrystalCard(props: ShopProps, row: CrystalShopRow): HTMLElement {
+  const soldOut = row.remaining !== null && row.remaining <= 0;
+  const blocked = soldOut || !row.affordable;
+  return el("div", { className: "cshop-card" }, nodes([
+    el("div", { className: "cshop-card__head" }, [
+      el("div", { className: "cshop-card__title" }, [row.item.name]),
+      el("div", { className: "cshop-card__price" }, [
+        icon("crystal"),
+        el("strong", {}, [row.item.price.toLocaleString("ja-JP")]),
+      ]),
+    ]),
+    el("div", { className: "cshop-card__note" }, [row.item.note]),
+    remainingLabel(row),
+    el("button", {
+      type: "button",
+      className: "btn btn--primary cshop-card__buy",
+      disabled: blocked,
+      onclick: () => props.onBuyCrystalItem(row.item.id),
+    }, [soldOut ? "購入済み" : "交換する"]),
+    /*
+     * 押せない時は理由を添える。**押せないボタンだけを出さない。**
+     * 何を満たせば買えるのかが分からないと、待てばよいのか
+     * 貯めればよいのかの区別が付かない。
+     */
+    blocked
+      ? el("div", { className: "cshop-card__reason" }, [
+        soldOut
+          ? (row.item.period === "WEEKLY" ? "来週また買えます" : "来月また買えます")
+          : `ダイヤがあと ${(row.item.price - props.player.crystal).toLocaleString("ja-JP")} 必要です`,
+      ])
+      : null,
+  ]));
+}
+
+function renderCrystalShop(props: ShopProps): HTMLElement[] {
+  const groups: { category: CrystalShopCategory; rows: CrystalShopRow[] }[] = [];
+  for (const row of props.crystalRows) {
+    const found = groups.find((g) => g.category === row.item.category);
+    if (found) found.rows.push(row);
+    else groups.push({ category: row.item.category, rows: [row] });
+  }
+  return groups.map((group) => el("section", { className: "panel cshop" }, [
+    /*
+     * 見出しに自前の印を足さない。**`.panel h2` が既に金色のひし形を立てている**ので、
+     * ここでクリスタルの絵を並べると「◆♢ 育成」と印が2つ並ぶ(実際にそうなった)。
+     * クリスタルの絵は値段の横だけに出す。
+     */
+    el("h2", { className: "cshop__title" }, [CRYSTAL_SHOP_CATEGORY_LABEL[group.category]]),
+    el("div", { className: "cshop__list" }, group.rows.map((row) => renderCrystalCard(props, row))),
+  ]));
 }

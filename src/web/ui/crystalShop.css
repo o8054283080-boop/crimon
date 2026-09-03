@@ -1,0 +1,107 @@
+/*
+ * ダイヤショップ。
+ *
+ * ## 別ファイルにした理由
+ *
+ * `style.css` へ追記し続けると、**Viteが黙って空のCSSを配るようになる**
+ * (この案件で実際に起きた。画面が崩れたら、まず配信バイト数を見ること)。
+ * 新しいまとまりは新しいファイルに置く。
+ *
+ * ## 縦画面を先に考える
+ *
+ * 商品は横に並べず、**1列で縦に積む。** 名前・中身・値段・残り回数・
+ * ボタンが、指の下から目線の上まで一直線に並ぶようにしてある。
+ * 横2列にすると、狭い端末で値段が名前の下へ回り込んで読めなくなる。
+ */
+
+.cshop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/*
+ * 見出しは `.panel h2` に任せる。**左の金具も字の大きさも共通のもの。**
+ * ここで上書きすると、ショップの中でこの棚だけ見出しの見え方が変わる。
+ */
+.cshop__title {
+  margin: 0 0 10px;
+}
+
+.cshop__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cshop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #2b2440;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #14101f, #0d0a15);
+}
+
+.cshop-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cshop-card__title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+/* 値段は名前と同じ行の右端。**買う前にいちばん見たい数字** */
+.cshop-card__price {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: #9fd8ff;
+  font-size: 1.05rem;
+}
+
+.cshop-card__note {
+  margin: 0;
+  color: var(--text-dim);
+  /*
+   * 12px 相当。**9px を下回らせない。**
+   * この案件では実機で読めない文字を何度も出している
+   * (`tests/cssReadability.test.ts` が 9px 未満を落とす)。
+   */
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.cshop-card__limit {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border: 1px solid #3a3155;
+  border-radius: 999px;
+  color: #cbbfe8;
+  font-size: 0.76rem;
+}
+
+/* 買えなくなった時だけ色を変える。**押す前に気づける** */
+.cshop-card__limit--out {
+  border-color: #5a3340;
+  background: #2a1620;
+  color: #e2a0ae;
+}
+
+.cshop-card__buy {
+  width: 100%;
+}
+
+.cshop-card__reason {
+  color: #e2a0ae;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  text-align: center;
+}

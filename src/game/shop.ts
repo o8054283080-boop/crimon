@@ -27,14 +27,46 @@ export const SHOP_MAX_SLOTS = 10;
 export const SHOP_SLOT_UNLOCK_COSTS = [150, 250, 400, 600, 900];
 
 /** 装備の星ごとの値段(ゴールド) */
-export const SHOP_EQUIPMENT_PRICE: Record<EquipStar, number> = {
-  1: 1000,
-  2: 3000,
-  3: 6000,
-  4: 12000,
-  5: 35000,
-  6: 100000,
+/**
+ * 装備の値段。**★ランクと初期サブOPの数だけで決める。**
+ *
+ * ## 中身では値段を変えない
+ *
+ * 速度・クリ率・攻撃%が揃った当たりでも、同じ★・同じサブ数なら同じ値段
+ * (依頼主の指定)。中身で値付けすると、
+ *
+ *   ・「強い組み合わせ」の定義を誰かが決めることになる
+ *   ・その定義を変えるたびに、棚の値段が黙って動く
+ *   ・買う側は「高い＝強い」と読むので、値段が攻略情報になる
+ *
+ * 引きの良し悪しは**買った後の楽しみ**として残す。
+ *
+ * ## 添字はサブOPの数(0〜4)
+ *
+ * サブ0の装備も棚に並ぶ。依頼の表はサブ1からなので、
+ * サブ0はサブ1の半額に置いてある(0円にすると「タダで拾える」になる)。
+ */
+export const SHOP_EQUIPMENT_PRICE: Record<EquipStar, readonly number[]> = {
+  //                サブ0     サブ1     サブ2     サブ3       サブ4
+  1: [/*0*/   250,    500,      750,    1_250,      2_000],
+  2: [/*0*/ 1_250,  2_500,    4_000,    6_000,     10_000],
+  3: [/*0*/ 5_000, 10_000,   15_000,   25_000,     40_000],
+  4: [/*0*/15_000, 30_000,   50_000,   80_000,    120_000],
+  5: [/*0*/40_000, 80_000,  130_000,  220_000,    350_000],
+  6: [/*0*/100_000,200_000, 350_000,  600_000,  1_000_000],
 };
+
+/**
+ * その装備の値段。**表示にも請求にも、必ずこれを通す。**
+ *
+ * 別々の場所で計算すると、片方だけ直されて
+ * 「表示より高く引かれる」が起きる(この案件で何度も出た形)。
+ */
+export function shopEquipmentPrice(equipment: Equipment): number {
+  const table = SHOP_EQUIPMENT_PRICE[equipment.star];
+  const subs = Math.max(0, Math.min(table.length - 1, equipment.subStats.length));
+  return table[subs];
+}
 
 /** モンスターの星ごとの値段(ゴールド)。ショップに出るのは星3まで */
 export const SHOP_MONSTER_PRICE: Record<1 | 2 | 3, number> = {
@@ -165,7 +197,7 @@ function buildEntry(rng: () => number, fighterLevel: number, index: number): Sho
   );
   const set: SetType = pick(SET_TYPES, rng);
   const equipment = generateEquipment({ star, subStatCount: subStatCountFor(star, rng), set, rng });
-  return { kind: "EQUIPMENT", equipment, price: SHOP_EQUIPMENT_PRICE[star] };
+  return { kind: "EQUIPMENT", equipment, price: shopEquipmentPrice(equipment) };
 }
 
 /**

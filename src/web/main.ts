@@ -6,6 +6,7 @@ import "./ui/tutorialBar.css";
 import "./ui/arena.css";
 import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
+import "./ui/crystalShop.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
@@ -51,9 +52,11 @@ import {
   applyStageClearRewards,
 } from "../game/rewards.js";
 import { executeMonsterPowerUp } from "../game/monsterPowerUp.js";
-import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
-import { awakenLatentAbility, confirmLatentAwakening, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
-import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
+import { CREATE_GOLD_COST, CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkill } from "../game/monsterCreate.js";
+import { awakenLatentAbility, confirmAbilityPoints, confirmLatentAwakening, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint, usedAbilityPoints } from "../game/monsterDevelopment.js";
+import {
+  TYPE_REINCARNATION_GOLD_COST,
+  ABILITY_POINT_RESET_COST, AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
 import {
   ARENA_HISTORY_MAX,
   claimDailyLoginBonus,
@@ -177,6 +180,7 @@ import { renderSummon } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
 import { ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
+import { buyCrystalShopItem, crystalShopRows } from "../game/crystalShop.js";
 
 let appMounted = false;
 let pwaRegistration: ServiceWorkerRegistration | null = null;
@@ -977,7 +981,9 @@ function handleConfirmMonsterCreate(): void {
   const slot = state.createSlot;
   if (!target || !material || slot === null) return;
 
-  const result = applyMonsterCreate(target, material, slot, state.player.partyIds, state.player.dungeonPartyIds);
+  // **費用も同じ呼び出しで引く。** 別々にすると、片方だけ通る道ができる
+  const result = applyMonsterCreate(
+    target, material, slot, state.player.partyIds, state.player.dungeonPartyIds, state.player);
   if (!result.ok) {
     playSfx("denied", 0.7);
     state.createNotice = result.reason ?? "クリエイトできませんでした";
@@ -2790,6 +2796,28 @@ function render(): void {
           if (result.ok) savePlayerState(state.player);
           render();
         },
+        crystalRows: crystalShopRows(state.player),
+        onBuyCrystalItem: (itemId: string) => {
+          /*
+           * **押す前に必ずたずねる。** 700💎の商品を誤タップで買われるのは
+           * 取り返しがつかない。金額と中身を1行ずつ出す。
+           */
+          const row = crystalShopRows(state.player).find((r) => r.item.id === itemId);
+          if (!row) return;
+          const ok = window.confirm(
+            `${row.item.price.toLocaleString("ja-JP")}ダイヤを使用して\n`
+            + `${row.item.name} ×${row.item.kind === "GOLD" ? 1 : row.item.amount}\n`
+            + `を購入しますか？`,
+          );
+          if (!ok) return;
+          const result = buyCrystalShopItem(state.player, itemId);
+          state.shopNotice = result.ok
+            ? `${result.item?.name ?? "商品"}を購入しました`
+            : (result.reason ?? "購入できませんでした");
+          if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
+          else playSfx("denied", 0.7);
+          render();
+        },
         onUnlockSlot: () => {
           const result = unlockShopSlot(state.player);
           state.shopNotice = result.ok ? "枠を1つ増やしました" : (result.reason ?? "開放できませんでした");
@@ -3387,9 +3415,11 @@ function render(): void {
         },
         onReincarnate: (type: MonsterType) => {
           const label = MONSTER_TYPE_LABELS[type];
-          if (!window.confirm(`${label}タイプへ転生しますか？\n${MONSTER_TYPE_DESCRIPTIONS[type]}\n費用：150,000G\nレベル・EXPは維持されます。\n能力ポイントはリセットされ、振り直せます。`)) return;
+          // **金額は定数から出す。** 文言に直接書くと、値を変えた時にここだけ古くなる
+          const typeCost = TYPE_REINCARNATION_GOLD_COST.toLocaleString("ja-JP");
+          if (!window.confirm(`${label}タイプへ転生しますか？\n${MONSTER_TYPE_DESCRIPTIONS[type]}\n費用：${typeCost}G\nレベル・EXPは維持されます。\n能力ポイントはリセットされ、振り直せます。`)) return;
           if (!reincarnateMonsterType(createTarget, type, state.player)) return;
-          state.createNotice = `150,000Gでタイプを変更しました（Lv・EXP維持）`;
+          state.createNotice = `${typeCost}Gでタイプを変更しました（Lv・EXP維持）`;
           savePlayerState(state.player);
           playSfx("levelUp");
           render();
@@ -3399,8 +3429,26 @@ function render(): void {
           savePlayerState(state.player);
           render();
         },
+        onConfirmAbilityPoints: () => {
+          /*
+           * **ここで確定する。** 押すまでは何度でも無料で振り直せて、
+           * 押した後は有料のリセットでしか変えられない。
+           * 取り返しがつかないので、押す前に必ず1度たずねる。
+           */
+          const used = usedAbilityPoints(createTarget.development.abilityPoints);
+          const cost = ABILITY_POINT_RESET_COST.toLocaleString("ja-JP");
+          if (!window.confirm(
+            `この配分で確定しますか？\n使用 ${used}pt\n\n確定すると、変えるには ${cost}G のリセットが必要になります。`
+          )) return;
+          if (!confirmAbilityPoints(createTarget)) return;
+          state.createNotice = "能力ポイントの配分を確定しました";
+          savePlayerState(state.player);
+          playSfx("levelUp");
+          render();
+        },
         onResetAbilityPoints: () => {
-          if (!window.confirm("能力ポイントをリセットしますか？\n能力ポイントがすべて0になります\n再び100ptを自由に振り直せます\n費用：100,000ゴールド")) return;
+          const resetCost = ABILITY_POINT_RESET_COST.toLocaleString("ja-JP");
+          if (!window.confirm(`能力ポイントをリセットしますか？\n能力ポイントがすべて0になります\nもう一度、無料で自由に振り直せます\n費用：${resetCost}ゴールド`)) return;
           if (!resetAbilityPoints(createTarget, state.player)) return;
           state.createNotice = "能力ポイントをリセットしました";
           savePlayerState(state.player);

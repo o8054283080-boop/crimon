@@ -150,6 +150,20 @@ export interface PlayerState {
    * (1日で使い切ると、その日はもう並びを変えられなくなる)。
    */
   arenaRerollsSinceBattle: number;
+
+  /* --- ダイヤショップ --- */
+  /**
+   * 週次・月次の購入回数。**周期の番号ごとに1行**。
+   * 番号が変われば数えている行が対象外になり、上限が自動で戻る
+   * (リセット用の後片付けを持たない。動かない後始末は必ず腐る)。
+   */
+  crystalShopPurchases: { itemId: string; period: string; periodKey: number; count: number }[];
+  /**
+   * 見た中でいちばん新しい周期の番号。**時計を巻き戻されても戻さない。**
+   * サーバを通していないので、これが唯一の歯止めになる。
+   */
+  crystalShopMaxWeekKey?: number;
+  crystalShopMaxMonthKey?: number;
   /** 期間報酬を最後に受け取った期の識別子(-1 = まだ一度も精算していない) */
   arenaPeriodKey: number;
   /** 今期の対戦回数 */
@@ -336,6 +350,7 @@ export function createInitialState(): PlayerState {
     lastArenaTicketUpdateAt: Date.now(),
     arenaOpponentSeed: 1,
     arenaRerollsSinceBattle: 0,
+    crystalShopPurchases: [],
     arenaPeriodKey: -1,
     arenaSeasonBattles: 0,
     arenaSeasonWins: 0,
@@ -435,6 +450,18 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
       if (!(monster.development.type === null || ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT", "BALANCE"].includes(monster.development.type))) {
         monster.development.type = null;
       }
+      /*
+       * 能力配分の「確定」の印。
+       *
+       * **印を知らない旧セーブは、既に振ってあれば確定済みとして読む。**
+       * ここを未確定にしてしまうと、前から遊んでいる人だけが
+       * 有料リセットを回り道できる場所が残る(これを塞ぐのが今回の目的)。
+       * 1点も振っていない個体は、当然そのまま無料で配れる。
+       */
+      if (typeof monster.development.abilityPointsConfirmed !== "boolean") {
+        const used = Object.values(monster.development.abilityPoints).reduce((sum, value) => sum + value, 0);
+        monster.development.abilityPointsConfirmed = used > 0;
+      }
     }
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
@@ -518,6 +545,22 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   // 前から遊んでいる人の控えには無い。**0から数え始める**(いきなり使い切らせない)
   if (typeof state.arenaRerollsSinceBattle !== "number" || state.arenaRerollsSinceBattle < 0) {
     state.arenaRerollsSinceBattle = 0;
+  }
+  /*
+   * ダイヤショップ。**前から遊んでいる人の控えには無い。**
+   * 無い時は空から始める(いきなり買えなくしない)。周期の控えは
+   * `undefined` のままでよい——`effectivePeriodKey` が今の番号を使う。
+   */
+  if (!Array.isArray(state.crystalShopPurchases)) state.crystalShopPurchases = [];
+  state.crystalShopPurchases = state.crystalShopPurchases.filter((entry) =>
+    entry && typeof entry.itemId === "string"
+    && typeof entry.periodKey === "number" && Number.isFinite(entry.periodKey)
+    && typeof entry.count === "number" && entry.count > 0);
+  if (typeof state.crystalShopMaxWeekKey !== "number" || !Number.isFinite(state.crystalShopMaxWeekKey)) {
+    state.crystalShopMaxWeekKey = undefined;
+  }
+  if (typeof state.crystalShopMaxMonthKey !== "number" || !Number.isFinite(state.crystalShopMaxMonthKey)) {
+    state.crystalShopMaxMonthKey = undefined;
   }
   if (typeof state.arenaPeriodKey !== "number") state.arenaPeriodKey = -1;
   if (typeof state.arenaSeasonBattles !== "number") state.arenaSeasonBattles = 0;

@@ -47,11 +47,11 @@ describe("潜在覚醒の候補", () => {
     const [abilityA, abilityB] = candidates;
     instance.development.latentAbilityId = abilityA.id;
     state.awakeningOrbs = 3;
-    state.gold = 150_000;
+    state.gold = 650_000;
 
     expect(reawakenLatentAbility(instance, state)).toBe(true);
     expect(state.awakeningOrbs).toBe(1);
-    expect(state.gold).toBe(50_000);
+    expect(state.gold).toBe(150_000);
     expect(instance.development.latentAbilityId).toBeNull();
     expect(instance.development.latentReselectPending).toBe(true);
 
@@ -60,17 +60,17 @@ describe("潜在覚醒の候補", () => {
     expect(loadedInstance.development.latentReselectPending).toBe(true);
     expect(awakenLatentAbility(loadedInstance, abilityB.id, candidates, loaded)).toBe(true);
     expect(loaded.awakeningOrbs).toBe(1);
-    expect(loaded.gold).toBe(50_000);
+    expect(loaded.gold).toBe(150_000);
     expect(loadedInstance.development.latentAbilityId).toBe(abilityB.id);
     expect(loadedInstance.development.latentReselectPending).toBe(false);
   });
 
-  it("再覚醒にはオーブ2個と100,000Gの両方が必要", () => {
+  it("再覚醒にはオーブ2個と500,000Gの両方が必要", () => {
     const instance = createMonsterInstance("slime_FIRE", 3);
     instance.development.latentAbilityId = LATENT_ABILITY_CANDIDATES[instance.dexId][0].id;
 
-    expect(reawakenLatentAbility(instance, { awakeningOrbs: 1, gold: 100_000 })).toBe(false);
-    expect(reawakenLatentAbility(instance, { awakeningOrbs: 2, gold: 99_999 })).toBe(false);
+    expect(reawakenLatentAbility(instance, { awakeningOrbs: 1, gold: 500_000 })).toBe(false);
+    expect(reawakenLatentAbility(instance, { awakeningOrbs: 2, gold: 499_999 })).toBe(false);
     expect(instance.development.latentAbilityId).not.toBeNull();
     expect(instance.development.latentReselectPending).toBe(false);
   });
@@ -83,13 +83,13 @@ describe("潜在覚醒の候補", () => {
 });
 
 describe("原子的な潜在確定", () => {
-  it("初回1個、再覚醒2個+100,000G、STALE/連打は無消費", async () => {
+  it("初回1個、再覚醒2個+500,000G、STALE/連打は無消費", async () => {
     const { confirmLatentAwakening } = await import("../src/game/monsterDevelopment.js");
     const instance = createMonsterInstance("slime_FIRE", 6);
     const candidates = LATENT_ABILITY_CANDIDATES[instance.dexId];
-    const wallet = { awakeningOrbs: 4, gold: 200_000 };
+    const wallet = { awakeningOrbs: 4, gold: 600_000 };
     expect(confirmLatentAwakening(instance, candidates[0].id, candidates, wallet, null)).toBe(true);
-    expect(wallet).toEqual({ awakeningOrbs: 3, gold: 200_000 });
+    expect(wallet).toEqual({ awakeningOrbs: 3, gold: 600_000 });
     const stale = { ...wallet };
     expect(confirmLatentAwakening(instance, candidates[1].id, candidates, wallet, null)).toBe(false);
     expect(wallet).toEqual(stale);
