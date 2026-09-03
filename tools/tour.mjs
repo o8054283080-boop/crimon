@@ -57,6 +57,7 @@ const SCREENS = [
   { name: "試練の塔", tab: "HOME", tile: "tower" },
   { name: "遊び方", tab: "HOME", tile: "help" },
   { name: "モンスター図鑑", tab: "HOME", tile: "dex" },
+  { name: "ミッション", tab: "HOME", tile: "mission" },
   // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
