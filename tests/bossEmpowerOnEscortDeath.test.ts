@@ -145,17 +145,23 @@ describe("取り巻きが倒れると本体が強くなる", () => {
   });
 });
 
-describe("既存の戦闘は1つも変わらない", () => {
-  it("本編の敵は誰も empowerBossOnDeath を持っていない", () => {
+describe("使っているのは60階だけ", () => {
+  it("図鑑のテンプレートは1体も empowerBossOnDeath を持たない", () => {
     /*
-     * **ここが崩れたら、この機構は「足しただけ」ではなくなる。**
-     * 試練の塔の階の敵も、図鑑の敵も、指定を持たないこと。
+     * **図鑑側に持たせない。**持たせると、召喚で手に入る個体やステージの敵にまで
+     * 「倒すと味方が強くなる」が付いて回る。指定は**階の側**で置くもの。
      */
     for (const dex of MONSTER_DEX) {
       expect(dex.bossTraits?.empowerBossOnDeath, `${dex.id} が指定を持っている`).toBeUndefined();
     }
-    for (const floor of TRIAL_TOWER_FLOORS) {
-      expect(JSON.stringify(floor)).not.toContain("empowerBossOnDeath");
+  });
+
+  it("試練の塔で指定を持つのは60階の取り巻きだけ", () => {
+    const withEmpower = TRIAL_TOWER_FLOORS.filter((floor) => JSON.stringify(floor).includes("empowerBossOnDeath"));
+    expect(withEmpower.map((floor) => floor.floor)).toEqual([60]);
+    for (const enemy of withEmpower[0].enemies) {
+      // **本体には付けない。**自分が倒れた時に自分を強くする指定は意味を持たない
+      if (enemy.bossTraits?.empowerBossOnDeath) expect(enemy.victoryTarget).toBe(false);
     }
   });
 

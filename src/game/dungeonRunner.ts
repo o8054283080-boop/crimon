@@ -35,8 +35,13 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale
   return {
     ...dex,
     id: `${dex.id}_dungeon`,
-    name: `${dex.name}★${enemy.star} Lv${enemy.level}${enemy.isBoss ? " 【BOSS】" : ""}`,
+    // 階が名前を持っていればそれを使う。**【BOSS】の印は名前の指定と関係なく付く**
+    name: `${enemy.displayName ?? `${dex.name}★${enemy.star} Lv${enemy.level}`}${enemy.isBoss ? " 【BOSS】" : ""}`,
     stats,
+    // 階の側の指定が図鑑より強い。**未指定なら図鑑のまま**なので、
+    // 既存の階(装備・魔獣ダンジョン、1〜50階)の敵は1体も変わらない
+    skills: enemy.skills ?? dex.skills,
+    bossTraits: enemy.bossTraits ?? dex.bossTraits,
     victoryTarget: enemy.victoryTarget,
     primaryTarget: enemy.primaryTarget,
     initialCooldowns: enemy.initialCooldowns,

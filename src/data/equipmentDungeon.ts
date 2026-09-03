@@ -1,6 +1,9 @@
 import { Element } from "../core/element.js";
 import { BEAST_DUNGEON_SET_TYPES, DEMON_DUNGEON_SET_TYPES, DUNGEON_FLOOR_COUNT, Equipment, SetType, generateDungeonEquipment } from "../core/equipment.js";
+import { BossTraits } from "../core/monster.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
+import { Skill } from "../core/skill.js";
+import { Stats } from "../core/stats.js";
 import {
   ANCIENT_CRYSTAL,
   ANCIENT_CRYSTAL_CURSE,
@@ -31,8 +34,27 @@ export interface DungeonEnemy {
    * 手番の回り方を変えたい場合はこちらを使う
    */
   spdMultiplier?: number;
-  /** 階層設計で確定させた実効値。指定時は通常の倍率計算より優先する。 */
-  fixedStats?: { hp: number; atk: number; def: number; spd: number };
+  /**
+   * 階層設計で確定させた実効値。指定時は通常の倍率計算(powerScale / speedScale /
+   * hpMultiplier / spdMultiplier)より優先する。
+   *
+   * 書いた項目だけが差し替わる。会心率・会心ダメージ・命中・抵抗まで指定できるのは、
+   * **専用ボスを「図鑑の値の倍率」ではなく実数で置きたい**場面があるため
+   * (試練の塔60階は Battle Lab で実測した実数をそのまま持ち込んでいる)。
+   */
+  fixedStats?: Partial<Stats>;
+  /**
+   * この個体だけのスキル差し替え。図鑑の3つをまるごと置き換える。
+   *
+   * 専用ボスは「同じ図鑑の個体だが技だけが違う」形になることがある
+   * (試練の塔60階の豪魔人・呪晶)。属性違いの新テンプレートを増やすと
+   * 図鑑・召喚・覚醒候補まで波及するので、階の側で差し替える。
+   */
+  skills?: [Skill, Skill, Skill];
+  /** この個体だけのボス特性。指定すると図鑑テンプレートの `bossTraits` を置き換える */
+  bossTraits?: BossTraits;
+  /** 画面に出す名前。省略時は「図鑑名★星 Lv」 */
+  displayName?: string;
   initialCooldowns?: [number, number, number];
 }
 

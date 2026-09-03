@@ -234,10 +234,17 @@ describe("試練の塔: 傾向がただの色違いになっていないか", ()
     expect(problems).toEqual([]);
   });
 
-  it("癒やしの階・守りの階でない階には、癒やす敵も盾を張る敵もいない", () => {
+  it("50階までは、癒やしの階・守りの階でない階に癒やす敵も盾を張る敵もいない", () => {
     // ここが崩れると「どの階にも癒やし手がいる」状態になり、癒やしの階が癒やしの階でなくなる。
     // 実際そうなっていて、双方が回復し合って300手で引き分ける盤面まで生まれていた
-    for (const floor of TRIAL_TOWER_FLOORS) {
+    //
+    // **51階以降にはこの規則を掛けない。**あちらは1階ずつ手で組んだ固定編成で、
+    // 難易度を数字ではなく**役割の噛み合い**で作っている(受け・回復・加速・妨害を
+    // 揃えた5体が上層の狙い。99階がその形)。回復役を癒やしの階だけに閉じ込めると、
+    // 「編成の質で難しくする」という上層の作り方そのものが成り立たない。
+    // 引き分けの心配は残るので、51階以降は tests/trialTowerUpper.test.ts が
+    // 実際に戦わせて決着することを確かめている
+    for (const floor of TRIAL_TOWER_FLOORS.filter((f) => f.floor <= 50)) {
       if (floor.trait === "HEALER" || floor.trait === "WARD") continue;
       for (const enemy of floor.enemies) {
         const dex = findMonsterById(`${enemy.templateId}_${enemy.element}`);
@@ -253,12 +260,16 @@ describe("試練の塔: 傾向がただの色違いになっていないか", ()
     }
   });
 
-  it("群れの階は数が多く、疾風の階は敵全員が速い", () => {
-    const swarm = TRIAL_TOWER_FLOORS.filter((f) => f.trait === "SWARM");
-    const plain = TRIAL_TOWER_FLOORS.filter((f) => f.trait === "NONE" && !isTowerBossFloor(f.floor));
+  it("群れの階は数が多く、疾風の階は敵全員が速い(50階まで)", () => {
+    // 群れの階は50階までにしか無く、そこでは速さを倍率で作っている。
+    // 51階以降は実効速度を実数で置いているので、確かめ方が別物になる
+    // (tests/trialTowerUpper.test.ts が帯と突き合わせている)
+    const upTo50 = TRIAL_TOWER_FLOORS.filter((f) => f.floor <= 50);
+    const swarm = upTo50.filter((f) => f.trait === "SWARM");
+    const plain = upTo50.filter((f) => f.trait === "NONE" && !isTowerBossFloor(f.floor));
     expect(swarm.length).toBeGreaterThan(0);
     for (const f of swarm) expect(f.enemies.length).toBeGreaterThan(plain[0]?.enemies.length ?? 4);
-    for (const f of TRIAL_TOWER_FLOORS.filter((x) => x.trait === "SWIFT")) {
+    for (const f of upTo50.filter((x) => x.trait === "SWIFT")) {
       for (const e of f.enemies) expect(e.spdMultiplier ?? 1).toBeGreaterThan(1);
     }
   });
