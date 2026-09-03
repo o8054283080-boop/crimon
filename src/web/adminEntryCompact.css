@@ -1,12 +1,13 @@
 .crimon-admin-entry-wrap {
   position: fixed !important;
-  right: 6px !important;
-  bottom: calc(98px + env(safe-area-inset-bottom)) !important;
+  right: 0 !important;
+  bottom: calc(86px + env(safe-area-inset-bottom)) !important;
   z-index: 40 !important;
-  display: block !important;
-  width: max-content !important;
-  height: auto !important;
-  min-height: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
   margin: 0 !important;
   padding: 0 !important;
   pointer-events: none;
@@ -14,11 +15,14 @@
 }
 
 .crimon-admin-entry {
-  display: block;
-  min-width: 0 !important;
-  min-height: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
   margin: 0 !important;
-  padding: 2px 3px !important;
+  padding: 0 !important;
   border: 0 !important;
   background: transparent !important;
   color: rgba(230, 235, 245, 0.5) !important;
