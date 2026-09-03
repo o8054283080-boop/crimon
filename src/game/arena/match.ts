@@ -113,6 +113,12 @@ export function recordArenaMatch(state: PlayerState, input: ArenaMatchInput): Ar
     state.arenaSeasonBattles += 1;
     if (input.won) state.arenaSeasonWins += 1;
     state.arenaRecentOpponentIds = rememberArenaOpponent(state.arenaRecentOpponentIds, input.opponent.id);
+    /*
+     * 「相手を変える」の回数を数え直す。**挑んだら戻る。**
+     * 防衛(留守中に攻められた分)では戻さない——自分が挑んだわけではないので、
+     * 寝ている間に引き直す権利が増えるのはおかしい。
+     */
+    state.arenaRerollsSinceBattle = 0;
   }
 
   const record: ArenaMatchRecord = {

@@ -547,8 +547,28 @@
   line-height: 1.5;
 }
 
+.ar-listhead__rerollbox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .ar-listhead__reroll {
   font-size: 0.84rem;
+  width: 100%;
+}
+
+/*
+ * 残り回数の下に添える一行。**9px を下回らせない。**
+ * この案件では実機で読めない文字を何度も出している
+ * (`tests/cssReadability.test.ts` が 9px 未満を落とす)。
+ */
+.ar-listhead__rerollnote {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  text-align: center;
 }
 
 .ar-detailhead {

@@ -176,6 +176,7 @@ import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/
 import { renderSummon } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
+import { ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
 
 let appMounted = false;
 let pwaRegistration: ServiceWorkerRegistration | null = null;
@@ -1305,10 +1306,22 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
    * (依頼主の指定)。同じ相手へ挑み直したい時も、その一覧に並んでいる。
    */
   const isArena = last?.kind === "ARENA";
-  if (last && !isArena) {
+  /*
+   * **アリーナで「もう一度」を出すのは、負けた時だけ**(依頼主の指定)。
+   *
+   * 勝った相手へもう一度挑んで挑戦券を1枚使うのは、ほとんどの場合
+   * やりたいことではない。負けた時は違う——**同じ相手に挑み直したい**のが
+   * 素直な流れなので、そこだけ残す。
+   */
+  const arenaRetry = isArena && state.stageResult?.cleared === false;
+  if (last && (!isArena || arenaRetry)) {
     actions.push({
-      // ここへ来るのはスタミナで回す場所だけ(アリーナは上で外してある)
-      label: fromAutoFarm ? `🔁 もう一度 ×${state.autoFarmCount}` : `🔁 もう一度 (⚡${cost})`,
+      // アリーナはスタミナではなく挑戦券で回す。⚡0 と出すと「無料で回せる」と読めてしまう
+      label: fromAutoFarm
+        ? `🔁 もう一度 ×${state.autoFarmCount}`
+        : arenaRetry
+          ? "🔁 同じ相手にもう一度 (挑戦券1)"
+          : `🔁 もう一度 (⚡${cost})`,
       variant: "primary",
       disabled: reason !== null,
       reason: reason ?? undefined,
@@ -1335,9 +1348,12 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
     });
   }
   actions.push({
-    // アリーナでは「もう一度」が無いので、ここが主役になる
     label: isArena ? "⚔ 相手を選び直す" : "🗺 選び直す",
-    variant: isArena ? "primary" : undefined,
+    /*
+     * 主役は1つだけ。勝った時のアリーナには「もう一度」が無いので、
+     * ここが主役になる。負けた時は「同じ相手にもう一度」が主役。
+     */
+    variant: isArena && !arenaRetry ? "primary" : undefined,
     run: backToLastRunList,
   });
   actions.push({ label: "🏠 ホーム", run: () => navigate("HOME") });
@@ -3037,9 +3053,23 @@ function render(): void {
           render();
         },
         onChallenge: startArenaMatch,
+        rerollsLeft: Math.max(0, ARENA_REROLL_LIMIT - state.player.arenaRerollsSinceBattle),
+        rerollLimit: ARENA_REROLL_LIMIT,
         onReroll: () => {
-          // 券は減らさない。並んだ相手がどれも噛み合わない時に
-          // 券を捨てて選び直させるのは理不尽なので
+          /*
+           * 券は減らさない。並んだ相手がどれも噛み合わない時に
+           * 券を捨てて選び直させるのは理不尽なので。
+           *
+           * **代わりに回数で絞る。** 無制限だと、いちばん弱い相手が
+           * 出るまで引き直せてしまう。1戦すれば数え直す。
+           */
+          if (state.player.arenaRerollsSinceBattle >= ARENA_REROLL_LIMIT) {
+            state.arenaNotice = "相手を変えられるのは1戦につき3回までです";
+            playSfx("denied", 0.7);
+            render();
+            return;
+          }
+          state.player.arenaRerollsSinceBattle += 1;
           advanceArenaOpponentSeed(state.player);
           savePlayerState(state.player);
           state.arenaCandidates = [];
