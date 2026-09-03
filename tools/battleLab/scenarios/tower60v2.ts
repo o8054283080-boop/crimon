@@ -92,7 +92,24 @@ export const TOWER60_V2: Scenario = {
       victoryTarget: true,
     },
     { ...V1_MASHOU, label: "古代の魔晶" },
-    { ...V1_JUSHOU, label: "古代の呪晶", skills: JUSHOU_SKILLS },
+    {
+      ...V1_JUSHOU,
+      label: "古代の呪晶",
+      /*
+       * 速度 170 → 200。
+       *
+       * v2 を測ったら、**回復不能が1000戦で20回しか出なかった。**
+       * 狙う順の先頭なので、行動する前に溶けていた(平均行動0.04回)。
+       * 札そのものは効く——狙う順を変えて生かすと敗北が43→127件へ増えた——
+       * ので、足りていないのは効き目ではなく**盤面に出る回数**。
+       *
+       * 倒されにくくするのではなく、**倒される前に1度動ける**ようにする。
+       * HPを盛ると「硬い置物」が増えるだけだが、速度なら
+       * 「先に撃たれるから急いで倒す」という読み合いになる。
+       */
+      stats: { ...V1_JUSHOU.stats, spd: 200 },
+      skills: JUSHOU_SKILLS,
+    },
   ],
   focusPatterns: TOWER60.focusPatterns,
 };
