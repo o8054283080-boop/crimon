@@ -35,10 +35,19 @@ import type { GearGrade, Scenario } from "./types.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** 装備の仕上がり具合。上から順に強い */
-const GEAR_GRADES: GearGrade[] = ["FINISHED", "STRONG", "MID", "ROUGH"];
+/*
+ * 並びは**実測で強い順**。名前の印象順ではない。
+ *
+ * 「60階の想定」は★6+15なのに、★6+12の「育成の途中」より弱く出る。
+ * サブOPが最初から4個ある装備は、+3/+6/+9/+12/+15 の強化が
+ * **既にある項目を伸ばす**方へ全部回る。1〜2個から始めた装備は、
+ * その枠を**個数を増やす**のに使ってしまう。同じ+15でも中身が違う。
+ */
+const GEAR_GRADES: GearGrade[] = ["FINISHED", "STRONG", "MID", "TYPICAL", "ROUGH"];
 const GEAR_LABEL: Record<GearGrade, string> = {
   FINISHED: "仕上げ切った (★6+15 / サブ4つとも役割どおり)",
   STRONG: "真面目に集めた (★6+15 / サブ半分は運任せ)",
+  TYPICAL: "60階の想定 (★6+15 / 初期サブ1〜2個から最大強化)",
   MID: "育成の途中 (★6+12 / サブ1つだけ狙いどおり)",
   ROUGH: "拾ったまま (★5+9 / サブは完全に運任せ)",
 };

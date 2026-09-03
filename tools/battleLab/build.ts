@@ -83,11 +83,26 @@ function dexIdOf(templateId: string, element: string): string {
  * 実際に効くのは「狙った項目がいくつ乗っているか」で、
  * そこが違うだけで同じモンスターが別物になる。
  */
-const GRADE_RULES: Record<GearGrade, { star: EquipStar; level: number; roleSubs: number }> = {
+const GRADE_RULES: Record<GearGrade, {
+  star: EquipStar;
+  level: number;
+  roleSubs: number;
+  /**
+   * 最初から着いているサブOPの数。ここを指定した段だけ、残りは
+   * **強化しながら増やす**(+3/+6/+9/+12/+15)。種類は選べない。
+   */
+  initialSubs?: number;
+}> = {
   // 仕上げ切った人。サブ4つとも役割どおり
   FINISHED: { star: 6, level: 15, roleSubs: 4 },
   // 真面目に集めた人。半分は狙った項目、半分は引いたまま
   STRONG: { star: 6, level: 15, roleSubs: 2 },
+  /*
+   * 塔の上の方の想定。★6を最大まで上げてはいるが、**買った時点のサブは1〜2個**。
+   * 残りは強化しながら増えるので、種類が選べない。
+   * 枠ごとに1個・2個を交互にする(全部1個は悲観的すぎ、全部2個は楽観的すぎる)。
+   */
+  TYPICAL: { star: 6, level: 15, roleSubs: 2, initialSubs: 2 },
   // 育成の途中。狙った項目は1つだけ乗っている
   MID: { star: 6, level: 12, roleSubs: 1 },
   // 拾ったものを着けている段階。中身は完全に運任せ
@@ -103,7 +118,17 @@ const GRADE_RULES: Record<GearGrade, { star: EquipStar; level: number; roleSubs:
  */
 function applyGrade(gear: GearSpec[], grade: GearGrade, rng: () => number): GearSpec[] {
   const rule = GRADE_RULES[grade];
-  return gear.map((spec) => {
+  return gear.map((spec, index) => {
+    /*
+     * 初期サブの数が決まっている段は、**そこまでしか配らない。**
+     * 足りないぶんは `craftGear` の中で `enhanceEquipment` が増やす——
+     * つまり種類は運任せになる。これが装備を集める側から見た本当の姿。
+     */
+    if (rule.initialSubs !== undefined) {
+      // 枠ごとに1個・2個を交互に。全部1個は悲観的すぎ、全部2個は楽観的すぎる
+      const count = index % 2 === 0 ? 1 : rule.initialSubs;
+      return { ...spec, star: rule.star, level: rule.level, subs: spec.subs.slice(0, count) };
+    }
     const role = spec.subs.slice(0, rule.roleSubs);
     const pool = STAT_TYPES.filter((type) => type !== spec.main && !role.includes(type));
     const filler: StatType[] = [];

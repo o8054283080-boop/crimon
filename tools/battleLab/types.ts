@@ -121,13 +121,22 @@ export interface Scenario {
  *
  *   FINISHED  ★6 +15 / サブは役割どおり。仕上げ切った人
  *   STRONG    ★6 +15 / サブは半分だけ役割どおり。真面目に集めた人
+ *   TYPICAL   ★6 +15 / **初期サブ1〜2個から最大まで上げた**。塔の上の方の想定
  *   MID       ★6 +12 / サブは1つだけ役割どおり。育成の途中
  *   ROUGH     ★5 +9  / サブは引いたまま。拾ったものを着けている段階
  *
  * ★や強化値ではなく**サブの中身が主役**にしてある。この案件では
  * 強い個体と弱い個体の差の大半がそこから出る。
+ *
+ * ## TYPICAL だけ、増え方まで本物どおり
+ *
+ * この作品は **+3 / +6 / +9 / +12 / +15 でサブOPが1つ増える**
+ * (`SUBSTAT_POWERUP_LEVELS`)。初期1個の装備を+15まで上げると4個になるが、
+ * 増えた3個は**種類が選べない。** 他の段は最初から4個そろえて配るのに対し、
+ * TYPICAL は初期ぶんだけ役割どおりに置き、残りは
+ * `enhanceEquipment` に増やさせる。**装備を集める側から見た本当の姿**はこれ。
  */
-export type GearGrade = "FINISHED" | "STRONG" | "MID" | "ROUGH";
+export type GearGrade = "FINISHED" | "STRONG" | "TYPICAL" | "MID" | "ROUGH";
 
 export type PresetName =
   | "MAX_ATTACKER"
