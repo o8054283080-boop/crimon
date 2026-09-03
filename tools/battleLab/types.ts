@@ -152,8 +152,23 @@ export interface TrackedUnit {
   readonly debuffCount: number;
   readonly alive: boolean;
   readonly skills: readonly { name: string; hpCoefficients: readonly number[] }[];
-  /** HP比例ダメージの係数を丸ごと差し替える(HP50%以下の+20%の再現に使う) */
-  scaleHpCoefficients(factor: number): void;
+  /**
+   * HP比例ダメージの係数を、**元の定義から**この倍率で置き直す。
+   *
+   * **累積しない。**前回は現在値へ掛けていたため、段が上がるたびに
+   * 1.2倍が重なり、HPが戻っても弱い段へ戻れなかった。
+   * 常に素の係数から計算するので、`1` を渡せば補正なしへ戻る。
+   */
+  setHpCoefficientFactor(factor: number): void;
+  /**
+   * 手番・クールタイム・行動ゲージを**一切消費せずに**このスキルを撃つ。
+   *
+   * 中で動くのは本編の `counterWithSkill` そのもので、ダメージも命中も
+   * 抵抗も会心も防御計算もすべてエンジンが決める。ここは「撃て」と言うだけ。
+   *
+   * 戻り値はその1発で増えたログ。撃った結果を数えるのに使う。
+   */
+  fireImmediate(skill: Skill): string[];
 }
 
 export interface Scenario {

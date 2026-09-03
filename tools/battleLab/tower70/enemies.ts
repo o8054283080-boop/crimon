@@ -29,7 +29,7 @@
  */
 import type { Skill } from "../../../src/core/skill.js";
 import type { EnemySpec } from "../types.js";
-import { TOWER70_ADDS, TOWER70_LABELS, type Tower70Numbers } from "./spec.js";
+import { TOWER70_LABELS, tower70AddsOf, type Tower70Numbers } from "./spec.js";
 
 /** 始祖ベヒモスの3つ。クールタイムは本編のベヒモスに合わせてある */
 export function progenitorSkills(): [Skill, Skill, Skill] {
@@ -169,6 +169,7 @@ export function pulseCrystalSkills(rate: number): [Skill, Skill, Skill] {
  * 取り巻きを残したままでも、本体を倒せばその時点で勝ち。
  */
 export function tower70Enemies(numbers: Tower70Numbers): EnemySpec[] {
+  const adds = tower70AddsOf(numbers);
   return [
     {
       label: TOWER70_LABELS.boss,
@@ -192,10 +193,10 @@ export function tower70Enemies(numbers: Tower70Numbers): EnemySpec[] {
       templateId: "fairy",
       element: "LIGHT",
       stats: {
-        hp: TOWER70_ADDS.life.hp,
-        atk: TOWER70_ADDS.life.atk,
-        def: TOWER70_ADDS.life.def,
-        spd: TOWER70_ADDS.life.spd,
+        hp: adds.life.hp,
+        atk: adds.life.atk,
+        def: adds.life.def,
+        spd: adds.life.spd,
         criRate: 0.1,
         criDmg: 1.5,
         accuracy: 0.3,
@@ -208,10 +209,10 @@ export function tower70Enemies(numbers: Tower70Numbers): EnemySpec[] {
       templateId: "golem",
       element: "DARK",
       stats: {
-        hp: TOWER70_ADDS.pulse.hp,
-        atk: TOWER70_ADDS.pulse.atk,
-        def: TOWER70_ADDS.pulse.def,
-        spd: TOWER70_ADDS.pulse.spd,
+        hp: adds.pulse.hp,
+        atk: adds.pulse.atk,
+        def: adds.pulse.def,
+        spd: adds.pulse.spd,
         criRate: 0.1,
         criDmg: 1.5,
         accuracy: 0.3,

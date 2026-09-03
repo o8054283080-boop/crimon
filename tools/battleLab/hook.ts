@@ -24,10 +24,29 @@
  */
 import type { BattleEngine } from "../../src/battle/engine.js";
 import type { BattleUnit } from "../../src/battle/unit.js";
+import type { Skill } from "../../src/core/skill.js";
 import type { ScenarioHook, ScenarioProbe, TrackedUnit } from "./types.js";
 
+/** エンジンの中の、観測点から呼んでよいところ */
+interface EngineInternals {
+  units: BattleUnit[];
+  log: string[];
+  recordTurn: (unit: BattleUnit, choice?: unknown) => unknown;
+  /** 手番もクールタイムも行動ゲージも消費せずにスキルを撃つ、本編の口 */
+  counterWithSkill: (source: BattleUnit, index: 0 | 1 | 2) => void;
+}
+
 /** `BattleUnit` の、観測点に見せてよいところだけを開く */
-function track(unit: BattleUnit): TrackedUnit {
+function track(unit: BattleUnit, engine: EngineInternals): TrackedUnit {
+  /*
+   * 素のスキル定義。**段階の倍率は必ずここから計算する。**
+   * 現在値へ掛け続けると、段が上がるたびに倍率が積み重なり、
+   * HPが戻っても弱い段へ下がれなくなる(第1回の実装がこれだった)
+   */
+  const baseSkills = unit.def.skills.map((skill) => ({
+    ...skill,
+    effects: skill.effects.map((effect) => ({ ...effect })),
+  })) as [Skill, Skill, Skill];
   return {
     get currentHp() { return unit.currentHp; },
     set currentHp(value: number) { unit.currentHp = value; },
@@ -66,16 +85,19 @@ function track(unit: BattleUnit): TrackedUnit {
       }));
     },
     /*
-     * HP比例ダメージの係数だけを掛け直す。
+     * HP比例ダメージの係数を、**素の定義から**この倍率で置き直す。
      *
      * 本編は `hpCoefficient × (1 + パッシブの上乗せ)` で計算するので、
      * 係数そのものを1.2倍するのと**数式として同じ**
      * (0.03 × 1.2 と 0.03 × (1 + 0.2) は同じ値)。
-     * パッシブ枠が空いていない敵で「HP比例部分だけ+20%」を測るための口で、
-     * 掛け直すのは**この1体の定義**だけ。図鑑にも他の敵にも波及しない。
+     * パッシブ枠が空いていない敵で「HP比例部分だけ+N%」を測るための口で、
+     * 置き直すのは**この1体の定義**だけ。図鑑にも他の敵にも波及しない。
+     *
+     * **累積しない。**`1` を渡せば補正なしへ戻るので、
+     * HPが回復して弱い段へ下がる動きもそのまま作れる。
      */
-    scaleHpCoefficients(factor: number) {
-      const skills = unit.def.skills.map((skill) => ({
+    setHpCoefficientFactor(factor: number) {
+      const skills = baseSkills.map((skill) => ({
         ...skill,
         effects: skill.effects.map((effect) =>
           effect.kind === "DAMAGE" && effect.hpCoefficient !== undefined
@@ -84,6 +106,28 @@ function track(unit: BattleUnit): TrackedUnit {
         ),
       }));
       (unit.def as { skills: unknown }).skills = skills;
+    },
+    /*
+     * 手番・クールタイム・行動ゲージを消費せずに1回撃つ。
+     *
+     * 本編の `counterWithSkill` は**枠の番号でしかスキルを選べない**ので、
+     * 撃つ間だけ3番目の枠へ差し込み、終わったら元へ戻す。
+     * クールタイムには一切触らない機構なので、戻せば何も残らない。
+     *
+     * **ダメージも命中も抵抗も会心も防御計算も、全部エンジンが決める。**
+     * ここでやっているのは差し替えと呼び出しだけ。
+     */
+    fireImmediate(skill: Skill): string[] {
+      const current = unit.def.skills;
+      const swapped = [current[0], current[1], skill] as [Skill, Skill, Skill];
+      (unit.def as { skills: unknown }).skills = swapped;
+      const before = engine.log.length;
+      try {
+        engine.counterWithSkill(unit, 2);
+      } finally {
+        (unit.def as { skills: unknown }).skills = current;
+      }
+      return engine.log.slice(before);
     },
   };
 }
@@ -95,17 +139,26 @@ function track(unit: BattleUnit): TrackedUnit {
 export function attachProbe(engine: BattleEngine, hook: ScenarioHook | undefined): ScenarioProbe | null {
   if (!hook) return null;
 
-  const engineAny = engine as unknown as {
-    units: BattleUnit[];
-    log: string[];
-    recordTurn: (unit: BattleUnit, choice?: unknown) => unknown;
-  };
+  const engineAny = engine as unknown as EngineInternals;
   const units = engineAny.units;
   const idOf = (unit: BattleUnit): string => unit.instanceId;
   const find = (id: string): BattleUnit | undefined => units.find((unit) => idOf(unit) === id);
 
+  /*
+   * `TrackedUnit` は素のスキル定義を抱えるので、1体につき1つだけ作って使い回す。
+   * 毎回作り直すと「素の定義」が段階適用後のものになり、倍率が積み重なる
+   */
+  const tracked = new Map<string, TrackedUnit>();
+  const trackedOf = (id: string): TrackedUnit | undefined => {
+    const unit = find(id);
+    if (!unit) return undefined;
+    let entry = tracked.get(id);
+    if (!entry) { entry = track(unit, engineAny); tracked.set(id, entry); }
+    return entry;
+  };
+
   const probe = hook({
-    unitOf: (id) => { const unit = find(id); return unit ? track(unit) : undefined; },
+    unitOf: trackedOf,
     aliveOf: (id) => find(id)?.alive ?? false,
   });
 

@@ -18,6 +18,7 @@ import { runMany } from "../run.js";
 import type { BattleTally, GearGrade } from "../types.js";
 import { buildTower70, TOWER70_FOCUS, TOWER70_PARTIES } from "../scenarios/tower70.js";
 import { TOWER70_BASE, TOWER70_SWEEPS, type Tower70Numbers } from "./spec.js";
+import { tower70Before } from "./before.js";
 
 export interface Tower70Row {
   party: string;
@@ -114,7 +115,12 @@ export function detailMarkdown(rows: Tower70Row[], keys: string[]): string {
   for (const row of rows) {
     const cells = keys.map((key) => {
       const value = row.extra[key] ?? 0;
-      return key.includes("割合") || key.includes("到達") ? pct(value) : num(value);
+      const asPercent = key.includes("割合") || key.includes("到達")
+        || key.includes("そろった") || key.includes("1回以上") || key.includes("2回以上")
+        || key.includes("味方HP") || key.startsWith("咆哮75") || key.startsWith("咆哮50") || key.startsWith("咆哮25")
+        || key === "咆哮で全滅";
+      if (asPercent) return pct(value);
+      return key === "咆哮回数" || key.includes("撃破数") ? value.toFixed(2) : num(value);
     });
     lines.push(`| ${row.party} | ${row.focus} | ${cells.join(" | ")} |`);
   }
@@ -157,7 +163,6 @@ function describeAxis(axis: string, numbers: Tower70Numbers): string {
     case "ATK": return numbers.bossAtk.toLocaleString("ja-JP");
     case "REGEN": return `+${Math.round(numbers.lifeCrystalRegenBonus * 100)}%`;
     case "SHIELD": return `${Math.round(numbers.pulseShieldRate * 100)}%`;
-    case "SPD": return `+${numbers.lowHpSpdBonus}`;
     default: return "";
   }
 }
@@ -169,6 +174,32 @@ export function sweepMarkdown(rows: SweepRow[]): string {
   for (const row of rows) {
     const mark = row.base ? " ←基準" : "";
     lines.push(`| ${row.label} | ${row.value}${mark} | ${pct(row.winRate)} | ${row.avgTurns.toFixed(1)} | ${num(row.bossHealed)} |`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * 第1回と第2回を並べる。
+ *
+ * **前回の値を消さない**(`before.ts`)。差が読めないと、勝率が動いた時に
+ * 何をしたから動いたのかを追えなくなる。
+ */
+export function beforeAfterMarkdown(rows: Tower70Row[]): string {
+  const lines: string[] = [];
+  lines.push("| 編成 | 狙う順 | 前回 | 今回 | 差 | 前回手数 | 今回手数 | 前回の解除 | 今回の解除 | 前回の盾 | 今回の盾 | 前回の本体行動 | 今回の本体行動 |");
+  lines.push("|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|");
+  for (const row of rows) {
+    const before = tower70Before(row.party, row.focus);
+    if (!before) continue;
+    const diff = (row.winRate - before.winRate) * 100;
+    const sign = diff >= 0 ? "+" : "";
+    lines.push(
+      `| ${row.party} | ${row.focus} | ${pct(before.winRate)} | **${pct(row.winRate)}** | ${sign}${diff.toFixed(1)}pt `
+      + `| ${before.avgTurns.toFixed(1)} | ${row.avgTurns.toFixed(1)} `
+      + `| ${before.lifeCleanses} | ${(row.extra["生命晶の全体解除回数"] ?? 0).toFixed(1)} `
+      + `| ${before.pulseShields} | ${(row.extra["シールド発動回数"] ?? 0).toFixed(1)} `
+      + `| ${before.bossRegenTicks} | ${(row.extra["再生発動回数"] ?? 0).toFixed(1)} |`,
+    );
   }
   return lines.join("\n");
 }
