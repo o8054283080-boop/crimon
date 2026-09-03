@@ -27,7 +27,7 @@
  */
 import type { Skill } from "../../../src/core/skill.js";
 import type { ScenarioProbe, TrackedUnit } from "../types.js";
-import { TOWER70_ROAR, TOWER70_ROAR_THRESHOLDS, tower70TierAt, type Tower70Numbers } from "./spec.js";
+import { TOWER70_CRUSH, TOWER70_ROAR_THRESHOLDS, tower70RoarOf, tower70TierAt, type Tower70Numbers } from "./spec.js";
 
 const BOSS = "E1";
 const LIFE = "E2";
@@ -38,19 +38,21 @@ interface Context {
   aliveOf(id: string): boolean;
 }
 
-/** 始祖の咆哮。**素の8%のまま**(段階のHP比例上乗せは掛けない) */
-export function roarSkill(): Skill {
+/** 始祖の咆哮。**素の係数のまま**(段階のHP比例上乗せは掛けない) */
+export function roarSkill(numbers?: Tower70Numbers): Skill {
+  const roar = numbers ? tower70RoarOf(numbers) : tower70RoarOf({ roarProfile: "V3" } as Tower70Numbers);
   return {
     id: "lab_t70_roar",
     name: "始祖の咆哮",
-    description: "敵全体に攻撃力2.0倍と最大HP8%ぶんのダメージを与え、行動ゲージを50%減少させ、3ターン防御力を大きく低下させる。",
+    description: `敵全体に攻撃力${roar.multiplier}倍と最大HP${Math.round(roar.hpCoefficient * 100)}%ぶんのダメージを与え、`
+      + "行動ゲージを50%減少させ、3ターン防御力を大きく低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: TOWER70_ROAR.multiplier, hpCoefficient: TOWER70_ROAR.hpCoefficient },
-      { kind: "GAUGE", amount: -TOWER70_ROAR.gaugeDown },
+      { kind: "DAMAGE", multiplier: roar.multiplier, hpCoefficient: roar.hpCoefficient },
+      { kind: "GAUGE", amount: -roar.gaugeDown },
       // 「100%」でも本編の命中/抵抗判定は通る。そこは本編の挙動に合わせる
-      { kind: "DEBUFF", stat: "def", amount: TOWER70_ROAR.defDown, durationTurns: TOWER70_ROAR.defDownTurns, chance: 1 },
+      { kind: "DEBUFF", stat: "def", amount: roar.defDown, durationTurns: roar.defDownTurns, chance: 1 },
     ],
   };
 }
@@ -108,6 +110,16 @@ interface Counters {
   /** 咆哮を受けた後に味方が誰か生き残っていた回数 */
   roarSurvived: number;
 
+  /** 脈動晶S2「命脈断ち」 */
+  crushUses: number;
+  crushHpBefore: number;
+  crushHpAfter: number;
+  crushRemoved: number;
+  /** 半減で相手が倒れた回数。**0でなければ仕様違反** */
+  crushKills: number;
+  /** 誰を狙ったか(P1〜P5) */
+  crushTargets: number[];
+
   poisonApplied: number;
   poisonDamage: number;
   poisonDamageBeforeLifeDeath: number;
@@ -128,6 +140,8 @@ function newCounters(): Counters {
     bossS3Uses: 0, bossS3Cleansed: 0,
     roar75: 0, roar50: 0, roar25: 0, roarDamage: 0, roarKills: 0, roarWipe: 0,
     roarHpBefore: 0, roarHpAfter: 0, roarAll3: 0, roarSurvived: 0,
+    crushUses: 0, crushHpBefore: 0, crushHpAfter: 0, crushRemoved: 0, crushKills: 0,
+    crushTargets: [0, 0, 0, 0, 0],
     poisonApplied: 0, poisonDamage: 0, poisonDamageBeforeLifeDeath: 0, poisonDamageAfterLifeDeath: 0,
     poisonKills: 0, bossDamageTaken: 0,
   };
@@ -219,7 +233,7 @@ export function tower70Probe(context: Context, numbers: Tower70Numbers): Scenari
 
       const hpBefore = playerHpRatio();
       const aliveBefore = playersAlive();
-      const roarLines = unit.fireImmediate(roarSkill());
+      const roarLines = unit.fireImmediate(roarSkill(numbers));
       const hpAfter = playerHpRatio();
       const aliveAfter = playersAlive();
 
@@ -304,9 +318,44 @@ export function tower70Probe(context: Context, numbers: Tower70Numbers): Scenari
       if (bossUnit.shieldValue < beforeShield) counters.pulseShieldAbsorbed += beforeShield - bossUnit.shieldValue;
       if (unitId === PULSE && lines.some((line) => line.includes("にシールドが張られた！"))) counters.pulseShields += 1;
 
+      /*
+       * 脈動晶S2「命脈断ち」。**現在HPが最も高い1体を、その場で半分にする。**
+       *
+       * 本編に「現在HPの割合を書き換える」機構が無い。ダメージ効果で代用すると
+       * 防御・軽減・会心を通ってしまい、仕様と別物になるので、
+       * スキル側は効果を空にして**使用のログだけを合図**にしている。
+       *
+       *   ・対象は選定の**直前**の現在HPで比べる(実数。割合ではない)
+       *   ・生きている敵1体だけ
+       *   ・1未満にはしない(**絶対に即死させない**)
+       *   ・防御にも会心にも命中/抵抗にも一切触れない
+       */
+      if (unitId === PULSE && lines.some((line) => line.includes("「命脈断ち」"))) {
+        let target: TrackedUnit | null = null;
+        let targetIndex = -1;
+        PLAYER_IDS.forEach((id, index) => {
+          const candidate = context.unitOf(id);
+          if (!candidate || !candidate.alive) return;
+          if (!target || candidate.currentHp > target.currentHp) { target = candidate; targetIndex = index; }
+        });
+        if (target !== null) {
+          const victim = target as TrackedUnit;
+          const before = victim.currentHp;
+          const after = Math.max(1, Math.round(before * TOWER70_CRUSH.ratio));
+          victim.currentHp = after;
+          counters.crushUses += 1;
+          counters.crushHpBefore += before;
+          counters.crushHpAfter += after;
+          counters.crushRemoved += before - after;
+          counters.crushTargets[targetIndex] += 1;
+          // 半減で倒れてはいけない。倒れたら仕様違反なので数えて表に出す
+          if (!victim.alive || victim.currentHp <= 0) counters.crushKills += 1;
+        }
+      }
+
       if (!lifeAlive()) lifeDead = true;
 
-      if (unitId === PULSE && context.aliveOf(PULSE)) {
+      if (numbers.pulseRole === "SHIELD" && unitId === PULSE && context.aliveOf(PULSE)) {
         pulseTurns += 1;
         if (pulseTurns % numbers.pulseShieldEveryTurns === 0 && bossUnit.alive) {
           const amount = Math.round(bossUnit.maxHp * numbers.pulseShieldRate);
@@ -400,6 +449,20 @@ export function tower70Probe(context: Context, numbers: Tower70Numbers): Scenari
         毒割合: poisonShare,
         生命晶撃破前の毒: counters.poisonDamageBeforeLifeDeath,
         生命晶撃破後の毒: counters.poisonDamageAfterLifeDeath,
+        命脈断ちの発動回数: counters.crushUses,
+        命脈断ちが1回以上: counters.crushUses >= 1 ? 1 : 0,
+        命脈断ちが2回以上: counters.crushUses >= 2 ? 1 : 0,
+        命脈断ち発動前HP: counters.crushUses > 0 ? counters.crushHpBefore / counters.crushUses : 0,
+        命脈断ち発動後HP: counters.crushUses > 0 ? counters.crushHpAfter / counters.crushUses : 0,
+        命脈断ち1回の削り: counters.crushUses > 0 ? counters.crushRemoved / counters.crushUses : 0,
+        命脈断ちの合計削り: counters.crushRemoved,
+        命脈断ちでの死亡: counters.crushKills,
+        "命脈断ちP1": counters.crushTargets[0],
+        "命脈断ちP2": counters.crushTargets[1],
+        "命脈断ちP3": counters.crushTargets[2],
+        "命脈断ちP4": counters.crushTargets[3],
+        "命脈断ちP5": counters.crushTargets[4],
+
         毒でとどめ: counters.poisonKills,
         本体被ダメージ: counters.bossDamageTaken,
       };

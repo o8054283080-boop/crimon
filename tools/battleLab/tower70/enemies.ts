@@ -29,7 +29,7 @@
  */
 import type { Skill } from "../../../src/core/skill.js";
 import type { EnemySpec } from "../types.js";
-import { TOWER70_LABELS, tower70AddsOf, type Tower70Numbers } from "./spec.js";
+import { TOWER70_CRUSH, TOWER70_LABELS, tower70AddsOf, type Tower70Numbers } from "./spec.js";
 
 /** 始祖ベヒモスの3つ。クールタイムは本編のベヒモスに合わせてある */
 export function progenitorSkills(): [Skill, Skill, Skill] {
@@ -121,20 +121,16 @@ export function lifeCrystalSkills(): [Skill, Skill, Skill] {
   ];
 }
 
-/** 古代の脈動晶。シールドと軽減で本体の寿命を延ばす */
-export function pulseCrystalSkills(rate: number): [Skill, Skill, Skill] {
+/**
+ * 古代の脈動晶(第2回まで)。シールドと軽減で本体の寿命を延ばす守り役。
+ *
+ * **第3回では使わない。**吸収量が本体HPの0.86〜1.46倍まで積み上がり、
+ * 削り切れずに300手で引き分ける盤面を量産したため。
+ * 切り分けで並べられるように残してある。
+ */
+export function pulseShieldSkills(rate: number): [Skill, Skill, Skill] {
   return [
-    {
-      id: "lab_t70_pulse_s1",
-      name: "脈動の衝",
-      description: "敵単体に攻撃力0.7倍のダメージを与え、50%で2ターン速度を低下させる。",
-      target: "SINGLE_ENEMY",
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.7 },
-        { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.5 },
-      ],
-    },
+    pulseS1(),
     {
       /*
        * **受け手の最大HP基準**でシールドを張る(`fromSourceHp` を書かない)。
@@ -156,9 +152,62 @@ export function pulseCrystalSkills(rate: number): [Skill, Skill, Skill] {
       cooldownTurns: 6,
       effects: [
         { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 2 },
-        // 依頼は「始祖ベヒモスへ軽減」だが、本編の適用先は SELF/ALLIES/最低HP味方 の3つだけで
-        // 特定の1体を名指しできない。味方全体へ配る形にしてある(取り巻きにも乗る)
         { kind: "MITIGATE", amount: 0.15, durationTurns: 2 },
+      ],
+    },
+  ];
+}
+
+/** 両方の形で共通のスキル1 */
+function pulseS1(): Skill {
+  return {
+    id: "lab_t70_pulse_s1",
+    name: "脈動の衝",
+    description: "敵単体に攻撃力0.7倍のダメージを与え、50%で2ターン速度を低下させる。",
+    target: "SINGLE_ENEMY",
+    cooldownTurns: 0,
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.7 },
+      { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.5 },
+    ],
+  };
+}
+
+/**
+ * 古代の脈動晶(第3回)。**HP圧縮役。**
+ *
+ * S2「命脈断ち」は、現在HPがいちばん高い1体を**その場で半分にする**。
+ * ダメージではないので、防御でも軽減でも会心でも動かない。
+ * 硬い個体ほど大きく削られるので、耐久で粘る形にだけ代償が付く。
+ *
+ * **効果は空にしてある。**本編に「現在HPの割合を書き換える」機構が無く、
+ * ダメージ効果で代用すると防御と会心を通ってしまい、仕様と別物になる。
+ * 中身は `probe.ts` が手番の境目で受け持つ(使用のログだけを合図にする)。
+ */
+export function pulseCrushSkills(): [Skill, Skill, Skill] {
+  return [
+    pulseS1(),
+    {
+      id: "lab_t70_pulse_s2_crush",
+      name: "命脈断ち",
+      description: "現在HPが最も高い敵1体の現在HPを半分にする。ダメージではないので防御や会心では変わらない。",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: TOWER70_CRUSH.cooldownTurns,
+      effects: [],
+    },
+    {
+      /*
+       * **主役はS2。**ここが強いと「何が効いたのか」が読めなくなるので、
+       * 倍率もゲージ減も軽く置いてある
+       */
+      id: "lab_t70_pulse_s3_crush",
+      name: "脈動崩し",
+      description: "敵全体に攻撃力0.5倍のダメージを与え、50%で行動ゲージを15%減少させる。",
+      target: "ALL_ENEMIES",
+      cooldownTurns: 5,
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.5 },
+        { kind: "GAUGE", amount: -0.15, chance: 0.5 },
       ],
     },
   ];
@@ -218,7 +267,7 @@ export function tower70Enemies(numbers: Tower70Numbers): EnemySpec[] {
         accuracy: 0.3,
         resistance: 0.3,
       },
-      skills: pulseCrystalSkills(numbers.pulseShieldRate),
+      skills: numbers.pulseRole === "SHIELD" ? pulseShieldSkills(numbers.pulseShieldRate) : pulseCrushSkills(),
     },
   ];
 }

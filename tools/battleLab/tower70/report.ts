@@ -18,7 +18,7 @@ import { runMany } from "../run.js";
 import type { BattleTally, GearGrade } from "../types.js";
 import { buildTower70, TOWER70_FOCUS, TOWER70_PARTIES } from "../scenarios/tower70.js";
 import { TOWER70_BASE, TOWER70_SWEEPS, type Tower70Numbers } from "./spec.js";
-import { tower70Before } from "./before.js";
+import { tower70Before, tower70V2 } from "./before.js";
 
 export interface Tower70Row {
   party: string;
@@ -120,7 +120,10 @@ export function detailMarkdown(rows: Tower70Row[], keys: string[]): string {
         || key.includes("味方HP") || key.startsWith("咆哮75") || key.startsWith("咆哮50") || key.startsWith("咆哮25")
         || key === "咆哮で全滅";
       if (asPercent) return pct(value);
-      return key === "咆哮回数" || key.includes("撃破数") ? value.toFixed(2) : num(value);
+      // 1戦あたり0〜数回しか起きないものは、丸めると全部「0」か「1」になって差が消える
+      const asDecimal = key === "咆哮回数" || key.includes("撃破数")
+        || key === "命脈断ちの発動回数" || key.startsWith("命脈断ちP") || key === "命脈断ちでの死亡";
+      return asDecimal ? value.toFixed(2) : num(value);
     });
     lines.push(`| ${row.party} | ${row.focus} | ${cells.join(" | ")} |`);
   }
@@ -162,7 +165,6 @@ function describeAxis(axis: string, numbers: Tower70Numbers): string {
     case "HP": return numbers.bossHp.toLocaleString("ja-JP");
     case "ATK": return numbers.bossAtk.toLocaleString("ja-JP");
     case "REGEN": return `+${Math.round(numbers.lifeCrystalRegenBonus * 100)}%`;
-    case "SHIELD": return `${Math.round(numbers.pulseShieldRate * 100)}%`;
     default: return "";
   }
 }
@@ -179,26 +181,32 @@ export function sweepMarkdown(rows: SweepRow[]): string {
 }
 
 /**
- * 第1回と第2回を並べる。
+ * 第1回・第2回・第3回を1枚に並べる。
  *
- * **前回の値を消さない**(`before.ts`)。差が読めないと、勝率が動いた時に
+ * **前の回の値を消さない**(`before.ts`)。差が読めないと、勝率が動いた時に
  * 何をしたから動いたのかを追えなくなる。
+ *
+ * 第1回には引き分けの記録が無い(当時は勝率と敗因しか控えていなかった)。
+ * 実測では敗北0%・勝率+引き分け=100%だったので、**1−勝率**を引き分けとして扱う。
  */
-export function beforeAfterMarkdown(rows: Tower70Row[]): string {
+export function generationsMarkdown(rows: Tower70Row[]): string {
   const lines: string[] = [];
-  lines.push("| 編成 | 狙う順 | 前回 | 今回 | 差 | 前回手数 | 今回手数 | 前回の解除 | 今回の解除 | 前回の盾 | 今回の盾 | 前回の本体行動 | 今回の本体行動 |");
-  lines.push("|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|");
+  lines.push(
+    "| 編成 | 狙う順 | 勝率① | 勝率② | 勝率③ | 引分① | 引分② | 引分③ "
+    + "| 手数① | 手数② | 手数③ | 本体行動① | 本体行動② | 本体行動③ | 生命晶S2① | 生命晶S2② | 生命晶S2③ |",
+  );
+  lines.push(`|---|---|${new Array(15).fill("--:").join("|")}|`);
   for (const row of rows) {
-    const before = tower70Before(row.party, row.focus);
-    if (!before) continue;
-    const diff = (row.winRate - before.winRate) * 100;
-    const sign = diff >= 0 ? "+" : "";
+    const v1 = tower70Before(row.party, row.focus);
+    const v2 = tower70V2(row.party, row.focus);
+    if (!v1 || !v2) continue;
     lines.push(
-      `| ${row.party} | ${row.focus} | ${pct(before.winRate)} | **${pct(row.winRate)}** | ${sign}${diff.toFixed(1)}pt `
-      + `| ${before.avgTurns.toFixed(1)} | ${row.avgTurns.toFixed(1)} `
-      + `| ${before.lifeCleanses} | ${(row.extra["生命晶の全体解除回数"] ?? 0).toFixed(1)} `
-      + `| ${before.pulseShields} | ${(row.extra["シールド発動回数"] ?? 0).toFixed(1)} `
-      + `| ${before.bossRegenTicks} | ${(row.extra["再生発動回数"] ?? 0).toFixed(1)} |`,
+      `| ${row.party} | ${row.focus} `
+      + `| ${pct(v1.winRate)} | ${pct(v2.winRate)} | **${pct(row.winRate)}** `
+      + `| ${pct(v1.drawRate ?? 1 - v1.winRate)} | ${pct(v2.drawRate ?? 0)} | **${pct(row.drawRate)}** `
+      + `| ${v1.avgTurns.toFixed(1)} | ${v2.avgTurns.toFixed(1)} | ${row.avgTurns.toFixed(1)} `
+      + `| ${v1.bossRegenTicks} | ${v2.bossRegenTicks} | ${(row.extra["再生発動回数"] ?? 0).toFixed(1)} `
+      + `| ${v1.lifeCleanses} | ${v2.lifeCleanses} | ${(row.extra["生命晶の全体解除回数"] ?? 0).toFixed(1)} |`,
     );
   }
   return lines.join("\n");

@@ -35,6 +35,10 @@ export interface Tower70Numbers {
   tierProfile: "V1" | "V2";
   /** 「始祖の咆哮」を鳴らすか */
   roar: boolean;
+  /** 咆哮の打点(V2=2.0倍+8% / V3=1.5倍+5%) */
+  roarProfile: "V2" | "V3";
+  /** 脈動晶の役割(SHIELD=守り役 / CRUSH=HP圧縮役) */
+  pulseRole: PulseRole;
 }
 
 /**
@@ -52,6 +56,8 @@ export const TOWER70_BASE: Tower70Numbers = {
   addsProfile: "V2",
   tierProfile: "V2",
   roar: true,
+  roarProfile: "V3",
+  pulseRole: "CRUSH",
 };
 
 /**
@@ -94,6 +100,13 @@ export function tower70TierAt(hpRatio: number, profile: "V1" | "V2" = "V2"): Tow
   return tiers.find((tier) => hpRatio <= tier.hpRatio) ?? null;
 }
 
+/** その値の組で使う咆哮の打点 */
+export function tower70RoarOf(numbers: Tower70Numbers) {
+  return numbers.roarProfile === "V2"
+    ? { ...TOWER70_ROAR, ...TOWER70_ROAR_V2 }
+    : TOWER70_ROAR;
+}
+
 /** その値の組で使う取り巻きの数値 */
 export function tower70AddsOf(numbers: Tower70Numbers) {
   return numbers.addsProfile === "V1" ? TOWER70_ADDS_V1 : TOWER70_ADDS;
@@ -109,12 +122,43 @@ export function tower70AddsOf(numbers: Tower70Numbers) {
  */
 export const TOWER70_ROAR_THRESHOLDS = [0.75, 0.5, 0.25] as const;
 
+/**
+ * 咆哮の打点(第3回改訂)。
+ *
+ * 第2回は ATK2.0倍 + 最大HP8% = 基礎34,000 で、**1発で味方チームの
+ * 残HPが95.2%→48.4%へ落ちていた**(ほぼ半分)。切り分けでも、
+ * 取り巻きと段の強化が合わせて−2〜−16ptなのに対し、
+ * 咆哮ひとつで−93〜−100pt。ここだけが効きすぎていた。
+ */
 export const TOWER70_ROAR = {
-  multiplier: 2.0,
-  hpCoefficient: 0.08,
+  multiplier: 1.5,
+  hpCoefficient: 0.05,
   gaugeDown: 0.5,
   defDown: 0.5,
   defDownTurns: 3,
+} as const;
+
+/** 第2回の打点。新旧を並べるために残してある */
+export const TOWER70_ROAR_V2 = { multiplier: 2.0, hpCoefficient: 0.08 } as const;
+
+/**
+ * 脈動晶の役割(第3回改訂)。
+ *
+ * V2 は「守り役」で、シールドと軽減で本体の寿命を延ばしていた。
+ * ところが**吸収量が本体HPの0.86〜1.46倍**まで積み上がり、
+ * 削り切れずに300手で引き分ける盤面を量産した
+ * (TYPICALで引き分け81〜89%、SUSTAINで96〜99%)。
+ *
+ * V3 は「HP圧縮役」。**現在HPが最も高い1体を、その場で半分にする。**
+ * 硬い個体ほど大きく削られるので、耐久で粘る形にだけ代償が付く。
+ * ダメージではないので、防御でも軽減でも会心でも動かない。
+ */
+export type PulseRole = "SHIELD" | "CRUSH";
+
+export const TOWER70_CRUSH = {
+  /** 現在HPをこの割合にする。**最大HPではなく現在HP** */
+  ratio: 0.5,
+  cooldownTurns: 5,
 } as const;
 
 /**
@@ -156,7 +200,11 @@ export const TOWER70_SWEEPS: { axis: string; label: string; values: Tower70Numbe
   { axis: "HP", label: "本体HP", values: [210_000, 230_000, 250_000].map((bossHp) => tower70With({ bossHp })) },
   { axis: "ATK", label: "本体ATK", values: [7_300, 7_800, 8_300].map((bossAtk) => tower70With({ bossAtk })) },
   { axis: "REGEN", label: "生命晶の追加再生", values: [0.03, 0.04, 0.05].map((v) => tower70With({ lifeCrystalRegenBonus: v })) },
-  { axis: "SHIELD", label: "脈動晶シールド", values: [0.10, 0.15, 0.20].map((v) => tower70With({ pulseShieldRate: v })) },
+  /*
+   * **シールドの軸は外した。**第3回の脈動晶は `CRUSH`(命脈断ち)で、
+   * `pulseShieldRate` を振っても1行も変わらない。同じ値が3つ並ぶ表は、
+   * 「効かなかった」ではなく「測っていない」の意味しか持たない
+   */
 ];
 
 /** その値の組が基準そのものか */
