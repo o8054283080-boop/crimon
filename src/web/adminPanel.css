@@ -1,0 +1,465 @@
+.crimon-admin-entry-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+}
+
+.crimon-admin-entry {
+  border: 0;
+  background: transparent;
+  color: rgba(230, 235, 245, 0.46);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.crimon-admin-entry:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.crimon-admin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  background: #0b0f17;
+  color: #f5f7fb;
+  overflow: hidden;
+}
+
+.crimon-admin-overlay[hidden] {
+  display: none;
+}
+
+.crimon-admin-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: #111722;
+}
+
+.crimon-admin-topbar__title {
+  min-width: 0;
+  flex: 1;
+}
+
+.crimon-admin-topbar__title strong,
+.crimon-admin-topbar__title small {
+  display: block;
+}
+
+.crimon-admin-topbar__title strong {
+  font-size: 16px;
+}
+
+.crimon-admin-topbar__title small {
+  margin-top: 2px;
+  color: #aeb7c7;
+  font-size: 10px;
+}
+
+.crimon-admin-btn {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  background: #1a2230;
+  color: #f5f7fb;
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.crimon-admin-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.crimon-admin-btn--primary {
+  background: #e5eaf2;
+  color: #10151e;
+  border-color: transparent;
+}
+
+.crimon-admin-btn--danger {
+  color: #ffd6d6;
+  border-color: rgba(255, 110, 110, 0.38);
+  background: rgba(126, 35, 35, 0.28);
+}
+
+.crimon-admin-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 12px calc(28px + env(safe-area-inset-bottom));
+}
+
+.crimon-admin-login {
+  width: min(440px, 100%);
+  margin: 12vh auto 0;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: #121925;
+}
+
+.crimon-admin-login h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.crimon-admin-login p {
+  margin: 0 0 16px;
+  color: #b8c0ce;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.crimon-admin-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.crimon-admin-field span {
+  color: #b8c0ce;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.crimon-admin-field input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  background: #0a0f17;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  padding: 9px 11px;
+}
+
+.crimon-admin-error {
+  min-height: 18px;
+  margin: 8px 0;
+  color: #ffb0b0;
+  font-size: 12px;
+}
+
+.crimon-admin-loading {
+  display: grid;
+  place-items: center;
+  min-height: 45vh;
+  color: #c6cfdd;
+  font-size: 13px;
+}
+
+.crimon-admin-dashboard {
+  display: grid;
+  gap: 14px;
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.crimon-admin-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.crimon-admin-summary__card {
+  min-width: 0;
+  padding: 12px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 11px;
+  background: #131b28;
+}
+
+.crimon-admin-summary__card small,
+.crimon-admin-summary__card strong {
+  display: block;
+}
+
+.crimon-admin-summary__card small {
+  color: #9ca9bb;
+  font-size: 10px;
+}
+
+.crimon-admin-summary__card strong {
+  margin-top: 4px;
+  font-size: 21px;
+}
+
+.crimon-admin-season {
+  margin: -4px 0 0;
+  color: #aeb8c8;
+  font-size: 11px;
+}
+
+.crimon-admin-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.crimon-admin-search {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  background: #0b111a;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 11px;
+}
+
+.crimon-admin-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #0a0f17;
+}
+
+.crimon-admin-tab {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #9da9ba;
+  font: inherit;
+  font-weight: 800;
+  padding: 9px 8px;
+  cursor: pointer;
+}
+
+.crimon-admin-tab.is-active {
+  background: #263142;
+  color: #fff;
+}
+
+.crimon-admin-section {
+  display: grid;
+  gap: 8px;
+}
+
+.crimon-admin-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.crimon-admin-section__head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.crimon-admin-section__head span {
+  color: #97a4b6;
+  font-size: 10px;
+}
+
+.crimon-admin-list {
+  display: grid;
+  gap: 8px;
+}
+
+.crimon-admin-row {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) repeat(4, minmax(70px, 0.7fr));
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: #111925;
+  color: inherit;
+  text-align: left;
+  padding: 10px;
+}
+
+button.crimon-admin-row {
+  cursor: pointer;
+}
+
+button.crimon-admin-row:active {
+  background: #182233;
+}
+
+.crimon-admin-row__primary {
+  min-width: 0;
+}
+
+.crimon-admin-row__primary strong,
+.crimon-admin-row__primary small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crimon-admin-row__primary strong {
+  font-size: 13px;
+}
+
+.crimon-admin-row__primary small {
+  margin-top: 3px;
+  color: #8f9db0;
+  font-size: 9px;
+}
+
+.crimon-admin-metric small,
+.crimon-admin-metric strong {
+  display: block;
+}
+
+.crimon-admin-metric small {
+  color: #8491a4;
+  font-size: 9px;
+}
+
+.crimon-admin-metric strong {
+  margin-top: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.crimon-admin-empty {
+  padding: 22px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: #8f9cad;
+  text-align: center;
+  font-size: 12px;
+}
+
+.crimon-admin-settings {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 14px;
+}
+
+.crimon-admin-settings summary {
+  cursor: pointer;
+  color: #c7d0dd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.crimon-admin-settings__inner {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #101722;
+}
+
+.crimon-admin-detail {
+  display: grid;
+  gap: 12px;
+}
+
+.crimon-admin-detail__back {
+  justify-self: start;
+}
+
+.crimon-admin-detail__card {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 11px;
+  background: #121a26;
+}
+
+.crimon-admin-detail__card h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.crimon-admin-kv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.crimon-admin-kv div {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #0b111a;
+}
+
+.crimon-admin-kv small,
+.crimon-admin-kv strong {
+  display: block;
+}
+
+.crimon-admin-kv small {
+  color: #8592a5;
+  font-size: 9px;
+}
+
+.crimon-admin-kv strong {
+  margin-top: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.crimon-admin-history {
+  display: grid;
+  gap: 6px;
+}
+
+.crimon-admin-history__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  background: #0b111a;
+  font-size: 11px;
+}
+
+.crimon-admin-history__item small {
+  color: #8e9bad;
+}
+
+@media (max-width: 640px) {
+  .crimon-admin-row {
+    grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(70px, 0.7fr));
+  }
+
+  .crimon-admin-row > :nth-child(4),
+  .crimon-admin-row > :nth-child(5) {
+    display: none;
+  }
+}
+
+@media (max-width: 390px) {
+  .crimon-admin-summary__card {
+    padding-inline: 8px;
+  }
+
+  .crimon-admin-summary__card strong {
+    font-size: 18px;
+  }
+
+  .crimon-admin-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
