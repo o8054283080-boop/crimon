@@ -1,0 +1,37 @@
+.crimon-admin-entry-wrap {
+  position: fixed !important;
+  right: 6px !important;
+  bottom: calc(98px + env(safe-area-inset-bottom)) !important;
+  z-index: 40 !important;
+  display: block !important;
+  width: max-content !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+  opacity: 0.14;
+}
+
+.crimon-admin-entry {
+  display: block;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 2px 3px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: rgba(230, 235, 245, 0.5) !important;
+  font-size: 9px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.02em !important;
+  text-decoration: none !important;
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.crimon-admin-entry-wrap:has(.crimon-admin-entry:focus-visible),
+.crimon-admin-entry-wrap:has(.crimon-admin-entry:active) {
+  opacity: 0.68;
+}
