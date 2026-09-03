@@ -333,3 +333,48 @@ describe("秘密の鍵がフロントに無いこと", () => {
     expect(front).not.toMatch(/VITE_[A-Z_]*SECRET/);
   });
 });
+
+describe("配信先の設定を待たずに繋がること", () => {
+  const env = readFileSync(fileURLToPath(new URL("../.env.production", import.meta.url)), "utf8");
+
+  it("接続先が置いてある", () => {
+    /*
+     * **置いていないと、配られたページは永久にオフライン。**
+     *
+     * Vite は `VITE_` を組み立ての時に焼き込むので、配信先(GitHub Pages /
+     * Cloudflare Pages)の設定画面で入れないと繋ぎに行かない。
+     * 配信先が2つあり、片方を入れ忘れるとそちらだけ静かにオフラインになる。
+     * ここに置けば、どの配信先でも設定なしで繋がる。
+     */
+    expect(env).toMatch(/^VITE_SUPABASE_URL=https:\/\/[a-z0-9]+\.supabase\.co$/m);
+    expect(env).toMatch(/^VITE_SUPABASE_ANON_KEY=\S+$/m);
+  });
+
+  it("公開してよい鍵しか置いていない", () => {
+    /*
+     * ここに置く鍵は**ブラウザへ配る前提のもの**(publishable / anon)。
+     * 全員の端末に既に入っているので隠しても意味がなく、守っているのは
+     * DB側の行ごとの権限と、勝敗をサーバが戦闘を回して決める作り。
+     *
+     * **`service_role` / `secret` は別物。** あれは全ての守りを無効にできる。
+     * 1行入っただけで、この案件の守りが丸ごと無意味になる。
+     */
+    const key = env.match(/^VITE_SUPABASE_ANON_KEY=(\S+)$/m)?.[1] ?? "";
+    expect(key).toMatch(/^(sb_publishable_|eyJ)/);
+    expect(key).not.toMatch(/^sb_secret_/);
+
+    /*
+     * **注釈は数えない。** 「ここへ書かないこと」という戒めそのものに
+     * 同じ言葉が入るので、丸ごと探すと自分の注意書きに引っかかる。
+     * この案件で3回やった。見るのは実際の設定行だけ。
+     */
+    const settings = env
+      .split("\n")
+      .filter((line) => line.trim() && !line.trimStart().startsWith("#"))
+      .join("\n");
+    expect(settings).not.toMatch(/service_role/i);
+    expect(settings).not.toMatch(/sb_secret_/);
+    // `VITE_` が付かない値は焼き込まれないが、置くこと自体を許さない
+    expect(settings).not.toMatch(/^SUPABASE_SERVICE/mi);
+  });
+});
