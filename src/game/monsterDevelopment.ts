@@ -12,7 +12,13 @@ import { MonsterInstance } from "../core/monsterInstance.js";
 export { LATENT_ABILITY_CANDIDATES } from "../data/latentAbilities.js";
 
 export const LATENT_REAWAKENING_ORB_COST = 2;
-export const LATENT_REAWAKENING_GOLD_COST = 100_000;
+/**
+ * 潜在覚醒でかかるゴールド。
+ *
+ * **初回の覚醒はオーブ1個だけで、ゴールドは取らない**(既存の作り)。
+ * ここで取るのは「覚醒し直す」代金。クリエイト系の中でいちばん高い。
+ */
+export const LATENT_REAWAKENING_GOLD_COST = 500_000;
 
 export function usedAbilityPoints(allocation: AbilityPointAllocation): number {
   return Object.values(allocation).reduce((sum, value) => sum + value, 0);
@@ -27,11 +33,43 @@ export function abilityStatBonuses(allocation: AbilityPointAllocation): AbilityP
   };
 }
 
+/**
+ * 配分を確定したか。
+ *
+ * **控えに印が無い時は「1点でも振ってあれば確定済み」と読む。**
+ * 前から遊んでいる人の控えにはこの印が無く、そこを未確定として扱うと、
+ * **既に配り終えた全員が無料で振り直せる状態**のまま残ってしまう。
+ */
+export function abilityPointsConfirmed(instance: MonsterInstance): boolean {
+  const dev = instance.development;
+  return dev.abilityPointsConfirmed ?? usedAbilityPoints(dev.abilityPoints) > 0;
+}
+
+/**
+ * 能力ポイントを1つ動かす。**確定後は動かせない。**
+ *
+ * 以前はここが下げる方向も素通ししていたので、HPを0へ戻して攻撃へ移す、を
+ * 無料で何度でもできた。有料のリセットは回り道があるせいで無意味だった。
+ */
 export function setAbilityPoint(instance: MonsterInstance, stat: AllocatableStat, points: number): boolean {
+  if (abilityPointsConfirmed(instance)) return false;
   if (!Number.isInteger(points) || points < 0) return false;
   const next = { ...instance.development.abilityPoints, [stat]: points };
   if (usedAbilityPoints(next) > abilityPointBudget(instance.star)) return false;
   instance.development.abilityPoints = next;
+  return true;
+}
+
+/**
+ * いまの配分で確定する。**ここから先は有料でしか変えられない。**
+ *
+ * 1点も振っていない状態では確定させない——「何もしていない」を
+ * 確定させても、次にできるのは有料リセットだけになる。
+ */
+export function confirmAbilityPoints(instance: MonsterInstance): boolean {
+  if (abilityPointsConfirmed(instance)) return false;
+  if (usedAbilityPoints(instance.development.abilityPoints) === 0) return false;
+  instance.development.abilityPointsConfirmed = true;
   return true;
 }
 
@@ -40,14 +78,25 @@ export function reincarnateMonsterType(instance: MonsterInstance, type: MonsterT
   wallet.gold -= TYPE_REINCARNATION_GOLD_COST;
   instance.development.type = type;
   instance.development.abilityPoints = { hp: 0, atk: 0, def: 0, spd: 0 };
+  // 能力が戻るのだから、確定の印も戻す(でないと配り直せない)
+  instance.development.abilityPointsConfirmed = false;
   return true;
 }
 
+/**
+ * 確定した配分を戻す。**払った後は、また無料で配れる状態に戻る。**
+ *
+ * 検証と支払いと書き換えを同じ区間で行う。連打しても、
+ * 2回目は「配分済みでない」で弾かれるので二重課金にならない。
+ */
 export function resetAbilityPoints(instance: MonsterInstance, wallet: { gold: number }): boolean {
-  // 配分済みであることも同じ同期処理内で検証し、連打で空配分へ二重課金しない。
-  if (instance.star !== 6 || usedAbilityPoints(instance.development.abilityPoints) === 0 || wallet.gold < ABILITY_POINT_RESET_COST) return false;
+  if (instance.star !== 6) return false;
+  if (usedAbilityPoints(instance.development.abilityPoints) === 0) return false;
+  if (wallet.gold < ABILITY_POINT_RESET_COST) return false;
   wallet.gold -= ABILITY_POINT_RESET_COST;
   instance.development.abilityPoints = { hp: 0, atk: 0, def: 0, spd: 0 };
+  // **印も外す。** 外さないと、払ったのに配り直せない
+  instance.development.abilityPointsConfirmed = false;
   return true;
 }
 

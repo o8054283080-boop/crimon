@@ -22,10 +22,36 @@ export interface MonsterDevelopment {
   latentAbilityId: string | null;
   /** 再覚醒の費用を支払い済みで、候補の再選択を待っている状態 */
   latentReselectPending: boolean;
+  /**
+   * 能力ポイントの配分を確定したか。
+   *
+   * **これが無い間は、何度でも自由に振り直せる**(初回配分)。
+   * 確定したら固定され、変えるには `ABILITY_POINT_RESET_COST` を払う。
+   *
+   * ## なぜ要ったのか
+   *
+   * 以前は `setAbilityPoint` が下げる方向も素通ししていたので、
+   * **HPを0へ戻して攻撃へ移す、を無料で何度でもできた。**
+   * 有料のリセットは、その回り道があるせいで意味を成していなかった。
+   *
+   * 省略可にしてあるのは、**前から遊んでいる人の控えに無いから。**
+   * 無い時は「1点でも振ってあれば確定済み」として読む
+   * (`abilityPointsConfirmed()`)。既に配り終えた人を、
+   * 無料で振り直せる状態のままにしないため。
+   */
+  abilityPointsConfirmed?: boolean;
 }
 
-export const ABILITY_POINT_RESET_COST = 100_000;
-export const TYPE_REINCARNATION_GOLD_COST = 150_000;
+/**
+ * 確定した能力ポイントを振り直す費用。
+ *
+ * **初回の配分は無料。** ここで取るのは「一度決めたものを変える」代金で、
+ * 決めること自体に金を取ると、触るのが怖くて誰も配らなくなる。
+ */
+export const ABILITY_POINT_RESET_COST = 300_000;
+
+/** タイプ転生。能力ポイントも一緒に戻るので、リセットと同額に揃えてある */
+export const TYPE_REINCARNATION_GOLD_COST = 300_000;
 
 /** 星ごとの配分上限。能力ポイントは星4で解放される。 */
 export const ABILITY_POINT_BUDGETS = { 1: 0, 2: 0, 3: 0, 4: 20, 5: 50, 6: 100 } as const;
@@ -218,5 +244,12 @@ export function createDefaultMonsterDevelopment(): MonsterDevelopment {
     abilityPoints: { hp: 0, atk: 0, def: 0, spd: 0 },
     latentAbilityId: null,
     latentReselectPending: false,
+    /*
+     * **新しい個体は必ず「未確定」から始める。**
+     * ここを省くと、印が無い＝配分済みかどうかを配分量から推し量ることになり、
+     * 1点振った瞬間に確定扱いになって残りが振れなくなる(実際にそうなった)。
+     * 推し量るのは**印を知らない旧セーブだけ**の仕事。
+     */
+    abilityPointsConfirmed: false,
   };
 }

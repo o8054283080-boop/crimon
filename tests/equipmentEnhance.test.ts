@@ -218,15 +218,25 @@ describe("プレイヤー状態経由での強化 (tryEnhanceEquipment)", () => 
     expect(result.ok).toBe(false);
   });
 
-  it("強化コストはレベル・星が上がるほど高くなる", () => {
+  it("強化コストは星が上がるほど高く、レベルでは下がらない", () => {
+    /*
+     * **表になったので「1段ごとに必ず上がる」ではなくなった。**
+     * +1と+2、+3と+4のように同じ額が続く段がある(依頼主の指定表)。
+     * 見張るのは「下がらないこと」と「星で必ず上がること」の2つ。
+     */
     const low = generateEquipment({ slot: 1, star: 1, subStatCount: 0 });
     const highStar = generateEquipment({ slot: 1, star: 6, subStatCount: 0 });
     expect(enhanceEquipmentCost(highStar)).toBeGreaterThan(enhanceEquipmentCost(low));
 
-    const leveled = generateEquipment({ slot: 1, star: 1, subStatCount: 0 });
-    const costAt0 = enhanceEquipmentCost(leveled);
-    enhanceEquipment(leveled);
-    const costAt1 = enhanceEquipmentCost(leveled);
-    expect(costAt1).toBeGreaterThan(costAt0);
+    const leveled = generateEquipment({ slot: 1, star: 6, subStatCount: 0 });
+    let previous = 0;
+    for (let level = 0; level < EQUIP_MAX_LEVEL; level += 1) {
+      const cost = enhanceEquipmentCost(leveled);
+      expect(cost).toBeGreaterThanOrEqual(previous);
+      previous = cost;
+      enhanceEquipment(leveled);
+    }
+    // +15まで上げ切ったら、それ以上は伸びない
+    expect(leveled.level).toBe(EQUIP_MAX_LEVEL);
   });
 });

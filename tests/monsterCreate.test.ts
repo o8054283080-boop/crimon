@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterInstance.js";
 import { findMonsterById } from "../src/data/monsters.js";
 import {
+  CREATE_GOLD_COST,
   CREATE_MATERIAL_STAR,
   applyMonsterCreate,
   checkMonsterCreate,
@@ -156,5 +157,62 @@ describe("表示用の情報", () => {
     const text = describeCreatedSkill(t.createdSkill!);
     expect(text).toContain("スキル2");
     expect(text).toContain("ウィスプ");
+  });
+});
+
+describe("スキル継承の費用", () => {
+  /*
+   * 移し替えは長いあいだ**完全に無料**だった。素材のモンスターを1体失うだけで、
+   * ゴールドは1枚も要らない。ここへ一律 500,000G を置く(依頼主の指定)。
+   *
+   * `wallet` を渡さない呼び出しは無料のまま——道具やテストから
+   * 「費用の話ぬきで移し替えだけ試す」道を残してある。画面からは必ず渡す。
+   */
+  it("財布を渡すと一律500,000Gを引く", () => {
+    expect(CREATE_GOLD_COST).toBe(500_000);
+    const wallet = { gold: 1_200_000 };
+    expect(applyMonsterCreate(target(), material(), 1, NO_PARTY, [], wallet).ok).toBe(true);
+    expect(wallet.gold).toBe(700_000);
+    expect(applyMonsterCreate(target(), material(), 1, NO_PARTY, [], wallet).ok).toBe(true);
+    expect(wallet.gold).toBe(200_000);
+  });
+
+  it("スキルの枠や星が変わっても額は同じ", () => {
+    // 「一律」なので、slot・素材・対象で値段が動いてはいけない
+    for (const slot of [1, 2] as const) {
+      const wallet = { gold: CREATE_GOLD_COST };
+      expect(applyMonsterCreate(target(), material(), slot, NO_PARTY, [], wallet).ok).toBe(true);
+      expect(wallet.gold).toBe(0);
+    }
+  });
+
+  it("足りなければ、モンスターもゴールドも動かさない", () => {
+    const t = target();
+    const m = material();
+    const wallet = { gold: CREATE_GOLD_COST - 1 };
+    const result = applyMonsterCreate(t, m, 1, NO_PARTY, [], wallet);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain("ゴールドが足りません");
+    expect(wallet.gold).toBe(CREATE_GOLD_COST - 1);
+    expect(t.createdSkill).toBeUndefined();
+  });
+
+  it("断られた移し替えでは請求しない", () => {
+    /*
+     * **払わせてから断る、が起きないこと。**
+     * 同じスキルへの移し替えは意味が無いので断られる。その時に
+     * ゴールドだけ消えていたら、押した側からは何が起きたのか分からない。
+     */
+    const t = target();
+    const wallet = { gold: 1_000_000 };
+    const same = applyMonsterCreate(t, material("slime_WATER"), 1, NO_PARTY, [], wallet);
+    expect(same.ok).toBe(false);
+    expect(wallet.gold).toBe(1_000_000);
+  });
+
+  it("財布を渡さない呼び出しは無料のまま", () => {
+    const t = target();
+    expect(applyMonsterCreate(t, material(), 1, NO_PARTY).ok).toBe(true);
+    expect(t.createdSkill).toBeDefined();
   });
 });

@@ -2,6 +2,7 @@ import { MonsterInstance, starLabel } from "../../core/monsterInstance.js";
 import { Skill, describeSkillLines } from "../../core/skill.js";
 import { findMonsterById } from "../../data/monsters.js";
 import {
+  CREATE_GOLD_COST,
   CREATE_MATERIAL_STAR,
   CreateSlot,
   checkMonsterCreate,
@@ -23,6 +24,7 @@ import {
   abilityPointBudget,
 } from "../../core/monsterDevelopment.js";
 import {
+  abilityPointsConfirmed,
   LATENT_ABILITY_CANDIDATES,
   LATENT_REAWAKENING_GOLD_COST,
   LATENT_REAWAKENING_ORB_COST,
@@ -71,6 +73,8 @@ export interface MonsterCreateProps {
   onReincarnate: (type: MonsterType) => void;
   onSetAbilityPoint: (stat: AllocatableStat, points: number) => void;
   onResetAbilityPoints: () => void;
+  /** いまの配分で確定する。ここから先は有料でしか変えられない */
+  onConfirmAbilityPoints: () => void;
   onAwaken: (candidateId: string) => void;
   reawakenConfirmOpen: boolean;
   onRequestReawaken: () => void;
@@ -262,6 +266,7 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
   const targetDex = findMonsterById(target.dexId);
   const material = props.materialId ? props.monsters.find((m) => m.id === props.materialId) : undefined;
   const ready = material !== undefined && props.slot !== null;
+  const goldShort = props.gold < CREATE_GOLD_COST;
 
   const menuItems: { id: CreateMenu; label: string }[] = [
     { id: "SKILL", label: "スキル継承" }, { id: "TYPE", label: "タイプ転生" },
@@ -295,16 +300,51 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
     const used = usedAbilityPoints(target.development.abilityPoints);
     const budget = abilityPointBudget(target.star);
     const bonuses = abilityStatBonuses(target.development.abilityPoints);
+    const confirmed = abilityPointsConfirmed(target);
     const labels: Record<AllocatableStat, string> = { hp: "最大HP", atk: "攻撃力", def: "防御力", spd: "速度" };
     return el("div", { className: "screen create-screen" }, [...shared, el("section", { className: "panel" }, ([
       el("h2", {}, ["能力付与"]),
       el("p", { className: "create-points" }, [`★${target.star}　使用 ${used} / ${budget}　残り ${budget - used}pt`]),
       budget === 0 ? el("p", { className: "create-notice" }, ["能力ポイントは★4から解放されます"]) : null,
+      /*
+       * **いま自由に動かせるのか、それとも確定済みなのかを先に言う。**
+       * スライダーが動かない理由を、動かしてから探させない。
+       */
+      budget > 0
+        ? el("p", { className: confirmed ? "create-notice" : "create-points" }, [
+          confirmed
+            ? `この配分で確定しています。変えるには ${ABILITY_POINT_RESET_COST.toLocaleString("ja-JP")}G のリセットが要ります`
+            : "確定するまでは、何度でも無料で振り直せます",
+        ])
+        : null,
       ...((Object.keys(labels) as AllocatableStat[]).map((stat) => el("label", { className: "create-allocation" }, [
         el("span", {}, [`${labels[stat]}: ${target.development.abilityPoints[stat]}pt → +${bonuses[stat]} (1pt = +${ABILITY_POINT_VALUES[stat]})`]),
-        el("input", { type: "range", min: "0", max: String(budget), disabled: budget === 0, value: String(target.development.abilityPoints[stat]), oninput: (event: Event) => props.onSetAbilityPoint(stat, Number((event.target as HTMLInputElement).value)) }, []),
+        el("input", {
+          type: "range",
+          min: "0",
+          max: String(budget),
+          disabled: budget === 0 || confirmed,
+          value: String(target.development.abilityPoints[stat]),
+          oninput: (event: Event) => props.onSetAbilityPoint(stat, Number((event.target as HTMLInputElement).value)),
+        }, []),
       ]))),
-      target.star === 6 ? el("button", { type: "button", className: "btn btn--ghost", disabled: used === 0 || props.gold < ABILITY_POINT_RESET_COST, onclick: props.onResetAbilityPoints }, [`能力ポイントリセット ${ABILITY_POINT_RESET_COST.toLocaleString()} GOLD`]) : null,
+      // 確定していない時だけ出す。1点も振っていなければ押させない
+      !confirmed && budget > 0
+        ? el("button", {
+          type: "button",
+          className: "btn btn--primary",
+          disabled: used === 0,
+          onclick: props.onConfirmAbilityPoints,
+        }, ["この配分で確定する"])
+        : null,
+      confirmed && budget > 0
+        ? el("button", {
+          type: "button",
+          className: "btn btn--ghost",
+          disabled: used === 0 || props.gold < ABILITY_POINT_RESET_COST,
+          onclick: props.onResetAbilityPoints,
+        }, [`能力ポイントリセット ${ABILITY_POINT_RESET_COST.toLocaleString("ja-JP")} GOLD`])
+        : null,
     ] as (HTMLElement | null)[]).filter(isEl))]);
   }
   if (props.menu === "LATENT") {
@@ -376,6 +416,15 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
       el("p", { className: "create-cost__warn create-cost__warn--sub" }, [
         "移し替えを持てるのは1体につき1つだけです。別のモンスターを合成すると、前の移し替えは失われます。",
       ]),
+      /*
+       * **払う額を、押す前に見せる。**
+       * ここが無いと、素材とスキルを選び終えて最後の一押しをした時に初めて
+       * 「ゴールドが足りません」と言われる。失う側だけ先に書いて、
+       * 要る側を書かないのは案内として片手落ちだった。
+       */
+      el("p", { className: goldShort ? "create-cost__warn create-cost__warn--sub latent-cost--short" : "create-cost__warn create-cost__warn--sub" }, [
+        `費用は移し替え1回につき ${CREATE_GOLD_COST.toLocaleString("ja-JP")}G です（所持 ${props.gold.toLocaleString("ja-JP")}G）${goldShort ? "・不足" : ""}`,
+      ]),
       renderMaterialList(props),
     ]),
 
@@ -389,10 +438,11 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
         {
           type: "button",
           className: "btn btn--primary create-actions__go",
-          disabled: !ready,
+          disabled: !ready || goldShort,
           onclick: props.onConfirm,
         },
-        [ready ? "この内容でクリエイトする" : "素材と枠を選んでください"],
+        // 足りない時は**何が足りないか**を出す。ただ灰色になるだけでは理由が分からない
+        [!ready ? "素材と枠を選んでください" : goldShort ? `ゴールドが足りません（${CREATE_GOLD_COST.toLocaleString("ja-JP")}G 必要）` : "この内容でクリエイトする"],
       ),
     ]),
   ].filter(isEl));

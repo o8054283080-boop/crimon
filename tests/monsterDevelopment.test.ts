@@ -23,6 +23,8 @@ describe("将来の個体育成データ", () => {
       abilityPoints: { hp: 0, atk: 0, def: 0, spd: 0 },
       latentAbilityId: null,
       latentReselectPending: false,
+      // 1点も振っていないので未確定。ここから無料で配れる
+      abilityPointsConfirmed: false,
     });
   });
 });

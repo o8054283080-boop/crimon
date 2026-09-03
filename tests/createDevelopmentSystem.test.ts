@@ -28,33 +28,33 @@ describe("星別能力ポイント", () => {
     expect(abilityPointBudget(four.star)).toBe(100);
   });
 
-  it("★6だけが10万Gでリセットでき、残高不足時は変更しない", () => {
+  it("★6だけが30万Gでリセットでき、残高不足時は変更しない", () => {
     const monster = createMonsterInstance("slime_FIRE", 6);
     setAbilityPoint(monster, "atk", 100);
-    const wallet = { gold: 150_000 };
+    const wallet = { gold: 450_000 };
     expect(resetAbilityPoints(monster, wallet)).toBe(true);
-    expect(wallet.gold).toBe(50_000);
+    expect(wallet.gold).toBe(150_000);
     expect(usedAbilityPoints(monster.development.abilityPoints)).toBe(0);
     expect(resetAbilityPoints(monster, wallet)).toBe(false);
-    expect(wallet.gold).toBe(50_000);
+    expect(wallet.gold).toBe(150_000);
     setAbilityPoint(monster, "atk", 100);
-    const poor = { gold: 99_999 };
+    const poor = { gold: 299_999 };
     expect(resetAbilityPoints(monster, poor)).toBe(false);
-    expect(poor.gold).toBe(99_999);
+    expect(poor.gold).toBe(299_999);
     expect(usedAbilityPoints(monster.development.abilityPoints)).toBe(100);
-    expect(ABILITY_POINT_RESET_COST).toBe(100_000);
+    expect(ABILITY_POINT_RESET_COST).toBe(300_000);
   });
 });
 
 describe("タイプ転生と実戦ステータス", () => {
   const types = Object.keys(MONSTER_TYPE_STAT_MULTIPLIERS) as MonsterType[];
-  it("★6転生は15万GでLv・EXPを維持し、能力だけリセットする", () => {
+  it("★6転生は30万GでLv・EXPを維持し、能力だけリセットする", () => {
     const monster = createMonsterInstance("slime_FIRE", 6, 60); monster.exp = 99;
     monster.equipment = { 1: "eq-1" };
     monster.skillLevels = [4, 3, 2];
     monster.development.latentAbilityId = "latent-test";
     setAbilityPoint(monster, "hp", 100);
-    const wallet = { gold: 150_000 };
+    const wallet = { gold: 300_000 };
     expect(reincarnateMonsterType(monster, "ATTACK", wallet)).toBe(true);
     expect([monster.star, monster.level, monster.exp, monster.development.type, usedAbilityPoints(monster.development.abilityPoints)]).toEqual([6, 60, 99, "ATTACK", 0]);
     expect(wallet.gold).toBe(0);
@@ -62,9 +62,9 @@ describe("タイプ転生と実戦ステータス", () => {
     expect(monster.skillLevels).toEqual([4, 3, 2]);
     expect(monster.development.latentAbilityId).toBe("latent-test");
   });
-  it("★5以下・149,999G以下は転生できない", () => {
-    expect(reincarnateMonsterType(createMonsterInstance("slime_FIRE", 5), "HP", { gold: 150_000 })).toBe(false);
-    expect(reincarnateMonsterType(createMonsterInstance("slime_FIRE", 6), "HP", { gold: 149_999 })).toBe(false);
+  it("★5以下・299,999G以下は転生できない", () => {
+    expect(reincarnateMonsterType(createMonsterInstance("slime_FIRE", 5), "HP", { gold: 300_000 })).toBe(false);
+    expect(reincarnateMonsterType(createMonsterInstance("slime_FIRE", 6), "HP", { gold: 299_999 })).toBe(false);
   });
   it.each(types)("%s補正がtoBattleDefinitionへ反映される", (type) => {
     const monster = createMonsterInstance("imp_DARK", 6, 60); const dex = findMonsterById(monster.dexId)!;
@@ -83,7 +83,7 @@ describe("タイプ転生と実戦ステータス", () => {
   it("BALANCEは転生済みとして保存され、未転生と戦闘値だけが等しい", () => {
     const monster = createMonsterInstance("slime_FIRE", 6, 60); const dex = findMonsterById(monster.dexId)!;
     const before = toBattleDefinition(monster, dex).stats;
-    expect(reincarnateMonsterType(monster, "BALANCE", { gold: 150_000 })).toBe(true);
+    expect(reincarnateMonsterType(monster, "BALANCE", { gold: 300_000 })).toBe(true);
     expect(monster.development.type).toBe("BALANCE");
     expect(toBattleDefinition(monster, dex).stats).toEqual(before);
   });

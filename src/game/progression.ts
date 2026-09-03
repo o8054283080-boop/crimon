@@ -54,6 +54,12 @@ export function applyRankUp(target: MonsterInstance, sacrifices: MonsterInstance
   target.exp = 0;
   // 新しい育成段階では、その段階の上限をゼロから配分し直す。
   target.development.abilityPoints = { hp: 0, atk: 0, def: 0, spd: 0 };
+  /*
+   * **確定の錠も一緒に外す。** 外し忘れると、★5で配分を確定した個体が
+   * ★6になった瞬間に「100ポイント持っているのに1つも振れない」状態になり、
+   * 振るためにリセット代を払わされる。増えた枠は無料で配れなければおかしい。
+   */
+  target.development.abilityPointsConfirmed = false;
 
   const leveledSkillIndices: number[] = [];
   for (const sacrifice of sacrifices) {

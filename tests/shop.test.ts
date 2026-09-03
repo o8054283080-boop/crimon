@@ -10,6 +10,7 @@ import {
   buildShopLineup,
   msUntilRotation,
   nextSlotUnlockCost,
+  shopEquipmentPrice,
 } from "../src/game/shop.js";
 import { MONSTER_TEMPLATES } from "../src/data/monsters.js";
 import { buyShopEntry, createInitialState, getShop, unlockShopSlot } from "../src/game/playerState.js";
@@ -46,7 +47,11 @@ describe("ショップの品揃え", () => {
   it("値段は指定どおりの表になっている", () => {
     for (let level = 1; level <= 50; level += 7) {
       for (const entry of buildShopLineup(HOUR + level * SHOP_ROTATION_MS, level, SHOP_MAX_SLOTS).entries) {
-        if (entry.kind === "EQUIPMENT") expect(entry.price).toBe(SHOP_EQUIPMENT_PRICE[entry.equipment.star]);
+        if (entry.kind === "EQUIPMENT") {
+          // ★とサブOPの初期本数だけで決まる。**中身では変えない**(依頼主の指定)
+          expect(entry.price).toBe(SHOP_EQUIPMENT_PRICE[entry.equipment.star][entry.equipment.subStats.length]);
+          expect(entry.price).toBe(shopEquipmentPrice(entry.equipment));
+        }
         if (entry.kind === "MONSTER") expect(entry.price).toBe(SHOP_MONSTER_PRICE[entry.star]);
         if (entry.kind === "SCROLL") {
           expect(SHOP_SCROLL_PRICES).toContainEqual({ count: entry.count, price: entry.price });

@@ -74,7 +74,7 @@ describe("潜在能力のBattleEngine接続", () => {
   it("保存IDの解決、再覚醒後の差替え、ロード、周回用setupを同じ定義へ反映する", () => {
     const instance = createMonsterInstance("slime_FIRE", 3);
     const candidates = LATENT_ABILITY_CANDIDATES[instance.dexId];
-    const wallet = { awakeningOrbs: 5, gold: 200_000 };
+    const wallet = { awakeningOrbs: 5, gold: 600_000 };
     expect(awakenLatentAbility(instance, candidates[0].id, candidates, wallet)).toBe(true);
     expect(toBattleDefinition(instance, findMonster("slime", "FIRE")!).latentAbility?.id).toBe(candidates[0].id);
     expect(reawakenLatentAbility(instance, wallet)).toBe(true);
