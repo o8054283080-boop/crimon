@@ -1,7 +1,15 @@
 import "./adminPanel.css";
 
 const ADMIN_SESSION_KEY = "crimon.admin.session.v1";
-const ADMIN_ENTRY_CLASS = "crimon-admin-entry-wrap";
+/**
+ * 管理者入口のボタンにつける印。
+ *
+ * 以前は「外枠 + 中のボタン」の2枚だったが、**押せる的の大きさを測るのは
+ * ボタン自身**(巡回も `button` を見る)。外枠を大きくしてもボタンが小さいままだと
+ * 「指で押すには小さい (34x13)」で落ちる——実際に落ちた。1枚にして、
+ * そのボタン自体を44×44にしてある。
+ */
+const ADMIN_ENTRY_CLASS = "crimon-admin-entry";
 
 type AdminSummary = {
   authUsers: number;
@@ -546,17 +554,38 @@ function openAdmin(): void {
   else renderLogin(root);
 }
 
+/**
+ * 管理者入口を置く先を決める。
+ *
+ * **ホームの上帯(プレイヤー情報バー)の中へ入れる。** 帯は
+ * `position: relative` なので、その中で `left:50%` を使えば
+ * 画面幅が変わっても中央からずれない。`top: 123px` のような
+ * 端末依存の座標は使わない。
+ *
+ * 帯が見つからない時だけホーム本体へ戻す。**入口が消えるより、
+ * 位置がずれる方がまし**——製作者が入れなくなると直す手段が無くなる。
+ */
+function entryHost(home: HTMLElement): HTMLElement {
+  return home.querySelector<HTMLElement>(":scope > .crimon-resource-header") ?? home;
+}
+
 function attachEntry(): void {
   const homes = document.querySelectorAll<HTMLElement>(".crimon-home");
   for (const home of homes) {
-    if (home.querySelector(`:scope > .${ADMIN_ENTRY_CLASS}`)) continue;
-    const wrap = el("div", ADMIN_ENTRY_CLASS);
-    const button = el("button", "crimon-admin-entry", "管理者") as HTMLButtonElement;
+    const host = entryHost(home);
+    if (host.querySelector(`:scope > .${ADMIN_ENTRY_CLASS}`)) continue;
+    // 置き場所が変わったら、前の場所に残っているものを片付ける
+    for (const stale of home.querySelectorAll(`.${ADMIN_ENTRY_CLASS}`)) stale.remove();
+    /*
+     * **文字を入れない。** 見せるのは CSS の小さな点だけ。
+     * 文字にすると「9px未満は落とす」検査(`tests/cssReadability.test.ts`)と
+     * 「薄く小さくしたい」が正面からぶつかる。意味は `aria-label` が運ぶ。
+     */
+    const button = el("button", ADMIN_ENTRY_CLASS) as HTMLButtonElement;
     button.type = "button";
     button.setAttribute("aria-label", "管理者画面を開く");
     button.onclick = openAdmin;
-    wrap.append(button);
-    home.append(wrap);
+    host.append(button);
   }
 }
 

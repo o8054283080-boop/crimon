@@ -1,27 +1,11 @@
-.crimon-admin-entry-wrap {
-  display: flex;
-  justify-content: center;
-  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
-}
-
-.crimon-admin-entry {
-  border: 0;
-  background: transparent;
-  color: rgba(230, 235, 245, 0.46);
-  font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  padding: 7px 12px;
-  cursor: pointer;
-}
-
-.crimon-admin-entry:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
-  border-radius: 6px;
-}
+/*
+ * 入口の見た目と置き場所は `adminEntryCompact.css` にまとめてある。
+ *
+ * **ここには書かない。** 以前は両方に書いてあり、しかも
+ * このファイルは `adminPanel.ts` から遅れて読み込まれるので後勝ちになり、
+ * 打ち消すために向こうが `!important` だらけになっていた。
+ * 出どころを1つにすれば、その必要が無くなる。
+ */
 
 .crimon-admin-overlay {
   position: fixed;
