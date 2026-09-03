@@ -3,13 +3,17 @@ import {
   CumulativeMissionView,
   MissionPeriod,
   PeriodMissionGroupView,
+  ReleaseCampaignView,
   claimAllAvailableMissionRewards,
   claimCumulativeMission,
   claimPeriodClear,
   claimPeriodMission,
+  claimReleaseCampaignMilestone,
+  claimReleaseCampaignMission,
   getCumulativeMissionViews,
   getPeriodMissionView,
   getRegisteredMissionPlayer,
+  getReleaseCampaignView,
   missionRewardText,
   startMissionObserver,
 } from "../game/missions.js";
@@ -22,7 +26,8 @@ const PERIOD_LABELS: Record<MissionPeriod, string> = {
 };
 
 let root: HTMLElement | null = null;
-let activeTab: MissionPeriod | "CUMULATIVE" = "DAILY";
+type MissionTab = MissionPeriod | "CAMPAIGN" | "CUMULATIVE";
+let activeTab: MissionTab = "DAILY";
 
 function button(label: string, className: string, onClick: () => void, disabled = false): HTMLButtonElement {
   const element = document.createElement("button");
@@ -131,6 +136,70 @@ function renderCumulativeCard(player: PlayerState, mission: CumulativeMissionVie
   return card;
 }
 
+function renderCampaign(player: PlayerState, campaign: ReleaseCampaignView): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "regular-missions__list regular-missions__list--campaign";
+
+  const hero = document.createElement("article");
+  hero.className = "regular-missions__campaign-hero";
+  const heading = document.createElement("strong");
+  heading.textContent = "🎊 CRIMON X公開記念キャンペーン";
+  const deadline = document.createElement("p");
+  deadline.textContent = campaign.remainingDays === 0
+    ? "10月3日 23:59まで・本日終了"
+    : `10月3日 23:59まで・あと${campaign.remainingDays}日`;
+  const count = document.createElement("b");
+  count.textContent = `達成数 ${campaign.completedCount} / ${campaign.missions.length}`;
+  hero.append(heading, deadline, count, progressBar(campaign.completedCount, campaign.missions.length));
+  section.append(hero);
+
+  const milestoneList = document.createElement("div");
+  milestoneList.className = "regular-missions__milestones";
+  for (const milestone of campaign.milestones) {
+    const card = document.createElement("article");
+    card.className = `regular-missions__milestone${milestone.complete ? " is-complete" : ""}${milestone.claimed ? " is-claimed" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = `${milestone.target}個達成報酬`;
+    card.append(title, rewardLine(missionRewardText(milestone.reward)), button(
+      milestone.claimed ? "受取済み" : milestone.complete ? "受け取る" : `${Math.min(campaign.completedCount, milestone.target)} / ${milestone.target}`,
+      "regular-missions__claim regular-missions__claim--milestone",
+      () => {
+        claimReleaseCampaignMilestone(player, milestone.target);
+        renderModal(player);
+      },
+      milestone.claimed || !milestone.complete,
+    ));
+    milestoneList.append(card);
+  }
+  section.append(milestoneList);
+
+  for (const [index, mission] of campaign.missions.entries()) {
+    const card = document.createElement("article");
+    card.className = `regular-missions__card${mission.complete ? " is-complete" : ""}${mission.claimed ? " is-claimed" : ""}`;
+    const head = document.createElement("div");
+    head.className = "regular-missions__card-head";
+    const name = document.createElement("strong");
+    name.textContent = `${index + 1}. ${mission.title}`;
+    const progress = document.createElement("span");
+    progress.textContent = `${mission.current.toLocaleString("ja-JP")} / ${mission.target.toLocaleString("ja-JP")}`;
+    head.append(name, progress);
+    const condition = document.createElement("p");
+    condition.className = "regular-missions__condition";
+    condition.textContent = mission.condition;
+    card.append(head, condition, progressBar(mission.current, mission.target), rewardLine(missionRewardText(mission.reward)), button(
+      mission.claimed ? "受取済み" : mission.complete ? "受け取る" : "未達成",
+      "regular-missions__claim",
+      () => {
+        claimReleaseCampaignMission(player, mission.id);
+        renderModal(player);
+      },
+      mission.claimed || !mission.complete,
+    ));
+    section.append(card);
+  }
+  return section;
+}
+
 function closeModal(): void {
   root?.remove();
   root = null;
@@ -153,6 +222,8 @@ function renderModal(player: PlayerState): void {
 
   const panel = document.createElement("div");
   panel.className = "regular-missions__panel";
+  const campaign = getReleaseCampaignView(player);
+  if (!campaign && activeTab === "CAMPAIGN") activeTab = "DAILY";
   const header = document.createElement("header");
   header.className = "regular-missions__header";
   const headerCopy = document.createElement("div");
@@ -161,13 +232,23 @@ function renderModal(player: PlayerState): void {
   const heading = document.createElement("h2");
   heading.textContent = "ミッション";
   const note = document.createElement("p");
-  note.textContent = "全部やらなくてもOK。好きな遊び方で報酬を獲得しよう。";
+  note.textContent = activeTab === "CAMPAIGN"
+    ? "1か月限定。30個達成で★5召喚書も獲得できます。"
+    : "全部やらなくてもOK。好きな遊び方で報酬を獲得しよう。";
   headerCopy.append(eyebrow, heading, note);
   header.append(headerCopy, button("閉じる", "regular-missions__close", closeModal));
 
   const tabs = document.createElement("nav");
   tabs.className = "regular-missions__tabs";
-  for (const [tab, label] of [["DAILY", "デイリー"], ["WEEKLY", "ウィークリー"], ["MONTHLY", "マンスリー"], ["CUMULATIVE", "累計"]] as const) {
+  const tabEntries: readonly (readonly [MissionTab, string])[] = [
+    ...(campaign ? [["CAMPAIGN", "公開記念"]] as const : []),
+    ["DAILY", "デイリー"],
+    ["WEEKLY", "ウィークリー"],
+    ["MONTHLY", "マンスリー"],
+    ["CUMULATIVE", "累計"],
+  ];
+  if (campaign) tabs.classList.add("regular-missions__tabs--campaign");
+  for (const [tab, label] of tabEntries) {
     const tabButton = button(label, `regular-missions__tab${activeTab === tab ? " is-active" : ""}`, () => {
       activeTab = tab;
       renderModal(player);
@@ -184,13 +265,15 @@ function renderModal(player: PlayerState): void {
 
   const body = document.createElement("main");
   body.className = "regular-missions__body";
-  if (activeTab === "CUMULATIVE") {
+  if (activeTab === "CAMPAIGN" && campaign) {
+    body.append(renderCampaign(player, campaign));
+  } else if (activeTab === "CUMULATIVE") {
     const intro = document.createElement("p");
     intro.className = "regular-missions__infinite-note";
     intro.textContent = "累計ミッションに終わりはありません。達成後は次の目標と報酬が自動で続きます。";
     body.append(intro);
     for (const mission of getCumulativeMissionViews(player)) body.append(renderCumulativeCard(player, mission));
-  } else {
+  } else if (activeTab !== "CAMPAIGN") {
     body.append(renderPeriodCard(player, activeTab, getPeriodMissionView(player, activeTab)));
   }
 
@@ -215,7 +298,7 @@ function installMissionButtonOverride(): void {
     if (!player) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    activeTab = "DAILY";
+    activeTab = getReleaseCampaignView(player) ? "CAMPAIGN" : "DAILY";
     renderModal(player);
   }, true);
 

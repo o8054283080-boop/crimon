@@ -84,6 +84,10 @@ body.regular-missions-open { overflow: hidden; }
   padding: 0 10px 10px;
 }
 
+.regular-missions__tabs--campaign {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .regular-missions__tab {
   min-width: 0;
   min-height: 42px;
@@ -115,6 +119,44 @@ body.regular-missions-open { overflow: hidden; }
 }
 
 .regular-missions__list { display: grid; gap: 9px; }
+
+.regular-missions__campaign-hero {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid rgba(242, 203, 114, 0.7);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 85% 10%, rgba(238, 184, 65, 0.24), transparent 38%),
+    linear-gradient(145deg, rgba(103, 56, 20, 0.96), rgba(32, 25, 28, 0.98));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.regular-missions__campaign-hero strong { font-size: 16px; color: #ffe7a5; }
+.regular-missions__campaign-hero p { margin: 0; font-size: 12px; color: rgba(255, 244, 218, 0.82); }
+.regular-missions__campaign-hero b { font-size: 13px; color: #fff8e5; }
+
+.regular-missions__milestones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.regular-missions__milestone {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(231, 186, 88, 0.3);
+  border-radius: 13px;
+  background: rgba(117, 73, 20, 0.18);
+}
+
+.regular-missions__milestone > strong { font-size: 13px; color: #f7d98d; }
+.regular-missions__milestone.is-complete { border-color: rgba(242, 203, 114, 0.78); }
+.regular-missions__milestone.is-claimed { opacity: 0.68; }
+.regular-missions__claim--milestone { justify-self: stretch; min-width: 0; padding: 0 6px; font-size: 11px; }
 
 .regular-missions__clear,
 .regular-missions__card {
@@ -213,6 +255,8 @@ body.regular-missions-open { overflow: hidden; }
   .regular-missions__header { padding: 13px 12px 9px; }
   .regular-missions__header h2 { font-size: 21px; }
   .regular-missions__tab { font-size: 10px; }
+  .regular-missions__tabs--campaign .regular-missions__tab { font-size: 9px; }
   .regular-missions__clear,
   .regular-missions__card { padding: 10px; }
+  .regular-missions__milestones { grid-template-columns: 1fr; }
 }

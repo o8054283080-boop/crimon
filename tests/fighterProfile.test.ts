@@ -71,7 +71,8 @@ describe("ログインボーナス (claimDailyLoginBonus)", () => {
     claimDailyLoginBonus(state, now);
     const crystalAfterFirst = state.crystal;
 
-    const later = Date.parse("2026-01-01T23:00:00Z");
+    // UTC固定だと日本時間では翌日になる。どの実行環境でも同じローカル日を指す値にする。
+    const later = now + 60 * 60 * 1000;
     const result = claimDailyLoginBonus(state, later);
 
     expect(result.claimed).toBe(false);
