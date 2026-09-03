@@ -94,8 +94,6 @@ export const TOWER60_V2: Scenario = {
     {
       ...V1_MASHOU,
       label: "古代の魔晶",
-      // 攻撃力 3,800 → 5,800。倒さず放っておくと痛い相手にする
-      stats: { ...V1_MASHOU.stats, atk: 5_800 },
       bossTraits: {
         /*
          * **倒すと本体が強くなる。**
@@ -122,10 +120,8 @@ export const TOWER60_V2: Scenario = {
        * HPを盛ると「硬い置物」が増えるだけだが、速度なら
        * 「先に撃たれるから急いで倒す」という読み合いになる。
        *
-       * 200 では足りなかった(呪縛の帳が1000戦で65回)。味方はこの装備水準で
-       * 219〜314なので、**その上へ出す**ために300まで上げる。
        */
-      stats: { ...V1_JUSHOU.stats, spd: 300 },
+      stats: { ...V1_JUSHOU.stats, spd: 200 },
       skills: JUSHOU_SKILLS,
       // 倒すと本体の速度が伸びる。回復不能を止めた代償が手番の数で返る
       bossTraits: { empowerBossOnDeath: { spd: 100 } },
