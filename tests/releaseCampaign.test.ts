@@ -36,7 +36,7 @@ describe("X公開記念プレゼント", () => {
 
   it("1週間の配布期間を過ぎると受け取れない", () => {
     const player = createInitialState();
-    expect(claimCompensations(player, new Date("2026-09-10T15:00:00.000Z")).some((claim) => claim.compensation.id === gift.id)).toBe(false);
+    expect(claimCompensations(player, new Date(2026, 8, 11, 12, 0, 0)).some((claim) => claim.compensation.id === gift.id)).toBe(false);
   });
 });
 
