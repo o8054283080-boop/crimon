@@ -1725,6 +1725,92 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
   ],
 };
 
+/** 魔獣のダンジョン専用ボス。召喚・図鑑には出現しない。 */
+export const ANCIENT_BEAST: MonsterTemplate = {
+  templateId: "ancient_beast",
+  baseName: "古代の魔獣",
+  emoji: "🐲",
+  role: "ボス",
+  baseStats: { hp: 3500, atk: 455, def: 365, spd: 205, criRate: 0.2, criDmg: 1.5, resistance: 0.25, accuracy: 0.25 },
+  bossTraits: { extraTurnChance: 0.15 },
+  skill1: {
+    id: "ancient_beast_s1", name: "裂地爪",
+    description: "敵単体に攻撃力2.4倍のダメージを与え、60%で2ターン速度を低下させる。防御低下中の敵を優先する。",
+    target: "SINGLE_ENEMY", targetPriority: "DEF_DOWN", cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.6 }],
+  },
+  skill2Variants: [{
+    id: "ancient_beast_s2", name: "獣王連撃",
+    description: "敵へランダムに攻撃力1.2倍のダメージを4回与え、各ヒット50%で行動ゲージを15%減少させる。同じ敵にも連続して命中する。",
+    target: "SINGLE_ENEMY", cooldownTurns: 3, randomEnemyHits: true,
+    effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 4 }, { kind: "GAUGE", amount: -0.15, chance: 0.5 }],
+  }],
+  skill3Variants: [{
+    id: "ancient_beast_s3", name: "終焉の咆哮",
+    description: "敵全体に攻撃力2.5倍のダメージを与え、80%で全強化を剥がして2ターン攻撃力を低下させる。",
+    target: "ALL_ENEMIES", cooldownTurns: 5,
+    effects: [
+      { kind: "DAMAGE", multiplier: 2.5 },
+      { kind: "STRIP", chance: 0.8, chanceGroup: "ancient_beast_roar" },
+      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.8, chanceGroup: "ancient_beast_roar" },
+    ],
+  }],
+};
+
+/** 魔獣のダンジョン専用の支援型お供。 */
+export const ANCIENT_GUARD_BEAST: MonsterTemplate = {
+  templateId: "ancient_guard_beast",
+  baseName: "古代の護獣",
+  emoji: "🦏",
+  role: "支援",
+  baseStats: { hp: 2000, atk: 155, def: 390, spd: 175, criRate: 0.1, criDmg: 1.5, resistance: 0.3, accuracy: 0.15 },
+  bossTraits: { allyThresholdHeal: { hpRatio: 0.35, healPercent: 0.35 } },
+  skill1: {
+    id: "ancient_guard_beast_s1", name: "守護の角",
+    description: "敵単体に攻撃力1.8倍のダメージを与え、味方全体の速度を1ターン上昇させる。",
+    target: "SINGLE_ENEMY", cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 1, applyTo: "ALLIES", fixedDuration: true }],
+  },
+  skill2Variants: [{
+    id: "ancient_guard_beast_s2", name: "加護の結界",
+    description: "味方全体に各自の最大HP10%のシールドを2ターン張り、1ターン免疫を付与する。",
+    target: "ALL_ALLIES", cooldownTurns: 3,
+    effects: [{ kind: "SHIELD", shieldRate: 0.1, durationTurns: 2 }, { kind: "IMMUNITY", durationTurns: 1, fixedDuration: true }],
+  }],
+  skill3Variants: [{
+    id: "ancient_guard_beast_s3", name: "生命の祝福",
+    description: "味方が攻撃を受けてHP35%以下で生存した時、戦闘中一度だけその味方の最大HP35%を回復する。回復できない時は消費しない。",
+    target: "SELF", cooldownTurns: 0, effects: [], automatic: true,
+  }],
+};
+
+/** 魔獣のダンジョン専用の攻撃型お供。 */
+export const ANCIENT_FANG_BEAST: MonsterTemplate = {
+  templateId: "ancient_fang_beast",
+  baseName: "古代の牙獣",
+  emoji: "🐺",
+  role: "攻撃",
+  baseStats: { hp: 1200, atk: 325, def: 199, spd: 173, criRate: 0.2, criDmg: 1.6, resistance: 0.15, accuracy: 0.25 },
+  bossTraits: { defenseIgnoreChance: 0.5, defenseIgnoreRatio: 0.5 },
+  skill1: {
+    id: "ancient_fang_beast_s1", name: "崩牙波",
+    description: "敵全体に攻撃力0.7倍のダメージを与え、それぞれ60%で2ターン防御力を低下させる。",
+    target: "ALL_ENEMIES", cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 0.7 }, { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.6 }],
+  },
+  skill2Variants: [{
+    id: "ancient_fang_beast_s2", name: "狩猟連鎖",
+    description: "HP割合が最も低い敵に攻撃力1.2倍の2回攻撃。対象のHPが50%以下ならダメージ25%上昇し、倒すと追加ターンを得る。",
+    target: "SINGLE_ENEMY", targetPriority: "LOWEST_HP", cooldownTurns: 3, extraTurnOnKill: true,
+    effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.25 }] }],
+  }],
+  skill3Variants: [{
+    id: "ancient_fang_beast_s3", name: "崩壊の牙",
+    description: "攻撃時50%で、その行動中のすべての攻撃が敵の防御力を50%無視する。",
+    target: "SELF", cooldownTurns: 0, effects: [], automatic: true,
+  }],
+};
+
 /** ガチャの星4(SR)テンプレート: 火水電草側 / 光闇側 */
 export const GACHA_SR_COMMON_TEMPLATE = GRIFFON;
 export const GACHA_SR_RARE_TEMPLATE = SERAPH;
@@ -1745,6 +1831,9 @@ export const ALL_MONSTER_TEMPLATES: MonsterTemplate[] = [
   ANCIENT_DEMON,
   ANCIENT_CRYSTAL,
   ANCIENT_CRYSTAL_CURSE,
+  ANCIENT_BEAST,
+  ANCIENT_GUARD_BEAST,
+  ANCIENT_FANG_BEAST,
   ...NEW_MONSTER_TEMPLATES,
 ];
 
@@ -1898,6 +1987,9 @@ export const SKILL_PIG_DEX = createAllVariants(SKILL_PIG);
 export const ANCIENT_DEMON_DEX = createAllVariants(ANCIENT_DEMON);
 export const ANCIENT_CRYSTAL_DEX = createAllVariants(ANCIENT_CRYSTAL);
 export const ANCIENT_CRYSTAL_CURSE_DEX = createAllVariants(ANCIENT_CRYSTAL_CURSE);
+export const ANCIENT_BEAST_DEX = createAllVariants(ANCIENT_BEAST);
+export const ANCIENT_GUARD_BEAST_DEX = createAllVariants(ANCIENT_GUARD_BEAST);
+export const ANCIENT_FANG_BEAST_DEX = createAllVariants(ANCIENT_FANG_BEAST);
 
 /** ガチャ限定の高レアモンスター(SR/SSR)図鑑。GRIFFON/DRAGON/SERAPH/NEMESISとも全6属性 */
 export const GACHA_EXCLUSIVE_DEX = [
@@ -1921,6 +2013,9 @@ export const MONSTER_DEX = [
   ...ANCIENT_DEMON_DEX,
   ...ANCIENT_CRYSTAL_DEX,
   ...ANCIENT_CRYSTAL_CURSE_DEX,
+  ...ANCIENT_BEAST_DEX,
+  ...ANCIENT_GUARD_BEAST_DEX,
+  ...ANCIENT_FANG_BEAST_DEX,
 ];
 
 /**

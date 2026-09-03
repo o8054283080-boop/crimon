@@ -11,7 +11,7 @@ import { BattleEngine } from "../battle/engine.js";
 import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
-import { DungeonFloor, EQUIPMENT_DUNGEON_FLOORS } from "../data/equipmentDungeon.js";
+import { DungeonFloor, EquipmentDungeonKind, dungeonFloorKey, findDungeonFloorByKey } from "../data/equipmentDungeon.js";
 import { GoldDungeonFloor, GOLD_DUNGEON_FLOORS } from "../data/goldDungeon.js";
 import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data/stages.js";
@@ -317,6 +317,7 @@ interface AppState {
   /** モンスターの装備スロットから装備詳細を開いた場合、戻る操作でこのモンスターの画面に戻るための参照 */
   equipmentReturnMonsterId: string | null;
   selectedDungeonFloor: number | null;
+  selectedDungeonKind: EquipmentDungeonKind;
   dungeonRun: DungeonRunState | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
   levelDungeonRun: LevelDungeonRunState | null;
@@ -399,6 +400,7 @@ const state: AppState = {
   equipmentSelecting: false,
   equipmentReturnMonsterId: null,
   selectedDungeonFloor: null,
+  selectedDungeonKind: "DEMON",
   dungeonRun: null,
   selectedLevelDungeonTier: null,
   levelDungeonRun: null,
@@ -548,6 +550,7 @@ interface RouteState {
   selectedStageId: string | null;
   selectedDifficulty: Difficulty;
   selectedDungeonFloor: number | null;
+  selectedDungeonKind: EquipmentDungeonKind;
   selectedDexEntryId: string | null;
   monsterTrainingTargetId: string | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
@@ -561,7 +564,7 @@ interface RouteState {
 const ROUTE_FIELDS = [
   "screen", "monsterDetailId", "rankUpMode", "equipmentDetailId", "equipmentPickerContext",
   "equipmentSlotFilter", "equipmentReturnMonsterId", "equipmentSelecting", "farmEquipmentOpen",
-  "farmEquipmentDetailId", "selectedStageId", "selectedDifficulty", "selectedDungeonFloor",
+  "farmEquipmentDetailId", "selectedStageId", "selectedDifficulty", "selectedDungeonFloor", "selectedDungeonKind",
   "selectedDexEntryId", "monsterTrainingTargetId", "selectedLevelDungeonTier",
   "selectedGoldDungeonFloor", "arenaEditing", "createTargetId", "createMenu", "partyEditMode",
 ] as const satisfies readonly (keyof RouteState)[];
@@ -643,6 +646,7 @@ function navigate(screen: ScreenName): void {
   state.equipmentSlotFilter = null;
   state.equipmentReturnMonsterId = null;
   state.selectedDungeonFloor = null;
+  state.selectedDungeonKind = "DEMON";
   state.selectedLevelDungeonTier = null;
   state.selectedGoldDungeonFloor = null;
   state.selectedDexEntryId = null;
@@ -677,6 +681,7 @@ function returnFromParty(): void {
   state.selectedStageId = restored.selectedStageId;
   state.selectedDifficulty = restored.selectedDifficulty;
   state.selectedDungeonFloor = restored.selectedDungeonFloor;
+  state.selectedDungeonKind = restored.selectedDungeonKind;
   state.selectedGoldDungeonFloor = restored.selectedGoldDungeonFloor;
   state.selectedLevelDungeonTier = restored.selectedLevelDungeonTier;
   render();
@@ -1262,7 +1267,7 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
     return { won: true, waves, extraGold: waves * stageWaveGold(stage, difficulty) };
   }
   const target = job.kind === "EQUIP_DUNGEON"
-    ? EQUIPMENT_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)
+    ? findDungeonFloorByKey(job.targetId)
     : job.kind === "LEVEL_DUNGEON"
       ? LEVEL_DUNGEON_DEFS.find((f) => f.tier === job.targetId)
       : GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId);
@@ -1308,7 +1313,7 @@ function processBackgroundFarmOnce(): void {
   if (!battle.won) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
   let reward: ClearRewardResult;
   if (job.kind === "STAGE") reward = applyStageClearRewards(state.player, STAGES.find((s) => s.id === job.targetId)!, battle.waves, party, job.difficulty);
-  else if (job.kind === "EQUIP_DUNGEON") reward = applyDungeonClearRewards(state.player, EQUIPMENT_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
+  else if (job.kind === "EQUIP_DUNGEON") reward = applyDungeonClearRewards(state.player, findDungeonFloorByKey(job.targetId)!, party);
   else if (job.kind === "LEVEL_DUNGEON") reward = applyLevelDungeonClearRewards(state.player, LEVEL_DUNGEON_DEFS.find((f) => f.tier === job.targetId)!, party);
   else reward = applyGoldDungeonClearRewards(state.player, GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
   state.player.gold += battle.extraGold;
@@ -1494,7 +1499,7 @@ function finishDungeon(cleared: boolean): void {
   const run = state.dungeonRun;
   if (!run) return;
   const floor = run.floor;
-  if (cleared) recordManualBattle(state.player.recentManualClearTimes, manualClearKey("EQUIP_DUNGEON", String(floor.floor)), run.manualStartedAt, Date.now());
+  if (cleared) recordManualBattle(state.player.recentManualClearTimes, manualClearKey("EQUIP_DUNGEON", dungeonFloorKey(floor)), run.manualStartedAt, Date.now());
 
   const reward = cleared ? applyDungeonClearRewards(state.player, floor, run.partyInstances) : null;
   savePlayerState(state.player);
@@ -1527,7 +1532,7 @@ function handleAutoFarmStage(stage: Stage, count: number, difficulty: Difficulty
 }
 
 function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
-  beginBackgroundFarm({ kind: "EQUIP_DUNGEON", targetId: String(floor.floor), targetName: floor.name, requestedRuns: count }, state.player.dungeonPartyIds, isDungeonFloorCleared(state.player, floor.floor));
+  beginBackgroundFarm({ kind: "EQUIP_DUNGEON", targetId: dungeonFloorKey(floor), targetName: floor.name, requestedRuns: count }, state.player.dungeonPartyIds, isDungeonFloorCleared(state.player, floor.floor, floor.kind));
 }
 
 function startLevelDungeonTier(def: LevelDungeonDef): void {
@@ -2373,14 +2378,16 @@ function render(): void {
       content = renderEquipmentDungeon({
         player: state.player,
         selectedFloor: state.selectedDungeonFloor,
-        onSelectFloor: (floor) => {
+        selectedKind: state.selectedDungeonKind,
+        onSelectFloor: (kind, floor) => {
+          state.selectedDungeonKind = kind;
           state.selectedDungeonFloor = floor;
           render();
         },
         onStartFloor: startDungeonFloor,
         // 専用の編成画面には絞り込みも並べ替えも無く、同じことを2か所で
         // 別々にやらせていた。編成はすべて編成画面へ集約する
-        onGoDungeonParty: () => openPartyFrom({ screen: "EQUIP_DUNGEON", label: `装備ダンジョン${state.selectedDungeonFloor ?? ""}F`, selectedDungeonFloor: state.selectedDungeonFloor ?? undefined }, "DUNGEON"),
+        onGoDungeonParty: () => openPartyFrom({ screen: "EQUIP_DUNGEON", label: `${state.selectedDungeonKind === "BEAST" ? "魔獣" : "魔人"}のダンジョン${state.selectedDungeonFloor ?? ""}F`, selectedDungeonFloor: state.selectedDungeonFloor ?? undefined, selectedDungeonKind: state.selectedDungeonKind }, "DUNGEON"),
         autoFarmCount: state.autoFarmCount,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;

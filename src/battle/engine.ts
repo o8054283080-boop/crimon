@@ -43,8 +43,6 @@ const ATB_THRESHOLD = 100;
  * 何かの拍子に「倒していないのに倒したと数える」不具合が入ると
  * その場で無限ループになり、画面が固まって原因も分からなくなる。
  */
-const MAX_CHAINED_EXTRA_TURNS = 20;
-
 /**
  * スキル1回の解決の中で起きたことを覚えておく入れ物。
  *
@@ -85,6 +83,8 @@ interface SkillResolution {
    * 必ず真になってしまう。** 殴る前の状態で判定するために控えておく。
    */
   readonly targetHpBefore: Map<string, number>;
+  /** 同一対象で共有するスキル効果の基礎発動判定。 */
+  readonly chanceGroups: Map<string, boolean>;
 }
 
 function newResolution(): SkillResolution {
@@ -92,7 +92,7 @@ function newResolution(): SkillResolution {
     anyCrit: false, critCount: 0, debuffApplied: false, stunFailed: false,
     stolenBuffs: 0, strippedTargets: 0, damageDealt: 0, kills: 0,
     sourcePassiveUsed: false, victimPassiveUsed: new Set(), applied: new Set(), gaugeRemoved: 0,
-    targetHpBefore: new Map(),
+    targetHpBefore: new Map(), chanceGroups: new Map(),
   };
 }
 
@@ -233,6 +233,20 @@ export class BattleEngine {
       ...enemyTeam.map((def, i) => createBattleUnit(def, "ENEMY", `E${i + 1}`)),
     ];
 
+    this.units.forEach((unit) => {
+      if (unit.def.initialCooldowns) unit.cooldowns = [...unit.def.initialCooldowns];
+      const mods = unit.def.combatMods;
+      const startShield = mods?.battleStartShieldPercent ?? 0;
+      if (startShield > 0) {
+        unit.shieldValue = Math.round(unit.maxHp * startShield);
+        unit.shieldTurns = (mods?.battleStartShieldTurns ?? 0) + 1;
+      }
+      const startImmunity = mods?.battleStartImmunityTurns ?? 0;
+      if (startImmunity > 0) {
+        unit.immuneTurns = startImmunity + 1;
+      }
+    });
+
     if (options.initialPlayerHp) {
       options.initialPlayerHp.forEach((hp, i) => {
         const unit = this.units[i];
@@ -279,14 +293,12 @@ export class BattleEngine {
 
         // 撃破で得た追加ターンは、次の人へ回さずその場で続けて動く。
         // 「倒したから、もう一度動ける」という手応えは、順番が飛ぶと消える
-        let chained = 0;
-        while (this.pendingExtraTurns.length > 0 && chained < MAX_CHAINED_EXTRA_TURNS && turnsTaken < this.maxTurns) {
+        while (this.pendingExtraTurns.length > 0 && turnsTaken < this.maxTurns) {
           const extra = this.pendingExtraTurns.shift()!;
           if (!extra.alive) continue;
           this.push(`${this.label(extra)} は追加ターンを得た！`);
           this.recordTurn(extra);
           turnsTaken += 1;
-          chained += 1;
         }
         this.pendingExtraTurns = [];
         if (turnsTaken >= this.maxTurns) break;
@@ -443,6 +455,7 @@ export class BattleEngine {
     this.applyRegenAtTurnStart(unit);
     this.applyPoisonAtTurnStart(unit);
 
+    let acted = false;
     if (!unit.alive) {
       // 毒などで手番開始時に力尽きた場合、この手番はここで終わる
     } else if (unit.stunTurns > 0) {
@@ -451,10 +464,11 @@ export class BattleEngine {
     } else {
       this.applyTrialBossAction(unit);
       this.act(unit, choice);
+      acted = true;
     }
 
     this.applyBurnAtTurnEnd(unit);
-    this.onUnitActed(unit);
+    if (acted) this.onUnitActed(unit);
   }
 
   /* ============================ パッシブ ============================ */
@@ -467,6 +481,10 @@ export class BattleEngine {
    * 動いただけでゲージが満ちてしまう。
    */
   private onUnitActed(actor: BattleUnit): void {
+    const extraTurnChance = Math.max(actor.def.combatMods?.extraTurnChance ?? 0, actor.def.bossTraits?.extraTurnChance ?? 0);
+    if (actor.alive && extraTurnChance > 0 && this.rng() < extraTurnChance) {
+      this.pendingExtraTurns.push(actor);
+    }
     for (const holder of this.units) {
       if (!holder.alive || holder === actor) continue;
       const passive = passiveEffectOf(holder);
@@ -546,6 +564,38 @@ export class BattleEngine {
     this.pendingExtraTurns.push(killer);
   }
 
+  /** 攻撃1回の解決後に、祝福セットと支援型魔獣の一度きり回復を判定する。 */
+  private tryThresholdHeals(victim: BattleUnit): void {
+    if (!victim.alive) return;
+
+    const mods = victim.def.combatMods;
+    if (!victim.thresholdHealUsed
+      && (mods?.thresholdHealPercent ?? 0) > 0
+      && hpRatio(victim) <= (mods?.thresholdHealHpRatio ?? 0)
+      && !(victim.healBlockTurns > 0 && victim.healBlockMultiplier <= 0)) {
+      victim.thresholdHealUsed = true;
+      const before = victim.currentHp;
+      applyHeal(victim, Math.round(victim.maxHp * (mods?.thresholdHealPercent ?? 0)));
+      const healed = victim.currentHp - before;
+      this.push(`  → ${this.label(victim)} の祝福が発動！ HPが ${healed} 回復！`);
+      this.pushEvent({ targetId: victim.instanceId, kind: "HEAL", amount: healed });
+    }
+
+    for (const holder of this.units) {
+      const trait = holder.def.bossTraits?.allyThresholdHeal;
+      if (!trait || holder.team !== victim.team || !holder.alive || holder.allyThresholdHealUsed) continue;
+      if (hpRatio(victim) > trait.hpRatio) continue;
+      if (victim.healBlockTurns > 0 && victim.healBlockMultiplier <= 0) continue;
+      holder.allyThresholdHealUsed = true;
+      const before = victim.currentHp;
+      applyHeal(victim, Math.round(victim.maxHp * trait.healPercent));
+      const healed = victim.currentHp - before;
+      this.push(`  → ${this.label(holder)} の「生命の祝福」！ ${this.label(victim)} のHPが ${healed} 回復！`);
+      this.pushEvent({ targetId: victim.instanceId, kind: "HEAL", amount: healed });
+      break;
+    }
+  }
+
   /**
    * 効果の向き先から、実際の受け手を決める。
    *
@@ -611,7 +661,7 @@ export class BattleEngine {
     let skill: Skill;
     let index: 0 | 1 | 2;
     // パッシブの枠は「使う」ものではない。手で選ばれてもAIの判断へ落とす
-    const passiveChoice = choice !== undefined && unit.def.skills[choice.skillIndex]?.passive !== undefined;
+    const passiveChoice = choice !== undefined && (unit.def.skills[choice.skillIndex]?.passive !== undefined || unit.def.skills[choice.skillIndex]?.automatic === true);
     if (!passiveChoice && choice && unit.cooldowns[choice.skillIndex] === 0 && (!hasStatus(unit, "SKILL_LOCK") || choice.skillIndex === 0)) {
       skill = unit.def.skills[choice.skillIndex];
       index = choice.skillIndex;
@@ -628,10 +678,22 @@ export class BattleEngine {
      * 溜まったまま他の技へ持ち越すと、被弾を重ねてから必殺技、という一方通行になる。
      */
     const charge = index === 0 ? unit.latentChargeBonus : 0;
-    const resolvedSkill = this.applyChargeToSkill(latent ? this.applyLatentToSkill(skill, latent) : skill, charge);
+    let resolvedSkill = this.applyChargeToSkill(latent ? this.applyLatentToSkill(skill, latent) : skill, charge);
+    const ignoreChance = Math.max(unit.def.combatMods?.defenseIgnoreChance ?? 0, unit.def.bossTraits?.defenseIgnoreChance ?? 0);
+    const ignoreRatio = Math.max(unit.def.combatMods?.defenseIgnoreRatio ?? 0, unit.def.bossTraits?.defenseIgnoreRatio ?? 0);
+    if (ignoreChance > 0 && ignoreRatio > 0 && resolvedSkill.effects.some((effect) => effect.kind === "DAMAGE") && this.rng() < ignoreChance) {
+      resolvedSkill = { ...resolvedSkill, effects: resolvedSkill.effects.map((effect) => effect.kind === "DAMAGE"
+        ? { ...effect, ignoreDefenseRatio: Math.max(effect.ignoreDefenseRatio ?? 0, ignoreRatio) }
+        : effect) };
+    }
     if (index === 0) unit.latentChargeBonus = 0;
     let targets: BattleUnit[];
-    if (choice?.targetId && (skill.target === "SINGLE_ENEMY" || skill.target === "SINGLE_ALLY")) {
+    if (skill.randomEnemyHits) {
+      const enemies = this.units.filter((candidate) => candidate.team !== unit.team && candidate.alive);
+      const hitCount = resolvedSkill.effects.find((effect) => effect.kind === "DAMAGE")?.hits ?? 1;
+      targets = Array.from({ length: hitCount }, () => enemies[Math.floor(this.rng() * enemies.length)]).filter(Boolean);
+      resolvedSkill = { ...resolvedSkill, effects: resolvedSkill.effects.map((effect) => effect.kind === "DAMAGE" ? { ...effect, hits: 1 } : effect) };
+    } else if (choice?.targetId && (skill.target === "SINGLE_ENEMY" || skill.target === "SINGLE_ALLY")) {
       const explicitTarget = this.units.find((u) => u.instanceId === choice.targetId && u.alive);
       targets = explicitTarget ? [explicitTarget] : chooseTargets(unit, skill, this.units);
     } else {
@@ -677,6 +739,7 @@ export class BattleEngine {
     const resolution = newResolution();
     const previousResolution = this.resolution;
     this.resolution = resolution;
+    const hpBeforeSkill = new Map(targets.map((target) => [target.instanceId, target.currentHp]));
     targets.forEach((target, i) => {
       const targetSkill = aoeConverted && latent?.aoeConversion ? { ...resolvedSkill, effects: resolvedSkill.effects
         .filter((effect) => i === 0 || latent.aoeConversion?.nativeEffectTarget !== "PRIMARY_ONLY" || effect.kind === "DAMAGE")
@@ -687,6 +750,11 @@ export class BattleEngine {
         }) } : resolvedSkill;
       this.applySkillEffects(unit, target, targetSkill, missed, i === 0, latent, resolution);
     });
+    for (const target of new Set(targets)) {
+      if (target.currentHp < (hpBeforeSkill.get(target.instanceId) ?? target.currentHp)) this.tryThresholdHeals(target);
+    }
+
+    if (skill.extraTurnOnKill && resolution.kills > 0 && unit.alive) this.pendingExtraTurns.push(unit);
 
     // 攻撃スキルに乗るパッシブは、対象を全部処理してから1度だけ判定する
     if (!missed) this.applyAttackPassives(unit, targets, resolution);
@@ -1238,7 +1306,7 @@ export class BattleEngine {
 
         case "DEBUFF": {
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution)) break;
           target.effects.push({
             stat: effect.stat,
             amount: -effect.amount,
@@ -1294,6 +1362,7 @@ export class BattleEngine {
 
         case "GAUGE": {
           if (!met(effect.requires)) break;
+          if (effect.chance !== undefined && this.rng() >= effect.chance) break;
           const receivers = this.receiversFor(source, target, effect.applyTo);
           for (const receiver of receivers) {
             if (!receiver.alive) continue;
@@ -1373,7 +1442,7 @@ export class BattleEngine {
 
         case "STRIP": {
           // IMMUNITY自身はBUFF。対抗手段である強化解除を免疫で封じない。
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution)) break;
           const removed = stripBuffs(target, effect.count ?? Number.POSITIVE_INFINITY);
           if (removed > 0) {
             resolution.strippedTargets += 1;
@@ -1628,16 +1697,35 @@ export class BattleEngine {
    * 的中シリーズ(4個セット)を装着していれば相手の抵抗率をさらに一部無視する。
    * 抵抗成功時、抵抗シリーズ(4個セット)を装着していればHPが回復する。
    */
-  private rollEffectSuccess(source: BattleUnit, target: BattleUnit, baseChance: number | undefined): boolean {
+  private rollEffectSuccess(
+    source: BattleUnit,
+    target: BattleUnit,
+    baseChance: number | undefined,
+    chanceGroup?: string,
+    resolution?: SkillResolution,
+  ): boolean {
     const procChance = baseChance ?? 1;
-    if (this.rng() >= procChance) return false;
+    const groupKey = chanceGroup && resolution ? `${target.instanceId}:${chanceGroup}` : undefined;
+    if (groupKey) {
+      const cached = resolution!.chanceGroups.get(groupKey);
+      if (cached !== undefined) return cached;
+    }
+    if (this.rng() >= procChance) {
+      if (groupKey) resolution!.chanceGroups.set(groupKey, false);
+      return false;
+    }
 
     const ignoreRatio = source.def.combatMods?.ignoreResistancePercent ?? 0;
     const effectiveResistance = target.def.stats.resistance * (1 - ignoreRatio);
     const accuracy = source.def.stats.accuracy;
     const hitChance = Math.max(0, Math.min(1, (1 - effectiveResistance + accuracy) / (1 + accuracy)));
 
-    if (this.rng() < hitChance) return true;
+    if (this.rng() < hitChance) {
+      if (groupKey) resolution!.chanceGroups.set(groupKey, true);
+      return true;
+    }
+
+    if (groupKey) resolution!.chanceGroups.set(groupKey, false);
 
     this.push(`  → ${this.label(target)} は効果を抵抗した！`);
     this.pushEvent({ targetId: target.instanceId, kind: "RESIST" });

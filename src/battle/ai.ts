@@ -19,7 +19,7 @@ export function chooseSkill(unit: BattleUnit, allUnits: BattleUnit[] = [unit]): 
     if (unit.cooldowns[i] === 0) {
       const skill = unit.def.skills[i];
       // パッシブは「使う」ものではない。手番の行動として選ばない
-      if (skill.passive) continue;
+      if (skill.passive || skill.automatic) continue;
       const hasHeal = skill.effects.some((effect) => effect.kind === "HEAL");
       const allies = allUnits.filter((candidate) => candidate.team === unit.team && candidate.alive);
       if (hasHeal && allies.every((ally) => hpRatio(ally) >= HEAL_SKILL_HP_THRESHOLD)) continue;
@@ -77,6 +77,12 @@ export function chooseTargets(unit: BattleUnit, skill: Skill, allUnits: BattleUn
         return 2;
       };
       const sorted = [...enemies].sort((a, b) => {
+        if (skill.targetPriority === "LOWEST_HP") return hpRatio(a) - hpRatio(b);
+        if (skill.targetPriority === "DEF_DOWN") {
+          const aDown = a.effects.some((effect) => effect.kind === "DEBUFF" && effect.stat === "def") ? 0 : 1;
+          const bDown = b.effects.some((effect) => effect.kind === "DEBUFF" && effect.stat === "def") ? 0 : 1;
+          if (aDown !== bDown) return aDown - bDown;
+        }
         const scoreDiff = affinityScore(a) - affinityScore(b);
         if (scoreDiff !== 0) return scoreDiff;
         return hpRatio(a) - hpRatio(b);

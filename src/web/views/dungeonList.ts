@@ -21,6 +21,7 @@ export interface FloorTileSpec {
   /** 小さな札。2〜3個まで(それ以上は詰まって読めない) */
   chips: string[];
   onClick: () => void;
+  disabled?: boolean;
 }
 
 const DEFAULT_COLOR = "#7b8cf6";
@@ -33,6 +34,7 @@ function tile(spec: FloorTileSpec): HTMLElement {
       className: "floor-tile",
       style: `--fl:${spec.color ?? DEFAULT_COLOR}`,
       onclick: spec.onClick,
+      disabled: spec.disabled,
     },
     [
       el("span", { className: "floor-tile__badge" }, [spec.badge]),

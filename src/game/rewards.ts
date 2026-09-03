@@ -213,10 +213,10 @@ export function applyDungeonClearRewards(
   partyInstances: MonsterInstance[],
   rng: () => number = Math.random,
 ): ClearRewardResult {
-  const isFirstClear = !isDungeonFloorCleared(state, floor.floor);
-  markDungeonFloorCleared(state, floor.floor);
+  const isFirstClear = !isDungeonFloorCleared(state, floor.floor, floor.kind);
+  markDungeonFloorCleared(state, floor.floor, floor.kind);
   const orbRewardId = "equipment-dungeon-floor-10";
-  if (isFirstClear && floor.floor === 10 && !state.claimedAwakeningOrbRewardIds.includes(orbRewardId)) {
+  if (floor.kind === "DEMON" && isFirstClear && floor.floor === 10 && !state.claimedAwakeningOrbRewardIds.includes(orbRewardId)) {
     state.awakeningOrbs += 1;
     state.claimedAwakeningOrbRewardIds.push(orbRewardId);
   }
