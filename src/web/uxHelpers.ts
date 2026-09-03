@@ -2,6 +2,7 @@ import { Equipment, EquipSlot, StatType, STAT_LABEL } from "../core/equipment.js
 import type { MonsterInstance } from "../core/monsterInstance.js";
 import type { Difficulty } from "../data/stages.js";
 import type { LevelDungeonTier } from "../data/levelDungeon.js";
+import type { EquipmentDungeonKind } from "../data/equipmentDungeon.js";
 import type { ScreenName } from "./views/bottomNav.js";
 
 export interface DungeonReturnContext {
@@ -10,6 +11,7 @@ export interface DungeonReturnContext {
   selectedStageId?: string;
   selectedDifficulty?: Difficulty;
   selectedDungeonFloor?: number;
+  selectedDungeonKind?: EquipmentDungeonKind;
   selectedLevelDungeonTier?: LevelDungeonTier;
   selectedGoldDungeonFloor?: number;
 }
@@ -19,6 +21,7 @@ export interface RestorableDungeonSelection {
   selectedStageId: string | null;
   selectedDifficulty: Difficulty;
   selectedDungeonFloor: number | null;
+  selectedDungeonKind: EquipmentDungeonKind;
   selectedLevelDungeonTier: LevelDungeonTier | null;
   selectedGoldDungeonFloor: number | null;
 }
@@ -29,6 +32,7 @@ export function restoreDungeonSelection(context: DungeonReturnContext): Restorab
     selectedStageId: context.selectedStageId ?? null,
     selectedDifficulty: context.selectedDifficulty ?? "NORMAL",
     selectedDungeonFloor: context.selectedDungeonFloor ?? null,
+    selectedDungeonKind: context.selectedDungeonKind ?? "DEMON",
     selectedLevelDungeonTier: context.selectedLevelDungeonTier ?? null,
     selectedGoldDungeonFloor: context.selectedGoldDungeonFloor ?? null,
   };

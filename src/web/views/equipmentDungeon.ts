@@ -1,7 +1,7 @@
-import { EquipStar } from "../../core/equipment.js";
+import { EquipStar, SET_LABEL } from "../../core/equipment.js";
 import { CYCLE_ELEMENTS, Element, ELEMENT_COLOR, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
 import { DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
-import { DungeonEnemy, DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
+import { BEAST_DUNGEON_FLOORS, DungeonEnemy, DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, EquipmentDungeonKind, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
 import { findMonster } from "../../data/monsters.js";
 import { getDungeonParty, isDungeonFloorCleared, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -12,7 +12,8 @@ import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 export interface EquipmentDungeonProps {
   player: PlayerState;
   selectedFloor: number | null;
-  onSelectFloor: (floor: number | null) => void;
+  selectedKind: EquipmentDungeonKind;
+  onSelectFloor: (kind: EquipmentDungeonKind, floor: number | null) => void;
   onStartFloor: (floor: DungeonFloor) => void;
   onGoDungeonParty: () => void;
   autoFarmCount: number;
@@ -42,17 +43,26 @@ function enemyDisplayName(enemy: DungeonEnemy): string {
   return findMonster(enemy.templateId, enemy.element)?.name ?? enemy.templateId;
 }
 
-function renderList(props: EquipmentDungeonProps): HTMLElement {
-  const tiles = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
+function floorTiles(props: EquipmentDungeonProps, floors: readonly DungeonFloor[]) {
+  return floors.map((floor) => {
     const element = floorElement(floor);
+    const unlocked = floor.kind === "DEMON" || floor.floor === 1 || isDungeonFloorCleared(props.player, floor.floor - 1, floor.kind);
     return {
       badge: `${floor.floor}F`,
-      title: `${ELEMENT_JA[element]}の階`,
+      title: unlocked ? `${ELEMENT_JA[element]}の階` : "未開放",
       color: ELEMENT_COLOR[element],
-      chips: [`最高 ${starLabel(maxStarForFloor(floor))}`, `🪙${floor.goldReward.toLocaleString("ja-JP")}`],
-      onClick: () => props.onSelectFloor(floor.floor),
+      chips: unlocked ? [`最高 ${starLabel(maxStarForFloor(floor))}`, `🪙${floor.goldReward.toLocaleString("ja-JP")}`] : ["前の階をクリア"],
+      disabled: !unlocked,
+      onClick: () => props.onSelectFloor(floor.kind, floor.floor),
     };
   });
+}
+
+function setNames(floors: readonly DungeonFloor[]): string {
+  return floors[0].setPool.map((set) => SET_LABEL[set]).join("・");
+}
+
+function renderList(props: EquipmentDungeonProps): HTMLElement {
 
   return el("div", { className: "screen stages-screen" }, [
     el("header", { className: "app-header app-header--row" }, [
@@ -71,7 +81,17 @@ function renderList(props: EquipmentDungeonProps): HTMLElement {
         [`🧑‍🤝‍🧑 ダンジョン専用パーティ編成 (${getDungeonParty(props.player).length}/5)`],
       ),
     ]),
-    renderFloorGrid(tiles),
+    el("section", { className: "panel" }, [
+      el("h2", {}, ["魔人のダンジョン"]),
+      el("p", { className: "app-subtitle" }, [`ドロップ: ${setNames(EQUIPMENT_DUNGEON_FLOORS)}`]),
+      renderFloorGrid(floorTiles(props, EQUIPMENT_DUNGEON_FLOORS)),
+    ]),
+    el("section", { className: "panel" }, [
+      el("h2", {}, ["魔獣のダンジョン"]),
+      el("p", { className: "app-subtitle" }, [`ドロップ: ${setNames(BEAST_DUNGEON_FLOORS)}`]),
+      el("p", { className: "app-subtitle" }, ["古代の魔獣と2体のお供に挑む高難度ダンジョン。ボスを倒すと勝利です。"]),
+      renderFloorGrid(floorTiles(props, BEAST_DUNGEON_FLOORS)),
+    ]),
   ]);
 }
 
@@ -104,7 +124,7 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
   return el("div", { className: "screen stages-screen" }, [
     el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, [floor.name]),
-      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: () => props.onSelectFloor(null) }, ["◀ 階層"]),
+      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: () => props.onSelectFloor(floor.kind, null) }, ["◀ 階層"]),
     ]),
 
     // 挑戦の入口を最初に置く。情報を読み終えないと挑めない並びだと、
@@ -127,8 +147,8 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
       ] as (HTMLElement | null)[]).filter((n): n is HTMLElement => n !== null),
     ),
 
-    isDungeonFloorCleared(props.player, floor.floor) ? renderAutoFarmPanel({
-      ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "EQUIP_DUNGEON", String(floor.floor)); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
+    isDungeonFloorCleared(props.player, floor.floor, floor.kind) ? renderAutoFarmPanel({
+      ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "EQUIP_DUNGEON", `${floor.kind}:${floor.floor}`); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: DUNGEON_STAMINA_COST,
@@ -155,6 +175,7 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
     ),
     el("section", { className: "panel" }, [
       el("h2", {}, ["報酬"]),
+      el("p", { className: "app-subtitle" }, [`装備セット: ${floor.setPool.map((set) => SET_LABEL[set]).join("・")}（種類は毎回ランダム）`]),
       ...bonusNotes.map((note) => el("p", { className: "app-subtitle" }, [note])),
       el("p", {}, [`🪙 クリア報酬ゴールド: ${floor.goldReward}`]),
     ]),
@@ -162,12 +183,13 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
       el("p", { className: "app-subtitle" }, [`ダンジョン専用パーティ: ${party.length}/5体`]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoDungeonParty }, ["編成を変更する"]),
     ]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectFloor(null) }, ["◀ 階層選択に戻る"]),
+    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectFloor(floor.kind, null) }, ["◀ 階層選択に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 
 export function renderEquipmentDungeon(props: EquipmentDungeonProps): HTMLElement {
-  const floor = props.selectedFloor ? EQUIPMENT_DUNGEON_FLOORS.find((f) => f.floor === props.selectedFloor) : undefined;
+  const floors = props.selectedKind === "BEAST" ? BEAST_DUNGEON_FLOORS : EQUIPMENT_DUNGEON_FLOORS;
+  const floor = props.selectedFloor ? floors.find((f) => f.floor === props.selectedFloor) : undefined;
   if (floor) return renderDetail(props, floor);
   return renderList(props);
 }

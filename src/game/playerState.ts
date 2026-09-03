@@ -17,6 +17,7 @@ import {
 import { Difficulty } from "../data/stages.js";
 import { BackgroundFarmJob } from "./backgroundAutoFarm.js";
 import { FALLBACK_REFERENCE_SECONDS, ManualClearTimes } from "./manualClearTimes.js";
+import type { EquipmentDungeonKind } from "../data/equipmentDungeon.js";
 
 export interface PlayerState {
   /** 保存型バックグラウンド周回。同時に1件だけ保持する。 */
@@ -31,6 +32,8 @@ export interface PlayerState {
   clearedStageIds: string[];
   /** クリア済みの装備ダンジョン階層(初回クリア判定・ダイヤ報酬用) */
   clearedDungeonFloors: number[];
+  /** クリア済みの魔獣のダンジョン階層。旧セーブでは空配列として扱う。 */
+  clearedBeastDungeonFloors?: number[];
   /** クリア済みのレベル上げダンジョン難易度(初回クリア判定・ダイヤ報酬用) */
   clearedLevelDungeonTiers: string[];
   /** クリア済みのゴールドダンジョン階層 */
@@ -209,6 +212,7 @@ export function createInitialState(): PlayerState {
     partyIds: monsters.map((m) => m.id),
     clearedStageIds: [],
     clearedDungeonFloors: [],
+    clearedBeastDungeonFloors: [],
     clearedLevelDungeonTiers: [],
     clearedGoldDungeonFloors: [],
     equipment: [],
@@ -330,6 +334,7 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];
+  if (!state.clearedBeastDungeonFloors) state.clearedBeastDungeonFloors = [];
   if (!state.clearedLevelDungeonTiers) state.clearedLevelDungeonTiers = [];
   if (!state.clearedGoldDungeonFloors) state.clearedGoldDungeonFloors = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
@@ -530,13 +535,14 @@ export function markStageCleared(state: PlayerState, stageId: string, difficulty
   }
 }
 
-export function isDungeonFloorCleared(state: PlayerState, floor: number): boolean {
-  return state.clearedDungeonFloors.includes(floor);
+export function isDungeonFloorCleared(state: PlayerState, floor: number, kind: EquipmentDungeonKind = "DEMON"): boolean {
+  return (kind === "BEAST" ? (state.clearedBeastDungeonFloors ?? []) : state.clearedDungeonFloors).includes(floor);
 }
 
-export function markDungeonFloorCleared(state: PlayerState, floor: number): void {
-  if (!state.clearedDungeonFloors.includes(floor)) {
-    state.clearedDungeonFloors.push(floor);
+export function markDungeonFloorCleared(state: PlayerState, floor: number, kind: EquipmentDungeonKind = "DEMON"): void {
+  const cleared = kind === "BEAST" ? (state.clearedBeastDungeonFloors ??= []) : state.clearedDungeonFloors;
+  if (!cleared.includes(floor)) {
+    cleared.push(floor);
   }
 }
 

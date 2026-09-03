@@ -252,7 +252,7 @@ function renderSetBonusPanel(equippedItems: ReturnType<typeof resolveEquippedIte
 
   const rows = active.flatMap((bonus) => {
     const desc = SET_BONUS_DESCRIPTION[bonus.set];
-    const lines = [el("div", { className: "set-bonus-row" }, [`${SET_LABEL[bonus.set]}(${bonus.count}) 2セット: ${desc.two}`])];
+    const lines = bonus.twoActive ? [el("div", { className: "set-bonus-row" }, [`${SET_LABEL[bonus.set]}(${bonus.count}) 2セット: ${desc.two}`])] : [];
     if (bonus.fourActive) {
       lines.push(el("div", { className: "set-bonus-row" }, [`${SET_LABEL[bonus.set]}(${bonus.count}) 4セット: ${desc.four}`]));
     }
@@ -377,7 +377,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
       el("h2", {}, ["装備"]), renderSlotGrid(props, instance),
       activeSets.length ? el("p", { className: "monster-detail-equipment__sets" }, [activeSets.flatMap((bonus) => {
         const description = SET_BONUS_DESCRIPTION[bonus.set];
-        return [`${SET_LABEL[bonus.set]}：${description.two}${bonus.fourActive ? ` / ${description.four}` : ""}`];
+        return [`${SET_LABEL[bonus.set]}：${bonus.twoActive ? description.two : ""}${bonus.twoActive && bonus.fourActive ? " / " : ""}${bonus.fourActive ? description.four : ""}`];
       }).join("　")]) : null,
     ].filter((node): node is HTMLElement => node !== null)),
     el("section", { className: "monster-detail-actions" }, [

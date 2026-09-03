@@ -29,7 +29,7 @@ export const ABYSSREAPER: MonsterTemplate = {
   skill1: {
     id: "abyssreaper_s1",
     name: "魂刈り",
-    description: "敵単体に攻撃力1.0倍のダメージを与え、60%で有利な効果を1個解除する。",
+    description: "敵単体に攻撃力1.0倍のダメージを与え、60%で有利な効果を1個剥がす。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
@@ -41,7 +41,7 @@ export const ABYSSREAPER: MonsterTemplate = {
     {
       id: "abyssreaper_s2_a",
       name: "魂の略奪",
-      description: "敵単体に攻撃力1.5倍のダメージを与え、有利な効果を最大2個解除する。解除1個につき自身の行動ゲージが15%進む。",
+      description: "敵単体に攻撃力1.5倍のダメージを与え、有利な効果を最大2個剥がす。剥がした効果1個につき自身の行動ゲージが15%進む。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
@@ -52,7 +52,7 @@ export const ABYSSREAPER: MonsterTemplate = {
     {
       id: "abyssreaper_s2_b",
       name: "死神の鎖",
-      description: "鎖で縛り、有利な効果を1個解除してから敵単体に攻撃力1.4倍のダメージを与える。80%で2ターン防御力を50%低下させ、行動ゲージを40%減少させる。",
+      description: "鎖で縛り、有利な効果を1個剥がしてから敵単体に攻撃力1.4倍のダメージを与える。80%で2ターン防御力を50%低下させ、行動ゲージを40%減少させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
@@ -78,7 +78,7 @@ export const ABYSSREAPER: MonsterTemplate = {
     {
       id: "abyssreaper_s3_a",
       name: "魂喰らいの宴",
-      description: "敵全体に攻撃力1.15倍のダメージを与え、それぞれ75%で有利な効果を1個解除する。解除に成功した敵1体につき自身の行動ゲージが10%進む。",
+      description: "敵全体に攻撃力1.15倍のダメージを与え、それぞれ75%で有利な効果を1個剥がす。成功した敵1体につき自身の行動ゲージが10%進む。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
@@ -89,7 +89,7 @@ export const ABYSSREAPER: MonsterTemplate = {
     {
       id: "abyssreaper_s3_b",
       name: "死の宣告",
-      description: "敵単体に攻撃力2.0倍のダメージを与える。対象の弱体効果1個につき最終ダメージが8%上昇する(最大40%)。対象に残っている有利な効果はすべて解除する。",
+      description: "敵単体に攻撃力2.0倍のダメージを与える。対象の弱体効果1個につき最終ダメージが8%上昇する(最大40%)。対象に残っている有利な効果はすべて剥がす。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
@@ -116,7 +116,7 @@ export const ABYSSREAPER: MonsterTemplate = {
   lightSkill3: {
     id: "abyssreaper_s3_light",
     name: "聖魂転生",
-    description: "魂が巡り、敵全体にそれぞれ65%で有利な効果をすべて解除する。味方全体の行動ゲージを25%進め、自身に3ターンの復活を得る。",
+    description: "魂が巡り、敵全体にそれぞれ65%で有利な効果をすべて剥がす。味方全体の行動ゲージを25%進め、自身に3ターンの復活を得る。",
     target: "ALL_ENEMIES",
     cooldownTurns: 6,
     effects: [
@@ -229,7 +229,7 @@ export const FENRIR: MonsterTemplate = {
     {
       id: "fenrir_s3_b",
       name: "血の追跡",
-      description: "血の匂いを追い、敵単体に攻撃力2.8倍のダメージを与える。80%で2ターン回復阻害を付与し、80%で2ターン毒(2スタック)を付与する。",
+      description: "血の匂いを追い、敵単体に攻撃力2.8倍のダメージを与える。80%で2ターン回復封じを付与し、80%で2ターン毒(2スタック)を付与する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [

@@ -1,10 +1,13 @@
 import { Element } from "../core/element.js";
-import { DUNGEON_FLOOR_COUNT, Equipment, generateDungeonEquipment } from "../core/equipment.js";
+import { BEAST_DUNGEON_SET_TYPES, DEMON_DUNGEON_SET_TYPES, DUNGEON_FLOOR_COUNT, Equipment, SetType, generateDungeonEquipment } from "../core/equipment.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import {
   ANCIENT_CRYSTAL,
   ANCIENT_CRYSTAL_CURSE,
   ANCIENT_DEMON,
+  ANCIENT_BEAST,
+  ANCIENT_FANG_BEAST,
+  ANCIENT_GUARD_BEAST,
   MONSTER_TEMPLATES,
   REINCARNATION_PIG_DEX,
 } from "./monsters.js";
@@ -28,9 +31,15 @@ export interface DungeonEnemy {
    * 手番の回り方を変えたい場合はこちらを使う
    */
   spdMultiplier?: number;
+  /** 階層設計で確定させた実効値。指定時は通常の倍率計算より優先する。 */
+  fixedStats?: { hp: number; atk: number; def: number; spd: number };
+  initialCooldowns?: [number, number, number];
 }
 
+export type EquipmentDungeonKind = "DEMON" | "BEAST";
+
 export interface DungeonFloor {
+  kind: EquipmentDungeonKind;
   floor: number;
   name: string;
   enemies: DungeonEnemy[];
@@ -39,6 +48,7 @@ export interface DungeonFloor {
   /** 敵の速度に掛かる倍率。powerScale とは別にする(速度は手番の数に直結するため) */
   speedScale: number;
   goldReward: number;
+  setPool: readonly SetType[];
 }
 
 const NORMAL_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
@@ -261,24 +271,76 @@ function buildFloor(floor: number): DungeonFloor {
   ];
 
   return {
+    kind: "DEMON",
     floor,
-    name: `装備ダンジョン ${floor}階`,
+    name: `魔人のダンジョン ${floor}階`,
     enemies,
     powerScale: powerScaleForFloor(floor),
     speedScale: speedScaleForFloor(floor),
     goldReward: 60 * floor,
+    setPool: DEMON_DUNGEON_SET_TYPES,
   };
 }
 
 export const EQUIPMENT_DUNGEON_FLOORS: DungeonFloor[] = Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildFloor(i + 1));
 
-export function findDungeonFloor(floor: number): DungeonFloor | undefined {
-  return EQUIPMENT_DUNGEON_FLOORS.find((f) => f.floor === floor);
+const BEAST_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS", "LIGHT", "DARK", "FIRE", "WATER", "ELECTRIC", "DARK"];
+const BEAST_STATS = [
+  { boss: [112000, 1460, 1170, 136], support: [64000, 500, 1250, 111], attacker: [38400, 1040, 640, 111] },
+  { boss: [136500, 1770, 1420, 143], support: [78000, 600, 1520, 118], attacker: [46800, 1270, 780, 118] },
+  { boss: [164500, 2140, 1720, 150], support: [94000, 730, 1830, 125], attacker: [56400, 1530, 940, 125] },
+  { boss: [196000, 2550, 2040, 157], support: [112000, 870, 2180, 132], attacker: [67200, 1820, 1110, 132] },
+  { boss: [217000, 2820, 2260, 164], support: [124000, 960, 2420, 139], attacker: [74400, 2020, 1230, 139] },
+  { boss: [238000, 3090, 2480, 171], support: [136000, 1050, 2650, 146], attacker: [81600, 2210, 1350, 146] },
+  { boss: [252000, 3280, 2630, 178], support: [144000, 1120, 2810, 153], attacker: [86400, 2340, 1430, 153] },
+  { boss: [273000, 3550, 2850, 185], support: [156000, 1210, 3040, 160], attacker: [93600, 2540, 1550, 159] },
+  { boss: [294000, 3820, 3070, 192], support: [168000, 1300, 3280, 167], attacker: [100800, 2730, 1670, 166] },
+  { boss: [350000, 4550, 3650, 205], support: [200000, 1550, 3900, 175], attacker: [120000, 3250, 1990, 173] },
+] as const;
+
+function fixedStats(values: readonly [number, number, number, number]) {
+  return { hp: values[0], atk: values[1], def: values[2], spd: values[3] };
+}
+
+function buildBeastFloor(floor: number): DungeonFloor {
+  const element = BEAST_ELEMENTS[floor - 1];
+  const stats = BEAST_STATS[floor - 1];
+  return {
+    kind: "BEAST",
+    floor,
+    name: `魔獣のダンジョン ${floor}階`,
+    powerScale: 1,
+    speedScale: 1,
+    goldReward: 60 * floor,
+    setPool: BEAST_DUNGEON_SET_TYPES,
+    enemies: [
+      { templateId: ANCIENT_BEAST.templateId, element, star: 6, level: 60, isBoss: true, victoryTarget: true, primaryTarget: true, fixedStats: fixedStats(stats.boss), initialCooldowns: [0, 3, 5] },
+      { templateId: ANCIENT_GUARD_BEAST.templateId, element, star: 6, level: 60, victoryTarget: false, fixedStats: fixedStats(stats.support) },
+      { templateId: ANCIENT_FANG_BEAST.templateId, element, star: 6, level: 60, victoryTarget: false, fixedStats: fixedStats(stats.attacker) },
+    ],
+  };
+}
+
+export const BEAST_DUNGEON_FLOORS: DungeonFloor[] = Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildBeastFloor(i + 1));
+export const ALL_EQUIPMENT_DUNGEON_FLOORS = [...EQUIPMENT_DUNGEON_FLOORS, ...BEAST_DUNGEON_FLOORS];
+
+export function findDungeonFloor(floor: number, kind: EquipmentDungeonKind = "DEMON"): DungeonFloor | undefined {
+  return (kind === "BEAST" ? BEAST_DUNGEON_FLOORS : EQUIPMENT_DUNGEON_FLOORS).find((f) => f.floor === floor);
+}
+
+export function dungeonFloorKey(floor: DungeonFloor): string {
+  return `${floor.kind}:${floor.floor}`;
+}
+
+export function findDungeonFloorByKey(key: string): DungeonFloor | undefined {
+  if (!key.includes(":")) return findDungeonFloor(Number(key), "DEMON");
+  const [kind, rawFloor] = key.split(":");
+  return findDungeonFloor(Number(rawFloor), kind === "BEAST" ? "BEAST" : "DEMON");
 }
 
 /** 装備ダンジョンは挑戦するたびに必ず1個装備がドロップする(階層のドロップ率テーブルに従って星が決まる) */
 export function rollDungeonEquipment(floor: DungeonFloor, rng: () => number = Math.random): Equipment {
-  return generateDungeonEquipment(floor.floor, rng);
+  return generateDungeonEquipment(floor.floor, rng, floor.setPool ?? DEMON_DUNGEON_SET_TYPES);
 }
 
 /** 召喚の書の階層共通ドロップ率 */

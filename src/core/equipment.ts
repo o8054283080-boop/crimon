@@ -88,9 +88,13 @@ export function formatStatValue(roll: StatRoll): string {
   return `${STAT_LABEL[roll.type]}${(roll.value * 100).toFixed(1)}%`;
 }
 
-export type SetType = "CRIT" | "POWER" | "GUARD" | "VITALITY" | "ACCURACY_SET" | "RESIST_SET" | "SWIFT";
+export type SetType =
+  | "CRIT" | "POWER" | "GUARD" | "VITALITY" | "ACCURACY_SET" | "RESIST_SET" | "SWIFT"
+  | "WARD" | "RAMPAGE" | "IMMUNITY_SET" | "COLLAPSE" | "BLESSING";
 
-export const SET_TYPES: SetType[] = ["CRIT", "POWER", "GUARD", "VITALITY", "ACCURACY_SET", "RESIST_SET", "SWIFT"];
+export const DEMON_DUNGEON_SET_TYPES: SetType[] = ["CRIT", "POWER", "GUARD", "VITALITY", "ACCURACY_SET", "RESIST_SET", "SWIFT"];
+export const BEAST_DUNGEON_SET_TYPES: SetType[] = ["WARD", "RAMPAGE", "IMMUNITY_SET", "COLLAPSE", "BLESSING"];
+export const SET_TYPES: SetType[] = [...DEMON_DUNGEON_SET_TYPES, ...BEAST_DUNGEON_SET_TYPES];
 
 export const SET_LABEL: Record<SetType, string> = {
   CRIT: "会心",
@@ -100,6 +104,11 @@ export const SET_LABEL: Record<SetType, string> = {
   ACCURACY_SET: "的中",
   RESIST_SET: "抵抗",
   SWIFT: "速攻",
+  WARD: "加護",
+  RAMPAGE: "暴走",
+  IMMUNITY_SET: "免疫",
+  COLLAPSE: "崩壊",
+  BLESSING: "祝福",
 };
 
 /**
@@ -112,7 +121,8 @@ export type SetBonusEffect =
   | { kind: "DAMAGE_TAKEN_MULTIPLIER"; amount: number }
   | { kind: "TURN_HEAL_PERCENT"; amount: number }
   | { kind: "IGNORE_RESISTANCE_PERCENT"; amount: number }
-  | { kind: "HEAL_ON_RESIST_PERCENT"; amount: number };
+  | { kind: "HEAL_ON_RESIST_PERCENT"; amount: number }
+  | { kind: "NONE" };
 
 /** シリーズごとの2個セット/4個セットの効果定義(ユーザー指定の全7シリーズ) */
 export const SET_BONUS_CONFIG: Record<SetType, { two: SetBonusEffect; four: SetBonusEffect }> = {
@@ -144,6 +154,11 @@ export const SET_BONUS_CONFIG: Record<SetType, { two: SetBonusEffect; four: SetB
     two: { kind: "STAT", stat: "SPD_PERCENT", amount: 0.05 },
     four: { kind: "STAT", stat: "SPD_PERCENT", amount: 0.12 },
   },
+  WARD: { two: { kind: "NONE" }, four: { kind: "NONE" } },
+  RAMPAGE: { two: { kind: "NONE" }, four: { kind: "NONE" } },
+  IMMUNITY_SET: { two: { kind: "NONE" }, four: { kind: "NONE" } },
+  COLLAPSE: { two: { kind: "NONE" }, four: { kind: "NONE" } },
+  BLESSING: { two: { kind: "NONE" }, four: { kind: "NONE" } },
 };
 
 /** UI表示用の効果テキスト */
@@ -155,6 +170,11 @@ export const SET_BONUS_DESCRIPTION: Record<SetType, { two: string; four: string 
   ACCURACY_SET: { two: "状態異常付与率+15%", four: "敵の状態異常抵抗率25%無視" },
   RESIST_SET: { two: "状態異常抵抗率+25%", four: "状態異常を抵抗した時HP15%回復" },
   SWIFT: { two: "速度+5%", four: "速度+12%" },
+  WARD: { two: "戦闘開始時、1ターン最大HP8%のシールド（2セットごとに+8%）", four: "シールドが最大HP16%に上昇" },
+  RAMPAGE: { two: "4セットで発動", four: "行動終了時15%で追加ターン（回数制限なし）" },
+  IMMUNITY_SET: { two: "戦闘開始時、1ターン免疫（2セットごとに+1ターン）", four: "免疫が2ターンに延長" },
+  COLLAPSE: { two: "4セットで発動", four: "攻撃時50%で敵の防御を50%無視" },
+  BLESSING: { two: "4セットで発動", four: "HP35%以下で一度だけ最大HP35%回復" },
 };
 
 /** 2個セットに必要な個数 / 4個セットに必要な個数 */
@@ -390,10 +410,11 @@ export interface ActiveSetBonus {
 /** 現在発動中(2個以上そろっている)のセットボーナス一覧。UI表示に使う */
 export function getActiveSetBonuses(equipmentList: Equipment[]): ActiveSetBonus[] {
   const counts = getEquippedSetCounts(equipmentList);
-  return SET_TYPES.filter((type) => (counts[type] ?? 0) >= SET_PIECE_COUNTS.TWO).map((type) => ({
+  const fourOnly = new Set<SetType>(["RAMPAGE", "COLLAPSE", "BLESSING"]);
+  return SET_TYPES.filter((type) => (counts[type] ?? 0) >= (fourOnly.has(type) ? SET_PIECE_COUNTS.FOUR : SET_PIECE_COUNTS.TWO)).map((type) => ({
     set: type,
     count: counts[type] ?? 0,
-    twoActive: (counts[type] ?? 0) >= SET_PIECE_COUNTS.TWO,
+    twoActive: !fourOnly.has(type) && (counts[type] ?? 0) >= SET_PIECE_COUNTS.TWO,
     fourActive: (counts[type] ?? 0) >= SET_PIECE_COUNTS.FOUR,
   }));
 }
@@ -432,6 +453,14 @@ export interface CombatModifiers {
   ignoreResistancePercent: number;
   /** 状態異常を抵抗した時、最大HPに対する割合で回復する量 */
   healOnResistPercent: number;
+  battleStartShieldPercent?: number;
+  battleStartShieldTurns?: number;
+  battleStartImmunityTurns?: number;
+  extraTurnChance?: number;
+  defenseIgnoreChance?: number;
+  defenseIgnoreRatio?: number;
+  thresholdHealHpRatio?: number;
+  thresholdHealPercent?: number;
 }
 
 export const DEFAULT_COMBAT_MODIFIERS: CombatModifiers = {
@@ -440,6 +469,14 @@ export const DEFAULT_COMBAT_MODIFIERS: CombatModifiers = {
   turnHealPercent: 0,
   ignoreResistancePercent: 0,
   healOnResistPercent: 0,
+  battleStartShieldPercent: 0,
+  battleStartShieldTurns: 0,
+  battleStartImmunityTurns: 0,
+  extraTurnChance: 0,
+  defenseIgnoreChance: 0,
+  defenseIgnoreRatio: 0,
+  thresholdHealHpRatio: 0,
+  thresholdHealPercent: 0,
 };
 
 function applyStatEffect(bonus: SetStatBonuses, effect: SetBonusEffect): void {
@@ -515,6 +552,22 @@ export function computeSetCombatModifiers(equipmentList: Equipment[]): CombatMod
     const config = SET_BONUS_CONFIG[type];
     if (count >= SET_PIECE_COUNTS.TWO) applyCombatEffect(mods, config.two);
     if (count >= SET_PIECE_COUNTS.FOUR) applyCombatEffect(mods, config.four);
+  }
+  const wardSets = Math.floor((counts.WARD ?? 0) / 2);
+  if (wardSets > 0) {
+    mods.battleStartShieldPercent = wardSets * 0.08;
+    mods.battleStartShieldTurns = 1;
+  }
+  const immunitySets = Math.floor((counts.IMMUNITY_SET ?? 0) / 2);
+  if (immunitySets > 0) mods.battleStartImmunityTurns = immunitySets;
+  if ((counts.RAMPAGE ?? 0) >= 4) mods.extraTurnChance = 0.15;
+  if ((counts.COLLAPSE ?? 0) >= 4) {
+    mods.defenseIgnoreChance = 0.5;
+    mods.defenseIgnoreRatio = 0.5;
+  }
+  if ((counts.BLESSING ?? 0) >= 4) {
+    mods.thresholdHealHpRatio = 0.35;
+    mods.thresholdHealPercent = 0.35;
   }
   return mods;
 }
@@ -693,9 +746,13 @@ export function getDungeonFloorDropRates(floor: number): { star: EquipStar; perc
 }
 
 /** 装備ダンジョンの指定階層で装備を1つ生成する(ドロップは呼び出し側で確定させてから呼ぶ) */
-export function generateDungeonEquipment(floor: number, rng: () => number = Math.random): Equipment {
+export function generateDungeonEquipment(
+  floor: number,
+  rng: () => number = Math.random,
+  setPool: readonly SetType[] = DEMON_DUNGEON_SET_TYPES,
+): Equipment {
   const starWeights = DUNGEON_FLOOR_STAR_WEIGHTS[floor] ?? DUNGEON_FLOOR_STAR_WEIGHTS[1];
   const star = weightedPick(starWeights, rng);
   const subStatCount = weightedPick(DUNGEON_SUBSTAT_COUNT_WEIGHTS_BY_STAR[star], rng);
-  return generateEquipment({ star, subStatCount, rng });
+  return generateEquipment({ star, subStatCount, set: setPool[Math.floor(rng() * setPool.length)], rng });
 }
