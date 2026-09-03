@@ -28,6 +28,8 @@ export interface UnitSummary {
   debuffsLanded: number;
   stunsLanded: number;
   stripsLanded: number;
+  gaugeDrains: number;
+  passiveGaugeGains: number;
   /** 敵だけ: 平均で何ターン目まで生きていたか(倒された順の平均) */
   avgKillOrder: number;
 }
@@ -125,6 +127,8 @@ export function summarize(
       debuffsLanded: rows.reduce((a, r) => a + r.debuffsLanded, 0),
       stunsLanded: rows.reduce((a, r) => a + r.stunsLanded, 0),
       stripsLanded: rows.reduce((a, r) => a + r.stripsLanded, 0),
+      gaugeDrains: rows.reduce((a, r) => a + r.gaugeDrains, 0),
+      passiveGaugeGains: rows.reduce((a, r) => a + r.passiveGaugeGains, 0),
       avgKillOrder: mean(killOrders),
     };
   });

@@ -388,3 +388,74 @@ describe("セーブデータへ触らない", () => {
     }
   });
 });
+
+describe("味方の属性だけを差し替える", () => {
+  /*
+   * 「火ドラゴンと闇ドラゴン、どちらが良いか」を測る時、比べたいのは
+   * **属性の違いだけ**。★もLvも装備も能力ポイントもタイプも潜在も、
+   * 他が1つでも違えば、出た差がどこから来たのか言えなくなる。
+   */
+  it("属性を変えると、本編の正式なスキルがそのまま入る", () => {
+    /*
+     * **Battle Lab用に簡略化した技を作る余地はどこにも無い。**
+     * `<templateId>_<属性>` の図鑑を引くので、闇ドラゴンなら
+     * 本編の「破壊の流星」、闇クロノスなら「時の管理者」が来る。
+     */
+    const fire = buildAlly({ templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" }, mulberry32(7));
+    const dark = buildAlly({ templateId: "dragon", element: "DARK", preset: "MAX_ATTACKER" }, mulberry32(7));
+    expect(fire.skills[2].name).toBe("破滅の咆哮");
+    expect(dark.skills[2].name).toBe("破壊の流星");
+    // 闇のS3は防御無視。図鑑の中身がそのまま来ていることの裏取り
+    expect(dark.skills[2].effects.some((e) => e.kind === "DAMAGE" && e.ignoreDefense === true)).toBe(true);
+
+    const electric = buildAlly({ templateId: "chronos", element: "ELECTRIC", preset: "MAX_SPEED" }, mulberry32(7));
+    const darkChronos = buildAlly({ templateId: "chronos", element: "DARK", preset: "MAX_SPEED" }, mulberry32(7));
+    expect(electric.skills[2].name).toBe("終焉時計");
+    expect(darkChronos.skills[2].name).toBe("時の管理者");
+    // 闇のS3はパッシブ。手番の行動として選ばれない側へ変わる
+    expect(darkChronos.skills[2].passive).toBeDefined();
+  });
+
+  it("属性以外は同じ育て方のまま", () => {
+    // 差が属性から出たと言うために、他が揃っている必要がある
+    const fire = buildAlly({ templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" }, mulberry32(11));
+    const dark = buildAlly({ templateId: "dragon", element: "DARK", preset: "MAX_ATTACKER" }, mulberry32(11));
+    expect(fire.templateId).toBe(dark.templateId);
+    expect(fire.skills[0].name).toBe(dark.skills[0].name);
+    expect(fire.combatMods).toEqual(dark.combatMods);
+  });
+
+  it("図鑑に無い組み合わせは、候補を添えて止まる", () => {
+    // 黙って別のモンスターを作らない。書き間違いはその場で分かる方がよい
+    expect(() => buildAlly({ templateId: "dragon", element: "WATER" }, mulberry32(1))).not.toThrow();
+    expect(() => buildAlly({ templateId: "notamonster", element: "FIRE" }, mulberry32(1))).toThrow(/図鑑に/);
+  });
+});
+
+describe("ゲージまわりの数え上げ", () => {
+  it("吸収とパッシブによる上昇を、別々に数える", () => {
+    /*
+     * 行の主語が違うので分けている。
+     *   吸収した … 主語は吸った側
+     *   進んだ   … 主語は進んだ本人
+     * 闇クロノスの「時の管理者」は両方を出すので、まとめて数えると意味が壊れる。
+     */
+    const scenario: typeof TOWER60 = {
+      ...TOWER60,
+      allies: TOWER60.allies.map((ally) => (
+        ally.templateId === "chronos" ? { ...ally, element: "DARK" as const } : ally
+      )),
+    };
+    const tally = runBattle(scenario, 20260903, [], "TYPICAL");
+    const chronos = tally.units.find((u) => u.id === "P3")!;
+    expect(chronos.passiveGaugeGains).toBeGreaterThan(0);
+    expect(chronos.gaugeDrains).toBeGreaterThan(0);
+    // 数えているのは行動した本人のぶんだけ。味方全員に散らばっていない
+    expect(tally.units.filter((u) => u.passiveGaugeGains > 0)).toHaveLength(1);
+  });
+
+  it("パッシブを持たない編成では0のまま", () => {
+    const tally = runBattle(TOWER60, 20260903, [], "TYPICAL");
+    expect(tally.units.every((u) => u.passiveGaugeGains === 0)).toBe(true);
+  });
+});
