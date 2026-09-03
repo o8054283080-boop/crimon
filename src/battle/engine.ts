@@ -223,6 +223,8 @@ export class BattleEngine {
   private coopDepth = 0;
   /** 溜めた反撃の入れ子の深さ。0でないときは反撃を呼ばない(反射と往復し続けるため) */
   private counterDepth = 0;
+  /** `empowerBossOnDeath` を処理し終えた個体。同じ死で二度強くしない */
+  private readonly mournedDeaths = new Set<string>();
   /** いま解決中のスキル。パッシブの「1スキル1回」を数えるのに使う */
   private resolution: SkillResolution | null = null;
 
@@ -290,6 +292,7 @@ export class BattleEngine {
         }
 
         this.recordTurn(unit);
+        this.applyAllyDeathBoosts();
         turnsTaken += 1;
         if (turnsTaken >= this.maxTurns) break;
 
@@ -1714,6 +1717,41 @@ export class BattleEngine {
    * `applySkillEffects` をそのまま通す。** ここで別式を書くと、
    * 本編を直した時にボスの反撃だけが古い規則で殴り続ける。
    */
+  /**
+   * 倒れた取り巻きのぶんだけ、本体を強くする。
+   *
+   * ## 死んだ瞬間ではなく、走査で拾う
+   *
+   * 死は毒でも火傷でも反撃でも起きるので、**倒れ方ごとに合図を挿していくと
+   * 必ずどれか一つを取りこぼす。**代わりに手番の切れ目ごとに全員を見て、
+   * まだ弔っていない死体があれば処理する。`mournedDeaths` に控えるので、
+   * 同じ死で二度強くなることはない。
+   *
+   * 効き先は「生き残っている勝利条件の敵」だけ。取り巻き同士では強め合わない
+   * (どちらを先に倒しても同じ、では順番を考える意味が無くなる)。
+   */
+  private applyAllyDeathBoosts(): void {
+    for (const victim of this.units) {
+      if (victim.alive || this.mournedDeaths.has(victim.instanceId)) continue;
+      this.mournedDeaths.add(victim.instanceId);
+      const boost = victim.def.bossTraits?.empowerBossOnDeath;
+      if (!boost) continue;
+      for (const boss of this.units) {
+        if (!boss.alive || boss === victim || boss.team !== victim.team || !boss.def.victoryTarget) continue;
+        const parts: string[] = [];
+        for (const stat of ["atk", "spd", "def"] as const) {
+          const amount = boost[stat];
+          if (!amount) continue;
+          boss.flatStatBonus[stat] = (boss.flatStatBonus[stat] ?? 0) + amount;
+          parts.push(`${stat.toUpperCase()}+${amount}`);
+        }
+        if (parts.length > 0) {
+          this.push(`${this.label(boss)} は ${this.label(victim)} の力を取り込んだ！ (${parts.join(" ")})`);
+        }
+      }
+    }
+  }
+
   private counterWithSkill(source: BattleUnit, index: 0 | 1 | 2): void {
     const skill = source.def.skills[index];
     if (!skill || skill.passive) return;
