@@ -1,6 +1,7 @@
 import { createMonsterInstance, MonsterInstance } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL, Star } from "../core/rarity.js";
-import { EXP_PIG, REINCARNATION_PIG, SKILL_PIG, findMonsterById } from "../data/monsters.js";
+import { EXP_PIG, EXP_PIG_DEX, REINCARNATION_PIG, REINCARNATION_PIG_DEX, SKILL_PIG, findMonsterById } from "../data/monsters.js";
+import { addArenaCoins } from "./arena/progress.js";
 import { PlayerState, savePlayerState } from "./playerState.js";
 
 export type MissionPeriod = "DAILY" | "WEEKLY" | "MONTHLY";
@@ -13,7 +14,8 @@ export type MissionCounterKey =
   | "arenaBattles"
   | "equipmentEnhancements"
   | "shopPurchases"
-  | "staminaSpent";
+  | "staminaSpent"
+  | "dungeonClears";
 
 export interface MissionCounters extends Record<MissionCounterKey, number> {}
 
@@ -25,6 +27,10 @@ export interface MissionReward {
   lightDarkFourStarSummonScrolls?: number;
   fiveStarSummonScrolls?: number;
   awakeningOrbs?: number;
+  stamina?: number;
+  arenaCoins?: number;
+  expPig3?: number;
+  expPig4?: number;
   reincarnationPig3?: number;
   reincarnationPig4?: number;
 }
@@ -59,6 +65,15 @@ interface CumulativeClaimState {
   lastClaimedTarget: number;
 }
 
+interface ReleaseCampaignState {
+  id: string;
+  baseline: MissionCounters;
+  claimedIds: string[];
+  claimedMilestones: number[];
+  towerBestFloor: number;
+  maxedSixStarEquipment: boolean;
+}
+
 export interface MissionState {
   version: 1;
   counters: MissionCounters;
@@ -67,6 +82,7 @@ export interface MissionState {
   monthly: MissionPeriodState;
   cumulative: Record<string, CumulativeClaimState>;
   observed: MissionObservedState;
+  releaseCampaign?: ReleaseCampaignState;
 }
 
 type MissionPlayerState = PlayerState & { missionState?: MissionState };
@@ -110,6 +126,40 @@ export interface CumulativeMissionView {
   complete: boolean;
 }
 
+type ReleaseCampaignProgress = MissionCounterKey | "towerBestFloor" | "maxedSixStarEquipment";
+
+export interface ReleaseCampaignMissionDefinition {
+  id: string;
+  title: string;
+  condition: string;
+  progress: ReleaseCampaignProgress;
+  target: number;
+  reward: MissionReward;
+}
+
+export interface ReleaseCampaignMissionView extends ReleaseCampaignMissionDefinition {
+  current: number;
+  complete: boolean;
+  claimed: boolean;
+}
+
+export interface ReleaseCampaignMilestoneView {
+  target: number;
+  reward: MissionReward;
+  complete: boolean;
+  claimed: boolean;
+}
+
+export interface ReleaseCampaignView {
+  id: string;
+  fromDate: string;
+  toDate: string;
+  remainingDays: number;
+  missions: ReleaseCampaignMissionView[];
+  completedCount: number;
+  milestones: ReleaseCampaignMilestoneView[];
+}
+
 const PERIOD_REQUIREMENTS: Record<MissionPeriod, number> = {
   DAILY: 4,
   WEEKLY: 6,
@@ -129,6 +179,50 @@ const PERIOD_CLEAR_REWARDS: Record<MissionPeriod, MissionReward> = {
     awakeningOrbs: 1,
   },
 };
+
+export const RELEASE_CAMPAIGN_ID = "2026-09-x-release";
+export const RELEASE_CAMPAIGN_FROM_DATE = "2026-09-03";
+export const RELEASE_CAMPAIGN_TO_DATE = "2026-10-03";
+
+export const RELEASE_CAMPAIGN_MISSIONS: readonly ReleaseCampaignMissionDefinition[] = [
+  { id: "release-login-1", title: "公開記念ログイン", condition: "ログインする", progress: "loginDays", target: 1, reward: { stamina: 300 } },
+  { id: "release-login-2", title: "2日ログイン", condition: "2日ログインする", progress: "loginDays", target: 2, reward: { crystal: 100 } },
+  { id: "release-login-5", title: "5日ログイン", condition: "5日ログインする", progress: "loginDays", target: 5, reward: { summonScrolls: 3 } },
+  { id: "release-login-10", title: "10日ログイン", condition: "10日ログインする", progress: "loginDays", target: 10, reward: { crystal: 300 } },
+  { id: "release-login-15", title: "15日ログイン", condition: "15日ログインする", progress: "loginDays", target: 15, reward: { summonScrolls: 5 } },
+  { id: "release-stamina-300", title: "冒険の始まり", condition: "スタミナを300消費する", progress: "staminaSpent", target: 300, reward: { gold: 100_000 } },
+  { id: "release-stamina-1000", title: "冒険を続けよう", condition: "スタミナを1,000消費する", progress: "staminaSpent", target: 1_000, reward: { crystal: 200 } },
+  { id: "release-stamina-2500", title: "大冒険", condition: "スタミナを2,500消費する", progress: "staminaSpent", target: 2_500, reward: { summonScrolls: 3 } },
+  { id: "release-stamina-5000", title: "公開記念の大遠征", condition: "スタミナを5,000消費する", progress: "staminaSpent", target: 5_000, reward: { crystal: 500 } },
+  { id: "release-level-20", title: "育成を始めよう", condition: "モンスターのレベルを合計20上げる", progress: "levelsGained", target: 20, reward: { expPig3: 2 } },
+  { id: "release-level-100", title: "育成の成果", condition: "モンスターのレベルを合計100上げる", progress: "levelsGained", target: 100, reward: { expPig4: 1 } },
+  { id: "release-rank-3", title: "ランクアップ入門", condition: "ランクアップを3回行う", progress: "rankUps", target: 3, reward: { reincarnationPig3: 1 } },
+  { id: "release-rank-8", title: "さらなる高みへ", condition: "ランクアップを8回行う", progress: "rankUps", target: 8, reward: { reincarnationPig3: 2 } },
+  { id: "release-star6-1", title: "初めての★6", condition: "★6モンスターを1体育成する", progress: "star6Raised", target: 1, reward: { reincarnationPig4: 1 } },
+  { id: "release-star6-2", title: "★6パーティへの一歩", condition: "★6モンスターを2体育成する", progress: "star6Raised", target: 2, reward: { crystal: 500 } },
+  { id: "release-equipment-20", title: "装備を磨こう", condition: "装備を20回強化する", progress: "equipmentEnhancements", target: 20, reward: { gold: 200_000 } },
+  { id: "release-equipment-60", title: "装備強化の達人", condition: "装備を60回強化する", progress: "equipmentEnhancements", target: 60, reward: { gold: 500_000 } },
+  { id: "release-equipment-max", title: "最高の装備", condition: "★6装備を1個+15まで強化する", progress: "maxedSixStarEquipment", target: 1, reward: { crystal: 300 } },
+  { id: "release-summon-10", title: "仲間を求めて", condition: "10回召喚する", progress: "summons", target: 10, reward: { summonScrolls: 3 } },
+  { id: "release-summon-25", title: "仲間を増やそう", condition: "25回召喚する", progress: "summons", target: 25, reward: { summonScrolls: 5 } },
+  { id: "release-summon-50", title: "召喚の達人", condition: "50回召喚する", progress: "summons", target: 50, reward: { fourStarSummonScrolls: 1 } },
+  { id: "release-dungeon-20", title: "ダンジョン探索", condition: "ダンジョンを20回クリアする", progress: "dungeonClears", target: 20, reward: { stamina: 500 } },
+  { id: "release-dungeon-50", title: "ダンジョン攻略", condition: "ダンジョンを50回クリアする", progress: "dungeonClears", target: 50, reward: { crystal: 300 } },
+  { id: "release-dungeon-100", title: "ダンジョン制覇への道", condition: "ダンジョンを100回クリアする", progress: "dungeonClears", target: 100, reward: { summonScrolls: 5 } },
+  { id: "release-arena-5", title: "アリーナ初挑戦", condition: "アリーナに5回挑戦する", progress: "arenaBattles", target: 5, reward: { arenaCoins: 300 } },
+  { id: "release-arena-15", title: "アリーナで腕試し", condition: "アリーナに15回挑戦する", progress: "arenaBattles", target: 15, reward: { arenaCoins: 700 } },
+  { id: "release-arena-30", title: "アリーナの強者", condition: "アリーナに30回挑戦する", progress: "arenaBattles", target: 30, reward: { arenaCoins: 1_000 } },
+  { id: "release-tower-5", title: "試練の塔へ", condition: "試練の塔を5階クリアする", progress: "towerBestFloor", target: 5, reward: { crystal: 200 } },
+  { id: "release-tower-15", title: "塔の中腹へ", condition: "試練の塔を15階クリアする", progress: "towerBestFloor", target: 15, reward: { summonScrolls: 5 } },
+  { id: "release-tower-30", title: "試練の塔を踏破", condition: "試練の塔を30階クリアする", progress: "towerBestFloor", target: 30, reward: { fourStarSummonScrolls: 1 } },
+];
+
+export const RELEASE_CAMPAIGN_MILESTONES: readonly { target: number; reward: MissionReward }[] = [
+  { target: 10, reward: { summonScrolls: 10 } },
+  { target: 20, reward: { fourStarSummonScrolls: 1, crystal: 500 } },
+  { target: 25, reward: { reincarnationPig4: 1, gold: 1_000_000, lightDarkFourStarSummonScrolls: 1 } },
+  { target: 30, reward: { lightDarkFourStarSummonScrolls: 1, crystal: 1_000, fiveStarSummonScrolls: 1 } },
+];
 
 export const DAILY_MISSIONS: readonly PeriodMissionDefinition[] = [
   { id: "daily-login", title: "今日もクリモン", condition: "ログインする", counter: "loginDays", target: 1, reward: { crystal: 20 } },
@@ -180,6 +274,7 @@ const ZERO_COUNTERS = (): MissionCounters => ({
   equipmentEnhancements: 0,
   shopPurchases: 0,
   staminaSpent: 0,
+  dungeonClears: 0,
 });
 
 function cloneCounters(counters: MissionCounters): MissionCounters {
@@ -194,6 +289,16 @@ function jstDateParts(now: Date): { year: number; month: number; day: number; we
     day: shifted.getUTCDate(),
     weekday: shifted.getUTCDay(),
   };
+}
+
+function jstDateString(now: Date): string {
+  const { year, month, day } = jstDateParts(now);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function isReleaseCampaignActive(now: Date = new Date()): boolean {
+  const today = jstDateString(now);
+  return today >= RELEASE_CAMPAIGN_FROM_DATE && today <= RELEASE_CAMPAIGN_TO_DATE;
 }
 
 export function dailyMissionKeyAt(now: Date = new Date()): string {
@@ -256,6 +361,22 @@ function createMissionState(player: PlayerState, now: Date): MissionState {
   };
 }
 
+function createReleaseCampaignState(state: MissionState, now: Date): ReleaseCampaignState {
+  const baseline = cloneCounters(state.counters);
+  // 追加アップデート前に同じ日にログイン済みでも、公開日のログイン1日ぶんは失わせない。
+  if (state.observed.lastLoginKey === dailyMissionKeyAt(now)) {
+    baseline.loginDays = Math.max(0, baseline.loginDays - 1);
+  }
+  return {
+    id: RELEASE_CAMPAIGN_ID,
+    baseline,
+    claimedIds: [],
+    claimedMilestones: [],
+    towerBestFloor: 0,
+    maxedSixStarEquipment: false,
+  };
+}
+
 function finiteNonNegative(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
 }
@@ -291,7 +412,36 @@ export function missionStateFor(player: PlayerState, now: Date = new Date()): Mi
     current.clearClaimed = current.clearClaimed === true;
     for (const key of Object.keys(defaults) as MissionCounterKey[]) current.baseline[key] = finiteNonNegative(current.baseline[key]);
   }
+  const campaign = state.releaseCampaign;
+  if (campaign?.id === RELEASE_CAMPAIGN_ID) {
+    if (!campaign.baseline || typeof campaign.baseline !== "object") campaign.baseline = cloneCounters(state.counters);
+    for (const key of Object.keys(defaults) as MissionCounterKey[]) campaign.baseline[key] = finiteNonNegative(campaign.baseline[key]);
+    if (!Array.isArray(campaign.claimedIds)) campaign.claimedIds = [];
+    if (!Array.isArray(campaign.claimedMilestones)) campaign.claimedMilestones = [];
+    campaign.towerBestFloor = finiteNonNegative(campaign.towerBestFloor);
+    campaign.maxedSixStarEquipment = campaign.maxedSixStarEquipment === true;
+  }
   return state;
+}
+
+function ensureReleaseCampaignState(player: PlayerState, state: MissionState, now: Date): boolean {
+  if (!isReleaseCampaignActive(now)) return false;
+  let changed = false;
+  if (!state.releaseCampaign || state.releaseCampaign.id !== RELEASE_CAMPAIGN_ID) {
+    state.releaseCampaign = createReleaseCampaignState(state, now);
+    changed = true;
+  }
+  const campaign = state.releaseCampaign;
+  const towerBest = Math.max(0, Math.floor(player.trialTowerBestFloor ?? 0));
+  if (towerBest > campaign.towerBestFloor) {
+    campaign.towerBestFloor = towerBest;
+    changed = true;
+  }
+  if (!campaign.maxedSixStarEquipment && player.equipment.some((equipment) => equipment.star === 6 && equipment.level >= 15)) {
+    campaign.maxedSixStarEquipment = true;
+    changed = true;
+  }
+  return changed;
 }
 
 function resetExpiredPeriods(state: MissionState, now: Date): boolean {
@@ -403,9 +553,24 @@ function persist(player: PlayerState): void {
 export function syncMissions(player: PlayerState, now: Date = new Date()): MissionState {
   const state = missionStateFor(player, now);
   let changed = resetExpiredPeriods(state, now);
+  // 基準値は進捗を観測する前に固定する。公開記念の外で積んだ累計を持ち込ませない。
+  if (ensureReleaseCampaignState(player, state, now)) changed = true;
   if (observeProgress(player, state, now)) changed = true;
   if (changed) persist(player);
   return state;
+}
+
+/** 観測できないゲーム内イベントを、全期間共通のミッション累計へ1回ぶん記録する。 */
+export function recordMissionProgress(
+  player: PlayerState,
+  counter: Extract<MissionCounterKey, "dungeonClears">,
+  amount = 1,
+  now: Date = new Date(),
+): void {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const state = missionStateFor(player, now);
+  ensureReleaseCampaignState(player, state, now);
+  state.counters[counter] += Math.floor(amount);
 }
 
 function stateForPeriod(state: MissionState, period: MissionPeriod): MissionPeriodState {
@@ -439,10 +604,11 @@ export function getPeriodMissionView(player: PlayerState, period: MissionPeriod,
   };
 }
 
-function grantPig(player: PlayerState, star: 3 | 4, count: number): void {
+function grantPig(player: PlayerState, kind: "EXP" | "REINCARNATION", star: 3 | 4, count: number): void {
   const maxLevel = STAR_MAX_LEVEL[star];
+  const pool = kind === "EXP" ? EXP_PIG_DEX : REINCARNATION_PIG_DEX;
   for (let index = 0; index < count; index += 1) {
-    player.monsters.push(createMonsterInstance(`${REINCARNATION_PIG.templateId}_FIRE`, star, maxLevel));
+    player.monsters.push(createMonsterInstance(pool[index % pool.length].id, star, maxLevel));
   }
 }
 
@@ -454,8 +620,12 @@ export function grantMissionReward(player: PlayerState, reward: MissionReward): 
   player.lightDarkFourStarSummonScrolls += reward.lightDarkFourStarSummonScrolls ?? 0;
   player.fiveStarSummonScrolls += reward.fiveStarSummonScrolls ?? 0;
   player.awakeningOrbs += reward.awakeningOrbs ?? 0;
-  grantPig(player, 3, reward.reincarnationPig3 ?? 0);
-  grantPig(player, 4, reward.reincarnationPig4 ?? 0);
+  player.stamina += reward.stamina ?? 0;
+  addArenaCoins(player, reward.arenaCoins ?? 0);
+  grantPig(player, "EXP", 3, reward.expPig3 ?? 0);
+  grantPig(player, "EXP", 4, reward.expPig4 ?? 0);
+  grantPig(player, "REINCARNATION", 3, reward.reincarnationPig3 ?? 0);
+  grantPig(player, "REINCARNATION", 4, reward.reincarnationPig4 ?? 0);
 }
 
 export function claimPeriodMission(player: PlayerState, period: MissionPeriod, id: string, now: Date = new Date()): MissionReward | null {
@@ -646,6 +816,75 @@ export function claimCumulativeMission(player: PlayerState, key: string, now: Da
   return step.reward;
 }
 
+function campaignProgress(state: MissionState, progress: ReleaseCampaignProgress): number {
+  const campaign = state.releaseCampaign;
+  if (!campaign) return 0;
+  if (progress === "towerBestFloor") return campaign.towerBestFloor;
+  if (progress === "maxedSixStarEquipment") return campaign.maxedSixStarEquipment ? 1 : 0;
+  return Math.max(0, state.counters[progress] - campaign.baseline[progress]);
+}
+
+function releaseCampaignRemainingDays(now: Date): number {
+  if (jstDateString(now) === RELEASE_CAMPAIGN_TO_DATE) return 0;
+  const [year, month, day] = RELEASE_CAMPAIGN_TO_DATE.split("-").map(Number);
+  const endAt = Date.UTC(year, month - 1, day, 14, 59, 59, 999); // 日本時間23:59:59
+  return Math.max(1, Math.ceil((endAt - now.getTime()) / 86_400_000));
+}
+
+export function getReleaseCampaignView(player: PlayerState, now: Date = new Date()): ReleaseCampaignView | null {
+  if (!isReleaseCampaignActive(now)) return null;
+  const state = syncMissions(player, now);
+  const campaign = state.releaseCampaign;
+  if (!campaign) return null;
+  const missions = RELEASE_CAMPAIGN_MISSIONS.map((mission) => {
+    const rawCurrent = campaignProgress(state, mission.progress);
+    return {
+      ...mission,
+      current: Math.min(mission.target, rawCurrent),
+      complete: rawCurrent >= mission.target,
+      claimed: campaign.claimedIds.includes(mission.id),
+    };
+  });
+  const completedCount = missions.filter((mission) => mission.complete).length;
+  return {
+    id: RELEASE_CAMPAIGN_ID,
+    fromDate: RELEASE_CAMPAIGN_FROM_DATE,
+    toDate: RELEASE_CAMPAIGN_TO_DATE,
+    remainingDays: releaseCampaignRemainingDays(now),
+    missions,
+    completedCount,
+    milestones: RELEASE_CAMPAIGN_MILESTONES.map((milestone) => ({
+      ...milestone,
+      complete: completedCount >= milestone.target,
+      claimed: campaign.claimedMilestones.includes(milestone.target),
+    })),
+  };
+}
+
+export function claimReleaseCampaignMission(player: PlayerState, id: string, now: Date = new Date()): MissionReward | null {
+  const view = getReleaseCampaignView(player, now);
+  const mission = view?.missions.find((entry) => entry.id === id);
+  if (!mission || !mission.complete || mission.claimed) return null;
+  const campaign = missionStateFor(player, now).releaseCampaign;
+  if (!campaign) return null;
+  campaign.claimedIds.push(id);
+  grantMissionReward(player, mission.reward);
+  persist(player);
+  return mission.reward;
+}
+
+export function claimReleaseCampaignMilestone(player: PlayerState, target: number, now: Date = new Date()): MissionReward | null {
+  const view = getReleaseCampaignView(player, now);
+  const milestone = view?.milestones.find((entry) => entry.target === target);
+  if (!milestone || !milestone.complete || milestone.claimed) return null;
+  const campaign = missionStateFor(player, now).releaseCampaign;
+  if (!campaign) return null;
+  campaign.claimedMilestones.push(target);
+  grantMissionReward(player, milestone.reward);
+  persist(player);
+  return milestone.reward;
+}
+
 function addReward(total: MissionReward, reward: MissionReward): void {
   const keys = Object.keys(reward) as (keyof MissionReward)[];
   for (const key of keys) total[key] = (total[key] ?? 0) + (reward[key] ?? 0);
@@ -670,6 +909,17 @@ export function claimAllAvailableMissionRewards(player: PlayerState, now: Date =
       addReward(total, reward);
     }
   }
+  const campaign = getReleaseCampaignView(player, now);
+  if (campaign) {
+    for (const mission of campaign.missions) {
+      const reward = claimReleaseCampaignMission(player, mission.id, now);
+      if (reward) addReward(total, reward);
+    }
+    for (const milestone of getReleaseCampaignView(player, now)?.milestones ?? []) {
+      const reward = claimReleaseCampaignMilestone(player, milestone.target, now);
+      if (reward) addReward(total, reward);
+    }
+  }
   persist(player);
   return total;
 }
@@ -683,6 +933,10 @@ export function missionRewardText(reward: MissionReward): string {
   if (reward.lightDarkFourStarSummonScrolls) parts.push(`★4以上光闇召喚書×${reward.lightDarkFourStarSummonScrolls}`);
   if (reward.fiveStarSummonScrolls) parts.push(`★5召喚書×${reward.fiveStarSummonScrolls}`);
   if (reward.awakeningOrbs) parts.push(`覚醒オーブ×${reward.awakeningOrbs}`);
+  if (reward.stamina) parts.push(`スタミナ×${reward.stamina.toLocaleString("ja-JP")}`);
+  if (reward.arenaCoins) parts.push(`アリーナコイン×${reward.arenaCoins.toLocaleString("ja-JP")}`);
+  if (reward.expPig3) parts.push(`★3 MAX経験ピッグ×${reward.expPig3}`);
+  if (reward.expPig4) parts.push(`★4 MAX経験ピッグ×${reward.expPig4}`);
   if (reward.reincarnationPig3) parts.push(`★3 MAX転生ピッグ×${reward.reincarnationPig3}`);
   if (reward.reincarnationPig4) parts.push(`★4 MAX転生ピッグ×${reward.reincarnationPig4}`);
   return parts.join(" / ") || "報酬なし";

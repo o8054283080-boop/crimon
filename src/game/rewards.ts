@@ -33,6 +33,7 @@ import {
   markLevelDungeonTierCleared,
   markStageCleared,
 } from "./playerState.js";
+import { recordMissionProgress } from "./missions.js";
 
 /** 初回クリアはダイヤ200確定。2回目以降は3%の確率でダイヤ50がもらえる */
 function rollClearCrystal(isFirstClear: boolean, rng: () => number): number {
@@ -213,6 +214,7 @@ export function applyDungeonClearRewards(
   partyInstances: MonsterInstance[],
   rng: () => number = Math.random,
 ): ClearRewardResult {
+  recordMissionProgress(state, "dungeonClears");
   const isFirstClear = !isDungeonFloorCleared(state, floor.floor, floor.kind);
   markDungeonFloorCleared(state, floor.floor, floor.kind);
   const orbRewardId = "equipment-dungeon-floor-10";
@@ -270,6 +272,7 @@ export function applyLevelDungeonClearRewards(
   partyInstances: MonsterInstance[],
   rng: () => number = Math.random,
 ): ClearRewardResult {
+  recordMissionProgress(state, "dungeonClears");
   const isFirstClear = !isLevelDungeonTierCleared(state, def.tier);
   markLevelDungeonTierCleared(state, def.tier);
 
@@ -315,6 +318,7 @@ export function applyGoldDungeonClearRewards(
   floor: GoldDungeonFloor,
   partyInstances: MonsterInstance[],
 ): ClearRewardResult {
+  recordMissionProgress(state, "dungeonClears");
   const expTotal = floor.floor * 20;
   const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);
 

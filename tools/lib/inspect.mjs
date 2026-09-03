@@ -22,7 +22,20 @@ export const INSPECT = `(() => {
   const navTop = nav ? nav.getBoundingClientRect().top : vh;
 
   // 2. 押せないボタン。他の要素が上に乗っている/画面外にある
-  const buttons = [...document.querySelectorAll('button:not([disabled]), a[href]')];
+  /*
+   * モーダルが開いている時、背面の画面は意図的に操作できない。
+   * document 全体を調べると、それらを全部「押せない」と誤報するため、
+   * aria-modal の付いた最前面だけを検査対象にする。
+   * 全面スクリーンは中央をパネルが覆うのが正常なので対象外にする。
+   */
+  const modal = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
+    .find((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+  const scope = modal ?? document;
+  const buttons = [...scope.querySelectorAll('button:not([disabled]), a[href]')]
+    .filter((b) => !b.matches('.regular-missions__scrim'));
   for (const b of buttons) {
     const r = b.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;

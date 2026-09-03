@@ -57,6 +57,7 @@ const SCREENS = [
   { name: "試練の塔", tab: "HOME", tile: "tower" },
   { name: "遊び方", tab: "HOME", tile: "help" },
   { name: "モンスター図鑑", tab: "HOME", tile: "dex" },
+  { name: "ミッション", tab: "HOME", tile: "mission" },
   // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
@@ -166,6 +167,16 @@ async function goScreen(screen) {
   const clicked = await call("eval", {
     expression: `(async () => {
       const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      /*
+       * 前の巡回対象がモーダルなら、次の画面へ移る前に閉じる。
+       * ミッションは下タブの上に残るため、閉じないと以降の巡回が
+       * すべて同じモーダルを検査してしまう。
+       */
+      const modalClose = document.querySelector('[role="dialog"][aria-modal="true"] .regular-missions__close');
+      if (modalClose instanceof HTMLElement) {
+        modalClose.click();
+        await wait(200);
+      }
       /*
        * **まず今いる階層から出る。**
        *
