@@ -8,6 +8,7 @@
  *   npm run battle:lab -- --scenario tower-60 --runs 300 --focus 豪魔人集中
  *   npm run battle:lab -- --scenario tower-60 --runs 300 --gear mid
  *   npm run battle:lab -- --scenario tower-60 --runs 300 --gear-compare
+ *   npm run battle:lab -- --scenario tower-60 --runs 1000 --swap dragon=DARK,chronos=DARK
  *   npm run battle:lab -- --list
  *
  * ## 何を触らないか
@@ -30,6 +31,7 @@ import type { Skill } from "../../src/core/skill.js";
 import { runBattle, runMany } from "./run.js";
 import { compareMarkdown, summarize, toMarkdown } from "./report.js";
 import { SCENARIOS, findScenario } from "./scenarios/index.js";
+import type { Element } from "../../src/core/element.js";
 import type { GearGrade, Scenario } from "./types.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +70,8 @@ interface Args {
   gear?: GearGrade;
   /** 仕上がり具合を並べて比べる */
   gearCompare: boolean;
+  /** 味方の属性だけ差し替える。`dragon=DARK,chronos=DARK` の形 */
+  swap?: Record<string, Element>;
   compare?: { key: string; values: number[] };
 }
 
@@ -111,6 +115,15 @@ function parseArgs(argv: string[]): Args {
         break;
       }
       case "--gear-compare": args.gearCompare = true; break;
+      case "--swap": {
+        args.swap = Object.fromEntries((value ?? "").split(",").filter(Boolean).map((pair) => {
+          const [template, element] = pair.split("=");
+          if (!template || !element) throw new Error(`--swap の書き方は dragon=DARK,chronos=DARK です(受け取った: ${pair})`);
+          return [template, element.toUpperCase() as Element];
+        }));
+        i += 1;
+        break;
+      }
       case "--compare": {
         const [k, list] = (value ?? "").split("=");
         args.compare = { key: k, values: (list ?? "").split(",").map(Number).filter((n) => !Number.isNaN(n)) };
@@ -141,6 +154,32 @@ function variant(scenario: Scenario, key: string, value: number): Scenario {
     return { ...enemy, skills };
   });
   return { ...scenario, enemies };
+}
+
+/**
+ * 味方の**属性だけ**を差し替えたシナリオを作る。
+ *
+ * ## なぜ属性だけなのか
+ *
+ * 「火ドラゴンと闇ドラゴンでどちらが良いか」を測る時、比べたいのは
+ * **属性の違いだけ**。★もLvも装備も能力ポイントもタイプも潜在も、
+ * 他が1つでも違えば、出た差がどこから来たのか言えなくなる。
+ *
+ * スキルは差し替えない。属性を変えれば `buildAlly` が
+ * `${templateId}_${element}` の図鑑を引くので、**本編の正式なスキルが
+ * そのまま入る**(闇ドラゴンの「破壊の流星」、闇クロノスの「時の管理者」)。
+ * Battle Lab用に簡略化した技を作る余地はどこにも無い。
+ *
+ * **複製して変えるので、元のシナリオには触らない。**
+ */
+function swapElements(scenario: Scenario, swap: Record<string, Element>): Scenario {
+  const allies = scenario.allies.map((ally) => {
+    const element = swap[ally.templateId];
+    if (!element) return ally;
+    const label = (ally.label ?? ally.templateId).replace(/\[.+\]$/, "");
+    return { ...ally, element, label: `${label}[${element}]` };
+  });
+  return { ...scenario, allies };
 }
 
 function focusOf(scenario: Scenario, name: string | undefined): { name: string; order: string[] } {
@@ -181,14 +220,15 @@ function main(): void {
     process.exitCode = 1;
     return;
   }
-  const focus = focusOf(scenario, args.focus);
+  const target = args.swap ? swapElements(scenario, args.swap) : scenario;
+  const focus = focusOf(target, args.focus);
 
   // --- 見比べ ---
   if (args.compare) {
     const rows = args.compare.values.map((value) => {
-      const target = variant(scenario, args.compare!.key, value);
-      const tallies = runMany(target, args.seed, args.runs, focus.order, args.gear);
-      return { label: `${args.compare!.key}=${value}`, summary: summarize(target, tallies, { seed: args.seed, focus: focus.name }) };
+      const shifted = variant(target, args.compare!.key, value);
+      const tallies = runMany(shifted, args.seed, args.runs, focus.order, args.gear);
+      return { label: `${args.compare!.key}=${value}`, summary: summarize(shifted, tallies, { seed: args.seed, focus: focus.name }) };
     });
     const body = compareMarkdown(`${scenario.title} 見比べ (${args.runs}戦 / seed ${args.seed} / ${focus.name})`, rows);
     if (args.json) {
@@ -206,7 +246,7 @@ function main(): void {
   if (args.gearCompare) {
     const rows = GEAR_GRADES.map((grade) => ({
       label: GEAR_LABEL[grade],
-      summary: summarize(scenario, runMany(scenario, args.seed, args.runs, focus.order, grade), { seed: args.seed, focus: focus.name }),
+      summary: summarize(target, runMany(target, args.seed, args.runs, focus.order, grade), { seed: args.seed, focus: focus.name }),
     }));
     const body = compareMarkdown(`${scenario.title} 装備の仕上がり具合ごと (${args.runs}戦 / seed ${args.seed} / ${focus.name})`, rows);
     if (args.json) {
@@ -224,7 +264,7 @@ function main(): void {
   if (args.logBattle > 0) {
     for (let i = 0; i < Math.min(args.logBattle, args.runs); i += 1) {
       const seed = (args.seed + i) >>> 0;
-      const tally = runBattle(scenario, seed, focus.order, args.gear);
+      const tally = runBattle(target, seed, focus.order, args.gear);
       console.log(`=== ${scenario.title} / seed ${seed} / 狙う順 ${focus.name} ===`);
       for (const line of tally.log) console.log(line);
       console.log(`--- 結果: ${tally.winner === "PLAYER" ? "勝利" : tally.winner === "DRAW" ? "引き分け" : "敗北"} `
@@ -234,8 +274,8 @@ function main(): void {
     if (args.runs <= args.logBattle) return;
   }
 
-  const tallies = runMany(scenario, args.seed, args.runs, focus.order, args.gear);
-  const summary = summarize(scenario, tallies, { seed: args.seed, focus: focus.name });
+  const tallies = runMany(target, args.seed, args.runs, focus.order, args.gear);
+  const summary = summarize(target, tallies, { seed: args.seed, focus: focus.name });
 
   if (args.json) {
     const json = JSON.stringify(summary, null, 2);

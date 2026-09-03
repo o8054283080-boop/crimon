@@ -58,6 +58,9 @@ npm run battle:lab -- --scenario tower-60 --runs 300 --gear mid
 
 # 仕上がり具合を4段階そろえて比べる
 npm run battle:lab -- --scenario tower-60 --runs 300 --gear-compare
+
+# 味方の属性だけ差し替えて比べる(他の条件は完全に同じ)
+npm run battle:lab -- --scenario tower-60 --runs 1000 --swap dragon=DARK,chronos=DARK
 ```
 
 ### 引数
@@ -76,6 +79,7 @@ npm run battle:lab -- --scenario tower-60 --runs 300 --gear-compare
 | `--compare <key>=<v1>,<v2>,…` | 1か所だけ変えた盤面を並べて比べる。いまは `boss-s3` のみ |
 | `--gear <段階>` | 味方の装備の仕上がり具合。`finished` / `strong` / `mid` / `rough`。省略時は `finished` |
 | `--gear-compare` | 4段階すべてを並べて比べる |
+| `--swap <template>=<属性>,…` | 味方の**属性だけ**差し替える。例 `dragon=DARK,chronos=DARK` |
 | `--strict` | 期待範囲を外れたら終了コードを非0にする |
 | `--list` | シナリオの一覧 |
 
@@ -207,6 +211,21 @@ export const MY_SCENARIO: Scenario = {
 **勝率は上でも下でも張り付くが、決着ターンは飽和しない。**
 難易度を読むならこちらを見る。`rough` の敗因が全件「ターン上限」で
 生存2.62というのは、**倒されているのではなく倒しきれていない**という意味。
+
+### 属性だけを差し替えて比べる
+
+「火ドラゴンと闇ドラゴン、60階ではどちらが良いか」を測る時、比べたいのは
+**属性の違いだけ**。★もLvも装備も能力ポイントもタイプも潜在も、
+他が1つでも違えば、出た差がどこから来たのか言えなくなる。
+
+```bash
+npm run battle:lab -- --scenario tower-60 --runs 1000 --gear typical --swap dragon=DARK,chronos=DARK
+```
+
+**スキルは差し替えない。** 属性を変えれば `buildAlly` が
+`<templateId>_<属性>` の図鑑を引くので、**本編の正式なスキルがそのまま入る**
+(闇ドラゴンの「破壊の流星」、闇クロノスの「時の管理者」)。
+Battle Lab用に簡略化した技を作る余地はどこにも無い。
 
 ### 一部だけ変える
 
