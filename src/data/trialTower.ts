@@ -3,6 +3,14 @@ import { SkillEffect } from "../core/skill.js";
 import { STAR_MAX_LEVEL, Star, levelMultiplier, starMultiplier } from "../core/rarity.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
 import { ANCIENT_DEMON, findMonster } from "./monsters.js";
+import { TOWER60_ENEMIES } from "./trialTowerFloor60.js";
+import {
+  isTowerUpperFloor,
+  towerUpperEnemies,
+  towerUpperFloorDef,
+  towerUpperNote,
+  towerUpperSwiftFloorSpd,
+} from "./trialTowerUpper.js";
 
 /**
  * 試練の塔。
@@ -22,10 +30,23 @@ import { ANCIENT_DEMON, findMonster } from "./monsters.js";
  * 削り続ける手に、敵が数で来るなら全体攻撃に、敵が速いなら手番を奪う手に場面が回る。
  * これは特定の戦術を潰すのではなく、別の戦術へ**場面を配る**やり方になる。
  *
- * ここで「回復封じ・剥がしに場面が回る」とは書かない。**プレイヤー側にその手が無い。**
+ * 50階までの傾向に「回復封じ・剥がしに場面が回る」を入れていないのは、
+ * この帯を作った時点で**プレイヤー側にその手が無かった**から。
  * STRIP と HEAL_BLOCK を持つのは敵専用の古代の呪晶だけで、
- * 通常モンスターにも高レアにも1体もいない(全図鑑を機械的に数えて確認した)。
+ * 通常モンスターにも高レアにも1体もいなかった(全図鑑を機械的に数えて確認した)。
  * 持っていない答えを前提に階を作ると、それは場面ではなく通行止めになる。
+ *
+ * **いまは11種が入って、その手はプレイヤー側にもある**
+ * (アビスリーパー・マッシュルン・ミミック・フェンリル)。
+ * だから51階以降には妨害・弱体の階を置いてある。50階までは据え置き
+ * (途中で性質を変えると、途中まで登った人の壁が動く)。
+ *
+ * ## 51階以降は別の作りになっている
+ *
+ * 下の `towerPowerOf` の曲線が受け持つのは**50階まで**。
+ * 51〜99階の通常階は `trialTowerUpper.ts` の固定編成+実数の帯で、
+ * 60階は `trialTowerFloor60.ts` の専用編成。
+ * 70/80/90/100階だけは従来どおりこの曲線に乗っている。
  */
 
 /** 階の傾向。敵の側の性質を変えることで、別のスキルに場面を作る */
@@ -62,6 +83,17 @@ export interface TowerFloor {
   /** 1始まりの階数 */
   floor: number;
   name: string;
+  /**
+   * 画面に出す短い名札。`name` の「◯◯階」より後ろの部分。
+   *
+   * **傾向(`trait`)から引いてはいけない。**傾向は5種類しかないので、
+   * 51階以降の「妨害」「鉄壁」「攻防一体」のような狙いを名乗れない。
+   * 実際、画面が `TOWER_TRAIT_LABEL[trait]` を出していたせいで、
+   * 51階以降は名札が消えたり(NONE)、加速の階が「疾風の階」と出たりしていた。
+   */
+  label: string;
+  /** 名札の説明。**何が起きるかだけ**を書く(「◯◯を持って行け」とは書かない) */
+  note: string;
   trait: TowerTrait;
   enemies: DungeonEnemy[];
   /** 敵の実効ステータスに掛かる倍率 */
@@ -216,6 +248,12 @@ export const TOWER_TRAIT_REQUIRED_EFFECTS: Partial<Record<TowerTrait, SkillEffec
  */
 function traitOf(floor: number): TowerTrait {
   if (isTowerBossFloor(floor)) return "NONE";
+  /*
+   * **51階以降は1階ずつ手で決めてある**(`trialTowerUpper.ts`)。
+   * 下の巡回に乗せると、階の狙いと顔ぶれがずれる。
+   */
+  const upper = towerUpperFloorDef(floor);
+  if (upper) return upper.trait;
   /*
    * **最初の節目までは傾向を載せない。**
    *
@@ -422,6 +460,18 @@ const TRAIT_SWIFT_ANCHOR_SPD = 1.45;
 
 /** 傾向に応じた顔ぶれを組む */
 function enemiesOf(floor: number, trait: TowerTrait): DungeonEnemy[] {
+  /*
+   * 60階は専用編成(豪魔人+魔晶+呪晶)。実数は Battle Lab の実測から来ている。
+   * **70/80/90/100階はここに入れない**——あちらは従来のまま。
+   */
+  if (floor === 60) return TOWER60_ENEMIES.map((enemy) => ({ ...enemy }));
+  /*
+   * 51階以降の通常階は固定編成。実効ステータスも帯の実数で決まるので、
+   * 下の powerScale / speedScale は掛からない(`fixedStats` が優先される)。
+   */
+  const upper = towerUpperEnemies(floor);
+  if (upper) return upper;
+
   const star = enemyStarOf(floor);
   const level = enemyLevelOf(floor);
   const element = CYCLE[(floor - 1) % CYCLE.length];
@@ -483,12 +533,23 @@ function enemiesOf(floor: number, trait: TowerTrait): DungeonEnemy[] {
  * 傾向がただの色違いになっていても気づけない(tools/towerPressure.mjs --traits)。
  */
 export function buildTowerFloor(floor: number, traitOverride?: TowerTrait): TowerFloor {
-  const trait = traitOverride ?? traitOf(floor);
-  const bossLabels: Partial<Record<number, string>> = { 70: "超再生", 80: "免疫", 90: "狂化", 100: "最終試練" };
-  const label = bossLabels[floor] ?? (isTowerBossFloor(floor) && traitOverride === undefined ? "関門" : TOWER_TRAIT_LABEL[trait] || "");
+  /*
+   * **51階以降と60階は差し替えを受け付けない。**
+   * あちらは顔ぶれが固定なので、傾向だけ書き換えても中身は1体も変わらない。
+   * 名乗りだけが変わった階は、測っても「傾向の効き」ではなく名前の違いを見ることになる。
+   */
+  const fixedRoster = floor === 60 || isTowerUpperFloor(floor);
+  const trait = fixedRoster ? traitOf(floor) : traitOverride ?? traitOf(floor);
+  const bossLabels: Partial<Record<number, string>> = { 60: "豪魔人", 70: "超再生", 80: "免疫", 90: "狂化", 100: "最終試練" };
+  const upperConcept = towerUpperFloorDef(floor)?.concept;
+  const label = bossLabels[floor]
+    ?? upperConcept
+    ?? (isTowerBossFloor(floor) && traitOverride === undefined ? "関門" : TOWER_TRAIT_LABEL[trait] || "");
   return {
     floor,
     name: `${floor}階${label ? ` ${label}` : ""}`,
+    label,
+    note: (upperConcept ? towerUpperNote(floor) : "") || TOWER_TRAIT_NOTE[trait],
     trait,
     enemies: enemiesOf(floor, trait),
     powerScale: powerScaleOf(floor),
@@ -526,8 +587,20 @@ export function towerTraitProblem(floor: TowerFloor): string | null {
   if (floor.trait === "SWARM" && floor.enemies.length <= 4) {
     return `群れの階なのに敵が${floor.enemies.length}体しかいない`;
   }
-  if (floor.trait === "SWIFT" && !floor.enemies.every((e) => (e.spdMultiplier ?? 1) > 1)) {
-    return "疾風の階なのに速度が上がっていない敵がいる";
+  if (floor.trait === "SWIFT") {
+    /*
+     * **速さの確かめ方が階の作りで変わる。**
+     * 50階までは倍率(speedScale)で速くしているので `spdMultiplier` を見る。
+     * 51階以降は実効速度を実数で置いているので倍率が1のまま——そこを倍率で見ると、
+     * 実際は帯の上限より速い階を「速くなっていない」と誤って落とす。
+     */
+    const swiftFloorSpd = towerUpperSwiftFloorSpd(floor.floor);
+    if (swiftFloorSpd !== null && isTowerUpperFloor(floor.floor)) {
+      const slow = floor.enemies.filter((e) => (e.fixedStats?.spd ?? 0) < swiftFloorSpd);
+      if (slow.length > 0) return `疾風の階なのに速度が${swiftFloorSpd}未満の敵が${slow.length}体いる`;
+    } else if (!floor.enemies.every((e) => (e.spdMultiplier ?? 1) > 1)) {
+      return "疾風の階なのに速度が上がっていない敵がいる";
+    }
   }
   return null;
 }

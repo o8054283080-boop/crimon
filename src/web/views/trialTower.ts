@@ -7,8 +7,6 @@ import {
   TOWER_FLOOR_COUNT,
   TOWER_STAMINA_COST,
   TRIAL_TOWER_FLOORS,
-  TOWER_TRAIT_LABEL,
-  TOWER_TRAIT_NOTE,
   TowerFloor,
   TowerReward,
   findTowerFloor,
@@ -293,8 +291,10 @@ function renderHero(props: TrialTowerProps): HTMLElement {
       el("span", { className: "tower-hero__next-floor" }, [`${nextFloor}階`]),
       nextDef && isTowerBossFloor(nextFloor)
         ? el("span", { className: "tower-tag tower-tag--boss" }, ["関門"])
-        : nextDef && TOWER_TRAIT_LABEL[nextDef.trait]
-          ? el("span", { className: "tower-tag" }, [TOWER_TRAIT_LABEL[nextDef.trait]])
+        // **傾向からではなく階の名札を出す。**傾向は5種類しかないので、
+        // 51階以降の「妨害」「鉄壁」を名乗れず、加速の階が「疾風の階」と出ていた
+        : nextDef && nextDef.label
+          ? el("span", { className: "tower-tag" }, [nextDef.label])
           : null,
     ].filter((n): n is HTMLElement => n !== null)),
   ]);
@@ -388,8 +388,15 @@ function renderRun(props: TrialTowerProps): HTMLElement | null {
  * 次の階の中身
  * ============================================================ */
 
+/**
+ * 敵の札に出す名前。
+ *
+ * **階が名前を持っていればそれを使う。**60階の3体は図鑑の見た目を借りているだけで、
+ * 技もステータスも別物なので、図鑑名で出すと「古代の魔人[闇]」と表示され、
+ * 戦闘中の「古代の豪魔人」と食い違う。名札が2つある敵はいない
+ */
 function enemyName(enemy: DungeonEnemy): string {
-  return findMonster(enemy.templateId, enemy.element)?.name ?? enemy.templateId;
+  return enemy.displayName ?? findMonster(enemy.templateId, enemy.element)?.name ?? enemy.templateId;
 }
 
 function renderEnemy(enemy: DungeonEnemy): HTMLElement {
@@ -418,14 +425,14 @@ function renderNextFloor(props: TrialTowerProps, floor: TowerFloor): HTMLElement
   const boss = isTowerBossFloor(floor.floor);
   const check = isTowerCheckpoint(floor.floor);
   const claimed = props.claimedFloors.includes(floor.floor);
-  const note = TOWER_TRAIT_NOTE[floor.trait];
+  const note = floor.note;
 
   return el("section", { className: `panel tower-floor${boss ? " tower-floor--boss" : ""}` }, nodes([
     el("div", { className: "tower-floor__head" }, nodes([
       el("span", { className: "tower-floor__no" }, [`${floor.floor}階`]),
       boss ? el("span", { className: "tower-tag tower-tag--boss" }, ["関門"]) : null,
-      !boss && TOWER_TRAIT_LABEL[floor.trait]
-        ? el("span", { className: "tower-tag" }, [TOWER_TRAIT_LABEL[floor.trait]])
+      !boss && floor.label
+        ? el("span", { className: "tower-tag" }, [floor.label])
         : null,
       check ? el("span", { className: "tower-tag tower-tag--check" }, ["節"]) : null,
     ])),
@@ -571,7 +578,9 @@ function renderLadder(props: TrialTowerProps): HTMLElement {
     const passed = props.bestFloor >= to;
     const locked = from > props.nextFloor;
     const boss = floors.find((floor) => isTowerBossFloor(floor.floor));
-    const bossName = boss && boss.floor >= 70 ? boss.name.replace(`${boss.floor}階 `, "") : "";
+    // 名前を持っている関門だけ出す。**階番号で判定しない**
+    // (「関門」しか名乗らない階は、節の見出しに出しても何も伝わらない)
+    const bossName = boss && boss.label !== "関門" ? boss.label : "";
     blocks.push(
       el("details", { className: `tower-band${passed ? " is-passed" : ""}${active ? " is-current" : ""}${locked ? " is-locked" : ""}`, open: active }, [
         el("summary", { className: "tower-band__head" }, nodes([
