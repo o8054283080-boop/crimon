@@ -1,0 +1,1094 @@
+/**
+ * アリーナのスタイル。
+ *
+ * ## なぜ style.css へ足さないのか
+ *
+ * `style.css` は7,800行あり、追記し続けると **Viteが黙って空のCSSを配る**
+ * 事故を出している(CLAUDE.md / docs/dev-tools.md)。新しい面はここに分ける。
+ *
+ * ## 名前の頭は `ar-`
+ *
+ * 旧アリーナの `.arena-*` が style.css に残っている(この画面では使わない)。
+ * 同じ名前を使うと、消し忘れた古い規則が静かに効いて、直したはずの見た目が
+ * 場所によって違う、という一番読みにくい壊れ方をする。**頭文字で分ける。**
+ *
+ * ## 浮かせない
+ *
+ * ここには `position: fixed` も `absolute` の小窓も1つも無い。
+ * この案件では浮かせた札が3回とも下のボタンを覆っている。
+ * 案内・進捗・お知らせは、すべて画面の流れの中に置く。
+ *
+ * ## 文字の下限
+ *
+ * 9px を下回る指定を書かない(`tests/cssReadability.test.ts` が落とす)。
+ * ここで一番小さいのは 0.68rem = 10.9px。
+ */
+
+.ar-screen {
+  gap: 12px;
+}
+
+/* ==========================================================================
+ * 共通の小物
+ * ========================================================================== */
+
+/* 案内。**流れの中の一枚**として置く。浮かせない */
+.ar-notice {
+  margin: 0;
+  padding: 11px 13px;
+  color: #f4e3bd;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.ar-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.ar-empty {
+  margin: 0;
+  padding: 4px 0;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+/* 警告。赤で塗らず、金の面に赤い文字。塗ると画面の主役が奪われる */
+.ar-warn {
+  margin: 0;
+  color: #ffb4a2;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.ar-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  color: #ded6e8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 実プレイヤーの印。NPCと作りを変えず、印だけで示す */
+.ar-chip--player {
+  background: rgba(176, 123, 224, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(176, 123, 224, 0.45);
+  color: #e6d4ff;
+}
+
+.ar-chip--out {
+  color: #c9a0a0;
+}
+
+/* ==========================================================================
+ * トップ：ランク・レート・順位
+ * ========================================================================== */
+
+.ar-standing {
+  --tier: #9aa6bb;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ar-standing__head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.ar-tier {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tier) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier) 62%, transparent);
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+.ar-standing__rating {
+  margin-left: auto;
+  font-size: 1.72rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #f6ecd6;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-standing__unit {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ar-track {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.ar-track__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tier) 55%, #000), var(--tier));
+}
+
+.ar-standing__next {
+  margin: 0;
+  color: #cdc3d8;
+  font-size: 0.76rem;
+}
+
+/*
+ * 現在順位。
+ *
+ * **未接続のときに数字を出さない。** 出す言葉そのものを変えるので、
+ * ここは色も一段落として「全国の話ではない」ことを見た目でも伝える。
+ */
+.ar-standing__rank {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(4, 2, 9, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.ar-standing__rank-label {
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.ar-standing__rank-value {
+  color: #ffd98a;
+  font-size: 1.12rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-standing__rank-note {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.ar-standing__rank.is-local .ar-standing__rank-value {
+  color: #b9b1c2;
+  font-size: 0.98rem;
+}
+
+/* ==========================================================================
+ * トップ：挑戦権
+ * ========================================================================== */
+
+.ar-tickets {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ar-tickets__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ar-tickets__label {
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.ar-tickets__count {
+  margin-left: auto;
+  color: #f4d995;
+  font-size: 0.95rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-tickets__pips {
+  display: flex;
+  gap: 4px;
+}
+
+.ar-tickets__pip {
+  flex: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.ar-tickets__pip.is-on {
+  background: linear-gradient(180deg, #ffe6a6, #d8a642);
+  box-shadow: inset 0 0 0 1px rgba(255, 236, 190, 0.7), 0 0 7px rgba(255, 190, 70, 0.35);
+}
+
+.ar-tickets__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ar-tickets__timer {
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.ar-tickets__refill {
+  flex: none;
+  font-size: 0.8rem;
+  padding: 10px 13px;
+}
+
+/* ==========================================================================
+ * トップ：シーズンと週
+ * ========================================================================== */
+
+.ar-period {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ar-period__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ar-period__label {
+  color: #ded6e8;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ar-period__value {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.ar-period__claim {
+  margin-top: 4px;
+  font-size: 0.94rem;
+}
+
+.ar-period__claimed {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+
+/* ==========================================================================
+ * トップ：行き先
+ * ========================================================================== */
+
+.ar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ar-menu__item {
+  appearance: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 58px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  text-align: left;
+  color: var(--text);
+  background: var(--grain), var(--surface);
+  box-shadow: inset 0 0 0 1px var(--panel-border), var(--drop-soft);
+  cursor: pointer;
+}
+
+.ar-menu__item:active {
+  transform: translateY(1.5px);
+  filter: brightness(0.93);
+}
+
+.ar-menu__icon {
+  flex: none;
+  width: 30px;
+  font-size: 1.35rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.ar-menu__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ar-menu__label {
+  font-size: 0.98rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.ar-menu__note {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.ar-menu__arrow {
+  flex: none;
+  color: rgba(214, 178, 108, 0.8);
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+/* ==========================================================================
+ * 編成の要約
+ * ========================================================================== */
+
+.ar-team {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ar-team__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ar-team__head h2 {
+  margin: 0;
+  flex: 1;
+}
+
+.ar-team__edit {
+  flex: none;
+  font-size: 0.8rem;
+  padding: 10px 14px;
+}
+
+/* ==========================================================================
+ * 対戦候補の札
+ * ========================================================================== */
+
+.ar-card {
+  --tier: #9aa6bb;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--tier) 38%, transparent),
+    inset 0 1px 0 rgba(255, 232, 190, 0.07),
+    var(--drop);
+}
+
+.ar-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ar-card__ident {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ar-card__name {
+  font-size: 1rem;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-card__tier {
+  color: var(--tier);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.ar-card__score {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.ar-card__rating {
+  color: #f6ecd6;
+  font-size: 1.08rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-card__diff {
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.ar-card__diff.is-up { color: #ffb877; }
+.ar-card__diff.is-down { color: #8fd6a8; }
+
+.ar-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* 顔ぶれ。2列に畳む。390px幅で4体を1列に並べると名前が読めなくなる */
+.ar-card__units {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.ar-mini {
+  --elem: #8a8397;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgba(4, 2, 9, 0.5);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--elem) 32%, transparent);
+}
+
+.ar-mini__face {
+  flex: none;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.ar-mini__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ar-mini__name {
+  font-size: 0.76rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-mini__grade {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ar-card__inspect,
+.ar-card__go {
+  flex: 1;
+  font-size: 0.88rem;
+  padding: 12px 10px;
+}
+
+/* 押せない理由。**押せないボタンだけを出して黙らない** */
+.ar-card__blocked {
+  margin: 0;
+  color: #d8b9a4;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.ar-listhead {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ar-listhead__note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.ar-listhead__reroll {
+  font-size: 0.84rem;
+}
+
+.ar-detailhead {
+  --tier: #9aa6bb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ar-detailhead__note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+/* ==========================================================================
+ * 1体の検分
+ * ========================================================================== */
+
+.ar-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 1体を選ぶ並び。横に流す。畳むと4体で2段になり、下の中身が押し下げられる */
+.ar-picker {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ar-picker__item {
+  --elem: #8a8397;
+  appearance: none;
+  border: none;
+  flex: 1 0 auto;
+  min-width: 86px;
+  min-height: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 7px;
+  border-radius: 11px;
+  color: var(--text);
+  background: rgba(4, 2, 9, 0.55);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--elem) 30%, transparent);
+  cursor: pointer;
+}
+
+.ar-picker__item.is-on {
+  background: color-mix(in srgb, var(--elem) 22%, rgba(4, 2, 9, 0.6));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--elem) 75%, transparent), 0 0 12px rgba(0, 0, 0, 0.4);
+}
+
+.ar-picker__face {
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+
+.ar-picker__name {
+  max-width: 100%;
+  font-size: 0.72rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-picker__grade {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-unit {
+  --elem: #8a8397;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ar-unit__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ar-unit__face {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.ar-unit__ident {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ar-unit__name {
+  font-size: 1.02rem;
+  font-weight: 900;
+}
+
+.ar-unit__grade {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-block {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ar-block__title {
+  margin: 0;
+  color: #e0c88b;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.ar-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ar-fact {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ar-points {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(4, 2, 9, 0.48);
+}
+
+.ar-points__label {
+  color: #ded6e8;
+  font-size: 0.76rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-points__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ar-points__item {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(176, 123, 224, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(176, 123, 224, 0.35);
+  color: #e6d4ff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-latent {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: rgba(46, 30, 68, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(176, 123, 224, 0.32);
+}
+
+.ar-latent__name {
+  color: #e6d4ff;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.ar-latent__desc {
+  color: #cdc3d8;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* ステータスは2列。8項目を1列に積むと、装備まで遠くなる */
+.ar-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+
+.ar-stats__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgba(4, 2, 9, 0.45);
+}
+
+.ar-stats__label {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ar-stats__value {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-gears {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ar-gear {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(4, 2, 9, 0.48);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.ar-gear__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.ar-gear__slot {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ar-gear__set {
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.ar-gear__star {
+  color: #f4d995;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.ar-gear__level {
+  margin-left: auto;
+  color: #ffd98a;
+  font-size: 0.78rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-gear__main {
+  color: #f6ecd6;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-gear__subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ar-gear__sub {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #cdc3d8;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-gear__sub--none {
+  color: var(--text-dim);
+}
+
+/* ==========================================================================
+ * 防衛の登録
+ * ========================================================================== */
+
+.ar-registered {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ar-registered__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ar-registered__head h2 {
+  margin: 0;
+}
+
+.ar-registered__at {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+ * ランキング
+ * ========================================================================== */
+
+.ar-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ar-rank h2 {
+  margin: 0;
+}
+
+.ar-rank__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/*
+ * 1行。順位・代表・名前・ランク・レート・戦績。
+ * 390px でも折り返さないよう、名前だけを可変にして他は固定幅にしてある。
+ */
+.ar-rank__row {
+  --tier: #9aa6bb;
+  display: grid;
+  grid-template-columns: 30px 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 7px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: rgba(4, 2, 9, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.ar-rank__row.is-me {
+  background: rgba(60, 44, 20, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(226, 182, 110, 0.55);
+}
+
+.ar-rank__no {
+  color: #f4d995;
+  font-size: 0.86rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ar-rank__lead {
+  font-size: 1.05rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.ar-rank__name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-rank__rating {
+  font-size: 0.86rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ar-rank__tier {
+  grid-column: 3;
+  color: var(--tier);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.ar-rank__record {
+  grid-column: 4;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ==========================================================================
+ * ショップ
+ * ========================================================================== */
+
+.ar-shop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ar-shop__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ar-shop__name {
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.ar-shop__price {
+  margin-left: auto;
+  color: #ffd98a;
+  font-size: 0.95rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ar-shop__note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.ar-shop__limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ar-shop__buy {
+  width: 100%;
+  font-size: 0.92rem;
+}
+
+/* ==========================================================================
+ * 防衛履歴
+ * ========================================================================== */
+
+.ar-hist {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ar-hist.is-win {
+  box-shadow: inset 0 0 0 1px rgba(120, 200, 150, 0.3), inset 0 1px 0 rgba(255, 232, 190, 0.07), var(--drop);
+}
+
+.ar-hist.is-lose {
+  box-shadow: inset 0 0 0 1px rgba(210, 120, 110, 0.32), inset 0 1px 0 rgba(255, 232, 190, 0.07), var(--drop);
+}
+
+.ar-hist__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ar-hist__name {
+  font-size: 0.94rem;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-hist__result {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ar-hist.is-win .ar-hist__result { color: #8fd6a8; }
+.ar-hist.is-lose .ar-hist__result { color: #ff9f8f; }
+
+.ar-hist__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--text-dim);
+  font-size: 0.73rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-hist__delta.is-up { color: #8fd6a8; }
+.ar-hist__delta.is-down { color: #ff9f8f; }
+
+.ar-hist__revenge {
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+/* ==========================================================================
+ * 幅の狭い端末(iPhone SE 相当)
+ *
+ * 390px でも壊れないことは前提。ここはさらに狭い場合の逃げ。
+ * **潰さずに畳む。** 潰すと `overflow:hidden` が中身を黙って切り落とす
+ * (ホームで実際に「試練の塔」が押せなくなった)。
+ * ========================================================================== */
+
+@media (max-width: 360px) {
+  .ar-card__units {
+    grid-template-columns: 1fr;
+  }
+
+  .ar-card__actions {
+    flex-direction: column;
+  }
+
+  .ar-stats {
+    grid-template-columns: 1fr;
+  }
+}

@@ -61,6 +61,19 @@ const SCREENS = [
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
   { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },
+  /*
+   * アリーナは中でさらに6画面に分かれる。**巡回に入れていなかった。**
+   *
+   * 一番大きい追加なのに、見ていたのは入口のトップだけだった。
+   * 対戦候補・防衛・ランキング・ショップ・防衛履歴・攻撃編成は、
+   * どれも一覧と札が縦に伸びる作りで、いちばん崩れやすい形をしている。
+   */
+  { name: "アリーナ/対戦候補", tab: "HOME", tile: "arena", tour: "arena:opponents" },
+  { name: "アリーナ/防衛編成", tab: "HOME", tile: "arena", tour: "arena:defense" },
+  { name: "アリーナ/ランキング", tab: "HOME", tile: "arena", tour: "arena:ranking" },
+  { name: "アリーナ/ショップ", tab: "HOME", tile: "arena", tour: "arena:shop" },
+  { name: "アリーナ/防衛履歴", tab: "HOME", tile: "arena", tour: "arena:history" },
+  { name: "アリーナ/攻撃編成", tab: "HOME", tile: "arena", then: "編成する" },
 ];
 
 /*
@@ -76,6 +89,14 @@ const SCREENS = [
  */
 const SIZES = [
   { label: "縦(iPhone)", width: 390, height: 844 },
+  /*
+   * 大きい方の縦。**幅が広い方が安全とは限らない。**
+   *
+   * 390 で収まる並びが 430 では隙間だらけになり、逆に高さが増えたぶん
+   * 「入りきらない時だけ出る」案内が出なくなって、下の要素が押し出される。
+   * 実機の主流が2つに割れている以上、片方だけ見るのは片方だけ触るのと同じ。
+   */
+  { label: "縦(大)", width: 430, height: 932 },
 ];
 
 /**
@@ -145,6 +166,21 @@ async function goScreen(screen) {
   const clicked = await call("eval", {
     expression: `(async () => {
       const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      /*
+       * **まず今いる階層から出る。**
+       *
+       * 下タブを押せば戻る、という前提で組んでいたが、アリーナは
+       * 中でさらに6画面に分かれていて、下タブを押してもう一度入ると
+       * **さっき開いた中の画面がそのまま出る。** そのせいでトップの目印が
+       * 見つからず、2つ目以降のアリーナ画面が丸ごと「目印が無い」になった。
+       * 戻るボタンが消えるまで押して、必ず同じところから始める。
+       */
+      for (let i = 0; i < 4; i += 1) {
+        const back = document.querySelector('.global-back');
+        if (!back) break;
+        back.click();
+        await wait(200);
+      }
       const tab = document.querySelector('[data-tour="tab:' + ${JSON.stringify(screen.tab)} + '"]');
       if (!tab) return 'タブが無い: ' + ${JSON.stringify(screen.tab)};
       tab.click();
@@ -162,6 +198,21 @@ async function goScreen(screen) {
           ? `const tile2 = document.querySelector('[data-tour="tile:' + ${JSON.stringify(screen.tile2)} + '"]');
              if (!tile2) return '2段目の枠が無い: ' + ${JSON.stringify(screen.tile2)};
              tile2.click();
+             await wait(350);`
+          : ""
+      }
+      ${
+        /*
+         * 3段目以降の目印。**`data-tour` の値をそのまま書く。**
+         *
+         * アリーナのように「絵 → 中の行き先」と2段入る画面があり、
+         * `tile:` の接頭辞が付かない目印(`arena:opponents` など)を
+         * 指せなかった。文言で探すと、ラベルを変えた回に一斉に誤報が出る。
+         */
+        screen.tour
+          ? `const mark = document.querySelector('[data-tour=' + ${JSON.stringify(JSON.stringify(screen.tour))} + ']');
+             if (!mark) return '目印が無い: ' + ${JSON.stringify(screen.tour)};
+             mark.click();
              await wait(350);`
           : ""
       }
@@ -236,7 +287,14 @@ async function main() {
 
       if (shotDir) {
         // 絶対パスで渡された時に cwd を前置しない(join だと /home/... の下へ潜り込む)
-        await call("shot", { path: resolve(shotDir, `${size.width}x${size.height}-${screen.name}.png`) });
+        /*
+         * 画面名の `/` をそのまま使うと**階層ができる。**
+         * 「アリーナ/対戦候補」が `.../390x844-アリーナ/対戦候補.png` になり、
+         * CIの `artifacts/tour/*.png` に引っかからず、
+         * **いちばん新しい画面の絵だけが成果物から抜け落ちていた。**
+         */
+        const safe = screen.name.replace(/[/\\]/g, "-");
+        await call("shot", { path: resolve(shotDir, `${size.width}x${size.height}-${safe}.png`) });
       }
 
       if (found.length > 0) failures += found.length;

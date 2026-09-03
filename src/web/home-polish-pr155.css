@@ -58,7 +58,7 @@
 .world-party{transform:translateY(-24px)!important}
 
 @media(max-width:405px){
-  .world-actions--left{width:94px!important;left:-3px!important}
+  .world-actions--left{width:94px!important;left:0!important}
   .world-actions--left .world-action{width:92px!important;min-width:92px!important;height:76px!important;min-height:76px!important}
   .world-actions--right{width:102px!important;right:-4px!important}
   .world-actions--right .world-action{width:100px!important;min-width:100px!important;height:96px!important;min-height:96px!important}

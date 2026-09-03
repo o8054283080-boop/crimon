@@ -3,6 +3,7 @@ import "./crimon-visual-system.css";
 import "./home-pop-design.css";
 import "./mobile-ux.css";
 import "./ui/tutorialBar.css";
+import "./ui/arena.css";
 import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
@@ -54,6 +55,7 @@ import { CreateSlot, applyMonsterCreate, clearMonsterCreate, describeCreatedSkil
 import { awakenLatentAbility, confirmLatentAwakening, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint } from "../game/monsterDevelopment.js";
 import { AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
 import {
+  ARENA_HISTORY_MAX,
   claimDailyLoginBonus,
   FIGHTER_NAME_MAX_LENGTH,
   LoginBonusResult,
@@ -119,17 +121,48 @@ import { DexSortKey } from "../game/monsterDexSort.js";
 import { DexFilter, EMPTY_DEX_FILTER } from "../game/monsterDexFilter.js";
 import { renderPvpArena } from "./views/pvpArena.js";
 import { renderHowToPlay } from "./views/howToPlay.js";
-import { ArenaTeamSlot } from "./views/pvpArena.js";
+import type { ArenaViewName } from "./views/pvpArena.js";
+import { buildArenaEntryBattle } from "./views/arena/model.js";
+import { arenaNpcRng, buildArenaNpcs } from "../game/arena/npc.js";
+import { buildArenaCandidates } from "../game/arena/matchmaking.js";
+import { captureArenaDefense } from "../game/arena/snapshot.js";
+import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, recordArenaMatch } from "../game/arena/match.js";
 import {
+  applyArenaSeasonRollover,
+  claimArenaSeasonReward as claimArenaSeasonRewardLocal,
+  claimArenaWeeklyReward,
+} from "../game/arena/progress.js";
+import { runPendingDefenseAttacks } from "../game/arena/defenseSim.js";
+import { arenaShopRows, buyArenaShopItem, fulfillArenaShopPurchase } from "../game/arena/shop.js";
+import { ARENA_TICKET_MAX_V2 } from "../data/arena/shop.js";
+import { arenaTierForRating } from "../data/arena/ranks.js";
+import type { ArenaTierId } from "../data/arena/ranks.js";
+import type { ArenaDefenseSnapshot, ArenaOpponentEntry } from "../game/arena/types.js";
+import {
+  arenaSyncAvailable,
+  claimArenaWeeklyReward as claimArenaWeeklyRewardRemote,
+  ensureArenaProfile,
+  fetchArenaOpponents,
+  fetchArenaRanking,
+  fetchArenaMatchHistory,
+  fetchArenaRankingAround,
+  fetchArenaState,
+  claimArenaSeasonReward,
+  purchaseArenaShopItem,
+  fetchPendingArenaShopPurchases,
+  acknowledgeArenaShopPurchase,
+  beginArenaMatch,
+  pushArenaDefense,
+  settleArenaMatch,
+} from "../net/arenaSync.js";
+import type { ArenaMatchTicket, ArenaRankingEntry } from "../net/arenaSync.js";
+import { arenaAuthUserId, ensureArenaAuth } from "../net/arenaAuth.js";
+import {
+  ARENA_TEAM_SIZE,
   advanceArenaOpponentSeed,
   applyArenaTicketRegen,
-  ArenaOpponent,
-  ArenaPeriodSettlement,
-  generateArenaOpponents,
+  arenaNextTicketAt,
   getArenaTeam,
-  resolveArenaMatch,
-  settleArenaPeriod,
-  setupArenaBattle,
   toggleArenaTeamMember,
   tryRefillArenaTickets,
   trySpendArenaTicket,
@@ -244,13 +277,7 @@ type LastRun =
   | { kind: "EQUIP_DUNGEON"; floor: DungeonFloor }
   | { kind: "LEVEL_DUNGEON"; def: LevelDungeonDef }
   | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor }
-  | { kind: "ARENA"; opponent: ArenaOpponent };
-
-/** 進行中のアリーナ1戦 */
-interface ArenaRun {
-  opponent: ArenaOpponent;
-  partyInstances: MonsterInstance[];
-}
+  | { kind: "ARENA"; entry: ArenaOpponentEntry };
 
 /**
  * 直前に登った階の決着。塔の画面はこれを見て「何が起きて戻ってきたか」を出す。
@@ -332,11 +359,35 @@ interface AppState {
   dexFilterOpen: boolean;
   /* --- アリーナ --- */
   /** 編成を編集中の枠。null なら対戦相手の一覧 */
-  arenaEditing: ArenaTeamSlot | null;
-  arenaRun: ArenaRun | null;
+  /** アリーナの中のどこを見ているか */
+  arenaView: ArenaViewName;
+  /** 詳細を開いている相手の並び位置。開いていなければ null */
+  arenaDetailIndex: number | null;
+  /** 検分している1体の位置 */
+  arenaUnitIndex: number;
+  /** 防衛に登録しようとしている顔ぶれ(まだ焼いていない) */
+  arenaDefenseDraftIds: string[];
+  /** いま並べている対戦候補。実プレイヤーとNPCが混ざる */
+  arenaCandidates: ArenaOpponentEntry[];
+  arenaCandidatesLoading: boolean;
+  arenaRankingTop: ArenaRankingEntry[];
+  arenaRankingAround: ArenaRankingEntry[];
+  arenaRankingLoading: boolean;
+  /** 自分の全国順位。未接続・未掲載なら null */
+  arenaMyRank: number | null;
+  /** いま挑んでいる相手。焼いた防衛からしか戦闘を組まない */
+  arenaEntry: ArenaOpponentEntry | null;
+  /**
+   * サーバが発行した1戦。**精算に要る対戦IDと nonce。**
+   * 未接続なら null で、その時はローカルの記録だけで進む。
+   */
+  arenaTicket: ArenaMatchTicket | null;
+  /** サーバの戦績を1度引いたか。開くたびに引き直さない */
+  arenaHistoryLoaded: boolean;
+  /** サーバへ送った攻撃編成。画面もこれから組む(別のステータスで戦わないため) */
+  arenaAttackerSnapshot: ArenaDefenseSnapshot | null;
   arenaNotice: string | null;
   /** 期間が変わった時に出す前の期のまとめ報酬。受け取るまで残す */
-  arenaSettlement: ArenaPeriodSettlement | null;
   monsterTrainingTargetId: string | null;
   monsterTrainingMaterialIds: string[];
   monsterTrainingFilter: MonsterTrainingFilter;
@@ -410,10 +461,21 @@ const state: AppState = {
   dexSortKey: "number",
   dexFilter: { ...EMPTY_DEX_FILTER },
   dexFilterOpen: false,
-  arenaEditing: null,
-  arenaRun: null,
+  arenaView: "TOP",
+  arenaTicket: null,
+  arenaHistoryLoaded: false,
+  arenaAttackerSnapshot: null,
+  arenaDetailIndex: null,
+  arenaUnitIndex: 0,
+  arenaDefenseDraftIds: [],
+  arenaCandidates: [],
+  arenaCandidatesLoading: false,
+  arenaRankingTop: [],
+  arenaRankingAround: [],
+  arenaRankingLoading: false,
+  arenaMyRank: null,
+  arenaEntry: null,
   arenaNotice: null,
-  arenaSettlement: null,
   monsterTrainingTargetId: null,
   monsterTrainingMaterialIds: [],
   monsterTrainingFilter: { ...EMPTY_MONSTER_TRAINING_FILTER },
@@ -492,12 +554,24 @@ let persistState: PersistState = "UNSUPPORTED";
     savePlayerState(state.player);
   }
 
-  // アリーナ。期が変わっていれば前の期のまとめ報酬を精算し、
-  // 挑戦券の自然回復を反映する(起動のたびに1度だけ)
-  const settlement = settleArenaPeriod(state.player);
-  if (settlement) state.arenaSettlement = settlement;
+  /*
+   * アリーナ。挑戦券の自然回復だけを反映する(起動のたびに1度だけ)。
+   *
+   * **旧アリーナの週次精算(`settleArenaPeriod`)はここから外した。**
+   * 新しいシーズン制と二重に走っていて、実測でこうなっていた:
+   *
+   *   - 旧の週次報酬(💎3,400 / 30万G / 召喚の書8)が**画面に一言も出ずに**入る
+   *     (`state.arenaSettlement` はどこにも描画されていなかった)
+   *   - `arenaSeasonBestPoints` を今のレートまで潰す。新の週間報酬は
+   *     「下がっても取り上げない」ために最高レートで等級を決めているので、
+   *     **マスター→プラチナIIへ降格**していた
+   *   - `arenaSeasonBattles/Wins` を毎週0に戻す。画面は「今シーズンの戦績」と
+   *     出しているのに、実際は週で消えていた
+   *
+   * 週の区切りも3つ(旧=木曜/新=月曜/ショップ=火曜)に割れていた。
+   * 精算はシーズン制の側(`applyArenaSeasonRollover` と週間報酬)に一本化する。
+   */
   applyArenaTicketRegen(state.player);
-  if (settlement) savePlayerState(state.player);
 }
 
 const rootCandidate = document.getElementById("app");
@@ -555,10 +629,24 @@ interface RouteState {
   monsterTrainingTargetId: string | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
   selectedGoldDungeonFloor: number | null;
-  arenaEditing: ArenaTeamSlot | null;
   createTargetId: string | null;
   createMenu: CreateMenu;
   partyEditMode: PartyEditMode;
+  /*
+   * アリーナは1つの画面の中でさらに6つに分かれる。**ここに入れ忘れていた。**
+   *
+   * 巡回をアリーナの中まで広げて分かった不具合が2つある。どちらもこれが原因:
+   *
+   *   1. 中の画面で「戻る」を押すと、アリーナのトップを飛ばしてホームまで戻る
+   *      (トップ→対戦候補で見ている場所が変わっていないことになり、履歴が積まれない)
+   *   2. ホームから入り直しても、前に開いた中の画面がそのまま出る
+   *      (`navigate` が畳んでいない)
+   *
+   * 画面の中で行き先が分かれるなら、その行き先も「見ている場所」の一部にする。
+   */
+  arenaView: ArenaViewName;
+  arenaDetailIndex: number | null;
+  arenaUnitIndex: number;
 }
 
 const ROUTE_FIELDS = [
@@ -566,7 +654,8 @@ const ROUTE_FIELDS = [
   "equipmentSlotFilter", "equipmentReturnMonsterId", "equipmentSelecting", "farmEquipmentOpen",
   "farmEquipmentDetailId", "selectedStageId", "selectedDifficulty", "selectedDungeonFloor", "selectedDungeonKind",
   "selectedDexEntryId", "monsterTrainingTargetId", "selectedLevelDungeonTier",
-  "selectedGoldDungeonFloor", "arenaEditing", "createTargetId", "createMenu", "partyEditMode",
+  "selectedGoldDungeonFloor", "createTargetId", "createMenu", "partyEditMode",
+  "arenaView", "arenaDetailIndex", "arenaUnitIndex",
 ] as const satisfies readonly (keyof RouteState)[];
 
 function routeState(): RouteState {
@@ -654,6 +743,15 @@ function navigate(screen: ScreenName): void {
   state.monsterTrainingMaterialIds = [];
   state.autoFarmResult = null;
   state.viewingBackgroundFarmJobId = null;
+  /*
+   * アリーナは中で6画面に分かれる。**畳んでから入る。**
+   * 畳まないと、ホームから入り直しても前に開いた中の画面がそのまま出る
+   * (巡回をアリーナの中まで広げて見つかった)。
+   */
+  state.arenaView = "TOP";
+  state.arenaDetailIndex = null;
+  state.arenaUnitIndex = 0;
+  state.arenaNotice = null;
   // 旧式の戦闘画面連鎖だけを破棄する。保存型ジョブは別画面でも継続する。
   state.farmRun = null;
   // 塔の案内は次の画面へ持ち越さない。**登坂そのもの(trialTowerRun)は消さない**
@@ -1133,7 +1231,8 @@ function startFromLastRun(last: LastRun): void {
       startGoldDungeonFloor(last.floor);
       break;
     case "ARENA":
-      startArenaMatch(last.opponent);
+      // 同じ相手へもう一度。焼いた防衛を持っているので、そのまま組み直せる
+      startArenaMatch(last.entry);
       break;
   }
 }
@@ -1682,52 +1781,398 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
  * アリーナ(対人戦)
  * ========================================================================== */
 
-/** 今の点数帯から、並べる挑戦相手を作る。同じ点数・同じ種なら同じ顔ぶれになる */
-function currentArenaOpponents(): ArenaOpponent[] {
-  return generateArenaOpponents(state.player.arenaPoints, state.player.arenaOpponentSeed);
+/** 何人並べるか。実プレイヤーが足りない分はNPCで埋める */
+const ARENA_CANDIDATE_COUNT = 5;
+
+/**
+ * 自分の識別子。
+ *
+ * **対戦の種を流用しない。** 種は「相手を変える」で進むので、
+ * 押すたびに自分のIDが変わってしまい、自分を候補から外す判定も
+ * ランキングの自分判定も成立しなくなる。控えに焼いたUUIDを使う。
+ */
+/**
+ * 自分のアリーナID。
+ *
+ * **繋がっている時は `auth.uid()` が正。** 端末が作ったUUIDは、
+ * オフラインで自分を候補から外すためだけの器で、名乗るだけで誰にでもなれる。
+ * サーバ側の判定(自分除外・順位表の自分・防衛の持ち主)は
+ * すべて `auth.uid()` で行うので、画面もそれに合わせないと
+ * 「サーバは他人だと言っているのに、画面では自分」がすれ違う。
+ */
+function arenaSelfId(): string {
+  return arenaAuthUserId() ?? state.player.arenaLocalId;
 }
 
-function startArenaMatch(opponent: ArenaOpponent): void {
+/**
+ * サーバに繋ぐ。**アリーナを開いた時に1度だけ。**
+ *
+ * 順番に意味がある:
+ *
+ *   1. 匿名ログイン    …… `auth.uid()` が無いと、書き込み系のRPCは全て弾かれる
+ *   2. プロフィール    …… 順位表に載るための行。無いと自分だけ表に出ない
+ *   3. サーバの状態     …… レート・コイン・挑戦券は**サーバが正**。
+ *                          ここで引き寄せないと、画面だけ古い数字を出し続ける
+ *
+ * どれも失敗してよい。失敗したらオフラインのアリーナとして動く。
+ * **`connected` が false の間は、通貨を動かす操作をサーバへ送らない。**
+ */
+let arenaConnecting: Promise<boolean> | null = null;
+type ArenaConnectionStatus = "UNCONFIGURED" | "IDLE" | "CONNECTING" | "ONLINE" | "OFFLINE";
+let arenaConnectionStatus: ArenaConnectionStatus = arenaSyncAvailable() ? "IDLE" : "UNCONFIGURED";
+
+async function connectArena(): Promise<boolean> {
+  if (!arenaSyncAvailable()) {
+    arenaConnectionStatus = "UNCONFIGURED";
+    return false;
+  }
+  if (arenaConnecting) return arenaConnecting;
+  arenaConnectionStatus = "CONNECTING";
+  arenaConnecting = (async () => {
+    const auth = await ensureArenaAuth();
+    if (!auth) {
+      arenaConnectionStatus = "OFFLINE";
+      return false;
+    }
+    const profile = await ensureArenaProfile(state.player.fighterName || "プレイヤー");
+    if (!profile) {
+      arenaConnectionStatus = "OFFLINE";
+      return false;
+    }
+    const remote = await fetchArenaState();
+    if (!remote) {
+      arenaConnectionStatus = "OFFLINE";
+      return false;
+    }
+    applyArenaServerState(remote);
+    arenaConnectionStatus = "ONLINE";
+    await reconcileArenaShopPurchases();
+    return true;
+  })().finally(() => { arenaConnecting = null; });
+  return arenaConnecting;
+}
+
+/**
+ * サーバが持っている数字を控えへ写す。
+ *
+ * **画面の数字はサーバの値に合わせる。** ローカルで進めた値を残すと、
+ * 「買ったのに減っていない」「勝ったのに上がっていない」がその場では
+ * 起きないまま、次に開いた時にまとめて飛ぶ。ずれは早く潰す。
+ */
+function applyArenaServerState(remote: Record<string, unknown>): void {
+  /*
+   * `arena_state()` は入れ子で返る:
+   *   { seasonId, profile, standing: { rating, best_rating, ... },
+   *     wallet: { coins, tickets, ... } }
+   *
+   * **平らだと思って読んでいて、1つも取り込めていなかった。**
+   * 形が違えば黙って何もしないので、気づく手がかりも出なかった。
+   */
+  const nested = (group: string, key: string): number | null => {
+    const box = remote[group];
+    if (typeof box !== "object" || box === null) return null;
+    const value = (box as Record<string, unknown>)[key];
+    return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+  };
+
+  const rating = nested("standing", "rating");
+  const best = nested("standing", "best_rating");
+  const coins = nested("wallet", "coins");
+  const tickets = nested("wallet", "tickets");
+  if (rating !== null) state.player.arenaPoints = Math.max(0, rating);
+  if (best !== null) state.player.arenaSeasonBestPoints = Math.max(0, best);
+  if (coins !== null) state.player.arenaCoins = Math.max(0, coins);
+  if (tickets !== null) state.player.arenaTickets = Math.max(0, tickets);
+  savePlayerState(state.player);
+}
+
+/** 繋がっている時の残高は**サーバの値が正**。受け取ったら必ず合わせる */
+function adoptArenaCoinBalance(remote: Record<string, unknown> | null): void {
+  if (!remote) return;
+  const balance = remote.coinBalance;
+  if (typeof balance === "number" && Number.isFinite(balance)) {
+    state.player.arenaCoins = Math.max(0, Math.round(balance));
+  }
+}
+
+let arenaShopReconciling: Promise<number> | null = null;
+
+/** 購入成立後に通信が切れても、未受取の領収書から安全に再開する。 */
+async function reconcileArenaShopPurchases(): Promise<number> {
+  if (arenaShopReconciling) return arenaShopReconciling;
+  arenaShopReconciling = (async () => {
+    const pending = await fetchPendingArenaShopPurchases();
+    let fulfilled = 0;
+    for (const receipt of pending) {
+      const result = fulfillArenaShopPurchase(
+        state.player,
+        receipt.itemId,
+        receipt.purchaseId,
+        receipt.quantity,
+        receipt.purchasedAt,
+      );
+      if (!result.ok) continue;
+      // **先に控えへ保存する。** 保存後に通信が切れても購入IDが二重付与を止める。
+      savePlayerState(state.player);
+      if (await acknowledgeArenaShopPurchase(receipt.purchaseId)) fulfilled += result.alreadyFulfilled ? 0 : 1;
+    }
+    return fulfilled;
+  })().finally(() => { arenaShopReconciling = null; });
+  return arenaShopReconciling;
+}
+
+/**
+ * 対戦候補を組み直す。
+ *
+ * **実プレイヤーを先に、足りない分をNPCで埋める。** 人口が少ない前提なので、
+ * 実プレイヤーが0人でも必ず5人並ぶ。未接続なら `fetchArenaOpponents` が
+ * 通信せず空を返すので、そのままNPCだけになる。
+ */
+async function refreshArenaCandidates(): Promise<void> {
+  const rating = state.player.arenaPoints;
+  const seed = state.player.arenaOpponentSeed;
+  const npcs = buildArenaNpcs(rating, seed, ARENA_CANDIDATE_COUNT * 2);
+  // まずNPCだけで即座に並べる。通信を待つ間、画面が空にならないようにする
+  state.arenaCandidates = buildArenaCandidates([], npcs, {
+    count: ARENA_CANDIDATE_COUNT,
+    selfId: arenaSelfId(),
+    recentIds: state.player.arenaRecentOpponentIds,
+  });
+  if (!(await connectArena())) return;
+  state.arenaCandidatesLoading = true;
+  const players = await fetchArenaOpponents(arenaSelfId(), rating, ARENA_CANDIDATE_COUNT);
+  state.arenaCandidatesLoading = false;
+  // 戻ってくる頃に別の画面へ移っていることがある。その時は捨てる
+  if (state.screen !== "ARENA") return;
+  state.arenaCandidates = buildArenaCandidates(players, npcs, {
+    count: ARENA_CANDIDATE_COUNT,
+    selfId: arenaSelfId(),
+    recentIds: state.player.arenaRecentOpponentIds,
+  });
+  render();
+}
+
+/**
+ * シーズン報酬を受け取る。
+ *
+ * **繋がっていればサーバが先。** 二重受取はサーバの一意制約
+ * (`arena_reward_claims_once`)が物理的に止める。そこが通ってから手元へ配る。
+ * 未接続なら手元だけで完結する(オフラインでも遊べる状態を壊さない)。
+ */
+async function claimArenaSeasonRewardBoth(bestRatingOfEndedSeason: number): Promise<void> {
+  let remote: Record<string, unknown> | null = null;
+  let verifiedTierId: ArenaTierId | undefined;
+  if (await connectArena()) {
+    const claimed = await claimArenaSeasonReward();
+    if (!claimed) return;
+    if (!claimed.ok) return;
+    remote = { coinBalance: claimed.coinBalance };
+    verifiedTierId = claimed.tierId ?? undefined;
+  }
+  const result = claimArenaSeasonRewardLocal(
+    state.player,
+    bestRatingOfEndedSeason,
+    Date.now(),
+    verifiedTierId,
+  );
+  adoptArenaCoinBalance(remote);
+  savePlayerState(state.player);
+  if (!result.ok) return;
+  state.arenaNotice = `${result.tierName} のシーズン報酬を受け取りました`;
+  render();
+}
+
+/**
+ * サーバの戦績を控えへ写す。
+ *
+ * 繋がっている時、防衛の記録を作るのは**攻めてきた相手**であって自分ではない。
+ * だから手元では作れない。サーバの `arena_matches` から引いてくる。
+ */
+async function refreshArenaHistory(): Promise<void> {
+  const records = await fetchArenaMatchHistory(arenaSelfId(), ARENA_HISTORY_MAX);
+  if (records.length === 0) return;
+  state.player.arenaMatchHistory = records.slice(0, ARENA_HISTORY_MAX);
+  savePlayerState(state.player);
+  render();
+}
+
+/** ランキングを引き直す。未接続なら何もしない(嘘の順位を出さないため) */
+async function refreshArenaRanking(): Promise<void> {
+  if (!(await connectArena())) {
+    state.arenaRankingTop = [];
+    state.arenaRankingAround = [];
+    state.arenaMyRank = null;
+    return;
+  }
+  state.arenaRankingLoading = true;
+  render();
+  const [top, around] = await Promise.all([
+    fetchArenaRanking(100),
+    fetchArenaRankingAround(arenaSelfId(), 5),
+  ]);
+  state.arenaRankingLoading = false;
+  state.arenaRankingTop = top;
+  state.arenaRankingAround = around;
+  state.arenaMyRank = around.find((entry) => entry.userId === arenaSelfId())?.rank ?? null;
+  render();
+}
+
+function startArenaMatch(entry: ArenaOpponentEntry): void {
   const party = getArenaTeam(state.player, "OFFENSE");
   if (party.length === 0) {
     state.arenaNotice = "攻撃編成を組んでください";
     render();
     return;
   }
+  if (entry.defense.units.length === 0) {
+    state.arenaNotice = "この相手は防衛編成を登録していません";
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
   // アリーナはスタミナではなく挑戦券で回す。育成の周回と取り合いにしないため
-  if (!trySpendArenaTicket(state.player).ok) {
+  applyArenaTicketRegen(state.player);
+  if (state.player.arenaTickets <= 0) {
     state.arenaNotice = "挑戦券が足りません";
     playSfx("denied", 0.7);
     render();
     return;
   }
-  savePlayerState(state.player);
+
   state.arenaNotice = null;
-  state.lastRun = { kind: "ARENA", opponent };
-  state.arenaRun = { opponent, partyInstances: party };
-  state.screen = "ARENA_BATTLE";
+  state.lastRun = { kind: "ARENA", entry };
+  state.arenaEntry = entry;
+  state.arenaTicket = null;
+  state.arenaAttackerSnapshot = null;
+
+  /*
+   * **繋がっているなら、始める前にサーバへ1戦を発行してもらう。**
+   *
+   * 返ってくるのは対戦ID・nonce・**サーバが決めた乱数の種**、そして
+   * 相手が実プレイヤーならサーバが持っている防衛編成。
+   *
+   * ここを待たずに戦闘を始めていた頃は、画面が `Math.random` で戦い、
+   * サーバは別の種で戦い直していた。**同じ戦いを2回やっているつもりで、
+   * 実際には別の戦いだった。** 勝ったのに負け、が普通に起きる。
+   * だから待つ。待つ間は「準備しています」と出す。
+   *
+   * 発行できなければ(未接続・通信断)ローカルだけで進む。
+   * その時は勝敗も手元の計算になる——オフラインで遊べる状態は壊さない。
+   */
+  if (!arenaSyncAvailable()) {
+    trySpendArenaTicket(state.player);
+    savePlayerState(state.player);
+    state.screen = "ARENA_BATTLE";
+    render();
+    return;
+  }
+
+  state.arenaNotice = "対戦を準備しています…";
   render();
+
+  // 攻撃編成も防衛と同じ形で焼く。**サーバは同じ検分をかける**
+  const attackerSnapshot = captureArenaDefense(party, state.player.equipment);
+
+  void (async () => {
+    const ticket = (await connectArena())
+      ? await beginArenaMatch({
+        kind: entry.kind,
+        attackerSnapshot,
+        opponentId: entry.kind === "PLAYER" ? entry.id : null,
+        opponentSeed: entry.kind === "NPC" ? String(state.player.arenaOpponentSeed) : null,
+        opponentIndex: entry.kind === "NPC" ? (entry.npcGenerationIndex ?? entry.index) : null,
+        opponentCount: entry.kind === "NPC" ? ARENA_CANDIDATE_COUNT * 2 : null,
+        opponentName: entry.name,
+      })
+      : null;
+
+    // 待っている間に別の画面へ移っていることがある。その時は始めない
+    if (state.arenaEntry !== entry) return;
+
+    if (ticket) {
+      // 挑戦券はサーバが引いた。**手元で二重に引かない**
+      state.arenaTicket = ticket;
+      state.arenaAttackerSnapshot = attackerSnapshot;
+      state.player.arenaTickets = ticket.tickets;
+    } else {
+      state.arenaNotice = null;
+      trySpendArenaTicket(state.player);
+    }
+    savePlayerState(state.player);
+    state.arenaNotice = null;
+    state.screen = "ARENA_BATTLE";
+    render();
+  })();
 }
 
+/**
+ * 決着を反映する。
+ *
+ * **画面はレートもコインも触らない。** どちらもいくら動くかは
+ * `recordArenaMatch` が決める(`game/arena/match.ts`)。
+ * ここがやるのは、その結果を見せることだけ。
+ */
 function finishArenaMatch(won: boolean): void {
-  const run = state.arenaRun;
-  if (!run) return;
+  const entry = state.arenaEntry;
+  if (!entry) return;
 
-  const result = resolveArenaMatch(state.player, run.opponent, won);
+  const before = arenaTierForRating(state.player.arenaPoints);
+  const outcome = recordArenaMatch(state.player, { opponent: entry, won, side: "OFFENSE" });
+  const after = arenaTierForRating(outcome.ratingAfter);
   savePlayerState(state.player);
 
-  const rankLine =
-    result.rankChange === "UP"
-      ? `${result.rankAfter.name}へ昇格！`
-      : result.rankChange === "DOWN"
-        ? `${result.rankAfter.name}へ降格`
-        : null;
+  /*
+   * **繋がっていれば、勝敗そのものをサーバに決めてもらう。**
+   *
+   * 送るのは「この対戦を精算してくれ」だけ。勝敗を送る欄が無い。
+   * Edge Function が発行時の種と編成で戦闘を回し直し、そこで出た
+   * 勝敗で確定する。同じ入力からは同じ結果しか出ないので、
+   * 画面で見た決着と食い違うことはない。
+   *
+   * 失敗しても進行は止めない。ローカルの記録だけで遊べる状態を保つ。
+   */
+  void (async () => {
+    const ticket = state.arenaTicket;
+    state.arenaTicket = null;
+    if (!ticket) return;
+    const report = await settleArenaMatch(ticket.matchId, ticket.nonce);
+    if (!report) return;
+    state.player.arenaPoints = report.rating;
+    state.player.arenaCoins = report.coinBalance;
+    state.player.arenaTickets = report.tickets;
+    if (state.player.arenaPoints > state.player.arenaSeasonBestPoints) {
+      state.player.arenaSeasonBestPoints = state.player.arenaPoints;
+    }
+    const record = state.player.arenaMatchHistory.find((item) => item.id === outcome.record.id);
+    if (record) {
+      // **勝敗もサーバの答えを控える。** 種と編成が同じなので普通は一致するが、
+      // 一致しなかった時に手元の言い分だけが残るのはおかしい
+      record.won = report.won;
+      record.ratingDelta = report.ratingDelta;
+      record.ratingAfter = report.rating;
+      record.coins = report.coins;
+    }
+    savePlayerState(state.player);
+  })();
 
+  const rankLine = outcome.tierChanged
+    ? outcome.ratingAfter > outcome.ratingBefore
+      ? `${after.name}へ昇格！`
+      : `${after.name}へ降格`
+    : null;
+  void before;
+
+  /*
+   * 結果画面は `goldEarned` などが全部0だと「獲得したものはありません」と出る。
+   * アリーナで手に入るのはレートとコインなので、**場所の名前に添えて必ず見せる。**
+   * (レートの増減はアリーナ画面へ戻るまで出ない `arenaNotice` にしか無かった)
+   */
+  const gainLine = `${outcome.record.ratingDelta >= 0 ? "+" : ""}${outcome.record.ratingDelta} レート ・ 🎫+${outcome.record.coins}`;
   state.stageResult = {
     cleared: won,
-    stageName: `アリーナ ${run.opponent.name}`,
-    goldEarned: result.goldEarned,
-    crystalEarned: result.crystalEarned,
+    stageName: `アリーナ ${entry.name}（${gainLine}）`,
+    goldEarned: 0,
+    crystalEarned: 0,
     wavesCleared: won ? 1 : 0,
     totalWaves: 1,
     levelUps: [],
@@ -1735,17 +2180,19 @@ function finishArenaMatch(won: boolean): void {
     dropStar: null,
     equipmentDrop: null,
     pigDrop: null,
-    summonScrollDropped: result.scrollEarned > 0,
+    summonScrollDropped: false,
     fighterLevelsGained: 0,
   };
-  // 点数の増減と昇降格は、勝敗そのものと同じくらい見たい情報
+  // レートの増減と昇降格は、勝敗そのものと同じくらい見たい情報
   state.arenaNotice = [
-    `${result.pointDelta >= 0 ? "+" : ""}${result.pointDelta} pt (${result.pointsAfter} pt)`,
+    `${outcome.record.ratingDelta >= 0 ? "+" : ""}${outcome.record.ratingDelta} レート（${outcome.ratingAfter}）`,
+    `アリーナコイン +${outcome.record.coins}`,
     rankLine,
   ]
     .filter(Boolean)
     .join(" / ");
-  state.arenaRun = null;
+  state.arenaEntry = null;
+  state.arenaCandidates = [];
   enterStageResult();
 }
 
@@ -1863,17 +2310,41 @@ function renderCurrentTowerBattle(): BattleViewHandle {
 }
 
 function renderCurrentArenaBattle(): BattleViewHandle {
-  const run = state.arenaRun;
-  if (!run) throw new Error("arenaRun is not set");
+  const entry = state.arenaEntry;
+  if (!entry) throw new Error("arenaEntry is not set");
 
-  const setup = setupArenaBattle(run.partyInstances, run.opponent, state.player.equipment);
-  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+  /*
+   * **敵側は焼いた防衛からしか作らない。**
+   * 相手の手持ちを今から読み直すと、登録後に本人が装備を外しただけで
+   * 相手の画面の編成が崩れる。
+   */
+  /*
+   * **相手はサーバが控えた編成を優先する。**
+   * 発行の時点で固定してあるので、待っている間に相手が防衛を替えても
+   * この対戦の相手は替わらない。
+   */
+  const ticket = state.arenaTicket;
+  const opponent = ticket?.defenderSnapshot
+    ? { ...entry, defense: ticket.defenderSnapshot }
+    : entry;
+  const setup = buildArenaEntryBattle(
+    getArenaTeam(state.player, "OFFENSE"), opponent, state.player.equipment, state.arenaAttackerSnapshot);
+  /*
+   * **乱数の種もサーバのものを使う。**
+   *
+   * ここを `Math.random` のままにしていた時は、画面とサーバが
+   * 別々の戦いをしていた(同じ戦いを2回やっているつもりで)。
+   * 戦闘エンジンは種を渡せば決定的なので、同じ種なら同じ経過になる。
+   * 未接続なら種は無い——その時は勝敗も手元の計算なので、食い違いようがない。
+   */
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs,
+    ticket ? { rng: arenaNpcRng(ticket.battleSeed | 0) } : {});
 
   return renderBattleView({
     engine,
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
-    title: `vs ${run.opponent.name}`,
+    title: `vs ${entry.name}`,
     // 対人戦は観客のいる闘技場。それ自体がアリーナの空気になっている
     venue: "duel",
     resultLabel: (winner) => (winner === "PLAYER" ? "🏆 結果を見る" : "アリーナに戻る"),
@@ -2459,48 +2930,260 @@ function render(): void {
       break;
     }
 
-    case "ARENA":
+    case "ARENA": {
+      if (arenaConnectionStatus === "IDLE") void connectArena().then(() => render());
+      const arenaOnline = arenaConnectionStatus === "ONLINE";
+      const arenaOffline = arenaConnectionStatus === "UNCONFIGURED" || arenaConnectionStatus === "OFFLINE";
+      /*
+       * シーズンが変わっていたら、開いた時に締める。
+       * **画面を開く前に必ず通る場所でやる。** 遊んでいる最中に
+       * レートが勝手に変わると、何が起きたのか分からない。
+       */
+      const rollover = applyArenaSeasonRollover(state.player);
+      if (rollover.changed) {
+        savePlayerState(state.player);
+        // 締まったシーズンの報酬を受け取る。**繋がっていればサーバが先**
+        void claimArenaSeasonRewardBoth(rollover.ratingBefore);
+      }
+      /*
+       * 留守中に攻められた分をさばく。
+       *
+       * **繋がっている時はやらない。** 繋がっていれば、攻めてくるのは
+       * 本物のプレイヤーで、その結果はサーバの `arena_matches` に積まれる。
+       * その上でこちらでもNPCに攻めさせると、**サーバが知らないレートの増減**が
+       * 手元だけで起きて、次に開いた時にまとめて飛ぶ。
+       *
+       * オフラインでだけ、NPCが防衛へ挑んでくる。人口任せにすると
+       * 「登録すると攻められるようになります」が嘘になるので。
+       */
+      if (arenaOffline) {
+        const defended = runPendingDefenseAttacks(state.player);
+        if (defended.attacks > 0) {
+          savePlayerState(state.player);
+          state.arenaNotice = `留守中に${defended.attacks}回攻められました（${defended.held}回退けた / `
+            + `${defended.ratingDelta >= 0 ? "+" : ""}${defended.ratingDelta} レート）`;
+        }
+      } else if (arenaOnline && !state.arenaHistoryLoaded) {
+        // 繋がっている時の戦績は**サーバの記録が正**。攻めも守りも同じ表から来る
+        state.arenaHistoryLoaded = true;
+        void refreshArenaHistory();
+      }
+      if (state.arenaCandidates.length === 0 && !state.arenaCandidatesLoading) void refreshArenaCandidates();
       content = renderPvpArena({
         player: state.player,
-        opponents: currentArenaOpponents(),
-        editing: state.arenaEditing,
+        view: state.arenaView,
         notice: state.arenaNotice,
-        settlement: state.arenaSettlement,
-        onEdit: (slot) => {
-          state.arenaEditing = slot;
+        online: arenaOnline,
+        myRank: state.arenaMyRank,
+        ticketMax: ARENA_TICKET_MAX_V2,
+        nextTicketAt: arenaNextTicketAt(state.player),
+        candidates: state.arenaCandidates,
+        candidatesLoading: state.arenaCandidatesLoading,
+        detailEntry: state.arenaDetailIndex === null ? null : (state.arenaCandidates[state.arenaDetailIndex] ?? null),
+        unitIndex: state.arenaUnitIndex,
+        ranking: {
+          loading: state.arenaRankingLoading,
+          top: state.arenaRankingTop,
+          around: state.arenaRankingAround,
+          myUserId: arenaOnline ? arenaSelfId() : null,
+        },
+        shopRows: arenaShopRows(state.player),
+        history: arenaDefenseHistory(state.player).map((record) => ({
+          record,
+          block: arenaRevengeBlock(record, state.player.arenaTickets),
+        })),
+        defenseDraftIds: state.arenaDefenseDraftIds,
+        offenseMembers: getArenaTeam(state.player, "OFFENSE"),
+        onGo: (view) => {
+          state.arenaView = view;
           state.arenaNotice = null;
+          if (view !== "OPPONENT_DETAIL") state.arenaDetailIndex = null;
+          if (view === "RANKING" && state.arenaRankingTop.length === 0) void refreshArenaRanking();
+          if (view === "DEFENSE" && state.arenaDefenseDraftIds.length === 0) {
+            // 登録済みの顔ぶれを下敷きにする。ゼロから選び直させない
+            state.arenaDefenseDraftIds = [...state.player.arenaDefenseIds];
+          }
           render();
         },
-        onToggleMember: (slot, instanceId) => {
-          toggleArenaTeamMember(state.player, slot, instanceId);
-          savePlayerState(state.player);
+        onOpenOpponent: (entry) => {
+          state.arenaDetailIndex = entry.index;
+          state.arenaUnitIndex = 0;
+          state.arenaView = "OPPONENT_DETAIL";
+          render();
+        },
+        onSelectUnit: (index) => {
+          state.arenaUnitIndex = index;
           render();
         },
         onChallenge: startArenaMatch,
+        onReroll: () => {
+          // 券は減らさない。並んだ相手がどれも噛み合わない時に
+          // 券を捨てて選び直させるのは理不尽なので
+          advanceArenaOpponentSeed(state.player);
+          savePlayerState(state.player);
+          state.arenaCandidates = [];
+          void refreshArenaCandidates();
+          render();
+        },
         onRefillTickets: () => {
           const result = tryRefillArenaTickets(state.player);
           state.arenaNotice = result.ok ? "挑戦券を回復しました" : (result.reason ?? "回復できませんでした");
           if (result.ok) savePlayerState(state.player);
           render();
         },
-        onRerollOpponents: () => {
-          // 券は減らさない。並んだ3人がどれも噛み合わない時に
-          // 券を捨てて選び直させるのは理不尽なので
-          advanceArenaOpponentSeed(state.player);
+        onClaimWeekly: () => {
+          /*
+           * **繋がっている時は、先にサーバへ通す。**
+           * 二重受取はサーバの一意制約が止める。そこが通ってから配る。
+           */
+          void (async () => {
+            let remote: Record<string, unknown> | null = null;
+            let verifiedTierId: ArenaTierId | undefined;
+            if (await connectArena()) {
+              const claimed = await claimArenaWeeklyRewardRemote();
+              if (!claimed || !claimed.ok) {
+                state.arenaNotice = claimed?.code === "ALREADY_CLAIMED"
+                  ? "今週のランク報酬は受け取り済みです"
+                  : "受け取れませんでした（時間をおいて試してください）";
+                render();
+                return;
+              }
+              remote = { coinBalance: claimed.coinBalance };
+              verifiedTierId = claimed.tierId ?? undefined;
+            }
+            const result = claimArenaWeeklyReward(state.player, Date.now(), verifiedTierId);
+            adoptArenaCoinBalance(remote);
+            state.arenaNotice = result.ok
+              ? `${result.tierName} の週間報酬を受け取りました`
+              : (result.reason ?? "受け取れませんでした");
+            if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
+            render();
+          })();
+        },
+        onToggleOffenseMember: (instanceId) => {
+          toggleArenaTeamMember(state.player, "OFFENSE", instanceId);
           savePlayerState(state.player);
           render();
         },
-        onDismissSettlement: () => {
-          state.arenaSettlement = null;
+        onToggleDefenseDraft: (instanceId) => {
+          const index = state.arenaDefenseDraftIds.indexOf(instanceId);
+          if (index >= 0) state.arenaDefenseDraftIds.splice(index, 1);
+          else if (state.arenaDefenseDraftIds.length < ARENA_TEAM_SIZE) state.arenaDefenseDraftIds.push(instanceId);
           render();
         },
-        onViewDetail: (instanceId) => {
+        onRegisterDefense: () => {
+          const members = state.arenaDefenseDraftIds
+            .map((id) => state.player.monsters.find((m) => m.id === id))
+            .filter((m): m is NonNullable<typeof m> => m !== undefined);
+          if (members.length === 0) {
+            state.arenaNotice = "防衛編成を選んでください";
+            playSfx("denied", 0.7);
+            render();
+            return;
+          }
+          /*
+           * **登録した瞬間の姿を焼く。** 焼いた後に本人が装備を外しても
+           * 売っても、相手の画面の防衛は1バイトも変わらない。
+           */
+          state.player.arenaDefenseIds = [...state.arenaDefenseDraftIds];
+          state.player.arenaDefenseSnapshot = captureArenaDefense(members, state.player.equipment);
+          savePlayerState(state.player);
+          // 繋がっていれば上げる。失敗しても控えには残っているので進行は止めない
+          void pushArenaDefense(state.player.arenaDefenseSnapshot);
+          state.arenaNotice = `防衛編成を登録しました（${members.length}体）`;
+          playSfx("stageClear");
+          render();
+        },
+        onBuy: (itemId) => {
+          /*
+           * **繋がっている時は、先にサーバへ通す。**
+           *
+           * コインは対戦でサーバが決めた値を持っている。購入だけローカルで
+           * 引くと、残高が両側で食い違う(サーバは減っていない)。
+           * 価格・在庫・上限・残高はサーバが見るので、そこが通ってから配る。
+           */
+          void (async () => {
+            if (await connectArena()) {
+              const receipt = await purchaseArenaShopItem(itemId);
+              if (!receipt) {
+                state.arenaNotice = "購入できませんでした（上限・残高・在庫を確認してください）";
+                playSfx("denied", 0.7);
+                render();
+                return;
+              }
+              const fulfilled = fulfillArenaShopPurchase(
+                state.player,
+                receipt.itemId,
+                receipt.purchaseId,
+                receipt.quantity,
+                receipt.purchasedAt,
+              );
+              if (!fulfilled.ok) {
+                state.arenaNotice = "購入は成立しています。受取処理を次回接続時に再開します";
+                playSfx("denied", 0.7);
+                render();
+                return;
+              }
+              state.player.arenaCoins = receipt.coinBalance;
+              // 付与済みIDを保存してからサーバへ受取完了を返す。
+              savePlayerState(state.player);
+              await acknowledgeArenaShopPurchase(receipt.purchaseId);
+              state.arenaNotice = `${fulfilled.item?.name ?? "商品"}を購入しました`;
+              playSfx("stageClear");
+              render();
+              return;
+            }
+            const result = buyArenaShopItem(state.player, itemId);
+            state.arenaNotice = result.ok
+              ? `${result.item?.name ?? "商品"}を購入しました`
+              : (result.reason ?? "購入できませんでした");
+            if (result.ok) { savePlayerState(state.player); playSfx("stageClear"); }
+            else playSfx("denied", 0.7);
+            render();
+          })();
+        },
+        onRevenge: (record) => {
+          if (arenaRevengeBlock(record, state.player.arenaTickets) !== null) {
+            playSfx("denied", 0.7);
+            return;
+          }
+          /*
+           * **戦う前に印を付ける。** 結果で変えると、負けた時に
+           * 何度でも挑み直せてしまう。
+           */
+          const target = state.arenaCandidates.find((entry) => entry.name === record.opponentName);
+          if (!target) {
+            // **印を付けずに戻す。** 挑めていないのに1回きりの権利を使わせない
+            state.arenaNotice = "相手が見つかりませんでした。対戦候補から挑んでください";
+            state.arenaView = "OPPONENTS";
+            render();
+            return;
+          }
+          /*
+           * **戦う前に印を付ける。** 結果で変えると、負けた時に何度でも挑み直せる。
+           * ただし挑めなかった時(編成未設定・挑戦券切れ)は戻す
+           * ——挑んでいないのに1回きりの権利が消えるのは、防ぎたい不正とは別の話。
+           */
+          if (!markArenaRevenged(state.player, record.id)) return;
+          const ticketsBefore = state.player.arenaTickets;
+          savePlayerState(state.player);
+          startArenaMatch(target);
+          if (state.screen !== "ARENA_BATTLE") {
+            record.revenged = false;
+            state.player.arenaTickets = ticketsBefore;
+            savePlayerState(state.player);
+            render();
+          }
+        },
+        onReloadRanking: () => { void refreshArenaRanking(); },
+        onViewMonster: (instanceId) => {
           state.monsterDetailId = instanceId;
           state.screen = "MONSTERS";
           render();
         },
       });
       break;
+    }
 
     case "TRIAL_TOWER": {
       if (ensureTowerMonthlyState(state.player)) savePlayerState(state.player);

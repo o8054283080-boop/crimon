@@ -254,15 +254,25 @@ export function nextArenaRank(rank: ArenaRank): ArenaRank | null {
  * ========================================================================== */
 
 /**
+ * アリーナの1編成の人数。
+ *
+ * **2つの画面がそれぞれ `const ARENA_TEAM_SIZE = 4` を持っていた。**
+ * 見た目には同じ4でも、サーバ側の検分もこの数を使う以上、
+ * 置き場所が3つあると必ずどれかが古くなる(挑戦券と勝敗コインで
+ * 実際にそうなった)。ここ1つにする。
+ */
+export const ARENA_TEAM_SIZE = 4;
+
+/**
  * 挑戦券。**スタミナとは別枠**にしてある。
  *
  * スタミナを使う作りにすると、周回の途中でアリーナに寄るたびに
  * 周回そのものが止まる。逆にアリーナ側も「今日はもう周回で使い切った」で
  * 触れなくなる。どちらの遊びも相手の都合で止まらないように分ける。
  */
-export const ARENA_TICKET_MAX = 5;
+export const ARENA_TICKET_MAX = 10;
 /** 挑戦券が1枚回復するまでの実時間(分) */
-export const ARENA_TICKET_REGEN_MINUTES = 30;
+export const ARENA_TICKET_REGEN_MINUTES = 60;
 /** ダイヤを払って挑戦券を全回復する時の価格 */
 export const ARENA_TICKET_REFILL_COST = 100;
 

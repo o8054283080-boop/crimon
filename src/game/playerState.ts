@@ -3,9 +3,37 @@ import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requ
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { Star } from "../core/rarity.js";
+import type { ArenaDefenseSnapshot, ArenaMatchRecord } from "./arena/types.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
 import { LEGACY_LEVEL_DUNGEON_TIERS, LEVEL_DUNGEON_DAILY_LIMIT } from "../data/levelDungeon.js";
 import { ARENA_START_POINTS, ARENA_TICKET_MAX } from "../data/pvpArena.js";
+import { ARENA_NOT_CLAIMED } from "../data/arena/season.js";
+
+/** アリーナの記録として残す件数。増やし続けると控えが太る */
+export const ARENA_HISTORY_MAX = 30;
+
+/**
+ * この端末の識別子を作る。
+ *
+ * **形はUUIDに揃える。** サーバ側の `user_id` は uuid 型なので、
+ * `local_1` のような文字列を送ると PostgREST がキャストで落として
+ * 400を返す——実プレイヤーが1人も並ばず、順位も常に「未掲載」になる。
+ * 認証が入ったらそのユーザIDへ差し替える。
+ */
+export function newArenaLocalId(): string {
+  const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${hex(8)}-${hex(4)}-4${hex(3)}-${["8", "9", "a", "b"][Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}`;
+}
+
+/** アリーナショップの購入回数1件ぶん */
+export interface ArenaShopPurchaseRecord {
+  itemId: string;
+  /** "WEEKLY" / "MONTHLY" */
+  period: string;
+  /** その周期の通し番号。番号が変われば数え直す(= 上限がリセットされる) */
+  periodKey: number;
+  count: number;
+}
 import {
   ShopEntry,
   SHOP_INITIAL_SLOTS,
@@ -121,6 +149,53 @@ export interface PlayerState {
   arenaSeasonWins: number;
   /** 今期の最高到達点数。期間報酬はこの値で決まる(下がっても取り上げない) */
   arenaSeasonBestPoints: number;
+  /*
+   * --- 非同期PvPアリーナ(2026-09 刷新) ---
+   *
+   * **レートは `arenaPoints` をそのまま使う。** 新しい `arenaRating` を足して
+   * 移し替えると、いま遊んでいる人の順位が一度リセットされたように見える。
+   * 名前が古いだけで意味は同じなので、増やさず流用する。
+   *
+   * 以下はすべて**未設定でも成立する**形にしてある。古い控えには丸ごと無い。
+   */
+  /** アリーナ専用通貨。ショップで使う */
+  arenaCoins: number;
+  /** 防衛パーティを登録した時点の姿。登録後に本人が何をしても壊れない */
+  arenaDefenseSnapshot: ArenaDefenseSnapshot | null;
+  /** 攻撃と防衛の記録。新しいものが先頭 */
+  arenaMatchHistory: ArenaMatchRecord[];
+  /** 直近で候補に出した相手。同じ顔ぶれが続かないようにする */
+  arenaRecentOpponentIds: string[];
+  /** 週間報酬を受け取った週。二重受取はここで弾く(`ARENA_NOT_CLAIMED` = 未受取) */
+  arenaWeeklyClaimedWeek: number;
+  /** シーズン報酬を受け取ったシーズン番号(`ARENA_NOT_CLAIMED` = 未受取) */
+  arenaSeasonClaimedNumber: number;
+  /** いま進行中のシーズン番号。ここが変わったらソフトリセットを掛ける */
+  arenaSeasonNumber: number;
+  /** アリーナショップの購入回数。周期ごとに数える */
+  arenaShopPurchases: ArenaShopPurchaseRecord[];
+  /**
+   * サーバ購入を手元へ付与済みの購入ID。
+   * 保存してからサーバへ受取完了を返すことで、通信断でも二重付与しない。
+   */
+  arenaShopFulfilledPurchaseIds: string[];
+  /** 手に入れた見た目の報酬(称号・フレーム・アイコン) */
+  arenaCosmetics: string[];
+  /**
+   * この端末の識別子。
+   *
+   * **対戦の種(`arenaOpponentSeed`)を流用してはいけない。** 種は
+   * 「相手を変える」で進むので、押すたびに自分のIDが変わってしまう。
+   * 自分を候補から外す判定も、ランキングの自分判定も、それでは成立しない。
+   * 認証が入るまでの仮の識別子で、**一度決めたら変えない**。
+   */
+  arenaLocalId: string;
+  /** 留守中の防衛戦を最後にさばいた時刻。0 なら「今から数え始める」 */
+  arenaLastDefenseCheckAt: number;
+  /** 今日、防衛で失ったレート。寝ている間に落ち続けないよう上限を掛ける */
+  arenaDefenseLossToday: number;
+  /** 上の値を数えている日(JSTの日付文字列) */
+  arenaDefenseLossDate: string;
 
   /* --- 試練の塔 --- */
   /** 塔専用の編成。HPを持ち越して登る場所なので、耐久寄りに組み替えられるよう別枠で持つ */
@@ -251,6 +326,20 @@ export function createInitialState(): PlayerState {
     arenaSeasonBattles: 0,
     arenaSeasonWins: 0,
     arenaSeasonBestPoints: ARENA_START_POINTS,
+    arenaCoins: 0,
+    arenaDefenseSnapshot: null,
+    arenaMatchHistory: [],
+    arenaRecentOpponentIds: [],
+    arenaWeeklyClaimedWeek: ARENA_NOT_CLAIMED,
+    arenaSeasonClaimedNumber: ARENA_NOT_CLAIMED,
+    arenaSeasonNumber: 0,
+    arenaShopPurchases: [],
+    arenaShopFulfilledPurchaseIds: [],
+    arenaCosmetics: [],
+    arenaLocalId: newArenaLocalId(),
+    arenaLastDefenseCheckAt: 0,
+    arenaDefenseLossToday: 0,
+    arenaDefenseLossDate: "",
     towerPartyIds: [],
     trialTowerBestFloor: 0,
     trialTowerClaimedFloors: [],
@@ -414,6 +503,28 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.arenaSeasonBattles !== "number") state.arenaSeasonBattles = 0;
   if (typeof state.arenaSeasonWins !== "number") state.arenaSeasonWins = 0;
   if (typeof state.arenaSeasonBestPoints !== "number") state.arenaSeasonBestPoints = state.arenaPoints;
+  /*
+   * 刷新ぶん。**古い控えには丸ごと無い**ので、初参加と同じ状態から始める。
+   * 型が違う値が入っていた場合も既定へ戻す(壊れた控えでアリーナが開けなくなる方が痛い)。
+   */
+  if (typeof state.arenaCoins !== "number" || !Number.isFinite(state.arenaCoins) || state.arenaCoins < 0) state.arenaCoins = 0;
+  if (!state.arenaDefenseSnapshot || !Array.isArray(state.arenaDefenseSnapshot.units)) state.arenaDefenseSnapshot = null;
+  if (!Array.isArray(state.arenaMatchHistory)) state.arenaMatchHistory = [];
+  if (state.arenaMatchHistory.length > ARENA_HISTORY_MAX) state.arenaMatchHistory.length = ARENA_HISTORY_MAX;
+  if (!Array.isArray(state.arenaRecentOpponentIds)) state.arenaRecentOpponentIds = [];
+  if (typeof state.arenaWeeklyClaimedWeek !== "number") state.arenaWeeklyClaimedWeek = ARENA_NOT_CLAIMED;
+  if (typeof state.arenaSeasonClaimedNumber !== "number") state.arenaSeasonClaimedNumber = ARENA_NOT_CLAIMED;
+  if (typeof state.arenaSeasonNumber !== "number") state.arenaSeasonNumber = 0;
+  if (!Array.isArray(state.arenaShopPurchases)) state.arenaShopPurchases = [];
+  if (!Array.isArray(state.arenaShopFulfilledPurchaseIds)) state.arenaShopFulfilledPurchaseIds = [];
+  state.arenaShopFulfilledPurchaseIds = state.arenaShopFulfilledPurchaseIds
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .slice(-500);
+  if (!Array.isArray(state.arenaCosmetics)) state.arenaCosmetics = [];
+  if (typeof state.arenaLocalId !== "string" || state.arenaLocalId.length < 8) state.arenaLocalId = newArenaLocalId();
+  if (typeof state.arenaLastDefenseCheckAt !== "number") state.arenaLastDefenseCheckAt = 0;
+  if (typeof state.arenaDefenseLossToday !== "number") state.arenaDefenseLossToday = 0;
+  if (typeof state.arenaDefenseLossDate !== "string") state.arenaDefenseLossDate = "";
 
   if (!Array.isArray(state.towerPartyIds)) state.towerPartyIds = [];
   if (typeof state.trialTowerBestFloor !== "number") state.trialTowerBestFloor = 0;

@@ -51,6 +51,18 @@ jobs:
       - name: モンスターのデータ検診
         run: npx tsx tools/monsterDoctor.mts
 
+      # サーバ側の検分に使う定義表は、ゲームのデータから生成している。
+      # **データを触って生成し直すのを忘れると、検分が古い定義で動く。**
+      # 図鑑を1体足しただけで、その1体を使う人が防衛を登録できなくなる。
+      - name: アリーナの照合表が最新か
+        run: npm run arena:catalog -- --check
+
+      # Edge Function はクライアントと**同じ戦闘エンジン**を使う。
+      # 組み立てられないと、勝敗を決める場所が動かない。
+      # ここで落としておかないと、気づくのは本番へ配った後になる。
+      - name: Edge Function 向けの組み立て
+        run: npm run build:edge
+
   tour:
     name: 巡回(画面の崩れ)
     runs-on: ubuntu-latest
@@ -99,14 +111,16 @@ jobs:
             cat harness.log
             exit 1
           fi
-          node tools/tour.mjs && exit 0
-          # 落ちた時に何が起きていたのかを見られるようにする。
-          # 文字だけの報告では「押せないボタン」の絵が分からない
-          node tools/tour.mjs --shots artifacts/tour || true
-          exit 1
+          # **成功しても撮る。**
+          #
+          # 以前は落ちた時だけ撮っていたが、それでは「通ったから見なくていい」に
+          # なってしまう。巡回が拾えるのは、はみ出し・押せない・小さすぎる文字だけで、
+          # 「読めるが格好悪い」は数字にならない。**目で見るための絵を毎回残す。**
+          node tools/tour.mjs --shots artifacts/tour
 
       - uses: actions/upload-artifact@v4
-        if: failure()
+        # 通った時こそ見たいので always()。落ちた時は原因の絵が要る
+        if: always()
         with:
           name: tour-${{ github.event.pull_request.number || github.run_id }}
           path: artifacts/tour/*.png
