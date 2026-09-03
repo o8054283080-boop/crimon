@@ -18,6 +18,7 @@ import {
   Equipment,
   EquipStar,
   StatRoll,
+  StatType,
   enhanceEquipment,
   rollStatValue,
 } from "../../src/core/equipment.js";
@@ -27,7 +28,8 @@ import { createMonsterInstance, toBattleDefinition } from "../../src/core/monste
 import { MONSTER_DEX, findMonsterById } from "../../src/data/monsters.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../src/data/latentAbilities.js";
 import { PRESETS } from "./presets.js";
-import type { AllySpec, EnemySpec, GearSpec, Scenario } from "./types.js";
+import { STAT_TYPES } from "../../src/core/equipment.js";
+import type { AllySpec, EnemySpec, GearGrade, GearSpec, Scenario } from "./types.js";
 
 /** サブOPは初期値の2割ぶん。本編の生成と同じ比率 */
 const SUB_STAT_RATIO = 0.2;
@@ -74,7 +76,46 @@ function dexIdOf(templateId: string, element: string): string {
 }
 
 /** 味方1体を、本編と同じ道で戦闘定義まで持っていく */
-export function buildAlly(spec: AllySpec, rng: () => number): MonsterDefinition {
+/**
+ * 装備の仕上がり具合ごとの設定。
+ *
+ * ここで効かせているのは主に**サブOPの中身**。★と強化値も落とすが、
+ * 実際に効くのは「狙った項目がいくつ乗っているか」で、
+ * そこが違うだけで同じモンスターが別物になる。
+ */
+const GRADE_RULES: Record<GearGrade, { star: EquipStar; level: number; roleSubs: number }> = {
+  // 仕上げ切った人。サブ4つとも役割どおり
+  FINISHED: { star: 6, level: 15, roleSubs: 4 },
+  // 真面目に集めた人。半分は狙った項目、半分は引いたまま
+  STRONG: { star: 6, level: 15, roleSubs: 2 },
+  // 育成の途中。狙った項目は1つだけ乗っている
+  MID: { star: 6, level: 12, roleSubs: 1 },
+  // 拾ったものを着けている段階。中身は完全に運任せ
+  ROUGH: { star: 5, level: 9, roleSubs: 0 },
+};
+
+/**
+ * プリセットの装備を、指定の仕上がり具合まで落とす。
+ *
+ * **メインは落とさない。** メインは枠ごとに選ぶものなので、
+ * 装備が揃っていない人でも「速度メインの2枠」くらいは持っている。
+ * 差が出るのはサブの中身の方で、そこを段階的に運任せへ寄せる。
+ */
+function applyGrade(gear: GearSpec[], grade: GearGrade, rng: () => number): GearSpec[] {
+  const rule = GRADE_RULES[grade];
+  return gear.map((spec) => {
+    const role = spec.subs.slice(0, rule.roleSubs);
+    const pool = STAT_TYPES.filter((type) => type !== spec.main && !role.includes(type));
+    const filler: StatType[] = [];
+    while (role.length + filler.length < 4 && pool.length > 0) {
+      const [type] = pool.splice(Math.floor(rng() * pool.length), 1);
+      filler.push(type);
+    }
+    return { ...spec, star: rule.star, level: rule.level, subs: [...role, ...filler] };
+  });
+}
+
+export function buildAlly(spec: AllySpec, rng: () => number, grade?: GearGrade): MonsterDefinition {
   const preset = spec.preset ? PRESETS[spec.preset] : undefined;
   const dexId = dexIdOf(spec.templateId, spec.element);
   const dex = findMonsterById(dexId)!;
@@ -99,7 +140,8 @@ export function buildAlly(spec: AllySpec, rng: () => number): MonsterDefinition 
     instance.development.latentAbilityId = candidates[latentIndex].id;
   }
 
-  const gearSpecs = spec.gear ?? preset?.gear ?? [];
+  const baseGear = spec.gear ?? preset?.gear ?? [];
+  const gearSpecs = grade ? applyGrade(baseGear, grade, rng) : baseGear;
   const gear = gearSpecs.map((g) => craftGear(g, rng));
   gear.forEach((eq) => { instance.equipment[eq.slot] = eq.id; });
 
@@ -142,9 +184,9 @@ export interface BuiltTeams {
   enemies: MonsterDefinition[];
 }
 
-export function buildTeams(scenario: Scenario, rng: () => number): BuiltTeams {
+export function buildTeams(scenario: Scenario, rng: () => number, grade?: GearGrade): BuiltTeams {
   return {
-    players: scenario.allies.map((spec) => buildAlly(spec, rng)),
+    players: scenario.allies.map((spec) => buildAlly(spec, rng, grade)),
     enemies: scenario.enemies.map((spec) => buildEnemy(spec)),
   };
 }

@@ -20,7 +20,7 @@ import { BattleEngine, BattleResult } from "../../src/battle/engine.js";
 import type { MonsterDefinition } from "../../src/core/monster.js";
 import { buildTeams } from "./build.js";
 import { mulberry32, runSeed } from "./rng.js";
-import type { Scenario } from "./types.js";
+import type { GearGrade, Scenario } from "./types.js";
 
 /** 名札から識別子を取り出す。`[味方:P1] ドラゴン(火)` → `P1` */
 const ID = /\[(?:味方|敵):(P\d+|E\d+)\]/;
@@ -101,10 +101,13 @@ function newUnitTally(def: MonsterDefinition, id: string, team: "PLAYER" | "ENEM
  *
  * `focus` を渡すと、味方AIの単体攻撃がその順で狙う
  * (`BattleEngine.setFocusTarget` は本編の「狙う相手を決める」機能そのもの)。
+ *
+ * `grade` を渡すと、味方の装備の仕上がり具合をそこまで落とす。
+ * 装備を極めた人だけで測ると、その階が誰にとって難しいのかが読めない。
  */
-export function runBattle(scenario: Scenario, seed: number, focus?: string[]): BattleTally {
+export function runBattle(scenario: Scenario, seed: number, focus?: string[], grade?: GearGrade): BattleTally {
   const rng = mulberry32(seed);
-  const { players, enemies } = buildTeams(scenario, rng);
+  const { players, enemies } = buildTeams(scenario, rng, grade);
   const engine = new BattleEngine(players, enemies, { rng, maxTurns: scenario.maxTurns ?? 300 });
 
   const tallies = new Map<string, UnitTally>();
@@ -333,8 +336,14 @@ function classifyLoss(result: BattleResult, units: UnitTally[], scenario: Scenar
 }
 
 /** 走らせる回数ぶん、種をずらしながら繰り返す */
-export function runMany(scenario: Scenario, baseSeed: number, runs: number, focus?: string[]): BattleTally[] {
+export function runMany(
+  scenario: Scenario,
+  baseSeed: number,
+  runs: number,
+  focus?: string[],
+  grade?: GearGrade,
+): BattleTally[] {
   const out: BattleTally[] = [];
-  for (let i = 0; i < runs; i += 1) out.push(runBattle(scenario, runSeed(baseSeed, i), focus));
+  for (let i = 0; i < runs; i += 1) out.push(runBattle(scenario, runSeed(baseSeed, i), focus, grade));
   return out;
 }
