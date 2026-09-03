@@ -922,6 +922,12 @@
 /*
  * 1行。順位・代表・名前・ランク・レート・戦績。
  * 390px でも折り返さないよう、名前だけを可変にして他は固定幅にしてある。
+ *
+ * **列は全部明示する。**自動配置に任せていて事故った。代表モンスターの絵文字は
+ * `leadDexId` が無い行では要素そのものが出ないので、名前が繰り上がって
+ * **22px幅の「代表」列**に入り、実機で「ド‥」「荒‥」と2文字目で切れていた。
+ * 名前が省略されるのは行が狭い時だけであるべきで、
+ * 「隣の要素が有るか無いか」で列が動いてはいけない。
  */
 .ar-rank__row {
   --tier: #9aa6bb;
@@ -941,6 +947,8 @@
 }
 
 .ar-rank__no {
+  grid-column: 1;
+  grid-row: 1;
   color: #f4d995;
   font-size: 0.86rem;
   font-weight: 900;
@@ -949,12 +957,16 @@
 }
 
 .ar-rank__lead {
+  grid-column: 2;
+  grid-row: 1;
   font-size: 1.05rem;
   line-height: 1;
   text-align: center;
 }
 
 .ar-rank__name {
+  grid-column: 3;
+  grid-row: 1;
   font-size: 0.82rem;
   font-weight: 800;
   overflow: hidden;
@@ -963,6 +975,8 @@
 }
 
 .ar-rank__rating {
+  grid-column: 4;
+  grid-row: 1;
   font-size: 0.86rem;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
@@ -971,6 +985,7 @@
 
 .ar-rank__tier {
   grid-column: 3;
+  grid-row: 2;
   color: var(--tier);
   font-size: 0.68rem;
   font-weight: 800;
@@ -978,6 +993,7 @@
 
 .ar-rank__record {
   grid-column: 4;
+  grid-row: 2;
   color: var(--text-dim);
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;

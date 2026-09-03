@@ -80,7 +80,33 @@ export const INSPECT = `(() => {
     }
   }
 
-  // 5. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
+  /*
+   * 5. 文字が「‥」で切り落とされている。
+   *
+   * text-overflow: ellipsis は、本来**長い名前を1行に収めるための保険**で、
+   * 数文字しか入らない枠に落ちた時の非常口ではない。
+   * アリーナのランキングで、代表モンスターの絵文字が無い行の名前が
+   * 22px幅の列へ繰り上がり、実機で「ド‥」と2文字目で切れていた。
+   * はみ出しでも小さすぎる文字でもないので、既存の検査を全部すり抜ける。
+   *
+   * 「切れているか」だけを見ると、長い名前を収める正常な省略まで拾ってしまう。
+   * **枠そのものが狭すぎるか**で判定する(文字5個ぶんも入らない枠)。
+   */
+  for (const el of document.querySelectorAll('span, p, div, button, h1, h2, h3')) {
+    if (!el.textContent || el.children.length > 0) continue;
+    const cs = getComputedStyle(el);
+    if (cs.textOverflow !== 'ellipsis') continue;
+    if (el.scrollWidth <= el.clientWidth + 1) continue;
+    const size = parseFloat(cs.fontSize) || 12;
+    if (el.clientWidth >= size * 5) continue;
+    problems.push(
+      '文字が切り落とされている (幅' + Math.round(el.clientWidth) + 'px / 文字' + size.toFixed(0) + 'px): '
+      + el.textContent.trim().slice(0, 14) + ' [' + (el.className || el.tagName) + ']',
+    );
+    break;
+  }
+
+  // 6. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
   const header = document.querySelector('.app-header h1, .battle-topbar__title');
   if (header) {
     const hr = header.getBoundingClientRect();

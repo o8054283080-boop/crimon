@@ -3922,6 +3922,59 @@ if (import.meta.env.DEV) {
       render,
     }),
   );
+
+  /*
+   * **繋がっていないと出ない画面を、巡回に見せるための口。**
+   *
+   * アリーナのランキングは未接続だと表そのものを出さない(行が0の表は
+   * 「誰も居ない」に見えるが実際は「分からない」で、意味がまるで違うため)。
+   * その結果、巡回は毎回この画面を**行が1つも無い状態**で検査し、
+   * 「アリーナ/ランキング 問題なし」と報告し続けていた。
+   *
+   * 実際には、代表モンスターの絵文字が無い行で名前が22px幅の列へ落ち、
+   * 実機で「ド‥」と2文字目で切れていた。行を一度も描いていないので拾えない。
+   *
+   * 仮の行は**最悪の形**にしてある(名前が上限の12文字、代表が有る行と無い行、
+   * 4桁のレート、3桁の戦績)。ここが収まれば実データも収まる。
+   */
+  const demoRow = (
+    rank: number,
+    name: string,
+    rating: number,
+    wins: number,
+    losses: number,
+    leadDexId: string | null,
+  ): ArenaRankingEntry => ({
+    rank,
+    userId: `dev-${rank}`,
+    name,
+    iconKey: "",
+    rating,
+    tierId: "BRONZE_1" as ArenaTierId,
+    wins,
+    losses,
+    leadDexId,
+    leadStar: leadDexId ? 6 : null,
+  });
+
+  const DEMO_RANKING_ROWS: ArenaRankingEntry[] = [
+    // 名前は上限の12文字。代表モンスターが**無い**行(ここが崩れていた)
+    demoRow(1, "あいうえおかきくけこさし", 2480, 128, 96, null),
+    // 代表モンスターが**有る**行
+    demoRow(2, "ドラゴンつかいのさとし", 1224, 14, 0, "dragon_FIRE"),
+    demoRow(3, "荒ぶるコボルト軍団長", 1188, 11, 3, null),
+  ];
+
+  (window as unknown as Record<string, unknown>).__crimonDev = {
+    showDemoRanking() {
+      arenaConnectionStatus = "ONLINE";
+      state.arenaRankingLoading = false;
+      state.arenaRankingTop = DEMO_RANKING_ROWS;
+      state.arenaRankingAround = DEMO_RANKING_ROWS;
+      state.arenaView = "RANKING";
+      render();
+    },
+  };
 }
 
 appMounted = true;

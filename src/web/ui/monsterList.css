@@ -18,17 +18,41 @@
   gap: 6px;
 }
 
-/* 肖像を主役にしつつ、識別情報を肖像直下の1行へ集約する。 */
+/*
+ * 肖像を主役にしつつ、識別情報を肖像直下へ集約する。
+ *
+ * **区画を持たない子を作らないこと。**図鑑は名前の下へ「No.001 · アタッカー」を
+ * 足すが、その札に区画を与えていなかったため `auto` の2列目へ自動配置され、
+ * 札の幅ぶん列が膨らんで **名前の列が2pxまで潰れていた**。
+ * `text-overflow: ellipsis` があるので崩れず、ただ名前が消える。
+ * 図鑑の156枚すべてで、モンスターの名前が1文字も出ていなかった。
+ */
 .mcard--compact {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     "portrait portrait"
-    "name stars";
+    "name stars"
+    "info info"
+    "caption caption";
   gap: 2px 4px;
   min-width: 0;
   padding: 3px 3px 4px;
   border-radius: 9px;
+}
+
+.mcard--compact .mcard__info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.mcard--compact .mcard__caption {
+  grid-area: caption;
+  min-width: 0;
+  padding-left: 2px;
+  /* 名前と頭を揃える。中央寄せだと2行に折り返した時に名前と関係が読めない */
+  text-align: left;
+  line-height: 1.35;
 }
 
 .mcard--compact .mcard__portrait {
