@@ -9,4 +9,5 @@ if (motionLabPath.test(window.location.pathname) || new URLSearchParams(window.l
   void import("./missionUi.js");
   void import("./rewardAcquisitionFx.js");
   void import("./noticeUi.js");
+  void import("./adminPanel.js");
 }
