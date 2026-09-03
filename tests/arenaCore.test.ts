@@ -12,6 +12,7 @@ import {
 import { ARENA_SHOP_ITEMS } from "../src/data/arena/shop.js";
 import { createInitialState } from "../src/game/playerState.js";
 import { buildArenaCandidates, rememberArenaOpponent } from "../src/game/arena/matchmaking.js";
+import { buildArenaNpcs } from "../src/game/arena/npc.js";
 import { arenaRevengeBlock, markArenaRevenged, recordArenaMatch } from "../src/game/arena/match.js";
 import {
   applyArenaSeasonRollover,
@@ -19,7 +20,7 @@ import {
   claimArenaSeasonReward,
   claimArenaWeeklyReward,
 } from "../src/game/arena/progress.js";
-import { arenaShopRemaining, buyArenaShopItem } from "../src/game/arena/shop.js";
+import { arenaShopRemaining, buyArenaShopItem, fulfillArenaShopPurchase } from "../src/game/arena/shop.js";
 import { captureArenaDefense, isUsableDefense, snapshotToDefinitions } from "../src/game/arena/snapshot.js";
 import { MAX_ATTACKS_PER_VISIT, runPendingDefenseAttacks } from "../src/game/arena/defenseSim.js";
 import { ArenaDefenseSnapshot, ArenaOpponentEntry } from "../src/game/arena/types.js";
@@ -199,6 +200,15 @@ describe("報酬の二重受取", () => {
     expect(claimArenaWeeklyReward(state, SEASON1 + WEEK_MS).ok).toBe(true);
   });
 
+  it("オンライン報酬はサーバが確定したランク内容で手元へ配る", () => {
+    const state = createInitialState();
+    state.arenaPoints = 1000;
+    state.arenaSeasonBestPoints = 1000;
+    const result = claimArenaWeeklyReward(state, SEASON1, "GOLD_1");
+    expect(result.ok).toBe(true);
+    expect(result.tierName).toBe("ゴールドI");
+  });
+
   it("シーズン報酬は終わったシーズンぶんを1回だけ", () => {
     const state = createInitialState();
     const inSeason2 = SEASON1 + ARENA_SEASON_WEEKS * WEEK_MS;
@@ -290,6 +300,16 @@ describe("アリーナショップ", () => {
     expect(buyArenaShopItem(state, "not_a_real_item", SEASON1).ok).toBe(false);
     expect(state.arenaCoins).toBe(999_999);
   });
+
+  it("サーバ購入の再送では品物を二重に付与しない", () => {
+    const state = createInitialState();
+    const first = fulfillArenaShopPurchase(state, "summon_scroll", "purchase-1", 1, SEASON1);
+    const retry = fulfillArenaShopPurchase(state, "summon_scroll", "purchase-1", 1, SEASON1);
+    expect(first.ok).toBe(true);
+    expect(retry.alreadyFulfilled).toBe(true);
+    expect(state.summonScrolls).toBe(1);
+    expect(state.arenaShopPurchases[0]?.count).toBe(1);
+  });
 });
 
 describe("対戦候補の混合", () => {
@@ -339,6 +359,20 @@ describe("対戦候補の混合", () => {
   it("並びの位置は必ず0から振り直す", () => {
     const list = buildArenaCandidates([], npcs, { count: 4, selfId: "me" });
     expect(list.map((e) => e.index)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("実プレイヤーとの混在や直近除外でもNPCの生成位置は変えない", () => {
+    const generated = buildArenaNpcs(1500, 24680, 8);
+    const players = [opponent("p1", "PLAYER", 1510)];
+    const list = buildArenaCandidates(players, generated, {
+      count: 3,
+      selfId: "me",
+      recentIds: [generated[0].id],
+    });
+    expect(list.map((entry) => entry.index)).toEqual([0, 1, 2]);
+    const shownNpcs = list.filter((entry) => entry.kind === "NPC");
+    expect(shownNpcs.map((entry) => entry.npcGenerationIndex)).toEqual([1, 2]);
+    expect(shownNpcs.map((entry) => entry.id)).toEqual([generated[1].id, generated[2].id]);
   });
 
   it("直近リストは新しい順で、際限なく伸びない", () => {
@@ -489,7 +523,7 @@ describe("既存セーブとの互換", () => {
     for (const key of [
       "arenaCoins", "arenaDefenseSnapshot", "arenaMatchHistory", "arenaRecentOpponentIds",
       "arenaWeeklyClaimedWeek", "arenaSeasonClaimedNumber", "arenaSeasonNumber",
-      "arenaShopPurchases", "arenaCosmetics", "arenaDefenseLossToday", "arenaDefenseLossDate",
+      "arenaShopPurchases", "arenaShopFulfilledPurchaseIds", "arenaCosmetics", "arenaDefenseLossToday", "arenaDefenseLossDate",
     ]) delete state[key];
     expect(() => recordArenaMatch(state as never, {
       opponent: opponent("p", "NPC", 1500), won: true, side: "OFFENSE",

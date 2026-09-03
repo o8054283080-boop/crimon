@@ -53,6 +53,14 @@ export type ArenaOpponentKind = "PLAYER" | "NPC";
 export interface ArenaOpponentEntry {
   /** 候補の並びの中での位置 */
   index: number;
+  /**
+   * NPCを種から組み直す時に使う不変の位置。
+   *
+   * `index` は実プレイヤーとの混在後に画面用として振り直される。
+   * こちらまで振り直すと、画面で見たNPCとサーバが再生成するNPCが別物になる。
+   * 実プレイヤーでは未使用。
+   */
+  npcGenerationIndex?: number;
   kind: ArenaOpponentKind;
   /** 実プレイヤーならその識別子。NPCは生成に使った種 */
   id: string;

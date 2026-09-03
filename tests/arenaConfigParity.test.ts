@@ -9,6 +9,7 @@ import {
   ARENA_SEASON_WEEKS,
   ARENA_SOFT_RESET,
   arenaSeasonReward,
+  arenaWeekIndex,
   arenaWeeklyReward,
 } from "../src/data/arena/season.js";
 import { ARENA_SHOP_ITEMS } from "../src/data/arena/shop.js";
@@ -38,6 +39,7 @@ import { ARENA_SNAPSHOT_VERSION } from "../src/game/arena/types.js";
 const sql0001 = readFileSync(new URL("../supabase/migrations/20260902170000_arena_schema.sql", import.meta.url), "utf8");
 const sql0003 = readFileSync(new URL("../supabase/migrations/20260902172000_arena_rpc.sql", import.meta.url), "utf8");
 const sqlSeed = readFileSync(new URL("../supabase/migrations/20260902172100_arena_seed.sql", import.meta.url), "utf8");
+const sqlSafety = readFileSync(new URL("../supabase/migrations/20260903003038_arena_release_safety.sql", import.meta.url), "utf8");
 
 /** `arena_config` に入れている初期値を1件取り出す */
 function seededConfig(key: string): Record<string, number> {
@@ -171,6 +173,17 @@ describe("報酬・シーズン・棚がクライアントと同じ値である�
     expect(Date.parse(starts![1])).toBe(ARENA_SEASON_EPOCH_UTC);
     const weekMs = 7 * 24 * 60 * 60 * 1000;
     expect(Date.parse(starts![2]) - Date.parse(starts![1])).toBe(ARENA_SEASON_WEEKS * weekMs);
+  });
+
+  it("週の境界はクライアントとサーバの両方で月曜4時JST", () => {
+    const before = Date.parse("2026-09-06T18:59:59.999Z");
+    const boundary = Date.parse("2026-09-06T19:00:00.000Z");
+    expect(arenaWeekIndex(boundary)).toBe(arenaWeekIndex(before) + 1);
+    expect(sqlSafety).toContain("2026-08-30 19:00:00+00");
+    expect(sqlSafety).toContain("public.arena_week_key_at(v_now)");
+    expect(sqlSafety).toContain("public.arena_week_key_at(now())");
+    expect(sqlSafety).toContain("public.arena_tier_for_rating(s.best_rating)");
+    expect(sqlSafety).not.toContain("IYYY-\"W\"IW");
   });
 
   it("棚に並ぶのは実在する商品だけで、値段も上限も一致する", () => {

@@ -62,7 +62,8 @@ export function buildArenaCandidates(
     chosen.push(...[...npcFresh, ...npcSeen].slice(0, room));
   }
 
-  // 4. 並びの位置を振り直す。画面は index で対象を指す
+  // 4. 画面用の位置だけを振り直す。
+  // NPCの生成位置 `npcGenerationIndex` は、サーバで同じ相手を組み直すため不変にする。
   return chosen.slice(0, count).map((entry, index) => ({ ...entry, index }));
 }
 

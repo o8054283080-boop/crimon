@@ -103,9 +103,10 @@ export function mergeReward(result: AutoFarmResult, reward: ClearRewardResult, e
     result.equipmentDropCount += 1;
     (result.earnedEquipmentIds ??= []).push(reward.equipmentDrop.id);
   }
-  if (reward.pigDrop) {
+  const pigDrops = reward.pigDrops ?? (reward.pigDrop ? [reward.pigDrop] : []);
+  for (const pigDrop of pigDrops) {
     result.pigDropCount += 1;
-    result.monsterDrops.push({ dexId: reward.pigDrop.dexId, star: reward.pigDrop.star });
+    result.monsterDrops.push({ dexId: pigDrop.dexId, star: pigDrop.star });
   }
   if (reward.summonScrollDropped) result.summonScrollCount += 1;
 

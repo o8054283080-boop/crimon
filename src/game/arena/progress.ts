@@ -9,7 +9,8 @@
  *  ——ローカルは書き換えられるし、通信は失敗する)
  */
 import { PlayerState, addSummonScrolls } from "../playerState.js";
-import { arenaTierForRating } from "../../data/arena/ranks.js";
+import { ARENA_TIERS, arenaTierForRating } from "../../data/arena/ranks.js";
+import type { ArenaTierId } from "../../data/arena/ranks.js";
 import {
   ARENA_SEASON_WEEKS,
   ArenaRewardBundle,
@@ -114,10 +115,15 @@ export function canClaimArenaWeekly(state: PlayerState, now: number = Date.now()
  *
  * 受け取る額は**その週の最高レート**で決める(下がっても取り上げない)。
  */
-export function claimArenaWeeklyReward(state: PlayerState, now: number = Date.now()): ArenaRewardClaim {
+export function claimArenaWeeklyReward(
+  state: PlayerState,
+  now: number = Date.now(),
+  verifiedTierId?: ArenaTierId,
+): ArenaRewardClaim {
   const week = arenaWeekIndex(now);
   if (state.arenaWeeklyClaimedWeek === week) return { ok: false, reason: "今週のぶんは受け取り済みです" };
-  const tier = arenaTierForRating(Math.max(state.arenaPoints, state.arenaSeasonBestPoints));
+  const tier = (verifiedTierId ? ARENA_TIERS.find((entry) => entry.id === verifiedTierId) : null)
+    ?? arenaTierForRating(Math.max(state.arenaPoints, state.arenaSeasonBestPoints));
   const reward = arenaWeeklyReward(tier.id);
   // **先に印を付けてから配る。** 逆にすると、配った直後に落ちた時へ二重に配れる
   state.arenaWeeklyClaimedWeek = week;
@@ -141,11 +147,13 @@ export function claimArenaSeasonReward(
   state: PlayerState,
   bestRatingOfEndedSeason: number,
   now: number = Date.now(),
+  verifiedTierId?: ArenaTierId,
 ): ArenaRewardClaim {
   const season = arenaSeasonNumber(now);
   if (season <= 1) return { ok: false, reason: "まだ終わったシーズンがありません" };
   if (state.arenaSeasonClaimedNumber >= season - 1) return { ok: false, reason: "受け取り済みです" };
-  const tier = arenaTierForRating(bestRatingOfEndedSeason);
+  const tier = (verifiedTierId ? ARENA_TIERS.find((entry) => entry.id === verifiedTierId) : null)
+    ?? arenaTierForRating(bestRatingOfEndedSeason);
   const reward = arenaSeasonReward(tier.id);
   state.arenaSeasonClaimedNumber = season - 1;
   grantReward(state, reward);

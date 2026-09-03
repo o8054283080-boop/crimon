@@ -135,7 +135,8 @@ describe("ステージデータ", () => {
     for (const id of templateIds) expect(["slime", "wolf", "golem", "fairy", "treant", "knight", "imp", "wisp"]).toContain(id);
   });
 
-  it("チャプターのテーマドロップは星1固定で、同一チャプター内で一貫している", () => {
+  it("チャプターのテーマドロップは後半ほど高い星になり、同一チャプター内で一貫している", () => {
+    const expectedStars: Record<number, number[]> = { 1: [1], 2: [1], 3: [1], 4: [1], 5: [1], 6: [1], 7: [1, 2], 8: [2] };
     for (const chapter of CHAPTERS) {
       const stages = stagesOf(chapter);
       const templateId = stages[0].rewards.dropTemplateId;
@@ -143,29 +144,31 @@ describe("ステージデータ", () => {
       for (const stage of stages) {
         expect(stage.rewards.dropTemplateId).toBe(templateId);
         expect(stage.rewards.equipmentSet).toBe(set);
-        expect(stage.rewards.dropStars).toEqual([1]);
+        expect(stage.rewards.dropStars).toEqual(expectedStars[chapter]);
       }
     }
   });
 
-  it("rollStageDropはそのチャプターのテーマ種族・星1のみをドロップする", () => {
+  it("rollStageDropはそのチャプターのテーマ種族と設定された星をドロップする", () => {
     const rng = () => 0;
+    const expectedMinimumStar: Record<number, number> = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 2 };
     for (const chapter of CHAPTERS) {
       const stage = stagesOf(chapter)[0];
       const drop = rollStageDrop(stage, rng);
       expect(drop).not.toBeNull();
-      expect(drop!.star).toBe(1);
+      expect(drop!.star).toBe(expectedMinimumStar[chapter]);
       expect(drop!.dexId.startsWith(`${stage.rewards.dropTemplateId}_`)).toBe(true);
     }
   });
 
   it("rollStageEquipmentはそのチャプターのテーマシリーズをドロップする", () => {
     const rng = () => 0;
+    const expectedMinimumStar: Record<number, number> = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 6: 3, 7: 3, 8: 3 };
     for (const chapter of CHAPTERS) {
       const stage = stagesOf(chapter)[0];
       const equipment = rollStageEquipment(stage, rng);
       expect(equipment).not.toBeNull();
-      expect(equipment!.star).toBe(1);
+      expect(equipment!.star).toBe(expectedMinimumStar[chapter]);
       expect(equipment!.set).toBe(stage.rewards.equipmentSet);
     }
   });

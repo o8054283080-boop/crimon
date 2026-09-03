@@ -595,6 +595,7 @@ export interface ArenaClaimResult {
   ok: boolean;
   code: string | null;
   periodKey: string | null;
+  tierId: ArenaTierId | null;
   coins: number;
   coinBalance: number;
 }
@@ -605,6 +606,7 @@ function toClaimResult(value: unknown): ArenaClaimResult | null {
     ok: value.ok === true,
     code: typeof value.code === "string" ? value.code : null,
     periodKey: typeof value.periodKey === "string" ? value.periodKey : null,
+    tierId: typeof value.tierId === "string" && TIER_IDS.has(value.tierId) ? value.tierId as ArenaTierId : null,
     coins: Math.max(0, Math.round(asFiniteNumber(value.coins, 0))),
     coinBalance: Math.max(0, Math.round(asFiniteNumber(value.coinBalance, 0))),
   };
@@ -620,14 +622,41 @@ export async function claimArenaWeeklyReward(): Promise<ArenaClaimResult | null>
   }
 }
 
-/** シーズン報酬を受け取る */
-export async function claimArenaSeasonReward(seasonId: string): Promise<ArenaClaimResult | null> {
+/** 最新の未受取・終了済みシーズン報酬を受け取る。対象シーズンはサーバが決める。 */
+export async function claimArenaSeasonReward(): Promise<ArenaClaimResult | null> {
   try {
-    if (!arenaSyncAvailable() || !seasonId) return null;
-    return toClaimResult(await callRpc("arena_claim_season_reward", { p_season_id: seasonId }));
+    if (!arenaSyncAvailable()) return null;
+    return toClaimResult(await callRpc("arena_claim_latest_season_reward", {}));
   } catch {
     return null;
   }
+}
+
+export interface ArenaShopPurchaseReceipt {
+  purchaseId: string;
+  itemId: string;
+  quantity: number;
+  coinBalance: number;
+  purchasedAt: number;
+  payload: Record<string, unknown>;
+}
+
+function toPurchaseReceipt(value: unknown): ArenaShopPurchaseReceipt | null {
+  if (!isRecord(value)) return null;
+  const purchaseId = asText(value.purchaseId, "");
+  const itemId = asText(value.itemId, "");
+  const quantity = Math.round(asFiniteNumber(value.quantity, 0));
+  const purchasedAtText = asText(value.createdAt, "");
+  const purchasedAt = Date.parse(purchasedAtText);
+  if (!purchaseId || !itemId || quantity < 1 || quantity > 99 || !Number.isFinite(purchasedAt)) return null;
+  return {
+    purchaseId,
+    itemId,
+    quantity,
+    coinBalance: Math.max(0, Math.round(asFiniteNumber(value.coinBalance, 0))),
+    purchasedAt,
+    payload: isRecord(value.payload) ? value.payload : {},
+  };
 }
 
 /**
@@ -637,15 +666,38 @@ export async function claimArenaSeasonReward(seasonId: string): Promise<ArenaCla
 export async function purchaseArenaShopItem(
   itemId: string,
   quantity = 1,
-): Promise<Record<string, unknown> | null> {
+): Promise<ArenaShopPurchaseReceipt | null> {
   try {
     if (!arenaSyncAvailable() || !itemId) return null;
     const result = await callRpc("arena_purchase_shop_item", {
       p_item_id: itemId,
       p_quantity: Math.max(1, Math.min(99, Math.floor(quantity))),
     });
-    return isRecord(result) && result.ok === true ? result : null;
+    return isRecord(result) && result.ok === true ? toPurchaseReceipt(result) : null;
   } catch {
     return null;
+  }
+}
+
+/** 保存前に通信が切れた購入を再受信する。古い順に返す。 */
+export async function fetchPendingArenaShopPurchases(): Promise<ArenaShopPurchaseReceipt[]> {
+  try {
+    if (!arenaSyncAvailable()) return [];
+    const result = await callRpc("arena_pending_shop_purchases", {});
+    if (!Array.isArray(result)) return [];
+    return result.map(toPurchaseReceipt).filter((row): row is ArenaShopPurchaseReceipt => row !== null);
+  } catch {
+    return [];
+  }
+}
+
+/** 手元へ保存できた購入だけを受取済みにする。 */
+export async function acknowledgeArenaShopPurchase(purchaseId: string): Promise<boolean> {
+  try {
+    if (!arenaSyncAvailable() || !purchaseId) return false;
+    const result = await callRpc("arena_ack_shop_purchase", { p_purchase_id: purchaseId });
+    return isRecord(result) && result.ok === true;
+  } catch {
+    return false;
   }
 }

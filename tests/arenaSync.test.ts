@@ -30,6 +30,8 @@ import {
   fetchArenaRankingAround,
   fetchArenaState,
   purchaseArenaShopItem,
+  fetchPendingArenaShopPurchases,
+  acknowledgeArenaShopPurchase,
   pushArenaDefense,
   beginArenaMatch,
   settleArenaMatch,
@@ -137,8 +139,10 @@ describe("鍵が無い時", () => {
     await expect(ensureArenaProfile("あかり")).resolves.toBeNull();
     await expect(fetchArenaState()).resolves.toBeNull();
     await expect(claimArenaWeeklyReward()).resolves.toBeNull();
-    await expect(claimArenaSeasonReward("S1")).resolves.toBeNull();
+    await expect(claimArenaSeasonReward()).resolves.toBeNull();
     await expect(purchaseArenaShopItem("summon_scroll")).resolves.toBeNull();
+    await expect(fetchPendingArenaShopPurchases()).resolves.toEqual([]);
+    await expect(acknowledgeArenaShopPurchase("p1")).resolves.toBe(false);
 
     // **1回も外に出ない。** 未接続で叩きに行くと、鍵の無い人の端末で
     // 毎回タイムアウトを待つことになる
@@ -323,6 +327,15 @@ describe("送っている中身", () => {
     await expect(pushArenaDefense({ version: 1, capturedAt: 0, units: [] } as ArenaDefenseSnapshot)).resolves.toBe(false);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+
+  it("シーズン報酬は終了済みの対象をサーバに選ばせる", async () => {
+    const fetchImpl = stubFetch({ ok: false, code: "NO_CLAIMABLE_SEASON" });
+    connect(fetchImpl);
+    await claimArenaSeasonReward();
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://example.test/rest/v1/rpc/arena_claim_latest_season_reward");
+    expect(JSON.parse(String(init.body))).toEqual({});
+  });
 });
 
 describe("サーバの答えの読み取り", () => {
@@ -367,7 +380,47 @@ describe("サーバの答えの読み取り", () => {
   it("二重受取の返事はそのまま伝える", async () => {
     connect(stubFetch({ ok: false, code: "ALREADY_CLAIMED", periodKey: "2026-W36" }));
     const result = await claimArenaWeeklyReward();
-    expect(result).toEqual({ ok: false, code: "ALREADY_CLAIMED", periodKey: "2026-W36", coins: 0, coinBalance: 0 });
+    expect(result).toEqual({
+      ok: false,
+      code: "ALREADY_CLAIMED",
+      periodKey: "2026-W36",
+      tierId: null,
+      coins: 0,
+      coinBalance: 0,
+    });
+  });
+
+  it("ショップの購入領収書と未受取一覧を読める", async () => {
+    const row = {
+      ok: true,
+      purchaseId: "purchase-1",
+      itemId: "summon_scroll",
+      quantity: 1,
+      coinBalance: 240,
+      payload: { kind: "SUMMON_SCROLL", amount: 1 },
+      createdAt: "2026-09-03T00:00:00.000Z",
+    };
+    connect(stubFetch(row));
+    await expect(purchaseArenaShopItem("summon_scroll")).resolves.toEqual({
+      purchaseId: "purchase-1",
+      itemId: "summon_scroll",
+      quantity: 1,
+      coinBalance: 240,
+      purchasedAt: Date.parse(row.createdAt),
+      payload: row.payload,
+    });
+
+    connect(stubFetch([row]));
+    await expect(fetchPendingArenaShopPurchases()).resolves.toHaveLength(1);
+  });
+
+  it("ショップ受取完了は購入IDだけを送る", async () => {
+    const fetchImpl = stubFetch({ ok: true, purchaseId: "purchase-1" });
+    connect(fetchImpl);
+    await expect(acknowledgeArenaShopPurchase("purchase-1")).resolves.toBe(true);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://example.test/rest/v1/rpc/arena_ack_shop_purchase");
+    expect(JSON.parse(String(init.body))).toEqual({ p_purchase_id: "purchase-1" });
   });
 
   it("戦績は攻撃側と防衛側で向きが変わる", async () => {

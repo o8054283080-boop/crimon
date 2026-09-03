@@ -16,7 +16,7 @@
   (中身が見えないので、`arena_` 接頭辞で確実に分ける方針だけを取った)
 
 **代わりに、手元の PostgreSQL 16 に `auth.uid()` と `anon` /
-`authenticated` / `service_role` のスタブを作り、3つの migration をそのまま
+`authenticated` / `service_role` のスタブを作り、初期の migration をそのまま
 流して動きを確かめてある。** 確かめた内容は「6. 手元で確かめたこと」。
 
 Supabase 固有の部分(JWT の発行、`auth.users` の実装、既定の
@@ -36,6 +36,7 @@ supabase/
   migrations/20260902172000_arena_rpc.sql          RPC(security definer)
   migrations/20260902172100_arena_seed.sql         ACTIVE シーズン・棚・報酬額
   migrations/20260902172200_arena_match_integrity.sql  検分と、勝敗のサーバ確定
+  migrations/20260903003038_arena_release_safety.sql   シーズン自動更新・週境界・ショップ領収書
   functions/arena-settle/index.ts                  **勝敗を決める場所**
 src/net/arenaAuth.ts             匿名ログイン(GoTrue を素の fetch で)
 src/net/arenaSync.ts             クライアント層(素の fetch。SDKは足していない)
@@ -196,23 +197,24 @@ RPC が仕事をできなくなる。
 | `arena_ensure_profile(名前, アイコン)` | `user_id` は**引数で受け取らず** `auth.uid()` から取る。プロフィール・財布・シーズン成績をまとめて用意 |
 | `arena_state()` | 自分のレート・コイン・挑戦権。挑戦権の回復は**サーバ時刻**でのみ進む |
 | `arena_set_defense(スナップショット)` | JSONBの形(`units` が配列・1〜4体・`version` が数値)、大きさの上限(256KiB)、`capturedAt` を未来に置かせない |
-| `arena_report_match(...)` | **下に別項** |
+| `arena_begin_match(...)` | 攻撃編成を検分し、相手・乱数・挑戦券を固定した対戦IDを発行 |
 | `arena_claim_weekly_reward()` | 週の区切りを `now()` から出す。金額は `arena_reward_rules`。**二重受取は一意制約**で弾く |
-| `arena_claim_season_reward(シーズン)` | シーズンが CLOSED であること、順位が焼かれていること。同じく一意制約 |
-| `arena_purchase_shop_item(商品, 個数)` | 販売中か・期間内か・1回の上限・在庫・週/月/通算の購入上限・残高。**引いてから渡す**(同じトランザクション) |
+| `arena_claim_latest_season_reward()` | 最新のCLOSEDシーズンをサーバが選ぶ。受取直後の通信断では同じ領収内容を再送 |
+| `arena_purchase_shop_item(商品, 個数)` | 販売中か・期間内か・1回の上限・在庫・週/月/通算の購入上限・残高。購入ID付きの領収書を返す |
+| `arena_pending_shop_purchases()` | サーバで購入済み・端末で未受取の領収書を本人分だけ返す |
+| `arena_ack_shop_purchase(購入ID)` | 端末への付与と保存が終わった本人の領収書だけ受取済みにする |
 | `arena_ranking_around(誰, 前後何人)` | 読むだけ |
 
-### 対戦結果の記録(`arena_report_match`)
+### 対戦結果の記録(`arena_begin_match` → `arena-settle`)
 
-**クライアントが送るのは「誰と」「勝ったか負けたか」だけ。**
+**クライアントは勝敗を送らない。** 対戦IDとnonceだけを送り、Edge Functionが
+発行時の編成と乱数で戦闘を再実行する。
 
-- 相手が実プレイヤーなら、相手のレートは**DBの値**を使う(申告は捨てる)
-- NPCなら申告を受け取るが、**自分のレート ±300 に丸める**
-  (「レート9999のNPCに勝った」で格上ボーナスを作れない)
-- 増減幅は `arena_rating_delta`(= `src/data/arena/rating.ts` と同じ式)
-- コインは `arena_match_coins`。**金額を送る口が無い**
-- 挑戦権を1つ消費する。無ければ `NO_TICKET` で戦績にならない
-- 連打よけの最小間隔(既定3秒)
+- 相手が実プレイヤーなら、相手のレートと防衛編成は**DBの値**を使う
+- NPCは種・不変の生成位置・件数から同じ一覧をサーバで組み直す
+- 増減幅とコインはサーバで計算し、クライアントから金額を送る口は無い
+- 挑戦権は発行時に1つ消費。シーズン境界で未精算なら次期へ混ぜず返却する
+- `arena_report_match` は互換用に名前だけ残し、誰にも実行権限を与えていない
 - 自分自身とは戦えない
 - 防衛側は増減を**半分**にし、**1日に落ちる量に上限**(既定60)を置く
   ── 寝ている間に順位が溶けないように
@@ -389,8 +391,7 @@ rollback;
 4. `.env`(または配信先の環境変数)に `VITE_SUPABASE_URL` /
    `VITE_SUPABASE_ANON_KEY` を置く。**`service_role` は置かない**
 5. **上の「7.」の確認を実際に走らせる**
-6. シーズンを締める運用(`arena_close_season`)を、Edge Function か
-   スケジュール実行のどちらに載せるか決める。`service_role` が要る
+6. `cron.job` に `crimon-arena-season-rollover` が登録されていることを確認する
 
 シーズンも棚も報酬額も seed に入っているので、**手で入れる作業は無い。**
 値を変えたい時は `src/data/arena/` を直して、

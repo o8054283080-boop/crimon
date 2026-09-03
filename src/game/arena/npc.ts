@@ -351,6 +351,7 @@ export function buildArenaNpc(
 
   return {
     index,
+    npcGenerationIndex: index,
     kind: "NPC",
     id,
     name,

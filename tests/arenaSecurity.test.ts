@@ -22,6 +22,8 @@ const files = readdirSync(MIGRATIONS).filter((name) => name.endsWith(".sql")).so
 const sql = files.map((name) => readFileSync(join(MIGRATIONS, name), "utf8")).join("\n");
 const integrity = readFileSync(
   join(MIGRATIONS, files.find((n) => n.includes("match_integrity"))!), "utf8");
+const safety = readFileSync(
+  join(MIGRATIONS, files.find((n) => n.includes("release_safety"))!), "utf8");
 
 describe("migration の並び", () => {
   it("すべてタイムスタンプ形式になっている", () => {
@@ -139,6 +141,8 @@ describe("編成の検分", () => {
       "INVALID_SKILL_LEVEL",       // スキル
       "UNKNOWN_LATENT",            // 潜在覚醒
       "DUPLICATE_EQUIP_SLOT",      // 装備6枠(重複)
+      "DUPLICATE_UNIT_ID",         // 同じ個体の4体コピー
+      "DUPLICATE_EQUIPMENT_ID",    // 同じ装備の使い回し
       "INVALID_EQUIP_STAR",        // レアリティ
       "INVALID_EQUIP_LEVEL",       // 強化値
       "UNKNOWN_SET",               // シリーズ
@@ -185,6 +189,34 @@ describe("自分と他人の切り分け", () => {
   it("二度は精算しない", () => {
     expect(integrity).toContain("ALREADY_SETTLED");
     expect(integrity).toContain("MATCH_EXPIRED");
+  });
+});
+
+describe("シーズンとショップの復旧", () => {
+  it("期限切れシーズンを自動で締め、RPC利用時にも検査する", () => {
+    expect(safety).toContain("public.arena_rollover_due_seasons()");
+    expect(safety).toContain("crimon-arena-season-rollover");
+    expect(safety).toContain("perform public.arena_rollover_due_seasons()");
+    expect(safety).toContain("grant execute on function public.arena_rollover_due_seasons() to service_role;");
+  });
+
+  it("シーズン報酬の対象をクライアントに選ばせない", () => {
+    expect(safety).toContain("public.arena_claim_latest_season_reward()");
+    expect(safety).toContain("s.status = 'CLOSED'");
+    expect(safety).toContain("grant execute on function public.arena_claim_latest_season_reward() to authenticated;");
+  });
+
+  it("シーズンをまたいだ対戦は次期へ記録せず挑戦券を返す", () => {
+    expect(safety).toContain("'SEASON_CLOSED'");
+    expect(safety).toContain("w.tickets + 1");
+    expect(safety).toContain("where s.id = v_session.season_id");
+  });
+
+  it("ショップ領収書は本人だけが読み、本人だけが完了できる", () => {
+    expect(safety).toContain("where pu.user_id = v_uid and pu.fulfilled_at is null");
+    expect(safety).toContain("where pu.id = p_purchase_id and pu.user_id = v_uid");
+    expect(safety).toContain("grant execute on function public.arena_pending_shop_purchases() to authenticated;");
+    expect(safety).toContain("grant execute on function public.arena_ack_shop_purchase(uuid) to authenticated;");
   });
 });
 

@@ -21,6 +21,7 @@ supabase db push
 20260902172000_arena_rpc.sql               RPC
 20260902172100_arena_seed.sql              ACTIVE シーズン・棚・報酬額
 20260902172200_arena_match_integrity.sql   検分と、勝敗のサーバ確定
+20260903003038_arena_release_safety.sql    シーズン自動更新・週境界・ショップ領収書
 ```
 
 RPC は `arena_catalog_*` を読むので、**照合表が先**でなければならない。
@@ -55,7 +56,9 @@ Authentication → Providers → **Anonymous sign-ins を有効**にする。
 
 ## 流した後にやること
 
-**特に無い。** シーズンも棚も報酬額も seed に入っている。
+**特に無い。** シーズンも棚も報酬額も seed に入っており、期限を迎えた
+シーズンは `arena_release_safety` が作る5分ごとのCronとRPC利用時の検査で
+自動的に締まる。
 
 以前ここには「シーズンを1つ開ける」「商品を入れる」という手作業の例が
 書いてあった。その例に出てくる `EQUIPMENT_TICKET` は**実装に無い商品**で、
@@ -67,6 +70,7 @@ seed に置いたのは、プレイヤーが実際に持てる7種だけ。
 ```sql
 select id, name, price from public.arena_shop_items order by sort_order;
 select id, status, starts_at, ends_at from public.arena_seasons;
+select jobname, schedule from cron.job where jobname = 'crimon-arena-season-rollover';
 select count(*) from public.arena_catalog_monsters;  -- 174 のはず
 ```
 

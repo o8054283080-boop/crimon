@@ -1,7 +1,18 @@
 import { ELEMENT_COLOR, ELEMENT_JA } from "../../core/element.js";
 import { SET_LABEL } from "../../core/equipment.js";
 import { STAGE_STAMINA_COST } from "../../core/fighterLevel.js";
-import { DIFFICULTIES, Difficulty, DIFFICULTY_JA, STAGES, Stage, Wave, WaveEnemy } from "../../data/stages.js";
+import {
+  DIFFICULTIES,
+  Difficulty,
+  DIFFICULTY_JA,
+  STAGES,
+  Stage,
+  Wave,
+  WaveEnemy,
+  stageClearExp,
+  stageClearGold,
+  stageWaveGold,
+} from "../../data/stages.js";
 import { MONSTER_TEMPLATES } from "../../data/monsters.js";
 import { NEW_MONSTER_TEMPLATES } from "../../data/newMonsters/index.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
@@ -393,9 +404,9 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
     el("section", { className: "panel" }, [
       el("h2", {}, ["報酬"]),
       el("div", { className: "reward-grid" }, [
-        rewardTile("🪙", "ウェーブ毎", num(stage.rewards.waveGold), "reward-tile--gold"),
-        rewardTile("✨", "経験値/体", num(stage.rewards.waveExp), "reward-tile--exp"),
-        rewardTile("🏆", "クリア報酬", num(stage.rewards.clearGold), "reward-tile--gold"),
+        rewardTile("🪙", "ウェーブ毎", num(stageWaveGold(stage, props.selectedDifficulty)), "reward-tile--gold"),
+        rewardTile("✨", "1周EXP/体", num(stageClearExp(stage, props.selectedDifficulty)), "reward-tile--exp"),
+        rewardTile("🏆", "クリア報酬", num(stageClearGold(stage, props.selectedDifficulty)), "reward-tile--gold"),
       ]),
       el("div", { className: "reward-drops" }, [
         el("span", { className: "reward-drops__label" }, ["ドロップ"]),

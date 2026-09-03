@@ -48,6 +48,7 @@ export interface ArenaShopPurchaseResult {
   ok: boolean;
   reason?: string;
   item?: ArenaShopItem;
+  alreadyFulfilled?: boolean;
 }
 
 /** ピッグは**レベル上限で渡す。** 素材なので、レベルが低いと意味が変わる */
@@ -55,6 +56,34 @@ function grantPig(state: PlayerState, kind: "EXP_PIG" | "REINCARNATION_PIG", sta
   const pool = kind === "EXP_PIG" ? EXP_PIG_DEX : REINCARNATION_PIG_DEX;
   const dex = pool[seed % pool.length];
   addMonster(state, dex.id, star, STAR_MAX_LEVEL[star]);
+}
+
+/** 商品を付与する。購入可否やコインは呼び出し側が確定してからここへ来る。 */
+function grantItem(state: PlayerState, item: ArenaShopItem, quantity: number, seed: number): void {
+  const amount = item.amount * quantity;
+  switch (item.kind) {
+    case "SUMMON_SCROLL": addSummonScrolls(state, amount); break;
+    case "FOUR_STAR_SCROLL": state.fourStarSummonScrolls += amount; break;
+    case "LIGHT_DARK_SCROLL": state.lightDarkFourStarSummonScrolls += amount; break;
+    case "GOLD": state.gold += amount; break;
+    case "AWAKENING_ORB": state.awakeningOrbs += amount; break;
+    case "EXP_PIG":
+    case "REINCARNATION_PIG":
+      for (let i = 0; i < amount; i += 1) grantPig(state, item.kind, item.star ?? 3, seed + i);
+      break;
+  }
+}
+
+function recordPurchase(state: PlayerState, item: ArenaShopItem, quantity: number, now: number): void {
+  const key = arenaShopPeriodKey(item.period, now);
+  const record = state.arenaShopPurchases.find(
+    (entry) => entry.itemId === item.id && entry.period === item.period && entry.periodKey === key,
+  );
+  if (record) record.count += quantity;
+  else state.arenaShopPurchases.push({ itemId: item.id, period: item.period, periodKey: key, count: quantity });
+  state.arenaShopPurchases = state.arenaShopPurchases.filter(
+    (entry) => entry.periodKey >= arenaShopPeriodKey(entry.period as ArenaShopPeriod, now) - 1,
+  );
 }
 
 /**
@@ -77,27 +106,40 @@ export function buyArenaShopItem(
 
   state.arenaCoins -= item.price;
 
-  const key = arenaShopPeriodKey(item.period, now);
-  const record = state.arenaShopPurchases.find(
-    (entry) => entry.itemId === item.id && entry.period === item.period && entry.periodKey === key,
-  );
-  if (record) record.count += 1;
-  else state.arenaShopPurchases.push({ itemId: item.id, period: item.period, periodKey: key, count: 1 });
-  // 古い周期の行は溜め続けない。数えるのは今の周期だけなので落としてよい
-  state.arenaShopPurchases = state.arenaShopPurchases.filter(
-    (entry) => entry.periodKey >= arenaShopPeriodKey(entry.period as ArenaShopPeriod, now) - 1,
-  );
+  recordPurchase(state, item, 1, now);
+  grantItem(state, item, 1, now);
+  return { ok: true, item };
+}
 
-  switch (item.kind) {
-    case "SUMMON_SCROLL": addSummonScrolls(state, item.amount); break;
-    case "FOUR_STAR_SCROLL": state.fourStarSummonScrolls += item.amount; break;
-    case "LIGHT_DARK_SCROLL": state.lightDarkFourStarSummonScrolls += item.amount; break;
-    case "GOLD": state.gold += item.amount; break;
-    case "AWAKENING_ORB": state.awakeningOrbs += item.amount; break;
-    case "EXP_PIG":
-    case "REINCARNATION_PIG":
-      for (let i = 0; i < item.amount; i += 1) grantPig(state, item.kind, item.star ?? 3, now + i);
-      break;
+/**
+ * サーバで成立した購入を手元へ付与する。
+ *
+ * コインはサーバですでに引かれているため、ここでは引かない。
+ * 購入IDを控えへ一緒に保存すれば、保存後の通信断で同じ領収書が再送されても
+ * 品物は二重に増えない。
+ */
+export function fulfillArenaShopPurchase(
+  state: PlayerState,
+  itemId: string,
+  purchaseId: string,
+  quantity = 1,
+  purchasedAt: number = Date.now(),
+): ArenaShopPurchaseResult {
+  if (!purchaseId) return { ok: false, reason: "購入IDがありません" };
+  const item = findArenaShopItem(itemId);
+  if (!item) return { ok: false, reason: "未対応の商品です" };
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 99) {
+    return { ok: false, reason: "購入数が正しくありません", item };
+  }
+  if (state.arenaShopFulfilledPurchaseIds.includes(purchaseId)) {
+    return { ok: true, item, alreadyFulfilled: true };
+  }
+
+  recordPurchase(state, item, quantity, purchasedAt);
+  grantItem(state, item, quantity, purchasedAt);
+  state.arenaShopFulfilledPurchaseIds.push(purchaseId);
+  if (state.arenaShopFulfilledPurchaseIds.length > 500) {
+    state.arenaShopFulfilledPurchaseIds.splice(0, state.arenaShopFulfilledPurchaseIds.length - 500);
   }
   return { ok: true, item };
 }

@@ -171,6 +171,11 @@ export interface PlayerState {
   arenaSeasonNumber: number;
   /** アリーナショップの購入回数。周期ごとに数える */
   arenaShopPurchases: ArenaShopPurchaseRecord[];
+  /**
+   * サーバ購入を手元へ付与済みの購入ID。
+   * 保存してからサーバへ受取完了を返すことで、通信断でも二重付与しない。
+   */
+  arenaShopFulfilledPurchaseIds: string[];
   /** 手に入れた見た目の報酬(称号・フレーム・アイコン) */
   arenaCosmetics: string[];
   /**
@@ -325,6 +330,7 @@ export function createInitialState(): PlayerState {
     arenaSeasonClaimedNumber: ARENA_NOT_CLAIMED,
     arenaSeasonNumber: 0,
     arenaShopPurchases: [],
+    arenaShopFulfilledPurchaseIds: [],
     arenaCosmetics: [],
     arenaLocalId: newArenaLocalId(),
     arenaLastDefenseCheckAt: 0,
@@ -505,6 +511,10 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.arenaSeasonClaimedNumber !== "number") state.arenaSeasonClaimedNumber = ARENA_NOT_CLAIMED;
   if (typeof state.arenaSeasonNumber !== "number") state.arenaSeasonNumber = 0;
   if (!Array.isArray(state.arenaShopPurchases)) state.arenaShopPurchases = [];
+  if (!Array.isArray(state.arenaShopFulfilledPurchaseIds)) state.arenaShopFulfilledPurchaseIds = [];
+  state.arenaShopFulfilledPurchaseIds = state.arenaShopFulfilledPurchaseIds
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .slice(-500);
   if (!Array.isArray(state.arenaCosmetics)) state.arenaCosmetics = [];
   if (typeof state.arenaLocalId !== "string" || state.arenaLocalId.length < 8) state.arenaLocalId = newArenaLocalId();
   if (typeof state.arenaLastDefenseCheckAt !== "number") state.arenaLastDefenseCheckAt = 0;

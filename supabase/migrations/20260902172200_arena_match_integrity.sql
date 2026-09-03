@@ -64,6 +64,9 @@ declare
   v_slot     integer;
   v_slots    integer[];
   v_types    text[];
+  v_unit_ids text[] := array[]::text[];
+  v_equip_ids text[] := array[]::text[];
+  v_id       text;
   v_cap      public.arena_catalog_stat_caps%rowtype;
   v_max_skill integer;
   v_skills   integer;
@@ -114,6 +117,14 @@ begin
     if jsonb_typeof(v_inst) <> 'object' then
       raise exception 'INVALID_INSTANCE';
     end if;
+    v_id := v_inst ->> 'id';
+    if v_id is null or btrim(v_id) = '' then
+      raise exception 'INVALID_UNIT_ID';
+    end if;
+    if v_id = any (v_unit_ids) then
+      raise exception 'DUPLICATE_UNIT_ID: %', v_id;
+    end if;
+    v_unit_ids := v_unit_ids || v_id;
 
     /*
      * 図鑑ID。**属性の検分もこれで済む。**
@@ -214,6 +225,14 @@ begin
       if jsonb_typeof(v_item) <> 'object' then
         raise exception 'INVALID_EQUIPMENT';
       end if;
+      v_id := v_item ->> 'id';
+      if v_id is null or btrim(v_id) = '' then
+        raise exception 'INVALID_EQUIPMENT_ID';
+      end if;
+      if v_id = any (v_equip_ids) then
+        raise exception 'DUPLICATE_EQUIPMENT_ID: %', v_id;
+      end if;
+      v_equip_ids := v_equip_ids || v_id;
 
       -- 枠。**同じ枠を2つ着せない**
       if jsonb_typeof(v_item -> 'slot') <> 'number' then

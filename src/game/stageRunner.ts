@@ -52,13 +52,14 @@ function defFromWaveEnemy(
   const difficultySpeed = DIFFICULTY_MODIFIERS[difficulty].speedScaleMultiplier;
   // ボスのspeedOverrideはNORMAL時の最終実効速度。通常敵だけウェーブの速度カーブを使う。
   const normalSpeed = enemy.speedOverride ?? base.spd * speedScale;
-  const stats = {
+  const calculatedStats = {
     ...base,
     hp: Math.round(base.hp * powerScale),
     atk: scaledEnemyAtk(base.atk * powerScale),
     def: Math.round(base.def * powerScale),
     spd: Math.round(normalSpeed * difficultySpeed),
   };
+  const stats = { ...calculatedStats, ...(enemy.statOverrides?.[difficulty] ?? {}) };
 
   const counterAfterHits = enemy.bossCounterAfterHits?.[difficulty];
   const bossTraits = counterAfterHits
