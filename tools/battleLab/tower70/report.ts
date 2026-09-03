@@ -136,8 +136,12 @@ export interface SweepRow {
   value: string;
   base: boolean;
   winRate: number;
+  /** **第3回はここが主題。**勝率だけ見ると泥仕合が「難しい」に化ける */
+  drawRate: number;
+  lossRate: number;
   avgTurns: number;
   bossHealed: number;
+  bossDamageTaken: number;
 }
 
 /** 1軸ずつ振って、どれが効いているのかを切り分ける */
@@ -152,8 +156,11 @@ export function runTower70Sweeps(options: { party: string; focus: string; runs: 
         value: describeAxis(sweep.axis, numbers),
         base: describeAxis(sweep.axis, numbers) === describeAxis(sweep.axis, TOWER70_BASE),
         winRate: row.winRate,
+        drawRate: row.drawRate,
+        lossRate: row.lossRate,
         avgTurns: row.avgTurns,
         bossHealed: row.extra["本体総回復量"] ?? 0,
+        bossDamageTaken: row.extra["本体被ダメージ"] ?? 0,
       });
     }
   }
@@ -165,17 +172,23 @@ function describeAxis(axis: string, numbers: Tower70Numbers): string {
     case "HP": return numbers.bossHp.toLocaleString("ja-JP");
     case "ATK": return numbers.bossAtk.toLocaleString("ja-JP");
     case "REGEN": return `+${Math.round(numbers.lifeCrystalRegenBonus * 100)}%`;
+    case "BOSS_REGEN": return `${(numbers.bossRegen * 100).toFixed(0)}%`;
     default: return "";
   }
 }
 
 export function sweepMarkdown(rows: SweepRow[]): string {
   const lines: string[] = [];
-  lines.push("| 軸 | 値 | 勝率 | 平均手数 | 本体総回復量 |");
-  lines.push("|---|---|--:|--:|--:|");
+  lines.push("| 軸 | 値 | 勝率 | 引分 | 敗北 | 平均手数 | 本体総回復量 | 本体被ダメージ | 差引 |");
+  lines.push("|---|---|--:|--:|--:|--:|--:|--:|--:|");
   for (const row of rows) {
     const mark = row.base ? " ←基準" : "";
-    lines.push(`| ${row.label} | ${row.value}${mark} | ${pct(row.winRate)} | ${row.avgTurns.toFixed(1)} | ${num(row.bossHealed)} |`);
+    // 「削った量 − 戻された量」。ここが本体HPに届かない限り、何をしても引き分ける
+    const net = row.bossDamageTaken - row.bossHealed;
+    lines.push(
+      `| ${row.label} | ${row.value}${mark} | ${pct(row.winRate)} | ${pct(row.drawRate)} | ${pct(row.lossRate)} `
+      + `| ${row.avgTurns.toFixed(1)} | ${num(row.bossHealed)} | ${num(row.bossDamageTaken)} | ${num(net)} |`,
+    );
   }
   return lines.join("\n");
 }

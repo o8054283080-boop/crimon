@@ -201,6 +201,15 @@ export const TOWER70_SWEEPS: { axis: string; label: string; values: Tower70Numbe
   { axis: "ATK", label: "本体ATK", values: [7_300, 7_800, 8_300].map((bossAtk) => tower70With({ bossAtk })) },
   { axis: "REGEN", label: "生命晶の追加再生", values: [0.03, 0.04, 0.05].map((v) => tower70With({ lifeCrystalRegenBonus: v })) },
   /*
+   * **第3回で足した診断用の軸。**基準値(3%)は動かさない。
+   *
+   * 第3回の実測で、1戦の本体被ダメージ(175,715)と本体総回復量(147,942)が
+   * ほぼ釣り合っていた。SUSTAINに至っては**回復が被ダメを上回る**
+   * (188,171 対 185,134)。引き分けの犯人が咆哮でも盾でもなく
+   * 再生ではないかを確かめるために、ここだけ0まで振れるようにしてある
+   */
+  { axis: "BOSS_REGEN", label: "本体の自ターン再生", values: [0, 0.01, 0.02, 0.03].map((bossRegen) => tower70With({ bossRegen })) },
+  /*
    * **シールドの軸は外した。**第3回の脈動晶は `CRUSH`(命脈断ち)で、
    * `pulseShieldRate` を振っても1行も変わらない。同じ値が3つ並ぶ表は、
    * 「効かなかった」ではなく「測っていない」の意味しか持たない

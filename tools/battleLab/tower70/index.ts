@@ -204,14 +204,20 @@ function main(): void {
   }
 
   if (has("sweep")) {
-    out.push("\n## 1軸ずつ振った比較(TYPICAL × 生命晶→ボス)\n");
-    process.stderr.write("  スイープ中 …\n");
-    out.push(sweepMarkdown(runTower70Sweeps({
-      party: "TYPICAL",
-      focus: "生命晶→ボス",
-      runs: Math.max(200, Math.round(RUNS / 4)),
-      seed: SEED,
-    })));
+    /*
+     * **引き分けの犯人を探すための軸。**「差引」= 本体被ダメージ − 本体総回復量。
+     * ここが本体HPに届かない限り、咆哮を弱めても盾を外しても300手で終わる。
+     * 泥仕合が濃いSUSTAINも一緒に見る(TYPICALだけだと片方しか読めない)
+     */
+    const sweepRuns = Math.max(200, Math.round(RUNS / 4));
+    for (const cell of [
+      { party: "TYPICAL", focus: "生命晶→ボス" },
+      { party: "SUSTAIN", focus: "ボス集中" },
+    ]) {
+      out.push(`\n## 1軸ずつ振った比較(${cell.party} × ${cell.focus}、各${sweepRuns}戦)\n`);
+      process.stderr.write(`  スイープ中: ${cell.party} × ${cell.focus} …\n`);
+      out.push(sweepMarkdown(runTower70Sweeps({ ...cell, runs: sweepRuns, seed: SEED })));
+    }
   }
 
   const text = out.join("\n");
