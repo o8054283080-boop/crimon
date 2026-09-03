@@ -168,6 +168,16 @@ async function goScreen(screen) {
     expression: `(async () => {
       const wait = (ms) => new Promise(r => setTimeout(r, ms));
       /*
+       * 前の巡回対象がモーダルなら、次の画面へ移る前に閉じる。
+       * ミッションは下タブの上に残るため、閉じないと以降の巡回が
+       * すべて同じモーダルを検査してしまう。
+       */
+      const modalClose = document.querySelector('[role="dialog"][aria-modal="true"] .regular-missions__close');
+      if (modalClose instanceof HTMLElement) {
+        modalClose.click();
+        await wait(200);
+      }
+      /*
        * **まず今いる階層から出る。**
        *
        * 下タブを押せば戻る、という前提で組んでいたが、アリーナは
