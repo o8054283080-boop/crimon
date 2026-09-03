@@ -17,6 +17,7 @@ import {
 import { addArenaCoins, arenaCoinsFor } from "./progress.js";
 import { ArenaMatchRecord, ArenaOpponentEntry, ArenaRevengeBlock } from "./types.js";
 import { rememberArenaOpponent } from "./matchmaking.js";
+import { ARENA_COIN_DEFENSE_DAILY_CAP } from "../../data/arena/shop.js";
 
 export interface ArenaMatchInput {
   opponent: Pick<ArenaOpponentEntry, "id" | "kind" | "name" | "rating">;
@@ -57,6 +58,20 @@ function capDefenseLoss(state: PlayerState, delta: number, now: number): number 
   return -allowed;
 }
 
+/** 防衛成功コインはJST1日40まで。人口や談合で際限なく増やさない。 */
+function capDefenseCoins(state: PlayerState, coins: number, now: number): number {
+  if (coins <= 0) return 0;
+  const day = jstDateKey(now);
+  if (state.arenaDefenseCoinDate !== day) {
+    state.arenaDefenseCoinDate = day;
+    state.arenaDefenseCoinsToday = 0;
+  }
+  const room = Math.max(0, ARENA_COIN_DEFENSE_DAILY_CAP - state.arenaDefenseCoinsToday);
+  const awarded = Math.min(coins, room);
+  state.arenaDefenseCoinsToday += awarded;
+  return awarded;
+}
+
 /**
  * 結果を反映する。
  *
@@ -76,6 +91,8 @@ export function recordArenaMatch(state: PlayerState, input: ArenaMatchInput): Ar
   if (typeof state.arenaCoins !== "number") state.arenaCoins = 0;
   if (typeof state.arenaDefenseLossToday !== "number") state.arenaDefenseLossToday = 0;
   if (typeof state.arenaDefenseLossDate !== "string") state.arenaDefenseLossDate = "";
+  if (typeof state.arenaDefenseCoinsToday !== "number") state.arenaDefenseCoinsToday = 0;
+  if (typeof state.arenaDefenseCoinDate !== "string") state.arenaDefenseCoinDate = "";
   if (typeof state.arenaSeasonBestPoints !== "number") state.arenaSeasonBestPoints = state.arenaPoints;
   const before = state.arenaPoints;
   const beforeTier = arenaTierForRating(before).id;
@@ -88,7 +105,8 @@ export function recordArenaMatch(state: PlayerState, input: ArenaMatchInput): Ar
   state.arenaPoints = Math.max(0, before + delta);
   if (state.arenaPoints > state.arenaSeasonBestPoints) state.arenaSeasonBestPoints = state.arenaPoints;
 
-  const coins = arenaCoinsFor(input.won, input.side);
+  const baseCoins = arenaCoinsFor(input.won, input.side);
+  const coins = input.side === "DEFENSE" ? capDefenseCoins(state, baseCoins, now) : baseCoins;
   addArenaCoins(state, coins);
 
   if (input.side === "OFFENSE") {

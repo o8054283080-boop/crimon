@@ -27,7 +27,7 @@ export function renderArenaShop(props: PvpArenaProps): HTMLElement {
     ]),
     props.notice ? el("p", { className: "panel ar-notice" }, [props.notice]) : null,
     el("p", { className: "panel ar-note" }, [
-      "アリーナコインは対戦と防衛で貯まります。上限は週・月それぞれで数え直されます",
+      "アリーナコインは対戦と防衛で貯まります。上限は週・月・シーズンごとに数え直されます",
     ]),
     ...rows.map((row) =>
       el("section", { className: "panel ar-shop" }, nodes([

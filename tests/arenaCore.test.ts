@@ -238,7 +238,7 @@ describe("アリーナショップ", () => {
     for (const kind of kinds) {
       expect([
         "SUMMON_SCROLL", "FOUR_STAR_SCROLL", "LIGHT_DARK_SCROLL",
-        "GOLD", "AWAKENING_ORB", "EXP_PIG", "REINCARNATION_PIG",
+        "FIVE_STAR_SCROLL", "GOLD", "AWAKENING_ORB", "EXP_PIG", "REINCARNATION_PIG", "SKILL_PIG",
       ]).toContain(kind);
     }
     expect(ARENA_SHOP_ITEMS.every((item) => item.price > 0 && item.limit > 0)).toBe(true);
@@ -294,6 +294,34 @@ describe("アリーナショップ", () => {
     expect(buyArenaShopItem(state, "four_star_scroll", SEASON1 + WEEK_MS).ok).toBe(false);
   });
 
+  it("シーズン商品は翌週では戻らず、次シーズンで数え直す", () => {
+    const state = createInitialState();
+    state.arenaCoins = 999_999;
+    expect(buyArenaShopItem(state, "five_star_scroll", SEASON1).ok).toBe(true);
+    expect(buyArenaShopItem(state, "five_star_scroll", SEASON1 + WEEK_MS).ok).toBe(false);
+    expect(buyArenaShopItem(state, "five_star_scroll", SEASON1 + ARENA_SEASON_WEEKS * WEEK_MS).ok).toBe(true);
+    expect(state.fiveStarSummonScrolls).toBe(2);
+  });
+
+  it("追加したピッグは正しい種類・星・レベルで届く", () => {
+    const state = createInitialState();
+    state.arenaCoins = 999_999;
+    expect(buyArenaShopItem(state, "exp_pig_4", SEASON1).ok).toBe(true);
+    expect(buyArenaShopItem(state, "reincarnation_pig_5", SEASON1).ok).toBe(true);
+    expect(buyArenaShopItem(state, "skill_pig", SEASON1).ok).toBe(true);
+    const added = state.monsters.slice(-3);
+    expect(added.map((monster) => [monster.star, monster.level])).toEqual([[4, 40], [5, 50], [1, 1]]);
+  });
+
+  it("覚醒オーブは500コインで週1個だけ", () => {
+    const state = createInitialState();
+    state.arenaCoins = 1_000;
+    expect(buyArenaShopItem(state, "awakening_orb", SEASON1).ok).toBe(true);
+    expect(state.arenaCoins).toBe(500);
+    expect(state.awakeningOrbs).toBe(1);
+    expect(buyArenaShopItem(state, "awakening_orb", SEASON1).ok).toBe(false);
+  });
+
   it("知らない商品IDでは何も起きない", () => {
     const state = createInitialState();
     state.arenaCoins = 999_999;
@@ -309,6 +337,29 @@ describe("アリーナショップ", () => {
     expect(retry.alreadyFulfilled).toBe(true);
     expect(state.summonScrolls).toBe(1);
     expect(state.arenaShopPurchases[0]?.count).toBe(1);
+  });
+});
+
+describe("防衛成功コイン", () => {
+  it("1勝4コインで、JST1日40コインを超えない", () => {
+    const state = createInitialState();
+    const now = Date.parse("2026-09-03T10:00:00.000Z");
+    for (let i = 0; i < 12; i += 1) {
+      recordArenaMatch(state, { opponent: opponent(`npc${i}`, "NPC", 1200), won: true, side: "DEFENSE", now: now + i });
+    }
+    expect(state.arenaCoins).toBe(40);
+    expect(state.arenaMatchHistory.filter((record) => record.coins === 4)).toHaveLength(10);
+    expect(state.arenaMatchHistory.filter((record) => record.coins === 0)).toHaveLength(2);
+  });
+
+  it("JSTの日付が変われば防衛コイン上限を数え直す", () => {
+    const state = createInitialState();
+    const before = Date.parse("2026-09-03T14:59:59.000Z");
+    for (let i = 0; i < 10; i += 1) {
+      recordArenaMatch(state, { opponent: opponent(`a${i}`, "NPC", 1200), won: true, side: "DEFENSE", now: before - i });
+    }
+    recordArenaMatch(state, { opponent: opponent("next", "NPC", 1200), won: true, side: "DEFENSE", now: before + 1_000 });
+    expect(state.arenaCoins).toBe(44);
   });
 });
 
@@ -524,6 +575,7 @@ describe("既存セーブとの互換", () => {
       "arenaCoins", "arenaDefenseSnapshot", "arenaMatchHistory", "arenaRecentOpponentIds",
       "arenaWeeklyClaimedWeek", "arenaSeasonClaimedNumber", "arenaSeasonNumber",
       "arenaShopPurchases", "arenaShopFulfilledPurchaseIds", "arenaCosmetics", "arenaDefenseLossToday", "arenaDefenseLossDate",
+      "arenaDefenseCoinsToday", "arenaDefenseCoinDate",
     ]) delete state[key];
     expect(() => recordArenaMatch(state as never, {
       opponent: opponent("p", "NPC", 1500), won: true, side: "OFFENSE",

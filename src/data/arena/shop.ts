@@ -3,8 +3,8 @@
  *
  * **並んでいるのは既に実装済みのものだけ。** 存在しない道具を勝手に作らない。
  * ここに出せるのは、いまプレイヤーが実際に持てるもの——
- * 召喚の書 / ★4以上召喚書 / 光闇召喚書 / 経験ピッグ / 転生ピッグ /
- * ゴールド / 覚醒オーブ、に限る。
+ * 召喚の書 / ★4以上召喚書 / 光闇召喚書 / ★5召喚書 /
+ * 経験ピッグ / 転生ピッグ / スキルピッグ / ゴールド / 覚醒オーブ、に限る。
  */
 import { Star } from "../../core/rarity.js";
 import { ARENA_TICKET_MAX, ARENA_TICKET_REGEN_MINUTES } from "../pvpArena.js";
@@ -21,6 +21,8 @@ export const ARENA_COIN_WIN = 10;
 export const ARENA_COIN_LOSS = 3;
 /** 防衛で退けた時。自分で挑んでいないので控えめ */
 export const ARENA_COIN_DEFENSE_WIN = 4;
+/** 防衛だけで際限なく増えないようにするJST1日ぶんの上限 */
+export const ARENA_COIN_DEFENSE_DAILY_CAP = 40;
 
 /* ==========================================================================
  * 挑戦権
@@ -45,13 +47,15 @@ export type ArenaShopKind =
   | "SUMMON_SCROLL"
   | "FOUR_STAR_SCROLL"
   | "LIGHT_DARK_SCROLL"
+  | "FIVE_STAR_SCROLL"
   | "GOLD"
   | "AWAKENING_ORB"
   | "EXP_PIG"
-  | "REINCARNATION_PIG";
+  | "REINCARNATION_PIG"
+  | "SKILL_PIG";
 
 /** 買える周期。上限のリセット単位でもある */
-export type ArenaShopPeriod = "WEEKLY" | "MONTHLY";
+export type ArenaShopPeriod = "WEEKLY" | "MONTHLY" | "SEASON";
 
 export interface ArenaShopItem {
   id: string;
@@ -72,9 +76,9 @@ export interface ArenaShopItem {
  * 棚。
  *
  * 値付けの考え方:
- * - 1戦で 10 / 3 コイン、挑戦権は1日に最大24枚ぶん回復する(上限10)。
- *   全部使い切って勝ち続けて**1週で1000コイン強**が上限に近い
- * - 週の上限を全部買うと合計 925 コイン。**普通に遊んで届く範囲**にしてある
+ * - 1戦で 10 / 3 コイン、防衛成功は4コイン(1日40まで)。
+ * - 週の商品を全部取るには1,365コイン。全部を軽く買わせず、
+ *   覚醒オーブを取るかシーズン商品へ貯めるかを選べる額にする
  * - **転生ピッグは別格に高くする。** ランクアップの頭数をそのまま買えるので、
  *   安いと育成の順番そのものが壊れる。月1回・700コイン(ほぼ1週ぶんの稼ぎ)
  */
@@ -101,7 +105,13 @@ export const ARENA_SHOP_ITEMS: readonly ArenaShopItem[] = [
     id: "awakening_orb",
     name: "覚醒オーブ",
     note: "潜在覚醒の候補を1つ選べる",
-    kind: "AWAKENING_ORB", amount: 1, price: 120, period: "WEEKLY", limit: 2,
+    kind: "AWAKENING_ORB", amount: 1, price: 500, period: "WEEKLY", limit: 1,
+  },
+  {
+    id: "exp_pig_4",
+    name: "経験ピッグ★4",
+    note: "レベル上限で届く上級強化素材",
+    kind: "EXP_PIG", amount: 1, star: 4, price: 180, period: "WEEKLY", limit: 1,
   },
   {
     id: "four_star_scroll",
@@ -120,6 +130,30 @@ export const ARENA_SHOP_ITEMS: readonly ArenaShopItem[] = [
     name: "転生ピッグ★4",
     note: "ランクアップの素材。レベル上限で届く",
     kind: "REINCARNATION_PIG", amount: 1, star: 4, price: 700, period: "MONTHLY", limit: 1,
+  },
+  {
+    id: "skill_pig",
+    name: "スキルピッグ",
+    note: "同じ種族を使わずスキルレベルを上げられる",
+    kind: "SKILL_PIG", amount: 1, price: 900, period: "MONTHLY", limit: 1,
+  },
+  {
+    id: "reincarnation_pig_5",
+    name: "転生ピッグ★5",
+    note: "ランクアップの上級素材。レベル上限で届く",
+    kind: "REINCARNATION_PIG", amount: 1, star: 5, price: 1_500, period: "MONTHLY", limit: 1,
+  },
+  {
+    id: "five_star_scroll",
+    name: "★5召喚書",
+    note: "★5モンスターを確定召喚。貯めて狙う目玉商品",
+    kind: "FIVE_STAR_SCROLL", amount: 1, price: 2_500, period: "SEASON", limit: 1,
+  },
+  {
+    id: "skill_pig_bundle",
+    name: "スキルピッグ×3",
+    note: "スキル育成をまとめて進めるシーズン商品",
+    kind: "SKILL_PIG", amount: 3, price: 2_000, period: "SEASON", limit: 1,
   },
 ];
 
