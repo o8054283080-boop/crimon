@@ -65,8 +65,21 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
     ]);
   });
 
-  const levelUpLine =
-    result.levelUps.length > 0
+  // 通常戦闘結果と同様に、周回開始時 → 現在のレベルを全メンバー分表示する。
+  // 旧セーブの完了済み結果には partyLevels が無いので、その場合だけ従来の Lv+N 表示へ戻す。
+  const levelUpLine = result.partyLevels?.length
+    ? el(
+        "div",
+        { className: "result-levelups" },
+        result.partyLevels.map((member) => {
+          const gained = result.levelUps.find((l) => l.instanceId === member.instanceId)?.levels ?? 0;
+          const startLevel = Math.max(1, member.level - gained);
+          return el("span", { className: "result-levelups__item" }, [
+            `${member.name} Lv${startLevel}/${member.maxLevel} → Lv${member.level}/${member.maxLevel}`,
+          ]);
+        }),
+      )
+    : result.levelUps.length > 0
       ? el(
           "div",
           { className: "result-levelups" },

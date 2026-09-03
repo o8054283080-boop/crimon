@@ -1,4 +1,4 @@
-import { ClearRewardResult, LevelUpInfo } from "./rewards.js";
+import { ClearRewardResult, LevelUpInfo, PartyLevelInfo } from "./rewards.js";
 
 /**
  * 周回(まとめて何回も挑む)の成果を積み上げる側。
@@ -36,6 +36,11 @@ export interface AutoFarmResult {
   pigDropCount: number;
   summonScrollCount: number;
   levelUps: LevelUpInfo[];
+  /**
+   * 最後に報酬を受け取った時点のパーティレベル。
+   * optional にして旧セーブの進行中/完了済み周回結果との互換性を保つ。
+   */
+  partyLevels?: PartyLevelInfo[];
 }
 
 export function emptyResult(): AutoFarmResult {
@@ -115,4 +120,9 @@ export function mergeReward(result: AutoFarmResult, reward: ClearRewardResult, e
     if (existing) existing.levels += levelUp.levels;
     else result.levelUps.push({ ...levelUp });
   }
+
+  // 通常戦闘結果と同じレベル情報を周回集計にも残す。
+  // levelUps は周回全体の累計なので、最終レベルから差し引けば開始レベルを復元できる。
+  const partyLevels = reward.expAwards?.partyLevels;
+  if (partyLevels) result.partyLevels = partyLevels.map((member) => ({ ...member }));
 }
