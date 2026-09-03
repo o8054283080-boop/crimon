@@ -221,6 +221,8 @@ export class BattleEngine {
   private pendingExtraTurns: BattleUnit[] = [];
   /** 協力攻撃の入れ子の深さ。0でないときは協力攻撃を呼ばない(無限に連鎖するため) */
   private coopDepth = 0;
+  /** 溜めた反撃の入れ子の深さ。0でないときは反撃を呼ばない(反射と往復し続けるため) */
+  private counterDepth = 0;
   /** いま解決中のスキル。パッシブの「1スキル1回」を数えるのに使う */
   private resolution: SkillResolution | null = null;
 
@@ -1670,8 +1672,23 @@ export class BattleEngine {
     const every = traits?.counterAfterHits ?? 0;
     if (every <= 0 || !defender.alive || !attacker.alive) return;
     if (defender.hitsTaken < every) return;
+    /*
+     * **反撃の中から反撃を呼ばない。**
+     *
+     * 反撃そのものは被弾数を増やさないので普通は連鎖しないが、
+     * 反射(REFLECT)を張った相手を殴ると跳ね返りで自分の被弾数が増える。
+     * そこから次の反撃が立ち上がると、盤面が動かないまま延々と往復する。
+     */
+    if (this.counterDepth > 0) return;
 
     defender.hitsTaken -= every;
+
+    // 溜めた反撃で**スキルをそのまま撃つ**指定があれば、そちらへ回す
+    if (traits?.counterSkillIndex !== undefined) {
+      this.counterWithSkill(defender, traits.counterSkillIndex);
+      return;
+    }
+
     const result = calcDamage(defender, attacker, { kind: "DAMAGE", multiplier: traits?.counterMultiplier ?? 1.2 }, this.rng);
     applyDamage(attacker, result.damage);
     this.push(`  → ${this.label(defender)} の反撃！ ${this.label(attacker)} に ${result.damage} ダメージ (残りHP ${attacker.currentHp}/${attacker.maxHp})`);
@@ -1679,6 +1696,46 @@ export class BattleEngine {
     if (!attacker.alive) {
       this.push(`  → ${this.label(attacker)} は倒れた！`);
       this.pushEvent({ targetId: attacker.instanceId, kind: "DEATH" });
+    }
+  }
+
+  /**
+   * 溜めた反撃で、自分のスキルをそのまま撃つ。
+   *
+   * ## 通常の手番と、どこが違うか
+   *
+   *   ・**クールタイムを動かさない。** 反撃で溜まりが消えるなら、
+   *     こちらの手数がそのままボスの手を縛る道具になってしまう
+   *   ・手番を消費しない(行動ゲージにも触らない)
+   *   ・協力攻撃・撃破による追加ターンは呼ばない(反撃から手番が増えると、
+   *     殴った側が損をする形が二重になる)
+   *
+   * ダメージ・会心・命中/抵抗・ゲージ吸収・解除は、**本編と同じ
+   * `applySkillEffects` をそのまま通す。** ここで別式を書くと、
+   * 本編を直した時にボスの反撃だけが古い規則で殴り続ける。
+   */
+  private counterWithSkill(source: BattleUnit, index: 0 | 1 | 2): void {
+    const skill = source.def.skills[index];
+    if (!skill || skill.passive) return;
+    const targets = chooseTargets(source, skill, this.units);
+    if (targets.length === 0) return;
+
+    this.push(`  → ${this.label(source)} の反撃「${skill.name}」！`);
+    this.counterDepth += 1;
+    const resolution = newResolution();
+    const previousResolution = this.resolution;
+    this.resolution = resolution;
+    try {
+      targets.forEach((target, i) => this.applySkillEffects(source, target, skill, false, i === 0, undefined, resolution));
+    } finally {
+      this.resolution = previousResolution;
+      this.counterDepth -= 1;
+    }
+    for (const target of new Set(targets)) {
+      if (!target.alive) {
+        this.push(`  → ${this.label(target)} は倒れた！`);
+        this.pushEvent({ targetId: target.instanceId, kind: "DEATH" });
+      }
     }
   }
 

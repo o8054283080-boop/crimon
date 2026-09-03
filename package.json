@@ -25,7 +25,8 @@
     "check": "npm run typecheck && npm run test && npm run tour",
     "floor10:rebalance": "tsx tools/floor10Rebalance.ts",
     "build:edge": "tsc --project tsconfig.edge.json",
-    "arena:catalog": "tsx tools/exportArenaCatalog.mts"
+    "arena:catalog": "tsx tools/exportArenaCatalog.mts",
+    "battle:lab": "tsx tools/battleLab/index.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
