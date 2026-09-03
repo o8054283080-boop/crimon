@@ -388,3 +388,67 @@ describe("セーブデータへ触らない", () => {
     }
   });
 });
+
+describe("倒すと本体が強くなる", () => {
+  /*
+   * 取り巻きを「先に消しておく置物」で終わらせないための仕掛け。
+   * **同じ死で二度強くならないこと**が一番大事(走査で拾う作りなので、
+   * 控えを忘れると手番ごとに際限なく伸びる)。
+   */
+  function escort(boost: { atk?: number; spd?: number }): MonsterDefinition {
+    return dummy("取り巻き", {
+      stats: { hp: 1, atk: 100, def: 1, spd: 1, criRate: 0, criDmg: 1.5, accuracy: 0, resistance: 1 },
+      skills: [oneHit("e1"), oneHit("e2"), oneHit("e3")],
+      bossTraits: { empowerBossOnDeath: boost },
+    });
+  }
+  const boss = dummy("本体", {
+    stats: { hp: 500_000, atk: 1_000, def: 1_000, spd: 1, criRate: 0, criDmg: 1.5, accuracy: 0, resistance: 1 },
+    skills: [oneHit("b1"), oneHit("b2"), oneHit("b3")],
+    victoryTarget: true,
+  });
+  /**
+   * 攻め手は**全体攻撃**を持つ。
+   *
+   * 単体攻撃だと、AIは属性相性のあとHP割合の低い方を選ぶ。取り巻きのHPを1にしても
+   * 割合は1.0のままなので本体ばかり殴り、**検査が空振りする**(実際にそうなった)。
+   */
+  const aoe = (id: string): Skill => ({
+    id, name: "薙ぎ払い", description: "", target: "ALL_ENEMIES", cooldownTurns: 0,
+    effects: [{ kind: "DAMAGE", multiplier: 0.2 }],
+  });
+  const striker = dummy("攻め手", {
+    stats: { hp: 200_000, atk: 5_000, def: 1_000, spd: 500, criRate: 0, criDmg: 1.5, accuracy: 1, resistance: 1 },
+    skills: [aoe("s1"), aoe("s2"), aoe("s3")],
+  });
+
+  it("取り巻きが倒れると本体が強くなる", () => {
+    const result = new BattleEngine([striker], [boss, escort({ atk: 2_000 })], { rng: mulberry32(3), maxTurns: 12 }).run();
+    expect(result.log.some((line) => line.includes("の力を取り込んだ！") && line.includes("ATK+2000"))).toBe(true);
+  });
+
+  it("同じ死で二度は強くならない", () => {
+    // 走査で拾う作りなので、控えを忘れると手番の数だけ伸びてしまう
+    const result = new BattleEngine([striker], [boss, escort({ spd: 100 })], { rng: mulberry32(5), maxTurns: 30 }).run();
+    expect(result.log.filter((line) => line.includes("の力を取り込んだ！"))).toHaveLength(1);
+  });
+
+  it("指定が無い取り巻きでは何も起きない", () => {
+    const plain = dummy("ただの取り巻き", {
+      stats: { hp: 1, atk: 100, def: 1, spd: 1, criRate: 0, criDmg: 1.5, accuracy: 0, resistance: 1 },
+      skills: [oneHit("p1"), oneHit("p2"), oneHit("p3")],
+    });
+    const result = new BattleEngine([striker], [boss, plain], { rng: mulberry32(7), maxTurns: 12 }).run();
+    expect(result.log.some((line) => line.includes("の力を取り込んだ！"))).toBe(false);
+  });
+
+  it("勝利条件でない敵は強くならない", () => {
+    // 取り巻き同士で強め合うと、どちらを先に倒しても同じになり順番を考える意味が消える
+    const other = dummy("別の取り巻き", {
+      stats: { hp: 300_000, atk: 100, def: 1, spd: 1, criRate: 0, criDmg: 1.5, accuracy: 0, resistance: 1 },
+      skills: [oneHit("o1"), oneHit("o2"), oneHit("o3")],
+    });
+    const result = new BattleEngine([striker], [other, escort({ atk: 2_000 })], { rng: mulberry32(11), maxTurns: 6 }).run();
+    expect(result.log.some((line) => line.includes("の力を取り込んだ！"))).toBe(false);
+  });
+});

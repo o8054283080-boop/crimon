@@ -91,7 +91,22 @@ export const TOWER60_V2: Scenario = {
       },
       victoryTarget: true,
     },
-    { ...V1_MASHOU, label: "古代の魔晶" },
+    {
+      ...V1_MASHOU,
+      label: "古代の魔晶",
+      // 攻撃力 3,800 → 5,800。倒さず放っておくと痛い相手にする
+      stats: { ...V1_MASHOU.stats, atk: 5_800 },
+      bossTraits: {
+        /*
+         * **倒すと本体が強くなる。**
+         *
+         * v2 までは「魔晶を先に消す」が明確な最適解で、読み合いが1手で終わっていた。
+         * 消した見返りに本体が伸びるなら、**急いで消すか、殴られながら本体を削るか**
+         * を選ぶことになる。取り巻きが置物でなくなる。
+         */
+        empowerBossOnDeath: { atk: 2_000 },
+      },
+    },
     {
       ...V1_JUSHOU,
       label: "古代の呪晶",
@@ -106,9 +121,14 @@ export const TOWER60_V2: Scenario = {
        * 倒されにくくするのではなく、**倒される前に1度動ける**ようにする。
        * HPを盛ると「硬い置物」が増えるだけだが、速度なら
        * 「先に撃たれるから急いで倒す」という読み合いになる。
+       *
+       * 200 では足りなかった(呪縛の帳が1000戦で65回)。味方はこの装備水準で
+       * 219〜314なので、**その上へ出す**ために300まで上げる。
        */
-      stats: { ...V1_JUSHOU.stats, spd: 200 },
+      stats: { ...V1_JUSHOU.stats, spd: 300 },
       skills: JUSHOU_SKILLS,
+      // 倒すと本体の速度が伸びる。回復不能を止めた代償が手番の数で返る
+      bossTraits: { empowerBossOnDeath: { spd: 100 } },
     },
   ],
   focusPatterns: TOWER60.focusPatterns,

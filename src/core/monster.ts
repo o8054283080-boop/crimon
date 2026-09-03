@@ -125,6 +125,15 @@ export interface BossTraits {
   defenseIgnoreRatio?: number;
   /** 味方が閾値以下で生存した時、一度だけ回復する支援特性。 */
   allyThresholdHeal?: { hpRatio: number; healPercent: number };
+  /**
+   * **この個体が倒れた時**、生き残っている `victoryTarget` の敵へ足す実数。
+   *
+   * 取り巻きを「先に消しておく置物」で終わらせないための仕掛け。
+   * 消せば消すほど本体が強くなるので、**どの順で倒すか**そのものが
+   * 考えどころになる。倍率ではなく実数なのは、
+   * 「攻撃力を2000上げる」を額のまま書けるようにするため。
+   */
+  empowerBossOnDeath?: { atk?: number; spd?: number; def?: number };
 }
 
 /*

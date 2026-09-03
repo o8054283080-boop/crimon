@@ -63,6 +63,13 @@ export interface BattleUnit {
    * 手数で押す戦い方(小さい攻撃を何度も、毒を重ねる)に代償を作るための数。
    */
   hitsTaken: number;
+  /**
+   * ステータスへの**実数**の上乗せ。倍率のバフとは別に足す。
+   *
+   * 既存のバフは全部「何%上げる」なので、「攻撃力を2000上げる」が書けなかった。
+   * 仲間が倒れるたびに強くなる相手を作るのに要る。
+   */
+  flatStatBonus: Partial<Record<BuffStat, number>>;
 
   /* ---- ここから下は今回の11種で足した状態。**どれも戦闘中だけのもので、セーブには出ない** ---- */
 
@@ -196,6 +203,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     healBlockTurns: 0,
     healBlockMultiplier: 1,
     hitsTaken: 0,
+    flatStatBonus: {},
     ...freshExtendedState(),
   };
 }
@@ -203,7 +211,8 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
 /** バフ/デバフを反映した実効ステータス値を計算する。criRate/criDmgは加算、それ以外は乗算で効く */
 export function getEffectiveStat(unit: BattleUnit, stat: BuffStat): number {
   const passive = passiveStatBonus(unit, stat);
-  const base = unit.def.stats[stat] + (stat === "spd" ? passive.add : 0);
+  const flat = unit.flatStatBonus[stat] ?? 0;
+  const base = unit.def.stats[stat] + flat + (stat === "spd" ? passive.add : 0);
   const totalRate = unit.effects
     .filter((e) => e.stat === stat)
     .reduce((sum, e) => sum + e.amount, 0);
