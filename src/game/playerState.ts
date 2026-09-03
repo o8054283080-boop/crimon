@@ -141,6 +141,15 @@ export interface PlayerState {
   lastArenaTicketUpdateAt: number;
   /** 挑戦相手を選ぶ乱数の種。挑むたびに進めるので、同じ相手が続けて出ない */
   arenaOpponentSeed: number;
+  /**
+   * 前の対戦から「相手を変える」を使った回数。**1戦するたびに0へ戻る。**
+   *
+   * 手で変えるのは「並んだ5人がどれも噛み合わない」時のための逃げ道。
+   * 無制限だと、いちばん弱い相手が出るまで引き直せてしまう。
+   * 日付で区切らないのは、**挑めば数え直せる**方が分かりやすいから
+   * (1日で使い切ると、その日はもう並びを変えられなくなる)。
+   */
+  arenaRerollsSinceBattle: number;
   /** 期間報酬を最後に受け取った期の識別子(-1 = まだ一度も精算していない) */
   arenaPeriodKey: number;
   /** 今期の対戦回数 */
@@ -326,6 +335,7 @@ export function createInitialState(): PlayerState {
     arenaTickets: ARENA_TICKET_MAX,
     lastArenaTicketUpdateAt: Date.now(),
     arenaOpponentSeed: 1,
+    arenaRerollsSinceBattle: 0,
     arenaPeriodKey: -1,
     arenaSeasonBattles: 0,
     arenaSeasonWins: 0,
@@ -505,6 +515,10 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.lastArenaTicketUpdateAt !== "number") state.lastArenaTicketUpdateAt = Date.now();
   // 種が0のままだと相手の抽選が動かない(0に何を掛けても0のため)
   if (typeof state.arenaOpponentSeed !== "number" || state.arenaOpponentSeed <= 0) state.arenaOpponentSeed = 1;
+  // 前から遊んでいる人の控えには無い。**0から数え始める**(いきなり使い切らせない)
+  if (typeof state.arenaRerollsSinceBattle !== "number" || state.arenaRerollsSinceBattle < 0) {
+    state.arenaRerollsSinceBattle = 0;
+  }
   if (typeof state.arenaPeriodKey !== "number") state.arenaPeriodKey = -1;
   if (typeof state.arenaSeasonBattles !== "number") state.arenaSeasonBattles = 0;
   if (typeof state.arenaSeasonWins !== "number") state.arenaSeasonWins = 0;

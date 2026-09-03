@@ -96,11 +96,7 @@ export function renderArenaOpponents(props: PvpArenaProps): HTMLElement {
           ? "近いレートの相手を並べています。実プレイヤーが足りない分はNPCで埋まります"
           : "オフラインのため、いまはNPCだけが並びます",
       ]),
-      el(
-        "button",
-        { type: "button", className: "btn btn--ghost ar-listhead__reroll", onclick: props.onReroll },
-        ["🔄 相手を変える（挑戦券は減りません）"],
-      ),
+      rerollButton(props),
     ])),
     props.candidatesLoading
       ? el("p", { className: "panel ar-empty" }, ["相手を探しています…"])
@@ -108,7 +104,41 @@ export function renderArenaOpponents(props: PvpArenaProps): HTMLElement {
         ? el("p", { className: "panel ar-empty" }, ["挑戦できる相手が見つかりませんでした。「相手を変える」でもう一度探せます"])
         : null,
     ...list.map((entry) => renderCandidate(props, entry)),
+    /*
+     * **下にも置く。** 候補は5人ぶん縦に伸びるので、全部見終わった時には
+     * 上のボタンは画面の外にある。そこから指を戻させるのは、
+     * 「どれも違った」と分かった直後にいちばんやらせたくない動きになる。
+     */
+    list.length > 0 ? el("section", { className: "panel ar-listhead" }, [rerollButton(props)]) : null,
     backRow(props),
+  ]));
+}
+
+/**
+ * 「相手を変える」。
+ *
+ * **残り回数を札に出す。** 押せなくなってから理由を探させない。
+ * 無制限だといちばん弱い相手が出るまで引き直せるので数回に絞ってあるが、
+ * **1戦すれば戻る**ので、行き止まりにはならない。
+ */
+function rerollButton(props: PvpArenaProps): HTMLElement {
+  const left = Math.max(0, props.rerollsLeft);
+  return el("div", { className: "ar-listhead__rerollbox" }, nodes([
+    el(
+      "button",
+      {
+        type: "button",
+        className: "btn btn--ghost ar-listhead__reroll",
+        disabled: left <= 0,
+        onclick: props.onReroll,
+      },
+      [`🔄 相手を変える（残り ${left} / ${props.rerollLimit}）`],
+    ),
+    el("p", { className: "ar-listhead__rerollnote" }, [
+      left > 0
+        ? "挑戦券は減りません"
+        : "1戦すると、また変えられます",
+    ]),
   ]));
 }
 

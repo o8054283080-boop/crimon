@@ -63,6 +63,9 @@ export interface PvpArenaProps {
   onSelectUnit: (index: number) => void;
   onChallenge: (entry: ArenaOpponentEntry) => void;
   onReroll: () => void;
+  /** 「相手を変える」の残り回数。0なら押せない */
+  rerollsLeft: number;
+  rerollLimit: number;
   onRefillTickets: () => void;
   onClaimWeekly: () => void;
   onToggleOffenseMember: (instanceId: string) => void;
