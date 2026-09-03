@@ -72,6 +72,16 @@ const SCREENS = [
   { name: "アリーナ/対戦候補", tab: "HOME", tile: "arena", tour: "arena:opponents" },
   { name: "アリーナ/防衛編成", tab: "HOME", tile: "arena", tour: "arena:defense" },
   { name: "アリーナ/ランキング", tab: "HOME", tile: "arena", tour: "arena:ranking" },
+  /*
+   * **行が入った状態のランキング。**
+   *
+   * 上の行は未接続なので表そのものが出ない(「誰も居ない」と「分からない」は
+   * 別のことなので、出せない時は表を出さない作りにしてある)。
+   * そのせいで巡回は毎回**行が1つも無い画面**を検査して「問題なし」と報告し、
+   * 名前が22px幅の列へ落ちて「ド‥」と切れているのを見逃していた。
+   * DEV限定の口で仮の行を入れ、実際に描かれた行を検査する。
+   */
+  { name: "アリーナ/ランキング(行あり)", tab: "HOME", tile: "arena", tour: "arena:ranking", setup: "window.__crimonDev?.showDemoRanking()" },
   { name: "アリーナ/ショップ", tab: "HOME", tile: "arena", tour: "arena:shop" },
   { name: "アリーナ/防衛履歴", tab: "HOME", tile: "arena", tour: "arena:history" },
   { name: "アリーナ/攻撃編成", tab: "HOME", tile: "arena", then: "編成する" },
@@ -224,6 +234,16 @@ async function goScreen(screen) {
           ? `const mark = document.querySelector('[data-tour=' + ${JSON.stringify(JSON.stringify(screen.tour))} + ']');
              if (!mark) return '目印が無い: ' + ${JSON.stringify(screen.tour)};
              mark.click();
+             await wait(350);`
+          : ""
+      }
+      ${
+        /*
+         * 画面を出した後に、その画面でしか作れない状態を作る。
+         * **繋がっていないと出ない画面**を検査するために要る。
+         */
+        screen.setup
+          ? `${screen.setup};
              await wait(350);`
           : ""
       }
