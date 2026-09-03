@@ -28,7 +28,7 @@ export function newArenaLocalId(): string {
 /** アリーナショップの購入回数1件ぶん */
 export interface ArenaShopPurchaseRecord {
   itemId: string;
-  /** "WEEKLY" / "MONTHLY" */
+  /** "WEEKLY" / "MONTHLY" / "SEASON" */
   period: string;
   /** その周期の通し番号。番号が変われば数え直す(= 上限がリセットされる) */
   periodKey: number;
@@ -196,6 +196,10 @@ export interface PlayerState {
   arenaDefenseLossToday: number;
   /** 上の値を数えている日(JSTの日付文字列) */
   arenaDefenseLossDate: string;
+  /** 今日、防衛成功で受け取ったアリーナコイン */
+  arenaDefenseCoinsToday: number;
+  /** 上の値を数えている日(JSTの日付文字列) */
+  arenaDefenseCoinDate: string;
 
   /* --- 試練の塔 --- */
   /** 塔専用の編成。HPを持ち越して登る場所なので、耐久寄りに組み替えられるよう別枠で持つ */
@@ -340,6 +344,8 @@ export function createInitialState(): PlayerState {
     arenaLastDefenseCheckAt: 0,
     arenaDefenseLossToday: 0,
     arenaDefenseLossDate: "",
+    arenaDefenseCoinsToday: 0,
+    arenaDefenseCoinDate: "",
     towerPartyIds: [],
     trialTowerBestFloor: 0,
     trialTowerClaimedFloors: [],
@@ -525,6 +531,8 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.arenaLastDefenseCheckAt !== "number") state.arenaLastDefenseCheckAt = 0;
   if (typeof state.arenaDefenseLossToday !== "number") state.arenaDefenseLossToday = 0;
   if (typeof state.arenaDefenseLossDate !== "string") state.arenaDefenseLossDate = "";
+  if (typeof state.arenaDefenseCoinsToday !== "number") state.arenaDefenseCoinsToday = 0;
+  if (typeof state.arenaDefenseCoinDate !== "string") state.arenaDefenseCoinDate = "";
 
   if (!Array.isArray(state.towerPartyIds)) state.towerPartyIds = [];
   if (typeof state.trialTowerBestFloor !== "number") state.trialTowerBestFloor = 0;

@@ -38,6 +38,7 @@
    */
   "include": [
     "src/battle/engine.ts",
+    "src/data/pvpArena.ts",
     "src/game/arena/npc.ts",
     "src/game/arena/snapshot.ts",
     "src/game/arena/types.ts"

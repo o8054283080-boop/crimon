@@ -350,8 +350,10 @@ function toMatchRecord(row: unknown, myId: string): ArenaMatchRecord | null {
     won,
     ratingDelta: Math.round(delta),
     ratingAfter: Math.max(0, Math.round(after)),
-    // 防衛はコインが入らない(攻めた側の取り分)
-    coins: side === "OFFENSE" ? Math.max(0, Math.round(asFiniteNumber(row.coins_awarded, 0))) : 0,
+    coins: Math.max(0, Math.round(asFiniteNumber(
+      side === "OFFENSE" ? row.coins_awarded : row.defender_coins_awarded,
+      0,
+    ))),
   };
 }
 

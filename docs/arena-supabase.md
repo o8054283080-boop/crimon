@@ -4,24 +4,11 @@
 
 ---
 
-## 0. 先に、確かめていないことを書く
+## 0. 適用状況
 
-**この作業環境から `plufhhhxokqgedlyfsfz.supabase.co` へは一切到達できない。**
-だから次のことは**やっていない**:
-
-- 実プロジェクトへの migration の適用
-- PostgREST / RPC への実通信
-- Supabase の `authenticated` / `anon` ロールの実際の既定権限との突き合わせ
-- Edge Function `crimon-recovery` が使っている既存テーブルとの実地の衝突確認
-  (中身が見えないので、`arena_` 接頭辞で確実に分ける方針だけを取った)
-
-**代わりに、手元の PostgreSQL 16 に `auth.uid()` と `anon` /
-`authenticated` / `service_role` のスタブを作り、初期の migration をそのまま
-流して動きを確かめてある。** 確かめた内容は「6. 手元で確かめたこと」。
-
-Supabase 固有の部分(JWT の発行、`auth.users` の実装、既定の
-`alter default privileges` の中身)はスタブなので、**本番で同じになる保証は無い。**
-適用したら、まず「7. 適用したら最初に試すこと」の SQL を実行して確かめてほしい。
+本番 Supabase へ migration を適用し、内部関数を `anon` / `authenticated` が
+直接実行できないこと、シーズン更新 Cron とショップ棚が有効なことを確認済み。
+手元のテストに加え、本番の Database Advisor でも権限と索引を確認する。
 
 ---
 
@@ -37,6 +24,9 @@ supabase/
   migrations/20260902172100_arena_seed.sql         ACTIVE シーズン・棚・報酬額
   migrations/20260902172200_arena_match_integrity.sql  検分と、勝敗のサーバ確定
   migrations/20260903003038_arena_release_safety.sql   シーズン自動更新・週境界・ショップ領収書
+  migrations/20260903015014_arena_shop_goals_and_defense_coins.sql  シーズン商品・防衛成功コイン
+  migrations/20260903020202_arena_internal_rpc_lockdown.sql  内部RPCの権限閉鎖・必要索引
+  migrations/20260903020600_arena_foreign_key_indexes.sql  外部キー用の補助索引
   functions/arena-settle/index.ts                  **勝敗を決める場所**
 src/net/arenaAuth.ts             匿名ログイン(GoTrue を素の fetch で)
 src/net/arenaSync.ts             クライアント層(素の fetch。SDKは足していない)
@@ -294,7 +284,10 @@ tables to anon, authenticated, service_role` も入れてある
 - 他人の財布が見えない(自分の1行だけ)
 - 表示名は自分で直せる。他人の行は0行更新
 - 週間報酬:1回目 ok、**2回目は `ALREADY_CLAIMED`**
-- ショップ:週の上限超過で `OVER_WEEKLY_LIMIT`、1回の個数超過で `OVER_ORDER_LIMIT`
+- ショップ:週の上限超過で `OVER_WEEKLY_LIMIT`、月は `OVER_MONTHLY_LIMIT`、
+  シーズンは `OVER_SEASON_LIMIT`、1回の個数超過で `OVER_ORDER_LIMIT`
+- 防衛成功:1戦4コイン、JSTの1日40コインまで。対戦行へ獲得額を確定し、
+  本人が次に状態を取得した時、未受取分だけを財布へ一度だけ移す
 - 対戦履歴が**攻撃側からも防衛側からも1行として引ける**
 - 防衛スナップショット:`version` が文字列、`units` が空 → 例外で弾かれる
 - `anon` は**ランキングだけ読めて**、対戦候補・防衛・財布・履歴は `permission denied`

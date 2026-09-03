@@ -1,7 +1,7 @@
 # supabase/
 
-非同期PvPアリーナのサーバ側。**このリポジトリからは適用していない。**
-依頼主が自分の Supabase プロジェクトへ流す想定で置いてある。
+非同期PvPアリーナのサーバ側。本番プロジェクトへ適用済みで、
+以後の環境でも同じ構成を再現できるよう migration を置いてある。
 
 くわしい説明は `docs/arena-supabase.md`。ここは手順だけ。
 
@@ -22,6 +22,9 @@ supabase db push
 20260902172100_arena_seed.sql              ACTIVE シーズン・棚・報酬額
 20260902172200_arena_match_integrity.sql   検分と、勝敗のサーバ確定
 20260903003038_arena_release_safety.sql    シーズン自動更新・週境界・ショップ領収書
+20260903015014_arena_shop_goals_and_defense_coins.sql  シーズン商品・防衛成功コイン
+20260903020202_arena_internal_rpc_lockdown.sql  内部RPCの権限閉鎖・必要索引
+20260903020600_arena_foreign_key_indexes.sql  外部キー用の補助索引
 ```
 
 RPC は `arena_catalog_*` を読むので、**照合表が先**でなければならない。
@@ -90,10 +93,7 @@ VITE_SUPABASE_ANON_KEY=<anon key>
 静かに落ちる)。`service_role` キーをフロントに置いてはいけない。
 置いていないことは `tests/arenaSecurity.test.ts` が見張っている。
 
-## まだ済んでいないこと
+## 制約
 
-- **この作業環境からは Supabase へ接続できないため、実プロジェクトへの
-  適用も接続テストも行っていない。** 手元の PostgreSQL に
-  `auth.uid()` などのスタブを作って流す確認まで。
 - 攻撃編成の**所有**は確かめられない。手持ちをサーバへ同期していないので、
   「作れるはずの編成」であることまでしか見られない。

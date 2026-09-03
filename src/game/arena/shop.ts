@@ -10,10 +10,10 @@
  * (リセット用の後片付け処理を持たない。動かない後始末は必ず腐る)。
  */
 import { Star } from "../../core/rarity.js";
-import { EXP_PIG_DEX, REINCARNATION_PIG_DEX } from "../../data/monsters.js";
+import { EXP_PIG_DEX, REINCARNATION_PIG_DEX, SKILL_PIG_DEX } from "../../data/monsters.js";
 import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { ARENA_SHOP_ITEMS, ArenaShopItem, ArenaShopPeriod, findArenaShopItem } from "../../data/arena/shop.js";
-import { ARENA_SEASON_EPOCH_UTC } from "../../data/arena/season.js";
+import { ARENA_SEASON_EPOCH_UTC, arenaSeasonNumber } from "../../data/arena/season.js";
 import { PlayerState, addMonster, addSummonScrolls } from "../playerState.js";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -27,6 +27,7 @@ const WEEK_EPOCH_UTC = ARENA_SEASON_EPOCH_UTC;
 /** その周期の通し番号。番号が変われば上限が数え直しになる */
 export function arenaShopPeriodKey(period: ArenaShopPeriod, now: number = Date.now()): number {
   if (period === "WEEKLY") return Math.floor((now - WEEK_EPOCH_UTC) / WEEK_MS);
+  if (period === "SEASON") return arenaSeasonNumber(now);
   const date = new Date(now);
   return date.getUTCFullYear() * 12 + date.getUTCMonth();
 }
@@ -51,11 +52,11 @@ export interface ArenaShopPurchaseResult {
   alreadyFulfilled?: boolean;
 }
 
-/** ピッグは**レベル上限で渡す。** 素材なので、レベルが低いと意味が変わる */
-function grantPig(state: PlayerState, kind: "EXP_PIG" | "REINCARNATION_PIG", star: Star, seed: number): void {
-  const pool = kind === "EXP_PIG" ? EXP_PIG_DEX : REINCARNATION_PIG_DEX;
+/** 経験・転生ピッグはレベル上限、スキルピッグは素材として★1 Lv1で渡す。 */
+function grantPig(state: PlayerState, kind: "EXP_PIG" | "REINCARNATION_PIG" | "SKILL_PIG", star: Star, seed: number): void {
+  const pool = kind === "EXP_PIG" ? EXP_PIG_DEX : kind === "REINCARNATION_PIG" ? REINCARNATION_PIG_DEX : SKILL_PIG_DEX;
   const dex = pool[seed % pool.length];
-  addMonster(state, dex.id, star, STAR_MAX_LEVEL[star]);
+  addMonster(state, dex.id, kind === "SKILL_PIG" ? 1 : star, kind === "SKILL_PIG" ? 1 : STAR_MAX_LEVEL[star]);
 }
 
 /** 商品を付与する。購入可否やコインは呼び出し側が確定してからここへ来る。 */
@@ -65,10 +66,12 @@ function grantItem(state: PlayerState, item: ArenaShopItem, quantity: number, se
     case "SUMMON_SCROLL": addSummonScrolls(state, amount); break;
     case "FOUR_STAR_SCROLL": state.fourStarSummonScrolls += amount; break;
     case "LIGHT_DARK_SCROLL": state.lightDarkFourStarSummonScrolls += amount; break;
+    case "FIVE_STAR_SCROLL": state.fiveStarSummonScrolls += amount; break;
     case "GOLD": state.gold += amount; break;
     case "AWAKENING_ORB": state.awakeningOrbs += amount; break;
     case "EXP_PIG":
     case "REINCARNATION_PIG":
+    case "SKILL_PIG":
       for (let i = 0; i < amount; i += 1) grantPig(state, item.kind, item.star ?? 3, seed + i);
       break;
   }
@@ -100,7 +103,8 @@ export function buyArenaShopItem(
   const item = findArenaShopItem(itemId);
   if (!item) return { ok: false, reason: "その商品はありません" };
   if (arenaShopRemaining(state, item, now) <= 0) {
-    return { ok: false, reason: item.period === "WEEKLY" ? "今週の上限に達しています" : "今月の上限に達しています", item };
+    const period = item.period === "WEEKLY" ? "今週" : item.period === "MONTHLY" ? "今月" : "今シーズン";
+    return { ok: false, reason: `${period}の上限に達しています`, item };
   }
   if (state.arenaCoins < item.price) return { ok: false, reason: "アリーナコインが足りません", item };
 

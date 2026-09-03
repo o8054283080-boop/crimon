@@ -433,9 +433,9 @@ describe("サーバの答えの読み取り", () => {
       },
       {
         id: "m2", attacker_id: "u3", defender_id: "me", opponent_kind: "PLAYER",
-        attacker_won: true, attacker_rating_before: 1300, attacker_rating_delta: 15,
-        defender_rating_delta: -5, defender_rating_after: 1195,
-        coins_awarded: 30, created_at: "2026-02-02T00:00:00.000Z",
+        attacker_won: false, attacker_rating_before: 1300, attacker_rating_delta: -10,
+        defender_rating_delta: 5, defender_rating_after: 1205,
+        coins_awarded: 3, defender_coins_awarded: 4, created_at: "2026-02-02T00:00:00.000Z",
       },
     ]));
     const [offense, defense] = await fetchArenaMatchHistory("me");
@@ -447,12 +447,11 @@ describe("サーバの答えの読み取り", () => {
     expect(offense.at).toBe(Date.parse("2026-02-01T00:00:00.000Z"));
 
     expect(defense.side).toBe("DEFENSE");
-    // 攻撃側が勝った = 防衛側から見れば負け
-    expect(defense.won).toBe(false);
-    expect(defense.ratingDelta).toBe(-5);
-    expect(defense.ratingAfter).toBe(1195);
-    // 防衛にコインは入らない
-    expect(defense.coins).toBe(0);
+    // 攻撃側が負けた = 防衛成功。サーバが焼いた防衛報酬を表示する
+    expect(defense.won).toBe(true);
+    expect(defense.ratingDelta).toBe(5);
+    expect(defense.ratingAfter).toBe(1205);
+    expect(defense.coins).toBe(4);
   });
 
   it("日時が読めなくても落ちない", async () => {

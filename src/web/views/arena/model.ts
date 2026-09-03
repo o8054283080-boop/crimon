@@ -454,7 +454,7 @@ export interface ArenaShopRowView {
  * 次にやること(来週まで待つ / 戦ってコインを貯める)がまるで違う。
  */
 export function arenaShopRowView(row: ArenaShopRow, coins: number): ArenaShopRowView {
-  const period = row.item.period === "WEEKLY" ? "週" : "月";
+  const period = row.item.period === "WEEKLY" ? "週" : row.item.period === "MONTHLY" ? "月" : "シーズン";
   const soldOut = row.remaining <= 0;
   const poor = coins < row.item.price;
   return {

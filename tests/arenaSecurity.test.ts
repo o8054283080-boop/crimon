@@ -24,6 +24,14 @@ const integrity = readFileSync(
   join(MIGRATIONS, files.find((n) => n.includes("match_integrity"))!), "utf8");
 const safety = readFileSync(
   join(MIGRATIONS, files.find((n) => n.includes("release_safety"))!), "utf8");
+const shopGoals = readFileSync(
+  join(MIGRATIONS, files.find((n) => n.includes("shop_goals_and_defense_coins"))!), "utf8");
+const lockdown = readFileSync(
+  join(MIGRATIONS, files.find((n) => n.includes("internal_rpc_lockdown"))!), "utf8");
+const foreignKeyIndexes = readFileSync(
+  join(MIGRATIONS, files.find((n) => n.includes("foreign_key_indexes"))!), "utf8");
+const edgeTsconfig = readFileSync(
+  fileURLToPath(new URL("../tsconfig.edge.json", import.meta.url)), "utf8");
 
 describe("migration の並び", () => {
   it("すべてタイムスタンプ形式になっている", () => {
@@ -51,6 +59,26 @@ describe("migration の並び", () => {
     expect(sql).toContain("create table if not exists");
     expect(sql).not.toMatch(/\ncreate table public\./);
     expect(sql).not.toMatch(/\ncreate function public\./);
+  });
+});
+
+describe("運用時の索引", () => {
+  it("外部キーに対応する索引を持つ", () => {
+    for (const column of [
+      "arena_reward_claims (tier_id)",
+      "arena_reward_rules (tier_id)",
+      "arena_season_results (final_tier_id)",
+      "arena_shop_purchases (item_id)",
+      "arena_standings (tier_id)",
+    ]) {
+      expect(foreignKeyIndexes).toContain(`on public.${column}`);
+    }
+  });
+});
+
+describe("Edge Function の配布物", () => {
+  it("entrypoint が直接読む速度補正式を生成する", () => {
+    expect(edgeTsconfig).toContain('"src/data/pvpArena.ts"');
   });
 });
 
@@ -218,9 +246,30 @@ describe("シーズンとショップの復旧", () => {
     expect(safety).toContain("grant execute on function public.arena_pending_shop_purchases() to authenticated;");
     expect(safety).toContain("grant execute on function public.arena_ack_shop_purchase(uuid) to authenticated;");
   });
+
+  it("防衛報酬は対戦行の作成時だけ動き、直接呼べない", () => {
+    expect(shopGoals).toContain("before insert on public.arena_matches");
+    expect(shopGoals).toContain("revoke execute on function public.arena__award_defense_coins() from public, anon, authenticated;");
+    expect(shopGoals).toContain("daily_coin_cap");
+    expect(shopGoals).toContain("defender_coins_awarded := v_award");
+    expect(shopGoals).toContain("defender_coins_claimed_at is null");
+    expect(shopGoals).toContain("perform public.arena__claim_defense_coins(v_uid)");
+    expect(shopGoals).toContain("revoke execute on function public.arena__claim_defense_coins(uuid) from public, anon, authenticated;");
+  });
+
+  it("シーズン商品の上限もサーバ購入処理で検査する", () => {
+    expect(shopGoals).toContain("v_item.limit_per_season is not null");
+    expect(shopGoals).toContain("pu.season_key = v_season");
+    expect(shopGoals).toContain("'OVER_SEASON_LIMIT'");
+  });
 });
 
 describe("security definer の書き方", () => {
+  it("内部の編成検証とシーズン更新をData APIへ公開しない", () => {
+    expect(lockdown).toMatch(/arena__validate_snapshot\(jsonb\)[\s\S]*from public, anon, authenticated/);
+    expect(lockdown).toMatch(/arena_current_season\(\)[\s\S]*from public, anon, authenticated/);
+  });
+
   it("すべて search_path を空にしている", () => {
     /*
      * `security definer` は定義者の権限で動く。`search_path` を

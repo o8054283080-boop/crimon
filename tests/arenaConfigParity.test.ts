@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { ARENA_DEFENSE_DAILY_LOSS_CAP, ARENA_DEFENSE_RATING_SCALE, ARENA_RATING_RULES } from "../src/data/arena/rating.js";
-import { ARENA_COIN_LOSS, ARENA_COIN_WIN } from "../src/data/arena/shop.js";
+import {
+  ARENA_COIN_DEFENSE_DAILY_CAP,
+  ARENA_COIN_DEFENSE_WIN,
+  ARENA_COIN_LOSS,
+  ARENA_COIN_WIN,
+} from "../src/data/arena/shop.js";
 import { ARENA_TICKET_MAX, ARENA_TICKET_REGEN_MINUTES } from "../src/data/pvpArena.js";
 import { ARENA_TIERS } from "../src/data/arena/ranks.js";
 import {
@@ -40,6 +45,7 @@ const sql0001 = readFileSync(new URL("../supabase/migrations/20260902170000_aren
 const sql0003 = readFileSync(new URL("../supabase/migrations/20260902172000_arena_rpc.sql", import.meta.url), "utf8");
 const sqlSeed = readFileSync(new URL("../supabase/migrations/20260902172100_arena_seed.sql", import.meta.url), "utf8");
 const sqlSafety = readFileSync(new URL("../supabase/migrations/20260903003038_arena_release_safety.sql", import.meta.url), "utf8");
+const sqlShopGoals = readFileSync(new URL("../supabase/migrations/20260903015014_arena_shop_goals_and_defense_coins.sql", import.meta.url), "utf8");
 
 /** `arena_config` に入れている初期値を1件取り出す */
 function seededConfig(key: string): Record<string, number> {
@@ -193,13 +199,17 @@ describe("報酬・シーズン・棚がクライアントと同じ値である�
      */
     for (const item of ARENA_SHOP_ITEMS) {
       // 行の終わりは `),` か `)` +改行。**最後の1件だけ `,` が無い**
-      const row = sqlSeed.match(new RegExp(`\\('${item.id}',[^)]{0,400}\\)`));
+      const row = sqlShopGoals.match(new RegExp(`\\('${item.id}',[^)]{0,500}\\)`));
       expect(row, `${item.id} が seed に無い`).not.toBeNull();
       const text = row![0];
       expect(text, `${item.id} の値段`).toContain(`, ${item.price},`);
       expect(text, `${item.id} の中身`).toContain(`"kind":"${item.kind}"`);
       expect(text, `${item.id} の個数`).toContain(`"amount":${item.amount}`);
-      const limits = item.period === "WEEKLY" ? `${item.limit}, null` : `null, ${item.limit}`;
+      const limits = item.period === "WEEKLY"
+        ? `${item.limit}, null, null`
+        : item.period === "MONTHLY"
+          ? `null, ${item.limit}, null`
+          : `null, null, ${item.limit}`;
       expect(text, `${item.id} の上限(${item.period})`).toContain(limits);
     }
   });
@@ -211,13 +221,20 @@ describe("報酬・シーズン・棚がクライアントと同じ値である�
      * ファイル全体から拾うと設定の鍵まで「商品」として数えてしまう
      * (`snapshot` を商品だと言って落ちた)。
      */
-    const from = sqlSeed.indexOf("insert into public.arena_shop_items");
-    const block = sqlSeed.slice(from, sqlSeed.indexOf("on conflict", from));
+    const from = sqlShopGoals.indexOf("insert into public.arena_shop_items");
+    const block = sqlShopGoals.slice(from, sqlShopGoals.indexOf("on conflict", from));
     const ids = [...block.matchAll(/^\s{2}\('([a-z0-9_]+)',\s*'/gm)].map((m) => m[1]);
     const known = new Set(ARENA_SHOP_ITEMS.map((item) => item.id));
     for (const id of ids) {
       expect(known.has(id), `${id} は実装に無い商品`).toBe(true);
     }
+  });
+
+  it("防衛成功コインと日次上限がサーバ設定と一致する", () => {
+    expect(sqlShopGoals).toContain(`\"coin_win\":${ARENA_COIN_DEFENSE_WIN}`);
+    expect(sqlShopGoals).toContain(`\"daily_coin_cap\":${ARENA_COIN_DEFENSE_DAILY_CAP}`);
+    expect(sqlShopGoals).toContain("defender_coins_awarded");
+    expect(sqlShopGoals).toContain("at time zone 'Asia/Tokyo'");
   });
 });
 
