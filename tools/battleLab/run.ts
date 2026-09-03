@@ -53,6 +53,10 @@ export interface UnitTally {
   stunsLanded: number;
   stripsLanded: number;
   resisted: number;
+  /** 行動ゲージの吸収に成功した回数(スキル・パッシブの両方) */
+  gaugeDrains: number;
+  /** パッシブで自分の行動ゲージが進んだ回数(闇クロノスの「時の管理者」など) */
+  passiveGaugeGains: number;
 }
 
 export interface SkillTally {
@@ -93,6 +97,7 @@ function newUnitTally(def: MonsterDefinition, id: string, team: "PLAYER" | "ENEM
     id, name: def.name, team, alive: true, hpLeft: def.stats.hp, maxHp: def.stats.hp,
     deathOrder: 0, actions: 0, damageDealt: 0, damageTaken: 0, healed: 0,
     buffsGiven: 0, debuffsLanded: 0, stunsLanded: 0, stripsLanded: 0, resisted: 0,
+    gaugeDrains: 0, passiveGaugeGains: 0,
   };
 }
 
@@ -259,6 +264,13 @@ export function runBattle(scenario: Scenario, seed: number, focus?: string[], gr
       continue;
     }
     if (line.includes("は効果を抵抗した！")) { bump(target, "resisted"); continue; }
+    /*
+     * ゲージまわり。**行の主語が違う**ので分けて数える。
+     *   吸収した   … 主語は吸った側(名札はその1体だけ)
+     *   進んだ     … 主語は進んだ本人
+     */
+    if (line.includes("行動ゲージを吸収した")) { bump(target, "gaugeDrains"); continue; }
+    if (line.includes("で行動ゲージが進んだ")) { bump(target, "passiveGaugeGains"); continue; }
   }
 
   // 最終HPは engine の最終スナップショットが正。ログの読み落としに影響されない

@@ -58,6 +58,9 @@ npm run battle:lab -- --scenario tower-60 --runs 300 --gear mid
 
 # 仕上がり具合を4段階そろえて比べる
 npm run battle:lab -- --scenario tower-60 --runs 300 --gear-compare
+
+# 味方の属性だけ差し替えて比べる(他の条件は完全に同じ)
+npm run battle:lab -- --scenario tower-60 --runs 1000 --swap dragon=DARK,chronos=DARK
 ```
 
 ### 引数
@@ -73,11 +76,27 @@ npm run battle:lab -- --scenario tower-60 --runs 300 --gear-compare
 | `--json` | 集計をJSONで出す |
 | `--markdown` | 表で出す(既定) |
 | `--out` | `tools/battleLab/results/` へも保存する |
-| `--compare <key>=<v1>,<v2>,…` | 1か所だけ変えた盤面を並べて比べる。いまは `boss-s3` のみ |
+| `--compare <key>=<v1>,<v2>,…` | 1か所だけ変えた盤面を並べて比べる(下の表) |
 | `--gear <段階>` | 味方の装備の仕上がり具合。`finished` / `strong` / `mid` / `rough`。省略時は `finished` |
 | `--gear-compare` | 4段階すべてを並べて比べる |
+| `--swap <template>=<属性>,…` | 味方の**属性だけ**差し替える。例 `dragon=DARK,chronos=DARK` |
 | `--strict` | 期待範囲を外れたら終了コードを非0にする |
 | `--list` | シナリオの一覧 |
+
+### `--compare` のキー
+
+| キー | 意味 |
+|---|---|
+| `boss-s3` | 勝利条件の敵のスキル3の**倍率**(置き換え) |
+| `boss-atk` / `boss-spd` / `boss-hp` | 勝利条件の敵のその値への**増減**(足し算) |
+| `enemy-atk` / `enemy-spd` | **敵全員**のその値への増減 |
+
+倍率だけ置き換えで、他は足し算。「攻撃力を1000増やすとどうなるか」を
+測りたいのであって、「攻撃力を1000にする」ではないため。
+
+```bash
+npm run battle:lab -- --scenario tower-60 --runs 1000 --gear typical --compare enemy-atk=0,250,500,1000
+```
 
 **再現性**: 1000戦を `--seed S` で走らせた時の137戦目は、`--seed S+137 --runs 1 --verbose`
 でそのまま取り出して眺められる(1戦ごとに `seed + 番号` を使っている)。
@@ -208,6 +227,21 @@ export const MY_SCENARIO: Scenario = {
 難易度を読むならこちらを見る。`rough` の敗因が全件「ターン上限」で
 生存2.62というのは、**倒されているのではなく倒しきれていない**という意味。
 
+### 属性だけを差し替えて比べる
+
+「火ドラゴンと闇ドラゴン、60階ではどちらが良いか」を測る時、比べたいのは
+**属性の違いだけ**。★もLvも装備も能力ポイントもタイプも潜在も、
+他が1つでも違えば、出た差がどこから来たのか言えなくなる。
+
+```bash
+npm run battle:lab -- --scenario tower-60 --runs 1000 --gear typical --swap dragon=DARK,chronos=DARK
+```
+
+**スキルは差し替えない。** 属性を変えれば `buildAlly` が
+`<templateId>_<属性>` の図鑑を引くので、**本編の正式なスキルがそのまま入る**
+(闇ドラゴンの「破壊の流星」、闇クロノスの「時の管理者」)。
+Battle Lab用に簡略化した技を作る余地はどこにも無い。
+
 ### 一部だけ変える
 
 ```ts
@@ -219,6 +253,15 @@ export const MY_SCENARIO: Scenario = {
 ## 崩れの見張り(回帰基準)
 
 シナリオに `expect: { minWinRate, maxWinRate }` を書いておくと、外れた時に警告が出る。
+
+**基準にするのは「実測でいちばん強い線」。** `focusPatterns` の1つ目が
+既定になるので、そこへ最良手を置くこと。最悪手を既定にしたまま数値を詰めると、
+プレイヤーが最良手を見つけた瞬間に想定より易しくなる
+(60階v2で実際にそうなりかけた。既定54.2%に対し最良手は85.7%)。
+最良手は階ごとに違うので、**作った後に測って並べ直す。**
+
+範囲を外れた時は、**範囲の方を広げて黙らせない。** 外れているのは
+シナリオがまだ釣り合っていないという意味で、警告はその合図。
 
 ```
 WARN: tower-60 win rate 97.8% is outside expected range 60%-85%
