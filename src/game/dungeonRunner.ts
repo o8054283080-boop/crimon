@@ -22,7 +22,7 @@ export interface DungeonLikeFloor {
 function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale: number): MonsterDefinition {
   const dex = resolveDex(`${enemy.templateId}_${enemy.element}`);
   const base = computeEffectiveStats(dex.stats, enemy.star, enemy.level);
-  const stats = {
+  const scaledStats = {
     ...base,
     // hpMultiplier / spdMultiplier は個体単位の補正。powerScale が階層全体に掛かるのに対し、
     // こちらはボス1体だけを分厚くしたり手番を早めたりするために使う
@@ -31,6 +31,7 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale
     def: Math.round(base.def * powerScale),
     spd: Math.round(base.spd * (enemy.spdMultiplier ?? 1) * speedScale),
   };
+  const stats = enemy.fixedStats ? { ...base, ...enemy.fixedStats } : scaledStats;
   return {
     ...dex,
     id: `${dex.id}_dungeon`,
@@ -38,6 +39,7 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale
     stats,
     victoryTarget: enemy.victoryTarget,
     primaryTarget: enemy.primaryTarget,
+    initialCooldowns: enemy.initialCooldowns,
   };
 }
 

@@ -52,7 +52,7 @@ export const MUSHROON: MonsterTemplate = {
     {
       id: "mushroon_s2_b",
       name: "衰弱胞子",
-      description: "敵単体に攻撃力1.2倍のダメージを与え、75%で2ターン攻撃力を50%低下させ、75%で2ターン回復阻害を付与する。",
+      description: "敵単体に攻撃力1.2倍のダメージを与え、75%で2ターン攻撃力を50%低下させ、75%で2ターン回復封じを付与する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [

@@ -103,6 +103,10 @@ export interface BattleUnit {
   hitGaugeTurns: number;
   /** 被弾1回ごとに進む行動ゲージ */
   hitGaugeAmount: number;
+  /** 祝福セットの戦闘中1回を消費済みか。 */
+  thresholdHealUsed: boolean;
+  /** 味方回復型ボス特性の戦闘中1回を消費済みか。 */
+  allyThresholdHealUsed: boolean;
 }
 
 /** 空の状態から作る時に使う、今回足した状態の初期値 */
@@ -124,6 +128,8 @@ function freshExtendedState() {
     latentOneShotMitigate: 0,
     hitGaugeTurns: 0,
     hitGaugeAmount: 0,
+    thresholdHealUsed: false,
+    allyThresholdHealUsed: false,
   };
 }
 

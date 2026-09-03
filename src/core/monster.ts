@@ -91,6 +91,8 @@ export interface MonsterDefinition {
   victoryTarget?: boolean;
   /** 支援AIが単体攻撃バフを優先する主要対象。 */
   primaryTarget?: boolean;
+  /** 戦闘開始時点のスキル残りクールタイム。 */
+  initialCooldowns?: [number, number, number];
   /** 図鑑に出す説明。テンプレートの `dexNote` がそのまま渡る */
   dexNote?: string;
 }
@@ -105,6 +107,13 @@ export interface BossTraits {
   counterAfterHits?: number;
   /** 反撃のダメージ倍率 */
   counterMultiplier?: number;
+  /** 行動終了時に追加ターンを得る確率。 */
+  extraTurnChance?: number;
+  /** 1回の攻撃行動ごとに判定する部分防御無視。 */
+  defenseIgnoreChance?: number;
+  defenseIgnoreRatio?: number;
+  /** 味方が閾値以下で生存した時、一度だけ回復する支援特性。 */
+  allyThresholdHeal?: { hpRatio: number; healPercent: number };
 }
 
 /*

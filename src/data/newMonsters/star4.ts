@@ -117,7 +117,7 @@ export const BASILISK: MonsterTemplate = {
   lightSkill3: {
     id: "basilisk_s3_light",
     name: "神眼の裁き",
-    description: "裁きの眼光が走り、敵全体の有利な効果を1個解除し、行動ゲージを25%減少させ、80%で2ターン速度を低下させる。",
+    description: "裁きの眼光が走り、敵全体の有利な効果を1個剥がし、行動ゲージを25%減少させ、80%で2ターン速度を低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
@@ -188,7 +188,7 @@ export const MIMIC: MonsterTemplate = {
     {
       id: "mimic_s2_b",
       name: "呪われた財宝",
-      description: "呪いの財宝を押し付け、敵単体に攻撃力1.0倍のダメージを与える(最大HP×0.04を加算)。80%で2ターン回復阻害を付与し、行動ゲージを25%減少させる。",
+      description: "呪いの財宝を押し付け、敵単体に攻撃力1.0倍のダメージを与える(最大HP×0.04を加算)。80%で2ターン回復封じを付与し、行動ゲージを25%減少させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [

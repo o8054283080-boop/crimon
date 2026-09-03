@@ -227,6 +227,8 @@ export interface DebuffEffect {
   durationTurns: number;
   /** この効果が発動を試みる基礎確率(0-1)。省略時は常に発動を試みる(その後、命中率/抵抗率判定を経る) */
   chance?: number;
+  /** 同じIDを持つ効果同士で、基礎発動判定を共有する。 */
+  chanceGroup?: string;
   /** Lv5でも継続ターンを延ばさない印 */
   fixedDuration?: true;
 }
@@ -252,6 +254,8 @@ export interface BurnEffect {
 export interface GaugeEffect {
   kind: "GAUGE";
   amount: number;
+  /** ヒットごとに独立して判定する発動確率。命中・抵抗の影響は受けない。 */
+  chance?: number;
   /**
    * trueなら「吸収」になり、対象から減らした分をそのまま術者へ移す。
    * 相手を遅らせつつ自分が早く動けるので、単なる増減より強い。
@@ -428,6 +432,8 @@ export interface StripEffect {
   kind: "STRIP";
   /** この効果が発動を試みる基礎確率(0-1) */
   chance?: number;
+  /** 同じIDを持つ効果同士で、基礎発動判定を共有する。 */
+  chanceGroup?: string;
   /**
    * 解除する個数。**省略時は従来どおり全部**。
    * 既存スキルの意味を変えないため、既定値は残してある。
@@ -544,6 +550,14 @@ export interface Skill {
   /** このスキルが使えるようになるまでのクールタイム(ターン数)。0ならクールタイム無し */
   cooldownTurns: number;
   effects: SkillEffect[];
+  /** 単体敵スキルで、防御低下中の相手を優先する。 */
+  targetPriority?: "DEF_DOWN" | "LOWEST_HP";
+  /** このスキルで敵を倒した時、使用者が追加ターンを得る。 */
+  extraTurnOnKill?: boolean;
+  /** 戦闘中に自動発動する表示用パッシブ。AIの行動候補にはしない。 */
+  automatic?: boolean;
+  /** DAMAGEのhits回ぶん、敵を重複ありでランダム選択する。 */
+  randomEnemyHits?: boolean;
   /**
    * パッシブ。**この枠は行動として選ばれない。**
    *
@@ -562,7 +576,7 @@ export interface Skill {
 
 /** そのスキルがパッシブか */
 export function isPassiveSkill(skill: Skill): boolean {
-  return skill.passive !== undefined;
+  return skill.passive !== undefined || skill.automatic === true;
 }
 
 export function isOffCooldownSkill(skill: Skill): boolean {
@@ -619,6 +633,7 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
    * ここではレベルだけを焼き込み、効果には一切触れない。
    */
   if (skill.passive) return { ...skill, passiveLevel: clampedLevel };
+  if (skill.automatic) return skill;
   if (clampedLevel === 1) return skill;
 
   const growth = powerGrowthFactor(clampedLevel, skill.cooldownTurns === 0);
@@ -656,7 +671,7 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
       case "BURN":
         return { ...effect, chance: growChance(effect.chance, growth) };
       case "GAUGE":
-        return { ...effect, amount: round3(effect.amount * growth) };
+        return { ...effect, amount: round3(effect.amount * growth), chance: effect.chance === undefined ? undefined : growChance(effect.chance, growth) };
       case "SHIELD": {
         const withRate = { ...effect, shieldRate: round3(effect.shieldRate * growth) };
         return extend(withRate) ? { ...withRate, durationTurns: withRate.durationTurns + 1 } : withRate;
@@ -819,9 +834,9 @@ export function describeSkillEffect(effect: SkillEffect): string {
           ? ` (HP${Math.round(effect.lowHpExtra.hpRatio * 100)}%以下ならさらに${Math.round(effect.lowHpExtra.amount * 100)}%)`
           : "";
       const head = conditionPrefix(effect.requires);
-      if (effect.drain) return `${head}${scope}行動ゲージを${Math.round(effect.amount * 100)}%吸収${extra}`;
+      if (effect.drain) return `${head}${chanceSuffix(effect.chance)}${scope}行動ゲージを${Math.round(effect.amount * 100)}%吸収${extra}`;
       const verb = effect.amount >= 0 ? `+${Math.round(effect.amount * 100)}%` : `-${Math.round(-effect.amount * 100)}%`;
-      return `${head}${scope}行動ゲージ${verb}${extra}`;
+      return `${head}${chanceSuffix(effect.chance)}${scope}行動ゲージ${verb}${extra}`;
     }
     case "SHIELD": {
       const scope = effect.applyTo === "ALLIES" ? "味方全体に" : effect.applyTo === "SELF" ? "自身に" : "";

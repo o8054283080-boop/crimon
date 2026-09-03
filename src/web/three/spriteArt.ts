@@ -195,7 +195,12 @@ export function tintThresholdsFor(templateId: string, element: Element): TintThr
  * 転生ピッグは属性を持たない育成素材で、6色に散らす意味が無い。
  * 経験ピッグは属性ごとに出るので、色替えの対象に含める。
  */
-export const NO_TINT_TEMPLATES = new Set(["reincarnation_pig"]);
+export const NO_TINT_TEMPLATES = new Set([
+  "reincarnation_pig",
+  "ancient_beast",
+  "ancient_guard_beast",
+  "ancient_fang_beast",
+]);
 
 export type SpritePose = "idle" | "attack" | "hit" | "cast";
 
