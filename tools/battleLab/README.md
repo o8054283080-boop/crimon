@@ -76,12 +76,27 @@ npm run battle:lab -- --scenario tower-60 --runs 1000 --swap dragon=DARK,chronos
 | `--json` | 集計をJSONで出す |
 | `--markdown` | 表で出す(既定) |
 | `--out` | `tools/battleLab/results/` へも保存する |
-| `--compare <key>=<v1>,<v2>,…` | 1か所だけ変えた盤面を並べて比べる。いまは `boss-s3` のみ |
+| `--compare <key>=<v1>,<v2>,…` | 1か所だけ変えた盤面を並べて比べる(下の表) |
 | `--gear <段階>` | 味方の装備の仕上がり具合。`finished` / `strong` / `mid` / `rough`。省略時は `finished` |
 | `--gear-compare` | 4段階すべてを並べて比べる |
 | `--swap <template>=<属性>,…` | 味方の**属性だけ**差し替える。例 `dragon=DARK,chronos=DARK` |
 | `--strict` | 期待範囲を外れたら終了コードを非0にする |
 | `--list` | シナリオの一覧 |
+
+### `--compare` のキー
+
+| キー | 意味 |
+|---|---|
+| `boss-s3` | 勝利条件の敵のスキル3の**倍率**(置き換え) |
+| `boss-atk` / `boss-spd` / `boss-hp` | 勝利条件の敵のその値への**増減**(足し算) |
+| `enemy-atk` / `enemy-spd` | **敵全員**のその値への増減 |
+
+倍率だけ置き換えで、他は足し算。「攻撃力を1000増やすとどうなるか」を
+測りたいのであって、「攻撃力を1000にする」ではないため。
+
+```bash
+npm run battle:lab -- --scenario tower-60 --runs 1000 --gear typical --compare enemy-atk=0,250,500,1000
+```
 
 **再現性**: 1000戦を `--seed S` で走らせた時の137戦目は、`--seed S+137 --runs 1 --verbose`
 でそのまま取り出して眺められる(1戦ごとに `seed + 番号` を使っている)。

@@ -9,6 +9,7 @@
  *   npm run battle:lab -- --scenario tower-60 --runs 300 --gear mid
  *   npm run battle:lab -- --scenario tower-60 --runs 300 --gear-compare
  *   npm run battle:lab -- --scenario tower-60 --runs 1000 --swap dragon=DARK,chronos=DARK
+ *   npm run battle:lab -- --scenario tower-60 --runs 1000 --compare enemy-atk=0,1000
  *   npm run battle:lab -- --list
  *
  * ## 何を触らないか
@@ -139,11 +140,46 @@ function parseArgs(argv: string[]): Args {
 /**
  * 見比べ用に、シナリオを1か所だけ変えた複製を作る。
  *
- * いまのところ `boss-s3`(勝利条件になっている敵のスキル3の倍率)だけ。
  * **複製して変えるので、元のシナリオには触らない。**
+ *
+ * | キー | 意味 |
+ * |---|---|
+ * | `boss-s3`    | 勝利条件の敵のスキル3の**倍率**(置き換え) |
+ * | `boss-atk`   | 勝利条件の敵の攻撃力への**増減**(足し算) |
+ * | `boss-spd`   | 同じく速度への増減 |
+ * | `boss-hp`    | 同じくHPへの増減 |
+ * | `enemy-atk`  | **敵全員**の攻撃力への増減 |
+ * | `enemy-spd`  | 同じく速度への増減 |
+ *
+ * 倍率だけ置き換えで、他は足し算。「攻撃力を1000増やすとどうなるか」を
+ * 測りたいのであって、「攻撃力を1000にする」ではないため。
  */
+const STAT_DELTA_KEYS: Record<string, { stat: "atk" | "spd" | "hp"; bossOnly: boolean }> = {
+  "boss-atk": { stat: "atk", bossOnly: true },
+  "boss-spd": { stat: "spd", bossOnly: true },
+  "boss-hp": { stat: "hp", bossOnly: true },
+  "enemy-atk": { stat: "atk", bossOnly: false },
+  "enemy-spd": { stat: "spd", bossOnly: false },
+};
+
 function variant(scenario: Scenario, key: string, value: number): Scenario {
-  if (key !== "boss-s3") throw new Error(`--compare は boss-s3 だけに対応しています(受け取った: ${key})`);
+  const delta = STAT_DELTA_KEYS[key];
+  if (delta) {
+    const enemies = scenario.enemies.map((enemy) => {
+      if (delta.bossOnly && !enemy.victoryTarget) return enemy;
+      const base = enemy.stats?.[delta.stat];
+      if (base === undefined) {
+        throw new Error(`${enemy.label ?? enemy.templateId} に ${delta.stat} が書かれていないので増減できません`);
+      }
+      // 0を下回らせない。速度0は行動できない相手になり、比べる意味が消える
+      return { ...enemy, stats: { ...enemy.stats, [delta.stat]: Math.max(1, base + value) } };
+    });
+    return { ...scenario, enemies };
+  }
+
+  if (key !== "boss-s3") {
+    throw new Error(`--compare のキー "${key}" がありません。候補: boss-s3 / ${Object.keys(STAT_DELTA_KEYS).join(" / ")}`);
+  }
   const enemies = scenario.enemies.map((enemy) => {
     if (!enemy.victoryTarget || !enemy.skills) return enemy;
     const skills = enemy.skills.map((skill, i) => (
