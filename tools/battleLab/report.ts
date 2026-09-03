@@ -37,7 +37,18 @@ export interface SkillSummary {
   unitName: string;
   skillName: string;
   uses: number;
+  /**
+   * 1回**撃つ**ごとのダメージ。全体技では**対象ぜんぶの合計**になる。
+   *
+   * この列だけを見ると、3体に当たる技は1体あたりの3倍に見える。
+   * 実際それで「120,000のHPを一撃で抜く」と読み違えた
+   * (本当は2発かかっていた)。**1体あたりは `avgPerHit` を見ること。**
+   */
   avgDamage: number;
+  /** 1**発**あたりのダメージ。多段は1ヒット、全体技は1体ぶん */
+  avgPerHit: number;
+  /** 1回撃つと平均何発当たるか。全体技なら生きている敵の数に近づく */
+  hitsPerUse: number;
   crits: number;
   critRate: number;
   debuffs: number;
@@ -128,7 +139,7 @@ export function summarize(
       if (!entry) {
         entry = {
           unitId: skill.unitId, unitName: nameOf(skill.unitId), skillName: skill.skillName,
-          uses: 0, avgDamage: 0, crits: 0, critRate: 0, debuffs: 0, strips: 0, damage: 0, hits: 0,
+          uses: 0, avgDamage: 0, avgPerHit: 0, hitsPerUse: 0, crits: 0, critRate: 0, debuffs: 0, strips: 0, damage: 0, hits: 0,
         };
         skillMap.set(key, entry);
       }
@@ -144,6 +155,8 @@ export function summarize(
     .map(({ damage, hits, ...rest }) => ({
       ...rest,
       avgDamage: rest.uses > 0 ? Math.round(damage / rest.uses) : 0,
+      avgPerHit: hits > 0 ? Math.round(damage / hits) : 0,
+      hitsPerUse: rest.uses > 0 ? hits / rest.uses : 0,
       critRate: hits > 0 ? rest.crits / hits : 0,
     }))
     .sort((a, b) => b.uses - a.uses);
@@ -244,11 +257,14 @@ export function toMarkdown(summary: Summary): string {
 
   out.push("## スキル");
   out.push("");
-  out.push("| 使い手 | スキル | 使用 | 平均ダメージ | 会心 | 会心率 | デバフ成功 | 解除成功 |");
-  out.push("|---|---|---:|---:|---:|---:|---:|---:|");
+  out.push("1発あたり = 1体に入った1回ぶん。1回あたり = 撃った1回ぶん(全体技は対象ぜんぶの合計)");
+  out.push("");
+  out.push("| 使い手 | スキル | 使用 | 1発あたり | 発/回 | 1回あたり | 会心 | 会心率 | デバフ成功 | 解除成功 |");
+  out.push("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");
   for (const skill of summary.skills) {
     out.push(
-      `| ${skill.unitName} | ${skill.skillName} | ${skill.uses} | ${skill.avgDamage.toLocaleString("ja-JP")} `
+      `| ${skill.unitName} | ${skill.skillName} | ${skill.uses} | ${skill.avgPerHit.toLocaleString("ja-JP")} `
+      + `| ${num(skill.hitsPerUse, 2)} | ${skill.avgDamage.toLocaleString("ja-JP")} `
       + `| ${skill.crits} | ${pct(skill.critRate)} | ${skill.debuffs} | ${skill.strips} |`,
     );
   }
