@@ -1268,7 +1268,15 @@ function backToLastRunList(): void {
       navigate("GOLD_DUNGEON");
       break;
     case "ARENA":
+      /*
+       * **トップではなく、相手の一覧へ戻す。**
+       * `navigate` はアリーナの中の行き先を畳むので、そのあとで開き直す。
+       * 一覧はここへ来る前に組んであるものをそのまま使う——組み直すと
+       * 相手の顔ぶれが変わり、「さっき戦った人にもう一度」ができなくなる。
+       */
       navigate("ARENA");
+      state.arenaView = "OPPONENTS";
+      render();
       break;
   }
 }
@@ -1285,14 +1293,22 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
   const cost = last ? lastRunStaminaCost(last) : 0;
 
   const actions: ResultAction[] = [];
-  if (last) {
+  /*
+   * **アリーナに「もう一度」は出さない。**
+   *
+   * ほかの場所の「もう一度」は同じ階へ挑み直すことで、周回そのものが遊びの形に
+   * なっている。アリーナは違う。相手は毎回選ぶもので、同じ人へ挑み直すのは
+   * 「選ぶ」を飛ばすだけになる。勝った相手にもう一度挑んで挑戦券を1枚使うのは、
+   * ほとんどの場合やりたいことではない。
+   *
+   * 代わりに「選び直す」を主役にして、押したらすぐ相手の一覧へ行く
+   * (依頼主の指定)。同じ相手へ挑み直したい時も、その一覧に並んでいる。
+   */
+  const isArena = last?.kind === "ARENA";
+  if (last && !isArena) {
     actions.push({
-      // アリーナはスタミナではなく挑戦券で回す。⚡0 と出すと「無料で回せる」と読めてしまう
-      label: fromAutoFarm
-        ? `🔁 もう一度 ×${state.autoFarmCount}`
-        : last.kind === "ARENA"
-          ? `🔁 もう一度 (挑戦券1)`
-          : `🔁 もう一度 (⚡${cost})`,
+      // ここへ来るのはスタミナで回す場所だけ(アリーナは上で外してある)
+      label: fromAutoFarm ? `🔁 もう一度 ×${state.autoFarmCount}` : `🔁 もう一度 (⚡${cost})`,
       variant: "primary",
       disabled: reason !== null,
       reason: reason ?? undefined,
@@ -1318,7 +1334,12 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
       },
     });
   }
-  actions.push({ label: "🗺 選び直す", run: backToLastRunList });
+  actions.push({
+    // アリーナでは「もう一度」が無いので、ここが主役になる
+    label: isArena ? "⚔ 相手を選び直す" : "🗺 選び直す",
+    variant: isArena ? "primary" : undefined,
+    run: backToLastRunList,
+  });
   actions.push({ label: "🏠 ホーム", run: () => navigate("HOME") });
   return actions;
 }
