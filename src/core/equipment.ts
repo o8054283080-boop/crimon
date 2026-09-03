@@ -282,7 +282,15 @@ function roundStatValue(type: StatType, raw: number): number {
   return Math.round(raw * 1000) / 1000;
 }
 
-function rollStatValue(type: StatType, star: EquipStar, ratio: number, rng: () => number): number {
+/**
+ * 1項目ぶんの初期値を引く。
+ *
+ * `export` してあるのは、開発用の Battle Lab が
+ * **「速度メインの★6を用意する」を値の表ごと借りて組み立てられる**ようにするため。
+ * ここを借りずに向こうで数字を置くと、装備の値付けを直した時に
+ * 測定だけが古い表で回り続ける。ゲーム本編からの呼び出し方は変わっていない。
+ */
+export function rollStatValue(type: StatType, star: EquipStar, ratio: number, rng: () => number): number {
   const base = STAT_BASE_VALUE[type] * STAR_INITIAL_MULTIPLIER[star] * ratio;
   const variance = 0.85 + rng() * 0.3; // 0.85〜1.15倍のばらつき
   return roundStatValue(type, base * variance);

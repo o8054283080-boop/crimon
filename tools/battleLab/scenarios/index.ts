@@ -1,0 +1,14 @@
+/**
+ * シナリオの棚。
+ *
+ * 新しく足す時は、ここへ1行 import して並べるだけ。
+ * `--scenario <id>` の `<id>` は `Scenario.id` を見ている。
+ */
+import type { Scenario } from "../types.js";
+import { TOWER60 } from "./tower60.js";
+
+export const SCENARIOS: Scenario[] = [TOWER60];
+
+export function findScenario(id: string): Scenario | undefined {
+  return SCENARIOS.find((scenario) => scenario.id === id);
+}
