@@ -34,9 +34,22 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # **アリーナのオンライン機能は、ここで環境変数を渡さないと永久に動かない。**
+      #
+      # Vite は `VITE_` で始まる環境変数を**組み立ての時に**中へ焼き込む。
+      # 渡さないまま配ると、`arenaSyncAvailable()` がずっと false になり、
+      # ランキングは「ローカル(この端末の中だけ)」のままになる。
+      # 表・RPC・Edge Function をどれだけ整えても、そこへ繋ぎに行かない。
+      #
+      # anon key は**ブラウザへ配る前提の鍵**なので、リポジトリ変数でよい
+      # (秘密として置きたい場合のために secrets も見る)。
+      # **`service_role` は絶対にここへ書かない。**
+      # 未設定なら今までどおりオフラインで組み上がる——落ちはしない。
       - run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
