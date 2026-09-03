@@ -7,6 +7,7 @@ import { mulberry32, runSeed } from "../tools/battleLab/rng.js";
 import { runBattle, runMany } from "../tools/battleLab/run.js";
 import { summarize, toMarkdown } from "../tools/battleLab/report.js";
 import { TOWER60 } from "../tools/battleLab/scenarios/tower60.js";
+import type { GearGrade } from "../tools/battleLab/types.js";
 import { findScenario } from "../tools/battleLab/scenarios/index.js";
 import { createInitialState } from "../src/game/playerState.js";
 
@@ -300,6 +301,53 @@ describe("シナリオの組み立て", () => {
   it("崩れの基準を持っている", () => {
     expect(TOWER60.expect?.minWinRate).toBeGreaterThan(0);
     expect(TOWER60.expect?.maxWinRate).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("装備の仕上がり具合", () => {
+  /*
+   * **プリセットは「装備を極めた人」の姿しか出せない。**
+   * それだけで測ると、その階が誰にとって難しいのかが読めない。
+   * 段階を落として測れること、そして段階の順に弱くなることを見る。
+   */
+  it("段階を落とすほど弱くなる", () => {
+    /*
+     * **1個体で比べない。**
+     *
+     * 下の段ほどサブの中身が運任せになるので、たまたま狙った項目を
+     * 引いて上の段を追い越すことがある(会心率で実際に起きた)。
+     * それは装備が本当にそう振る舞うということなので、直すのは検査の方。
+     * 何個体かの平均で見る。
+     */
+    const spec = { templateId: "dragon", element: "FIRE" as const, preset: "MAX_ATTACKER" as const };
+    const avg = (grade: GearGrade, pick: (s: { atk: number; criDmg: number; hp: number }) => number): number => {
+      const values = Array.from({ length: 20 }, (_, i) => pick(buildAlly(spec, mulberry32(100 + i), grade).stats));
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    };
+    for (const pick of [(s: { atk: number }) => s.atk, (s: { criDmg: number }) => s.criDmg, (s: { hp: number }) => s.hp]) {
+      const get = pick as (s: { atk: number; criDmg: number; hp: number }) => number;
+      expect(avg("FINISHED", get)).toBeGreaterThan(avg("MID", get));
+      expect(avg("MID", get)).toBeGreaterThan(avg("ROUGH", get));
+    }
+  });
+
+  it("段階を渡さなければプリセットのまま", () => {
+    const spec = { templateId: "dragon", element: "FIRE" as const, preset: "MAX_ATTACKER" as const };
+    const bare = buildAlly(spec, mulberry32(9));
+    const finished = buildAlly(spec, mulberry32(9), "FINISHED");
+    expect(bare.stats).toEqual(finished.stats);
+  });
+
+  it("段階ごとに戦って、決着ターンが伸びる", () => {
+    /*
+     * 勝率は上でも下でも張り付くが、**決着ターンは飽和しない。**
+     * 難易度を読むならこちらを見る(この案件で何度も刺さっている)。
+     */
+    const turnsOf = (grade: GearGrade): number => {
+      const tallies = runMany(TOWER60, 4242, 12, undefined, grade);
+      return tallies.reduce((sum, t) => sum + t.turns, 0) / tallies.length;
+    };
+    expect(turnsOf("ROUGH")).toBeGreaterThan(turnsOf("FINISHED"));
   });
 });
 

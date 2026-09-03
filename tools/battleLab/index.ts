@@ -6,6 +6,8 @@
  *   npm run battle:lab -- --scenario tower-60 --runs 500 --json --out
  *   npm run battle:lab -- --scenario tower-60 --runs 300 --compare boss-s3=3.0,2.8,2.5,2.3
  *   npm run battle:lab -- --scenario tower-60 --runs 300 --focus 豪魔人集中
+ *   npm run battle:lab -- --scenario tower-60 --runs 300 --gear mid
+ *   npm run battle:lab -- --scenario tower-60 --runs 300 --gear-compare
  *   npm run battle:lab -- --list
  *
  * ## 何を触らないか
@@ -28,9 +30,27 @@ import type { Skill } from "../../src/core/skill.js";
 import { runBattle, runMany } from "./run.js";
 import { compareMarkdown, summarize, toMarkdown } from "./report.js";
 import { SCENARIOS, findScenario } from "./scenarios/index.js";
-import type { Scenario } from "./types.js";
+import type { GearGrade, Scenario } from "./types.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** 装備の仕上がり具合。上から順に強い */
+/*
+ * 並びは**実測で強い順**。名前の印象順ではない。
+ *
+ * 「60階の想定」は★6+15なのに、★6+12の「育成の途中」より弱く出る。
+ * サブOPが最初から4個ある装備は、+3/+6/+9/+12/+15 の強化が
+ * **既にある項目を伸ばす**方へ全部回る。1〜2個から始めた装備は、
+ * その枠を**個数を増やす**のに使ってしまう。同じ+15でも中身が違う。
+ */
+const GEAR_GRADES: GearGrade[] = ["FINISHED", "STRONG", "MID", "TYPICAL", "ROUGH"];
+const GEAR_LABEL: Record<GearGrade, string> = {
+  FINISHED: "仕上げ切った (★6+15 / サブ4つとも役割どおり)",
+  STRONG: "真面目に集めた (★6+15 / サブ半分は運任せ)",
+  TYPICAL: "60階の想定 (★6+15 / 初期サブ1〜2個から最大強化)",
+  MID: "育成の途中 (★6+12 / サブ1つだけ狙いどおり)",
+  ROUGH: "拾ったまま (★5+9 / サブは完全に運任せ)",
+};
 
 interface Args {
   scenario: string;
@@ -44,6 +64,10 @@ interface Args {
   out: boolean;
   list: boolean;
   strict: boolean;
+  /** 味方の装備の仕上がり具合。省略時はプリセットのまま(仕上げ切った人) */
+  gear?: GearGrade;
+  /** 仕上がり具合を並べて比べる */
+  gearCompare: boolean;
   compare?: { key: string; values: number[] };
 }
 
@@ -60,6 +84,7 @@ function parseArgs(argv: string[]): Args {
     out: false,
     list: false,
     strict: false,
+    gearCompare: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const key = argv[i];
@@ -76,6 +101,16 @@ function parseArgs(argv: string[]): Args {
       case "--out": args.out = true; break;
       case "--list": args.list = true; break;
       case "--strict": args.strict = true; break;
+      case "--gear": {
+        const upper = (value ?? "").toUpperCase();
+        if (!GEAR_GRADES.includes(upper as GearGrade)) {
+          throw new Error(`装備の段階 "${value}" がありません。候補: ${GEAR_GRADES.join(" / ").toLowerCase()}`);
+        }
+        args.gear = upper as GearGrade;
+        i += 1;
+        break;
+      }
+      case "--gear-compare": args.gearCompare = true; break;
       case "--compare": {
         const [k, list] = (value ?? "").split("=");
         args.compare = { key: k, values: (list ?? "").split(",").map(Number).filter((n) => !Number.isNaN(n)) };
@@ -152,7 +187,7 @@ function main(): void {
   if (args.compare) {
     const rows = args.compare.values.map((value) => {
       const target = variant(scenario, args.compare!.key, value);
-      const tallies = runMany(target, args.seed, args.runs, focus.order);
+      const tallies = runMany(target, args.seed, args.runs, focus.order, args.gear);
       return { label: `${args.compare!.key}=${value}`, summary: summarize(target, tallies, { seed: args.seed, focus: focus.name }) };
     });
     const body = compareMarkdown(`${scenario.title} 見比べ (${args.runs}戦 / seed ${args.seed} / ${focus.name})`, rows);
@@ -167,11 +202,29 @@ function main(): void {
     return;
   }
 
+  // --- 装備の仕上がり具合を並べて比べる ---
+  if (args.gearCompare) {
+    const rows = GEAR_GRADES.map((grade) => ({
+      label: GEAR_LABEL[grade],
+      summary: summarize(scenario, runMany(scenario, args.seed, args.runs, focus.order, grade), { seed: args.seed, focus: focus.name }),
+    }));
+    const body = compareMarkdown(`${scenario.title} 装備の仕上がり具合ごと (${args.runs}戦 / seed ${args.seed} / ${focus.name})`, rows);
+    if (args.json) {
+      const json = JSON.stringify(rows.map((r) => ({ label: r.label, ...r.summary })), null, 2);
+      console.log(json);
+      if (args.out) console.error(`保存: ${saveResult(`${scenario.id}-gear-${args.seed}.json`, json)}`);
+    } else {
+      console.log(body);
+      if (args.out) console.error(`保存: ${saveResult(`${scenario.id}-gear-${args.seed}.md`, body)}`);
+    }
+    return;
+  }
+
   // --- 詳しいログ(先頭の数戦ぶんだけ) ---
   if (args.logBattle > 0) {
     for (let i = 0; i < Math.min(args.logBattle, args.runs); i += 1) {
       const seed = (args.seed + i) >>> 0;
-      const tally = runBattle(scenario, seed, focus.order);
+      const tally = runBattle(scenario, seed, focus.order, args.gear);
       console.log(`=== ${scenario.title} / seed ${seed} / 狙う順 ${focus.name} ===`);
       for (const line of tally.log) console.log(line);
       console.log(`--- 結果: ${tally.winner === "PLAYER" ? "勝利" : tally.winner === "DRAW" ? "引き分け" : "敗北"} `
@@ -181,7 +234,7 @@ function main(): void {
     if (args.runs <= args.logBattle) return;
   }
 
-  const tallies = runMany(scenario, args.seed, args.runs, focus.order);
+  const tallies = runMany(scenario, args.seed, args.runs, focus.order, args.gear);
   const summary = summarize(scenario, tallies, { seed: args.seed, focus: focus.name });
 
   if (args.json) {
