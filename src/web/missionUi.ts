@@ -56,6 +56,38 @@ function progressBar(current: number, target: number): HTMLElement {
   return wrap;
 }
 
+/**
+ * ミッション画面はHOMEの上へ重なるモーダルなので、報酬受取で player を更新しても
+ * 背後のHOMEは自動では再描画されない。保存値だけ増えて見た目が古いままだと
+ * 「報酬が付与されなかった」と見えるため、画面に存在する資源表示だけを同じ
+ * PlayerState の最新値へ同期する。
+ */
+export function refreshMissionRewardResourceDisplay(player: PlayerState, scope: ParentNode = document): void {
+  const setNumber = (selector: string, value: number): void => {
+    scope.querySelectorAll<HTMLElement>(selector).forEach((node) => {
+      node.textContent = value.toLocaleString("ja-JP");
+    });
+  };
+
+  setNumber(".home-wallet__chip--crystal > strong", player.crystal);
+  setNumber(".home-wallet__chip--gold > strong", player.gold);
+  setNumber(".home-wallet__chip--stamina > strong", player.stamina);
+  setNumber(".home-stamina__num > strong", player.stamina);
+
+  scope.querySelectorAll<HTMLElement>(".home-vitals__stats .home-stat").forEach((card) => {
+    const label = card.querySelector("small")?.textContent;
+    const value = card.querySelector<HTMLElement>("strong");
+    if (!value) return;
+    if (label === "所持ダイヤ") value.textContent = player.crystal.toLocaleString("ja-JP");
+    if (label === "所持ゴールド") value.textContent = player.gold.toLocaleString("ja-JP");
+  });
+
+  const staminaRatio = Math.max(0, Math.min(1, player.stamina / Math.max(1, player.maxStamina)));
+  scope.querySelectorAll<HTMLElement>(".home-stamina__track > i").forEach((track) => {
+    track.style.width = `${(staminaRatio * 100).toFixed(1)}%`;
+  });
+}
+
 function renderPeriodCard(player: PlayerState, period: MissionPeriod, group: PeriodMissionGroupView): HTMLElement {
   const section = document.createElement("section");
   section.className = "regular-missions__list";
@@ -74,7 +106,8 @@ function renderPeriodCard(player: PlayerState, period: MissionPeriod, group: Per
     group.clearClaimed ? "受取済み" : group.canClaimClear ? "クリア報酬を受け取る" : `あと${Math.max(0, group.requiredCount - group.completedCount)}個達成`,
     "regular-missions__claim regular-missions__claim--clear",
     () => {
-      claimPeriodClear(player, period);
+      const reward = claimPeriodClear(player, period);
+      if (reward) refreshMissionRewardResourceDisplay(player);
       renderModal(player);
     },
     group.clearClaimed || !group.canClaimClear,
@@ -100,7 +133,8 @@ function renderPeriodCard(player: PlayerState, period: MissionPeriod, group: Per
       mission.claimed ? "受取済み" : mission.complete ? "受け取る" : "未達成",
       "regular-missions__claim",
       () => {
-        claimPeriodMission(player, period, mission.id);
+        const reward = claimPeriodMission(player, period, mission.id);
+        if (reward) refreshMissionRewardResourceDisplay(player);
         renderModal(player);
       },
       mission.claimed || !mission.complete,
@@ -128,7 +162,8 @@ function renderCumulativeCard(player: PlayerState, mission: CumulativeMissionVie
     mission.complete ? "受け取る" : "未達成",
     "regular-missions__claim",
     () => {
-      claimCumulativeMission(player, mission.key);
+      const reward = claimCumulativeMission(player, mission.key);
+      if (reward) refreshMissionRewardResourceDisplay(player);
       renderModal(player);
     },
     !mission.complete,
@@ -164,7 +199,8 @@ function renderCampaign(player: PlayerState, campaign: ReleaseCampaignView): HTM
       milestone.claimed ? "受取済み" : milestone.complete ? "受け取る" : `${Math.min(campaign.completedCount, milestone.target)} / ${milestone.target}`,
       "regular-missions__claim regular-missions__claim--milestone",
       () => {
-        claimReleaseCampaignMilestone(player, milestone.target);
+        const reward = claimReleaseCampaignMilestone(player, milestone.target);
+        if (reward) refreshMissionRewardResourceDisplay(player);
         renderModal(player);
       },
       milestone.claimed || !milestone.complete,
@@ -190,7 +226,8 @@ function renderCampaign(player: PlayerState, campaign: ReleaseCampaignView): HTM
       mission.claimed ? "受取済み" : mission.complete ? "受け取る" : "未達成",
       "regular-missions__claim",
       () => {
-        claimReleaseCampaignMission(player, mission.id);
+        const reward = claimReleaseCampaignMission(player, mission.id);
+        if (reward) refreshMissionRewardResourceDisplay(player);
         renderModal(player);
       },
       mission.claimed || !mission.complete,
@@ -260,6 +297,7 @@ function renderModal(player: PlayerState): void {
   actions.className = "regular-missions__actions";
   actions.append(button("受け取れる報酬を一括受取", "regular-missions__claim-all", () => {
     claimAllAvailableMissionRewards(player);
+    refreshMissionRewardResourceDisplay(player);
     renderModal(player);
   }));
 

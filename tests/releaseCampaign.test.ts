@@ -64,6 +64,36 @@ describe("1か月限定の公開記念ミッション", () => {
     expect(claimReleaseCampaignMission(player, during.missions[0].id, AFTER)).toBeNull();
   });
 
+  it("公開記念ログインのスタミナ300を実値へ加算し、再読込後も残して二重受取させない", () => {
+    const player = createInitialState();
+    getReleaseCampaignView(player, DURING);
+    const before = player.stamina;
+
+    expect(claimReleaseCampaignMission(player, "release-login-1", DURING)).toMatchObject({ stamina: 300 });
+    expect(player.stamina).toBe(before + 300);
+
+    const reloaded = normalizeLoadedState(JSON.parse(JSON.stringify(player)));
+    expect(reloaded.stamina).toBe(before + 300);
+    expect(claimReleaseCampaignMission(reloaded, "release-login-1", DURING)).toBeNull();
+    expect(reloaded.stamina).toBe(before + 300);
+  });
+
+  it("試練の塔5階のダイヤ200を実値へ加算し、再読込後も残して二重受取させない", () => {
+    const player = createInitialState();
+    getReleaseCampaignView(player, DURING);
+    player.trialTowerBestFloor = 5;
+    expect(getReleaseCampaignView(player, DURING)!.missions.find((entry) => entry.id === "release-tower-5")?.complete).toBe(true);
+    const before = player.crystal;
+
+    expect(claimReleaseCampaignMission(player, "release-tower-5", DURING)).toMatchObject({ crystal: 200 });
+    expect(player.crystal).toBe(before + 200);
+
+    const reloaded = normalizeLoadedState(JSON.parse(JSON.stringify(player)));
+    expect(reloaded.crystal).toBe(before + 200);
+    expect(claimReleaseCampaignMission(reloaded, "release-tower-5", DURING)).toBeNull();
+    expect(reloaded.crystal).toBe(before + 200);
+  });
+
   it("ダンジョンクリアだけを1回ずつ公開記念の進捗へ加える", () => {
     const player = createInitialState();
     getReleaseCampaignView(player, DURING);

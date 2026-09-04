@@ -61,12 +61,13 @@ describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefill
     expect(state.crystal).toBe(100 - STAMINA_REFILL_PARTIAL_COST);
   });
 
-  it("上限を超える分は切り捨てられる", () => {
+  it("+100回復は現在の上限を超えて保持できる", () => {
     const state = createInitialState();
     state.stamina = state.maxStamina - 30;
     state.crystal = 100;
-    tryRefillStaminaPartial(state);
-    expect(state.stamina).toBe(state.maxStamina);
+    const result = tryRefillStaminaPartial(state);
+    expect(result.ok).toBe(true);
+    expect(state.stamina).toBe(state.maxStamina - 30 + STAMINA_REFILL_PARTIAL_AMOUNT);
   });
 
   it("ダイヤが足りない場合は消費されず失敗する", () => {
@@ -79,13 +80,18 @@ describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefill
     expect(state.crystal).toBe(STAMINA_REFILL_PARTIAL_COST - 1);
   });
 
-  it("スタミナが満タンの場合は実行できない(ダイヤを無駄にしない)", () => {
+  it("満タンや上限超過中でも+100回復できる", () => {
     const state = createInitialState();
     state.crystal = 1000;
     expect(state.stamina).toBe(state.maxStamina);
-    const result = tryRefillStaminaPartial(state);
-    expect(result.ok).toBe(false);
-    expect(state.crystal).toBe(1000);
+    const first = tryRefillStaminaPartial(state);
+    expect(first.ok).toBe(true);
+    expect(state.stamina).toBe(state.maxStamina + STAMINA_REFILL_PARTIAL_AMOUNT);
+    expect(state.crystal).toBe(1000 - STAMINA_REFILL_PARTIAL_COST);
+
+    const second = tryRefillStaminaPartial(state);
+    expect(second.ok).toBe(true);
+    expect(state.stamina).toBe(state.maxStamina + STAMINA_REFILL_PARTIAL_AMOUNT * 2);
   });
 
   it("ダイヤ200を消費してスタミナが全回復する", () => {
@@ -96,6 +102,23 @@ describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefill
     expect(result.ok).toBe(true);
     expect(state.stamina).toBe(state.maxStamina);
     expect(state.crystal).toBe(500 - STAMINA_REFILL_FULL_COST);
+  });
+
+  it("**全回復は上限超過中のスタミナを削らない**", () => {
+    /*
+     * 上限を超えている間は「既に満タンです」で弾かれるので、
+     * ダイヤも減らないし超過分も減らない。
+     * 450/150 の人が全回復を買って 150/150 になる、という壊れ方をしない
+     */
+    const state = createInitialState();
+    state.stamina = state.maxStamina + 300;
+    state.crystal = 500;
+
+    const result = tryRefillStaminaFull(state);
+
+    expect(result.ok).toBe(false);
+    expect(state.stamina).toBe(state.maxStamina + 300);
+    expect(state.crystal).toBe(500);
   });
 
   it("全回復もダイヤが足りない場合は失敗する", () => {
@@ -111,7 +134,7 @@ describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefill
 describe("ファイター経験値とレベルアップ (addFighterExp)", () => {
   it("必要経験値を満たすとレベルが上がり、スタミナが新上限まで全回復する", () => {
     const state = createInitialState();
-    state.stamina = 10; // 減っている状態から検証する
+    state.stamina = 10;
     const needed = requiredExpForFighterLevel(1);
 
     const result = addFighterExp(state, needed);
@@ -120,7 +143,25 @@ describe("ファイター経験値とレベルアップ (addFighterExp)", () => 
     expect(state.fighterLevel).toBe(2);
     expect(state.maxStamina).toBe(maxStaminaForFighterLevel(2));
     expect(state.maxStamina).toBe(155);
-    expect(state.stamina).toBe(state.maxStamina); // 全回復
+    expect(state.stamina).toBe(state.maxStamina);
+  });
+
+  it("**レベルアップの全回復で、既に持っている超過スタミナを削らない**", () => {
+    /*
+     * レベルアップは新しい上限まで全回復させる仕様。だが素朴に
+     * `stamina = maxStamina` と書くと、配布でもらった超過分が
+     * **レベルが上がった瞬間に消える**。多い方を残す
+     */
+    const state = createInitialState();
+    state.stamina = state.maxStamina + 300;
+    const before = state.stamina;
+
+    const result = addFighterExp(state, requiredExpForFighterLevel(1));
+
+    expect(result.levelsGained).toBe(1);
+    expect(state.fighterLevel).toBe(2);
+    expect(state.maxStamina).toBe(maxStaminaForFighterLevel(2));
+    expect(state.stamina).toBe(before);
   });
 
   it("大量に経験値を得ると複数レベル一気に上がる", () => {
@@ -210,7 +251,7 @@ describe("Lv100向けスタミナカーブ", () => {
 });
 
 describe("旧Lv50セーブ互換性", () => {
-  it("レベルとfighterExpを巻き戻さず、新スタミナ上限へ安全に補正する", () => {
+  it("レベルとfighterExpを巻き戻さず、上限超過スタミナも失わない", () => {
     const state = createInitialState();
     state.fighterLevel = 50;
     state.fighterExp = 12_345;
@@ -220,7 +261,7 @@ describe("旧Lv50セーブ互換性", () => {
     expect(state.fighterLevel).toBe(50);
     expect(state.fighterExp).toBe(12_345);
     expect(state.maxStamina).toBe(335);
-    expect(state.stamina).toBe(335);
+    expect(state.stamina).toBe(500);
   });
 });
 
@@ -247,7 +288,7 @@ describe("スタミナの自然回復 (applyPassiveStaminaRegen)", () => {
     expect(state.stamina).toBe(107);
   });
 
-  it("上限を超えて回復しない", () => {
+  it("上限を超えて自然回復しない", () => {
     const state = createInitialState();
     state.stamina = state.maxStamina - 1;
     const start = Date.now();
@@ -256,6 +297,22 @@ describe("スタミナの自然回復 (applyPassiveStaminaRegen)", () => {
     applyPassiveStaminaRegen(state, start + STAMINA_REGEN_INTERVAL_MINUTES * 60_000 * 100);
 
     expect(state.stamina).toBe(state.maxStamina);
+  });
+
+  it("**上限超過中は自然回復せず、超過分も減らさない**", () => {
+    /*
+     * 配布やミッション報酬で上限を超えたスタミナは、そのまま持ち続ける。
+     * ここで `Math.min(stamina, maxStamina)` へ寄せると、
+     * 300もらった直後にアプリを開き直しただけで消える
+     */
+    const state = createInitialState();
+    state.stamina = state.maxStamina + 300;
+    const start = Date.now();
+    state.lastStaminaUpdateAt = start;
+
+    applyPassiveStaminaRegen(state, start + STAMINA_REGEN_INTERVAL_MINUTES * 60_000 * 100);
+
+    expect(state.stamina).toBe(state.maxStamina + 300);
   });
 
   it("既に満タンなら基準時刻だけ更新され増えない", () => {
