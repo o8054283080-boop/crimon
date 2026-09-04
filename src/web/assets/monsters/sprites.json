@@ -5,12 +5,42 @@
     "bodyVal": 0.64,
     "aspect": 0.984
   },
-  "ancient_beast-DARK": { "bodyHue": -1, "bodySat": 0.431, "bodyVal": 0.203, "aspect": 1.488 },
-  "ancient_beast-ELECTRIC": { "bodyHue": -1, "bodySat": 0.31, "bodyVal": 0.333, "aspect": 1.497 },
-  "ancient_beast-FIRE": { "bodyHue": -1, "bodySat": 0.41, "bodyVal": 0.3, "aspect": 1.497 },
-  "ancient_beast-GRASS": { "bodyHue": -1, "bodySat": 0.272, "bodyVal": 0.261, "aspect": 1.493 },
-  "ancient_beast-LIGHT": { "bodyHue": -1, "bodySat": 0.096, "bodyVal": 0.556, "aspect": 1.493 },
-  "ancient_beast-WATER": { "bodyHue": -1, "bodySat": 0.28, "bodyVal": 0.284, "aspect": 1.493 },
+  "ancient_beast-DARK": {
+    "bodyHue": -1,
+    "bodySat": 0.431,
+    "bodyVal": 0.203,
+    "aspect": 1.488
+  },
+  "ancient_beast-ELECTRIC": {
+    "bodyHue": -1,
+    "bodySat": 0.31,
+    "bodyVal": 0.333,
+    "aspect": 1.497
+  },
+  "ancient_beast-FIRE": {
+    "bodyHue": -1,
+    "bodySat": 0.41,
+    "bodyVal": 0.3,
+    "aspect": 1.497
+  },
+  "ancient_beast-GRASS": {
+    "bodyHue": -1,
+    "bodySat": 0.272,
+    "bodyVal": 0.261,
+    "aspect": 1.493
+  },
+  "ancient_beast-LIGHT": {
+    "bodyHue": -1,
+    "bodySat": 0.096,
+    "bodyVal": 0.556,
+    "aspect": 1.493
+  },
+  "ancient_beast-WATER": {
+    "bodyHue": -1,
+    "bodySat": 0.28,
+    "bodyVal": 0.284,
+    "aspect": 1.493
+  },
   "ancient_crystal": {
     "bodyHue": 0.012,
     "bodySat": 0.74,
@@ -29,18 +59,78 @@
     "bodyVal": 0.43,
     "aspect": 0.791
   },
-  "ancient_fang_beast-DARK": { "bodyHue": -1, "bodySat": 0.241, "bodyVal": 0.111, "aspect": 1.471 },
-  "ancient_fang_beast-ELECTRIC": { "bodyHue": -1, "bodySat": 0.18, "bodyVal": 0.208, "aspect": 1.455 },
-  "ancient_fang_beast-FIRE": { "bodyHue": -1, "bodySat": 0.208, "bodyVal": 0.183, "aspect": 1.48 },
-  "ancient_fang_beast-GRASS": { "bodyHue": -1, "bodySat": 0.143, "bodyVal": 0.184, "aspect": 1.467 },
-  "ancient_fang_beast-LIGHT": { "bodyHue": -1, "bodySat": 0.066, "bodyVal": 0.405, "aspect": 1.467 },
-  "ancient_fang_beast-WATER": { "bodyHue": -1, "bodySat": 0.183, "bodyVal": 0.197, "aspect": 1.455 },
-  "ancient_guard_beast-DARK": { "bodyHue": -1, "bodySat": 0.304, "bodyVal": 0.193, "aspect": 1.484 },
-  "ancient_guard_beast-ELECTRIC": { "bodyHue": -1, "bodySat": 0.226, "bodyVal": 0.236, "aspect": 1.476 },
-  "ancient_guard_beast-FIRE": { "bodyHue": -1, "bodySat": 0.327, "bodyVal": 0.237, "aspect": 1.476 },
-  "ancient_guard_beast-GRASS": { "bodyHue": -1, "bodySat": 0.177, "bodyVal": 0.207, "aspect": 1.476 },
-  "ancient_guard_beast-LIGHT": { "bodyHue": -1, "bodySat": 0.1, "bodyVal": 0.485, "aspect": 1.493 },
-  "ancient_guard_beast-WATER": { "bodyHue": -1, "bodySat": 0.242, "bodyVal": 0.241, "aspect": 1.471 },
+  "ancient_fang_beast-DARK": {
+    "bodyHue": -1,
+    "bodySat": 0.241,
+    "bodyVal": 0.111,
+    "aspect": 1.471
+  },
+  "ancient_fang_beast-ELECTRIC": {
+    "bodyHue": -1,
+    "bodySat": 0.18,
+    "bodyVal": 0.208,
+    "aspect": 1.455
+  },
+  "ancient_fang_beast-FIRE": {
+    "bodyHue": -1,
+    "bodySat": 0.208,
+    "bodyVal": 0.183,
+    "aspect": 1.48
+  },
+  "ancient_fang_beast-GRASS": {
+    "bodyHue": -1,
+    "bodySat": 0.143,
+    "bodyVal": 0.184,
+    "aspect": 1.467
+  },
+  "ancient_fang_beast-LIGHT": {
+    "bodyHue": -1,
+    "bodySat": 0.066,
+    "bodyVal": 0.405,
+    "aspect": 1.467
+  },
+  "ancient_fang_beast-WATER": {
+    "bodyHue": -1,
+    "bodySat": 0.183,
+    "bodyVal": 0.197,
+    "aspect": 1.455
+  },
+  "ancient_guard_beast-DARK": {
+    "bodyHue": -1,
+    "bodySat": 0.304,
+    "bodyVal": 0.193,
+    "aspect": 1.484
+  },
+  "ancient_guard_beast-ELECTRIC": {
+    "bodyHue": -1,
+    "bodySat": 0.226,
+    "bodyVal": 0.236,
+    "aspect": 1.476
+  },
+  "ancient_guard_beast-FIRE": {
+    "bodyHue": -1,
+    "bodySat": 0.327,
+    "bodyVal": 0.237,
+    "aspect": 1.476
+  },
+  "ancient_guard_beast-GRASS": {
+    "bodyHue": -1,
+    "bodySat": 0.177,
+    "bodyVal": 0.207,
+    "aspect": 1.476
+  },
+  "ancient_guard_beast-LIGHT": {
+    "bodyHue": -1,
+    "bodySat": 0.1,
+    "bodyVal": 0.485,
+    "aspect": 1.493
+  },
+  "ancient_guard_beast-WATER": {
+    "bodyHue": -1,
+    "bodySat": 0.242,
+    "bodyVal": 0.241,
+    "aspect": 1.471
+  },
   "basilisk": {
     "bodyHue": 0.017,
     "bodySat": 0.74,
@@ -58,6 +148,30 @@
     "bodySat": 0.75,
     "bodyVal": 0.71,
     "aspect": 1
+  },
+  "crimoark_attack-DARK": {
+    "bodyHue": 0.039,
+    "bodySat": 0.86,
+    "bodyVal": 0.89,
+    "aspect": 0.764
+  },
+  "crimoark_debuff-DARK": {
+    "bodyHue": 0.713,
+    "bodySat": 0.65,
+    "bodyVal": 0.75,
+    "aspect": 0.754
+  },
+  "crimoark_support-DARK": {
+    "bodyHue": 0.457,
+    "bodySat": 0.81,
+    "bodyVal": 0.9,
+    "aspect": 0.764
+  },
+  "crimoark-DARK": {
+    "bodyHue": 0.823,
+    "bodySat": 0.78,
+    "bodyVal": 0.65,
+    "aspect": 0.764
   },
   "dragon": {
     "bodyHue": 0.472,

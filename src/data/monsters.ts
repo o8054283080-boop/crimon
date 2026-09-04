@@ -2,6 +2,7 @@ import { MonsterTemplate, createAllVariants } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
 import { setCreatedSkillResolver } from "../core/monsterInstance.js";
 import { NEW_MONSTER_TEMPLATES, NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES } from "./newMonsters/index.js";
+import { CRIMOARK, CRIMOARK_ATTACK, CRIMOARK_DEBUFF, CRIMOARK_SUPPORT } from "./crimoark.js";
 
 const SLIME: MonsterTemplate = {
   templateId: "slime",
@@ -1835,6 +1836,11 @@ export const ALL_MONSTER_TEMPLATES: MonsterTemplate[] = [
   ANCIENT_GUARD_BEAST,
   ANCIENT_FANG_BEAST,
   ...NEW_MONSTER_TEMPLATES,
+  // 試練の塔100階のクリモアークと分身3種。**召喚にも図鑑にも出さない**
+  CRIMOARK,
+  CRIMOARK_ATTACK,
+  CRIMOARK_SUPPORT,
+  CRIMOARK_DEBUFF,
 ];
 
 /*
@@ -1991,6 +1997,18 @@ export const ANCIENT_BEAST_DEX = createAllVariants(ANCIENT_BEAST);
 export const ANCIENT_GUARD_BEAST_DEX = createAllVariants(ANCIENT_GUARD_BEAST);
 export const ANCIENT_FANG_BEAST_DEX = createAllVariants(ANCIENT_FANG_BEAST);
 
+/**
+ * 試練の塔100階のクリモアークと分身3種。
+ *
+ * **`ALL_DISPLAYABLE_MONSTERS_DEX` には入れない。**あちらは図鑑に並ぶ顔ぶれで、
+ * 潜在覚醒の候補もあの並び順から生成される。100階のボスを入れると
+ * 図鑑に最終ボスが並び、覚醒の候補IDが全部ずれる。
+ */
+export const CRIMOARK_DEX = createAllVariants(CRIMOARK);
+export const CRIMOARK_ATTACK_DEX = createAllVariants(CRIMOARK_ATTACK);
+export const CRIMOARK_SUPPORT_DEX = createAllVariants(CRIMOARK_SUPPORT);
+export const CRIMOARK_DEBUFF_DEX = createAllVariants(CRIMOARK_DEBUFF);
+
 /** ガチャ限定の高レアモンスター(SR/SSR)図鑑。GRIFFON/DRAGON/SERAPH/NEMESISとも全6属性 */
 export const GACHA_EXCLUSIVE_DEX = [
   ...GACHA_SR_COMMON_DEX,
@@ -2016,6 +2034,25 @@ export const MONSTER_DEX = [
   ...ANCIENT_BEAST_DEX,
   ...ANCIENT_GUARD_BEAST_DEX,
   ...ANCIENT_FANG_BEAST_DEX,
+];
+
+/**
+ * 試練の塔100階でしか出ないクリモアークと分身3種。
+ *
+ * **`MONSTER_DEX` には入れない。**あちらはアリーナの照合表
+ * (`arena_catalog_monsters`)と1件単位で突き合わされていて、
+ * あの表は「プレイヤーが正当に持ちうる個体」の許可リスト。
+ * 100階のボスは誰も所有できないので、あそこへ並べる意味が無いどころか、
+ * 対人戦の検証に**持てないはずの個体**を通す穴を開けることになる。
+ *
+ * 引き当てだけができれば良いので、探す側(`findMonster` / `findMonsterById`)が
+ * ここも見に来る形にしてある。
+ */
+export const TOWER_BOSS_ONLY_DEX = [
+  ...CRIMOARK_DEX,
+  ...CRIMOARK_ATTACK_DEX,
+  ...CRIMOARK_SUPPORT_DEX,
+  ...CRIMOARK_DEBUFF_DEX,
 ];
 
 /**
@@ -2060,11 +2097,13 @@ export const MATERIAL_TEMPLATE_IDS: ReadonlySet<string> = new Set(
 );
 
 export function findMonster(templateId: string, element: string) {
-  return MONSTER_DEX.find((m) => m.templateId === templateId && m.element === element);
+  return MONSTER_DEX.find((m) => m.templateId === templateId && m.element === element)
+    ?? TOWER_BOSS_ONLY_DEX.find((m) => m.templateId === templateId && m.element === element);
 }
 
 export function findMonsterById(dexId: string) {
-  return MONSTER_DEX.find((m) => m.id === dexId);
+  return MONSTER_DEX.find((m) => m.id === dexId)
+    ?? TOWER_BOSS_ONLY_DEX.find((m) => m.id === dexId);
 }
 
 /**

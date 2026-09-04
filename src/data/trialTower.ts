@@ -6,6 +6,7 @@ import { ANCIENT_DEMON, findMonster } from "./monsters.js";
 import { TOWER60_ENEMIES } from "./trialTowerFloor60.js";
 import { TOWER70_ENEMIES } from "./trialTowerFloor70.js";
 import { TOWER90_ENEMIES } from "./trialTowerFloor90.js";
+import { TOWER100_ENEMIES } from "./trialTowerFloor100.js";
 import {
   isTowerUpperFloor,
   towerUpperEnemies,
@@ -259,6 +260,7 @@ function enemiesOf(floor: number, trait: TowerTrait): DungeonEnemy[] {
   if (floor === 60) return TOWER60_ENEMIES.map((enemy) => ({ ...enemy }));
   if (floor === 70) return TOWER70_ENEMIES.map((enemy) => ({ ...enemy }));
   if (floor === 90) return TOWER90_ENEMIES.map((enemy) => ({ ...enemy }));
+  if (floor === 100) return TOWER100_ENEMIES.map((enemy) => ({ ...enemy }));
   const upper = towerUpperEnemies(floor);
   if (upper) return upper;
 
@@ -312,9 +314,9 @@ function enemiesOf(floor: number, trait: TowerTrait): DungeonEnemy[] {
 }
 
 export function buildTowerFloor(floor: number, traitOverride?: TowerTrait): TowerFloor {
-  const fixedRoster = floor === 60 || floor === 70 || floor === 90 || isTowerUpperFloor(floor);
+  const fixedRoster = floor === 60 || floor === 70 || floor === 90 || floor === 100 || isTowerUpperFloor(floor);
   const trait = fixedRoster ? traitOf(floor) : traitOverride ?? traitOf(floor);
-  const bossLabels: Partial<Record<number, string>> = { 60: "豪魔人", 70: "始祖ベヒモス", 80: "免疫", 90: "古代ネメシス", 100: "最終試練" };
+  const bossLabels: Partial<Record<number, string>> = { 60: "豪魔人", 70: "始祖ベヒモス", 80: "免疫", 90: "古代ネメシス", 100: "クリモアーク" };
   const upperConcept = towerUpperFloorDef(floor)?.concept;
   const label = bossLabels[floor]
     ?? upperConcept
@@ -324,7 +326,11 @@ export function buildTowerFloor(floor: number, traitOverride?: TowerTrait): Towe
     : floor === 90
       // **何が起きるかだけを書く。**「◯◯を持って行け」とは書かない(編成は考える所)
       ? "古代ネメシスはHPが減るほど狂化し、お供を1体倒すごとにさらに強くなります。お供は強化・加速・妨害で攻めてきます。"
-      : "";
+      : floor === 100
+        ? "クリモアークは戦いの最中に自身の分身を生み出します。分身は攻撃型・サポート型・デバフ型のいずれかで、"
+          + "生きている間はクリモアーク本体が硬くなり、倒すと本体が一時的に強くなります。"
+          + "クリモアーク本体を倒せば、分身が残っていてもその階はクリアです。"
+        : "";
   return {
     floor,
     name: `${floor}階${label ? ` ${label}` : ""}`,

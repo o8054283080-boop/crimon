@@ -75,6 +75,8 @@ export type EffectCondition =
   | "TARGET_HP_ABOVE_SELF"
   /** 対象の行動ゲージが20%以下 */
   | "TARGET_GAUGE_BELOW_20"
+  /** 対象に弱体効果が2個以上 */
+  | "TARGET_DEBUFF_AT_LEAST_2"
   /** 対象に弱体効果が3個以上 */
   | "TARGET_DEBUFF_AT_LEAST_3"
   /** 自身のHPが50%以上 */
@@ -85,6 +87,14 @@ export type EffectCondition =
   | "CRITS_AT_LEAST_2"
   /** このスキルで3回以上クリティカルした */
   | "CRITS_AT_LEAST_3"
+  /**
+   * **この一撃で、この相手から強化効果を実際に剥がせた。**
+   *
+   * 「解除に成功した相手にだけ強化不可を付ける」を書くための条件。
+   * 剥がすものが無かった相手には何も起きない。
+   * 判定は**相手1体ごと**で、同じ技の他の相手の結果には引きずられない。
+   */
+  | "STRIPPED_TARGET"
   /** 直前のスタンが失敗した(免疫・抵抗・確率のいずれでも) */
   | "STUN_FAILED"
   /** このスキルで相手を倒した */
@@ -104,6 +114,13 @@ export interface StatusEffect {
    * 効果の重さと釣り合っている。伸ばしたくないものはここで止める。
    */
   fixedDuration?: true;
+  /**
+   * この効果を出す条件。満たさなければ何も起きない。
+   *
+   * 「解除に**成功した相手にだけ**強化不可」のように、
+   * 同じ技の中で先に起きたことを見て出し分けるために使う。
+   */
+  requires?: EffectCondition;
 }
 
 /**
@@ -744,11 +761,13 @@ export const EFFECT_CONDITION_JA: Record<EffectCondition, string> = {
   TARGET_HP_BELOW_30: "対象のHPが30%以下なら",
   TARGET_HP_ABOVE_SELF: "対象のHP割合が自身より高いなら",
   TARGET_GAUGE_BELOW_20: "対象の行動ゲージが20%以下なら",
+  TARGET_DEBUFF_AT_LEAST_2: "対象の弱体効果が2個以上なら",
   TARGET_DEBUFF_AT_LEAST_3: "対象の弱体効果が3個以上なら",
   SELF_HP_ABOVE_50: "自身のHPが50%以上なら",
   ANY_CRIT: "1回以上クリティカルしたら",
   CRITS_AT_LEAST_2: "2回以上クリティカルしたら",
   CRITS_AT_LEAST_3: "3回以上クリティカルしたら",
+  STRIPPED_TARGET: "強化効果を剥がせたら",
   STUN_FAILED: "スタンが失敗したら",
   KILLED_TARGET: "相手を倒したら",
 };

@@ -443,7 +443,13 @@ function renderNextFloor(props: TrialTowerProps, floor: TowerFloor): HTMLElement
           "越えると全員が全回復し、次はここから登り直せます。",
         ])
       : null,
-    el("div", { className: "tower-floor__enemies" }, floor.enemies.map(renderEnemy)),
+    /*
+     * **戦いの最中に呼ばれる相手は、ここには並べない。**
+     * 100階の分身は盤面としては開幕から席に居るが、まだ生まれていない。
+     * 並べると「クリモアーク・攻」が2体、型まで決まった顔で先に見えてしまう
+     */
+    el("div", { className: "tower-floor__enemies" },
+      floor.enemies.filter((enemy) => !enemy.summonedInBattle).map(renderEnemy)),
     el("div", { className: "tower-floor__reward" }, nodes([
       el("span", { className: "tower-floor__reward-label" }, [claimed ? "初回報酬(受取済み)" : "初回到達報酬"]),
       renderRewardChips(floor.firstClearReward),

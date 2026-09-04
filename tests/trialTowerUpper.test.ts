@@ -605,24 +605,21 @@ describe("今回触っていないところ", () => {
     expect(digest(1, 50)).toBe("5cd6d8ab53f376a3");
   });
 
-  it("80/100階のボスが変わっていない", () => {
+  it("80階のボスが変わっていない", () => {
     /*
-     * **70階と90階はここから外した。**どちらも専用ボスへ作り替えた回で
+     * **70階・90階・100階はここから外した。**どれも専用ボスへ作り替えた回で
      * 意図して変えた階なので、固めるのは下の専用の見張りへ移してある
-     * (70階=始祖ベヒモス / 90階=古代ネメシス)。
-     * 80/100階は据え置き——ここが落ちたら、意図せず手が入ったということ。
+     * (70階=始祖ベヒモス / 90階=古代ネメシス / 100階=クリモアーク)。
+     * 80階は据え置き——ここが落ちたら、意図せず手が入ったということ。
      */
     expect(digest(80, 80)).toBe("d3ae9c59b9b31e6a");
-    expect(digest(100, 100)).toBe("b329fde94c830368");
   });
 
-  it("80/100階は従来どおり古代の魔人+お供2体のまま", () => {
-    for (const floor of [80, 100]) {
-      const def = findTowerFloor(floor)!;
-      expect(def.enemies, `${floor}階`).toHaveLength(3);
-      expect(def.enemies[0].templateId).toBe("ancient_demon");
-      expect(def.enemies[0].fixedStats, `${floor}階は倍率で組まれたまま`).toBeUndefined();
-    }
+  it("80階は従来どおり古代の魔人+お供2体のまま", () => {
+    const def = findTowerFloor(80)!;
+    expect(def.enemies).toHaveLength(3);
+    expect(def.enemies[0].templateId).toBe("ancient_demon");
+    expect(def.enemies[0].fixedStats, "80階は倍率で組まれたまま").toBeUndefined();
   });
 
   it("90階は古代ネメシス+お供4体で固定されている", () => {
