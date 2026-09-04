@@ -229,6 +229,8 @@ export interface PlayerState {
   towerPartyIds: string[];
   /** 越えた階の最高。ここから節(10階ごと)を割り出して再開地点を決める */
   trialTowerBestFloor: number;
+  /** 月をまたいでも残す歴代最高到達階。オンラインランキングの同期元 */
+  trialTowerLifetimeBestFloor: number;
   /** 初回到達報酬を渡し済みの階。登り直しで二重に渡さないために残す */
   trialTowerClaimedFloors: number[];
   /** 塔の月間シーズン。端末のタイムゾーンによらないJSTの YYYY-MM */
@@ -373,6 +375,7 @@ export function createInitialState(): PlayerState {
     arenaDefenseCoinDate: "",
     towerPartyIds: [],
     trialTowerBestFloor: 0,
+    trialTowerLifetimeBestFloor: 0,
     trialTowerClaimedFloors: [],
     trialTowerSeason: towerSeasonKeyAt(),
     trialTowerMonthlyOrbClaimedFloors: [],
@@ -593,6 +596,15 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
 
   if (!Array.isArray(state.towerPartyIds)) state.towerPartyIds = [];
   if (typeof state.trialTowerBestFloor !== "number") state.trialTowerBestFloor = 0;
+  // 旧セーブは、その時点の月間最高を歴代最高として安全に引き継ぐ。
+  if (typeof state.trialTowerLifetimeBestFloor !== "number" || !Number.isFinite(state.trialTowerLifetimeBestFloor)) {
+    state.trialTowerLifetimeBestFloor = state.trialTowerBestFloor;
+  }
+  state.trialTowerLifetimeBestFloor = Math.max(
+    0,
+    Math.min(100, Math.round(state.trialTowerLifetimeBestFloor)),
+    Math.min(100, Math.round(state.trialTowerBestFloor)),
+  );
   if (!Array.isArray(state.trialTowerClaimedFloors)) state.trialTowerClaimedFloors = [];
   if (!state.trialTowerRun || !Array.isArray(state.trialTowerRun.members)) state.trialTowerRun = null;
   ensureTowerMonthlyState(state, now);

@@ -11,6 +11,122 @@
 
 .tower-screen {
   gap: 13px;
+  overflow-x: clip;
+}
+
+.tower-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tower-actions__button {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  font-size: 0.78rem;
+}
+
+/* 敵情報とランキング。下部ナビ・iPhoneのホームインジケータを避ける。 */
+.tower-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 18px 10px calc(18px + env(safe-area-inset-bottom));
+}
+
+.tower-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(2, 1, 6, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.tower-modal__sheet {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: min(82dvh, 760px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px 14px 18px;
+  border-radius: 18px 18px 12px 12px;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(31, 22, 45, 0.99), rgba(9, 6, 16, 0.99));
+  box-shadow: inset 0 0 0 1px rgba(210, 177, 104, 0.42), 0 -12px 40px rgba(0, 0, 0, 0.62);
+}
+
+.tower-modal__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tower-modal__head > div { min-width: 0; flex: 1; }
+.tower-modal__head h2 { margin: 2px 0 0; font-size: 1.08rem; }
+.tower-modal__eyebrow { font-size: 0.62rem; letter-spacing: 0.16em; color: #d7ba73; }
+.btn.tower-modal__close { width: 40px; min-width: 40px; height: 40px; padding: 0; }
+.tower-modal__lead { margin: 10px 0 12px; color: #bcb2c9; font-size: 0.78rem; line-height: 1.55; }
+
+.tower-intel { display: grid; gap: 10px; }
+.tower-intel__card {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(4, 2, 9, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+.tower-intel__card h3 { margin: 0 0 9px; color: #f5d98c; font-size: 0.9rem; }
+.tower-intel__abilities { display: grid; gap: 8px; }
+.tower-intel__abilities + .tower-intel__abilities { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.tower-intel__ability-name { color: #eee8f4; font-size: 0.82rem; font-weight: 800; }
+.tower-intel__ability-effect { margin: 3px 0 0; color: #bfb6cb; font-size: 0.78rem; line-height: 1.55; overflow-wrap: anywhere; }
+
+.tower-ranking__list { display: grid; gap: 6px; padding-bottom: 70px; }
+.tower-ranking__row {
+  display: grid;
+  grid-template-columns: 45px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(4, 2, 9, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.tower-ranking__row.is-self { box-shadow: inset 0 0 0 1px rgba(236, 196, 100, 0.55); }
+.tower-ranking__rank { color: #aaa0b8; font-size: 0.76rem; font-weight: 800; }
+.tower-ranking__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; font-weight: 800; }
+.tower-ranking__floor { color: #ead59f; font-size: 0.8rem; font-weight: 900; white-space: nowrap; }
+.tower-ranking__floor.is-clear { color: #ffd866; }
+.tower-ranking__state { margin: 20px 0; text-align: center; color: #c8bfD2; font-size: 0.78rem; }
+.tower-ranking__state p { margin: 0 0 12px; }
+.tower-ranking__self {
+  position: sticky;
+  bottom: -18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px -6px -12px;
+  padding: 13px 14px calc(13px + env(safe-area-inset-bottom));
+  border-radius: 12px 12px 8px 8px;
+  color: #fff1bd;
+  background: rgba(35, 25, 10, 0.98);
+  box-shadow: inset 0 0 0 1px rgba(236, 196, 100, 0.54), 0 -8px 20px rgba(0, 0, 0, 0.5);
+  font-size: 0.78rem;
+}
+
+@media (min-height: 700px) {
+  .tower-modal { align-items: center; }
+  .tower-modal__sheet { border-radius: 18px; }
+}
+
+@media (max-width: 360px) {
+  .tower-actions { grid-template-columns: 1fr; }
+  .tower-ranking__row { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 5px; padding-inline: 8px; }
 }
 
 .tower-monthly { padding: 12px 14px; }

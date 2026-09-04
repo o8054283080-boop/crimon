@@ -232,6 +232,21 @@ describe("持ち越し (applyTowerFloorResult)", () => {
     expect(state.trialTowerBestFloor).toBe(TOWER_FLOOR_COUNT);
     expect(state.trialTowerRun).toBeNull();
   });
+
+  it("歴代最高は自己ベストを越えた時だけ更新する", () => {
+    const state = stateWithTowerParty();
+    state.trialTowerLifetimeBestFloor = 73;
+    beginTowerRun(state);
+    state.trialTowerRun!.floor = 73;
+    const same = climbOneFloor(state);
+    expect(same.lifetimeBestUpdated).toBe(false);
+    expect(state.trialTowerLifetimeBestFloor).toBe(73);
+
+    state.trialTowerRun!.floor = 74;
+    const best = climbOneFloor(state);
+    expect(best.lifetimeBestUpdated).toBe(true);
+    expect(state.trialTowerLifetimeBestFloor).toBe(74);
+  });
 });
 
 describe("初回到達報酬", () => {

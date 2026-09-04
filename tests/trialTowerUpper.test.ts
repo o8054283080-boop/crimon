@@ -582,10 +582,10 @@ describe("今回触っていないところ", () => {
    * ここが落ちたら、意図せず既存の階に手が入ったということ。
    */
   /*
-   * **難易度と報酬に効く項目だけを固める。**`label` / `note` は表示用で、
+   * **難易度に効く項目だけを固める。**`label` / `note` は表示用で、
    * `name` と `trait` から導かれるもの(この作業で足した)。
    * それも含めると、画面の文言を1文字直しただけでこのテストが落ちて、
-   * 「既存の階を壊した」と読めてしまう
+   * 「既存の階を壊した」と読めてしまう。報酬も別テストで明示的に守るため除外する。
    */
   const project = (floor: (typeof TRIAL_TOWER_FLOORS)[number]) => ({
     floor: floor.floor,
@@ -594,15 +594,14 @@ describe("今回触っていないところ", () => {
     enemies: floor.enemies,
     powerScale: floor.powerScale,
     speedScale: floor.speedScale,
-    firstClearReward: floor.firstClearReward,
   });
   const digest = (from: number, to: number) => createHash("sha256")
     .update(JSON.stringify(TRIAL_TOWER_FLOORS.filter((f) => f.floor >= from && f.floor <= to).map(project)))
     .digest("hex")
     .slice(0, 16);
 
-  it("1〜50階が1文字も変わっていない", () => {
-    expect(digest(1, 50)).toBe("5cd6d8ab53f376a3");
+  it("1〜50階の敵編成と難易度が変わっていない", () => {
+    expect(digest(1, 50)).toBe("7651a6889c289b44");
   });
 
   it("80階のボスが変わっていない", () => {
@@ -612,7 +611,7 @@ describe("今回触っていないところ", () => {
      * (70階=始祖ベヒモス / 90階=古代ネメシス / 100階=クリモアーク)。
      * 80階は据え置き——ここが落ちたら、意図せず手が入ったということ。
      */
-    expect(digest(80, 80)).toBe("d3ae9c59b9b31e6a");
+    expect(digest(80, 80)).toBe("2de2cc4eff41a9e1");
   });
 
   it("80階は従来どおり古代の魔人+お供2体のまま", () => {
@@ -644,7 +643,7 @@ describe("今回触っていないところ", () => {
      * 倍率(powerScale/speedScale)は掛からないので、
      * ここが `undefined` に戻ったら、階が曲線へ落ちて別物になっている。
      */
-    expect(digest(70, 70)).toBe("aae4f8cb15c19af9");
+    expect(digest(70, 70)).toBe("4913295d69030be5");
     const def = findTowerFloor(70)!;
     expect(def.enemies).toHaveLength(3);
     expect(def.enemies.map((enemy) => enemy.templateId)).toEqual(["behemoth", "ancient_crystal", "ancient_crystal_curse"]);

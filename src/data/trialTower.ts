@@ -221,17 +221,16 @@ function rewardOf(floor: number): TowerReward {
     return { crystal: 10 + floor, gold: 400 + floor * 100 };
   }
   const milestones: Partial<Record<number, TowerReward>> = {
-    40: { crystal: 100, summonScroll: 10 },
-    50: { crystal: 150, fourStarSummonScrolls: 1, awakeningOrbs: 2 },
-    60: { crystal: 200, summonScroll: 10, fourStarSummonScrolls: 1 },
-    70: { crystal: 250, fiveStarSummonScrolls: 1, skillPigs: 1 },
-    80: { crystal: 300, fourStarSummonScrolls: 3, lightDarkFourStarSummonScrolls: 1 },
-    90: { crystal: 350, skillPigs: 3, awakeningOrbs: 3 },
-    100: { crystal: 500, summonScroll: 30, lightDarkFourStarSummonScrolls: 3, fiveStarSummonScrolls: 1 },
+    40: { crystal: 600, summonScroll: 10 },
+    50: { crystal: 800, fourStarSummonScrolls: 1, awakeningOrbs: 2 },
+    60: { crystal: 1_200, summonScroll: 10, fourStarSummonScrolls: 1 },
+    70: { crystal: 1_500, fiveStarSummonScrolls: 1, skillPigs: 1 },
+    80: { crystal: 2_000, fourStarSummonScrolls: 3, lightDarkFourStarSummonScrolls: 1 },
+    90: { crystal: 2_500, skillPigs: 3, awakeningOrbs: 3 },
+    100: { crystal: 3_000, summonScroll: 30, lightDarkFourStarSummonScrolls: 3, fiveStarSummonScrolls: 1 },
   };
   if (milestones[floor]) return milestones[floor]!;
-  if (isTowerCheckpoint(floor)) return { gold: floor * 1000 };
-  return { gold: floor * 250 };
+  return { gold: floor * 1_000 };
 }
 
 const BOSS_HP_MULTIPLIER = 2.2;
