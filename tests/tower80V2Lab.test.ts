@@ -9,6 +9,7 @@ import { attachProbe } from "../tools/battleLab/hook.js";
 import { mulberry32 } from "../tools/battleLab/rng.js";
 import { runBattle } from "../tools/battleLab/run.js";
 import { buildTower80V2, TOWER80_ENEMIES_V2, TOWER80_STRIP_BLOCK_PARTY_V2, TOWER80_V2 } from "../tools/battleLab/scenarios/tower80v2.js";
+import { buildTower80V3 } from "../tools/battleLab/scenarios/tower80v3.js";
 import { TOWER80_RULES } from "../tools/battleLab/tower80/probe.js";
 
 /*
@@ -242,5 +243,90 @@ describe("本編の80階は1つも変わっていない", () => {
     const dummy = findMonsterById("wolf_FIRE")!;
     const engine = new BattleEngine([dummy], enemies, { rng: mulberry32(1), maxTurns: 1 });
     expect(attachProbe(engine, undefined)).toBeNull();
+  });
+});
+
+describe("80階V3: 鼓舞晶の弱体化とお供撃破ボーナス", () => {
+  /*
+   * V3で入れた2つ。**性格が正反対**なので、両方が仕様どおり動くことを別々に見張る。
+   * 鼓舞晶の弱体化はボス集中が得をし、撃破ボーナスはお供を倒す線にだけ効く。
+   */
+  it("弱めた鼓舞晶はS2 ATK+32%/SPD+22%、S3 ゲージ+16%", () => {
+    const inspire = buildTower80V3().enemies.find((enemy) => enemy.label === "古代の鼓舞晶")!;
+    expect(inspire.skills?.[1].effects).toContainEqual({ kind: "BUFF", stat: "atk", amount: 0.32, durationTurns: 2 });
+    expect(inspire.skills?.[1].effects).toContainEqual({ kind: "BUFF", stat: "spd", amount: 0.22, durationTurns: 2 });
+    expect(inspire.skills?.[2].effects).toContainEqual({ kind: "GAUGE", amount: 0.16 });
+  });
+
+  it("V2より弱く、しかし支援役として消えてはいない", () => {
+    const v2 = TOWER80_ENEMIES_V2.find((enemy) => enemy.label === "古代の鼓舞晶")!;
+    const v3 = buildTower80V3().enemies.find((enemy) => enemy.label === "古代の鼓舞晶")!;
+    const buffOf = (enemy: typeof v2, stat: string) => {
+      const effect = enemy.skills?.[1].effects.find((e) => e.kind === "BUFF" && e.stat === stat);
+      return (effect as { amount: number } | undefined)?.amount ?? 0;
+    };
+    expect(buffOf(v3, "atk")).toBeLessThan(buffOf(v2, "atk"));
+    expect(buffOf(v3, "spd")).toBeLessThan(buffOf(v2, "spd"));
+    // **0にはしない。**消すとボス集中がさらに得をする(実測 +29.2pt)
+    expect(buffOf(v3, "atk")).toBeGreaterThan(0);
+    expect(buffOf(v3, "spd")).toBeGreaterThan(0);
+  });
+
+  it("お供を倒すほどボスの被ダメージが5%ずつ増える", () => {
+    const scenario = buildTower80V3();
+    const enemies = scenario.enemies.map(buildEnemy);
+    const base = findMonsterById("wolf_FIRE")!;
+    const dummy = { ...base, stats: { ...base.stats, hp: 500_000, atk: 1, spd: 1 } };
+    const engine = new BattleEngine([dummy], enemies, { rng: mulberry32(1), maxTurns: 1 });
+    const probe = attachProbe(engine, scenario.hook)!;
+    const foes = engine.getUnits().filter((unit) => unit.team === "ENEMY");
+    const boss = foes[0];
+
+    probe.beforeTurn("P1");
+    probe.afterTurn("P1", []);
+    // 免疫中はお供撃破ぶんだけが乗る(剥がれている間の+25%は付かない)
+    expect(boss.mitigateAmount).toBe(0);
+
+    for (let killed = 1; killed <= 4; killed += 1) {
+      foes[killed].alive = false;
+      foes[killed].currentHp = 0;
+      probe.beforeTurn("P1");
+      probe.afterTurn("P1", []);
+      expect(boss.mitigateAmount, `${killed}体撃破`).toBeCloseTo(-0.05 * killed, 6);
+    }
+  });
+
+  it("**免疫中でも撃破ぶんは効く**(効かないとV2へ逆戻りする)", () => {
+    const scenario = buildTower80V3();
+    const enemies = scenario.enemies.map(buildEnemy);
+    const base = findMonsterById("wolf_FIRE")!;
+    const dummy = { ...base, stats: { ...base.stats, hp: 500_000, atk: 1, spd: 1 } };
+    const engine = new BattleEngine([dummy], enemies, { rng: mulberry32(1), maxTurns: 1 });
+    const probe = attachProbe(engine, scenario.hook)!;
+    const foes = engine.getUnits().filter((unit) => unit.team === "ENEMY");
+    const boss = foes[0];
+    probe.beforeTurn("P1");
+    probe.afterTurn("P1", []);
+    foes[1].alive = false;
+    foes[1].currentHp = 0;
+    foes[2].alive = false;
+    foes[2].currentHp = 0;
+
+    // 免疫を張り直しても撃破ぶんは残る
+    boss.immuneTurns = 5;
+    probe.beforeTurn("P1");
+    probe.afterTurn("P1", []);
+    expect(boss.immuneTurns).toBeGreaterThan(0);
+    expect(boss.mitigateAmount).toBeCloseTo(-0.10, 6);
+  });
+
+  it("V2には撃破ボーナスが乗らない(V3だけの追加)", () => {
+    const r = rig();
+    turn(r, "P1");
+    r.foes[1].alive = false;
+    r.foes[1].currentHp = 0;
+    turn(r, "P1");
+    // V2は免疫中なら軽減0のまま
+    expect(r.boss.mitigateAmount).toBe(0);
   });
 });

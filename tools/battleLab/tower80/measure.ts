@@ -26,6 +26,7 @@ import { writeFileSync } from "node:fs";
 import { runMany } from "../run.js";
 import type { BattleTally } from "../types.js";
 import { buildTower80V2, TOWER80_FOCUS_V2, TOWER80_V2, type Tower80Variant } from "../scenarios/tower80v2.js";
+import { buildTower80V3, TOWER80_V3 } from "../scenarios/tower80v3.js";
 
 function arg(name: string, fallback: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -34,6 +35,8 @@ function arg(name: string, fallback: string): string {
 
 const RUNS = Number(arg("runs", "1000"));
 const SEED = Number(arg("seed", "20260930"));
+/** どの案を測るか。`v2`(既定) か `v3` */
+const GEN = arg("gen", "v2").toLowerCase();
 
 const mean = (values: number[]): number => (values.length === 0 ? 0 : values.reduce((a, b) => a + b, 0) / values.length);
 
@@ -53,12 +56,14 @@ const KEYS = [
   "免疫再展開の合計", "S3の免疫供給", "強化阻害で防いだ免疫",
   "ボス残HP", "ボス残HP割合", "HP50%未満へ到達", "HP50%未満後の全滅",
   "護晶を倒せた", "護晶が倒れた手番", "破邪獣を倒せた", "破邪獣が倒れた手番", "ボス行動回数",
+  "倒したお供の数", "お供撃破ぶんの被ダメ増", "撃破ボーナス下でのボス行動割合",
 ];
 
 /** 割合として出す列(1戦あたりの平均ではなく%で読む) */
 const AS_PERCENT = new Set([
   "免疫中の行動割合", "強化阻害中の行動割合", "ボス残HP割合",
   "HP50%未満へ到達", "HP50%未満後の全滅", "護晶を倒せた", "破邪獣を倒せた",
+  "お供撃破ぶんの被ダメ増", "撃破ボーナス下でのボス行動割合",
 ]);
 
 function measure(scenario = TOWER80_V2, quiet = false): Row[] {
@@ -103,7 +108,19 @@ const V1 = [
   { focus: "ボス集中", winRate: 0.158, lossRate: 0.842, drawRate: 0, avgTurns: 89.8 },
 ];
 
-function markdown(rows: Row[]): string {
+/**
+ * V2の実測(各1000戦)。**消さずに残す。**
+ * 新旧を並べられないと、勝率が動いた時に何をしたから動いたのかが読めない。
+ */
+const V2 = [
+  { focus: "破邪獣→護晶→ボス", winRate: 0.169, lossRate: 0.716, drawRate: 0.115, avgTurns: 147.2, bossHpRatio: 0.723 },
+  { focus: "護晶→破邪獣→ボス", winRate: 0.133, lossRate: 0.803, drawRate: 0.064, avgTurns: 126.4, bossHpRatio: 0.796 },
+  { focus: "鼓舞晶→護晶→破邪獣→ボス", winRate: 0.040, lossRate: 0.752, drawRate: 0.208, avgTurns: 146.5, bossHpRatio: 0.879 },
+  { focus: "呪獣→護晶→破邪獣→ボス", winRate: 0.060, lossRate: 0.873, drawRate: 0.067, avgTurns: 115.7, bossHpRatio: 0.866 },
+  { focus: "ボス集中", winRate: 0.357, lossRate: 0.643, drawRate: 0.0, avgTurns: 109.8, bossHpRatio: 0.384 },
+];
+
+function markdown(rows: Row[], againstV2 = false): string {
   const out: string[] = [];
   out.push("## 勝敗\n");
   out.push("| 狙う順 | 戦数 | 勝率 | 敗北 | 引分 | 平均手数 |");
@@ -112,11 +129,13 @@ function markdown(rows: Row[]): string {
     out.push(`| ${row.focus} | ${row.runs} | **${pct(row.winRate)}** | ${pct(row.lossRate)} | ${pct(row.drawRate)} | ${row.avgTurns.toFixed(1)} |`);
   }
 
-  out.push("\n## V1との比較\n");
-  out.push("| 狙う順 | 勝率V1 | 勝率V2 | 差 | 敗北V1 | 敗北V2 | 引分V1 | 引分V2 | 手数V1 | 手数V2 |");
+  const prevLabel = againstV2 ? "V2" : "V1";
+  const nowLabel = againstV2 ? "V3" : "V2";
+  out.push(`\n## ${prevLabel}との比較\n`);
+  out.push(`| 狙う順 | 勝率${prevLabel} | 勝率${nowLabel} | 差 | 敗北${prevLabel} | 敗北${nowLabel} | 引分${prevLabel} | 引分${nowLabel} | 手数${prevLabel} | 手数${nowLabel} |`);
   out.push("|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|");
   for (const row of rows) {
-    const before = V1.find((entry) => entry.focus === row.focus);
+    const before = (againstV2 ? V2 : V1).find((entry) => entry.focus === row.focus);
     if (!before) continue;
     const diff = (row.winRate - before.winRate) * 100;
     out.push(
@@ -197,18 +216,104 @@ function ablationMarkdown(): string {
   return out.join("\n");
 }
 
+/**
+ * V3(鼓舞晶を弱める + お供撃破でボス被ダメ+5%)の切り分け。
+ *
+ * **2つ同時に入れたので、必ず分けて測る。**
+ * V1→V2でお供のATKとSPDを同時に動かし、どちらがどれだけ効いたのか
+ * 分からなくなった前例がある。
+ */
+const V3_STAGES: { name: string; variant: Tower80Variant }[] = [
+  { name: "A V2のまま", variant: {} },
+  { name: "B 鼓舞晶を弱めるだけ(中)", variant: { inspireProfile: "MID" } },
+  { name: "C お供撃破ボーナスだけ", variant: { escortKillDamageBonus: 0.05 } },
+  { name: "D 両方・弱め小", variant: { inspireProfile: "LIGHT", escortKillDamageBonus: 0.05 } },
+  { name: "E 両方・弱め中", variant: { inspireProfile: "MID", escortKillDamageBonus: 0.05 } },
+  { name: "F 両方・弱め大", variant: { inspireProfile: "HEAVY", escortKillDamageBonus: 0.05 } },
+  /*
+   * **撃破ボーナスの効き幅を確かめる段。**
+   * 5%では1戦に1〜1.4体しか倒せず、実効5〜7%しか乗らなかった
+   * (最大20%のうち)。上げれば「お供を倒す線」だけが伸びるはず——
+   * ボス集中はお供を倒さないので、ここは動かないことが確認になる
+   */
+  { name: "G 弱め小+ボーナス10%", variant: { inspireProfile: "LIGHT", escortKillDamageBonus: 0.10 } },
+  { name: "H 弱め小+ボーナス15%", variant: { inspireProfile: "LIGHT", escortKillDamageBonus: 0.15 } },
+  { name: "I 弱め小+ボーナス20%", variant: { inspireProfile: "LIGHT", escortKillDamageBonus: 0.20 } },
+  /*
+   * **倒せる数が増えればボーナスが効くのか。**
+   * ボーナスを4倍(5→20%)にしてもお供線が+5.2ptしか動かなかったのは、
+   * 1戦に1.21体しか倒せていないため。お供を柔らかくして数を増やす。
+   *
+   * V2ではHP0.75倍が**逆効果**(−6.2pt)だったが、あの時は倒す見返りが
+   * 無かった。見返りがある今は結果が変わるはずで、
+   * 変わらなければ「お供の数そのものが多すぎる」ということになる
+   */
+  { name: "J 弱め小+10%+お供HP0.75倍", variant: { inspireProfile: "LIGHT", escortKillDamageBonus: 0.10, escortHpFactor: 0.75 } },
+  { name: "K 弱め小+10%+お供HP0.6倍", variant: { inspireProfile: "LIGHT", escortKillDamageBonus: 0.10, escortHpFactor: 0.6 } },
+];
+
+function v3StageMarkdown(): string {
+  const out: string[] = [];
+  // `--stage-only A,J,K` で測る段を絞る。**基準(A)は必ず含める**
+  const only = arg("stage-only", "");
+  const picked = only === ""
+    ? V3_STAGES
+    : V3_STAGES.filter((stage) => only.split(",").some((key) => stage.name.startsWith(key.trim())));
+  if (picked.length === 0) throw new Error(`測る段がありません(--stage-only ${only})`);
+  const table = picked.map((stage) => {
+    process.stderr.write(`  切り分け: ${stage.name} …\n`);
+    return { name: stage.name, rows: measure(buildTower80V2(stage.variant), true) };
+  });
+  const base = table[0];
+  const names = TOWER80_FOCUS_V2.map((focus) => focus.name);
+
+  out.push(`\n## 2つの変更を分けて測る(各${RUNS}戦)\n`);
+  out.push("### 勝率\n");
+  out.push(`| 変えたところ | ${names.join(" | ")} |`);
+  out.push(`|---|${names.map(() => "--:").join("|")}|`);
+  for (const stage of table) {
+    const cells = stage.rows.map((row, i) => {
+      const diff = (row.winRate - base.rows[i].winRate) * 100;
+      return stage === base ? pct(row.winRate) : `${pct(row.winRate)} (${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pt)`;
+    });
+    out.push(`| ${stage.name} | ${cells.join(" | ")} |`);
+  }
+
+  out.push("\n### ボス残HP割合(削れているか)\n");
+  out.push(`| 変えたところ | ${names.join(" | ")} |`);
+  out.push(`|---|${names.map(() => "--:").join("|")}|`);
+  for (const stage of table) {
+    out.push(`| ${stage.name} | ${stage.rows.map((row) => pct(row.extra["ボス残HP割合"] ?? 0)).join(" | ")} |`);
+  }
+
+  out.push("\n### 倒せたお供の数(1戦あたり)\n");
+  out.push(`| 変えたところ | ${names.join(" | ")} |`);
+  out.push(`|---|${names.map(() => "--:").join("|")}|`);
+  for (const stage of table) {
+    out.push(`| ${stage.name} | ${stage.rows.map((row) => (row.extra["倒したお供の数"] ?? 0).toFixed(2)).join(" | ")} |`);
+  }
+  return out.join("\n");
+}
+
 function main(): void {
   const started = Date.now();
-  const rows = measure();
+  const v3 = GEN === "v3";
+  const rows = measure(v3 ? TOWER80_V3 : TOWER80_V2);
   const text = [
-    "# 試練の塔80階「古代聖竜」V2 実測(検証中・本編未反映)\n",
+    `# 試練の塔80階「古代聖竜」${v3 ? "V3" : "V2"} 実測(検証中・本編未反映)\n`,
     `装備段階 TYPICAL / 各 ${RUNS} 戦 / seed ${SEED}(攻略順ごとに +10,000)。`
     + "ボス HP200,000 ATK9,500 DEF3,800 SPD185(免疫中は実質11,500)。"
     + "お供は 護晶 ATK6,000/SPD170、鼓舞晶 ATK5,500/SPD162、破邪獣 ATK8,500/SPD180、呪獣 ATK6,500/SPD155。"
     + "開始時とHP70%/40%初到達、ボスS3で敵側全体に免疫2ターン。"
-    + "免疫が剥がれている間は被ダメージ+25%、HP50%未満で全攻撃×1.5。\n",
-    markdown(rows),
+    + "免疫が剥がれている間は被ダメージ+25%、HP50%未満で全攻撃×1.5。"
+    + (v3
+      ? "**V3の変更2つ**: 鼓舞晶を弱める(S2 ATK+25%/SPD+15% CT5、S3 ゲージ+12%のみ CT6)、"
+        + "お供1体撃破ごとにボスの被ダメージ+5%(最大+20%、免疫中も効く)。"
+      : "")
+    + "\n",
+    markdown(rows, v3),
     process.argv.includes("--ablate") ? ablationMarkdown() : "",
+    process.argv.includes("--stages") ? v3StageMarkdown() : "",
     // **空の要素を混ぜたまま繋がない。**末尾に空行が残り、
     // CIの `git diff --check` が「new blank line at EOF」で落ちる
   ].filter((part) => part !== "").join("\n").replace(/\n+$/, "");

@@ -82,6 +82,47 @@ const inspireSkills: [Skill, Skill, Skill] = [
   ]),
 ];
 
+/**
+ * 弱めた鼓舞晶(V3)。
+ *
+ * V2の切り分けで、**この1体が難易度の主役**だと分かった。
+ * ゲージ加速を外すだけで勝率が +15.7〜+37.8pt、
+ * ATK/SPDバフを外すと +19.3〜+28.6pt——免疫まわり4つの合計を上回る。
+ * 「免疫を剥がす階」のはずが、実際にはバフとゲージ加速が難易度を作っていた。
+ *
+ * **消さずに弱める。**支援役としての役割は残しつつ、
+ * 効き幅を落として、免疫と剥がしの読み合いが主役に戻るようにする。
+ *
+ *   S2 …… ATK+40%/SPD+30%(CT4) → ATK+25%/SPD+15%(CT5)
+ *   S3 …… ゲージ+20%+CT短縮1(CT5) → ゲージ+12%のみ(CT6)
+ *
+ * CT短縮を落としたのは、これが**他の3体のスキル回転そのもの**を速めていて、
+ * 効き幅が読みにくかったため(ゲージ加速との二重取り)。
+ */
+const inspireVariants = {
+  /** 弱め小: バフだけ少し下げ、CTとCT短縮はV2のまま */
+  LIGHT: { atk: 0.32, spd: 0.22, buffCt: 4, gauge: 0.16, gaugeCt: 5, keepCooldownReduce: true },
+  /** 弱め中: CTを1ずつ伸ばし、CT短縮を落とす */
+  MID: { atk: 0.25, spd: 0.15, buffCt: 5, gauge: 0.12, gaugeCt: 6, keepCooldownReduce: false },
+  /** 弱め大: 支援役として最低限だけ残す */
+  HEAVY: { atk: 0.18, spd: 0.10, buffCt: 5, gauge: 0.08, gaugeCt: 6, keepCooldownReduce: false },
+} as const;
+
+function inspireSkillsOf(profile: keyof typeof inspireVariants): [Skill, Skill, Skill] {
+  const v = inspireVariants[profile];
+  return [
+    inspireSkills[0],
+    skill(`tower80_inspire_s2_${profile}`, "戦意共鳴", "ALL_ALLIES", v.buffCt, [
+      { kind: "BUFF", stat: "atk", amount: v.atk, durationTurns: 2 },
+      { kind: "BUFF", stat: "spd", amount: v.spd, durationTurns: 2 },
+    ]),
+    skill(`tower80_inspire_s3_${profile}`, "加速共鳴", "ALL_ALLIES", v.gaugeCt, [
+      { kind: "GAUGE", amount: v.gauge },
+      ...(v.keepCooldownReduce ? [{ kind: "COOLDOWN_REDUCE", turns: 1 } as const] : []),
+    ]),
+  ];
+}
+
 const breakerSkills: [Skill, Skill, Skill] = [
   skill("tower80_breaker_s1", "裂光爪", "SINGLE_ENEMY", 0, [
     { kind: "DAMAGE", multiplier: 1.1 },
@@ -152,6 +193,8 @@ export interface Tower80Variant extends Tower80ProbeOptions {
   noCurseDebuff?: boolean;
   /** 護晶S2の免疫供給を外す */
   noGuardImmunity?: boolean;
+  /** 鼓舞晶の強さ(V2=そのまま / 以降は弱めた3段階) */
+  inspireProfile?: "V2" | "LIGHT" | "MID" | "HEAVY";
 }
 
 const stripEffects = (skills: [Skill, Skill, Skill], drop: (effect: Skill["effects"][number]) => boolean): [Skill, Skill, Skill] =>
@@ -166,6 +209,9 @@ export function tower80EnemiesV2(variant: Tower80Variant = {}): EnemySpec[] {
     if (index === 0) return { ...enemy };
     const stats = enemy.stats!;
     let skills = enemy.skills as [Skill, Skill, Skill];
+    if (variant.inspireProfile && variant.inspireProfile !== "V2" && enemy.label === "古代の鼓舞晶") {
+      skills = inspireSkillsOf(variant.inspireProfile);
+    }
     if (variant.noInspireBuff && enemy.label === "古代の鼓舞晶") skills = stripEffects(skills, (e) => e.kind === "BUFF");
     if (variant.noInspireGauge && enemy.label === "古代の鼓舞晶") {
       skills = stripEffects(skills, (e) => (e.kind === "GAUGE" && e.amount > 0) || e.kind === "COOLDOWN_REDUCE");

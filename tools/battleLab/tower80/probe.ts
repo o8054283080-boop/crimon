@@ -63,6 +63,15 @@ export const TOWER80_RULES = {
   enrageHpRatio: 0.5,
   /** 初到達で免疫を配り直すHP割合 */
   immunityThresholds: [0.7, 0.4] as const,
+  /**
+   * お供を1体倒すごとに、ボスの被ダメージへ足す割合(V3で追加)。
+   *
+   * V2では**お供を倒す線ほど負けていた**。お供の合計HPは410,000で
+   * ボス単体の2倍を超えるのに、倒した見返りが「その1体の火力が消える」
+   * だけだったため、払う手数に見合っていなかった。
+   * **倒したことがボス撃破そのものを楽にする**形へ変える。
+   */
+  escortKillDamageBonus: 0.05,
 } as const;
 
 interface Counters {
@@ -93,6 +102,10 @@ interface Counters {
   /** お供が倒れた手番(倒れなければ0のまま) */
   guardDownTurn: number;
   breakerDownTurn: number;
+  /** 決着時点で倒せていたお供の数(0〜4) */
+  escortsKilled: number;
+  /** 撃破ぶんの被ダメージ上昇が乗った状態でボスが行動した手番 */
+  bossActionsWithKillBonus: number;
   /** 数えた手番の総数 */
   turns: number;
 }
@@ -103,7 +116,7 @@ function newCounters(): Counters {
     bossStrips: 0, bossBuffBlocks: 0,
     thresholdImmunity70: 0, thresholdImmunity40: 0, roarImmunity: 0, immunityBlocked: 0,
     bossHpLeft: 0, bossHpRatioLeft: 0, reachedHalf: 0, wipedAfterHalf: 0,
-    guardDownTurn: 0, breakerDownTurn: 0, turns: 0,
+    guardDownTurn: 0, breakerDownTurn: 0, escortsKilled: 0, bossActionsWithKillBonus: 0, turns: 0,
   };
 }
 
@@ -135,6 +148,11 @@ export interface Tower80ProbeOptions {
   noImmuneAtk?: boolean;
   /** 免疫が剥がれている間の被ダメージ+25%を止める */
   noStrippedWeakness?: boolean;
+  /**
+   * お供1体撃破ごとにボスの被ダメージへ足す割合。
+   * **既定は0(V2のまま)。**V3で `TOWER80_RULES.escortKillDamageBonus` を渡す。
+   */
+  escortKillDamageBonus?: number;
 }
 
 export function tower80Probe(context: Context, options: Tower80ProbeOptions = {}): ScenarioProbe {
@@ -185,7 +203,21 @@ export function tower80Probe(context: Context, options: Tower80ProbeOptions = {}
      * 測っているのが何なのか分からなくなる
      */
     unit.mitigateTurns = 999;
-    unit.mitigateAmount = immune || options.noStrippedWeakness ? 0 : -TOWER80_RULES.strippedDamageTaken;
+    /*
+     * 被ダメージは2つの足し算。
+     *
+     *   ・免疫が剥がれている間の +25%(免疫中は付かない)
+     *   ・**倒したお供の数 × 5%(免疫中でも付く)**
+     *
+     * 後者を免疫中も効かせるのが要点。免疫中だけ消えるなら、
+     * お供を倒しても「免疫を張られている間は無意味」になり、
+     * V2と同じ「倒す意味がない」へ戻る
+     */
+    const stripped = immune || options.noStrippedWeakness ? 0 : TOWER80_RULES.strippedDamageTaken;
+    const killBonus = (options.escortKillDamageBonus ?? 0) * escortsDown();
+    const extra = stripped + killBonus;
+    // `-(0)` は `-0` になる。`Object.is(-0, 0)` は false なので、素の0へ揃える
+    unit.mitigateAmount = extra === 0 ? 0 : -extra;
 
     const ratio = unit.currentHp / unit.maxHp;
     const enraged = ratio < TOWER80_RULES.enrageHpRatio && !options.noEnrage;
@@ -193,6 +225,8 @@ export function tower80Probe(context: Context, options: Tower80ProbeOptions = {}
   };
 
   const playersAlive = (): number => PLAYER_IDS.filter((id) => context.aliveOf(id)).length;
+  /** 倒したお供の数(ボスは含めない) */
+  const escortsDown = (): number => ENEMY_IDS.slice(1).filter((id) => !context.aliveOf(id)).length;
 
   return {
     beforeTurn(unitId) {
@@ -212,6 +246,7 @@ export function tower80Probe(context: Context, options: Tower80ProbeOptions = {}
         counters.bossActions += 1;
         if (unit.immuneTurns > 0) counters.bossImmuneActions += 1;
         if (unit.hasStatus("BUFF_BLOCK")) counters.bossBuffBlockedActions += 1;
+        if (escortsDown() > 0) counters.bossActionsWithKillBonus += 1;
       }
     },
 
@@ -263,7 +298,12 @@ export function tower80Probe(context: Context, options: Tower80ProbeOptions = {}
       counters.bossHpLeft = unit ? Math.max(0, unit.currentHp) : 0;
       counters.bossHpRatioLeft = unit && unit.maxHp > 0 ? Math.max(0, unit.currentHp) / unit.maxHp : 0;
       counters.reachedHalf = sawHalf ? 1 : 0;
+      counters.escortsKilled = escortsDown();
+      const bonus = options.escortKillDamageBonus ?? 0;
       return {
+        倒したお供の数: counters.escortsKilled,
+        "お供撃破ぶんの被ダメ増": counters.escortsKilled * bonus,
+        撃破ボーナス下でのボス行動割合: acted > 0 ? counters.bossActionsWithKillBonus / acted : 0,
         ボス行動回数: acted,
         免疫中の行動割合: acted > 0 ? counters.bossImmuneActions / acted : 0,
         強化阻害中の行動割合: acted > 0 ? counters.bossBuffBlockedActions / acted : 0,
