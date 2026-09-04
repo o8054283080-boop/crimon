@@ -35,6 +35,7 @@ export function tower90Probe(context: Context): ScenarioProbe {
   let warDrumBuffUses = 0;
   let warDrumTempoUses = 0;
   let fangKills = 0;
+  let playersAliveBeforeTurn = PLAYERS.length;
   const deathTurn: Record<string, number> = { E2: 0, E3: 0, E4: 0, E5: 0 };
   let previousAlive = new Set(ESCORTS.filter((id) => context.aliveOf(id)));
 
@@ -102,6 +103,7 @@ export function tower90Probe(context: Context): ScenarioProbe {
   return {
     beforeTurn(unitId) {
       turns += 1;
+      playersAliveBeforeTurn = playerAliveCount();
       syncBoss();
       observeThresholds();
       observeEscortDeaths();
@@ -113,14 +115,13 @@ export function tower90Probe(context: Context): ScenarioProbe {
       }
     },
     afterTurn(unitId, lines) {
-      const playersBefore = playerAliveCount();
       if (unitId === "E3" && lines.some((line) => line.includes("狂戦の鼓動"))) warDrumBuffUses += 1;
       if (unitId === "E3" && lines.some((line) => line.includes("血戦共鳴"))) warDrumTempoUses += 1;
       observeEscortDeaths();
       syncBoss();
       observeThresholds();
       const playersAfter = playerAliveCount();
-      if (unitId === "E4" && playersAfter < playersBefore) fangKills += playersBefore - playersAfter;
+      if (unitId === "E4" && playersAfter < playersAliveBeforeTurn) fangKills += playersAliveBeforeTurn - playersAfter;
     },
     finish() {
       syncBoss();
