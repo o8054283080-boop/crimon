@@ -97,6 +97,21 @@ async function syncNow(showUnchanged = false): Promise<void> {
   }
 }
 
+/**
+ * ホームの「アカウント復旧の登録がまだです」を、登録できた瞬間に消す。
+ *
+ * ホームの再描画は `main.ts` が持っていて、この欄からは呼べない
+ * (呼べたとしても、開いている設定シートごと閉じてしまう)。
+ * 出ている札を直接外す。
+ *
+ * 高さの申告はホーム側の `ResizeObserver` が札の並びを見ているので、
+ * 1枚減れば `--home-banner-h` も自動で縮む。**ここで高さを触らない**——
+ * 触ると実測と食い違い、世界の枠が潰れて「試練の塔」が押せなくなる。
+ */
+function dismissHomeWarning(): void {
+  document.querySelectorAll("[data-cloud-recovery-warning]").forEach((node) => node.remove());
+}
+
 function showRecoveryKey(panel: HTMLElement, recoveryId: string, recoveryKey: string) {
   panel.querySelector(".cloud-recovery__key-box")?.remove();
   const box = document.createElement("div");
@@ -135,10 +150,38 @@ function previewRestore(panel: HTMLElement, save: CloudSaveEnvelope, meta: Cloud
   panel.append(preview);
 }
 
+/**
+ * 登録のやり方(全文)。**ホームの札ではなく、ここに置く。**
+ *
+ * ホームは `100dvh` を分け合う縦並びで、上に足したぶんはそのまま
+ * 下の何かを画面外へ押し出す(手順4行を札へ積んだら、実機で
+ * 「試練の塔」と「遊び方」が押せなくなった)。設定シートは全画面の覆いなので、
+ * 縦に伸びても何も潰さない。**読ませる場所はこちら。**
+ */
+function registerSteps(): HTMLElement {
+  const steps = [
+    "下の「アカウント復旧を設定」を開く",
+    "復旧IDとパスワード（6文字以上）を決めて「復旧設定を登録」を押す",
+    "表示される復旧キーを控える（パスワードを忘れた時の最後の手段）",
+  ];
+  const box = document.createElement("div");
+  box.className = "cloud-recovery__steps";
+  const title = document.createElement("strong");
+  title.textContent = "登録のやり方（メールアドレスは要りません）";
+  const list = document.createElement("ol");
+  for (const step of steps) {
+    const item = document.createElement("li");
+    item.textContent = step;
+    list.append(item);
+  }
+  const note = document.createElement("small");
+  note.textContent = "登録すると、この端末の最新セーブが自動でクラウドへ控えられます。機種を変えても、IDとパスワードで取り戻せます。";
+  box.append(title, list, note);
+  return box;
+}
+
 function renderDisconnected(panel: HTMLElement) {
-  const intro = document.createElement("p");
-  intro.className = "save-data__note";
-  intro.textContent = "復旧IDとパスワードを登録すると、この端末の最新セーブをクラウドへ控えられます。メールアドレスは不要です。";
+  const intro = registerSteps();
 
   const registerDetails = document.createElement("details");
   registerDetails.className = "cloud-recovery__details";
@@ -165,6 +208,7 @@ function renderDisconnected(panel: HTMLElement) {
       setStatus(`登録・バックアップ完了：${formatSavedAt(result.meta.savedAt)}`, "ok");
       showRecoveryKey(panel, result.meta.recoveryId, result.recoveryKey);
       renderPanelInto(panel, true);
+      dismissHomeWarning();
     } catch (error) {
       setStatus(cloudRecoveryMessage(error), "error");
     } finally {
@@ -302,6 +346,9 @@ function installStyles() {
     .cloud-recovery__input{box-sizing:border-box;width:100%;margin-top:8px;padding:11px 12px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:rgba(0,0,0,.22);color:inherit;font:inherit}
     .cloud-recovery__details .btn{margin-top:10px;width:100%}.cloud-recovery__connected{font-weight:700;margin:0}.cloud-recovery__key-box,.cloud-recovery__preview{display:grid;gap:7px;padding:12px;border:1px solid rgba(233,181,76,.5);border-radius:10px;background:rgba(233,181,76,.08)}
     .cloud-recovery__key-box p,.cloud-recovery__preview p{margin:0}.cloud-recovery__key-box code{user-select:all;overflow-wrap:anywhere}.cloud-recovery__warning{font-size:.82rem;opacity:.9}.cloud-recovery__rollback{width:100%}
+    .cloud-recovery__steps{display:grid;gap:6px;padding:10px;border:1px solid rgba(224,122,95,.4);border-left:3px solid #e07a5f;border-radius:10px;background:rgba(70,34,26,.35)}
+    .cloud-recovery__steps strong{font-size:.82rem;color:#ffd9a8}.cloud-recovery__steps ol{margin:0;padding-left:1.3em;font-size:.76rem;line-height:1.6}
+    .cloud-recovery__steps li+li{margin-top:3px}.cloud-recovery__steps small{font-size:.72rem;opacity:.88;line-height:1.5}
   `;
   document.head.append(style);
 }

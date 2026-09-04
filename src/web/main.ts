@@ -7,6 +7,7 @@ import "./ui/arena.css";
 import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
 import "./ui/crystalShop.css";
+import "./ui/cloudRecoveryWarning.css";
 import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
