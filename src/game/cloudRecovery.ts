@@ -92,6 +92,28 @@ export function clearCloudMeta(storage: Pick<Storage, "removeItem"> = localStora
   storage.removeItem(CLOUD_RECOVERY_META_KEY);
 }
 
+/**
+ * この端末がクラウド復旧へつながっているか。**ホームの警告を出すかどうかの判定。**
+ *
+ * `loadCloudMeta` を使ってはいけない。あちらは**セッションの期限切れでも null** を返すので、
+ * ちゃんと登録した人にまで「登録がまだです」と出てしまう。
+ * ここで見たいのは「登録という手続きを済ませたか」なので、
+ * 期限は見ずに `recoveryId` の有無だけで決める。
+ *
+ * 逆に、この端末の接続を解除した人には**また出る**。それでいい——
+ * 解除した端末はもう復旧設定につながっておらず、消えたら戻せないのは同じだから。
+ */
+export function hasCloudRecoveryAccount(storage: Pick<Storage, "getItem"> = localStorage): boolean {
+  try {
+    const raw = storage.getItem(CLOUD_RECOVERY_META_KEY);
+    if (!raw) return false;
+    const meta = JSON.parse(raw) as Partial<CloudRecoveryMeta>;
+    return typeof meta.recoveryId === "string" && meta.recoveryId.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function metaFromAuth(recoveryId: string, data: ApiOk, save: CloudSaveEnvelope): CloudRecoveryMeta {
   if (!data.session || !data.revision || !data.savedAt) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   return {

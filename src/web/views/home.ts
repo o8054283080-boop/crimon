@@ -9,6 +9,7 @@ import {
   STAMINA_REFILL_PARTIAL_COST,
 } from "../../game/playerState.js";
 import { CompensationClaim, compensationBannerLabel, selectHomeBanners } from "../../game/compensation.js";
+import { hasCloudRecoveryAccount } from "../../game/cloudRecovery.js";
 import { PERSIST_STATE_NOTE, PersistState } from "../../game/saveDurability.js";
 import { ELEMENT_JA, ELEMENT_MARK } from "../../core/element.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
@@ -220,6 +221,86 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
     ]);
   });
   return banners;
+}
+
+/**
+ * アカウント復旧の登録がまだの人へ出す警告。**登録すると消える。**
+ *
+ * ## なぜホームの一番上なのか
+ *
+ * このゲームのセーブは端末のブラウザの中だけにある。ブラウザの履歴や
+ * サイトデータを消せば一緒に消えるし、機種を変えれば持って行けない。
+ * 気づくのはたいてい**消えた後**で、その時点では打てる手が何も無い。
+ * だから設定の奥ではなく、必ず通るホームの頭に出す。
+ *
+ * ## 浮かせない
+ *
+ * `.reward-banner-stack` の中へ入れる。ここは `position` を持たず、
+ * 高さを `declareBannerStackHeight` が実測して世界の枠へ申告するので、
+ * **下の「試練の塔」「お知らせ」「遊び方」を覆わない**。
+ * 浮遊パネルで押せないボタンを作った事故を3回出している。
+ *
+ * ## **背は低く保つ。ここが一番危ない**
+ *
+ * 最初は見出し・理由・手順4行・ボタンを縦に積んで**291px**にした。
+ * 実機(390x844)で測ったら `--home-banner-h` が **640px** まで膨らみ、
+ * 世界の枠が `min-height` に張り付いて y=904 —— **画面の外**。
+ * 「試練の塔」も「遊び方」も `elementFromPoint` に映らず、押せなくなっていた。
+ *
+ * ホームは `100dvh` を分け合う縦並びで、世界の枠は縮み切ると
+ * それ以上は譲らない。**上に足したぶんは、そのまま下の何かを画面外へ押し出す。**
+ * だから札は横一列の2行。手順の全文は、押した先(設定シートの中の
+ * クラウド復旧の欄)で読ませる。あちらは全画面の覆いなので高さに余裕がある。
+ *
+ * ## `reward-banner` の見た目は借りない
+ *
+ * あちらはホームでは `min-height:42px` の横一列に潰され、
+ * `.compensation__message` が `display:none` にされる。
+ * ここは**理由とやり方を読ませるのが仕事**なので、その形には乗せられない。
+ *
+ * ## 閉じるボタンを付けない
+ *
+ * 閉じられる案内は、いちばん要る人から先に消える。
+ * 消し方は「登録すること」ひとつだけにしてある。
+ */
+function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | null {
+  if (hasCloudRecoveryAccount()) return null;
+  return el("section", {
+    className: "cloud-warn",
+    "data-cloud-recovery-warning": "",
+    ariaLabel: "アカウント復旧の登録",
+  }, [
+    el("div", { className: "cloud-warn__mark", "aria-hidden": "true" }, ["⚠"]),
+    el("div", { className: "cloud-warn__text" }, [
+      el("div", { className: "cloud-warn__title" }, ["アカウント復旧の登録がまだです"]),
+      /*
+       * **短く書く。**最初は理由を丁寧に書いて2行で打ち切られ、
+       * 肝心の「どうすれば登録できるか」が省略記号の向こうへ消えていた
+       * (実機で撮って気づいた。文字数を数えただけでは分からない)。
+       * 詳しい手順3つは、押した先のクラウド復旧の欄にある。
+       */
+      el("div", { className: "cloud-warn__lead" }, [
+        "データはこの端末の中だけ。消すと戻せません。右の「登録する」から、IDとパスワードを決めるだけです（メール不要）。",
+      ]),
+    ]),
+    el("button", {
+      type: "button",
+      className: "btn btn--primary cloud-warn__go",
+      "data-tour": "cloud-recovery-warning",
+      onclick: () => {
+        openSettings();
+        /*
+         * 設定を開いただけでは、復旧の欄はシートの下の方にある。
+         * **開いた先で自分から探させない。**描き終わりを待ってから寄せる
+         * (クラウド復旧の欄は別のモジュールが後から差し込むので、
+         *  見つからなければ何もしない——推測して別の場所へ飛ばさない)
+         */
+        window.requestAnimationFrame(() => {
+          document.querySelector(".cloud-recovery")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      },
+    }, ["登録する"]),
+  ]);
 }
 
 /** 畳んだぶんの行。**「消えた」と読ませない**ので、受け取り済みだと明示する */
@@ -903,6 +984,12 @@ export function renderHome(props: HomeProps): HTMLElement {
     tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
   const banners = [
+    /*
+     * **配布の札より先。**下に置くと、札が複数出ている日には
+     * スクロールしないと見えない位置まで落ちる。
+     * 消えたら戻せない話なので、受け取りの案内より優先する
+     */
+    renderCloudRecoveryWarning(openSettings),
     ...renderCompensationBanners(props.compensationClaims, props.onDismissCompensation),
     props.loginBonusResult ? renderLoginBonusBanner(props.loginBonusResult, props.onDismissLoginBonus) : null,
     // 畳んだ件数は札の一番下。札の途中に挟むと、下の札が別扱いに見える
