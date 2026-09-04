@@ -18,9 +18,12 @@ const V4_TIERS = [
  *
  * 1. HP比例ダメージを 70%:+20 / 50%:+50 / 30%:+100 / 15%:+150 へ強化
  * 2. 治癒阻害がボスに付いている間、3%+生命晶4%の特殊再生も完全に0にする
+ * 3. 攻略AIは「攻撃対象とは別に回復阻害だけ始祖ベヒモスへ維持する」手動攻略を近似する
  *
- * ここでの治癒阻害は第5回検証仕様「回復完全不可」。
- * 生命晶の全解除で解除された場合は追跡側も解除する。
+ * Battle Labの既存focus AIは単体スキルの対象をすべて同じ相手へ向けるため、
+ * 生命晶を殴っている最中は回復阻害まで生命晶へ飛ぶ。実プレイヤーは回復阻害だけ
+ * ボスへ入れられるので、成功ログが出た回復阻害はボスに維持したものとして追跡する。
+ * ダメージ部分までボスへ移さないため、火力面では保守的な近似になっている。
  */
 export function tower70V4Probe(
   context: { unitOf(id: string): TrackedUnit | undefined; aliveOf(id: string): boolean },
@@ -84,17 +87,16 @@ export function tower70V4Probe(
       const boss = context.unitOf(BOSS);
       if (!boss) return;
 
-      // 実戦で成功した付与だけをログから拾う。第5回は「完全回復不可」として扱う。
-      for (const line of lines) {
-        if (line.includes("[敵:E1]") && line.includes("治癒阻害を受けた")) {
-          manualHealBlockTurns = Math.max(manualHealBlockTurns, 2);
-          healBlockMultiplier = 0;
-          healBlockApplied += 1;
-        }
+      // プレイヤー側で治癒阻害の付与が成功したら、手動攻略ではボスへ入れたものとして扱う。
+      // 確率・命中・抵抗の成功判定自体はBattleEngineが出した実ログを使う。
+      if (unitId.startsWith("P") && lines.some((line) => line.includes("治癒阻害を受けた"))) {
+        manualHealBlockTurns = Math.max(manualHealBlockTurns, 2);
+        healBlockMultiplier = 0;
+        healBlockApplied += 1;
       }
 
-      // 生命晶S2でボスの弱化が全解除されたら、追跡側も解除する。
-      if (unitId === LIFE && lines.some((line) => line.includes("[敵:E1]") && line.includes("デバフが解除された"))) {
+      // 生命晶がS2「生命の律動」を使えば、ボスへ維持している回復阻害も全解除される。
+      if (unitId === LIFE && lines.some((line) => line.includes("「生命の律動」"))) {
         manualHealBlockTurns = 0;
         healBlockMultiplier = 1;
         bossTurnHealMultiplier = 1;
