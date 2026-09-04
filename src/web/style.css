@@ -990,6 +990,15 @@ body {
  * 札だけ別の世界になると、画面全体が寄せ集めに見える。
  * ========================================================================== */
 
+/*
+ * **`hidden` を効かせる。**`.unit-hud` は `display:flex` なので、
+ * HTMLの `hidden` 属性(UAの `display:none`)は詳細度で負けて素通りする。
+ * 100階の「まだ生まれていない分身」の札が、体の無いまま2枚出ていた。
+ */
+.unit-hud[hidden] {
+  display: none !important;
+}
+
 .unit-hud {
   position: absolute;
   display: flex;

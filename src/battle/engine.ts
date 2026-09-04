@@ -36,6 +36,52 @@ import {
   TOWER90_WAR_DRUM_BOSS_GAUGE,
   TOWER90_WAR_DRUM_TEMPO_SKILL_ID,
 } from "../data/trialTowerFloor90.js";
+import {
+  CRIMOARK_ATTACK_KILL_GAUGE,
+  CRIMOARK_ATTACK_S3_ID,
+  CRIMOARK_CLONE_DEATH_ATK,
+  CRIMOARK_CLONE_DEATH_SPD,
+  CRIMOARK_CLONE_DEATH_TURNS,
+  CRIMOARK_CLONE_HP_FLOOR,
+  CRIMOARK_CLONE_HP_RATIO,
+  CRIMOARK_CLONE_MITIGATE_EACH,
+  CRIMOARK_CLONE_PROFILE,
+  CRIMOARK_CLONE_REFRESH_GAUGE,
+  CRIMOARK_CLONE_REFRESH_HEAL,
+  CRIMOARK_CLONE_ROLES,
+  CRIMOARK_HP20_ATK,
+  CRIMOARK_HP20_CRI_DMG,
+  CRIMOARK_HP20_CRI_RATE,
+  CRIMOARK_HP20_DAMAGE_FACTOR,
+  CRIMOARK_HP20_SPD,
+  CRIMOARK_HP40_ATK,
+  CRIMOARK_HP40_CRI_DMG,
+  CRIMOARK_HP40_CRI_RATE,
+  CRIMOARK_HP40_DAMAGE_FACTOR,
+  CRIMOARK_HP40_SPD,
+  CRIMOARK_HP70_ATK,
+  CRIMOARK_HP70_SPD,
+  CRIMOARK_LOW_HP_BOSS_GAUGE,
+  CRIMOARK_LOW_HP_CLONE_GAUGE,
+  CRIMOARK_MAX_CLONES_HIGH,
+  CRIMOARK_MAX_CLONES_LOW,
+  CRIMOARK_S3_ID,
+  CRIMOARK_S4,
+  CRIMOARK_S4_CLONE_BONUS,
+  CRIMOARK_S4_COOLDOWN,
+  CRIMOARK_SUPPORT_BUFF_ATK,
+  CRIMOARK_SUPPORT_BUFF_SPD,
+  CRIMOARK_SUPPORT_BUFF_TURNS,
+  CRIMOARK_SUPPORT_FEED_GAUGE,
+  CRIMOARK_SUPPORT_HASTE_COOLDOWN,
+  CRIMOARK_SUPPORT_HASTE_GAUGE,
+  CRIMOARK_SUPPORT_S1_ID,
+  CRIMOARK_SUPPORT_S2_ID,
+  CRIMOARK_SUPPORT_S3_ID,
+  CRIMOARK_SUPPORT_SHIELD_RATE,
+  CRIMOARK_TEMPLATE_ID,
+  CrimoarkCloneRole,
+} from "../data/crimoark.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
 import { calcDamage, evaluateTargetCondition } from "./damage.js";
 import {
@@ -177,6 +223,16 @@ export interface UnitSnapshot {
   shieldTurns: number;
   /** 状態異常免疫の残りターン(0=免疫していない) */
   immuneTurns: number;
+  /**
+   * 表示名。**100階の分身は途中で変わる**ので、開幕の定義を握らずここを見る。
+   */
+  name: string;
+  /** 絵を引くための種族ID。分身が型を得た瞬間に変わる */
+  templateId: string;
+  /** 役割。札の見せ方と当たり方の質感に効く */
+  role: string;
+  /** まだ生まれていない席。**画面に出さない** */
+  hidden: boolean;
   /** 毒のスタック数(0=毒なし) */
   poisonStacks: number;
   /** 毒の残りターン */
@@ -259,6 +315,26 @@ export class BattleEngine {
    * (= リトライで狂化が二重に乗ることはない)。
    */
   private readonly tower90DeadEscortIds = new Set<string>();
+  /**
+   * 100階の分身の空席。**開幕は眠っていて、画面にも出ない。**
+   *
+   * `everSpawned` を持つのは、**まだ生まれていない席を「倒された」と数えないため。**
+   * 生存の有無だけで見ると、開幕から2体が死んでいることになり、
+   * 1手目でいきなり本体へ「分身2体撃破」の強化が乗る。
+   */
+  private readonly tower100Clones: {
+    unit: BattleUnit;
+    role: CrimoarkCloneRole | null;
+    everSpawned: boolean;
+    /** 前回見た時に生きていたか。死んだ**瞬間**を1度だけ拾うために持つ */
+    previousAlive: boolean;
+  }[] = [];
+  /** 100階スキル4の残りクールタイム。**3枠の外**なので独立して数える */
+  private tower100S4Cooldown = 0;
+  /** HP40%以下へ初めて落ちた時の1回きりの処理を、もう済ませたか */
+  private tower100Crossed40 = false;
+  /** この手番でスキル4を撃つと決めたか(手番の中で act() へ伝えるための印) */
+  private tower100UseS4 = false;
   /** 撃破で得た追加ターン待ちのユニット。手番の直後にまとめて処理する */
   private pendingExtraTurns: BattleUnit[] = [];
   /** 協力攻撃の入れ子の深さ。0でないときは協力攻撃を呼ばない(無限に連鎖するため) */
@@ -311,6 +387,7 @@ export class BattleEngine {
     this.maxTurns = options.maxTurns ?? 300;
     this.trialTowerFloor = options.trialTowerFloor;
     if (options.trialTowerFloor === 80) { const boss = this.trialBoss(); if (boss) boss.immuneTurns = 3; }
+    if (options.trialTowerFloor === 100) this.setupTower100();
   }
 
   run(): BattleResult {
@@ -449,7 +526,13 @@ export class BattleEngine {
     this.events.push(event);
   }
 
-  private snapshotUnits(): UnitSnapshot[] {
+  /**
+   * 今の盤面をそのまま写す。**画面側もこれを使う。**
+   *
+   * 以前は戦闘画面が同じ形を手で組み直していて、
+   * スナップショットへ項目を足すたびに片方だけ古くなっていた。
+   */
+  snapshotUnits(): UnitSnapshot[] {
     return this.units.map((u) => ({
       instanceId: u.instanceId,
       team: u.team,
@@ -467,7 +550,28 @@ export class BattleEngine {
       poisonStacks: u.poisonStacks,
       poisonTurns: u.poisonTurns,
       blindTurns: u.blindTurns,
+      /*
+       * 見た目まわり。**100階の分身は戦いの最中に姿と名前が変わる。**
+       * 開幕に決めた `def` を画面が握ったままだと、攻撃型として生まれた分身が
+       * サポート型の絵のまま殴ることになる
+       */
+      name: u.def.name,
+      templateId: u.def.templateId,
+      role: u.def.role,
+      hidden: this.isDormant(u),
     }));
+  }
+
+  /**
+   * まだ画面に出してはいけない席か。
+   *
+   * 100階の分身は開幕から盤面に居るが、**生まれるまでは存在しない扱い。**
+   * これを立てておかないと、開幕から「HP0の分身」の札が2枚並ぶ。
+   */
+  private isDormant(unit: BattleUnit): boolean {
+    if (this.trialTowerFloor !== 100) return false;
+    const slot = this.tower100Clones.find((entry) => entry.unit === unit);
+    return slot !== undefined && !slot.everSpawned;
   }
 
   private checkWinner(): BattleWinner | null {
@@ -531,6 +635,16 @@ export class BattleEngine {
     // 70階の再生は「始祖ベヒモス自身が実際に行動した手番の終了時」だけ。
     // スタンで行動できなかった時や、取り巻きの手番では進めない。
     if (this.isTower70Boss(actor)) this.applyTower70BossRegen(actor);
+    /*
+     * 100階。分身が倒れた瞬間を拾うのは**誰の手番の後でも**必要になる。
+     * 分身を倒すのはこちらなので、ボスの手番だけ見ていては1手遅れる
+     */
+    if (this.trialTowerFloor === 100) {
+      this.syncTower100CloneDeaths();
+      this.applyTower100LowHpTempo(actor);
+      const boss = this.trialBoss();
+      if (boss) this.syncTower100Boss(boss);
+    }
 
     const extraTurnChance = Math.max(actor.def.combatMods?.extraTurnChance ?? 0, actor.def.bossTraits?.extraTurnChance ?? 0);
     if (actor.alive && extraTurnChance > 0 && this.rng() < extraTurnChance) {
@@ -800,6 +914,274 @@ export class BattleEngine {
     this.push(`  → ${this.label(boss)} は血戦共鳴で行動ゲージとスキルの回転を得た！`);
   }
 
+  /* ======================================================================
+   * 100階「クリモアーク」。**戦っている最中に敵が増える唯一の階。**
+   *
+   * 増やす機構はエンジンに無い(盤面・HPの札・行動順UI・勝敗判定のどれもが
+   * 開幕に決まった顔ぶれを前提にしている)。代わりに**空席を先に2つ置いて
+   * 眠らせておき**、スキル3で起こす。顔ぶれの数は最初から最後まで変わらない。
+   *
+   * **どのメソッドも `trialTowerFloor === 100` で入口を閉じてある。**
+   * =================================================================== */
+
+  /** 開幕の仕込み。分身の空席を眠らせ、スキル4のクールタイムを立てる */
+  private setupTower100(): void {
+    const boss = this.trialBoss();
+    if (!boss) return;
+    for (const unit of this.units) {
+      if (unit.team !== "ENEMY" || unit === boss) continue;
+      unit.alive = false;
+      unit.currentHp = 0;
+      unit.gauge = 0;
+      this.tower100Clones.push({ unit, role: null, everSpawned: false, previousAlive: false });
+    }
+    /*
+     * 開幕からスキル4を撃たせない。**通常のクールタイムより1手だけ短い**ので、
+     * 「S3で分身を出す → S4」という並びに落ち着く
+     */
+    this.tower100S4Cooldown = CRIMOARK_S4_COOLDOWN - 1;
+  }
+
+  private isTower100Boss(unit: BattleUnit): boolean {
+    return this.trialTowerFloor === 100 && unit === this.trialBoss();
+  }
+
+  /** その席がいま起きている分身か */
+  private tower100CloneOf(unit: BattleUnit) {
+    if (this.trialTowerFloor !== 100) return undefined;
+    return this.tower100Clones.find((slot) => slot.unit === unit);
+  }
+
+  private tower100AliveClones(): BattleUnit[] {
+    return this.tower100Clones.filter((slot) => slot.everSpawned && slot.unit.alive).map((slot) => slot.unit);
+  }
+
+  /** 同時に立てる分身の数。**HP70%以下で1体から2体へ増える** */
+  private tower100MaxClones(boss: BattleUnit): number {
+    return hpRatio(boss) > 0.70 ? CRIMOARK_MAX_CLONES_HIGH : CRIMOARK_MAX_CLONES_LOW;
+  }
+
+  /**
+   * 本体の段階強化を張り直す。
+   *
+   * ATK・SPD・クリ率・クリダメは**積み上がる**(HP20%以下では70/40/20の全部を持つ)。
+   * 与ダメージの倍率だけは積まずに段階で置き換える(1.15×1.30 にはしない)。
+   */
+  private syncTower100Boss(unit: BattleUnit): void {
+    if (!this.isTower100Boss(unit) || !unit.alive) return;
+    const ratio = hpRatio(unit);
+    let atk = 0;
+    let spd = 0;
+    let criRate = 0;
+    let criDmg = 0;
+    if (ratio <= 0.70) { atk += CRIMOARK_HP70_ATK; spd += CRIMOARK_HP70_SPD; }
+    if (ratio <= 0.40) {
+      atk += CRIMOARK_HP40_ATK; spd += CRIMOARK_HP40_SPD;
+      criRate += CRIMOARK_HP40_CRI_RATE; criDmg += CRIMOARK_HP40_CRI_DMG;
+    }
+    if (ratio <= 0.20) {
+      atk += CRIMOARK_HP20_ATK; spd += CRIMOARK_HP20_SPD;
+      criRate += CRIMOARK_HP20_CRI_RATE; criDmg += CRIMOARK_HP20_CRI_DMG;
+    }
+    unit.flatStatBonus.atk = atk;
+    unit.flatStatBonus.spd = spd;
+    unit.flatStatBonus.criRate = criRate;
+    unit.flatStatBonus.criDmg = criDmg;
+
+    /*
+     * 分身が立っている間だけ本体が硬くなる。**倒せば即座に戻る。**
+     * 「分身を無視して本体を殴る」を選びにくくするための重しなので、
+     * 残りターン数ではなく生存数からその場で作り直す
+     */
+    const clones = this.tower100AliveClones().length;
+    unit.mitigateAmount = clones * CRIMOARK_CLONE_MITIGATE_EACH;
+    unit.mitigateTurns = clones > 0 ? 999 : 0;
+
+    // HP40%以下へ**初めて**落ちた瞬間の建て直し。1戦につき1回だけ
+    if (!this.tower100Crossed40 && ratio <= 0.40) {
+      this.tower100Crossed40 = true;
+      const removed = cleanseDebuffs(unit);
+      unit.gauge = Math.max(unit.gauge, ATB_THRESHOLD);
+      unit.cooldowns[2] = 0;
+      this.tower100S4Cooldown = Math.max(0, this.tower100S4Cooldown - 1);
+      this.push(`${this.label(unit)} は限界を超えて創り直した！${removed > 0 ? " 弱体効果をすべて振り払った！" : ""}`);
+    }
+  }
+
+  /** 本体の与ダメージ倍率。**段階式で、掛け算では積まない** */
+  private tower100BossDamageFactor(unit: BattleUnit): number {
+    if (!this.isTower100Boss(unit)) return 1;
+    const ratio = hpRatio(unit);
+    if (ratio <= 0.20) return CRIMOARK_HP20_DAMAGE_FACTOR;
+    if (ratio <= 0.40) return CRIMOARK_HP40_DAMAGE_FACTOR;
+    return 1;
+  }
+
+  /**
+   * 分身が倒れた**瞬間**を1度だけ拾い、本体へ一時強化を渡す。
+   *
+   * 生存数から作ると、蘇生や再計算のたびに何度も乗る。
+   * **まだ生まれていない席は数えない**(`everSpawned`)ので、
+   * 開幕に「2体倒した」ことにはならない。
+   */
+  private syncTower100CloneDeaths(): void {
+    if (this.trialTowerFloor !== 100) return;
+    const boss = this.trialBoss();
+    for (const slot of this.tower100Clones) {
+      const alive = slot.unit.alive;
+      if (slot.everSpawned && slot.previousAlive && !alive && boss?.alive) {
+        boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_CLONE_DEATH_ATK, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1 });
+        boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_CLONE_DEATH_SPD, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1 });
+        this.push(`  → ${this.label(boss)} は失った分身の力を取り込んだ！`);
+      }
+      slot.previousAlive = alive;
+    }
+  }
+
+  /**
+   * スキル3の中身。**上限まで揃っていれば生成せず、立て直しに変わる。**
+   *
+   * 型は3種から毎回引き直す。同じ型が並んでも構わない(依頼主の指定)。
+   */
+  private applyTower100Copy(boss: BattleUnit): void {
+    const max = this.tower100MaxClones(boss);
+    const alive = this.tower100AliveClones();
+    const empty = this.tower100Clones.find((slot) => !slot.unit.alive);
+
+    if (alive.length >= max || !empty) {
+      for (const clone of alive) {
+        const heal = Math.round(clone.maxHp * CRIMOARK_CLONE_REFRESH_HEAL);
+        applyHeal(clone, heal);
+        clone.gauge = Math.min(ATB_THRESHOLD, clone.gauge + CRIMOARK_CLONE_REFRESH_GAUGE * ATB_THRESHOLD);
+        this.push(`  → ${this.label(clone)} は創り直され、HPが ${heal} 回復して行動ゲージが進んだ！`);
+      }
+      return;
+    }
+
+    const role = CRIMOARK_CLONE_ROLES[Math.floor(this.rng() * CRIMOARK_CLONE_ROLES.length)] ?? "ATTACK";
+    const profile = CRIMOARK_CLONE_PROFILE[role];
+    /*
+     * **最大HPは生まれた瞬間の本体の現在HPで決まり、以後は動かない。**
+     * 本体が削れるたびに追従させると、後から生まれた分身ほど紙になり、
+     * 先に生まれた分身まで一緒に縮む
+     */
+    const maxHp = Math.max(CRIMOARK_CLONE_HP_FLOOR, Math.round(boss.currentHp * CRIMOARK_CLONE_HP_RATIO));
+
+    empty.unit.def = {
+      ...empty.unit.def,
+      templateId: profile.templateId,
+      name: profile.displayName,
+      role: role === "ATTACK" ? "アタッカー" : role === "SUPPORT" ? "サポート" : "デバッファー",
+      stats: {
+        ...empty.unit.def.stats,
+        hp: maxHp,
+        atk: profile.atk,
+        def: profile.def,
+        spd: profile.spd,
+        criRate: profile.criRate,
+        criDmg: profile.criDmg,
+        accuracy: profile.accuracy,
+        resistance: profile.resistance,
+      },
+      skills: profile.skills,
+    };
+    empty.unit.maxHp = maxHp;
+    empty.unit.currentHp = maxHp;
+    empty.unit.alive = true;
+    empty.unit.gauge = 0;
+    empty.unit.cooldowns = [0, 0, 0];
+    empty.unit.effects = [];
+    empty.unit.statusEffects = [];
+    empty.unit.flatStatBonus = {};
+    empty.unit.shieldValue = 0;
+    empty.unit.shieldTurns = 0;
+    empty.role = role;
+    empty.everSpawned = true;
+    empty.previousAlive = true;
+    this.push(`  → ${this.label(empty.unit)} が生み出された！ (HP ${maxHp})`);
+  }
+
+  /**
+   * 分身のスキルが**本体にだけ**渡すぶん。
+   *
+   * 「味方全体」として書くともう1体の分身にも配られる。
+   * 正式仕様はどれも本体限定なので、技のIDを見てここで渡す。
+   */
+  private applyTower100CloneSupport(actor: BattleUnit, skillId: string, kills: number): void {
+    if (this.trialTowerFloor !== 100) return;
+    const boss = this.trialBoss();
+    if (!boss || !boss.alive || !this.tower100CloneOf(actor)) return;
+
+    if (skillId === CRIMOARK_ATTACK_S3_ID && kills > 0) {
+      boss.gauge = Math.min(ATB_THRESHOLD, boss.gauge + CRIMOARK_ATTACK_KILL_GAUGE * ATB_THRESHOLD);
+      this.push(`  → ${this.label(boss)} は模造処刑の戦果で行動ゲージが進んだ！`);
+      return;
+    }
+    if (skillId === CRIMOARK_SUPPORT_S1_ID) {
+      boss.gauge = Math.min(ATB_THRESHOLD, boss.gauge + CRIMOARK_SUPPORT_FEED_GAUGE * ATB_THRESHOLD);
+      this.push(`  → ${this.label(boss)} へ力が供給された！`);
+      return;
+    }
+    if (skillId === CRIMOARK_SUPPORT_S2_ID) {
+      boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_SUPPORT_BUFF_ATK, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1 });
+      boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_SUPPORT_BUFF_SPD, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1 });
+      const shield = Math.round(boss.maxHp * CRIMOARK_SUPPORT_SHIELD_RATE);
+      boss.shieldValue = Math.max(boss.shieldValue, shield);
+      boss.shieldTurns = Math.max(boss.shieldTurns, CRIMOARK_SUPPORT_BUFF_TURNS + 1);
+      this.push(`  → ${this.label(boss)} の攻撃力と速度が上がり、シールド ${shield} を得た！`);
+      return;
+    }
+    if (skillId === CRIMOARK_SUPPORT_S3_ID) {
+      boss.gauge = Math.min(ATB_THRESHOLD, boss.gauge + CRIMOARK_SUPPORT_HASTE_GAUGE * ATB_THRESHOLD);
+      // **縮めるのは本体のスキル3とスキル4だけ。**味方全体の全スキルは縮めない
+      boss.cooldowns[2] = Math.max(0, boss.cooldowns[2] - CRIMOARK_SUPPORT_HASTE_COOLDOWN);
+      this.tower100S4Cooldown = Math.max(0, this.tower100S4Cooldown - CRIMOARK_SUPPORT_HASTE_COOLDOWN);
+      this.push(`  → ${this.label(boss)} が加速し、クリエイト・コピーとオーバークリエイトが早まった！`);
+    }
+  }
+
+  /**
+   * HP20%以下でだけ起きる、本体と分身の押し合い。
+   * 本体が動いたら分身が進み、分身が動いたら本体が進む。
+   */
+  private applyTower100LowHpTempo(actor: BattleUnit): void {
+    if (this.trialTowerFloor !== 100) return;
+    const boss = this.trialBoss();
+    if (!boss || !boss.alive || hpRatio(boss) > 0.20) return;
+    if (actor === boss) {
+      for (const clone of this.tower100AliveClones()) {
+        clone.gauge = Math.min(ATB_THRESHOLD, clone.gauge + CRIMOARK_LOW_HP_CLONE_GAUGE * ATB_THRESHOLD);
+      }
+      return;
+    }
+    if (this.tower100CloneOf(actor)?.everSpawned && actor.alive) {
+      boss.gauge = Math.min(ATB_THRESHOLD, boss.gauge + CRIMOARK_LOW_HP_BOSS_GAUGE * ATB_THRESHOLD);
+    }
+  }
+
+  /**
+   * 100階のボスが、この手番で何を撃つかを決める。
+   *
+   * **ラスボスらしく必殺技を使う。**既存AI(`chooseSkill`)は
+   * 「クールタイムが明けた中でいちばん番号の大きいもの」に寄るので、
+   * 4枠目のスキル4も、分身が足りない時のスキル3も選べない。
+   * 100階だけここで先に決める。
+   */
+  private tower100ChooseSkillIndex(boss: BattleUnit): 0 | 1 | 2 | null {
+    this.tower100UseS4 = false;
+    if (hasStatus(boss, "SKILL_LOCK")) return null;
+    // スキル4がいちばん強い。撃てるなら撃つ
+    if (this.tower100S4Cooldown <= 0) {
+      this.tower100UseS4 = true;
+      return 2;
+    }
+    // 分身が足りていなければ作る。上限まで揃っていれば立て直しになる
+    if (boss.cooldowns[2] === 0 && this.tower100AliveClones().length < this.tower100MaxClones(boss)) return 2;
+    if (boss.cooldowns[1] === 0) return 1;
+    if (boss.cooldowns[2] === 0) return 2;
+    return 0;
+  }
+
   private applyTower70BossRegen(boss: BattleUnit): void {
     if (!boss.alive) return;
     const lifeAlive = this.units.some((unit) => unit.team === "ENEMY" && unit.alive && unit.def.skills.some((skill) => skill.id === "tower70_life_s2"));
@@ -905,18 +1287,17 @@ export class BattleEngine {
       this.syncTower90Fang();
       return;
     }
-    const enrage = this.trialTowerFloor === 100 && ratio < 0.4 && !unit.effects.some((e) => e.remainingTurns === 999);
-    if (enrage) {
-      unit.effects.push({ kind: "BUFF", stat: "atk", amount: 2, remainingTurns: 999 });
-      unit.effects.push({ kind: "BUFF", stat: "spd", amount: 1, remainingTurns: 999 });
-      this.push(`${this.label(unit)} は狂化段階へ移行した！`);
+    if (this.trialTowerFloor === 100) {
+      /*
+       * **旧実装の「HP40%未満でATK+200%/SPD+100%、10%未満でさらに」は廃止。**
+       * クリモアークは段階強化・分身・スキル4で圧を作るので、
+       * 素の倍率を積み増す形は持たない。
+       */
+      this.syncTower100CloneDeaths();
+      this.syncTower100Boss(unit);
+      return;
     }
-    if (this.trialTowerFloor === 100 && ratio < 0.1 && !unit.effects.some((e) => e.stat === "def" && e.remainingTurns === 998)) {
-      unit.effects.push({ kind: "BUFF", stat: "atk", amount: 2, remainingTurns: 998 });
-      unit.effects.push({ kind: "BUFF", stat: "def", amount: 2, remainingTurns: 998 });
-      unit.effects.push({ kind: "BUFF", stat: "spd", amount: 1, remainingTurns: 998 });
-      this.push(`${this.label(unit)} は最終強化段階へ移行した！`);
-    }
+    void ratio;
   }
 
   private act(unit: BattleUnit, choice?: ManualChoice): void {
@@ -932,6 +1313,15 @@ export class BattleEngine {
         this.push(`  → ${this.label(unit)} はスキル使用不可のためスキル1を使用する！`);
       }
       ({ skill, index } = chooseSkill(unit, this.units));
+      /*
+       * 100階のクリモアークだけ、既存AIより先に自分で決める。
+       * `chooseSkill` は3枠しか知らないので、4枠目のスキル4も
+       * 「分身が足りないからスキル3」も選べない
+       */
+      if (this.isTower100Boss(unit)) {
+        const picked = this.tower100ChooseSkillIndex(unit);
+        if (picked !== null) { index = picked; skill = unit.def.skills[picked]; }
+      }
     }
 
     const latent = index === 0 && unit.def.latentAbility?.skillSlot === 0 ? unit.def.latentAbility : undefined;
@@ -983,6 +1373,45 @@ export class BattleEngine {
           ? { ...effect, multiplier: TOWER90_FANG_EXECUTE_RAGE_MULTIPLIER }
           : effect),
       };
+    }
+    /*
+     * 100階。**スキル4は3枠の外側にある。**
+     *
+     * 全モンスターを4枠へ広げると、UI・AI・スキル継承・セーブのすべてが
+     * 「3つ」を前提にしているところへ手が入る。ここでは撃つ瞬間だけ
+     * スキル4の定義を差し込み、枠そのものは3つのまま置いておく。
+     */
+    if (this.isTower100Boss(unit)) {
+      this.syncTower100Boss(unit);
+      if (this.tower100UseS4) {
+        // 生存している分身1体につき最終ダメージ+15%
+        const bonus = this.tower100AliveClones().length * CRIMOARK_S4_CLONE_BONUS;
+        /*
+         * **枠のクールタイムは触らせない。**`cooldownTurns` を 0 にした写しを渡す。
+         * 6のまま渡すと `unit.cooldowns[2] = 6` が走り、
+         * スキル3(クリエイト・コピー)まで6ターン止まる。
+         * スキル4の待ち時間は `tower100S4Cooldown` が別に数えている
+         */
+        skill = { ...CRIMOARK_S4, cooldownTurns: 0 };
+        resolvedSkill = bonus > 0
+          ? { ...skill, effects: CRIMOARK_S4.effects.map((effect) => effect.kind === "DAMAGE"
+            ? { ...effect, finalDamageBonus: (effect.finalDamageBonus ?? 0) + bonus }
+            : effect) }
+          : skill;
+        this.tower100S4Cooldown = CRIMOARK_S4_COOLDOWN;
+        this.tower100UseS4 = false;
+      } else {
+        this.tower100S4Cooldown = Math.max(0, this.tower100S4Cooldown - 1);
+      }
+      const factor = this.tower100BossDamageFactor(unit);
+      if (factor !== 1) {
+        resolvedSkill = {
+          ...resolvedSkill,
+          effects: resolvedSkill.effects.map((effect) => effect.kind === "DAMAGE"
+            ? { ...effect, multiplier: effect.multiplier * factor }
+            : effect),
+        };
+      }
     }
     const tower70BossS3AboveHalf = this.isTower70Boss(unit)
       && skill.id === "tower70_behemoth_s3"
@@ -1040,6 +1469,9 @@ export class BattleEngine {
     const tower90WarDrumTempo = this.trialTowerFloor === 90
       && unit.team === "ENEMY"
       && skill.id === TOWER90_WAR_DRUM_TEMPO_SKILL_ID;
+    // 100階。分身の生成と、分身から本体だけへ渡すぶんは技のIDで見分ける
+    const tower100Copy = this.isTower100Boss(unit) && skill.id === CRIMOARK_S3_ID;
+    const tower100CloneSkillId = this.trialTowerFloor === 100 && this.tower100CloneOf(unit) ? skill.id : null;
 
     // 暗闇がかかっていると、攻撃するたびに外れ判定が入る。
     // 外れた場合はこの手番のあいだ、ダメージが大きく下がり追加効果も乗らない。
@@ -1090,6 +1522,9 @@ export class BattleEngine {
     if (latent && !missed) this.applyLatentAfterSkill(unit, targets[0], latent, resolution);
     // 90階の戦鼓晶S3。全体ゲージを配り終えた後で、ボスにだけ上乗せする
     if (tower90WarDrumTempo) this.applyTower90WarDrumTempo();
+    // 100階。分身を生む/立て直すのは技が解決し終わってから
+    if (tower100Copy) this.applyTower100Copy(unit);
+    if (tower100CloneSkillId) this.applyTower100CloneSupport(unit, tower100CloneSkillId, resolution.kills);
     this.applyCoopAttack(unit, resolvedSkill, targets[0]);
     this.resolution = previousResolution;
   }
@@ -1529,9 +1964,18 @@ export class BattleEngine {
     if (!resolution.targetHpBefore.has(target.instanceId)) {
       resolution.targetHpBefore.set(target.instanceId, target.currentHp / target.maxHp);
     }
+    /*
+     * **この相手から強化効果を剥がせたか。**`resolution` ではなくここに置く。
+     *
+     * `resolution` は1回の技で相手全員ぶんを通して共有されるので、
+     * そちらに持たせると**1体から剥がせただけで全員に強化不可が付く。**
+     * 「解除に成功した相手にだけ」は相手ごとの話なので、相手ごとの変数で持つ。
+     */
+    let strippedThisTarget = false;
     /** 解決の途中の結果まで含めて、条件が満たされているかを見る */
     const met = (condition: EffectCondition | undefined): boolean => {
       if (!condition) return true;
+      if (condition === "STRIPPED_TARGET") return strippedThisTarget;
       if (condition === "ANY_CRIT") return resolution.critCount >= 1;
       if (condition === "CRITS_AT_LEAST_2") return resolution.critCount >= 2;
       if (condition === "CRITS_AT_LEAST_3") return resolution.critCount >= 3;
@@ -1653,6 +2097,7 @@ export class BattleEngine {
         }
 
         case "STATUS": {
+          if (!met(effect.requires)) break;
           const category = STATUS_EFFECT_CATEGORY[effect.status];
           const receivers = this.receiversFor(source, target, effect.applyTo);
           for (const receiver of receivers) {
@@ -1778,6 +2223,7 @@ export class BattleEngine {
           if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution)) break;
           const removed = stripBuffs(target, effect.count ?? Number.POSITIVE_INFINITY);
           if (removed > 0) {
+            strippedThisTarget = true;
             resolution.strippedTargets += 1;
             resolution.applied.add("STRIP");
             this.push(`  → ${this.label(target)} の有利な効果が剥がされた！`);

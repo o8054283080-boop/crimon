@@ -30,11 +30,12 @@ export function evaluateTargetCondition(condition: EffectCondition, source: Batt
     case "TARGET_HP_BELOW_30": return targetRatio <= 0.3;
     case "TARGET_HP_ABOVE_SELF": return targetRatio > source.currentHp / source.maxHp;
     case "TARGET_GAUGE_BELOW_20": return target.gauge <= 20;
+    case "TARGET_DEBUFF_AT_LEAST_2": return countDebuffs(target) >= 2;
     case "TARGET_DEBUFF_AT_LEAST_3": return countDebuffs(target) >= 3;
     case "SELF_HP_ABOVE_50": return source.currentHp / source.maxHp >= 0.5;
     // 解決の文脈が要る条件は、ここでは判定できない
     case "ANY_CRIT": case "CRITS_AT_LEAST_2": case "CRITS_AT_LEAST_3":
-    case "STUN_FAILED": case "KILLED_TARGET":
+    case "STUN_FAILED": case "KILLED_TARGET": case "STRIPPED_TARGET":
       return false;
   }
 }

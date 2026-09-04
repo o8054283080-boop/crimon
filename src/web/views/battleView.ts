@@ -8,7 +8,7 @@ import { el } from "../dom.js";
 import { BattleStage, StageUnitInit } from "../three/battleStage.js";
 import { BattleVenue } from "../three/stageBackdrop.js";
 import { withPortrait } from "../three/portrait.js";
-import { FloatKind, UnitHudRefs, buildFloatingNumber, buildHudCard, buildStatusChips } from "./battleHud.js";
+import { FloatKind, UnitHudRefs, buildFloatingNumber, buildHudCard, buildStatusChips, parseUnitName } from "./battleHud.js";
 
 /** 周回の途中であることを戦闘画面へ伝える */
 export interface BattleChainInfo {
@@ -407,10 +407,32 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     }
   }
 
+  /** 札に今出ている名前。**100階の分身だけが途中で変わる**ので、変わった時だけ書き換える */
+  const lastNames = new Map<string, string>(stageUnits.map((u) => [u.instanceId, u.def.name]));
+
   function applySnapshot(snapshot: UnitSnapshot[], immediate = false): void {
     for (const s of snapshot) {
       const refs = hudRefs.get(s.instanceId);
       if (!refs) continue;
+      /*
+       * まだ生まれていない席(100階の分身)は、札も本体もまるごと隠す。
+       * 隠さないと開幕からHP0の札が2枚並び、何が起きるのかも先に割れてしまう
+       */
+      refs.card.hidden = s.hidden;
+      stage.setUnitHidden(s.instanceId, s.hidden);
+      if (s.hidden) continue;
+      /*
+       * **姿と名前は毎回見る。**100階の分身は生まれた瞬間に型が決まり、
+       * 絵も名前も変わる。開幕の定義を握ったままだと、
+       * 攻撃型として生まれた分身がサポート型の絵で殴ることになる
+       */
+      stage.restyleUnit(s.instanceId, { element: defOf.get(s.instanceId)!.element, role: s.role, templateId: s.templateId });
+      if (lastNames.get(s.instanceId) !== s.name) {
+        lastNames.set(s.instanceId, s.name);
+        const parsed = parseUnitName(s.name);
+        refs.name.textContent = parsed.base || s.name;
+        refs.card.setAttribute("aria-label", `${parsed.base || s.name}を集中攻撃ターゲットに指定`);
+      }
       const ratio = s.maxHp > 0 ? Math.max(0, Math.min(1, s.currentHp / s.maxHp)) : 0;
       refs.hpFill.style.width = `${ratio * 100}%`;
       /*
@@ -945,27 +967,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 削れたHPのまま始まる)では、満タンの帯が最初の1手でいきなり落ちる、
    * という嘘の絵になっていた。状態異常の印も同じ理由で出ていなかった。
    */
-  applySnapshot(
-    engine.getUnits().map((u) => ({
-      instanceId: u.instanceId,
-      team: u.team,
-      currentHp: u.currentHp,
-      maxHp: u.maxHp,
-      gauge: Math.round(u.gauge),
-      alive: u.alive,
-      effects: u.effects.map((e) => ({ ...e })),
-      statusEffects: u.statusEffects.map((e) => ({ ...e })),
-      stunTurns: u.stunTurns,
-      burnTurns: u.burnTurns,
-      shieldValue: u.shieldValue,
-      shieldTurns: u.shieldTurns,
-      immuneTurns: u.immuneTurns,
-      poisonStacks: u.poisonStacks,
-      poisonTurns: u.poisonTurns,
-      blindTurns: u.blindTurns,
-    })),
-    true,
-  );
+  applySnapshot(engine.snapshotUnits(), true);
 
   maybeScheduleTick();
 

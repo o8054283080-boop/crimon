@@ -442,6 +442,8 @@ export class BattleStage {
   private environmentTarget: THREE.WebGLRenderTarget | null = null;
   private readonly vfx = new VfxSystem();
   private readonly avatars = new Map<string, BattleAvatar>();
+  /** その席が今どの姿で組まれているか。同じ姿での組み直しを避けるための控え */
+  private readonly avatarStyles = new Map<string, string>();
   /** エフェクトの出し分けに使う、ユニットごとの属性 */
   private readonly unitElements = new Map<string, VfxElement>();
   /** 当たり方の質感。役割から決める(前衛は斬撃、重量級は打撃、後衛は魔法) */
@@ -478,6 +480,8 @@ export class BattleStage {
   }[] = [];
   /** 最後に隊列を組んだ時の縦長さ。変わっていなければ組み直さない */
   private formationPortrait = -1;
+  /** いまアバターへ渡している見下ろし角。途中で組み直した1体にも同じ角度を渡す */
+  private avatarPitch = 0;
   /** フレーミングで決まったカメラ距離。UIの遠近スケールの基準にも使う */
   private frameDistance = 20;
 
@@ -943,6 +947,8 @@ export class BattleStage {
         this.scene.add(light);
         // 画面比が変わったら組み直せるよう、誰がどの列の何番目かを残しておく
         this.formation.push({ avatar, light, team, index, count: list.length, isBoss: unit.def.isBoss === true });
+        // 今の姿を控える。**これが無いと、最初の同期で全員が組み直される**
+        this.avatarStyles.set(unit.instanceId, `${unit.def.templateId}/${unit.def.element}/${unit.def.role}`);
       });
     };
 
@@ -1113,6 +1119,7 @@ export class BattleStage {
     this.backdrop?.fit(this.camera);
 
     // 板をカメラの角度へ倒して正対させる。倒さないと縦に潰れて見える
+    this.avatarPitch = pitch;
     for (const avatar of this.avatars.values()) avatar.setCameraPitch(pitch);
 
     // 画面の縦がワールド何単位ぶん映っているか。正投影ではそのまま表示範囲の高さ
@@ -1424,7 +1431,11 @@ export class BattleStage {
     for (const entry of this.contactShadows) {
       const position = entry.avatar.root.position;
       entry.mesh.position.set(position.x, 0.02, position.z);
-      entry.mesh.visible = !entry.avatar.isDying();
+      /*
+       * **隠した席の影は出さない。**ここを `isDying()` だけで決めていたので、
+       * まだ生まれていない100階の分身の足元に、体の無い輪だけが残っていた
+       */
+      entry.mesh.visible = entry.avatar.root.visible && !entry.avatar.isDying();
     }
     // 継続エフェクトは、踏み込みなどで動くキャラの位置へ毎フレーム追従させる
     for (const [instanceId, kinds] of this.activeAuras) {
@@ -1792,6 +1803,78 @@ export class BattleStage {
   }
 
   /** HP割合や生死をアバターへ反映する */
+  /**
+   * まだ生まれていない席を、盤面から**まるごと隠す。**
+   *
+   * 100階の分身は開幕から席に居るが、生まれるまでは存在しない扱い。
+   * 隠さないと、開幕の舞台にHP0の分身が2体立つ。
+   */
+  setUnitHidden(instanceId: string, hidden: boolean): void {
+    const avatar = this.avatars.get(instanceId);
+    if (!avatar) return;
+    avatar.root.visible = !hidden;
+    // 毎フレームの追従(update)も本体の表示に従うが、最初の1枚のために here でも消す
+    for (const entry of this.contactShadows) {
+      if (entry.avatar === avatar) entry.mesh.visible = !hidden;
+    }
+    const slot = this.formation.find((entry) => entry.avatar === avatar);
+    if (slot) slot.light.visible = !hidden;
+  }
+
+  /**
+   * その席の姿を**丸ごと作り直す。**
+   *
+   * 100階の分身は、生まれた瞬間に攻撃型・サポート型・デバフ型のどれかになる。
+   * 絵はアバターを組む時に決まるので、**中身を差し替えるのではなく組み直す。**
+   * 立ち位置・向き・接地影・属性光は元の席のものをそのまま引き継ぐ。
+   *
+   * 同じ姿のまま呼ばれた時は何もしない(毎フレーム呼ばれても組み直さない)。
+   */
+  restyleUnit(instanceId: string, def: { element: Element; role: string; templateId: string }): void {
+    const previous = this.avatars.get(instanceId);
+    const slot = this.formation.find((entry) => entry.avatar === previous);
+    if (!previous || !slot) return;
+    if (this.avatarStyles.get(instanceId) === `${def.templateId}/${def.element}/${def.role}`) return;
+    this.avatarStyles.set(instanceId, `${def.templateId}/${def.element}/${def.role}`);
+
+    const facing = slot.team === "PLAYER" ? 1 : -1;
+    const avatar = createBattleAvatar({
+      element: def.element,
+      role: def.role,
+      templateId: def.templateId,
+      facing,
+      bodyScale: slot.isBoss ? BOSS_BODY_SCALE : 1,
+    });
+    const { x, z } = { x: previous.root.position.x, z: previous.root.position.z };
+    avatar.setSlotPosition(x, z);
+    avatar.setCameraPitch(this.avatarPitch);
+    this.scene.add(avatar.root);
+
+    // 接地影は体の太さから作られているので、古いものを捨てて敷き直す
+    for (let i = this.contactShadows.length - 1; i >= 0; i -= 1) {
+      if (this.contactShadows[i].avatar !== previous) continue;
+      const entry = this.contactShadows[i];
+      this.scene.remove(entry.mesh);
+      entry.mesh.geometry.dispose();
+      this.contactShadows.splice(i, 1);
+    }
+    this.addContactShadow(avatar, slot.team);
+
+    previous.dispose();
+    slot.avatar = avatar;
+    this.avatars.set(instanceId, avatar);
+    this.unitElements.set(instanceId, def.element as VfxElement);
+    this.unitHitStyles.set(instanceId, HIT_STYLE_BY_ROLE[def.role] ?? "magic");
+
+    // 相手チームの中心へ向け直す。忘れるとそっぽを向いたまま立つ
+    const foes = this.formation.filter((entry) => entry.team !== slot.team);
+    if (foes.length > 0) {
+      const centerX = foes.reduce((sum, entry) => sum + entry.avatar.root.position.x, 0) / foes.length;
+      const centerZ = foes.reduce((sum, entry) => sum + entry.avatar.root.position.z, 0) / foes.length;
+      avatar.faceToward(centerX, centerZ);
+    }
+  }
+
   syncUnitState(instanceId: string, hpRatio: number, alive: boolean, status?: UnitStatusFlags): void {
     const avatar = this.avatars.get(instanceId);
     if (!avatar) return;

@@ -217,6 +217,8 @@ export function parseUnitName(name: string): ParsedUnitName {
 
 export interface UnitHudRefs {
   card: HTMLElement;
+  /** 名前。**100階の分身は途中で型が決まるので、後から書き換える** */
+  name: HTMLElement;
   plate: HTMLElement;
   hpFill: HTMLElement;
   /** 減った分を少し遅れて追いかける帯。どれだけ削られたかが目で分かる */
@@ -251,9 +253,8 @@ export function buildHudCard(def: MonsterDefinition, team: "PLAYER" | "ENEMY"): 
     el("span", { className: "unit-hud__crest-face" }, [glyph(ELEMENT_GLYPH[element])]),
   ]);
 
-  const head = el("div", { className: "unit-hud__head" }, [
-    el("span", { className: "unit-hud__name" }, [parsed.base || def.name]),
-  ]);
+  const name = el("span", { className: "unit-hud__name" }, [parsed.base || def.name]);
+  const head = el("div", { className: "unit-hud__head" }, [name]);
   if (parsed.star !== null) {
     head.append(
       el("span", { className: "unit-hud__rank", title: `★${parsed.star}` }, [
@@ -300,7 +301,7 @@ export function buildHudCard(def: MonsterDefinition, team: "PLAYER" | "ENEMY"): 
   }
   card.style.setProperty("--unit-color", def.color);
 
-  return { card, refs: { card, plate, hpFill, hpTrail, hpShield, hpText, gaugeFill, chips, leader } };
+  return { card, refs: { card, name, plate, hpFill, hpTrail, hpShield, hpText, gaugeFill, chips, leader } };
 }
 
 /* ------------------------------------------------------------------ 飛び出す数字 */
