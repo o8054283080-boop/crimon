@@ -1,0 +1,65 @@
+name: Minimal stamina patch
+
+on:
+  push:
+    branches:
+      - fix/release-mission-reward-refresh
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply minimal stamina changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/game/playerState.ts')
+          s = p.read_text()
+          replacements = [
+              (
+                  '  state.stamina = Math.max(0, Math.min(state.stamina, state.maxStamina));',
+                  '  state.stamina = Math.max(0, state.stamina);',
+              ),
+              (
+                  '/** ダイヤ50でスタミナ100回復(上限を超える分は切り捨て) */',
+                  '/** ダイヤ50でスタミナ100回復。配布と同じく現在上限を超えて保持できる */',
+              ),
+              (
+                  '  if (state.stamina >= state.maxStamina) return { ok: false, reason: "スタミナは既に満タンです" };\n  if (state.crystal < STAMINA_REFILL_PARTIAL_COST) return { ok: false, reason: "ダイヤが足りません" };\n  state.crystal -= STAMINA_REFILL_PARTIAL_COST;\n  state.stamina = Math.min(state.maxStamina, state.stamina + STAMINA_REFILL_PARTIAL_AMOUNT);',
+                  '  if (state.crystal < STAMINA_REFILL_PARTIAL_COST) return { ok: false, reason: "ダイヤが足りません" };\n  state.crystal -= STAMINA_REFILL_PARTIAL_COST;\n  state.stamina += STAMINA_REFILL_PARTIAL_AMOUNT;',
+              ),
+              (
+                  '  state.fighterExp += exp;\n  let levelsGained = 0;',
+                  '  const staminaBefore = state.stamina;\n  state.fighterExp += exp;\n  let levelsGained = 0;',
+              ),
+              (
+                  '  if (levelsGained > 0) state.crystal += FIGHTER_LEVEL_UP_CRYSTAL_REWARD * levelsGained;',
+                  '  if (levelsGained > 0) {\n    state.stamina = Math.max(state.stamina, staminaBefore);\n    state.crystal += FIGHTER_LEVEL_UP_CRYSTAL_REWARD * levelsGained;\n  }',
+              ),
+          ]
+          changed = False
+          for old, new in replacements:
+              if old in s:
+                  s = s.replace(old, new, 1)
+                  changed = True
+              elif new not in s:
+                  raise SystemExit(f'expected source not found: {old[:80]}')
+          if changed:
+              p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/game/playerState.ts
+          git commit -m "Apply minimal stamina overflow patch"
+          git push
