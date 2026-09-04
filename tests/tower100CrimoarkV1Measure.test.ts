@@ -46,7 +46,7 @@ const cloneS3: Skill = {
   effects: [{ kind: "DAMAGE", multiplier: 1.60, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.40 }] }, { kind: "GAUGE", amount: 0.15, applyTo: "ALLIES" }],
 };
 
-const BASE_STATS = { hp: 500_000, atk: 10_500, def: 5_000, spd: 215, criRate: 0.30, criDmg: 1.80, acc: 0.75, res: 0.60 };
+const BASE_STATS = { hp: 500_000, atk: 10_500, def: 5_000, spd: 215, criRate: 0.30, criDmg: 1.80, accuracy: 0.75, resistance: 0.60 };
 
 function bossDef(): MonsterDefinition {
   const base = findMonster("nemesis", "DARK")!;
@@ -56,7 +56,7 @@ function cloneDef(index: number): MonsterDefinition {
   const base = findMonster("nemesis", "DARK")!;
   return {
     ...base, id: `crimoark_clone_${index}`, name: `クリモアークの分身${index}`,
-    stats: { ...base.stats, hp: 110_000, atk: 8_400, def: 3_750, spd: 215, criRate: 0.30, criDmg: 1.80, acc: 0.65, res: 0.40 },
+    stats: { ...base.stats, hp: 110_000, atk: 8_400, def: 3_750, spd: 215, criRate: 0.30, criDmg: 1.80, accuracy: 0.65, resistance: 0.40 },
     skills: [cloneS1, cloneS2, cloneS3], victoryTarget: false,
   };
 }
@@ -101,7 +101,6 @@ function runOne(specs: AllySpec[], seed: number, mode: Mode) {
   for (const clone of clones) { clone.alive = false; clone.currentHp = 0; clone.gauge = 0; }
 
   let turns = 0;
-  let bossTurns = 0;
   let s4Cd = 5;
   let crossed40 = false;
   let spawned = 0;
@@ -164,9 +163,7 @@ function runOne(specs: AllySpec[], seed: number, mode: Mode) {
 
     const actor = engine.getNextActor();
     if (!actor) break;
-    let record;
     if (actor === boss) {
-      bossTurns += 1;
       s4Cd -= 1;
       if (s4Cd <= 0) {
         const aliveClones = clones.filter((c) => c.alive).length;
@@ -185,17 +182,17 @@ function runOne(specs: AllySpec[], seed: number, mode: Mode) {
         };
         const old = boss.def.skills[2]; const oldCd = boss.cooldowns[2];
         boss.def.skills[2] = s4; boss.cooldowns[2] = 0;
-        record = engine.resolveTurn(actor, { skillIndex: 2 });
+        engine.resolveTurn(actor, { skillIndex: 2 });
         boss.def.skills[2] = old; boss.cooldowns[2] = oldCd;
         s4Cd = 6; s4Uses += 1;
       } else if (boss.cooldowns[2] <= 0) {
-        record = engine.resolveTurn(actor, { skillIndex: 2 });
+        engine.resolveTurn(actor, { skillIndex: 2 });
         spawnOrRefresh();
       } else {
-        record = engine.resolveTurn(actor);
+        engine.resolveTurn(actor);
       }
     } else {
-      record = engine.resolveTurn(actor);
+      engine.resolveTurn(actor);
       if (boss.currentHp / boss.maxHp <= 0.20 && actor.team === "ENEMY" && actor !== boss && actor.alive) boss.gauge += 10;
     }
     if (boss.currentHp / boss.maxHp <= 0.20 && actor === boss && boss.alive) {
@@ -205,7 +202,7 @@ function runOne(specs: AllySpec[], seed: number, mode: Mode) {
   }
   const winner = engine.getWinner() ?? "DRAW";
   const survivors = units.filter((u) => u.team === "PLAYER" && u.alive).length;
-  return { winner, turns, survivors, bossHpRatio: Math.max(0, boss.currentHp / boss.maxHp), spawned, cloneDeaths, s4Uses, bossTurns };
+  return { winner, turns, survivors, bossHpRatio: Math.max(0, boss.currentHp / boss.maxHp), spawned, cloneDeaths, s4Uses };
 }
 
 function measure(name: string, specs: AllySpec[], mode: Mode, seedBase: number, runs = 1000) {
