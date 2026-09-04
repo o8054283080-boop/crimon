@@ -6,7 +6,7 @@ import type { Skill } from "../src/core/skill.js";
 import { findMonster } from "../src/data/monsters.js";
 import { buildAlly } from "../tools/battleLab/build.js";
 import { mulberry32 } from "../tools/battleLab/rng.js";
-import type { AllySpec } from "../tools/battleLab/types.js";
+import type { AllySpec, GearGrade } from "../tools/battleLab/types.js";
 
 const S1: Skill = {
   id: "crimoark_s1", name: "クリエイト・ブレイク", description: "100F V1", target: "SINGLE_ENEMY", cooldownTurns: 0,
@@ -91,9 +91,9 @@ function clearDebuffs(unit: BattleUnit): void {
   unit.stunTurns = 0; unit.burnTurns = 0; unit.poisonStacks = 0; unit.poisonTurns = 0; unit.blindTurns = 0; unit.healBlockTurns = 0;
 }
 
-function runOne(specs: AllySpec[], seed: number, mode: Mode) {
+function runOne(specs: AllySpec[], seed: number, mode: Mode, grade: GearGrade) {
   const rng = mulberry32(seed);
-  const players = specs.map((s) => buildAlly(s, rng, "TYPICAL"));
+  const players = specs.map((s) => buildAlly(s, rng, grade));
   const engine = new BattleEngine(players, [bossDef(), cloneDef(1), cloneDef(2)], { rng, maxTurns: 350 });
   const units = (engine as unknown as { units: BattleUnit[] }).units;
   const boss = units.find((u) => u.instanceId === "E1")!;
@@ -205,24 +205,27 @@ function runOne(specs: AllySpec[], seed: number, mode: Mode) {
   return { winner, turns, survivors, bossHpRatio: Math.max(0, boss.currentHp / boss.maxHp), spawned, cloneDeaths, s4Uses };
 }
 
-function measure(name: string, specs: AllySpec[], mode: Mode, seedBase: number, runs = 1000) {
+function measure(name: string, specs: AllySpec[], mode: Mode, grade: GearGrade, seedBase: number, runs = 1000) {
   let wins = 0, losses = 0, draws = 0, turns = 0, survivors = 0, bossHp = 0, spawned = 0, cloneDeaths = 0, s4Uses = 0;
   for (let i = 0; i < runs; i++) {
-    const r = runOne(specs, seedBase + i, mode);
+    const r = runOne(specs, seedBase + i, mode, grade);
     if (r.winner === "PLAYER") wins += 1; else if (r.winner === "ENEMY") losses += 1; else draws += 1;
     turns += r.turns; survivors += r.survivors; bossHp += r.bossHpRatio; spawned += r.spawned; cloneDeaths += r.cloneDeaths; s4Uses += r.s4Uses;
   }
-  return { name, winRate: wins / runs, lossRate: losses / runs, drawRate: draws / runs, avgTurns: turns / runs, avgSurvivors: survivors / runs, avgBossHpRatio: bossHp / runs, avgClonesSpawned: spawned / runs, avgCloneDeaths: cloneDeaths / runs, avgS4Uses: s4Uses / runs };
+  return { name, grade, winRate: wins / runs, lossRate: losses / runs, drawRate: draws / runs, avgTurns: turns / runs, avgSurvivors: survivors / runs, avgBossHpRatio: bossHp / runs, avgClonesSpawned: spawned / runs, avgCloneDeaths: cloneDeaths / runs, avgS4Uses: s4Uses / runs };
 }
 
 describe("100階クリモアークV1 一時測定", () => {
-  it("分身処理・ボス集中・耐久を各1000戦測る", () => {
+  it("TYPICALとFINISHEDで3攻略型を各1000戦測る", () => {
     const rows = [
-      measure("分身処理型", SAFE, "CLONES", 410000),
-      measure("ボス集中型", RUSH, "BOSS", 420000),
-      measure("耐久処理型", SUSTAIN, "SUSTAIN", 430000),
+      measure("分身処理型", SAFE, "CLONES", "TYPICAL", 410000),
+      measure("ボス集中型", RUSH, "BOSS", "TYPICAL", 420000),
+      measure("耐久処理型", SUSTAIN, "SUSTAIN", "TYPICAL", 430000),
+      measure("分身処理型", SAFE, "CLONES", "FINISHED", 510000),
+      measure("ボス集中型", RUSH, "BOSS", "FINISHED", 520000),
+      measure("耐久処理型", SUSTAIN, "SUSTAIN", "FINISHED", 530000),
     ];
-    console.log(`TOWER100_CRIMOARK_V1_RESULTS=${JSON.stringify(rows)}`);
-    expect(rows).toHaveLength(3);
+    console.log(`TOWER100_CRIMOARK_V1_GRADE_RESULTS=${JSON.stringify(rows)}`);
+    expect(rows).toHaveLength(6);
   }, 120_000);
 });
