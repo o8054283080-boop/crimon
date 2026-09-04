@@ -605,19 +605,39 @@ describe("今回触っていないところ", () => {
     expect(digest(1, 50)).toBe("5cd6d8ab53f376a3");
   });
 
-  it("70/80/90/100階のボスが変わっていない", () => {
-    expect(digest(70, 70)).toBe("b587ac10479a875b");
+  it("80/90/100階のボスが変わっていない", () => {
+    /*
+     * **70階はここから外した。**始祖ベヒモスへ作り替えた回(PR #250)で
+     * 意図して変えた階なので、固めるのは下の専用の見張りへ移してある。
+     * 80/90/100階は据え置き——ここが落ちたら、意図せず手が入ったということ。
+     */
     expect(digest(80, 80)).toBe("d3ae9c59b9b31e6a");
     expect(digest(90, 90)).toBe("91790c1c2fbe574e");
     expect(digest(100, 100)).toBe("b329fde94c830368");
   });
 
-  it("70/80/90/100階は従来どおり古代の魔人+お供2体のまま", () => {
-    for (const floor of [70, 80, 90, 100]) {
+  it("80/90/100階は従来どおり古代の魔人+お供2体のまま", () => {
+    for (const floor of [80, 90, 100]) {
       const def = findTowerFloor(floor)!;
       expect(def.enemies, `${floor}階`).toHaveLength(3);
       expect(def.enemies[0].templateId).toBe("ancient_demon");
       expect(def.enemies[0].fixedStats, `${floor}階は倍率で組まれたまま`).toBeUndefined();
     }
+  });
+
+  it("70階は始祖ベヒモス+取り巻き2体で固定されている", () => {
+    /*
+     * 70階だけは倍率ではなく**実数(`fixedStats`)**で組んである。
+     * 倍率(powerScale/speedScale)は掛からないので、
+     * ここが `undefined` に戻ったら、階が曲線へ落ちて別物になっている。
+     */
+    expect(digest(70, 70)).toBe("aae4f8cb15c19af9");
+    const def = findTowerFloor(70)!;
+    expect(def.enemies).toHaveLength(3);
+    expect(def.enemies.map((enemy) => enemy.templateId)).toEqual(["behemoth", "ancient_crystal", "ancient_crystal_curse"]);
+    expect(def.enemies.map((enemy) => enemy.displayName)).toEqual(["始祖ベヒモス", "古代の生命晶", "古代の脈動晶"]);
+    for (const enemy of def.enemies) expect(enemy.fixedStats, `${enemy.displayName} は実数で組む`).toBeDefined();
+    // 本体を倒せば取り巻きが残っていても勝ち
+    expect(def.enemies[0].victoryTarget).toBe(true);
   });
 });
