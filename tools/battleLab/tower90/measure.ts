@@ -1,5 +1,5 @@
 import { runMany } from "../run.js";
-import type { BattleTally, UnitTally } from "../run.js";
+import type { BattleTally } from "../run.js";
 import { TOWER90_RUSH_FOCUS, TOWER90_RUSH_V1, TOWER90_SAFE_FOCUS, TOWER90_SAFE_V1 } from "../scenarios/tower90v1.js";
 
 function arg(name: string, fallback: string): string {
@@ -92,6 +92,6 @@ const bossRush = rows.find((r) => r.focus === "速攻: ボス集中");
 if (bestSafe && bossRush) {
   const safeRate = bestSafe.wins / RUNS;
   const rushRate = bossRush.wins / RUNS;
-  console.log(`\n目標: 安全処理25〜35% / ボス速攻15〜20%`);
+  console.log("\n目標: 安全処理25〜35% / ボス速攻15〜20%");
   console.log(`最良安全処理=${pct(safeRate)} (${bestSafe.focus}) / ボス集中=${pct(rushRate)}`);
 }
