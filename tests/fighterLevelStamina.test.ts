@@ -129,6 +129,24 @@ describe("ファイター経験値とレベルアップ (addFighterExp)", () => 
     expect(state.stamina).toBe(state.maxStamina);
   });
 
+  it("**レベルアップの全回復で、既に持っている超過スタミナを削らない**", () => {
+    /*
+     * レベルアップは新しい上限まで全回復させる仕様。だが素朴に
+     * `stamina = maxStamina` と書くと、配布でもらった超過分が
+     * **レベルが上がった瞬間に消える**。多い方を残す
+     */
+    const state = createInitialState();
+    state.stamina = state.maxStamina + 300;
+    const before = state.stamina;
+
+    const result = addFighterExp(state, requiredExpForFighterLevel(1));
+
+    expect(result.levelsGained).toBe(1);
+    expect(state.fighterLevel).toBe(2);
+    expect(state.maxStamina).toBe(maxStaminaForFighterLevel(2));
+    expect(state.stamina).toBe(before);
+  });
+
   it("大量に経験値を得ると複数レベル一気に上がる", () => {
     const state = createInitialState();
     let hugeExp = 0;
@@ -262,6 +280,22 @@ describe("スタミナの自然回復 (applyPassiveStaminaRegen)", () => {
     applyPassiveStaminaRegen(state, start + STAMINA_REGEN_INTERVAL_MINUTES * 60_000 * 100);
 
     expect(state.stamina).toBe(state.maxStamina);
+  });
+
+  it("**上限超過中は自然回復せず、超過分も減らさない**", () => {
+    /*
+     * 配布やミッション報酬で上限を超えたスタミナは、そのまま持ち続ける。
+     * ここで `Math.min(stamina, maxStamina)` へ寄せると、
+     * 300もらった直後にアプリを開き直しただけで消える
+     */
+    const state = createInitialState();
+    state.stamina = state.maxStamina + 300;
+    const start = Date.now();
+    state.lastStaminaUpdateAt = start;
+
+    applyPassiveStaminaRegen(state, start + STAMINA_REGEN_INTERVAL_MINUTES * 60_000 * 100);
+
+    expect(state.stamina).toBe(state.maxStamina + 300);
   });
 
   it("既に満タンなら基準時刻だけ更新され増えない", () => {
