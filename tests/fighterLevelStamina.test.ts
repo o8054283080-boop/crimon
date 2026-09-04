@@ -104,6 +104,23 @@ describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefill
     expect(state.crystal).toBe(500 - STAMINA_REFILL_FULL_COST);
   });
 
+  it("**全回復は上限超過中のスタミナを削らない**", () => {
+    /*
+     * 上限を超えている間は「既に満タンです」で弾かれるので、
+     * ダイヤも減らないし超過分も減らない。
+     * 450/150 の人が全回復を買って 150/150 になる、という壊れ方をしない
+     */
+    const state = createInitialState();
+    state.stamina = state.maxStamina + 300;
+    state.crystal = 500;
+
+    const result = tryRefillStaminaFull(state);
+
+    expect(result.ok).toBe(false);
+    expect(state.stamina).toBe(state.maxStamina + 300);
+    expect(state.crystal).toBe(500);
+  });
+
   it("全回復もダイヤが足りない場合は失敗する", () => {
     const state = createInitialState();
     state.stamina = 1;

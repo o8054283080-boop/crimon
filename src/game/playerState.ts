@@ -856,7 +856,13 @@ export function tryRefillStaminaFull(state: PlayerState): StaminaRefillResult {
   if (state.stamina >= state.maxStamina) return { ok: false, reason: "スタミナは既に満タンです" };
   if (state.crystal < STAMINA_REFILL_FULL_COST) return { ok: false, reason: "ダイヤが足りません" };
   state.crystal -= STAMINA_REFILL_FULL_COST;
-  state.stamina = state.maxStamina;
+  /*
+   * **持っている方を残す。**上の「既に満タンなら失敗」で上限超過中は弾かれるので、
+   * いまは常に `maxStamina` を代入するのと同じ。それでも `Math.max` で書くのは、
+   * ここが素の代入だと**ガードを緩めた瞬間に、配布でもらった超過分が黙って消える**から。
+   * 450/150 の人が全回復を買って 150/150 になる、という壊れ方をしない形にしておく
+   */
+  state.stamina = Math.max(state.stamina, state.maxStamina);
   return { ok: true };
 }
 
