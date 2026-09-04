@@ -99,6 +99,78 @@ export interface ExpectRange {
   maxWinRate?: number;
 }
 
+/**
+ * 手番の境目に差し込む観測点。
+ *
+ * ## 何のためにあるか
+ *
+ * 本編のエンジンに**まだ無い挙動**を試したい時がある。試練の塔70階の
+ * 「自ターン終了時に回復」「取り巻きが生きている間だけ回復量が増える」
+ * 「一定の手番ごとに自動でシールド」は、どれも本編に機構が無い。
+ *
+ * ## それでも戦闘の中身は本編のまま
+ *
+ * ここが触れるのは**手番と手番の間だけ**。ダメージ計算・スキル処理・
+ * 命中/抵抗・AI・バフ/デバフには一切入らない。使うのも
+ * `currentHp` `shieldValue` `mitigateTurns` `flatStatBonus` といった
+ * **本編がすでに持っている口**だけで、新しい計算式は1つも足さない。
+ *
+ * この線を越えて「Battle Lab専用のダメージ計算」を書き始めた瞬間、
+ * この道具で測った数字は本編の数字ではなくなる。
+ */
+export interface ScenarioProbe {
+  /** 1手番の直前 */
+  beforeTurn(unitId: string): void;
+  /** 1手番の直後。`lines` はその手番でエンジンが出したログ */
+  afterTurn(unitId: string, lines: readonly string[]): void;
+  /** 決着後に返す、この階だけの集計 */
+  finish(): Record<string, number>;
+}
+
+/** エンジン1つにつき1回だけ呼ばれ、観測点を返す */
+export type ScenarioHook = (context: {
+  /** 敵の並び順の識別子(`E1`/`E2`…)から実体を引く */
+  unitOf(id: string): TrackedUnit | undefined;
+  /** 生きているか */
+  aliveOf(id: string): boolean;
+}) => ScenarioProbe;
+
+/**
+ * 観測点が触れてよい範囲。**本編の `BattleUnit` の一部だけ**を写している。
+ * ここに無い項目(スキルの解決過程や命中判定)へは手が届かない。
+ */
+export interface TrackedUnit {
+  currentHp: number;
+  readonly maxHp: number;
+  shieldValue: number;
+  shieldTurns: number;
+  mitigateTurns: number;
+  mitigateAmount: number;
+  flatStatBonus: { spd?: number; atk?: number; def?: number };
+  readonly poisonStacks: number;
+  /** かかっている弱体の数(効果・状態・毒・気絶などを合わせた数) */
+  readonly debuffCount: number;
+  readonly alive: boolean;
+  readonly skills: readonly { name: string; hpCoefficients: readonly number[] }[];
+  /**
+   * HP比例ダメージの係数を、**元の定義から**この倍率で置き直す。
+   *
+   * **累積しない。**前回は現在値へ掛けていたため、段が上がるたびに
+   * 1.2倍が重なり、HPが戻っても弱い段へ戻れなかった。
+   * 常に素の係数から計算するので、`1` を渡せば補正なしへ戻る。
+   */
+  setHpCoefficientFactor(factor: number): void;
+  /**
+   * 手番・クールタイム・行動ゲージを**一切消費せずに**このスキルを撃つ。
+   *
+   * 中で動くのは本編の `counterWithSkill` そのもので、ダメージも命中も
+   * 抵抗も会心も防御計算もすべてエンジンが決める。ここは「撃て」と言うだけ。
+   *
+   * 戻り値はその1発で増えたログ。撃った結果を数えるのに使う。
+   */
+  fireImmediate(skill: Skill): string[];
+}
+
 export interface Scenario {
   id: string;
   title: string;
@@ -110,6 +182,11 @@ export interface Scenario {
   focusPatterns?: FocusOrder[];
   maxTurns?: number;
   expect?: ExpectRange;
+  /**
+   * 手番の境目に差し込む観測点。**本編に無い挙動を試す時だけ。**
+   * 書かなければ、これまでどおり本編のエンジンだけが動く。
+   */
+  hook?: ScenarioHook;
 }
 
 /**
