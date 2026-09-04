@@ -43,6 +43,8 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale
     skills: enemy.skills ?? dex.skills,
     bossTraits: enemy.bossTraits ?? dex.bossTraits,
     victoryTarget: enemy.victoryTarget,
+    // 戦闘画面でだけ使う印。大きく・中央に立たせる相手を見分けるためのもの
+    isBoss: enemy.isBoss,
     primaryTarget: enemy.primaryTarget,
     initialCooldowns: enemy.initialCooldowns,
   };

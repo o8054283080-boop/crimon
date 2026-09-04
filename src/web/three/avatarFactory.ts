@@ -18,6 +18,8 @@ export interface BattleAvatarOptions {
   role: string;
   templateId: string;
   facing: 1 | -1;
+  /** 背丈の倍率。その階の主だけ大きくする時に渡す。2Dと3Dのどちらでも同じ意味 */
+  bodyScale?: number;
 }
 
 /**

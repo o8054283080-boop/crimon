@@ -102,6 +102,14 @@ export interface SpriteAvatarOptions {
   templateId: string;
   /** PLAYER側は+1(手前)、ENEMY側は-1(奥) */
   facing: 1 | -1;
+  /**
+   * 背丈の倍率。**その階の主だけ大きくするために使う。**
+   *
+   * `this.height` へ畳み込む。板だけを大きくすると、当たり判定の箱も
+   * 足元の影もダメージ数字の位置も元の大きさのまま取り残される
+   * (3D側の `MonsterAvatarOptions.bodyScale` と同じ約束事)。
+   */
+  bodyScale?: number;
 }
 
 /**
@@ -369,7 +377,7 @@ export class SpriteAvatar {
   private readonly disposables: { dispose: () => void }[] = [];
 
   constructor(options: SpriteAvatarOptions) {
-    const { element, role, templateId, facing } = options;
+    const { element, role, templateId, facing, bodyScale = 1 } = options;
     this.facing = facing;
     this.theme = themeFor(element);
 
@@ -399,10 +407,10 @@ export class SpriteAvatar {
      * すべてこの値から作られている。板だけを縮めると、
      * 数字が頭の上に浮き、影が絵より大きく残る。
      */
-    this.height = (ROLE_HEIGHT[role] ?? 2.2) * SPRITE_SCALE;
+    this.height = (ROLE_HEIGHT[role] ?? 2.2) * SPRITE_SCALE * bodyScale;
     const float = FLOATING_TEMPLATES.has(templateId) ? Math.max(0.34, ROLE_FLOAT[role] ?? 0) : (ROLE_FLOAT[role] ?? 0);
     // 浮かせる高さも一緒に縮める。縮めないと、小さくなった絵が不釣り合いに高く浮く
-    this.floatHeight = float * SPRITE_SCALE;
+    this.floatHeight = float * SPRITE_SCALE * bodyScale;
 
     // 画像の縦横比から幅を出す。**全部同じ幅にすると、翼を広げた種族が潰れる。**
     // 読み込みが終わるまで比が分からないので、まず正方形で置いて後から直す
