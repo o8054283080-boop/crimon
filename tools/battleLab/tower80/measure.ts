@@ -209,7 +209,9 @@ function main(): void {
     + "免疫が剥がれている間は被ダメージ+25%、HP50%未満で全攻撃×1.5。\n",
     markdown(rows),
     process.argv.includes("--ablate") ? ablationMarkdown() : "",
-  ].join("\n");
+    // **空の要素を混ぜたまま繋がない。**末尾に空行が残り、
+    // CIの `git diff --check` が「new blank line at EOF」で落ちる
+  ].filter((part) => part !== "").join("\n").replace(/\n+$/, "");
 
   const file = arg("out", "");
   if (file) {
