@@ -1,5 +1,23 @@
+/**
+ * 試練の塔80階「古代聖竜」第2回。**本編には1行も入っていない。**
+ *
+ * V1はお供の火力と手数が強すぎて、免疫を剥がす以前に押し切られていた
+ * (最良でも勝率15.8%、それも「ボス集中」という雑な線)。
+ * V2はボスを据え置き、お供4体のATKを下げ、SPDを各10落として測り直す。
+ *
+ * ## ボス固有の仕掛けはスキル定義では表せない
+ *
+ * 開始時の全体免疫、免疫中のATK+2000、免疫が剥がれている間の被ダメ+25%、
+ * HP50%未満での全攻撃×1.5、HP70%/40%初到達での免疫再展開——どれも
+ * 本編に機構が無い。`tower80/probe.ts` が手番の境目で受け持つ。
+ *
+ * S3「聖域の咆哮」の「味方全体へ免疫2ターン」も同じ。本編の `IMMUNITY` 効果は
+ * `applyTo` を持たず、`ALL_ENEMIES` のスキルから味方側へは配れない
+ * (護晶S2は `ALL_ALLIES` なので定義のまま表せている)。
+ */
 import type { AllySpec, EnemySpec, FocusOrder, Scenario } from "../types.js";
 import type { Skill } from "../../../src/core/skill.js";
+import { tower80Probe, type Tower80ProbeOptions } from "../tower80/probe.js";
 
 const skill = (id: string, name: string, target: Skill["target"], cooldownTurns: number, effects: Skill["effects"]): Skill => ({
   id, name, description: name, target, cooldownTurns, effects,
@@ -23,6 +41,11 @@ const bossSkills: [Skill, Skill, Skill] = [
     { kind: "STRIP", count: 2 },
     { kind: "GAUGE", amount: 0.2, applyTo: "SELF" },
   ]),
+  /*
+   * 「味方全体に免疫2ターン」は**ここに書けない。**
+   * `IMMUNITY` は `applyTo` を持たず、`ALL_ENEMIES` のスキルからは
+   * 敵(=こちら)にしか乗らない。`probe.ts` がこの使用を合図に配る
+   */
   skill("tower80_boss_s3", "聖域の咆哮", "ALL_ENEMIES", 5, [
     { kind: "DAMAGE", multiplier: 1.15 },
     { kind: "CLEANSE", count: 1, applyTo: "ALLIES" },
@@ -106,12 +129,68 @@ export const TOWER80_FOCUS_V2: FocusOrder[] = [
   { name: "ボス集中", order: ["古代聖竜"] },
 ];
 
-export const TOWER80_V2: Scenario = {
-  id: "tower-80-v2",
-  title: "試練の塔80階 免疫5体編成 第2回",
-  note: "V1からボスは据え置き。お供4体のATKを6000/5500/8500/6500へ下げ、SPDを各10低下。剥がし+強化阻害編成で再測定する。",
-  allies: TOWER80_STRIP_BLOCK_PARTY_V2,
-  enemies: TOWER80_ENEMIES_V2,
-  focusPatterns: TOWER80_FOCUS_V2,
-  maxTurns: 300,
-};
+/**
+ * 切り分け用の変種を作る。**既定は依頼どおりの仕様そのまま。**
+ *
+ * 「V2でも極端に強すぎる/弱すぎる場合は、どの要素が原因かを数値で分析する」
+ * ための道具。1つずつ外して測らないと、原因が読めない
+ * (V1→V2でお供のATKとSPDを同時に動かしたので、
+ *  どちらがどれだけ効いたのかは結局分かっていない)。
+ */
+export interface Tower80Variant extends Tower80ProbeOptions {
+  /** お供4体のATKに足す値(負で弱くなる) */
+  escortAtkDelta?: number;
+  /** お供4体のSPDに足す値 */
+  escortSpdDelta?: number;
+  /** お供4体のHPに掛ける倍率 */
+  escortHpFactor?: number;
+  /** 鼓舞晶S2のATK/SPDバフを外す */
+  noInspireBuff?: boolean;
+  /** 鼓舞晶S3のゲージ加速とCT短縮を外す */
+  noInspireGauge?: boolean;
+  /** 呪獣S2/S3の全体デバフを外す(ダメージは残す) */
+  noCurseDebuff?: boolean;
+  /** 護晶S2の免疫供給を外す */
+  noGuardImmunity?: boolean;
+}
+
+const stripEffects = (skills: [Skill, Skill, Skill], drop: (effect: Skill["effects"][number]) => boolean): [Skill, Skill, Skill] =>
+  skills.map((entry) => ({ ...entry, effects: entry.effects.filter((effect) => !drop(effect)) })) as [Skill, Skill, Skill];
+
+export function tower80EnemiesV2(variant: Tower80Variant = {}): EnemySpec[] {
+  const atk = variant.escortAtkDelta ?? 0;
+  const spd = variant.escortSpdDelta ?? 0;
+  const hp = variant.escortHpFactor ?? 1;
+  return TOWER80_ENEMIES_V2.map((enemy, index) => {
+    // ボス(index 0)には手を入れない。お供だけを振る
+    if (index === 0) return { ...enemy };
+    const stats = enemy.stats!;
+    let skills = enemy.skills as [Skill, Skill, Skill];
+    if (variant.noInspireBuff && enemy.label === "古代の鼓舞晶") skills = stripEffects(skills, (e) => e.kind === "BUFF");
+    if (variant.noInspireGauge && enemy.label === "古代の鼓舞晶") {
+      skills = stripEffects(skills, (e) => (e.kind === "GAUGE" && e.amount > 0) || e.kind === "COOLDOWN_REDUCE");
+    }
+    if (variant.noCurseDebuff && enemy.label === "古代の呪獣") skills = stripEffects(skills, (e) => e.kind === "DEBUFF");
+    if (variant.noGuardImmunity && enemy.label === "古代の護晶") skills = stripEffects(skills, (e) => e.kind === "IMMUNITY");
+    return {
+      ...enemy,
+      skills,
+      stats: { ...stats, atk: Math.max(1, stats.atk! + atk), spd: Math.max(1, stats.spd! + spd), hp: Math.round(stats.hp! * hp) },
+    };
+  });
+}
+
+export function buildTower80V2(variant: Tower80Variant = {}): Scenario {
+  return {
+    id: "tower-80-v2",
+    title: "試練の塔80階 免疫5体編成 第2回",
+    note: "V1からボスは据え置き。お供4体のATKを6000/5500/8500/6500へ下げ、SPDを各10低下。剥がし+強化阻害編成で再測定する。",
+    allies: TOWER80_STRIP_BLOCK_PARTY_V2,
+    enemies: tower80EnemiesV2(variant),
+    focusPatterns: TOWER80_FOCUS_V2,
+    maxTurns: 300,
+    hook: (context) => tower80Probe(context, variant),
+  };
+}
+
+export const TOWER80_V2: Scenario = buildTower80V2();

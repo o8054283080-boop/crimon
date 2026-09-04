@@ -1,172 +1,246 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
-import type { BattleUnit } from "../src/battle/unit.js";
 import { hasStatus } from "../src/battle/unit.js";
-import type { Skill } from "../src/core/skill.js";
-import { buildTeams } from "../tools/battleLab/build.js";
+import type { DamageEffect } from "../src/core/skill.js";
+import { findMonsterById } from "../src/data/monsters.js";
+import { TRIAL_TOWER_FLOORS } from "../src/data/trialTower.js";
+import { buildEnemy } from "../tools/battleLab/build.js";
+import { attachProbe } from "../tools/battleLab/hook.js";
 import { mulberry32 } from "../tools/battleLab/rng.js";
-import { TOWER80_FOCUS_V2, TOWER80_V2 } from "../tools/battleLab/scenarios/tower80v2.js";
+import { runBattle } from "../tools/battleLab/run.js";
+import { buildTower80V2, TOWER80_ENEMIES_V2, TOWER80_STRIP_BLOCK_PARTY_V2, TOWER80_V2 } from "../tools/battleLab/scenarios/tower80v2.js";
+import { TOWER80_RULES } from "../tools/battleLab/tower80/probe.js";
 
-interface EngineInternals {
-  units: BattleUnit[];
-  log: string[];
-  recordTurn: (unit: BattleUnit, choice?: unknown) => unknown;
+/*
+ * 試練の塔80階の**仮**盤面(第2回)。
+ *
+ * ## 計測はここに置かない
+ *
+ * 元は「TYPICAL 1000戦×5攻略順」という `it` が V1・V2 に1つずつあり、
+ * 合わせて28秒をCIが毎回払っていた。確かめていたのは
+ * `expect(rows).toHaveLength(5)` だけで、数字は `console.log` へ流すだけ。
+ * **測定はテストではない。**数字が要る時は
+ * `npx tsx tools/battleLab/tower80/measure.ts` から回す。
+ *
+ * ## ここで見張ること
+ *
+ * この盤面はボス固有の仕掛けを `probe` が受け持っている。だから
+ * **「置いたつもりの仕掛けが本当にその形で効いているか」**を確かめないと、
+ * 測った勝率が何の勝率なのか分からなくなる。
+ *
+ * 特に**免疫と強化阻害の関係**は、この階の攻略そのもの。
+ * ここが黙って壊れると「剥がし編成でも勝てない」という
+ * 嘘の結論をそのまま報告することになる。
+ */
+
+/** 観測点だけを取り付けた盤面。`E1`=ボス `E2`=護晶 `E3`=鼓舞晶 `E4`=破邪獣 `E5`=呪獣 */
+function rig(options: { bossHp?: number } = {}) {
+  const scenario = buildTower80V2();
+  const enemies = scenario.enemies.map(buildEnemy);
+  const base = findMonsterById("wolf_FIRE")!;
+  const dummy = { ...base, stats: { ...base.stats, hp: 500_000, atk: 1, spd: 1 } };
+  const engine = new BattleEngine([dummy], enemies, { rng: mulberry32(1), maxTurns: 1 });
+  const probe = attachProbe(engine, scenario.hook)!;
+  const units = engine.getUnits();
+  const foes = units.filter((unit) => unit.team === "ENEMY");
+  const boss = foes[0];
+  if (options.bossHp !== undefined) boss.currentHp = options.bossHp;
+  return { engine, probe, boss, foes };
 }
 
-interface OneResult {
-  winner: "PLAYER" | "ENEMY" | "DRAW";
-  turns: number;
-  bossActions: number;
-  bossImmuneActions: number;
-  bossBuffBlockedActions: number;
-  bossStripEvents: number;
-  buffBlockApplications: number;
-  thresholdImmunities: number;
-  bossHpLeft: number;
-}
+const turn = (rigged: ReturnType<typeof rig>, id: string, lines: string[] = []): void => {
+  rigged.probe.beforeTurn(id);
+  rigged.probe.afterTurn(id, lines);
+};
 
-function cloneSkills(skills: readonly Skill[]): [Skill, Skill, Skill] {
-  return skills.map((skill) => ({ ...skill, effects: skill.effects.map((effect) => ({ ...effect })) })) as [Skill, Skill, Skill];
-}
+const damageOf = (skill: { effects: readonly unknown[] }): DamageEffect =>
+  skill.effects.find((effect) => (effect as DamageEffect).kind === "DAMAGE") as DamageEffect;
 
-function runOne(seed: number, focusOrder: string[]): OneResult {
-  const rng = mulberry32(seed);
-  const { players, enemies } = buildTeams(TOWER80_V2, rng, "TYPICAL");
-  const engine = new BattleEngine(players, enemies, { rng, maxTurns: 300 });
-  const e = engine as unknown as EngineInternals;
-  const boss = e.units.find((u) => u.instanceId === "E1")!;
-  const baseBossSkills = cloneSkills(boss.def.skills);
-
-  for (const unit of e.units.filter((u) => u.team === "ENEMY")) unit.immuneTurns = Math.max(unit.immuneTurns, 3);
-
-  let threshold70 = false;
-  let threshold40 = false;
-  let bossActions = 0;
-  let bossImmuneActions = 0;
-  let bossBuffBlockedActions = 0;
-  let bossStripEvents = 0;
-  let buffBlockApplications = 0;
-  let thresholdImmunities = 0;
-  let lastBossBuffBlock = hasStatus(boss, "BUFF_BLOCK");
-
-  const enemyIdFor = (label: string): string | null => {
-    const index = TOWER80_V2.enemies.findIndex((enemy) => (enemy.label ?? enemy.templateId) === label);
-    return index >= 0 ? `E${index + 1}` : null;
-  };
-  const focusIds = focusOrder.map(enemyIdFor).filter((id): id is string => id !== null);
-  const refocus = () => {
-    for (const id of focusIds) {
-      const target = e.units.find((u) => u.instanceId === id);
-      if (target?.alive) { engine.setFocusTarget(id); return; }
-    }
-    engine.setFocusTarget(null);
-  };
-
-  const applyTeamImmunity = () => {
-    for (const unit of e.units.filter((u) => u.team === "ENEMY" && u.alive)) {
-      if (!hasStatus(unit, "BUFF_BLOCK")) unit.immuneTurns = Math.max(unit.immuneTurns, 3);
-    }
-  };
-
-  const syncBossPassive = () => {
-    if (!boss.alive) return;
-    const immune = boss.immuneTurns > 0;
-    boss.flatStatBonus.atk = immune ? 2_000 : 0;
-    boss.mitigateTurns = 999;
-    boss.mitigateAmount = immune ? 0 : -0.25;
-    const factor = boss.currentHp / boss.maxHp < 0.5 ? 1.5 : 1;
-    boss.def.skills = baseBossSkills.map((skill) => ({
-      ...skill,
-      effects: skill.effects.map((effect) => effect.kind === "DAMAGE"
-        ? { ...effect, multiplier: effect.multiplier * factor }
-        : { ...effect }),
-    })) as [Skill, Skill, Skill];
-  };
-
-  const original = e.recordTurn.bind(e);
-  e.recordTurn = (unit: BattleUnit, choice?: unknown) => {
-    refocus();
-    syncBossPassive();
-    if (unit === boss && boss.alive) {
-      bossActions += 1;
-      if (boss.immuneTurns > 0) bossImmuneActions += 1;
-      if (hasStatus(boss, "BUFF_BLOCK")) bossBuffBlockedActions += 1;
-    }
-    const beforeLog = e.log.length;
-    const record = original(unit, choice);
-    const lines = e.log.slice(beforeLog);
-
-    if (unit === boss && lines.some((line) => line.includes("聖域の咆哮"))) applyTeamImmunity();
-
-    const ratio = boss.currentHp / boss.maxHp;
-    if (boss.alive && ratio <= 0.70 && !threshold70) {
-      threshold70 = true;
-      thresholdImmunities += 1;
-      applyTeamImmunity();
-    }
-    if (boss.alive && ratio <= 0.40 && !threshold40) {
-      threshold40 = true;
-      thresholdImmunities += 1;
-      applyTeamImmunity();
-    }
-
-    if (lines.some((line) => line.includes("[敵:E1]") && line.includes("有利な効果") && line.includes("剥"))) bossStripEvents += 1;
-    const nowBlocked = hasStatus(boss, "BUFF_BLOCK");
-    if (!lastBossBuffBlock && nowBlocked) buffBlockApplications += 1;
-    lastBossBuffBlock = nowBlocked;
-    syncBossPassive();
-    return record;
-  };
-
-  refocus();
-  syncBossPassive();
-  const result = engine.run();
-  return {
-    winner: result.winner,
-    turns: result.turnsTaken,
-    bossActions,
-    bossImmuneActions,
-    bossBuffBlockedActions,
-    bossStripEvents,
-    buffBlockApplications,
-    thresholdImmunities,
-    bossHpLeft: boss.currentHp,
-  };
-}
-
-const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
-
-describe("80階V2: お供ATK低下+SPD-10、剥がし+強化阻害で再測定", () => {
-  it("V2実数を固定", () => {
-    expect(TOWER80_V2.enemies.map((e) => [e.stats?.atk, e.stats?.spd])).toEqual([
-      [9500, 185], [6000, 170], [5500, 162], [8500, 180], [6500, 155],
+describe("80階V2: 敵の実数", () => {
+  it("ボスとお供のATK/SPDが依頼どおり", () => {
+    expect(TOWER80_ENEMIES_V2.map((enemy) => [enemy.stats?.atk, enemy.stats?.spd])).toEqual([
+      [9_500, 185], [6_000, 170], [5_500, 162], [8_500, 180], [6_500, 155],
     ]);
   });
 
-  it("TYPICAL 1000戦×5攻略順", () => {
-    const rows = TOWER80_FOCUS_V2.map((focus, fi) => {
-      const results = Array.from({ length: 1000 }, (_, i) => runOne(20260930 + fi * 10_000 + i, focus.order));
-      const wins = results.filter((r) => r.winner === "PLAYER").length;
-      const losses = results.filter((r) => r.winner === "ENEMY").length;
-      const draws = results.filter((r) => r.winner === "DRAW").length;
-      const bossActions = results.reduce((sum, r) => sum + r.bossActions, 0);
-      const bossImmuneActions = results.reduce((sum, r) => sum + r.bossImmuneActions, 0);
-      const bossBlockedActions = results.reduce((sum, r) => sum + r.bossBuffBlockedActions, 0);
-      return {
-        focus: focus.name,
-        winRate: wins / results.length,
-        lossRate: losses / results.length,
-        drawRate: draws / results.length,
-        avgTurns: mean(results.map((r) => r.turns)),
-        bossImmuneActionRate: bossActions ? bossImmuneActions / bossActions : 0,
-        bossBuffBlockActionRate: bossActions ? bossBlockedActions / bossActions : 0,
-        avgBossStrips: mean(results.map((r) => r.bossStripEvents)),
-        avgBuffBlockApplications: mean(results.map((r) => r.buffBlockApplications)),
-        avgThresholdImmunities: mean(results.map((r) => r.thresholdImmunities)),
-        avgBossHpLeft: mean(results.map((r) => r.bossHpLeft)),
-      };
+  it("HPも依頼どおり(ボス200,000 / お供は合計410,000)", () => {
+    const hp = TOWER80_ENEMIES_V2.map((enemy) => enemy.stats?.hp);
+    expect(hp).toEqual([200_000, 100_000, 120_000, 80_000, 110_000]);
+    // お供の合計はボス単体の2倍を超える。**「お供を倒す線が重い」ことの根拠**
+    expect(hp.slice(1).reduce<number>((sum, value) => sum + (value ?? 0), 0)).toBe(410_000);
+  });
+
+  it("勝利条件はボスの撃破だけ", () => {
+    expect(TOWER80_ENEMIES_V2[0].victoryTarget).toBe(true);
+    for (const enemy of TOWER80_ENEMIES_V2.slice(1)) expect(enemy.victoryTarget).toBeUndefined();
+  });
+});
+
+describe("80階V2: 測定パーティは本当に剥がし・強化阻害を持っているか", () => {
+  /*
+   * **持っていない編成で測ると、結論がまるごと嘘になる。**
+   * 毒を1つも持たない3体を「毒編成」として測った前例がある。
+   */
+  it("剥がしを持つのは3体(草・電気アビスリーパー・光バジリスク)", () => {
+    const strippers = TOWER80_STRIP_BLOCK_PARTY_V2.filter((ally) => {
+      const dex = findMonsterById(`${ally.templateId}_${ally.element}`)!;
+      return dex.skills.some((skill) => skill.effects.some((effect) => effect.kind === "STRIP" || effect.kind === "STEAL_BUFF"));
     });
-    console.log("TOWER80_V2_STRIP_BLOCK_RESULTS=" + JSON.stringify(rows));
-    expect(rows).toHaveLength(5);
-  }, 240_000);
+    expect(strippers.map((ally) => ally.label)).toEqual([
+      "アビスリーパー[草]", "アビスリーパー[電気]", "バジリスク[光]",
+    ]);
+  });
+
+  it("**強化阻害はパッシブから出る。**草アビスリーパーのS3が持っている", () => {
+    /*
+     * 効果の配列だけを見ると見落とす。`REAPER_HARVEST` は
+     * 「ダメージを与えた時、確率で1ターンの強化不可」という**パッシブ**で、
+     * S3「死神の収穫」の枠に入っている(効果の配列は空)
+     */
+    const grass = findMonsterById("abyssreaper_GRASS")!;
+    const passive = grass.skills.find((skill) => skill.passive !== undefined);
+    expect(passive?.name).toBe("死神の収穫");
+    expect(JSON.stringify(passive?.passive)).toContain("REAPER_HARVEST");
+  });
+
+  it("編成にBUFF_BLOCKを効果として持つ個体はいない(パッシブ経由だけ)", () => {
+    // ここが変わったら、強化阻害の入り方そのものが変わったということ
+    for (const ally of TOWER80_STRIP_BLOCK_PARTY_V2) {
+      const dex = findMonsterById(`${ally.templateId}_${ally.element}`)!;
+      const direct = dex.skills.flatMap((skill) => skill.effects)
+        .filter((effect) => effect.kind === "STATUS" && (effect as { status?: string }).status === "BUFF_BLOCK");
+      expect(direct, `${ally.label}`).toHaveLength(0);
+    }
+  });
+});
+
+describe("80階V2: ボス固有の仕掛け", () => {
+  it("戦闘開始時、敵側全体に免疫2ターン", () => {
+    const r = rig();
+    turn(r, "P1");
+    for (const foe of r.foes) expect(foe.immuneTurns, foe.def.name).toBeGreaterThanOrEqual(TOWER80_RULES.immunityTurns);
+  });
+
+  it("免疫中はATK+2,000、剥がれると+0", () => {
+    const r = rig();
+    turn(r, "P1");
+    expect(r.boss.flatStatBonus.atk).toBe(2_000);
+    r.boss.immuneTurns = 0;
+    turn(r, "P1");
+    expect(r.boss.flatStatBonus.atk).toBe(0);
+  });
+
+  it("免疫が剥がれている間だけ被ダメージ+25%", () => {
+    const r = rig();
+    turn(r, "P1");
+    // 免疫中は素通り(軽減0)
+    expect(r.boss.mitigateAmount).toBe(0);
+    r.boss.immuneTurns = 0;
+    turn(r, "P1");
+    // **軽減の裏返し**で表す。負の軽減=被ダメージ増加
+    expect(r.boss.mitigateAmount).toBeCloseTo(-0.25, 6);
+  });
+
+  it("HP50%未満で全攻撃スキルの倍率が×1.5、戻れば元に戻る", () => {
+    const r = rig({ bossHp: Math.round(200_000 * 0.45) });
+    turn(r, "P1");
+    expect(damageOf(r.boss.def.skills[0]).multiplier).toBeCloseTo(1.0 * 1.5, 6);
+    expect(damageOf(r.boss.def.skills[1]).multiplier).toBeCloseTo(1.8 * 1.5, 6);
+    expect(damageOf(r.boss.def.skills[2]).multiplier).toBeCloseTo(1.15 * 1.5, 6);
+
+    // **累積させない。**HPが戻れば素の倍率へ戻る
+    r.boss.currentHp = Math.round(200_000 * 0.8);
+    turn(r, "P1");
+    expect(damageOf(r.boss.def.skills[1]).multiplier).toBeCloseTo(1.8, 6);
+  });
+
+  it("HP70%・40%への初到達で1回ずつ免疫を配り直す(二度は配らない)", () => {
+    const r = rig({ bossHp: Math.round(200_000 * 0.69) });
+    turn(r, "P1");
+    expect(r.probe.finish()["免疫再展開70%"]).toBe(1);
+
+    const r2 = rig({ bossHp: Math.round(200_000 * 0.69) });
+    for (let i = 0; i < 5; i += 1) turn(r2, "P1");
+    r2.boss.currentHp = Math.round(200_000 * 0.39);
+    for (let i = 0; i < 5; i += 1) turn(r2, "P1");
+    const extra = r2.probe.finish();
+    expect(extra["免疫再展開70%"]).toBe(1);
+    expect(extra["免疫再展開40%"]).toBe(1);
+  });
+
+  it("ボスS3「聖域の咆哮」で敵側全体へ免疫が戻る", () => {
+    const r = rig();
+    turn(r, "P1");
+    for (const foe of r.foes) foe.immuneTurns = 0;
+    turn(r, "E1", ["[敵:E1] 古代聖竜(光) の「聖域の咆哮」！"]);
+    for (const foe of r.foes) expect(foe.immuneTurns, foe.def.name).toBeGreaterThanOrEqual(2);
+    expect(r.probe.finish()["S3の免疫供給"]).toBe(1);
+  });
+});
+
+describe("80階V2: 強化阻害は免疫の再付与を防ぐ", () => {
+  /*
+   * **この階の攻略そのもの。**観測点が配る免疫も、本編の `IMMUNITY` 効果と
+   * 同じく `BUFF_BLOCK` を見なければならない。ここを素通りさせると、
+   * 強化阻害という攻略が観測点の側から黙って潰される。
+   */
+  it("強化阻害中の相手には免疫が乗らず、防いだ数が記録される", () => {
+    const r = rig();
+    turn(r, "P1");
+    for (const foe of r.foes) foe.immuneTurns = 0;
+    // ボスだけ強化不可にする
+    r.boss.statusEffects.push({ type: "BUFF_BLOCK", category: "DEBUFF", remainingTurns: 3 });
+
+    turn(r, "E1", ["[敵:E1] 古代聖竜(光) の「聖域の咆哮」！"]);
+    expect(hasStatus(r.boss, "BUFF_BLOCK")).toBe(true);
+    expect(r.boss.immuneTurns, "強化不可のボスには免疫が乗らない").toBe(0);
+    // 他の4体には乗る
+    for (const foe of r.foes.slice(1)) expect(foe.immuneTurns, foe.def.name).toBeGreaterThanOrEqual(2);
+    expect(r.probe.finish()["強化阻害で防いだ免疫"]).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("80階V2: 実際に戦わせる", () => {
+  it("1戦通して、免疫・剥がし・強化阻害がすべて発動する", () => {
+    /*
+     * 機構が黙って効いていない状態で勝率だけ見て結論を書かないための番人。
+     *
+     * **測定と同じ道(`runBattle`)で1戦だけ走らせる。**エンジンを自分で組むと
+     * 装備も狙う順も本番と別物になり、「ここでは動いたが測定では動いていない」
+     * を見逃す。狙う順はボス集中——剥がしも強化阻害も、
+     * **ボスを殴っている線でしか入らない**ことが分かっているため
+     */
+    const tally = runBattle(TOWER80_V2, 20260930, ["古代聖竜"], "TYPICAL");
+    expect(tally.extra["ボス行動回数"]).toBeGreaterThan(0);
+    expect(tally.extra["免疫中の行動割合"]).toBeGreaterThan(0);
+    expect(tally.extra["S3の免疫供給"]).toBeGreaterThan(0);
+    expect(tally.extra["ボスへの剥がし回数"]).toBeGreaterThan(0);
+    expect(tally.extra["ボスへの強化阻害回数"]).toBeGreaterThan(0);
+  });
+});
+
+describe("本編の80階は1つも変わっていない", () => {
+  it("試練の塔80階は従来どおり古代の魔人+お供2体のまま", () => {
+    const floor = TRIAL_TOWER_FLOORS[79];
+    expect(floor.floor).toBe(80);
+    expect(floor.name).toBe("80階 免疫");
+    expect(floor.enemies).toHaveLength(3);
+    expect(floor.enemies[0].templateId).toBe("ancient_demon");
+    // 仮の名前が本編へ漏れていないこと
+    expect(JSON.stringify(floor)).not.toContain("古代聖竜");
+    expect(JSON.stringify(floor)).not.toContain("tower80_");
+  });
+
+  it("80階の仮スキルは本編の塔データのどこにも入っていない", () => {
+    expect(JSON.stringify(TRIAL_TOWER_FLOORS)).not.toContain("tower80_");
+    expect(JSON.stringify(TRIAL_TOWER_FLOORS)).not.toContain("古代の護晶");
+    expect(JSON.stringify(TRIAL_TOWER_FLOORS)).not.toContain("古代の鼓舞晶");
+  });
+
+  it("観測点を付けない盤面では、集計が空のまま", () => {
+    const enemies = TOWER80_V2.enemies.map(buildEnemy);
+    const dummy = findMonsterById("wolf_FIRE")!;
+    const engine = new BattleEngine([dummy], enemies, { rng: mulberry32(1), maxTurns: 1 });
+    expect(attachProbe(engine, undefined)).toBeNull();
+  });
 });

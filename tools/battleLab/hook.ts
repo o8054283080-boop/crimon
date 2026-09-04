@@ -47,6 +47,27 @@ function track(unit: BattleUnit, engine: EngineInternals): TrackedUnit {
     ...skill,
     effects: skill.effects.map((effect) => ({ ...effect })),
   })) as [Skill, Skill, Skill];
+
+  /*
+   * かかっている倍率。**2種類あるので別々に覚えておく。**
+   * どちらのセッターも素の定義から作り直すので、片方だけを持つ作りにすると
+   * 「HP比例を設定したら攻撃倍率が戻る」が黙って起きる。
+   */
+  let hpFactor = 1;
+  let mulFactor = 1;
+  const applyFactors = (): void => {
+    const skills = baseSkills.map((skill) => ({
+      ...skill,
+      effects: skill.effects.map((effect) => {
+        if (effect.kind !== "DAMAGE") return effect;
+        const next = { ...effect, multiplier: effect.multiplier * mulFactor };
+        if (effect.hpCoefficient !== undefined) next.hpCoefficient = effect.hpCoefficient * hpFactor;
+        return next;
+      }),
+    }));
+    (unit.def as { skills: unknown }).skills = skills;
+  };
+
   return {
     get currentHp() { return unit.currentHp; },
     set currentHp(value: number) { unit.currentHp = value; },
@@ -97,15 +118,24 @@ function track(unit: BattleUnit, engine: EngineInternals): TrackedUnit {
      * HPが回復して弱い段へ下がる動きもそのまま作れる。
      */
     setHpCoefficientFactor(factor: number) {
-      const skills = baseSkills.map((skill) => ({
-        ...skill,
-        effects: skill.effects.map((effect) =>
-          effect.kind === "DAMAGE" && effect.hpCoefficient !== undefined
-            ? { ...effect, hpCoefficient: effect.hpCoefficient * factor }
-            : effect,
-        ),
-      }));
-      (unit.def as { skills: unknown }).skills = skills;
+      hpFactor = factor;
+      applyFactors();
+    },
+    /*
+     * ATK倍率の側(80階の「HP50%未満で全攻撃×1.5」)。
+     *
+     * **HP比例側と別々に持つ。**両方が `baseSkills` から作り直すので、
+     * 片方を設定するともう片方が黙って消える作りにしてはいけない
+     */
+    setDamageMultiplierFactor(factor: number) {
+      mulFactor = factor;
+      applyFactors();
+    },
+    get immuneTurns() { return unit.immuneTurns; },
+    set immuneTurns(value: number) { unit.immuneTurns = value; },
+    hasStatus(name: string) {
+      // 本編の `hasStatus` と同じ見方(残りターンが0のものは掛かっていない扱い)
+      return unit.statusEffects.some((effect) => effect.type === name && effect.remainingTurns > 0);
     },
     /*
      * 手番・クールタイム・行動ゲージを消費せずに1回撃つ。

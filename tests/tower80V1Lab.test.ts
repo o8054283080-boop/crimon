@@ -1,169 +1,61 @@
 import { describe, expect, it } from "vitest";
-import { BattleEngine } from "../src/battle/engine.js";
-import type { BattleUnit } from "../src/battle/unit.js";
-import { hasStatus } from "../src/battle/unit.js";
-import type { Skill } from "../src/core/skill.js";
-import { buildTeams } from "../tools/battleLab/build.js";
-import { mulberry32 } from "../tools/battleLab/rng.js";
-import { TOWER80_FOCUS, TOWER80_V1 } from "../tools/battleLab/scenarios/tower80v1.js";
+import { TOWER80_ENEMIES_V1, TOWER80_FOCUS } from "../tools/battleLab/scenarios/tower80v1.js";
+import { TOWER80_ENEMIES_V2 } from "../tools/battleLab/scenarios/tower80v2.js";
 
-interface EngineInternals {
-  units: BattleUnit[];
-  log: string[];
-  recordTurn: (unit: BattleUnit, choice?: unknown) => unknown;
-  counterWithSkill: (source: BattleUnit, index: 0 | 1 | 2) => void;
-}
+/*
+ * 試練の塔80階の**仮**盤面(第1回)。
+ *
+ * ## 計測はここに置かない
+ *
+ * 元は「TYPICAL 1000戦×5攻略順」という `it` があり、12秒をCIが毎回払っていた。
+ * 確かめていたのは `expect(rows).toHaveLength(5)` だけで、数字は
+ * `console.log` へ流すだけ。**測定はテストではない。**
+ *
+ * ## V1を残す理由
+ *
+ * V2との**差分を測るための基準**として残してある。
+ * V1の実測値(勝率1.2〜15.8%)は `tools/battleLab/tower80/measure.ts` の
+ * 比較表に控えてあり、V2の結果と並べて出る。
+ * ここでは「V1→V2で何を変えたのか」が数字として残っていることだけを見張る。
+ */
 
-interface OneResult {
-  winner: "PLAYER" | "ENEMY" | "DRAW";
-  turns: number;
-  bossActions: number;
-  bossImmuneActions: number;
-  bossBuffBlockedActions: number;
-  bossStripEvents: number;
-  buffBlockApplications: number;
-  thresholdImmunities: number;
-  bossHpLeft: number;
-}
+describe("80階V1: V2との差分の基準として固定する", () => {
+  it("V1のお供はATKが高くSPDが速い(ここがV2との唯一の違い)", () => {
+    expect(TOWER80_ENEMIES_V1.map((enemy) => [enemy.label, enemy.stats?.atk, enemy.stats?.spd])).toEqual([
+      ["古代聖竜", 9_500, 185],
+      ["古代の護晶", 7_500, 180],
+      ["古代の鼓舞晶", 6_900, 172],
+      ["古代の破邪獣", 9_800, 190],
+      ["古代の呪獣", 8_500, 165],
+    ]);
+  });
 
-function cloneSkills(skills: readonly Skill[]): [Skill, Skill, Skill] {
-  return skills.map((skill) => ({ ...skill, effects: skill.effects.map((effect) => ({ ...effect })) })) as [Skill, Skill, Skill];
-}
-
-function runOne(seed: number, focusOrder: string[]): OneResult {
-  const rng = mulberry32(seed);
-  const { players, enemies } = buildTeams(TOWER80_V1, rng, "TYPICAL");
-  const engine = new BattleEngine(players, enemies, { rng, maxTurns: 300 });
-  const e = engine as unknown as EngineInternals;
-  const boss = e.units.find((u) => u.instanceId === "E1")!;
-  const baseBossSkills = cloneSkills(boss.def.skills);
-
-  // 80階の仮パッシブ。開始時は味方全体に免疫2T。
-  for (const unit of e.units.filter((u) => u.team === "ENEMY")) unit.immuneTurns = Math.max(unit.immuneTurns, 3);
-
-  let threshold70 = false;
-  let threshold40 = false;
-  let bossActions = 0;
-  let bossImmuneActions = 0;
-  let bossBuffBlockedActions = 0;
-  let bossStripEvents = 0;
-  let buffBlockApplications = 0;
-  let thresholdImmunities = 0;
-  let lastBossBuffBlock = hasStatus(boss, "BUFF_BLOCK");
-
-  const enemyIdFor = (label: string): string | null => {
-    const index = TOWER80_V1.enemies.findIndex((enemy) => (enemy.label ?? enemy.templateId) === label);
-    return index >= 0 ? `E${index + 1}` : null;
-  };
-  const focusIds = focusOrder.map(enemyIdFor).filter((id): id is string => id !== null);
-  const refocus = () => {
-    for (const id of focusIds) {
-      const target = e.units.find((u) => u.instanceId === id);
-      if (target?.alive) { engine.setFocusTarget(id); return; }
+  it("V1→V2で下げたのはお供のATKとSPDだけ。ボスとHPは据え置き", () => {
+    /*
+     * **2つ同時に動かした**ので、どちらがどれだけ効いたのかは
+     * V1↔V2の比較だけでは分からない。切り分けは
+     * `measure.ts --ablate` で1軸ずつ振って測ってある
+     */
+    const v1 = TOWER80_ENEMIES_V1;
+    const v2 = TOWER80_ENEMIES_V2;
+    expect(v1).toHaveLength(v2.length);
+    // ボスは1文字も変えていない
+    expect(v1[0].stats).toEqual(v2[0].stats);
+    for (let i = 1; i < v1.length; i += 1) {
+      expect(v2[i].stats?.hp, `${v1[i].label} のHP`).toBe(v1[i].stats?.hp);
+      expect(v2[i].stats?.def, `${v1[i].label} のDEF`).toBe(v1[i].stats?.def);
+      expect(v2[i].stats?.atk!, `${v1[i].label} のATK`).toBeLessThan(v1[i].stats?.atk!);
+      expect(v2[i].stats?.spd!, `${v1[i].label} のSPD`).toBe(v1[i].stats?.spd! - 10);
     }
-    engine.setFocusTarget(null);
-  };
+  });
 
-  const applyTeamImmunity = () => {
-    for (const unit of e.units.filter((u) => u.team === "ENEMY" && u.alive)) {
-      if (!hasStatus(unit, "BUFF_BLOCK")) unit.immuneTurns = Math.max(unit.immuneTurns, 3);
-    }
-  };
-
-  const syncBossPassive = () => {
-    if (!boss.alive) return;
-    const immune = boss.immuneTurns > 0;
-    boss.flatStatBonus.atk = immune ? 2_000 : 0;
-    boss.mitigateTurns = 999;
-    boss.mitigateAmount = immune ? 0 : -0.25;
-    const factor = boss.currentHp / boss.maxHp < 0.5 ? 1.5 : 1;
-    boss.def.skills = baseBossSkills.map((skill) => ({
-      ...skill,
-      effects: skill.effects.map((effect) => effect.kind === "DAMAGE"
-        ? { ...effect, multiplier: effect.multiplier * factor }
-        : { ...effect }),
-    })) as [Skill, Skill, Skill];
-  };
-
-  const original = e.recordTurn.bind(e);
-  e.recordTurn = (unit: BattleUnit, choice?: unknown) => {
-    refocus();
-    syncBossPassive();
-    if (unit === boss && boss.alive) {
-      bossActions += 1;
-      if (boss.immuneTurns > 0) bossImmuneActions += 1;
-      if (hasStatus(boss, "BUFF_BLOCK")) bossBuffBlockedActions += 1;
-    }
-    const beforeLog = e.log.length;
-    const record = original(unit, choice);
-    const lines = e.log.slice(beforeLog);
-
-    // ボスS3の「味方全体免疫2T」は、攻撃部分を本編で解決した後に付与。
-    if (unit === boss && lines.some((line) => line.includes("聖域の咆哮"))) applyTeamImmunity();
-
-    const ratio = boss.currentHp / boss.maxHp;
-    if (boss.alive && ratio <= 0.70 && !threshold70) {
-      threshold70 = true;
-      thresholdImmunities += 1;
-      applyTeamImmunity();
-    }
-    if (boss.alive && ratio <= 0.40 && !threshold40) {
-      threshold40 = true;
-      thresholdImmunities += 1;
-      applyTeamImmunity();
-    }
-
-    if (lines.some((line) => line.includes("[敵:E1]") && line.includes("有利な効果") && line.includes("剥"))) bossStripEvents += 1;
-    const nowBlocked = hasStatus(boss, "BUFF_BLOCK");
-    if (!lastBossBuffBlock && nowBlocked) buffBlockApplications += 1;
-    lastBossBuffBlock = nowBlocked;
-    syncBossPassive();
-    return record;
-  };
-
-  refocus();
-  syncBossPassive();
-  const result = engine.run();
-  return {
-    winner: result.winner,
-    turns: result.turnsTaken,
-    bossActions,
-    bossImmuneActions,
-    bossBuffBlockedActions,
-    bossStripEvents,
-    buffBlockApplications,
-    thresholdImmunities,
-    bossHpLeft: boss.currentHp,
-  };
-}
-
-const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
-
-describe("80階V1: 剥がし+強化阻害で免疫5体編成を実測", () => {
-  it("TYPICAL 1000戦×5攻略順", () => {
-    const rows = TOWER80_FOCUS.map((focus, fi) => {
-      const results = Array.from({ length: 1000 }, (_, i) => runOne(20260920 + fi * 10_000 + i, focus.order));
-      const wins = results.filter((r) => r.winner === "PLAYER").length;
-      const losses = results.filter((r) => r.winner === "ENEMY").length;
-      const draws = results.filter((r) => r.winner === "DRAW").length;
-      const bossActions = results.reduce((sum, r) => sum + r.bossActions, 0);
-      const bossImmuneActions = results.reduce((sum, r) => sum + r.bossImmuneActions, 0);
-      const bossBlockedActions = results.reduce((sum, r) => sum + r.bossBuffBlockedActions, 0);
-      return {
-        focus: focus.name,
-        winRate: wins / results.length,
-        lossRate: losses / results.length,
-        drawRate: draws / results.length,
-        avgTurns: mean(results.map((r) => r.turns)),
-        bossImmuneActionRate: bossActions ? bossImmuneActions / bossActions : 0,
-        bossBuffBlockActionRate: bossActions ? bossBlockedActions / bossActions : 0,
-        avgBossStrips: mean(results.map((r) => r.bossStripEvents)),
-        avgBuffBlockApplications: mean(results.map((r) => r.buffBlockApplications)),
-        avgThresholdImmunities: mean(results.map((r) => r.thresholdImmunities)),
-        avgBossHpLeft: mean(results.map((r) => r.bossHpLeft)),
-      };
-    });
-    console.log("TOWER80_V1_STRIP_BLOCK_RESULTS=" + JSON.stringify(rows));
-    expect(rows).toHaveLength(5);
-  }, 240_000);
+  it("攻略順の5パターンはV1・V2で同じ(線の差だけを比べるため)", () => {
+    expect(TOWER80_FOCUS.map((focus) => focus.name)).toEqual([
+      "破邪獣→護晶→ボス",
+      "護晶→破邪獣→ボス",
+      "鼓舞晶→護晶→破邪獣→ボス",
+      "呪獣→護晶→破邪獣→ボス",
+      "ボス集中",
+    ]);
+  });
 });
