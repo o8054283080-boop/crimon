@@ -35,7 +35,7 @@ export function tower90ProbeV3(context: Context): ScenarioProbe {
   let warDrumBuffUses = 0;
   let warDrumTempoUses = 0;
   let fangKills = 0;
-  let playersAliveBeforeTurn = PLAYERS.length;
+  let playersAliveBeforeTurn: number = PLAYERS.length;
   const deathTurn: Record<string, number> = { E2: 0, E3: 0, E4: 0, E5: 0 };
   let previousAlive = new Set<string>(ESCORTS.filter((id) => context.aliveOf(id)));
 
