@@ -675,7 +675,8 @@ export class BattleEngine {
     const lifeAlive = this.units.some((unit) => unit.team === "ENEMY" && unit.alive && unit.def.skills.some((skill) => skill.id === "tower70_life_s2"));
     const rate = TOWER70_BOSS_REGEN + (lifeAlive ? TOWER70_LIFE_REGEN_BONUS : 0);
     const before = boss.currentHp;
-    const healed = applyHeal(boss, Math.round(boss.maxHp * rate));
+    applyHeal(boss, Math.round(boss.maxHp * rate));
+    const healed = boss.currentHp - before;
     if (healed > 0) {
       this.push(`${this.label(boss)} の「不滅の巨獣」でHPが ${healed} 回復！ (${boss.currentHp}/${boss.maxHp})`);
       this.pushEvent({ targetId: boss.instanceId, kind: "HEAL", amount: healed });

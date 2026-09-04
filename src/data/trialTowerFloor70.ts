@@ -1,6 +1,6 @@
 import { Skill } from "../core/skill.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
-import { ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE, BEHEMOTH } from "./monsters.js";
+import { ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE } from "./monsters.js";
 
 /**
  * 試練の塔70階「始祖ベヒモス」。
@@ -25,7 +25,7 @@ export const TOWER70_ROAR_DEF_DOWN = 0.5;
 export const TOWER70_ROAR_DEF_DOWN_TURNS = 3;
 export const TOWER70_PULSE_CRUSH_RATIO = 0.5;
 
-export const TOWER70_BOSS_TEMPLATE_ID = BEHEMOTH.templateId;
+export const TOWER70_BOSS_TEMPLATE_ID = "behemoth";
 export const TOWER70_LIFE_TEMPLATE_ID = ANCIENT_CRYSTAL.templateId;
 export const TOWER70_PULSE_TEMPLATE_ID = ANCIENT_CRYSTAL_CURSE.templateId;
 
