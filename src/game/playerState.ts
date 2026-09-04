@@ -492,7 +492,7 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (state.fighterLevel >= MAX_FIGHTER_LEVEL) state.fighterExp = 0;
   state.maxStamina = maxStaminaForFighterLevel(state.fighterLevel);
   if (typeof state.stamina !== "number" || !Number.isFinite(state.stamina)) state.stamina = state.maxStamina;
-  state.stamina = Math.max(0, Math.min(state.stamina, state.maxStamina));
+  state.stamina = Math.max(0, state.stamina);
   if (typeof state.lastStaminaUpdateAt !== "number") state.lastStaminaUpdateAt = Date.now();
   if (typeof state.fighterName !== "string" || state.fighterName.length === 0) state.fighterName = DEFAULT_FIGHTER_NAME;
   if (typeof state.lastLoginBonusAt !== "number") state.lastLoginBonusAt = null;
@@ -830,7 +830,7 @@ export function trySpendStamina(state: PlayerState, cost: number): StaminaSpendR
   return { ok: true };
 }
 
-/** ダイヤ50でスタミナ100回復(上限を超える分は切り捨て) */
+/** ダイヤ50でスタミナ100回復。配布と同じく現在上限を超えて保持できる */
 export const STAMINA_REFILL_PARTIAL_COST = 50;
 export const STAMINA_REFILL_PARTIAL_AMOUNT = 100;
 /** ダイヤ200でスタミナ全回復 */
@@ -844,10 +844,9 @@ export interface StaminaRefillResult {
 /** ダイヤを消費してスタミナを100回復する。呼ぶ前に自然回復を反映する */
 export function tryRefillStaminaPartial(state: PlayerState): StaminaRefillResult {
   applyPassiveStaminaRegen(state);
-  if (state.stamina >= state.maxStamina) return { ok: false, reason: "スタミナは既に満タンです" };
   if (state.crystal < STAMINA_REFILL_PARTIAL_COST) return { ok: false, reason: "ダイヤが足りません" };
   state.crystal -= STAMINA_REFILL_PARTIAL_COST;
-  state.stamina = Math.min(state.maxStamina, state.stamina + STAMINA_REFILL_PARTIAL_AMOUNT);
+  state.stamina += STAMINA_REFILL_PARTIAL_AMOUNT;
   return { ok: true };
 }
 
@@ -875,6 +874,7 @@ export const FIGHTER_LEVEL_UP_CRYSTAL_REWARD = 300;
 export function addFighterExp(state: PlayerState, exp: number): FighterExpResult {
   if (state.fighterLevel >= MAX_FIGHTER_LEVEL || exp <= 0) return { levelsGained: 0 };
 
+  const staminaBefore = state.stamina;
   state.fighterExp += exp;
   let levelsGained = 0;
   while (state.fighterLevel < MAX_FIGHTER_LEVEL && state.fighterExp >= requiredExpForFighterLevel(state.fighterLevel)) {
@@ -888,7 +888,10 @@ export function addFighterExp(state: PlayerState, exp: number): FighterExpResult
     state.fighterLevel = MAX_FIGHTER_LEVEL;
     state.fighterExp = 0;
   }
-  if (levelsGained > 0) state.crystal += FIGHTER_LEVEL_UP_CRYSTAL_REWARD * levelsGained;
+  if (levelsGained > 0) {
+    state.stamina = Math.max(state.stamina, staminaBefore);
+    state.crystal += FIGHTER_LEVEL_UP_CRYSTAL_REWARD * levelsGained;
+  }
   return { levelsGained };
 }
 
