@@ -5,6 +5,8 @@ import type { Tower70Numbers } from "./spec.js";
 const PULSE = "E3";
 const PLAYER_IDS = ["P1", "P2", "P3", "P4", "P5"] as const;
 
+type PlayerId = (typeof PLAYER_IDS)[number];
+
 /**
  * 第5回: 命脈断ちを「現在HPが高い生存3体」へ拡張する。
  *
@@ -17,15 +19,19 @@ export function tower70V5Probe(
   numbers: Tower70Numbers,
 ): ScenarioProbe {
   const base = tower70V4Probe(context, numbers);
-  let rankedAtPulseTurn: string[] = [];
+  let rankedAtPulseTurn: PlayerId[] = [];
   let extraCrushTargets = 0;
   let extraCrushRemoved = 0;
 
-  const snapshotRank = (): string[] => PLAYER_IDS
-    .map((id) => ({ id, unit: context.unitOf(id) }))
-    .filter((entry): entry is { id: string; unit: TrackedUnit } => Boolean(entry.unit?.alive))
-    .sort((a, b) => b.unit.currentHp - a.unit.currentHp)
-    .map((entry) => entry.id);
+  const snapshotRank = (): PlayerId[] => {
+    const entries: Array<{ id: PlayerId; unit: TrackedUnit }> = [];
+    for (const id of PLAYER_IDS) {
+      const unit = context.unitOf(id);
+      if (unit?.alive) entries.push({ id, unit });
+    }
+    entries.sort((a, b) => b.unit.currentHp - a.unit.currentHp);
+    return entries.map((entry) => entry.id);
+  };
 
   return {
     beforeTurn(unitId) {
