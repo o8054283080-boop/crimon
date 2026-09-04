@@ -119,7 +119,12 @@ function newUnitTally(def: MonsterDefinition, id: string, team: "PLAYER" | "ENEM
 export function runBattle(scenario: Scenario, seed: number, focus?: string[], grade?: GearGrade): BattleTally {
   const rng = mulberry32(seed);
   const { players, enemies } = buildTeams(scenario, rng, grade);
-  const engine = new BattleEngine(players, enemies, { rng, maxTurns: scenario.maxTurns ?? 300 });
+  const engine = new BattleEngine(players, enemies, {
+    rng,
+    maxTurns: scenario.maxTurns ?? 300,
+    // 階固有の仕掛けを**本編の実装のまま**動かす。書いていない盤面は今までどおり
+    trialTowerFloor: scenario.trialTowerFloor,
+  });
   // 階固有の挙動と数え上げ。**戦闘の中身には入らない**(tools/battleLab/hook.ts)
   const probe = attachProbe(engine, scenario.hook);
 
