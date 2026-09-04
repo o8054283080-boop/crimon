@@ -1,0 +1,27 @@
+name: 70階型エラー修正
+on:
+  push:
+    branches: [claude/tower-70-progenitor-behemoth-lab]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, '型エラー修正スクリプト')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/tower-70-progenitor-behemoth-lab
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/fixTower70Types.mjs
+      - run: npm ci
+      - run: npm run typecheck
+      - run: |
+          rm tools/fixTower70Types.mjs .github/workflows/tower70-typefix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "70階本編の型エラーを修正"
+          git push origin HEAD:claude/tower-70-progenitor-behemoth-lab
