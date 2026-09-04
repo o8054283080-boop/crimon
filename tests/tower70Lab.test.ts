@@ -610,16 +610,24 @@ describe("70階の仮盤面: 実際に戦わせる", () => {
   });
 });
 
-describe("本編は1つも変わっていない", () => {
-  it("試練の塔70階は従来どおり古代の魔人+お供2体のまま", () => {
+describe("Battle Labの仮組みが本編へ漏れていない", () => {
+  /*
+   * **この節の意味が途中で変わっている。**
+   *
+   * 元は「本編は1つも変わっていない」で、70階が従来の古代の魔人のままだと
+   * 固めていた。その後の回で本編実装が入り、70階は始祖ベヒモスになった。
+   * 変わったのは本編の側なので、ここは
+   * **仮組み(`lab_t70_*`)が本編へ紛れ込んでいないか**だけを見張る役へ移す。
+   * 70階そのものの中身は `tests/trialTowerUpper.test.ts` が固めている。
+   */
+  it("本編の70階は本編の定義で組まれている(Labの札ではない)", () => {
     const floor = TRIAL_TOWER_FLOORS[69];
     expect(floor.floor).toBe(70);
-    expect(floor.name).toBe("70階 超再生");
     expect(floor.enemies).toHaveLength(3);
-    expect(floor.enemies[0].templateId).toBe("ancient_demon");
-    // 仮の名前が本編へ漏れていないこと
-    expect(JSON.stringify(floor)).not.toContain(TOWER70_LABELS.boss);
-    expect(JSON.stringify(floor)).not.toContain("始祖");
+    // Labの仮スキルIDが1つも混ざっていないこと
+    expect(JSON.stringify(floor)).not.toContain("lab_t70");
+    // Labだけの仮の呼び名(取り巻きの内部ラベル)も漏れていないこと
+    expect(JSON.stringify(floor)).not.toContain(TOWER70_LABELS.pulse + "(仮)");
   });
 
   it("70階の仮スキルは図鑑のどこにも入っていない", () => {
