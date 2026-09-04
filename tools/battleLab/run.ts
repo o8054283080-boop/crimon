@@ -19,6 +19,7 @@
 import { BattleEngine, BattleResult } from "../../src/battle/engine.js";
 import type { MonsterDefinition } from "../../src/core/monster.js";
 import { buildTeams } from "./build.js";
+import { attachProbe } from "./hook.js";
 import { mulberry32, runSeed } from "./rng.js";
 import type { GearGrade, Scenario } from "./types.js";
 
@@ -90,6 +91,11 @@ export interface BattleTally {
   /** 敗因の見出し。勝った戦いでは空 */
   lossReason: string;
   log: string[];
+  /**
+   * その階だけの数え上げ。`Scenario.hook` を持つ盤面だけが中身を持つ。
+   * 持たない盤面では空のまま(既存のシナリオは1つも変わらない)
+   */
+  extra: Record<string, number>;
 }
 
 function newUnitTally(def: MonsterDefinition, id: string, team: "PLAYER" | "ENEMY"): UnitTally {
@@ -114,6 +120,8 @@ export function runBattle(scenario: Scenario, seed: number, focus?: string[], gr
   const rng = mulberry32(seed);
   const { players, enemies } = buildTeams(scenario, rng, grade);
   const engine = new BattleEngine(players, enemies, { rng, maxTurns: scenario.maxTurns ?? 300 });
+  // 階固有の挙動と数え上げ。**戦闘の中身には入らない**(tools/battleLab/hook.ts)
+  const probe = attachProbe(engine, scenario.hook);
 
   const tallies = new Map<string, UnitTally>();
   players.forEach((def, i) => tallies.set(`P${i + 1}`, newUnitTally(def, `P${i + 1}`, "PLAYER")));
@@ -296,6 +304,7 @@ export function runBattle(scenario: Scenario, seed: number, focus?: string[], gr
     counters: [...counters.values()],
     lossReason: result.winner === "PLAYER" ? "" : classifyLoss(result, units, scenario),
     log: result.log,
+    extra: probe?.finish() ?? {},
   };
 }
 
