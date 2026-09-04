@@ -77,7 +77,7 @@ export function tower90ProbeV6(context: Context): ScenarioProbe {
     let hpAtk = 0;
     let hpSpd = 0;
     // 40%以上だけV5より10%低火力。40%以下はV5の狂化火力へそのまま切り替える。
-    let damageFactor = TOWER90_V6_RULES.earlyDamageFactor;
+    let damageFactor: number = TOWER90_V6_RULES.earlyDamageFactor;
     if (ratio <= 0.70) {
       hpAtk += TOWER90_V6_RULES.hp70Atk;
       hpSpd += TOWER90_V6_RULES.hp70Spd;
