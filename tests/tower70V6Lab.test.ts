@@ -4,12 +4,8 @@ import type { DamageEffect } from "../src/core/skill.js";
 import { findMonsterById } from "../src/data/monsters.js";
 import { buildEnemy } from "../tools/battleLab/build.js";
 import { attachProbe } from "../tools/battleLab/hook.js";
-import { runMany } from "../tools/battleLab/run.js";
 import { mulberry32 } from "../tools/battleLab/rng.js";
-import { TOWER70_FOCUS } from "../tools/battleLab/scenarios/tower70.js";
 import { buildTower70V6, TOWER70_HEAL_BLOCK_3, TOWER70_MIXED, TOWER70_POISON_3 } from "../tools/battleLab/scenarios/tower70v6.js";
-
-const mean = (xs: number[]): number => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 
 function hasHealBlock(id: string): boolean {
   const monster = findMonsterById(id)!;
@@ -30,34 +26,18 @@ function tierRig(ratio: number) {
   return { boss, s3 };
 }
 
-function measureScenario(label: string, allies: typeof TOWER70_HEAL_BLOCK_3, seed: number) {
-  const scenario = buildTower70V6(allies);
-  const rows = TOWER70_FOCUS.map((pattern) => {
-    const tallies = runMany(scenario, seed, 1000, pattern.order, "TYPICAL");
-    const wins = tallies.filter((t) => t.winner === "PLAYER").length;
-    const losses = tallies.filter((t) => t.winner === "ENEMY").length;
-    const draws = tallies.filter((t) => t.winner === "DRAW").length;
-    const extraMean = (key: string) => mean(tallies.map((t) => t.extra[key] ?? 0));
-    return {
-      focus: pattern.name,
-      runs: tallies.length,
-      winRate: wins / tallies.length,
-      lossRate: losses / tallies.length,
-      drawRate: draws / tallies.length,
-      avgTurns: mean(tallies.map((t) => t.turns)),
-      bossHealed: extraMean("本体総回復量"),
-      healBlockSuccess: extraMean("V4治癒阻害成功"),
-      healBlockUptime: extraMean("V4治癒阻害稼働率"),
-      preventedHealing: extraMean("V4阻害した回復量"),
-      poisonApplied: extraMean("毒付与数"),
-      poisonDamage: extraMean("毒ダメージ"),
-      poisonKills: extraMean("毒フィニッシュ"),
-      crushUses: extraMean("命脈断ちの発動回数"),
-    };
-  });
-  console.log(label + "=" + JSON.stringify(rows));
-  return rows;
-}
+
+/*
+ * **計測はここから外した。**
+ *
+ * 元は「1000戦×5攻略順を実測してログへ出す」という `it` があったが、
+ * 確かめていたのは `expect(rows).toHaveLength(5)` だけ——5回ループしたことしか
+ * 見ておらず、肝心の数字は `console.log` へ流すだけだった。
+ * そのために毎回のCIが約170秒(7件で)遅くなっていた。**測定はテストではない。**
+ *
+ * 数字が要る時は `npx tsx tools/battleLab/tower70/measure.ts` から回す。
+ * ここに残すのは、壊れたら落ちる仕様の見張りだけ。
+ */
 
 describe("70階V6: 攻撃型パッシブ + 回復阻害/毒/混合", () => {
   it("回復阻害3体編成は実在する回復阻害を3体とも持つ", () => {
@@ -107,16 +87,4 @@ describe("70階V6: 攻撃型パッシブ + 回復阻害/毒/混合", () => {
     expect(boss.mitigateAmount).toBe(0);
     expect(s3.hpCoefficient).toBeCloseTo(0.05, 6);
   });
-
-  it("V6 回復阻害3体 1000戦×5攻略順", () => {
-    expect(measureScenario("TOWER70_V6_HEAL_BLOCK3_RESULTS", TOWER70_HEAL_BLOCK_3, 20260906)).toHaveLength(5);
-  }, 180_000);
-
-  it("V6 毒3体 1000戦×5攻略順", () => {
-    expect(measureScenario("TOWER70_V6_POISON3_RESULTS", TOWER70_POISON_3, 20260907)).toHaveLength(5);
-  }, 180_000);
-
-  it("V6 回復阻害+毒混合 1000戦×5攻略順", () => {
-    expect(measureScenario("TOWER70_V6_MIXED_RESULTS", TOWER70_MIXED, 20260908)).toHaveLength(5);
-  }, 180_000);
 });
