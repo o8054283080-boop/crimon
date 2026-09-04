@@ -138,6 +138,42 @@ const RUNG = 3.15;
 const TILT_COS = 0.70;
 
 /**
+ * その階の主を大きくする倍率。
+ *
+ * ## なぜ要るか
+ *
+ * 依頼主から「ボスが分かりづらい」と指摘を受けた。実際、名前は
+ * 【BOSS】と付くが**盤面の絵は取り巻きと同じ大きさ**で、
+ * 5体が縦に並ぶ試練の塔と装備ダンジョンでは、どれが主なのか絵から読めない。
+ *
+ * 役割の背丈(`spriteAvatar.ts` の ROLE_HEIGHT)を上げる手もあるが、
+ * あれは図鑑の役割そのもので、**古代ネメシスの役割は「アタッカー」**。
+ * 役割を書き換えると図鑑とAIの当たり方まで変わる。
+ * 見た目だけの話なので、盤面の側で倍率を掛ける。
+ *
+ * ## 1.3 が上限すれすれではない理由 —— 枠(`yTop`)を1mmも動かさずに済む
+ *
+ * **最初は枠も一緒に上げた。それは間違いだった。**
+ * `yTop` を 1.3倍にしたら、カメラが引いて**取り巻きが4.2%小さくなった**
+ * (味方の段の間隔が実測111.7px → 107.0px)。
+ * 主を大きくしたつもりで盤面全体が縮むのでは、意味が逆になる。
+ *
+ * 上げなくてよい。枠の天井は `SPRITE_MAX_HEIGHT / TILT_COS` で、
+ * 見下ろし角ぶん(0.70)の割り戻しが**もともと1.43倍の余裕として入っている。**
+ * いちばん背の高い役割(ボス2.95)を1.3倍しても
+ *
+ *   2.95 × 1.3 × SPRITE_SCALE = 1.99  <  2.95 × SPRITE_SCALE / 0.70 = 2.19
+ *
+ * で天井に届かない。**つまり 1/TILT_COS = 1.428 までなら枠は動かさなくてよい。**
+ * ここを超える値にする時は、枠と取り巻きの大きさを対で測り直すこと
+ * (`tests/bossEmphasis.test.ts` が両者の関係を見張っている)。
+ *
+ * 実測(390×844・試練の塔90階)で、カメラの写す高さは main と同じ 7.5647。
+ * **取り巻きは1pxも縮んでいない。**
+ */
+const BOSS_BODY_SCALE = 1.3;
+
+/**
  * 板の半幅の見込み。
  *
  * 実際の幅は絵の縦横比で決まる。最大は横長のゴーレム(512×420)で、
@@ -232,6 +268,48 @@ function slotPositions(
     const x = side * (laneInner + (i % 2 === 0 ? laneGap : 0));
     return { x, z };
   });
+}
+
+/**
+ * その階の主を、隊列の**真ん中の席**へ入れ替える。
+ *
+ * 返すのは「その並び順の何番目が、どの席に立つか」。
+ * 席そのもの(`slotPositions`)は動かさない。**動かすのは誰がどこに立つかだけ。**
+ *
+ * ## 並びを入れ替えず、席の割り当てだけを入れ替える理由
+ *
+ * `list` の順番は、HPの札・行動順・狙う相手の選択と全部つながっている。
+ * ここで配列そのものを並べ替えると、絵は真ん中に来るのに
+ * **札と行動順だけ元の位置に残る。**入れ替えるのは席だけにする。
+ *
+ * 主が居ない盤面(通常ステージ・アリーナ)では何もしない。
+ */
+function slotOrderWithBossCentered(units: { def: { isBoss?: boolean } }[]): number[] {
+  const order = units.map((_, index) => index);
+  // 3体未満だと「真ん中」が端と同じになる。入れ替える意味が無い
+  if (units.length < 3) return order;
+  const bossIndex = units.findIndex((unit) => unit.def.isBoss);
+  if (bossIndex < 0) return order;
+  const middle = Math.floor(units.length / 2);
+  [order[bossIndex], order[middle]] = [order[middle], order[bossIndex]];
+  return order;
+}
+
+/**
+ * 主の立ち位置。**真ん中の段の、内側の列。**
+ *
+ * ## 段だけ真ん中にして、列を放っておくと画面から切れる
+ *
+ * 段(前後)と列(左右)は `slotPositions` で連動していて、段が偶数番なら外側の列。
+ * 3体の階では真ん中の段がちょうど外側にあたる。そこへ1.3倍の主を置いたら、
+ * **画面の右端から56pxはみ出した**(390px幅・装備ダンジョン1階で実測)。
+ *
+ * 枠(`halfWidth`)を広げて逃げると、今度はカメラが引いて取り巻きが縮む。
+ * 主は大きいのだから、**列は内側に置く**のが素直で、
+ * 依頼の「真ん中に」にも近い。段は真ん中のまま動かさない。
+ */
+function bossStandPosition(slot: { x: number; z: number }, laneInner: number): { x: number; z: number } {
+  return { x: Math.sign(slot.x) * laneInner, z: slot.z };
 }
 
 /**
@@ -395,6 +473,8 @@ export class BattleStage {
     team: "PLAYER" | "ENEMY";
     index: number;
     count: number;
+    /** その階の主。画面比が変わって組み直す時も、内側の列へ置き直すために要る */
+    isBoss: boolean;
   }[] = [];
   /** 最後に隊列を組んだ時の縦長さ。変わっていなければ組み直さない */
   private formationPortrait = -1;
@@ -826,15 +906,20 @@ export class BattleStage {
     const placed: { avatar: BattleAvatar; x: number; z: number; team: "PLAYER" | "ENEMY" }[] = [];
     const place = (list: StageUnitInit[], team: "PLAYER" | "ENEMY") => {
       const slots = slotPositions(list.length, team);
-      list.forEach((unit, index) => {
+      // 主は真ん中の席へ。並び順(札・行動順)は動かさない
+      const order = slotOrderWithBossCentered(list);
+      list.forEach((unit, listIndex) => {
+        const index = order[listIndex];
+        const slot = unit.def.isBoss ? bossStandPosition(slots[index], LANE_INNER) : slots[index];
         const avatar = createBattleAvatar({
           element: unit.def.element,
           role: unit.def.role,
           templateId: unit.def.templateId,
           facing: team === "PLAYER" ? 1 : -1,
+          bodyScale: unit.def.isBoss ? BOSS_BODY_SCALE : 1,
         });
-        avatar.setSlotPosition(slots[index].x, slots[index].z);
-        placed.push({ avatar, x: slots[index].x, z: slots[index].z, team });
+        avatar.setSlotPosition(slot.x, slot.z);
+        placed.push({ avatar, x: slot.x, z: slot.z, team });
         this.scene.add(avatar.root);
         this.avatars.set(unit.instanceId, avatar);
         this.unitElements.set(unit.instanceId, unit.def.element as VfxElement);
@@ -857,7 +942,7 @@ export class BattleStage {
         light.position.set(slots[index].x, 1.5, slots[index].z);
         this.scene.add(light);
         // 画面比が変わったら組み直せるよう、誰がどの列の何番目かを残しておく
-        this.formation.push({ avatar, light, team, index, count: list.length });
+        this.formation.push({ avatar, light, team, index, count: list.length, isBoss: unit.def.isBoss === true });
       });
     };
 
@@ -1101,8 +1186,10 @@ export class BattleStage {
         minZ = Math.min(minZ, slot.z);
       }
       for (const entry of members) {
-        const slot = slots[entry.index + offset];
-        if (!slot) continue;
+        const seat = slots[entry.index + offset];
+        if (!seat) continue;
+        // 主は段だけ真ん中で、列は内側。外側の列に置くと画面の端から切れる
+        const slot = entry.isBoss ? bossStandPosition(seat, laneInner) : seat;
         entry.avatar.setSlotPosition(slot.x, slot.z);
         entry.light.position.set(slot.x, 1.5, slot.z);
         placed.push({ avatar: entry.avatar, x: slot.x, z: slot.z, team });
@@ -1153,6 +1240,13 @@ export class BattleStage {
        * 一番奥の1体の頭が画面上で届く高さは、足元から背丈ぶん。
        * 見下ろし角ぶんを割り戻した高さをここへ入れれば、
        * 枠の角がちょうど頭の位置に来る。
+       *
+       * **大きくした主(`BOSS_BODY_SCALE`)もここに収まるので、動かさない。**
+       * 割り戻しの 1/0.70 = 1.43倍 がそのまま余裕として効いていて、
+       * いちばん背の高い役割を1.3倍しても天井に届かない。
+       *
+       * 一度ここを1.3倍にしてみたが、主の居る戦いだけカメラが引いて
+       * **取り巻きが4.2%縮んだ。**主を大きくしたつもりで盤面が縮むのでは逆効果。
        */
       yTop: SPRITE_MAX_HEIGHT / TILT_COS,
     };

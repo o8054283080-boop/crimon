@@ -89,6 +89,14 @@ export interface MonsterDefinition {
   bossTraits?: BossTraits;
   /** この敵の死亡を勝利条件にする。未指定の戦闘は従来通り敵全滅で勝利する。 */
   victoryTarget?: boolean;
+  /**
+   * その階の主。**見た目にだけ効く。**戦闘の計算には1つも入らない。
+   *
+   * `victoryTarget` とは別に持つ。装備ダンジョンは最終階以外
+   * 「ボスだが倒しただけでは勝ちにならない」ので、勝利条件で見分けると
+   * 9階までの主が普通の敵と同じ大きさのまま並ぶ。
+   */
+  isBoss?: boolean;
   /** 支援AIが単体攻撃バフを優先する主要対象。 */
   primaryTarget?: boolean;
   /** 戦闘開始時点のスキル残りクールタイム。 */

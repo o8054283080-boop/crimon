@@ -164,6 +164,14 @@ export interface MonsterAvatarOptions {
   templateId: string;
   /** PLAYER側は+Z(手前)、ENEMY側は-Z(奥)に立つ */
   facing: 1 | -1;
+  /**
+   * 背丈の倍率。**その階の主だけ大きくするために使う。**
+   *
+   * `finalizeRig` へ渡す目標の背丈ごと掛ける。表示だけを大きくすると、
+   * 当たり判定の箱・足元の影・魔法陣・ダメージ数字の位置が
+   * 元の大きさのまま取り残される。
+   */
+  bodyScale?: number;
 }
 
 /**
@@ -282,7 +290,7 @@ export class MonsterAvatar {
   private readonly facing: 1 | -1;
 
   constructor(options: MonsterAvatarOptions) {
-    const { element, role, templateId, facing } = options;
+    const { element, role, templateId, facing, bodyScale = 1 } = options;
     this.facing = facing;
     this.theme = themeFor(element);
 
@@ -298,7 +306,13 @@ export class MonsterAvatar {
     builder.build(this.kit, this.rig);
     // 役割で組んだ骨格に、種別固有の特徴(翼・光輪・羽根飾りなど)を足す
     applyTemplateTraits(templateId, this.kit, this.rig);
-    finalizeRig(this.rig, this.kit, builder.height, builder.float);
+    /*
+     * 背丈の倍率は**目標の背丈ごと**渡す。ここで畳んでおけば、
+     * 以後 `this.rig.height` から作られるもの(当たり判定・影・魔法陣・
+     * ダメージ数字の位置・オーラ)が全部そろって大きくなる。
+     * 浮かせる高さも一緒に掛けないと、大きくなった体が低く沈む
+     */
+    finalizeRig(this.rig, this.kit, builder.height * bodyScale, builder.float * bodyScale);
     this.uniforms.uHeight.value = this.rig.height;
 
     // 重さは骨組みが確定してから読む(体高も重さの手がかりに使われている)
