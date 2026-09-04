@@ -22,8 +22,8 @@ const atkSkills: [Skill,Skill,Skill] = [
 ];
 const supSkills: [Skill,Skill,Skill] = [
   { id:"cvs1",name:"模造供給",description:"サポート型",target:"SINGLE_ENEMY",cooldownTurns:0,effects:[{kind:"DAMAGE",multiplier:0.75},{kind:"GAUGE",amount:0.10,applyTo:"ALLIES"}] },
-  { id:"cvs2",name:"模造強化",description:"サポート型",target:"ALL_ALLIES",cooldownTurns:3,effects:[{kind:"BUFF",stat:"atk",amount:0.50,durationTurns:2},{kind:"BUFF",stat:"spd",amount:0.30,durationTurns:2},{kind:"SHIELD",hpRatio:0.08,durationTurns:2}] },
-  { id:"cvs3",name:"模造加速",description:"サポート型",target:"ALL_ALLIES",cooldownTurns:4,effects:[{kind:"GAUGE",amount:0.35},{kind:"COOLDOWN_REDUCE",amount:1}] },
+  { id:"cvs2",name:"模造強化",description:"サポート型",target:"ALL_ALLIES",cooldownTurns:3,effects:[{kind:"BUFF",stat:"atk",amount:0.50,durationTurns:2},{kind:"BUFF",stat:"spd",amount:0.30,durationTurns:2},{kind:"SHIELD",shieldRate:0.08,durationTurns:2}] },
+  { id:"cvs3",name:"模造加速",description:"サポート型",target:"ALL_ALLIES",cooldownTurns:4,effects:[{kind:"GAUGE",amount:0.35},{kind:"COOLDOWN_REDUCE",turns:1}] },
 ];
 const debSkills: [Skill,Skill,Skill] = [
   { id:"cvd1",name:"模造侵蝕刃",description:"デバフ型",target:"SINGLE_ENEMY",cooldownTurns:0,effects:[{kind:"DAMAGE",multiplier:0.80},{kind:"DEBUFF",stat:"def",amount:0.50,durationTurns:2,chance:1}] },
