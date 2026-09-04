@@ -161,6 +161,22 @@ export interface TrackedUnit {
    */
   setHpCoefficientFactor(factor: number): void;
   /**
+   * ATK倍率の側を、**元の定義から**この倍率で置き直す(80階の「HP50%未満で×1.5」)。
+   *
+   * `setHpCoefficientFactor` と同じ理由で**累積させない**。
+   * 現在値へ掛け続けると、HPが戻っても倍率が戻らない盤面ができる。
+   */
+  setDamageMultiplierFactor(factor: number): void;
+  /**
+   * 免疫の残りターン。読み書きどちらもできる。
+   *
+   * **書く時は本編の作法に合わせること。**エンジンは `Math.max` で
+   * 上書きするので、短い値を代入しても既にかかっている免疫は縮まない。
+   */
+  immuneTurns: number;
+  /** その状態異常がかかっているか(`"BUFF_BLOCK"` など) */
+  hasStatus(name: string): boolean;
+  /**
    * 手番・クールタイム・行動ゲージを**一切消費せずに**このスキルを撃つ。
    *
    * 中で動くのは本編の `counterWithSkill` そのもので、ダメージも命中も
