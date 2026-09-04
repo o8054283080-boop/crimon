@@ -672,7 +672,7 @@ export class BattleEngine {
 
   private applyTower70BossRegen(boss: BattleUnit): void {
     if (!boss.alive) return;
-    const lifeAlive = this.units.some((unit) => unit.team === "ENEMY" && unit.alive && unit.def.name === "古代の生命晶");
+    const lifeAlive = this.units.some((unit) => unit.team === "ENEMY" && unit.alive && unit.def.skills.some((skill) => skill.id === "tower70_life_s2"));
     const rate = TOWER70_BOSS_REGEN + (lifeAlive ? TOWER70_LIFE_REGEN_BONUS : 0);
     const before = boss.currentHp;
     const healed = applyHeal(boss, Math.round(boss.maxHp * rate));
@@ -721,12 +721,23 @@ export class BattleEngine {
         this.push(`  → ${this.label(target)} に ${applied.hpDamage} ダメージ！ (残りHP ${target.currentHp}/${target.maxHp})`);
         this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
         target.gauge = Math.max(0, target.gauge - TOWER70_ROAR_GAUGE_DOWN * ATB_THRESHOLD);
-        target.effects.push({
-          kind: "DEBUFF",
-          stat: "def",
-          amount: -TOWER70_ROAR_DEF_DOWN,
-          remainingTurns: TOWER70_ROAR_DEF_DOWN_TURNS,
-        });
+        if (target.alive) {
+          const existingDefDown = target.effects.find((effect) =>
+            effect.kind === "DEBUFF"
+            && effect.stat === "def"
+            && effect.amount === -TOWER70_ROAR_DEF_DOWN
+          );
+          if (existingDefDown) {
+            existingDefDown.remainingTurns = Math.max(existingDefDown.remainingTurns, TOWER70_ROAR_DEF_DOWN_TURNS);
+          } else {
+            target.effects.push({
+              kind: "DEBUFF",
+              stat: "def",
+              amount: -TOWER70_ROAR_DEF_DOWN,
+              remainingTurns: TOWER70_ROAR_DEF_DOWN_TURNS,
+            });
+          }
+        }
       }
     }
   }
