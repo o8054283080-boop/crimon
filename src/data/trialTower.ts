@@ -1,6 +1,6 @@
 import { Element } from "../core/element.js";
 import { SkillEffect } from "../core/skill.js";
-import { STAR_MAX_LEVEL, Star, levelMultiplier, starMultiplier } from "../core/rarity.js";
+import { Star, levelMultiplier, starMultiplier } from "../core/rarity.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
 import { ANCIENT_DEMON, findMonster } from "./monsters.js";
 import { TOWER60_ENEMIES } from "./trialTowerFloor60.js";

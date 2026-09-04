@@ -3,6 +3,17 @@ import { MonsterDefinition } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
 import { PassiveLevelEffect } from "../core/passive.js";
 import { EffectApplyTo, EffectCondition, STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
+import {
+  TOWER70_BOSS_REGEN,
+  TOWER70_LIFE_REGEN_BONUS,
+  TOWER70_PULSE_CRUSH_RATIO,
+  TOWER70_ROAR_DEF_DOWN,
+  TOWER70_ROAR_DEF_DOWN_TURNS,
+  TOWER70_ROAR_GAUGE_DOWN,
+  TOWER70_ROAR_HP_COEFFICIENT,
+  TOWER70_ROAR_MULTIPLIER,
+  TOWER70_ROAR_THRESHOLDS,
+} from "../data/trialTowerFloor70.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
 import { calcDamage, evaluateTargetCondition } from "./damage.js";
 import {
@@ -217,6 +228,8 @@ export class BattleEngine {
   private readonly consumedLatents = new Set<string>();
   private readonly trialTowerFloor?: number;
   private trialBossTurns = 0;
+  /** 70階「始祖の咆哮」を既に発動したHP閾値。回復して跨ぎ直しても再発動しない。 */
+  private readonly tower70RoaredThresholds = new Set<number>();
   /** 撃破で得た追加ターン待ちのユニット。手番の直後にまとめて処理する */
   private pendingExtraTurns: BattleUnit[] = [];
   /** 協力攻撃の入れ子の深さ。0でないときは協力攻撃を呼ばない(無限に連鎖するため) */
@@ -486,6 +499,10 @@ export class BattleEngine {
    * 動いただけでゲージが満ちてしまう。
    */
   private onUnitActed(actor: BattleUnit): void {
+    // 70階の再生は「始祖ベヒモス自身が実際に行動した手番の終了時」だけ。
+    // スタンで行動できなかった時や、取り巻きの手番では進めない。
+    if (this.isTower70Boss(actor)) this.applyTower70BossRegen(actor);
+
     const extraTurnChance = Math.max(actor.def.combatMods?.extraTurnChance ?? 0, actor.def.bossTraits?.extraTurnChance ?? 0);
     if (actor.alive && extraTurnChance > 0 && this.rng() < extraTurnChance) {
       this.pendingExtraTurns.push(actor);
@@ -629,12 +646,102 @@ export class BattleEngine {
     return this.units.find((u) => u.team === "ENEMY" && u.def.victoryTarget);
   }
 
+  private isTower70Boss(unit: BattleUnit): boolean {
+    return this.trialTowerFloor === 70 && unit === this.trialBoss();
+  }
+
+  /** 70階のHP帯強化。段階は加算ではなく置き換え。 */
+  private tower70Tier(unit: BattleUnit): { atk: number; spd: number; hpFactor: number } {
+    const ratio = hpRatio(unit);
+    if (ratio <= 0.30) return { atk: 1500, spd: 45, hpFactor: 2.50 };
+    if (ratio <= 0.50) return { atk: 1000, spd: 25, hpFactor: 1.60 };
+    if (ratio <= 0.70) return { atk: 500, spd: 10, hpFactor: 1.30 };
+    return { atk: 0, spd: 0, hpFactor: 1 };
+  }
+
+  private syncTower70BossTier(unit: BattleUnit): void {
+    if (!this.isTower70Boss(unit) || !unit.alive) return;
+    const tier = this.tower70Tier(unit);
+    unit.flatStatBonus.atk = tier.atk;
+    unit.flatStatBonus.spd = tier.spd;
+  }
+
+  private tower70HpCoefficientFactor(unit: BattleUnit): number {
+    return this.isTower70Boss(unit) ? this.tower70Tier(unit).hpFactor : 1;
+  }
+
+  private applyTower70BossRegen(boss: BattleUnit): void {
+    if (!boss.alive) return;
+    const lifeAlive = this.units.some((unit) => unit.team === "ENEMY" && unit.alive && unit.def.name === "古代の生命晶");
+    const rate = TOWER70_BOSS_REGEN + (lifeAlive ? TOWER70_LIFE_REGEN_BONUS : 0);
+    const before = boss.currentHp;
+    const healed = applyHeal(boss, Math.round(boss.maxHp * rate));
+    if (healed > 0) {
+      this.push(`${this.label(boss)} の「不滅の巨獣」でHPが ${healed} 回復！ (${boss.currentHp}/${boss.maxHp})`);
+      this.pushEvent({ targetId: boss.instanceId, kind: "HEAL", amount: healed });
+    } else if (before < boss.maxHp && boss.healBlockTurns > 0) {
+      this.push(`${this.label(boss)} の再生は回復阻害で封じられた！`);
+    }
+    this.syncTower70BossTier(boss);
+  }
+
+  /** 脈動晶S2。通常ダメージではなく、現在HPの実数上位3体をその場で半分にする。 */
+  private applyTower70PulseCrush(): void {
+    const ranked = this.units
+      .map((unit, slot) => ({ unit, slot }))
+      .filter(({ unit }) => unit.team === "PLAYER" && unit.alive)
+      .sort((a, b) => b.unit.currentHp - a.unit.currentHp || a.slot - b.slot)
+      .slice(0, 3);
+    for (const { unit } of ranked) {
+      const before = unit.currentHp;
+      unit.currentHp = Math.max(1, Math.floor(unit.currentHp * TOWER70_PULSE_CRUSH_RATIO));
+      const removed = before - unit.currentHp;
+      this.push(`  → ${this.label(unit)} の命脈が断たれ、現在HPが半減！ (${unit.currentHp}/${unit.maxHp})`);
+      if (removed > 0) this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: removed });
+    }
+  }
+
+  /** 始祖ベヒモスのHPが減った直後に段階更新と75/50/25%咆哮を処理する。 */
+  private afterTower70BossHpChanged(boss: BattleUnit): void {
+    if (!this.isTower70Boss(boss) || !boss.alive) return;
+    this.syncTower70BossTier(boss);
+    for (const threshold of TOWER70_ROAR_THRESHOLDS) {
+      if (hpRatio(boss) > threshold || this.tower70RoaredThresholds.has(threshold)) continue;
+      this.tower70RoaredThresholds.add(threshold);
+      this.push(`${this.label(boss)} の「始祖の咆哮」！`);
+      const targets = this.units.filter((unit) => unit.team === "PLAYER" && unit.alive);
+      for (const target of targets) {
+        const result = calcDamage(boss, target, {
+          kind: "DAMAGE",
+          multiplier: TOWER70_ROAR_MULTIPLIER,
+          hpCoefficient: TOWER70_ROAR_HP_COEFFICIENT,
+        }, this.rng);
+        // 咆哮は割り込み攻撃。通常攻撃への反撃・反射を再帰的に呼ばない。
+        const applied = this.applyIncomingDamage(target, result.damage, boss, "reflect");
+        this.push(`  → ${this.label(target)} に ${applied.hpDamage} ダメージ！ (残りHP ${target.currentHp}/${target.maxHp})`);
+        this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
+        target.gauge = Math.max(0, target.gauge - TOWER70_ROAR_GAUGE_DOWN * ATB_THRESHOLD);
+        target.effects.push({
+          kind: "DEBUFF",
+          stat: "def",
+          amount: -TOWER70_ROAR_DEF_DOWN,
+          remainingTurns: TOWER70_ROAR_DEF_DOWN_TURNS,
+        });
+      }
+    }
+  }
+
   /** 実際に行動できるボスターンだけ発火する。従ってスタン中は70F超再生も進行しない。 */
   private applyTrialBossAction(unit: BattleUnit): void {
     if (!this.trialTowerFloor || unit !== this.trialBoss()) return;
     this.trialBossTurns += 1;
     const ratio = hpRatio(unit);
-    const healing = this.trialTowerFloor === 70 || (this.trialTowerFloor === 100 && ratio >= 0.7);
+    if (this.trialTowerFloor === 70) {
+      // 旧実装の「毎手番72%超再生」は廃止。V7確定仕様は行動終了時3%（生命晶生存中は7%）。
+      this.syncTower70BossTier(unit);
+      return;
+    }
+    const healing = this.trialTowerFloor === 100 && ratio >= 0.7;
     if (healing) {
       const before = unit.currentHp;
       applyHeal(unit, Math.round(unit.maxHp * 0.72));
@@ -684,6 +791,23 @@ export class BattleEngine {
      */
     const charge = index === 0 ? unit.latentChargeBonus : 0;
     let resolvedSkill = this.applyChargeToSkill(latent ? this.applyLatentToSkill(skill, latent) : skill, charge);
+    // 70階はHPが減るほど「HP比例部分だけ」が30%/60%/150%強くなる。
+    // 咆哮はここを通らないので、咆哮の最大HP5%は常に固定。
+    if (this.isTower70Boss(unit)) {
+      this.syncTower70BossTier(unit);
+      const hpFactor = this.tower70HpCoefficientFactor(unit);
+      if (hpFactor !== 1) {
+        resolvedSkill = {
+          ...resolvedSkill,
+          effects: resolvedSkill.effects.map((effect) => effect.kind === "DAMAGE" && effect.hpCoefficient !== undefined
+            ? { ...effect, hpCoefficient: effect.hpCoefficient * hpFactor }
+            : effect),
+        };
+      }
+    }
+    const tower70BossS3AboveHalf = this.isTower70Boss(unit)
+      && skill.id === "tower70_behemoth_s3"
+      && hpRatio(unit) >= 0.5;
     const ignoreChance = Math.max(unit.def.combatMods?.defenseIgnoreChance ?? 0, unit.def.bossTraits?.defenseIgnoreChance ?? 0);
     const ignoreRatio = Math.max(unit.def.combatMods?.defenseIgnoreRatio ?? 0, unit.def.bossTraits?.defenseIgnoreRatio ?? 0);
     if (ignoreChance > 0 && ignoreRatio > 0 && resolvedSkill.effects.some((effect) => effect.kind === "DAMAGE") && this.rng() < ignoreChance) {
@@ -729,6 +853,11 @@ export class BattleEngine {
 
     this.push(`${this.label(unit)} の「${skill.name}」！`);
 
+    if (this.trialTowerFloor === 70 && unit.team === "ENEMY" && skill.id === "tower70_pulse_s2") {
+      this.applyTower70PulseCrush();
+      return;
+    }
+
     // 暗闇がかかっていると、攻撃するたびに外れ判定が入る。
     // 外れた場合はこの手番のあいだ、ダメージが大きく下がり追加効果も乗らない。
     let missed = false;
@@ -755,6 +884,18 @@ export class BattleEngine {
         }) } : resolvedSkill;
       this.applySkillEffects(unit, target, targetSkill, missed, i === 0, latent, resolution);
     });
+
+    if (this.isTower70Boss(unit) && skill.id === "tower70_behemoth_s3") {
+      const removed = cleanseDebuffs(unit);
+      if (removed > 0) this.push(`  → ${this.label(unit)} は自身の弱体効果をすべて解除した！`);
+      if (tower70BossS3AboveHalf) {
+        for (const enemy of this.units.filter((candidate) => candidate.team === "PLAYER" && candidate.alive)) {
+          enemy.gauge = Math.max(0, enemy.gauge - 0.2 * ATB_THRESHOLD);
+        }
+        this.push("  → 天地崩壊で味方全体の行動ゲージが20%後退した！");
+      }
+    }
+
     for (const target of new Set(targets)) {
       if (target.currentHp < (hpBeforeSkill.get(target.instanceId) ?? target.currentHp)) this.tryThresholdHeals(target);
     }
@@ -813,7 +954,7 @@ export class BattleEngine {
         }
         if (this.rollEffectSuccess(source, primary, passive.chance)) {
           primary.healBlockTurns = Math.max(primary.healBlockTurns, 1);
-          primary.healBlockMultiplier = Math.min(primary.healBlockMultiplier, 0.5);
+          primary.healBlockMultiplier = 0;
           this.push(`  → ${this.label(primary)} は治癒阻害を受けた！ (1ターン)`);
           landed = true;
         }
@@ -1087,7 +1228,7 @@ export class BattleEngine {
           receiver.effects.push({ stat, amount: -0.3, remainingTurns: latent.duration, kind: "DEBUFF" });
         } else if (latent.status === "HEAL_BLOCK") {
           receiver.healBlockTurns = Math.max(receiver.healBlockTurns, latent.duration);
-          receiver.healBlockMultiplier = Math.min(receiver.healBlockMultiplier, 0.5);
+          receiver.healBlockMultiplier = 0;
         } else if (latent.status === "BLIND") {
           receiver.blindTurns = Math.max(receiver.blindTurns, latent.duration);
         } else if (latent.status && latent.status in STATUS_EFFECT_CATEGORY) {
@@ -1140,6 +1281,7 @@ export class BattleEngine {
     unit.burnTurns -= 1;
     const burnDamage = Math.max(1, Math.round(getEffectiveStat(unit, "atk")));
     applyDamage(unit, burnDamage);
+    if (this.isTower70Boss(unit)) this.afterTower70BossHpChanged(unit);
     this.push(`  → ${this.label(unit)} は火傷でダメージを受けた！ ${burnDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: burnDamage });
     if (!unit.alive) {
@@ -1171,6 +1313,7 @@ export class BattleEngine {
     }
     const poisonDamage = Math.max(1, Math.round(unit.maxHp * unit.poisonDamageRate * stacks));
     applyDamage(unit, poisonDamage);
+    if (this.isTower70Boss(unit)) this.afterTower70BossHpChanged(unit);
     this.push(`  → ${this.label(unit)} は毒(${stacks}スタック)でダメージを受けた！ ${poisonDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);
     this.pushEvent({ targetId: unit.instanceId, kind: "DAMAGE", amount: poisonDamage });
     this.onPoisonDamage(unit);
@@ -1540,7 +1683,7 @@ export class BattleEngine {
           resolution.debuffApplied = true;
           resolution.applied.add("HEAL_BLOCK");
           // 複数から掛かったら、いちばんきついものが残る
-          target.healBlockMultiplier = Math.min(target.healBlockMultiplier, effect.healMultiplier);
+          target.healBlockMultiplier = 0;
           this.push(
             `  → ${this.label(target)} は治癒阻害を受けた！ (${effect.durationTurns}ターン、回復${Math.round((1 - effect.healMultiplier) * 100)}%減)`,
           );
@@ -1616,6 +1759,7 @@ export class BattleEngine {
     }
 
     const applied = applyDamage(target, incoming);
+    if (this.isTower70Boss(target) && target.alive && applied.hpDamage > 0) this.afterTower70BossHpChanged(target);
     if (applied.invincible) this.push(`  → ${this.label(target)} は無敵でダメージを無効化した！`);
     if (applied.endured) this.push(`  → ${this.label(target)} は我慢でHP1に踏みとどまった！`);
     if (applied.revived) this.push(`  → ${this.label(target)} は最大HPの25%で復活した！`);
