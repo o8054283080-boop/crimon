@@ -6,7 +6,6 @@ permissions:
   contents: write
 jobs:
   fix:
-    if: contains(github.event.head_commit.message, '型エラー修正スクリプト')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
