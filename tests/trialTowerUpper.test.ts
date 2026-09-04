@@ -605,24 +605,40 @@ describe("今回触っていないところ", () => {
     expect(digest(1, 50)).toBe("5cd6d8ab53f376a3");
   });
 
-  it("80/90/100階のボスが変わっていない", () => {
+  it("80/100階のボスが変わっていない", () => {
     /*
-     * **70階はここから外した。**始祖ベヒモスへ作り替えた回(PR #250)で
-     * 意図して変えた階なので、固めるのは下の専用の見張りへ移してある。
-     * 80/90/100階は据え置き——ここが落ちたら、意図せず手が入ったということ。
+     * **70階と90階はここから外した。**どちらも専用ボスへ作り替えた回で
+     * 意図して変えた階なので、固めるのは下の専用の見張りへ移してある
+     * (70階=始祖ベヒモス / 90階=古代ネメシス)。
+     * 80/100階は据え置き——ここが落ちたら、意図せず手が入ったということ。
      */
     expect(digest(80, 80)).toBe("d3ae9c59b9b31e6a");
-    expect(digest(90, 90)).toBe("91790c1c2fbe574e");
     expect(digest(100, 100)).toBe("b329fde94c830368");
   });
 
-  it("80/90/100階は従来どおり古代の魔人+お供2体のまま", () => {
-    for (const floor of [80, 90, 100]) {
+  it("80/100階は従来どおり古代の魔人+お供2体のまま", () => {
+    for (const floor of [80, 100]) {
       const def = findTowerFloor(floor)!;
       expect(def.enemies, `${floor}階`).toHaveLength(3);
       expect(def.enemies[0].templateId).toBe("ancient_demon");
       expect(def.enemies[0].fixedStats, `${floor}階は倍率で組まれたまま`).toBeUndefined();
     }
+  });
+
+  it("90階は古代ネメシス+お供4体で固定されている", () => {
+    /*
+     * 90階も倍率ではなく**実数(`fixedStats`)**で組んである。
+     * ここが `undefined` に戻ったら、階が曲線へ落ちて別物になっている。
+     */
+    const def = findTowerFloor(90)!;
+    expect(def.enemies).toHaveLength(5);
+    expect(def.enemies.map((enemy) => enemy.displayName)).toEqual([
+      "古代ネメシス", "古代の裂晶", "古代の戦鼓晶", "古代の狂牙獣", "古代の縛晶",
+    ]);
+    for (const enemy of def.enemies) expect(enemy.fixedStats, `${enemy.displayName} は実数で組む`).toBeDefined();
+    // 本体を倒せばお供が残っていても勝ち
+    expect(def.enemies[0].victoryTarget).toBe(true);
+    expect(def.enemies.filter((enemy) => enemy.victoryTarget)).toHaveLength(1);
   });
 
   it("70階は始祖ベヒモス+取り巻き2体で固定されている", () => {

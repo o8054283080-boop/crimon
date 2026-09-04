@@ -14,6 +14,28 @@ import {
   TOWER70_ROAR_MULTIPLIER,
   TOWER70_ROAR_THRESHOLDS,
 } from "../data/trialTowerFloor70.js";
+import {
+  TOWER90_EARLY_DAMAGE_FACTOR,
+  TOWER90_ESCORT_DEATH_ATK,
+  TOWER90_ESCORT_DEATH_CRI_DMG,
+  TOWER90_ESCORT_DEATH_CRI_RATE,
+  TOWER90_ESCORT_DEATH_SPD,
+  TOWER90_FANG_EXECUTE_RAGE_MULTIPLIER,
+  TOWER90_FANG_EXECUTE_SKILL_ID,
+  TOWER90_FANG_RAGE_ATK,
+  TOWER90_FANG_RAGE_SPD,
+  TOWER90_RAGE_HP20_ATK,
+  TOWER90_RAGE_HP20_DAMAGE_FACTOR,
+  TOWER90_RAGE_HP20_SPD,
+  TOWER90_RAGE_HP40_ATK,
+  TOWER90_RAGE_HP40_DAMAGE_FACTOR,
+  TOWER90_RAGE_HP40_SPD,
+  TOWER90_RAGE_HP70_ATK,
+  TOWER90_RAGE_HP70_SPD,
+  TOWER90_WAR_DRUM_BOSS_COOLDOWN,
+  TOWER90_WAR_DRUM_BOSS_GAUGE,
+  TOWER90_WAR_DRUM_TEMPO_SKILL_ID,
+} from "../data/trialTowerFloor90.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
 import { calcDamage, evaluateTargetCondition } from "./damage.js";
 import {
@@ -230,6 +252,13 @@ export class BattleEngine {
   private trialBossTurns = 0;
   /** 70階「始祖の咆哮」を既に発動したHP閾値。回復して跨ぎ直しても再発動しない。 */
   private readonly tower70RoaredThresholds = new Set<number>();
+  /**
+   * 90階で一度でも倒れたお供。**戻さない。**
+   * 生存数から引く形にすると、蘇生や再計算で狂化が戻ってしまう。
+   * このエンジン1戦ぶんの記録なので、戦闘をやり直せば白紙から始まる
+   * (= リトライで狂化が二重に乗ることはない)。
+   */
+  private readonly tower90DeadEscortIds = new Set<string>();
   /** 撃破で得た追加ターン待ちのユニット。手番の直後にまとめて処理する */
   private pendingExtraTurns: BattleUnit[] = [];
   /** 協力攻撃の入れ子の深さ。0でないときは協力攻撃を呼ばない(無限に連鎖するため) */
@@ -670,6 +699,107 @@ export class BattleEngine {
     return this.isTower70Boss(unit) ? this.tower70Tier(unit).hpFactor : 1;
   }
 
+  /* ======================================================================
+   * 90階「狂化」。**お供を倒すとボスが強くなる階。**
+   *
+   * ここに書いてあるのは、3スキル枠に収まらない階固有の仕掛けだけ。
+   * ダメージ計算も命中も抵抗もエンジンのまま——独自の計算式は1つも足さない。
+   * **どのメソッドも `trialTowerFloor === 90` で入口を閉じてある。**
+   * =================================================================== */
+
+  private isTower90Boss(unit: BattleUnit): boolean {
+    return this.trialTowerFloor === 90 && unit === this.trialBoss();
+  }
+
+  /** その名前のお供が生きているか。並び順ではなくスキルIDで見分ける */
+  private tower90EscortAlive(skillId: string): boolean {
+    return this.units.some((unit) =>
+      unit.team === "ENEMY" && unit.alive && unit.def.skills.some((skill) => skill.id === skillId));
+  }
+
+  /**
+   * 倒したお供の数。**一度倒れた相手を覚えておく。**
+   *
+   * 生存数から引く形にすると、蘇生や再戦で数が戻った時に狂化も戻ってしまう。
+   * 「1体倒すごとに永久加算」なので、**戻らないこと**が仕様の一部。
+   * 覚えておく場所はエンジンのインスタンスなので、
+   * 戦闘をやり直せば新しいエンジンとともに白紙へ戻る(二重適用しない)。
+   */
+  private tower90CountEscortDeaths(): number {
+    if (this.trialTowerFloor !== 90) return 0;
+    for (const unit of this.units) {
+      if (unit.team !== "ENEMY" || unit.alive || unit.def.victoryTarget) continue;
+      this.tower90DeadEscortIds.add(unit.instanceId);
+    }
+    return this.tower90DeadEscortIds.size;
+  }
+
+  /**
+   * ボスの狂化を張り直す。**HP帯とお供死亡は別枠で、同時に効く。**
+   * HP帯は加算式(70%以下 +1,000 / 40%以下 さらに +2,000 / 20%以下 さらに +2,000)。
+   */
+  private syncTower90Boss(unit: BattleUnit): void {
+    if (!this.isTower90Boss(unit) || !unit.alive) return;
+    const ratio = hpRatio(unit);
+    let atk = 0;
+    let spd = 0;
+    if (ratio <= 0.70) { atk += TOWER90_RAGE_HP70_ATK; spd += TOWER90_RAGE_HP70_SPD; }
+    if (ratio <= 0.40) { atk += TOWER90_RAGE_HP40_ATK; spd += TOWER90_RAGE_HP40_SPD; }
+    if (ratio <= 0.20) { atk += TOWER90_RAGE_HP20_ATK; spd += TOWER90_RAGE_HP20_SPD; }
+
+    const kills = this.tower90CountEscortDeaths();
+    unit.flatStatBonus.atk = atk + kills * TOWER90_ESCORT_DEATH_ATK;
+    unit.flatStatBonus.spd = spd + kills * TOWER90_ESCORT_DEATH_SPD;
+    unit.flatStatBonus.criRate = kills * TOWER90_ESCORT_DEATH_CRI_RATE;
+    unit.flatStatBonus.criDmg = kills * TOWER90_ESCORT_DEATH_CRI_DMG;
+  }
+
+  /**
+   * ボスの与ダメージ倍率。**段階式で、掛け算では積まない。**
+   * 40%以下は×1.25、20%以下は×1.5(1.25×1.5=1.875 にはしない)。
+   * 40%より上の×0.90は序盤の抑制で、これが無いと判断する前に押し切られる。
+   */
+  private tower90BossDamageFactor(unit: BattleUnit): number {
+    if (!this.isTower90Boss(unit)) return 1;
+    const ratio = hpRatio(unit);
+    if (ratio <= 0.20) return TOWER90_RAGE_HP20_DAMAGE_FACTOR;
+    if (ratio <= 0.40) return TOWER90_RAGE_HP40_DAMAGE_FACTOR;
+    return TOWER90_EARLY_DAMAGE_FACTOR;
+  }
+
+  /** 戦鼓晶が倒れた後、狂牙獣が生きている間だけ乗る強化 */
+  private syncTower90Fang(): void {
+    if (this.trialTowerFloor !== 90) return;
+    const fang = this.units.find((unit) =>
+      unit.team === "ENEMY" && unit.def.skills.some((skill) => skill.id === TOWER90_FANG_EXECUTE_SKILL_ID));
+    if (!fang) return;
+    const enraged = fang.alive && !this.tower90EscortAlive(TOWER90_WAR_DRUM_TEMPO_SKILL_ID);
+    fang.flatStatBonus.atk = enraged ? TOWER90_FANG_RAGE_ATK : 0;
+    fang.flatStatBonus.spd = enraged ? TOWER90_FANG_RAGE_SPD : 0;
+  }
+
+  /** 戦鼓晶が倒れていて狂牙獣が生きているか(処刑突撃だけを2.9倍にする条件) */
+  private isTower90FangEnraged(unit: BattleUnit): boolean {
+    if (this.trialTowerFloor !== 90 || !unit.alive) return false;
+    if (!unit.def.skills.some((skill) => skill.id === TOWER90_FANG_EXECUTE_SKILL_ID)) return false;
+    return !this.tower90EscortAlive(TOWER90_WAR_DRUM_TEMPO_SKILL_ID);
+  }
+
+  /**
+   * 戦鼓晶S3「血戦共鳴」の、**ボスにだけ渡すぶん。**
+   * 全体へのゲージ30%はスキル定義の側が配る。ここはボス限定の上乗せで、
+   * お供へCT短縮を配ってしまうと縛晶の妨害まで回転が上がって別物の階になる。
+   */
+  private applyTower90WarDrumTempo(): void {
+    const boss = this.trialBoss();
+    if (!boss || !boss.alive) return;
+    boss.gauge = Math.min(ATB_THRESHOLD, boss.gauge + TOWER90_WAR_DRUM_BOSS_GAUGE * ATB_THRESHOLD);
+    for (let i = 0; i < boss.cooldowns.length; i += 1) {
+      boss.cooldowns[i] = Math.max(0, boss.cooldowns[i] - TOWER90_WAR_DRUM_BOSS_COOLDOWN);
+    }
+    this.push(`  → ${this.label(boss)} は血戦共鳴で行動ゲージとスキルの回転を得た！`);
+  }
+
   private applyTower70BossRegen(boss: BattleUnit): void {
     if (!boss.alive) return;
     const lifeAlive = this.units.some((unit) => unit.team === "ENEMY" && unit.alive && unit.def.skills.some((skill) => skill.id === "tower70_life_s2"));
@@ -766,8 +896,16 @@ export class BattleEngine {
       unit.immuneTurns = Math.max(unit.immuneTurns, 3);
       this.push(`${this.label(unit)} は状態異常免疫を展開した！`);
     }
-    const enrage = (this.trialTowerFloor === 90 && this.trialBossTurns === 8)
-      || (this.trialTowerFloor === 100 && ratio < 0.4 && !unit.effects.some((e) => e.remainingTurns === 999));
+    if (this.trialTowerFloor === 90) {
+      /*
+       * **旧実装の「8手番目にATK+200%/SPD+100%」は廃止。**
+       * V7の狂化はHP帯とお供の死亡で決まるので、手番数では動かさない。
+       */
+      this.syncTower90Boss(unit);
+      this.syncTower90Fang();
+      return;
+    }
+    const enrage = this.trialTowerFloor === 100 && ratio < 0.4 && !unit.effects.some((e) => e.remainingTurns === 999);
     if (enrage) {
       unit.effects.push({ kind: "BUFF", stat: "atk", amount: 2, remainingTurns: 999 });
       unit.effects.push({ kind: "BUFF", stat: "spd", amount: 1, remainingTurns: 999 });
@@ -816,6 +954,35 @@ export class BattleEngine {
             : effect),
         };
       }
+    }
+    /*
+     * 90階。**ボスは与ダメージの倍率そのものが動く。**
+     * HP40%より上は×0.90(序盤の抑制)、40%以下は×1.25、20%以下は×1.5。
+     * 段階式なので 1.25×1.5 にはならない。
+     */
+    if (this.isTower90Boss(unit)) {
+      this.syncTower90Boss(unit);
+      const factor = this.tower90BossDamageFactor(unit);
+      if (factor !== 1) {
+        resolvedSkill = {
+          ...resolvedSkill,
+          effects: resolvedSkill.effects.map((effect) => effect.kind === "DAMAGE"
+            ? { ...effect, multiplier: effect.multiplier * factor }
+            : effect),
+        };
+      }
+    }
+    /*
+     * 狂牙獣の処刑突撃だけ 2.6 → 2.9 倍。**S1・S2は据え置く。**
+     * 全部を底上げすると「瀕死を刈る役」ではなくただの高火力役になる。
+     */
+    if (skill.id === TOWER90_FANG_EXECUTE_SKILL_ID && this.isTower90FangEnraged(unit)) {
+      resolvedSkill = {
+        ...resolvedSkill,
+        effects: resolvedSkill.effects.map((effect) => effect.kind === "DAMAGE"
+          ? { ...effect, multiplier: TOWER90_FANG_EXECUTE_RAGE_MULTIPLIER }
+          : effect),
+      };
     }
     const tower70BossS3AboveHalf = this.isTower70Boss(unit)
       && skill.id === "tower70_behemoth_s3"
@@ -869,6 +1036,10 @@ export class BattleEngine {
       this.applyTower70PulseCrush();
       return;
     }
+    // 90階の戦鼓晶S3。全体ゲージ30%はスキル定義が配り、ここはボス限定の上乗せ
+    const tower90WarDrumTempo = this.trialTowerFloor === 90
+      && unit.team === "ENEMY"
+      && skill.id === TOWER90_WAR_DRUM_TEMPO_SKILL_ID;
 
     // 暗闇がかかっていると、攻撃するたびに外れ判定が入る。
     // 外れた場合はこの手番のあいだ、ダメージが大きく下がり追加効果も乗らない。
@@ -917,6 +1088,8 @@ export class BattleEngine {
     // 攻撃スキルに乗るパッシブは、対象を全部処理してから1度だけ判定する
     if (!missed) this.applyAttackPassives(unit, targets, resolution);
     if (latent && !missed) this.applyLatentAfterSkill(unit, targets[0], latent, resolution);
+    // 90階の戦鼓晶S3。全体ゲージを配り終えた後で、ボスにだけ上乗せする
+    if (tower90WarDrumTempo) this.applyTower90WarDrumTempo();
     this.applyCoopAttack(unit, resolvedSkill, targets[0]);
     this.resolution = previousResolution;
   }
@@ -1627,12 +1800,27 @@ export class BattleEngine {
 
         case "MITIGATE": {
           const receivers = this.receiversFor(source, target, effect.applyTo);
+          /*
+           * **負の `amount` は「脆弱」**(被ダメージ増加)。
+           * `damageTakenMultiplier` が `1 - reduction` で解くので、
+           * -0.4 が入れば 1.4倍になる——が、両方を `Math.max` で丸めると
+           * `Math.max(0, -0.4)` で**脆弱が何も起きないまま素通り**する。
+           * 向きごとに「より強い方を残す」形へ分ける。
+           *
+           * 正の側は従来のまま。図鑑にも塔にも**負の MITIGATE は1件も無い**ので、
+           * ここまでの軽減の挙動は1つも変わらない(90階の脆弱刻印が最初の1件)。
+           */
+          const weaken = effect.amount < 0;
           for (const receiver of receivers) {
             if (!receiver.alive) continue;
-            receiver.mitigateAmount = Math.max(receiver.mitigateAmount, effect.amount);
+            receiver.mitigateAmount = weaken
+              ? Math.min(receiver.mitigateAmount, effect.amount)
+              : Math.max(receiver.mitigateAmount, effect.amount);
             receiver.mitigateVsTaunted = Math.max(receiver.mitigateVsTaunted, effect.vsTauntedExtra ?? 0);
             receiver.mitigateTurns = Math.max(receiver.mitigateTurns, effect.durationTurns);
-            this.push(`  → ${this.label(receiver)} は受けるダメージが軽減された！ (${effect.durationTurns}ターン)`);
+            this.push(weaken
+              ? `  → ${this.label(receiver)} は受けるダメージが ${Math.round(-effect.amount * 100)}% 増加した！ (${effect.durationTurns}ターン)`
+              : `  → ${this.label(receiver)} は受けるダメージが軽減された！ (${effect.durationTurns}ターン)`);
           }
           break;
         }

@@ -52,13 +52,21 @@ describe("100F試練の塔統合", () => {
     expect(enemy.currentHp).toBe(stunnedHp);
   });
 
-  it("90Fは8回目の実行可能なボスターンで永続狂化する", () => {
+  it("**90Fの狂化は手番数では起きない**(V7でHP帯とお供死亡へ置き換えた)", () => {
+    /*
+     * 旧実装は「8回目のボス手番でATK+200%/SPD+100%」だった。
+     * V7の狂化はHP割合と倒したお供の数で決まるので、
+     * **手番を何回重ねても、HPが減っていなければ何も起きない**。
+     * 詳しい狂化の中身は `tests/trialTowerFloor90.test.ts` が見張る。
+     */
     const player = findMonster("wolf", "FIRE")!;
     const boss = { ...findMonster("ancient_demon", "FIRE")!, victoryTarget: true };
     const engine = new BattleEngine([player], [boss], { trialTowerFloor: 90 });
     const enemy = engine.getUnits()[1];
-    for (let i = 0; i < 8; i++) (engine as any).applyTrialBossAction(enemy);
-    expect(enemy.effects.some((e) => e.stat === "atk" && e.remainingTurns === 999)).toBe(true);
-    expect(enemy.effects.some((e) => e.stat === "spd" && e.remainingTurns === 999)).toBe(true);
+    for (let i = 0; i < 12; i++) (engine as any).applyTrialBossAction(enemy);
+    expect(enemy.effects.some((e) => e.remainingTurns === 999)).toBe(false);
+    // HPが満タンのままなので、実数加算も乗らない
+    expect(enemy.flatStatBonus.atk ?? 0).toBe(0);
+    expect(enemy.flatStatBonus.spd ?? 0).toBe(0);
   });
 });
