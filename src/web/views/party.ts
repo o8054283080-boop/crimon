@@ -3,10 +3,13 @@ import { MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
 import { MonsterFilter, filterMonsters } from "../monsterFilter.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
+import { createIncrementalGrid } from "../incrementalGrid.js";
+import { withPortrait } from "../three/portrait.js";
 import { renderMonsterSortRow } from "./monsters.js";
 import { renderMonsterFilterBar } from "./monsterFilterBar.js";
-import { partyMemberCard, renderPartySlots } from "./partyCard.js";
+import { partyMemberCard } from "./partyCard.js";
 import { findMonsterById } from "../../data/monsters.js";
+import "../ui/party.css";
 
 export type PartyEditMode = "NORMAL" | "DUNGEON" | "TOWER";
 
@@ -40,19 +43,11 @@ export interface PartyProps {
 
 const MAX_PARTY_SIZE = 4;
 
-/**
- * 編成の枠は3つある。**同じ編成を使い回せない**のは意図したもので、
- * 場所ごとに組み替えるのがこのゲームの考える所そのものだから。
- *
- * 札のラベルは短く保つこと。縦画面(390px)に3つ並ぶので、
- * 説明を足すと文字が切れて、切れた文字はあるだけ無駄になる。
- */
 interface ModeSpec {
   mode: PartyEditMode;
   label: string;
   iconName: Parameters<typeof icon>[0] | null;
   maxSize: number;
-  /** その枠でしか成り立たない決まりごと。操作の説明は書かない */
   note: string | null;
 }
 
@@ -79,6 +74,7 @@ export function renderParty(props: PartyProps): HTMLElement {
   const spec = MODE_SPECS.find((s) => s.mode === mode) ?? MODE_SPECS[0];
   const activeIds =
     mode === "DUNGEON" ? player.dungeonPartyIds : mode === "TOWER" ? player.towerPartyIds : player.partyIds;
+  const activeIdSet = new Set(activeIds);
   const maxSize = spec.maxSize;
   const onToggle =
     mode === "DUNGEON"
@@ -90,28 +86,104 @@ export function renderParty(props: PartyProps): HTMLElement {
     .map((id) => player.monsters.find((m) => m.id === id))
     .filter((m): m is NonNullable<typeof m> => m !== undefined);
 
-  // 編成画面では「いま編成しているかどうか」が最優先なので、
-  // おすすめ順・絞り込みの基準を表示中の編成(通常/ダンジョン)に合わせる
   const context = { partyIds: activeIds };
   const shown = filterMonsters(player.monsters, props.filter, context);
   const sortedMonsters = sortMonsters(shown, props.sortKey, context);
-  const cards = sortedMonsters.map((instance) =>
-    partyMemberCard(
-      instance,
-      activeIds.includes(instance.id),
-      () => props.selectedSlot === null ? onToggle(instance.id) : props.onChooseMonster(instance.id),
-      () => props.onViewDetail(instance.id),
-    ),
+  // 編成中の個体は一覧の先頭へまとめる。明示した並び順は各グループ内でそのまま保つ。
+  const orderedMonsters = [
+    ...sortedMonsters.filter((monster) => activeIdSet.has(monster.id)),
+    ...sortedMonsters.filter((monster) => !activeIdSet.has(monster.id)),
+  ];
+
+  const rosterGrid = createIncrementalGrid({
+    className: "monster-grid party-monster-grid",
+    items: orderedMonsters,
+    renderItem: (instance) =>
+      partyMemberCard(
+        instance,
+        activeIdSet.has(instance.id),
+        () => {
+          if (props.selectedSlot !== null) {
+            props.onChooseMonster(instance.id);
+            return;
+          }
+          const activeIndex = activeIds.indexOf(instance.id);
+          // 編成中カードのタップで即解除しない。まずその枠を交換対象にする。
+          if (activeIndex >= 0) {
+            props.onSelectSlot(activeIndex);
+            return;
+          }
+          // 空きがある時の追加は従来どおり1タップで行える。
+          onToggle(instance.id);
+        },
+        () => props.onViewDetail(instance.id),
+      ),
+    moreLabel: (rendered, total) => `さらに表示（${rendered} / ${total}）`,
+  });
+
+  const selectedMember = props.selectedSlot === null ? undefined : activeMembers[props.selectedSlot];
+  const selectedDex = selectedMember ? findMonsterById(selectedMember.dexId) : undefined;
+
+  const partySlots = el(
+    "div",
+    { className: "party-edit-slots", style: `grid-template-columns: repeat(${maxSize}, minmax(0, 1fr))` },
+    Array.from({ length: maxSize }, (_, index) => {
+      const member = activeMembers[index];
+      const dex = member ? findMonsterById(member.dexId) : undefined;
+      const selected = props.selectedSlot === index;
+      const slotClass = `party-edit-slot${member ? " is-filled" : " is-empty"}${selected ? " is-selected" : ""}`;
+      const selectButton = el(
+        "button",
+        {
+          type: "button",
+          className: "party-edit-slot__select",
+          onclick: () => props.onSelectSlot(index),
+          "aria-pressed": selected ? "true" : "false",
+          title: member ? `${dex?.name ?? member.dexId}を交換` : `${index + 1}枠目に追加`,
+        },
+        member
+          ? [
+              withPortrait(el("span", { className: "party-edit-slot__portrait" }, [dex?.emoji ?? "❓"]), dex, "fill"),
+              el("span", { className: "party-edit-slot__name" }, [dex?.name ?? member.dexId]),
+              el("span", { className: "party-edit-slot__meta" }, [`★${member.star} · Lv${member.level}`]),
+              el("span", { className: "party-edit-slot__action" }, [selected ? "選択中" : "交換"]),
+            ]
+          : [
+              el("span", { className: "party-edit-slot__empty-mark", "aria-hidden": "true" }, ["＋"]),
+              el("span", { className: "party-edit-slot__name" }, [`枠${index + 1}`]),
+              el("span", { className: "party-edit-slot__action" }, [selected ? "選択中" : "追加"]),
+            ],
+      );
+
+      return el("div", { className: slotClass }, [
+        selectButton,
+        member
+          ? el(
+              "button",
+              {
+                type: "button",
+                className: "party-edit-slot__remove",
+                title: `${dex?.name ?? member.dexId}を編成から外す`,
+                "aria-label": `${dex?.name ?? member.dexId}を編成から外す`,
+                onclick: () => onToggle(member.id),
+              },
+              ["×"],
+            )
+          : null,
+      ].filter(Boolean) as HTMLElement[]);
+    }),
   );
 
   return el("div", { className: "screen party-screen" }, [
     el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["パーティ編成"]),
-      props.onComplete ? el("button", { type: "button", className: "btn btn--ghost", onclick: props.onComplete }, [`← ${props.returnLabel ?? "戻る"}`]) : el("span", { className: "head-note" }, [`${activeIds.length} / ${maxSize}`]),
+      props.onComplete
+        ? el("button", { type: "button", className: "btn btn--ghost", onclick: props.onComplete }, [`← ${props.returnLabel ?? "戻る"}`])
+        : el("span", { className: "head-note" }, [`${activeIds.length} / ${maxSize}`]),
     ]),
     el(
       "section",
-      { className: "panel mode-toggle" },
+      { className: "panel mode-toggle party-mode-toggle" },
       MODE_SPECS.map((s) =>
         el(
           "button",
@@ -127,13 +199,17 @@ export function renderParty(props: PartyProps): HTMLElement {
     el("section", { className: "panel party-current" }, [
       el("div", { className: "party-current__head" }, [
         el("strong", {}, ["現在のパーティ"]),
-        el("span", {}, [props.selectedSlot === null ? "交換する枠をタップ" : `枠${props.selectedSlot + 1}の交換相手を選択`]),
+        el("span", {}, [props.selectedSlot === null ? "交換する枠を選択" : `枠${props.selectedSlot + 1}を選択中`]),
       ]),
-      // 枠そのものを外すボタンにする。入れ替えのたびに一覧から本人を探し直さない
-      el("div", { className: "party-swap-slots" }, Array.from({ length: maxSize }, (_, index) => {
-        const member = activeMembers[index];
-        return el("button", { type: "button", className: `party-swap-slot${props.selectedSlot === index ? " is-selected" : ""}`, onclick: () => props.onSelectSlot(index) }, [member ? (findMonsterById(member.dexId)?.name ?? member.dexId) : "＋ 空き枠", el("small", {}, [member ? "交換する" : "追加する"])]);
-      })),
+      partySlots,
+      props.selectedSlot !== null
+        ? el("div", { className: "party-selection-guide", role: "status" }, [
+            el("span", { className: "party-selection-guide__label" }, [
+              selectedMember ? `${selectedDex?.name ?? selectedMember.dexId}を交換` : `空き枠${props.selectedSlot + 1}に追加`,
+            ]),
+            el("strong", {}, ["↓ 下のモンスターを選択"]),
+          ])
+        : null,
       props.notice ? el("p", { className: "party-notice" }, [props.notice]) : null,
       el("div", { className: "party-actions" }, [
         el(
@@ -150,21 +226,20 @@ export function renderParty(props: PartyProps): HTMLElement {
           "button",
           {
             type: "button",
-            className: "btn btn--ghost party-actions__btn",
+            className: "btn btn--ghost party-actions__btn party-actions__clear",
             disabled: activeIds.length === 0,
             onclick: props.onClearParty,
           },
           ["全部外す"],
         ),
       ]),
-      // **操作の説明文は置かない。**「枠を押すと外れます。一覧はタップで編成、
-      // 長押しで詳細。」と書かないと使えないなら、その操作は見つかっていない。
-      // 枠には✕、カードには詳細の丸ボタンを出して、見れば分かる形にした。
-      // ここに残すのは、操作ではなく**知りようのない決まりごと**だけ
       spec.note ? el("p", { className: "app-subtitle" }, [spec.note]) : null,
     ].filter(Boolean) as HTMLElement[]),
     el("section", { className: "panel party-roster" }, [
-      el("h2", { className: "party-roster__title" }, ["所持モンスター"]),
+      el("div", { className: "party-roster__head" }, [
+        el("h2", { className: "party-roster__title" }, ["所持モンスター"]),
+        el("span", { className: "party-roster__count" }, [`${shown.length}体`]),
+      ]),
       player.monsters.length === 0
         ? el("p", { className: "app-subtitle" }, ["モンスターを所持していません。召喚してみましょう。"])
         : el("div", {}, [
@@ -177,9 +252,12 @@ export function renderParty(props: PartyProps): HTMLElement {
               onChange: props.onChangeFilter,
             }),
             renderMonsterSortRow(props.sortKey, props.onChangeSort),
-            cards.length === 0
+            props.selectedSlot !== null
+              ? el("p", { className: "party-roster__instruction" }, [`枠${props.selectedSlot + 1}の交換相手を選んでください`])
+              : el("p", { className: "party-roster__instruction is-muted" }, ["編成中のモンスターは先頭に表示されます"]),
+            orderedMonsters.length === 0
               ? el("p", { className: "app-subtitle" }, ["条件に当てはまるモンスターがいません。絞り込みを緩めてください。"])
-              : el("div", { className: "monster-grid" }, cards),
+              : rosterGrid.element,
           ]),
     ]),
   ]);

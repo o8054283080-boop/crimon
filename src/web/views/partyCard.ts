@@ -7,7 +7,7 @@ import { el } from "../dom.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import { withPortrait } from "../three/portrait.js";
 
-/** パーティ編成画面用のモンスターカード。編成中(selected)の場合は「✅ 編成中」バッジを表示する */
+/** パーティ編成画面用のモンスターカード。編成中(selected)の場合は「編成中」バッジを表示する */
 export function partyMemberCard(
   instance: MonsterInstance,
   selected: boolean,
@@ -16,6 +16,7 @@ export function partyMemberCard(
 ): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   return buildMonsterCard(dex, instance.dexId, onClick, {
+    compact: true,
     selected,
     onLongPress,
     star: instance.star,
@@ -62,18 +63,14 @@ export function renderPartySlots(
     ].filter((n): n is HTMLElement => n !== null);
 
     if (!onRemove) {
-      return el("div", { className: "party-slot", // 色をそのまま背景に流し込むと、属性色で面が塗り潰されて色札の列になる。
-      // 変数として渡し、暗さと縁の作りはCSS側に任せる
-      style: dex ? `--elem:${dex.color}` : undefined }, children);
+      return el("div", { className: "party-slot", style: dex ? `--elem:${dex.color}` : undefined }, children);
     }
     return el(
       "button",
       {
         type: "button",
         className: "party-slot party-slot--removable",
-        // 色をそのまま背景に流し込むと、属性色で面が塗り潰されて色札の列になる。
-      // 変数として渡し、暗さと縁の作りはCSS側に任せる
-      style: dex ? `--elem:${dex.color}` : undefined,
+        style: dex ? `--elem:${dex.color}` : undefined,
         title: `${dex ? dex.name : instance.dexId}を編成から外す`,
         onclick: () => onRemove(instance.id),
       },
