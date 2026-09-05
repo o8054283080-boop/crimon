@@ -19,15 +19,17 @@ export interface AudioSettings {
 }
 
 const STORAGE_KEY = "crimon.audio.v1";
+const VOLUME_MIGRATION_KEY = "crimon.audio.volume-defaults.v2";
 
 /**
- * 既定値。BGMは効果音より一段低くしてある。
- * 戦闘で何が起きたかを伝えるのは効果音の役目で、BGMはその下に敷く空気だから。
+ * 既定値。
+ * iPhoneのスピーカーでは従来の80%/90%がかなり大きく感じられたため、
+ * 初回から無理なく遊べる音量へ引き下げる。必要なら設定画面から上げられる。
  */
 export const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
-  masterVolume: 0.8,
+  masterVolume: 0.5,
   bgmVolume: 0.38,
-  sfxVolume: 0.9,
+  sfxVolume: 0.6,
   bgmEnabled: true,
   sfxEnabled: true,
 };
@@ -43,10 +45,24 @@ function readStorage(): AudioSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_AUDIO_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<AudioSettings>;
+
+    let masterVolume = clamp01(parsed.masterVolume, DEFAULT_AUDIO_SETTINGS.masterVolume);
+    let sfxVolume = clamp01(parsed.sfxVolume, DEFAULT_AUDIO_SETTINGS.sfxVolume);
+
+    // 旧既定値(80% / 90%)をそのまま使っていた既存ユーザーだけ一度だけ新既定値へ移行する。
+    // 手動で別の値へ調整済みのユーザー設定は上書きしない。
+    if (!localStorage.getItem(VOLUME_MIGRATION_KEY)) {
+      if (masterVolume === 0.8 && sfxVolume === 0.9) {
+        masterVolume = DEFAULT_AUDIO_SETTINGS.masterVolume;
+        sfxVolume = DEFAULT_AUDIO_SETTINGS.sfxVolume;
+      }
+      localStorage.setItem(VOLUME_MIGRATION_KEY, "1");
+    }
+
     return {
-      masterVolume: clamp01(parsed.masterVolume, DEFAULT_AUDIO_SETTINGS.masterVolume),
+      masterVolume,
       bgmVolume: clamp01(parsed.bgmVolume, DEFAULT_AUDIO_SETTINGS.bgmVolume),
-      sfxVolume: clamp01(parsed.sfxVolume, DEFAULT_AUDIO_SETTINGS.sfxVolume),
+      sfxVolume,
       bgmEnabled: parsed.bgmEnabled !== false,
       sfxEnabled: parsed.sfxEnabled !== false,
     };
