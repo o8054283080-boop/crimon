@@ -24,6 +24,7 @@ import { stickyActions } from "./stickyActions.js";
 import { computeLeveledSkill, describeSkillLines, MAX_SKILL_LEVEL } from "../../core/skill.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import "../ui/monsterDetail.css";
+import { renderMonsterListDensityToggle } from "../monsterListDensity.js";
 
 export interface MonstersProps {
   player: PlayerState;
@@ -47,16 +48,19 @@ export interface MonstersProps {
   filterOpen: boolean;
   onChangeFilter: (filter: MonsterFilter) => void;
   onToggleFilterOpen: () => void;
+  dense: boolean;
+  onToggleDense: () => void;
 }
 
 export function monsterCard(
   instance: MonsterInstance,
   onClick: () => void,
-  extra?: { compact?: boolean; selected?: boolean; disabled?: boolean; bonus?: boolean; onLongPress?: () => void; badge?: string },
+  extra?: { compact?: boolean; dense?: boolean; selected?: boolean; disabled?: boolean; bonus?: boolean; onLongPress?: () => void; badge?: string },
 ): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   return buildMonsterCard(dex, instance.dexId, onClick, {
     compact: extra?.compact,
+    dense: extra?.dense,
     selected: extra?.selected,
     disabled: extra?.disabled,
     bonus: extra?.bonus,
@@ -64,10 +68,10 @@ export function monsterCard(
     onDetail: extra?.onLongPress,
     star: instance.star,
     level: instance.level,
-    maxLevel: extra?.compact ? undefined : STAR_MAX_LEVEL[instance.star],
-    power: extra?.compact ? undefined : monsterPower(instance),
-    gearCount: extra?.compact ? undefined : equippedCount(instance),
-    gearTotal: extra?.compact ? undefined : GEAR_SLOT_TOTAL,
+    maxLevel: extra?.compact || extra?.dense ? undefined : STAR_MAX_LEVEL[instance.star],
+    power: extra?.compact || extra?.dense ? undefined : monsterPower(instance),
+    gearCount: extra?.compact || extra?.dense ? undefined : equippedCount(instance),
+    gearTotal: extra?.compact || extra?.dense ? undefined : GEAR_SLOT_TOTAL,
     badge: extra?.badge,
     badgeCorner: extra?.badge !== undefined,
     created: instance.createdSkill !== undefined,
@@ -89,11 +93,12 @@ function renderList(props: MonstersProps): HTMLElement {
   const shown = filterMonsters(props.player.monsters, props.filter, context);
   const sortedMonsters = sortMonsters(shown, props.sortKey, context);
   const monsterGrid = createIncrementalGrid({
-    className: "monster-grid",
+    className: `monster-grid${props.dense ? " monster-grid--dense" : ""}`,
     items: sortedMonsters,
     renderItem: (instance) => {
       const card = monsterCard(instance, () => props.onSelectDetail(instance.id), {
         compact: true,
+        dense: props.dense,
         badge: props.player.partyIds.includes(instance.id) ? "編成中" : undefined,
       });
       card.classList.toggle("monster-list-card--locked", instance.locked === true);
@@ -117,7 +122,10 @@ function renderList(props: MonstersProps): HTMLElement {
         onToggleOpen: props.onToggleFilterOpen,
         onChange: props.onChangeFilter,
       }),
-      renderMonsterSortRow(props.sortKey, props.onChangeSort),
+      el("div", { className: "monster-list-toolbar" }, [
+        renderMonsterSortRow(props.sortKey, props.onChangeSort),
+        renderMonsterListDensityToggle(props.dense, props.onToggleDense),
+      ]),
       sortedMonsters.length === 0
         ? el("p", { className: "app-subtitle" }, ["条件に当てはまるモンスターがいません。絞り込みを緩めてください。"])
         : monsterGrid.element,
@@ -362,11 +370,12 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     rankUpMaterialSort,
   );
   const grid = createIncrementalGrid({
-    className: "monster-grid",
+    className: `monster-grid${props.dense ? " monster-grid--dense" : ""}`,
     items: buildItems(),
     renderItem: (candidate) => monsterCard(candidate, () => props.onToggleSacrifice(candidate.id), {
       selected: props.selectedSacrificeIds.includes(candidate.id),
       bonus: isSameSpecies(target, candidate),
+      dense: props.dense,
       onLongPress: () => props.onSelectDetail(candidate.id),
     }),
     moreLabel: (shown, total) => `素材をさらに表示（${shown} / ${total}）`,
@@ -448,6 +457,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       ]),
     ]),
     el("section", { className: "panel" }, [
+      el("div", { className: "monster-density-row" }, [renderMonsterListDensityToggle(props.dense, props.onToggleDense)]),
       el("div", { className: "mfilter__group" }, [
         el("span", { className: "mfilter__label" }, ["属性"]),
         el("div", { className: "mfilter__chips" }, elementButtons),
@@ -464,24 +474,23 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
         el("span", { className: "mfilter__label" }, ["素材"]),
         el("div", { className: "mfilter__chips" }, [normalSortButton, reincarnationSortButton]),
       ]),
+      stickyActions({
+        status: check.ok
+          ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
+          : check.reason ?? `あと ${Math.max(0, requiredCount - props.selectedSacrificeIds.length)} 体選んでください`,
+        primary: el("button", {
+          type: "button",
+          className: "btn btn--primary btn--large",
+          disabled: !check.ok,
+          onclick: props.onConfirmRankUp,
+        }, ["⭐ ランクアップ実行"]),
+      }),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : buildItems().length === 0
           ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
           : grid.element,
-      el("div", { className: "sticky-actions__spacer" }, []),
     ]),
-    stickyActions({
-      status: check.ok
-        ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
-        : check.reason ?? `あと ${Math.max(0, requiredCount - props.selectedSacrificeIds.length)} 体選んでください`,
-      primary: el("button", {
-        type: "button",
-        className: "btn btn--primary btn--large",
-        disabled: !check.ok,
-        onclick: props.onConfirmRankUp,
-      }, ["⭐ ランクアップ実行"]),
-    }),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancelRankUp }, ["キャンセル"]),
   ]);
 }

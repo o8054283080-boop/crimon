@@ -117,6 +117,17 @@ jobs:
           # なってしまう。巡回が拾えるのは、はみ出し・押せない・小さすぎる文字だけで、
           # 「読めるが格好悪い」は数字にならない。**目で見るための絵を毎回残す。**
           node tools/tour.mjs --shots artifacts/tour
+          # 今回追加した3一覧を、通常/簡易・iPhone 2サイズで個別に残す。
+          # scene は同じ保存データを毎回差し込むため、列数と選択素材数を再現できる。
+          for SIZE in 縦 縦大; do
+            DIMS=$([ "$SIZE" = "縦" ] && echo "390x844" || echo "430x932")
+            for VIEW in normal dense; do
+              DENSE_FLAG=$([ "$VIEW" = "dense" ] && echo "--dense" || echo "")
+              npx tsx tools/scene.mts monsters --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-モンスター-${VIEW}.png"
+              npx tsx tools/scene.mts training --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-強化素材-${VIEW}.png"
+              npx tsx tools/scene.mts rankup --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-ランクアップ素材-${VIEW}.png"
+            done
+          done
 
       - uses: actions/upload-artifact@v4
         # 通った時こそ見たいので always()。落ちた時は原因の絵が要る

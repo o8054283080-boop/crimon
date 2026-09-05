@@ -101,6 +101,7 @@ import {
 import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
 import { findMonsterById } from "../data/monsters.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
+import { loadMonsterListDense, saveMonsterListDense } from "./monsterListDensity.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
@@ -343,6 +344,8 @@ interface AppState {
   monsterFilter: MonsterFilter;
   /** 絞り込みの札を開いているか */
   monsterFilterOpen: boolean;
+  /** 所持・強化素材・ランクアップ素材で共有する簡易表示 */
+  monsterListDense: boolean;
   /** まとめて売却するために選ばれている装備 */
   equipmentSelectedIds: string[];
   farmEquipmentOpen: boolean;
@@ -461,6 +464,7 @@ const state: AppState = {
   monsterSortKey: "recommended",
   monsterFilter: { ...EMPTY_MONSTER_FILTER },
   monsterFilterOpen: false,
+  monsterListDense: loadMonsterListDense(),
   equipmentSelectedIds: [],
   farmEquipmentOpen: false,
   farmEquipmentSelectedIds: [],
@@ -3454,6 +3458,8 @@ function render(): void {
         targetId: state.monsterTrainingTargetId,
         selectedMaterialIds: state.monsterTrainingMaterialIds,
         filter: state.monsterTrainingFilter,
+        dense: state.monsterListDense,
+        onToggleDense: handleToggleMonsterListDense,
         onChangeFilter: (filter) => {
           state.monsterTrainingFilter = filter;
           render();
@@ -3842,7 +3848,15 @@ function renderMonstersScreen(): HTMLElement {
     filterOpen: state.monsterFilterOpen,
     onChangeFilter: handleChangeMonsterFilter,
     onToggleFilterOpen: handleToggleMonsterFilterOpen,
+    dense: state.monsterListDense,
+    onToggleDense: handleToggleMonsterListDense,
   });
+}
+
+function handleToggleMonsterListDense(): void {
+  state.monsterListDense = !state.monsterListDense;
+  saveMonsterListDense(state.monsterListDense);
+  render();
 }
 
 /**

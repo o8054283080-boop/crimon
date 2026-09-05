@@ -11,6 +11,7 @@ import { monsterCard } from "./monsters.js";
 import { renderPartySlots } from "./partyCard.js";
 import { managementHeader } from "./managementHeader.js";
 import { stickyActions } from "./stickyActions.js";
+import { renderMonsterListDensityToggle } from "../monsterListDensity.js";
 
 export interface MonsterTrainingProps {
   player: PlayerState;
@@ -21,6 +22,8 @@ export interface MonsterTrainingProps {
   onToggleMaterial: (id: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  dense: boolean;
+  onToggleDense: () => void;
 }
 
 export type MaterialUseFilter = "ALL" | "SAME_SPECIES" | "SAME_ELEMENT" | "SELECTED";
@@ -81,11 +84,12 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
 
   const shownCandidates = filterTrainingMaterials(candidates, target, props.selectedMaterialIds, props.filter);
   const materialGrid = createIncrementalGrid({
-    className: "monster-grid",
+    className: `monster-grid${props.dense ? " monster-grid--dense" : ""}`,
     items: shownCandidates,
     renderItem: (candidate) => monsterCard(candidate, () => props.onToggleMaterial(candidate.id), {
       selected: props.selectedMaterialIds.includes(candidate.id),
       bonus: isSameSpecies(target, candidate),
+      dense: props.dense,
     }),
     moreLabel: (shown, total) => `素材をさらに表示（${shown} / ${total}）`,
   });
@@ -118,6 +122,7 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         : null,
     ].filter((n): n is HTMLParagraphElement => n !== null)),
     el("section", { className: "panel" }, [
+      el("div", { className: "monster-density-row" }, [renderMonsterListDensityToggle(props.dense, props.onToggleDense)]),
       el("div", { className: "mfilter mfilter__body training-filter" }, [
         el("div", { className: "mfilter__group" }, [
           el("span", { className: "mfilter__label" }, ["属性"]),
@@ -150,22 +155,21 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         ]),
         el("span", { className: "mfilter__count" }, [shownCandidates.length === candidates.length ? `${candidates.length}体` : `${candidates.length}体中 ${shownCandidates.length}体`]),
       ]),
+      stickyActions({
+        status: check.ok
+          ? `${props.selectedMaterialIds.length}体で 経験値 ${totalExp}`
+          : check.reason ?? "下の一覧から素材を選んでください",
+        primary: el(
+          "button",
+          { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
+          ["💪 モンスター強化実行"],
+        ),
+      }),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : shownCandidates.length === 0
           ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
           : materialGrid.element,
-      el("div", { className: "sticky-actions__spacer" }, []),
     ]),
-    stickyActions({
-      status: check.ok
-        ? `${props.selectedMaterialIds.length}体で 経験値 ${totalExp}`
-        : check.reason ?? "下の一覧から素材を選んでください",
-      primary: el(
-        "button",
-        { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
-        ["💪 モンスター強化実行"],
-      ),
-    }),
   ]);
 }
