@@ -44,6 +44,21 @@ export function levelMultiplier(star: Star, level: number): number {
   return 1 + ((clampedLevel - 1) / (maxLevel - 1)) * 1.0;
 }
 
+/** 星・レベルを反映した実効ステータスを計算する */
+export function computeEffectiveStats(baseStats: Stats, star: Star, level: number): Stats {
+  const multiplier = starMultiplier(star) * levelMultiplier(star, level);
+  return {
+    hp: Math.round(baseStats.hp * multiplier),
+    atk: Math.round(baseStats.atk * multiplier),
+    def: Math.round(baseStats.def * multiplier),
+    spd: baseStats.spd,
+    criRate: baseStats.criRate,
+    criDmg: baseStats.criDmg,
+    resistance: baseStats.resistance,
+    accuracy: baseStats.accuracy,
+  };
+}
+
 /**
  * ★6のLv50以降は完成育成帯として必要経験値を大きく引き上げる。
  * Lv50→60の合計は1,200,000 EXP。
