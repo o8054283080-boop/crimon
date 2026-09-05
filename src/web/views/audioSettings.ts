@@ -1,4 +1,4 @@
-import { AudioSettings } from "../audio/settings.js";
+import { AudioSettings, updateAudioSettings } from "../audio/settings.js";
 import { el } from "../dom.js";
 
 export interface AudioSettingsProps {
@@ -29,8 +29,6 @@ function slider(label: string, value: number, onCommit: (v: number) => void): HT
 
   const commitAfterGesture = () => {
     if (commitTimer !== null) window.clearTimeout(commitTimer);
-    // range の操作中に onChange -> render() が走ると、指の下のDOMが丸ごと差し替わり、
-    // iPhone が続く click を背面のHOMEへ渡してしまう。クリック列が終わった次のtickで保存する。
     commitTimer = window.setTimeout(() => {
       commitTimer = null;
       onCommit(current);
@@ -63,7 +61,6 @@ function slider(label: string, value: number, onCommit: (v: number) => void): HT
       stopNavigationEvent(event);
       const next = Number((event.target as HTMLInputElement).value);
       setVisualValue(next / 100);
-      // キーボード等pointerupを伴わない変更にも対応。タッチではpointerup側が後勝ちする。
       commitAfterGesture();
     },
   });
@@ -105,6 +102,11 @@ function slider(label: string, value: number, onCommit: (v: number) => void): HT
 
 export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
   const { settings } = props;
+  // 音量変更でHOME全体をrenderし直すと設定シートが閉じる。
+  // 設定保存はここで直接行い、設定シートのDOMを保持する。
+  const applyPatch = (patch: Partial<AudioSettings>) => {
+    updateAudioSettings(patch);
+  };
 
   const ready = props.contextState === "running";
   const stateText = ready
@@ -119,43 +121,35 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
     onclick: stopNavigationEvent,
   }, [
     el("div", { className: "panel-header" }, [el("h2", {}, ["音の設定"])]),
-    el(
-      "label",
-      { className: "audio-settings__row audio-settings__row--toggle" },
-      [
-        el("span", { className: "audio-settings__label" }, ["BGM"]),
-        el("input", {
-          type: "checkbox",
-          checked: settings.bgmEnabled,
-          className: "audio-settings__toggle",
-          onclick: stopNavigationEvent,
-          onchange: (event: Event) => {
-            stopNavigationEvent(event);
-            props.onChange({ bgmEnabled: (event.target as HTMLInputElement).checked });
-          },
-        }),
-      ],
-    ),
-    slider("BGMの音量", settings.bgmVolume, (v) => props.onChange({ bgmVolume: v })),
-    el(
-      "label",
-      { className: "audio-settings__row audio-settings__row--toggle" },
-      [
-        el("span", { className: "audio-settings__label" }, ["効果音"]),
-        el("input", {
-          type: "checkbox",
-          checked: settings.sfxEnabled,
-          className: "audio-settings__toggle",
-          onclick: stopNavigationEvent,
-          onchange: (event: Event) => {
-            stopNavigationEvent(event);
-            props.onChange({ sfxEnabled: (event.target as HTMLInputElement).checked });
-          },
-        }),
-      ],
-    ),
-    slider("全体の音量", settings.masterVolume, (v) => props.onChange({ masterVolume: v })),
-    slider("効果音の音量", settings.sfxVolume, (v) => props.onChange({ sfxVolume: v })),
+    el("label", { className: "audio-settings__row audio-settings__row--toggle" }, [
+      el("span", { className: "audio-settings__label" }, ["BGM"]),
+      el("input", {
+        type: "checkbox",
+        checked: settings.bgmEnabled,
+        className: "audio-settings__toggle",
+        onclick: stopNavigationEvent,
+        onchange: (event: Event) => {
+          stopNavigationEvent(event);
+          applyPatch({ bgmEnabled: (event.target as HTMLInputElement).checked });
+        },
+      }),
+    ]),
+    slider("BGMの音量", settings.bgmVolume, (v) => applyPatch({ bgmVolume: v })),
+    el("label", { className: "audio-settings__row audio-settings__row--toggle" }, [
+      el("span", { className: "audio-settings__label" }, ["効果音"]),
+      el("input", {
+        type: "checkbox",
+        checked: settings.sfxEnabled,
+        className: "audio-settings__toggle",
+        onclick: stopNavigationEvent,
+        onchange: (event: Event) => {
+          stopNavigationEvent(event);
+          applyPatch({ sfxEnabled: (event.target as HTMLInputElement).checked });
+        },
+      }),
+    ]),
+    slider("全体の音量", settings.masterVolume, (v) => applyPatch({ masterVolume: v })),
+    slider("効果音の音量", settings.sfxVolume, (v) => applyPatch({ sfxVolume: v })),
     el("div", { className: "audio-settings__actions" }, [
       el("button", {
         type: "button",
@@ -246,20 +240,13 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
         font-variant-numeric: tabular-nums;
       }
       @media (max-width: 430px) {
-        .audio-settings__row--volume {
-          min-height: 78px;
-        }
+        .audio-settings__row--volume { min-height: 78px; }
         .audio-settings__control {
           grid-template-columns: 42px minmax(0, 1fr) 42px;
           gap: 8px;
         }
-        .audio-settings__step {
-          width: 42px;
-          height: 42px;
-        }
-        .audio-settings__slider {
-          min-width: 0;
-        }
+        .audio-settings__step { width: 42px; height: 42px; }
+        .audio-settings__slider { min-width: 0; }
       }
       `,
     ]),
