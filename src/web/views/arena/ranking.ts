@@ -29,7 +29,13 @@ function renderRow(entry: ArenaRankingEntry, mine: boolean): HTMLElement {
   return el("div", { className: `ar-rank__row${mine ? " is-me" : ""}`, style: `--tier:${tier.color}` }, nodes([
     el("span", { className: "ar-rank__no" }, [`${entry.rank}`]),
     lead ? el("span", { className: "ar-rank__lead" }, [lead.emoji]) : null,
-    el("span", { className: "ar-rank__name" }, [entry.name]),
+    el("span", {
+      className: "ar-rank__name",
+      title: entry.name,
+      // iPhone幅で名前列が1文字分まで潰れ、「ドラ」が「ド…」になるのを防ぐ。
+      // 長い名前だけは8emで省略し、レート欄を押し出さない。
+      style: "min-width:4em;max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
+    }, [entry.name]),
     el("span", { className: "ar-rank__tier" }, [tier.name]),
     el("span", { className: "ar-rank__rating" }, [entry.rating.toLocaleString("ja-JP")]),
     el("span", { className: "ar-rank__record" }, [`${entry.wins}勝${entry.losses}敗`]),
