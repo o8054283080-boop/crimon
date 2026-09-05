@@ -68,6 +68,17 @@ export function bodyHueFor(templateId: string, element: Element): number {
 }
 
 /**
+ * その絵の縦横比(横 ÷ 縦)。測っていなければ 1(正方形とみなす)。
+ *
+ * **盤面の枠を決める側が、絵の読み込みを待たずに幅を知るための口。**
+ * 実際の表示幅はテクスチャが届いてから `mesh.scale.x` へ入るが、
+ * 枠はその前に決まる。待っていると、最初の1枚だけ幅を見誤る。
+ */
+export function aspectFor(templateId: string, element: Element): number {
+  return entryFor(templateId, element)?.aspect ?? 1;
+}
+
+/**
  * 基本の絵を属性色へ寄せる強さ。0で寄せない、1で完全に置き換える。
  *
  * **色を「混ぜる」のではなく「HSVで置き換える」。**

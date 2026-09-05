@@ -68,6 +68,14 @@ export interface TrialTowerProps {
   rankingSelf: TrialTowerRankingEntry | null;
   rankingLoading: boolean;
   rankingError: boolean;
+  /**
+   * そもそも通信につながっていない(オフライン、または未接続の配布)。
+   *
+   * **障害と分けて持つ。**どちらも「取れなかった」で一括りにしていたので、
+   * ただ繋がっていないだけの人にも「取得できませんでした」と出て、
+   * 壊れているように見えていた。
+   */
+  rankingOffline: boolean;
   onOpenEnemyInfo: (floor: number) => void;
   onOpenRewards: () => void;
   onOpenRanking: () => void;
@@ -134,6 +142,11 @@ function renderRankingModal(props: TrialTowerProps): HTMLElement {
   const selfId = props.rankingSelf?.userId ?? null;
   let body: HTMLElement;
   if (props.rankingLoading) body = el("p", { className: "tower-ranking__state" }, ["ランキングを読み込んでいます…"]);
+  else if (props.rankingOffline) body = el("div", { className: "tower-ranking__state" }, [
+    el("p", {}, ["いまは通信につながっていないため、ほかのプレイヤーの記録は見られません。"]),
+    el("p", {}, ["自分の最高到達階は、つながった時にまとめて反映されます。"]),
+    el("button", { type: "button", className: "btn btn--ghost", onclick: props.onReloadRanking }, ["もう一度試す"]),
+  ]);
   else if (props.rankingError) body = el("div", { className: "tower-ranking__state" }, [
     el("p", {}, ["ランキングを取得できませんでした"]),
     el("button", { type: "button", className: "btn btn--ghost", onclick: props.onReloadRanking }, ["もう一度試す"]),

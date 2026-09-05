@@ -59,10 +59,12 @@ function enginePassives(floor: number, enemyIndex: number): TowerEnemyAbilityInf
     if (enemyIndex === 3) passives.push({ name: "狂牙の激昂", description: "古代の戦鼓晶が倒れると攻撃力と速度が上がり、「処刑突撃」の威力が増す。" });
     return passives;
   }
+  /*
+   * **「超再生」と「中層免疫」はもう無い。**どちらもクリモアークを入れる前の
+   * 100階のもので、消し忘れがエンジンに残っていた(この画面に出ていたことで見つかった)。
+   */
   if (floor === 100 && enemyIndex === 0) return [
-    { name: "超再生", description: "HPが70%以上の間、行動後に自身を大きく回復する。" },
     { name: "段階強化", description: "HPが70%・40%・20%を下回るたびに攻撃性能と速度が上がる。40%を下回った時は弱体効果をすべて解除し、即座に行動する。" },
-    { name: "中層免疫", description: "HPが70%未満40%以上の間、自身の行動回数が4の倍数になるたびに3ターンの免疫を得る。" },
     { name: "分身結界", description: "生存している分身1体につき受けるダメージが減る。分身が倒れると一時的に攻撃力と速度が上がり、HP20%以下では本体と分身の行動ゲージが進む。" },
   ];
   return [];

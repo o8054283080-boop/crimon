@@ -28,7 +28,17 @@ describe("試練の塔: 敵情報", () => {
     expect(trialTowerEnemyInfo(90)[0].passives.map((item) => item.name)).toContain("古代の狂化");
     expect(trialTowerEnemyInfo(90)[3].passives.map((item) => item.name)).toContain("狂牙の激昂");
     expect(trialTowerEnemyInfo(100)[0].passives.map((item) => item.name)).toContain("分身結界");
-    expect(trialTowerEnemyInfo(100)[0].passives.map((item) => item.name)).toContain("中層免疫");
+  });
+
+  it("**100階は旧実装の「超再生」「中層免疫」を説明しない**", () => {
+    /*
+     * どちらもクリモアークを入れる前の100階のもので、エンジン側に
+     * 消し忘れが残っていた。この画面に出ていたことで見つかった。
+     * 説明とエンジンの両方から消してあるので、**両方**を見張る。
+     */
+    const names = trialTowerEnemyInfo(100)[0].passives.map((item) => item.name);
+    expect(names).not.toContain("超再生");
+    expect(names).not.toContain("中層免疫");
   });
 
   it("100階は本体のスキル4と、出現しうる分身3型をすべて表示する", () => {

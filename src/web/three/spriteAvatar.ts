@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Element } from "../../core/element.js";
 import { ElementTheme, themeFor } from "./elementTheme.js";
-import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, SpriteSheet, TINT_MASK, bodyHueFor, idleSheetFor, isElementSpecific, loadSheetTexture, loadSpriteTexture, spriteUrlFor, tintThresholdsFor } from "./spriteArt.js";
+import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, SpriteSheet, TINT_MASK, aspectFor, bodyHueFor, idleSheetFor, isElementSpecific, loadSheetTexture, loadSpriteTexture, spriteUrlFor, tintThresholdsFor } from "./spriteArt.js";
 
 /**
  * 2Dの絵で立つモンスター。
@@ -288,6 +288,14 @@ export class SpriteAvatar {
   private readonly material: THREE.MeshBasicMaterial;
   private readonly hitProxy: THREE.Mesh;
   private readonly height: number;
+  /**
+   * 板の半幅(ワールド単位)。**盤面の枠を決める側が読む。**
+   *
+   * 種族ごとに絵の縦横比が違い、いちばん広い古代の魔獣は 1.15 ある。
+   * 枠が固定の 0.80 を見込んでいた頃は、そこを超える種族が
+   * 画面の端で切れる可能性を抱えたままだった。
+   */
+  readonly halfWidth: number;
   private readonly floatHeight: number;
   private readonly facing: 1 | -1;
 
@@ -408,6 +416,14 @@ export class SpriteAvatar {
      * 数字が頭の上に浮き、影が絵より大きく残る。
      */
     this.height = (ROLE_HEIGHT[role] ?? 2.2) * SPRITE_SCALE * bodyScale;
+    /*
+     * 板の半幅。**絵の読み込みを待たずに、測っておいた縦横比から出す。**
+     *
+     * 実際の表示幅はテクスチャが届いてから `mesh.scale.x` へ入るが、
+     * 盤面の枠はその前に決まる。待つと最初の1枚だけ枠が幅を見誤り、
+     * 横に広い種族が画面の端で切れる。
+     */
+    this.halfWidth = this.height * aspectFor(templateId, element) / 2;
     const float = FLOATING_TEMPLATES.has(templateId) ? Math.max(0.34, ROLE_FLOAT[role] ?? 0) : (ROLE_FLOAT[role] ?? 0);
     // 浮かせる高さも一緒に縮める。縮めないと、小さくなった絵が不釣り合いに高く浮く
     this.floatHeight = float * SPRITE_SCALE * bodyScale;
