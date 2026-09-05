@@ -1,4 +1,4 @@
-import { ELEMENT_JA } from "../../core/element.js";
+import { ELEMENTS, ELEMENT_JA, Element } from "../../core/element.js";
 import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
 import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
@@ -61,28 +61,22 @@ export function monsterCard(
     disabled: extra?.disabled,
     bonus: extra?.bonus,
     onLongPress: extra?.onLongPress,
-    // 長押しは見えない操作なので、同じ詳細へ丸ボタンからも辿れるようにする
     onDetail: extra?.onLongPress,
     star: instance.star,
     level: instance.level,
     maxLevel: extra?.compact ? undefined : STAR_MAX_LEVEL[instance.star],
-    // 所持一覧では識別情報だけに絞る。他の選択画面では従来の判断材料を保つ。
     power: extra?.compact ? undefined : monsterPower(instance),
     gearCount: extra?.compact ? undefined : equippedCount(instance),
     gearTotal: extra?.compact ? undefined : GEAR_SLOT_TOTAL,
     badge: extra?.badge,
     badgeCorner: extra?.badge !== undefined,
-    // 移し替え済みだと一目で分かるように。**同じ種族でも中身が違う**ので、
-    // 印が無いと編成の時にどれが作り替えた個体か見分けが付かない
     created: instance.createdSkill !== undefined,
   });
 }
 
-/** 並べ替えの切り替え。押した軸がそのまま並びに出るので、選択中を強調する */
 export function renderMonsterSortRow(current: MonsterSortKey, onChange: (key: MonsterSortKey) => void): HTMLElement {
   return el(
     "div",
-    // 装備の並べ替えと同じ見た目にする。画面ごとに操作の形が違うと迷う
     { className: "slot-filter-row sort-row" },
     MONSTER_SORT_KEYS.map((key) =>
       el(
@@ -118,8 +112,6 @@ function renderList(props: MonstersProps): HTMLElement {
   });
 
   return el("div", { className: "screen monsters-screen" }, [
-    // 見出しと図鑑への入口を1行にまとめる。縦画面では上の帯が厚いほど
-    // 「モンスターが1体も見えないまま画面が終わる」ため
     el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["所持モンスター"]),
       el("button", { type: "button", className: "btn btn--ghost head-action", onclick: props.onGoMonsterDex }, ["📖 図鑑"]),
@@ -141,7 +133,6 @@ function renderList(props: MonstersProps): HTMLElement {
   ]);
 }
 
-/** 所持一覧専用の鍵。カードの詳細遷移とは独立した操作として扱う。 */
 export function renderMonsterListLock(instance: MonsterInstance, onToggleLock: (monsterId: string) => void): HTMLButtonElement {
   const view = monsterListLockView(instance);
   return el(
@@ -180,8 +171,6 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
     const equipment = equipmentId ? props.player.equipment.find((e) => e.id === equipmentId) : undefined;
 
     if (equipment) {
-      // 一覧のカードと同じ data 属性を持たせ、同じ色の規則で読めるようにする。
-      // 装備画面と詳細画面で見え方が違うと、同じ物だと気付けない
       return el(
         "button",
         {
@@ -221,9 +210,6 @@ function renderSkillPanel(
   onGoCreate: () => void,
 ): HTMLElement | null {
   if (!dex) return null;
-
-  // 移し替え済みの枠は、元のスキルではなく移した側を出す。
-  // ここが元のままだと、戦闘で出る技と説明が食い違う
   const shown = dex.skills.map((skill, i) => (i === 0 ? skill : currentSkillOf(instance, i as CreateSlot) ?? skill));
 
   return el("section", { className: "panel" }, [
@@ -272,9 +258,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const expNeeded = requiredExpForLevel(instance.level);
   const inParty = props.player.partyIds.includes(instance.id);
 
-  // 主要4項目と、それ以外を分ける。全部を同じ大きさで並べると、
-  // 何を見て強さを判断すればよいのかが伝わらない。
-  // どちらも「素の値 / 装備で増えた分 / 合計」の内訳付きで出す
   const primaryStats = growthStats && effectiveStats ? buildStatBreakdown(growthStats, effectiveStats, PRIMARY_STAT_FORMATS) : [];
   const secondaryStats = growthStats && effectiveStats ? buildStatBreakdown(growthStats, effectiveStats, EXTRA_STAT_FORMATS) : [];
   const gearedSlots = equippedItems.length;
@@ -297,7 +280,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
     ]),
     el("main", { className: "monster-detail-layout" }, [
     el("section", { className: "monster-detail monster-detail-summary", "data-star": String(instance.star) }, [
-      // 集めたものを眺める画面なので、肖像を主役の大きさで出す
       el("div", { className: "monster-detail__hero" }, [
         withPortrait(
           el("div", { className: "monster-detail__avatar", style: dex ? `background:${dex.color}` : undefined }, [dex ? dex.emoji : "❓"]),
@@ -326,8 +308,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
           el("div", { className: "stat-tile" }, [
             el("span", { className: "stat-tile__label" }, [entry.label]),
             el("span", { className: "stat-tile__value" }, [entry.total]),
-            // 合計だけ出すと、その数字のどこまでが装備のおかげなのかが分からない。
-            // 装備を組み替える判断はこの差分を見てするもの
             entry.gain
               ? el("span", { className: "stat-tile__breakdown" }, [
                   el("span", { className: "stat-tile__base" }, [entry.base]),
@@ -392,33 +372,30 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
 }
 
 let rankUpMaterialSort: Extract<MaterialMonsterSort, "DEFAULT" | "REINCARNATION_PIG_FIRST"> = "DEFAULT";
-/**
- * ランクアップの素材選びで使う並べ替えの軸。
- *
- * **所持一覧と同じ軸をそのまま出す。** 素材を選ぶ時に見たいものは
- * 一覧を見る時と変わらない(弱い順に処分したい・種族で揃えたい・
- * 引いたばかりの子を避けたい)。ここだけ別の言葉にすると、
- * 同じことをするのに2つの操作を覚えることになる。
- *
- * 画面を離れたら「おすすめ」へ戻す(`renderMonsters` の末尾)。
- * 素材選びは一度きりの作業なので、前回の軸を持ち越す意味がない。
- */
 let rankUpSortKey: MonsterSortKey = "recommended";
+let rankUpElementFilter: Element | "ALL" = "ALL";
+let rankUpSelectionFilter: "ALL" | "SELECTED" = "ALL";
 
 function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElement {
   const dex = findMonsterById(target.dexId);
   const requiredCount = RANK_UP_SACRIFICE_COUNT[target.star];
-  const candidates = props.player.monsters.filter((m) => m.id !== target.id && m.star === target.star && !props.player.partyIds.includes(m.id));
+  const candidates = props.player.monsters.filter(
+    (m) => m.id !== target.id && m.star === target.star && !props.player.partyIds.includes(m.id) && m.locked !== true,
+  );
 
   const sacrifices = props.selectedSacrificeIds
     .map((id) => props.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkRankUp(target, sacrifices, props.player.partyIds);
 
-  // 軸で並べてから、転生ピッグだけを先頭へ寄せる。
-  // 逆にすると寄せた並びを軸が壊すので、順番は入れ替えられない
+  const filteredCandidates = (): MonsterInstance[] => candidates.filter((candidate) => {
+    if (rankUpElementFilter !== "ALL" && findMonsterById(candidate.dexId)?.element !== rankUpElementFilter) return false;
+    if (rankUpSelectionFilter === "SELECTED" && !props.selectedSacrificeIds.includes(candidate.id)) return false;
+    return true;
+  });
+
   const buildItems = (): MonsterInstance[] => sortMaterialMonsters(
-    sortMonsters(candidates, rankUpSortKey, { partyIds: props.player.partyIds }),
+    sortMonsters(filteredCandidates(), rankUpSortKey, { partyIds: props.player.partyIds }),
     rankUpMaterialSort,
   );
   const grid = createIncrementalGrid({
@@ -431,10 +408,6 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     moreLabel: (shown, total) => `素材をさらに表示（${shown} / ${total}）`,
   });
 
-  /*
-   * 札は作り直さず、押された時に印だけ付け替える。
-   * 画面ごと描き直すと、選んだ素材と巻物の位置が毎回先頭へ戻ってしまう。
-   */
   const sortButtons = MONSTER_SORT_KEYS.map((key) => {
     const button = el("button", {
       type: "button",
@@ -467,22 +440,58 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
   normalSortButton.onclick = () => applyMaterialSort("DEFAULT");
   reincarnationSortButton.onclick = () => applyMaterialSort("REINCARNATION_PIG_FIRST");
 
+  const elementButtons = (["ALL", ...ELEMENTS] as const).map((element) => {
+    const label = element === "ALL" ? "すべて" : ELEMENT_JA[element];
+    const button = el("button", {
+      type: "button",
+      className: `slot-filter-chip${rankUpElementFilter === element ? " slot-filter-chip--active" : ""}`,
+    }, [label]) as HTMLButtonElement;
+    button.onclick = () => {
+      rankUpElementFilter = element;
+      for (const [i, other] of elementButtons.entries()) {
+        other.classList.toggle("slot-filter-chip--active", (["ALL", ...ELEMENTS] as const)[i] === element);
+      }
+      grid.reset(buildItems());
+    };
+    return button;
+  });
+
+  const allSelectionButton = el("button", {
+    type: "button",
+    className: `slot-filter-chip${rankUpSelectionFilter === "ALL" ? " slot-filter-chip--active" : ""}`,
+  }, ["すべて"]) as HTMLButtonElement;
+  const selectedOnlyButton = el("button", {
+    type: "button",
+    className: `slot-filter-chip${rankUpSelectionFilter === "SELECTED" ? " slot-filter-chip--active" : ""}`,
+  }, ["選択中"]) as HTMLButtonElement;
+  const applySelectionFilter = (filter: typeof rankUpSelectionFilter): void => {
+    rankUpSelectionFilter = filter;
+    allSelectionButton.classList.toggle("slot-filter-chip--active", filter === "ALL");
+    selectedOnlyButton.classList.toggle("slot-filter-chip--active", filter === "SELECTED");
+    grid.reset(buildItems());
+  };
+  allSelectionButton.onclick = () => applySelectionFilter("ALL");
+  selectedOnlyButton.onclick = () => applySelectionFilter("SELECTED");
+
   return el("div", { className: "screen monsters-screen" }, [
     managementHeader("ランクアップ", props.onCancelRankUp, dex ? dex.name : target.dexId),
     el("section", { className: "panel" }, [
       el("p", {}, [`対象: ${dex ? dex.name : target.dexId} ${starLabel(target.star)} → ${starLabel((target.star + 1) as 1 | 2 | 3 | 4 | 5)}`]),
       el("p", {}, [`同じ星(${starLabel(target.star)})のモンスターを${requiredCount}体選択してください (${props.selectedSacrificeIds.length}/${requiredCount})`]),
-      /*
-       * **選んだ顔ぶれをここに並べる。**
-       * 数だけ出しても「誰を選んだか」は分からず、確かめるには一覧を探し直すしかなかった。
-       * 必要な数だけ枠を出すので、あと何体かも同時に分かる。押せば外せる。
-       */
       el("div", { className: "picked-row" }, [
         el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
         renderPartySlots(sacrifices, requiredCount, props.onToggleSacrifice),
       ]),
     ]),
     el("section", { className: "panel" }, [
+      el("div", { className: "mfilter__group" }, [
+        el("span", { className: "mfilter__label" }, ["属性"]),
+        el("div", { className: "mfilter__chips" }, elementButtons),
+      ]),
+      el("div", { className: "mfilter__group" }, [
+        el("span", { className: "mfilter__label" }, ["表示"]),
+        el("div", { className: "mfilter__chips" }, [allSelectionButton, selectedOnlyButton]),
+      ]),
       el("div", { className: "mfilter__group" }, [
         el("span", { className: "mfilter__label" }, ["並び順"]),
         el("div", { className: "mfilter__chips" }, sortButtons),
@@ -493,13 +502,11 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       ]),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
-        : grid.element,
+        : buildItems().length === 0
+          ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
+          : grid.element,
       el("div", { className: "sticky-actions__spacer" }, []),
     ]),
-    /*
-     * 実行は下に貼り付ける。素材は一覧の上の方で選び終わっているのに、
-     * 押すためだけに数十枚を巻き下ろすことになっていた。
-     */
     stickyActions({
       status: check.ok
         ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
@@ -525,6 +532,8 @@ export function renderMonsters(props: MonstersProps): HTMLElement {
   if (target && props.rankUpMode) return renderRankUp(props, target);
   rankUpMaterialSort = "DEFAULT";
   rankUpSortKey = "recommended";
+  rankUpElementFilter = "ALL";
+  rankUpSelectionFilter = "ALL";
   if (target) return renderDetail(props, target);
   return renderList(props);
 }
