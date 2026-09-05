@@ -123,9 +123,9 @@ jobs:
             DIMS=$([ "$SIZE" = "縦" ] && echo "390x844" || echo "430x932")
             for VIEW in normal dense; do
               DENSE_FLAG=$([ "$VIEW" = "dense" ] && echo "--dense" || echo "")
-              node tools/scene.mts monsters --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-モンスター-${VIEW}.png"
-              node tools/scene.mts training --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-強化素材-${VIEW}.png"
-              node tools/scene.mts rankup --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-ランクアップ素材-${VIEW}.png"
+              npx tsx tools/scene.mts monsters --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-モンスター-${VIEW}.png"
+              npx tsx tools/scene.mts training --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-強化素材-${VIEW}.png"
+              npx tsx tools/scene.mts rankup --state mid --size "$SIZE" $DENSE_FLAG --shot "artifacts/tour/${DIMS}-ランクアップ素材-${VIEW}.png"
             done
           done
 
