@@ -64,6 +64,13 @@
   font-size: 0.92rem;
 }
 
+/* 素材画面の実行導線は絞り込みの直後へ置き、固定表示でチップを覆わない。 */
+.monsters-screen .sticky-actions {
+  position: static;
+  bottom: auto;
+  margin: 8px 0;
+}
+
 /*
  * 簡易表示はカードを縮尺変換せず、不要なDOMを描画しない専用モード。
  * 390pxでは5列、430pxでは6列にして、各カードのタップ面積は列全体で確保する。

@@ -474,24 +474,23 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
         el("span", { className: "mfilter__label" }, ["素材"]),
         el("div", { className: "mfilter__chips" }, [normalSortButton, reincarnationSortButton]),
       ]),
+      stickyActions({
+        status: check.ok
+          ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
+          : check.reason ?? `あと ${Math.max(0, requiredCount - props.selectedSacrificeIds.length)} 体選んでください`,
+        primary: el("button", {
+          type: "button",
+          className: "btn btn--primary btn--large",
+          disabled: !check.ok,
+          onclick: props.onConfirmRankUp,
+        }, ["⭐ ランクアップ実行"]),
+      }),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : buildItems().length === 0
           ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
           : grid.element,
-      el("div", { className: "sticky-actions__spacer" }, []),
     ]),
-    stickyActions({
-      status: check.ok
-        ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
-        : check.reason ?? `あと ${Math.max(0, requiredCount - props.selectedSacrificeIds.length)} 体選んでください`,
-      primary: el("button", {
-        type: "button",
-        className: "btn btn--primary btn--large",
-        disabled: !check.ok,
-        onclick: props.onConfirmRankUp,
-      }, ["⭐ ランクアップ実行"]),
-    }),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancelRankUp }, ["キャンセル"]),
   ]);
 }

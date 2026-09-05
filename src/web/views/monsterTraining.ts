@@ -155,22 +155,21 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
         ]),
         el("span", { className: "mfilter__count" }, [shownCandidates.length === candidates.length ? `${candidates.length}体` : `${candidates.length}体中 ${shownCandidates.length}体`]),
       ]),
+      stickyActions({
+        status: check.ok
+          ? `${props.selectedMaterialIds.length}体で 経験値 ${totalExp}`
+          : check.reason ?? "下の一覧から素材を選んでください",
+        primary: el(
+          "button",
+          { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
+          ["💪 モンスター強化実行"],
+        ),
+      }),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : shownCandidates.length === 0
           ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
           : materialGrid.element,
-      el("div", { className: "sticky-actions__spacer" }, []),
     ]),
-    stickyActions({
-      status: check.ok
-        ? `${props.selectedMaterialIds.length}体で 経験値 ${totalExp}`
-        : check.reason ?? "下の一覧から素材を選んでください",
-      primary: el(
-        "button",
-        { type: "button", className: "btn btn--primary btn--large", disabled: !check.ok, onclick: props.onConfirm },
-        ["💪 モンスター強化実行"],
-      ),
-    }),
   ]);
 }
