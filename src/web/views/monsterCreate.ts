@@ -11,6 +11,7 @@ import {
 } from "../../game/monsterCreate.js";
 import { MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
 import { el } from "../dom.js";
+import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
 import {
@@ -83,6 +84,7 @@ export interface MonsterCreateProps {
 }
 
 const SLOT_LABEL: Record<CreateSlot, string> = { 1: "スキル2", 2: "スキル3" };
+const CREATE_MATERIAL_INITIAL_RENDER_COUNT = 24;
 
 function isEl(node: HTMLElement | null): node is HTMLElement {
   return node !== null;
@@ -180,6 +182,9 @@ function monsterFace(instance: MonsterInstance, extraClass = ""): HTMLElement {
  *
  * **選べないものも理由付きで出す。**一覧から消してしまうと、
  * 「あの子はどこへ行った」と手持ちを探し直すことになる。
+ *
+ * 所持数が多い時でも、候補全件を一度にDOM化・肖像生成・作成可否判定しない。
+ * 所持一覧と同じ段階描画を使い、画面へ近づいた分だけ実体化する。
  */
 function renderMaterialList(props: MonsterCreateProps): HTMLElement {
   const candidates = sortMonsters(
@@ -192,31 +197,40 @@ function renderMaterialList(props: MonsterCreateProps): HTMLElement {
     return el("p", { className: "app-subtitle" }, ["ほかにモンスターがいません。"]);
   }
 
-  const cards = candidates.map((instance) => {
-    const dex = findMonsterById(instance.dexId);
-    const check = checkMonsterCreate(props.target, instance, props.partyIds, props.dungeonPartyIds);
-    const selected = props.materialId === instance.id;
+  const selectedIndex = props.materialId ? candidates.findIndex((instance) => instance.id === props.materialId) : -1;
+  const initialCount = Math.max(CREATE_MATERIAL_INITIAL_RENDER_COUNT, selectedIndex + 1);
+  const grid = createIncrementalGrid({
+    className: "create-candidates",
+    items: candidates,
+    initialCount,
+    batchSize: CREATE_MATERIAL_INITIAL_RENDER_COUNT,
+    renderItem: (instance) => {
+      const dex = findMonsterById(instance.dexId);
+      const check = checkMonsterCreate(props.target, instance, props.partyIds, props.dungeonPartyIds);
+      const selected = props.materialId === instance.id;
 
-    return el(
-      "button",
-      {
-        type: "button",
-        className: `create-candidate${selected ? " create-candidate--on" : ""}${check.ok ? "" : " create-candidate--off"}`,
-        disabled: !check.ok,
-        title: check.ok ? undefined : check.reason,
-        onclick: () => props.onSelectMaterial(selected ? null : instance.id),
-      },
-      [
-        monsterFace(instance, "create-face--small"),
-        el("span", { className: "create-candidate__name" }, [dex ? dex.name : instance.dexId]),
-        check.ok
-          ? null
-          : el("span", { className: "create-candidate__why" }, [check.reason ?? "選べません"]),
-      ].filter(isEl),
-    );
+      return el(
+        "button",
+        {
+          type: "button",
+          className: `create-candidate${selected ? " create-candidate--on" : ""}${check.ok ? "" : " create-candidate--off"}`,
+          disabled: !check.ok,
+          title: check.ok ? undefined : check.reason,
+          onclick: () => props.onSelectMaterial(selected ? null : instance.id),
+        },
+        [
+          monsterFace(instance, "create-face--small"),
+          el("span", { className: "create-candidate__name" }, [dex ? dex.name : instance.dexId]),
+          check.ok
+            ? null
+            : el("span", { className: "create-candidate__why" }, [check.reason ?? "選べません"]),
+        ].filter(isEl),
+      );
+    },
+    moreLabel: (shownCount, total) => `素材候補をさらに表示（${shownCount} / ${total}）`,
   });
 
-  return el("div", { className: "create-candidates" }, cards);
+  return grid.element;
 }
 
 /** 移し替えの中身。どの枠が、何から何に変わるのかを並べて見せる */

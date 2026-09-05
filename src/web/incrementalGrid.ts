@@ -1,5 +1,5 @@
-export const INVENTORY_INITIAL_RENDER_COUNT = 48;
-export const INVENTORY_RENDER_BATCH_SIZE = 48;
+export const INVENTORY_INITIAL_RENDER_COUNT = 24;
+export const INVENTORY_RENDER_BATCH_SIZE = 24;
 
 export function nextIncrementalCount(total: number, current: number, batchSize = INVENTORY_RENDER_BATCH_SIZE): number {
   if (!Number.isFinite(total) || total <= 0) return 0;
@@ -28,7 +28,7 @@ interface IncrementalGridOptions<T> {
  * 大量の所持品を一度にDOM化しないための段階描画グリッド。
  *
  * 配列の絞り込み・並べ替え結果そのものは維持し、画面へ実体化するカードだけを
- * 最初の48件→以後48件ずつに分ける。IntersectionObserverが使えるブラウザでは
+ * 最初の24件→以後24件ずつに分ける。IntersectionObserverが使えるブラウザでは
  * 一覧末尾へ近づくと自動で次を足し、使えない環境でも「さらに表示」ボタンで進める。
  * セーブ形式や所持数には一切触れない。
  */
