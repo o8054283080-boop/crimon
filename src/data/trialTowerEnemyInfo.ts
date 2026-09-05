@@ -1,4 +1,5 @@
 import { Skill, isPassiveSkill } from "../core/skill.js";
+import { TOWER80_PASSIVES } from "./trialTowerFloor80.js";
 import { CRIMOARK_CLONE_PROFILE, CRIMOARK_CLONE_ROLES, CRIMOARK_S4 } from "./crimoark.js";
 import { findTowerFloor } from "./trialTower.js";
 import { buildDungeonEnemyTeam } from "../game/dungeonRunner.js";
@@ -47,7 +48,7 @@ function enginePassives(floor: number, enemyIndex: number): TowerEnemyAbilityInf
     if (enemyIndex === 1) return [{ name: "生命共鳴", description: "生きている間、始祖ベヒモスの行動時の回復量を増加させる。" }];
   }
   if (floor === 80 && enemyIndex === 0) {
-    return [{ name: "免疫の関門", description: "戦闘開始時に3ターンの免疫を得る。自身の最初の行動と、その後4回行動するたびに3ターンの免疫を張り直す。" }];
+    return TOWER80_PASSIVES;
   }
   if (floor === 90) {
     if (enemyIndex === 0) return [

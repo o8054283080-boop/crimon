@@ -55,6 +55,11 @@ try {
     await open("view=tower&floor=31&panel=enemy&infoFloor=60", "[data-tour='tower-enemy-info']");
     await page.screenshot({ path: `${outDir}/enemy-locked-60-${viewport.name}.png`, fullPage: false });
 
+    await open("view=tower&floor=31&panel=enemy&infoFloor=80", "[data-tour='tower-enemy-info']");
+    await page.getByText("古代聖竜", { exact: true }).waitFor();
+    await page.screenshot({ path: `${outDir}/enemy-80-top-${viewport.name}.png`, fullPage: false });
+    await page.locator(".tower-modal__sheet").evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    await page.screenshot({ path: `${outDir}/enemy-80-bottom-${viewport.name}.png`, fullPage: false });
     await open("view=tower&floor=100&panel=enemy", "[data-tour='tower-enemy-info']");
     await page.screenshot({ path: `${outDir}/enemy-100-top-${viewport.name}.png`, fullPage: false });
     await page.locator(".tower-modal__sheet").evaluate((node) => { node.scrollTop = node.scrollHeight; });

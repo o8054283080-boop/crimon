@@ -220,22 +220,18 @@ describe("80階V2: 実際に戦わせる", () => {
   });
 });
 
-describe("本編の80階は1つも変わっていない", () => {
-  it("試練の塔80階は従来どおり古代の魔人+お供2体のまま", () => {
+describe("本編80階への接続と検証版の分離", () => {
+  it("試練の塔80階は古代聖竜の専用5体編成", () => {
     const floor = TRIAL_TOWER_FLOORS[79];
     expect(floor.floor).toBe(80);
-    expect(floor.name).toBe("80階 免疫");
-    expect(floor.enemies).toHaveLength(3);
-    expect(floor.enemies[0].templateId).toBe("ancient_demon");
-    // 仮の名前が本編へ漏れていないこと
-    expect(JSON.stringify(floor)).not.toContain("古代聖竜");
-    expect(JSON.stringify(floor)).not.toContain("tower80_");
+    expect(floor.name).toBe("80階 古代聖竜");
+    expect(floor.enemies).toHaveLength(5);
+    expect(floor.enemies[0].templateId).toBe("dragon");
+    expect(floor.enemies[0].victoryTarget).toBe(true);
   });
 
-  it("80階の仮スキルは本編の塔データのどこにも入っていない", () => {
-    expect(JSON.stringify(TRIAL_TOWER_FLOORS)).not.toContain("tower80_");
-    expect(JSON.stringify(TRIAL_TOWER_FLOORS)).not.toContain("古代の護晶");
-    expect(JSON.stringify(TRIAL_TOWER_FLOORS)).not.toContain("古代の鼓舞晶");
+  it("80階専用スキルは他の階へ混ざらない", () => {
+    expect(JSON.stringify(TRIAL_TOWER_FLOORS.filter((floor) => floor.floor !== 80))).not.toContain("tower80_");
   });
 
   it("観測点を付けない盤面では、集計が空のまま", () => {
