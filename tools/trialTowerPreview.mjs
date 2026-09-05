@@ -38,6 +38,8 @@ try {
     };
 
     await open("view=tower&floor=31", ".tower-screen");
+    await page.locator("[data-tour='tower-rewards-open']").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${outDir}/tower-rewards-button-${viewport.name}.png`, fullPage: false });
     const upperBand = page.locator(".tower-band").nth(5);
     await upperBand.locator("summary").click();
     const floor60 = page.locator("[data-tour='tower-enemy-info-floor-60']");
