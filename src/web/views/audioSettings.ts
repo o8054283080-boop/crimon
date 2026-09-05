@@ -9,194 +9,96 @@ export interface AudioSettingsProps {
   onTest: () => void;
 }
 
-const STEP = 5;
+const VOLUME_STEP = 0.01;
 
-function clampPercent(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
+function stopNavigationEvent(event: Event): void {
+  // 設定シートはHOME上のオーバーレイとして表示される。
+  // iPhoneではrange操作のpointer/clickが背面のHOME操作へ抜けることがあるため、
+  // 音量操作内で必ず止める。preventDefaultはrange本来のドラッグを壊すためclick系のみ。
+  event.stopPropagation();
 }
 
 function slider(label: string, value: number, onCommit: (v: number) => void): HTMLElement {
-  let percent = clampPercent(value * 100);
-  const readout = el("span", { className: "audio-settings__value" }, [`${percent}%`]);
+  let current = Math.round(value * 100) / 100;
+  const readout = el("span", { className: "audio-settings__value" }, [`${Math.round(current * 100)}%`]);
+
+  const setValue = (next: number, commit = true) => {
+    current = Math.max(0, Math.min(1, Math.round(next * 100) / 100));
+    const percent = Math.round(current * 100);
+    input.value = String(percent);
+    readout.textContent = `${percent}%`;
+    if (commit) onCommit(current);
+  };
 
   const input = el("input", {
     type: "range",
     min: "0",
     max: "100",
     step: "1",
-    value: String(percent),
+    value: String(Math.round(current * 100)),
     className: "audio-settings__slider",
-    "aria-label": label,
+    onpointerdown: stopNavigationEvent,
+    onpointerup: stopNavigationEvent,
+    onclick: stopNavigationEvent,
     oninput: (event: Event) => {
-      percent = clampPercent(Number((event.target as HTMLInputElement).value));
-      readout.textContent = `${percent}%`;
+      stopNavigationEvent(event);
+      const next = Number((event.target as HTMLInputElement).value);
+      current = next / 100;
+      readout.textContent = `${next}%`;
+      // 指を離すまで待たず、その場で音量が変わるようにする。
+      onCommit(current);
     },
     onchange: (event: Event) => {
-      percent = clampPercent(Number((event.target as HTMLInputElement).value));
-      readout.textContent = `${percent}%`;
-      onCommit(percent / 100);
+      stopNavigationEvent(event);
+      const next = Number((event.target as HTMLInputElement).value);
+      setValue(next / 100);
     },
-  }) as HTMLInputElement;
+  });
 
-  const nudge = (amount: number) => {
-    percent = clampPercent(percent + amount);
-    input.value = String(percent);
-    readout.textContent = `${percent}%`;
-    onCommit(percent / 100);
-  };
+  const decrement = el("button", {
+    type: "button",
+    className: "audio-settings__step",
+    "aria-label": `${label}を1%下げる`,
+    onpointerdown: stopNavigationEvent,
+    onclick: (event: Event) => {
+      stopNavigationEvent(event);
+      setValue(current - VOLUME_STEP);
+    },
+  }, ["−"]);
 
-  const controls = el("div", { className: "audio-settings__controls" }, [
-    el("button", {
-      type: "button",
-      className: "audio-settings__nudge",
-      "aria-label": `${label}を${STEP}%下げる`,
-      onclick: () => nudge(-STEP),
-    }, ["−"]),
-    input,
-    el("button", {
-      type: "button",
-      className: "audio-settings__nudge",
-      "aria-label": `${label}を${STEP}%上げる`,
-      onclick: () => nudge(STEP),
-    }, ["＋"]),
+  const increment = el("button", {
+    type: "button",
+    className: "audio-settings__step",
+    "aria-label": `${label}を1%上げる`,
+    onpointerdown: stopNavigationEvent,
+    onclick: (event: Event) => {
+      stopNavigationEvent(event);
+      setValue(current + VOLUME_STEP);
+    },
+  }, ["＋"]);
+
+  return el("div", {
+    className: "audio-settings__row audio-settings__row--volume",
+    onpointerdown: stopNavigationEvent,
+    onclick: stopNavigationEvent,
+  }, [
+    el("span", { className: "audio-settings__label" }, [label]),
+    el("div", { className: "audio-settings__control" }, [decrement, input, increment]),
     readout,
   ]);
-
-  return el("div", { className: "audio-settings__row audio-settings__row--volume" }, [
-    el("span", { className: "audio-settings__label" }, [label]),
-    controls,
-  ]);
-}
-
-function toggle(label: string, checked: boolean, onChange: (checked: boolean) => void): HTMLElement {
-  return el("label", { className: "audio-settings__row audio-settings__row--toggle" }, [
-    el("span", { className: "audio-settings__label" }, [label]),
-    el("input", {
-      type: "checkbox",
-      checked,
-      className: "audio-settings__toggle",
-      onchange: (event: Event) => onChange((event.target as HTMLInputElement).checked),
-    }),
-  ]);
-}
-
-function mobileSliderStyles(): HTMLElement {
-  return el("style", {}, [String.raw`
-    .audio-settings__row--volume {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 7px;
-      align-items: stretch;
-    }
-
-    .audio-settings__row--volume .audio-settings__label {
-      flex: none;
-      font-size: 0.88rem;
-      font-weight: 700;
-    }
-
-    .audio-settings__controls {
-      display: grid;
-      grid-template-columns: 44px minmax(0, 1fr) 44px 48px;
-      gap: 8px;
-      align-items: center;
-      width: 100%;
-      min-height: 48px;
-    }
-
-    .audio-settings__slider {
-      width: 100%;
-      min-width: 0;
-      height: 44px;
-      margin: 0;
-      padding: 0;
-      background: transparent;
-      touch-action: pan-x;
-      accent-color: var(--accent, #d77cf0);
-    }
-
-    .audio-settings__slider::-webkit-slider-runnable-track {
-      height: 10px;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.58);
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
-    }
-
-    .audio-settings__slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 30px;
-      height: 30px;
-      margin-top: -10px;
-      border: 2px solid rgba(255, 255, 255, 0.95);
-      border-radius: 50%;
-      background: #ffffff;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 5px rgba(220, 125, 238, 0.13);
-    }
-
-    .audio-settings__slider::-moz-range-track {
-      height: 10px;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.58);
-    }
-
-    .audio-settings__slider::-moz-range-thumb {
-      width: 30px;
-      height: 30px;
-      border: 2px solid rgba(255, 255, 255, 0.95);
-      border-radius: 50%;
-      background: #ffffff;
-    }
-
-    .audio-settings__nudge {
-      width: 44px;
-      height: 44px;
-      padding: 0;
-      border: 1px solid rgba(222, 190, 120, 0.4);
-      border-radius: 12px;
-      color: #fff2cf;
-      background: linear-gradient(180deg, rgba(54, 44, 72, 0.88), rgba(22, 17, 34, 0.96));
-      font: inherit;
-      font-size: 1.35rem;
-      font-weight: 900;
-      line-height: 1;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    .audio-settings__nudge:active {
-      transform: translateY(1px) scale(0.97);
-      background: rgba(110, 76, 126, 0.85);
-    }
-
-    .audio-settings__value {
-      min-width: 48px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      font-weight: 800;
-    }
-
-    @media (max-width: 390px) {
-      .audio-settings__controls {
-        grid-template-columns: 42px minmax(0, 1fr) 42px 44px;
-        gap: 6px;
-      }
-      .audio-settings__nudge {
-        width: 42px;
-        height: 42px;
-      }
-    }
-  `]);
 }
 
 /**
  * 音の設定。
  *
- * iPhoneで「音量が大きい」「レンジのつまみを狙いづらい」を避けるため、
- * 44px以上の操作領域と±5%ボタンを用意する。BGM/SEも同じ画面で個別調整できる。
+ * 音量を変えられる場所がそもそも無かった。加えて「音が鳴らない」と言われた時、
+ * 端末の音量なのか、設定で切れているのか、まだ画面を触っていないだけなのかを
+ * **利用者自身が切り分けられない**のが困る。試聴ボタンと状態表示を同じ場所に置く。
  */
 export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
   const { settings } = props;
+
+  // ブラウザは画面を一度も触っていない間は音を出せない。その旨をそのまま伝える
   const ready = props.contextState === "running";
   const stateText = ready
     ? "音を鳴らせる状態です"
@@ -204,21 +106,141 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
       ? "画面をどこか一度タップすると鳴らせるようになります"
       : `音が止まっています(${props.contextState})。下の「音を試す」を押してください`;
 
-  return el("section", { className: "panel audio-settings" }, [
-    mobileSliderStyles(),
+  return el("section", {
+    className: "panel audio-settings",
+    onpointerdown: stopNavigationEvent,
+    onclick: stopNavigationEvent,
+  }, [
     el("div", { className: "panel-header" }, [el("h2", {}, ["音の設定"])]),
-    toggle("BGM", settings.bgmEnabled, (enabled) => props.onChange({ bgmEnabled: enabled })),
-    toggle("効果音", settings.sfxEnabled, (enabled) => props.onChange({ sfxEnabled: enabled })),
-    slider("全体の音量", settings.masterVolume, (v) => props.onChange({ masterVolume: v })),
+    el(
+      "label",
+      { className: "audio-settings__row audio-settings__row--toggle" },
+      [
+        el("span", { className: "audio-settings__label" }, ["BGM"]),
+        el("input", {
+          type: "checkbox",
+          checked: settings.bgmEnabled,
+          className: "audio-settings__toggle",
+          onclick: stopNavigationEvent,
+          onchange: (event: Event) => {
+            stopNavigationEvent(event);
+            props.onChange({ bgmEnabled: (event.target as HTMLInputElement).checked });
+          },
+        }),
+      ],
+    ),
     slider("BGMの音量", settings.bgmVolume, (v) => props.onChange({ bgmVolume: v })),
+    el(
+      "label",
+      { className: "audio-settings__row audio-settings__row--toggle" },
+      [
+        el("span", { className: "audio-settings__label" }, ["効果音"]),
+        el("input", {
+          type: "checkbox",
+          checked: settings.sfxEnabled,
+          className: "audio-settings__toggle",
+          onclick: stopNavigationEvent,
+          onchange: (event: Event) => {
+            stopNavigationEvent(event);
+            props.onChange({ sfxEnabled: (event.target as HTMLInputElement).checked });
+          },
+        }),
+      ],
+    ),
+    slider("全体の音量", settings.masterVolume, (v) => props.onChange({ masterVolume: v })),
     slider("効果音の音量", settings.sfxVolume, (v) => props.onChange({ sfxVolume: v })),
-    el("p", { className: "audio-settings__hint" }, ["バーを直接タップするか、− / ＋ で5%ずつ調整できます。"]),
     el("div", { className: "audio-settings__actions" }, [
-      el("button", { type: "button", className: "btn btn--primary", onclick: props.onTest }, ["♪ 音を試す"]),
+      el("button", {
+        type: "button",
+        className: "btn btn--primary",
+        onpointerdown: stopNavigationEvent,
+        onclick: (event: Event) => {
+          stopNavigationEvent(event);
+          props.onTest();
+        },
+      }, ["♪ 音を試す"]),
     ]),
     el("p", { className: `audio-settings__state${ready ? " audio-settings__state--ok" : ""}` }, [stateText]),
     el("p", { className: "audio-settings__note" }, [
       "iPhoneでは、本体横のマナーモード(消音)スイッチが入っていると音が出ません。鳴らない時はそちらもご確認ください。",
+    ]),
+    el("style", {}, [
+      `
+      .audio-settings__row--volume {
+        align-items: center;
+        gap: 10px;
+        min-height: 52px;
+      }
+      .audio-settings__control {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) 42px;
+        align-items: center;
+        gap: 8px;
+      }
+      .audio-settings__step {
+        appearance: none;
+        width: 42px;
+        height: 42px;
+        padding: 0;
+        border: 1px solid rgba(218, 180, 91, 0.5);
+        border-radius: 12px;
+        color: #fff4cf;
+        background: linear-gradient(180deg, rgba(64, 47, 25, 0.94), rgba(21, 16, 16, 0.98));
+        box-shadow: inset 0 1px 0 rgba(255, 239, 185, 0.12), 0 2px 7px rgba(0, 0, 0, 0.32);
+        font: inherit;
+        font-size: 1.35rem;
+        font-weight: 900;
+        line-height: 1;
+        touch-action: manipulation;
+      }
+      .audio-settings__slider {
+        width: 100%;
+        min-width: 0;
+        height: 44px;
+        margin: 0;
+        cursor: pointer;
+        touch-action: pan-y;
+      }
+      .audio-settings__slider::-webkit-slider-runnable-track {
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(4, 4, 8, 0.78);
+        box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+      .audio-settings__slider::-webkit-slider-thumb {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 30px;
+        height: 30px;
+        margin-top: -10px;
+        border: 2px solid rgba(255, 255, 255, 0.86);
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+      }
+      .audio-settings__value {
+        flex: 0 0 3.4em;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      @media (max-width: 430px) {
+        .audio-settings__row--volume {
+          display: grid;
+          grid-template-columns: 7em minmax(0, 1fr) 3.2em;
+          gap: 7px;
+        }
+        .audio-settings__control {
+          grid-template-columns: 38px minmax(0, 1fr) 38px;
+          gap: 5px;
+        }
+        .audio-settings__step {
+          width: 38px;
+          height: 42px;
+        }
+      }
+      `,
     ]),
   ]);
 }
