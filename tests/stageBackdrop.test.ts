@@ -238,8 +238,13 @@ describe("背景と盤面の釣り合い", () => {
      * 縦画面で枠を削ってカメラを寄せる細工が入っていた。
      * 千鳥にして外側の列が画面の端まで来たので、削ったぶんだけ
      * **外側の列が画面の外へはみ出した。**
+     *
+     * いまは見込みの定数ではなく、**実際に立っている板の幅**から取る。
+     * 定数(0.80)は実測より狭く、古代の魔獣は 1.15、主の1.3倍が乗ると 1.49 ある。
+     * 見込みは下限としてだけ残す(狭い板ばかりの盤面で枠が縮まないように)。
      */
-    expect(stage).toMatch(/halfWidth: maxAbsX \+ SPRITE_HALF_WIDTH,/);
+    expect(stage).toMatch(/maxAbsX \+ SPRITE_HALF_WIDTH,/);
+    expect(stage).toMatch(/Math\.abs\(entry\.x\) \+ entry\.avatar\.halfWidth/);
   });
 
   it("エフェクトの大きさが、画面ではなく本体の背丈から決まる", () => {

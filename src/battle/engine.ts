@@ -1312,19 +1312,14 @@ export class BattleEngine {
       this.syncTower70BossTier(unit);
       return;
     }
-    const healing = this.trialTowerFloor === 100 && ratio >= 0.7;
-    if (healing) {
-      const before = unit.currentHp;
-      applyHeal(unit, Math.round(unit.maxHp * 0.72));
-      const amount = unit.currentHp - before;
-      this.push(`${this.label(unit)} の超再生が発動！ HPが ${amount} 回復！`);
-      this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount });
-    }
-    const immunity = this.trialTowerFloor === 100 && ratio < 0.7 && ratio >= 0.4;
-    if (immunity && (this.trialBossTurns === 1 || this.trialBossTurns % 4 === 0)) {
-      unit.immuneTurns = Math.max(unit.immuneTurns, 3);
-      this.push(`${this.label(unit)} は状態異常免疫を展開した！`);
-    }
+    /*
+     * **旧100階の「超再生(毎手番72%回復)」と「中層免疫」はここにあった。廃止。**
+     *
+     * どちらもクリモアークを入れる前の、倍率だけで作られていた100階のもの。
+     * V3の仕様書にはどちらも無い。**消し忘れていて、クリモアークが
+     * HP70%以上の間ずっと最大HPの72%を回復し続けていた。**
+     * 敵情報の画面に「超再生」と出ていたことで見つかった。
+     */
     if (this.trialTowerFloor === 90) {
       /*
        * **旧実装の「8手番目にATK+200%/SPD+100%」は廃止。**

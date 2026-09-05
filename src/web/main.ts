@@ -431,6 +431,8 @@ interface AppState {
   towerRankingSelf: TrialTowerRankingEntry | null;
   towerRankingLoading: boolean;
   towerRankingError: boolean;
+  /** 通信につながっていないだけ。障害(`towerRankingError`)とは分けて出す */
+  towerRankingOffline: boolean;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
   /** 結果確認後に通知だけを閉じる対象。報酬データとは独立して扱う。 */
@@ -520,6 +522,7 @@ const state: AppState = {
   towerRankingSelf: null,
   towerRankingLoading: false,
   towerRankingError: false,
+  towerRankingOffline: false,
   autoFarmResult: null,
   autoFarmTargetName: "",
   viewingBackgroundFarmJobId: null,
@@ -2292,6 +2295,7 @@ async function syncTrialTowerBest(): Promise<boolean> {
 async function refreshTrialTowerRanking(): Promise<void> {
   state.towerRankingLoading = true;
   state.towerRankingError = false;
+  state.towerRankingOffline = false;
   render();
 
   const connected = await connectTrialTower();
@@ -2306,7 +2310,13 @@ async function refreshTrialTowerRanking(): Promise<void> {
   state.towerRankingEntries = ranking.entries;
   state.towerRankingSelf = self;
   state.towerRankingLoading = false;
-  state.towerRankingError = !ranking.ok;
+  /*
+   * **繋がっていないだけの人に「取得できませんでした」と出さない。**
+   * `connectTrialTower()` が false を返すのは通信そのものが使えない時なので、
+   * そちらは案内、実際に取りに行って失敗した時だけ障害として出す
+   */
+  state.towerRankingOffline = !connected;
+  state.towerRankingError = connected && !ranking.ok;
   render();
 }
 
@@ -3356,6 +3366,7 @@ function render(): void {
         rankingSelf: state.towerRankingSelf,
         rankingLoading: state.towerRankingLoading,
         rankingError: state.towerRankingError,
+        rankingOffline: state.towerRankingOffline,
         onOpenEnemyInfo: (floor) => {
           state.towerEnemyInfoFloor = floor;
           state.towerPanel = "ENEMY_INFO";

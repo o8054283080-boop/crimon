@@ -1232,7 +1232,24 @@ export class BattleStage {
        * **外側の列が画面の外へはみ出した。**寄せるための削りは、
        * 端に何も立っていなかった頃の名残。
        */
-      halfWidth: maxAbsX + SPRITE_HALF_WIDTH,
+      /*
+       * **見込みではなく、実際に立っている板の幅から取る。**
+       *
+       * `SPRITE_HALF_WIDTH` は「だいたいこのくらい」の見込みで、
+       * 実測すると古代の魔獣が 1.15、主の1.3倍が乗ると 1.49 ある。
+       * 見込みのままだと、広い種族が外側の列に立った盤面で
+       * 枠が足りず、画面の端で切れる。
+       *
+       * 席ごとに `|x| + その板の半幅` を測って、いちばん外側を採る。
+       * 「いちばん広い板」を全席へ見込むのとは違う——広い板が内側の列に
+       * 居るだけの盤面まで、カメラが無駄に引いてしまう。
+       * 見込みは**下限**として残す(狭い板ばかりの盤面で枠が縮み、
+       * 今より寄ってしまうのを防ぐ)。
+       */
+      halfWidth: Math.max(
+        maxAbsX + SPRITE_HALF_WIDTH,
+        ...placed.map((entry) => Math.abs(entry.x) + entry.avatar.halfWidth),
+      ),
       zNear: maxZ + 0.3,
       zFar: minZ - 0.3,
       yBottom: -0.3,

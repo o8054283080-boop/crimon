@@ -288,6 +288,8 @@ export class MonsterAvatar {
   private readonly tmpVector = new THREE.Vector3();
   /** PLAYER側は+1(カメラのある手前側)、ENEMY側は-1。斜に構える向きを決める */
   private readonly facing: 1 | -1;
+  /** 体の半幅(ワールド単位)。盤面の枠を決める側が読む */
+  readonly halfWidth: number;
 
   constructor(options: MonsterAvatarOptions) {
     const { element, role, templateId, facing, bodyScale = 1 } = options;
@@ -330,6 +332,12 @@ export class MonsterAvatar {
     this.root.add(this.rig.root);
 
     const footprint = this.rig.height * 0.62;
+    /*
+     * 体の半幅。2D側(`SpriteAvatar.halfWidth`)と**同じ約束事**で、
+     * 盤面の枠を決める側がどちらが立っているかを気にせず読めるようにする。
+     * 立体には絵の縦横比が無いので、当たり判定の箱の幅から出す。
+     */
+    this.halfWidth = footprint * 1.15 / 2;
 
     // --- 足元の魔法陣 ---
     const sigilGeometry = new THREE.PlaneGeometry(footprint * 1.7, footprint * 1.7);

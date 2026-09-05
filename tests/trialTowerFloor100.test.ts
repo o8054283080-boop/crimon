@@ -495,6 +495,30 @@ describe("100階の仕掛けは1〜99階へ漏れていない", () => {
     expect(JSON.stringify(others)).not.toContain("crimoark");
   });
 
+  it("**旧100階の「超再生」と「中層免疫」は残っていない**", () => {
+    /*
+     * クリモアークを入れた回で、旧100階(倍率だけで作られていた頃)の
+     * 「毎手番で最大HPの72%回復」と「4手番ごとに免疫」を**消し忘れていた。**
+     * V3の仕様書にはどちらも無い。実戦を走らせてログで見張る——
+     * private を直接叩く形だと、消し忘れた分岐そのものを踏まない
+     */
+    const enemies = buildDungeonEnemyTeam(findTowerFloor(100)!);
+    const rng = mulberry32(31337);
+    const players = ([
+      { templateId: "valkyria", element: "LIGHT", preset: "MAX_TANK" },
+      { templateId: "seraph", element: "LIGHT", preset: "MAX_HEALER" },
+      { templateId: "basilisk", element: "LIGHT", preset: "MAX_TANK" },
+      { templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
+    ] as AllySpec[]).map((spec) => buildAlly(spec, rng, "FINISHED"));
+    const log = new BattleEngine(players, enemies, {
+      rng, maxTurns: 300, trialTowerFloor: 100,
+    }).run().log;
+    // 手番が実際に回っていることを先に確かめる(0手番なら何も出なくて当たり前)
+    expect(log.some((line) => line.includes("クリモアーク")), "ボスが動いている").toBe(true);
+    expect(log.some((line) => line.includes("超再生")), "超再生は廃止した").toBe(false);
+    expect(log.some((line) => line.includes("状態異常免疫を展開")), "中層免疫は廃止した").toBe(false);
+  });
+
   it("追加報酬を維持し、指定されたダイヤ3,000へ更新する", () => {
     expect(findTowerFloor(100)!.firstClearReward)
       .toEqual({ crystal: 3_000, summonScroll: 30, lightDarkFourStarSummonScrolls: 3, fiveStarSummonScrolls: 1 });

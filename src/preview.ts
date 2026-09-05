@@ -195,6 +195,7 @@ if (params.get("view") === "tower") {
     rankingSelf: { rank: 17, userId: "self", name: "あなたの名前は長めです", bestFloor: 73, bestFloorReachedAt: "2026-09-03T00:00:00Z", updatedAt: "2026-09-03T00:00:00Z" },
     rankingLoading: params.get("loading") === "1",
     rankingError: params.get("error") === "1",
+    rankingOffline: params.get("offline") === "1",
     onOpenEnemyInfo: () => undefined,
     onOpenRewards: () => undefined,
     onOpenRanking: () => undefined,
