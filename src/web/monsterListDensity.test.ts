@@ -19,6 +19,10 @@ describe("モンスター一覧の簡易表示設定", () => {
     expect(loadMonsterListDense(storage)).toBe(false);
   });
 
+  it("未知の保存値は簡易表示として扱わない", () => {
+    expect(loadMonsterListDense(memoryStorage({ crimon_monster_list_dense_v1: "true" }))).toBe(false);
+  });
+
   it("ストレージが使えない場合も通常表示へ安全に戻る", () => {
     const blocked = {
       getItem: () => { throw new Error("blocked"); },
