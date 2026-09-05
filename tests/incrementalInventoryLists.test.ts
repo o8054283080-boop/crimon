@@ -8,11 +8,11 @@ import {
 
 describe("大量所持一覧の段階描画", () => {
   it("3000件あっても最初から全件を描画する計画にならない", () => {
-    expect(INVENTORY_INITIAL_RENDER_COUNT).toBe(48);
-    expect(INVENTORY_RENDER_BATCH_SIZE).toBe(48);
-    expect(nextIncrementalCount(3000, 0)).toBe(48);
-    expect(nextIncrementalCount(3000, 48)).toBe(96);
-    expect(nextIncrementalCount(3000, 2976)).toBe(3000);
+    expect(INVENTORY_INITIAL_RENDER_COUNT).toBe(24);
+    expect(INVENTORY_RENDER_BATCH_SIZE).toBe(24);
+    expect(nextIncrementalCount(3000, 0)).toBe(24);
+    expect(nextIncrementalCount(3000, 24)).toBe(48);
+    expect(nextIncrementalCount(3000, 2988)).toBe(3000);
   });
 
   it("所持モンスター・装備・強化素材・ランクアップ素材が共通の段階描画を使う", () => {

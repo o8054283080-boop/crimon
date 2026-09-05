@@ -194,10 +194,12 @@ const SCENES: Record<string, Scene> = {
   tower: { tab: "HOME", tile: "tower", note: "試練の塔" },
   howto: { tab: "HOME", tile: "info", note: "遊び方" },
   training: { tab: "MONSTERS", then: "モンスター強化", note: "強化の素材選び(モンスターを1体選んでから)" },
+  rankup: { tab: "MONSTERS", then: "ランクアップ", note: "ランクアップの素材選び(モンスターを1体選んでから)" },
 };
 
 const SIZES: Record<string, { width: number; height: number }> = {
   縦: { width: 390, height: 844 },
+  縦大: { width: 430, height: 932 },
   横: { width: 900, height: 430 },
 };
 
@@ -209,7 +211,7 @@ function usage(): void {
   console.log("\n=== 指定できる状態(--state)===");
   for (const [key, s] of Object.entries(STATES)) console.log(`  ${key.padEnd(16)} ${s.note}`);
   console.log("\n=== 画面の大きさ(--size)===");
-  console.log("  縦 (390x844) / 横 (900x430)  ※既定は縦\n");
+  console.log("  縦 (390x844) / 縦大 (430x932) / 横 (900x430)  ※既定は縦\n");
 }
 
 async function main(): Promise<void> {
@@ -249,7 +251,11 @@ async function main(): Promise<void> {
   await call("goto", { path: "/", fresh: true, ...size });
   const save = JSON.stringify(state.build());
   await call("eval", {
-    expression: `(() => { localStorage.setItem("crimon_save_v1", ${JSON.stringify(save)}); return "ok"; })()`,
+    expression: `(() => {
+      localStorage.setItem("crimon_save_v1", ${JSON.stringify(save)});
+      localStorage.setItem("crimon_monster_list_dense_v1", ${args.includes("--dense") ? '"1"' : '"0"'});
+      return "ok";
+    })()`,
   });
   await call("goto", { path: "/", ...size });
 
@@ -291,14 +297,42 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // 素材画面は1体選んだ状態も撮り、金枠・暗幕・✓が小型カードでも読めるか見る。
+  if (sceneKey === "training" || sceneKey === "rankup") {
+    await call("eval", {
+      expression: `(async () => {
+        document.querySelector('.monster-grid .mcard')?.click();
+        await new Promise(r => setTimeout(r, 300));
+        return document.querySelectorAll('.monster-grid .mcard--selected').length;
+      })()`,
+    });
+  }
+
   // 3. 機械で拾える崩れを見る
   const inspected = await call("eval", { expression: INSPECT });
   const runtime = (await call("problems")).problems ?? [];
   const problems = [...(inspected.value?.problems ?? []), ...runtime];
 
+  const gridMetrics = await call("eval", {
+    expression: `(() => {
+      const cards = [...document.querySelectorAll('.monster-grid .mcard')];
+      if (!cards.length) return null;
+      const rects = cards.map(card => card.getBoundingClientRect());
+      const firstTop = rects[0].top;
+      const columns = rects.filter(rect => Math.abs(rect.top - firstTop) < 2).length;
+      return {
+        columns,
+        cardWidth: Math.round(rects[0].width),
+        cardHeight: Math.round(rects[0].height),
+        dense: cards[0].classList.contains('mcard--dense'),
+      };
+    })()`,
+  });
+
   console.log(`\n${scene.note} / ${state.note} / ${valueOf("--size") ?? "縦"}(${size.width}x${size.height})`);
   console.log(problems.length === 0 ? "  機械で拾える崩れ: 無し" : `  指摘 ${problems.length}件:`);
   for (const p of problems) console.log(`    ！ ${p}`);
+  if (gridMetrics.value) console.log(`  一覧: ${gridMetrics.value.columns}列 / カード ${gridMetrics.value.cardWidth}x${gridMetrics.value.cardHeight}px / ${gridMetrics.value.dense ? "簡易" : "通常"}`);
 
   if (shotPath) {
     await call("shot", { path: shotPath.startsWith("/") ? shotPath : `${process.cwd()}/${shotPath}` });

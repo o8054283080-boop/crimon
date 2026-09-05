@@ -17,6 +17,8 @@ import { withPortrait } from "../three/portrait.js";
 export interface MonsterCardOptions {
   /** 所持一覧向け。画像と識別情報だけを残した省スペース表示 */
   compact?: boolean;
+  /** 5〜6列向け。肖像・属性・星・Lvと状態表示だけを描画する */
+  dense?: boolean;
   /** 選択中(編成済みなど)。額縁が光る */
   selected?: boolean;
   /** 押せない状態 */
@@ -148,11 +150,12 @@ export function buildMonsterCard(
   onClick: () => void,
   options: MonsterCardOptions = {},
 ): HTMLElement {
-  const { compact, selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress, onDetail, created } =
+  const { compact, dense, selected, disabled, bonus, star, level, maxLevel, caption, power, gearCount, gearTotal, badge, badgeCorner, onLongPress, onDetail, created } =
     options;
 
   const classes = ["mcard", rarityClass(star)];
   if (compact) classes.push("mcard--compact");
+  if (dense) classes.push("mcard--dense");
   if (selected) classes.push("mcard--selected");
   if (disabled) classes.push("mcard--disabled");
   if (bonus) classes.push("mcard--bonus");
@@ -211,12 +214,12 @@ export function buildMonsterCard(
 
   const children: (HTMLElement | null)[] = [
     el("span", { className: "mcard__portrait", style: dex ? `--elem:${dex.color}` : undefined }, portraitChildren.filter(isElement)),
-    star ? el("span", { className: "mcard__stars" }, [compact ? `★${star}` : starRow(star)]) : null,
-    el("span", { className: "mcard__name" }, [dex ? dex.name : fallbackName]),
-    infoParts.length > 0 ? el("span", { className: "mcard__info" }, infoParts) : null,
-    caption ? el("span", { className: "mcard__caption" }, [caption]) : null,
+    star ? el("span", { className: "mcard__stars" }, [compact || dense ? `★${star}` : starRow(star)]) : null,
+    dense ? null : el("span", { className: "mcard__name" }, [dex ? dex.name : fallbackName]),
+    !dense && infoParts.length > 0 ? el("span", { className: "mcard__info" }, infoParts) : null,
+    !dense && caption ? el("span", { className: "mcard__caption" }, [caption]) : null,
     badge ? el("span", { className: `mcard__badge${badgeCorner ? " mcard__badge--corner" : ""}` }, [badge]) : null,
-    created ? el("span", { className: "mcard__created", title: "クリエイト済み" }, [icon("summon", { size: 10 })]) : null,
+    created && !dense ? el("span", { className: "mcard__created", title: "クリエイト済み" }, [icon("summon", { size: 10 })]) : null,
   ];
 
   // 詳細ボタンを角に入れるため、外側は button ではなく div にする
