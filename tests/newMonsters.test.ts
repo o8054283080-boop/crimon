@@ -262,14 +262,44 @@ describe("⑬ 多段スキルで追加効果が多重発動しない", () => {
   it("4連撃でも、ゲージ吸収のパッシブは1回しか出ない", () => {
     // 闇クロノスの「時の管理者」は、攻撃スキル1回につき1度だけ吸収する
     const engine = battle(["chronos_DARK"], ["golem_WATER"], () => 0);
-    const [chronos] = engine.getUnits();
+    const [chronos, enemy] = engine.getUnits();
     chronos.def = { ...chronos.def, skills: [{
       id: "test_multi", name: "検査用多段", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0,
       effects: [{ kind: "DAMAGE", multiplier: 0.1, hits: 4 }],
     }, chronos.def.skills[1], chronos.def.skills[2]] };
+    chronos.gauge = 100;
+    enemy.gauge = 50;
     const record = engine.resolveTurn(chronos, { skillIndex: 0 });
     const drains = record.lines.filter((line) => line.includes("「時の管理者」で行動ゲージを吸収")).length;
     expect(drains).toBe(1);
+    expect(enemy.gauge).toBeCloseTo(44, 5);
+    expect(chronos.gauge).toBeCloseTo(6, 5);
+  });
+
+  it("闇クロノスは全体攻撃で生存敵それぞれから1回ずつゲージを吸収する", () => {
+    const chronos = findMonsterById("chronos_DARK")!;
+    const nemesis = findMonsterById("nemesis_FIRE")!;
+    const enemies = Array.from({ length: 4 }, () => findMonsterById("golem_WATER")!);
+    const engine = new BattleEngine([
+      {
+        ...chronos,
+        skills: [
+          chronos.skills[0],
+          nemesis.skills[1],
+          { ...chronos.skills[2], passiveLevel: 5 },
+        ],
+      },
+    ], enemies, { rng: () => 0 });
+    const [source, ...targets] = engine.getUnits();
+    source.gauge = 100;
+    targets.forEach((target) => { target.gauge = 50; });
+
+    const record = engine.resolveTurn(source, { skillIndex: 1 });
+
+    expect(source.gauge).toBeCloseTo(40, 5);
+    expect(targets.map((target) => target.gauge)).toEqual([40, 40, 40, 40]);
+    expect(targets.every((target) => target.stunTurns === 1)).toBe(true);
+    expect(record.lines.filter((line) => line.includes("「時の管理者」で行動ゲージを吸収"))).toHaveLength(4);
   });
 
   it("多段の毒付与も1回だけ判定される", () => {

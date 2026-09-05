@@ -86,9 +86,12 @@ export function calcDamage(
       : getEffectiveStat(attacker, effect.scaleBonus.stat)
     : 0;
   // 基準値に対する割合。基準の半分なら上乗せも半分になる
-  const scaleBonus = effect.scaleBonus
+  const prey = passiveEffectOf(attacker);
+  const passiveSpeedBonus = prey?.kind === "SCENT_OF_PREY"
+    ? (prey.speedCoefficient ?? 0) * getEffectiveStat(attacker, "spd") / 200 : 0;
+  const scaleBonus = passiveSpeedBonus + (effect.scaleBonus
     ? effect.scaleBonus.bonusAtReference * (scaleBonusStatValue / SCALE_REFERENCE[effect.scaleBonus.stat])
-    : 0;
+    : 0);
   const dependentStat = effect.hpCoefficient !== undefined
     ? attacker.maxHp
     : effect.defCoefficient !== undefined

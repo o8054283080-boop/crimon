@@ -168,6 +168,10 @@ export function passiveStatBonus(unit: BattleUnit, stat: BuffStat): { multiplier
     if (stat === "criDmg") return { multiplier: 1, add: effect.critDmg };
     if (stat === "spd") return { multiplier: 1, add: effect.spd };
   }
+  if (effect.kind === "SCENT_OF_PREY") {
+    if (stat === "atk") return { multiplier: 1 + (effect.atkUp ?? 0), add: 0 };
+    if (stat === "spd") return { multiplier: 1, add: effect.spd ?? 0 };
+  }
   if (effect.kind === "PACK_INSTINCT" && stat === "criDmg") return { multiplier: 1, add: effect.critDmg };
   return { multiplier: 1, add: 0 };
 }

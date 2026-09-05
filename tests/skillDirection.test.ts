@@ -39,6 +39,7 @@ function misdirection(effect: SkillEffect, direction: Direction): string | undef
 
   if (effect.kind === "GAUGE") {
     // 吸収は相手から奪う動作なので敵向き、素の増加は味方向き
+    if (effect.drain && effect.amount <= 0) return "ゲージ吸収量が0以下で発動しない";
     if (effect.drain && direction !== "ENEMY") return "ゲージ吸収を味方に向けている";
     if (!effect.drain && effect.amount > 0 && direction === "ENEMY") return "敵の行動ゲージを進めてしまう";
     return undefined;
@@ -66,6 +67,7 @@ describe("スキルの効果の向き", () => {
     expect(misdirection({ kind: "HEAL", healRate: 0.12 }, "ENEMY")).toBeTruthy();
     expect(misdirection({ kind: "GAUGE", amount: 0.3 }, "ENEMY")).toBeTruthy();
     expect(misdirection({ kind: "GAUGE", amount: 0.25, drain: true }, "ALLY")).toBeTruthy();
+    expect(misdirection({ kind: "GAUGE", amount: -0.15, drain: true }, "ENEMY")).toBeTruthy();
   });
 
   it("正しい向きは通す", () => {

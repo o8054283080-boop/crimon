@@ -310,10 +310,10 @@ export const KOBOLD: MonsterTemplate = {
     {
       id: "kobold_s2_a",
       name: "急所突き",
-      description: "急所を狙い、敵単体に攻撃力1.6倍のダメージを与える。この攻撃は相手の防御力を20%無視する。",
+      description: "急所を狙い、敵単体に攻撃力1.9倍のダメージを与える。この攻撃は相手の防御力を25%無視する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
-      effects: [{ kind: "DAMAGE", multiplier: 1.6, ignoreDefenseRatio: 0.2 }],
+      effects: [{ kind: "DAMAGE", multiplier: 1.9, ignoreDefenseRatio: 0.25 }],
     },
     {
       id: "kobold_s2_b",

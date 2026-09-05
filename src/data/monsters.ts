@@ -31,12 +31,12 @@ const SLIME: MonsterTemplate = {
     {
       id: "slime_s2_a",
       name: "エレメンタルバースト",
-      description: "属性の力を込めて敵単体に攻撃力1.7倍のダメージを与え、50%で2ターン攻撃力を低下させる。",
-      target: "SINGLE_ENEMY",
+      description: "属性の力を弾けさせ、敵全体に攻撃力1.05倍のダメージを与え、それぞれ45%で2ターン攻撃力を低下させる。",
+      target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.7 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.5 },
+        { kind: "DAMAGE", multiplier: 1.05 },
+        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.45 },
       ],
     },
     {
@@ -521,12 +521,12 @@ const IMP: MonsterTemplate = {
     {
       id: "imp_s2_b",
       name: "めつぶし",
-      description: "敵単体に攻撃力1.2倍のダメージを与え、65%で2ターン暗闇を付与する。",
-      target: "SINGLE_ENEMY",
+      description: "敵全体に攻撃力0.9倍のダメージを与え、それぞれ50%で2ターン暗闇を付与する。",
+      target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.2 },
-        { kind: "BLIND", durationTurns: 2, chance: 0.65 },
+        { kind: "DAMAGE", multiplier: 0.9 },
+        { kind: "BLIND", durationTurns: 2, chance: 0.5 },
       ],
     },
     {
@@ -537,7 +537,7 @@ const IMP: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.2 },
-        { kind: "GAUGE", amount: -0.15, drain: true },
+        { kind: "GAUGE", amount: 0.15, drain: true },
         { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.7 },
       ],
     },
@@ -774,12 +774,12 @@ const TREANT: MonsterTemplate = {
     {
       id: "treant_s2_a",
       name: "からみつくねっこ",
-      description: "敵単体に攻撃力0.8倍のダメージを与え、55%で1ターン行動不能にする。自身の最大HPが高いほど威力が上がる。",
-      target: "SINGLE_ENEMY",
+      description: "敵全体に攻撃力0.7倍のダメージを与え、それぞれ40%で1ターン行動不能にする。自身の最大HPが高いほど威力が上がる。",
+      target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.04 },
-        { kind: "STUN", durationTurns: 1, chance: 0.55 },
+        { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.03 },
+        { kind: "STUN", durationTurns: 1, chance: 0.4 },
       ],
     },
     {
@@ -1031,12 +1031,12 @@ const GRIFFON: MonsterTemplate = {
     {
       id: "griffon_s2_a",
       name: "きりさく突風",
-      description: "鋭い風の刃で敵単体に攻撃力2.0倍のダメージを与え、30%で1ターンスタンさせる。",
-      target: "SINGLE_ENEMY",
+      description: "鋭い風の刃で敵全体に攻撃力1.2倍のダメージを与え、それぞれ25%で1ターンスタンさせる。",
+      target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "STUN", durationTurns: 1, chance: 0.3 },
+        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "STUN", durationTurns: 1, chance: 0.25 },
       ],
     },
     {
@@ -1324,12 +1324,12 @@ const SERAPH: MonsterTemplate = {
     {
       id: "seraph_s2_a",
       name: "さばきの光",
-      description: "敵単体に攻撃力2.3倍のダメージを与え、85%で1ターン暗闇を付与する。",
-      target: "SINGLE_ENEMY",
+      description: "敵全体に攻撃力1.25倍のダメージを与え、それぞれ60%で1ターン暗闇を付与する。",
+      target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.3 },
-        { kind: "BLIND", durationTurns: 1, chance: 0.85 },
+        { kind: "DAMAGE", multiplier: 1.25 },
+        { kind: "BLIND", durationTurns: 1, chance: 0.6 },
       ],
     },
     {
