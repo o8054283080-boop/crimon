@@ -114,7 +114,7 @@ body.notice-sheet-open{overflow:hidden!important}
   color:#edf3f7;
   font-size:.78rem;
   line-height:1.68;
-  white-space:normal;
+  white-space:pre-line;
   overflow-wrap:anywhere;
 }
 .notice-card__reward{

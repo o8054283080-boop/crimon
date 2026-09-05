@@ -216,6 +216,7 @@ export interface LifestealEffect {
   kind: "LIFESTEAL";
   /** 直前に与えたダメージに対する回復割合(例: 0.1で与ダメの10%回復) */
   healRate: number;
+  maxSourceHpRate?: number;
   /** 自身のHPがこの割合以下なら、回復割合をさらに増やす */
   selfLowHpExtra?: { hpRatio: number; extra: number };
 }
@@ -560,6 +561,8 @@ export type SkillEffect =
   | GaugeOnHitEffect;
 
 export interface Skill {
+  /** 指定レベル到達時の個別性能。通常成長のあとに適用する。 */
+  maxLevelOverride?: { effects?: SkillEffect[]; cooldownTurns?: number };
   id: string;
   name: string;
   description: string;
@@ -734,7 +737,7 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
 
   const cooldownTurns = isMaxLevel ? Math.max(0, skill.cooldownTurns - 1) : skill.cooldownTurns;
 
-  return { ...skill, cooldownTurns, effects };
+  return { ...skill, cooldownTurns, effects, ...(isMaxLevel ? skill.maxLevelOverride : {}) };
 }
 
 export const BUFF_STAT_JA: Record<BuffStat, string> = {
@@ -830,7 +833,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `${who}回復 最大HPの${(effect.healRate * 100).toFixed(1)}%`;
     }
     case "LIFESTEAL":
-      return `与えたダメージの${(effect.healRate * 100).toFixed(0)}%を自身が回復`;
+      return `与えたダメージの${(effect.healRate * 100).toFixed(0)}%を自身が回復${effect.maxSourceHpRate === undefined ? "" : ` (自身の最大HPの${effect.maxSourceHpRate * 100}%まで)`}`;
     case "BUFF": {
       const scope = effect.applyTo === "ALLIES" ? "味方全体の" : effect.applyTo === "SELF" ? "自身の" : "";
       return `${scope}${BUFF_STAT_JA[effect.stat]}+${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;

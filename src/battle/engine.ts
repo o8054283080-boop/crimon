@@ -1556,11 +1556,20 @@ export class BattleEngine {
     }
     if (passive.kind === "TIME_KEEPER" && resolution.damageDealt > 0) {
       resolution.sourcePassiveUsed = true;
-      this.drainGauge(source, primary, passive.drain);
-      this.push(`  → ${this.label(source)} の「時の管理者」で行動ゲージを吸収した！`);
-      if (primary.alive && !this.isImmune(primary) && this.rollEffectSuccess(source, primary, passive.stunChance)) {
-        primary.stunTurns = Math.max(primary.stunTurns, 1);
-        this.push(`  → ${this.label(primary)} はスタンした！`);
+      // 全体攻撃なら、攻撃を受けて生き残った敵それぞれへ1回ずつ作用する。
+      // Setで重複を除くため、同じ敵へ複数回当たる多段・ランダム攻撃でも
+      // 吸収とスタンは1スキルにつき敵1体あたり1回まで。
+      const affectedTargets = [...new Set(targets)]
+        .filter((target) => target.alive && target.team !== source.team);
+      for (const affected of affectedTargets) {
+        const drained = this.drainGauge(source, affected, passive.drain);
+        if (drained > 0) {
+          this.push(`  → ${this.label(source)} の「時の管理者」で行動ゲージを吸収した！ (対象: ${this.label(affected)})`);
+        }
+        if (!this.isImmune(affected) && this.rollEffectSuccess(source, affected, passive.stunChance)) {
+          affected.stunTurns = Math.max(affected.stunTurns, 1);
+          this.push(`  → ${this.label(affected)} はスタンした！`);
+        }
       }
     }
     if (passive.kind === "REAPER_HARVEST" && resolution.damageDealt > 0 && primary.alive) {
@@ -2054,7 +2063,8 @@ export class BattleEngine {
           const lowExtra = effect.selfLowHpExtra && hpRatio(source) <= effect.selfLowHpExtra.hpRatio
             ? effect.selfLowHpExtra.extra
             : 0;
-          const healAmount = Math.round(damageDealtThisCall * (effect.healRate + lowExtra));
+          const healAmount = Math.min(Math.round(damageDealtThisCall * (effect.healRate + lowExtra)),
+            effect.maxSourceHpRate === undefined ? Infinity : Math.floor(source.maxHp * effect.maxSourceHpRate));
           if (healAmount <= 0) break;
           applyHeal(source, healAmount);
           this.push(`  → ${this.label(source)} は与えたダメージの一部でHPが ${healAmount} 回復！ (${source.currentHp}/${source.maxHp})`);

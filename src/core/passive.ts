@@ -61,7 +61,7 @@ export type PassiveLevelEffect =
    * コボルト「獲物の匂い」。
    * HPが一定割合以下の敵への最終ダメージが上がる。
    */
-  | { kind: "SCENT_OF_PREY"; hpRatio: number; damageUp: number }
+  | { kind: "SCENT_OF_PREY"; hpRatio: number; damageUp: number; atkUp?: number; spd?: number; speedCoefficient?: number }
   /**
    * バジリスク「蛇王の支配」。
    * 速度低下状態の敵が行動するたび、自身の行動ゲージが上がる。
@@ -129,7 +129,7 @@ export function describePassiveLevel(effect: PassiveLevelEffect): string {
     case "LAST_STAND":
       return `自身のHPが${pct(effect.hpRatio)}以下の間、防御力+${pct(effect.defUp)}・受けるダメージ-${pct(effect.damageTaken)}`;
     case "SCENT_OF_PREY":
-      return `HPが${pct(effect.hpRatio)}以下の敵への最終ダメージ+${pct(effect.damageUp)}`;
+      return `HPが${pct(effect.hpRatio)}以下の敵への最終ダメージ+${pct(effect.damageUp)}。常時攻撃力+${pct(effect.atkUp ?? 0)}・速度+${effect.spd ?? 0}。すべての攻撃に速度比例を加算(速度200で倍率+${effect.speedCoefficient ?? 0})`;
     case "GAUGE_ON_SLOWED_ENEMY_ACT":
       return `速度低下状態の敵が行動するたび、自身の行動ゲージ+${pct(effect.gauge)}`;
     case "FALSE_TREASURE":

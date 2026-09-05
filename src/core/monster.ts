@@ -1,6 +1,7 @@
 import { Element, ELEMENT_COLOR, ELEMENT_JA, ELEMENTS } from "./element.js";
 import { CombatModifiers } from "./equipment.js";
 import { Skill, SkillEffect } from "./skill.js";
+import { applySeptemberSkillBalance } from "./skillRebalance.js";
 import { Stats, cloneStats } from "./stats.js";
 import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
 
@@ -173,6 +174,7 @@ const ELEMENT_STAT_FLAVOR: Record<Element, (stats: Stats) => Stats> = {
  * 実体化の直前にIDで差し替える。光/闇固有技や新規高レアには一切波及しない。
  */
 function applyLegacySkillBalance(skill: Skill): Skill {
+  skill = applySeptemberSkillBalance(skill);
   switch (skill.id) {
     case "slime_s3_a":
       return {

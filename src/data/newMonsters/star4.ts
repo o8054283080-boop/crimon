@@ -451,11 +451,11 @@ export const THUNDERBEAST: MonsterTemplate = {
     {
       id: "thunderbeast_s2_b",
       name: "連雷",
-      description: "敵単体に攻撃力0.75倍のダメージを2回与える。一度でもクリティカルすれば自身の行動ゲージが25%進む。",
-      target: "SINGLE_ENEMY",
+      description: "敵全体に攻撃力0.55倍のダメージを2回与える。一度でもクリティカルすれば自身の行動ゲージが25%進む。",
+      target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.75, hits: 2 },
+        { kind: "DAMAGE", multiplier: 0.55, hits: 2 },
         { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "ANY_CRIT" },
       ],
     },

@@ -104,13 +104,13 @@ describe("80階V2: 測定パーティは本当に剥がし・強化阻害を持�
     expect(JSON.stringify(passive?.passive)).toContain("REAPER_HARVEST");
   });
 
-  it("編成にBUFF_BLOCKを効果として持つ個体はいない(パッシブ経由だけ)", () => {
+  it("草アビスリーパーは冥府の契約でも強化阻害を付与できる", () => {
     // ここが変わったら、強化阻害の入り方そのものが変わったということ
     for (const ally of TOWER80_STRIP_BLOCK_PARTY_V2) {
       const dex = findMonsterById(`${ally.templateId}_${ally.element}`)!;
       const direct = dex.skills.flatMap((skill) => skill.effects)
         .filter((effect) => effect.kind === "STATUS" && (effect as { status?: string }).status === "BUFF_BLOCK");
-      expect(direct, `${ally.label}`).toHaveLength(0);
+      expect(direct, `${ally.label}`).toHaveLength(dex.id === "abyssreaper_GRASS" ? 1 : 0);
     }
   });
 });
