@@ -495,9 +495,9 @@ describe("100階の仕掛けは1〜99階へ漏れていない", () => {
     expect(JSON.stringify(others)).not.toContain("crimoark");
   });
 
-  it("報酬は触っていない", () => {
+  it("追加報酬を維持し、指定されたダイヤ3,000へ更新する", () => {
     expect(findTowerFloor(100)!.firstClearReward)
-      .toEqual({ crystal: 500, summonScroll: 30, lightDarkFourStarSummonScrolls: 3, fiveStarSummonScrolls: 1 });
+      .toEqual({ crystal: 3_000, summonScroll: 30, lightDarkFourStarSummonScrolls: 3, fiveStarSummonScrolls: 1 });
   });
 });
 

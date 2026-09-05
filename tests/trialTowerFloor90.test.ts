@@ -394,9 +394,8 @@ describe("90階の仕掛けは90階の外へ漏れていない", () => {
     expect(JSON.stringify(others)).not.toContain("tower90_");
   });
 
-  it("報酬は他のボス階と同じ式のまま(今回は触っていない)", () => {
-    // 90階は節(10階ごと)の報酬。**敵編成を作り替えても報酬式には手を入れていない**
-    expect(findTowerFloor(90)!.firstClearReward).toEqual({ crystal: 350, skillPigs: 3, awakeningOrbs: 3 });
+  it("追加報酬を維持し、指定されたダイヤ2,500へ更新する", () => {
+    expect(findTowerFloor(90)!.firstClearReward).toEqual({ crystal: 2_500, skillPigs: 3, awakeningOrbs: 3 });
   });
 });
 

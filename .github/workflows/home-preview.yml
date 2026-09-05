@@ -7,6 +7,7 @@ on:
     paths:
       - "src/web/**"
       - "tools/homePreview.mjs"
+      - "tools/trialTowerPreview.mjs"
       - ".github/workflows/home-preview.yml"
   workflow_dispatch: {}
 
@@ -36,9 +37,26 @@ jobs:
           exit 1
       - name: Capture HOME screenshots
         run: node tools/homePreview.mjs
+      - name: Start Trial Tower preview server
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4174 > /tmp/crimon-tower-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4174/preview.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/crimon-tower-preview.log
+          exit 1
+      - name: Capture Trial Tower screenshots
+        run: node tools/trialTowerPreview.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: home-preview-${{ github.event.pull_request.number || github.run_id }}
           path: artifacts/home-preview/*.png
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trial-tower-preview-${{ github.event.pull_request.number || github.run_id }}
+          path: artifacts/trial-tower-preview/*.png
           if-no-files-found: error
           retention-days: 7

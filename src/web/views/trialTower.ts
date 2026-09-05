@@ -13,8 +13,10 @@ import {
   isTowerBossFloor,
   isTowerCheckpoint,
 } from "../../data/trialTower.js";
+import { TowerEnemyInfo, trialTowerEnemyInfo } from "../../data/trialTowerEnemyInfo.js";
 import { MAX_TOWER_PARTY_SIZE, PlayerState } from "../../game/playerState.js";
 import { TowerRewardResult } from "../../game/trialTower.js";
+import { TrialTowerRankingEntry } from "../../net/trialTowerSync.js";
 import { el } from "../dom.js";
 import { withPortrait } from "../three/portrait.js";
 
@@ -55,6 +57,15 @@ export interface TrialTowerProps {
     floor: number;
     reward: TowerRewardResult;
   } | null;
+  panel: "NONE" | "ENEMY_INFO" | "RANKING";
+  rankingEntries: TrialTowerRankingEntry[];
+  rankingSelf: TrialTowerRankingEntry | null;
+  rankingLoading: boolean;
+  rankingError: boolean;
+  onOpenEnemyInfo: () => void;
+  onOpenRanking: () => void;
+  onReloadRanking: () => void;
+  onClosePanel: () => void;
   /** outcome の知らせを閉じる */
   onDismissOutcome: () => void;
   onEditParty: () => void;
@@ -63,6 +74,86 @@ export interface TrialTowerProps {
   /** 登坂をやめる(途中経過を捨てて節からやり直しになる) */
   onAbandon: () => void;
   onBack: () => void;
+}
+
+function renderEnemyAbilityList(label: string, items: TowerEnemyInfo["skills"]): HTMLElement | null {
+  if (items.length === 0) return null;
+  return el("div", { className: "tower-intel__abilities" }, items.map((item, index) =>
+    el("div", { className: "tower-intel__ability" }, [
+      el("div", { className: "tower-intel__ability-name" }, [`${label}${label === "スキル" ? index + 1 : ""}：${item.name}`]),
+      el("p", { className: "tower-intel__ability-effect" }, [`効果：${item.description}`]),
+    ]),
+  ));
+}
+
+function renderEnemyInfoModal(props: TrialTowerProps): HTMLElement {
+  const enemies = trialTowerEnemyInfo(props.nextFloor);
+  return el("div", { className: "tower-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "tower-enemy-info-title", "data-tour": "tower-enemy-info" }, [
+    el("button", { type: "button", className: "tower-modal__backdrop", "aria-label": "閉じる", onclick: props.onClosePanel }, []),
+    el("section", { className: "tower-modal__sheet" }, [
+      el("div", { className: "tower-modal__head" }, [
+        el("div", {}, [
+          el("span", { className: "tower-modal__eyebrow" }, [`${props.nextFloor}F`]),
+          el("h2", { id: "tower-enemy-info-title" }, ["敵情報"]),
+        ]),
+        el("button", { type: "button", className: "btn btn--ghost tower-modal__close", onclick: props.onClosePanel, "aria-label": "敵情報を閉じる" }, ["✕"]),
+      ]),
+      el("p", { className: "tower-modal__lead" }, ["この階で実際に使われるスキルと固有効果です。能力値・装備は表示していません。"]),
+      el("div", { className: "tower-intel" }, enemies.map((enemy) =>
+        el("article", { className: "tower-intel__card" }, nodes([
+          el("h3", {}, [`【${enemy.name}】`]),
+          renderEnemyAbilityList("スキル", enemy.skills),
+          renderEnemyAbilityList("パッシブ", enemy.passives),
+        ])),
+      )),
+    ]),
+  ]);
+}
+
+function rankingFloor(entry: TrialTowerRankingEntry): string {
+  return entry.bestFloor >= TOWER_FLOOR_COUNT ? "👑 100F CLEAR" : `${entry.bestFloor}F`;
+}
+
+function renderRankingRow(entry: TrialTowerRankingEntry, selfId: string | null): HTMLElement {
+  const self = entry.userId === selfId;
+  return el("div", { className: `tower-ranking__row${self ? " is-self" : ""}` }, [
+    el("span", { className: "tower-ranking__rank" }, [`${entry.rank}位`]),
+    el("span", { className: "tower-ranking__name" }, [entry.name]),
+    el("span", { className: `tower-ranking__floor${entry.bestFloor >= 100 ? " is-clear" : ""}` }, [rankingFloor(entry)]),
+  ]);
+}
+
+function renderRankingModal(props: TrialTowerProps): HTMLElement {
+  const selfId = props.rankingSelf?.userId ?? null;
+  let body: HTMLElement;
+  if (props.rankingLoading) body = el("p", { className: "tower-ranking__state" }, ["ランキングを読み込んでいます…"]);
+  else if (props.rankingError) body = el("div", { className: "tower-ranking__state" }, [
+    el("p", {}, ["ランキングを取得できませんでした"]),
+    el("button", { type: "button", className: "btn btn--ghost", onclick: props.onReloadRanking }, ["もう一度試す"]),
+  ]);
+  else if (props.rankingEntries.length === 0) body = el("p", { className: "tower-ranking__state" }, ["まだ到達記録がありません"]);
+  else body = el("div", { className: "tower-ranking__list" }, props.rankingEntries.map((entry) => renderRankingRow(entry, selfId)));
+
+  return el("div", { className: "tower-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "tower-ranking-title", "data-tour": "tower-ranking" }, [
+    el("button", { type: "button", className: "tower-modal__backdrop", "aria-label": "閉じる", onclick: props.onClosePanel }, []),
+    el("section", { className: "tower-modal__sheet tower-modal__sheet--ranking" }, nodes([
+      el("div", { className: "tower-modal__head" }, [
+        el("div", {}, [
+          el("span", { className: "tower-modal__eyebrow" }, ["ALL-TIME BEST"]),
+          el("h2", { id: "tower-ranking-title" }, ["最高到達階ランキング"]),
+        ]),
+        el("button", { type: "button", className: "btn btn--ghost tower-modal__close", onclick: props.onClosePanel, "aria-label": "ランキングを閉じる" }, ["✕"]),
+      ]),
+      el("p", { className: "tower-modal__lead" }, ["歴代最高階の高い順。同じ階では先に到達したプレイヤーが上位です。"]),
+      body,
+      props.rankingSelf
+        ? el("div", { className: "tower-ranking__self" }, [
+            el("span", {}, ["あなた"]),
+            el("strong", {}, [`${props.rankingSelf.rank}位 / ${rankingFloor(props.rankingSelf)}`]),
+          ])
+        : null,
+    ])),
+  ]);
 }
 
 function renderMonthlyRewards(props: TrialTowerProps): HTMLElement {
@@ -623,6 +714,12 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
       el("h1", {}, ["試練の塔"]),
       el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
     ]),
+    el("div", { className: "tower-actions" }, nodes([
+      props.nextFloor >= 60
+        ? el("button", { type: "button", className: "btn btn--ghost tower-actions__button", onclick: props.onOpenEnemyInfo, "data-tour": "tower-enemy-info-open" }, ["📖 敵情報"])
+        : null,
+      el("button", { type: "button", className: "btn btn--ghost tower-actions__button", onclick: props.onOpenRanking, "data-tour": "tower-ranking-open" }, ["🏆 ランキング"]),
+    ])),
     renderOutcome(props),
     props.notice ? el("div", { className: "tower-notice" }, [props.notice]) : null,
     renderHero(props),
@@ -641,5 +738,7 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
         )
       : null,
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onBack }, ["◀ 戻る"]),
+    props.panel === "ENEMY_INFO" ? renderEnemyInfoModal(props) : null,
+    props.panel === "RANKING" ? renderRankingModal(props) : null,
   ]));
 }

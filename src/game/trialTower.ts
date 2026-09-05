@@ -177,6 +177,8 @@ export interface TowerFloorOutcome {
   /** 全滅して登坂が終わったか */
   wiped: boolean;
   reward: TowerRewardResult;
+  /** この勝利で、月をまたいで残す歴代最高階を更新したか */
+  lifetimeBestUpdated: boolean;
 }
 
 /**
@@ -206,17 +208,19 @@ export function applyTowerFloorResult(
   if (!cleared) {
     // 負けたらこの登坂は終わり。次は節からやり直し
     state.trialTowerRun = null;
-    return { cleared: false, restored: false, completed: false, wiped: true, reward: emptyTowerRewardResult() };
+    return { cleared: false, restored: false, completed: false, wiped: true, reward: emptyTowerRewardResult(), lifetimeBestUpdated: false };
   }
 
   const clearedFloor = run.floor;
   const reward = claimTowerFloorReward(state, clearedFloor, rng);
   if (clearedFloor > state.trialTowerBestFloor) state.trialTowerBestFloor = clearedFloor;
+  const lifetimeBestUpdated = clearedFloor > state.trialTowerLifetimeBestFloor;
+  if (lifetimeBestUpdated) state.trialTowerLifetimeBestFloor = clearedFloor;
 
   const completed = clearedFloor >= TOWER_FLOOR_COUNT;
   if (completed) {
     state.trialTowerRun = null;
-    return { cleared: true, restored: false, completed: true, wiped: false, reward };
+    return { cleared: true, restored: false, completed: true, wiped: false, reward, lifetimeBestUpdated };
   }
 
   const restored = isTowerCheckpoint(clearedFloor);
@@ -228,7 +232,7 @@ export function applyTowerFloorResult(
     state.trialTowerRun = run;
   }
 
-  return { cleared: true, restored, completed: false, wiped: false, reward };
+  return { cleared: true, restored, completed: false, wiped: false, reward, lifetimeBestUpdated };
 }
 
 /**

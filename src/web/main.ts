@@ -162,6 +162,12 @@ import {
 import type { ArenaMatchTicket, ArenaRankingEntry } from "../net/arenaSync.js";
 import { arenaAuthUserId, ensureArenaAuth } from "../net/arenaAuth.js";
 import {
+  fetchTrialTowerRanking,
+  fetchTrialTowerSelf,
+  submitTrialTowerProgress,
+} from "../net/trialTowerSync.js";
+import type { TrialTowerRankingEntry } from "../net/trialTowerSync.js";
+import {
   ARENA_TEAM_SIZE,
   advanceArenaOpponentSeed,
   applyArenaTicketRegen,
@@ -415,6 +421,11 @@ interface AppState {
   towerOutcome: TowerOutcome | null;
   /** 戦闘画面の ⏹ が押された。今の階を終えたら登坂を止める */
   towerStopRequested: boolean;
+  towerPanel: "NONE" | "ENEMY_INFO" | "RANKING";
+  towerRankingEntries: TrialTowerRankingEntry[];
+  towerRankingSelf: TrialTowerRankingEntry | null;
+  towerRankingLoading: boolean;
+  towerRankingError: boolean;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
   /** 結果確認後に通知だけを閉じる対象。報酬データとは独立して扱う。 */
@@ -497,6 +508,11 @@ const state: AppState = {
   towerNotice: null,
   towerOutcome: null,
   towerStopRequested: false,
+  towerPanel: "NONE",
+  towerRankingEntries: [],
+  towerRankingSelf: null,
+  towerRankingLoading: false,
+  towerRankingError: false,
   autoFarmResult: null,
   autoFarmTargetName: "",
   viewingBackgroundFarmJobId: null,
@@ -765,6 +781,7 @@ function navigate(screen: ScreenName): void {
   state.towerNotice = null;
   state.towerOutcome = null;
   state.towerStopRequested = false;
+  state.towerPanel = "NONE";
   render();
 }
 
@@ -2244,6 +2261,47 @@ function finishArenaMatch(won: boolean): void {
  * 試練の塔
  * ============================================================ */
 
+/** Arena と同じ匿名認証・プロフィールを使って塔の同期入口を整える。 */
+let trialTowerProfileName: string | null = null;
+async function connectTrialTower(): Promise<boolean> {
+  if (!arenaSyncAvailable()) return false;
+  const auth = await ensureArenaAuth();
+  if (!auth) return false;
+  const name = state.player.fighterName || "プレイヤー";
+  if (trialTowerProfileName === name) return true;
+  if ((await ensureArenaProfile(name)) === null) return false;
+  trialTowerProfileName = name;
+  return true;
+}
+
+/** ローカルの歴代最高を送る。失敗しても塔・報酬・セーブには一切触れない。 */
+async function syncTrialTowerBest(): Promise<boolean> {
+  const best = state.player.trialTowerLifetimeBestFloor;
+  if (best < 1 || !(await connectTrialTower())) return false;
+  return (await submitTrialTowerProgress(best)) !== null;
+}
+
+async function refreshTrialTowerRanking(): Promise<void> {
+  state.towerRankingLoading = true;
+  state.towerRankingError = false;
+  render();
+
+  const connected = await connectTrialTower();
+  if (connected && state.player.trialTowerLifetimeBestFloor > 0) {
+    // 前回の通信断で送れなかった自己ベストも、ランキングを開いた時に追いつかせる。
+    await submitTrialTowerProgress(state.player.trialTowerLifetimeBestFloor);
+  }
+  const [ranking, self] = await Promise.all([
+    fetchTrialTowerRanking(50),
+    fetchTrialTowerSelf(arenaAuthUserId()),
+  ]);
+  state.towerRankingEntries = ranking.entries;
+  state.towerRankingSelf = self;
+  state.towerRankingLoading = false;
+  state.towerRankingError = !ranking.ok;
+  render();
+}
+
 /**
  * 次の階へ挑む(登坂の開始も継続もここ)。
  *
@@ -2291,6 +2349,7 @@ function finishTowerFloor(cleared: boolean, setup: TowerBattleSetup, engine: Bat
 
   const outcome = applyTowerFloorResult(state.player, run, setup, engine, cleared);
   savePlayerState(state.player);
+  if (outcome.lifetimeBestUpdated) void syncTrialTowerBest();
 
   /** 塔の画面へ戻す。⏹ の押下は登坂ごとのものなので、ここで必ず畳む */
   const backToTower = (kind: TowerOutcome["kind"], fanfare = false): void => {
@@ -3283,6 +3342,24 @@ function render(): void {
         notice: state.towerNotice === blockedReason ? null : state.towerNotice,
         outcome: state.towerOutcome,
         blockedReason,
+        panel: state.towerPanel,
+        rankingEntries: state.towerRankingEntries,
+        rankingSelf: state.towerRankingSelf,
+        rankingLoading: state.towerRankingLoading,
+        rankingError: state.towerRankingError,
+        onOpenEnemyInfo: () => {
+          state.towerPanel = "ENEMY_INFO";
+          render();
+        },
+        onOpenRanking: () => {
+          state.towerPanel = "RANKING";
+          void refreshTrialTowerRanking();
+        },
+        onReloadRanking: () => { void refreshTrialTowerRanking(); },
+        onClosePanel: () => {
+          state.towerPanel = "NONE";
+          render();
+        },
         onEditParty: () => {
           state.towerOutcome = null;
           openPartyFrom({ screen: "TRIAL_TOWER", label: `試練の塔${nextTowerFloor(state.player)}F` }, "TOWER");

@@ -19,6 +19,7 @@ describe("試練の塔のJST月間シーズン", () => {
     const state = createInitialState();
     state.trialTowerSeason = "2026-08";
     state.trialTowerBestFloor = 20;
+    state.trialTowerLifetimeBestFloor = 73;
     state.trialTowerClaimedFloors = [1, 15, 20];
     state.trialTowerMonthlyOrbClaimedFloors = [15];
     state.awakeningOrbs = 7;
@@ -32,6 +33,7 @@ describe("試練の塔のJST月間シーズン", () => {
     expect(state).toMatchObject({
       trialTowerSeason: "2026-09",
       trialTowerBestFloor: 0,
+      trialTowerLifetimeBestFloor: 73,
       trialTowerClaimedFloors: [],
       trialTowerMonthlyOrbClaimedFloors: [],
       trialTowerRun: null,
@@ -64,9 +66,11 @@ describe("試練の塔のJST月間シーズン", () => {
     legacy.trialTowerBestFloor = 20;
     delete legacy.trialTowerSeason;
     delete legacy.trialTowerMonthlyOrbClaimedFloors;
+    delete legacy.trialTowerLifetimeBestFloor;
     const loaded = normalizeLoadedState(legacy, SEPTEMBER);
     expect(loaded.trialTowerSeason).toBe("2026-09");
     expect(loaded.trialTowerBestFloor).toBe(20);
+    expect(loaded.trialTowerLifetimeBestFloor).toBe(20);
     expect(loaded.trialTowerMonthlyOrbClaimedFloors).toEqual([15]);
   });
 });
