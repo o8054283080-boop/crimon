@@ -102,7 +102,20 @@ export function renderParty(props: PartyProps): HTMLElement {
       partyMemberCard(
         instance,
         activeIdSet.has(instance.id),
-        () => (props.selectedSlot === null ? onToggle(instance.id) : props.onChooseMonster(instance.id)),
+        () => {
+          if (props.selectedSlot !== null) {
+            props.onChooseMonster(instance.id);
+            return;
+          }
+          const activeIndex = activeIds.indexOf(instance.id);
+          // 編成中カードのタップで即解除しない。まずその枠を交換対象にする。
+          if (activeIndex >= 0) {
+            props.onSelectSlot(activeIndex);
+            return;
+          }
+          // 空きがある時の追加は従来どおり1タップで行える。
+          onToggle(instance.id);
+        },
         () => props.onViewDetail(instance.id),
       ),
     moreLabel: (rendered, total) => `さらに表示（${rendered} / ${total}）`,
@@ -118,11 +131,12 @@ export function renderParty(props: PartyProps): HTMLElement {
       const member = activeMembers[index];
       const dex = member ? findMonsterById(member.dexId) : undefined;
       const selected = props.selectedSlot === index;
-      return el(
+      const slotClass = `party-edit-slot${member ? " is-filled" : " is-empty"}${selected ? " is-selected" : ""}`;
+      const selectButton = el(
         "button",
         {
           type: "button",
-          className: `party-edit-slot${member ? " is-filled" : " is-empty"}${selected ? " is-selected" : ""}`,
+          className: "party-edit-slot__select",
           onclick: () => props.onSelectSlot(index),
           "aria-pressed": selected ? "true" : "false",
           title: member ? `${dex?.name ?? member.dexId}を交換` : `${index + 1}枠目に追加`,
@@ -140,6 +154,23 @@ export function renderParty(props: PartyProps): HTMLElement {
               el("span", { className: "party-edit-slot__action" }, [selected ? "選択中" : "追加"]),
             ],
       );
+
+      return el("div", { className: slotClass }, [
+        selectButton,
+        member
+          ? el(
+              "button",
+              {
+                type: "button",
+                className: "party-edit-slot__remove",
+                title: `${dex?.name ?? member.dexId}を編成から外す`,
+                "aria-label": `${dex?.name ?? member.dexId}を編成から外す`,
+                onclick: () => onToggle(member.id),
+              },
+              ["×"],
+            )
+          : null,
+      ].filter(Boolean) as HTMLElement[]);
     }),
   );
 
