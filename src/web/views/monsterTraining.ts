@@ -66,7 +66,9 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
   }
 
   const dex = findMonsterById(target.dexId);
-  const candidates = props.player.monsters.filter((m) => m.id !== target.id && !props.player.partyIds.includes(m.id));
+  const candidates = props.player.monsters.filter(
+    (m) => m.id !== target.id && !props.player.partyIds.includes(m.id) && m.locked !== true,
+  );
   const materials = props.selectedMaterialIds
     .map((id) => props.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
@@ -105,11 +107,6 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
       el("p", {}, [
         `${props.selectedMaterialIds.length}体選択中(うち同種${bonusCount}体・同属性${sameElementCount}体) / 獲得予定経験値 ${totalExp}${isLevelMax ? "（LvMAX）" : ""}`,
       ]),
-      /*
-       * **選んだ顔ぶれをここに並べる。**
-       * 数だけ出しても「誰を選んだか」は分からず、確かめるには数十枚の一覧を
-       * 上から探し直すしかなかった。押せば外せるので、間違えた時も一覧へ戻らずに済む。
-       */
       materials.length > 0
         ? el("div", { className: "picked-row" }, [
             el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
