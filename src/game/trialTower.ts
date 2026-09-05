@@ -66,6 +66,13 @@ export interface TowerRewardResult {
   skillPigs: number;
 }
 
+/** 各階の月次報酬に加えて、覚醒オーブを1個受け取れる階。 */
+export const TRIAL_TOWER_MONTHLY_ORB_FLOORS = [15, 30] as const;
+
+export function isTrialTowerMonthlyOrbFloor(floor: number): floor is (typeof TRIAL_TOWER_MONTHLY_ORB_FLOORS)[number] {
+  return TRIAL_TOWER_MONTHLY_ORB_FLOORS.includes(floor as (typeof TRIAL_TOWER_MONTHLY_ORB_FLOORS)[number]);
+}
+
 export function emptyTowerRewardResult(): TowerRewardResult {
   return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null, awakeningOrbs: 0, fourStarSummonScrolls: 0, lightDarkFourStarSummonScrolls: 0, fiveStarSummonScrolls: 0, skillPigs: 0 };
 }
@@ -250,7 +257,7 @@ export function claimTowerFloorReward(state: PlayerState, floor: number, rng: ()
   state.trialTowerClaimedFloors.push(floor);
 
   const reward: TowerReward = def.firstClearReward;
-  if ((floor === 15 || floor === 30) && !state.trialTowerMonthlyOrbClaimedFloors.includes(floor)) {
+  if (isTrialTowerMonthlyOrbFloor(floor) && !state.trialTowerMonthlyOrbClaimedFloors.includes(floor)) {
     state.awakeningOrbs += 1;
     state.trialTowerMonthlyOrbClaimedFloors.push(floor);
     result.awakeningOrbs = 1;

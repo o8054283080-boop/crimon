@@ -133,6 +133,9 @@
 .tower-monthly__head, .tower-monthly__row { display: flex; align-items: center; gap: 10px; }
 .tower-monthly__head h2 { margin: 0; flex: 1; }
 .tower-monthly__season, .tower-monthly__reset { color: #a99db6; font-size: 0.65rem; }
+.tower-monthly__guide { margin: 8px 0; color: #bcb2c9; font-size: 0.72rem; line-height: 1.5; }
+.btn.tower-monthly__all { width: 100%; min-height: 42px; margin-bottom: 10px; font-size: 0.78rem; }
+.tower-monthly__bonus-head { margin: 2px 0 4px; color: #d8c390; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; }
 .tower-monthly__row { margin-top: 8px; padding: 8px 10px; border-radius: 9px; background: rgba(4, 2, 9, 0.48); }
 .tower-monthly__floor { width: 38px; font-weight: 900; }
 .tower-monthly__reward { flex: 1; color: #f4d995; font-size: 0.75rem; }
@@ -140,6 +143,34 @@
 .tower-monthly__row.is-claimed { opacity: 0.62; }
 .tower-monthly__row.is-claimed .tower-monthly__status { color: #b9b1c2; }
 .tower-monthly__reset { margin: 8px 0 0; text-align: right; }
+
+/* 全100階の月次報酬。10階ずつ畳み、現在の節だけ最初から開く。 */
+.tower-reward-catalog { display: grid; gap: 8px; }
+.tower-reward-band {
+  border-radius: 11px;
+  overflow: hidden;
+  background: rgba(4, 2, 9, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+.tower-reward-band__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 11px 12px;
+  color: #ead59f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.tower-reward-band__rows { display: grid; gap: 1px; padding: 0 7px 7px; }
+.tower-reward-row { padding: 9px 7px; background: rgba(15, 10, 24, 0.58); }
+.tower-reward-row + .tower-reward-row { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.tower-reward-row.is-claimed { opacity: 0.58; }
+.tower-reward-row__head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.tower-reward-row__head strong { color: #f0dfb6; font-size: 0.78rem; }
+.tower-reward-row__head span { color: #aaa0b8; font-size: 0.68rem; font-weight: 800; }
+.tower-reward-row .tower-reward { padding-inline: 8px; font-size: 0.68rem; }
 
 /* ==========================================================================
  * 戻ってきた理由
@@ -1184,6 +1215,27 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset 0 -2px 0 rgba(0, 0, 0, 0.5),
     inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+button.tower-step--intel {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.tower-step--intel:active { transform: scale(0.96); }
+button.tower-step--intel:focus-visible { outline: 3px solid #ffe08a; outline-offset: 2px; }
+
+.tower-step__info {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  color: #e9d394;
+  font-size: 0.58rem;
+  line-height: 1;
 }
 
 .tower-step__no {

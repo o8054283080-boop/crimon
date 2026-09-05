@@ -15,7 +15,11 @@ import {
 } from "../../data/trialTower.js";
 import { TowerEnemyInfo, trialTowerEnemyInfo } from "../../data/trialTowerEnemyInfo.js";
 import { MAX_TOWER_PARTY_SIZE, PlayerState } from "../../game/playerState.js";
-import { TowerRewardResult } from "../../game/trialTower.js";
+import {
+  TRIAL_TOWER_MONTHLY_ORB_FLOORS,
+  TowerRewardResult,
+  isTrialTowerMonthlyOrbFloor,
+} from "../../game/trialTower.js";
 import { TrialTowerRankingEntry } from "../../net/trialTowerSync.js";
 import { el } from "../dom.js";
 import { withPortrait } from "../three/portrait.js";
@@ -57,12 +61,15 @@ export interface TrialTowerProps {
     floor: number;
     reward: TowerRewardResult;
   } | null;
-  panel: "NONE" | "ENEMY_INFO" | "RANKING";
+  panel: "NONE" | "ENEMY_INFO" | "RANKING" | "REWARDS";
+  /** 敵情報で表示する階。次の挑戦階とは独立し、未到達階も選べる。 */
+  enemyInfoFloor: number;
   rankingEntries: TrialTowerRankingEntry[];
   rankingSelf: TrialTowerRankingEntry | null;
   rankingLoading: boolean;
   rankingError: boolean;
-  onOpenEnemyInfo: () => void;
+  onOpenEnemyInfo: (floor: number) => void;
+  onOpenRewards: () => void;
   onOpenRanking: () => void;
   onReloadRanking: () => void;
   onClosePanel: () => void;
@@ -87,13 +94,13 @@ function renderEnemyAbilityList(label: string, items: TowerEnemyInfo["skills"]):
 }
 
 function renderEnemyInfoModal(props: TrialTowerProps): HTMLElement {
-  const enemies = trialTowerEnemyInfo(props.nextFloor);
+  const enemies = trialTowerEnemyInfo(props.enemyInfoFloor);
   return el("div", { className: "tower-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "tower-enemy-info-title", "data-tour": "tower-enemy-info" }, [
     el("button", { type: "button", className: "tower-modal__backdrop", "aria-label": "閉じる", onclick: props.onClosePanel }, []),
     el("section", { className: "tower-modal__sheet" }, [
       el("div", { className: "tower-modal__head" }, [
         el("div", {}, [
-          el("span", { className: "tower-modal__eyebrow" }, [`${props.nextFloor}F`]),
+          el("span", { className: "tower-modal__eyebrow" }, [`${props.enemyInfoFloor}F`]),
           el("h2", { id: "tower-enemy-info-title" }, ["敵情報"]),
         ]),
         el("button", { type: "button", className: "btn btn--ghost tower-modal__close", onclick: props.onClosePanel, "aria-label": "敵情報を閉じる" }, ["✕"]),
@@ -157,7 +164,7 @@ function renderRankingModal(props: TrialTowerProps): HTMLElement {
 }
 
 function renderMonthlyRewards(props: TrialTowerProps): HTMLElement {
-  const rewardRow = (floor: 15 | 30) => {
+  const rewardRow = (floor: (typeof TRIAL_TOWER_MONTHLY_ORB_FLOORS)[number]) => {
     const claimed = props.player.trialTowerMonthlyOrbClaimedFloors.includes(floor);
     return el("div", { className: `tower-monthly__row${claimed ? " is-claimed" : ""}` }, [
       el("span", { className: "tower-monthly__floor" }, [`${floor}階`]),
@@ -167,11 +174,13 @@ function renderMonthlyRewards(props: TrialTowerProps): HTMLElement {
   };
   return el("section", { className: "panel tower-monthly" }, [
     el("div", { className: "tower-monthly__head" }, [
-      el("h2", {}, ["今月の報酬"]),
+      el("h2", {}, ["今月の塔報酬"]),
       el("span", { className: "tower-monthly__season" }, [props.player.trialTowerSeason]),
     ]),
-    rewardRow(15),
-    rewardRow(30),
+    el("p", { className: "tower-monthly__guide" }, ["各階の報酬は毎月もう一度受け取れます。全100階の内容を確認できます。"]),
+    el("button", { type: "button", className: "btn btn--ghost tower-monthly__all", onclick: props.onOpenRewards, "data-tour": "tower-rewards-open" }, ["🎁 全100階の報酬を見る"]),
+    el("div", { className: "tower-monthly__bonus-head" }, ["15階・30階の追加報酬"]),
+    ...TRIAL_TOWER_MONTHLY_ORB_FLOORS.map(rewardRow),
     el("p", { className: "tower-monthly__reset" }, ["毎月1日 00:00（JST）リセット"]),
   ]);
 }
@@ -226,17 +235,66 @@ function rewardItems(reward: TowerReward): RewardItem[] {
   return items;
 }
 
-function renderRewardChips(reward: TowerReward): HTMLElement {
+function renderRewardItemChips(items: RewardItem[]): HTMLElement {
   return el(
     "div",
     { className: "tower-rewards" },
-    rewardItems(reward).map((item) =>
+    items.map((item) =>
       el("span", { className: `tower-reward${item.strong ? " tower-reward--strong" : ""}` }, [
         el("span", { className: "tower-reward__icon" }, [item.icon]),
         el("span", { className: "tower-reward__text" }, [item.text]),
       ]),
     ),
   );
+}
+
+function renderRewardChips(reward: TowerReward): HTMLElement {
+  return renderRewardItemChips(rewardItems(reward));
+}
+
+function renderRewardsModal(props: TrialTowerProps): HTMLElement {
+  const sections = Array.from({ length: TOWER_FLOOR_COUNT / TOWER_CHECKPOINT_INTERVAL }, (_, index) => {
+    const from = index * TOWER_CHECKPOINT_INTERVAL + 1;
+    const to = from + TOWER_CHECKPOINT_INTERVAL - 1;
+    const floors = TRIAL_TOWER_FLOORS.filter((floor) => floor.floor >= from && floor.floor <= to);
+    const isCurrentSection = props.nextFloor >= from && props.nextFloor <= to;
+
+    return el("details", { className: "tower-reward-band", open: isCurrentSection }, [
+      el("summary", { className: "tower-reward-band__head" }, [
+        el("span", {}, [`第${index + 1}節`]),
+        el("span", {}, [`${from} - ${to}階`]),
+      ]),
+      el("div", { className: "tower-reward-band__rows" }, floors.map((floor) => {
+        const claimed = props.claimedFloors.includes(floor.floor);
+        const items = rewardItems(floor.firstClearReward);
+        if (isTrialTowerMonthlyOrbFloor(floor.floor)) {
+          items.push({ icon: "🔮", text: "覚醒オーブ 1（追加）", strong: true });
+        }
+        return el("div", { className: `tower-reward-row${claimed ? " is-claimed" : ""}` }, [
+          el("div", { className: "tower-reward-row__head" }, [
+            el("strong", {}, [`${floor.floor}階`]),
+            el("span", {}, [claimed ? "受取済み" : "未受取"]),
+          ]),
+          renderRewardItemChips(items),
+        ]);
+      })),
+    ]);
+  });
+
+  return el("div", { className: "tower-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "tower-rewards-title", "data-tour": "tower-rewards" }, [
+    el("button", { type: "button", className: "tower-modal__backdrop", "aria-label": "閉じる", onclick: props.onClosePanel }, []),
+    el("section", { className: "tower-modal__sheet tower-modal__sheet--rewards" }, [
+      el("div", { className: "tower-modal__head" }, [
+        el("div", {}, [
+          el("span", { className: "tower-modal__eyebrow" }, [props.player.trialTowerSeason]),
+          el("h2", { id: "tower-rewards-title" }, ["全100階の報酬"]),
+        ]),
+        el("button", { type: "button", className: "btn btn--ghost tower-modal__close", onclick: props.onClosePanel, "aria-label": "報酬一覧を閉じる" }, ["✕"]),
+      ]),
+      el("p", { className: "tower-modal__lead" }, ["各階で今月最初にクリアした時の報酬です。受取状態は毎月1日00:00（JST）にリセットされます。"]),
+      el("div", { className: "tower-reward-catalog" }, sections),
+    ]),
+  ]);
 }
 
 /** 実際に受け取ったものを並びへ崩す。**空なら空配列**(空欄の枠を出さないため) */
@@ -635,6 +693,7 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
   const boss = isTowerBossFloor(floor.floor);
   const check = isTowerCheckpoint(floor.floor);
   const locked = floor.floor > props.nextFloor;
+  const hasEnemyInfo = floor.floor >= 60;
 
   const classes = [
     "tower-step",
@@ -643,12 +702,11 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
     boss ? "tower-step--boss" : "",
     check ? "tower-step--check" : "",
     locked ? "tower-step--locked" : "",
+    hasEnemyInfo ? "tower-step--intel" : "",
   ].filter(Boolean);
 
-  return el(
-    "div",
-    { className: classes.join(" "), title: `${floor.name}${passed ? "（クリア済み）" : locked ? "（未解放）" : "（次の挑戦）"}`, "aria-label": `${floor.name} ${passed ? "クリア済み" : locked ? "未解放" : "次の挑戦"}` },
-    nodes([
+  const label = `${floor.name} ${passed ? "クリア済み" : locked ? "未解放" : "次の挑戦"}`;
+  const children = nodes([
       // 節はすべて関門でもある。片方だけ出すと、凡例と食い違って
       // 「10階は関門ではない」と読めてしまうので、両方の印を並べる
       boss || check
@@ -657,11 +715,23 @@ function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElemen
       el("span", { className: "tower-step__no" }, [String(floor.floor)]),
       passed ? el("span", { className: "tower-step__check" }, ["✓"]) : null,
       now ? el("span", { className: "tower-step__now" }, ["今"]) : null,
+      hasEnemyInfo ? el("span", { className: "tower-step__info", "aria-hidden": "true" }, ["ⓘ"]) : null,
       // 関門の名前(超再生・免疫…)はここには出さない。
       // 1辺30pxの石に入れると7pxまで縮み、実機で読めなかった。
       // 名前は節の見出し(.tower-band__boss)と、この石の title / aria-label が持つ
-    ]),
-  );
+    ]);
+
+  if (hasEnemyInfo) {
+    return el("button", {
+      type: "button",
+      className: classes.join(" "),
+      title: `${floor.name}の敵情報を見る`,
+      "aria-label": `${label} 敵情報を開く`,
+      "data-tour": boss ? `tower-enemy-info-floor-${floor.floor}` : undefined,
+      onclick: () => props.onOpenEnemyInfo(floor.floor),
+    }, children);
+  }
+  return el("div", { className: classes.join(" "), title: `${floor.name}${passed ? "（クリア済み）" : locked ? "（未解放）" : "（次の挑戦）"}`, "aria-label": label }, children);
 }
 
 function renderLadder(props: TrialTowerProps): HTMLElement {
@@ -698,6 +768,7 @@ function renderLadder(props: TrialTowerProps): HTMLElement {
       el("span", { className: "tower-legend__item" }, ["👑 関門"]),
       el("span", { className: "tower-legend__item" }, ["⚑ 節(全回復)"]),
       el("span", { className: "tower-legend__item" }, ["今 これから挑む階"]),
+      el("span", { className: "tower-legend__item" }, ["ⓘ 60階以降は敵情報"]),
       el("span", { className: "tower-legend__item" }, ["暗色 未解放"]),
     ]),
     ...blocks,
@@ -716,7 +787,7 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
     ]),
     el("div", { className: "tower-actions" }, nodes([
       props.nextFloor >= 60
-        ? el("button", { type: "button", className: "btn btn--ghost tower-actions__button", onclick: props.onOpenEnemyInfo, "data-tour": "tower-enemy-info-open" }, ["📖 敵情報"])
+        ? el("button", { type: "button", className: "btn btn--ghost tower-actions__button", onclick: () => props.onOpenEnemyInfo(props.nextFloor), "data-tour": "tower-enemy-info-open" }, ["📖 敵情報"])
         : null,
       el("button", { type: "button", className: "btn btn--ghost tower-actions__button", onclick: props.onOpenRanking, "data-tour": "tower-ranking-open" }, ["🏆 ランキング"]),
     ])),
@@ -740,5 +811,6 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onBack }, ["◀ 戻る"]),
     props.panel === "ENEMY_INFO" ? renderEnemyInfoModal(props) : null,
     props.panel === "RANKING" ? renderRankingModal(props) : null,
+    props.panel === "REWARDS" ? renderRewardsModal(props) : null,
   ]));
 }
