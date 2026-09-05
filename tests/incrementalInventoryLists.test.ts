@@ -26,4 +26,20 @@ describe("大量所持一覧の段階描画", () => {
     expect(training).toContain("createIncrementalGrid");
     expect(party).toContain("createIncrementalGrid");
   });
+
+  /*
+   * アリーナの攻撃編成・防衛登録だけが段階描画から取り残されていた。
+   *
+   * 所持400体で測ると、一覧を全件DOM化するせいで画面のノードが12,042個になり、
+   * **1体選ぶたびに246〜286msかかっていた**(同じ所持数のパーティ編成は8.4ms)。
+   * 攻撃と防衛は `renderPicker` を共有しているので、ここが素のmapへ戻ると
+   * 両方いっぺんに重くなる。
+   */
+  it("アリーナの攻撃編成・防衛登録の候補一覧も段階描画を使う", () => {
+    const arenaTeams = readFileSync("src/web/views/arena/teams.ts", "utf8");
+
+    expect(arenaTeams).toContain("createIncrementalGrid");
+    // 攻撃・防衛の両方が通る唯一の一覧なので、素のmapでカードを並べる形へ戻さない
+    expect(arenaTeams).not.toMatch(/sorted\.map\(/);
+  });
 });

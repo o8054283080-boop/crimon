@@ -15,6 +15,7 @@
  * 登録済みの節は「あれば出す」に徹する。
  */
 import { el } from "../../dom.js";
+import { createIncrementalGrid } from "../../incrementalGrid.js";
 import { MonsterInstance } from "../../../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../../../core/rarity.js";
 import { findMonsterById } from "../../../data/monsters.js";
@@ -40,32 +41,50 @@ function backRow(props: PvpArenaProps): HTMLElement {
   );
 }
 
-/** 手持ちを並べて、押すと入る/外れる。攻撃と防衛で同じ部品を使う */
+/**
+ * 手持ちを並べて、押すと入る/外れる。攻撃と防衛で同じ部品を使う。
+ *
+ * **一覧は所持数ぶんまとめてDOM化しない。**
+ * 所持400体で測ったところ、全件を作ると画面のノードが12,021個・
+ * 開くのに73.8msかかっていた。同じ所持数の「所持モンスター」画面は
+ * 段階描画のおかげで586個で開く。ここだけが取り残されていた。
+ *
+ * 並べ替えの結果そのものは変えない。画面へ実体化するカードを
+ * 最初の24枚→以後24枚ずつに分けるだけなので、
+ * 絞り込み・並び順・編成中の位置はこれまでどおり。
+ * 編成中の個体は `sortMonsters` の `partyIds` で先頭側へ寄るので、
+ * 選んだ相手は最初の24枚の中に見える。
+ */
 function renderPicker(
   props: PvpArenaProps,
   selectedIds: readonly string[],
   onToggle: (instanceId: string) => void,
 ): HTMLElement {
   const sorted = sortMonsters(props.player.monsters, "recommended", { partyIds: [...selectedIds] });
-  const cards = sorted.map((instance: MonsterInstance) => {
-    const dex = findMonsterById(instance.dexId);
-    const selected = selectedIds.includes(instance.id);
-    return buildMonsterCard(dex, instance.dexId, () => onToggle(instance.id), {
-      selected,
-      // 入っている本人まで押せなくすると、上限に達したあと誰も外せなくなる
-      disabled: !selected && selectedIds.length >= ARENA_TEAM_SIZE,
-      star: instance.star,
-      level: instance.level,
-      maxLevel: STAR_MAX_LEVEL[instance.star],
-      power: monsterPower(instance),
-      gearCount: equippedCount(instance),
-      gearTotal: GEAR_SLOT_TOTAL,
-      badge: selected ? "編成中" : undefined,
-      badgeCorner: true,
-      onDetail: () => props.onViewMonster(instance.id),
-    });
+  const grid = createIncrementalGrid<MonsterInstance>({
+    className: "monster-grid",
+    items: sorted,
+    renderItem: (instance) => {
+      const dex = findMonsterById(instance.dexId);
+      const selected = selectedIds.includes(instance.id);
+      return buildMonsterCard(dex, instance.dexId, () => onToggle(instance.id), {
+        selected,
+        // 入っている本人まで押せなくすると、上限に達したあと誰も外せなくなる
+        disabled: !selected && selectedIds.length >= ARENA_TEAM_SIZE,
+        star: instance.star,
+        level: instance.level,
+        maxLevel: STAR_MAX_LEVEL[instance.star],
+        power: monsterPower(instance),
+        gearCount: equippedCount(instance),
+        gearTotal: GEAR_SLOT_TOTAL,
+        badge: selected ? "編成中" : undefined,
+        badgeCorner: true,
+        onDetail: () => props.onViewMonster(instance.id),
+      });
+    },
+    moreLabel: (rendered, total) => `さらに表示（${rendered} / ${total}）`,
   });
-  return el("section", { className: "panel" }, [el("div", { className: "monster-grid" }, cards)]);
+  return el("section", { className: "panel" }, [grid.element]);
 }
 
 function membersOf(props: PvpArenaProps, ids: readonly string[]): MonsterInstance[] {
