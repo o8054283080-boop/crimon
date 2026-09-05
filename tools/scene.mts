@@ -193,7 +193,7 @@ const SCENES: Record<string, Scene> = {
   arena: { tab: "HOME", tile: "arena", note: "アリーナ" },
   tower: { tab: "HOME", tile: "tower", note: "試練の塔" },
   howto: { tab: "HOME", tile: "info", note: "遊び方" },
-  training: { tab: "MONSTERS", then: "モンスター強化", note: "強化の素材選び(モンスターを1体選んでから)" },
+  training: { tab: "MONSTERS", then: "強化", note: "強化の素材選び(モンスターを1体選んでから)" },
   rankup: { tab: "MONSTERS", then: "ランクアップ", note: "ランクアップの素材選び(モンスターを1体選んでから)" },
 };
 
