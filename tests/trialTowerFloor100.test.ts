@@ -486,7 +486,7 @@ describe("100階の仕掛けは1〜99階へ漏れていない", () => {
   it("60/70/80/90階の敵の数は変わっていない", () => {
     expect(findTowerFloor(60)!.enemies).toHaveLength(3);
     expect(findTowerFloor(70)!.enemies).toHaveLength(3);
-    expect(findTowerFloor(80)!.enemies).toHaveLength(3);
+    expect(findTowerFloor(80)!.enemies).toHaveLength(5); // 古代聖竜V3
     expect(findTowerFloor(90)!.enemies).toHaveLength(5);
   });
 

@@ -1,4 +1,5 @@
 import { ELEMENT_JA } from "../core/element.js";
+import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
 import { PassiveLevelEffect } from "../core/passive.js";
@@ -315,6 +316,8 @@ export class BattleEngine {
    * (= リトライで狂化が二重に乗ることはない)。
    */
   private readonly tower90DeadEscortIds = new Set<string>();
+  private readonly tower80ImmunityThresholds = new Set<number>();
+  private readonly tower80DeadEscortIds = new Set<string>();
   /**
    * 100階の分身の空席。**開幕は眠っていて、画面にも出ない。**
    *
@@ -386,7 +389,7 @@ export class BattleEngine {
     this.rng = options.rng ?? Math.random;
     this.maxTurns = options.maxTurns ?? 300;
     this.trialTowerFloor = options.trialTowerFloor;
-    if (options.trialTowerFloor === 80) { const boss = this.trialBoss(); if (boss) boss.immuneTurns = 3; }
+    if (options.trialTowerFloor === 80) { this.grantTower80Immunity(); this.syncTower80Boss(); }
     if (options.trialTowerFloor === 100) this.setupTower100();
   }
 
@@ -436,7 +439,9 @@ export class BattleEngine {
   private recordTurn(unit: BattleUnit, choice?: ManualChoice): TurnRecord {
     const linesBefore = this.log.length;
     const eventsBefore = this.events.length;
+    this.syncTower80Boss();
     this.takeTurn(unit, choice);
+    this.syncTower80Boss();
     const record: TurnRecord = {
       actorId: unit.instanceId,
       lines: this.log.slice(linesBefore),
@@ -820,6 +825,48 @@ export class BattleEngine {
    * ダメージ計算も命中も抵抗もエンジンのまま——独自の計算式は1つも足さない。
    * **どのメソッドも `trialTowerFloor === 90` で入口を閉じてある。**
    * =================================================================== */
+
+  private isTower80Boss(unit: BattleUnit): boolean {
+    return this.trialTowerFloor === 80 && unit.team === "ENEMY"
+      && unit.def.skills.some((skill) => skill.id === "tower80_boss_s1");
+  }
+
+  private grantTower80Immunity(): void {
+    if (this.trialTowerFloor !== 80 || !this.units.some((unit) => this.isTower80Boss(unit) && unit.alive)) return;
+    for (const unit of this.units) {
+      if (unit.team !== "ENEMY" || !unit.alive) continue;
+      if (hasStatus(unit, "BUFF_BLOCK")) {
+        this.push(`${this.label(unit)} は強化阻害で免疫の付与を防がれた！`);
+        continue;
+      }
+      unit.immuneTurns = Math.max(unit.immuneTurns, TOWER80_RULES.immunityTurns);
+    }
+  }
+
+  private syncTower80Boss(): void {
+    // 通常の強化・軽減を上書きしない。被ダメージ補正は着弾時に別途計算する。
+    // Labの手番境界と異なり、HP閾値は被弾直後にも処理する。
+    if (this.trialTowerFloor !== 80) return;
+    const boss = this.units.find((unit) => this.isTower80Boss(unit));
+    if (!boss?.alive) return;
+    for (const unit of this.units) {
+      if (unit.team === "ENEMY" && unit !== boss && !unit.alive) this.tower80DeadEscortIds.add(unit.instanceId);
+    }
+    for (const threshold of TOWER80_RULES.immunityThresholds) {
+      if (hpRatio(boss) <= threshold && !this.tower80ImmunityThresholds.has(threshold)) {
+        this.tower80ImmunityThresholds.add(threshold);
+        this.grantTower80Immunity();
+        this.push(`${this.label(boss)} の「聖竜の免疫」が再展開！`);
+      }
+    }
+    boss.flatStatBonus.atk = boss.immuneTurns > 0 ? TOWER80_RULES.immuneAtkBonus : 0;
+  }
+
+  private tower80DamageTakenFactor(unit: BattleUnit): number {
+    if (!this.isTower80Boss(unit)) return 1;
+    return 1 + (unit.immuneTurns > 0 ? 0 : TOWER80_RULES.strippedDamageTaken)
+      + Math.min(4, this.tower80DeadEscortIds.size) * TOWER80_RULES.escortKillDamageBonus;
+  }
 
   private isTower90Boss(unit: BattleUnit): boolean {
     return this.trialTowerFloor === 90 && unit === this.trialBoss();
@@ -1273,7 +1320,7 @@ export class BattleEngine {
       this.push(`${this.label(unit)} の超再生が発動！ HPが ${amount} 回復！`);
       this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount });
     }
-    const immunity = this.trialTowerFloor === 80 || (this.trialTowerFloor === 100 && ratio < 0.7 && ratio >= 0.4);
+    const immunity = this.trialTowerFloor === 100 && ratio < 0.7 && ratio >= 0.4;
     if (immunity && (this.trialBossTurns === 1 || this.trialBossTurns % 4 === 0)) {
       unit.immuneTurns = Math.max(unit.immuneTurns, 3);
       this.push(`${this.label(unit)} は状態異常免疫を展開した！`);
@@ -1301,6 +1348,7 @@ export class BattleEngine {
   }
 
   private act(unit: BattleUnit, choice?: ManualChoice): void {
+    this.syncTower80Boss();
     let skill: Skill;
     let index: 0 | 1 | 2;
     // パッシブの枠は「使う」ものではない。手で選ばれてもAIの判断へ落とす
@@ -1350,6 +1398,10 @@ export class BattleEngine {
      * HP40%より上は×0.90(序盤の抑制)、40%以下は×1.25、20%以下は×1.5。
      * 段階式なので 1.25×1.5 にはならない。
      */
+    if (this.isTower80Boss(unit) && hpRatio(unit) < TOWER80_RULES.enrageHpRatio) {
+      resolvedSkill = { ...resolvedSkill, effects: resolvedSkill.effects.map((effect) => effect.kind === "DAMAGE"
+        ? { ...effect, multiplier: effect.multiplier * TOWER80_RULES.enragedMultiplier } : effect) };
+    }
     if (this.isTower90Boss(unit)) {
       this.syncTower90Boss(unit);
       const factor = this.tower90BossDamageFactor(unit);
@@ -1522,6 +1574,10 @@ export class BattleEngine {
     if (latent && !missed) this.applyLatentAfterSkill(unit, targets[0], latent, resolution);
     // 90階の戦鼓晶S3。全体ゲージを配り終えた後で、ボスにだけ上乗せする
     if (tower90WarDrumTempo) this.applyTower90WarDrumTempo();
+    if (this.isTower80Boss(unit) && unit.alive && skill.id === "tower80_boss_s3") {
+      this.grantTower80Immunity();
+      this.syncTower80Boss();
+    }
     // 100階。分身を生む/立て直すのは技が解決し終わってから
     if (tower100Copy) this.applyTower100Copy(unit);
     if (tower100CloneSkillId) this.applyTower100CloneSupport(unit, tower100CloneSkillId, resolution.kills);
@@ -2386,10 +2442,11 @@ export class BattleEngine {
     sourceType: "normal" | "reflect" | "periodic" = "normal",
     resolution: SkillResolution | null = null,
   ): DamageApplicationResult {
+    this.syncTower80Boss();
     const equipmentMultiplier = Math.max(0, Math.min(1, target.def.latentAbility?.damageTakenMultiplier ?? 1));
     const hpBefore = hpRatio(target);
     // 軽減とパッシブによる被ダメージ減は、無敵・シールドより手前で1度だけ掛ける
-    let incoming = Math.round(amount * equipmentMultiplier * damageTakenMultiplier(target, source ? hasStatus(source, "TAUNT") : false));
+    let incoming = Math.round(amount * equipmentMultiplier * damageTakenMultiplier(target, source ? hasStatus(source, "TAUNT") : false) * this.tower80DamageTakenFactor(target));
     if (target.latentOneShotMitigate > 0) target.latentOneShotMitigate = 0;
 
     /*
@@ -2415,6 +2472,7 @@ export class BattleEngine {
     }
 
     const applied = applyDamage(target, incoming);
+    this.syncTower80Boss();
     if (this.isTower70Boss(target) && target.alive && applied.hpDamage > 0) this.afterTower70BossHpChanged(target);
     if (applied.invincible) this.push(`  → ${this.label(target)} は無敵でダメージを無効化した！`);
     if (applied.endured) this.push(`  → ${this.label(target)} は我慢でHP1に踏みとどまった！`);

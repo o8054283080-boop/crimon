@@ -5,6 +5,7 @@ import { DungeonEnemy } from "./equipmentDungeon.js";
 import { ANCIENT_DEMON, findMonster } from "./monsters.js";
 import { TOWER60_ENEMIES } from "./trialTowerFloor60.js";
 import { TOWER70_ENEMIES } from "./trialTowerFloor70.js";
+import { TOWER80_ENEMIES } from "./trialTowerFloor80.js";
 import { TOWER90_ENEMIES } from "./trialTowerFloor90.js";
 import { TOWER100_ENEMIES } from "./trialTowerFloor100.js";
 import {
@@ -258,6 +259,7 @@ const TRAIT_SWIFT_ANCHOR_SPD = 1.45;
 function enemiesOf(floor: number, trait: TowerTrait): DungeonEnemy[] {
   if (floor === 60) return TOWER60_ENEMIES.map((enemy) => ({ ...enemy }));
   if (floor === 70) return TOWER70_ENEMIES.map((enemy) => ({ ...enemy }));
+  if (floor === 80) return TOWER80_ENEMIES.map((enemy) => ({ ...enemy }));
   if (floor === 90) return TOWER90_ENEMIES.map((enemy) => ({ ...enemy }));
   if (floor === 100) return TOWER100_ENEMIES.map((enemy) => ({ ...enemy }));
   const upper = towerUpperEnemies(floor);
@@ -313,15 +315,17 @@ function enemiesOf(floor: number, trait: TowerTrait): DungeonEnemy[] {
 }
 
 export function buildTowerFloor(floor: number, traitOverride?: TowerTrait): TowerFloor {
-  const fixedRoster = floor === 60 || floor === 70 || floor === 90 || floor === 100 || isTowerUpperFloor(floor);
+  const fixedRoster = floor === 60 || floor === 70 || floor === 80 || floor === 90 || floor === 100 || isTowerUpperFloor(floor);
   const trait = fixedRoster ? traitOf(floor) : traitOverride ?? traitOf(floor);
-  const bossLabels: Partial<Record<number, string>> = { 60: "豪魔人", 70: "始祖ベヒモス", 80: "免疫", 90: "古代ネメシス", 100: "クリモアーク" };
+  const bossLabels: Partial<Record<number, string>> = { 60: "豪魔人", 70: "始祖ベヒモス", 80: "古代聖竜", 90: "古代ネメシス", 100: "クリモアーク" };
   const upperConcept = towerUpperFloorDef(floor)?.concept;
   const label = bossLabels[floor]
     ?? upperConcept
     ?? (isTowerBossFloor(floor) && traitOverride === undefined ? "関門" : TOWER_TRAIT_LABEL[trait] || "");
   const specialNote = floor === 70
     ? "生命晶が生きている間は始祖ベヒモスの再生が強化され、脈動晶は現在HPの高い3体を半減させます。始祖ベヒモスはHPが減るほど攻撃性能が上がります。"
+    : floor === 80
+      ? "古代聖竜と4体のお供が免疫・強化・妨害で攻めてきます。免疫が切れると本体が弱まり、お供を倒すほど本体にダメージが通りやすくなります。本体を倒せばクリアです。"
     : floor === 90
       // **何が起きるかだけを書く。**「◯◯を持って行け」とは書かない(編成は考える所)
       ? "古代ネメシスはHPが減るほど狂化し、お供を1体倒すごとにさらに強くなります。お供は強化・加速・妨害で攻めてきます。"
