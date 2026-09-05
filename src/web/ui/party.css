@@ -5,11 +5,7 @@
 }
 
 .party-mode-toggle {
-  position: sticky;
-  top: 0;
-  z-index: 3;
   padding: 6px;
-  backdrop-filter: blur(10px);
 }
 
 .party-current,
