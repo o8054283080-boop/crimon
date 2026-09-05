@@ -248,7 +248,9 @@ async function main(): Promise<void> {
   // 1. 保存データを差し込んでから開く。開いてから差し込むと、
   //    起動時のログインボーナスや控えの移行がもう一度走って条件がぶれる
   await call("size", size);
-  await call("goto", { path: "/", fresh: true, ...size });
+  // ゲーム画面を先に開くと、遷移時の自動保存がこれから差し込む検証データを
+  // 初期データで上書きする。何も保存しない同一オリジンのページで準備する。
+  await call("goto", { path: "/bare.html", fresh: true, ...size });
   const save = JSON.stringify(state.build());
   await call("eval", {
     expression: `(() => {
