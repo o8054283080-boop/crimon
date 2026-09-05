@@ -1,0 +1,18 @@
+/*
+ * スキル/潜在覚醒の説明重複を表示側だけで整理する。
+ *
+ * データ定義（description / effects / 潜在効果）は戦闘仕様や他画面でも使うため削除しない。
+ * モンスター詳細は閉じている時だけ簡易効果を見せ、展開時は完全説明側へ一本化する。
+ */
+.monster-skill-compact[open] .monster-skill-compact__effect {
+  display: none !important;
+}
+
+/*
+ * 潜在覚醒候補は authored description と自動生成の「効果: ...」がほぼ同内容で
+ * 二重表示になっていたため、選択画面では人間向けの説明文を1本だけ表示する。
+ * モンスター詳細の潜在覚醒欄には影響しない。
+ */
+.latent-choice__effect {
+  display: none !important;
+}
