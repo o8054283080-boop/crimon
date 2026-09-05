@@ -5,10 +5,22 @@ const view = readFileSync(new URL("../src/web/views/trialTower.ts", import.meta.
 const css = readFileSync(new URL("../src/web/ui/trialTower.css", import.meta.url), "utf8");
 
 describe("試練の塔: 敵情報・ランキングUI", () => {
-  it("敵情報ボタンは60階以降だけ表示し、実データ生成関数を使う", () => {
-    expect(view).toContain("props.nextFloor >= 60");
-    expect(view).toContain("trialTowerEnemyInfo(props.nextFloor)");
+  it("60階以降の各階を未到達でもボタンとして開き、選択階の実データを使う", () => {
+    expect(view).toContain("const hasEnemyInfo = floor.floor >= 60");
+    expect(view).toContain('return el("button"');
+    expect(view).toContain("props.onOpenEnemyInfo(floor.floor)");
+    expect(view).toContain("trialTowerEnemyInfo(props.enemyInfoFloor)");
+    expect(view).toContain("ⓘ 60階以降は敵情報");
     expect(view).toContain('"data-tour": "tower-enemy-info-open"');
+  });
+
+  it("15・30階の追加報酬と、全100階の月次報酬一覧を分けて表示する", () => {
+    expect(view).toContain("🎁 全100階の報酬を見る");
+    expect(view).toContain("15階・30階の追加報酬");
+    expect(view).toContain("TRIAL_TOWER_FLOORS.filter");
+    expect(view).toContain("覚醒オーブ 1（追加）");
+    expect(view).toContain('"data-tour": "tower-rewards-open"');
+    expect(view).toContain('"data-tour": "tower-rewards"');
   });
 
   it("ランキングに空・失敗・100F CLEAR・自分固定行がある", () => {

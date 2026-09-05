@@ -421,7 +421,9 @@ interface AppState {
   towerOutcome: TowerOutcome | null;
   /** 戦闘画面の ⏹ が押された。今の階を終えたら登坂を止める */
   towerStopRequested: boolean;
-  towerPanel: "NONE" | "ENEMY_INFO" | "RANKING";
+  towerPanel: "NONE" | "ENEMY_INFO" | "RANKING" | "REWARDS";
+  /** 敵情報で選んだ階。未到達の階も一覧から確認できる。 */
+  towerEnemyInfoFloor: number;
   towerRankingEntries: TrialTowerRankingEntry[];
   towerRankingSelf: TrialTowerRankingEntry | null;
   towerRankingLoading: boolean;
@@ -509,6 +511,7 @@ const state: AppState = {
   towerOutcome: null,
   towerStopRequested: false,
   towerPanel: "NONE",
+  towerEnemyInfoFloor: 60,
   towerRankingEntries: [],
   towerRankingSelf: null,
   towerRankingLoading: false,
@@ -782,6 +785,7 @@ function navigate(screen: ScreenName): void {
   state.towerOutcome = null;
   state.towerStopRequested = false;
   state.towerPanel = "NONE";
+  state.towerEnemyInfoFloor = 60;
   render();
 }
 
@@ -3343,12 +3347,18 @@ function render(): void {
         outcome: state.towerOutcome,
         blockedReason,
         panel: state.towerPanel,
+        enemyInfoFloor: state.towerEnemyInfoFloor,
         rankingEntries: state.towerRankingEntries,
         rankingSelf: state.towerRankingSelf,
         rankingLoading: state.towerRankingLoading,
         rankingError: state.towerRankingError,
-        onOpenEnemyInfo: () => {
+        onOpenEnemyInfo: (floor) => {
+          state.towerEnemyInfoFloor = floor;
           state.towerPanel = "ENEMY_INFO";
+          render();
+        },
+        onOpenRewards: () => {
+          state.towerPanel = "REWARDS";
           render();
         },
         onOpenRanking: () => {

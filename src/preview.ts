@@ -106,7 +106,17 @@ if (params.get("view") === "tower") {
   const blocked = params.get("blocked") === "1";
   const requestedFloor = Number(params.get("floor") ?? 14);
   const previewFloor = Number.isInteger(requestedFloor) && requestedFloor >= 1 && requestedFloor <= 100 ? requestedFloor : 14;
-  const previewPanel = params.get("panel") === "enemy" ? "ENEMY_INFO" : params.get("panel") === "ranking" ? "RANKING" : "NONE";
+  const previewPanel = params.get("panel") === "enemy"
+    ? "ENEMY_INFO"
+    : params.get("panel") === "ranking"
+      ? "RANKING"
+      : params.get("panel") === "rewards"
+        ? "REWARDS"
+        : "NONE";
+  const requestedInfoFloor = Number(params.get("infoFloor") ?? previewFloor);
+  const enemyInfoFloor = Number.isInteger(requestedInfoFloor) && requestedInfoFloor >= 60 && requestedInfoFloor <= 100
+    ? requestedInfoFloor
+    : Math.max(60, previewFloor);
 
   const player = createInitialState();
   player.stamina = blocked ? 1 : 62;
@@ -176,6 +186,7 @@ if (params.get("view") === "tower") {
         ? { kind: outcomeKind, floor: outcomeKind === "COMPLETED" ? 30 : outcomeKind === "CHECKPOINT" ? 10 : 13, reward }
         : null,
     panel: previewPanel,
+    enemyInfoFloor,
     rankingEntries: [
       { rank: 1, userId: "one", name: "PLAYER-A", bestFloor: 100, bestFloorReachedAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z" },
       { rank: 2, userId: "two", name: "PLAYER-B", bestFloor: 97, bestFloorReachedAt: "2026-09-02T00:00:00Z", updatedAt: "2026-09-02T00:00:00Z" },
@@ -185,6 +196,7 @@ if (params.get("view") === "tower") {
     rankingLoading: params.get("loading") === "1",
     rankingError: params.get("error") === "1",
     onOpenEnemyInfo: () => undefined,
+    onOpenRewards: () => undefined,
     onOpenRanking: () => undefined,
     onReloadRanking: () => undefined,
     onClosePanel: () => undefined,

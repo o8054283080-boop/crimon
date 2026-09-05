@@ -34,13 +34,26 @@ try {
       if (layout.modal && (layout.modal.left < -1 || layout.modal.right > layout.viewportWidth + 1)) {
         throw new Error(`モーダルの横はみ出しを検出: ${JSON.stringify(layout.modal)}`);
       }
+      await page.locator(".tower-modal__sheet").evaluate((node) => { node.scrollTop = 0; }).catch(() => undefined);
     };
 
-    await open("view=tower&floor=60", ".tower-screen");
-    await page.screenshot({ path: `${outDir}/tower-60-${viewport.name}.png`, fullPage: false });
+    await open("view=tower&floor=31", ".tower-screen");
+    await page.locator("[data-tour='tower-rewards-open']").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${outDir}/tower-rewards-button-${viewport.name}.png`, fullPage: false });
+    const upperBand = page.locator(".tower-band").nth(5);
+    await upperBand.locator("summary").click();
+    const floor60 = page.locator("[data-tour='tower-enemy-info-floor-60']");
+    await floor60.scrollIntoViewIfNeeded();
+    const floor60Hit = await floor60.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return hit === node || (hit instanceof Node && node.contains(hit));
+    });
+    if (!floor60Hit) throw new Error("60階の敵情報ボタンが別の要素に覆われています");
+    await page.screenshot({ path: `${outDir}/tower-locked-60-${viewport.name}.png`, fullPage: false });
 
-    await open("view=tower&floor=60&panel=enemy", "[data-tour='tower-enemy-info']");
-    await page.screenshot({ path: `${outDir}/enemy-60-${viewport.name}.png`, fullPage: false });
+    await open("view=tower&floor=31&panel=enemy&infoFloor=60", "[data-tour='tower-enemy-info']");
+    await page.screenshot({ path: `${outDir}/enemy-locked-60-${viewport.name}.png`, fullPage: false });
 
     await open("view=tower&floor=100&panel=enemy", "[data-tour='tower-enemy-info']");
     await page.screenshot({ path: `${outDir}/enemy-100-top-${viewport.name}.png`, fullPage: false });
@@ -49,6 +62,11 @@ try {
 
     await open("view=tower&floor=100&panel=ranking", "[data-tour='tower-ranking']");
     await page.screenshot({ path: `${outDir}/ranking-100-${viewport.name}.png`, fullPage: false });
+
+    await open("view=tower&floor=31&panel=rewards", "[data-tour='tower-rewards']");
+    await page.screenshot({ path: `${outDir}/rewards-current-${viewport.name}.png`, fullPage: false });
+    await page.locator(".tower-modal__sheet").evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    await page.screenshot({ path: `${outDir}/rewards-bottom-${viewport.name}.png`, fullPage: false });
 
     await context.close();
   }
