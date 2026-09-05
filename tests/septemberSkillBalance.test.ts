@@ -18,6 +18,7 @@ describe("合意したスキル強化", () => {
     expect(skill("wisp_s3_c", 1)).toMatchObject({ cooldownTurns: 4, effects: [{ amount: 0.8 }, { durationTurns: 2 }] });
     expect(skill("fairy_s1").effects).toMatchObject([{ multiplier: 1 }, { healRate: 0.04 }]);
     expect(skill("mimic_s3_b").cooldownTurns).toBe(3);
+    expect(skill("mimic_s3_b", 4).cooldownTurns).toBe(5);
     expect(skill("treant_s2_c").effects).toMatchObject([{ multiplier: 1.5, hpCoefficient: 0.06 }, { maxSourceHpRate: 0.3 }]);
     expect(skill("golem_s3_c").effects[2]).toMatchObject({ status: "REFLECT", durationTurns: 3, applyTo: "SELF" });
     expect(skill("golem_s3_c", 4).effects).toHaveLength(2);

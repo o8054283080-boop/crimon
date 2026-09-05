@@ -32,7 +32,7 @@ export function applySeptemberSkillBalance(skill: Skill): Skill {
       { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 }]);
     case "fairy_s1": return change("敵単体に攻撃力0.7倍のダメージを与え、自身の最大HPの2%を回復。最大レベルでは1.0倍・4%回復。", skill.effects, {
       maxLevelOverride: { effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "HEAL", healRate: 0.04, applyTo: "SELF" }] } });
-    case "mimic_s3_b": return { ...skill, cooldownTurns: 4 };
+    case "mimic_s3_b": return { ...skill, maxLevelOverride: { cooldownTurns: 3 } };
     case "golem_s3_c": return { ...skill, description: skill.description + "最大レベルで自身に3ターン反射も付与する。", maxLevelOverride: { effects: [
       { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 },
       { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] } };
