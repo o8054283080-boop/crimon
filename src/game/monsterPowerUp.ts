@@ -27,6 +27,9 @@ export function checkMonsterPowerUp(
   if (materials.some((m) => m.id === target.id)) {
     return { ok: false, reason: "対象自身は素材にできません" };
   }
+  if (materials.some((m) => m.locked === true)) {
+    return { ok: false, reason: "ロック中のモンスターは素材にできません" };
+  }
   if (materials.some((m) => partyIds.includes(m.id))) {
     return { ok: false, reason: "パーティに編成中のモンスターは素材にできません" };
   }

@@ -26,6 +26,9 @@ export function checkRankUp(target: MonsterInstance, sacrifices: MonsterInstance
   if (sacrifices.length !== requiredCount) {
     return { ok: false, reason: `素材が${requiredCount}体必要です`, requiredCount };
   }
+  if (sacrifices.some((s) => s.locked === true)) {
+    return { ok: false, reason: "ロック中のモンスターは素材にできません", requiredCount };
+  }
   if (sacrifices.some((s) => s.star !== target.star)) {
     return { ok: false, reason: "素材は対象と同じ星のモンスターのみ使用できます", requiredCount };
   }

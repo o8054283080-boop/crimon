@@ -51,7 +51,7 @@ export function computeEffectiveStats(baseStats: Stats, star: Star, level: numbe
     hp: Math.round(baseStats.hp * multiplier),
     atk: Math.round(baseStats.atk * multiplier),
     def: Math.round(baseStats.def * multiplier),
-    spd: baseStats.spd, // SPDは星・レベルによる変化なし(常に基礎値のまま)
+    spd: baseStats.spd,
     criRate: baseStats.criRate,
     criDmg: baseStats.criDmg,
     resistance: baseStats.resistance,
@@ -59,9 +59,27 @@ export function computeEffectiveStats(baseStats: Stats, star: Star, level: numbe
   };
 }
 
-/** そのレベルからレベルアップに必要な累積経験値 */
+/**
+ * ★6のLv50以降は完成育成帯として必要経験値を大きく引き上げる。
+ * Lv50→60の合計は1,200,000 EXP。
+ * Lv49以下は従来式を維持し、既存の序盤〜中盤育成テンポは変えない。
+ */
+const LATE_GAME_EXP: Record<number, number> = {
+  50: 60_000,
+  51: 70_000,
+  52: 80_000,
+  53: 90_000,
+  54: 105_000,
+  55: 120_000,
+  56: 135_000,
+  57: 155_000,
+  58: 180_000,
+  59: 205_000,
+};
+
+/** そのレベルから次のレベルへ上がるために必要な経験値 */
 export function requiredExpForLevel(level: number): number {
-  return Math.round(40 * level ** 1.5);
+  return LATE_GAME_EXP[level] ?? Math.round(40 * level ** 1.5);
 }
 
 export function canRankUp(star: Star, level: number): boolean {
