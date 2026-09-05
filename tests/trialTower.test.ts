@@ -211,7 +211,20 @@ describe("試練の塔: 報酬", () => {
         expect(group[i].firstClearReward.gold ?? 0).toBeGreaterThan(group[i - 1].firstClearReward.gold ?? 0);
       }
     }
-    expect(findTowerFloor(100)?.firstClearReward.crystal).toBe(500);
+    expect(findTowerFloor(100)?.firstClearReward.crystal).toBe(3_000);
+  });
+
+  it("31階以降の通常階は階層×1,000G、節目階は専用報酬を優先する", () => {
+    for (const floor of [31, 32, 39, 41, 49, 55, 59, 61, 69, 71, 79, 81, 89, 91, 99]) {
+      expect(findTowerFloor(floor)?.firstClearReward).toEqual({ gold: floor * 1_000 });
+    }
+    expect(findTowerFloor(40)?.firstClearReward).toMatchObject({ crystal: 600, summonScroll: 10 });
+    expect(findTowerFloor(50)?.firstClearReward).toMatchObject({ crystal: 800, fourStarSummonScrolls: 1, awakeningOrbs: 2 });
+    expect(findTowerFloor(60)?.firstClearReward).toMatchObject({ crystal: 1_200, summonScroll: 10, fourStarSummonScrolls: 1 });
+    expect(findTowerFloor(70)?.firstClearReward).toMatchObject({ crystal: 1_500, fiveStarSummonScrolls: 1, skillPigs: 1 });
+    expect(findTowerFloor(80)?.firstClearReward).toMatchObject({ crystal: 2_000, fourStarSummonScrolls: 3, lightDarkFourStarSummonScrolls: 1 });
+    expect(findTowerFloor(90)?.firstClearReward).toMatchObject({ crystal: 2_500, skillPigs: 3, awakeningOrbs: 3 });
+    expect(findTowerFloor(100)?.firstClearReward).toMatchObject({ crystal: 3_000, summonScroll: 30, lightDarkFourStarSummonScrolls: 3, fiveStarSummonScrolls: 1 });
   });
 
   it("同じ階の報酬は二度受け取れない(登り直しても増えない)", () => {
