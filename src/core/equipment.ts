@@ -579,6 +579,21 @@ export interface CombatModifiers {
   defenseIgnoreRatio?: number;
   thresholdHealHpRatio?: number;
   thresholdHealPercent?: number;
+  /*
+   * ここから下は**才能覚醒(戦闘才能)が使う口。**装備のセット効果は触らない。
+   *
+   * 装備と同じ器に入れてあるのは、戦闘側が見る場所を1つに保つため。
+   * 才能のために別の袋をもう1つ渡すと、エンジンが「装備の補正」と
+   * 「才能の補正」を両方覚えることになり、足し忘れが必ず出る。
+   */
+  /** 自分が行う回復の倍率(1 = 補正なし) */
+  healingMultiplier?: number;
+  /** 自分が張るシールドの倍率(1 = 補正なし) */
+  shieldMultiplier?: number;
+  /** スキルが持つ弱体の基礎発動率への上乗せ。**的中とは別物** */
+  debuffChanceBonus?: number;
+  /** 味方の行動ゲージを進めるスキルの倍率(1 = 補正なし) */
+  gaugeUpMultiplier?: number;
 }
 
 export const DEFAULT_COMBAT_MODIFIERS: CombatModifiers = {

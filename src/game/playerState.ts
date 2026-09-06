@@ -3,6 +3,7 @@ import { clampInitialSubStatCount } from "../core/equipmentRarity.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
+import { createDefaultTalentState } from "../core/talents.js";
 import { Star } from "../core/rarity.js";
 import type { ArenaDefenseSnapshot, ArenaMatchRecord } from "./arena/types.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
@@ -80,6 +81,21 @@ export interface PlayerState {
   fiveStarSummonScrolls: number;
   /** 潜在覚醒で1個消費する素材 */
   awakeningOrbs: number;
+  /*
+   * --- 才能覚醒の素材(目覚の深域で集める) ---
+   *
+   * **どれも省略可。**前から遊んでいる人の控えには無いので、
+   * 読み込み時に0で埋める。深域は最初から挑めるので、
+   * ★6に届いていない人でも先に貯めておける。
+   */
+  /** 目覚の欠片。才能ptの解放にいちばん多く要る */
+  awakeningShards?: number;
+  /** 目覚の結晶。8pt目から要り始める */
+  awakeningCrystals?: number;
+  /** 目覚の奇石。スキル覚醒に3個要る */
+  awakeningStones?: number;
+  /** クリア済みの目覚の深域の階(初回報酬を二重に渡さないための印) */
+  clearedAwakeningDepthFloors?: number[];
   /** 覚醒オーブの達成報酬を受取済みのID。既存報酬の受取印とは分け、後付け報酬も安全に配る */
   claimedAwakeningOrbRewardIds: string[];
   /** プレイヤー(ファイター)自身のレベル。上限50 */
@@ -327,6 +343,10 @@ export function createInitialState(): PlayerState {
     lightDarkFourStarSummonScrolls: 0,
     fiveStarSummonScrolls: 0,
     awakeningOrbs: 0,
+    awakeningShards: 0,
+    awakeningCrystals: 0,
+    awakeningStones: 0,
+    clearedAwakeningDepthFloors: [],
     claimedAwakeningOrbRewardIds: [],
     fighterLevel: 1,
     fighterExp: 0,
@@ -483,6 +503,27 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
         const used = Object.values(monster.development.abilityPoints).reduce((sum, value) => sum + value, 0);
         monster.development.abilityPointsConfirmed = used > 0;
       }
+      /*
+       * 才能覚醒。**前から遊んでいる人の控えには丸ごと無い。**
+       *
+       * 白紙で埋めるだけ。解放ptは素材を払って初めて増えるものなので、
+       * ここで配ると「知らないうちに配られていた」ことになる。
+       * 中の器(basic / battle / skill)は形だけ整えて、
+       * **読む側が毎回 undefined を気にしないで済む**ようにする。
+       */
+      const talents = monster.development.talents;
+      if (!talents || typeof talents !== "object") {
+        monster.development.talents = createDefaultTalentState();
+      } else {
+        talents.schemaVersion = 1;
+        talents.unlockedPoints = Math.max(0, Math.floor(talents.unlockedPoints ?? 0));
+        if (!talents.basic || typeof talents.basic !== "object") talents.basic = {};
+        if (!talents.battle || typeof talents.battle !== "object") talents.battle = {};
+        if (!talents.skill || typeof talents.skill !== "object") talents.skill = { 1: [], 2: [] };
+        if (!Array.isArray(talents.skill[1])) talents.skill[1] = [];
+        if (!Array.isArray(talents.skill[2])) talents.skill[2] = [];
+        if (talents.awakening !== null && typeof talents.awakening !== "object") talents.awakening = null;
+      }
     }
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
@@ -490,6 +531,14 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (!state.clearedBeastDungeonFloors) state.clearedBeastDungeonFloors = [];
   if (!state.clearedLevelDungeonTiers) state.clearedLevelDungeonTiers = [];
   if (!state.clearedGoldDungeonFloors) state.clearedGoldDungeonFloors = [];
+  /*
+   * 才能覚醒の素材。**無い控えは0から。**
+   * 深域は最初から挑めるので、ここが0でも詰まりはしない。
+   */
+  if (typeof state.awakeningShards !== "number" || state.awakeningShards < 0) state.awakeningShards = 0;
+  if (typeof state.awakeningCrystals !== "number" || state.awakeningCrystals < 0) state.awakeningCrystals = 0;
+  if (typeof state.awakeningStones !== "number" || state.awakeningStones < 0) state.awakeningStones = 0;
+  if (!Array.isArray(state.clearedAwakeningDepthFloors)) state.clearedAwakeningDepthFloors = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;

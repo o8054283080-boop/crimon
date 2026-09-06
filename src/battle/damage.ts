@@ -30,6 +30,7 @@ export function evaluateTargetCondition(condition: EffectCondition, source: Batt
     case "TARGET_HP_BELOW_30": return targetRatio <= 0.3;
     case "TARGET_HP_ABOVE_SELF": return targetRatio > source.currentHp / source.maxHp;
     case "TARGET_GAUGE_BELOW_20": return target.gauge <= 20;
+    case "TARGET_GAUGE_ABOVE_50": return target.gauge >= 50;
     case "TARGET_DEBUFF_AT_LEAST_2": return countDebuffs(target) >= 2;
     case "TARGET_DEBUFF_AT_LEAST_3": return countDebuffs(target) >= 3;
     case "SELF_HP_ABOVE_50": return source.currentHp / source.maxHp >= 0.5;
