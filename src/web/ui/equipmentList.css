@@ -294,38 +294,192 @@
 }
 
 /* ==========================================================================
- * 簡易表示 — 1画面に並ぶ行数を倍にする
+ * 簡易表示 — 2列を4列にする
  *
- * 実測(390×844)で、通常の札は192px。内訳は
+ * 通常の札は2列・192px。内訳は
  * 見出し49 / メイン20 / **サブ4行67** / **持ち主19** / 余白。
- * サブと持ち主は描かない(`equipment.ts` 側)ので、残るのは106px前後。
- * 4行しか入らなかった画面に7〜8行が入る。
+ * サブと持ち主は描かない(`equipment.ts` 側)ので、そのぶんがまるごと消える。
  *
- * **列は2列のまま。** 3列にするとメインの数値(「攻撃力+ 236」)が
- * 読める大きさを保てず、この画面でいちばん見比べたい数字が潰れる。
- * 縦を詰めるだけで行数は足りる。
+ * そのうえで**列を4つにする。**390pxの画面では1枚が約82px幅になるので、
+ * 中身は横並びをやめて縦に積み直す:
+ *
+ *     紋章 ・ +15      … どの枠の物か / 育てた度合い
+ *     ★★★★★★         … 極小。数ではなく「長さ」で見る
+ *     [エピック]        … レア度。枠の色と合わせて格が分かる
+ *     236              … メインの数値。**ここだけは大きいまま**
+ *     攻撃力+           … その数値が何か
+ *
+ * **メインの数値を小さくしない。**この画面でいちばん見比べたい数字で、
+ * ここが読めなくなると列を増やした意味が無い。
+ * 字は9px(`tests/cssReadability.test.ts`)を下回らない範囲で詰める。
  * ========================================================================== */
 
 .equip-grid--dense {
-  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
 }
 
 .equipment-screen .equip-card--dense {
-  padding: 6px 8px;
+  padding: 5px 4px;
+  border-radius: 9px;
+  min-width: 0;
 }
 
-/* 見出しの行間を詰める。★・レア度・枠・シリーズ・強化段階はそのまま残す */
+/* 見出しは「紋章 と 強化段階」の1行だけにする */
 .equip-card--dense .equip-card__head {
-  gap: 5px;
-  margin-bottom: 0;
+  gap: 3px;
+  margin-bottom: 1px;
 }
 
 .equip-card--dense .equip-card__sigil {
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
 }
 
-/* メインの数値はこの画面の主役。**縮めない** */
+.equip-card--dense .equip-card__sigil .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/*
+ * 強化段階は**右上へ固定する。**
+ *
+ * 通常の札では見出しの行に `margin-left:auto` で右寄せしているが、
+ * 簡易表示では★とレア度を縦に積むので、その「行」ではなく
+ * **積んだ塊の右**に来てしまい、レア度の札の上に「+0」が重なっていた。
+ * 位置を決め打ちして、★の行に逃げ場を空ける。
+ */
+.equip-card--dense .equip-card__level {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  margin-left: 0;
+  font-size: 0.62rem;
+}
+
+/*
+ * ★の行だけ「+0」の逃げ場を空ける。
+ * **レア度の札には付けない**——あちらは次の行なので、
+ * 同じ逃げ場を空けると47pxの札が入らなくなる。
+ */
+.equip-card--dense .equip-card__head-text {
+  min-width: 0;
+}
+
+.equip-card--dense .equip-card__star {
+  padding-right: 24px;
+}
+
+/*
+ * ★は6つ並ぶので、いちばん詰める。読むのではなく長さで見る。
+ *
+ * **0.58rem(9.28px)より下げない。**0.52rem(8.32px)にしたら
+ * `tests/cssReadability.test.ts` に落とされた。記号でも例外は作らない
+ * ——実機で潰れて見えないことに変わりはないため。
+ * 幅は字間を詰めて稼ぐ(6つで約50px、82pxの札に収まる)。
+ */
+.equip-card--dense .equip-card__star {
+  font-size: 0.62rem;
+  letter-spacing: 0;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+/* ★とレア度は縦に積む。82pxの幅に横並びは入らない */
+.equip-card--dense .equip-card__grade {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.equip-card--dense .equip-rarity-tag {
+  font-size: 0.58rem;
+  padding: 0 4px;
+  line-height: 1.4;
+}
+
+/* 枠番号とシリーズは1行に収め、入らなければ省略記号にする */
+.equip-card--dense .equip-card__meta {
+  gap: 3px;
+  min-width: 0;
+}
+
+.equip-card--dense .equip-card__set {
+  font-size: 0.58rem;
+  padding: 0 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.equip-card--dense .equip-card__slot {
+  font-size: 0.58rem;
+}
+
+/*
+ * メインは**数値を大きく、名前を下に小さく**。
+ * 通常は「攻撃力+ ……… 236」と1行に横並びだが、
+ * 82pxの幅では名前と数値がぶつかる。
+ */
 .equip-card--dense .equip-card__main {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 0;
   margin: 2px 0 0;
+}
+
+.equip-card--dense .equip-card__main-value {
+  font-size: 1.0rem;
+  line-height: 1.15;
+}
+
+.equip-card--dense .equip-card__main-label {
+  font-size: 0.58rem;
+  line-height: 1.3;
+}
+
+/*
+ * 鍵は**右下へ移す。**
+ *
+ * 通常の札(161px)では右上に置いても余白があるが、
+ * 4列の79pxでは**レア度の札の上に重なり、「エピック」が読めなくなった**
+ * (実機で「工ロビック」のように見えていた)。
+ * 下側はメインの数値の右が空くので、そこへ逃がす。
+ * 44px角のままだと札の半分を覆うので32pxまで詰めるが、
+ * 押せる大きさ(30px以上)は保つ。
+ */
+.equipment-screen .equip-picker-card:has(.equip-card--dense) .equip-card__lock-button {
+  top: auto;
+  bottom: 2px;
+  right: 2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.equipment-screen .equip-picker-card:has(.equip-card--dense) .equip-card__lock-button .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* メインの名前が鍵の下へ潜らないよう、右に逃げ場を空ける */
+.equip-card--dense .equip-card__main-label {
+  padding-right: 30px;
+}
+
+/*
+ * 簡易表示のレア度は独立した行。
+ * 紋章の右に置くと48pxしか使えず、「レジェンド」が切れていた。
+ * ここなら札の幅いっぱい(71px)を使える。
+ */
+.equip-card--dense .equip-card__rarity-row {
+  display: flex;
+  margin-top: 1px;
+}
+
+.equip-card--dense .equip-card__rarity-row .equip-rarity-tag {
+  max-width: 100%;
 }

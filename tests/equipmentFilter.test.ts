@@ -181,12 +181,18 @@ describe("一覧の1ページぶん", () => {
 });
 
 /*
- * 「1画面に2行しか見えないので4行にしたい」という依頼で入れた簡易表示。
+ * 「文字や星を小さくして2列を4列にしたい」という依頼で入れた簡易表示。
  *
- * 実測(390×844)で 通常192px → 簡易85px。1画面の行数は 4 → 9。
- * 縮めているのは**サブ4行(67px)と持ち主(19px)を描かないこと**で、
- * 見比べに要る ★・レア度・枠・シリーズ・強化段階・メインの数値は全部残す。
- * ここを `display:none` で隠す形へ変えると、数百枚ぶんのDOMを持ったままになる。
+ * 実測(390×844): 2列192px(1画面8枚) → **4列81px(1画面36枚)**。
+ * 落としているのはサブ4行・持ち主・枠番号・シリーズで、
+ * 残すのは「その装備を選ぶ理由」——★・レア度・強化段階・メインの数値。
+ * 隠す(`display:none`)のではなく**描かない**。数百枚を並べる画面なので、
+ * 持っているだけで組み直しの費用が掛かる。
+ *
+ * 79pxの札に収めるまでに3回はみ出した。**どれも実機で見るまで気付けなかった**:
+ *   1. 鍵が右上でレア度の札に重なり「エピック」が読めない
+ *   2. 強化段階「+0」が★とレア度の両方に重なる(縦に積んだ塊の右へ来ていた)
+ *   3. 「レジェンド」が紋章に押されて右端で切れる
  */
 describe("一覧の簡易表示", () => {
   const source = readFileSync(new URL("../src/web/views/equipment.ts", import.meta.url), "utf8");
@@ -196,25 +202,41 @@ describe("一覧の簡易表示", () => {
     expect(source, "持ち主も描かない").toMatch(/dense\s*\?\s*null\s*:\s*ownerName/);
   });
 
-  it("見比べに要るもの(★・レア度・枠・シリーズ・強化段階・メインの数値)は残す", () => {
+  it("4列にする。文字と★も詰める", () => {
+    const css = readFileSync(new URL("../src/web/ui/equipmentList.css", import.meta.url), "utf8");
+    expect(css).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
+    // ★は数字表記(★6)にする。79pxの札に6つ並べると強化段階の下へ潜る
+    expect(source).toContain("dense ? `★${equipment.star}` : \"★\".repeat(equipment.star)");
+  });
+
+  it("狭い札で重なった3つを、それぞれ逃がしてある", () => {
+    const css = readFileSync(new URL("../src/web/ui/equipmentList.css", import.meta.url), "utf8");
+    // 鍵は右上から右下へ
+    expect(css, "鍵が右上のままだとレア度に重なる").toMatch(/:has\(\.equip-card--dense\) \.equip-card__lock-button[\s\S]{0,120}bottom:/);
+    // 強化段階は位置を決め打ちして★の行から外す
+    expect(css).toMatch(/\.equip-card--dense \.equip-card__level \{[\s\S]{0,120}position: absolute/);
+    // レア度は紋章に押されない独立した行へ
+    expect(source).toContain('el("div", { className: "equip-card__rarity-row" }, [equipmentRarityTag(equipment)])');
+  });
+
+  it("見比べに要るもの(★・レア度・強化段階・メインの数値)は簡易表示でも残す", () => {
     /*
-     * これらは `dense` の分岐を通らない＝簡易表示でも必ず描かれる。
-     * どれか1つでも `dense ? null :` を付けて落とすと、
-     * 「どの装備か」「どれが強いか」が一覧で分からなくなる。
+     * どれか1つでも落とすと「どの装備か」「どれが強いか」が一覧で分からなくなる。
+     * 枠番号とシリーズは落としてよい——枠は紋章が語り、
+     * シリーズは絞り込みで選べるようになったため。
      */
     for (const keep of [
       'el("span", { className: "equip-card__star" }',
-      "equipmentRarityTag(equipment)",
-      'el("span", { className: "equip-card__slot" }',
-      'el("span", { className: "equip-card__set" }',
       'el("span", { className: "equip-card__level" }',
       'el("strong", { className: "equip-card__main-value" }',
     ]) {
       const at = source.indexOf(keep);
       expect(at, `${keep} が無い`).toBeGreaterThan(-1);
-      // 直前200文字に dense の分岐が無いこと
-      expect(source.slice(Math.max(0, at - 200), at), `${keep} が簡易表示で落ちている`).not.toContain("dense ? null");
+      expect(source.slice(Math.max(0, at - 160), at), `${keep} が簡易表示で落ちている`).not.toContain("dense ? null");
     }
+    // レア度は簡易でも必ずどちらかの場所に出る
+    expect(source).toContain("dense ? null : equipmentRarityTag(equipment)");
+    expect(source).toContain('dense ? el("div", { className: "equip-card__rarity-row" }');
   });
 
   it("装備を選びに来た画面では簡易表示にしない", () => {

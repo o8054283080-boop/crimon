@@ -196,16 +196,45 @@ function equipmentCard(
         el("span", { className: "equip-card__head-text" }, [
           // ★とレア度は別物なので、同じ行に並べて出す(★6=エピック と読ませない)
           el("span", { className: "equip-card__grade" }, [
-            el("span", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
-            equipmentRarityTag(equipment),
-          ]),
-          el("span", { className: "equip-card__meta" }, [
-            el("span", { className: "equip-card__slot" }, [`枠${equipment.slot}`]),
-            el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
-          ]),
-        ]),
+            /*
+             * ★は**簡易表示だけ数字にする。**
+             *
+             * 4列にすると1枚が79pxで、★6つ(約50px)は右上の「+0」の下へ
+             * 潜ってしまった。そもそもこの大きさで6つ並んだ星を
+             * **数えるのは実機では無理**で、「★6」の方が速く読める。
+             * 通常表示は粒のまま——並べた時に格の差が一目で分かるのはあちら。
+             */
+            el("span", { className: "equip-card__star" }, [dense ? `★${equipment.star}` : "★".repeat(equipment.star)]),
+            /*
+             * 簡易表示ではレア度をここに置かない。**札の幅が足りない。**
+             * 紋章の右に押し込むと使える幅が48pxしか無く、
+             * いちばん長い「レジェンド」(約54px)が右端で切れていた。
+             * 下の行へ独立させて、札の幅いっぱい(71px)を使わせる。
+             */
+            dense ? null : equipmentRarityTag(equipment),
+          ].filter((node): node is HTMLElement => node !== null)),
+          /*
+           * 枠番号とシリーズは**簡易表示では出さない。**
+           *
+           * 4列にすると1枚が79pxしかなく、ここを残すと
+           * 「崩…」「会…」と省略記号だらけになったうえ、
+           * レア度の札に鍵が重なって「エピック」が読めなくなっていた。
+           *
+           * 枠は左の紋章が語る(剣・羽・盾・珠・兜・環)。
+           * シリーズは絞り込みで選べるようになったので、
+           * 一覧で字を出さなくても目当ての物へ辿り着ける。
+           */
+          dense
+            ? null
+            : el("span", { className: "equip-card__meta" }, [
+                el("span", { className: "equip-card__slot" }, [`枠${equipment.slot}`]),
+                el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
+              ]),
+        ].filter((node): node is HTMLElement => node !== null)),
         el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
       ]),
+      // 簡易表示のレア度は、紋章に押されない独立した行にする
+      dense ? el("div", { className: "equip-card__rarity-row" }, [equipmentRarityTag(equipment)]) : null,
       equipment.id === currentId ? el("span", { className: "equip-card__status" }, ["現在装備中"]) : null,
       el("div", { className: "equip-card__main" }, [
         el("span", { className: "equip-card__main-label" }, [STAT_LABEL[equipment.mainStat.type]]),
