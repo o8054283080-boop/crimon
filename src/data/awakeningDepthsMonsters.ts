@@ -24,6 +24,14 @@ import { Skill } from "../core/skill.js";
  * 装備ダンジョンの古代の魔人と同じ考え方で、
  * 取り巻きを「先に消しておく置物」で終わらせないための仕掛け。
  *
+ * ## 姿
+ *
+ * アルケオスの絵は `src/web/assets/monsters/archeos-DARK.webp`。
+ * **属性名を付けたファイル名にしてある**ので、属性による色替えが掛からず、
+ * 描かれたままの氷青で出る(`spriteArt.ts` の `isElementSpecific`)。
+ * 属性は闇のままなので、**絵の色と属性は一致していない。**
+ * 色を属性へ寄せると氷の結晶が濃紫に潰れ、この姿でなくなる。
+ *
  * ## 図鑑には載せない
  *
  * 誰も所有できない敵なので、召喚にも図鑑にも出さない
@@ -167,7 +175,7 @@ function templateOf(
 }
 
 export const ARCHEOS: MonsterTemplate = templateOf(
-  ARCHEOS_TEMPLATE_ID, "才能神獣 アルケオス", "🦌", "ボス", ARCHEOS_SKILLS,
+  ARCHEOS_TEMPLATE_ID, "才能神獣 アルケオス", "🐉", "ボス", ARCHEOS_SKILLS,
 );
 export const TALENT_SHARD_ATK: MonsterTemplate = templateOf(
   TALENT_SHARD_ATK_TEMPLATE_ID, "才能晶・攻", "🔺", "アタッカー", SHARD_ATK_SKILLS,

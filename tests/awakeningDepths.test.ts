@@ -18,9 +18,17 @@ import { SHOP_AWAKENING_OFFERS } from "../src/game/shop.js";
  */
 
 describe("階の中身", () => {
-  it("10階建て。スタミナは6から15まで1ずつ", () => {
+  /*
+   * スタミナは**どの階も10**。
+   *
+   * 階ごとに 6〜15 と変えていたが、深い階ほど高くすると
+   * 「上の階を回るほど1周が高い」ことになり、下の階を回る動機が
+   * ドロップではなく**燃費**で決まってしまう。同じ10なら、
+   * どこを回るかは「どこまで安定して勝てるか」だけで決まる。
+   */
+  it("10階建て。スタミナはどの階も10", () => {
     expect(AWAKENING_DEPTH_FLOORS).toHaveLength(10);
-    expect(AWAKENING_DEPTH_FLOORS.map((f) => f.stamina)).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    expect(AWAKENING_DEPTH_FLOORS.map((f) => f.stamina)).toEqual(Array(10).fill(10));
   });
 
   it("ボスの実効値は依頼の表どおり。**倍率ではなく実数で置く**", () => {
