@@ -25,7 +25,7 @@ import {
   takeSkillTalent, unlockTalentPoint, type SkillTalentSlot,
 } from "../game/talents.js";
 import { renderAwakeningDepths } from "./views/awakeningDepths.js";
-import { renderTalentAwakening, type TalentTab } from "./views/talentAwakening.js";
+import { type TalentTab } from "./views/talentAwakening.js";
 import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
@@ -2016,11 +2016,20 @@ function renderCurrentAwakeningDepthBattle(): BattleViewHandle {
  * 才能覚醒
  * ========================================================================== */
 
+/**
+ * 才能覚醒を開く。**行き先はクリエイトの「才能覚醒」の欄。**
+ *
+ * 独立した画面として持っていたが、才能を付ける先はスキル2・3で、
+ * その中身を入れ替えるのはクリエイト。**同じものを2か所で触る形**に
+ * なっていたので、入口ごとクリエイトへ寄せた。
+ */
 function openTalentAwakening(monsterId: string): void {
-  state.talentTargetId = monsterId;
+  state.createTargetId = monsterId;
+  state.createMenu = "TALENT";
+  state.createNotice = null;
   state.talentTab = "BASIC";
   state.talentSkillSlot = 1;
-  navigate("TALENT_AWAKENING");
+  navigate("MONSTER_CREATE");
 }
 
 /**
@@ -2031,7 +2040,7 @@ function openTalentAwakening(monsterId: string): void {
  * 不適合な才能がptを取り続けることになる。
  */
 function withTalentTarget(run: (monster: MonsterInstance) => { ok: boolean; reason?: string }): void {
-  const monster = state.player.monsters.find((m) => m.id === state.talentTargetId);
+  const monster = state.player.monsters.find((m) => m.id === state.createTargetId);
   if (!monster) return;
   const result = run(monster);
   // **押せない時は音で返す。**理由はボタン側の文言が既に語っている
@@ -3382,46 +3391,6 @@ function render(): void {
       break;
     }
 
-    case "TALENT_AWAKENING": {
-      const target = state.player.monsters.find((m) => m.id === state.talentTargetId);
-      if (!target) {
-        navigate("MONSTERS");
-        return;
-      }
-      const dex = findMonsterById(target.dexId);
-      if (!dex) { navigate("MONSTERS"); return; }
-      /*
-       * **開くたびに、継承で不適合になった才能を外してptを戻す。**
-       * 開かない限り直らない形にすると、クリエイトで技を替えた個体が
-       * 効かない才能にptを取られたまま放置される。
-       */
-      const reconciled = reconcileSkillTalents(target, toBattleDefinition(target, dex).skills);
-      if (reconciled.removed.length > 0) savePlayerState(state.player);
-      content = renderTalentAwakening({
-        player: state.player,
-        monster: target,
-        dex,
-        tab: state.talentTab,
-        onChangeTab: (tab) => { state.talentTab = tab; render(); },
-        skillSlot: state.talentSkillSlot,
-        onChangeSkillSlot: (slot) => { state.talentSkillSlot = slot; render(); },
-        onUnlockPoint: () => withTalentTarget((m) => unlockTalentPoint(state.player, m)),
-        onTakeBasic: (line) => withTalentTarget((m) => takeBasicTalent(m, line as never)),
-        onTakeBattle: (line) => withTalentTarget((m) => takeBattleTalent(m, line as never)),
-        onTakeSkillTalent: (slot, id) => withTalentTarget((m) => {
-          const skill = toBattleDefinition(m, findMonsterById(m.dexId)!).skills[slot];
-          return takeSkillTalent(m, slot, id, skill);
-        }),
-        onTakeAwakening: (slot, id) => withTalentTarget((m) => {
-          const skill = toBattleDefinition(m, findMonsterById(m.dexId)!).skills[slot];
-          return takeSkillAwakening(state.player, m, slot, id, skill);
-        }),
-        onReset: () => withTalentTarget((m) => resetTalents(state.player, m)),
-        onClose: () => goBack(),
-      });
-      break;
-    }
-
     case "ARENA": {
       if (arenaConnectionStatus === "IDLE") void connectArena().then(() => render());
       const arenaOnline = arenaConnectionStatus === "ONLINE";
@@ -3847,9 +3816,41 @@ function render(): void {
         navigate("MONSTERS");
         return;
       }
+      const createDex = findMonsterById(createTarget.dexId);
+      if (!createDex) { navigate("MONSTERS"); return; }
+      /*
+       * **開くたびに、継承で不適合になった才能を外してptを戻す。**
+       * 開かない限り直らない形にすると、クリエイトで技を替えた個体が
+       * 効かない才能にptを取られたまま放置される。
+       * 同じ画面の中で技を替えられるようになったので、なおさらここで通す。
+       */
+      const reconciled = reconcileSkillTalents(createTarget, toBattleDefinition(createTarget, createDex).skills);
+      if (reconciled.removed.length > 0) savePlayerState(state.player);
       content = renderMonsterCreate({
         target: createTarget,
         monsters: state.player.monsters,
+        talent: {
+          player: state.player,
+          monster: createTarget,
+          dex: createDex,
+          tab: state.talentTab,
+          onChangeTab: (tab) => { state.talentTab = tab; render(); },
+          skillSlot: state.talentSkillSlot,
+          onChangeSkillSlot: (slot) => { state.talentSkillSlot = slot; render(); },
+          onUnlockPoint: () => withTalentTarget((m) => unlockTalentPoint(state.player, m)),
+          onTakeBasic: (line) => withTalentTarget((m) => takeBasicTalent(m, line as never)),
+          onTakeBattle: (line) => withTalentTarget((m) => takeBattleTalent(m, line as never)),
+          onTakeSkillTalent: (slot, id) => withTalentTarget((m) => {
+            const skill = toBattleDefinition(m, findMonsterById(m.dexId)!).skills[slot];
+            return takeSkillTalent(m, slot, id, skill);
+          }),
+          onTakeAwakening: (slot, id) => withTalentTarget((m) => {
+            const skill = toBattleDefinition(m, findMonsterById(m.dexId)!).skills[slot];
+            return takeSkillAwakening(state.player, m, slot, id, skill);
+          }),
+          onReset: () => withTalentTarget((m) => resetTalents(state.player, m)),
+          onClose: () => goBack(),
+        },
         partyIds: state.player.partyIds,
         dungeonPartyIds: state.player.dungeonPartyIds,
         materialId: state.createMaterialId,
@@ -4473,11 +4474,17 @@ if (import.meta.env.DEV) {
      * (アリーナのランキングで**行が1つも無い画面**を検査し続け、
      * 名前の切れを見逃したのと同じ穴。)
      */
-    openTalentAwakening() {
+    openCreateMenu(menu: CreateMenu = "TALENT") {
       const monster = state.player.monsters.find((m) => m.star === 6) ?? state.player.monsters[0];
       if (!monster) return;
+      // 才能覚醒もタイプ転生も★6でしか中身が出ない
       monster.star = 6;
-      openTalentAwakening(monster.id);
+      state.createTargetId = monster.id;
+      state.createMenu = menu;
+      state.createNotice = null;
+      state.talentTab = "BASIC";
+      state.talentSkillSlot = 1;
+      navigate("MONSTER_CREATE");
       render();
     },
     showDemoRanking() {

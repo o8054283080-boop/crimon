@@ -10,6 +10,7 @@ import {
   currentSkillOf,
 } from "../../game/monsterCreate.js";
 import { MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
+import { TalentAwakeningProps, renderTalentAwakeningBody } from "./talentAwakening.js";
 import { el } from "../dom.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon } from "../icons.js";
@@ -34,7 +35,7 @@ import {
   usedAbilityPoints,
 } from "../../game/monsterDevelopment.js";
 
-export type CreateMenu = "SKILL" | "TYPE" | "ABILITY" | "LATENT";
+export type CreateMenu = "SKILL" | "TYPE" | "ABILITY" | "LATENT" | "TALENT";
 
 /**
  * クリエイト(スキル合成)の画面。
@@ -81,6 +82,14 @@ export interface MonsterCreateProps {
   onRequestReawaken: () => void;
   onCancelReawaken: () => void;
   onConfirmReawaken: () => void;
+  /**
+   * 才能覚醒の欄の中身。
+   *
+   * **クリエイトの一部として持つ。**別画面にしていたが、
+   * スキル2・3へ才能を付ける仕組みである以上、
+   * 技を入れ替える場所と同じところに無いと行き来が要る。
+   */
+  talent: TalentAwakeningProps;
 }
 
 const SLOT_LABEL: Record<CreateSlot, string> = { 1: "スキル2", 2: "スキル3" };
@@ -282,9 +291,15 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
   const ready = material !== undefined && props.slot !== null;
   const goldShort = props.gold < CREATE_GOLD_COST;
 
+  /*
+   * 才能覚醒は**潜在覚醒の次**に置く。
+   * 潜在覚醒はスキル1、才能覚醒はスキル2・3と基礎/戦闘。
+   * 隣り合わせにすると担当の違いがそのまま並びで読める。
+   */
   const menuItems: { id: CreateMenu; label: string }[] = [
     { id: "SKILL", label: "スキル継承" }, { id: "TYPE", label: "タイプ転生" },
     { id: "ABILITY", label: "能力付与" }, { id: "LATENT", label: "潜在覚醒" },
+    { id: "TALENT", label: "才能覚醒" },
   ];
   const shared = [
     el("header", { className: "app-header app-header--row" }, [
@@ -297,13 +312,30 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
     el("section", { className: "panel create-target" }, [monsterFace(target), el("strong", {}, [targetDex ? targetDex.name : target.dexId])]),
   ];
 
+  /*
+   * 才能覚醒。**対象の札(`create-target`)は出さない。**
+   * 才能覚醒側が自分で、姿・初期★・残りptの帯を先頭に出すので、
+   * 同じモンスターの札が2枚縦に並んでしまう。
+   */
+  if (props.menu === "TALENT") {
+    return el("div", { className: "screen create-screen talent-screen talent-screen--in-create" }, [
+      ...shared.slice(0, 2),
+      ...renderTalentAwakeningBody(props.talent),
+    ]);
+  }
+
   if (props.menu === "TYPE") {
     return el("div", { className: "screen create-screen" }, [...shared,
       el("section", { className: "panel" }, [
         el("h2", {}, ["タイプ転生"]),
         el("p", { className: "app-subtitle" }, [`現在: ${target.development.type ? MONSTER_TYPE_LABELS[target.development.type] : "未転生"} / Lv${target.level}`]),
         el("p", {}, [`★6限定・費用 ${TYPE_REINCARNATION_GOLD_COST.toLocaleString()}G。レベル・EXPは維持されます。能力ポイントはリセットされ、100ptを振り直せます。`]),
-        el("div", { className: "create-menu" }, (Object.keys(MONSTER_TYPE_LABELS) as MonsterType[]).map((type) =>
+        /*
+         * **欄のタブと同じ組を使わない。**同じ `create-menu` を借りていたため、
+         * 欄が5つになって1枚あたりの幅を詰めた時に、
+         * 説明文の長いこちらのボタンが道連れで3列になり、縦に潰れた。
+         */
+        el("div", { className: "create-type-list" }, (Object.keys(MONSTER_TYPE_LABELS) as MonsterType[]).map((type) =>
           el("button", { type: "button", className: "btn btn--ghost", disabled: target.star !== 6 || target.development.type === type || props.gold < TYPE_REINCARNATION_GOLD_COST, onclick: () => props.onReincarnate(type) }, [
             `${MONSTER_TYPE_LABELS[type]}: ${MONSTER_TYPE_DESCRIPTIONS[type]}`,
           ]),

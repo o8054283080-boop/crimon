@@ -333,14 +333,20 @@ function renderFooter(props: TalentAwakeningProps, battleDef: MonsterDefinition)
 
 /* ==========================================================================
  * 画面
+ *
+ * **中身と外枠を分けてある。**才能覚醒はクリエイトの中の1つの欄として出す
+ * (依頼主の指定: 「クリエイト要素なのでクリエイトの中に入れてほしい」)。
+ * クリエイト画面は自分のヘッダとメニューを持っているので、
+ * こちらのヘッダを重ねるわけにはいかない。中身だけを返す口を用意して、
+ * 外枠はそれぞれの画面が持つ形にした。
  * ========================================================================== */
 
-export function renderTalentAwakening(props: TalentAwakeningProps): HTMLElement {
+/** ヘッダを含まない中身。クリエイトの中へそのまま並べられる */
+export function renderTalentAwakeningBody(props: TalentAwakeningProps): HTMLElement[] {
   const { monster, dex } = props;
 
   if (!isTalentUnlocked(monster)) {
-    return el("div", { className: "screen talent-screen" }, [
-      el("header", { className: "app-header app-header--row" }, [el("h1", {}, ["才能覚醒"])]),
+    return [
       el("section", { className: "card talent-locked" }, [
         el("p", {}, [`${dex.name} は★${monster.star}です。才能覚醒は★6で解放されます。`]),
         el("p", { className: "talent-locked__note" }, [
@@ -348,7 +354,7 @@ export function renderTalentAwakening(props: TalentAwakeningProps): HTMLElement 
           + "素材(目覚の欠片・結晶)は★6になる前から目覚の深域で集めておけます。",
         ]),
       ]),
-    ]);
+    ];
   }
 
   const battleDef = toBattleDefinition(monster, dex);
@@ -375,11 +381,5 @@ export function renderTalentAwakening(props: TalentAwakeningProps): HTMLElement 
         )))
       : renderSkillTab(props, battleDef);
 
-  return el("div", { className: "screen talent-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [el("h1", {}, ["才能覚醒"])]),
-    renderHeader(props),
-    tabs,
-    body,
-    renderFooter(props, battleDef),
-  ]);
+  return [renderHeader(props), tabs, body, renderFooter(props, battleDef)];
 }

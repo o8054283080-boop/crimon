@@ -69,13 +69,22 @@ const SCREENS = [
     setup: "document.querySelector('.floor-grid > *')?.click()",
   },
   /*
-   * 才能覚醒。**★6が居ないと中身が出ない**ので、DEV限定の口で
-   * 1体を★6にしてから開く(空の画面を検査して「問題なし」と言わないため)。
+   * クリエイトの5つの欄。**★6が居ないと中身が出ない**欄があるので、
+   * DEV限定の口で1体を★6にしてから開く
+   * (空の画面を検査して「問題なし」と言わないため)。
+   *
+   * 5つとも見るのは、**欄のボタンが全部の欄で共通の帯**だから。
+   * 才能覚醒を足して5つになった時に幅を詰めたら、
+   * 同じ組を借りていたタイプ転生の選択肢が3列になって縦に潰れた。
    */
-  { name: "才能覚醒/基礎才能", tab: "MONSTERS", setup: "window.__crimonDev?.openTalentAwakening()" },
+  { name: "クリエイト/スキル継承", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('SKILL')" },
+  { name: "クリエイト/タイプ転生", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TYPE')" },
+  { name: "クリエイト/能力付与", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('ABILITY')" },
+  { name: "クリエイト/潜在覚醒", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('LATENT')" },
+  { name: "クリエイト/才能覚醒(基礎)", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TALENT')" },
   {
-    name: "才能覚醒/スキル才能", tab: "MONSTERS",
-    setup: "window.__crimonDev?.openTalentAwakening(); await wait(300);"
+    name: "クリエイト/才能覚醒(スキル)", tab: "MONSTERS",
+    setup: "window.__crimonDev?.openCreateMenu('TALENT'); await wait(300);"
       + " [...document.querySelectorAll('.talent-tab')].find(t => /スキル/.test(t.textContent))?.click()",
   },
   /*

@@ -4892,7 +4892,22 @@ body {
   gap: 8px;
 }
 
-.create-menu .btn { flex: 1 1 130px; }
+/*
+ * **5つを2行に収める。**130pxだと390px幅で2列3行になり、
+ * 欄のボタンだけで画面の上半分を使ってしまう
+ * (才能覚醒を足して5つになった時に、才能の札が1枚も見えなくなった)。
+ * 100pxなら3列+2列の2行。文字は5字なので詰まらない。
+ */
+.create-menu .btn { flex: 1 1 100px; }
+
+/* タイプ転生の6つ。説明文が長いので**幅を広く取り、2列に留める** */
+.create-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.create-type-list .btn { flex: 1 1 130px; }
 
 .create-points {
   font-weight: 800;
