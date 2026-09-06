@@ -167,7 +167,10 @@ export function calcDamage(
   const isCrit = rng() < getFinalCritRate(attacker, defender, effect.critRateBonus ?? 0);
   const critMultiplier = isCrit ? getEffectiveStat(attacker, "criDmg") : 1;
 
-  const dealtMultiplier = attacker.def.combatMods?.damageDealtMultiplier ?? 1;
+  const dealtMultiplier = (attacker.def.combatMods?.damageDealtMultiplier ?? 1)
+    // 高揚支援。**掛かっている間だけ**乗る
+    * (attacker.damageDealtBonusTurns && attacker.damageDealtBonusTurns > 0
+      ? 1 + (attacker.damageDealtBonus ?? 0) : 1);
   const takenMultiplier = (defender.def.combatMods?.damageTakenMultiplier ?? 1)
     * (defender.deathBoostDamageTaken ?? 1)
     * adaptationMultiplier(attacker, defender);
