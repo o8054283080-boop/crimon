@@ -44,39 +44,42 @@ function measure(name: string, order: string[]) {
 }
 
 describe("才能の神殿10F 仮測定", () => {
-  test("塔60F想定装備(TYPICAL)で4つの狙い順を1000戦ずつ測る", () => {
+  test("初期案を4つの狙い順で1000戦ずつ測る", () => {
     const patterns = [
       ["アルケオス集中", ["才能神獣 アルケオス"]],
       ["攻→護→アルケオス", ["才能晶・攻", "才能晶・護", "才能神獣 アルケオス"]],
       ["護→攻→アルケオス", ["才能晶・護", "才能晶・攻", "才能神獣 アルケオス"]],
       ["既存AIまかせ", []],
     ] as const;
-
     const results = patterns.map(([name, order]) => measure(name, [...order]));
     expect(results).toHaveLength(4);
   }, 240_000);
 
-  test("ボス攻撃力×速度を300戦ずつ振って60〜70%の帯を探す", () => {
-    const attacks = [8_000, 9_000, 10_000, 11_000];
-    const speeds = [180, 200, 220];
+  test("HP×柔らかい反撃間隔を300戦ずつ振って60〜70%の帯を探す", () => {
+    const hitIntervals = [8, 6, 5];
+    const bossHps = [200_000, 230_000, 260_000];
     const focus = ["才能神獣 アルケオス"];
     const results = [];
 
-    for (const atk of attacks) {
-      for (const spd of speeds) {
+    for (const hp of bossHps) {
+      for (const counterAfterHits of hitIntervals) {
         const scenario = {
           ...TALENT_TEMPLE_10_MEASURE,
           enemies: TALENT_TEMPLE_10_MEASURE.enemies.map((enemy, index) => index === 0
-            ? { ...enemy, stats: { ...enemy.stats, atk, spd } }
+            ? {
+                ...enemy,
+                stats: { ...enemy.stats, hp, atk: 8_000, spd: 185 },
+                // 3.5倍単体反撃ではなく、S2「全体1.1倍＋ゲージ20%吸収」を返す。
+                bossTraits: { counterAfterHits, counterSkillIndex: 1 },
+              }
             : enemy),
         };
-        const rows = runMany(scenario, SEED + atk + spd, 300, focus, "TYPICAL");
-        const result = summarize(`atk${atk}-spd${spd}`, rows);
-        console.log(`TALENT10_SWEEP ${JSON.stringify(result)}`);
+        const rows = runMany(scenario, SEED + hp + counterAfterHits, 300, focus, "TYPICAL");
+        const result = summarize(`hp${hp}-counter${counterAfterHits}`, rows);
+        console.log(`TALENT10_STRUCT_SWEEP ${JSON.stringify(result)}`);
         results.push(result);
       }
     }
-
-    expect(results).toHaveLength(12);
+    expect(results).toHaveLength(9);
   }, 240_000);
 });
