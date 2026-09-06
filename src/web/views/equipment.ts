@@ -207,8 +207,21 @@ function equipmentCard(
        * 枠・シリーズとレア度はそれぞれ下の独立した行へ出す。
        */
       el("div", { className: "equip-card__head" }, [
-        // 枠の紋章。等級の色を纏わせ、台座に嵌める
-        el("span", { className: "equip-card__sigil" }, [icon(slotIcon(equipment.slot))]),
+        /*
+         * 枠の印。等級の色を纏わせ、台座に嵌める。
+         *
+         * **簡易表示では絵ではなく枠番号そのものを出す。**
+         * 通常表示には「枠1」という字が別にあるので絵でも困らないが、
+         * 4列ではその行を落としてあり、**絵だけが枠を語る唯一の手がかり**
+         * になっていた。剣・羽・盾・珠・兜・環の6つを20pxで描き分けるのは
+         * 実機では無理で、依頼主から「どのスロットか分かりにくい」と指摘を受けた。
+         *
+         * 数字なら見間違えようがない。絞り込みの枠タブも絵の右下に
+         * 同じ番号を添えてあるので、押した番号と札の番号が直に対応する。
+         */
+        el("span", { className: `equip-card__sigil${dense ? " equip-card__sigil--number" : ""}` }, [
+          dense ? String(equipment.slot) : icon(slotIcon(equipment.slot)),
+        ]),
         /*
          * ★は**簡易表示だけ数字にする。**
          *

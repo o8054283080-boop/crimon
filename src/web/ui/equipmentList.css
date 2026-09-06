@@ -371,6 +371,22 @@
 }
 
 /*
+ * 簡易表示の枠印は**数字そのもの。**
+ *
+ * 6種の絵を20pxで描き分けるのは実機では無理で、
+ * 「どのスロットか分かりにくい」という指摘を受けた。
+ * 台座(丸い座と等級の色)はそのまま使うので、
+ * 札の見た目の並びは変わらない。中身だけが絵から数字になる。
+ */
+.equip-card__sigil--number {
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #e6edff;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
  * 強化段階は通常表示と同じく**見出しの行の兄弟**。
  *
  * 一度 `position: absolute` で右上へ固定したが、

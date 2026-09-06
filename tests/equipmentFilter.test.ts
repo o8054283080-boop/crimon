@@ -277,6 +277,19 @@ describe("一覧の簡易表示", () => {
     expect(css.slice(at, at + 200)).toContain("repeat(3, minmax(0, 1fr))");
   });
 
+  /*
+   * 簡易表示は「枠1」の行を落としているので、**枠を語るのは左上の印だけ**になる。
+   * 剣・羽・盾・珠・兜・環の6つを20pxで描き分けるのは実機では無理で、
+   * 依頼主から「どのスロットか分かりにくい」と指摘を受けた。
+   * 台座はそのまま、中身だけを枠番号そのものにしてある。
+   */
+  it("簡易表示の枠印は絵ではなく番号", () => {
+    expect(source).toContain("dense ? String(equipment.slot) : icon(slotIcon(equipment.slot))");
+    expect(source).toContain('equip-card__sigil${dense ? " equip-card__sigil--number" : ""}');
+    const css = readFileSync(new URL("../src/web/ui/equipmentList.css", import.meta.url), "utf8");
+    expect(css, "数字の見た目が決まっていない").toContain(".equip-card__sigil--number");
+  });
+
   it("4列にする。文字と★も詰める", () => {
     const css = readFileSync(new URL("../src/web/ui/equipmentList.css", import.meta.url), "utf8");
     expect(css).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
