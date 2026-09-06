@@ -32,19 +32,19 @@
 
 [data-rarity="rare"] {
   --eq-rarity: #4f9dff;
-  --eq-rarity-glow: rgba(79, 157, 255, 0.32);
+  --eq-rarity-glow: rgba(79, 157, 255, 0.42);
   --eq-rarity-ink: #a8ceff;
 }
 
 [data-rarity="hero"] {
   --eq-rarity: #b07bff;
-  --eq-rarity-glow: rgba(176, 123, 255, 0.4);
+  --eq-rarity-glow: rgba(176, 123, 255, 0.5);
   --eq-rarity-ink: #d8c2ff;
 }
 
 [data-rarity="legend"] {
   --eq-rarity: #ffc53f;
-  --eq-rarity-glow: rgba(255, 197, 63, 0.45);
+  --eq-rarity-glow: rgba(255, 197, 63, 0.55);
   --eq-rarity-ink: #ffe6a6;
 }
 
@@ -55,7 +55,7 @@
  */
 [data-rarity="epic"] {
   --eq-rarity: #ff8fd0;
-  --eq-rarity-glow: rgba(255, 143, 208, 0.4);
+  --eq-rarity-glow: rgba(255, 143, 208, 0.5);
   --eq-rarity-ink: #ffd9ef;
   --eq-rainbow: linear-gradient(
     100deg,
@@ -111,8 +111,21 @@
  * 一覧のカード — 枠色だけ。数字の邪魔をしない
  * ========================================================================== */
 
+/*
+ * **枠の色は薄めない。**
+ *
+ * 最初 60% に薄めていたら、縮小した一覧ではどの札も同じ暗い枠に見えて
+ * ノーマルとレア、ヒーローとエピックが**見分けられなかった。**
+ * 色を濃くしても文字の上には何も乗らないので、
+ * 「ギラギラさせない」と「見分けが付く」は両立する。
+ */
 .equip-card[data-rarity] {
-  border-color: color-mix(in srgb, var(--eq-rarity, #4a5372) 60%, transparent);
+  border-color: var(--eq-rarity, #4a5372);
+}
+
+/* ノーマルだけは主張させない。落ち着いた枠にする */
+.equip-card[data-rarity="normal"] {
+  border-color: color-mix(in srgb, var(--eq-rarity) 55%, transparent);
 }
 
 /* レジェンドだけ枠を少し太くする。金は他より一段上だと分かるように */
@@ -130,7 +143,7 @@
 .equip-card[data-rarity="legend"] {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 8px var(--eq-rarity-glow, transparent),
+    0 0 12px var(--eq-rarity-glow, transparent),
     0 3px 10px rgba(0, 0, 0, 0.4);
 }
 
@@ -145,7 +158,7 @@
   border-color: transparent;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 0 10px var(--eq-rarity-glow, transparent),
+    0 0 14px var(--eq-rarity-glow, transparent),
     0 3px 10px rgba(0, 0, 0, 0.4);
 }
 
@@ -162,7 +175,7 @@
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-  opacity: 0.75;
+  opacity: 1;
   pointer-events: none;
   animation: equip-rainbow-drift 12s linear infinite;
 }
