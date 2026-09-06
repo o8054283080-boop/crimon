@@ -252,6 +252,10 @@ describe("一覧の簡易表示", () => {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => { store.set(k, v); },
     };
+    // 何も保存されていなければ簡易表示(4列)から始める
+    expect(mod.loadEquipmentListDense(storage)).toBe(true);
+    // 一度でも切り替えた人の設定は尊重する
+    mod.saveEquipmentListDense(false, storage);
     expect(mod.loadEquipmentListDense(storage)).toBe(false);
     mod.saveEquipmentListDense(true, storage);
     expect(mod.loadEquipmentListDense(storage)).toBe(true);
@@ -265,7 +269,7 @@ describe("一覧の簡易表示", () => {
       getItem: () => { throw new Error("使えません"); },
       setItem: () => { throw new Error("使えません"); },
     };
-    expect(mod.loadEquipmentListDense(broken)).toBe(false);
+    expect(mod.loadEquipmentListDense(broken)).toBe(true);
     expect(() => mod.saveEquipmentListDense(true, broken)).not.toThrow();
   });
 });

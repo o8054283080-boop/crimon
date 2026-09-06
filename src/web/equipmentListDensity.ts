@@ -11,11 +11,25 @@ const EQUIPMENT_LIST_DENSE_KEY = "crimon_equipment_list_dense_v1";
  * 装備は数百個たまるので簡易のまま使い、モンスターは通常で見る、という
  * 組み合わせが普通に起きる。
  */
+/**
+ * **既定は簡易表示(4列)。**
+ *
+ * 装備は数百個たまる持ち物で、一覧を開く目的は
+ * 「持っている物を見比べて目当ての1個を探す」こと。
+ * 2列の詳しい札だと1画面に8個しか出ず、その用途に合っていなかった
+ * (依頼主から「2列を4列にしたい」と、画面に線を引いた絵で指示を受けている)。
+ *
+ * サブまで読みたい時は札を押せば詳細で全部見られるし、
+ * 「▦ 通常表示」でいつでも戻せる。
+ * **一度でも切り替えた人の設定は尊重する**——保存が無い時だけ既定を使う。
+ */
 export function loadEquipmentListDense(storage: Pick<Storage, "getItem"> = localStorage): boolean {
   try {
-    return storage.getItem(EQUIPMENT_LIST_DENSE_KEY) === "1";
+    const saved = storage.getItem(EQUIPMENT_LIST_DENSE_KEY);
+    if (saved === null) return true;
+    return saved === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
