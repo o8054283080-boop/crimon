@@ -117,6 +117,7 @@ import { ResultAction } from "./views/resultActions.js";
 import { BattleChainInfo, BattleViewHandle, renderBattleView } from "./views/battleView.js";
 import { EquipmentPickerContext, EquipmentProps, EquipmentSortKey, applyEquipmentOrder, renderEquipment, visibleEquipment } from "./views/equipment.js";
 import { EMPTY_EQUIPMENT_FILTER, EquipmentFilter } from "./equipmentFilter.js";
+import { loadEquipmentListDense, saveEquipmentListDense } from "./equipmentListDensity.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
@@ -339,6 +340,8 @@ interface AppState {
   equipmentPickerContext: EquipmentPickerContext | null;
   equipmentSlotFilter: EquipSlot | null;
   equipmentSortKey: EquipmentSortKey;
+  /** 所持装備の一覧を簡易表示にしているか。端末の見た目設定として保存する */
+  equipmentListDense: boolean;
   /** 所持装備の絞り込み条件。所持一覧で使う(装備を選びに来た時は当てない) */
   equipmentFilter: EquipmentFilter;
   /** 絞り込みの札を開いているか */
@@ -496,6 +499,7 @@ const state: AppState = {
   equipmentPickerContext: null,
   equipmentSlotFilter: null,
   equipmentSortKey: "recommended",
+  equipmentListDense: loadEquipmentListDense(),
   equipmentFilter: { ...EMPTY_EQUIPMENT_FILTER },
   equipmentFilterOpen: false,
   equipmentOrder: null,
@@ -3990,6 +3994,12 @@ function renderEquipmentScreen(): HTMLElement {
     detailId: state.equipmentDetailId,
     pickerContext: state.equipmentPickerContext,
     slotFilter: state.equipmentSlotFilter,
+    dense: state.equipmentListDense,
+    onToggleDense: () => {
+      state.equipmentListDense = !state.equipmentListDense;
+      saveEquipmentListDense(state.equipmentListDense);
+      render();
+    },
     filter: state.equipmentFilter,
     filterOpen: state.equipmentFilterOpen,
     onChangeFilter: (filter) => {

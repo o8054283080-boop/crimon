@@ -179,3 +179,71 @@ describe("一覧の1ページぶん", () => {
     expect(EQUIPMENT_LIST_PAGE_SIZE).toBeGreaterThan(INVENTORY_INITIAL_RENDER_COUNT);
   });
 });
+
+/*
+ * 「1画面に2行しか見えないので4行にしたい」という依頼で入れた簡易表示。
+ *
+ * 実測(390×844)で 通常192px → 簡易85px。1画面の行数は 4 → 9。
+ * 縮めているのは**サブ4行(67px)と持ち主(19px)を描かないこと**で、
+ * 見比べに要る ★・レア度・枠・シリーズ・強化段階・メインの数値は全部残す。
+ * ここを `display:none` で隠す形へ変えると、数百枚ぶんのDOMを持ったままになる。
+ */
+describe("一覧の簡易表示", () => {
+  const source = readFileSync(new URL("../src/web/views/equipment.ts", import.meta.url), "utf8");
+
+  it("簡易表示では、サブと持ち主を**描かない**(隠すのではない)", () => {
+    expect(source).toContain('dense ? null : el("div", { className: "equip-card__subs" }, subLines)');
+    expect(source, "持ち主も描かない").toMatch(/dense\s*\?\s*null\s*:\s*ownerName/);
+  });
+
+  it("見比べに要るもの(★・レア度・枠・シリーズ・強化段階・メインの数値)は残す", () => {
+    /*
+     * これらは `dense` の分岐を通らない＝簡易表示でも必ず描かれる。
+     * どれか1つでも `dense ? null :` を付けて落とすと、
+     * 「どの装備か」「どれが強いか」が一覧で分からなくなる。
+     */
+    for (const keep of [
+      'el("span", { className: "equip-card__star" }',
+      "equipmentRarityTag(equipment)",
+      'el("span", { className: "equip-card__slot" }',
+      'el("span", { className: "equip-card__set" }',
+      'el("span", { className: "equip-card__level" }',
+      'el("strong", { className: "equip-card__main-value" }',
+    ]) {
+      const at = source.indexOf(keep);
+      expect(at, `${keep} が無い`).toBeGreaterThan(-1);
+      // 直前200文字に dense の分岐が無いこと
+      expect(source.slice(Math.max(0, at - 200), at), `${keep} が簡易表示で落ちている`).not.toContain("dense ? null");
+    }
+  });
+
+  it("装備を選びに来た画面では簡易表示にしない", () => {
+    // 札が差分と強化ボタンを抱えているので、縮めると押すところが無くなる
+    expect(source).toContain("props.dense && !props.pickerContext");
+    expect(source).toContain("props.pickerContext ? null : renderEquipmentListDensityToggle(");
+  });
+
+  it("表示密度はセーブデータではなく端末の設定として持つ", async () => {
+    const mod = await import("../src/web/equipmentListDensity.js");
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+    };
+    expect(mod.loadEquipmentListDense(storage)).toBe(false);
+    mod.saveEquipmentListDense(true, storage);
+    expect(mod.loadEquipmentListDense(storage)).toBe(true);
+    // モンスター側とはキーを分ける(見たい細かさが別なので)
+    expect([...store.keys()][0]).toBe("crimon_equipment_list_dense_v1");
+  });
+
+  it("書けない端末でも落ちない", async () => {
+    const mod = await import("../src/web/equipmentListDensity.js");
+    const broken = {
+      getItem: () => { throw new Error("使えません"); },
+      setItem: () => { throw new Error("使えません"); },
+    };
+    expect(mod.loadEquipmentListDense(broken)).toBe(false);
+    expect(() => mod.saveEquipmentListDense(true, broken)).not.toThrow();
+  });
+});

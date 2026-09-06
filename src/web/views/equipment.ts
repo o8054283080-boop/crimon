@@ -10,6 +10,7 @@ import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.j
 import { equipmentRarityRank, getEquipmentRarity } from "../../core/equipmentRarity.js";
 import { EquipmentFilter, filterEquipment } from "../equipmentFilter.js";
 import { renderEquipmentFilterBar } from "./equipmentFilterBar.js";
+import { renderEquipmentListDensityToggle } from "../equipmentListDensity.js";
 import "../ui/equipmentList.css";
 
 export interface EquipmentPickerContext {
@@ -74,6 +75,9 @@ export interface EquipmentProps {
   onGoDungeon: () => void;
   onChangeSlotFilter: (slot: EquipSlot | null) => void;
   onChangeSort: (key: EquipmentSortKey) => void;
+  /** 札を小さくして1画面に多く並べるか。端末の見た目設定として保存する */
+  dense: boolean;
+  onToggleDense: () => void;
   /** 絞り込みの条件と、開いているかどうか */
   filter: EquipmentFilter;
   filterOpen: boolean;
@@ -149,7 +153,13 @@ function formatSubStatNumber(stat: StatRoll): string {
  *   中央に大きくメインの数値 ……………… その装備を選ぶ理由
  *   下にサブと持ち主 ………………………… 確かめる時だけ読む
  */
-function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () => void, currentId?: string): HTMLElement {
+function equipmentCard(
+  player: PlayerState,
+  equipment: Equipment,
+  onClick: () => void,
+  currentId?: string,
+  dense = false,
+): HTMLElement {
   const ownerName = equipmentOwnerName(player, equipment);
   /*
    * サブは**名前と数値を分ける。**
@@ -172,7 +182,7 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
     "button",
     {
       type: "button",
-      className: `equip-card${equipment.id === currentId ? " equip-card--current" : ""}`,
+      className: `equip-card${equipment.id === currentId ? " equip-card--current" : ""}${dense ? " equip-card--dense" : ""}`,
       onclick: onClick,
       "data-star": String(equipment.star),
       "data-set": equipment.set,
@@ -201,13 +211,27 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
         el("span", { className: "equip-card__main-label" }, [STAT_LABEL[equipment.mainStat.type]]),
         el("strong", { className: "equip-card__main-value" }, [formatMainStatNumber(equipment.mainStat)]),
       ]),
-      el("div", { className: "equip-card__subs" }, subLines),
-      ownerName
-        ? el("div", { className: "equip-card__owner" }, [el("i", { className: "equip-card__dot" }, []), ownerName])
-        : el("div", { className: "equip-card__owner equip-card__owner--free" }, [
-            el("i", { className: "equip-card__dot" }, []),
-            "未装着",
-          ]),
+      /*
+       * **簡易表示ではサブと持ち主を描かない。**
+       *
+       * 実測(390×844)で、札192pxのうち サブ4行=67px・持ち主=19px。
+       * この2つを畳むと106pxになり、**1画面に見える行数がちょうど倍**になる。
+       * 隠すのではなく描かない——数百枚を並べる画面なので、
+       * `display:none` で持っていても組み直しの費用は掛かる。
+       *
+       * 消える情報は札を押せば詳細で全部見られる。
+       * 逆に**残すのは「その装備を選ぶ理由」**——★・レア度・枠・シリーズ・
+       * 強化段階・メインの数値。これだけで見比べは足りる。
+       */
+      dense ? null : el("div", { className: "equip-card__subs" }, subLines),
+      dense
+        ? null
+        : ownerName
+          ? el("div", { className: "equip-card__owner" }, [el("i", { className: "equip-card__dot" }, []), ownerName])
+          : el("div", { className: "equip-card__owner equip-card__owner--free" }, [
+              el("i", { className: "equip-card__dot" }, []),
+              "未装着",
+            ]),
     ].filter((node): node is HTMLElement => node !== null),
   );
 }
@@ -295,7 +319,7 @@ export function sortEquipment(equipment: readonly Equipment[], key: EquipmentSor
 
 /** iPhoneでも1段に収まり、現在値が常に見えるネイティブ選択欄。 */
 function renderSortRow(props: EquipmentProps): HTMLElement {
-  return el("div", { className: "equip-sort" }, [
+  const nodes: (HTMLElement | null)[] = [
     el("label", { className: "equip-sort__label", htmlFor: "equipment-sort" }, ["並べ替え"]),
     el("div", { className: "equip-sort__control" }, [
       el("select", {
@@ -307,7 +331,16 @@ function renderSortRow(props: EquipmentProps): HTMLElement {
       }, EQUIPMENT_SORT_KEYS.map((key) => el("option", { value: key }, [EQUIPMENT_SORT_LABEL[key]]))),
       el("span", { className: "equip-sort__current", ariaHidden: "true" }, [EQUIPMENT_SORT_LABEL[props.sortKey]]),
     ]),
-  ]);
+    /*
+     * 表示の切替は並べ替えと同じ行に置く。
+     * 一覧の上に帯を増やすと、その分だけ装備が下へ押し出される
+     * (この画面は既に「枠」「絞り込み」「並べ替え」で3段ある)。
+     * 装備を選びに来た画面では出さない——札が差分と強化を抱えていて、
+     * 縮めると押すところが無くなる。
+     */
+    props.pickerContext ? null : renderEquipmentListDensityToggle(props.dense, props.onToggleDense),
+  ];
+  return el("div", { className: "equip-sort" }, nodes.filter((n): n is HTMLElement => n !== null));
 }
 
 /** 一括売却の操作帯。選択モードの時だけ出す */
@@ -406,7 +439,7 @@ function renderList(props: EquipmentProps): HTMLElement {
       } else {
         props.onSelectDetail(eq.id);
       }
-    }, currentEquipmentId);
+    }, currentEquipmentId, props.dense && !props.pickerContext);
     if (selecting) {
       card.classList.add("equip-card--selectable");
       if (isEquipped(eq) || eq.locked) card.classList.add("equip-card--locked");
@@ -510,7 +543,7 @@ function renderList(props: EquipmentProps): HTMLElement {
    * 一覧と同じ枚数にすると重くなる。こちらは既定のままにする。
    */
   const equipmentGrid = createIncrementalGrid({
-    className: "equip-grid",
+    className: `equip-grid${props.dense && !props.pickerContext ? " equip-grid--dense" : ""}`,
     items,
     renderItem,
     initialCount: props.pickerContext ? undefined : EQUIPMENT_LIST_PAGE_SIZE,
