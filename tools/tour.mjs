@@ -62,6 +62,22 @@ const SCREENS = [
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
   { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },
+  { name: "目覚の深域", tab: "HOME", tile: "dungeon", tile2: "awakeningDepth" },
+  // 階の詳細。**一覧と詳細は別の作り**なので、入口だけ見ても足りない
+  {
+    name: "目覚の深域/階の詳細", tab: "HOME", tile: "dungeon", tile2: "awakeningDepth",
+    setup: "document.querySelector('.floor-grid > *')?.click()",
+  },
+  /*
+   * 才能覚醒。**★6が居ないと中身が出ない**ので、DEV限定の口で
+   * 1体を★6にしてから開く(空の画面を検査して「問題なし」と言わないため)。
+   */
+  { name: "才能覚醒/基礎才能", tab: "MONSTERS", setup: "window.__crimonDev?.openTalentAwakening()" },
+  {
+    name: "才能覚醒/スキル才能", tab: "MONSTERS",
+    setup: "window.__crimonDev?.openTalentAwakening(); await wait(300);"
+      + " [...document.querySelectorAll('.talent-tab')].find(t => /スキル/.test(t.textContent))?.click()",
+  },
   /*
    * アリーナは中でさらに6画面に分かれる。**巡回に入れていなかった。**
    *
