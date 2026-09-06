@@ -44,7 +44,7 @@ function measure(name: string, order: string[]) {
 }
 
 describe("才能の神殿10F 仮測定", () => {
-  test("初期案を4つの狙い順で1000戦ずつ測る", () => {
+  test("本命候補を4つの狙い順で1000戦ずつ測る", () => {
     const patterns = [
       ["アルケオス集中", ["才能神獣 アルケオス"]],
       ["攻→護→アルケオス", ["才能晶・攻", "才能晶・護", "才能神獣 アルケオス"]],
@@ -69,7 +69,6 @@ describe("才能の神殿10F 仮測定", () => {
             ? {
                 ...enemy,
                 stats: { ...enemy.stats, hp, atk: 8_000, spd: 185 },
-                // 3.5倍単体反撃ではなく、S2「全体1.1倍＋ゲージ20%吸収」を返す。
                 bossTraits: { counterAfterHits, counterSkillIndex: 1 as const },
               }
             : enemy),
@@ -77,6 +76,33 @@ describe("才能の神殿10F 仮測定", () => {
         const rows = runMany(scenario, SEED + hp + counterAfterHits, 300, focus, "TYPICAL");
         const result = summarize(`hp${hp}-counter${counterAfterHits}`, rows);
         console.log(`TALENT10_STRUCT_SWEEP ${JSON.stringify(result)}`);
+        results.push(result);
+      }
+    }
+    expect(results).toHaveLength(9);
+  }, 240_000);
+
+  test("周回向けにHPを下げて攻撃圧を上げ、時間切れを減らす", () => {
+    const hps = [180_000, 190_000, 200_000];
+    const attacks = [8_500, 9_000, 9_500];
+    const focus = ["才能神獣 アルケオス"];
+    const results = [];
+
+    for (const hp of hps) {
+      for (const atk of attacks) {
+        const scenario = {
+          ...TALENT_TEMPLE_10_MEASURE,
+          enemies: TALENT_TEMPLE_10_MEASURE.enemies.map((enemy, index) => index === 0
+            ? {
+                ...enemy,
+                stats: { ...enemy.stats, hp, atk, spd: 185 },
+                bossTraits: { counterAfterHits: 5, counterSkillIndex: 1 as const },
+              }
+            : enemy),
+        };
+        const rows = runMany(scenario, SEED + hp + atk, 400, focus, "TYPICAL");
+        const result = summarize(`farm-hp${hp}-atk${atk}`, rows);
+        console.log(`TALENT10_FARM_SWEEP ${JSON.stringify(result)}`);
         results.push(result);
       }
     }
