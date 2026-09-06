@@ -75,7 +75,15 @@ body.regular-missions-open { overflow: hidden; }
   background: rgba(255, 255, 255, 0.06);
 }
 
-.regular-missions__close { padding: 0 13px; }
+/*
+ * **「閉じる」が「閉じ／る」と2行に割れていた。**
+ * 高さ40pxの枠に2行が入らず、下の行が枠の外へ出ていた。
+ */
+.regular-missions__close {
+  padding: 0 10px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
 
 .regular-missions__tabs {
   display: grid;
@@ -84,8 +92,14 @@ body.regular-missions-open { overflow: hidden; }
   padding: 0 10px 10px;
 }
 
+/*
+ * 公開記念が並ぶ時は5枚。**5列に並べると1枚66pxで、
+ * 「ウィークリー」の6文字(11px)が入らず2行に割れていた。**
+ * 高さは42px固定なので、2行目がそのまま枠の外へ出る。
+ * 字を小さくして押し込むより、3列2行にして本来の大きさで読ませる。
+ */
 .regular-missions__tabs--campaign {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .regular-missions__tab {
@@ -93,6 +107,8 @@ body.regular-missions-open { overflow: hidden; }
   min-height: 42px;
   padding: 6px 3px;
   font-size: 11px;
+  /* 折り返させない。**入らない時は枠の方を広げる** */
+  white-space: nowrap;
 }
 
 .regular-missions__tab.is-active {
