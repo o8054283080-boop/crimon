@@ -1,0 +1,161 @@
+/*
+ * 目覚の深域。
+ *
+ * 既存のダンジョン画面(`stages-screen`)の作りをそのまま借り、
+ * ここでは**この場所だけのもの**——素材の持ち数の帯と交換の札——だけを足す。
+ * 一から組み直すと、同じ「ダンジョン」なのに操作の位置が違う画面ができる。
+ */
+
+/* ==========================================================================
+ * 素材の持ち数
+ *
+ * **一覧にも詳細にも同じ形で出す。**深域は「あと何個で1pt解放できるか」を
+ * 数えながら回る場所で、持ち数が見えないと何周すればいいのか分からない。
+ * ========================================================================== */
+
+.depth-materials {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.depth-material {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(127, 178, 255, 0.28);
+  background: linear-gradient(180deg, rgba(24, 32, 56, 0.92), rgba(12, 16, 30, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  min-width: 0;
+}
+
+.depth-material__icon {
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+
+/* **9pxを下回らせない。**素材の名前が読めないと、どれが何個か分からない */
+.depth-material__name {
+  font-size: 0.62rem;
+  color: #9fb0d8;
+  white-space: nowrap;
+}
+
+.depth-material__count {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #eaf0ff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+ * 階の中身
+ * ========================================================================== */
+
+.depth-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.depth-detail__note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #cbd6f2;
+}
+
+.depth-detail__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #dbe4fb;
+}
+
+.depth-detail__label {
+  flex: 0 0 4.5em;
+  color: #93a2c4;
+  font-size: 0.72rem;
+  padding-top: 1px;
+}
+
+/* 初回だけの報酬は、二度と出ない情報なので色で立てる */
+.depth-detail__row--first {
+  color: #ffdf9a;
+}
+
+/* ==========================================================================
+ * 素材の交換
+ *
+ * 深域の画面の中に置く。**「余りをどうするか」を考える場所と
+ * 「集める場所」を離さない。**
+ * ========================================================================== */
+
+.depth-exchange {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.depth-exchange__title {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #eaf0ff;
+}
+
+.depth-exchange__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.depth-exchange__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.depth-exchange__name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #eaf0ff;
+}
+
+/* **交換レートは名前と同じ大きさで出す。**注記より先に読ませたい */
+.depth-exchange__rate {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 1px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #ffd166;
+  font-variant-numeric: tabular-nums;
+}
+
+.depth-exchange__have {
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: #9fb0d8;
+}
+
+.depth-exchange__note {
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: #93a2c4;
+}
+
+.depth-exchange__btn {
+  flex: 0 0 auto;
+  min-width: 84px;
+  min-height: 40px;
+  font-size: 0.78rem;
+}
+
+/* 足りない時は「あと○個」を出す。押せない理由を札そのものが語る */
+.depth-exchange__btn--short {
+  color: #93a2c4;
+}

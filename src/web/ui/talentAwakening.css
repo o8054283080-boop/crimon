@@ -1,0 +1,473 @@
+/*
+ * 才能覚醒の画面。
+ *
+ * ## この画面の性格
+ *
+ * 暗い地に、青い光と金の装飾。**育成のいちばん奥**にある場所なので、
+ * ステージやショップより一段静かで、重い手触りにしてある。
+ *
+ * ## 下の帯は浮かせない
+ *
+ * 「残りpt」と「決定」は一覧をどれだけ流しても見える必要があるが、
+ * **`position: fixed` では下の何かを覆う**(この案件で3回やっている)。
+ * `sticky` にして、一覧の最後で止まる形にした。
+ * 巻物の終わりまで行けば、その下には何も無い。
+ */
+
+.talent-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 0%, rgba(64, 96, 176, 0.18), transparent 70%),
+    linear-gradient(180deg, #0a0d18, #070911);
+}
+
+/* ==========================================================================
+ * 上の情報
+ * ========================================================================== */
+
+.talent-head {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(214, 176, 92, 0.35);
+  background: linear-gradient(180deg, rgba(26, 32, 54, 0.95), rgba(12, 15, 28, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.talent-head__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.talent-head__portrait {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  display: grid;
+  place-items: center;
+  font-size: 1.7rem;
+  border-radius: 14px;
+  border: 1px solid rgba(214, 176, 92, 0.5);
+  background: radial-gradient(circle at 40% 30%, rgba(96, 128, 200, 0.35), rgba(10, 14, 28, 0.95) 70%);
+}
+
+.talent-head__id {
+  min-width: 0;
+}
+
+.talent-head__name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f2e9cf;
+}
+
+.talent-head__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: #9fb0d8;
+}
+
+.talent-head__star {
+  color: #ffd166;
+  font-weight: 800;
+}
+
+/* 初期★は**pt上限の理由**。他のメタより目立たせる */
+.talent-head__origin {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 178, 255, 0.45);
+  color: #a9c6ff;
+  font-weight: 700;
+}
+
+.talent-head__points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.talent-point {
+  padding: 6px 4px;
+  border-radius: 10px;
+  background: rgba(10, 14, 28, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+  min-width: 0;
+}
+
+.talent-point__label {
+  font-size: 0.62rem;
+  color: #93a2c4;
+}
+
+.talent-point__value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #eaf0ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.talent-point__note {
+  font-size: 0.6rem;
+  color: #7f8db0;
+}
+
+.talent-head__unlock,
+.talent-head__reset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.talent-head__unlock-cost {
+  flex: 1;
+  font-size: 0.74rem;
+  color: #cbd6f2;
+  min-width: 0;
+}
+
+.talent-cost {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.talent-cost--ok { color: #9ff0c0; }
+/* 足りない時は赤。**押せない理由を色でも言う** */
+.talent-cost--short { color: #ff9c9c; }
+
+.talent-head__unlock-btn,
+.talent-head__reset .btn {
+  flex: 0 0 auto;
+  min-height: 40px;
+  font-size: 0.76rem;
+}
+
+.talent-head__reset-note {
+  flex: 1;
+  font-size: 0.66rem;
+  color: #7f8db0;
+}
+
+.talent-head__remaining {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(64, 96, 176, 0.25), transparent);
+  font-size: 0.74rem;
+  color: #cbd6f2;
+}
+
+.talent-head__remaining strong {
+  font-size: 1.15rem;
+  color: #eaf0ff;
+}
+
+/* ==========================================================================
+ * タブ
+ * ========================================================================== */
+
+.talent-tabs,
+.talent-slot-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.talent-tab,
+.talent-slot-tab {
+  appearance: none;
+  cursor: pointer;
+  min-height: 40px;
+  padding: 0 8px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(16, 20, 34, 0.85);
+  color: #9fb0d8;
+  font-weight: 800;
+  font-size: 0.78rem;
+}
+
+.talent-tab--active,
+.talent-slot-tab--active {
+  border-color: rgba(214, 176, 92, 0.7);
+  background: linear-gradient(180deg, rgba(70, 58, 26, 0.9), rgba(34, 28, 14, 0.95));
+  color: #f2e9cf;
+}
+
+/* ==========================================================================
+ * 才能のカード
+ * ========================================================================== */
+
+/*
+ * 一覧の**末尾に、下の帯の高さぶんの空白**を確保する。
+ *
+ * 帯は `sticky` なので、貼り付いている間は自分より上の内容を覆う。
+ * 空白が無いと最後のカードが帯の下に隠れたままになり、
+ * **スクロールし切っても押せないボタン**ができる(実測で1枚覆っていた)。
+ * 実測の帯の高さは99px。余裕を見て110px空ける。
+ */
+.talent-list {
+  display: grid;
+  gap: 8px;
+  /* 帯(99px)＋下タブ(64px)。**両方ぶん空けないと最後のカードが隠れる** */
+  padding-bottom: 175px;
+}
+
+.talent-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(22, 27, 46, 0.92), rgba(12, 15, 28, 0.95));
+}
+
+/* 取れる才能だけ縁が光る。**押せるものが一目で分かる** */
+.talent-card--ready {
+  border-color: rgba(127, 178, 255, 0.55);
+  box-shadow: 0 0 12px rgba(64, 118, 210, 0.25);
+}
+
+.talent-card--taken {
+  border-color: rgba(159, 240, 192, 0.4);
+}
+
+.talent-card--max,
+.talent-card--short,
+.talent-card--locked {
+  opacity: 0.82;
+}
+
+/* スキル覚醒は別格。金で縁取る */
+.talent-card--awaken {
+  border-color: rgba(214, 176, 92, 0.55);
+  background: linear-gradient(180deg, rgba(38, 32, 20, 0.94), rgba(14, 12, 8, 0.96));
+}
+
+.talent-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.talent-card__name {
+  margin: 0;
+  flex: 1;
+  font-size: 0.88rem;
+  color: #f2e9cf;
+  min-width: 0;
+}
+
+.talent-card__tier,
+.talent-card__cost {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #a9c6ff;
+  white-space: nowrap;
+}
+
+.talent-card__effect {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #eaf0ff;
+}
+
+.talent-card__desc {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: #93a2c4;
+}
+
+.talent-card__steps {
+  display: grid;
+  gap: 3px;
+}
+
+.talent-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: rgba(10, 14, 28, 0.6);
+  font-size: 0.7rem;
+  color: #9fb0d8;
+}
+
+/* 取った段は色を変える。**どこまで進んだかが縦に見える** */
+.talent-step--taken {
+  background: rgba(38, 62, 46, 0.65);
+  color: #cdebd8;
+}
+
+.talent-step__tier {
+  flex: 0 0 2em;
+  font-weight: 800;
+  color: #d6b05c;
+}
+
+.talent-step__effect {
+  flex: 1;
+  min-width: 0;
+}
+
+.talent-step__cost {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.talent-card__take {
+  min-height: 42px;
+  font-size: 0.78rem;
+}
+
+.talent-skill-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(16, 20, 34, 0.8);
+  font-size: 0.82rem;
+  color: #eaf0ff;
+}
+
+.talent-skill-name__label {
+  font-size: 0.68rem;
+  color: #93a2c4;
+}
+
+.talent-awaken-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(214, 176, 92, 0.3);
+}
+
+.talent-awaken-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #f2e9cf;
+}
+
+/* **0/1を大きく見せる。**1体に1つしか取れないことを数字で伝える */
+.talent-awaken-count {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #ffd166;
+  font-variant-numeric: tabular-nums;
+}
+
+.talent-awaken-note {
+  margin: 0;
+  font-size: 0.7rem;
+  color: #93a2c4;
+}
+
+.talent-empty {
+  margin: 0;
+  padding: 12px;
+  border-radius: 11px;
+  background: rgba(16, 20, 34, 0.7);
+  font-size: 0.74rem;
+  color: #93a2c4;
+  text-align: center;
+}
+
+/* ==========================================================================
+ * 下の帯
+ *
+ * **`fixed` にしない。**この画面の浮遊部品は、これまで3回とも
+ * 下の何かを覆って押せないボタンを作っている。`sticky` なら
+ * 一覧の流れの中に居るので、覆う先がそもそも無い。
+ * ========================================================================== */
+
+.talent-footer {
+  position: sticky;
+  /*
+   * **下のタブの上に置く。**`bottom: 0` にしていた時、
+   * 「決定」が下タブ(高さ64px・`position: fixed`)の下へ潜って押せなかった。
+   * 実測で見つけた事故で、型にもテストにも出ない類のもの。
+   */
+  bottom: 64px;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+  border-radius: 14px 14px 0 0;
+  border-top: 1px solid rgba(214, 176, 92, 0.45);
+  background: linear-gradient(180deg, rgba(18, 22, 38, 0.97), rgba(8, 10, 20, 0.99));
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.talent-footer__stat-line {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #9ff0c0;
+}
+
+.talent-footer__preview {
+  font-size: 0.68rem;
+  color: #93a2c4;
+  font-variant-numeric: tabular-nums;
+}
+
+.talent-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.talent-footer__remaining {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #cbd6f2;
+}
+
+.talent-footer__remaining strong {
+  font-size: 1.3rem;
+  color: #eaf0ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.talent-footer__close {
+  flex: 0 0 auto;
+  min-width: 110px;
+  min-height: 44px;
+}
+
+/* ==========================================================================
+ * ★6前
+ * ========================================================================== */
+
+.talent-locked {
+  display: grid;
+  gap: 8px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #cbd6f2;
+}
+
+.talent-locked__note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #93a2c4;
+}

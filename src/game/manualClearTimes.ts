@@ -11,6 +11,8 @@ export const MIN_REFERENCE_SECONDS: Record<BackgroundFarmKind, number> = {
   EQUIP_DUNGEON: 45,
   LEVEL_DUNGEON: 30,
   GOLD_DUNGEON: 30,
+  // 深域はボス1体+晶2体で、殴り合いが長い。下限も他より高く置く
+  AWAKENING_DEPTH: 45,
 };
 
 export const FALLBACK_REFERENCE_SECONDS: Record<BackgroundFarmKind, number> = {
@@ -18,6 +20,7 @@ export const FALLBACK_REFERENCE_SECONDS: Record<BackgroundFarmKind, number> = {
   EQUIP_DUNGEON: 150,
   LEVEL_DUNGEON: 120,
   GOLD_DUNGEON: 120,
+  AWAKENING_DEPTH: 160,
 };
 
 /** 難易度を含め、報酬・解放単位と同じ粒度で実戦記録を分離する。 */
@@ -27,6 +30,7 @@ export function manualClearKey(kind: BackgroundFarmKind, targetId: string, diffi
     case "EQUIP_DUNGEON": return `equip_${targetId}`;
     case "LEVEL_DUNGEON": return `level_${targetId}`;
     case "GOLD_DUNGEON": return `gold_${targetId}`;
+    case "AWAKENING_DEPTH": return `depth_${targetId}`;
   }
 }
 

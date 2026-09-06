@@ -1,7 +1,7 @@
 import { AutoFarmResult, AutoFarmStopReason, emptyResult } from "./autoFarm.js";
 import { Difficulty } from "../data/stages.js";
 
-export type BackgroundFarmKind = "STAGE" | "EQUIP_DUNGEON" | "LEVEL_DUNGEON" | "GOLD_DUNGEON";
+export type BackgroundFarmKind = "STAGE" | "EQUIP_DUNGEON" | "LEVEL_DUNGEON" | "GOLD_DUNGEON" | "AWAKENING_DEPTH";
 export type BackgroundFarmStatus = "RUNNING" | "SETTLING" | "COMPLETED" | "STOPPED";
 
 /** localStorage に報酬集計と進行位置を一緒に保存する、同時に一つだけの周回ジョブ。 */

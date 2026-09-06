@@ -14,6 +14,8 @@ export interface DungeonReturnContext {
   selectedDungeonKind?: EquipmentDungeonKind;
   selectedLevelDungeonTier?: LevelDungeonTier;
   selectedGoldDungeonFloor?: number;
+  /** 目覚の深域。編成を変えて戻った時に、同じ階を開いたままにする */
+  selectedAwakeningDepthFloor?: number;
 }
 
 export interface RestorableDungeonSelection {
