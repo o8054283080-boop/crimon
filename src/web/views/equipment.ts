@@ -1,4 +1,4 @@
-import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, StatRoll, formatStatValue } from "../../core/equipment.js";
+import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, STAT_LABEL_SHORT, StatRoll, formatStatValue } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -168,13 +168,18 @@ function equipmentCard(
    * どこまでが名前でどこからが数値なのか目で切れず、数十枚を見比べる画面で
    * いちばん読み違えるところだった。名前は左、数値は右端で揃える。
    */
+  /*
+   * 4列(79px)では名前を詰める。「効果命中%」と数値を1行に並べると必ず溢れる
+   * (`STAT_LABEL_SHORT`)。数値は名前の右端で揃えたいので、
+   * 名前と数値は通常表示と同じく別の span のまま。
+   */
   const subLines =
     equipment.subStats.length > 0
       ? equipment.subStats.map((s) => el("div", { className: "equip-card__sub-line" }, [
-        el("span", { className: "equip-card__sub-label" }, [STAT_LABEL[s.type]]),
+        el("span", { className: "equip-card__sub-label" }, [dense ? STAT_LABEL_SHORT[s.type] : STAT_LABEL[s.type]]),
         el("span", { className: "equip-card__sub-value" }, [formatSubStatNumber(s)]),
       ]))
-      : [el("div", { className: "equip-card__sub-line equip-card__sub-line--empty" }, ["サブステータスなし"])];
+      : [el("div", { className: "equip-card__sub-line equip-card__sub-line--empty" }, [dense ? "サブなし" : "サブステータスなし"])];
 
   // 等級・シリーズ・強化段階を data 属性で持たせ、色と縁取りはCSS側で当てる。
   // 数十枚を並べる画面なので、文字を読まなくても強さの序列が分かることを優先する
@@ -190,69 +195,80 @@ function equipmentCard(
       ...equipmentRarityAttrs(equipment),
     },
     [
+      /*
+       * 見出しは**「紋章・★・強化段階」の1行だけ**にする。
+       *
+       * 前は紋章の右に縦積みの塊(★ / 枠・シリーズ)を挟み、
+       * その右へ強化段階を寄せていた。塊が flex で縮められると
+       * 中の★(`white-space: nowrap`)が塊からはみ出し、
+       * **狭い札で強化段階の上に3pxだけ乗る**という直しにくい重なりになっていた。
+       *
+       * ★と強化段階を同じ行の兄弟にすれば、場所を取り合うので重なりようがない。
+       * 枠・シリーズとレア度はそれぞれ下の独立した行へ出す。
+       */
       el("div", { className: "equip-card__head" }, [
         // 枠の紋章。等級の色を纏わせ、台座に嵌める
         el("span", { className: "equip-card__sigil" }, [icon(slotIcon(equipment.slot))]),
-        el("span", { className: "equip-card__head-text" }, [
-          // ★とレア度は別物なので、同じ行に並べて出す(★6=エピック と読ませない)
-          el("span", { className: "equip-card__grade" }, [
-            /*
-             * ★は**簡易表示だけ数字にする。**
-             *
-             * 4列にすると1枚が79pxで、★6つ(約50px)は右上の「+0」の下へ
-             * 潜ってしまった。そもそもこの大きさで6つ並んだ星を
-             * **数えるのは実機では無理**で、「★6」の方が速く読める。
-             * 通常表示は粒のまま——並べた時に格の差が一目で分かるのはあちら。
-             */
-            el("span", { className: "equip-card__star" }, [dense ? `★${equipment.star}` : "★".repeat(equipment.star)]),
-            /*
-             * 簡易表示ではレア度をここに置かない。**札の幅が足りない。**
-             * 紋章の右に押し込むと使える幅が48pxしか無く、
-             * いちばん長い「レジェンド」(約54px)が右端で切れていた。
-             * 下の行へ独立させて、札の幅いっぱい(71px)を使わせる。
-             */
-            dense ? null : equipmentRarityTag(equipment),
-          ].filter((node): node is HTMLElement => node !== null)),
-          /*
-           * 枠番号とシリーズは**簡易表示では出さない。**
-           *
-           * 4列にすると1枚が79pxしかなく、ここを残すと
-           * 「崩…」「会…」と省略記号だらけになったうえ、
-           * レア度の札に鍵が重なって「エピック」が読めなくなっていた。
-           *
-           * 枠は左の紋章が語る(剣・羽・盾・珠・兜・環)。
-           * シリーズは絞り込みで選べるようになったので、
-           * 一覧で字を出さなくても目当ての物へ辿り着ける。
-           */
-          dense
-            ? null
-            : el("span", { className: "equip-card__meta" }, [
-                el("span", { className: "equip-card__slot" }, [`枠${equipment.slot}`]),
-                el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
-              ]),
-        ].filter((node): node is HTMLElement => node !== null)),
+        /*
+         * ★は**簡易表示だけ数字にする。**
+         *
+         * 4列にすると1枚が79pxで、★6つ(約50px)は右上の「+0」の下へ
+         * 潜ってしまった。そもそもこの大きさで6つ並んだ星を
+         * **数えるのは実機では無理**で、「★6」の方が速く読める。
+         * 通常表示は粒のまま——並べた時に格の差が一目で分かるのはあちら。
+         */
+        el("span", { className: "equip-card__star" }, [dense ? `★${equipment.star}` : "★".repeat(equipment.star)]),
         el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
       ]),
-      // 簡易表示のレア度は、紋章に押されない独立した行にする
-      dense ? el("div", { className: "equip-card__rarity-row" }, [equipmentRarityTag(equipment)]) : null,
+      /*
+       * 枠番号とシリーズは**簡易表示では出さない。**
+       *
+       * 4列にすると1枚が79pxしかなく、ここを残すと
+       * 「崩…」「会…」と省略記号だらけになったうえ、
+       * レア度の札に鍵が重なって「エピック」が読めなくなっていた。
+       *
+       * 枠は左の紋章が語る(剣・羽・盾・珠・兜・環)。
+       * シリーズは絞り込みで選べるようになったので、
+       * 一覧で字を出さなくても目当ての物へ辿り着ける。
+       */
+      dense
+        ? null
+        : el("div", { className: "equip-card__meta" }, [
+            el("span", { className: "equip-card__slot" }, [`枠${equipment.slot}`]),
+            el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
+          ]),
+      /*
+       * レア度は**独立した行**にする(簡易表示でも通常表示でも)。
+       *
+       * 最初は★と同じ行へ横に並べていたが、札の幅が足りない画面で
+       * 次々に事故を起こした:
+       *   ・320pxや3列(480px〜)では「+15」が★やレア度の札に重なる
+       *   ・簡易表示(79px)では「レジェンド」が紋章に押されて切れる
+       *
+       * ★の行を「★と強化段階」だけにすれば、いちばん狭い札でも
+       * ★6つ(50px)＋「+15」(26px)で収まる。
+       * レア度は幅いっぱいの行を貰うので、5文字の「レジェンド」も切れない。
+       *
+       * **★とレア度が別の行になること自体が、この2つは別物だという印**でもある。
+       */
+      el("div", { className: "equip-card__rarity-row" }, [equipmentRarityTag(equipment)]),
       equipment.id === currentId ? el("span", { className: "equip-card__status" }, ["現在装備中"]) : null,
       el("div", { className: "equip-card__main" }, [
         el("span", { className: "equip-card__main-label" }, [STAT_LABEL[equipment.mainStat.type]]),
         el("strong", { className: "equip-card__main-value" }, [formatMainStatNumber(equipment.mainStat)]),
       ]),
       /*
-       * **簡易表示ではサブと持ち主を描かない。**
+       * **サブは簡易表示でも出す。**
        *
-       * 実測(390×844)で、札192pxのうち サブ4行=67px・持ち主=19px。
-       * この2つを畳むと106pxになり、**1画面に見える行数がちょうど倍**になる。
-       * 隠すのではなく描かない——数百枚を並べる画面なので、
-       * `display:none` で持っていても組み直しの費用は掛かる。
+       * 一度は「4列に収めるため」落としていたが、依頼主から
+       * 「赤枠のところに付いているサブオプションを表示してほしい」と
+       * 画面に印を付けた絵で指示を受けている。
+       * 装備を見比べる時にいちばん読む中身なので、無いと一覧の用が足りない。
        *
-       * 消える情報は札を押せば詳細で全部見られる。
-       * 逆に**残すのは「その装備を選ぶ理由」**——★・レア度・枠・シリーズ・
-       * 強化段階・メインの数値。これだけで見比べは足りる。
+       * 79pxに収めるために名前を短くしてある(`STAT_LABEL_SHORT`)。
+       * 字は9px(`tests/cssReadability.test.ts`)を下回らない。
        */
-      dense ? null : el("div", { className: "equip-card__subs" }, subLines),
+      el("div", { className: "equip-card__subs" }, subLines),
       dense
         ? null
         : ownerName

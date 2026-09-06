@@ -3592,10 +3592,22 @@ body {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--eq-set, #cfd8f5) 40%, transparent);
 }
 
-/* 強化段階。育成の中心なので、カードの中で一番目立つ数字にする */
+/*
+ * 強化段階。育成の中心なので、カードの中で一番目立つ数字にする。
+ *
+ * **見出しの行(`equip-card__head`)の兄弟として右へ寄せる。**
+ * 一度 `position: absolute` にしたが、それだと札の狭い端末で
+ * ★の上に重なった。flexの兄弟なら**場所を取り合うので重なりようがない。**
+ *
+ * 以前この形で「+15」がレア度の札に重なっていたのは、
+ * レア度が★と同じ縦積みの中に居て、`margin-left:auto` が
+ * 「行」ではなく**積んだ塊の右**へ効いていたため。
+ * レア度を独立した行(`equip-card__rarity-row`)へ出した今は起きない。
+ */
 .equip-card__level {
   margin-left: auto;
-  font-size: 0.78rem;
+  flex: none;
+  font-size: 0.74rem;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   color: var(--eq-tone, #cfd8f5);
@@ -3607,10 +3619,19 @@ body {
   text-shadow: 0 0 8px var(--eq-glow, transparent), 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
+/*
+ * ★の粒。
+ *
+ * **`padding-right` で逃げ場を作ろうとして失敗した。**
+ * この要素は `box-sizing` が content-box なので、padding が幅に足され、
+ * ★の行が札を25pxはみ出した(360pxで実測)。
+ * 強化段階との位置関係は下の `.equip-card__level` 側で解いている。
+ */
 .equip-card__star {
   font-size: 0.62rem;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.06em;
   color: var(--eq-tone, #ffd166);
+  white-space: nowrap;
 }
 
 .equip-card__main {
@@ -5582,19 +5603,24 @@ body {
   font-size: 19px;
 }
 
-.equip-card__head-text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+/*
+ * **`equip-card__head-text` は廃止した。**
+ *
+ * 紋章の右へ縦積みの塊を挟む形だったが、その塊が flex で縮められると
+ * 中の★がはみ出して強化段階に重なった。
+ * いまは「紋章・★・強化段階」が見出しの1行に並び、
+ * 枠・シリーズとレア度はそれぞれ下の独立した行になっている。
+ */
+
+.equip-card__meta {
+  margin-top: 2px;
 }
 
 .equip-card__meta {
-  min-width: 0;
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
 .equip-card__slot {
@@ -5604,10 +5630,22 @@ body {
   color: var(--eq-tone, #a9b8dc);
 }
 
+/*
+ * シリーズ名は**省略しない。**
+ *
+ * `text-overflow: ellipsis` を付けていたせいで、実機では
+ * 「的中」が「的…」、「免疫」が「免…」と**2文字が1文字に潰れていた**
+ * (依頼主の画面で発覚)。字幅はフォントで変わるので、
+ * 開発機のChromiumでは足りていて実機のiOSでは足りない、という差が出る。
+ *
+ * **シリーズ名は12種すべて2文字**(会心・筋力・守護・体力・的中・抵抗・
+ * 速攻・加護・暴走・免疫・崩壊・祝福)。潰す余地は要らないので、
+ * 縮まない札にして必ず全部出す。
+ * 押し出されるのは同じ行の余白で、`equip-card__head-text` が
+ * `min-width: 0` なので他の行(★・レア度)を壊すこともない。
+ */
 .equip-card__set {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
   white-space: nowrap;
 }
 

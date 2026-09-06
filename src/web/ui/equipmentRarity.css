@@ -221,6 +221,15 @@
   animation: equip-rainbow-drift 12s linear infinite;
 }
 
+/*
+ * レア度の行。★の行とは別の行にして、狭い札でも重ならないようにする
+ * (経緯は `views/equipment.ts` の `equip-card__rarity-row` のところ)。
+ */
+.equip-card__rarity-row {
+  display: flex;
+  margin-top: 3px;
+}
+
 /* 見出しの並び。★とレア度を横に並べ、混同させない */
 .equip-detail__grade {
   display: flex;

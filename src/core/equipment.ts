@@ -56,6 +56,31 @@ export const STAT_LABEL: Record<StatType, string> = {
   RESISTANCE: "効果抵抗%",
 };
 
+/**
+ * 4列に並べた札のための**短い名前。**
+ *
+ * 1枚が79pxしかなく、9px(実機で読める下限)の字だと8文字ほどしか入らない。
+ * 「効果命中%」と数値を1行に並べると必ず溢れるので、名前の方を詰める。
+ *
+ * **削るのは「力」「効果」のような、どれにも付く語**にとどめる。
+ * 「攻」「防」まで削ると、一覧で見比べている時に読み違える
+ * (「攻%」と「防%」は形が似ている)。
+ * 実数か%かは末尾の記号で分かるので、そこは残す。
+ */
+export const STAT_LABEL_SHORT: Record<StatType, string> = {
+  ATK_FLAT: "攻撃+",
+  ATK_PERCENT: "攻撃%",
+  DEF_FLAT: "防御+",
+  DEF_PERCENT: "防御%",
+  HP_FLAT: "HP+",
+  HP_PERCENT: "HP%",
+  SPD: "速度+",
+  CRIT_RATE: "クリ率",
+  CRIT_DMG: "クリダメ",
+  ACCURACY: "命中%",
+  RESISTANCE: "抵抗%",
+};
+
 /** スロットごとに選ばれ得るメインステータスの候補。スロット1/3/5は固定、2/4/6は複数候補から抽選 */
 export const SLOT_MAIN_STAT_OPTIONS: Record<EquipSlot, StatType[]> = {
   1: ["ATK_FLAT"],
