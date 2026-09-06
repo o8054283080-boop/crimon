@@ -2077,6 +2077,7 @@ export class BattleEngine {
             resolution.damageDealt += applied.hpDamage;
             if (applied.died) { resolution.kills += 1; this.onKill(source); }
             target.hitsTaken += 1;
+            this.advanceAdaptation(target, source);
             counterTargets.add(target);
             const critText = result.isCrit ? "会心の一撃！" : "";
             const affinityText =
@@ -2598,10 +2599,59 @@ export class BattleEngine {
           boss.flatStatBonus[stat] = (boss.flatStatBonus[stat] ?? 0) + amount;
           parts.push(`${stat.toUpperCase()}+${amount}`);
         }
+        /*
+         * 割合の変化。**実数では書けないものだけがここに来る。**
+         * 目覚の深域の才能晶は「防御を20%無視するようになる」
+         * 「受けるダメージが15%減る」を残していく。
+         */
+        const ratio = victim.def.bossTraits?.empowerBossOnDeathRatio;
+        if (ratio?.defenseIgnoreRatio) {
+          boss.deathBoostDefenseIgnore = (boss.deathBoostDefenseIgnore ?? 0) + ratio.defenseIgnoreRatio;
+          parts.push(`防御無視+${Math.round(ratio.defenseIgnoreRatio * 100)}%`);
+        }
+        if (ratio?.damageTakenMultiplier !== undefined) {
+          boss.deathBoostDamageTaken = (boss.deathBoostDamageTaken ?? 1) * ratio.damageTakenMultiplier;
+          parts.push(`被ダメ-${Math.round((1 - ratio.damageTakenMultiplier) * 100)}%`);
+        }
         if (parts.length > 0) {
           this.push(`${this.label(boss)} は ${this.label(victim)} の力を取り込んだ！ (${parts.join(" ")})`);
         }
       }
+    }
+  }
+
+  /**
+   * 才能適応を1段進める。**別の相手から受けたら1段戻す。**
+   *
+   * ## なぜ「戻す」を入れるのか
+   *
+   * 積むだけなら、答えは「もっと強い1体を作る」で終わってしまう
+   * (適応が乗り切る前に落とせばいい)。**別の味方が殴れば戻る**からこそ、
+   * 手を配るという別の答えが生まれる。
+   * 数字ではなく編成の形を問う仕掛けにするための、いちばん大事な半分。
+   *
+   * 進めるのは**ヒットごと**。多段攻撃は1回で数段ぶん進むので、
+   * 手数の多い技ほど早く効かなくなる——それも「同じ手の繰り返し」に含む。
+   */
+  private advanceAdaptation(target: BattleUnit, source: BattleUnit): void {
+    const trait = target.def.bossTraits?.talentAdaptation;
+    if (!trait || source.team === target.team) return;
+    if (!target.adaptationStacks) target.adaptationStacks = new Map();
+    const stacks = target.adaptationStacks;
+
+    if (target.lastAttackerId && target.lastAttackerId !== source.instanceId) {
+      // 別の味方が入った。**前の相手への適応が1段緩む**
+      const previous = stacks.get(target.lastAttackerId) ?? 0;
+      if (previous > 0) stacks.set(target.lastAttackerId, previous - 1);
+    }
+    target.lastAttackerId = source.instanceId;
+
+    const maxStacks = Math.ceil(trait.maxReduction / trait.perStack);
+    const current = stacks.get(source.instanceId) ?? 0;
+    if (current >= maxStacks) return;
+    stacks.set(source.instanceId, current + 1);
+    if (current + 1 === maxStacks) {
+      this.push(`  → ${this.label(target)} は ${this.label(source)} の攻撃に適応しきった！`);
     }
   }
 

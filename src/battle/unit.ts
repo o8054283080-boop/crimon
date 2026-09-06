@@ -71,6 +71,21 @@ export interface BattleUnit {
    */
   flatStatBonus: Partial<Record<BuffStat, number>>;
 
+  /* ---- 目覚の深域。**取り巻きの死で本体に残る、割合の変化** ---- */
+  /** 仲間が倒れて手に入れた部分防御無視率 */
+  deathBoostDefenseIgnore?: number;
+  /** 仲間が倒れて手に入れた被ダメージ倍率(0.85 で15%軽減) */
+  deathBoostDamageTaken?: number;
+  /**
+   * 才能適応。**誰から何段ぶん適応しているか。**
+   *
+   * 同じ相手から連続で受けるほど積み上がり、
+   * 別の味方から攻撃を受けると1段戻る。キーは攻撃側の instanceId。
+   */
+  adaptationStacks?: Map<string, number>;
+  /** 最後にこの個体を攻撃した相手。**別人に変わった時に1段戻す**ための控え */
+  lastAttackerId?: string;
+
   /* ---- ここから下は今回の11種で足した状態。**どれも戦闘中だけのもので、セーブには出ない** ---- */
 
   /** 被ダメージ軽減の残りターン */
@@ -208,6 +223,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     healBlockMultiplier: 1,
     hitsTaken: 0,
     flatStatBonus: {},
+    adaptationStacks: new Map<string, number>(),
     ...freshExtendedState(),
   };
 }
