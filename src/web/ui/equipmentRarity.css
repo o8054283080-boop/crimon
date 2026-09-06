@@ -324,3 +324,37 @@
 .farm-equip-card__detail .equip-rarity-tag {
   justify-self: start;
 }
+
+/* ==========================================================================
+ * 絞り込みのレア度チップ
+ *
+ * 5段の色は装備の札と同じものを使う。
+ * 「金の札を押せば金の装備が残る」が、字を読まなくても分かるようにする。
+ * ========================================================================== */
+
+.mfilter__chip--rarity {
+  border-color: color-mix(in srgb, var(--eq-rarity, #4a5372) 65%, transparent);
+  color: var(--eq-rarity-ink, #c3cadb);
+}
+
+.mfilter__chip--rarity.slot-filter-chip--active {
+  border-color: var(--eq-rarity, #4a5372);
+  background: color-mix(in srgb, var(--eq-rarity, #4a5372) 28%, transparent);
+  color: #fff;
+}
+
+/* エピックだけ、選んだ時に下地へ虹を薄く敷く */
+.mfilter__chip--rarity[data-rarity="epic"].slot-filter-chip--active {
+  background:
+    linear-gradient(rgba(12, 14, 26, 0.5), rgba(12, 14, 26, 0.5)),
+    var(--eq-rainbow);
+  background-size: auto, 160% 100%;
+  border-color: rgba(255, 255, 255, 0.4);
+  animation: equip-rainbow-drift 12s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mfilter__chip--rarity[data-rarity="epic"].slot-filter-chip--active {
+    animation: none;
+  }
+}

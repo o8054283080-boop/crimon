@@ -8,6 +8,8 @@ import { managementHeader } from "./managementHeader.js";
 import { compareEquipmentStats, equipmentForSlot, equipmentLockLabel, equipmentStatTotal, sellableEquipmentIds } from "../uxHelpers.js";
 import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
 import { equipmentRarityRank, getEquipmentRarity } from "../../core/equipmentRarity.js";
+import { EquipmentFilter, filterEquipment } from "../equipmentFilter.js";
+import { renderEquipmentFilterBar } from "./equipmentFilterBar.js";
 import "../ui/equipmentList.css";
 
 export interface EquipmentPickerContext {
@@ -43,6 +45,14 @@ export const EQUIPMENT_SORT_LABEL: Record<EquipmentSortKey, string> = {
   CRIT_DMG: "会心ダメージ", ACCURACY: "効果命中", RESISTANCE: "効果抵抗",
 };
 
+/**
+ * 所持装備の一覧で、一度に描く枚数。
+ *
+ * 共通の既定は24枚(`incrementalGrid.ts`)。装備の札はモンスターより小さく、
+ * 2列で並ぶので24枚では12行しか出ない。手持ちを見比べる画面なので倍にする。
+ */
+export const EQUIPMENT_LIST_PAGE_SIZE = 48;
+
 export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "rarity", "level", "star", "HP_PERCENT", "HP_FLAT", "ATK_PERCENT", "ATK_FLAT", "DEF_PERCENT", "DEF_FLAT", "SPD", "CRIT_RATE", "CRIT_DMG", "ACCURACY", "RESISTANCE", "slot", "set", "value"];
 
 export interface EquipmentProps {
@@ -64,12 +74,46 @@ export interface EquipmentProps {
   onGoDungeon: () => void;
   onChangeSlotFilter: (slot: EquipSlot | null) => void;
   onChangeSort: (key: EquipmentSortKey) => void;
+  /** 絞り込みの条件と、開いているかどうか */
+  filter: EquipmentFilter;
+  filterOpen: boolean;
+  onChangeFilter: (filter: EquipmentFilter) => void;
+  onToggleFilterOpen: () => void;
+  /**
+   * 一覧に出す並びを固定するID列。
+   *
+   * **強化しても札が動かないようにするためだけの仕組み。**
+   * 「おすすめ順」は強化値を見て並ぶので、`+1` を押した瞬間にその札が
+   * 前の方へ飛び、次の `+2` を押そうとするとそこには別の装備が居た。
+   * 画面に居る間は最初に決めた順序を保ち、画面を出入りするか
+   * 並び順・絞り込みを変えた時に組み直す(`null` を渡すと組み直し)。
+   */
+  orderIds: readonly string[] | null;
   onToggleSelecting: () => void;
   onToggleSelected: (equipmentId: string) => void;
   onSelectAllShown: (ids: string[]) => void;
   onClearSelection: () => void;
   onBulkSell: () => void;
   onToggleLock: (equipmentId: string) => void;
+}
+
+/**
+ * 「その装備は誰かが着けているか」を O(1) で答える判定を作る。
+ *
+ * **並べ替えの比較から毎回呼ばれる場所。** 以前は1件ごとに
+ * `findEquippedOwner`(全モンスターを走査)を呼んでいたので、
+ * 所持1800個の一覧を開くのに **597ms** かかっていた
+ * (比較は 1,800 × log2(1,800) ≈ 19,000 回起き、その各々で2回呼ばれる)。
+ * 着けているIDの集合を先に1回だけ作れば、走査は所持数ぶんの1回で済む。
+ */
+function makeIsEquipped(player: PlayerState): (equipment: Equipment) => boolean {
+  const ids = new Set<string>();
+  for (const monster of player.monsters) {
+    for (const id of Object.values(monster.equipment)) {
+      if (id) ids.add(id);
+    }
+  }
+  return (equipment) => ids.has(equipment.id);
 }
 
 function equipmentOwnerName(player: PlayerState, equipment: Equipment): string | null {
@@ -268,7 +312,7 @@ function renderSortRow(props: EquipmentProps): HTMLElement {
 
 /** 一括売却の操作帯。選択モードの時だけ出す */
 function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
-  const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
+  const isEquipped = makeIsEquipped(props.player);
   // 装着中のものは売れないので、まとめて選ぶ対象からも外す
   const equippedIds = new Set(shown.filter(isEquipped).map((item) => item.id));
   const sellableIds = sellableEquipmentIds(shown, equippedIds);
@@ -301,12 +345,48 @@ function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
   ]);
 }
 
-function renderList(props: EquipmentProps): HTMLElement {
-  const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
-  const filteredItems = props.pickerContext
+/**
+ * いま一覧に出す装備を、絞り込み→並べ替えの順に確定する。
+ *
+ * **画面と `main.ts` の両方から同じ関数を通す。** 並びを固定する仕組み
+ * (`orderIds`)のために `main.ts` 側でも同じ結果が要るので、
+ * 2か所に同じ条件を書くと必ずずれる。
+ */
+export function visibleEquipment(props: EquipmentProps): Equipment[] {
+  const isEquipped = makeIsEquipped(props.player);
+  /*
+   * 装備を選びに来た時(picker)は、その枠に着けられる物だけ。
+   * 絞り込みの札は出していないので、条件も当てない。
+   */
+  const base = props.pickerContext
     ? equipmentForSlot(props.player.equipment, props.pickerContext.slot)
-    : props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter);
-  const items = sortEquipment(filteredItems, props.sortKey, isEquipped);
+    : filterEquipment(
+        props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter),
+        props.filter,
+        isEquipped,
+      );
+  return sortEquipment(base, props.sortKey, isEquipped);
+}
+
+/**
+ * 固定した並びを、いま見えている装備へ当てはめる。
+ *
+ * 固定済みのIDはその順で先に並べ、固定した後に増えた装備(拾った・作った)は
+ * 新しい並びの順で末尾へ回す。売った装備は自然に消える。
+ */
+export function applyEquipmentOrder(items: readonly Equipment[], orderIds: readonly string[] | null): Equipment[] {
+  if (!orderIds || orderIds.length === 0) return [...items];
+  const rank = new Map(orderIds.map((id, index) => [id, index]));
+  const known: Equipment[] = [];
+  const fresh: Equipment[] = [];
+  for (const item of items) (rank.has(item.id) ? known : fresh).push(item);
+  known.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  return [...known, ...fresh];
+}
+
+function renderList(props: EquipmentProps): HTMLElement {
+  const isEquipped = makeIsEquipped(props.player);
+  const items = applyEquipmentOrder(visibleEquipment(props), props.orderIds);
 
   const selecting = props.selecting && !props.pickerContext;
   const pickerMonster = props.pickerContext
@@ -419,10 +499,22 @@ function renderList(props: EquipmentProps): HTMLElement {
     ].filter((node): node is HTMLElement => node !== null));
   };
 
+  /*
+   * 装備は**モンスターより1枚が小さく、1画面に多く入る。**
+   * 共通の既定(24枚)だと2列で12行しか出ず、
+   * 手持ちを見比べるのに何度も「さらに表示」を押すことになっていた。
+   * 装備だけ1回ぶんを倍(48枚)にする
+   * (所持400個で測って、開くのに 8.5ms → 14ms・ノード 784 → 1,500 程度)。
+   *
+   * 装備を選びに来た時(picker)は1枚の札が差分と強化ボタンを抱えて背が高いので、
+   * 一覧と同じ枚数にすると重くなる。こちらは既定のままにする。
+   */
   const equipmentGrid = createIncrementalGrid({
     className: "equip-grid",
     items,
     renderItem,
+    initialCount: props.pickerContext ? undefined : EQUIPMENT_LIST_PAGE_SIZE,
+    batchSize: props.pickerContext ? undefined : EQUIPMENT_LIST_PAGE_SIZE,
     moreLabel: (shown, total) => `装備をさらに表示（${shown} / ${total}）`,
   });
 
@@ -464,6 +556,15 @@ function renderList(props: EquipmentProps): HTMLElement {
     ]),
     toolbar,
     props.pickerContext ? null : renderSlotFilterRow(props),
+    // 絞り込みは picker では出さない(その枠に着く物しか並んでいないため)
+    props.pickerContext ? null : renderEquipmentFilterBar({
+      all: props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter),
+      shownCount: items.length,
+      filter: props.filter,
+      open: props.filterOpen,
+      onToggleOpen: props.onToggleFilterOpen,
+      onChange: props.onChangeFilter,
+    }),
     renderSortRow(props),
     selecting ? renderBulkBar(props, items) : null,
     el("section", { className: "panel" }, [

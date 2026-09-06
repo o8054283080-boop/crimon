@@ -115,7 +115,8 @@ import { loadNavigationState, saveNavigationState } from "./navigationState.js";
 import { DungeonReturnContext, keepReturnContext, normalStageReturnContext, rememberedScrollTop, replacePartySlot, restoreDungeonSelection, restoreScrollTop, sellableEquipmentIds } from "./uxHelpers.js";
 import { ResultAction } from "./views/resultActions.js";
 import { BattleChainInfo, BattleViewHandle, renderBattleView } from "./views/battleView.js";
-import { EquipmentPickerContext, EquipmentSortKey, renderEquipment } from "./views/equipment.js";
+import { EquipmentPickerContext, EquipmentProps, EquipmentSortKey, applyEquipmentOrder, renderEquipment, visibleEquipment } from "./views/equipment.js";
+import { EMPTY_EQUIPMENT_FILTER, EquipmentFilter } from "./equipmentFilter.js";
 import { renderEquipmentDungeon } from "./views/equipmentDungeon.js";
 import { renderGoldDungeon } from "./views/goldDungeon.js";
 import { renderHome } from "./views/home.js";
@@ -338,6 +339,20 @@ interface AppState {
   equipmentPickerContext: EquipmentPickerContext | null;
   equipmentSlotFilter: EquipSlot | null;
   equipmentSortKey: EquipmentSortKey;
+  /** 所持装備の絞り込み条件。所持一覧で使う(装備を選びに来た時は当てない) */
+  equipmentFilter: EquipmentFilter;
+  /** 絞り込みの札を開いているか */
+  equipmentFilterOpen: boolean;
+  /**
+   * 一覧の並びを画面に居る間だけ固定するID列。
+   *
+   * **強化しても札が動かないようにするためだけの控え。**
+   * 「おすすめ順」は強化値を見て並ぶので、装備を選ぶ画面で `+1` を押すと
+   * その札が前へ飛び、続けて `+2` を押そうとするとそこには別の装備が居た。
+   * `null` なら次の描画で組み直す。画面を移る・並び順を変える・
+   * 絞り込みを変える・装備を選びに入る、のいずれかで `null` に戻す。
+   */
+  equipmentOrder: string[] | null;
   /** 所持モンスターの並べ替えの軸 */
   monsterSortKey: MonsterSortKey;
   /** 所持モンスターの絞り込み条件。所持一覧と編成画面で共有する(同じ探し方で通す) */
@@ -481,6 +496,9 @@ const state: AppState = {
   equipmentPickerContext: null,
   equipmentSlotFilter: null,
   equipmentSortKey: "recommended",
+  equipmentFilter: { ...EMPTY_EQUIPMENT_FILTER },
+  equipmentFilterOpen: false,
+  equipmentOrder: null,
   monsterSortKey: "recommended",
   monsterFilter: { ...EMPTY_MONSTER_FILTER },
   monsterFilterOpen: false,
@@ -796,6 +814,8 @@ function navigate(screen: ScreenName): void {
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
   state.equipmentSlotFilter = null;
+  // 固定していた並びは画面をまたいで持ち越さない。入り直せば今の状態で並ぶ
+  state.equipmentOrder = null;
   state.equipmentReturnMonsterId = null;
   state.selectedDungeonFloor = null;
   state.selectedDungeonKind = "DEMON";
@@ -898,6 +918,8 @@ function returnFromParty(): void {
 
 function handleSelectSlot(monsterId: string, slot: EquipSlot): void {
   state.equipmentPickerContext = { monsterId, slot };
+  // 装備を選びに来た。並びはこの枠に着く物だけで組み直す
+  state.equipmentOrder = null;
   state.screen = "EQUIPMENT";
   render();
 }
@@ -3963,13 +3985,27 @@ function handleToggleMonsterFilterOpen(): void {
 }
 
 function renderEquipmentScreen(): HTMLElement {
-  return renderEquipment({
+  const props: EquipmentProps = {
     player: state.player,
     detailId: state.equipmentDetailId,
     pickerContext: state.equipmentPickerContext,
     slotFilter: state.equipmentSlotFilter,
+    filter: state.equipmentFilter,
+    filterOpen: state.equipmentFilterOpen,
+    onChangeFilter: (filter) => {
+      state.equipmentFilter = filter;
+      // 条件が変われば見えるものが変わる。並びも組み直す
+      state.equipmentOrder = null;
+      render();
+    },
+    onToggleFilterOpen: () => {
+      state.equipmentFilterOpen = !state.equipmentFilterOpen;
+      render();
+    },
+    orderIds: state.equipmentOrder,
     onChangeSlotFilter: (slot) => {
       state.equipmentSlotFilter = slot;
+      state.equipmentOrder = null;
       render();
     },
     onSelectDetail: (id) => {
@@ -4001,6 +4037,8 @@ function renderEquipmentScreen(): HTMLElement {
     selecting: state.equipmentSelecting,
     onChangeSort: (key) => {
       state.equipmentSortKey = key;
+      // 並べ替えを選び直したのだから、固定していた並びは捨てる
+      state.equipmentOrder = null;
       render();
     },
     onToggleSelecting: () => {
@@ -4032,7 +4070,19 @@ function renderEquipmentScreen(): HTMLElement {
       savePlayerState(state.player);
       render();
     },
-  });
+  };
+
+  /*
+   * 並びを固定する。**強化した札をその場に留めるための唯一の場所。**
+   *
+   * 描く前にここで一度だけ決めて控える。控えが無ければ今の並びをそのまま採り、
+   * あれば「今見えているもの」をその順に並べ直して控えを更新する
+   * (売った装備は消え、増えた装備は末尾に付く)。
+   * 控えを捨てる場所は `navigate` と、並び順・絞り込み・枠を変えた時。
+   */
+  const shown = applyEquipmentOrder(visibleEquipment(props), state.equipmentOrder);
+  state.equipmentOrder = shown.map((item) => item.id);
+  return renderEquipment({ ...props, orderIds: state.equipmentOrder });
 }
 
 /**
