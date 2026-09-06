@@ -446,7 +446,25 @@ interface AppState {
   partyNotice: string | null;
   partySelectedSlot: number | null;
   returnContext: DungeonReturnContext | null;
+  /**
+   * モンスター詳細を**どこから開いたか**。閉じた時にそこへ帰すためだけに使う。
+   *
+   * 詳細は「所持モンスター」画面(`MONSTERS`)の中にしか無いので、
+   * 編成画面から詳細を見ると `screen` を `MONSTERS` へ移すしかない。
+   * その結果、**閉じると編成ではなく所持一覧に立っていた。**
+   * 編成の途中で1体調べただけなのに、選びかけの画面から放り出される。
+   *
+   * `returnContext` とは別物。あちらは「ダンジョンから編成へ来た」経路で、
+   * 編成を終える時に元のダンジョンへ帰すためのもの。ここは詳細の1階層だけを見る。
+   */
+  monsterDetailReturn: MonsterDetailReturn | null;
 }
+
+/** 詳細を閉じた時の帰り先。画面だけでなく、その画面の「どこを見ていたか」まで戻す */
+type MonsterDetailReturn =
+  | { kind: "PARTY"; mode: PartyEditMode }
+  | { kind: "ARENA"; view: ArenaViewName }
+  | { kind: "HOME" };
 
 const state: AppState = {
   screen: "HOME",
@@ -532,6 +550,7 @@ const state: AppState = {
   partyNotice: null,
   partySelectedSlot: null,
   returnContext: null,
+  monsterDetailReturn: null,
 };
 
 // ゲームセーブとは別のキーから画面だけを復元する。対象が消えていた詳細画面は安全な一覧へ戻す。
@@ -731,6 +750,12 @@ function goBack(): void {
   for (const field of ROUTE_FIELDS) {
     (state as unknown as Record<string, unknown>)[field] = previous[field];
   }
+  /*
+   * 詳細の帰り先も持ち越さない。**これは「見ている場所」ではなく片道の控え**なので
+   * `RouteState` には入れていない。履歴で巻き戻した先に古い控えが残ると、
+   * 後から無関係な詳細を閉じた人が編成へ飛ばされる。
+   */
+  state.monsterDetailReturn = null;
   // 場所に紐づく一時的な案内は持ち越さない。前の画面の言葉が残ると嘘になる
   state.shopNotice = null;
   state.createNotice = null;
@@ -757,6 +782,12 @@ function persistNavigationState(): void {
 function navigate(screen: ScreenName): void {
   state.screen = screen;
   state.monsterDetailId = null;
+  /*
+   * 詳細の帰り先は**その1回きり**。ここで捨てないと、
+   * 編成から詳細を開いた人が下のタブで別の画面へ移った後、
+   * 無関係な詳細を閉じた時にまで編成へ飛ばされる。
+   */
+  state.monsterDetailReturn = null;
   state.rankUpMode = false;
   state.rankUpSacrificeIds = [];
   state.selectedStageId = null;
@@ -802,6 +833,52 @@ function openPartyFrom(context: DungeonReturnContext, mode: PartyEditMode): void
   state.partySelectedSlot = null;
   state.screen = "PARTY";
   render();
+}
+
+/**
+ * 編成の途中で1体だけ詳細を開く。**帰り先を控えてから移る。**
+ *
+ * 詳細は所持モンスター画面の中にしか無いので `screen` は動かさざるを得ない。
+ * 控えを取らずに移していたせいで、閉じた人は所持一覧に立たされていた。
+ */
+function openMonsterDetail(instanceId: string, from: MonsterDetailReturn): void {
+  state.monsterDetailReturn = from;
+  state.monsterDetailId = instanceId;
+  state.rankUpMode = false;
+  state.rankUpSacrificeIds = [];
+  state.screen = "MONSTERS";
+  render();
+}
+
+/**
+ * 詳細を閉じる。控えがあれば元の画面へ、無ければ所持一覧に留まる。
+ *
+ * 帰り先は画面名だけでなく「その画面のどこを見ていたか」まで戻す。
+ * 通常・ダンジョン・塔の編成は別々の枠なので `mode` を、
+ * アリーナは攻撃編成と防衛登録で別画面なので `view` を復元しないと、
+ * **帰れてはいるが別の編成が開いている**という直しそこないになる。
+ *
+ * @returns 控えを使って帰ったら true
+ */
+function returnFromMonsterDetail(): boolean {
+  const from = state.monsterDetailReturn;
+  if (!from) return false;
+  state.monsterDetailReturn = null;
+  state.monsterDetailId = null;
+  state.rankUpMode = false;
+  state.rankUpSacrificeIds = [];
+  if (from.kind === "PARTY") {
+    state.partyEditMode = from.mode;
+    state.partySelectedSlot = null;
+    state.screen = "PARTY";
+  } else if (from.kind === "ARENA") {
+    state.arenaView = from.view;
+    state.screen = "ARENA";
+  } else {
+    state.screen = "HOME";
+  }
+  render();
+  return true;
 }
 
 function returnFromParty(): void {
@@ -2803,7 +2880,7 @@ function render(): void {
         onGoMonsterDex: () => navigate("MONSTER_DEX"),
         onGoStages: () => navigate("STAGES"),
         onGoParty: () => navigate("PARTY"),
-        onViewPartyMonster: (id) => { state.monsterDetailId = id; state.screen = "MONSTERS"; render(); },
+        onViewPartyMonster: (id) => { openMonsterDetail(id, { kind: "HOME" }); },
         onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
@@ -2924,11 +3001,11 @@ function render(): void {
           state.monsterSortKey = key;
           render();
         },
-        // 長押しは編成を変えずに詳細だけを見たい時の操作。所持一覧の詳細へ送る
+        // 長押しは編成を変えずに詳細だけを見たい時の操作。所持一覧の詳細へ送る。
+        // **閉じたら編成へ帰す。**編成の途中で1体調べただけなので、
+        // 選びかけの画面から所持一覧へ放り出さない
         onViewDetail: (instanceId) => {
-          state.monsterDetailId = instanceId;
-          state.screen = "MONSTERS";
-          render();
+          openMonsterDetail(instanceId, { kind: "PARTY", mode: state.partyEditMode });
         },
         filter: state.monsterFilter,
         filterOpen: state.monsterFilterOpen,
@@ -3333,10 +3410,9 @@ function render(): void {
           }
         },
         onReloadRanking: () => { void refreshArenaRanking(); },
+        // 攻撃編成・防衛登録から調べた1体。閉じたらその編成画面へ帰す
         onViewMonster: (instanceId) => {
-          state.monsterDetailId = instanceId;
-          state.screen = "MONSTERS";
-          render();
+          openMonsterDetail(instanceId, { kind: "ARENA", view: state.arenaView });
         },
       });
       break;
@@ -3791,6 +3867,8 @@ function renderMonstersScreen(): HTMLElement {
     rankUpMode: state.rankUpMode,
     selectedSacrificeIds: state.rankUpSacrificeIds,
     onSelectDetail: (id) => {
+      // 編成やホームから開いた1体。控えた画面へそのまま帰す
+      if (id === null && returnFromMonsterDetail()) return;
       if (id === null && state.returnContext) {
         state.monsterDetailId = null;
         state.screen = "PARTY";
