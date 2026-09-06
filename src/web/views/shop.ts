@@ -6,6 +6,7 @@ import { CRYSTAL_SHOP_CATEGORY_LABEL, CrystalShopCategory } from "../../data/cry
 import { CrystalShopRow } from "../../game/crystalShop.js";
 import { el } from "../dom.js";
 import { icon, slotIcon } from "../icons.js";
+import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
 import { withPortrait } from "../three/portrait.js";
 
 /** null を落として並べる。この画面だけの小道具(他の画面も同じ形で持っている) */
@@ -48,7 +49,11 @@ function renderEquipmentBody(entry: Extract<ShopEntry, { kind: "EQUIPMENT" }>): 
     el("div", { className: "shop-card__title" }, [SLOT_LABEL[eq.slot]]),
     el("div", { className: "shop-card__sub" }, [`${SET_LABEL[eq.set]}シリーズ`]),
     el("div", { className: "shop-card__stat" }, [formatStatValue(eq.mainStat)]),
-    el("div", { className: "shop-card__sub" }, [eq.subStats.length > 0 ? `サブ${eq.subStats.length}個` : "サブなし"]),
+    /*
+     * 棚に並ぶのは強化していない新品なので、今のサブ数＝初期サブ数＝レア度。
+     * 値段は前からサブ数で決まっているので、**その根拠が札の上で読める**ようになる。
+     */
+    el("div", { className: "shop-card__sub" }, [equipmentRarityTag(eq)]),
   ];
 }
 
@@ -86,7 +91,12 @@ function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElem
 
   return el(
     "div",
-    { className: `shop-card${purchased ? " shop-card--sold" : ""}`, "data-kind": entry.kind },
+    {
+      className: `shop-card${purchased ? " shop-card--sold" : ""}`,
+      "data-kind": entry.kind,
+      // 装備の枠だけレア度の色が乗る。モンスターと書には付かない
+      ...(entry.kind === "EQUIPMENT" ? equipmentRarityAttrs(entry.equipment) : {}),
+    },
     [
       el("div", { className: "shop-card__body" }, body),
       el(

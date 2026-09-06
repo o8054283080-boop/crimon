@@ -1,4 +1,5 @@
 import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost, equipmentSellPrice } from "../core/equipment.js";
+import { clampInitialSubStatCount } from "../core/equipmentRarity.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
@@ -427,6 +428,23 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
     if (typeof equipment.level !== "number") equipment.level = 0;
     if (!equipment.set) equipment.set = deterministicSetFromId(equipment.id);
     equipment.locked = equipment.locked === true;
+    /*
+     * レア度のもとになる初期サブ数を補う(`core/equipmentRarity.ts`)。
+     *
+     * **旧セーブには入っていない。**強化済みの装備から本来の初期サブ数を
+     * 復元する手立ては無い(何個目が強化で増えたのか、どこにも残っていない)ので、
+     * 推測で復元を組まず、今のサブ数をそのまま初期値として**一度だけ**採る。
+     *
+     * 強化済みの旧装備は本来より高いレア度になり得るが、
+     * 既に持っている装備の価値を下げる方に倒すよりましだと判断した。
+     * ここで書き込むので、次の保存以降は動かない
+     * (開くたびにレア度が変わる、ということにはならない)。
+     */
+    if (typeof equipment.initialSubStatCount !== "number") {
+      equipment.initialSubStatCount = clampInitialSubStatCount(equipment.subStats?.length ?? 0);
+    } else {
+      equipment.initialSubStatCount = clampInitialSubStatCount(equipment.initialSubStatCount);
+    }
   }
   if (state.backgroundFarmJob?.result && !Array.isArray(state.backgroundFarmJob.result.earnedEquipmentIds)) {
     state.backgroundFarmJob.result.earnedEquipmentIds = [];

@@ -1,4 +1,5 @@
 import { Equipment, STAT_LABEL } from "../../core/equipment.js";
+import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
 import { Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { el } from "../dom.js";
@@ -54,14 +55,16 @@ function rewardTile(icon: string, label: string, amount: string, modifier?: stri
   ]);
 }
 
-/** 装備ドロップの札。スロット・星・主効果を1枚にまとめる */
+/** 装備ドロップの札。スロット・星・レア度・主効果を1枚にまとめる */
 function equipmentTile(equipment: Equipment): HTMLElement {
-  return el("div", { className: "reward-drop" }, [
+  return el("div", { className: "reward-drop", ...equipmentRarityAttrs(equipment) }, [
     el("div", { className: "reward-drop__art reward-drop__art--gear" }, [
       el("span", { className: "reward-drop__emoji" }, ["⚔"]),
       el("span", { className: "reward-drop__stars" }, ["★".repeat(equipment.star)]),
     ]),
     el("div", { className: "reward-drop__name" }, [`スロット${equipment.slot}`]),
+    // ★とは別の軸なので、行を分けて出す
+    el("div", { className: "reward-drop__rarity" }, [equipmentRarityTag(equipment)]),
     el("div", { className: "reward-drop__meta" }, [STAT_LABEL[equipment.mainStat.type]]),
   ]);
 }

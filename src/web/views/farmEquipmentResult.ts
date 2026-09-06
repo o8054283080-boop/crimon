@@ -2,6 +2,7 @@ import { Equipment, SET_LABEL, SLOT_LABEL, equipmentSellPrice, formatStatValue }
 import { el } from "../dom.js";
 import "../farmEquipmentResult.css";
 import { equipmentLockLabel, sellableEquipmentIds } from "../uxHelpers.js";
+import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
 
 export interface FarmEquipmentResultProps {
   equipment: Equipment[];
@@ -17,18 +18,26 @@ export interface FarmEquipmentResultProps {
   onClose(): void;
 }
 
-const rarity = (star: number): string => star >= 6 ? "伝説" : star >= 5 ? "英雄" : star >= 4 ? "希少" : "一般";
+/*
+ * **ここには★数から作った別のレア度名(伝説/英雄/希少/一般)が並んでいた。**
+ *
+ * 装備のレア度は初期サブ数で決まる別の軸になったので、★由来の言葉を残すと
+ * 「★6＝伝説」と「初期サブ4＝エピック」の2つのレア度が同じ札の中に並ぶ。
+ * ★は `★★★★★★` として既に出ているので、言葉の方はレア度へ譲る。
+ */
 const name = (equipment: Equipment): string => `${SET_LABEL[equipment.set]}の${SLOT_LABEL[equipment.slot]}`;
 
 export function renderFarmEquipmentResult(props: FarmEquipmentResultProps): HTMLElement {
   const selected = props.equipment.filter((item) => props.selectedIds.includes(item.id) && !item.locked);
   const total = selected.reduce((sum, item) => sum + equipmentSellPrice(item), 0);
   const detail = props.equipment.find((item) => item.id === props.detailId) ?? null;
-  const cards = props.equipment.map((item) => el("article", { className: "farm-equip-card", "data-locked": String(item.locked === true) }, [
+  const cards = props.equipment.map((item) => el("article", { className: "farm-equip-card", "data-locked": String(item.locked === true), ...equipmentRarityAttrs(item) }, [
     el("button", { type: "button", className: "farm-equip-card__detail", onclick: () => props.onDetail(item.id) }, [
       el("strong", {}, [name(item)]),
       el("span", { className: "farm-equip-card__stars" }, ["★".repeat(item.star)]),
-      el("span", {}, [`${rarity(item.star)} ・ ${SLOT_LABEL[item.slot]} ・ +${item.level}`]),
+      // 獲得の場面はいちばん強く出してよい。レジェンド・エピックが一目で分かるように大きい札にする
+      equipmentRarityTag(item, "lg"),
+      el("span", {}, [`${SLOT_LABEL[item.slot]} ・ +${item.level}`]),
       el("b", {}, [formatStatValue(item.mainStat)]),
       el("small", {}, [item.subStats.length ? `サブ：${item.subStats.map(formatStatValue).join(" / ")}` : "サブステータスなし"]),
     ]),
@@ -52,8 +61,10 @@ export function renderFarmEquipmentResult(props: FarmEquipmentResultProps): HTML
         el("button", { type: "button", className: "btn btn--danger", disabled: selected.length === 0 || props.selling, onclick: props.onSell }, [props.selling ? "売却中…" : `${selected.length}個を売却　+${total.toLocaleString("ja-JP")}G`]),
       ]),
     ]),
-    detail ? el("section", { className: "farm-equip-detail", role: "dialog", ariaLabel: "装備詳細" }, [
-      el("h3", {}, [name(detail)]), el("b", {}, [`${"★".repeat(detail.star)} ${rarity(detail.star)}　+${detail.level}`]),
+    detail ? el("section", { className: "farm-equip-detail", role: "dialog", ariaLabel: "装備詳細", ...equipmentRarityAttrs(detail) }, [
+      el("h3", {}, [name(detail)]),
+      el("b", {}, [`${"★".repeat(detail.star)}　+${detail.level}`]),
+      equipmentRarityTag(detail, "lg"),
       el("p", {}, [`${SLOT_LABEL[detail.slot]} / ${SET_LABEL[detail.set]}シリーズ`]),
       el("strong", {}, [formatStatValue(detail.mainStat)]),
       ...detail.subStats.map((stat) => el("p", {}, [formatStatValue(stat)])),

@@ -119,25 +119,37 @@ describe("装備売却価格 (equipmentSellPrice)", () => {
   });
 });
 
+/*
+ * **サブは0〜2個・付きにくい、という前提はもう無い。**
+ *
+ * 初期サブ数が装備のレア度になったので、通常ステージでも4個(エピック)まで出る
+ * (`core/equipmentRarity.ts` の `NORMAL_STAGE_INITIAL_SUB_WEIGHTS`)。
+ * 以前ここにあった「0〜2個のみ」「サブ付きは55%未満」は旧仕様の確認だったので、
+ * 新しい重みに沿った確認へ差し替えてある。
+ */
 describe("チャプターテーマ装備ドロップ (generateThemedStageEquipment)", () => {
-  it("星は必ず1、シリーズは指定したものになり、サブステータスは0〜2個のみ", () => {
+  it("星は必ず1、シリーズは指定したものになり、サブは0〜4個", () => {
     const rng = mulberry32(6);
     for (let i = 0; i < 500; i++) {
       const eq = generateThemedStageEquipment("CRIT", rng);
       expect(eq.star).toBe(1);
       expect(eq.set).toBe("CRIT");
-      expect(eq.subStats.length).toBeLessThanOrEqual(2);
+      expect(eq.subStats.length).toBeLessThanOrEqual(4);
+      // 引けた数ではなく、頼まれた数が焼かれる
+      expect(eq.initialSubStatCount).toBe(eq.subStats.length);
     }
   });
 
-  it("サブ付き装備の出現率はかなり低い", () => {
+  it("初期サブ数の出方が通常ステージの重み(20/30/30/15/5)に沿う", () => {
     const rng = mulberry32(7);
-    const N = 2000;
-    let hasSubCount = 0;
+    const N = 20000;
+    const counts = [0, 0, 0, 0, 0];
     for (let i = 0; i < N; i++) {
-      const eq = generateThemedStageEquipment("POWER", rng);
-      if (eq.subStats.length > 0) hasSubCount += 1;
+      counts[generateThemedStageEquipment("POWER", rng).initialSubStatCount ?? 0] += 1;
     }
-    expect(hasSubCount / N).toBeLessThan(0.55);
+    const expected = [0.2, 0.3, 0.3, 0.15, 0.05];
+    for (let sub = 0; sub < expected.length; sub += 1) {
+      expect(counts[sub] / N, `初期サブ${sub}個`).toBeCloseTo(expected[sub], 1);
+    }
   });
 });

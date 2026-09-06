@@ -1,4 +1,10 @@
 import { Stats } from "./stats.js";
+import {
+  NORMAL_STAGE_INITIAL_SUB_WEIGHTS,
+  clampInitialSubStatCount,
+  dungeonFloorInitialSubWeights,
+  pickInitialSubStatCount,
+} from "./equipmentRarity.js";
 
 export type EquipSlot = 1 | 2 | 3 | 4 | 5 | 6;
 export const EQUIP_SLOTS: EquipSlot[] = [1, 2, 3, 4, 5, 6];
@@ -192,6 +198,16 @@ export interface Equipment {
   set: SetType;
   mainStat: StatRoll;
   subStats: StatRoll[];
+  /**
+   * **生成した瞬間のサブオプション数。レア度はこれだけで決まる**(`core/equipmentRarity.ts`)。
+   *
+   * 強化で `subStats` が増えてもここは動かさない。動かすと、+15まで鍛えた装備が
+   * 全部エピックになり、レア度が「育てたかどうか」を指す別の物になる。
+   *
+   * 旧セーブには入っていないので任意。読み込み時の正規化
+   * (`normalizeState`)が今のサブ数から一度だけ補って、以後は保存される。
+   */
+  initialSubStatCount?: number;
 }
 
 let equipmentCounter = 0;
@@ -333,7 +349,24 @@ export function generateEquipment(options: GenerateEquipmentOptions): Equipment 
     subStats.push({ type, value: rollStatValue(type, star, SUB_STAT_RATIO, rng) });
   }
 
-  return { id: generateEquipmentId(), slot, star, level: 0, set, mainStat, subStats };
+  /*
+   * **引けた数ではなく、頼まれた数を焼く。**
+   *
+   * サブの種類は「メイン以外」から重複なしで引くので、理屈の上では
+   * 引き切れずに `subStats.length` が要求より少なくなり得る。
+   * その時に実際の本数を焼くと、同じ「初期サブ3個」を頼んだ装備で
+   * レア度が割れる。頼まれた数(0〜4に丸めたもの)がその装備の格。
+   */
+  return {
+    id: generateEquipmentId(),
+    slot,
+    star,
+    level: 0,
+    set,
+    mainStat,
+    subStats,
+    initialSubStatCount: clampInitialSubStatCount(subCount),
+  };
 }
 
 export function canEnhanceEquipment(equipment: Equipment): boolean {
@@ -673,22 +706,16 @@ function weightedPick<T>(options: WeightedOption<T>[], rng: () => number): T {
 }
 
 /**
- * 通常冒険(ステージ)向けの装備抽選設定。サブステータスは最大2個までしか付かず、
- * サブ付きの装備が出る確率はかなり低めにしてある。
- */
-const NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS: WeightedOption<number>[] = [
-  { value: 0, weight: 60 },
-  { value: 1, weight: 30 },
-  { value: 2, weight: 10 },
-];
-
-/**
  * チャプター(ステージ1〜4)テーマ装備。星は通常1固定だが、starBonusを渡すとその分だけ星を引き上げられる
  * (ボスステージのボーナスドロップ・ハード/ヘル難易度用、6を超える分はクランプされる)。シリーズは指定されたものに固定される。
- * サブステータスの個数分布は通常ステージ装備と同じ(0〜2個、大半は0〜1個)。
+ *
+ * **初期サブ数(=レア度)は★数によらず一律**で
+ * `NORMAL_STAGE_INITIAL_SUB_WEIGHTS`(20/30/30/15/5)から引く。
+ * 以前はここに独自の 60/30/10 の表があり、サブは最大2個までだった。
+ * ★と連動させないのは、「★6＝エピック」という誤解をそのまま仕様にしないため。
  */
 export function generateThemedStageEquipment(set: SetType, rng: () => number = Math.random, starBonus = 0): Equipment {
-  const subStatCount = weightedPick(NORMAL_STAGE_SUBSTAT_COUNT_WEIGHTS, rng);
+  const subStatCount = pickInitialSubStatCount(NORMAL_STAGE_INITIAL_SUB_WEIGHTS, rng);
   const star = Math.max(1, Math.min(6, 1 + starBonus)) as EquipStar;
   return generateEquipment({ star, set, subStatCount, rng });
 }
@@ -756,48 +783,6 @@ export const DUNGEON_FLOOR_STAR_WEIGHTS: Record<number, WeightedOption<EquipStar
   ],
 };
 
-/** 星のランクごとのサブステータス個数の出やすさ。星が高いほどサブが多くつきやすい */
-const DUNGEON_SUBSTAT_COUNT_WEIGHTS_BY_STAR: Record<EquipStar, WeightedOption<number>[]> = {
-  1: [
-    { value: 0, weight: 45 },
-    { value: 1, weight: 35 },
-    { value: 2, weight: 20 },
-  ],
-  2: [
-    { value: 0, weight: 35 },
-    { value: 1, weight: 35 },
-    { value: 2, weight: 25 },
-    { value: 3, weight: 5 },
-  ],
-  3: [
-    { value: 0, weight: 15 },
-    { value: 1, weight: 30 },
-    { value: 2, weight: 30 },
-    { value: 3, weight: 20 },
-    { value: 4, weight: 5 },
-  ],
-  4: [
-    { value: 0, weight: 8 },
-    { value: 1, weight: 22 },
-    { value: 2, weight: 30 },
-    { value: 3, weight: 28 },
-    { value: 4, weight: 12 },
-  ],
-  5: [
-    { value: 0, weight: 5 },
-    { value: 1, weight: 15 },
-    { value: 2, weight: 30 },
-    { value: 3, weight: 30 },
-    { value: 4, weight: 20 },
-  ],
-  6: [
-    { value: 1, weight: 5 },
-    { value: 2, weight: 20 },
-    { value: 3, weight: 35 },
-    { value: 4, weight: 40 },
-  ],
-};
-
 /** 指定した階層のドロップ率テーブルを取得する(1階=[{star:1,percent:40}, ...]のような表示用) */
 export function getDungeonFloorDropRates(floor: number): { star: EquipStar; percent: number }[] {
   const weights = DUNGEON_FLOOR_STAR_WEIGHTS[floor] ?? [];
@@ -805,7 +790,13 @@ export function getDungeonFloorDropRates(floor: number): { star: EquipStar; perc
   return weights.map((w) => ({ star: w.value, percent: total > 0 ? Math.round((w.weight / total) * 1000) / 10 : 0 }));
 }
 
-/** 装備ダンジョンの指定階層で装備を1つ生成する(ドロップは呼び出し側で確定させてから呼ぶ) */
+/**
+ * 装備ダンジョンの指定階層で装備を1つ生成する(ドロップは呼び出し側で確定させてから呼ぶ)。
+ *
+ * ★数と初期サブ数(=レア度)は**別々の表から独立に引く。**
+ * 以前は初期サブ数を★ごとの表から引いていたので、★が上がると自動でサブも増え、
+ * 2つが実質1本の軸になっていた。切り離すことで、★6ノーマルも★3エピックも出る。
+ */
 export function generateDungeonEquipment(
   floor: number,
   rng: () => number = Math.random,
@@ -813,6 +804,6 @@ export function generateDungeonEquipment(
 ): Equipment {
   const starWeights = DUNGEON_FLOOR_STAR_WEIGHTS[floor] ?? DUNGEON_FLOOR_STAR_WEIGHTS[1];
   const star = weightedPick(starWeights, rng);
-  const subStatCount = weightedPick(DUNGEON_SUBSTAT_COUNT_WEIGHTS_BY_STAR[star], rng);
+  const subStatCount = pickInitialSubStatCount(dungeonFloorInitialSubWeights(floor), rng);
   return generateEquipment({ star, subStatCount, set: setPool[Math.floor(rng() * setPool.length)], rng });
 }

@@ -111,7 +111,17 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
   const recommendedGear = floor.floor <= 5 ? "★5装備(サブ4個推奨)" : "★6装備推奨";
   const pigStar = floor.floor <= REINCARNATION_PIG_LOW_TIER_MAX_FLOOR ? 2 : 3;
   const bonusNotes = [
-    "クリアすると装備が1個確定でドロップします(サブステータス数は星が高いほど付きやすくなります)。",
+    /*
+     * **「サブは星が高いほど付きやすい」はもう嘘。**
+     *
+     * 初期サブ数は装備のレア度になり、★とは切り離して階層だけで決まる
+     * (`core/equipmentRarity.ts` の `DUNGEON_FLOOR_INITIAL_SUB_WEIGHTS`)。
+     * ★6ノーマルも★3エピックも出るので、★に紐づけた案内を残すと
+     * 「★6＝エピック」という誤解をこちらから作ることになる。
+     *
+     * 確率の数字は出さない(依頼主との約束)。上の階ほど良くなる、とだけ言う。
+     */
+    "クリアすると装備が1個確定でドロップします(上の階ほど、レア度の高い装備が出やすくなります)。",
     "低確率で「召喚の書」もドロップします。",
     `低確率で転生ピッグ★${pigStar}(ランクアップ素材専用モンスター)もドロップします。`,
   ];

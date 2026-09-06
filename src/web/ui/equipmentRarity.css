@@ -1,0 +1,313 @@
+/*
+ * 装備のレア度(初期サブ数)を色で見せる。
+ *
+ * ## ★の色とは別の場所に出す
+ *
+ * 既存の `--eq-tone` は**★数**の色で、カードの上端の帯・強化段階の数字・
+ * 星の並びが全部それを見ている。レア度をそこへ混ぜると
+ * 「★6＝エピック」という誤解をCSSの側から作ってしまう。
+ * だからレア度は `--eq-rarity` という別の変数を立て、
+ * **外周の枠と小さなラベル**という別の場所だけに出す。
+ *
+ * ## 一覧で光らせすぎない
+ *
+ * 装備は数十枚〜数百枚を並べる画面なので、発光もアニメーションも
+ * 「数字が読めること」より優先しない。エピックの虹も一覧では控えめにして、
+ * 詳細と獲得結果でだけ少し強くする。
+ *
+ * ## 動くのはエピックの虹だけ
+ *
+ * しかもゆっくり(12秒で一巡)、背景の位置をずらすだけ。
+ * `background-position` のアニメーションは合成だけで済むので、
+ * 一覧に何十枚あってもレイアウトを組み直さない。
+ * `prefers-reduced-motion` では止める。
+ */
+
+/* 5段の色。ここだけが色の定義 */
+[data-rarity="normal"] {
+  --eq-rarity: #8b93a7;
+  --eq-rarity-glow: rgba(139, 147, 167, 0);
+  --eq-rarity-ink: #c3cadb;
+}
+
+[data-rarity="rare"] {
+  --eq-rarity: #4f9dff;
+  --eq-rarity-glow: rgba(79, 157, 255, 0.32);
+  --eq-rarity-ink: #a8ceff;
+}
+
+[data-rarity="hero"] {
+  --eq-rarity: #b07bff;
+  --eq-rarity-glow: rgba(176, 123, 255, 0.4);
+  --eq-rarity-ink: #d8c2ff;
+}
+
+[data-rarity="legend"] {
+  --eq-rarity: #ffc53f;
+  --eq-rarity-glow: rgba(255, 197, 63, 0.45);
+  --eq-rarity-ink: #ffe6a6;
+}
+
+/*
+ * エピックは単色を持たない。枠は虹のグラデーションで描くので、
+ * `--eq-rarity` には**文字や影に使うための代表色**だけを置く
+ * (虹をそのまま文字色にすると読めない)。
+ */
+[data-rarity="epic"] {
+  --eq-rarity: #ff8fd0;
+  --eq-rarity-glow: rgba(255, 143, 208, 0.4);
+  --eq-rarity-ink: #ffd9ef;
+  --eq-rainbow: linear-gradient(
+    100deg,
+    #ff6b6b, #ffb347, #ffe66d, #7bdc8a, #6fd6ff, #6f8cff, #c07bff, #ff6b6b
+  );
+}
+
+/* ==========================================================================
+ * レア度ラベル
+ * ========================================================================== */
+
+.equip-rarity-tag {
+  display: inline-flex;
+  align-items: center;
+  /*
+   * **0.58rem(9.28px)より下げない。**
+   * 0.55rem(8.8px)にしたら `tests/cssReadability.test.ts` に落とされた。
+   * この案件ではホームの経験値が8px、塔の関門名が7.4pxで実機で読めなくなっている。
+   */
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  padding: 0 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--eq-rarity-ink, #c3cadb);
+  background: color-mix(in srgb, var(--eq-rarity, #8b93a7) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--eq-rarity, #8b93a7) 45%, transparent);
+}
+
+/* 詳細・獲得結果ではひとまわり大きく */
+.equip-rarity-tag--lg {
+  font-size: 0.68rem;
+  padding: 1px 8px;
+}
+
+/*
+ * エピックのラベルだけ、下地に虹を薄く敷く。
+ * 文字は白のままにして、読みにくくしない。
+ */
+[data-rarity="epic"] .equip-rarity-tag {
+  color: #fff;
+  background:
+    linear-gradient(rgba(12, 14, 26, 0.55), rgba(12, 14, 26, 0.55)),
+    var(--eq-rainbow);
+  background-size: auto, 160% 100%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  animation: equip-rainbow-drift 12s linear infinite;
+}
+
+/* ==========================================================================
+ * 一覧のカード — 枠色だけ。数字の邪魔をしない
+ * ========================================================================== */
+
+.equip-card[data-rarity] {
+  border-color: color-mix(in srgb, var(--eq-rarity, #4a5372) 60%, transparent);
+}
+
+/* レジェンドだけ枠を少し太くする。金は他より一段上だと分かるように */
+.equip-card[data-rarity="legend"] {
+  border-width: 2px;
+}
+
+/*
+ * 発光。ノーマルは 0 なので何も出ない。
+ * `data-tier="max"` の既存の光と足し算にならないよう、
+ * こちらは**外周のごく薄い一枚**に留める。
+ */
+.equip-card[data-rarity="rare"],
+.equip-card[data-rarity="hero"],
+.equip-card[data-rarity="legend"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 8px var(--eq-rarity-glow, transparent),
+    0 3px 10px rgba(0, 0, 0, 0.4);
+}
+
+/*
+ * エピックの虹枠。
+ *
+ * `border` は1本の色しか持てないので、枠そのものを描く薄い層を重ねる。
+ * `inset` の擬似要素なのでカードの中身には一切かからず、
+ * 文字の上に色が乗ることはない。
+ */
+.equip-card[data-rarity="epic"] {
+  border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 10px var(--eq-rarity-glow, transparent),
+    0 3px 10px rgba(0, 0, 0, 0.4);
+}
+
+.equip-card[data-rarity="epic"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: var(--eq-rainbow);
+  background-size: 160% 100%;
+  /* 枠だけを残して中央を抜く。中身の文字には一切かからない */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.75;
+  pointer-events: none;
+  animation: equip-rainbow-drift 12s linear infinite;
+}
+
+/* ==========================================================================
+ * 詳細・強化画面 — 一覧より少し強く
+ * ========================================================================== */
+
+.equip-detail[data-rarity] {
+  border-color: color-mix(in srgb, var(--eq-rarity, #4a5372) 55%, transparent);
+}
+
+.equip-detail[data-rarity="rare"],
+.equip-detail[data-rarity="hero"],
+.equip-detail[data-rarity="legend"] {
+  box-shadow: 0 0 18px var(--eq-rarity-glow, transparent), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.equip-detail[data-rarity="legend"] {
+  border-width: 2px;
+}
+
+.equip-detail[data-rarity="epic"] {
+  position: relative;
+  border-color: transparent;
+  box-shadow: 0 0 22px var(--eq-rarity-glow, transparent), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.equip-detail[data-rarity="epic"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--eq-rainbow);
+  background-size: 160% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.9;
+  pointer-events: none;
+  animation: equip-rainbow-drift 12s linear infinite;
+}
+
+/* 見出しの並び。★とレア度を横に並べ、混同させない */
+.equip-detail__grade {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+ * 獲得結果 — いちばん強く出してよい場所
+ * ========================================================================== */
+
+.farm-equip-card[data-rarity] {
+  border-color: color-mix(in srgb, var(--eq-rarity, #4a5372) 60%, transparent);
+}
+
+.farm-equip-card[data-rarity="legend"] {
+  border-width: 2px;
+  box-shadow: 0 0 16px var(--eq-rarity-glow, transparent);
+}
+
+.farm-equip-card[data-rarity="epic"] {
+  position: relative;
+  border-color: transparent;
+  box-shadow: 0 0 20px var(--eq-rarity-glow, transparent);
+}
+
+.farm-equip-card[data-rarity="epic"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--eq-rainbow);
+  background-size: 160% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.9;
+  pointer-events: none;
+  animation: equip-rainbow-drift 12s linear infinite;
+}
+
+/* ステージ結果の装備札 */
+.reward-drop__rarity {
+  display: block;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+ * 虹の動き
+ *
+ * 位置をずらすだけ。原色が点滅する表現にはしない。
+ * ========================================================================== */
+
+@keyframes equip-rainbow-drift {
+  from { background-position: 0% 50%; }
+  to { background-position: 160% 50%; }
+}
+
+/* 動きを減らす設定では止める。色はそのまま残す */
+@media (prefers-reduced-motion: reduce) {
+  [data-rarity="epic"] .equip-rarity-tag,
+  .equip-card[data-rarity="epic"]::after,
+  .equip-detail[data-rarity="epic"]::after,
+  .farm-equip-card[data-rarity="epic"]::after {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+ * ★とレア度を1行に並べる
+ *
+ * 縦画面(390px)では札の横幅が厳しいので、入らなければ折り返す。
+ * ★6は6文字あるので、詰めて出さないと2段になりやすい。
+ * ========================================================================== */
+
+.equip-card__grade {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* ショップの札。レア度は行を1つ使う */
+.shop-card[data-rarity] {
+  border-color: color-mix(in srgb, var(--eq-rarity, #4a5372) 50%, transparent);
+}
+
+.shop-card[data-rarity="legend"] {
+  border-width: 2px;
+}
+
+/*
+ * 獲得結果の札。`.farm-equip-card__detail` は grid なので、
+ * レア度の札は1行を占める。**引き伸ばさない**よう左端に寄せる
+ * (grid の子は既定で行幅いっぱいに伸び、丸い札が横長の帯になる)。
+ */
+.farm-equip-card__detail .equip-rarity-tag {
+  justify-self: start;
+}

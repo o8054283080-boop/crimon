@@ -6,6 +6,8 @@ import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon, slotIcon } from "../icons.js";
 import { managementHeader } from "./managementHeader.js";
 import { compareEquipmentStats, equipmentForSlot, equipmentLockLabel, equipmentStatTotal, sellableEquipmentIds } from "../uxHelpers.js";
+import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
+import { equipmentRarityRank, getEquipmentRarity } from "../../core/equipmentRarity.js";
 import "../ui/equipmentList.css";
 
 export interface EquipmentPickerContext {
@@ -19,7 +21,7 @@ export interface EquipmentPickerContext {
  * 装備は数十個たまるので、「今その順で見たい理由」が場面ごとに違う。
  * 強い物を探す・売る物を探す・シリーズを揃える、で必要な順序が別なので選べるようにする。
  */
-export type EquipmentSortKey = "recommended" | "star" | "level" | "slot" | "set" | "value" | StatRoll["type"];
+export type EquipmentSortKey = "recommended" | "rarity" | "star" | "level" | "slot" | "set" | "value" | StatRoll["type"];
 
 /**
  * 並べ替えの札に出す文言。
@@ -30,6 +32,7 @@ export type EquipmentSortKey = "recommended" | "star" | "level" | "slot" | "set"
  */
 export const EQUIPMENT_SORT_LABEL: Record<EquipmentSortKey, string> = {
   recommended: "おすすめ",
+  rarity: "レア度順",
   star: "★の高い順",
   level: "強化順",
   slot: "枠の順",
@@ -40,7 +43,7 @@ export const EQUIPMENT_SORT_LABEL: Record<EquipmentSortKey, string> = {
   CRIT_DMG: "会心ダメージ", ACCURACY: "効果命中", RESISTANCE: "効果抵抗",
 };
 
-export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "level", "star", "HP_PERCENT", "HP_FLAT", "ATK_PERCENT", "ATK_FLAT", "DEF_PERCENT", "DEF_FLAT", "SPD", "CRIT_RATE", "CRIT_DMG", "ACCURACY", "RESISTANCE", "slot", "set", "value"];
+export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "rarity", "level", "star", "HP_PERCENT", "HP_FLAT", "ATK_PERCENT", "ATK_FLAT", "DEF_PERCENT", "DEF_FLAT", "SPD", "CRIT_RATE", "CRIT_DMG", "ACCURACY", "RESISTANCE", "slot", "set", "value"];
 
 export interface EquipmentProps {
   player: PlayerState;
@@ -130,13 +133,18 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
       "data-star": String(equipment.star),
       "data-set": equipment.set,
       "data-tier": equipment.level >= 12 ? "max" : equipment.level >= 6 ? "mid" : "low",
+      ...equipmentRarityAttrs(equipment),
     },
     [
       el("div", { className: "equip-card__head" }, [
         // 枠の紋章。等級の色を纏わせ、台座に嵌める
         el("span", { className: "equip-card__sigil" }, [icon(slotIcon(equipment.slot))]),
         el("span", { className: "equip-card__head-text" }, [
-          el("span", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
+          // ★とレア度は別物なので、同じ行に並べて出す(★6=エピック と読ませない)
+          el("span", { className: "equip-card__grade" }, [
+            el("span", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
+            equipmentRarityTag(equipment),
+          ]),
           el("span", { className: "equip-card__meta" }, [
             el("span", { className: "equip-card__slot" }, [`枠${equipment.slot}`]),
             el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
@@ -199,6 +207,15 @@ export function compareEquipmentBySort(key: EquipmentSortKey, isEquipped: (e: Eq
   return (a, b) => {
     let result: number;
     switch (key) {
+      /*
+       * レア度順。エピック → レジェンド → ヒーロー → レア → ノーマル。
+       * 同じレア度の中は既存の「★の高い順」と同じ並びに落として、
+       * 別の順序を新しく持ち込まない。
+       */
+      case "rarity":
+        result = equipmentRarityRank(getEquipmentRarity(b)) - equipmentRarityRank(getEquipmentRarity(a))
+          || b.star - a.star || b.level - a.level || a.slot - b.slot;
+        break;
       case "star":
         result = b.star - a.star || b.level - a.level || a.slot - b.slot;
         break;
@@ -481,12 +498,17 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
         "data-star": String(equipment.star),
         "data-set": equipment.set,
         "data-tier": equipment.level >= 12 ? "max" : equipment.level >= 6 ? "mid" : "low",
+        ...equipmentRarityAttrs(equipment),
       },
       [
         el("div", { className: "equip-detail__top" }, [
           el("div", { className: "equip-detail__sigil" }, [icon(slotIcon(equipment.slot))]),
           el("div", { className: "equip-detail__ident" }, [
-            el("div", { className: "equip-detail__star" }, ["★".repeat(equipment.star)]),
+            // ★は基礎性能、レア度は伸びしろ。別の物なので並べて出す
+            el("div", { className: "equip-detail__grade" }, [
+              el("span", { className: "equip-detail__star" }, ["★".repeat(equipment.star)]),
+              equipmentRarityTag(equipment, "lg"),
+            ]),
             el("div", { className: "equip-detail__set" }, [`${SET_LABEL[equipment.set]}シリーズ`]),
             el("div", { className: "equip-detail__main" }, [formatStatValue(equipment.mainStat)]),
           ]),
