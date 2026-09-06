@@ -141,7 +141,18 @@ function pickWeighted<T>(items: { value: T; weight: number }[], rng: () => numbe
   return items[items.length - 1].value;
 }
 
-/** 星が高いほどサブステータスも多めに付く(値段に見合う中身にするため) */
+/**
+ * 星が高いほどサブステータスも多めに付く(値段に見合う中身にするため)。
+ *
+ * **ここは通常ステージ・装備ダンジョンとは別の表のまま。**
+ * 棚の値段が `★ × サブ数` で決まっている(`SHOP_EQUIPMENT_PRICE`)ので、
+ * 出方を階層別の表へ差し替えると値段の分布まで動く。
+ * レア度の導入で通常ステージとダンジョンの確率は入れ替えたが、
+ * 買い物の相場は今回の依頼の対象ではないので触っていない。
+ *
+ * 棚に並ぶのは強化していない新品なので、ここで決まるサブ数が
+ * そのまま初期サブ数＝レア度になる。
+ */
 function subStatCountFor(star: EquipStar, rng: () => number): number {
   const base = star >= 5 ? 2 : star >= 3 ? 1 : 0;
   return Math.min(4, base + (rng() < 0.45 ? 1 : 0));

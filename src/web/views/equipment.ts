@@ -1,4 +1,4 @@
-import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, StatRoll, formatStatValue } from "../../core/equipment.js";
+import { canEnhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, Equipment, EQUIP_SLOTS, EquipSlot, SET_LABEL, SLOT_LABEL, STAT_LABEL, STAT_LABEL_SHORT, StatRoll, formatStatValue } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -6,6 +6,11 @@ import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon, slotIcon } from "../icons.js";
 import { managementHeader } from "./managementHeader.js";
 import { compareEquipmentStats, equipmentForSlot, equipmentLockLabel, equipmentStatTotal, sellableEquipmentIds } from "../uxHelpers.js";
+import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
+import { equipmentRarityRank, getEquipmentRarity } from "../../core/equipmentRarity.js";
+import { EquipmentFilter, filterEquipment } from "../equipmentFilter.js";
+import { renderEquipmentFilterBar } from "./equipmentFilterBar.js";
+import { renderEquipmentListDensityToggle } from "../equipmentListDensity.js";
 import "../ui/equipmentList.css";
 
 export interface EquipmentPickerContext {
@@ -19,7 +24,7 @@ export interface EquipmentPickerContext {
  * 装備は数十個たまるので、「今その順で見たい理由」が場面ごとに違う。
  * 強い物を探す・売る物を探す・シリーズを揃える、で必要な順序が別なので選べるようにする。
  */
-export type EquipmentSortKey = "recommended" | "star" | "level" | "slot" | "set" | "value" | StatRoll["type"];
+export type EquipmentSortKey = "recommended" | "rarity" | "star" | "level" | "slot" | "set" | "value" | StatRoll["type"];
 
 /**
  * 並べ替えの札に出す文言。
@@ -30,6 +35,7 @@ export type EquipmentSortKey = "recommended" | "star" | "level" | "slot" | "set"
  */
 export const EQUIPMENT_SORT_LABEL: Record<EquipmentSortKey, string> = {
   recommended: "おすすめ",
+  rarity: "レア度順",
   star: "★の高い順",
   level: "強化順",
   slot: "枠の順",
@@ -40,7 +46,15 @@ export const EQUIPMENT_SORT_LABEL: Record<EquipmentSortKey, string> = {
   CRIT_DMG: "会心ダメージ", ACCURACY: "効果命中", RESISTANCE: "効果抵抗",
 };
 
-export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "level", "star", "HP_PERCENT", "HP_FLAT", "ATK_PERCENT", "ATK_FLAT", "DEF_PERCENT", "DEF_FLAT", "SPD", "CRIT_RATE", "CRIT_DMG", "ACCURACY", "RESISTANCE", "slot", "set", "value"];
+/**
+ * 所持装備の一覧で、一度に描く枚数。
+ *
+ * 共通の既定は24枚(`incrementalGrid.ts`)。装備の札はモンスターより小さく、
+ * 2列で並ぶので24枚では12行しか出ない。手持ちを見比べる画面なので倍にする。
+ */
+export const EQUIPMENT_LIST_PAGE_SIZE = 48;
+
+export const EQUIPMENT_SORT_KEYS: EquipmentSortKey[] = ["recommended", "rarity", "level", "star", "HP_PERCENT", "HP_FLAT", "ATK_PERCENT", "ATK_FLAT", "DEF_PERCENT", "DEF_FLAT", "SPD", "CRIT_RATE", "CRIT_DMG", "ACCURACY", "RESISTANCE", "slot", "set", "value"];
 
 export interface EquipmentProps {
   player: PlayerState;
@@ -61,12 +75,49 @@ export interface EquipmentProps {
   onGoDungeon: () => void;
   onChangeSlotFilter: (slot: EquipSlot | null) => void;
   onChangeSort: (key: EquipmentSortKey) => void;
+  /** 札を小さくして1画面に多く並べるか。端末の見た目設定として保存する */
+  dense: boolean;
+  onToggleDense: () => void;
+  /** 絞り込みの条件と、開いているかどうか */
+  filter: EquipmentFilter;
+  filterOpen: boolean;
+  onChangeFilter: (filter: EquipmentFilter) => void;
+  onToggleFilterOpen: () => void;
+  /**
+   * 一覧に出す並びを固定するID列。
+   *
+   * **強化しても札が動かないようにするためだけの仕組み。**
+   * 「おすすめ順」は強化値を見て並ぶので、`+1` を押した瞬間にその札が
+   * 前の方へ飛び、次の `+2` を押そうとするとそこには別の装備が居た。
+   * 画面に居る間は最初に決めた順序を保ち、画面を出入りするか
+   * 並び順・絞り込みを変えた時に組み直す(`null` を渡すと組み直し)。
+   */
+  orderIds: readonly string[] | null;
   onToggleSelecting: () => void;
   onToggleSelected: (equipmentId: string) => void;
   onSelectAllShown: (ids: string[]) => void;
   onClearSelection: () => void;
   onBulkSell: () => void;
   onToggleLock: (equipmentId: string) => void;
+}
+
+/**
+ * 「その装備は誰かが着けているか」を O(1) で答える判定を作る。
+ *
+ * **並べ替えの比較から毎回呼ばれる場所。** 以前は1件ごとに
+ * `findEquippedOwner`(全モンスターを走査)を呼んでいたので、
+ * 所持1800個の一覧を開くのに **597ms** かかっていた
+ * (比較は 1,800 × log2(1,800) ≈ 19,000 回起き、その各々で2回呼ばれる)。
+ * 着けているIDの集合を先に1回だけ作れば、走査は所持数ぶんの1回で済む。
+ */
+function makeIsEquipped(player: PlayerState): (equipment: Equipment) => boolean {
+  const ids = new Set<string>();
+  for (const monster of player.monsters) {
+    for (const id of Object.values(monster.equipment)) {
+      if (id) ids.add(id);
+    }
+  }
+  return (equipment) => ids.has(equipment.id);
 }
 
 function equipmentOwnerName(player: PlayerState, equipment: Equipment): string | null {
@@ -102,7 +153,13 @@ function formatSubStatNumber(stat: StatRoll): string {
  *   中央に大きくメインの数値 ……………… その装備を選ぶ理由
  *   下にサブと持ち主 ………………………… 確かめる時だけ読む
  */
-function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () => void, currentId?: string): HTMLElement {
+function equipmentCard(
+  player: PlayerState,
+  equipment: Equipment,
+  onClick: () => void,
+  currentId?: string,
+  dense = false,
+): HTMLElement {
   const ownerName = equipmentOwnerName(player, equipment);
   /*
    * サブは**名前と数値を分ける。**
@@ -111,13 +168,18 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
    * どこまでが名前でどこからが数値なのか目で切れず、数十枚を見比べる画面で
    * いちばん読み違えるところだった。名前は左、数値は右端で揃える。
    */
+  /*
+   * 4列(79px)では名前を詰める。「効果命中%」と数値を1行に並べると必ず溢れる
+   * (`STAT_LABEL_SHORT`)。数値は名前の右端で揃えたいので、
+   * 名前と数値は通常表示と同じく別の span のまま。
+   */
   const subLines =
     equipment.subStats.length > 0
       ? equipment.subStats.map((s) => el("div", { className: "equip-card__sub-line" }, [
-        el("span", { className: "equip-card__sub-label" }, [STAT_LABEL[s.type]]),
+        el("span", { className: "equip-card__sub-label" }, [dense ? STAT_LABEL_SHORT[s.type] : STAT_LABEL[s.type]]),
         el("span", { className: "equip-card__sub-value" }, [formatSubStatNumber(s)]),
       ]))
-      : [el("div", { className: "equip-card__sub-line equip-card__sub-line--empty" }, ["サブステータスなし"])];
+      : [el("div", { className: "equip-card__sub-line equip-card__sub-line--empty" }, [dense ? "サブなし" : "サブステータスなし"])];
 
   // 等級・シリーズ・強化段階を data 属性で持たせ、色と縁取りはCSS側で当てる。
   // 数十枚を並べる画面なので、文字を読まなくても強さの序列が分かることを優先する
@@ -125,37 +187,96 @@ function equipmentCard(player: PlayerState, equipment: Equipment, onClick: () =>
     "button",
     {
       type: "button",
-      className: `equip-card${equipment.id === currentId ? " equip-card--current" : ""}`,
+      className: `equip-card${equipment.id === currentId ? " equip-card--current" : ""}${dense ? " equip-card--dense" : ""}`,
       onclick: onClick,
       "data-star": String(equipment.star),
       "data-set": equipment.set,
       "data-tier": equipment.level >= 12 ? "max" : equipment.level >= 6 ? "mid" : "low",
+      ...equipmentRarityAttrs(equipment),
     },
     [
+      /*
+       * 見出しは**「紋章・★・強化段階」の1行だけ**にする。
+       *
+       * 前は紋章の右に縦積みの塊(★ / 枠・シリーズ)を挟み、
+       * その右へ強化段階を寄せていた。塊が flex で縮められると
+       * 中の★(`white-space: nowrap`)が塊からはみ出し、
+       * **狭い札で強化段階の上に3pxだけ乗る**という直しにくい重なりになっていた。
+       *
+       * ★と強化段階を同じ行の兄弟にすれば、場所を取り合うので重なりようがない。
+       * 枠・シリーズとレア度はそれぞれ下の独立した行へ出す。
+       */
       el("div", { className: "equip-card__head" }, [
         // 枠の紋章。等級の色を纏わせ、台座に嵌める
         el("span", { className: "equip-card__sigil" }, [icon(slotIcon(equipment.slot))]),
-        el("span", { className: "equip-card__head-text" }, [
-          el("span", { className: "equip-card__star" }, ["★".repeat(equipment.star)]),
-          el("span", { className: "equip-card__meta" }, [
+        /*
+         * ★は**簡易表示だけ数字にする。**
+         *
+         * 4列にすると1枚が79pxで、★6つ(約50px)は右上の「+0」の下へ
+         * 潜ってしまった。そもそもこの大きさで6つ並んだ星を
+         * **数えるのは実機では無理**で、「★6」の方が速く読める。
+         * 通常表示は粒のまま——並べた時に格の差が一目で分かるのはあちら。
+         */
+        el("span", { className: "equip-card__star" }, [dense ? `★${equipment.star}` : "★".repeat(equipment.star)]),
+        el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
+      ]),
+      /*
+       * 枠番号とシリーズは**簡易表示では出さない。**
+       *
+       * 4列にすると1枚が79pxしかなく、ここを残すと
+       * 「崩…」「会…」と省略記号だらけになったうえ、
+       * レア度の札に鍵が重なって「エピック」が読めなくなっていた。
+       *
+       * 枠は左の紋章が語る(剣・羽・盾・珠・兜・環)。
+       * シリーズは絞り込みで選べるようになったので、
+       * 一覧で字を出さなくても目当ての物へ辿り着ける。
+       */
+      dense
+        ? null
+        : el("div", { className: "equip-card__meta" }, [
             el("span", { className: "equip-card__slot" }, [`枠${equipment.slot}`]),
             el("span", { className: "equip-card__set" }, [SET_LABEL[equipment.set]]),
           ]),
-        ]),
-        el("span", { className: "equip-card__level" }, [`+${equipment.level}`]),
-      ]),
+      /*
+       * レア度は**独立した行**にする(簡易表示でも通常表示でも)。
+       *
+       * 最初は★と同じ行へ横に並べていたが、札の幅が足りない画面で
+       * 次々に事故を起こした:
+       *   ・320pxや3列(480px〜)では「+15」が★やレア度の札に重なる
+       *   ・簡易表示(79px)では「レジェンド」が紋章に押されて切れる
+       *
+       * ★の行を「★と強化段階」だけにすれば、いちばん狭い札でも
+       * ★6つ(50px)＋「+15」(26px)で収まる。
+       * レア度は幅いっぱいの行を貰うので、5文字の「レジェンド」も切れない。
+       *
+       * **★とレア度が別の行になること自体が、この2つは別物だという印**でもある。
+       */
+      el("div", { className: "equip-card__rarity-row" }, [equipmentRarityTag(equipment)]),
       equipment.id === currentId ? el("span", { className: "equip-card__status" }, ["現在装備中"]) : null,
       el("div", { className: "equip-card__main" }, [
         el("span", { className: "equip-card__main-label" }, [STAT_LABEL[equipment.mainStat.type]]),
         el("strong", { className: "equip-card__main-value" }, [formatMainStatNumber(equipment.mainStat)]),
       ]),
+      /*
+       * **サブは簡易表示でも出す。**
+       *
+       * 一度は「4列に収めるため」落としていたが、依頼主から
+       * 「赤枠のところに付いているサブオプションを表示してほしい」と
+       * 画面に印を付けた絵で指示を受けている。
+       * 装備を見比べる時にいちばん読む中身なので、無いと一覧の用が足りない。
+       *
+       * 79pxに収めるために名前を短くしてある(`STAT_LABEL_SHORT`)。
+       * 字は9px(`tests/cssReadability.test.ts`)を下回らない。
+       */
       el("div", { className: "equip-card__subs" }, subLines),
-      ownerName
-        ? el("div", { className: "equip-card__owner" }, [el("i", { className: "equip-card__dot" }, []), ownerName])
-        : el("div", { className: "equip-card__owner equip-card__owner--free" }, [
-            el("i", { className: "equip-card__dot" }, []),
-            "未装着",
-          ]),
+      dense
+        ? null
+        : ownerName
+          ? el("div", { className: "equip-card__owner" }, [el("i", { className: "equip-card__dot" }, []), ownerName])
+          : el("div", { className: "equip-card__owner equip-card__owner--free" }, [
+              el("i", { className: "equip-card__dot" }, []),
+              "未装着",
+            ]),
     ].filter((node): node is HTMLElement => node !== null),
   );
 }
@@ -199,6 +320,15 @@ export function compareEquipmentBySort(key: EquipmentSortKey, isEquipped: (e: Eq
   return (a, b) => {
     let result: number;
     switch (key) {
+      /*
+       * レア度順。エピック → レジェンド → ヒーロー → レア → ノーマル。
+       * 同じレア度の中は既存の「★の高い順」と同じ並びに落として、
+       * 別の順序を新しく持ち込まない。
+       */
+      case "rarity":
+        result = equipmentRarityRank(getEquipmentRarity(b)) - equipmentRarityRank(getEquipmentRarity(a))
+          || b.star - a.star || b.level - a.level || a.slot - b.slot;
+        break;
       case "star":
         result = b.star - a.star || b.level - a.level || a.slot - b.slot;
         break;
@@ -234,7 +364,7 @@ export function sortEquipment(equipment: readonly Equipment[], key: EquipmentSor
 
 /** iPhoneでも1段に収まり、現在値が常に見えるネイティブ選択欄。 */
 function renderSortRow(props: EquipmentProps): HTMLElement {
-  return el("div", { className: "equip-sort" }, [
+  const nodes: (HTMLElement | null)[] = [
     el("label", { className: "equip-sort__label", htmlFor: "equipment-sort" }, ["並べ替え"]),
     el("div", { className: "equip-sort__control" }, [
       el("select", {
@@ -246,12 +376,21 @@ function renderSortRow(props: EquipmentProps): HTMLElement {
       }, EQUIPMENT_SORT_KEYS.map((key) => el("option", { value: key }, [EQUIPMENT_SORT_LABEL[key]]))),
       el("span", { className: "equip-sort__current", ariaHidden: "true" }, [EQUIPMENT_SORT_LABEL[props.sortKey]]),
     ]),
-  ]);
+    /*
+     * 表示の切替は並べ替えと同じ行に置く。
+     * 一覧の上に帯を増やすと、その分だけ装備が下へ押し出される
+     * (この画面は既に「枠」「絞り込み」「並べ替え」で3段ある)。
+     * 装備を選びに来た画面では出さない——札が差分と強化を抱えていて、
+     * 縮めると押すところが無くなる。
+     */
+    props.pickerContext ? null : renderEquipmentListDensityToggle(props.dense, props.onToggleDense),
+  ];
+  return el("div", { className: "equip-sort" }, nodes.filter((n): n is HTMLElement => n !== null));
 }
 
 /** 一括売却の操作帯。選択モードの時だけ出す */
 function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
-  const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
+  const isEquipped = makeIsEquipped(props.player);
   // 装着中のものは売れないので、まとめて選ぶ対象からも外す
   const equippedIds = new Set(shown.filter(isEquipped).map((item) => item.id));
   const sellableIds = sellableEquipmentIds(shown, equippedIds);
@@ -284,12 +423,48 @@ function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
   ]);
 }
 
-function renderList(props: EquipmentProps): HTMLElement {
-  const isEquipped = (e: Equipment) => equipmentOwnerName(props.player, e) !== null;
-  const filteredItems = props.pickerContext
+/**
+ * いま一覧に出す装備を、絞り込み→並べ替えの順に確定する。
+ *
+ * **画面と `main.ts` の両方から同じ関数を通す。** 並びを固定する仕組み
+ * (`orderIds`)のために `main.ts` 側でも同じ結果が要るので、
+ * 2か所に同じ条件を書くと必ずずれる。
+ */
+export function visibleEquipment(props: EquipmentProps): Equipment[] {
+  const isEquipped = makeIsEquipped(props.player);
+  /*
+   * 装備を選びに来た時(picker)は、その枠に着けられる物だけ。
+   * 絞り込みの札は出していないので、条件も当てない。
+   */
+  const base = props.pickerContext
     ? equipmentForSlot(props.player.equipment, props.pickerContext.slot)
-    : props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter);
-  const items = sortEquipment(filteredItems, props.sortKey, isEquipped);
+    : filterEquipment(
+        props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter),
+        props.filter,
+        isEquipped,
+      );
+  return sortEquipment(base, props.sortKey, isEquipped);
+}
+
+/**
+ * 固定した並びを、いま見えている装備へ当てはめる。
+ *
+ * 固定済みのIDはその順で先に並べ、固定した後に増えた装備(拾った・作った)は
+ * 新しい並びの順で末尾へ回す。売った装備は自然に消える。
+ */
+export function applyEquipmentOrder(items: readonly Equipment[], orderIds: readonly string[] | null): Equipment[] {
+  if (!orderIds || orderIds.length === 0) return [...items];
+  const rank = new Map(orderIds.map((id, index) => [id, index]));
+  const known: Equipment[] = [];
+  const fresh: Equipment[] = [];
+  for (const item of items) (rank.has(item.id) ? known : fresh).push(item);
+  known.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  return [...known, ...fresh];
+}
+
+function renderList(props: EquipmentProps): HTMLElement {
+  const isEquipped = makeIsEquipped(props.player);
+  const items = applyEquipmentOrder(visibleEquipment(props), props.orderIds);
 
   const selecting = props.selecting && !props.pickerContext;
   const pickerMonster = props.pickerContext
@@ -309,7 +484,7 @@ function renderList(props: EquipmentProps): HTMLElement {
       } else {
         props.onSelectDetail(eq.id);
       }
-    }, currentEquipmentId);
+    }, currentEquipmentId, props.dense && !props.pickerContext);
     if (selecting) {
       card.classList.add("equip-card--selectable");
       if (isEquipped(eq) || eq.locked) card.classList.add("equip-card--locked");
@@ -402,10 +577,22 @@ function renderList(props: EquipmentProps): HTMLElement {
     ].filter((node): node is HTMLElement => node !== null));
   };
 
+  /*
+   * 装備は**モンスターより1枚が小さく、1画面に多く入る。**
+   * 共通の既定(24枚)だと2列で12行しか出ず、
+   * 手持ちを見比べるのに何度も「さらに表示」を押すことになっていた。
+   * 装備だけ1回ぶんを倍(48枚)にする
+   * (所持400個で測って、開くのに 8.5ms → 14ms・ノード 784 → 1,500 程度)。
+   *
+   * 装備を選びに来た時(picker)は1枚の札が差分と強化ボタンを抱えて背が高いので、
+   * 一覧と同じ枚数にすると重くなる。こちらは既定のままにする。
+   */
   const equipmentGrid = createIncrementalGrid({
-    className: "equip-grid",
+    className: `equip-grid${props.dense && !props.pickerContext ? " equip-grid--dense" : ""}`,
     items,
     renderItem,
+    initialCount: props.pickerContext ? undefined : EQUIPMENT_LIST_PAGE_SIZE,
+    batchSize: props.pickerContext ? undefined : EQUIPMENT_LIST_PAGE_SIZE,
     moreLabel: (shown, total) => `装備をさらに表示（${shown} / ${total}）`,
   });
 
@@ -447,6 +634,15 @@ function renderList(props: EquipmentProps): HTMLElement {
     ]),
     toolbar,
     props.pickerContext ? null : renderSlotFilterRow(props),
+    // 絞り込みは picker では出さない(その枠に着く物しか並んでいないため)
+    props.pickerContext ? null : renderEquipmentFilterBar({
+      all: props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter),
+      shownCount: items.length,
+      filter: props.filter,
+      open: props.filterOpen,
+      onToggleOpen: props.onToggleFilterOpen,
+      onChange: props.onChangeFilter,
+    }),
     renderSortRow(props),
     selecting ? renderBulkBar(props, items) : null,
     el("section", { className: "panel" }, [
@@ -481,12 +677,17 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
         "data-star": String(equipment.star),
         "data-set": equipment.set,
         "data-tier": equipment.level >= 12 ? "max" : equipment.level >= 6 ? "mid" : "low",
+        ...equipmentRarityAttrs(equipment),
       },
       [
         el("div", { className: "equip-detail__top" }, [
           el("div", { className: "equip-detail__sigil" }, [icon(slotIcon(equipment.slot))]),
           el("div", { className: "equip-detail__ident" }, [
-            el("div", { className: "equip-detail__star" }, ["★".repeat(equipment.star)]),
+            // ★は基礎性能、レア度は伸びしろ。別の物なので並べて出す
+            el("div", { className: "equip-detail__grade" }, [
+              el("span", { className: "equip-detail__star" }, ["★".repeat(equipment.star)]),
+              equipmentRarityTag(equipment, "lg"),
+            ]),
             el("div", { className: "equip-detail__set" }, [`${SET_LABEL[equipment.set]}シリーズ`]),
             el("div", { className: "equip-detail__main" }, [formatStatValue(equipment.mainStat)]),
           ]),
