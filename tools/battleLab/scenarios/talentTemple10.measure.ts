@@ -95,13 +95,6 @@ const GUARD_CRYSTAL_SKILLS: [Skill, Skill, Skill] = [
   },
 ];
 
-/**
- * 本案の「才能適応」と護晶撃破後の15%軽減を、Battle Labが既に許している
- * mitigateAmount/mitigateTurnsだけで再現する。ダメージ式そのものは本編エンジンのまま。
- *
- * 攻晶撃破後の「防御20%無視」だけは実行時に traits を差し替える口が無いため、
- * 初回測定では近い圧として boss ATK +1000 で代理する。
- */
 const talentHook: ScenarioHook = ({ unitOf, aliveOf }) => {
   const boss = unitOf("E1");
   const adapt = new Map<string, number>();
@@ -164,8 +157,8 @@ export const TALENT_TEMPLE_10_MEASURE: Scenario = {
       templateId: "ancient_beast",
       element: "LIGHT",
       stats: {
-        hp: 230_000,
-        atk: 8_000,
+        hp: 180_000,
+        atk: 9_500,
         def: 4_000,
         spd: 185,
         criRate: 0.2,
@@ -175,8 +168,8 @@ export const TALENT_TEMPLE_10_MEASURE: Scenario = {
       },
       skills: BOSS_SKILLS,
       victoryTarget: true,
-      // 塔60Fの3.5倍単体反撃より穏やかに、6ヒットごとにS2を返す。
-      bossTraits: { counterAfterHits: 6, counterSkillIndex: 1 },
+      // 周回向け最終候補。5ヒットごとにS2「全体1.1倍＋ゲージ20%吸収」を返す。
+      bossTraits: { counterAfterHits: 5, counterSkillIndex: 1 },
     },
     {
       label: "才能晶・攻",
@@ -193,7 +186,7 @@ export const TALENT_TEMPLE_10_MEASURE: Scenario = {
         resistance: 0.3,
       },
       skills: ATTACK_CRYSTAL_SKILLS,
-      // 「防御20%無視」の初回代理。さらに両晶撃破で速度+20になるよう半分の+10を持たせる。
+      // 本番案の「防御20%無視」は測定口がないためATK+1000で近似。
       bossTraits: { empowerBossOnDeath: { atk: 1_000, spd: 10 } },
     },
     {
