@@ -5,8 +5,7 @@ import { TALENT_TEMPLE_10_MEASURE } from "../tools/battleLab/scenarios/talentTem
 const RUNS = 1000;
 const SEED = 20260906;
 
-function measure(name: string, order: string[]) {
-  const rows = runMany(TALENT_TEMPLE_10_MEASURE, SEED, RUNS, order, "TYPICAL");
+function summarize(name: string, rows: ReturnType<typeof runMany>) {
   const wins = rows.filter((r) => r.winner === "PLAYER").length;
   const losses = rows.filter((r) => r.winner === "ENEMY").length;
   const draws = rows.filter((r) => r.winner === "DRAW").length;
@@ -21,13 +20,13 @@ function measure(name: string, order: string[]) {
     return acc;
   }, {});
 
-  const result = {
+  return {
     name,
-    runs: RUNS,
+    runs: rows.length,
     wins,
     losses,
     draws,
-    winRate: wins / RUNS,
+    winRate: wins / rows.length,
     avgTurns: Number(avgTurns.toFixed(1)),
     avgSurvivors: Number(avgSurvivors.toFixed(2)),
     avgBossHpLeft: Math.round(avgBossHpLeft),
@@ -35,6 +34,11 @@ function measure(name: string, order: string[]) {
     guardAwakenRate: Number(guardAwakenRate.toFixed(3)),
     lossesByReason,
   };
+}
+
+function measure(name: string, order: string[]) {
+  const rows = runMany(TALENT_TEMPLE_10_MEASURE, SEED, RUNS, order, "TYPICAL");
+  const result = summarize(name, rows);
   console.log(`TALENT10_MEASURE ${JSON.stringify(result)}`);
   return result;
 }
@@ -50,6 +54,29 @@ describe("才能の神殿10F 仮測定", () => {
 
     const results = patterns.map(([name, order]) => measure(name, [...order]));
     expect(results).toHaveLength(4);
-    expect(results.every((r) => r.runs === RUNS)).toBe(true);
+  }, 240_000);
+
+  test("ボス攻撃力×速度を300戦ずつ振って60〜70%の帯を探す", () => {
+    const attacks = [8_000, 9_000, 10_000, 11_000];
+    const speeds = [180, 200, 220];
+    const focus = ["才能神獣 アルケオス"];
+    const results = [];
+
+    for (const atk of attacks) {
+      for (const spd of speeds) {
+        const scenario = {
+          ...TALENT_TEMPLE_10_MEASURE,
+          enemies: TALENT_TEMPLE_10_MEASURE.enemies.map((enemy, index) => index === 0
+            ? { ...enemy, stats: { ...enemy.stats, atk, spd } }
+            : enemy),
+        };
+        const rows = runMany(scenario, SEED + atk + spd, 300, focus, "TYPICAL");
+        const result = summarize(`atk${atk}-spd${spd}`, rows);
+        console.log(`TALENT10_SWEEP ${JSON.stringify(result)}`);
+        results.push(result);
+      }
+    }
+
+    expect(results).toHaveLength(12);
   }, 240_000);
 });
