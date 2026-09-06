@@ -26,10 +26,14 @@ export type CrystalShopKind =
   | "GOLD"
   | "REINCARNATION_PIG"
   | "FOUR_STAR_SCROLL"
-  | "LIGHT_DARK_SCROLL";
+  | "LIGHT_DARK_SCROLL"
+  /* --- 才能覚醒の素材。**どれも無制限** --- */
+  | "AWAKENING_SHARD"
+  | "AWAKENING_CRYSTAL"
+  | "AWAKENING_STONE";
 
 /** 棚の並び。カテゴリごとに区切って出す */
-export type CrystalShopCategory = "GOLD" | "TRAINING" | "SUMMON";
+export type CrystalShopCategory = "GOLD" | "TRAINING" | "SUMMON" | "TALENT";
 
 export interface CrystalShopItem {
   id: string;
@@ -124,12 +128,58 @@ export const CRYSTAL_SHOP_ITEMS: readonly CrystalShopItem[] = [
     category: "SUMMON", kind: "LIGHT_DARK_SCROLL", amount: 1,
     price: 700, period: "MONTHLY", limit: 1,
   },
+  /*
+   * --- 才能覚醒の素材。**無制限で常設** ---
+   *
+   * 値付けは深域の周回より**明確に重い。**ここで揃うようにすると、
+   * 深域そのものを回る理由が消える。
+   * 足りない最後のひと押しを買う場所で、集める場所ではない。
+   *
+   * 奇石だけ桁が違うのは、**スキル覚醒が1体に1つだけ**だから。
+   * 何度も買うものではなく、「どうしても今日決めたい」時の1個。
+   */
+  {
+    id: "awakening_shard_50",
+    name: "目覚の欠片 ×50",
+    note: "才能ptの解放にいちばん多く要る",
+    category: "TALENT", kind: "AWAKENING_SHARD", amount: 50,
+    price: 300, period: "UNLIMITED",
+  },
+  {
+    id: "awakening_shard_100",
+    name: "目覚の欠片 ×100",
+    note: "まとめ買いのぶん少し軽い",
+    category: "TALENT", kind: "AWAKENING_SHARD", amount: 100,
+    price: 550, period: "UNLIMITED",
+  },
+  {
+    id: "awakening_crystal_10",
+    name: "目覚の結晶 ×10",
+    note: "8pt目から要り始める",
+    category: "TALENT", kind: "AWAKENING_CRYSTAL", amount: 10,
+    price: 400, period: "UNLIMITED",
+  },
+  {
+    id: "awakening_crystal_30",
+    name: "目覚の結晶 ×30",
+    note: "まとめ買いのぶん少し軽い",
+    category: "TALENT", kind: "AWAKENING_CRYSTAL", amount: 30,
+    price: 1_000, period: "UNLIMITED",
+  },
+  {
+    id: "awakening_stone_1",
+    name: "目覚の奇石 ×1",
+    note: "スキル覚醒に3個要る。深域7階から先でしか落ちない",
+    category: "TALENT", kind: "AWAKENING_STONE", amount: 1,
+    price: 1_500, period: "UNLIMITED",
+  },
 ];
 
 export const CRYSTAL_SHOP_CATEGORY_LABEL: Record<CrystalShopCategory, string> = {
   GOLD: "ゴールド",
   TRAINING: "育成",
   SUMMON: "召喚",
+  TALENT: "才能覚醒",
 };
 
 export function findCrystalShopItem(id: string): CrystalShopItem | undefined {

@@ -1,7 +1,7 @@
 import { SET_LABEL, SLOT_LABEL, formatStatValue } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState, ShopView } from "../../game/playerState.js";
-import { SHOP_MAX_SLOTS, ShopEntry, msUntilRotation } from "../../game/shop.js";
+import { AWAKENING_MATERIAL_LABEL, SHOP_MAX_SLOTS, ShopEntry, msUntilRotation } from "../../game/shop.js";
 import { CRYSTAL_SHOP_CATEGORY_LABEL, CrystalShopCategory } from "../../data/crystalShop.js";
 import { CrystalShopRow } from "../../game/crystalShop.js";
 import { el } from "../dom.js";
@@ -80,12 +80,33 @@ function renderScrollBody(entry: Extract<ShopEntry, { kind: "SCROLL" }>): HTMLEl
   ];
 }
 
+/**
+ * 才能覚醒の素材の札。
+ *
+ * **どの素材かが一目で分かるように色を分ける。**
+ * 欠片・結晶・奇石は用途がはっきり違い(pt解放 / 8pt目から / スキル覚醒)、
+ * 見分けがつかないと「持っているのに買ってしまう」が起きる。
+ */
+function renderAwakeningBody(entry: Extract<ShopEntry, { kind: "AWAKENING_MATERIAL" }>): HTMLElement[] {
+  const emoji = entry.material === "shards" ? "🔹" : entry.material === "crystals" ? "💠" : "🌟";
+  const sub = entry.material === "shards" ? "才能ptの解放に"
+    : entry.material === "crystals" ? "才能ptの8つ目から" : "スキル覚醒に3個";
+  return [
+    el("div", { className: `shop-card__icon shop-card__icon--awakening shop-card__icon--${entry.material}` }, [emoji]),
+    el("div", { className: "shop-card__title" }, [`${AWAKENING_MATERIAL_LABEL[entry.material]} ×${entry.count}`]),
+    el("div", { className: "shop-card__sub" }, [sub]),
+  ];
+}
+
 function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElement {
   const purchased = props.shop.purchasedSlots.includes(index);
   const affordable = props.player.gold >= entry.price;
 
   const body =
-    entry.kind === "EQUIPMENT" ? renderEquipmentBody(entry) : entry.kind === "MONSTER" ? renderMonsterBody(entry) : renderScrollBody(entry);
+    entry.kind === "EQUIPMENT" ? renderEquipmentBody(entry)
+      : entry.kind === "MONSTER" ? renderMonsterBody(entry)
+        : entry.kind === "AWAKENING_MATERIAL" ? renderAwakeningBody(entry)
+          : renderScrollBody(entry);
 
   const buyLabel = purchased ? "購入済み" : entry.price.toLocaleString("ja-JP");
 

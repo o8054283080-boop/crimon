@@ -4,6 +4,7 @@ import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requ
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { createDefaultTalentState } from "../core/talents.js";
+import { AWAKENING_MATERIAL_LABEL } from "./shop.js";
 import { Star } from "../core/rarity.js";
 import type { ArenaDefenseSnapshot, ArenaMatchRecord } from "./arena/types.js";
 import { GOLD_DUNGEON_DAILY_LIMIT } from "../data/goldDungeon.js";
@@ -1198,6 +1199,13 @@ export function buyShopEntry(state: PlayerState, slotIndex: number, now = Date.n
     case "SCROLL":
       addSummonScrolls(state, entry.count);
       return { ok: true, label: `召喚の書を${entry.count}個購入しました` };
+    case "AWAKENING_MATERIAL": {
+      const label = AWAKENING_MATERIAL_LABEL[entry.material];
+      if (entry.material === "shards") state.awakeningShards = (state.awakeningShards ?? 0) + entry.count;
+      else if (entry.material === "crystals") state.awakeningCrystals = (state.awakeningCrystals ?? 0) + entry.count;
+      else state.awakeningStones = (state.awakeningStones ?? 0) + entry.count;
+      return { ok: true, label: `${label}を${entry.count}個購入しました` };
+    }
   }
 }
 

@@ -29,7 +29,7 @@ function richState(crystal = 100_000) {
 }
 
 describe("棚の中身", () => {
-  it("依頼どおりの7品が、指定の値段と上限で並んでいる", () => {
+  it("依頼どおりの品が、指定の値段と上限で並んでいる", () => {
     const expected = [
       { id: "gold_200k", price: 100, period: "UNLIMITED", limit: undefined },
       { id: "gold_1200k", price: 500, period: "UNLIMITED", limit: undefined },
@@ -38,6 +38,16 @@ describe("棚の中身", () => {
       { id: "reincarnation_pig_4_max", price: 400, period: "MONTHLY", limit: 1 },
       { id: "four_star_scroll", price: 350, period: "MONTHLY", limit: 2 },
       { id: "light_dark_scroll", price: 700, period: "MONTHLY", limit: 1 },
+      /*
+       * 才能覚醒の素材。**どれも無制限で常設。**
+       * 値付けは深域を回るより明確に重い——ここで揃うようにすると、
+       * 深域そのものを回る理由が消える。
+       */
+      { id: "awakening_shard_50", price: 300, period: "UNLIMITED", limit: undefined },
+      { id: "awakening_shard_100", price: 550, period: "UNLIMITED", limit: undefined },
+      { id: "awakening_crystal_10", price: 400, period: "UNLIMITED", limit: undefined },
+      { id: "awakening_crystal_30", price: 1_000, period: "UNLIMITED", limit: undefined },
+      { id: "awakening_stone_1", price: 1_500, period: "UNLIMITED", limit: undefined },
     ];
     expect(CRYSTAL_SHOP_ITEMS).toHaveLength(expected.length);
     for (const want of expected) {
@@ -54,7 +64,10 @@ describe("棚の中身", () => {
      * **手に入らない物を棚に置くと、買えたのに何も増えない**が起きる。
      */
     const kinds = new Set(CRYSTAL_SHOP_ITEMS.map((item) => item.kind));
-    expect([...kinds].sort()).toEqual(["FOUR_STAR_SCROLL", "GOLD", "LIGHT_DARK_SCROLL", "REINCARNATION_PIG"]);
+    expect([...kinds].sort()).toEqual([
+      "AWAKENING_CRYSTAL", "AWAKENING_SHARD", "AWAKENING_STONE",
+      "FOUR_STAR_SCROLL", "GOLD", "LIGHT_DARK_SCROLL", "REINCARNATION_PIG",
+    ]);
   });
 
   it("まとめ買いほど1ダイヤあたりが得になる", () => {
