@@ -1,3 +1,4 @@
+import "../ui/battleSurrender.css";
 import { BattleEngine, BattleEvent, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
 import { formatHpPair } from "../../core/stats.js";
 import { BattleUnit } from "../../battle/unit.js";
@@ -43,6 +44,18 @@ export interface BattleViewProps {
    * 省略すると、敵チームで最も多い属性から舞台が決まる。
    */
   venue?: BattleVenue;
+  /**
+   * 自分から負けを選べるか。**既定は選べる。**
+   *
+   * 耐久寄りの編成で塔の上の階へ挑むと、**どちらも倒しきれずに
+   * 数百手まで伸びる**戦いになる(100階の実測で224手・引き分け15%)。
+   * 手を止める術が無いと、その戦いは閉じるまで終わらない。
+   *
+   * **対人戦だけは渡さない(false)。**勝敗はサーバが同じ種で戦闘を
+   * 再現して決めるので、こちらで敗北にしても向こうは勝ちのまま進む。
+   * 画面とサーバが別の結末を持つ状態を作らない。
+   */
+  canSurrender?: boolean;
 }
 
 export interface BattleViewHandle {
@@ -127,6 +140,7 @@ const HUD_MIN_SCALE = 0.88;
 
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish, chain, venue } = props;
+  const canSurrender = props.canSurrender !== false;
 
   let mode: "AUTO" | "MANUAL" = "AUTO";
   let userPaused = false;
@@ -756,20 +770,30 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     maybeScheduleTick();
   }
 
-  function showResult(winner: BattleWinner): void {
+  function showResult(winner: BattleWinner, surrendered = false): void {
     finished = true;
     userPaused = true;
     stopTimer();
     setActive(null);
     picker = { phase: "NONE" };
     renderActionPanel();
+    disarmSurrender();
+    surrenderBtn?.classList.add("battle-surrender-btn--gone");
     resultBanner.classList.remove("result-banner--hidden");
     resultBanner.textContent = "";
     if (winner === "PLAYER") playSfx("victory");
     else if (winner === "ENEMY") playSfx("defeat");
     // 勝った側が小さく跳ねる。引き分けはどちらも跳ねない
     if (winner === "PLAYER" || winner === "ENEMY") stage.playVictoryMotion(winner);
-    const text = winner === "PLAYER" ? "🎉 勝利！" : winner === "ENEMY" ? "💀 敗北…" : "🤝 引き分け";
+    /*
+     * **自分でやめた時は「敗北」と書かない。**
+     * 扱いは負けと同じでも、押した本人にとっては起きたことが違う。
+     * 負けた覚えのない「💀 敗北…」を見せられると、
+     * 何かの不具合で落とされたようにしか読めない。
+     */
+    const text = surrendered
+      ? "🏳 諦めました"
+      : winner === "PLAYER" ? "🎉 勝利！" : winner === "ENEMY" ? "💀 敗北…" : "🤝 引き分け";
     resultBanner.append(el("div", { className: "result-banner__text" }, [text]));
     finishBtn.textContent = resultLabel(winner);
     finishBtn.classList.remove("battle-controls__finish--hidden");
@@ -845,8 +869,16 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
         userPaused = !userPaused;
         playPauseBtn.textContent = userPaused ? "▶" : "⏸";
         playPauseBtn.setAttribute("title", userPaused ? "再生" : "一時停止");
-        if (!userPaused) maybeScheduleTick();
-        else stopTimer();
+        /*
+         * 諦めるは止まっている間だけ出す。
+         * 再開したら確認の途中でも畳む——止めて考え直した結果として
+         * 再生を押しているので、その手はもう「やめない」という意思表示。
+         */
+        surrenderBtn?.classList.toggle("battle-surrender-btn--gone", !userPaused);
+        if (!userPaused) {
+          disarmSurrender();
+          maybeScheduleTick();
+        } else stopTimer();
       },
     },
     ["⏸"],
@@ -921,6 +953,73 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       )
     : null;
 
+  /*
+   * 諦める。**一時停止した時だけ現れる。**
+   *
+   * 耐久寄りの編成で上の階へ挑むと、どちらも倒しきれないまま
+   * 数百手まで伸びる戦いになる(100階の実測で224手・引き分け15%)。
+   * 手を止める術が無いと、その戦いはアプリを閉じるまで終わらない。
+   *
+   * ## なぜ常設しないか
+   *
+   * **上帯に置き場所が無い。**実測(390px)で、塔100階の
+   * 「塔 100階 癒やしの階」は諦めるボタンが無くても21px削れており、
+   * 常設すると**61px削れて「塔 100階 癒…」になる。**
+   * 階の呼び名は、その階で何が起きるか(癒やし・守り・群れ・疾風)を
+   * 伝える攻略の情報で、戦っている間ずっと要る。
+   *
+   * 止まっている間だけなら、場所の名前が縮んでも失うものが無い。
+   * そして**終わらないと感じた人は、まず⏸を押す。**
+   * 探す場所と置く場所が一致している。
+   *
+   * ## なぜそれでも2段階か
+   *
+   * 一時停止は戦況を見るためにも押す。その状態で隣に並ぶので、
+   * 1度目で「やめる?」に変わり、もう1度押して確定する。
+   * 5秒触らなければ元へ戻すので、間違えて押しても放っておけばいい。
+   *
+   * 別窓の確認は出さない。この画面の浮遊パネルは、これまで3回とも
+   * 下の何かを覆って押せないボタンを作っている。
+   */
+  let surrenderArmed: ReturnType<typeof setTimeout> | null = null;
+
+  function disarmSurrender(): void {
+    if (surrenderArmed !== null) clearTimeout(surrenderArmed);
+    surrenderArmed = null;
+    surrenderBtn?.classList.remove("battle-surrender-btn--armed");
+    if (surrenderBtn) surrenderBtn.textContent = "🏳 諦める";
+  }
+
+  const surrenderBtn = canSurrender
+    ? el(
+        "button",
+        {
+          type: "button",
+          className: "battle-surrender-btn battle-surrender-btn--gone",
+          title: "この戦いを諦める(負け扱いになります)",
+          onclick: () => {
+            if (finished) return;
+            if (surrenderArmed === null) {
+              surrenderBtn!.classList.add("battle-surrender-btn--armed");
+              surrenderBtn!.textContent = "本当にやめる?";
+              surrenderArmed = setTimeout(disarmSurrender, 5000);
+              return;
+            }
+            clearTimeout(surrenderArmed);
+            surrenderArmed = null;
+            /*
+             * **周回に入っていたら、そこで打ち切る。**
+             * 1戦を諦めただけのつもりで、次の1戦が始まってしまうのでは
+             * 何も解決しない(そもそも止めたくて押している)。
+             */
+            if (chain && !chain.stopped) chain.onStop();
+            showResult("ENEMY", true);
+          },
+        },
+        ["🏳 諦める"],
+      )
+    : null;
+
   const finishBtn = el(
     "button",
     { type: "button", className: "btn btn--primary battle-controls__finish battle-controls__finish--hidden" },
@@ -955,7 +1054,20 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     handleStageTap(event);
   });
 
+  /*
+   * 諦めるは**上帯の中に入れない。**
+   *
+   * 一度は操作の列へ並べたが、実測(390px・周回の札あり)で
+   * 塔100階の「塔 100階 癒やしの階」が**36pxまで潰れた**
+   * (確認の「本当にやめる?」に変わると5px——ほぼ消える)。
+   * 階の呼び名は攻略の情報なので、ここを削ってまで置く場所ではない。
+   *
+   * 上帯の**直下・右**へ移す。左のログ帯とちょうど対角で、
+   * どちらとも重ならない。戦場の上ではあるが、
+   * **止まっている間だけ出る**ので、敵を指す邪魔もその間だけになる。
+   */
   stageHost.append(topBar, actionPanelEl, skillDock, logStrip);
+  if (surrenderBtn) stageHost.append(surrenderBtn);
 
   const container = el("div", { className: "screen battle-view" }, [stageHost, resultBanner, finishBtn]);
 

@@ -2573,6 +2573,14 @@ function renderCurrentArenaBattle(): BattleViewHandle {
     venue: "duel",
     resultLabel: (winner) => (winner === "PLAYER" ? "🏆 結果を見る" : "アリーナに戻る"),
     onFinish: (winner) => finishArenaMatch(winner === "PLAYER"),
+    /*
+     * **対人戦だけは諦められない。**
+     *
+     * 勝敗はサーバが同じ種で戦闘を再現して決める。こちらで負けにしても
+     * 向こうは勝ちのまま進むので、画面とサーバが別の結末を持つことになる。
+     * 対人戦は4対4で必ず決着が付き、長引く戦いにもならない。
+     */
+    canSurrender: false,
   });
 }
 
