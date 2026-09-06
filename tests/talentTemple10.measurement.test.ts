@@ -70,7 +70,7 @@ describe("才能の神殿10F 仮測定", () => {
                 ...enemy,
                 stats: { ...enemy.stats, hp, atk: 8_000, spd: 185 },
                 // 3.5倍単体反撃ではなく、S2「全体1.1倍＋ゲージ20%吸収」を返す。
-                bossTraits: { counterAfterHits, counterSkillIndex: 1 },
+                bossTraits: { counterAfterHits, counterSkillIndex: 1 as const },
               }
             : enemy),
         };
