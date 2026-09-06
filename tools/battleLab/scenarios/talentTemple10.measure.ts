@@ -22,7 +22,6 @@ const BOSS_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 1.1 },
-      // 本案の「20%減少＋成功1体につき自分+5%」に近い既存機構として、まず20%吸収で測る。
       { kind: "GAUGE", amount: 0.2, drain: true },
     ],
   },
@@ -165,10 +164,10 @@ export const TALENT_TEMPLE_10_MEASURE: Scenario = {
       templateId: "ancient_beast",
       element: "LIGHT",
       stats: {
-        hp: 180_000,
-        atk: 7_000,
+        hp: 230_000,
+        atk: 8_000,
         def: 4_000,
-        spd: 170,
+        spd: 185,
         criRate: 0.2,
         criDmg: 1.6,
         accuracy: 0.35,
@@ -176,6 +175,8 @@ export const TALENT_TEMPLE_10_MEASURE: Scenario = {
       },
       skills: BOSS_SKILLS,
       victoryTarget: true,
+      // 塔60Fの3.5倍単体反撃より穏やかに、6ヒットごとにS2を返す。
+      bossTraits: { counterAfterHits: 6, counterSkillIndex: 1 },
     },
     {
       label: "才能晶・攻",
