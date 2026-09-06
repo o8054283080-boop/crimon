@@ -25,6 +25,8 @@ describe("将来の個体育成データ", () => {
       latentReselectPending: false,
       // 1点も振っていないので未確定。ここから無料で配れる
       abilityPointsConfirmed: false,
+      // 才能覚醒も白紙から。**素材を1つも買っていない状態**
+      talents: { schemaVersion: 1, unlockedPoints: 0, basic: {}, battle: {}, skill: { 1: [], 2: [] }, awakening: null },
     });
   });
 });

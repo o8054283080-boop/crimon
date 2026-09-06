@@ -75,6 +75,14 @@ export type EffectCondition =
   | "TARGET_HP_ABOVE_SELF"
   /** 対象の行動ゲージが20%以下 */
   | "TARGET_GAUGE_BELOW_20"
+  /**
+   * 対象の行動ゲージが50%以上。
+   *
+   * **「もうすぐ動く相手」を狙い撃つための条件。**
+   * 才能覚醒の「高ゲージ特攻」「連続抑制」が使う。遅延は、
+   * ゲージが溜まっている相手に当ててこそ手番を1つ奪える。
+   */
+  | "TARGET_GAUGE_ABOVE_50"
   /** 対象に弱体効果が2個以上 */
   | "TARGET_DEBUFF_AT_LEAST_2"
   /** 対象に弱体効果が3個以上 */
@@ -189,6 +197,11 @@ export interface DamageEffect {
   gaugeOnCritPerHit?: number;
   /** 同じスキルで奪った強化効果1個につき乗る最終ダメージの上乗せ(上限必須) */
   stolenBuffBonus?: { perBuff: number; maxBonus: number };
+  /**
+   * この効果のクリティカル率への上乗せ。**才能覚醒の「会心補助」が使う。**
+   * 個体のクリ率ではなく、この一撃だけが会心しやすくなる。
+   */
+  critRateBonus?: number;
 }
 
 export interface HealEffect {
@@ -209,6 +222,12 @@ export interface HealEffect {
    * バフの applyTo と同じ書き方に揃えてある。
    */
   applyTo?: EffectApplyTo;
+  /**
+   * 受け手のHPがこの割合以下なら、回復量をさらに増やす。
+   * **才能覚醒の「緊急回復」「緊急治療」が使う。**
+   * `extra` は元の回復量に対する上乗せ(0.15 で +15%)。
+   */
+  lowHpExtra?: { hpRatio: number; extra: number };
 }
 
 /** ライフスティール: 同じスキルのDAMAGE効果で与えたダメージの一部を自身が回復する */
@@ -488,6 +507,11 @@ export interface CleanseEffect {
   count?: number;
   /** 適用先。省略時はスキルの対象 */
   applyTo?: EffectApplyTo;
+  /**
+   * 解除を試みる確率(0〜1)。省略時は必ず解除する。
+   * **才能覚醒の「浄化補助」(50%で1個)が使う。**
+   */
+  chance?: number;
 }
 
 /**
@@ -592,6 +616,61 @@ export interface Skill {
    * 静的なスキル定義には無く、個体から作った戦闘用の定義にだけ入る。
    */
   passiveLevel?: number;
+  /**
+   * 才能覚醒がこの枠へ足した、**効果の組み替えでは書けない振る舞い。**
+   *
+   * 静的なスキル定義には無く、個体から作った戦闘用の定義にだけ入る
+   * (`applySkillTalents` が焼き込む)。エンジンはここだけを読めばよく、
+   * 才能が増えても分岐は増えない。
+   */
+  talentMods?: SkillTalentMods;
+}
+
+/**
+ * 才能覚醒がスキルへ載せる特別な振る舞い。
+ *
+ * **ここに入るのは「効果の配列に足す」では表せないものだけ。**
+ * 威力+10%やゲージ+10%は普通の効果として足せるので、ここには来ない。
+ */
+export interface SkillTalentMods {
+  /** このスキルだけ、対象の状態異常抵抗をこの割合ぶん低く扱う */
+  ignoreResistance?: number;
+  /** このスキルが張ったシールドが乗っている間の被ダメージ軽減 */
+  shieldMitigate?: number;
+  /** このスキルが張ったシールドが乗っている間、受けたダメージのこの割合を反射する */
+  shieldReflect?: number;
+  /** シールド付与と同時に、対象を最大HPのこの割合だけ回復する */
+  shieldHeal?: number;
+  /** 弱体の付与に成功した時、術者の行動ゲージを進める */
+  selfGaugeOnDebuff?: number;
+  /** 弱体の付与に成功した時、対象の行動ゲージを減らす */
+  targetGaugeOnDebuff?: number;
+  /** 攻撃が命中した時、確率で対象のゲージを奪って術者へ移す */
+  gaugeSteal?: { chance: number; value: number };
+  /** 単体の弱体が成功した時、確率でランダムな別の敵1体へ1つ波及する */
+  debuffSpreadChance?: number;
+  /** 単体回復の時、他の味方も本来回復量のこの割合で回復する */
+  healSplash?: number;
+  /** 最もゲージが低い別の味方にも、この量だけ行動ゲージを配る */
+  gaugeChain?: number;
+  /** 減らした相手のゲージのうち、この割合を術者が得る */
+  gaugeDrainShare?: number;
+  /** 使用後、確率でこのスキルのクールタイムを1縮める */
+  cooldownRefundChance?: number;
+  /** 使用後、確率でスキル1を追加で使う */
+  followUpS1Chance?: number;
+  /** 使用時、確率で追加ターンを得る */
+  extraTurnChance?: number;
+  /** このスキルが付ける強化の持続を、確率で1ターン延ばす */
+  buffExtendChance?: number;
+  /** このスキルが付ける弱体の持続を、確率で1ターン延ばす */
+  debuffExtendChance?: number;
+  /** このスキルが張るシールドの持続を、確率で1ターン延ばす */
+  shieldExtendChance?: number;
+  /** 条件を満たす相手にだけ、弱体の基礎発動率へ足す */
+  debuffChanceWhen?: readonly { when: EffectCondition; value: number }[];
+  /** 強化されている味方の与ダメージを、この量だけ上げる */
+  buffedAllyDamage?: { value: number; turns: number };
 }
 
 /** そのスキルがパッシブか */
@@ -764,6 +843,7 @@ export const EFFECT_CONDITION_JA: Record<EffectCondition, string> = {
   TARGET_HP_BELOW_30: "対象のHPが30%以下なら",
   TARGET_HP_ABOVE_SELF: "対象のHP割合が自身より高いなら",
   TARGET_GAUGE_BELOW_20: "対象の行動ゲージが20%以下なら",
+  TARGET_GAUGE_ABOVE_50: "対象の行動ゲージが50%以上なら",
   TARGET_DEBUFF_AT_LEAST_2: "対象の弱体効果が2個以上なら",
   TARGET_DEBUFF_AT_LEAST_3: "対象の弱体効果が3個以上なら",
   SELF_HP_ABOVE_50: "自身のHPが50%以上なら",

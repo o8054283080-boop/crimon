@@ -39,6 +39,8 @@ export interface HomeProps {
   onGoEquipDungeon: () => void;
   onGoLevelDungeon: () => void;
   onGoGoldDungeon: () => void;
+  /** 目覚の深域(才能覚醒の素材) */
+  onGoAwakeningDepth: () => void;
   onGoArena: () => void;
   onGoTrialTower: () => void;
   onGoHowToPlay: () => void;
@@ -88,8 +90,10 @@ export function homeUtilityActions(props: Pick<HomeProps, "onGoArena" | "onGoSho
 }
 
 /** Dungeon selection belongs to the Home DOM only; navigation state remains untouched. */
-export function dungeonActions(props: Pick<HomeProps, "onGoEquipDungeon" | "onGoLevelDungeon" | "onGoGoldDungeon">): readonly (() => void)[] {
-  return [props.onGoEquipDungeon, props.onGoLevelDungeon, props.onGoGoldDungeon];
+export function dungeonActions(
+  props: Pick<HomeProps, "onGoEquipDungeon" | "onGoLevelDungeon" | "onGoGoldDungeon" | "onGoAwakeningDepth">,
+): readonly (() => void)[] {
+  return [props.onGoEquipDungeon, props.onGoLevelDungeon, props.onGoGoldDungeon, props.onGoAwakeningDepth];
 }
 
 export function tutorialMissionActions(
@@ -906,7 +910,7 @@ export function renderHome(props: HomeProps): HTMLElement {
   );
   const openSettings = () => { settingsSheet.hidden = false; };
   const [onGoArena, onGoShop, onGoHowToPlay] = homeUtilityActions(props);
-  const [onGoEquipDungeon, onGoLevelDungeon, onGoGoldDungeon] = dungeonActions(props);
+  const [onGoEquipDungeon, onGoLevelDungeon, onGoGoldDungeon, onGoAwakeningDepth] = dungeonActions(props);
   const homeAssets: Record<string, string> = {
     "menu-mission": new URL("../assets/home/menu-mission.svg", import.meta.url).href,
     "menu-dex": new URL("../assets/home/menu-dex.svg", import.meta.url).href,
@@ -940,6 +944,12 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("button", { type: "button", "data-tour": "tile:equipDungeon", onclick: onGoEquipDungeon }, [icon("equipDungeon"), el("span", {}, ["装備"])]),
     el("button", { type: "button", "data-tour": "tile:trainDungeon", onclick: onGoLevelDungeon }, [icon("trainDungeon"), el("span", {}, ["育成"])]),
     el("button", { type: "button", "data-tour": "tile:goldDungeon", onclick: onGoGoldDungeon }, [icon("goldDungeon"), el("span", {}, ["ゴールド"])]),
+    /*
+     * 目覚の深域。**才能覚醒の素材を集める場所。**
+     * ここに置くのは、装備・育成・ゴールドと同じ「素材を取りに行く場所」だから。
+     * 才能覚醒そのものはモンスターの詳細から開く。
+     */
+    el("button", { type: "button", "data-tour": "tile:awakeningDepth", onclick: onGoAwakeningDepth }, [icon("trainDungeon"), el("span", {}, ["目覚"])]),
   ]);
   const toggleDungeonChooser = () => { dungeonChooser.hidden = !dungeonChooser.hidden; };
   const rewardText = (mission: (typeof TUTORIAL_MISSIONS)[number]): string => [

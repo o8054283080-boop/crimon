@@ -30,6 +30,7 @@ export function evaluateTargetCondition(condition: EffectCondition, source: Batt
     case "TARGET_HP_BELOW_30": return targetRatio <= 0.3;
     case "TARGET_HP_ABOVE_SELF": return targetRatio > source.currentHp / source.maxHp;
     case "TARGET_GAUGE_BELOW_20": return target.gauge <= 20;
+    case "TARGET_GAUGE_ABOVE_50": return target.gauge >= 50;
     case "TARGET_DEBUFF_AT_LEAST_2": return countDebuffs(target) >= 2;
     case "TARGET_DEBUFF_AT_LEAST_3": return countDebuffs(target) >= 3;
     case "SELF_HP_ABOVE_50": return source.currentHp / source.maxHp >= 0.5;
@@ -58,8 +59,25 @@ export interface DamageResult {
   affinity: ElementAffinity;
 }
 
-export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit): number {
+/**
+ * 才能適応による被ダメージの軽減倍率。
+ *
+ * **同じ相手から連続で攻撃を受けるほど、その相手からのダメージが効かなくなる。**
+ * 段数を進めるのも戻すのも `BattleEngine` の仕事で、ここは今の段を読むだけ
+ * (ダメージ計算はヒットごとに走るので、ここで数えると多段攻撃1回で
+ * 上限まで積み上がってしまう)。
+ */
+export function adaptationMultiplier(attacker: BattleUnit, defender: BattleUnit): number {
+  const trait = defender.def.bossTraits?.talentAdaptation;
+  if (!trait) return 1;
+  const stacks = defender.adaptationStacks?.get(attacker.instanceId) ?? 0;
+  if (stacks <= 0) return 1;
+  return 1 - Math.min(trait.maxReduction, stacks * trait.perStack);
+}
+
+export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit, skillBonus = 0): number {
   const rate = getEffectiveStat(attacker, "criRate")
+    + skillBonus
     + (hasStatus(defender, "CRIT_RATE_UP") ? 0.5 : 0)
     - (hasStatus(defender, "CRIT_RATE_DOWN") ? 0.3 : 0);
   return Math.max(0, Math.min(1, rate));
@@ -77,7 +95,14 @@ export function calcDamage(
   const hpIgnore = [...(effect.targetHpIgnoreDefense ?? [])]
     .sort((a, b) => a.hpRatio - b.hpRatio)
     .find((tier) => defenderRatio <= tier.hpRatio);
-  const ratio = Math.max(0, Math.min(1, Math.max(effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0)));
+  /*
+   * 取り巻きが倒れて手に入れた防御無視も、ここで一緒に見る。
+   * **足すのではなく大きい方を取る**——重ねると、防御役が
+   * どれだけ積んでも意味を持たない相手が出来てしまう。
+   */
+  const ratio = Math.max(0, Math.min(1, Math.max(
+    effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0, attacker.deathBoostDefenseIgnore ?? 0,
+  )));
   const def = getEffectiveStat(defender, "def") * (1 - ratio);
 
   const scaleBonusStatValue = effect.scaleBonus
@@ -139,11 +164,16 @@ export function calcDamage(
   const affinity = getElementAffinity(attacker.def.element, defender.def.element);
   const elementMultiplier = getElementMultiplier(attacker.def.element, defender.def.element);
 
-  const isCrit = rng() < getFinalCritRate(attacker, defender);
+  const isCrit = rng() < getFinalCritRate(attacker, defender, effect.critRateBonus ?? 0);
   const critMultiplier = isCrit ? getEffectiveStat(attacker, "criDmg") : 1;
 
-  const dealtMultiplier = attacker.def.combatMods?.damageDealtMultiplier ?? 1;
-  const takenMultiplier = defender.def.combatMods?.damageTakenMultiplier ?? 1;
+  const dealtMultiplier = (attacker.def.combatMods?.damageDealtMultiplier ?? 1)
+    // 高揚支援。**掛かっている間だけ**乗る
+    * (attacker.damageDealtBonusTurns && attacker.damageDealtBonusTurns > 0
+      ? 1 + (attacker.damageDealtBonus ?? 0) : 1);
+  const takenMultiplier = (defender.def.combatMods?.damageTakenMultiplier ?? 1)
+    * (defender.deathBoostDamageTaken ?? 1)
+    * adaptationMultiplier(attacker, defender);
   // 軽減・パッシブによる被ダメージ減はここでは掛けない。
   // 無敵・シールド・かばうと同じ場所(applyIncomingDamage)で1度だけ掛ける
 

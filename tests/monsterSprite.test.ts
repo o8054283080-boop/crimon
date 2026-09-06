@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { ELEMENTS } from "../src/core/element.js";
 import { ALL_MONSTER_TEMPLATES, EXP_PIG, REINCARNATION_PIG, SKILL_PIG } from "../src/data/monsters.js";
+import { ARCHEOS, TALENT_SHARD_ATK, TALENT_SHARD_DEF } from "../src/data/awakeningDepthsMonsters.js";
 
 /*
  * モンスターの2Dの絵まわり。
@@ -31,6 +32,15 @@ const TEMPLATE_IDS = new Set([
   EXP_PIG.templateId,
   REINCARNATION_PIG.templateId,
   SKILL_PIG.templateId,
+  /*
+   * 目覚の深域の3体も同じ**特別枠**。
+   * 誰も所有できないので召喚にも図鑑にも出さず、
+   * `ALL_MONSTER_TEMPLATES` には入っていない。
+   * ここへ足さないと、正しく置いた絵が「使われない絵」で落ちる。
+   */
+  ARCHEOS.templateId,
+  TALENT_SHARD_ATK.templateId,
+  TALENT_SHARD_DEF.templateId,
 ]);
 const ELEMENT_NAMES = new Set<string>(ELEMENTS);
 /*

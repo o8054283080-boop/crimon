@@ -62,6 +62,31 @@ const SCREENS = [
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
   { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },
+  { name: "目覚の深域", tab: "HOME", tile: "dungeon", tile2: "awakeningDepth" },
+  // 階の詳細。**一覧と詳細は別の作り**なので、入口だけ見ても足りない
+  {
+    name: "目覚の深域/階の詳細", tab: "HOME", tile: "dungeon", tile2: "awakeningDepth",
+    setup: "document.querySelector('.floor-grid > *')?.click()",
+  },
+  /*
+   * クリエイトの5つの欄。**★6が居ないと中身が出ない**欄があるので、
+   * DEV限定の口で1体を★6にしてから開く
+   * (空の画面を検査して「問題なし」と言わないため)。
+   *
+   * 5つとも見るのは、**欄のボタンが全部の欄で共通の帯**だから。
+   * 才能覚醒を足して5つになった時に幅を詰めたら、
+   * 同じ組を借りていたタイプ転生の選択肢が3列になって縦に潰れた。
+   */
+  { name: "クリエイト/スキル継承", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('SKILL')" },
+  { name: "クリエイト/タイプ転生", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TYPE')" },
+  { name: "クリエイト/能力付与", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('ABILITY')" },
+  { name: "クリエイト/潜在覚醒", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('LATENT')" },
+  { name: "クリエイト/才能覚醒(基礎)", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TALENT')" },
+  {
+    name: "クリエイト/才能覚醒(スキル)", tab: "MONSTERS",
+    setup: "window.__crimonDev?.openCreateMenu('TALENT'); await wait(300);"
+      + " [...document.querySelectorAll('.talent-tab')].find(t => /スキル/.test(t.textContent))?.click()",
+  },
   /*
    * アリーナは中でさらに6画面に分かれる。**巡回に入れていなかった。**
    *

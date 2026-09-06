@@ -3,6 +3,7 @@ import { Skill } from "../core/skill.js";
 import { setCreatedSkillResolver } from "../core/monsterInstance.js";
 import { NEW_MONSTER_TEMPLATES, NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES } from "./newMonsters/index.js";
 import { CRIMOARK, CRIMOARK_ATTACK, CRIMOARK_DEBUFF, CRIMOARK_SUPPORT } from "./crimoark.js";
+import { ARCHEOS, TALENT_SHARD_ATK, TALENT_SHARD_DEF } from "./awakeningDepthsMonsters.js";
 
 const SLIME: MonsterTemplate = {
   templateId: "slime",
@@ -2005,6 +2006,16 @@ export const ANCIENT_FANG_BEAST_DEX = createAllVariants(ANCIENT_FANG_BEAST);
  * 図鑑に最終ボスが並び、覚醒の候補IDが全部ずれる。
  */
 export const CRIMOARK_DEX = createAllVariants(CRIMOARK);
+/*
+ * 目覚の深域の敵。**属性は闇で揃えてある。**
+ *
+ * 才能覚醒の素材を集める場所なので、こちらの編成が
+ * どんな属性でも同じ難易度で回れる必要がある。属性を階ごとに変えると、
+ * 相性の良い1体を置くかどうかで周回の速さが変わってしまう。
+ */
+export const ARCHEOS_DEX = createAllVariants(ARCHEOS);
+export const TALENT_SHARD_ATK_DEX = createAllVariants(TALENT_SHARD_ATK);
+export const TALENT_SHARD_DEF_DEX = createAllVariants(TALENT_SHARD_DEF);
 export const CRIMOARK_ATTACK_DEX = createAllVariants(CRIMOARK_ATTACK);
 export const CRIMOARK_SUPPORT_DEX = createAllVariants(CRIMOARK_SUPPORT);
 export const CRIMOARK_DEBUFF_DEX = createAllVariants(CRIMOARK_DEBUFF);
@@ -2053,6 +2064,10 @@ export const TOWER_BOSS_ONLY_DEX = [
   ...CRIMOARK_ATTACK_DEX,
   ...CRIMOARK_SUPPORT_DEX,
   ...CRIMOARK_DEBUFF_DEX,
+  // 目覚の深域の敵も同じ扱い。所有できないので図鑑にも召喚にも出さない
+  ...ARCHEOS_DEX,
+  ...TALENT_SHARD_ATK_DEX,
+  ...TALENT_SHARD_DEF_DEX,
 ];
 
 /**

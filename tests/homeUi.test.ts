@@ -43,8 +43,12 @@ describe("CRIMON world lobby", () => {
   });
 
   it("preserves dungeon callbacks", () => {
-    const callbacks = [vi.fn(), vi.fn(), vi.fn()] as const;
-    dungeonActions({ onGoEquipDungeon: callbacks[0], onGoLevelDungeon: callbacks[1], onGoGoldDungeon: callbacks[2] }).forEach((action) => action());
+    // 目覚の深域を足した。**順番も込みで見る**——並びが入れ替わると別の場所へ飛ぶ
+    const callbacks = [vi.fn(), vi.fn(), vi.fn(), vi.fn()] as const;
+    dungeonActions({
+      onGoEquipDungeon: callbacks[0], onGoLevelDungeon: callbacks[1],
+      onGoGoldDungeon: callbacks[2], onGoAwakeningDepth: callbacks[3],
+    }).forEach((action) => action());
     callbacks.forEach((callback) => expect(callback).toHaveBeenCalledOnce());
   });
 

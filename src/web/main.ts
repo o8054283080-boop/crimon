@@ -16,6 +16,16 @@ import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor, EquipmentDungeonKind, dungeonFloorKey, findDungeonFloorByKey } from "../data/equipmentDungeon.js";
 import { GoldDungeonFloor, GOLD_DUNGEON_FLOORS } from "../data/goldDungeon.js";
+import { AWAKENING_DEPTH_FLOORS, AwakeningDepthFloor, findAwakeningDepthFloor } from "../data/awakeningDepths.js";
+import {
+  exchangeMaterial, grantAwakeningDepthReward, isAwakeningDepthUnlocked,
+} from "../game/awakeningDepths.js";
+import {
+  reconcileSkillTalents, resetTalents, takeBasicTalent, takeBattleTalent, takeSkillAwakening,
+  takeSkillTalent, unlockTalentPoint, type SkillTalentSlot,
+} from "../game/talents.js";
+import { renderAwakeningDepths } from "./views/awakeningDepths.js";
+import { type TalentTab } from "./views/talentAwakening.js";
 import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
@@ -100,6 +110,7 @@ import {
 } from "../game/playerState.js";
 import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
 import { findMonsterById } from "../data/monsters.js";
+import { toBattleDefinition } from "../core/monsterInstance.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
 import { loadMonsterListDense, saveMonsterListDense } from "./monsterListDensity.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
@@ -280,6 +291,13 @@ interface GoldDungeonRunState {
   manualStartedAt: number;
 }
 
+/** 目覚の深域の1戦。ゴールドダンジョンと同じく、持ち越しは無い */
+interface AwakeningDepthRunState {
+  floor: AwakeningDepthFloor;
+  partyInstances: MonsterInstance[];
+  manualStartedAt: number;
+}
+
 /**
  * 直前に挑んだ場所。
  *
@@ -292,6 +310,7 @@ type LastRun =
   | { kind: "EQUIP_DUNGEON"; floor: DungeonFloor }
   | { kind: "LEVEL_DUNGEON"; def: LevelDungeonDef }
   | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor }
+  | { kind: "AWAKENING_DEPTH"; floor: AwakeningDepthFloor }
   | { kind: "ARENA"; entry: ArenaOpponentEntry };
 
 /**
@@ -383,6 +402,15 @@ interface AppState {
   levelDungeonRun: LevelDungeonRunState | null;
   selectedGoldDungeonFloor: number | null;
   goldDungeonRun: GoldDungeonRunState | null;
+  /* --- 目覚の深域と才能覚醒 --- */
+  selectedAwakeningDepthFloor: number | null;
+  awakeningDepthRun: AwakeningDepthRunState | null;
+  /** 才能覚醒を開いている個体 */
+  talentTargetId: string | null;
+  /** 才能覚醒のタブ */
+  talentTab: TalentTab;
+  /** スキル才能で見ている枠(1 = スキル2、2 = スキル3) */
+  talentSkillSlot: SkillTalentSlot;
   selectedDexEntryId: string | null;
   /** 図鑑の並べ替え。66体を番号だけで並べると目当ての1体まで延々たどることになる */
   dexSortKey: DexSortKey;
@@ -522,6 +550,11 @@ const state: AppState = {
   levelDungeonRun: null,
   selectedGoldDungeonFloor: null,
   goldDungeonRun: null,
+  selectedAwakeningDepthFloor: null,
+  awakeningDepthRun: null,
+  talentTargetId: null,
+  talentTab: "BASIC",
+  talentSkillSlot: 1,
   selectedDexEntryId: null,
   dexSortKey: "number",
   dexFilter: { ...EMPTY_DEX_FILTER },
@@ -702,6 +735,9 @@ interface RouteState {
   monsterTrainingTargetId: string | null;
   selectedLevelDungeonTier: LevelDungeonTier | null;
   selectedGoldDungeonFloor: number | null;
+  selectedAwakeningDepthFloor: number | null;
+  talentTargetId: string | null;
+  talentTab: TalentTab;
   createTargetId: string | null;
   createMenu: CreateMenu;
   partyEditMode: PartyEditMode;
@@ -727,7 +763,8 @@ const ROUTE_FIELDS = [
   "equipmentSlotFilter", "equipmentReturnMonsterId", "equipmentSelecting", "farmEquipmentOpen",
   "farmEquipmentDetailId", "selectedStageId", "selectedDifficulty", "selectedDungeonFloor", "selectedDungeonKind",
   "selectedDexEntryId", "monsterTrainingTargetId", "selectedLevelDungeonTier",
-  "selectedGoldDungeonFloor", "createTargetId", "createMenu", "partyEditMode",
+  "selectedGoldDungeonFloor", "selectedAwakeningDepthFloor", "talentTargetId", "talentTab",
+  "createTargetId", "createMenu", "partyEditMode",
   "arenaView", "arenaDetailIndex", "arenaUnitIndex",
 ] as const satisfies readonly (keyof RouteState)[];
 
@@ -1322,6 +1359,9 @@ function lastRunStaminaCost(last: LastRun): number {
       return LEVEL_DUNGEON_STAMINA_COST;
     case "GOLD_DUNGEON":
       return GOLD_DUNGEON_STAMINA_COST;
+    // 深域は階ごとに消費が違う(6〜15)ので、階から引く
+    case "AWAKENING_DEPTH":
+      return last.floor.stamina;
     case "ARENA":
       // アリーナは挑戦券で回すのでスタミナは要らない
       return 0;
@@ -1405,6 +1445,9 @@ function backToLastRunList(): void {
       break;
     case "GOLD_DUNGEON":
       navigate("GOLD_DUNGEON");
+      break;
+    case "AWAKENING_DEPTH":
+      navigate("AWAKENING_DEPTH");
       break;
     case "ARENA":
       /*
@@ -1877,6 +1920,132 @@ function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
   state.lastRun = { kind: "GOLD_DUNGEON", floor };
   state.goldDungeonRun = { floor, partyInstances: party, manualStartedAt: Date.now() };
   state.screen = "GOLD_DUNGEON_BATTLE";
+  render();
+}
+
+/* ==========================================================================
+ * 目覚の深域
+ * ========================================================================== */
+
+function startAwakeningDepthFloor(floor: AwakeningDepthFloor): void {
+  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
+  const party = getParty(state.player);
+  if (party.length === 0) return;
+  if (!isAwakeningDepthUnlocked(state.player, floor.floor)) { playSfx("denied", 0.7); return; }
+  if (!trySpendStamina(state.player, floor.stamina).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  savePlayerState(state.player);
+  state.lastRun = { kind: "AWAKENING_DEPTH", floor };
+  state.awakeningDepthRun = { floor, partyInstances: party, manualStartedAt: Date.now() };
+  state.screen = "AWAKENING_DEPTH_BATTLE";
+  render();
+}
+
+function finishAwakeningDepth(cleared: boolean): void {
+  const run = state.awakeningDepthRun;
+  if (!run) return;
+  const floor = run.floor;
+  if (cleared) {
+    recordManualBattle(
+      state.player.recentManualClearTimes,
+      manualClearKey("AWAKENING_DEPTH", String(floor.floor)),
+      run.manualStartedAt, Date.now(),
+    );
+  }
+  /*
+   * 素材は**勝った時だけ。**負けても消費したスタミナは戻らないが、
+   * それは他のダンジョンと同じ扱い。
+   */
+  const reward = cleared ? grantAwakeningDepthReward(state.player, floor) : null;
+  savePlayerState(state.player);
+  state.awakeningDepthRun = null;
+
+  const materialLines = reward
+    ? [
+        reward.shards > 0 ? `目覚の欠片 ×${reward.shards}` : null,
+        reward.crystals > 0 ? `目覚の結晶 ×${reward.crystals}` : null,
+        reward.stones > 0 ? `目覚の奇石 ×${reward.stones}` : null,
+      ].filter((v): v is string => v !== null)
+    : [];
+
+  state.stageResult = {
+    cleared,
+    stageName: floor.name + (reward?.firstClear ? "(初回クリア)" : ""),
+    goldEarned: 0,
+    crystalEarned: 0,
+    wavesCleared: cleared ? 1 : 0,
+    totalWaves: 1,
+    levelUps: [],
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    extraLines: materialLines,
+  };
+  enterStageResult();
+}
+
+function handleAutoFarmAwakeningDepth(floor: AwakeningDepthFloor, count: number): void {
+  beginBackgroundFarm(
+    { kind: "AWAKENING_DEPTH", targetId: String(floor.floor), targetName: floor.name, requestedRuns: count },
+    state.player.partyIds,
+    (state.player.clearedAwakeningDepthFloors ?? []).includes(floor.floor),
+  );
+}
+
+function renderCurrentAwakeningDepthBattle(): BattleViewHandle {
+  const run = state.awakeningDepthRun;
+  if (!run) throw new Error("awakeningDepthRun is not set");
+
+  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment);
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+
+  return renderBattleView({
+    engine,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    title: `深域 ${run.floor.floor}階`,
+    resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "深域に戻る"),
+    onFinish: (winner) => finishAwakeningDepth(winner === "PLAYER"),
+    chain: battleChainInfo(),
+  });
+}
+
+/* ==========================================================================
+ * 才能覚醒
+ * ========================================================================== */
+
+/**
+ * 才能覚醒を開く。**行き先はクリエイトの「才能覚醒」の欄。**
+ *
+ * 独立した画面として持っていたが、才能を付ける先はスキル2・3で、
+ * その中身を入れ替えるのはクリエイト。**同じものを2か所で触る形**に
+ * なっていたので、入口ごとクリエイトへ寄せた。
+ */
+function openTalentAwakening(monsterId: string): void {
+  state.createTargetId = monsterId;
+  state.createMenu = "TALENT";
+  state.createNotice = null;
+  state.talentTab = "BASIC";
+  state.talentSkillSlot = 1;
+  navigate("MONSTER_CREATE");
+}
+
+/**
+ * 才能覚醒の操作をまとめて受ける。
+ *
+ * **継承で技が変わっていた時の後始末を、毎回ここで通す。**
+ * 画面を開くたびに確かめる形にすると、開かない限り
+ * 不適合な才能がptを取り続けることになる。
+ */
+function withTalentTarget(run: (monster: MonsterInstance) => { ok: boolean; reason?: string }): void {
+  const monster = state.player.monsters.find((m) => m.id === state.createTargetId);
+  if (!monster) return;
+  const result = run(monster);
+  // **押せない時は音で返す。**理由はボタン側の文言が既に語っている
+  if (!result.ok) playSfx("denied", 0.7);
+  savePlayerState(state.player);
   render();
 }
 
@@ -2918,6 +3087,7 @@ function render(): void {
         onGoEquipDungeon: () => navigate("EQUIP_DUNGEON"),
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
+        onGoAwakeningDepth: () => navigate("AWAKENING_DEPTH"),
         onGoShop: () => navigate("SHOP"),
         onGoArena: () => navigate("ARENA"),
         onGoTrialTower: () => navigate("TRIAL_TOWER"),
@@ -3179,6 +3349,43 @@ function render(): void {
     case "GOLD_DUNGEON_BATTLE": {
       showNav = false;
       const handle = renderCurrentGoldDungeonBattle();
+      disposeCurrentView = handle.dispose;
+      content = handle.element;
+      break;
+    }
+
+    case "AWAKENING_DEPTH":
+      content = renderAwakeningDepths({
+        player: state.player,
+        selectedFloor: state.selectedAwakeningDepthFloor,
+        onSelectFloor: (floor) => {
+          state.selectedAwakeningDepthFloor = floor;
+          render();
+        },
+        onStartFloor: startAwakeningDepthFloor,
+        onGoParty: () => openPartyFrom({
+          screen: "AWAKENING_DEPTH",
+          label: `目覚の深域${state.selectedAwakeningDepthFloor ?? ""}F`,
+          selectedAwakeningDepthFloor: state.selectedAwakeningDepthFloor ?? undefined,
+        }, "NORMAL"),
+        onExchange: (id) => {
+          const result = exchangeMaterial(state.player, id);
+          if (!result.ok) playSfx("denied", 0.7);
+          else savePlayerState(state.player);
+          render();
+        },
+        autoFarmCount: state.autoFarmCount,
+        onChangeAutoFarmCount: (count) => {
+          state.autoFarmCount = count;
+          render();
+        },
+        onAutoFarm: handleAutoFarmAwakeningDepth,
+      });
+      break;
+
+    case "AWAKENING_DEPTH_BATTLE": {
+      showNav = false;
+      const handle = renderCurrentAwakeningDepthBattle();
       disposeCurrentView = handle.dispose;
       content = handle.element;
       break;
@@ -3609,9 +3816,41 @@ function render(): void {
         navigate("MONSTERS");
         return;
       }
+      const createDex = findMonsterById(createTarget.dexId);
+      if (!createDex) { navigate("MONSTERS"); return; }
+      /*
+       * **開くたびに、継承で不適合になった才能を外してptを戻す。**
+       * 開かない限り直らない形にすると、クリエイトで技を替えた個体が
+       * 効かない才能にptを取られたまま放置される。
+       * 同じ画面の中で技を替えられるようになったので、なおさらここで通す。
+       */
+      const reconciled = reconcileSkillTalents(createTarget, toBattleDefinition(createTarget, createDex).skills);
+      if (reconciled.removed.length > 0) savePlayerState(state.player);
       content = renderMonsterCreate({
         target: createTarget,
         monsters: state.player.monsters,
+        talent: {
+          player: state.player,
+          monster: createTarget,
+          dex: createDex,
+          tab: state.talentTab,
+          onChangeTab: (tab) => { state.talentTab = tab; render(); },
+          skillSlot: state.talentSkillSlot,
+          onChangeSkillSlot: (slot) => { state.talentSkillSlot = slot; render(); },
+          onUnlockPoint: () => withTalentTarget((m) => unlockTalentPoint(state.player, m)),
+          onTakeBasic: (line) => withTalentTarget((m) => takeBasicTalent(m, line as never)),
+          onTakeBattle: (line) => withTalentTarget((m) => takeBattleTalent(m, line as never)),
+          onTakeSkillTalent: (slot, id) => withTalentTarget((m) => {
+            const skill = toBattleDefinition(m, findMonsterById(m.dexId)!).skills[slot];
+            return takeSkillTalent(m, slot, id, skill);
+          }),
+          onTakeAwakening: (slot, id) => withTalentTarget((m) => {
+            const skill = toBattleDefinition(m, findMonsterById(m.dexId)!).skills[slot];
+            return takeSkillAwakening(state.player, m, slot, id, skill);
+          }),
+          onReset: () => withTalentTarget((m) => resetTalents(state.player, m)),
+          onClose: () => goBack(),
+        },
         partyIds: state.player.partyIds,
         dungeonPartyIds: state.player.dungeonPartyIds,
         materialId: state.createMaterialId,
@@ -3946,6 +4185,7 @@ function renderMonstersScreen(): HTMLElement {
       state.screen = "MONSTER_TRAINING";
       render();
     },
+    onGoTalentAwakening: (monsterId) => openTalentAwakening(monsterId),
     onGoCreate: (monsterId) => {
       state.createTargetId = monsterId;
       state.createMaterialId = null;
@@ -4225,6 +4465,28 @@ if (import.meta.env.DEV) {
   ];
 
   (window as unknown as Record<string, unknown>).__crimonDev = {
+    /*
+     * **才能覚醒の中身を巡回に見せるための口。**
+     *
+     * この画面は★6でしか開かない。初期セーブには★6が居ないので、
+     * 巡回はいつまでも「★6で解放されます」の案内だけを検査し、
+     * 才能の札や下の帯を一度も見ないことになる。
+     * (アリーナのランキングで**行が1つも無い画面**を検査し続け、
+     * 名前の切れを見逃したのと同じ穴。)
+     */
+    openCreateMenu(menu: CreateMenu = "TALENT") {
+      const monster = state.player.monsters.find((m) => m.star === 6) ?? state.player.monsters[0];
+      if (!monster) return;
+      // 才能覚醒もタイプ転生も★6でしか中身が出ない
+      monster.star = 6;
+      state.createTargetId = monster.id;
+      state.createMenu = menu;
+      state.createNotice = null;
+      state.talentTab = "BASIC";
+      state.talentSkillSlot = 1;
+      navigate("MONSTER_CREATE");
+      render();
+    },
     showDemoRanking() {
       arenaConnectionStatus = "ONLINE";
       state.arenaRankingLoading = false;

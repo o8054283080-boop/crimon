@@ -1,10 +1,13 @@
-import { Equipment, EquipSlot, applyEquipmentToStats, computeSetCombatModifiers } from "./equipment.js";
+import { CombatModifiers, DEFAULT_COMBAT_MODIFIERS, Equipment, EquipSlot, applyEquipmentToStats, computeSetCombatModifiers } from "./equipment.js";
 import { MonsterDefinition } from "./monster.js";
 import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
 import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDevelopment.js";
 import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
+import { applySkillTalents } from "./talentApply.js";
+import { talentCombatBonus, talentStatBonus, type TalentState } from "./talents.js";
+import type { Stats } from "./stats.js";
 
 /**
  * 移し替えたスキルの実体を引く関数。
@@ -160,8 +163,18 @@ export function toBattleDefinition(
     accuracy: Math.max(0, Math.min(1, growthStats.accuracy + multiplier.accuracy)),
     resistance: Math.max(0, Math.min(1, growthStats.resistance + multiplier.resistance)),
   };
-  const stats = equippedItems.length > 0 ? applyEquipmentToStats(developedStats, equippedItems) : developedStats;
-  const combatMods = equippedItems.length > 0 ? computeSetCombatModifiers(equippedItems) : undefined;
+  const equipped = equippedItems.length > 0 ? applyEquipmentToStats(developedStats, equippedItems) : developedStats;
+  const baseMods = equippedItems.length > 0 ? computeSetCombatModifiers(equippedItems) : undefined;
+  /*
+   * 才能覚醒。**装備のあとに掛ける。**
+   *
+   * 装備は「持ち物」で付け替えられるが、才能はその個体そのものの伸びしろ。
+   * 装備込みの値に対して割合で乗せることで、
+   * **装備を整えた個体ほど才能の1ptが効く**という順序になる。
+   */
+  const talents = instance.development.talents;
+  const stats = talents ? applyTalentStats(equipped, talents) : equipped;
+  const combatMods = talents ? applyTalentCombatMods(baseMods, talents) : baseMods;
   const skills = dex.skills.map((skill, i) => computeLeveledSkill(skill, instance.skillLevels[i])) as [
     MonsterDefinition["skills"][0],
     MonsterDefinition["skills"][1],
@@ -173,6 +186,19 @@ export function toBattleDefinition(
   if (created) {
     const source = resolveCreatedSkill(created.skillId);
     if (source) skills[created.slot] = computeLeveledSkill(source, instance.skillLevels[created.slot]);
+  }
+  /*
+   * スキル才能とスキル覚醒は**差し替えのあと**に焼き込む。
+   * 順序を逆にすると、継承で入れ替わった技に前の枠の才能が乗ってしまう。
+   */
+  if (talents) {
+    for (const slot of [1, 2] as const) {
+      const ids = [
+        ...talents.skill[slot],
+        ...(talents.awakening?.slot === slot ? [talents.awakening.id] : []),
+      ];
+      if (ids.length > 0) skills[slot] = applySkillTalents(skills[slot], ids);
+    }
   }
   return {
     ...dex,
@@ -189,4 +215,47 @@ export function toBattleDefinition(
 
 export function starLabel(star: Star): string {
   return "★".repeat(star);
+}
+
+/**
+ * 基礎才能をステータスへ乗せる。
+ *
+ * 割合のものは掛け算、速度だけ実数で足す。
+ * クリ率・的中・抵抗は**0〜1に収める**——ここで抑えないと、
+ * 装備と才能を積み切った個体の的中が1を超えて、抵抗の意味が消える。
+ */
+function applyTalentStats(stats: Stats, talents: TalentState): Stats {
+  const bonus = talentStatBonus(talents);
+  return {
+    ...stats,
+    hp: Math.round(stats.hp * (1 + bonus.hpPercent)),
+    atk: Math.round(stats.atk * (1 + bonus.atkPercent)),
+    def: Math.round(stats.def * (1 + bonus.defPercent)),
+    spd: stats.spd + bonus.spdFlat,
+    criRate: Math.max(0, Math.min(1, stats.criRate + bonus.criRate)),
+    criDmg: Math.max(1, stats.criDmg + bonus.criDmg),
+    accuracy: Math.max(0, Math.min(1, stats.accuracy + bonus.accuracy)),
+    resistance: Math.max(0, Math.min(1, stats.resistance + bonus.resistance)),
+  };
+}
+
+/**
+ * 戦闘才能を戦闘補正へ乗せる。
+ *
+ * **装備のセット効果と掛け算で重ねる。**足し算にすると、
+ * 装備で与ダメ+20%を持っている個体と持っていない個体で
+ * 才能の+7%の意味が変わってしまう。
+ */
+function applyTalentCombatMods(base: CombatModifiers | undefined, talents: TalentState): CombatModifiers | undefined {
+  const bonus = talentCombatBonus(talents);
+  const hasAny = Object.values(bonus).some((v) => v !== 0);
+  if (!hasAny) return base;
+  const mods: CombatModifiers = { ...DEFAULT_COMBAT_MODIFIERS, ...(base ?? {}) };
+  mods.damageDealtMultiplier *= 1 + bonus.damageDealt;
+  mods.damageTakenMultiplier *= 1 - bonus.damageTaken;
+  mods.healingMultiplier = (mods.healingMultiplier ?? 1) * (1 + bonus.healing);
+  mods.shieldMultiplier = (mods.shieldMultiplier ?? 1) * (1 + bonus.shielding);
+  mods.debuffChanceBonus = (mods.debuffChanceBonus ?? 0) + bonus.debuffChance;
+  mods.gaugeUpMultiplier = (mods.gaugeUpMultiplier ?? 1) * (1 + bonus.gaugeUp);
+  return mods;
 }

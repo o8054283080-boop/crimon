@@ -1,4 +1,5 @@
 import type { BuffStat, EffectCondition } from "./skill.js";
+import { createDefaultTalentState, type TalentState } from "./talents.js";
 
 /**
  * クリエイト拡張で個体ごとに保存する育成情報。
@@ -40,6 +41,14 @@ export interface MonsterDevelopment {
    * 無料で振り直せる状態のままにしないため。
    */
   abilityPointsConfirmed?: boolean;
+  /**
+   * 才能覚醒。**★6に到達した個体だけが開ける2本目の育成。**
+   *
+   * 省略可にしてあるのは、**前から遊んでいる人の控えに無いから。**
+   * 読み込み時に既定値で埋める(`playerState` の正規化)。
+   * 中身の意味は `src/core/talents.ts`。
+   */
+  talents?: TalentState;
 }
 
 /**
@@ -251,5 +260,6 @@ export function createDefaultMonsterDevelopment(): MonsterDevelopment {
      * 推し量るのは**印を知らない旧セーブだけ**の仕事。
      */
     abilityPointsConfirmed: false,
+    talents: createDefaultTalentState(),
   };
 }

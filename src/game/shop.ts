@@ -86,7 +86,39 @@ export const SHOP_SCROLL_PRICES: { count: number; price: number }[] = [
 export type ShopEntry =
   | { kind: "EQUIPMENT"; equipment: Equipment; price: number }
   | { kind: "MONSTER"; dexId: string; star: 1 | 2 | 3; price: number }
-  | { kind: "SCROLL"; count: number; price: number };
+  | { kind: "SCROLL"; count: number; price: number }
+  /** 才能覚醒の素材。**たまにしか並ばない**(下の重み表を参照) */
+  | { kind: "AWAKENING_MATERIAL"; material: "shards" | "crystals" | "stones"; count: number; price: number };
+
+/**
+ * 才能覚醒の素材の棚。
+ *
+ * **値段は深域を回るより明確に重い。**ここで揃うようにすると、
+ * 深域そのものを回る理由が消える。並ぶ確率も低くしてあり、
+ * 「見かけたら買っておく」くらいの位置に置いてある。
+ *
+ * 奇石だけ極端に重く・極端に出にくいのは、**スキル覚醒が1体に1つだけ**だから。
+ * 何度も買うものではない。
+ */
+export const SHOP_AWAKENING_OFFERS: readonly {
+  material: "shards" | "crystals" | "stones"; count: number; price: number; weight: number;
+}[] = [
+  { material: "shards", count: 20, price: 300_000, weight: 34 },
+  { material: "shards", count: 50, price: 650_000, weight: 26 },
+  { material: "crystals", count: 5, price: 500_000, weight: 22 },
+  { material: "crystals", count: 10, price: 900_000, weight: 15 },
+  // 奇石は**滅多に出ない**。3,000,000Gという額と釣り合う希少さにしてある
+  { material: "stones", count: 1, price: 3_000_000, weight: 3 },
+];
+
+/**
+ * 素材の枠が並ぶ確率。
+ *
+ * 装備の枠のうち1つを、この確率で素材に差し替える。
+ * **常設にしない**のは、ここが「装備を買う場所」だから——
+ * 毎回素材が並ぶと、棚の性格そのものが変わってしまう。
+ */
+export const SHOP_AWAKENING_SLOT_CHANCE = 0.35;
 
 export interface ShopLineup {
   /** この品揃えの識別子。時間帯が変わると変わる(購入済みの管理に使う) */
@@ -202,6 +234,16 @@ function buildEntry(rng: () => number, fighterLevel: number, index: number): Sho
     return { kind: "SCROLL", count: offer.count, price: offer.price };
   }
 
+  /*
+   * 装備の枠のうち1つ(role 2)だけ、たまに才能覚醒の素材へ差し替える。
+   * 枠を増やさないのは、**枠の数はダイヤで買うもの**だから——
+   * 素材のために1枠増えると、買った枠の価値が薄まる。
+   */
+  if (role === 2 && rng() < SHOP_AWAKENING_SLOT_CHANCE) {
+    const offer = pickWeighted(SHOP_AWAKENING_OFFERS.map((o) => ({ value: o, weight: o.weight })), rng);
+    return { kind: "AWAKENING_MATERIAL", material: offer.material, count: offer.count, price: offer.price };
+  }
+
   const star = pickWeighted(
     equipmentStarWeights(fighterLevel).map((w) => ({ value: w.star, weight: w.weight })),
     rng,
@@ -264,7 +306,14 @@ export function describeShopEntry(entry: ShopEntry): string {
       return `星${entry.star} モンスター`;
     case "SCROLL":
       return `召喚の書 ×${entry.count}`;
+    case "AWAKENING_MATERIAL":
+      return `${AWAKENING_MATERIAL_LABEL[entry.material]} ×${entry.count}`;
   }
 }
+
+/** 才能覚醒の素材の名前。**表示はどこでもこれを通す** */
+export const AWAKENING_MATERIAL_LABEL: Record<"shards" | "crystals" | "stones", string> = {
+  shards: "目覚の欠片", crystals: "目覚の結晶", stones: "目覚の奇石",
+};
 
 export type { Star };

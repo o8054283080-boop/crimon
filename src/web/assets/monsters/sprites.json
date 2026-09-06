@@ -131,6 +131,12 @@
     "bodyVal": 0.241,
     "aspect": 1.471
   },
+  "archeos-DARK": {
+    "bodyHue": 0.607,
+    "bodySat": 0.63,
+    "bodyVal": 0.71,
+    "aspect": 1.306
+  },
   "basilisk": {
     "bodyHue": 0.017,
     "bodySat": 0.74,
@@ -149,6 +155,12 @@
     "bodyVal": 0.71,
     "aspect": 1
   },
+  "crimoark-DARK": {
+    "bodyHue": 0.823,
+    "bodySat": 0.78,
+    "bodyVal": 0.65,
+    "aspect": 0.764
+  },
   "crimoark_attack-DARK": {
     "bodyHue": 0.039,
     "bodySat": 0.86,
@@ -165,12 +177,6 @@
     "bodyHue": 0.457,
     "bodySat": 0.81,
     "bodyVal": 0.9,
-    "aspect": 0.764
-  },
-  "crimoark-DARK": {
-    "bodyHue": 0.823,
-    "bodySat": 0.78,
-    "bodyVal": 0.65,
     "aspect": 0.764
   },
   "dragon": {

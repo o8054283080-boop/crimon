@@ -344,6 +344,8 @@ export class BattleEngine {
   private coopDepth = 0;
   /** 溜めた反撃の入れ子の深さ。0でないときは反撃を呼ばない(反射と往復し続けるため) */
   private counterDepth = 0;
+  /** この手番で実際に使った技。才能の「使用時に〜」を手番の終わりで見るための控え */
+  private lastUsedSkill: Skill | null = null;
   /** `empowerBossOnDeath` を処理し終えた個体。同じ死で二度強くしない */
   private readonly mournedDeaths = new Set<string>();
   /** いま解決中のスキル。パッシブの「1スキル1回」を数えるのに使う */
@@ -651,7 +653,38 @@ export class BattleEngine {
       if (boss) this.syncTower100Boss(boss);
     }
 
-    const extraTurnChance = Math.max(actor.def.combatMods?.extraTurnChance ?? 0, actor.def.bossTraits?.extraTurnChance ?? 0);
+    /*
+     * 追加攻撃。**確率でスキル1をもう一度撃つ。**
+     *
+     * 追加ターンと違い、**手番そのものは増えない**(1つの技の中で
+     * もう一撃だけ出る)。反撃の中では起こさない——反撃から反撃を
+     * 呼び続ける形になり、盤面が止まらなくなる。
+     */
+    const followUp = this.lastUsedSkill?.talentMods?.followUpS1Chance ?? 0;
+    if (actor.alive && followUp > 0 && this.counterDepth === 0 && this.rng() < followUp) {
+      const s1 = actor.def.skills[0];
+      if (s1 && !s1.passive) {
+        this.push(`  → ${this.label(actor)} の追加攻撃！`);
+        this.counterDepth += 1;
+        try {
+          const targets = chooseTargets(actor, s1, this.units);
+          const resolution = newResolution();
+          targets.forEach((t, i) => this.applySkillEffects(actor, t, s1, false, i === 0, undefined, resolution));
+        } finally {
+          this.counterDepth -= 1;
+        }
+      }
+    }
+
+    /*
+     * 再行動。装備・ボス特性に加えて、**その手番で撃った技の才能**も見る。
+     * `usedSkill` はこの手番で実際に使った技(パッシブや反撃は含まない)。
+     */
+    const extraTurnChance = Math.max(
+      actor.def.combatMods?.extraTurnChance ?? 0,
+      actor.def.bossTraits?.extraTurnChance ?? 0,
+      this.lastUsedSkill?.talentMods?.extraTurnChance ?? 0,
+    );
     if (actor.alive && extraTurnChance > 0 && this.rng() < extraTurnChance) {
       this.pendingExtraTurns.push(actor);
     }
@@ -1503,8 +1536,22 @@ export class BattleEngine {
     if (targets.length === 0) return;
 
     if (skill.cooldownTurns > 0) {
-      unit.cooldowns[index] = skill.cooldownTurns;
+      /*
+       * 再使用補助。**確率でこの枠のクールタイムを1縮める。**
+       * 置く場所をここにしてあるのは、CTを入れた直後でなければ
+       * 「縮める」が成立しないから(あとで縮めると、既に減った分と混ざる)。
+       */
+      const refund = skill.talentMods?.cooldownRefundChance;
+      const saved = refund && this.rng() < refund ? 1 : 0;
+      unit.cooldowns[index] = Math.max(0, skill.cooldownTurns - saved);
+      if (saved > 0) this.push(`  → ${this.label(unit)} の「${skill.name}」のクールタイムが縮まった！`);
     }
+
+    /*
+     * この手番で実際に使った技。**反撃やパッシブでは書き換えない。**
+     * 「使用時に確率で追加ターン」を手番の終わりで判定するために要る。
+     */
+    if (this.counterDepth === 0) this.lastUsedSkill = skill;
 
     this.push(`${this.label(unit)} の「${skill.name}」！`);
 
@@ -2077,6 +2124,7 @@ export class BattleEngine {
             resolution.damageDealt += applied.hpDamage;
             if (applied.died) { resolution.kills += 1; this.onKill(source); }
             target.hitsTaken += 1;
+            this.advanceAdaptation(target, source);
             counterTargets.add(target);
             const critText = result.isCrit ? "会心の一撃！" : "";
             const affinityText =
@@ -2100,11 +2148,35 @@ export class BattleEngine {
                 : effect.scaleStat === "def"
                   ? getEffectiveStat(source, "def")
                   : receiver.maxHp;
-            const healAmount = Math.round(healBase * effect.healRate);
+            /*
+             * 才能の回復補正。**術者側の才能だけを見る。**
+             * 受け手の「回復量+」で自分への回復が増えると、
+             * 回復役を育てる意味が薄れて全員に薄く配るのが最適になる。
+             */
+            const healBoost = source.def.combatMods?.healingMultiplier ?? 1;
+            // 緊急回復。受け手が落ちかけている時だけ乗る
+            const lowHp = effect.lowHpExtra && hpRatio(receiver) <= effect.lowHpExtra.hpRatio
+              ? effect.lowHpExtra.extra : 0;
+            const healAmount = Math.round(healBase * effect.healRate * healBoost * (1 + lowHp));
             if (healAmount <= 0) continue;
             applyHeal(receiver, healAmount);
             this.push(`  → ${this.label(receiver)} のHPが ${healAmount} 回復！ (${receiver.currentHp}/${receiver.maxHp})`);
             this.pushEvent({ targetId: receiver.instanceId, kind: "HEAL", amount: healAmount });
+            /*
+             * 波及治療。**単体回復の時だけ**、他の味方にも薄く配る。
+             * 全体回復に付けても意味が無く、
+             * 「1体に絞った代わりに広がる」という取引がこの覚醒の中身。
+             */
+            const splash = skill.talentMods?.healSplash;
+            if (splash && receivers.length === 1) {
+              const amount = Math.round(healAmount * splash);
+              for (const ally of this.units) {
+                if (!ally.alive || ally.team !== source.team || ally === receiver || amount <= 0) continue;
+                applyHeal(ally, amount);
+                this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount });
+              }
+              if (amount > 0) this.push(`  → 回復が味方全体へ波及した！ (${amount})`);
+            }
           }
           break;
         }
@@ -2124,6 +2196,9 @@ export class BattleEngine {
         }
 
         case "BUFF": {
+          // 強化効率・延長支援。どちらも**その効果1つにつき1回**だけ判定する
+          const buffTurns = effect.durationTurns + this.talentExtend(skill, "buff");
+          const buffAmount = effect.amount;
           // 適用先を選べる。敵を攻撃しつつ味方を強化するスキルなどで使う
           const receivers = this.receiversFor(source, target, effect.applyTo);
           for (const receiver of receivers) {
@@ -2133,27 +2208,43 @@ export class BattleEngine {
             }
             receiver.effects.push({
               stat: effect.stat,
-              amount: effect.amount,
-              remainingTurns: effect.durationTurns,
+              amount: buffAmount,
+              remainingTurns: buffTurns,
               kind: "BUFF",
             });
-            this.push(`  → ${this.label(receiver)} の ${effect.stat.toUpperCase()} が上昇！ (${effect.durationTurns}ターン)`);
+            this.push(`  → ${this.label(receiver)} の ${effect.stat.toUpperCase()} が上昇！ (${buffTurns}ターン)`);
+          }
+          /*
+           * 高揚支援。**強化を配った相手の与ダメージを上げる。**
+           * 強化そのものではなく「強化された状態」に乗るので、
+           * 誰に配ったかがそのまま火力の伸びになる。
+           */
+          const elation = skill.talentMods?.buffedAllyDamage;
+          if (elation && sourceScoped) {
+            for (const ally of this.units) {
+              if (!ally.alive || ally.team !== source.team || !hasAnyBuff(ally)) continue;
+              ally.damageDealtBonusTurns = Math.max(ally.damageDealtBonusTurns ?? 0, elation.turns);
+              ally.damageDealtBonus = Math.max(ally.damageDealtBonus ?? 0, elation.value);
+            }
+            this.push(`  → 強化された味方の与ダメージが上がった！ (高揚支援)`);
           }
           break;
         }
 
         case "DEBUFF": {
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution, skill)) break;
+          // 弱化延長。**確率は効果ごとではなく、その効果1つにつき1回**振る
+          const debuffTurns = effect.durationTurns + this.talentExtend(skill, "debuff");
           target.effects.push({
             stat: effect.stat,
             amount: -effect.amount,
-            remainingTurns: effect.durationTurns,
+            remainingTurns: debuffTurns,
             kind: "DEBUFF",
           });
           resolution.debuffApplied = true;
           resolution.applied.add(`${effect.stat.toUpperCase()}_DOWN`);
-          this.push(`  → ${this.label(target)} の ${effect.stat.toUpperCase()} が低下！ (${effect.durationTurns}ターン)`);
+          this.push(`  → ${this.label(target)} の ${effect.stat.toUpperCase()} が低下！ (${debuffTurns}ターン)`);
           break;
         }
 
@@ -2163,7 +2254,7 @@ export class BattleEngine {
           const receivers = this.receiversFor(source, target, effect.applyTo);
           for (const receiver of receivers) {
             if (category === "DEBUFF") {
-              if (this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
+              if (this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance, undefined, undefined, skill)) continue;
             }
             if (!applyStatus(receiver, effect.status, effect.durationTurns, source.instanceId)) {
               this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`);
@@ -2177,7 +2268,7 @@ export class BattleEngine {
 
         case "STUN": {
           if (!met(effect.requires)) break;
-          if (this.isImmune(target) || !this.rollEffectSuccess(source, target, effect.chance)) {
+          if (this.isImmune(target) || !this.rollEffectSuccess(source, target, effect.chance, undefined, undefined, skill)) {
             // 「スタンが失敗したら代わりにゲージを削る」型の技のために、外れたことを覚えておく
             resolution.stunFailed = true;
             break;
@@ -2191,7 +2282,7 @@ export class BattleEngine {
 
         case "BURN": {
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, undefined, undefined, skill)) break;
           target.burnTurns = Math.max(target.burnTurns, effect.durationTurns);
           resolution.debuffApplied = true;
           resolution.applied.add("BURN");
@@ -2208,6 +2299,13 @@ export class BattleEngine {
             let amount = effect.amount;
             if (effect.conditionalExtra && met(effect.conditionalExtra.when)) amount += effect.conditionalExtra.amount;
             if (effect.lowHpExtra && hpRatio(receiver) <= effect.lowHpExtra.hpRatio) amount += effect.lowHpExtra.amount;
+            /*
+             * 戦闘才能の「ゲージ増加量」。**味方を進める時だけ**乗せる。
+             * 敵を下げる側にも掛けると、支援役の才能が妨害にも効いてしまう。
+             */
+            if (amount > 0 && receiver.team === source.team) {
+              amount *= source.def.combatMods?.gaugeUpMultiplier ?? 1;
+            }
             if (effect.drain) {
               // 吸収: 対象から減らした分をそのまま術者へ移す
               resolution.gaugeRemoved += this.drainGauge(source, receiver, amount);
@@ -2216,16 +2314,41 @@ export class BattleEngine {
             }
             const before = receiver.gauge;
             receiver.gauge = Math.max(0, Math.min(ATB_THRESHOLD, receiver.gauge + amount * ATB_THRESHOLD));
-            if (amount < 0) resolution.gaugeRemoved += (before - receiver.gauge) / ATB_THRESHOLD;
+            if (amount < 0) {
+              const removed = (before - receiver.gauge) / ATB_THRESHOLD;
+              resolution.gaugeRemoved += removed;
+              /*
+               * 奪取。**減らした分の一部を術者が受け取る。**
+               * `drain` との違いは「減らす量そのものは変わらない」こと——
+               * 相手を止める効き目は同じまま、こちらの手番が少し増える。
+               */
+              const share = skill.talentMods?.gaugeDrainShare;
+              if (share && removed > 0) this.gainGauge(source, removed * share);
+            }
             const verb = amount >= 0 ? "進んだ" : "後退した";
             this.push(`  → ${this.label(receiver)} の行動ゲージが${verb}！`);
+          }
+          /*
+           * 支援連鎖。**受け取っていない味方のうち、いちばん遅れている1体**へも配る。
+           * 単体加速の技でも編成全体が回るようにするための才能。
+           */
+          const chain = skill.talentMods?.gaugeChain;
+          if (chain && effect.amount > 0 && sourceScoped) {
+            const given = new Set(receivers.map((r) => r.instanceId));
+            const rest = this.units
+              .filter((u) => u.alive && u.team === source.team && !given.has(u.instanceId))
+              .sort((a, b) => a.gauge - b.gauge)[0];
+            if (rest) {
+              this.gainGauge(rest, chain);
+              this.push(`  → ${this.label(rest)} の行動ゲージも進んだ！ (支援連鎖)`);
+            }
           }
           break;
         }
 
         case "BLIND": {
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, undefined, undefined, skill)) break;
           target.blindTurns = Math.max(target.blindTurns, effect.durationTurns);
           resolution.debuffApplied = true;
           resolution.applied.add("BLIND");
@@ -2240,10 +2363,33 @@ export class BattleEngine {
             if (hasStatus(receiver, "BUFF_BLOCK")) { this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`); continue; }
             // タンクの守りは「自分の頑丈さを配る」形。基準を術者のHPに切り替えられる
             const base = effect.fromSourceHp ? source.maxHp : receiver.maxHp;
-            const shieldAmount = Math.round(base * effect.shieldRate);
+            // 才能のシールド補正も、回復と同じく**張る側**の才能だけを見る
+            const shieldBoost = source.def.combatMods?.shieldMultiplier ?? 1;
+            const shieldAmount = Math.round(base * effect.shieldRate * shieldBoost);
+            /*
+             * スキル才能の「長期障壁」。確率で1ターン延びる。
+             * 判定は**張るたびに1回**で、受け手ごとには振らない
+             * (全体シールドで1人だけ長く残ると、盤面が読めなくなる)。
+             */
+            const mods = skill.talentMods;
+            const extend = mods?.shieldExtendChance && this.rng() < mods.shieldExtendChance ? 1 : 0;
             receiver.shieldValue = Math.max(receiver.shieldValue, shieldAmount);
-            receiver.shieldTurns = Math.max(receiver.shieldTurns, effect.durationTurns);
-            this.push(`  → ${this.label(receiver)} にシールドが張られた！ (${shieldAmount}、${effect.durationTurns}ターン)`);
+            receiver.shieldTurns = Math.max(receiver.shieldTurns, effect.durationTurns + extend);
+            if (mods?.shieldMitigate) {
+              receiver.shieldMitigate = Math.max(receiver.shieldMitigate ?? 0, mods.shieldMitigate);
+            }
+            if (mods?.shieldReflect) {
+              receiver.shieldReflect = Math.max(receiver.shieldReflect ?? 0, mods.shieldReflect);
+            }
+            // 治癒障壁。盾を張りながら削れた分も戻す
+            if (mods?.shieldHeal) {
+              const healed = Math.round(receiver.maxHp * mods.shieldHeal);
+              if (healed > 0) {
+                applyHeal(receiver, healed);
+                this.push(`  → ${this.label(receiver)} のHPが ${healed} 回復！ (治癒障壁)`);
+              }
+            }
+            this.push(`  → ${this.label(receiver)} にシールドが張られた！ (${shieldAmount}、${effect.durationTurns + extend}ターン)`);
           }
           break;
         }
@@ -2281,7 +2427,7 @@ export class BattleEngine {
 
         case "STRIP": {
           // IMMUNITY自身はBUFF。対抗手段である強化解除を免疫で封じない。
-          if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution, skill)) break;
           const removed = stripBuffs(target, effect.count ?? Number.POSITIVE_INFINITY);
           if (removed > 0) {
             strippedThisTarget = true;
@@ -2295,7 +2441,7 @@ export class BattleEngine {
 
         case "STEAL_BUFF": {
           if (!target.alive) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, undefined, undefined, skill)) break;
           const stolen = stealBuffs(target, source, effect.count ?? 1);
           if (stolen > 0) {
             resolution.stolenBuffs += stolen;
@@ -2385,7 +2531,7 @@ export class BattleEngine {
 
         case "HEAL_BLOCK": {
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, undefined, undefined, skill)) break;
           target.healBlockTurns = Math.max(target.healBlockTurns, effect.durationTurns);
           resolution.debuffApplied = true;
           resolution.applied.add("HEAL_BLOCK");
@@ -2402,7 +2548,7 @@ export class BattleEngine {
           // 他のデバフと同じ判定を通す。ここを素通りさせると、
           // 状態異常無効も抵抗も効かない唯一の妨害になってしまう
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, undefined, undefined, skill)) break;
           target.cooldowns = target.cooldowns.map((c) => c + effect.turns) as [number, number, number];
           this.push(`  → ${this.label(target)} のスキルのクールタイムが ${effect.turns}ターン延長された！`);
           break;
@@ -2410,7 +2556,7 @@ export class BattleEngine {
 
         case "POISON": {
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          if (!this.rollEffectSuccess(source, target, effect.chance, undefined, undefined, skill)) break;
           // 「既に毒状態ならさらに重ねる」は、判定より先に今の状態を見る
           const alreadyPoisoned = target.poisonStacks > 0;
           const stacks = (effect.stacks ?? 1) + (alreadyPoisoned ? (effect.extraStacksIfPoisoned ?? 0) : 0);
@@ -2423,6 +2569,44 @@ export class BattleEngine {
           break;
         }
       }
+    }
+
+    /*
+     * 弱化が通った時の才能。**この相手に1回だけ。**
+     * 効果ごとに配ると、弱体を3つ持つ技で3倍もらえてしまう。
+     */
+    const mods = skill.talentMods;
+    if (mods && resolution.debuffApplied && target.alive) {
+      if (mods.selfGaugeOnDebuff) {
+        this.gainGauge(source, mods.selfGaugeOnDebuff, `${this.label(source)} の行動ゲージが進んだ！ (追圧)`);
+      }
+      if (mods.targetGaugeOnDebuff) {
+        target.gauge = Math.max(0, target.gauge - mods.targetGaugeOnDebuff * ATB_THRESHOLD);
+        this.push(`  → ${this.label(target)} の行動ゲージが後退した！ (ゲージ抑制)`);
+      }
+      /*
+       * 弱化拡散。**単体技のときだけ。**全体技に付けても意味が無く、
+       * 「1体に絞った代わりに広がる」という取引がこの才能の中身。
+       */
+      if (mods.debuffSpreadChance && skill.target === "SINGLE_ENEMY" && this.rng() < mods.debuffSpreadChance) {
+        const others = this.units.filter((u) => u.alive && u.team !== source.team && u !== target);
+        const pick = others[Math.floor(this.rng() * others.length)];
+        const spread = target.effects.find((e) => e.kind === "DEBUFF");
+        if (pick && spread && !this.isImmune(pick)) {
+          pick.effects.push({ ...spread });
+          this.push(`  → ${this.label(pick)} にも弱化が広がった！ (弱化拡散)`);
+        }
+      }
+    }
+    /*
+     * 攻撃が通った時のゲージ奪取。**当たった相手ごとに1回。**
+     * 減らす量と得る量が同じなので、盤面全体の手番の総量は変わらない。
+     */
+    if (mods?.gaugeSteal && damageDealtThisCall > 0 && target.alive && this.rng() < mods.gaugeSteal.chance) {
+      const moved = Math.min(target.gauge, mods.gaugeSteal.value * ATB_THRESHOLD);
+      target.gauge -= moved;
+      this.gainGauge(source, moved / ATB_THRESHOLD);
+      this.push(`  → ${this.label(source)} が ${this.label(target)} の行動ゲージを奪った！`);
     }
 
     for (const victim of counterTargets) this.tryCounter(victim, source);
@@ -2443,6 +2627,14 @@ export class BattleEngine {
     // 軽減とパッシブによる被ダメージ減は、無敵・シールドより手前で1度だけ掛ける
     let incoming = Math.round(amount * equipmentMultiplier * damageTakenMultiplier(target, source ? hasStatus(source, "TAUNT") : false) * this.tower80DamageTakenFactor(target));
     if (target.latentOneShotMitigate > 0) target.latentOneShotMitigate = 0;
+    /*
+     * 防御障壁。**盾が乗っている間だけ**の軽減で、割れたら消える。
+     * シールドそのものとは別枠——「盾が残っている限り硬い」という形にすることで、
+     * 盾を張り直す手番に意味が出る。
+     */
+    if (target.shieldMitigate && target.shieldTurns > 0 && target.shieldValue > 0) {
+      incoming = Math.round(incoming * (1 - target.shieldMitigate));
+    }
 
     /*
      * かばう。**軽減のあと、致死処理の前**に割り込む。
@@ -2467,6 +2659,26 @@ export class BattleEngine {
     }
 
     const applied = applyDamage(target, incoming);
+    /*
+     * 反射障壁。**盾が乗っている間だけ**、受けたぶんの一部を返す。
+     * 反射で反射を呼ばないよう、返す一撃は "reflect" として扱う
+     * (既存の REFLECT 状態と同じ扱い)。
+     */
+    if (
+      target.shieldReflect && target.shieldTurns > 0 && sourceType === "normal"
+      && source && source.alive && source.team !== target.team && applied.hpDamage > 0
+    ) {
+      const back = Math.round(applied.hpDamage * target.shieldReflect);
+      if (back > 0) {
+        const hit = applyDamage(source, back);
+        this.push(`  → ${this.label(target)} の障壁が ${hit.hpDamage} ダメージを返した！`);
+        this.pushEvent({ targetId: source.instanceId, kind: "DAMAGE", amount: hit.hpDamage });
+        if (hit.died) {
+          this.push(`  → ${this.label(source)} は倒れた！`);
+          this.pushEvent({ targetId: source.instanceId, kind: "DEATH" });
+        }
+      }
+    }
     this.syncTower80Boss();
     if (this.isTower70Boss(target) && target.alive && applied.hpDamage > 0) this.afterTower70BossHpChanged(target);
     if (applied.invincible) this.push(`  → ${this.label(target)} は無敵でダメージを無効化した！`);
@@ -2598,10 +2810,59 @@ export class BattleEngine {
           boss.flatStatBonus[stat] = (boss.flatStatBonus[stat] ?? 0) + amount;
           parts.push(`${stat.toUpperCase()}+${amount}`);
         }
+        /*
+         * 割合の変化。**実数では書けないものだけがここに来る。**
+         * 目覚の深域の才能晶は「防御を20%無視するようになる」
+         * 「受けるダメージが15%減る」を残していく。
+         */
+        const ratio = victim.def.bossTraits?.empowerBossOnDeathRatio;
+        if (ratio?.defenseIgnoreRatio) {
+          boss.deathBoostDefenseIgnore = (boss.deathBoostDefenseIgnore ?? 0) + ratio.defenseIgnoreRatio;
+          parts.push(`防御無視+${Math.round(ratio.defenseIgnoreRatio * 100)}%`);
+        }
+        if (ratio?.damageTakenMultiplier !== undefined) {
+          boss.deathBoostDamageTaken = (boss.deathBoostDamageTaken ?? 1) * ratio.damageTakenMultiplier;
+          parts.push(`被ダメ-${Math.round((1 - ratio.damageTakenMultiplier) * 100)}%`);
+        }
         if (parts.length > 0) {
           this.push(`${this.label(boss)} は ${this.label(victim)} の力を取り込んだ！ (${parts.join(" ")})`);
         }
       }
+    }
+  }
+
+  /**
+   * 才能適応を1段進める。**別の相手から受けたら1段戻す。**
+   *
+   * ## なぜ「戻す」を入れるのか
+   *
+   * 積むだけなら、答えは「もっと強い1体を作る」で終わってしまう
+   * (適応が乗り切る前に落とせばいい)。**別の味方が殴れば戻る**からこそ、
+   * 手を配るという別の答えが生まれる。
+   * 数字ではなく編成の形を問う仕掛けにするための、いちばん大事な半分。
+   *
+   * 進めるのは**ヒットごと**。多段攻撃は1回で数段ぶん進むので、
+   * 手数の多い技ほど早く効かなくなる——それも「同じ手の繰り返し」に含む。
+   */
+  private advanceAdaptation(target: BattleUnit, source: BattleUnit): void {
+    const trait = target.def.bossTraits?.talentAdaptation;
+    if (!trait || source.team === target.team) return;
+    if (!target.adaptationStacks) target.adaptationStacks = new Map();
+    const stacks = target.adaptationStacks;
+
+    if (target.lastAttackerId && target.lastAttackerId !== source.instanceId) {
+      // 別の味方が入った。**前の相手への適応が1段緩む**
+      const previous = stacks.get(target.lastAttackerId) ?? 0;
+      if (previous > 0) stacks.set(target.lastAttackerId, previous - 1);
+    }
+    target.lastAttackerId = source.instanceId;
+
+    const maxStacks = Math.ceil(trait.maxReduction / trait.perStack);
+    const current = stacks.get(source.instanceId) ?? 0;
+    if (current >= maxStacks) return;
+    stacks.set(source.instanceId, current + 1);
+    if (current + 1 === maxStacks) {
+      this.push(`  → ${this.label(target)} は ${this.label(source)} の攻撃に適応しきった！`);
     }
   }
 
@@ -2645,14 +2906,42 @@ export class BattleEngine {
    * 的中シリーズ(4個セット)を装着していれば相手の抵抗率をさらに一部無視する。
    * 抵抗成功時、抵抗シリーズ(4個セット)を装着していればHPが回復する。
    */
+  /**
+   * 才能による持続の延長。**その効果1つにつき1回だけ**判定する。
+   *
+   * 受け手ごとに振ると、全体強化で1人だけ長く残る盤面ができて読めなくなる。
+   * 確率1の覚醒(延長支援・弱化延長)は必ず+1になる。
+   */
+  private talentExtend(skill: Skill, kind: "buff" | "debuff"): number {
+    const chance = kind === "buff" ? skill.talentMods?.buffExtendChance : skill.talentMods?.debuffExtendChance;
+    if (!chance) return 0;
+    return this.rng() < chance ? 1 : 0;
+  }
+
   private rollEffectSuccess(
     source: BattleUnit,
     target: BattleUnit,
     baseChance: number | undefined,
     chanceGroup?: string,
     resolution?: SkillResolution,
+    skill?: Skill,
   ): boolean {
-    const procChance = baseChance ?? 1;
+    /*
+     * 才能による発動率の底上げ。**的中とは別物。**
+     * 的中は相手の抵抗と引き算する値で、こちらは
+     * スキルが元々持っている発動率(「65%で火傷」の65)そのものを動かす。
+     *
+     * **確率が書かれていない効果は素通り。**「常に試みる」ものを
+     * 1より上へ押し上げても意味が無く、逆に「必ず入る」の意味が壊れる。
+     */
+    let procChance = baseChance ?? 1;
+    if (baseChance !== undefined) {
+      procChance += source.def.combatMods?.debuffChanceBonus ?? 0;
+      for (const entry of skill?.talentMods?.debuffChanceWhen ?? []) {
+        if (evaluateTargetCondition(entry.when, source, target)) procChance += entry.value;
+      }
+      procChance = Math.max(0, Math.min(1, procChance));
+    }
     const groupKey = chanceGroup && resolution ? `${target.instanceId}:${chanceGroup}` : undefined;
     if (groupKey) {
       const cached = resolution!.chanceGroups.get(groupKey);
@@ -2663,7 +2952,14 @@ export class BattleEngine {
       return false;
     }
 
-    const ignoreRatio = source.def.combatMods?.ignoreResistancePercent ?? 0;
+    /*
+     * 抵抗崩し。**装備のセット効果と、このスキルの才能の大きい方**を取る。
+     * 足すと、両方持っている個体が抵抗を丸ごと無視できてしまう。
+     */
+    const ignoreRatio = Math.max(
+      source.def.combatMods?.ignoreResistancePercent ?? 0,
+      skill?.talentMods?.ignoreResistance ?? 0,
+    );
     const effectiveResistance = target.def.stats.resistance * (1 - ignoreRatio);
     const accuracy = source.def.stats.accuracy;
     const hitChance = Math.max(0, Math.min(1, (1 - effectiveResistance + accuracy) / (1 + accuracy)));

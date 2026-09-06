@@ -71,6 +71,30 @@ export interface BattleUnit {
    */
   flatStatBonus: Partial<Record<BuffStat, number>>;
 
+  /* ---- 目覚の深域。**取り巻きの死で本体に残る、割合の変化** ---- */
+  /** 仲間が倒れて手に入れた部分防御無視率 */
+  deathBoostDefenseIgnore?: number;
+  /** 仲間が倒れて手に入れた被ダメージ倍率(0.85 で15%軽減) */
+  deathBoostDamageTaken?: number;
+  /**
+   * 才能適応。**誰から何段ぶん適応しているか。**
+   *
+   * 同じ相手から連続で受けるほど積み上がり、
+   * 別の味方から攻撃を受けると1段戻る。キーは攻撃側の instanceId。
+   */
+  adaptationStacks?: Map<string, number>;
+  /** 最後にこの個体を攻撃した相手。**別人に変わった時に1段戻す**ための控え */
+  lastAttackerId?: string;
+
+  /* ---- 才能覚醒(スキル才能)がシールドに乗せる性質 ---- */
+  /** シールドが乗っている間の被ダメージ軽減。盾が切れたら消える */
+  shieldMitigate?: number;
+  /** シールドが乗っている間、受けたダメージのこの割合を攻撃者へ返す */
+  shieldReflect?: number;
+  /** 高揚支援による与ダメージの上乗せ。残りターンが0になると消える */
+  damageDealtBonus?: number;
+  damageDealtBonusTurns?: number;
+
   /* ---- ここから下は今回の11種で足した状態。**どれも戦闘中だけのもので、セーブには出ない** ---- */
 
   /** 被ダメージ軽減の残りターン */
@@ -208,6 +232,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     healBlockMultiplier: 1,
     hitsTaken: 0,
     flatStatBonus: {},
+    adaptationStacks: new Map<string, number>(),
     ...freshExtendedState(),
   };
 }
@@ -467,6 +492,18 @@ export function tickBlindAtTurnStart(unit: BattleUnit): void {
  * 手番開始の呼び出し側に足し忘れ、その状態だけ永久に切れなくなる。
  */
 export function tickExtendedStateAtTurnStart(unit: BattleUnit): void {
+  if (unit.damageDealtBonusTurns && unit.damageDealtBonusTurns > 0) {
+    unit.damageDealtBonusTurns -= 1;
+    if (unit.damageDealtBonusTurns <= 0) unit.damageDealtBonus = 0;
+  }
+  /*
+   * シールドに乗せた性質は**盾が消えたら一緒に消す。**
+   * 残すと、盾が割れた後も反射だけが効き続ける。
+   */
+  if (unit.shieldTurns <= 0 || unit.shieldValue <= 0) {
+    unit.shieldMitigate = 0;
+    unit.shieldReflect = 0;
+  }
   if (unit.mitigateTurns > 0) {
     unit.mitigateTurns -= 1;
     if (unit.mitigateTurns <= 0) { unit.mitigateAmount = 0; unit.mitigateVsTaunted = 0; }

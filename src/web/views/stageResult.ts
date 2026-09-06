@@ -38,6 +38,13 @@ export interface StageResultInfo {
   pigDrops?: { dexId: string; star: number }[];
   /** このクリアでファイターレベルが何レベル上がったか */
   fighterLevelsGained?: number;
+  /**
+   * 通貨でも装備でもない、その場所だけの獲得物を並べる行。
+   *
+   * **目覚の深域の素材が最初の使い手。**専用の枠を型に足していくと、
+   * 場所が増えるたびに結果画面の形が増える。ここは「文字で言うだけ」に留める。
+   */
+  extraLines?: readonly string[];
 }
 
 export interface StageResultProps {
@@ -81,6 +88,21 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
   if (info.summonScrollDropped) tiles.push(rewardTile("📜", "召喚の書", "+1", "scroll"));
   if (info.fighterLevelsGained && info.fighterLevelsGained > 0) {
     tiles.push(rewardTile("🎖", "ファイター", `Lv+${info.fighterLevelsGained}`, "fighter"));
+  }
+  /*
+   * その場所だけの獲得物(目覚の素材など)。
+   * **札の形は他と揃える。**ここだけ別の見た目にすると、
+   * 同じ「もらったもの」なのに読み方が変わる。
+   */
+  for (const line of info.extraLines ?? []) {
+    const [name, amount] = line.split(" ×");
+    /*
+     * **絵は素材ごとに変える。**全部を同じ絵で出していたため、
+     * 欠片と結晶が結果画面では見分けられなかった
+     * (深域の持ち数の帯では 🔹/💠/🌟 と描き分けている)。
+     */
+    const emoji = name.includes("結晶") ? "💠" : name.includes("奇石") ? "🌟" : "🔹";
+    tiles.push(rewardTile(emoji, name, amount ? `+${amount}` : "", "material"));
   }
 
   // --- 現物のドロップは、一覧と同じカードで見せる ---

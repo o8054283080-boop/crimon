@@ -171,6 +171,15 @@ export function buyCrystalShopItem(
     case "FOUR_STAR_SCROLL":
       state.fourStarSummonScrolls += item.amount;
       break;
+    case "AWAKENING_SHARD":
+      state.awakeningShards = (state.awakeningShards ?? 0) + item.amount;
+      break;
+    case "AWAKENING_CRYSTAL":
+      state.awakeningCrystals = (state.awakeningCrystals ?? 0) + item.amount;
+      break;
+    case "AWAKENING_STONE":
+      state.awakeningStones = (state.awakeningStones ?? 0) + item.amount;
+      break;
     case "LIGHT_DARK_SCROLL":
       state.lightDarkFourStarSummonScrolls += item.amount;
       break;
