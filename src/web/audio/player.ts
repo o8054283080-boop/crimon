@@ -106,17 +106,31 @@ class SfxPlayer {
     audioEngine.installUnlock();
   }
 
-  /** 出力へつなぐ枝を用意する。文脈そのものは `audioEngine` が持つ */
+  /**
+   * 出力へつなぐ枝を用意する。
+   *
+   * **失敗を永久に覚え込まない。** iPhoneで最初の音声解錠に失敗した時、
+   * 以前は解決済みの `preparing` を持ち続けて `master === null` のままになり、
+   * その後何度タップしてもSEだけ二度と準備されなかった。BGM側と同じく、
+   * 成功時はmasterを再利用し、失敗時は次の操作でやり直せるようにする。
+   */
   private prepare(): Promise<void> {
+    if (this.master) return Promise.resolve();
     if (this.preparing) return this.preparing;
     this.preparing = (async () => {
-      const ctx = await audioEngine.ensure();
-      if (!ctx) return;
-      this.master = ctx.createGain();
-      this.master.gain.value = this.effectiveVolume();
-      this.master.connect(ctx.destination);
-      // 音が読めなくてもゲームは動くべきなので、失敗しても静かに進む
-      await loadAudioManifest();
+      try {
+        const ctx = await audioEngine.ensure();
+        if (!ctx) return;
+        this.master = ctx.createGain();
+        this.master.gain.value = this.effectiveVolume();
+        this.master.connect(ctx.destination);
+        // 音が読めなくてもゲームは動くべきなので、失敗しても静かに進む
+        await loadAudioManifest();
+      } catch {
+        this.master = null;
+      } finally {
+        this.preparing = null;
+      }
     })();
     return this.preparing;
   }
