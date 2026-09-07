@@ -2,6 +2,7 @@ import {
   AWAKENING_DEPTH_FLOORS, AwakeningDepthFloor, findAwakeningDepthFloor, rollAwakeningDepthDrop,
 } from "../data/awakeningDepths.js";
 import type { PlayerState } from "./playerState.js";
+import { recordMissionProgress } from "./missions.js";
 
 /**
  * 目覚の深域の進行。**素材を配るのはここだけ。**
@@ -50,6 +51,12 @@ export function grantAwakeningDepthReward(
   const cleared = state.clearedAwakeningDepthFloors ?? (state.clearedAwakeningDepthFloors = []);
   const firstClear = !cleared.includes(floor.floor);
   if (firstClear) cleared.push(floor.floor);
+  /*
+   * 累計ミッションへ1回ぶん記録する。**階は問わない。**
+   * 深い階ほど価値が高い形にすると、上へ行けない人の累計が止まる。
+   * スタミナはどの階も10で揃えてあるので、回数で数えれば釣り合う。
+   */
+  recordMissionProgress(state, "awakeningDepthClears");
 
   const reward: AwakeningDepthReward = {
     shards: drop.shards + (firstClear ? floor.firstClear.shards : 0),

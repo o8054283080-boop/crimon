@@ -15,7 +15,11 @@ export type MissionCounterKey =
   | "equipmentEnhancements"
   | "shopPurchases"
   | "staminaSpent"
-  | "dungeonClears";
+  | "dungeonClears"
+  /** 目覚の深域を勝った回数。階は問わない */
+  | "awakeningDepthClears"
+  /** 才能ptを解放した数。振り直しても減らない(**使った素材の数**を数えている) */
+  | "talentPointsUnlocked";
 
 export interface MissionCounters extends Record<MissionCounterKey, number> {}
 
@@ -33,6 +37,15 @@ export interface MissionReward {
   expPig4?: number;
   reincarnationPig3?: number;
   reincarnationPig4?: number;
+  /*
+   * 才能覚醒の素材。
+   *
+   * **その道の報酬は、その道で要るものにする。**深域を回った先が
+   * 召喚書だけだと、深域を回る理由が召喚になってしまう。
+   */
+  awakeningShards?: number;
+  awakeningCrystals?: number;
+  awakeningStones?: number;
 }
 
 export interface PeriodMissionDefinition {
@@ -275,6 +288,8 @@ const ZERO_COUNTERS = (): MissionCounters => ({
   shopPurchases: 0,
   staminaSpent: 0,
   dungeonClears: 0,
+  awakeningDepthClears: 0,
+  talentPointsUnlocked: 0,
 });
 
 function cloneCounters(counters: MissionCounters): MissionCounters {
@@ -563,7 +578,7 @@ export function syncMissions(player: PlayerState, now: Date = new Date()): Missi
 /** 観測できないゲーム内イベントを、全期間共通のミッション累計へ1回ぶん記録する。 */
 export function recordMissionProgress(
   player: PlayerState,
-  counter: Extract<MissionCounterKey, "dungeonClears">,
+  counter: Extract<MissionCounterKey, "dungeonClears" | "awakeningDepthClears" | "talentPointsUnlocked">,
   amount = 1,
   now: Date = new Date(),
 ): void {
@@ -626,6 +641,10 @@ export function grantMissionReward(player: PlayerState, reward: MissionReward): 
   grantPig(player, "EXP", 4, reward.expPig4 ?? 0);
   grantPig(player, "REINCARNATION", 3, reward.reincarnationPig3 ?? 0);
   grantPig(player, "REINCARNATION", 4, reward.reincarnationPig4 ?? 0);
+  // 目覚の素材は**省略可の欄**なので、足す前に0で埋める(古いセーブには無い)
+  if (reward.awakeningShards) player.awakeningShards = (player.awakeningShards ?? 0) + reward.awakeningShards;
+  if (reward.awakeningCrystals) player.awakeningCrystals = (player.awakeningCrystals ?? 0) + reward.awakeningCrystals;
+  if (reward.awakeningStones) player.awakeningStones = (player.awakeningStones ?? 0) + reward.awakeningStones;
 }
 
 export function claimPeriodMission(player: PlayerState, period: MissionPeriod, id: string, now: Date = new Date()): MissionReward | null {
@@ -765,6 +784,52 @@ const CUMULATIVE_DEFINITIONS: readonly CumulativeDefinition[] = [
     ],
     nextAfterFixed: (last) => last + 50,
     rewardAfterFixed: () => ({ reincarnationPig3: 1, crystal: 100 }),
+  },
+  /*
+   * 目覚の深域。**階を問わず「勝った回数」**で数える。
+   *
+   * 深い階ほど価値が高い形にすると、上へ行けない人の累計が止まる。
+   * スタミナはどの階も同じ10なので、回数で数えれば
+   * 「1階を何度も」でも「10階を何度も」でも同じだけ進む。
+   */
+  {
+    key: "awakening-depth",
+    title: "目覚の深域クリア回数",
+    counter: "awakeningDepthClears",
+    fixed: [
+      { target: 5, reward: { awakeningShards: 30 } },
+      { target: 20, reward: { awakeningCrystals: 5 } },
+      { target: 50, reward: { awakeningShards: 120, awakeningCrystals: 10 } },
+      { target: 100, reward: { awakeningStones: 1 } },
+      { target: 200, reward: { awakeningCrystals: 30, gold: 300_000 } },
+    ],
+    nextAfterFixed: (last) => last + 100,
+    // **奇石は200回に1つだけ。**回数で必ず届く道を1本だけ残しておく
+    rewardAfterFixed: (target) => target % 200 === 0
+      ? { awakeningStones: 1, awakeningCrystals: 20 }
+      : { awakeningShards: 150, awakeningCrystals: 15 },
+  },
+  /*
+   * 才能覚醒。**振り分けではなく「ptを解放した数」**で数える。
+   *
+   * 振り分けは何度でも戻せるので、数えると振り直すだけで進んでしまう。
+   * 解放は素材を使い切った証拠なので、戻らない。
+   */
+  {
+    key: "talent-points",
+    title: "才能pt解放数",
+    counter: "talentPointsUnlocked",
+    fixed: [
+      { target: 1, reward: { awakeningShards: 20 } },
+      { target: 5, reward: { awakeningShards: 60 } },
+      { target: 15, reward: { awakeningCrystals: 10 } },
+      { target: 30, reward: { awakeningStones: 1 } },
+      { target: 60, reward: { awakeningCrystals: 30, crystal: 300 } },
+    ],
+    nextAfterFixed: (last) => last + 30,
+    rewardAfterFixed: (target) => target % 150 === 0
+      ? { awakeningStones: 1, awakeningCrystals: 20 }
+      : { awakeningCrystals: 20, awakeningShards: 100 },
   },
   {
     key: "login",
@@ -939,6 +1004,9 @@ export function missionRewardText(reward: MissionReward): string {
   if (reward.expPig4) parts.push(`★4 MAX経験ピッグ×${reward.expPig4}`);
   if (reward.reincarnationPig3) parts.push(`★3 MAX転生ピッグ×${reward.reincarnationPig3}`);
   if (reward.reincarnationPig4) parts.push(`★4 MAX転生ピッグ×${reward.reincarnationPig4}`);
+  if (reward.awakeningShards) parts.push(`目覚の欠片×${reward.awakeningShards.toLocaleString("ja-JP")}`);
+  if (reward.awakeningCrystals) parts.push(`目覚の結晶×${reward.awakeningCrystals.toLocaleString("ja-JP")}`);
+  if (reward.awakeningStones) parts.push(`目覚の奇石×${reward.awakeningStones}`);
   return parts.join(" / ") || "報酬なし";
 }
 

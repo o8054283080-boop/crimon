@@ -12,6 +12,7 @@ import {
 } from "../core/talentSkills.js";
 import { initialRarityOfDexId } from "../data/initialRarity.js";
 import type { PlayerState } from "./playerState.js";
+import { recordMissionProgress } from "./missions.js";
 
 /**
  * 才能覚醒の操作。**素材とゴールドに触るのはここだけ。**
@@ -76,6 +77,12 @@ export function unlockTalentPoint(state: PlayerState, monster: MonsterInstance):
   state.awakeningShards = (state.awakeningShards ?? 0) - cost.shards;
   state.awakeningCrystals = (state.awakeningCrystals ?? 0) - cost.crystals;
   talentsOf(monster).unlockedPoints += 1;
+  /*
+   * 累計ミッションへ1つ記録する。**振り分けではなく解放を数える。**
+   * 振り分けは何度でも戻せるので、そちらを数えると
+   * 振り直すだけでミッションが進んでしまう。
+   */
+  recordMissionProgress(state, "talentPointsUnlocked");
   return { ok: true };
 }
 
