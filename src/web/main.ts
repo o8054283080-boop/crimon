@@ -364,6 +364,15 @@ interface AppState {
   equipmentListDense: boolean;
   /** 所持装備の絞り込み条件。所持一覧で使う(装備を選びに来た時は当てない) */
   equipmentFilter: EquipmentFilter;
+  /**
+   * 装備を選ぶ画面(picker)専用の絞り込み。
+   *
+   * **所持装備の一覧とは別に持つ。**共有すると、一覧で
+   * 「速攻シリーズだけ」に絞ったままモンスターの枠を開いた時、
+   * 何も出ないのに理由が分からない、という詰まり方をする。
+   */
+  equipmentPickerFilter: EquipmentFilter;
+  equipmentPickerFilterOpen: boolean;
   /** 絞り込みの札を開いているか */
   equipmentFilterOpen: boolean;
   /**
@@ -531,6 +540,8 @@ const state: AppState = {
   equipmentListDense: loadEquipmentListDense(),
   equipmentFilter: { ...EMPTY_EQUIPMENT_FILTER },
   equipmentFilterOpen: false,
+  equipmentPickerFilter: { ...EMPTY_EQUIPMENT_FILTER },
+  equipmentPickerFilterOpen: false,
   equipmentOrder: null,
   monsterSortKey: "recommended",
   monsterFilter: { ...EMPTY_MONSTER_FILTER },
@@ -4219,16 +4230,26 @@ function renderEquipmentScreen(): HTMLElement {
       saveEquipmentListDense(state.equipmentListDense);
       render();
     },
-    filter: state.equipmentFilter,
-    filterOpen: state.equipmentFilterOpen,
+    /*
+     * 絞り込みは**画面ごとに別の物を渡す。**
+     * 装備を選ぶ画面(picker)と所持装備の一覧で条件を共有すると、
+     * 一覧で絞ったままモンスターの枠を開いた時に「何も出ない」が起きる。
+     */
+    filter: state.equipmentPickerContext ? state.equipmentPickerFilter : state.equipmentFilter,
+    filterOpen: state.equipmentPickerContext ? state.equipmentPickerFilterOpen : state.equipmentFilterOpen,
     onChangeFilter: (filter) => {
-      state.equipmentFilter = filter;
+      if (state.equipmentPickerContext) state.equipmentPickerFilter = filter;
+      else state.equipmentFilter = filter;
       // 条件が変われば見えるものが変わる。並びも組み直す
       state.equipmentOrder = null;
       render();
     },
     onToggleFilterOpen: () => {
-      state.equipmentFilterOpen = !state.equipmentFilterOpen;
+      if (state.equipmentPickerContext) {
+        state.equipmentPickerFilterOpen = !state.equipmentPickerFilterOpen;
+      } else {
+        state.equipmentFilterOpen = !state.equipmentFilterOpen;
+      }
       render();
     },
     orderIds: state.equipmentOrder,
