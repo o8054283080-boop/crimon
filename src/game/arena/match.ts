@@ -179,3 +179,35 @@ export function markArenaRevenged(state: PlayerState, recordId: string): boolean
 export function arenaDefenseHistory(state: PlayerState): ArenaMatchRecord[] {
   return state.arenaMatchHistory.filter((record) => record.side === "DEFENSE");
 }
+
+/**
+ * サーバの記録と手元の記録を合わせる。
+ *
+ * **上書きしてはいけない。** 以前はサーバから引いた分で丸ごと置き換えており、
+ * 繋がっていない間に積んだ記録(留守中にNPCへ攻められた分)が、
+ * 一度オンラインになった瞬間に**全部消えて保存されていた**。
+ * 消えた記録は二度と戻らない——サーバはその戦いを知らないので。
+ *
+ * サーバの記録の方が正なので、同じ戦い(同じid)ならサーバ側を採る。
+ * 並びは新しい順。同じ時刻なら、サーバの記録を先に置く。
+ */
+export function mergeArenaHistory(
+  local: readonly ArenaMatchRecord[],
+  remote: readonly ArenaMatchRecord[],
+): ArenaMatchRecord[] {
+  const byId = new Map<string, ArenaMatchRecord>();
+  for (const record of local) byId.set(record.id, record);
+  // 後から入れる方が勝つ。サーバの記録を正とする
+  for (const record of remote) byId.set(record.id, record);
+
+  const remoteIds = new Set(remote.map((record) => record.id));
+  const merged = [...byId.values()].sort((a, b) => {
+    if (b.at !== a.at) return b.at - a.at;
+    // 同じ時刻はサーバ側を先に。並びが起動ごとに揺れないよう、最後はidで決める
+    const aRemote = remoteIds.has(a.id) ? 0 : 1;
+    const bRemote = remoteIds.has(b.id) ? 0 : 1;
+    if (aRemote !== bRemote) return aRemote - bRemote;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  return merged.slice(0, ARENA_HISTORY_MAX);
+}
