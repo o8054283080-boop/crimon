@@ -167,7 +167,7 @@ const FLOOR_CONFIG: Record<number, FloorConfig> = {
     note: "10階の手前。ここを安定して回れるなら10階が見える",
   },
   10: {
-    hp: 152_000, atk: 7_800, def: 4_000, spd: 185,
+    hp: 145_000, atk: 7_000, def: 4_000, spd: 185,
     counterAfterHits: 5, adaptationMax: 0.20, shards: ["ATK", "DEF"], stamina: 10,
     drop: { shards: [14, 18], crystals: [4, 6], stoneChance: 0.06 },
     firstClear: { shards: 150, crystals: 30, stones: 1 },
