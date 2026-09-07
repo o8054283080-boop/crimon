@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMPENSATIONS, claimCompensations, compensationBannerLabel, localDateString, pendingCompensations } from "../src/game/compensation.js";
+import { COMPENSATIONS, claimCompensations, compensationBannerLabel, hasReward, localDateString, pendingCompensations } from "../src/game/compensation.js";
 import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
 
 const TARGET = COMPENSATIONS.find((c) => c.id === "2026-08-18-save-loss")!;
@@ -190,5 +190,66 @@ describe("新モンスター追加の記念配布", () => {
     expect(compensationBannerLabel([{ compensation: apology }])).toBe("お詫びの配布");
     // 混ざった時は、どちらの言葉も嘘になるので中立にする
     expect(compensationBannerLabel([{ compensation: CELEBRATION }, { compensation: apology }])).toBe("配布のお知らせ");
+  });
+});
+
+/**
+ * 音と真っ黒画面のお詫び。
+ *
+ * **光闇召喚書をお知らせから配るのは、これが初めて。**
+ * 配るには3か所そろえる必要がある——受け取り(`claimCompensations`)、
+ * 有無の判定(`hasReward`)、ホームの札。どれか1つ忘れると
+ * **配ったのに増えない**か、**中身の出ない札**になる。
+ * 型チェックは3つとも素通りするので、ここで見張る。
+ */
+describe("音と真っ黒画面のお詫び", () => {
+  const APOLOGY = COMPENSATIONS.find((c) => c.id === "2026-09-07-apology-audio-and-black-screen")!;
+
+  /** この配布だけを見るため、ほかの受け取り済みにする */
+  function only(state: ReturnType<typeof createInitialState>): void {
+    for (const c of COMPENSATIONS) {
+      if (c.id !== APOLOGY.id) state.claimedCompensationIds.push(c.id);
+    }
+  }
+
+  it("ダイヤ2000・ゴールド50万・★4以上光闇召喚書1枚を配る", () => {
+    expect(APOLOGY.crystal).toBe(2000);
+    expect(APOLOGY.gold).toBe(500_000);
+    expect(APOLOGY.lightDarkFourStarSummonScrolls).toBe(1);
+  });
+
+  it("受け取ると、光闇召喚書がちゃんと増える", () => {
+    const state = createInitialState();
+    only(state);
+    const before = {
+      crystal: state.crystal,
+      gold: state.gold,
+      lightDark: state.lightDarkFourStarSummonScrolls,
+    };
+    const claims = claimCompensations(state, localNoonOn("2026-09-07"));
+    expect(claims.map(({ compensation }) => compensation.id)).toEqual([APOLOGY.id]);
+    expect(state.crystal).toBe(before.crystal + 2000);
+    expect(state.gold).toBe(before.gold + 500_000);
+    // ここが増えていなければ、受け取り側に足し忘れている
+    expect(state.lightDarkFourStarSummonScrolls).toBe(before.lightDark + 1);
+  });
+
+  it("中身のある配布として扱われる(ホームの札に出る)", () => {
+    // hasReward が false だと、モノを配っているのに札が畳まれて気づかれない
+    expect(hasReward(APOLOGY)).toBe(true);
+  });
+
+  it("何度開いても二重には配られない", () => {
+    const state = createInitialState();
+    only(state);
+    claimCompensations(state, localNoonOn("2026-09-07"));
+    const after = state.lightDarkFourStarSummonScrolls;
+    const reloaded = normalizeLoadedState(JSON.parse(JSON.stringify(state)));
+    expect(claimCompensations(reloaded, localNoonOn("2026-09-08"))).toHaveLength(0);
+    expect(reloaded.lightDarkFourStarSummonScrolls).toBe(after);
+  });
+
+  it("お詫びとして出す", () => {
+    expect(compensationBannerLabel([{ compensation: APOLOGY }])).toBe("お詫びの配布");
   });
 });

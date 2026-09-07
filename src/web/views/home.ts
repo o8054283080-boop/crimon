@@ -212,6 +212,9 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
     if ((compensation.fourStarSummonScrolls ?? 0) > 0) {
       items.push({ name: "scroll", amount: `+${compensation.fourStarSummonScrolls}`, unit: "★4以上召喚書" });
     }
+    if ((compensation.lightDarkFourStarSummonScrolls ?? 0) > 0) {
+      items.push({ name: "scroll", amount: `+${compensation.lightDarkFourStarSummonScrolls}`, unit: "★4以上光闇召喚書" });
+    }
     return el("section", { className: "panel reward-banner compensation" }, [
       rewardSeal("scroll"),
       el("div", { className: "reward-banner__body" }, [
