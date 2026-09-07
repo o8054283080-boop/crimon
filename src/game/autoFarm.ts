@@ -41,6 +41,15 @@ export interface AutoFarmResult {
    * optional にして旧セーブの進行中/完了済み周回結果との互換性を保つ。
    */
   partyLevels?: PartyLevelInfo[];
+  /*
+   * 目覚の素材。**深域の周回でだけ増える。**
+   *
+   * ゴールドや経験値と混ぜられないので別枠にする。
+   * optional なのは旧セーブの周回結果と噛み合わせるため。
+   */
+  awakeningShards?: number;
+  awakeningCrystals?: number;
+  awakeningStones?: number;
 }
 
 export function emptyResult(): AutoFarmResult {

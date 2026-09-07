@@ -415,8 +415,8 @@ export class BattleEngine {
           return { winner: winnerMidLoop, log: this.log, turnsTaken, turns: this.turns };
         }
 
+        // 強化の配布は `recordTurn` の中でやる(どの道を通っても呼ばれるように)
         this.recordTurn(unit);
-        this.applyAllyDeathBoosts();
         turnsTaken += 1;
         if (turnsTaken >= this.maxTurns) break;
 
@@ -444,6 +444,20 @@ export class BattleEngine {
     this.syncTower80Boss();
     this.takeTurn(unit, choice);
     this.syncTower80Boss();
+    /*
+     * 倒れた味方が残していく強化を、**ここで必ず配る。**
+     *
+     * 以前は `run()` の中の1か所でしか呼んでいなかった。`run()` は
+     * まとめて決着だけ出す道で、画面から1手ずつ進める道(`resolveTurn`)は
+     * 通らない。つまり**画面で遊ぶ限り、目覚の深域の才能晶を倒しても
+     * ボスが強くならなかった。**「周回だと負ける」と言われて分かった——
+     * 負けていたのではなく、**手で遊ぶ側だけがギミックを飛ばしていた。**
+     *
+     * `run()` 自身も、追加ターンのあとでは呼んでいなかった。
+     * 1手を記録する場所へ移せば、どの道を通っても呼び忘れが起きない。
+     * スナップショットより前に置いて、強化が画面へ反映されるようにする。
+     */
+    this.applyAllyDeathBoosts();
     const record: TurnRecord = {
       actorId: unit.instanceId,
       lines: this.log.slice(linesBefore),
