@@ -4,7 +4,7 @@
  * ゲーム用に調整済みのループ音源をそのまま繰り返す。
  * 音声文脈は `context.ts` の `audioEngine` が持つ。効果音と同じものを使う。
  */
-import { audioEngine, loadAudioBuffer, loadAudioManifest } from "./context.js";
+import { audioEngine, lastAudioLoadError, loadAudioBuffer, loadAudioManifest } from "./context.js";
 import { AudioSettings, getAudioSettings, onAudioSettingsChange } from "./settings.js";
 
 /** 場面。拠点・通常戦闘・ボス戦の3系統 */
@@ -31,10 +31,21 @@ class BgmPlayer {
 
   constructor() {
     onAudioSettingsChange((next) => {
-      const wasEnabled = this.settings.bgmEnabled;
+      /*
+       * **音量が0から上がった時も鳴らし直す。**
+       *
+       * 鳴らす処理は音量0なら何もせずに返る。以前はスイッチを
+       * OFF→ONにした時しか再開を試みていなかったので、
+       * **スライダーを0にした人は、上げ直しても無音のまま**だった
+       * (画面を移ってBGMの場面が変わるまで直らない)。
+       * 全体の音量を0にしていた場合も同じ穴に落ちる。
+       */
+      const wasSilent = this.effectiveVolume() <= 0;
       this.settings = next;
       if (this.master) this.master.gain.value = this.effectiveVolume();
-      if (!wasEnabled && next.bgmEnabled && this.wanted) void this.apply(this.wanted);
+      if (wasSilent && this.effectiveVolume() > 0 && this.wanted && !this.playing) {
+        void this.apply(this.wanted);
+      }
     });
 
     // iOSでは初回タップだけでなく、バックグラウンド復帰後にもreadyが来る。
@@ -54,18 +65,30 @@ class BgmPlayer {
     return document.querySelector(".unit-hud--enemy.unit-hud--boss") ? "boss" : "battle";
   }
 
+  /**
+   * 出力へつなぐ枝を用意する。
+   *
+   * **失敗を覚え込まない。**以前は最初の1回の約束をそのまま持ち続けていたので、
+   * 音声文脈を作れなかった端末は、以後どれだけ画面を移動しても
+   * 毎回ここで打ち切られ、**アプリを開き直すまで二度と鳴らなかった**。
+   * さらに文脈の生成が例外を投げると約束が解決されず、待っている側が
+   * 永久に返らない状態になっていた。
+   */
   private prepare(): Promise<void> {
+    if (this.master) return Promise.resolve();
     if (this.preparing) return this.preparing;
-    let done!: () => void;
-    this.preparing = new Promise<void>((resolve) => (done = resolve));
-    void (async () => {
-      const ctx = await audioEngine.ensure();
-      if (ctx) {
+    this.preparing = (async () => {
+      try {
+        const ctx = await audioEngine.ensure();
+        if (!ctx) return;
         this.master = ctx.createGain();
         this.master.gain.value = this.effectiveVolume();
         this.master.connect(ctx.destination);
+      } catch {
+        // 用意できなかった。**次に呼ばれた時にやり直せる状態へ戻す**
+      } finally {
+        this.preparing = null;
       }
-      done();
     })();
     return this.preparing;
   }
@@ -155,6 +178,24 @@ class BgmPlayer {
   /** いま鳴っている場面。鳴っていなければ null */
   currentScene(): BgmScene | null {
     return this.playing?.scene ?? null;
+  }
+
+  /**
+   * なぜ鳴っていないのかを一言で返す。**設定画面に出して切り分けに使う。**
+   *
+   * 「鳴らない」と言われた時、これが無いと音量なのか解錠なのか
+   * 読み込み失敗なのかを誰も見分けられなかった。
+   */
+  diagnosis(): string {
+    if (this.playing) return `鳴っています（${this.playing.scene}）`;
+    if (!this.settings.bgmEnabled) return "BGMのスイッチが切れています";
+    if (this.effectiveVolume() <= 0) return "音量が0です（全体かBGMのどちらか）";
+    if (!this.wanted) return "この画面ではBGMを鳴らしていません";
+    const loadError = lastAudioLoadError();
+    if (loadError) return `音を読めていません — ${loadError}`;
+    if (audioEngine.state() !== "running") return `まだ音を出せる状態ではありません（${audioEngine.state()}）`;
+    if (this.inflight) return "読み込み中です";
+    return "準備はできていますが、まだ鳴っていません";
   }
 
   /**

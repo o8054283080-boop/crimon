@@ -8,7 +8,8 @@ import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
 import "./ui/crystalShop.css";
 import "./ui/cloudRecoveryWarning.css";
-import { audioContextState, BgmScene, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
+import { audioContextState, bgmDiagnosis, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
+import { BATTLE_SCREENS, bgmSceneOf } from "./audio/bgmScene.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
 import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
@@ -3109,6 +3110,7 @@ function render(): void {
         audioSettings: {
           settings: getAudioSettings(),
           contextState: audioContextState(),
+          bgmDiagnosis: bgmDiagnosis(),
           onChange: (patch) => {
             updateAudioSettings(patch);
             render();
@@ -4086,28 +4088,6 @@ function render(): void {
   window.scrollTo(0, scrollPositions.get(newRouteKey) ?? 0);
   lastRouteKey = newRouteKey;
   lastRouteState = routeState();
-}
-
-/**
- * 画面ごとに敷くBGM。
- *
- * 焼いてあるのは2つだけで、戦闘とそれ以外で分ける。場面をこれ以上刻んでも、
- * 中身の差を作れなければ切り替わりが目立つだけで良くならない。
- *
- * `playBgm` は同じ場面を何度渡しても鳴らし直さないので、
- * 再描画のたびに呼んで構わない(むしろ、そう呼ぶ前提で作ってある)。
- */
-const BATTLE_SCREENS = new Set<ScreenName>([
-  "BATTLE",
-  "DUNGEON_BATTLE",
-  "LEVEL_DUNGEON_BATTLE",
-  "GOLD_DUNGEON_BATTLE",
-  "ARENA_BATTLE",
-  "TOWER_BATTLE",
-]);
-
-function bgmSceneOf(screen: ScreenName): BgmScene {
-  return BATTLE_SCREENS.has(screen) ? "battle" : "home";
 }
 
 function renderSummonScreen(): HTMLElement {

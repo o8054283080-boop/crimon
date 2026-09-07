@@ -25,6 +25,21 @@ class AudioEngine {
   installUnlock(): void {
     if (typeof window === "undefined" || this.unlockInstalled) return;
     this.unlockInstalled = true;
+    /*
+     * **iPhoneの消音スイッチでも鳴らす。**
+     *
+     * Web Audio は既定で「着信音と同じ扱い(ambient)」なので、
+     * 本体横のスイッチが消音側だと無音になる。`playback` を宣言すると
+     * 音楽アプリと同じ扱いになり、消音スイッチの影響を受けなくなる
+     * (Safari 16.4以降。持たないブラウザでは何も起きない)。
+     *
+     * 他のアプリで音楽を鳴らしている時に、こちらの音が出ないことがあるのも
+     * 同じ宣言で改善する。
+     */
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session) {
+      try { session.type = "playback"; } catch { /* 宣言できない環境でもゲームは動く */ }
+    }
     const start = () => {
       void this.ensure();
       this.unlockInGesture();
@@ -114,12 +129,50 @@ export const audioEngine = new AudioEngine();
  */
 export const AUDIO_BASE_URL = `${import.meta.env.BASE_URL ?? "/"}audio/`.replace(/\/{2,}/g, "/");
 
+/**
+ * 最後に音を読めなかった理由。**握り潰さずに残す。**
+ *
+ * ここを黙って null で返していたため、「BGMだけ鳴らない」と言われても
+ * 通信で落ちたのか、復号できない形式なのか、そもそも配信されていないのかを
+ * 誰も切り分けられなかった。設定画面がこれを読んで画面へ出す。
+ */
+let lastAudioError: string | null = null;
+
+export function lastAudioLoadError(): string | null {
+  return lastAudioError;
+}
+
 export async function loadAudioBuffer(ctx: AudioContext, file: string): Promise<AudioBuffer | null> {
+  let response: Response;
   try {
-    const response = await fetch(`${AUDIO_BASE_URL}${file}`);
-    if (!response.ok) return null;
-    return await ctx.decodeAudioData(await response.arrayBuffer());
-  } catch {
+    response = await fetch(`${AUDIO_BASE_URL}${file}`);
+  } catch (error) {
+    lastAudioError = `${file}: 取得できない (${(error as Error)?.name ?? "不明"})`;
+    return null;
+  }
+  if (!response.ok) {
+    lastAudioError = `${file}: 取得できない (HTTP ${response.status})`;
+    return null;
+  }
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await response.arrayBuffer();
+  } catch (error) {
+    lastAudioError = `${file}: 読み取れない (${(error as Error)?.name ?? "不明"})`;
+    return null;
+  }
+  try {
+    const buffer = await ctx.decodeAudioData(bytes);
+    lastAudioError = null;
+    return buffer;
+  } catch (error) {
+    /*
+     * **ここが本命の疑い。**この端末が ogg を復号できない場合、
+     * 効果音もBGMも同じように落ちる。BGMだけ落ちるなら、
+     * 大きさ(500KB超)の側の問題になる。どちらかを名前で見分けられるよう、
+     * ファイル名と大きさを残す。
+     */
+    lastAudioError = `${file}: 音を復号できない (${(error as Error)?.name ?? "不明"} / ${Math.round(bytes.byteLength / 1024)}KB)`;
     return null;
   }
 }
