@@ -3560,6 +3560,15 @@ function renderScreen(): void {
           state.arenaNotice = null;
           if (view !== "OPPONENT_DETAIL") state.arenaDetailIndex = null;
           if (view === "RANKING" && state.arenaRankingTop.length === 0) void refreshArenaRanking();
+          /*
+           * **防衛履歴は開くたびに取り直す。**
+           *
+           * 攻められるのはこちらが見ていない時なので、アプリを開いたままだと
+           * 起動時に1度引いたきり、その後どれだけ攻められても画面は変わらない。
+           * レートの方は繋いだ時にサーバの値へ合わせるので、
+           * **レートだけ下がって、理由が履歴に出ない**という食い違いになる。
+           */
+          if (view === "HISTORY") state.arenaHistoryLoaded = false;
           if (view === "DEFENSE" && state.arenaDefenseDraftIds.length === 0) {
             // 登録済みの顔ぶれを下敷きにする。ゼロから選び直させない
             state.arenaDefenseDraftIds = [...state.player.arenaDefenseIds];
