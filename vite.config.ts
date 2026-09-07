@@ -65,7 +65,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // prompt更新では、ユーザーが更新ボタンを押すまで新workerをwaitingに保つ。
+        // prompt更新では、ユーザーがバナーのボタンを押すまで新workerをwaitingに保つ。
         // falseなら生成SWにSKIP_WAITINGメッセージのlistenerが入り、registerSWが返す
         // updateSW()から公式のmessageSkipWaiting()経由で安全に有効化できる。
         skipWaiting: false,
@@ -73,13 +73,14 @@ export default defineConfig({
         /*
          * ogg/json を入れ忘れていたため、効果音がキャッシュの対象外だった
          * (オフラインでは無音になり、ビルドの版とも紐づかない)。
+         * iPhone互換用に公開時生成する m4a も同じく必ずキャッシュする。
          *
          * **webp も同じ穴が開いていた。** モンスターの2Dの絵も、
          * ホームの絵札もすべて webp なので、入れないと
          * オフラインでモンスターが1体も出ない。
          * 拡張子を増やしたら必ずここへ足すこと。
          */
-        globPatterns: ["**/*.{js,css,html,png,webp,jpg,svg,webmanifest,ogg,json}"],
+        globPatterns: ["**/*.{js,css,html,png,webp,jpg,svg,webmanifest,ogg,m4a,json}"],
         // 効果音が72個あるので、既定の上限(2MiB)だと取りこぼす
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // 古い版のキャッシュを残さない。残ると更新後も旧ファイルを掴み続ける
