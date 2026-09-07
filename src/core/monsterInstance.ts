@@ -1,6 +1,7 @@
 import { CombatModifiers, DEFAULT_COMBAT_MODIFIERS, Equipment, EquipSlot, applyEquipmentToStats, computeSetCombatModifiers } from "./equipment.js";
 import { MonsterDefinition } from "./monster.js";
 import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
+import { applyLowRarityBoost } from "./lowRarityBoost.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
 import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDevelopment.js";
@@ -148,7 +149,13 @@ export function toBattleDefinition(
   dex: MonsterDefinition,
   equippedItems: Equipment[] = [],
 ): MonsterDefinition {
-  const growthStats = computeEffectiveStats(dex.stats, instance.star, instance.level);
+  /* 低い星から出るモンスターの底上げ。**ここはプレイヤーの手持ちの道。**
+     敵は stageRunner / dungeonRunner の別の道を通るので掛からない */
+  const growthStats = applyLowRarityBoost(
+    computeEffectiveStats(dex.stats, instance.star, instance.level),
+    dex.templateId,
+    instance.star,
+  );
   const type = instance.development.type;
   const multiplier = type ? MONSTER_TYPE_STAT_MULTIPLIERS[type] : MONSTER_TYPE_STAT_MULTIPLIERS.BALANCE;
   const points = instance.development.abilityPoints;
