@@ -34,6 +34,31 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # iOS 18.7.8 の実機で OGG/Vorbis が Web Audio の decodeAudioData() では
+      # EncodingError、HTMLAudioElement でも「再生中」に見えるのに無音になる端末を確認した。
+      # 公開物だけは互換性の高い AAC/M4A へ変換し、manifest も M4A を指すようにする。
+      # 元のOGGはリポジトリに残すので、音作りのソースや再生成手順は変えない。
+      - name: iPhone互換のAAC音源を用意
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          for src in public/audio/*.ogg; do
+            dst="${src%.ogg}.m4a"
+            ffmpeg -hide_banner -loglevel error -y -i "$src" -c:a aac -b:a 160k -movflags +faststart "$dst"
+          done
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("public/audio/manifest.json")
+          text = p.read_text(encoding="utf-8")
+          p.write_text(text.replace('.ogg"', '.m4a"'), encoding="utf-8")
+          PY
+          test -s public/audio/bgm_home.m4a
+          test -s public/audio/tap_0.m4a
+          grep -q 'bgm_home.m4a' public/audio/manifest.json
       # **アリーナのオンライン機能は、ここで環境変数を渡さないと永久に動かない。**
       #
       # Vite は `VITE_` で始まる環境変数を**組み立ての時に**中へ焼き込む。
