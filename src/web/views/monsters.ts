@@ -3,6 +3,7 @@ import { EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET
 import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel, toBattleDefinition } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "../../core/stats.js";
+import { MATERIAL_PIG_KINDS, MATERIAL_PIG_LABEL, MaterialPigKind, materialPigKindOf } from "../../core/materialPig.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
@@ -406,6 +407,13 @@ let rankUpMaterialSort: Extract<MaterialMonsterSort, "DEFAULT" | "REINCARNATION_
 let rankUpSortKey: MonsterSortKey = "recommended";
 let rankUpElementFilter: Element | "ALL" = "ALL";
 let rankUpUseFilter: "ALL" | "SAME_SPECIES" | "SELECTED" = "ALL";
+/**
+ * 素材ピッグの種類。
+ *
+ * **役割ではここが分けられない**(3種とも「素材」)。ランクアップで使うのは
+ * 転生ピッグだけなので、混ざっていると探しにくい。
+ */
+let rankUpPigFilter: MaterialPigKind | "ALL" = "ALL";
 let rankUpDetailId: string | null = null;
 
 function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElement {
@@ -455,6 +463,8 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     if (rankUpElementFilter !== "ALL" && findMonsterById(candidate.dexId)?.element !== rankUpElementFilter) return false;
     if (rankUpUseFilter === "SAME_SPECIES" && !isSameSpecies(target, candidate)) return false;
     if (rankUpUseFilter === "SELECTED" && !props.selectedSacrificeIds.includes(candidate.id)) return false;
+    if (rankUpPigFilter !== "ALL"
+      && materialPigKindOf(findMonsterById(candidate.dexId)?.templateId) !== rankUpPigFilter) return false;
     return true;
   });
 
@@ -548,6 +558,20 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     return button;
   });
 
+  const pigValues = ["ALL", ...MATERIAL_PIG_KINDS] as const;
+  const pigButtons = pigValues.map((kind) => {
+    const button = el("button", {
+      type: "button",
+      className: `slot-filter-chip${rankUpPigFilter === kind ? " slot-filter-chip--active" : ""}`,
+    }, [kind === "ALL" ? "すべて" : MATERIAL_PIG_LABEL[kind]]) as HTMLButtonElement;
+    button.onclick = () => {
+      rankUpPigFilter = kind;
+      for (const [i, other] of pigButtons.entries()) other.classList.toggle("slot-filter-chip--active", pigValues[i] === kind);
+      grid.reset(buildItems());
+    };
+    return button;
+  });
+
   return el("div", { className: "screen monsters-screen" }, [
     managementHeader("ランクアップ", props.onCancelRankUp, dex ? dex.name : target.dexId),
     el("section", { className: "panel" }, [
@@ -576,6 +600,11 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
         el("span", { className: "mfilter__label" }, ["素材用途"]),
         el("div", { className: "mfilter__chips" }, useButtons),
       ]),
+      // 素材ピッグの種類。ランクアップで使うのは転生ピッグだけなので、混ざると探しにくい
+      el("div", { className: "mfilter__group" }, [
+        el("span", { className: "mfilter__label" }, ["素材の種類"]),
+        el("div", { className: "mfilter__chips" }, pigButtons),
+      ]),
       el("div", { className: "mfilter__group" }, [
         el("span", { className: "mfilter__label" }, ["並び順"]),
         el("div", { className: "mfilter__chips" }, sortButtons),
@@ -603,6 +632,7 @@ export function renderMonsters(props: MonstersProps): HTMLElement {
   rankUpSortKey = "recommended";
   rankUpElementFilter = "ALL";
   rankUpUseFilter = "ALL";
+  rankUpPigFilter = "ALL";
   if (target) return renderDetail(props, target);
   return renderList(props);
 }

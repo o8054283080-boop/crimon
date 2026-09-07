@@ -1,6 +1,7 @@
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { ELEMENTS, ELEMENT_COLOR, ELEMENT_JA, Element } from "../../core/element.js";
 import { STARS, STAR_MAX_LEVEL, Star } from "../../core/rarity.js";
+import { MATERIAL_PIG_KINDS, MATERIAL_PIG_LABEL, MaterialPigKind, materialPigKindOf } from "../../core/materialPig.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkMonsterPowerUp, isSameElement, isSameSpecies, monsterPowerUpExp } from "../../game/monsterPowerUp.js";
@@ -32,10 +33,18 @@ export interface MonsterTrainingFilter {
   element: Element | "ALL";
   star: Star | "ALL";
   use: MaterialUseFilter;
+  /**
+   * 素材ピッグの種類。
+   *
+   * **3種とも役割は「素材」で同じ**なので、これが無いと
+   * 経験ピッグとスキルピッグが混ざったまま並ぶ。
+   * 既存の控えとの互換のため省略可(省略時は絞らない)。
+   */
+  pig?: MaterialPigKind | "ALL";
   /** 既存状態との互換性のため省略時は通常順として扱う。 */
   sort?: MonsterTrainingMaterialSort;
 }
-export const EMPTY_MONSTER_TRAINING_FILTER: MonsterTrainingFilter = { element: "ALL", star: "ALL", use: "ALL", sort: "DEFAULT" };
+export const EMPTY_MONSTER_TRAINING_FILTER: MonsterTrainingFilter = { element: "ALL", star: "ALL", use: "ALL", pig: "ALL", sort: "DEFAULT" };
 
 /** 素材の選択自体とは独立した表示条件。複数条件はすべてANDで適用する。 */
 export function filterTrainingMaterials(
@@ -50,6 +59,10 @@ export function filterTrainingMaterials(
     if (filter.use === "SAME_SPECIES" && !isSameSpecies(target, candidate)) return false;
     if (filter.use === "SAME_ELEMENT" && !isSameElement(target, candidate)) return false;
     if (filter.use === "SELECTED" && !selectedIds.includes(candidate.id)) return false;
+    if (filter.pig && filter.pig !== "ALL") {
+      // 素材ピッグ以外は、種類を指定した時点で外れる
+      if (materialPigKindOf(findMonsterById(candidate.dexId)?.templateId) !== filter.pig) return false;
+    }
     return true;
   });
   return sortMaterialMonsters(filtered, filter.sort ?? "DEFAULT");
@@ -144,6 +157,18 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
             ...([["ALL", "すべて"], ["SAME_SPECIES", "同じ種族"], ["SAME_ELEMENT", "同じ属性"], ["SELECTED", "選択中"]] as const).map(([use, label]) => {
               return filterChip(label, props.filter.use === use, () => props.onChangeFilter({ ...props.filter, use }));
             }),
+          ]),
+        ]),
+        /*
+         * 素材ピッグの種類。**役割ではここが分けられない**(3種とも「素材」)。
+         * 経験ピッグとスキルピッグは使い道がまったく違うので、札を分ける。
+         */
+        el("div", { className: "mfilter__group" }, [
+          el("span", { className: "mfilter__label" }, ["素材の種類"]),
+          el("div", { className: "mfilter__chips" }, [
+            filterChip("すべて", (props.filter.pig ?? "ALL") === "ALL", () => props.onChangeFilter({ ...props.filter, pig: "ALL" })),
+            ...MATERIAL_PIG_KINDS.map((kind) =>
+              filterChip(MATERIAL_PIG_LABEL[kind], props.filter.pig === kind, () => props.onChangeFilter({ ...props.filter, pig: kind }))),
           ]),
         ]),
         el("div", { className: "mfilter__group" }, [
