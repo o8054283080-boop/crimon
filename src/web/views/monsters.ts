@@ -433,6 +433,18 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     .filter((m): m is MonsterInstance => m !== undefined);
   const check = checkRankUp(target, sacrifices, props.player.partyIds);
 
+  const rankUpAction = (): HTMLElement => stickyActions({
+    status: check.ok
+      ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
+      : check.reason ?? `あと ${Math.max(0, requiredCount - props.selectedSacrificeIds.length)} 体選んでください`,
+    primary: el("button", {
+      type: "button",
+      className: "btn btn--primary btn--large",
+      disabled: !check.ok,
+      onclick: props.onConfirmRankUp,
+    }, ["⭐ ランクアップ実行"]),
+  });
+
   const filteredCandidates = (): MonsterInstance[] => candidates.filter((candidate) => {
     if (rankUpElementFilter !== "ALL" && findMonsterById(candidate.dexId)?.element !== rankUpElementFilter) return false;
     if (rankUpUseFilter === "SAME_SPECIES" && !isSameSpecies(target, candidate)) return false;
@@ -546,6 +558,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
         el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
         renderPartySlots(sacrifices, requiredCount, props.onToggleSacrifice),
       ]),
+      rankUpAction(),
     ]),
     el("section", { className: "panel" }, [
       el("div", { className: "monster-density-row" }, [renderMonsterListDensityToggle(props.dense, props.onToggleDense)]),
@@ -565,23 +578,13 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
         el("span", { className: "mfilter__label" }, ["素材"]),
         el("div", { className: "mfilter__chips" }, [normalSortButton, reincarnationSortButton]),
       ]),
-      stickyActions({
-        status: check.ok
-          ? `素材 ${props.selectedSacrificeIds.length}/${requiredCount} 体`
-          : check.reason ?? `あと ${Math.max(0, requiredCount - props.selectedSacrificeIds.length)} 体選んでください`,
-        primary: el("button", {
-          type: "button",
-          className: "btn btn--primary btn--large",
-          disabled: !check.ok,
-          onclick: props.onConfirmRankUp,
-        }, ["⭐ ランクアップ実行"]),
-      }),
       candidates.length === 0
         ? el("p", { className: "app-subtitle" }, ["素材にできるモンスターがいません"])
         : buildItems().length === 0
           ? el("p", { className: "app-subtitle" }, ["条件に一致するモンスターがいません"])
           : grid.element,
     ]),
+    rankUpAction(),
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancelRankUp }, ["キャンセル"]),
   ]);
 }
