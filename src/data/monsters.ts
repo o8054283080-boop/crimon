@@ -1179,12 +1179,20 @@ const DRAGON: MonsterTemplate = {
     {
       id: "dragon_s2_flame",
       name: "フレイムブレス",
-      description: "灼熱の息を吐き、敵全体に攻撃力1.5倍のダメージを与え、65%で1ターン火傷させる。",
+      /*
+       * **ネメシスの「冥府の炎」の下位互換だった。**
+       * あちらは同じ全体1発で 1.7倍・火傷100%、こちらは 1.5倍・火傷65%。
+       * 形が同じで数字だけ小さいと、ドラゴンを選ぶ理由がどこにも無い。
+       *
+       * 多段(0.7倍×3)へ変える。合計倍率は近いが、**当たり判定が3回ある**ので
+       * クリティカル・反撃回数・ヒット数で数える仕掛けへの噛み合い方が変わる。
+       * 数字の大小ではなく、別のスキルになる。
+       */
+      description: "灼熱の息を吐き、敵全体に攻撃力0.7倍のダメージを3回与える。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.5 },
-        { kind: "BURN", durationTurns: 1, chance: 0.65 },
+        { kind: "DAMAGE", multiplier: 0.7, hits: 3 },
       ],
     },
     {
@@ -1234,12 +1242,12 @@ const DRAGON: MonsterTemplate = {
     {
       id: "dragon_s2_d_flame",
       name: "フレイムブレス",
-      description: "灼熱の息を吐き、敵全体に攻撃力1.5倍のダメージを与え、65%で1ターン火傷させる。",
+      // 火のドラゴンと同じ。片方だけ直すと、同じ名前で中身が違うことになる
+      description: "灼熱の息を吐き、敵全体に攻撃力0.7倍のダメージを3回与える。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.5 },
-        { kind: "BURN", durationTurns: 1, chance: 0.65 },
+        { kind: "DAMAGE", multiplier: 0.7, hits: 3 },
       ],
     },
   ],
