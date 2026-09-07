@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { compareFilterRoles } from "../src/core/materialPig.js";
 import { LATENT_ABILITY_CANDIDATES } from "../src/data/latentAbilities.js";
 import {
   ALL_DISPLAYABLE_MONSTERS_DEX,
@@ -130,12 +131,25 @@ describe("図鑑の絞り込み", () => {
     for (const element of facets.elements) {
       expect(MONSTER_DEX_ENTRIES.some((d) => d.element === element)).toBe(true);
     }
+    /*
+     * 役割の札は、**押して1体以上残ること**で確かめる。
+     *
+     * 以前は `d.role === role` と直に比べていたが、素材ピッグ3種は
+     * 役割が「素材」で同じなので、絞り込みでは種類名で分けている
+     * (`filterRoleOf`)。名前の一致ではなく、**札の目的**を見る。
+     */
     for (const role of facets.roles) {
-      expect(MONSTER_DEX_ENTRIES.some((d) => d.role === role)).toBe(true);
+      const shown = filterDexEntries(MONSTER_DEX_ENTRIES, { ...EMPTY_DEX_FILTER, roles: [role] }, SETS);
+      expect(shown.length, `${role} の札を押すと0体になる`).toBeGreaterThan(0);
     }
     expect(facets.sources).toEqual(DEX_SOURCES);
     // 並びは定義順。出てきた順だと絞り込むたび札の位置が動く
-    expect(facets.roles).toEqual([...facets.roles].sort((a, b) => a.localeCompare(b, "ja")));
+    /*
+     * 並びは定義順。**素材ピッグは戦う役割の後ろへまとめる**ので、
+     * 五十音そのままではなく `compareFilterRoles` の順になる
+     * (素直に五十音だと、素材が戦う役割の間へ散らばって読みにくい)。
+     */
+    expect(facets.roles).toEqual([...facets.roles].sort(compareFilterRoles));
   });
 
   it("札は押すたびに入り切りする", () => {

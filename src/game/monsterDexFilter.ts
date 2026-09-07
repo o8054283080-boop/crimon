@@ -1,4 +1,5 @@
 import { Element } from "../core/element.js";
+import { compareFilterRoles, filterRoleOf } from "../core/materialPig.js";
 import { MonsterDefinition } from "../core/monster.js";
 
 /**
@@ -71,7 +72,14 @@ export function filterDexEntries(
 ): MonsterDefinition[] {
   return entries.filter((dex) => {
     if (filter.elements.length > 0 && !filter.elements.includes(dex.element)) return false;
-    if (filter.roles.length > 0 && !filter.roles.includes(dex.role)) return false;
+    /*
+     * 役割。**素材ピッグだけは種類で分ける**(`filterRoleOf`)。
+     * 3種とも役割は「素材」なので、そのままだと1枚の札にまとまってしまう。
+     */
+    if (filter.roles.length > 0) {
+      const role = filterRoleOf(dex);
+      if (!role || !filter.roles.includes(role)) return false;
+    }
     if (filter.sources.length > 0 && !filter.sources.includes(dexSourceOf(dex, sets))) return false;
     return true;
   });
@@ -88,14 +96,15 @@ export function dexFacets(entries: readonly MonsterDefinition[], sets: DexSource
   const sources: DexSource[] = [];
   for (const dex of entries) {
     if (!elements.includes(dex.element)) elements.push(dex.element);
-    if (!roles.includes(dex.role)) roles.push(dex.role);
+    const role = filterRoleOf(dex);
+    if (role && !roles.includes(role)) roles.push(role);
     const source = dexSourceOf(dex, sets);
     if (!sources.includes(source)) sources.push(source);
   }
   // 並びは定義順に揃える。出てきた順だと、絞り込むたび札の位置が動く
   return {
     elements,
-    roles: roles.sort((a, b) => a.localeCompare(b, "ja")),
+    roles: roles.sort(compareFilterRoles),
     sources: DEX_SOURCES.filter((source) => sources.includes(source)),
   };
 }

@@ -3,11 +3,13 @@ import { EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET
 import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel, toBattleDefinition } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "../../core/stats.js";
+import { MATERIAL_PIG_KINDS, MATERIAL_PIG_LABEL, MaterialPigKind, materialPigKindOf } from "../../core/materialPig.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
 import { isSameSpecies } from "../../game/monsterPowerUp.js";
 import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
+import { baseStarOf } from "../../game/monsterBaseStar.js";
 import { el } from "../dom.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
 import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, sortMonsters } from "../../game/monsterSort.js";
@@ -172,9 +174,15 @@ export function handleMonsterListLockClick(event: Pick<Event, "preventDefault" |
  * ランクアップの一括選択。
  *
  * すでに手で選んだ有効な素材は残し、足りない分だけ補う。
- * 補充分は「同じ種類が何体余っているか」が多い順にすることで、
- * 1体しか持っていない個体より重複している個体を先に素材へ回す。
- * 同数なら手持ちの並びを維持する。
+ * 補う順は上から順に見て、同じなら次の物差しへ進む。
+ *
+ * 1. **初期星が低い順。**候補はみな今の星が同じ(ランクアップの条件)なので、
+ *    ★5同士でも「★5として出たもの」と「★3を上げて★5にしたもの」が混ざる。
+ *    手に入りにくいのは前者なので、後ろへ回して守る
+ * 2. **レベルが低い順。**育てた分だけ費やしたものが残るようにする
+ * 3. **同じ種類を多く持っている順。**1体しか持っていない個体より、
+ *    重複している個体を先に素材へ回す
+ * 4. 手持ちの並び
  */
 export function autoSelectRankUpSacrificeIds(
   candidates: readonly MonsterInstance[],
@@ -189,9 +197,13 @@ export function autoSelectRankUpSacrificeIds(
   for (const monster of candidates) counts.set(monster.dexId, (counts.get(monster.dexId) ?? 0) + 1);
   const keptSet = new Set(kept);
   const originalIndex = new Map(candidates.map((monster, index) => [monster.id, index]));
+  const baseStars = new Map(candidates.map((monster) => [monster.id, baseStarOf(monster)]));
   const remaining = candidates
     .filter((monster) => !keptSet.has(monster.id))
     .sort((a, b) => {
+      const starDiff = (baseStars.get(a.id) ?? a.star) - (baseStars.get(b.id) ?? b.star);
+      if (starDiff !== 0) return starDiff;
+      if (a.level !== b.level) return a.level - b.level;
       const countDiff = (counts.get(b.dexId) ?? 0) - (counts.get(a.dexId) ?? 0);
       if (countDiff !== 0) return countDiff;
       return (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0);
@@ -406,6 +418,13 @@ let rankUpMaterialSort: Extract<MaterialMonsterSort, "DEFAULT" | "REINCARNATION_
 let rankUpSortKey: MonsterSortKey = "recommended";
 let rankUpElementFilter: Element | "ALL" = "ALL";
 let rankUpUseFilter: "ALL" | "SAME_SPECIES" | "SELECTED" = "ALL";
+/**
+ * 素材ピッグの種類。
+ *
+ * **役割ではここが分けられない**(3種とも「素材」)。ランクアップで使うのは
+ * 転生ピッグだけなので、混ざっていると探しにくい。
+ */
+let rankUpPigFilter: MaterialPigKind | "ALL" = "ALL";
 let rankUpDetailId: string | null = null;
 
 function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElement {
@@ -455,6 +474,8 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     if (rankUpElementFilter !== "ALL" && findMonsterById(candidate.dexId)?.element !== rankUpElementFilter) return false;
     if (rankUpUseFilter === "SAME_SPECIES" && !isSameSpecies(target, candidate)) return false;
     if (rankUpUseFilter === "SELECTED" && !props.selectedSacrificeIds.includes(candidate.id)) return false;
+    if (rankUpPigFilter !== "ALL"
+      && materialPigKindOf(findMonsterById(candidate.dexId)?.templateId) !== rankUpPigFilter) return false;
     return true;
   });
 
@@ -548,6 +569,20 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     return button;
   });
 
+  const pigValues = ["ALL", ...MATERIAL_PIG_KINDS] as const;
+  const pigButtons = pigValues.map((kind) => {
+    const button = el("button", {
+      type: "button",
+      className: `slot-filter-chip${rankUpPigFilter === kind ? " slot-filter-chip--active" : ""}`,
+    }, [kind === "ALL" ? "すべて" : MATERIAL_PIG_LABEL[kind]]) as HTMLButtonElement;
+    button.onclick = () => {
+      rankUpPigFilter = kind;
+      for (const [i, other] of pigButtons.entries()) other.classList.toggle("slot-filter-chip--active", pigValues[i] === kind);
+      grid.reset(buildItems());
+    };
+    return button;
+  });
+
   return el("div", { className: "screen monsters-screen" }, [
     managementHeader("ランクアップ", props.onCancelRankUp, dex ? dex.name : target.dexId),
     el("section", { className: "panel" }, [
@@ -559,7 +594,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
         disabled: autoSelectedIds.length === 0 || props.selectedSacrificeIds.length >= requiredCount,
         onclick: applyAutoSelection,
       }, ["☑ 必要数まで一括選択"]),
-      el("p", { className: "app-subtitle" }, ["未ロック・編成外の素材から、同じ種類を多く持っているモンスターを優先して必要数まで選びます。すでに手で選んだ素材は残します。"]),
+      el("p", { className: "app-subtitle" }, ["未ロック・編成外の素材から、初期星が低く、レベルの低いモンスターを優先して必要数まで選びます。同じなら、同じ種類を多く持っているものが先です。すでに手で選んだ素材は残します。"]),
       el("div", { className: "picked-row" }, [
         el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
         renderPartySlots(sacrifices, requiredCount, props.onToggleSacrifice),
@@ -575,6 +610,11 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       el("div", { className: "mfilter__group" }, [
         el("span", { className: "mfilter__label" }, ["素材用途"]),
         el("div", { className: "mfilter__chips" }, useButtons),
+      ]),
+      // 素材ピッグの種類。ランクアップで使うのは転生ピッグだけなので、混ざると探しにくい
+      el("div", { className: "mfilter__group" }, [
+        el("span", { className: "mfilter__label" }, ["素材の種類"]),
+        el("div", { className: "mfilter__chips" }, pigButtons),
       ]),
       el("div", { className: "mfilter__group" }, [
         el("span", { className: "mfilter__label" }, ["並び順"]),
@@ -603,6 +643,7 @@ export function renderMonsters(props: MonstersProps): HTMLElement {
   rankUpSortKey = "recommended";
   rankUpElementFilter = "ALL";
   rankUpUseFilter = "ALL";
+  rankUpPigFilter = "ALL";
   if (target) return renderDetail(props, target);
   return renderList(props);
 }

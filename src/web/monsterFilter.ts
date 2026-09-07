@@ -11,6 +11,7 @@
  * 表示だけの都合なので `src/web` に置く(保存データには一切入らない)。
  */
 import { Element } from "../core/element.js";
+import { compareFilterRoles, filterRoleOf } from "../core/materialPig.js";
 import { EQUIP_SLOTS } from "../core/equipment.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { Star } from "../core/rarity.js";
@@ -97,7 +98,14 @@ export function filterMonsters(
     const dex = findMonsterById(instance.dexId);
     if (filter.elements.length > 0 && (!dex || !filter.elements.includes(dex.element))) return false;
     if (filter.stars.length > 0 && !filter.stars.includes(instance.star)) return false;
-    if (filter.roles.length > 0 && (!dex || !filter.roles.includes(dex.role))) return false;
+    /*
+     * 役割。**素材ピッグだけは種類で分ける**(`filterRoleOf`)。
+     * 3種とも役割は「素材」で同じなので、そのまま使うと1枚にまとまる。
+     */
+    if (filter.roles.length > 0) {
+      const role = filterRoleOf(dex);
+      if (!role || !filter.roles.includes(role)) return false;
+    }
     if (filter.party !== "ALL") {
       const inParty = context.partyIds.includes(instance.id);
       if (filter.party === "IN" && !inParty) return false;
@@ -127,12 +135,13 @@ export function availableFacets(monsters: readonly MonsterInstance[]): {
     const dex = findMonsterById(instance.dexId);
     if (!dex) continue;
     elements.add(dex.element);
-    roles.add(dex.role);
+    const role = filterRoleOf(dex);
+    if (role) roles.add(role);
   }
   return {
     elements: [...elements],
     stars: [...stars].sort((a, b) => b - a),
-    roles: [...roles].sort((a, b) => a.localeCompare(b, "ja")),
+    roles: [...roles].sort(compareFilterRoles),
   };
 }
 
