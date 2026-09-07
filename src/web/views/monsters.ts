@@ -9,6 +9,7 @@ import { PlayerState } from "../../game/playerState.js";
 import { checkRankUp } from "../../game/progression.js";
 import { isSameSpecies } from "../../game/monsterPowerUp.js";
 import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
+import { baseStarOf } from "../../game/monsterBaseStar.js";
 import { el } from "../dom.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
 import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, sortMonsters } from "../../game/monsterSort.js";
@@ -173,9 +174,15 @@ export function handleMonsterListLockClick(event: Pick<Event, "preventDefault" |
  * ランクアップの一括選択。
  *
  * すでに手で選んだ有効な素材は残し、足りない分だけ補う。
- * 補充分は「同じ種類が何体余っているか」が多い順にすることで、
- * 1体しか持っていない個体より重複している個体を先に素材へ回す。
- * 同数なら手持ちの並びを維持する。
+ * 補う順は上から順に見て、同じなら次の物差しへ進む。
+ *
+ * 1. **初期星が低い順。**候補はみな今の星が同じ(ランクアップの条件)なので、
+ *    ★5同士でも「★5として出たもの」と「★3を上げて★5にしたもの」が混ざる。
+ *    手に入りにくいのは前者なので、後ろへ回して守る
+ * 2. **レベルが低い順。**育てた分だけ費やしたものが残るようにする
+ * 3. **同じ種類を多く持っている順。**1体しか持っていない個体より、
+ *    重複している個体を先に素材へ回す
+ * 4. 手持ちの並び
  */
 export function autoSelectRankUpSacrificeIds(
   candidates: readonly MonsterInstance[],
@@ -190,9 +197,13 @@ export function autoSelectRankUpSacrificeIds(
   for (const monster of candidates) counts.set(monster.dexId, (counts.get(monster.dexId) ?? 0) + 1);
   const keptSet = new Set(kept);
   const originalIndex = new Map(candidates.map((monster, index) => [monster.id, index]));
+  const baseStars = new Map(candidates.map((monster) => [monster.id, baseStarOf(monster)]));
   const remaining = candidates
     .filter((monster) => !keptSet.has(monster.id))
     .sort((a, b) => {
+      const starDiff = (baseStars.get(a.id) ?? a.star) - (baseStars.get(b.id) ?? b.star);
+      if (starDiff !== 0) return starDiff;
+      if (a.level !== b.level) return a.level - b.level;
       const countDiff = (counts.get(b.dexId) ?? 0) - (counts.get(a.dexId) ?? 0);
       if (countDiff !== 0) return countDiff;
       return (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0);
@@ -583,7 +594,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
         disabled: autoSelectedIds.length === 0 || props.selectedSacrificeIds.length >= requiredCount,
         onclick: applyAutoSelection,
       }, ["☑ 必要数まで一括選択"]),
-      el("p", { className: "app-subtitle" }, ["未ロック・編成外の素材から、同じ種類を多く持っているモンスターを優先して必要数まで選びます。すでに手で選んだ素材は残します。"]),
+      el("p", { className: "app-subtitle" }, ["未ロック・編成外の素材から、初期星が低く、レベルの低いモンスターを優先して必要数まで選びます。同じなら、同じ種類を多く持っているものが先です。すでに手で選んだ素材は残します。"]),
       el("div", { className: "picked-row" }, [
         el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
         renderPartySlots(sacrifices, requiredCount, props.onToggleSacrifice),
