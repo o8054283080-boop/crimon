@@ -143,10 +143,39 @@
   font-size: 0.57rem;
 }
 
+/*
+ * 簡易表示では1枚が約60〜70px幅しかない。
+ * 共通の詳細ボタン36px・所持一覧のロック40pxをそのまま使うと、
+ * 見えている小さな丸より透明な判定だけがカードの半分以上を占め、
+ * 「カード本体を押したつもり」が詳細/ロックに吸われる。
+ * 見た目の丸はほぼ変えず、簡易表示の時だけ透明な判定を28px角へ絞る。
+ */
+.mcard--dense .mcard__detail {
+  left: -1px;
+  bottom: -1px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.mcard--dense .mcard__detail::before {
+  width: 20px;
+  height: 20px;
+}
+
 .monsters-list-panel .mcard--dense .monster-list-card__lock {
-  width: 40px;
-  height: 40px;
-  padding: 0 3px 14px 14px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.monsters-list-panel .mcard--dense .monster-list-card__lock-glyph {
+  width: 20px;
+  height: 20px;
 }
 
 @media (min-width: 420px) {
@@ -246,7 +275,7 @@
   font-size: 0.57rem;
 }
 
-/* 所持一覧のカードだけに重ねる。見た目は小さく、指の判定は44pxを確保する。 */
+/* 所持一覧の通常表示では、誤タップより押しやすさを優先して44pxを維持する。 */
 .monsters-list-panel .monster-list-card__lock {
   position: absolute;
   z-index: 4;
