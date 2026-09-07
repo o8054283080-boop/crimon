@@ -1,6 +1,7 @@
 import { ELEMENTS, Element } from "../core/element.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
+import { applyLowRarityBoost } from "../core/lowRarityBoost.js";
 import { findMonsterById } from "../data/monsters.js";
 
 /**
@@ -33,7 +34,9 @@ export const MONSTER_SORT_KEYS: MonsterSortKey[] = ["recommended", "power", "sta
 export function monsterPower(instance: MonsterInstance): number {
   const dex = findMonsterById(instance.dexId);
   if (!dex) return 0;
-  const s = dex.stats;
+  // 低い星から出るモンスターの底上げを含める。ここを外すと、画面の戦闘力だけが
+  // 実際のステータスより低いままになる
+  const s = applyLowRarityBoost(dex.stats, dex.templateId, instance.star);
   const base = s.hp / 10 + s.atk + s.def + s.spd;
   // 星とレベルの伸びを掛ける。星が上がるほど伸びしろも大きい
   const growth = instance.star * 1.0 + instance.level / 10;
