@@ -55,6 +55,11 @@ export function audioContextState(): string {
   return sfxPlayer.contextState();
 }
 
+/** BGMがいま鳴っていない理由を一言で。設定画面に出す */
+export function bgmDiagnosis(): string {
+  return bgmPlayer.diagnosis();
+}
+
 /** 効果音を鳴らす。まだ操作されていない/設定で切られている時は静かに何もしない */
 export function playSfx(name: SfxName, gain = 1): void {
   sfxPlayer.play(name, gain);

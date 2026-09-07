@@ -7,6 +7,14 @@ export interface AudioSettingsProps {
   contextState: string;
   onChange: (patch: Partial<AudioSettings>) => void;
   onTest: () => void;
+  /**
+   * BGMがいまどうなっているかを一言で。
+   *
+   * **効果音は鳴るのにBGMだけ鳴らない、という報告が続いた。**
+   * 音量なのか、解錠なのか、音の読み込みに失敗しているのかを
+   * プレイヤー自身が見分けられないと、こちらも原因を絞れない。
+   */
+  bgmDiagnosis: string;
 }
 
 const VOLUME_STEP = 0.01;
@@ -162,8 +170,10 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
       }, ["♪ 音を試す"]),
     ]),
     el("p", { className: `audio-settings__state${ready ? " audio-settings__state--ok" : ""}` }, [stateText]),
+    el("p", { className: "audio-settings__state audio-settings__state--bgm" }, [`BGM: ${props.bgmDiagnosis}`]),
     el("p", { className: "audio-settings__note" }, [
-      "iPhoneでは、本体横のマナーモード(消音)スイッチが入っていると音が出ません。鳴らない時はそちらもご確認ください。",
+      "iPhoneでは、本体横のマナーモード(消音)スイッチが入っていると音が出ないことがあります。"
+      + "切っても鳴らない時は、上の「BGM:」の行をそのままお知らせください。原因を特定できます。",
     ]),
     el("style", {}, [
       `
