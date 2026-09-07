@@ -53,6 +53,15 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
   if (result.equipmentDropCount > 0) tiles.push(rewardTile("⚔", "装備", `+${result.equipmentDropCount}`));
   if (result.summonScrollCount > 0) tiles.push(rewardTile("📜", "召喚の書", `+${result.summonScrollCount}`, "scroll"));
   if (result.totalFighterLevels > 0) tiles.push(rewardTile("🎖", "ファイター", `Lv+${result.totalFighterLevels}`, "fighter"));
+  /*
+   * 目覚の素材。**深域の周回でだけ出る。**
+   *
+   * 深域はゴールドも経験値も配らないので、これを出さないと
+   * 「10回まわしたのに何ももらえていない」画面になる。
+   */
+  if ((result.awakeningShards ?? 0) > 0) tiles.push(rewardTile("🔷", "目覚の欠片", `+${result.awakeningShards}`, "crystal"));
+  if ((result.awakeningCrystals ?? 0) > 0) tiles.push(rewardTile("💠", "目覚の結晶", `+${result.awakeningCrystals}`, "crystal"));
+  if ((result.awakeningStones ?? 0) > 0) tiles.push(rewardTile("🌟", "目覚の奇石", `+${result.awakeningStones}`, "crystal"));
 
   // 同じモンスターは1枚にまとめ、枚数を重ねて表示する
   const dropCards = drops.map((drop) => {

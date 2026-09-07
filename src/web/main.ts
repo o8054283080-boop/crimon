@@ -1442,6 +1442,15 @@ function startFromLastRun(last: LastRun): void {
     case "GOLD_DUNGEON":
       startGoldDungeonFloor(last.floor);
       break;
+    /*
+     * **ここが抜けていた。**深域を足した時、消費スタミナ(`lastRunStaminaCost`)と
+     * 押せない理由(`retryBlockedReason`)には足したのに、
+     * *始める*側だけ漏れていた。押しても何も起きないボタンになっていた。
+     * 戻り値が無い switch なので、型チェックは漏れを教えてくれない。
+     */
+    case "AWAKENING_DEPTH":
+      startAwakeningDepthFloor(last.floor);
+      break;
     case "ARENA":
       // 同じ相手へもう一度。焼いた防衛を持っているので、そのまま組み直せる
       startArenaMatch(last.entry);
@@ -1584,12 +1593,47 @@ function backgroundParty(job: BackgroundFarmJob): MonsterInstance[] {
   return job.partyIds.map((id) => state.player.monsters.find((m) => m.id === id)).filter((m): m is MonsterInstance => Boolean(m));
 }
 
+/**
+ * 1周ぶんのスタミナ。
+ *
+ * **`if` の連ねだったので、深域が最後の `return` へ落ちていた。**
+ * 深域を周回すると、ゴールドダンジョンのスタミナが引かれていた。
+ * `switch` に書き換えて、種類が増えた時に**型チェックが漏れを教える**ようにする
+ * (戻り値のある関数なので、網羅していないと `number` を返せず落ちる)。
+ */
 function backgroundFarmCost(job: BackgroundFarmJob): number {
-  if (job.kind === "STAGE") return STAGE_STAMINA_COST;
-  if (job.kind === "EQUIP_DUNGEON") return DUNGEON_STAMINA_COST;
-  if (job.kind === "LEVEL_DUNGEON") return LEVEL_DUNGEON_STAMINA_COST;
-  return GOLD_DUNGEON_STAMINA_COST;
+  switch (job.kind) {
+    case "STAGE": return STAGE_STAMINA_COST;
+    case "EQUIP_DUNGEON": return DUNGEON_STAMINA_COST;
+    case "LEVEL_DUNGEON": return LEVEL_DUNGEON_STAMINA_COST;
+    case "GOLD_DUNGEON": return GOLD_DUNGEON_STAMINA_COST;
+    // 深域は階ごとに消費が違う形で作ってあるので、階から引く
+    case "AWAKENING_DEPTH": return findAwakeningDepthFloor(Number(job.targetId))?.stamina ?? AWAKENING_DEPTH_FALLBACK_STAMINA;
+  }
 }
+
+/** 階が見つからない時のスタミナ。いまは全階10で揃えてある */
+const AWAKENING_DEPTH_FALLBACK_STAMINA = 10;
+
+/**
+ * 何も配らない報酬。
+ *
+ * 深域はゴールドも経験値もドロップも無く、素材だけを配る。
+ * 周回の集計は `ClearRewardResult` を通す作りなので、空を1つ渡す。
+ */
+const EMPTY_CLEAR_REWARD = {
+  goldEarned: 0,
+  crystalEarned: 0,
+  expTotal: 0,
+  fighterExp: 0,
+  levelUps: [],
+  dropDexId: null,
+  dropStar: null,
+  equipmentDrop: null,
+  pigDrop: null,
+  summonScrollDropped: false,
+  fighterLevelsGained: 0,
+} as const satisfies ClearRewardResult;
 
 function scheduleBackgroundFarm(delay = 0): void {
   if (backgroundFarmTimer !== null) return;
@@ -1616,11 +1660,20 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
     }
     return { won: true, waves, extraGold: waves * stageWaveGold(stage, difficulty) };
   }
+  /*
+   * **深域がここから漏れていた。**
+   *
+   * 三項の最後が「それ以外はゴールドダンジョン」だったので、深域を周回すると
+   * **同じ階番号のゴールドダンジョンと戦っていた**(見つからない階は全敗扱い)。
+   * 種類を1つずつ書き、当てはまらないものは黙って別の場所へ落とさない。
+   */
   const target = job.kind === "EQUIP_DUNGEON"
     ? findDungeonFloorByKey(job.targetId)
     : job.kind === "LEVEL_DUNGEON"
       ? LEVEL_DUNGEON_DEFS.find((f) => f.tier === job.targetId)
-      : GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId);
+      : job.kind === "GOLD_DUNGEON"
+        ? GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)
+        : findAwakeningDepthFloor(Number(job.targetId));
   if (!target) return { won: false, waves: 0, extraGold: 0 };
   const setup = setupDungeonBattle(party, target, state.player.equipment);
   return { won: new BattleEngine(setup.playerDefs, setup.enemyDefs).run().winner === "PLAYER", waves: 1, extraGold: 0 };
@@ -1665,7 +1718,22 @@ function processBackgroundFarmOnce(): void {
   if (job.kind === "STAGE") reward = applyStageClearRewards(state.player, STAGES.find((s) => s.id === job.targetId)!, battle.waves, party, job.difficulty);
   else if (job.kind === "EQUIP_DUNGEON") reward = applyDungeonClearRewards(state.player, findDungeonFloorByKey(job.targetId)!, party);
   else if (job.kind === "LEVEL_DUNGEON") reward = applyLevelDungeonClearRewards(state.player, LEVEL_DUNGEON_DEFS.find((f) => f.tier === job.targetId)!, party);
-  else reward = applyGoldDungeonClearRewards(state.player, GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
+  else if (job.kind === "AWAKENING_DEPTH") {
+    /*
+     * **深域もここから漏れていた。**最後の `else` がゴールドダンジョンだったので、
+     * 階番号が重なる1〜5階では**ゴールドの報酬**が入り、6階以上では
+     * 階が見つからず `!` で潰した undefined が渡って落ちていた。
+     */
+    const floor = findAwakeningDepthFloor(Number(job.targetId));
+    if (!floor) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
+    const materials = grantAwakeningDepthReward(state.player, floor);
+    // 素材はゴールドや経験値と別の枠。周回の結果へそのまま積む
+    job.result.awakeningShards = (job.result.awakeningShards ?? 0) + materials.shards;
+    job.result.awakeningCrystals = (job.result.awakeningCrystals ?? 0) + materials.crystals;
+    job.result.awakeningStones = (job.result.awakeningStones ?? 0) + materials.stones;
+    // 深域はゴールドも経験値も配らない(手で挑んだ時と同じ)。素材だけが報酬
+    reward = EMPTY_CLEAR_REWARD;
+  } else reward = applyGoldDungeonClearRewards(state.player, GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
   state.player.gold += battle.extraGold;
   mergeReward(job.result, reward, battle.extraGold);
   job.result.cleared += 1; job.completedRuns += 1; job.inFlight = false;
