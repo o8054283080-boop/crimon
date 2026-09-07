@@ -2016,21 +2016,13 @@ function renderCurrentAwakeningDepthBattle(): BattleViewHandle {
  * 才能覚醒
  * ========================================================================== */
 
-/**
- * 才能覚醒を開く。**行き先はクリエイトの「才能覚醒」の欄。**
+/*
+ * **才能覚醒への専用の入口は持たない。**
  *
- * 独立した画面として持っていたが、才能を付ける先はスキル2・3で、
- * その中身を入れ替えるのはクリエイト。**同じものを2か所で触る形**に
- * なっていたので、入口ごとクリエイトへ寄せた。
+ * 才能を付ける先はスキル2・3で、その中身を入れ替えるのはクリエイト。
+ * 入口を別に持つと同じものを2か所で触ることになるので、
+ * クリエイト(`MONSTER_CREATE` の「才能覚醒」の欄)に一本化してある。
  */
-function openTalentAwakening(monsterId: string): void {
-  state.createTargetId = monsterId;
-  state.createMenu = "TALENT";
-  state.createNotice = null;
-  state.talentTab = "BASIC";
-  state.talentSkillSlot = 1;
-  navigate("MONSTER_CREATE");
-}
 
 /**
  * 才能覚醒の操作をまとめて受ける。
@@ -4185,7 +4177,6 @@ function renderMonstersScreen(): HTMLElement {
       state.screen = "MONSTER_TRAINING";
       render();
     },
-    onGoTalentAwakening: (monsterId) => openTalentAwakening(monsterId),
     onGoCreate: (monsterId) => {
       state.createTargetId = monsterId;
       state.createMaterialId = null;

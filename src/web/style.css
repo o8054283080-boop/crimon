@@ -7723,10 +7723,80 @@ body::before {
   color: var(--text-dim);
 }
 
+/*
+ * 章の見出し。**閉じた見出しが36個並ぶので、区切りが要る。**
+ * 札ではなく地の文に近い見た目にして、押せる物と混ざらないようにする。
+ */
+.howto-chapter {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 14px 2px 2px;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--gold-2);
+}
+
+.howto-chapter::before {
+  display: none;
+}
+
+.howto-chapter__count {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/*
+ * 見出しの行。**ここが開閉の取っ手。**
+ *
+ * `summary` の既定の三角は消して、右端の `▾` に置き換える
+ * (既定の三角は左に付き、アイコンと二重に見える)。
+ * 押せる高さは44pxを下回らせない。
+ */
+.howto-card {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .howto-card__head {
   display: flex;
   align-items: center;
   gap: 9px;
+  min-height: 44px;
+  padding: 9px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+/* WebKitの既定マーカー。`list-style: none` だけでは消えない */
+.howto-card__head::-webkit-details-marker {
+  display: none;
+}
+
+.howto-card__head h2 {
+  flex: 1;
+  min-width: 0;
+}
+
+.howto-card__caret {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  color: var(--gold-3);
+  transition: transform 0.15s ease;
+}
+
+.howto-card[open] .howto-card__caret {
+  transform: rotate(180deg);
+}
+
+/* 開いた時だけ、見出しと中身の間に区切りを出す */
+.howto-card[open] .howto-card__head {
+  border-bottom: 1px solid rgba(198, 160, 84, 0.22);
+}
+
+.howto-card__body {
+  padding-bottom: 11px;
 }
 
 .howto-card__head h2 {
