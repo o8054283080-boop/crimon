@@ -62,6 +62,19 @@ export const INSPECT = `(() => {
   const TAP_MIN = 36;
   for (const b of buttons) {
     if (b.closest('.dev-menu')) continue;
+    /*
+     * **理由を書いた1件だけ、例外にする。**
+     *
+     * 所持一覧の簡易表示は1枚が60〜70px幅しかない。そこへ36pxの判定を置くと、
+     * 見えている小さな丸より透明な判定の方がカードの半分以上を占め、
+     * 「カード本体を押したつもり」がロックや詳細に吸われる。
+     * 小さいことより、押したつもりの操作が別のものに化ける方が悪い。
+     *
+     * **無条件の穴にはしない。** data-tap-small を書いた要素だけを外し、
+     * 値にはどの画面でなぜ小さいのかを残す。付ける時は、
+     * 「小さくても誤操作が減る」と言い切れるかを毎回確かめること。
+     */
+    if (b.dataset.tapSmall) continue;
     const r = b.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
     if (r.height < TAP_MIN || r.width < TAP_MIN) {
