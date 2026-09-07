@@ -56,6 +56,15 @@ const SCREENS = [
   { name: "アリーナ", tab: "HOME", tile: "arena" },
   { name: "試練の塔", tab: "HOME", tile: "tower" },
   { name: "遊び方", tab: "HOME", tile: "help" },
+  /*
+   * **開いた状態も見る。**畳んだ見出しだけを検査していると、
+   * 中の文字が小さすぎても枠から溢れていても気づけない
+   * (アリーナのランキングで、行が1つも無い表を検査し続けたのと同じ穴)。
+   */
+  {
+    name: "遊び方(開いた状態)", tab: "HOME", tile: "help",
+    setup: "document.querySelectorAll('.howto-card').forEach((c) => { c.open = true; })",
+  },
   { name: "モンスター図鑑", tab: "HOME", tile: "dex" },
   { name: "ミッション", tab: "HOME", tile: "mission" },
   // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く

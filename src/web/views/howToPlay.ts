@@ -19,7 +19,18 @@ export interface HowToPlayProps {
   onBack: () => void;
 }
 
+/**
+ * 章。**見出しだけを並べた時に、目で追える単位に切る。**
+ *
+ * 項目が36まで増えて、閉じていても縦に長い一覧になった。
+ * 章が無いと「どこまで見たか」が分からなくなる。
+ */
+type Chapter =
+  | "はじめに" | "戦いの仕組み" | "育成の基本" | "装備" | "仲間を増やす"
+  | "クリエイトと覚醒" | "挑む場所" | "資源とやりくり" | "困った時に";
+
 interface Topic {
+  chapter: Chapter;
   name: IconName;
   title: string;
   lead: string;
@@ -28,6 +39,7 @@ interface Topic {
 
 const TOPICS: Topic[] = [
   {
+    chapter: "はじめに",
     name: "info",
     title: "CRIMONで目指すこと",
     lead: "モンスターを集め、育て、装備とスキルを組み合わせて、自分だけのパーティを作る育成RPGです。",
@@ -39,6 +51,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "はじめに",
     name: "home",
     title: "ホーム画面の見方",
     lead: "ホームはすべての機能の入口です。上部の資源と、中央・下部の各メニューを使い分けます。",
@@ -52,6 +65,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "はじめに",
     name: "adventure",
     title: "冒険の進め方",
     lead: "まず最優先で進めたい基本コンテンツです。ステージを進めながら経験値・ゴールド・素材などを集めます。",
@@ -66,6 +80,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "戦いの仕組み",
     name: "tag",
     title: "属性の相性",
     lead: "火・草・電気・水の4属性が一周する形で有利不利を持ち、光と闇は互いだけを弱点とします。",
@@ -79,6 +94,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "戦いの仕組み",
     name: "party",
     title: "パーティ編成の基本",
     lead: "強いモンスターを並べるだけでなく、役割を分担させると安定します。",
@@ -92,6 +108,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "戦いの仕組み",
     name: "adventure",
     title: "戦闘画面の見方",
     lead: "戦闘は自動で進みます。見るところと、途中で触れるところを覚えておくと待ち時間が減ります。",
@@ -105,6 +122,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "戦いの仕組み",
     name: "info",
     title: "強化と弱体（バフ・デバフ）",
     lead: "数値を上げ下げするものと、行動そのものを縛るものがあります。高難度ほど効き方の差が出ます。",
@@ -120,6 +138,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "戦いの仕組み",
     name: "monsters",
     title: "モンスターのステータス",
     lead: "詳細画面の数値は、そのモンスターが何を得意としているかを判断する材料です。",
@@ -136,6 +155,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "育成の基本",
     name: "monsters",
     title: "レベルアップと経験値",
     lead: "最初に取り組みやすい育成です。戦闘や育成用コンテンツで経験値を獲得します。",
@@ -148,6 +168,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "育成の基本",
     name: "arrowUp",
     title: "ランクアップと★",
     lead: "最大レベルまで育てたモンスターは、素材を使ってさらに上の★へ成長させられます。",
@@ -161,6 +182,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "育成の基本",
     name: "arrowUp",
     title: "スキル強化",
     lead: "レベルや装備とは別に、スキルそのものを成長させる育成です。",
@@ -172,6 +194,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "装備",
     name: "equipment",
     title: "装備の基本",
     lead: "最終的な強さを大きく左右する育成要素です。6つの装備枠を組み合わせて役割に合う数値を作ります。",
@@ -187,6 +210,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "装備",
     name: "equipment",
     title: "装備強化と厳選",
     lead: "良い装備を入手したら強化して完成させます。高★装備ほど長く使う候補になります。",
@@ -199,6 +223,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "仲間を増やす",
     name: "summon",
     title: "召喚",
     lead: "ダイヤや召喚の書を使って仲間を増やします。入手したモンスターは育成・スキル強化・ランク素材などに活用できます。",
@@ -212,6 +237,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "クリエイトと覚醒",
     name: "pencil",
     title: "クリエイトとは",
     lead: "モンスターを自分好みに作り込む、CRIMONの中核となる育成です。通常育成の先にある長期強化として使います。",
@@ -225,6 +251,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "クリエイトと覚醒",
     name: "scroll",
     title: "スキル継承の考え方",
     lead: "元のモンスターにはない役割を追加できるため、編成の自由度を大きく上げられます。",
@@ -236,6 +263,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "クリエイトと覚醒",
     name: "crystal",
     title: "潜在覚醒",
     lead: "モンスターごとの個性をさらに強める上位育成です。通常のステータス強化とは違う効果を得られます。",
@@ -248,6 +276,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "クリエイトと覚醒",
     name: "arrowUp",
     title: "才能覚醒とは",
     lead: "★6にしたモンスターだけが開ける、育成のいちばん奥です。クリエイトの「才能覚醒」の欄から入ります。潜在覚醒とは別のもので、両方あわせて伸ばせます。",
@@ -262,6 +291,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "クリエイトと覚醒",
     name: "arrowUp",
     title: "才能の選び方",
     lead: "配る先は3つの方向に分かれています。役割に合うものから取ると、少ないptでも実感できます。",
@@ -277,6 +307,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "tower",
     title: "目覚の深域",
     lead: "才能覚醒に使う素材だけを配る専用ダンジョンです。10階まであり、前の階をクリアすると次が開きます。",
@@ -291,6 +322,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "tower",
     title: "深域の戦い方",
     lead: "この場所が問うのは「同じ手を繰り返せるか」です。2つの仕掛けがそれを試します。",
@@ -306,6 +338,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "equipDungeon",
     title: "装備ダンジョン",
     lead: "強い装備を集めるための主要な周回先です。育成が進んだら、より上の階層を安定周回できる編成を作りましょう。",
@@ -318,6 +351,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "trainDungeon",
     title: "育成ダンジョン",
     lead: "モンスターのレベルを上げたい時に使う経験値重視のコンテンツです。",
@@ -329,6 +363,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "goldDungeon",
     title: "ゴールドダンジョン",
     lead: "装備強化や各種育成で不足しやすいゴールドを集めるためのコンテンツです。",
@@ -340,6 +375,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "adventure",
     title: "自動周回",
     lead: "クリア済みのステージを繰り返し攻略し、経験値・ゴールド・ドロップをまとめて集めるための機能です。",
@@ -352,6 +388,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "tower",
     title: "試練の塔",
     lead: "通常ステージとは違い、連戦を前提にした高難度コンテンツです。瞬間火力だけでなく継戦能力が重要です。",
@@ -365,6 +402,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "arena",
     title: "アリーナの基本",
     lead: "他プレイヤーやNPCの防衛パーティと戦い、レート・ランキング・報酬を狙う対戦コンテンツです。",
@@ -378,6 +416,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "挑む場所",
     name: "coin",
     title: "アリーナ報酬とアリーナコイン",
     lead: "対戦を続けることで専用報酬を獲得し、アリーナショップで育成アイテムなどと交換できます。",
@@ -390,6 +429,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "資源とやりくり",
     name: "shop",
     title: "ショップの使い分け",
     lead: "ショップごとに使う通貨と目的が違います。必要な育成資源を補う場所として利用します。",
@@ -402,6 +442,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "資源とやりくり",
     name: "check",
     title: "ミッション",
     lead: "遊びながら条件を達成して報酬を受け取れる、育成を支える重要なコンテンツです。",
@@ -419,6 +460,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "資源とやりくり",
     name: "stamina",
     title: "スタミナの使い方",
     lead: "時間で回復する資源です。育成したいものに合わせて周回先を選びます。",
@@ -430,6 +472,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "資源とやりくり",
     name: "coin",
     title: "ゴールドの主な使い道",
     lead: "育成全体で大量に必要になる基本通貨です。特に装備育成を始めると消費量が増えます。",
@@ -443,6 +486,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "資源とやりくり",
     name: "crystal",
     title: "ダイヤの主な使い道",
     lead: "貴重な通貨なので、召喚だけでなく育成全体を見て使い道を決めます。",
@@ -455,6 +499,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "困った時に",
     name: "map",
     title: "詰まった時の強化順",
     lead: "何をすればいいか分からなくなった時は、下の順番で確認すると原因を見つけやすくなります。",
@@ -471,6 +516,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "困った時に",
     name: "check",
     title: "毎日おすすめの流れ",
     lead: "全部を長時間やる必要はありません。短時間の日は優先順位を付けて進めましょう。",
@@ -485,6 +531,7 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    chapter: "困った時に",
     name: "info",
     title: "覚えておくと便利なこと",
     lead: "長く遊ぶほど、資源管理と役割分担が効いてきます。",
@@ -498,34 +545,64 @@ const TOPICS: Topic[] = [
   },
 ];
 
+/**
+ * 1項目。**閉じた見出しだけを並べ、押した項目だけを開く。**
+ *
+ * 36項目ぶんの説明を全部開いたまま並べていたので、
+ * 最後の項目まで行くのに画面70枚ぶんの巻物を送ることになっていた。
+ *
+ * `details`/`summary` を使うのは、**開閉を自前で持たないため**。
+ * 押した時の開閉も、キーボードでの操作も、読み上げの扱いも
+ * ブラウザ側が持っている。ここで状態を持つと、画面を描き直した時に
+ * 開いていた項目が閉じる(この画面は他の操作でも描き直される)。
+ */
 function renderTopic(topic: Topic): HTMLElement {
-  return el("section", { className: "panel howto-card" }, [
-    el("div", { className: "howto-card__head" }, [
+  return el("details", { className: "panel howto-card" }, [
+    el("summary", { className: "howto-card__head" }, [
       el("span", { className: "howto-card__icon" }, [icon(topic.name)]),
       el("h2", {}, [topic.title]),
+      // 開いているかどうかを形で見せる。色だけだと押せる物に見えない
+      el("span", { className: "howto-card__caret", "aria-hidden": "true" }, ["▾"]),
     ]),
-    el("p", { className: "howto-card__lead" }, [topic.lead]),
-    el(
-      "ul",
-      { className: "howto-card__list" },
-      topic.points.map((text) =>
-        el(
-          "li",
-          {},
-          text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 === 1 ? el("strong", {}, [part]) : part)),
+    el("div", { className: "howto-card__body" }, [
+      el("p", { className: "howto-card__lead" }, [topic.lead]),
+      el(
+        "ul",
+        { className: "howto-card__list" },
+        topic.points.map((text) =>
+          el(
+            "li",
+            {},
+            text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 === 1 ? el("strong", {}, [part]) : part)),
+          ),
         ),
       ),
-    ),
+    ]),
   ]);
 }
 
 export function renderHowToPlay(props: HowToPlayProps): HTMLElement {
+  const blocks: HTMLElement[] = [];
+  let current: Chapter | null = null;
+  for (const topic of TOPICS) {
+    if (topic.chapter !== current) {
+      current = topic.chapter;
+      const count = TOPICS.filter((t) => t.chapter === current).length;
+      blocks.push(el("h2", { className: "howto-chapter" }, [
+        topic.chapter,
+        el("span", { className: "howto-chapter__count" }, [`${count}件`]),
+      ]));
+    }
+    blocks.push(renderTopic(topic));
+  }
+
   return el("div", { className: "screen howto-screen" }, [
     el("header", { className: "app-header" }, [el("h1", {}, ["遊び方・ゲームガイド"])]),
     el("p", { className: "howto-intro" }, [
-      "初めての進め方から、育成・装備・クリエイト・周回・試練の塔・アリーナまでまとめています。分からなくなった時にいつでも確認してください。",
+      `全${TOPICS.length}項目。読みたい見出しを押すと説明が開きます。`
+      + "初めての進め方から、育成・装備・クリエイト・周回・試練の塔・アリーナまでまとめています。",
     ]),
-    ...TOPICS.map(renderTopic),
+    ...blocks,
     el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onBack }, ["◀ 戻る"]),
   ]);
 }
