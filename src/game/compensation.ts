@@ -19,9 +19,25 @@ export interface Compensation {
   gold: number;
   summonScrolls: number;
   fourStarSummonScrolls?: number;
+  /**
+   * ★4以上光闇召喚書。
+   *
+   * **配れるようにしたのはここが初めて。**ミッションの報酬にはあったが、
+   * お知らせからは配れなかった。足す時は3か所そろえること
+   * (受け取り `claimCompensations` / 有無の判定 `hasReward` / ホームの札)。
+   * どれか1つでも忘れると、**配ったのに増えない**か**何も出ない札**になる。
+   */
+  lightDarkFourStarSummonScrolls?: number;
 }
 
 export const COMPENSATIONS: Compensation[] = [
+  {
+    id: "2026-09-07-apology-audio-and-black-screen",
+    title: "9/7 お詫びの配布（音が鳴らない不具合・真っ黒になる不具合）",
+    message: "2つの不具合で長らくご不便をおかけしました。お詫びの品をお受け取りください。\n\n【iPhoneで音がまったく鳴らなかった件】音源の形式がiPhoneでは再生できないものだったうえ、iPhone向けに用意したはずの音源が配信に含まれていませんでした。何度もご報告いただきながら直しきれず、申し訳ありませんでした。\n\n【戦闘のあと「戻る」で画面が真っ黒になった件】ステージやアリーナの結果画面から「戻る」を押すと、何も表示されないまま操作できなくなっていました。読み込み直す以外に抜け道がない状態でした。\n\nどちらも原因を特定して直しています。詳しくはこの下のお知らせをご覧ください。",
+    kind: "APOLOGY", fromDate: "2026-09-07", toDate: "9999-12-31",
+    crystal: 2000, gold: 500_000, summonScrolls: 0, lightDarkFourStarSummonScrolls: 1,
+  },
   {
     id: "2026-09-07-iphone-audio-format",
     title: "9/7 iPhoneで音がまったく鳴らなかった原因を直しました",
@@ -410,7 +426,8 @@ export function compensationBannerLabel(claims: readonly CompensationClaim[]): s
 /** 受け取ったモノがあるか。ダイヤ・ゴールド・召喚の書のどれか */
 export function hasReward(compensation: Compensation): boolean {
   return compensation.crystal > 0 || compensation.gold > 0
-    || compensation.summonScrolls > 0 || (compensation.fourStarSummonScrolls ?? 0) > 0;
+    || compensation.summonScrolls > 0 || (compensation.fourStarSummonScrolls ?? 0) > 0
+    || (compensation.lightDarkFourStarSummonScrolls ?? 0) > 0;
 }
 
 export interface HomeBannerSelection {
@@ -465,6 +482,7 @@ export function claimCompensations(state: PlayerState, now: Date = new Date()): 
     state.gold += compensation.gold;
     state.summonScrolls += compensation.summonScrolls;
     state.fourStarSummonScrolls += compensation.fourStarSummonScrolls ?? 0;
+    state.lightDarkFourStarSummonScrolls += compensation.lightDarkFourStarSummonScrolls ?? 0;
     state.claimedCompensationIds.push(compensation.id);
     claims.push({ compensation });
   }

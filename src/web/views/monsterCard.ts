@@ -183,6 +183,8 @@ export function buildMonsterCard(
             className: "mcard__detail",
             title: "詳細を見る",
             "aria-label": "詳細を見る",
+            // 簡易表示ではCSSが28px角へ絞る。理由は `renderMonsterListLock` と同じ
+            "data-tap-small": "所持一覧の簡易表示。カード幅60〜70pxで、本体の操作を奪わないため28px",
             onclick: (event: MouseEvent) => {
               // カード自体の「編成する」を巻き添えにしない
               event.stopPropagation();

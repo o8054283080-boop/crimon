@@ -142,6 +142,12 @@ export function renderMonsterListLock(instance: MonsterInstance, onToggleLock: (
     title: view.title,
     ariaLabel: view.label,
     "aria-pressed": String(view.locked),
+    /*
+     * 簡易表示ではCSSがこの判定を28px角へ絞る(`monsterList.css`)。
+     * カード1枚が60〜70px幅しかないので、36pxの判定だとカード本体の操作を奪う。
+     * 巡回の「指で押すには小さい」を、理由付きでここだけ外す(`tools/lib/inspect.mjs`)。
+     */
+    "data-tap-small": "所持一覧の簡易表示。カード幅60〜70pxで、本体の操作を奪わないため28px",
     onclick: (event: MouseEvent) => handleMonsterListLockClick(event, instance.id, onToggleLock),
   }, [el("span", { className: "monster-list-card__lock-glyph", "aria-hidden": "true" }, [view.glyph])]);
 }
