@@ -49,6 +49,19 @@
   line-height: 1.55;
 }
 
+/*
+ * 「なぜ増えないのか」を添える行。
+ * 本文より一段静かにするが、**小さくしすぎない**(実機で読めなくなる)。
+ */
+.ar-note__sub {
+  display: block;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.74rem;
+  opacity: 0.9;
+}
+
 .ar-empty {
   margin: 0;
   padding: 4px 0;

@@ -24,6 +24,21 @@ export function renderArenaHistory(props: PvpArenaProps): HTMLElement {
     props.notice ? el("p", { className: "panel ar-notice" }, [props.notice]) : null,
     el("p", { className: "panel ar-note" }, [
       "登録した防衛編成が挑まれた記録です。破られた相手には1回だけリベンジできます",
+      /*
+       * **増えない理由を書く。**
+       *
+       * 繋がっている間、防衛はほかの人が実際に挑んできた時にしか起きない
+       * (NPCが攻めてくるのは、繋がっていない時だけ)。人がまだ少ないので
+       * 何日も増えないことがあり、それを書いていないと
+       * 「壊れている」としか読めない。実際そう報告を受けた。
+       */
+      props.online
+        ? el("span", { className: "ar-note__sub" }, [
+          "いま対戦相手のサーバに繋がっています。この間は、ほかの人が実際に挑んできた時だけ記録が増えます",
+        ])
+        : el("span", { className: "ar-note__sub" }, [
+          "いまは繋がっていないので、留守のあいだに近いレートの相手が挑んできます",
+        ]),
     ]),
     rows.length === 0
       ? el("p", { className: "panel ar-empty" }, ["まだ攻められた記録はありません"])

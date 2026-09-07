@@ -320,7 +320,25 @@ function toRankingEntry(row: unknown): ArenaRankingEntry | null {
   };
 }
 
-function toMatchRecord(row: unknown, myId: string): ArenaMatchRecord | null {
+/**
+ * 埋め込みで一緒に取ってきたプロフィールから表示名を読む。
+ *
+ * PostgRESTは繋がりの向きによって、1件のオブジェクトで返すことも
+ * 1要素の配列で返すこともある。どちらでも読めるようにしておく。
+ * 取れなければ null——**知らない名前をでっち上げない。**
+ */
+function embeddedName(value: unknown): string | null {
+  const record = Array.isArray(value) ? value[0] : value;
+  if (!isRecord(record)) return null;
+  const name = record.display_name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
+
+/**
+ * 1行を戦績へ直す。**テストから直接叩けるように出してある。**
+ * 相手の名前をどこから取るかは、ここでしか決まらない。
+ */
+export function toMatchRecord(row: unknown, myId: string): ArenaMatchRecord | null {
   if (!isRecord(row)) return null;
   const id = row.id;
   if (typeof id !== "string" || !id) return null;
@@ -340,10 +358,21 @@ function toMatchRecord(row: unknown, myId: string): ArenaMatchRecord | null {
     at: Number.isFinite(at) ? at : 0,
     side,
     opponentKind: row.opponent_kind === "NPC" ? "NPC" : "PLAYER",
-    // NPCの名前だけが行に入っている。実プレイヤーの表示名は
-    // arena_matches に持たせていない(改名で履歴が食い違うのを避ける)。
-    // 名前が要る画面はランキング側から引くこと
-    opponentName: asText(row.npc_name, "名もなき挑戦者"),
+    /*
+     * 相手の名前。**NPCなら行に入っている名前、実プレイヤーならプロフィールから。**
+     *
+     * `arena_matches` は表示名を持たない(改名で履歴が食い違うのを避けるため)。
+     * ここでプロフィールを引いていなかったので、**実プレイヤーに攻められた記録は
+     * 全部「名もなき挑戦者」になっていた。** 誰に破られたのか分からないまま
+     * 「リベンジする」だけが並ぶ画面になっていた。
+     *
+     * 取れなかった時だけ「名もなき挑戦者」に戻す。名前を知らないことを
+     * 名前であるかのように出さない。
+     */
+    opponentName: row.opponent_kind === "NPC"
+      ? asText(row.npc_name, "名もなき挑戦者")
+      : embeddedName(side === "OFFENSE" ? row.defender : row.attacker)
+        ?? asText(row.npc_name, "名もなき挑戦者"),
     opponentRating: Math.max(0, Math.round(side === "OFFENSE"
       ? asFiniteNumber(row.defender_rating_before, 0)
       : asFiniteNumber(row.attacker_rating_before, 0))),
@@ -548,11 +577,25 @@ export async function fetchArenaMatchHistory(myId: string, limit = 20): Promise<
   try {
     if (!arenaSyncAvailable() || !myId) return [];
     const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
-    const params = new URLSearchParams();
-    params.set("select", "*");
-    params.set("order", "created_at.desc");
-    params.set("limit", String(safeLimit));
-    const rows = await request(`arena_matches?${params.toString()}`);
+    const build = (select: string) => {
+      const params = new URLSearchParams();
+      params.set("select", select);
+      params.set("order", "created_at.desc");
+      params.set("limit", String(safeLimit));
+      return `arena_matches?${params.toString()}`;
+    };
+    /*
+     * **相手の名前も一緒に取る。**`arena_matches` は表示名を持たないので、
+     * 繋がっているプロフィールを埋め込みで引く。これをしていなかったため、
+     * 実プレイヤーに攻められた記録は全部「名もなき挑戦者」になっていた。
+     *
+     * 埋め込みは繋がりの名前に依存するので、**通らない時のために素の取得も残す。**
+     * 名前が出ないのは困るが、履歴そのものが出ないのはもっと困る。
+     */
+    const embedded = "*,attacker:arena_profiles!arena_matches_attacker_id_fkey(display_name)"
+      + ",defender:arena_profiles!arena_matches_defender_id_fkey(display_name)";
+    let rows = await request(build(embedded)).catch(() => null);
+    if (!Array.isArray(rows)) rows = await request(build("*"));
     if (!Array.isArray(rows)) return [];
     return rows
       .map((row) => toMatchRecord(row, myId))

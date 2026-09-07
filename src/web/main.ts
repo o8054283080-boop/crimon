@@ -145,7 +145,7 @@ import { buildArenaEntryBattle } from "./views/arena/model.js";
 import { arenaNpcRng, buildArenaNpcs } from "../game/arena/npc.js";
 import { buildArenaCandidates } from "../game/arena/matchmaking.js";
 import { captureArenaDefense } from "../game/arena/snapshot.js";
-import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, recordArenaMatch } from "../game/arena/match.js";
+import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, mergeArenaHistory, recordArenaMatch } from "../game/arena/match.js";
 import {
   applyArenaSeasonRollover,
   claimArenaSeasonReward as claimArenaSeasonRewardLocal,
@@ -2358,7 +2358,14 @@ async function claimArenaSeasonRewardBoth(bestRatingOfEndedSeason: number): Prom
 async function refreshArenaHistory(): Promise<void> {
   const records = await fetchArenaMatchHistory(arenaSelfId(), ARENA_HISTORY_MAX);
   if (records.length === 0) return;
-  state.player.arenaMatchHistory = records.slice(0, ARENA_HISTORY_MAX);
+  /*
+   * **上書きせず、合わせる。**
+   *
+   * 以前はここで丸ごと置き換えていたので、繋がっていない間に積んだ記録
+   * (留守中にNPCへ攻められた分)が、一度オンラインになった瞬間に
+   * 全部消えて保存されていた。サーバはその戦いを知らないので、二度と戻らない。
+   */
+  state.player.arenaMatchHistory = mergeArenaHistory(state.player.arenaMatchHistory, records);
   savePlayerState(state.player);
   render();
 }
@@ -3553,6 +3560,15 @@ function renderScreen(): void {
           state.arenaNotice = null;
           if (view !== "OPPONENT_DETAIL") state.arenaDetailIndex = null;
           if (view === "RANKING" && state.arenaRankingTop.length === 0) void refreshArenaRanking();
+          /*
+           * **防衛履歴は開くたびに取り直す。**
+           *
+           * 攻められるのはこちらが見ていない時なので、アプリを開いたままだと
+           * 起動時に1度引いたきり、その後どれだけ攻められても画面は変わらない。
+           * レートの方は繋いだ時にサーバの値へ合わせるので、
+           * **レートだけ下がって、理由が履歴に出ない**という食い違いになる。
+           */
+          if (view === "HISTORY") state.arenaHistoryLoaded = false;
           if (view === "DEFENSE" && state.arenaDefenseDraftIds.length === 0) {
             // 登録済みの顔ぶれを下敷きにする。ゼロから選び直させない
             state.arenaDefenseDraftIds = [...state.player.arenaDefenseIds];
