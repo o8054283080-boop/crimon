@@ -401,3 +401,70 @@ describe("シリーズ名は省略しない", () => {
     expect(block, "縮む余地があると潰れる").toContain("flex: none");
   });
 });
+
+/*
+ * モンスターの枠から装備を選ぶ画面(picker)。
+ *
+ * **枠で絞れば十分、と考えて絞り込みを出していなかった。**
+ * ★6のエピックが何十個も並ぶ段階になると枠だけでは選べない、
+ * という指摘をもらって出すようにした。ここでは
+ * 「その枠に着く物」と「絞り込み」の両方が効くことを見張る。
+ */
+describe("装備を選ぶ画面の絞り込み", () => {
+  it("枠で絞ったうえに、条件も効く", async () => {
+    const { visibleEquipment } = await import("../src/web/views/equipment.js");
+    const crit1 = generateEquipment({ slot: 1, star: 6, subStatCount: 4, set: "CRIT", rng: mulberry32(2) });
+    const swift1 = generateEquipment({ slot: 1, star: 6, subStatCount: 4, set: "SWIFT", rng: mulberry32(3) });
+    // **別の枠の速攻。**枠で弾かれるので、条件に合っていても出てはいけない
+    const swift3 = generateEquipment({ slot: 3, star: 6, subStatCount: 4, set: "SWIFT", rng: mulberry32(4) });
+
+    const props = {
+      player: { equipment: [crit1, swift1, swift3], monsters: [] },
+      pickerContext: { slot: 1, monsterId: "m1" },
+      slotFilter: null,
+      sortKey: "recommended",
+      filter: { ...EMPTY_EQUIPMENT_FILTER, sets: ["SWIFT"] },
+    } as unknown as Parameters<typeof visibleEquipment>[0];
+
+    const shown = visibleEquipment(props);
+    expect(shown.map((e) => e.id)).toEqual([swift1.id]);
+  });
+
+  it("条件を何も選んでいなければ、その枠の物が全部出る", async () => {
+    const { visibleEquipment } = await import("../src/web/views/equipment.js");
+    const a = generateEquipment({ slot: 1, star: 6, subStatCount: 4, set: "CRIT", rng: mulberry32(5) });
+    const b = generateEquipment({ slot: 1, star: 5, subStatCount: 2, set: "SWIFT", rng: mulberry32(6) });
+    const other = generateEquipment({ slot: 2, star: 6, subStatCount: 4, set: "CRIT", rng: mulberry32(7) });
+
+    const props = {
+      player: { equipment: [a, b, other], monsters: [] },
+      pickerContext: { slot: 1, monsterId: "m1" },
+      slotFilter: null,
+      sortKey: "recommended",
+      filter: { ...EMPTY_EQUIPMENT_FILTER },
+    } as unknown as Parameters<typeof visibleEquipment>[0];
+
+    const shown = visibleEquipment(props);
+    expect(shown.map((e) => e.id).sort()).toEqual([a.id, b.id].sort());
+  });
+
+  it("装着中だけを見る条件も、選ぶ画面で効く", async () => {
+    const { visibleEquipment } = await import("../src/web/views/equipment.js");
+    const worn = generateEquipment({ slot: 1, star: 6, subStatCount: 4, set: "CRIT", rng: mulberry32(8) });
+    const free = generateEquipment({ slot: 1, star: 6, subStatCount: 4, set: "CRIT", rng: mulberry32(9) });
+
+    const props = {
+      player: {
+        equipment: [worn, free],
+        monsters: [{ id: "m9", equipment: { 1: worn.id } }],
+      },
+      pickerContext: { slot: 1, monsterId: "m1" },
+      slotFilter: null,
+      sortKey: "recommended",
+      filter: { ...EMPTY_EQUIPMENT_FILTER, use: "FREE" },
+    } as unknown as Parameters<typeof visibleEquipment>[0];
+
+    expect(visibleEquipment(props).map((e) => e.id)).toEqual([free.id]);
+  });
+
+});

@@ -446,11 +446,20 @@ function renderBulkBar(props: EquipmentProps, shown: Equipment[]): HTMLElement {
 export function visibleEquipment(props: EquipmentProps): Equipment[] {
   const isEquipped = makeIsEquipped(props.player);
   /*
-   * 装備を選びに来た時(picker)は、その枠に着けられる物だけ。
-   * 絞り込みの札は出していないので、条件も当てない。
+   * 装備を選びに来た時(picker)は、まずその枠に着けられる物だけに絞る。
+   * **そのうえで絞り込みも当てる。**
+   *
+   * 以前は picker では条件を当てていなかった。枠で絞れば十分だろう、
+   * という判断だったが、★6のエピックが何十個も並ぶ段階になると
+   * **枠だけでは選べない**(依頼主の指摘)。シリーズ・レア度・
+   * メイン効果は枠に関係なく効く条件なので、そのまま使える。
    */
   const base = props.pickerContext
-    ? equipmentForSlot(props.player.equipment, props.pickerContext.slot)
+    ? filterEquipment(
+        equipmentForSlot(props.player.equipment, props.pickerContext.slot),
+        props.filter,
+        isEquipped,
+      )
     : filterEquipment(
         props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter),
         props.filter,
@@ -646,10 +655,19 @@ function renderList(props: EquipmentProps): HTMLElement {
       el("p", { className: "app-subtitle" }, [`${items.length}個`]),
     ]),
     toolbar,
+    // 枠の行は picker では出さない。**その枠に着く物しか並んでいない**
     props.pickerContext ? null : renderSlotFilterRow(props),
-    // 絞り込みは picker では出さない(その枠に着く物しか並んでいないため)
-    props.pickerContext ? null : renderEquipmentFilterBar({
-      all: props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter),
+    /*
+     * 絞り込みは picker でも出す。
+     *
+     * 候補として渡すのは「いま見ている範囲」——picker ならその枠に着く物、
+     * 一覧なら枠で絞ったあとの物。**そこに実在する条件しか札に出さない**ので、
+     * 押しても0件になる札が並ばない。
+     */
+    renderEquipmentFilterBar({
+      all: props.pickerContext
+        ? equipmentForSlot(props.player.equipment, props.pickerContext.slot)
+        : props.player.equipment.filter((e) => props.slotFilter === null || e.slot === props.slotFilter),
       shownCount: items.length,
       filter: props.filter,
       open: props.filterOpen,
