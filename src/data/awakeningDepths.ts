@@ -160,14 +160,14 @@ const FLOOR_CONFIG: Record<number, FloorConfig> = {
     note: "適応が15%まで深くなる。同じ1体で殴り続けると通らなくなる",
   },
   9: {
-    hp: 162_000, atk: 8_300, def: 3_700, spd: 180,
+    hp: 145_000, atk: 7_100, def: 3_700, spd: 180,
     counterAfterHits: 6, adaptationMax: 0.15, shards: ["ATK", "DEF"], stamina: 10,
     drop: { shards: [11, 14], crystals: [3, 5], stoneChance: 0.03 },
     firstClear: { shards: 120, crystals: 20, stones: 0 },
     note: "10階の手前。ここを安定して回れるなら10階が見える",
   },
   10: {
-    hp: 180_000, atk: 9_500, def: 4_000, spd: 185,
+    hp: 152_000, atk: 7_800, def: 4_000, spd: 185,
     counterAfterHits: 5, adaptationMax: 0.20, shards: ["ATK", "DEF"], stamina: 10,
     drop: { shards: [14, 18], crystals: [4, 6], stoneChance: 0.06 },
     firstClear: { shards: 150, crystals: 30, stones: 1 },
