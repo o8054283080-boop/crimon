@@ -9,8 +9,6 @@ import { checkRankUp } from "../../game/progression.js";
 import { isSameSpecies } from "../../game/monsterPowerUp.js";
 import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
 import { el } from "../dom.js";
-import { usedTalentPoints } from "../../core/talents.js";
-import { skillTalentCost } from "../../core/talentSkills.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
 import { MONSTER_SORT_KEYS, MONSTER_SORT_LABEL, MonsterSortKey, monsterPower, sortMonsters } from "../../game/monsterSort.js";
 import { GEAR_SLOT_TOTAL, MonsterFilter, equippedCount, filterMonsters } from "../monsterFilter.js";
@@ -43,8 +41,6 @@ export interface MonstersProps {
   onViewEquippedSlot: (equipmentId: string, monsterId: string) => void;
   onGoMonsterTraining: (monsterId: string) => void;
   onGoCreate: (monsterId: string) => void;
-  /** 才能覚醒を開く。★6でなければ押せない */
-  onGoTalentAwakening: (monsterId: string) => void;
   onGoMonsterDex: () => void;
   sortKey: MonsterSortKey;
   onChangeSort: (key: MonsterSortKey) => void;
@@ -249,16 +245,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const skills = dex?.skills.map((skill, index) => index === 0 ? skill : currentSkillOf(instance, index as CreateSlot) ?? skill) ?? [];
   const latentId = instance.development?.latentAbilityId ?? null;
   const latent = latentId ? LATENT_ABILITY_CANDIDATES[instance.dexId]?.find((candidate) => candidate.id === latentId) : undefined;
-  /*
-   * 才能覚醒の要約。**解放したptと使ったpt、スキル覚醒の有無だけ。**
-   * 中身を全部並べると詳細が才能の一覧になってしまうので、
-   * 「どれだけ進んでいるか」に絞る。
-   */
-  const talents = instance.development?.talents;
-  const talentSummary = instance.star >= 6 && talents
-    ? `${talents.unlockedPoints}pt 解放 / ${usedTalentPoints(talents, skillTalentCost)}pt 使用`
-      + `${talents.awakening ? " ・ スキル覚醒 1/1" : ""}`
-    : null;
   const activeSets = getActiveSetBonuses(equippedItems);
 
   return el("div", { className: "screen monsters-screen monster-detail-screen" }, [
@@ -337,18 +323,10 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
           : el("span", { className: "monster-detail-empty" }, [latentId ? "潜在覚醒：未設定" : "🔒 未解放"]),
       ]),
       /*
-       * 才能覚醒。**潜在覚醒の隣に置く。**
-       *
-       * どちらも「その個体だけの伸びしろ」で、片方はスキル1、
-       * もう片方は基礎・戦闘・スキル2/3。**並べると役割の違いが分かる。**
-       * ★6前は入口を出すが押せない——何をすれば開くのかを先に見せる。
+       * **才能覚醒はここに出さない。**入口も要約もクリエイトの中にある
+       * (クリエイトの5つ目の欄)。両方に置くと、同じものを触る場所が
+       * 2か所になり、どちらが本体か分からなくなる。
        */
-      el("section", { className: "monster-detail-section monster-detail-talent" }, [
-        el("h2", {}, ["◆ 才能覚醒"]),
-        talentSummary
-          ? el("div", {}, [el("strong", {}, [talentSummary])])
-          : el("span", { className: "monster-detail-empty" }, ["🔒 ★6で解放"]),
-      ]),
       el("section", { className: "monster-detail-section monster-detail-equipment" }, [
         el("h2", {}, ["装備"]),
         renderSlotGrid(props, instance),
@@ -360,16 +338,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
       el("section", { className: "monster-detail-actions" }, [
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoMonsterTraining(instance.id) }, ["強化"]),
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoCreate(instance.id) }, [instance.createdSkill ? "クリエイトし直す" : "クリエイト"]),
-        el(
-          "button",
-          {
-            type: "button",
-            className: "btn btn--ghost",
-            disabled: instance.star < 6,
-            onclick: () => props.onGoTalentAwakening(instance.id),
-          },
-          [instance.star >= 6 ? "才能覚醒" : "才能覚醒（★6で解放）"],
-        ),
         rankReady ? el("button", { type: "button", className: "btn btn--primary", onclick: props.onStartRankUp }, [`ランクアップ（素材${RANK_UP_SACRIFICE_COUNT[instance.star]}体）`]) : null,
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectSlot(instance.id, 1) }, ["装備変更"]),
         el("small", { className: "monster-detail-actions__hint" }, [rankReady ? "ランクアップ可能" : instance.star >= 6 ? "最大ランク到達" : `ランクアップ：Lv${maxLevel}で解放`]),
