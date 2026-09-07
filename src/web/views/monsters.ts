@@ -101,7 +101,8 @@ function renderList(props: MonstersProps): HTMLElement {
         dense: props.dense,
         badge: props.player.partyIds.includes(instance.id) ? "編成中" : undefined,
       });
-      card.classList.toggle("monster-list-card--locked", instance.locked === true);
+      const lockView = monsterListLockView(instance);
+      card.classList.toggle("monster-list-card--locked", lockView.locked);
       card.append(renderMonsterListLock(instance, props.onToggleLock));
       return card;
     },
@@ -159,6 +160,38 @@ export function handleMonsterListLockClick(event: Pick<Event, "preventDefault" |
   event.preventDefault();
   event.stopPropagation();
   onToggleLock(monsterId);
+}
+
+/**
+ * ランクアップの一括選択。
+ *
+ * すでに手で選んだ有効な素材は残し、足りない分だけ補う。
+ * 補充分は「同じ種類が何体余っているか」が多い順にすることで、
+ * 1体しか持っていない個体より重複している個体を先に素材へ回す。
+ * 同数なら手持ちの並びを維持する。
+ */
+export function autoSelectRankUpSacrificeIds(
+  candidates: readonly MonsterInstance[],
+  selectedIds: readonly string[],
+  requiredCount: number,
+): string[] {
+  const candidateIds = new Set(candidates.map((monster) => monster.id));
+  const kept = selectedIds.filter((id, index) => candidateIds.has(id) && selectedIds.indexOf(id) === index).slice(0, requiredCount);
+  if (kept.length >= requiredCount) return kept;
+
+  const counts = new Map<string, number>();
+  for (const monster of candidates) counts.set(monster.dexId, (counts.get(monster.dexId) ?? 0) + 1);
+  const keptSet = new Set(kept);
+  const originalIndex = new Map(candidates.map((monster, index) => [monster.id, index]));
+  const remaining = candidates
+    .filter((monster) => !keptSet.has(monster.id))
+    .sort((a, b) => {
+      const countDiff = (counts.get(b.dexId) ?? 0) - (counts.get(a.dexId) ?? 0);
+      if (countDiff !== 0) return countDiff;
+      return (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0);
+    });
+
+  return [...kept, ...remaining.slice(0, Math.max(0, requiredCount - kept.length)).map((monster) => monster.id)];
 }
 
 function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLElement {
@@ -229,13 +262,6 @@ function renderSetBonusPanel(equippedItems: ReturnType<typeof resolveEquippedIte
   return el("section", { className: "panel" }, [el("h2", {}, ["発動中のセット効果"]), ...rows]);
 }
 
-/**
- * 緑の字が何を足したものかを言う。
- *
- * **「装備補正」とだけ書いていたが、実際は育成のぶんも入っている。**
- * 何も育てていない個体で「装備補正：なし」と出しておきながら、
- * タイプ転生をすると数字が動く、では読み手が混乱する。
- */
 export function detailGainNote(instance: MonsterInstance, gearedSlots: number): string {
   const sources: string[] = [];
   if (gearedSlots > 0) sources.push(`装備${gearedSlots}枠`);
@@ -247,21 +273,18 @@ export function detailGainNote(instance: MonsterInstance, gearedSlots: number): 
   return sources.length > 0 ? `育成・装備の補正：${sources.join(" / ")}（緑字）` : "育成・装備の補正：なし";
 }
 
-function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElement {
+interface MonsterDetailOptions {
+  onBack?: () => void;
+  backLabel?: string;
+  hideRankUp?: boolean;
+  onToggleLock?: (monsterId: string) => void;
+}
+
+function renderDetail(props: MonstersProps, instance: MonsterInstance, options: MonsterDetailOptions = {}): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   const maxLevel = STAR_MAX_LEVEL[instance.star];
   const growthStats = dex ? computeEffectiveStats(dex.stats, instance.star, instance.level) : null;
   const equippedItems = resolveEquippedItems(instance, props.player.equipment);
-  /*
-   * **戦闘で使うのと同じ計算で出す。**
-   *
-   * ここは長いあいだ「レベル成長 + 装備」だけを見ていた。
-   * タイプ転生・能力ポイント・才能覚醒は戦闘には効いているのに
-   * **詳細画面の数字が一切動かず**、「クリ率アップは本当に効いているのか」と
-   * 指摘を受けた(実際に効いていたが、確かめる手段が無かった)。
-   *
-   * 育成の結果を確かめる場所なので、育てたぶんは全部入った値を出す。
-   */
   const effectiveStats = dex ? toBattleDefinition(instance, dex, equippedItems).stats : null;
   const rankReady = canRankUp(instance.star, instance.level);
   const expNeeded = requiredExpForLevel(instance.level);
@@ -274,17 +297,21 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
   const latentId = instance.development?.latentAbilityId ?? null;
   const latent = latentId ? LATENT_ABILITY_CANDIDATES[instance.dexId]?.find((candidate) => candidate.id === latentId) : undefined;
   const activeSets = getActiveSetBonuses(equippedItems);
+  const lockView = monsterListLockView(instance);
+  const onBack = options.onBack ?? (() => props.onSelectDetail(null));
+  const onToggleLock = options.onToggleLock ?? props.onToggleLock;
 
   return el("div", { className: "screen monsters-screen monster-detail-screen" }, [
     el("header", { className: "monster-detail-head" }, [
-      el("button", { type: "button", className: "monster-detail-head__back", onclick: () => props.onSelectDetail(null), ariaLabel: "所持モンスター一覧へ戻る" }, [icon("back", { size: 17 }), "戻る"]),
+      el("button", { type: "button", className: "monster-detail-head__back", onclick: onBack, ariaLabel: options.backLabel ?? "所持モンスター一覧へ戻る" }, [icon("back", { size: 17 }), options.backLabel ?? "戻る"]),
       el("h1", {}, [dex?.name ?? instance.dexId ?? "名称未設定"]),
       el("button", {
         type: "button",
-        className: `monster-detail-head__lock${instance.locked ? " is-locked" : ""}`,
-        onclick: (event: MouseEvent) => { event.stopPropagation(); props.onToggleLock(instance.id); },
-        ariaLabel: instance.locked ? "モンスターのロックを解除" : "モンスターをロック",
-        title: instance.locked ? "ロック中" : "未ロック",
+        className: `monster-detail-head__lock${lockView.locked ? " is-locked" : ""}`,
+        onclick: (event: MouseEvent) => { event.stopPropagation(); onToggleLock(instance.id); },
+        ariaLabel: lockView.label,
+        title: lockView.title,
+        "aria-pressed": String(lockView.locked),
       }, [icon("lock", { size: 19 })]),
     ]),
     el("main", { className: "monster-detail-layout" }, [
@@ -323,10 +350,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
             entry.gain ? el("span", { className: "stat-tile__gain" }, [entry.gain]) : null,
           ].filter((n): n is string | HTMLElement => n !== null)),
         )),
-        /*
-         * 緑の字は「レベル成長からの差」。**装備だけではない。**
-         * タイプ転生・能力ポイント・才能覚醒もここに含まれる。
-         */
         el("div", { className: "monster-detail__gear-note" }, [detailGainNote(instance, gearedSlots)]),
       ]),
       el("section", { className: "monster-detail-section monster-detail-skills" }, [
@@ -354,11 +377,6 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
         latent ? el("div", {}, [el("strong", {}, [latent.name || "名称未設定"]), el("span", {}, [latent.description || "説明未登録"])])
           : el("span", { className: "monster-detail-empty" }, [latentId ? "潜在覚醒：未設定" : "🔒 未解放"]),
       ]),
-      /*
-       * **才能覚醒はここに出さない。**入口も要約もクリエイトの中にある
-       * (クリエイトの5つ目の欄)。両方に置くと、同じものを触る場所が
-       * 2か所になり、どちらが本体か分からなくなる。
-       */
       el("section", { className: "monster-detail-section monster-detail-equipment" }, [
         el("h2", {}, ["装備"]),
         renderSlotGrid(props, instance),
@@ -370,9 +388,9 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
       el("section", { className: "monster-detail-actions" }, [
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoMonsterTraining(instance.id) }, ["強化"]),
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoCreate(instance.id) }, [instance.createdSkill ? "クリエイトし直す" : "クリエイト"]),
-        rankReady ? el("button", { type: "button", className: "btn btn--primary", onclick: props.onStartRankUp }, [`ランクアップ（素材${RANK_UP_SACRIFICE_COUNT[instance.star]}体）`]) : null,
+        rankReady && !options.hideRankUp ? el("button", { type: "button", className: "btn btn--primary", onclick: props.onStartRankUp }, [`ランクアップ（素材${RANK_UP_SACRIFICE_COUNT[instance.star]}体）`]) : null,
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectSlot(instance.id, 1) }, ["装備変更"]),
-        el("small", { className: "monster-detail-actions__hint" }, [rankReady ? "ランクアップ可能" : instance.star >= 6 ? "最大ランク到達" : `ランクアップ：Lv${maxLevel}で解放`]),
+        el("small", { className: "monster-detail-actions__hint" }, [options.hideRankUp ? "ランクアップ素材の詳細を確認中" : rankReady ? "ランクアップ可能" : instance.star >= 6 ? "最大ランク到達" : `ランクアップ：Lv${maxLevel}で解放`]),
       ].filter((n): n is HTMLElement => n !== null)),
     ]),
   ].filter((n): n is HTMLElement => n !== null));
@@ -382,13 +400,33 @@ let rankUpMaterialSort: Extract<MaterialMonsterSort, "DEFAULT" | "REINCARNATION_
 let rankUpSortKey: MonsterSortKey = "recommended";
 let rankUpElementFilter: Element | "ALL" = "ALL";
 let rankUpUseFilter: "ALL" | "SAME_SPECIES" | "SELECTED" = "ALL";
+let rankUpDetailId: string | null = null;
 
 function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElement {
   const dex = findMonsterById(target.dexId);
   const requiredCount = RANK_UP_SACRIFICE_COUNT[target.star];
   const candidates = props.player.monsters.filter(
-    (m) => m.id !== target.id && m.star === target.star && !props.player.partyIds.includes(m.id) && m.locked !== true,
+    (m) => m.id !== target.id && m.star === target.star && !props.player.partyIds.includes(m.id) && !monsterListLockView(m).locked,
   );
+
+  const inspected = rankUpDetailId ? props.player.monsters.find((monster) => monster.id === rankUpDetailId) : undefined;
+  if (inspected && inspected.id !== target.id) {
+    const backToRankUp = (): void => {
+      rankUpDetailId = null;
+      props.onSelectDetail(target.id);
+    };
+    return renderDetail(props, inspected, {
+      onBack: backToRankUp,
+      backLabel: "ランクアップへ戻る",
+      hideRankUp: true,
+      onToggleLock: (monsterId) => {
+        const wasSelected = props.selectedSacrificeIds.includes(monsterId);
+        props.onToggleLock(monsterId);
+        if (wasSelected) props.onToggleSacrifice(monsterId);
+      },
+    });
+  }
+  if (rankUpDetailId && !inspected) rankUpDetailId = null;
 
   const sacrifices = props.selectedSacrificeIds
     .map((id) => props.player.monsters.find((m) => m.id === id))
@@ -413,10 +451,25 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
       selected: props.selectedSacrificeIds.includes(candidate.id),
       bonus: isSameSpecies(target, candidate),
       dense: props.dense,
-      onLongPress: () => props.onSelectDetail(candidate.id),
+      onLongPress: () => {
+        rankUpDetailId = candidate.id;
+        props.onSelectDetail(target.id);
+      },
     }),
     moreLabel: (shown, total) => `素材をさらに表示（${shown} / ${total}）`,
   });
+
+  const autoSelectedIds = autoSelectRankUpSacrificeIds(candidates, props.selectedSacrificeIds, requiredCount);
+  const applyAutoSelection = (): void => {
+    const current = new Set(props.selectedSacrificeIds);
+    const next = new Set(autoSelectedIds);
+    for (const id of props.selectedSacrificeIds) {
+      if (!next.has(id)) props.onToggleSacrifice(id);
+    }
+    for (const id of autoSelectedIds) {
+      if (!current.has(id)) props.onToggleSacrifice(id);
+    }
+  };
 
   const sortButtons = MONSTER_SORT_KEYS.map((key) => {
     const button = el("button", {
@@ -425,9 +478,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     }, [MONSTER_SORT_LABEL[key]]) as HTMLButtonElement;
     button.onclick = () => {
       rankUpSortKey = key;
-      for (const [i, other] of sortButtons.entries()) {
-        other.classList.toggle("slot-filter-chip--active", MONSTER_SORT_KEYS[i] === key);
-      }
+      for (const [i, other] of sortButtons.entries()) other.classList.toggle("slot-filter-chip--active", MONSTER_SORT_KEYS[i] === key);
       grid.reset(buildItems());
     };
     return button;
@@ -459,9 +510,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     }, [label]) as HTMLButtonElement;
     button.onclick = () => {
       rankUpElementFilter = element;
-      for (const [i, other] of elementButtons.entries()) {
-        other.classList.toggle("slot-filter-chip--active", elementValues[i] === element);
-      }
+      for (const [i, other] of elementButtons.entries()) other.classList.toggle("slot-filter-chip--active", elementValues[i] === element);
       grid.reset(buildItems());
     };
     return button;
@@ -475,9 +524,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     }, [label]) as HTMLButtonElement;
     button.onclick = () => {
       rankUpUseFilter = value;
-      for (const [i, other] of useButtons.entries()) {
-        other.classList.toggle("slot-filter-chip--active", useValues[i][0] === value);
-      }
+      for (const [i, other] of useButtons.entries()) other.classList.toggle("slot-filter-chip--active", useValues[i][0] === value);
       grid.reset(buildItems());
     };
     return button;
@@ -488,6 +535,13 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     el("section", { className: "panel" }, [
       el("p", {}, [`対象: ${dex ? dex.name : target.dexId} ${starLabel(target.star)} → ${starLabel((target.star + 1) as 1 | 2 | 3 | 4 | 5)}`]),
       el("p", {}, [`同じ星(${starLabel(target.star)})のモンスターを${requiredCount}体選択してください (${props.selectedSacrificeIds.length}/${requiredCount})`]),
+      el("button", {
+        type: "button",
+        className: "btn btn--ghost btn--large",
+        disabled: autoSelectedIds.length === 0 || props.selectedSacrificeIds.length >= requiredCount,
+        onclick: applyAutoSelection,
+      }, ["☑ 必要数まで一括選択"]),
+      el("p", { className: "app-subtitle" }, ["未ロック・編成外の素材から、同じ種類を多く持っているモンスターを優先して必要数まで選びます。すでに手で選んだ素材は残します。"]),
       el("div", { className: "picked-row" }, [
         el("span", { className: "picked-row__label" }, ["選んだ素材(押すと外せます)"]),
         renderPartySlots(sacrifices, requiredCount, props.onToggleSacrifice),
@@ -535,6 +589,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
 export function renderMonsters(props: MonstersProps): HTMLElement {
   const target = props.detailId ? props.player.monsters.find((m) => m.id === props.detailId) : undefined;
   if (target && props.rankUpMode) return renderRankUp(props, target);
+  rankUpDetailId = null;
   rankUpMaterialSort = "DEFAULT";
   rankUpSortKey = "recommended";
   rankUpElementFilter = "ALL";
