@@ -34,31 +34,33 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # iOS 18.7.8 の実機で OGG/Vorbis が Web Audio の decodeAudioData() では
-      # EncodingError、HTMLAudioElement でも「再生中」に見えるのに無音になる端末を確認した。
-      # 公開物だけは互換性の高い AAC/M4A へ変換し、manifest も M4A を指すようにする。
-      # 元のOGGはリポジトリに残すので、音作りのソースや再生成手順は変えない。
-      - name: iPhone互換のAAC音源を用意
+      # iPhone互換のAAC/M4A音源は**リポジトリに置いてある**。
+      #
+      # 以前はここで OGG から変換していたが、**その公開先にしか届かなかった。**
+      # 本番は Cloudflare Pages 経由で配られており、あちらは `npm run build` を
+      # 実行するだけなので、この手順は一度も走らない。結果としてiPhoneには
+      # 永久にOGGしか届かず、「M4Aへ変換した」つもりのまま無音が続いていた。
+      #
+      # いまは形式そのものを控えに入れ、再生側が端末に応じて選ぶ(`src/web/audio/format.ts`)。
+      # ここに残すのは**揃っていることの確認**だけ。足りなければ公開を止める。
+      - name: iPhone互換のAAC音源が揃っているか確かめる
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
-          fi
+          missing=0
           for src in public/audio/*.ogg; do
             dst="${src%.ogg}.m4a"
-            ffmpeg -hide_banner -loglevel error -y -i "$src" -c:a aac -b:a 160k -movflags +faststart "$dst"
+            if [ ! -s "$dst" ]; then
+              echo "M4Aがありません: $dst"
+              missing=1
+            fi
           done
-          python - <<'PY'
-          from pathlib import Path
-          p = Path("public/audio/manifest.json")
-          text = p.read_text(encoding="utf-8")
-          p.write_text(text.replace('.ogg"', '.m4a"'), encoding="utf-8")
-          PY
+          if [ "$missing" -ne 0 ]; then
+            echo "tools/audio/makeM4a.sh を実行して控えへ入れてください" >&2
+            exit 1
+          fi
           test -s public/audio/bgm_home.m4a
           test -s public/audio/tap_0.m4a
-          grep -q 'bgm_home.m4a' public/audio/manifest.json
       # **アリーナのオンライン機能は、ここで環境変数を渡さないと永久に動かない。**
       #
       # Vite は `VITE_` で始まる環境変数を**組み立ての時に**中へ焼き込む。

@@ -7,7 +7,50 @@
  * 不具合になるので、入口をここに集約する。
  */
 
+import {
+  AudioFormat,
+  audioLoadReport,
+  effectiveAudioFormat,
+  noteAudioLoadFailure,
+  noteAudioLoadSuccess,
+  resolveAudioFile,
+} from "./format.js";
+
 type Listener = () => void;
+
+/**
+ * 音の扱い方をiPhoneへ伝える。**必ずAudioContextを作る前に呼ぶ。**
+ *
+ * `ambient` を指定すると
+ *   ・本体横の消音スイッチ(マナーモード)に従う
+ *   ・他アプリの音楽を止めない(混ぜて鳴る)
+ * という、ゲームとして正しい振る舞いになる。
+ *
+ * **`playback` は使わない。**あれは音楽・動画アプリ向けで、
+ * 消音スイッチを無視し、ホームへ戻った後もBGMが鳴り続ける。
+ * 既定の `auto` はWeb Audioを使った時点で `playback` 相当に倒れるので、
+ * 「指定しない」は「playbackでよい」と同じ意味になってしまう。必ず明示すること。
+ *
+ * 同じ端末で正常に鳴っている Monster-farm も、これを明示している。
+ */
+export function applyAmbientAudioSession(): void {
+  try {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session && session.type !== "ambient") session.type = "ambient";
+  } catch {
+    // 非対応の端末。ブラウザ既定の扱いに任せる
+  }
+}
+
+/** Audio Session の状態。診断表示に出す */
+export function audioSessionType(): string {
+  try {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    return session?.type ?? "非対応";
+  } catch {
+    return "非対応";
+  }
+}
 
 class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -16,6 +59,7 @@ class AudioEngine {
   private primed = false;
   private readyListeners = new Set<Listener>();
   private stateListeners = new Set<Listener>();
+  private gestureListeners = new Set<Listener>();
   private unlockInstalled = false;
 
   /**
@@ -36,8 +80,22 @@ class AudioEngine {
       if (document.visibilityState !== "visible") return;
       void this.ensure();
       this.unlockInGesture();
+      for (const listener of [...this.gestureListeners]) listener();
     };
-    window.addEventListener("pointerdown", start, { passive: true });
+    /*
+     * **`pointerdown` だけに頼らない。**
+     *
+     * iPhoneは端末や設定によって届くイベントが揺れる。同じ端末で正常に鳴っている
+     * Monster-farm は pointerdown / touchstart / click の3つすべてで音を起こし直しており、
+     * こちらは pointerdown 1つだけだった。取りこぼすと**一度も解錠されない**。
+     *
+     * **`once: true` にしてはいけない。**画面ロック・他アプリへの切り替え・着信で
+     * AudioContextはいつでも止められる。1回きりの購読だと二度と起こし直せず、
+     * そのまま永久に無音になる。
+     */
+    for (const type of ["pointerdown", "touchstart", "click"] as const) {
+      window.addEventListener(type, start, { passive: true });
+    }
     window.addEventListener("keydown", start, { passive: true });
 
     document.addEventListener("visibilitychange", () => {
@@ -82,6 +140,8 @@ class AudioEngine {
             : window.AudioContext ??
               (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (!Ctor) return null;
+        // **作る前に指定する。**後から変えてもその文脈には効かない
+        applyAmbientAudioSession();
         this.ctx = new Ctor();
         this.primed = false;
         this.ctx.onstatechange = () => {
@@ -140,6 +200,17 @@ class AudioEngine {
     return () => this.stateListeners.delete(listener);
   }
 
+  /**
+   * 利用者が画面を触るたびに呼ばれる。
+   *
+   * **iPhoneは「操作の中で呼ばれた再生」しか通さないことがある。**
+   * 操作の外で `play()` が拒まれた側は、ここで次の操作を待って再試行する。
+   */
+  onGesture(listener: Listener): () => void {
+    this.gestureListeners.add(listener);
+    return () => this.gestureListeners.delete(listener);
+  }
+
   /** 再入を避けるため通知は必ずmicrotaskへ送る。 */
   private notifyReady(): void {
     if (this.ctx?.state !== "running") return;
@@ -183,43 +254,97 @@ export function lastAudioLoadError(): string | null {
   return lastAudioError;
 }
 
+/** 音源の絶対URL。互換再生(HTML Audio)側と同じ道筋で組み立てる */
+export function audioFileUrl(file: string, format?: AudioFormat): string {
+  return `${AUDIO_BASE_URL}${resolveAudioFile(file, format ?? effectiveAudioFormat())}`;
+}
+
+/**
+ * 音を1つ読む。
+ *
+ * **manifest に書いてある拡張子をそのまま使わない。**端末が再生できる形式へ
+ * 差し替えてから取りに行く(`format.ts`)。iPhoneはOGGを復号できないので、
+ * ここでM4Aへ倒れる。
+ *
+ * 失敗の理由は握り潰さずに残す。**ただし「取得できない」と「復号できない」を
+ * 区別する。**前者は通信や配信の問題で、形式を変えても直らない。
+ * 後者だけが「この端末はこの形式を読めない」の証拠になる。
+ */
 export async function loadAudioBuffer(ctx: AudioContext, file: string): Promise<AudioBuffer | null> {
+  const target = resolveAudioFile(file);
   let response: Response;
   try {
-    response = await fetch(`${AUDIO_BASE_URL}${file}`);
+    response = await fetch(`${AUDIO_BASE_URL}${target}`);
   } catch (error) {
-    lastAudioError = `${file}: 取得できない (${(error as Error)?.name ?? "不明"})`;
+    lastAudioError = `${target}: 取得できない (${(error as Error)?.name ?? "不明"})`;
+    noteAudioLoadFailure(target, lastAudioError, false);
     return null;
   }
   if (!response.ok) {
-    lastAudioError = `${file}: 取得できない (HTTP ${response.status})`;
+    lastAudioError = `${target}: 取得できない (HTTP ${response.status})`;
+    noteAudioLoadFailure(target, lastAudioError, false);
     return null;
   }
   let bytes: ArrayBuffer;
   try {
     bytes = await response.arrayBuffer();
   } catch (error) {
-    lastAudioError = `${file}: 読み取れない (${(error as Error)?.name ?? "不明"})`;
+    lastAudioError = `${target}: 読み取れない (${(error as Error)?.name ?? "不明"})`;
+    noteAudioLoadFailure(target, lastAudioError, false);
     return null;
   }
   try {
     const buffer = await ctx.decodeAudioData(bytes);
     lastAudioError = null;
+    noteAudioLoadSuccess(target);
     return buffer;
   } catch (error) {
-    lastAudioError = `${file}: 音を復号できない (${(error as Error)?.name ?? "不明"} / ${Math.round(bytes.byteLength / 1024)}KB)`;
-    return null;
+    lastAudioError = `${target}: 音を復号できない (${(error as Error)?.name ?? "不明"} / ${Math.round(bytes.byteLength / 1024)}KB)`;
+    noteAudioLoadFailure(target, lastAudioError, true);
+    /*
+     * **形式を変えてもう一度だけ試す。**
+     *
+     * `canPlayType` は "maybe" と答えておきながら実際には復号できないことがある。
+     * ここで乗り換えておかないと、その端末は永久に同じ形式を掴み続ける。
+     */
+    const fallbackFormat: AudioFormat = formatOfTarget(target) === "ogg" ? "m4a" : "ogg";
+    const retry = resolveAudioFile(file, fallbackFormat);
+    if (retry === target) return null;
+    try {
+      const response2 = await fetch(`${AUDIO_BASE_URL}${retry}`);
+      if (!response2.ok) return null;
+      const buffer = await ctx.decodeAudioData(await response2.arrayBuffer());
+      lastAudioError = null;
+      noteAudioLoadSuccess(retry);
+      return buffer;
+    } catch {
+      return null;
+    }
   }
 }
+
+function formatOfTarget(file: string): AudioFormat {
+  return file.toLowerCase().endsWith(".m4a") ? "m4a" : "ogg";
+}
+
+/** 読み込みの記録。設定画面の診断へそのまま出す */
+export { audioLoadReport };
 
 export interface AudioManifest {
   [name: string]: string[];
 }
 
 let manifestPromise: Promise<AudioManifest | null> | null = null;
+let manifestState: "未取得" | "読込中" | "読込済み" | "失敗" = "未取得";
+
+/** 音の一覧を取れているか。診断表示に出す */
+export function audioManifestState(): string {
+  return manifestState;
+}
 
 export function loadAudioManifest(): Promise<AudioManifest | null> {
   if (!manifestPromise) {
+    manifestState = "読込中";
     manifestPromise = (async () => {
       try {
         const response = await fetch(`${AUDIO_BASE_URL}manifest.json`);
@@ -230,6 +355,7 @@ export function loadAudioManifest(): Promise<AudioManifest | null> {
       }
     })().then((manifest) => {
       // 一時的な通信失敗を永久キャッシュしない。次の描画/タップで取り直せるようにする。
+      manifestState = manifest ? "読込済み" : "失敗";
       if (!manifest) manifestPromise = null;
       return manifest;
     });

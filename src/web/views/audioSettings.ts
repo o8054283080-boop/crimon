@@ -1,21 +1,15 @@
+import { AudioDiagnosticLine, audioDiagnosticLines } from "../audio/index.js";
 import { AudioSettings, updateAudioSettings } from "../audio/settings.js";
 import { el } from "../dom.js";
 
 export interface AudioSettingsProps {
   settings: AudioSettings;
-  /** 音声文脈の状態。"running" 以外なら、まだ音を出せる状態になっていない */
-  contextState: string;
   onChange: (patch: Partial<AudioSettings>) => void;
   onTest: () => void;
-  /**
-   * BGMがいまどうなっているかを一言で。
-   *
-   * **効果音は鳴るのにBGMだけ鳴らない、という報告が続いた。**
-   * 音量なのか、解錠なのか、音の読み込みに失敗しているのかを
-   * プレイヤー自身が見分けられないと、こちらも原因を絞れない。
-   */
-  bgmDiagnosis: string;
 }
+
+/** 診断の更新間隔。再生位置が進んでいるかを目で見られる速さにする */
+const DIAGNOSTICS_REFRESH_MS = 500;
 
 const VOLUME_STEP = 0.01;
 
@@ -108,6 +102,48 @@ function slider(label: string, value: number, onCommit: (v: number) => void): HT
   ]);
 }
 
+/**
+ * 診断の一覧。
+ *
+ * **この節はスクリーンショット1枚で足りることが目的。**
+ * 「鳴らない」と言われた時に、こちらが端末を持っていなくても
+ * どこで止まっているかを読み取れるだけの値を並べる。
+ *
+ * 再生位置(currentTime)は動いていることに意味があるので、
+ * 開いている間だけ短い間隔で書き換える。画面から外れたら自分で止まる。
+ */
+function renderDiagnostics(): HTMLElement {
+  const list = el("dl", { className: "audio-diag__list" });
+
+  const paint = () => {
+    const lines: AudioDiagnosticLine[] = audioDiagnosticLines();
+    list.replaceChildren(
+      ...lines.flatMap((line) => [
+        el("dt", { className: "audio-diag__key" }, [line.label]),
+        el("dd", { className: `audio-diag__val${line.bad ? " audio-diag__val--bad" : ""}` }, [line.value]),
+      ]),
+    );
+  };
+  paint();
+
+  const panel = el("details", { className: "panel audio-diag", open: true }, [
+    el("summary", { className: "audio-diag__head" }, ["音の状態（鳴らない時はこの画面を撮ってお知らせください）"]),
+    list,
+  ]);
+
+  if (typeof window !== "undefined") {
+    const timer = window.setInterval(() => {
+      // 画面から外れたら自分で止まる。設定を閉じた後も回り続けさせない
+      if (!panel.isConnected) {
+        window.clearInterval(timer);
+        return;
+      }
+      if (panel.open) paint();
+    }, DIAGNOSTICS_REFRESH_MS);
+  }
+  return panel;
+}
+
 export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
   const { settings } = props;
   // 音量変更でHOME全体をrenderし直すと設定シートが閉じる。
@@ -115,13 +151,6 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
   const applyPatch = (patch: Partial<AudioSettings>) => {
     updateAudioSettings(patch);
   };
-
-  const ready = props.contextState === "running";
-  const stateText = ready
-    ? "音を鳴らせる状態です"
-    : props.contextState === "未作成"
-      ? "画面をどこか一度タップすると鳴らせるようになります"
-      : `音が止まっています(${props.contextState})。下の「音を試す」を押してください`;
 
   return el("section", {
     className: "panel audio-settings",
@@ -169,11 +198,18 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
         },
       }, ["♪ 音を試す"]),
     ]),
-    el("p", { className: `audio-settings__state${ready ? " audio-settings__state--ok" : ""}` }, [stateText]),
-    el("p", { className: "audio-settings__state audio-settings__state--bgm" }, [`BGM: ${props.bgmDiagnosis}`]),
+    /*
+     * **状態は診断の表だけに出す。**
+     *
+     * 以前はここに「音を鳴らせる状態です」「BGM: …」の2行を別に置いていたが、
+     * この2つは画面を描いた時の値のまま止まる。表は動き続けるので、
+     * **「音が止まっています」と「鳴らしています（home）」が同じ画面に並ぶ**
+     * ことになっていた。食い違った診断は、無いより悪い。
+     */
+    renderDiagnostics(),
     el("p", { className: "audio-settings__note" }, [
       "iPhoneでは、本体横のマナーモード(消音)スイッチが入っていると音が出ないことがあります。"
-      + "切っても鳴らない時は、上の「BGM:」の行をそのままお知らせください。原因を特定できます。",
+      + "切っても鳴らない時は、上の「音の状態」をそのまま撮ってお知らせください。原因を特定できます。",
     ]),
     el("style", {}, [
       `
@@ -249,6 +285,40 @@ export function renderAudioSettings(props: AudioSettingsProps): HTMLElement {
         text-align: right;
         font-variant-numeric: tabular-nums;
       }
+      .audio-diag {
+        margin-top: 12px;
+        padding: 10px 12px;
+      }
+      .audio-diag__head {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #f0e2b8;
+        cursor: pointer;
+        line-height: 1.5;
+      }
+      .audio-diag__list {
+        display: grid;
+        grid-template-columns: minmax(0, 8.4em) minmax(0, 1fr);
+        column-gap: 10px;
+        row-gap: 3px;
+        margin: 10px 0 0;
+        font-size: 11.5px;
+        line-height: 1.5;
+      }
+      .audio-diag__key {
+        margin: 0;
+        color: #a9a3bd;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .audio-diag__val {
+        margin: 0;
+        color: #ece8f6;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+      }
+      .audio-diag__val--bad { color: #ff9d9d; }
       @media (max-width: 430px) {
         .audio-settings__row--volume { min-height: 78px; }
         .audio-settings__control {

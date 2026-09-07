@@ -180,6 +180,16 @@ class BgmPlayer {
     return this.playing?.scene ?? null;
   }
 
+  /** 鳴らそうとしている場面。まだ鳴っていなくても入っている */
+  wantedScene(): BgmScene | null {
+    return this.wanted;
+  }
+
+  /** 読み込み中か。診断で「読めていない」と「まだ読んでいる」を分けるために使う */
+  isLoading(): boolean {
+    return this.inflight !== null;
+  }
+
   /**
    * なぜ鳴っていないのかを一言で返す。**設定画面に出して切り分けに使う。**
    *
