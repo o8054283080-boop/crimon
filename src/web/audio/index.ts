@@ -10,6 +10,7 @@
  * 着信音の親戚に聞こえるため。詳しくは tools/audio/render_bgm.py の冒頭。
  */
 import { BgmScene, bgmPlayer } from "./bgm.js";
+import { audioEngine } from "./context.js";
 import { HitOptions, HitStyle, SfxElement, SfxName, sfxPlayer } from "./player.js";
 import { getAudioSettings, onAudioSettingsChange, updateAudioSettings } from "./settings.js";
 
@@ -53,6 +54,11 @@ export function initAudio(): void {
 /** 音声文脈の状態。"running" 以外なら、まだ音を出せる状態になっていない */
 export function audioContextState(): string {
   return sfxPlayer.contextState();
+}
+
+/** AudioContextの状態変化を購読する。設定画面の診断を古い値のままにしないために使う。 */
+export function onAudioContextStateChange(listener: () => void): () => void {
+  return audioEngine.onStateChange(listener);
 }
 
 /** BGMがいま鳴っていない理由を一言で。設定画面に出す */
