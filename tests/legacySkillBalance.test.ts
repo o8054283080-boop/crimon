@@ -53,16 +53,42 @@ describe("既存モンスターの弱スキル底上げ", () => {
     expect(cross.effects[1]).toMatchObject({ kind: "STUN", chance: 0.6 });
   });
 
-  it("時空崩壊を70%で行動ゲージ100%ダウンにする", () => {
+  /*
+   * 時空崩壊。**書いたままが起きる形で持つ。**
+   *
+   * 以前は「GAUGEに発動率が無い」という理由で0ターンのスタンを判定の印にし、
+   * 外れた時だけ +100% を足して打ち消していた。GAUGEに `chance` が入った後も
+   * 残っていて、画面には
+   *   「70%でスタン(0ターン) / 行動ゲージ-100%(スタンが失敗したらさらに100%)」
+   * と出ていた。**何が起きるのか読めない**と指摘を受けて組み直した。
+   */
+  it("時空崩壊は70%でゲージ100%ダウン、20%でスタン", () => {
     const collapse = skill("chronos_s3_b");
-    expect(collapse.description).toContain("70%");
-    expect(collapse.description).toContain("100%減少");
+    expect(collapse.description).toContain("70%で行動ゲージを100%減少");
+    expect(collapse.description).toContain("20%で1ターン行動不能");
+    expect(collapse.effects).toHaveLength(3);
     expect(collapse.effects[0]).toMatchObject({ kind: "DAMAGE", multiplier: 1.0 });
-    expect(collapse.effects[1]).toMatchObject({ kind: "STUN", durationTurns: 0, chance: 0.7 });
-    expect(collapse.effects[2]).toMatchObject({
-      kind: "GAUGE",
-      amount: -1,
-      conditionalExtra: { when: "STUN_FAILED", amount: 1 },
-    });
+    expect(collapse.effects[1]).toMatchObject({ kind: "GAUGE", amount: -1, chance: 0.7 });
+    expect(collapse.effects[2]).toMatchObject({ kind: "STUN", durationTurns: 1, chance: 0.2 });
+    // **判定の印として使う0ターンのスタンは、もう持たない**
+    for (const effect of collapse.effects) {
+      if (effect.kind === "STUN") expect(effect.durationTurns).toBeGreaterThan(0);
+    }
+  });
+
+  /*
+   * 表示。ゲージは0〜100%に収まるので、100%を超える指定は意味を持たない。
+   * スキルを上げると量も伸びるため、-100%と書いた技がMAXで「-118%」と
+   * 表示されていた(**足りない数字を盛って見せていた**)。
+   */
+  it("行動ゲージの増減は、100%を超えて表示しない", async () => {
+    const { computeLeveledSkill, describeSkillLines } = await import("../src/core/skill.js");
+    const collapse = skill("chronos_s3_b");
+    const maxed = describeSkillLines(computeLeveledSkill(collapse, 5)).join(" / ");
+    expect(maxed).toContain("行動ゲージ-100%");
+    // 出ている数字を全部取り出して、100を超えるものが無いことを見る
+    const shown = [...maxed.matchAll(/行動ゲージ[+-](\d+)%/g)].map((m) => Number(m[1]));
+    expect(shown.length).toBeGreaterThan(0);
+    expect(Math.max(...shown), `100%を超える表示: ${maxed}`).toBeLessThanOrEqual(100);
   });
 });

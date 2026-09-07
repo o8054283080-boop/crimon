@@ -937,7 +937,16 @@ export function describeSkillEffect(effect: SkillEffect): string {
           : "";
       const head = conditionPrefix(effect.requires);
       if (effect.drain) return `${head}${chanceSuffix(effect.chance)}${scope}行動ゲージを${Math.round(effect.amount * 100)}%吸収${extra}`;
-      const verb = effect.amount >= 0 ? `+${Math.round(effect.amount * 100)}%` : `-${Math.round(-effect.amount * 100)}%`;
+      /*
+       * **100%を超える指定は、100%と書く。**
+       *
+       * ゲージは0〜100%の間に収まる(`engine.ts` が両端で止める)ので、
+       * -118% と -100% では起きることが同じ。スキルを上げると量も伸びる作りなので、
+       * 「-100%」と書いた技がMAXで「-118%」と表示され、**足りない数字を
+       * 盛ったように見えていた**。実際に起きることだけを書く。
+       */
+      const shown = Math.min(1, Math.abs(effect.amount));
+      const verb = effect.amount >= 0 ? `+${Math.round(shown * 100)}%` : `-${Math.round(shown * 100)}%`;
       return `${head}${chanceSuffix(effect.chance)}${scope}行動ゲージ${verb}${extra}`;
     }
     case "SHIELD": {

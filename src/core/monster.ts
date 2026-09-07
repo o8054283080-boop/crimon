@@ -290,18 +290,25 @@ function applyLegacySkillBalance(skill: Skill): Skill {
       };
     case "chronos_s3_b": {
       /*
-       * GAUGEには基礎発動率フィールドが無いため、0ターンSTUNを発動判定だけの印として使う。
-       * 成功時(70%、命中/抵抗判定込み)はSTUN_FAILEDが立たず-100%、失敗時は+100%を相殺して0%。
-       * duration=0なのでスタンそのものは一切残らない。
+       * **素直に2つ並べる。**
+       *
+       * 以前は「GAUGEに発動率が無い」という理由で、0ターンのスタンを
+       * 発動判定の印として使い、外れた時だけ +100% を足して打ち消す、
+       * という組み方をしていた。**GAUGEに `chance` が入った後もそのまま
+       * 残っていて**、画面には
+       *   「70%でスタン(0ターン) / 行動ゲージ-100%(スタンが失敗したらさらに100%)」
+       * と出ていた。何が起きるのか誰にも読めない(依頼主の指摘)。
+       *
+       * 発動率はそれぞれの効果が自分で持てるので、書いたままが起きる形にする。
        */
-      const procMarker = { kind: "STUN", durationTurns: 0, chance: 0.7 } as SkillEffect;
       return {
         ...skill,
-        description: "時空が軋み、敵全体に攻撃力1.0倍のダメージを与える。ダメージのあと70%で敵の行動ゲージを100%減少させる。",
+        description: "時空が軋み、敵全体に攻撃力1.0倍のダメージを与える。"
+          + "70%で行動ゲージを100%減少させ、20%で1ターン行動不能にする。",
         effects: [
           { kind: "DAMAGE", multiplier: 1.0 },
-          procMarker,
-          { kind: "GAUGE", amount: -1, conditionalExtra: { when: "STUN_FAILED", amount: 1 } },
+          { kind: "GAUGE", amount: -1, chance: 0.7 },
+          { kind: "STUN", durationTurns: 1, chance: 0.2 },
         ],
       };
     }
