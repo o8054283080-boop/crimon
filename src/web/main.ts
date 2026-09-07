@@ -8,7 +8,7 @@ import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
 import "./ui/crystalShop.css";
 import "./ui/cloudRecoveryWarning.css";
-import { audioContextState, bgmDiagnosis, getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
+import { getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { BATTLE_SCREENS, bgmSceneOf } from "./audio/bgmScene.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
@@ -3210,8 +3210,6 @@ function renderScreen(): void {
         },
         audioSettings: {
           settings: getAudioSettings(),
-          contextState: audioContextState(),
-          bgmDiagnosis: bgmDiagnosis(),
           onChange: (patch) => {
             updateAudioSettings(patch);
             render();

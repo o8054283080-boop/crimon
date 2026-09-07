@@ -13,6 +13,7 @@
  */
 import { audioEngine, loadAudioBuffer, loadAudioManifest, measureOutput } from "./context.js";
 import { AudioSettings, getAudioSettings, onAudioSettingsChange } from "./settings.js";
+import { playSynthSfx, synthNameFor } from "./synthSfx.js";
 
 export type SfxElement = "FIRE" | "WATER" | "ELECTRIC" | "GRASS" | "LIGHT" | "DARK" | "NEUTRAL";
 export type HitStyle = "slash" | "blunt" | "pierce" | "magic";
@@ -81,6 +82,8 @@ const FLAVOR_PLACEMENT: Record<Exclude<SfxElement, "NEUTRAL">, { delay: number; 
 class SfxPlayer {
   private master: GainNode | null = null;
   private buffers = new Map<string, AudioBuffer[]>();
+  /** 読めなかった音の名前。同じ物を何度も取りに行かないための控え */
+  private unreadable = new Set<string>();
   private preparing: Promise<void> | null = null;
   private live = 0;
   private lastPlayedAt = new Map<string, number>();
@@ -135,18 +138,30 @@ class SfxPlayer {
     return this.preparing;
   }
 
-  /** 必要になった時点で読む。全部を先読みすると初回表示が遅くなる */
+  /**
+   * 必要になった時点で読む。全部を先読みすると初回表示が遅くなる。
+   *
+   * **読めなかったことも覚える。**覚えないと、音を鳴らそうとするたびに
+   * 同じファイルを取りに行き、鳴らないうえに通信だけが増える。
+   */
   private async load(ctx: AudioContext, name: string): Promise<AudioBuffer[] | null> {
     const cached = this.buffers.get(name);
     if (cached) return cached;
+    if (this.unreadable.has(name)) return null;
     const manifest = await loadAudioManifest();
     const files = manifest?.[name];
-    if (!files) return null;
+    if (!files) {
+      this.unreadable.add(name);
+      return null;
+    }
 
     const decoded = (await Promise.all(files.map((file) => loadAudioBuffer(ctx, file)))).filter(
       (buffer): buffer is AudioBuffer => buffer !== null,
     );
-    if (decoded.length === 0) return null;
+    if (decoded.length === 0) {
+      this.unreadable.add(name);
+      return null;
+    }
     this.buffers.set(name, decoded);
     return decoded;
   }
@@ -169,7 +184,17 @@ class SfxPlayer {
     if (this.live >= MAX_CONCURRENT) return;
 
     const buffers = await this.load(ctx, name);
-    if (!buffers || buffers.length === 0) return;
+    if (!buffers || buffers.length === 0) {
+      /*
+       * 焼いた音を読めなかった。**代役でつなぐ。**
+       *
+       * 押しても何も返ってこない状態は、音が素朴なことより悪い。
+       * 読める端末ではここへ来ないので、いつもの音は何も変わらない。
+       */
+      const synth = synthNameFor(name);
+      if (synth) playSynthSfx(ctx, this.master, synth, gain);
+      return;
+    }
 
     const source = ctx.createBufferSource();
     source.buffer = buffers[Math.floor(Math.random() * buffers.length)];
@@ -198,6 +223,15 @@ class SfxPlayer {
    */
   contextState(): string {
     return audioEngine.state();
+  }
+
+  /** 効果音側がどこまで用意できているか。設定画面の診断へ出す */
+  diagnostics(): { masterReady: boolean; loaded: number; unreadable: number } {
+    return {
+      masterReady: this.master !== null,
+      loaded: this.buffers.size,
+      unreadable: this.unreadable.size,
+    };
   }
 
   /**
