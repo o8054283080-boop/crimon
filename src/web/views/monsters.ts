@@ -2,7 +2,7 @@ import { ELEMENTS, ELEMENT_JA, Element } from "../../core/element.js";
 import { EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
 import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel, toBattleDefinition } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
-import { applyLowRarityBoost } from "../../core/lowRarityBoost.js";
+import { applyPlayerStatBoost } from "../../core/playerStatBoost.js";
 import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "../../core/stats.js";
 import { MATERIAL_PIG_KINDS, MATERIAL_PIG_LABEL, MaterialPigKind, materialPigKindOf } from "../../core/materialPig.js";
 import { findMonsterById } from "../../data/monsters.js";
@@ -305,7 +305,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
   /* 底上げは**素の値の側**に入れる。ここを掛けずに実効値だけ掛けると、
      画面の「装備・育成の補正(緑字)」へ底上げ分が紛れ込んで嘘の内訳になる */
   const growthStats = dex
-    ? applyLowRarityBoost(computeEffectiveStats(dex.stats, instance.star, instance.level), dex.templateId, instance.star)
+    ? applyPlayerStatBoost(computeEffectiveStats(dex.stats, instance.star, instance.level), dex.templateId, instance.star)
     : null;
   const equippedItems = resolveEquippedItems(instance, props.player.equipment);
   const effectiveStats = dex ? toBattleDefinition(instance, dex, equippedItems).stats : null;
