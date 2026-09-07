@@ -802,6 +802,25 @@ let lastRouteState: RouteState | null = null;
 /** 戻っている最中。この間は積まない(戻った先をまた積むと前に進めなくなる) */
 let restoringRoute = false;
 
+/**
+ * その戦闘画面が描ける状態か(進行中の戦いが控えにあるか)。
+ *
+ * **戦闘画面ごとに見る場所が違う。**塔だけは控えがプレイヤー側にあり
+ * (階をまたいで持ち越すため)、ほかは画面の状態に持っている。
+ */
+function hasBattleRun(screen: ScreenName): boolean {
+  switch (screen) {
+    case "BATTLE": return state.stageRun !== null;
+    case "DUNGEON_BATTLE": return state.dungeonRun !== null;
+    case "LEVEL_DUNGEON_BATTLE": return state.levelDungeonRun !== null;
+    case "GOLD_DUNGEON_BATTLE": return state.goldDungeonRun !== null;
+    case "AWAKENING_DEPTH_BATTLE": return state.awakeningDepthRun !== null;
+    case "TOWER_BATTLE": return state.player.trialTowerRun != null;
+    case "ARENA_BATTLE": return state.arenaEntry !== null;
+    default: return true;
+  }
+}
+
 function canGoBack(): boolean {
   // 戦闘の最中に「戻る」を出さない。抜けた戦いがどう扱われるのかが決まっていない
   if (BATTLE_SCREENS.has(state.screen)) return false;
@@ -3040,7 +3059,59 @@ function refreshBackgroundFarmStatus(): void {
   else tutorialCurrent.remove();
 }
 
+/**
+ * 画面を描く。**ここが投げても、画面を空のままにしない。**
+ *
+ * `renderScreen()` は `root.innerHTML = ""` で一度まっさらにしてから
+ * 中身を組み立てる。その途中で例外が出ると、消したまま何も入らない
+ * ——**真っ黒で、押せるものが1つも無い画面**になる。
+ * 実際にそうなった: 結果画面から「戻る」を押すと、戻り先が終わったばかりの
+ * 戦闘画面で、進行中の戦い(`stageRun`)がもう無いために投げていた。
+ *
+ * 投げる原因は塞いだが、塞いだのは「その1つ」でしかない。画面の組み立ては
+ * 数十か所に散らばっていて、どこか1つが投げれば同じ詰み方をする。
+ * だから**出口側でも受け止める。**受け止めたらホームへ落とす。
+ */
 function render(): void {
+  try {
+    renderScreen();
+    renderFailed = false;
+    return;
+  } catch (error) {
+    console.error("画面を描けませんでした", error);
+    if (renderFailed) {
+      // ホームでも投げた。これ以上やり直しても同じなので、
+      // せめて「読み込み直す」だけは押せる形にして止まる。
+      renderFailed = false;
+      root.innerHTML = "";
+      // ここだけは見た目をCSSに頼らない。CSSが配られていない事故でも
+      // 「読み込み直す」が読めて押せる必要がある
+      root.append(el("div", {
+        className: "render-fallback",
+        style: "display:grid;gap:14px;justify-items:center;padding:48px 20px;color:#e8e6f0;font-size:15px;text-align:center",
+      }, [
+        el("p", { style: "margin:0" }, ["画面を表示できませんでした。"]),
+        el("button", {
+          type: "button",
+          className: "btn btn--primary",
+          style: "padding:12px 28px;border-radius:10px;border:1px solid #9c7b40;background:#2a2140;color:#f4e9c8;font-size:15px",
+          onclick: () => window.location.reload(),
+        }, ["読み込み直す"]),
+      ]));
+      return;
+    }
+    renderFailed = true;
+  }
+  // 戻り先の履歴も捨てる。壊れた場所へ「戻る」で入り直せてしまう
+  routeHistory.length = 0;
+  lastRouteState = null;
+  navigate("HOME");
+}
+
+/** 直前の描画が例外で終わったか。ホームへ落とす処理が輪にならないよう見張る */
+let renderFailed = false;
+
+function renderScreen(): void {
   if (lastRouteKey !== null) scrollPositions.set(lastRouteKey, window.scrollY);
   /*
    * 通ってきた場所を積むのは**描き始める前**。
@@ -3048,7 +3119,16 @@ function render(): void {
    * その1回だけ「戻る」が出ない画面になる(実際にそうなった)。
    */
   if (lastRouteState !== null && !restoringRoute && routeKey() !== lastRouteKey) {
-    routeHistory.push(lastRouteState);
+    /*
+     * **戦闘は「戻る先」にしない。**
+     *
+     * 戦っている最中に「戻る」を出さない決まりは `canGoBack()` に入れてあったが、
+     * *積む*側が同じ扱いをしていなかった。そのせいで結果画面の「戻る」が
+     * 終わったばかりの戦闘を指し、進行中の戦い(`stageRun` など)がもう無い所へ
+     * 入って例外になり、画面が真っ黒のまま操作できなくなっていた。
+     * 決着した戦いは戻れる場所ではないので、履歴に残さない。
+     */
+    if (!BATTLE_SCREENS.has(lastRouteState.screen)) routeHistory.push(lastRouteState);
     if (routeHistory.length > ROUTE_HISTORY_MAX) routeHistory.shift();
     lastRouteState = null;
   }
@@ -3063,6 +3143,16 @@ function render(): void {
   if (state.player.stamina !== staminaBefore) savePlayerState(state.player);
 
   persistNavigationState();
+
+  /*
+   * 戦闘画面は**進行中の戦いが控えにある時だけ**描ける。
+   * 無い所へ入ると、戦闘の組み立てが例外を投げて画面が空のまま残る。
+   * 履歴からも保存された画面からもここへ来られるので、入口で1回だけ見る。
+   */
+  if (BATTLE_SCREENS.has(state.screen) && !hasBattleRun(state.screen)) {
+    navigate("HOME");
+    return;
+  }
 
   let content: HTMLElement;
   let showNav = true;
