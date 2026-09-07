@@ -15,51 +15,53 @@ class AudioEngine {
   /** 無音を鳴らして解錠済みか(操作のたびに鳴らす必要はない) */
   private primed = false;
   private readyListeners = new Set<Listener>();
+  private stateListeners = new Set<Listener>();
   private unlockInstalled = false;
 
   /**
    * 音を使えるようにする。iPhone/PWAでは一度 running になっても、
    * 画面ロック・バックグラウンド移動・出力先変更などで後から suspended に戻る。
    * そのため解錠イベントは一度成功しても外さず、以後の操作でも必要なら resume する。
+   *
+   * **audioSession.type = "playback" は使わない。**
+   * これを指定するとiPhoneで音楽アプリ扱いになり、マナーモードを貫通し、
+   * ホームへ戻った後もBGMが鳴り続ける。CRIMONはゲームなので、端末の消音と
+   * フォアグラウンド/バックグラウンドの境界を尊重する。
    */
   installUnlock(): void {
     if (typeof window === "undefined" || this.unlockInstalled) return;
     this.unlockInstalled = true;
-    /*
-     * **iPhoneの消音スイッチでも鳴らす。**
-     *
-     * Web Audio は既定で「着信音と同じ扱い(ambient)」なので、
-     * 本体横のスイッチが消音側だと無音になる。`playback` を宣言すると
-     * 音楽アプリと同じ扱いになり、消音スイッチの影響を受けなくなる
-     * (Safari 16.4以降。持たないブラウザでは何も起きない)。
-     *
-     * 他のアプリで音楽を鳴らしている時に、こちらの音が出ないことがあるのも
-     * 同じ宣言で改善する。
-     */
-    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
-    if (session) {
-      try { session.type = "playback"; } catch { /* 宣言できない環境でもゲームは動く */ }
-    }
+
     const start = () => {
+      if (document.visibilityState !== "visible") return;
       void this.ensure();
       this.unlockInGesture();
     };
     window.addEventListener("pointerdown", start, { passive: true });
     window.addEventListener("keydown", start, { passive: true });
 
-    // iOSはホーム画面PWAへ戻った時に AudioContext を suspended にすることがある。
-    // gesture外なので必ず成功するとは限らないが、成功した端末はここで即復帰できる。
     document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        void this.suspend();
+      } else {
+        // iOSは復帰だけでは resume を拒むことがある。その場合でも次のタップで再試行する。
+        void this.resume();
+      }
+    });
+    window.addEventListener("pagehide", () => void this.suspend());
+    window.addEventListener("pageshow", () => {
       if (document.visibilityState === "visible") void this.resume();
     });
-    window.addEventListener("pageshow", () => void this.resume());
   }
 
   /** 利用者の操作の中で同期的に解錠を試す。 */
   private unlockInGesture(): void {
     const ctx = this.ctx;
-    if (!ctx) return;
-    void ctx.resume().then(() => this.notifyReady()).catch(() => undefined);
+    if (!ctx || ctx.state === "closed") return;
+    void ctx.resume().then(() => {
+      this.notifyState();
+      this.notifyReady();
+    }).catch(() => undefined);
     if (this.primed) return;
     this.primed = true;
     const source = ctx.createBufferSource();
@@ -70,33 +72,59 @@ class AudioEngine {
 
   /** 文脈を用意する。まだ操作されていなければ止まった状態で返ることがある */
   ensure(): Promise<AudioContext | null> {
+    if (this.ctx && this.ctx.state !== "closed") return Promise.resolve(this.ctx);
     if (this.starting) return this.starting;
     this.starting = (async () => {
-      const Ctor =
-        typeof window === "undefined"
-          ? undefined
-          : window.AudioContext ??
-            (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Ctor) return null;
-      this.ctx = new Ctor();
-      if (this.ctx.state !== "running") await this.ctx.resume().catch(() => undefined);
-      this.notifyReady();
-      return this.ctx;
+      try {
+        const Ctor =
+          typeof window === "undefined"
+            ? undefined
+            : window.AudioContext ??
+              (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Ctor) return null;
+        this.ctx = new Ctor();
+        this.primed = false;
+        this.ctx.onstatechange = () => {
+          this.notifyState();
+          if (this.ctx?.state === "running") this.notifyReady();
+        };
+        this.notifyState();
+        if (document.visibilityState === "visible" && this.ctx.state !== "running") {
+          await this.ctx.resume().catch(() => undefined);
+        }
+        this.notifyState();
+        this.notifyReady();
+        return this.ctx;
+      } finally {
+        // closedになったAudioContextを次回作り直せるよう、完了Promiseを永久保持しない。
+        this.starting = null;
+      }
     })();
     return this.starting;
   }
 
   /** 停止している既存文脈を再開する。BGMの再試行通知もここで行う。 */
   async resume(): Promise<AudioContext | null> {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return null;
     const ctx = await this.ensure();
-    if (!ctx) return null;
+    if (!ctx || ctx.state === "closed") return null;
     if (ctx.state !== "running") await ctx.resume().catch(() => undefined);
+    this.notifyState();
     if (ctx.state === "running") this.notifyReady();
     return ctx.state === "running" ? ctx : null;
   }
 
-  /** 鳴らす直前にも毎回起こす。 */
+  /** バックグラウンドへ移った時は明示的に止める。 */
+  async suspend(): Promise<void> {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state === "closed" || ctx.state === "suspended") return;
+    await ctx.suspend().catch(() => undefined);
+    this.notifyState();
+  }
+
+  /** 鳴らす直前にも毎回起こす。バックグラウンド中は絶対に鳴らさない。 */
   async running(): Promise<AudioContext | null> {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return null;
     return this.resume();
   }
 
@@ -106,10 +134,23 @@ class AudioEngine {
     return () => this.readyListeners.delete(listener);
   }
 
+  /** AudioContextの状態が変わったら呼ばれる。設定画面の診断表示に使う。 */
+  onStateChange(listener: Listener): () => void {
+    this.stateListeners.add(listener);
+    return () => this.stateListeners.delete(listener);
+  }
+
   /** 再入を避けるため通知は必ずmicrotaskへ送る。 */
   private notifyReady(): void {
     if (this.ctx?.state !== "running") return;
     const listeners = [...this.readyListeners];
+    queueMicrotask(() => {
+      for (const listener of listeners) listener();
+    });
+  }
+
+  private notifyState(): void {
+    const listeners = [...this.stateListeners];
     queueMicrotask(() => {
       for (const listener of listeners) listener();
     });
@@ -166,12 +207,6 @@ export async function loadAudioBuffer(ctx: AudioContext, file: string): Promise<
     lastAudioError = null;
     return buffer;
   } catch (error) {
-    /*
-     * **ここが本命の疑い。**この端末が ogg を復号できない場合、
-     * 効果音もBGMも同じように落ちる。BGMだけ落ちるなら、
-     * 大きさ(500KB超)の側の問題になる。どちらかを名前で見分けられるよう、
-     * ファイル名と大きさを残す。
-     */
     lastAudioError = `${file}: 音を復号できない (${(error as Error)?.name ?? "不明"} / ${Math.round(bytes.byteLength / 1024)}KB)`;
     return null;
   }
