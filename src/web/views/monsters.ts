@@ -1,6 +1,6 @@
 import { ELEMENTS, ELEMENT_JA, Element } from "../../core/element.js";
-import { applyEquipmentToStats, EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
-import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel } from "../../core/monsterInstance.js";
+import { EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
+import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel, toBattleDefinition } from "../../core/monsterInstance.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "../../core/stats.js";
 import { findMonsterById } from "../../data/monsters.js";
@@ -229,12 +229,40 @@ function renderSetBonusPanel(equippedItems: ReturnType<typeof resolveEquippedIte
   return el("section", { className: "panel" }, [el("h2", {}, ["発動中のセット効果"]), ...rows]);
 }
 
+/**
+ * 緑の字が何を足したものかを言う。
+ *
+ * **「装備補正」とだけ書いていたが、実際は育成のぶんも入っている。**
+ * 何も育てていない個体で「装備補正：なし」と出しておきながら、
+ * タイプ転生をすると数字が動く、では読み手が混乱する。
+ */
+export function detailGainNote(instance: MonsterInstance, gearedSlots: number): string {
+  const sources: string[] = [];
+  if (gearedSlots > 0) sources.push(`装備${gearedSlots}枠`);
+  if (instance.development?.type) sources.push("タイプ");
+  const points = instance.development?.abilityPoints;
+  if (points && (points.hp + points.atk + points.def + points.spd) > 0) sources.push("能力pt");
+  const talents = instance.development?.talents;
+  if (talents && talents.unlockedPoints > 0) sources.push("才能");
+  return sources.length > 0 ? `育成・装備の補正：${sources.join(" / ")}（緑字）` : "育成・装備の補正：なし";
+}
+
 function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElement {
   const dex = findMonsterById(instance.dexId);
   const maxLevel = STAR_MAX_LEVEL[instance.star];
   const growthStats = dex ? computeEffectiveStats(dex.stats, instance.star, instance.level) : null;
   const equippedItems = resolveEquippedItems(instance, props.player.equipment);
-  const effectiveStats = growthStats ? applyEquipmentToStats(growthStats, equippedItems) : null;
+  /*
+   * **戦闘で使うのと同じ計算で出す。**
+   *
+   * ここは長いあいだ「レベル成長 + 装備」だけを見ていた。
+   * タイプ転生・能力ポイント・才能覚醒は戦闘には効いているのに
+   * **詳細画面の数字が一切動かず**、「クリ率アップは本当に効いているのか」と
+   * 指摘を受けた(実際に効いていたが、確かめる手段が無かった)。
+   *
+   * 育成の結果を確かめる場所なので、育てたぶんは全部入った値を出す。
+   */
+  const effectiveStats = dex ? toBattleDefinition(instance, dex, equippedItems).stats : null;
   const rankReady = canRankUp(instance.star, instance.level);
   const expNeeded = requiredExpForLevel(instance.level);
   const inParty = props.player.partyIds.includes(instance.id);
@@ -295,7 +323,11 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance): HTMLElem
             entry.gain ? el("span", { className: "stat-tile__gain" }, [entry.gain]) : null,
           ].filter((n): n is string | HTMLElement => n !== null)),
         )),
-        el("div", { className: "monster-detail__gear-note" }, [gearedSlots ? `装備補正：${gearedSlots}枠（緑字）` : "装備補正：なし"]),
+        /*
+         * 緑の字は「レベル成長からの差」。**装備だけではない。**
+         * タイプ転生・能力ポイント・才能覚醒もここに含まれる。
+         */
+        el("div", { className: "monster-detail__gear-note" }, [detailGainNote(instance, gearedSlots)]),
       ]),
       el("section", { className: "monster-detail-section monster-detail-skills" }, [
         el("h2", {}, ["スキル", el("small", {}, ["タップで完全説明"])]),
