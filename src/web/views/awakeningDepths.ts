@@ -86,6 +86,19 @@ function renderList(props: AwakeningDepthProps): HTMLElement {
       ["1階から順に開放", "★6でなくても挑めます"],
     ),
     renderMaterialBar(props.player),
+    /*
+     * **交換への近道。**交換は画面のいちばん下にあるが、
+     * 階の札10枚を越えた先なので、探して見つからなかったという
+     * 指摘をもらった。持ち数の帯のすぐ下から飛べるようにする。
+     * 浮かせず、流れの中に置く。
+     */
+    el("button", {
+      type: "button",
+      className: "btn btn--ghost depth-jump",
+      onclick: () => {
+        document.querySelector(".depth-exchange")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    }, ["🔁 素材の交換へ（この画面の一番下）"]),
     renderFloorGrid(tiles),
     renderExchange(props),
   ]);
