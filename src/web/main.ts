@@ -8,6 +8,8 @@ import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
 import "./ui/crystalShop.css";
 import "./ui/cloudRecoveryWarning.css";
+// タイトルの絵は、既存の装飾用の指定を上書きする。**必ず後に読むこと**
+import "./ui/titleCover.css";
 import { getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
 import { BATTLE_SCREENS, bgmSceneOf } from "./audio/bgmScene.js";
 import { registerSW } from "virtual:pwa-register";

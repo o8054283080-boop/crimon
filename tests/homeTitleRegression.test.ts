@@ -14,12 +14,29 @@ describe("NEW TITLE → NEW HOME regression contract", () => {
     expect(hasStartedHome(storage)).toBe(true);
   });
 
-  it("renders the CRIMON title logo, START control and transition", () => {
+  /**
+   * タイトルは1枚の絵になった。
+   *
+   * 題字も「Tap to Start」も絵の中にあるので、**上に文字を重ねない**。
+   * そのぶん、次の2つが欠けると画面が丸ごと死ぬ:
+   *   - 絵が無ければ、真っ黒な画面に透明なボタンだけが残る
+   *   - 読み上げ用の名前が無ければ、絵の中の文字は読まれないので無名の押しものになる
+   */
+  it("renders the title cover art, start control and transition", () => {
     expect(source).toContain('className: "title-screen crimon-title-screen"');
-    expect(source).toContain('alt: "CRIMON"');
-    expect(source).toContain('["START"]');
-    expect(source).toContain('title-screen--leaving');
-    expect(source).toContain('home-menu--visible');
+    expect(source).toContain("../assets/title-cover.webp");
+    expect(source).toContain('className: "crimon-title-screen__cover"');
+    // 巡回はここを押す。無いとタイトルに覆われたホームを「問題なし」と報告する
+    expect(source).toContain('"data-tour": "start"');
+    expect(source).toContain('ariaLabel: "ゲームを開始"');
+    expect(source).toContain("title-screen--leaving");
+    expect(source).toContain("home-menu--visible");
+  });
+
+  it("絵の上に題字を重ねない（絵の中の文字と二重になる）", () => {
+    expect(source).not.toContain("crimon-title-screen__logo");
+    expect(source).not.toContain("crimon-title-screen__fallback");
+    expect(source).not.toContain("DARK FANTASY MONSTER RPG");
   });
 
   it("preserves Arena, Shop, and How to Play callbacks exactly", () => {

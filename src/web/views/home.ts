@@ -489,248 +489,6 @@ function ticks(radius: number, count: number, length: number, width: number, col
 const GOLD_LINE = "rgba(226,182,110,.42)";
 const GOLD_LINE_SOFT = "rgba(226,182,110,.20)";
 
-/**
- * 背後で回る錬成陣。
- *
- * 2枚を**逆向きに、別々の速さで**回す。1枚だと「絵が回っている」だけだが、
- * 速さの違う輪が重なると、止まっていない奥行きに見える。
- */
-function arcaneRings(className: string): HTMLElement {
-  const outer = svg("svg", { viewBox: "0 0 500 500", class: "arcane-ring arcane-ring--outer", "aria-hidden": "true" }, [
-    svg("circle", { cx: "250", cy: "250", r: "236", fill: "none", stroke: GOLD_LINE_SOFT, "stroke-width": "1" }),
-    svg("circle", { cx: "250", cy: "250", r: "222", fill: "none", stroke: GOLD_LINE_SOFT, "stroke-width": "1" }),
-    ...ticks(206, 60, 9, 1, GOLD_LINE_SOFT),
-    ...ticks(202, 12, 17, 2, GOLD_LINE),
-    svg("circle", { cx: "250", cy: "250", r: "202", fill: "none", stroke: GOLD_LINE_SOFT, "stroke-width": "1" }),
-  ]);
-  const inner = svg("svg", { viewBox: "0 0 500 500", class: "arcane-ring arcane-ring--inner", "aria-hidden": "true" }, [
-    svg("circle", { cx: "250", cy: "250", r: "168", fill: "none", stroke: GOLD_LINE, "stroke-width": "1.5" }),
-    svg("circle", { cx: "250", cy: "250", r: "158", fill: "none", stroke: GOLD_LINE_SOFT, "stroke-width": "1" }),
-    ...ticks(158, 24, -8, 1, GOLD_LINE_SOFT),
-    svg("path", {
-      d: "M250 82 L395 334 L105 334 Z",
-      fill: "none",
-      stroke: "rgba(150,190,255,.20)",
-      "stroke-width": "1.5",
-    }),
-    svg("path", {
-      d: "M250 418 L105 166 L395 166 Z",
-      fill: "none",
-      stroke: "rgba(150,190,255,.20)",
-      "stroke-width": "1.5",
-    }),
-  ]);
-  return el("div", { className, "aria-hidden": "true" }, [outer, inner]);
-}
-
-/** ロゴ本体。角・核・罫・文字を1つの座標系にまとめる */
-function titleEmblem(): SVGSVGElement {
-  const defs = svg("defs", {}, [
-    svg("linearGradient", { id: "crimonGold", x1: "0", y1: "0", x2: "0", y2: "1" }, [
-      svg("stop", { offset: "0", "stop-color": "#fff8e6" }),
-      svg("stop", { offset: ".34", "stop-color": "#f6d491" }),
-      svg("stop", { offset: ".53", "stop-color": "#c1832b" }),
-      svg("stop", { offset: ".63", "stop-color": "#f2cd83" }),
-      svg("stop", { offset: "1", "stop-color": "#8a5312" }),
-    ]),
-    svg("linearGradient", { id: "crimonSheen", x1: "0", y1: "0", x2: "0", y2: "1" }, [
-      svg("stop", { offset: "0", "stop-color": "#ffffff", "stop-opacity": ".85" }),
-      svg("stop", { offset: ".4", "stop-color": "#ffffff", "stop-opacity": "0" }),
-    ]),
-    svg("linearGradient", { id: "crimonHorn", x1: "0", y1: "0", x2: "0", y2: "1" }, [
-      svg("stop", { offset: "0", "stop-color": "#f0d095" }),
-      svg("stop", { offset: ".42", "stop-color": "#b98429" }),
-      svg("stop", { offset: "1", "stop-color": "#59340a" }),
-    ]),
-    svg("linearGradient", { id: "crimonHornDark", x1: "0", y1: "0", x2: "0", y2: "1" }, [
-      svg("stop", { offset: "0", "stop-color": "#c8a466" }),
-      svg("stop", { offset: ".45", "stop-color": "#8a5c17" }),
-      svg("stop", { offset: "1", "stop-color": "#3d2306" }),
-    ]),
-    svg("radialGradient", { id: "crimonCore", cx: ".5", cy: ".38", r: ".72" }, [
-      svg("stop", { offset: "0", "stop-color": "#ffffff" }),
-      svg("stop", { offset: ".3", "stop-color": "#b6e3ff" }),
-      svg("stop", { offset: ".72", "stop-color": "#4f8ae8" }),
-      svg("stop", { offset: "1", "stop-color": "#1b3f9c" }),
-    ]),
-    svg("radialGradient", { id: "crimonHalo", cx: ".5", cy: ".5", r: ".5" }, [
-      svg("stop", { offset: "0", "stop-color": "#9ad4ff", "stop-opacity": ".55" }),
-      svg("stop", { offset: ".55", "stop-color": "#5a8bff", "stop-opacity": ".16" }),
-      svg("stop", { offset: "1", "stop-color": "#5a8bff", "stop-opacity": "0" }),
-    ]),
-  ]);
-
-  /*
-   * 翼。
-   *
-   * 最初は左右1枚ずつの塗りだった。1枚だと**平らな凧**にしかならず、
-   * 切り欠きを入れても黒い線が浮いているだけだった。
-   * ここでは根元から扇形に4枚を重ねる。奥ほど暗くすると、
-   * 同じ金色でも面が前後に分かれて厚みが出る。
-   */
-  const mirror = "translate(640,0) scale(-1,1)";
-  const quills: Array<[string, string]> = [
-    ["M298 108 C258 102 216 96 172 78 C220 104 264 120 300 126 Z", "url(#crimonHornDark)"],
-    ["M298 92 C252 84 202 74 140 52 C198 84 254 104 300 114 Z", "url(#crimonHorn)"],
-    ["M298 76 C246 64 186 50 102 24 C174 62 244 88 300 100 Z", "url(#crimonHornDark)"],
-    ["M298 58 C240 42 168 24 64 2 C148 42 230 72 300 86 Z", "url(#crimonHorn)"],
-  ];
-  const wing = (path: string, fill: string, flip: boolean) =>
-    svg("path", {
-      d: path,
-      fill,
-      stroke: "#150f0b",
-      "stroke-width": "2.5",
-      "stroke-linejoin": "round",
-      ...(flip ? { transform: mirror } : {}),
-    });
-
-  const horns = svg("g", {}, [
-    ...quills.flatMap(([d, fill]) => [wing(d, fill, false), wing(d, fill, true)]),
-    // 羽の筋。根元から先へ1本ずつ流すと、塗りの面に向きが生まれる
-    ...["M292 100 C244 88 196 70 140 44", "M294 116 C252 108 214 94 178 76"].flatMap((d) => [
-      svg("path", { d, fill: "none", stroke: "rgba(255,232,190,.28)", "stroke-width": "2", "stroke-linecap": "round" }),
-      svg("path", { d, transform: mirror, fill: "none", stroke: "rgba(255,232,190,.28)", "stroke-width": "2", "stroke-linecap": "round" }),
-    ]),
-  ]);
-
-  /*
-   * 核。合成の行き着く先を、画面でいちばん明るい一点にする。
-   * **角より後に描く**。角の根元がこの石の裏へ潜り、左右が1つに束ねられる。
-   */
-  const core = svg("g", {}, [
-    svg("circle", { cx: "320", cy: "76", r: "80", fill: "url(#crimonHalo)", class: "title-emblem__halo" }),
-    svg("path", { d: "M320 16 L360 76 L320 138 L280 76 Z", fill: "url(#crimonCore)" }),
-    svg("path", {
-      d: "M320 16 L360 76 L320 138 L280 76 Z",
-      fill: "none",
-      stroke: "#ffe9bd",
-      "stroke-width": "3.5",
-      "stroke-linejoin": "round",
-    }),
-    svg("path", {
-      d: "M280 76 H360 M320 16 L302 76 M320 16 L338 76",
-      stroke: "rgba(255,255,255,.5)",
-      "stroke-width": "1.5",
-      fill: "none",
-    }),
-    // 上面の照り返しと、下半分の落ち込み。面が2つに割れて石らしくなる
-    svg("path", { d: "M320 24 L349 68 L320 60 L291 68 Z", fill: "rgba(255,255,255,.42)" }),
-    svg("path", { d: "M320 132 L353 82 L320 96 L287 82 Z", fill: "rgba(10,20,60,.4)" }),
-  ]);
-
-  const rules = svg("g", { stroke: "rgba(226,182,110,.55)", "stroke-width": "1.6", fill: "none" }, [
-    svg("path", { d: "M104 182 H214" }),
-    svg("path", { d: "M426 182 H536" }),
-    svg("path", { d: "M52 308 H588" }),
-    svg("path", { d: "M52 308 l18 -10 M588 308 l-18 -10" }),
-  ]);
-  const ruleGems = svg("g", { fill: "#e6b86e" }, [
-    svg("path", { d: "M222 182 l7 -7 7 7 -7 7 Z" }),
-    svg("path", { d: "M404 182 l7 -7 7 7 -7 7 Z" }),
-    svg("path", { d: "M320 298 l11 10 -11 10 -11 -10 Z" }),
-  ]);
-
-  const wordmark = svg("g", { "text-anchor": "middle" }, [
-    svg("text", {
-      x: "320",
-      y: "192",
-      "font-size": "32",
-      "font-weight": "800",
-      textLength: "128",
-      lengthAdjust: "spacingAndGlyphs",
-      fill: "#f0dcb6",
-      stroke: "#14100a",
-      "stroke-width": "6",
-      "paint-order": "stroke",
-    }),
-    svg("text", {
-      x: "320",
-      y: "276",
-      "font-size": "90",
-      "font-weight": "900",
-      textLength: "540",
-      lengthAdjust: "spacingAndGlyphs",
-      stroke: "#0a0912",
-      "stroke-width": "16",
-      "paint-order": "stroke",
-      fill: "url(#crimonGold)",
-    }),
-    svg("text", {
-      x: "320",
-      y: "276",
-      "font-size": "90",
-      "font-weight": "900",
-      textLength: "540",
-      lengthAdjust: "spacingAndGlyphs",
-      fill: "url(#crimonSheen)",
-    }),
-  ]);
-  wordmark.children[0].textContent = "CREATE";
-  wordmark.children[1].textContent = "MONSTERS";
-  wordmark.children[2].textContent = "MONSTERS";
-
-  return svg("svg", {
-    viewBox: "0 0 640 332",
-    class: "title-emblem",
-    role: "img",
-    "aria-label": "CREATE MONSTERS",
-  }, [defs, horns, core, rules, ruleGems, wordmark]);
-}
-
-/**
- * 下の稜線。
- *
- * 熾火だけを置いた時は、画面の下3分の1が**ただの茶色い靄**になっていた。
- * 手前に黒い岩の影を1枚入れると、同じ明かりが「稜線の向こうで燃えている
- * 何か」に変わる。奥と手前で2枚重ね、奥の縁だけに火の色を乗せる。
- */
-function forgeRidge(): HTMLElement {
-  /*
-   * 山を3枚重ねる。
-   *
-   * 2枚だったときは**鋸の歯**に見えていた。峰の高さと間隔をばらしても
-   * 直らなかったのは、**傾きが全部同じ**だったから。自然の稜線は
-   * 片側が急でもう片側が緩い。ここでは長く登って短く落ちる形にしてある。
-   *
-   * いちばん奥は淡く青へ寄せる。遠いものほど大気で色が抜けるので、
-   * これだけで「遠い」と分かるようになる。
-   */
-  const distant = "M0 74 L44 58 L62 66 L118 30 L136 52 L190 40 L214 56 L272 22 L292 48 L336 38 L358 54 L390 44 L390 120 L0 120 Z";
-  const far = "M0 90 L38 74 L56 82 L102 44 L120 66 L164 56 L186 70 L232 36 L252 62 L296 52 L318 74 L344 50 L370 68 L390 60 L390 120 L0 120 Z";
-  const near = "M0 108 L36 96 L60 103 L108 80 L134 99 L176 91 L204 103 L250 84 L286 101 L322 93 L358 105 L390 97 L390 120 L0 120 Z";
-  const crest = (d: string) => d.slice(0, d.indexOf(" L390 120"));
-
-  const ridge = svg("svg", { viewBox: "0 0 390 120", preserveAspectRatio: "none", class: "title-ridge__art", "aria-hidden": "true" }, [
-    svg("path", { d: distant, fill: "#151228", opacity: "0.75" }),
-    svg("path", { d: crest(distant), fill: "none", stroke: "rgba(150,180,255,.28)", "stroke-width": "1" }),
-    svg("path", { d: far, fill: "#0a0812" }),
-    svg("path", { d: crest(far), fill: "none", stroke: "rgba(255,170,84,.45)", "stroke-width": "1.2" }),
-    svg("path", { d: near, fill: "#040309" }),
-  ]);
-  return el("div", { className: "title-ridge", "aria-hidden": "true" }, [ridge]);
-}
-
-/** 立ちのぼる火の粉。数は少なく、速さはばらす。揃っていると作り物に見える */
-function emberMotes(count: number): HTMLElement {
-  const layer = el("div", { className: "title-motes", "aria-hidden": "true" }, []);
-  for (let i = 0; i < count; i += 1) {
-    const left = 4 + (i * 92) / count + Math.random() * 6;
-    layer.append(
-      el("i", {
-        style: [
-          `left:${left.toFixed(1)}%`,
-          `animation-duration:${(9 + Math.random() * 11).toFixed(1)}s`,
-          `animation-delay:${(-Math.random() * 18).toFixed(1)}s`,
-          `--mote-drift:${(Math.random() * 40 - 20).toFixed(0)}px`,
-          `--mote-size:${(2 + Math.random() * 2).toFixed(1)}px`,
-        ].join(";"),
-      }),
-    );
-  }
-  return layer;
-}
-
 interface MenuTile {
   name: IconName;
   label: string;
@@ -1092,17 +850,26 @@ export function renderHome(props: HomeProps): HTMLElement {
   if (hasStarted) return el("div", { className: "screen home-screen home-screen--menu-only" }, [menu]);
 
   const homeScreen = el("div", { className: "screen home-screen" }, []);
+  /*
+   * タイトルは**1枚の絵**。
+   *
+   * 以前はロゴのSVGと、その周りの装飾(炉・輪・粉・稜線・粒子・周辺減光)を
+   * CSSで積んで作っていた。依頼主から1枚の絵を受け取ったので、
+   * それをそのまま敷く。題字も「Tap to Start」も絵の中にある。
+   *
+   * **絵の上に文字を重ねない。**重ねると、絵の中の題字と二重になる。
+   * 押す場所は画面全体。絵のどこを触っても始まる。
+   */
   const titleScreen = el("section", { className: "title-screen crimon-title-screen", ariaLabel: "CRIMON タイトル" }, [
-    el("div", { className: "title-screen__forge", "aria-hidden": "true" }, []),
-    arcaneRings("title-screen__rings"), emberMotes(10), forgeRidge(),
-    el("div", { className: "title-screen__grain", "aria-hidden": "true" }, []),
-    el("div", { className: "title-screen__vignette", "aria-hidden": "true" }, []),
-    el("div", { className: "crimon-title-screen__brand" }, [
-      el("img", { src: new URL("../assets/crimon-emblem.svg", import.meta.url).href, alt: "", "aria-hidden": "true", className: "crimon-title-screen__emblem" }, []),
-      el("img", { src: new URL("../assets/crimon-logo.svg", import.meta.url).href, alt: "CRIMON", className: "crimon-title-screen__logo", onerror: (event) => { ((event as Event).currentTarget as HTMLImageElement).hidden = true; } }, []),
-      el("span", { className: "crimon-title-screen__fallback", "aria-hidden": "true" }, ["CRIMON"]),
-      el("p", {}, ["DARK FANTASY MONSTER RPG"]),
-    ]),
+    el("img", {
+      src: new URL("../assets/title-cover.webp", import.meta.url).href,
+      alt: "",
+      "aria-hidden": "true",
+      className: "crimon-title-screen__cover",
+      // 最初に出る絵なので、ほかの何よりも先に取りに行かせる
+      fetchPriority: "high",
+      decoding: "async",
+    }, []),
     // 巡回はここを押さないと、タイトルに覆われたホームを「問題なし」と報告してしまう
     el("button", { type: "button", className: "title-start crimon-title-start", "data-tour": "start", ariaLabel: "ゲームを開始", onclick: () => {
       startHome();
@@ -1111,7 +878,7 @@ export function renderHome(props: HomeProps): HTMLElement {
       menu.classList.remove("home-menu--hidden"); menu.classList.add("home-menu--visible");
       window.scrollTo({ top: 0 });
       window.setTimeout(() => titleScreen.remove(), 320);
-    } }, [el("span", {}, ["START"])]),
+    } }, []),
   ]);
   homeScreen.append(titleScreen, menu);
   return homeScreen;
