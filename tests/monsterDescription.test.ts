@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ELEMENTS } from "../src/core/element.js";
 import { MonsterTemplate, createMonsterVariant } from "../src/core/monster.js";
-import type { Skill, SkillEffect } from "../src/core/skill.js";
+import { describeSkillLines, type Skill, type SkillEffect } from "../src/core/skill.js";
 import { ALL_MONSTER_TEMPLATES } from "../src/data/monsters.js";
 
 /*
@@ -26,6 +26,7 @@ import { ALL_MONSTER_TEMPLATES } from "../src/data/monsters.js";
  * 正しい説明文まで落とし始めて誰もテストを信じなくなる)。
  */
 const REQUIRED_WORDS: Record<SkillEffect["kind"], string[]> = {
+  CURSE: ["呪い"], DETONATE_CURSES: ["呪い"], CONVERT_CURSES: ["呪い"], DAMAGE_BOOST: ["与ダメージ"],
   DAMAGE: ["ダメージ", "一撃"],
   DEBUFF: ["低下"],
   BUFF: ["上昇", "高める"],
@@ -43,7 +44,7 @@ const REQUIRED_WORDS: Record<SkillEffect["kind"], string[]> = {
   LIFESTEAL: ["回復", "吸収"],
   COOLDOWN_EXTEND: ["クールタイム", "待ち時間"],
   STRIP: ["剥が", "はが", "打ち消", "取り除", "解除"],
-  HEAL_BLOCK: ["回復封じ", "回復不能", "回復を封", "回復阻害"],
+  HEAL_BLOCK: ["治癒阻害", "回復封じ", "回復不能", "回復を封", "回復阻害"],
   MITIGATE: ["軽減"],
   PROTECT: ["保護", "かば", "肩代わり"],
   COUNTER_STANCE: ["反撃"],
@@ -85,6 +86,12 @@ describe("スキルの説明文と効果", () => {
     const lies: string[] = [];
     for (const { where, skill } of EVERY_SKILL) {
       const d = skill.description ?? "";
+      // 個別成長の新スキルはデータから説明文を生成する。呪いの発動や暗闇の共通説明まで
+      // 直接付与する確率と照合せず、表示が実データから生成されていることを検証する。
+      if (skill.levelOverrides) {
+        expect(d.startsWith(describeSkillLines(skill).join('。')), where).toBe(true);
+        continue;
+      }
       const effects = skill.effects as (SkillEffect & Record<string, unknown>)[];
       const declared = (re: RegExp, scale = 1) => [...d.matchAll(re)].map((m) => Number(m[1]) * scale);
       const actual = (key: string) => effects.map((e) => e[key]).filter((v): v is number => typeof v === "number");

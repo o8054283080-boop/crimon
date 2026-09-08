@@ -34,11 +34,11 @@ describe("スキル2の全体攻撃・弱スキル見直し", () => {
     }
   });
 
-  it("攻撃型スキル2の全体攻撃が13種類ある", () => {
+  it("攻撃型スキル2の全体攻撃が15種類ある", () => {
     const attacking = PLAYABLE_TEMPLATES.flatMap((template) => template.skill2Variants)
       .filter((skill) => skill.effects.some((effect) => effect.kind === "DAMAGE"));
-    expect(attacking).toHaveLength(49);
-    expect(attacking.filter((skill) => skill.target === "ALL_ENEMIES")).toHaveLength(13);
+    expect(attacking).toHaveLength(56);
+    expect(attacking.filter((skill) => skill.target === "ALL_ENEMIES")).toHaveLength(15);
   });
 
   it("コボルトの急所突きは強化後の威力と防御無視率を持つ", () => {

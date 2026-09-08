@@ -191,7 +191,7 @@ const GAUGE_EPSILON = 1e-6;
  */
 function isSourceScopedEffect(effect: SkillEffect): boolean {
   switch (effect.kind) {
-    case "HEAL": case "BUFF": case "STATUS": case "GAUGE": case "SHIELD":
+    case "DAMAGE_BOOST": case "HEAL": case "BUFF": case "STATUS": case "GAUGE": case "SHIELD":
     case "REGEN": case "MITIGATE": case "CLEANSE": case "COOLDOWN_REDUCE": case "GAUGE_ON_HIT":
       return effect.applyTo !== undefined;
     // 協力攻撃・反撃態勢は術者そのものに1度だけかかる
@@ -205,6 +205,8 @@ function isSourceScopedEffect(effect: SkillEffect): boolean {
 export type BattleWinner = "PLAYER" | "ENEMY" | "DRAW";
 
 export interface UnitSnapshot {
+  curseCount?: number;
+  curseNextTurns?: number;
   instanceId: string;
   team: Team;
   currentHp: number;
@@ -266,6 +268,7 @@ export interface BattleResult {
 }
 
 export interface BattleEngineOptions {
+  initialSkyStacks?: number[];
   rng?: () => number;
   maxTurns?: number;
   /**
@@ -340,6 +343,7 @@ export class BattleEngine {
   private tower100UseS4 = false;
   /** 撃破で得た追加ターン待ちのユニット。手番の直後にまとめて処理する */
   private pendingExtraTurns: BattleUnit[] = [];
+  private interactiveExtraCounts = new Map<BattleUnit, number>();
   /** 協力攻撃の入れ子の深さ。0でないときは協力攻撃を呼ばない(無限に連鎖するため) */
   private coopDepth = 0;
   /** 溜めた反撃の入れ子の深さ。0でないときは反撃を呼ばない(反射と往復し続けるため) */
@@ -374,6 +378,7 @@ export class BattleEngine {
       }
     });
 
+    options.initialSkyStacks?.forEach((stacks, i) => { if (this.units[i]) this.units[i].skyStacks = Math.max(0, Math.min(8, stacks)); });
     if (options.initialPlayerHp) {
       options.initialPlayerHp.forEach((hp, i) => {
         const unit = this.units[i];
@@ -426,7 +431,7 @@ export class BattleEngine {
           const extra = this.pendingExtraTurns.shift()!;
           if (!extra.alive) continue;
           this.push(`${this.label(extra)} は追加ターンを得た！`);
-          this.recordTurn(extra);
+          this.recordTurn(extra, undefined, true);
           turnsTaken += 1;
         }
         this.pendingExtraTurns = [];
@@ -438,11 +443,11 @@ export class BattleEngine {
   }
 
   /** 1手番を解決し、演出用の記録を1件積む */
-  private recordTurn(unit: BattleUnit, choice?: ManualChoice): TurnRecord {
+  private recordTurn(unit: BattleUnit, choice?: ManualChoice, extraTurn = false): TurnRecord {
     const linesBefore = this.log.length;
     const eventsBefore = this.events.length;
     this.syncTower80Boss();
-    this.takeTurn(unit, choice);
+    this.takeTurn(unit, choice, extraTurn);
     this.syncTower80Boss();
     /*
      * 倒れた味方が残していく強化を、**ここで必ず配る。**
@@ -532,13 +537,16 @@ export class BattleEngine {
     if (idx >= 0) this.interactiveQueue.splice(idx, 1);
     unit.gauge -= ATB_THRESHOLD;
 
-    const record = this.recordTurn(unit, choice);
+    const extraCount = this.interactiveExtraCounts.get(unit) ?? 0;
+    if (extraCount > 0) this.interactiveExtraCounts.set(unit, extraCount - 1);
+    const record = this.recordTurn(unit, choice, extraCount > 0);
     // 追加ターンは列の先頭へ戻す。ライブ進行でも「続けてもう一度動く」を保つ
     while (this.pendingExtraTurns.length > 0) {
       const extra = this.pendingExtraTurns.pop()!;
       if (!extra.alive) continue;
       extra.gauge += ATB_THRESHOLD;
       this.interactiveQueue.unshift(extra);
+      this.interactiveExtraCounts.set(extra, (this.interactiveExtraCounts.get(extra) ?? 0) + 1);
     }
     return record;
   }
@@ -568,6 +576,8 @@ export class BattleEngine {
       shieldValue: u.shieldValue,
       shieldTurns: u.shieldTurns,
       immuneTurns: u.immuneTurns,
+      curseCount: u.curses?.length ?? 0,
+      curseNextTurns: u.curses?.length ? Math.min(...u.curses.map(c => c.turns)) : 0,
       poisonStacks: u.poisonStacks,
       poisonTurns: u.poisonTurns,
       blindTurns: u.blindTurns,
@@ -607,7 +617,8 @@ export class BattleEngine {
     return null;
   }
 
-  private takeTurn(unit: BattleUnit, choice?: ManualChoice): void {
+  private takeTurn(unit: BattleUnit, choice?: ManualChoice, extraTurn = false): void {
+    if (!unit.alive) return;
     tickEffectsAtTurnStart(unit);
     tickCooldownsAtTurnStart(unit);
     tickShieldAtTurnStart(unit);
@@ -626,6 +637,23 @@ export class BattleEngine {
 
     this.applyRegenAtTurnStart(unit);
     this.applyPoisonAtTurnStart(unit);
+    for (const curse of unit.curses ?? []) curse.turns--;
+    this.detonateCurses(unit, false);
+    const passive = passiveEffectOf(unit);
+    if (unit.alive && passive?.kind === "REBIRTH") {
+      for (const ally of this.units.filter(u => u.alive && u.team === unit.team)) {
+        const before = ally.currentHp;
+        applyHeal(ally, Math.round(unit.maxHp * passive.heal));
+        this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount: ally.currentHp - before });
+      }
+    }
+    if (unit.alive && passive?.kind === "ILLUSION" && !extraTurn) {
+      this.push(`${this.label(unit)} の「バトルイリュージョン」！`);
+      const opening: Skill = { id: "illusion_opening", name: "バトルイリュージョン", description: "", target: "ALL_ENEMIES", cooldownTurns: 0,
+        effects: [{ kind: "DAMAGE", multiplier: passive.damage }, { kind: "CURSE", chance: passive.chance }] };
+      const resolution = newResolution();
+      for (const enemy of this.units.filter(u => u.alive && u.team !== unit.team)) this.applySkillEffects(unit, enemy, opening, false, false, undefined, resolution);
+    }
 
     let acted = false;
     if (!unit.alive) {
@@ -777,6 +805,7 @@ export class BattleEngine {
   private onKill(killer: BattleUnit | undefined): void {
     if (!killer?.alive) return;
     const passive = passiveEffectOf(killer);
+    if (passive?.kind === "SKY_RULER") killer.skyStacks = Math.min(8, (killer.skyStacks ?? 0) + 1);
     if (passive?.kind !== "PACK_INSTINCT") return;
     this.pendingExtraTurns.push(killer);
   }
@@ -1597,16 +1626,22 @@ export class BattleEngine {
     const previousResolution = this.resolution;
     this.resolution = resolution;
     const hpBeforeSkill = new Map(targets.map((target) => [target.instanceId, target.currentHp]));
+    // 新しい全体攻撃の味方支援は、敵全体への攻撃を終えてから1回だけ配る。
+    const deferred = resolvedSkill.levelOverrides && resolvedSkill.target === "ALL_ENEMIES"
+      ? resolvedSkill.effects.filter(isSourceScopedEffect) : [];
+    const directSkill = deferred.length ? { ...resolvedSkill, effects: resolvedSkill.effects.filter(e => !isSourceScopedEffect(e)) } : resolvedSkill;
     targets.forEach((target, i) => {
-      const targetSkill = aoeConverted && latent?.aoeConversion ? { ...resolvedSkill, effects: resolvedSkill.effects
+      const targetSkill = aoeConverted && latent?.aoeConversion ? { ...directSkill, effects: directSkill.effects
         .filter((effect) => i === 0 || latent.aoeConversion?.nativeEffectTarget !== "PRIMARY_ONLY" || effect.kind === "DAMAGE")
         .map((effect) => {
           if (effect.kind === "DAMAGE") return { ...effect, multiplier: effect.multiplier * latent.aoeConversion!.damageMultiplier };
           if (i > 0 && "chance" in effect && typeof effect.chance === "number") return { ...effect, chance: effect.chance * (latent.aoeConversion!.secondaryEffectChanceMultiplier ?? 1) };
           return effect;
-        }) } : resolvedSkill;
+        }) } : directSkill;
       this.applySkillEffects(unit, target, targetSkill, missed, i === 0, latent, resolution);
     });
+
+    if (deferred.length && unit.alive) this.applySkillEffects(unit, targets[0], { ...resolvedSkill, effects: deferred }, missed, true, undefined, resolution, true);
 
     if (this.isTower70Boss(unit) && skill.id === "tower70_behemoth_s3") {
       const removed = cleanseDebuffs(unit);
@@ -1623,6 +1658,9 @@ export class BattleEngine {
       if (target.currentHp < (hpBeforeSkill.get(target.instanceId) ?? target.currentHp)) this.tryThresholdHeals(target);
     }
 
+    if (skill.resetCooldownOnKill && resolution.kills > 0) unit.cooldowns[index] = 0;
+    if (skill.extraTurn && unit.alive) this.pendingExtraTurns.push(unit);
+    if (skill.gaugeIfThreeEnemies && targets.length >= 3) this.gainGauge(unit, skill.gaugeIfThreeEnemies);
     if (skill.extraTurnOnKill && resolution.kills > 0 && unit.alive) this.pendingExtraTurns.push(unit);
 
     // 攻撃スキルに乗るパッシブは、対象を全部処理してから1度だけ判定する
@@ -2034,9 +2072,10 @@ export class BattleEngine {
   /** 継続回復がかかっている場合、手番開始時に最大HPのregenRate分回復する */
   private applyRegenAtTurnStart(unit: BattleUnit): void {
     if (unit.regenTurns <= 0 || !unit.alive) return;
+    const savedRate = unit.regenRate;
     unit.regenTurns -= 1;
     if (unit.regenTurns <= 0) unit.regenRate = 0;
-    const healAmount = Math.round(unit.maxHp * unit.regenRate);
+    const healAmount = Math.round(unit.maxHp * (unit.regenIncludesLastTurn ? savedRate : unit.regenRate));
     if (healAmount <= 0) return;
     applyHeal(unit, healAmount);
     this.push(`  → ${this.label(unit)} は継続回復でHPが ${healAmount} 回復！ (${unit.currentHp}/${unit.maxHp})`);
@@ -2077,6 +2116,7 @@ export class BattleEngine {
     sourceScoped = true,
     latent?: LatentAbilityCandidate,
     resolution: SkillResolution = newResolution(),
+    perHit = false,
   ): { anyCrit: boolean; debuffApplied: boolean } {
     let damageDealtThisCall = 0;
     // 反撃は効果の解決の途中に割り込ませない(解決中に相手が動くと、
@@ -2111,7 +2151,31 @@ export class BattleEngine {
       if (missed && effect.kind !== "DAMAGE" && effect.kind !== "LIFESTEAL") continue;
       if (!sourceScoped && isSourceScopedEffect(effect)) continue;
 
+      if ('requires' in effect && !met(effect.requires)) continue;
       switch (effect.kind) {
+        case "CURSE": {
+          if (!this.isImmune(target) && this.rollEffectSuccess(source, target, effect.chance)) this.addCurse(source, target);
+          break;
+        }
+        case "DETONATE_CURSES": this.detonateCurses(target, true); break;
+        case "CONVERT_CURSES": {
+          // 1対象につき1回の成功判定。免疫を含む強化を剥がしてから呪いへ変える。
+          if (!this.rollEffectSuccess(source, target, effect.chance)) break;
+          const removed = stripBuffs(target);
+          if (!this.isImmune(target)) {
+            for (let i = 0; i < removed; i++) this.addCurse(source, target);
+            if (removed > 0) target.stunTurns = Math.max(target.stunTurns, 1);
+          }
+          break;
+        }
+        case "DAMAGE_BOOST": {
+          for (const receiver of this.receiversFor(source, target, effect.applyTo)) {
+            if (!receiver.alive || hasStatus(receiver, "BUFF_BLOCK")) continue;
+            receiver.damageDealtBonus = Math.max(receiver.damageDealtBonus ?? 0, effect.amount);
+            receiver.damageDealtBonusTurns = Math.max(receiver.damageDealtBonusTurns ?? 0, effect.durationTurns);
+          }
+          break;
+        }
         case "DAMAGE": {
           if (!met(effect.requires)) break;
           // 「奪った強化1個につき」は解決の途中の結果を見るので、ここで足してから撃つ
@@ -2123,7 +2187,9 @@ export class BattleEngine {
             : effect;
           const hits = effect.hits ?? 1;
           for (let h = 0; h < hits && target.alive; h += 1) {
-            const result = calcDamage(source, target, damageEffect, this.rng);
+            const cheat = passiveEffectOf(source);
+            const enhanced = cheat?.kind === "CHEAT" ? { ...damageEffect, hpCoefficient: (damageEffect.hpCoefficient ?? 0) + .07 / hits } : damageEffect;
+            const result = calcDamage(source, target, enhanced, this.rng);
             if (result.isCrit) {
               resolution.anyCrit = true;
               resolution.critCount += 1;
@@ -2137,6 +2203,16 @@ export class BattleEngine {
             damageDealtThisCall += applied.hpDamage;
             resolution.damageDealt += applied.hpDamage;
             if (applied.died) { resolution.kills += 1; this.onKill(source); }
+            if (result.isCrit && target.alive && passiveEffectOf(target)?.kind === "CHEAT") {
+              const key = `cheat:${target.instanceId}`;
+              if (!resolution.applied.has(key)) {
+                resolution.applied.add(key);
+                const before = target.currentHp;
+                applyHeal(target, Math.round(target.maxHp * .1));
+                this.pushEvent({ targetId: target.instanceId, kind: "HEAL", amount: target.currentHp - before });
+              }
+            }
+            if (effect.perHitEffects && target.alive && !missed) this.applySkillEffects(source, target, { ...skill, effects: effect.perHitEffects }, false, false, undefined, resolution, true);
             target.hitsTaken += 1;
             this.advanceAdaptation(target, source);
             counterTargets.add(target);
@@ -2161,7 +2237,7 @@ export class BattleEngine {
                 ? getEffectiveStat(source, "atk")
                 : effect.scaleStat === "def"
                   ? getEffectiveStat(source, "def")
-                  : receiver.maxHp;
+                  : effect.scaleStat === "hp" ? source.maxHp : receiver.maxHp;
             /*
              * 才能の回復補正。**術者側の才能だけを見る。**
              * 受け手の「回復量+」で自分への回復が増えると、
@@ -2421,6 +2497,7 @@ export class BattleEngine {
           for (const receiver of receivers) {
             if (!receiver.alive) continue;
             if (hasStatus(receiver, "BUFF_BLOCK")) { this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`); continue; }
+            receiver.regenIncludesLastTurn = receiver.regenIncludesLastTurn || Boolean(skill.levelOverrides);
             receiver.regenRate = Math.max(receiver.regenRate, effect.healRate);
             receiver.regenTurns = Math.max(receiver.regenTurns, effect.durationTurns);
             this.push(`  → ${this.label(receiver)} は継続回復を得た！ (${effect.durationTurns}ターン)`);
@@ -2589,6 +2666,7 @@ export class BattleEngine {
      * 弱化が通った時の才能。**この相手に1回だけ。**
      * 効果ごとに配ると、弱体を3つ持つ技で3倍もらえてしまう。
      */
+    if (perHit) return { anyCrit: resolution.anyCrit, debuffApplied: resolution.debuffApplied };
     const mods = skill.talentMods;
     if (mods && resolution.debuffApplied && target.alive) {
       if (mods.selfGaugeOnDebuff) {
@@ -2628,6 +2706,26 @@ export class BattleEngine {
   }
 
   /** 特殊ダメージにも共通の致死処理を通し、通常由来だけ反射を1段生成する。 */
+  private addCurse(source: BattleUnit, target: BattleUnit): void {
+    (target.curses ??= []).push({ attack: getEffectiveStat(source, "atk"), turns: 2, sourceId: source.instanceId });
+    this.push(`  → ${this.label(target)} に呪いが付与された！`);
+  }
+
+  private detonateCurses(target: BattleUnit, all: boolean): void {
+    const ready = (target.curses ?? []).filter(c => all || c.turns <= 0);
+    target.curses = (target.curses ?? []).filter(c => !ready.includes(c));
+    for (const curse of ready) {
+      if (!target.alive) continue;
+      const source = this.units.find(u => u.instanceId === curse.sourceId);
+      // 固定ダメージには攻撃スキルの倍率・会心・防御・属性補正を掛けない。
+      const hit = this.applyIncomingDamage(target, Math.round(curse.attack * 4), source, "periodic");
+      this.push(`  → ${this.label(target)} の呪いが発動！ ${hit.hpDamage}ダメージ`);
+      this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: hit.hpDamage });
+      if (hit.died) { this.onKill(source); this.pushEvent({ targetId: target.instanceId, kind: "DEATH" }); if (this.resolution) this.resolution.kills++; }
+      if (target.alive && !this.isImmune(target) && source && this.rollEffectSuccess(source, target, 1)) target.stunTurns = Math.max(target.stunTurns, 1);
+    }
+  }
+
   private applyIncomingDamage(
     target: BattleUnit,
     amount: number,
@@ -2672,6 +2770,8 @@ export class BattleEngine {
       }
     }
 
+    const illusion = passiveEffectOf(target);
+    if (illusion?.kind === "ILLUSION" && source && ["LIGHT", "DARK"].includes(source.def.element)) incoming = Math.round(incoming * .5);
     const applied = applyDamage(target, incoming);
     /*
      * 反射障壁。**盾が乗っている間だけ**、受けたぶんの一部を返す。

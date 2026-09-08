@@ -253,3 +253,23 @@ describe("音と真っ黒画面のお詫び", () => {
     expect(compensationBannerLabel([{ compensation: APOLOGY }])).toBe("お詫びの配布");
   });
 });
+
+
+describe("新4種追加の記念配布", () => {
+  it("ダイヤ2000と通常召喚書30枚を配り、保存後も重複しない", () => {
+    const gift = COMPENSATIONS.find(c => c.id === "2026-09-08-new-four-species-gift")!;
+    const state = createInitialState();
+    state.claimedCompensationIds = COMPENSATIONS.filter(c => c.id !== gift.id).map(c => c.id);
+    const before = { crystal: state.crystal, scrolls: state.summonScrolls, gold: state.gold };
+    const when = localNoonOn(gift.fromDate);
+    expect(claimCompensations(state, when).map(c => c.compensation.id)).toEqual([gift.id]);
+    expect(state.crystal).toBe(before.crystal + 2000);
+    expect(state.summonScrolls).toBe(before.scrolls + 30);
+    expect(state.gold).toBe(before.gold);
+    const restored = normalizeLoadedState(JSON.parse(JSON.stringify(state)));
+    expect(claimCompensations(restored, when)).toHaveLength(0);
+    expect(restored.crystal).toBe(state.crystal);
+    expect(restored.summonScrolls).toBe(state.summonScrolls);
+    expect(hasReward(gift)).toBe(true);
+  });
+});

@@ -33,9 +33,9 @@ function battle(playerIds: string[], enemyIds: string[], rng = () => 0) {
 }
 
 describe("① 11種すべてが6属性で実体化できる", () => {
-  it("11種 × 6属性 = 66体が図鑑にある", () => {
-    expect(NEW_MONSTER_TEMPLATES).toHaveLength(11);
-    expect(NEW_MONSTERS_DEX).toHaveLength(66);
+  it("15種 × 6属性 = 90体が図鑑にある", () => {
+    expect(NEW_MONSTER_TEMPLATES).toHaveLength(15);
+    expect(NEW_MONSTERS_DEX).toHaveLength(90);
     for (const template of NEW_MONSTER_TEMPLATES) {
       for (const element of ELEMENTS) {
         const dex = findMonster(template.templateId, element);
@@ -132,7 +132,7 @@ describe("⑦ パッシブのLv1〜5成長", () => {
   it("11種のパッシブすべてが5段を持ち、Lv5がLv1より弱くならない", () => {
     const passives = NEW_MONSTER_TEMPLATES.flatMap((t) =>
       [...t.skill3Variants, t.lightSkill3, t.darkSkill3].filter((s) => s?.passive).map((s) => s!));
-    expect(passives.length).toBe(11);
+    expect(passives.length).toBe(16);
     for (const skill of passives) {
       expect(skill.passive!.levels, skill.id).toHaveLength(5);
       const lv1 = JSON.stringify(passiveAtLevel(skill.passive!, 1));

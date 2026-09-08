@@ -115,6 +115,7 @@ export function setupWaveBattle(
 export interface WaveSurvivors {
   survivorInstances: MonsterInstance[];
   survivorHp: Map<string, number>;
+  survivorSkyStacks: Map<string, number>;
 }
 
 /** バトル終了後、パーティ側の生存者と残りHPを取り出す(次ウェーブへの持ち越し用) */
@@ -122,16 +123,18 @@ export function extractSurvivors(engine: BattleEngine, partyInstances: MonsterIn
   const units = engine.getUnits();
   const survivorInstances: MonsterInstance[] = [];
   const survivorHp = new Map<string, number>();
+  const survivorSkyStacks = new Map<string, number>();
 
   partyInstances.forEach((instance, i) => {
     const unit = units[i];
     if (unit && unit.alive) {
       survivorInstances.push(instance);
       survivorHp.set(instance.id, unit.currentHp);
+      survivorSkyStacks.set(instance.id, unit.skyStacks ?? 0);
     }
   });
 
-  return { survivorInstances, survivorHp };
+  return { survivorInstances, survivorHp, survivorSkyStacks };
 }
 
 /**

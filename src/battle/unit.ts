@@ -21,6 +21,8 @@ export interface ActiveStatusEffect {
 }
 
 export interface BattleUnit {
+  curses?: { attack: number; turns: number; sourceId: string }[];
+  skyStacks?: number;
   instanceId: string;
   def: MonsterDefinition;
   team: Team;
@@ -44,6 +46,8 @@ export interface BattleUnit {
   immuneTurns: number;
   /** 継続回復の割合(最大HPに対する%)。regenTurnsが0より大きい間、自身の手番開始時に発動する */
   regenRate: number;
+  /** 個別成長スキルの継続回復は指定回数ぶん発動してから終了する。 */
+  regenIncludesLastTurn?: boolean;
   /** 継続回復の残りターン数 */
   regenTurns: number;
   /** 毒のスタック数(0-5)。多いほど手番開始時のダメージが大きくなる */
@@ -185,6 +189,10 @@ export function passiveEffectOf(unit: BattleUnit): PassiveLevelEffect | undefine
 export function passiveStatBonus(unit: BattleUnit, stat: BuffStat): { multiplier: number; add: number } {
   const effect = passiveEffectOf(unit);
   if (!effect) return { multiplier: 1, add: 0 };
+  if (effect.kind === "SKY_RULER") {
+    if (stat === "atk") return { multiplier: 1 + effect.atk * (unit.skyStacks ?? 0), add: 0 };
+    if (stat === "criDmg") return { multiplier: 1, add: effect.critDmg * (unit.skyStacks ?? 0) };
+  }
   if (effect.kind === "LAST_STAND" && stat === "def") {
     return unit.currentHp / unit.maxHp <= effect.hpRatio ? { multiplier: 1 + effect.defUp, add: 0 } : { multiplier: 1, add: 0 };
   }
@@ -312,7 +320,12 @@ export function applyDamage(unit: BattleUnit, amount: number): DamageApplication
     unit.currentHp = Math.max(0, before - remaining);
   }
   result.hpDamage = before - unit.currentHp;
-  if (unit.currentHp === 0 && hasStatus(unit, "REVIVE")) {
+  const rebirth = passiveEffectOf(unit);
+  if (unit.currentHp === 0 && rebirth?.kind === "REBIRTH" && unit.passiveCooldown <= 0) {
+    unit.currentHp = unit.maxHp;
+    unit.passiveCooldown = rebirth.cooldown;
+    result.revived = true;
+  } else if (unit.currentHp === 0 && hasStatus(unit, "REVIVE")) {
     unit.statusEffects = unit.statusEffects.filter((effect) => effect.type !== "REVIVE");
     unit.currentHp = Math.max(1, Math.round(unit.maxHp * 0.25));
     unit.alive = true;
@@ -390,6 +403,12 @@ export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): 
     if (index < 0) break;
     unit.statusEffects.splice(index, 1); remaining -= 1; removed += 1;
   }
+  const take = (active: boolean, clear: () => void) => { if (remaining > 0 && active) { clear(); remaining--; removed++; } };
+  take((unit.damageDealtBonusTurns ?? 0) > 0, () => { unit.damageDealtBonus = 0; unit.damageDealtBonusTurns = 0; });
+  take(unit.mitigateTurns > 0, () => { unit.mitigateTurns = 0; unit.mitigateAmount = 0; unit.mitigateVsTaunted = 0; });
+  take(unit.protectTurns > 0, () => { unit.protectTurns = 0; unit.protectShare = 0; unit.protectorId = undefined; });
+  take(unit.counterTurns > 0, () => { unit.counterTurns = 0; unit.counterMultiplier = 0; unit.counterHpCoefficient = 0; unit.counterHealRate = 0; });
+  take(unit.hitGaugeTurns > 0, () => { unit.hitGaugeTurns = 0; unit.hitGaugeAmount = 0; });
   return removed;
 }
 
@@ -436,7 +455,7 @@ export function stealBuffs(from: BattleUnit, to: BattleUnit, count = 1): number 
 
 /** その相手が有利な効果を持っているか。奪取・解除の条件判定に使う */
 export function hasAnyBuff(unit: BattleUnit): boolean {
-  return unit.immuneTurns > 0
+  return (unit.damageDealtBonusTurns ?? 0) > 0 || unit.mitigateTurns > 0 || unit.protectTurns > 0 || unit.counterTurns > 0 || unit.hitGaugeTurns > 0 || unit.immuneTurns > 0
     || unit.shieldTurns > 0
     || unit.regenTurns > 0
     || unit.effects.some((effect) => effect.kind === "BUFF")
@@ -445,7 +464,7 @@ export function hasAnyBuff(unit: BattleUnit): boolean {
 
 /** その相手が持っている弱体効果の数。ダメージ倍率や条件判定に使う */
 export function countDebuffs(unit: BattleUnit): number {
-  return unit.effects.filter((e) => e.kind === "DEBUFF").length
+  return (unit.curses?.length ?? 0) + unit.effects.filter((e) => e.kind === "DEBUFF").length
     + unit.statusEffects.filter((e) => e.category === "DEBUFF").length
     + Number(unit.poisonStacks > 0)
     + Number(unit.healBlockTurns > 0)
@@ -477,6 +496,7 @@ export function cleanseDebuffs(unit: BattleUnit, count = Number.POSITIVE_INFINIT
   take(unit.stunTurns > 0, () => { unit.stunTurns = 0; });
   take(unit.burnTurns > 0, () => { unit.burnTurns = 0; });
   take(unit.blindTurns > 0, () => { unit.blindTurns = 0; });
+  while (remaining > 0 && unit.curses?.length) { unit.curses.shift(); remaining--; removed++; }
   return removed;
 }
 

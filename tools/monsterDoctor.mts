@@ -22,7 +22,7 @@
  */
 import { ELEMENTS, ELEMENT_JA } from "../src/core/element.js";
 import { MonsterTemplate, createMonsterVariant } from "../src/core/monster.js";
-import type { Skill, SkillEffect } from "../src/core/skill.js";
+import { describeSkillLines, type Skill, type SkillEffect } from "../src/core/skill.js";
 import { ALL_MONSTER_TEMPLATES, MONSTER_TEMPLATES } from "../src/data/monsters.js";
 
 /* ============================================================
@@ -60,7 +60,7 @@ const REQUIRED_WORDS: Record<SkillEffect["kind"], string[]> = {
    * CLAUDE.md も「解除と回復阻害」と書いており、そちらが本来の言い方。
    */
   STRIP: ["剥が", "はが", "打ち消", "取り除", "解除"],
-  HEAL_BLOCK: ["回復封じ", "回復不能", "回復を封", "回復阻害"],
+  HEAL_BLOCK: ["治癒阻害", "回復封じ", "回復不能", "回復を封", "回復阻害"],
 };
 
 interface Finding {
@@ -89,6 +89,10 @@ function allSkills(t: MonsterTemplate): { slot: string; skill: Skill }[] {
 /** 1. 説明文に書いてある数字が、実際の効果と合っているか */
 function checkNumbers(where: string, skill: Skill): void {
   const d = skill.description ?? "";
+  if (skill.levelOverrides) {
+    if (!d.startsWith(describeSkillLines(skill).join('。'))) note("だめ", where, "生成された説明文が実データと一致しない");
+    return;
+  }
   const effects = skill.effects as (SkillEffect & Record<string, unknown>)[];
 
   const declared = (re: RegExp, scale = 1) => [...d.matchAll(re)].map((m) => Number(m[1]) * scale);
