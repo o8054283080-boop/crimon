@@ -92,6 +92,8 @@ import {
   removeMonsters,
   savePlayerState,
   lastSaveFailure,
+  recordStorageEstimate,
+  type SaveFailure,
   sellEquipment,
   setEquipmentLocked,
   setMonsterLocked,
@@ -3136,6 +3138,105 @@ function buildFarmBar(): HTMLElement | null {
  * 「試練の塔」が切り落とされて押せなくなる。過去に出している事故)。
  */
 /**
+ * ブラウザに「いくら使っていて、いくらまで使えるか」を聞く。
+ *
+ * **非同期なので、失敗した瞬間には間に合わない。**取れたら書き足して描き直す。
+ * 1回で足りる——失敗が続く間、同じ数字を何度も聞く必要はない。
+ * 対応していないブラウザや拒否された時は、数字なしの文面のままでよい。
+ */
+let storageEstimateRequested = false;
+
+function requestStorageEstimate(): void {
+  if (storageEstimateRequested) return;
+  storageEstimateRequested = true;
+  const storage = navigator.storage;
+  if (!storage?.estimate) return;
+  storage.estimate().then((estimate) => {
+    // usage は localStorage を数えないことがある。**欠けていても quota だけで足りる**
+    if (estimate.quota === undefined) return;
+    recordStorageEstimate(estimate.usage ?? 0, estimate.quota);
+    render();
+  }).catch(() => {
+    // 取れなくても案内は出せる。ここで失敗を重ねない
+  });
+}
+
+/** 1MBに満たない時にMB表記だと「0.0MB」になって、かえって何も伝わらない */
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return "不明";
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+}
+
+/**
+ * これ未満のセーブで保存に失敗したなら、**原因はアプリのデータ量ではない。**
+ *
+ * ブラウザが1つのサイトへ許す量はふつう5MB前後ある。実際に報告された端末では
+ * **882KB**で失敗していた。iOS Safari は端末の空き容量が少ないと
+ * 割り当てそのものを絞るので、こうなる。
+ *
+ * ここで見分けないと「装備やモンスターを整理してください」と案内してしまい、
+ * **整理しても直らない**人を延々と走らせることになる。
+ */
+const SAVE_SIZE_LIKELY_FINE = 2 * 1024 * 1024;
+
+/**
+ * これだけ許されているなら、**入らない理由は容量ではない。**
+ * 空き容量が理由で絞られている端末は、ここまでの数字を出さない。
+ */
+const ROOMY_QUOTA = 50 * 1024 * 1024;
+
+/**
+ * 「一杯」の文面。
+ *
+ * **一杯には3種類ある。**どれも同じ `QuotaExceededError` になるので、
+ * 例外の形では見分けられない。数字で切り分ける。
+ *
+ *   1. 端末の空き容量が無くて、割り当てそのものが小さい
+ *      → 実際の報告では**セーブ882KB**で失敗していた。普通は5MB前後使えるので、
+ *        これは「アプリのデータが多い」ではない。整理を案内しても直らない
+ *   2. アプリのデータが本当に多い
+ *   3. 容量とは無関係(プライベートモード、サイトデータの拒否)
+ *      → 割り当てに余裕があるのに失敗しているならこれ
+ *
+ * 見分けずに「装備やモンスターを整理してください」と書くと、
+ * 1と3の人を**直らない作業へ延々と走らせる**ことになる。
+ *
+ * ## 使用量は出さない
+ *
+ * `navigator.storage.estimate()` の `usage` は**localStorage を数えないことがある。**
+ * 実機(Chromium)で quota は 958.6MB と返るのに usage は 0 だった。
+ * 「使用 不明」と出しても読む人には何も伝わらないし、
+ * **その 0 を割り算に使えば判定ごと嘘になる。**使うのは quota と実際のセーブだけ。
+ */
+function quotaDetail(failure: SaveFailure): string {
+  const write = "直す前に、下の「⬇ 控えを書き出す」で控えを取ってください。";
+  const mine = failure.bytes > 0 ? `いまのセーブは ${formatBytes(failure.bytes)}。` : "";
+  const quota = failure.storage && failure.storage.quota > 0 ? failure.storage.quota : 0;
+
+  // 許されている量に余裕があるのに書けない = 容量の話ではない
+  if (quota >= ROOMY_QUOTA) {
+    return `${mine}この端末はこのサイトへ ${formatBytes(quota)} まで許しているので、`
+      + `容量が足りないわけではありません。プライベートブラウズや、`
+      + `サイトのデータを保存しない設定になっていないか確かめてください。${write}`;
+  }
+  if (quota > 0) {
+    return `${mine}この端末がこのサイトへ許す量が ${formatBytes(quota)} まで狭まっています。`
+      + `端末の空き容量が少ないと、この「許す量」自体が小さくなります。`
+      + `写真やアプリを整理して空きを作ってください。${write}`;
+  }
+
+  // 量が聞けなかった時は、セーブの大きさだけで見分ける
+  if (failure.bytes > 0 && failure.bytes < SAVE_SIZE_LIKELY_FINE) {
+    return `${mine}この大きさで入らないのは、端末の空き容量が少ないか、`
+      + `サイトのデータを保存しない設定になっているためです。`
+      + `装備やモンスターを整理しても直りません。${write}`;
+  }
+  return `${mine}端末の空き容量が少ないか、装備・モンスターが増えすぎています。`
+    + `端末の空きを作るか、使わない装備・モンスターを整理してください。${write}`;
+}
+
+/**
  * セーブに失敗している時の警告。
  *
  * **黙って消えるのがいちばん悪い。**保存領域が一杯だと
@@ -3150,13 +3251,9 @@ function buildSaveFailureBar(): HTMLElement | null {
   const failure = lastSaveFailure();
   if (!failure) return null;
   if (BATTLE_SCREENS.has(state.screen)) return null;
-  // 1MBに満たない時にMB表記だと「0.0MB」になって、かえって何も伝わらない
-  const size = failure.bytes <= 0 ? ""
-    : failure.bytes >= 1024 * 1024 ? `${(failure.bytes / 1024 / 1024).toFixed(1)}MB`
-      : `${Math.max(1, Math.round(failure.bytes / 1024))}KB`;
-  const detail = failure.quotaExceeded
-    ? `この端末の保存できる量を超えました${size ? `(${size})` : ""}。装備やモンスターを整理するか、下の「データを書き出す」で控えを取ってください。`
-    : "この端末に書き込めませんでした。プライベートモードや保存の制限を解除してから、もう一度お試しください。";
+  if (!failure.storage) requestStorageEstimate();
+  const detail = failure.quotaExceeded ? quotaDetail(failure)
+    : "この端末に書き込めませんでした。プライベートモードや、サイトのデータを保存しない設定になっていないか確かめてください。";
   return el("section", {
     className: "tutorial-bar tutorial-bar--danger",
     "data-save-failure-bar": "",
@@ -3169,6 +3266,12 @@ function buildSaveFailureBar(): HTMLElement | null {
       el("div", { className: "tutorial-bar__cond" }, [
         el("span", {}, [`${detail} このまま閉じると、いま遊んだぶんは戻ります。`]),
       ]),
+      // 控えを取る的をその場に置く。ホームまで戻る道中で失われるのが困る
+      el("button", {
+        type: "button",
+        className: "btn btn--primary tutorial-bar__save-act",
+        onclick: handleExportSave,
+      }, ["⬇ 控えを書き出す"]),
     ]),
   ]);
 }

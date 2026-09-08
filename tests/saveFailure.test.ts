@@ -97,6 +97,64 @@ describe("保存できていないことを画面に出す", () => {
   });
 
   /*
+   * **数字を見て、原因を3つに切り分ける。**どれも同じ `QuotaExceededError` になる。
+   *
+   * 実ユーザーのスクショで**セーブ882KB**で失敗していると分かった。
+   * localStorage の上限はふつう5MB前後なので、882KB で溢れるのは
+   * アプリのデータ量の問題ではない。それなのに当時の文面は
+   * 「装備やモンスターを整理してください」——**整理しても直らない案内**だった。
+   */
+  it("許す量に余裕がある時は、整理ではなく設定を疑わせる", () => {
+    const detail = MAIN.slice(MAIN.indexOf("function quotaDetail"), MAIN.indexOf("function buildSaveFailureBar"));
+    const roomy = detail.slice(detail.indexOf("if (quota >= ROOMY_QUOTA)"), detail.indexOf("if (quota > 0)"));
+    expect(roomy).toContain("サイトのデータを保存しない設定");
+    expect(roomy, "余裕がある人に整理を案内しない").not.toContain("整理して空き");
+  });
+
+  it("小さいセーブで失敗した人に「整理しても直らない」と伝える", () => {
+    const detail = MAIN.slice(MAIN.indexOf("function quotaDetail"), MAIN.indexOf("function buildSaveFailureBar"));
+    expect(detail).toContain("装備やモンスターを整理しても直りません");
+  });
+
+  /*
+   * `navigator.storage.estimate()` の `usage` は localStorage を数えないことがある。
+   * 実機(Chromium)で quota 958.6MB / usage 0 が返り、画面に「使用 **不明**」と出た。
+   * **0 を割り算に使えば判定ごと嘘になる。**
+   */
+  it("信用できない usage を、表示にも判定にも使わない", () => {
+    const detail = MAIN.slice(MAIN.indexOf("function quotaDetail"), MAIN.indexOf("function buildSaveFailureBar"));
+    expect(detail, "使用量を画面に出している").not.toContain("使用 ");
+    expect(detail, "usage で割っている").not.toMatch(/usage\s*\//);
+  });
+
+  it("usage が欠けていても quota だけで案内する", () => {
+    const req = MAIN.slice(MAIN.indexOf("function requestStorageEstimate"), MAIN.indexOf("function formatBytes"));
+    expect(req, "usage が無いだけで諦めている").not.toContain("estimate.usage === undefined ||");
+    expect(req).toContain("estimate.usage ?? 0");
+  });
+
+  /*
+   * 控えを取る的を帯の中に置く。以前は「まず下の『データを書き出す』で」と
+   * 書いていたが、**そのボタンはホームにしか無い。**召喚画面で警告が出ている人には
+   * 存在しないものを指していた。
+   */
+  it("その場で控えを書き出せる", () => {
+    const bar = MAIN.slice(MAIN.indexOf("function buildSaveFailureBar"), MAIN.indexOf("function mountTutorialBar"));
+    expect(bar).toContain("onclick: handleExportSave");
+    expect(bar).toContain("⬇ 控えを書き出す");
+  });
+
+  /*
+   * 狭い端末で説明が消えていた。`.tutorial-bar__cond > span:first-child` を
+   * 380px 以下で `display: none` にしていて、**周回の帯だけが例外指定**されていた。
+   * 360px の端末では題だけが残り、何をすればいいかが1文字も出ない。
+   */
+  it("360pxでも警告文が消えない", () => {
+    const media = CSS.slice(CSS.indexOf("@media (max-width: 380px)"));
+    expect(media).toContain(".tutorial-bar--danger .tutorial-bar__cond > span:first-child");
+  });
+
+  /*
    * **浮かせない。**この案件では浮遊パネルで押せないボタンを3回作っている。
    */
   it("帯を浮かせていない", () => {
