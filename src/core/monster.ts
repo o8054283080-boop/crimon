@@ -189,17 +189,119 @@ export interface BossTraits {
  */
 
 /**
- * 属性ごとの簡単なステータス補正。同じモンスターでも属性違いで
- * 少しだけ得意分野が変わる(色違い=完全に同一ステータスではない)フレーバー付け。
+ * 属性ごとのステータス補正。
+ *
+ * ## 前はこうだった
+ *
+ *   火 攻撃+10% / 水 防御+10%・HP+5% / 電気 **速度+15%** / 木 HP+15%
+ *   光 クリ率+3% / 闇 クリダメ+5%
+ *
+ * 問題が2つあった。
+ *
+ * ### 1. 上がるだけで、下がるものが1つも無い
+ *
+ * 属性は**引いた時に決まる**もので、選べない。上がるだけだと
+ * 「木を引けば得、光を引けば損」という当たり外れになる。
+ * とくに木のHP+15%は他より大きく、純粋な上振れだった。
+ *
+ * ### 2. 電気の速度+15%が効きすぎる
+ *
+ * 速度は**何回動けるか**に直結する。装備ダンジョンでは
+ * 「10階の速度を1.85→1.96(わずか6%)に上げただけで最強編成の勝率が
+ * 0%から動かなくなる」ほど鋭い(`src/data/equipmentDungeon.ts`)。
+ * そこへ15%を素で乗せていた。ウルフ110→126、ドラゴン120→138。
+ *
+ * ## いまの形
+ *
+ * **どの型も「1つ上げて、1つ下げる」。**そして属性ごとに2つの型を持ち、
+ * **テンプレートIDと属性の両方から**どちらを使うか決める。
+ * 「火なら必ず攻撃が上がる」ではなくなり、火のウルフと火のゴーレムで
+ * 上がるものが違う。同じモンスターは何度見ても同じ型になる(決定論)。
+ *
+ * 速度を上げる型は**電気の片方だけ**で、+6%に抑えてある。
+ * 速度を下げる型も水の片方だけ、-4%。速度は数%が効くので、
+ * ここだけは上下とも小さく刻み、置く場所も1つずつに限る。
  */
-const ELEMENT_STAT_FLAVOR: Record<Element, (stats: Stats) => Stats> = {
-  FIRE: (s) => ({ ...s, atk: Math.round(s.atk * 1.1) }),
-  WATER: (s) => ({ ...s, def: Math.round(s.def * 1.1), hp: Math.round(s.hp * 1.05) }),
-  ELECTRIC: (s) => ({ ...s, spd: Math.round(s.spd * 1.15) }),
-  GRASS: (s) => ({ ...s, hp: Math.round(s.hp * 1.15) }),
-  LIGHT: (s) => ({ ...s, criRate: Math.min(1, s.criRate + 0.03) }),
-  DARK: (s) => ({ ...s, criDmg: s.criDmg + 0.05 }),
+type ElementStatFlavor = { readonly note: string; readonly apply: (stats: Stats) => Stats };
+
+const scale = (value: number, ratio: number): number => Math.round(value * ratio);
+
+const ELEMENT_STAT_FLAVORS: Record<Element, readonly ElementStatFlavor[]> = {
+  // 火は攻め。重い一撃で押すか、会心で通すか
+  FIRE: [
+    { note: "攻撃+12% / 防御-12%", apply: (s) => ({ ...s, atk: scale(s.atk, 1.12), def: scale(s.def, 0.88) }) },
+    { note: "クリダメ+5% / 防御-6%", apply: (s) => ({ ...s, criDmg: s.criDmg + 0.05, def: scale(s.def, 0.94) }) },
+  ],
+  // 水は守り。防御で弾くか、HPで受けるか
+  WATER: [
+    { note: "防御+14% / 攻撃-10%", apply: (s) => ({ ...s, def: scale(s.def, 1.14), atk: scale(s.atk, 0.90) }) },
+    { note: "HP+12% / 速度-4%", apply: (s) => ({ ...s, hp: scale(s.hp, 1.12), spd: scale(s.spd, 0.96) }) },
+  ],
+  // 電気は手数。速く動くか、外さなくなるか
+  ELECTRIC: [
+    { note: "速度+6% / HP-10%", apply: (s) => ({ ...s, spd: scale(s.spd, 1.06), hp: scale(s.hp, 0.90) }) },
+    { note: "命中+8% / 防御-10%", apply: (s) => ({ ...s, accuracy: Math.min(1, s.accuracy + 0.08), def: scale(s.def, 0.90) }) },
+  ],
+  // 木は粘り。HPで受けるか、防御で受けるか
+  GRASS: [
+    { note: "HP+14% / 攻撃-10%", apply: (s) => ({ ...s, hp: scale(s.hp, 1.14), atk: scale(s.atk, 0.90) }) },
+    { note: "防御+12% / 攻撃-8%", apply: (s) => ({ ...s, def: scale(s.def, 1.12), atk: scale(s.atk, 0.92) }) },
+  ],
+  /*
+   * 光と闇は会心のまま。**依頼は「火水木電気で上がるものが決まっているのがつまらない」**で、
+   * ここは名指しされていない。加えて会心は `tests/secondaryStatsFinal.test.ts` が
+   * CR15〜23% / CD150〜170% に平準化しており、素の上限(CR20% / CD165%)から
+   * 動かせる幅が +3% / +5% しかない。大きく振ると範囲を割る。
+   */
+  LIGHT: [
+    { note: "クリ率+3% / 防御-6%", apply: (s) => ({ ...s, criRate: Math.min(1, s.criRate + 0.03), def: scale(s.def, 0.94) }) },
+    { note: "命中+7% / HP-6%", apply: (s) => ({ ...s, accuracy: Math.min(1, s.accuracy + 0.07), hp: scale(s.hp, 0.94) }) },
+  ],
+  DARK: [
+    { note: "クリダメ+5% / HP-5%", apply: (s) => ({ ...s, criDmg: s.criDmg + 0.05, hp: scale(s.hp, 0.95) }) },
+    { note: "攻撃+10% / 防御-12%", apply: (s) => ({ ...s, atk: scale(s.atk, 1.10), def: scale(s.def, 0.88) }) },
+  ],
 };
+
+/**
+ * どの型を使うかを、テンプレートIDと属性から決める。
+ *
+ * **乱数は使わない。**同じモンスターを何度見ても同じ型になること、
+ * セーブに何も持たなくてよいことの両方が要る。
+ */
+export function elementFlavorIndexOf(templateId: string, element: Element, count: number): number {
+  /*
+   * **最後にビットを混ぜてから剰余を取る。**
+   *
+   * ここは2回間違えた。`hash * 31 + code` も FNV-1a も、掛ける数が奇数なので
+   * **最下位ビットが全文字コードの最下位ビットのXORのまま**になる。
+   * 型が2つだと剰余2、つまり最下位ビットしか見ないので、
+   * 「FIREとGRASSは必ず同じ型、WATERとELECTRICは必ず同じ型」という並びになり、
+   * 表を出すと全モンスターが2グループに分かれるだけだった
+   * (属性ごとに変える、という狙いがまるごと外れていた)。
+   *
+   * 剰余を取る前に上位ビットを下位へ折り返す(murmur3 の仕上げと同じ形)。
+   * `tests/elementFlavor.test.ts` が、実際に属性ごとに割れているかを見張る。
+   */
+  const key = `${templateId}_${element}`;
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i += 1) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 2246822507) >>> 0;
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 3266489909) >>> 0;
+  hash ^= hash >>> 16;
+  return (hash >>> 0) % count;
+}
+
+/** そのモンスターに掛かる属性補正。図鑑やテストから中身を説明できるよう note も返す */
+export function elementStatFlavorOf(templateId: string, element: Element): ElementStatFlavor {
+  const flavors = ELEMENT_STAT_FLAVORS[element];
+  return flavors[elementFlavorIndexOf(templateId, element, flavors.length)];
+}
 
 /**
  * 既存の弱いスキルだけを対象にした2026-09-01の底上げ。
@@ -333,7 +435,7 @@ function pickSkillVariant(variants: Skill[], element: Element, groupOffset: numb
 }
 
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
-  const flavoredStats = ELEMENT_STAT_FLAVOR[element](cloneStats(template.baseStats));
+  const flavoredStats = elementStatFlavorOf(template.templateId, element).apply(cloneStats(template.baseStats));
   const assignment = template.skillAssignment?.[element];
   const skill2 = applyLegacySkillBalance(
     template.skill2Variants[assignment?.skill2 ?? -1] ?? pickSkillVariant(template.skill2Variants, element, 0),

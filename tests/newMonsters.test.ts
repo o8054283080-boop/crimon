@@ -7,7 +7,7 @@ import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterIn
 import { BattleEngine } from "../src/battle/engine.js";
 import { applyStatus, createBattleUnit, hasAnyBuff, stealBuffs, stripBuffs } from "../src/battle/unit.js";
 import { creatableSkills, applyMonsterCreate } from "../src/game/monsterCreate.js";
-import { findMonster, findMonsterById, NEW_MONSTERS_DEX } from "../src/data/monsters.js";
+import { findMonster, findMonsterById, NEW_MONSTERS_DEX, MONSTER_TEMPLATES } from "../src/data/monsters.js";
 import {
   MUSHROON, SHELLTURTLE, KOBOLD, BASILISK, MIMIC, VALKYRIA, THUNDERBEAST,
   ABYSSREAPER, FENRIR, CHRONOS, BEHEMOTH, NEW_MONSTER_TEMPLATES,
@@ -455,7 +455,14 @@ describe("既存モンスターを触っていない", () => {
     // 変えていないことの証拠を1件だけ残す。全件は既存テストが見張っている
     const nemesis = findMonster("nemesis", "DARK")!;
     expect(nemesis.skills.map((s) => s.id)).toEqual(["nemesis_s1", "nemesis_s2_c", "nemesis_s3_dark"]);
-    expect(findMonster("slime", "FIRE")!.stats.atk).toBe(132);
+    /*
+     * **属性補正の後ではなく、テンプレートの素の値で見る。**
+     * ここで見たいのは「11種を足した時に既存を触っていないか」であって、
+     * 属性補正(`ELEMENT_STAT_FLAVORS`)は別の話。あちらはモンスターごとに
+     * 型が変わるので、色違いの実効値で固定すると、属性補正を触るたびに
+     * 無関係のこのテストが落ちる。
+     */
+    expect(MONSTER_TEMPLATES.find((t) => t.templateId === "slime")!.baseStats.atk).toBe(120);
   });
 });
 
