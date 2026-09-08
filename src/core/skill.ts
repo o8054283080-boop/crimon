@@ -152,6 +152,11 @@ export const SCALE_REFERENCE: Record<"spd" | "def" | "hp", number> = {
 };
 
 export interface DamageEffect {
+  critDamageBonus?: number;
+  currentHpBonus?: number;
+  fullHpBonus?: number;
+  debuffIgnoreDefense?: { count: number; ratio: number };
+  perHitEffects?: SkillEffect[];
   kind: "DAMAGE";
   /** ATK に対する倍率。属性相性・防御力で更に補正される */
   multiplier: number;
@@ -210,7 +215,7 @@ export interface HealEffect {
    * healRateの基準にする値。省略時(undefined)は対象の最大HPに対する割合。
    * "atk"/"def"を指定すると、施術者(スキルの使い手)の攻撃力/防御力に対する割合になる。
    */
-  scaleStat?: "atk" | "def";
+  scaleStat?: "atk" | "def" | "hp";
   /** scaleStat省略時は対象の最大HPに対する割合、指定時は施術者のその能力値に対する割合 */
   healRate: number;
   /**
@@ -466,6 +471,7 @@ export interface CoopAttackEffect {
  * ボス側の強化を剥がす役が攻略の要になっている)。
  */
 export interface StripEffect {
+  requires?: EffectCondition;
   kind: "STRIP";
   /** この効果が発動を試みる基礎確率(0-1) */
   chance?: number;
@@ -544,6 +550,7 @@ export interface BlindEffect {
 
 /** 毒: 1スタックにつき、対象の手番開始時に最大HPのdamageRatePerStack分のダメージを受ける(最大5スタックまで重複) */
 export interface PoisonEffect {
+  requires?: EffectCondition;
   kind: "POISON";
   damageRatePerStack: number;
   durationTurns: number;
@@ -558,6 +565,10 @@ export interface PoisonEffect {
 }
 
 export type SkillEffect =
+  | { kind: "CURSE"; chance: number }
+  | { kind: "DETONATE_CURSES" }
+  | { kind: "CONVERT_CURSES"; chance: number }
+  | { kind: "DAMAGE_BOOST"; amount: number; durationTurns: number; applyTo?: EffectApplyTo }
   | DamageEffect
   | HealEffect
   | LifestealEffect
@@ -585,6 +596,11 @@ export type SkillEffect =
   | GaugeOnHitEffect;
 
 export interface Skill {
+  /** 個別成長。各レベルの完成値を持ち、一律成長は適用しない。 */
+  levelOverrides?: readonly { effects: SkillEffect[]; cooldownTurns: number }[];
+  extraTurn?: boolean;
+  resetCooldownOnKill?: boolean;
+  gaugeIfThreeEnemies?: number;
   /** 指定レベル到達時の個別性能。通常成長のあとに適用する。 */
   maxLevelOverride?: { effects?: SkillEffect[]; cooldownTurns?: number };
   id: string;
@@ -733,6 +749,7 @@ export function computeLeveledSkill(skill: Skill, level: number): Skill {
    */
   if (skill.passive) return { ...skill, passiveLevel: clampedLevel };
   if (skill.automatic) return skill;
+  if (skill.levelOverrides) return { ...skill, ...JSON.parse(JSON.stringify(skill.levelOverrides[clampedLevel - 1])) };
   if (clampedLevel === 1) return skill;
 
   const growth = powerGrowthFactor(clampedLevel, skill.cooldownTurns === 0);
@@ -872,6 +889,10 @@ function conditionPrefix(condition: EffectCondition | undefined): string {
 /** UI表示用に、スキル効果1件を短い日本語テキストに変換する */
 export function describeSkillEffect(effect: SkillEffect): string {
   switch (effect.kind) {
+    case "CURSE": return `${Math.round(effect.chance * 100)}%で呪い1個(対象の2回目のターン開始時、付与時攻撃力×4の固定ダメージと1ターンスタン)`;
+    case "DETONATE_CURSES": return "対象の呪いをすべて即時発動";
+    case "CONVERT_CURSES": return `${Math.round(effect.chance * 100)}%で対象の強化をすべて呪いへ変換。成功時1ターンスタン`;
+    case "DAMAGE_BOOST": return `与ダメージ+${Math.round(effect.amount * 100)}%(${effect.durationTurns}ターン)`;
     case "DAMAGE": {
       const scaleText = effect.scaleBonus
         ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
@@ -903,11 +924,19 @@ export function describeSkillEffect(effect: SkillEffect): string {
       const critGaugeText = effect.gaugeOnCritPerHit
         ? ` 各ヒットのクリティカルで自身の行動ゲージ+${Math.round(effect.gaugeOnCritPerHit * 100)}%`
         : "";
+      const special = [
+        effect.critDamageBonus ? `会心時の最終ダメージ+${effect.critDamageBonus * 100}%` : '',
+        effect.currentHpBonus ? `対象の現在HP割合が高いほど最終ダメージ上昇(最大+${effect.currentHpBonus * 100}%)` : '',
+        effect.fullHpBonus ? `対象HP100%で最終ダメージ+${effect.fullHpBonus * 100}%` : '',
+        effect.debuffIgnoreDefense ? `弱体${effect.debuffIgnoreDefense.count}個以上で防御${effect.debuffIgnoreDefense.ratio * 100}%無視` : '',
+        effect.perHitEffects ? `各ヒットごとに: ${effect.perHitEffects.map(describeSkillEffect).join('、')}` : '',
+      ].filter(Boolean).join('。');
       const requiresText = conditionPrefix(effect.requires);
-      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${critGaugeText}`;
+      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${critGaugeText}${special ? `。${special}` : ""}`;
     }
     case "HEAL": {
       const who = effect.applyTo === "SELF" ? "自身を" : effect.applyTo === "ALLIES" ? "味方全体を" : "";
+      if (effect.scaleStat === "hp") return `${who}回復 術者の最大HPの${Number((effect.healRate * 100).toFixed(2))}%`;
       if (effect.scaleStat === "atk") return `${who}回復 自身の攻撃力の${(effect.healRate * 100).toFixed(0)}%`;
       if (effect.scaleStat === "def") return `${who}回復 自身の防御力の${(effect.healRate * 100).toFixed(0)}%`;
       return `${who}回復 最大HPの${(effect.healRate * 100).toFixed(1)}%`;
@@ -964,8 +993,8 @@ export function describeSkillEffect(effect: SkillEffect): string {
     }
     case "STRIP":
       return effect.count === undefined
-        ? `${chanceSuffix(effect.chance)}有利な効果(シールド・無効・能力上昇)を解除`
-        : `${chanceSuffix(effect.chance)}有利な効果を${effect.count}個解除`;
+        ? `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}有利な効果(シールド・無効・能力上昇)を解除`
+        : `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}有利な効果を${effect.count}個解除`;
     case "STEAL_BUFF":
       return `${chanceSuffix(effect.chance)}有利な効果を${effect.count ?? 1}個奪って自身に付与`;
     case "MITIGATE": {
@@ -999,7 +1028,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "POISON": {
       const stacks = effect.stacks && effect.stacks > 1 ? `${effect.stacks}スタック` : "1スタック";
       const extra = effect.extraStacksIfPoisoned ? ` (既に毒状態ならさらに${effect.extraStacksIfPoisoned}スタック)` : "";
-      return `${chanceSuffix(effect.chance)}毒${stacks} (1スタックにつき最大HPの${Math.round(effect.damageRatePerStack * 100)}%、最大5スタック、${effect.durationTurns}ターン)${extra}`;
+      return `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}毒${stacks} (1スタックにつき最大HPの${Math.round(effect.damageRatePerStack * 100)}%、最大5スタック、${effect.durationTurns}ターン)${extra}`;
     }
   }
 }
@@ -1010,5 +1039,9 @@ export function describeSkillEffect(effect: SkillEffect): string {
  */
 export function describeSkillLines(skill: Skill): string[] {
   if (skill.passive) return [describePassiveLevel(passiveAtLevel(skill.passive, skill.passiveLevel ?? 1))];
-  return skill.effects.map(describeSkillEffect);
+  return [...skill.effects.map(describeSkillEffect),
+    ...(skill.extraTurn ? ['使用後、即時に追加ターンを獲得'] : []),
+    ...(skill.resetCooldownOnKill ? ['このスキルで1体以上倒すと、このスキルのCTを全回復'] : []),
+    ...(skill.gaugeIfThreeEnemies ? [`敵が3体以上いる時、自身の行動ゲージ+${skill.gaugeIfThreeEnemies * 100}%`] : []),
+  ];
 }

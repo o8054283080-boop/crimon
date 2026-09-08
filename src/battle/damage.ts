@@ -76,7 +76,9 @@ export function adaptationMultiplier(attacker: BattleUnit, defender: BattleUnit)
 }
 
 export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit, skillBonus = 0): number {
-  const rate = getEffectiveStat(attacker, "criRate")
+  const weak = passiveEffectOf(attacker);
+  const conditionalCrit = weak?.kind === "WEAK_POINT" && defender.currentHp / defender.maxHp <= weak.hpRatio ? weak.critRate : 0;
+  const rate = conditionalCrit + getEffectiveStat(attacker, "criRate")
     + skillBonus
     + (hasStatus(defender, "CRIT_RATE_UP") ? 0.5 : 0)
     - (hasStatus(defender, "CRIT_RATE_DOWN") ? 0.3 : 0);
@@ -100,8 +102,11 @@ export function calcDamage(
    * **足すのではなく大きい方を取る**——重ねると、防御役が
    * どれだけ積んでも意味を持たない相手が出来てしまう。
    */
+  const weak = passiveEffectOf(attacker);
+  const weakActive = weak?.kind === "WEAK_POINT" && defenderRatio <= weak.hpRatio;
+  const debuffIgnore = effect.debuffIgnoreDefense && countDebuffs(defender) >= effect.debuffIgnoreDefense.count ? effect.debuffIgnoreDefense.ratio : 0;
   const ratio = Math.max(0, Math.min(1, Math.max(
-    effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0, attacker.deathBoostDefenseIgnore ?? 0,
+    effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0, attacker.deathBoostDefenseIgnore ?? 0, debuffIgnore, weakActive ? weak.ignore : 0,
   )));
   const def = getEffectiveStat(defender, "def") * (1 - ratio);
 
@@ -125,9 +130,7 @@ export function calcDamage(
   // ベヒモスの「古代巨獣」は、HPが減るほど最大HP比例のダメージが伸びる
   const hpDamageBonus = effect.hpCoefficient !== undefined ? passiveHpDamageBonus(attacker) : 0;
   const coefficient = (effect.hpCoefficient ?? effect.defCoefficient ?? 0) * (1 + hpDamageBonus);
-  const debuffCount = defender.effects.filter((e) => e.kind === "DEBUFF").length
-    + defender.statusEffects.filter((e) => e.category === "DEBUFF").length
-    + Number(defender.poisonStacks > 0) + Number(defender.healBlockTurns > 0) + Number(defender.stunTurns > 0);
+  const debuffCount = countDebuffs(defender);
   const debuffBonus = effect.debuffDamageBonus
     ? Math.min(effect.debuffDamageBonus.maxBonus, debuffCount * effect.debuffDamageBonus.perDebuff) : 0;
 
@@ -136,7 +139,9 @@ export function calcDamage(
    * **足し算でまとめてから1度だけ掛ける。** 掛け算で重ねると、条件が2つ揃った時に
    * 想定の倍以上へ跳ねる(HP30%以下の相手に処刑技を撃った時が実際にそうなった)。
    */
-  let finalBonus = effect.finalDamageBonus ?? 0;
+  let finalBonus = (effect.finalDamageBonus ?? 0) + (effect.currentHpBonus ?? 0) * defenderRatio + (defenderRatio >= 1 ? effect.fullHpBonus ?? 0 : 0);
+  if (prey?.kind === "REBIRTH") finalBonus += prey.damage * defenderRatio;
+  if (prey?.kind === "ILLUSION" && ["LIGHT", "DARK"].includes(defender.def.element)) finalBonus += .5;
   const hpTier = [...(effect.targetHpBonus ?? [])]
     .sort((a, b) => a.hpRatio - b.hpRatio)
     .find((tier) => defenderRatio <= tier.hpRatio);
@@ -165,7 +170,7 @@ export function calcDamage(
   const elementMultiplier = getElementMultiplier(attacker.def.element, defender.def.element);
 
   const isCrit = rng() < getFinalCritRate(attacker, defender, effect.critRateBonus ?? 0);
-  const critMultiplier = isCrit ? getEffectiveStat(attacker, "criDmg") : 1;
+  const critMultiplier = isCrit ? (getEffectiveStat(attacker, "criDmg") + (weakActive ? weak.critDmg : 0)) * (1 + (effect.critDamageBonus ?? 0)) : 1;
 
   const dealtMultiplier = (attacker.def.combatMods?.damageDealtMultiplier ?? 1)
     // 高揚支援。**掛かっている間だけ**乗る
@@ -177,7 +182,9 @@ export function calcDamage(
   // 軽減・パッシブによる被ダメージ減はここでは掛けない。
   // 無敵・シールド・かばうと同じ場所(applyIncomingDamage)で1度だけ掛ける
 
-  const rawDamage = afterDefense * elementMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
+  const defensePassive = passiveEffectOf(defender);
+  const critReduction = isCrit && defensePassive?.kind === "CHEAT" ? 1 - defensePassive.reduction : 1;
+  const rawDamage = critReduction * afterDefense * elementMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
   const damage = roundNormalDamage(rawDamage);
 
   return { damage, isCrit, affinity };

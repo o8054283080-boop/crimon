@@ -1,3 +1,4 @@
+import { SCORPION, HARPY, PHOENIX, JOKER } from "./newMonsters/fourSpecies.js";
 import { MonsterTemplate, createAllVariants } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
 import { setCreatedSkillResolver } from "../core/monsterInstance.js";
@@ -1862,11 +1863,11 @@ export const ALL_MONSTER_TEMPLATES: MonsterTemplate[] = [
  */
 
 /** 星3の抽選対象。既存8種 + 今回の3種 */
-export const GACHA_STAR3_TEMPLATES: MonsterTemplate[] = [...MONSTER_TEMPLATES, ...NEW_STAR3_TEMPLATES];
+export const GACHA_STAR3_TEMPLATES: MonsterTemplate[] = [...MONSTER_TEMPLATES, ...NEW_STAR3_TEMPLATES, SCORPION];
 /** 星4の抽選対象。既存2種 + 今回の4種 */
-export const GACHA_STAR4_TEMPLATES: MonsterTemplate[] = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, ...NEW_STAR4_TEMPLATES];
+export const GACHA_STAR4_TEMPLATES: MonsterTemplate[] = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, ...NEW_STAR4_TEMPLATES, HARPY];
 /** 星5の抽選対象。既存2種 + 今回の4種 */
-export const GACHA_STAR5_TEMPLATES: MonsterTemplate[] = [GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE, ...NEW_STAR5_TEMPLATES];
+export const GACHA_STAR5_TEMPLATES: MonsterTemplate[] = [GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE, ...NEW_STAR5_TEMPLATES, PHOENIX, JOKER];
 
 export const GACHA_SR_COMMON_DEX = createAllVariants(GRIFFON);
 export const GACHA_SSR_COMMON_DEX = createAllVariants(DRAGON);

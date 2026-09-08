@@ -276,6 +276,7 @@ interface StageRunState {
   originalPartyIds: string[];
   currentPartyInstances: MonsterInstance[];
   carryHp: Map<string, number> | null;
+  carrySkyStacks?: Map<string, number>;
   goldEarned: number;
   wavesCleared: number;
   manualStartedAt: number;
@@ -1744,13 +1745,14 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
     const difficulty = job.difficulty ?? "NORMAL";
     let alive = party;
     let hp: Map<string, number> | null = null;
+    let skyStacks = new Map<string, number>();
     let waves = 0;
     for (const wave of stage.waves) {
       const setup = setupWaveBattle(alive, hp, wave, state.player.equipment, difficulty);
-      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp });
+      const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp, initialSkyStacks: alive.map(m => skyStacks.get(m.id) ?? 0) });
       if (engine.run().winner !== "PLAYER") return { won: false, waves, extraGold: waves * stageWaveGold(stage, difficulty) };
       const survivors = extractSurvivors(engine, alive);
-      alive = survivors.survivorInstances; hp = survivors.survivorHp; waves += 1;
+      alive = survivors.survivorInstances; hp = survivors.survivorHp; skyStacks = survivors.survivorSkyStacks; waves += 1;
     }
     return { won: true, waves, extraGold: waves * stageWaveGold(stage, difficulty) };
   }
@@ -2971,7 +2973,7 @@ function renderCurrentWaveBattle(): BattleViewHandle {
 
   const wave = run.stage.waves[run.waveIndex];
   const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave, state.player.equipment, run.difficulty);
-  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp });
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp, initialSkyStacks: run.currentPartyInstances.map(m => run.carrySkyStacks?.get(m.id) ?? 0) });
   const isLastWave = run.waveIndex >= run.stage.waves.length - 1;
   const difficultySuffix = run.difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[run.difficulty]}]`;
 
@@ -2994,10 +2996,11 @@ function renderCurrentWaveBattle(): BattleViewHandle {
     },
     onFinish: (winner) => {
       if (winner === "PLAYER") {
-        const { survivorInstances, survivorHp } = extractSurvivors(engine, run.currentPartyInstances);
+        const { survivorInstances, survivorHp, survivorSkyStacks } = extractSurvivors(engine, run.currentPartyInstances);
         run.goldEarned += stageWaveGold(run.stage, run.difficulty);
         run.wavesCleared += 1;
         run.carryHp = survivorHp;
+        run.carrySkyStacks = survivorSkyStacks;
         run.currentPartyInstances = survivorInstances;
         if (isLastWave) {
           finishStage(true);

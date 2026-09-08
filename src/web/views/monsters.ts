@@ -396,7 +396,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
               el("span", { className: "monster-skill-compact__effect" }, [effects.length ? effects.join(" / ") : "効果データなし"]),
             ]),
             el("div", { className: "monster-skill-compact__full" }, [
-              el("p", {}, [skill.description || "説明未登録"]),
+              ...(!skill.levelOverrides && skill.description ? [el("p", {}, [skill.description])] : []),
               el("p", {}, [effects.length ? effects.join(" / ") : "効果データなし"]),
             ]),
           ]);

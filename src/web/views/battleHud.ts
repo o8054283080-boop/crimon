@@ -142,6 +142,7 @@ export function buildStatusChips(snapshot: UnitSnapshot): HTMLElement[] {
   if (snapshot.burnTurns > 0) {
     chips.push(buildChip("burn", CHIP_GLYPH.burn, String(snapshot.burnTurns), `${CHIP_LABEL.burn}(残り${snapshot.burnTurns}ターン)`));
   }
+  if (snapshot.curseCount) chips.push(buildChip("debuff", "呪", String(snapshot.curseCount), `呪い${snapshot.curseCount}個(次の発動まで${snapshot.curseNextTurns}ターン)`));
   if (snapshot.poisonStacks > 0) {
     chips.push(
       buildChip("poison", CHIP_GLYPH.poison, `${snapshot.poisonStacks}`, `毒 ${snapshot.poisonStacks}重(残り${snapshot.poisonTurns}ターン)`),

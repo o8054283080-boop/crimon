@@ -455,7 +455,7 @@ export function createMonsterVariant(template: MonsterTemplate, element: Element
     color: ELEMENT_COLOR[element],
     role: template.role,
     emoji: template.emoji,
-    stats: flavoredStats,
+    stats: template.templateId === "phoenix" && element === "DARK" ? { ...flavoredStats, atk: 160, def: 65 } : flavoredStats,
     skills: [applyLegacySkillBalance(template.skill1), skill2, skill3],
     bossTraits: template.bossTraits,
     dexNote: template.dexNote,

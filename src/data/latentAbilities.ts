@@ -5,6 +5,7 @@ import { setLatentAbilityResolver } from "../core/monsterInstance.js";
 
 const ELEMENT_LABEL: Record<string, string> = { FIRE: "炎", WATER: "水", GRASS: "翠", ELECTRIC: "雷", LIGHT: "光", DARK: "闇" };
 const SPECIES_LABEL: Record<string, string> = {
+  scorpion: "スコーピオン", harpy: "ハーピー", phoenix: "フェニックス", joker: "ジョーカー",
   slime: "スライム", wolf: "ウルフ", golem: "ゴーレム", fairy: "フェアリー", imp: "インプ", wisp: "ウィスプ",
   treant: "トレント", knight: "ナイト", griffon: "グリフォン", dragon: "ドラゴン", seraph: "セラフ", nemesis: "ネメシス",
 };

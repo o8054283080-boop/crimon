@@ -17,7 +17,7 @@ export function renderSkillRows(skills: readonly Skill[], levels?: readonly numb
         el("span", { className: "skill-row__name" }, [nameText]),
         el("span", { className: "skill-row__cooldown" }, [leveled.cooldownTurns > 0 ? `CT ${leveled.cooldownTurns}ターン` : "CTなし"]),
       ]),
-      el("div", { className: "skill-row__desc" }, [skill.description]),
+      ...(!skill.levelOverrides ? [el("div", { className: "skill-row__desc" }, [skill.description])] : []),
       el(
         "div",
         { className: "skill-row__effects" },
@@ -32,7 +32,7 @@ const GROWTH_PREVIEW_LEVELS = [1, 4, 5] as const;
 
 export function renderSkillGrowthRows(skills: readonly Skill[]): HTMLElement[] {
   return skills.map((skill, i) => {
-    const previewRows = GROWTH_PREVIEW_LEVELS.map((level) => {
+    const previewRows = (skill.levelOverrides ? [1, 2, 3, 4, 5] : GROWTH_PREVIEW_LEVELS).map((level) => {
       const leveled = computeLeveledSkill(skill, level);
       const cooldownText = leveled.cooldownTurns > 0 ? `CT ${leveled.cooldownTurns}ターン` : "CTなし";
       const effectText = describeSkillLines(leveled).join(" / ");
@@ -46,7 +46,7 @@ export function renderSkillGrowthRows(skills: readonly Skill[]): HTMLElement[] {
 
     return el("div", { className: "skill-row" }, [
       el("div", { className: "skill-row__header" }, [el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`])]),
-      el("div", { className: "skill-row__desc" }, [skill.description]),
+      ...(!skill.levelOverrides ? [el("div", { className: "skill-row__desc" }, [skill.description])] : []),
       el("div", { className: "skill-growth" }, previewRows),
     ]);
   });

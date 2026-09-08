@@ -220,7 +220,7 @@ function renderSkills(dex: MonsterDefinition): HTMLElement {
         el("strong", {}, [`S${index + 1} ${skill.name}`]),
         el("span", {}, [skill.cooldownTurns ? `CT${skill.cooldownTurns}` : "通常"]),
       ]),
-      el("p", {}, [skill.description || "説明未登録"]),
+      ...(!skill.levelOverrides && skill.description ? [el("p", {}, [skill.description])] : []),
       el("small", {}, [describeSkillLines(skill).join(" / ") || "効果データなし"]),
     ])),
   ]);

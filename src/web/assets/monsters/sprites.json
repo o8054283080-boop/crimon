@@ -338,5 +338,29 @@
     "bodySat": 0.66,
     "bodyVal": 0.64,
     "aspect": 1.089
+  },
+  "scorpion": {
+    "bodyHue": 0.052,
+    "bodySat": 0.85,
+    "bodyVal": 0.82,
+    "aspect": 1.016
+  },
+  "harpy": {
+    "bodyHue": 0.041,
+    "bodySat": 0.74,
+    "bodyVal": 0.84,
+    "aspect": 1.016
+  },
+  "phoenix": {
+    "bodyHue": 0.054,
+    "bodySat": 0.77,
+    "bodyVal": 0.95,
+    "aspect": 0.99
+  },
+  "joker": {
+    "bodyHue": 0.981,
+    "bodySat": 0.74,
+    "bodyVal": 0.53,
+    "aspect": 1.004
   }
 }
