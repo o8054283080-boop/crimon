@@ -1,4 +1,5 @@
 import { PlayerState } from "./playerState.js";
+import { decodeSave, encodeSave } from "./saveCodec.js";
 import { parseSaveFile, serializeSaveFile } from "./saveFile.js";
 
 export const CLOUD_RECOVERY_ENDPOINT = "https://plufhhhxokqgedlyfsfz.supabase.co/functions/v1/crimon-recovery";
@@ -59,7 +60,9 @@ export function currentSaveEnvelope(storage: Pick<Storage, "getItem"> = localSto
   const raw = storage.getItem(PLAYER_STORAGE_KEY);
   if (!raw) return null;
   try {
-    const state = JSON.parse(raw) as PlayerState;
+    // 縮めた形で保存されている。**生の JSON.parse では読めない**
+    const state = decodeSave(raw);
+    if (!state) return null;
     const parsed = parseSaveFile(serializeSaveFile(state));
     return parsed.ok ? parsed.file as CloudSaveEnvelope : null;
   } catch {
@@ -177,17 +180,19 @@ export function restoreCloudSave(save: CloudSaveEnvelope, storage: Pick<Storage,
     storage.setItem(CLOUD_RESTORE_BACKUP_KEY, current);
     storage.setItem(CLOUD_RESTORE_BACKUP_AT_KEY, new Date().toISOString());
   }
-  storage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(parsed.file.state));
+  storage.setItem(PLAYER_STORAGE_KEY, encodeSave(parsed.file.state));
 }
 
 export function restoreBeforeCloudRecovery(storage: Pick<Storage, "getItem" | "setItem"> = localStorage): boolean {
   const backup = storage.getItem(CLOUD_RESTORE_BACKUP_KEY);
   if (!backup) return false;
   try {
-    const state = JSON.parse(backup) as PlayerState;
+    // 退避した控えも縮めた形。**戻す時も同じ道を通す**
+    const state = decodeSave(backup);
+    if (!state) return false;
     const parsed = parseSaveFile(serializeSaveFile(state));
     if (!parsed.ok) return false;
-    storage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(state));
+    storage.setItem(PLAYER_STORAGE_KEY, encodeSave(state));
     return true;
   } catch {
     return false;

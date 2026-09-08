@@ -4,6 +4,7 @@ import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requ
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { createDefaultTalentState } from "../core/talents.js";
+import { decodeSave, encodeSave } from "./saveCodec.js";
 import { AWAKENING_MATERIAL_LABEL } from "./shop.js";
 import { Star } from "../core/rarity.js";
 import type { ArenaDefenseSnapshot, ArenaMatchRecord } from "./arena/types.js";
@@ -713,8 +714,9 @@ export function loadPlayerState(): PlayerState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return createInitialState();
-    const parsed = JSON.parse(raw) as PlayerState;
-    if (!parsed.monsters || parsed.monsters.length === 0) return createInitialState();
+    // 縮めた形も、縮めていない昔の形も、ここが見分ける
+    const parsed = decodeSave(raw);
+    if (!parsed?.monsters || parsed.monsters.length === 0) return createInitialState();
     return normalizeState(parsed);
   } catch {
     return createInitialState();
@@ -805,7 +807,7 @@ function isQuotaError(error: unknown): boolean {
 export function savePlayerState(state: PlayerState): boolean {
   let json = "";
   try {
-    json = JSON.stringify(state);
+    json = encodeSave(state);
     localStorage.setItem(STORAGE_KEY, json);
     saveFailure = null;
     return true;
