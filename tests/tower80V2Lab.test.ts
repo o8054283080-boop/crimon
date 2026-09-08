@@ -210,13 +210,20 @@ describe("80階V2: 実際に戦わせる", () => {
      * 装備も狙う順も本番と別物になり、「ここでは動いたが測定では動いていない」
      * を見逃す。狙う順はボス集中——剥がしも強化阻害も、
      * **ボスを殴っている線でしか入らない**ことが分かっているため
+     *
+     * **1戦だと0になる項目が出る。**役割ごとの底上げでプレイヤー側が強くなり、
+     * 引きによってはボスが1手しか動かないうちに決着する。すると免疫が乗る場面
+     * そのものが来ない。ここで見たいのは勝ち負けではなく**機構が動くかどうか**
+     * なので、種を変えて5戦ぶんを合計する。1戦の引きに左右されず、
+     * かつ「まったく動いていない」なら合計も0のままになる。
      */
-    const tally = runBattle(TOWER80_V2, 20260930, ["古代聖竜"], "TYPICAL");
-    expect(tally.extra["ボス行動回数"]).toBeGreaterThan(0);
-    expect(tally.extra["免疫中の行動割合"]).toBeGreaterThan(0);
-    expect(tally.extra["S3の免疫供給"]).toBeGreaterThan(0);
-    expect(tally.extra["ボスへの剥がし回数"]).toBeGreaterThan(0);
-    expect(tally.extra["ボスへの強化阻害回数"]).toBeGreaterThan(0);
+    const keys = ["ボス行動回数", "免疫中の行動割合", "S3の免疫供給", "ボスへの剥がし回数", "ボスへの強化阻害回数"];
+    const total: Record<string, number> = {};
+    for (let i = 0; i < 5; i += 1) {
+      const extra = runBattle(TOWER80_V2, 20260930 + i * 7, ["古代聖竜"], "TYPICAL").extra;
+      for (const key of keys) total[key] = (total[key] ?? 0) + (extra[key] ?? 0);
+    }
+    for (const key of keys) expect(total[key], key).toBeGreaterThan(0);
   });
 });
 

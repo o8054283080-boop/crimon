@@ -1,0 +1,153 @@
+import type { Stats } from "./stats.js";
+
+/**
+ * プレイヤーの手持ちにだけ掛かるステータス補正。**敵には掛からない。**
+ *
+ * ## 直しているのは2つの歪み
+ *
+ * ### 1. 低い星から出るモンスターが追いつけない
+ *
+ * 同じ★6 Lv60・同じ装備で揃えても、初期★3と初期★5ではこう開いていた
+ * (アタッカーどうしの平均)。
+ *
+ *   HP 1.27倍 / 攻撃 1.55倍 / 防御 1.48倍 / **速度 1.11倍**
+ *
+ * 速度だけ差が小さいのは狙ったからではない。速度の装備は実数加算が主で
+ * 素の差が埋もれるが、攻撃は%装備が効くので**素の差がそのまま比例して残る**。
+ *
+ * ### 2. アタッカーだけ総合値が高い
+ *
+ * ★6 Lv60 の指数(HP/10 + 攻撃 + 防御 + 速度)を役割ごとに並べると、
+ * 初期★3の中だけでもこうなっていた。
+ *
+ *   アタッカー 4421 / ディフェンダー 4128 / バランス型 4011
+ *   デバッファー 3723 / サポート 3124 / **ヒーラー 2773**
+ *
+ * ヒーラーはアタッカーの63%しかない。**役割を選んだこと自体が罰**になっており、
+ * `docs/design-concept.md` の「スキルがモンスターに、いろんな場所での役割を与える」
+ * が数字の側から潰されていた。しかもヒーラーには初期★5が1体もいないので、
+ * 上の帯へ持っていく手段もない。
+ *
+ * ## なぜ図鑑の baseStats を直接上げないか
+ *
+ * **上げると敵も強くなる。**スライムやウルフはステージ1〜6章のウェーブ、
+ * 装備ダンジョンのお供、レベル上げ・ゴールドダンジョン、試練の塔1〜50階の
+ * 敵として使われている(`MONSTER_TEMPLATES` が土台になっている)。
+ * baseStats を上げれば差し引きゼロになり、**★5編成の人にだけ純粋な難化**として残る。
+ *
+ * だからここはプレイヤーの実効値を作る道(`toBattleDefinition`・一覧の戦闘力・
+ * 詳細の素の値)だけに掛ける。敵は `stageRunner` / `dungeonRunner` の別の道を
+ * 通るので、これまでどおりの強さのまま。
+ *
+ * ## 決め方
+ *
+ * 初期星ごとのアタッカー平均指数を基準に置き、役割ごとの目標比まで引き上げる。
+ *
+ *   ディフェンダー  1.05倍   守りの役が総合で劣るなら、誰も選ばない
+ *   タンク        1.02倍
+ *   バランス型      0.95倍
+ *   それ以外       0.88倍
+ *
+ * 完全に揃えないのは、**攻撃で勝つのがアタッカーの取り柄**だから。
+ * 総合で並んでも、攻撃力そのものはアタッカーが持っていく。
+ *
+ * 伸ばす先は役割の特徴を濃くする方へ配る。**攻撃力は上げない。**
+ *
+ *   ディフェンダー  防御に全部     → 「硬さ」がいちばんの取り柄になる
+ *   タンク        HP 6 : 防御 4  → 殴られ役として立ち続ける
+ *   ヒーラー       HP 5 : 防御 5  → **倒される前に回復を回せる**
+ *   サポート       HP 6 : 防御 4
+ *   デバッファー    HP 4 : 防御 6
+ *   バランス型      HP 4 : 防御 6
+ *
+ * 防御へ厚く配るのは、方式E(`src/battle/damageFormula.ts`)では
+ * `防御×1.5 ÷ (防御×1.5 + 攻撃)` が軽減率になり、★6装備をフルに固めても
+ * 2割ほどしか軽減できていなかったため。防御という数字が仕事をしていなかった。
+ */
+
+/** テンプレートIDごとの倍率。速度・会心・命中・抵抗には掛からない */
+export interface StatBoost {
+  hp: number;
+  atk: number;
+  def: number;
+}
+
+/**
+ * 倍率の表。
+ *
+ * **初期★5のアタッカー(ドラゴン・ネメシス・フェンリル)は入っていない。**
+ * ここが今の上限で、縮める差の片側だから。
+ */
+export const PLAYER_STAT_BOOST: Readonly<Record<string, StatBoost>> = {
+  // --- 初期★3 ---
+  slime: { hp: 1.24, atk: 1.24, def: 1.24 },
+  wolf: { hp: 1.24, atk: 1.24, def: 1.24 },
+  kobold: { hp: 1.24, atk: 1.24, def: 1.24 },
+  imp: { hp: 1.25, atk: 1.13, def: 1.43 },
+  mushroon: { hp: 1.13, atk: 1.13, def: 1.13 },
+  knight: { hp: 1.05, atk: 1, def: 1.11 },
+  golem: { hp: 1, atk: 1, def: 1.27 },
+  treant: { hp: 1, atk: 1, def: 1.41 },
+  shellturtle: { hp: 1, atk: 1, def: 1.56 },
+  wisp: { hp: 1.39, atk: 1, def: 1.35 },
+  fairy: { hp: 1.55, atk: 1, def: 1.80 },
+  // --- 初期★4 ---
+  griffon: { hp: 1.13, atk: 1.13, def: 1.13 },
+  thunderbeast: { hp: 1.13, atk: 1.13, def: 1.13 },
+  basilisk: { hp: 1.10, atk: 1.08, def: 1.12 },
+  mimic: { hp: 1.27, atk: 1, def: 1.34 },
+  valkyria: { hp: 1.21, atk: 1, def: 1.20 },
+  // --- 初期★5(アタッカー以外) ---
+  abyssreaper: { hp: 1.14, atk: 1, def: 1.34 },
+  behemoth: { hp: 1.28, atk: 1, def: 1.38 },
+  chronos: { hp: 1.47, atk: 1, def: 1.47 },
+};
+
+const NO_BOOST: StatBoost = { hp: 1, atk: 1, def: 1 };
+
+/**
+ * 今の星ごとの効き方。**★5から効き始め、★6で満額。**
+ *
+ * 序盤には効かせない。装備ダンジョン1階は「★3のLv上限・装備なしでは
+ * 勝てない」ところに置いてあり(`tests/equipmentDungeonBalance.test.ts`)、
+ * ここが**装備を取りに行く理由**そのものになっている。
+ * 満額を最初から掛けたとき、その勝率が実測で 12% から 100% へ飛んだ。
+ *
+ * 意味としても素直で、**育て切った人への報い**になる。
+ */
+const BOOST_RATIO_BY_STAR: Readonly<Record<number, number>> = { 5: 0.5, 6: 1 };
+
+/**
+ * そのテンプレートと今の星での倍率。
+ *
+ * 星を渡さないと満額(★6と同じ)。図鑑のように「育て切ったらどうなるか」を
+ * 見せる場所で使う。
+ */
+export function playerStatBoostOf(templateId: string | undefined, star?: number): StatBoost {
+  if (templateId === undefined) return NO_BOOST;
+  const full = PLAYER_STAT_BOOST[templateId];
+  if (full === undefined) return NO_BOOST;
+  const ratio = star === undefined ? 1 : BOOST_RATIO_BY_STAR[star] ?? 0;
+  if (ratio === 0) return NO_BOOST;
+  return {
+    hp: 1 + (full.hp - 1) * ratio,
+    atk: 1 + (full.atk - 1) * ratio,
+    def: 1 + (full.def - 1) * ratio,
+  };
+}
+
+/**
+ * HP・攻撃・防御へ倍率を掛ける。**速度と会心・命中・抵抗はそのまま。**
+ *
+ * 何も変わらないときは元のオブジェクトをそのまま返す。
+ */
+export function applyPlayerStatBoost(stats: Stats, templateId: string | undefined, star?: number): Stats {
+  const boost = playerStatBoostOf(templateId, star);
+  if (boost.hp === 1 && boost.atk === 1 && boost.def === 1) return stats;
+  return {
+    ...stats,
+    hp: Math.round(stats.hp * boost.hp),
+    atk: Math.round(stats.atk * boost.atk),
+    def: Math.round(stats.def * boost.def),
+  };
+}
