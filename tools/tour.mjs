@@ -86,6 +86,21 @@ const SCREENS = [
    * 才能覚醒を足して5つになった時に幅を詰めたら、
    * 同じ組を借りていたタイプ転生の選択肢が3列になって縦に潰れた。
    */
+  /*
+   * モンスター交換所。**選んだ状態も見る。**
+   * 実行バーは選ぶまで出ないので、空のまま検査すると
+   * 内訳の行も的の大きさも一度も測らずに通ってしまう。
+   */
+  {
+    name: "モンスター交換所", tab: "MONSTERS",
+    setup: "[...document.querySelectorAll('button')].find(b => b.textContent.includes('交換所'))?.click()",
+  },
+  {
+    name: "モンスター交換所(選んだ状態)", tab: "MONSTERS",
+    setup: "[...document.querySelectorAll('button')].find(b => b.textContent.includes('交換所'))?.click();"
+      + " await wait(300);"
+      + " [...document.querySelectorAll('.mp-send button')].find(b => b.textContent.includes('表示中をすべて選ぶ'))?.click()",
+  },
   { name: "クリエイト/スキル継承", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('SKILL')" },
   { name: "クリエイト/タイプ転生", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TYPE')" },
   { name: "クリエイト/能力付与", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('ABILITY')" },

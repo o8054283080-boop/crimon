@@ -1,0 +1,142 @@
+/*
+ * モンスター交換所。
+ *
+ * 交換の札と、送る操作を同じ画面に並べる。
+ * **どちらも position を持たない**(実行バーだけが sticky で、
+ * それは `stickyActions` 側が居場所を確保している)。
+ */
+
+.mp-owned {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 210, 63, 0.12), rgba(0, 0, 0, 0.3));
+  box-shadow: inset 0 0 0 1px rgba(255, 210, 63, 0.3);
+}
+
+.mp-owned__label {
+  color: #cbbf9e;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mp-owned__value {
+  color: #ffe8a3;
+  font-size: 1.2rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 交換品1枚。絵・説明・値段と的を1行に収める */
+.mp-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.mp-item__icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 1.5rem;
+}
+
+.mp-item__body {
+  min-width: 0;
+}
+
+.mp-item__name {
+  color: #ffe6b0;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+/*
+ * 説明は折り返して全部読ませる。1行に詰めると肝心のところが消える。
+ * **9pxを下回らせない**(`tests/cssReadability.test.ts` が落とす)。
+ */
+.mp-item__detail {
+  margin-top: 2px;
+  color: #b6ab97;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.mp-item__buy {
+  display: grid;
+  gap: 4px;
+  justify-items: stretch;
+  text-align: center;
+}
+
+.mp-item__cost {
+  color: #ffd66b;
+  font-size: 0.8rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 的は40pxを下回らせない(巡回が拾う下限) */
+.btn.mp-item__button {
+  min-width: 74px;
+  min-height: 40px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.mp-send__note {
+  margin: 0 0 4px;
+  color: #b6ab97;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.btn.mp-send__go {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 狭い端末では絵と余白を詰める。
+ *
+ * **絵を `display: none` で消してはいけない。**
+ * この並びは3列(絵・説明・値段と的)の grid なので、絵を消すと
+ * 子が2つになり、説明が1列目(auto)へ、値段と的が2列目(1fr)へずれる。
+ * 実機の360pxで**値段の列が幅0に潰れ、「750 P」と「あと750」が
+ * 右へ溢れて切れていた。**型チェックもテストも拾えない壊れ方だった。
+ */
+@media (max-width: 360px) {
+  .mp-item {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .mp-item__icon {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+
+  .mp-item__detail {
+    font-size: 0.65rem;
+  }
+
+  .btn.mp-item__button {
+    min-width: 62px;
+    padding: 6px 6px;
+    font-size: 0.72rem;
+  }
+}

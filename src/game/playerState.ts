@@ -100,6 +100,13 @@ export interface PlayerState {
   clearedAwakeningDepthFloors?: number[];
   /** 覚醒オーブの達成報酬を受取済みのID。既存報酬の受取印とは分け、後付け報酬も安全に配る */
   claimedAwakeningOrbRewardIds: string[];
+  /**
+   * モンスターポイント。余った仲間を送ると、星の数だけ貯まる。
+   *
+   * **省略可。**前から遊んでいる人の控えには無いので、読み込み時に0で埋める。
+   * 中身の意味は `src/game/monsterPoints.ts`。
+   */
+  monsterPoints?: number;
   /** プレイヤー(ファイター)自身のレベル。上限50 */
   fighterLevel: number;
   /** 次のファイターレベルまでの累積経験値 */
@@ -350,6 +357,7 @@ export function createInitialState(): PlayerState {
     awakeningStones: 0,
     clearedAwakeningDepthFloors: [],
     claimedAwakeningOrbRewardIds: [],
+    monsterPoints: 0,
     fighterLevel: 1,
     fighterExp: 0,
     stamina: INITIAL_MAX_STAMINA,
@@ -546,6 +554,9 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
   if (typeof state.fiveStarSummonScrolls !== "number") state.fiveStarSummonScrolls = 0;
   if (typeof state.awakeningOrbs !== "number") state.awakeningOrbs = 0;
+  // 前から遊んでいる人の控えには無い。0から始める
+  if (typeof state.monsterPoints !== "number" || !Number.isFinite(state.monsterPoints)) state.monsterPoints = 0;
+  state.monsterPoints = Math.max(0, Math.floor(state.monsterPoints));
   if (!Array.isArray(state.claimedAwakeningOrbRewardIds)) {
     state.claimedAwakeningOrbRewardIds = [];
     // ⑧-4A以前に条件を満たした控えにも、追加分を一度だけ追給する。

@@ -118,6 +118,8 @@ import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
 import { findMonsterById } from "../data/monsters.js";
 import { toBattleDefinition } from "../core/monsterInstance.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
+import { renderMonsterExchange } from "./views/monsterExchange.js";
+import { sendMonstersForPoints, tryExchangeMonsterPoints } from "../game/monsterPoints.js";
 import { loadMonsterListDense, saveMonsterListDense } from "./monsterListDensity.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
@@ -357,6 +359,11 @@ interface AppState {
   monsterDetailId: string | null;
   rankUpMode: boolean;
   rankUpSacrificeIds: string[];
+  /** モンスター交換所で、送るために選ばれている子 */
+  monsterExchangeIds: string[];
+  monsterExchangeFilter: MonsterFilter;
+  monsterExchangeFilterOpen: boolean;
+  monsterExchangeSortKey: MonsterSortKey;
   selectedStageId: string | null;
   selectedDifficulty: Difficulty;
   stageRun: StageRunState | null;
@@ -406,6 +413,7 @@ interface AppState {
   farmEquipmentSelling: boolean;
   /** ショップで直前に買ったものの案内。次に何か操作したら消す */
   shopNotice: string | null;
+  monsterExchangeNotice: string | null;
   /** まとめ売却の選択モード中か */
   equipmentSelecting: boolean;
   /** モンスターの装備スロットから装備詳細を開いた場合、戻る操作でこのモンスターの画面に戻るための参照 */
@@ -534,6 +542,10 @@ const state: AppState = {
   monsterDetailId: null,
   rankUpMode: false,
   rankUpSacrificeIds: [],
+  monsterExchangeIds: [],
+  monsterExchangeFilter: { ...EMPTY_MONSTER_FILTER },
+  monsterExchangeFilterOpen: false,
+  monsterExchangeSortKey: "recommended",
   selectedStageId: null,
   selectedDifficulty: "NORMAL",
   stageRun: null,
@@ -558,6 +570,7 @@ const state: AppState = {
   farmEquipmentDetailId: null,
   farmEquipmentSelling: false,
   shopNotice: null,
+  monsterExchangeNotice: null,
   equipmentSelecting: false,
   equipmentReturnMonsterId: null,
   selectedDungeonFloor: null,
@@ -853,6 +866,7 @@ function goBack(): void {
   state.monsterDetailReturn = null;
   // 場所に紐づく一時的な案内は持ち越さない。前の画面の言葉が残ると嘘になる
   state.shopNotice = null;
+  state.monsterExchangeNotice = null;
   state.createNotice = null;
   state.partyNotice = null;
   state.arenaNotice = null;
@@ -1197,6 +1211,57 @@ function handleConfirmRankUp(): void {
   savePlayerState(state.player);
   state.rankUpMode = false;
   state.rankUpSacrificeIds = [];
+  render();
+}
+
+/**
+ * まとめて送る。
+ *
+ * **保存できなければ、送らなかったことにする。**召喚と同じ形。
+ * ここで保存の失敗を素通しすると、画面の上では消えているのに
+ * 再起動すると戻ってくる(しかもポイントは消えている)状態を作る。
+ */
+function handleSendMonstersForPoints(): void {
+  const before = structuredClone(state.player.monsters);
+  const beforePoints = state.player.monsterPoints ?? 0;
+  const result = sendMonstersForPoints(state.player, state.monsterExchangeIds);
+  if (!result) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  if (!savePlayerState(state.player)) {
+    state.player.monsters = before;
+    state.player.monsterPoints = beforePoints;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  playSfx("stageClear");
+  state.monsterExchangeIds = [];
+  state.monsterExchangeNotice = `${result.sent}体を送って ${result.gained}P を受け取りました（所持 ${result.total}P）`;
+  render();
+}
+
+/** ポイントを交換する。足りない時は何も減らさない(`tryExchangeMonsterPoints` が守る) */
+function handleExchangeMonsterPoints(itemId: string): void {
+  const beforeMonsters = structuredClone(state.player.monsters);
+  const beforePoints = state.player.monsterPoints ?? 0;
+  const beforeScrolls = state.player.summonScrolls;
+  const result = tryExchangeMonsterPoints(state.player, itemId);
+  if (!result) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  if (!savePlayerState(state.player)) {
+    state.player.monsters = beforeMonsters;
+    state.player.monsterPoints = beforePoints;
+    state.player.summonScrolls = beforeScrolls;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  playSfx("stageClear");
+  state.monsterExchangeNotice = `${result.item.name}と交換しました（残り ${result.remaining}P）`;
   render();
 }
 
@@ -4096,6 +4161,49 @@ function renderScreen(): void {
       break;
     }
 
+    case "MONSTER_EXCHANGE":
+      content = renderMonsterExchange({
+        player: state.player,
+        notice: state.monsterExchangeNotice,
+        selectedIds: state.monsterExchangeIds,
+        filter: state.monsterExchangeFilter,
+        filterOpen: state.monsterExchangeFilterOpen,
+        sortKey: state.monsterExchangeSortKey,
+        dense: state.monsterListDense,
+        onBack: () => navigate("MONSTERS"),
+        onToggleSelect: (monsterId) => {
+          const index = state.monsterExchangeIds.indexOf(monsterId);
+          if (index >= 0) state.monsterExchangeIds.splice(index, 1);
+          else state.monsterExchangeIds.push(monsterId);
+          render();
+        },
+        onSelectAllShown: (monsterIds) => {
+          // 既に選んだものは残す。絞り込みを変えながら足していけるようにする
+          const already = new Set(state.monsterExchangeIds);
+          for (const id of monsterIds) if (!already.has(id)) state.monsterExchangeIds.push(id);
+          render();
+        },
+        onClearSelection: () => {
+          state.monsterExchangeIds = [];
+          render();
+        },
+        onSend: handleSendMonstersForPoints,
+        onExchange: handleExchangeMonsterPoints,
+        onChangeFilter: (filter) => {
+          state.monsterExchangeFilter = filter;
+          render();
+        },
+        onToggleFilterOpen: () => {
+          state.monsterExchangeFilterOpen = !state.monsterExchangeFilterOpen;
+          render();
+        },
+        onChangeSort: (key) => {
+          state.monsterExchangeSortKey = key;
+          render();
+        },
+      });
+      break;
+
     case "MONSTER_DEX":
       content = renderMonsterDex({
         selectedDexId: state.selectedDexEntryId,
@@ -4527,6 +4635,12 @@ function renderMonstersScreen(): HTMLElement {
     onGoMonsterDex: () => {
       state.selectedDexEntryId = null;
       state.screen = "MONSTER_DEX";
+      render();
+    },
+    onGoExchange: () => {
+      // 選択は持ち越さない。前に開いた時の選択が残っていると、そのまま送ってしまう
+      state.monsterExchangeIds = [];
+      state.screen = "MONSTER_EXCHANGE";
       render();
     },
     sortKey: state.monsterSortKey,
