@@ -61,25 +61,39 @@ describe("倍率の表", () => {
   });
 
   /*
-   * **初期★5のアタッカーは入れない。**ここが今の上限で、
-   * 「初期星の差」と「役割の差」のどちらを測るときも基準になる側だから。
+   * **基準の2体は入れない。**ここが今の上限で、
+   * 「初期星の差」と「役割の差」のどちらを測るときも 1.00 に置く側だから。
+   *
+   * 同じ初期★5のアタッカーでもフェンリルは入っている。★6 Lv60・闇属性の指数で
+   * 3891 しかなく、**初期★3の3体すべて(4311/4236/4156)に負けていた**ため。
    */
-  it("初期★5のアタッカーは1体も入っていない", () => {
-    for (const template of GACHA_STAR5_TEMPLATES) {
-      if (String(template.role) !== "アタッカー") continue;
-      expect(PLAYER_STAT_BOOST[template.templateId], template.templateId).toBeUndefined();
-    }
+  it("基準にしているドラゴンとネメシスは入っていない", () => {
+    expect(PLAYER_STAT_BOOST.dragon).toBeUndefined();
+    expect(PLAYER_STAT_BOOST.nemesis).toBeUndefined();
   });
 
-  it("攻撃を上げるのは初期星の底上げだけ。役割のために攻撃は上げない", () => {
-    // 攻撃が上がるのは、初期★3・★4のアタッカーとデバッファーだけ
+  it("攻撃を上げるのは、初期星の底上げとフェンリルだけ。役割のために攻撃は上げない", () => {
     for (const [templateId, boost] of Object.entries(PLAYER_STAT_BOOST)) {
       if (boost.atk === 1) continue;
+      if (templateId === "fenrir") continue; // ★3より弱かったので別枠で引き上げている
       const band = BAND.get(templateId);
       expect(band, templateId).toBeLessThan(5);
       const role = ALL_MONSTER_TEMPLATES.find((t) => t.templateId === templateId)!.role;
       expect(["アタッカー", "デバッファー"], `${templateId} の役割`).toContain(String(role));
     }
+  });
+
+  /*
+   * **★5として引いた意味が残っているか。**フェンリルは初期★5なのに
+   * 初期★3の3体すべてより弱かった。指摘を受けて引き上げている。
+   */
+  it("フェンリルが初期★3のアタッカーを上回っている", () => {
+    const power = (templateId: string) => ROWS.find((r) => r.templateId === templateId)!.power;
+    for (const id of ["slime", "wolf", "kobold"]) {
+      expect(power("fenrir"), `フェンリル 対 ${id}`).toBeGreaterThan(power(id));
+    }
+    // ただしドラゴン・ネメシスは超えない(基準はあくまでこの2体)
+    expect(power("fenrir")).toBeLessThan(power("dragon"));
   });
 });
 
@@ -205,6 +219,7 @@ describe("初期星の差", () => {
   it("初期★3が初期★5を攻撃力で追い越さない", () => {
     const atk = (id: string) => ROWS.find((r) => r.templateId === id)!.atk;
     const best3 = Math.max(...["slime", "wolf", "kobold"].map(atk));
-    expect(best3).toBeLessThan(Math.min(atk("dragon"), atk("nemesis")));
+    const worst5 = Math.min(...["dragon", "nemesis", "fenrir"].map(atk));
+    expect(best3).toBeLessThan(worst5);
   });
 });
