@@ -756,6 +756,18 @@ export interface SaveFailure {
   quotaExceeded: boolean;
   /** 直近で保存しようとした大きさ(バイト)。どれくらい溜まっているかを画面に出す */
   bytes: number;
+  /**
+   * ブラウザが教えてくれる保存の状況(`navigator.storage.estimate()`)。
+   *
+   * **「一杯」には2種類ある。**アプリのデータが多いのか、
+   * **端末の空き容量が無くてブラウザに割り当てられる量そのものが小さい**のか。
+   * どちらも同じ `QuotaExceededError` になるので、例外の形だけでは見分けられない。
+   *
+   * 見分けずに「装備やモンスターを整理してください」と出すと、
+   * 端末がいっぱいの人には**まったく効かない案内**になる。
+   * だから数字を出して、本人に判断してもらう。取れなければ null。
+   */
+  storage: { usage: number; quota: number } | null;
 }
 
 let saveFailure: SaveFailure | null = null;
@@ -763,6 +775,17 @@ let saveFailure: SaveFailure | null = null;
 /** 直近のセーブに失敗していれば、その中身。成功していれば null */
 export function lastSaveFailure(): SaveFailure | null {
   return saveFailure;
+}
+
+/**
+ * 保存の状況を後から書き足す。
+ *
+ * `navigator.storage.estimate()` は非同期なので、失敗した瞬間には間に合わない。
+ * 取れた時点でここへ入れて、画面を描き直す(呼ぶのは `src/web/main.ts`)。
+ */
+export function recordStorageEstimate(usage: number, quota: number): void {
+  if (!saveFailure) return;
+  saveFailure = { ...saveFailure, storage: { usage, quota } };
 }
 
 /** 保存領域が一杯だったかどうかを、例外の形から見分ける */
@@ -787,7 +810,7 @@ export function savePlayerState(state: PlayerState): boolean {
     saveFailure = null;
     return true;
   } catch (error) {
-    saveFailure = { at: Date.now(), quotaExceeded: isQuotaError(error), bytes: json.length };
+    saveFailure = { at: Date.now(), quotaExceeded: isQuotaError(error), bytes: json.length, storage: null };
     console.error("セーブに失敗しました", error);
     return false;
   }

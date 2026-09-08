@@ -271,6 +271,15 @@
     font-size: 0.65rem;
     text-overflow: ellipsis;
   }
+
+  /*
+   * **警告文は絶対に畳まない。**上の `display: none` がここまで効いていて、
+   * 360px の端末では「データを保存できていません」の題だけが残り、
+   * 何をすればいいかが1文字も出ていなかった。
+   */
+  .tutorial-bar--danger .tutorial-bar__cond > span:first-child {
+    display: block;
+  }
 }
 
 /*
@@ -311,4 +320,21 @@
 .tutorial-bar--danger .tutorial-bar__cond > span:first-child {
   overflow: visible;
   white-space: normal;
+}
+
+/*
+ * 控えを取る的は**帯の中に置く。**
+ *
+ * 文面は「ホームの『データの控え』で書き出してください」と案内できるが、
+ * 保存できていない人にとって**その道中で失われる**のが困る。押せる的を
+ * その場に置けば1タップで済む。書き出しは localStorage を使わないので、
+ * 保存に失敗している最中でも必ず動く。
+ */
+.tutorial-bar__save-act {
+  justify-self: start;
+  margin-top: 6px;
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 0.74rem;
+  white-space: nowrap;
 }
