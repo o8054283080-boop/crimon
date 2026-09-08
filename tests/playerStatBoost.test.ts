@@ -61,23 +61,18 @@ describe("倍率の表", () => {
   });
 
   /*
-   * **基準の2体は入れない。**ここが今の上限で、
-   * 「初期星の差」と「役割の差」のどちらを測るときも 1.00 に置く側だから。
-   *
-   * 同じ初期★5のアタッカーでもフェンリルは入っている。★6 Lv60・闇属性の指数で
-   * 3891 しかなく、**初期★3の3体すべて(4311/4236/4156)に負けていた**ため。
+   * **攻撃は下げない。**そのモンスターの立ち位置そのものだから。
+   * 下げてよいのは防御(攻撃上位のアタッカーを打たれ弱くする)とHPだけ。
    */
-  it("基準にしているドラゴンとネメシスは入っていない", () => {
-    expect(PLAYER_STAT_BOOST.dragon).toBeUndefined();
-    expect(PLAYER_STAT_BOOST.nemesis).toBeUndefined();
+  it("攻撃力を下げているモンスターは1体もいない", () => {
+    for (const [templateId, boost] of Object.entries(PLAYER_STAT_BOOST)) {
+      expect(boost.atk, `${templateId} の攻撃倍率`).toBeGreaterThanOrEqual(1);
+    }
   });
 
-  it("攻撃を上げるのは、初期星の底上げとフェンリルだけ。役割のために攻撃は上げない", () => {
+  it("攻撃を上げるのはアタッカーとデバッファーだけ。他の役割のために攻撃は上げない", () => {
     for (const [templateId, boost] of Object.entries(PLAYER_STAT_BOOST)) {
       if (boost.atk === 1) continue;
-      if (templateId === "fenrir") continue; // ★3より弱かったので別枠で引き上げている
-      const band = BAND.get(templateId);
-      expect(band, templateId).toBeLessThan(5);
       const role = ALL_MONSTER_TEMPLATES.find((t) => t.templateId === templateId)!.role;
       expect(["アタッカー", "デバッファー"], `${templateId} の役割`).toContain(String(role));
     }
@@ -110,8 +105,8 @@ describe("効き始める星", () => {
   });
 
   it("表に無いモンスターは何も変わらない", () => {
-    const stats = findMonsterById("dragon_FIRE")!.stats;
-    expect(applyPlayerStatBoost(stats, "dragon", 6)).toBe(stats);
+    const stats = findMonsterById("seraph_FIRE")!.stats;
+    expect(applyPlayerStatBoost(stats, "seraph", 6)).toBe(stats);
     expect(applyPlayerStatBoost(stats, undefined, 6)).toBe(stats);
   });
 
@@ -195,6 +190,22 @@ describe("役割ごとの総合値", () => {
     expect(best("def", 3).role).toBe("ディフェンダー");
     expect(best("atk", 5).role).toBe("アタッカー");
     expect(best("hp", 5).role).toBe("タンク");
+  });
+
+  /*
+   * **攻撃で勝つ代わりに打たれ弱い、がアタッカーの形。**
+   * ネメシスは攻撃1位・防御1位・速度1位・HP2位で、
+   * 「攻撃が高い代わりに」が成立していなかった。
+   */
+  it("攻撃が上位のアタッカーほど、防御は上位に来ない", () => {
+    const attackers = ROWS.filter((r) => r.role === "アタッカー");
+    const byAtk = [...attackers].sort((a, b) => b.atk - a.atk);
+    const byDef = [...attackers].sort((a, b) => b.def - a.def);
+    for (const top of byAtk.slice(0, 2)) {
+      const defRank = byDef.findIndex((r) => r.templateId === top.templateId) + 1;
+      // 攻撃1位・2位が、防御でも上位2位に入らないこと
+      expect(defRank, `${top.templateId} の防御順位`).toBeGreaterThan(2);
+    }
   });
 
   it("ヒーラーは、アタッカーの63%だったところから追いついている", () => {
