@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./playerState.js";
+import { decodeSave } from "./saveCodec.js";
 import { serializeSaveFile } from "./saveFile.js";
 import {
   CLOUD_RESTORE_BACKUP_KEY,
@@ -80,10 +81,12 @@ describe("cloud recovery", () => {
     const cloud = envelope();
     cloud.state.gold = 999;
     restoreCloudSave(cloud, storage as unknown as Storage);
+    // 退避は raw のまま丸ごと写す(形を解釈しない)ので、書いた文字列と同じになる
     expect(storage.getItem(CLOUD_RESTORE_BACKUP_KEY)).toBe(JSON.stringify(before));
-    expect(JSON.parse(storage.getItem("crimon_save_v1")!).gold).toBe(999);
+    // 書き戻しは縮めた形。**生の JSON.parse では読めない**ので decodeSave を通す
+    expect(decodeSave(storage.getItem("crimon_save_v1")!)!.gold).toBe(999);
 
     expect(restoreBeforeCloudRecovery(storage as unknown as Storage)).toBe(true);
-    expect(JSON.parse(storage.getItem("crimon_save_v1")!).gold).toBe(12345);
+    expect(decodeSave(storage.getItem("crimon_save_v1")!)!.gold).toBe(12345);
   });
 });
