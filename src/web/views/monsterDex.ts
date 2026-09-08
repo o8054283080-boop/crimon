@@ -1,7 +1,9 @@
 import { ELEMENT_COLOR, ELEMENT_JA } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { describeSkillLines } from "../../core/skill.js";
-import { formatExtraStatLines } from "../../core/stats.js";
+import { Stats, formatExtraStatLines } from "../../core/stats.js";
+import { computeEffectiveStats } from "../../core/rarity.js";
+import { applyPlayerStatBoost } from "../../core/playerStatBoost.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import { GACHA_ONLY_TEMPLATE_IDS, MATERIAL_TEMPLATE_IDS, MONSTER_DEX_ENTRIES } from "../../data/monsters.js";
 import {
@@ -168,6 +170,48 @@ function statTile(label: string, value: string | number): HTMLElement {
   return el("div", { className: "monster-dex-detail__stat" }, [el("span", {}, [label]), el("strong", {}, [String(value)])]);
 }
 
+/**
+ * 図鑑に出す2つの見方。
+ *
+ * **Lv1の基礎値だけでは、育てた後の姿が分からなかった。**
+ * 図鑑は「引く前に決める」ための場所なので、育て切ったらどうなるかが
+ * いちばん知りたいことになる。
+ *
+ * ★6 Lv60 の側には `playerStatBoost` を満額で掛ける。手持ちの★6と
+ * 同じ値になるので、図鑑で見た数字と一覧で見る数字が食い違わない。
+ * (`applyPlayerStatBoost` は星を渡さないと満額になる。この場面のための引数)
+ */
+type DexStatView = "BASE" | "MAX";
+
+const DEX_STAT_VIEW_LABEL: Record<DexStatView, string> = {
+  BASE: "Lv1",
+  MAX: "★6 Lv60",
+};
+
+const DEX_STAT_VIEW_NOTE: Record<DexStatView, string> = {
+  BASE: "表示値はLv1の基礎値です。入手先は召喚・各ステージの報酬をご確認ください。",
+  MAX: "★6 Lv60・装備なしの値です。装備と育成でここからさらに伸びます。",
+};
+
+/** 画面をまたいで覚えておく。開くたびにLv1へ戻ると、比べ歩くときに毎回押し直しになる */
+let dexStatView: DexStatView = "BASE";
+
+function dexStatsOf(dex: MonsterDefinition, view: DexStatView): Stats {
+  if (view === "BASE") return dex.stats;
+  return applyPlayerStatBoost(computeEffectiveStats(dex.stats, 6, 60), dex.templateId);
+}
+
+function statTilesFor(dex: MonsterDefinition, view: DexStatView): HTMLElement[] {
+  const stats = dexStatsOf(dex, view);
+  return [
+    statTile("HP", stats.hp), statTile("攻撃", stats.atk), statTile("防御", stats.def), statTile("速度", stats.spd),
+    ...formatExtraStatLines(stats).map((line) => {
+      const [label, ...value] = line.split(" ");
+      return statTile(label, value.join(" "));
+    }),
+  ];
+}
+
 function renderSkills(dex: MonsterDefinition): HTMLElement {
   return el("section", { className: "monster-dex-detail__panel monster-dex-detail__skills" }, [
     el("h2", {}, ["スキル"]),
@@ -199,7 +243,31 @@ function renderLatents(dex: MonsterDefinition): HTMLElement {
 
 function renderDetail(props: MonsterDexProps, dex: MonsterDefinition): HTMLElement {
   const index = MONSTER_DEX_ENTRIES.indexOf(dex);
-  const extraStats = formatExtraStatLines(dex.stats);
+
+  const statsSection = el("section", { className: "monster-dex-detail__stats", "aria-label": "基礎ステータス" },
+    statTilesFor(dex, dexStatView));
+  const note = el("p", { className: "monster-dex-detail__note" }, [DEX_STAT_VIEW_NOTE[dexStatView]]);
+  const chips: HTMLButtonElement[] = [];
+  const applyView = (view: DexStatView): void => {
+    dexStatView = view;
+    statsSection.replaceChildren(...statTilesFor(dex, view));
+    note.textContent = DEX_STAT_VIEW_NOTE[view];
+    for (const chip of chips) chip.classList.toggle("slot-filter-chip--active", chip.dataset.view === view);
+  };
+  const statSwitch = el("div", { className: "monster-dex-detail__stat-switch" }, [
+    el("span", { className: "monster-dex-detail__stat-switch-label" }, ["ステータス"]),
+    ...(["BASE", "MAX"] as DexStatView[]).map((view) => {
+      const chip = el("button", {
+        type: "button",
+        className: `slot-filter-chip${dexStatView === view ? " slot-filter-chip--active" : ""}`,
+        "data-view": view,
+        onclick: () => applyView(view),
+      }, [DEX_STAT_VIEW_LABEL[view]]) as HTMLButtonElement;
+      chips.push(chip);
+      return chip;
+    }),
+  ]);
+
   return el("div", { className: "screen monster-dex monster-dex-detail" }, [
     el("header", { className: "monster-dex-detail__top" }, [
       el("button", { type: "button", className: "btn btn--ghost monster-dex-detail__back", onclick: () => props.onSelectEntry(null) }, ["‹ 一覧"]),
@@ -223,15 +291,13 @@ function renderDetail(props: MonsterDexProps, dex: MonsterDefinition): HTMLEleme
       el("h2", {}, ["このモンスターについて"]),
       el("p", {}, [dex.dexNote]),
     ]) : null,
-    el("section", { className: "monster-dex-detail__stats", "aria-label": "基礎ステータス" }, [
-      statTile("HP", dex.stats.hp), statTile("攻撃", dex.stats.atk), statTile("防御", dex.stats.def), statTile("速度", dex.stats.spd),
-      ...extraStats.map((line) => { const [label, ...value] = line.split(" "); return statTile(label, value.join(" ")); }),
-    ]),
+    statSwitch,
+    statsSection,
     el("div", { className: "monster-dex-detail__columns" }, [renderSkills(dex), renderLatents(dex)]),
     el("details", { className: "monster-dex-detail__growth" }, [
       el("summary", {}, ["スキルLv別の変化を見る"]), ...renderSkillGrowthRows(dex.skills),
     ]),
-    el("p", { className: "monster-dex-detail__note" }, ["表示値はLv1の基礎値です。入手先は召喚・各ステージの報酬をご確認ください。"]),
+    note,
   ].filter((node): node is HTMLElement => node !== null));
 }
 

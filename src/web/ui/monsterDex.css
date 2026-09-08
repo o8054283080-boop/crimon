@@ -58,3 +58,12 @@
   .monster-dex__grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .monster-dex-detail__columns { grid-template-columns:1fr; }
 }
+
+/*
+ * ステータスの見方を切り替える帯。
+ *
+ * **画面の流れの中に置く。**浮かせると下のタイルを覆う
+ * (この案件で3回やった事故)。並べ替えの帯と同じ札の形にしてある。
+ */
+.monster-dex-detail__stat-switch { display:flex; align-items:center; gap:5px; margin:0 0 4px; }
+.monster-dex-detail__stat-switch-label { flex:0 0 auto; color:var(--text-dim); font-size:.62rem; }
