@@ -272,3 +272,43 @@
     text-overflow: ellipsis;
   }
 }
+
+/*
+ * セーブに失敗している時の帯。
+ *
+ * **いちばん上に、赤で出す。**保存できていないことは、遊び方の案内より先に
+ * 知らせないといけない。閉じるボタンは付けない——消せる警告は消されるし、
+ * 消えている間にデータが失われる。
+ *
+ * ここも position を持たない。浮かせると下を覆う(この案件で3回やった事故)。
+ */
+.tutorial-bar--danger {
+  grid-template-columns: auto minmax(0, 1fr);
+  border-color: rgba(255, 118, 118, 0.5);
+  border-left-color: #ff6b6b;
+  background: linear-gradient(90deg, rgba(58, 22, 22, 0.94), rgba(30, 15, 15, 0.94));
+}
+
+.tutorial-bar--danger .tutorial-bar__title {
+  color: #ffb3b3;
+}
+
+.tutorial-bar--danger .tutorial-bar__badge {
+  background: rgba(255, 107, 107, 0.18);
+  border-color: rgba(255, 107, 107, 0.5);
+  font-size: 1.05rem;
+}
+
+/* 説明は折り返して全部読ませる。1行に詰めると肝心のところが消える */
+.tutorial-bar--danger .tutorial-bar__cond {
+  display: block;
+  color: #ffd9d9;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.tutorial-bar--danger .tutorial-bar__cond > span:first-child {
+  overflow: visible;
+  white-space: normal;
+}

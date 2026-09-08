@@ -91,6 +91,7 @@ import {
   normalizeLoadedState,
   removeMonsters,
   savePlayerState,
+  lastSaveFailure,
   sellEquipment,
   setEquipmentLocked,
   setMonsterLocked,
@@ -1088,8 +1089,15 @@ function handleSummon(count: number): void {
   }
   state.player.crystal -= cost;
   const results = summonMany(count);
-  for (const r of results) addMonster(state.player, r.dexId, r.star);
-  savePlayerState(state.player);
+  const added = results.map((r) => addMonster(state.player, r.dexId, r.star));
+  // 保存できないなら引けなかったことにする(理由は handleUseSummonScroll のコメント)
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, added.map((m) => m.id));
+    state.player.crystal += cost;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
   state.summonResults = results;
   playSummonSfx(results);
   render();
@@ -1105,8 +1113,15 @@ function handleTutorialSummon(): void {
   if (state.player.tutorialSummonDone) return;
   state.player.tutorialSummonDone = true;
   const results = summonTutorial();
-  for (const r of results) addMonster(state.player, r.dexId, r.star);
-  savePlayerState(state.player);
+  const added = results.map((r) => addMonster(state.player, r.dexId, r.star));
+  // 保存できないなら引けなかったことにする。1度きりの権利を空振りで失わせない
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, added.map((m) => m.id));
+    state.player.tutorialSummonDone = false;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
   state.summonResults = results;
   playSummonSfx(results);
   render();
@@ -1134,8 +1149,20 @@ function handleUseSummonScroll(count: number): void {
     return;
   }
   const results = summonMany(count);
-  for (const r of results) addMonster(state.player, r.dexId, r.star);
-  savePlayerState(state.player);
+  const added = results.map((r) => addMonster(state.player, r.dexId, r.star));
+  if (!savePlayerState(state.player)) {
+    /*
+     * **保存できないなら、無かったことにする。**
+     * ここを素通りさせると、書だけ減って見えるのに再起動で戻る、という
+     * 実際に報告された状態になる(演出も出ないまま)。引けなかったことにして、
+     * 画面には `buildSaveFailureBar` の警告が出る。
+     */
+    removeMonsters(state.player, added.map((m) => m.id));
+    state.player.summonScrolls += count;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
   state.summonResults = results;
   playSummonSfx(results);
   render();
@@ -3108,9 +3135,50 @@ function buildFarmBar(): HTMLElement | null {
  * 高さは `--home-farm-h` で申告する(申告しないと `.home-world` が黙って潰れ、
  * 「試練の塔」が切り落とされて押せなくなる。過去に出している事故)。
  */
+/**
+ * セーブに失敗している時の警告。
+ *
+ * **黙って消えるのがいちばん悪い。**保存領域が一杯だと
+ * `localStorage.setItem` が例外を投げる。以前はそれが呼び出し元まで抜けて
+ * 操作の途中で全部飛んでいた(召喚が演出も出さずに止まり、書だけ減って見えて、
+ * 再起動すると戻る)。例外は `savePlayerState` で止めたので、
+ * あとは**起きたことを伝える**役目がここ。
+ *
+ * 戦闘中は出さない。手が離せない場面で読ませても操作できない。
+ */
+function buildSaveFailureBar(): HTMLElement | null {
+  const failure = lastSaveFailure();
+  if (!failure) return null;
+  if (BATTLE_SCREENS.has(state.screen)) return null;
+  // 1MBに満たない時にMB表記だと「0.0MB」になって、かえって何も伝わらない
+  const size = failure.bytes <= 0 ? ""
+    : failure.bytes >= 1024 * 1024 ? `${(failure.bytes / 1024 / 1024).toFixed(1)}MB`
+      : `${Math.max(1, Math.round(failure.bytes / 1024))}KB`;
+  const detail = failure.quotaExceeded
+    ? `この端末の保存できる量を超えました${size ? `(${size})` : ""}。装備やモンスターを整理するか、下の「データを書き出す」で控えを取ってください。`
+    : "この端末に書き込めませんでした。プライベートモードや保存の制限を解除してから、もう一度お試しください。";
+  return el("section", {
+    className: "tutorial-bar tutorial-bar--danger",
+    "data-save-failure-bar": "",
+    role: "alert",
+    "aria-label": "セーブに失敗しています",
+  }, [
+    el("div", { className: "tutorial-bar__badge" }, [el("strong", {}, ["⚠"])]),
+    el("div", { className: "tutorial-bar__text" }, [
+      el("div", { className: "tutorial-bar__title" }, ["データを保存できていません"]),
+      el("div", { className: "tutorial-bar__cond" }, [
+        el("span", {}, [`${detail} このまま閉じると、いま遊んだぶんは戻ります。`]),
+      ]),
+    ]),
+  ]);
+}
+
 function mountTutorialBar(content: HTMLElement): void {
   const bar = buildTutorialBar();
   if (bar) content.prepend(bar);
+  // 保存の警告は案内より上。**遊び方より先に知らせる**
+  const saveBar = buildSaveFailureBar();
+  if (saveBar) content.prepend(saveBar);
   const farm = buildFarmBar();
   if (!farm) return;
   const world = content.querySelector(".home-world");
