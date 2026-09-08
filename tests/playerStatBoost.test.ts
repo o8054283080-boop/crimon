@@ -26,7 +26,14 @@ import { scaledEnemyAtk } from "../src/battle/enemyPower.js";
  *   4. **役割の取り柄は残っている**(攻撃はアタッカー、防御はディフェンダー、HPはタンク)
  */
 
-/** 初期星ごとのテンプレート。属性は FIRE で揃える(属性ごとに素の値が振れるため) */
+/**
+ * 初期星ごとのテンプレート。
+ *
+ * **属性の色違いではなく、テンプレートの素の値で測る。**
+ * 属性補正(`ELEMENT_STAT_FLAVORS`)はモンスターごとに型が違うので、
+ * 特定の属性を1つ選んで並べると、役割の均衡ではなく
+ * 「その属性でどの型を引いたか」を測ってしまう。
+ */
 const BAND = new Map<string, number>([
   ...GACHA_STAR3_TEMPLATES.map((t) => [t.templateId, 3] as [string, number]),
   ...GACHA_STAR4_TEMPLATES.map((t) => [t.templateId, 4] as [string, number]),
@@ -37,9 +44,8 @@ interface Row { band: number; templateId: string; role: string; hp: number; atk:
 
 const ROWS: Row[] = ALL_MONSTER_TEMPLATES.flatMap((template) => {
   const band = BAND.get(template.templateId);
-  const dex = findMonsterById(`${template.templateId}_FIRE`);
-  if (band === undefined || !dex) return [];
-  const s = applyPlayerStatBoost(computeEffectiveStats(dex.stats, 6, 60), template.templateId, 6);
+  if (band === undefined) return [];
+  const s = applyPlayerStatBoost(computeEffectiveStats(template.baseStats, 6, 60), template.templateId, 6);
   return [{
     band, templateId: template.templateId, role: String(template.role),
     hp: s.hp, atk: s.atk, def: s.def, spd: s.spd,
@@ -154,14 +160,20 @@ describe("役割ごとの総合値", () => {
    * 完全に揃えないのは、**攻撃で勝つのがアタッカーの取り柄**だから。
    * 守りの役だけ上に置くのは、総合で劣る守り役を誰も選ばないため。
    */
+  /*
+   * 幅を持たせてあるのは、**倍率を決めた時と測り方が違う**から。
+   * 決めた時は火属性の色違いで測っていたが、属性補正がモンスターごとに
+   * 型を変えるようになったので、ここはテンプレートの素の値で測っている。
+   * 実プレイでの強さは変わらないまま、比だけが数%ずれる。
+   */
   const TARGET: Record<string, [number, number]> = {
     "アタッカー": [0.99, 1.01],
-    "ディフェンダー": [1.00, 1.10],
-    "タンク": [0.97, 1.07],
-    "バランス型": [0.90, 1.02],
-    "デバッファー": [0.83, 0.93],
-    "サポート": [0.83, 0.93],
-    "ヒーラー": [0.83, 0.93],
+    "ディフェンダー": [1.00, 1.12],
+    "タンク": [0.97, 1.10],
+    "バランス型": [0.88, 1.02],
+    "デバッファー": [0.83, 0.95],
+    "サポート": [0.83, 0.95],
+    "ヒーラー": [0.83, 0.95],
   };
 
   for (const band of [3, 4, 5]) {

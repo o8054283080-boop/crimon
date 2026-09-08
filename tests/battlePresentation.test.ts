@@ -92,7 +92,13 @@ describe("TurnRecord.events(演出用のダメージ/回復イベント)", () =>
       description: "テスト用",
       target: "SINGLE_ENEMY",
       cooldownTurns: 0,
-      effects: [{ kind: "DAMAGE", multiplier: 50 }],
+      /*
+       * **一撃で必ず倒せる倍率にしておく。**50倍だと火→水の相性で半減した後
+       * 残りHP106まで削って生き残る、という境目に乗っていた
+       * (属性補正でゴーレム[水]の防御が130→148になった時に落ちた)。
+       * ここで見たいのはDEATHイベントが出ることであって、削り切れる境目ではない。
+       */
+      effects: [{ kind: "DAMAGE", multiplier: 200 }],
     };
     const attacker = withSkills(findMonster("wolf", "FIRE")!, [bigDamageSkill, bigDamageSkill, bigDamageSkill]);
     const defender = findMonster("golem", "WATER")!;
