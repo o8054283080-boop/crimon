@@ -721,8 +721,76 @@ export function loadPlayerState(): PlayerState {
   }
 }
 
-export function savePlayerState(state: PlayerState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+/**
+ * セーブの失敗。**投げっぱなしにしない。**
+ *
+ * ## 何が起きていたか
+ *
+ * `localStorage.setItem` は保存領域が一杯だと `QuotaExceededError` を投げる。
+ * ここが素の1行だったので、例外がそのまま呼び出し元へ抜けていた。
+ * 召喚(`handleUseSummonScroll`)はこう並んでいる:
+ *
+ *   1. 書を減らす → 2. 抽選 → 3. モンスターを足す
+ *   → 4. **保存(ここで例外)** → 5. 結果を画面へ → 6. 描き直す
+ *
+ * 4で飛ぶので5と6に到達しない。実際に報告された症状がそのまま出る:
+ *
+ *   ・演出が出ない(5に来ない)
+ *   ・モンスターは増えている(3は終わっている)
+ *   ・戻ると書が減っている(1もメモリ上では終わっている)
+ *   ・**再起動すると書が戻る**(4が失敗しているので何も保存されていない)
+ *
+ * しかも誰も捕まえないので、**プレイヤーには何も伝わらない。**
+ * 実機(Chromium)で上限は4.5MBだった。モンスター1体405バイト・装備1個276バイトなので、
+ * 長く遊んだ人ほどここへ来る。
+ *
+ * ## いまの形
+ *
+ * 例外を外へ出さず、成否を返す。失敗は記録して画面から取り出せるようにする
+ * (`lastSaveFailure`)。**黙って消えるのがいちばん悪い。**
+ */
+export interface SaveFailure {
+  /** 失敗した時刻 */
+  at: number;
+  /** 保存領域が一杯かどうか。それ以外(書き込み禁止など)と文面を変えるために持つ */
+  quotaExceeded: boolean;
+  /** 直近で保存しようとした大きさ(バイト)。どれくらい溜まっているかを画面に出す */
+  bytes: number;
+}
+
+let saveFailure: SaveFailure | null = null;
+
+/** 直近のセーブに失敗していれば、その中身。成功していれば null */
+export function lastSaveFailure(): SaveFailure | null {
+  return saveFailure;
+}
+
+/** 保存領域が一杯だったかどうかを、例外の形から見分ける */
+function isQuotaError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  // Safari は QuotaExceededError、古い Firefox は NS_ERROR_DOM_QUOTA_REACHED
+  return /quota/i.test(error.name) || /quota/i.test(error.message) || error.name === "NS_ERROR_DOM_QUOTA_REACHED";
+}
+
+/**
+ * セーブする。**成功したら true。失敗しても例外は投げない。**
+ *
+ * 返り値を見ない呼び出しがほとんどだが、それでよい。
+ * ここで例外を止めるだけで「操作の途中で全部飛ぶ」が無くなる。
+ * 失敗したことは `lastSaveFailure()` から画面が拾う。
+ */
+export function savePlayerState(state: PlayerState): boolean {
+  let json = "";
+  try {
+    json = JSON.stringify(state);
+    localStorage.setItem(STORAGE_KEY, json);
+    saveFailure = null;
+    return true;
+  } catch (error) {
+    saveFailure = { at: Date.now(), quotaExceeded: isQuotaError(error), bytes: json.length };
+    console.error("セーブに失敗しました", error);
+    return false;
+  }
 }
 
 export function addMonster(state: PlayerState, dexId: string, star: Star, level = 1): MonsterInstance {
