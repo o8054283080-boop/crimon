@@ -45,6 +45,7 @@ export interface MonstersProps {
   onGoMonsterTraining: (monsterId: string) => void;
   onGoCreate: (monsterId: string) => void;
   onGoMonsterDex: () => void;
+  onGoExchange: () => void;
   sortKey: MonsterSortKey;
   onChangeSort: (key: MonsterSortKey) => void;
   filter: MonsterFilter;
@@ -115,6 +116,12 @@ function renderList(props: MonstersProps): HTMLElement {
   return el("div", { className: "screen monsters-screen" }, [
     el("header", { className: "app-header app-header--row" }, [
       el("h1", {}, ["所持モンスター"]),
+      /*
+       * 交換所は**余りが並ぶこの場所から入る。**
+       * 目覚素材の交換所を一度ショップへ置こうとして間違えている
+       * (集める場所から離すと使われない)。
+       */
+      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: props.onGoExchange }, ["🔁 交換所"]),
       el("button", { type: "button", className: "btn btn--ghost head-action", onclick: props.onGoMonsterDex }, ["📖 図鑑"]),
     ]),
     el("section", { className: "panel monsters-list-panel" }, [
