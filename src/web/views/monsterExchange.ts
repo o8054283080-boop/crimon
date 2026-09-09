@@ -124,6 +124,7 @@ export function renderMonsterExchange(props: MonsterExchangeProps): HTMLElement 
   const rare = rareCountOf(selected);
 
   const grid = createIncrementalGrid({
+    memoryKey: "monsterExchange",
     className: `monster-grid${props.dense ? " monster-grid--dense" : ""}`,
     items: shown,
     renderItem: (monster) => monsterCard(monster, () => props.onToggleSelect(monster.id), {

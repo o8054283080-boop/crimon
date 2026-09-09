@@ -97,6 +97,7 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
 
   const shownCandidates = filterTrainingMaterials(candidates, target, props.selectedMaterialIds, props.filter);
   const materialGrid = createIncrementalGrid({
+    memoryKey: "trainingMaterials",
     className: `monster-grid${props.dense ? " monster-grid--dense" : ""}`,
     items: shownCandidates,
     renderItem: (candidate) => monsterCard(candidate, () => props.onToggleMaterial(candidate.id), {
