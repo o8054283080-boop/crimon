@@ -1,0 +1,28 @@
+/*
+ * HOME初心者ミッションの完成基準レイアウト。
+ * 参考画像どおり「ヘッダー → 初心者ミッション → CURRENT PARTY → ワールド」の
+ * 2段カードを、既存の旧48px固定高さに切らせない。
+ */
+html body .crimon-home > .crimon-tutorial.crimon-tutorial--compact {
+  height: auto !important;
+  min-height: 86px !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+.crimon-home > .current-party-panel {
+  flex: 0 0 auto !important;
+}
+
+/* 旧HOMEは初心者ミッションを48pxとしてワールド高を計算している。
+ * コンパクト2段カードの実寸(約86px)との差38pxをワールド側から引き、
+ * 下部ナビへ押し出さない。 */
+.crimon-home:has(> .crimon-tutorial--compact) > .home-world {
+  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 86px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
+}
+
+@media (max-height: 860px) {
+  .crimon-home:has(> .crimon-tutorial--compact) > .home-world {
+    height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 86px - 5px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
+  }
+}
