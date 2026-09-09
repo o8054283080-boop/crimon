@@ -1,5 +1,6 @@
 import "./update-notice.css";
 import "./adminEntryCompact.css";
+import "./ui/beginnerMissionReferenceLayout.css";
 
 const motionLabPath = /\/(?:motion-lab|tools\/motion-generator)\/?$/;
 
