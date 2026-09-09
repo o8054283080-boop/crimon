@@ -5,28 +5,20 @@ import { applyDungeonClearRewards } from "../src/game/rewards.js";
 import { claimTowerFloorReward } from "../src/game/trialTower.js";
 import { claimTutorialMission, TUTORIAL_MISSIONS } from "../src/game/tutorialMissions.js";
 
-function prepareMission(step: number) {
-  const state = createInitialState();
-  state.tutorialMissions.claimedIds = TUTORIAL_MISSIONS.slice(0, step - 1).map((mission) => mission.id);
-  if (step === 26) state.tutorialMissions.createOpened = true;
-  if (step === 30) {
-    state.monsters[0].star = 6;
-    state.monsters[0].development.type = "ATTACK";
-    state.monsters[0].development.abilityPoints.hp = 1;
-  }
-  return state;
-}
-
 describe("覚醒オーブの達成報酬", () => {
-  it("初心者STEP26と全達成STEP30で1個ずつ受け取る", () => {
-    const midway = prepareMission(26);
-    expect(claimTutorialMission(midway, "tutorial-step-26")).toBe(true);
-    expect(midway.awakeningOrbs).toBe(1);
+  it("80個版初心者ミッションではSTEP60とSTEP64に1個ずつ配置する", () => {
+    expect(TUTORIAL_MISSIONS[59].reward.awakeningOrbs).toBe(1);
+    expect(TUTORIAL_MISSIONS[63].reward.awakeningOrbs).toBe(1);
+  });
 
-    const complete = prepareMission(30);
-    expect(claimTutorialMission(complete, "tutorial-step-30")).toBe(true);
-    expect(complete.awakeningOrbs).toBe(1);
-    expect(complete.fiveStarSummonScrolls).toBe(1);
+  it("STEP60は一本道の受取と二重取得防止が機能する", () => {
+    const state = createInitialState();
+    state.tutorialMissions.claimedIds = TUTORIAL_MISSIONS.slice(0, 59).map((mission) => mission.id);
+    state.monsters[0].development.type = "ATTACK";
+    expect(claimTutorialMission(state, "beginner-step-060")).toBe(true);
+    expect(state.awakeningOrbs).toBe(1);
+    expect(claimTutorialMission(state, "beginner-step-060")).toBe(false);
+    expect(state.awakeningOrbs).toBe(1);
   });
 
   it("装備ダンジョン10階は初回だけ1個付与する", () => {
@@ -46,9 +38,9 @@ describe("覚醒オーブの達成報酬", () => {
     expect(state.awakeningOrbs).toBe(2);
   });
 
-  it("既存達成者へ追給し、再ロード後も所持数と受取印を維持する", () => {
+  it("旧30件版の達成者への追給は新80件導入後も失わない", () => {
     const legacy = createInitialState() as ReturnType<typeof createInitialState> & { claimedAwakeningOrbRewardIds?: string[] };
-    legacy.tutorialMissions.claimedIds = TUTORIAL_MISSIONS.map((mission) => mission.id);
+    legacy.tutorialMissions.claimedIds = ["tutorial-step-26", "tutorial-step-30"];
     legacy.clearedDungeonFloors = [10];
     legacy.trialTowerBestFloor = 30;
     delete (legacy as Partial<typeof legacy>).claimedAwakeningOrbRewardIds;
