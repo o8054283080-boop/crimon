@@ -610,6 +610,7 @@ function renderList(props: EquipmentProps): HTMLElement {
    * 一覧と同じ枚数にすると重くなる。こちらは既定のままにする。
    */
   const equipmentGrid = createIncrementalGrid({
+    memoryKey: props.pickerContext ? "equipmentPicker" : "equipment",
     className: `equip-grid${props.dense && !props.pickerContext ? " equip-grid--dense" : ""}`,
     items,
     renderItem,

@@ -96,6 +96,7 @@ export function renderParty(props: PartyProps): HTMLElement {
   ];
 
   const rosterGrid = createIncrementalGrid({
+    memoryKey: "party",
     className: "monster-grid party-monster-grid",
     items: orderedMonsters,
     renderItem: (instance) =>

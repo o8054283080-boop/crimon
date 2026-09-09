@@ -117,7 +117,8 @@ function pickSpecialTier(table: readonly GachaTier[], rng: () => number): GachaT
   return table[table.length - 1];
 }
 
-const SPECIAL_SCROLL_FIELD: Record<SpecialSummonScroll, "fourStarSummonScrolls" | "lightDarkFourStarSummonScrolls" | "fiveStarSummonScrolls"> = {
+/** 書の種類 → 持ち数の置き場。**巻き戻しにも要る**ので外へ出してある */
+export const SPECIAL_SCROLL_FIELD: Record<SpecialSummonScroll, "fourStarSummonScrolls" | "lightDarkFourStarSummonScrolls" | "fiveStarSummonScrolls"> = {
   FOUR_STAR: "fourStarSummonScrolls",
   LIGHT_DARK_FOUR_STAR: "lightDarkFourStarSummonScrolls",
   FIVE_STAR: "fiveStarSummonScrolls",

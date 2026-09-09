@@ -31,7 +31,7 @@ import { renderAwakeningDepths } from "./views/awakeningDepths.js";
 import { type TalentTab } from "./views/talentAwakening.js";
 import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/levelDungeon.js";
 import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data/stages.js";
-import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, useSpecialSummonScroll } from "../game/gacha.js";
+import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, SPECIAL_SCROLL_FIELD, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
 import { BackgroundFarmJob, MAX_OFFLINE_FARM_MS, availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange } from "../game/backgroundAutoFarm.js";
@@ -118,6 +118,7 @@ import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
 import { findMonsterById } from "../data/monsters.js";
 import { toBattleDefinition } from "../core/monsterInstance.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
+import { forgetShownCounts } from "./incrementalGrid.js";
 import { renderMonsterExchange } from "./views/monsterExchange.js";
 import { sendMonstersForPoints, tryExchangeMonsterPoints } from "../game/monsterPoints.js";
 import { loadMonsterListDense, saveMonsterListDense } from "./monsterListDensity.js";
@@ -205,7 +206,7 @@ import { EMPTY_MONSTER_TRAINING_FILTER, MonsterTrainingFilter, renderMonsterTrai
 import { CreateMenu, renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
-import { renderSummon } from "./views/summon.js";
+import { renderSummon, type SummonMethod } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
 import { ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
@@ -357,6 +358,8 @@ interface AppState {
   screen: ScreenName;
   player: PlayerState;
   summonResults: SummonResult[] | null;
+  /** 直前に何で引いたか。結果画面の「もう一度」を同じ手段で繰り返すために覚える */
+  lastSummonMethod: SummonMethod | null;
   monsterDetailId: string | null;
   rankUpMode: boolean;
   rankUpSacrificeIds: string[];
@@ -540,6 +543,7 @@ const state: AppState = {
   screen: "HOME",
   player: loadPlayerState(),
   summonResults: null,
+  lastSummonMethod: null,
   monsterDetailId: null,
   rankUpMode: false,
   rankUpSacrificeIds: [],
@@ -891,6 +895,14 @@ function persistNavigationState(): void {
 
 function navigate(screen: ScreenName): void {
   state.screen = screen;
+  /*
+   * 「さらに表示」で増やした件数は**画面を移ったら忘れる。**
+   *
+   * 同じ画面の中では覚えたまま(ロックしても素材に選んでも巻き戻らない)。
+   * だが別の場所から入り直した時にまで何百件も並べると、
+   * 速さのために段階描画を入れた意味が無くなる。
+   */
+  forgetShownCounts();
   state.monsterDetailId = null;
   /*
    * 詳細の帰り先は**その1回きり**。ここで捨てないと、
@@ -903,6 +915,7 @@ function navigate(screen: ScreenName): void {
   state.selectedStageId = null;
   state.selectedDifficulty = "NORMAL";
   state.summonResults = null;
+  state.lastSummonMethod = null;
   state.equipmentDetailId = null;
   state.equipmentPickerContext = null;
   state.equipmentSlotFilter = null;
@@ -1116,6 +1129,7 @@ function handleSummon(count: number): void {
     return;
   }
   state.summonResults = results;
+  state.lastSummonMethod = { kind: "CRYSTAL", count };
   playSummonSfx(results);
   render();
 }
@@ -1140,6 +1154,8 @@ function handleTutorialSummon(): void {
     return;
   }
   state.summonResults = results;
+  // はじまりの10連は1度きり。**「もう一度」はダイヤへ落とす**ので手段を残さない
+  state.lastSummonMethod = null;
   playSummonSfx(results);
   render();
 }
@@ -1181,15 +1197,31 @@ function handleUseSummonScroll(count: number): void {
     return;
   }
   state.summonResults = results;
+  state.lastSummonMethod = { kind: "SCROLL", count };
   playSummonSfx(results);
   render();
 }
 
+/**
+ * 特別召喚書で引く。
+ *
+ * **ここだけ保存の成否を見ていなかった。**他の召喚(ダイヤ・書・はじまりの10連)は
+ * 失敗したら引かなかったことにしているのに、この経路だけ素通りしていた。
+ * 結果画面から「もう一度」で連打できるようになったので、同じ形へ揃える。
+ */
 function handleUseSpecialSummonScroll(type: SpecialSummonScroll): void {
+  const before = state.player.monsters.length;
   const result = useSpecialSummonScroll(state.player, type);
   if (!result) { playSfx("denied", 0.7); return; }
-  savePlayerState(state.player);
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, state.player.monsters.slice(before).map((m) => m.id));
+    state.player[SPECIAL_SCROLL_FIELD[type]] += 1;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
   state.summonResults = [result];
+  state.lastSummonMethod = { kind: "SPECIAL", type };
   playSummonSfx([result]);
   render();
 }
@@ -4561,6 +4593,7 @@ function renderSummonScreen(): HTMLElement {
   return renderSummon({
     player: state.player,
     lastResults: state.summonResults,
+    lastMethod: state.lastSummonMethod,
     onSummon: handleSummon,
     onDismissResults: () => {
       state.summonResults = null;

@@ -62,6 +62,7 @@ function renderPicker(
 ): HTMLElement {
   const sorted = sortMonsters(props.player.monsters, "recommended", { partyIds: [...selectedIds] });
   const grid = createIncrementalGrid<MonsterInstance>({
+    memoryKey: "arenaTeam",
     className: "monster-grid",
     items: sorted,
     renderItem: (instance) => {

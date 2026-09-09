@@ -19,9 +19,84 @@ import {
   SummonGrade,
 } from "./summonFx.js";
 
+/**
+ * 直前に何で引いたか。
+ *
+ * 結果画面の「もう一度」を**同じ手段で繰り返す**ために覚える。
+ * 前はここが常にダイヤだったので、**書で10連した直後の「もう一度」が
+ * ダイヤ10連になっていた。** 書がまだ何十枚もあるのに、続けて引くには
+ * 一度閉じて画面を戻る必要があった。
+ */
+export type SummonMethod =
+  | { kind: "CRYSTAL"; count: number }
+  | { kind: "SCROLL"; count: number }
+  | { kind: "SPECIAL"; type: SpecialSummonScroll };
+
+/** 「もう一度」の的に出すもの */
+export interface SummonAgain {
+  method: SummonMethod;
+  lead: string;
+  costIcon: IconName;
+  cost: number;
+  enabled: boolean;
+}
+
+const SPECIAL_SCROLL_OWNED: Record<SpecialSummonScroll, (player: PlayerState) => number> = {
+  FOUR_STAR: (player) => player.fourStarSummonScrolls,
+  LIGHT_DARK_FOUR_STAR: (player) => player.lightDarkFourStarSummonScrolls,
+  FIVE_STAR: (player) => player.fiveStarSummonScrolls,
+};
+
+const SPECIAL_SCROLL_LEAD: Record<SpecialSummonScroll, string> = {
+  FOUR_STAR: "書でもう一度",
+  LIGHT_DARK_FOUR_STAR: "書でもう一度",
+  FIVE_STAR: "書でもう一度",
+};
+
+/**
+ * 「もう一度」で何を引くかを決める。
+ *
+ * **同じ手段が続けられるなら、それを出す。**続けられない時だけダイヤへ落とす
+ * (書を使い切った人の前で、押せないボタンを出したままにしない)。
+ *
+ * `last` が無い時 —— はじまりの10連の直後や、再読み込みを挟んだ時 —— は
+ * 引いた数からダイヤの10連・1回を選ぶ。ここは前のままの振る舞い。
+ */
+export function resolveSummonAgain(
+  player: PlayerState,
+  last: SummonMethod | null,
+  resultCount: number,
+): SummonAgain {
+  if (last?.kind === "SCROLL" && player.summonScrolls >= last.count) {
+    return {
+      method: last,
+      lead: last.count >= 10 ? "書でもう10連" : "書でもう一度",
+      costIcon: "scroll",
+      cost: last.count,
+      enabled: true,
+    };
+  }
+  if (last?.kind === "SPECIAL" && SPECIAL_SCROLL_OWNED[last.type](player) >= 1) {
+    return { method: last, lead: SPECIAL_SCROLL_LEAD[last.type], costIcon: "scroll", cost: 1, enabled: true };
+  }
+
+  // 書が尽きた時と、もともとダイヤで引いた時。**引いた数に合わせる**
+  const ten = last ? (last.kind === "SPECIAL" ? false : last.count >= 10) : resultCount >= 10;
+  const cost = ten ? SUMMON_COST_TEN : SUMMON_COST_SINGLE;
+  return {
+    method: { kind: "CRYSTAL", count: ten ? 10 : 1 },
+    lead: ten ? "もう10連" : "もう一度",
+    costIcon: "crystal",
+    cost,
+    enabled: player.crystal >= cost,
+  };
+}
+
 export interface SummonProps {
   player: PlayerState;
   lastResults: SummonResult[] | null;
+  /** 直前に何で引いたか。「もう一度」を同じ手段で繰り返すために要る */
+  lastMethod: SummonMethod | null;
   onSummon: (count: number) => void;
   onDismissResults: () => void;
   /** 召喚の書で引く。枚数ぶん消費する */
@@ -309,8 +384,13 @@ function renderResult(props: SummonProps): HTMLElement {
     body = el("div", { className: "grid10" }, pops);
   }
 
-  const again = results.length >= 10 ? SUMMON_COST_TEN : SUMMON_COST_SINGLE;
-  const canAgain = player.crystal >= again;
+  /*
+   * **直前と同じ手段で繰り返す。**
+   *
+   * ここが常にダイヤだったので、書で10連した直後の「もう一度」がダイヤ10連に
+   * なっていた。書がまだ何十枚もあっても、続けて引くには一度閉じて戻る必要があった。
+   */
+  const again = resolveSummonAgain(player, props.lastMethod, results.length);
 
   // 周回する遊びなので、次に押されるのはほぼ必ず「もう一度」。
   // 前は「閉じる」と同じ幅・同じ高さで並んでいて、**次の一手が読めなかった**。
@@ -322,12 +402,19 @@ function renderResult(props: SummonProps): HTMLElement {
       {
         type: "button",
         className: "btn btn--gold summon-actions__again",
-        disabled: !canAgain,
-        onclick: () => onSummon(results.length >= 10 ? 10 : 1),
+        disabled: !again.enabled,
+        onclick: () => {
+          if (again.method.kind === "SCROLL") props.onUseSummonScroll(again.method.count);
+          else if (again.method.kind === "SPECIAL") props.onUseSpecialSummonScroll(again.method.type);
+          else onSummon(again.method.count);
+        },
       },
       [
-        el("span", { className: "summon-actions__again-lead" }, [results.length >= 10 ? "もう10連" : "もう一度"]),
-        el("span", { className: "summon-actions__again-cost" }, [icon("crystal"), el("strong", {}, [again.toLocaleString("ja-JP")])]),
+        el("span", { className: "summon-actions__again-lead" }, [again.lead]),
+        el("span", { className: "summon-actions__again-cost" }, [
+          icon(again.costIcon),
+          el("strong", {}, [again.cost.toLocaleString("ja-JP")]),
+        ]),
       ],
     ),
   ]);

@@ -209,6 +209,7 @@ function renderMaterialList(props: MonsterCreateProps): HTMLElement {
   const selectedIndex = props.materialId ? candidates.findIndex((instance) => instance.id === props.materialId) : -1;
   const initialCount = Math.max(CREATE_MATERIAL_INITIAL_RENDER_COUNT, selectedIndex + 1);
   const grid = createIncrementalGrid({
+    memoryKey: "createMaterials",
     className: "create-candidates",
     items: candidates,
     initialCount,

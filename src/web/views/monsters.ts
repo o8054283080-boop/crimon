@@ -97,6 +97,7 @@ function renderList(props: MonstersProps): HTMLElement {
   const shown = filterMonsters(props.player.monsters, props.filter, context);
   const sortedMonsters = sortMonsters(shown, props.sortKey, context);
   const monsterGrid = createIncrementalGrid({
+    memoryKey: "monsters",
     className: `monster-grid${props.dense ? " monster-grid--dense" : ""}`,
     items: sortedMonsters,
     renderItem: (instance) => {
@@ -496,6 +497,7 @@ function renderRankUp(props: MonstersProps, target: MonsterInstance): HTMLElemen
     rankUpMaterialSort,
   );
   const grid = createIncrementalGrid({
+    memoryKey: "rankUpMaterials",
     className: `monster-grid${props.dense ? " monster-grid--dense" : ""}`,
     items: buildItems(),
     renderItem: (candidate) => monsterCard(candidate, () => props.onToggleSacrifice(candidate.id), {
