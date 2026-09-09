@@ -255,7 +255,7 @@
  * ゴールド・装備の数)で、消すと帯が何も伝えなくなる。
  * 代わりに文字を小さくして収める(9pxは下回らせない。巡回が落とす)。
  */
-@media (max-width: 380px) {
+@media (max-width: 400px) {
   .tutorial-bar {
     gap: 8px;
     padding: 7px 8px;
