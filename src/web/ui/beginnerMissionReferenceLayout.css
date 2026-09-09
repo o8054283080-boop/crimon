@@ -21,8 +21,18 @@ html body .crimon-home > .crimon-tutorial.crimon-tutorial--compact {
   height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 86px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
 }
 
+/* 80/80達成後は初心者ミッション自体をDOMから外す。
+ * 旧48px分を引き続けると不要な空白が残るため、その分をワールドへ返す。 */
+.crimon-home:not(:has(> .crimon-tutorial)) > .home-world {
+  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
+}
+
 @media (max-height: 860px) {
   .crimon-home:has(> .crimon-tutorial--compact) > .home-world {
     height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 86px - 5px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
+  }
+
+  .crimon-home:not(:has(> .crimon-tutorial)) > .home-world {
+    height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 5px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
   }
 }
