@@ -13,4 +13,5 @@ if (motionLabPath.test(window.location.pathname) || new URLSearchParams(window.l
   void import("./adminPanel.js");
   // @ts-expect-error side-effect script intentionally has no exports
   void import("./beginnerMissionCompact.js");
+  void import("./beginnerMissionReferencePosition.js");
 }
