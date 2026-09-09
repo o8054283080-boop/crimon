@@ -287,18 +287,15 @@
  * 初心者ミッションUX
  * ============================================================ */
 
-/*
- * HOMEではミッション帯をヘッダー直下に常駐させる。
- * fixed分の高さをヘッダー下マージンとして先に確保し、下の警告・配布・ボタンを覆わない。
- */
+/* HOMEではヘッダー操作の直下に常駐させる。スタミナボタンと十分に距離を取る。 */
 .crimon-home > .crimon-resource-header {
-  margin-bottom: 76px !important;
+  margin-bottom: 94px !important;
 }
 
 .crimon-home > .crimon-tutorial:not(:has(.crimon-tutorial__complete)) {
   position: fixed !important;
   z-index: 46 !important;
-  top: calc(var(--home-safe-top, 0px) + var(--home-header-h, 106px) + 6px) !important;
+  top: calc(var(--home-safe-top, 0px) + var(--home-header-h, 106px) + 24px) !important;
   left: 6px !important;
   right: 6px !important;
   margin: 0 !important;
@@ -319,7 +316,6 @@
   font-weight: 900;
 }
 
-/* 旧HOMEに残る「/30」は表示せず、右側の実カウント(例 17/80)を正とする。 */
 .crimon-home > .crimon-tutorial .crimon-tutorial__head > span:first-child strong {
   display: none !important;
 }
@@ -332,7 +328,6 @@
   font-weight: 900;
 }
 
-/* HOME以外はスクロール領域の上端に追従する。 */
 .screen > .tutorial-bar[data-tutorial-bar] {
   position: sticky;
   top: max(4px, env(safe-area-inset-top));
@@ -340,7 +335,6 @@
   backdrop-filter: blur(10px);
 }
 
-/* 受取報酬。実際に増えた物を1項目ずつ見せる。 */
 .tutorial-reward-popup {
   position: fixed;
   inset: 0;
@@ -426,17 +420,16 @@
 }
 
 @media (max-width: 400px) {
-  /* 390px級では条件文を隠して、進捗とボタンの幅を確保する。周回帯は除外。 */
   .tutorial-bar:not(.tutorial-bar--farm):not(.tutorial-bar--danger) .tutorial-bar__cond > span:first-child {
     display: none;
   }
 
   .crimon-home > .crimon-resource-header {
-    margin-bottom: 74px !important;
+    margin-bottom: 92px !important;
   }
 
   .crimon-home > .crimon-tutorial:not(:has(.crimon-tutorial__complete)) {
-    top: calc(var(--home-safe-top, 0px) + var(--home-header-h, 100px) + 4px) !important;
+    top: calc(var(--home-safe-top, 0px) + var(--home-header-h, 100px) + 22px) !important;
   }
 
   .tutorial-reward-popup__card {
