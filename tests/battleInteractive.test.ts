@@ -174,7 +174,7 @@ describe("BattleEngine のインタラクティブ操作API", () => {
     const actor = engine.getNextActor()!;
     const [, firstEnemy, cursedEnemy] = units;
 
-    cursedEnemy.curses = [{ turns: 2, sourceAtk: actor.def.stats.atk }];
+    cursedEnemy.curses = [{ turns: 2, attack: actor.def.stats.atk, sourceId: actor.instanceId }];
 
     const opening = engine.prepareInteractiveTurn(actor);
     expect(opening).not.toBeNull();

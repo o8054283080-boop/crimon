@@ -1,0 +1,44 @@
+.battle-skill-name {
+  position: absolute;
+  z-index: 6;
+  max-width: min(180px, 46vw);
+  padding: 4px 8px;
+  border-radius: 999px;
+  transform: translate(-50%, -100%) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(4px);
+  transition: opacity 70ms linear, transform 70ms ease-out;
+}
+
+.battle-skill-name--player {
+  color: #eff8ff;
+  background: rgba(20, 76, 126, 0.88);
+  border: 1px solid rgba(160, 220, 255, 0.75);
+}
+
+.battle-skill-name--enemy {
+  color: #fff1f1;
+  background: rgba(112, 30, 38, 0.9);
+  border: 1px solid rgba(255, 168, 168, 0.72);
+}
+
+.battle-skill-name--show {
+  opacity: 1;
+  transform: translate(-50%, -100%) scale(1);
+}
+
+@media (max-width: 390px) {
+  .battle-skill-name {
+    max-width: 150px;
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+}
