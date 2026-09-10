@@ -344,6 +344,8 @@ export class BattleEngine {
   /** 撃破で得た追加ターン待ちのユニット。手番の直後にまとめて処理する */
   private pendingExtraTurns: BattleUnit[] = [];
   private interactiveExtraCounts = new Map<BattleUnit, number>();
+  /** 手動操作でスキル選択前にターン開始処理を済ませたユニット。resolveTurnで二重実行しないための印 */
+  private interactivePreparedTurns = new Set<BattleUnit>();
   /** 協力攻撃の入れ子の深さ。0でないときは協力攻撃を呼ばない(無限に連鎖するため) */
   private coopDepth = 0;
   /** 溜めた反撃の入れ子の深さ。0でないときは反撃を呼ばない(反射と往復し続けるため) */
@@ -532,6 +534,30 @@ export class BattleEngine {
    * choiceを渡すとその内容で行動する(指定したスキルがクールタイム中ならAIにフォールバックする)。
    * choiceを省略した場合はAIが行動を決める(敵ユニットや、手動操作をしない時に使う)。
    */
+  /**
+   * 手動操作用: スキル選択画面を出す前に、ターン開始時の自動効果だけを解決する。
+   * 現在は「バトルイリュージョン」のように選択前に見せる必要がある通常ターンだけで使う。
+   * resolveTurn() 側はこの印を見てターン開始処理を二重実行しない。
+   */
+  prepareInteractiveTurn(unit: BattleUnit): TurnRecord | null {
+    if (this.interactiveQueue[0] !== unit || this.interactivePreparedTurns.has(unit)) return null;
+    const extraCount = this.interactiveExtraCounts.get(unit) ?? 0;
+    const passive = passiveEffectOf(unit);
+    if (extraCount > 0 || passive?.kind !== "ILLUSION") return null;
+
+    const linesBefore = this.log.length;
+    const eventsBefore = this.events.length;
+    this.applyTurnStart(unit, false);
+    this.interactivePreparedTurns.add(unit);
+    this.applyAllyDeathBoosts();
+    return {
+      actorId: unit.instanceId,
+      lines: this.log.slice(linesBefore),
+      events: this.events.slice(eventsBefore),
+      snapshot: this.snapshotUnits(),
+    };
+  }
+
   resolveTurn(unit: BattleUnit, choice?: ManualChoice): TurnRecord {
     const idx = this.interactiveQueue.indexOf(unit);
     if (idx >= 0) this.interactiveQueue.splice(idx, 1);
@@ -547,6 +573,9 @@ export class BattleEngine {
       extra.gauge += ATB_THRESHOLD;
       this.interactiveQueue.unshift(extra);
       this.interactiveExtraCounts.set(extra, (this.interactiveExtraCounts.get(extra) ?? 0) + 1);
+      const message = `${this.label(extra)} は追加ターンを得た！`;
+      this.push(message);
+      record.lines.push(message);
     }
     return record;
   }
@@ -617,8 +646,8 @@ export class BattleEngine {
     return null;
   }
 
-  private takeTurn(unit: BattleUnit, choice?: ManualChoice, extraTurn = false): void {
-    if (!unit.alive) return;
+  /** ターン開始時の継続効果・CT・自動発動パッシブをまとめて処理する。 */
+  private applyTurnStart(unit: BattleUnit, extraTurn = false): void {
     tickEffectsAtTurnStart(unit);
     tickCooldownsAtTurnStart(unit);
     tickShieldAtTurnStart(unit);
@@ -654,6 +683,12 @@ export class BattleEngine {
       const resolution = newResolution();
       for (const enemy of this.units.filter(u => u.alive && u.team !== unit.team)) this.applySkillEffects(unit, enemy, opening, false, false, undefined, resolution);
     }
+  }
+
+  private takeTurn(unit: BattleUnit, choice?: ManualChoice, extraTurn = false): void {
+    if (!unit.alive) return;
+    const wasPrepared = this.interactivePreparedTurns.delete(unit);
+    if (!wasPrepared) this.applyTurnStart(unit, extraTurn);
 
     let acted = false;
     if (!unit.alive) {
