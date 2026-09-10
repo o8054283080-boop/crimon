@@ -1,0 +1,64 @@
+/* 効果一覧の入口を追加しても、既存の縦画面レイアウトを崩さないための補正。 */
+
+/* 所持装備の上部操作は元々2列だった。
+ * 3つ目をそのまま足すと「シリーズ効果」だけ2段目へ落ち、
+ * 装備一覧が下へ押し出されるため、3操作を1段に収める。 */
+.equipment-screen:not(.equipment-screen--detail) .equip-toolbar {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr);
+}
+
+.equipment-screen:not(.equipment-screen--detail) .effect-ref-entry--equipment {
+  min-width: 0;
+  padding-inline: 8px;
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 戦闘上部は階名と既存操作で横幅が厳しい。
+ * 「効果」は2文字の小さな操作に留め、タイトル側の幅を奪いすぎない。 */
+.battle-topbar__controls .effect-ref-entry--battle {
+  flex: 0 0 auto;
+  min-width: 36px;
+  min-height: 34px;
+  padding: 4px 5px;
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+@media (max-width: 390px) {
+  .equipment-screen:not(.equipment-screen--detail) .equip-toolbar {
+    gap: 6px;
+  }
+
+  .equipment-screen:not(.equipment-screen--detail) .equip-toolbar .btn {
+    padding-inline: 6px;
+    font-size: 0.72rem;
+  }
+
+  .equipment-screen:not(.equipment-screen--detail) .effect-ref-entry--equipment {
+    font-size: 0.68rem;
+  }
+
+  .battle-topbar__controls {
+    gap: 4px;
+  }
+
+  .battle-topbar__controls .effect-ref-entry--battle {
+    min-width: 34px;
+    padding-inline: 4px;
+    font-size: 0.62rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .equipment-screen:not(.equipment-screen--detail) .equip-toolbar .btn {
+    min-height: 40px;
+    padding-inline: 4px;
+    font-size: 0.66rem;
+  }
+
+  .equipment-screen:not(.equipment-screen--detail) .effect-ref-entry--equipment {
+    font-size: 0.64rem;
+  }
+}
