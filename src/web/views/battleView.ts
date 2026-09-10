@@ -834,6 +834,20 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       return;
     }
     if (mode === "MANUAL" && actor.team === "PLAYER" && actor.stunTurns === 0) {
+      const opening = engine.prepareInteractiveTurn(actor);
+      if (opening) {
+        applyRecord(opening);
+        const openingWinner = engine.getWinner();
+        if (openingWinner) {
+          showResult(openingWinner);
+          return;
+        }
+        if (!actor.alive) {
+          const record = engine.resolveTurn(actor);
+          applyRecord(record);
+          return;
+        }
+      }
       picker = { phase: "SKILL", unit: actor };
       renderActionPanel();
       return;
