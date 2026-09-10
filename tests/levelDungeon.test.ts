@@ -58,7 +58,6 @@ describe("レベル上げダンジョンの定義", () => {
   });
 
   it("上の階ほど敵が強い(実効の強さで単調に上がる)", () => {
-    // 星の帯とレベルと倍率を別々に見ても分からない。**掛けた値**で見る
     const power = (d: (typeof LEVEL_DUNGEON_DEFS)[number]) =>
       starMultiplier(d.enemies[0].star) * levelMultiplier(d.enemies[0].star, d.enemies[0].level) * d.powerScale;
     for (let i = 1; i < LEVEL_DUNGEON_DEFS.length; i++) {
@@ -67,7 +66,6 @@ describe("レベル上げダンジョンの定義", () => {
   });
 
   it("経験ピッグの星は下がらない(3階以降は★6で据え置き)", () => {
-    // **下げると、前から遊んでいる人にとっては劣化になる**
     for (let i = 1; i < LEVEL_DUNGEON_DEFS.length; i++) {
       expect(LEVEL_DUNGEON_DEFS[i].pigStar).toBeGreaterThanOrEqual(LEVEL_DUNGEON_DEFS[i - 1].pigStar);
     }
@@ -98,11 +96,11 @@ describe("レベル上げダンジョンの報酬 (applyLevelDungeonClearRewards
     expect(addedPig.level).toBe(STAR_MAX_LEVEL[def.pigStar]);
   });
 
-  it("最高階でもモンスター52,000 EXPとファイター400 EXPを分離する", () => {
+  it("最高階ではモンスター100,000 EXPとファイター400 EXPを分離する", () => {
     const state = createInitialState();
     const def = findLevelDungeonDef("F5")!;
     const result = applyLevelDungeonClearRewards(state, def, [], () => 0);
-    expect([result.expTotal, result.fighterExp]).toEqual([52_000, 400]);
+    expect([result.expTotal, result.fighterExp]).toEqual([100_000, 400]);
   });
 
   it("初回クリアはダイヤ200、2回目以降は3%の確率でダイヤ50になる", () => {
@@ -196,7 +194,6 @@ describe("1日の挑戦回数", () => {
   });
 
   it("ゴールドダンジョンの回数とは別枠で数える", () => {
-    // 片方を使い切ったらもう片方も入れない、では別のコンテンツにならない
     const state = createInitialState();
     const day = Date.parse("2026-05-01T09:00:00Z");
     for (let i = 0; i < LEVEL_DUNGEON_DAILY_LIMIT; i++) trySpendLevelDungeonChallenge(state, day);
@@ -206,7 +203,6 @@ describe("1日の挑戦回数", () => {
 
 describe("控えの移行(3段階 → 5階)", () => {
   it("古い名前のクリア記録が、対応する階へ読み替えられる", () => {
-    // **読み替えないと、前から遊んでいる人のクリア済みが全部消える**
     const old = createInitialState() as unknown as Record<string, unknown>;
     old.clearedLevelDungeonTiers = ["BEGINNER", "INTERMEDIATE", "ADVANCED"];
     const loaded = normalizeLoadedState(JSON.parse(JSON.stringify(old)) as PlayerState);
