@@ -1,9 +1,13 @@
 import { MonsterInstance, addExp, isSkillMaxLevel, rollSkillLevelUp } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, requiredExpForLevel } from "../core/rarity.js";
-import { findMonsterById, SKILL_PIG } from "../data/monsters.js";
+import { EXP_PIG, findMonsterById, SKILL_PIG } from "../data/monsters.js";
 
 export function isSkillPig(material: MonsterInstance): boolean {
   return findMonsterById(material.dexId)?.templateId === SKILL_PIG.templateId;
+}
+
+export function isExpPig(material: MonsterInstance): boolean {
+  return findMonsterById(material.dexId)?.templateId === EXP_PIG.templateId;
 }
 
 function isSkillMaterial(target: MonsterInstance, material: MonsterInstance): boolean {
@@ -47,6 +51,18 @@ export function checkMonsterPowerUp(
 /** 星ごとの、素材1体あたりの基礎経験値(レアリティ分の価値)。星が高い素材ほど経験値としての価値が高い */
 const FEED_EXP_BASE_PER_STAR: Record<Star, number> = { 1: 50, 2: 90, 3: 160, 4: 280, 5: 480, 6: 800 };
 
+/**
+ * 経験ピッグ専用の固定EXP。
+ * ★3〜6は通常素材の計算式から切り離し、育成素材として明確な価値を持たせる。
+ * ★1/★2は従来仕様を維持する。
+ */
+const EXP_PIG_FEED_EXP: Partial<Record<Star, number>> = {
+  3: 40_000,
+  4: 80_000,
+  5: 140_000,
+  6: 300_000,
+};
+
 /** 素材の属性(色)が対象と同じ場合の経験値ボーナス倍率 */
 const SAME_ELEMENT_EXP_MULTIPLIER = 1.5;
 
@@ -60,14 +76,14 @@ export function isSameElement(target: MonsterInstance, material: MonsterInstance
 
 /**
  * 素材モンスター1体を強化に使った時に得られる経験値。
- * 星ごとの基礎価値に加えて、その素材が現在のレベルに到達するために本来必要な経験値
- * (requiredExpForLevel)分も上乗せする。レベルが高い素材ほど、それだけ多くの経験値を
- * 費やして育てられてきたことになるため、素材にした時の価値もその分だけ大きくなる。
- * さらに、素材の属性(色)が対象と同じ場合は経験値が1.5倍になる。
+ * ★3〜6経験ピッグは固定値(4万/8万/14万/30万)。
+ * それ以外は従来どおり、星ごとの基礎価値＋素材Lvの必要経験値を使う。
+ * 対象と同じ属性(色)なら、どちらも1.5倍になる。
  */
 export function feedExpValue(target: MonsterInstance, material: MonsterInstance): number {
   if (isSkillPig(material)) return 0;
-  const base = FEED_EXP_BASE_PER_STAR[material.star] + requiredExpForLevel(material.level);
+  const fixedPigExp = isExpPig(material) ? EXP_PIG_FEED_EXP[material.star] : undefined;
+  const base = fixedPigExp ?? FEED_EXP_BASE_PER_STAR[material.star] + requiredExpForLevel(material.level);
   const multiplier = isSameElement(target, material) ? SAME_ELEMENT_EXP_MULTIPLIER : 1;
   return Math.round(base * multiplier);
 }
