@@ -91,14 +91,11 @@ interface TierConfig {
 /**
  * 各階の中身。
  *
- * 経験値の額は**必要経験値から逆算**してある(勘で決めていない)。
- * ★6を Lv1 から Lv60 まで上げるのに要るのは 436,915。
- * 5階を1日5回まわすと 1体あたり 260,000 なので、★6 Lv1から約2日で1体が仕上がる。
- * 1〜3階は以前の初級・中級・上級におおむね対応する強さで、額だけを引き上げてある
- * (回数制限を課したぶん、1回の価値を上げないと以前より痩せる)。
+ * 新しい★6育成はLv1→50が900,000 EXP、Lv50→60が1,200,000 EXP。
+ * 5階は1回100,000 EXPをパーティ各1体へ直接付与し、さらに★6経験ピッグを1体確定で渡す。
+ * 1日5回・スタミナ20の制限は維持し、通常ステージとの差別化と経験ピッグの価値を両立する。
  *
  * ピッグは3階から★6のまま据え置く。**ここを下げると、前から遊んでいる人にとっては劣化**になる。
- * 上の階の伸びしろは、この場所の存在理由そのものである経験値で出す。
  *
  * 4階・5階の倍率は**振って測って決めた**(通常4体・★6Lv60・24回ずつ):
  *
@@ -117,7 +114,7 @@ const TIER_CONFIG: Record<LevelDungeonTier, TierConfig> = {
   F2: { star: 4, level: 40, powerScale: 0.8, expReward: 9000, goldReward: 2600, pigStar: 4, speedScale: 1.06 },
   F3: { star: 5, level: 50, powerScale: 1.35, expReward: 20000, goldReward: 4500, pigStar: 6, speedScale: 1.12 },
   F4: { star: 6, level: 55, powerScale: 1.05, expReward: 34000, goldReward: 7000, pigStar: 6, speedScale: 1.18 },
-  F5: { star: 6, level: 60, powerScale: 1.2, expReward: 52000, goldReward: 10000, pigStar: 6, speedScale: 1.24 },
+  F5: { star: 6, level: 60, powerScale: 1.2, expReward: 100000, goldReward: 10000, pigStar: 6, speedScale: 1.24 },
 };
 
 export const LEVEL_DUNGEON_DEFS: LevelDungeonDef[] = LEVEL_DUNGEON_TIERS.map((tier) => {
