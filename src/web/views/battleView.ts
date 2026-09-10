@@ -140,6 +140,13 @@ const LEADER_MIN = 18;
  */
 const HUD_MIN_SCALE = 0.88;
 
+export function actionNamesFromLines(lines: readonly string[]): string[] {
+  return lines
+    .filter((line) => !line.startsWith(" "))
+    .map((line) => /「(.+?)」！/.exec(line)?.[1])
+    .filter((name): name is string => Boolean(name));
+}
+
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish, chain, venue } = props;
   const canSurrender = props.canSurrender !== false;
@@ -621,13 +628,6 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 名前を行動者の3つのスキルと突き合わせれば番号が分かる。
    * 番号が分かると、必殺技(3番目)だけ演出を別格にできる。
    */
-  export function actionNamesFromLines(lines: readonly string[]): string[] {
-    return lines
-      .filter((line) => !line.startsWith(" "))
-      .map((line) => /「(.+?)」！/.exec(line)?.[1])
-      .filter((name): name is string => Boolean(name));
-  }
-
   function actionNameOf(record: TurnRecord): string | null {
     const actor = engine.getUnits().find((u) => u.instanceId === record.actorId);
     const skillNames = new Set(actor?.def.skills.map((skill) => skill.name) ?? []);
