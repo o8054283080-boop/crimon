@@ -14,6 +14,28 @@ export const STAR_MAX_LEVEL: Record<Star, number> = {
   6: 60,
 };
 
+/**
+ * 各ランクをLv1からそのランクの育成区切りまで上げるのに必要な総EXP。
+ * ★6だけはLv1→50を900,000、Lv50→60を1,200,000に分ける。
+ */
+export const STAR_EARLY_TOTAL_EXP: Record<Star, number> = {
+  1: 40_000,
+  2: 80_000,
+  3: 220_000,
+  4: 420_000,
+  5: 700_000,
+  6: 900_000,
+};
+
+export const STAR_MAX_TOTAL_EXP: Record<Star, number> = {
+  1: 40_000,
+  2: 80_000,
+  3: 220_000,
+  4: 420_000,
+  5: 700_000,
+  6: 2_100_000,
+};
+
 /** ランクアップ(星を1つ上げる)に必要な、同じ星の素材モンスターの数 */
 export const RANK_UP_SACRIFICE_COUNT: Record<Star, number> = {
   1: 1,
@@ -60,9 +82,8 @@ export function computeEffectiveStats(baseStats: Stats, star: Star, level: numbe
 }
 
 /**
- * ★6のLv50以降は完成育成帯として必要経験値を大きく引き上げる。
- * Lv50→60の合計は1,200,000 EXP。
- * Lv49以下は従来式を維持し、既存の序盤〜中盤育成テンポは変えない。
+ * ★6のLv50以降は完成育成帯。
+ * Lv50→60の合計は1,200,000 EXPで据え置く。
  */
 const LATE_GAME_EXP: Record<number, number> = {
   50: 60_000,
@@ -77,7 +98,45 @@ const LATE_GAME_EXP: Record<number, number> = {
   59: 205_000,
 };
 
-/** そのレベルから次のレベルへ上がるために必要な経験値 */
+/**
+ * 星1〜5の全育成帯と、★6のLv1→50を滑らかに配分するカーブ。
+ * 累積値の差分で計算するため、丸めを含めても各ランクの合計EXPは必ず設計値に一致する。
+ */
+const EARLY_EXP_CURVE_POWER = 1.35;
+
+function cumulativeEarlyExp(totalExp: number, step: number, stepCount: number): number {
+  if (step <= 0) return 0;
+  if (step >= stepCount) return totalExp;
+  return Math.round(totalExp * (step / stepCount) ** EARLY_EXP_CURVE_POWER);
+}
+
+/**
+ * 星ランクを含めた実際のモンスター育成用必要EXP。
+ * level は「そのレベルから次のレベルへ上がる」際の現在レベル。
+ */
+export function requiredExpForStarLevel(star: Star, level: number): number {
+  const safeLevel = Math.max(1, Math.floor(Number.isFinite(level) ? level : 1));
+
+  if (star === 6 && safeLevel >= 50) {
+    return LATE_GAME_EXP[safeLevel] ?? 0;
+  }
+
+  const earlyMaxLevel = star === 6 ? 50 : STAR_MAX_LEVEL[star];
+  if (safeLevel >= earlyMaxLevel) return 0;
+
+  const stepCount = earlyMaxLevel - 1;
+  const totalExp = STAR_EARLY_TOTAL_EXP[star];
+  return (
+    cumulativeEarlyExp(totalExp, safeLevel, stepCount) -
+    cumulativeEarlyExp(totalExp, safeLevel - 1, stepCount)
+  );
+}
+
+/**
+ * 星情報を持たない旧来の汎用計算。
+ * 素材価値など既存仕様の互換用に残し、実際のモンスターレベルアップは
+ * requiredExpForStarLevel を使う。
+ */
 export function requiredExpForLevel(level: number): number {
   return LATE_GAME_EXP[level] ?? Math.round(40 * level ** 1.5);
 }
