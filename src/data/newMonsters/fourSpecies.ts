@@ -102,7 +102,7 @@ export const JOKER: MonsterTemplate = {
   skill1:skill('joker_s1','呪いの札','SINGLE_ENEMY',0,[d(1),{kind:'STATUS',status:'SKILL_LOCK',durationTurns:1,chance:.4},{kind:'CURSE',chance:.2}],[power(1.1),set(1,{chance:.5}),power(1.2/1.1),set(2,{chance:.3})]),
   skill2Variants:[
     skill('joker_s2_a','悪魔の囁き','SINGLE_ENEMY',3,[d(1.4),deb('atk',.6),deb('def',.6),block(.6)],[power(1.1),e=>{[1,2,3].forEach(i=>Object.assign(e[i],{chance:.7}));},power(1.2/1.1)]),
-    skill('joker_s2_b','最低なイタズラ','SINGLE_ENEMY',4,[d(1.2),{kind:'DETONATE_CURSES'}],growth20,{extraTurn:true}),
+    skill('joker_s2_b','最低なイタズラ','SINGLE_ENEMY',4,[d(1.2),{kind:'DETONATE_CURSES'}],growth20,{extraTurn:true,targetPriority:'CURSED'}),
     skill('joker_s2_c','悪意の振り撒き','ALL_ENEMIES',4,[{kind:'CURSE',chance:.7},{kind:'BLIND',chance:.7,durationTurns:2},gauge(-.25,undefined,{chance:.6})],[set(0,{chance:.8}),set(1,{chance:.8}),set(2,{chance:.7})]),
   ],
   skill3Variants:[
