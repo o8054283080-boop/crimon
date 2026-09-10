@@ -611,7 +611,7 @@ export interface Skill {
   cooldownTurns: number;
   effects: SkillEffect[];
   /** 単体敵スキルで、防御低下中の相手を優先する。 */
-  targetPriority?: "DEF_DOWN" | "LOWEST_HP";
+  targetPriority?: "DEF_DOWN" | "LOWEST_HP" | "CURSED";
   /** このスキルで敵を倒した時、使用者が追加ターンを得る。 */
   extraTurnOnKill?: boolean;
   /** 戦闘中に自動発動する表示用パッシブ。AIの行動候補にはしない。 */
