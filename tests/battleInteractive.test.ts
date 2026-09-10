@@ -163,4 +163,26 @@ describe("BattleEngine のインタラクティブ操作API", () => {
     expect(second.lines.some((line) => line.includes("呪いの札"))).toBe(true);
   });
 
+  it("最低なイタズラのオート対象は呪い持ちを最優先する", () => {
+    const joker = findMonster("joker", "ELECTRIC")!;
+    const enemies = [
+      findMonster("golem", "FIRE")!,
+      findMonster("golem", "WATER")!,
+    ];
+    const engine = new BattleEngine([joker], enemies, { rng: () => 0 });
+    const units = engine.getUnits();
+    const actor = engine.getNextActor()!;
+    const [, firstEnemy, cursedEnemy] = units;
+
+    cursedEnemy.curses = [{ turns: 2, sourceAtk: actor.def.stats.atk }];
+
+    const opening = engine.prepareInteractiveTurn(actor);
+    expect(opening).not.toBeNull();
+
+    const record = engine.resolveTurn(actor);
+    expect(record.lines.some((line) => line.includes("最低なイタズラ"))).toBe(true);
+    expect((cursedEnemy.curses ?? []).length).toBe(0);
+    expect((firstEnemy.curses ?? []).length).toBeGreaterThanOrEqual(0);
+  });
+
 });
