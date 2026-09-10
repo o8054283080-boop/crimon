@@ -1,4 +1,5 @@
 import "../ui/battleSurrender.css";
+import "../ui/battleSkillName.css";
 import { BattleEngine, BattleEvent, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
 import { formatHpPair } from "../../core/stats.js";
 import { BattleUnit } from "../../battle/unit.js";
@@ -77,6 +78,7 @@ const SPEED_STEPS = ["1", "2", "4", "8"] as const;
 const SPEED_INTERVAL_MS: Record<string, number> = { "1": 1000, "2": 500, "4": 250, "8": 125 };
 /** 攻撃モーションを見せてから着弾させるまでの間(再生速度で縮む) */
 const IMPACT_DELAY_MS: Record<string, number> = { "1": 320, "2": 160, "4": 80, "8": 40 };
+const SKILL_NAME_MS: Record<string, number> = { "1": 900, "2": 450, "4": 220, "8": 110 };
 
 /**
  * 選んだ再生速度は覚えておき、次の戦闘へ持ち越す。
@@ -157,6 +159,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const hudRefs = new Map<string, UnitHudRefs>();
   const teamOf = new Map<string, "PLAYER" | "ENEMY">();
   const anchorPositions = new Map<string, { x: number; y: number }>();
+  const skillNameRefs = new Map<string, HTMLElement>();
+  const skillNameHandles = new Map<string, ReturnType<typeof setTimeout>>();
 
   /** 着弾待ちなど、時間差で走る演出。画面を離れる時にまとめて取り消す */
   const pendingEffects: { handle: ReturnType<typeof setTimeout>; run: () => void }[] = [];
@@ -179,6 +183,8 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
 
   function cancelPending(): void {
     for (const entry of pendingEffects.splice(0, pendingEffects.length)) clearTimeout(entry.handle);
+    for (const handle of skillNameHandles.values()) clearTimeout(handle);
+    skillNameHandles.clear();
   }
 
   // --- 3Dステージ ---
@@ -210,6 +216,9 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       });
     }
     overlay.append(card);
+    const skillName = el("div", { className: `battle-skill-name battle-skill-name--${unit.team === "PLAYER" ? "player" : "enemy"}` });
+    skillNameRefs.set(unit.instanceId, skillName);
+    overlay.append(skillName);
   }
 
   const stage = new BattleStage(stageHost, stageUnits, venue);
@@ -334,6 +343,12 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       refs.card.style.left = `${anchorX}px`;
       // transform が `-100%` なので、指定するのは札の**下端**
       refs.card.style.top = `${top + height}px`;
+      const skillName = skillNameRefs.get(anchor.instanceId);
+      if (skillName) {
+        skillName.style.left = `${anchorX}px`;
+        skillName.style.top = `${Math.max(6, top - 6)}px`;
+        skillName.style.visibility = anchor.visible ? "visible" : "hidden";
+      }
 
       // ぶつかって下へ送られた時だけ、本体まで線を引いて対応を示す
       refs.card.classList.remove("unit-hud--lifted");
@@ -606,13 +621,40 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 名前を行動者の3つのスキルと突き合わせれば番号が分かる。
    * 番号が分かると、必殺技(3番目)だけ演出を別格にできる。
    */
+  function actionNameOf(record: TurnRecord): string | null {
+    const actor = engine.getUnits().find((u) => u.instanceId === record.actorId);
+    const skillNames = new Set(actor?.def.skills.map((skill) => skill.name) ?? []);
+    const names = record.lines
+      .filter((line) => !line.startsWith(" "))
+      .map((line) => /「(.+?)」！/.exec(line)?.[1])
+      .filter((name): name is string => Boolean(name));
+    const active = [...names].reverse().find((name) => skillNames.has(name));
+    return active ?? names.at(-1) ?? null;
+  }
+
   function skillIndexOf(record: TurnRecord): 0 | 1 | 2 {
-    const headline = record.lines.find((line) => !line.startsWith(" "));
-    const name = headline ? /「(.+?)」/.exec(headline)?.[1] : undefined;
+    const name = actionNameOf(record);
     if (!name) return 0;
     const actor = engine.getUnits().find((u) => u.instanceId === record.actorId);
     const index = actor?.def.skills.findIndex((skill) => skill.name === name) ?? -1;
     return index === 1 || index === 2 ? index : 0;
+  }
+
+  function showSkillName(record: TurnRecord): void {
+    const name = actionNameOf(record);
+    const label = skillNameRefs.get(record.actorId);
+    if (!name || !label) return;
+    const previous = skillNameHandles.get(record.actorId);
+    if (previous) clearTimeout(previous);
+    label.textContent = name;
+    label.classList.remove("battle-skill-name--show");
+    void label.offsetWidth;
+    label.classList.add("battle-skill-name--show");
+    const handle = setTimeout(() => {
+      label.classList.remove("battle-skill-name--show");
+      skillNameHandles.delete(record.actorId);
+    }, SKILL_NAME_MS[speed]);
+    skillNameHandles.set(record.actorId, handle);
   }
 
   function applyRecord(record: TurnRecord): void {
@@ -623,6 +665,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       dockUnit = engine.getUnits().find((u) => u.instanceId === record.actorId) ?? dockUnit;
     }
     appendLines(record.lines);
+    showSkillName(record);
 
     const offensive = isOffensiveTurn(record.actorId, record.events);
     const skillIndex = skillIndexOf(record);
