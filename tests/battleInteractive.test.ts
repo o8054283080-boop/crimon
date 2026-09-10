@@ -119,4 +119,48 @@ describe("BattleEngine のインタラクティブ操作API", () => {
     }
     expect(engine.getNextActor()).toBeNull();
   });
+  it("電気ジョーカーは手動でバトルイリュージョン→最低なイタズラ→追加ターン→通常攻撃になる", () => {
+    const joker = findMonster("joker", "ELECTRIC")!;
+    const enemy = findMonster("golem", "WATER")!;
+    const engine = new BattleEngine([joker], [enemy], { rng: () => 0 });
+
+    const actor = engine.getNextActor()!;
+    expect(actor.def.name).toContain("ジョーカー");
+
+    const opening = engine.prepareInteractiveTurn(actor);
+    expect(opening).not.toBeNull();
+    expect(opening!.lines.some((line) => line.includes("バトルイリュージョン"))).toBe(true);
+
+    const target = engine.getUnits().find((unit) => unit.team === "ENEMY")!;
+    expect((target.curses ?? []).length).toBeGreaterThan(0);
+
+    const prank = engine.resolveTurn(actor, { skillIndex: 1, targetId: target.instanceId });
+    expect(prank.lines.some((line) => line.includes("最低なイタズラ"))).toBe(true);
+    expect(prank.lines.some((line) => line.includes("追加ターンを得た"))).toBe(true);
+
+    const extraActor = engine.getNextActor();
+    expect(extraActor).toBe(actor);
+    const normal = engine.resolveTurn(extraActor!, { skillIndex: 0, targetId: target.instanceId });
+    expect(normal.lines.some((line) => line.includes("バトルイリュージョン"))).toBe(false);
+    expect(normal.lines.some((line) => line.includes("呪いの札"))).toBe(true);
+  });
+
+  it("電気ジョーカーのオートもバトルイリュージョン→最低なイタズラ→追加ターン→通常攻撃になる", () => {
+    const joker = findMonster("joker", "ELECTRIC")!;
+    const enemy = findMonster("golem", "WATER")!;
+    const engine = new BattleEngine([joker], [enemy], { rng: () => 0 });
+
+    const actor = engine.getNextActor()!;
+    const first = engine.resolveTurn(actor);
+    expect(first.lines.some((line) => line.includes("バトルイリュージョン"))).toBe(true);
+    expect(first.lines.some((line) => line.includes("最低なイタズラ"))).toBe(true);
+    expect(first.lines.some((line) => line.includes("追加ターンを得た"))).toBe(true);
+
+    const extraActor = engine.getNextActor();
+    expect(extraActor).toBe(actor);
+    const second = engine.resolveTurn(extraActor!);
+    expect(second.lines.some((line) => line.includes("バトルイリュージョン"))).toBe(false);
+    expect(second.lines.some((line) => line.includes("呪いの札"))).toBe(true);
+  });
+
 });
