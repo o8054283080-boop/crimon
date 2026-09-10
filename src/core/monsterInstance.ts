@@ -1,6 +1,6 @@
 import { CombatModifiers, DEFAULT_COMBAT_MODIFIERS, Equipment, EquipSlot, applyEquipmentToStats, computeSetCombatModifiers } from "./equipment.js";
 import { MonsterDefinition } from "./monster.js";
-import { Star, computeEffectiveStats, requiredExpForLevel } from "./rarity.js";
+import { Star, computeEffectiveStats, requiredExpForStarLevel } from "./rarity.js";
 import { applyPlayerStatBoost } from "./playerStatBoost.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
@@ -114,7 +114,7 @@ export function rollSkillLevelUp(instance: MonsterInstance, rng: () => number = 
  * core層からdata層へ依存を逆流させないため、安定している図鑑IDのprefixだけで判定する。
  */
 export function requiredExpForMonsterLevel(instance: MonsterInstance): number {
-  const base = requiredExpForLevel(instance.level);
+  const base = requiredExpForStarLevel(instance.star, instance.level);
   return instance.dexId.startsWith("reincarnation_pig_") ? Math.max(1, Math.ceil(base / 3)) : base;
 }
 
