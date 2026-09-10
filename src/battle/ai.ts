@@ -83,6 +83,11 @@ export function chooseTargets(unit: BattleUnit, skill: Skill, allUnits: BattleUn
           const bDown = b.effects.some((effect) => effect.kind === "DEBUFF" && effect.stat === "def") ? 0 : 1;
           if (aDown !== bDown) return aDown - bDown;
         }
+        if (skill.targetPriority === "CURSED") {
+          const aCursed = (a.curses?.length ?? 0) > 0 ? 0 : 1;
+          const bCursed = (b.curses?.length ?? 0) > 0 ? 0 : 1;
+          if (aCursed !== bCursed) return aCursed - bCursed;
+        }
         const scoreDiff = affinityScore(a) - affinityScore(b);
         if (scoreDiff !== 0) return scoreDiff;
         return hpRatio(a) - hpRatio(b);
