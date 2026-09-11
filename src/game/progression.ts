@@ -1,5 +1,5 @@
 import { MonsterInstance, rollSkillLevelUp } from "../core/monsterInstance.js";
-import { RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, Star, canRankUp } from "../core/rarity.js";
+import { RANK_UP_SACRIFICE_COUNT, Star, canRankUp } from "../core/rarity.js";
 import { EXP_PIG, findMonsterById } from "../data/monsters.js";
 import { isSameSpecies } from "./monsterPowerUp.js";
 
@@ -72,8 +72,4 @@ export function applyRankUp(target: MonsterInstance, sacrifices: MonsterInstance
   }
 
   return { leveledSkillIndices };
-}
-
-export function maxLevelOf(instance: MonsterInstance): number {
-  return STAR_MAX_LEVEL[instance.star];
 }

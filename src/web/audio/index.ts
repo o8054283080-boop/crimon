@@ -18,8 +18,7 @@
  */
 import { BgmScene, bgmPlayer } from "./bgm.js";
 import { audioEngine } from "./context.js";
-import { audioDiagnosticLines, bgmDiagnosisSummary, bgmRoute } from "./diagnostics.js";
-import { decodeFailedForCurrentFormat } from "./format.js";
+import { audioDiagnosticLines, bgmRoute } from "./diagnostics.js";
 import { mediaBgmPlayer } from "./mediaBgm.js";
 import { HitOptions, HitStyle, SfxElement, SfxName, sfxPlayer } from "./player.js";
 import { getAudioSettings, onAudioSettingsChange, updateAudioSettings } from "./settings.js";
@@ -101,21 +100,6 @@ export function initAudio(): void {
   };
 }
 
-/** 音声文脈の状態。"running" 以外なら、まだ音を出せる状態になっていない */
-export function audioContextState(): string {
-  return sfxPlayer.contextState();
-}
-
-/** AudioContextの状態変化を購読する。設定画面の診断を古い値のままにしないために使う。 */
-export function onAudioContextStateChange(listener: () => void): () => void {
-  return audioEngine.onStateChange(listener);
-}
-
-/** BGMがいま鳴っていない理由を一言で。設定画面に出す */
-export function bgmDiagnosis(): string {
-  return bgmDiagnosisSummary();
-}
-
 /** 効果音を鳴らす。まだ操作されていない/設定で切られている時は静かに何もしない */
 export function playSfx(name: SfxName, gain = 1): void {
   sfxPlayer.play(name, gain);
@@ -135,11 +119,6 @@ export function playHitSfx(options: HitOptions = {}): void {
 export function playBgm(scene: BgmScene | null): void {
   wantedScene = scene;
   route();
-}
-
-/** いま互換再生(HTML Audio)を使っているか。テストと診断のために出す */
-export function usingMediaFallback(): boolean {
-  return decodeFailedForCurrentFormat();
 }
 
 /** 3D側と同じ割り当て(役割で当たり方が変わる) */

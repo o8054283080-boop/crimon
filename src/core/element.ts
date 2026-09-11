@@ -11,8 +11,6 @@ export const CYCLE_ELEMENTS = ["FIRE", "GRASS", "ELECTRIC", "WATER"] as const;
 export type CycleElement = (typeof CYCLE_ELEMENTS)[number];
 
 export const DUAL_ELEMENTS = ["LIGHT", "DARK"] as const;
-export type DualElement = (typeof DUAL_ELEMENTS)[number];
-
 export const ELEMENTS = [...CYCLE_ELEMENTS, ...DUAL_ELEMENTS] as const;
 export type Element = (typeof ELEMENTS)[number];
 

@@ -694,10 +694,6 @@ export function isPassiveSkill(skill: Skill): boolean {
   return skill.passive !== undefined || skill.automatic === true;
 }
 
-export function isOffCooldownSkill(skill: Skill): boolean {
-  return skill.cooldownTurns > 0;
-}
-
 /** スキルレベルの上限 */
 export const MAX_SKILL_LEVEL = 5;
 

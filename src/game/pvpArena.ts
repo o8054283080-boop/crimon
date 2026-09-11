@@ -12,7 +12,7 @@
  */
 import { Equipment, EquipSlot, EQUIP_SLOTS, StatType, SLOT_MAIN_STAT_OPTIONS, enhanceEquipment, generateEquipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
-import { MonsterInstance, createMonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
+import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import { MAX_SKILL_LEVEL } from "../core/skill.js";
@@ -35,13 +35,10 @@ import {
   arenaCompressedSpeed,
   arenaPeriodKey,
   arenaRankForPoints,
-  findArenaArchetype,
 } from "../data/pvpArena.js";
 import {
   PlayerState,
-  addEquipment,
   addSummonScrolls,
-  equipToMonster,
 } from "./playerState.js";
 import { resolveDex } from "./stageRunner.js";
 
@@ -108,10 +105,6 @@ export function toggleArenaTeamMember(state: PlayerState, slot: ArenaTeamSlot, i
   if (ids.length >= ARENA_TEAM_SIZE) return false;
   ids.push(instanceId);
   return true;
-}
-
-export function clearArenaTeam(state: PlayerState, slot: ArenaTeamSlot): void {
-  teamIds(state, slot).length = 0;
 }
 
 /* ==========================================================================
@@ -519,50 +512,3 @@ export function settleArenaPeriod(state: PlayerState, now: number = Date.now()):
  * 先に確かめるための道具。過去に、毒を1体も持たない編成を「毒編成」として
  * 測り、まるごと嘘の結論を出した事故があるので、ここに置いてある。
  * ========================================================================== */
-
-/** その型の顔ぶれが、狙った戦術の技を実際に持っているかを数える */
-export function countArchetypeSkillEvidence(archetypeId: ArenaArchetypeId, rare: boolean): {
-  debuffLike: number;
-  healLike: number;
-  guardLike: number;
-} {
-  const archetype = findArenaArchetype(archetypeId);
-  const roster = rare ? archetype.rareTeam : archetype.normalTeam;
-  let debuffLike = 0;
-  let healLike = 0;
-  let guardLike = 0;
-  for (const dexId of roster) {
-    const dex = resolveDex(dexId);
-    for (const skill of dex.skills) {
-      for (const effect of skill.effects) {
-        if (["DEBUFF", "STUN", "POISON", "BLIND", "BURN", "HEAL_BLOCK", "STRIP", "COOLDOWN_EXTEND"].includes(effect.kind)) {
-          debuffLike += 1;
-        }
-        if (effect.kind === "HEAL" || effect.kind === "REGEN" || effect.kind === "LIFESTEAL") healLike += 1;
-        if (effect.kind === "SHIELD" || effect.kind === "IMMUNITY" || effect.kind === "CLEANSE") guardLike += 1;
-      }
-    }
-  }
-  return { debuffLike, healLike, guardLike };
-}
-
-/**
- * 相手編成をプレイヤーの手持ちとして取り込む(測定専用)。
- *
- * バランスを測る時に、相手側の編成をそのまま「こちら側」として使いたいことがある。
- * 本編からは呼ばない。
- */
-export function materializeOpponentAsParty(state: PlayerState, opponent: ArenaOpponent): MonsterInstance[] {
-  const party: MonsterInstance[] = [];
-  for (const unit of opponent.units) {
-    const instance = createMonsterInstance(unit.dexId, unit.star, unit.level);
-    instance.skillLevels = [...unit.skillLevels] as [number, number, number];
-    state.monsters.push(instance);
-    for (const equipment of unit.equipment) {
-      addEquipment(state, equipment);
-      equipToMonster(state, instance.id, equipment.id);
-    }
-    party.push(instance);
-  }
-  return party;
-}

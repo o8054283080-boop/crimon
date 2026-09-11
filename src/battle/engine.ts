@@ -2,7 +2,6 @@ import { ELEMENT_JA } from "../core/element.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
-import { PassiveLevelEffect } from "../core/passive.js";
 import { EffectApplyTo, EffectCondition, STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
 import {
   TOWER70_BOSS_REGEN,
@@ -80,7 +79,6 @@ import {
   CRIMOARK_SUPPORT_S2_ID,
   CRIMOARK_SUPPORT_S3_ID,
   CRIMOARK_SUPPORT_SHIELD_RATE,
-  CRIMOARK_TEMPLATE_ID,
   CrimoarkCloneRole,
 } from "../data/crimoark.js";
 import { chooseSkill, chooseTargets } from "./ai.js";
@@ -94,7 +92,6 @@ import {
   applyStatus,
   applyHeal,
   cleanseDebuffs,
-  countDebuffs,
   createBattleUnit,
   damageTakenMultiplier,
   getEffectiveStat,
@@ -3183,8 +3180,4 @@ export class BattleEngine {
   getUnits(): readonly BattleUnit[] {
     return this.units;
   }
-}
-
-export function summarizeUnit(unit: BattleUnit): string {
-  return `${unit.def.name} HP:${unit.currentHp}/${unit.maxHp} (${Math.round(hpRatio(unit) * 100)}%)`;
 }

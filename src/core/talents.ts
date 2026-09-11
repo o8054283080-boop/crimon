@@ -337,11 +337,6 @@ export function createDefaultTalentState(): TalentState {
   return { schemaVersion: 1, unlockedPoints: 0, basic: {}, battle: {}, skill: { 1: [], 2: [] }, awakening: null };
 }
 
-/** 才能覚醒に触ったことがあるか。UIの「未着手」表示に使う */
-export function isTalentUntouched(state: TalentState): boolean {
-  return usedTalentPoints(state, () => 0) === 0 && state.unlockedPoints === 0;
-}
-
 /**
  * 使用済みpt。
  *

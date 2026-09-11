@@ -83,8 +83,6 @@ export const SPRITE = {
   CRESCENT: 15,
 } as const;
 
-export type SpriteCell = (typeof SPRITE)[keyof typeof SPRITE];
-
 export const ATLAS_COLUMNS = 4;
 
 type CellDraw = (ctx: CanvasRenderingContext2D, s: number) => void;
@@ -948,6 +946,13 @@ export function vortexTexture(): THREE.Texture {
   });
 }
 
+/**
+ * 作ったテクスチャを全部捨てる。
+ *
+ * **いまどこからも呼ばれていない。**`disposeSpriteTextures`(spriteArt.ts) と
+ * 同じ事情で残してある——無駄なのか呼び忘れなのか、実機でGPUの使用量を
+ * 測るまで決められない。**測る前に消さない。**
+ */
 export function disposeFxTextures(): void {
   for (const texture of cache.values()) texture.dispose();
   cache.clear();

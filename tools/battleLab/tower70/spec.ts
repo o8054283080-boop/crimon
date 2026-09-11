@@ -215,8 +215,3 @@ export const TOWER70_SWEEPS: { axis: string; label: string; values: Tower70Numbe
    * 「効かなかった」ではなく「測っていない」の意味しか持たない
    */
 ];
-
-/** その値の組が基準そのものか */
-export function isTower70Base(numbers: Tower70Numbers): boolean {
-  return (Object.keys(TOWER70_BASE) as (keyof Tower70Numbers)[]).every((key) => numbers[key] === TOWER70_BASE[key]);
-}

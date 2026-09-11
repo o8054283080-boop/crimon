@@ -297,20 +297,6 @@ export function nextSlotUnlockCost(unlockedSlots: number): number | null {
   return SHOP_SLOT_UNLOCK_COSTS[index];
 }
 
-/** 表示用のラベル。値段はUIに出すが、星の出やすさは出さない */
-export function describeShopEntry(entry: ShopEntry): string {
-  switch (entry.kind) {
-    case "EQUIPMENT":
-      return `星${entry.equipment.star} 装備`;
-    case "MONSTER":
-      return `星${entry.star} モンスター`;
-    case "SCROLL":
-      return `召喚の書 ×${entry.count}`;
-    case "AWAKENING_MATERIAL":
-      return `${AWAKENING_MATERIAL_LABEL[entry.material]} ×${entry.count}`;
-  }
-}
-
 /** 才能覚醒の素材の名前。**表示はどこでもこれを通す** */
 export const AWAKENING_MATERIAL_LABEL: Record<"shards" | "crystals" | "stones", string> = {
   shards: "目覚の欠片", crystals: "目覚の結晶", stones: "目覚の奇石",
