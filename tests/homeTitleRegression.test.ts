@@ -24,7 +24,7 @@ describe("NEW TITLE → NEW HOME regression contract", () => {
    */
   it("renders the title cover art, start control and transition", () => {
     expect(source).toContain('className: "title-screen crimon-title-screen"');
-    expect(source).toContain("../assets/title-cover.webp");
+    expect(source).toContain("../assets/backgrounds/title-cover.webp");
     expect(source).toContain('className: "crimon-title-screen__cover"');
     // 巡回はここを押す。無いとタイトルに覆われたホームを「問題なし」と報告する
     expect(source).toContain('"data-tour": "start"');

@@ -16,20 +16,23 @@
  *
  * ## 元絵について
  *
- * `src/web/assets/app-icon.png` を縮めて使う。元絵は透過つきなので、
+ * `art/sources/app-icon-1254.png` を縮めて使う。元絵は透過つきなので、
  * **必ず背景を敷いてから描く。** iOSはホーム画面のアイコンを角丸で
  * 切り抜くだけで、透過部分は黒く残る。透過のまま渡すと、
  * 暗い壁紙の上で何が描いてあるのか読めない。
  *
  * 元絵自体が壊れていないことは `tests/pngIntegrity.test.ts` が見張る
- * (`src/web/assets` も検査の対象に入っている)。
+ * (`art` も検査の対象に入っている)。
+ *
+ * **元絵は配信されない。**画面に出る絵ではないので `src/web/assets` には置かない
+ * (2.1MBあり、そこに置くとビルドに混ざる)。置き場の決まりは `art/README.md`。
  */
 import { chromium } from "playwright";
 import { CHROMIUM_GL_ARGS, chromiumExecutablePath } from "./lib/chromium.mjs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const SOURCE = "src/web/assets/app-icon.png";
+const SOURCE = "art/sources/app-icon-1254.png";
 const OUT_DIR = "public/icons";
 
 /** 焼く大きさ。iOSのホーム画面は180、manifestは192と512 */

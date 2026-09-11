@@ -32,7 +32,7 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: url("../assets/title-cover.webp") center / cover no-repeat;
+  background: url("../assets/backgrounds/title-cover.webp") center / cover no-repeat;
   /* ぼかすと縁が透けるので、少し大きめに引き伸ばしてから隠す */
   transform: scale(1.12);
   filter: blur(26px) brightness(0.62) saturate(0.9);

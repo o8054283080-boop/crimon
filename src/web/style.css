@@ -6730,7 +6730,7 @@ body {
 .home-screen--menu-only .home-menu::before {
   background-image:
     linear-gradient(180deg, rgba(6, 5, 12, 0.1) 0%, rgba(6, 5, 12, 0.34) 26%, rgba(6, 5, 12, 0.78) 52%, var(--bg) 74%),
-    url("./assets/home-hero.jpg");
+    url("./assets/backgrounds/home-hero.jpg");
   background-size: cover, 118% auto;
   background-position: center top, center -150px;
   background-repeat: no-repeat, no-repeat;
@@ -7186,7 +7186,7 @@ body {
 .home-adventure__sky {
   position: absolute;
   inset: 0;
-  background-image: url("./assets/adventure-bg.jpg");
+  background-image: url("./assets/backgrounds/adventure-bg.jpg");
   background-size: cover;
   background-position: center 62%;
 }
@@ -7399,11 +7399,11 @@ body {
 }
 
 .home-feature-grid .home-tile[data-tour="tile:summon"] {
-  background-image: url("./assets/summon-bg.jpg");
+  background-image: url("./assets/backgrounds/summon-bg.jpg");
 }
 
 .home-feature-grid .home-tile[data-tour="tile:shop"] {
-  background-image: url("./assets/shop-bg.jpg");
+  background-image: url("./assets/backgrounds/shop-bg.jpg");
 }
 
 /* 絵の上に字を置くので、下端を沈めて読めるようにする */
@@ -7510,7 +7510,7 @@ body::before {
   background-color: var(--bg);
   background-image:
     linear-gradient(180deg, rgba(6, 5, 12, 0.3) 0%, rgba(6, 5, 12, 0.68) 34%, rgba(6, 5, 12, 0.92) 62%, var(--bg) 84%),
-    url("./assets/world-bg.jpg");
+    url("./assets/backgrounds/world-bg.jpg");
   background-size: cover, cover;
   background-position: center top, center top;
   background-repeat: no-repeat, no-repeat;
