@@ -32,36 +32,6 @@ export function radialGlowTexture(): THREE.Texture {
   });
 }
 
-/** 中心が抜けたリング状の光。衝撃波・魔法陣の縁に使う */
-export function ringGlowTexture(): THREE.Texture {
-  return fromCanvas("ring", 256, (ctx, size) => {
-    const r = size / 2;
-    const gradient = ctx.createRadialGradient(r, r, 0, r, r, r);
-    gradient.addColorStop(0.0, "rgba(255,255,255,0)");
-    gradient.addColorStop(0.62, "rgba(255,255,255,0)");
-    gradient.addColorStop(0.78, "rgba(255,255,255,1)");
-    gradient.addColorStop(0.92, "rgba(255,255,255,0.35)");
-    gradient.addColorStop(1.0, "rgba(255,255,255,0)");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, size, size);
-  });
-}
-
-/** 縦に伸びた光の筋。斬撃・軌跡パーティクルに使う */
-export function streakTexture(): THREE.Texture {
-  return fromCanvas("streak", 128, (ctx, size) => {
-    const gradient = ctx.createLinearGradient(0, 0, 0, size);
-    gradient.addColorStop(0.0, "rgba(255,255,255,0)");
-    gradient.addColorStop(0.5, "rgba(255,255,255,1)");
-    gradient.addColorStop(1.0, "rgba(255,255,255,0)");
-    ctx.fillStyle = gradient;
-    const w = size * 0.22;
-    ctx.fillRect(size / 2 - w / 2, 0, w, size);
-    ctx.filter = "blur(6px)";
-    ctx.drawImage(ctx.canvas, 0, 0);
-  });
-}
-
 /** 六角形の魔法陣。足元のキャラクター台座に敷く */
 export function sigilTexture(): THREE.Texture {
   return fromCanvas("sigil", 512, (ctx, size) => {
@@ -127,6 +97,18 @@ export function shadowTexture(): THREE.Texture {
   });
 }
 
+/**
+ * 読み込み済みのテクスチャを全部捨てる。
+ *
+ * **いまどこからも呼ばれていない。**「画面を離れる時に捨てる」つもりで
+ * 置かれたが、呼び出しが繋がっていない。消さずに残してあるのは、
+ * これが**無駄なのか呼び忘れなのか決めきれていない**ため:
+ *
+ *   ・捨てない方が正しい … 同じ絵を何度も使うので、持ち続ける方が速い
+ *   ・捨てるべき … 画面を行き来するとGPUの持ち物が増え続ける
+ *
+ * 判断するには実機でGPUの使用量を測る必要がある。**測る前に消さない。**
+ */
 export function disposeTextureCache(): void {
   for (const texture of cache.values()) texture.dispose();
   cache.clear();

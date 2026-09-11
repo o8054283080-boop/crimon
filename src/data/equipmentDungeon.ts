@@ -383,8 +383,6 @@ function buildBeastFloor(floor: number): DungeonFloor {
 }
 
 export const BEAST_DUNGEON_FLOORS: DungeonFloor[] = Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildBeastFloor(i + 1));
-export const ALL_EQUIPMENT_DUNGEON_FLOORS = [...EQUIPMENT_DUNGEON_FLOORS, ...BEAST_DUNGEON_FLOORS];
-
 export function findDungeonFloor(floor: number, kind: EquipmentDungeonKind = "DEMON"): DungeonFloor | undefined {
   return (kind === "BEAST" ? BEAST_DUNGEON_FLOORS : EQUIPMENT_DUNGEON_FLOORS).find((f) => f.floor === floor);
 }

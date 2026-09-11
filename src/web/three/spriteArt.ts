@@ -341,7 +341,18 @@ export function loadSpriteTexture(url: string): THREE.Texture {
   return texture;
 }
 
-/** 読み込み済みのテクスチャを全部捨てる(画面を離れる時) */
+/**
+ * 読み込み済みのテクスチャを全部捨てる。
+ *
+ * **いまどこからも呼ばれていない。**「画面を離れる時に捨てる」つもりで
+ * 置かれたが、呼び出しが繋がっていない。消さずに残してあるのは、
+ * これが**無駄なのか呼び忘れなのか決めきれていない**ため:
+ *
+ *   ・捨てない方が正しい … 同じ絵を何度も使うので、持ち続ける方が速い
+ *   ・捨てるべき … 画面を行き来するとGPUの持ち物が増え続ける
+ *
+ * 判断するには実機でGPUの使用量を測る必要がある。**測る前に消さない。**
+ */
 export function disposeSpriteTextures(): void {
   for (const texture of textures.values()) texture.dispose();
   textures.clear();

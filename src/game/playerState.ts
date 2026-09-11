@@ -957,10 +957,6 @@ export function unequipFromMonster(state: PlayerState, monsterId: string, slot: 
   delete monster.equipment[slot];
 }
 
-export function getEquipmentById(state: PlayerState, equipmentId: string): Equipment | undefined {
-  return state.equipment.find((e) => e.id === equipmentId);
-}
-
 export interface EnhanceResult {
   ok: boolean;
   reason?: string;

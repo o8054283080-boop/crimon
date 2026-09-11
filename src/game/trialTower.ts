@@ -99,11 +99,6 @@ export function nextTowerFloor(state: PlayerState): number {
   return towerStartFloor(state.trialTowerBestFloor);
 }
 
-/** 塔を登り切っているか */
-export function isTowerCompleted(state: PlayerState): boolean {
-  return state.trialTowerBestFloor >= TOWER_FLOOR_COUNT;
-}
-
 /**
  * 登坂を始める(または節から再開する)。
  * 全員が最大HP・クールタイム0の状態で始まる。

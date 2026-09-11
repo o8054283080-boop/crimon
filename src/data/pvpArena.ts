@@ -243,12 +243,6 @@ export function arenaRankForPoints(points: number): ArenaRank {
   return current;
 }
 
-/** 次のランク帯(最上位なら null) */
-export function nextArenaRank(rank: ArenaRank): ArenaRank | null {
-  const index = ARENA_RANKS.findIndex((r) => r.id === rank.id);
-  return index >= 0 && index + 1 < ARENA_RANKS.length ? ARENA_RANKS[index + 1] : null;
-}
-
 /* ==========================================================================
  * 挑戦券
  * ========================================================================== */
@@ -302,11 +296,6 @@ export const ARENA_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
  */
 export function arenaPeriodKey(now: number): number {
   return Math.floor(now / ARENA_PERIOD_MS);
-}
-
-/** その期間が終わる時刻(ミリ秒epoch) */
-export function arenaPeriodEndAt(now: number): number {
-  return (arenaPeriodKey(now) + 1) * ARENA_PERIOD_MS;
 }
 
 /* ==========================================================================

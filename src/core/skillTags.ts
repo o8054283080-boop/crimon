@@ -125,10 +125,3 @@ export function skillTags(skill: Skill): ReadonlySet<SkillTag> {
   }
   return tags;
 }
-
-/** 表示用の札の名前 */
-export const SKILL_TAG_LABEL: Readonly<Record<SkillTag, string>> = {
-  attack: "攻撃", heal: "回復", buff: "強化", debuff: "弱化",
-  gauge_up: "ゲージ増加", gauge_down: "ゲージ減少", shield: "シールド",
-  single: "単体", aoe: "全体", self_target: "自分", ally_target: "味方", enemy_target: "敵",
-};

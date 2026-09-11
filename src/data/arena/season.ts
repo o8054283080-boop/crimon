@@ -10,9 +10,6 @@ import { ArenaTierId } from "./ranks.js";
 /** 1シーズンの長さ(週)。ここを変えれば期間が変わる */
 export const ARENA_SEASON_WEEKS = 4;
 
-/** 週の区切り。JSTの月曜4時を境にする(日付が変わった直後の混乱を避ける) */
-export const ARENA_WEEK_ANCHOR_HOUR_JST = 4;
-
 /**
  * シーズン1の開始。ここから4週ごとに区切る。
  *

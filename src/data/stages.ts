@@ -421,10 +421,6 @@ function buildStage(theme: ChapterTheme, stageNumber: number): Stage {
 
 export const STAGES: Stage[] = CHAPTER_THEMES.flatMap((theme) => [1, 2, 3, 4, 5].map((stageNumber) => buildStage(theme, stageNumber)));
 
-export function findStage(stageId: string): Stage | undefined {
-  return STAGES.find((s) => s.id === stageId);
-}
-
 /** 選択中の難易度を反映したウェーブ報酬ゴールド。 */
 export function stageWaveGold(stage: Stage, difficulty: Difficulty = "NORMAL"): number {
   return Math.round(stage.rewards.waveGold * DIFFICULTY_MODIFIERS[difficulty].goldMultiplier);

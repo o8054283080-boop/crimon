@@ -130,11 +130,6 @@ export function canSendMonster(state: PlayerState, monster: MonsterInstance): bo
   return true;
 }
 
-/** いま送れる子だけを残す */
-export function sendableMonsters(state: PlayerState): MonsterInstance[] {
-  return state.monsters.filter((monster) => canSendMonster(state, monster));
-}
-
 export interface SendMonstersResult {
   /** 実際に送った数 */
   sent: number;

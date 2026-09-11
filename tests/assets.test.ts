@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
  *
  * 調べたら、**使われていない画像が5枚、置き場所の重複が1組**あった。
  *
- *   art/monsters-raw/       27MB  配信しない生PNG(リポジトリの半分)
+ *   art/monsters-raw/       27MB  配信しない生PNG(リポジトリの半分)。後に削除
  *   src/assets/             4枚   src/web/assets/home/ と中身が同じ重複
  *   app-icon.png            2.1MB どこからも参照されない元画像
  *   home-bottom-nav-frame-v2/v3   v5 だけ使われていた
@@ -125,18 +125,23 @@ describe("使われていない画像を置かない", () => {
 /**
  * 元素材は `art/` へ。
  *
- * 生PNGは1枚2MB前後ある。配信されないのにビルドとリポジトリを重くするので、
- * **画面に出す絵と同じ場所に置かない。**
+ * 生の元絵は1枚2MB前後ある。配信されないのにビルドとリポジトリを重くするので、
+ * **画面に出す絵と同じ場所に置かない。**そして`art`にも、
+ * **使う道具があるものだけ**を置く。
  */
 describe("元素材と配信する画像を混ぜない", () => {
-  it("art の生PNGは、対応するwebpが配信側にある", () => {
-    const raws = TRACKED.filter((f) => f.startsWith("art/monsters-raw/") && f.endsWith(".png"));
-    expect(raws.length, "生PNGが1枚も無い").toBeGreaterThan(0);
-    const missing = raws.filter((f) => {
-      const stem = basename(f, ".png");
-      return !TRACKED.includes(`${ASSET_DIR}/monsters/${stem}.webp`);
-    });
-    expect(missing, `webpに変換されていない生PNG: ${missing.join(", ")}`).toEqual([]);
+  /*
+   * **art に置くのは、道具が名指しで使うものだけ。**
+   *
+   * 「いつか使うかもしれない」で置くと誰も消せなくなる。実際、
+   * モンスターの生PNGが12枚27MB(リポジトリの半分)溜まっていた——
+   * 全部webpに変換済みで、アプリにも道具にも要らないものだった。
+   */
+  it("art にあるのは、道具が使う元素材だけ", () => {
+    const orphan = TRACKED
+      .filter((f) => f.startsWith("art/") && IMAGE_EXT.test(f))
+      .filter((f) => !TOOLING.includes(basename(f)));
+    expect(orphan, `どの道具も使わない元素材: ${orphan.join(", ")}`).toEqual([]);
   });
 
   it("art の中身がアプリ本体から参照されていない", () => {

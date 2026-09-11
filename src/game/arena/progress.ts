@@ -131,12 +131,6 @@ export function claimArenaWeeklyReward(
   return { ok: true, reward, tierName: tier.name };
 }
 
-export function canClaimArenaSeason(state: PlayerState, now: number = Date.now()): boolean {
-  const season = arenaSeasonNumber(now);
-  // 進行中のシーズンぶんは受け取れない。終わったシーズンだけ
-  return state.arenaSeasonClaimedNumber < season - 1 && season > 1;
-}
-
 /**
  * シーズン報酬。終わったシーズンぶんを1回だけ。
  *
