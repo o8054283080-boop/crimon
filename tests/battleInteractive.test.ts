@@ -130,6 +130,9 @@ describe("BattleEngine のインタラクティブ操作API", () => {
     const opening = engine.prepareInteractiveTurn(actor);
     expect(opening).not.toBeNull();
     expect(opening!.lines.some((line) => line.includes("バトルイリュージョン"))).toBe(true);
+    expect(opening!.cues).toEqual([
+      { sourceId: actor.instanceId, name: "バトルイリュージョン", type: "PASSIVE" },
+    ]);
 
     const target = engine.getUnits().find((unit) => unit.team === "ENEMY")!;
     expect((target.curses ?? []).length).toBeGreaterThan(0);
@@ -161,6 +164,19 @@ describe("BattleEngine のインタラクティブ操作API", () => {
     const second = engine.resolveTurn(extraActor!);
     expect(second.lines.some((line) => line.includes("バトルイリュージョン"))).toBe(false);
     expect(second.lines.some((line) => line.includes("呪いの札"))).toBe(true);
+  });
+
+  it("他人のターン中に発動したパッシブは発動者本人のIDで記録する", () => {
+    const attacker = findMonster("scorpion", "FIRE")!;
+    const mimic = findMonster("mimic", "GRASS")!;
+    const engine = new BattleEngine([attacker], [mimic], { rng: () => 0 });
+
+    const actor = engine.getNextActor()!;
+    expect(actor.instanceId).toBe("P1");
+    const record = engine.resolveTurn(actor, { skillIndex: 0, targetId: "E1" });
+
+    expect(record.cues).toContainEqual({ sourceId: "P1", name: attacker.skills[0].name, type: "SKILL" });
+    expect(record.cues).toContainEqual({ sourceId: "E1", name: "偽りの財宝", type: "PASSIVE" });
   });
 
   it("最低なイタズラのオート対象は呪い持ちを最優先する", () => {

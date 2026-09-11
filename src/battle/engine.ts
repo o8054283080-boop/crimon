@@ -253,11 +253,18 @@ export interface BattleEvent {
 }
 
 /** ユニット1体の1手番分の記録。UIでのアニメーション再生に使う */
+export interface BattleCue {
+  sourceId: string;
+  name: string;
+  type: "SKILL" | "PASSIVE";
+}
+
 export interface TurnRecord {
   actorId: string;
   lines: string[];
   snapshot: UnitSnapshot[];
   events: BattleEvent[];
+  cues: BattleCue[];
 }
 
 export interface BattleResult {
@@ -302,6 +309,8 @@ export class BattleEngine {
   private readonly maxTurns: number;
   private readonly log: string[] = [];
   private readonly events: BattleEvent[] = [];
+  /** UIへ「誰が何を発動したか」を文字列解析なしで渡す。 */
+  private readonly cues: BattleCue[] = [];
   private readonly turns: TurnRecord[] = [];
   /** getNextActor()/resolveTurn()による手動進行専用のキュー。run()は使わない */
   private interactiveQueue: BattleUnit[] = [];
@@ -448,6 +457,7 @@ export class BattleEngine {
   private recordTurn(unit: BattleUnit, choice?: ManualChoice, extraTurn = false): TurnRecord {
     const linesBefore = this.log.length;
     const eventsBefore = this.events.length;
+    const cuesBefore = this.cues.length;
     this.syncTower80Boss();
     this.takeTurn(unit, choice, extraTurn);
     this.syncTower80Boss();
@@ -469,6 +479,7 @@ export class BattleEngine {
       actorId: unit.instanceId,
       lines: this.log.slice(linesBefore),
       events: this.events.slice(eventsBefore),
+      cues: this.cues.slice(cuesBefore),
       snapshot: this.snapshotUnits(),
     };
     this.turns.push(record);
@@ -547,6 +558,7 @@ export class BattleEngine {
 
     const linesBefore = this.log.length;
     const eventsBefore = this.events.length;
+    const cuesBefore = this.cues.length;
     this.applyTurnStart(unit, false);
     this.interactivePreparedTurns.add(unit);
     this.applyAllyDeathBoosts();
@@ -554,6 +566,7 @@ export class BattleEngine {
       actorId: unit.instanceId,
       lines: this.log.slice(linesBefore),
       events: this.events.slice(eventsBefore),
+      cues: this.cues.slice(cuesBefore),
       snapshot: this.snapshotUnits(),
     };
   }
@@ -582,6 +595,15 @@ export class BattleEngine {
 
   private pushEvent(event: BattleEvent): void {
     this.events.push(event);
+  }
+
+  private pushCue(source: BattleUnit, name: string, type: BattleCue["type"]): void {
+    this.cues.push({ sourceId: source.instanceId, name, type });
+  }
+
+  private pushPassiveCue(source: BattleUnit): void {
+    const passiveSkill = source.def.skills.find((skill) => Boolean(skill.passive));
+    if (passiveSkill) this.pushCue(source, passiveSkill.name, "PASSIVE");
   }
 
   /**
@@ -670,6 +692,7 @@ export class BattleEngine {
     this.detonateCurses(unit, false);
     const passive = passiveEffectOf(unit);
     if (unit.alive && passive?.kind === "REBIRTH") {
+      this.pushPassiveCue(unit);
       for (const ally of this.units.filter(u => u.alive && u.team === unit.team)) {
         const before = ally.currentHp;
         applyHeal(ally, Math.round(unit.maxHp * passive.heal));
@@ -677,6 +700,7 @@ export class BattleEngine {
       }
     }
     if (unit.alive && passive?.kind === "ILLUSION" && !extraTurn) {
+      this.pushPassiveCue(unit);
       this.push(`${this.label(unit)} の「バトルイリュージョン」！`);
       const opening: Skill = { id: "illusion_opening", name: "バトルイリュージョン", description: "", target: "ALL_ENEMIES", cooldownTurns: 0,
         effects: [{ kind: "DAMAGE", multiplier: passive.damage }, { kind: "CURSE", chance: passive.chance }] };
@@ -770,11 +794,15 @@ export class BattleEngine {
       const passive = passiveEffectOf(holder);
       if (!passive) continue;
       if (passive.kind === "TIME_KEEPER" && holder.team === actor.team) {
+        this.pushPassiveCue(holder);
         this.gainGauge(holder, passive.allyGauge, `${this.label(holder)} の「時の管理者」で行動ゲージが進んだ！`);
       }
       if (passive.kind === "GAUGE_ON_SLOWED_ENEMY_ACT" && holder.team !== actor.team) {
         const slowed = actor.effects.some((effect) => effect.kind === "DEBUFF" && effect.stat === "spd");
-        if (slowed) this.gainGauge(holder, passive.gauge, `${this.label(holder)} の「蛇王の支配」で行動ゲージが進んだ！`);
+        if (slowed) {
+          this.pushPassiveCue(holder);
+          this.gainGauge(holder, passive.gauge, `${this.label(holder)} の「蛇王の支配」で行動ゲージが進んだ！`);
+        }
       }
     }
   }
@@ -785,6 +813,7 @@ export class BattleEngine {
       if (!holder.alive || holder.team === victim.team) continue;
       const passive = passiveEffectOf(holder);
       if (passive?.kind !== "GAUGE_ON_ENEMY_POISON") continue;
+      this.pushPassiveCue(holder);
       this.gainGauge(holder, passive.gauge, `${this.label(holder)} の「菌糸支配」で行動ゲージが進んだ！`);
     }
   }
@@ -805,6 +834,7 @@ export class BattleEngine {
     const already = resolutionKey?.victimPassiveUsed.has(victim.instanceId) ?? false;
     if (passive?.kind === "FALSE_TREASURE" && !already) {
       resolutionKey?.victimPassiveUsed.add(victim.instanceId);
+      this.pushPassiveCue(victim);
       const healAmount = Math.round(victim.maxHp * passive.heal);
       applyHeal(victim, healAmount);
       this.push(`  → ${this.label(victim)} の「偽りの財宝」でHPが ${healAmount} 回復！ (${victim.currentHp}/${victim.maxHp})`);
@@ -826,6 +856,7 @@ export class BattleEngine {
       if (holder.passiveCooldown > 0) continue;
       if (hpRatio(victim) > passive.hpRatio) continue;
       holder.passiveCooldown = passive.internalCooldown;
+      this.pushPassiveCue(holder);
       // 無敵は1ターン固定。Lv5でも伸ばさない(依頼主の指定)
       applyStatus(victim, "INVINCIBLE", 1, holder.instanceId);
       const healAmount = Math.round(holder.maxHp * passive.heal);
@@ -840,8 +871,12 @@ export class BattleEngine {
   private onKill(killer: BattleUnit | undefined): void {
     if (!killer?.alive) return;
     const passive = passiveEffectOf(killer);
-    if (passive?.kind === "SKY_RULER") killer.skyStacks = Math.min(8, (killer.skyStacks ?? 0) + 1);
+    if (passive?.kind === "SKY_RULER") {
+      killer.skyStacks = Math.min(8, (killer.skyStacks ?? 0) + 1);
+      this.pushPassiveCue(killer);
+    }
     if (passive?.kind !== "PACK_INSTINCT") return;
+    this.pushPassiveCue(killer);
     this.pendingExtraTurns.push(killer);
   }
 
@@ -1631,6 +1666,7 @@ export class BattleEngine {
      */
     if (this.counterDepth === 0) this.lastUsedSkill = skill;
 
+    this.pushCue(unit, skill.name, "SKILL");
     this.push(`${this.label(unit)} の「${skill.name}」！`);
 
     if (this.trialTowerFloor === 70 && unit.team === "ENEMY" && skill.id === "tower70_pulse_s2") {
@@ -1736,11 +1772,13 @@ export class BattleEngine {
 
     if (passive.kind === "THUNDER_INSTINCT" && resolution.anyCrit) {
       resolution.sourcePassiveUsed = true;
+      this.pushPassiveCue(source);
       this.drainGauge(source, primary, passive.drain);
       this.push(`  → ${this.label(source)} の「雷の本能」で行動ゲージを吸収した！`);
     }
     if (passive.kind === "TIME_KEEPER" && resolution.damageDealt > 0) {
       resolution.sourcePassiveUsed = true;
+      this.pushPassiveCue(source);
       // 全体攻撃なら、攻撃を受けて生き残った敵それぞれへ1回ずつ作用する。
       // Setで重複を除くため、同じ敵へ複数回当たる多段・ランダム攻撃でも
       // 吸収とスタンは1スキルにつき敵1体あたり1回まで。
@@ -1774,6 +1812,7 @@ export class BattleEngine {
         }
       }
       if (landed) {
+        this.pushPassiveCue(source);
         const healAmount = Math.round(source.maxHp * passive.heal);
         applyHeal(source, healAmount);
         this.pushEvent({ targetId: source.instanceId, kind: "HEAL", amount: healAmount });
@@ -2242,6 +2281,7 @@ export class BattleEngine {
               const key = `cheat:${target.instanceId}`;
               if (!resolution.applied.has(key)) {
                 resolution.applied.add(key);
+                this.pushPassiveCue(target);
                 const before = target.currentHp;
                 applyHeal(target, Math.round(target.maxHp * .1));
                 this.pushEvent({ targetId: target.instanceId, kind: "HEAL", amount: target.currentHp - before });
