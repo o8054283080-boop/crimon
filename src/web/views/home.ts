@@ -862,7 +862,7 @@ export function renderHome(props: HomeProps): HTMLElement {
    */
   const titleScreen = el("section", { className: "title-screen crimon-title-screen", ariaLabel: "CRIMON タイトル" }, [
     el("img", {
-      src: new URL("../assets/title-cover.webp", import.meta.url).href,
+      src: new URL("../assets/backgrounds/title-cover.webp", import.meta.url).href,
       alt: "",
       "aria-hidden": "true",
       className: "crimon-title-screen__cover",

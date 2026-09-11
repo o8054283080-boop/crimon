@@ -27,7 +27,7 @@ import path from "node:path";
  */
 
 /** 検査するフォルダ。配布物と、その元 */
-const ROOTS = ["public", "src/web/assets"];
+const ROOTS = ["public", "src/web/assets", "art"];
 
 function pngFilesIn(dir: string): string[] {
   let entries: string[];

@@ -61,7 +61,7 @@ base64の一部しか書けなかった、途中のNULバイトで切れた、�
 
 ### 1. 元絵から焼く
 
-`tools/bakeAppIcons.mjs` を足した。`src/web/assets/app-icon.png` を
+`tools/bakeAppIcons.mjs` を足した。`art/sources/app-icon-1254.png` を
 Chromiumのcanvasで描き、**canvasが出したbase64をBufferで直接書き出す**。
 途中に文字列としての加工が入らないので、同じ壊れ方をしない。
 
@@ -74,13 +74,13 @@ iOSはアイコンを角丸で切り抜くだけで、透過部分は黒く残�
 元絵自体が壊れていないことも `tests/pngIntegrity.test.ts` が見張っている
 (`src/web/assets` も検査の対象)。
 
-**アイコンを差し替える時は、`src/web/assets/app-icon.png` を置き換えて
+**アイコンを差し替える時は、`art/sources/app-icon-1254.png` を置き換えて
 この道具を回すだけ。** `public/icons/` のPNGを手で作らないこと——
 5回壊れたのは、そこを手で作った時だけ起きている。
 
 ### 2. 壊れたら必ず落ちるようにする
 
-`tests/pngIntegrity.test.ts` を足した。`public/` と `src/web/assets/` の
+`tests/pngIntegrity.test.ts` を足した。`public/` と `src/web/assets/` と `art/` の
 PNGを全部たどり、チャンクを最後まで読み、CRCを検算し、**IDATを実際に展開して
 画素の量が縦×横と一致するか**まで確かめる。途中で切れていれば必ず落ちる。
 
