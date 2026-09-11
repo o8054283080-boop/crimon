@@ -140,6 +140,13 @@ const LEADER_MIN = 18;
  */
 const HUD_MIN_SCALE = 0.88;
 
+export function actionNamesFromLines(lines: readonly string[]): string[] {
+  return lines
+    .filter((line) => !line.startsWith(" "))
+    .map((line) => /「(.+?)」！/.exec(line)?.[1])
+    .filter((name): name is string => Boolean(name));
+}
+
 export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   const { engine, playerTeam, enemyTeam, title = "バトル", resultLabel, onFinish, chain, venue } = props;
   const canSurrender = props.canSurrender !== false;
@@ -624,10 +631,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   function actionNameOf(record: TurnRecord): string | null {
     const actor = engine.getUnits().find((u) => u.instanceId === record.actorId);
     const skillNames = new Set(actor?.def.skills.map((skill) => skill.name) ?? []);
-    const names = record.lines
-      .filter((line) => !line.startsWith(" "))
-      .map((line) => /「(.+?)」！/.exec(line)?.[1])
-      .filter((name): name is string => Boolean(name));
+    const names = actionNamesFromLines(record.lines);
     const active = [...names].reverse().find((name) => skillNames.has(name));
     return active ?? names.at(-1) ?? null;
   }
@@ -641,20 +645,33 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   }
 
   function showSkillName(record: TurnRecord): void {
-    const name = actionNameOf(record);
+    const names = actionNamesFromLines(record.lines);
     const label = skillNameRefs.get(record.actorId);
-    if (!name || !label) return;
+    if (names.length === 0 || !label) return;
+
     const previous = skillNameHandles.get(record.actorId);
     if (previous) clearTimeout(previous);
-    label.textContent = name;
-    label.classList.remove("battle-skill-name--show");
-    void label.offsetWidth;
-    label.classList.add("battle-skill-name--show");
-    const handle = setTimeout(() => {
+
+    const totalMs = SKILL_NAME_MS[speed];
+    const perNameMs = Math.max(45, Math.floor(totalMs / names.length));
+    let index = 0;
+
+    const showNext = () => {
+      if (index >= names.length) {
+        label.classList.remove("battle-skill-name--show");
+        skillNameHandles.delete(record.actorId);
+        return;
+      }
+      label.textContent = names[index];
       label.classList.remove("battle-skill-name--show");
-      skillNameHandles.delete(record.actorId);
-    }, SKILL_NAME_MS[speed]);
-    skillNameHandles.set(record.actorId, handle);
+      void label.offsetWidth;
+      label.classList.add("battle-skill-name--show");
+      index += 1;
+      const handle = setTimeout(showNext, perNameMs);
+      skillNameHandles.set(record.actorId, handle);
+    };
+
+    showNext();
   }
 
   function applyRecord(record: TurnRecord): void {
