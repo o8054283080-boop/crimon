@@ -1,0 +1,20 @@
+name: Build CRIMON OP pilot assets
+on:
+  push:
+    branches: [op-pilot-assets]
+  workflow_dispatch:
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack OP assets
+        run: |
+          mkdir -p op-assets/backgrounds op-assets/monsters op-assets/brand
+          cp src/web/assets/backgrounds/{world-bg.jpg,adventure-bg.jpg,title-cover.webp,summon-bg.jpg} op-assets/backgrounds/
+          cp src/web/assets/monsters/{dragon.webp,nemesis.webp,phoenix.webp,joker.webp,harpy.webp,scorpion.webp,crimoark-DARK.webp,crimoark_attack-DARK.webp,crimoark_debuff-DARK.webp,crimoark_support-DARK.webp} op-assets/monsters/
+          cp src/web/assets/brand/crimon-logo.svg op-assets/brand/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crimon-op-pilot-assets
+          path: op-assets
