@@ -3353,7 +3353,7 @@ function buildSaveFailureBar(): HTMLElement | null {
   if (BATTLE_SCREENS.has(state.screen)) return null;
   if (!failure.storage) requestStorageEstimate();
   const detail = failure.quotaExceeded ? quotaDetail(failure)
-    : "この端末に書き込めませんでした。プライベートモードや、サイトのデータを保存しない設定になっていないか確かめてください。";
+    : "この端末に書き込めませんでした。プライベートモードや、サイトのデータを保存しない設定になっていないか確かめてください。モンスターや装備が多い場合は、使わないものを整理すると改善することがあります。";
   return el("section", {
     className: "tutorial-bar tutorial-bar--danger",
     "data-save-failure-bar": "",
@@ -3364,7 +3364,7 @@ function buildSaveFailureBar(): HTMLElement | null {
     el("div", { className: "tutorial-bar__text" }, [
       el("div", { className: "tutorial-bar__title" }, ["データを保存できていません"]),
       el("div", { className: "tutorial-bar__cond" }, [
-        el("span", {}, [`${detail} このまま閉じると、いま遊んだぶんは戻ります。`]),
+        el("span", {}, [`${detail} モンスターや装備が増えすぎている場合は、使わないものを整理してください。このまま閉じると、いま遊んだぶんは戻ります。`]),
       ]),
       // 控えを取る的をその場に置く。ホームまで戻る道中で失われるのが困る
       el("button", {
