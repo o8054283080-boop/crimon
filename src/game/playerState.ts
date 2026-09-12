@@ -60,6 +60,8 @@ export interface PlayerState {
   crystal: number;
   gold: number;
   monsters: MonsterInstance[];
+  /** 未育成Lv1の同一個体を圧縮して持つ保管所。旧セーブでは空配列として補完する。 */
+  monsterStorage: { dexId: string; star: Star; count: number }[];
   partyIds: string[];
   clearedStageIds: string[];
   /** クリア済みの装備ダンジョン階層(初回クリア判定・ダイヤ報酬用) */
@@ -339,6 +341,7 @@ export function createInitialState(): PlayerState {
     crystal: 300,
     gold: 500,
     monsters,
+    monsterStorage: [],
     partyIds: monsters.map((m) => m.id),
     clearedStageIds: [],
     clearedDungeonFloors: [],
@@ -555,6 +558,11 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.fiveStarSummonScrolls !== "number") state.fiveStarSummonScrolls = 0;
   if (typeof state.awakeningOrbs !== "number") state.awakeningOrbs = 0;
   // 前から遊んでいる人の控えには無い。0から始める
+  if (!Array.isArray(state.monsterStorage)) state.monsterStorage = [];
+  state.monsterStorage = state.monsterStorage
+    .filter((stack) => stack && typeof stack.dexId === "string" && Number.isFinite(stack.star) && Number.isFinite(stack.count))
+    .map((stack) => ({ ...stack, count: Math.max(0, Math.floor(stack.count)) }))
+    .filter((stack) => stack.count > 0);
   if (typeof state.monsterPoints !== "number" || !Number.isFinite(state.monsterPoints)) state.monsterPoints = 0;
   state.monsterPoints = Math.max(0, Math.floor(state.monsterPoints));
   if (!Array.isArray(state.claimedAwakeningOrbRewardIds)) {
