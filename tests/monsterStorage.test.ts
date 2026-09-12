@@ -23,6 +23,18 @@ describe("monster storage", () => {
     expect(depositMonsters(state, "slime_FIRE", 3, 99)).toBe(0);
   });
 
+  it("marks withdrawn monsters as already observed so missions do not count them as summons", () => {
+    const state = createInitialState() as ReturnType<typeof createInitialState> & {
+      missionState?: { observed?: { monsters?: Record<string, { star: number; level: number }> } };
+    };
+    state.monsterStorage = [{ dexId: "slime_FIRE", star: 3, count: 2 }];
+    state.missionState = { observed: { monsters: {} } };
+    expect(withdrawMonsters(state, "slime_FIRE", 3, 2)).toBe(2);
+    const restored = state.monsters.filter((monster) => monster.dexId === "slime_FIRE" && monster.star === 3);
+    expect(restored).toHaveLength(2);
+    for (const monster of restored) expect(state.missionState?.observed?.monsters?.[monster.id]).toEqual({ star: 3, level: 1 });
+  });
+
   it("converts a chosen stored quantity directly into existing monster points", () => {
     const state = createInitialState();
     state.monsterStorage = [{ dexId: "slime_FIRE", star: 3, count: 10 }];
