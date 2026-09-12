@@ -115,7 +115,8 @@ export const ARENA_NPC_ROLE_PLANS: Readonly<Record<ArenaNpcRole, ArenaNpcRolePla
  * ========================================================================== */
 
 export type ArenaNpcBandId =
-  | "NOVICE" | "LEARNER" | "REGULAR" | "VETERAN" | "EXPERT" | "MASTER" | "APEX";
+  | "NOVICE" | "LEARNER" | "REGULAR" | "VETERAN" | "EXPERT" | "MASTER"
+  | "ELITE" | "CHAMPION" | "FINALIST" | "APEX";
 
 export interface WeightedStar {
   star: Star;
@@ -358,7 +359,10 @@ export function arenaNpcBandForRating(rating: number): ArenaNpcBand {
 export const ARENA_NPC_TEAM_SIZE = 4;
 
 /** 一度に並べるNPCの既定人数 */
-export const ARENA_NPC_DEFAULT_COUNT = 3;\n\n/** NPCレートの絶対上限。NPCだけで上位レートを青天井に伸ばさない */\nexport const ARENA_NPC_MAX_RATING = 2700;
+export const ARENA_NPC_DEFAULT_COUNT = 3;
+
+/** NPCレートの絶対上限。NPCだけで上位レートを青天井に伸ばさない */
+export const ARENA_NPC_MAX_RATING = 2700;
 
 /**
  * 並んだNPCのレートの置き方。
