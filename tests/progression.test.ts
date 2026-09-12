@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { EXP_PIG_DEX } from "../src/data/monsters.js";
+import { EXP_PIG_DEX, SKILL_PIG_DEX } from "../src/data/monsters.js";
 import { applyRankUp, checkRankUp } from "../src/game/progression.js";
 
 describe("ランクアップ判定 (checkRankUp)", () => {
@@ -95,6 +95,36 @@ describe("ランクアップの適用 (applyRankUp)", () => {
     const result = applyRankUp(target, sacrifices, () => 0);
 
     expect(result.leveledSkillIndices).toHaveLength(1);
+  });
+
+  it("★5スキルピッグを★5→★6ランクアップ素材に使うとスキルレベルが1上がる", () => {
+    const target = createMonsterInstance("slime_FIRE", 5, 50);
+    const skillPig = createMonsterInstance(SKILL_PIG_DEX[0].id, 5, 1);
+    const others = Array.from({ length: 4 }, () => createMonsterInstance("wolf_WATER", 5, 1));
+    const sacrifices = [skillPig, ...others];
+
+    expect(checkRankUp(target, sacrifices, []).ok).toBe(true);
+    const before = target.skillLevels.reduce((sum, level) => sum + level, 0);
+    const result = applyRankUp(target, sacrifices, () => 0);
+
+    expect(target.star).toBe(6);
+    expect(result.leveledSkillIndices).toHaveLength(1);
+    expect(target.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(before + 1);
+  });
+
+  it("スキルピッグと同種族素材が混在した場合、それぞれ1回ずつスキルレベルアップを試行する", () => {
+    const target = createMonsterInstance("slime_FIRE", 5, 50);
+    const sacrifices = [
+      createMonsterInstance(SKILL_PIG_DEX[0].id, 5, 1),
+      createMonsterInstance("slime_WATER", 5, 1),
+      createMonsterInstance("wolf_WATER", 5, 1),
+      createMonsterInstance("golem_FIRE", 5, 1),
+      createMonsterInstance("fairy_GRASS", 5, 1),
+    ];
+
+    const result = applyRankUp(target, sacrifices, () => 0);
+
+    expect(result.leveledSkillIndices).toHaveLength(2);
   });
 
   it("異なる種族の素材ではスキルレベルは上がらない", () => {

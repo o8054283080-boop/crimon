@@ -1,7 +1,7 @@
 import { MonsterInstance, rollSkillLevelUp } from "../core/monsterInstance.js";
 import { RANK_UP_SACRIFICE_COUNT, Star, canRankUp } from "../core/rarity.js";
 import { EXP_PIG, findMonsterById } from "../data/monsters.js";
-import { isSameSpecies } from "./monsterPowerUp.js";
+import { isSameSpecies, isSkillPig } from "./monsterPowerUp.js";
 
 export interface RankUpCheck {
   ok: boolean;
@@ -48,7 +48,7 @@ export interface RankUpResult {
 
 /**
  * ランクアップを実行する。呼び出し前に checkRankUp で ok を確認すること。
- * 素材のうち対象と同じ種族(属性・色違いでも可)のものは1体につき、まだ最大レベルに達していない
+ * 素材のうち対象と同じ種族(属性・色違いでも可)、またはスキルピッグは1体につき、まだ最大レベルに達していない
  * スキルの中からランダムに1つ選んでレベルを+1する(モンスター強化と同じ仕組み)。
  */
 export function applyRankUp(target: MonsterInstance, sacrifices: MonsterInstance[], rng: () => number = Math.random): RankUpResult {
@@ -66,7 +66,7 @@ export function applyRankUp(target: MonsterInstance, sacrifices: MonsterInstance
 
   const leveledSkillIndices: number[] = [];
   for (const sacrifice of sacrifices) {
-    if (!isSameSpecies(target, sacrifice)) continue;
+    if (!isSameSpecies(target, sacrifice) && !isSkillPig(sacrifice)) continue;
     const index = rollSkillLevelUp(target, rng);
     if (index >= 0) leveledSkillIndices.push(index);
   }
