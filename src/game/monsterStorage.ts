@@ -105,7 +105,15 @@ export function withdrawMonsters(
   if (!stack) return 0;
   const count = clampCount(requested, stack.count);
   if (count === 0) return 0;
-  for (let i = 0; i < count; i += 1) state.monsters.push(createMonsterInstance(dexId, star, 1));
+  const missionObserved = (state as PlayerState & {
+    missionState?: { observed?: { monsters?: Record<string, { star: number; level: number }> } };
+  }).missionState?.observed?.monsters;
+  for (let i = 0; i < count; i += 1) {
+    const instance = createMonsterInstance(dexId, star, 1);
+    state.monsters.push(instance);
+    // 保管所から戻しただけの個体を「新規召喚」と累計ミッションへ数えない。
+    if (missionObserved) missionObserved[instance.id] = { star: instance.star, level: instance.level };
+  }
   stack.count -= count;
   state.monsterStorage = storageStacks(state).filter((row) => row.count > 0);
   return count;
