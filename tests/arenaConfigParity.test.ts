@@ -45,7 +45,8 @@ const sql0001 = readFileSync(new URL("../supabase/migrations/20260902170000_aren
 const sql0003 = readFileSync(new URL("../supabase/migrations/20260902172000_arena_rpc.sql", import.meta.url), "utf8");
 const sqlSeed = readFileSync(new URL("../supabase/migrations/20260902172100_arena_seed.sql", import.meta.url), "utf8");
 const sqlSafety = readFileSync(new URL("../supabase/migrations/20260903003038_arena_release_safety.sql", import.meta.url), "utf8");
-const sqlShopGoals = readFileSync(new URL("../supabase/migrations/20260903015014_arena_shop_goals_and_defense_coins.sql", import.meta.url), "utf8");\nconst sqlRatingRebalance = readFileSync(new URL("../supabase/migrations/20260912120000_arena_rating_gap_rebalance.sql", import.meta.url), "utf8");
+const sqlShopGoals = readFileSync(new URL("../supabase/migrations/20260903015014_arena_shop_goals_and_defense_coins.sql", import.meta.url), "utf8");
+const sqlRatingRebalance = readFileSync(new URL("../supabase/migrations/20260912120000_arena_rating_gap_rebalance.sql", import.meta.url), "utf8");
 
 /** `arena_config` に入れている初期値を1件取り出す */
 function seededConfig(key: string): Record<string, number> {
