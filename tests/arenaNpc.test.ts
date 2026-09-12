@@ -20,6 +20,7 @@ import { LATENT_ABILITY_CANDIDATES } from "../src/data/latentAbilities.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX, findMonsterById } from "../src/data/monsters.js";
 import {
   ARENA_NPC_BANDS,
+  ARENA_NPC_MAX_RATING,
   ARENA_NPC_ROLE_PLANS,
   ARENA_NPC_TEAM_SIZE,
   VARIABLE_SLOTS,
