@@ -14,7 +14,7 @@ import { getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } fr
 import { BATTLE_SCREENS, bgmSceneOf } from "./audio/bgmScene.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
-import { equipmentSellPrice, EquipSlot } from "../core/equipment.js";
+import { EQUIP_SLOTS, equipmentSellPrice, EquipSlot, generateEquipment, type Equipment } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor, EquipmentDungeonKind, dungeonFloorKey, findDungeonFloorByKey } from "../data/equipmentDungeon.js";
@@ -77,6 +77,7 @@ import {
   FIGHTER_NAME_MAX_LENGTH,
   LoginBonusResult,
   PlayerState,
+  addEquipment,
   addMonster,
   applyPassiveStaminaRegen,
   buyShopEntry,
@@ -117,8 +118,27 @@ import {
 import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
 import { findMonsterById } from "../data/monsters.js";
 import { toBattleDefinition } from "../core/monsterInstance.js";
+import type { Stats } from "../core/stats.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
 import { forgetShownCounts } from "./incrementalGrid.js";
+import { renderAutoEquip } from "./views/autoEquip.js";
+import {
+  applyAutoEquipPlan,
+  createDefaultAutoEquipSettings,
+  currentStatsOf,
+  planAutoEquip,
+  type AutoEquipPlan,
+  type AutoEquipSettings,
+} from "../game/autoEquip.js";
+import {
+  capturePreset,
+  isPresetSaved,
+  normalizeAutoEquipSettings,
+  presetsOf,
+  resolvePreset,
+  writePreset,
+  PRESET_NAME_MAX_LENGTH,
+} from "../game/equipmentPreset.js";
 import { renderMonsterExchange } from "./views/monsterExchange.js";
 import { renderMonsterStorage } from "./views/monsterStorage.js";
 import { depositMonsters, exchangeStoredMonstersForPoints, withdrawMonsters } from "../game/monsterStorage.js";
@@ -365,6 +385,15 @@ interface AppState {
   monsterDetailId: string | null;
   rankUpMode: boolean;
   rankUpSacrificeIds: string[];
+  /** おまかせ装備の画面。どの子を触っているか */
+  autoEquipMonsterId: string | null;
+  autoEquipSettings: AutoEquipSettings;
+  /** 計算した結果。**確定するまで装備は動かない** */
+  autoEquipPlan: AutoEquipPlan | null;
+  autoEquipError: string | null;
+  autoEquipNotice: string | null;
+  autoEquipDetailOpen: boolean;
+  autoEquipRenamingIndex: number | null;
   /** モンスター交換所で、送るために選ばれている子 */
   monsterExchangeIds: string[];
   monsterExchangeFilter: MonsterFilter;
@@ -550,6 +579,13 @@ const state: AppState = {
   monsterDetailId: null,
   rankUpMode: false,
   rankUpSacrificeIds: [],
+  autoEquipMonsterId: null,
+  autoEquipSettings: createDefaultAutoEquipSettings(),
+  autoEquipPlan: null,
+  autoEquipError: null,
+  autoEquipNotice: null,
+  autoEquipDetailOpen: false,
+  autoEquipRenamingIndex: null,
   monsterExchangeIds: [],
   monsterExchangeFilter: { ...EMPTY_MONSTER_FILTER },
   monsterExchangeFilterOpen: false,
@@ -876,6 +912,14 @@ function goBack(): void {
   // 場所に紐づく一時的な案内は持ち越さない。前の画面の言葉が残ると嘘になる
   state.shopNotice = null;
   state.monsterExchangeNotice = null;
+  /*
+   * おまかせの結果は**その場限り。**持ち越すと、別の子の画面で
+   * 前の子の「変更後」が出たまま確定できてしまう。
+   */
+  state.autoEquipPlan = null;
+  state.autoEquipError = null;
+  state.autoEquipNotice = null;
+  state.autoEquipRenamingIndex = null;
   state.monsterStorageNotice = null;
   state.createNotice = null;
   state.partyNotice = null;
@@ -1229,6 +1273,155 @@ function handleUseSpecialSummonScroll(type: SpecialSummonScroll): void {
   state.lastSummonMethod = { kind: "SPECIAL", type };
   playSummonSfx([result]);
   render();
+}
+
+/* ------------------------------------------------------------------ *
+ * おまかせ装備とプリセット
+ * ------------------------------------------------------------------ */
+
+/**
+ * 条件で探す。**ここでは装備を動かさない。**
+ *
+ * 結果を画面へ置くだけ。人が「この装備に変更」を押して初めて着け替える。
+ */
+function handleAutoEquipSearch(monsterId: string, settings: AutoEquipSettings): void {
+  const outcome = planAutoEquip(state.player, monsterId, settings);
+  if (!outcome.ok) {
+    state.autoEquipPlan = null;
+    state.autoEquipError = outcome.reason;
+    state.autoEquipNotice = null;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.autoEquipPlan = outcome.plan;
+  state.autoEquipError = null;
+  state.autoEquipNotice = null;
+  render();
+}
+
+/**
+ * 計画を着ける。
+ *
+ * **保存できなければ、着けなかったことにする。**召喚で同じ事故を出している
+ * (画面の上では変わっているのに、再起動すると戻る)。
+ * 装備は他の子からも外すので、巻き戻しは**全モンスターぶん**取る。
+ */
+function handleAutoEquipApply(): void {
+  const plan = state.autoEquipPlan;
+  const monsterId = state.autoEquipMonsterId;
+  if (!plan || !monsterId) return;
+
+  const before = state.player.monsters.map((m) => ({ id: m.id, equipment: { ...m.equipment } }));
+  applyAutoEquipPlan(state.player, monsterId, plan.assignment);
+  if (!savePlayerState(state.player)) {
+    for (const snapshot of before) {
+      const monster = state.player.monsters.find((m) => m.id === snapshot.id);
+      if (monster) monster.equipment = snapshot.equipment;
+    }
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  playSfx("levelUp");
+  state.autoEquipPlan = null;
+  state.autoEquipError = null;
+  state.autoEquipNotice = "装備を変更しました";
+  render();
+}
+
+/** いまの装備と、いまの条件を枠へ焼く */
+function handleSavePreset(monsterId: string, index: number): void {
+  const monster = state.player.monsters.find((m) => m.id === monsterId);
+  if (!monster) return;
+  writePreset(monster, index, capturePreset(monster, index, state.autoEquipSettings));
+  if (!savePlayerState(state.player)) {
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  playSfx("stageClear");
+  state.autoEquipRenamingIndex = null;
+  state.autoEquipNotice = `${presetsOf(monster)[index].name} に保存しました`;
+  render();
+}
+
+/**
+ * 保存した装備をそのまま着ける。
+ *
+ * **売られた装備があっても落とさない。**残っているものだけを着けて、
+ * 欠けた数を伝える。他の子が着けている装備は、確認の画面へ回す。
+ */
+function handleApplyPreset(monsterId: string, index: number): void {
+  const monster = state.player.monsters.find((m) => m.id === monsterId);
+  if (!monster) return;
+  const preset = presetsOf(monster)[index];
+  if (!isPresetSaved(preset)) return;
+
+  const resolved = resolvePreset(state.player, monster, preset, (m) => findMonsterById(m.dexId)?.name ?? m.dexId);
+  const stats = currentStatsOf(state.player, monster);
+  if (!stats) return;
+
+  /*
+   * **そのまま着けず、いったんプレビューへ回す。**
+   * 他の子から外れる場合があるので、確認の形を
+   * おまかせと同じにする(誰の何が外れるか見てから決める)。
+   */
+  const after = previewStatsOf(monster, resolved.available);
+  if (!after) return;
+  state.autoEquipPlan = {
+    assignment: resolved.available,
+    before: stats,
+    after,
+    stolen: resolved.stolen.map((entry) => ({
+      monsterId: entry.monsterId,
+      monsterName: entry.monsterName,
+      equipmentId: entry.equipmentId,
+      slot: entry.slot,
+    })),
+    // 比べてはいない。保存した組み合わせを読んだだけ
+    evaluated: 0,
+  };
+  state.autoEquipError = null;
+  state.autoEquipNotice = resolved.missing > 0
+    ? `保存されていた装備のうち ${resolved.missing} 個が見つかりません。残っているぶんだけ着けます（組み直すこともできます）`
+    : `${preset.name} の装備を読み込みました。下で確かめてから確定してください`;
+  render();
+}
+
+/** 保存した条件で、いまの持ち物から探し直す */
+function handleReoptimizePreset(monsterId: string, index: number): void {
+  const monster = state.player.monsters.find((m) => m.id === monsterId);
+  if (!monster) return;
+  const preset = presetsOf(monster)[index];
+  if (!isPresetSaved(preset)) return;
+  state.autoEquipSettings = normalizeAutoEquipSettings(preset.settings);
+  handleAutoEquipSearch(monsterId, state.autoEquipSettings);
+  if (state.autoEquipPlan) state.autoEquipNotice = `${preset.name} の条件で組み直しました`;
+  render();
+}
+
+function handleRenamePreset(monsterId: string, index: number, name: string): void {
+  const monster = state.player.monsters.find((m) => m.id === monsterId);
+  if (!monster) return;
+  const trimmed = name.trim().slice(0, PRESET_NAME_MAX_LENGTH);
+  const presets = presetsOf(monster);
+  const preset = presets[index];
+  writePreset(monster, index, { ...preset, name: trimmed || preset.name });
+  savePlayerState(state.player);
+  state.autoEquipRenamingIndex = null;
+  render();
+}
+
+/** その割り当てを着けた時の最終ステータス(実際には着けない) */
+function previewStatsOf(monster: MonsterInstance, assignment: Partial<Record<EquipSlot, string>>): Stats | null {
+  const dex = findMonsterById(monster.dexId);
+  if (!dex) return null;
+  const byId = new Map(state.player.equipment.map((e) => [e.id, e] as const));
+  const items = Object.values(assignment)
+    .map((id) => (id ? byId.get(id) : undefined))
+    .filter((e): e is Equipment => e !== undefined);
+  return toBattleDefinition(monster, dex, items).stats;
 }
 
 function handleConfirmRankUp(): void {
@@ -4212,6 +4405,53 @@ function renderScreen(): void {
       break;
     }
 
+    case "AUTO_EQUIP": {
+      const target = state.player.monsters.find((m) => m.id === state.autoEquipMonsterId);
+      // navigate は中で描き直す。**break ではなく return**——
+      // break で抜けると content を持たないまま下へ落ち、二重に描いてしまう
+      if (!target) { navigate("MONSTERS"); return; }
+      content = renderAutoEquip({
+        player: state.player,
+        monster: target,
+        settings: state.autoEquipSettings,
+        plan: state.autoEquipPlan,
+        error: state.autoEquipError,
+        notice: state.autoEquipNotice,
+        detailOpen: state.autoEquipDetailOpen,
+        renamingIndex: state.autoEquipRenamingIndex,
+        onBack: () => {
+          // 詳細へ戻す。おまかせは「その子を見ている最中」の操作
+          state.screen = "MONSTERS";
+          state.monsterDetailId = target.id;
+          state.autoEquipPlan = null;
+          state.autoEquipError = null;
+          state.autoEquipNotice = null;
+          render();
+        },
+        onChangeSettings: (settings) => {
+          state.autoEquipSettings = settings;
+          // 条件を変えたら、前の結果は古い。**出したままにしない**
+          state.autoEquipPlan = null;
+          state.autoEquipError = null;
+          render();
+        },
+        onToggleDetail: () => { state.autoEquipDetailOpen = !state.autoEquipDetailOpen; render(); },
+        onSearch: () => handleAutoEquipSearch(target.id, state.autoEquipSettings),
+        onApply: handleAutoEquipApply,
+        onDiscardPlan: () => {
+          state.autoEquipPlan = null;
+          state.autoEquipNotice = "変更をやめました。装備はそのままです";
+          render();
+        },
+        onSavePreset: (index) => handleSavePreset(target.id, index),
+        onApplyPreset: (index) => handleApplyPreset(target.id, index),
+        onReoptimizePreset: (index) => handleReoptimizePreset(target.id, index),
+        onStartRename: (index) => { state.autoEquipRenamingIndex = index; render(); },
+        onRenamePreset: (index, name) => handleRenamePreset(target.id, index, name),
+      });
+      break;
+    }
+
     case "MONSTER_EXCHANGE":
       content = renderMonsterExchange({
         player: state.player,
@@ -4753,6 +4993,16 @@ function renderMonstersScreen(): HTMLElement {
       state.screen = "MONSTER_EXCHANGE";
       render();
     },
+    onGoAutoEquip: (monsterId) => {
+      state.autoEquipMonsterId = monsterId;
+      // 前の子の結果を持ち越さない
+      state.autoEquipPlan = null;
+      state.autoEquipError = null;
+      state.autoEquipNotice = null;
+      state.autoEquipRenamingIndex = null;
+      state.screen = "AUTO_EQUIP";
+      render();
+    },
     onGoStorage: () => {
       state.monsterStorageNotice = null;
       state.screen = "MONSTER_STORAGE";
@@ -4887,6 +5137,16 @@ function renderEquipmentScreen(): HTMLElement {
       render();
     },
     onBulkSell: handleBulkSellEquipment,
+    onToggleAutoExclude: (equipmentId) => {
+      const item = state.player.equipment.find((e) => e.id === equipmentId);
+      if (!item) return;
+      item.autoExclude = !item.autoExclude;
+      if (!savePlayerState(state.player)) {
+        item.autoExclude = !item.autoExclude;
+        playSfx("denied", 0.7);
+      }
+      render();
+    },
     onToggleLock: (equipmentId) => {
       const item = state.player.equipment.find((entry) => entry.id === equipmentId);
       if (!item || !setEquipmentLocked(state.player, equipmentId, !item.locked)) return;
@@ -5059,6 +5319,47 @@ if (import.meta.env.DEV) {
       state.arenaRankingTop = DEMO_RANKING_ROWS;
       state.arenaRankingAround = DEMO_RANKING_ROWS;
       state.arenaView = "RANKING";
+      render();
+    },
+    /*
+     * **おまかせ装備を巡回に見せるための口。**
+     *
+     * 初期セーブには装備が1個も無い。そのまま開くと
+     * 「候補になる装備がありません」の一文だけが出て、
+     * 変更前→変更後の行も、部位ごとの入れ替えも、他の子から外す警告も、
+     * 実行バーも**一度も検査されない**
+     * (アリーナのランキングで行が1つも無い画面を検査し続け、
+     * 名前の切れを見逃したのと同じ穴)。
+     *
+     * `withPlan` を立てると、探し終えた状態まで進める。
+     */
+    openAutoEquip(withPlan = false) {
+      const monster = state.player.monsters[0];
+      if (!monster) return;
+      monster.star = 6;
+      monster.level = 60;
+      // 6枠ぶんを2周ぶん配る。1個しか無いと「選びようがない」画面になる
+      for (let round = 0; round < 2; round += 1) {
+        for (const slot of EQUIP_SLOTS) {
+          const item = generateEquipment({ slot, star: 6, subStatCount: 4 });
+          addEquipment(state.player, item);
+          if (round === 0) equipToMonster(state.player, monster.id, item.id);
+        }
+      }
+      state.autoEquipMonsterId = monster.id;
+      state.autoEquipSettings = createDefaultAutoEquipSettings();
+      state.autoEquipPlan = null;
+      state.autoEquipError = null;
+      state.autoEquipNotice = null;
+      state.autoEquipRenamingIndex = null;
+      state.autoEquipDetailOpen = true;
+      state.screen = "AUTO_EQUIP";
+      if (withPlan) {
+        // 保存済みの枠も見せる。空の3枠だけでは札の中身が検査されない
+        writePreset(monster, 0, capturePreset(monster, 0, state.autoEquipSettings, "アリーナ"));
+        handleAutoEquipSearch(monster.id, state.autoEquipSettings);
+        return;
+      }
       render();
     },
   };

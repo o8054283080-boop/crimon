@@ -1,0 +1,474 @@
+/*
+ * おまかせ装備の画面。
+ *
+ * **どこも浮かせない。**設定・結果・確認と段が深いので、
+ * 浮かせると必ず下のものを覆う(この案件で3回やった事故)。
+ * 実行バーだけが `stickyActions` で、あれは流れの中に居場所を持つ部品。
+ *
+ * 狭い端末(360px)を先に決めて、広い方へ伸ばす。
+ * 数字を打つ欄と押す的は、**細くしない**——潰れたら打てない。
+ */
+
+/* ---- 選ぶ札 ---- */
+
+.ae-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ae-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* 的は40pxを下回らせない(巡回が拾う下限) */
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid rgba(214, 168, 74, 0.38);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(38, 30, 20, 0.9), rgba(20, 16, 12, 0.92));
+  color: #e6d7b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ae-chip.is-active {
+  border-color: #ffd66b;
+  background: linear-gradient(180deg, #5a4420, #2e2211);
+  color: #ffe9b6;
+  box-shadow: inset 0 1px 0 rgba(255, 232, 190, 0.18);
+}
+
+.ae-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 優先順位の番号。押した順がそのまま順位 */
+.ae-chip__rank {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffd66b;
+  color: #2a1f10;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+/* ---- 項目 ---- */
+
+.ae-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.ae-field__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  color: #ffe6b0;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+/* 9px未満は実機で読めない(tests/cssReadability.test.ts が見張っている) */
+.ae-field__hint {
+  color: #b6ab97;
+  font-size: 0.66rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.ae-note {
+  margin: 6px 0 0;
+  color: #b6ab97;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+/* ---- 折りたたみ ---- */
+
+.ae-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid rgba(214, 168, 74, 0.32);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffe6b0;
+  font-size: 0.8rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ae-disclosure__mark {
+  color: #d6a84a;
+  font-size: 0.7rem;
+}
+
+.ae-detail {
+  padding-top: 4px;
+}
+
+/* ---- 最低条件 ---- */
+
+.ae-minimums {
+  display: grid;
+  gap: 6px;
+}
+
+/*
+ * 1行1項目。**名前は左、欄は右。**
+ * 横に詰めると、狭い端末で3桁の速度すら見えなくなる。
+ */
+.ae-minimums__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.ae-minimums__name {
+  color: #e6d7b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ae-minimums__input {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid rgba(214, 168, 74, 0.42);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffe9b6;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ae-minimums__unit {
+  color: #b6ab97;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+/* ---- 部位の固定 ---- */
+
+.ae-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ae-slot {
+  display: grid;
+  gap: 2px;
+  min-height: 58px;
+  padding: 6px 4px;
+  border: 1px solid rgba(214, 168, 74, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cfc2a8;
+  cursor: pointer;
+  text-align: center;
+}
+
+.ae-slot.is-fixed {
+  border-color: #ffd66b;
+  background: linear-gradient(180deg, rgba(90, 68, 32, 0.9), rgba(46, 34, 17, 0.95));
+  color: #ffe9b6;
+}
+
+.ae-slot__no {
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.ae-slot__item {
+  overflow: hidden;
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ae-slot__pin {
+  font-size: 0.62rem;
+  opacity: 0.85;
+}
+
+/* ---- 変更前 → 変更後 ---- */
+
+.ae-stats {
+  display: grid;
+  gap: 4px;
+}
+
+/*
+ * 名前・前・矢印・後・差。**差は右端に固定**して、
+ * 縦に並んだ時に増減が一列で読めるようにする。
+ */
+.ae-stats__row {
+  display: grid;
+  grid-template-columns: 4.2em minmax(0, 1fr) auto minmax(0, 1fr) 5.2em;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ae-stats__name { color: #cfc2a8; font-weight: 700; }
+.ae-stats__before { color: #a99c86; text-align: right; }
+.ae-stats__arrow { color: #7e7364; font-size: 0.7rem; }
+.ae-stats__after { color: #ffe9b6; font-weight: 900; text-align: right; }
+.ae-stats__delta { color: #8e8271; font-weight: 900; text-align: right; }
+
+/* 上下は色だけに頼らない。符号(+/-)も必ず出す */
+.ae-stats__row.is-up .ae-stats__delta { color: #76e39b; }
+.ae-stats__row.is-down .ae-stats__delta { color: #ff9b9b; }
+
+/* ---- 部位ごとの入れ替え ---- */
+
+.ae-slotdiff {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.ae-slotdiff__row {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.7rem;
+}
+
+.ae-slotdiff__no { color: #d6a84a; font-weight: 900; }
+.ae-slotdiff__arrow { color: #7e7364; }
+
+/* 装備名が長くても崩さない。溢れる時は末尾を省く */
+.ae-slotdiff__before,
+.ae-slotdiff__after {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ae-slotdiff__before { color: #a99c86; }
+.ae-slotdiff__after { color: #ffe9b6; font-weight: 700; }
+
+/* ---- 他の子から外す時の警告 ---- */
+
+.ae-warning {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(255, 118, 118, 0.5);
+  border-left: 3px solid #ff6b6b;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(58, 22, 22, 0.9), rgba(30, 15, 15, 0.9));
+}
+
+.ae-warning__title {
+  color: #ffb3b3;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.ae-warning__list {
+  margin: 6px 0 0;
+  padding-left: 1.1em;
+  color: #ffd9d9;
+  font-size: 0.7rem;
+  line-height: 1.6;
+}
+
+/* ---- 断った時 ---- */
+
+.ae-error {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 118, 118, 0.45);
+  border-left: 3px solid #ff6b6b;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(58, 22, 22, 0.9), rgba(30, 15, 15, 0.9));
+  color: #ffd9d9;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.ae-error strong { color: #ffb3b3; font-size: 0.8rem; }
+
+/* ---- プリセット ---- */
+
+.ae-preset {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ae-preset.is-saved {
+  border-color: rgba(214, 168, 74, 0.42);
+  background: linear-gradient(180deg, rgba(42, 33, 20, 0.72), rgba(18, 15, 11, 0.8));
+}
+
+.ae-preset__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+/* 名前が長くても崩さない。押すと編集に変わる */
+.ae-preset__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  /* 名前を押すと編集に変わる。**的は40pxを下回らせない**(巡回が拾う下限) */
+  min-height: 40px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffe6b0;
+  font-size: 0.88rem;
+  font-weight: 900;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ae-preset__pencil { color: #b08d4a; font-size: 0.72rem; }
+
+.ae-preset__rename {
+  flex: 1 1 8em;
+  min-width: 0;
+  min-height: 38px;
+  padding: 4px 8px;
+  border: 1px solid rgba(214, 168, 74, 0.5);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #ffe9b6;
+  font-size: 0.86rem;
+}
+
+.ae-preset__summary {
+  color: #b6ab97;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+/*
+ * 3つの操作。**縦に積む。**横に並べると、狭い端末で
+ * 「今の持ち物で組み直す」が2文字しか見えなくなる。
+ */
+.ae-preset__actions {
+  display: grid;
+  gap: 6px;
+}
+
+.btn.ae-preset__btn {
+  min-height: 40px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+}
+
+/* ---- 実行 ---- */
+
+/*
+ * **貼り付けない。**画面の頭を見ている間ずっと下端に居座り、
+ * その裏のプリセットの札を押せなくしていた(巡回が拾った)。
+ * 押す順に並べれば、貼り付けなくても届く。
+ */
+.auto-equip-screen .sticky-actions {
+  position: static;
+  bottom: auto;
+  margin: 10px 0 0;
+}
+
+.btn.ae-run {
+  width: 100%;
+}
+
+/* 結果が出ている時の「条件を変えて探し直す」。確定の下へ置く */
+.ae-research { margin-top: 8px; }
+
+.ae-confirm {
+  display: grid;
+  grid-template-columns: 5.5em minmax(0, 1fr);
+  gap: 8px;
+}
+
+.btn.ae-confirm__cancel,
+.btn.ae-confirm__go {
+  min-height: 46px;
+  margin: 0;
+}
+
+/* ---- 広い端末 ---- */
+
+/*
+ * 3つを横に並べてよいのは、**3つとも1行に収まる幅から。**
+ * 430pxで3列にしたら「今の持ち物で組み直す」が2行に折れて、
+ * 札の高さだけが揃わなくなった。折れない幅まで待つ。
+ */
+@media (min-width: 560px) {
+  .ae-preset__actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---- 狭い端末 ---- */
+
+@media (max-width: 360px) {
+  .ae-chip {
+    padding: 6px 9px;
+    font-size: 0.74rem;
+  }
+
+  .ae-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /*
+   * 数字の欄は**細くしない。**ここを縮めると打った値が見えなくなる。
+   * 代わりに単位を落として幅を作る。
+   */
+  .ae-minimums__row {
+    grid-template-columns: minmax(0, 1fr) 84px;
+  }
+
+  .ae-minimums__unit {
+    display: none;
+  }
+
+  .ae-stats__row {
+    grid-template-columns: 3.6em minmax(0, 1fr) auto minmax(0, 1fr) 4.6em;
+    font-size: 0.72rem;
+  }
+}

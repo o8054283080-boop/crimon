@@ -4,6 +4,7 @@ import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requ
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
 import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import { createDefaultTalentState } from "../core/talents.js";
+import { normalizeMonsterPresets } from "./equipmentPreset.js";
 import { decodeSave, encodeSave } from "./saveCodec.js";
 import { AWAKENING_MATERIAL_LABEL } from "./shop.js";
 import { Star } from "../core/rarity.js";
@@ -538,6 +539,11 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
         if (talents.awakening !== null && typeof talents.awakening !== "object") talents.awakening = null;
       }
     }
+    /*
+     * 装備プリセット。**知らない値が入っている前提で読む。**
+     * 控えは人が書き換えられるし、旧セーブには存在しない。
+     */
+    normalizeMonsterPresets(monster);
   }
   if (!state.dungeonPartyIds) state.dungeonPartyIds = [];
   if (!state.clearedDungeonFloors) state.clearedDungeonFloors = [];

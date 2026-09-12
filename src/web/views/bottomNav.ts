@@ -21,6 +21,7 @@ export type ScreenName =
   | "MONSTER_DEX"
   | "MONSTER_EXCHANGE"
   | "MONSTER_STORAGE"
+  | "AUTO_EQUIP"
   | "SHOP"
   | "MONSTER_TRAINING"
   | "MONSTER_CREATE"

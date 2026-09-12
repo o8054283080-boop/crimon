@@ -47,6 +47,7 @@ export interface MonstersProps {
   onGoMonsterDex: () => void;
   onGoExchange: () => void;
   onGoStorage: () => void;
+  onGoAutoEquip: (monsterId: string) => void;
   sortKey: MonsterSortKey;
   onChangeSort: (key: MonsterSortKey) => void;
   filter: MonsterFilter;
@@ -415,6 +416,15 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
       el("section", { className: "monster-detail-section monster-detail-equipment" }, [
         el("h2", {}, ["装備"]),
         renderSlotGrid(props, instance),
+        /*
+         * おまかせは**装備の並びのすぐ下**に置く。
+         * 下の操作列(強化・クリエイト)へ混ぜると、装備の話から離れて見つからない。
+         */
+        el("button", {
+          type: "button",
+          className: "btn btn--primary monster-detail-equipment__auto",
+          onclick: () => props.onGoAutoEquip(instance.id),
+        }, ["⚙ おまかせ装備・プリセット"]),
         activeSets.length ? el("p", { className: "monster-detail-equipment__sets" }, [activeSets.flatMap((bonus) => {
           const description = SET_BONUS_DESCRIPTION[bonus.set];
           return [`${SET_LABEL[bonus.set]}：${bonus.twoActive ? description.two : ""}${bonus.twoActive && bonus.fourActive ? " / " : ""}${bonus.fourActive ? description.four : ""}`];
