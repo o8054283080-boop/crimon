@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ARENA_TIERS, arenaNextTier, arenaTierForRating } from "../src/data/arena/ranks.js";
-import { ARENA_RATING_RULES, applyArenaDefenseRating, applyArenaRating, arenaRatingDelta } from "../src/data/arena/rating.js";
+import { applyArenaDefenseRating, applyArenaRating, arenaRatingDelta } from "../src/data/arena/rating.js";
 import {
   ARENA_NOT_CLAIMED,
   ARENA_SEASON_EPOCH_UTC,
@@ -68,46 +68,33 @@ describe("ランク表", () => {
 });
 
 describe("レートの増減", () => {
-  it("同格は依頼の目安どおり", () => {
-    expect(arenaRatingDelta(1500, 1500, true)).toBe(ARENA_RATING_RULES.evenWin);
-    expect(arenaRatingDelta(1500, 1500, false)).toBe(-ARENA_RATING_RULES.evenLoss);
-  });
-
-  it("格上に勝つほど大きく、格上に負けても小さい", () => {
-    expect(arenaRatingDelta(1500, 1800, true)).toBe(ARENA_RATING_RULES.maxWin);
-    expect(arenaRatingDelta(1500, 1800, false)).toBe(-ARENA_RATING_RULES.minLoss);
-  });
-
-  it("格下に勝っても小さく、格下に負けると大きく減る", () => {
-    expect(arenaRatingDelta(1800, 1500, true)).toBe(ARENA_RATING_RULES.minWin);
-    expect(arenaRatingDelta(1800, 1500, false)).toBe(-ARENA_RATING_RULES.maxLoss);
-  });
-
-  it("差が開いても上限・下限を超えない", () => {
-    // 段差を作らない代わりに、際限なく伸びないことを確かめる
-    for (const diff of [0, 100, 300, 1000, 5000]) {
-      const win = arenaRatingDelta(1500, 1500 + diff, true);
-      const loss = arenaRatingDelta(1500, 1500 - diff, false);
-      expect(win).toBeLessThanOrEqual(ARENA_RATING_RULES.maxWin);
-      expect(win).toBeGreaterThanOrEqual(ARENA_RATING_RULES.minWin);
-      expect(-loss).toBeLessThanOrEqual(ARENA_RATING_RULES.maxLoss);
+  it("確定したレート差カーブの主要点と端を守る", () => {
+    const cases: Array<[number, number, number]> = [
+      [-500, 1, -32], [-300, 1, -30], [-200, 3, -24], [-100, 6, -18],
+      [0, 12, -13], [100, 18, -9], [200, 26, -5], [300, 34, -3],
+      [500, 40, -1], [1000, 40, -1],
+    ];
+    for (const [diff, win, loss] of cases) {
+      expect(arenaRatingDelta(2000, 2000 + diff, true), `勝利 diff=${diff}`).toBe(win);
+      expect(arenaRatingDelta(2000, 2000 + diff, false), `敗北 diff=${diff}`).toBe(loss);
     }
   });
 
-  it("レートは0を下回らない", () => {
-    expect(applyArenaRating(3, 1500, false).rating).toBe(0);
+  it("表の中間は滑らかに補間する", () => {
+    expect(arenaRatingDelta(2000, 1925, true)).toBe(8);
+    expect(arenaRatingDelta(2000, 2075, true)).toBe(17);
+    expect(arenaRatingDelta(2000, 1925, false)).toBe(-17);
+    expect(arenaRatingDelta(2000, 2075, false)).toBe(-10);
   });
 
-  it("防衛の増減は攻撃より小さい", () => {
-    /*
-     * **寝ている間に大量に落ちる状態を避ける。**
-     * 防衛は自分で選べない戦いなので、同じ幅で動かすと
-     * 触っていないのに順位が溶ける。
-     */
-    const attack = Math.abs(applyArenaRating(1500, 1500, false).rating - 1500);
-    const defense = Math.abs(applyArenaDefenseRating(1500, 1500, false).rating - 1500);
-    expect(defense).toBeLessThan(attack);
-    expect(defense).toBeGreaterThan(0);
+  it("レートは0を下回らない", () => {
+    expect(applyArenaRating(3, 0, false).rating).toBe(0);
+  });
+
+  it("防衛は攻撃戦の60%相当で、最低1は動く", () => {
+    expect(applyArenaDefenseRating(1500, 1500, false).delta).toBe(-8);
+    expect(applyArenaDefenseRating(1500, 1800, true).delta).toBe(20);
+    expect(applyArenaDefenseRating(1500, 2000, false).delta).toBe(-1);
   });
 });
 
