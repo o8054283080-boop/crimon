@@ -61,7 +61,7 @@ export interface PlayerState {
   gold: number;
   monsters: MonsterInstance[];
   /** 未育成Lv1の同一個体を圧縮して持つ保管所。旧セーブでは空配列として補完する。 */
-  monsterStorage: { dexId: string; star: Star; count: number }[];
+  monsterStorage?: { dexId: string; star: Star; count: number }[];
   partyIds: string[];
   clearedStageIds: string[];
   /** クリア済みの装備ダンジョン階層(初回クリア判定・ダイヤ報酬用) */
