@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { ARENA_DEFENSE_DAILY_LOSS_CAP, ARENA_DEFENSE_RATING_SCALE, ARENA_RATING_RULES } from "../src/data/arena/rating.js";
+import { ARENA_DEFENSE_DAILY_LOSS_CAP, ARENA_DEFENSE_RATING_SCALE, arenaRatingDelta } from "../src/data/arena/rating.js";
 import {
   ARENA_COIN_DEFENSE_DAILY_CAP,
   ARENA_COIN_DEFENSE_WIN,
@@ -46,6 +46,7 @@ const sql0003 = readFileSync(new URL("../supabase/migrations/20260902172000_aren
 const sqlSeed = readFileSync(new URL("../supabase/migrations/20260902172100_arena_seed.sql", import.meta.url), "utf8");
 const sqlSafety = readFileSync(new URL("../supabase/migrations/20260903003038_arena_release_safety.sql", import.meta.url), "utf8");
 const sqlShopGoals = readFileSync(new URL("../supabase/migrations/20260903015014_arena_shop_goals_and_defense_coins.sql", import.meta.url), "utf8");
+const sqlRatingRebalance = readFileSync(new URL("../supabase/migrations/20260912120000_arena_rating_gap_rebalance.sql", import.meta.url), "utf8");
 
 /** `arena_config` に入れている初期値を1件取り出す */
 function seededConfig(key: string): Record<string, number> {
@@ -66,22 +67,23 @@ function fallbacksIn(sql: string, key: string): Record<string, number>[] {
 }
 
 describe("サーバ設定とクライアント定数が同じ値であること", () => {
-  it("レートの増減", () => {
-    const rating = seededConfig("rating");
-    expect(rating.even_win).toBe(ARENA_RATING_RULES.evenWin);
-    expect(rating.even_loss).toBe(ARENA_RATING_RULES.evenLoss);
-    expect(rating.max_win).toBe(ARENA_RATING_RULES.maxWin);
-    expect(rating.min_loss).toBe(ARENA_RATING_RULES.minLoss);
-    expect(rating.min_win).toBe(ARENA_RATING_RULES.minWin);
-    expect(rating.max_loss).toBe(ARENA_RATING_RULES.maxLoss);
-    expect(rating.spread).toBe(ARENA_RATING_RULES.spread);
-    expect(rating.floor).toBe(ARENA_RATING_RULES.floor);
+  it("レート差カーブがサーバ移行SQLと一致する", () => {
+    const anchors: Array<[number, number, number]> = [
+      [-300, 1, 30], [-200, 3, 24], [-100, 6, 18], [0, 12, 13],
+      [100, 18, 9], [200, 26, 5], [300, 34, 3], [500, 40, 1],
+    ];
+    for (const [diff, win, loss] of anchors) {
+      expect(arenaRatingDelta(2000, 2000 + diff, true)).toBe(win);
+      expect(arenaRatingDelta(2000, 2000 + diff, false)).toBe(-loss);
+      expect(sqlRatingRebalance).toContain(`(${diff},${win})`);
+      expect(sqlRatingRebalance).toContain(`(${diff},${loss})`);
+    }
   });
 
   it("防衛の増減と1日の下落上限", () => {
-    const defense = seededConfig("defense");
-    expect(defense.scale).toBe(ARENA_DEFENSE_RATING_SCALE);
-    expect(defense.daily_loss_cap).toBe(ARENA_DEFENSE_DAILY_LOSS_CAP);
+    expect(sqlRatingRebalance).toContain('"scale":0.6');
+    expect(ARENA_DEFENSE_RATING_SCALE).toBe(0.6);
+    expect(ARENA_DEFENSE_DAILY_LOSS_CAP).toBe(60);
   });
 
   it("挑戦券の上限と回復間隔", () => {

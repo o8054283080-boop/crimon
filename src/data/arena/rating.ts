@@ -1,75 +1,109 @@
 /**
- * レートの増減。
+ * アリーナのレート増減。
  *
- * **数字はすべてここの定数。** 依頼の目安をそのまま置いてある。
+ * 相手との差を強く反映する。格下狩りではほとんど伸びず、
+ * 格上に勝った時は後発でも追いつけるだけ大きく伸びる。
  *
- *   同格   勝ち +15 / 負け -10
- *   格上   勝ち +20〜25 / 負け -5
- *   格下   勝ち +8〜12 / 負け -15
- *
- * これを「勝つと +15」の1本で書くと格差が反映されないので、
- * レート差から連続的に出す。差がゼロなら必ず同格の値になり、
- * 差が開くほど格上/格下の値へ寄る(段差を作らない)。
+ * 差 = 相手レート - 自分レート。
+ * 表の間は線形補間し、表の外は端の値で固定する。
  */
 
+export interface ArenaRatingPoint {
+  diff: number;
+  value: number;
+}
+
 export interface ArenaRatingRules {
-  /** 同格での勝ち幅・負け幅 */
-  evenWin: number;
-  evenLoss: number;
-  /** 格上に勝った時の上限・格上に負けた時の下限 */
-  maxWin: number;
-  minLoss: number;
-  /** 格下に勝った時の下限・格下に負けた時の上限 */
-  minWin: number;
-  maxLoss: number;
-  /**
-   * 「格上/格下」と見なすレート差。
-   * この差でちょうど上限・下限へ届く。
-   */
-  spread: number;
-  /** レートの下限。ここより下へは落ちない */
+  /** 勝利時の増加量。value は正数 */
+  winCurve: readonly ArenaRatingPoint[];
+  /** 敗北時の減少量。value は正数 */
+  lossCurve: readonly ArenaRatingPoint[];
+  /** レートの下限 */
   floor: number;
 }
 
+/**
+ * 確定バランス。
+ *
+ * 勝利:
+ * -300以下:+1 / -200:+3 / -100:+6 / 0:+12 / +100:+18 /
+ * +200:+26 / +300:+34 / +500以上:+40
+ *
+ * 敗北:
+ * +500以上:-1 / +400:-2 / +300:-3 / +200:-5 / +100:-9 /
+ * 0:-13 / -100:-18 / -200:-24 / -300:-30 / -400以下:-32
+ */
 export const ARENA_RATING_RULES: ArenaRatingRules = {
-  evenWin: 15,
-  evenLoss: 10,
-  maxWin: 25,
-  minLoss: 5,
-  minWin: 8,
-  maxLoss: 15,
-  spread: 300,
+  winCurve: [
+    { diff: -300, value: 1 },
+    { diff: -250, value: 2 },
+    { diff: -200, value: 3 },
+    { diff: -150, value: 4 },
+    { diff: -100, value: 6 },
+    { diff: -50, value: 9 },
+    { diff: 0, value: 12 },
+    { diff: 50, value: 15 },
+    { diff: 100, value: 18 },
+    { diff: 150, value: 22 },
+    { diff: 200, value: 26 },
+    { diff: 250, value: 30 },
+    { diff: 300, value: 34 },
+    { diff: 400, value: 38 },
+    { diff: 500, value: 40 },
+  ],
+  lossCurve: [
+    { diff: -400, value: 32 },
+    { diff: -300, value: 30 },
+    { diff: -250, value: 27 },
+    { diff: -200, value: 24 },
+    { diff: -150, value: 21 },
+    { diff: -100, value: 18 },
+    { diff: -50, value: 15 },
+    { diff: 0, value: 13 },
+    { diff: 50, value: 11 },
+    { diff: 100, value: 9 },
+    { diff: 150, value: 7 },
+    { diff: 200, value: 5 },
+    { diff: 250, value: 4 },
+    { diff: 300, value: 3 },
+    { diff: 400, value: 2 },
+    { diff: 500, value: 1 },
+  ],
   floor: 0,
 };
 
 /**
- * 防衛側の増減は攻撃側より小さくする。
- *
- * **寝ている間に大量に落ちる状態を避ける。** 防衛は自分で選べない戦いなので、
- * 同じ幅で動かすと「触っていないのに順位が溶ける」ことになる。
+ * 防衛は自分で相手を選べないため、攻撃戦の60%。
+ * 0にはせず、動いたことが分かるよう最低1は残す。
  */
-export const ARENA_DEFENSE_RATING_SCALE = 0.5;
+export const ARENA_DEFENSE_RATING_SCALE = 0.6;
 
-/** 1日に防衛で減らせるレートの上限。これ以上は寝ている間に落ちない */
+/** 1日に防衛で減らせるレートの上限。既存の安全弁は維持する */
 export const ARENA_DEFENSE_DAILY_LOSS_CAP = 60;
 
 export interface ArenaRatingChange {
-  /** 増減。勝ちは正、負けは負 */
   delta: number;
-  /** 適用後のレート */
   rating: number;
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+function interpolateCurve(diff: number, curve: readonly ArenaRatingPoint[]): number {
+  if (curve.length === 0) return 0;
+  if (diff <= curve[0].diff) return curve[0].value;
+  const last = curve[curve.length - 1];
+  if (diff >= last.diff) return last.value;
+
+  for (let i = 1; i < curve.length; i += 1) {
+    const high = curve[i];
+    if (diff > high.diff) continue;
+    const low = curve[i - 1];
+    const span = high.diff - low.diff;
+    const t = span <= 0 ? 0 : (diff - low.diff) / span;
+    return Math.round(low.value + (high.value - low.value) * t);
+  }
+  return last.value;
 }
 
-/**
- * 1戦ぶんのレート増減。
- *
- * `opponentRating - myRating` が正なら格上。
- * 差の大きさを `spread` で 0〜1 に潰してから、同格の値と上限/下限の間を取る。
- */
+/** 1戦ぶんのレート増減。diff が正なら格上。 */
 export function arenaRatingDelta(
   myRating: number,
   opponentRating: number,
@@ -77,14 +111,8 @@ export function arenaRatingDelta(
   rules: ArenaRatingRules = ARENA_RATING_RULES,
 ): number {
   const diff = opponentRating - myRating;
-  const t = Math.min(1, Math.abs(diff) / rules.spread);
-  const upward = diff > 0;
-  if (won) {
-    const target = upward ? rules.maxWin : rules.minWin;
-    return Math.round(lerp(rules.evenWin, target, t));
-  }
-  const target = upward ? rules.minLoss : rules.maxLoss;
-  return -Math.round(lerp(rules.evenLoss, target, t));
+  const amount = interpolateCurve(diff, won ? rules.winCurve : rules.lossCurve);
+  return won ? amount : -amount;
 }
 
 /** 攻撃側の1戦を適用する */
@@ -98,10 +126,7 @@ export function applyArenaRating(
   return { delta, rating: Math.max(rules.floor, myRating + delta) };
 }
 
-/**
- * 防衛側の1戦を適用する。
- * `won` は**防衛側から見た勝敗**(攻撃を退けたら true)。
- */
+/** 防衛側の1戦を適用する。won は防衛側から見た勝敗。 */
 export function applyArenaDefenseRating(
   myRating: number,
   attackerRating: number,
@@ -110,7 +135,6 @@ export function applyArenaDefenseRating(
   scale: number = ARENA_DEFENSE_RATING_SCALE,
 ): ArenaRatingChange {
   const raw = arenaRatingDelta(myRating, attackerRating, won, rules);
-  // 0にはしない。防衛でも動いたことが分かる方がよい
   const delta = raw === 0 ? 0 : Math.sign(raw) * Math.max(1, Math.round(Math.abs(raw) * scale));
   return { delta, rating: Math.max(rules.floor, myRating + delta) };
 }

@@ -56,6 +56,7 @@ import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import { arenaTierForRating } from "../../data/arena/ranks.js";
 import {
   ARENA_NPC_DEFAULT_COUNT,
+  ARENA_NPC_MAX_RATING,
   ARENA_NPC_RATING_JITTER,
   ARENA_NPC_RATING_OFFSETS,
   ARENA_NPC_ROLE_PLANS,
@@ -328,7 +329,7 @@ export function buildArenaNpc(
   const rng = arenaNpcRng(unitSeed(seed, index));
   const offset = ARENA_NPC_RATING_OFFSETS[index % ARENA_NPC_RATING_OFFSETS.length];
   const jitter = Math.round((rng() * 2 - 1) * ARENA_NPC_RATING_JITTER);
-  const opponentRating = Math.max(0, Math.round(rating + offset + jitter));
+  const opponentRating = Math.min(ARENA_NPC_MAX_RATING, Math.max(0, Math.round(rating + offset + jitter)));
 
   const band = arenaNpcBandForRating(opponentRating);
   const pool = arenaNpcTeamsForTiers(band.teamTiers);
