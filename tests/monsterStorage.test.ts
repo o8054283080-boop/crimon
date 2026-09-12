@@ -11,7 +11,7 @@ describe("monster storage", () => {
     expect(depositMonsters(state, "slime_FIRE", 3, 2)).toBe(2);
     expect(state.monsterStorage?.[0]).toMatchObject({ dexId: "slime_FIRE", star: 3, count: 2 });
     expect(withdrawMonsters(state, "slime_FIRE", 3, 1)).toBe(1);
-    expect(state.monsterStorage?.[0].count).toBe(1);
+    expect(state.monsterStorage?.[0]?.count).toBe(1);
   });
 
   it("does not store locked or developed monsters", () => {
@@ -28,6 +28,6 @@ describe("monster storage", () => {
     state.monsterStorage = [{ dexId: "slime_FIRE", star: 3, count: 10 }];
     state.monsterPoints = 7;
     expect(exchangeStoredMonstersForPoints(state, "slime_FIRE", 3, 4)).toEqual({ sent: 4, gained: 12, total: 19 });
-    expect(state.monsterStorage[0].count).toBe(6);
+    expect(state.monsterStorage?.[0]?.count).toBe(6);
   });
 });
