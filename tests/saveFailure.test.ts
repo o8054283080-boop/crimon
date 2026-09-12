@@ -111,6 +111,10 @@ describe("保存できていないことを画面に出す", () => {
     expect(roomy, "余裕がある人に整理を案内しない").not.toContain("整理して空き");
   });
 
+  it("警告にはモンスターや装備の整理案内も出す", () => {
+    expect(MAIN).toContain("モンスターや装備が増えすぎている場合は、使わないものを整理してください");
+  });
+
   it("小さいセーブで失敗した人に「整理しても直らない」と伝える", () => {
     const detail = MAIN.slice(MAIN.indexOf("function quotaDetail"), MAIN.indexOf("function buildSaveFailureBar"));
     expect(detail).toContain("装備やモンスターを整理しても直りません");
