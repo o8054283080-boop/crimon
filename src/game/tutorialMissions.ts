@@ -75,7 +75,11 @@ const partyEquippedTotal = (p: PlayerState) => partyMonsters(p).reduce((sum, mon
 const enhanced = (p: PlayerState, level: number) => p.equipment.some((e) => e.level >= level);
 const enhancedCount = (p: PlayerState, level: number) => p.equipment.filter((e) => e.level >= level).length;
 const hasLevel = (p: PlayerState, level: number) => p.monsters.some((m) => m.level >= level);
-const hasStarCount = (p: PlayerState, star: Star, count: number) => p.monsters.filter((m) => m.star >= star).length >= count;
+const hasStarCount = (p: PlayerState, star: Star, count: number) => {
+  const active = p.monsters.filter((m) => m.star >= star).length;
+  const stored = (p.monsterStorage ?? []).filter((stack) => stack.star >= star).reduce((sum, stack) => sum + stack.count, 0);
+  return active + stored >= count;
+};
 const starLevelCount = (p: PlayerState, star: Star, level: number) => p.monsters.filter((m) => m.star >= star && m.level >= level).length;
 const hasStarLevel = (p: PlayerState, star: Star, level: number) => starLevelCount(p, star, level) >= 1;
 const hasMaxLevel = (p: PlayerState) => p.monsters.some((m) => m.level >= STAR_MAX_LEVEL[m.star]);

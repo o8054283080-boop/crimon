@@ -120,6 +120,8 @@ import { toBattleDefinition } from "../core/monsterInstance.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
 import { forgetShownCounts } from "./incrementalGrid.js";
 import { renderMonsterExchange } from "./views/monsterExchange.js";
+import { renderMonsterStorage } from "./views/monsterStorage.js";
+import { depositMonsters, exchangeStoredMonstersForPoints, withdrawMonsters } from "../game/monsterStorage.js";
 import { sendMonstersForPoints, tryExchangeMonsterPoints } from "../game/monsterPoints.js";
 import { loadMonsterListDense, saveMonsterListDense } from "./monsterListDensity.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
@@ -368,6 +370,7 @@ interface AppState {
   monsterExchangeFilter: MonsterFilter;
   monsterExchangeFilterOpen: boolean;
   monsterExchangeSortKey: MonsterSortKey;
+  monsterStorageNotice: string | null;
   selectedStageId: string | null;
   selectedDifficulty: Difficulty;
   stageRun: StageRunState | null;
@@ -551,6 +554,7 @@ const state: AppState = {
   monsterExchangeFilter: { ...EMPTY_MONSTER_FILTER },
   monsterExchangeFilterOpen: false,
   monsterExchangeSortKey: "recommended",
+  monsterStorageNotice: null,
   selectedStageId: null,
   selectedDifficulty: "NORMAL",
   stageRun: null,
@@ -872,6 +876,7 @@ function goBack(): void {
   // 場所に紐づく一時的な案内は持ち越さない。前の画面の言葉が残ると嘘になる
   state.shopNotice = null;
   state.monsterExchangeNotice = null;
+  state.monsterStorageNotice = null;
   state.createNotice = null;
   state.partyNotice = null;
   state.arenaNotice = null;
@@ -1276,6 +1281,17 @@ function handleSendMonstersForPoints(): void {
 }
 
 /** ポイントを交換する。足りない時は何も減らさない(`tryExchangeMonsterPoints` が守る) */
+function askMonsterStorageQuantity(action: string, max: number): number | null {
+  const raw = window.prompt(`${action}体数を入力してください（1〜${max}）`, String(max));
+  if (raw === null) return null;
+  const count = Math.floor(Number(raw));
+  if (!Number.isFinite(count) || count < 1 || count > max) {
+    window.alert(`1〜${max}の範囲で入力してください。`);
+    return null;
+  }
+  return count;
+}
+
 function handleExchangeMonsterPoints(itemId: string): void {
   const beforeMonsters = structuredClone(state.player.monsters);
   const beforePoints = state.player.monsterPoints ?? 0;
@@ -4239,6 +4255,64 @@ function renderScreen(): void {
       });
       break;
 
+    case "MONSTER_STORAGE":
+      content = renderMonsterStorage({
+        player: state.player,
+        notice: state.monsterStorageNotice,
+        onBack: () => navigate("MONSTERS"),
+        onDeposit: (dexId, star, max) => {
+          const count = askMonsterStorageQuantity("預ける", max);
+          if (count === null) return;
+          const beforeMonsters = structuredClone(state.player.monsters);
+          const beforeStorage = structuredClone(state.player.monsterStorage);
+          const moved = depositMonsters(state.player, dexId, star, count);
+          if (moved === 0 || !savePlayerState(state.player)) {
+            state.player.monsters = beforeMonsters;
+            state.player.monsterStorage = beforeStorage;
+            playSfx("denied", 0.7);
+          } else {
+            state.monsterStorageNotice = `${moved}体を保管所へ預けました。`;
+            playSfx("select");
+          }
+          render();
+        },
+        onWithdraw: (dexId, star, max) => {
+          const count = askMonsterStorageQuantity("取り出す", max);
+          if (count === null) return;
+          const beforeMonsters = structuredClone(state.player.monsters);
+          const beforeStorage = structuredClone(state.player.monsterStorage);
+          const moved = withdrawMonsters(state.player, dexId, star, count);
+          if (moved === 0 || !savePlayerState(state.player)) {
+            state.player.monsters = beforeMonsters;
+            state.player.monsterStorage = beforeStorage;
+            playSfx("denied", 0.7);
+          } else {
+            state.monsterStorageNotice = `${moved}体を所持モンスターへ取り出しました。`;
+            playSfx("select");
+          }
+          render();
+        },
+        onExchangePoints: (dexId, star, max) => {
+          const count = askMonsterStorageQuantity("ポイントに変える", max);
+          if (count === null) return;
+          const gain = count * star;
+          if (!window.confirm(`★${star} Lv1 を ${count}体送り、${gain}Pに変えます。\n送ったモンスターは戻せません。よろしいですか？`)) return;
+          const beforeStorage = structuredClone(state.player.monsterStorage);
+          const beforePoints = state.player.monsterPoints ?? 0;
+          const result = exchangeStoredMonstersForPoints(state.player, dexId, star, count);
+          if (!result || !savePlayerState(state.player)) {
+            state.player.monsterStorage = beforeStorage;
+            state.player.monsterPoints = beforePoints;
+            playSfx("denied", 0.7);
+          } else {
+            state.monsterStorageNotice = `${result.sent}体を送って ${result.gained}P を受け取りました（所持 ${result.total}P）`;
+            playSfx("stageClear");
+          }
+          render();
+        },
+      });
+      break;
+
     case "MONSTER_DEX":
       content = renderMonsterDex({
         selectedDexId: state.selectedDexEntryId,
@@ -4677,6 +4751,11 @@ function renderMonstersScreen(): HTMLElement {
       // 選択は持ち越さない。前に開いた時の選択が残っていると、そのまま送ってしまう
       state.monsterExchangeIds = [];
       state.screen = "MONSTER_EXCHANGE";
+      render();
+    },
+    onGoStorage: () => {
+      state.monsterStorageNotice = null;
+      state.screen = "MONSTER_STORAGE";
       render();
     },
     sortKey: state.monsterSortKey,
