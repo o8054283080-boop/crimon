@@ -30,7 +30,7 @@ import { buildArenaNpc, buildArenaNpcs } from "../src/game/arena/npc.js";
 import type { ArenaOpponentEntry } from "../src/game/arena/types.js";
 
 /** 帯の代表レート。境界から十分離した値を使う(揺らぎで隣の帯へ落ちないように) */
-const BAND_SAMPLE_RATINGS = ARENA_NPC_BANDS.map((band) => band.minRating + 150);
+const BAND_SAMPLE_RATINGS = [300, 1350, 1650, 1950, 2250, 2450, 2525, 2600, 2650, 2690];
 
 /** 検査に使う種。1つの抽選で判断すると、揺らぎをそのまま結論にしてしまう */
 const SEEDS = Array.from({ length: 25 }, (_, i) => i * 7919 + 17);
@@ -64,6 +64,20 @@ describe("アリーナNPC", () => {
     // 種が違えば違う相手になる(同じ種を無視して固定値を返していないか)
     const c = buildArenaNpcs(1650, 12346, 3);
     expect(JSON.stringify(c)).not.toBe(JSON.stringify(a));
+  });
+
+  it("NPCのレートは2700を絶対に超えない", () => {
+    for (const myRating of [2600, 2700, 3000, 5000, 9999]) {
+      for (const npc of buildArenaNpcs(myRating, 424242, 8)) {
+        expect(npc.rating).toBeLessThanOrEqual(ARENA_NPC_MAX_RATING);
+      }
+    }
+    expect(ARENA_NPC_MAX_RATING).toBe(2700);
+  });
+
+  it("3000以上では最高NPCでも300差以上の格下になる", () => {
+    const ratings = buildArenaNpcs(3000, 12345, 8).map((npc) => npc.rating);
+    expect(Math.max(...ratings)).toBe(2700);
   });
 
   it("編成テンプレートの図鑑IDがすべて実在する", () => {
