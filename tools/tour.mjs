@@ -101,6 +101,14 @@ const SCREENS = [
       + " await wait(300);"
       + " [...document.querySelectorAll('.mp-send button')].find(b => b.textContent.includes('表示中をすべて選ぶ'))?.click()",
   },
+  /*
+   * おまかせ装備。**探した後も見る。**
+   * 初期セーブには装備が1個も無く、探す前は設定の札しか出ない。
+   * 変更前→変更後の行・部位ごとの入れ替え・他の子から外す警告・実行バーは
+   * どれも結果が出てから初めて現れるので、そこを見ないと素通りになる。
+   */
+  { name: "おまかせ装備", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip()" },
+  { name: "おまかせ装備(探した後)", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip(true)" },
   { name: "クリエイト/スキル継承", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('SKILL')" },
   { name: "クリエイト/タイプ転生", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TYPE')" },
   { name: "クリエイト/能力付与", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('ABILITY')" },

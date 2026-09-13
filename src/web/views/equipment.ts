@@ -99,6 +99,7 @@ export interface EquipmentProps {
   onClearSelection: () => void;
   onBulkSell: () => void;
   onToggleLock: (equipmentId: string) => void;
+  onToggleAutoExclude: (equipmentId: string) => void;
 }
 
 /**
@@ -781,6 +782,20 @@ function renderDetail(props: EquipmentProps, equipment: Equipment): HTMLElement 
       : null,
 
     el("button", { type: "button", className: "btn btn--ghost equip-detail__act", onclick: () => props.onToggleLock(equipment.id) }, [equipmentLockLabel(equipment)]),
+
+    /*
+     * **売却防止の鍵とは別の印。**あちらは「手放したくない」、
+     * こちらは「おまかせ装備で勝手に着け替えたくない」。
+     * 同じ意味にすると、鍵をかけた強い装備がおまかせに一切出てこなくなる。
+     */
+    el("button", {
+      type: "button",
+      className: "btn btn--ghost equip-detail__act",
+      onclick: () => props.onToggleAutoExclude(equipment.id),
+    }, [equipment.autoExclude ? "おまかせ対象外を解く" : "おまかせ対象外にする"]),
+    equipment.autoExclude
+      ? el("p", { className: "equip-detail__note" }, ["おまかせ装備の候補に入りません（売却はできます）"])
+      : null,
 
     isEquipped ? el("p", { className: "equip-detail__note" }, ["装着中は売却できません。先に外してください"]) : null,
 

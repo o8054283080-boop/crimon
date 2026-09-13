@@ -153,6 +153,7 @@ function packEquipment(equipment: Equipment): Packed {
   };
   if (equipment.level) packed.l = equipment.level;
   if (equipment.locked) packed.o = 1;
+  if (equipment.autoExclude) packed.a = 1;
   if (equipment.subStats.length > 0) packed.b = equipment.subStats.map(packRoll);
   if (equipment.initialSubStatCount !== undefined) packed.n = equipment.initialSubStatCount;
   return packed;
@@ -170,6 +171,7 @@ function unpackEquipment(packed: Packed): Equipment {
   };
   if (packed.n !== undefined) equipment.initialSubStatCount = packed.n as number;
   if (packed.o) equipment.locked = true;
+  if (packed.a) equipment.autoExclude = true;
   return equipment;
 }
 
@@ -278,6 +280,14 @@ function packMonster(monster: MonsterInstance): Packed {
   }
   const development = packDevelopment(monster.development);
   if (development) packed.v = development;
+
+  /*
+   * 装備プリセット。**使っている人のぶんだけ書く。**
+   * 中身は素通し(3枠しかなく、縮めても数十バイトにしかならない一方、
+   * 読めなくなった時に何が消えたのか分からなくなる)。
+   */
+  const presets = monster.equipmentPresets?.filter((preset) => preset.savedAt > 0);
+  if (presets && presets.length > 0) packed.p = monster.equipmentPresets;
   return packed;
 }
 
@@ -293,6 +303,7 @@ function unpackMonster(packed: Packed): MonsterInstance {
     development: unpackDevelopment(packed.v as Packed | undefined),
   };
   if (packed.o) monster.locked = true;
+  if (Array.isArray(packed.p)) monster.equipmentPresets = packed.p as MonsterInstance["equipmentPresets"];
   if (packed.c) {
     const [slot, skillId, sourceDexId] = packed.c as [CreatedSkill["slot"], string, string];
     monster.createdSkill = { slot, skillId, sourceDexId };

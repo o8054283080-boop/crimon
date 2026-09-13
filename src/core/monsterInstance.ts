@@ -9,6 +9,7 @@ import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
 import { applySkillTalents } from "./talentApply.js";
 import { talentCombatBonus, talentStatBonus, type TalentState } from "./talents.js";
 import type { Stats } from "./stats.js";
+import type { EquipmentPreset } from "./equipmentPreset.js";
 
 /**
  * 移し替えたスキルの実体を引く関数。
@@ -57,6 +58,14 @@ export interface MonsterInstance {
   createdSkill?: CreatedSkill;
   /** 将来のタイプ転生・能力ポイント・潜在覚醒をまとめた、個体固有の育成情報 */
   development: MonsterDevelopment;
+  /**
+   * 装備プリセット。**3枠ちょうど、または持たない。**
+   *
+   * 中身の意味は `src/game/equipmentPreset.ts`。
+   * 省略可なのは、**使っていない人のセーブを太らせないため。**
+   * 1体に空の3枠を配ると、持っているモンスターの数だけ無駄が増える。
+   */
+  equipmentPresets?: EquipmentPreset[];
 }
 
 /** 移し替えたスキル1つ分の記録 */
