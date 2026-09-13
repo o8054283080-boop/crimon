@@ -6,11 +6,12 @@
  *   npx tsx tools/defenseFormulaVerify.ts --runs 200
  *   npx tsx tools/defenseFormulaVerify.ts --only demon --def-scan
  *
- * ## 比べる3条件
+ * ## 比べる4条件
  *
  *   旧式      いまの方式E。軽減が**攻める側の攻撃力との比**で決まる
  *   新式      1000 / (1000 + 1.2 * DEF)。攻撃力を見ない
- *   新式+統一 上に加えて、防御低下を一律50%・防御上昇を一律30%へ
+ *   再設計    新式のまま、敵だけHP/DEF/ATKを検証用に補正
+ *   再設計+統一 上に加えて、防御低下を一律50%・防御上昇を一律30%へ
  *
  * ## 同じ種を使う
  *
@@ -44,14 +45,68 @@ const arg = (name: string, fallback: string): string => {
 const RUNS = Number(arg("runs", "200"));
 const ONLY = arg("only", "all");
 const GEAR = arg("gear", "TYPICAL") as GearGrade;
+const FLOOR_FILTER = arg("floors", "").split(",").filter(Boolean).map(Number);
+const TEAM_FILTER = arg("team", "");
 const DEF_SCAN = argv.includes("--def-scan");
+const REDESIGN_SCAN = argv.includes("--redesign-scan");
+const SCAN_RUNS = Number(arg("scan-runs", "40"));
+
+interface EnemyScale {
+  hp: number;
+  def: number;
+  atk: number;
+}
+
+const REQUESTED_SCALE: EnemyScale = {
+  hp: Number(arg("enemy-hp", "0.60")),
+  def: Number(arg("enemy-def", "0.20")),
+  atk: Number(arg("enemy-atk", "1.60")),
+};
+
+/** `--candidates "0.8,0.3,2;0.8,0.25,2"` で絞り込み後の複数案を一度に再測定する。 */
+const CANDIDATE_SCALES = arg("candidates", "")
+  .split(";")
+  .filter(Boolean)
+  .map((entry) => {
+    const [hp, def, atk] = entry.split(",").map(Number);
+    if (![hp, def, atk].every(Number.isFinite)) throw new Error(`候補倍率の形式が不正: ${entry}`);
+    return { hp, def, atk };
+  });
+
+const IDENTITY_SCALE: EnemyScale = { hp: 1, def: 1, atk: 1 };
+
+function patchEnemyDefs(defs: MonsterDefinition[], scale: EnemyScale): MonsterDefinition[] {
+  return defs.map((def) => ({
+    ...def,
+    stats: {
+      ...def.stats,
+      hp: Math.max(1, Math.round(def.stats.hp * scale.hp)),
+      def: Math.max(0, Math.round(def.stats.def * scale.def)),
+      atk: Math.max(0, Math.round(def.stats.atk * scale.atk)),
+      // SPD・クリ率・クリダメ・命中・抵抗は意図的に変更しない
+    },
+  }));
+}
 
 /** 比べる条件。**旧式を必ず先頭に置く**(差分の基準になる) */
-const CONDITIONS = [
-  { key: "旧式", flags: { defenseFormula: "legacy" as const, unifyDefModifiers: false } },
-  { key: "新式", flags: { defenseFormula: "sw" as const, unifyDefModifiers: false } },
-  { key: "新式+統一", flags: { defenseFormula: "sw" as const, unifyDefModifiers: true } },
+const BASE_CONDITIONS = [
+  { key: "A旧式", flags: { defenseFormula: "legacy" as const, unifyDefModifiers: false }, scale: IDENTITY_SCALE },
+  { key: "B新式", flags: { defenseFormula: "sw" as const, unifyDefModifiers: false }, scale: IDENTITY_SCALE },
 ];
+const CONDITIONS = CANDIDATE_SCALES.length > 0
+  ? [
+    ...BASE_CONDITIONS,
+    ...CANDIDATE_SCALES.map((scale, index) => ({
+      key: `候補${index + 1}(${scale.hp}/${scale.def}/${scale.atk})`,
+      flags: { defenseFormula: "sw" as const, unifyDefModifiers: false },
+      scale,
+    })),
+  ]
+  : [
+    ...BASE_CONDITIONS,
+    { key: "C1再設計", flags: { defenseFormula: "sw" as const, unifyDefModifiers: false }, scale: REQUESTED_SCALE },
+    { key: "C2再設計+統一", flags: { defenseFormula: "sw" as const, unifyDefModifiers: true }, scale: REQUESTED_SCALE },
+  ];
 
 interface Row {
   win: number;
@@ -71,11 +126,11 @@ function printHeader(title: string): void {
 }
 
 function printRows(label: string, rows: Record<string, Row>): void {
-  const base = rows["旧式"];
+  const base = rows["A旧式"];
   for (const cond of CONDITIONS) {
     const r = rows[cond.key];
     if (!r) continue;
-    const delta = cond.key === "旧式" ? "" : ` (勝率 ${r.win >= base.win ? "+" : ""}${((r.win - base.win) * 100).toFixed(0)}pt)`;
+    const delta = cond.key === "A旧式" ? "" : ` (勝率 ${r.win >= base.win ? "+" : ""}${((r.win - base.win) * 100).toFixed(0)}pt)`;
     console.log(
       `  ${label.padEnd(22)} ${cond.key.padEnd(9)} ` +
       `勝率${pct(r.win).padStart(5)}  敵残${pct1(r.enemyLeft).padStart(6)}  味方残${pct1(r.allyLeft).padStart(6)}  ` +
@@ -86,11 +141,11 @@ function printRows(label: string, rows: Record<string, Row>): void {
 }
 
 /** 条件を切り替えて測る。**必ず最後に旧式へ戻す**(測り終えた後の状態を残さない) */
-function underEachCondition<T>(measure: () => T): Record<string, T> {
+function underEachCondition<T>(measure: (scale: EnemyScale) => T): Record<string, T> {
   const out: Record<string, T> = {};
   for (const cond of CONDITIONS) {
     setBalanceFlags(cond.flags);
-    out[cond.key] = measure();
+    out[cond.key] = measure(cond.scale);
   }
   setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false });
   return out;
@@ -98,10 +153,22 @@ function underEachCondition<T>(measure: () => T): Record<string, T> {
 
 // ───────────────────────────── 試練の塔 ─────────────────────────────
 
-function towerRow(scenarioId: string, runs: number): Row {
+function towerRow(scenarioId: string, runs: number, scale: EnemyScale = IDENTITY_SCALE): Row {
   const scenario = findScenario(scenarioId);
   if (!scenario) throw new Error(`シナリオがない: ${scenarioId}`);
-  const tallies = runMany(scenario, 20260913, runs, undefined, GEAR);
+  const patchedScenario = scale === IDENTITY_SCALE ? scenario : {
+    ...scenario,
+    enemies: scenario.enemies.map((enemy) => ({
+      ...enemy,
+      stats: {
+        ...enemy.stats,
+        hp: Math.max(1, Math.round((enemy.stats?.hp ?? 1) * scale.hp)),
+        def: Math.max(0, Math.round((enemy.stats?.def ?? 0) * scale.def)),
+        atk: Math.max(0, Math.round((enemy.stats?.atk ?? 0) * scale.atk)),
+      },
+    })),
+  };
+  const tallies = runMany(patchedScenario, 20260913, runs, undefined, GEAR);
   let wins = 0, enemyLeft = 0, allyLeft = 0, wipe = 0, timeout = 0;
   const turns: number[] = [];
   for (const t of tallies) {
@@ -128,12 +195,12 @@ function towerRow(scenarioId: string, runs: number): Row {
 function runTower(runs: number): void {
   printHeader(`試練の塔 / ${runs}戦・装備${GEAR}・全回復から1戦だけ`);
   for (const floor of [60, 70, 80, 90, 100]) {
-    printRows(`${floor}階`, underEachCondition(() => towerRow(`tower-f${floor}`, runs)));
+    printRows(`${floor}階`, underEachCondition((scale) => towerRow(`tower-f${floor}`, runs, scale)));
     console.log("");
   }
   console.log("  ── 通常階(節目以外) ──");
   for (const floor of [51, 61, 71, 81, 91, 99]) {
-    printRows(`${floor}階`, underEachCondition(() => towerRow(`tower-f${floor}`, runs)));
+    printRows(`${floor}階`, underEachCondition((scale) => towerRow(`tower-f${floor}`, runs, scale)));
     console.log("");
   }
 }
@@ -146,6 +213,8 @@ const DUNGEON_TEAMS: Record<string, { ids: string[]; tuned: boolean }> = {
   "通常バランス(速度詰め)": { ids: ["knight_WATER", "wolf_GRASS", "imp_ELECTRIC", "fairy_WATER", "wisp_GRASS"], tuned: true },
   "毒重ね": { ids: ["slime_GRASS", "slime_DARK", "wolf_DARK", "wolf_ELECTRIC", "imp_DARK"], tuned: true },
   "耐久": { ids: ["golem_LIGHT", "treant_LIGHT", "fairy_DARK", "wisp_DARK", "knight_LIGHT"], tuned: false },
+  // 完全防御無視を持つ闇ドラゴンと、防御無視を持つウルフを同居させた確認枠
+  "防御無視": { ids: ["dragon_DARK", "wolf_FIRE", "griffon_GRASS", "fairy_WATER", "wisp_GRASS"], tuned: true },
 };
 
 function dungeonRow(
@@ -161,10 +230,14 @@ function dungeonRow(
 
 function runDungeon(kind: "DEMON" | "BEAST", runs: number): void {
   printHeader(`${kind === "DEMON" ? "魔人" : "魔獣"}のダンジョン / ${runs}戦・★6Lv60+★6装備`);
-  for (const floor of [10, 11, 12]) {
+  for (const floor of [10, 11, 12].filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value))) {
     console.log(`  ── ${floor}階 ──`);
     for (const [name, team] of Object.entries(DUNGEON_TEAMS)) {
-      printRows(name, underEachCondition(() => dungeonRow(team.ids, floor, team.tuned, kind, runs)));
+      if (TEAM_FILTER && name !== TEAM_FILTER) continue;
+      printRows(name, underEachCondition((scale) => dungeonRow(
+        team.ids, floor, team.tuned, kind, runs,
+        scale === IDENTITY_SCALE ? undefined : (defs) => patchEnemyDefs(defs, scale),
+      )));
       console.log("");
     }
   }
@@ -194,7 +267,12 @@ const AWAKENING_TEAMS: Record<string, { templateId: string; element: string; pre
   ],
 };
 
-function awakeningRow(specs: { templateId: string; element: string; preset: string }[], floorIndex: number, runs: number): Row {
+function awakeningRow(
+  specs: { templateId: string; element: string; preset: string }[],
+  floorIndex: number,
+  runs: number,
+  scale: EnemyScale = IDENTITY_SCALE,
+): Row {
   const floor = AWAKENING_DEPTH_FLOORS[floorIndex - 1];
   let wins = 0, enemyLeft = 0, allyLeft = 0, wipe = 0, timeout = 0;
   const turns: number[] = [];
@@ -202,7 +280,7 @@ function awakeningRow(specs: { templateId: string; element: string; preset: stri
     const rng = mulberry32(20260913 + i * 7919);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const players = specs.map((spec) => buildAlly(spec as any, rng, GEAR));
-    const enemies = buildDungeonEnemyTeam(floor);
+    const enemies = patchEnemyDefs(buildDungeonEnemyTeam(floor), scale);
     const res = new BattleEngine(players, enemies, { rng, maxTurns: 300 }).run();
     if (res.winner === "PLAYER") wins += 1;
     turns.push(res.turnsTaken);
@@ -227,13 +305,81 @@ function awakeningRow(specs: { templateId: string; element: string; preset: stri
 
 function runAwakening(runs: number): void {
   printHeader(`目覚の深域 / ${runs}戦・装備${GEAR}`);
-  for (const floor of [8, 9, 10]) {
+  for (const floor of [8, 9, 10].filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value))) {
     console.log(`  ── ${floor}階 ──`);
     for (const [name, specs] of Object.entries(AWAKENING_TEAMS)) {
-      printRows(name, underEachCondition(() => awakeningRow(specs, floor, runs)));
+      if (TEAM_FILTER && name !== TEAM_FILTER) continue;
+      printRows(name, underEachCondition((scale) => awakeningRow(specs, floor, runs, scale)));
       console.log("");
     }
   }
+}
+
+// ──────────────── PvE再設計倍率の粗いスキャン ────────────────
+
+/**
+ * 旧式との距離。周回時間を最重視し、中央値が1.3倍を超える候補へ追加罰を置く。
+ * 勝率が同じでも手数2倍なら、手数項だけで十分に上位から外れる。
+ */
+function distance(base: Row, next: Row): number {
+  const turnRatio = next.turnsMedian / Math.max(1, base.turnsMedian);
+  const turnDistance = Math.abs(Math.log(turnRatio));
+  const tooLong = Math.max(0, turnRatio - 1.3);
+  return Math.abs(next.win - base.win) * 5
+    + Math.abs(next.enemyLeft - base.enemyLeft) * 2
+    + Math.abs(next.allyLeft - base.allyLeft)
+    + turnDistance * 6
+    + tooLong * 10
+    + Math.abs(next.wipe - base.wipe) * 2
+    + Math.abs(next.timeout - base.timeout) * 4;
+}
+
+function runRedesignScan(runs: number): void {
+  printHeader(`PvE再設計倍率の粗いスキャン / 代表4対象・各${runs}戦`);
+  const normal = DUNGEON_TEAMS["通常バランス(速度詰め)"];
+  const spread = AWAKENING_TEAMS["分散型"];
+  setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false, swRatio: 1.2 });
+  const bases = {
+    demon10: dungeonRow(normal.ids, 10, normal.tuned, "DEMON", runs),
+    tower60: towerRow("tower-f60", runs),
+    tower90: towerRow("tower-f90", runs),
+    awakening10: awakeningRow(spread, 10, runs),
+  };
+  const ranked: { scale: EnemyScale; score: number; rows: typeof bases }[] = [];
+  setBalanceFlags({ defenseFormula: "sw", unifyDefModifiers: false, swRatio: 1.2 });
+  for (const hp of [0.4, 0.5, 0.6, 0.7, 0.8]) {
+    for (const def of [0.1, 0.15, 0.2, 0.25, 0.3]) {
+      for (const atk of [1.2, 1.4, 1.6, 1.8, 2]) {
+        const scale = { hp, def, atk };
+        const patch = (defs: MonsterDefinition[]) => patchEnemyDefs(defs, scale);
+        const rows = {
+          demon10: dungeonRow(normal.ids, 10, normal.tuned, "DEMON", runs, patch),
+          tower60: towerRow("tower-f60", runs, scale),
+          tower90: towerRow("tower-f90", runs, scale),
+          awakening10: awakeningRow(spread, 10, runs, scale),
+        };
+        const score = distance(bases.demon10, rows.demon10) * 1.5
+          + distance(bases.tower60, rows.tower60)
+          + distance(bases.tower90, rows.tower90)
+          + distance(bases.awakening10, rows.awakening10) * 1.5;
+        ranked.push({ scale, score, rows });
+      }
+    }
+  }
+  ranked.sort((a, b) => a.score - b.score);
+  console.log("  順位  HP    DEF   ATK   スコア  魔人10(勝/手)  塔60(勝/手)  塔90(勝/手/時切)  目覚10分散(勝/手/時切)");
+  ranked.slice(0, 10).forEach((entry, index) => {
+    const r = entry.rows;
+    console.log(
+      `  ${String(index + 1).padStart(2)}  ×${entry.scale.hp.toFixed(2)} ×${entry.scale.def.toFixed(2)} ×${entry.scale.atk.toFixed(2)} ` +
+      `${entry.score.toFixed(2).padStart(7)}  ` +
+      `${pct(r.demon10.win)}/${r.demon10.turnsMedian}  ` +
+      `${pct(r.tower60.win)}/${r.tower60.turnsMedian}  ` +
+      `${pct(r.tower90.win)}/${r.tower90.turnsMedian}/${pct(r.tower90.timeout)}  ` +
+      `${pct(r.awakening10.win)}/${r.awakening10.turnsMedian}/${pct(r.awakening10.timeout)}`,
+    );
+  });
+  setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false, swRatio: 1.2 });
 }
 
 // ──────────────── ボスDEFの逆算(新式で旧式に近づける) ────────────────
@@ -266,7 +412,7 @@ function scanBossDef(kind: "DEMON" | "BEAST", floor: number, runs: number): void
 // ───────────────────────────── 実行 ─────────────────────────────
 
 console.log(`防御計算の検証 / ${RUNS}戦 / 装備${GEAR}`);
-console.log(`旧式 = 方式E(攻撃力との比) / 新式 = 1000/(1000+1.2*DEF) / 統一 = 防御低下50%・上昇30%`);
+console.log(`旧式 = 方式E / 新式 = 1000/(1000+1.2*DEF) / 再設計 = 敵HP×${REQUESTED_SCALE.hp}, DEF×${REQUESTED_SCALE.def}, ATK×${REQUESTED_SCALE.atk}`);
 console.log(`検証開始時のフラグ: ${JSON.stringify(balanceFlags)}`);
 
 if (ONLY === "all" || ONLY === "tower") runTower(RUNS);
@@ -278,5 +424,6 @@ if (DEF_SCAN) {
   for (const floor of [10, 11, 12]) scanBossDef("DEMON", floor, RUNS);
   for (const floor of [10, 11, 12]) scanBossDef("BEAST", floor, RUNS);
 }
+if (REDESIGN_SCAN) runRedesignScan(SCAN_RUNS);
 
 console.log(`\n終了時のフラグ: ${JSON.stringify(balanceFlags)} (旧式へ戻っていること)`);
