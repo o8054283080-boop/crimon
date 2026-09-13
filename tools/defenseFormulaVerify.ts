@@ -194,12 +194,14 @@ function towerRow(scenarioId: string, runs: number, scale: EnemyScale = IDENTITY
 
 function runTower(runs: number): void {
   printHeader(`試練の塔 / ${runs}戦・装備${GEAR}・全回復から1戦だけ`);
-  for (const floor of [60, 70, 80, 90, 100]) {
+  for (const floor of [60, 70, 80, 90, 100].filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value))) {
     printRows(`${floor}階`, underEachCondition((scale) => towerRow(`tower-f${floor}`, runs, scale)));
     console.log("");
   }
-  console.log("  ── 通常階(節目以外) ──");
-  for (const floor of [51, 61, 71, 81, 91, 99]) {
+  const normalFloors = [51, 61, 71, 81, 91, 99]
+    .filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value));
+  if (normalFloors.length > 0) console.log("  ── 通常階(節目以外) ──");
+  for (const floor of normalFloors) {
     printRows(`${floor}階`, underEachCondition((scale) => towerRow(`tower-f${floor}`, runs, scale)));
     console.log("");
   }
