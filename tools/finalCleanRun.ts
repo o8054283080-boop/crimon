@@ -40,15 +40,19 @@ interface Scale { hp: number; def: number; atk: number }
 const NONE: Scale = { hp: 1, def: 1, atk: 1 };
 
 /**
- * 階ごとの敵倍率。**確定しているものだけ**を書く。
- * 塔60/80/99階は倍率の指定が無いので素のまま（`NONE`）で測る。
+ * 階ごとの敵倍率。
+ *
+ * 60/80/99階は**通過階**（勝率100%・味方残90%以上）なので、壁ではなく手数だけが問題だった。
+ * 敵DETを素のままにすると新防御式で手数が旧仕様の3〜4.5倍になるため、
+ * `tools/towerLowerScan.ts` で測って **DEF×0.25** に決めた（旧16/16/28手 → 24/24/35手）。
+ * HPとATKは触らない。
  */
 const FLOOR_SCALE: Record<string, Scale> = {
-  "tower-f60": NONE,
+  "tower-f60": { hp: 1.00, def: 0.25, atk: 1.00 },
   "tower-f70": { hp: 0.95, def: 0.40, atk: 2.60 },
-  "tower-f80": NONE,
+  "tower-f80": { hp: 1.00, def: 0.25, atk: 1.00 },
   "tower-f90": { hp: 0.70, def: 0.25, atk: 2.50 },
-  "tower-f99": NONE,
+  "tower-f99": { hp: 1.00, def: 0.25, atk: 1.00 },
   "tower-f100": { hp: 1.00, def: 0.30, atk: 2.50 },
 };
 const DEMON_SCALE: Scale = { hp: 0.80, def: 0.30, atk: 2.20 };
