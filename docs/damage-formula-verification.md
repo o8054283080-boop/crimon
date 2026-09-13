@@ -1409,5 +1409,3 @@ A/B/Cだけから選ぶなら**案B**。ただし中心目標へより近づけ�
 ```bash
 node --import tsx tools/playerTypeAbilityAudit.ts --runs 200
 ```
-
-
