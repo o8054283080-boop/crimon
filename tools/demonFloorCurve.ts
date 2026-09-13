@@ -12,6 +12,7 @@
  */
 import { resetBalanceFlags, setBalanceFlags } from "../src/core/balanceFlags.js";
 import type { MonsterDefinition } from "../src/core/monster.js";
+import type { Skill, SkillEffect } from "../src/core/skill.js";
 import { findDungeonFloor } from "../src/data/equipmentDungeon.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import { PVE_DUNGEON_TEAMS, type PressureResult, type PressureTeam, measurePressure } from "./dungeonPressure.js";
@@ -52,6 +53,17 @@ interface Plan {
    * そのせいなので、**クリスタルが動くかどうか**を直接振る。
    */
   f11Crystal?: { hp: number; spd: number };
+  /**
+   * 11Fのクリスタルへ、**12Fの仕掛けを弱めた版**を入れる。
+   *
+   * 12Fのクリスタルは「古代の加護」が行動ゲージ+70%＋2ターンATKアップで、
+   * これがボスの手番を増やして階の壁になっている。11Fへ同じ形を弱めて置けば、
+   * ステータス倍率では作れなかった**質的な階段**になる。
+   *
+   * `gauge` はゲージ付与の割合。`counterAfterHits` は魔人の反撃間隔
+   * (12Fは5発に1度、10・11Fは7発。ここを縮めると12F寄りになる)。
+   */
+  f11Gimmick?: { gauge: number; counterAfterHits?: number };
 }
 
 /**
@@ -137,13 +149,32 @@ function patchFor(plan: Plan, floor: number) {
   const main = patchOf(scaleFor(plan, floor), skip);
   const baseOnly = patchOf(BASE);
   const crystal = floor === 11 ? plan.f11Crystal : undefined;
-  if (skip.length === 0 && !crystal) return main;
+  const gimmick = floor === 11 ? plan.f11Gimmick : undefined;
+  if (skip.length === 0 && !crystal && !gimmick) return main;
   return (defs: MonsterDefinition[]): MonsterDefinition[] => {
     const scaled = main(defs);
     const base = baseOnly(defs);
     return scaled.map((d, i) => {
       if (skip.includes(i)) return base[i];
-      if (crystal && i === CRYSTAL_INDEX) return { ...d, stats: { ...d.stats, hp: crystal.hp, spd: crystal.spd } };
+      if (i === CRYSTAL_INDEX && (crystal || gimmick)) {
+        const stats = crystal ? { ...d.stats, hp: crystal.hp, spd: crystal.spd } : d.stats;
+        if (!gimmick) return { ...d, stats };
+        // S2を「ゲージ付与＋2ターンATKアップ」へ。12Fと同じ形で、ゲージ量だけ弱める
+        const skills = [...d.skills] as [Skill, Skill, Skill];
+        skills[1] = {
+          ...skills[1],
+          name: "古代の加護",
+          cooldownTurns: 3,
+          effects: [
+            { kind: "GAUGE", amount: gimmick.gauge } as SkillEffect,
+            { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 } as SkillEffect,
+          ],
+        };
+        return { ...d, stats, skills };
+      }
+      if (i === 0 && gimmick?.counterAfterHits) {
+        return { ...d, bossTraits: { ...d.bossTraits, counterAfterHits: gimmick.counterAfterHits } };
+      }
       return d;
     });
   };
