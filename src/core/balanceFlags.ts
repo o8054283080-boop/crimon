@@ -47,6 +47,15 @@ export interface BalanceFlags {
   typeMultiplierOverride?: Partial<Record<string, Record<string, number>>>;
   /** 能力付与の1ptあたりの値の上書き。書いた能力だけ差し替える */
   abilityPointOverride?: Partial<Record<string, number>>;
+  /**
+   * 属性相性の倍率の上書き。
+   *
+   * 現行は 有利×1.5 / 不利×0.5。サマナーズウォーは不利側が
+   * 「かすり」で約0.7倍なので、**不利のペナルティが現行のほうが重い。**
+   * ここを緩めると、不利属性で挑んだ時の火力が上がる一方、
+   * **敵が不利属性で殴ってくる時のダメージも上がる**(両陣営に効く)。
+   */
+  elementMultiplierOverride?: { advantage?: number; disadvantage?: number };
 }
 
 /** 統一した時の既定の幅。低下は50%、上昇は30% */
@@ -88,6 +97,7 @@ export function resetBalanceFlags(): void {
   balanceFlags.defUpRate = UNIFIED_DEF_UP;
   delete balanceFlags.typeMultiplierOverride;
   delete balanceFlags.abilityPointOverride;
+  delete balanceFlags.elementMultiplierOverride;
 }
 
 /** 測定ツールから明示的に切り替える。**本番の経路からは呼ばない。** */

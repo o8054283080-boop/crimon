@@ -7,6 +7,8 @@
  *
  * 光と闇は他の4属性とは相性を持たず、光と闇の間でのみ互いに弱点となる。
  */
+import { balanceFlags } from "./balanceFlags.js";
+
 export const CYCLE_ELEMENTS = ["FIRE", "GRASS", "ELECTRIC", "WATER"] as const;
 export type CycleElement = (typeof CYCLE_ELEMENTS)[number];
 
@@ -77,11 +79,13 @@ export function getElementAffinity(attacker: Element, defender: Element): Elemen
 }
 
 export function getElementMultiplier(attacker: Element, defender: Element): number {
+  // 検証フラグが立っている時だけ差し替わる。既定は現行の 1.5 / 0.5
+  const o = balanceFlags.elementMultiplierOverride;
   switch (getElementAffinity(attacker, defender)) {
     case "ADVANTAGE":
-      return ADVANTAGE_MULTIPLIER;
+      return o?.advantage ?? ADVANTAGE_MULTIPLIER;
     case "DISADVANTAGE":
-      return DISADVANTAGE_MULTIPLIER;
+      return o?.disadvantage ?? DISADVANTAGE_MULTIPLIER;
     default:
       return NEUTRAL_MULTIPLIER;
   }
