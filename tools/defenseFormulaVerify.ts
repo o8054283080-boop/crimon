@@ -34,8 +34,9 @@ import { buildAlly } from "./battleLab/build.js";
 import { mulberry32 } from "./battleLab/rng.js";
 import { runMany } from "./battleLab/run.js";
 import { findScenario } from "./battleLab/scenarios/index.js";
-import type { AllySpec, GearGrade } from "./battleLab/types.js";
+import type { GearGrade } from "./battleLab/types.js";
 import {
+  AWAKENING_PVE_TEAMS,
   PVE_DUNGEON_TEAMS,
   deathAction,
   measurePressure,
@@ -308,54 +309,6 @@ function printTeamStats(title: string, teams: Record<string, PressureTeam>, runs
 // ───────────────────────────── 目覚の深域 ─────────────────────────────
 
 /** awakeningDepths.ts と同じ3編成。**削り役を必ず入れる**(殴る手の無い編成で測ると嘘が出る) */
-const a = (label: string, templateId: string, element: AllySpec["element"], preset: NonNullable<AllySpec["preset"]>): AllySpec => ({
-  label, templateId, element, preset,
-});
-
-const AWAKENING_TEAMS: Record<string, PressureTeam> = {
-  "集中型": {
-    purpose: "既存の攻撃役1・支援3編成",
-    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("回復・水ウィスプ", "wisp", "WATER", "MAX_HEALER"), a("防護・草ゴーレム", "golem", "GRASS", "MAX_TANK"), a("支援・光フェアリー", "fairy", "LIGHT", "MAX_SUPPORT")],
-    healerLabels: ["回復・水ウィスプ"],
-  },
-  "分散型": {
-    purpose: "既存の攻撃役3・回復役1編成",
-    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("火力・電気ウルフ", "wolf", "ELECTRIC", "MAX_ATTACKER"), a("火力・水ナイト", "knight", "WATER", "MAX_ATTACKER"), a("回復・水ウィスプ", "wisp", "WATER", "MAX_HEALER")],
-    healerLabels: ["回復・水ウィスプ"],
-  },
-  "耐久型": {
-    purpose: "既存の防護1・回復2・攻撃1編成",
-    allies: [a("防護・草ゴーレム", "golem", "GRASS", "MAX_TANK"), a("回復・光セラフ", "seraph", "LIGHT", "MAX_HEALER"), a("回復・水ウィスプ", "wisp", "WATER", "MAX_HEALER"), a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER")],
-    healerLabels: ["回復・光セラフ", "回復・水ウィスプ"],
-  },
-  "共通高レア": PVE_DUNGEON_TEAMS["共通高レア"],
-  "高レア集中型": {
-    purpose: "主力を草ドラゴン1体に絞り、妨害・加速・障壁・回復で支える",
-    allies: [a("主力・草ドラゴン", "dragon", "GRASS", "MAX_ATTACKER"), a("妨害・電気アビスリーパー", "abyssreaper", "ELECTRIC", "MAX_DEBUFFER"), a("支援・光クロノス", "chronos", "LIGHT", "MAX_SUPPORT"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER")],
-    healerLabels: ["回復・水フェニックス"],
-  },
-  "高レアバランス型(水セラフ)": {
-    purpose: "火力2・妨害・防護を固定し、水セラフを採用",
-    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"), a("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・水セラフ", "seraph", "WATER", "MAX_HEALER")],
-    healerLabels: ["回復・水セラフ"],
-  },
-  "高レアバランス型(水フェニックス)": {
-    purpose: "高レアバランス型の他4体を固定し、水フェニックスを採用",
-    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"), a("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER")],
-    healerLabels: ["回復・水フェニックス"],
-  },
-  "高レアバランス型(光フェアリー)": {
-    purpose: "高レアバランス型の他4体を固定し、光フェアリーを採用",
-    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"), a("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・光フェアリー", "fairy", "LIGHT", "MAX_HEALER")],
-    healerLabels: ["回復・光フェアリー"],
-  },
-  "高レア耐久型": {
-    purpose: "攻撃1・加速1・防護2・回復1でボスの適応と反撃を抑える",
-    allies: [a("主力・草ドラゴン", "dragon", "GRASS", "MAX_ATTACKER"), a("支援・光クロノス", "chronos", "LIGHT", "MAX_SUPPORT"), a("防護・水ベヒーモス", "behemoth", "WATER", "MAX_TANK"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・光フェアリー", "fairy", "LIGHT", "MAX_HEALER")],
-    healerLabels: ["回復・光フェアリー"],
-  },
-};
-
 function awakeningRow(
   team: PressureTeam,
   floorIndex: number,
@@ -407,7 +360,7 @@ function runAwakening(runs: number): void {
   printHeader(`目覚の深域 / ${runs}戦・装備${GEAR}`);
   for (const floor of [8, 9, 10].filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value))) {
     console.log(`  ── ${floor}階 ──`);
-    for (const [name, team] of Object.entries(AWAKENING_TEAMS)) {
+    for (const [name, team] of Object.entries(AWAKENING_PVE_TEAMS)) {
       if (TEAM_FILTER && name !== TEAM_FILTER) continue;
       const rows = underEachCondition((scale) => awakeningRow(team, floor, runs, scale));
       printRows(name, rows);
@@ -439,7 +392,7 @@ function distance(base: Row, next: Row): number {
 function runRedesignScan(runs: number): void {
   printHeader(`PvE再設計倍率の粗いスキャン / 代表4対象・各${runs}戦`);
   const normal = PVE_DUNGEON_TEAMS["実戦通常"];
-  const spread = AWAKENING_TEAMS["分散型"];
+  const spread = AWAKENING_PVE_TEAMS["分散型"];
   setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false, swRatio: 1.2 });
   const bases = {
     demon10: dungeonRow(normal, 10, "DEMON", runs),
@@ -534,7 +487,7 @@ if (ONLY === "all" || ONLY === "beast") {
 if (ONLY === "all" || ONLY === "awakening") {
   runAwakening(RUNS);
   printTeamStats("目覚め・共通高レア／攻略高レアの最終ステータス", Object.fromEntries(
-    Object.entries(AWAKENING_TEAMS).filter(([name]) => name.includes("高レア")),
+    Object.entries(AWAKENING_PVE_TEAMS).filter(([name]) => name.includes("高レア")),
   ), RUNS);
 }
 if (DEF_SCAN) {
