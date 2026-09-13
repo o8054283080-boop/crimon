@@ -3,6 +3,7 @@ import { EQUIP_SLOTS, Equipment, EquipSlot, generateEquipment } from "../src/cor
 import { toBattleDefinition } from "../src/core/monsterInstance.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX, findMonsterById } from "../src/data/monsters.js";
 import { addEquipment, addMonster, createInitialState, type PlayerState } from "../src/game/playerState.js";
+import type { Stats } from "../src/core/stats.js";
 import {
   applyAutoEquipPlan,
   autoEquipPowerOf,
@@ -12,6 +13,7 @@ import {
   meetsMinimums,
   planAutoEquip,
   type AutoEquipSettings,
+  type AutoEquipStat,
 } from "../src/game/autoEquip.js";
 
 /**
@@ -76,6 +78,43 @@ function bruteForceBest(state: PlayerState, monsterId: string, key: string): num
   return best;
 }
 
+/**
+ * カスタムの目的そのもの。**辞書順 → 総合力。**
+ * `compareStats` と同じ規則を、テスト側にもう一度書いて突き合わせる。
+ */
+function customKeyOf(stats: Stats, priorities: AutoEquipStat[]): number[] {
+  const value = (key: AutoEquipStat): number => (stats as unknown as Record<string, number>)[key];
+  return [...priorities.map(value), autoEquipPowerOf(stats)];
+}
+
+function keyBetter(a: number[], b: number[]): boolean {
+  for (let i = 0; i < a.length; i += 1) {
+    if (Math.abs(a[i] - b[i]) > 1e-9) return a[i] > b[i];
+  }
+  return false;
+}
+
+/** カスタム(優先順位＋最低条件)の総当たり。最低条件を満たす中での最良を返す */
+function bruteForceCustom(state: PlayerState, monsterId: string, settings: AutoEquipSettings): number[] | null {
+  const monster = state.monsters.find((m) => m.id === monsterId)!;
+  const dex = findMonsterById(monster.dexId)!;
+  const bySlot = EQUIP_SLOTS.map((slot) => state.equipment.filter((e) => e.slot === slot));
+  let best: number[] | null = null;
+  const walk = (i: number, chosen: Equipment[]): void => {
+    if (i === EQUIP_SLOTS.length) {
+      const stats = toBattleDefinition(monster, dex, chosen).stats;
+      if (!meetsMinimums(stats, settings.minimums)) return;
+      const key = customKeyOf(stats, settings.priorities);
+      if (!best || keyBetter(key, best)) best = key;
+      return;
+    }
+    for (const item of bySlot[i]) walk(i + 1, [...chosen, item]);
+    walk(i + 1, chosen);
+  };
+  walk(0, []);
+  return best;
+}
+
 function settingsFor(over: Partial<AutoEquipSettings>): AutoEquipSettings {
   return { ...createDefaultAutoEquipSettings(), scope: "ALL", ...over };
 }
@@ -100,6 +139,58 @@ describe("本当に一番強い構成を出す", () => {
       }
     });
   }
+
+  /*
+   * ## ここが長いあいだ空いていた穴
+   *
+   * 総当たりと突き合わせていたのは**単一ステータス6種と総合力の7種だけ**で、
+   * カスタム(優先順位＋最低条件)は一度も検証していなかった。
+   * 依頼主から「カスタムで強化していない装備が着いた」と指摘され、
+   * 測ってみたら **27件中7件が総当たりに負けていた。**
+   * 最悪の例は「優先=攻撃・速度110以上」で、総当たり4,237に対し4,118。
+   *
+   * 原因は3つとも別物だった。
+   *
+   *   1. 辞書順の目的を、重み付きの和1本に潰して絞り込んでいた
+   *   2. 最低条件のステータスが絞り込みの基準に入っていなかった
+   *   3. 詰め直しの入口を**条件の達成度**で並べ、
+   *      「直せば最良になる惜しい構成」を真っ先に切り捨てていた
+   *
+   * 以後この形で見張る。
+   */
+  const CUSTOM_CASES: Partial<AutoEquipSettings>[] = [
+    { priorities: ["spd"] },
+    { priorities: ["atk"] },
+    { priorities: ["spd", "atk"] },
+    { priorities: ["atk", "criRate"] },
+    { priorities: ["hp", "def"] },
+    { priorities: ["spd", "atk", "hp"] },
+    { priorities: ["atk"], minimums: { spd: 110 } },
+    { priorities: ["hp"], minimums: { spd: 105, criRate: 0.2 } },
+    { priorities: [] },
+  ];
+
+  it("カスタムも、総当たりの最良と一致する", () => {
+    for (const seed of [7, 19, 33]) {
+      const { state, monsterId } = stateWith(4, seed);
+      for (const over of CUSTOM_CASES) {
+        const settings = settingsFor({ type: "custom", ...over });
+        const label = `seed=${seed} ${JSON.stringify(over)}`;
+        const want = bruteForceCustom(state, monsterId, settings);
+        const out = planAutoEquip(state, monsterId, settings);
+        if (!want) {
+          expect(out.ok, `${label}: 総当たりが解なしなのに成功した`).toBe(false);
+          continue;
+        }
+        expect(out.ok, `${label}: ${out.ok ? "" : out.reason}`).toBe(true);
+        if (!out.ok) continue;
+        const got = customKeyOf(out.plan.after, settings.priorities);
+        for (const [i, value] of got.entries()) {
+          expect(value, `${label} の第${i + 1}指標`).toBeCloseTo(want[i], 6);
+        }
+      }
+    }
+  });
 
   /*
    * **母集団を増やしても、増やしたぶんは必ず活きる。**
