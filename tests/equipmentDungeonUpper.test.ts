@@ -112,15 +112,21 @@ describe("指定されたステータスがそのまま入る", () => {
     ]);
   });
 
-  it("魔人12階(クリスタルのSPDは165)", () => {
+  it("魔人12階(クリスタルはHP35万・SPD200)", () => {
     const stats = statsOf(12, "DEMON");
     expect(stats).toMatchObject([
-      { hp: 485_000, atk: 7_000, def: 3_600, spd: 204 },
-      { hp: 140_000, def: 2_500, spd: 165 },
+      { hp: 550_000, atk: 10_000, def: 3_600, spd: 204 },
+      { hp: 350_000, def: 2_500, spd: 200 },
       { hp: 135_000, atk: 2_900, def: 1_950, spd: 136 },
     ]);
-    // **165は意図した調整値。**10階相当(122)まで落ちていないこと
-    expect(stats[1].spd, "12階クリスタルのSPD").toBe(165);
+    /*
+     * **どちらもクリスタルに加護を撃たせるための値。**
+     * HP14万・SPD165 だった頃は、ボスを狙った全体攻撃の巻き込みだけで落ちて
+     * 生存率0%・加護0.0回だった(実測200回)。速度だけ上げても生存0%のまま。
+     * ここを下げる時は、下げた後にまだ撃てているかを実測で確かめること。
+     */
+    expect(stats[1].hp, "12階クリスタルのHP").toBe(350_000);
+    expect(stats[1].spd, "12階クリスタルのSPD").toBe(200);
     expect(stats[1].spd).toBeGreaterThan(statsOf(10, "DEMON")[1].spd);
   });
 
@@ -145,7 +151,7 @@ describe("指定されたステータスがそのまま入る", () => {
 
   it("ボスのATKが指定値そのもの", () => {
     expect(statsOf(11, "DEMON")[0].atk).toBe(6_100);
-    expect(statsOf(12, "DEMON")[0].atk).toBe(7_000);
+    expect(statsOf(12, "DEMON")[0].atk).toBe(10_000);
     expect(statsOf(11, "BEAST")[0].atk).toBe(6_400);
     expect(statsOf(12, "BEAST")[0].atk).toBe(7_500);
   });
@@ -235,22 +241,55 @@ describe("ボスを倒した時点で勝利する", () => {
   /*
    * ボス特性(7回攻撃を受けると1.4倍反撃、15%追加ターン)は図鑑のまま。
    * 階の側で `bossTraits` を指定しなければ `dex.bossTraits` が使われる。
+   * **例外は魔人12階だけ**で、そこは反撃が5発に1度になる。
    */
-  it("ボス特性は10階と同じものが乗る", () => {
+  it("ボス特性は10階と同じ。魔人12階だけ反撃が5発に1度", () => {
     for (const floor of [11, 12]) {
       for (const kind of ["DEMON", "BEAST"] as const) {
         const at = (f: number) => buildDungeonEnemyTeam(kind === "BEAST" ? beast(f) : demon(f))[0].bossTraits;
+        if (kind === "DEMON" && floor === 12) continue;
         expect(at(floor), `${kind}${floor}階のボス特性`).toEqual(at(10));
       }
     }
+    const final = buildDungeonEnemyTeam(demon(12))[0].bossTraits;
+    expect(final, "魔人12階のボス特性").toEqual({ counterAfterHits: 5, counterMultiplier: 1.4 });
+    /*
+     * `bossTraits` は図鑑の指定を**まるごと置き換える**。
+     * 反撃倍率を書き忘れると 1.4 が既定の 1.2 へ黙って戻るので、
+     * 10階と同じ値であることを名指しで押さえておく。
+     */
+    expect(final?.counterMultiplier, "反撃倍率は10階と同じ").toBe(
+      buildDungeonEnemyTeam(demon(10))[0].bossTraits?.counterMultiplier,
+    );
   });
 
-  it("スキルも10階と同じ(差し替えていない)", () => {
+  /*
+   * スキルの差し替えは**魔人12階のクリスタルのS2だけ**。
+   * 名前は「古代の加護」のまま変えていないので、名前だけ比べると
+   * 中身がゲージ付与へ変わったことに気づけない。**効果まで見る。**
+   */
+  it("スキルは10階と同じ。魔人12階のクリスタルS2だけ加護がゲージ付与になる", () => {
     for (const floor of [11, 12]) {
       for (const kind of ["DEMON", "BEAST"] as const) {
         const at = (f: number) => buildDungeonEnemyTeam(kind === "BEAST" ? beast(f) : demon(f)).map((d) => d.skills.map((s) => s.name));
-        expect(at(floor), `${kind}${floor}階のスキル`).toEqual(at(10));
+        expect(at(floor), `${kind}${floor}階のスキル名`).toEqual(at(10));
       }
+    }
+    const effectsAt = (floor: number, unit: number, skill: number) =>
+      buildDungeonEnemyTeam(demon(floor))[unit].skills[skill].effects;
+    // 11階のクリスタルS2は図鑑のまま(4ターンATKアップ)
+    expect(effectsAt(11, 1, 1), "11階クリスタルのS2").toEqual(effectsAt(10, 1, 1));
+    // 12階だけ、ゲージ70%と2ターンATKアップへ
+    expect(effectsAt(12, 1, 1), "12階クリスタルのS2").toEqual([
+      { kind: "GAUGE", amount: 0.7 },
+      { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
+    ]);
+    // S1・S3は12階でも図鑑のまま
+    expect(effectsAt(12, 1, 0), "12階クリスタルのS1").toEqual(effectsAt(10, 1, 0));
+    expect(effectsAt(12, 1, 2), "12階クリスタルのS3").toEqual(effectsAt(10, 1, 2));
+    // 魔人と呪晶のスキルはどの階でも差し替えていない
+    for (const unit of [0, 2]) {
+      expect(effectsAt(12, unit, 1), `12階の${unit === 0 ? "魔人" : "呪晶"}のS2`).toEqual(effectsAt(10, unit, 1));
     }
   });
 });

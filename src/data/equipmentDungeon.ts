@@ -423,17 +423,61 @@ const DEMON_UPPER_STATS: Record<number, {
     curse: [115_000, 2_550, 1_750, 132],
   },
   12: {
-    boss: [485_000, 7_000, 3_600, 204],
-    // **SPD165 は意図した調整値。**10階相当まで落とさないこと
-    crystal: { hp: 140_000, atk: UPPER_CRYSTAL_ATK, def: 2_500, spd: 165 },
+    boss: [550_000, 10_000, 3_600, 204],
+    /*
+     * **HP35万・SPD200 はどちらも「加護を撃たせる」ための値。**
+     *
+     * 元は HP14万・SPD165 だったが、この値だとクリスタルは
+     * **ボスを狙った全体攻撃の巻き込みだけで落ちる**。実測(200回)で
+     * 戦闘終了時の生存率が0%、加護の使用回数も0.0回——つまり
+     * **S2をどう設計しても一度も撃たれない置物**になっていた。
+     * 速度だけ200へ上げても生存0%のままで、何も変わらなかった。
+     *
+     * HP35万にして初めて生存23%・加護3.0回になり、魔人の手番が実際に増える。
+     * **数字を下げる時は、下げた後にまだ撃てているかを確かめること。**
+     */
+    crystal: { hp: 350_000, atk: UPPER_CRYSTAL_ATK, def: 2_500, spd: 200 },
     curse: [135_000, 2_900, 1_950, 136],
   },
 };
+
+/**
+ * 12階のクリスタルだけが持つ「古代の加護」。
+ *
+ * 図鑑の加護は**攻撃力を積み上げる**技だが、12階の魔人は
+ * 手番そのものが回ってこないのが問題だった(実測で1戦に1.0回)。
+ * そこで**ゲージを渡して手番を作る**技に置き換える。積み上げではなく
+ * 「殴られている間にもう一度動く」ための技なので、持続は2ターンに縮めてCTを3にした。
+ *
+ * 図鑑の `ANCIENT_CRYSTAL` は1〜11階が使い続けるので触らない。
+ * 階の側で差し替えるこの形なら、召喚・図鑑・覚醒候補には一切出ない。
+ */
+const UPPER_CRYSTAL_SKILLS: [Skill, Skill, Skill] = [
+  ANCIENT_CRYSTAL.skill1,
+  {
+    id: "ancient_crystal_s2_upper",
+    name: "古代の加護",
+    description: "味方単体へ古代の力を送り込み、行動ゲージを70%進めて2ターン攻撃力を上昇させる。",
+    target: "SINGLE_ALLY",
+    cooldownTurns: 3,
+    effects: [
+      { kind: "GAUGE", amount: 0.7 },
+      { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
+    ],
+  },
+  ANCIENT_CRYSTAL.skill3Variants[0],
+];
 
 function buildDemonUpperFloor(floor: number): DungeonFloor {
   // 属性は既存の巡回をそのまま延長する(11階=電気、12階=草)
   const element = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
   const spec = DEMON_UPPER_STATS[floor];
+  /*
+   * 12階だけ、反撃を7発に1度から**5発に1度**へ。
+   * `bossTraits` は図鑑の指定を**まるごと置き換える**ので、
+   * 据え置く `counterMultiplier` も書き写しておく(書き忘れると反撃が1.2倍へ戻る)。
+   */
+  const isFinal = floor === DUNGEON_UPPER_FLOOR_COUNT;
   return {
     kind: "DEMON",
     floor,
@@ -454,6 +498,7 @@ function buildDemonUpperFloor(floor: number): DungeonFloor {
         victoryTarget: true,
         primaryTarget: true,
         fixedStats: fixedStats(spec.boss),
+        ...(isFinal ? { bossTraits: { counterAfterHits: 5, counterMultiplier: 1.4 } } : {}),
       },
       {
         templateId: ANCIENT_CRYSTAL.templateId,
@@ -461,6 +506,7 @@ function buildDemonUpperFloor(floor: number): DungeonFloor {
         star: DUNGEON_ENEMY_STAR,
         level: DUNGEON_ENEMY_LEVEL,
         fixedStats: { hp: spec.crystal.hp, atk: spec.crystal.atk, def: spec.crystal.def, spd: spec.crystal.spd },
+        ...(isFinal ? { skills: UPPER_CRYSTAL_SKILLS } : {}),
       },
       {
         templateId: ANCIENT_CRYSTAL_CURSE.templateId,
