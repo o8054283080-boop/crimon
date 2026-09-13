@@ -22,7 +22,7 @@
     "stats:balance": "tsx tools/statBalance.ts",
     "damage:balance": "tsx tools/damageBalance.ts --write",
     "defense:compare": "tsx tools/damageBalance.ts --write",
-    "check": "npm run typecheck && npm run test && npm run tour",
+    "check": "npm run typecheck && npm run build:edge && npm run test && npm run tour",
     "floor10:rebalance": "tsx tools/floor10Rebalance.ts",
     "build:edge": "tsc --project tsconfig.edge.json",
     "arena:catalog": "tsx tools/exportArenaCatalog.mts",

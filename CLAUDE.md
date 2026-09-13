@@ -105,12 +105,24 @@ GLSLのコンパイル失敗も、重なり順の誤りも、`position` の指�
 
 ```
 npx tsc --noEmit                  # 型
-npx vitest run                    # テスト(551件)
+npm run build:edge                # サーバ側(Deno)へ持っていく組み立て
+npx vitest run                    # テスト
 node tools/harness.mjs &          # 常駐サーバ(実ブラウザ)
-HARNESS_PORT=<port> node tools/tour.mjs   # 全28画面の巡回
+HARNESS_PORT=<port> node tools/tour.mjs   # 全画面の巡回
 ```
 
 **巡回は最後に必ず通す。** はみ出し・押せないボタン・9px未満の文字を機械的に拾う。
+
+**`tsc --noEmit` が通っても `build:edge` は落ちる。** あちらは戦闘に要るものだけを
+`lib` に DOM を入れずに組み立てるので、`core/` から `game/` を1つ取り込んだだけで
+`playerState` → `missions` と芋づるで引かれ、`localStorage` を触るコードが混ざって落ちる。
+**型だけの取り込み(`import type`)でも、相手のファイルは型検査される。**
+実際に `MonsterInstance` へ装備プリセットを持たせた時にこれで落とした
+(直し方: 形だけを `core/` へ下ろし、向きを断つ)。
+
+`npm run check` はこの4つをまとめて回す。ただし**CIはさらに
+`tools/monsterDoctor.mts`・`npm run arena:catalog -- --check`・`git diff --check`
+も走らせる**ので、データや生成物を触った回はそちらも手元で通しておくこと。
 
 `style.css` へ追記し続けると **Viteが黙って空のCSSを配るようになる**。
 画面が崩れたら、まず配信バイト数を見ること(`docs/dev-tools.md`)。
