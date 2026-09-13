@@ -27,8 +27,17 @@ const RUNS = Number(arg("runs", "200"));
 const GEAR = arg("gear", "TYPICAL") as GearGrade;
 const SEED = 20260913;
 
-/** 振る不利倍率。0.5が現行、0.7がサマナーズウォー寄り */
-const DISADVANTAGES = [0.5, 0.6, 0.7, 0.8];
+/**
+ * 比べる方式。
+ *   legacy 0.5  いまの本番(有利×1.5 / 不利×0.5)
+ *   legacy 0.7  倍率だけサマナーズウォー寄りへ緩めた版
+ *   sw          本物の方式(クリ率±15pt・不利は50%でかすり・かすりは弱体不可)
+ */
+const MODES: [string, { elementMode?: "legacy" | "sw"; elementMultiplierOverride?: { disadvantage: number } }][] = [
+  ["現行(不利×0.5)", {}],
+  ["倍率だけ0.7", { elementMultiplierOverride: { disadvantage: 0.7 } }],
+  ["sw方式", { elementMode: "sw" }],
+];
 
 const DEMON = { hp: 0.80, def: 0.30, atk: 2.20 };
 const BEAST = { hp: 0.80, def: 0.30, atk: 2.00 };
@@ -73,14 +82,14 @@ const CASES: Case[] = [
 
 console.log(`属性の不利倍率を振る / ${RUNS}戦・装備${GEAR}・seed${SEED}`);
 console.log(`有利は×1.5で据え置き。プレイヤー側は採用候補で固定\n`);
-console.log(`  対象                      ${DISADVANTAGES.map((d) => `不利×${d.toFixed(1)}`.padStart(14)).join("")}`);
+console.log(`  対象                      ${MODES.map(([l]) => l.padStart(16)).join("")}`);
 for (const c of CASES) {
-  const cells = DISADVANTAGES.map((d) => {
+  const cells = MODES.map(([, flags]) => {
     resetBalanceFlags();
-    setBalanceFlags({ ...FINAL_CANDIDATE, elementMultiplierOverride: { disadvantage: d } });
+    setBalanceFlags({ ...FINAL_CANDIDATE, ...flags });
     const r = c.run();
     resetBalanceFlags();
-    return `${`${(r.rate * 100).toFixed(0)}%`}/${r.actions}`.padStart(14);
+    return `${`${(r.rate * 100).toFixed(0)}%`}/${r.actions}`.padStart(16);
   });
   console.log(`  ${c.label.padEnd(26)}${cells.join("")}`);
 }

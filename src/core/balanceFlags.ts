@@ -56,11 +56,33 @@ export interface BalanceFlags {
    * **敵が不利属性で殴ってくる時のダメージも上がる**(両陣営に効く)。
    */
   elementMultiplierOverride?: { advantage?: number; disadvantage?: number };
+  /**
+   * 属性相性の効き方そのものを差し替える。
+   *
+   * `legacy` は現行の倍率方式(有利×1.5 / 不利×0.5)。
+   * `sw` はサマナーズウォー方式で、**倍率ではなく確率で効く**。
+   *   ・有利   クリ率 +15pt
+   *   ・不利   クリ率 −15pt、さらに**50%でかすり**
+   *   ・かすり ダメージ −30%、クリティカル不可、**弱体を入れられない**
+   *
+   * **いちばん重いのは最後の「弱体を入れられない」。**防御低下75%を持っていても、
+   * 苦手属性へ撃ってかすると入らない。火力の話では終わらない。
+   */
+  elementMode?: "legacy" | "sw";
 }
 
 /** 統一した時の既定の幅。低下は50%、上昇は30% */
 export const UNIFIED_DEF_DOWN = 0.5;
 export const UNIFIED_DEF_UP = 0.3;
+
+/**
+ * サマナーズウォー方式の属性相性の定数。
+ * 有利/不利でクリ率を15pt動かし、不利側は50%で「かすり」になる。
+ * かすりはダメージ3割減で、クリティカルも弱体付与もできない。
+ */
+export const SW_CRIT_SHIFT = 0.15;
+export const SW_GLANCING_CHANCE = 0.5;
+export const SW_GLANCING_MULTIPLIER = 0.7;
 
 /** 検証式の係数。`1000 / (1000 + DEF_SW_RATIO * DEF)` */
 export const DEF_SW_BASE = 1000;
@@ -98,6 +120,7 @@ export function resetBalanceFlags(): void {
   delete balanceFlags.typeMultiplierOverride;
   delete balanceFlags.abilityPointOverride;
   delete balanceFlags.elementMultiplierOverride;
+  delete balanceFlags.elementMode;
 }
 
 /** 測定ツールから明示的に切り替える。**本番の経路からは呼ばない。** */

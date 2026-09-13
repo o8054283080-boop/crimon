@@ -1,4 +1,5 @@
 import { ElementAffinity, getElementAffinity, getElementMultiplier } from "../core/element.js";
+import { SW_CRIT_SHIFT, SW_GLANCING_CHANCE, SW_GLANCING_MULTIPLIER, balanceFlags } from "../core/balanceFlags.js";
 import { DamageEffect, EffectCondition, SCALE_REFERENCE } from "../core/skill.js";
 import {
   BattleUnit,
@@ -57,6 +58,11 @@ export interface DamageResult {
   damage: number;
   isCrit: boolean;
   affinity: ElementAffinity;
+  /**
+   * サマナーズウォー方式で「かすり」になったか。
+   * **この一撃では弱体を入れられない。**戦闘側が見て弱体付与を止める。
+   */
+  isGlancing?: boolean;
 }
 
 /**
@@ -167,9 +173,26 @@ export function calcDamage(
   const afterDefense = resolutionDefense.afterDefense / hits;
 
   const affinity = getElementAffinity(attacker.def.element, defender.def.element);
-  const elementMultiplier = getElementMultiplier(attacker.def.element, defender.def.element);
+  /*
+   * sw方式では属性の倍率を使わない(相性はクリ率とかすりで表す)。
+   * かすった時だけ 0.7 を掛ける。
+   */
+  const elementMultiplier = balanceFlags.elementMode === "sw"
+    ? 1
+    : getElementMultiplier(attacker.def.element, defender.def.element);
 
-  const isCrit = rng() < getFinalCritRate(attacker, defender, effect.critRateBonus ?? 0);
+  /*
+   * サマナーズウォー方式の属性相性。**倍率ではなく確率で効く。**
+   * 有利はクリ率+15pt、不利はクリ率−15ptに加えて50%でかすり。
+   * かすりは「ダメージ−30%・クリ不可・弱体不可」。
+   */
+  const swElement = balanceFlags.elementMode === "sw";
+  const swCritBonus = swElement
+    ? (affinity === "ADVANTAGE" ? SW_CRIT_SHIFT : affinity === "DISADVANTAGE" ? -SW_CRIT_SHIFT : 0)
+    : 0;
+  const isGlancing = swElement && affinity === "DISADVANTAGE" && rng() < SW_GLANCING_CHANCE;
+  const isCrit = !isGlancing
+    && rng() < getFinalCritRate(attacker, defender, (effect.critRateBonus ?? 0) + swCritBonus);
   const critMultiplier = isCrit ? (getEffectiveStat(attacker, "criDmg") + (weakActive ? weak.critDmg : 0)) * (1 + (effect.critDamageBonus ?? 0)) : 1;
 
   const dealtMultiplier = (attacker.def.combatMods?.damageDealtMultiplier ?? 1)
@@ -184,8 +207,9 @@ export function calcDamage(
 
   const defensePassive = passiveEffectOf(defender);
   const critReduction = isCrit && defensePassive?.kind === "CHEAT" ? 1 - defensePassive.reduction : 1;
-  const rawDamage = critReduction * afterDefense * elementMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
+  const glancingMultiplier = isGlancing ? SW_GLANCING_MULTIPLIER : 1;
+  const rawDamage = critReduction * afterDefense * elementMultiplier * glancingMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
   const damage = roundNormalDamage(rawDamage);
 
-  return { damage, isCrit, affinity };
+  return { damage, isCrit, affinity, isGlancing };
 }

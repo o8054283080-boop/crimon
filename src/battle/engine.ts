@@ -162,6 +162,14 @@ interface SkillResolution {
   readonly targetHpBefore: Map<string, number>;
   /** 同一対象で共有するスキル効果の基礎発動判定。 */
   readonly chanceGroups: Map<string, boolean>;
+  /**
+   * このスキルで「かすり」になった相手(instanceId)。
+   *
+   * サマナーズウォー方式では、苦手属性へ撃ってかすると**弱体を入れられない。**
+   * 防御低下75%を持っていても相性が悪ければ通らない、という設計なので、
+   * ダメージの解決で記録して、後続の弱体付与で見る。
+   */
+  readonly glancedTargets: Set<string>;
 }
 
 function newResolution(): SkillResolution {
@@ -169,7 +177,7 @@ function newResolution(): SkillResolution {
     anyCrit: false, critCount: 0, debuffApplied: false, stunFailed: false,
     stolenBuffs: 0, strippedTargets: 0, damageDealt: 0, kills: 0,
     sourcePassiveUsed: false, victimPassiveUsed: new Set(), applied: new Set(), gaugeRemoved: 0,
-    targetHpBefore: new Map(), chanceGroups: new Map(),
+    targetHpBefore: new Map(), chanceGroups: new Map(), glancedTargets: new Set(),
   };
 }
 
@@ -2261,6 +2269,7 @@ export class BattleEngine {
             const cheat = passiveEffectOf(source);
             const enhanced = cheat?.kind === "CHEAT" ? { ...damageEffect, hpCoefficient: (damageEffect.hpCoefficient ?? 0) + .07 / hits } : damageEffect;
             const result = calcDamage(source, target, enhanced, this.rng);
+            if (result.isGlancing) resolution.glancedTargets.add(target.instanceId);
             if (result.isCrit) {
               resolution.anyCrit = true;
               resolution.critCount += 1;
@@ -2289,8 +2298,9 @@ export class BattleEngine {
             this.advanceAdaptation(target, source);
             counterTargets.add(target);
             const critText = result.isCrit ? "会心の一撃！" : "";
-            const affinityText =
-              result.affinity === "ADVANTAGE" ? " 効果は抜群だ！" : result.affinity === "DISADVANTAGE" ? " 効果は今ひとつだ…" : "";
+            const affinityText = result.isGlancing
+              ? " かすった！"
+              : result.affinity === "ADVANTAGE" ? " 効果は抜群だ！" : result.affinity === "DISADVANTAGE" ? " 効果は今ひとつだ…" : "";
             this.push(
               `  → ${this.label(target)} に ${applied.hpDamage} ダメージ！${critText}${affinityText} (残りHP ${target.currentHp}/${target.maxHp})`,
             );
@@ -3112,6 +3122,8 @@ export class BattleEngine {
     resolution?: SkillResolution,
     skill?: Skill,
   ): boolean {
+    // かすった相手には弱体を入れられない(サマナーズウォー方式の時だけ)
+    if (resolution?.glancedTargets.has(target.instanceId)) return false;
     /*
      * 才能による発動率の底上げ。**的中とは別物。**
      * 的中は相手の抵抗と引き算する値で、こちらは
