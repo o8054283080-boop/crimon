@@ -1,0 +1,282 @@
+/**
+ * **防御計算を入れ替えたら、各コンテンツの難易度がどう動くか**を本編のエンジンで測る。
+ *
+ *   npx tsx tools/defenseFormulaVerify.ts                    # 全部
+ *   npx tsx tools/defenseFormulaVerify.ts --only tower       # 塔だけ
+ *   npx tsx tools/defenseFormulaVerify.ts --runs 200
+ *   npx tsx tools/defenseFormulaVerify.ts --only demon --def-scan
+ *
+ * ## 比べる3条件
+ *
+ *   旧式      いまの方式E。軽減が**攻める側の攻撃力との比**で決まる
+ *   新式      1000 / (1000 + 1.2 * DEF)。攻撃力を見ない
+ *   新式+統一 上に加えて、防御低下を一律50%・防御上昇を一律30%へ
+ *
+ * ## 同じ種を使う
+ *
+ * 条件ごとに乱数が変わると、差が式のせいなのか引きのせいなのか分からない。
+ * **どの条件も同じ seed 群から始める。**装備の生成も seed から回るので、
+ * 同じ seed なら同じ装備を着けた同じ編成が、同じ敵に挑む。
+ *
+ * ## 勝率が張り付いても読めるようにする
+ *
+ * 0%や100%に張り付くと勝率からは何も分からなくなる。
+ * 敵残HP・味方残HP・手数・全滅率を必ず一緒に出す(`CLAUDE.md` の「測ってから判断する」)。
+ */
+import { balanceFlags, setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { BattleEngine } from "../src/battle/engine.js";
+import type { MonsterDefinition } from "../src/core/monster.js";
+import { AWAKENING_DEPTH_FLOORS } from "../src/data/awakeningDepths.js";
+import { findDungeonFloor } from "../src/data/equipmentDungeon.js";
+import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
+import { buildAlly } from "./battleLab/build.js";
+import { mulberry32 } from "./battleLab/rng.js";
+import { runMany } from "./battleLab/run.js";
+import { findScenario } from "./battleLab/scenarios/index.js";
+import type { GearGrade } from "./battleLab/types.js";
+import { measurePressure } from "./dungeonPressure.js";
+
+const argv = process.argv.slice(2);
+const arg = (name: string, fallback: string): string => {
+  const i = argv.indexOf(`--${name}`);
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
+};
+const RUNS = Number(arg("runs", "200"));
+const ONLY = arg("only", "all");
+const GEAR = arg("gear", "TYPICAL") as GearGrade;
+const DEF_SCAN = argv.includes("--def-scan");
+
+/** 比べる条件。**旧式を必ず先頭に置く**(差分の基準になる) */
+const CONDITIONS = [
+  { key: "旧式", flags: { defenseFormula: "legacy" as const, unifyDefModifiers: false } },
+  { key: "新式", flags: { defenseFormula: "sw" as const, unifyDefModifiers: false } },
+  { key: "新式+統一", flags: { defenseFormula: "sw" as const, unifyDefModifiers: true } },
+];
+
+interface Row {
+  win: number;
+  enemyLeft: number;
+  allyLeft: number;
+  turnsMedian: number;
+  turnsMean: number;
+  wipe: number;
+  timeout: number;
+}
+
+const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
+const pct1 = (x: number) => `${(x * 100).toFixed(1)}%`;
+
+function printHeader(title: string): void {
+  console.log(`\n${"═".repeat(96)}\n■ ${title}\n${"═".repeat(96)}`);
+}
+
+function printRows(label: string, rows: Record<string, Row>): void {
+  const base = rows["旧式"];
+  for (const cond of CONDITIONS) {
+    const r = rows[cond.key];
+    if (!r) continue;
+    const delta = cond.key === "旧式" ? "" : ` (勝率 ${r.win >= base.win ? "+" : ""}${((r.win - base.win) * 100).toFixed(0)}pt)`;
+    console.log(
+      `  ${label.padEnd(22)} ${cond.key.padEnd(9)} ` +
+      `勝率${pct(r.win).padStart(5)}  敵残${pct1(r.enemyLeft).padStart(6)}  味方残${pct1(r.allyLeft).padStart(6)}  ` +
+      `手数 中${String(r.turnsMedian).padStart(3)}/平${r.turnsMean.toFixed(0).padStart(3)}  ` +
+      `全滅${pct(r.wipe).padStart(4)}  時間切${pct(r.timeout).padStart(4)}${delta}`,
+    );
+  }
+}
+
+/** 条件を切り替えて測る。**必ず最後に旧式へ戻す**(測り終えた後の状態を残さない) */
+function underEachCondition<T>(measure: () => T): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const cond of CONDITIONS) {
+    setBalanceFlags(cond.flags);
+    out[cond.key] = measure();
+  }
+  setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false });
+  return out;
+}
+
+// ───────────────────────────── 試練の塔 ─────────────────────────────
+
+function towerRow(scenarioId: string, runs: number): Row {
+  const scenario = findScenario(scenarioId);
+  if (!scenario) throw new Error(`シナリオがない: ${scenarioId}`);
+  const tallies = runMany(scenario, 20260913, runs, undefined, GEAR);
+  let wins = 0, enemyLeft = 0, allyLeft = 0, wipe = 0, timeout = 0;
+  const turns: number[] = [];
+  for (const t of tallies) {
+    if (t.winner === "PLAYER") wins += 1;
+    turns.push(t.turns);
+    const enemies = t.units.filter((u) => u.team === "ENEMY");
+    const allies = t.units.filter((u) => u.team === "PLAYER");
+    const eMax = enemies.reduce((s, u) => s + u.maxHp, 0);
+    const aMax = allies.reduce((s, u) => s + u.maxHp, 0);
+    enemyLeft += eMax > 0 ? enemies.reduce((s, u) => s + Math.max(0, u.hpLeft), 0) / eMax : 0;
+    allyLeft += aMax > 0 ? allies.reduce((s, u) => s + Math.max(0, u.hpLeft), 0) / aMax : 0;
+    if (allies.every((u) => !u.alive)) wipe += 1;
+    else if (t.winner !== "PLAYER") timeout += 1;
+  }
+  turns.sort((a, b) => a - b);
+  const n = tallies.length;
+  return {
+    win: wins / n, enemyLeft: enemyLeft / n, allyLeft: allyLeft / n,
+    turnsMedian: turns[Math.floor(n / 2)], turnsMean: turns.reduce((a, b) => a + b, 0) / n,
+    wipe: wipe / n, timeout: timeout / n,
+  };
+}
+
+function runTower(runs: number): void {
+  printHeader(`試練の塔 / ${runs}戦・装備${GEAR}・全回復から1戦だけ`);
+  for (const floor of [60, 70, 80, 90, 100]) {
+    printRows(`${floor}階`, underEachCondition(() => towerRow(`tower-f${floor}`, runs)));
+    console.log("");
+  }
+  console.log("  ── 通常階(節目以外) ──");
+  for (const floor of [51, 61, 71, 81, 91, 99]) {
+    printRows(`${floor}階`, underEachCondition(() => towerRow(`tower-f${floor}`, runs)));
+    console.log("");
+  }
+}
+
+// ─────────────────────── 魔人・魔獣のダンジョン ───────────────────────
+
+/** dungeonPressure の攻略編成をそのまま使う(魔人専用だったので kind を渡せるよう拡張済み) */
+const DUNGEON_TEAMS: Record<string, { ids: string[]; tuned: boolean }> = {
+  "高レア(速度詰め)": { ids: ["griffon_GRASS", "dragon_FIRE", "seraph_WATER", "nemesis_ELECTRIC", "griffon_WATER"], tuned: true },
+  "通常バランス(速度詰め)": { ids: ["knight_WATER", "wolf_GRASS", "imp_ELECTRIC", "fairy_WATER", "wisp_GRASS"], tuned: true },
+  "毒重ね": { ids: ["slime_GRASS", "slime_DARK", "wolf_DARK", "wolf_ELECTRIC", "imp_DARK"], tuned: true },
+  "耐久": { ids: ["golem_LIGHT", "treant_LIGHT", "fairy_DARK", "wisp_DARK", "knight_LIGHT"], tuned: false },
+};
+
+function dungeonRow(
+  ids: string[], floor: number, tuned: boolean, kind: "DEMON" | "BEAST", runs: number,
+  patchEnemies?: (defs: MonsterDefinition[]) => MonsterDefinition[],
+): Row {
+  const r = measurePressure(ids, floor, tuned, runs, kind, 20260913, patchEnemies);
+  return {
+    win: r.rate, enemyLeft: r.enemyHpLeft, allyLeft: r.allyHpLeft,
+    turnsMedian: r.actions, turnsMean: r.actionsMean, wipe: r.wipeRate, timeout: r.timeoutRate,
+  };
+}
+
+function runDungeon(kind: "DEMON" | "BEAST", runs: number): void {
+  printHeader(`${kind === "DEMON" ? "魔人" : "魔獣"}のダンジョン / ${runs}戦・★6Lv60+★6装備`);
+  for (const floor of [10, 11, 12]) {
+    console.log(`  ── ${floor}階 ──`);
+    for (const [name, team] of Object.entries(DUNGEON_TEAMS)) {
+      printRows(name, underEachCondition(() => dungeonRow(team.ids, floor, team.tuned, kind, runs)));
+      console.log("");
+    }
+  }
+}
+
+// ───────────────────────────── 目覚の深域 ─────────────────────────────
+
+/** awakeningDepths.ts と同じ3編成。**削り役を必ず入れる**(殴る手の無い編成で測ると嘘が出る) */
+const AWAKENING_TEAMS: Record<string, { templateId: string; element: string; preset: string }[]> = {
+  "集中型": [
+    { templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" },
+    { templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
+    { templateId: "golem", element: "GRASS", preset: "MAX_TANK" },
+    { templateId: "fairy", element: "LIGHT", preset: "MAX_SUPPORT" },
+  ],
+  "分散型": [
+    { templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" },
+    { templateId: "wolf", element: "ELECTRIC", preset: "MAX_ATTACKER" },
+    { templateId: "knight", element: "WATER", preset: "MAX_ATTACKER" },
+    { templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
+  ],
+  "耐久型": [
+    { templateId: "golem", element: "GRASS", preset: "MAX_TANK" },
+    { templateId: "seraph", element: "LIGHT", preset: "MAX_HEALER" },
+    { templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
+    { templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" },
+  ],
+};
+
+function awakeningRow(specs: { templateId: string; element: string; preset: string }[], floorIndex: number, runs: number): Row {
+  const floor = AWAKENING_DEPTH_FLOORS[floorIndex - 1];
+  let wins = 0, enemyLeft = 0, allyLeft = 0, wipe = 0, timeout = 0;
+  const turns: number[] = [];
+  for (let i = 0; i < runs; i += 1) {
+    const rng = mulberry32(20260913 + i * 7919);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const players = specs.map((spec) => buildAlly(spec as any, rng, GEAR));
+    const enemies = buildDungeonEnemyTeam(floor);
+    const res = new BattleEngine(players, enemies, { rng, maxTurns: 300 }).run();
+    if (res.winner === "PLAYER") wins += 1;
+    turns.push(res.turnsTaken);
+    const last = res.turns[res.turns.length - 1];
+    const snap = last ? last.snapshot : [];
+    const es = snap.filter((u) => u.team === "ENEMY");
+    const as = snap.filter((u) => u.team === "PLAYER");
+    const eMax = es.reduce((s, u) => s + u.maxHp, 0);
+    const aMax = as.reduce((s, u) => s + u.maxHp, 0);
+    enemyLeft += eMax > 0 ? es.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / eMax : 0;
+    allyLeft += aMax > 0 ? as.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / aMax : 0;
+    if (as.length > 0 && as.every((u) => !u.alive)) wipe += 1;
+    else if (res.winner !== "PLAYER") timeout += 1;
+  }
+  turns.sort((a, b) => a - b);
+  return {
+    win: wins / runs, enemyLeft: enemyLeft / runs, allyLeft: allyLeft / runs,
+    turnsMedian: turns[Math.floor(runs / 2)], turnsMean: turns.reduce((a, b) => a + b, 0) / runs,
+    wipe: wipe / runs, timeout: timeout / runs,
+  };
+}
+
+function runAwakening(runs: number): void {
+  printHeader(`目覚の深域 / ${runs}戦・装備${GEAR}`);
+  for (const floor of [8, 9, 10]) {
+    console.log(`  ── ${floor}階 ──`);
+    for (const [name, specs] of Object.entries(AWAKENING_TEAMS)) {
+      printRows(name, underEachCondition(() => awakeningRow(specs, floor, runs)));
+      console.log("");
+    }
+  }
+}
+
+// ──────────────── ボスDEFの逆算(新式で旧式に近づける) ────────────────
+
+/**
+ * 新式のまま、ボスのDEFをどこまで下げれば旧式の難易度に戻るか。
+ *
+ * **勝率だけで合わせない。**張り付く帯では動かないので、
+ * 敵残HPと手数も一緒に見て、旧式にいちばん近い点を選ぶ。
+ */
+function scanBossDef(kind: "DEMON" | "BEAST", floor: number, runs: number): void {
+  const team = DUNGEON_TEAMS["通常バランス(速度詰め)"];
+  setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false });
+  const base = dungeonRow(team.ids, floor, team.tuned, kind, runs);
+  const def0 = buildDungeonEnemyTeam(findDungeonFloor(floor, kind)!)[0].stats.def;
+  console.log(`\n  ${kind === "DEMON" ? "魔人" : "魔獣"}${floor}階 (現在のボスDEF ${def0.toLocaleString()})`);
+  console.log(`    旧式(基準)            勝率${pct(base.win).padStart(5)}  敵残${pct1(base.enemyLeft).padStart(6)}  手数${String(base.turnsMedian).padStart(4)}`);
+  setBalanceFlags({ defenseFormula: "sw", unifyDefModifiers: false });
+  for (const scale of [1, 0.75, 0.5, 0.35, 0.25, 0.15]) {
+    // **敵全員のDEFを同じ割合で下げる。**ボスだけ下げるとお供が相対的に硬くなり、
+    // 「どこを削れば勝てるか」の順番が変わってしまう
+    const r = dungeonRow(team.ids, floor, team.tuned, kind, runs, (defs) =>
+      defs.map((d) => ({ ...d, stats: { ...d.stats, def: Math.round(d.stats.def * scale) } })));
+    const near = Math.abs(r.win - base.win) <= 0.05 ? " ← 旧式に近い" : "";
+    console.log(`    新式 DEF×${(scale * 100).toFixed(0).padStart(3)}% (ボス${String(Math.round(def0 * scale)).padStart(5)})  勝率${pct(r.win).padStart(5)}  敵残${pct1(r.enemyLeft).padStart(6)}  手数${String(r.turnsMedian).padStart(4)}${near}`);
+  }
+  setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false });
+}
+
+// ───────────────────────────── 実行 ─────────────────────────────
+
+console.log(`防御計算の検証 / ${RUNS}戦 / 装備${GEAR}`);
+console.log(`旧式 = 方式E(攻撃力との比) / 新式 = 1000/(1000+1.2*DEF) / 統一 = 防御低下50%・上昇30%`);
+console.log(`検証開始時のフラグ: ${JSON.stringify(balanceFlags)}`);
+
+if (ONLY === "all" || ONLY === "tower") runTower(RUNS);
+if (ONLY === "all" || ONLY === "demon") runDungeon("DEMON", RUNS);
+if (ONLY === "all" || ONLY === "beast") runDungeon("BEAST", RUNS);
+if (ONLY === "all" || ONLY === "awakening") runAwakening(RUNS);
+if (DEF_SCAN) {
+  printHeader("ボスDEFの逆算(新式のまま、旧式の難易度へ戻すには)");
+  for (const floor of [10, 11, 12]) scanBossDef("DEMON", floor, RUNS);
+  for (const floor of [10, 11, 12]) scanBossDef("BEAST", floor, RUNS);
+}
+
+console.log(`\n終了時のフラグ: ${JSON.stringify(balanceFlags)} (旧式へ戻っていること)`);

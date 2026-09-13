@@ -13,9 +13,10 @@
  *   npx tsx tools/dungeonPressure.ts
  */
 import { BattleEngine } from "../src/battle/engine.js";
+import { MonsterDefinition } from "../src/core/monster.js";
 import { EQUIP_SLOTS, Equipment, generateEquipment } from "../src/core/equipment.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
+import { EQUIPMENT_DUNGEON_FLOORS, EquipmentDungeonKind, findDungeonFloor } from "../src/data/equipmentDungeon.js";
 import { setupDungeonBattle } from "../src/game/dungeonRunner.js";
 import { addEquipment, createInitialState, equipToMonster } from "../src/game/playerState.js";
 
@@ -68,16 +69,44 @@ export interface PressureResult {
   actions: number;
   /** 戦闘中に敵へ乗った毒スタックの最大値。毒編成でこれが0なら測定が成立していない */
   maxPoisonOnEnemy: number;
+  /** 決着までの行動数の平均。中央値と離れていれば、決着の付き方が二極化している */
+  actionsMean: number;
+  /** 決着時点で味方に残っているHPの割合。**勝率が100%でも、ここが薄ければ余裕は無い** */
+  allyHpLeft: number;
+  /** 全滅した割合(敗因のうち「削り切られた」ぶん) */
+  wipeRate: number;
+  /** 時間切れになった割合。勝率が落ちた時、削り負けと時間切れを分けて読む */
+  timeoutRate: number;
 }
 
-export function measurePressure(ids: string[], floorNum: number, tuned: boolean, trials = 50): PressureResult {
-  const floor = EQUIPMENT_DUNGEON_FLOORS[floorNum - 1];
+/**
+ * 測る階。**魔人と魔獣は別の配列**なので、番号だけでは決まらない。
+ * 既定を "DEMON" にしてあるのは、呼び出し側(既存の実行部)を変えないため。
+ */
+export function measurePressure(
+  ids: string[],
+  floorNum: number,
+  tuned: boolean,
+  trials = 50,
+  kind: EquipmentDungeonKind = "DEMON",
+  seedBase = 900,
+  /**
+   * 敵の定義をここで差し替えられる。**ボスのDEFを振って逆算する**ために置いた。
+   * 渡さなければ本編のデータそのまま(既存の呼び出しは1つも変わらない)。
+   */
+  patchEnemies?: (defs: MonsterDefinition[]) => MonsterDefinition[],
+): PressureResult {
+  const floor = findDungeonFloor(floorNum, kind);
+  if (!floor) throw new Error(`${kind} の ${floorNum}階が見つからない`);
   let wins = 0;
   let hpLeftSum = 0;
   let maxPoisonOnEnemy = 0;
+  let allyHpSum = 0;
+  let wipes = 0;
+  let timeouts = 0;
   const actions: number[] = [];
   for (let i = 0; i < trials; i++) {
-    const rng = mulberry32(900 + i);
+    const rng = mulberry32(seedBase + i);
     const state = createInitialState();
     const party = ids.map((id) => createMonsterInstance(id, 6, 60));
     state.monsters = party;
@@ -89,7 +118,8 @@ export function measurePressure(ids: string[], floorNum: number, tuned: boolean,
       }
     }
     const setup = setupDungeonBattle(party, floor, state.equipment);
-    const result = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng }).run();
+    const enemyDefs = patchEnemies ? patchEnemies(setup.enemyDefs) : setup.enemyDefs;
+    const result = new BattleEngine(setup.playerDefs, enemyDefs, { rng }).run();
     if (result.winner === "PLAYER") wins += 1;
     actions.push(result.turnsTaken);
     for (const turn of result.turns) {
@@ -101,9 +131,23 @@ export function measurePressure(ids: string[], floorNum: number, tuned: boolean,
     const enemies = last ? last.snapshot.filter((u) => u.team === "ENEMY") : [];
     const maxHp = enemies.reduce((s, u) => s + u.maxHp, 0);
     hpLeftSum += maxHp > 0 ? enemies.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / maxHp : 0;
+    const allies = last ? last.snapshot.filter((u) => u.team === "PLAYER") : [];
+    const allyMax = allies.reduce((s, u) => s + u.maxHp, 0);
+    allyHpSum += allyMax > 0 ? allies.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / allyMax : 0;
+    if (allies.length > 0 && allies.every((u) => !u.alive)) wipes += 1;
+    if (result.winner !== "PLAYER" && allies.some((u) => u.alive)) timeouts += 1;
   }
   actions.sort((a, b) => a - b);
-  return { rate: wins / trials, enemyHpLeft: hpLeftSum / trials, actions: actions[Math.floor(trials / 2)], maxPoisonOnEnemy };
+  return {
+    rate: wins / trials,
+    enemyHpLeft: hpLeftSum / trials,
+    actions: actions[Math.floor(trials / 2)],
+    maxPoisonOnEnemy,
+    actionsMean: actions.reduce((a, b) => a + b, 0) / trials,
+    allyHpLeft: allyHpSum / trials,
+    wipeRate: wipes / trials,
+    timeoutRate: timeouts / trials,
+  };
 }
 
 if (process.argv[1]?.endsWith("dungeonPressure.ts")) {
