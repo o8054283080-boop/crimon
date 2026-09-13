@@ -831,6 +831,19 @@ export const DUNGEON_FLOOR_STAR_WEIGHTS: Record<number, WeightedOption<EquipStar
     { value: 5, weight: 68 },
     { value: 6, weight: 32 },
   ],
+  /*
+   * 上位階(11・12)。**★4以下は出さない。**
+   * 10階を安定周回できる人が、装備を更新しながら周回場所を上げていくための階なので、
+   * 既に用済みの★4が混ざると周回の実入りが薄まる。
+   */
+  11: [
+    { value: 5, weight: 55 },
+    { value: 6, weight: 45 },
+  ],
+  12: [
+    { value: 5, weight: 40 },
+    { value: 6, weight: 60 },
+  ],
 };
 
 /** 指定した階層のドロップ率テーブルを取得する(1階=[{star:1,percent:40}, ...]のような表示用) */

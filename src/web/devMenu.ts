@@ -13,6 +13,7 @@ import { EQUIP_SLOTS, EquipStar, generateEquipment } from "../core/equipment.js"
 import { ELEMENTS } from "../core/element.js";
 import { Star } from "../core/rarity.js";
 import { MONSTER_TEMPLATES, GACHA_EXCLUSIVE_DEX } from "../data/monsters.js";
+import { DUNGEON_UPPER_FLOOR_COUNT } from "../data/equipmentDungeon.js";
 import { PlayerState, addEquipment, addMonster, addSummonScrolls, equipToMonster } from "../game/playerState.js";
 import { el } from "./dom.js";
 
@@ -92,6 +93,19 @@ const ACTIONS: DevAction[] = [
         for (let stage = 1; stage <= 5; stage++) ids.push(`${chapter}-${stage}`);
       }
       p.clearedStageIds = ids;
+    },
+  },
+  {
+    /*
+     * 装備ダンジョンの上位階(11・12)は前の階をクリアしないと開かない。
+     * 手で10階を倒すのは数分かかるので、**確認のために階を開ける口**を置く。
+     * 確認が面倒な場所ほど確認されず不具合が残る、をここでも避ける。
+     */
+    label: "装備ダンジョン全階クリア扱い",
+    run: (p) => {
+      const floors = Array.from({ length: DUNGEON_UPPER_FLOOR_COUNT }, (_, i) => i + 1);
+      p.clearedDungeonFloors = floors;
+      p.clearedBeastDungeonFloors = floors;
     },
   },
 ];

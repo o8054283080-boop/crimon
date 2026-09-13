@@ -1,7 +1,7 @@
-import { EquipStar, SET_LABEL } from "../../core/equipment.js";
+import { DUNGEON_FLOOR_COUNT, DUNGEON_FLOOR_STAR_WEIGHTS, EquipStar, SET_LABEL } from "../../core/equipment.js";
 import { CYCLE_ELEMENTS, Element, ELEMENT_COLOR, ELEMENT_JA, getElementAffinity } from "../../core/element.js";
 import { DUNGEON_STAMINA_COST } from "../../core/fighterLevel.js";
-import { BEAST_DUNGEON_FLOORS, DungeonEnemy, DungeonFloor, EQUIPMENT_DUNGEON_FLOORS, EquipmentDungeonKind, REINCARNATION_PIG_LOW_TIER_MAX_FLOOR } from "../../data/equipmentDungeon.js";
+import { BEAST_DUNGEON_FLOORS, DungeonEnemy, DungeonFloor, dungeonFloorHasSkillPigDrop, dungeonFloorPigStars, EQUIPMENT_DUNGEON_FLOORS, EquipmentDungeonKind } from "../../data/equipmentDungeon.js";
 import { findMonster } from "../../data/monsters.js";
 import { getDungeonParty, isDungeonFloorCleared, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
@@ -25,8 +25,13 @@ function starLabel(star: EquipStar): string {
   return "★".repeat(star);
 }
 
+/**
+ * その階で出うる最高★。**階のドロップ表そのものから読む。**
+ * ここを階数のしきい値で書くと、階を足すたびに表と案内がずれる。
+ */
 function maxStarForFloor(floor: DungeonFloor): EquipStar {
-  return floor.floor <= 3 ? 4 : floor.floor <= 6 ? 5 : 6;
+  const stars = (DUNGEON_FLOOR_STAR_WEIGHTS[floor.floor] ?? []).map((w) => w.value);
+  return stars.length > 0 ? (Math.max(...stars) as EquipStar) : 6;
 }
 
 /** その階層の敵は全員この属性で統一されている(弱点属性を突きやすくするため) */
@@ -46,7 +51,16 @@ function enemyDisplayName(enemy: DungeonEnemy): string {
 function floorTiles(props: EquipmentDungeonProps, floors: readonly DungeonFloor[]) {
   return floors.map((floor) => {
     const element = floorElement(floor);
-    const unlocked = floor.kind === "DEMON" || floor.floor === 1 || isDungeonFloorCleared(props.player, floor.floor - 1, floor.kind);
+    /*
+     * 解放。**魔人の1〜10階は今までどおり無条件で開いたまま。**
+     * ここを「前の階をクリア」に統一すると、既に10階を周回している人まで
+     * 1階からやり直しに見える(実際には遡って開くが、画面が閉じて見える)。
+     * 上位階(11・12)だけを前の階クリア制にする。魔獣は従来どおり全階そう。
+     */
+    const isUpper = floor.floor > DUNGEON_FLOOR_COUNT;
+    const unlocked = floor.floor === 1
+      || (floor.kind === "DEMON" && !isUpper)
+      || isDungeonFloorCleared(props.player, floor.floor - 1, floor.kind);
     return {
       badge: `${floor.floor}F`,
       title: unlocked ? `${ELEMENT_JA[element]}の階` : "未開放",
@@ -109,7 +123,12 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
   const element = floorElement(floor);
   const counter = counterElement(element);
   const recommendedGear = floor.floor <= 5 ? "★5装備(サブ4個推奨)" : "★6装備推奨";
-  const pigStar = floor.floor <= REINCARNATION_PIG_LOW_TIER_MAX_FLOOR ? 2 : 3;
+  /*
+   * 出るピッグの★は**階の表から引く。**しきい値をここに書き写すと、
+   * 表を触った時に案内だけが古いまま残る。
+   * 上位階は★3と★4の両方が出るので「★3・★4」と並ぶ。
+   */
+  const pigStars = dungeonFloorPigStars(floor.floor).map((star) => `★${star}`).join("・");
   const bonusNotes = [
     /*
      * **「サブは星が高いほど付きやすい」はもう嘘。**
@@ -123,8 +142,15 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
      */
     "クリアすると装備が1個確定でドロップします(上の階ほど、レア度の高い装備が出やすくなります)。",
     "低確率で「召喚の書」もドロップします。",
-    `低確率で転生ピッグ★${pigStar}(ランクアップ素材専用モンスター)もドロップします。`,
-  ];
+    `低確率で転生ピッグ${pigStars}(ランクアップ素材専用モンスター)もドロップします。`,
+    /*
+     * スキルピッグは上位階だけ。**確率の数字は出さない**(依頼主との約束)。
+     * 「ここでしか出ない」ことだけを伝える——上の階へ行く理由になる。
+     */
+    dungeonFloorHasSkillPigDrop(floor.floor)
+      ? "ごく低確率で「スキルピッグ」(スキル強化専用モンスター)もドロップします。この階でしか手に入りません。"
+      : null,
+  ].filter((note): note is string => note !== null);
 
   const blockers = [
     party.length === 0 ? "ダンジョン専用パーティが編成されていません" : null,
