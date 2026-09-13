@@ -154,6 +154,43 @@ function compareStats(a: Stats, b: Stats, settings: AutoEquipSettings): number {
   return autoEquipPowerOf(a) - autoEquipPowerOf(b);
 }
 
+/**
+ * 最低条件にどれだけ足りていないか。満たしていれば0。
+ *
+ * 桁の違うステータス(HPは万、速度は百)を混ぜるので、**割合で足す。**
+ */
+function shortfallOf(stats: Stats, minimums: Partial<Record<AutoEquipStat, number>>): number {
+  let total = 0;
+  for (const key of AUTO_EQUIP_STATS) {
+    const min = minimums[key];
+    if (min === undefined) continue;
+    const value = statValue(stats, key);
+    if (value < min) total += (min - value) / Math.max(1e-9, min);
+  }
+  return total;
+}
+
+/**
+ * 探している途中の順序。**「まだ条件を満たしていない構成」も比べられるようにする。**
+ *
+ * ここが無かったせいで、最低条件つきの答えが総当たりに負けていた。
+ * 「攻撃優先・速度110以上」で、攻撃を最大にした構成は速度が足りない。
+ * 足りない構成を**種にすら入れていなかった**ので、そこから
+ * 1枠ずつ入れ替えて速度を戻す道が最初から塞がっていた
+ * (実測で攻撃4,118。総当たりは4,237)。
+ *
+ * 満たしている方が常に上。どちらも満たしていないなら、**不足の小さい方が上。**
+ * これで詰め直しが「惜しい構成」を足がかりにできる。
+ */
+function searchOrder(a: Stats, b: Stats, settings: AutoEquipSettings): number {
+  const shortA = shortfallOf(a, settings.minimums);
+  const shortB = shortfallOf(b, settings.minimums);
+  if (shortA > 0 || shortB > 0) {
+    if (Math.abs(shortA - shortB) > 1e-12) return shortB - shortA;
+  }
+  return compareStats(a, b, settings);
+}
+
 /* ------------------------------------------------------------------ *
  * 候補を集める
  * ------------------------------------------------------------------ */
@@ -254,6 +291,15 @@ const FALLBACK_PER_SLOT = 3;
  */
 const REFINE_POOL = 10;
 
+/**
+ * 1スロットの持ち駒の上限。
+ *
+ * 基準の数だけ上位を集めるので、放っておくと
+ * (優先3 + 最低条件6 + 総合力) × 10 で90枚まで膨らむ。
+ * 詰め直しは 24席 × 3巡 × 6枠 × 持ち駒 の回数を食うので、ここで頭を押さえる。
+ */
+const MAX_SLOT_POOL = 24;
+
 /** 詰め直しを試す割り当ての数。評価の高い順に選ぶ */
 const REFINE_TOP_ASSIGNMENTS = 24;
 
@@ -274,7 +320,11 @@ interface SetPlan {
   want: Map<SetType, number>;
 }
 
-function buildSetPlans(bySlot: Map<EquipSlot, Equipment[]>, fixedItems: Equipment[]): SetPlan[] {
+function buildSetPlans(
+  bySlot: Map<EquipSlot, Equipment[]>,
+  fixedItems: Equipment[],
+  wanted: Map<SetType, 2 | 4>,
+): SetPlan[] {
   const slotsOf = new Map<SetType, Set<EquipSlot>>();
   for (const type of SET_TYPES) slotsOf.set(type, new Set());
   for (const [slot, items] of bySlot) {
@@ -306,7 +356,101 @@ function buildSetPlans(bySlot: Map<EquipSlot, Equipment[]>, fixedItems: Equipmen
       }
     }
   }
-  return plans;
+
+  /*
+   * シリーズを名指しされていたら、**そろう構成だけを残す。**
+   * 固定した部位が既に持っているぶんも頭数に入れる
+   * (速攻を1つ固定していれば、残り3つで4セットになる)。
+   */
+  if (wanted.size === 0) return plans;
+  return plans.filter((plan) => {
+    for (const [type, count] of wanted) {
+      if ((plan.want.get(type) ?? 0) + (fixedCount.get(type) ?? 0) < count) return false;
+    }
+    return true;
+  });
+}
+
+/** 指定されたシリーズが、実際にそろっているか */
+function meetsWantedSets(items: Equipment[], wanted: Map<SetType, 2 | 4>): boolean {
+  if (wanted.size === 0) return true;
+  const counts = new Map<SetType, number>();
+  for (const item of items) counts.set(item.set, (counts.get(item.set) ?? 0) + 1);
+  for (const [type, count] of wanted) {
+    if ((counts.get(type) ?? 0) < count) return false;
+  }
+  return true;
+}
+
+/**
+ * 指定を読める形へ整える。
+ *
+ * **4個でしか効かないシリーズに2を指定させない。**
+ * 暴走・崩壊・祝福は2個そろえても何も起きないので、
+ * 2を渡されたら4へ引き上げる(黙って無意味な縛りを掛けない)。
+ */
+const FOUR_PIECE_ONLY_SETS = new Set<SetType>(["RAMPAGE", "COLLAPSE", "BLESSING"]);
+
+export function normalizeWantedSets(raw: Partial<Record<SetType, 2 | 4>> | undefined): Map<SetType, 2 | 4> {
+  const wanted = new Map<SetType, 2 | 4>();
+  if (!raw || typeof raw !== "object") return wanted;
+  for (const type of SET_TYPES) {
+    const count = raw[type];
+    if (count !== 2 && count !== 4) continue;
+    wanted.set(type, FOUR_PIECE_ONLY_SETS.has(type) ? 4 : count);
+  }
+  return wanted;
+}
+
+/**
+ * 指定した個数の合計。6枠に収まらない指定は**叶えようがない。**
+ *
+ * ここを「収まらないなら指定を捨てる」にしていたら、
+ * 暴走4+崩壊4(=8枠)が**無指定と同じ結果を返して成功扱い**になった。
+ * 黙って願いを捨てて「できました」と言うのがいちばん悪い。**断る。**
+ */
+export function wantedSetsTotal(wanted: Map<SetType, 2 | 4>): number {
+  let total = 0;
+  for (const count of wanted.values()) total += count;
+  return total;
+}
+
+/**
+ * いまの条件で、そのシリーズを**何枠に置けるか。**
+ *
+ * 画面のシリーズ札に出す数。**「所持数」を出してはいけない。**
+ * 最初は `state.equipment` を素朴に数えて「所持35」と出していたが、
+ * 探す範囲が「今の装備＋未装備」なら他の子が着けている35個は使えない。
+ * **押せるのに必ず断られる札**ができていた。
+ *
+ * 同じシリーズを同じ枠に2つ着けることはできないので、
+ * 数えるのは個数ではなく**置ける枠の数**(`buildSetPlans` の数え方と同じ)。
+ * 固定した部位が既に着けているぶんも頭数に入れる。
+ */
+export function reachableSetCounts(
+  state: PlayerState,
+  monster: MonsterInstance,
+  settings: AutoEquipSettings,
+): Map<SetType, number> {
+  const bySlot = collectCandidates(state, monster, settings);
+  const slotsOf = new Map<SetType, Set<EquipSlot>>();
+  for (const type of SET_TYPES) slotsOf.set(type, new Set());
+  for (const [slot, items] of bySlot) {
+    for (const item of items) slotsOf.get(item.set)?.add(slot);
+  }
+  const byId = new Map(state.equipment.map((e) => [e.id, e] as const));
+  const counts = new Map<SetType, number>();
+  for (const type of SET_TYPES) counts.set(type, slotsOf.get(type)?.size ?? 0);
+  for (const slot of settings.fixedSlots) {
+    const item = byId.get(monster.equipment[slot] ?? "");
+    if (item) counts.set(item.set, (counts.get(item.set) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** そのシリーズが4個でしか効かないか。画面で2を押せなくするために使う */
+export function isFourPieceOnlySet(type: SetType): boolean {
+  return FOUR_PIECE_ONLY_SETS.has(type);
 }
 
 /**
@@ -367,65 +511,127 @@ interface SlotRanking {
 }
 
 /**
- * スロットごとの順位を**1回だけ**作る。
+ * スロットごとの持ち駒を**1回だけ**作る。
  *
- * 寄与の測り方はセット構成に依らないので、構成ごとに並べ替え直す必要はない。
+ * ## なぜ1本の点数で並べてはいけないのか
+ *
+ * 最初は「優先順位を重み付きで足した1つの点数」で並べていた。
+ * だがカスタムの目的は**辞書順**で、足し算ではない。
+ * 第1優先が1でも高い方が必ず勝つのに、第2・第3を混ぜた点数で絞ると、
+ * **第1優先で最良の装備が持ち駒から落ちる。**
+ *
+ * さらに、最低条件のステータスは点数に一切入っていなかった。
+ * 「攻撃優先・速度110以上」なら、速度を稼ぐ装備が持ち駒に居ないと
+ * 条件を満たしたまま攻撃を伸ばせない。
+ * 実測で**総当たりの攻撃4,237に対し4,118**しか出せていなかった。
+ *
+ * ## いまの持ち方
+ *
+ * **基準ごとに上位を取り、その和集合を持ち駒にする。**
+ * 基準は「第1〜第3優先」「最低条件のステータス」「総合力(同点の決め手)」。
+ * 深さ0から順に各基準を一巡するので、**どの基準の1位も必ず入る。**
+ * 並び順は第1基準——これで `pickForAssignment(depth 0)` は
+ * 単一目的の時これまでどおり厳密な最良を指す。
  */
 function rankSlots(
   bySlot: Map<EquipSlot, Equipment[]>,
   baseStats: Stats,
   settings: AutoEquipSettings,
 ): Map<EquipSlot, SlotRanking> {
+  const criteria = scoringCriteria(baseStats, settings);
   const ranking = new Map<EquipSlot, SlotRanking>();
+
   for (const slot of EQUIP_SLOTS) {
     const items = bySlot.get(slot) ?? [];
-    const scored = items
-      .map((item) => ({ item, score: contributionOf(item, baseStats, settings) }))
-      .sort((a, b) => b.score - a.score)
-      .map((s) => s.item);
-    const bySet = new Map<SetType, Equipment[]>();
-    for (const item of scored) {
-      const list = bySet.get(item.set);
-      if (list) { if (list.length < REFINE_POOL) list.push(item); }
-      else bySet.set(item.set, [item]);
+    // 基準ごとの点数を1回だけ出す。装備1つにつき基準の数だけ
+    const scores = new Map<string, number[]>();
+    for (const item of items) {
+      scores.set(item.id, criteria.map((weights) => scoreItem(item, baseStats, weights)));
     }
-    ranking.set(slot, { best: scored.slice(0, REFINE_POOL), bySet });
+    const primary = (item: Equipment): number => scores.get(item.id)?.[0] ?? 0;
+
+    /** 各基準の上位を一巡しながら拾う。**どの基準の1位も必ず入る** */
+    const buildPool = (source: Equipment[]): Equipment[] => {
+      if (source.length <= 1) return [...source];
+      const ranked = criteria.map((_, i) =>
+        [...source].sort((a, b) => (scores.get(b.id)?.[i] ?? 0) - (scores.get(a.id)?.[i] ?? 0)));
+      const pool: Equipment[] = [];
+      const seen = new Set<string>();
+      for (let depth = 0; depth < REFINE_POOL && pool.length < MAX_SLOT_POOL; depth += 1) {
+        for (const list of ranked) {
+          const item = list[depth];
+          if (!item || seen.has(item.id)) continue;
+          seen.add(item.id);
+          pool.push(item);
+          if (pool.length >= MAX_SLOT_POOL) break;
+        }
+      }
+      // 並びは第1基準の順。単一目的ならこの先頭がその割り当ての厳密な最良
+      return pool.sort((a, b) => primary(b) - primary(a));
+    };
+
+    const bySet = new Map<SetType, Equipment[]>();
+    for (const type of SET_TYPES) {
+      const ofSet = items.filter((item) => item.set === type);
+      if (ofSet.length > 0) bySet.set(type, buildPool(ofSet));
+    }
+    ranking.set(slot, { best: buildPool(items), bySet });
   }
   return ranking;
 }
 
 /**
- * その装備がステータスへどれだけ足すか。
+ * 絞り込みに使う基準。**目的の数だけ持つ。**
  *
- * **単一の目的なら、この順位がそのまま厳密な最良を指す。**
+ * 1本の点数へ潰すと、辞書順の第1優先で最良の装備が落ちる。
+ * 最低条件のステータスも基準に入れる——満たすための装備が
+ * 持ち駒に居ないと、条件を守ったまま目的を伸ばせない。
+ * 総合力は最後に足す(優先順位が並んだ時の決め手であり、
+ * 「どれも似た値」の時に良い装備を残す網でもある)。
+ */
+function scoringCriteria(base: Stats, settings: AutoEquipSettings): Record<AutoEquipStat, number>[] {
+  const one = (key: AutoEquipStat): Record<AutoEquipStat, number> => {
+    const weights = { hp: 0, atk: 0, def: 0, spd: 0, criRate: 0, criDmg: 0 };
+    weights[key] = 1;
+    return weights;
+  };
+  const list: Record<AutoEquipStat, number>[] = [];
+  const added = new Set<AutoEquipStat>();
+  const push = (key: AutoEquipStat): void => {
+    if (added.has(key)) return;
+    added.add(key);
+    list.push(one(key));
+  };
+
+  if (settings.type === "custom") {
+    for (const key of settings.priorities.slice(0, MAX_AUTO_EQUIP_PRIORITIES)) push(key);
+  } else if (settings.type !== "power") {
+    push(settings.type);
+  }
+  // 最低条件のステータスは、満たすために要る
+  for (const key of AUTO_EQUIP_STATS) {
+    if (settings.minimums[key] !== undefined) push(key);
+  }
+  // 総合力。第1基準が無い(総合力狙い・優先順位なしのカスタム)時はこれが第1基準
+  list.push(powerWeights(base));
+  return list;
+}
+
+/**
+ * その装備が、渡された重みで見てどれだけ足すか。
+ *
  * 計算の形が「素の値 × (1 + %の合計) + 実数の合計」なので、
  * `素の値 × その装備の% + その装備の実数` が寄与そのものになる。
  * セット効果は構成が決まれば定数なので、順位には影響しない。
- *
- * 総合力とカスタムは複数のステータスを見るので、ここは目安になる。
- * **順位を最終決定に使わないための歯止め**として、最後は必ず
- * `toBattleDefinition` の結果で比べる。
+ * **単一の基準なら、この順位がそのまま厳密な最良を指す。**
  */
-function contributionOf(item: Equipment, base: Stats, settings: AutoEquipSettings): number {
-  const keys: AutoEquipStat[] = settings.type === "custom"
-    ? (settings.priorities.length > 0 ? settings.priorities.slice(0, MAX_AUTO_EQUIP_PRIORITIES) : [...AUTO_EQUIP_STATS])
-    : settings.type === "power" ? [...AUTO_EQUIP_STATS] : [settings.type];
-
-  /*
-   * **総合力は式に合わせて重みを付ける。**
-   * ただ足し合わせると、HP(万の桁)が攻撃(千の桁)を押しつぶして
-   * 「HPだけ高い構成」が選ばれる。総合力の式
-   * (HP/10 + 攻撃×会心期待値 + 防御 + 速度)と同じ比率で見る。
-   */
-  const powerWeight = settings.type === "power" ? powerWeights(base) : null;
-
+function scoreItem(item: Equipment, base: Stats, weights: Record<AutoEquipStat, number>): number {
   let score = 0;
-  const rolls = [item.mainStat, ...item.subStats];
-  for (const roll of rolls) {
-    for (const [i, key] of keys.entries()) {
-      const raw = rollContribution(roll.type, roll.value, key, base);
-      // 第1優先ほど重く見る。単一目的ならキーが1つなので重みは効かない
-      score += powerWeight ? raw * powerWeight[key] : raw / (i + 1);
+  for (const roll of [item.mainStat, ...item.subStats]) {
+    for (const key of AUTO_EQUIP_STATS) {
+      const weight = weights[key];
+      if (weight === 0) continue;
+      score += rollContribution(roll.type, roll.value, key, base) * weight;
     }
   }
   // 同点なら育っている方を選ぶ(見た目の納得感のため。順位そのものは変えない)
@@ -564,7 +770,11 @@ export function planAutoEquip(
   const before = toBattleDefinition(monster, dex, currentItems).stats;
   const baseStats = toBattleDefinition(monster, dex, []).stats;
 
-  const plans = buildSetPlans(bySlot, fixedItems);
+  const wantedSets = normalizeWantedSets(settings.wantedSets);
+  if (wantedSetsTotal(wantedSets) > EQUIP_SLOTS.length) {
+    return { ok: false, reason: `シリーズの指定が合計${wantedSetsTotal(wantedSets)}個で、${EQUIP_SLOTS.length}枠に入りません` };
+  }
+  const plans = buildSetPlans(bySlot, fixedItems, wantedSets);
   const ranking = rankSlots(bySlot, baseStats, settings);
 
   const freeSlots = EQUIP_SLOTS.filter((slot) => !fixed.has(slot) && (bySlot.get(slot)?.length ?? 0) > 0);
@@ -582,11 +792,25 @@ export function planAutoEquip(
    */
   const evaluate = (picked: Equipment[]): Stats | null => {
     const items = [...fixedItems, ...picked];
+    /*
+     * **指定されたシリーズは、ここでも実際に数える。**
+     * 構成の絞り込みだけに任せると、詰め直しが1枠を別シリーズへ
+     * 入れ替えた時に黙って崩れる(そちらの方がステータスは上がるので、
+     * 放っておくと必ずそうなる)。約束したものは最後に数えて守る。
+     */
+    if (!meetsWantedSets(items, wantedSets)) return null;
     const stats = toBattleDefinition(monster, dex, items).stats;
     evaluated += 1;
     sawAny = true;
-    if (!meetsMinimums(stats, settings.minimums)) return null;
-    if (!best || compareStats(stats, best.stats, settings) > 0) best = { stats, items: [...items] };
+    /*
+     * **条件を満たしていなくてもステータスは返す。**
+     * 返さないと、惜しい構成が種にも詰め直しにも入らず、
+     * そこから1枠ずつ直して条件を満たす道が塞がる。
+     * `best` に採るのは満たしたものだけ。
+     */
+    if (meetsMinimums(stats, settings.minimums)) {
+      if (!best || compareStats(stats, best.stats, settings) > 0) best = { stats, items: [...items] };
+    }
     return stats;
   };
 
@@ -605,8 +829,24 @@ export function planAutoEquip(
    */
   const needsDeeper = hasMinimums || settings.type === "power" || settings.type === "custom";
 
-  // 詰め直しの入口にする割り当てを、評価の高い順に少しだけ覚えておく
-  const seeds: { score: number; items: Equipment[]; assignment: Map<EquipSlot, SetType | null> }[] = [];
+  /*
+   * 詰め直しの入口にする割り当て。
+   *
+   * **並べ替えは本当の目的で行う。**ここを総合力で並べていたせいで、
+   * 「速度優先」のカスタムなのに総合力の高い入口ばかりが選ばれ、
+   * 速度で一番良い割り当てが詰め直しに回らないことがあった。
+   */
+  const seeds: { stats: Stats; items: Equipment[]; assignment: Map<EquipSlot, SetType | null> }[] = [];
+  /*
+   * **並べ替えは目的だけで行う。条件の達成度で並べない。**
+   *
+   * 条件を満たす構成を上に置いていたせいで、
+   * 「攻撃は高いが速度が足りない」入口——**直せば最良になるもの**——が
+   * 真っ先に切り捨てられていた。席は24しかないので、
+   * 満たしている構成だけで埋まってしまう。
+   * 条件は後から詰め直しで戻せるのだから、入口は目的の高い順に取る。
+   */
+  const seedOrder = (a: { stats: Stats }, b: { stats: Stats }): number => compareStats(b.stats, a.stats, settings);
 
   for (const plan of plans) {
     if (evaluated >= MAX_EVALUATIONS) break;
@@ -628,9 +868,9 @@ export function planAutoEquip(
        */
       if (needsDeeper) {
         if (stats) {
-          seeds.push({ score: autoEquipPowerOf(stats), items: picked, assignment });
+          seeds.push({ stats, items: picked, assignment });
           if (seeds.length > REFINE_TOP_ASSIGNMENTS * 4) {
-            seeds.sort((a, b) => b.score - a.score);
+            seeds.sort(seedOrder);
             seeds.length = REFINE_TOP_ASSIGNMENTS;
           }
         }
@@ -654,15 +894,22 @@ export function planAutoEquip(
    * 近似で済ませず、最後まで実測で決める。
    */
   if (needsDeeper && seeds.length > 0) {
-    seeds.sort((a, b) => b.score - a.score);
-    for (const seed of seeds.slice(0, REFINE_TOP_ASSIGNMENTS)) {
-      if (evaluated >= MAX_EVALUATIONS) break;
-      let current = [...seed.items];
+    seeds.sort(seedOrder);
+    /**
+     * 1枠ずつ入れ替えて登る。良くなれば採り、改善が止まったら終わる。
+     * `order` に何を渡すかで「何を良いとするか」が変わる。
+     */
+    const climb = (
+      start: Equipment[],
+      assignment: Map<EquipSlot, SetType | null>,
+      order: (a: Stats, b: Stats) => number,
+    ): Equipment[] => {
+      let current = [...start];
       let currentStats = toBattleDefinition(monster, dex, [...fixedItems, ...current]).stats;
       evaluated += 1;
       for (let round = 0; round < 3; round += 1) {
         let improved = false;
-        for (const [slot, type] of seed.assignment) {
+        for (const [slot, type] of assignment) {
           if (evaluated >= MAX_EVALUATIONS) break;
           const rank = ranking.get(slot);
           if (!rank) continue;
@@ -673,7 +920,7 @@ export function planAutoEquip(
             const trial = current.filter((item) => item.slot !== slot).concat(candidate);
             const stats = evaluate(trial);
             if (!stats) continue;
-            if (compareStats(stats, currentStats, settings) > 0) {
+            if (order(stats, currentStats) > 0) {
               current = trial;
               currentStats = stats;
               improved = true;
@@ -682,15 +929,40 @@ export function planAutoEquip(
         }
         if (!improved) break;
       }
+      return current;
+    };
+
+    const byObjective = (a: Stats, b: Stats): number => compareStats(a, b, settings);
+    const byFeasibility = (a: Stats, b: Stats): number => searchOrder(a, b, settings);
+
+    for (const seed of seeds.slice(0, REFINE_TOP_ASSIGNMENTS)) {
+      if (evaluated >= MAX_EVALUATIONS) break;
+      /*
+       * **最低条件がある時は、いったん条件を忘れて登ってから戻す。**
+       *
+       * 条件を守ったまま1枠ずつ登ると、**2枠同時でないと届かない答え**に
+       * 手が出ない。実測の例(優先=攻撃・速度110以上)では、
+       * S5を最良へ寄せると攻撃4,253まで伸びるが速度が107で条件割れ、
+       * S6だけ寄せると条件は通るが攻撃4,102まで下がる。
+       * **どちらも単独では弾かれる**のに、両方替えると攻撃4,237・速度116。
+       * 片方ずつしか見ない登り方では、ここに永久に辿り着けなかった。
+       *
+       * そこで、まず条件を無視して目的だけで登り切り、
+       * そこから条件へ戻す向きで登り直す。途中で通った構成のうち
+       * 条件を満たすものは `evaluate` が拾っているので、取りこぼさない。
+       */
+      let current = [...seed.items];
+      if (hasMinimums) current = climb(current, seed.assignment, byObjective);
+      climb(current, seed.assignment, byFeasibility);
     }
   }
 
   if (!best) {
     return {
       ok: false,
-      reason: sawAny
-        ? "指定条件を満たす装備構成がありません"
-        : Object.keys(settings.minimums).length > 0
+      reason: wantedSets.size > 0 && !sawAny
+        ? "指定したシリーズをそろえられません"
+        : sawAny || Object.keys(settings.minimums).length > 0
           ? "指定条件を満たす装備構成がありません"
           : "使える装備がありません",
     };

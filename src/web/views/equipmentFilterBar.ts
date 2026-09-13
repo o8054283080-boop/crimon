@@ -97,7 +97,7 @@ export function renderEquipmentFilterBar(props: EquipmentFilterBarProps): HTMLEl
   );
 
   // 装着・ロックは「どれか1つ」なので、同じ札をもう一度押すと解除にする
-  const useChips = (["EQUIPPED", "FREE", "LOCKED"] as Exclude<EquipUseFilter, "ALL">[]).map((value) =>
+  const useChips = (["EQUIPPED", "FREE", "LOCKED", "AUTO_OFF"] as Exclude<EquipUseFilter, "ALL">[]).map((value) =>
     chip(EQUIP_USE_FILTER_LABEL[value], filter.use === value, () =>
       onChange({ ...filter, use: filter.use === value ? "ALL" : value }),
     ),

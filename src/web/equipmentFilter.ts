@@ -17,7 +17,7 @@ import { EquipStar, Equipment, SetType, StatType } from "../core/equipment.js";
 import { EquipmentRarity, getEquipmentRarity } from "../core/equipmentRarity.js";
 
 /** 装着状態の絞り込み。ALLは条件なし */
-export type EquipUseFilter = "ALL" | "EQUIPPED" | "FREE" | "LOCKED";
+export type EquipUseFilter = "ALL" | "EQUIPPED" | "FREE" | "LOCKED" | "AUTO_OFF";
 
 export interface EquipmentFilter {
   /** 空配列は「すべて」。選んだものの**いずれか**に当てはまるものを残す */
@@ -40,6 +40,11 @@ export const EQUIP_USE_FILTER_LABEL: Record<Exclude<EquipUseFilter, "ALL">, stri
   EQUIPPED: "装着中",
   FREE: "未装着",
   LOCKED: "ロック中",
+  /*
+   * おまかせ対象外。**印を付けた後で探せないと、解きようがない。**
+   * 数百個の中から1個ずつ開いて確かめることになっていた。
+   */
+  AUTO_OFF: "おまかせ対象外",
 };
 
 /** 配列の中身を1つ出し入れする。札を押すたびに呼ぶ */
@@ -115,6 +120,7 @@ export function filterEquipment(
     if (filter.use === "EQUIPPED" && !isEquipped(item)) return false;
     if (filter.use === "FREE" && isEquipped(item)) return false;
     if (filter.use === "LOCKED" && item.locked !== true) return false;
+    if (filter.use === "AUTO_OFF" && item.autoExclude !== true) return false;
     return true;
   });
 }

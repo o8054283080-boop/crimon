@@ -205,10 +205,55 @@
  * 札本体を押す操作は装着なので、要素は兄弟に分けたまま(誤装着を防ぐ)。
  */
 
+/*
+ * 操作が2つ(強化・おまかせ対象外)になったので**折り返す。**
+ * 横一列のままだと、狭い端末で「おまかせ対象外にする」が
+ * 2文字しか見えない札になる(プリセットの操作で同じ形をやっている)。
+ */
 .equipment-screen .equip-picker-card__foot {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: flex-end;
   padding: 0 8px 8px;
+}
+
+/*
+ * おまかせ対象外の切り替え。**強化より目立たせない。**
+ * こちらは取り返しがつく操作で、しかも押す頻度は強化の方が高い。
+ */
+.equipment-screen .equip-picker-card__auto {
+  min-height: 36px;
+  padding: 4px 9px;
+  border-radius: 9px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+/* 外してある間は、押せば戻せることが分かる色にする */
+.equipment-screen .equip-picker-card__auto.is-off {
+  border-color: rgba(255, 179, 179, 0.55);
+  color: #ffc9c9;
+}
+
+/*
+ * 対象外の印。**一覧でも簡易表示でも出す。**
+ * 開くまで分からないと、数百個から探し直せない。
+ */
+.equip-card__auto-off {
+  margin-top: 3px;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 179, 179, 0.45);
+  border-radius: 999px;
+  background: rgba(84, 30, 30, 0.6);
+  color: #ffc9c9;
+  /* 9px未満は実機で読めない(tests/cssReadability.test.ts が見張っている) */
+  font-size: 0.6rem;
+  font-weight: 800;
+  justify-self: start;
+  white-space: nowrap;
 }
 
 .equipment-screen .equip-picker-card__enhance {

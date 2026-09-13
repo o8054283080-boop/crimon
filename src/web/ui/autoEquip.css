@@ -164,6 +164,69 @@
   white-space: nowrap;
 }
 
+/* ---- そろえるシリーズ ---- */
+
+/*
+ * 12種類ある。**縦に12枚並べない。**
+ * 2列で折り返し、狭い端末でも名前と個数が1行に収まる大きさにする。
+ */
+.ae-sets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ae-set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  /* 的は40pxを下回らせない(巡回が拾う下限) */
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid rgba(214, 168, 74, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cfc2a8;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ae-set.is-active {
+  border-color: #ffd66b;
+  background: linear-gradient(180deg, rgba(90, 68, 32, 0.9), rgba(46, 34, 17, 0.95));
+  color: #ffe9b6;
+}
+
+/* 持っていないシリーズは押せない。押せた瞬間に断るだけの札にしない */
+.ae-set:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.ae-set__name {
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 9px未満は実機で読めない(tests/cssReadability.test.ts が見張っている) */
+.ae-set__count {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.ae-set.is-active .ae-set__count {
+  color: #ffd66b;
+  font-weight: 900;
+  opacity: 1;
+}
+
 /* ---- 部位の固定 ---- */
 
 .ae-slots {

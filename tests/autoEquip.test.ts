@@ -3,6 +3,7 @@ import { EQUIP_SLOTS, Equipment, EquipSlot, generateEquipment } from "../src/cor
 import { toBattleDefinition } from "../src/core/monsterInstance.js";
 import { ALL_DISPLAYABLE_MONSTERS_DEX, findMonsterById } from "../src/data/monsters.js";
 import { addEquipment, addMonster, createInitialState, type PlayerState } from "../src/game/playerState.js";
+import type { Stats } from "../src/core/stats.js";
 import {
   applyAutoEquipPlan,
   autoEquipPowerOf,
@@ -12,6 +13,7 @@ import {
   meetsMinimums,
   planAutoEquip,
   type AutoEquipSettings,
+  type AutoEquipStat,
 } from "../src/game/autoEquip.js";
 
 /**
@@ -76,6 +78,43 @@ function bruteForceBest(state: PlayerState, monsterId: string, key: string): num
   return best;
 }
 
+/**
+ * カスタムの目的そのもの。**辞書順 → 総合力。**
+ * `compareStats` と同じ規則を、テスト側にもう一度書いて突き合わせる。
+ */
+function customKeyOf(stats: Stats, priorities: AutoEquipStat[]): number[] {
+  const value = (key: AutoEquipStat): number => (stats as unknown as Record<string, number>)[key];
+  return [...priorities.map(value), autoEquipPowerOf(stats)];
+}
+
+function keyBetter(a: number[], b: number[]): boolean {
+  for (let i = 0; i < a.length; i += 1) {
+    if (Math.abs(a[i] - b[i]) > 1e-9) return a[i] > b[i];
+  }
+  return false;
+}
+
+/** カスタム(優先順位＋最低条件)の総当たり。最低条件を満たす中での最良を返す */
+function bruteForceCustom(state: PlayerState, monsterId: string, settings: AutoEquipSettings): number[] | null {
+  const monster = state.monsters.find((m) => m.id === monsterId)!;
+  const dex = findMonsterById(monster.dexId)!;
+  const bySlot = EQUIP_SLOTS.map((slot) => state.equipment.filter((e) => e.slot === slot));
+  let best: number[] | null = null;
+  const walk = (i: number, chosen: Equipment[]): void => {
+    if (i === EQUIP_SLOTS.length) {
+      const stats = toBattleDefinition(monster, dex, chosen).stats;
+      if (!meetsMinimums(stats, settings.minimums)) return;
+      const key = customKeyOf(stats, settings.priorities);
+      if (!best || keyBetter(key, best)) best = key;
+      return;
+    }
+    for (const item of bySlot[i]) walk(i + 1, [...chosen, item]);
+    walk(i + 1, chosen);
+  };
+  walk(0, []);
+  return best;
+}
+
 function settingsFor(over: Partial<AutoEquipSettings>): AutoEquipSettings {
   return { ...createDefaultAutoEquipSettings(), scope: "ALL", ...over };
 }
@@ -100,6 +139,58 @@ describe("本当に一番強い構成を出す", () => {
       }
     });
   }
+
+  /*
+   * ## ここが長いあいだ空いていた穴
+   *
+   * 総当たりと突き合わせていたのは**単一ステータス6種と総合力の7種だけ**で、
+   * カスタム(優先順位＋最低条件)は一度も検証していなかった。
+   * 依頼主から「カスタムで強化していない装備が着いた」と指摘され、
+   * 測ってみたら **27件中7件が総当たりに負けていた。**
+   * 最悪の例は「優先=攻撃・速度110以上」で、総当たり4,237に対し4,118。
+   *
+   * 原因は3つとも別物だった。
+   *
+   *   1. 辞書順の目的を、重み付きの和1本に潰して絞り込んでいた
+   *   2. 最低条件のステータスが絞り込みの基準に入っていなかった
+   *   3. 詰め直しの入口を**条件の達成度**で並べ、
+   *      「直せば最良になる惜しい構成」を真っ先に切り捨てていた
+   *
+   * 以後この形で見張る。
+   */
+  const CUSTOM_CASES: Partial<AutoEquipSettings>[] = [
+    { priorities: ["spd"] },
+    { priorities: ["atk"] },
+    { priorities: ["spd", "atk"] },
+    { priorities: ["atk", "criRate"] },
+    { priorities: ["hp", "def"] },
+    { priorities: ["spd", "atk", "hp"] },
+    { priorities: ["atk"], minimums: { spd: 110 } },
+    { priorities: ["hp"], minimums: { spd: 105, criRate: 0.2 } },
+    { priorities: [] },
+  ];
+
+  it("カスタムも、総当たりの最良と一致する", () => {
+    for (const seed of [7, 19, 33]) {
+      const { state, monsterId } = stateWith(4, seed);
+      for (const over of CUSTOM_CASES) {
+        const settings = settingsFor({ type: "custom", ...over });
+        const label = `seed=${seed} ${JSON.stringify(over)}`;
+        const want = bruteForceCustom(state, monsterId, settings);
+        const out = planAutoEquip(state, monsterId, settings);
+        if (!want) {
+          expect(out.ok, `${label}: 総当たりが解なしなのに成功した`).toBe(false);
+          continue;
+        }
+        expect(out.ok, `${label}: ${out.ok ? "" : out.reason}`).toBe(true);
+        if (!out.ok) continue;
+        const got = customKeyOf(out.plan.after, settings.priorities);
+        for (const [i, value] of got.entries()) {
+          expect(value, `${label} の第${i + 1}指標`).toBeCloseTo(want[i], 6);
+        }
+      }
+    }
+  });
 
   /*
    * **母集団を増やしても、増やしたぶんは必ず活きる。**
@@ -430,6 +521,157 @@ describe("プレビューに出す数字が、実際の戦闘の数字と一致�
     const out = planAutoEquip(state, monsterId, settingsFor({ type: "atk" }));
     expect(out.ok).toBe(true);
     if (out.ok) expect(out.plan.before).toEqual(before);
+  });
+});
+
+describe("そろえるシリーズを指定する", () => {
+  /*
+   * ## なぜこの指定が要るのか
+   *
+   * おまかせはステータスの数字で比べる。だが暴走・崩壊・祝福・加護・免疫の
+   * 効果は `CombatModifiers` にしか入らず、**HPにも攻撃にも1も乗らない。**
+   * つまり指定が無ければ、あの5つは**評価が常にゼロ**で一生選ばれない。
+   * ここでは「名指しすれば必ずそろう」ことだけを見る。
+   */
+  function manyItems(perSlot = 40, seed = 11): { state: PlayerState; monsterId: string } {
+    return stateWith(perSlot, seed);
+  }
+
+  const setCountsOf = (state: PlayerState, assignment: Partial<Record<EquipSlot, string>>): Map<string, number> => {
+    const counts = new Map<string, number>();
+    for (const id of Object.values(assignment)) {
+      const item = state.equipment.find((e) => e.id === id);
+      if (item) counts.set(item.set, (counts.get(item.set) ?? 0) + 1);
+    }
+    return counts;
+  };
+
+  it("4セットを名指しすると、必ず4個そろう", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { SWIFT: 4 } }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("SWIFT") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it("2つ同時に名指ししても、両方そろう", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({
+      type: "power", scope: "ALL", wantedSets: { SWIFT: 4, CRIT: 2 },
+    }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    const counts = setCountsOf(state, out.plan.assignment);
+    expect(counts.get("SWIFT") ?? 0).toBeGreaterThanOrEqual(4);
+    expect(counts.get("CRIT") ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  /*
+   * **これが無いと機能そのものが無意味。**暴走はステータスに何も乗せないので、
+   * 指定しなければ総合力狙いで選ばれることはまず無い。
+   */
+  it("ステータスに出ないシリーズ(暴走)も、名指しすればそろう", () => {
+    const { state, monsterId } = manyItems();
+    const free = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL" }));
+    expect(free.ok).toBe(true);
+    if (free.ok) {
+      expect(setCountsOf(state, free.plan.assignment).get("RAMPAGE") ?? 0,
+        "指定しなくても暴走が4つ選ばれるなら、この試験は何も見ていない").toBeLessThan(4);
+    }
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { RAMPAGE: 4 } }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("RAMPAGE") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  /*
+   * 暴走・崩壊・祝福は2個では何も起きない。
+   * 2を渡されたら4へ引き上げる——**黙って無意味な縛りを掛けない。**
+   */
+  it("4個でしか効かないシリーズに2を指定したら、4へ引き上げる", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { RAMPAGE: 2 } }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("RAMPAGE") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  /*
+   * **黙って願いを捨てて「できました」と言わない。**
+   * 最初の版は合計が6を超えると指定を丸ごと捨てており、
+   * 暴走4+崩壊4 が「無指定と同じ結果」を成功として返していた。
+   */
+  it("6枠に入らない指定は、成功させずに断る", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({
+      type: "power", scope: "ALL", wantedSets: { RAMPAGE: 4, COLLAPSE: 4 },
+    }));
+    expect(out.ok, "叶えられない指定を成功にした").toBe(false);
+    if (!out.ok) expect(out.reason).toContain("6枠");
+  });
+
+  it("そろえるだけ持っていないシリーズは断る", () => {
+    const { state, monsterId } = stateWith(4, 71);
+    // 速攻を1個だけ残して、他は全部消す
+    const swift = state.equipment.filter((e) => e.set === "SWIFT");
+    if (swift.length > 1) {
+      const keep = swift[0].id;
+      state.equipment = state.equipment.filter((e) => e.set !== "SWIFT" || e.id === keep);
+    }
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { SWIFT: 4 } }));
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toContain("シリーズ");
+  });
+
+  /*
+   * **詰め直しが約束を崩さないこと。**総合力・カスタムは1枠ずつ
+   * 入れ替えて詰めるので、そこで別シリーズへ替えた方が数字は上がる。
+   * 放っておくと必ずそうなるので、最後に実際の個数を数えて守っている。
+   */
+  it("詰め直しが走る狙い(総合力・カスタム)でも崩れない", () => {
+    const { state, monsterId } = manyItems(30, 29);
+    for (const settings of [
+      settingsFor({ type: "power", scope: "ALL", wantedSets: { CRIT: 4 } }),
+      settingsFor({ type: "custom", priorities: ["spd", "atk"], scope: "ALL", wantedSets: { CRIT: 4 } }),
+      settingsFor({ type: "custom", priorities: ["atk"], minimums: { spd: 100 }, scope: "ALL", wantedSets: { CRIT: 4 } }),
+    ]) {
+      const out = planAutoEquip(state, monsterId, settings);
+      expect(out.ok).toBe(true);
+      if (!out.ok) continue;
+      expect(setCountsOf(state, out.plan.assignment).get("CRIT") ?? 0,
+        `${settings.type} で約束が崩れた`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("固定した部位のシリーズも頭数に入れる", () => {
+    const { state, monsterId } = manyItems();
+    const monster = state.monsters.find((m) => m.id === monsterId)!;
+    // まず速攻4セットを組んで着せる
+    const first = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { SWIFT: 4 } }));
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    applyAutoEquipPlan(state, monsterId, first.plan.assignment);
+
+    // 速攻が乗っている部位を1つ固定して、もう一度同じ指定で探す
+    const swiftSlot = EQUIP_SLOTS.find((slot) => {
+      const id = monster.equipment[slot];
+      return state.equipment.find((e) => e.id === id)?.set === "SWIFT";
+    });
+    expect(swiftSlot).toBeDefined();
+    const out = planAutoEquip(state, monsterId, settingsFor({
+      type: "power", scope: "ALL", wantedSets: { SWIFT: 4 }, fixedSlots: [swiftSlot!],
+    }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("SWIFT") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it("指定しなければ、今までどおり何も縛らない", () => {
+    const { state, monsterId } = manyItems();
+    const a = planAutoEquip(state, monsterId, settingsFor({ type: "atk", scope: "ALL" }));
+    const b = planAutoEquip(state, monsterId, settingsFor({ type: "atk", scope: "ALL", wantedSets: {} }));
+    expect(a.ok && b.ok).toBe(true);
+    if (a.ok && b.ok) expect(b.plan.after.atk).toBe(a.plan.after.atk);
   });
 });
 
