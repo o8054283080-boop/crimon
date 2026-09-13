@@ -1,174 +1,249 @@
 /**
- * 装備ダンジョン終盤(7〜10階)の難易度を、**飽和しない連続値**で測る。
+ * 装備ダンジョンの難易度を、Battle Lab と同じ育成・装備基準で測る。
  *
- * 勝率だけで難易度を見ると、上げすぎた時に全編成が0%へ張り付いて
- * 「9階と10階のどちらが難しいか」すら分からなくなる。
- * 決着時点で敵をどこまで削れたか(残HP割合)は常に0〜1の間に分布するので、
- * 勝率が0でも1でも階層どうしの差が読める。
+ * 味方は全員 `buildAlly()` を通る。これにより★6 Lv60、スキルMAX、能力ポイント100、
+ * タイプ転生、潜在覚醒、GearGrade別の装備が塔の検証と同じ経路で組み上がる。
+ * 旧 `speedGear()` 編成は過去比較用の資料にだけ残し、最終バランス評価には使わない。
  *
- * 攻略の型ごとに測るのは、特定の型(毒重ね・耐久)だけが抜け道になっていないかを
- * 見るため。巨人ダンジョン式の仕掛け(反撃・継続ダメージ耐性・バフ剥がし・回復阻害)は
- * まさにこの2つを潰すために入れてある。
- *
- *   npx tsx tools/dungeonPressure.ts
+ *   node --import tsx tools/dungeonPressure.ts --gear STRONG 10 11 12
  */
 import { BattleEngine } from "../src/battle/engine.js";
-import { MonsterDefinition } from "../src/core/monster.js";
-import { EQUIP_SLOTS, Equipment, generateEquipment } from "../src/core/equipment.js";
-import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { EQUIPMENT_DUNGEON_FLOORS, EquipmentDungeonKind, findDungeonFloor } from "../src/data/equipmentDungeon.js";
-import { setupDungeonBattle } from "../src/game/dungeonRunner.js";
-import { addEquipment, createInitialState, equipToMonster } from "../src/game/playerState.js";
+import type { MonsterDefinition } from "../src/core/monster.js";
+import type { Stats } from "../src/core/stats.js";
+import { EQUIPMENT_DUNGEON_FLOORS, type EquipmentDungeonKind, findDungeonFloor } from "../src/data/equipmentDungeon.js";
+import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
+import { buildAlly } from "./battleLab/build.js";
+import { mulberry32 } from "./battleLab/rng.js";
+import type { AllySpec, GearGrade } from "./battleLab/types.js";
 
-function mulberry32(seed: number): () => number {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+export interface PressureTeam {
+  allies: AllySpec[];
+  purpose: string;
+  /** 毒詳細で死亡時点を追う役。ラベルは allies の label と一致させる。 */
+  healerLabels?: string[];
+  poisonCarryLabels?: string[];
 }
 
-/**
- * 速度に寄せた副効果の装備を選び直す(実際のプレイヤーがやる装備の詰め方の再現)。
- * ランダムに生成した装備をそのまま着けるだけだと、速度を詰めた編成の強さを過小評価する。
- */
-function speedGear(rng: () => number): Equipment[] {
-  const best: Record<number, { eq: Equipment; spd: number }> = {};
-  for (let r = 0; r < 40; r++) {
-    for (const slot of EQUIP_SLOTS) {
-      const eq = generateEquipment({ slot, star: 6, subStatCount: 4, rng });
-      const spd = [eq.mainStat, ...eq.subStats].reduce((s, x) => s + (x.type === "SPD" ? x.value : 0), 0);
-      if (!best[slot] || spd > best[slot].spd) best[slot] = { eq, spd };
-    }
-  }
-  return Object.values(best).map((b) => b.eq);
-}
+const ally = (label: string, templateId: string, element: AllySpec["element"], preset: NonNullable<AllySpec["preset"]>): AllySpec => ({
+  label, templateId, element, preset,
+});
 
-const TEAMS: Record<string, { ids: string[]; tuned: boolean }> = {
-  "高レア(速度詰め)": { ids: ["griffon_GRASS", "dragon_FIRE", "seraph_WATER", "nemesis_ELECTRIC", "griffon_WATER"], tuned: true },
-  "高レア(素装備)": { ids: ["griffon_GRASS", "dragon_FIRE", "seraph_WATER", "nemesis_ELECTRIC", "griffon_WATER"], tuned: false },
-  // 通常モンスターだけで役割を分けて組み、速度も詰めた「本気の通常編成」。
-  // docs/design-concept.md の「ふつうのモンスターでも努力で強くなれる」を守れているかは、
-  // 極端な毒重ね・耐久ではなくこの編成で見る
-  "通常バランス(速度詰め)": { ids: ["knight_WATER", "wolf_GRASS", "imp_ELECTRIC", "fairy_WATER", "wisp_GRASS"], tuned: true },
-  // **毒を持っているのは属性違いのごく一部だけ。** ここを適当に選ぶと、
-  // 毒を一度も撒けない編成で「毒は通用しない」という嘘の結論が出る(実際に出した)
-  "毒重ね": { ids: ["slime_GRASS", "slime_DARK", "wolf_DARK", "wolf_ELECTRIC", "imp_DARK"], tuned: true },
-  "耐久": { ids: ["golem_LIGHT", "treant_LIGHT", "fairy_DARK", "wisp_DARK", "knight_LIGHT"], tuned: false },
+/** 本編の実スキルとBattle Labプリセットから組む、最終評価用の実戦編成。 */
+export const PVE_DUNGEON_TEAMS: Record<string, PressureTeam> = {
+  "実戦通常": {
+    purpose: "通常モンスター中心。主力、サブ火力、妨害、回復、支援を1枠ずつ置く",
+    allies: [
+      ally("主力・草ウルフ", "wolf", "GRASS", "MAX_ATTACKER"),
+      ally("サブ・水ナイト", "knight", "WATER", "MAX_ATTACKER"),
+      ally("妨害・電気インプ", "imp", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("回復・水フェアリー", "fairy", "WATER", "MAX_HEALER"),
+      ally("支援・草ウィスプ", "wisp", "GRASS", "MAX_SUPPORT"),
+    ],
+    healerLabels: ["回復・水フェアリー"],
+  },
+  "実戦毒": {
+    purpose: "毒2体、毒と防御低下を補う1体、ヒーラー、タンクでボスを削る",
+    allies: [
+      // 火マッシュルンはS1毒、S2毒2スタック、S3毒床を実際に持つ。
+      ally("毒主力・火マッシュルン", "mushroon", "FIRE", "MAX_DEBUFFER"),
+      // 草スコーピオンは会心時S1毒に加え、S2防御低下とS3毒殺を持つ。
+      ally("毒火力・草スコーピオン", "scorpion", "GRASS", "MAX_ATTACKER"),
+      // 電気フェンリルは防御低下、回復阻害、2スタック毒で補助する。
+      ally("毒補助・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER"),
+      ally("防護・光ゴーレム", "golem", "LIGHT", "MAX_TANK"),
+    ],
+    healerLabels: ["回復・水フェニックス"],
+    poisonCarryLabels: ["毒主力・火マッシュルン", "毒火力・草スコーピオン"],
+  },
+  "実戦耐久": {
+    purpose: "削り役を残し、二重防護と回復で長期戦を成立させる",
+    allies: [
+      ally("削り・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"),
+      ally("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER"),
+      ally("支援・水ウィスプ", "wisp", "WATER", "MAX_SUPPORT"),
+      ally("防護・光ゴーレム", "golem", "LIGHT", "MAX_TANK"),
+      ally("防護・光トレント", "treant", "LIGHT", "MAX_TANK"),
+    ],
+    healerLabels: ["回復・水フェニックス"],
+  },
+  "高レア": {
+    purpose: "高レアの主力2体、妨害、回復、攻撃支援で組む",
+    allies: [
+      ally("主力・草グリフォン", "griffon", "GRASS", "MAX_ATTACKER"),
+      ally("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"),
+      ally("妨害・電気ネメシス", "nemesis", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("回復・水セラフ", "seraph", "WATER", "MAX_HEALER"),
+      ally("支援・火ヴァルキリア", "valkyria", "FIRE", "MAX_SUPPORT"),
+    ],
+    healerLabels: ["回復・水セラフ"],
+  },
+  "防御無視": {
+    purpose: "完全防御無視を持つ闇ドラゴンと火ウルフの相対価値を確認する",
+    allies: [
+      ally("防御無視・闇ドラゴン", "dragon", "DARK", "MAX_ATTACKER"),
+      ally("防御無視・火ウルフ", "wolf", "FIRE", "MAX_ATTACKER"),
+      ally("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER"),
+      ally("支援・火ヴァルキリア", "valkyria", "FIRE", "MAX_SUPPORT"),
+      ally("防護・光ゴーレム", "golem", "LIGHT", "MAX_TANK"),
+    ],
+    healerLabels: ["回復・水フェニックス"],
+  },
+  "旧毒圧力": {
+    purpose: "毒発動だけを見る旧スライム2・ウルフ2・インプ1。最終評価には使わない",
+    allies: [
+      ally("草スライム", "slime", "GRASS", "MAX_DEBUFFER"),
+      ally("闇スライム", "slime", "DARK", "MAX_DEBUFFER"),
+      ally("闇ウルフ", "wolf", "DARK", "MAX_DEBUFFER"),
+      ally("電気ウルフ", "wolf", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("闇インプ", "imp", "DARK", "MAX_DEBUFFER"),
+    ],
+    poisonCarryLabels: ["草スライム", "闇スライム", "闇ウルフ", "電気ウルフ", "闇インプ"],
+  },
 };
 
 export interface PressureResult {
-  /** 勝率。上げすぎると0へ張り付くので、単体では難易度の指標にしない */
   rate: number;
-  /** 決着時点で敵に残っているHPの割合(0=完全に削り切った、1=まったく削れていない) */
   enemyHpLeft: number;
-  /** 決着までの行動数の中央値 */
   actions: number;
-  /** 戦闘中に敵へ乗った毒スタックの最大値。毒編成でこれが0なら測定が成立していない */
-  maxPoisonOnEnemy: number;
-  /** 決着までの行動数の平均。中央値と離れていれば、決着の付き方が二極化している */
   actionsMean: number;
-  /** 決着時点で味方に残っているHPの割合。**勝率が100%でも、ここが薄ければ余裕は無い** */
   allyHpLeft: number;
-  /** 全滅した割合(敗因のうち「削り切られた」ぶん) */
   wipeRate: number;
-  /** 時間切れになった割合。勝率が落ちた時、削り負けと時間切れを分けて読む */
   timeoutRate: number;
+  maxPoisonOnEnemy: number;
+  /** 全戦闘・全敵・全スナップショットでの毒スタック平均。 */
+  avgPoisonOnEnemy: number;
+  poisonAppliedRate: number;
+  poisonDamageShare: number;
+  /** 死亡した戦闘だけで平均した手数。死亡しなければnull。 */
+  healerDeathAction: number | null;
+  healerDeathRate: number;
+  poisonCarryDeathAction: number | null;
+  poisonCarryDeathRate: number;
 }
 
-/**
- * 測る階。**魔人と魔獣は別の配列**なので、番号だけでは決まらない。
- * 既定を "DEMON" にしてあるのは、呼び出し側(既存の実行部)を変えないため。
- */
+function deathAction(result: ReturnType<BattleEngine["run"]>, labels: readonly string[]): number | null {
+  if (labels.length === 0) return null;
+  for (let i = 0; i < result.turns.length; i += 1) {
+    const tracked = result.turns[i].snapshot.filter((u) => labels.includes(u.name));
+    if (tracked.length > 0 && tracked.some((u) => !u.alive)) return i + 1;
+  }
+  return null;
+}
+
 export function measurePressure(
-  ids: string[],
+  team: PressureTeam,
   floorNum: number,
-  tuned: boolean,
+  gear: GearGrade,
   trials = 50,
   kind: EquipmentDungeonKind = "DEMON",
   seedBase = 900,
-  /**
-   * 敵の定義をここで差し替えられる。**ボスのDEFを振って逆算する**ために置いた。
-   * 渡さなければ本編のデータそのまま(既存の呼び出しは1つも変わらない)。
-   */
   patchEnemies?: (defs: MonsterDefinition[]) => MonsterDefinition[],
 ): PressureResult {
   const floor = findDungeonFloor(floorNum, kind);
   if (!floor) throw new Error(`${kind} の ${floorNum}階が見つからない`);
-  let wins = 0;
-  let hpLeftSum = 0;
-  let maxPoisonOnEnemy = 0;
-  let allyHpSum = 0;
-  let wipes = 0;
-  let timeouts = 0;
+  let wins = 0, hpLeftSum = 0, allyHpSum = 0, wipes = 0, timeouts = 0;
+  let maxPoisonOnEnemy = 0, poisonStackSum = 0, poisonSnapshotCount = 0, poisonBattles = 0;
+  let poisonDamage = 0, totalEnemyDamage = 0;
+  let healerDeathSum = 0, healerDeaths = 0, poisonDeathSum = 0, poisonDeaths = 0;
   const actions: number[] = [];
-  for (let i = 0; i < trials; i++) {
+
+  for (let i = 0; i < trials; i += 1) {
     const rng = mulberry32(seedBase + i);
-    const state = createInitialState();
-    const party = ids.map((id) => createMonsterInstance(id, 6, 60));
-    state.monsters = party;
-    for (const m of party) {
-      const gear = tuned ? speedGear(rng) : EQUIP_SLOTS.map((slot) => generateEquipment({ slot, star: 6, subStatCount: 4, rng }));
-      for (const eq of gear) {
-        addEquipment(state, eq);
-        equipToMonster(state, m.id, eq.id);
-      }
-    }
-    const setup = setupDungeonBattle(party, floor, state.equipment);
-    const enemyDefs = patchEnemies ? patchEnemies(setup.enemyDefs) : setup.enemyDefs;
-    const result = new BattleEngine(setup.playerDefs, enemyDefs, { rng }).run();
+    const players = team.allies.map((spec) => buildAlly(spec, rng, gear));
+    const baseEnemies = buildDungeonEnemyTeam(floor);
+    const enemies = patchEnemies ? patchEnemies(baseEnemies) : baseEnemies;
+    const engine = new BattleEngine(players, enemies, { rng, maxTurns: 300 });
+    const enemyIds = new Set(engine.getUnits().filter((u) => u.team === "ENEMY").map((u) => u.instanceId));
+    const result = engine.run();
     if (result.winner === "PLAYER") wins += 1;
     actions.push(result.turnsTaken);
+
+    let battleHadPoison = false;
     for (const turn of result.turns) {
       for (const u of turn.snapshot) {
-        if (u.team === "ENEMY") maxPoisonOnEnemy = Math.max(maxPoisonOnEnemy, u.poisonStacks);
+        if (u.team !== "ENEMY") continue;
+        maxPoisonOnEnemy = Math.max(maxPoisonOnEnemy, u.poisonStacks);
+        poisonStackSum += u.poisonStacks;
+        poisonSnapshotCount += 1;
+        if (u.poisonStacks > 0) battleHadPoison = true;
+      }
+      for (const event of turn.events) {
+        if (event.kind === "DAMAGE" && enemyIds.has(event.targetId)) totalEnemyDamage += event.amount ?? 0;
+      }
+      for (const line of turn.lines) {
+        const match = line.match(/毒\(\d+スタック\)でダメージを受けた！\s*([\d,]+)/);
+        if (match) poisonDamage += Number(match[1].replaceAll(",", ""));
       }
     }
+    if (battleHadPoison) poisonBattles += 1;
+
+    const healerDeath = deathAction(result, team.healerLabels ?? []);
+    if (healerDeath !== null) { healerDeathSum += healerDeath; healerDeaths += 1; }
+    const poisonCarryDeath = deathAction(result, team.poisonCarryLabels ?? []);
+    if (poisonCarryDeath !== null) { poisonDeathSum += poisonCarryDeath; poisonDeaths += 1; }
+
     const last = result.turns[result.turns.length - 1];
-    const enemies = last ? last.snapshot.filter((u) => u.team === "ENEMY") : [];
-    const maxHp = enemies.reduce((s, u) => s + u.maxHp, 0);
-    hpLeftSum += maxHp > 0 ? enemies.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / maxHp : 0;
-    const allies = last ? last.snapshot.filter((u) => u.team === "PLAYER") : [];
-    const allyMax = allies.reduce((s, u) => s + u.maxHp, 0);
-    allyHpSum += allyMax > 0 ? allies.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / allyMax : 0;
-    if (allies.length > 0 && allies.every((u) => !u.alive)) wipes += 1;
-    if (result.winner !== "PLAYER" && allies.some((u) => u.alive)) timeouts += 1;
+    const enemiesAtEnd = last ? last.snapshot.filter((u) => u.team === "ENEMY") : [];
+    const enemyMax = enemiesAtEnd.reduce((s, u) => s + u.maxHp, 0);
+    hpLeftSum += enemyMax > 0 ? enemiesAtEnd.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / enemyMax : 0;
+    const alliesAtEnd = last ? last.snapshot.filter((u) => u.team === "PLAYER") : [];
+    const allyMax = alliesAtEnd.reduce((s, u) => s + u.maxHp, 0);
+    allyHpSum += allyMax > 0 ? alliesAtEnd.reduce((s, u) => s + Math.max(0, u.currentHp), 0) / allyMax : 0;
+    if (alliesAtEnd.length > 0 && alliesAtEnd.every((u) => !u.alive)) wipes += 1;
+    else if (result.winner !== "PLAYER") timeouts += 1;
   }
+
   actions.sort((a, b) => a - b);
   return {
     rate: wins / trials,
     enemyHpLeft: hpLeftSum / trials,
     actions: actions[Math.floor(trials / 2)],
-    maxPoisonOnEnemy,
     actionsMean: actions.reduce((a, b) => a + b, 0) / trials,
     allyHpLeft: allyHpSum / trials,
     wipeRate: wipes / trials,
     timeoutRate: timeouts / trials,
+    maxPoisonOnEnemy,
+    avgPoisonOnEnemy: poisonSnapshotCount > 0 ? poisonStackSum / poisonSnapshotCount : 0,
+    poisonAppliedRate: poisonBattles / trials,
+    poisonDamageShare: totalEnemyDamage > 0 ? poisonDamage / totalEnemyDamage : 0,
+    healerDeathAction: healerDeaths > 0 ? healerDeathSum / healerDeaths : null,
+    healerDeathRate: healerDeaths / trials,
+    poisonCarryDeathAction: poisonDeaths > 0 ? poisonDeathSum / poisonDeaths : null,
+    poisonCarryDeathRate: poisonDeaths / trials,
   };
 }
 
+export interface TeamStatSummary {
+  label: string;
+  stats: Stats;
+}
+
+/** GearGradeに乱数幅があるため、最終ステータスは同じseed群の平均を返す。 */
+export function summarizeTeamStats(team: PressureTeam, gear: GearGrade, trials = 200, seedBase = 20260913): TeamStatSummary[] {
+  const sums = team.allies.map(() => ({ hp: 0, atk: 0, def: 0, spd: 0, criRate: 0, criDmg: 0, resistance: 0, accuracy: 0 }));
+  for (let i = 0; i < trials; i += 1) {
+    const rng = mulberry32(seedBase + i);
+    team.allies.map((spec) => buildAlly(spec, rng, gear)).forEach((def, index) => {
+      for (const key of Object.keys(sums[index]) as (keyof Stats)[]) sums[index][key] += def.stats[key];
+    });
+  }
+  return sums.map((sum, index) => ({
+    label: team.allies[index].label ?? `${team.allies[index].templateId}[${team.allies[index].element}]`,
+    stats: Object.fromEntries(Object.entries(sum).map(([key, value]) => [key, value / trials])) as unknown as Stats,
+  }));
+}
+
 if (process.argv[1]?.endsWith("dungeonPressure.ts")) {
-  const floors = process.argv.slice(2).map(Number).filter((n) => Number.isFinite(n));
+  const argv = process.argv.slice(2);
+  const gearIndex = argv.indexOf("--gear");
+  const gear = (gearIndex >= 0 ? argv[gearIndex + 1] : "STRONG") as GearGrade;
+  const floors = argv.filter((value, index) => index !== gearIndex && index !== gearIndex + 1).map(Number).filter(Number.isFinite);
   for (const f of floors.length > 0 ? floors : [7, 8, 9, 10]) {
-    console.log(`\n=== ${f}階 (powerScale ${EQUIPMENT_DUNGEON_FLOORS[f - 1].powerScale.toFixed(3)}) ===`);
-    console.log("編成".padEnd(18) + "勝率".padStart(8) + "敵残HP".padStart(10) + "行動".padStart(7) + "最大毒".padStart(8));
-    for (const [name, team] of Object.entries(TEAMS)) {
-      const r = measurePressure(team.ids, f, team.tuned);
-      console.log(
-        name.padEnd(18) +
-          `${(r.rate * 100).toFixed(0)}%`.padStart(8) +
-          `${(r.enemyHpLeft * 100).toFixed(1)}%`.padStart(10) +
-          String(r.actions).padStart(7) +
-          String(r.maxPoisonOnEnemy).padStart(8),
-      );
-      // 毒編成が一度も毒を撒けていなければ、その行の勝率は難易度ではなく編成ミスを測っている。
-      // 毒を持つのは属性違いのごく一部だけなので、黙って0%が並ぶと本当に見落とす
-      if (name.includes("毒") && r.maxPoisonOnEnemy === 0) {
-        console.log("  ⚠ 毒編成が一度も毒を入れていない。この行の数字は難易度ではなく編成ミスを測っている");
-      }
+    console.log(`\n=== ${f}階 (powerScale ${EQUIPMENT_DUNGEON_FLOORS[f - 1].powerScale.toFixed(3)} / ${gear}) ===`);
+    for (const [name, team] of Object.entries(PVE_DUNGEON_TEAMS)) {
+      const r = measurePressure(team, f, gear);
+      console.log(`${name}: 勝率${(r.rate * 100).toFixed(0)}% 敵残${(r.enemyHpLeft * 100).toFixed(1)}% 手数${r.actions} 最大毒${r.maxPoisonOnEnemy}`);
     }
   }
 }

@@ -35,7 +35,13 @@ import { mulberry32 } from "./battleLab/rng.js";
 import { runMany } from "./battleLab/run.js";
 import { findScenario } from "./battleLab/scenarios/index.js";
 import type { GearGrade } from "./battleLab/types.js";
-import { measurePressure } from "./dungeonPressure.js";
+import {
+  PVE_DUNGEON_TEAMS,
+  measurePressure,
+  summarizeTeamStats,
+  type PressureResult,
+  type PressureTeam,
+} from "./dungeonPressure.js";
 
 const argv = process.argv.slice(2);
 const arg = (name: string, fallback: string): string => {
@@ -209,39 +215,60 @@ function runTower(runs: number): void {
 
 // ─────────────────────── 魔人・魔獣のダンジョン ───────────────────────
 
-/** dungeonPressure の攻略編成をそのまま使う(魔人専用だったので kind を渡せるよう拡張済み) */
-const DUNGEON_TEAMS: Record<string, { ids: string[]; tuned: boolean }> = {
-  "高レア(速度詰め)": { ids: ["griffon_GRASS", "dragon_FIRE", "seraph_WATER", "nemesis_ELECTRIC", "griffon_WATER"], tuned: true },
-  "通常バランス(速度詰め)": { ids: ["knight_WATER", "wolf_GRASS", "imp_ELECTRIC", "fairy_WATER", "wisp_GRASS"], tuned: true },
-  "毒重ね": { ids: ["slime_GRASS", "slime_DARK", "wolf_DARK", "wolf_ELECTRIC", "imp_DARK"], tuned: true },
-  "耐久": { ids: ["golem_LIGHT", "treant_LIGHT", "fairy_DARK", "wisp_DARK", "knight_LIGHT"], tuned: false },
-  // 完全防御無視を持つ闇ドラゴンと、防御無視を持つウルフを同居させた確認枠
-  "防御無視": { ids: ["dragon_DARK", "wolf_FIRE", "griffon_GRASS", "fairy_WATER", "wisp_GRASS"], tuned: true },
-};
-
 function dungeonRow(
-  ids: string[], floor: number, tuned: boolean, kind: "DEMON" | "BEAST", runs: number,
+  team: PressureTeam, floor: number, kind: "DEMON" | "BEAST", runs: number,
   patchEnemies?: (defs: MonsterDefinition[]) => MonsterDefinition[],
-): Row {
-  const r = measurePressure(ids, floor, tuned, runs, kind, 20260913, patchEnemies);
+): Row & { pressure: PressureResult } {
+  const r = measurePressure(team, floor, GEAR, runs, kind, 20260913, patchEnemies);
   return {
     win: r.rate, enemyLeft: r.enemyHpLeft, allyLeft: r.allyHpLeft,
     turnsMedian: r.actions, turnsMean: r.actionsMean, wipe: r.wipeRate, timeout: r.timeoutRate,
+    pressure: r,
   };
 }
 
+function printPoisonRows(rows: Record<string, Row & { pressure: PressureResult }>): void {
+  for (const cond of CONDITIONS) {
+    const r = rows[cond.key]?.pressure;
+    if (!r) continue;
+    const death = (action: number | null, rate: number) =>
+      action === null ? "なし" : `${action.toFixed(0)}手(${pct(rate)})`;
+    console.log(
+      `    毒詳細 ${cond.key}: 最大${r.maxPoisonOnEnemy} 平均${r.avgPoisonOnEnemy.toFixed(2)} ` +
+      `付与戦${pct(r.poisonAppliedRate)} 毒ダメ比${pct1(r.poisonDamageShare)} ` +
+      `回復役死亡${death(r.healerDeathAction, r.healerDeathRate)} ` +
+      `毒主力死亡${death(r.poisonCarryDeathAction, r.poisonCarryDeathRate)}`,
+    );
+  }
+}
+
 function runDungeon(kind: "DEMON" | "BEAST", runs: number): void {
-  printHeader(`${kind === "DEMON" ? "魔人" : "魔獣"}のダンジョン / ${runs}戦・★6Lv60+★6装備`);
+  printHeader(`${kind === "DEMON" ? "魔人" : "魔獣"}のダンジョン / ${runs}戦・BattleLab装備${GEAR}`);
   for (const floor of [10, 11, 12].filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value))) {
     console.log(`  ── ${floor}階 ──`);
-    for (const [name, team] of Object.entries(DUNGEON_TEAMS)) {
+    for (const [name, team] of Object.entries(PVE_DUNGEON_TEAMS)) {
       if (TEAM_FILTER && name !== TEAM_FILTER) continue;
-      printRows(name, underEachCondition((scale) => dungeonRow(
-        team.ids, floor, team.tuned, kind, runs,
+      const rows = underEachCondition((scale) => dungeonRow(
+        team, floor, kind, runs,
         scale === IDENTITY_SCALE ? undefined : (defs) => patchEnemyDefs(defs, scale),
-      )));
+      ));
+      printRows(name, rows);
+      if (name.includes("毒")) printPoisonRows(rows);
       console.log("");
     }
+  }
+}
+
+function printDungeonTeamStats(runs: number): void {
+  printHeader(`実戦毒編成の最終ステータス / 装備${GEAR}・同一seed群${runs}個体の平均`);
+  for (const row of summarizeTeamStats(PVE_DUNGEON_TEAMS["実戦毒"], GEAR, runs, 20260913)) {
+    const s = row.stats;
+    console.log(
+      `  ${row.label.padEnd(18)} HP${s.hp.toFixed(0).padStart(7)} ATK${s.atk.toFixed(0).padStart(5)} ` +
+      `DEF${s.def.toFixed(0).padStart(5)} SPD${s.spd.toFixed(0).padStart(4)} ` +
+      `CR${pct(s.criRate).padStart(4)} CD${pct(s.criDmg).padStart(5)} ` +
+      `的中${pct(s.accuracy).padStart(4)} 抵抗${pct(s.resistance).padStart(4)}`,
+    );
   }
 }
 
@@ -338,11 +365,11 @@ function distance(base: Row, next: Row): number {
 
 function runRedesignScan(runs: number): void {
   printHeader(`PvE再設計倍率の粗いスキャン / 代表4対象・各${runs}戦`);
-  const normal = DUNGEON_TEAMS["通常バランス(速度詰め)"];
+  const normal = PVE_DUNGEON_TEAMS["実戦通常"];
   const spread = AWAKENING_TEAMS["分散型"];
   setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false, swRatio: 1.2 });
   const bases = {
-    demon10: dungeonRow(normal.ids, 10, normal.tuned, "DEMON", runs),
+    demon10: dungeonRow(normal, 10, "DEMON", runs),
     tower60: towerRow("tower-f60", runs),
     tower90: towerRow("tower-f90", runs),
     awakening10: awakeningRow(spread, 10, runs),
@@ -355,7 +382,7 @@ function runRedesignScan(runs: number): void {
         const scale = { hp, def, atk };
         const patch = (defs: MonsterDefinition[]) => patchEnemyDefs(defs, scale);
         const rows = {
-          demon10: dungeonRow(normal.ids, 10, normal.tuned, "DEMON", runs, patch),
+          demon10: dungeonRow(normal, 10, "DEMON", runs, patch),
           tower60: towerRow("tower-f60", runs, scale),
           tower90: towerRow("tower-f90", runs, scale),
           awakening10: awakeningRow(spread, 10, runs, scale),
@@ -393,9 +420,9 @@ function runRedesignScan(runs: number): void {
  * 敵残HPと手数も一緒に見て、旧式にいちばん近い点を選ぶ。
  */
 function scanBossDef(kind: "DEMON" | "BEAST", floor: number, runs: number): void {
-  const team = DUNGEON_TEAMS["通常バランス(速度詰め)"];
+  const team = PVE_DUNGEON_TEAMS["実戦通常"];
   setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false });
-  const base = dungeonRow(team.ids, floor, team.tuned, kind, runs);
+  const base = dungeonRow(team, floor, kind, runs);
   const def0 = buildDungeonEnemyTeam(findDungeonFloor(floor, kind)!)[0].stats.def;
   console.log(`\n  ${kind === "DEMON" ? "魔人" : "魔獣"}${floor}階 (現在のボスDEF ${def0.toLocaleString()})`);
   console.log(`    旧式(基準)            勝率${pct(base.win).padStart(5)}  敵残${pct1(base.enemyLeft).padStart(6)}  手数${String(base.turnsMedian).padStart(4)}`);
@@ -403,7 +430,7 @@ function scanBossDef(kind: "DEMON" | "BEAST", floor: number, runs: number): void
   for (const scale of [1, 0.75, 0.5, 0.35, 0.25, 0.15]) {
     // **敵全員のDEFを同じ割合で下げる。**ボスだけ下げるとお供が相対的に硬くなり、
     // 「どこを削れば勝てるか」の順番が変わってしまう
-    const r = dungeonRow(team.ids, floor, team.tuned, kind, runs, (defs) =>
+    const r = dungeonRow(team, floor, kind, runs, (defs) =>
       defs.map((d) => ({ ...d, stats: { ...d.stats, def: Math.round(d.stats.def * scale) } })));
     const near = Math.abs(r.win - base.win) <= 0.05 ? " ← 旧式に近い" : "";
     console.log(`    新式 DEF×${(scale * 100).toFixed(0).padStart(3)}% (ボス${String(Math.round(def0 * scale)).padStart(5)})  勝率${pct(r.win).padStart(5)}  敵残${pct1(r.enemyLeft).padStart(6)}  手数${String(r.turnsMedian).padStart(4)}${near}`);
@@ -414,12 +441,14 @@ function scanBossDef(kind: "DEMON" | "BEAST", floor: number, runs: number): void
 // ───────────────────────────── 実行 ─────────────────────────────
 
 console.log(`防御計算の検証 / ${RUNS}戦 / 装備${GEAR}`);
-console.log(`旧式 = 方式E / 新式 = 1000/(1000+1.2*DEF) / 再設計 = 敵HP×${REQUESTED_SCALE.hp}, DEF×${REQUESTED_SCALE.def}, ATK×${REQUESTED_SCALE.atk}`);
+const scaleSummary = CONDITIONS.slice(2).map((condition) => `${condition.key}=敵HP×${condition.scale.hp}, DEF×${condition.scale.def}, ATK×${condition.scale.atk}`).join(" / ");
+console.log(`旧式 = 方式E / 新式 = 1000/(1000+1.2*DEF) / ${scaleSummary}`);
 console.log(`検証開始時のフラグ: ${JSON.stringify(balanceFlags)}`);
 
 if (ONLY === "all" || ONLY === "tower") runTower(RUNS);
 if (ONLY === "all" || ONLY === "demon") runDungeon("DEMON", RUNS);
 if (ONLY === "all" || ONLY === "beast") runDungeon("BEAST", RUNS);
+if (ONLY === "all" || ONLY === "demon") printDungeonTeamStats(RUNS);
 if (ONLY === "all" || ONLY === "awakening") runAwakening(RUNS);
 if (DEF_SCAN) {
   printHeader("ボスDEFの逆算(新式のまま、旧式の難易度へ戻すには)");
