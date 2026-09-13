@@ -7,7 +7,7 @@
  *   node --import tsx tools/playerDefenseRoleHpAudit.ts --runs 200
  */
 import { setBalanceFlags } from "../src/battle/balanceFlags.js";
-import { applyDefenseE, calculateBaseDamage, roundNormalDamage } from "../src/battle/damageFormula.js";
+import { applyDefense, calculateBaseDamage, roundNormalDamage } from "../src/battle/damageFormula.js";
 import type { Element } from "../src/core/element.js";
 import { ELEMENT_JA } from "../src/core/element.js";
 import type { StatType } from "../src/core/equipment.js";
@@ -175,7 +175,7 @@ function title(value: string): void { console.log(`\n## ${value}\n`); }
 function ehp(hp: number, def: number): number { return hp * (1000 + 1.2 * Math.max(0, def)) / 1000; }
 function damage(atk: number, criDmg: number, def: number, multiplier: number): number {
   const raw = calculateBaseDamage(atk, multiplier) * criDmg;
-  return roundNormalDamage(applyDefenseE(raw, atk, def).afterDefense);
+  return roundNormalDamage(applyDefense(raw, atk, def).afterDefense);
 }
 function shots(hp: number, hit: number): number { return Math.max(1, Math.ceil(hp / Math.max(1, hit))); }
 

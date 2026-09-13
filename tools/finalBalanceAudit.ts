@@ -18,7 +18,7 @@
  */
 import { balanceFlags, resetBalanceFlags, setBalanceFlags } from "../src/core/balanceFlags.js";
 import { FINAL_CANDIDATE } from "./finalCandidate.js";
-import { applyDefenseE } from "../src/battle/damageFormula.js";
+import { applyDefense } from "../src/battle/damageFormula.js";
 import { MONSTER_DEX } from "../src/data/monsters.js";
 import { buildAlly } from "./battleLab/build.js";
 import { mulberry32 } from "./battleLab/rng.js";
@@ -62,7 +62,7 @@ function defSpec(m: DexEntry): AllySpec {
 /** 1発あたりに通る割合。DEFに倍率を掛けてから測る(防御低下・上昇の再現) */
 function through(def: number, defScale: number, attackerAtk = 10_000): number {
   const base = 100_000;
-  return applyDefenseE(base, attackerAtk, def * defScale).afterDefense / base;
+  return applyDefense(base, attackerAtk, def * defScale).afterDefense / base;
 }
 
 /** 同じ seed 群で何度も組み、HPとDEFの平均を取る(装備の引きを均す) */
@@ -204,7 +204,7 @@ for (const [label, mult] of SKILL_MULTIPLIERS) {
 /** 火ドラゴンから相手へ当てたときの、防御を通した後のダメージと耐発数 */
 function hits(targetHp: number, targetDef: number, mult: number, defScale: number, crit: boolean): { dmg: number; count: number } {
   const raw = dragon.atk * mult * (crit ? dragon.criDmg : 1);
-  const dmg = applyDefenseE(raw, dragon.atk, targetDef * defScale).afterDefense;
+  const dmg = applyDefense(raw, dragon.atk, targetDef * defScale).afterDefense;
   return { dmg, count: dmg > 0 ? targetHp / dmg : Infinity };
 }
 

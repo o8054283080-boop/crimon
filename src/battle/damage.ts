@@ -10,7 +10,7 @@ import {
   passiveEffectOf,
   passiveHpDamageBonus,
 } from "./unit.js";
-import { applyDefenseE, calculateBaseDamage, roundNormalDamage } from "./damageFormula.js";
+import { applyDefense, calculateBaseDamage, roundNormalDamage } from "./damageFormula.js";
 
 /**
  * 相手や自分の**今の状態だけ**で決まる条件を判定する。
@@ -43,16 +43,17 @@ export function evaluateTargetCondition(condition: EffectCondition, source: Batt
 }
 
 /**
- * 防御力による軽減は、**攻める側の攻撃力との比**で決める。
+ * 防御力による軽減は `1000 / (1000 + 1.2 × DEF)`。**攻撃力は見ない。**
  *
- * 以前は `防御 ÷ (防御 + 300)` という固定の定数だった。この300は序盤の防御力
- * (100〜200)に合わせた値で、終盤の防御3500では92%を弾いてしまい、
- * 補正のない技が相手のHPを1%も削れなくなっていた。
- * 定数を終盤に合わせ直すと、今度は序盤の防御力がほぼ無意味になる。
+ * 以前は攻める側の攻撃力との比で決めていた(方式E)。段階に依存しない良さがあった反面、
+ * **攻撃を積めばどんな防御も抜けてしまう**ので、HPを積むほうが常に得という形になっていた。
+ * 依頼主とChatGPTの相談で、HPと防御が釣り合うようサマナーズウォー寄りの式へ入れ替えた。
  *
- * 攻撃力との比なら段階に依存しない。攻撃と防御が釣り合っていれば常に50%軽減で、
- * 序盤の防御役も終盤の防御役も同じ意味を持つ。攻撃を積めば相手の防御を抜け、
- * 防御を積めば硬くなる、という関係が全編で成り立つ。
+ * いまの式では軽減率がDEFの値だけで確定する。攻撃側にできるのは
+ * **防御無視と防御低下**で、そこが編成の分かれ目になる。
+ *
+ * 式そのものは `damageFormula.ts`。旧式に戻して比べる道は
+ * `balanceFlags.defenseFormula = "legacy"` に残してある。
  */
 export interface DamageResult {
   damage: number;
@@ -169,7 +170,7 @@ export function calcDamage(
     * (1 + finalBonus);
   const hits = Math.max(1, Math.floor(effect.hits ?? 1));
   // 割合軽減は線形なのでhitごとの結果と同じ。固定軽減だけは解決全体で算出し均等配賦する。
-  const resolutionDefense = applyDefenseE(perHitBase * hits, atk, def, effect.ignoreDefense);
+  const resolutionDefense = applyDefense(perHitBase * hits, atk, def, effect.ignoreDefense);
   const afterDefense = resolutionDefense.afterDefense / hits;
 
   const affinity = getElementAffinity(attacker.def.element, defender.def.element);

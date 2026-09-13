@@ -5,6 +5,15 @@ import { MonsterDefinition } from "../src/core/monster.js";
 import { Skill } from "../src/core/skill.js";
 import { findMonster } from "../src/data/monsters.js";
 
+/**
+ * **攻める側は火のウルフ、受ける側は電気のゴーレムで揃えてある。火→電気は等倍。**
+ *
+ * 以前は受ける側が水で、火→水の**不利**だった。属性がクリ率とかすりで効くようになってからは、
+ * 不利属性だと50%でかすって**クリティカルにならず、弱体も入らない**ので、
+ * ここで見たい仕組み(クリダメバフ・暗闇・免疫など)が乱数任せで通ったり落ちたりする。
+ * 属性の話をしていないテストでは、必ず等倍の組み合わせにすること。
+ */
+
 function withSkills(def: MonsterDefinition, skills: [Skill, Skill, Skill]): MonsterDefinition {
   return { ...def, skills };
 }
@@ -43,7 +52,7 @@ describe("シールド(SHIELD)", () => {
       cooldownTurns: 0,
       effects: [],
     };
-    const ally = withSkills(findMonster("golem", "WATER")!, [idleSkill, idleSkill, idleSkill]);
+    const ally = withSkills(findMonster("golem", "ELECTRIC")!, [idleSkill, idleSkill, idleSkill]);
     const attacker = withSkills(findMonster("wolf", "FIRE")!, [plainAttackSkill, plainAttackSkill, plainAttackSkill]);
 
     const engine = new BattleEngine([caster, ally], [attacker], { rng: () => 0.999, maxTurns: 1 });
@@ -77,7 +86,7 @@ describe("シールド(SHIELD)", () => {
       cooldownTurns: 0,
       effects: [],
     };
-    const ally = withSkills(findMonster("golem", "WATER")!, [idleSkill, idleSkill, idleSkill]);
+    const ally = withSkills(findMonster("golem", "ELECTRIC")!, [idleSkill, idleSkill, idleSkill]);
     const enemy = findMonster("slime", "FIRE")!;
 
     const engine = new BattleEngine([caster, ally], [enemy], { rng: () => 0.999, maxTurns: 1 });
@@ -123,7 +132,7 @@ describe("状態異常免疫(IMMUNITY)", () => {
   };
 
   it("免疫中はスタンが付与されない", () => {
-    const defender = withSkills(findMonster("golem", "WATER")!, [immunitySkill, immunitySkill, immunitySkill]);
+    const defender = withSkills(findMonster("golem", "ELECTRIC")!, [immunitySkill, immunitySkill, immunitySkill]);
     const attacker = withSkills(findMonster("wolf", "FIRE")!, [stunSkill, stunSkill, stunSkill]);
 
     const engine = new BattleEngine([defender], [attacker], { rng: () => 0, maxTurns: 1 });
@@ -139,7 +148,7 @@ describe("状態異常免疫(IMMUNITY)", () => {
   });
 
   it("免疫中は新しいデバフが付与されない", () => {
-    const defender = withSkills(findMonster("golem", "WATER")!, [immunitySkill, immunitySkill, immunitySkill]);
+    const defender = withSkills(findMonster("golem", "ELECTRIC")!, [immunitySkill, immunitySkill, immunitySkill]);
     const attacker = withSkills(findMonster("wolf", "FIRE")!, [debuffSkill, debuffSkill, debuffSkill]);
 
     const engine = new BattleEngine([defender], [attacker], { rng: () => 0, maxTurns: 1 });
@@ -167,7 +176,7 @@ describe("防御力無視ダメージ (ignoreDefense)", () => {
 
     const attacker1 = withSkills(findMonster("wolf", "FIRE")!, [ignoreDefSkill, ignoreDefSkill, ignoreDefSkill]);
     const attacker2 = withSkills(findMonster("wolf", "FIRE")!, [plainAttackSkill, plainAttackSkill, plainAttackSkill]);
-    const defender = withStats(findMonster("golem", "WATER")!, { def: 2000 });
+    const defender = withStats(findMonster("golem", "ELECTRIC")!, { def: 2000 });
     const noCrit = () => 0.999;
 
     const engine1 = new BattleEngine([attacker1], [defender], { rng: noCrit, maxTurns: 1 });
@@ -202,7 +211,7 @@ describe("継続回復(REGEN)", () => {
 
   it("自分の手番開始時に最大HPのhealRate分回復する", () => {
     const caster = withSkills(findMonster("fairy", "GRASS")!, [regenSkill, regenSkill, regenSkill]);
-    const ally = findMonster("golem", "WATER")!;
+    const ally = findMonster("golem", "ELECTRIC")!;
     const enemy = findMonster("slime", "FIRE")!;
 
     const engine = new BattleEngine([caster, ally], [enemy], { rng: () => 0.999, maxTurns: 1 });
@@ -232,7 +241,7 @@ describe("デバフ解除(CLEANSE)", () => {
       cooldownTurns: 0,
       effects: [{ kind: "CLEANSE" }],
     };
-    const target = withSkills(findMonster("golem", "WATER")!, [cleanseSkill, cleanseSkill, cleanseSkill]);
+    const target = withSkills(findMonster("golem", "ELECTRIC")!, [cleanseSkill, cleanseSkill, cleanseSkill]);
     const enemy = findMonster("slime", "FIRE")!;
 
     const engine = new BattleEngine([target], [enemy], { rng: () => 0.999, maxTurns: 1 });
@@ -264,7 +273,7 @@ describe("クリ率/クリダメバフ (criRate/criDmg)", () => {
       withStats(findMonster("wolf", "FIRE")!, { criRate: 0.2 }),
       [critRateBuffSkill, plainAttackSkill, plainAttackSkill],
     );
-    const defender = findMonster("golem", "WATER")!;
+    const defender = findMonster("golem", "ELECTRIC")!;
 
     // rng=0.5は素のクリ率0.2では外れるが、+50%バフ後の0.7なら当たる
     const rng = () => 0.5;
@@ -294,7 +303,7 @@ describe("クリ率/クリダメバフ (criRate/criDmg)", () => {
       withStats(findMonster("wolf", "FIRE")!, { criRate: 1 }),
       [critDmgBuffSkill, plainAttackSkill, plainAttackSkill],
     );
-    const defender = findMonster("golem", "WATER")!;
+    const defender = findMonster("golem", "ELECTRIC")!;
     const alwaysCrit = () => 0;
 
     const engineBuffed = new BattleEngine([attacker], [defender], { rng: alwaysCrit, maxTurns: 1 });
@@ -345,7 +354,7 @@ describe("クールタイム延長 (COOLDOWN_EXTEND)", () => {
 
   function setup(skill: Skill, rng: () => number) {
     const caster = withSkills(findMonster("wolf", "FIRE")!, [skill, skill, skill]);
-    const target = withSkills(findMonster("golem", "WATER")!, [immunitySkill, immunitySkill, immunitySkill]);
+    const target = withSkills(findMonster("golem", "ELECTRIC")!, [immunitySkill, immunitySkill, immunitySkill]);
     const engine = new BattleEngine([caster], [target], { rng, maxTurns: 4 });
     const units = engine.getUnits();
     return {
@@ -391,7 +400,7 @@ describe("毒(POISON)", () => {
 
   it("スタックは重複し、最大5スタックまでしか積み上がらない", () => {
     const caster = withSkills(findMonster("wolf", "FIRE")!, [poisonSkill, poisonSkill, poisonSkill]);
-    const target = findMonster("golem", "WATER")!;
+    const target = findMonster("golem", "ELECTRIC")!;
 
     const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
     const units = engine.getUnits();
@@ -406,7 +415,7 @@ describe("毒(POISON)", () => {
 
   it("自分の手番開始時に、スタック数×damageRatePerStack分のダメージを受ける", () => {
     const caster = withSkills(findMonster("wolf", "FIRE")!, [poisonSkill, poisonSkill, poisonSkill]);
-    const target = findMonster("golem", "WATER")!;
+    const target = findMonster("golem", "ELECTRIC")!;
 
     const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
     const units = engine.getUnits();
@@ -425,7 +434,7 @@ describe("毒(POISON)", () => {
 
   it("継続ターンが尽きるとスタックも消滅する", () => {
     const caster = withSkills(findMonster("wolf", "FIRE")!, [poisonSkill, poisonSkill, poisonSkill]);
-    const target = findMonster("golem", "WATER")!;
+    const target = findMonster("golem", "ELECTRIC")!;
 
     const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
     const units = engine.getUnits();
@@ -451,7 +460,7 @@ describe("毒(POISON)", () => {
       cooldownTurns: 0,
       effects: [{ kind: "IMMUNITY", durationTurns: 2 }],
     };
-    const defender = withSkills(findMonster("golem", "WATER")!, [immunitySkill, immunitySkill, immunitySkill]);
+    const defender = withSkills(findMonster("golem", "ELECTRIC")!, [immunitySkill, immunitySkill, immunitySkill]);
     const attacker = withSkills(findMonster("wolf", "FIRE")!, [poisonSkill, poisonSkill, poisonSkill]);
 
     const engine = new BattleEngine([defender], [attacker], { rng: () => 0, maxTurns: 1 });
@@ -476,7 +485,7 @@ describe("速度デバフ(既存のDEBUFF機構をspdに適用)", () => {
       effects: [{ kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2 }],
     };
     const caster = withSkills(findMonster("wolf", "FIRE")!, [spdDebuffSkill, spdDebuffSkill, spdDebuffSkill]);
-    const target = findMonster("golem", "WATER")!;
+    const target = findMonster("golem", "ELECTRIC")!;
 
     const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
     const units = engine.getUnits();
@@ -514,7 +523,7 @@ describe("暗闇(BLIND)", () => {
 
   it("暗闇を付与でき、残りターンが手番ごとに減る", () => {
     const caster = withSkills(findMonster("seraph", "LIGHT")!, [blindSkill, blindSkill, blindSkill]);
-    const target = withSkills(findMonster("golem", "WATER")!, [strikeSkill, strikeSkill, strikeSkill]);
+    const target = withSkills(findMonster("golem", "ELECTRIC")!, [strikeSkill, strikeSkill, strikeSkill]);
 
     const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
     const units = engine.getUnits();
@@ -530,7 +539,7 @@ describe("暗闇(BLIND)", () => {
 
   it("暗闇で外すとダメージが大きく減り、追加効果も乗らない", () => {
     const attacker = withSkills(findMonster("wolf", "FIRE")!, [strikeSkill, strikeSkill, strikeSkill]);
-    const victim = withStats(findMonster("golem", "WATER")!, { hp: 100000, def: 1 });
+    const victim = withStats(findMonster("golem", "ELECTRIC")!, { hp: 100000, def: 1 });
 
     // 暗闇が付いていない側。低い乱数にして、効果抵抗の判定にも勝つようにする
     const hitEngine = new BattleEngine([attacker], [victim], { rng: () => 0.1, maxTurns: 1 });
@@ -560,7 +569,7 @@ describe("暗闇(BLIND)", () => {
 
   it("状態異常免疫があると暗闇を防げる", () => {
     const caster = withSkills(findMonster("seraph", "LIGHT")!, [blindSkill, blindSkill, blindSkill]);
-    const target = withSkills(findMonster("golem", "WATER")!, [strikeSkill, strikeSkill, strikeSkill]);
+    const target = withSkills(findMonster("golem", "ELECTRIC")!, [strikeSkill, strikeSkill, strikeSkill]);
 
     const engine = new BattleEngine([caster], [target], { rng: () => 0, maxTurns: 1 });
     const units = engine.getUnits();
@@ -584,7 +593,7 @@ describe("行動ゲージの吸収", () => {
       effects: [{ kind: "GAUGE", amount: 0.1, drain: true }],
     };
     const caster = withSkills(findMonster("nemesis", "DARK")!, [drainSkill, drainSkill, drainSkill]);
-    const target = findMonster("golem", "WATER")!;
+    const target = findMonster("golem", "ELECTRIC")!;
 
     const engine = new BattleEngine([caster], [target], { rng: () => 0.9, maxTurns: 1 });
     const units = engine.getUnits();

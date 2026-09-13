@@ -5,7 +5,7 @@
  *   node --import tsx tools/playerDefenseAudit.ts --runs 200
  */
 import { setBalanceFlags } from "../src/battle/balanceFlags.js";
-import { applyDefenseE, calculateBaseDamage, roundNormalDamage } from "../src/battle/damageFormula.js";
+import { applyDefense, calculateBaseDamage, roundNormalDamage } from "../src/battle/damageFormula.js";
 import type { MonsterDefinition } from "../src/core/monster.js";
 import type { Element } from "../src/core/element.js";
 import { ELEMENT_JA } from "../src/core/element.js";
@@ -222,7 +222,7 @@ function damage(
   damageTakenMultiplier = 1,
 ): number {
   const base = calculateBaseDamage(atk, multiplier) * (critical ? criDmg : 1);
-  return roundNormalDamage(applyDefenseE(base, atk, def).afterDefense * damageTakenMultiplier);
+  return roundNormalDamage(applyDefense(base, atk, def).afterDefense * damageTakenMultiplier);
 }
 function shots(hp: number, hit: number): number { return Math.max(1, Math.ceil(hp / Math.max(1, hit))); }
 

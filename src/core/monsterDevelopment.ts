@@ -72,11 +72,20 @@ export function abilityPointBudget(star: keyof typeof ABILITY_POINT_BUDGETS): nu
   return ABILITY_POINT_BUDGETS[star];
 }
 
-/** 能力付与の正式換算値。必ずこの一か所から参照する。 */
+/**
+ * 能力付与の正式換算値。必ずこの一か所から参照する。
+ *
+ * **DEFは3から5へ上げてある。**防御計算が `1000/(1000+1.2×DEF)` に変わり、
+ * 軽減が攻撃力との比ではなく**DEFの値だけ**で決まるようになったため、
+ * 3のままだと1pt振っても軽減率がほとんど動かず、選ぶ意味が無くなっていた。
+ *
+ * ポイントの振り分けは個体に**pt数だけ**を保存しているので、この値を変えると
+ * 既に振ってある個体にもそのまま効く(控えの移行は要らない)。
+ */
 export const ABILITY_POINT_VALUES: Readonly<Record<AllocatableStat, number>> = {
   hp: 20,
   atk: 2,
-  def: 3,
+  def: 5,
   spd: 0.1,
 };
 
@@ -111,10 +120,26 @@ export function effectiveAbilityPointValues(): Readonly<Record<AllocatableStat, 
   return { ...ABILITY_POINT_VALUES, ...override } as Record<AllocatableStat, number>;
 }
 
+/**
+ * タイプ転生の正式倍率。
+ *
+ * ## 体力型と防御型は、**場面で入れ替わる**ように置いてある
+ *
+ * 防御計算が `1000/(1000+1.2×DEF)` になり、DEFの値だけで軽減率が決まるようになった。
+ * そのままだと防御型が一方的に硬くなるので、**DEFが効かない場面**を対にして置いた。
+ *
+ *   ・通常       防御型が上(体力型は同じ耐久を出すのに約88.5点ぶんしか稼げない)
+ *   ・防御低下中  体力型が上(防御型は78.4点まで落ちる)
+ *   ・防御無視    体力型が**約3倍**強い
+ *
+ * 体力型の `def: 0.90` と防御型の `hp: 0.85` は、この入れ替えを作るための短所。
+ * どちらか片方だけ動かすと3段階が崩れるので、**必ず162個体で測り直すこと**
+ * (`npx tsx tools/playerTypeAbilityAudit.ts --runs 200`)。
+ */
 export const MONSTER_TYPE_STAT_MULTIPLIERS: Readonly<Record<MonsterType, Readonly<MonsterTypeModifiers>>> = {
   ATTACK: { hp: 0.85, atk: 1.20, def: 0.90, spd: 1, criRate: 0.10, criDmg: 0, accuracy: 0, resistance: -0.10 },
-  HP: { hp: 1.20, atk: 0.85, def: 1, spd: 1, criRate: -0.05, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
-  DEFENSE: { hp: 1, atk: 0.90, def: 1.20, spd: 1, criRate: -0.10, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
+  HP: { hp: 1.10, atk: 0.85, def: 0.90, spd: 1, criRate: -0.05, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
+  DEFENSE: { hp: 0.85, atk: 0.90, def: 1.40, spd: 1, criRate: -0.10, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
   SUPPORT: { hp: 1.10, atk: 0.85, def: 1, spd: 1.10, criRate: 0, criDmg: -0.15, accuracy: 0, resistance: 0.05 },
   DISRUPT: { hp: 1, atk: 0.85, def: 1, spd: 1.08, criRate: 0, criDmg: -0.15, accuracy: 0.15, resistance: -0.05 },
   BALANCE: { hp: 1, atk: 1, def: 1, spd: 1, criRate: 0, criDmg: 0, accuracy: 0, resistance: 0 },
@@ -122,8 +147,8 @@ export const MONSTER_TYPE_STAT_MULTIPLIERS: Readonly<Record<MonsterType, Readonl
 
 export const MONSTER_TYPE_DESCRIPTIONS: Readonly<Record<MonsterType, string>> = {
   ATTACK: "長所: ATK +20%・クリ率 +10pt / 短所: HP -15%・DEF -10%・抵抗 -10pt",
-  HP: "長所: HP +20%・抵抗 +10pt / 短所: ATK -15%・クリ率 -5pt・クリダメ -10pt",
-  DEFENSE: "長所: DEF +20%・抵抗 +10pt / 短所: ATK -10%・クリ率 -10pt・クリダメ -10pt",
+  HP: "長所: HP +10%・抵抗 +10pt / 短所: ATK -15%・DEF -10%・クリ率 -5pt・クリダメ -10pt",
+  DEFENSE: "長所: DEF +40%・抵抗 +10pt / 短所: HP -15%・ATK -10%・クリ率 -10pt・クリダメ -10pt",
   SUPPORT: "長所: SPD +10%・HP +10%・抵抗 +5pt / 短所: ATK -15%・クリダメ -15pt",
   DISRUPT: "長所: SPD +8%・的中 +15pt / 短所: ATK -15%・クリダメ -15pt・抵抗 -5pt",
   BALANCE: "すべての能力補正なし。長所も短所もない標準型",

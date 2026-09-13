@@ -13,7 +13,7 @@
  */
 import { setBalanceFlags } from "../src/core/balanceFlags.js";
 import { BattleEngine } from "../src/battle/engine.js";
-import { applyDefenseE } from "../src/battle/damageFormula.js";
+import { applyDefense } from "../src/battle/damageFormula.js";
 import { findDungeonFloor } from "../src/data/equipmentDungeon.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import { buildAlly } from "./battleLab/build.js";
@@ -54,9 +54,9 @@ for (const a of built) {
   for (const atk of [5_000, 10_000, 20_000]) {
     const base = 100_000;
     setBalanceFlags({ defenseFormula: "legacy", unifyDefModifiers: false });
-    const oldThrough = applyDefenseE(base, atk, a.stats.def).afterDefense / base;
+    const oldThrough = applyDefense(base, atk, a.stats.def).afterDefense / base;
     setBalanceFlags({ defenseFormula: "sw", unifyDefModifiers: false });
-    const newThrough = applyDefenseE(base, atk, a.stats.def).afterDefense / base;
+    const newThrough = applyDefense(base, atk, a.stats.def).afterDefense / base;
     const oldEff = a.stats.hp / oldThrough;
     const newEff = a.stats.hp / newThrough;
     cells.push(`${Math.round(oldEff / 1000).toLocaleString().padStart(5)}k /${Math.round(newEff / 1000).toLocaleString().padStart(5)}k (${(newEff / oldEff).toFixed(2)}倍)`);
