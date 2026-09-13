@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
+import { DUNGEON_FLOOR_COUNT } from "../src/core/equipment.js";
 import { GOLD_DUNGEON_FLOORS } from "../src/data/goldDungeon.js";
 import { LEVEL_DUNGEON_DEFS } from "../src/data/levelDungeon.js";
 import { STAGES } from "../src/data/stages.js";
@@ -13,7 +14,16 @@ import { STAGES } from "../src/data/stages.js";
  * ゴールド/レベル上げダンジョンは育成場所なので、引き続き装備ダンジョンより緩く保つ。
  */
 
-const equipTop = EQUIPMENT_DUNGEON_FLOORS[EQUIPMENT_DUNGEON_FLOORS.length - 1].speedScale;
+/*
+ * **倍率カーブの頂点は10階。末尾ではない。**
+ *
+ * 11・12階は倍率に乗らず `fixedStats` の実数で置いてあるので、
+ * speedScale には「掛けていない」印の1が入っている。
+ * 末尾で取ると、階を足した瞬間にこの見張りが1を頂点だと思い込んで崩れる。
+ * 見たい階は番号で名指しする。
+ */
+const CURVED_EQUIP_FLOORS = EQUIPMENT_DUNGEON_FLOORS.filter((floor) => floor.floor <= DUNGEON_FLOOR_COUNT);
+const equipTop = CURVED_EQUIP_FLOORS[CURVED_EQUIP_FLOORS.length - 1].speedScale;
 
 describe("敵の速度カーブ", () => {
   it("どの場所も、最初は等倍から始まる", () => {
@@ -38,7 +48,7 @@ describe("敵の速度カーブ", () => {
 
   it("進むほど速くなる(どの場所でも後退しない)", () => {
     const series: [string, number[]][] = [
-      ["装備ダンジョン", EQUIPMENT_DUNGEON_FLOORS.map((f) => f.speedScale)],
+      ["装備ダンジョン", CURVED_EQUIP_FLOORS.map((f) => f.speedScale)],
       ["ゴールド", GOLD_DUNGEON_FLOORS.map((f) => f.speedScale)],
       ["レベル上げ", LEVEL_DUNGEON_DEFS.map((d) => d.speedScale)],
       ["ステージ", STAGES.map((s) => s.waves[0].speedScale)],
@@ -51,8 +61,8 @@ describe("敵の速度カーブ", () => {
   });
 
   it("**速度はHPや攻撃力ほど急には伸ばさない**", () => {
-    const first = EQUIPMENT_DUNGEON_FLOORS[0];
-    const last = EQUIPMENT_DUNGEON_FLOORS[EQUIPMENT_DUNGEON_FLOORS.length - 1];
+    const first = CURVED_EQUIP_FLOORS[0];
+    const last = CURVED_EQUIP_FLOORS[CURVED_EQUIP_FLOORS.length - 1];
     expect(last.speedScale / first.speedScale).toBeLessThan(last.powerScale / first.powerScale);
   });
 
