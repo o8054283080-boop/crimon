@@ -23,7 +23,7 @@ import {
 import { runMany } from "./battleLab/run.js";
 import { findScenario } from "./battleLab/scenarios/index.js";
 import type { GearGrade } from "./battleLab/types.js";
-import { FINAL_CANDIDATE } from "./finalBalanceAudit.js";
+import { FINAL_CANDIDATE } from "./finalCandidate.js";
 
 const argv = process.argv.slice(2);
 const arg = (name: string, fallback: string): string => {

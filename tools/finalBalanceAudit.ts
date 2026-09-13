@@ -17,6 +17,7 @@
  * これを見ないと「HP型とDEF型のどちらが硬いか」は比べられない。
  */
 import { balanceFlags, resetBalanceFlags, setBalanceFlags } from "../src/core/balanceFlags.js";
+import { FINAL_CANDIDATE } from "./finalCandidate.js";
 import { applyDefenseE } from "../src/battle/damageFormula.js";
 import { MONSTER_DEX } from "../src/data/monsters.js";
 import { buildAlly } from "./battleLab/build.js";
@@ -31,24 +32,7 @@ const arg = (name: string, fallback: string): string => {
 const RUNS = Number(arg("runs", "200"));
 const GEAR = arg("gear", "STRONG") as GearGrade;
 
-/**
- * 最終候補。**ここが唯一の定義**で、他のツールもここを読む。
- * 本番データではない——`balanceFlags` に載せるだけの仮の値。
- */
-export const FINAL_CANDIDATE = {
-  defenseFormula: "sw" as const,
-  swRatio: 1.2,
-  unifyDefModifiers: true,
-  defDownRate: 0.75,
-  defUpRate: 0.30,
-  typeMultiplierOverride: {
-    // 体力タイプ: HP 1.20→1.10 / DEF 1.00→0.90。他は現行のまま
-    HP: { hp: 1.10, def: 0.90 },
-    // 防御タイプ: HP 1.00→0.85 / DEF 1.20→1.40。他は現行のまま
-    DEFENSE: { hp: 0.85, def: 1.40 },
-  },
-  abilityPointOverride: { def: 5 },
-};
+export { FINAL_CANDIDATE } from "./finalCandidate.js";
 
 /** 素材3種と敵専用6種を除いた27種。これに6属性で162個体 */
 const EXCLUDED = new Set([
