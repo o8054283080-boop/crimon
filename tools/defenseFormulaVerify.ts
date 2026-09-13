@@ -24,7 +24,7 @@
  * 0%や100%に張り付くと勝率からは何も分からなくなる。
  * 敵残HP・味方残HP・手数・全滅率を必ず一緒に出す(`CLAUDE.md` の「測ってから判断する」)。
  */
-import { balanceFlags, setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { balanceFlags, setBalanceFlags } from "../src/core/balanceFlags.js";
 import { BattleEngine } from "../src/battle/engine.js";
 import type { MonsterDefinition } from "../src/core/monster.js";
 import { AWAKENING_DEPTH_FLOORS } from "../src/data/awakeningDepths.js";

@@ -11,7 +11,7 @@
  *
  * 後半は実測。同じ敵の前へ1体ずつ立たせて、**倒れるまでの手数**を数える。
  */
-import { setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { setBalanceFlags } from "../src/core/balanceFlags.js";
 import { BattleEngine } from "../src/battle/engine.js";
 import { applyDefenseE } from "../src/battle/damageFormula.js";
 import { findDungeonFloor } from "../src/data/equipmentDungeon.js";
