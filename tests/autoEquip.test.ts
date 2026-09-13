@@ -433,6 +433,157 @@ describe("プレビューに出す数字が、実際の戦闘の数字と一致�
   });
 });
 
+describe("そろえるシリーズを指定する", () => {
+  /*
+   * ## なぜこの指定が要るのか
+   *
+   * おまかせはステータスの数字で比べる。だが暴走・崩壊・祝福・加護・免疫の
+   * 効果は `CombatModifiers` にしか入らず、**HPにも攻撃にも1も乗らない。**
+   * つまり指定が無ければ、あの5つは**評価が常にゼロ**で一生選ばれない。
+   * ここでは「名指しすれば必ずそろう」ことだけを見る。
+   */
+  function manyItems(perSlot = 40, seed = 11): { state: PlayerState; monsterId: string } {
+    return stateWith(perSlot, seed);
+  }
+
+  const setCountsOf = (state: PlayerState, assignment: Partial<Record<EquipSlot, string>>): Map<string, number> => {
+    const counts = new Map<string, number>();
+    for (const id of Object.values(assignment)) {
+      const item = state.equipment.find((e) => e.id === id);
+      if (item) counts.set(item.set, (counts.get(item.set) ?? 0) + 1);
+    }
+    return counts;
+  };
+
+  it("4セットを名指しすると、必ず4個そろう", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { SWIFT: 4 } }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("SWIFT") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it("2つ同時に名指ししても、両方そろう", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({
+      type: "power", scope: "ALL", wantedSets: { SWIFT: 4, CRIT: 2 },
+    }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    const counts = setCountsOf(state, out.plan.assignment);
+    expect(counts.get("SWIFT") ?? 0).toBeGreaterThanOrEqual(4);
+    expect(counts.get("CRIT") ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  /*
+   * **これが無いと機能そのものが無意味。**暴走はステータスに何も乗せないので、
+   * 指定しなければ総合力狙いで選ばれることはまず無い。
+   */
+  it("ステータスに出ないシリーズ(暴走)も、名指しすればそろう", () => {
+    const { state, monsterId } = manyItems();
+    const free = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL" }));
+    expect(free.ok).toBe(true);
+    if (free.ok) {
+      expect(setCountsOf(state, free.plan.assignment).get("RAMPAGE") ?? 0,
+        "指定しなくても暴走が4つ選ばれるなら、この試験は何も見ていない").toBeLessThan(4);
+    }
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { RAMPAGE: 4 } }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("RAMPAGE") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  /*
+   * 暴走・崩壊・祝福は2個では何も起きない。
+   * 2を渡されたら4へ引き上げる——**黙って無意味な縛りを掛けない。**
+   */
+  it("4個でしか効かないシリーズに2を指定したら、4へ引き上げる", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { RAMPAGE: 2 } }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("RAMPAGE") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  /*
+   * **黙って願いを捨てて「できました」と言わない。**
+   * 最初の版は合計が6を超えると指定を丸ごと捨てており、
+   * 暴走4+崩壊4 が「無指定と同じ結果」を成功として返していた。
+   */
+  it("6枠に入らない指定は、成功させずに断る", () => {
+    const { state, monsterId } = manyItems();
+    const out = planAutoEquip(state, monsterId, settingsFor({
+      type: "power", scope: "ALL", wantedSets: { RAMPAGE: 4, COLLAPSE: 4 },
+    }));
+    expect(out.ok, "叶えられない指定を成功にした").toBe(false);
+    if (!out.ok) expect(out.reason).toContain("6枠");
+  });
+
+  it("そろえるだけ持っていないシリーズは断る", () => {
+    const { state, monsterId } = stateWith(4, 71);
+    // 速攻を1個だけ残して、他は全部消す
+    const swift = state.equipment.filter((e) => e.set === "SWIFT");
+    if (swift.length > 1) {
+      const keep = swift[0].id;
+      state.equipment = state.equipment.filter((e) => e.set !== "SWIFT" || e.id === keep);
+    }
+    const out = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { SWIFT: 4 } }));
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toContain("シリーズ");
+  });
+
+  /*
+   * **詰め直しが約束を崩さないこと。**総合力・カスタムは1枠ずつ
+   * 入れ替えて詰めるので、そこで別シリーズへ替えた方が数字は上がる。
+   * 放っておくと必ずそうなるので、最後に実際の個数を数えて守っている。
+   */
+  it("詰め直しが走る狙い(総合力・カスタム)でも崩れない", () => {
+    const { state, monsterId } = manyItems(30, 29);
+    for (const settings of [
+      settingsFor({ type: "power", scope: "ALL", wantedSets: { CRIT: 4 } }),
+      settingsFor({ type: "custom", priorities: ["spd", "atk"], scope: "ALL", wantedSets: { CRIT: 4 } }),
+      settingsFor({ type: "custom", priorities: ["atk"], minimums: { spd: 100 }, scope: "ALL", wantedSets: { CRIT: 4 } }),
+    ]) {
+      const out = planAutoEquip(state, monsterId, settings);
+      expect(out.ok).toBe(true);
+      if (!out.ok) continue;
+      expect(setCountsOf(state, out.plan.assignment).get("CRIT") ?? 0,
+        `${settings.type} で約束が崩れた`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("固定した部位のシリーズも頭数に入れる", () => {
+    const { state, monsterId } = manyItems();
+    const monster = state.monsters.find((m) => m.id === monsterId)!;
+    // まず速攻4セットを組んで着せる
+    const first = planAutoEquip(state, monsterId, settingsFor({ type: "power", scope: "ALL", wantedSets: { SWIFT: 4 } }));
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    applyAutoEquipPlan(state, monsterId, first.plan.assignment);
+
+    // 速攻が乗っている部位を1つ固定して、もう一度同じ指定で探す
+    const swiftSlot = EQUIP_SLOTS.find((slot) => {
+      const id = monster.equipment[slot];
+      return state.equipment.find((e) => e.id === id)?.set === "SWIFT";
+    });
+    expect(swiftSlot).toBeDefined();
+    const out = planAutoEquip(state, monsterId, settingsFor({
+      type: "power", scope: "ALL", wantedSets: { SWIFT: 4 }, fixedSlots: [swiftSlot!],
+    }));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(setCountsOf(state, out.plan.assignment).get("SWIFT") ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it("指定しなければ、今までどおり何も縛らない", () => {
+    const { state, monsterId } = manyItems();
+    const a = planAutoEquip(state, monsterId, settingsFor({ type: "atk", scope: "ALL" }));
+    const b = planAutoEquip(state, monsterId, settingsFor({ type: "atk", scope: "ALL", wantedSets: {} }));
+    expect(a.ok && b.ok).toBe(true);
+    if (a.ok && b.ok) expect(b.plan.after.atk).toBe(a.plan.after.atk);
+  });
+});
+
 describe("重さ", () => {
   /*
    * **測ってから決める。**所持1800個(1スロット300個)でも待たされないこと。

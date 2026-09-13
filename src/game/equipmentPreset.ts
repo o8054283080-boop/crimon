@@ -9,6 +9,7 @@ import {
   AutoEquipType,
   MAX_AUTO_EQUIP_PRIORITIES,
   createDefaultAutoEquipSettings,
+  normalizeWantedSets,
 } from "./autoEquip.js";
 import type { PlayerState } from "./playerState.js";
 
@@ -202,7 +203,16 @@ export function normalizeAutoEquipSettings(raw: Partial<AutoEquipSettings> | und
     ? [...new Set(raw.fixedSlots.filter((s): s is EquipSlot => EQUIP_SLOTS.includes(s as EquipSlot)))]
     : [];
 
-  return { type, priorities: uniquePriorities, minimums, scope, fixedSlots };
+  /*
+   * 指定シリーズ。**持たない形のまま残す。**
+   * 空の入れ物を付けて回ると、使っていない人のセーブが枠の数だけ太る
+   * (`saveCodec` は既定のままなら書かない作りなので、無いことに意味がある)。
+   * 4個専用シリーズの丸めや合計6枠の検査は `normalizeWantedSets` が持つ。
+   */
+  const wanted = normalizeWantedSets(raw.wantedSets);
+  const settings: AutoEquipSettings = { type, priorities: uniquePriorities, minimums, scope, fixedSlots };
+  if (wanted.size > 0) settings.wantedSets = Object.fromEntries(wanted) as AutoEquipSettings["wantedSets"];
+  return settings;
 }
 
 /** 読み込んだ枠を整える。壊れていたら空の枠にする */

@@ -14,7 +14,7 @@ import { getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } fr
 import { BATTLE_SCREENS, bgmSceneOf } from "./audio/bgmScene.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
-import { EQUIP_SLOTS, equipmentSellPrice, EquipSlot, generateEquipment, type Equipment } from "../core/equipment.js";
+import { EQUIP_SLOTS, equipmentSellPrice, EquipSlot, generateEquipment, SET_TYPES, type Equipment } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor, EquipmentDungeonKind, dungeonFloorKey, findDungeonFloorByKey } from "../data/equipmentDungeon.js";
@@ -126,6 +126,7 @@ import {
   applyAutoEquipPlan,
   createDefaultAutoEquipSettings,
   currentStatsOf,
+  reachableSetCounts,
   planAutoEquip,
   type AutoEquipPlan,
   type AutoEquipSettings,
@@ -5333,7 +5334,7 @@ if (import.meta.env.DEV) {
      *
      * `withPlan` を立てると、探し終えた状態まで進める。
      */
-    openAutoEquip(withPlan = false) {
+    openAutoEquip(withPlan = false, withSets = false) {
       const monster = state.player.monsters[0];
       if (!monster) return;
       monster.star = 6;
@@ -5354,6 +5355,15 @@ if (import.meta.env.DEV) {
       state.autoEquipRenamingIndex = null;
       state.autoEquipDetailOpen = true;
       state.screen = "AUTO_EQUIP";
+      /*
+       * シリーズ札は**選んだ状態も見せる。**選ぶまでは全部同じ形なので、
+       * 「4セット」と出ている札の幅も、残り枠の案内文も一度も測られない。
+       */
+      if (withSets) {
+        const reach = reachableSetCounts(state.player, monster, state.autoEquipSettings);
+        const pick = SET_TYPES.filter((type) => (reach.get(type) ?? 0) >= 4).slice(0, 1);
+        if (pick.length > 0) state.autoEquipSettings = { ...state.autoEquipSettings, wantedSets: { [pick[0]]: 4 } };
+      }
       if (withPlan) {
         // 保存済みの枠も見せる。空の3枠だけでは札の中身が検査されない
         writePreset(monster, 0, capturePreset(monster, 0, state.autoEquipSettings, "アリーナ"));

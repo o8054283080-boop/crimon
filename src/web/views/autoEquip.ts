@@ -1,4 +1,4 @@
-import { EQUIP_SLOTS, Equipment, EquipSlot, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
+import { EQUIP_SLOTS, Equipment, EquipSlot, SET_BONUS_DESCRIPTION, SET_LABEL, SET_TYPES, SetType, STAT_LABEL } from "../../core/equipment.js";
 import type { MonsterInstance } from "../../core/monsterInstance.js";
 import type { Stats } from "../../core/stats.js";
 import { findMonsterById } from "../../data/monsters.js";
@@ -16,6 +16,8 @@ import {
   AutoEquipStat,
   AutoEquipType,
   MAX_AUTO_EQUIP_PRIORITIES,
+  isFourPieceOnlySet,
+  reachableSetCounts,
 } from "../../game/autoEquip.js";
 import {
   EQUIPMENT_PRESET_SLOTS,
@@ -253,6 +255,111 @@ function renderFixedSlots(props: AutoEquipProps): HTMLElement {
   ]);
 }
 
+/**
+ * そろえるシリーズ。
+ *
+ * ## なぜ「狙い」と別に要るのか
+ *
+ * おまかせはステータスの数字で比べる。だが**セット効果の半分は数字に出ない。**
+ * 暴走の追加ターンも、崩壊の防御無視も、加護のシールドも、
+ * 効くのは戦闘中の挙動(`CombatModifiers`)だけで、HPにも攻撃にも1も乗らない。
+ * つまり**放っておくと、この5つは永遠に選ばれない。**
+ *
+ * 「揃うほど加点」という重みにしなかったのは、
+ * **追加ターン15%が攻撃何ポイントぶんか、決める根拠が無い**から。
+ * 点数を捏造する代わりに、人が名指しして縛る。
+ *
+ * ## 押せないものは押させない
+ *
+ * 持っていないシリーズ、枠が足りないシリーズ、
+ * 2個では何も起きないシリーズ——どれも押せた瞬間に
+ * 「見つかりません」を出すだけの札になる。**先に塞ぐ。**
+ */
+function renderWantedSets(props: AutoEquipProps): HTMLElement {
+  const wanted = props.settings.wantedSets ?? {};
+  /*
+   * **所持数ではなく「置ける枠の数」を出す。**
+   * 素朴に所持数を数えていた時、探す範囲が「今の装備＋未装備」でも
+   * 他の子が着けているぶんまで数えて「所持35」と出ていた。
+   * 押せるのに必ず「そろえられません」と断られる札になっていた。
+   */
+  const owned = reachableSetCounts(props.player, props.monster, props.settings);
+  const total = SET_TYPES.reduce((sum, type) => sum + (wanted[type] ?? 0), 0);
+  const room = EQUIP_SLOTS.length - total;
+
+  const nodes: (HTMLElement | null)[] = [
+    el("div", { className: "ae-field__label" }, [
+      "そろえるシリーズ",
+      el("span", { className: "ae-field__hint" }, [
+        "押すと 4セット → 2セット → 指定なし と変わります。"
+        + "数字は、いまの探す範囲でそのシリーズを置ける枠の数です。"
+        + "暴走・崩壊・祝福・加護・免疫の効果はステータスに出ないので、"
+        + "ここで指定しないと選ばれません",
+      ]),
+    ]),
+    el("div", { className: "ae-sets" }, SET_TYPES.map((type) => {
+      const count = wanted[type];
+      const have = owned.get(type) ?? 0;
+      const fourOnly = isFourPieceOnlySet(type);
+      // いま選んでいるぶんを戻したうえで、どれだけ枠が空くか
+      const roomForNext = room + (count ?? 0);
+      const canTake = (n: 2 | 4): boolean => have >= n && roomForNext >= n;
+      /*
+       * **「4は無理でも2なら入る」を塞がない。**
+       * ここを `4 が入らないなら押せない` にしていたら、
+       * 暴走4セットを選んだ後、残り2枠あるのに会心が押せなくなった。
+       * 押せる条件は「いちばん小さい指定が入るか」で見る
+       * (暴走・崩壊・祝福は2個では何も起きないので、最小が4)。
+       */
+      const smallest: 2 | 4 = fourOnly ? 4 : 2;
+      const disabled = count === undefined && !canTake(smallest);
+      return el("button", {
+        type: "button",
+        className: `ae-set${count ? " is-active" : ""}`,
+        disabled,
+        "aria-pressed": String(Boolean(count)),
+        /*
+         * **押せない理由を、押せない札自身に持たせる。**
+         * 理由は2つある(置ける枠が足りない / 他の指定で枠を使い切った)。
+         * 祝福を6枠持っていても、暴走4を選んだ後は残り2枠で押せない。
+         * 「6枠あるのに押せない」だけ見せると、壊れているようにしか見えない。
+         */
+        title: disabled
+          ? have < smallest
+            ? `いまの探す範囲では、${SET_LABEL[type]}を${have}枠にしか置けません(${smallest}枠から効きます)`
+            : `残りが${roomForNext}枠しかありません(${SET_LABEL[type]}は${smallest}枠から効きます)`
+          : SET_BONUS_DESCRIPTION[type].four,
+        onclick: () => {
+          const nextWanted = { ...wanted };
+          /*
+           * 4セット → 2セット → 指定なし と回す。
+           * 未選択から押した時は、**入るなら4から**(そちらが強い)。
+           */
+          let value: 2 | 4 | undefined;
+          if (count === 4) value = fourOnly ? undefined : 2;
+          else if (count === 2) value = undefined;
+          else value = canTake(4) ? 4 : fourOnly ? undefined : 2;
+          if (value === 2 && !canTake(2)) value = undefined;
+          if (value === undefined) delete nextWanted[type];
+          else nextWanted[type] = value;
+          props.onChangeSettings({ ...props.settings, wantedSets: nextWanted });
+        },
+      }, [
+        el("span", { className: "ae-set__name" }, [SET_LABEL[type]]),
+        el("span", { className: "ae-set__count" }, [count ? `${count}セット` : have > 0 ? `${have}枠` : "なし"]),
+      ]);
+    })),
+    total > 0
+      ? el("p", { className: "ae-note" }, [
+        `6枠のうち ${total} 枠をシリーズで埋めます。`
+        + (total >= EQUIP_SLOTS.length ? "残りの枠はありません。" : `残り ${EQUIP_SLOTS.length - total} 枠は自由に選びます。`)
+        + "シリーズを縛るぶん、ステータスは下がることがあります",
+      ])
+      : null,
+  ];
+  return el("div", { className: "ae-field" }, nodes.filter((n): n is HTMLElement => n !== null));
+}
+
 /* ------------------------------------------------------------------ *
  * 結果
  * ------------------------------------------------------------------ */
@@ -405,6 +512,7 @@ export function renderAutoEquip(props: AutoEquipProps): HTMLElement {
     props.detailOpen
       ? el("div", { className: "ae-detail" }, [
         isCustom ? renderMinimums(props) : null,
+        renderWantedSets(props),
         renderScope(props),
         renderFixedSlots(props),
       ].filter((n): n is HTMLElement => n !== null))

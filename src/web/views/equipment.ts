@@ -291,6 +291,14 @@ function equipmentCard(
               el("i", { className: "equip-card__dot" }, []),
               "未装着",
             ]),
+      /*
+       * おまかせ対象外の印。**一覧に出さないと、開くまで分からない。**
+       * 数百個の中から「前に対象外にしたやつ」を探せなくなる。
+       * 簡易表示でも出す——あちらは絵が無いぶん、印の場所が空いている。
+       */
+      equipment.autoExclude
+        ? el("div", { className: "equip-card__auto-off" }, [dense ? "おま外" : "おまかせ対象外"])
+        : null,
     ].filter((node): node is HTMLElement => node !== null),
   );
 }
@@ -587,6 +595,33 @@ function renderList(props: EquipmentProps): HTMLElement {
      * 「装備そのもの → 今との差 → 強化」の順に置く。
      * 等級の色は `data-star` で決まるので、枠を移した先にも同じ印を持たせる。
      */
+    /*
+     * おまかせ対象外の切り替え。
+     *
+     * **ここに無いと押す手段が無かった。**この画面から装備を見ている人は
+     * 「この子の枠に何を着けるか」を考えている最中で、
+     * 「これはおまかせに任せたくない」と思うのもまさにこの瞬間。
+     * なのに印を付けられるのは所持一覧の詳細だけで、
+     * 一度この画面を出て、一覧から同じ装備を探し直す必要があった。
+     */
+    const autoExcludeButton = el(
+      "button",
+      {
+        type: "button",
+        className: `btn btn--ghost equip-picker-card__auto${eq.autoExclude ? " is-off" : ""}`,
+        title: eq.autoExclude
+          ? "おまかせ装備の候補に戻す"
+          : "おまかせ装備の候補から外す(売却はできます)",
+        onclick: (event: Event) => {
+          // 札本体は「装備する」。そちらへ絶対に伝播させない
+          event.preventDefault();
+          event.stopPropagation();
+          props.onToggleAutoExclude(eq.id);
+        },
+      },
+      [eq.autoExclude ? "おまかせ対象外を解く" : "おまかせ対象外にする"],
+    );
+
     return el("div", {
       className: `equip-picker-card equip-picker-card--framed${eq.id === currentEquipmentId ? " equip-picker-card--current" : ""}`,
       "data-star": String(eq.star),
@@ -595,7 +630,7 @@ function renderList(props: EquipmentProps): HTMLElement {
     }, [
       card,
       comparisonRows.length ? el("div", { className: "equip-cmp" }, comparisonRows) : null,
-      el("div", { className: "equip-picker-card__foot" }, [enhanceButton]),
+      el("div", { className: "equip-picker-card__foot" }, [enhanceButton, autoExcludeButton]),
       lockButton,
     ].filter((node): node is HTMLElement => node !== null));
   };

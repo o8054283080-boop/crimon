@@ -1,4 +1,4 @@
-import type { EquipSlot } from "./equipment.js";
+import type { EquipSlot, SetType } from "./equipment.js";
 
 /**
  * 装備プリセットと、おまかせ装備の条件の**形だけ**。
@@ -38,6 +38,20 @@ export interface AutoEquipSettings {
   scope: AutoEquipScope;
   /** 今のまま動かさない部位 */
   fixedSlots: EquipSlot[];
+  /**
+   * 必ずそろえるシリーズ。シリーズ → 個数(2 か 4)。
+   *
+   * **これが無いと、暴走・崩壊・祝福・加護・免疫は一生選ばれない。**
+   * あの5つの効果は戦闘中の挙動(`CombatModifiers`)で、
+   * HP や攻撃といった数字には1も現れない。
+   * おまかせはステータスで比べるので、**評価が常にゼロ**になる。
+   * 「揃うほど加点」という重みを作る手もあるが、
+   * 追加ターン15%が攻撃何ポイントぶんかを決める根拠が無い。
+   * だから点数ではなく、**人が名指しして縛る**形にした。
+   *
+   * 省略可。旧セーブと、指定しない時は持たない。
+   */
+  wantedSets?: Partial<Record<SetType, 2 | 4>>;
 }
 
 export interface EquipmentPreset {

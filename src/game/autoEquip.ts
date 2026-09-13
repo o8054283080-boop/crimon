@@ -274,7 +274,11 @@ interface SetPlan {
   want: Map<SetType, number>;
 }
 
-function buildSetPlans(bySlot: Map<EquipSlot, Equipment[]>, fixedItems: Equipment[]): SetPlan[] {
+function buildSetPlans(
+  bySlot: Map<EquipSlot, Equipment[]>,
+  fixedItems: Equipment[],
+  wanted: Map<SetType, 2 | 4>,
+): SetPlan[] {
   const slotsOf = new Map<SetType, Set<EquipSlot>>();
   for (const type of SET_TYPES) slotsOf.set(type, new Set());
   for (const [slot, items] of bySlot) {
@@ -306,7 +310,101 @@ function buildSetPlans(bySlot: Map<EquipSlot, Equipment[]>, fixedItems: Equipmen
       }
     }
   }
-  return plans;
+
+  /*
+   * シリーズを名指しされていたら、**そろう構成だけを残す。**
+   * 固定した部位が既に持っているぶんも頭数に入れる
+   * (速攻を1つ固定していれば、残り3つで4セットになる)。
+   */
+  if (wanted.size === 0) return plans;
+  return plans.filter((plan) => {
+    for (const [type, count] of wanted) {
+      if ((plan.want.get(type) ?? 0) + (fixedCount.get(type) ?? 0) < count) return false;
+    }
+    return true;
+  });
+}
+
+/** 指定されたシリーズが、実際にそろっているか */
+function meetsWantedSets(items: Equipment[], wanted: Map<SetType, 2 | 4>): boolean {
+  if (wanted.size === 0) return true;
+  const counts = new Map<SetType, number>();
+  for (const item of items) counts.set(item.set, (counts.get(item.set) ?? 0) + 1);
+  for (const [type, count] of wanted) {
+    if ((counts.get(type) ?? 0) < count) return false;
+  }
+  return true;
+}
+
+/**
+ * 指定を読める形へ整える。
+ *
+ * **4個でしか効かないシリーズに2を指定させない。**
+ * 暴走・崩壊・祝福は2個そろえても何も起きないので、
+ * 2を渡されたら4へ引き上げる(黙って無意味な縛りを掛けない)。
+ */
+const FOUR_PIECE_ONLY_SETS = new Set<SetType>(["RAMPAGE", "COLLAPSE", "BLESSING"]);
+
+export function normalizeWantedSets(raw: Partial<Record<SetType, 2 | 4>> | undefined): Map<SetType, 2 | 4> {
+  const wanted = new Map<SetType, 2 | 4>();
+  if (!raw || typeof raw !== "object") return wanted;
+  for (const type of SET_TYPES) {
+    const count = raw[type];
+    if (count !== 2 && count !== 4) continue;
+    wanted.set(type, FOUR_PIECE_ONLY_SETS.has(type) ? 4 : count);
+  }
+  return wanted;
+}
+
+/**
+ * 指定した個数の合計。6枠に収まらない指定は**叶えようがない。**
+ *
+ * ここを「収まらないなら指定を捨てる」にしていたら、
+ * 暴走4+崩壊4(=8枠)が**無指定と同じ結果を返して成功扱い**になった。
+ * 黙って願いを捨てて「できました」と言うのがいちばん悪い。**断る。**
+ */
+export function wantedSetsTotal(wanted: Map<SetType, 2 | 4>): number {
+  let total = 0;
+  for (const count of wanted.values()) total += count;
+  return total;
+}
+
+/**
+ * いまの条件で、そのシリーズを**何枠に置けるか。**
+ *
+ * 画面のシリーズ札に出す数。**「所持数」を出してはいけない。**
+ * 最初は `state.equipment` を素朴に数えて「所持35」と出していたが、
+ * 探す範囲が「今の装備＋未装備」なら他の子が着けている35個は使えない。
+ * **押せるのに必ず断られる札**ができていた。
+ *
+ * 同じシリーズを同じ枠に2つ着けることはできないので、
+ * 数えるのは個数ではなく**置ける枠の数**(`buildSetPlans` の数え方と同じ)。
+ * 固定した部位が既に着けているぶんも頭数に入れる。
+ */
+export function reachableSetCounts(
+  state: PlayerState,
+  monster: MonsterInstance,
+  settings: AutoEquipSettings,
+): Map<SetType, number> {
+  const bySlot = collectCandidates(state, monster, settings);
+  const slotsOf = new Map<SetType, Set<EquipSlot>>();
+  for (const type of SET_TYPES) slotsOf.set(type, new Set());
+  for (const [slot, items] of bySlot) {
+    for (const item of items) slotsOf.get(item.set)?.add(slot);
+  }
+  const byId = new Map(state.equipment.map((e) => [e.id, e] as const));
+  const counts = new Map<SetType, number>();
+  for (const type of SET_TYPES) counts.set(type, slotsOf.get(type)?.size ?? 0);
+  for (const slot of settings.fixedSlots) {
+    const item = byId.get(monster.equipment[slot] ?? "");
+    if (item) counts.set(item.set, (counts.get(item.set) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** そのシリーズが4個でしか効かないか。画面で2を押せなくするために使う */
+export function isFourPieceOnlySet(type: SetType): boolean {
+  return FOUR_PIECE_ONLY_SETS.has(type);
 }
 
 /**
@@ -564,7 +662,11 @@ export function planAutoEquip(
   const before = toBattleDefinition(monster, dex, currentItems).stats;
   const baseStats = toBattleDefinition(monster, dex, []).stats;
 
-  const plans = buildSetPlans(bySlot, fixedItems);
+  const wantedSets = normalizeWantedSets(settings.wantedSets);
+  if (wantedSetsTotal(wantedSets) > EQUIP_SLOTS.length) {
+    return { ok: false, reason: `シリーズの指定が合計${wantedSetsTotal(wantedSets)}個で、${EQUIP_SLOTS.length}枠に入りません` };
+  }
+  const plans = buildSetPlans(bySlot, fixedItems, wantedSets);
   const ranking = rankSlots(bySlot, baseStats, settings);
 
   const freeSlots = EQUIP_SLOTS.filter((slot) => !fixed.has(slot) && (bySlot.get(slot)?.length ?? 0) > 0);
@@ -582,6 +684,13 @@ export function planAutoEquip(
    */
   const evaluate = (picked: Equipment[]): Stats | null => {
     const items = [...fixedItems, ...picked];
+    /*
+     * **指定されたシリーズは、ここでも実際に数える。**
+     * 構成の絞り込みだけに任せると、詰め直しが1枠を別シリーズへ
+     * 入れ替えた時に黙って崩れる(そちらの方がステータスは上がるので、
+     * 放っておくと必ずそうなる)。約束したものは最後に数えて守る。
+     */
+    if (!meetsWantedSets(items, wantedSets)) return null;
     const stats = toBattleDefinition(monster, dex, items).stats;
     evaluated += 1;
     sawAny = true;
@@ -688,9 +797,9 @@ export function planAutoEquip(
   if (!best) {
     return {
       ok: false,
-      reason: sawAny
-        ? "指定条件を満たす装備構成がありません"
-        : Object.keys(settings.minimums).length > 0
+      reason: wantedSets.size > 0 && !sawAny
+        ? "指定したシリーズをそろえられません"
+        : sawAny || Object.keys(settings.minimums).length > 0
           ? "指定条件を満たす装備構成がありません"
           : "使える装備がありません",
     };

@@ -109,6 +109,7 @@ const SCREENS = [
    */
   { name: "おまかせ装備", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip()" },
   { name: "おまかせ装備(探した後)", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip(true)" },
+  { name: "おまかせ装備(シリーズ指定)", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip(false, true)" },
   { name: "クリエイト/スキル継承", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('SKILL')" },
   { name: "クリエイト/タイプ転生", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TYPE')" },
   { name: "クリエイト/能力付与", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('ABILITY')" },

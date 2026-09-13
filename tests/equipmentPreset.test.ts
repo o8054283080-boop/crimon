@@ -178,6 +178,36 @@ describe("前から遊んでいる人の控え", () => {
     expect(presets[2].name.length).toBeLessThanOrEqual(12);
   });
 
+  /*
+   * 指定シリーズも枠へ焼いて、再起動しても残ること。
+   * **形が増えた時に保存を通し忘れると、前から遊んでいる人だけが
+   * 「保存したのに戻らない枠」を持つ**ことになる。
+   */
+  it("そろえるシリーズも、保存して読み直すと残る", () => {
+    const { state, monsterId } = stateWith();
+    const monster = state.monsters.find((m) => m.id === monsterId)!;
+    writePreset(monster, 0, capturePreset(monster, 0, {
+      ...createDefaultAutoEquipSettings(), type: "power", wantedSets: { SWIFT: 4, CRIT: 2 },
+    }, "速攻"));
+
+    const restored = decodeSave(encodeSave(state))!;
+    const back = restored.monsters.find((m) => m.id === monsterId)!;
+    expect(presetsOf(back)[0].settings.wantedSets).toEqual({ SWIFT: 4, CRIT: 2 });
+  });
+
+  it("知らないシリーズ名や、2でも4でもない個数は落とす", () => {
+    const settings = normalizeAutoEquipSettings({
+      wantedSets: { SWIFT: 4, CRIT: 3, でたらめ: 4, RAMPAGE: 2 },
+    } as never);
+    // 3個セットは無い。知らない名前も落とす。暴走の2は4へ引き上げる
+    expect(settings.wantedSets).toEqual({ SWIFT: 4, RAMPAGE: 4 });
+  });
+
+  it("指定していない子は、そのぶんを持たない", () => {
+    const settings = normalizeAutoEquipSettings({ type: "atk" } as never);
+    expect(settings.wantedSets, "空の入れ物を配るとセーブが太る").toBeUndefined();
+  });
+
   it("知らない条件は既定値へ丸める", () => {
     const settings = normalizeAutoEquipSettings({
       type: "でたらめ", priorities: ["spd", "spd", "atk", "def", "hp"], minimums: { spd: -5, atk: Number.NaN, hp: 100 },
