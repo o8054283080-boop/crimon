@@ -19,6 +19,8 @@ import type { AllySpec, GearGrade } from "./battleLab/types.js";
 export interface PressureTeam {
   allies: AllySpec[];
   purpose: string;
+  /** 指定した装備ダンジョンだけで表示する。未指定は両方で使う共通編成。 */
+  kinds?: EquipmentDungeonKind[];
   /** 毒詳細で死亡時点を追う役。ラベルは allies の label と一致させる。 */
   healerLabels?: string[];
   poisonCarryLabels?: string[];
@@ -67,8 +69,8 @@ export const PVE_DUNGEON_TEAMS: Record<string, PressureTeam> = {
     ],
     healerLabels: ["回復・水フェニックス"],
   },
-  "高レア": {
-    purpose: "高レアの主力2体、妨害、回復、攻撃支援で組む",
+  "共通高レア": {
+    purpose: "同じ5体を全PvEへ投げ、コンテンツ間の差を比べる固定高レア編成",
     allies: [
       ally("主力・草グリフォン", "griffon", "GRASS", "MAX_ATTACKER"),
       ally("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"),
@@ -77,6 +79,93 @@ export const PVE_DUNGEON_TEAMS: Record<string, PressureTeam> = {
       ally("支援・火ヴァルキリア", "valkyria", "FIRE", "MAX_SUPPORT"),
     ],
     healerLabels: ["回復・水セラフ"],
+  },
+  "魔人攻略高レア(水セラフ)": {
+    kinds: ["DEMON"],
+    purpose: "単発火力、毒・回復阻害、強化阻害、障壁を固定し、水セラフを採用",
+    allies: [
+      ally("主力・草ドラゴン", "dragon", "GRASS", "MAX_ATTACKER"),
+      ally("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"),
+      ally("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"),
+      ally("回復・水セラフ", "seraph", "WATER", "MAX_HEALER"),
+    ],
+    healerLabels: ["回復・水セラフ"],
+    poisonCarryLabels: ["毒火力・電気フェンリル", "妨害・草アビスリーパー"],
+  },
+  "魔人攻略高レア(水フェニックス)": {
+    kinds: ["DEMON"],
+    purpose: "魔人攻略高レアの他4体を固定し、ヒーラーだけ水フェニックスへ差し替え",
+    allies: [
+      ally("主力・草ドラゴン", "dragon", "GRASS", "MAX_ATTACKER"),
+      ally("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"),
+      ally("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"),
+      ally("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER"),
+    ],
+    healerLabels: ["回復・水フェニックス"],
+    poisonCarryLabels: ["毒火力・電気フェンリル", "妨害・草アビスリーパー"],
+  },
+  "魔人攻略高レア(光フェアリー)": {
+    kinds: ["DEMON"],
+    purpose: "魔人攻略高レアの他4体を固定し、ヒーラーだけ光フェアリーへ差し替え",
+    allies: [
+      ally("主力・草ドラゴン", "dragon", "GRASS", "MAX_ATTACKER"),
+      ally("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"),
+      ally("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"),
+      ally("回復・光フェアリー", "fairy", "LIGHT", "MAX_HEALER"),
+    ],
+    healerLabels: ["回復・光フェアリー"],
+    poisonCarryLabels: ["毒火力・電気フェンリル", "妨害・草アビスリーパー"],
+  },
+  "魔獣攻略高レア(水セラフ)": {
+    kinds: ["BEAST"],
+    purpose: "指定4体を固定し、ヒーラーだけ水セラフへ差し替える魔獣比較編成",
+    allies: [
+      ally("主力・草グリフォン", "griffon", "GRASS", "MAX_ATTACKER"),
+      ally("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"),
+      ally("妨害・電気ネメシス", "nemesis", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("支援・火ヴァルキリア", "valkyria", "FIRE", "MAX_SUPPORT"),
+      ally("回復・水セラフ", "seraph", "WATER", "MAX_HEALER"),
+    ],
+    healerLabels: ["回復・水セラフ"],
+  },
+  "魔獣攻略高レア(水フェニックス)": {
+    kinds: ["BEAST"],
+    purpose: "魔獣攻略高レアの他4体を固定し、ヒーラーだけ水フェニックスへ差し替え",
+    allies: [
+      ally("主力・草グリフォン", "griffon", "GRASS", "MAX_ATTACKER"),
+      ally("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"),
+      ally("妨害・電気ネメシス", "nemesis", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("支援・火ヴァルキリア", "valkyria", "FIRE", "MAX_SUPPORT"),
+      ally("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER"),
+    ],
+    healerLabels: ["回復・水フェニックス"],
+  },
+  "魔獣攻略高レア(光フェアリー)": {
+    kinds: ["BEAST"],
+    purpose: "魔獣攻略高レアの他4体を固定し、ヒーラーだけ光フェアリーへ差し替え",
+    allies: [
+      ally("主力・草グリフォン", "griffon", "GRASS", "MAX_ATTACKER"),
+      ally("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"),
+      ally("妨害・電気ネメシス", "nemesis", "ELECTRIC", "MAX_DEBUFFER"),
+      ally("支援・火ヴァルキリア", "valkyria", "FIRE", "MAX_SUPPORT"),
+      ally("回復・光フェアリー", "fairy", "LIGHT", "MAX_HEALER"),
+    ],
+    healerLabels: ["回復・光フェアリー"],
+  },
+  "魔獣攻略高レア(タンク)": {
+    kinds: ["BEAST"],
+    purpose: "魔獣の低HP狙いと防御低下へ、ネメシス枠を障壁・解除タンクへ替えた安定型",
+    allies: [
+      ally("主力・草グリフォン", "griffon", "GRASS", "MAX_ATTACKER"),
+      ally("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"),
+      ally("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"),
+      ally("支援・火ヴァルキリア", "valkyria", "FIRE", "MAX_SUPPORT"),
+      ally("回復・光フェアリー", "fairy", "LIGHT", "MAX_HEALER"),
+    ],
+    healerLabels: ["回復・光フェアリー"],
   },
   "防御無視": {
     purpose: "完全防御無視を持つ闇ドラゴンと火ウルフの相対価値を確認する",
@@ -120,15 +209,50 @@ export interface PressureResult {
   healerDeathRate: number;
   poisonCarryDeathAction: number | null;
   poisonCarryDeathRate: number;
+  /** 1戦あたりの味方への実回復量（HEALイベントの実回復値）。 */
+  totalHealing: number;
+  /** 1戦あたりの、実際に弱体を1個以上消した味方人数。 */
+  cleanseCount: number;
+  /** 1戦あたりの免疫付与人数。 */
+  immunityCount: number;
+  /** 1戦あたりのATK/DEF/SPD/クリ率/クリダメ上昇付与人数。 */
+  majorBuffCount: number;
 }
 
-function deathAction(result: ReturnType<BattleEngine["run"]>, labels: readonly string[]): number | null {
+export function deathAction(result: ReturnType<BattleEngine["run"]>, labels: readonly string[]): number | null {
   if (labels.length === 0) return null;
   for (let i = 0; i < result.turns.length; i += 1) {
     const tracked = result.turns[i].snapshot.filter((u) => labels.includes(u.name));
     if (tracked.length > 0 && tracked.some((u) => !u.alive)) return i + 1;
   }
   return null;
+}
+
+export interface SupportMetrics {
+  totalHealing: number;
+  cleanseCount: number;
+  immunityCount: number;
+  majorBuffCount: number;
+}
+
+/** ログの文言は本編エンジンが「実際に適用できた時」だけ出すため、試行ではなく成功回数を数える。 */
+export function supportMetricsOf(result: ReturnType<BattleEngine["run"]>): SupportMetrics {
+  const playerIds = new Set(
+    result.turns[0]?.snapshot.filter((unit) => unit.team === "PLAYER").map((unit) => unit.instanceId) ?? [],
+  );
+  let totalHealing = 0, cleanseCount = 0, immunityCount = 0, majorBuffCount = 0;
+  for (const turn of result.turns) {
+    for (const event of turn.events) {
+      if (event.kind === "HEAL" && playerIds.has(event.targetId)) totalHealing += event.amount ?? 0;
+    }
+    for (const line of turn.lines) {
+      if (!line.includes("[味方:")) continue;
+      if (line.includes("のデバフが解除された！")) cleanseCount += 1;
+      if (line.includes("は状態異常免疫を得た！")) immunityCount += 1;
+      if (/ の (ATK|DEF|SPD|CRIRATE|CRIDMG) が上昇！/.test(line)) majorBuffCount += 1;
+    }
+  }
+  return { totalHealing, cleanseCount, immunityCount, majorBuffCount };
 }
 
 export function measurePressure(
@@ -146,6 +270,7 @@ export function measurePressure(
   let maxPoisonOnEnemy = 0, poisonStackSum = 0, poisonSnapshotCount = 0, poisonBattles = 0;
   let poisonDamage = 0, totalEnemyDamage = 0;
   let healerDeathSum = 0, healerDeaths = 0, poisonDeathSum = 0, poisonDeaths = 0;
+  let totalHealing = 0, cleanseCount = 0, immunityCount = 0, majorBuffCount = 0;
   const actions: number[] = [];
 
   for (let i = 0; i < trials; i += 1) {
@@ -177,6 +302,12 @@ export function measurePressure(
       }
     }
     if (battleHadPoison) poisonBattles += 1;
+
+    const support = supportMetricsOf(result);
+    totalHealing += support.totalHealing;
+    cleanseCount += support.cleanseCount;
+    immunityCount += support.immunityCount;
+    majorBuffCount += support.majorBuffCount;
 
     const healerDeath = deathAction(result, team.healerLabels ?? []);
     if (healerDeath !== null) { healerDeathSum += healerDeath; healerDeaths += 1; }
@@ -211,25 +342,35 @@ export function measurePressure(
     healerDeathRate: healerDeaths / trials,
     poisonCarryDeathAction: poisonDeaths > 0 ? poisonDeathSum / poisonDeaths : null,
     poisonCarryDeathRate: poisonDeaths / trials,
+    totalHealing: totalHealing / trials,
+    cleanseCount: cleanseCount / trials,
+    immunityCount: immunityCount / trials,
+    majorBuffCount: majorBuffCount / trials,
   };
 }
 
 export interface TeamStatSummary {
   label: string;
+  element: AllySpec["element"];
+  role: string;
   stats: Stats;
 }
 
 /** GearGradeに乱数幅があるため、最終ステータスは同じseed群の平均を返す。 */
 export function summarizeTeamStats(team: PressureTeam, gear: GearGrade, trials = 200, seedBase = 20260913): TeamStatSummary[] {
   const sums = team.allies.map(() => ({ hp: 0, atk: 0, def: 0, spd: 0, criRate: 0, criDmg: 0, resistance: 0, accuracy: 0 }));
+  let roles: string[] = [];
   for (let i = 0; i < trials; i += 1) {
     const rng = mulberry32(seedBase + i);
     team.allies.map((spec) => buildAlly(spec, rng, gear)).forEach((def, index) => {
+      if (i === 0) roles[index] = def.role;
       for (const key of Object.keys(sums[index]) as (keyof Stats)[]) sums[index][key] += def.stats[key];
     });
   }
   return sums.map((sum, index) => ({
     label: team.allies[index].label ?? `${team.allies[index].templateId}[${team.allies[index].element}]`,
+    element: team.allies[index].element,
+    role: roles[index],
     stats: Object.fromEntries(Object.entries(sum).map(([key, value]) => [key, value / trials])) as unknown as Stats,
   }));
 }
@@ -242,6 +383,7 @@ if (process.argv[1]?.endsWith("dungeonPressure.ts")) {
   for (const f of floors.length > 0 ? floors : [7, 8, 9, 10]) {
     console.log(`\n=== ${f}階 (powerScale ${EQUIPMENT_DUNGEON_FLOORS[f - 1].powerScale.toFixed(3)} / ${gear}) ===`);
     for (const [name, team] of Object.entries(PVE_DUNGEON_TEAMS)) {
+      if (team.kinds && !team.kinds.includes("DEMON")) continue;
       const r = measurePressure(team, f, gear);
       console.log(`${name}: 勝率${(r.rate * 100).toFixed(0)}% 敵残${(r.enemyHpLeft * 100).toFixed(1)}% 手数${r.actions} 最大毒${r.maxPoisonOnEnemy}`);
     }

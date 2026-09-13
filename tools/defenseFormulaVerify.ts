@@ -34,10 +34,12 @@ import { buildAlly } from "./battleLab/build.js";
 import { mulberry32 } from "./battleLab/rng.js";
 import { runMany } from "./battleLab/run.js";
 import { findScenario } from "./battleLab/scenarios/index.js";
-import type { GearGrade } from "./battleLab/types.js";
+import type { AllySpec, GearGrade } from "./battleLab/types.js";
 import {
   PVE_DUNGEON_TEAMS,
+  deathAction,
   measurePressure,
+  supportMetricsOf,
   summarizeTeamStats,
   type PressureResult,
   type PressureTeam,
@@ -122,6 +124,14 @@ interface Row {
   turnsMean: number;
   wipe: number;
   timeout: number;
+}
+
+interface DiagnosticRow extends Row {
+  healerDeathRate: number;
+  totalHealing: number;
+  cleanseCount: number;
+  immunityCount: number;
+  majorBuffCount: number;
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
@@ -218,16 +228,21 @@ function runTower(runs: number): void {
 function dungeonRow(
   team: PressureTeam, floor: number, kind: "DEMON" | "BEAST", runs: number,
   patchEnemies?: (defs: MonsterDefinition[]) => MonsterDefinition[],
-): Row & { pressure: PressureResult } {
+): DiagnosticRow & { pressure: PressureResult } {
   const r = measurePressure(team, floor, GEAR, runs, kind, 20260913, patchEnemies);
   return {
     win: r.rate, enemyLeft: r.enemyHpLeft, allyLeft: r.allyHpLeft,
     turnsMedian: r.actions, turnsMean: r.actionsMean, wipe: r.wipeRate, timeout: r.timeoutRate,
+    healerDeathRate: r.healerDeathRate,
+    totalHealing: r.totalHealing,
+    cleanseCount: r.cleanseCount,
+    immunityCount: r.immunityCount,
+    majorBuffCount: r.majorBuffCount,
     pressure: r,
   };
 }
 
-function printPoisonRows(rows: Record<string, Row & { pressure: PressureResult }>): void {
+function printPoisonRows(rows: Record<string, DiagnosticRow & { pressure: PressureResult }>): void {
   for (const cond of CONDITIONS) {
     const r = rows[cond.key]?.pressure;
     if (!r) continue;
@@ -242,75 +257,126 @@ function printPoisonRows(rows: Record<string, Row & { pressure: PressureResult }
   }
 }
 
+function printSupportRows(rows: Record<string, DiagnosticRow>): void {
+  for (const cond of CONDITIONS) {
+    const r = rows[cond.key];
+    if (!r) continue;
+    console.log(
+      `    支援詳細 ${cond.key}: 回復${r.totalHealing.toFixed(0)} ` +
+      `解除${r.cleanseCount.toFixed(2)} 免疫${r.immunityCount.toFixed(2)} ` +
+      `主要バフ${r.majorBuffCount.toFixed(2)} 回復役死亡${pct(r.healerDeathRate)}`,
+    );
+  }
+}
+
 function runDungeon(kind: "DEMON" | "BEAST", runs: number): void {
   printHeader(`${kind === "DEMON" ? "魔人" : "魔獣"}のダンジョン / ${runs}戦・BattleLab装備${GEAR}`);
   for (const floor of [10, 11, 12].filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value))) {
     console.log(`  ── ${floor}階 ──`);
     for (const [name, team] of Object.entries(PVE_DUNGEON_TEAMS)) {
       if (TEAM_FILTER && name !== TEAM_FILTER) continue;
+      if (team.kinds && !team.kinds.includes(kind)) continue;
       const rows = underEachCondition((scale) => dungeonRow(
         team, floor, kind, runs,
         scale === IDENTITY_SCALE ? undefined : (defs) => patchEnemyDefs(defs, scale),
       ));
       printRows(name, rows);
       if (name.includes("毒")) printPoisonRows(rows);
+      if (name.includes("攻略高レア")) printSupportRows(rows);
       console.log("");
     }
   }
 }
 
-function printDungeonTeamStats(runs: number): void {
-  printHeader(`実戦毒編成の最終ステータス / 装備${GEAR}・同一seed群${runs}個体の平均`);
-  for (const row of summarizeTeamStats(PVE_DUNGEON_TEAMS["実戦毒"], GEAR, runs, 20260913)) {
-    const s = row.stats;
-    console.log(
-      `  ${row.label.padEnd(18)} HP${s.hp.toFixed(0).padStart(7)} ATK${s.atk.toFixed(0).padStart(5)} ` +
-      `DEF${s.def.toFixed(0).padStart(5)} SPD${s.spd.toFixed(0).padStart(4)} ` +
-      `CR${pct(s.criRate).padStart(4)} CD${pct(s.criDmg).padStart(5)} ` +
-      `的中${pct(s.accuracy).padStart(4)} 抵抗${pct(s.resistance).padStart(4)}`,
-    );
+function printTeamStats(title: string, teams: Record<string, PressureTeam>, runs: number): void {
+  printHeader(`${title} / 装備${GEAR}・同一seed群${runs}個体の平均`);
+  for (const [name, team] of Object.entries(teams)) {
+    console.log(`  ── ${name}: ${team.purpose} ──`);
+    for (const row of summarizeTeamStats(team, GEAR, runs, 20260913)) {
+      const s = row.stats;
+      console.log(
+        `  ${row.label.padEnd(22)} ${row.element.padEnd(8)} ${row.role.padEnd(9)} ` +
+        `HP${s.hp.toFixed(0).padStart(7)} ATK${s.atk.toFixed(0).padStart(5)} ` +
+        `DEF${s.def.toFixed(0).padStart(5)} SPD${s.spd.toFixed(0).padStart(4)} ` +
+        `CR${pct(s.criRate).padStart(4)} CD${pct(s.criDmg).padStart(5)} ` +
+        `的中${pct(s.accuracy).padStart(4)} 抵抗${pct(s.resistance).padStart(4)}`,
+      );
+    }
   }
 }
 
 // ───────────────────────────── 目覚の深域 ─────────────────────────────
 
 /** awakeningDepths.ts と同じ3編成。**削り役を必ず入れる**(殴る手の無い編成で測ると嘘が出る) */
-const AWAKENING_TEAMS: Record<string, { templateId: string; element: string; preset: string }[]> = {
-  "集中型": [
-    { templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" },
-    { templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
-    { templateId: "golem", element: "GRASS", preset: "MAX_TANK" },
-    { templateId: "fairy", element: "LIGHT", preset: "MAX_SUPPORT" },
-  ],
-  "分散型": [
-    { templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" },
-    { templateId: "wolf", element: "ELECTRIC", preset: "MAX_ATTACKER" },
-    { templateId: "knight", element: "WATER", preset: "MAX_ATTACKER" },
-    { templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
-  ],
-  "耐久型": [
-    { templateId: "golem", element: "GRASS", preset: "MAX_TANK" },
-    { templateId: "seraph", element: "LIGHT", preset: "MAX_HEALER" },
-    { templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
-    { templateId: "dragon", element: "FIRE", preset: "MAX_ATTACKER" },
-  ],
+const a = (label: string, templateId: string, element: AllySpec["element"], preset: NonNullable<AllySpec["preset"]>): AllySpec => ({
+  label, templateId, element, preset,
+});
+
+const AWAKENING_TEAMS: Record<string, PressureTeam> = {
+  "集中型": {
+    purpose: "既存の攻撃役1・支援3編成",
+    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("回復・水ウィスプ", "wisp", "WATER", "MAX_HEALER"), a("防護・草ゴーレム", "golem", "GRASS", "MAX_TANK"), a("支援・光フェアリー", "fairy", "LIGHT", "MAX_SUPPORT")],
+    healerLabels: ["回復・水ウィスプ"],
+  },
+  "分散型": {
+    purpose: "既存の攻撃役3・回復役1編成",
+    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("火力・電気ウルフ", "wolf", "ELECTRIC", "MAX_ATTACKER"), a("火力・水ナイト", "knight", "WATER", "MAX_ATTACKER"), a("回復・水ウィスプ", "wisp", "WATER", "MAX_HEALER")],
+    healerLabels: ["回復・水ウィスプ"],
+  },
+  "耐久型": {
+    purpose: "既存の防護1・回復2・攻撃1編成",
+    allies: [a("防護・草ゴーレム", "golem", "GRASS", "MAX_TANK"), a("回復・光セラフ", "seraph", "LIGHT", "MAX_HEALER"), a("回復・水ウィスプ", "wisp", "WATER", "MAX_HEALER"), a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER")],
+    healerLabels: ["回復・光セラフ", "回復・水ウィスプ"],
+  },
+  "共通高レア": PVE_DUNGEON_TEAMS["共通高レア"],
+  "高レア集中型": {
+    purpose: "主力を草ドラゴン1体に絞り、妨害・加速・障壁・回復で支える",
+    allies: [a("主力・草ドラゴン", "dragon", "GRASS", "MAX_ATTACKER"), a("妨害・電気アビスリーパー", "abyssreaper", "ELECTRIC", "MAX_DEBUFFER"), a("支援・光クロノス", "chronos", "LIGHT", "MAX_SUPPORT"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER")],
+    healerLabels: ["回復・水フェニックス"],
+  },
+  "高レアバランス型(水セラフ)": {
+    purpose: "火力2・妨害・防護を固定し、水セラフを採用",
+    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"), a("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・水セラフ", "seraph", "WATER", "MAX_HEALER")],
+    healerLabels: ["回復・水セラフ"],
+  },
+  "高レアバランス型(水フェニックス)": {
+    purpose: "高レアバランス型の他4体を固定し、水フェニックスを採用",
+    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"), a("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・水フェニックス", "phoenix", "WATER", "MAX_HEALER")],
+    healerLabels: ["回復・水フェニックス"],
+  },
+  "高レアバランス型(光フェアリー)": {
+    purpose: "高レアバランス型の他4体を固定し、光フェアリーを採用",
+    allies: [a("主力・火ドラゴン", "dragon", "FIRE", "MAX_ATTACKER"), a("毒火力・電気フェンリル", "fenrir", "ELECTRIC", "MAX_DEBUFFER"), a("妨害・草アビスリーパー", "abyssreaper", "GRASS", "MAX_DEBUFFER"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・光フェアリー", "fairy", "LIGHT", "MAX_HEALER")],
+    healerLabels: ["回復・光フェアリー"],
+  },
+  "高レア耐久型": {
+    purpose: "攻撃1・加速1・防護2・回復1でボスの適応と反撃を抑える",
+    allies: [a("主力・草ドラゴン", "dragon", "GRASS", "MAX_ATTACKER"), a("支援・光クロノス", "chronos", "LIGHT", "MAX_SUPPORT"), a("防護・水ベヒーモス", "behemoth", "WATER", "MAX_TANK"), a("防護・光ベヒーモス", "behemoth", "LIGHT", "MAX_TANK"), a("回復・光フェアリー", "fairy", "LIGHT", "MAX_HEALER")],
+    healerLabels: ["回復・光フェアリー"],
+  },
 };
 
 function awakeningRow(
-  specs: { templateId: string; element: string; preset: string }[],
+  team: PressureTeam,
   floorIndex: number,
   runs: number,
   scale: EnemyScale = IDENTITY_SCALE,
-): Row {
+): DiagnosticRow {
   const floor = AWAKENING_DEPTH_FLOORS[floorIndex - 1];
   let wins = 0, enemyLeft = 0, allyLeft = 0, wipe = 0, timeout = 0;
   const turns: number[] = [];
+  let healerDeaths = 0, totalHealing = 0, cleanseCount = 0, immunityCount = 0, majorBuffCount = 0;
   for (let i = 0; i < runs; i += 1) {
     const rng = mulberry32(20260913 + i * 7919);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const players = specs.map((spec) => buildAlly(spec as any, rng, GEAR));
+    const players = team.allies.map((spec) => buildAlly(spec, rng, GEAR));
     const enemies = patchEnemyDefs(buildDungeonEnemyTeam(floor), scale);
     const res = new BattleEngine(players, enemies, { rng, maxTurns: 300 }).run();
+    if (deathAction(res, team.healerLabels ?? []) !== null) healerDeaths += 1;
+    const support = supportMetricsOf(res);
+    totalHealing += support.totalHealing;
+    cleanseCount += support.cleanseCount;
+    immunityCount += support.immunityCount;
+    majorBuffCount += support.majorBuffCount;
     if (res.winner === "PLAYER") wins += 1;
     turns.push(res.turnsTaken);
     const last = res.turns[res.turns.length - 1];
@@ -329,6 +395,11 @@ function awakeningRow(
     win: wins / runs, enemyLeft: enemyLeft / runs, allyLeft: allyLeft / runs,
     turnsMedian: turns[Math.floor(runs / 2)], turnsMean: turns.reduce((a, b) => a + b, 0) / runs,
     wipe: wipe / runs, timeout: timeout / runs,
+    healerDeathRate: healerDeaths / runs,
+    totalHealing: totalHealing / runs,
+    cleanseCount: cleanseCount / runs,
+    immunityCount: immunityCount / runs,
+    majorBuffCount: majorBuffCount / runs,
   };
 }
 
@@ -336,9 +407,11 @@ function runAwakening(runs: number): void {
   printHeader(`目覚の深域 / ${runs}戦・装備${GEAR}`);
   for (const floor of [8, 9, 10].filter((value) => FLOOR_FILTER.length === 0 || FLOOR_FILTER.includes(value))) {
     console.log(`  ── ${floor}階 ──`);
-    for (const [name, specs] of Object.entries(AWAKENING_TEAMS)) {
+    for (const [name, team] of Object.entries(AWAKENING_TEAMS)) {
       if (TEAM_FILTER && name !== TEAM_FILTER) continue;
-      printRows(name, underEachCondition((scale) => awakeningRow(specs, floor, runs, scale)));
+      const rows = underEachCondition((scale) => awakeningRow(team, floor, runs, scale));
+      printRows(name, rows);
+      if (name.includes("高レア")) printSupportRows(rows);
       console.log("");
     }
   }
@@ -448,8 +521,22 @@ console.log(`検証開始時のフラグ: ${JSON.stringify(balanceFlags)}`);
 if (ONLY === "all" || ONLY === "tower") runTower(RUNS);
 if (ONLY === "all" || ONLY === "demon") runDungeon("DEMON", RUNS);
 if (ONLY === "all" || ONLY === "beast") runDungeon("BEAST", RUNS);
-if (ONLY === "all" || ONLY === "demon") printDungeonTeamStats(RUNS);
-if (ONLY === "all" || ONLY === "awakening") runAwakening(RUNS);
+if (ONLY === "all" || ONLY === "demon") {
+  printTeamStats("魔人・実戦毒／共通高レア／攻略高レアの最終ステータス", Object.fromEntries(
+    Object.entries(PVE_DUNGEON_TEAMS).filter(([name]) => name === "実戦毒" || name === "共通高レア" || name.startsWith("魔人攻略高レア")),
+  ), RUNS);
+}
+if (ONLY === "all" || ONLY === "beast") {
+  printTeamStats("魔獣・共通高レア／攻略高レアの最終ステータス", Object.fromEntries(
+    Object.entries(PVE_DUNGEON_TEAMS).filter(([name]) => name === "共通高レア" || name.startsWith("魔獣攻略高レア")),
+  ), RUNS);
+}
+if (ONLY === "all" || ONLY === "awakening") {
+  runAwakening(RUNS);
+  printTeamStats("目覚め・共通高レア／攻略高レアの最終ステータス", Object.fromEntries(
+    Object.entries(AWAKENING_TEAMS).filter(([name]) => name.includes("高レア")),
+  ), RUNS);
+}
 if (DEF_SCAN) {
   printHeader("ボスDEFの逆算(新式のまま、旧式の難易度へ戻すには)");
   for (const floor of [10, 11, 12]) scanBossDef("DEMON", floor, RUNS);
