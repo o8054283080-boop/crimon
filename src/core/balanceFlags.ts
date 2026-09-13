@@ -33,9 +33,23 @@ export interface BalanceFlags {
    * ここを振って、どの係数なら現行の手数に近いかを測るために可変にしてある。
    */
   swRatio: number;
+  /**
+   * 統一した時の防御**低下**幅。既定0.5。
+   * 検証で75%を試すために可変にしてある。
+   */
+  defDownRate: number;
+  /** 統一した時の防御**上昇**幅。既定0.3 */
+  defUpRate: number;
+  /**
+   * タイプ転生の倍率の上書き。**種類ごとに、書いた項目だけ**差し替える。
+   * `{ HP: { hp: 1.10 } }` なら体力タイプのHP倍率だけが変わり、残りは本番のまま。
+   */
+  typeMultiplierOverride?: Partial<Record<string, Record<string, number>>>;
+  /** 能力付与の1ptあたりの値の上書き。書いた能力だけ差し替える */
+  abilityPointOverride?: Partial<Record<string, number>>;
 }
 
-/** 統一した時の幅。低下は50%、上昇は30% */
+/** 統一した時の既定の幅。低下は50%、上昇は30% */
 export const UNIFIED_DEF_DOWN = 0.5;
 export const UNIFIED_DEF_UP = 0.3;
 
@@ -57,7 +71,24 @@ export const balanceFlags: BalanceFlags = {
   defenseFormula: readEnv("CRIMON_DEF_FORMULA") === "sw" ? "sw" : "legacy",
   unifyDefModifiers: readEnv("CRIMON_UNIFY_DEF") === "1",
   swRatio: Number(readEnv("CRIMON_DEF_SW_RATIO") ?? DEF_SW_RATIO) || DEF_SW_RATIO,
+  defDownRate: Number(readEnv("CRIMON_DEF_DOWN") ?? UNIFIED_DEF_DOWN) || UNIFIED_DEF_DOWN,
+  defUpRate: Number(readEnv("CRIMON_DEF_UP") ?? UNIFIED_DEF_UP) || UNIFIED_DEF_UP,
 };
+
+/**
+ * 検証を終えたら必ず呼ぶ。**上書きを消し忘れると、後の測定が全部ずれる。**
+ * `setBalanceFlags` は Object.assign なので、undefined を渡しても消えない
+ * (キーが残る)。消すのはこちらの仕事。
+ */
+export function resetBalanceFlags(): void {
+  balanceFlags.defenseFormula = "legacy";
+  balanceFlags.unifyDefModifiers = false;
+  balanceFlags.swRatio = DEF_SW_RATIO;
+  balanceFlags.defDownRate = UNIFIED_DEF_DOWN;
+  balanceFlags.defUpRate = UNIFIED_DEF_UP;
+  delete balanceFlags.typeMultiplierOverride;
+  delete balanceFlags.abilityPointOverride;
+}
 
 /** 測定ツールから明示的に切り替える。**本番の経路からは呼ばない。** */
 export function setBalanceFlags(next: Partial<BalanceFlags>): void {

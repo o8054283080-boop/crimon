@@ -4,7 +4,7 @@ import { Star, computeEffectiveStats, requiredExpForStarLevel } from "./rarity.j
 import { applyPlayerStatBoost } from "./playerStatBoost.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
-import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDevelopment.js";
+import { effectiveAbilityPointValues, effectiveTypeMultipliers } from "./monsterDevelopment.js";
 import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
 import { applySkillTalents } from "./talentApply.js";
 import { talentCombatBonus, talentStatBonus, type TalentState } from "./talents.js";
@@ -166,14 +166,15 @@ export function toBattleDefinition(
     instance.star,
   );
   const type = instance.development.type;
-  const multiplier = type ? MONSTER_TYPE_STAT_MULTIPLIERS[type] : MONSTER_TYPE_STAT_MULTIPLIERS.BALANCE;
+  const multiplier = effectiveTypeMultipliers(type ?? "BALANCE");
+  const apValues = effectiveAbilityPointValues();
   const points = instance.development.abilityPoints;
   const developedStats = {
     ...growthStats,
-    hp: Math.round(growthStats.hp * multiplier.hp + points.hp * ABILITY_POINT_VALUES.hp),
-    atk: Math.round(growthStats.atk * multiplier.atk + points.atk * ABILITY_POINT_VALUES.atk),
-    def: Math.round(growthStats.def * multiplier.def + points.def * ABILITY_POINT_VALUES.def),
-    spd: Math.round(growthStats.spd * multiplier.spd + Math.floor(points.spd * ABILITY_POINT_VALUES.spd)),
+    hp: Math.round(growthStats.hp * multiplier.hp + points.hp * apValues.hp),
+    atk: Math.round(growthStats.atk * multiplier.atk + points.atk * apValues.atk),
+    def: Math.round(growthStats.def * multiplier.def + points.def * apValues.def),
+    spd: Math.round(growthStats.spd * multiplier.spd + Math.floor(points.spd * apValues.spd)),
     criRate: Math.max(0, Math.min(1, growthStats.criRate + multiplier.criRate)),
     criDmg: Math.max(1, growthStats.criDmg + multiplier.criDmg),
     accuracy: Math.max(0, Math.min(1, growthStats.accuracy + multiplier.accuracy)),

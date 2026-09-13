@@ -1,4 +1,4 @@
-import { UNIFIED_DEF_DOWN, UNIFIED_DEF_UP, balanceFlags } from "./balanceFlags.js";
+import { balanceFlags } from "../core/balanceFlags.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { PassiveLevelEffect, PassiveSpec, passiveAtLevel } from "../core/passive.js";
 import { BuffStat, STATUS_EFFECT_CATEGORY, Skill, StatusEffectCategory, StatusEffectType } from "../core/skill.js";
@@ -262,7 +262,7 @@ export function getEffectiveStat(unit: BattleUnit, stat: BuffStat): number {
     .reduce((sum, e) => {
       if (!balanceFlags.unifyDefModifiers || stat !== "def") return sum + e.amount;
       if (e.amount === 0) return sum;
-      return sum + (e.amount < 0 ? -UNIFIED_DEF_DOWN : UNIFIED_DEF_UP);
+      return sum + (e.amount < 0 ? -balanceFlags.defDownRate : balanceFlags.defUpRate);
     }, 0);
 
   if (stat === "criRate") {

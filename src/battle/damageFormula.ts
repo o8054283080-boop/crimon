@@ -1,4 +1,4 @@
-import { DEF_SW_BASE, balanceFlags } from "./balanceFlags.js";
+import { DEF_SW_BASE, balanceFlags } from "../core/balanceFlags.js";
 
 /** 正式な方式Eの係数。検証ツールもこの純粋関数を参照して式の乖離を防ぐ。 */
 export const DEFENSE_RATIO = 1.5;

@@ -1,3 +1,4 @@
+import { balanceFlags } from "./balanceFlags.js";
 import type { BuffStat, EffectCondition } from "./skill.js";
 import { createDefaultTalentState, type TalentState } from "./talents.js";
 
@@ -87,6 +88,27 @@ export interface MonsterTypeModifiers extends Record<AllocatableStat, number> {
   criDmg: number;
   accuracy: number;
   resistance: number;
+}
+
+/**
+ * 検証用の上書きを乗せた、実際に使われるタイプ倍率。
+ *
+ * **本番の経路もここを通る。**上書きが無ければ `MONSTER_TYPE_STAT_MULTIPLIERS`
+ * をそのまま返すので、既定では1つも変わらない。
+ * バランス検証で「体力タイプのHP倍率だけ変えたら何が起きるか」を
+ * 本番データを書き換えずに測るために置いた。
+ */
+export function effectiveTypeMultipliers(type: MonsterType): MonsterTypeModifiers {
+  const override = balanceFlags.typeMultiplierOverride?.[type];
+  if (!override) return MONSTER_TYPE_STAT_MULTIPLIERS[type];
+  return { ...MONSTER_TYPE_STAT_MULTIPLIERS[type], ...override } as MonsterTypeModifiers;
+}
+
+/** 同上。能力付与の1ptあたりの値 */
+export function effectiveAbilityPointValues(): Readonly<Record<AllocatableStat, number>> {
+  const override = balanceFlags.abilityPointOverride;
+  if (!override) return ABILITY_POINT_VALUES;
+  return { ...ABILITY_POINT_VALUES, ...override } as Record<AllocatableStat, number>;
 }
 
 export const MONSTER_TYPE_STAT_MULTIPLIERS: Readonly<Record<MonsterType, Readonly<MonsterTypeModifiers>>> = {

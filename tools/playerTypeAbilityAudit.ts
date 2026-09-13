@@ -1,5 +1,5 @@
 /** PR #335: タイプ転生＋能力付与の最終候補を、全162体で検証する。 */
-import { setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { setBalanceFlags } from "../src/core/balanceFlags.js";
 import { calculateBaseDamage } from "../src/battle/damageFormula.js";
 import type { Element } from "../src/core/element.js";
 import type { StatType } from "../src/core/equipment.js";
