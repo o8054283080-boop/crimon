@@ -61,6 +61,9 @@ function buildFloorScenario(floor: number): Scenario {
     title: `試練の塔 ${def.name}(本編)`,
     note: `本編の${def.floor}階をそのまま。敵${enemies.length}体。全回復から1戦だけ挑んだ場合の値`,
     maxTurns: 300,
+    // BattleEngine が持つ70/80/90/100階などの本編専用処理を有効にする。
+    // これを渡さないと敵データだけが同じでも、階固有ギミックは動かない。
+    trialTowerFloor: floor,
     // **範囲は置かない。**階ごとに狙いが違うので、1つの範囲で全部を測ると
     // どれかが必ず警告を出し続けて意味を失う
     allies: TOWER60.allies,
