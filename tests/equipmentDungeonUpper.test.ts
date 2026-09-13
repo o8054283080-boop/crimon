@@ -14,7 +14,9 @@ import {
   rollDungeonSkillPig,
   rollDungeonSummonScroll,
 } from "../src/data/equipmentDungeon.js";
-import { SKILL_PIG, REINCARNATION_PIG, findMonsterById } from "../src/data/monsters.js";
+import { SKILL_PIG, REINCARNATION_PIG, findMonster, findMonsterById } from "../src/data/monsters.js";
+import { computeEffectiveStats } from "../src/core/rarity.js";
+import { scaledEnemyAtk } from "../src/battle/enemyPower.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import { applyDungeonClearRewards } from "../src/game/rewards.js";
 import {
@@ -150,15 +152,48 @@ describe("指定されたステータスがそのまま入る", () => {
 
   /*
    * **指定しなかった能力を「素の値」で置くと下がる。**
-   * 10階は powerScale 2.734 が掛かってクリスタルのATKが1,394だが、
-   * 上位階は倍率に乗らないのでATKを書かないと図鑑素の691まで落ちる。
-   * 支援役なので伸ばす理由は無いが、**10階より弱くする理由も無い。**
+   * 上位階は倍率に乗らないのでATKを書かないと図鑑素の622〜691まで落ちる
+   * (10階の半分以下)。支援役なので伸ばす理由は無いが、
+   * **10階より弱くする理由も無い。**
    */
   it("クリスタルのATKは10階より下がらない", () => {
     const base = statsOf(10, "DEMON")[1].atk;
     for (const floor of [11, 12]) {
       expect(statsOf(floor, "DEMON")[1].atk, `${floor}階クリスタルのATK`).toBeGreaterThanOrEqual(base);
     }
+  });
+
+  /*
+   * **書き写した数字が古くなっていないか、導出ごと突き合わせる。**
+   *
+   * 上位階のATKは実数で焼いてあるので、10階側の powerScale や
+   * ENEMY_ATK_SCALE を触っても自動では追従しない。
+   * ここで10階の実効ATKを「図鑑 → 星レベル → powerScale → 0.82」の順に
+   * 組み立て直し、実際に戦闘へ渡る値と、上位階へ焼いた値の三者が
+   * 一致することを見る。どれかを触れば必ず落ちる。
+   */
+  it("10階クリスタルの実効ATKは、図鑑からの導出とも戦闘へ渡る値とも一致する", () => {
+    const floor10 = demon(10);
+    const enemy = floor10.enemies[1];
+    const dex = findMonster(enemy.templateId, enemy.element)!;
+    const leveled = computeEffectiveStats(dex.stats, enemy.star, enemy.level);
+    const derived = scaledEnemyAtk(leveled.atk * floor10.powerScale);
+
+    expect(derived, "図鑑から組み立て直した10階の実効ATK").toBe(1_394);
+    expect(statsOf(10, "DEMON")[1].atk, "戦闘へ渡る10階の実効ATK").toBe(derived);
+    for (const floor of [11, 12]) {
+      expect(statsOf(floor, "DEMON")[1].atk, `${floor}階へ焼いたATK`).toBe(derived);
+    }
+  });
+
+  /*
+   * クリスタルの図鑑ATKは属性ごとに違う(水・草81 / 火・電気・光90 / 闇99)。
+   * 10階と同じ計算を通すと11階(電気)は1,549になるが、
+   * **それだと11階が12階(草=1,394)より強くなる。**
+   * 支援役の攻撃力で階の順番を逆転させないよう、両階とも10階の値で揃えている。
+   */
+  it("11階と12階のクリスタルATKは同じ(階の順番を逆転させない)", () => {
+    expect(statsOf(11, "DEMON")[1].atk).toBe(statsOf(12, "DEMON")[1].atk);
   });
 
   it("HP・ATK・DEF・SPDは階を上がるほど強くなる", () => {
