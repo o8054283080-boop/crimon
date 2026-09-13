@@ -170,7 +170,18 @@ export function buildAlly(spec: AllySpec, rng: () => number, grade?: GearGrade):
   const gear = gearSpecs.map((g) => craftGear(g, rng));
   gear.forEach((eq) => { instance.equipment[eq.slot] = eq.id; });
 
-  const def = toBattleDefinition(instance, dex, gear);
+  const multipliers = spec.baseStatMultipliers;
+  const patchedDex = multipliers ? {
+    ...dex,
+    stats: {
+      ...dex.stats,
+      hp: dex.stats.hp * (multipliers.hp ?? 1),
+      atk: dex.stats.atk * (multipliers.atk ?? 1),
+      def: dex.stats.def * (multipliers.def ?? 1),
+      spd: dex.stats.spd * (multipliers.spd ?? 1),
+    },
+  } : dex;
+  const def = toBattleDefinition(instance, patchedDex, gear);
   const stats = spec.statOverrides ? { ...def.stats, ...spec.statOverrides } : def.stats;
   return { ...def, name: spec.label ?? def.name, stats };
 }
