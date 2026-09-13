@@ -21,6 +21,12 @@ export const FINAL_CANDIDATE = {
     DEFENSE: { hp: 0.85, def: 1.40 },
   },
   abilityPointOverride: { def: 5 },
+  /**
+   * 属性相性はサマナーズウォー方式。
+   * 有利はクリ率+15pt、不利はクリ率-15ptに加えて50%でかすり。
+   * **かすりは弱体を入れられない**ので、デバッファーの属性が編成の要件になる。
+   */
+  elementMode: "sw" as const,
 };
 
 /** 旧仕様 = いまの本番。防御式・タイプ・能力付与・防御低下、すべて現行 */

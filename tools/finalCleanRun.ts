@@ -52,6 +52,13 @@ const FLOOR_SCALE: Record<string, Scale> = {
   "tower-f100": { hp: 1.00, def: 0.30, atk: 2.50 },
 };
 const DEMON_SCALE: Scale = { hp: 0.80, def: 0.30, atk: 2.20 };
+/**
+ * 魔人11Fだけの上乗せ（候補Q）。10F→11F→12Fの段差を埋めるために決めた値。
+ * 魔人のATKだけを1.45倍にし、クリスタルはHP160,000・SPD170へ。
+ * **クリスタルのATKは触らない**(11・12階とも10階の実効値で揃える設計)。
+ */
+const DEMON_F11: { bossHp: number; bossAtk: number; crystalHp: number; crystalSpd: number } =
+  { bossHp: 1.10, bossAtk: 1.45, crystalHp: 160_000, crystalSpd: 170 };
 const BEAST_SCALE: Scale = { hp: 0.80, def: 0.30, atk: 2.00 };
 const AWAKENING_SCALE: Scale = { hp: 0.80, def: 0.30, atk: 2.20 };
 
@@ -154,6 +161,21 @@ function teamsFor(kind: "DEMON" | "BEAST"): [string, PressureTeam][] {
   return names.map((n) => [n, PVE_DUNGEON_TEAMS[n]]).filter(([, t]) => t) as [string, PressureTeam][];
 }
 
+/** 魔人11Fだけ、確定倍率の上に候補Qを重ねる */
+function demonF11Patch(s: Scale) {
+  return (defs: MonsterDefinition[]): MonsterDefinition[] => defs.map((d, i) => {
+    const isBoss = i === 0, isCrystal = i === 1;
+    return { ...d, stats: {
+      ...d.stats,
+      hp: isCrystal ? DEMON_F11.crystalHp
+        : Math.max(1, Math.round(d.stats.hp * s.hp * (isBoss ? DEMON_F11.bossHp : 1))),
+      spd: isCrystal ? DEMON_F11.crystalSpd : d.stats.spd,
+      def: Math.max(1, Math.round(d.stats.def * s.def)),
+      atk: Math.max(1, Math.round(d.stats.atk * s.atk * (isBoss ? DEMON_F11.bossAtk : 1))),
+    } };
+  });
+}
+
 function runDungeon(kind: "DEMON" | "BEAST"): void {
   const s = kind === "DEMON" ? DEMON_SCALE : BEAST_SCALE;
   const patch = patchOf(s);
@@ -161,13 +183,14 @@ function runDungeon(kind: "DEMON" | "BEAST"): void {
   header(`${jp}のダンジョン / ${RUNS}戦・敵 HP×${s.hp} DEF×${s.def} ATK×${s.atk}`);
   for (const floor of [10, 11, 12]) {
     console.log(`  ── ${floor}階 / STRONG ──`);
+    const usePatch = kind === "DEMON" && floor === 11 ? demonF11Patch(s) : patch;
     for (const [name, team] of teamsFor(kind)) {
-      show(name, final(() => toRow(measurePressure(team, floor, "STRONG", RUNS, kind, SEED, patch))));
+      show(name, final(() => toRow(measurePressure(team, floor, "STRONG", RUNS, kind, SEED, usePatch))));
     }
     if (floor === 12) {
       console.log(`  ── 12階 / TYPICAL ──`);
       for (const [name, team] of teamsFor(kind)) {
-        show(name, final(() => toRow(measurePressure(team, floor, "TYPICAL", RUNS, kind, SEED, patch))));
+        show(name, final(() => toRow(measurePressure(team, floor, "TYPICAL", RUNS, kind, SEED, usePatch))));
       }
     }
   }
