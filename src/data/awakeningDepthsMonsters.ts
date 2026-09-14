@@ -50,7 +50,7 @@ export const TALENT_SHARD_DEF_TEMPLATE_ID = "talent_shard_def";
 const ARCHEOS_S1: Skill = {
   id: "archeos_s1",
   name: "才閃",
-  description: "敵単体に攻撃力1.4倍のダメージを与え、40%で防御力を50%低下させる(1ターン)。",
+  description: "敵単体に攻撃力1.4倍のダメージを与え、40%で防御力を75%低下させる(1ターン)。",
   target: "SINGLE_ENEMY",
   cooldownTurns: 0,
   effects: [
@@ -119,7 +119,7 @@ const SHARD_ATK_SKILLS: [Skill, Skill, Skill] = [
   },
   {
     id: "talent_shard_atk_s3", name: "才穿",
-    description: "敵単体に攻撃力1.6倍のダメージを与え、防御力を50%低下させる(2ターン)。",
+    description: "敵単体に攻撃力1.6倍のダメージを与え、防御力を75%低下させる(2ターン)。",
     target: "SINGLE_ENEMY", cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.6 },

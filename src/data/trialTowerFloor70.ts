@@ -56,7 +56,7 @@ const BEHEMOTH_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "tower70_behemoth_s3",
     name: "天地崩壊",
-    description: "敵全体に攻撃力1.2倍＋自身の最大HP5%分のダメージを与え、80%で2ターン防御力を50%低下。使用時に自身の弱体効果を全解除し、HP50%以上なら敵全体の行動ゲージを20%減少させる。",
+    description: "敵全体に攻撃力1.2倍＋自身の最大HP5%分のダメージを与え、80%で2ターン防御力を75%低下。使用時に自身の弱体効果を全解除し、HP50%以上なら敵全体の行動ゲージを20%減少させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [

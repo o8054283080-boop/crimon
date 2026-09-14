@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../../../src/core/statusValues.js";
 /**
  * 試練の塔80階「古代聖竜」第2回。**本編には1行も入っていない。**
  *
@@ -34,7 +35,7 @@ export const TOWER80_STRIP_BLOCK_PARTY_V2: AllySpec[] = [
 const bossSkills: [Skill, Skill, Skill] = [
   skill("tower80_boss_s1", "聖竜の牙", "SINGLE_ENEMY", 0, [
     { kind: "DAMAGE", multiplier: 1.0 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.5 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 },
   ]),
   skill("tower80_boss_s2", "浄化の竜爪", "SINGLE_ENEMY", 3, [
     { kind: "DAMAGE", multiplier: 1.8 },
@@ -55,14 +56,14 @@ const bossSkills: [Skill, Skill, Skill] = [
 const guardSkills: [Skill, Skill, Skill] = [
   skill("tower80_guard_s1", "護光弾", "SINGLE_ENEMY", 0, [
     { kind: "DAMAGE", multiplier: 0.9 },
-    { kind: "DEBUFF", stat: "spd", amount: 0.2, durationTurns: 2, chance: 0.5 },
+    { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.5 },
   ]),
   skill("tower80_guard_s2", "聖域展開", "ALL_ALLIES", 4, [
     { kind: "IMMUNITY", durationTurns: 2 },
     { kind: "CLEANSE", count: 1 },
   ]),
   skill("tower80_guard_s3", "守護反応", "ALL_ALLIES", 5, [
-    { kind: "BUFF", stat: "def", amount: 0.4, durationTurns: 2 },
+    { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
     { kind: "GAUGE", amount: 0.3, applyTo: "LOWEST_HP_ALLY" },
   ]),
 ];
@@ -72,6 +73,8 @@ const inspireSkills: [Skill, Skill, Skill] = [
     { kind: "DAMAGE", multiplier: 0.85 },
     { kind: "GAUGE", amount: 0.1, applyTo: "SELF" },
   ]),
+  // **V2案の値。本編には入っていない**ので、共通値へは寄せず当時のまま残す
+  // (V3がこれをどれだけ弱めたかを比べるための基準)
   skill("tower80_inspire_s2", "戦意共鳴", "ALL_ALLIES", 4, [
     { kind: "BUFF", stat: "atk", amount: 0.4, durationTurns: 2 },
     { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
@@ -100,8 +103,11 @@ const inspireSkills: [Skill, Skill, Skill] = [
  * 効き幅が読みにくかったため(ゲージ加速との二重取り)。
  */
 const inspireVariants = {
-  /** 弱め小: バフだけ少し下げ、CTとCT短縮はV2のまま */
-  LIGHT: { atk: 0.32, spd: 0.22, buffCt: 4, gauge: 0.16, gaugeCt: 5, keepCooldownReduce: true },
+  /**
+   * 弱め小: バフだけ少し下げ、CTとCT短縮はV2のまま。
+   * **本編が採ったのはこれ。**効果量を共通値へ揃えた回で 0.32/0.22 → 共通値になった。
+   */
+  LIGHT: { atk: ATK_UP, spd: SPD_UP, buffCt: 4, gauge: 0.16, gaugeCt: 5, keepCooldownReduce: true },
   /** 弱め中: CTを1ずつ伸ばし、CT短縮を落とす */
   MID: { atk: 0.25, spd: 0.15, buffCt: 5, gauge: 0.12, gaugeCt: 6, keepCooldownReduce: false },
   /** 弱め大: 支援役として最低限だけ残す */
@@ -129,7 +135,7 @@ const breakerSkills: [Skill, Skill, Skill] = [
   ]),
   skill("tower80_breaker_s2", "聖牙連撃", "SINGLE_ENEMY", 3, [
     { kind: "DAMAGE", multiplier: 0.55, hits: 3 },
-    { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.5 },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 },
   ]),
   skill("tower80_breaker_s3", "破邪突進", "SINGLE_ENEMY", 4, [
     { kind: "DAMAGE", multiplier: 2.4, conditionalBonus: [{ when: "TARGET_HAS_BUFF", bonus: 0.25 }] },
@@ -139,17 +145,17 @@ const breakerSkills: [Skill, Skill, Skill] = [
 const curseSkills: [Skill, Skill, Skill] = [
   skill("tower80_curse_s1", "呪爪", "SINGLE_ENEMY", 0, [
     { kind: "DAMAGE", multiplier: 0.9 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.7 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
   ]),
   skill("tower80_curse_s2", "衰弱の咆哮", "ALL_ENEMIES", 3, [
     { kind: "DAMAGE", multiplier: 0.65 },
-    { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
-    { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.7 },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
+    { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
   ]),
   skill("tower80_curse_s3", "呪縛領域", "ALL_ENEMIES", 5, [
     { kind: "DAMAGE", multiplier: 0.8 },
     { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 0.8 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 },
     { kind: "GAUGE", amount: -0.2 },
   ]),
 ];

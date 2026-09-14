@@ -63,7 +63,7 @@ export const BASILISK: MonsterTemplate = {
     {
       id: "basilisk_s2_c",
       name: "締め付け",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、80%で2ターン防御力を50%低下させる。対象が速度低下状態なら行動ゲージをさらに25%減少させる。",
+      description: "敵単体に攻撃力1.3倍のダメージを与え、80%で2ターン防御力を75%低下させる。対象が速度低下状態なら行動ゲージをさらに25%減少させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
@@ -462,7 +462,7 @@ export const THUNDERBEAST: MonsterTemplate = {
     {
       id: "thunderbeast_s2_c",
       name: "雷鳴の爪",
-      description: "敵単体に攻撃力1.25倍のダメージを与える(自身の速度が高いほど上昇)。80%で2ターン防御力を50%低下させる。",
+      description: "敵単体に攻撃力1.25倍のダメージを与える(自身の速度が高いほど上昇)。80%で2ターン防御力を75%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [

@@ -112,7 +112,7 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "tower90_boss_s1",
     name: "断罪の刃",
-    description: "敵単体に攻撃力1.2倍のダメージを与え、70%で2ターン防御力を50%低下させ、行動ゲージを15%減少させる。",
+    description: "敵単体に攻撃力1.2倍のダメージを与え、70%で2ターン防御力を75%低下させ、行動ゲージを15%減少させる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
@@ -144,7 +144,7 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
      */
     id: "tower90_boss_s3",
     name: "絶・終焉の波動",
-    description: "敵全体に攻撃力1.35倍のダメージを与え、強化効果をすべて解除し、行動ゲージを50%減少させ、3ターン防御力を50%低下させる。",
+    description: "敵全体に攻撃力1.35倍のダメージを与え、強化効果をすべて解除し、行動ゲージを50%減少させ、3ターン防御力を75%低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
@@ -160,7 +160,7 @@ const RIFT_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "tower90_rift_s1",
     name: "裂傷弾",
-    description: "敵単体に攻撃力0.9倍のダメージを与え、75%で2ターン防御力を50%低下させる。",
+    description: "敵単体に攻撃力0.9倍のダメージを与え、75%で2ターン防御力を75%低下させる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
@@ -171,7 +171,7 @@ const RIFT_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "tower90_rift_s2",
     name: "破砕波",
-    description: "敵全体に攻撃力0.6倍のダメージを与え、85%で2ターン防御力を50%低下させる。",
+    description: "敵全体に攻撃力0.6倍のダメージを与え、85%で2ターン防御力を75%低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 3,
     effects: [

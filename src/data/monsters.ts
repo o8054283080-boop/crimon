@@ -167,7 +167,7 @@ const WOLF: MonsterTemplate = {
     {
       id: "wolf_s2_b",
       name: "いあつ",
-      description: "威圧の咆哮で敵全体の強化を50%で剥がし、70%で1ターン攻撃力を大きく低下させる。",
+      description: "威圧の咆哮で敵全体の強化を50%で剥がし、70%で1ターン攻撃力を50%低下させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [{ kind: "STRIP", chance: 0.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.7 }],
@@ -200,15 +200,21 @@ const WOLF: MonsterTemplate = {
     {
       id: "wolf_s3_b",
       name: "ウルフスラッシュ",
-      description: "敵単体に攻撃力0.7倍のダメージを3回与え、1撃ごとに防御力を25%低下させる。",
+      description: "敵単体に攻撃力0.9倍のダメージを3回与え、1撃ごとに25%で2ターン防御力を75%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
+      /*
+       * 以前は防御低下を**3つ重ねて確定で**かける技だった。同じ弱体を重ねない
+       * 決まりに揃えたので、**1撃ごとに25%の独立判定**へ作り直してある。
+       * 3回とも外す確率は 0.75^3 なので、**1回以上入るのは約57.8%**。
+       * 何度成功しても効果量は共通値の1つぶんで、ターンだけが長い方に揃う。
+       * 重ねがけぶんの火力が消えたので、1撃の倍率を 0.7 → 0.9 に上げた。
+       */
       effects: [
-        { kind: "DAMAGE", multiplier: 0.7, hits: 3 },
-        // 3回斬るので、防御低下も1撃につき1つずつ、計3つ重ねてかける
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2 },
+        {
+          kind: "DAMAGE", multiplier: 0.9, hits: 3,
+          perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }],
+        },
       ],
     },
     {
@@ -291,12 +297,13 @@ const GOLEM: MonsterTemplate = {
     {
       id: "golem_s2_c",
       name: "いわくだき",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、60%で1ターン防御力を大きく低下させる。",
+      description: "敵単体に攻撃力1.3倍のダメージを与え、80%で1ターン防御力を75%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 1, chance: 0.6 },
+        // 持続1ターンと短いぶん、通る確率を上げてある(60%→80%)
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 1, chance: 0.8 },
       ],
     },
   ],
@@ -336,7 +343,7 @@ const GOLEM: MonsterTemplate = {
   lightSkill3: {
     id: "golem_s3_light",
     name: "オーロラウォール",
-    description: "味方全体に最大HPの40%のシールドを3ターン張り、防御力を3ターン大きく上昇させ、3ターンのあいだ毎ターン8%ずつ回復させ、デバフを解除する。",
+    description: "味方全体に最大HPの40%のシールドを3ターン張り、防御力を3ターン30%上昇させ、3ターンのあいだ毎ターン8%ずつ回復させ、デバフを解除する。",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
@@ -350,7 +357,7 @@ const GOLEM: MonsterTemplate = {
   darkSkill3: {
     id: "golem_s3_dark",
     name: "オブシディアンクラッシュ",
-    description: "敵全体に攻撃力1.6倍のダメージを与え、70%で2ターン防御力を大きく低下させる。自身の防御力が高いほど威力が上がる。",
+    description: "敵全体に攻撃力1.6倍のダメージを与え、70%で2ターン防御力を75%低下させる。自身の防御力が高いほど威力が上がる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
@@ -516,7 +523,7 @@ const IMP: MonsterTemplate = {
     {
       id: "imp_s2_a",
       name: "のろいのつめ",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、70%で2ターン防御力を大きく低下させる。",
+      description: "敵単体に攻撃力1.3倍のダメージを与え、70%で2ターン防御力を75%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
@@ -552,7 +559,7 @@ const IMP: MonsterTemplate = {
     {
       id: "imp_s3_a",
       name: "あくいのばらまき",
-      description: "敵全体に攻撃力1.1倍のダメージを与え、55%で2ターン攻撃力を大きく低下させる。",
+      description: "敵全体に攻撃力1.1倍のダメージを与え、55%で2ターン攻撃力を50%低下させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
@@ -587,7 +594,7 @@ const IMP: MonsterTemplate = {
   lightSkill3: {
     id: "imp_s3_light",
     name: "ジャッジメントヘイズ",
-    description: "敵全体に攻撃力1.4倍のダメージを与え、70%で2ターン攻撃力を大きく低下させ、60%で2ターン暗闇を付与する。",
+    description: "敵全体に攻撃力1.4倍のダメージを与え、70%で2ターン攻撃力を50%低下させ、60%で2ターン暗闇を付与する。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
@@ -687,9 +694,10 @@ const WISP: MonsterTemplate = {
     {
       id: "wisp_s3_a",
       name: "ほしくずのわ",
-      description: "味方全体の攻撃力とクリティカル率を2ターン上昇させる。",
+      description: "味方全体の攻撃力を30%、クリティカル率を20pt、2ターン上昇させる。",
       target: "ALL_ALLIES",
-      cooldownTurns: 5,
+      // 効果量が共通値に下がったぶん、回せる速さで釣り合わせる(5→4)
+      cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
         { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
@@ -1112,7 +1120,7 @@ const GRIFFON: MonsterTemplate = {
   darkSkill3: {
     id: "griffon_s3_dark",
     name: "シャドウタロン",
-    description: "影の鉤爪で敵単体に攻撃力1.9倍のダメージを3回与え、70%で2ターン防御力を大きく低下させる。自身の速度が高いほど威力が上がる。",
+    description: "影の鉤爪で敵単体に攻撃力1.9倍のダメージを3回与え、70%で2ターン防御力を75%低下させる。自身の速度が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
@@ -1171,7 +1179,7 @@ const DRAGON: MonsterTemplate = {
   skill1: {
     id: "dragon_s1",
     name: "つのぶつけ",
-    description: "敵単体に攻撃力1.2倍のダメージを与え、25%で防御力を大きく低下させる。",
+    description: "敵単体に攻撃力1.2倍のダメージを与え、25%で防御力を75%低下させる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
@@ -1203,7 +1211,7 @@ const DRAGON: MonsterTemplate = {
     {
       id: "dragon_s2_claw",
       name: "ドラゴンクロー",
-      description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を大きく低下させる。",
+      description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を75%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
@@ -1225,7 +1233,7 @@ const DRAGON: MonsterTemplate = {
     {
       id: "dragon_s2_w_claw",
       name: "ドラゴンクロー",
-      description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を大きく低下させる。",
+      description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を75%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
@@ -1373,7 +1381,7 @@ const SERAPH: MonsterTemplate = {
     {
       id: "seraph_s3_a",
       name: "裁きの雷光",
-      description: "天より雷光を降らせ、敵全体に攻撃力1.6倍のダメージを与え、70%で1ターン防御力を大きく低下させる。",
+      description: "天より雷光を降らせ、敵全体に攻撃力1.6倍のダメージを与え、70%で1ターン防御力を75%低下させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
@@ -1471,7 +1479,7 @@ const NEMESIS: MonsterTemplate = {
     {
       id: "nemesis_s2_b",
       name: "デーモンクロー",
-      description: "敵単体に攻撃力2.7倍のダメージを与え、75%で防御力を大きく低下させる。",
+      description: "敵単体に攻撃力2.7倍のダメージを与え、75%で防御力を75%低下させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
@@ -1539,7 +1547,7 @@ const NEMESIS: MonsterTemplate = {
   darkSkill3: {
     id: "nemesis_s3_dark",
     name: "エンドオブオール",
-    description: "終焉の波動で敵全体に攻撃力1.8倍のダメージを2回与え、行動ゲージを20%吸収し、70%で2ターン防御力を大きく低下させる。",
+    description: "終焉の波動で敵全体に攻撃力1.8倍のダメージを2回与え、行動ゲージを20%吸収し、70%で2ターン防御力を75%低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
@@ -1600,7 +1608,7 @@ export const ANCIENT_DEMON: MonsterTemplate = {
     {
       id: "ancient_demon_s2",
       name: "古代の呪詛",
-      description: "封じられていた呪いを解き放ち、敵全体に攻撃力1.6倍のダメージを与え、45%で攻撃力を大きく低下させる。",
+      description: "封じられていた呪いを解き放ち、敵全体に攻撃力1.6倍のダメージを与え、45%で攻撃力を50%低下させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
@@ -1613,7 +1621,7 @@ export const ANCIENT_DEMON: MonsterTemplate = {
     {
       id: "ancient_demon_s3",
       name: "終焉の審判",
-      description: "太古の力を解き放ち、敵全体に攻撃力2.0倍のダメージを与え、50%で攻撃力を大きく低下させる。自身の防御力が高いほど威力が上がる。",
+      description: "太古の力を解き放ち、敵全体に攻撃力2.0倍のダメージを与え、50%で攻撃力を50%低下させる。自身の防御力が高いほど威力が上がる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
@@ -1656,12 +1664,20 @@ export const ANCIENT_CRYSTAL: MonsterTemplate = {
     {
       id: "ancient_crystal_s2",
       name: "古代の加護",
-      description: "味方単体に古代の力を送り込み、4ターン攻撃力を上昇させる。重ねがけで積み上がる。",
+      description: "味方単体に古代の力を送り込み、4ターンのあいだ攻撃力を30%、クリティカル率を20pt、クリティカルダメージを30%上昇させる。",
       target: "SINGLE_ALLY",
       cooldownTurns: 2,
-      // **積み上がることが肝。**バフは同じ能力値でも重ねた数だけ足し合わされるので、
-      // 長引くほど魔人の一撃が重くなる。耐久で待つ戦い方に「待てば待つほど不利」を作る
-      effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 }],
+      /*
+       * 以前は**攻撃UPが重ねがけで積み上がる**ことが肝の技だった。
+       * 同じ強化を重ねない決まりに揃えたので、積み上げの代わりに
+       * **3種類**を一度に配る形へ変えてある。長引くほど重くなる圧は、
+       * 1回あたりの厚みに置き換わった。
+       */
+      effects: [
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 },
+        { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 4 },
+        { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 4 },
+      ],
     },
   ],
   skill3Variants: [
@@ -1711,7 +1727,7 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
     {
       id: "ancient_crystal_curse_s2",
       name: "呪縛の波動",
-      description: "敵全体に攻撃力0.9倍のダメージを与え、55%で攻撃力を大きく低下させ、50%で強化効果を剥がす。",
+      description: "敵全体に攻撃力0.9倍のダメージを与え、55%で攻撃力を50%低下させ、50%で強化効果を剥がす。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
@@ -1726,7 +1742,7 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
     {
       id: "ancient_crystal_curse_s3",
       name: "破滅の呪詛",
-      description: "敵全体に攻撃力1.8倍のダメージを与え、50%で防御力を大きく低下させ、70%で3ターン回復封じを付与する。",
+      description: "敵全体に攻撃力1.8倍のダメージを与え、50%で防御力を75%低下させ、70%で3ターン回復封じを付与する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [

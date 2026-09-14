@@ -137,7 +137,7 @@ export const CRIMOARK_S4_ID = "crimoark_s4";
 const CRIMOARK_S1: Skill = {
   id: CRIMOARK_S1_ID,
   name: "クリエイト・ブレイク",
-  description: "敵単体に攻撃力1.35倍のダメージを与え、防御力を50%低下させ(2ターン)、行動ゲージを20%減少させる。"
+  description: "敵単体に攻撃力1.35倍のダメージを与え、防御力を75%低下させ(2ターン)、行動ゲージを20%減少させる。"
     + "対象に弱体効果が2個以上あれば最終ダメージ+30%、さらにHPが50%以下なら+20%。",
   target: "SINGLE_ENEMY",
   cooldownTurns: 0,
@@ -204,7 +204,7 @@ export const CRIMOARK_S4: Skill = {
   id: CRIMOARK_S4_ID,
   name: "オーバークリエイト",
   description: "敵全体の強化効果をすべて解除し、攻撃力1.30倍のダメージを与える。"
-    + "さらに行動ゲージを50%減少させ、防御力を50%低下(3ターン)、回復阻害(2ターン)を与え、自身の行動ゲージを30%進める。"
+    + "さらに行動ゲージを50%減少させ、防御力を75%低下(3ターン)、回復阻害(2ターン)を与え、自身の行動ゲージを30%進める。"
     + "生存している分身1体につき最終ダメージ+15%。",
   target: "ALL_ENEMIES",
   cooldownTurns: CRIMOARK_S4_COOLDOWN,
@@ -278,7 +278,7 @@ const SUPPORT_SKILLS: [Skill, Skill, Skill] = [
 const DEBUFF_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "crimoark_debuff_s1", name: "模造侵蝕刃",
-    description: "敵単体に攻撃力0.80倍のダメージを与え、防御力を50%低下させる(2ターン)。",
+    description: "敵単体に攻撃力0.80倍のダメージを与え、防御力を75%低下させる(2ターン)。",
     target: "SINGLE_ENEMY", cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.80 },

@@ -138,7 +138,7 @@ const JUSHOU_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "tower60_jushou_s2",
     name: "呪晶の波動",
-    description: "敵全体に攻撃力0.8倍のダメージを与え、70%で2ターン防御力を大きく低下させる。",
+    description: "敵全体に攻撃力0.8倍のダメージを与え、70%で2ターン防御力を75%低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 3,
     effects: [

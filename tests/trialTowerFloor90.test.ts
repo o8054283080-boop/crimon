@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
+import { DEF_DOWN } from "../src/core/statusValues.js";
 import type { DamageEffect } from "../src/core/skill.js";
 import { findMonster } from "../src/data/monsters.js";
 import { TRIAL_TOWER_FLOORS, findTowerFloor } from "../src/data/trialTower.js";
@@ -254,11 +255,11 @@ describe("90階: 絶・終焉の波動", () => {
     expect(strip.count).toBeUndefined();
   });
 
-  it("処理順は ダメージ → 全解除 → ゲージ-50% → 防御-50%3ターン", () => {
+  it("処理順は ダメージ → 全解除 → ゲージ-50% → 防御低下3ターン", () => {
     expect(s3.effects.map((effect) => effect.kind)).toEqual(["DAMAGE", "STRIP", "GAUGE", "DEBUFF"]);
     expect(s3.effects[0]).toMatchObject({ multiplier: 1.35 });
     expect(s3.effects[2]).toMatchObject({ amount: -0.5 });
-    expect(s3.effects[3]).toMatchObject({ stat: "def", amount: 0.5, durationTurns: 3, chance: 1 });
+    expect(s3.effects[3]).toMatchObject({ stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 });
   });
 
   it("旧仕様の速度ダウンは入っていない", () => {

@@ -638,7 +638,12 @@ describe("今回触っていないところ", () => {
      * 倍率(powerScale/speedScale)は掛からないので、
      * ここが `undefined` に戻ったら、階が曲線へ落ちて別物になっている。
      */
-    expect(digest(70, 70)).toBe("4913295d69030be5");
+    /*
+     * **2026年9月にここを1度更新している。**バフ・デバフの効果量を
+     * `core/statusValues.ts` の共通値へ揃えた回で、70階の専用スキルが持つ
+     * 防御DOWNなどの量が変わったため。ステータスと編成は触っていない。
+     */
+    expect(digest(70, 70)).toBe("7126fd3d4e32eb93");
     const def = findTowerFloor(70)!;
     expect(def.enemies).toHaveLength(3);
     expect(def.enemies.map((enemy) => enemy.templateId)).toEqual(["behemoth", "ancient_crystal", "ancient_crystal_curse"]);
