@@ -66,6 +66,13 @@ const SCREENS = [
     setup: "document.querySelectorAll('.howto-card').forEach((c) => { c.open = true; })",
   },
   { name: "モンスター図鑑", tab: "HOME", tile: "dex" },
+  // プレゼントボックス。**受取履歴の側も見る**(空の一覧だけ見ていると、
+  // 札が出た時の崩れに気づけない)
+  { name: "プレゼントボックス", tab: "HOME", tile: "giftBox" },
+  {
+    name: "プレゼントボックス(受取履歴)", tab: "HOME", tile: "giftBox",
+    setup: "document.querySelector('[data-tour=giftTabHistory]')?.click()",
+  },
   { name: "ミッション", tab: "HOME", tile: "mission" },
   // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
