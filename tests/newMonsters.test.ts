@@ -178,13 +178,19 @@ describe("⑨ 戦乙女の誓いの内部クールタイム", () => {
     ally.currentHp = Math.round(ally.maxHp * 0.9);
 
     const enemy = engine.getUnits()[2];
-    // 1回目: 攻撃で閾値を割ったので発動し、無敵と回復が入る
-    ally.currentHp = Math.round(ally.maxHp * 0.31);
+    /*
+     * 1回目: 攻撃で閾値を割ったので発動し、無敵と回復が入る。
+     *
+     * **半分から始める。**閾値のすぐ上(31%)から始めると、いまの火力では
+     * 一撃で倒れてしまい「HP30%を割った」ではなく戦闘不能になって発動しない。
+     * 半分なら、この一撃で30%を割りつつ生き残る。
+     */
+    ally.currentHp = Math.round(ally.maxHp * 0.5);
     const first = engine.resolveTurn(enemy, { skillIndex: 0, targetId: ally.instanceId });
     expect(first.lines.some((line) => line.includes("「戦乙女の誓い」"))).toBe(true);
     expect(valkyria.passiveCooldown).toBe(4);
     // 2回目: 同じように閾値を割っても、内部クールタイム中なので出ない
-    ally.currentHp = Math.round(ally.maxHp * 0.31);
+    ally.currentHp = Math.round(ally.maxHp * 0.5);
     const second = engine.resolveTurn(enemy, { skillIndex: 0, targetId: ally.instanceId });
     expect(second.lines.some((line) => line.includes("「戦乙女の誓い」"))).toBe(false);
     // クールタイムは保持者の手番開始時に減る。敵が動いただけでは減らない

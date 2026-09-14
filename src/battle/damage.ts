@@ -1,4 +1,5 @@
 import { ElementAffinity, getElementAffinity, getElementMultiplier } from "../core/element.js";
+import { SW_CRIT_SHIFT, SW_GLANCING_CHANCE, SW_GLANCING_MULTIPLIER, balanceFlags } from "../core/balanceFlags.js";
 import { DamageEffect, EffectCondition, SCALE_REFERENCE } from "../core/skill.js";
 import {
   BattleUnit,
@@ -9,7 +10,7 @@ import {
   passiveEffectOf,
   passiveHpDamageBonus,
 } from "./unit.js";
-import { applyDefenseE, calculateBaseDamage, roundNormalDamage } from "./damageFormula.js";
+import { applyDefense, calculateBaseDamage, roundNormalDamage } from "./damageFormula.js";
 
 /**
  * 相手や自分の**今の状態だけ**で決まる条件を判定する。
@@ -42,21 +43,27 @@ export function evaluateTargetCondition(condition: EffectCondition, source: Batt
 }
 
 /**
- * 防御力による軽減は、**攻める側の攻撃力との比**で決める。
+ * 防御力による軽減は `1000 / (1000 + 1.2 × DEF)`。**攻撃力は見ない。**
  *
- * 以前は `防御 ÷ (防御 + 300)` という固定の定数だった。この300は序盤の防御力
- * (100〜200)に合わせた値で、終盤の防御3500では92%を弾いてしまい、
- * 補正のない技が相手のHPを1%も削れなくなっていた。
- * 定数を終盤に合わせ直すと、今度は序盤の防御力がほぼ無意味になる。
+ * 以前は攻める側の攻撃力との比で決めていた(方式E)。段階に依存しない良さがあった反面、
+ * **攻撃を積めばどんな防御も抜けてしまう**ので、HPを積むほうが常に得という形になっていた。
+ * 依頼主とChatGPTの相談で、HPと防御が釣り合うようサマナーズウォー寄りの式へ入れ替えた。
  *
- * 攻撃力との比なら段階に依存しない。攻撃と防御が釣り合っていれば常に50%軽減で、
- * 序盤の防御役も終盤の防御役も同じ意味を持つ。攻撃を積めば相手の防御を抜け、
- * 防御を積めば硬くなる、という関係が全編で成り立つ。
+ * いまの式では軽減率がDEFの値だけで確定する。攻撃側にできるのは
+ * **防御無視と防御低下**で、そこが編成の分かれ目になる。
+ *
+ * 式そのものは `damageFormula.ts`。旧式に戻して比べる道は
+ * `balanceFlags.defenseFormula = "legacy"` に残してある。
  */
 export interface DamageResult {
   damage: number;
   isCrit: boolean;
   affinity: ElementAffinity;
+  /**
+   * サマナーズウォー方式で「かすり」になったか。
+   * **この一撃では弱体を入れられない。**戦闘側が見て弱体付与を止める。
+   */
+  isGlancing?: boolean;
 }
 
 /**
@@ -163,13 +170,30 @@ export function calcDamage(
     * (1 + finalBonus);
   const hits = Math.max(1, Math.floor(effect.hits ?? 1));
   // 割合軽減は線形なのでhitごとの結果と同じ。固定軽減だけは解決全体で算出し均等配賦する。
-  const resolutionDefense = applyDefenseE(perHitBase * hits, atk, def, effect.ignoreDefense);
+  const resolutionDefense = applyDefense(perHitBase * hits, atk, def, effect.ignoreDefense);
   const afterDefense = resolutionDefense.afterDefense / hits;
 
   const affinity = getElementAffinity(attacker.def.element, defender.def.element);
-  const elementMultiplier = getElementMultiplier(attacker.def.element, defender.def.element);
+  /*
+   * sw方式では属性の倍率を使わない(相性はクリ率とかすりで表す)。
+   * かすった時だけ 0.7 を掛ける。
+   */
+  const elementMultiplier = balanceFlags.elementMode === "sw"
+    ? 1
+    : getElementMultiplier(attacker.def.element, defender.def.element);
 
-  const isCrit = rng() < getFinalCritRate(attacker, defender, effect.critRateBonus ?? 0);
+  /*
+   * サマナーズウォー方式の属性相性。**倍率ではなく確率で効く。**
+   * 有利はクリ率+15pt、不利はクリ率−15ptに加えて50%でかすり。
+   * かすりは「ダメージ−30%・クリ不可・弱体不可」。
+   */
+  const swElement = balanceFlags.elementMode === "sw";
+  const swCritBonus = swElement
+    ? (affinity === "ADVANTAGE" ? SW_CRIT_SHIFT : affinity === "DISADVANTAGE" ? -SW_CRIT_SHIFT : 0)
+    : 0;
+  const isGlancing = swElement && affinity === "DISADVANTAGE" && rng() < SW_GLANCING_CHANCE;
+  const isCrit = !isGlancing
+    && rng() < getFinalCritRate(attacker, defender, (effect.critRateBonus ?? 0) + swCritBonus);
   const critMultiplier = isCrit ? (getEffectiveStat(attacker, "criDmg") + (weakActive ? weak.critDmg : 0)) * (1 + (effect.critDamageBonus ?? 0)) : 1;
 
   const dealtMultiplier = (attacker.def.combatMods?.damageDealtMultiplier ?? 1)
@@ -184,8 +208,9 @@ export function calcDamage(
 
   const defensePassive = passiveEffectOf(defender);
   const critReduction = isCrit && defensePassive?.kind === "CHEAT" ? 1 - defensePassive.reduction : 1;
-  const rawDamage = critReduction * afterDefense * elementMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
+  const glancingMultiplier = isGlancing ? SW_GLANCING_MULTIPLIER : 1;
+  const rawDamage = critReduction * afterDefense * elementMultiplier * glancingMultiplier * critMultiplier * dealtMultiplier * takenMultiplier;
   const damage = roundNormalDamage(rawDamage);
 
-  return { damage, isCrit, affinity };
+  return { damage, isCrit, affinity, isGlancing };
 }

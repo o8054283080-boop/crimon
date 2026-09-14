@@ -1,3 +1,4 @@
+import { balanceFlags } from "../core/balanceFlags.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { PassiveLevelEffect, PassiveSpec, passiveAtLevel } from "../core/passive.js";
 import { BuffStat, STATUS_EFFECT_CATEGORY, Skill, StatusEffectCategory, StatusEffectType } from "../core/skill.js";
@@ -250,9 +251,19 @@ export function getEffectiveStat(unit: BattleUnit, stat: BuffStat): number {
   const passive = passiveStatBonus(unit, stat);
   const flat = unit.flatStatBonus[stat] ?? 0;
   const base = unit.def.stats[stat] + flat + (stat === "spd" ? passive.add : 0);
+  /*
+   * 検証フラグが立っている時だけ、**防御の増減幅を一律に揃える**
+   * (低下50% / 上昇30%)。現行はスキルごとに 0.25〜0.5 / 0.15〜0.8 とばらつくので、
+   * 防御計算の式そのものを比べたい時に幅の違いが混ざってしまう。
+   * 既定では何もしない——ここは本番の経路でもあるため。
+   */
   const totalRate = unit.effects
     .filter((e) => e.stat === stat)
-    .reduce((sum, e) => sum + e.amount, 0);
+    .reduce((sum, e) => {
+      if (!balanceFlags.unifyDefModifiers || stat !== "def") return sum + e.amount;
+      if (e.amount === 0) return sum;
+      return sum + (e.amount < 0 ? -balanceFlags.defDownRate : balanceFlags.defUpRate);
+    }, 0);
 
   if (stat === "criRate") {
     return Math.max(0, Math.min(1, base + totalRate + passive.add));
