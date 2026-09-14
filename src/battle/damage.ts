@@ -1,6 +1,7 @@
 import { ElementAffinity, getElementAffinity, getElementMultiplier } from "../core/element.js";
 import { SW_CRIT_SHIFT, SW_GLANCING_CHANCE, SW_GLANCING_MULTIPLIER, balanceFlags } from "../core/balanceFlags.js";
 import { DamageEffect, EffectCondition, SCALE_REFERENCE } from "../core/skill.js";
+import { CRIT_RATE_TAKEN_DOWN, CRIT_RATE_TAKEN_UP } from "../core/statusValues.js";
 import {
   BattleUnit,
   countDebuffs,
@@ -87,8 +88,9 @@ export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit, ski
   const conditionalCrit = weak?.kind === "WEAK_POINT" && defender.currentHp / defender.maxHp <= weak.hpRatio ? weak.critRate : 0;
   const rate = conditionalCrit + getEffectiveStat(attacker, "criRate")
     + skillBonus
-    + (hasStatus(defender, "CRIT_RATE_UP") ? 0.5 : 0)
-    - (hasStatus(defender, "CRIT_RATE_DOWN") ? 0.3 : 0);
+    // 被クリ率の上げ下げ。**受ける側に付く**効果なので、名前の UP/DOWN は相手から見た向き
+    + (hasStatus(defender, "CRIT_RATE_UP") ? CRIT_RATE_TAKEN_UP : 0)
+    - (hasStatus(defender, "CRIT_RATE_DOWN") ? CRIT_RATE_TAKEN_DOWN : 0);
   return Math.max(0, Math.min(1, rate));
 }
 

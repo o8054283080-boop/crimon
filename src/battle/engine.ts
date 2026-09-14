@@ -1,4 +1,5 @@
 import { ELEMENT_JA } from "../core/element.js";
+import { ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
@@ -2051,10 +2052,10 @@ export class BattleEngine {
       } else if (effect.kind === "DEBUFF") {
         if (!receiver.alive || this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
         if (effect.status === "HEAL_BLOCK") { receiver.healBlockTurns = Math.max(receiver.healBlockTurns, effect.duration); receiver.healBlockMultiplier = 0; }
-        else if (effect.status === "SPD_DOWN") receiver.effects.push({ stat: "spd", amount: -.3, remainingTurns: effect.duration, kind: "DEBUFF" });
-        // 攻撃DOWN・防御DOWNは50%固定(依頼主の指定)
-        else if (effect.status === "ATK_DOWN") receiver.effects.push({ stat: "atk", amount: -.5, remainingTurns: effect.duration, kind: "DEBUFF" });
-        else if (effect.status === "DEF_DOWN") receiver.effects.push({ stat: "def", amount: -.5, remainingTurns: effect.duration, kind: "DEBUFF" });
+        // 効果量はスキルと同じ共通値。潜在から入っても強さが変わらないようにする
+        else if (effect.status === "SPD_DOWN") receiver.effects.push({ stat: "spd", amount: -SPD_DOWN, remainingTurns: effect.duration, kind: "DEBUFF" });
+        else if (effect.status === "ATK_DOWN") receiver.effects.push({ stat: "atk", amount: -ATK_DOWN, remainingTurns: effect.duration, kind: "DEBUFF" });
+        else if (effect.status === "DEF_DOWN") receiver.effects.push({ stat: "def", amount: -DEF_DOWN, remainingTurns: effect.duration, kind: "DEBUFF" });
         else if (effect.status === "POISON") { receiver.poisonStacks = Math.min(5, receiver.poisonStacks + 1); receiver.poisonTurns = Math.max(receiver.poisonTurns, effect.duration); receiver.poisonDamageRate = effect.value ?? .05; }
         else if (effect.status === "STUN") receiver.stunTurns = Math.max(receiver.stunTurns, effect.duration);
         else applyStatus(receiver, "BUFF_BLOCK", effect.duration, source.instanceId);
@@ -2082,8 +2083,11 @@ export class BattleEngine {
         // 正式な基礎発動率→命中/抵抗の共通経路を必ず使う。
         if (!this.rollEffectSuccess(source, receiver, latent.chance)) return;
         if (latent.status === "SPD_DOWN" || latent.status === "ATK_DOWN" || latent.status === "DEF_DOWN") {
+          // **以前はどれも -0.3 だった。**攻撃DOWNも防御DOWNも速度DOWNの量で入っていたので、
+          // 種類ごとの共通値へ直した
           const stat = latent.status === "SPD_DOWN" ? "spd" : latent.status === "ATK_DOWN" ? "atk" : "def";
-          receiver.effects.push({ stat, amount: -0.3, remainingTurns: latent.duration, kind: "DEBUFF" });
+          const amount = stat === "spd" ? SPD_DOWN : stat === "atk" ? ATK_DOWN : DEF_DOWN;
+          receiver.effects.push({ stat, amount: -amount, remainingTurns: latent.duration, kind: "DEBUFF" });
         } else if (latent.status === "HEAL_BLOCK") {
           receiver.healBlockTurns = Math.max(receiver.healBlockTurns, latent.duration);
           receiver.healBlockMultiplier = 0;

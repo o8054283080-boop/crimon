@@ -1,5 +1,6 @@
 import { MonsterTemplate } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
+import { ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 
 /**
  * 試練の塔100階の最終ボス「クリモアーク」と、その分身3種。
@@ -152,7 +153,7 @@ const CRIMOARK_S1: Skill = {
       conditionalBonus: [{ when: "TARGET_DEBUFF_AT_LEAST_2", bonus: 0.30 }],
       targetHpBonus: [{ hpRatio: 0.5, bonus: 0.20 }],
     },
-    { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 2, chance: 1 },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 },
     { kind: "GAUGE", amount: -0.20 },
   ],
 };
@@ -171,7 +172,7 @@ const CRIMOARK_S2: Skill = {
     // **剥がせた相手にだけ。**剥がすものが無かった相手には何も付かない
     { kind: "STATUS", status: "BUFF_BLOCK", durationTurns: 2, chance: 1, requires: "STRIPPED_TARGET", fixedDuration: true },
     { kind: "GAUGE", amount: -0.25 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.50, durationTurns: 2, chance: 0.70 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.70 },
     { kind: "CLEANSE", count: 2, applyTo: "SELF" },
   ],
 };
@@ -211,7 +212,7 @@ export const CRIMOARK_S4: Skill = {
     { kind: "STRIP", chance: 1 },
     { kind: "DAMAGE", multiplier: 1.30 },
     { kind: "GAUGE", amount: -0.50 },
-    { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 3, chance: 1, fixedDuration: true },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1, fixedDuration: true },
     { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 1, fixedDuration: true },
     { kind: "GAUGE", amount: 0.30, applyTo: "SELF" },
   ],
@@ -281,7 +282,7 @@ const DEBUFF_SKILLS: [Skill, Skill, Skill] = [
     target: "SINGLE_ENEMY", cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.80 },
-      { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 2, chance: 1 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 },
     ],
   },
   {
@@ -291,7 +292,7 @@ const DEBUFF_SKILLS: [Skill, Skill, Skill] = [
     effects: [
       { kind: "DAMAGE", multiplier: 0.65 },
       { kind: "GAUGE", amount: -0.20 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.50, durationTurns: 2, chance: 0.70 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.70 },
     ],
   },
   {

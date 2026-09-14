@@ -5,6 +5,10 @@ import { setCreatedSkillResolver } from "../core/monsterInstance.js";
 import { NEW_MONSTER_TEMPLATES, NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES } from "./newMonsters/index.js";
 import { CRIMOARK, CRIMOARK_ATTACK, CRIMOARK_DEBUFF, CRIMOARK_SUPPORT } from "./crimoark.js";
 import { ARCHEOS, TALENT_SHARD_ATK, TALENT_SHARD_DEF } from "./awakeningDepthsMonsters.js";
+import {
+  ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP,
+  ATK_DOWN, DEF_DOWN, SPD_DOWN,
+} from "../core/statusValues.js";
 
 const SLIME: MonsterTemplate = {
   templateId: "slime",
@@ -38,7 +42,7 @@ const SLIME: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.05 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.45 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.45 },
       ],
     },
     {
@@ -60,7 +64,7 @@ const SLIME: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
-        { kind: "DEBUFF", stat: "spd", amount: 0.2, durationTurns: 2, chance: 0.7 },
+        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
       ],
     },
   ],
@@ -166,7 +170,7 @@ const WOLF: MonsterTemplate = {
       description: "威圧の咆哮で敵全体の強化を50%で剥がし、70%で1ターン攻撃力を大きく低下させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "STRIP", chance: 0.5 }, { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 1, chance: 0.7 }],
+      effects: [{ kind: "STRIP", chance: 0.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.7 }],
     },
     {
       id: "wolf_s2_c",
@@ -202,9 +206,9 @@ const WOLF: MonsterTemplate = {
       effects: [
         { kind: "DAMAGE", multiplier: 0.7, hits: 3 },
         // 3回斬るので、防御低下も1撃につき1つずつ、計3つ重ねてかける
-        { kind: "DEBUFF", stat: "def", amount: 0.25, durationTurns: 2 },
-        { kind: "DEBUFF", stat: "def", amount: 0.25, durationTurns: 2 },
-        { kind: "DEBUFF", stat: "def", amount: 0.25, durationTurns: 2 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2 },
       ],
     },
     {
@@ -215,7 +219,7 @@ const WOLF: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "GAUGE", amount: 0.2 },
-        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
       ],
     },
   ],
@@ -292,7 +296,7 @@ const GOLEM: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 1, chance: 0.6 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 1, chance: 0.6 },
       ],
     },
   ],
@@ -324,8 +328,8 @@ const GOLEM: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
-        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
       ],
     },
   ],
@@ -338,7 +342,7 @@ const GOLEM: MonsterTemplate = {
     effects: [
       // 攻撃を持たないぶん、量で釣り合わせないと通常のスキル3(溶岩落とし)に届かない
       { kind: "SHIELD", shieldRate: 0.4, durationTurns: 3 },
-      { kind: "BUFF", stat: "def", amount: 0.8, durationTurns: 3 },
+      { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
       { kind: "REGEN", healRate: 0.08, durationTurns: 3 },
       { kind: "CLEANSE" },
     ],
@@ -351,7 +355,7 @@ const GOLEM: MonsterTemplate = {
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.0 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
 };
@@ -422,7 +426,7 @@ const FAIRY: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
         { kind: "CLEANSE" },
       ],
     },
@@ -442,7 +446,7 @@ const FAIRY: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "HEAL", healRate: 0.15 },
-        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
       ],
     },
   ],
@@ -469,7 +473,7 @@ const FAIRY: MonsterTemplate = {
     cooldownTurns: 5,
     effects: [
       { kind: "HEAL", healRate: 0.3 },
-      { kind: "BUFF", stat: "spd", amount: 0.35, durationTurns: 3 },
+      { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
       { kind: "GAUGE", amount: 0.35 },
     ],
   },
@@ -505,7 +509,7 @@ const IMP: MonsterTemplate = {
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.9 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.25, durationTurns: 1, chance: 0.3 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.3 },
     ],
   },
   skill2Variants: [
@@ -517,7 +521,7 @@ const IMP: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
-        { kind: "DEBUFF", stat: "def", amount: 0.45, durationTurns: 2, chance: 0.7 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
       ],
     },
     {
@@ -540,7 +544,7 @@ const IMP: MonsterTemplate = {
       effects: [
         { kind: "DAMAGE", multiplier: 1.2 },
         { kind: "GAUGE", amount: 0.15, drain: true },
-        { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.7 },
+        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
       ],
     },
   ],
@@ -553,7 +557,7 @@ const IMP: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "DAMAGE", multiplier: 1.1 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.55 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.55 },
       ],
     },
     {
@@ -588,7 +592,7 @@ const IMP: MonsterTemplate = {
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.4 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
       { kind: "BLIND", durationTurns: 2, chance: 0.6 },
     ],
   },
@@ -639,7 +643,7 @@ const WISP: MonsterTemplate = {
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.7 },
-      { kind: "BUFF", stat: "def", amount: 0.15, durationTurns: 1, applyTo: "ALLIES" },
+      { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" },
     ],
   },
   skill2Variants: [
@@ -663,7 +667,7 @@ const WISP: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
         { kind: "GAUGE", amount: 0.15 },
       ],
     },
@@ -687,8 +691,8 @@ const WISP: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 2 },
-        { kind: "BUFF", stat: "criRate", amount: 0.2, durationTurns: 2 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
       ],
     },
     {
@@ -712,7 +716,7 @@ const WISP: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "GAUGE", amount: 0.3 },
-        { kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
       ],
     },
   ],
@@ -723,8 +727,8 @@ const WISP: MonsterTemplate = {
     target: "ALL_ALLIES",
     cooldownTurns: 6,
     effects: [
-      { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 },
-      { kind: "BUFF", stat: "criRate", amount: 0.25, durationTurns: 3 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
+      { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 },
       { kind: "GAUGE", amount: 0.25 },
     ],
   },
@@ -736,7 +740,7 @@ const WISP: MonsterTemplate = {
     cooldownTurns: 6,
     effects: [
       { kind: "GAUGE", amount: 0.35 },
-      { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 3 },
+      { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
       { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
     ],
   },
@@ -791,7 +795,7 @@ const TREANT: MonsterTemplate = {
       target: "SELF",
       cooldownTurns: 4,
       effects: [
-        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
         { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
       ],
     },
@@ -827,7 +831,7 @@ const TREANT: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.04 },
-        { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
+        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
       ],
     },
     {
@@ -864,12 +868,12 @@ const TREANT: MonsterTemplate = {
     effects: [
       { kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.05 },
       { kind: "LIFESTEAL", healRate: 0.4 },
-      { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.6 },
+      { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
       // トレントは味方を保たせる種族。火力だけを積んでも、通常のスキル3(もりのゆりかご)を
       // 外したぶんの穴が埋まらず、実測では30戦中29敗になっていた。
       // **役割を捨てさせないこと。**吸った分を味方へ回す形にして、闇でも支え役として成立させる
       { kind: "HEAL", healRate: 0.15, applyTo: "ALLIES" },
-      { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3, applyTo: "ALLIES" },
+      { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "ALLIES" },
     ],
   },
 };
@@ -912,7 +916,7 @@ const KNIGHT: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.5 },
-        { kind: "DEBUFF", stat: "def", amount: 0.35, durationTurns: 2, chance: 0.65 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 },
       ],
     },
     {
@@ -923,7 +927,7 @@ const KNIGHT: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "CLEANSE" },
-        { kind: "BUFF", stat: "def", amount: 0.5, durationTurns: 3, applyTo: "SELF" },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" },
       ],
     },
     {
@@ -944,7 +948,7 @@ const KNIGHT: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "DAMAGE", multiplier: 1.8 },
-        { kind: "BUFF", stat: "atk", amount: 0.4, durationTurns: 2, applyTo: "ALLIES" },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" },
       ],
     },
     {
@@ -966,8 +970,8 @@ const KNIGHT: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "SHIELD", shieldRate: 0.12, durationTurns: 3 },
-        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
-        { kind: "BUFF", stat: "criRate", amount: 0.15, durationTurns: 2 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
       ],
     },
   ],
@@ -978,8 +982,8 @@ const KNIGHT: MonsterTemplate = {
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "BUFF", stat: "atk", amount: 0.45, durationTurns: 3 },
-      { kind: "BUFF", stat: "def", amount: 0.4, durationTurns: 3 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
+      { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
       { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
     ],
   },
@@ -1057,7 +1061,7 @@ const GRIFFON: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.6 },
-        { kind: "DEBUFF", stat: "spd", amount: 0.25, durationTurns: 2, chance: 0.7 },
+        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
       ],
     },
   ],
@@ -1088,8 +1092,8 @@ const GRIFFON: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 },
-        { kind: "BUFF", stat: "criDmg", amount: 0.3, durationTurns: 3 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
+        { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 },
       ],
     },
   ],
@@ -1102,7 +1106,7 @@ const GRIFFON: MonsterTemplate = {
     effects: [
       { kind: "DAMAGE", multiplier: 2.4 },
       { kind: "STUN", durationTurns: 1, chance: 0.5 },
-      { kind: "BUFF", stat: "atk", amount: 0.35, durationTurns: 3, applyTo: "ALLIES" },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" },
     ],
   },
   darkSkill3: {
@@ -1113,7 +1117,7 @@ const GRIFFON: MonsterTemplate = {
     cooldownTurns: 5,
     effects: [
       { kind: "DAMAGE", multiplier: 1.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
 };
@@ -1133,7 +1137,7 @@ const DRAGON_LIGHT_SKILL3: Skill = {
     // 固定倍率をいくら上げても追いつけないため、こちらにも一段厚いHP補正を持たせる
     { kind: "DAMAGE", multiplier: 2.6, hpCoefficient: 0.05 },
     { kind: "BLIND", durationTurns: 2, chance: 0.75 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 },
   ],
 };
 
@@ -1172,7 +1176,7 @@ const DRAGON: MonsterTemplate = {
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 1.2 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.25 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 },
     ],
   },
   // 6件に揃えることで、属性の並び(火・草・電気・水・光・闇)と1対1で対応する
@@ -1204,7 +1208,7 @@ const DRAGON: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 2.4 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.55 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 },
       ],
     },
     {
@@ -1214,8 +1218,8 @@ const DRAGON: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "BUFF", stat: "criDmg", amount: 0.3, durationTurns: 2 },
-        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
       ],
     },
     {
@@ -1226,7 +1230,7 @@ const DRAGON: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 2.4 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.55 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 },
       ],
     },
     {
@@ -1236,8 +1240,8 @@ const DRAGON: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "BUFF", stat: "criDmg", amount: 0.3, durationTurns: 2 },
-        { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
       ],
     },
     {
@@ -1271,7 +1275,7 @@ const DRAGON: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 3.6 },
-        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2, applyTo: "ALLIES" },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" },
       ],
     },
     {
@@ -1289,8 +1293,8 @@ const DRAGON: MonsterTemplate = {
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 },
-        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
         { kind: "HEAL", scaleStat: "def", healRate: 1.5 },
       ],
     },
@@ -1350,7 +1354,7 @@ const SERAPH: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "HEAL", scaleStat: "atk", healRate: 1.6 },
-        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
       ],
     },
     {
@@ -1374,7 +1378,7 @@ const SERAPH: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.6 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 1, chance: 0.7 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 1, chance: 0.7 },
       ],
     },
     {
@@ -1396,8 +1400,8 @@ const SERAPH: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "GAUGE", amount: 0.2 },
-        { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 },
-        { kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 3 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
+        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
       ],
     },
   ],
@@ -1472,7 +1476,7 @@ const NEMESIS: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 2.7 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.75 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 },
       ],
     },
     {
@@ -1515,7 +1519,7 @@ const NEMESIS: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "GAUGE", amount: 0.3 },
-        { kind: "BUFF", stat: "criRate", amount: 0.3, durationTurns: 2 },
+        { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
       ],
     },
   ],
@@ -1541,7 +1545,7 @@ const NEMESIS: MonsterTemplate = {
     effects: [
       { kind: "DAMAGE", multiplier: 1.8, hits: 2 },
       { kind: "GAUGE", amount: 0.2, drain: true },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
 };
@@ -1601,7 +1605,7 @@ export const ANCIENT_DEMON: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.6 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.45 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.45 },
       ],
     },
   ],
@@ -1614,7 +1618,7 @@ export const ANCIENT_DEMON: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 2.0, defCoefficient: 0.75 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.5 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 },
       ],
     },
   ],
@@ -1657,7 +1661,7 @@ export const ANCIENT_CRYSTAL: MonsterTemplate = {
       cooldownTurns: 2,
       // **積み上がることが肝。**バフは同じ能力値でも重ねた数だけ足し合わされるので、
       // 長引くほど魔人の一撃が重くなる。耐久で待つ戦い方に「待てば待つほど不利」を作る
-      effects: [{ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 4 }],
+      effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 }],
     },
   ],
   skill3Variants: [
@@ -1669,7 +1673,7 @@ export const ANCIENT_CRYSTAL: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "HEAL", scaleStat: "def", healRate: 1.2 },
-        { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
       ],
     },
   ],
@@ -1712,7 +1716,7 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 0.9 },
-        { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.55 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.55 },
         // 巨人ダンジョンの右の結晶にあたる役割。**張り続けたものを剥がし続ける**
         { kind: "STRIP", chance: 0.5 },
       ],
@@ -1727,7 +1731,7 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.8 },
-        { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.5 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 },
         // **回復で粘る戦い方への答え。**9・10階にしか現れないので、
         // ここに置けば序盤の階を巻き添えにしない
         { kind: "HEAL_BLOCK", healMultiplier: 0.4, durationTurns: 3, chance: 0.7 },
@@ -1748,7 +1752,7 @@ export const ANCIENT_BEAST: MonsterTemplate = {
     id: "ancient_beast_s1", name: "裂地爪",
     description: "敵単体に攻撃力2.4倍のダメージを与え、60%で2ターン速度を低下させる。防御低下中の敵を優先する。",
     target: "SINGLE_ENEMY", targetPriority: "DEF_DOWN", cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.6 }],
+    effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 }],
   },
   skill2Variants: [{
     id: "ancient_beast_s2", name: "獣王連撃",
@@ -1763,7 +1767,7 @@ export const ANCIENT_BEAST: MonsterTemplate = {
     effects: [
       { kind: "DAMAGE", multiplier: 2.5 },
       { kind: "STRIP", chance: 0.8, chanceGroup: "ancient_beast_roar" },
-      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.8, chanceGroup: "ancient_beast_roar" },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.8, chanceGroup: "ancient_beast_roar" },
     ],
   }],
 };
@@ -1780,7 +1784,7 @@ export const ANCIENT_GUARD_BEAST: MonsterTemplate = {
     id: "ancient_guard_beast_s1", name: "守護の角",
     description: "敵単体に攻撃力1.8倍のダメージを与え、味方全体の速度を1ターン上昇させる。",
     target: "SINGLE_ENEMY", cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 1, applyTo: "ALLIES", fixedDuration: true }],
+    effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 1, applyTo: "ALLIES", fixedDuration: true }],
   },
   skill2Variants: [{
     id: "ancient_guard_beast_s2", name: "加護の結界",
@@ -1807,7 +1811,7 @@ export const ANCIENT_FANG_BEAST: MonsterTemplate = {
     id: "ancient_fang_beast_s1", name: "崩牙波",
     description: "敵全体に攻撃力0.7倍のダメージを与え、それぞれ60%で2ターン防御力を低下させる。",
     target: "ALL_ENEMIES", cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.7 }, { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.6 }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.6 }],
   },
   skill2Variants: [{
     id: "ancient_fang_beast_s2", name: "狩猟連鎖",
