@@ -862,3 +862,57 @@ body:has(.crimon-home) {
     right: 12px !important;
   }
 }
+
+
+/* PR #338: プレゼントは固定レーンではなく既存お知らせの直下へ。
+ * noticeUi が「遊び方」の直後にお知らせを差し込むため、
+ * DOM上で遊び方の次に置いたプレゼントは自動的にその下へ回る。 */
+.home-world > .home-quick-stack {
+  display: none !important;
+}
+
+.world-actions--left .home-gift-action {
+  width: 72px !important;
+  min-height: 69px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.world-actions--left .home-gift-action .home-quick__icon {
+  width: 58px !important;
+  height: 58px !important;
+  border: 1px solid var(--home-gold) !important;
+  border-radius: 7px !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 29px !important;
+  background: linear-gradient(180deg, #163c64, #071a34) !important;
+  box-shadow: inset 0 0 0 2px rgba(4,17,38,.9), 0 4px 8px rgba(0,0,0,.35) !important;
+}
+
+.world-actions--left .home-gift-action .home-quick__badge {
+  top: 0 !important;
+  right: 2px !important;
+}
+
+/* 右列の余白を本当に詰める。
+ * ボタン枠ではなく、見えている装飾が画面端へ寄る位置まで出す。 */
+.crimon-home .world-actions--right {
+  right: -8px !important;
+}
+
+@media (max-width: 405px) {
+  .crimon-home .world-actions--right {
+    right: -8px !important;
+  }
+}
+
+@media (min-width: 410px) {
+  .crimon-home .world-actions--right {
+    right: -6px !important;
+  }
+}
