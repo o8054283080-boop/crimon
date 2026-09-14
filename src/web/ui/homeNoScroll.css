@@ -57,15 +57,13 @@ body:has(.crimon-home) {
   margin: 0 !important;
 }
 
-/* ログインボーナス等はHOMEの高さを増やさず、必要な時だけ重ねる。 */
+/* 既存の一時案内は重ねず、従来どおりHOME内の通常フローに置く。
+ * HOMEの残り高さはワールド側が吸収する。 */
 .crimon-home .reward-banner-stack {
-  position: absolute !important;
-  z-index: 30 !important;
-  top: calc(max(6px, var(--home-safe-top)) + var(--home-header-h) + clamp(70px, 10.2dvh, 86px) + 4px) !important;
-  left: 6px !important;
-  right: 6px !important;
-  max-height: min(31dvh, 220px) !important;
-  margin: 0 !important;
+  position: static !important;
+  flex: 0 0 auto !important;
+  max-height: clamp(56px, 11dvh, 96px) !important;
+  margin: 0 6px 4px !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -179,12 +177,11 @@ body:has(.crimon-home) {
 .home-notice summary strong { min-width: 0; font-size: 12px; line-height: 1.45; }
 .home-notice p { margin: 0; padding: 0 10px 12px; color: var(--home-text-muted); font-size: 11.5px; line-height: 1.65; white-space: pre-line; }
 
-.home-tutorial-sheet .crimon-tutorial {
-  display: block !important;
-  height: auto !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  overflow: visible !important;
+.crimon-home > .crimon-tutorial {
+  flex: 0 0 auto !important;
+  max-height: clamp(48px, 9dvh, 76px) !important;
+  margin: 0 6px 4px !important;
+  overflow: hidden !important;
 }
 
 @media (max-height: 700px) {
@@ -207,7 +204,7 @@ body:has(.crimon-home) {
   .crimon-resource-header { grid-template-columns: minmax(0,1fr) 142px !important; padding-inline: 8px !important; }
   .crimon-resource-header .home-id__name strong { font-size: 12px !important; }
   .current-party-panel { grid-template-columns: 92px minmax(0,1fr) 52px !important; gap: 3px !important; }
-  .current-party-panel__title small { font-size: 8.5px !important; }
+  .current-party-panel__title small { font-size: 9px !important; }
   .world-actions--left { left: 2px !important; }
   .world-actions--right { right: 2px !important; }
 }
