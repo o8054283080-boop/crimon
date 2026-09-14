@@ -255,3 +255,84 @@ body:has(.crimon-home) {
     font-size: 19px !important;
   }
 }
+
+
+/* 上部4情報（ファイター / ダイヤ / ゴールド / スタミナ）を一段コンパクトに。
+ * HOMEの主役はワールドなので、上部は約15〜20%圧縮する。 */
+html:has(.crimon-home),
+body:has(.crimon-home) {
+  --home-header-h: clamp(74px, 10.8dvh, 90px);
+}
+
+.crimon-home .crimon-resource-header {
+  padding: 8px 10px 6px 8px !important;
+  grid-template-columns: minmax(0, 1fr) 150px !important;
+  gap: 5px !important;
+}
+
+.crimon-home .crimon-resource-header .home-id {
+  height: 66px !important;
+  gap: 5px !important;
+}
+
+.crimon-home .crimon-resource-header .home-id__crest {
+  width: 50px !important;
+  height: 50px !important;
+}
+
+.crimon-home .crimon-resource-header .home-id__name strong {
+  font-size: 13px !important;
+}
+
+.crimon-home .crimon-resource-header .home-id__level strong {
+  font-size: 12px !important;
+}
+
+.crimon-home .crimon-resource-header .home-id__exp {
+  margin-top: 4px !important;
+}
+
+.crimon-home .crimon-resource-header .home-wallet {
+  height: 54px !important;
+  grid-template-rows: 20px 20px !important;
+  gap: 1px !important;
+  padding: 5px 4px !important;
+}
+
+.crimon-home .crimon-resource-header .home-wallet__chip {
+  height: 20px !important;
+  min-height: 20px !important;
+}
+
+.crimon-home .crimon-resource-header .home-wallet__chip--stamina {
+  top: 16px !important;
+  right: 4px !important;
+  left: 4px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding-top: 17px !important;
+}
+
+@media (max-height: 700px) {
+  html:has(.crimon-home),
+  body:has(.crimon-home) {
+    --home-header-h: 72px;
+  }
+
+  .crimon-home .crimon-resource-header {
+    padding-block: 6px 4px !important;
+  }
+
+  .crimon-home .crimon-resource-header .home-id {
+    height: 60px !important;
+  }
+
+  .crimon-home .crimon-resource-header .home-id__crest {
+    width: 46px !important;
+    height: 46px !important;
+  }
+
+  .crimon-home .crimon-resource-header .home-wallet {
+    height: 50px !important;
+  }
+}
