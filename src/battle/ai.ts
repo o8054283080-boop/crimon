@@ -23,10 +23,30 @@ export function chooseSkill(unit: BattleUnit, allUnits: BattleUnit[] = [unit]): 
       const hasHeal = skill.effects.some((effect) => effect.kind === "HEAL");
       const allies = allUnits.filter((candidate) => candidate.team === unit.team && candidate.alive);
       if (hasHeal && allies.every((ally) => hpRatio(ally) >= HEAL_SKILL_HP_THRESHOLD)) continue;
+      if (isRedundantBuff(unit, skill, allUnits)) continue;
       return { skill, index: i as 1 | 2 };
     }
   }
   return { skill: unit.def.skills[0], index: 0 };
+}
+
+/**
+ * **強化しかしないスキルを、もう掛かっている相手へ撃とうとしていないか。**
+ *
+ * 同じ強化は重ねがけしない決まりなので、全部すでに付いていて残りターンも
+ * 足りているなら、配り直しても**何も起きない**(ターンすら伸びない)。
+ * それなら1つ下のスキルを使うほうがよい。
+ *
+ * ダメージや回復を併せ持つスキルは対象にしない。強化が無駄でも殴る値打ちがある。
+ * 弱体も対象にしない。確率で外れるので、入っていない可能性が残るため。
+ */
+function isRedundantBuff(unit: BattleUnit, skill: Skill, allUnits: BattleUnit[]): boolean {
+  const buffs = skill.effects.filter((effect) => effect.kind === "BUFF");
+  if (buffs.length === 0 || buffs.length !== skill.effects.length) return false;
+  const targets = chooseTargets(unit, skill, allUnits);
+  if (targets.length === 0) return false;
+  return targets.every((target) => buffs.every((buff) => target.effects.some((active) =>
+    active.kind === "BUFF" && active.stat === buff.stat && active.remainingTurns >= buff.durationTurns)));
 }
 
 /** スキルの対象タイプに応じて対象ユニットを選ぶ */
