@@ -353,9 +353,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の裂晶",
     fixedStats: {
-      hp: 210_000,
-      atk: 7_000,
-      def: 3_200,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 210_000 / 7_000 / 3_200
+      hp: 147_000,
+      atk: 17_500,
+      def: 800,
       spd: 175,
       criRate: 0.15,
       criDmg: 1.5,
@@ -372,9 +373,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の戦鼓晶",
     fixedStats: {
-      hp: 250_000,
-      atk: 7_500,
-      def: 4_000,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 250_000 / 7_500 / 4_000
+      hp: 175_000,
+      atk: 18_750,
+      def: 1_000,
       spd: 205,
       criRate: 0.15,
       criDmg: 1.5,
@@ -391,9 +393,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の狂牙獣",
     fixedStats: {
-      hp: 190_000,
-      atk: 9_500,
-      def: 2_600,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 190_000 / 9_500 / 2_600
+      hp: 133_000,
+      atk: 23_750,
+      def: 650,
       spd: 205,
       criRate: 0.15,
       criDmg: 1.5,
@@ -410,9 +413,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の縛晶",
     fixedStats: {
-      hp: 220_000,
-      atk: 6_500,
-      def: 3_800,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 220_000 / 6_500 / 3_800
+      hp: 154_000,
+      atk: 16_250,
+      def: 950,
       spd: 165,
       criRate: 0.15,
       criDmg: 1.5,

@@ -90,12 +90,17 @@ const curseSkills: [Skill, Skill, Skill] = [
   ]),
 ];
 
+/*
+ * DEFはV2・本編と同じく×0.25。**V1そのものは本編に入らない**が、
+ * 「V1→V2で下げたのはお供のATKとSPDだけ」という差分の意味を保つために揃える。
+ * 旧値は 3,800/3,000/4,000/2,400/2,900。
+ */
 export const TOWER80_ENEMIES_V1: EnemySpec[] = [
-  { label: "古代聖竜", templateId: "dragon", element: "LIGHT", star: 6, level: 60, stats: { hp: 200_000, atk: 9_500, def: 3_800, spd: 185 }, skills: bossSkills, victoryTarget: true },
-  { label: "古代の護晶", templateId: "ancient_crystal", element: "WATER", star: 6, level: 60, stats: { hp: 100_000, atk: 7_500, def: 3_000, spd: 180 }, skills: guardSkills },
-  { label: "古代の鼓舞晶", templateId: "ancient_crystal", element: "GRASS", star: 6, level: 60, stats: { hp: 120_000, atk: 6_900, def: 4_000, spd: 172 }, skills: inspireSkills },
-  { label: "古代の破邪獣", templateId: "ancient_fang_beast", element: "FIRE", star: 6, level: 60, stats: { hp: 80_000, atk: 9_800, def: 2_400, spd: 190 }, skills: breakerSkills },
-  { label: "古代の呪獣", templateId: "ancient_beast", element: "DARK", star: 6, level: 60, stats: { hp: 110_000, atk: 8_500, def: 2_900, spd: 165 }, skills: curseSkills },
+  { label: "古代聖竜", templateId: "dragon", element: "LIGHT", star: 6, level: 60, stats: { hp: 200_000, atk: 9_500, def: 950, spd: 185 }, skills: bossSkills, victoryTarget: true },
+  { label: "古代の護晶", templateId: "ancient_crystal", element: "WATER", star: 6, level: 60, stats: { hp: 100_000, atk: 7_500, def: 750, spd: 180 }, skills: guardSkills },
+  { label: "古代の鼓舞晶", templateId: "ancient_crystal", element: "GRASS", star: 6, level: 60, stats: { hp: 120_000, atk: 6_900, def: 1_000, spd: 172 }, skills: inspireSkills },
+  { label: "古代の破邪獣", templateId: "ancient_fang_beast", element: "FIRE", star: 6, level: 60, stats: { hp: 80_000, atk: 9_800, def: 600, spd: 190 }, skills: breakerSkills },
+  { label: "古代の呪獣", templateId: "ancient_beast", element: "DARK", star: 6, level: 60, stats: { hp: 110_000, atk: 8_500, def: 725, spd: 165 }, skills: curseSkills },
 ];
 
 export const TOWER80_FOCUS: FocusOrder[] = [

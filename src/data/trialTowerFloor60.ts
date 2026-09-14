@@ -178,7 +178,8 @@ const GOMAJIN_TRAITS: BossTraits = {
 /** 60階の豪魔人が持つ実効HP。ここを触る時は必ず Battle Lab で測り直すこと */
 export const TOWER60_BOSS_HP = 150_000;
 export const TOWER60_BOSS_ATK = 7_200;
-export const TOWER60_BOSS_DEF = 3_800;
+// DEFは防御計算の入れ替えに合わせて×0.25(旧 3,800)
+export const TOWER60_BOSS_DEF = 950;
 export const TOWER60_BOSS_SPD = 165;
 
 /** 呪晶を倒した時、豪魔人へ足す速度 */
@@ -226,7 +227,7 @@ export const TOWER60_ENEMIES: DungeonEnemy[] = [
     fixedStats: {
       hp: 120_000,
       atk: 3_800,
-      def: 2_600,
+      def: 650,  // ×0.25(旧 2_600)
       spd: 175,
       criRate: 0.15,
       criDmg: 1.5,
@@ -247,7 +248,7 @@ export const TOWER60_ENEMIES: DungeonEnemy[] = [
     fixedStats: {
       hp: 112_500,
       atk: 3_500,
-      def: 2_400,
+      def: 600,  // ×0.25(旧 2_400)
       spd: 170,
       criRate: 0.15,
       criDmg: 1.5,

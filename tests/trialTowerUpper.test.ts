@@ -439,7 +439,7 @@ describe("試練の塔 60階: 豪魔人", () => {
     expect(boss.stats.atk).toBe(7_200);
     expect(boss.stats.spd).toBe(TOWER60_BOSS_SPD);
     expect(boss.stats.spd).toBe(165);
-    expect(boss.stats.def).toBe(3_800);
+    expect(boss.stats.def).toBe(950);  // 防御計算の入れ替えに合わせて×0.25(旧 3,800)
   });
 
   it("スキル3が3.5倍で、5発受けるとそのスキル3が返る", () => {
@@ -643,7 +643,7 @@ describe("今回触っていないところ", () => {
      * `core/statusValues.ts` の共通値へ揃えた回で、70階の専用スキルが持つ
      * 防御DOWNなどの量が変わったため。ステータスと編成は触っていない。
      */
-    expect(digest(70, 70)).toBe("7126fd3d4e32eb93");
+    expect(digest(70, 70)).toBe("2839540b50c407f0");
     const def = findTowerFloor(70)!;
     expect(def.enemies).toHaveLength(3);
     expect(def.enemies.map((enemy) => enemy.templateId)).toEqual(["behemoth", "ancient_crystal", "ancient_crystal_curse"]);

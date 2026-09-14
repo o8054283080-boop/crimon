@@ -106,14 +106,14 @@ describe("90階: 編成とステータス", () => {
     expect([TOWER90_BOSS_HP, TOWER90_BOSS_ATK, TOWER90_BOSS_DEF, TOWER90_BOSS_SPD]).toEqual([350_000, 9_000, 4_200, 200]);
   });
 
-  it("戦鼓晶は HP250,000 / DEF4,000 / SPD205、狂牙獣は ATK9,500 / SPD205", () => {
-    expect(TOWER90_ENEMIES[2].fixedStats).toMatchObject({ hp: 250_000, def: 4_000, spd: 205 });
-    expect(TOWER90_ENEMIES[3].fixedStats).toMatchObject({ atk: 9_500, spd: 205 });
+  it("戦鼓晶と狂牙獣の実数(HP×0.70 / DEF×0.25 / ATK×2.50 を当てた後)", () => {
+    expect(TOWER90_ENEMIES[2].fixedStats).toMatchObject({ hp: 175_000, def: 1_000, spd: 205 });
+    expect(TOWER90_ENEMIES[3].fixedStats).toMatchObject({ atk: 23_750, spd: 205 });
   });
 
   it("残りのお供も依頼どおりの実数", () => {
-    expect(TOWER90_ENEMIES[1].fixedStats).toMatchObject({ hp: 210_000, atk: 7_000, def: 3_200, spd: 175 });
-    expect(TOWER90_ENEMIES[4].fixedStats).toMatchObject({ hp: 220_000, atk: 6_500, def: 3_800, spd: 165 });
+    expect(TOWER90_ENEMIES[1].fixedStats).toMatchObject({ hp: 147_000, atk: 17_500, def: 800, spd: 175 });
+    expect(TOWER90_ENEMIES[4].fixedStats).toMatchObject({ hp: 154_000, atk: 16_250, def: 950, spd: 165 });
   });
 });
 

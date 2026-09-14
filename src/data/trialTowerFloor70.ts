@@ -11,9 +11,19 @@ import { ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE } from "./monsters.js";
  * 3スキル枠とは別の階固有ギミックなので BattleEngine の70階処理で解決する。
  */
 
-export const TOWER70_BOSS_HP = 170_000;
-export const TOWER70_BOSS_ATK = 8_000;
-export const TOWER70_BOSS_DEF = 4_000;
+/*
+ * **防御計算の入れ替えに合わせて実数を置き直した(2026-09)。**
+ * 旧式は軽減が攻撃力との比で決まったが、いまは `1000/(1000+1.2×DEF)` で
+ * DEFの値だけで決まる。同じDEF4,000でも通る量がまるで違うので、
+ * **式と敵のDEFは対で決める。**
+ *
+ * 200戦の実測で確定した倍率は HP×0.95 / DEF×0.40 / ATK×2.60
+ * (`docs/element-sw-plan-a.md`)。その結果 72%勝率 / 中央値174手。
+ * 旧値は HP170,000 / ATK8,000 / DEF4,000。
+ */
+export const TOWER70_BOSS_HP = 161_500;
+export const TOWER70_BOSS_ATK = 20_800;
+export const TOWER70_BOSS_DEF = 1_600;
 export const TOWER70_BOSS_SPD = 168;
 
 export const TOWER70_BOSS_REGEN = 0.03;
@@ -153,9 +163,10 @@ export const TOWER70_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の生命晶",
     fixedStats: {
-      hp: 130_000,
-      atk: 1_900,
-      def: 3_800,
+      // 同じ倍率(HP×0.95 / DEF×0.40 / ATK×2.60)。旧値は 130,000 / 1,900 / 3,800
+      hp: 123_500,
+      atk: 4_940,
+      def: 1_520,
       spd: 230,
       criRate: 0.15,
       criDmg: 1.5,
@@ -172,9 +183,10 @@ export const TOWER70_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の脈動晶",
     fixedStats: {
-      hp: 140_000,
-      atk: 2_100,
-      def: 4_200,
+      // 同じ倍率。旧値は 140,000 / 2,100 / 4,200
+      hp: 133_000,
+      atk: 5_460,
+      def: 1_680,
       spd: 230,
       criRate: 0.15,
       criDmg: 1.5,

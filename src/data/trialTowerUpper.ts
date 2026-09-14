@@ -195,12 +195,21 @@ export interface TowerUpperBand {
   swiftSpdBonus: number;
 }
 
+/*
+ * **DEFは防御計算の入れ替えに合わせて×0.25へ置き直した(2026-09)。**
+ * 旧式は軽減が攻撃力との比だったが、いまは `1000/(1000+1.2×DEF)` で
+ * DEFの値だけで決まる。据え置くと手数が3〜4.5倍になり、
+ * 通過階を抜けるだけで時間を取られる。
+ * 60/80/99階の実測で決めた倍率(`docs/element-sw-plan-a.md`)を帯全体へ当てている。
+ * HP・ATK・SPDは触っていない。旧DEFは [1600,2400] [1750,2650] [1950,2950]
+ * [2150,3250] [2400,3650]。
+ */
 export const TOWER_UPPER_BANDS: readonly TowerUpperBand[] = [
-  { from: 51, to: 59, hp: [48_000, 68_000], atk: [4_400, 5_900], def: [1_600, 2_400], spd: [138, 162], swiftSpdBonus: 10 },
-  { from: 61, to: 69, hp: [57_000, 80_000], atk: [5_000, 6_700], def: [1_750, 2_650], spd: [143, 168], swiftSpdBonus: 10 },
-  { from: 71, to: 79, hp: [67_000, 94_000], atk: [5_700, 7_500], def: [1_950, 2_950], spd: [148, 174], swiftSpdBonus: 11 },
-  { from: 81, to: 89, hp: [78_000, 108_000], atk: [6_400, 8_400], def: [2_150, 3_250], spd: [153, 180], swiftSpdBonus: 11 },
-  { from: 91, to: 99, hp: [90_000, 125_000], atk: [7_100, 9_500], def: [2_400, 3_650], spd: [158, 188], swiftSpdBonus: 12 },
+  { from: 51, to: 59, hp: [48_000, 68_000], atk: [4_400, 5_900], def: [400, 600], spd: [138, 162], swiftSpdBonus: 10 },
+  { from: 61, to: 69, hp: [57_000, 80_000], atk: [5_000, 6_700], def: [438, 662], spd: [143, 168], swiftSpdBonus: 10 },
+  { from: 71, to: 79, hp: [67_000, 94_000], atk: [5_700, 7_500], def: [488, 738], spd: [148, 174], swiftSpdBonus: 11 },
+  { from: 81, to: 89, hp: [78_000, 108_000], atk: [6_400, 8_400], def: [538, 812], spd: [153, 180], swiftSpdBonus: 11 },
+  { from: 91, to: 99, hp: [90_000, 125_000], atk: [7_100, 9_500], def: [600, 912], spd: [158, 188], swiftSpdBonus: 12 },
 ];
 
 export function towerUpperBandOf(floor: number): TowerUpperBand | null {
