@@ -819,15 +819,6 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
       /*
-       * ログインボーナスと補填の札。**世界の上へ浮かせない。**
-       *
-       * `position:absolute; top:78px` で世界へ被せていたため、
-       * 2枚同時に出た時は下の札の「閉じる」が押せず、
-       * 左右の縦列(ミッション・図鑑・冒険・ダンジョン・闘技場)も覆っていた。
-       * 上から順に押し下げる並びなら、何も隠さない。
-       */
-      bannerStack,
-      /*
        * 編成は**世界の枠より上**に置く。
        *
        * 世界の枠は `min-height: 356px` で縮まない(縮めると左右の縦列が
@@ -864,6 +855,22 @@ export function renderHome(props: HomeProps): HTMLElement {
           // 差し込むので、並びは 遊び方 → お知らせ → プレゼント になる
           giftEntry,
         ]),
+        /*
+         * ログインボーナスと補填の札。**世界の空の部分へ置く。**
+         *
+         * 以前はヘッダーの下に積んでいた。何も隠さない代わりに、
+         * 札の高さぶん世界の枠が縮み(`--home-banner-h`)、
+         * 何枚か出ている日は**世界そのものが画面の外まで押し出されていた**。
+         * ホームの主役が見えないので、置き場所としては成り立っていない。
+         *
+         * ここは左右の縦列の間で、モンスターより上。**誰も覆わない場所。**
+         * 一度 `position:absolute` で世界へ被せて失敗しているが、あの時は
+         * 全部を重ねたうえで `overflow:hidden` で押し込んだため、
+         * はみ出した「閉じる」が切り落とされて押せなくなっていた。
+         * **今回は切り落とさない。**代わりに出す本数を絞り
+         * (`HOME_BANNER_LIMIT`)、残りは「ほかにN件」の1行へ畳む。
+         */
+        bannerStack,
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
           worldButton("right", "activity-adventure", "冒険", props.onGoStages),
@@ -876,12 +883,19 @@ export function renderHome(props: HomeProps): HTMLElement {
           el("span", { className: "world-foreground__spire world-foreground__spire--left" }, []),
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
         ]),
-      ]),
+      ].filter((node): node is NonNullable<typeof node> => node !== null)),
       tutorial,
       staminaSheet,
       settingsSheet,
     ].filter((node): node is HTMLElement => node !== null));
-  if (bannerStack) declareBannerStackHeight(menu, bannerStack);
+  /*
+   * **札の高さはもう申告しない。**
+   *
+   * 世界の枠は `calc(100dvh - ... - var(--home-banner-h))` で、
+   * 申告した分だけ縮む作りだった。札を世界の中へ移した今は、
+   * 縮める理由が無い(札は世界の場所を分け合っていない)。
+   * 申告を残すと、**札が出ている日だけ世界が二重に縮む。**
+   */
   if (hasStarted) return el("div", { className: "screen home-screen home-screen--menu-only" }, [menu]);
 
   const homeScreen = el("div", { className: "screen home-screen" }, []);
