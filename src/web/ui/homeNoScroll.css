@@ -1,0 +1,213 @@
+/*
+ * HOMEをスマホの高さの中へ必ず収めるための最終レイアウト。
+ * 見た目は既存HOMEを維持し、縦方向だけ端末高に追従させる。
+ */
+
+html:has(.crimon-home),
+body:has(.crimon-home) {
+  --home-header-h: clamp(82px, 12.5dvh, 106px);
+  --home-nav-base-h: clamp(68px, 9.8dvh, 82px);
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.home-screen:has(.crimon-home),
+.home-screen--menu-only:has(.crimon-home) {
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.crimon-home {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  padding: max(6px, var(--home-safe-top)) 0 var(--bottom-nav-h) !important;
+  overflow: hidden !important;
+  --home-banner-h: 0px !important;
+}
+
+.crimon-home .crimon-resource-header {
+  flex: 0 0 var(--home-header-h) !important;
+  height: var(--home-header-h) !important;
+}
+
+.crimon-home .current-party-panel {
+  flex: 0 0 clamp(70px, 10.2dvh, 86px) !important;
+  height: clamp(70px, 10.2dvh, 86px) !important;
+  min-height: 0 !important;
+  margin: 0 6px 4px !important;
+}
+
+.crimon-home .current-party-panel__portraits {
+  height: clamp(50px, 7.4dvh, 63px) !important;
+}
+
+.crimon-home .current-party-panel__portraits .hp-card {
+  height: 100% !important;
+}
+
+.crimon-home .home-world {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+}
+
+/* ログインボーナス等はHOMEの高さを増やさず、必要な時だけ重ねる。 */
+.crimon-home .reward-banner-stack {
+  position: absolute !important;
+  z-index: 30 !important;
+  top: calc(max(6px, var(--home-safe-top)) + var(--home-header-h) + clamp(70px, 10.2dvh, 86px) + 4px) !important;
+  left: 6px !important;
+  right: 6px !important;
+  max-height: min(31dvh, 220px) !important;
+  margin: 0 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* お知らせ・プレゼント。左メニューの5・6段目として使う。 */
+.home-quick {
+  position: relative;
+  width: clamp(54px, 17.5vw, 72px);
+  min-height: clamp(48px, 7.8dvh, 72px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--home-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  text-shadow: 0 1px 3px #000, 0 0 5px #000;
+}
+
+.home-quick__icon {
+  display: grid;
+  place-items: center;
+  width: clamp(40px, 12.5vw, 56px);
+  height: clamp(40px, 12.5vw, 56px);
+  border: 2px solid var(--home-gold);
+  border-radius: 8px;
+  background: radial-gradient(circle at 50% 32%, rgba(79,190,231,.32), transparent 56%), linear-gradient(180deg,#173f68,#06182f);
+  box-shadow: inset 0 0 0 2px rgba(4,17,38,.9), inset 0 0 0 3px rgba(116,216,255,.28), 0 5px 10px rgba(0,18,34,.42);
+  font-size: clamp(22px, 6.8vw, 31px);
+  line-height: 1;
+}
+
+.home-quick__label {
+  margin-top: -2px;
+  padding: 1px 4px;
+  border: 1px solid rgba(224,187,101,.82);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(15,45,79,.97), rgba(4,18,38,.98));
+  box-shadow: 0 3px 6px rgba(0,17,34,.42);
+  font: 700 clamp(9px, 2.7vw, 11px)/1.2 "Yu Mincho", serif;
+  white-space: nowrap;
+}
+
+.home-quick__badge {
+  position: absolute;
+  top: 0;
+  right: 1px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 2px solid #fff1df;
+  border-radius: 999px;
+  background: #d7332f;
+  box-shadow: 0 2px 6px rgba(0,0,0,.5), 0 0 8px rgba(215,51,47,.5);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 16px;
+  text-align: center;
+}
+
+.home-quick:active { transform: scale(.96); filter: brightness(1.1); }
+
+/* 縦の短い端末では、左右のメニューも高さ基準で縮める。 */
+.crimon-home .world-actions {
+  top: clamp(4px, 1.2dvh, 15px) !important;
+  gap: clamp(0px, .45dvh, 5px) !important;
+}
+
+.crimon-home .world-action {
+  width: clamp(54px, 17.5vw, 72px) !important;
+  min-height: clamp(48px, 8.1dvh, 78px) !important;
+}
+
+.crimon-home .world-action img {
+  width: clamp(40px, 13.5vw, 58px) !important;
+  height: clamp(40px, 13.5vw, 58px) !important;
+}
+
+.crimon-home .world-action strong { font-size: clamp(9px, 2.7vw, 11px) !important; }
+
+.crimon-home .world-action--right {
+  width: clamp(62px, 20vw, 82px) !important;
+  min-height: clamp(58px, 10.4dvh, 94px) !important;
+}
+
+.crimon-home .world-action--right img {
+  width: clamp(48px, 16vw, 70px) !important;
+  height: clamp(48px, 16vw, 70px) !important;
+}
+
+.crimon-home .world-action--right strong { font-size: clamp(9.5px, 2.9vw, 12px) !important; }
+
+.crimon-home .world-party {
+  inset: clamp(50px, 10dvh, 92px) clamp(64px, 22vw, 86px) clamp(38px, 9dvh, 82px) !important;
+}
+
+.crimon-home .world-party__figure {
+  width: clamp(82px, 13.3dvh, 112px) !important;
+  height: clamp(118px, 19dvh, 160px) !important;
+}
+
+.home-notices { max-height: min(78dvh, 720px) !important; }
+.home-notices__list { display: flex; flex-direction: column; gap: 8px; }
+.home-notice { border: 1px solid rgba(215,177,94,.36); border-radius: 9px; background: rgba(5,20,42,.82); overflow: hidden; }
+.home-notice summary { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; gap: 8px; min-height: 44px; padding: 9px 10px; cursor: pointer; color: var(--home-text); }
+.home-notice__date { color: var(--home-gold-bright); font-size: 10px; line-height: 1.5; white-space: nowrap; }
+.home-notice summary strong { min-width: 0; font-size: 12px; line-height: 1.45; }
+.home-notice p { margin: 0; padding: 0 10px 12px; color: var(--home-text-muted); font-size: 11.5px; line-height: 1.65; white-space: pre-line; }
+
+.home-tutorial-sheet .crimon-tutorial {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+@media (max-height: 700px) {
+  html:has(.crimon-home), body:has(.crimon-home) { --home-header-h: 82px; --home-nav-base-h: 68px; }
+  .crimon-resource-header { padding-block: 8px 6px !important; }
+  .crimon-resource-header .home-id { height: 64px !important; }
+  .crimon-resource-header .home-id__crest { width: 50px !important; height: 50px !important; }
+  .crimon-home .current-party-panel { flex-basis: 70px !important; height: 70px !important; padding-block: 4px !important; }
+  .crimon-home .current-party-panel__portraits { height: 50px !important; }
+  .crimon-home .world-action, .home-quick { min-height: 46px !important; }
+  .crimon-home .world-action img, .home-quick__icon { width: 38px !important; height: 38px !important; }
+  .home-quick__icon { font-size: 21px !important; }
+  .crimon-home .world-action--right { min-height: 56px !important; }
+  .crimon-home .world-action--right img { width: 46px !important; height: 46px !important; }
+  .crimon-home .world-party__figure { width: 78px !important; height: 112px !important; }
+  .crimon-home .reward-banner-stack { max-height: 25dvh !important; }
+}
+
+@media (max-width: 360px) {
+  .crimon-resource-header { grid-template-columns: minmax(0,1fr) 142px !important; padding-inline: 8px !important; }
+  .crimon-resource-header .home-id__name strong { font-size: 12px !important; }
+  .current-party-panel { grid-template-columns: 92px minmax(0,1fr) 52px !important; gap: 3px !important; }
+  .current-party-panel__title small { font-size: 8.5px !important; }
+  .world-actions--left { left: 2px !important; }
+  .world-actions--right { right: 2px !important; }
+}
