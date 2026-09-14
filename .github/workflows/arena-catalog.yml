@@ -1,0 +1,134 @@
+name: アリーナ照合表を本番へ流す
+
+# 照合表を、押すだけで本番のSupabaseへ入れる。
+#
+# **作り直しても、流すまでは効かない。**
+# `npm run arena:catalog` が作るのは `supabase/migrations/` のファイルだけで、
+# CIも「手元の定義と揃っているか」しか見ていない。本番へ入れる作業は手動だった。
+#
+# 実際に流し忘れて事故になった。メインのクリダメを1.35倍にした時、
+# ★6+15 の上限は 0.948 → 1.274 へ動いたのに本番の表は古いまま。
+# クリダメメインの★6装備を着けている人は全員 `MAIN_STAT_OVER_CAP` で弾かれ、
+# **防衛の登録も、対戦の発行も落ちていた。**
+# しかもそれは画面に「挑戦券が減らない」としてしか現れなかった。
+#
+# 照合表は `delete` してから `insert` する作りなので、**何度流しても同じ結果**になる。
+# 流す時は `--single-transaction` で囲む。途中で落ちて表が空になると、
+# `CATALOG_MISSING` で全員がアリーナに入れなくなるため。
+#
+# ## 使うのに要るもの
+#
+# リポジトリの Settings → Secrets and variables → Actions に、
+# `SUPABASE_DB_URL` を1つだけ登録する(値は Supabase の
+# Settings → Database → Connection string の URI)。
+# **`service_role` の鍵ではない。**あれはここでは使わないし、置いてもいけない。
+
+on:
+  # 押した時だけ流す。データを書き換えるので、自動では走らせない
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "流さずに、いまの本番の値だけを見る"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # 同時に2本流すと、片方の delete ともう片方の insert が噛み合って表が壊れる
+  group: arena-catalog-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: 照合表を流す
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 流すファイルを決める
+        id: pick
+        run: |
+          set -euo pipefail
+          # 生成物は日付つきの名前で増えていく。**いちばん新しい1本だけ**でよい
+          # (中身は全テーブルの入れ替えなので、過去のぶんを含んでいる)
+          file="$(ls -1 supabase/migrations/*arena_catalog*.sql | sort | tail -1)"
+          if [ -z "$file" ]; then
+            echo "照合表の生成物が見つかりません" >&2
+            exit 1
+          fi
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          echo "流すファイル: $file"
+
+      - name: 手元の生成物が最新か確かめる
+        # **古い生成物を本番へ入れない。**定義を触って作り直し忘れていたら、
+        # ここで止まる(`arena:catalog --check` がCIと同じ検査をする)
+        run: |
+          npm ci
+          npm run arena:catalog -- --check
+
+      - name: 接続を確かめる
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DB_URL:-}" ]; then
+            echo "SUPABASE_DB_URL が登録されていません。" >&2
+            echo "Settings → Secrets and variables → Actions で追加してください。" >&2
+            exit 1
+          fi
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "select 'つながりました: ' || current_database();"
+
+      - name: いまの本番の値
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "
+            select stat_type, star, level, main_max
+              from public.arena_catalog_stat_caps
+             where (stat_type, star, level) in (('CRIT_DMG', 6, 15), ('HP_PERCENT', 6, 15))
+             order by stat_type;"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
+            select '図鑑の件数: ' || count(*) from public.arena_catalog_monsters;"
+
+      - name: 流す
+        if: ${{ !inputs.dry_run }}
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          # **途中で落ちたら全部戻す。**表が空のまま残るのがいちばん困る
+          psql "$DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f "${{ steps.pick.outputs.file }}"
+
+      - name: 入ったか確かめる
+        if: ${{ !inputs.dry_run }}
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "
+            select stat_type, star, level, main_max
+              from public.arena_catalog_stat_caps
+             where (stat_type, star, level) in (('CRIT_DMG', 6, 15), ('HP_PERCENT', 6, 15))
+             order by stat_type;"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
+            select '図鑑の件数: ' || count(*) from public.arena_catalog_monsters;"
+
+          # **手元の生成物と突き合わせる。**流したつもりで入っていない、を防ぐ
+          want="$(grep -oE "\('CRIT_DMG', 6, 15, [0-9.]+" "${{ steps.pick.outputs.file }}" \
+                  | head -1 | grep -oE "[0-9.]+$")"
+          got="$(psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
+            select main_max from public.arena_catalog_stat_caps
+             where stat_type = 'CRIT_DMG' and star = 6 and level = 15;")"
+          echo "手元 $want / 本番 $got"
+          if [ "$(printf '%s' "$want" | sed 's/0*$//')" != "$(printf '%s' "$got" | sed 's/0*$//')" ]; then
+            echo "本番の値が生成物と合っていません" >&2
+            exit 1
+          fi
+          echo "照合表は最新です"
