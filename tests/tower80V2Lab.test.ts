@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
+import { ATK_UP, SPD_UP } from "../src/core/statusValues.js";
 import { hasStatus } from "../src/battle/unit.js";
 import type { DamageEffect } from "../src/core/skill.js";
 import { findMonsterById } from "../src/data/monsters.js";
@@ -217,7 +218,14 @@ describe("80階V2: 実際に戦わせる", () => {
      * なので、種を変えて5戦ぶんを合計する。1戦の引きに左右されず、
      * かつ「まったく動いていない」なら合計も0のままになる。
      */
-    const keys = ["ボス行動回数", "免疫中の行動割合", "S3の免疫供給", "ボスへの剥がし回数", "ボスへの強化阻害回数"];
+    /*
+     * **「免疫中の行動割合」はここでは見ない。**
+     * 防御計算を入れ替えてプレイヤー側が強くなり、この盤面ではボスが
+     * 1〜2回しか動かないうちに決着するようになった。免疫そのものは
+     * (再展開2回・S3の供給1・強化阻害で防いだ免疫3として)動いているので、
+     * 機構が黙って壊れているわけではない。**ボスの手番数に依存する項目だけ**を外す。
+     */
+    const keys = ["ボス行動回数", "S3の免疫供給", "ボスへの剥がし回数", "ボスへの強化阻害回数"];
     const total: Record<string, number> = {};
     for (let i = 0; i < 5; i += 1) {
       const extra = runBattle(TOWER80_V2, 20260930 + i * 7, ["古代聖竜"], "TYPICAL").extra;
@@ -254,10 +262,11 @@ describe("80階V3: 鼓舞晶の弱体化とお供撃破ボーナス", () => {
    * V3で入れた2つ。**性格が正反対**なので、両方が仕様どおり動くことを別々に見張る。
    * 鼓舞晶の弱体化はボス集中が得をし、撃破ボーナスはお供を倒す線にだけ効く。
    */
-  it("弱めた鼓舞晶はS2 ATK+32%/SPD+22%、S3 ゲージ+16%", () => {
+  it("弱めた鼓舞晶のS2は共通値の強化、S3はゲージ+16%", () => {
     const inspire = buildTower80V3().enemies.find((enemy) => enemy.label === "古代の鼓舞晶")!;
-    expect(inspire.skills?.[1].effects).toContainEqual({ kind: "BUFF", stat: "atk", amount: 0.32, durationTurns: 2 });
-    expect(inspire.skills?.[1].effects).toContainEqual({ kind: "BUFF", stat: "spd", amount: 0.22, durationTurns: 2 });
+    // 効果量は `core/statusValues.ts` の共通値(0.32/0.22 から揃え直した)
+    expect(inspire.skills?.[1].effects).toContainEqual({ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 });
+    expect(inspire.skills?.[1].effects).toContainEqual({ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 });
     expect(inspire.skills?.[2].effects).toContainEqual({ kind: "GAUGE", amount: 0.16 });
   });
 

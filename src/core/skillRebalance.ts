@@ -1,5 +1,6 @@
 import type { Skill, SkillEffect } from "./skill.js";
 import type { PassiveSpec } from "./passive.js";
+import { ATK_UP, DEF_UP, SPD_UP, ATK_DOWN, DEF_DOWN } from "./statusValues.js";
 
 /** 9月の合意済み調整。実体化時に適用し、所持済み・継承済みの技にも反映する。 */
 export function applySeptemberSkillBalance(skill: Skill): Skill {
@@ -7,7 +8,7 @@ export function applySeptemberSkillBalance(skill: Skill): Skill {
     ({ ...skill, description, effects, ...rest });
   switch (skill.id) {
     case "golem_s2_c": return change("敵単体に攻撃力1.5倍のダメージ。85%で防御力を50%低下させる(2ターン)。", [
-      { kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "def", amount: 0.5, chance: 0.85, durationTurns: 2 }]);
+      { kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, chance: 0.85, durationTurns: 2 }]);
     case "abyssreaper_s2_c": return change("敵単体の強化を1個奪い、行動ゲージを50%減少。さらに強化阻害と毒1スタックをそれぞれ90%で2ターン付与する。", [
       { kind: "STEAL_BUFF", count: 1 }, { kind: "GAUGE", amount: -0.5 },
       { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.9, durationTurns: 2 },
@@ -20,21 +21,21 @@ export function applySeptemberSkillBalance(skill: Skill): Skill {
       skill.effects.map(e => e.kind === "DAMAGE" ? { ...e, multiplier: 1.8 } : e));
     case "behemoth_s2_a": return change("敵全体に攻撃力0.8倍＋自身の最大HP×0.05のダメージ。70%で攻撃力を50%低下させる(2ターン)。行動ゲージを30%減少させる。", [
       { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.05 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.5, chance: 0.7, durationTurns: 2 }, { kind: "GAUGE", amount: -0.3 }]);
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.7, durationTurns: 2 }, { kind: "GAUGE", amount: -0.3 }]);
     case "kobold_s3_a": return change("敵単体に攻撃力2.3倍のダメージ。攻撃前の対象HPが30%以下なら防御力を完全に無視する。", [
       { kind: "DAMAGE", multiplier: 2.3, targetHpIgnoreDefense: [{ hpRatio: 0.3, ratio: 1 }] }]);
-    case "wisp_s3_c": return change("味方単体の行動ゲージを80%進め、速度を25%上昇させる(2ターン)。最大レベルでゲージ100%、速度3ターン、CT3。", [
-      { kind: "GAUGE", amount: 0.8 }, { kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 2 }], {
+    case "wisp_s3_c": return change("味方単体の行動ゲージを80%進め、速度を20%上昇させる(2ターン)。最大レベルでゲージ100%、速度3ターン、CT3。", [
+      { kind: "GAUGE", amount: 0.8 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }], {
       target: "SINGLE_ALLY", cooldownTurns: 4, maxLevelOverride: { cooldownTurns: 3, effects: [
-        { kind: "GAUGE", amount: 1 }, { kind: "BUFF", stat: "spd", amount: 0.25, durationTurns: 3 }] } });
-    case "valkyria_s3_b": return change("味方全体の行動ゲージを30%進め、速度と攻撃力を30%上昇させる(2ターン)。", [
-      { kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: 0.3, durationTurns: 2 },
-      { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 }]);
+        { kind: "GAUGE", amount: 1 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] } });
+    case "valkyria_s3_b": return change("味方全体の行動ゲージを30%進め、速度を20%・攻撃力を30%上昇させる(2ターン)。", [
+      { kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }]);
     case "fairy_s1": return change("敵単体に攻撃力0.7倍のダメージを与え、自身の最大HPの2%を回復。最大レベルでは1.0倍・4%回復。", skill.effects, {
       maxLevelOverride: { effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "HEAL", healRate: 0.04, applyTo: "SELF" }] } });
     case "mimic_s3_b": return { ...skill, maxLevelOverride: { cooldownTurns: 3 } };
     case "golem_s3_c": return { ...skill, description: skill.description + "最大レベルで自身に3ターン反射も付与する。", maxLevelOverride: { effects: [
-      { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
       { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] } };
     case "griffon_s3_c": return { ...skill, description: skill.description + "さらに味方全体の行動ゲージを15%進める。", effects: [...skill.effects, { kind: "GAUGE", amount: 0.15 }] };
     case "treant_s2_c": return { ...skill, description: skill.description + "回復量は自身の最大HPの30%まで。最大レベルでは攻撃力1.5倍＋最大HP×0.06のダメージ。",

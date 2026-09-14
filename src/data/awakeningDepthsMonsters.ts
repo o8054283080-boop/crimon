@@ -1,5 +1,6 @@
 import { MonsterTemplate } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
+import { ATK_UP, DEF_UP, DEF_DOWN } from "../core/statusValues.js";
 
 /**
  * 目覚の深域に出る敵。**才能神獣アルケオスと、その2つの晶。**
@@ -49,12 +50,12 @@ export const TALENT_SHARD_DEF_TEMPLATE_ID = "talent_shard_def";
 const ARCHEOS_S1: Skill = {
   id: "archeos_s1",
   name: "才閃",
-  description: "敵単体に攻撃力1.4倍のダメージを与え、40%で防御力を50%低下させる(1ターン)。",
+  description: "敵単体に攻撃力1.4倍のダメージを与え、40%で防御力を75%低下させる(1ターン)。",
   target: "SINGLE_ENEMY",
   cooldownTurns: 0,
   effects: [
     { kind: "DAMAGE", multiplier: 1.4 },
-    { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 1, chance: 0.40, fixedDuration: true },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 1, chance: 0.40, fixedDuration: true },
   ],
 };
 
@@ -114,15 +115,15 @@ const SHARD_ATK_SKILLS: [Skill, Skill, Skill] = [
     id: "talent_shard_atk_s2", name: "増幅の光",
     description: "味方全体の攻撃力を30%上昇させる(2ターン)。",
     target: "ALL_ALLIES", cooldownTurns: 3,
-    effects: [{ kind: "BUFF", stat: "atk", amount: 0.30, durationTurns: 2 }],
+    effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }],
   },
   {
     id: "talent_shard_atk_s3", name: "才穿",
-    description: "敵単体に攻撃力1.6倍のダメージを与え、防御力を50%低下させる(2ターン)。",
+    description: "敵単体に攻撃力1.6倍のダメージを与え、防御力を75%低下させる(2ターン)。",
     target: "SINGLE_ENEMY", cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.6 },
-      { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 2, chance: 1 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 },
     ],
   },
 ];
@@ -146,7 +147,7 @@ const SHARD_DEF_SKILLS: [Skill, Skill, Skill] = [
     target: "ALL_ALLIES", cooldownTurns: 4,
     effects: [
       { kind: "HEAL", healRate: 0.15 },
-      { kind: "BUFF", stat: "def", amount: 0.30, durationTurns: 2 },
+      { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
     ],
   },
 ];

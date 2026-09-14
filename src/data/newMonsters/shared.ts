@@ -7,18 +7,17 @@ import { PassiveLevelEffect, PassiveSpec, PassiveTrigger } from "../../core/pass
  * 定数にしておけば、どこか1つだけ違う値を書いてしまう事故が起きない。
  */
 
-/** 攻撃DOWN・防御DOWNの効果量。**依頼主の指定で50%固定** */
-export const ATK_DOWN = 0.5;
-export const DEF_DOWN = 0.5;
-/** 速度DOWNの効果量。既存モンスターと同じ水準に揃えてある */
-export const SPD_DOWN = 0.3;
-
-/** 能力上昇の標準量。既存モンスターで最も多い値に合わせてある */
-export const ATK_UP = 0.4;
-export const DEF_UP = 0.5;
-export const SPD_UP = 0.3;
-export const CRI_RATE_UP = 0.25;
-export const CRI_DMG_UP = 0.3;
+/*
+ * 通常のバフ・デバフの効果量は `src/core/statusValues.ts` が唯一の置き場所。
+ * ここは**そこへの入口**で、値そのものは持たない。
+ * 11種を書いた時はここに書いてあったが、既存モンスターが直書きのままで
+ * 同じ名前の効果に違う値が混在していたため、全体で1か所へ寄せた。
+ */
+export {
+  ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP,
+  ATK_DOWN, DEF_DOWN, SPD_DOWN, CRI_RATE_DOWN,
+  CRIT_RATE_TAKEN_UP, CRIT_RATE_TAKEN_DOWN,
+} from "../../core/statusValues.js";
 
 /** 毒1スタックあたりのダメージ割合。既存の毒と同じ水準 */
 export const POISON_RATE = 0.05;

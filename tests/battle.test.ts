@@ -9,7 +9,9 @@ import { MONSTER_TEMPLATES, findMonster } from "../src/data/monsters.js";
 const noCrit = () => 0.999; // criRate は常に1未満なのでクリティカルにならない
 
 describe("ダメージ計算", () => {
-  it("属性有利は不利より大きなダメージになる", () => {
+  it("**不利属性はかすり、有利属性はかすらない**", () => {
+    // 相性は倍率ではなくクリ率とかすりで効く。倍率で比べると差が出ないので、
+    // かすり判定に必ず当たる乱数(0)を渡して、不利側だけが「かすり」になることを見る
     const fireSlime = createMonsterVariant(MONSTER_TEMPLATES[0], "FIRE");
     const grassGolem = createMonsterVariant(MONSTER_TEMPLATES[2], "GRASS");
     const waterGolem = createMonsterVariant(MONSTER_TEMPLATES[2], "WATER");
@@ -19,10 +21,8 @@ describe("ダメージ計算", () => {
     const weakTarget = createBattleUnit(waterGolem, "ENEMY", "E2");
 
     const effect = { kind: "DAMAGE" as const, multiplier: 1.0 };
-    const advDamage = calcDamage(attacker, strongTarget, effect, noCrit).damage;
-    const disDamage = calcDamage(attacker, weakTarget, effect, noCrit).damage;
-
-    expect(advDamage).toBeGreaterThan(disDamage);
+    expect(calcDamage(attacker, weakTarget, effect, () => 0).isGlancing).toBe(true);
+    expect(calcDamage(attacker, strongTarget, effect, () => 0).isGlancing).toBeFalsy();
   });
 
   it("最低ダメージは1", () => {
