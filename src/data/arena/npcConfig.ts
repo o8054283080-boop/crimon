@@ -12,9 +12,9 @@
  * この案件では既に、装備の生成側を変えても控えに焼いた値が変わらない事故を
  * 出している(CLAUDE.md)。**調整点を散らさないことがそのまま安全になる。**
  *
- * ## 上の帯ほど「数値が高い」ではなく「完成度が高い」
+ * ## 上の帯ほど「数値が高い」ではなく「完成度が高い」(レート3000まで)
  *
- * 帯を上げる時に倍率を掛けてはいけない。上げるのは
+ * 3000までは、帯を上げる時に倍率を掛けない。上げるのは
  *
  *   星 → レベルの詰め具合 → 装備の星と強化 → サブOPの本数 →
  *   メインOPが役割に合う確率 → **装備を選び取った回数(厳選)** →
@@ -22,16 +22,22 @@
  *   タイプ転生の済み具合 → 編成テンプレの噛み合い
  *
  * の10個だけ。**どれもプレイヤーが自分の手で到達できる**ものに限る。
- * 最上位でも `EQUIP_MAX_LEVEL`(15)・`ABILITY_POINT_BUDGETS`(星6で100)・
- * `STAR_MAX_LEVEL`(星6で60)を1も超えない。超えた瞬間、
- * 「どう育てても届かない相手」が並ぶ場所になる。
+ * `EQUIP_MAX_LEVEL`(15)・`ABILITY_POINT_BUDGETS`(星6で100)・
+ * `STAR_MAX_LEVEL`(星6で60)を1も超えない。
  *
- * ## 一番上の帯は、育成では上げられない
+ * ## 3000から上だけ、育成の外へ出ている
  *
  * 星もレベルもスキルも装備の強化も能力ポイントも、上の帯はとっくに上限に
- * 張り付いている。**そこから先を作れる軸は「厳選」しか残っていない**——
- * 同じ★6+15でも、サブOPの中身が役割に噛み合っているかどうかで別物になる。
- * 上限を超えた数字を与えるのではなく、**引き直した回数**で差を付ける。
+ * 張り付いている。最後に残っていた軸が「厳選」(`gearRolls`)だが、
+ * **22本でほぼ最適に届く**ので、320本に増やしても差にならなかった。
+ *
+ * それどころか**厳選は途中から逆効果だった。**体力型はサブOPの希望がHP寄りなので、
+ * 選び直すほどHPに偏る。同じ編成で 3000 と 3500 を比べると
+ * 攻撃が-12%・防御が-13%・クリ率が-6pt 下がっていた(HPは+23%)。
+ *
+ * そこで依頼主の判断で、3000より上には `statMultiplier` を置いた。
+ * **ここだけが「どう育てても再現できない」領域**で、
+ * 3000までは今までどおり育成の範囲内に収まっている。
  */
 import { EquipStar, SetType, StatType } from "../../core/equipment.js";
 import { MonsterType } from "../../core/monsterDevelopment.js";
@@ -197,6 +203,26 @@ export interface ArenaNpcBand {
    * 帯を上げる時は倍々で増やさないと差にならない。
    */
   gearRolls?: number;
+  /**
+   * HP・攻撃・防御へ掛ける倍率。**レート3000より上の帯だけが持つ。**
+   *
+   * ## ここだけが育成の外に出ている
+   *
+   * 上の10項目は全部「プレイヤーが自分の手で到達できる」ものだが、これは違う。
+   * 3000あたりで育成の範囲内で作れる強さの天井に届き、そこから先は
+   * 何を積んでも差が出なくなったため、依頼主の判断で入れた。
+   *
+   * **厳選は途中から逆効果でもあった。**体力型はサブOPの希望がHP寄りなので、
+   * 選び直すほどHPに偏る。同じ編成で 3000 と 3500 を比べると
+   * 攻撃が-12%・防御が-13%・クリ率が-6pt 下がっていた(HPは+23%)。
+   * だから `gearRolls` は3000で打ち止めにして、そこから上は倍率で伸ばす。
+   *
+   * ## 速度には掛からない
+   *
+   * 掛かるのはHP・攻撃・防御の3つだけ(`snapshotToDefinitions`)。
+   * 速度は手番の数に直結するので、伸ばすと相手だけが何度も動く別のゲームになる。
+   */
+  statMultiplier?: number;
   /** シリーズを4+2でそろえる確率。低い帯はバラバラの装備を着ている */
   setCoherence: number;
   /** 星別上限(`ABILITY_POINT_BUDGETS`)のうち、実際に振ってある割合 */
@@ -473,7 +499,8 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     equipEnhance: [15, 15],
     equipSubStats: [4, 4],
     mainStatRerolls: 20,
-    gearRolls: 40,
+    gearRolls: 22,
+    statMultiplier: 1.1,
     setCoherence: 1,
     abilityPointRatio: [1, 1],
     latentChance: 1,
@@ -491,7 +518,8 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     equipEnhance: [15, 15],
     equipSubStats: [4, 4],
     mainStatRerolls: 20,
-    gearRolls: 70,
+    gearRolls: 22,
+    statMultiplier: 1.22,
     setCoherence: 1,
     abilityPointRatio: [1, 1],
     latentChance: 1,
@@ -509,7 +537,8 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     equipEnhance: [15, 15],
     equipSubStats: [4, 4],
     mainStatRerolls: 20,
-    gearRolls: 120,
+    gearRolls: 22,
+    statMultiplier: 1.36,
     setCoherence: 1,
     abilityPointRatio: [1, 1],
     latentChance: 1,
@@ -527,7 +556,8 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     equipEnhance: [15, 15],
     equipSubStats: [4, 4],
     mainStatRerolls: 20,
-    gearRolls: 200,
+    gearRolls: 22,
+    statMultiplier: 1.52,
     setCoherence: 1,
     abilityPointRatio: [1, 1],
     latentChance: 1,
@@ -545,7 +575,8 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     equipEnhance: [15, 15],
     equipSubStats: [4, 4],
     mainStatRerolls: 20,
-    gearRolls: 320,
+    gearRolls: 22,
+    statMultiplier: 1.7,
     setCoherence: 1,
     abilityPointRatio: [1, 1],
     latentChance: 1,
