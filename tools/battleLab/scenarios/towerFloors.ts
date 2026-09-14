@@ -26,8 +26,14 @@ import { buildDungeonEnemyTeam } from "../../../src/game/dungeonRunner.js";
 import type { EnemySpec, Scenario } from "../types.js";
 import { TOWER60 } from "./tower60.js";
 
-/** 測る階。**代表点だけ。**全100階を生やすと `--list` が読めなくなる */
-const MEASURED_FLOORS = [51, 55, 59, 60, 61, 65, 69, 71, 75, 79, 81, 85, 89, 91, 95, 99];
+/**
+ * 測る階。**代表点だけ。**全100階を生やすと `--list` が読めなくなる。
+ *
+ * 70/80/90/100 は**節目のボス階**。ここだけ従来の等比曲線のままなので、
+ * 曲線に手を入れた時と、防御計算のような全体の式を変えた時の
+ * 影響がいちばん素直に出る。
+ */
+const MEASURED_FLOORS = [51, 55, 59, 60, 61, 65, 69, 70, 71, 75, 79, 80, 81, 85, 89, 90, 91, 95, 99, 100];
 
 function toEnemySpec(def: MonsterDefinition, index: number): EnemySpec {
   return {
@@ -55,6 +61,9 @@ function buildFloorScenario(floor: number): Scenario {
     title: `試練の塔 ${def.name}(本編)`,
     note: `本編の${def.floor}階をそのまま。敵${enemies.length}体。全回復から1戦だけ挑んだ場合の値`,
     maxTurns: 300,
+    // BattleEngine が持つ70/80/90/100階などの本編専用処理を有効にする。
+    // これを渡さないと敵データだけが同じでも、階固有ギミックは動かない。
+    trialTowerFloor: floor,
     // **範囲は置かない。**階ごとに狙いが違うので、1つの範囲で全部を測ると
     // どれかが必ず警告を出し続けて意味を失う
     allies: TOWER60.allies,

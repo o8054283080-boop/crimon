@@ -145,8 +145,11 @@ describe("プレイヤーの手持ちにだけ効く", () => {
     const enemy = floor!.enemies.find((e) => e.templateId === "wolf")!;
     const dex = findMonsterById(`${enemy.templateId}_${enemy.element}`)!;
     const base = computeEffectiveStats(dex.stats, enemy.star, enemy.level);
-    const plain = scaledEnemyAtk(base.atk * floor!.powerScale);
-    const boosted = scaledEnemyAtk(applyPlayerStatBoost(base, "wolf", enemy.star).atk * floor!.powerScale);
+    // 個体ごとの攻撃力倍率(1階だけ0.7)も式に含める。見たいのは
+    // 「プレイヤー側の補正が敵に掛かっていないこと」だけ
+    const atkScale = floor!.powerScale * (enemy.atkMultiplier ?? 1);
+    const plain = scaledEnemyAtk(base.atk * atkScale);
+    const boosted = scaledEnemyAtk(applyPlayerStatBoost(base, "wolf", enemy.star).atk * atkScale);
 
     const built = buildDungeonEnemyTeam(floor!).find((d) => d.templateId === "wolf")!;
     expect(built.stats.atk, "敵に補正が掛かっている").toBe(plain);

@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { BossTraits } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
@@ -106,7 +107,7 @@ const MASHOU_SKILLS: [Skill, Skill, Skill] = [
     description: "味方全体の攻撃力を2ターン上昇させる。",
     target: "ALL_ALLIES",
     cooldownTurns: 3,
-    effects: [{ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 }],
+    effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }],
   },
   {
     id: "tower60_mashou_s3",
@@ -131,18 +132,18 @@ const JUSHOU_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.9 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.3, durationTurns: 2, chance: 0.5 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 },
     ],
   },
   {
     id: "tower60_jushou_s2",
     name: "呪晶の波動",
-    description: "敵全体に攻撃力0.8倍のダメージを与え、70%で2ターン防御力を大きく低下させる。",
+    description: "敵全体に攻撃力0.8倍のダメージを与え、70%で2ターン防御力を75%低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.8 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
   {
@@ -177,7 +178,8 @@ const GOMAJIN_TRAITS: BossTraits = {
 /** 60階の豪魔人が持つ実効HP。ここを触る時は必ず Battle Lab で測り直すこと */
 export const TOWER60_BOSS_HP = 150_000;
 export const TOWER60_BOSS_ATK = 7_200;
-export const TOWER60_BOSS_DEF = 3_800;
+// DEFは防御計算の入れ替えに合わせて×0.25(旧 3,800)
+export const TOWER60_BOSS_DEF = 950;
 export const TOWER60_BOSS_SPD = 165;
 
 /** 呪晶を倒した時、豪魔人へ足す速度 */
@@ -225,7 +227,7 @@ export const TOWER60_ENEMIES: DungeonEnemy[] = [
     fixedStats: {
       hp: 120_000,
       atk: 3_800,
-      def: 2_600,
+      def: 650,  // ×0.25(旧 2_600)
       spd: 175,
       criRate: 0.15,
       criDmg: 1.5,
@@ -246,7 +248,7 @@ export const TOWER60_ENEMIES: DungeonEnemy[] = [
     fixedStats: {
       hp: 112_500,
       atk: 3_500,
-      def: 2_400,
+      def: 600,  // ×0.25(旧 2_400)
       spd: 170,
       criRate: 0.15,
       criDmg: 1.5,

@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { Skill } from "../core/skill.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
 import { ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE } from "./monsters.js";
@@ -10,9 +11,19 @@ import { ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE } from "./monsters.js";
  * 3スキル枠とは別の階固有ギミックなので BattleEngine の70階処理で解決する。
  */
 
-export const TOWER70_BOSS_HP = 170_000;
-export const TOWER70_BOSS_ATK = 8_000;
-export const TOWER70_BOSS_DEF = 4_000;
+/*
+ * **防御計算の入れ替えに合わせて実数を置き直した(2026-09)。**
+ * 旧式は軽減が攻撃力との比で決まったが、いまは `1000/(1000+1.2×DEF)` で
+ * DEFの値だけで決まる。同じDEF4,000でも通る量がまるで違うので、
+ * **式と敵のDEFは対で決める。**
+ *
+ * 200戦の実測で確定した倍率は HP×0.95 / DEF×0.40 / ATK×2.60
+ * (`docs/element-sw-plan-a.md`)。その結果 72%勝率 / 中央値174手。
+ * 旧値は HP170,000 / ATK8,000 / DEF4,000。
+ */
+export const TOWER70_BOSS_HP = 161_500;
+export const TOWER70_BOSS_ATK = 20_800;
+export const TOWER70_BOSS_DEF = 1_600;
 export const TOWER70_BOSS_SPD = 168;
 
 export const TOWER70_BOSS_REGEN = 0.03;
@@ -49,18 +60,18 @@ const BEHEMOTH_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.04 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
   {
     id: "tower70_behemoth_s3",
     name: "天地崩壊",
-    description: "敵全体に攻撃力1.2倍＋自身の最大HP5%分のダメージを与え、80%で2ターン防御力を50%低下。使用時に自身の弱体効果を全解除し、HP50%以上なら敵全体の行動ゲージを20%減少させる。",
+    description: "敵全体に攻撃力1.2倍＋自身の最大HP5%分のダメージを与え、80%で2ターン防御力を75%低下。使用時に自身の弱体効果を全解除し、HP50%以上なら敵全体の行動ゲージを20%減少させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.05 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.8 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
     ],
   },
 ];
@@ -152,9 +163,10 @@ export const TOWER70_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の生命晶",
     fixedStats: {
-      hp: 130_000,
-      atk: 1_900,
-      def: 3_800,
+      // 同じ倍率(HP×0.95 / DEF×0.40 / ATK×2.60)。旧値は 130,000 / 1,900 / 3,800
+      hp: 123_500,
+      atk: 4_940,
+      def: 1_520,
       spd: 230,
       criRate: 0.15,
       criDmg: 1.5,
@@ -171,9 +183,10 @@ export const TOWER70_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の脈動晶",
     fixedStats: {
-      hp: 140_000,
-      atk: 2_100,
-      def: 4_200,
+      // 同じ倍率。旧値は 140,000 / 2,100 / 4,200
+      hp: 133_000,
+      atk: 5_460,
+      def: 1_680,
       spd: 230,
       criRate: 0.15,
       criDmg: 1.5,

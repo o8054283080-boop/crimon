@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { Skill } from "../core/skill.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
 import { ANCIENT_CRYSTAL, ANCIENT_FANG_BEAST } from "./monsters.js";
@@ -111,12 +112,12 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "tower90_boss_s1",
     name: "断罪の刃",
-    description: "敵単体に攻撃力1.2倍のダメージを与え、70%で2ターン防御力を50%低下させ、行動ゲージを15%減少させる。",
+    description: "敵単体に攻撃力1.2倍のダメージを与え、70%で2ターン防御力を75%低下させ、行動ゲージを15%減少させる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 1.2 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
       { kind: "GAUGE", amount: -0.15 },
     ],
   },
@@ -128,7 +129,7 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.7, hits: 3, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.35 }] },
-      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 1 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 1 },
     ],
   },
   {
@@ -143,14 +144,14 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
      */
     id: "tower90_boss_s3",
     name: "絶・終焉の波動",
-    description: "敵全体に攻撃力1.35倍のダメージを与え、強化効果をすべて解除し、行動ゲージを50%減少させ、3ターン防御力を50%低下させる。",
+    description: "敵全体に攻撃力1.35倍のダメージを与え、強化効果をすべて解除し、行動ゲージを50%減少させ、3ターン防御力を75%低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
       { kind: "DAMAGE", multiplier: 1.35 },
       { kind: "STRIP", chance: 1 },
       { kind: "GAUGE", amount: -0.5 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 3, chance: 1, fixedDuration: true },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1, fixedDuration: true },
     ],
   },
 ];
@@ -159,23 +160,23 @@ const RIFT_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "tower90_rift_s1",
     name: "裂傷弾",
-    description: "敵単体に攻撃力0.9倍のダメージを与え、75%で2ターン防御力を50%低下させる。",
+    description: "敵単体に攻撃力0.9倍のダメージを与え、75%で2ターン防御力を75%低下させる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.9 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.75 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 },
     ],
   },
   {
     id: "tower90_rift_s2",
     name: "破砕波",
-    description: "敵全体に攻撃力0.6倍のダメージを与え、85%で2ターン防御力を50%低下させる。",
+    description: "敵全体に攻撃力0.6倍のダメージを与え、85%で2ターン防御力を75%低下させる。",
     target: "ALL_ENEMIES",
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.6 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.85 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 },
     ],
   },
   {
@@ -219,8 +220,8 @@ const WAR_DRUM_SKILLS: [Skill, Skill, Skill] = [
     target: "ALL_ALLIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 2 },
-      { kind: "BUFF", stat: "spd", amount: 0.4, durationTurns: 2 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+      { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
     ],
   },
   {
@@ -303,7 +304,7 @@ const BIND_SKILLS: [Skill, Skill, Skill] = [
     effects: [
       { kind: "DAMAGE", multiplier: 0.55 },
       { kind: "GAUGE", amount: -0.2 },
-      { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.6 },
+      { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
     ],
   },
   {
@@ -352,9 +353,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の裂晶",
     fixedStats: {
-      hp: 210_000,
-      atk: 7_000,
-      def: 3_200,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 210_000 / 7_000 / 3_200
+      hp: 147_000,
+      atk: 17_500,
+      def: 800,
       spd: 175,
       criRate: 0.15,
       criDmg: 1.5,
@@ -371,9 +373,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の戦鼓晶",
     fixedStats: {
-      hp: 250_000,
-      atk: 7_500,
-      def: 4_000,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 250_000 / 7_500 / 4_000
+      hp: 175_000,
+      atk: 18_750,
+      def: 1_000,
       spd: 205,
       criRate: 0.15,
       criDmg: 1.5,
@@ -390,9 +393,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の狂牙獣",
     fixedStats: {
-      hp: 190_000,
-      atk: 9_500,
-      def: 2_600,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 190_000 / 9_500 / 2_600
+      hp: 133_000,
+      atk: 23_750,
+      def: 650,
       spd: 205,
       criRate: 0.15,
       criDmg: 1.5,
@@ -409,9 +413,10 @@ export const TOWER90_ENEMIES: DungeonEnemy[] = [
     victoryTarget: false,
     displayName: "古代の縛晶",
     fixedStats: {
-      hp: 220_000,
-      atk: 6_500,
-      def: 3_800,
+      // 同じ倍率(HP×0.70 / DEF×0.25 / ATK×2.50)。旧値は 220_000 / 6_500 / 3_800
+      hp: 154_000,
+      atk: 16_250,
+      def: 950,
       spd: 165,
       criRate: 0.15,
       criDmg: 1.5,

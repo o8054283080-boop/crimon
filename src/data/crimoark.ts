@@ -1,5 +1,6 @@
 import { MonsterTemplate } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
+import { ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 
 /**
  * 試練の塔100階の最終ボス「クリモアーク」と、その分身3種。
@@ -43,9 +44,15 @@ export const CRIMOARK_CLONE_ROLES: readonly CrimoarkCloneRole[] = ["ATTACK", "SU
  * 本体の実効ステータス
  * ===================================================================== */
 
+/*
+ * **防御計算の入れ替えに合わせて実数を置き直した(2026-09)。**
+ * 200戦の実測で確定した倍率は HP×1.00 / DEF×0.30 / ATK×2.50。
+ * 結果は勝率28%(`docs/element-sw-plan-a.md`)。HPは据え置き。
+ * 旧値は ATK9,800 / DEF4,600。
+ */
 export const CRIMOARK_HP = 400_000;
-export const CRIMOARK_ATK = 9_800;
-export const CRIMOARK_DEF = 4_600;
+export const CRIMOARK_ATK = 24_500;
+export const CRIMOARK_DEF = 1_380;
 export const CRIMOARK_SPD = 215;
 export const CRIMOARK_CRI_RATE = 0.30;
 export const CRIMOARK_CRI_DMG = 1.80;
@@ -136,7 +143,7 @@ export const CRIMOARK_S4_ID = "crimoark_s4";
 const CRIMOARK_S1: Skill = {
   id: CRIMOARK_S1_ID,
   name: "クリエイト・ブレイク",
-  description: "敵単体に攻撃力1.35倍のダメージを与え、防御力を50%低下させ(2ターン)、行動ゲージを20%減少させる。"
+  description: "敵単体に攻撃力1.35倍のダメージを与え、防御力を75%低下させ(2ターン)、行動ゲージを20%減少させる。"
     + "対象に弱体効果が2個以上あれば最終ダメージ+30%、さらにHPが50%以下なら+20%。",
   target: "SINGLE_ENEMY",
   cooldownTurns: 0,
@@ -152,7 +159,7 @@ const CRIMOARK_S1: Skill = {
       conditionalBonus: [{ when: "TARGET_DEBUFF_AT_LEAST_2", bonus: 0.30 }],
       targetHpBonus: [{ hpRatio: 0.5, bonus: 0.20 }],
     },
-    { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 2, chance: 1 },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 },
     { kind: "GAUGE", amount: -0.20 },
   ],
 };
@@ -171,7 +178,7 @@ const CRIMOARK_S2: Skill = {
     // **剥がせた相手にだけ。**剥がすものが無かった相手には何も付かない
     { kind: "STATUS", status: "BUFF_BLOCK", durationTurns: 2, chance: 1, requires: "STRIPPED_TARGET", fixedDuration: true },
     { kind: "GAUGE", amount: -0.25 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.50, durationTurns: 2, chance: 0.70 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.70 },
     { kind: "CLEANSE", count: 2, applyTo: "SELF" },
   ],
 };
@@ -203,7 +210,7 @@ export const CRIMOARK_S4: Skill = {
   id: CRIMOARK_S4_ID,
   name: "オーバークリエイト",
   description: "敵全体の強化効果をすべて解除し、攻撃力1.30倍のダメージを与える。"
-    + "さらに行動ゲージを50%減少させ、防御力を50%低下(3ターン)、回復阻害(2ターン)を与え、自身の行動ゲージを30%進める。"
+    + "さらに行動ゲージを50%減少させ、防御力を75%低下(3ターン)、回復阻害(2ターン)を与え、自身の行動ゲージを30%進める。"
     + "生存している分身1体につき最終ダメージ+15%。",
   target: "ALL_ENEMIES",
   cooldownTurns: CRIMOARK_S4_COOLDOWN,
@@ -211,7 +218,7 @@ export const CRIMOARK_S4: Skill = {
     { kind: "STRIP", chance: 1 },
     { kind: "DAMAGE", multiplier: 1.30 },
     { kind: "GAUGE", amount: -0.50 },
-    { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 3, chance: 1, fixedDuration: true },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1, fixedDuration: true },
     { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 1, fixedDuration: true },
     { kind: "GAUGE", amount: 0.30, applyTo: "SELF" },
   ],
@@ -277,11 +284,11 @@ const SUPPORT_SKILLS: [Skill, Skill, Skill] = [
 const DEBUFF_SKILLS: [Skill, Skill, Skill] = [
   {
     id: "crimoark_debuff_s1", name: "模造侵蝕刃",
-    description: "敵単体に攻撃力0.80倍のダメージを与え、防御力を50%低下させる(2ターン)。",
+    description: "敵単体に攻撃力0.80倍のダメージを与え、防御力を75%低下させる(2ターン)。",
     target: "SINGLE_ENEMY", cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.80 },
-      { kind: "DEBUFF", stat: "def", amount: 0.50, durationTurns: 2, chance: 1 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 },
     ],
   },
   {
@@ -291,7 +298,7 @@ const DEBUFF_SKILLS: [Skill, Skill, Skill] = [
     effects: [
       { kind: "DAMAGE", multiplier: 0.65 },
       { kind: "GAUGE", amount: -0.20 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.50, durationTurns: 2, chance: 0.70 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.70 },
     ],
   },
   {
@@ -325,17 +332,20 @@ export const CRIMOARK_CLONE_PROFILE: Record<CrimoarkCloneRole, {
 }> = {
   ATTACK: {
     templateId: CRIMOARK_ATTACK_TEMPLATE_ID, displayName: "クリモアーク・攻",
-    atk: 8_500, def: 2_100, spd: 220, criRate: 0.40, criDmg: 1.90, accuracy: 0.65, resistance: 0.40,
+    // 同じ倍率(DEF×0.30 / ATK×2.50)。旧値は 8_500 / 2_100
+    atk: 21_250, def: 630, spd: 220, criRate: 0.40, criDmg: 1.90, accuracy: 0.65, resistance: 0.40,
     skills: ATTACK_SKILLS,
   },
   SUPPORT: {
     templateId: CRIMOARK_SUPPORT_TEMPLATE_ID, displayName: "クリモアーク・援",
-    atk: 5_500, def: 2_700, spd: 230, criRate: 0.30, criDmg: 1.80, accuracy: 0.65, resistance: 0.40,
+    // 同じ倍率(DEF×0.30 / ATK×2.50)。旧値は 5_500 / 2_700
+    atk: 13_750, def: 810, spd: 230, criRate: 0.30, criDmg: 1.80, accuracy: 0.65, resistance: 0.40,
     skills: SUPPORT_SKILLS,
   },
   DEBUFF: {
     templateId: CRIMOARK_DEBUFF_TEMPLATE_ID, displayName: "クリモアーク・蝕",
-    atk: 6_000, def: 2_300, spd: 225, criRate: 0.30, criDmg: 1.80, accuracy: 0.75, resistance: 0.40,
+    // 同じ倍率(DEF×0.30 / ATK×2.50)。旧値は 6_000 / 2_300
+    atk: 15_000, def: 690, spd: 225, criRate: 0.30, criDmg: 1.80, accuracy: 0.75, resistance: 0.40,
     skills: DEBUFF_SKILLS,
   },
 };

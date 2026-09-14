@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MONSTER_DEX } from "../src/data/monsters.js";
 import { DamageEffect } from "../src/core/skill.js";
-import { applyDefenseE, calculateBaseDamage } from "../src/battle/damageFormula.js";
+import { applyDefenseLegacyE, calculateBaseDamage } from "../src/battle/damageFormula.js";
 
 export type DefenseMode = "A" | "B" | "C" | "D" | "E";
 export interface DamageInput {
@@ -50,7 +50,7 @@ export function simulatedDamageBreakdown(input: DamageInput): DamageBreakdown {
   const defenseRatio = clean(input.defenseRatio, 1.5);
   const flatRatio = clean(input.flatRatio, 0.25);
   if (mode === "E" && defenseRatio === 1.5 && flatRatio === 0.25 && clean(input.flatCap, 0.25) === 0.25) {
-    const result = applyDefenseE(base, atk, def);
+    const result = applyDefenseLegacyE(base, atk, def);
     const damage = Math.max(1, Math.round(result.afterDefense * crit));
     return { base, afterRatio: result.afterRatio, flatReduction: result.flatReduction, beforeCrit: result.afterDefense, damage, hpRatio: hp ? damage / hp : 0, hits };
   }
