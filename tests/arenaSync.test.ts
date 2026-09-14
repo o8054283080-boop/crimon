@@ -34,6 +34,7 @@ import {
   acknowledgeArenaShopPurchase,
   pushArenaDefense,
   beginArenaMatch,
+  arenaRefusalText,
   settleArenaMatch,
   setArenaSyncAccessToken,
 } from "../src/net/arenaSync.js";
@@ -134,7 +135,8 @@ describe("鍵が無い時", () => {
     await expect(fetchArenaRankingAround("me")).resolves.toEqual([]);
     await expect(fetchArenaMatchHistory("me")).resolves.toEqual([]);
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
-    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() }))
+      .resolves.toEqual({ ok: false, reached: false, reason: null });
     await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(ensureArenaProfile("あかり")).resolves.toBeNull();
     await expect(fetchArenaState()).resolves.toBeNull();
@@ -156,24 +158,34 @@ describe("通信が失敗した時", () => {
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
     await expect(fetchArenaRanking()).resolves.toEqual([]);
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
-    await expect(beginArenaMatch({ kind: "PLAYER", attackerSnapshot: snapshot(), opponentId: "u2" })).resolves.toBeNull();
+    // **サーバまで届いていない。** ここを「断られた」と混ぜると、
+    // 圏外で挑んだ人が手元でも遊べなくなる
+    await expect(beginArenaMatch({ kind: "PLAYER", attackerSnapshot: snapshot(), opponentId: "u2" }))
+      .resolves.toEqual({ ok: false, reached: false, reason: null });
     await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(claimArenaWeeklyReward()).resolves.toBeNull();
     await expect(purchaseArenaShopItem("summon_scroll")).resolves.toBeNull();
   });
 
-  it("HTTPが失敗した時も既定値", async () => {
+  it("HTTPが失敗した時も既定値。**ただし断られたことは伝える**", async () => {
     connect(stubFetch({ message: "permission denied" }, false));
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
-    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+    /*
+     * **届いたうえで断られた。**通信断と同じ `null` に潰していたせいで、
+     * 画面は「オフライン」と思い込んで手元だけで戦い、
+     * 引いた挑戦券が次の同期で戻っていた(減らないように見える)。
+     */
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() }))
+      .resolves.toEqual({ ok: false, reached: true, reason: "permission denied" });
   });
 
   it("本文がJSONでなくても既定値", async () => {
     connect(vi.fn(async () => ({ ok: true, json: async () => { throw new SyntaxError("not json"); } })));
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
     await expect(fetchArenaRanking()).resolves.toEqual([]);
-    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() }))
+      .resolves.toEqual({ ok: false, reached: true, reason: null });
   });
 
   it("fetch が無い実行環境でも落ちない", async () => {
@@ -356,22 +368,28 @@ describe("サーバの答えの読み取り", () => {
       ok: true, matchId: "m1", nonce: "n1", battleSeed: 12345,
       defenderSnapshot: null, defenderRating: 1180, attackerRating: 1200, tickets: 9,
     }));
-    const ticket = await beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() });
-    expect(ticket).toEqual({
-      matchId: "m1", nonce: "n1", battleSeed: 12345,
-      defenderSnapshot: null, defenderRating: 1180, attackerRating: 1200, tickets: 9,
+    const result = await beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() });
+    expect(result).toEqual({
+      ok: true,
+      ticket: {
+        matchId: "m1", nonce: "n1", battleSeed: 12345,
+        defenderSnapshot: null, defenderRating: 1180, attackerRating: 1200, tickets: 9,
+      },
     });
   });
 
   it("対戦IDか nonce が欠けた答えは受け取らない", async () => {
     // どちらかが無いと精算できない。**「発行できた」ことにしない**
     connect(stubFetch({ ok: true, matchId: "m1", battleSeed: 1 }));
-    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() }))
+      .resolves.toEqual({ ok: false, reached: true, reason: "INVALID_TICKET" });
   });
 
-  it("ok が false の答えは null(勝手に成功にしない)", async () => {
+  it("ok が false の答えは受け取らない(勝手に成功にしない)", async () => {
     connect(stubFetch({ ok: false, code: "NO_TICKET" }));
-    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() })).resolves.toBeNull();
+    // **届いてはいる。**手元だけで戦わせてよい相手ではない
+    await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() }))
+      .resolves.toEqual({ ok: false, reached: true, reason: null });
     await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
     await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
     await expect(purchaseArenaShopItem("summon_scroll")).resolves.toBeNull();
@@ -459,5 +477,43 @@ describe("サーバの答えの読み取り", () => {
     const [record] = await fetchArenaMatchHistory("me");
     expect(record.at).toBe(0);
     expect(record.won).toBe(false);
+  });
+});
+
+/*
+ * 挑戦券が減らなかった不具合の見張り。
+ *
+ * **「サーバまで届かなかった」と「届いたうえで断られた」は別物。**
+ * ひとつの `null` に潰していたせいで、画面は断られたことに気づけず、
+ * オフラインと同じ道へ落ちて手元だけで券を引いていた。
+ * 券はサーバでは引かれていないので、次に残高を写した瞬間に元へ戻る
+ * ——プレイヤーからは**何度でも挑めて、挑戦券が減らない**ように見える。
+ */
+describe("断られたのか、届かなかったのか", () => {
+  it("サーバの断り文句を持って帰る", async () => {
+    connect(stubFetch({ message: "MAIN_STAT_OVER_CAP: CRIT_DMG = 0.85(上限 0.8)", code: "P0001" }, false));
+    const result = await beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reached, "届いたのに『届かなかった』扱いになっている").toBe(true);
+    expect(result.reason).toContain("MAIN_STAT_OVER_CAP");
+    // 符丁だけでなく、どのRPCの断りかを追えるように状態番号も添える
+    expect(result.reason).toContain("P0001");
+  });
+
+  it("本文が読めない断りでも、断られたことだけは伝わる", async () => {
+    connect(vi.fn(async () => ({ ok: false, status: 503, json: async () => { throw new SyntaxError("no"); } })));
+    const result = await beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() });
+    expect(result).toEqual({ ok: false, reached: true, reason: "HTTP 503" });
+  });
+
+  it("断り文句は、読める日本語と符丁の両方になる", () => {
+    // **符丁を落とさない。**落とすと、報告を受けた側がどの検分か追えなくなる
+    expect(arenaRefusalText("MAIN_STAT_OVER_CAP: CRIT_DMG = 0.85(上限 0.8)"))
+      .toBe("装備の数値がサーバの照合表と合っていません（MAIN_STAT_OVER_CAP）");
+    expect(arenaRefusalText("NO_TICKET")).toBe("サーバ側の挑戦券が足りません（NO_TICKET）");
+    // 知らない符丁は、丸ごとそのまま出す(伏せると原因が消える)
+    expect(arenaRefusalText("SOMETHING_NEW")).toContain("SOMETHING_NEW");
+    expect(arenaRefusalText(null)).toBe("サーバが対戦を受け付けませんでした");
   });
 });

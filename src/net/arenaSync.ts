@@ -189,13 +189,54 @@ interface RequestOptions {
   single?: boolean;
 }
 
-async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
+/**
+ * 通信の結果。**断られた理由も持って帰る。**
+ *
+ * もとは `request` が `null` ひとつで
+ * 「設定が無い」「通信が届かない」「サーバに断られた」の3つを表していた。
+ * どれも同じ `null` なので、呼ぶ側は**区別のしようがなかった**。
+ *
+ * そのせいで実際に起きたのが、アリーナの挑戦券が減らない不具合。
+ * サーバが対戦の発行を断ると、画面は「繋がっていない」と同じ道へ落ちて
+ * 手元だけで券を引き、次にサーバの残高を写した瞬間に元へ戻っていた。
+ * **プレイヤーには何度でも挑めるように見え、戦績はどこにも残らない。**
+ *
+ * 理由を捨てなければ、止めることも、何が起きたか見せることもできる。
+ */
+interface RequestOutcome {
+  /** 成功した時の本文。失敗なら null */
+  value: unknown;
+  /** サーバまで届いて、返事をもらえたか。false は通信断・時間切れ・CORS・未設定 */
+  reached: boolean;
+  /** 断られた理由。サーバの言葉をそのまま(例: `MAIN_STAT_OVER_CAP: ...`) */
+  error: string | null;
+}
+
+const UNREACHED: RequestOutcome = { value: null, reached: false, error: null };
+
+/** 断り本文から理由を取り出す。PostgREST は `{code,message,details,hint}` を返す */
+async function readRefusal(response: Response): Promise<string | null> {
+  try {
+    const body = await response.json();
+    if (isRecord(body)) {
+      const message = typeof body.message === "string" ? body.message : null;
+      const code = typeof body.code === "string" ? body.code : null;
+      if (message) return code ? `${message} (${code})` : message;
+      if (code) return code;
+    }
+  } catch {
+    // 本文がJSONでない。状態番号だけでも伝わる方がいい
+  }
+  return `HTTP ${response.status}`;
+}
+
+async function requestDetailed(path: string, options: RequestOptions = {}): Promise<RequestOutcome> {
   const config = arenaSyncConfig();
-  if (!config) return null;
+  if (!config) return UNREACHED;
 
   const fetchImpl = config.fetchImpl
     ?? (globalThis as { fetch?: typeof fetch }).fetch;
-  if (typeof fetchImpl !== "function") return null;
+  if (typeof fetchImpl !== "function") return UNREACHED;
 
   const headers: Record<string, string> = {
     apikey: config.anonKey,
@@ -223,24 +264,36 @@ async function request(path: string, options: RequestOptions = {}): Promise<unkn
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: controller?.signal,
     });
-    if (!response || typeof response !== "object") return null;
-    if (typeof (response as Response).ok === "boolean" && !(response as Response).ok) return null;
+    if (!response || typeof response !== "object") return UNREACHED;
+    if (typeof (response as Response).ok === "boolean" && !(response as Response).ok) {
+      // **届いてはいる。**断られた理由を持って帰る
+      return { value: null, reached: true, error: await readRefusal(response as Response) };
+    }
     // 本文が無い/JSONでない時も落とさない
     try {
-      return await (response as Response).json();
+      return { value: await (response as Response).json(), reached: true, error: null };
     } catch {
-      return null;
+      return { value: null, reached: true, error: null };
     }
   } catch {
-    // 通信断・時間切れ・CORS。**呼ぶ側には何も伝えない(既定値で進む)**
-    return null;
+    // 通信断・時間切れ・CORS。**サーバまで届いていない**
+    return UNREACHED;
   } finally {
     if (timer) clearTimeout(timer);
   }
 }
 
+/** 本文だけが要る時の入口。**理由が要る呼び出しは `requestDetailed` を使う** */
+async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
+  return (await requestDetailed(path, options)).value;
+}
+
 async function callRpc(name: string, args: Record<string, unknown>): Promise<unknown> {
   return request(`rpc/${name}`, { method: "POST", body: args });
+}
+
+async function callRpcDetailed(name: string, args: Record<string, unknown>): Promise<RequestOutcome> {
+  return requestDetailed(`rpc/${name}`, { method: "POST", body: args });
 }
 
 // ---------------------------------------------------------------------
@@ -446,12 +499,23 @@ export async function pushArenaDefense(snapshot: ArenaDefenseSnapshot): Promise<
  * クライアントはこの種とこの編成で戦闘を再生する——
  * つまり**画面に出るのは、あとでサーバが回し直すのと同じ戦い**になる。
  *
- * 失敗したら null。呼ぶ側はローカルだけで進める。
+ * **断られた時は、断られたと分かる形で返す。**
+ *
+ * `reached` が false なら、サーバまで届いていない(未設定・通信断・時間切れ)。
+ * その時だけ、呼ぶ側は手元だけで進めてよい——オフラインで遊べる状態は壊さない。
+ *
+ * `reached` が true で `ok` が false は**別物**で、サーバが対戦の発行を拒んだということ。
+ * サーバから見てその対戦は存在しないので、手元で戦わせてはいけない
+ * (券は戻り、レートとコインだけが手元で動き、戦績はどこにも残らない)。
  */
-export async function beginArenaMatch(input: ArenaBeginMatchInput): Promise<ArenaMatchTicket | null> {
+export type ArenaBeginMatchResult =
+  | { ok: true; ticket: ArenaMatchTicket }
+  | { ok: false; reached: boolean; reason: string | null };
+
+export async function beginArenaMatch(input: ArenaBeginMatchInput): Promise<ArenaBeginMatchResult> {
   try {
-    if (!arenaSyncAvailable()) return null;
-    const result = await callRpc("arena_begin_match", {
+    if (!arenaSyncAvailable()) return { ok: false, reached: false, reason: null };
+    const outcome = await callRpcDetailed("arena_begin_match", {
       p_opponent_kind: input.kind,
       p_attacker_snapshot: input.attackerSnapshot,
       p_opponent_id: input.kind === "PLAYER" ? (input.opponentId ?? null) : null,
@@ -460,22 +524,59 @@ export async function beginArenaMatch(input: ArenaBeginMatchInput): Promise<Aren
       p_opponent_index: input.kind === "NPC" ? (input.opponentIndex ?? null) : null,
       p_opponent_count: input.kind === "NPC" ? (input.opponentCount ?? null) : null,
     });
-    if (!isRecord(result) || result.ok !== true) return null;
+    if (!outcome.reached) return { ok: false, reached: false, reason: null };
+
+    const result = outcome.value;
+    if (!isRecord(result) || result.ok !== true) {
+      return { ok: false, reached: true, reason: outcome.error };
+    }
     const matchId = asText(result.matchId, "");
     const nonce = asText(result.nonce, "");
-    if (!matchId || !nonce) return null;
+    // 形が足りない返事。**届いてはいるので、断られたのと同じ扱いにする**
+    if (!matchId || !nonce) return { ok: false, reached: true, reason: "INVALID_TICKET" };
     return {
-      matchId,
-      nonce,
-      battleSeed: Math.round(asFiniteNumber(result.battleSeed, 0)),
-      defenderSnapshot: toDefenseSnapshot(result.defenderSnapshot),
-      defenderRating: Math.max(0, Math.round(asFiniteNumber(result.defenderRating, 0))),
-      attackerRating: Math.max(0, Math.round(asFiniteNumber(result.attackerRating, 0))),
-      tickets: Math.max(0, Math.round(asFiniteNumber(result.tickets, 0))),
+      ok: true,
+      ticket: {
+        matchId,
+        nonce,
+        battleSeed: Math.round(asFiniteNumber(result.battleSeed, 0)),
+        defenderSnapshot: toDefenseSnapshot(result.defenderSnapshot),
+        defenderRating: Math.max(0, Math.round(asFiniteNumber(result.defenderRating, 0))),
+        attackerRating: Math.max(0, Math.round(asFiniteNumber(result.attackerRating, 0))),
+        tickets: Math.max(0, Math.round(asFiniteNumber(result.tickets, 0))),
+      },
     };
   } catch {
-    return null;
+    return { ok: false, reached: false, reason: null };
   }
+}
+
+/**
+ * 断られた理由を、プレイヤーが読める言葉にする。
+ *
+ * **符丁も必ず添える。** 言い換えだけにすると、報告を受けた側が
+ * サーバのどの検分で止まったのかを追えなくなる。
+ */
+export function arenaRefusalText(reason: string | null): string {
+  if (!reason) return "サーバが対戦を受け付けませんでした";
+  const head = reason.split(/[:\s(]/)[0];
+  const known: Record<string, string> = {
+    NO_TICKET: "サーバ側の挑戦券が足りません",
+    TOO_FAST: "少し間をあけてから挑んでください",
+    SELF_MATCH: "自分自身には挑めません",
+    NO_ACTIVE_SEASON: "いまシーズンが開いていません",
+    NO_STANDING: "アリーナへの登録がまだ済んでいません",
+    CATALOG_MISSING: "サーバの照合表が入っていません",
+    MAIN_STAT_OVER_CAP: "装備の数値がサーバの照合表と合っていません",
+    SUB_STAT_OVER_CAP: "装備の数値がサーバの照合表と合っていません",
+    NO_STAT_CAP: "装備の数値がサーバの照合表と合っていません",
+    UNKNOWN_DEX_ID: "このモンスターはサーバの照合表にまだ載っていません",
+    UNKNOWN_SET: "この装備シリーズはサーバの照合表にまだ載っていません",
+    UNKNOWN_LATENT: "この潜在覚醒はサーバの照合表にまだ載っていません",
+    INVALID_TICKET: "サーバの返事が読めませんでした",
+  };
+  const text = known[head];
+  return text ? `${text}（${head}）` : `サーバが対戦を受け付けませんでした（${reason}）`;
 }
 
 /**
