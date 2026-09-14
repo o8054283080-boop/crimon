@@ -208,3 +208,50 @@ body:has(.crimon-home) {
   .world-actions--left { left: 2px !important; }
   .world-actions--right { right: 2px !important; }
 }
+
+
+/* お知らせ・プレゼントは既存の左メニュー列とは分離する。
+ * 現行HOMEのお知らせ位置を基準に、左下へ縦2段で固定する。 */
+.home-quick-stack {
+  position: absolute;
+  z-index: 6;
+  left: clamp(4px, 1.5vw, 8px);
+  bottom: clamp(8px, 2.2dvh, 18px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home-quick-stack .home-quick {
+  min-height: 44px !important;
+}
+
+.home-quick-stack .home-quick__icon {
+  width: clamp(38px, 11.5vw, 48px);
+  height: clamp(38px, 11.5vw, 48px);
+  font-size: clamp(20px, 6vw, 26px);
+}
+
+.home-quick-stack .home-quick__label {
+  font-size: 9px;
+}
+
+/* hidden属性を最優先。巡回でも閉じたシートのボタンを押せる物と誤判定させない。 */
+.home-sheet[hidden] {
+  display: none !important;
+}
+
+@media (max-height: 700px) {
+  .home-quick-stack {
+    bottom: 6px;
+    gap: 2px;
+  }
+  .home-quick-stack .home-quick {
+    min-height: 40px !important;
+  }
+  .home-quick-stack .home-quick__icon {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 19px !important;
+  }
+}
