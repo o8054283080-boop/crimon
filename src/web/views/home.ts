@@ -825,7 +825,6 @@ export function renderHome(props: HomeProps): HTMLElement {
     ariaLabel: unreadNoticeCount > 0 ? `お知らせ（未読${unreadNoticeCount}件）` : "お知らせ",
   }, [
     el("span", { className: "home-quick__icon", "aria-hidden": "true" }, ["📄"]),
-    el("span", { className: "home-quick__label" }, ["お知らせ"]),
     unreadNoticeCount > 0 ? el("span", { className: "home-quick__badge" }, [String(unreadNoticeCount)]) : null,
   ].filter((node): node is HTMLElement => node !== null)) as HTMLButtonElement;
 
@@ -837,7 +836,6 @@ export function renderHome(props: HomeProps): HTMLElement {
     ariaLabel: giftCount > 0 ? `プレゼントボックス（未受取${giftCount}件）` : "プレゼントボックス",
   }, [
     el("span", { className: "home-quick__icon", "aria-hidden": "true" }, ["🎁"]),
-    el("span", { className: "home-quick__label" }, ["プレゼント"]),
     giftCount > 0 ? el("span", { className: "home-quick__badge" }, [String(giftCount)]) : null,
   ].filter((node): node is HTMLElement => node !== null));
 
