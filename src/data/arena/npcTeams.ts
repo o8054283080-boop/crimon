@@ -269,6 +269,89 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
       { dexId: "imp_DARK", role: "DISRUPT" },
     ],
   },
+
+  /* ---------------- 段4: レート2700から上の相手 ----------------
+   *
+   * **段3より数値が高いのではない。**星もレベルも装備の強化も同じ上限で、
+   * 違うのは**噛み合い方の徹底ぶり**と、装備の厳選の回数(`gearRolls`)。
+   *
+   * ここを作った理由は、2700を越えた人に同じ相手しか並ばなかったこと。
+   * 上限だけ上げても、伸びしろの無い相手が横に広がるだけになる。
+   */
+  {
+    id: "titan_tide",
+    claims: ["HEAL", "GUARD", "CONTROL"],
+    name: "巨獣の潮",
+    note: "HPを積むほど攻撃も回復も重くなる。先に動いて、押し潰す",
+    tier: 4,
+    /*
+     * **HP比例で殴る顔ぶれを、速度シリーズで先に動かす。**
+     *
+     * ベヒモスの「巨体の圧力」は最大HP×0.20、フェニックスの「灼熱転生」は×0.18。
+     * どちらもHPがそのまま火力なので、耐久を積むことが火力を積むことになる——
+     * 普通は選ばされる二択が、この顔ぶれでは両立してしまう。
+     * フェニックスの回復も最大HP基準なので、積んだHPが三重に効く。
+     *
+     * 体力型はふつう遅い。そこを疾風4セットで埋めると、
+     * **硬くて重くて先に動く**という噛み合いになる。
+     */
+    set: "SWIFT",
+    members: [
+      { dexId: "behemoth_LIGHT", role: "HP" },
+      { dexId: "phoenix_WATER", role: "HP" },
+      { dexId: "mimic_DARK", role: "HP" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT" },
+    ],
+  },
+  {
+    id: "rampage_chain",
+    claims: ["SPEED", "HEAL", "DEBUFF"],
+    name: "暴走の連鎖",
+    note: "追加の手番が続く。回復を挟まれる前に削り切られる",
+    tier: 4,
+    // 暴走4セット。行動終了時に追加ターンが乗る回数が、そのまま手数の差になる
+    set: "RAMPAGE",
+    members: [
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK" },
+      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT" },
+      { dexId: "seraph_WATER", role: "SUPPORT" },
+    ],
+  },
+  {
+    id: "collapse_edge",
+    claims: ["BURST", "STRIP", "HEAL"],
+    name: "崩壊の刃",
+    note: "硬さを当てにできない。強化を剥がしてから、一撃で抜く",
+    tier: 4,
+    // 崩壊4セット。守りを固める相手ほど、この編成には通じない
+    set: "COLLAPSE",
+    members: [
+      { dexId: "dragon_DARK", role: "ATTACK" },
+      { dexId: "griffon_GRASS", role: "ATTACK" },
+      { dexId: "abyssreaper_DARK", role: "DISRUPT" },
+      { dexId: "phoenix_FIRE", role: "SUPPORT" },
+    ],
+  },
+  {
+    id: "honed_normal",
+    claims: ["HEAL", "DEBUFF"],
+    name: "極めた常連",
+    note: "通常モンスターだけ。厳選しきった装備だけで最上位に並ぶ",
+    tier: 4,
+    /*
+     * **最上段を高レアだけで埋めない。**
+     * `docs/design-concept.md` の芯は「ふつうのモンスターでも、育てて
+     * 装備を整えれば奥まで行ける」。ここを引き当てた顔ぶれだけにすると、
+     * 相手編成そのものが「ここから先は引き次第だ」と言ってしまう。
+     */
+    members: [
+      { dexId: "golem_DARK", role: "DEFENSE" },
+      { dexId: "wolf_DARK", role: "ATTACK" },
+      { dexId: "fairy_LIGHT", role: "SUPPORT" },
+      { dexId: "imp_DARK", role: "DISRUPT" },
+    ],
+  },
 ];
 
 /** その段で使える編成テンプレート。1つも無ければ全体から返す(空を返さない) */

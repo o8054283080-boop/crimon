@@ -149,6 +149,94 @@ function generateRoleEquipment(
 }
 
 /**
+ * サブOPが役割にどれだけ噛み合っているか。**大きいほど良い装備。**
+ *
+ * 見るのはサブOPだけ。メインは `generateRoleEquipment` が先に合わせているので、
+ * ここで一緒に数えると「メインが当たった装備」ばかりが選ばれ、
+ * サブの厳選という軸が消える。
+ *
+ * ## 種類の重みと、値の大きさを両方見る
+ *
+ * 役割の希望一覧(`subStats`)の**前にあるものほど重く**数える。攻撃型にとって
+ * クリダメと攻撃実数では値打ちが違うので、本数だけ数えると
+ * 「当たりでないOPが4つ乗った装備」を選んでしまう。
+ *
+ * 値の方は**その項目の中での相対値**にする。HP実数(2,000前後)と
+ * クリダメ(0.3前後)を素の数字で足すと、実数系のOPだけで順位が決まる。
+ */
+function gearRoleScore(equipment: Equipment, wantedSubs: readonly StatType[]): number {
+  let score = 0;
+  for (const sub of equipment.subStats) {
+    const rank = wantedSubs.indexOf(sub.type);
+    if (rank < 0) continue;
+    // 1位が1.0、以降なだらかに下がる。希望の外は0点
+    const weight = 1 / (1 + rank * 0.45);
+    /*
+     * 同じ項目どうしで比べるための目安。★6のサブは
+     * 「初期値の2割 × 星6倍率」あたりから始まり、強化で増える。
+     * 厳密な上限ではなく**桁を合わせるための割り算**なので、多少粗くてよい。
+     */
+    const scale = SUB_STAT_REFERENCE[sub.type];
+    score += weight * (sub.value / scale);
+  }
+  return score;
+}
+
+/**
+ * サブOP1つぶんの「だいたいこのくらい」の値。**桁合わせにだけ使う。**
+ * ★6のサブOPが強化を経て落ち着くあたりを置いてある。
+ */
+const SUB_STAT_REFERENCE: Readonly<Record<StatType, number>> = {
+  ATK_FLAT: 60,
+  DEF_FLAT: 54,
+  HP_FLAT: 660,
+  ATK_PERCENT: 0.16,
+  DEF_PERCENT: 0.16,
+  HP_PERCENT: 0.16,
+  SPD: 21,
+  CRIT_RATE: 0.09,
+  CRIT_DMG: 0.14,
+  ACCURACY: 0.14,
+  RESISTANCE: 0.14,
+};
+
+/**
+ * 装備1個を `rolls` 本引いて、**役割にいちばん噛み合う1本を残す。**
+ *
+ * 引いた装備は毎回**最後まで強化してから**見比べる。強化の節目(+3/+6/+9/+12/+15)で
+ * サブOPが増えたり伸びたりするので、鍛える前に比べると本当の当たりが分からない。
+ * 実際のプレイヤーも、鍛えてみて初めて当たりかどうかが決まる。
+ *
+ * `rolls` が 1 以下なら今までどおり1本引いて終わり。**下の帯の挙動は変わらない。**
+ */
+function pickBestRoleEquipment(
+  slot: EquipSlot,
+  star: EquipStar,
+  subStatCount: number,
+  set: SetType,
+  wantedMains: readonly StatType[],
+  wantedSubs: readonly StatType[],
+  mainRerolls: number,
+  enhanceTo: number,
+  rolls: number,
+  rng: () => number,
+): Equipment {
+  const attempts = Math.max(1, Math.floor(rolls));
+  let best: Equipment | null = null;
+  let bestScore = -1;
+  for (let i = 0; i < attempts; i += 1) {
+    const candidate = generateRoleEquipment(slot, star, subStatCount, set, wantedMains, mainRerolls, rng);
+    for (let level = 0; level < enhanceTo; level += 1) enhanceEquipment(candidate, rng);
+    const score = gearRoleScore(candidate, wantedSubs);
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  return best!;
+}
+
+/**
  * 6スロットぶんの装備を組む。
  *
  * シリーズは 4個 + 2個 でそろえる。ただし `setCoherence` を下回った時は
@@ -179,12 +267,20 @@ function buildUnitEquipment(
     const wanted = VARIABLE_SLOTS.includes(slot as VariableSlot)
       ? plan.mainStats[slot as VariableSlot]
       : [];
-    const equipment = generateRoleEquipment(slot, star, subStatCount, set, wanted, band.mainStatRerolls, rng);
+    const enhance = Math.min(EQUIP_MAX_LEVEL, pickInt(band.equipEnhance, rng));
+    /*
+     * **強化はここではなく選ぶ側の中でやる。**
+     * 鍛えた後の姿を見比べないと、サブOPの当たり外れが判定できない
+     * (節目でサブが増えるので、鍛える前は本数すら違う)。
+     * `gearRolls` が無い帯は1本引いて終わりなので、今までと同じ挙動になる。
+     */
+    const equipment = pickBestRoleEquipment(
+      slot, star, subStatCount, set, wanted, plan.subStats,
+      band.mainStatRerolls, enhance, band.gearRolls ?? 1, rng,
+    );
     // 生成側のIDは時刻とカウンタを含むので、同じ種でも一致しない。
     // **決定的であることが契約**なので、種から決まるIDへ置き換える
     equipment.id = `${unitId}_eq${slot}`;
-    const enhance = Math.min(EQUIP_MAX_LEVEL, pickInt(band.equipEnhance, rng));
-    for (let i = 0; i < enhance; i += 1) enhanceEquipment(equipment, rng);
     gear.push(equipment);
   }
   return gear;
