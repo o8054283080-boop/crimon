@@ -168,7 +168,7 @@ export const SHELLTURTLE: MonsterTemplate = {
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.6, defCoefficient: 0.5 },
+      { kind: "DAMAGE", multiplier: 0.6, defCoefficient: 0.75 },
       { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 },
     ],
   },
@@ -191,7 +191,7 @@ export const SHELLTURTLE: MonsterTemplate = {
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.9, defCoefficient: 0.75 },
+        { kind: "DAMAGE", multiplier: 0.9, defCoefficient: 1.125 },
         { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.8 },
         { kind: "GAUGE", amount: -0.25 },
       ],
@@ -228,7 +228,7 @@ export const SHELLTURTLE: MonsterTemplate = {
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.0, defCoefficient: 0.75 },
+        { kind: "DAMAGE", multiplier: 1.0, defCoefficient: 1.125 },
         { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
       ],
     },
@@ -267,7 +267,7 @@ export const SHELLTURTLE: MonsterTemplate = {
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.0 },
+      { kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.5 },
       { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
       { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" },
     ],

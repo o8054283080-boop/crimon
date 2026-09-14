@@ -89,7 +89,18 @@ export const HARPY: MonsterTemplate = {
 
 export const PHOENIX: MonsterTemplate = {
   templateId:'phoenix',baseName:'フェニックス',role:'ヒーラー',emoji:'🔥',gachaStar:5,baseStats:stats(1750,108,105,102),
-  skill1:skill('phoenix_s1','生命の火','SINGLE_ENEMY',0,[d(.7,{hpCoefficient:.04,currentHpBonus:.3})],[power(1.05),power(1.1/1.05),power(1.15/1.1),power(1.25/1.15)]),
+  /*
+   * **フェニックスのHP比例は一律2倍ではなく、技ごとに決めた値を置く。**
+   *
+   * ヒーラーが自前のHPで殴る形なので、2倍にすると回復役のまま
+   * 純アタッカーの火力帯に並んでしまう。S1は0.075、全体S2(炎の翼)は0.08で据え置き、
+   * 攻撃S3(灼熱転生)だけ0.18まで伸ばす。
+   *
+   * **ここに書くのは定義値。**`power()` が段ごとに同じ倍率を比例係数にも掛けるので、
+   * Lv5では S1 0.094 / 灼熱転生 0.216 になる(既存モンスターは係数が育たない作りで、
+   * この一族だけ育つ)。数字を動かす時は、どちらの値を見ているかを取り違えないこと。
+   */
+  skill1:skill('phoenix_s1','生命の火','SINGLE_ENEMY',0,[d(.7,{hpCoefficient:.075,currentHpBonus:.3})],[power(1.05),power(1.1/1.05),power(1.15/1.1),power(1.25/1.15)]),
   skill2Variants:[
     skill('phoenix_s2_a','癒しの炎','SINGLE_ALLY',3,[heal(.2),{kind:'CLEANSE',count:1},{kind:'IMMUNITY',durationTurns:1}],[set(0,{healRate:.22}),set(0,{healRate:.24}),set(1,{count:2})]),
     skill('phoenix_s2_b','命の火種','SINGLE_ALLY',3,[heal(.25),regen(.15,3),buff('spd')],[set(0,{healRate:.275}),set(0,{healRate:.3}),set(1,{healRate:.2})]),
@@ -98,7 +109,7 @@ export const PHOENIX: MonsterTemplate = {
   skill3Variants:[
     skill('phoenix_s3_a','再生の炎','ALL_ALLIES',5,[heal(.15),buff('def'),regen(.15,2)],[set(0,{healRate:.17}),set(0,{healRate:.2}),set(2,{healRate:.2})]),
     skill('phoenix_s3_b','不死鳥の羽','ALL_ALLIES',5,[heal(.18),{kind:'CLEANSE',count:2},{kind:'IMMUNITY',durationTurns:2},gauge(.2)],[set(0,{healRate:.2}),set(0,{healRate:.22}),set(1,{count:3})]),
-    skill('phoenix_s3_c','灼熱転生','ALL_ENEMIES',5,[d(1.2,{hpCoefficient:.1}),buff('atk','ALLIES'),{kind:'SHIELD',shieldRate:.15,durationTurns:3,fromSourceHp:true,applyTo:'ALLIES'}],[power(1.1),set(2,{shieldRate:.18}),power(1.2/1.1)]),
+    skill('phoenix_s3_c','灼熱転生','ALL_ENEMIES',5,[d(1.2,{hpCoefficient:.18}),buff('atk','ALLIES'),{kind:'SHIELD',shieldRate:.15,durationTurns:3,fromSourceHp:true,applyTo:'ALLIES'}],[power(1.1),set(2,{shieldRate:.18}),power(1.2/1.1)]),
     skill('phoenix_s3_electric','雷光再生','ALL_ALLIES',5,[heal(.18),gauge(.25),buff('spd'),{kind:'CLEANSE',count:1}],[set(0,{healRate:.2}),set(0,{healRate:.22}),set(1,{amount:.3})]),
   ],
   lightSkill3:skill('phoenix_s3_light','輪廻の聖炎','SINGLE_ALLY',8,[{kind:'STATUS',status:'INVINCIBLE',durationTurns:3},regen(.15,2)],[set(1,{healRate:.175}),set(1,{healRate:.2}),set(1,{durationTurns:3})]),

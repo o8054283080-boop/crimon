@@ -251,4 +251,17 @@ export type PresetName =
   | "MAX_HEALER"
   | "MAX_DEBUFFER"
   | "MAX_TANK"
-  | "MAX_SPEED";
+  | "MAX_SPEED"
+  /*
+   * --- 4枠に何を置くかを比べるための型紙 ---
+   *
+   * HP比例・DEF比例で殴る個体は、4枠に耐久%を置くか会心ダメージを置くかで
+   * **火力と硬さのどちらを取るか**が決まる。その2択を同じ条件で並べる。
+   * 2枠と6枠は耐久%で固定し、**違いを4枠だけに閉じ込める。**
+   * `MAX_ATTACKER_ATK4` は純アタッカー側の同じ2択(攻撃%かクリダメか)。
+   */
+  | "MAX_ATTACKER_ATK4"
+  | "HP_SCALE_ENDURE"
+  | "HP_SCALE_CRIT"
+  | "DEF_SCALE_ENDURE"
+  | "DEF_SCALE_CRIT";

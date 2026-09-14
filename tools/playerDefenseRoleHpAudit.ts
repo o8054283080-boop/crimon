@@ -6,7 +6,7 @@
  *
  *   node --import tsx tools/playerDefenseRoleHpAudit.ts --runs 200
  */
-import { setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { setBalanceFlags } from "../src/core/balanceFlags.js";
 import { applyDefense, calculateBaseDamage, roundNormalDamage } from "../src/battle/damageFormula.js";
 import type { Element } from "../src/core/element.js";
 import { ELEMENT_JA } from "../src/core/element.js";

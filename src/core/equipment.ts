@@ -313,6 +313,38 @@ const STAT_BASE_VALUE: Record<StatType, number> = {
 /** サブステータスはメインステータスに対してこの比率分だけ弱くなる */
 const SUB_STAT_RATIO = 0.2;
 
+/**
+ * **メイン効果だけに掛かる調整倍率。サブOPには掛からない。**
+ *
+ * ## なぜメインとサブを分けるのか
+ *
+ * メインは枠ごとに1つだけ選ぶもので、2・4・6枠の選択がそのまま
+ * ビルドの形になる。サブは引いたものを使うしかない。
+ * **選べる側だけを動かせば、厳選のやり直しを強いずに選択肢の重みを変えられる。**
+ *
+ * ## いま入っている2つ
+ *
+ * - **HP% ×0.85** … どの枠もHP%が最適解になり、2・4・6が実質1択だった
+ * - **クリダメ% ×1.35** … 4枠のクリダメが★6+15で80〜95%帯しかなく、
+ *   耐久%を捨ててまで選ぶ理由が無かった。110〜130%帯まで上げて
+ *   「耐久を捨てる代わりに会心火力を取る」を成立させる
+ *
+ * ## 触る時の約束
+ *
+ * **生成・強化・既存装備の移行の3か所が対で決まる。**
+ * ここを変えたら `playerState` の移行(`equipmentMainHpCritRebalanced` の隣)へ
+ * 新しい印を足して、既に持っている装備も一度だけ揃えること。
+ * 片方だけ直すと「前から遊んでいる人だけ古い性能」になる。
+ */
+export const MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
+  HP_PERCENT: 0.85,
+  CRIT_DMG: 1.35,
+};
+
+export function mainStatTuning(type: StatType): number {
+  return MAIN_STAT_TUNING[type] ?? 1;
+}
+
 /** 装備の最大強化レベル */
 export const EQUIP_MAX_LEVEL = 15;
 /** サブステータスの最大個数 */
@@ -326,7 +358,7 @@ function pick<T>(items: T[], rng: () => number): T {
   return items[Math.floor(rng() * items.length)];
 }
 
-function roundStatValue(type: StatType, raw: number): number {
+export function roundStatValue(type: StatType, raw: number): number {
   if (FLAT_STAT_TYPES.has(type)) {
     return Math.max(1, Math.round(raw));
   }
@@ -347,9 +379,24 @@ export function rollStatValue(type: StatType, star: EquipStar, ratio: number, rn
   return roundStatValue(type, base * variance);
 }
 
+/**
+ * メイン効果の初期値を引く。
+ *
+ * **サブと同じ関数を使わない。** `MAIN_STAT_TUNING` はメインにだけ掛かるので、
+ * `ratio === 1` かどうかで見分ける作りにすると、いつか誰かが
+ * サブを ratio 1 で呼んだ日に静かに壊れる。呼ぶ側が「これはメイン」と
+ * 言い切れる入口を分けてある(Battle Lab の `craftGear` もこちらを通る)。
+ */
+export function rollMainStatValue(type: StatType, star: EquipStar, rng: () => number): number {
+  const base = STAT_BASE_VALUE[type] * STAR_INITIAL_MULTIPLIER[star] * mainStatTuning(type);
+  const variance = 0.85 + rng() * 0.3; // 0.85〜1.15倍のばらつき
+  return roundStatValue(type, base * variance);
+}
+
 /** 強化レベルが1上がったときにメインステータスへ加算される量(15レベル到達時のみ大きく増える) */
 function mainStatLevelIncrement(type: StatType, star: EquipStar, reachedLevel: number): number {
-  const base = STAT_BASE_VALUE[type] * STAR_LEVEL_GROWTH_RATE[star];
+  // 初期値と同じ倍率を強化の伸びにも掛ける。片方だけだと+0と+15で基準がずれる
+  const base = STAT_BASE_VALUE[type] * STAR_LEVEL_GROWTH_RATE[star] * mainStatTuning(type);
   const bonus = reachedLevel === EQUIP_MAX_LEVEL ? LEVEL_MAX_BONUS_MULTIPLIER : 1;
   return roundStatValue(type, base * bonus);
 }
@@ -372,7 +419,7 @@ export function generateEquipment(options: GenerateEquipmentOptions): Equipment 
   const set = options.set ?? pick(SET_TYPES, rng);
 
   const mainType = pick(SLOT_MAIN_STAT_OPTIONS[slot], rng);
-  const mainStat: StatRoll = { type: mainType, value: rollStatValue(mainType, star, 1, rng) };
+  const mainStat: StatRoll = { type: mainType, value: rollMainStatValue(mainType, star, rng) };
 
   const subCandidates = STAT_TYPES.filter((t) => t !== mainType);
   const subCount = Math.max(0, Math.min(MAX_SUB_STATS, options.subStatCount));

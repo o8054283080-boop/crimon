@@ -4,7 +4,7 @@
  *
  *   node --import tsx tools/playerDefenseAudit.ts --runs 200
  */
-import { setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { setBalanceFlags } from "../src/core/balanceFlags.js";
 import { applyDefense, calculateBaseDamage, roundNormalDamage } from "../src/battle/damageFormula.js";
 import type { MonsterDefinition } from "../src/core/monster.js";
 import type { Element } from "../src/core/element.js";

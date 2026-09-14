@@ -6,7 +6,7 @@
  *
  *   node --import tsx tools/pveAxisVerify.ts --runs 200
  */
-import { setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { setBalanceFlags } from "../src/core/balanceFlags.js";
 import type { MonsterDefinition } from "../src/core/monster.js";
 import { AWAKENING_DEPTH_FLOORS } from "../src/data/awakeningDepths.js";
 import type { EquipmentDungeonKind } from "../src/data/equipmentDungeon.js";
