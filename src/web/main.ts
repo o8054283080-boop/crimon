@@ -235,7 +235,7 @@ import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/
 import { renderSummon, type SummonMethod } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
-import { ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
+import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
 import { buyCrystalShopItem, crystalShopRows } from "../game/crystalShop.js";
 
 let appMounted = false;
@@ -3178,7 +3178,7 @@ function renderCurrentArenaBattle(): BattleViewHandle {
    * 未接続なら種は無い——その時は勝敗も手元の計算なので、食い違いようがない。
    */
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs,
-    ticket ? { rng: arenaNpcRng(ticket.battleSeed | 0) } : {});
+    ticket ? { ...ARENA_BATTLE_OPTIONS, rng: arenaNpcRng(ticket.battleSeed | 0) } : { ...ARENA_BATTLE_OPTIONS });
 
   return renderBattleView({
     engine,

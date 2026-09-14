@@ -140,8 +140,14 @@ describe("NPCの編成テンプレート", () => {
   });
 
   it("どの段にも複数の編成がある", () => {
-    // 1つしか無いと、その帯の相手が全員同じ顔ぶれになる
-    for (const tier of [0, 1, 2, 3]) {
+    /*
+     * 1つしか無いと、その帯の相手が全員同じ顔ぶれになる。
+     * **段を数え打ちしない。**段を足した日に、その新しい段だけ
+     * 検査されないまま通ってしまう(段4・段5を足した時に実際そうなった)。
+     */
+    const tiers = [...new Set(ARENA_NPC_TEAMS.map((team) => team.tier))].sort((a, b) => a - b);
+    expect(tiers.length, "段が1つも無い").toBeGreaterThan(0);
+    for (const tier of tiers) {
       const teams = ARENA_NPC_TEAMS.filter((team) => team.tier === tier);
       expect(teams.length, `段${tier}`).toBeGreaterThanOrEqual(3);
     }
@@ -154,11 +160,14 @@ describe("NPCの編成テンプレート", () => {
      * **相手編成そのものが「ここから先は引き次第だ」と言ってしまう。**
      */
     const gachaOnly = new Set(["griffon", "dragon", "seraph", "nemesis"]);
-    const topTier = ARENA_NPC_TEAMS.filter((team) => team.tier === 3);
+    // **一番上の段を数え打ちしない。**段を足すたびに、この検査が
+    // 下の段を見たまま素通りするようになる
+    const maxTier = Math.max(...ARENA_NPC_TEAMS.map((team) => team.tier));
+    const topTier = ARENA_NPC_TEAMS.filter((team) => team.tier === maxTier);
     const normalOnly = topTier.filter((team) =>
       team.members.every((member) => !gachaOnly.has(findMonsterById(member.dexId)!.templateId)),
     );
-    expect(normalOnly.length, "段3が高レアだけで埋まっている").toBeGreaterThan(0);
+    expect(normalOnly.length, `段${maxTier}が高レアだけで埋まっている`).toBeGreaterThan(0);
   });
 
   it("編成IDも表示名も重複していない", () => {

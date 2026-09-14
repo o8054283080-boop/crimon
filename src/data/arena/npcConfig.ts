@@ -12,18 +12,32 @@
  * この案件では既に、装備の生成側を変えても控えに焼いた値が変わらない事故を
  * 出している(CLAUDE.md)。**調整点を散らさないことがそのまま安全になる。**
  *
- * ## 上の帯ほど「数値が高い」ではなく「完成度が高い」
+ * ## 上の帯ほど「数値が高い」ではなく「完成度が高い」(レート3000まで)
  *
- * 帯を上げる時に倍率を掛けてはいけない。上げるのは
+ * 3000までは、帯を上げる時に倍率を掛けない。上げるのは
  *
  *   星 → レベルの詰め具合 → 装備の星と強化 → サブOPの本数 →
- *   メインOPが役割に合う確率 → 能力ポイントの投入率 → 潜在覚醒の所持率 →
+ *   メインOPが役割に合う確率 → **装備を選び取った回数(厳選)** →
+ *   能力ポイントの投入率 → 潜在覚醒の所持率 →
  *   タイプ転生の済み具合 → 編成テンプレの噛み合い
  *
- * の9つだけ。**どれもプレイヤーが自分の手で到達できる**ものに限る。
- * 最上位でも `EQUIP_MAX_LEVEL`(15)・`ABILITY_POINT_BUDGETS`(星6で100)・
- * `STAR_MAX_LEVEL`(星6で60)を1も超えない。超えた瞬間、
- * 「どう育てても届かない相手」が並ぶ場所になる。
+ * の10個だけ。**どれもプレイヤーが自分の手で到達できる**ものに限る。
+ * `EQUIP_MAX_LEVEL`(15)・`ABILITY_POINT_BUDGETS`(星6で100)・
+ * `STAR_MAX_LEVEL`(星6で60)を1も超えない。
+ *
+ * ## 3000から上だけ、育成の外へ出ている
+ *
+ * 星もレベルもスキルも装備の強化も能力ポイントも、上の帯はとっくに上限に
+ * 張り付いている。最後に残っていた軸が「厳選」(`gearRolls`)だが、
+ * **22本でほぼ最適に届く**ので、320本に増やしても差にならなかった。
+ *
+ * それどころか**厳選は途中から逆効果だった。**体力型はサブOPの希望がHP寄りなので、
+ * 選び直すほどHPに偏る。同じ編成で 3000 と 3500 を比べると
+ * 攻撃が-12%・防御が-13%・クリ率が-6pt 下がっていた(HPは+23%)。
+ *
+ * そこで依頼主の判断で、3000より上には `statMultiplier` を置いた。
+ * **ここだけが「どう育てても再現できない」領域**で、
+ * 3000までは今までどおり育成の範囲内に収まっている。
  */
 import { EquipStar, SetType, StatType } from "../../core/equipment.js";
 import { MonsterType } from "../../core/monsterDevelopment.js";
@@ -52,6 +66,17 @@ export interface ArenaNpcRolePlan {
    * 「役割に合った装備」を名乗れないNPCが黙って出来上がる。
    */
   mainStats: Record<VariableSlot, readonly StatType[]>;
+  /**
+   * その役割にとって値打ちのあるサブOP。**厳選の良し悪しを測る物差し。**
+   *
+   * サブOPは枠も種類も選べない(引いたものが乗る)ので、`mainStats` のように
+   * 「狙って当てる」ことはできない。できるのは**当たりの多い装備を選び取る**こと——
+   * 実際のプレイヤーがやっている厳選そのもの。上の帯ほど、その選び取りを
+   * たくさん繰り返した相手になる(`ArenaNpcBand.gearRolls`)。
+   *
+   * **並び順が優先度。**前にあるものほど重く数える。
+   */
+  subStats: readonly StatType[];
   /** 4個セットに寄せるシリーズと、残り2枠のシリーズ */
   sets: { primary: SetType; secondary: SetType };
   /** 能力ポイントの配り方。合計1になるようにしておく(端数は最大の枠へ寄せる) */
@@ -76,6 +101,7 @@ export const ARENA_NPC_ROLE_PLANS: Readonly<Record<ArenaNpcRole, ArenaNpcRolePla
   ATTACK: {
     label: "攻撃",
     mainStats: { 2: ["ATK_PERCENT", "SPD"], 4: ["CRIT_RATE", "CRIT_DMG"], 6: ["ATK_PERCENT"] },
+    subStats: ["CRIT_DMG", "CRIT_RATE", "ATK_PERCENT", "SPD", "ATK_FLAT"],
     sets: { primary: "CRIT", secondary: "POWER" },
     abilityWeights: { hp: 0.1, atk: 0.6, def: 0.05, spd: 0.25 },
     latentCategories: ["OFFENSE", "DISRUPT", "SPECIAL"],
@@ -83,6 +109,7 @@ export const ARENA_NPC_ROLE_PLANS: Readonly<Record<ArenaNpcRole, ArenaNpcRolePla
   HP: {
     label: "体力",
     mainStats: { 2: ["HP_PERCENT", "SPD"], 4: ["HP_PERCENT"], 6: ["HP_PERCENT", "RESISTANCE"] },
+    subStats: ["HP_PERCENT", "SPD", "DEF_PERCENT", "RESISTANCE", "HP_FLAT"],
     sets: { primary: "VITALITY", secondary: "RESIST_SET" },
     abilityWeights: { hp: 0.55, atk: 0, def: 0.2, spd: 0.25 },
     latentCategories: ["DURABILITY", "SUPPORT", "SPECIAL"],
@@ -90,6 +117,7 @@ export const ARENA_NPC_ROLE_PLANS: Readonly<Record<ArenaNpcRole, ArenaNpcRolePla
   DEFENSE: {
     label: "防御",
     mainStats: { 2: ["DEF_PERCENT", "SPD"], 4: ["DEF_PERCENT", "HP_PERCENT"], 6: ["DEF_PERCENT", "HP_PERCENT"] },
+    subStats: ["DEF_PERCENT", "HP_PERCENT", "SPD", "RESISTANCE", "DEF_FLAT"],
     sets: { primary: "GUARD", secondary: "VITALITY" },
     abilityWeights: { hp: 0.25, atk: 0, def: 0.55, spd: 0.2 },
     latentCategories: ["DURABILITY", "SUPPORT", "SPECIAL"],
@@ -97,6 +125,7 @@ export const ARENA_NPC_ROLE_PLANS: Readonly<Record<ArenaNpcRole, ArenaNpcRolePla
   SUPPORT: {
     label: "補助",
     mainStats: { 2: ["SPD"], 4: ["HP_PERCENT", "DEF_PERCENT"], 6: ["RESISTANCE", "HP_PERCENT"] },
+    subStats: ["SPD", "HP_PERCENT", "RESISTANCE", "DEF_PERCENT", "HP_FLAT"],
     sets: { primary: "SWIFT", secondary: "RESIST_SET" },
     abilityWeights: { hp: 0.3, atk: 0, def: 0.2, spd: 0.5 },
     latentCategories: ["SUPPORT", "DURABILITY", "SPECIAL"],
@@ -104,6 +133,7 @@ export const ARENA_NPC_ROLE_PLANS: Readonly<Record<ArenaNpcRole, ArenaNpcRolePla
   DISRUPT: {
     label: "妨害",
     mainStats: { 2: ["SPD"], 4: ["HP_PERCENT", "DEF_PERCENT"], 6: ["ACCURACY", "HP_PERCENT"] },
+    subStats: ["SPD", "ACCURACY", "HP_PERCENT", "DEF_PERCENT", "HP_FLAT"],
     sets: { primary: "ACCURACY_SET", secondary: "SWIFT" },
     abilityWeights: { hp: 0.3, atk: 0, def: 0.2, spd: 0.5 },
     latentCategories: ["DISRUPT", "SUPPORT", "SPECIAL"],
@@ -116,7 +146,16 @@ export const ARENA_NPC_ROLE_PLANS: Readonly<Record<ArenaNpcRole, ArenaNpcRolePla
 
 export type ArenaNpcBandId =
   | "NOVICE" | "LEARNER" | "REGULAR" | "VETERAN" | "EXPERT" | "MASTER"
-  | "ELITE" | "CHAMPION" | "FINALIST" | "APEX";
+  | "ELITE" | "CHAMPION" | "FINALIST" | "APEX"
+  /*
+   * --- 2700から上、100ごとの9段 ---
+   *
+   * ここから先は**育成では上げられない。**星もレベルもスキルも装備の強化も
+   * 能力ポイントも、APEX の時点で上限に張り付いている。
+   * 違うのは `gearRolls` ——**何本引いて一番良いものを残したか**だけ。
+   */
+  | "ASCEND_1" | "ASCEND_2" | "ASCEND_3" | "ASCEND_4" | "ASCEND_5"
+  | "ASCEND_6" | "ASCEND_7" | "ASCEND_8" | "ASCEND_9";
 
 export interface WeightedStar {
   star: Star;
@@ -148,6 +187,42 @@ export interface ArenaNpcBand {
    * 0だと完全に運任せになり、下の帯の「役割に合っていない装備」を再現できる。
    */
   mainStatRerolls: number;
+  /**
+   * 装備1個を**何本引いて、そのうち一番良いものを残したか**。
+   *
+   * `mainStatRerolls` は「狙ったメインが出るまで引き直す」だけで、
+   * サブOPの中身は最後に引いたものが素通りする。こちらは**引いた装備を
+   * 最後まで鍛えてから見比べて、役割に噛み合う1本を残す**——
+   * 実際のプレイヤーがやっている厳選と同じ手順。
+   *
+   * 省略・0・1 はどれも「引いたものをそのまま着ける」。
+   * 上の帯だけがここを持ち、下の帯は今までどおり運任せのまま。
+   *
+   * **効きは鈍る。**2本から4本にした時ほど、40本から80本にした効果は無い
+   * (良い方を選び続けるほど、次の1本が上回る見込みが減るため)。
+   * 帯を上げる時は倍々で増やさないと差にならない。
+   */
+  gearRolls?: number;
+  /**
+   * HP・攻撃・防御へ掛ける倍率。**レート3000より上の帯だけが持つ。**
+   *
+   * ## ここだけが育成の外に出ている
+   *
+   * 上の10項目は全部「プレイヤーが自分の手で到達できる」ものだが、これは違う。
+   * 3000あたりで育成の範囲内で作れる強さの天井に届き、そこから先は
+   * 何を積んでも差が出なくなったため、依頼主の判断で入れた。
+   *
+   * **厳選は途中から逆効果でもあった。**体力型はサブOPの希望がHP寄りなので、
+   * 選び直すほどHPに偏る。同じ編成で 3000 と 3500 を比べると
+   * 攻撃が-12%・防御が-13%・クリ率が-6pt 下がっていた(HPは+23%)。
+   * だから `gearRolls` は3000で打ち止めにして、そこから上は倍率で伸ばす。
+   *
+   * ## 速度には掛からない
+   *
+   * 掛かるのはHP・攻撃・防御の3つだけ(`snapshotToDefinitions`)。
+   * 速度は手番の数に直結するので、伸ばすと相手だけが何度も動く別のゲームになる。
+   */
+  statMultiplier?: number;
   /** シリーズを4+2でそろえる確率。低い帯はバラバラの装備を着ている */
   setCoherence: number;
   /** 星別上限(`ABILITY_POINT_BUDGETS`)のうち、実際に振ってある割合 */
@@ -340,6 +415,174 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     typeChance: 1,
     teamTiers: [3],
   },
+
+  {
+    id: "ASCEND_1",
+    name: "絶級",
+    minRating: 2700,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 3,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [3, 4],
+  },
+  {
+    id: "ASCEND_2",
+    name: "絶級II",
+    minRating: 2800,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 6,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [4],
+  },
+  {
+    id: "ASCEND_3",
+    name: "絶級III",
+    minRating: 2900,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 12,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [4],
+  },
+  {
+    id: "ASCEND_4",
+    name: "極級",
+    minRating: 3000,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 22,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [4, 5],
+  },
+  {
+    id: "ASCEND_5",
+    name: "極級II",
+    minRating: 3100,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 22,
+    statMultiplier: 1.1,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [4, 5],
+  },
+  {
+    id: "ASCEND_6",
+    name: "極級III",
+    minRating: 3200,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 22,
+    statMultiplier: 1.22,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [5],
+  },
+  {
+    id: "ASCEND_7",
+    name: "覇級",
+    minRating: 3300,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 22,
+    statMultiplier: 1.36,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [5],
+  },
+  {
+    id: "ASCEND_8",
+    name: "覇級II",
+    minRating: 3400,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 22,
+    statMultiplier: 1.52,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [5],
+  },
+  {
+    id: "ASCEND_9",
+    name: "覇級III",
+    minRating: 3500,
+    starWeights: [{ star: 6, weight: 100 }],
+    levelRatio: [1, 1],
+    skillLevel: [5, 5],
+    equipStar: [6, 6],
+    equipEnhance: [15, 15],
+    equipSubStats: [4, 4],
+    mainStatRerolls: 20,
+    gearRolls: 22,
+    statMultiplier: 1.7,
+    setCoherence: 1,
+    abilityPointRatio: [1, 1],
+    latentChance: 1,
+    typeChance: 1,
+    teamTiers: [5],
+  },
 ];
 
 /** そのレートの帯。表の外の値でも必ず1つ返す */
@@ -361,8 +604,15 @@ export const ARENA_NPC_TEAM_SIZE = 4;
 /** 一度に並べるNPCの既定人数 */
 export const ARENA_NPC_DEFAULT_COUNT = 3;
 
-/** NPCレートの絶対上限。NPCだけで上位レートを青天井に伸ばさない */
-export const ARENA_NPC_MAX_RATING = 2700;
+/**
+ * NPCレートの絶対上限。**NPCだけで上位レートを青天井に伸ばさない。**
+ *
+ * 2700 だった頃、そこを越えた人には**同じ相手しか並ばなかった**。
+ * 3500 まで100ごとの帯(`ASCEND_1`〜`ASCEND_9`)を置いたので、そこに合わせる。
+ * ここを動かす時は帯の表も一緒に伸ばすこと——上限だけ上げると、
+ * 一番上の帯が伸びしろのないまま横に広がる。
+ */
+export const ARENA_NPC_MAX_RATING = 3500;
 
 /**
  * 並んだNPCのレートの置き方。

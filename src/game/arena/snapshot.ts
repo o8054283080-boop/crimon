@@ -91,11 +91,35 @@ export function snapshotUnitToDefinition(unit: ArenaUnitSnapshot): MonsterDefini
   return { ...def, name: `${dex.name}★${unit.instance.star} Lv${unit.instance.level}` };
 }
 
-/** 防衛パーティ全体を戦闘用の定義列へ戻す */
+/**
+ * 防衛パーティ全体を戦闘用の定義列へ戻す。
+ *
+ * **倍率(`statMultiplier`)はここでだけ掛ける。**
+ * アリーナの戦闘は3か所で組まれるが、どこも必ずこの関数を通るので、
+ * ここに置けば3か所とも自動でそろう。呼ぶ側へ配ると、1か所忘れた時に
+ * 「画面とサーバで別の強さの相手と戦う」ことになる。
+ */
 export function snapshotToDefinitions(snapshot: ArenaDefenseSnapshot): MonsterDefinition[] {
-  return snapshot.units
+  const defs = snapshot.units
     .map(snapshotUnitToDefinition)
     .filter((def): def is MonsterDefinition => def !== null);
+  const multiplier = snapshot.statMultiplier ?? 1;
+  if (multiplier === 1) return defs;
+  /*
+   * **速度には掛けない。**速度は手番の数に直結するので、
+   * ここを伸ばすと相手だけが何度も動く別のゲームになる。
+   * クリ率・クリダメ・的中・抵抗も触らない(確率は積み上げても頭打ちで、
+   * 100%を超えた瞬間から「絶対に当たる」という別の性質に変わる)。
+   */
+  return defs.map((def) => ({
+    ...def,
+    stats: {
+      ...def.stats,
+      hp: Math.round(def.stats.hp * multiplier),
+      atk: Math.round(def.stats.atk * multiplier),
+      def: Math.round(def.stats.def * multiplier),
+    },
+  }));
 }
 
 /** 焼いたものが戦えるか。0体になっていたら候補に出さない */

@@ -29,6 +29,7 @@
  *   supabase functions deploy arena-settle
  */
 import { BattleEngine } from "../_shared/battle/engine.js";
+import { ARENA_BATTLE_OPTIONS } from "../_shared/data/pvpArena.js";
 import { MonsterDefinition } from "../_shared/core/monster.js";
 import { buildArenaNpcs } from "../_shared/game/arena/npc.js";
 import { snapshotToDefinitions } from "../_shared/game/arena/snapshot.js";
@@ -219,6 +220,8 @@ Deno.serve(async (req: Request) => {
    * 守り切ったのだから防衛の勝ち、という扱い。
    */
   const result = new BattleEngine(attackers, defender.defs, {
+    // **画面側と同じ設定を使う。**片方だけ違うと、同じ種でも別の戦いになる
+    ...ARENA_BATTLE_OPTIONS,
     rng: seededRng(Number(session.battle_seed) | 0),
   }).run();
   const attackerWon = result.winner === "PLAYER";

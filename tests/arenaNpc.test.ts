@@ -67,18 +67,32 @@ describe("アリーナNPC", () => {
     expect(JSON.stringify(c)).not.toBe(JSON.stringify(a));
   });
 
-  it("NPCのレートは2700を絶対に超えない", () => {
-    for (const myRating of [2600, 2700, 3000, 5000, 9999]) {
+  it("NPCのレートは上限を絶対に超えない", () => {
+    for (const myRating of [2600, 2700, 3000, 3500, 5000, 9999]) {
       for (const npc of buildArenaNpcs(myRating, 424242, 8)) {
         expect(npc.rating).toBeLessThanOrEqual(ARENA_NPC_MAX_RATING);
       }
     }
-    expect(ARENA_NPC_MAX_RATING).toBe(2700);
+    expect(ARENA_NPC_MAX_RATING).toBe(3500);
   });
 
-  it("3000以上では最高NPCでも300差以上の格下になる", () => {
-    const ratings = buildArenaNpcs(3000, 12345, 8).map((npc) => npc.rating);
-    expect(Math.max(...ratings)).toBe(2700);
+  /*
+   * **2700で頭打ちになっていた頃の名残を残さない。**
+   *
+   * 以前はここが「3000以上では最高NPCでも2700」を確かめていた。
+   * それは意図した仕様だったが、そこを越えた人には同じ相手しか並ばず、
+   * 上まで行くほど寂しい場所になっていた。いまは3500まで帯がある。
+   */
+  it("2700を越えた先でも、同じくらいのレートの相手が並ぶ", () => {
+    for (const myRating of [2700, 3000, 3300]) {
+      const ratings = buildArenaNpcs(myRating, 12345, 8).map((npc) => npc.rating);
+      // 並ぶ相手は -60 〜 +70 の幅に散らす。上限に張り付いていないこと
+      expect(Math.max(...ratings), `${myRating} で格上が出ない`).toBeGreaterThan(myRating);
+      expect(Math.min(...ratings), `${myRating} で格下が出ない`).toBeLessThan(myRating);
+    }
+    // 上限より上では、さすがに全員が格下になる
+    const beyond = buildArenaNpcs(4000, 12345, 8).map((npc) => npc.rating);
+    expect(Math.max(...beyond)).toBe(ARENA_NPC_MAX_RATING);
   });
 
   it("編成テンプレートの図鑑IDがすべて実在する", () => {
