@@ -16,7 +16,7 @@
  */
 import { BattleEngine } from "../src/battle/engine.js";
 import type { MonsterDefinition } from "../src/core/monster.js";
-import { arenaCompressedSpeed } from "../src/data/pvpArena.js";
+import { ARENA_BATTLE_OPTIONS, arenaCompressedSpeed } from "../src/data/pvpArena.js";
 import { ARENA_NPC_BANDS, arenaNpcBandForRating } from "../src/data/arena/npcConfig.js";
 import { ARENA_NPC_TEAMS } from "../src/data/arena/npcTeams.js";
 import { buildArenaNpc } from "../src/game/arena/npc.js";
@@ -95,7 +95,8 @@ function measure(rating: number, teamId?: string): Result {
     const enemies = snapshotToDefinitions(npc.defense).map(withArenaSpeed);
     if (enemies.length === 0) continue;
 
-    const result = new BattleEngine(allies, enemies, { rng }).run();
+    // **本番と同じ設定で戦わせる。**長引いた時の決着もそのまま効く
+    const result = new BattleEngine(allies, enemies, { ...ARENA_BATTLE_OPTIONS, rng }).run();
     if (result.winner === "PLAYER") wins += 1;
     const last = result.turns[result.turns.length - 1];
     const snap = last ? last.snapshot.filter((u) => u.team === "ENEMY") : [];

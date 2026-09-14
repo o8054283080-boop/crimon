@@ -302,6 +302,38 @@ export interface BattleEngineOptions {
   initialCooldowns?: [number, number, number][];
   /** 試練の塔だけが指定する階番号。通常戦闘へ特殊ボス規則を漏らさない。 */
   trialTowerFloor?: number;
+  /**
+   * 長引いた戦いで、**与えるダメージが段階的に増えていく**仕掛け。
+   *
+   * ## 何のためにあるか
+   *
+   * 硬さを極めた編成どうしがぶつかると、**どちらも相手を削り切れない**。
+   * アリーナの実測で、299手番かけて相手のHPを0.7%しか減らせない組み合わせが出た。
+   * それは「強い相手」ではなく「終わらない試合」で、
+   * 挑んだ側は5分間ただ殴り続けることになる。
+   *
+   * 硬い編成を弱くしてこれを避けることもできるが、それは
+   * **耐久という戦い方そのものを潰す**ことになる。代わりに、
+   * 長引くほど decisive になる仕掛けを置いて、どんな組み合わせでも決着させる。
+   *
+   * ## 効き方
+   *
+   * `afterTurns` 手番までは何も起きない(短い試合は今までどおり)。
+   * そこから `everyTurns` 手番ごとに `factorPerStep` 倍ずつ**累積**する。
+   * 上限は設けない——上限を置くと、そこで再び「終わらない」が戻ってくる。
+   *
+   * **この設定はアリーナ専用。**PvEへ持ち込むと、耐久編成で塔を登る道が消える。
+   */
+  damageRamp?: DamageRampConfig;
+}
+
+export interface DamageRampConfig {
+  /** ここまでは補正なし。普通の長さの試合に触らないための猶予 */
+  afterTurns: number;
+  /** 何手番ごとに1段上がるか */
+  everyTurns: number;
+  /** 1段ぶんの倍率。段は累積する(2段目は2乗) */
+  factorPerStep: number;
 }
 
 /** 手動操作時にプレイヤーが選んだ行動。省略された場合はAIが代わりに決める */
@@ -315,6 +347,7 @@ export class BattleEngine {
   private readonly units: BattleUnit[];
   private readonly rng: () => number;
   private readonly maxTurns: number;
+  private readonly damageRamp?: DamageRampConfig;
   private readonly log: string[] = [];
   private readonly events: BattleEvent[] = [];
   /** UIへ「誰が何を発動したか」を文字列解析なしで渡す。 */
@@ -414,6 +447,7 @@ export class BattleEngine {
     }
     this.rng = options.rng ?? Math.random;
     this.maxTurns = options.maxTurns ?? 300;
+    this.damageRamp = options.damageRamp;
     this.trialTowerFloor = options.trialTowerFloor;
     if (options.trialTowerFloor === 80) { this.grantTower80Immunity(); this.syncTower80Boss(); }
     if (options.trialTowerFloor === 100) this.setupTower100();
@@ -2800,6 +2834,24 @@ export class BattleEngine {
     }
   }
 
+  /**
+   * 長引いた戦いでの、与えるダメージの増え方(`damageRamp`)。
+   *
+   * **どんな種類のダメージにも同じだけ掛ける。**通常攻撃だけを増やすと、
+   * 毒や反撃で削る編成だけが決着から取り残される。
+   *
+   * 数えるのは**済んだ手番の数**。ここは手番の最中に呼ばれるので、
+   * 進行中の1手ぶんは入っていない(1ずれるだけなので、そのまま使う)。
+   */
+  private damageRampFactor(): number {
+    const ramp = this.damageRamp;
+    if (!ramp) return 1;
+    const past = this.turns.length - ramp.afterTurns;
+    if (past < 0) return 1;
+    const steps = Math.floor(past / ramp.everyTurns) + 1;
+    return ramp.factorPerStep ** steps;
+  }
+
   private applyIncomingDamage(
     target: BattleUnit,
     amount: number,
@@ -2811,7 +2863,7 @@ export class BattleEngine {
     const equipmentMultiplier = Math.max(0, Math.min(1, target.def.latentAbility?.damageTakenMultiplier ?? 1));
     const hpBefore = hpRatio(target);
     // 軽減とパッシブによる被ダメージ減は、無敵・シールドより手前で1度だけ掛ける
-    let incoming = Math.round(amount * equipmentMultiplier * damageTakenMultiplier(target, source ? hasStatus(source, "TAUNT") : false) * this.tower80DamageTakenFactor(target));
+    let incoming = Math.round(amount * equipmentMultiplier * damageTakenMultiplier(target, source ? hasStatus(source, "TAUNT") : false) * this.tower80DamageTakenFactor(target) * this.damageRampFactor());
     if (target.latentOneShotMitigate > 0) target.latentOneShotMitigate = 0;
     /*
      * 防御障壁。**盾が乗っている間だけ**の軽減で、割れたら消える。

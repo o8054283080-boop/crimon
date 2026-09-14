@@ -30,7 +30,7 @@ import { PlayerState } from "../playerState.js";
 import { buildArenaNpcs } from "./npc.js";
 import { recordArenaMatch } from "./match.js";
 import { snapshotToDefinitions } from "./snapshot.js";
-import { arenaCompressedSpeed } from "../../data/pvpArena.js";
+import { ARENA_BATTLE_OPTIONS, arenaCompressedSpeed } from "../../data/pvpArena.js";
 
 /** 攻められる間隔。これより短い間に何度も起きない */
 export const DEFENSE_ATTACK_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -90,7 +90,7 @@ export function runPendingDefenseAttacks(state: PlayerState, now: number = Date.
      * **実際に戦って決める。** 攻める側を `playerDefs` に置くので、
      * 勝者が PLAYER なら攻撃側の勝ち = こちらの防衛は破られた。
      */
-    const winner = new BattleEngine(attackerDefs, defenders).run().winner;
+    const winner = new BattleEngine(attackerDefs, defenders, { ...ARENA_BATTLE_OPTIONS }).run().winner;
     const held = winner !== "PLAYER";
     const outcome = recordArenaMatch(state, {
       opponent: attacker,

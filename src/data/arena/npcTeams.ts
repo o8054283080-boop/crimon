@@ -270,20 +270,34 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     ],
   },
 
-  /* ---------------- 段4: レート2700から上の相手 ----------------
+  /* ---------------- 段4・段5: レート2700から上の相手 ----------------
    *
    * **段3より数値が高いのではない。**星もレベルも装備の強化も同じ上限で、
    * 違うのは**噛み合い方の徹底ぶり**と、装備の厳選の回数(`gearRolls`)。
    *
    * ここを作った理由は、2700を越えた人に同じ相手しか並ばなかったこと。
    * 上限だけ上げても、伸びしろの無い相手が横に広がるだけになる。
+   *
+   * ## 段4と段5の分け方は、実測で決めた
+   *
+   * **設定を眺めても強さは分からない。**育成が全部カンストした編成どうしでは
+   * 表に差が1行も出ず、効くのは顔ぶれの噛み合い方だけになる。
+   * 同じ相手へ30戦ずつぶつけて、挑む側の勝率で並べ替えてある
+   * (`npx tsx tools/arenaNpcPressure.ts --teams`)。
+   *
+   *   段5(勝率0〜23%) … 巨獣の潮 / 免疫の砦 / 審判の城壁 /
+   *                      聖なる宝箱 / 時を制す殲滅 / 極めた常連
+   *   段4(勝率47%〜)  … 聖炎の盾 / 呪いの宴 / 崩壊の刃 / 暴走の連鎖
+   *
+   * **数字を触ったら並べ替え直すこと。**順番が入れ替わったまま帯へ配ると、
+   * 上のレートほど弱い相手が並ぶ、という逆転が黙って起きる。
    */
   {
     id: "titan_tide",
     claims: ["HEAL", "GUARD", "CONTROL"],
     name: "巨獣の潮",
     note: "HPを積むほど攻撃も回復も重くなる。先に動いて、押し潰す",
-    tier: 4,
+    tier: 5,
     /*
      * **HP比例で殴る顔ぶれを、速度シリーズで先に動かす。**
      *
@@ -309,11 +323,19 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     name: "暴走の連鎖",
     note: "追加の手番が続く。回復を挟まれる前に削り切られる",
     tier: 4,
-    // 暴走4セット。行動終了時に追加ターンが乗る回数が、そのまま手数の差になる
+    /*
+     * 暴走4セット。行動終了時に追加ターンが乗る回数が、そのまま手数の差になる。
+     *
+     * **暴走は4個そろえないと何も起きない。**そのぶん会心シリーズの2個セット
+     * (クリ率+15%)を諦めることになり、最初に組んだ顔ぶれでは
+     * 攻撃役が会心を出せず、実測で**勝率100%(=最弱)**だった。
+     * 追加ターンが増えても、その1回が軽ければ手数の意味が無い。
+     * 1手の重さを足すために、グリフォンへ差し替えてある。
+     */
     set: "RAMPAGE",
     members: [
       { dexId: "fenrir_ELECTRIC", role: "ATTACK" },
-      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK" },
+      { dexId: "griffon_GRASS", role: "ATTACK" },
       { dexId: "chronos_ELECTRIC", role: "SUPPORT" },
       { dexId: "seraph_WATER", role: "SUPPORT" },
     ],
@@ -338,7 +360,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     claims: ["CONTROL", "SPEED"],
     name: "時を制す殲滅",
     note: "手番を奪われ、返す前に全体を抜かれる",
-    tier: 4,
+    tier: 5,
     /*
      * 水クロノスは的中26%と抵抗22%を素で持ち、**弱体が通りやすい。**
      * S2「時間加速」で闇ドラゴンのゲージを50%進めつつクールタイムを1縮め、
@@ -358,7 +380,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     claims: ["GUARD", "SPEED", "BURST"],
     name: "聖なる宝箱",
     note: "無敵で攻めを1手やり過ごし、その間に距離を詰めてくる",
-    tier: 4,
+    tier: 5,
     /*
      * 光ミミックの「聖なる宝箱」は**味方全体へ1ターンの無敵。**
      * 素の速度は92と遅いので、補助の型紙で速度メインを積んで先に撃たせる。
@@ -378,7 +400,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     claims: ["HEAL", "GUARD"],
     name: "免疫の砦",
     note: "状態異常が通らない。崩す手を持たないと、削り切れない",
-    tier: 4,
+    tier: 5,
     /*
      * 免疫4セットで**戦闘開始から2ターン、状態異常が入らない。**
      * 開幕に弱体を入れて優位を作る戦い方が、そのまま空振りになる。
@@ -436,7 +458,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     claims: ["GUARD", "BURST", "DEBUFF"],
     name: "審判の城壁",
     note: "守りを固めるほど一撃が重くなる。硬いのに、殴ると痛い",
-    tier: 4,
+    tier: 5,
     /*
      * **防御が火力になる顔ぶれ。**
      *
@@ -460,7 +482,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     claims: ["HEAL", "DEBUFF"],
     name: "極めた常連",
     note: "通常モンスターだけ。厳選しきった装備だけで最上位に並ぶ",
-    tier: 4,
+    tier: 5,
     /*
      * **最上段を高レアだけで埋めない。**
      * `docs/design-concept.md` の芯は「ふつうのモンスターでも、育てて

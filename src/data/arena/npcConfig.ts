@@ -424,7 +424,7 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     abilityPointRatio: [1, 1],
     latentChance: 1,
     typeChance: 1,
-    teamTiers: [3, 4],
+    teamTiers: [4],
   },
   {
     id: "ASCEND_3",
@@ -460,7 +460,7 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     abilityPointRatio: [1, 1],
     latentChance: 1,
     typeChance: 1,
-    teamTiers: [4],
+    teamTiers: [4, 5],
   },
   {
     id: "ASCEND_5",
@@ -478,7 +478,7 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     abilityPointRatio: [1, 1],
     latentChance: 1,
     typeChance: 1,
-    teamTiers: [4],
+    teamTiers: [4, 5],
   },
   {
     id: "ASCEND_6",
@@ -496,7 +496,7 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     abilityPointRatio: [1, 1],
     latentChance: 1,
     typeChance: 1,
-    teamTiers: [4],
+    teamTiers: [5],
   },
   {
     id: "ASCEND_7",
@@ -514,7 +514,7 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     abilityPointRatio: [1, 1],
     latentChance: 1,
     typeChance: 1,
-    teamTiers: [4],
+    teamTiers: [5],
   },
   {
     id: "ASCEND_8",
@@ -532,7 +532,7 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     abilityPointRatio: [1, 1],
     latentChance: 1,
     typeChance: 1,
-    teamTiers: [4],
+    teamTiers: [5],
   },
   {
     id: "ASCEND_9",
@@ -550,7 +550,7 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     abilityPointRatio: [1, 1],
     latentChance: 1,
     typeChance: 1,
-    teamTiers: [4],
+    teamTiers: [5],
   },
 ];
 
