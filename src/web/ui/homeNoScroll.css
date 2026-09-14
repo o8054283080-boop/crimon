@@ -649,3 +649,75 @@ body:has(.crimon-home) {
     gap: 4px !important;
   }
 }
+
+
+/* PR #338 overlap fix:
+ * 中央情報は左右メニューのタップ領域へ絶対に入れない。
+ * お知らせ/プレゼントは既存左列の下側から独立させる。 */
+.home-world > .world-info-stack {
+  left: clamp(92px, 24vw, 104px) !important;
+  right: clamp(100px, 26vw, 112px) !important;
+  top: 4px !important;
+  max-height: 96px !important;
+}
+
+.home-world .world-info-stack > .crimon-tutorial {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+}
+
+.home-world .world-info-stack .cloud-warn,
+.home-world .world-info-stack .reward-banner {
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+}
+
+.home-world .world-info-stack .cloud-warn {
+  grid-template-columns: 18px minmax(0,1fr) 64px !important;
+}
+
+.home-world .world-info-stack .cloud-warn__go {
+  width: 64px !important;
+  min-width: 64px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 5px !important;
+  font-size: 9px !important;
+}
+
+.home-world .world-info-stack .reward-banner__close {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  padding-inline: 6px !important;
+}
+
+/* 既存のお知らせ位置に相当する左下レーン。
+ * 左4メニューのタップ領域と重ならないよう、最下段へ固定。 */
+.home-world > .home-quick-stack {
+  left: 14px !important;
+  bottom: clamp(12px, 2.5dvh, 20px) !important;
+  gap: 6px !important;
+}
+
+.home-world > .home-quick-stack .home-quick {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+@media (max-height: 860px) {
+  .home-world > .world-info-stack {
+    left: 88px !important;
+    right: 96px !important;
+    top: 3px !important;
+  }
+
+  .home-world > .home-quick-stack {
+    left: 12px !important;
+    bottom: 6px !important;
+  }
+}
