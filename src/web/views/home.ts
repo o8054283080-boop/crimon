@@ -8,7 +8,7 @@ import {
   STAMINA_REFILL_PARTIAL_AMOUNT,
   STAMINA_REFILL_PARTIAL_COST,
 } from "../../game/playerState.js";
-import { CompensationClaim, compensationBannerLabel, selectHomeBanners } from "../../game/compensation.js";
+import { COMPENSATIONS, CompensationClaim, compensationBannerLabel, localDateString, selectHomeBanners } from "../../game/compensation.js";
 import { hasCloudRecoveryAccount } from "../../game/cloudRecovery.js";
 import { PERSIST_STATE_NOTE, PersistState } from "../../game/saveDurability.js";
 import { ELEMENT_JA, ELEMENT_MARK } from "../../core/element.js";
@@ -80,6 +80,35 @@ export function homeTowerSummary(player: Pick<PlayerState, "trialTowerBestFloor"
 }
 
 const HOME_STARTED_KEY = "crimon.started";
+const HOME_NOTICE_READ_KEY = "crimon.home.notice.read.v1";
+
+function activeHomeNotices(now: Date = new Date()) {
+  const today = localDateString(now);
+  return COMPENSATIONS.filter((notice) => today >= notice.fromDate && today <= notice.toDate);
+}
+
+function readHomeNoticeIds(): Set<string> {
+  try {
+    if (typeof localStorage === "undefined") return new Set();
+    const raw = localStorage.getItem(HOME_NOTICE_READ_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markHomeNoticesRead(ids: readonly string[]): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const merged = readHomeNoticeIds();
+    for (const id of ids) merged.add(id);
+    localStorage.setItem(HOME_NOTICE_READ_KEY, JSON.stringify([...merged]));
+  } catch {
+    // お知らせの既読保存に失敗しても、ゲーム本体は止めない
+  }
+}
 
 export function hasStartedHome(storage: Pick<Storage, "getItem"> = sessionStorage): boolean {
   return storage.getItem(HOME_STARTED_KEY) === "1";
@@ -674,6 +703,29 @@ export function renderHome(props: HomeProps): HTMLElement {
     ]),
   );
   const openSettings = () => { settingsSheet.hidden = false; };
+  const notices = activeHomeNotices();
+  const readNoticeIds = readHomeNoticeIds();
+  const unreadNoticeCount = notices.filter((notice) => !readNoticeIds.has(notice.id)).length;
+  const noticeSheet = el("div", { className: "home-sheet", hidden: true }, []);
+  const closeNotices = () => { noticeSheet.hidden = true; };
+  noticeSheet.append(
+    el("div", { className: "home-sheet__scrim", onclick: closeNotices }, []),
+    el("div", { className: "home-sheet__panel home-notices" }, [
+      el("div", { className: "home-sheet__head" }, [
+        el("strong", {}, ["お知らせ"]),
+        el("button", { type: "button", className: "btn btn--ghost", onclick: closeNotices }, ["閉じる"]),
+      ]),
+      el("div", { className: "home-notices__list" }, notices.map((notice) =>
+        el("details", { className: "home-notice" }, [
+          el("summary", {}, [
+            el("span", { className: "home-notice__date" }, [notice.fromDate.replaceAll("-", "/")]),
+            el("strong", {}, [notice.title]),
+          ]),
+          el("p", {}, [notice.message]),
+        ]),
+      )),
+    ]),
+  );
   const [onGoArena, onGoShop, onGoHowToPlay] = homeUtilityActions(props);
   const [onGoEquipDungeon, onGoLevelDungeon, onGoGoldDungeon, onGoAwakeningDepth] = dungeonActions(props);
   const homeAssets: Record<string, string> = {
@@ -758,23 +810,54 @@ export function renderHome(props: HomeProps): HTMLElement {
    * 赤い印は「配布が始まっていて・まだ受け取っていなくて・期限内」のものだけ数える。
    */
   const giftCount = unclaimedGiftCount(GIFT_DEFINITIONS, player);
+  let noticeEntry!: HTMLButtonElement;
+  const openNotices = () => {
+    markHomeNoticesRead(notices.map((notice) => notice.id));
+    noticeSheet.hidden = false;
+    noticeEntry.querySelector(".home-quick__badge")?.remove();
+    noticeEntry.setAttribute("aria-label", "お知らせ");
+  };
+  noticeEntry = el("button", {
+    type: "button",
+    className: "home-quick home-quick--notice",
+    "data-tour": "tile:notices",
+    onclick: openNotices,
+    ariaLabel: unreadNoticeCount > 0 ? `お知らせ（未読${unreadNoticeCount}件）` : "お知らせ",
+  }, [
+    el("span", { className: "home-quick__icon", "aria-hidden": "true" }, ["📄"]),
+    el("span", { className: "home-quick__label" }, ["お知らせ"]),
+    unreadNoticeCount > 0 ? el("span", { className: "home-quick__badge" }, [String(unreadNoticeCount)]) : null,
+  ].filter((node): node is HTMLElement => node !== null)) as HTMLButtonElement;
+
   const giftEntry = el("button", {
     type: "button",
-    className: "home-gift",
+    className: "home-quick home-quick--gift",
     "data-tour": "tile:giftBox",
     onclick: props.onGoGiftBox,
     ariaLabel: giftCount > 0 ? `プレゼントボックス（未受取${giftCount}件）` : "プレゼントボックス",
   }, [
-    el("span", { className: "home-gift__icon", "aria-hidden": "true" }, ["🎁"]),
-    el("span", { className: "home-gift__label" }, ["プレゼント"]),
-    giftCount > 0
-      ? el("span", { className: "home-gift__badge" }, [String(giftCount)])
-      : el("span", { className: "home-gift__note" }, ["受取履歴を見る"]),
-  ]);
+    el("span", { className: "home-quick__icon", "aria-hidden": "true" }, ["🎁"]),
+    el("span", { className: "home-quick__label" }, ["プレゼント"]),
+    giftCount > 0 ? el("span", { className: "home-quick__badge" }, [String(giftCount)]) : null,
+  ].filter((node): node is HTMLElement => node !== null));
+
+  const tutorialSheet = el("div", { className: "home-sheet", hidden: true }, []);
+  const closeTutorial = () => { tutorialSheet.hidden = true; };
+  tutorialSheet.append(
+    el("div", { className: "home-sheet__scrim", onclick: closeTutorial }, []),
+    el("div", { className: "home-sheet__panel home-tutorial-sheet" }, [
+      el("div", { className: "home-sheet__head" }, [
+        el("strong", {}, ["初心者ミッション"]),
+        el("button", { type: "button", className: "btn btn--ghost", onclick: closeTutorial }, ["閉じる"]),
+      ]),
+      tutorial,
+    ]),
+  );
+
   const openTutorial = () => {
+    tutorialSheet.hidden = false;
     const current = tutorial.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
     if (current) current.open = true;
-    tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
   const banners = [
     /*
@@ -808,16 +891,6 @@ export function renderHome(props: HomeProps): HTMLElement {
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
-      /*
-       * プレゼントの入口。**浮かせず、ヘッダーのすぐ下に置く。**
-       *
-       * 初心者ミッションは `beginnerMissionReferencePosition.ts` が
-       * 「配布の札(無ければヘッダー)の直後」へ常に引き上げている。
-       * 配布の札の下に置くと**その後ろへ押し出され**、実測では画面の下端
-       * (390x844で765px地点)まで落ちて下のタブに覆われていた。
-       * ここなら何が増えても上に残る。
-       */
-      giftEntry,
       /*
        * ログインボーナスと補填の札。**世界の上へ浮かせない。**
        *
@@ -860,6 +933,8 @@ export function renderHome(props: HomeProps): HTMLElement {
           worldButton("left", "menu-dex", "図鑑", props.onGoMonsterDex),
           worldButton("left", "menu-ranking", "ランキング"),
           worldButton("left", "menu-help", "遊び方", onGoHowToPlay),
+          noticeEntry,
+          giftEntry,
         ]),
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
@@ -874,7 +949,8 @@ export function renderHome(props: HomeProps): HTMLElement {
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
         ]),
       ]),
-      tutorial,
+      tutorialSheet,
+      noticeSheet,
       staminaSheet,
       settingsSheet,
     ].filter((node): node is HTMLElement => node !== null));
