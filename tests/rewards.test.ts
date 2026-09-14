@@ -152,17 +152,23 @@ describe("⑧-5-1 EXPバランス", () => {
     expect(values).toEqual([[15_000, 3_750], [22_500, 5_625], [30_000, 7_500]]);
   });
 
-  it("装備ダンジョンは階層ごとに500増え、10階は5,000 EXP", () => {
+  it("装備ダンジョンは階層ごとに500増え、11・12階もその続き", () => {
     const values = EQUIPMENT_DUNGEON_FLOORS.map((floor) => {
       const state = createInitialState();
       return applyDungeonClearRewards(state, floor, getParty(state)).expTotal;
     });
-    expect(values).toEqual([500, 1_000, 1_500, 2_000, 2_500, 3_000, 3_500, 4_000, 4_500, 5_000]);
+    expect(values).toEqual([500, 1_000, 1_500, 2_000, 2_500, 3_000, 3_500, 4_000, 4_500, 5_000, 5_500, 6_000]);
   });
 
+  /*
+   * **`.at(-1)` で最終階を取らない。**階を足した瞬間に別の階を見に行き、
+   * 「10階は5,000のまま」という見張りが黙って別の階の見張りに変わる。
+   * 見たい階は番号で名指しする。
+   */
   it("装備ダンジョン10階はモンスター5,000 EXPのまま、ファイター750 EXP", () => {
     const state = createInitialState();
-    const reward = applyDungeonClearRewards(state, EQUIPMENT_DUNGEON_FLOORS.at(-1)!, getParty(state));
+    const floor10 = EQUIPMENT_DUNGEON_FLOORS.find((floor) => floor.floor === 10)!;
+    const reward = applyDungeonClearRewards(state, floor10, getParty(state));
     expect([reward.expTotal, reward.fighterExp]).toEqual([5_000, 750]);
   });
 });

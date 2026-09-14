@@ -13,6 +13,7 @@ import {
   ANCIENT_GUARD_BEAST,
   MONSTER_TEMPLATES,
   REINCARNATION_PIG_DEX,
+  SKILL_PIG_DEX,
 } from "./monsters.js";
 
 export interface DungeonEnemy {
@@ -310,6 +311,10 @@ function powerScaleForFloor(floor: number): number {
   return base * (LATE_FLOOR_POWER_BONUS[floor] ?? 1);
 }
 
+function fixedStats(values: readonly [number, number, number, number]) {
+  return { hp: values[0], atk: values[1], def: values[2], spd: values[3] };
+}
+
 function buildFloor(floor: number): DungeonFloor {
   // 各階層の敵は単一属性で統一する。弱点を突く属性のパーティを組めば有利に戦えるようになる
   const floorElement = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
@@ -371,9 +376,201 @@ function buildFloor(floor: number): DungeonFloor {
   };
 }
 
-export const EQUIPMENT_DUNGEON_FLOORS: DungeonFloor[] = Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildFloor(i + 1));
+/* ==========================================================================
+ * 11階・12階(上位階)
+ *
+ * ## なぜ buildFloor を伸ばさなかったのか
+ *
+ * `DUNGEON_FLOOR_COUNT` は**倍率カーブの分母**でもある
+ * (`powerScaleForFloor` / `speedScaleForFloor` が `COUNT - 1` で割っている)。
+ * 10 を 12 にした瞬間、**1〜10階すべての倍率が変わって**別のゲームになる。
+ * さらに `floor === DUNGEON_FLOOR_COUNT` で10階の勝利条件・HP倍率を決めているので、
+ * ここを動かすと10階が「ボス撃破で勝利」でなくなる。
+ *
+ * だから上位階は**倍率カーブに一切乗せず**、魔獣ダンジョンと同じく
+ * `fixedStats` に実数を置く。指定された値がそのまま敵の値になり、
+ * 既存10階は1ミリも動かない。
+ *
+ * ## 何を変えていないか
+ *
+ * 顔ぶれ(古代の魔人・クリスタル・呪晶)、スキル、ボス特性(7回受けて1.4倍反撃)、
+ * 勝利条件(魔人撃破で勝利)、装備セットの系統。**ステータスだけで難度を作る。**
+ * ========================================================================== */
 
-const BEAST_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS", "LIGHT", "DARK", "FIRE", "WATER", "ELECTRIC", "DARK"];
+/** 上位階の最初。ここから先は倍率カーブではなく実数で置く */
+export const DUNGEON_UPPER_FLOOR_START = DUNGEON_FLOOR_COUNT + 1;
+/** 上位階を含めた最終階 */
+export const DUNGEON_UPPER_FLOOR_COUNT = 12;
+
+/**
+ * 魔人の上位階。**HP/ATK/DEF/SPD だけを実数で置く。**
+ *
+ * 会心率・命中・抵抗は図鑑(★6 Lv60)のまま。`fixedStats` は
+ * 書いた項目だけを差し替えるので、指定していないものは10階と同じ素性になる。
+ */
+/**
+ * 10階の古代のクリスタルの実効ATK。
+ *
+ * **指定されなかった能力を「素の値」で置くと、下がる。**
+ * 上位階は倍率に乗らないので、ATKを書かないと図鑑素の622〜691まで落ちる
+ * (10階の半分以下)。クリスタルは支援役なので攻撃力を伸ばす理由は無いが、
+ * **10階より弱くする理由も無い。**10階の実効値をそのまま据え置く。
+ *
+ * ## この1,394はどこから来たか
+ *
+ * 10階(水)の古代のクリスタルが戦闘へ渡される時の値そのもの。
+ *
+ *   図鑑の基礎ATK 81
+ *     → computeEffectiveStats(★5, Lv50)        622
+ *     → × powerScale 2.73375                  1700.39
+ *     → × ENEMY_ATK_SCALE 0.82 して四捨五入      1394
+ *
+ * `tests/equipmentDungeonUpper.test.ts` が**この導出を丸ごと突き合わせている。**
+ * powerScale や ENEMY_ATK_SCALE を触れば必ず落ちるので、
+ * 書き写した数字だけが古いまま残ることはない。
+ *
+ * ## 属性で基礎値が違うが、それでも一本にする
+ *
+ * クリスタルの図鑑ATKは属性ごとに違う(水・草81 / 火・電気・光90 / 闇99)。
+ * 10階と同じ計算を通すと 11階(電気)は1,549、12階(草)は1,394になる。
+ * だが**それだと11階が12階より強くなる**(1,549 > 1,394)。
+ * 支援役の攻撃力で階の順番を逆転させる意味は無いので、
+ * 両階とも10階の実効値で揃える。どちらも「10階より弱くない」は満たす。
+ */
+const UPPER_CRYSTAL_ATK = 1_394;
+
+const DEMON_UPPER_STATS: Record<number, {
+  boss: readonly [number, number, number, number];
+  crystal: { hp: number; atk: number; def: number; spd: number };
+  curse: readonly [number, number, number, number];
+}> = {
+  11: {
+    /*
+     * **DEFだけは指定値(3,250 / 2,250 / 1,750)から上げてある。**
+     *
+     * 指定された時点の防御式は `atk/(def*1.5+atk)` で、軽減が攻撃力との比で
+     * 決まっていたため、DEFの多少の上下は難易度にほとんど現れなかった。
+     * 新しい防御式 `1000 / (1000 + 1.2 × DEF)` では**DEFがそのまま軽減割合**で、
+     * 指定値は3体とも10階の実効値(3,352 / 2,269 / 1,785)を下回っている。
+     * そのまま置くと「上位階のほうが打たれ弱い」になる。
+     *
+     * 10階の実効値と12階の指定値の間へ収めた。HP・ATK・SPDは指定どおり。
+     */
+    boss: [410_000, 6_100, 3_480, 200],
+    // クリスタルは攻撃役ではないので、ATKは10階の実効値のまま伸ばさない
+    crystal: { hp: 120_000, atk: UPPER_CRYSTAL_ATK, def: 2_390, spd: 145 },
+    curse: [115_000, 2_550, 1_870, 132],
+  },
+  12: {
+    boss: [550_000, 10_000, 3_600, 204],
+    /*
+     * **HP35万・SPD200 はどちらも「加護を撃たせる」ための値。**
+     *
+     * 元は HP14万・SPD165 だったが、この値だとクリスタルは
+     * **ボスを狙った全体攻撃の巻き込みだけで落ちる**。実測(200回)で
+     * 戦闘終了時の生存率が0%、加護の使用回数も0.0回——つまり
+     * **S2をどう設計しても一度も撃たれない置物**になっていた。
+     * 速度だけ200へ上げても生存0%のままで、何も変わらなかった。
+     *
+     * HP35万にして初めて生存23%・加護3.0回になり、魔人の手番が実際に増える。
+     * **数字を下げる時は、下げた後にまだ撃てているかを確かめること。**
+     */
+    crystal: { hp: 350_000, atk: UPPER_CRYSTAL_ATK, def: 2_500, spd: 200 },
+    curse: [135_000, 2_900, 1_950, 136],
+  },
+};
+
+/**
+ * 12階のクリスタルだけが持つ「古代の加護」。
+ *
+ * 図鑑の加護は**攻撃力を積み上げる**技だが、12階の魔人は
+ * 手番そのものが回ってこないのが問題だった(実測で1戦に1.0回)。
+ * そこで**ゲージを渡して手番を作る**技に置き換える。積み上げではなく
+ * 「殴られている間にもう一度動く」ための技なので、持続は2ターンに縮めてCTを3にした。
+ *
+ * 図鑑の `ANCIENT_CRYSTAL` は1〜11階が使い続けるので触らない。
+ * 階の側で差し替えるこの形なら、召喚・図鑑・覚醒候補には一切出ない。
+ */
+const UPPER_CRYSTAL_SKILLS: [Skill, Skill, Skill] = [
+  ANCIENT_CRYSTAL.skill1,
+  {
+    id: "ancient_crystal_s2_upper",
+    name: "古代の加護",
+    description: "味方単体へ古代の力を送り込み、行動ゲージを70%進めて2ターン攻撃力を上昇させる。",
+    target: "SINGLE_ALLY",
+    cooldownTurns: 3,
+    effects: [
+      { kind: "GAUGE", amount: 0.7 },
+      { kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 },
+    ],
+  },
+  ANCIENT_CRYSTAL.skill3Variants[0],
+];
+
+function buildDemonUpperFloor(floor: number): DungeonFloor {
+  // 属性は既存の巡回をそのまま延長する(11階=電気、12階=草)
+  const element = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
+  const spec = DEMON_UPPER_STATS[floor];
+  /*
+   * 12階だけ、反撃を7発に1度から**5発に1度**へ。
+   * `bossTraits` は図鑑の指定を**まるごと置き換える**ので、
+   * 据え置く `counterMultiplier` も書き写しておく(書き忘れると反撃が1.2倍へ戻る)。
+   */
+  const isFinal = floor === DUNGEON_UPPER_FLOOR_COUNT;
+  return {
+    kind: "DEMON",
+    floor,
+    name: `魔人のダンジョン ${floor}階`,
+    // 実数で置くので倍率は掛からない。1を入れて「掛けていない」ことを明示する
+    powerScale: 1,
+    speedScale: 1,
+    goldReward: 60 * floor,
+    setPool: DEMON_DUNGEON_SET_TYPES,
+    enemies: [
+      {
+        templateId: BOSS_TEMPLATE.templateId,
+        element,
+        star: DUNGEON_BOSS_STAR,
+        level: DUNGEON_BOSS_LEVEL,
+        isBoss: true,
+        // 10階と同じく、魔人を倒した時点で勝利する
+        victoryTarget: true,
+        primaryTarget: true,
+        fixedStats: fixedStats(spec.boss),
+        ...(isFinal ? { bossTraits: { counterAfterHits: 5, counterMultiplier: 1.4 } } : {}),
+      },
+      {
+        templateId: ANCIENT_CRYSTAL.templateId,
+        element,
+        star: DUNGEON_ENEMY_STAR,
+        level: DUNGEON_ENEMY_LEVEL,
+        fixedStats: { hp: spec.crystal.hp, atk: spec.crystal.atk, def: spec.crystal.def, spd: spec.crystal.spd },
+        ...(isFinal ? { skills: UPPER_CRYSTAL_SKILLS } : {}),
+      },
+      {
+        templateId: ANCIENT_CRYSTAL_CURSE.templateId,
+        element,
+        star: DUNGEON_ENEMY_STAR,
+        level: DUNGEON_ENEMY_LEVEL,
+        fixedStats: fixedStats(spec.curse),
+      },
+    ],
+  };
+}
+
+export const EQUIPMENT_DUNGEON_FLOORS: DungeonFloor[] = [
+  ...Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildFloor(i + 1)),
+  ...Array.from(
+    { length: DUNGEON_UPPER_FLOOR_COUNT - DUNGEON_FLOOR_COUNT },
+    (_, i) => buildDemonUpperFloor(DUNGEON_UPPER_FLOOR_START + i),
+  ),
+];
+
+/*
+ * 階ごとの属性。**手書きで並べてある**(魔人のような機械的な巡回ではない)。
+ * 11・12階は続きとして草・光を置き、7〜12階で6属性がひと回りする形にした。
+ */
+const BEAST_ELEMENTS: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS", "LIGHT", "DARK", "FIRE", "WATER", "ELECTRIC", "DARK", "GRASS", "LIGHT"];
 const BEAST_STATS = [
   { boss: [112000, 1460, 1170, 136], support: [64000, 500, 1250, 111], attacker: [38400, 1040, 640, 111] },
   { boss: [136500, 1770, 1420, 143], support: [78000, 600, 1520, 118], attacker: [46800, 1270, 780, 118] },
@@ -386,10 +583,6 @@ const BEAST_STATS = [
   { boss: [294000, 3820, 3070, 192], support: [168000, 1300, 3280, 167], attacker: [100800, 2730, 1670, 166] },
   { boss: [350000, 4550, 3650, 205], support: [200000, 1550, 3900, 175], attacker: [120000, 3250, 1990, 173] },
 ] as const;
-
-function fixedStats(values: readonly [number, number, number, number]) {
-  return { hp: values[0], atk: values[1], def: values[2], spd: values[3] };
-}
 
 function buildBeastFloor(floor: number): DungeonFloor {
   const element = BEAST_ELEMENTS[floor - 1];
@@ -410,7 +603,61 @@ function buildBeastFloor(floor: number): DungeonFloor {
   };
 }
 
-export const BEAST_DUNGEON_FLOORS: DungeonFloor[] = Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildBeastFloor(i + 1));
+/**
+ * 魔獣の上位階。
+ *
+ * 魔獣はもともと全階が `fixedStats` の実数指定なので、**表を伸ばすだけ。**
+ * ボスの `initialCooldowns: [0, 3, 5]` も既存階と同じにして、
+ * 開幕の手の出方を変えない。
+ *
+ * 属性は手書きの並び(`BEAST_ELEMENTS`)の続き。7〜10階が
+ * 火・水・電気・闇 なので、11階に草・12階に光を置くと
+ * **7〜12階で6属性がひと回りする。**
+ */
+const BEAST_UPPER_STATS: Record<number, {
+  boss: readonly [number, number, number, number];
+  support: readonly [number, number, number, number];
+  attacker: readonly [number, number, number, number];
+}> = {
+  11: {
+    boss: [420_000, 6_400, 4_050, 210],
+    support: [235_000, 1_700, 4_300, 182],
+    attacker: [145_000, 3_650, 2_250, 180],
+  },
+  12: {
+    // **ATK7,500 は意図した値。**安全側へ下げないこと
+    boss: [500_000, 7_500, 4_500, 215],
+    support: [270_000, 1_850, 4_650, 187],
+    attacker: [165_000, 4_050, 2_500, 185],
+  },
+};
+
+function buildBeastUpperFloor(floor: number): DungeonFloor {
+  const element = BEAST_ELEMENTS[floor - 1];
+  const stats = BEAST_UPPER_STATS[floor];
+  return {
+    kind: "BEAST",
+    floor,
+    name: `魔獣のダンジョン ${floor}階`,
+    powerScale: 1,
+    speedScale: 1,
+    goldReward: 60 * floor,
+    setPool: BEAST_DUNGEON_SET_TYPES,
+    enemies: [
+      { templateId: ANCIENT_BEAST.templateId, element, star: 6, level: 60, isBoss: true, victoryTarget: true, primaryTarget: true, fixedStats: fixedStats(stats.boss), initialCooldowns: [0, 3, 5] },
+      { templateId: ANCIENT_GUARD_BEAST.templateId, element, star: 6, level: 60, victoryTarget: false, fixedStats: fixedStats(stats.support) },
+      { templateId: ANCIENT_FANG_BEAST.templateId, element, star: 6, level: 60, victoryTarget: false, fixedStats: fixedStats(stats.attacker) },
+    ],
+  };
+}
+
+export const BEAST_DUNGEON_FLOORS: DungeonFloor[] = [
+  ...Array.from({ length: DUNGEON_FLOOR_COUNT }, (_, i) => buildBeastFloor(i + 1)),
+  ...Array.from(
+    { length: DUNGEON_UPPER_FLOOR_COUNT - DUNGEON_FLOOR_COUNT },
+    (_, i) => buildBeastUpperFloor(DUNGEON_UPPER_FLOOR_START + i),
+  ),
+];
 export function findDungeonFloor(floor: number, kind: EquipmentDungeonKind = "DEMON"): DungeonFloor | undefined {
   return (kind === "BEAST" ? BEAST_DUNGEON_FLOORS : EQUIPMENT_DUNGEON_FLOORS).find((f) => f.floor === floor);
 }
@@ -442,21 +689,110 @@ export interface DungeonPigDrop {
   star: Star;
 }
 
-/** 装備ドロップとは独立して、低確率で召喚の書もドロップする(全階層共通) */
-export function rollDungeonSummonScroll(rng: () => number = Math.random): boolean {
-  return rng() < SUMMON_SCROLL_DROP_RATE;
+/**
+ * 装備ドロップとは独立して、低確率で召喚の書もドロップする。
+ *
+ * 1〜10階は全階層共通5%(**据え置き**)。11・12階だけ階ごとの率を持つ。
+ * 引数を省略すると従来どおり共通率で引くので、既存の呼び出しは壊れない。
+ */
+export function rollDungeonSummonScroll(rng: () => number = Math.random, floor?: number): boolean {
+  const rate = (floor !== undefined ? upperBonusRates(floor)?.summonScroll : undefined) ?? SUMMON_SCROLL_DROP_RATE;
+  return rng() < rate;
 }
 
 function reincarnationPigStarForFloor(floor: number): Star {
   return floor <= REINCARNATION_PIG_LOW_TIER_MAX_FLOOR ? 2 : 3;
 }
 
+/* --------------------------------------------------------------------------
+ * 上位階(11・12)の副ドロップ
+ *
+ * ## 既存の方式を変えない
+ *
+ * 1〜10階は**独立抽選**。召喚の書(5%)と転生ピッグ(10%)をそれぞれ別に引き、
+ * 装備はクリアで1個確定。上位階もこの形をそのまま踏襲する
+ * (「1枠だけ当たる」方式に変えると、10階以前の期待値まで変わってしまう)。
+ *
+ * ## ピッグだけは1枠にする理由
+ *
+ * 上位階は★3と★4のピッグを**別々の確率**で出す。
+ * ★3と★4を独立に引くと「同じ戦闘で2匹出る」ことになり、
+ * 指定された確率(★3=7%、★4=0.8%)の意味がずれる。
+ * そこで**ピッグ枠の中だけ**を排他にし、枠そのものは
+ * 召喚の書・スキルピッグから独立させる。これで指定値がそのまま出る。
+ * -------------------------------------------------------------------------- */
+
+/** 上位階の副ドロップ率。階 → 各枠の確率 */
+const UPPER_FLOOR_BONUS_RATES: Record<number, {
+  summonScroll: number;
+  /** ピッグ枠。上から順に判定する排他抽選(合計がピッグの総ドロップ率) */
+  pigs: readonly { star: Star; rate: number }[];
+  skillPig: number;
+}> = {
+  11: {
+    summonScroll: 0.07,
+    pigs: [{ star: 4, rate: 0.008 }, { star: 3, rate: 0.07 }],
+    skillPig: 0.002,
+  },
+  12: {
+    summonScroll: 0.10,
+    pigs: [{ star: 4, rate: 0.02 }, { star: 3, rate: 0.05 }],
+    skillPig: 0.005,
+  },
+};
+
+/** その階が上位階の副ドロップ表を持つか */
+function upperBonusRates(floor: number) {
+  return UPPER_FLOOR_BONUS_RATES[floor];
+}
+
+/** 画面と抽選が同じ表を見るための入口(確率の数字は画面に出さないが、何が出るかは出す) */
+export function dungeonFloorHasSkillPigDrop(floor: number): boolean {
+  return (upperBonusRates(floor)?.skillPig ?? 0) > 0;
+}
+
+/** その階で出うる転生ピッグの★(低い順)。案内文に使う */
+export function dungeonFloorPigStars(floor: number): Star[] {
+  const rates = upperBonusRates(floor);
+  if (rates) return [...rates.pigs].map((entry) => entry.star).sort((a, b) => a - b);
+  return [reincarnationPigStarForFloor(floor)];
+}
+
 /**
- * 低確率で転生ピッグがドロップする(全階層共通10%)。
- * 1〜6階は星2、7〜10階は星3のピッグがドロップする。ドロップしなければnull
+ * 低確率で転生ピッグがドロップする。
+ *
+ * 1〜10階は全階層共通10%で、1〜6階は星2、7〜10階は星3
+ * (**既存の挙動は1ミリも変えない**)。
+ * 11・12階だけは★3と★4を別々の確率で出すので、専用の表から排他に引く。
  */
 export function rollDungeonReincarnationPig(floor: DungeonFloor, rng: () => number = Math.random): DungeonPigDrop | null {
+  const upper = upperBonusRates(floor.floor);
+  if (upper) {
+    let roll = rng();
+    for (const entry of upper.pigs) {
+      if (roll < entry.rate) {
+        const variant = REINCARNATION_PIG_DEX[Math.floor(rng() * REINCARNATION_PIG_DEX.length)];
+        return { dexId: variant.id, star: entry.star };
+      }
+      roll -= entry.rate;
+    }
+    return null;
+  }
   if (rng() >= REINCARNATION_PIG_DROP_RATE) return null;
   const variant = REINCARNATION_PIG_DEX[Math.floor(rng() * REINCARNATION_PIG_DEX.length)];
   return { dexId: variant.id, star: reincarnationPigStarForFloor(floor.floor) };
+}
+
+/**
+ * 上位階だけの副ドロップ。**スキルピッグ。**
+ *
+ * 図鑑の正式なデータ(`SKILL_PIG_DEX`)から引く。
+ * 名前で素材の種類を見分けるような真似はしない——
+ * 判定は `monsterPowerUp.ts` が `templateId` で行っている。
+ */
+export function rollDungeonSkillPig(floor: DungeonFloor, rng: () => number = Math.random): DungeonPigDrop | null {
+  const rate = upperBonusRates(floor.floor)?.skillPig ?? 0;
+  if (rate <= 0 || rng() >= rate) return null;
+  const variant = SKILL_PIG_DEX[Math.floor(rng() * SKILL_PIG_DEX.length)];
+  return { dexId: variant.id, star: 5 };
 }

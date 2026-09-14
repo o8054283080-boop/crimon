@@ -5,7 +5,7 @@ import {
   generateDungeonEquipment,
   getDungeonFloorDropRates,
 } from "../src/core/equipment.js";
-import { EQUIPMENT_DUNGEON_FLOORS, findDungeonFloor } from "../src/data/equipmentDungeon.js";
+import { DUNGEON_UPPER_FLOOR_COUNT, EQUIPMENT_DUNGEON_FLOORS, findDungeonFloor } from "../src/data/equipmentDungeon.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import { MONSTER_TEMPLATES } from "../src/data/monsters.js";
 
@@ -24,11 +24,18 @@ function mulberry32(seed: number): () => number {
 }
 
 describe("装備ダンジョン フロアデータ", () => {
-  it("1〜10階まで存在する", () => {
-    expect(EQUIPMENT_DUNGEON_FLOORS).toHaveLength(DUNGEON_FLOOR_COUNT);
-    for (let i = 1; i <= DUNGEON_FLOOR_COUNT; i++) {
+  it("1〜12階まで存在する(11・12階は倍率カーブに乗らない上位階)", () => {
+    expect(EQUIPMENT_DUNGEON_FLOORS).toHaveLength(DUNGEON_UPPER_FLOOR_COUNT);
+    for (let i = 1; i <= DUNGEON_UPPER_FLOOR_COUNT; i++) {
       expect(findDungeonFloor(i)).toBeDefined();
     }
+    /*
+     * **`DUNGEON_FLOOR_COUNT` は階数ではなく倍率カーブの分母。**
+     * ここを12にすると `powerScaleForFloor` の割り算が変わり、
+     * 1〜10階すべての難易度が動く。上位階は実数(`fixedStats`)で置くので、
+     * この定数は10のまま据え置く。
+     */
+    expect(DUNGEON_FLOOR_COUNT, "倍率カーブの分母は動かさない").toBe(10);
   });
 
   it("各階層の敵は全員同じ属性で統一されている(弱点属性を突きやすくするため)", () => {

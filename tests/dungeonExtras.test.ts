@@ -70,9 +70,14 @@ describe("転生ピッグ", () => {
 });
 
 describe("装備ダンジョンのボーナスドロップ", () => {
-  it("転生ピッグは全階層でドロップし得て、1〜6階は星2・7〜10階は星3になる", () => {
+  /*
+   * 11・12階は★3と★4を別々の確率で出す専用の表を持つので、ここでは見ない
+   * (上位階は `tests/equipmentDungeonUpper.test.ts` が見張る)。
+   * ここが守るのは**1〜10階の従来どおりの出方**。
+   */
+  it("転生ピッグは1〜10階でドロップし得て、1〜6階は星2・7〜10階は星3になる", () => {
     const rng = () => 0; // 必ずドロップ側に倒れる乱数
-    for (const floor of EQUIPMENT_DUNGEON_FLOORS) {
+    for (const floor of EQUIPMENT_DUNGEON_FLOORS.filter((f) => f.floor <= 10)) {
       const result = rollDungeonReincarnationPig(floor, rng);
       expect(result).not.toBeNull();
       expect(result!.star).toBe(floor.floor <= REINCARNATION_PIG_LOW_TIER_MAX_FLOOR ? 2 : 3);

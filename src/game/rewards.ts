@@ -1,7 +1,7 @@
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
 import { Equipment } from "../core/equipment.js";
-import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
+import { DungeonFloor, rollDungeonEquipment, rollDungeonReincarnationPig, rollDungeonSkillPig, rollDungeonSummonScroll } from "../data/equipmentDungeon.js";
 import { GoldDungeonFloor } from "../data/goldDungeon.js";
 import { LevelDungeonDef } from "../data/levelDungeon.js";
 import { EXP_PIG_DEX, findMonsterById } from "../data/monsters.js";
@@ -82,6 +82,11 @@ export interface ClearRewardResult {
   pigDrop: StageDrop | null;
   /** 星2通常抽選とボス階の星3抽選。既存のpigDropは先頭1件を指し、旧呼び出し側との互換を保つ。 */
   pigDrops?: StageDrop[];
+  /**
+   * スキルピッグ。装備ダンジョンの上位階(11・12)だけで出る。
+   * **転生ピッグとは別枠**——あちらはランクアップ素材、こちらはスキル強化素材。
+   */
+  skillPigDrop?: StageDrop | null;
   summonScrollDropped: boolean;
   fighterLevelsGained: number;
 }
@@ -231,13 +236,32 @@ export function applyDungeonClearRewards(
 
   const equipmentDrop = rollDungeonEquipment(floor);
   addEquipment(state, equipmentDrop);
-  const summonScrollDropped = rollDungeonSummonScroll();
+  /*
+   * **副ドロップはここでも Math.random のまま引く。**
+   *
+   * 引数の `rng` を渡すと乱数の引く順番が変わり、
+   * 既存階のドロップの出方が(確率は同じでも)別の並びになる。
+   * 確率そのものの検証は各 roll 関数へ rng を注入して行う
+   * (`tests/equipmentDungeonUpper.test.ts`)。
+   */
+  const summonScrollDropped = rollDungeonSummonScroll(Math.random, floor.floor);
   if (summonScrollDropped) addSummonScrolls(state, 1);
   let pigDrop: StageDrop | null = null;
   const pig = rollDungeonReincarnationPig(floor);
   if (pig) {
     pigDrop = { dexId: pig.dexId, star: pig.star };
     addMonster(state, pig.dexId, pig.star, STAR_MAX_LEVEL[pig.star]);
+  }
+  /*
+   * スキルピッグは上位階(11・12)だけの副ドロップ。
+   * 転生ピッグとは別の素材なので `pigDrop` には混ぜない
+   * (混ぜると画面が転生ピッグとして数え、ランクアップ素材に見える)。
+   */
+  let skillPigDrop: StageDrop | null = null;
+  const skillPig = rollDungeonSkillPig(floor);
+  if (skillPig) {
+    skillPigDrop = { dexId: skillPig.dexId, star: skillPig.star };
+    addMonster(state, skillPig.dexId, skillPig.star, STAR_MAX_LEVEL[skillPig.star]);
   }
   const fighterExp = equipmentDungeonFighterExp(floor.floor);
   const fighterLevelsGained = addFighterExp(state, fighterExp).levelsGained;
@@ -256,6 +280,7 @@ export function applyDungeonClearRewards(
     dropStar: null,
     equipmentDrop,
     pigDrop,
+    skillPigDrop,
     summonScrollDropped,
     fighterLevelsGained,
   };

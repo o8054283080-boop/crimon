@@ -7,9 +7,10 @@ import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 
 describe("魔獣のダンジョン", () => {
   it("10階構成・属性巡回・確定ステータスが設計どおり", () => {
-    expect(BEAST_DUNGEON_FLOORS).toHaveLength(10);
+    expect(BEAST_DUNGEON_FLOORS).toHaveLength(12);
+    // 7〜12階で6属性がひと回りする(11=草・12=光を続きとして足した)
     expect(BEAST_DUNGEON_FLOORS.map((floor) => floor.enemies[0].element)).toEqual([
-      "FIRE", "WATER", "ELECTRIC", "GRASS", "LIGHT", "DARK", "FIRE", "WATER", "ELECTRIC", "DARK",
+      "FIRE", "WATER", "ELECTRIC", "GRASS", "LIGHT", "DARK", "FIRE", "WATER", "ELECTRIC", "DARK", "GRASS", "LIGHT",
     ]);
     const floor10 = BEAST_DUNGEON_FLOORS[9];
     expect(floor10.enemies.map((enemy) => enemy.templateId)).toEqual([

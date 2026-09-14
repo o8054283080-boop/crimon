@@ -3,6 +3,7 @@ import { BattleEngine } from "../src/battle/engine.js";
 import { EQUIP_SLOTS, EquipStar, generateEquipment } from "../src/core/equipment.js";
 import { createMonsterInstance, MonsterInstance } from "../src/core/monsterInstance.js";
 import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
+import { DUNGEON_FLOOR_COUNT } from "../src/core/equipment.js";
 import { MAX_DUNGEON_PARTY_SIZE, addEquipment, createInitialState, equipToMonster, PlayerState } from "../src/game/playerState.js";
 import { setupDungeonBattle } from "../src/game/dungeonRunner.js";
 
@@ -271,13 +272,21 @@ describe("装備ダンジョンの難易度(1階は星3+星1装備くらいで�
     }
   });
 
-  it("6階までは硬さが単調増加し、速さは最後まで単調増加する", () => {
+  it("6階までは硬さが単調増加し、10階までは速さが単調増加する", () => {
     // powerScale は10階だけ9階より低い。10階のお供はHPが2倍で速度倍率も最速なので、
     // 同じ倍率だと9階より二段階難しくなってしまうため意図的に下げてある
     // (実際の手応えが単調増加していることは別のテストで実測して確かめている)
-    for (let i = 1; i < EQUIPMENT_DUNGEON_FLOORS.length; i++) {
-      const prev = EQUIPMENT_DUNGEON_FLOORS[i - 1];
-      const cur = EQUIPMENT_DUNGEON_FLOORS[i];
+    /*
+     * **見るのは1〜10階の倍率カーブだけ。**
+     * 11・12階は倍率に乗らず `fixedStats` の実数で置いてあるので、
+     * powerScale / speedScale は「掛けていない」印の1が入っている。
+     * ここへ混ぜると、カーブの見張りが上位階の1に引っかかって落ちる。
+     * 上位階のステータスは `tests/equipmentDungeonUpper.test.ts` が実数で見張る。
+     */
+    const curved = EQUIPMENT_DUNGEON_FLOORS.filter((floor) => floor.floor <= DUNGEON_FLOOR_COUNT);
+    for (let i = 1; i < curved.length; i++) {
+      const prev = curved[i - 1];
+      const cur = curved[i];
       if (i + 1 <= 9) expect(cur.powerScale, `${i + 1}階のpowerScale`).toBeGreaterThan(prev.powerScale);
       expect(cur.speedScale, `${i + 1}階のspeedScale`).toBeGreaterThan(prev.speedScale);
     }
