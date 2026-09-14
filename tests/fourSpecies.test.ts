@@ -150,7 +150,9 @@ describe('パッシブ・追加ターン・多段攻撃',()=>{
     const {a,b,act}=battle('scorpion');a.def.stats.criRate=1;act(0);expect(a.gauge).toBe(0);expect(b.poisonStacks).toBe(1);act(0);expect(a.gauge).toBe(10);
   });
   it('条件付き防御無視・HPボーナス・クリティカル軽減をダメージ計算へ反映する',()=>{
-    const a=createBattleUnit(def('scorpion','WATER',5),'PLAYER','a');const b=createBattleUnit(def('slime'),'ENEMY','b');b.currentHp=b.maxHp*.8;
+    // 水 vs 草で**等倍**にしておく。有利属性だとクリ率が15pt乗ってしまい、
+    // 「パッシブの条件でクリになる」ことを確かめられなくなる
+    const a=createBattleUnit(def('scorpion','WATER',5),'PLAYER','a');const b=createBattleUnit(def('slime','GRASS'),'ENEMY','b');b.currentHp=b.maxHp*.8;
     const weak=calcDamage(a,b,{kind:'DAMAGE',multiplier:1},()=>.1);expect(weak.isCrit).toBe(true);
     b.currentHp=b.maxHp;expect(calcDamage(a,b,{kind:'DAMAGE',multiplier:1},()=>.1).isCrit).toBe(false);
     a.def.skills[2] = def("slime").skills[2];

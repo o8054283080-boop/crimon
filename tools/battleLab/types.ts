@@ -60,6 +60,11 @@ export interface AllySpec {
   /** 潜在覚醒。候補の並びの何番目か。`null` で覚醒なし */
   latentIndex?: number | null;
   /**
+   * 検証専用の図鑑基礎ステータス倍率。装備やタイプより前へ掛ける。
+   * 本番データを書き換えず、基礎ATK/DEF案が実際の育成経路を通った結果を測るために使う。
+   */
+  baseStatMultipliers?: Partial<Pick<Stats, "hp" | "atk" | "def" | "spd">>;
+  /**
    * 最終ステータスの直接上書き。**プリセットも装備も通した後にかかる。**
    * 「速度180ちょうどで比べたい」のような、詰めの確認に使う。
    */

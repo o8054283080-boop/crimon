@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { calcDamage } from "../src/battle/damage.js";
-import { applyDefenseE, calculateBaseDamage } from "../src/battle/damageFormula.js";
+import { applyDefenseLegacyE, calculateBaseDamage } from "../src/battle/damageFormula.js";
 import { createBattleUnit } from "../src/battle/unit.js";
+import { resetBalanceFlags, setBalanceFlags } from "../src/core/balanceFlags.js";
 import { MonsterDefinition } from "../src/core/monster.js";
 import { Stats } from "../src/core/stats.js";
 
@@ -14,12 +15,20 @@ const unit = (side: "PLAYER" | "ENEMY", overrides: Partial<Stats>) => createBatt
   role: "test", emoji: "x", stats: stats(overrides), skills: [] as unknown as MonsterDefinition["skills"],
 }, side, side);
 
-describe("production combat damage formula E", () => {
+/**
+ * **入れ替える前の方式E。**いまの本番は `1000/(1000+1.2×DEF)` なので、
+ * ここは `legacy` を立てて、旧式の実装がそのまま残っていることを守る
+ * (前後を並べて比べる道を潰さないため)。本番の式は `defenseFormulaSw.test.ts`。
+ */
+describe("入れ替える前の方式E(比較用に残してある)", () => {
+  beforeEach(() => setBalanceFlags({ defenseFormula: "legacy", elementMode: "legacy" }));
+  afterEach(() => resetBalanceFlags());
+
   it.each([
     [1000, 3000, 3, 409], [1000, 4000, 3, 321], [1000, 6500, 3, 209],
     [2000, 4000, 3, 1125], [4000, 6500, 3, 2618],
   ])("reproduces ATK %i / DEF %i / x%i", (atk, def, multiplier, expected) => {
-    expect(Math.round(applyDefenseE(atk * multiplier, atk, def).afterDefense)).toBe(expected);
+    expect(Math.round(applyDefenseLegacyE(atk * multiplier, atk, def).afterDefense)).toBe(expected);
   });
 
   it("covers the requested ATK/DEF/multiplier/critical matrix without invalid damage", () => {
@@ -27,7 +36,7 @@ describe("production combat damage formula E", () => {
       for (const def of [0, 1000, 2000, 4000, 6500])
         for (const multiplier of [0.5, 1, 2, 3, 5])
           for (const crit of [1, 1.5, 2, 2.5, 3]) {
-            const value = applyDefenseE(atk * multiplier, atk, def).afterDefense * crit;
+            const value = applyDefenseLegacyE(atk * multiplier, atk, def).afterDefense * crit;
             expect(Number.isFinite(value)).toBe(true);
             expect(Math.round(value)).toBeGreaterThan(1);
           }
@@ -48,7 +57,7 @@ describe("production combat damage formula E", () => {
   });
 
   it("bypasses ratio and flat defense together", () => {
-    expect(applyDefenseE(6000, 3000, 6500, true)).toEqual({ afterRatio: 6000, flatReduction: 0, afterDefense: 6000 });
+    expect(applyDefenseLegacyE(6000, 3000, 6500, true)).toEqual({ afterRatio: 6000, flatReduction: 0, afterDefense: 6000 });
   });
 
   it.each([[10000], [30000], [50000], [90000]])("uses maximum HP as an independent term (%i)", (hp) => {
