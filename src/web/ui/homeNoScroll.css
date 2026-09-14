@@ -916,3 +916,15 @@ body:has(.crimon-home) {
     right: -6px !important;
   }
 }
+
+
+/* 右列は画面外へ出さず、見た目の余白だけ最小化する。 */
+.crimon-home .world-actions--right {
+  right: 0 !important;
+}
+@media (max-width: 405px) {
+  .crimon-home .world-actions--right { right: 0 !important; }
+}
+@media (min-width: 410px) {
+  .crimon-home .world-actions--right { right: 2px !important; }
+}
