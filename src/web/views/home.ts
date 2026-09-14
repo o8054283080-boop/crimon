@@ -844,7 +844,6 @@ export function renderHome(props: HomeProps): HTMLElement {
   const openTutorial = () => {
     const current = tutorial.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
     if (current) current.open = true;
-    tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
   const banners = [
     /*
@@ -886,7 +885,6 @@ export function renderHome(props: HomeProps): HTMLElement {
        * 左右の縦列(ミッション・図鑑・冒険・ダンジョン・闘技場)も覆っていた。
        * 上から順に押し下げる並びなら、何も隠さない。
        */
-      bannerStack,
       /*
        * 編成は**世界の枠より上**に置く。
        *
@@ -921,6 +919,10 @@ export function renderHome(props: HomeProps): HTMLElement {
           worldButton("left", "menu-ranking", "ランキング"),
           worldButton("left", "menu-help", "遊び方", onGoHowToPlay),
         ]),
+        el("div", { className: "world-info-stack" }, [
+          tutorial,
+          bannerStack,
+        ].filter((node): node is HTMLElement => node !== null)),
         el("div", { className: "home-quick-stack" }, [noticeEntry, giftEntry]),
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
@@ -935,7 +937,6 @@ export function renderHome(props: HomeProps): HTMLElement {
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
         ]),
       ]),
-      tutorial,
       noticeSheet,
       staminaSheet,
       settingsSheet,
