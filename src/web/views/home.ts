@@ -920,9 +920,8 @@ export function renderHome(props: HomeProps): HTMLElement {
           worldButton("left", "menu-dex", "図鑑", props.onGoMonsterDex),
           worldButton("left", "menu-ranking", "ランキング"),
           worldButton("left", "menu-help", "遊び方", onGoHowToPlay),
-          noticeEntry,
-          giftEntry,
         ]),
+        el("div", { className: "home-quick-stack" }, [noticeEntry, giftEntry]),
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
           worldButton("right", "activity-adventure", "冒険", props.onGoStages),
