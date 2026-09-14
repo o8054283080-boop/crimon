@@ -721,3 +721,120 @@ body:has(.crimon-home) {
     bottom: 6px !important;
   }
 }
+
+
+/* ==========================================================================
+ * PR #338 polish: 既存ナビ/メニューの見た目を縮めない
+ * 高さ不足は中央情報バナーだけで吸収する。
+ * ========================================================================== */
+
+/* 下部5タブは既存HOMEの密度をそのまま使う。
+ * homeNoScroll側では高さを縮めない。 */
+body:has(.crimon-home) {
+  --home-nav-base-h: 82px !important;
+}
+@media (max-width: 405px) {
+  body:has(.crimon-home) {
+    --home-nav-base-h: 78px !important;
+  }
+}
+
+/* 左右8メニューは元のHOMEサイズへ戻す。
+ * 「小さくして間だけ空く」状態を禁止。 */
+.crimon-home .world-actions {
+  gap: 2px !important;
+}
+.crimon-home .world-action {
+  width: 72px !important;
+  min-height: 78px !important;
+}
+.crimon-home .world-action img {
+  width: 58px !important;
+  height: 58px !important;
+}
+.crimon-home .world-action strong {
+  font-size: 11px !important;
+}
+.crimon-home .world-action--right {
+  width: 82px !important;
+  min-height: 94px !important;
+}
+.crimon-home .world-action--right img {
+  width: 70px !important;
+  height: 70px !important;
+}
+.crimon-home .world-action--right strong {
+  font-size: 12px !important;
+}
+
+/* 390x844級でも左右メニューは縮めない。
+ * 代わりに中央の情報枠をさらに狭く・上詰めにする。 */
+@media (max-height: 860px) {
+  .crimon-home .world-action {
+    width: 72px !important;
+    min-height: 69px !important;
+  }
+  .crimon-home .world-action img {
+    width: 58px !important;
+    height: 58px !important;
+  }
+  .crimon-home .world-action--right {
+    width: 82px !important;
+    min-height: 78px !important;
+  }
+  .crimon-home .world-action--right:first-child {
+    min-height: 91px !important;
+  }
+  .crimon-home .world-action--right img {
+    width: 70px !important;
+    height: 70px !important;
+  }
+}
+
+/* 冒険と絶対に重ならない中央カラム。
+ * 右メニュー82px + 余白を丸ごと避ける。 */
+.home-world > .world-info-stack {
+  left: 94px !important;
+  right: 108px !important;
+  top: 3px !important;
+  max-height: 86px !important;
+  gap: 3px !important;
+}
+
+/* 中央情報だけをコンパクトにする。 */
+.home-world .world-info-stack > .crimon-tutorial {
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  padding: 3px 7px !important;
+}
+.home-world .world-info-stack .cloud-warn,
+.home-world .world-info-stack .reward-banner {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+}
+.home-world .world-info-stack .cloud-warn {
+  grid-template-columns: 16px minmax(0,1fr) 58px !important;
+  padding-inline: 5px !important;
+}
+.home-world .world-info-stack .cloud-warn__go {
+  width: 58px !important;
+  min-width: 58px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+}
+.home-world .world-info-stack .reward-banner__close {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+/* 大きめ端末でも中央バナーが右メニューへ寄らない。 */
+@media (min-width: 410px) {
+  .home-world > .world-info-stack {
+    left: 100px !important;
+    right: 116px !important;
+  }
+}
