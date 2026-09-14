@@ -841,23 +841,10 @@ export function renderHome(props: HomeProps): HTMLElement {
     giftCount > 0 ? el("span", { className: "home-quick__badge" }, [String(giftCount)]) : null,
   ].filter((node): node is HTMLElement => node !== null));
 
-  const tutorialSheet = el("div", { className: "home-sheet", hidden: true }, []);
-  const closeTutorial = () => { tutorialSheet.hidden = true; };
-  tutorialSheet.append(
-    el("div", { className: "home-sheet__scrim", onclick: closeTutorial }, []),
-    el("div", { className: "home-sheet__panel home-tutorial-sheet" }, [
-      el("div", { className: "home-sheet__head" }, [
-        el("strong", {}, ["初心者ミッション"]),
-        el("button", { type: "button", className: "btn btn--ghost", onclick: closeTutorial }, ["閉じる"]),
-      ]),
-      tutorial,
-    ]),
-  );
-
   const openTutorial = () => {
-    tutorialSheet.hidden = false;
     const current = tutorial.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
     if (current) current.open = true;
+    tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
   const banners = [
     /*
@@ -949,7 +936,7 @@ export function renderHome(props: HomeProps): HTMLElement {
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
         ]),
       ]),
-      tutorialSheet,
+      tutorial,
       noticeSheet,
       staminaSheet,
       settingsSheet,
