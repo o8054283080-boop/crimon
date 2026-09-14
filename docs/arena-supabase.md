@@ -430,6 +430,24 @@ CI も、そのファイルが手元の定義と揃っているかしか見て�
 `装備の数値がサーバの照合表と合っていません（MAIN_STAT_OVER_CAP）`
 がそのまま画面に出る。**この文言が出たら、まず照合表を流す。**
 
+### 流し方
+
+**GitHub Actions から押すだけで流せる**(`.github/workflows/arena-catalog.yml`)。
+
+```
+Actions → 「アリーナ照合表を本番へ流す」 → Run workflow
+```
+
+いちばん新しい `arena_catalog_*.sql` を1本だけ、`--single-transaction` で流す。
+中身は全テーブルの入れ替えなので、過去のぶんも含んでいる。
+流す前に `arena:catalog --check` を通すので、**作り直し忘れた古い生成物は入らない。**
+`dry_run` を入れて押すと、流さずにいまの本番の値だけを見る。
+
+要るのは Secrets の `SUPABASE_DB_URL` 1つだけ(Supabase の
+Settings → Database → Connection string の URI)。
+**`service_role` の鍵は置かない。**あれは全ての守りを無効にできる。
+
+手で流す時は、Supabase の SQL エディタへ生成物の全文を貼る。
 流したかどうかは、SQLエディタから直接見れば分かる:
 
 ```sql
