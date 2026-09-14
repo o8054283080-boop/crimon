@@ -123,10 +123,16 @@ body:has(.crimon-home) {
 .crimon-resource-header .home-wallet__suffix { color: var(--home-text-muted) !important; }
 
 /* 画像の明るい世界をHOMEの主役にする。上部は空、中央はモンスターの余白、
- * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。 */
+ * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。
+ *
+ * **下限は左の縦列が入りきる高さ。**`crimon-visual-system.css` の
+ * `.home-world` と同じ値にすること。実際に効くのは `!important` の付いた
+ * こちらなので、あちらだけ直しても画面は1pxも動かない(実測で確認)。
+ * 6段(ミッション・図鑑・ランキング・遊び方・お知らせ・プレゼント)の内訳は
+ * 72px × 6 + 間隔5px × 5 + 上下の余白 = 472px。 */
 .home-world {
   height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
-  min-height: 356px !important;
+  min-height: 472px !important;
   margin: -1px 0 0 !important;
   border-inline: 0 !important;
   background: url("./assets/home/home-sky-isles-v2.jpg") center 58% / cover no-repeat !important;
@@ -371,4 +377,110 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 
 @media (prefers-reduced-motion: reduce) {
   .crimon-home * { animation-duration: .01ms !important; }
+}
+
+/* ==========================================================================
+ * 配布の札を、世界の空へ置く
+ *
+ * 以前はヘッダーの下に積んでいた。何も隠さない代わりに、札の高さぶん
+ * 世界の枠が縮み(`--home-banner-h`)、何枚か出ている日は**世界そのものが
+ * 画面の外まで押し出されていた**。ホームの主役が見えないので、
+ * 置き場所として成り立っていない。
+ *
+ * ここは左右の縦列の間で、モンスターより上。**誰も覆わない場所。**
+ * 一度 `position:absolute` で被せて失敗しているが、あの時は全部を重ねたうえで
+ * `overflow:hidden` で押し込み、はみ出した「閉じる」を切り落としていた。
+ * **切り落とさない。**入りきらない分は `HOME_BANNER_LIMIT` で畳む。
+ * ========================================================================== */
+
+.home-world > .reward-banner-stack {
+  position: absolute !important;
+  /* 左右の縦列(`.world-actions` は z-index 4〜6)より上。
+   * モンスター(`.world-party` は 2)も跨ぐので、札が隠れることはない */
+  /* 左右の縦列より必ず上。**6や8では足りなかった。**
+   * 430px幅の端末で、札の「閉じる」が右列の手前に回り込み、
+   * 巡回が「押せないボタン『閉じる』の手前に world-action--right」を拾った */
+  z-index: 12 !important;
+  top: 6px !important;
+  /* 縦列のタップ領域へ**1pxも入らない**。左72px/右82px + 余白を丸ごと避ける */
+  left: 88px !important;
+  right: 104px !important;
+  display: grid !important;
+  gap: 4px !important;
+  margin: 0 !important;
+}
+
+/* 札は1本ぶんの高さに抑える。**縦に伸ばすとモンスターを覆う**
+ * (抑えずに出したら、世界の下半分まで札が伸びて顔が隠れた)。
+ *
+ * 中身は溢れるが、切り落とされて困るのは「閉じる」だけ。
+ * それは下で右上へ絶対配置して、**必ず枠の中に残す**。
+ * 詳しい中身は左の「お知らせ」から全部読める。 */
+.home-world > .reward-banner-stack .reward-banner {
+  position: relative !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+  padding: 5px 48px 5px 6px !important;
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+}
+
+/* 畳んだ件数は**1行に収める。**
+ * 折り返すと3行になり、それだけでモンスターの顔ぶんの高さを食う。
+ * ここは押す物が無いので、あふれた文字は省略してよい
+ * (中身は左の「お知らせ」から全部読める)。 */
+.home-world > .reward-banner-stack .reward-banner-stack__rest {
+  padding: 4px 7px !important;
+  font-size: 9.5px !important;
+  line-height: 1.4 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* 閉じるボタンは**右上へ固定する。**
+ *
+ * 札の中身と一緒に流れていると、高さを抑えた時に枠の外へ押し出され、
+ * `overflow:hidden` に切り落とされて押せなくなる。
+ * 一度それをやって巡回が8件拾っている(「押せないボタン『閉じる』の
+ * 手前に home-world」)。**位置を中身から切り離せば、二度と起きない。** */
+.home-world > .reward-banner-stack .reward-banner__close {
+  position: absolute !important;
+  top: 5px !important;
+  right: 5px !important;
+  /* **44pxを割らない。**34pxにしたら巡回が「指で押すには小さい」を拾った */
+  min-width: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+}
+
+/* アカウント復旧の案内も1本ぶんに抑える。
+ * こちらは閉じるボタンを持たない(消し方は「登録すること」だけ)ので、
+ * 切り落として困るのは**「登録する」の的**だけ。右へ固定して残す。 */
+.home-world > .reward-banner-stack .cloud-warn {
+  position: relative !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+  padding: 5px 76px 5px 6px !important;
+  overflow: hidden !important;
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+}
+
+.home-world > .reward-banner-stack .cloud-warn__lead {
+  display: none !important;
+}
+
+.home-world > .reward-banner-stack .cloud-warn__go {
+  position: absolute !important;
+  top: 5px !important;
+  right: 5px !important;
+  width: 66px !important;
+  min-width: 66px !important;
+  /* **44pxを割らない。**64x34にしたら巡回が「指で押すには小さい」を拾った */
+  height: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 4px !important;
+  font-size: 10px !important;
 }

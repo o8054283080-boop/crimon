@@ -74,5 +74,10 @@
  *
  * **縦列が入りきる高さを必ず確保し、入らない時は潰さずに巻物を出す。**
  * (`.crimon-home` を overflow:hidden から overflow-y:auto へ変えてある)
+ *
+ * 左が6段になった時(遊び方 → お知らせ → プレゼント)は、**ここも一緒に上げる。**
+ * 段だけ増やして下限を据え置いたら、6段目が枠を89pxはみ出して
+ * 切り落とされ、プレゼントが押せなくなった(実測)。
+ * 内訳は 72px × 6段 + 間隔5px × 5 + 上下の余白 = 472px。
  */
-.home-world { min-height: 356px; flex-shrink: 0; }
+.home-world { min-height: 472px; flex-shrink: 0; }
