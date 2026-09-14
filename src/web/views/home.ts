@@ -15,6 +15,8 @@ import { ELEMENT_JA, ELEMENT_MARK } from "../../core/element.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
+import { GIFT_DEFINITIONS } from "../../data/gifts.js";
+import { unclaimedGiftCount } from "../../game/gift.js";
 import { monsterPower } from "../../game/monsterSort.js";
 import { withPortrait } from "../three/portrait.js";
 import { partyCardAction } from "../uxHelpers.js";
@@ -44,6 +46,8 @@ export interface HomeProps {
   onGoArena: () => void;
   onGoTrialTower: () => void;
   onGoHowToPlay: () => void;
+  /** プレゼントボックス。運営から届いたものを受け取る場所 */
+  onGoGiftBox: () => void;
   onGoShop: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
@@ -749,6 +753,24 @@ export function renderHome(props: HomeProps): HTMLElement {
   staminaSheet.append(el("div", { className: "home-sheet__scrim", onclick: closeStamina }, []), el("div", { className: "home-sheet__panel" }, [el("div", { className: "home-sheet__head" }, [el("strong", {}, ["スタミナ回復"]), el("button", { type: "button", className: "btn btn--ghost", onclick: closeStamina }, ["閉じる"])]), renderVitals(player, props.onRefillStaminaPartial, props.onRefillStaminaFull, party)]));
   const openStamina = () => { staminaSheet.hidden = false; };
   const totalPower = party.reduce((sum, monster) => sum + monsterPower(monster), 0);
+  /*
+   * プレゼントの入口。**未受取が0でも入口は出す**(履歴を見に行けるように)。
+   * 赤い印は「配布が始まっていて・まだ受け取っていなくて・期限内」のものだけ数える。
+   */
+  const giftCount = unclaimedGiftCount(GIFT_DEFINITIONS, player);
+  const giftEntry = el("button", {
+    type: "button",
+    className: "home-gift",
+    "data-tour": "tile:giftBox",
+    onclick: props.onGoGiftBox,
+    ariaLabel: giftCount > 0 ? `プレゼントボックス（未受取${giftCount}件）` : "プレゼントボックス",
+  }, [
+    el("span", { className: "home-gift__icon", "aria-hidden": "true" }, ["🎁"]),
+    el("span", { className: "home-gift__label" }, ["プレゼント"]),
+    giftCount > 0
+      ? el("span", { className: "home-gift__badge" }, [String(giftCount)])
+      : el("span", { className: "home-gift__note" }, ["受取履歴を見る"]),
+  ]);
   const openTutorial = () => {
     const current = tutorial.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
     if (current) current.open = true;
@@ -786,6 +808,16 @@ export function renderHome(props: HomeProps): HTMLElement {
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
+      /*
+       * プレゼントの入口。**浮かせず、ヘッダーのすぐ下に置く。**
+       *
+       * 初心者ミッションは `beginnerMissionReferencePosition.ts` が
+       * 「配布の札(無ければヘッダー)の直後」へ常に引き上げている。
+       * 配布の札の下に置くと**その後ろへ押し出され**、実測では画面の下端
+       * (390x844で765px地点)まで落ちて下のタブに覆われていた。
+       * ここなら何が増えても上に残る。
+       */
+      giftEntry,
       /*
        * ログインボーナスと補填の札。**世界の上へ浮かせない。**
        *

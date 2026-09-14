@@ -148,6 +148,9 @@ import { loadMonsterListDense, saveMonsterListDense } from "./monsterListDensity
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
+import { renderGiftBox, type GiftTab } from "./views/giftBox.js";
+import { GIFT_DEFINITIONS } from "../data/gifts.js";
+import { claimAllGifts, claimGift, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
@@ -379,6 +382,10 @@ interface FarmRun {
 
 interface AppState {
   screen: ScreenName;
+  /** プレゼントボックスのタブ */
+  giftTab: GiftTab;
+  /** 直前の受け取りの結果。押した後に一度だけ出す */
+  giftResult: GiftClaimResult | GiftClaimAllResult | null;
   player: PlayerState;
   summonResults: SummonResult[] | null;
   /** 直前に何で引いたか。結果画面の「もう一度」を同じ手段で繰り返すために覚える */
@@ -574,6 +581,8 @@ type MonsterDetailReturn =
 
 const state: AppState = {
   screen: "HOME",
+  giftTab: "OPEN",
+  giftResult: null,
   player: loadPlayerState(),
   summonResults: null,
   lastSummonMethod: null,
@@ -3744,6 +3753,12 @@ function renderScreen(): void {
         onGoArena: () => navigate("ARENA"),
         onGoTrialTower: () => navigate("TRIAL_TOWER"),
         onGoHowToPlay: () => navigate("HOW_TO_PLAY"),
+        onGoGiftBox: () => {
+          // 開き直すたびに前回の結果が残らないよう、入る時に消す
+          state.giftTab = "OPEN";
+          state.giftResult = null;
+          navigate("GIFT_BOX");
+        },
         onGoTutorialDestination: goTutorialDestination,
         onClaimTutorial: (id) => {
           if (claimTutorialMission(state.player, id)) { savePlayerState(state.player); playSfx("stageClear"); }
@@ -4396,6 +4411,28 @@ function renderScreen(): void {
 
     case "HOW_TO_PLAY":
       content = renderHowToPlay({ onBack: () => navigate("HOME") });
+      break;
+
+    case "GIFT_BOX":
+      content = renderGiftBox({
+        player: state.player,
+        tab: state.giftTab,
+        lastResult: state.giftResult,
+        onChangeTab: (tab) => { state.giftTab = tab; state.giftResult = null; render(); },
+        onClaim: (giftId) => {
+          /*
+           * **保存できて初めて受け取ったことにする。**
+           * `claimGift` に保存を渡しておくと、失敗した時に所持品も受取の印も
+           * まとめて元へ戻る。片方だけ残ることがない。
+           */
+          state.giftResult = claimGift(GIFT_DEFINITIONS, state.player, giftId, { save: savePlayerState });
+          render();
+        },
+        onClaimAll: () => {
+          state.giftResult = claimAllGifts(GIFT_DEFINITIONS, state.player, { save: savePlayerState });
+          render();
+        },
+      });
       break;
 
     case "ARENA_BATTLE": {

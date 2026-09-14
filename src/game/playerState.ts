@@ -142,6 +142,14 @@ export interface PlayerState {
   shopPurchasedSlots: number[];
   /** 受け取り済みのお詫び配布のid。重複して配らないために残す */
   claimedCompensationIds: string[];
+  /**
+   * プレゼントボックスで受け取ったものの記録。**二度渡さないための印。**
+   *
+   * 所持品と同じ保存の中にあるので、**片方だけ残ることがない。**
+   * 保存に失敗した受け取りは、印も所持品もまとめて戻る。
+   * 古い控えには無いので、読み込み時に空配列で補う。
+   */
+  claimedGifts?: { giftId: string; claimedAt: number }[];
   /** はじまりの10連を引いたか。1度きりなので使い切りの印として持つ */
   tutorialSummonDone?: boolean;
   /**
@@ -378,6 +386,7 @@ export function createInitialState(): PlayerState {
     shopRotationKey: -1,
     shopPurchasedSlots: [],
     claimedCompensationIds: [],
+    claimedGifts: [],
     tutorialSummonDone: false,
     equipmentSpeedRebalanced: true,
     arenaDefenseIds: [],
@@ -608,6 +617,7 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.shopRotationKey !== "number") state.shopRotationKey = -1;
   if (!Array.isArray(state.shopPurchasedSlots)) state.shopPurchasedSlots = [];
   if (!Array.isArray(state.claimedCompensationIds)) state.claimedCompensationIds = [];
+  if (!Array.isArray(state.claimedGifts)) state.claimedGifts = [];
   // 古い控えには無い。既に遊んでいる人にも1回だけ引かせる(印が無い＝未使用)
   if (typeof state.tutorialSummonDone !== "boolean") state.tutorialSummonDone = false;
 

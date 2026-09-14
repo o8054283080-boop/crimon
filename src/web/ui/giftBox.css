@@ -1,0 +1,265 @@
+/*
+ * プレゼントボックス。
+ *
+ * **style.css へ足さない。**あちらは追記が続くと Vite が黙って空のCSSを配る
+ * ことがあり、実際に画面が崩れた(CLAUDE.md)。画面ごとに1枚持つ。
+ *
+ * 色は濃紺＋金。白い管理画面にしない。
+ */
+
+.gift-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* 左上の「戻る」に重ならないよう、上に逃げ場を空ける */
+  padding: 56px 14px calc(24px + var(--bottom-nav-h, 64px));
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+}
+
+.gift-screen__title {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  background: var(--gold-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.gift-screen__lead {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+/* ------------------------------------------------------------------ タブ */
+
+.gift-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.gift-tabs__button {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--edge-line);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.gift-tabs__button[aria-selected="true"] {
+  border-color: var(--hairline);
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), 0 0 0 1px rgba(198, 160, 84, 0.22) inset;
+  color: var(--gold-2);
+}
+
+.gift-tabs__count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ 札 */
+
+.gift-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--drop-soft);
+}
+
+.gift-card--claimed { opacity: 0.82; }
+
+.gift-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.45;
+  color: var(--gold-2);
+  /* 長い名前でも枠から出さない。折り返して全部読ませる */
+  overflow-wrap: anywhere;
+}
+
+.gift-card__description {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.gift-card__rewards {
+  display: grid;
+  /*
+   * **iPhone幅(390px)では必ず1列。**2列にすると「ゴールド ×1,500,000」の
+   * 名前が「ゴール/ド」と折り返して読めなくなる(実機で確認)。
+   * 広い画面でだけ2列に開く。
+   */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(198, 160, 84, 0.18);
+  border-radius: 10px;
+  background: var(--panel-deep);
+  list-style: none;
+}
+
+.gift-card__reward {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.gift-card__reward-icon { font-size: 15px; }
+.gift-card__reward-name { color: var(--text-dim); font-size: 12px; }
+.gift-card__reward-amount { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.gift-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.gift-card__meta strong { color: var(--gold-2); font-weight: 700; }
+
+/** 期限が近い時の注意。小さすぎない字で出す */
+.gift-card__meta--urgent strong { color: #ff9a76; }
+
+.gift-card__claim {
+  min-height: 48px;
+  border: 1px solid var(--gold-3);
+  border-radius: 12px;
+  background: var(--gold-grad);
+  box-shadow: var(--edge-light), var(--drop-soft);
+  color: #2a1c02;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.gift-card__claim:disabled { opacity: 0.55; }
+
+.gift-claim-all {
+  min-height: 48px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--drop-soft);
+  color: var(--gold-2);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+/* ------------------------------------------------------------------ 受取の結果 */
+
+.gift-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--panel-deep);
+  box-shadow: var(--edge-light);
+}
+
+.gift-result__head { margin: 0; font-size: 14px; font-weight: 800; color: var(--gold-2); }
+.gift-result__note { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.gift-result--error .gift-result__head { color: #ff9a76; }
+
+.gift-result__items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.gift-empty {
+  margin: 0;
+  padding: 22px 14px;
+  border: 1px dashed var(--panel-border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ ホームの入口 */
+
+.home-gift {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--edge-light), var(--drop-soft);
+  color: var(--text);
+  text-align: left;
+}
+
+.home-gift__icon { font-size: 20px; line-height: 1; }
+
+.home-gift__label {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--gold-2);
+}
+
+.home-gift__note {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.home-gift__badge {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #c0392b;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+}
