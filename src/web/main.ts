@@ -7,7 +7,8 @@ import "./ui/arena.css";
 import "./ui/portraitOnly.css";
 import "./ui/monsterList.css";
 import "./ui/crystalShop.css";
-import "./ui/cloudRecoveryWarning.css";\nimport "./ui/homeNoScroll.css";
+import "./ui/cloudRecoveryWarning.css";
+import "./ui/homeNoScroll.css";
 // タイトルの絵は、既存の装飾用の指定を上書きする。**必ず後に読むこと**
 import "./ui/titleCover.css";
 import { getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } from "./audio/index.js";
