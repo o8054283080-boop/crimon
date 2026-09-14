@@ -334,6 +334,128 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     ],
   },
   {
+    id: "time_annihilation",
+    claims: ["CONTROL", "SPEED"],
+    name: "時を制す殲滅",
+    note: "手番を奪われ、返す前に全体を抜かれる",
+    tier: 4,
+    /*
+     * 水クロノスは的中26%と抵抗22%を素で持ち、**弱体が通りやすい。**
+     * S2「時間加速」で闇ドラゴンのゲージを50%進めつつクールタイムを1縮め、
+     * S3「時空崩壊」で敵全体のゲージを100%飛ばす。
+     * その空いた手番に、防御を無視する「破壊の流星」が落ちてくる。
+     */
+    set: "SWIFT",
+    members: [
+      { dexId: "chronos_WATER", role: "SUPPORT" },
+      { dexId: "valkyria_ELECTRIC", role: "SUPPORT" },
+      { dexId: "dragon_DARK", role: "ATTACK" },
+      { dexId: "seraph_WATER", role: "SUPPORT" },
+    ],
+  },
+  {
+    id: "treasure_veil",
+    claims: ["GUARD", "SPEED", "BURST"],
+    name: "聖なる宝箱",
+    note: "無敵で攻めを1手やり過ごし、その間に距離を詰めてくる",
+    tier: 4,
+    /*
+     * 光ミミックの「聖なる宝箱」は**味方全体へ1ターンの無敵。**
+     * 素の速度は92と遅いので、補助の型紙で速度メインを積んで先に撃たせる。
+     * ヴァルキリアの号令が全体のゲージを20%進めるので、無敵の1ターンが
+     * そのまま殴る番に変わる。
+     */
+    set: "SWIFT",
+    members: [
+      { dexId: "mimic_LIGHT", role: "SUPPORT" },
+      { dexId: "valkyria_ELECTRIC", role: "SUPPORT" },
+      { dexId: "nemesis_LIGHT", role: "ATTACK" },
+      { dexId: "dragon_FIRE", role: "ATTACK" },
+    ],
+  },
+  {
+    id: "immune_bastion",
+    claims: ["HEAL", "GUARD"],
+    name: "免疫の砦",
+    note: "状態異常が通らない。崩す手を持たないと、削り切れない",
+    tier: 4,
+    /*
+     * 免疫4セットで**戦闘開始から2ターン、状態異常が入らない。**
+     * 開幕に弱体を入れて優位を作る戦い方が、そのまま空振りになる。
+     * ウィスプのS3がさらに2ターンの無効を重ねるので、切れ目が薄い。
+     */
+    set: "IMMUNITY_SET",
+    members: [
+      { dexId: "behemoth_WATER", role: "HP" },
+      { dexId: "shellturtle_LIGHT", role: "DEFENSE" },
+      { dexId: "wisp_WATER", role: "SUPPORT" },
+      { dexId: "fairy_WATER", role: "SUPPORT" },
+    ],
+  },
+  {
+    id: "phoenix_aegis",
+    claims: ["GUARD", "SPEED", "BURST"],
+    name: "聖炎の盾",
+    note: "主力に無敵が乗る。落とす順番を間違えると手が尽きる",
+    tier: 4,
+    /*
+     * 光フェニックスの「輪廻の聖炎」は**味方1体へ3ターンの無敵。**
+     * 貼られた先が5.0倍の「ラストジャッジメント」を持つ光ネメシスなので、
+     * 主力を落として止める、という基本の手が3ターン封じられる。
+     * CT7と長いぶん、掛かっている間に決着を付けに来る。
+     */
+    set: "SWIFT",
+    members: [
+      { dexId: "phoenix_LIGHT", role: "SUPPORT" },
+      { dexId: "valkyria_ELECTRIC", role: "SUPPORT" },
+      { dexId: "nemesis_LIGHT", role: "ATTACK" },
+      { dexId: "griffon_LIGHT", role: "ATTACK" },
+    ],
+  },
+  {
+    id: "curse_carnival",
+    claims: ["CONTROL", "DEBUFF"],
+    name: "呪いの宴",
+    note: "撒かれた呪いが一斉に弾ける。手番を奪われたまま終わる",
+    tier: 4,
+    /*
+     * ジョーカーの呪いは**2回目のターン開始時に、付与時攻撃力×4の固定ダメージと
+     * 1ターンのスタン。**S2「最低なイタズラ」が呪いを即時発動させ、
+     * しかも使用後に追加ターンを得る。2体で撒いて一度に起こす形。
+     */
+    set: "ACCURACY_SET",
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT" },
+      { dexId: "joker_DARK", role: "DISRUPT" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT" },
+      { dexId: "seraph_WATER", role: "SUPPORT" },
+    ],
+  },
+  {
+    id: "judgment_bulwark",
+    claims: ["GUARD", "BURST", "DEBUFF"],
+    name: "審判の城壁",
+    note: "守りを固めるほど一撃が重くなる。硬いのに、殴ると痛い",
+    tier: 4,
+    /*
+     * **防御が火力になる顔ぶれ。**
+     *
+     * 光ネメシスの「ラストジャッジメント」は防御力×1.5、闇シェルタートルの
+     * 「アビスシェル」と闇ゴーレムの「オブシディアンクラッシュ」も同じ×1.5。
+     * 守護4セットで防御を積むと、耐久と火力が同時に伸びる——
+     * ふつうは選ばされる二択が、ここでは両立してしまう。
+     *
+     * 「巨獣の潮」がHPで同じことをする編成なので、**対になっている。**
+     */
+    set: "GUARD",
+    members: [
+      { dexId: "nemesis_LIGHT", role: "DEFENSE" },
+      { dexId: "shellturtle_DARK", role: "DEFENSE" },
+      { dexId: "golem_DARK", role: "DEFENSE" },
+      { dexId: "phoenix_WATER", role: "SUPPORT" },
+    ],
+  },
+  {
     id: "honed_normal",
     claims: ["HEAL", "DEBUFF"],
     name: "極めた常連",
