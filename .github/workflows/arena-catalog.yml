@@ -19,9 +19,21 @@ name: アリーナ照合表を本番へ流す
 # ## 使うのに要るもの
 #
 # リポジトリの Settings → Secrets and variables → Actions に、
-# `SUPABASE_DB_URL` を1つだけ登録する(値は Supabase の
-# Settings → Database → Connection string の URI)。
+# `SUPABASE_DB_PASSWORD` を1つだけ登録する
+# (Supabase の Settings → Database → Database password)。
 # **`service_role` の鍵ではない。**あれはここでは使わないし、置いてもいけない。
+#
+# **接続文字列(URI)を丸ごと入れる形にはしない。**
+# 最初はそうしていて、認証で弾かれた。パスワードに `@` `#` `?` `/` `%` が
+# 1文字でも混ざると、URLとしての切れ目がずれてパスワードが途中で切れる。
+# しかも出るのは `password authentication failed` だけで、
+# **パスワードが違うのか、文字列が壊れたのかが区別できない。**
+# 接続先は `.env.production` から組み立て、パスワードは `PGPASSWORD` で渡す。
+# こうすると、どんな記号が入っていてもそのまま通る。
+#
+# 接続先のホストは既定で東京の Session pooler。別のリージョンなら
+# `SUPABASE_DB_HOST` を足すと、そちらが使われる
+# (Supabase の Connect → Direct → Session pooler に出ているホスト名)。
 
 on:
   # 押した時だけ流す。データを書き換えるので、自動では走らせない
@@ -72,58 +84,91 @@ jobs:
           npm ci
           npm run arena:catalog -- --check
 
-      - name: 接続を確かめる
+      - name: 接続先を組み立てる
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # ホストの上書き。登録が無ければ既定(東京の Session pooler)を使う
+          HOST_OVERRIDE: ${{ secrets.SUPABASE_DB_HOST }}
         run: |
           set -euo pipefail
-          if [ -z "${DB_URL:-}" ]; then
-            echo "SUPABASE_DB_URL が登録されていません。" >&2
-            echo "Settings → Secrets and variables → Actions で追加してください。" >&2
+          # プロジェクトの識別子は `.env.production` にある。**2か所に置かない**
+          url="$(grep -E '^VITE_SUPABASE_URL=' .env.production | cut -d= -f2-)"
+          ref="$(printf '%s' "$url" | sed -E 's#^https?://([^.]+)\..*#\1#')"
+          if [ -z "$ref" ]; then
+            echo ".env.production から Supabase の識別子を読めませんでした" >&2
             exit 1
           fi
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "select 'つながりました: ' || current_database();"
+          host="${HOST_OVERRIDE:-aws-0-ap-northeast-1.pooler.supabase.com}"
+          {
+            echo "PGHOST=$host"
+            echo "PGPORT=5432"
+            # Session pooler は識別子つきの利用者名を要る。**ここを `postgres` だけにすると弾かれる**
+            echo "PGUSER=postgres.$ref"
+            echo "PGDATABASE=postgres"
+          } >> "$GITHUB_ENV"
+          echo "接続先: $host / postgres.$ref"
+
+      - name: 接続を確かめる
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PGPASSWORD:-}" ]; then
+            echo "SUPABASE_DB_PASSWORD が登録されていません。" >&2
+            echo "Settings → Secrets and variables → Actions で追加してください。" >&2
+            echo "値は Supabase の Settings → Database → Database password です。" >&2
+            exit 1
+          fi
+          # **弾かれた時に何を直せばいいかを出す。**
+          # psql が返すのは `password authentication failed` だけで、
+          # パスワードが違うのか接続先が違うのかが読み取れない
+          if ! psql -v ON_ERROR_STOP=1 -t -A -c "select 'つながりました: ' || current_database();"; then
+            echo "::error::接続できませんでした。$PGHOST / $PGUSER で試しています。" >&2
+            echo "パスワードが違う場合は、Supabase の Settings → Database → Reset database password で" >&2
+            echo "作り直してから、SUPABASE_DB_PASSWORD を入れ直してください。" >&2
+            echo "リージョンが東京でない場合は、SUPABASE_DB_HOST に pooler のホスト名を登録してください。" >&2
+            exit 1
+          fi
 
       - name: いまの本番の値
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "
+          psql -v ON_ERROR_STOP=1 -c "
             select stat_type, star, level, main_max
               from public.arena_catalog_stat_caps
              where (stat_type, star, level) in (('CRIT_DMG', 6, 15), ('HP_PERCENT', 6, 15))
              order by stat_type;"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
+          psql -v ON_ERROR_STOP=1 -t -A -c "
             select '図鑑の件数: ' || count(*) from public.arena_catalog_monsters;"
 
       - name: 流す
         if: ${{ !inputs.dry_run }}
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           # **途中で落ちたら全部戻す。**表が空のまま残るのがいちばん困る
-          psql "$DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f "${{ steps.pick.outputs.file }}"
+          psql -v ON_ERROR_STOP=1 --single-transaction -f "${{ steps.pick.outputs.file }}"
 
       - name: 入ったか確かめる
         if: ${{ !inputs.dry_run }}
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "
+          psql -v ON_ERROR_STOP=1 -c "
             select stat_type, star, level, main_max
               from public.arena_catalog_stat_caps
              where (stat_type, star, level) in (('CRIT_DMG', 6, 15), ('HP_PERCENT', 6, 15))
              order by stat_type;"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
+          psql -v ON_ERROR_STOP=1 -t -A -c "
             select '図鑑の件数: ' || count(*) from public.arena_catalog_monsters;"
 
           # **手元の生成物と突き合わせる。**流したつもりで入っていない、を防ぐ
           want="$(grep -oE "\('CRIT_DMG', 6, 15, [0-9.]+" "${{ steps.pick.outputs.file }}" \
                   | head -1 | grep -oE "[0-9.]+$")"
-          got="$(psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
+          got="$(psql -v ON_ERROR_STOP=1 -t -A -c "
             select main_max from public.arena_catalog_stat_caps
              where stat_type = 'CRIT_DMG' and star = 6 and level = 15;")"
           echo "手元 $want / 本番 $got"
