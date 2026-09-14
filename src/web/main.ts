@@ -205,6 +205,7 @@ import {
   fetchPendingArenaShopPurchases,
   acknowledgeArenaShopPurchase,
   beginArenaMatch,
+  arenaRefusalText,
   pushArenaDefense,
   settleArenaMatch,
 } from "../net/arenaSync.js";
@@ -2808,18 +2809,18 @@ async function refreshArenaRanking(): Promise<void> {
   render();
 }
 
-function startArenaMatch(entry: ArenaOpponentEntry): void {
+function startArenaMatch(entry: ArenaOpponentEntry, onRefused?: () => void): boolean {
   const party = getArenaTeam(state.player, "OFFENSE");
   if (party.length === 0) {
     state.arenaNotice = "攻撃編成を組んでください";
     render();
-    return;
+    return false;
   }
   if (entry.defense.units.length === 0) {
     state.arenaNotice = "この相手は防衛編成を登録していません";
     playSfx("denied", 0.7);
     render();
-    return;
+    return false;
   }
   // アリーナはスタミナではなく挑戦券で回す。育成の周回と取り合いにしないため
   applyArenaTicketRegen(state.player);
@@ -2827,7 +2828,7 @@ function startArenaMatch(entry: ArenaOpponentEntry): void {
     state.arenaNotice = "挑戦券が足りません";
     playSfx("denied", 0.7);
     render();
-    return;
+    return false;
   }
 
   state.arenaNotice = null;
@@ -2847,15 +2848,22 @@ function startArenaMatch(entry: ArenaOpponentEntry): void {
    * 実際には別の戦いだった。** 勝ったのに負け、が普通に起きる。
    * だから待つ。待つ間は「準備しています」と出す。
    *
-   * 発行できなければ(未接続・通信断)ローカルだけで進む。
+   * サーバまで届かなければ(未設定・通信断)ローカルだけで進む。
    * その時は勝敗も手元の計算になる——オフラインで遊べる状態は壊さない。
+   *
+   * **届いたうえで断られた時は、進まない。**
+   * サーバから見てその対戦は存在しないので、手元で戦わせると
+   * 券だけが手元で引かれ、次に残高を写した瞬間に元へ戻る。
+   * プレイヤーには「挑戦券が減らない」「何度でも挑める」ように見え、
+   * レートとコインだけが手元で動いて、戦績はどこにも残らない。
+   * 断られたら止めて、理由を見せる。
    */
   if (!arenaSyncAvailable()) {
     trySpendArenaTicket(state.player);
     savePlayerState(state.player);
     state.screen = "ARENA_BATTLE";
     render();
-    return;
+    return true;
   }
 
   state.arenaNotice = "対戦を準備しています…";
@@ -2865,7 +2873,8 @@ function startArenaMatch(entry: ArenaOpponentEntry): void {
   const attackerSnapshot = captureArenaDefense(party, state.player.equipment);
 
   void (async () => {
-    const ticket = (await connectArena())
+    const connected = await connectArena();
+    const result = connected
       ? await beginArenaMatch({
         kind: entry.kind,
         attackerSnapshot,
@@ -2875,18 +2884,33 @@ function startArenaMatch(entry: ArenaOpponentEntry): void {
         opponentCount: entry.kind === "NPC" ? ARENA_CANDIDATE_COUNT * 2 : null,
         opponentName: entry.name,
       })
-      : null;
+      : ({ ok: false, reached: false, reason: null } as const);
 
     // 待っている間に別の画面へ移っていることがある。その時は始めない
     if (state.arenaEntry !== entry) return;
 
-    if (ticket) {
+    if (result.ok) {
       // 挑戦券はサーバが引いた。**手元で二重に引かない**
-      state.arenaTicket = ticket;
+      state.arenaTicket = result.ticket;
       state.arenaAttackerSnapshot = attackerSnapshot;
-      state.player.arenaTickets = ticket.tickets;
+      state.player.arenaTickets = result.ticket.tickets;
+    } else if (result.reached) {
+      /*
+       * **サーバに断られた。ここで止める。**
+       * 券は引かない(引いても次の同期で戻り、減らないように見えるだけ)。
+       * 理由は必ず画面へ出す。黙って手元で戦わせていた頃は、
+       * 何が起きているのかプレイヤーにも、報告を受けた側にも分からなかった。
+       */
+      state.arenaEntry = null;
+      state.lastRun = null;
+      state.arenaNotice = arenaRefusalText(result.reason);
+      // 呼んだ側が先に付けた印(リベンジの1回きりの権利など)を戻させる
+      onRefused?.();
+      playSfx("denied", 0.7);
+      render();
+      return;
     } else {
-      state.arenaNotice = null;
+      // サーバまで届かなかった。手元だけで進む
       trySpendArenaTicket(state.player);
     }
     savePlayerState(state.player);
@@ -2894,6 +2918,7 @@ function startArenaMatch(entry: ArenaOpponentEntry): void {
     state.screen = "ARENA_BATTLE";
     render();
   })();
+  return true;
 }
 
 /**
@@ -4311,17 +4336,26 @@ function renderScreen(): void {
           }
           /*
            * **戦う前に印を付ける。** 結果で変えると、負けた時に何度でも挑み直せる。
-           * ただし挑めなかった時(編成未設定・挑戦券切れ)は戻す
+           * ただし挑めなかった時(編成未設定・挑戦券切れ・サーバに断られた)は戻す
            * ——挑んでいないのに1回きりの権利が消えるのは、防ぎたい不正とは別の話。
            */
           if (!markArenaRevenged(state.player, record.id)) return;
           const ticketsBefore = state.player.arenaTickets;
           savePlayerState(state.player);
-          startArenaMatch(target);
-          if (state.screen !== "ARENA_BATTLE") {
+          /*
+           * **`state.screen` を見て判定しない。**
+           * 繋がっている時の `startArenaMatch` は、サーバへ1戦を発行してもらってから
+           * 画面を切り替える。呼んだ直後はまだ切り替わっていないので、
+           * 画面で見ると**毎回「挑めなかった」**になり、印も券も戻っていた。
+           * 挑めたかどうかは戻り値で、断られたかどうかは `onRefused` で受け取る。
+           */
+          const rollback = () => {
             record.revenged = false;
             state.player.arenaTickets = ticketsBefore;
             savePlayerState(state.player);
+          };
+          if (!startArenaMatch(target, rollback)) {
+            rollback();
             render();
           }
         },
