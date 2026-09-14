@@ -3,6 +3,24 @@ import "./noticeUi.css";
 
 const BUTTON_ID = "persistent-notice-button";
 const SHEET_ID = "persistent-notice-sheet";
+const NOTICE_READ_KEY = "crimon.notice.latest.read.v1";
+
+function latestNoticeId(): string | null {
+  return [...COMPENSATIONS].sort((a, b) => b.fromDate.localeCompare(a.fromDate))[0]?.id ?? null;
+}
+
+function noticeUnread(): boolean {
+  const latest = latestNoticeId();
+  if (!latest) return false;
+  try { return localStorage.getItem(NOTICE_READ_KEY) !== latest; }
+  catch { return true; }
+}
+
+function markNoticeRead(): void {
+  const latest = latestNoticeId();
+  if (!latest) return;
+  try { localStorage.setItem(NOTICE_READ_KEY, latest); } catch { /* noop */ }
+}
 
 function kindLabel(notice: Compensation): string {
   if (notice.kind === "UPDATE") return "アップデート";
@@ -26,6 +44,8 @@ function closeSheet(): void {
 
 function openSheet(): void {
   if (document.getElementById(SHEET_ID)) return;
+  markNoticeRead();
+  document.querySelector("#persistent-notice-button .notice-unread-badge")?.remove();
 
   const root = document.createElement("div");
   root.id = SHEET_ID;
@@ -115,6 +135,14 @@ function installNoticeButton(): void {
   const label = button.querySelector<HTMLElement>("span") ?? button.querySelector<HTMLElement>("strong");
   if (label) label.textContent = "お知らせ";
   else button.append(document.createTextNode("お知らせ"));
+
+  if (noticeUnread()) {
+    const badge = document.createElement("span");
+    badge.className = "notice-unread-badge";
+    badge.setAttribute("aria-hidden", "true");
+    badge.textContent = "!";
+    button.append(badge);
+  }
 
   button.addEventListener("click", openSheet);
   playButton.insertAdjacentElement("afterend", button);
