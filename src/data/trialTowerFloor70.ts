@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { Skill } from "../core/skill.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
 import { ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE } from "./monsters.js";
@@ -49,7 +50,7 @@ const BEHEMOTH_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.04 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
   {
@@ -60,7 +61,7 @@ const BEHEMOTH_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.05 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.8 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
     ],
   },
 ];

@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { BossTraits } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
@@ -106,7 +107,7 @@ const MASHOU_SKILLS: [Skill, Skill, Skill] = [
     description: "味方全体の攻撃力を2ターン上昇させる。",
     target: "ALL_ALLIES",
     cooldownTurns: 3,
-    effects: [{ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 2 }],
+    effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }],
   },
   {
     id: "tower60_mashou_s3",
@@ -131,7 +132,7 @@ const JUSHOU_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.9 },
-      { kind: "DEBUFF", stat: "atk", amount: 0.3, durationTurns: 2, chance: 0.5 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 },
     ],
   },
   {
@@ -142,7 +143,7 @@ const JUSHOU_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.8 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
   {

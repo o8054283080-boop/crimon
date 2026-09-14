@@ -91,6 +91,8 @@ import {
   Team,
   applyDamage,
   applyStatus,
+  applyStatEffect,
+  extendEffects,
   applyHeal,
   cleanseDebuffs,
   createBattleUnit,
@@ -846,7 +848,7 @@ export class BattleEngine {
       this.push(`  → ${this.label(victim)} の「偽りの財宝」でHPが ${healAmount} 回復！ (${victim.currentHp}/${victim.maxHp})`);
       this.pushEvent({ targetId: victim.instanceId, kind: "HEAL", amount: healAmount });
       if (!this.isImmune(attacker) && this.rollEffectSuccess(victim, attacker, passive.chance)) {
-        attacker.effects.push({ stat: "atk", amount: -passive.atkDown, remainingTurns: passive.duration, kind: "DEBUFF" });
+        applyStatEffect(attacker, "atk", -passive.atkDown, passive.duration, "DEBUFF");
         this.push(`  → ${this.label(attacker)} の ATK が低下！ (${passive.duration}ターン)`);
       }
     }
@@ -1229,6 +1231,11 @@ export class BattleEngine {
     for (const slot of this.tower100Clones) {
       const alive = slot.unit.alive;
       if (slot.everSpawned && slot.previousAlive && !alive && boss?.alive) {
+        /*
+         * **ここだけは積み上がる。**「分身が1体倒れるたびに乗る」のが100階の仕掛けで、
+         * 通常の強化の重ねがけ禁止(`applyStatEffect`)は通さない。
+         * 3体倒せば3段ぶん乗り、倒すほど本体が重くなる、という階の形。
+         */
         boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_CLONE_DEATH_ATK, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1 });
         boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_CLONE_DEATH_SPD, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1 });
         this.push(`  → ${this.label(boss)} は失った分身の力を取り込んだ！`);
@@ -1322,6 +1329,7 @@ export class BattleEngine {
       return;
     }
     if (skillId === CRIMOARK_SUPPORT_S2_ID) {
+      // 支援分身が本体へ送る強化も**積み上がる**(上の分身死亡時と同じ理由)
       boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_SUPPORT_BUFF_ATK, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1 });
       boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_SUPPORT_BUFF_SPD, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1 });
       const shield = Math.round(boss.maxHp * CRIMOARK_SUPPORT_SHIELD_RATE);
@@ -1433,22 +1441,9 @@ export class BattleEngine {
         this.push(`  → ${this.label(target)} に ${applied.hpDamage} ダメージ！ (残りHP ${target.currentHp}/${target.maxHp})`);
         this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
         target.gauge = Math.max(0, target.gauge - TOWER70_ROAR_GAUGE_DOWN * ATB_THRESHOLD);
+        // 咆哮はもともと重ねがけしない作りだった。いまは全体の共通処理と同じ道を通る
         if (target.alive) {
-          const existingDefDown = target.effects.find((effect) =>
-            effect.kind === "DEBUFF"
-            && effect.stat === "def"
-            && effect.amount === -TOWER70_ROAR_DEF_DOWN
-          );
-          if (existingDefDown) {
-            existingDefDown.remainingTurns = Math.max(existingDefDown.remainingTurns, TOWER70_ROAR_DEF_DOWN_TURNS);
-          } else {
-            target.effects.push({
-              kind: "DEBUFF",
-              stat: "def",
-              amount: -TOWER70_ROAR_DEF_DOWN,
-              remainingTurns: TOWER70_ROAR_DEF_DOWN_TURNS,
-            });
-          }
+          applyStatEffect(target, "def", -TOWER70_ROAR_DEF_DOWN, TOWER70_ROAR_DEF_DOWN_TURNS, "DEBUFF");
         }
       }
     }
@@ -2031,7 +2026,7 @@ export class BattleEngine {
         announce();
       } else if (effect.kind === "LOWEST_ALLY_BUFF") {
         if (!hasStatus(lowestAlly, "BUFF_BLOCK")) {
-          lowestAlly.effects.push({ stat: effect.stat, amount: effect.amount, remainingTurns: effect.duration, kind: "BUFF" });
+          applyStatEffect(lowestAlly, effect.stat, effect.amount, effect.duration, "BUFF");
           announce();
         }
       } else if (effect.kind === "ALLY_HEAL") {
@@ -2053,9 +2048,9 @@ export class BattleEngine {
         if (!receiver.alive || this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
         if (effect.status === "HEAL_BLOCK") { receiver.healBlockTurns = Math.max(receiver.healBlockTurns, effect.duration); receiver.healBlockMultiplier = 0; }
         // 効果量はスキルと同じ共通値。潜在から入っても強さが変わらないようにする
-        else if (effect.status === "SPD_DOWN") receiver.effects.push({ stat: "spd", amount: -SPD_DOWN, remainingTurns: effect.duration, kind: "DEBUFF" });
-        else if (effect.status === "ATK_DOWN") receiver.effects.push({ stat: "atk", amount: -ATK_DOWN, remainingTurns: effect.duration, kind: "DEBUFF" });
-        else if (effect.status === "DEF_DOWN") receiver.effects.push({ stat: "def", amount: -DEF_DOWN, remainingTurns: effect.duration, kind: "DEBUFF" });
+        else if (effect.status === "SPD_DOWN") applyStatEffect(receiver, "spd", -SPD_DOWN, effect.duration, "DEBUFF");
+        else if (effect.status === "ATK_DOWN") applyStatEffect(receiver, "atk", -ATK_DOWN, effect.duration, "DEBUFF");
+        else if (effect.status === "DEF_DOWN") applyStatEffect(receiver, "def", -DEF_DOWN, effect.duration, "DEBUFF");
         else if (effect.status === "POISON") { receiver.poisonStacks = Math.min(5, receiver.poisonStacks + 1); receiver.poisonTurns = Math.max(receiver.poisonTurns, effect.duration); receiver.poisonDamageRate = effect.value ?? .05; }
         else if (effect.status === "STUN") receiver.stunTurns = Math.max(receiver.stunTurns, effect.duration);
         else applyStatus(receiver, "BUFF_BLOCK", effect.duration, source.instanceId);
@@ -2063,7 +2058,8 @@ export class BattleEngine {
       } else if (effect.kind === "ALLY_GAUGE_UP") {
         if (this.rng() < effect.chance) { for (const ally of allies) ally.gauge = Math.min(ATB_THRESHOLD, ally.gauge + effect.value * ATB_THRESHOLD); announce(); }
       } else if (effect.kind === "DEBUFF_EXTEND") {
-        if (receiver.alive && this.rng() < effect.chance) { receiver.effects.filter((e) => e.kind === "DEBUFF").forEach((e) => e.remainingTurns += effect.duration); receiver.statusEffects.filter((e) => e.category === "DEBUFF").forEach((e) => e.remainingTurns += effect.duration); if (receiver.poisonTurns) receiver.poisonTurns += effect.duration; if (receiver.healBlockTurns) receiver.healBlockTurns += effect.duration; announce(); }
+        // **明示的な延長だけ**が残りターンへ加算する道。通常の再付与は長い方を採るだけ
+        if (receiver.alive && this.rng() < effect.chance) { extendEffects(receiver, effect.duration, "DEBUFF"); if (receiver.poisonTurns) receiver.poisonTurns += effect.duration; if (receiver.healBlockTurns) receiver.healBlockTurns += effect.duration; announce(); }
       } else if (effect.kind === "HEAL_CLEANSE") {
         applyHeal(lowestAlly, Math.round(lowestAlly.maxHp * effect.value));
         cleanseDebuffs(lowestAlly, 1);
@@ -2087,7 +2083,7 @@ export class BattleEngine {
           // 種類ごとの共通値へ直した
           const stat = latent.status === "SPD_DOWN" ? "spd" : latent.status === "ATK_DOWN" ? "atk" : "def";
           const amount = stat === "spd" ? SPD_DOWN : stat === "atk" ? ATK_DOWN : DEF_DOWN;
-          receiver.effects.push({ stat, amount: -amount, remainingTurns: latent.duration, kind: "DEBUFF" });
+          applyStatEffect(receiver, stat, -amount, latent.duration, "DEBUFF");
         } else if (latent.status === "HEAL_BLOCK") {
           receiver.healBlockTurns = Math.max(receiver.healBlockTurns, latent.duration);
           receiver.healBlockMultiplier = 0;
@@ -2382,12 +2378,8 @@ export class BattleEngine {
               this.push(`  → ${this.label(receiver)} は強化不可でBUFF付与を防いだ！`);
               continue;
             }
-            receiver.effects.push({
-              stat: effect.stat,
-              amount: buffAmount,
-              remainingTurns: buffTurns,
-              kind: "BUFF",
-            });
+            // 同じ能力の強化は重ねない。すでに付いていれば長い方のターンを採る
+            applyStatEffect(receiver, effect.stat, buffAmount, buffTurns, "BUFF");
             this.push(`  → ${this.label(receiver)} の ${effect.stat.toUpperCase()} が上昇！ (${buffTurns}ターン)`);
           }
           /*
@@ -2412,12 +2404,8 @@ export class BattleEngine {
           if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution, skill)) break;
           // 弱化延長。**確率は効果ごとではなく、その効果1つにつき1回**振る
           const debuffTurns = effect.durationTurns + this.talentExtend(skill, "debuff");
-          target.effects.push({
-            stat: effect.stat,
-            amount: -effect.amount,
-            remainingTurns: debuffTurns,
-            kind: "DEBUFF",
-          });
+          // 同じ能力の弱体は重ねない。すでに付いていれば長い方のターンを採る
+          applyStatEffect(target, effect.stat, -effect.amount, debuffTurns, "DEBUFF");
           resolution.debuffApplied = true;
           resolution.applied.add(`${effect.stat.toUpperCase()}_DOWN`);
           this.push(`  → ${this.label(target)} の ${effect.stat.toUpperCase()} が低下！ (${debuffTurns}ターン)`);
@@ -2771,7 +2759,7 @@ export class BattleEngine {
         const pick = others[Math.floor(this.rng() * others.length)];
         const spread = target.effects.find((e) => e.kind === "DEBUFF");
         if (pick && spread && !this.isImmune(pick)) {
-          pick.effects.push({ ...spread });
+          applyStatEffect(pick, spread.stat, spread.amount, spread.remainingTurns, "DEBUFF");
           this.push(`  → ${this.label(pick)} にも弱化が広がった！ (弱化拡散)`);
         }
       }

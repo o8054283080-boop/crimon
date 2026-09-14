@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
 import type { BattleUnit } from "../src/battle/unit.js";
+import { DEF_DOWN } from "../src/core/statusValues.js";
 import {
   CRIMOARK_ATTACK_TEMPLATE_ID,
   CRIMOARK_CLONE_DEATH_ATK,
@@ -408,7 +409,8 @@ describe("100階: スキル4「オーバークリエイト」", () => {
     expect((CRIMOARK_S4.effects[0] as { count?: number }).count).toBeUndefined();
     expect(CRIMOARK_S4.effects[1]).toMatchObject({ multiplier: 1.30 });
     expect(CRIMOARK_S4.effects[2]).toMatchObject({ amount: -0.50 });
-    expect(CRIMOARK_S4.effects[3]).toMatchObject({ stat: "def", amount: 0.50, durationTurns: 3 });
+    // 防御DOWNの量は共通値(`core/statusValues.ts`)。持続3ターンはこのスキル固有
+    expect(CRIMOARK_S4.effects[3]).toMatchObject({ stat: "def", amount: DEF_DOWN, durationTurns: 3 });
     expect(CRIMOARK_S4.effects[4]).toMatchObject({ healMultiplier: 0, durationTurns: 2 });
     expect(CRIMOARK_S4.effects[5]).toMatchObject({ amount: 0.30, applyTo: "SELF" });
   });

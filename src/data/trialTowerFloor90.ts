@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { Skill } from "../core/skill.js";
 import { DungeonEnemy } from "./equipmentDungeon.js";
 import { ANCIENT_CRYSTAL, ANCIENT_FANG_BEAST } from "./monsters.js";
@@ -116,7 +117,7 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 1.2 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
       { kind: "GAUGE", amount: -0.15 },
     ],
   },
@@ -128,7 +129,7 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.7, hits: 3, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.35 }] },
-      { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 1 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 1 },
     ],
   },
   {
@@ -150,7 +151,7 @@ const NEMESIS_SKILLS: [Skill, Skill, Skill] = [
       { kind: "DAMAGE", multiplier: 1.35 },
       { kind: "STRIP", chance: 1 },
       { kind: "GAUGE", amount: -0.5 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 3, chance: 1, fixedDuration: true },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1, fixedDuration: true },
     ],
   },
 ];
@@ -164,7 +165,7 @@ const RIFT_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.9 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.75 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 },
     ],
   },
   {
@@ -175,7 +176,7 @@ const RIFT_SKILLS: [Skill, Skill, Skill] = [
     cooldownTurns: 3,
     effects: [
       { kind: "DAMAGE", multiplier: 0.6 },
-      { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.85 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 },
     ],
   },
   {
@@ -219,8 +220,8 @@ const WAR_DRUM_SKILLS: [Skill, Skill, Skill] = [
     target: "ALL_ALLIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 2 },
-      { kind: "BUFF", stat: "spd", amount: 0.4, durationTurns: 2 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+      { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
     ],
   },
   {
@@ -303,7 +304,7 @@ const BIND_SKILLS: [Skill, Skill, Skill] = [
     effects: [
       { kind: "DAMAGE", multiplier: 0.55 },
       { kind: "GAUGE", amount: -0.2 },
-      { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.6 },
+      { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
     ],
   },
   {

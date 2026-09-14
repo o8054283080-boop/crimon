@@ -252,10 +252,17 @@ export function getEffectiveStat(unit: BattleUnit, stat: BuffStat): number {
   const flat = unit.flatStatBonus[stat] ?? 0;
   const base = unit.def.stats[stat] + flat + (stat === "spd" ? passive.add : 0);
   /*
-   * 検証フラグが立っている時だけ、**防御の増減幅を一律に揃える**
-   * (低下50% / 上昇30%)。現行はスキルごとに 0.25〜0.5 / 0.15〜0.8 とばらつくので、
-   * 防御計算の式そのものを比べたい時に幅の違いが混ざってしまう。
-   * 既定では何もしない——ここは本番の経路でもあるため。
+   * 同じ能力にかかっているものを足し合わせる。
+   *
+   * **同じ向きは重ねがけしない**(`applyStatEffect`)ので、ここで足されるのは
+   * 基本的に「強化1つ + 弱体1つ」の打ち消し合い。
+   * 攻撃UP30%と攻撃DOWN50%が同時なら -20%になる。
+   *
+   * 塔100階の分身死亡時強化だけは階の仕掛けとして積み上がるため、
+   * そこでは強化が複数並ぶ。
+   *
+   * `unifyDefModifiers` は**検証専用**。旧仕様と比べる時に防御の増減幅だけを
+   * 揃えるためのもので、本番では立たない。
    */
   const totalRate = unit.effects
     .filter((e) => e.stat === stat)
@@ -295,15 +302,75 @@ export function hasStatus(unit: BattleUnit, type: StatusEffectType): boolean {
   return unit.statusEffects.some((effect) => effect.type === type && effect.remainingTurns > 0);
 }
 
-/** 同名はスタックせず、新しい付与で残りターンと挑発元を上書きする。 */
+/**
+ * 無敵・挑発などの状態を1つ付ける。**同名はスタックしない。**
+ *
+ * すでに付いている時は**残りターンの長い方**を採る。
+ * 以前は新しい付与で上書きしていたので、フェニックスの無敵3ターンへ
+ * ミミックの無敵1ターンを重ねると**1ターンに縮んでいた。**
+ * 味方の支援が味方の支援を弱める形になっていたのを直した。
+ *
+ * 挑発元だけは新しい方を採る。**後から挑発した相手へ向く**方が自然なため。
+ */
 export function applyStatus(unit: BattleUnit, type: StatusEffectType, durationTurns: number, sourceId?: string): boolean {
   if (STATUS_EFFECT_CATEGORY[type] === "BUFF" && hasStatus(unit, "BUFF_BLOCK")) return false;
+  const existing = unit.statusEffects.find((effect) => effect.type === type);
+  if (existing) {
+    existing.remainingTurns = Math.max(existing.remainingTurns, durationTurns);
+    if (type === "TAUNT") existing.sourceId = sourceId;
+    return true;
+  }
   const next: ActiveStatusEffect = { type, category: STATUS_EFFECT_CATEGORY[type], remainingTurns: durationTurns };
   if (type === "TAUNT") next.sourceId = sourceId;
-  const index = unit.statusEffects.findIndex((effect) => effect.type === type);
-  if (index >= 0) unit.statusEffects[index] = next;
-  else unit.statusEffects.push(next);
+  unit.statusEffects.push(next);
   return true;
+}
+
+/**
+ * 能力変化(攻撃・防御・速度・クリ率・クリダメ)の強化/弱体を1つ付ける。
+ *
+ * **同じ能力・同じ向きは重ねがけしない。**攻撃UP30%を2回受けても+30%のまま。
+ * すでに付いていれば、**量は大きい方・残りターンは長い方**を採る。
+ * 量は `core/statusValues.ts` で共通化してあるので通常は同値だが、
+ * 塔の階専用スキルのように別の量を持つものが残っているため大きい方を採る。
+ *
+ * 強化と弱体は**別枠**。攻撃UPと攻撃DOWNは同時に付き、打ち消し合う。
+ *
+ * @param amount 強化なら正、弱体なら負の値を渡す
+ */
+export function applyStatEffect(
+  unit: BattleUnit,
+  stat: BuffStat,
+  amount: number,
+  remainingTurns: number,
+  kind: "BUFF" | "DEBUFF",
+): void {
+  const existing = unit.effects.find((e) => e.stat === stat && e.kind === kind);
+  if (existing) {
+    if (Math.abs(amount) > Math.abs(existing.amount)) existing.amount = amount;
+    existing.remainingTurns = Math.max(existing.remainingTurns, remainingTurns);
+    return;
+  }
+  unit.effects.push({ stat, amount, remainingTurns, kind });
+}
+
+/**
+ * **明示的な「延長」だけ**が通る道。残りターンへ加算する。
+ * 通常の再付与(`applyStatEffect` / `applyStatus`)は長い方を採るだけで、加算しない。
+ */
+export function extendEffects(unit: BattleUnit, turns: number, category: "BUFF" | "DEBUFF"): number {
+  let extended = 0;
+  for (const e of unit.effects) {
+    if (e.kind !== category) continue;
+    e.remainingTurns += turns;
+    extended += 1;
+  }
+  for (const e of unit.statusEffects) {
+    if (e.category !== category) continue;
+    e.remainingTurns += turns;
+    extended += 1;
+  }
+  return extended;
 }
 
 /** 無敵→シールド→HP→我慢→復活の共通致死処理。 */

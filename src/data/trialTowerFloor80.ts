@@ -1,3 +1,4 @@
+import { ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import type { Skill } from "../core/skill.js";
 import type { DungeonEnemy } from "./equipmentDungeon.js";
 
@@ -37,7 +38,7 @@ const skill = (id: string, name: string, target: Skill["target"], cooldownTurns:
 const bossSkills: [Skill, Skill, Skill] = [
   skill("tower80_boss_s1", "聖竜の牙", "SINGLE_ENEMY", 0, [
     { kind: "DAMAGE", multiplier: 1.0 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.5 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 },
   ]),
   skill("tower80_boss_s2", "浄化の竜爪", "SINGLE_ENEMY", 3, [
     { kind: "DAMAGE", multiplier: 1.8 },
@@ -53,14 +54,14 @@ const bossSkills: [Skill, Skill, Skill] = [
 const guardSkills: [Skill, Skill, Skill] = [
   skill("tower80_guard_s1", "護光弾", "SINGLE_ENEMY", 0, [
     { kind: "DAMAGE", multiplier: 0.9 },
-    { kind: "DEBUFF", stat: "spd", amount: 0.2, durationTurns: 2, chance: 0.5 },
+    { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.5 },
   ]),
   skill("tower80_guard_s2", "聖域展開", "ALL_ALLIES", 4, [
     { kind: "IMMUNITY", durationTurns: 2 },
     { kind: "CLEANSE", count: 1 },
   ]),
   skill("tower80_guard_s3", "守護反応", "ALL_ALLIES", 5, [
-    { kind: "BUFF", stat: "def", amount: 0.4, durationTurns: 2 },
+    { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
     { kind: "GAUGE", amount: 0.3, applyTo: "LOWEST_HP_ALLY" },
   ]),
 ];
@@ -71,8 +72,8 @@ const inspireSkills: [Skill, Skill, Skill] = [
     { kind: "GAUGE", amount: 0.1, applyTo: "SELF" },
   ]),
   skill("tower80_inspire_s2_LIGHT", "戦意共鳴", "ALL_ALLIES", 4, [
-    { kind: "BUFF", stat: "atk", amount: 0.32, durationTurns: 2 },
-    { kind: "BUFF", stat: "spd", amount: 0.22, durationTurns: 2 },
+    { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+    { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
   ]),
   skill("tower80_inspire_s3_LIGHT", "加速共鳴", "ALL_ALLIES", 5, [
     { kind: "GAUGE", amount: 0.16 },
@@ -86,7 +87,7 @@ const breakerSkills: [Skill, Skill, Skill] = [
   ]),
   skill("tower80_breaker_s2", "聖牙連撃", "SINGLE_ENEMY", 3, [
     { kind: "DAMAGE", multiplier: 0.55, hits: 3 },
-    { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.5 },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 },
   ]),
   skill("tower80_breaker_s3", "破邪突進", "SINGLE_ENEMY", 4, [
     { kind: "DAMAGE", multiplier: 2.4, conditionalBonus: [{ when: "TARGET_HAS_BUFF", bonus: 0.25 }] },
@@ -96,17 +97,17 @@ const breakerSkills: [Skill, Skill, Skill] = [
 const curseSkills: [Skill, Skill, Skill] = [
   skill("tower80_curse_s1", "呪爪", "SINGLE_ENEMY", 0, [
     { kind: "DAMAGE", multiplier: 0.9 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.7 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
   ]),
   skill("tower80_curse_s2", "衰弱の咆哮", "ALL_ENEMIES", 3, [
     { kind: "DAMAGE", multiplier: 0.65 },
-    { kind: "DEBUFF", stat: "def", amount: 0.5, durationTurns: 2, chance: 0.7 },
-    { kind: "DEBUFF", stat: "spd", amount: 0.3, durationTurns: 2, chance: 0.7 },
+    { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
+    { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
   ]),
   skill("tower80_curse_s3", "呪縛領域", "ALL_ENEMIES", 5, [
     { kind: "DAMAGE", multiplier: 0.8 },
     { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 0.8 },
-    { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
+    { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 },
     { kind: "GAUGE", amount: -0.2 },
   ]),
 ];
