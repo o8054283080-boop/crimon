@@ -443,9 +443,20 @@ Actions → 「アリーナ照合表を本番へ流す」 → Run workflow
 流す前に `arena:catalog --check` を通すので、**作り直し忘れた古い生成物は入らない。**
 `dry_run` を入れて押すと、流さずにいまの本番の値だけを見る。
 
-要るのは Secrets の `SUPABASE_DB_URL` 1つだけ(Supabase の
-Settings → Database → Connection string の URI)。
+要るのは Secrets の `SUPABASE_DB_PASSWORD` 1つだけ(Supabase の
+Settings → Database → Database password)。
 **`service_role` の鍵は置かない。**あれは全ての守りを無効にできる。
+
+接続先(ホスト・利用者名)は `.env.production` から組み立てる。
+**接続文字列(URI)を丸ごと入れる形にはしない。**最初はそうしていて認証で弾かれた。
+パスワードに `@` `#` `?` `/` `%` が1文字でも混ざると、URLとしての切れ目がずれて
+パスワードが途中で切れる。しかも出るのは `password authentication failed` だけで、
+**パスワードが違うのか、文字列が壊れたのかが区別できない。**
+パスワードは `PGPASSWORD` で渡すので、どんな記号が入っていても通る。
+
+東京以外のリージョンなら `SUPABASE_DB_HOST` を足す(Connect → Direct →
+Session pooler に出ているホスト名)。**Direct connection ではなく Session pooler。**
+Direct は IPv6 でしか繋がらず、GitHub Actions からは届かない。
 
 手で流す時は、Supabase の SQL エディタへ生成物の全文を貼る。
 流したかどうかは、SQLエディタから直接見れば分かる:
