@@ -165,11 +165,11 @@ export const MIMIC: MonsterTemplate = {
   skill1: {
     id: "mimic_s1",
     name: "噛みつく宝箱",
-    description: "敵単体に攻撃力0.7倍のダメージを与える(最大HP×0.03を加算)。与えたダメージの20%を自身が回復する。",
+    description: "敵単体に攻撃力0.7倍のダメージを与える(最大HP×0.06を加算)。与えたダメージの20%を自身が回復する。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.03 },
+      { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.06 },
       { kind: "LIFESTEAL", healRate: 0.2 },
     ],
   },
@@ -177,22 +177,22 @@ export const MIMIC: MonsterTemplate = {
     {
       id: "mimic_s2_a",
       name: "がぶ飲み",
-      description: "喰らいついて敵単体に攻撃力1.0倍のダメージを与える(最大HP×0.04を加算)。与えたダメージの40%を自身が回復し、自身のHPが50%以下ならさらに20%ぶん多く回復する。",
+      description: "喰らいついて敵単体に攻撃力1.0倍のダメージを与える(最大HP×0.08を加算)。与えたダメージの40%を自身が回復し、自身のHPが50%以下ならさらに20%ぶん多く回復する。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.0, hpCoefficient: 0.04 },
+        { kind: "DAMAGE", multiplier: 1.0, hpCoefficient: 0.08 },
         { kind: "LIFESTEAL", healRate: 0.4, selfLowHpExtra: { hpRatio: 0.5, extra: 0.2 } },
       ],
     },
     {
       id: "mimic_s2_b",
       name: "呪われた財宝",
-      description: "呪いの財宝を押し付け、敵単体に攻撃力1.0倍のダメージを与える(最大HP×0.04を加算)。80%で2ターン回復封じを付与し、行動ゲージを25%減少させる。",
+      description: "呪いの財宝を押し付け、敵単体に攻撃力1.0倍のダメージを与える(最大HP×0.08を加算)。80%で2ターン回復封じを付与し、行動ゲージを25%減少させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.0, hpCoefficient: 0.04 },
+        { kind: "DAMAGE", multiplier: 1.0, hpCoefficient: 0.08 },
         { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.8 },
         { kind: "GAUGE", amount: -0.25 },
       ],
@@ -214,22 +214,22 @@ export const MIMIC: MonsterTemplate = {
     {
       id: "mimic_s3_a",
       name: "貪欲な反撃",
-      description: "2ターンのあいだ、攻撃を受けるたび攻撃者へ攻撃力0.60倍の反撃を返す(最大HP×0.02を加算)。使用時に自身のHPを最大HPの5%回復する。",
+      description: "2ターンのあいだ、攻撃を受けるたび攻撃者へ攻撃力0.60倍の反撃を返す(最大HP×0.04を加算)。使用時に自身のHPを最大HPの5%回復する。",
       target: "SELF",
       cooldownTurns: 5,
       effects: [
-        { kind: "COUNTER_STANCE", durationTurns: 2, multiplier: 0.6, hpCoefficient: 0.02 },
+        { kind: "COUNTER_STANCE", durationTurns: 2, multiplier: 0.6, hpCoefficient: 0.04 },
         { kind: "HEAL", healRate: 0.05, applyTo: "SELF" },
       ],
     },
     {
       id: "mimic_s3_b",
       name: "食らいつく",
-      description: "全身で食らいつき、敵単体に攻撃力1.4倍のダメージを与える(最大HP×0.05を加算)。自身が失ったHPの割合が高いほど最終ダメージが上昇する(最大40%)。",
+      description: "全身で食らいつき、敵単体に攻撃力1.4倍のダメージを与える(最大HP×0.10を加算)。自身が失ったHPの割合が高いほど最終ダメージが上昇する(最大40%)。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.4, hpCoefficient: 0.05, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.4 } },
+        { kind: "DAMAGE", multiplier: 1.4, hpCoefficient: 0.1, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.4 } },
       ],
     },
     {
@@ -261,11 +261,11 @@ export const MIMIC: MonsterTemplate = {
   darkSkill3: {
     id: "mimic_s3_dark",
     name: "強欲の魔箱",
-    description: "強欲が形を成し、敵単体に攻撃力1.6倍のダメージを与える(最大HP×0.05を加算)。対象が弱体状態なら最終ダメージが25%上昇し、与えたダメージの50%を自身が回復する。",
+    description: "強欲が形を成し、敵単体に攻撃力1.6倍のダメージを与える(最大HP×0.10を加算)。対象が弱体状態なら最終ダメージが25%上昇し、与えたダメージの50%を自身が回復する。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.05, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }] },
+      { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.1, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }] },
       { kind: "LIFESTEAL", healRate: 0.5 },
     ],
   },

@@ -17,10 +17,16 @@ export function applySeptemberSkillBalance(skill: Skill): Skill {
       { kind: "DAMAGE", multiplier: 1.75, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.33 }] }, { kind: "GAUGE", amount: 0.3, drain: true }]);
     case "mushroon_s2_a": return change("敵全体に攻撃力0.75倍のダメージ。75%で毒2スタックを2ターン付与する。", [
       { kind: "DAMAGE", multiplier: 0.75 }, { kind: "POISON", damageRatePerStack: 0.05, stacks: 2, chance: 0.75, durationTurns: 2 }]);
-    case "mimic_s2_a": return change("敵単体に攻撃力1.8倍＋自身の最大HP×0.04のダメージ。与えたダメージの40%を回復し、自身のHPが50%以下なら吸血率が20ポイント増加する。",
+    case "mimic_s2_a": return change("敵単体に攻撃力1.8倍＋自身の最大HP×0.08のダメージ。与えたダメージの40%を回復し、自身のHPが50%以下なら吸血率が20ポイント増加する。",
       skill.effects.map(e => e.kind === "DAMAGE" ? { ...e, multiplier: 1.8 } : e));
-    case "behemoth_s2_a": return change("敵全体に攻撃力0.8倍＋自身の最大HP×0.05のダメージ。70%で攻撃力を50%低下させる(2ターン)。行動ゲージを30%減少させる。", [
-      { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.05 },
+    /*
+     * **大地踏みの最大HP比例は、ここに書いた値が本番になる。**
+     * `star5.ts` 側の 0.12 は実体化の時にこの差し替えで上書きされるので、
+     * 片方だけ直すと効かない。全体攻撃なので、単体主力の「巨体の圧力」(0.20)
+     * より低く置く——ここを揃えると単体で殴る理由が消える。
+     */
+    case "behemoth_s2_a": return change("敵全体に攻撃力0.8倍＋自身の最大HP×0.12のダメージ。70%で攻撃力を50%低下させる(2ターン)。行動ゲージを30%減少させる。", [
+      { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.12 },
       { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.7, durationTurns: 2 }, { kind: "GAUGE", amount: -0.3 }]);
     case "kobold_s3_a": return change("敵単体に攻撃力2.3倍のダメージ。攻撃前の対象HPが30%以下なら防御力を完全に無視する。", [
       { kind: "DAMAGE", multiplier: 2.3, targetHpIgnoreDefense: [{ hpRatio: 0.3, ratio: 1 }] }]);
@@ -38,9 +44,10 @@ export function applySeptemberSkillBalance(skill: Skill): Skill {
       { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
       { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] } };
     case "griffon_s3_c": return { ...skill, description: skill.description + "さらに味方全体の行動ゲージを15%進める。", effects: [...skill.effects, { kind: "GAUGE", amount: 0.15 }] };
-    case "treant_s2_c": return { ...skill, description: skill.description + "回復量は自身の最大HPの30%まで。最大レベルでは攻撃力1.5倍＋最大HP×0.06のダメージ。",
+    case "treant_s2_c": return { ...skill, description: skill.description + "回復量は自身の最大HPの30%まで。最大レベルでは攻撃力1.5倍＋最大HP×0.12のダメージ。",
       effects: skill.effects.map(e => e.kind === "LIFESTEAL" ? { ...e, maxSourceHpRate: 0.3 } : e),
-      maxLevelOverride: { effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.06 }, { kind: "LIFESTEAL", healRate: 0.472, maxSourceHpRate: 0.3 }] } };
+      // Lv5の差し替え側にも同じ2倍を掛ける。ここを忘れると「育てると比例が痩せる」
+      maxLevelOverride: { effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.12 }, { kind: "LIFESTEAL", healRate: 0.472, maxSourceHpRate: 0.3 }] } };
     case "mushroon_s3_dark": return { ...skill, description: skill.description + "最大レベルでは全体0.5倍の3回攻撃になり、各攻撃後65%で毒1スタックを3ターン付与する。弱体数による威力増加は維持する。",
       maxLevelOverride: { effects: Array.from({ length: 3 }, (): SkillEffect[] => [
         { kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.06, maxBonus: 0.3 } },

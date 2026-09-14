@@ -440,11 +440,11 @@ export const BEHEMOTH: MonsterTemplate = {
   skill1: {
     id: "behemoth_s1",
     name: "巨獣の一撃",
-    description: "敵単体に攻撃力0.55倍のダメージを与える(最大HP×0.03を加算)。50%で2ターン挑発する。",
+    description: "敵単体に攻撃力0.55倍のダメージを与える(最大HP×0.08を加算)。50%で2ターン挑発する。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.55, hpCoefficient: 0.03 },
+      { kind: "DAMAGE", multiplier: 0.55, hpCoefficient: 0.08 },
       { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.5 },
     ],
   },
@@ -452,22 +452,22 @@ export const BEHEMOTH: MonsterTemplate = {
     {
       id: "behemoth_s2_a",
       name: "大地踏み",
-      description: "大地を踏み鳴らし、敵全体に攻撃力0.8倍のダメージを与える(最大HP×0.04を加算)。70%で2ターン攻撃力を50%低下させる。",
+      description: "大地を踏み鳴らし、敵全体に攻撃力0.8倍のダメージを与える(最大HP×0.12を加算)。70%で2ターン攻撃力を50%低下させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.04 },
+        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.12 },
         { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
       ],
     },
     {
       id: "behemoth_s2_b",
       name: "巨体の圧力",
-      description: "巨体で圧し掛かり、敵単体に攻撃力1.3倍のダメージを与える(最大HP×0.05を加算)。行動ゲージを40%減少させ、対象のHP割合が自身より高ければさらに20%減少させる。",
+      description: "巨体で圧し掛かり、敵単体に攻撃力1.3倍のダメージを与える(最大HP×0.20を加算)。行動ゲージを40%減少させ、対象のHP割合が自身より高ければさらに20%減少させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.3, hpCoefficient: 0.05 },
+        { kind: "DAMAGE", multiplier: 1.3, hpCoefficient: 0.2 },
         { kind: "GAUGE", amount: -0.4, conditionalExtra: { when: "TARGET_HP_ABOVE_SELF", amount: -0.2 } },
       ],
     },
@@ -487,11 +487,11 @@ export const BEHEMOTH: MonsterTemplate = {
     {
       id: "behemoth_s3_a",
       name: "天地崩壊",
-      description: "天地が崩れ、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.05を加算)。80%で2ターン防御力を75%低下させる。自身のHPが50%以上なら敵全体の行動ゲージをさらに20%減少させる。",
+      description: "天地が崩れ、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.15を加算)。80%で2ターン防御力を75%低下させる。自身のHPが50%以上なら敵全体の行動ゲージをさらに20%減少させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 6,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.05 },
+        { kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.15 },
         { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
         { kind: "GAUGE", amount: -0.2, requires: "SELF_HP_ABOVE_50" },
       ],
@@ -559,11 +559,11 @@ export const BEHEMOTH: MonsterTemplate = {
   darkSkill3: {
     id: "behemoth_s3_dark",
     name: "滅界の咆哮",
-    description: "世界を砕く咆哮が響き、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.05を加算)。80%で2ターン挑発し、行動ゲージを30%減少させる。自身に2ターン反射を得る。",
+    description: "世界を砕く咆哮が響き、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.15を加算)。80%で2ターン挑発し、行動ゲージを30%減少させる。自身に2ターン反射を得る。",
     target: "ALL_ENEMIES",
     cooldownTurns: 6,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.05 },
+      { kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.15 },
       { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.8 },
       { kind: "GAUGE", amount: -0.3 },
       { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" },

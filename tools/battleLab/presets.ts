@@ -120,6 +120,60 @@ export const PRESETS: Record<PresetName, Preset> = {
     latentIndex: 0,
     note: "守護4セット。抵抗を積んで崩されない",
   },
+  /**
+   * 殴る役の、4枠だけ攻撃%にした版。
+   *
+   * **`MAX_ATTACKER` との違いは4枠だけ。**純アタッカーにとっても
+   * 「4枠に攻撃%かクリダメか」は選択なので、比例型の比較と同じ形で並べる。
+   */
+  MAX_ATTACKER_ATK4: {
+    type: "ATTACK",
+    abilityPoints: { hp: 0, atk: 70, def: 0, spd: 30 },
+    gear: gearOf("CRIT", "SPD", "ATK_PERCENT", "ATK_PERCENT", ["CRIT_RATE", "CRIT_DMG", "ATK_PERCENT", "SPD", "HP_PERCENT", "DEF_PERCENT"], "POWER"),
+    latentIndex: 0,
+    note: "会心4セット・速度メイン。4枠は攻撃%",
+  },
+  /*
+   * --- 比例アタッカーの4枠比較 ---
+   *
+   * HP比例・DEF比例で殴る個体の「4枠に何を置くか」を並べるための4つ。
+   * **2枠と6枠は耐久%で固定し、違いを4枠だけに閉じ込める。**
+   * ここを揃えないと、勝った負けたが4枠のせいなのか他の枠のせいなのか読めない。
+   *
+   * 能力ポイントも4つとも同じ。**装備の1枠だけが違う同じ個体**にする。
+   */
+  /** HP比例で殴る役の、4枠もHP%(耐久寄り) */
+  HP_SCALE_ENDURE: {
+    type: "HP",
+    abilityPoints: { hp: 60, atk: 0, def: 10, spd: 30 },
+    gear: gearOf("VITALITY", "HP_PERCENT", "HP_PERCENT", "HP_PERCENT", ["HP_PERCENT", "CRIT_RATE", "CRIT_DMG", "SPD", "DEF_PERCENT", "HP_FLAT"], "CRIT"),
+    latentIndex: 0,
+    note: "体力4+会心2。2/4/6すべてHP%。硬さを取る側",
+  },
+  /** HP比例で殴る役の、4枠はクリダメ(火力寄り) */
+  HP_SCALE_CRIT: {
+    type: "HP",
+    abilityPoints: { hp: 60, atk: 0, def: 10, spd: 30 },
+    gear: gearOf("VITALITY", "HP_PERCENT", "CRIT_DMG", "HP_PERCENT", ["HP_PERCENT", "CRIT_RATE", "CRIT_DMG", "SPD", "DEF_PERCENT", "HP_FLAT"], "CRIT"),
+    latentIndex: 0,
+    note: "体力4+会心2。4枠だけクリダメ。耐久を捨てて会心火力を取る側",
+  },
+  /** DEF比例で殴る役の、4枠も防御%(耐久寄り) */
+  DEF_SCALE_ENDURE: {
+    type: "DEFENSE",
+    abilityPoints: { hp: 10, atk: 0, def: 60, spd: 30 },
+    gear: gearOf("GUARD", "DEF_PERCENT", "DEF_PERCENT", "DEF_PERCENT", ["DEF_PERCENT", "CRIT_RATE", "CRIT_DMG", "SPD", "HP_PERCENT", "DEF_FLAT"], "CRIT"),
+    latentIndex: 0,
+    note: "守護4+会心2。2/4/6すべて防御%。硬さを取る側",
+  },
+  /** DEF比例で殴る役の、4枠はクリダメ(火力寄り) */
+  DEF_SCALE_CRIT: {
+    type: "DEFENSE",
+    abilityPoints: { hp: 10, atk: 0, def: 60, spd: 30 },
+    gear: gearOf("GUARD", "DEF_PERCENT", "CRIT_DMG", "DEF_PERCENT", ["DEF_PERCENT", "CRIT_RATE", "CRIT_DMG", "SPD", "HP_PERCENT", "DEF_FLAT"], "CRIT"),
+    latentIndex: 0,
+    note: "守護4+会心2。4枠だけクリダメ。耐久を捨てて会心火力を取る側",
+  },
   /** 速さだけを極める。順番の検証用で、火力は期待しない */
   MAX_SPEED: {
     type: "SUPPORT",

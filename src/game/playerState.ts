@@ -1,4 +1,4 @@
-import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost, equipmentSellPrice } from "../core/equipment.js";
+import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment, enhanceEquipmentCost, equipmentSellPrice, mainStatTuning, roundStatValue } from "../core/equipment.js";
 import { clampInitialSubStatCount } from "../core/equipmentRarity.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
@@ -160,6 +160,15 @@ export interface PlayerState {
    * 倍の速度装備を持ち続けることになる。
    */
   equipmentSpeedRebalanced?: boolean;
+  /**
+   * メインHP%とメインクリダメ%を新しい基準へ揃えた印。
+   *
+   * 速度の時と同じ理由で要る。**装備の数値は引いた時に確定して控えに焼かれる**ので、
+   * 生成側の倍率(`MAIN_STAT_TUNING`)を変えても既に持っている装備には効かない。
+   * 印が無い控えだけを一度だけ通し、二度目からは何もしない。
+   * ここが無いと、開くたびに ×0.85 が重なって装備が消えていく。
+   */
+  equipmentMainHpCritRebalanced?: boolean;
 
   /* --- アリーナ(対人戦) --- */
   /**
@@ -389,6 +398,8 @@ export function createInitialState(): PlayerState {
     claimedGifts: [],
     tutorialSummonDone: false,
     equipmentSpeedRebalanced: true,
+    // 新しく始めた人の装備は最初から新基準で生成される。移行を走らせない
+    equipmentMainHpCritRebalanced: true,
     arenaDefenseIds: [],
     arenaOffenseIds: [],
     arenaPoints: ARENA_START_POINTS,
@@ -639,6 +650,29 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
       }
     }
     state.equipmentSpeedRebalanced = true;
+  }
+
+  /*
+   * メインHP%とメインクリダメ%の見直しの後追い。
+   *
+   * どの枠もHP%が最適解になっていて、2・4・6枠の選択が実質1択だった。
+   * メインのHP%を0.85倍、クリダメ%を1.35倍にして、
+   * 「耐久を捨てて会心火力を取る」を選べるようにしている。
+   *
+   * **触るのはメイン効果だけ。**サブOPも、他のメイン(攻撃%・防御%・速度・
+   * クリ率・命中・抵抗)も、星・強化値・シリーズ・ロック・装着先も動かさない。
+   * 倍率を掛けるだけなので、厳選した装備の序列はそのまま保たれる。
+   *
+   * 一度だけ走らせる(印が無い控えだけが対象)。ここを印なしで書くと、
+   * **開くたびに0.85が重なって装備が痩せていく。**
+   */
+  if (!state.equipmentMainHpCritRebalanced) {
+    for (const equipment of state.equipment) {
+      const main = equipment.mainStat;
+      const tuning = mainStatTuning(main.type);
+      if (tuning !== 1) main.value = roundStatValue(main.type, main.value * tuning);
+    }
+    state.equipmentMainHpCritRebalanced = true;
   }
 
   // アリーナ。古い控えには丸ごと無いので、初参加と同じ状態から始める

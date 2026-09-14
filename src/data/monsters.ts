@@ -275,7 +275,7 @@ const GOLEM: MonsterTemplate = {
     description: "敵単体に攻撃力0.7倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.5 }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.75 }],
   },
   skill2Variants: [
     {
@@ -284,7 +284,7 @@ const GOLEM: MonsterTemplate = {
       description: "巨岩を降らせ敵全体に攻撃力0.9倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.9, defCoefficient: 0.75 }],
+      effects: [{ kind: "DAMAGE", multiplier: 0.9, defCoefficient: 1.125 }],
     },
     {
       id: "golem_s2_b",
@@ -292,7 +292,7 @@ const GOLEM: MonsterTemplate = {
       description: "敵全体に攻撃力0.45倍のダメージを3回与える。自身の防御力が高いほど威力が上がる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, defCoefficient: 0.5 }],
+      effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, defCoefficient: 0.75 }],
     },
     {
       id: "golem_s2_c",
@@ -361,7 +361,7 @@ const GOLEM: MonsterTemplate = {
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.0 },
+      { kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.5 },
       { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
     ],
   },
@@ -782,7 +782,7 @@ const TREANT: MonsterTemplate = {
     description: "敵単体に攻撃力0.6倍のダメージを与える。自身の最大HPが高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.03 }],
+    effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.06 }],
   },
   skill2Variants: [
     {
@@ -792,7 +792,7 @@ const TREANT: MonsterTemplate = {
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.03 },
+        { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.06 },
         { kind: "STUN", durationTurns: 1, chance: 0.4 },
       ],
     },
@@ -814,7 +814,7 @@ const TREANT: MonsterTemplate = {
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.04 },
+        { kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.08 },
         { kind: "LIFESTEAL", healRate: 0.4 },
       ],
     },
@@ -838,7 +838,7 @@ const TREANT: MonsterTemplate = {
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.04 },
+        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.08 },
         { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
       ],
     },
@@ -874,7 +874,7 @@ const TREANT: MonsterTemplate = {
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.05 },
+      { kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.1 },
       { kind: "LIFESTEAL", healRate: 0.4 },
       { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
       // トレントは味方を保たせる種族。火力だけを積んでも、通常のスキル3(もりのゆりかご)を
@@ -913,7 +913,7 @@ const KNIGHT: MonsterTemplate = {
     description: "敵単体に攻撃力1.0倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.0, defCoefficient: 0.5 }],
+    effects: [{ kind: "DAMAGE", multiplier: 1.0, defCoefficient: 0.75 }],
   },
   skill2Variants: [
     {
@@ -1143,7 +1143,7 @@ const DRAGON_LIGHT_SKILL3: Skill = {
   effects: [
     // 比較相手の「破滅の咆哮」は2.0倍にHP補正(0.0003)が乗るので、育てるほど差が開く。
     // 固定倍率をいくら上げても追いつけないため、こちらにも一段厚いHP補正を持たせる
-    { kind: "DAMAGE", multiplier: 2.6, hpCoefficient: 0.05 },
+    { kind: "DAMAGE", multiplier: 2.6, hpCoefficient: 0.1 },
     { kind: "BLIND", durationTurns: 2, chance: 0.75 },
     { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 },
   ],
@@ -1273,7 +1273,7 @@ const DRAGON: MonsterTemplate = {
       description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.05 }],
+      effects: [{ kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.1 }],
     },
     {
       id: "dragon_s3_scale",
@@ -1292,7 +1292,7 @@ const DRAGON: MonsterTemplate = {
       description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.05 }],
+      effects: [{ kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.1 }],
     },
     {
       id: "dragon_s3_blessing",
@@ -1493,7 +1493,7 @@ const NEMESIS: MonsterTemplate = {
       description: "敵単体に攻撃力1.2倍のダメージを2回与える。自身の防御力が高いほど威力が上がる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2, defCoefficient: 0.5 }],
+      effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2, defCoefficient: 0.75 }],
     },
   ],
   skill3Variants: [
@@ -1504,7 +1504,7 @@ const NEMESIS: MonsterTemplate = {
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 3.9, defCoefficient: 0.75 },
+        { kind: "DAMAGE", multiplier: 3.9, defCoefficient: 1.125 },
         { kind: "STUN", durationTurns: 1, chance: 0.7 },
       ],
     },
@@ -1539,7 +1539,7 @@ const NEMESIS: MonsterTemplate = {
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 5.0, defCoefficient: 1.0 },
+      { kind: "DAMAGE", multiplier: 5.0, defCoefficient: 1.5 },
       { kind: "STUN", durationTurns: 1, chance: 0.75 },
       { kind: "GAUGE", amount: 0.4, drain: true },
     ],

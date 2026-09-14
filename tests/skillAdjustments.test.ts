@@ -61,7 +61,7 @@ describe("電気ドラゴンのスキル3(破滅の咆哮)", () => {
     const skill3 = dragon.skills[2];
     expect(skill3.name).toBe("破滅の咆哮");
     const damage = skill3.effects.find((e) => e.kind === "DAMAGE");
-    expect(damage).toMatchObject({ kind: "DAMAGE", hpCoefficient: 0.05 });
+    expect(damage).toMatchObject({ kind: "DAMAGE", hpCoefficient: 0.1 });
   });
 });
 
@@ -91,7 +91,7 @@ describe("血のいけにえに自身の防御力スケールダメージを追�
     const skill2 = nemesis.skills[1];
     expect(skill2.name).toBe("血のいけにえ");
     const damage = skill2.effects.find((e) => e.kind === "DAMAGE");
-    expect(damage).toMatchObject({ kind: "DAMAGE", defCoefficient: 0.5 });
+    expect(damage).toMatchObject({ kind: "DAMAGE", defCoefficient: 0.75 });
   });
 });
 

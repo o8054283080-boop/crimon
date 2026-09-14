@@ -20,6 +20,7 @@ import {
   StatRoll,
   StatType,
   enhanceEquipment,
+  rollMainStatValue,
   rollStatValue,
 } from "../../src/core/equipment.js";
 import { MAX_SKILL_LEVEL } from "../../src/core/skill.js";
@@ -46,7 +47,7 @@ let craftCounter = 0;
 function craftGear(spec: GearSpec, rng: () => number): Equipment {
   const star: EquipStar = spec.star ?? 6;
   craftCounter += 1;
-  const mainStat: StatRoll = { type: spec.main, value: rollStatValue(spec.main, star, 1, rng) };
+  const mainStat: StatRoll = { type: spec.main, value: rollMainStatValue(spec.main, star, rng) };
   const subStats: StatRoll[] = spec.subs
     .filter((type) => type !== spec.main)
     .slice(0, 4)

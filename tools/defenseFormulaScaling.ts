@@ -6,7 +6,7 @@
  */
 import type { DamageEffect } from "../src/core/skill.js";
 import { calcDamage } from "../src/battle/damage.js";
-import { setBalanceFlags } from "../src/battle/balanceFlags.js";
+import { setBalanceFlags } from "../src/core/balanceFlags.js";
 import { createBattleUnit, getEffectiveStat } from "../src/battle/unit.js";
 import { MONSTER_DEX } from "../src/data/monsters.js";
 import { buildAlly } from "./battleLab/build.js";
