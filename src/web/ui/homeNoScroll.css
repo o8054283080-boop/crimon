@@ -838,3 +838,27 @@ body:has(.crimon-home) {
     right: 116px !important;
   }
 }
+
+
+/* PR #338 correction:
+ * 既存のお知らせを増やさない。home-quick-stack はプレゼントだけ。
+ * 右メニュー列は元のHOMEと同じ右端位置へ戻し、謎の余白を作らない。 */
+.home-world > .home-quick-stack {
+  left: 12px !important;
+}
+
+.crimon-home .world-actions--right {
+  right: 10px !important;
+}
+
+@media (max-width: 405px) {
+  .crimon-home .world-actions--right {
+    right: 10px !important;
+  }
+}
+
+@media (min-width: 410px) {
+  .crimon-home .world-actions--right {
+    right: 12px !important;
+  }
+}
