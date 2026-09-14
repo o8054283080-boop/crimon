@@ -80,35 +80,6 @@ export function homeTowerSummary(player: Pick<PlayerState, "trialTowerBestFloor"
 }
 
 const HOME_STARTED_KEY = "crimon.started";
-const HOME_NOTICE_READ_KEY = "crimon.home.notice.read.v1";
-
-function activeHomeNotices(now: Date = new Date()) {
-  const today = localDateString(now);
-  return COMPENSATIONS.filter((notice) => today >= notice.fromDate && today <= notice.toDate);
-}
-
-function readHomeNoticeIds(): Set<string> {
-  try {
-    if (typeof localStorage === "undefined") return new Set();
-    const raw = localStorage.getItem(HOME_NOTICE_READ_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw);
-    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function markHomeNoticesRead(ids: readonly string[]): void {
-  try {
-    if (typeof localStorage === "undefined") return;
-    const merged = readHomeNoticeIds();
-    for (const id of ids) merged.add(id);
-    localStorage.setItem(HOME_NOTICE_READ_KEY, JSON.stringify([...merged]));
-  } catch {
-    // お知らせの既読保存に失敗しても、ゲーム本体は止めない
-  }
-}
 
 export function hasStartedHome(storage: Pick<Storage, "getItem"> = sessionStorage): boolean {
   return storage.getItem(HOME_STARTED_KEY) === "1";
@@ -703,29 +674,6 @@ export function renderHome(props: HomeProps): HTMLElement {
     ]),
   );
   const openSettings = () => { settingsSheet.hidden = false; };
-  const notices = activeHomeNotices();
-  const readNoticeIds = readHomeNoticeIds();
-  const unreadNoticeCount = notices.filter((notice) => !readNoticeIds.has(notice.id)).length;
-  const noticeSheet = el("div", { className: "home-sheet", hidden: true }, []);
-  const closeNotices = () => { noticeSheet.hidden = true; };
-  noticeSheet.append(
-    el("div", { className: "home-sheet__scrim", onclick: closeNotices }, []),
-    el("div", { className: "home-sheet__panel home-notices" }, [
-      el("div", { className: "home-sheet__head" }, [
-        el("strong", {}, ["お知らせ"]),
-        el("button", { type: "button", className: "btn btn--ghost", onclick: closeNotices }, ["閉じる"]),
-      ]),
-      el("div", { className: "home-notices__list" }, notices.map((notice) =>
-        el("details", { className: "home-notice" }, [
-          el("summary", {}, [
-            el("span", { className: "home-notice__date" }, [notice.fromDate.replaceAll("-", "/")]),
-            el("strong", {}, [notice.title]),
-          ]),
-          el("p", {}, [notice.message]),
-        ]),
-      )),
-    ]),
-  );
   const [onGoArena, onGoShop, onGoHowToPlay] = homeUtilityActions(props);
   const [onGoEquipDungeon, onGoLevelDungeon, onGoGoldDungeon, onGoAwakeningDepth] = dungeonActions(props);
   const homeAssets: Record<string, string> = {
@@ -810,24 +758,6 @@ export function renderHome(props: HomeProps): HTMLElement {
    * 赤い印は「配布が始まっていて・まだ受け取っていなくて・期限内」のものだけ数える。
    */
   const giftCount = unclaimedGiftCount(GIFT_DEFINITIONS, player);
-  let noticeEntry!: HTMLButtonElement;
-  const openNotices = () => {
-    markHomeNoticesRead(notices.map((notice) => notice.id));
-    noticeSheet.hidden = false;
-    noticeEntry.querySelector(".home-quick__badge")?.remove();
-    noticeEntry.setAttribute("aria-label", "お知らせ");
-  };
-  noticeEntry = el("button", {
-    type: "button",
-    className: "home-quick home-quick--notice",
-    "data-tour": "tile:notices",
-    onclick: openNotices,
-    ariaLabel: unreadNoticeCount > 0 ? `お知らせ（未読${unreadNoticeCount}件）` : "お知らせ",
-  }, [
-    el("span", { className: "home-quick__icon", "aria-hidden": "true" }, ["📄"]),
-    unreadNoticeCount > 0 ? el("span", { className: "home-quick__badge" }, [String(unreadNoticeCount)]) : null,
-  ].filter((node): node is HTMLElement => node !== null)) as HTMLButtonElement;
-
   const giftEntry = el("button", {
     type: "button",
     className: "home-quick home-quick--gift",
@@ -921,7 +851,7 @@ export function renderHome(props: HomeProps): HTMLElement {
           tutorial,
           bannerStack,
         ].filter((node): node is HTMLElement => node !== null)),
-        el("div", { className: "home-quick-stack" }, [noticeEntry, giftEntry]),
+        el("div", { className: "home-quick-stack" }, [giftEntry]),
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
           worldButton("right", "activity-adventure", "冒険", props.onGoStages),
@@ -935,7 +865,6 @@ export function renderHome(props: HomeProps): HTMLElement {
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
         ]),
       ]),
-      noticeSheet,
       staminaSheet,
       settingsSheet,
     ].filter((node): node is HTMLElement => node !== null));
