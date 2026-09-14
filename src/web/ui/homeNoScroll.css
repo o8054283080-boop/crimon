@@ -427,3 +427,225 @@ body:has(.crimon-home) {
   overflow: hidden !important;
   font-size: 9px !important;
 }
+
+
+/* ==========================================================================
+ * PR #338 最終HOME配置
+ * - 上部ファイター情報 / CURRENT PARTY / 左右8メニューは現行のまま
+ * - 中央上寄せに初心者ミッション・アカウント警告などの小型情報
+ * - 既存のお知らせ位置にアイコンのみ、その真下にプレゼント
+ * ========================================================================== */
+
+.home-world > .world-info-stack {
+  position: absolute !important;
+  z-index: 7 !important;
+  top: clamp(5px, 1.0dvh, 9px) !important;
+  left: clamp(80px, 21vw, 92px) !important;
+  right: clamp(86px, 22vw, 98px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  max-height: clamp(78px, 12dvh, 104px) !important;
+  overflow: hidden !important;
+  pointer-events: auto;
+}
+
+/* 中央の初心者ミッションは「細い1本」にする。
+ * 詳細はタップした時だけ既存detailsが前面に開く。 */
+.home-world .world-info-stack > .crimon-tutorial {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  margin: 0 !important;
+  padding: 4px 8px !important;
+  overflow: hidden !important;
+  border-radius: 7px !important;
+  box-sizing: border-box !important;
+}
+
+.home-world .world-info-stack > .crimon-tutorial .crimon-tutorial__head {
+  height: 28px !important;
+  min-height: 28px !important;
+}
+
+.home-world .world-info-stack > .crimon-tutorial .crimon-tutorial__head small {
+  display: none !important;
+}
+
+.home-world .world-info-stack > .crimon-tutorial .crimon-tutorial__head strong {
+  font-size: 10px !important;
+  white-space: nowrap !important;
+}
+
+.home-world .world-info-stack > .crimon-tutorial .crimon-tutorial__count {
+  font-size: 10px !important;
+  white-space: nowrap !important;
+}
+
+/* 閉じている間は詳細の本体を細いバナーの外へ出さない。
+ * 開いた時だけ既存の全画面details表示を使う。 */
+.home-world .world-info-stack > .crimon-tutorial .crimon-tutorial__current:not([open]) {
+  position: absolute !important;
+  inset: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+.home-world .world-info-stack > .crimon-tutorial .crimon-tutorial__current:not([open]) > summary {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 38px !important;
+  margin: 0 !important;
+  font-size: 0 !important;
+  pointer-events: auto !important;
+}
+
+.home-world .world-info-stack > .crimon-tutorial .crimon-tutorial__current:not([open]) > summary::after {
+  content: "›" !important;
+  position: absolute !important;
+  right: 8px !important;
+  top: 5px !important;
+  font-size: 24px !important;
+  color: var(--home-gold-bright) !important;
+}
+
+/* アカウント保存警告・配布案内も中央の細い情報枠へ。
+ * HOMEの縦レイアウトには一切加算しない。 */
+.home-world .world-info-stack > .reward-banner-stack {
+  position: relative !important;
+  inset: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  width: 100% !important;
+  max-height: 48px !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.home-world .world-info-stack .cloud-warn {
+  position: relative !important;
+  width: 100% !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  max-height: 38px !important;
+  margin: 0 !important;
+  padding: 3px 6px !important;
+  display: grid !important;
+  grid-template-columns: 20px minmax(0,1fr) 54px !important;
+  gap: 5px !important;
+  align-items: center !important;
+  border-radius: 7px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.home-world .world-info-stack .cloud-warn__mark {
+  font-size: 14px !important;
+}
+
+.home-world .world-info-stack .cloud-warn__title {
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.home-world .world-info-stack .cloud-warn__lead {
+  display: none !important;
+}
+
+.home-world .world-info-stack .cloud-warn__go {
+  min-width: 54px !important;
+  width: 54px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 4px !important;
+  font-size: 9px !important;
+}
+
+/* 配布/ログインの一時札が同時に存在しても、中央情報枠を巨大化させない。 */
+.home-world .world-info-stack .reward-banner {
+  min-height: 38px !important;
+  height: 38px !important;
+  max-height: 38px !important;
+  padding-block: 2px !important;
+  overflow: hidden !important;
+}
+
+.home-world .world-info-stack .reward-banner-stack__rest {
+  display: none !important;
+}
+
+/* お知らせは既存の左下ポジション。表示はアイコンのみ。
+ * プレゼントはその真下。ラベルを出して横長にしない。 */
+.home-world > .home-quick-stack {
+  position: absolute !important;
+  z-index: 9 !important;
+  left: clamp(12px, 3.5vw, 18px) !important;
+  bottom: clamp(10px, 2.2dvh, 18px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.home-world > .home-quick-stack .home-quick {
+  position: relative !important;
+  width: clamp(40px, 11.5vw, 48px) !important;
+  height: clamp(40px, 11.5vw, 48px) !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.home-world > .home-quick-stack .home-quick__icon {
+  width: 100% !important;
+  height: 100% !important;
+  font-size: clamp(20px, 5.8vw, 26px) !important;
+}
+
+.home-world > .home-quick-stack .home-quick__label {
+  display: none !important;
+}
+
+.home-world > .home-quick-stack .home-quick__badge {
+  top: -5px !important;
+  right: -7px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding-inline: 4px !important;
+  border-width: 1px !important;
+  font-size: 9px !important;
+  line-height: 16px !important;
+}
+
+/* 390x844などでは中央情報をさらに上詰めし、モンスターへ被せない。 */
+@media (max-height: 860px) {
+  .home-world > .world-info-stack {
+    top: 4px !important;
+    max-height: 84px !important;
+  }
+
+  .home-world > .world-info-stack > .crimon-tutorial,
+  .home-world .world-info-stack .cloud-warn {
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+  }
+
+  .home-world > .home-quick-stack {
+    left: 10px !important;
+    bottom: 8px !important;
+    gap: 4px !important;
+  }
+}
