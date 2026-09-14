@@ -44,6 +44,14 @@ export interface DungeonEnemy {
    */
   spdMultiplier?: number;
   /**
+   * この個体だけに掛かる攻撃力倍率。
+   *
+   * `powerScale` はHP・ATK・DEFへまとめて掛かるので、
+   * **「硬さはそのままで、殴られる痛さだけ変えたい」時に使う。**
+   * 防御計算を入れ替えた後の1階がこれに当たる(下の `buildFloor` を参照)。
+   */
+  atkMultiplier?: number;
+  /**
    * 階層設計で確定させた実効値。指定時は通常の倍率計算(powerScale / speedScale /
    * hpMultiplier / spdMultiplier)より優先する。
    *
@@ -109,6 +117,11 @@ const BOSS_TEMPLATE = ANCIENT_DEMON;
  * powerScale を上げて厚くすると攻撃力も一緒に上がって事故死が増えるので、
  * **HPだけ**を別枠で伸ばし、殴り合いの時間そのものを長くしている。
  */
+/**
+ * 1階だけの攻撃力倍率。**新しい防御式が序盤で効かないぶんを、敵の痛さで戻す。**
+ * 星3+★1装備で1階を抜けられる水準として依頼主が決めた値。
+ */
+export const FIRST_FLOOR_ATK_MULTIPLIER = 0.7;
 const BOSS_HP_MULTIPLIER = 5;
 
 /**
@@ -307,6 +320,19 @@ function buildFloor(floor: number): DungeonFloor {
     ? FINAL_BOSS_COMPANION_TEMPLATES.map((t) => t.templateId)
     : [MONSTER_TEMPLATES[(floor - 1) % MONSTER_TEMPLATES.length].templateId, MONSTER_TEMPLATES[floor % MONSTER_TEMPLATES.length].templateId];
   const companionHpMultiplier = floor === DUNGEON_FLOOR_COUNT ? FINAL_FLOOR_COMPANION_HP_MULTIPLIER : undefined;
+  /*
+   * **1階だけ敵の攻撃力を70%にする。**
+   *
+   * 防御計算が `1000/(1000+1.2×DEF)` になり、軽減率がDEFの値だけで決まるように
+   * なった。係数1.2は終盤のDEF(3,000〜6,000)に合わせた値なので、
+   * **序盤のDEF帯(100〜300)では軽減がほとんど効かない**(DEF100で89%が通る。
+   * 旧式なら66%。`npx tsx tools/defenseCurveCompare.ts`)。
+   * その結果、星3+★1装備での1階が勝率5%まで落ちていた。
+   *
+   * 硬さは触らず**殴られる痛さだけ**を下げる。上の階は据え置き
+   * (DEFが育つほど新しい式の軽減が効き始めるため)。
+   */
+  const atkMultiplier = floor === 1 ? FIRST_FLOOR_ATK_MULTIPLIER : undefined;
 
   // ボス1体+お供2体の3体編成。ボスを先頭に置く
   const enemies: DungeonEnemy[] = [
@@ -321,6 +347,7 @@ function buildFloor(floor: number): DungeonFloor {
       // 10階は魔人撃破で即勝利になるため、速攻が一択にならない約30万HPへ調整する
       hpMultiplier: floor === DUNGEON_FLOOR_COUNT ? 8.5 : BOSS_HP_MULTIPLIER,
       spdMultiplier: BOSS_SPD_MULTIPLIER,
+      atkMultiplier,
     },
     ...companionTemplateIds.map((templateId) => ({
       templateId,
@@ -328,6 +355,7 @@ function buildFloor(floor: number): DungeonFloor {
       star: DUNGEON_ENEMY_STAR,
       level: DUNGEON_ENEMY_LEVEL,
       hpMultiplier: companionHpMultiplier,
+      atkMultiplier,
     })),
   ];
 

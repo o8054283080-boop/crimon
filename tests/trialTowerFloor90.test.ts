@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
+import { DEF_DOWN } from "../src/core/statusValues.js";
 import type { DamageEffect } from "../src/core/skill.js";
 import { findMonster } from "../src/data/monsters.js";
 import { TRIAL_TOWER_FLOORS, findTowerFloor } from "../src/data/trialTower.js";
@@ -105,14 +106,14 @@ describe("90階: 編成とステータス", () => {
     expect([TOWER90_BOSS_HP, TOWER90_BOSS_ATK, TOWER90_BOSS_DEF, TOWER90_BOSS_SPD]).toEqual([350_000, 9_000, 4_200, 200]);
   });
 
-  it("戦鼓晶は HP250,000 / DEF4,000 / SPD205、狂牙獣は ATK9,500 / SPD205", () => {
-    expect(TOWER90_ENEMIES[2].fixedStats).toMatchObject({ hp: 250_000, def: 4_000, spd: 205 });
-    expect(TOWER90_ENEMIES[3].fixedStats).toMatchObject({ atk: 9_500, spd: 205 });
+  it("戦鼓晶と狂牙獣の実数(HP×0.70 / DEF×0.25 / ATK×2.50 を当てた後)", () => {
+    expect(TOWER90_ENEMIES[2].fixedStats).toMatchObject({ hp: 175_000, def: 1_000, spd: 205 });
+    expect(TOWER90_ENEMIES[3].fixedStats).toMatchObject({ atk: 23_750, spd: 205 });
   });
 
   it("残りのお供も依頼どおりの実数", () => {
-    expect(TOWER90_ENEMIES[1].fixedStats).toMatchObject({ hp: 210_000, atk: 7_000, def: 3_200, spd: 175 });
-    expect(TOWER90_ENEMIES[4].fixedStats).toMatchObject({ hp: 220_000, atk: 6_500, def: 3_800, spd: 165 });
+    expect(TOWER90_ENEMIES[1].fixedStats).toMatchObject({ hp: 147_000, atk: 17_500, def: 800, spd: 175 });
+    expect(TOWER90_ENEMIES[4].fixedStats).toMatchObject({ hp: 154_000, atk: 16_250, def: 950, spd: 165 });
   });
 });
 
@@ -254,11 +255,11 @@ describe("90階: 絶・終焉の波動", () => {
     expect(strip.count).toBeUndefined();
   });
 
-  it("処理順は ダメージ → 全解除 → ゲージ-50% → 防御-50%3ターン", () => {
+  it("処理順は ダメージ → 全解除 → ゲージ-50% → 防御低下3ターン", () => {
     expect(s3.effects.map((effect) => effect.kind)).toEqual(["DAMAGE", "STRIP", "GAUGE", "DEBUFF"]);
     expect(s3.effects[0]).toMatchObject({ multiplier: 1.35 });
     expect(s3.effects[2]).toMatchObject({ amount: -0.5 });
-    expect(s3.effects[3]).toMatchObject({ stat: "def", amount: 0.5, durationTurns: 3, chance: 1 });
+    expect(s3.effects[3]).toMatchObject({ stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 });
   });
 
   it("旧仕様の速度ダウンは入っていない", () => {

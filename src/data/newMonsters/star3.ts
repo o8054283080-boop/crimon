@@ -89,7 +89,7 @@ export const MUSHROON: MonsterTemplate = {
     {
       id: "mushroon_s3_b",
       name: "腐敗の胞子",
-      description: "敵全体に攻撃力1.0倍のダメージを与え、70%で2ターン防御力を50%低下させる。弱体効果が付いている敵は行動ゲージが20%減少する。",
+      description: "敵全体に攻撃力1.0倍のダメージを与え、70%で2ターン防御力を75%低下させる。弱体効果が付いている敵は行動ゲージが20%減少する。",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
@@ -263,7 +263,7 @@ export const SHELLTURTLE: MonsterTemplate = {
   darkSkill3: {
     id: "shellturtle_s3_dark",
     name: "アビスシェル",
-    description: "深淵の甲羅で押し潰し、敵単体に攻撃力1.6倍のダメージを与える(自身の防御力が高いほど上昇)。80%で2ターン防御力を50%低下させ、自身に2ターン反射を得る。",
+    description: "深淵の甲羅で押し潰し、敵単体に攻撃力1.6倍のダメージを与える(自身の防御力が高いほど上昇)。80%で2ターン防御力を75%低下させ、自身に2ターン反射を得る。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [

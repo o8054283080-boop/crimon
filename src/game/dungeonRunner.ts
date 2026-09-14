@@ -24,10 +24,11 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale
   const base = computeEffectiveStats(dex.stats, enemy.star, enemy.level);
   const scaledStats = {
     ...base,
-    // hpMultiplier / spdMultiplier は個体単位の補正。powerScale が階層全体に掛かるのに対し、
-    // こちらはボス1体だけを分厚くしたり手番を早めたりするために使う
+    // hpMultiplier / atkMultiplier / spdMultiplier は個体単位の補正。powerScale が
+    // 階層全体に掛かるのに対し、こちらはボス1体だけを分厚くしたり、
+    // 殴られる痛さだけを変えたり、手番を早めたりするために使う
     hp: Math.round(base.hp * powerScale * (enemy.hpMultiplier ?? 1)),
-    atk: scaledEnemyAtk(base.atk * powerScale),
+    atk: scaledEnemyAtk(base.atk * powerScale * (enemy.atkMultiplier ?? 1)),
     def: Math.round(base.def * powerScale),
     spd: Math.round(base.spd * (enemy.spdMultiplier ?? 1) * speedScale),
   };

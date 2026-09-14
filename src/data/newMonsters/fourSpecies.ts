@@ -3,6 +3,9 @@ import type { Skill, SkillEffect, TargetType } from '../../core/skill.js';
 import { describeSkillLines } from '../../core/skill.js';
 import type { PassiveLevelEffect } from '../../core/passive.js';
 import { passive } from './shared.js';
+import {
+  ATK_UP, DEF_UP, SPD_UP, CRI_RATE_UP, CRI_DMG_UP, ATK_DOWN, DEF_DOWN, SPD_DOWN,
+} from '../../core/statusValues.js';
 
 // 各段の完成値を保存する。既存モンスターの一律成長は変更しない。
 type Step = (effects: SkillEffect[]) => void;
@@ -29,8 +32,11 @@ function pass(id: string, name: string, levels: PassiveLevelEffect[]): Skill {
   return { id, name, description: '', target: 'SELF', cooldownTurns: 0, effects: [], passive: passive('ALWAYS', levels) };
 }
 const d = (multiplier: number, extra = {}): SkillEffect => ({ kind: 'DAMAGE', multiplier, ...extra });
-const deb = (stat: 'atk'|'def'|'spd', chance = 1, durationTurns = 2): SkillEffect => ({ kind: 'DEBUFF', stat, amount: stat === 'spd' ? .3 : .5, chance, durationTurns });
-const buff = (stat: 'atk'|'def'|'spd'|'criRate'|'criDmg', amount: number, applyTo?: 'SELF'|'ALLIES'): SkillEffect => ({ kind: 'BUFF', stat, amount, durationTurns: 2, applyTo });
+/* 効果量は種類ごとに固定。スキル側で選べるのは**確率と持続ターンだけ** */
+const DEBUFF_AMOUNT = { atk: ATK_DOWN, def: DEF_DOWN, spd: SPD_DOWN } as const;
+const BUFF_AMOUNT = { atk: ATK_UP, def: DEF_UP, spd: SPD_UP, criRate: CRI_RATE_UP, criDmg: CRI_DMG_UP } as const;
+const deb = (stat: 'atk'|'def'|'spd', chance = 1, durationTurns = 2): SkillEffect => ({ kind: 'DEBUFF', stat, amount: DEBUFF_AMOUNT[stat], chance, durationTurns });
+const buff = (stat: 'atk'|'def'|'spd'|'criRate'|'criDmg', applyTo?: 'SELF'|'ALLIES'): SkillEffect => ({ kind: 'BUFF', stat, amount: BUFF_AMOUNT[stat], durationTurns: 2, applyTo });
 const heal = (healRate: number, applyTo?: 'ALLIES'): SkillEffect => ({ kind: 'HEAL', scaleStat: 'hp', healRate, applyTo });
 const regen = (healRate: number, durationTurns: number): SkillEffect => ({ kind: 'REGEN', healRate, durationTurns });
 const gauge = (amount: number, applyTo?: 'SELF'|'ALLIES', extra = {}): SkillEffect => ({ kind: 'GAUGE', amount, applyTo, ...extra });
@@ -47,7 +53,8 @@ export const SCORPION: MonsterTemplate = {
   skill1:skill('scorpion_s1','毒針','SINGLE_ENEMY',0,[d(1), gauge(.1,'SELF',{requires:'TARGET_POISONED'}),poison(.8,{requires:'ANY_CRIT'})],[power(1.1),set(2,{chance:.9}),power(1.2/1.1),set(2,{chance:1})]),
   skill2Variants:[
     skill('scorpion_s2_a','急所刺し','SINGLE_ENEMY',3,[d(1.9,{critDamageBonus:.3}),deb('def')],growth25),
-    skill('scorpion_s2_b','狩りの構え','SELF',4,[buff('atk',.5),buff('criRate',.3),buff('criDmg',.3),gauge(.3)],[set(3,{amount:.35}),set(1,{amount:.35}),set(2,{amount:.4})]),
+    // 強化の量は共通値で固定なので、レベルで伸ばすのは行動ゲージだけ(Lv5でCT-1)
+    skill('scorpion_s2_b','狩りの構え','SELF',4,[buff('atk'),buff('criRate'),buff('criDmg'),gauge(.3)],[set(3,{amount:.35})]),
     skill('scorpion_s2_c','麻痺針','SINGLE_ENEMY',3,[d(1.6),deb('spd',.8),gauge(-.3),{kind:'STUN',chance:.6,durationTurns:1,requires:'TARGET_HP_BELOW_50'}],[power(1.1),set(1,{chance:.9}),set(3,{chance:.7})]),
   ],
   skill3Variants:[
@@ -65,7 +72,9 @@ export const HARPY: MonsterTemplate = {
   skill1:skill('harpy_s1','フェザースラッシュ','ALL_ENEMIES',0,[d(.7),deb('atk',.2)],[power(1.1),set(1,{chance:.25}),power(1.2/1.1),set(1,{chance:.3})],{gaugeIfThreeEnemies:.1}),
   skill2Variants:[
     skill('harpy_s2_a','急降下','SINGLE_ENEMY',3,[d(2.4,{fullHpBonus:.3}),gauge(.4,'SELF',{requires:'ANY_CRIT'})],growth25),
-    skill('harpy_s2_b','羽ばたき','SELF',4,[buff('atk',.5)],[set(0,{amount:.55}),set(0,{amount:.6}),set(0,{amount:.65})],{extraTurn:true}),
+    // 強化の量は共通値で固定。このスキルは効果量でしか伸びていなかったので、
+    // いまはLv5のCT短縮だけが成長になる(**要検討として報告済み**)
+    skill('harpy_s2_b','羽ばたき','SELF',4,[buff('atk')],[],{extraTurn:true}),
     skill('harpy_s2_c','ツインフェザー','ALL_ENEMIES',3,[d(.7,{hits:2,fullHpBonus:.25,perHitEffects:[deb('spd',.5)]})],[power(1.1),set(0,{perHitEffects:[deb('spd',.6)]}),power(1.2/1.1)]),
   ],
   skill3Variants:[
@@ -83,14 +92,14 @@ export const PHOENIX: MonsterTemplate = {
   skill1:skill('phoenix_s1','生命の火','SINGLE_ENEMY',0,[d(.7,{hpCoefficient:.04,currentHpBonus:.3})],[power(1.05),power(1.1/1.05),power(1.15/1.1),power(1.25/1.15)]),
   skill2Variants:[
     skill('phoenix_s2_a','癒しの炎','SINGLE_ALLY',3,[heal(.2),{kind:'CLEANSE',count:1},{kind:'IMMUNITY',durationTurns:1}],[set(0,{healRate:.22}),set(0,{healRate:.24}),set(1,{count:2})]),
-    skill('phoenix_s2_b','命の火種','SINGLE_ALLY',3,[heal(.25),regen(.15,3),buff('spd',.3)],[set(0,{healRate:.275}),set(0,{healRate:.3}),set(1,{healRate:.2})]),
+    skill('phoenix_s2_b','命の火種','SINGLE_ALLY',3,[heal(.25),regen(.15,3),buff('spd')],[set(0,{healRate:.275}),set(0,{healRate:.3}),set(1,{healRate:.2})]),
     skill('phoenix_s2_c','炎の翼','ALL_ENEMIES',4,[d(.8,{hpCoefficient:.08}),block(.75),heal(.1,'ALLIES')],[power(1.1),set(1,{chance:.85}),set(2,{healRate:.12})]),
   ],
   skill3Variants:[
-    skill('phoenix_s3_a','再生の炎','ALL_ALLIES',5,[heal(.15),buff('def',.5),regen(.15,2)],[set(0,{healRate:.17}),set(0,{healRate:.2}),set(2,{healRate:.2})]),
+    skill('phoenix_s3_a','再生の炎','ALL_ALLIES',5,[heal(.15),buff('def'),regen(.15,2)],[set(0,{healRate:.17}),set(0,{healRate:.2}),set(2,{healRate:.2})]),
     skill('phoenix_s3_b','不死鳥の羽','ALL_ALLIES',5,[heal(.18),{kind:'CLEANSE',count:2},{kind:'IMMUNITY',durationTurns:2},gauge(.2)],[set(0,{healRate:.2}),set(0,{healRate:.22}),set(1,{count:3})]),
-    skill('phoenix_s3_c','灼熱転生','ALL_ENEMIES',5,[d(1.2,{hpCoefficient:.1}),buff('atk',.5,'ALLIES'),{kind:'SHIELD',shieldRate:.15,durationTurns:3,fromSourceHp:true,applyTo:'ALLIES'}],[power(1.1),set(2,{shieldRate:.18}),power(1.2/1.1)]),
-    skill('phoenix_s3_electric','雷光再生','ALL_ALLIES',5,[heal(.18),gauge(.25),buff('spd',.3),{kind:'CLEANSE',count:1}],[set(0,{healRate:.2}),set(0,{healRate:.22}),set(1,{amount:.3})]),
+    skill('phoenix_s3_c','灼熱転生','ALL_ENEMIES',5,[d(1.2,{hpCoefficient:.1}),buff('atk','ALLIES'),{kind:'SHIELD',shieldRate:.15,durationTurns:3,fromSourceHp:true,applyTo:'ALLIES'}],[power(1.1),set(2,{shieldRate:.18}),power(1.2/1.1)]),
+    skill('phoenix_s3_electric','雷光再生','ALL_ALLIES',5,[heal(.18),gauge(.25),buff('spd'),{kind:'CLEANSE',count:1}],[set(0,{healRate:.2}),set(0,{healRate:.22}),set(1,{amount:.3})]),
   ],
   lightSkill3:skill('phoenix_s3_light','輪廻の聖炎','SINGLE_ALLY',8,[{kind:'STATUS',status:'INVINCIBLE',durationTurns:3},regen(.15,2)],[set(1,{healRate:.175}),set(1,{healRate:.2}),set(1,{durationTurns:3})]),
   darkSkill3:pass('phoenix_s3_dark','輪廻転生',[0,1,2,3,4].map(i=>({kind:'REBIRTH',heal:i>=3?.1:i>=1?.09:.08,damage:i>=2?.55:.5,cooldown:i===4?8:9}))),

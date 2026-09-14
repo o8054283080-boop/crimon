@@ -69,6 +69,15 @@ const SCREENS = [
   { name: "ミッション", tab: "HOME", tile: "mission" },
   // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
+  /*
+   * 上位階(11・12)。**開いた状態も見る。**
+   * 初期セーブでは10階をクリアしていないので「未開放」の札しか出ず、
+   * 12枚に増えた階層グリッドも、上位階の報酬案内も一度も検査されない。
+   */
+  {
+    name: "装備ダンジョン(上位階まで開放)", tab: "HOME", tile: "dungeon", tile2: "equipDungeon",
+    setup: "[...document.querySelectorAll('.dev-menu button')].find(b => b.textContent.includes('装備ダンジョン全階クリア扱い'))?.click()",
+  },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
   { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },
   { name: "目覚の深域", tab: "HOME", tile: "dungeon", tile2: "awakeningDepth" },

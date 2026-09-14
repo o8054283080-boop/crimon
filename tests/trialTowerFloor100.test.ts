@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
 import type { BattleUnit } from "../src/battle/unit.js";
+import { DEF_DOWN } from "../src/core/statusValues.js";
 import {
   CRIMOARK_ATTACK_TEMPLATE_ID,
   CRIMOARK_CLONE_DEATH_ATK,
@@ -85,7 +86,7 @@ describe("100階: 編成と勝利条件", () => {
 
   it("本体HPは400,000。他の実数も依頼どおり", () => {
     expect(findTowerFloor(100)!.enemies[0].fixedStats).toMatchObject({
-      hp: CRIMOARK_HP, atk: 9_800, def: 4_600, spd: 215,
+      hp: CRIMOARK_HP, atk: 24_500, def: 1_380, spd: 215,
       criRate: 0.30, criDmg: 1.80, accuracy: 0.75, resistance: 0.60,
     });
     expect(CRIMOARK_HP).toBe(400_000);
@@ -212,16 +213,16 @@ describe("100階: 分身の3種類", () => {
     }
     const attack = found.get(CRIMOARK_ATTACK_TEMPLATE_ID)!;
     expect(attack.def.name).toBe("クリモアーク・攻");
-    expect(attack.def.stats).toMatchObject({ atk: 8_500, def: 2_100, spd: 220, criRate: 0.40, criDmg: 1.90 });
+    expect(attack.def.stats).toMatchObject({ atk: 21_250, def: 630, spd: 220, criRate: 0.40, criDmg: 1.90 });
     expect(attack.def.skills.map((s) => s.name)).toEqual(["模造強襲", "模造連撃", "模造処刑"]);
 
     const support = found.get(CRIMOARK_SUPPORT_TEMPLATE_ID)!;
     expect(support.def.name).toBe("クリモアーク・援");
-    expect(support.def.stats).toMatchObject({ atk: 5_500, def: 2_700, spd: 230 });
+    expect(support.def.stats).toMatchObject({ atk: 13_750, def: 810, spd: 230 });
 
     const debuff = found.get(CRIMOARK_DEBUFF_TEMPLATE_ID)!;
     expect(debuff.def.name).toBe("クリモアーク・蝕");
-    expect(debuff.def.stats).toMatchObject({ atk: 6_000, def: 2_300, spd: 225, accuracy: 0.75 });
+    expect(debuff.def.stats).toMatchObject({ atk: 15_000, def: 690, spd: 225, accuracy: 0.75 });
   });
 
   it("**同じ型が2体並ぶことを禁じていない**", () => {
@@ -408,7 +409,8 @@ describe("100階: スキル4「オーバークリエイト」", () => {
     expect((CRIMOARK_S4.effects[0] as { count?: number }).count).toBeUndefined();
     expect(CRIMOARK_S4.effects[1]).toMatchObject({ multiplier: 1.30 });
     expect(CRIMOARK_S4.effects[2]).toMatchObject({ amount: -0.50 });
-    expect(CRIMOARK_S4.effects[3]).toMatchObject({ stat: "def", amount: 0.50, durationTurns: 3 });
+    // 防御DOWNの量は共通値(`core/statusValues.ts`)。持続3ターンはこのスキル固有
+    expect(CRIMOARK_S4.effects[3]).toMatchObject({ stat: "def", amount: DEF_DOWN, durationTurns: 3 });
     expect(CRIMOARK_S4.effects[4]).toMatchObject({ healMultiplier: 0, durationTurns: 2 });
     expect(CRIMOARK_S4.effects[5]).toMatchObject({ amount: 0.30, applyTo: "SELF" });
   });

@@ -127,7 +127,7 @@ const DUR: LatentAbilityCategory = "DURABILITY";
 const MUSHROON: SpeciesTable = {
   FIRE: [
     { name: "猛毒培養", description: "スキル1の毒付与率が30%上がる", chanceBonus: { effectKind: "POISON", value: 0.3 } },
-    { name: "腐食胞子", description: "スキル1で毒が入った時、1ターン防御力を50%低下させる", category: DIS, condition: on("POISON"), effects: [DB("DEF_DOWN", 1)] },
+    { name: "腐食胞子", description: "スキル1で毒が入った時、1ターン防御力を75%低下させる", category: DIS, condition: on("POISON"), effects: [DB("DEF_DOWN", 1)] },
     { name: "胞子吸収", description: "スキル1使用時、自身のHPを最大HPの5%回復する", category: DUR, effects: [H(0.05)] },
   ],
   GRASS: [
@@ -218,7 +218,7 @@ const KOBOLD: SpeciesTable = {
   ],
   DARK: [
     { name: "処刑人", description: "HPが50%以下の相手へのスキル1の最終ダメージが25%上がる", when: [{ when: "TARGET_HP_BELOW_50", bonus: 0.25 }] },
-    { name: "鎧断ち", description: "HPが50%以下の相手へのスキル1で、1ターン防御力を50%低下させる", category: DIS, condition: below(0.5), effects: [DB("DEF_DOWN", 1)] },
+    { name: "鎧断ち", description: "HPが50%以下の相手へのスキル1で、1ターン防御力を75%低下させる", category: DIS, condition: below(0.5), effects: [DB("DEF_DOWN", 1)] },
     { name: "血の疾走", description: "スキル1で相手を倒した時、自身の行動ゲージが30%進む", condition: kill, effects: [G(0.3)] },
   ],
 };
@@ -231,7 +231,7 @@ const BASILISK: SpeciesTable = {
   ],
   GRASS: [
     { name: "蔦絡み", description: "速度低下状態の相手へのスキル1の最終ダメージが18%上がる", when: [{ when: "TARGET_SPD_DOWN", bonus: 0.18 }] },
-    { name: "鱗剥がし", description: "スキル1で速度低下が入った時、1ターン防御力を50%低下させる", category: DIS, condition: on("SPD_DOWN"), effects: [DB("DEF_DOWN", 1)] },
+    { name: "鱗剥がし", description: "スキル1で速度低下が入った時、1ターン防御力を75%低下させる", category: DIS, condition: on("SPD_DOWN"), effects: [DB("DEF_DOWN", 1)] },
     { name: "森の恵み", description: "スキル1使用時、自身のHPを最大HPの6%回復する", category: DUR, effects: [H(0.06)] },
   ],
   ELECTRIC: [
@@ -264,7 +264,7 @@ const MIMIC: SpeciesTable = {
   ],
   GRASS: [
     { name: "肥えた宝箱", description: "自身の最大HPが12%上がる", category: DUR, hpMul: 1.12 },
-    { name: "蔦の錠前", description: "対象が弱体状態なら、スキル1で1ターン防御力を50%低下させる", category: DIS, condition: state("TARGET_HAS_DEBUFF"), effects: [DB("DEF_DOWN", 1)] },
+    { name: "蔦の錠前", description: "対象が弱体状態なら、スキル1で1ターン防御力を75%低下させる", category: DIS, condition: state("TARGET_HAS_DEBUFF"), effects: [DB("DEF_DOWN", 1)] },
     { name: "苔むす木箱", description: "スキル1使用時、自身のHPを最大HPの5%回復する", category: DUR, effects: [H(0.05)] },
   ],
   ELECTRIC: [
@@ -326,7 +326,7 @@ const THUNDERBEAST: SpeciesTable = {
   FIRE: [
     { name: "灼雷の脚", description: "スキル1の速度比例ダメージが上がる", scale: { stat: "spd", bonusAtReference: 0.15 } },
     { name: "雷の昂ぶり", description: "スキル1がクリティカルした時、自身の行動ゲージが10%進む", condition: crit(), effects: [G(0.1)] },
-    { name: "焦がす牙", description: "スキル1がクリティカルした時、1ターン防御力を50%低下させる", category: DIS, condition: crit(), effects: [DB("DEF_DOWN", 1)] },
+    { name: "焦がす牙", description: "スキル1がクリティカルした時、1ターン防御力を75%低下させる", category: DIS, condition: crit(), effects: [DB("DEF_DOWN", 1)] },
   ],
   GRASS: [
     { name: "野生の脚", description: "スキル1使用時、自身の行動ゲージが8%進む", effects: [G(0.08)] },
@@ -357,7 +357,7 @@ const THUNDERBEAST: SpeciesTable = {
 
 const ABYSSREAPER: SpeciesTable = {
   FIRE: [
-    { name: "灼熱の鎌", description: "スキル1で解除に成功した時、1ターン防御力を50%低下させる", category: DIS, condition: on("STRIP"), effects: [DB("DEF_DOWN", 1)] },
+    { name: "灼熱の鎌", description: "スキル1で解除に成功した時、1ターン防御力を75%低下させる", category: DIS, condition: on("STRIP"), effects: [DB("DEF_DOWN", 1)] },
     { name: "無防備狩り", description: "強化効果を持つ相手を崩したあと、スキル1の最終ダメージが20%上がる", flat: 0.2 },
     { name: "刈り取りの勢い", description: "スキル1で解除に成功した時、自身の行動ゲージが12%進む", condition: on("STRIP"), effects: [G(0.12)] },
   ],
@@ -449,7 +449,7 @@ const CHRONOS: SpeciesTable = {
   ],
   DARK: [
     { name: "奪う時", description: "スキル1の行動ゲージ減少が30%になる", category: DIS, gaugeOverride: 0.3 },
-    { name: "凍てつく針", description: "スキル1のあと対象の行動ゲージが20%以下なら、1ターン防御力を50%低下させる", category: DIS, condition: state("TARGET_GAUGE_BELOW_20"), effects: [DB("DEF_DOWN", 1)] },
+    { name: "凍てつく針", description: "スキル1のあと対象の行動ゲージが20%以下なら、1ターン防御力を75%低下させる", category: DIS, condition: state("TARGET_GAUGE_BELOW_20"), effects: [DB("DEF_DOWN", 1)] },
     { name: "時の吸収", description: "スキル1で減らした行動ゲージの50%を自身が吸収する", effects: [DRAIN(0.5)] },
   ],
 };
@@ -482,7 +482,7 @@ const BEHEMOTH: SpeciesTable = {
   ],
   DARK: [
     { name: "挑発の追撃", description: "挑発状態の敵へのスキル1の最終ダメージが25%上がる", when: [{ when: "TARGET_TAUNTED", bonus: 0.25 }] },
-    { name: "砕く咆哮", description: "スキル1で挑発が入った時、1ターン防御力を50%低下させる", category: DIS, condition: on("TAUNT"), effects: [DB("DEF_DOWN", 1)] },
+    { name: "砕く咆哮", description: "スキル1で挑発が入った時、1ターン防御力を75%低下させる", category: DIS, condition: on("TAUNT"), effects: [DB("DEF_DOWN", 1)] },
     { name: "怒りの巨体", description: "攻撃を受けるたび次のスキル1の最終ダメージが6%上がる(最大30%、スキル1使用で戻る)", category: DUR, chargeOnHit: { perHit: 0.06, maxBonus: 0.3 } },
   ],
 };

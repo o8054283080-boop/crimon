@@ -106,17 +106,17 @@ describe("試練の塔70階 確定仕様", () => {
 
     boss.currentHp = 100_000;
     e.applyTower70BossRegen(boss);
-    expect(boss.currentHp).toBe(111_900); // 170000 * 7%
+    expect(boss.currentHp).toBe(111_305); // 161500 * 7%
 
     life.alive = false;
     life.currentHp = 0;
     e.applyTower70BossRegen(boss);
-    expect(boss.currentHp).toBe(117_000); // +170000 * 3%
+    expect(boss.currentHp).toBe(116_150); // +161500 * 3%
 
     boss.healBlockTurns = 2;
     boss.healBlockMultiplier = 0;
     e.applyTower70BossRegen(boss);
-    expect(boss.currentHp).toBe(117_000);
+    expect(boss.currentHp).toBe(116_150);
   });
 
   it("HP帯強化は置き換え式でATK/SPD/HP比例倍率が70/50/30%帯で切り替わる", () => {

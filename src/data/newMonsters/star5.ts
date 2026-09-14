@@ -52,7 +52,7 @@ export const ABYSSREAPER: MonsterTemplate = {
     {
       id: "abyssreaper_s2_b",
       name: "死神の鎖",
-      description: "鎖で縛り、有利な効果を1個剥がしてから敵単体に攻撃力1.4倍のダメージを与える。80%で2ターン防御力を50%低下させ、行動ゲージを40%減少させる。",
+      description: "鎖で縛り、有利な効果を1個剥がしてから敵単体に攻撃力1.4倍のダメージを与える。80%で2ターン防御力を75%低下させ、行動ゲージを40%減少させる。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
@@ -164,7 +164,7 @@ export const FENRIR: MonsterTemplate = {
   skill1: {
     id: "fenrir_s1",
     name: "狩狼牙",
-    description: "敵単体へ攻撃力0.55倍のダメージを与える牙を二度立てる。それぞれの攻撃ごとに35%で2ターン防御力を50%低下させる。",
+    description: "敵単体へ攻撃力0.55倍のダメージを与える牙を二度立てる。それぞれの攻撃ごとに35%で2ターン防御力を75%低下させる。",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
@@ -199,7 +199,7 @@ export const FENRIR: MonsterTemplate = {
     {
       id: "fenrir_s2_c",
       name: "喉笛裂き",
-      description: "喉笛を狙い、敵単体に攻撃力1.35倍のダメージを与える。80%で2ターン防御力を50%低下させる。対象のHPが50%以下なら自身の行動ゲージが50%進む。",
+      description: "喉笛を狙い、敵単体に攻撃力1.35倍のダメージを与える。80%で2ターン防御力を75%低下させる。対象のHPが50%以下なら自身の行動ゲージが50%進む。",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
@@ -487,7 +487,7 @@ export const BEHEMOTH: MonsterTemplate = {
     {
       id: "behemoth_s3_a",
       name: "天地崩壊",
-      description: "天地が崩れ、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.05を加算)。80%で2ターン防御力を50%低下させる。自身のHPが50%以上なら敵全体の行動ゲージをさらに20%減少させる。",
+      description: "天地が崩れ、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.05を加算)。80%で2ターン防御力を75%低下させる。自身のHPが50%以上なら敵全体の行動ゲージをさらに20%減少させる。",
       target: "ALL_ENEMIES",
       cooldownTurns: 6,
       effects: [
