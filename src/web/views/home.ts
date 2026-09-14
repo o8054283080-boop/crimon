@@ -760,7 +760,7 @@ export function renderHome(props: HomeProps): HTMLElement {
   const giftCount = unclaimedGiftCount(GIFT_DEFINITIONS, player);
   const giftEntry = el("button", {
     type: "button",
-    className: "home-quick home-quick--gift",
+    className: "world-action world-action--left home-gift-action",
     "data-tour": "tile:giftBox",
     onclick: props.onGoGiftBox,
     ariaLabel: giftCount > 0 ? `プレゼントボックス（未受取${giftCount}件）` : "プレゼントボックス",
@@ -846,12 +846,12 @@ export function renderHome(props: HomeProps): HTMLElement {
           worldButton("left", "menu-dex", "図鑑", props.onGoMonsterDex),
           worldButton("left", "menu-ranking", "ランキング"),
           worldButton("left", "menu-help", "遊び方", onGoHowToPlay),
+          giftEntry,
         ]),
         el("div", { className: "world-info-stack" }, [
           tutorial,
           bannerStack,
         ].filter((node): node is HTMLElement => node !== null)),
-        el("div", { className: "home-quick-stack" }, [giftEntry]),
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
           worldButton("right", "activity-adventure", "冒険", props.onGoStages),
