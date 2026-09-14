@@ -123,10 +123,16 @@ body:has(.crimon-home) {
 .crimon-resource-header .home-wallet__suffix { color: var(--home-text-muted) !important; }
 
 /* 画像の明るい世界をHOMEの主役にする。上部は空、中央はモンスターの余白、
- * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。 */
+ * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。
+ *
+ * **下限は左の縦列が入りきる高さ。**`crimon-visual-system.css` の
+ * `.home-world` と同じ値にすること。実際に効くのは `!important` の付いた
+ * こちらなので、あちらだけ直しても画面は1pxも動かない(実測で確認)。
+ * 6段(ミッション・図鑑・ランキング・遊び方・お知らせ・プレゼント)の内訳は
+ * 72px × 6 + 間隔5px × 5 + 上下の余白 = 472px。 */
 .home-world {
   height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
-  min-height: 356px !important;
+  min-height: 472px !important;
   margin: -1px 0 0 !important;
   border-inline: 0 !important;
   background: url("./assets/home/home-sky-isles-v2.jpg") center 58% / cover no-repeat !important;

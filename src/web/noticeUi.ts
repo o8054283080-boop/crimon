@@ -112,7 +112,12 @@ function installNoticeButton(): void {
   const image = button.querySelector<HTMLImageElement>("img");
   if (image) image.src = new URL("./assets/home/menu-notice.svg", import.meta.url).href;
 
-  const label = button.querySelector<HTMLElement>("span") ?? button.querySelector<HTMLElement>("strong");
+  /*
+   * **`strong` を先に探す。**`span` を先に取ると、中の `strong` ごと
+   * 文字列で潰してしまい、お知らせの札だけ書体と大きさが変わる
+   * (`.world-action strong` の 700 11px が当たらなくなるため)。
+   */
+  const label = button.querySelector<HTMLElement>("strong") ?? button.querySelector<HTMLElement>("span");
   if (label) label.textContent = "お知らせ";
   else button.append(document.createTextNode("お知らせ"));
 

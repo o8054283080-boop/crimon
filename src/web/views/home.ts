@@ -681,6 +681,7 @@ export function renderHome(props: HomeProps): HTMLElement {
     "menu-dex": new URL("../assets/home/menu-dex.svg", import.meta.url).href,
     "menu-ranking": new URL("../assets/home/menu-ranking.svg", import.meta.url).href,
     "menu-help": new URL("../assets/home/menu-help.svg", import.meta.url).href,
+    "menu-gift": new URL("../assets/home/menu-gift.svg", import.meta.url).href,
     "activity-adventure": new URL("../assets/home/activity-adventure.svg", import.meta.url).href,
     "activity-dungeon": new URL("../assets/home/activity-dungeon.svg", import.meta.url).href,
     "activity-arena": new URL("../assets/home/activity-arena.svg", import.meta.url).href,
@@ -756,21 +757,30 @@ export function renderHome(props: HomeProps): HTMLElement {
   /*
    * プレゼントの入口。**未受取が0でも入口は出す**(履歴を見に行けるように)。
    * 赤い印は「配布が始まっていて・まだ受け取っていなくて・期限内」のものだけ数える。
+   *
+   * **左の縦列の一員として置く。**以前はヘッダーのすぐ下に横長で置いていたが、
+   * 1本まるごと縦を食っていて、配布の札が何枚か出ている日には
+   * **世界の絵が画面の外まで押し出されていた**(実測で確認)。
+   * 縦列なら、増えても世界の高さを奪わない。
+   *
+   * 並びは 遊び方 → お知らせ → プレゼント。
+   * お知らせは `noticeUi.ts` が「遊び方」の直後へ差し込むので、
+   * **ここで遊び方の次に置けば、自動でお知らせの下に回る。**
    */
   const giftCount = unclaimedGiftCount(GIFT_DEFINITIONS, player);
   const giftEntry = el("button", {
     type: "button",
-    className: "home-gift",
+    className: "world-action world-action--left home-gift",
     "data-tour": "tile:giftBox",
     onclick: props.onGoGiftBox,
     ariaLabel: giftCount > 0 ? `プレゼントボックス（未受取${giftCount}件）` : "プレゼントボックス",
   }, [
-    el("span", { className: "home-gift__icon", "aria-hidden": "true" }, ["🎁"]),
-    el("span", { className: "home-gift__label" }, ["プレゼント"]),
+    el("img", { src: homeAsset("menu-gift"), alt: "", "aria-hidden": "true" }, []),
+    el("span", {}, [el("strong", {}, ["プレゼント"])]),
     giftCount > 0
       ? el("span", { className: "home-gift__badge" }, [String(giftCount)])
-      : el("span", { className: "home-gift__note" }, ["受取履歴を見る"]),
-  ]);
+      : null,
+  ].filter((node): node is HTMLElement => node !== null));
   const openTutorial = () => {
     const current = tutorial.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
     if (current) current.open = true;
@@ -808,16 +818,6 @@ export function renderHome(props: HomeProps): HTMLElement {
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
       ]),
-      /*
-       * プレゼントの入口。**浮かせず、ヘッダーのすぐ下に置く。**
-       *
-       * 初心者ミッションは `beginnerMissionReferencePosition.ts` が
-       * 「配布の札(無ければヘッダー)の直後」へ常に引き上げている。
-       * 配布の札の下に置くと**その後ろへ押し出され**、実測では画面の下端
-       * (390x844で765px地点)まで落ちて下のタブに覆われていた。
-       * ここなら何が増えても上に残る。
-       */
-      giftEntry,
       /*
        * ログインボーナスと補填の札。**世界の上へ浮かせない。**
        *
@@ -860,6 +860,9 @@ export function renderHome(props: HomeProps): HTMLElement {
           worldButton("left", "menu-dex", "図鑑", props.onGoMonsterDex),
           worldButton("left", "menu-ranking", "ランキング"),
           worldButton("left", "menu-help", "遊び方", onGoHowToPlay),
+          // **お知らせはここに挟まる。**`noticeUi.ts` が「遊び方」の直後へ
+          // 差し込むので、並びは 遊び方 → お知らせ → プレゼント になる
+          giftEntry,
         ]),
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [

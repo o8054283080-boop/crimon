@@ -221,45 +221,53 @@
 
 /* ------------------------------------------------------------------ ホームの入口 */
 
+/*
+ * 見た目は `world-action`(左の縦列)が持つ。**ここでは何も足さない。**
+ *
+ * 以前はヘッダーの下に置く横長の札で、独自の枠と背景を持っていた。
+ * 縦列へ移した今それを残すと、隣の「お知らせ」「遊び方」と額が違って見える。
+ * 縦列の一員として揃えたいので、**指定するのは赤い印の位置だけ**。
+ */
 .home-gift {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 52px;
-  padding: 10px 14px;
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  background: var(--surface-raised);
-  box-shadow: var(--edge-light), var(--drop-soft);
-  color: var(--text);
-  text-align: left;
+  position: relative;
 }
 
-.home-gift__icon { font-size: 20px; line-height: 1; }
-
-.home-gift__label {
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--gold-2);
-}
-
-.home-gift__note {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
+/*
+ * 未受取の件数。**角へ寄せる。**
+ * 中に混ぜると絵とラベルの間へ割り込んで、隣のボタンだけ縦に伸びる。
+ */
 .home-gift__badge {
-  min-width: 22px;
-  padding: 1px 6px;
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  min-width: 20px;
+  padding: 0 5px;
+  border: 2px solid #fff1df;
   border-radius: 999px;
   background: #c0392b;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
-  line-height: 20px;
+  line-height: 18px;
   text-align: center;
 }
+
+/*
+ * 左の縦列は6段になった(ミッション・図鑑・ランキング・遊び方・お知らせ・プレゼント)。
+ *
+ * **世界の枠に収める。** `.home-world` の高さは
+ * `100dvh - ... - var(--home-banner-h)` で決まるので、
+ * 配布の札が何枚か出ている日は下限の356pxまで縮む。
+ * 6段をそのまま並べると432pxになり、**76pxぶんが枠の外へ出る。**
+ * 世界は `overflow:hidden` なので、はみ出した段は黙って切り落とされ、
+ * 一番下のプレゼントが押せなくなる
+ * (同じ切り落としを「試練の塔」で出している。CLAUDE.md参照)。
+ *
+ * 高さが足りない時だけ縮み、余っていれば元の大きさのままにする。
+ * **潰れきらないよう下限を置く**(44pxは指で押せる最小)。
+ */
+/*
+ * 世界の枠は6段ぶんへ広げてある(`crimon-visual-system.css` の `.home-world`)。
+ * **枠の高さはあちらが持つ。**ここで上書きすると、同じ値が2か所に散る。
+ */
