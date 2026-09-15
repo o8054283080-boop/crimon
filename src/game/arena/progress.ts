@@ -100,9 +100,6 @@ function grantReward(state: PlayerState, reward: ArenaRewardBundle): void {
   if (reward.summonScrolls) addSummonScrolls(state, reward.summonScrolls);
   if (reward.fourStarSummonScrolls) state.fourStarSummonScrolls += reward.fourStarSummonScrolls;
   if (reward.lightDarkFourStarSummonScrolls) state.lightDarkFourStarSummonScrolls += reward.lightDarkFourStarSummonScrolls;
-  if (reward.cosmeticId && !state.arenaCosmetics.includes(reward.cosmeticId)) {
-    state.arenaCosmetics.push(reward.cosmeticId);
-  }
 }
 
 /** 週間報酬を受け取れるか(受け取らずに確かめるだけ) */
