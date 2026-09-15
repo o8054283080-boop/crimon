@@ -10,6 +10,10 @@ create table if not exists public.arena_rank_reward_rules (
   coins integer not null check (coins >= 0)
 );
 
+alter table public.arena_rank_reward_rules enable row level security;
+-- No direct client policy is needed: this rule table is consumed only by the
+-- SECURITY DEFINER claim RPC. Keeping it closed prevents client-side tampering.
+
 insert into public.arena_rank_reward_rules (min_rank, max_rank, coins) values
   (1,1,1500),(2,2,1250),(3,3,1000),(4,10,750),(11,30,500),(31,100,250)
 on conflict (min_rank) do update set max_rank=excluded.max_rank, coins=excluded.coins;
