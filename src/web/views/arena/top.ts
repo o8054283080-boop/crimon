@@ -13,7 +13,46 @@ import { renderPartySlots } from "../partyCard.js";
 import { buildArenaTopView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
 import { ARENA_TEAM_SIZE } from "../../../data/pvpArena.js";
+import { ARENA_WEEKLY_REWARDS, ARENA_SEASON_REWARDS, ARENA_SEASON_RANK_REWARDS, ArenaRewardBundle, arenaWeeklyReward, arenaSeasonReward, arenaSeasonRankReward } from "../../../data/arena/season.js";
+import { ARENA_TIERS } from "../../../data/arena/ranks.js";
 
+
+function rewardText(reward: ArenaRewardBundle): string {
+  const parts: string[] = [];
+  if (reward.crystal) parts.push(`💎${reward.crystal.toLocaleString("ja-JP")}`);
+  if (reward.gold) parts.push(`💰${reward.gold.toLocaleString("ja-JP")}`);
+  if (reward.arenaCoins) parts.push(`🎫${reward.arenaCoins.toLocaleString("ja-JP")}`);
+  if (reward.summonScrolls) parts.push(`召喚書×${reward.summonScrolls}`);
+  if (reward.fourStarSummonScrolls) parts.push(`★4以上×${reward.fourStarSummonScrolls}`);
+  if (reward.lightDarkFourStarSummonScrolls) parts.push(`★4以上光闇×${reward.lightDarkFourStarSummonScrolls}`);
+  return parts.join(" / ") || "なし";
+}
+
+function renderRewardGuide(view: ReturnType<typeof buildArenaTopView>): HTMLElement {
+  const rankReward = arenaSeasonRankReward(view.standing.online && /位$/.test(view.standing.label) ? Number(view.standing.label.replace("位","")) : null);
+  return el("details", { className: "panel ar-rewards" }, [
+    el("summary", { className: "ar-rewards__summary" }, ["🎁 アリーナ報酬を確認"]),
+    el("div", { className: "ar-rewards__current" }, [
+      el("strong", {}, ["今週のランク報酬"]),
+      el("span", {}, [rewardText(arenaWeeklyReward(view.tier.id))]),
+      el("strong", {}, ["現在ランクのシーズン報酬"]),
+      el("span", {}, [rewardText(arenaSeasonReward(view.tier.id))]),
+      el("strong", {}, ["現在順位のシーズン順位報酬"]),
+      el("span", {}, [rewardText(rankReward)]),
+    ]),
+    el("h3", {}, ["週間 / シーズン ランク報酬"]),
+    ...ARENA_TIERS.map((tier) => el("div", { className: "ar-rewards__row" }, [
+      el("b", {}, [tier.name]),
+      el("span", {}, [`週: ${rewardText(ARENA_WEEKLY_REWARDS.find(x=>x.tierId===tier.id)?.reward ?? {})}`]),
+      el("span", {}, [`季: ${rewardText(ARENA_SEASON_REWARDS.find(x=>x.tierId===tier.id)?.reward ?? {})}`]),
+    ])),
+    el("h3", {}, ["シーズン最終順位報酬（ランク報酬に追加）"]),
+    ...ARENA_SEASON_RANK_REWARDS.map((entry) => el("div", { className: "ar-rewards__row" }, [
+      el("b", {}, [entry.label]), el("span", {}, [rewardText(entry.reward)]),
+    ])),
+    el("p", { className: "ar-note" }, ["順位報酬はシーズン終了時の最終順位で確定します。"]),
+  ]);
+}
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
@@ -160,6 +199,7 @@ export function renderArenaTop(props: PvpArenaProps): HTMLElement {
     renderStanding(view),
     renderTickets(props, view),
     renderPeriod(props, view),
+    renderRewardGuide(view),
     renderMenu(props, view),
     renderOffense(props),
   ]));
