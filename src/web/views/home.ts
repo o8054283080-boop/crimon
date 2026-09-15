@@ -778,7 +778,9 @@ export function renderHome(props: HomeProps): HTMLElement {
     el("img", { src: homeAsset("menu-gift"), alt: "", "aria-hidden": "true" }, []),
     el("span", {}, [el("strong", {}, ["プレゼント"])]),
     giftCount > 0
-      ? el("span", { className: "home-gift__badge" }, [String(giftCount)])
+      // **`span` にしない。**左の縦列は `.world-action > span` を読み上げ用に
+      // 隠しているので、印もそれに巻き込まれて見えなくなる(`noticeUi.ts` 参照)
+      ? el("i", { className: "world-action__badge home-gift__badge" }, [String(giftCount)])
       : null,
   ].filter((node): node is HTMLElement => node !== null));
   const openTutorial = () => {
@@ -870,7 +872,22 @@ export function renderHome(props: HomeProps): HTMLElement {
          * **今回は切り落とさない。**代わりに出す本数を絞り
          * (`HOME_BANNER_LIMIT`)、残りは「ほかにN件」の1行へ畳む。
          */
-        bannerStack,
+        /*
+         * 札と初心者ミッション。**1つの箱へまとめて縦に並べる。**
+         *
+         * どちらも世界の空(左右の縦列の間、モンスターより上)へ置く。
+         * 世界の外にあった頃は2つで183pxを縦から取っていて、それだけで
+         * ホームが画面に収まらなくなっていた。
+         *
+         * **別々に浮かせない。**最初そうしたら、初心者ミッションの
+         * 「移動」が札の裏に、「受け取る」が右の縦列の裏に回り込んだ
+         * (巡回が5件拾った)。1つの箱に入れて縦に積めば、重なりようがない。
+         *
+         * 押した時に開く詳細は `position:fixed` で画面いっぱいに出る作りなので、
+         * 世界の中にあっても読める範囲は変わらない。
+         */
+        el("div", { className: "world-info" }, [bannerStack, tutorial]
+          .filter((node): node is NonNullable<typeof node> => node !== null)),
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
           worldButton("right", "activity-adventure", "冒険", props.onGoStages),
@@ -884,7 +901,6 @@ export function renderHome(props: HomeProps): HTMLElement {
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
         ]),
       ].filter((node): node is NonNullable<typeof node> => node !== null)),
-      tutorial,
       staminaSheet,
       settingsSheet,
     ].filter((node): node is HTMLElement => node !== null));

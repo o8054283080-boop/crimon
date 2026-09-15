@@ -136,7 +136,7 @@ describe("ホームに出すお知らせを絞る", () => {
      * 一度それをやって巡回が8件拾っている。位置を中身から切り離す。
      */
     const css = readFileSync(new URL("../src/web/home-pop-design.css", import.meta.url), "utf8");
-    const close = css.slice(css.indexOf(".home-world > .reward-banner-stack .reward-banner__close"));
+    const close = css.slice(css.indexOf(".home-world .reward-banner-stack .reward-banner__close"));
     expect(close.slice(0, 220)).toContain("position: absolute");
   });
 });

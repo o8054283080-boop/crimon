@@ -4,6 +4,37 @@ import "./noticeUi.css";
 const BUTTON_ID = "persistent-notice-button";
 const SHEET_ID = "persistent-notice-sheet";
 
+/**
+ * 最後にお知らせを開いた日。**IDではなく日付で覚える。**
+ *
+ * IDにすると、そのお知らせが後で消えた時に何と比べればいいのか分からなくなる。
+ * 日付なら「これより新しいものが何件あるか」を数えるだけで済む。
+ */
+const NOTICE_READ_KEY = "crimon.notice.readUntil.v1";
+
+function today(): string {
+  const now = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+}
+
+/**
+ * まだ読んでいないお知らせの件数。
+ *
+ * **配り始めていないものは数えない。**先の日付で書いてあるお知らせを
+ * 数えると、赤い印が出ているのに開いても何も新しくない状態になる。
+ */
+function unreadNoticeCount(): number {
+  let readUntil = "";
+  try { readUntil = localStorage.getItem(NOTICE_READ_KEY) ?? ""; } catch { /* 読めない端末は全部新着扱い */ }
+  const now = today();
+  return COMPENSATIONS.filter((n) => n.fromDate <= now && n.fromDate > readUntil).length;
+}
+
+function markNoticeRead(): void {
+  try { localStorage.setItem(NOTICE_READ_KEY, today()); } catch { /* 書けなくても開ける */ }
+}
+
 function kindLabel(notice: Compensation): string {
   if (notice.kind === "UPDATE") return "アップデート";
   if (notice.kind === "CELEBRATION") return "記念・配布";
@@ -26,6 +57,9 @@ function closeSheet(): void {
 
 function openSheet(): void {
   if (document.getElementById(SHEET_ID)) return;
+  // 開いた時点で既読。閉じてから消すと、読んだのに印が残って見える
+  markNoticeRead();
+  document.querySelector(`#${BUTTON_ID} .world-action__badge`)?.remove();
 
   const root = document.createElement("div");
   root.id = SHEET_ID;
@@ -120,6 +154,29 @@ function installNoticeButton(): void {
   const label = button.querySelector<HTMLElement>("strong") ?? button.querySelector<HTMLElement>("span");
   if (label) label.textContent = "お知らせ";
   else button.append(document.createTextNode("お知らせ"));
+
+  /*
+   * 新しいお知らせの件数。**プレゼントと同じ見た目**(`world-action__badge`)。
+   * 印が出る条件が2つの入口で違って見えるのは、並べて置く以上おかしい。
+   */
+  const unread = unreadNoticeCount();
+  if (unread > 0) {
+    /*
+     * **`span` にしない。**左の縦列は絵に文字が焼き込んであるため、
+     * `home-left-generated.css` が `.world-action > span` を読み上げ用に
+     * 隠している(`opacity:0; height:1px` の `!important` 付き)。
+     * `span` で作ると印もそれに巻き込まれ、20x1pxの透明になる(実測)。
+     */
+    const badge = document.createElement("i");
+    badge.className = "world-action__badge";
+    /*
+     * **2桁で打ち止め。**初めて開いた人は過去の更新履歴が全部未読なので、
+     * そのまま出すと「89」になる(実測)。左の縦列のボタンは幅72pxで、
+     * 3桁は絵の上まではみ出す。数の正確さより「新しいものがある」が伝わればよい。
+     */
+    badge.textContent = unread > 9 ? "9+" : String(unread);
+    button.append(badge);
+  }
 
   button.addEventListener("click", openSheet);
   playButton.insertAdjacentElement("afterend", button);

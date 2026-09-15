@@ -228,30 +228,21 @@
  * 縦列へ移した今それを残すと、隣の「お知らせ」「遊び方」と額が違って見える。
  * 縦列の一員として揃えたいので、**指定するのは赤い印の位置だけ**。
  */
+/*
+ * 赤い印(`world-action__badge`)は絶対配置なので、**受け皿が要る。**
+ * プレゼントだけに書くと、同じ印を付けたお知らせの数字が
+ * 画面の左上へ飛ぶ。左の縦列のボタン全部に持たせる。
+ */
+.world-action,
 .home-gift {
   position: relative;
 }
 
 /*
- * 未受取の件数。**角へ寄せる。**
- * 中に混ぜると絵とラベルの間へ割り込んで、隣のボタンだけ縦に伸びる。
+ * 赤い印の見た目は `home-pop-design.css` が持つ。
+ * **ここには書かない。**この1枚はプレゼントの画面を開くまで読まれず、
+ * ホームでは当たらないことがある(実測: 印が 20x1px・透明で出た)。
  */
-.home-gift__badge {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  min-width: 20px;
-  padding: 0 5px;
-  border: 2px solid #fff1df;
-  border-radius: 999px;
-  background: #c0392b;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 18px;
-  text-align: center;
-}
 
 /*
  * 左の縦列は6段になった(ミッション・図鑑・ランキング・遊び方・お知らせ・プレゼント)。
