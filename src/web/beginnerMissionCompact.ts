@@ -12,7 +12,7 @@ function installStyles(): void {
       margin-bottom: 6px !important;
     }
 
-    html body .crimon-home > .crimon-tutorial.crimon-tutorial--compact {
+    html body .crimon-home .crimon-tutorial.crimon-tutorial--compact {
       position: static !important;
       z-index: auto !important;
       top: auto !important;
@@ -170,7 +170,7 @@ function installStyles(): void {
         margin-bottom: 4px !important;
       }
 
-      html body .crimon-home > .crimon-tutorial.crimon-tutorial--compact {
+      html body .crimon-home .crimon-tutorial.crimon-tutorial--compact {
         margin: 3px 6px 7px !important;
       }
 
@@ -315,8 +315,13 @@ function enhanceBeginnerMission(section: HTMLElement): void {
   section.replaceChildren(wrapper);
 }
 
+/*
+ * **直下ではなく子孫で探す。**初心者ミッションは世界の中(左右の縦列の間)へ
+ * 移してあり、`.crimon-home > .crimon-tutorial` では1つも拾えない。
+ * 拾えないと2段カードへの作り替えが走らず、旧48pxの札のまま出る。
+ */
 function scan(): void {
-  document.querySelectorAll<HTMLElement>(".crimon-home > .crimon-tutorial").forEach(enhanceBeginnerMission);
+  document.querySelectorAll<HTMLElement>(".crimon-home .crimon-tutorial").forEach(enhanceBeginnerMission);
 }
 
 installStyles();

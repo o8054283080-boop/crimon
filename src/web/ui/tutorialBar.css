@@ -287,9 +287,17 @@
  * 初心者ミッションUX
  * ============================================================ */
 
-/* HOMEではヘッダー操作の直下に常駐させる。スタミナボタンと十分に距離を取る。 */
+/*
+ * **初心者ミッションは世界の中へ移した。**ここで場所を空ける必要は無い。
+ *
+ * もとはヘッダーの下に94pxの空き地を作り、そこへ `position:fixed` で
+ * 浮かせていた。浮かせた札の指定(`.crimon-home > .crimon-tutorial`)は
+ * 直下を見ているので、中へ移した今はもう当たらない。
+ * **空き地だけが残っていた**(実測92px)。ホームが画面に収まらない原因の
+ * ほぼ半分がこれで、はみ出し53pxのうち88pxぶんを占めていた。
+ */
 .crimon-home > .crimon-resource-header {
-  margin-bottom: 94px !important;
+  margin-bottom: 6px !important;
 }
 
 .crimon-home > .crimon-tutorial:not(:has(.crimon-tutorial__complete)) {
@@ -425,7 +433,7 @@
   }
 
   .crimon-home > .crimon-resource-header {
-    margin-bottom: 92px !important;
+    margin-bottom: 4px !important;
   }
 
   .crimon-home > .crimon-tutorial:not(:has(.crimon-tutorial__complete)) {

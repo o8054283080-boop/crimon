@@ -393,6 +393,35 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  * **切り落とさない。**入りきらない分は `HOME_BANNER_LIMIT` で畳む。
  * ========================================================================== */
 
+/* 札と初心者ミッションを入れた箱。**浮かせるのはこの箱だけ。**
+ * 中身を別々に浮かせると、初心者ミッションの「移動」が札の裏へ、
+ * 「受け取る」が右の縦列の裏へ回り込む(巡回が5件拾った)。 */
+.home-world > .world-info {
+  position: absolute !important;
+  z-index: 12 !important;
+  top: 6px !important;
+  left: 88px !important;
+  right: 104px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.home-world > .world-info > .reward-banner-stack,
+.home-world > .world-info > .crimon-tutorial {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  margin: 0 !important;
+}
+
+/* 初心者ミッションは1本ぶん。中の「移動」「受け取る」は押せる大きさを保つ */
+.home-world > .world-info > .crimon-tutorial {
+  min-height: 0 !important;
+  max-height: 86px !important;
+  overflow: hidden !important;
+}
+
 .home-world > .reward-banner-stack {
   position: absolute !important;
   /* 左右の縦列(`.world-actions` は z-index 4〜6)より上。
@@ -416,7 +445,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  * 中身は溢れるが、切り落とされて困るのは「閉じる」だけ。
  * それは下で右上へ絶対配置して、**必ず枠の中に残す**。
  * 詳しい中身は左の「お知らせ」から全部読める。 */
-.home-world > .reward-banner-stack .reward-banner {
+.home-world .reward-banner-stack .reward-banner {
   position: relative !important;
   min-height: 54px !important;
   max-height: 54px !important;
@@ -429,7 +458,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  * 折り返すと3行になり、それだけでモンスターの顔ぶんの高さを食う。
  * ここは押す物が無いので、あふれた文字は省略してよい
  * (中身は左の「お知らせ」から全部読める)。 */
-.home-world > .reward-banner-stack .reward-banner-stack__rest {
+.home-world .reward-banner-stack .reward-banner-stack__rest {
   padding: 4px 7px !important;
   font-size: 9.5px !important;
   line-height: 1.4 !important;
@@ -444,7 +473,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  * `overflow:hidden` に切り落とされて押せなくなる。
  * 一度それをやって巡回が8件拾っている(「押せないボタン『閉じる』の
  * 手前に home-world」)。**位置を中身から切り離せば、二度と起きない。** */
-.home-world > .reward-banner-stack .reward-banner__close {
+.home-world .reward-banner-stack .reward-banner__close {
   position: absolute !important;
   top: 5px !important;
   right: 5px !important;
@@ -457,7 +486,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 /* アカウント復旧の案内も1本ぶんに抑える。
  * こちらは閉じるボタンを持たない(消し方は「登録すること」だけ)ので、
  * 切り落として困るのは**「登録する」の的**だけ。右へ固定して残す。 */
-.home-world > .reward-banner-stack .cloud-warn {
+.home-world .reward-banner-stack .cloud-warn {
   position: relative !important;
   min-height: 54px !important;
   max-height: 54px !important;
@@ -467,11 +496,11 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   line-height: 1.3 !important;
 }
 
-.home-world > .reward-banner-stack .cloud-warn__lead {
+.home-world .reward-banner-stack .cloud-warn__lead {
   display: none !important;
 }
 
-.home-world > .reward-banner-stack .cloud-warn__go {
+.home-world .reward-banner-stack .cloud-warn__go {
   position: absolute !important;
   top: 5px !important;
   right: 5px !important;
@@ -483,4 +512,93 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   margin: 0 !important;
   padding: 0 4px !important;
   font-size: 10px !important;
+}
+
+/* 縦の短い端末(iPhone SE級 375x667)。
+ *
+ * 世界の下限472pxは**左の縦列6段が72pxで並ぶ**前提の値。
+ * 667pxの端末では ヘッダー100 + パーティ86 + ナビ78 を引くと約400pxしか
+ * 残らず、そのままだと134pxはみ出す(実測)。
+ *
+ * **段を切り落とさずに縮める。**絵を44px(指で押せる最小)まで小さくし、
+ * 下限もその6段ぶんへ下げる。潰して隠すのではなく、小さくして全部見せる。 */
+@media (max-height: 700px) {
+  .crimon-home .world-action {
+    min-height: 56px !important;
+  }
+
+  .crimon-home .world-action img {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .crimon-home .world-action--right {
+    min-height: 62px !important;
+  }
+
+  .crimon-home .world-action--right img {
+    width: 50px !important;
+    height: 50px !important;
+  }
+
+  /* 56px × 6段 + 間隔5px × 5 + 上下の余白 = 366px */
+  .home-world {
+    min-height: 366px !important;
+  }
+}
+
+/* 幅の広い端末(430px級)。
+ *
+ * ここでは左の縦列が1段84pxになり、6段で514px。
+ * 下限472pxのままだと**55pxはみ出してプレゼントが切り落とされる**
+ * (巡回が「押せないボタン『プレゼント』」を拾った)。
+ * 高さに余裕がある端末なので、下限の方を上げて全段を見せる。 */
+@media (min-width: 410px) {
+  .home-world {
+    min-height: 530px !important;
+  }
+}
+
+
+/* 新しいものがある印。お知らせ(未読)とプレゼント(未受取)で同じ見た目。
+ *
+ * **`giftBox.css` には置かない。**あの1枚はプレゼントの画面を開くまで
+ * 読まれず、ホームでは当たらないことがある。
+ * **`!important` が要る。**左の縦列は `.world-action span` に
+ * `display:flex; flex-direction:column` を持っていて、素の指定では
+ * 印が高さ1px・透明に潰れる(実測: 20x1px、opacity 0)。 */
+.crimon-home .world-action__badge,
+.crimon-home .home-gift__badge {
+  position: absolute !important;
+  z-index: 2 !important;
+  top: 1px !important;
+  right: 2px !important;
+  display: grid !important;
+  place-items: center !important;
+  box-sizing: border-box !important;
+  min-width: 20px !important;
+  height: 20px !important;
+  padding: 0 4px !important;
+  border: 2px solid #fff1df !important;
+  border-radius: 999px !important;
+  background: #d7332f !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .5) !important;
+  opacity: 1 !important;
+  color: #fff !important;
+  font: 900 11px/1 "Yu Mincho", serif !important;
+  /* `i` で作ってあるので、斜体を戻す(`span` は縦列の読み上げ用の隠しに巻き込まれる) */
+  font-style: normal !important;
+  text-shadow: none !important;
+}
+
+/* ダンジョンの選択(装備／育成／ゴールド／目覚)は**札より上**。
+ *
+ * 札の箱を z-index 12 にした時、選択の 8 を追い越してしまい、
+ * 4つの行き先が札の裏へ回り込んで押せなくなった
+ * (巡回が29件: 「押せないボタン『装備』の手前に reward-banner」と、
+ *  そこから先へ進めない画面が芋づるで11件)。
+ *
+ * **押した時だけ開く一時的なものが、常設の案内より下にあってはいけない。** */
+.home-world .crimon-dungeon-chooser {
+  z-index: 20 !important;
 }

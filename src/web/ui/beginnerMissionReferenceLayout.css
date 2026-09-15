@@ -3,7 +3,7 @@
  * 参考画像どおり「ヘッダー → 初心者ミッション → CURRENT PARTY → ワールド」の
  * 2段カードを、既存の旧48px固定高さに切らせない。
  */
-html body .crimon-home > .crimon-tutorial.crimon-tutorial--compact {
+html body .crimon-home .crimon-tutorial.crimon-tutorial--compact {
   height: auto !important;
   min-height: 86px !important;
   flex: 0 0 auto !important;
@@ -14,7 +14,12 @@ html body .crimon-home > .crimon-tutorial.crimon-tutorial--compact {
   flex: 0 0 auto !important;
 }
 
-/* 旧HOMEは初心者ミッションを48pxとしてワールド高を計算している。
+/* **初心者ミッションを世界の中へ移したので、この2つはもう当たらない。**
+ * `:has(> ...)` は直下だけを見るため、どちらの分岐にも入らず、
+ * 世界の高さは `crimon-visual-system.css` / `home-pop-design.css` の式で決まる。
+ * 残してあるのは、外へ戻した時に元の計算へ戻せるようにするため。
+ *
+ * 旧HOMEは初心者ミッションを48pxとしてワールド高を計算していた。
  * コンパクト2段カードの実寸(約86px)との差38pxをワールド側から引き、
  * 下部ナビへ押し出さない。 */
 .crimon-home:has(> .crimon-tutorial--compact) > .home-world {
