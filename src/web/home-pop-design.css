@@ -262,6 +262,31 @@ body:has(.crimon-home) .crimon-bottom-nav button {
 body:has(.crimon-home) .bottom-nav__btn + .bottom-nav__btn,
 body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 0 !important; }
 
+/* 下の帯の5マスは**等分ではない。**
+ *
+ * 帯は1枚の絵(home-bottom-nav-frame-v5.webp / 1536x512)を `100% 100%` で
+ * 引き伸ばして敷いている。ところが絵の中の仕切りは
+ * 0.9 / 21.1 / 40.2 / 59.3 / 78.3 / 99.7% の位置にあり、20%刻みではない
+ * (画素を数えて実測)。ボタンを `flex:1 1 0` で5等分すると、文字の中心は
+ * マスの中心から最大1.2%——390px幅で4.7pxずれる。
+ * **「ホーム」は絵より左、「召喚」は絵より右**に出て、並びがばらついて見えた。
+ *
+ * 文字だけを動かすのではなく、**ボタンの幅を仕切りに合わせる。**
+ * 文字は中央揃えのままで絵と揃い、押せる範囲もマスと一致する。
+ * (絵の中の意匠の重心も測ってあり、マスの中心と±0.35%で一致している) */
+body:has(.crimon-home) .bottom-nav__btn:nth-child(1) { flex: 0 0 21.1% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(2) { flex: 0 0 19.1% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(3) { flex: 0 0 19.1% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(4) { flex: 0 0 19.0% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(5) { flex: 0 0 21.7% !important; }
+
+/* 左端のマスだけは、絵の仕切りの外に外枠の縁(0.9%)がある。
+ * ボタンを画面の左端から始めるぶん中心が0.45%左へ寄るので、
+ * 文字だけをその半分ぶん右へ戻す(実測 -1.8px → -0.1px)。 */
+body:has(.crimon-home) .bottom-nav__btn:nth-child(1) .bottom-nav__label {
+  padding-left: 4.3% !important;
+}
+
 body:has(.crimon-home) .bottom-nav__icon {
   /* 画像側の大きなシンボルを使う。HTMLアイコンは二重表示しない。 */
   display: none !important;
