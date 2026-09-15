@@ -25,6 +25,7 @@ import { withPortrait } from "../three/portrait.js";
 import { managementHeader } from "./managementHeader.js";
 import { stickyActions } from "./stickyActions.js";
 import { computeLeveledSkill, describeSkillLines, MAX_SKILL_LEVEL } from "../../core/skill.js";
+import { describeSkillTarget } from "./skillPanel.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import "../ui/monsterDetail.css";
 import { renderMonsterListDensityToggle } from "../monsterListDensity.js";
@@ -393,7 +394,8 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
         el("div", { className: "monster-detail-skills__grid" }, skills.length ? skills.map((skill, index) => {
           const level = instance.skillLevels?.[index] ?? 1;
           const leveled = computeLeveledSkill(skill, level);
-          const effects = describeSkillLines(leveled);
+          // **対象は畳んだ1行にも出す。**開かないと分からないのでは、一覧で選べない
+          const effects = [describeSkillTarget(leveled), ...describeSkillLines(leveled)];
           return el("details", { className: "monster-skill-compact" }, [
             el("summary", {}, [
               el("span", { className: "monster-skill-compact__slot" }, [`S${index + 1}`]),

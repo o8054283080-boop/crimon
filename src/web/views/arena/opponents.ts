@@ -11,6 +11,8 @@ import { ArenaOpponentEntry } from "../../../game/arena/types.js";
 import { arenaOpponentView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
 import { renderArenaUnitInspector } from "./unitInspector.js";
+import { findMonsterById } from "../../../data/monsters.js";
+import { withPortrait } from "../../three/portrait.js";
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
@@ -57,7 +59,7 @@ function renderCandidate(props: PvpArenaProps, entry: ArenaOpponentEntry): HTMLE
       { className: "ar-card__units" },
       view.units.map((unit) =>
         el("div", { className: "ar-mini", style: `--elem:${unit.color}` }, [
-          el("span", { className: "ar-mini__face" }, [unit.emoji]),
+          withPortrait(el("span", { className: "ar-mini__face" }, [unit.emoji]), findMonsterById(unit.dexId), "box"),
           el("span", { className: "ar-mini__meta" }, [
             el("span", { className: "ar-mini__name" }, [unit.name]),
             el("span", { className: "ar-mini__grade" }, [`★${unit.star} Lv${unit.level}`]),

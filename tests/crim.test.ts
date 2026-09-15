@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STAR_MAX_LEVEL, computeEffectiveStats } from "../src/core/rarity.js";
-import { Skill, computeLeveledSkill } from "../src/core/skill.js";
+import { Skill, computeLeveledSkill, describeSkillLines } from "../src/core/skill.js";
 import { BattleEngine } from "../src/battle/engine.js";
 import { chooseSkill } from "../src/battle/ai.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
@@ -695,5 +695,41 @@ describe("オートAI", () => {
     expect(record.lines.some((line) => line.includes("追加ターンを得た"))).toBe(true);
     // 追加ターンぶん、ゲージが満タンへ戻っている(次に動けることの裏付け)
     expect(crimUnit.gauge).toBeGreaterThanOrEqual(100);
+  });
+});
+
+describe("画面に出す数字", () => {
+  it("図鑑のLv1表示は整数になる(素の値が小数でも)", () => {
+    /*
+     * **クリムの素の値は小数。**★6 Lv60 の到達値を設計値ちょうどに置くため、
+     * 割り算で決めている(`src/data/newMonsters/crim.ts`)。
+     *
+     * 図鑑はこれをそのまま出していたので、
+     * **「HP 1673.4098887338395645968914452109020051141989」**と並んだ。
+     * `computeEffectiveStats` は★1 Lv1 では倍率1.0なので値は動かず、
+     * 丸めだけが入る。
+     */
+    const raw = crim().stats;
+    expect(Number.isInteger(raw.hp), "素の値は小数のまま持っている").toBe(false);
+
+    const shown = computeEffectiveStats(raw, 1, 1);
+    for (const key of ["hp", "atk", "def", "spd"] as const) {
+      expect(Number.isInteger(shown[key]), `図鑑のLv1表示の${key}が整数でない`).toBe(true);
+    }
+  });
+
+  it("スキルの説明に、桁の長い小数が出ない", () => {
+    /*
+     * 係数をそのまま埋め込んでいたため、フェニックスなどの説明に
+     * 「最大HP×0.08624999999999998を加算」と出ていた(依頼主の指摘)。
+     * 二進小数の誤差がそのまま画面に出ていたもの。
+     */
+    for (let level = 1; level <= 5; level += 1) {
+      for (const skill of crim().skills) {
+        for (const line of describeSkillLines(computeLeveledSkill(skill, level))) {
+          expect(line, `Lv${level}: ${line}`).not.toMatch(/\d+\.\d{3,}/);
+        }
+      }
+    }
   });
 });
