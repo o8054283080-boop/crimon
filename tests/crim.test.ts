@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { computeEffectiveStats } from "../src/core/rarity.js";
+import { STAR_MAX_LEVEL, computeEffectiveStats } from "../src/core/rarity.js";
 import { Skill, computeLeveledSkill } from "../src/core/skill.js";
 import { BattleEngine } from "../src/battle/engine.js";
-import { findMonsterById } from "../src/data/monsters.js";
+import { chooseSkill } from "../src/battle/ai.js";
+import { createMonsterInstance } from "../src/core/monsterInstance.js";
+import { findMonsterById, SKILL_PIG_DEX } from "../src/data/monsters.js";
 import { LATENT_ABILITY_CANDIDATES } from "../src/data/latentAbilities.js";
+import { GIFT_DEFINITIONS } from "../src/data/gifts.js";
 import { CRIM_TEMPLATE_ID } from "../src/data/newMonsters/crim.js";
+import { CRIM_SHARDS_FOR_MAX_SKILLS, useCrimShard } from "../src/game/crim.js";
+import { createInitialState } from "../src/game/playerState.js";
+import { canSendMonster, sendMonstersForPoints } from "../src/game/monsterPoints.js";
+import { depositMonsters, isMonsterStorageEligible } from "../src/game/monsterStorage.js";
+import { checkMonsterPowerUp, executeMonsterPowerUp } from "../src/game/monsterPowerUp.js";
+import { checkRankUp } from "../src/game/progression.js";
+import { checkMonsterCreate } from "../src/game/monsterCreate.js";
+import { TUTORIAL_MISSIONS, syncCrimShardGrants } from "../src/game/tutorialMissions.js";
 
 /**
  * クリムの登録データと、★/Lv成長・スキルLvの到達値。
@@ -398,5 +409,291 @@ describe("S3の振る舞い", () => {
     const record = engine.resolveTurn(engine.getUnits()[0], { skillIndex: 2 });
     const extras = record.lines.filter((line) => line.includes("追加ターン"));
     expect(extras.length).toBe(1);
+  });
+});
+
+/* ==========================================================================
+ * クリムが消えないこと
+ *
+ * **画面から選べないだけでは足りない。**別の画面が同じ処理を呼んだ時、
+ * あるいは将来UIを作り直した時に、また消えるようになる。
+ * ここで見るのは**処理層の判定関数**そのもの。
+ * ========================================================================== */
+
+/** クリムと、比較用のふつうのモンスターを持った人 */
+function playerWithCrim() {
+  const player = createInitialState();
+  player.monsters = [];
+  const crimInstance = createMonsterInstance(CRIM_DEX_ID, 5, 1);
+  const other = createMonsterInstance("slime_FIRE", 5, 1);
+  const another = createMonsterInstance("slime_FIRE", 5, 1);
+  player.monsters.push(crimInstance, other, another);
+  player.partyIds = [];
+  return { player, crim: crimInstance, other, another };
+}
+
+describe("クリムは消えない(処理層で拒否する)", () => {
+  it("モンスターポイントへ変換できない", () => {
+    const { player, crim: crimInstance, other } = playerWithCrim();
+    expect(canSendMonster(player, crimInstance)).toBe(false);
+    // ふつうのモンスターは今までどおり送れる(制限を広げすぎていない)
+    expect(canSendMonster(player, other)).toBe(true);
+
+    // IDを直に渡しても、クリムだけが残る
+    const result = sendMonstersForPoints(player, [crimInstance.id, other.id]);
+    expect(result?.sent).toBe(1);
+    expect(player.monsters.some((m) => m.id === crimInstance.id)).toBe(true);
+  });
+
+  it("保管所へ預けられない(預けた先からポイントへ換えられてしまうため)", () => {
+    const { player, crim: crimInstance, other } = playerWithCrim();
+    expect(isMonsterStorageEligible(player, crimInstance)).toBe(false);
+    expect(isMonsterStorageEligible(player, other)).toBe(true);
+
+    const deposited = depositMonsters(player, CRIM_DEX_ID, 5, 1);
+    expect(deposited).toBe(0);
+    expect(player.monsters.some((m) => m.id === crimInstance.id)).toBe(true);
+  });
+
+  it("モンスター強化の素材にできない", () => {
+    const { player, crim: crimInstance, other } = playerWithCrim();
+    const check = checkMonsterPowerUp(other, [crimInstance], player.partyIds);
+    expect(check.ok).toBe(false);
+    expect(check.reason).toContain("クリム");
+
+    // 実際に呼んでも消えない
+    const transaction = executeMonsterPowerUp(player.monsters, other.id, [crimInstance.id], player.partyIds);
+    expect(transaction.ok).toBe(false);
+    expect(player.monsters.some((m) => m.id === crimInstance.id)).toBe(true);
+  });
+
+  it("ランクアップの素材にできない", () => {
+    const { player, crim: crimInstance, other } = playerWithCrim();
+    other.level = STAR_MAX_LEVEL[other.star];
+    const sacrifices = [crimInstance, ...Array.from({ length: 4 }, () => createMonsterInstance("slime_FIRE", 5, 1))];
+    const check = checkRankUp(other, sacrifices, player.partyIds);
+    expect(check.ok).toBe(false);
+    expect(check.reason).toContain("クリム");
+  });
+
+  it("クリエイト(スキル継承)の移し元にできない", () => {
+    const { player, crim: crimInstance, other } = playerWithCrim();
+    crimInstance.star = 6;
+    const check = checkMonsterCreate(other, crimInstance, player.partyIds);
+    expect(check.ok).toBe(false);
+    expect(check.reason).toContain("クリム");
+  });
+
+  it("クリムを強化する側にするのは自由(素材にできないだけ)", () => {
+    const { player, crim: crimInstance, other, another } = playerWithCrim();
+    const check = checkMonsterPowerUp(crimInstance, [other, another], player.partyIds);
+    expect(check.ok).toBe(true);
+  });
+});
+
+/* ==========================================================================
+ * 専用素材「クリムの宝珠のかけら」
+ * ========================================================================== */
+
+describe("クリムの宝珠のかけら", () => {
+  it("クリムのスキルレベルを1つ上げ、1個減る", () => {
+    const { player, crim: crimInstance } = playerWithCrim();
+    player.crimShards = 3;
+    const before = crimInstance.skillLevels.reduce((sum, level) => sum + level, 0);
+
+    const result = useCrimShard(player, crimInstance.id, () => 0);
+    expect(result.ok).toBe(true);
+    expect(crimInstance.skillLevels.reduce((sum, level) => sum + level, 0)).toBe(before + 1);
+    expect(player.crimShards).toBe(2);
+  });
+
+  it("クリム以外には使えない", () => {
+    const { player, other } = playerWithCrim();
+    player.crimShards = 5;
+    const result = useCrimShard(player, other.id);
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toContain("クリム");
+    // **かけらは減らない。**断ったのに消費されては困る
+    expect(player.crimShards).toBe(5);
+    expect(other.skillLevels).toEqual([1, 1, 1]);
+  });
+
+  it("持っていなければ使えない", () => {
+    const { player, crim: crimInstance } = playerWithCrim();
+    player.crimShards = 0;
+    expect(useCrimShard(player, crimInstance.id).ok).toBe(false);
+    expect(crimInstance.skillLevels).toEqual([1, 1, 1]);
+  });
+
+  it("全スキルMAXなら使えない(かけらを無駄にしない)", () => {
+    const { player, crim: crimInstance } = playerWithCrim();
+    player.crimShards = 1;
+    crimInstance.skillLevels = [5, 5, 5];
+    expect(useCrimShard(player, crimInstance.id).ok).toBe(false);
+    expect(player.crimShards).toBe(1);
+  });
+
+  it("12個で全スキルがMAXになる", () => {
+    const { player, crim: crimInstance } = playerWithCrim();
+    player.crimShards = CRIM_SHARDS_FOR_MAX_SKILLS;
+    for (let i = 0; i < CRIM_SHARDS_FOR_MAX_SKILLS; i += 1) {
+      expect(useCrimShard(player, crimInstance.id, () => 0).ok, `${i + 1}個目`).toBe(true);
+    }
+    expect(crimInstance.skillLevels).toEqual([5, 5, 5]);
+    expect(player.crimShards).toBe(0);
+  });
+
+  it("通常のスキルピッグでもクリムのスキルは上げられる(手段を奪っていない)", () => {
+    const { player, crim: crimInstance } = playerWithCrim();
+    const pig = createMonsterInstance(SKILL_PIG_DEX[0].id, 1, 1);
+    player.monsters.push(pig);
+    crimInstance.level = STAR_MAX_LEVEL[crimInstance.star];
+    const check = checkMonsterPowerUp(crimInstance, [pig], player.partyIds);
+    expect(check.ok).toBe(true);
+  });
+});
+
+/* ==========================================================================
+ * 配布と、初心者ミッションの遡及
+ * ========================================================================== */
+
+describe("クリムの配布", () => {
+  it("プレゼントとして1件だけ並び、期限が無い", () => {
+    const gifts = GIFT_DEFINITIONS.filter((gift) =>
+      gift.rewards.some((reward) => reward.kind === "MONSTER" && reward.dexId === CRIM_DEX_ID));
+    expect(gifts).toHaveLength(1);
+    // **期限を切らない。**配り終わりを作ると、その後に始めた人が持てなくなる
+    expect(gifts[0].expiresAt).toBeNull();
+    const reward = gifts[0].rewards.find((r) => r.kind === "MONSTER") as { star: number; amount: number };
+    expect(reward.star).toBe(5);
+    expect(reward.amount).toBe(1);
+  });
+});
+
+describe("初心者ミッションのかけら12個", () => {
+  it("合計がちょうど12個で、全スキルMAXに要る数と一致する", () => {
+    const total = TUTORIAL_MISSIONS.reduce((sum, entry) => sum + (entry.reward.crimShard ?? 0), 0);
+    expect(total).toBe(CRIM_SHARDS_FOR_MAX_SKILLS);
+  });
+
+  it("一度にまとめて渡さず、章をまたいで散らしてある", () => {
+    const steps = TUTORIAL_MISSIONS.filter((entry) => (entry.reward.crimShard ?? 0) > 0);
+    expect(steps.length).toBeGreaterThanOrEqual(10);
+    // 1つのミッションで2個以上まとめて渡さない
+    for (const entry of steps) expect(entry.reward.crimShard).toBe(1);
+    // 少なくとも5つの章にまたがっている
+    expect(new Set(steps.map((entry) => entry.chapter)).size).toBeGreaterThanOrEqual(5);
+  });
+
+  it("新しく達成した人は、その場で受け取れる", () => {
+    const player = createInitialState();
+    const entry = TUTORIAL_MISSIONS.find((m) => (m.reward.crimShard ?? 0) > 0)!;
+    player.tutorialMissions.claimedIds = [];
+    player.crimShards = 0;
+    // 受け取り済みにしてから同期すると、その1件ぶんだけ入る
+    player.tutorialMissions.claimedIds.push(entry.id);
+    expect(syncCrimShardGrants(player)).toBe(1);
+    expect(player.crimShards).toBe(1);
+  });
+
+  it("途中まで達成済みの人は、そこまでの分だけ受け取れる", () => {
+    const player = createInitialState();
+    // 第4章の終わり(step 32)までを達成済みにする
+    player.tutorialMissions.claimedIds = TUTORIAL_MISSIONS
+      .filter((entry) => entry.step <= 32).map((entry) => entry.id);
+    player.crimShards = 0;
+    const expected = TUTORIAL_MISSIONS
+      .filter((entry) => entry.step <= 32)
+      .reduce((sum, entry) => sum + (entry.reward.crimShard ?? 0), 0);
+    expect(syncCrimShardGrants(player)).toBe(expected);
+    expect(player.crimShards).toBe(expected);
+    expect(expected).toBeGreaterThan(0);
+    expect(expected).toBeLessThan(CRIM_SHARDS_FOR_MAX_SKILLS);
+  });
+
+  it("全部達成済みの人は、12個まとめて受け取れる", () => {
+    const player = createInitialState();
+    player.tutorialMissions.claimedIds = TUTORIAL_MISSIONS.map((entry) => entry.id);
+    player.crimShards = 0;
+    expect(syncCrimShardGrants(player)).toBe(CRIM_SHARDS_FOR_MAX_SKILLS);
+    expect(player.crimShards).toBe(CRIM_SHARDS_FOR_MAX_SKILLS);
+  });
+
+  it("二度呼んでも増えない", () => {
+    const player = createInitialState();
+    player.tutorialMissions.claimedIds = TUTORIAL_MISSIONS.map((entry) => entry.id);
+    player.crimShards = 0;
+    syncCrimShardGrants(player);
+    expect(syncCrimShardGrants(player)).toBe(0);
+    expect(player.crimShards).toBe(CRIM_SHARDS_FOR_MAX_SKILLS);
+  });
+
+  it("過去の報酬(ダイヤ・召喚書・ゴールド)は二重に配られない", () => {
+    /*
+     * **ここが今回いちばん怖いところ。**
+     * 受取印を消して配り直せば話は早いが、それをやると過去の報酬まで全部出る。
+     * かけら専用の印を使っているので、他の持ち物は1つも動かない。
+     */
+    const player = createInitialState();
+    player.tutorialMissions.claimedIds = TUTORIAL_MISSIONS.map((entry) => entry.id);
+    const before = {
+      crystal: player.crystal,
+      gold: player.gold,
+      summonScrolls: player.summonScrolls,
+      monsters: player.monsters.length,
+      arenaCoins: player.arenaCoins,
+    };
+    syncCrimShardGrants(player);
+    expect(player.crystal).toBe(before.crystal);
+    expect(player.gold).toBe(before.gold);
+    expect(player.summonScrolls).toBe(before.summonScrolls);
+    expect(player.monsters.length).toBe(before.monsters);
+    expect(player.arenaCoins).toBe(before.arenaCoins);
+  });
+
+  it("受け取り済みでないミッションのぶんは配らない", () => {
+    const player = createInitialState();
+    player.tutorialMissions.claimedIds = [];
+    player.crimShards = 0;
+    expect(syncCrimShardGrants(player)).toBe(0);
+    expect(player.crimShards).toBe(0);
+  });
+});
+
+/* ==========================================================================
+ * オートでの振る舞い
+ * ========================================================================== */
+
+describe("オートAI", () => {
+  it("S3 → S2 → S1 の順に選ぶ(クリム専用の分岐を増やしていない)", () => {
+    /*
+     * 既存のAIは「クールタイムが明けている中で番号が大きいスキル」を選ぶ。
+     * 依頼の優先度(S3 → S2 → S1)とそのまま一致するので、
+     * **クリムのためだけの分岐は1つも足していない。**
+     */
+    const engine = crimBattle(["slime_WATER"]);
+    const unit = engine.getUnits()[0];
+
+    unit.cooldowns = [0, 0, 0];
+    expect(chooseSkill(unit, [...engine.getUnits()]).index, "全部明けていればS3").toBe(2);
+
+    unit.cooldowns = [0, 0, 3];
+    expect(chooseSkill(unit, [...engine.getUnits()]).index, "S3が溜まり中ならS2").toBe(1);
+
+    unit.cooldowns = [0, 2, 3];
+    expect(chooseSkill(unit, [...engine.getUnits()]).index, "どちらも溜まり中ならS1").toBe(0);
+  });
+
+  it("S3で倒した後の追加ターンが、そのまま次の手番として処理される", () => {
+    const engine = crimBattle(["slime_WATER", "slime_WATER"], [1, 1, 1]);
+    for (const enemy of engine.getUnits().filter((u) => u.team === "ENEMY")) {
+      enemy.maxHp = 1; enemy.currentHp = 1;
+    }
+    const crimUnit = engine.getUnits()[0];
+    crimUnit.gauge = 100;
+    const record = engine.resolveTurn(crimUnit, { skillIndex: 2 });
+    expect(record.lines.some((line) => line.includes("追加ターンを得た"))).toBe(true);
+    // 追加ターンぶん、ゲージが満タンへ戻っている(次に動けることの裏付け)
+    expect(crimUnit.gauge).toBeGreaterThanOrEqual(100);
   });
 });
