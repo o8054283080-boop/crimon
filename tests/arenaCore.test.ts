@@ -226,6 +226,7 @@ describe("アリーナショップ", () => {
       expect([
         "SUMMON_SCROLL", "FOUR_STAR_SCROLL", "LIGHT_DARK_SCROLL",
         "FIVE_STAR_SCROLL", "GOLD", "AWAKENING_ORB", "EXP_PIG", "REINCARNATION_PIG", "SKILL_PIG",
+        "STAMINA_POTION",
       ]).toContain(kind);
     }
     expect(ARENA_SHOP_ITEMS.every((item) => item.price > 0 && item.limit > 0)).toBe(true);

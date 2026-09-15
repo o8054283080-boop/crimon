@@ -5,7 +5,7 @@ import {
   MATERIAL_EXCHANGES, isAwakeningDepthCleared, isAwakeningDepthUnlocked, materialCount,
 } from "../../game/awakeningDepths.js";
 import { el } from "../dom.js";
-import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 
@@ -32,6 +32,7 @@ export interface AwakeningDepthProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (floor: AwakeningDepthFloor, count: number) => void;
+  onToggleAutoUseStaminaPotion: (next: boolean) => void;
 }
 
 /** 素材の持ち数の帯。**同じ形を一覧と詳細の両方に出す** */
@@ -215,7 +216,8 @@ function renderDetail(props: AwakeningDepthProps, floor: AwakeningDepthFloor): H
             const timing = referenceRunTime(props.player.recentManualClearTimes, "AWAKENING_DEPTH", String(floor.floor));
             return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent };
           })(),
-          count: props.autoFarmCount,
+          ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
+      count: props.autoFarmCount,
           onChangeCount: props.onChangeAutoFarmCount,
           staminaCost: floor.stamina,
           stamina: props.player.stamina,

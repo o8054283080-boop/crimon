@@ -32,6 +32,13 @@ export interface MissionReward {
   fiveStarSummonScrolls?: number;
   awakeningOrbs?: number;
   stamina?: number;
+  /**
+   * スタミナポーション。**上限を超えて持てるスタミナの貯金。**
+   *
+   * `stamina` と違い、受け取った時点では減らない。上限に張り付いている時に
+   * 受け取っても無駄にならないので、**週・月のまとめ報酬に向く。**
+   */
+  staminaPotions?: number;
   arenaCoins?: number;
   expPig3?: number;
   expPig4?: number;
@@ -249,7 +256,7 @@ export const DAILY_MISSIONS: readonly PeriodMissionDefinition[] = [
 export const WEEKLY_MISSIONS: readonly PeriodMissionDefinition[] = [
   { id: "weekly-login", title: "今週も冒険", condition: "5日ログインする", counter: "loginDays", target: 5, reward: { summonScrolls: 5 } },
   { id: "weekly-levels", title: "育成週間", condition: "モンスターのレベルを合計100上げる", counter: "levelsGained", target: 100, reward: { gold: 300_000 } },
-  { id: "weekly-stamina", title: "スタミナ消費", condition: "スタミナを500消費する", counter: "staminaSpent", target: 500, reward: { summonScrolls: 5 } },
+  { id: "weekly-stamina", title: "スタミナ消費", condition: "スタミナを500消費する", counter: "staminaSpent", target: 500, reward: { summonScrolls: 5, staminaPotions: 1 } },
   { id: "weekly-arena", title: "闘技場週間", condition: "アリーナを20回プレイする", counter: "arenaBattles", target: 20, reward: { summonScrolls: 5 } },
   { id: "weekly-equipment", title: "装備強化週間", condition: "装備を20回強化する", counter: "equipmentEnhancements", target: 20, reward: { crystal: 100 } },
   { id: "weekly-shop", title: "お買い物週間", condition: "ショップで10回買い物する", counter: "shopPurchases", target: 10, reward: { gold: 300_000 } },
@@ -262,7 +269,7 @@ export const MONTHLY_MISSIONS: readonly PeriodMissionDefinition[] = [
   { id: "monthly-login20", title: "月の冒険者", condition: "20日ログインする", counter: "loginDays", target: 20, reward: { summonScrolls: 10 } },
   { id: "monthly-login25", title: "皆勤目前", condition: "25日ログインする", counter: "loginDays", target: 25, reward: { fourStarSummonScrolls: 1 } },
   { id: "monthly-levels", title: "大育成月間", condition: "モンスターのレベルを合計500上げる", counter: "levelsGained", target: 500, reward: { reincarnationPig3: 3 } },
-  { id: "monthly-stamina", title: "大冒険月間", condition: "スタミナを3,000消費する", counter: "staminaSpent", target: 3_000, reward: { summonScrolls: 10 } },
+  { id: "monthly-stamina", title: "大冒険月間", condition: "スタミナを3,000消費する", counter: "staminaSpent", target: 3_000, reward: { summonScrolls: 10, staminaPotions: 3 } },
   { id: "monthly-arena", title: "闘技場月間", condition: "アリーナを100回プレイする", counter: "arenaBattles", target: 100, reward: { summonScrolls: 10 } },
   { id: "monthly-equipment", title: "装備職人", condition: "装備を100回強化する", counter: "equipmentEnhancements", target: 100, reward: { gold: 1_000_000 } },
   { id: "monthly-shop", title: "常連ファイター", condition: "ショップで30回買い物する", counter: "shopPurchases", target: 30, reward: { crystal: 300 } },
@@ -636,6 +643,8 @@ export function grantMissionReward(player: PlayerState, reward: MissionReward): 
   player.fiveStarSummonScrolls += reward.fiveStarSummonScrolls ?? 0;
   player.awakeningOrbs += reward.awakeningOrbs ?? 0;
   player.stamina += reward.stamina ?? 0;
+  // 省略可の欄。前から遊んでいる人の控えには無いので0で埋めてから足す
+  if (reward.staminaPotions) player.staminaPotions = (player.staminaPotions ?? 0) + reward.staminaPotions;
   addArenaCoins(player, reward.arenaCoins ?? 0);
   grantPig(player, "EXP", 3, reward.expPig3 ?? 0);
   grantPig(player, "EXP", 4, reward.expPig4 ?? 0);
@@ -999,6 +1008,7 @@ export function missionRewardText(reward: MissionReward): string {
   if (reward.fiveStarSummonScrolls) parts.push(`★5召喚書×${reward.fiveStarSummonScrolls}`);
   if (reward.awakeningOrbs) parts.push(`覚醒オーブ×${reward.awakeningOrbs}`);
   if (reward.stamina) parts.push(`スタミナ×${reward.stamina.toLocaleString("ja-JP")}`);
+  if (reward.staminaPotions) parts.push(`スタミナポーション×${reward.staminaPotions}`);
   if (reward.arenaCoins) parts.push(`アリーナコイン×${reward.arenaCoins.toLocaleString("ja-JP")}`);
   if (reward.expPig3) parts.push(`★3 MAX経験ピッグ×${reward.expPig3}`);
   if (reward.expPig4) parts.push(`★4 MAX経験ピッグ×${reward.expPig4}`);

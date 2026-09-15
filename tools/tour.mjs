@@ -44,6 +44,15 @@ async function call(command, body = {}) {
 const SCREENS = [
   // 下部タブから直接行ける5つ
   { name: "ホーム", tab: "HOME" },
+  /*
+   * スタミナ回復の小窓。**⚡の数字を押すまで出ない。**
+   * ダイヤの回復2種とスタミナポーションが並ぶ場所で、
+   * ホームを見ているだけでは一度も検査されない。
+   */
+  {
+    name: "ホーム/スタミナ回復", tab: "HOME",
+    setup: "document.querySelector('[data-tour=staminaRefill]')?.click()",
+  },
   { name: "モンスター", tab: "MONSTERS" },
   { name: "装備", tab: "EQUIPMENT" },
   { name: "召喚", tab: "SUMMON" },
@@ -84,6 +93,26 @@ const SCREENS = [
   {
     name: "装備ダンジョン(上位階まで開放)", tab: "HOME", tile: "dungeon", tile2: "equipDungeon",
     setup: "[...document.querySelectorAll('.dev-menu button')].find(b => b.textContent.includes('装備ダンジョン全階クリア扱い'))?.click()",
+  },
+  /*
+   * 階の詳細。**ここにしか自動周回の設定が無い。**
+   * 一覧だけを見ていた頃は、周回パネル(回数の札・1周の秒数・
+   * スタミナポーションの自動使用)が一度も検査されていなかった。
+   * クリア済みでないと出ないので、DEV限定の口で開けてから入る。
+   */
+  {
+    name: "装備ダンジョン/階の詳細(自動周回)", tab: "HOME", tile: "dungeon", tile2: "equipDungeon",
+    setup: "[...document.querySelectorAll('.dev-menu button')].find(b => b.textContent.includes('装備ダンジョン全階クリア扱い'))?.click(); document.querySelector('.floor-grid > *')?.click()",
+  },
+  /*
+   * **ポーションを持った状態も見る。**0個・OFFのままだと、
+   * 数が2桁に伸びた時の折り返しも、ONで「最大」の札が伸びた姿も検査されない。
+   */
+  {
+    name: "装備ダンジョン/階の詳細(ポーション自動使用)", tab: "HOME", tile: "dungeon", tile2: "equipDungeon",
+    setup: "[...document.querySelectorAll('.dev-menu button')].find(b => b.textContent.includes('装備ダンジョン全階クリア扱い'))?.click();"
+      + " await wait(200); document.querySelector('.floor-grid > *')?.click();"
+      + " await wait(300); window.__crimonDev?.grantStaminaPotions(12, true)",
   },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
   { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },

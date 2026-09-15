@@ -16,6 +16,7 @@
  * 今は1戦ずつ実際に戦う。まとめているのは**押す手数**であって、戦闘そのものではない。
  */
 import { el } from "../dom.js";
+import { PlayerState, STAMINA_POTION_AMOUNT, staminaPotionsOwned } from "../../game/playerState.js";
 
 export interface AutoFarmPanelProps {
   count: number;
@@ -32,7 +33,32 @@ export interface AutoFarmPanelProps {
   referenceRunSeconds: number;
   referenceFromManual: boolean;
   recentManualClearTimes?: number[];
+  /** いま持っているスタミナポーションの数 */
+  staminaPotions: number;
+  /** 1個あたりの回復量 */
+  staminaPotionAmount: number;
+  /** 足りなくなった時にポーションを自動で使うか(既定OFF) */
+  autoUsePotion: boolean;
+  onToggleAutoUsePotion: (next: boolean) => void;
   onStart: () => void;
+}
+
+/**
+ * ポーション欄の4つを控えから組み立てる。
+ *
+ * 5つの画面が同じ4行を書き写すと、**片方だけ直す事故**が起きる。
+ * 所持数も設定も控えの中にあるので、渡すのは切り替えの手だけでよい。
+ */
+export function autoFarmPotionProps(
+  player: PlayerState,
+  onToggleAutoUsePotion: (next: boolean) => void,
+): Pick<AutoFarmPanelProps, "staminaPotions" | "staminaPotionAmount" | "autoUsePotion" | "onToggleAutoUsePotion"> {
+  return {
+    staminaPotions: staminaPotionsOwned(player),
+    staminaPotionAmount: STAMINA_POTION_AMOUNT,
+    autoUsePotion: player.autoUseStaminaPotionInFarm === true,
+    onToggleAutoUsePotion,
+  };
 }
 
 /** よく使う回数。1回・軽く・しっかり・まとめて、の4段 */
@@ -42,6 +68,23 @@ const PRESETS = [1, 5, 10, 20];
 export function affordableCount(stamina: number, staminaCost: number, hardLimit?: number): number {
   const byStamina = staminaCost > 0 ? Math.floor(stamina / staminaCost) : Number.MAX_SAFE_INTEGER;
   return Math.max(1, Math.min(byStamina, hardLimit ?? Number.MAX_SAFE_INTEGER));
+}
+
+/**
+ * 「最大」の札に使う、実際に回せるスタミナ。
+ *
+ * **自動使用がONの時だけ、ポーションぶんを足す。**
+ * OFFのまま手持ちのポーションを数えると、押した先で使われずに
+ * スタミナ切れで止まり、表示が嘘になる。
+ */
+export function usableStaminaForFarm(
+  stamina: number,
+  staminaPotions: number,
+  potionAmount: number,
+  autoUsePotion: boolean,
+): number {
+  if (!autoUsePotion) return stamina;
+  return stamina + Math.max(0, staminaPotions) * Math.max(0, potionAmount);
 }
 
 export function formatApproxDuration(seconds: number): string {
@@ -64,7 +107,8 @@ function countChip(label: string, active: boolean, onClick: () => void): HTMLEle
 }
 
 export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
-  const max = affordableCount(props.stamina, props.staminaCost, props.hardLimit);
+  const usable = usableStaminaForFarm(props.stamina, props.staminaPotions, props.staminaPotionAmount, props.autoUsePotion);
+  const max = affordableCount(usable, props.staminaCost, props.hardLimit);
   const totalCost = props.staminaCost * props.count;
   const willStopEarly = props.count > max;
 
@@ -75,9 +119,10 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
 
   const notes: HTMLElement[] = [];
   if (willStopEarly) {
+    const owned = props.autoUsePotion && props.staminaPotions > 0 ? ` + 🧪${props.staminaPotions}` : "";
     notes.push(
       el("p", { className: "autofarm__warn" }, [
-        `⚠ いまのスタミナでは${max}回で止まります(⚡${totalCost}必要 / 手持ち⚡${props.stamina})`,
+        `⚠ いまのスタミナでは${max}回で止まります(⚡${totalCost}必要 / 手持ち⚡${props.stamina}${owned})`,
       ]),
     );
   }
@@ -105,6 +150,20 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
           if (/^[1-9]\d*$/.test(input.value)) props.onChangeCount(Number(input.value));
         },
       }),
+    ]),
+    el("label", { className: "autofarm__potion" }, [
+      el("input", {
+        type: "checkbox",
+        className: "autofarm__potion-check",
+        checked: props.autoUsePotion,
+        onchange: (event: Event) => props.onToggleAutoUsePotion((event.currentTarget as HTMLInputElement).checked),
+      }),
+      el("span", { className: "autofarm__potion-text" }, [
+        el("strong", {}, ["スタミナポーションを自動で使う"]),
+        el("small", {}, [
+          `所持 🧪${props.staminaPotions}個(1個で⚡${props.staminaPotionAmount}回復) / 足りない時に必要な分だけ使います`,
+        ]),
+      ]),
     ]),
     ...notes,
     el(

@@ -34,7 +34,17 @@ import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, SPECIAL_SCROLL_FIELD, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
-import { BackgroundFarmJob, MAX_OFFLINE_FARM_MS, availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange } from "../game/backgroundAutoFarm.js";
+import {
+  BackgroundFarmJob,
+  MAX_OFFLINE_FARM_MS,
+  availableBackgroundRuns,
+  createBackgroundFarmJob,
+  dismissFinishedBackgroundFarm,
+  finishBackgroundFarm,
+  parseRequestedRuns,
+  shouldStopForJstDateChange,
+  staminaPotionsNeeded,
+} from "../game/backgroundAutoFarm.js";
 import { manualClearKey, recordManualBattle, referenceRunTime } from "../game/manualClearTimes.js";
 import {
   PersistState,
@@ -108,6 +118,9 @@ import {
   tryRefillStaminaPartial,
   trySpendGoldDungeonChallenge,
   trySpendStamina,
+  staminaPotionsOwned,
+  tryUseStaminaPotion,
+  STAMINA_POTION_AMOUNT,
   trySpendSummonScrolls,
   unlockShopSlot,
   goldDungeonChallengesRemaining,
@@ -1724,7 +1737,6 @@ function handleClearParty(): void {
 }
 
 function startStage(stage: Stage, difficulty: Difficulty): void {
-  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!trySpendStamina(state.player, STAGE_STAMINA_COST).ok) {
@@ -2082,6 +2094,30 @@ function processBackgroundFarmOnce(): void {
     const cost = backgroundFarmCost(job);
     const remaining = job.kind === "LEVEL_DUNGEON" ? levelDungeonChallengesRemaining(state.player)
       : job.kind === "GOLD_DUNGEON" ? goldDungeonChallengesRemaining(state.player) : undefined;
+    /*
+     * **1周ごとに、最新のスタミナを見てから判断する。**
+     *
+     * 自動周回中でも他のダンジョンへ入れるようになったので、
+     * ここへ来るまでにプレイヤーがスタミナを使っていることがある。
+     * 先に何周ぶんかまとめて払う作りにはしない——払った後で手動戦闘に
+     * 使われたら、どちらかがマイナスになる。
+     *
+     * `applyPassiveStaminaRegen` は `trySpendStamina` の中で呼ばれるが、
+     * **判断の前にも一度通す。**回復済みなら足りる、という場面で
+     * 「スタミナ不足」と言って止まってしまう。
+     */
+    applyPassiveStaminaRegen(state.player);
+    /*
+     * ポーションの自動使用。**足りない時だけ、必要な分だけ。**
+     * ダイヤには一切手を付けない(依頼主の指定)。
+     */
+    if (job.autoUseStaminaPotion && state.player.stamina < cost) {
+      const use = staminaPotionsNeeded(state.player.stamina, cost, staminaPotionsOwned(state.player), STAMINA_POTION_AMOUNT);
+      for (let i = 0; i < use; i += 1) {
+        if (!tryUseStaminaPotion(state.player).ok) break;
+        job.staminaPotionsUsed = (job.staminaPotionsUsed ?? 0) + 1;
+      }
+    }
     const blocked = farmBlockReason({ partySize: party.length, stamina: state.player.stamina, staminaCost: cost, challengesLeft: remaining });
     if (blocked) { finishBackgroundFarm(job, blocked); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
     if (job.kind === "LEVEL_DUNGEON") trySpendLevelDungeonChallenge(state.player);
@@ -2137,10 +2173,27 @@ function beginBackgroundFarm(input: Omit<Parameters<typeof createBackgroundFarmJ
   if (count === null || !unlocked || currentStatus === "RUNNING" || currentStatus === "SETTLING") { playSfx("denied", 0.7); return; }
   // 完了通知はここで新しいジョブに置き換える。報酬は完了時に既に player へ保存済み。
   const timing = referenceRunTime(state.player.recentManualClearTimes, input.kind, input.targetId, input.difficulty);
-  state.player.backgroundFarmJob = createBackgroundFarmJob({ ...input, requestedRuns: count, partyIds, referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual });
+  state.player.backgroundFarmJob = createBackgroundFarmJob({
+    ...input, requestedRuns: count, partyIds,
+    referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual,
+    // 始めた時点の設定で固定する。途中で切り替えて、既に進んだぶんの扱いが変わらないように
+    autoUseStaminaPotion: state.player.autoUseStaminaPotionInFarm === true,
+  });
   savePlayerState(state.player);
   state.screen = "HOME";
   render(); scheduleBackgroundFarm();
+}
+
+/**
+ * ポーションの自動使用を切り替える。
+ *
+ * **起動をまたいで残す。**再生速度と同じで、周回のたびに入れ直すものではない。
+ * 進行中のジョブには**効かない**(始めた時の設定で回りきる)。
+ */
+function setAutoUseStaminaPotion(next: boolean): void {
+  state.player.autoUseStaminaPotionInFarm = next;
+  savePlayerState(state.player);
+  render();
 }
 
 /** いまの手持ちで、その場所へもう1回挑めるか(判定そのものは autoFarm.ts) */
@@ -2282,7 +2335,6 @@ function finishStage(cleared: boolean): void {
 }
 
 function startDungeonFloor(floor: DungeonFloor): void {
-  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getDungeonParty(state.player);
   if (party.length === 0) return;
   if (!trySpendStamina(state.player, DUNGEON_STAMINA_COST).ok) {
@@ -2337,7 +2389,6 @@ function handleAutoFarmDungeon(floor: DungeonFloor, count: number): void {
 }
 
 function startLevelDungeonTier(def: LevelDungeonDef): void {
-  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getParty(state.player);
   if (party.length === 0) return;
   // **1日の上限を先に見る。**スタミナを払ってから上限に弾かれると、払い損になる
@@ -2392,7 +2443,6 @@ function handleAutoFarmLevelDungeon(def: LevelDungeonDef, count: number): void {
 }
 
 function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
-  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!trySpendGoldDungeonChallenge(state.player).ok) return;
@@ -2412,7 +2462,6 @@ function startGoldDungeonFloor(floor: GoldDungeonFloor): void {
  * ========================================================================== */
 
 function startAwakeningDepthFloor(floor: AwakeningDepthFloor): void {
-  if (state.player.backgroundFarmJob?.status === "RUNNING") { playSfx("denied", 0.7); return; }
   const party = getParty(state.player);
   if (party.length === 0) return;
   if (!isAwakeningDepthUnlocked(state.player, floor.floor)) { playSfx("denied", 0.7); return; }
@@ -3434,7 +3483,10 @@ function buildBackgroundFarmBar(job: BackgroundFarmJob): HTMLElement {
      */
     el("div", { className: "tutorial-bar__cond tutorial-bar__cond--full" }, [
       el("span", {}, [
-        `⚡${job.staminaSpent} / EXP ${job.result.totalExp.toLocaleString("ja-JP")}`
+        `⚡${job.staminaSpent}`
+        // 使った時だけ出す。0個を常に並べると、上の行の幅を無駄に取る
+        + (job.staminaPotionsUsed ? `(🧪${job.staminaPotionsUsed})` : "")
+        + ` / EXP ${job.result.totalExp.toLocaleString("ja-JP")}`
         + ` / 🪙${job.result.totalGold.toLocaleString("ja-JP")} / 装備${job.result.equipmentDropCount}`,
       ]),
     ]),
@@ -3834,6 +3886,11 @@ function renderScreen(): void {
           savePlayerState(state.player);
           render();
         },
+        onUseStaminaPotion: () => {
+          if (!tryUseStaminaPotion(state.player).ok) { playSfx("denied", 0.7); return; }
+          savePlayerState(state.player);
+          render();
+        },
         onEditFighterName: () => {
           const name = window.prompt(`ファイター名を入力してください(最大${FIGHTER_NAME_MAX_LENGTH}文字)`, state.player.fighterName);
           if (name === null) return;
@@ -3974,6 +4031,7 @@ function renderScreen(): void {
         },
         onStartStage: startStage,
         autoFarmCount: state.autoFarmCount,
+        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4010,6 +4068,7 @@ function renderScreen(): void {
         // 別々にやらせていた。編成はすべて編成画面へ集約する
         onGoDungeonParty: () => openPartyFrom({ screen: "EQUIP_DUNGEON", label: `${state.selectedDungeonKind === "BEAST" ? "魔獣" : "魔人"}のダンジョン${state.selectedDungeonFloor ?? ""}F`, selectedDungeonFloor: state.selectedDungeonFloor ?? undefined, selectedDungeonKind: state.selectedDungeonKind }, "DUNGEON"),
         autoFarmCount: state.autoFarmCount,
+        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4037,6 +4096,7 @@ function renderScreen(): void {
         onStartTier: startLevelDungeonTier,
         onGoParty: () => openPartyFrom({ screen: "LEVEL_DUNGEON", label: "レベルダンジョン", selectedLevelDungeonTier: state.selectedLevelDungeonTier ?? undefined }, "NORMAL"),
         autoFarmCount: state.autoFarmCount,
+        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4064,6 +4124,7 @@ function renderScreen(): void {
         onStartFloor: startGoldDungeonFloor,
         onGoParty: () => openPartyFrom({ screen: "GOLD_DUNGEON", label: `ゴールドダンジョン${state.selectedGoldDungeonFloor ?? ""}F`, selectedGoldDungeonFloor: state.selectedGoldDungeonFloor ?? undefined }, "NORMAL"),
         autoFarmCount: state.autoFarmCount,
+        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4101,6 +4162,7 @@ function renderScreen(): void {
           render();
         },
         autoFarmCount: state.autoFarmCount,
+        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -5419,6 +5481,20 @@ if (import.meta.env.DEV) {
       state.talentTab = "BASIC";
       state.talentSkillSlot = 1;
       navigate("MONSTER_CREATE");
+      render();
+    },
+    /*
+     * **ポーションを持った状態を巡回に見せるための口。**
+     *
+     * 初期セーブは0個・自動使用OFFなので、そのまま開くと
+     * 「所持 🧪0個」の1行しか検査されない。数が2桁になった時の
+     * 折り返しも、ONにした時に「最大」の札が伸びた姿も見ないままになる
+     * (行が1つも無いランキングを検査し続けたのと同じ穴)。
+     */
+    grantStaminaPotions(count = 3, autoUse = true) {
+      state.player.staminaPotions = count;
+      state.player.autoUseStaminaPotionInFarm = autoUse;
+      savePlayerState(state.player);
       render();
     },
     showDemoRanking() {

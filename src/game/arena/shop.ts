@@ -69,6 +69,8 @@ function grantItem(state: PlayerState, item: ArenaShopItem, quantity: number, se
     case "FIVE_STAR_SCROLL": state.fiveStarSummonScrolls += amount; break;
     case "GOLD": state.gold += amount; break;
     case "AWAKENING_ORB": state.awakeningOrbs += amount; break;
+    // 省略可の欄。前から遊んでいる人の控えには無いので0で埋めてから足す
+    case "STAMINA_POTION": state.staminaPotions = (state.staminaPotions ?? 0) + amount; break;
     case "EXP_PIG":
     case "REINCARNATION_PIG":
     case "SKILL_PIG":

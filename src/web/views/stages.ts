@@ -17,7 +17,7 @@ import { MONSTER_TEMPLATES } from "../../data/monsters.js";
 import { NEW_MONSTER_TEMPLATES } from "../../data/newMonsters/index.js";
 import { PlayerState, getParty, isStageCleared } from "../../game/playerState.js";
 import { el } from "../dom.js";
-import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 import "../ui/catalog.css";
 
@@ -31,6 +31,7 @@ export interface StagesProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (stage: Stage, count: number, difficulty: Difficulty) => void;
+  onToggleAutoUseStaminaPotion: (next: boolean) => void;
   onGoParty: () => void;
 }
 
@@ -387,6 +388,7 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
 
     cleared ? renderAutoFarmPanel({
       ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "STAGE", stage.id, props.selectedDifficulty); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
+      ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: STAGE_STAMINA_COST,

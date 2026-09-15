@@ -6,14 +6,25 @@ export type ManualClearTimes = Record<string, number[]>;
 export const MAX_RECENT_MANUAL_CLEARS = 5;
 export const MAX_MANUAL_CLEAR_SECONDS = 10 * 60;
 
-export const MIN_REFERENCE_SECONDS: Record<BackgroundFarmKind, number> = {
-  STAGE: 30,
-  EQUIP_DUNGEON: 45,
-  LEVEL_DUNGEON: 30,
-  GOLD_DUNGEON: 30,
-  // 深域はボス1体+晶2体で、殴り合いが長い。下限も他より高く置く
-  AWAKENING_DEPTH: 45,
-};
+/**
+ * 自動周回1周の下限。**1秒。**
+ *
+ * ## 30〜45秒の下限をやめた理由
+ *
+ * 以前はコンテンツごとに「STAGE 30秒 / 装備ダンジョン 45秒」といった下限を
+ * 置いていた。そのため**x8で3秒で終わる編成を作っても、自動周回は30秒/周**の
+ * ままで、速く倒せるように育てたことが自動周回には1秒も効かなかった。
+ *
+ * 高速周回の編成を組んだことが、そのまま周回効率になるべき(依頼主の指定)。
+ * 実測の中央値をそのまま使う。
+ *
+ * **ここに残す1秒は、速さの調整ではなく暴走止め。**
+ * 0秒や極端に小さい値が入ると、`availableBackgroundRuns` の
+ * 「経過時間 ÷ 1周の秒数」が跳ね上がり、復帰した瞬間に数万回ぶんの
+ * 処理権が生まれる。実際の記録は `addManualClearTime` が0以下を弾くので
+ * ここへは来ないが、**保存の壊れや時計の巻き戻し**は防ぎきれない。
+ */
+export const MIN_REFERENCE_SECONDS = 1;
 
 export const FALLBACK_REFERENCE_SECONDS: Record<BackgroundFarmKind, number> = {
   STAGE: 120,
@@ -60,7 +71,12 @@ export function referenceRunTime(records: ManualClearTimes, kind: BackgroundFarm
   const recent = recentManualClearTimes(records, manualClearKey(kind, targetId, difficulty));
   const median = medianSeconds(recent);
   return {
-    seconds: median === null ? FALLBACK_REFERENCE_SECONDS[kind] : Math.max(MIN_REFERENCE_SECONDS[kind], median),
+    /*
+     * **実測の中央値をそのまま使う。**速度の倍率で割り戻したりしない。
+     * x8で3秒なら3秒/周。画面上でかかった時間が、そのまま自動周回の1周になる。
+     * 記録が1件も無い時だけ、従来どおりコンテンツごとの標準時間へ落ちる。
+     */
+    seconds: median === null ? FALLBACK_REFERENCE_SECONDS[kind] : Math.max(MIN_REFERENCE_SECONDS, median),
     fromManual: median !== null,
     recent,
   };
