@@ -671,3 +671,17 @@ describe("留守中の防衛戦", () => {
     expect(state.arenaMatchHistory.length).toBeGreaterThan(0);
   });
 });
+
+
+describe("arena season placement rewards", () => {
+  it("uses the agreed final-rank bands", async () => {
+    const { arenaSeasonRankReward } = await import("../src/data/arena/season.js");
+    expect(arenaSeasonRankReward(1).crystal).toBe(3000);
+    expect(arenaSeasonRankReward(2).arenaCoins).toBe(1250);
+    expect(arenaSeasonRankReward(3).fourStarSummonScrolls).toBe(5);
+    expect(arenaSeasonRankReward(10).lightDarkFourStarSummonScrolls).toBe(1);
+    expect(arenaSeasonRankReward(30).crystal).toBe(1000);
+    expect(arenaSeasonRankReward(100).arenaCoins).toBe(250);
+    expect(arenaSeasonRankReward(101)).toEqual({});
+  });
+});
