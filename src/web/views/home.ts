@@ -7,6 +7,8 @@ import {
   STAMINA_REFILL_FULL_COST,
   STAMINA_REFILL_PARTIAL_AMOUNT,
   STAMINA_REFILL_PARTIAL_COST,
+  STAMINA_POTION_AMOUNT,
+  staminaPotionsOwned,
 } from "../../game/playerState.js";
 import { CompensationClaim, compensationBannerLabel, selectHomeBanners } from "../../game/compensation.js";
 import { hasCloudRecoveryAccount } from "../../game/cloudRecovery.js";
@@ -51,6 +53,8 @@ export interface HomeProps {
   onGoShop: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
+  /** スタミナポーションを1個使う。ダイヤを使わずに回復する道 */
+  onUseStaminaPotion: () => void;
   onEditFighterName: () => void;
   onGoTutorialDestination: (destination: TutorialDestination) => void;
   onClaimTutorial: (id: string) => void;
@@ -434,7 +438,8 @@ function currencyChip(name: IconName, value: number, modifier: string, suffix?: 
     suffix ? el("span", { className: "home-wallet__suffix" }, [suffix]) : null,
   ].filter((n): n is HTMLElement => n !== null);
   return onClick
-    ? el("button", { type: "button", className: `home-wallet__chip home-wallet__chip--${modifier}`, onclick: onClick, ariaLabel: "スタミナを回復" }, children)
+    // data-tour は巡回の目印。文言ではなくここを見てもらう(tools/tour.mjs)
+    ? el("button", { type: "button", className: `home-wallet__chip home-wallet__chip--${modifier}`, "data-tour": "staminaRefill", onclick: onClick, ariaLabel: "スタミナを回復" }, children)
     : el("div", { className: `home-wallet__chip home-wallet__chip--${modifier}` }, children);
 }
 
@@ -574,6 +579,7 @@ function renderVitals(
   player: PlayerState,
   onPartial: () => void,
   onFull: () => void,
+  onUsePotion: () => void,
   party: readonly MonsterInstance[],
 ): HTMLElement {
   const power = party.reduce((sum, m) => sum + monsterPower(m), 0);
@@ -628,6 +634,21 @@ function renderVitals(
           },
           [icon("crystal"), `${STAMINA_REFILL_FULL_COST} で全回復`],
         ),
+        /*
+         * ポーションはダイヤと違って**スタミナにしか使えない**ので、
+         * 満タンでも押せるようにしてある(上限を超えて持てる)。
+         * 持っていない時だけ押せない。
+         */
+        el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn--ghost home-vitals__potion",
+            disabled: staminaPotionsOwned(player) < 1,
+            onclick: onUsePotion,
+          },
+          [`🧪 ポーション ×${staminaPotionsOwned(player)} で +${STAMINA_POTION_AMOUNT}`],
+        ),
       ]),
     ]),
   ]);
@@ -664,7 +685,12 @@ export function renderHome(props: HomeProps): HTMLElement {
   const tower = homeTowerSummary(player);
   const tutorialNext = nextTutorialMission(player);
   const hasStarted = hasStartedHome();
-  const settingsSheet = el("div", { className: "home-sheet", hidden: true }, []);
+  /*
+   * 小窓は**閉じるまで背面を操作させない**作りなので、そう名乗らせる。
+   * 名乗っていないと巡回(tools/lib/inspect.mjs)が背面のボタンを
+   * 「押せない」と数え、本物の崩れが24件の誤報に埋もれる。
+   */
+  const settingsSheet = el("div", { className: "home-sheet", role: "dialog", "aria-modal": "true", "aria-label": "設定", hidden: true }, []);
   const closeSettings = () => { settingsSheet.hidden = true; };
   settingsSheet.append(
     el("div", { className: "home-sheet__scrim", onclick: closeSettings }, []),
@@ -774,9 +800,9 @@ export function renderHome(props: HomeProps): HTMLElement {
       ]),
     ]),
   ]);
-  const staminaSheet = el("div", { className: "home-sheet", hidden: true }, []);
+  const staminaSheet = el("div", { className: "home-sheet", role: "dialog", "aria-modal": "true", "aria-label": "スタミナ回復", hidden: true }, []);
   const closeStamina = () => { staminaSheet.hidden = true; };
-  staminaSheet.append(el("div", { className: "home-sheet__scrim", onclick: closeStamina }, []), el("div", { className: "home-sheet__panel" }, [el("div", { className: "home-sheet__head" }, [el("strong", {}, ["スタミナ回復"]), el("button", { type: "button", className: "btn btn--ghost", onclick: closeStamina }, ["閉じる"])]), renderVitals(player, props.onRefillStaminaPartial, props.onRefillStaminaFull, party)]));
+  staminaSheet.append(el("div", { className: "home-sheet__scrim", onclick: closeStamina }, []), el("div", { className: "home-sheet__panel" }, [el("div", { className: "home-sheet__head" }, [el("strong", {}, ["スタミナ回復"]), el("button", { type: "button", className: "btn btn--ghost", onclick: closeStamina }, ["閉じる"])]), renderVitals(player, props.onRefillStaminaPartial, props.onRefillStaminaFull, props.onUseStaminaPotion, party)]));
   const openStamina = () => { staminaSheet.hidden = false; };
   const totalPower = party.reduce((sum, monster) => sum + monsterPower(monster), 0);
   /*

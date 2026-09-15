@@ -4563,6 +4563,38 @@ body {
   color: #ffd7a0;
 }
 
+/* ポーションの自動使用。的の大きさを確保し、9px未満の文字は置かない */
+.autofarm__potion {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+}
+.autofarm__potion-check {
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  accent-color: #ffd15c;
+}
+.autofarm__potion-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.autofarm__potion-text strong {
+  font-size: 0.82rem;
+}
+.autofarm__potion-text small {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .autofarm__go {
   width: 100%;
 }
@@ -7368,15 +7400,30 @@ body {
   box-shadow: 0 0 8px rgba(127, 224, 143, 0.32);
 }
 
+/*
+ * 回復の手。**3つになったので、1行へ詰めるのをやめた。**
+ *
+ * ダイヤ2種だけの頃は横一列で 0.58rem(実測9.28px)。9px未満で落ちる
+ * 検査はぎりぎり通るが、実機で読める大きさではない。ポーションを足して
+ * 3つにすると、さらに幅を取り合って同じ文字が縮む。
+ * **潰さずに折り返す**方を選ぶ(ホームの世界の枠と同じ考え方)。
+ */
 .home-vitals__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  flex: 0 0 auto;
+  flex: 1 1 100%;
 }
 
 .home-vitals__actions .btn {
-  font-size: 0.58rem;
-  padding: 5px 8px;
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  flex: 1 1 auto;
+}
+
+/* ポーションは1行を丸ごと使う。所持数が2桁でも文言が切れない */
+.home-vitals__potion {
+  flex: 1 1 100%;
 }
 
 /* --- 5. 召喚・ショップ。絵を持つ2枚 --------------------------------- */

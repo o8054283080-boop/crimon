@@ -46,6 +46,14 @@ const sql0003 = readFileSync(new URL("../supabase/migrations/20260902172000_aren
 const sqlSeed = readFileSync(new URL("../supabase/migrations/20260902172100_arena_seed.sql", import.meta.url), "utf8");
 const sqlSafety = readFileSync(new URL("../supabase/migrations/20260903003038_arena_release_safety.sql", import.meta.url), "utf8");
 const sqlShopGoals = readFileSync(new URL("../supabase/migrations/20260903015014_arena_shop_goals_and_defense_coins.sql", import.meta.url), "utf8");
+/*
+ * **棚は1ファイルでは終わらない。**流し終えたマイグレーションは二度と走らないので、
+ * 商品を足す時は必ず新しいファイルになる。突き合わせは全部を繋いだ上で行う。
+ */
+const sqlShopAdditions = [
+  readFileSync(new URL("../supabase/migrations/20260915090000_arena_shop_stamina_potion.sql", import.meta.url), "utf8"),
+];
+const sqlShopAll = [sqlShopGoals, ...sqlShopAdditions].join("\n");
 const sqlRatingRebalance = readFileSync(new URL("../supabase/migrations/20260912120000_arena_rating_gap_rebalance.sql", import.meta.url), "utf8");
 
 /** `arena_config` に入れている初期値を1件取り出す */
@@ -201,7 +209,7 @@ describe("報酬・シーズン・棚がクライアントと同じ値である�
      */
     for (const item of ARENA_SHOP_ITEMS) {
       // 行の終わりは `),` か `)` +改行。**最後の1件だけ `,` が無い**
-      const row = sqlShopGoals.match(new RegExp(`\\('${item.id}',[^)]{0,500}\\)`));
+      const row = sqlShopAll.match(new RegExp(`\\('${item.id}',[^)]{0,500}\\)`));
       expect(row, `${item.id} が seed に無い`).not.toBeNull();
       const text = row![0];
       expect(text, `${item.id} の値段`).toContain(`, ${item.price},`);
@@ -223,9 +231,13 @@ describe("報酬・シーズン・棚がクライアントと同じ値である�
      * ファイル全体から拾うと設定の鍵まで「商品」として数えてしまう
      * (`snapshot` を商品だと言って落ちた)。
      */
-    const from = sqlShopGoals.indexOf("insert into public.arena_shop_items");
-    const block = sqlShopGoals.slice(from, sqlShopGoals.indexOf("on conflict", from));
-    const ids = [...block.matchAll(/^\s{2}\('([a-z0-9_]+)',\s*'/gm)].map((m) => m[1]);
+    const ids: string[] = [];
+    for (const sql of [sqlShopGoals, ...sqlShopAdditions]) {
+      const from = sql.indexOf("insert into public.arena_shop_items");
+      if (from < 0) continue;
+      const block = sql.slice(from, sql.indexOf("on conflict", from));
+      ids.push(...[...block.matchAll(/^\s{2}\('([a-z0-9_]+)',\s*'/gm)].map((m) => m[1]));
+    }
     const known = new Set(ARENA_SHOP_ITEMS.map((item) => item.id));
     for (const id of ids) {
       expect(known.has(id), `${id} は実装に無い商品`).toBe(true);

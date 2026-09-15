@@ -5,7 +5,7 @@ import { BEAST_DUNGEON_FLOORS, DungeonEnemy, DungeonFloor, dungeonFloorHasSkillP
 import { findMonster } from "../../data/monsters.js";
 import { getDungeonParty, isDungeonFloorCleared, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
-import { renderAutoFarmPanel } from "./autoFarmPanel.js";
+import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 
@@ -19,6 +19,7 @@ export interface EquipmentDungeonProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (floor: DungeonFloor, count: number) => void;
+  onToggleAutoUseStaminaPotion: (next: boolean) => void;
 }
 
 function starLabel(star: EquipStar): string {
@@ -192,6 +193,7 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
 
     isDungeonFloorCleared(props.player, floor.floor, floor.kind) ? renderAutoFarmPanel({
       ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "EQUIP_DUNGEON", `${floor.kind}:${floor.floor}`); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
+      ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: DUNGEON_STAMINA_COST,

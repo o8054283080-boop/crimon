@@ -27,6 +27,22 @@ export interface BackgroundFarmJob {
   result: AutoFarmResult;
   /** 支払い保存済み・未精算の1戦。復帰時は再課金せず、この戦闘から再開する。 */
   inFlight: boolean;
+  /**
+   * スタミナが足りない時、スタミナポーションを自動で使うか。
+   *
+   * **既定はOFF。**周回を回し続けたい人だけが自分で入れる。
+   * 勝手に使うと、貯めておいたぶんが気づかないうちに溶ける。
+   *
+   * **ダイヤは絶対に自動で使わない。**ポーションはスタミナにしか使えないので
+   * 減っても使い道が狭まるだけだが、ダイヤは何にでも使える。
+   * 自動で減らしてよいものではない(依頼主の指定)。
+   *
+   * 省略可にしてあるのは、**進行中のジョブを持ったまま更新した人のため。**
+   * 読み込み時に false として扱う。
+   */
+  autoUseStaminaPotion?: boolean;
+  /** その周回で自動使用したポーションの数。終わった時の報告に使う */
+  staminaPotionsUsed?: number;
 }
 
 export function parseRequestedRuns(value: unknown): number | null {
@@ -47,7 +63,8 @@ export function shouldStopForJstDateChange(job: Pick<BackgroundFarmJob, "kind" |
 
 export function createBackgroundFarmJob(input: {
   kind: BackgroundFarmKind; targetId: string; targetName: string; difficulty?: Difficulty;
-  requestedRuns: number; partyIds: string[]; referenceRunSeconds?: number; referenceFromManual?: boolean; now?: number;
+  requestedRuns: number; partyIds: string[]; referenceRunSeconds?: number; referenceFromManual?: boolean;
+  autoUseStaminaPotion?: boolean; now?: number;
 }): BackgroundFarmJob {
   const requestedRuns = parseRequestedRuns(input.requestedRuns);
   if (requestedRuns === null) throw new Error("周回回数は正の整数で指定してください");
@@ -61,7 +78,30 @@ export function createBackgroundFarmJob(input: {
     referenceFromManual: input.referenceFromManual ?? false,
     partyIds: [...input.partyIds], status: "RUNNING", stopReason: null,
     staminaSpent: 0, result: emptyResult(), inFlight: false,
+    // **既定はOFF。**入れた人だけが使う
+    autoUseStaminaPotion: input.autoUseStaminaPotion === true,
+    staminaPotionsUsed: 0,
   };
+}
+
+/**
+ * 次の1周を始めるために、ポーションを何個使えばよいか。
+ *
+ * **必要な分だけ。**まとめて使わない。1個で100回復するので、
+ * 10しか要らない周回のために2個使うようなことは起きない。
+ *
+ * @returns 使う個数。0なら使わなくてよい。足りない時は持っている数を超えて返さない
+ */
+export function staminaPotionsNeeded(
+  stamina: number,
+  cost: number,
+  owned: number,
+  potionAmount: number,
+): number {
+  if (!(potionAmount > 0)) return 0;
+  if (stamina >= cost) return 0;
+  const needed = Math.ceil((cost - stamina) / potionAmount);
+  return Math.max(0, Math.min(owned, needed));
 }
 
 export const MAX_OFFLINE_FARM_MS = 8 * 60 * 60 * 1000;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange } from "../src/game/backgroundAutoFarm.js";
-import { addManualClearTime, manualClearKey, medianSeconds, recordManualBattle, referenceRunTime } from "../src/game/manualClearTimes.js";
+import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange, staminaPotionsNeeded } from "../src/game/backgroundAutoFarm.js";
+import { MIN_REFERENCE_SECONDS, addManualClearTime, manualClearKey, medianSeconds, recordManualBattle, referenceRunTime } from "../src/game/manualClearTimes.js";
 import { affordableCount } from "../src/web/views/autoFarmPanel.js";
-import { createInitialState, normalizeLoadedState } from "../src/game/playerState.js";
+import { STAMINA_POTION_AMOUNT, applyPassiveStaminaRegen, createInitialState, normalizeLoadedState, staminaPotionsOwned, tryUseStaminaPotion } from "../src/game/playerState.js";
 import { readFileSync } from "node:fs";
 
 describe("保存型バックグラウンド周回", () => {
@@ -63,9 +63,20 @@ describe("実戦時間を基準にした周回速度", () => {
     expect(medianSeconds(records.key)).toBe(100);
   });
   it("偶数件は中央2件の平均を使う", () => expect(medianSeconds([90, 100])).toBe(95));
-  it("コンテンツ別の最低時間を適用する", () => {
-    expect(referenceRunTime({ "stage_1-1_NORMAL": [12] }, "STAGE", "1-1", "NORMAL").seconds).toBe(30);
-    expect(referenceRunTime({ equip_10: [20] }, "EQUIP_DUNGEON", "10").seconds).toBe(45);
+  /*
+   * 以前はここが「STAGE 30秒 / 装備45秒」の下限を確かめるテストだった。
+   * **速く倒せる編成を組んでも自動周回が速くならない**原因がこれだったので外した。
+   * いまの下限は暴走止めの1秒だけ。
+   */
+  it("実測が下限より短ければ、その実測をそのまま1周にする", () => {
+    expect(referenceRunTime({ "stage_1-1_NORMAL": [12] }, "STAGE", "1-1", "NORMAL").seconds).toBe(12);
+    expect(referenceRunTime({ equip_10: [20] }, "EQUIP_DUNGEON", "10").seconds).toBe(20);
+    // x8で3秒なら3秒/周。1倍速へ割り戻さない
+    expect(referenceRunTime({ equip_10: [3] }, "EQUIP_DUNGEON", "10").seconds).toBe(3);
+  });
+  it("壊れた保存で0秒が入っても、1秒を下回らない", () => {
+    // 0秒だと「経過時間 ÷ 1周」が跳ね、復帰した瞬間に数万回ぶんの処理権が生まれる
+    expect(referenceRunTime({ equip_10: [0.2, 0.2, 0.2] }, "EQUIP_DUNGEON", "10").seconds).toBe(MIN_REFERENCE_SECONDS);
   });
   it("記録なしは旧固定値へフォールバックする", () => {
     expect(referenceRunTime({}, "STAGE", "1-1", "NORMAL")).toMatchObject({ seconds: 120, fromManual: false });
@@ -112,5 +123,149 @@ describe("completed background farm notification", () => {
     const holder = { backgroundFarmJob: job };
     expect(dismissFinishedBackgroundFarm(holder, job.id)).toBe(false);
     expect(holder.backgroundFarmJob).toBe(job);
+  });
+});
+
+/* ==========================================================================
+ * スタミナポーション
+ * ========================================================================== */
+
+describe("スタミナポーション", () => {
+  it("1個で+100。上限を超えて持てる", () => {
+    const player = createInitialState();
+    player.staminaPotions = 1;
+    player.stamina = player.maxStamina; // 満タンから使う
+    expect(tryUseStaminaPotion(player).ok).toBe(true);
+    expect(player.stamina).toBe(player.maxStamina + STAMINA_POTION_AMOUNT);
+    expect(player.staminaPotions).toBe(0);
+  });
+
+  it("持っていなければ使えず、スタミナも減らない", () => {
+    const player = createInitialState();
+    player.staminaPotions = 0;
+    const before = player.stamina;
+    expect(tryUseStaminaPotion(player).ok).toBe(false);
+    expect(player.stamina).toBe(before);
+  });
+
+  it("ダイヤには一切手を付けない", () => {
+    const player = createInitialState();
+    player.staminaPotions = 2;
+    player.crystal = 500;
+    tryUseStaminaPotion(player);
+    expect(player.crystal).toBe(500);
+  });
+
+  it("超過中は自然回復で増えない(基準時刻だけ進む)", () => {
+    const player = createInitialState();
+    player.staminaPotions = 1;
+    player.stamina = player.maxStamina;
+    tryUseStaminaPotion(player);
+    const over = player.stamina;
+    // 丸1日ぶん時計を進めても、上限超過の間は1も増えない
+    applyPassiveStaminaRegen(player, Date.now() + 24 * 60 * 60 * 1000);
+    expect(player.stamina).toBe(over);
+  });
+
+  it("超過ぶんを使い切って上限を割れば、そこからは普通に自然回復する", () => {
+    const player = createInitialState();
+    player.staminaPotions = 1;
+    player.stamina = player.maxStamina;
+    tryUseStaminaPotion(player);
+    player.stamina = player.maxStamina - 5; // 超過ぶんを戦闘で使い切った状態
+    applyPassiveStaminaRegen(player, player.lastStaminaUpdateAt + 24 * 60 * 60 * 1000);
+    expect(player.stamina).toBe(player.maxStamina);
+  });
+
+  it("ポーション欄のない旧セーブは0個・自動使用OFFで読み込める", () => {
+    const legacy = createInitialState() as unknown as Record<string, unknown>;
+    delete legacy.staminaPotions;
+    delete legacy.autoUseStaminaPotionInFarm;
+    const loaded = normalizeLoadedState(legacy as never);
+    expect(staminaPotionsOwned(loaded)).toBe(0);
+    expect(loaded.autoUseStaminaPotionInFarm).toBe(false);
+  });
+
+  it.each([-5, NaN, "3" as unknown as number])("壊れた所持数 %s は0として扱う", (value) => {
+    const broken = createInitialState() as unknown as Record<string, unknown>;
+    broken.staminaPotions = value;
+    expect(staminaPotionsOwned(normalizeLoadedState(broken as never))).toBe(0);
+  });
+});
+
+describe("自動周回でのポーション自動使用", () => {
+  it("足りている時は使わない", () => {
+    expect(staminaPotionsNeeded(50, 8, 9, STAMINA_POTION_AMOUNT)).toBe(0);
+    expect(staminaPotionsNeeded(8, 8, 9, STAMINA_POTION_AMOUNT)).toBe(0);
+  });
+
+  it("足りない時は必要な分だけ。まとめて使わない", () => {
+    // あと2足りないだけなら1個。9個持っていても1個しか使わない
+    expect(staminaPotionsNeeded(6, 8, 9, STAMINA_POTION_AMOUNT)).toBe(1);
+    // 250要る場面で0からなら3個(100+100+100)
+    expect(staminaPotionsNeeded(0, 250, 9, STAMINA_POTION_AMOUNT)).toBe(3);
+  });
+
+  it("持っている数を超えて使わない", () => {
+    expect(staminaPotionsNeeded(0, 250, 1, STAMINA_POTION_AMOUNT)).toBe(1);
+    expect(staminaPotionsNeeded(0, 250, 0, STAMINA_POTION_AMOUNT)).toBe(0);
+  });
+
+  it("既定はOFF。入れた時だけジョブへ乗る", () => {
+    const off = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 3, partyIds: ["a"] });
+    expect(off.autoUseStaminaPotion).toBe(false);
+    const on = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 3, partyIds: ["a"], autoUseStaminaPotion: true });
+    expect(on.autoUseStaminaPotion).toBe(true);
+  });
+
+  it("ダイヤの自動回復へは一切繋がない", () => {
+    const source = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+    const processBody = source.slice(source.indexOf("function processBackgroundFarmOnce"), source.indexOf("function beginBackgroundFarm"));
+    expect(processBody).toContain("tryUseStaminaPotion");
+    // 周回の中からダイヤの回復を呼ばない。切れたらSTAMINAで正常に終わる
+    expect(processBody).not.toContain("tryRefillStamina");
+  });
+
+  it("切れたらSTAMINAで終わる(ダイヤを使って続けない)", () => {
+    const source = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+    const processBody = source.slice(source.indexOf("function processBackgroundFarmOnce"), source.indexOf("function beginBackgroundFarm"));
+    // farmBlockReason が STAMINA を返し、そのまま finishBackgroundFarm へ渡る
+    expect(processBody).toContain("finishBackgroundFarm(job, blocked)");
+  });
+});
+
+describe("自動周回中の手動プレイ", () => {
+  const source = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+
+  it.each([
+    "function startStage",
+    "function startDungeonFloor",
+    "function startLevelDungeonTier",
+    "function startGoldDungeonFloor",
+    "function startAwakeningDepthFloor",
+  ])("%s は周回中でも入れる", (header) => {
+    const start = source.indexOf(header);
+    expect(start).toBeGreaterThan(-1);
+    const body = source.slice(start, source.indexOf("\n}", start));
+    expect(body).not.toContain('backgroundFarmJob?.status === "RUNNING"');
+  });
+
+  it("周回の二重起動だけは止める", () => {
+    const begin = source.slice(source.indexOf("function beginBackgroundFarm"));
+    expect(begin.slice(0, 600)).toContain('currentStatus === "RUNNING"');
+  });
+
+  it("1周ごとに最新のスタミナを見る(まとめて前払いしない)", () => {
+    const processBody = source.slice(source.indexOf("function processBackgroundFarmOnce"), source.indexOf("function beginBackgroundFarm"));
+    expect(processBody).toContain("applyPassiveStaminaRegen(state.player)");
+    expect(processBody).toContain("stamina: state.player.stamina");
+    expect(processBody).toContain("trySpendStamina(state.player, cost)");
+  });
+
+  it("報酬は正式なクリア報酬処理を通す(簡易テーブルを作らない)", () => {
+    const processBody = source.slice(source.indexOf("function processBackgroundFarmOnce"), source.indexOf("function beginBackgroundFarm"));
+    for (const fn of ["applyStageClearRewards", "applyDungeonClearRewards", "applyLevelDungeonClearRewards"]) {
+      expect(processBody).toContain(fn);
+    }
   });
 });

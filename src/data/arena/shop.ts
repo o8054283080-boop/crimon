@@ -4,7 +4,8 @@
  * **並んでいるのは既に実装済みのものだけ。** 存在しない道具を勝手に作らない。
  * ここに出せるのは、いまプレイヤーが実際に持てるもの——
  * 召喚の書 / ★4以上召喚書 / 光闇召喚書 / ★5召喚書 /
- * 経験ピッグ / 転生ピッグ / スキルピッグ / ゴールド / 覚醒オーブ、に限る。
+ * 経験ピッグ / 転生ピッグ / スキルピッグ / ゴールド / 覚醒オーブ /
+ * スタミナポーション、に限る。
  */
 import { Star } from "../../core/rarity.js";
 import { ARENA_TICKET_MAX, ARENA_TICKET_REGEN_MINUTES } from "../pvpArena.js";
@@ -52,7 +53,8 @@ export type ArenaShopKind =
   | "AWAKENING_ORB"
   | "EXP_PIG"
   | "REINCARNATION_PIG"
-  | "SKILL_PIG";
+  | "SKILL_PIG"
+  | "STAMINA_POTION";
 
 /** 買える周期。上限のリセット単位でもある */
 export type ArenaShopPeriod = "WEEKLY" | "MONTHLY" | "SEASON";
@@ -94,6 +96,19 @@ export const ARENA_SHOP_ITEMS: readonly ArenaShopItem[] = [
     name: "ゴールド 50,000",
     note: "強化と装備の費用に",
     kind: "GOLD", amount: 50_000, price: 25, period: "WEEKLY", limit: 10,
+  },
+  {
+    /*
+     * スタミナポーション。**週2個まで。**
+     *
+     * 1個で⚡100。装備ダンジョンが1回⚡8なので、2個で25周ぶん。
+     * ここを厚くすると自動周回がコインの力でいくらでも伸びてしまうので、
+     * 「今日あと少し回りたい」を埋める量に留める。
+     */
+    id: "stamina_potion",
+    name: "スタミナポーション",
+    note: "ダイヤを使わずスタミナを回復する",
+    kind: "STAMINA_POTION", amount: 1, price: 80, period: "WEEKLY", limit: 2,
   },
   {
     id: "exp_pig_3",

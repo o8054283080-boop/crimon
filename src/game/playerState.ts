@@ -118,6 +118,22 @@ export interface PlayerState {
    */
   crimShards?: number;
   /**
+   * スタミナポーション。**ダイヤを使わずにスタミナを100回復する。**
+   *
+   * **省略可。**前から遊んでいる人の控えには無いので、読み込み時に0で埋める。
+   * ダイヤの回復(`tryRefillStaminaPartial`)と同じく、**上限を超えて持てる。**
+   */
+  staminaPotions?: number;
+  /**
+   * 自動周回でスタミナが足りなくなった時、ポーションを自動で使うか。
+   *
+   * **既定はOFF。**入れた人だけが使う。再生速度と同じで、
+   * 周回のたびに入れ直すものではないので起動をまたいで残す。
+   *
+   * **省略可。**前から遊んでいる人の控えには無いので、読み込み時に false で埋める。
+   */
+  autoUseStaminaPotionInFarm?: boolean;
+  /**
    * かけらを配り終えた初心者ミッションのID。
    *
    * ## なぜ `tutorialMissions.claimedIds` と分けるのか
@@ -402,6 +418,8 @@ export function createInitialState(): PlayerState {
     monsterPoints: 0,
     crimShards: 0,
     crimShardGrantedMissionIds: [],
+    staminaPotions: 0,
+    autoUseStaminaPotionInFarm: false,
     fighterLevel: 1,
     fighterExp: 0,
     stamina: INITIAL_MAX_STAMINA,
@@ -605,6 +623,11 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.crimShards !== "number" || !(state.crimShards >= 0)) state.crimShards = 0;
   else state.crimShards = Math.floor(state.crimShards);
   if (!Array.isArray(state.crimShardGrantedMissionIds)) state.crimShardGrantedMissionIds = [];
+  // スタミナポーション。前から遊んでいる人の控えには無い
+  if (typeof state.staminaPotions !== "number" || !(state.staminaPotions >= 0)) state.staminaPotions = 0;
+  else state.staminaPotions = Math.floor(state.staminaPotions);
+  // 自動使用の設定。**既定はOFF。**入れた覚えのない人が勝手に消費されないように
+  state.autoUseStaminaPotionInFarm = state.autoUseStaminaPotionInFarm === true;
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
@@ -1129,6 +1152,52 @@ export function tryRefillStaminaFull(state: PlayerState): StaminaRefillResult {
    */
   state.stamina = Math.max(state.stamina, state.maxStamina);
   return { ok: true };
+}
+
+/* ------------------------------------------------------ スタミナポーション */
+
+/**
+ * スタミナポーション。**ダイヤ以外のスタミナ回復手段。**
+ *
+ * ## ダイヤの回復と何が違うのか
+ *
+ * 量も上限の扱いも同じ(100回復・上限超過あり)。違うのは**持ち物であること。**
+ * ダイヤは何にでも使えるので、スタミナへ回すかどうかを毎回天秤にかける。
+ * ポーションはスタミナにしか使えないぶん、迷わず使える。
+ *
+ * ## 上限を超えて持てる
+ *
+ * 80/100 に1個使えば 180/100 になる。切り捨てない。
+ * 自然回復(`applyPassiveStaminaRegen`)は `stamina >= maxStamina` の間
+ * **基準時刻を進めるだけで1も回復しない**ので、超過中に勝手に増え続けることはない。
+ */
+export const STAMINA_POTION_AMOUNT = 100;
+
+export function staminaPotionsOwned(state: Pick<PlayerState, "staminaPotions">): number {
+  const value = state.staminaPotions ?? 0;
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+export interface StaminaPotionResult {
+  ok: boolean;
+  reason?: string;
+  /** 使った後の所持数 */
+  remaining?: number;
+}
+
+/**
+ * ポーションを1個使う。**呼ぶ前に自然回復を反映する**(ダイヤの回復と同じ手順)。
+ *
+ * 先に所持数を減らしてから足すのではなく、**足せることを確かめてから減らす。**
+ * 逆にすると、回復に失敗した時にポーションだけ消える。
+ */
+export function tryUseStaminaPotion(state: PlayerState): StaminaPotionResult {
+  applyPassiveStaminaRegen(state);
+  const owned = staminaPotionsOwned(state);
+  if (owned < 1) return { ok: false, reason: "スタミナポーションを持っていません" };
+  state.stamina += STAMINA_POTION_AMOUNT;
+  state.staminaPotions = owned - 1;
+  return { ok: true, remaining: state.staminaPotions };
 }
 
 export interface FighterExpResult {
