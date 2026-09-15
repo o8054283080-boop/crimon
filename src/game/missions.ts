@@ -36,7 +36,8 @@ export interface MissionReward {
    * スタミナポーション。**上限を超えて持てるスタミナの貯金。**
    *
    * `stamina` と違い、受け取った時点では減らない。上限に張り付いている時に
-   * 受け取っても無駄にならないので、**週・月のまとめ報酬に向く。**
+   * 受け取っても無駄にならないので、**日次に置いても取りこぼしが出ない。**
+   * (`stamina` を日次で配ると、満タンの人はその場で捨てることになる。)
    */
   staminaPotions?: number;
   arenaCoins?: number;
@@ -248,7 +249,7 @@ export const DAILY_MISSIONS: readonly PeriodMissionDefinition[] = [
   { id: "daily-login", title: "今日もクリモン", condition: "ログインする", counter: "loginDays", target: 1, reward: { crystal: 20 } },
   { id: "daily-levels", title: "少しずつ育成", condition: "モンスターのレベルを合計5上げる", counter: "levelsGained", target: 5, reward: { gold: 50_000 } },
   { id: "daily-shop", title: "ショップをのぞこう", condition: "ショップで1回買い物する", counter: "shopPurchases", target: 1, reward: { summonScrolls: 1 } },
-  { id: "daily-stamina", title: "今日の冒険", condition: "スタミナを50消費する", counter: "staminaSpent", target: 50, reward: { summonScrolls: 1 } },
+  { id: "daily-stamina", title: "今日の冒険", condition: "スタミナを50消費する", counter: "staminaSpent", target: 50, reward: { summonScrolls: 1, staminaPotions: 3 } },
   { id: "daily-arena", title: "闘技場に挑戦", condition: "アリーナを3回プレイする", counter: "arenaBattles", target: 3, reward: { gold: 50_000 } },
   { id: "daily-equipment", title: "装備を整える", condition: "装備を3回強化する", counter: "equipmentEnhancements", target: 3, reward: { crystal: 20 } },
 ];
@@ -256,7 +257,7 @@ export const DAILY_MISSIONS: readonly PeriodMissionDefinition[] = [
 export const WEEKLY_MISSIONS: readonly PeriodMissionDefinition[] = [
   { id: "weekly-login", title: "今週も冒険", condition: "5日ログインする", counter: "loginDays", target: 5, reward: { summonScrolls: 5 } },
   { id: "weekly-levels", title: "育成週間", condition: "モンスターのレベルを合計100上げる", counter: "levelsGained", target: 100, reward: { gold: 300_000 } },
-  { id: "weekly-stamina", title: "スタミナ消費", condition: "スタミナを500消費する", counter: "staminaSpent", target: 500, reward: { summonScrolls: 5, staminaPotions: 1 } },
+  { id: "weekly-stamina", title: "スタミナ消費", condition: "スタミナを500消費する", counter: "staminaSpent", target: 500, reward: { summonScrolls: 5, staminaPotions: 10 } },
   { id: "weekly-arena", title: "闘技場週間", condition: "アリーナを20回プレイする", counter: "arenaBattles", target: 20, reward: { summonScrolls: 5 } },
   { id: "weekly-equipment", title: "装備強化週間", condition: "装備を20回強化する", counter: "equipmentEnhancements", target: 20, reward: { crystal: 100 } },
   { id: "weekly-shop", title: "お買い物週間", condition: "ショップで10回買い物する", counter: "shopPurchases", target: 10, reward: { gold: 300_000 } },
@@ -269,7 +270,7 @@ export const MONTHLY_MISSIONS: readonly PeriodMissionDefinition[] = [
   { id: "monthly-login20", title: "月の冒険者", condition: "20日ログインする", counter: "loginDays", target: 20, reward: { summonScrolls: 10 } },
   { id: "monthly-login25", title: "皆勤目前", condition: "25日ログインする", counter: "loginDays", target: 25, reward: { fourStarSummonScrolls: 1 } },
   { id: "monthly-levels", title: "大育成月間", condition: "モンスターのレベルを合計500上げる", counter: "levelsGained", target: 500, reward: { reincarnationPig3: 3 } },
-  { id: "monthly-stamina", title: "大冒険月間", condition: "スタミナを3,000消費する", counter: "staminaSpent", target: 3_000, reward: { summonScrolls: 10, staminaPotions: 3 } },
+  { id: "monthly-stamina", title: "大冒険月間", condition: "スタミナを3,000消費する", counter: "staminaSpent", target: 3_000, reward: { summonScrolls: 10, staminaPotions: 30 } },
   { id: "monthly-arena", title: "闘技場月間", condition: "アリーナを100回プレイする", counter: "arenaBattles", target: 100, reward: { summonScrolls: 10 } },
   { id: "monthly-equipment", title: "装備職人", condition: "装備を100回強化する", counter: "equipmentEnhancements", target: 100, reward: { gold: 1_000_000 } },
   { id: "monthly-shop", title: "常連ファイター", condition: "ショップで30回買い物する", counter: "shopPurchases", target: 30, reward: { crystal: 300 } },

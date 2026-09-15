@@ -1,6 +1,6 @@
 import { SET_LABEL, SLOT_LABEL, formatStatValue } from "../../core/equipment.js";
 import { findMonsterById } from "../../data/monsters.js";
-import { PlayerState, ShopView } from "../../game/playerState.js";
+import { PlayerState, STAMINA_POTION_AMOUNT, ShopView } from "../../game/playerState.js";
 import { AWAKENING_MATERIAL_LABEL, SHOP_MAX_SLOTS, ShopEntry, msUntilRotation } from "../../game/shop.js";
 import { CRYSTAL_SHOP_CATEGORY_LABEL, CrystalShopCategory } from "../../data/crystalShop.js";
 import { CrystalShopRow } from "../../game/crystalShop.js";
@@ -98,6 +98,20 @@ function renderAwakeningBody(entry: Extract<ShopEntry, { kind: "AWAKENING_MATERI
   ];
 }
 
+/**
+ * スタミナポーションの札。
+ *
+ * **数を大きく出す。**1個・3個・5個のどれが並ぶかは時間帯で変わるので、
+ * 数が読めないと「見かけた時に買う」の判断ができない。
+ */
+function renderStaminaPotionBody(entry: Extract<ShopEntry, { kind: "STAMINA_POTION" }>): HTMLElement[] {
+  return [
+    el("div", { className: "shop-card__icon shop-card__icon--potion" }, ["🧪"]),
+    el("div", { className: "shop-card__title" }, [`スタミナポーション ×${entry.count}`]),
+    el("div", { className: "shop-card__sub" }, [`1個で⚡${STAMINA_POTION_AMOUNT}回復`]),
+  ];
+}
+
 function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElement {
   const purchased = props.shop.purchasedSlots.includes(index);
   const affordable = props.player.gold >= entry.price;
@@ -106,7 +120,8 @@ function renderCard(props: ShopProps, entry: ShopEntry, index: number): HTMLElem
     entry.kind === "EQUIPMENT" ? renderEquipmentBody(entry)
       : entry.kind === "MONSTER" ? renderMonsterBody(entry)
         : entry.kind === "AWAKENING_MATERIAL" ? renderAwakeningBody(entry)
-          : renderScrollBody(entry);
+          : entry.kind === "STAMINA_POTION" ? renderStaminaPotionBody(entry)
+            : renderScrollBody(entry);
 
   const buyLabel = purchased ? "購入済み" : entry.price.toLocaleString("ja-JP");
 

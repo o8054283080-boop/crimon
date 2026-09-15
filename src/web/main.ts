@@ -46,6 +46,7 @@ import {
   staminaPotionsNeeded,
 } from "../game/backgroundAutoFarm.js";
 import { manualClearKey, recordManualBattle, referenceRunTime } from "../game/manualClearTimes.js";
+import { SHOP_MAX_SLOTS, SHOP_ROTATION_MS, buildShopLineup, rotationKeyAt } from "../game/shop.js";
 import {
   PersistState,
   backupTakenAt,
@@ -543,6 +544,15 @@ interface AppState {
   reawakenConfirmOpen: boolean;
   partyEditMode: PartyEditMode;
   autoFarmCount: number;
+  /**
+   * ショップの棚を、この時刻の品揃えとして出す。null なら今の時刻。
+   *
+   * **DEVの口と巡回のためだけにある。**棚は1時間ごとに入れ替わり、
+   * スタミナポーションや才能覚醒の素材は毎回並ぶわけではないので、
+   * そのままでは「たまたま並ばなかった棚」を検査して問題なしと報告してしまう
+   * (行が1つも無いランキングを検査し続けたのと同じ穴)。
+   */
+  devShopNow: number | null;
   /** 周回の途中。null なら単発の挑戦 */
   farmRun: FarmRun | null;
   /* --- 試練の塔 --- */
@@ -685,6 +695,7 @@ const state: AppState = {
   reawakenConfirmOpen: false,
   partyEditMode: "NORMAL",
   autoFarmCount: 10,
+  devShopNow: null,
   farmRun: null,
   towerNotice: null,
   towerOutcome: null,
@@ -3930,10 +3941,10 @@ function renderScreen(): void {
     case "SHOP":
       content = renderShop({
         player: state.player,
-        shop: getShop(state.player),
+        shop: getShop(state.player, state.devShopNow ?? undefined),
         notice: state.shopNotice,
         onBuy: (slotIndex) => {
-          const result = buyShopEntry(state.player, slotIndex);
+          const result = buyShopEntry(state.player, slotIndex, state.devShopNow ?? undefined);
           state.shopNotice = result.ok ? (result.label ?? "購入しました") : (result.reason ?? "購入できませんでした");
           if (result.ok) savePlayerState(state.player);
           render();
@@ -5495,6 +5506,29 @@ if (import.meta.env.DEV) {
       state.player.staminaPotions = count;
       state.player.autoUseStaminaPotionInFarm = autoUse;
       savePlayerState(state.player);
+      render();
+    },
+    /*
+     * **スタミナポーションが並ぶ棚を巡回に見せるための口。**
+     *
+     * 棚は1時間ごとに入れ替わり、ポーションは毎回並ぶわけではない。
+     * そのままでは「たまたま並ばなかった棚」を検査して問題なしと報告する
+     * ことになるので、並ぶ時間帯を探してからその棚を出す。
+     */
+    showShopWithStaminaPotion() {
+      state.player.fighterLevel = Math.max(state.player.fighterLevel, 30);
+      state.player.shopSlotsUnlocked = SHOP_MAX_SLOTS;
+      state.player.gold = Math.max(state.player.gold, 5_000_000);
+      const base = rotationKeyAt(Date.now());
+      for (let i = 0; i < 400; i += 1) {
+        const at = (base + i) * SHOP_ROTATION_MS;
+        const lineup = buildShopLineup(at, state.player.fighterLevel, SHOP_MAX_SLOTS);
+        if (lineup.entries.some((entry) => entry.kind === "STAMINA_POTION")) {
+          state.devShopNow = at;
+          break;
+        }
+      }
+      navigate("SHOP");
       render();
     },
     showDemoRanking() {
