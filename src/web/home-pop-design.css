@@ -500,6 +500,26 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   display: none !important;
 }
 
+/* ⚠の四角は**この幅では文の行数に化ける。**
+ *
+ * 札は198px。右の「登録する」(76px)を避けると文に使えるのは約103pxだが、
+ * ⚠が26px＋間隔9pxを持っていくと68pxしか残らない。そこへ15文字を流すと
+ * **4行**になり、「アカ/ウン/ト復/旧の」という読めない刻み方をしていた
+ * (実測: .78rem で高さ49px、10pxへ落としてもまだ3行)。
+ *
+ * 札には既に赤い縦線と赤い地があり、**危ないことは⚠が無くても伝わる。**
+ * 26pxを文へ返して2行に収める。文字は10px——9pxは割らない(巡回が落とす)。 */
+.home-world .reward-banner-stack .cloud-warn__mark {
+  display: none !important;
+}
+
+.home-world .reward-banner-stack .cloud-warn__title {
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+  /* 2行を均す。無いと「アカウント復旧の登/録がまだです」と語の途中で割れる */
+  text-wrap: balance;
+}
+
 .home-world .reward-banner-stack .cloud-warn__go {
   position: absolute !important;
   top: 5px !important;
@@ -523,8 +543,20 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  * **段を切り落とさずに縮める。**絵を44px(指で押せる最小)まで小さくし、
  * 下限もその6段ぶんへ下げる。潰して隠すのではなく、小さくして全部見せる。 */
 @media (max-height: 700px) {
+  /* **`min-height` だけでは1mmも縮まない。**
+   *
+   * 左の縦列の段の高さは `home-left-generated.css` が `height:74px!important`
+   * で決めている。下限だけ56pxへ下げても上限は74pxのままで、実測すると
+   * 6段432px——世界の枠(402px)からも画面(667px)からもあふれ、
+   * **お知らせが下タブの裏に入り、プレゼントは画面の外**にいた
+   * (`elementFromPoint` で確認。`.click()` は覆われていても通るので使わない)。
+   *
+   * 使える縦は、世界の上端258pxから下タブの上589pxまでの331px。
+   * 列は世界の13px下から始まるので6段で318px——1段53pxが上限になる。
+   * **50pxにする。**絵は44pxなので上下3pxずつ余り、指で押せる44pxも割らない。 */
   .crimon-home .world-action {
-    min-height: 56px !important;
+    height: 50px !important;
+    min-height: 50px !important;
   }
 
   .crimon-home .world-action img {
