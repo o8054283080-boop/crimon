@@ -1,6 +1,7 @@
 import { ELEMENT_COLOR, ELEMENT_JA } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { describeSkillLines } from "../../core/skill.js";
+import { describeSkillTarget } from "./skillPanel.js";
 import { Stats, formatExtraStatLines } from "../../core/stats.js";
 import { computeEffectiveStats } from "../../core/rarity.js";
 import { applyPlayerStatBoost } from "../../core/playerStatBoost.js";
@@ -197,7 +198,18 @@ const DEX_STAT_VIEW_NOTE: Record<DexStatView, string> = {
 let dexStatView: DexStatView = "BASE";
 
 function dexStatsOf(dex: MonsterDefinition, view: DexStatView): Stats {
-  if (view === "BASE") return dex.stats;
+  /*
+   * **生の `dex.stats` をそのまま出さない。**
+   *
+   * 図鑑の素の値は整数とは限らない。クリムは★6 Lv60 の到達値を
+   * 設計値ちょうどに置くため、素の値を割り算で決めている
+   * (`src/data/newMonsters/crim.ts`)。そのまま出したら画面に
+   * **「HP 1673.4098887338395645968914452109020051141989」**と並んだ。
+   *
+   * `computeEffectiveStats` は★1 Lv1 では倍率1.0なので値は動かず、
+   * **丸めだけが入る。**「Lv1の基礎値」という意味も変わらない。
+   */
+  if (view === "BASE") return computeEffectiveStats(dex.stats, 1, 1);
   return applyPlayerStatBoost(computeEffectiveStats(dex.stats, 6, 60), dex.templateId);
 }
 
@@ -221,7 +233,7 @@ function renderSkills(dex: MonsterDefinition): HTMLElement {
         el("span", {}, [skill.cooldownTurns ? `CT${skill.cooldownTurns}` : "通常"]),
       ]),
       ...(!skill.levelOverrides && skill.description ? [el("p", {}, [skill.description])] : []),
-      el("small", {}, [describeSkillLines(skill).join(" / ") || "効果データなし"]),
+      el("small", {}, [[describeSkillTarget(skill), ...describeSkillLines(skill)].join(" / ") || "効果データなし"]),
     ])),
   ]);
 }

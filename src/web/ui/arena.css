@@ -1141,3 +1141,31 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+ * モンスターの顔を、絵文字から絵へ
+ *
+ * アリーナだけ**全部のモンスターが絵文字**で並んでいた(依頼主の指摘)。
+ * 他の画面は `withPortrait` で絵に差し替えている。
+ *
+ * 差し替えは背景画像(`background-size: contain`)で入るので、
+ * **要素そのものに四角い大きさが要る。**これまでは文字の大きさしか
+ * 決めていなかったので、絵を入れても潰れて出ない。
+ *
+ * 絵が無い種族はそのまま絵文字が残るので、中央に置いておく。
+ * ========================================================================== */
+.ar-mini__face,
+.ar-picker__face,
+.ar-unit__face,
+.ar-rank__lead {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 7px;
+  background-color: color-mix(in srgb, var(--elem, #8a8397) 20%, rgba(4, 2, 9, .55));
+}
+
+.ar-mini__face { width: 30px; height: 30px; }
+.ar-picker__face { width: 38px; height: 38px; }
+.ar-unit__face { width: 52px; height: 52px; }
+.ar-rank__lead { width: 28px; height: 28px; }

@@ -9,7 +9,15 @@ const TARGET_LABEL: Record<Skill["target"], string> = {
   SELF: "自身",
 };
 
-function describeSkillTarget(skill: Skill): string {
+/**
+ * そのスキルがどこへ当たるか。
+ *
+ * **画面によって出たり出なかったりしていた。**ここ(スキル一覧)には出ていたが、
+ * 図鑑・所持モンスターの詳細・クリエイトには無く、
+ * **全体攻撃なのか単体攻撃なのかが読めなかった**(依頼主の指摘)。
+ * 同じ言葉を全部の画面で使うために、ここから配る。
+ */
+export function describeSkillTarget(skill: Skill): string {
   return `対象：${TARGET_LABEL[skill.target]}`;
 }
 

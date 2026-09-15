@@ -909,6 +909,22 @@ function conditionPrefix(condition: EffectCondition | undefined): string {
   return condition ? EFFECT_CONDITION_JA[condition] : "";
 }
 
+/**
+ * 割合を百分率の文字列へ。**小数点以下は1桁まで。末尾の0は落とす。**
+ *
+ * ## なぜ要るのか
+ *
+ * 係数をそのまま埋め込んでいたため、画面に
+ * **「最大HP×0.08624999999999998を加算」**と出ていた(依頼主の指摘)。
+ * 二進小数の誤差がそのまま出ていたもので、
+ * 0.075 も「×0.075」と、比率なのか倍率なのかも読めない書き方だった。
+ *
+ * 百分率なら「最大HPの8.6%」と読める。桁も勝手に伸びない。
+ */
+function percent(ratio: number): string {
+  return `${Number((ratio * 100).toFixed(1))}%`;
+}
+
 /** UI表示用に、スキル効果1件を短い日本語テキストに変換する */
 export function describeSkillEffect(effect: SkillEffect): string {
   switch (effect.kind) {
@@ -922,9 +938,9 @@ export function describeSkillEffect(effect: SkillEffect): string {
       const scaleText = effect.scaleBonus
         ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
         : effect.hpCoefficient !== undefined
-          ? `(最大HP×${effect.hpCoefficient}を加算)`
+          ? `(最大HPの${percent(effect.hpCoefficient)}を加算)`
           : effect.defCoefficient !== undefined
-            ? `(防御力×${effect.defCoefficient}を加算)`
+            ? `(防御力の${percent(effect.defCoefficient)}を加算)`
             : "";
       const ignoreDefenseText = effect.ignoreDefense
         ? "(防御力無視)"
@@ -1030,7 +1046,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "PROTECT":
       return `保護 (${effect.durationTurns}ターン、対象が受けるダメージの${Math.round(effect.share * 100)}%を自身が肩代わり)`;
     case "COUNTER_STANCE": {
-      const hp = effect.hpCoefficient ? `(最大HP×${effect.hpCoefficient}を加算)` : "";
+      const hp = effect.hpCoefficient ? `(最大HPの${percent(effect.hpCoefficient)}を加算)` : "";
       const heal = effect.healRate ? ` 反撃のたび自身のHPを最大HPの${Math.round(effect.healRate * 100)}%回復` : "";
       return `${effect.durationTurns}ターン、攻撃を受けるたび攻撃者へ攻撃力${effect.multiplier.toFixed(2)}倍の反撃${hp}${heal}`;
     }

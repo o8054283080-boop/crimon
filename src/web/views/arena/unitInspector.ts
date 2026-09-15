@@ -15,6 +15,8 @@
 import { el } from "../../dom.js";
 import { ArenaUnitSnapshot } from "../../../game/arena/types.js";
 import { ArenaUnitDetailView, arenaUnitDetailView } from "./model.js";
+import { findMonsterById } from "../../../data/monsters.js";
+import { withPortrait } from "../../three/portrait.js";
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
@@ -40,7 +42,7 @@ function renderPicker(
           ariaPressed: index === selected ? "true" : "false",
         },
         [
-          el("span", { className: "ar-picker__face" }, [view.emoji]),
+          withPortrait(el("span", { className: "ar-picker__face" }, [view.emoji]), findMonsterById(view.dexId), "box"),
           el("span", { className: "ar-picker__name" }, [view.name]),
           el("span", { className: "ar-picker__grade" }, [`★${view.star} Lv${view.level}`]),
         ],
@@ -145,7 +147,7 @@ export function renderArenaUnitDetail(view: ArenaUnitDetailView): HTMLElement {
   }
   return el("section", { className: "panel ar-unit", style: `--elem:${view.color}` }, nodes([
     el("div", { className: "ar-unit__head" }, [
-      el("span", { className: "ar-unit__face" }, [view.emoji]),
+      withPortrait(el("span", { className: "ar-unit__face" }, [view.emoji]), findMonsterById(view.dexId), "box"),
       el("div", { className: "ar-unit__ident" }, [
         el("span", { className: "ar-unit__name" }, [view.name]),
         el("span", { className: "ar-unit__grade" }, [`★${view.star} Lv${view.level}`]),

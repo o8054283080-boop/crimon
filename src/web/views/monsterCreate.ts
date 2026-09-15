@@ -1,5 +1,6 @@
 import { MonsterInstance, starLabel } from "../../core/monsterInstance.js";
 import { Skill, describeSkillLines } from "../../core/skill.js";
+import { describeSkillTarget } from "./skillPanel.js";
 import { findMonsterById } from "../../data/monsters.js";
 import {
   CREATE_GOLD_COST,
@@ -100,7 +101,7 @@ function isEl(node: HTMLElement | null): node is HTMLElement {
 }
 
 function skillLines(skill: Skill): HTMLElement[] {
-  return describeSkillLines(skill).map((line) => el("li", {}, [line]));
+  return [describeSkillTarget(skill), ...describeSkillLines(skill)].map((line) => el("li", {}, [line]));
 }
 
 export function describeLatentEffect(candidate: (typeof LATENT_ABILITY_CANDIDATES)[string][number]): string {

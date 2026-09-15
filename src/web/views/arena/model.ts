@@ -196,6 +196,15 @@ export interface ArenaUnitStatLine {
 export interface ArenaUnitDetailView {
   /** 図鑑に載っている名前。消えた個体でも空にしない */
   name: string;
+  /**
+   * 図鑑ID。**絵を引くために持つ。**
+   *
+   * 以前は `emoji` だけを渡していたので、アリーナだけ
+   * **全部のモンスターが絵文字**で並んでいた(依頼主の指摘)。
+   * 他の画面は `withPortrait` で絵に差し替えている。
+   * 絵が無い種族のために `emoji` も残してある(差し替わるまでの下地)。
+   */
+  dexId: string;
   emoji: string;
   color: string;
   elementLabel: string;
@@ -273,6 +282,7 @@ export function arenaUnitDetailView(unit: ArenaUnitSnapshot): ArenaUnitDetailVie
 
   return {
     name: dex ? dex.name : instance.dexId,
+    dexId: instance.dexId,
     emoji: dex ? dex.emoji : "❓",
     color: dex ? dex.color : "#8a8397",
     elementLabel: dex ? ELEMENT_JA[dex.element] : "不明",
@@ -339,7 +349,7 @@ export interface ArenaOpponentView {
   /** 自分との差。正なら格上 */
   diff: number;
   diffText: string;
-  units: { name: string; emoji: string; color: string; star: number; level: number }[];
+  units: { name: string; dexId: string; emoji: string; color: string; star: number; level: number }[];
   /** 戦える編成か。0体なら挑戦させない */
   usable: boolean;
 }
@@ -362,6 +372,7 @@ export function arenaOpponentView(entry: ArenaOpponentEntry, myRating: number): 
       const dex = findMonsterById(unit.instance.dexId);
       return {
         name: dex ? dex.name : unit.instance.dexId,
+        dexId: unit.instance.dexId,
         emoji: dex ? dex.emoji : "❓",
         color: dex ? dex.color : "#8a8397",
         star: unit.instance.star,

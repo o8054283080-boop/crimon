@@ -18,6 +18,7 @@ import { arenaTierForRating } from "../../../data/arena/ranks.js";
 import { ArenaRankingEntry } from "../../../net/arenaSync.js";
 import { arenaRankingView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
+import { withPortrait } from "../../three/portrait.js";
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
@@ -28,7 +29,7 @@ function renderRow(entry: ArenaRankingEntry, mine: boolean): HTMLElement {
   const lead = entry.leadDexId ? findMonsterById(entry.leadDexId) : undefined;
   return el("div", { className: `ar-rank__row${mine ? " is-me" : ""}`, style: `--tier:${tier.color}` }, nodes([
     el("span", { className: "ar-rank__no" }, [`${entry.rank}`]),
-    lead ? el("span", { className: "ar-rank__lead" }, [lead.emoji]) : null,
+    lead ? withPortrait(el("span", { className: "ar-rank__lead" }, [lead.emoji]), lead, "box") : null,
     el("span", { className: "ar-rank__name" }, [entry.name]),
     el("span", { className: "ar-rank__tier" }, [tier.name]),
     el("span", { className: "ar-rank__rating" }, [entry.rating.toLocaleString("ja-JP")]),
