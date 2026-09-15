@@ -31,7 +31,7 @@ export interface StagesProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (stage: Stage, count: number, difficulty: Difficulty) => void;
-  onToggleAutoUseStaminaPotion: (next: boolean) => void;
+  onChangeStaminaPotionBudget: (next: number) => void;
   onGoParty: () => void;
 }
 
@@ -388,7 +388,7 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
 
     cleared ? renderAutoFarmPanel({
       ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "STAGE", stage.id, props.selectedDifficulty); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
-      ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
+      ...autoFarmPotionProps(props.player, props.onChangeStaminaPotionBudget),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: STAGE_STAMINA_COST,

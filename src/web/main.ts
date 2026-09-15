@@ -43,6 +43,7 @@ import {
   finishBackgroundFarm,
   parseRequestedRuns,
   shouldStopForJstDateChange,
+  staminaPotionBudgetOf,
   staminaPotionsNeeded,
 } from "../game/backgroundAutoFarm.js";
 import { manualClearKey, recordManualBattle, referenceRunTime } from "../game/manualClearTimes.js";
@@ -120,8 +121,10 @@ import {
   trySpendGoldDungeonChallenge,
   trySpendStamina,
   staminaPotionsOwned,
+  staminaPotionFarmBudgetOf,
   tryUseStaminaPotion,
   STAMINA_POTION_AMOUNT,
+  STAMINA_POTION_UNLIMITED_BUDGET,
   trySpendSummonScrolls,
   unlockShopSlot,
   goldDungeonChallengesRemaining,
@@ -2122,8 +2125,15 @@ function processBackgroundFarmOnce(): void {
      * ポーションの自動使用。**足りない時だけ、必要な分だけ。**
      * ダイヤには一切手を付けない(依頼主の指定)。
      */
-    if (job.autoUseStaminaPotion && state.player.stamina < cost) {
-      const use = staminaPotionsNeeded(state.player.stamina, cost, staminaPotionsOwned(state.player), STAMINA_POTION_AMOUNT);
+    /*
+     * **決めた数までしか使わない。**残りは手元に残る。
+     * 予算を使い切ったら、次からは普通にスタミナ切れで止まる。
+     */
+    const budgetLeft = staminaPotionBudgetOf(job, STAMINA_POTION_UNLIMITED_BUDGET) - (job.staminaPotionsUsed ?? 0);
+    if (budgetLeft > 0 && state.player.stamina < cost) {
+      const use = staminaPotionsNeeded(
+        state.player.stamina, cost, staminaPotionsOwned(state.player), STAMINA_POTION_AMOUNT, budgetLeft,
+      );
       for (let i = 0; i < use; i += 1) {
         if (!tryUseStaminaPotion(state.player).ok) break;
         job.staminaPotionsUsed = (job.staminaPotionsUsed ?? 0) + 1;
@@ -2187,8 +2197,8 @@ function beginBackgroundFarm(input: Omit<Parameters<typeof createBackgroundFarmJ
   state.player.backgroundFarmJob = createBackgroundFarmJob({
     ...input, requestedRuns: count, partyIds,
     referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual,
-    // 始めた時点の設定で固定する。途中で切り替えて、既に進んだぶんの扱いが変わらないように
-    autoUseStaminaPotion: state.player.autoUseStaminaPotionInFarm === true,
+    // 始めた時点の設定で固定する。途中で変えて、既に進んだぶんの扱いが変わらないように
+    staminaPotionBudget: staminaPotionFarmBudgetOf(state.player),
   });
   savePlayerState(state.player);
   state.screen = "HOME";
@@ -2196,13 +2206,13 @@ function beginBackgroundFarm(input: Omit<Parameters<typeof createBackgroundFarmJ
 }
 
 /**
- * ポーションの自動使用を切り替える。
+ * 1回の周回で使ってよいポーションの数を決める。**0なら使わない。**
  *
  * **起動をまたいで残す。**再生速度と同じで、周回のたびに入れ直すものではない。
  * 進行中のジョブには**効かない**(始めた時の設定で回りきる)。
  */
-function setAutoUseStaminaPotion(next: boolean): void {
-  state.player.autoUseStaminaPotionInFarm = next;
+function setStaminaPotionFarmBudget(next: number): void {
+  state.player.staminaPotionFarmBudget = Math.max(0, Math.floor(next));
   savePlayerState(state.player);
   render();
 }
@@ -4042,7 +4052,7 @@ function renderScreen(): void {
         },
         onStartStage: startStage,
         autoFarmCount: state.autoFarmCount,
-        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
+        onChangeStaminaPotionBudget: setStaminaPotionFarmBudget,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4079,7 +4089,7 @@ function renderScreen(): void {
         // 別々にやらせていた。編成はすべて編成画面へ集約する
         onGoDungeonParty: () => openPartyFrom({ screen: "EQUIP_DUNGEON", label: `${state.selectedDungeonKind === "BEAST" ? "魔獣" : "魔人"}のダンジョン${state.selectedDungeonFloor ?? ""}F`, selectedDungeonFloor: state.selectedDungeonFloor ?? undefined, selectedDungeonKind: state.selectedDungeonKind }, "DUNGEON"),
         autoFarmCount: state.autoFarmCount,
-        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
+        onChangeStaminaPotionBudget: setStaminaPotionFarmBudget,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4107,7 +4117,7 @@ function renderScreen(): void {
         onStartTier: startLevelDungeonTier,
         onGoParty: () => openPartyFrom({ screen: "LEVEL_DUNGEON", label: "レベルダンジョン", selectedLevelDungeonTier: state.selectedLevelDungeonTier ?? undefined }, "NORMAL"),
         autoFarmCount: state.autoFarmCount,
-        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
+        onChangeStaminaPotionBudget: setStaminaPotionFarmBudget,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4135,7 +4145,7 @@ function renderScreen(): void {
         onStartFloor: startGoldDungeonFloor,
         onGoParty: () => openPartyFrom({ screen: "GOLD_DUNGEON", label: `ゴールドダンジョン${state.selectedGoldDungeonFloor ?? ""}F`, selectedGoldDungeonFloor: state.selectedGoldDungeonFloor ?? undefined }, "NORMAL"),
         autoFarmCount: state.autoFarmCount,
-        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
+        onChangeStaminaPotionBudget: setStaminaPotionFarmBudget,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -4173,7 +4183,7 @@ function renderScreen(): void {
           render();
         },
         autoFarmCount: state.autoFarmCount,
-        onToggleAutoUseStaminaPotion: setAutoUseStaminaPotion,
+        onChangeStaminaPotionBudget: setStaminaPotionFarmBudget,
         onChangeAutoFarmCount: (count) => {
           state.autoFarmCount = count;
           render();
@@ -5502,9 +5512,9 @@ if (import.meta.env.DEV) {
      * 折り返しも、ONにした時に「最大」の札が伸びた姿も見ないままになる
      * (行が1つも無いランキングを検査し続けたのと同じ穴)。
      */
-    grantStaminaPotions(count = 3, autoUse = true) {
+    grantStaminaPotions(count = 3, budget = 3) {
       state.player.staminaPotions = count;
-      state.player.autoUseStaminaPotionInFarm = autoUse;
+      state.player.staminaPotionFarmBudget = budget;
       savePlayerState(state.player);
       render();
     },

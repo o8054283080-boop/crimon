@@ -32,7 +32,7 @@ export interface AwakeningDepthProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (floor: AwakeningDepthFloor, count: number) => void;
-  onToggleAutoUseStaminaPotion: (next: boolean) => void;
+  onChangeStaminaPotionBudget: (next: number) => void;
 }
 
 /** 素材の持ち数の帯。**同じ形を一覧と詳細の両方に出す** */
@@ -216,7 +216,7 @@ function renderDetail(props: AwakeningDepthProps, floor: AwakeningDepthFloor): H
             const timing = referenceRunTime(props.player.recentManualClearTimes, "AWAKENING_DEPTH", String(floor.floor));
             return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent };
           })(),
-          ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
+          ...autoFarmPotionProps(props.player, props.onChangeStaminaPotionBudget),
       count: props.autoFarmCount,
           onChangeCount: props.onChangeAutoFarmCount,
           staminaCost: floor.stamina,

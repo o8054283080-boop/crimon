@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange, staminaPotionsNeeded } from "../src/game/backgroundAutoFarm.js";
+import { availableBackgroundRuns, createBackgroundFarmJob, dismissFinishedBackgroundFarm, finishBackgroundFarm, parseRequestedRuns, shouldStopForJstDateChange, staminaPotionBudgetOf, staminaPotionsNeeded } from "../src/game/backgroundAutoFarm.js";
 import { MIN_REFERENCE_SECONDS, addManualClearTime, manualClearKey, medianSeconds, recordManualBattle, referenceRunTime } from "../src/game/manualClearTimes.js";
 import { affordableCount } from "../src/web/views/autoFarmPanel.js";
 import { STAMINA_POTION_AMOUNT, applyPassiveStaminaRegen, createInitialState, normalizeLoadedState, staminaPotionsOwned, tryUseStaminaPotion } from "../src/game/playerState.js";
@@ -177,13 +177,13 @@ describe("スタミナポーション", () => {
     expect(player.stamina).toBe(player.maxStamina);
   });
 
-  it("ポーション欄のない旧セーブは0個・自動使用OFFで読み込める", () => {
+  it("ポーション欄のない旧セーブは0個・使わないで読み込める", () => {
     const legacy = createInitialState() as unknown as Record<string, unknown>;
     delete legacy.staminaPotions;
-    delete legacy.autoUseStaminaPotionInFarm;
+    delete legacy.staminaPotionFarmBudget;
     const loaded = normalizeLoadedState(legacy as never);
     expect(staminaPotionsOwned(loaded)).toBe(0);
-    expect(loaded.autoUseStaminaPotionInFarm).toBe(false);
+    expect(loaded.staminaPotionFarmBudget).toBe(0);
   });
 
   it.each([-5, NaN, "3" as unknown as number])("壊れた所持数 %s は0として扱う", (value) => {
@@ -211,11 +211,42 @@ describe("自動周回でのポーション自動使用", () => {
     expect(staminaPotionsNeeded(0, 250, 0, STAMINA_POTION_AMOUNT)).toBe(0);
   });
 
-  it("既定はOFF。入れた時だけジョブへ乗る", () => {
+  it("決めた数を超えて使わない", () => {
+    // 250要る場面。9個持っていても「1個まで」なら1個
+    expect(staminaPotionsNeeded(0, 250, 9, STAMINA_POTION_AMOUNT, 1)).toBe(1);
+    expect(staminaPotionsNeeded(0, 250, 9, STAMINA_POTION_AMOUNT, 2)).toBe(2);
+    // 予算を使い切った後は1個も使わない
+    expect(staminaPotionsNeeded(0, 250, 9, STAMINA_POTION_AMOUNT, 0)).toBe(0);
+    expect(staminaPotionsNeeded(0, 250, 9, STAMINA_POTION_AMOUNT, -1)).toBe(0);
+  });
+
+  it("既定は0個＝使わない。入れた時だけジョブへ乗る", () => {
     const off = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 3, partyIds: ["a"] });
-    expect(off.autoUseStaminaPotion).toBe(false);
-    const on = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 3, partyIds: ["a"], autoUseStaminaPotion: true });
-    expect(on.autoUseStaminaPotion).toBe(true);
+    expect(off.staminaPotionBudget).toBe(0);
+    const on = createBackgroundFarmJob({ kind: "STAGE", targetId: "1-1", targetName: "1-1", requestedRuns: 3, partyIds: ["a"], staminaPotionBudget: 5 });
+    expect(on.staminaPotionBudget).toBe(5);
+  });
+
+  /*
+   * **進行中のまま更新した人のジョブ。**
+   * 入 / 切しか持っていないので、入だったなら「全部」として読む。
+   * ここを0にすると、回っていた周回が更新した途端に止まる。
+   */
+  it("入 / 切しか持たない古いジョブも読める", () => {
+    const unlimited = 9_007_199_254_740_991;
+    expect(staminaPotionBudgetOf({ autoUseStaminaPotion: true }, unlimited)).toBe(unlimited);
+    expect(staminaPotionBudgetOf({ autoUseStaminaPotion: false }, unlimited)).toBe(0);
+    expect(staminaPotionBudgetOf({}, unlimited)).toBe(0);
+    // 新しい欄があれば、そちらが勝つ
+    expect(staminaPotionBudgetOf({ staminaPotionBudget: 3, autoUseStaminaPotion: true }, unlimited)).toBe(3);
+    expect(staminaPotionBudgetOf({ staminaPotionBudget: 0, autoUseStaminaPotion: true }, unlimited)).toBe(0);
+  });
+
+  it("使った数を数えて、残りの予算から引いている", () => {
+    const source = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+    const processBody = source.slice(source.indexOf("function processBackgroundFarmOnce"), source.indexOf("function beginBackgroundFarm"));
+    expect(processBody).toContain("staminaPotionBudgetOf(job");
+    expect(processBody).toContain("job.staminaPotionsUsed ?? 0");
   });
 
   it("ダイヤの自動回復へは一切繋がない", () => {

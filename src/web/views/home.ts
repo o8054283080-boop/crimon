@@ -431,11 +431,26 @@ function renderIdentity(
   ]);
 }
 
-function currencyChip(name: IconName, value: number, modifier: string, suffix?: string, onClick?: () => void): HTMLElement {
+function currencyChip(
+  name: IconName,
+  value: number,
+  modifier: string,
+  suffix?: string,
+  onClick?: () => void,
+  /**
+   * 札の末尾へ添える一言。スタミナの札にポーションの所持数を出すために使う。
+   *
+   * **新しい区画を作らない。**通貨の帯は背景画像の枠に合わせて
+   * 上段2つ・下段1つで組んであり、4つ目を足すと枠と合わなくなる。
+   * ポーションはスタミナを回復する道具なので、スタミナの札に同居させる。
+   */
+  trailing?: HTMLElement | null,
+): HTMLElement {
   const children = [
     icon(name),
     el("strong", {}, [value.toLocaleString("ja-JP")]),
     suffix ? el("span", { className: "home-wallet__suffix" }, [suffix]) : null,
+    trailing ?? null,
   ].filter((n): n is HTMLElement => n !== null);
   return onClick
     // data-tour は巡回の目印。文言ではなくここを見てもらう(tools/tour.mjs)
@@ -870,7 +885,17 @@ export function renderHome(props: HomeProps): HTMLElement {
   const menu = el("main", { className: `home-menu crimon-home ${hasStarted ? "home-menu--visible" : "home-menu--hidden"}` }, [
       el("header", { className: "crimon-resource-header" }, [
         renderIdentity(player, props.onEditFighterName, openSettings, party[0]),
-        el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip("stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina)]),
+        el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip(
+            "stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina,
+            /*
+             * **持っている時だけ出す。**0個で常に出すと、狭い帯の幅を
+             * 何も伝えない文字が食う。押せばスタミナ回復が開き、
+             * そこには0個でも「×0」と出ている。
+             */
+            staminaPotionsOwned(player) > 0
+              ? el("span", { className: "home-wallet__potion" }, [`🧪${staminaPotionsOwned(player)}`])
+              : null,
+          )]),
       ]),
       /*
        * 編成は**世界の枠より上**に置く。

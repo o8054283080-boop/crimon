@@ -19,7 +19,7 @@ export interface EquipmentDungeonProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (floor: DungeonFloor, count: number) => void;
-  onToggleAutoUseStaminaPotion: (next: boolean) => void;
+  onChangeStaminaPotionBudget: (next: number) => void;
 }
 
 function starLabel(star: EquipStar): string {
@@ -193,7 +193,7 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
 
     isDungeonFloorCleared(props.player, floor.floor, floor.kind) ? renderAutoFarmPanel({
       ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "EQUIP_DUNGEON", `${floor.kind}:${floor.floor}`); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
-      ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
+      ...autoFarmPotionProps(props.player, props.onChangeStaminaPotionBudget),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: DUNGEON_STAMINA_COST,
