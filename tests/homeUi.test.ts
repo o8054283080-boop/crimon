@@ -200,3 +200,52 @@ describe("初心者ミッションの札(世界の中の幅で読める形)", ()
     for (const size of sizes) expect(size).toBeGreaterThanOrEqual(9);
   });
 });
+
+/*
+ * ホームのスタミナの札に添えた、ポーションの所持数。
+ *
+ * ## 0個で隠したら「壊れている」と読まれた
+ *
+ * 最初は幅の節約のつもりで「持っている時だけ出す」にしていた。
+ * ところが依頼主が0個の画面を見て**「ポーションがみえません」**と言った。
+ * 無いから出ていないのか、出す作りになっていないのか、画面から区別できない。
+ * 数を出す目的そのものを外していたので、0個でも必ず出す形へ変えた。
+ */
+describe("スタミナポーションの所持数", () => {
+  const potionCss = readFileSync(new URL("../src/web/home-pop-design.css", import.meta.url), "utf8");
+
+  it("0個でも出す(持っている時だけ、にしない)", () => {
+    const chip = source.slice(source.indexOf("home-wallet__potion") - 800, source.indexOf("home-wallet__potion") + 400);
+    // 「0より大きい時だけ出す」の形が戻っていないこと
+    expect(chip).not.toMatch(/staminaPotionsOwned\(player\)\s*>\s*0\s*\n?\s*\?/);
+    expect(chip).toContain("home-wallet__potion");
+  });
+
+  it("0個は色を落とす印を付ける", () => {
+    expect(source).toContain("home-wallet__potion--empty");
+    expect(source).toContain("staminaPotionsOwned(player) === 0");
+  });
+
+  /*
+   * **薄くする指定は、通常の色より後ろに置く。**
+   * 詳細度が同じなので、先に書くと通常の色が後勝ちして効かない
+   * (実際に先へ置いてしまい、0個でも緑のままだった)。
+   */
+  it("薄くする指定が、通常の色より後ろにある", () => {
+    const normal = potionCss.indexOf(".crimon-resource-header .home-wallet__potion {");
+    const empty = potionCss.indexOf(".crimon-resource-header .home-wallet__potion--empty");
+    expect(normal).toBeGreaterThan(-1);
+    expect(empty).toBeGreaterThan(normal);
+  });
+
+  /*
+   * 通貨の帯の数字。**9px未満は実機で読めない。**
+   * `clamp()` の下限が7.5pxで、390px幅では 2vw = 7.8px になっていた
+   * (`tests/cssReadability.test.ts` は clamp() の中までは見ていない)。
+   */
+  it("通貨の帯の数字が9pxを下回らない", () => {
+    for (const match of potionCss.matchAll(/font-size:\s*clamp\(\s*([\d.]+)px/g)) {
+      expect(Number(match[1])).toBeGreaterThanOrEqual(9);
+    }
+  });
+});

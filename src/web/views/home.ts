@@ -888,13 +888,23 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("div", { className: "home-wallet" }, [currencyChip("crystal", player.crystal, "crystal"), currencyChip("coin", player.gold, "gold"), currencyChip(
             "stamina", player.stamina, "stamina", `/ ${player.maxStamina}`, openStamina,
             /*
-             * **持っている時だけ出す。**0個で常に出すと、狭い帯の幅を
-             * 何も伝えない文字が食う。押せばスタミナ回復が開き、
-             * そこには0個でも「×0」と出ている。
+             * **0個でも必ず出す。**
+             *
+             * 最初は「持っている時だけ」にしていた。幅の節約のつもりだったが、
+             * **依頼主が0個の画面を見て「ポーションがみえません」と言った。**
+             * 無いから出ていないのか、出す作りになっていないのか、
+             * 画面からは区別できない——数を出す目的そのものを外していた。
+             *
+             * 3桁(🧪137)でも28pxで収まることは実測済みなので、幅の心配は無い。
+             * 0の時は色を落として「無い」ことが分かるようにする。
              */
-            staminaPotionsOwned(player) > 0
-              ? el("span", { className: "home-wallet__potion" }, [`🧪${staminaPotionsOwned(player)}`])
-              : null,
+            el(
+              "span",
+              {
+                className: `home-wallet__potion${staminaPotionsOwned(player) === 0 ? " home-wallet__potion--empty" : ""}`,
+              },
+              [`🧪${staminaPotionsOwned(player)}`],
+            ),
           )]),
       ]),
       /*
