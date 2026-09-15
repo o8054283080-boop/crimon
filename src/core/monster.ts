@@ -61,6 +61,21 @@ export interface MonsterTemplate {
    * 未指定のテンプレートは、従来どおり呼び出し側が並べたプールで扱う。
    */
   gachaStar?: 3 | 4 | 5;
+  /**
+   * 属性ごとの長所短所(`ELEMENT_STAT_FLAVORS`)を掛けない。
+   *
+   * ## なぜ要るのか
+   *
+   * あの補正は「引いた属性で当たり外れが出ないよう、どの型も1つ上げて
+   * 1つ下げる」ためのもの。**1属性しか存在しないモンスターには意味が無い。**
+   * 比べる相手がいないので、上げ下げは単なる設計値のずれにしかならない。
+   *
+   * もう1つ、丸めの問題がある。補正は `Math.round` を通すので、
+   * **★6 Lv60の到達値が飛び飛びになる。**防御を例にすると、素の値が
+   * 116なら1248、117なら1259で、設計値の1250はどう置いても作れない。
+   * 補正を通さなければ丸めは★とLvの1回だけになり、設計値ちょうどに置ける。
+   */
+  noElementFlavor?: true;
 }
 
 /** 属性ごとの色違いバリエーションとして実体化されたモンスター定義(静的データ) */
@@ -435,7 +450,9 @@ function pickSkillVariant(variants: Skill[], element: Element, groupOffset: numb
 }
 
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
-  const flavoredStats = elementStatFlavorOf(template.templateId, element).apply(cloneStats(template.baseStats));
+  const flavoredStats = template.noElementFlavor
+    ? cloneStats(template.baseStats)
+    : elementStatFlavorOf(template.templateId, element).apply(cloneStats(template.baseStats));
   const assignment = template.skillAssignment?.[element];
   const skill2 = applyLegacySkillBalance(
     template.skill2Variants[assignment?.skill2 ?? -1] ?? pickSkillVariant(template.skill2Variants, element, 0),

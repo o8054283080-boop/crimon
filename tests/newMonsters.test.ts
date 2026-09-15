@@ -32,11 +32,20 @@ function battle(playerIds: string[], enemyIds: string[], rng = () => 0) {
   return new BattleEngine(playerIds.map(toDef), enemyIds.map(toDef), { rng });
 }
 
+/**
+ * 6属性で実体化する種族だけ。
+ *
+ * **クリムは光1属性しか存在しない**(`elements: ["LIGHT"]`)ので、
+ * 「6属性そろっているか」「光と闇に専用スキル3があるか」の検査からは外す。
+ * クリム自身の検査は `tests/crim.test.ts` にある。
+ */
+const SIX_ELEMENT_TEMPLATES = NEW_MONSTER_TEMPLATES.filter((template) => template.elements === undefined);
+
 describe("① 11種すべてが6属性で実体化できる", () => {
-  it("15種 × 6属性 = 90体が図鑑にある", () => {
-    expect(NEW_MONSTER_TEMPLATES).toHaveLength(15);
-    expect(NEW_MONSTERS_DEX).toHaveLength(90);
-    for (const template of NEW_MONSTER_TEMPLATES) {
+  it("15種 × 6属性 = 90体が図鑑にある(＋光だけのクリム1体)", () => {
+    expect(SIX_ELEMENT_TEMPLATES).toHaveLength(15);
+    expect(NEW_MONSTERS_DEX).toHaveLength(91);
+    for (const template of SIX_ELEMENT_TEMPLATES) {
       for (const element of ELEMENTS) {
         const dex = findMonster(template.templateId, element);
         expect(dex, `${template.templateId}[${element}]`).toBeDefined();
@@ -93,7 +102,7 @@ describe("③ 属性ごとのスキル2/スキル3の割り当てが指定どお
 
 describe("④ 光/闇の専用スキル3が上書きされる", () => {
   it("11種すべてで、光と闇は専用スキル3を持つ", () => {
-    for (const template of NEW_MONSTER_TEMPLATES) {
+    for (const template of SIX_ELEMENT_TEMPLATES) {
       expect(createMonsterVariant(template, "LIGHT").skills[2].id, template.templateId).toBe(template.lightSkill3!.id);
       expect(createMonsterVariant(template, "DARK").skills[2].id, template.templateId).toBe(template.darkSkill3!.id);
     }

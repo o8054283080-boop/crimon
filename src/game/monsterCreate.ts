@@ -1,6 +1,7 @@
 import { CreatedSkill, MonsterInstance } from "../core/monsterInstance.js";
 import { Skill } from "../core/skill.js";
 import { findMonsterById } from "../data/monsters.js";
+import { CRIM_MATERIAL_REFUSAL, isCrim } from "./crim.js";
 
 /**
  * クリエイト(スキル合成)。
@@ -57,6 +58,16 @@ export function checkMonsterCreate(
 ): CreateCheck {
   if (target.id === material.id) {
     return { ok: false, reason: "同じモンスターは素材にできません" };
+  }
+  /*
+   * **クリムは移し元にできない。**
+   *
+   * クリエイトは素材を消費する。スキルを1つ譲る代わりに本体が消えるので、
+   * ここも消失の経路。クリムを**移し先**にするのは自由で、
+   * 他のモンスターからスキルを受け取れる。
+   */
+  if (isCrim(material)) {
+    return { ok: false, reason: CRIM_MATERIAL_REFUSAL };
   }
   if (material.star < CREATE_MATERIAL_STAR) {
     return { ok: false, reason: `素材は星${CREATE_MATERIAL_STAR}まで育てる必要があります` };

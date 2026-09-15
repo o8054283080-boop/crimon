@@ -15,3 +15,8 @@ reference-shots/
 # Edge Function へ持っていく共有コード(生成物)。
 # **焼き付けると必ず古くなる。** `npm run build:edge` で作る
 supabase/functions/_shared/
+
+# モンスターの生画像。`tools/prepareSprites.mjs` の入力で、1枚1〜2MBある。
+# ゲームに載るのは変換後の `src/web/assets/monsters/*.webp` の方なので、
+# 生の方は持たない(他の種族も同じ扱い)
+art/

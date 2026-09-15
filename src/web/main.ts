@@ -144,6 +144,7 @@ import { renderMonsterExchange } from "./views/monsterExchange.js";
 import { renderMonsterStorage } from "./views/monsterStorage.js";
 import { depositMonsters, exchangeStoredMonstersForPoints, withdrawMonsters } from "../game/monsterStorage.js";
 import { sendMonstersForPoints, tryExchangeMonsterPoints } from "../game/monsterPoints.js";
+import { crimShardsOwned, useCrimShard } from "../game/crim.js";
 import { loadMonsterListDense, saveMonsterListDense } from "./monsterListDensity.js";
 import { applyRankUp, checkRankUp } from "../game/progression.js";
 import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
@@ -1581,6 +1582,40 @@ function handleConfirmMonsterTraining(): void {
   state.monsterTrainingMaterialIds = [];
   state.monsterDetailId = target.id;
   state.screen = "MONSTERS";
+  render();
+}
+
+/**
+ * クリムの宝珠のかけらを1個使う。
+ *
+ * **画面を離れない。**スキルが1つ上がるだけなので、その場で数字が動くのが
+ * いちばん分かりやすい。上がったスキルの番号も出す——
+ * どれが上がるかはランダム(スキルピッグと同じ)なので、
+ * 結果が見えないと「押したのに何も起きていない」ように見える。
+ */
+function handleUseCrimShard(targetId: string): void {
+  const target = state.player.monsters.find((monster) => monster.id === targetId);
+  if (!target) return;
+  /*
+   * **保存できて初めて使ったことにする。**召喚と同じ扱い。
+   * ここを素通りさせると、かけらだけ減って見えるのに再起動で戻る
+   * (実際に召喚で報告された症状と同じ形)。
+   */
+  const skillsBefore = [...target.skillLevels] as [number, number, number];
+  const shardsBefore = crimShardsOwned(state.player);
+  const result = useCrimShard(state.player, targetId);
+  if (!result.ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  if (!savePlayerState(state.player)) {
+    target.skillLevels = skillsBefore;
+    state.player.crimShards = shardsBefore;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  playSfx("levelUp");
   render();
 }
 
@@ -4678,6 +4713,7 @@ function renderScreen(): void {
           render();
         },
         onConfirm: handleConfirmMonsterTraining,
+        onUseCrimShard: () => handleUseCrimShard(state.monsterTrainingTargetId!),
         onCancel: () => {
           state.monsterTrainingTargetId = null;
           state.monsterTrainingMaterialIds = [];

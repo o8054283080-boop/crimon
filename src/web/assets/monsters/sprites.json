@@ -155,11 +155,11 @@
     "bodyVal": 0.71,
     "aspect": 1
   },
-  "crimoark-DARK": {
-    "bodyHue": 0.823,
-    "bodySat": 0.78,
-    "bodyVal": 0.65,
-    "aspect": 0.764
+  "crim-LIGHT": {
+    "bodyHue": 0.626,
+    "bodySat": 0.64,
+    "bodyVal": 0.9,
+    "aspect": 1.113
   },
   "crimoark_attack-DARK": {
     "bodyHue": 0.039,
@@ -177,6 +177,12 @@
     "bodyHue": 0.457,
     "bodySat": 0.81,
     "bodyVal": 0.9,
+    "aspect": 0.764
+  },
+  "crimoark-DARK": {
+    "bodyHue": 0.823,
+    "bodySat": 0.78,
+    "bodyVal": 0.65,
     "aspect": 0.764
   },
   "dragon": {
@@ -221,11 +227,23 @@
     "bodyVal": 0.87,
     "aspect": 1.156
   },
+  "harpy": {
+    "bodyHue": 0.041,
+    "bodySat": 0.74,
+    "bodyVal": 0.84,
+    "aspect": 1.016
+  },
   "imp": {
     "bodyHue": 0.798,
     "bodySat": 0.48,
     "bodyVal": 0.65,
     "aspect": 1.125
+  },
+  "joker": {
+    "bodyHue": 0.981,
+    "bodySat": 0.74,
+    "bodyVal": 0.53,
+    "aspect": 1.004
   },
   "knight": {
     "bodyHue": 0.773,
@@ -265,11 +283,23 @@
     },
     "aspect": 0.922
   },
+  "phoenix": {
+    "bodyHue": 0.054,
+    "bodySat": 0.77,
+    "bodyVal": 0.95,
+    "aspect": 0.99
+  },
   "reincarnation_pig": {
     "bodyHue": 0.946,
     "bodySat": 0.27,
     "bodyVal": 0.96,
     "aspect": 0.965
+  },
+  "scorpion": {
+    "bodyHue": 0.052,
+    "bodySat": 0.85,
+    "bodyVal": 0.82,
+    "aspect": 1.016
   },
   "seraph": {
     "bodyHue": 0.072,
@@ -338,29 +368,5 @@
     "bodySat": 0.66,
     "bodyVal": 0.64,
     "aspect": 1.089
-  },
-  "scorpion": {
-    "bodyHue": 0.052,
-    "bodySat": 0.85,
-    "bodyVal": 0.82,
-    "aspect": 1.016
-  },
-  "harpy": {
-    "bodyHue": 0.041,
-    "bodySat": 0.74,
-    "bodyVal": 0.84,
-    "aspect": 1.016
-  },
-  "phoenix": {
-    "bodyHue": 0.054,
-    "bodySat": 0.77,
-    "bodyVal": 0.95,
-    "aspect": 0.99
-  },
-  "joker": {
-    "bodyHue": 0.981,
-    "bodySat": 0.74,
-    "bodyVal": 0.53,
-    "aspect": 1.004
   }
 }

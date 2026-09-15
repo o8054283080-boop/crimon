@@ -564,11 +564,38 @@ export interface PoisonEffect {
   fixedDuration?: true;
 }
 
+/**
+ * 拡散。**メイン対象へ実際に与えたダメージを、対象以外の敵へ配る。**
+ *
+ * ## 「他の敵へ0.5倍で殴る」とは別物
+ *
+ * 倍率で撃ち直すと、拡散のぶんにも属性相性・会心・相手の防御が
+ * もう一度かかる。それでは「本命に通った一撃が周りへ広がる」ではなく、
+ * **弱い全体攻撃がもう1回**になってしまう。
+ *
+ * ここが基準にするのは、メイン対象のHPを実際に削った量。
+ * 会心も、相性も、相手の防御も通り抜けた後の数字なので、
+ * **本命を通すほど周りへの被害も増える。**
+ *
+ * ## 拡散から拡散は起きない
+ *
+ * 配ったダメージは `applyIncomingDamage` へ直接渡す。
+ * DAMAGE効果を経由しないので、**そこからさらに拡散が生えることはない。**
+ * スキルに付いている他の効果(弱体・ゲージなど)も一切動かない。
+ * 拡散は「ダメージだけが広がる」もので、技をもう一度撃つことではない。
+ */
+export interface SplashEffect {
+  kind: "SPLASH";
+  /** メイン対象への実ダメージに対する割合 */
+  ratio: number;
+}
+
 export type SkillEffect =
   | { kind: "CURSE"; chance: number }
   | { kind: "DETONATE_CURSES" }
   | { kind: "CONVERT_CURSES"; chance: number }
   | { kind: "DAMAGE_BOOST"; amount: number; durationTurns: number; applyTo?: EffectApplyTo }
+  | SplashEffect
   | DamageEffect
   | HealEffect
   | LifestealEffect
@@ -889,6 +916,8 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "DETONATE_CURSES": return "対象の呪いをすべて即時発動";
     case "CONVERT_CURSES": return `${Math.round(effect.chance * 100)}%で対象の強化をすべて呪いへ変換。成功時1ターンスタン`;
     case "DAMAGE_BOOST": return `与ダメージ+${Math.round(effect.amount * 100)}%(${effect.durationTurns}ターン)`;
+    // **「対象以外へ」と書く。**対象を含めると、本命に二重で入るように読める
+    case "SPLASH": return `対象に与えたダメージの${Math.round(effect.ratio * 100)}%を対象以外の敵全体へ拡散`;
     case "DAMAGE": {
       const scaleText = effect.scaleBonus
         ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`

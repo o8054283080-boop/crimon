@@ -1,3 +1,4 @@
+import { CRIM_TEMPLATES } from "./crim.js";
 import { FOUR_SPECIES } from "./fourSpecies.js";
 import { MonsterTemplate } from "../../core/monster.js";
 import { NEW_STAR3_TEMPLATES } from "./star3.js";
@@ -13,15 +14,25 @@ import { NEW_STAR5_TEMPLATES } from "./star5.js";
  * バランスを触る時に読む範囲がその星だけで済む。
  */
 
+export * from "./crim.js";
 export * from "./star3.js";
 export * from "./star4.js";
 export * from "./star5.js";
-export { NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES };
+export { NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES, CRIM_TEMPLATES };
 
-/** 今回追加した11種すべて */
+/**
+ * 追加分すべて。
+ *
+ * **クリムは必ず末尾に置くこと。**この並びがそのまま
+ * `ALL_DISPLAYABLE_MONSTERS_DEX` の並びになり、
+ * **潜在覚醒の候補IDは添字から作られる**(`latentAbilities.ts`)。
+ * 途中へ差し込むと、既に覚醒済みの個体が持っているIDの指す先が
+ * 別のモンスターの候補へずれる。
+ */
 export const NEW_MONSTER_TEMPLATES: MonsterTemplate[] = [
   ...FOUR_SPECIES,
   ...NEW_STAR3_TEMPLATES,
   ...NEW_STAR4_TEMPLATES,
   ...NEW_STAR5_TEMPLATES,
+  ...CRIM_TEMPLATES,
 ];

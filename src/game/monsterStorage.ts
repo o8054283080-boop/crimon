@@ -1,6 +1,7 @@
 import type { MonsterInstance } from "../core/monsterInstance.js";
 import { createMonsterInstance } from "../core/monsterInstance.js";
 import type { Star } from "../core/rarity.js";
+import { isCrim } from "./crim.js";
 import type { PlayerState } from "./playerState.js";
 
 export interface MonsterStorageStack {
@@ -32,6 +33,14 @@ function hasDefaultDevelopment(monster: MonsterInstance): boolean {
 }
 
 export function isMonsterStorageEligible(state: PlayerState, monster: MonsterInstance): boolean {
+  /*
+   * **クリムは預けられない。**
+   *
+   * 保管所そのものは消失ではない(引き出せる)が、預けた先から
+   * `exchangeStoredMonstersForPoints` で直接ポイントへ換えられる。
+   * 預けさせなければ、その道にも入らない。
+   */
+  if (isCrim(monster)) return false;
   if (monster.level !== 1 || monster.exp !== 0 || monster.locked) return false;
   if (Object.values(monster.equipment ?? {}).some(Boolean)) return false;
   if (monster.skillLevels.some((level) => level !== 1)) return false;
