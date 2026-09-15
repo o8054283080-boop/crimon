@@ -6246,6 +6246,8 @@ body {
 
 .shop-card__icon--scroll { color: #d9b8ff; }
 .shop-card__icon--lock { color: #8b7a5e; }
+/* スタミナポーション。⚡と同じ緑に寄せて、何の道具かを色でも伝える */
+.shop-card__icon--potion { --eq-tone: #5fd38a; color: #9ff0bd; }
 
 /* 値札。押せる的は42px(共通の下限)を保つ。
  *

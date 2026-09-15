@@ -1460,6 +1460,10 @@ export function buyShopEntry(state: PlayerState, slotIndex: number, now = Date.n
       else state.awakeningStones = (state.awakeningStones ?? 0) + entry.count;
       return { ok: true, label: `${label}を${entry.count}個購入しました` };
     }
+    // 省略可の欄。前から遊んでいる人の控えには無いので0で埋めてから足す
+    case "STAMINA_POTION":
+      state.staminaPotions = (state.staminaPotions ?? 0) + entry.count;
+      return { ok: true, label: `スタミナポーションを${entry.count}個購入しました` };
   }
 }
 

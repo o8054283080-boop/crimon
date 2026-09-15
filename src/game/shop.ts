@@ -88,7 +88,47 @@ export type ShopEntry =
   | { kind: "MONSTER"; dexId: string; star: 1 | 2 | 3; price: number }
   | { kind: "SCROLL"; count: number; price: number }
   /** 才能覚醒の素材。**たまにしか並ばない**(下の重み表を参照) */
-  | { kind: "AWAKENING_MATERIAL"; material: "shards" | "crystals" | "stones"; count: number; price: number };
+  | { kind: "AWAKENING_MATERIAL"; material: "shards" | "crystals" | "stones"; count: number; price: number }
+  /** スタミナポーション。並ぶ数は時間帯ごとに 1 / 3 / 5 のどれかへ決まる */
+  | { kind: "STAMINA_POTION"; count: number; price: number };
+
+/**
+ * スタミナポーションの棚。
+ *
+ * ## ここはゴールドの棚に置く(依頼主の指定)
+ *
+ * ダイヤショップには**スタミナを置かない**と決めてある
+ * (`data/crystalShop.ts`)。ダイヤ → スタミナ → 周回 → ダイヤ の輪ができて、
+ * 時間の制限そのものが消えるため。ゴールドの棚ならその輪は閉じない。
+ *
+ * ## まとめ買いほど1個あたりが安い
+ *
+ * ゴールド交換やゴールドダンジョンと同じ考え方。
+ * 5個をまとめて買える時に当たると得をする、という置き方にしてある。
+ *
+ *   1個 →  60,000G  (1個 60,000G)
+ *   3個 → 165,000G  (1個 55,000G)
+ *   5個 → 250,000G  (1個 50,000G)
+ *
+ * **装備★3のサブ2(15,000G)より明確に重い。**ここが軽いと、
+ * ゴールドを持っている人がスタミナの制限から抜けてしまう。
+ */
+export const SHOP_STAMINA_POTION_OFFERS: readonly {
+  count: number; price: number; weight: number;
+}[] = [
+  { count: 1, price: 60_000, weight: 52 },
+  { count: 3, price: 165_000, weight: 33 },
+  { count: 5, price: 250_000, weight: 15 },
+];
+
+/**
+ * ポーションの枠が並ぶ確率。
+ *
+ * 覚醒素材(`SHOP_AWAKENING_SLOT_CHANCE`)と**別の枠**を使う。
+ * 同じ枠を取り合わせると、片方が並ぶ時間帯はもう片方が必ず消える。
+ * **常設にしない**のは、ここが「装備を買う場所」だから。
+ */
+export const SHOP_STAMINA_POTION_SLOT_CHANCE = 0.4;
 
 /**
  * 才能覚醒の素材の棚。
@@ -242,6 +282,15 @@ function buildEntry(rng: () => number, fighterLevel: number, index: number): Sho
   if (role === 2 && rng() < SHOP_AWAKENING_SLOT_CHANCE) {
     const offer = pickWeighted(SHOP_AWAKENING_OFFERS.map((o) => ({ value: o, weight: o.weight })), rng);
     return { kind: "AWAKENING_MATERIAL", material: offer.material, count: offer.count, price: offer.price };
+  }
+
+  /*
+   * スタミナポーション。**素材とは別の枠(role 0)を使う。**
+   * 同じ枠を取り合わせると、片方が並ぶ時間帯はもう片方が必ず消えてしまう。
+   */
+  if (role === 0 && rng() < SHOP_STAMINA_POTION_SLOT_CHANCE) {
+    const offer = pickWeighted(SHOP_STAMINA_POTION_OFFERS.map((o) => ({ value: o, weight: o.weight })), rng);
+    return { kind: "STAMINA_POTION", count: offer.count, price: offer.price };
   }
 
   const star = pickWeighted(
