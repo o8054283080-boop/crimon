@@ -262,6 +262,31 @@ body:has(.crimon-home) .crimon-bottom-nav button {
 body:has(.crimon-home) .bottom-nav__btn + .bottom-nav__btn,
 body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 0 !important; }
 
+/* 下の帯の5マスは**等分ではない。**
+ *
+ * 帯は1枚の絵(home-bottom-nav-frame-v5.webp / 1536x512)を `100% 100%` で
+ * 引き伸ばして敷いている。ところが絵の中の仕切りは
+ * 0.9 / 21.1 / 40.2 / 59.3 / 78.3 / 99.7% の位置にあり、20%刻みではない
+ * (画素を数えて実測)。ボタンを `flex:1 1 0` で5等分すると、文字の中心は
+ * マスの中心から最大1.2%——390px幅で4.7pxずれる。
+ * **「ホーム」は絵より左、「召喚」は絵より右**に出て、並びがばらついて見えた。
+ *
+ * 文字だけを動かすのではなく、**ボタンの幅を仕切りに合わせる。**
+ * 文字は中央揃えのままで絵と揃い、押せる範囲もマスと一致する。
+ * (絵の中の意匠の重心も測ってあり、マスの中心と±0.35%で一致している) */
+body:has(.crimon-home) .bottom-nav__btn:nth-child(1) { flex: 0 0 21.1% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(2) { flex: 0 0 19.1% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(3) { flex: 0 0 19.1% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(4) { flex: 0 0 19.0% !important; }
+body:has(.crimon-home) .bottom-nav__btn:nth-child(5) { flex: 0 0 21.7% !important; }
+
+/* 左端のマスだけは、絵の仕切りの外に外枠の縁(0.9%)がある。
+ * ボタンを画面の左端から始めるぶん中心が0.45%左へ寄るので、
+ * 文字だけをその半分ぶん右へ戻す(実測 -1.8px → -0.1px)。 */
+body:has(.crimon-home) .bottom-nav__btn:nth-child(1) .bottom-nav__label {
+  padding-left: 4.3% !important;
+}
+
 body:has(.crimon-home) .bottom-nav__icon {
   /* 画像側の大きなシンボルを使う。HTMLアイコンは二重表示しない。 */
   display: none !important;
@@ -500,6 +525,26 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   display: none !important;
 }
 
+/* ⚠の四角は**この幅では文の行数に化ける。**
+ *
+ * 札は198px。右の「登録する」(76px)を避けると文に使えるのは約103pxだが、
+ * ⚠が26px＋間隔9pxを持っていくと68pxしか残らない。そこへ15文字を流すと
+ * **4行**になり、「アカ/ウン/ト復/旧の」という読めない刻み方をしていた
+ * (実測: .78rem で高さ49px、10pxへ落としてもまだ3行)。
+ *
+ * 札には既に赤い縦線と赤い地があり、**危ないことは⚠が無くても伝わる。**
+ * 26pxを文へ返して2行に収める。文字は10px——9pxは割らない(巡回が落とす)。 */
+.home-world .reward-banner-stack .cloud-warn__mark {
+  display: none !important;
+}
+
+.home-world .reward-banner-stack .cloud-warn__title {
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+  /* 2行を均す。無いと「アカウント復旧の登/録がまだです」と語の途中で割れる */
+  text-wrap: balance;
+}
+
 .home-world .reward-banner-stack .cloud-warn__go {
   position: absolute !important;
   top: 5px !important;
@@ -523,8 +568,20 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  * **段を切り落とさずに縮める。**絵を44px(指で押せる最小)まで小さくし、
  * 下限もその6段ぶんへ下げる。潰して隠すのではなく、小さくして全部見せる。 */
 @media (max-height: 700px) {
+  /* **`min-height` だけでは1mmも縮まない。**
+   *
+   * 左の縦列の段の高さは `home-left-generated.css` が `height:74px!important`
+   * で決めている。下限だけ56pxへ下げても上限は74pxのままで、実測すると
+   * 6段432px——世界の枠(402px)からも画面(667px)からもあふれ、
+   * **お知らせが下タブの裏に入り、プレゼントは画面の外**にいた
+   * (`elementFromPoint` で確認。`.click()` は覆われていても通るので使わない)。
+   *
+   * 使える縦は、世界の上端258pxから下タブの上589pxまでの331px。
+   * 列は世界の13px下から始まるので6段で318px——1段53pxが上限になる。
+   * **50pxにする。**絵は44pxなので上下3pxずつ余り、指で押せる44pxも割らない。 */
   .crimon-home .world-action {
-    min-height: 56px !important;
+    height: 50px !important;
+    min-height: 50px !important;
   }
 
   .crimon-home .world-action img {
@@ -601,4 +658,20 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  * **押した時だけ開く一時的なものが、常設の案内より下にあってはいけない。** */
 .home-world .crimon-dungeon-chooser {
   z-index: 20 !important;
+}
+
+/* ホームの下の余白。
+ *
+ * `mobile-ux.css` が `--bottom-nav-h + 32px`(実測110px)を空けている。
+ * 下のタブが `position:fixed` で被る画面のための逃げ場だが、
+ * **ホームの箱は既にタブのぶん短い**(実測: 画面844pxに対して高さ766px)。
+ * 二重によけているぶん、中身が110px押し出されて**43pxスクロールしていた。**
+ *
+ * ここを測り間違えていた。`scrollHeight - window.innerHeight` で見ると
+ * -35pxで「収まっている」ように出るが、`innerHeight` にはタブの領域が入る。
+ * **見えるのは `clientHeight`。**809 - 766 = 43px が本当のはみ出し。
+ *
+ * 実機のホームインジケーターぶんだけ残す。 */
+.crimon-home {
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
 }

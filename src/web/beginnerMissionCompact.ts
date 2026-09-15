@@ -36,101 +36,80 @@ function installStyles(): void {
       min-width: 0;
     }
 
+    /*
+     * **この札は世界の中(左右の縦列の間)にいるので、使える幅は約198px。**
+     * 内側の余白を引くと170pxしか無い。横に3つも4つも並べると、
+     * 実測で「✦ 初心者ミッション」と「0 / 80」が49pxぶん重なり、
+     * ミッション名は幅38pxまで潰れて「モン…」になっていた。
+     *
+     * そこで**横に並べるのは2つまで**と決めている。
+     *   1段目: ✦ 初心者ミッション  第1章 0/8
+     *   2段目: ミッション名(1行・省略あり)
+     *   3段目: 0 / 80          [移動] [🎁 受け取る]
+     * 章の帯と「達成条件を満たそう」の一文は落とした。前者は「第1章 0/8」と
+     * 同じことしか言わず、後者はボタンを見れば分かる。
+     */
     .crimon-tutorial-compact__top {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 8px;
-      min-height: 38px;
-      padding: 6px 10px;
-      border-bottom: 1px solid rgba(221, 178, 80, .24);
-    }
-
-    .crimon-tutorial-compact__heading {
       display: flex;
       align-items: center;
       gap: 7px;
-      min-width: 0;
+      min-height: 32px;
+      padding: 5px 10px;
+      border-bottom: 1px solid rgba(221, 178, 80, .24);
     }
 
     .crimon-tutorial-compact__title {
       flex: 0 1 auto;
+      overflow: hidden;
       color: #fff5d6;
-      font-size: .78rem;
+      font-size: .72rem;
       font-weight: 900;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     .crimon-tutorial-compact__chapter {
       flex: 0 0 auto;
+      margin-left: auto;
       color: #8ee7aa;
-      font-size: .68rem;
+      font-size: .66rem;
       font-weight: 900;
-      white-space: nowrap;
-    }
-
-    .crimon-tutorial-compact__chapter-track {
-      flex: 1 1 72px;
-      max-width: 110px;
-      min-width: 42px;
-      height: 5px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: rgba(255,255,255,.12);
-    }
-
-    .crimon-tutorial-compact__chapter-track > i {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, #38c978, #86eda7);
-    }
-
-    .crimon-tutorial-compact__overall {
-      padding-left: 9px;
-      border-left: 1px solid rgba(221, 178, 80, .48);
-      color: #e9eef8;
-      font-size: .76rem;
-      font-weight: 900;
-      font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
 
     .crimon-tutorial-compact__body {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 8px;
-      min-height: 48px;
-      padding: 7px 9px 8px 11px;
+      gap: 5px;
+      padding: 7px 10px 8px;
     }
 
     .crimon-tutorial-compact__mission {
-      min-width: 0;
-    }
-
-    .crimon-tutorial-compact__mission strong {
-      display: block;
       overflow: hidden;
       color: #fff;
-      font-size: .76rem;
+      font-size: .74rem;
       font-weight: 900;
-      line-height: 1.35;
+      line-height: 1.3;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .crimon-tutorial-compact__mission small {
-      display: block;
-      margin-top: 2px;
-      color: #aebdd0;
-      font-size: .62rem;
-      line-height: 1.25;
+    .crimon-tutorial-compact__foot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .crimon-tutorial-compact--ready .crimon-tutorial-compact__mission small {
-      color: #91e7ad;
+    .crimon-tutorial-compact__overall {
+      flex: 0 0 auto;
+      color: #b9c6da;
+      font-size: .66rem;
       font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .crimon-tutorial-compact--ready .crimon-tutorial-compact__overall {
+      color: #91e7ad;
     }
 
     .crimon-tutorial-compact__actions {
@@ -138,6 +117,7 @@ function installStyles(): void {
       align-items: center;
       gap: 6px;
       flex: 0 0 auto;
+      margin-left: auto;
     }
 
     .crimon-tutorial-compact__actions .btn {
@@ -175,32 +155,29 @@ function installStyles(): void {
       }
 
       .crimon-tutorial-compact__top {
+        gap: 5px;
         padding-inline: 8px;
       }
 
-      .crimon-tutorial-compact__heading {
-        gap: 5px;
-      }
-
+      /* 9pxを割らない(巡回が落とす)。.70rem = 11.2px */
       .crimon-tutorial-compact__title {
-        font-size: .73rem;
+        font-size: .70rem;
       }
 
       .crimon-tutorial-compact__chapter {
         font-size: .63rem;
       }
 
-      .crimon-tutorial-compact__chapter-track {
-        max-width: 72px;
-      }
-
       .crimon-tutorial-compact__body {
-        gap: 6px;
-        padding-inline: 9px 7px;
+        padding-inline: 8px;
       }
 
-      .crimon-tutorial-compact__mission strong {
+      .crimon-tutorial-compact__mission {
         font-size: .71rem;
+      }
+
+      .crimon-tutorial-compact__overall {
+        font-size: .63rem;
       }
 
       .crimon-tutorial-compact__actions {
@@ -238,7 +215,6 @@ function enhanceBeginnerMission(section: HTMLElement): void {
   const claimed = complete ? TOTAL_BEGINNER_MISSIONS : parseClaimedCount(section);
   const chapter = claimed >= TOTAL_BEGINNER_MISSIONS ? 10 : Math.floor(claimed / MISSIONS_PER_CHAPTER) + 1;
   const chapterDone = claimed >= TOTAL_BEGINNER_MISSIONS ? MISSIONS_PER_CHAPTER : claimed % MISSIONS_PER_CHAPTER;
-  const chapterPercent = Math.round((chapterDone / MISSIONS_PER_CHAPTER) * 100);
 
   section.dataset.compactBeginnerMission = "1";
   section.classList.add("crimon-tutorial--compact");
@@ -264,9 +240,6 @@ function enhanceBeginnerMission(section: HTMLElement): void {
   const top = document.createElement("div");
   top.className = "crimon-tutorial-compact__top";
 
-  const heading = document.createElement("div");
-  heading.className = "crimon-tutorial-compact__heading";
-
   const title = document.createElement("span");
   title.className = "crimon-tutorial-compact__title";
   title.textContent = "✦ 初心者ミッション";
@@ -274,29 +247,25 @@ function enhanceBeginnerMission(section: HTMLElement): void {
   const chapterText = document.createElement("span");
   chapterText.className = "crimon-tutorial-compact__chapter";
   chapterText.textContent = `第${chapter}章 ${chapterDone}/${MISSIONS_PER_CHAPTER}`;
-
-  const track = document.createElement("span");
-  track.className = "crimon-tutorial-compact__chapter-track";
-  const fill = document.createElement("i");
-  fill.style.width = `${chapterPercent}%`;
-  track.append(fill);
-  heading.append(title, chapterText, track);
-
-  const overall = document.createElement("span");
-  overall.className = "crimon-tutorial-compact__overall";
-  overall.textContent = `${claimed} / ${TOTAL_BEGINNER_MISSIONS}`;
-  top.append(heading, overall);
+  top.append(title, chapterText);
 
   const body = document.createElement("div");
   body.className = "crimon-tutorial-compact__body";
 
-  const mission = document.createElement("div");
+  const mission = document.createElement("strong");
   mission.className = "crimon-tutorial-compact__mission";
-  const missionText = document.createElement("strong");
-  missionText.textContent = condition;
-  const state = document.createElement("small");
-  state.textContent = ready ? "達成！ 報酬を受け取れます" : "達成条件を満たそう";
-  mission.append(missionText, state);
+  mission.textContent = condition;
+
+  const foot = document.createElement("div");
+  foot.className = "crimon-tutorial-compact__foot";
+
+  /*
+   * 全体の進みは**ボタンと同じ段へ**。1段目へ足すと「✦ 初心者ミッション」
+   * 「第1章 0/8」と3つ並び、幅170pxに205px入れることになって重なる。
+   */
+  const overall = document.createElement("span");
+  overall.className = "crimon-tutorial-compact__overall";
+  overall.textContent = `${claimed} / ${TOTAL_BEGINNER_MISSIONS}`;
 
   const actions = document.createElement("div");
   actions.className = "crimon-tutorial-compact__actions";
@@ -310,7 +279,8 @@ function enhanceBeginnerMission(section: HTMLElement): void {
     claim.classList.add("crimon-tutorial-compact__claim");
     actions.append(claim);
   }
-  body.append(mission, actions);
+  foot.append(overall, actions);
+  body.append(mission, foot);
   wrapper.append(top, body);
   section.replaceChildren(wrapper);
 }

@@ -732,7 +732,20 @@ export function renderHome(props: HomeProps): HTMLElement {
   const claimedCount = TUTORIAL_MISSIONS.filter((mission) => player.tutorialMissions.claimedIds.includes(mission.id)).length;
   const tutorial = el("section", { className: "crimon-tutorial", ariaLabel: "初心者ミッション" }, [
     el("div", { className: "crimon-tutorial__head" }, [
-      el("span", {}, [el("small", {}, ["BEGINNER MISSIONS"]), el("strong", {}, [tutorialNext ? `STEP ${tutorialNext.step} / 30` : "COMPLETE 30 / 30"])]),
+      /*
+       * **数を書かない。**`TUTORIAL_MISSIONS` から引く。
+       * ここだけ `/ 30` と直に書いてあって、ミッションが80個ある今も
+       * 「STEP 35 / 30」のように**分母より大きいステップ**が出ていた
+       * (依頼主の指摘で発覚)。すぐ下の `crimon-tutorial__count` と
+       * 2段カード側(`beginnerMissionCompact.ts`)は80で数えていて、
+       * **同じ画面に30と80が並んでいた。**
+       */
+      el("span", {}, [
+        el("small", {}, ["BEGINNER MISSIONS"]),
+        el("strong", {}, [tutorialNext
+          ? `STEP ${tutorialNext.step} / ${TUTORIAL_MISSIONS.length}`
+          : `COMPLETE ${TUTORIAL_MISSIONS.length} / ${TUTORIAL_MISSIONS.length}`]),
+      ]),
       el("span", { className: "crimon-tutorial__count" }, [`${claimedCount} / ${TUTORIAL_MISSIONS.length}`]),
     ]),
     tutorialNext ? el("details", { className: `crimon-tutorial__current${tutorialClaimable ? " crimon-tutorial__current--ready" : ""}` }, [
@@ -784,9 +797,10 @@ export function renderHome(props: HomeProps): HTMLElement {
       : null,
   ].filter((node): node is HTMLElement => node !== null));
   const openTutorial = () => {
-    const current = tutorial.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
+    // 全部終わっていると札そのものが無い。押しても何も起きないでよい
+    const current = tutorial?.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
     if (current) current.open = true;
-    tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    tutorial?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
   const banners = [
     /*

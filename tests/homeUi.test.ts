@@ -65,4 +65,65 @@ describe("CRIMON world lobby", () => {
     homeUtilityActions({ onGoArena: callbacks[0], onGoShop: callbacks[1], onGoHowToPlay: callbacks[2] }).forEach((action) => action());
     callbacks.forEach((callback) => expect(callback).toHaveBeenCalledOnce());
   });
+
+  it("下の帯の5マスを、絵の仕切りに合わせて割る", () => {
+    /*
+     * 帯は1枚の絵を `100% 100%` で引き伸ばして敷いている。
+     * 絵の仕切りは 0.9 / 21.1 / 40.2 / 59.3 / 78.3 / 99.7% にあり、
+     * **20%刻みではない**(画素を数えて実測)。`flex:1 1 0` の5等分に戻すと
+     * 文字の中心がマスから最大4.7pxずれ、「ホーム」は絵より左、
+     * 「召喚」は絵より右に出て並びがばらつく。
+     *
+     * 幅の合計が100%から外れていないことも見る。足りなければ右端が余り、
+     * 超えれば5つ目が画面の外へ出る。
+     */
+    const pop = readFileSync(new URL("../src/web/home-pop-design.css", import.meta.url), "utf8");
+    const widths = [1, 2, 3, 4, 5].map((n) => {
+      const found = pop.match(new RegExp(`\\.bottom-nav__btn:nth-child\\(${n}\\)\\s*\\{\\s*flex:\\s*0 0 ([\\d.]+)%`));
+      expect(found, `${n}番目のマスの幅が無い`).not.toBeNull();
+      return Number(found![1]);
+    });
+    expect(widths.reduce((sum, w) => sum + w, 0)).toBeCloseTo(100, 1);
+    // 両端は外枠の縁を抱えるぶん広い。中の3つはほぼ等しい
+    expect(widths[0]).toBeGreaterThan(widths[1]);
+    expect(widths[4]).toBeGreaterThan(widths[3]);
+  });
+});
+
+describe("初心者ミッションの札(世界の中の幅で読める形)", () => {
+  const compact = readFileSync(new URL("../src/web/beginnerMissionCompact.ts", import.meta.url), "utf8");
+
+  it("横に並べるのは2つまでにする", () => {
+    /*
+     * 札の幅は世界の中で約198px。内側の余白を引くと170pxしかない。
+     * 3つ横に並べると実測で「✦ 初心者ミッション」と「0 / 80」が重なり、
+     * ミッション名は幅38pxまで潰れて「モン…」になった。
+     *
+     * 1段目は見出しと章、全体の数はボタンと同じ3段目。
+     * **`__top` を2列より多い grid へ戻すと、また重なる。**
+     */
+    expect(compact).toContain(".crimon-tutorial-compact__foot");
+    expect(compact).toMatch(/__top\s*\{[^}]*display:\s*flex/);
+    expect(compact).not.toMatch(/__top\s*\{[^}]*grid-template-columns/);
+    // 全体の数は3段目(foot)へ。1段目(top)に混ぜない
+    const footIndex = compact.indexOf("foot.append(overall");
+    expect(footIndex).toBeGreaterThan(0);
+    expect(compact).not.toContain("top.append(heading, overall)");
+  });
+
+  it("ミッション名は省略記号で畳み、折り返して縦に伸ばさない", () => {
+    /*
+     * 折り返すと札が背を伸ばし、世界の枠を押し下げて下のボタンを
+     * 画面の外へ出す。**1行で畳んで、続きは押して開いた先で読ませる。**
+     */
+    expect(compact).toMatch(/__mission\s*\{[^}]*white-space:\s*nowrap/);
+    expect(compact).toMatch(/__mission\s*\{[^}]*text-overflow:\s*ellipsis/);
+  });
+
+  it("文字は9pxを割らない", () => {
+    // 実機で読めない文字は無いのと同じ(`tests/cssReadability.test.ts` と同じ下限)
+    const sizes = [...compact.matchAll(/font-size:\s*([\d.]+)rem/g)].map((m) => Number(m[1]) * 16);
+    expect(sizes.length).toBeGreaterThan(0);
+    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(9);
+  });
 });
