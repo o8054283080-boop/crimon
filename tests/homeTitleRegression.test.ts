@@ -57,11 +57,23 @@ describe("NEW TITLE → NEW HOME regression contract", () => {
     expect(claim).toHaveBeenCalledWith(TUTORIAL_MISSIONS[0].id);
   });
 
-  it("keeps current, claimable and completed tutorial states", () => {
+  it("挑んでいる間は中身と報酬を見せ、全部終わったら札ごと引く", () => {
     expect(source).toContain("tutorialNext.condition");
     expect(source).toContain("rewardText(tutorialNext)");
     expect(source).toContain('["報酬を受け取る"]');
-    expect(source).toContain("全30ミッション達成");
+    /*
+     * **終わった後の札は出さない。**
+     *
+     * ここは以前「全30ミッション達成！」の札があることを守っていた。
+     * 外に置いていた頃は、終わると `position:fixed` が外れてヘッダー下の
+     * 空き地に収まり目立たなかった。世界の中へ移してからは
+     * **終わった後もずっとモンスターの上に居座る**ようになり、
+     * 依頼主から2度指摘をいただいている(2度目は実機の画面を添えて)。
+     *
+     * 達成した中身はミッションの画面から見られる。案内は終わったら引く。
+     */
+    expect(source).toMatch(/const tutorial = !tutorialNext \? null :/);
+    expect(source).not.toMatch(/ミッション達成/);
   });
 
   it("keeps CURRENT PARTY monster detail and moves Trial Tower after management", () => {

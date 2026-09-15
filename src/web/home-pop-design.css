@@ -125,14 +125,36 @@ body:has(.crimon-home) {
 /* 画像の明るい世界をHOMEの主役にする。上部は空、中央はモンスターの余白、
  * 下部は石造テラス。暗い旧SVGや紫の月景は使わない。
  *
- * **下限は左の縦列が入りきる高さ。**`crimon-visual-system.css` の
- * `.home-world` と同じ値にすること。実際に効くのは `!important` の付いた
- * こちらなので、あちらだけ直しても画面は1pxも動かない(実測で確認)。
- * 6段(ミッション・図鑑・ランキング・遊び方・お知らせ・プレゼント)の内訳は
- * 72px × 6 + 間隔5px × 5 + 上下の余白 = 472px。 */
+ * **ホームの箱の内側の余白を、この式から引き忘れていた。**
+ *
+ * `.crimon-home` は `height: calc(100dvh - var(--bottom-nav-h))` の箱で、
+ * その内側に上下の余白を持つ。確認用ブラウザでは 12px + 8px = 20px しかなく、
+ * 式の定数(48px, 23px)に吸われて見えなかったが、**実機ではノッチと
+ * ホームインジケーターのぶんで 59px + 34px = 93px になる。**
+ * 引いていないぶんがそのままはみ出し、依頼主の端末では上の身分証が切れ、
+ * プレゼントが下タブの裏に沈んでいた(実機の画面で発覚)。
+ *
+ * `env()` を直に書かず `--home-safe-top/bottom` を通すのは、
+ * **確認用ブラウザには safe-area が無い**ため。変数なら注入して実機相当を測れる。
+ *
+ * **下限は左の縦列が指で押せる大きさで6段入る高さ。**44px × 6 + 間隔 + 余白。
+ * ここを大きく取ると、逆に縦の短い端末ではみ出す——段の側が縮むので、
+ * 枠の下限は「これ以上は絵が絵に見えない」ところに置けばよい。 */
 .home-world {
-  height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 86px - 48px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important;
-  min-height: 472px !important;
+  /* **高さは引き算で決めない。残りを全部もらう。**
+   *
+   * ここには `calc(100dvh - 下タブ - ヘッダー - 86px - 48px - 23px - …)` という
+   * 式が5本(メディアクエリ違いを含めて9本)あり、どれが効いているのかも、
+   * 定数が何を見込んだ数字なのかも追えなくなっていた。**実機で合わなかったのは
+   * ノッチとホームインジケーターのぶんを、そのどの式も引いていなかったため。**
+   * 数え漏らした端末が出るたびに式を1本増やす作りをやめる。
+   *
+   * ホームは縦の flex なので、身分証と編成を置いた**残り**がここの高さになる。
+   * 足りない端末では下限まで縮み、そこから先は左右の縦列の段が分け合う。 */
+  flex: 1 1 auto !important;
+  height: auto !important;
+  /* 下限は、左の縦列6段が指で押せる44pxで入る高さ */
+  min-height: 290px !important;
   margin: -1px 0 0 !important;
   border-inline: 0 !important;
   background: url("./assets/home/home-sky-isles-v2.jpg") center 58% / cover no-repeat !important;
@@ -319,28 +341,19 @@ body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
 
 body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !important; }
 
-/* ミッション達成後は tutorial を表示しない。その時だけ HOME 自体を
- * 「ヘッダー → 世界 → 現在のパーティ」の固定レーンにし、iPhone の
- * safe-area と固定ナビの間へ編成パネルを必ず収める。 */
-.crimon-home:has(.crimon-tutorial__complete) {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100dvh !important;
-  min-height: 0 !important;
-  padding: max(12px, var(--home-safe-top)) 0 var(--bottom-nav-h) !important;
-  overflow: hidden !important;
-}
+/*
+ * ここには「ミッションを全部終えた時だけ」HOMEを画面いっぱいの固定レーンに
+ * 組み替える一式があった。**終わった時だけ正しい形をしていた。**
+ * 画面いっぱいの箱・下タブぶんの内側余白・残りをもらう世界——どれも
+ * 終わっていない人にこそ要るもので、上の `.crimon-home` と `.home-world` へ
+ * 移してある。そして全80達成した人には、そもそも札自体を出さなくなった
+ * (`views/home.ts`)ので、この `:has()` は二度と真にならない。
+ */
 
-.crimon-home:has(.crimon-tutorial__complete) .crimon-resource-header,
-.crimon-home:has(.crimon-tutorial__complete) .reward-banner-stack,
-.crimon-home:has(.crimon-tutorial__complete) .current-party-panel {
+.crimon-home .crimon-resource-header,
+.crimon-home .reward-banner-stack,
+.crimon-home .current-party-panel {
   flex: 0 0 auto !important;
-}
-
-.crimon-home:has(.crimon-tutorial__complete) .home-world {
-  height: auto !important;
-  min-height: 0 !important;
-  flex: 1 1 auto !important;
 }
 
 .crimon-home:has(.crimon-tutorial__complete) .current-party-panel {
@@ -387,17 +400,14 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 }
 
 @media (max-height: 860px) {
-  .home-world { height: calc(100dvh - var(--bottom-nav-h) - var(--home-header-h) - 82px - 48px - 23px - var(--home-banner-h, 0px) - var(--home-farm-h, 0px)) !important; }
+  /* 世界の枠の高さはここでは決めない(残りをもらう形に一本化した)。
+   * 画面の寸法ごとに別の式を置くのをやめた経緯は `.home-world` の説明を参照。 */
   .world-party { inset: 88px 80px 84px !important; }
   .world-party__figure { width: 104px !important; height: 148px !important; }
   .world-party__figure--1 { bottom: 6px !important; }
   .world-party__figure--2,
   .world-party__figure--4 { bottom: 37px !important; }
   .world-party__figure--3 { bottom: 64px !important; }
-}
-
-@media (max-height: 860px) {
-  .crimon-home:has(.crimon-tutorial__complete) .home-world { height: auto !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -559,62 +569,14 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   font-size: 10px !important;
 }
 
-/* 縦の短い端末(iPhone SE級 375x667)。
+/*
+ * ここには以前「縦の短い端末では段を50pxへ」「幅の広い端末では枠の下限を
+ * 530pxへ」という2つの但し書きがあった。**どちらも要らなくなった。**
  *
- * 世界の下限472pxは**左の縦列6段が72pxで並ぶ**前提の値。
- * 667pxの端末では ヘッダー100 + パーティ86 + ナビ78 を引くと約400pxしか
- * 残らず、そのままだと134pxはみ出す(実測)。
- *
- * **段を切り落とさずに縮める。**絵を44px(指で押せる最小)まで小さくし、
- * 下限もその6段ぶんへ下げる。潰して隠すのではなく、小さくして全部見せる。 */
-@media (max-height: 700px) {
-  /* **`min-height` だけでは1mmも縮まない。**
-   *
-   * 左の縦列の段の高さは `home-left-generated.css` が `height:74px!important`
-   * で決めている。下限だけ56pxへ下げても上限は74pxのままで、実測すると
-   * 6段432px——世界の枠(402px)からも画面(667px)からもあふれ、
-   * **お知らせが下タブの裏に入り、プレゼントは画面の外**にいた
-   * (`elementFromPoint` で確認。`.click()` は覆われていても通るので使わない)。
-   *
-   * 使える縦は、世界の上端258pxから下タブの上589pxまでの331px。
-   * 列は世界の13px下から始まるので6段で318px——1段53pxが上限になる。
-   * **50pxにする。**絵は44pxなので上下3pxずつ余り、指で押せる44pxも割らない。 */
-  .crimon-home .world-action {
-    height: 50px !important;
-    min-height: 50px !important;
-  }
-
-  .crimon-home .world-action img {
-    width: 44px !important;
-    height: 44px !important;
-  }
-
-  .crimon-home .world-action--right {
-    min-height: 62px !important;
-  }
-
-  .crimon-home .world-action--right img {
-    width: 50px !important;
-    height: 50px !important;
-  }
-
-  /* 56px × 6段 + 間隔5px × 5 + 上下の余白 = 366px */
-  .home-world {
-    min-height: 366px !important;
-  }
-}
-
-/* 幅の広い端末(430px級)。
- *
- * ここでは左の縦列が1段84pxになり、6段で514px。
- * 下限472pxのままだと**55pxはみ出してプレゼントが切り落とされる**
- * (巡回が「押せないボタン『プレゼント』」を拾った)。
- * 高さに余裕がある端末なので、下限の方を上げて全段を見せる。 */
-@media (min-width: 410px) {
-  .home-world {
-    min-height: 530px !important;
-  }
-}
+ * 画面の寸法ごとに正解の数字を置いていく限り、置いていない寸法
+ * (実機のノッチがある430x932が、まさにそれだった)で必ず破綻する。
+ * 段が枠を分け合うようにしたので、枠が何pxでも6段そろって入る。
+ */
 
 
 /* 新しいものがある印。お知らせ(未読)とプレゼント(未受取)で同じ見た目。
@@ -673,5 +635,62 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
  *
  * 実機のホームインジケーターぶんだけ残す。 */
 .crimon-home {
-  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  /* **画面いっぱいの箱にして、下タブのぶんは内側の余白で空ける。**
+   *
+   * これまでは箱の高さを `calc(100dvh - 下タブ)` にしていた。ところが親の
+   * `.home-screen` は中身を上下中央に置く flex で、**短くした箱はその中で
+   * 上下に散らされる**。実測(430x932・ノッチあり)で箱は 58〜874 に置かれ、
+   * 下の58pxが下タブの裏に沈んでいた。世界の絵の足元が隠れていたのはこれ。
+   *
+   * 高さを画面ぴったりにすれば、中央へ寄せても位置は動かない。
+   * 下タブと重ならないための逃げ場は、内側の余白として持つ。
+   *
+   * **`env()` を直に書かない。**`--home-safe-*` を通す。確認用ブラウザには
+   * safe-area が無いので、`env()` 直書きだと実機の状態を一度も測れない。
+   * 変数なら注入して実機相当を再現できる。 */
+  height: 100dvh !important;
+  padding-top: max(12px, var(--home-safe-top)) !important;
+  padding-bottom: calc(var(--bottom-nav-h) + 4px) !important;
+}
+
+/* 下タブも同じ理由で変数を通す。ここが `env()` 直書きのままだと、
+ * 帯の高さ(`--bottom-nav-h`)だけ実機相当になり、中の余白が置き去りになる。 */
+body:has(.crimon-home) .bottom-nav {
+  padding-bottom: max(6px, var(--home-safe-bottom)) !important;
+}
+
+/* 左右の縦列は、**枠に合わせて段の方を縮める。**
+ *
+ * 段は `home-left-generated.css` が `height:88px!important`(高さ860px以下で
+ * 74px)で固定していた。6段で528px——枠が514pxしか無くてもお構いなしにあふれ、
+ * **プレゼントが下タブの裏へ沈む。**実機で起きていたのはこれ。
+ *
+ * `flex:1 1 0` で分け合わせる。上限は元の大きさ、下限は指で押せる44px。
+ * **潰して隠すのではなく、小さくして全部見せる。**
+ *
+ * **列の下端を留めるのが先。**列は `top` しか指定が無く、高さは段の合計で
+ * 決まっていた。段を `flex` にしただけでは分け合う相手(親の高さ)が無く、
+ * 下限の44pxまで縮んで枠の下半分が空く(実測: 枠413pxに対し列274px)。 */
+.crimon-home .world-actions--left {
+  bottom: 13px !important;
+  height: auto !important;
+}
+
+.crimon-home .world-actions--right {
+  bottom: 16px !important;
+  height: auto !important;
+}
+
+.crimon-home .world-actions--left .world-action {
+  flex: 1 1 0 !important;
+  height: auto !important;
+  min-height: 44px !important;
+  max-height: 88px !important;
+}
+
+.crimon-home .world-actions--right .world-action {
+  flex: 1 1 0 !important;
+  height: auto !important;
+  min-height: 48px !important;
+  max-height: 110px !important;
 }
