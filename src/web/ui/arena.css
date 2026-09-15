@@ -1169,3 +1169,13 @@
 .ar-picker__face { width: 38px; height: 38px; }
 .ar-unit__face { width: 52px; height: 52px; }
 .ar-rank__lead { width: 28px; height: 28px; }
+
+.ar-rewards { display:flex; flex-direction:column; gap:9px; }
+.ar-rewards__summary { cursor:pointer; font-weight:900; color:#f4d995; }
+.ar-rewards__current { display:grid; gap:4px; padding:9px; border-radius:9px; background:rgba(4,2,9,.45); }
+.ar-rewards__current strong { margin-top:4px; font-size:.78rem; color:#e0c88b; }
+.ar-rewards__current span { font-size:.74rem; line-height:1.5; }
+.ar-rewards h3 { margin:8px 0 0; font-size:.82rem; color:#e0c88b; }
+.ar-rewards__row { display:grid; grid-template-columns:88px 1fr; gap:3px 8px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+.ar-rewards__row b { grid-row:1 / span 2; font-size:.74rem; }
+.ar-rewards__row span { font-size:.7rem; line-height:1.45; color:var(--text-dim); }

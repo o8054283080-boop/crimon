@@ -93,9 +93,6 @@ export interface ArenaRewardBundle {
   summonScrolls?: number;
   fourStarSummonScrolls?: number;
   lightDarkFourStarSummonScrolls?: number;
-  /** 見た目だけの報酬。称号・フレーム・アイコン */
-  cosmeticId?: string;
-  cosmeticName?: string;
 }
 
 export interface ArenaTierReward {
@@ -142,27 +139,27 @@ export const ARENA_SEASON_REWARDS: readonly ArenaTierReward[] = [
   { tierId: "GOLD_2", reward: { crystal: 800, gold: 400_000, arenaCoins: 400, summonScrolls: 14, fourStarSummonScrolls: 2 } },
   {
     tierId: "GOLD_1",
-    reward: { crystal: 900, gold: 450_000, arenaCoins: 450, summonScrolls: 16, fourStarSummonScrolls: 2, cosmeticId: "frame_gold", cosmeticName: "黄金の額縁" },
+    reward: { crystal: 900, gold: 450_000, arenaCoins: 450, summonScrolls: 16, fourStarSummonScrolls: 2 },
   },
   {
     tierId: "PLATINUM_3",
-    reward: { crystal: 1100, gold: 550_000, arenaCoins: 550, summonScrolls: 18, fourStarSummonScrolls: 3, cosmeticId: "frame_platinum", cosmeticName: "白金の額縁" },
+    reward: { crystal: 1100, gold: 550_000, arenaCoins: 550, summonScrolls: 18, fourStarSummonScrolls: 3 },
   },
   {
     tierId: "PLATINUM_2",
-    reward: { crystal: 1250, gold: 620_000, arenaCoins: 620, summonScrolls: 20, fourStarSummonScrolls: 3, lightDarkFourStarSummonScrolls: 1, cosmeticId: "frame_platinum", cosmeticName: "白金の額縁" },
+    reward: { crystal: 1250, gold: 620_000, arenaCoins: 620, summonScrolls: 20, fourStarSummonScrolls: 3, lightDarkFourStarSummonScrolls: 1 },
   },
   {
     tierId: "PLATINUM_1",
-    reward: { crystal: 1400, gold: 700_000, arenaCoins: 700, summonScrolls: 22, fourStarSummonScrolls: 4, lightDarkFourStarSummonScrolls: 1, cosmeticId: "title_champion", cosmeticName: "闘技場の覇者" },
+    reward: { crystal: 1400, gold: 700_000, arenaCoins: 700, summonScrolls: 22, fourStarSummonScrolls: 4, lightDarkFourStarSummonScrolls: 1 },
   },
   {
     tierId: "MASTER",
-    reward: { crystal: 1700, gold: 850_000, arenaCoins: 850, summonScrolls: 26, fourStarSummonScrolls: 5, lightDarkFourStarSummonScrolls: 2, cosmeticId: "title_master", cosmeticName: "闘神" },
+    reward: { crystal: 1700, gold: 850_000, arenaCoins: 850, summonScrolls: 26, fourStarSummonScrolls: 5, lightDarkFourStarSummonScrolls: 2 },
   },
   {
     tierId: "LEGEND",
-    reward: { crystal: 2000, gold: 1_000_000, arenaCoins: 1000, summonScrolls: 30, fourStarSummonScrolls: 6, lightDarkFourStarSummonScrolls: 2, cosmeticId: "title_legend", cosmeticName: "伝説" },
+    reward: { crystal: 2000, gold: 1_000_000, arenaCoins: 1000, summonScrolls: 30, fourStarSummonScrolls: 6, lightDarkFourStarSummonScrolls: 2 },
   },
 ];
 
@@ -172,4 +169,27 @@ export function arenaWeeklyReward(tierId: ArenaTierId): ArenaRewardBundle {
 
 export function arenaSeasonReward(tierId: ArenaTierId): ArenaRewardBundle {
   return ARENA_SEASON_REWARDS.find((entry) => entry.tierId === tierId)?.reward ?? {};
+}
+
+
+/** シーズン終了時の最終順位で追加でもらえる報酬。ランク報酬とは別枠。 */
+export interface ArenaSeasonRankReward {
+  minRank: number;
+  maxRank: number;
+  label: string;
+  reward: ArenaRewardBundle;
+}
+
+export const ARENA_SEASON_RANK_REWARDS: readonly ArenaSeasonRankReward[] = [
+  { minRank: 1, maxRank: 1, label: "1位", reward: { crystal: 3000, arenaCoins: 1500, fourStarSummonScrolls: 8, lightDarkFourStarSummonScrolls: 3 } },
+  { minRank: 2, maxRank: 2, label: "2位", reward: { crystal: 2500, arenaCoins: 1250, fourStarSummonScrolls: 6, lightDarkFourStarSummonScrolls: 2 } },
+  { minRank: 3, maxRank: 3, label: "3位", reward: { crystal: 2000, arenaCoins: 1000, fourStarSummonScrolls: 5, lightDarkFourStarSummonScrolls: 2 } },
+  { minRank: 4, maxRank: 10, label: "4〜10位", reward: { crystal: 1500, arenaCoins: 750, fourStarSummonScrolls: 4, lightDarkFourStarSummonScrolls: 1 } },
+  { minRank: 11, maxRank: 30, label: "11〜30位", reward: { crystal: 1000, arenaCoins: 500, fourStarSummonScrolls: 3 } },
+  { minRank: 31, maxRank: 100, label: "31〜100位", reward: { crystal: 500, arenaCoins: 250, fourStarSummonScrolls: 1 } },
+];
+
+export function arenaSeasonRankReward(rank: number | null | undefined): ArenaRewardBundle {
+  if (!rank || rank < 1) return {};
+  return ARENA_SEASON_RANK_REWARDS.find((entry) => rank >= entry.minRank && rank <= entry.maxRank)?.reward ?? {};
 }
