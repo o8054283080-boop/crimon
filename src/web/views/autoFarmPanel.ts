@@ -16,7 +16,15 @@
  * 今は1戦ずつ実際に戦う。まとめているのは**押す手数**であって、戦闘そのものではない。
  */
 import { el } from "../dom.js";
-import { PlayerState, STAMINA_POTION_AMOUNT, staminaPotionsOwned } from "../../game/playerState.js";
+import {
+  PlayerState,
+  STAMINA_POTION_AMOUNT,
+  STAMINA_POTION_BUDGET_CHOICES,
+  STAMINA_POTION_UNLIMITED_BUDGET,
+  staminaPotionBudgetLabel,
+  staminaPotionFarmBudgetOf,
+  staminaPotionsOwned,
+} from "../../game/playerState.js";
 
 export interface AutoFarmPanelProps {
   count: number;
@@ -37,9 +45,12 @@ export interface AutoFarmPanelProps {
   staminaPotions: number;
   /** 1個あたりの回復量 */
   staminaPotionAmount: number;
-  /** 足りなくなった時にポーションを自動で使うか(既定OFF) */
-  autoUsePotion: boolean;
-  onToggleAutoUsePotion: (next: boolean) => void;
+  /**
+   * この周回で使ってよいポーションの数。**0なら使わない(既定)。**
+   * `STAMINA_POTION_UNLIMITED_BUDGET` なら持っている分は全部。
+   */
+  staminaPotionBudget: number;
+  onChangeStaminaPotionBudget: (next: number) => void;
   onStart: () => void;
 }
 
@@ -51,13 +62,13 @@ export interface AutoFarmPanelProps {
  */
 export function autoFarmPotionProps(
   player: PlayerState,
-  onToggleAutoUsePotion: (next: boolean) => void,
-): Pick<AutoFarmPanelProps, "staminaPotions" | "staminaPotionAmount" | "autoUsePotion" | "onToggleAutoUsePotion"> {
+  onChangeStaminaPotionBudget: (next: number) => void,
+): Pick<AutoFarmPanelProps, "staminaPotions" | "staminaPotionAmount" | "staminaPotionBudget" | "onChangeStaminaPotionBudget"> {
   return {
     staminaPotions: staminaPotionsOwned(player),
     staminaPotionAmount: STAMINA_POTION_AMOUNT,
-    autoUsePotion: player.autoUseStaminaPotionInFarm === true,
-    onToggleAutoUsePotion,
+    staminaPotionBudget: staminaPotionFarmBudgetOf(player),
+    onChangeStaminaPotionBudget,
   };
 }
 
@@ -81,10 +92,13 @@ export function usableStaminaForFarm(
   stamina: number,
   staminaPotions: number,
   potionAmount: number,
-  autoUsePotion: boolean,
+  /** この周回で使ってよい数。0なら1個も足さない */
+  budget: number,
 ): number {
-  if (!autoUsePotion) return stamina;
-  return stamina + Math.max(0, staminaPotions) * Math.max(0, potionAmount);
+  if (!(budget > 0)) return stamina;
+  // **決めた数と手持ち、少ないほうまで。**5個までと決めて2個しか無ければ2個ぶん
+  const usablePotions = Math.min(Math.max(0, staminaPotions), Math.floor(budget));
+  return stamina + usablePotions * Math.max(0, potionAmount);
 }
 
 export function formatApproxDuration(seconds: number): string {
@@ -107,7 +121,7 @@ function countChip(label: string, active: boolean, onClick: () => void): HTMLEle
 }
 
 export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
-  const usable = usableStaminaForFarm(props.stamina, props.staminaPotions, props.staminaPotionAmount, props.autoUsePotion);
+  const usable = usableStaminaForFarm(props.stamina, props.staminaPotions, props.staminaPotionAmount, props.staminaPotionBudget);
   const max = affordableCount(usable, props.staminaCost, props.hardLimit);
   const totalCost = props.staminaCost * props.count;
   const willStopEarly = props.count > max;
@@ -119,7 +133,8 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
 
   const notes: HTMLElement[] = [];
   if (willStopEarly) {
-    const owned = props.autoUsePotion && props.staminaPotions > 0 ? ` + 🧪${props.staminaPotions}` : "";
+    const lent = Math.min(props.staminaPotions, props.staminaPotionBudget > 0 ? props.staminaPotionBudget : 0);
+    const owned = lent > 0 ? ` + 🧪${lent}` : "";
     notes.push(
       el("p", { className: "autofarm__warn" }, [
         `⚠ いまのスタミナでは${max}回で止まります(⚡${totalCost}必要 / 手持ち⚡${props.stamina}${owned})`,
@@ -151,18 +166,26 @@ export function renderAutoFarmPanel(props: AutoFarmPanelProps): HTMLElement {
         },
       }),
     ]),
-    el("label", { className: "autofarm__potion" }, [
-      el("input", {
-        type: "checkbox",
-        className: "autofarm__potion-check",
-        checked: props.autoUsePotion,
-        onchange: (event: Event) => props.onToggleAutoUsePotion((event.currentTarget as HTMLInputElement).checked),
-      }),
-      el("span", { className: "autofarm__potion-text" }, [
-        el("strong", {}, ["スタミナポーションを自動で使う"]),
-        el("small", {}, [
-          `所持 🧪${props.staminaPotions}個(1個で⚡${props.staminaPotionAmount}回復) / 足りない時に必要な分だけ使います`,
-        ]),
+    el("div", { className: "autofarm__potion" }, [
+      el("div", { className: "autofarm__potion-head" }, [
+        el("strong", {}, ["スタミナポーションを使う"]),
+        el("span", { className: "autofarm__potion-owned" }, [`所持 🧪${props.staminaPotions}`]),
+      ]),
+      el(
+        "div",
+        { className: "autofarm__chips autofarm__potion-chips" },
+        STAMINA_POTION_BUDGET_CHOICES.map((value) =>
+          countChip(
+            staminaPotionBudgetLabel(value),
+            props.staminaPotionBudget === value
+              // 「全部」は印の値そのものなので、手持ちより大きい指定もここへ寄せる
+              || (value === STAMINA_POTION_UNLIMITED_BUDGET && props.staminaPotionBudget >= STAMINA_POTION_UNLIMITED_BUDGET),
+            () => props.onChangeStaminaPotionBudget(value),
+          ),
+        ),
+      ),
+      el("small", { className: "autofarm__potion-note" }, [
+        `1個で⚡${props.staminaPotionAmount}回復。足りない時に、決めた数まで使います`,
       ]),
     ]),
     ...notes,

@@ -111,7 +111,12 @@ body:has(.crimon-home) {
 .crimon-resource-header .home-wallet__chip--crystal,
 .crimon-resource-header .home-wallet__chip--gold { justify-content:flex-end !important; padding:1px 3px 1px 19px !important; }
 .crimon-resource-header .home-wallet__chip--crystal strong,
-.crimon-resource-header .home-wallet__chip--gold strong { font-size:clamp(7.5px, 2vw, 9.5px) !important; letter-spacing:-.06em !important; text-align:right !important; }
+.crimon-resource-header .home-wallet__chip--gold strong { font-size:clamp(9px, 2vw, 9.5px) !important; letter-spacing:-.06em !important; text-align:right !important; }
+/* 下限を7.5pxから9pxへ上げた。390px幅では 2vw = 7.8px で、実機では読めない
+ * (ホームの経験値8px・試練の塔7.4pxと同じ事故。tests/cssReadability.test.ts が
+ *  9px未満を落とすが、clamp() の中までは見ていなかった)。 */
+/* スタミナの札へ添えるポーションの数。⚡の数字より一段小さく、色で分ける */
+.crimon-resource-header .home-wallet__potion { flex:0 0 auto !important; font-size:9.5px !important; line-height:1 !important; color:#9ff0bd !important; font-variant-numeric:tabular-nums !important; white-space:nowrap !important; }
 /* 見える数字は下段の24pxフレームへ置き、ボタン本体だけは44pxを確保する。 */
 .crimon-resource-header .home-wallet__chip--stamina { position:absolute !important; z-index:1 !important; top:20px !important; right:5px !important; left:5px !important; width:auto !important; height:44px !important; min-height:44px !important; box-sizing:border-box !important; align-items:flex-start !important; justify-content:center !important; gap:4px !important; padding:19px 3px 1px !important; }
 

@@ -4563,33 +4563,38 @@ body {
   color: #ffd7a0;
 }
 
-/* ポーションの自動使用。的の大きさを確保し、9px未満の文字は置かない */
+/*
+ * ポーションを何個まで使うか。
+ *
+ * **入 / 切のチェックから札の並びへ変えた。**入にすると持っている分を
+ * 使い切るまで止まらず、貯めておきたい人が周回のたびに切り替えるしか
+ * なかった(依頼主の指定で「決めた数まで」にした)。
+ * 9px未満の文字は置かない。
+ */
 .autofarm__potion {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 44px;
+  display: grid;
+  gap: 7px;
   padding: 9px 11px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.045);
-  cursor: pointer;
 }
-.autofarm__potion-check {
-  width: 22px;
-  height: 22px;
-  margin: 2px 0 0;
-  flex: 0 0 auto;
-  accent-color: #ffd15c;
+.autofarm__potion-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
-.autofarm__potion-text {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-.autofarm__potion-text strong {
+.autofarm__potion-head strong {
   font-size: 0.82rem;
 }
-.autofarm__potion-text small {
+/* 所持数は見出しの右端。数が2桁3桁に伸びても見出しを押し出さない */
+.autofarm__potion-owned {
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  color: #9ff0bd;
+  font-variant-numeric: tabular-nums;
+}
+.autofarm__potion-note {
   font-size: 0.72rem;
   color: var(--muted);
   line-height: 1.45;

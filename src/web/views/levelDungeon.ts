@@ -16,7 +16,7 @@ export interface LevelDungeonProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (def: LevelDungeonDef, count: number) => void;
-  onToggleAutoUseStaminaPotion: (next: boolean) => void;
+  onChangeStaminaPotionBudget: (next: number) => void;
 }
 
 /** 階ごとの色。上へ行くほど熱い色にして、選ぶ前に階の重さが伝わるようにする */
@@ -98,7 +98,7 @@ function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLEleme
 
     isLevelDungeonTierCleared(props.player, def.tier) ? renderAutoFarmPanel({
       ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "LEVEL_DUNGEON", def.tier); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
-      ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
+      ...autoFarmPotionProps(props.player, props.onChangeStaminaPotionBudget),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: LEVEL_DUNGEON_STAMINA_COST,

@@ -16,7 +16,7 @@ export interface GoldDungeonProps {
   autoFarmCount: number;
   onChangeAutoFarmCount: (count: number) => void;
   onAutoFarm: (floor: GoldDungeonFloor, count: number) => void;
-  onToggleAutoUseStaminaPotion: (next: boolean) => void;
+  onChangeStaminaPotionBudget: (next: number) => void;
 }
 
 function renderList(props: GoldDungeonProps): HTMLElement {
@@ -90,7 +90,7 @@ function renderDetail(props: GoldDungeonProps, floor: GoldDungeonFloor): HTMLEle
 
     props.player.clearedGoldDungeonFloors.includes(floor.floor) ? renderAutoFarmPanel({
       ...(() => { const timing = referenceRunTime(props.player.recentManualClearTimes, "GOLD_DUNGEON", String(floor.floor)); return { referenceRunSeconds: timing.seconds, referenceFromManual: timing.fromManual, recentManualClearTimes: timing.recent }; })(),
-      ...autoFarmPotionProps(props.player, props.onToggleAutoUseStaminaPotion),
+      ...autoFarmPotionProps(props.player, props.onChangeStaminaPotionBudget),
       count: props.autoFarmCount,
       onChangeCount: props.onChangeAutoFarmCount,
       staminaCost: GOLD_DUNGEON_STAMINA_COST,

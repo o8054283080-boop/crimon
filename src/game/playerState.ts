@@ -125,12 +125,29 @@ export interface PlayerState {
    */
   staminaPotions?: number;
   /**
-   * 自動周回でスタミナが足りなくなった時、ポーションを自動で使うか。
+   * 1回の自動周回で使ってよいスタミナポーションの数。
    *
-   * **既定はOFF。**入れた人だけが使う。再生速度と同じで、
+   * **0なら使わない。これが既定。**入れた人だけが使う。再生速度と同じで、
    * 周回のたびに入れ直すものではないので起動をまたいで残す。
    *
-   * **省略可。**前から遊んでいる人の控えには無いので、読み込み時に false で埋める。
+   * ## なぜ「使う / 使わない」ではなく数なのか
+   *
+   * 前は入 / 切だけで、入にすると**持っている分を使い切るまで止まらなかった。**
+   * 貯めておきたい人が周回のたびに切り替えるしかない。
+   * 「この周回では3個まで」と決められれば、残りは手元に残る(依頼主の指定)。
+   *
+   * `STAMINA_POTION_UNLIMITED_BUDGET` を入れると「持っている分は全部」。
+   *
+   * **省略可。**前から遊んでいる人の控えには無いので、読み込み時に埋める。
+   * 旧 `autoUseStaminaPotionInFarm`(入 / 切)を持つ控えは、
+   * 入だったなら「全部」として引き継ぐ——**前と同じ動きのままにする。**
+   */
+  staminaPotionFarmBudget?: number;
+  /**
+   * 旧: ポーションを自動で使うか(入 / 切)。
+   *
+   * **もう読まない。**`staminaPotionFarmBudget` へ移した後の控えには書かない。
+   * 型に残してあるのは、**古い控えを読む時にだけ**参照するため。
    */
   autoUseStaminaPotionInFarm?: boolean;
   /**
@@ -419,7 +436,7 @@ export function createInitialState(): PlayerState {
     crimShards: 0,
     crimShardGrantedMissionIds: [],
     staminaPotions: 0,
-    autoUseStaminaPotionInFarm: false,
+    staminaPotionFarmBudget: 0,
     fighterLevel: 1,
     fighterExp: 0,
     stamina: INITIAL_MAX_STAMINA,
@@ -626,8 +643,21 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   // スタミナポーション。前から遊んでいる人の控えには無い
   if (typeof state.staminaPotions !== "number" || !(state.staminaPotions >= 0)) state.staminaPotions = 0;
   else state.staminaPotions = Math.floor(state.staminaPotions);
-  // 自動使用の設定。**既定はOFF。**入れた覚えのない人が勝手に消費されないように
-  state.autoUseStaminaPotionInFarm = state.autoUseStaminaPotionInFarm === true;
+  /*
+   * 自動使用の上限。**既定は0＝使わない。**
+   * 入れた覚えのない人のポーションが勝手に減らないように。
+   *
+   * 旧 `autoUseStaminaPotionInFarm`(入 / 切)からの引き継ぎ:
+   * 入だった人は「全部」にする。**前と同じ動きのまま**にしないと、
+   * 更新しただけで周回が途中で止まるようになってしまう。
+   */
+  if (typeof state.staminaPotionFarmBudget !== "number" || !(state.staminaPotionFarmBudget >= 0)) {
+    state.staminaPotionFarmBudget = state.autoUseStaminaPotionInFarm === true ? STAMINA_POTION_UNLIMITED_BUDGET : 0;
+  } else {
+    state.staminaPotionFarmBudget = Math.floor(state.staminaPotionFarmBudget);
+  }
+  // 引き継ぎ済みなので、古い欄はここで落とす(2つの設定が食い違わないように)
+  delete state.autoUseStaminaPotionInFarm;
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
@@ -1172,6 +1202,30 @@ export function tryRefillStaminaFull(state: PlayerState): StaminaRefillResult {
  * **基準時刻を進めるだけで1も回復しない**ので、超過中に勝手に増え続けることはない。
  */
 export const STAMINA_POTION_AMOUNT = 100;
+
+/**
+ * 自動周回の上限に入れると「持っている分は全部」を意味する値。
+ *
+ * **所持数そのものを入れない。**入れた時点の数で焼き付いてしまい、
+ * 周回中にミッションで増えたぶんが使われない。
+ * 「上限なし」は数ではなく印として持つ。
+ */
+export const STAMINA_POTION_UNLIMITED_BUDGET = Number.MAX_SAFE_INTEGER;
+
+/** 自動周回の設定で選べる上限。0は「使わない」 */
+export const STAMINA_POTION_BUDGET_CHOICES: readonly number[] = [0, 1, 3, 5, 10, STAMINA_POTION_UNLIMITED_BUDGET];
+
+/** 上限の表示名。数をそのまま出すと MAX_SAFE_INTEGER が画面に出る */
+export function staminaPotionBudgetLabel(budget: number): string {
+  if (!(budget > 0)) return "使わない";
+  return budget >= STAMINA_POTION_UNLIMITED_BUDGET ? "全部" : `${budget}個`;
+}
+
+/** 控えに入っている上限を、選べる値のどれかへ丸める */
+export function staminaPotionFarmBudgetOf(state: Pick<PlayerState, "staminaPotionFarmBudget">): number {
+  const value = state.staminaPotionFarmBudget ?? 0;
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
 
 export function staminaPotionsOwned(state: Pick<PlayerState, "staminaPotions">): number {
   const value = state.staminaPotions ?? 0;

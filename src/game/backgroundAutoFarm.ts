@@ -28,17 +28,24 @@ export interface BackgroundFarmJob {
   /** 支払い保存済み・未精算の1戦。復帰時は再課金せず、この戦闘から再開する。 */
   inFlight: boolean;
   /**
-   * スタミナが足りない時、スタミナポーションを自動で使うか。
+   * この周回で使ってよいスタミナポーションの数。**0なら使わない。**
    *
-   * **既定はOFF。**周回を回し続けたい人だけが自分で入れる。
-   * 勝手に使うと、貯めておいたぶんが気づかないうちに溶ける。
+   * 始めた時の設定で固定する。途中で設定を変えても、
+   * 既に進んだぶんの扱いが変わらないように。
    *
    * **ダイヤは絶対に自動で使わない。**ポーションはスタミナにしか使えないので
    * 減っても使い道が狭まるだけだが、ダイヤは何にでも使える。
    * 自動で減らしてよいものではない(依頼主の指定)。
    *
    * 省略可にしてあるのは、**進行中のジョブを持ったまま更新した人のため。**
-   * 読み込み時に false として扱う。
+   * 旧 `autoUseStaminaPotion`(入 / 切)だけを持つジョブは、
+   * 入だったなら「全部」として読む(`staminaPotionBudgetOf`)。
+   */
+  staminaPotionBudget?: number;
+  /**
+   * 旧: ポーションを自動で使うか(入 / 切)。
+   *
+   * **進行中の古いジョブを読む時にだけ**参照する。新しく書くことはない。
    */
   autoUseStaminaPotion?: boolean;
   /** その周回で自動使用したポーションの数。終わった時の報告に使う */
@@ -64,7 +71,7 @@ export function shouldStopForJstDateChange(job: Pick<BackgroundFarmJob, "kind" |
 export function createBackgroundFarmJob(input: {
   kind: BackgroundFarmKind; targetId: string; targetName: string; difficulty?: Difficulty;
   requestedRuns: number; partyIds: string[]; referenceRunSeconds?: number; referenceFromManual?: boolean;
-  autoUseStaminaPotion?: boolean; now?: number;
+  staminaPotionBudget?: number; now?: number;
 }): BackgroundFarmJob {
   const requestedRuns = parseRequestedRuns(input.requestedRuns);
   if (requestedRuns === null) throw new Error("周回回数は正の整数で指定してください");
@@ -78,10 +85,29 @@ export function createBackgroundFarmJob(input: {
     referenceFromManual: input.referenceFromManual ?? false,
     partyIds: [...input.partyIds], status: "RUNNING", stopReason: null,
     staminaSpent: 0, result: emptyResult(), inFlight: false,
-    // **既定はOFF。**入れた人だけが使う
-    autoUseStaminaPotion: input.autoUseStaminaPotion === true,
+    // **既定は0＝使わない。**入れた人だけが使う
+    staminaPotionBudget: input.staminaPotionBudget !== undefined && input.staminaPotionBudget > 0
+      ? Math.floor(input.staminaPotionBudget)
+      : 0,
     staminaPotionsUsed: 0,
   };
+}
+
+/**
+ * このジョブがポーションを何個まで使ってよいか。
+ *
+ * **古いジョブも読めるようにする。**進行中のまま更新した人のジョブには
+ * `staminaPotionBudget` が無く、入 / 切の `autoUseStaminaPotion` しか無い。
+ * 入だったなら「全部」として扱い、**前と同じ動きのまま**にする。
+ */
+export function staminaPotionBudgetOf(
+  job: Pick<BackgroundFarmJob, "staminaPotionBudget" | "autoUseStaminaPotion">,
+  unlimited: number,
+): number {
+  if (typeof job.staminaPotionBudget === "number" && job.staminaPotionBudget >= 0) {
+    return Math.floor(job.staminaPotionBudget);
+  }
+  return job.autoUseStaminaPotion === true ? unlimited : 0;
 }
 
 /**
@@ -97,11 +123,13 @@ export function staminaPotionsNeeded(
   cost: number,
   owned: number,
   potionAmount: number,
+  /** この周回でまだ使ってよい数。省略すると上限なし */
+  budgetLeft: number = Number.MAX_SAFE_INTEGER,
 ): number {
   if (!(potionAmount > 0)) return 0;
   if (stamina >= cost) return 0;
   const needed = Math.ceil((cost - stamina) / potionAmount);
-  return Math.max(0, Math.min(owned, needed));
+  return Math.max(0, Math.min(owned, needed, Math.max(0, Math.floor(budgetLeft))));
 }
 
 export const MAX_OFFLINE_FARM_MS = 8 * 60 * 60 * 1000;
