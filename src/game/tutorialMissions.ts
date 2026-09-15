@@ -2,6 +2,7 @@ import { createMonsterInstance } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL, type Star } from "../core/rarity.js";
 import { EXP_PIG_DEX, REINCARNATION_PIG_DEX, SKILL_PIG_DEX } from "../data/monsters.js";
 import { addArenaCoins } from "./arena/progress.js";
+import { CRIM_SHARD_ICON, CRIM_SHARD_NAME } from "./crim.js";
 import type { PlayerState } from "./playerState.js";
 import { registerMissionPlayer, syncMissions, type MissionCounterKey } from "./missions.js";
 
@@ -29,6 +30,18 @@ export interface TutorialReward {
   reincarnationPig4?: number;
   reincarnationPig5?: number;
   skillPig?: number;
+  /**
+   * クリムの宝珠のかけら。**クリムのスキルを1回上げる専用の素材。**
+   *
+   * 合計12個(= S1〜S3を各4回)が、章の節目へ散らしてある。
+   * 一度にまとめて渡さないのは、**育てながら受け取る流れ**を作るため——
+   * クリムを使う → 育てる → かけらを得る → スキルが伸びる → また使う。
+   *
+   * この報酬だけは受け取り印を別に持つ(`crimShardGrantedMissionIds`)。
+   * 後から足した報酬なので、**既に達成済みの人へさかのぼって配る**必要があり、
+   * 既存の受取印を消して配り直すと過去の報酬まで二重に出てしまう。
+   */
+  crimShard?: number;
 }
 
 export interface TutorialMission {
@@ -118,13 +131,13 @@ const mission = (
 
 export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(1, 1, "最初の召喚", "モンスターを1回召喚する", { summonScrolls: 5 }, "MONSTERS", p => p.tutorialSummonDone === true || p.monsters.length >= 4),
-  mission(2, 1, "4体で編成", "パーティに4体編成する", { gold: 50_000 }, "PARTY", p => p.partyIds.length >= 4, p => ({ current: p.partyIds.length, target: 4 })),
+  mission(2, 1, "4体で編成", "パーティに4体編成する", { gold: 50_000, crimShard: 1 }, "PARTY", p => p.partyIds.length >= 4, p => ({ current: p.partyIds.length, target: 4 })),
   mission(3, 1, "1-1へ挑戦", "ステージ1-1をクリアする", { crystal: 50 }, "STAGES", p => stage(p, "1-1")),
   mission(4, 1, "Lv5にしよう", "モンスター1体をLv5以上にする", { expPig5: 1 }, "MONSTERS", p => hasLevel(p, 5)),
   mission(5, 1, "1-2へ挑戦", "ステージ1-2をクリアする", { summonScrolls: 5 }, "STAGES", p => stage(p, "1-2")),
   mission(6, 1, "Lv10にしよう", "モンスター1体をLv10以上にする", { stamina: 100 }, "MONSTERS", p => hasLevel(p, 10)),
   mission(7, 1, "1-3へ挑戦", "ステージ1-3をクリアする", { crystal: 50 }, "STAGES", p => stage(p, "1-3")),
-  mission(8, 1, "初めての装備", "装備を1個装着する", { gold: 100_000, summonScrolls: 10, crystal: 200, expPig5: 1 }, "MONSTERS", p => equippedTotal(p) >= 1, p => ({ current: equippedTotal(p), target: 1 })),
+  mission(8, 1, "初めての装備", "装備を1個装着する", { gold: 100_000, summonScrolls: 10, crystal: 200, expPig5: 1, crimShard: 1 }, "MONSTERS", p => equippedTotal(p) >= 1, p => ({ current: equippedTotal(p), target: 1 })),
   mission(9, 2, "1-4へ挑戦", "ステージ1-4をクリアする", { summonScrolls: 5 }, "STAGES", p => stage(p, "1-4")),
   mission(10, 2, "装備を増やそう", "装備を合計3個装着する", { gold: 100_000 }, "MONSTERS", p => equippedTotal(p) >= 3, p => ({ current: equippedTotal(p), target: 3 })),
   mission(11, 2, "装備を強化", "装備を1回以上強化する", { gold: 100_000 }, "EQUIPMENT", p => enhanced(p, 1)),
@@ -132,7 +145,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(13, 2, "1-5へ挑戦", "ステージ1-5をクリアする", { summonScrolls: 5 }, "STAGES", p => stage(p, "1-5")),
   mission(14, 2, "Lv15にしよう", "モンスター1体をLv15以上にする", { expPig5: 1 }, "MONSTERS", p => hasLevel(p, 15)),
   mission(15, 2, "2-1へ進もう", "ステージ2-1をクリアする", { stamina: 150 }, "STAGES", p => stage(p, "2-1")),
-  mission(16, 2, "第2章クリア", "ステージ2-2をクリアする", { crystal: 300, gold: 300_000, summonScrolls: 10 }, "STAGES", p => stage(p, "2-2")),
+  mission(16, 2, "第2章クリア", "ステージ2-2をクリアする", { crystal: 300, gold: 300_000, summonScrolls: 10, crimShard: 1 }, "STAGES", p => stage(p, "2-2")),
   mission(17, 3, "育成を続けよう", "モンスター1体をLv20以上にする", { expPig5: 1 }, "MONSTERS", p => hasLevel(p, 20)),
   mission(18, 3, "2-3へ挑戦", "ステージ2-3をクリアする", { summonScrolls: 5 }, "STAGES", p => stage(p, "2-3")),
   mission(19, 3, "装備を6個", "装備を合計6個装着する", { crystal: 50 }, "MONSTERS", p => equippedTotal(p) >= 6, p => ({ current: equippedTotal(p), target: 6 })),
@@ -140,7 +153,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(21, 3, "2-4へ挑戦", "ステージ2-4をクリアする", { summonScrolls: 5 }, "STAGES", p => stage(p, "2-4")),
   mission(22, 3, "LvMAXを作ろう", "LvMAXのモンスターを1体作る", { reincarnationPig4: 1 }, "MONSTERS", p => hasMaxLevel(p)),
   mission(23, 3, "2-5を突破", "ステージ2-5をクリアする", { crystal: 100 }, "STAGES", p => stage(p, "2-5")),
-  mission(24, 3, "第3章クリア", "★4以上のモンスターを1体所持する", { summonScrolls: 10, crystal: 250, expPig5: 2 }, "MONSTERS", p => hasStarCount(p, 4, 1)),
+  mission(24, 3, "第3章クリア", "★4以上のモンスターを1体所持する", { summonScrolls: 10, crystal: 250, expPig5: 2, crimShard: 1 }, "MONSTERS", p => hasStarCount(p, 4, 1)),
   mission(25, 4, "★4を育てよう", "★4以上のモンスターをLv10以上にする", { gold: 100_000 }, "MONSTERS", p => hasStarLevel(p, 4, 10)),
   mission(26, 4, "ランクアップ", "ランクアップを1回以上行う", { summonScrolls: 5 }, "MONSTERS", p => missionCounter(p, "rankUps") >= 1),
   mission(27, 4, "★4をLv20へ", "★4以上をLv20以上にする", { expPig5: 1 }, "MONSTERS", p => hasStarLevel(p, 4, 20)),
@@ -148,7 +161,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(29, 4, "3-2へ挑戦", "ステージ3-2をクリアする", { summonScrolls: 5 }, "STAGES", p => stage(p, "3-2")),
   mission(30, 4, "装備強化10回", "装備強化を累計10回行う", { gold: 250_000 }, "EQUIPMENT", p => missionCounter(p, "equipmentEnhancements") >= 10),
   mission(31, 4, "3-3へ挑戦", "ステージ3-3をクリアする", { crystal: 100 }, "STAGES", p => stage(p, "3-3")),
-  mission(32, 4, "第4章クリア", "★4以上のモンスターを2体所持する", { summonScrolls: 10, fourStarSummonScrolls: 1, reincarnationPig4: 2, crystal: 300 }, "MONSTERS", p => hasStarCount(p, 4, 2)),
+  mission(32, 4, "第4章クリア", "★4以上のモンスターを2体所持する", { summonScrolls: 10, fourStarSummonScrolls: 1, reincarnationPig4: 2, crystal: 300, crimShard: 1 }, "MONSTERS", p => hasStarCount(p, 4, 2)),
   mission(33, 5, "装備ダンジョンへ", "装備ダンジョン1階をクリアする", { stamina: 200 }, "EQUIP_DUNGEON", p => dungeon(p, 1)),
   mission(34, 5, "2階へ挑戦", "装備ダンジョン2階をクリアする", { summonScrolls: 5 }, "EQUIP_DUNGEON", p => dungeon(p, 2)),
   mission(35, 5, "★3装備を入手", "★3以上の装備を1個所持する", { gold: 200_000 }, "EQUIP_DUNGEON", p => p.equipment.some(e => e.star >= 3)),
@@ -156,7 +169,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(37, 5, "3階へ挑戦", "装備ダンジョン3階をクリアする", { summonScrolls: 5 }, "EQUIP_DUNGEON", p => dungeon(p, 3)),
   mission(38, 5, "装備を+6以上に", "強化値+6以上の装備を2個所持する", { gold: 250_000 }, "EQUIPMENT", p => enhancedCount(p, 6) >= 2, p => ({ current: enhancedCount(p, 6), target: 2 })),
   mission(39, 5, "4階へ挑戦", "装備ダンジョン4階をクリアする", { stamina: 300 }, "EQUIP_DUNGEON", p => dungeon(p, 4)),
-  mission(40, 5, "第5章クリア", "装備ダンジョン5階をクリアする", { summonScrolls: 15, fourStarSummonScrolls: 1, crystal: 300, expPig5: 2 }, "EQUIP_DUNGEON", p => dungeon(p, 5)),
+  mission(40, 5, "第5章クリア", "装備ダンジョン5階をクリアする", { summonScrolls: 15, fourStarSummonScrolls: 1, crystal: 300, expPig5: 2, crimShard: 1 }, "EQUIP_DUNGEON", p => dungeon(p, 5)),
   mission(41, 6, "★4を2体育成", "★4以上を2体Lv20以上にする", { expPig5: 1 }, "MONSTERS", p => starLevelCount(p, 4, 20) >= 2, p => ({ current: starLevelCount(p, 4, 20), target: 2 })),
   mission(42, 6, "4体をLv20へ", "パーティ4体を全員Lv20以上にする", { summonScrolls: 5 }, "PARTY", p => partyAllLevel(p, 20)),
   mission(43, 6, "4-1へ挑戦", "ステージ4-1をクリアする", { gold: 250_000 }, "STAGES", p => stage(p, "4-1")),
@@ -164,7 +177,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(45, 6, "装備強化20回", "装備強化を累計20回行う", { gold: 300_000 }, "EQUIPMENT", p => missionCounter(p, "equipmentEnhancements") >= 20),
   mission(46, 6, "★4をLvMAXへ", "★4以上のLvMAXを1体所持する", { reincarnationPig4: 1 }, "MONSTERS", p => hasMaxStarAtLeast(p, 4)),
   mission(47, 6, "初めての★5", "★5以上のモンスターを1体所持する", { summonScrolls: 10 }, "MONSTERS", p => hasStarCount(p, 5, 1)),
-  mission(48, 6, "第6章クリア", "ステージ4-5をクリアする", { fourStarSummonScrolls: 1, summonScrolls: 15, expPig5: 2, crystal: 400 }, "STAGES", p => stage(p, "4-5")),
+  mission(48, 6, "第6章クリア", "ステージ4-5をクリアする", { fourStarSummonScrolls: 1, summonScrolls: 15, expPig5: 2, crystal: 400, crimShard: 1 }, "STAGES", p => stage(p, "4-5")),
   mission(49, 7, "★5をLv20へ", "★5以上をLv20以上にする", { expPig5: 1 }, "MONSTERS", p => hasStarLevel(p, 5, 20)),
   mission(50, 7, "装備ダンジョン6階", "装備ダンジョン6階をクリアする", { summonScrolls: 5 }, "EQUIP_DUNGEON", p => dungeon(p, 6)),
   mission(51, 7, "★5をLvMAXへ", "★5以上のLvMAXを1体所持する", { reincarnationPig5: 1 }, "MONSTERS", p => hasMaxStarAtLeast(p, 5)),
@@ -172,7 +185,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(53, 7, "★5を2体", "★5以上を2体所持する", { summonScrolls: 10 }, "MONSTERS", p => hasStarCount(p, 5, 2)),
   mission(54, 7, "初めての★6", "★6モンスターを1体所持する", { crystal: 200 }, "MONSTERS", p => hasStarCount(p, 6, 1)),
   mission(55, 7, "★6をLv30へ", "★6モンスターをLv30以上にする", { expPig5: 2 }, "MONSTERS", p => hasStarLevel(p, 6, 30)),
-  mission(56, 7, "第7章クリア", "★6モンスターをLv60にする", { expPig6: 1, fourStarSummonScrolls: 1, summonScrolls: 15, crystal: 500, reincarnationPig5: 1 }, "MONSTERS", p => hasStarLevel(p, 6, 60)),
+  mission(56, 7, "第7章クリア", "★6モンスターをLv60にする", { expPig6: 1, fourStarSummonScrolls: 1, summonScrolls: 15, crystal: 500, reincarnationPig5: 1, crimShard: 1 }, "MONSTERS", p => hasStarLevel(p, 6, 60)),
   mission(57, 8, "クリエイト入門", "★6のクリエイト画面を開く", { gold: 200_000 }, "MONSTER_CREATE", p => p.tutorialMissions.createOpened),
   mission(58, 8, "能力ポイント", "能力ポイントを1以上使用する", { crystal: 75 }, "MONSTER_CREATE", abilityPoints),
   mission(59, 8, "潜在覚醒", "潜在覚醒を1回行う", { summonScrolls: 5 }, "MONSTER_CREATE", p => p.monsters.some(m => m.development.latentAbilityId !== null)),
@@ -180,7 +193,7 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(61, 8, "★6を整えよう", "★6に装備を4個以上装着する", { gold: 300_000 }, "MONSTERS", p => p.monsters.some(m => m.star === 6 && Object.keys(m.equipment).length >= 4)),
   mission(62, 8, "能力をさらに強化", "能力ポイントを合計10以上使用する", { summonScrolls: 5 }, "MONSTER_CREATE", p => maxAbilityPoints(p) >= 10),
   mission(63, 8, "目覚の深域へ", "目覚の深域1階をクリアする", { crystal: 150 }, "STAGES", p => (p.clearedAwakeningDepthFloors ?? []).some(f => f >= 1)),
-  mission(64, 8, "第8章クリア", "スキル覚醒用の才能ptを1以上解放する", { lightDarkFourStarSummonScrolls: 1, summonScrolls: 15, awakeningOrbs: 1, crystal: 500 }, "MONSTER_CREATE", p => missionCounter(p, "talentPointsUnlocked") >= 1),
+  mission(64, 8, "第8章クリア", "スキル覚醒用の才能ptを1以上解放する", { lightDarkFourStarSummonScrolls: 1, summonScrolls: 15, awakeningOrbs: 1, crystal: 500, crimShard: 1 }, "MONSTER_CREATE", p => missionCounter(p, "talentPointsUnlocked") >= 1),
   mission(65, 9, "試練の塔へ", "試練の塔1Fをクリアする", { summonScrolls: 5 }, "STAGES", p => p.trialTowerBestFloor >= 1),
   mission(66, 9, "塔5Fを突破", "試練の塔5Fをクリアする", { crystal: 100 }, "STAGES", p => p.trialTowerBestFloor >= 5),
   mission(67, 9, "アリーナへ", "アリーナを1回戦う", { arenaCoins: 300 }, "STAGES", p => arenaBattles(p) >= 1),
@@ -188,15 +201,15 @@ export const TUTORIAL_MISSIONS: readonly TutorialMission[] = [
   mission(69, 9, "装備ダンジョン7階", "装備ダンジョン7階をクリアする", { gold: 400_000 }, "EQUIP_DUNGEON", p => dungeon(p, 7)),
   mission(70, 9, "塔10Fを突破", "試練の塔10Fをクリアする", { expPig5: 1 }, "STAGES", p => p.trialTowerBestFloor >= 10),
   mission(71, 9, "アリーナ5戦", "アリーナを累計5回戦う", { arenaCoins: 500 }, "STAGES", p => arenaBattles(p) >= 5),
-  mission(72, 9, "第9章クリア", "装備ダンジョン8階をクリアする", { lightDarkFourStarSummonScrolls: 1, summonScrolls: 15, crystal: 600, gold: 500_000 }, "EQUIP_DUNGEON", p => dungeon(p, 8)),
+  mission(72, 9, "第9章クリア", "装備ダンジョン8階をクリアする", { lightDarkFourStarSummonScrolls: 1, summonScrolls: 15, crystal: 600, gold: 500_000, crimShard: 1 }, "EQUIP_DUNGEON", p => dungeon(p, 8)),
   mission(73, 10, "★6を2体", "★6モンスターを2体所持する", { expPig6: 1 }, "MONSTERS", p => hasStarCount(p, 6, 2)),
   mission(74, 10, "★6装備を入手", "★6装備を1個所持する", { gold: 500_000 }, "EQUIP_DUNGEON", p => p.equipment.some(e => e.star >= 6)),
   mission(75, 10, "装備を+12へ", "強化値+12以上の装備を1個作る", { crystal: 150 }, "EQUIPMENT", p => enhanced(p, 12)),
   mission(76, 10, "塔20Fを突破", "試練の塔20Fをクリアする", { summonScrolls: 10 }, "STAGES", p => p.trialTowerBestFloor >= 20),
   mission(77, 10, "アリーナ10戦", "アリーナを累計10回戦う", { arenaCoins: 1_000 }, "STAGES", p => arenaBattles(p) >= 10),
   mission(78, 10, "目覚の深域へ", "目覚の深域を1階以上クリアする", { awakeningStones: 1 }, "STAGES", p => (p.clearedAwakeningDepthFloors ?? []).length >= 1),
-  mission(79, 10, "スキル覚醒への一歩", "才能ptを3以上解放する", { skillPig: 1 }, "MONSTER_CREATE", p => missionCounter(p, "talentPointsUnlocked") >= 3),
-  mission(80, 10, "初心者卒業", "★6を2体所持し、塔20Fを突破する", { fiveStarSummonScrolls: 1, fourStarSummonScrolls: 1, summonScrolls: 20, crystal: 1_000, gold: 1_000_000, expPig6: 2, reincarnationPig5: 2, awakeningStones: 1, skillPig: 1 }, "MONSTERS", p => hasStarCount(p, 6, 2) && p.trialTowerBestFloor >= 20),
+  mission(79, 10, "スキル覚醒への一歩", "才能ptを3以上解放する", { skillPig: 1, crimShard: 1 }, "MONSTER_CREATE", p => missionCounter(p, "talentPointsUnlocked") >= 3),
+  mission(80, 10, "初心者卒業", "★6を2体所持し、塔20Fを突破する", { fiveStarSummonScrolls: 1, fourStarSummonScrolls: 1, summonScrolls: 20, crystal: 1_000, gold: 1_000_000, expPig6: 2, reincarnationPig5: 2, awakeningStones: 1, skillPig: 1, crimShard: 1 }, "MONSTERS", p => hasStarCount(p, 6, 2) && p.trialTowerBestFloor >= 20),
 ];
 
 export function nextTutorialMission(player: PlayerState): TutorialMission | undefined {
@@ -240,6 +253,46 @@ function grantSkillPig(player: PlayerState, count: number): void {
   for (let index = 0; index < count; index += 1) {
     player.monsters.push(createMonsterInstance(SKILL_PIG_DEX[index % SKILL_PIG_DEX.length].id, 5, STAR_MAX_LEVEL[5]));
   }
+}
+
+/**
+ * かけらの配布を、受け取り済みのミッションへ揃える。
+ *
+ * ## 何をするか
+ *
+ * **「受け取り済み」かつ「かけらをまだ配っていない」ミッションを探して配る。**
+ * 配った印は `crimShardGrantedMissionIds` に残す。
+ *
+ * これ1つで、次のどれも正しくなる:
+ *
+ *   ・新しく達成した人   … `claimTutorialMission` の中から呼ぶので、その場で入る
+ *   ・途中まで達成済みの人 … 読み込み時に呼ぶと、そこまでの分だけ入る
+ *   ・全部達成済みの人    … 同じく、12個まとめて入る
+ *   ・二度目以降         … 印が付いているので1個も増えない
+ *
+ * ## 既存の受取印は絶対に触らない
+ *
+ * `tutorialMissions.claimedIds` を消して配り直せば話は早いが、
+ * **それをやるとダイヤも召喚書もゴールドも全部もう一度出る。**
+ * 印を分けているのはそのため。
+ *
+ * @returns 今回実際に配った個数(0なら何も変わっていない)
+ */
+export function syncCrimShardGrants(player: PlayerState): number {
+  const claimed = new Set(player.tutorialMissions?.claimedIds ?? []);
+  const granted = new Set(player.crimShardGrantedMissionIds ?? []);
+  let gained = 0;
+  for (const entry of TUTORIAL_MISSIONS) {
+    const amount = entry.reward.crimShard ?? 0;
+    if (amount <= 0) continue;
+    if (!claimed.has(entry.id) || granted.has(entry.id)) continue;
+    gained += amount;
+    granted.add(entry.id);
+  }
+  if (gained <= 0) return 0;
+  player.crimShards = Math.max(0, Math.floor(player.crimShards ?? 0)) + gained;
+  player.crimShardGrantedMissionIds = [...granted];
+  return gained;
 }
 
 function grantTutorialReward(player: PlayerState, reward: TutorialReward): void {
@@ -309,6 +362,12 @@ export function claimTutorialMission(player: PlayerState, id: string): boolean {
   if (player.tutorialMissions.claimedIds.includes(id)) return false;
   grantTutorialReward(player, entry.reward);
   player.tutorialMissions.claimedIds.push(id);
+  /*
+   * **かけらは受取印を付けた後で、同じ関数から配る。**
+   * ここで直接足すと、さかのぼって配る側と2か所になり、
+   * どちらかを直し忘れた時に二重に出るか、片方だけ出なくなる。
+   */
+  syncCrimShardGrants(player);
   showTutorialRewardPopup(entry);
   return true;
 }
@@ -327,6 +386,7 @@ export function tutorialRewardText(reward: TutorialReward): string {
   if (reward.reincarnationPig4) parts.push(`🐷 ★4 MAX転生ピッグ ×${reward.reincarnationPig4}`);
   if (reward.reincarnationPig5) parts.push(`🐷 ★5 MAX転生ピッグ ×${reward.reincarnationPig5}`);
   if (reward.skillPig) parts.push(`🐷 スキルピッグ ×${reward.skillPig}`);
+  if (reward.crimShard) parts.push(`${CRIM_SHARD_ICON} ${CRIM_SHARD_NAME} ×${reward.crimShard}`);
   if (reward.awakeningOrbs) parts.push(`🔮 覚醒オーブ ×${reward.awakeningOrbs}`);
   if (reward.awakeningStones) parts.push(`💠 目覚の奇石 ×${reward.awakeningStones}`);
   if (reward.arenaCoins) parts.push(`🏅 アリーナコイン ×${reward.arenaCoins.toLocaleString("ja-JP")}`);

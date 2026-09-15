@@ -284,6 +284,14 @@ export interface LatentAbilityCandidate {
   /** スキル1の後、次に受けるダメージを1回だけ軽減する量 */
   oneShotMitigate?: number;
   aoeConversion?: { damageMultiplier: number; secondaryEffectChanceMultiplier?: number; nativeEffectTarget?: "ALL" | "PRIMARY_ONLY" };
+  /**
+   * S1の拡散率へ足すポイント。**割合ではなく加算。**
+   *
+   * 0.2 なら「70% → 90%」。拡散を持たないS1では何も起きない。
+   * 倍率にしなかったのは、スキルLvで拡散率そのものが伸びるため——
+   * 掛け算だと育てるほど潜在の効き目まで膨らみ、二重に伸びてしまう。
+   */
+  splashRatioBonus?: number;
   ignoreDefenseRatio?: number;
   debuffDamageBonus?: { perDebuff: number; maxBonus: number };
   hpMultiplier?: number;

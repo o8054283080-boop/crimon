@@ -1,6 +1,7 @@
 import { MonsterInstance, addExp, isSkillMaxLevel, rollSkillLevelUp } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, requiredExpForLevel } from "../core/rarity.js";
 import { EXP_PIG, findMonsterById, SKILL_PIG } from "../data/monsters.js";
+import { CRIM_MATERIAL_REFUSAL, isCrim } from "./crim.js";
 
 export function isSkillPig(material: MonsterInstance): boolean {
   return findMonsterById(material.dexId)?.templateId === SKILL_PIG.templateId;
@@ -30,6 +31,10 @@ export function checkMonsterPowerUp(
   }
   if (materials.some((m) => m.id === target.id)) {
     return { ok: false, reason: "対象自身は素材にできません" };
+  }
+  // **クリムは素材にできない。**全員へ1体しか配らないので、消えたら戻らない
+  if (materials.some(isCrim)) {
+    return { ok: false, reason: CRIM_MATERIAL_REFUSAL };
   }
   if (materials.some((m) => m.locked === true)) {
     return { ok: false, reason: "ロック中のモンスターは素材にできません" };

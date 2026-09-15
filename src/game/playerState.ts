@@ -110,6 +110,27 @@ export interface PlayerState {
    * 中身の意味は `src/game/monsterPoints.ts`。
    */
   monsterPoints?: number;
+  /**
+   * クリムの宝珠のかけら。**クリムのスキルレベルを上げること以外に使えない。**
+   *
+   * **省略可。**前から遊んでいる人の控えには無いので、読み込み時に0で埋める。
+   * 中身の意味は `src/game/crim.ts`。
+   */
+  crimShards?: number;
+  /**
+   * かけらを配り終えた初心者ミッションのID。
+   *
+   * ## なぜ `tutorialMissions.claimedIds` と分けるのか
+   *
+   * かけらは**後から足した報酬**なので、既に受け取り済みのミッションにも
+   * さかのぼって配る必要がある。ところが受取印は1つしか無く、
+   * それを消して配り直すと**ダイヤも召喚書もゴールドも全部もう一度出る。**
+   *
+   * だから「かけらを配ったか」だけを別に覚える。
+   * 新しく受け取った時も、さかのぼって配る時も、同じこの配列へ記録するので、
+   * **どちらの経路から来ても二重には配られない。**
+   */
+  crimShardGrantedMissionIds?: string[];
   /** プレイヤー(ファイター)自身のレベル。上限50 */
   fighterLevel: number;
   /** 次のファイターレベルまでの累積経験値 */
@@ -379,6 +400,8 @@ export function createInitialState(): PlayerState {
     clearedAwakeningDepthFloors: [],
     claimedAwakeningOrbRewardIds: [],
     monsterPoints: 0,
+    crimShards: 0,
+    crimShardGrantedMissionIds: [],
     fighterLevel: 1,
     fighterExp: 0,
     stamina: INITIAL_MAX_STAMINA,
@@ -578,6 +601,10 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.awakeningCrystals !== "number" || state.awakeningCrystals < 0) state.awakeningCrystals = 0;
   if (typeof state.awakeningStones !== "number" || state.awakeningStones < 0) state.awakeningStones = 0;
   if (!Array.isArray(state.clearedAwakeningDepthFloors)) state.clearedAwakeningDepthFloors = [];
+  // クリムのかけらと、その配布記録。前から遊んでいる人の控えには無い
+  if (typeof state.crimShards !== "number" || !(state.crimShards >= 0)) state.crimShards = 0;
+  else state.crimShards = Math.floor(state.crimShards);
+  if (!Array.isArray(state.crimShardGrantedMissionIds)) state.crimShardGrantedMissionIds = [];
   if (typeof state.summonScrolls !== "number") state.summonScrolls = 0;
   if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;

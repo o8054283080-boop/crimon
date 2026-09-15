@@ -5,6 +5,7 @@ import { MATERIAL_PIG_KINDS, MATERIAL_PIG_LABEL, MaterialPigKind, materialPigKin
 import { findMonsterById } from "../../data/monsters.js";
 import { PlayerState } from "../../game/playerState.js";
 import { checkMonsterPowerUp, isSameElement, isSameSpecies, monsterPowerUpExp } from "../../game/monsterPowerUp.js";
+import { CRIM_SHARD_ICON, CRIM_SHARD_NAME, crimShardsOwned, isCrim } from "../../game/crim.js";
 import { MaterialMonsterSort, sortMaterialMonsters } from "../../game/materialMonsterSort.js";
 import { el } from "../dom.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
@@ -25,6 +26,12 @@ export interface MonsterTrainingProps {
   onCancel: () => void;
   dense: boolean;
   onToggleDense: () => void;
+  /**
+   * クリムの宝珠のかけらを1個使う。**対象がクリムの時だけ画面に出る。**
+   * 省略可にしてあるのは、この画面を呼ぶ側が増えた時に
+   * かけらを渡さない呼び方も許すため(その場合は入口が出ないだけ)。
+   */
+  onUseCrimShard?: () => void;
 }
 
 export type MaterialUseFilter = "ALL" | "SAME_SPECIES" | "SAME_ELEMENT" | "SELECTED";
@@ -82,9 +89,19 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
   }
 
   const dex = findMonsterById(target.dexId);
+  /*
+   * **クリムは素材の一覧に出さない。**
+   *
+   * 押せてしまうと `checkMonsterPowerUp` が断るところまで進み、
+   * 「なぜ選べるのに使えないのか」が分からない。最初から並べない。
+   * 処理側の拒否(`monsterPowerUp.ts`)は別に残してある——
+   * この画面を通らない呼び方が将来できても、クリムは消えない。
+   */
   const candidates = props.player.monsters.filter(
-    (m) => m.id !== target.id && !props.player.partyIds.includes(m.id) && m.locked !== true,
+    (m) => m.id !== target.id && !props.player.partyIds.includes(m.id) && m.locked !== true && !isCrim(m),
   );
+  const targetIsCrim = isCrim(target);
+  const shards = crimShardsOwned(props.player);
   const materials = props.selectedMaterialIds
     .map((id) => props.player.monsters.find((m) => m.id === id))
     .filter((m): m is MonsterInstance => m !== undefined);
@@ -134,7 +151,37 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
       materials.length > 0 && !check.ok && check.reason
         ? el("p", { className: "app-subtitle training-warning" }, [`⚠ ${check.reason}`])
         : null,
-    ].filter((n): n is HTMLParagraphElement => n !== null)),
+      /*
+       * クリム専用の素材。**対象がクリムの時だけ出す。**
+       *
+       * 初心者が存在に気づけるよう、**0個でも案内は出す。**
+       * 「持っていないから何も書かない」だと、初心者ミッションで
+       * 手に入るものが何なのか分からないまま終わる。
+       */
+      targetIsCrim
+        ? el("div", { className: "crim-shard-row" }, [
+            el("p", {}, [
+              `${CRIM_SHARD_ICON} ${CRIM_SHARD_NAME} ×${shards}`,
+              el("span", { className: "app-subtitle" }, [
+                shards > 0
+                  ? "　1個でスキルLvが1つ上がります(上がるスキルはスキルピッグと同じくランダム)"
+                  : "　初心者ミッションを進めると手に入ります。1個でスキルLvが1つ上がります",
+              ]),
+            ]),
+            shards > 0 && props.onUseCrimShard
+              ? el("button", {
+                  type: "button",
+                  className: "btn btn--primary",
+                  onclick: props.onUseCrimShard,
+                }, [`${CRIM_SHARD_ICON} かけらを1個使う`])
+              : null,
+          ].filter((n): n is NonNullable<typeof n> => n !== null))
+        : null,
+      // クリムを持っている人へ、一覧に出ない理由を先に伝える
+      !targetIsCrim && props.player.monsters.some(isCrim)
+        ? el("p", { className: "app-subtitle" }, ["クリムは特別なモンスターのため、素材の一覧には出ません。"])
+        : null,
+    ].filter((n): n is NonNullable<typeof n> => n !== null)),
     el("section", { className: "panel" }, [
       el("div", { className: "monster-density-row" }, [renderMonsterListDensityToggle(props.dense, props.onToggleDense)]),
       el("div", { className: "mfilter mfilter__body training-filter" }, [

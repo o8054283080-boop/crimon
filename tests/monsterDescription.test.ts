@@ -52,6 +52,8 @@ const REQUIRED_WORDS: Record<SkillEffect["kind"], string[]> = {
   STEAL_BUFF: ["奪"],
   COOP_ATTACK: ["協力攻撃"],
   GAUGE_ON_HIT: ["ゲージ"],
+  // 拡散。**対象以外へ広がることが読めないと、単体技にしか見えない**
+  SPLASH: ["拡散", "広が"],
 };
 
 function allSkills(t: MonsterTemplate): { where: string; skill: Skill }[] {

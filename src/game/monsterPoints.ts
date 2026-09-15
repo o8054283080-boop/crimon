@@ -1,5 +1,6 @@
 import type { MonsterInstance } from "../core/monsterInstance.js";
 import { SKILL_PIG_DEX } from "../data/monsters.js";
+import { isCrim } from "./crim.js";
 import { addMonster, removeMonsters, type PlayerState } from "./playerState.js";
 
 /**
@@ -121,6 +122,8 @@ export function monsterPointsOwned(state: PlayerState): number {
  * 「ダンジョン編成の子が消えた」を起こすと、次に潜る時まで気づけない。
  */
 export function canSendMonster(state: PlayerState, monster: MonsterInstance): boolean {
+  // クリムは全員へ1体しか配らない看板モンスター。送れば二度と戻らない
+  if (isCrim(monster)) return false;
   if (monster.locked) return false;
   if (state.partyIds.includes(monster.id)) return false;
   if (state.dungeonPartyIds?.includes(monster.id)) return false;

@@ -1,6 +1,7 @@
 import { MonsterInstance, rollSkillLevelUp } from "../core/monsterInstance.js";
 import { RANK_UP_SACRIFICE_COUNT, Star, canRankUp } from "../core/rarity.js";
 import { EXP_PIG, findMonsterById } from "../data/monsters.js";
+import { CRIM_MATERIAL_REFUSAL, isCrim } from "./crim.js";
 import { isSameSpecies, isSkillPig } from "./monsterPowerUp.js";
 
 export interface RankUpCheck {
@@ -25,6 +26,10 @@ export function checkRankUp(target: MonsterInstance, sacrifices: MonsterInstance
   }
   if (sacrifices.length !== requiredCount) {
     return { ok: false, reason: `素材が${requiredCount}体必要です`, requiredCount };
+  }
+  // **クリムはランクアップの素材にもできない。**消える道は1つも残さない
+  if (sacrifices.some(isCrim)) {
+    return { ok: false, reason: CRIM_MATERIAL_REFUSAL, requiredCount };
   }
   if (sacrifices.some((s) => s.locked === true)) {
     return { ok: false, reason: "ロック中のモンスターは素材にできません", requiredCount };

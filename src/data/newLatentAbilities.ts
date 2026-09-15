@@ -79,6 +79,8 @@ interface Draft {
   defScale?: number;
   ignoreDef?: number;
   damageIndex?: number;
+  /** スキル1の拡散率へ足すポイント。拡散を持たないS1では何も起きない */
+  splash?: number;
 }
 
 function build(templateId: string, element: Element, index: 1 | 2 | 3, draft: Draft): LatentAbilityCandidate {
@@ -110,6 +112,7 @@ function build(templateId: string, element: Element, index: 1 | 2 | 3, draft: Dr
     oneShotMitigate: draft.oneShotMitigate,
     debuffDamageBonus: draft.debuffBonus,
     ignoreDefenseRatio: draft.ignoreDef,
+    splashRatioBonus: draft.splash,
     damageEffectIndex: draft.damageIndex,
     hpMultiplier: draft.hpMul,
     defMultiplier: draft.defMul,
@@ -501,13 +504,45 @@ const TABLES: Record<string, SpeciesTable> = {
   behemoth: BEHEMOTH,
 };
 
-/** 図鑑ID(種族_属性) → 3候補。11種 × 6属性 = 66件 */
+/**
+ * クリムの3候補。**光しか存在しないので、属性の表を作らずここに直接置く。**
+ *
+ * どれもS1「プリズムスプレッド」の性質に噛み合わせてある。
+ * 拡散を広げる・倒して手番を増やす・硬い相手を抜く——
+ * 「周回でどこが詰まるか」で選べる3方向にしてあり、
+ * どれを選んでも捨て札にならないようにした。
+ */
+const CRIM_DRAFTS: [Draft, Draft, Draft] = [
+  {
+    name: "プリズムチェイン",
+    description: "スキル1の拡散率が20pt上がる(スキルMAXなら70% → 90%)",
+    splash: 0.2,
+  },
+  {
+    name: "光速循環",
+    description: "スキル1で敵を1体以上倒した時、自身の行動ゲージが50%上がる(複数倒しても1回)",
+    category: SUP,
+    condition: kill,
+    effects: [G(0.5)],
+  },
+  {
+    name: "貫光の宝珠",
+    description: "スキル1が対象の防御力を30%無視する",
+    ignoreDef: 0.3,
+  },
+];
+
+/** 図鑑ID(種族_属性) → 3候補。11種 × 6属性 = 66件 ＋ クリム(光のみ) */
 export const NEW_LATENT_ABILITY_CANDIDATES: Readonly<Record<string, readonly LatentAbilityCandidate[]>> =
-  Object.fromEntries(
-    Object.entries(TABLES).flatMap(([templateId, table]) =>
+  Object.fromEntries([
+    ...Object.entries(TABLES).flatMap(([templateId, table]) =>
       ELEMENTS.map((element) => [
         `${templateId}_${element}`,
         table[element].map((draft, i) => build(templateId, element, (i + 1) as 1 | 2 | 3, draft)),
       ] as const),
     ),
-  );
+    [
+      "crim_LIGHT",
+      CRIM_DRAFTS.map((draft, i) => build("crim", "LIGHT", (i + 1) as 1 | 2 | 3, draft)),
+    ] as const,
+  ]);

@@ -1,3 +1,4 @@
+import { CRIM_DEX_ID } from "../game/crim.js";
 import type { GiftDefinition } from "../game/gift.js";
 
 /**
@@ -19,6 +20,29 @@ import type { GiftDefinition } from "../game/gift.js";
  * 後から確かめてほしい時、期限を切りたい時はこちらを使う。
  */
 export const GIFT_DEFINITIONS: readonly GiftDefinition[] = [
+  {
+    /*
+     * クリムの配布。**全員へ1体だけ。**
+     *
+     * プレゼントボックスに任せるのは、この仕組みが既に
+     * 「受け取ったかどうかを giftId で覚える」を持っているから。
+     * 新しく始めた人にも、前から遊んでいる人にも同じ1件が並び、
+     * 何度開き直しても2体目は出ない。
+     *
+     * **期限を切らない。**配り終わりを作ると、その日以降に始めた人だけが
+     * 看板モンスターを持てなくなる。
+     */
+    giftId: "crim_starter_20260915",
+    title: "クリムがあなたの相棒になります",
+    description: "CRIMONの看板モンスター「クリム」を1体お贈りします。"
+      + "光属性★5のアタッカーで、育てれば冒険とダンジョンの周回で長く戦えます。"
+      + "売却や素材にはできない特別な1体です。",
+    rewards: [
+      { kind: "MONSTER", dexId: CRIM_DEX_ID, star: 5, amount: 1 },
+    ],
+    startsAt: "2026-09-15T00:00:00+09:00",
+    expiresAt: null,
+  },
   {
     giftId: "balance_apology_20260914",
     title: "大規模バランス調整のおわび",

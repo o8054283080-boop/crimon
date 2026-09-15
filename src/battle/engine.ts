@@ -2259,7 +2259,16 @@ export class BattleEngine {
     };
 
     for (const effect of skill.effects) {
-      if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL" && !isSourceScopedEffect(effect)) continue;
+      /*
+       * 倒れた相手には、それ以上の効果を乗せない。
+       *
+       * **拡散(SPLASH)はここで止めない。**止めると、メイン対象を倒した時だけ
+       * 周りへ広がらなくなる——**いちばん強く当たった時に拡散しない**という、
+       * 技の趣旨と正反対のことが起きる(実際にそうなっていた)。
+       * 拡散が見るのは「その相手へ実際に与えた量」で、相手の生死ではない。
+       */
+      if (!target.alive && effect.kind !== "HEAL" && effect.kind !== "LIFESTEAL"
+        && effect.kind !== "SPLASH" && !isSourceScopedEffect(effect)) continue;
       // 暗闇で外した場合、ダメージ以外の効果は一切乗らない
       if (missed && effect.kind !== "DAMAGE" && effect.kind !== "LIFESTEAL") continue;
       if (!sourceScoped && isSourceScopedEffect(effect)) continue;
@@ -2339,6 +2348,39 @@ export class BattleEngine {
               `  → ${this.label(target)} に ${applied.hpDamage} ダメージ！${critText}${affinityText} (残りHP ${target.currentHp}/${target.maxHp})`,
             );
             this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
+          }
+          break;
+        }
+
+        case "SPLASH": {
+          /*
+           * 拡散。**メイン対象へ実際に削った量**を、対象以外の敵へ配る。
+           *
+           * `damageDealtThisCall` は、この呼び出しでこの相手のHPを削った合計。
+           * 会心も属性相性も相手の防御も通り抜けた後の数字なので、
+           * **本命を通すほど周りへの被害も増える。**
+           *
+           * **`applyIncomingDamage` を直に呼ぶ。**DAMAGE効果を通さないので、
+           * ここからさらに拡散が生えることも、スキルの他の効果(弱体・ゲージ)が
+           * 敵の数だけ再発動することもない。拡散は「ダメージだけが広がる」もの。
+           *
+           * `sourceScoped` を見るのは念のため。S1は単体技なので解決は1回しか
+           * 走らないが、**将来この効果を全体技へ載せた人が、対象の数だけ
+           * 拡散を撒いてしまわないように**最初の1回に限っておく。
+           */
+          if (!sourceScoped || damageDealtThisCall <= 0) break;
+          const ratio = Math.max(0, effect.ratio + (latent?.splashRatioBonus ?? 0));
+          if (ratio <= 0) break;
+          const amount = Math.max(1, Math.round(damageDealtThisCall * ratio));
+          const others = this.units.filter((unit) => unit.alive && unit.team !== source.team && unit !== target);
+          if (others.length === 0) break;
+          this.push(`  → 光が弾けて広がった！(${Math.round(ratio * 100)}%)`);
+          for (const other of others) {
+            const applied = this.applyIncomingDamage(other, amount, source, "normal", resolution);
+            resolution.damageDealt += applied.hpDamage;
+            if (applied.died) { resolution.kills += 1; this.onKill(source); }
+            this.push(`  → ${this.label(other)} に ${applied.hpDamage} ダメージ！ (残りHP ${other.currentHp}/${other.maxHp})`);
+            this.pushEvent({ targetId: other.instanceId, kind: "DAMAGE", amount: applied.hpDamage });
           }
           break;
         }
