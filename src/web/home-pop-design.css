@@ -602,3 +602,19 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 .home-world .crimon-dungeon-chooser {
   z-index: 20 !important;
 }
+
+/* ホームの下の余白。
+ *
+ * `mobile-ux.css` が `--bottom-nav-h + 32px`(実測110px)を空けている。
+ * 下のタブが `position:fixed` で被る画面のための逃げ場だが、
+ * **ホームの箱は既にタブのぶん短い**(実測: 画面844pxに対して高さ766px)。
+ * 二重によけているぶん、中身が110px押し出されて**43pxスクロールしていた。**
+ *
+ * ここを測り間違えていた。`scrollHeight - window.innerHeight` で見ると
+ * -35pxで「収まっている」ように出るが、`innerHeight` にはタブの領域が入る。
+ * **見えるのは `clientHeight`。**809 - 766 = 43px が本当のはみ出し。
+ *
+ * 実機のホームインジケーターぶんだけ残す。 */
+.crimon-home {
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+}

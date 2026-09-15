@@ -784,9 +784,10 @@ export function renderHome(props: HomeProps): HTMLElement {
       : null,
   ].filter((node): node is HTMLElement => node !== null));
   const openTutorial = () => {
-    const current = tutorial.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
+    // 全部終わっていると札そのものが無い。押しても何も起きないでよい
+    const current = tutorial?.querySelector<HTMLDetailsElement>(".crimon-tutorial__current");
     if (current) current.open = true;
-    tutorial.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    tutorial?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
   const banners = [
     /*
