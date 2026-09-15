@@ -115,8 +115,12 @@ body:has(.crimon-home) {
 /* 下限を7.5pxから9pxへ上げた。390px幅では 2vw = 7.8px で、実機では読めない
  * (ホームの経験値8px・試練の塔7.4pxと同じ事故。tests/cssReadability.test.ts が
  *  9px未満を落とすが、clamp() の中までは見ていなかった)。 */
-/* スタミナの札へ添えるポーションの数。⚡の数字より一段小さく、色で分ける */
+/* スタミナの札へ添えるポーションの数。⚡の数字より一段小さく、色で分ける。
+ * 0個でも出す(出ていないのか無いのか、画面から区別できないため)。 */
 .crimon-resource-header .home-wallet__potion { flex:0 0 auto !important; font-size:9.5px !important; line-height:1 !important; color:#9ff0bd !important; font-variant-numeric:tabular-nums !important; white-space:nowrap !important; }
+/* 0個は色を落として「無い」と分かるようにする。**通常の指定より後ろに置く**
+ * (同じ詳細度なので、先に書くと通常の色が後勝ちして効かない)。 */
+.crimon-resource-header .home-wallet__potion--empty { color:#6d7a72 !important; }
 /* 見える数字は下段の24pxフレームへ置き、ボタン本体だけは44pxを確保する。 */
 .crimon-resource-header .home-wallet__chip--stamina { position:absolute !important; z-index:1 !important; top:20px !important; right:5px !important; left:5px !important; width:auto !important; height:44px !important; min-height:44px !important; box-sizing:border-box !important; align-items:flex-start !important; justify-content:center !important; gap:4px !important; padding:19px 3px 1px !important; }
 
