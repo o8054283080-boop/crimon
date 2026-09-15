@@ -30,6 +30,26 @@ npm run check       # 型チェック + テスト + 全画面巡回
 | `npm run audio:render` | 効果音を焼き直す |
 | `npm run audio:bgm` | BGMを焼き直す |
 | `npm run balance` | 装備ダンジョンの勝率を、難易度つまみを振って実測する |
+| `node tools/homeSafeArea.mjs` | **ノッチのある実機を再現して**ホームを測る(下記) |
+
+## 確認用ブラウザには safe-area が無い
+
+`env(safe-area-inset-top)` も `bottom` も 0 で返る。実機(iPhone 15 Pro Max)では
+**59px + 34px = 93px** が画面から引かれるので、ここで「3サイズとも
+scrollTop は0でした」と言っても、実機では身分証が上で切れ、
+プレゼントが下タブの裏に沈んでいる——実際にそうなり、依頼主に2度指摘された。
+
+そのために `--home-safe-top` / `--home-safe-bottom` がある。
+**`env()` を直に書かず、必ずこの2つを通すこと。**通っていれば注入して再現できる。
+
+```
+node tools/harness.mjs &
+HARNESS_PORT=<port> node tools/homeSafeArea.mjs   # ホーム画面を開いた状態で
+```
+
+iPhone 15 Pro Max / 15 / 14 / 13 mini / SE と safe-area 無しの6通りで、
+スクロール量・押せないボタン・44pxを割る段を一度に出す。
+`tests/homeUi.test.ts` が `env()` の直書きへ戻すと落とす。
 
 ## 巡回(tour)が見つけられるもの
 

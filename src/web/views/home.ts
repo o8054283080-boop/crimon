@@ -730,7 +730,21 @@ export function renderHome(props: HomeProps): HTMLElement {
   const tutorialClaimable = tutorialNext ? canClaimTutorialMission(player, tutorialNext) : false;
   const tutorialActions = tutorialNext ? tutorialMissionActions(props, tutorialNext) : null;
   const claimedCount = TUTORIAL_MISSIONS.filter((mission) => player.tutorialMissions.claimedIds.includes(mission.id)).length;
-  const tutorial = el("section", { className: "crimon-tutorial", ariaLabel: "初心者ミッション" }, [
+  /*
+   * **全部終わったら札ごと出さない。**`null` を返す。
+   *
+   * 前に「終わった案内は引く」と直したつもりで、`openTutorial` を `?.` に
+   * しただけで**札を作るのをやめていなかった**。そのため全80達成した方の
+   * 画面には「🏆 初心者ミッション 80 / 80 完全制覇！」が居座り続けていた
+   * (依頼主の実機の画面で発覚。2回目の指摘)。
+   *
+   * 外に置いていた頃は、終わると `position:fixed` が外れてヘッダー下の
+   * 空き地へ収まり目立たなかった。世界の中へ移したことで、
+   * **終わった後もずっとモンスターの上に居座る**ようになっている。
+   *
+   * 案内は終わったら引く。達成した中身はミッションの画面から見られる。
+   */
+  const tutorial = !tutorialNext ? null : el("section", { className: "crimon-tutorial", ariaLabel: "初心者ミッション" }, [
     el("div", { className: "crimon-tutorial__head" }, [
       /*
        * **数を書かない。**`TUTORIAL_MISSIONS` から引く。
@@ -742,13 +756,11 @@ export function renderHome(props: HomeProps): HTMLElement {
        */
       el("span", {}, [
         el("small", {}, ["BEGINNER MISSIONS"]),
-        el("strong", {}, [tutorialNext
-          ? `STEP ${tutorialNext.step} / ${TUTORIAL_MISSIONS.length}`
-          : `COMPLETE ${TUTORIAL_MISSIONS.length} / ${TUTORIAL_MISSIONS.length}`]),
+        el("strong", {}, [`STEP ${tutorialNext.step} / ${TUTORIAL_MISSIONS.length}`]),
       ]),
       el("span", { className: "crimon-tutorial__count" }, [`${claimedCount} / ${TUTORIAL_MISSIONS.length}`]),
     ]),
-    tutorialNext ? el("details", { className: `crimon-tutorial__current${tutorialClaimable ? " crimon-tutorial__current--ready" : ""}` }, [
+    el("details", { className: `crimon-tutorial__current${tutorialClaimable ? " crimon-tutorial__current--ready" : ""}` }, [
       el("summary", {}, [tutorialClaimable ? "報酬を受け取れます！" : tutorialNext.title]),
       el("p", {}, [tutorialNext.condition]),
       el("p", { className: "crimon-tutorial__rewards" }, [rewardText(tutorialNext)]),
@@ -760,7 +772,7 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("summary", {}, ["詳細"]),
         ...TUTORIAL_MISSIONS.map((mission) => el("div", { className: player.tutorialMissions.claimedIds.includes(mission.id) ? "is-complete" : "" }, [`STEP ${mission.step}　${mission.title}`])),
       ]),
-    ]) : el("p", { className: "crimon-tutorial__complete" }, ["全30ミッション達成！ 基本育成ロードマップを制覇しました。"]),
+    ]),
   ]);
   const staminaSheet = el("div", { className: "home-sheet", hidden: true }, []);
   const closeStamina = () => { staminaSheet.hidden = true; };
