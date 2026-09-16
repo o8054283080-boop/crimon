@@ -1,0 +1,88 @@
+/**
+ * 属性システム
+ *
+ * 火・水・電気・草の4属性は三すくみならぬ「四すくみ」で一周する相性関係を持つ。
+ *   火 → 草 → 電気 → 水 → 火 …
+ * (矢印の先の属性に対して攻撃側が有利)
+ *
+ * 光と闇は他の4属性とは相性を持たず、光と闇の間でのみ互いに弱点となる。
+ *
+ * ## 相性は倍率では効かない
+ *
+ * **本番はサマナーズウォー方式**で、有利/不利はクリ率と「かすり」で表す
+ * (`balanceFlags.elementMode`)。下の `getElementMultiplier` は
+ * `legacy` を指定して旧方式に戻した時だけ通る比較用で、**既定の戦闘では呼ばれない。**
+ * 効き方の本体は `battle/damage.ts` にある。
+ */
+import { balanceFlags } from "./balanceFlags.js";
+export const CYCLE_ELEMENTS = ["FIRE", "GRASS", "ELECTRIC", "WATER"];
+export const DUAL_ELEMENTS = ["LIGHT", "DARK"];
+export const ELEMENTS = [...CYCLE_ELEMENTS, ...DUAL_ELEMENTS];
+export const ELEMENT_JA = {
+    FIRE: "火",
+    GRASS: "草",
+    ELECTRIC: "電気",
+    WATER: "水",
+    LIGHT: "光",
+    DARK: "闇",
+};
+/**
+ * 1文字に収めた属性の印。**狭い枠に入れる時だけ**使う。
+ *
+ * 「電気」は2文字あるので、18px角の宝石に入れると枠から溢れる。
+ * 溢れても型もテストも通り、画面では**枠の外に文字が出ているだけ**に見える。
+ * 文言そのものは `ELEMENT_JA` を使うこと。
+ */
+export const ELEMENT_MARK = {
+    FIRE: "火",
+    GRASS: "草",
+    ELECTRIC: "雷",
+    WATER: "水",
+    LIGHT: "光",
+    DARK: "闇",
+};
+/** UI表示用の属性カラー(色違いモンスター表現に使用) */
+export const ELEMENT_COLOR = {
+    FIRE: "#e74c3c",
+    GRASS: "#2ecc71",
+    ELECTRIC: "#f1c40f",
+    WATER: "#3498db",
+    LIGHT: "#f5e6a8",
+    DARK: "#6c3483",
+};
+const ADVANTAGE_MULTIPLIER = 1.5;
+const DISADVANTAGE_MULTIPLIER = 0.5;
+const NEUTRAL_MULTIPLIER = 1.0;
+function isCycleElement(el) {
+    return CYCLE_ELEMENTS.includes(el);
+}
+/** attacker が defender に対して持つ相性を返す */
+export function getElementAffinity(attacker, defender) {
+    if (isCycleElement(attacker) && isCycleElement(defender)) {
+        const idx = CYCLE_ELEMENTS.indexOf(attacker);
+        const beats = CYCLE_ELEMENTS[(idx + 1) % CYCLE_ELEMENTS.length];
+        const beatenBy = CYCLE_ELEMENTS[(idx + CYCLE_ELEMENTS.length - 1) % CYCLE_ELEMENTS.length];
+        if (defender === beats)
+            return "ADVANTAGE";
+        if (defender === beatenBy)
+            return "DISADVANTAGE";
+        return "NEUTRAL";
+    }
+    if (attacker === "LIGHT" && defender === "DARK")
+        return "ADVANTAGE";
+    if (attacker === "DARK" && defender === "LIGHT")
+        return "ADVANTAGE";
+    return "NEUTRAL";
+}
+export function getElementMultiplier(attacker, defender) {
+    // 検証フラグが立っている時だけ差し替わる。既定は現行の 1.5 / 0.5
+    const o = balanceFlags.elementMultiplierOverride;
+    switch (getElementAffinity(attacker, defender)) {
+        case "ADVANTAGE":
+            return o?.advantage ?? ADVANTAGE_MULTIPLIER;
+        case "DISADVANTAGE":
+            return o?.disadvantage ?? DISADVANTAGE_MULTIPLIER;
+        default:
+            return NEUTRAL_MULTIPLIER;
+    }
+}
