@@ -10,7 +10,19 @@ const SHEET_ID = "persistent-notice-sheet";
  * IDにすると、そのお知らせが後で消えた時に何と比べればいいのか分からなくなる。
  * 日付なら「これより新しいものが何件あるか」を数えるだけで済む。
  */
-const NOTICE_READ_KEY = "crimon.notice.readUntil.v1";
+const NOTICE_READ_KEY = "crimon.notice.readIds.v2";
+
+function noticeId(notice: Compensation): string {
+  // 同日追加でも別のお知らせとして扱える安定ID。
+  return `${notice.fromDate}:${notice.title}`;
+}
+
+function readNoticeIds(): Set<string> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NOTICE_READ_KEY) ?? "[]");
+    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
+  } catch { return new Set(); }
+}
 
 function today(): string {
   const now = new Date();
@@ -25,14 +37,18 @@ function today(): string {
  * 数えると、赤い印が出ているのに開いても何も新しくない状態になる。
  */
 function unreadNoticeCount(): number {
-  let readUntil = "";
-  try { readUntil = localStorage.getItem(NOTICE_READ_KEY) ?? ""; } catch { /* 読めない端末は全部新着扱い */ }
+  const read = readNoticeIds();
   const now = today();
-  return COMPENSATIONS.filter((n) => n.fromDate <= now && n.fromDate > readUntil).length;
+  return COMPENSATIONS.filter((n) => n.fromDate <= now && !read.has(noticeId(n))).length;
 }
 
 function markNoticeRead(): void {
-  try { localStorage.setItem(NOTICE_READ_KEY, today()); } catch { /* 書けなくても開ける */ }
+  try {
+    const now = today();
+    const read = readNoticeIds();
+    for (const notice of COMPENSATIONS) if (notice.fromDate <= now) read.add(noticeId(notice));
+    localStorage.setItem(NOTICE_READ_KEY, JSON.stringify([...read]));
+  } catch { /* 書けなくても開ける */ }
 }
 
 function kindLabel(notice: Compensation): string {
