@@ -5634,4 +5634,3 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") scheduleBackgroundFarm(0);
 });
 window.addEventListener("pagehide", () => savePlayerState(state.player));import { ARENA_TICKET_MAX, ARENA_TICKET_REFILL_COST } from "../data/pvpArena.js";
-
