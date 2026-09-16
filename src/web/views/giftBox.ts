@@ -27,6 +27,7 @@ import { el } from "../dom.js";
 export type GiftTab = "OPEN" | "HISTORY";
 
 export interface GiftBoxProps {
+  gifts?: readonly GiftDefinition[];
   player: PlayerState;
   tab: GiftTab;
   /** 直前の受け取りの結果。押した後に一度だけ出す */
@@ -113,8 +114,9 @@ function resultPanel(result: GiftClaimResult | GiftClaimAllResult): HTMLElement 
 
 export function renderGiftBox(props: GiftBoxProps): HTMLElement {
   const now = props.now ?? Date.now();
-  const open = openGifts(GIFT_DEFINITIONS, props.player, now);
-  const history = claimedGiftHistory(GIFT_DEFINITIONS, props.player);
+  const gifts = props.gifts ?? GIFT_DEFINITIONS;
+  const open = openGifts(gifts, props.player, now);
+  const history = claimedGiftHistory(gifts, props.player);
 
   const tabButton = (tab: GiftTab, label: string, count: number | null) =>
     el("button", {
