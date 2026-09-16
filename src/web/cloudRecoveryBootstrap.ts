@@ -18,7 +18,9 @@ import {
 } from "../game/cloudRecovery.js";
 
 const PANEL_MARKER = "data-crimon-cloud-recovery";
-const AUTO_SYNC_MS = 30_000;
+const AUTO_SYNC_MS = 12 * 60 * 60 * 1000;
+const STALE_BACKUP_MS = 24 * 60 * 60 * 1000;
+const LAST_ATTEMPT_KEY = "crimon_cloud_backup_last_attempt_v1";
 let syncRunning = false;
 let conflictDetected = false;
 let statusText = "";
@@ -70,10 +72,22 @@ function summaryText(save: CloudSaveEnvelope): string {
   return `${fighter} / Lv.${level} / モンスター${monsters}体 / 装備${equipment}個 / ゴールド${Number(gold).toLocaleString("ja-JP")} / ダイヤ${Number(crystal).toLocaleString("ja-JP")}`;
 }
 
-async function syncNow(showUnchanged = false): Promise<void> {
+function backupAge(meta: CloudRecoveryMeta): number {
+  const savedAt = meta.savedAt ? new Date(meta.savedAt).getTime() : 0;
+  return savedAt > 0 ? Date.now() - savedAt : Number.POSITIVE_INFINITY;
+}
+
+function shouldRunScheduledSync(meta: CloudRecoveryMeta): boolean {
+  const lastAttempt = Number(localStorage.getItem(LAST_ATTEMPT_KEY) ?? "0");
+  return !Number.isFinite(lastAttempt) || lastAttempt <= 0 || Date.now() - lastAttempt >= AUTO_SYNC_MS || backupAge(meta) >= STALE_BACKUP_MS;
+}
+
+async function syncNow(showUnchanged = false, scheduled = false): Promise<void> {
   if (syncRunning || conflictDetected) return;
   const meta = loadCloudMeta();
   if (!meta) return;
+  if (scheduled && !shouldRunScheduledSync(meta)) return;
+  if (scheduled) localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
   const save = currentSaveEnvelope();
   if (!save) {
     setStatus("端末セーブを確認できないため、クラウド更新を止めました。", "error");
@@ -83,6 +97,7 @@ async function syncNow(showUnchanged = false): Promise<void> {
   try {
     const next = await uploadCloudSave(meta, save);
     storeCloudMeta(next);
+    if (scheduled || next.revision !== meta.revision) localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
     if (next.revision !== meta.revision) {
       setStatus(`バックアップ済み：${formatSavedAt(next.savedAt)}（世代 ${next.revision}）`, "ok");
     } else if (showUnchanged) {
@@ -358,13 +373,16 @@ function boot() {
   attachPanel();
   new MutationObserver(attachPanel).observe(document.body, { childList: true, subtree: true });
   const meta = loadCloudMeta();
-  if (meta) setStatus(`クラウド接続済み：${formatSavedAt(meta.savedAt)}`, "ok");
-  window.setInterval(() => { void syncNow(); }, AUTO_SYNC_MS);
+  if (meta) {
+    if (backupAge(meta) >= STALE_BACKUP_MS) setStatus(`バックアップが24時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(meta.savedAt)}`, "warn");
+    else setStatus(`クラウド接続済み：${formatSavedAt(meta.savedAt)}`, "ok");
+  }
+  window.setInterval(() => { void syncNow(false, true); }, AUTO_SYNC_MS);
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void syncNow();
+    if (document.visibilityState === "hidden") void syncNow(false, true);
   });
-  window.addEventListener("pagehide", () => { void syncNow(); });
-  window.setTimeout(() => { void syncNow(); }, 5_000);
+  window.addEventListener("pagehide", () => { void syncNow(false, true); });
+  window.setTimeout(() => { void syncNow(false, true); }, 5_000);
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
