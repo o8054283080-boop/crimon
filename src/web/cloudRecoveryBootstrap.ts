@@ -20,6 +20,7 @@ import {
 const PANEL_MARKER = "data-crimon-cloud-recovery";
 const AUTO_SYNC_MS = 12 * 60 * 60 * 1000;
 const STALE_BACKUP_MS = 24 * 60 * 60 * 1000;
+const STALE_RETRY_MS = 60 * 60 * 1000;
 const LAST_ATTEMPT_KEY = "crimon_cloud_backup_last_attempt_v1";
 let syncRunning = false;
 let conflictDetected = false;
@@ -79,7 +80,9 @@ function backupAge(meta: CloudRecoveryMeta): number {
 
 function shouldRunScheduledSync(meta: CloudRecoveryMeta): boolean {
   const lastAttempt = Number(localStorage.getItem(LAST_ATTEMPT_KEY) ?? "0");
-  return !Number.isFinite(lastAttempt) || lastAttempt <= 0 || Date.now() - lastAttempt >= AUTO_SYNC_MS || backupAge(meta) >= STALE_BACKUP_MS;
+  const sinceAttempt = !Number.isFinite(lastAttempt) || lastAttempt <= 0 ? Number.POSITIVE_INFINITY : Date.now() - lastAttempt;
+  if (backupAge(meta) >= STALE_BACKUP_MS) return sinceAttempt >= STALE_RETRY_MS;
+  return sinceAttempt >= AUTO_SYNC_MS;
 }
 
 async function syncNow(showUnchanged = false, scheduled = false): Promise<void> {
