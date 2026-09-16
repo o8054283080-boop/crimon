@@ -50,6 +50,8 @@ export interface HomeProps {
   onGoHowToPlay: () => void;
   /** プレゼントボックス。運営から届いたものを受け取る場所 */
   onGoGiftBox: () => void;
+  /** Supabase個別配布も含む、ホームに表示する未受取件数 */
+  giftCount?: number;
   onGoShop: () => void;
   onRefillStaminaPartial: () => void;
   onRefillStaminaFull: () => void;
@@ -833,7 +835,7 @@ export function renderHome(props: HomeProps): HTMLElement {
    * お知らせは `noticeUi.ts` が「遊び方」の直後へ差し込むので、
    * **ここで遊び方の次に置けば、自動でお知らせの下に回る。**
    */
-  const giftCount = unclaimedGiftCount(GIFT_DEFINITIONS, player);
+  const giftCount = props.giftCount ?? unclaimedGiftCount(GIFT_DEFINITIONS, player);
   const giftEntry = el("button", {
     type: "button",
     className: "world-action world-action--left home-gift",
