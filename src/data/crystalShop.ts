@@ -60,12 +60,12 @@ export interface CrystalShopItem {
  *
  * まとめ買いほど得になる形にしてある(依頼主の指定)。
  *
- *   100💎 →   200,000G   (1💎 = 2,000G)
- *   500💎 → 1,200,000G   (1💎 = 2,400G)
- *  1000💎 → 3,000,000G   (1💎 = 3,000G)
+ *   100💎 →   300,000G   (1💎 = 3,000G)
+ *   500💎 → 1,800,000G   (1💎 = 3,600G)
+ *  1000💎 → 5,000,000G   (1💎 = 5,000G)
  *
  * ★6装備を+0から+15まで上げるのに 1,346,000G。
- * **1000💎でようやく装備2つぶんに届く**、という重さになっている。
+ * **1000💎なら★6装備を3つ仕上げても余る**、急いで育成したい時の交換先になっている。
  *
  * ## 育成・召喚に上限を置く理由
  *
@@ -77,23 +77,23 @@ export const CRYSTAL_SHOP_ITEMS: readonly CrystalShopItem[] = [
   /* --- ゴールド交換。無制限 --- */
   {
     id: "gold_200k",
-    name: "ゴールド 200,000",
+    name: "ゴールド 300,000",
     note: "1回の交換でいちばん軽い",
-    category: "GOLD", kind: "GOLD", amount: 200_000,
+    category: "GOLD", kind: "GOLD", amount: 300_000,
     price: 100, period: "UNLIMITED",
   },
   {
     id: "gold_1200k",
-    name: "ゴールド 1,200,000",
-    note: "100💎×5 より 200,000G 多い",
-    category: "GOLD", kind: "GOLD", amount: 1_200_000,
+    name: "ゴールド 1,800,000",
+    note: "100💎×5 より 300,000G 多い",
+    category: "GOLD", kind: "GOLD", amount: 1_800_000,
     price: 500, period: "UNLIMITED",
   },
   {
     id: "gold_3000k",
-    name: "ゴールド 3,000,000",
-    note: "★6装備を2つ仕上げられる",
-    category: "GOLD", kind: "GOLD", amount: 3_000_000,
+    name: "ゴールド 5,000,000",
+    note: "★6装備を3つ仕上げても余る",
+    category: "GOLD", kind: "GOLD", amount: 5_000_000,
     price: 1_000, period: "UNLIMITED",
   },
 
