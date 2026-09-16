@@ -28,7 +28,7 @@ describe("ゴールドダンジョン", () => {
   });
 
   it("階ごとの報酬が指定どおり", () => {
-    const expected = [50_000, 100_000, 180_000, 250_000, 380_000];
+    const expected = [50_000, 100_000, 180_000, 250_000, 500_000];
     expect(GOLD_DUNGEON_FLOORS.map((floor) => floor.goldReward)).toEqual(expected);
     for (let floor = 1; floor <= GOLD_DUNGEON_FLOOR_COUNT; floor += 1) {
       // 画面が読むのはこちら。表と食い違っていないことも見る
