@@ -4,12 +4,14 @@ on:
     branches: [main]
   workflow_dispatch: {}
 permissions:
-  contents: read
+  contents: write
 jobs:
   build-edge:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -23,3 +25,13 @@ jobs:
             supabase/functions/arena-settle/index.ts
             supabase/functions/_shared/**/*.js
           retention-days: 3
+      - name: Commit exact generated Edge bundle for production sync
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -f supabase/functions/_shared
+          git diff --cached --quiet && exit 0
+          git commit -m "build: stage exact arena edge bundle"
+          git push origin HEAD:${{ github.ref_name }}
