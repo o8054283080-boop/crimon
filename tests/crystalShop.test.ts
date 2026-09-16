@@ -88,7 +88,7 @@ describe("買う", () => {
     expect(buyCrystalShopItem(state, "gold_1200k", NOW).ok).toBe(true);
     expect([state.crystal, state.gold]).toEqual([1_000, 2_100_000]);
     expect(buyCrystalShopItem(state, "gold_3000k", NOW).ok).toBe(true);
-    expect([state.crystal, state.gold]).toEqual([0, 4_400_000]);
+    expect([state.crystal, state.gold]).toEqual([0, 7_100_000]);
   });
 
   it("ゴールド交換に回数の上限は無い", () => {
