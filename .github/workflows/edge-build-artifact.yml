@@ -44,4 +44,4 @@ jobs:
           git add -f supabase/functions/_shared supabase/functions/arena-edge-bundle.json
           git diff --cached --quiet && exit 0
           git commit -m "build: stage exact arena edge bundle"
-          git push origin HEAD:${{ github.ref_name }}
+          git push --force-with-lease origin HEAD:arena-edge-generated
