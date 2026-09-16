@@ -238,6 +238,8 @@ import {
 import type { TrialTowerRankingEntry } from "../net/trialTowerSync.js";
 import {
   ARENA_TEAM_SIZE,
+  ARENA_TICKET_MAX,
+  ARENA_TICKET_REFILL_COST,
   advanceArenaOpponentSeed,
   applyArenaTicketRegen,
   arenaNextTicketAt,
