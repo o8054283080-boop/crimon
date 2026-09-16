@@ -26,7 +26,6 @@ jobs:
             supabase/functions/_shared/**/*.js
           retention-days: 3
       - name: Commit exact generated Edge bundle for production sync
-        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           git config user.name github-actions[bot]
