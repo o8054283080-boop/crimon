@@ -3033,68 +3033,66 @@ function startArenaMatch(entry: ArenaOpponentEntry, onRefused?: () => void): boo
  * `recordArenaMatch` が決める(`game/arena/match.ts`)。
  * ここがやるのは、その結果を見せることだけ。
  */
-function finishArenaMatch(won: boolean): void {
+async function finishArenaMatch(won: boolean): Promise<void> {
   const entry = state.arenaEntry;
   if (!entry) return;
 
-  const before = arenaTierForRating(state.player.arenaPoints);
   const outcome = recordArenaMatch(state.player, { opponent: entry, won, side: "OFFENSE" });
-  const after = arenaTierForRating(outcome.ratingAfter);
   savePlayerState(state.player);
 
   /*
-   * **繋がっていれば、勝敗そのものをサーバに決めてもらう。**
-   *
-   * 送るのは「この対戦を精算してくれ」だけ。勝敗を送る欄が無い。
-   * Edge Function が発行時の種と編成で戦闘を回し直し、そこで出た
-   * 勝敗で確定する。同じ入力からは同じ結果しか出ないので、
-   * 画面で見た決着と食い違うことはない。
-   *
-   * 失敗しても進行は止めない。ローカルの記録だけで遊べる状態を保つ。
+   * オンライン戦は、結果画面を出す前にサーバ精算を待つ。
+   * ここを待たずにローカル予測値を見せると、数秒後にサーバ確定値へ
+   * 差し替わり「勝ったのに下がった」ように見える原因になる。
    */
-  void (async () => {
-    const ticket = state.arenaTicket;
-    state.arenaTicket = null;
-    if (!ticket) return;
+  const ticket = state.arenaTicket;
+  state.arenaTicket = null;
+  let ratingBefore = outcome.ratingBefore;
+  let ratingAfter = outcome.ratingAfter;
+  let ratingDelta = outcome.record.ratingDelta;
+  let coins = outcome.record.coins;
+  let finalWon = won;
+
+  if (ticket) {
     const report = await settleArenaMatch(ticket.matchId, ticket.nonce);
-    if (!report) return;
-    state.player.arenaPoints = report.rating;
-    state.player.arenaCoins = report.coinBalance;
-    state.player.arenaTickets = report.tickets;
-    if (state.player.arenaPoints > state.player.arenaSeasonBestPoints) {
-      state.player.arenaSeasonBestPoints = state.player.arenaPoints;
-    }
-    const record = state.player.arenaMatchHistory.find((item) => item.id === outcome.record.id);
-    if (record) {
-      // **勝敗もサーバの答えを控える。** 種と編成が同じなので普通は一致するが、
-      // 一致しなかった時に手元の言い分だけが残るのはおかしい
-      record.won = report.won;
-      record.ratingDelta = report.ratingDelta;
-      record.ratingAfter = report.rating;
-      record.coins = report.coins;
-    }
-    savePlayerState(state.player);
-  })();
+    if (report) {
+      ratingBefore = report.ratingBefore;
+      ratingAfter = report.rating;
+      ratingDelta = report.ratingDelta;
+      coins = report.coins;
+      finalWon = report.won;
 
-  const rankLine = outcome.tierChanged
-    ? outcome.ratingAfter > outcome.ratingBefore
-      ? `${after.name}へ昇格！`
-      : `${after.name}へ降格`
+      // サーバ確定値を即座に手元へ同期してから結果画面を描く。
+      state.player.arenaPoints = report.rating;
+      state.player.arenaCoins = report.coinBalance;
+      state.player.arenaTickets = report.tickets;
+      if (report.rating > state.player.arenaSeasonBestPoints) {
+        state.player.arenaSeasonBestPoints = report.rating;
+      }
+      const record = state.player.arenaMatchHistory.find((item) => item.id === outcome.record.id);
+      if (record) {
+        record.won = report.won;
+        record.ratingDelta = report.ratingDelta;
+        record.ratingAfter = report.rating;
+        record.coins = report.coins;
+      }
+      savePlayerState(state.player);
+    }
+  }
+
+  const beforeTier = arenaTierForRating(ratingBefore);
+  const afterTier = arenaTierForRating(ratingAfter);
+  const rankLine = beforeTier.id !== afterTier.id
+    ? ratingAfter > ratingBefore ? `${afterTier.name}へ昇格！` : `${afterTier.name}へ降格`
     : null;
-  void before;
+  const signedDelta = `${ratingDelta >= 0 ? "+" : ""}${ratingDelta}`;
 
-  /*
-   * 結果画面は `goldEarned` などが全部0だと「獲得したものはありません」と出る。
-   * アリーナで手に入るのはレートとコインなので、**場所の名前に添えて必ず見せる。**
-   * (レートの増減はアリーナ画面へ戻るまで出ない `arenaNotice` にしか無かった)
-   */
-  const gainLine = `${outcome.record.ratingDelta >= 0 ? "+" : ""}${outcome.record.ratingDelta} レート ・ 🎫+${outcome.record.coins}`;
   state.stageResult = {
-    cleared: won,
-    stageName: `アリーナ ${entry.name}（${gainLine}）`,
+    cleared: finalWon,
+    stageName: `アリーナ ${entry.name}`,
     goldEarned: 0,
     crystalEarned: 0,
-    wavesCleared: won ? 1 : 0,
+    wavesCleared: finalWon ? 1 : 0,
     totalWaves: 1,
     levelUps: [],
     dropDexId: null,
@@ -3103,15 +3101,13 @@ function finishArenaMatch(won: boolean): void {
     pigDrop: null,
     summonScrollDropped: false,
     fighterLevelsGained: 0,
+    extraLines: [
+      `レート　${ratingBefore.toLocaleString("ja-JP")} → ${ratingAfter.toLocaleString("ja-JP")}（${signedDelta}）`,
+      `アリーナコイン +${coins}`,
+      ...(rankLine ? [rankLine] : []),
+    ],
   };
-  // レートの増減と昇降格は、勝敗そのものと同じくらい見たい情報
-  state.arenaNotice = [
-    `${outcome.record.ratingDelta >= 0 ? "+" : ""}${outcome.record.ratingDelta} レート（${outcome.ratingAfter}）`,
-    `アリーナコイン +${outcome.record.coins}`,
-    rankLine,
-  ]
-    .filter(Boolean)
-    .join(" / ");
+  state.arenaNotice = `${signedDelta} レート（${ratingAfter}） / アリーナコイン +${coins}${rankLine ? ` / ${rankLine}` : ""}`;
   state.arenaEntry = null;
   state.arenaCandidates = [];
   enterStageResult();
@@ -3318,7 +3314,7 @@ function renderCurrentArenaBattle(): BattleViewHandle {
     // 対人戦は観客のいる闘技場。それ自体がアリーナの空気になっている
     venue: "duel",
     resultLabel: (winner) => (winner === "PLAYER" ? "🏆 結果を見る" : "アリーナに戻る"),
-    onFinish: (winner) => finishArenaMatch(winner === "PLAYER"),
+    onFinish: (winner) => { void finishArenaMatch(winner === "PLAYER"); },
     /*
      * **対人戦だけは諦められない。**
      *
