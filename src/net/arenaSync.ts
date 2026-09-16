@@ -508,6 +508,33 @@ export async function pushArenaDefense(snapshot: ArenaDefenseSnapshot): Promise<
  * サーバから見てその対戦は存在しないので、手元で戦わせてはいけない
  * (券は戻り、レートとコインだけが手元で動き、戦績はどこにも残らない)。
  */
+
+export interface ArenaTicketRefillResult {
+  ok: boolean;
+  reached: boolean;
+  reason: string | null;
+  tickets?: number;
+  ticketsMax?: number;
+}
+
+/** ダイヤ回復後の挑戦券をサーバにも確定させる。サーバに届いた失敗はローカル成功扱いにしない。 */
+export async function refillArenaTicketsRemote(): Promise<ArenaTicketRefillResult> {
+  try {
+    if (!arenaSyncAvailable()) return { ok: false, reached: false, reason: null };
+    const outcome = await callRpcDetailed("arena_refill_tickets_paid", {});
+    if (!outcome.reached) return { ok: false, reached: false, reason: null };
+    const result = outcome.value;
+    if (!isRecord(result) || result.ok !== true) return { ok: false, reached: true, reason: outcome.error };
+    return {
+      ok: true, reached: true, reason: null,
+      tickets: Math.max(0, Math.round(asFiniteNumber(result.tickets, 0))),
+      ticketsMax: Math.max(1, Math.round(asFiniteNumber(result.ticketsMax, 10))),
+    };
+  } catch {
+    return { ok: false, reached: false, reason: null };
+  }
+}
+
 export type ArenaBeginMatchResult =
   | { ok: true; ticket: ArenaMatchTicket }
   | { ok: false; reached: boolean; reason: string | null };
