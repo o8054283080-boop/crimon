@@ -25,12 +25,23 @@ jobs:
             supabase/functions/arena-settle/index.ts
             supabase/functions/_shared/**/*.js
           retention-days: 3
+      - name: Pack Edge bundle for deployment
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'), path=require('path');
+          const root='supabase/functions'; const out=[];
+          function walk(d){for(const n of fs.readdirSync(d)){const p=path.join(d,n);const s=fs.statSync(p);if(s.isDirectory())walk(p);else if(p.endsWith('.js'))out.push({name:p.slice(root.length+1),content:fs.readFileSync(p,'utf8')});}}
+          walk(root+'/_shared');
+          out.push({name:'arena-settle/index.ts',content:fs.readFileSync(root+'/arena-settle/index.ts','utf8')});
+          fs.writeFileSync(root+'/arena-edge-bundle.json',JSON.stringify(out));
+          NODE
+
       - name: Commit exact generated Edge bundle for production sync
         run: |
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -f supabase/functions/_shared
+          git add -f supabase/functions/_shared supabase/functions/arena-edge-bundle.json
           git diff --cached --quiet && exit 0
           git commit -m "build: stage exact arena edge bundle"
           git push origin HEAD:${{ github.ref_name }}
