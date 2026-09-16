@@ -168,7 +168,7 @@ import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { renderGiftBox, type GiftTab } from "./views/giftBox.js";
 import { GIFT_DEFINITIONS } from "../data/gifts.js";
-import { claimAllGifts, claimGift, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
+import { claimAllGifts, claimGift, unclaimedGiftCount, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
@@ -3861,10 +3861,16 @@ function renderScreen(): void {
 
   switch (state.screen) {
     case "HOME":
+      // 個別配布もホームに入った時点で取得し、赤バッジへ反映する。
+      if (!state.personalGiftsLoaded) {
+        state.personalGiftsLoaded = true;
+        void fetchPersonalGifts().then((gifts) => { state.personalGifts = gifts; if (state.screen === "HOME") render(); });
+      }
       content = renderHome({
         player: state.player,
         loginBonusResult: state.loginBonusResult,
         compensationClaims: state.compensationClaims,
+        giftCount: unclaimedGiftCount([...GIFT_DEFINITIONS, ...state.personalGifts], state.player),
         onDismissCompensation: () => {
           state.compensationClaims = [];
           render();
