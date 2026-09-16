@@ -223,7 +223,7 @@ import {
   fetchPendingArenaShopPurchases,
   acknowledgeArenaShopPurchase,
   beginArenaMatch,
-  arenaRefusalText,
+  refillArenaTicketsRemote,\n  arenaRefusalText,
   pushArenaDefense,
   settleArenaMatch,
 } from "../net/arenaSync.js";
@@ -4315,10 +4315,36 @@ function renderScreen(): void {
           render();
         },
         onRefillTickets: () => {
-          const result = tryRefillArenaTickets(state.player);
-          state.arenaNotice = result.ok ? "挑戦券を回復しました" : (result.reason ?? "回復できませんでした");
-          if (result.ok) savePlayerState(state.player);
-          render();
+          void (async () => {
+            applyArenaTicketRegen(state.player);
+            if (state.player.arenaTickets >= ARENA_TICKET_MAX) {
+              state.arenaNotice = "挑戦券は満タンです"; render(); return;
+            }
+            if (state.player.crystal < ARENA_TICKET_REFILL_COST) {
+              state.arenaNotice = "ダイヤが足りません"; render(); return;
+            }
+            if (arenaSyncAvailable()) {
+              if (!(await connectArena())) {
+                state.arenaNotice = "通信できないためダイヤ回復を中止しました（ダイヤは消費していません）"; render(); return;
+              }
+              const remote = await refillArenaTicketsRemote();
+              if (!remote.ok) {
+                state.arenaNotice = "挑戦券を回復できませんでした（ダイヤは消費していません）"; render(); return;
+              }
+              // サーバ券の回復成功を確認してから初めてダイヤを消費する。
+              state.player.crystal -= ARENA_TICKET_REFILL_COST;
+              state.player.arenaTickets = remote.tickets ?? ARENA_TICKET_MAX;
+              state.player.lastArenaTicketUpdateAt = Date.now();
+              savePlayerState(state.player);
+              state.arenaNotice = "挑戦券を回復しました";
+              render();
+              return;
+            }
+            const result = tryRefillArenaTickets(state.player);
+            state.arenaNotice = result.ok ? "挑戦券を回復しました" : (result.reason ?? "回復できませんでした");
+            if (result.ok) savePlayerState(state.player);
+            render();
+          })();
         },
         onClaimWeekly: () => {
           /*
