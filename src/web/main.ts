@@ -223,7 +223,8 @@ import {
   fetchPendingArenaShopPurchases,
   acknowledgeArenaShopPurchase,
   beginArenaMatch,
-  refillArenaTicketsRemote,\n  arenaRefusalText,
+  refillArenaTicketsRemote,
+  arenaRefusalText,
   pushArenaDefense,
   settleArenaMatch,
 } from "../net/arenaSync.js";
