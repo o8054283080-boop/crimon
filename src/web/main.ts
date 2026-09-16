@@ -3861,10 +3861,16 @@ function renderScreen(): void {
 
   switch (state.screen) {
     case "HOME":
+      // 個別配布もホームに入った時点で取得し、赤バッジへ反映する。
+      if (!state.personalGiftsLoaded) {
+        state.personalGiftsLoaded = true;
+        void fetchPersonalGifts().then((gifts) => { state.personalGifts = gifts; if (state.screen === "HOME") render(); });
+      }
       content = renderHome({
         player: state.player,
         loginBonusResult: state.loginBonusResult,
         compensationClaims: state.compensationClaims,
+        giftCount: unclaimedGiftCount([...GIFT_DEFINITIONS, ...state.personalGifts], state.player),
         onDismissCompensation: () => {
           state.compensationClaims = [];
           render();
