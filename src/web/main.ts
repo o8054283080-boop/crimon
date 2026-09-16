@@ -230,6 +230,7 @@ import {
 } from "../net/arenaSync.js";
 import type { ArenaMatchTicket, ArenaRankingEntry } from "../net/arenaSync.js";
 import { arenaAuthUserId, ensureArenaAuth } from "../net/arenaAuth.js";
+import { fetchPersonalGifts, markPersonalGiftClaimed } from "../net/personalGifts.js";
 import {
   fetchTrialTowerRanking,
   fetchTrialTowerSelf,
@@ -406,6 +407,8 @@ interface AppState {
   giftTab: GiftTab;
   /** 直前の受け取りの結果。押した後に一度だけ出す */
   giftResult: GiftClaimResult | GiftClaimAllResult | null;
+  personalGifts: import("../game/gift.js").GiftDefinition[];
+  personalGiftsLoaded: boolean;
   player: PlayerState;
   summonResults: SummonResult[] | null;
   /** 直前に何で引いたか。結果画面の「もう一度」を同じ手段で繰り返すために覚える */
@@ -612,6 +615,8 @@ const state: AppState = {
   screen: "HOME",
   giftTab: "OPEN",
   giftResult: null,
+  personalGifts: [],
+  personalGiftsLoaded: false,
   player: loadPlayerState(),
   summonResults: null,
   lastSummonMethod: null,
@@ -4588,8 +4593,14 @@ function renderScreen(): void {
       content = renderHowToPlay({ onBack: () => navigate("HOME") });
       break;
 
-    case "GIFT_BOX":
+    case "GIFT_BOX": {
+      if (!state.personalGiftsLoaded) {
+        state.personalGiftsLoaded = true;
+        void fetchPersonalGifts().then((gifts) => { state.personalGifts = gifts; if (state.screen === "GIFT_BOX") render(); });
+      }
+      const allGifts = [...GIFT_DEFINITIONS, ...state.personalGifts];
       content = renderGiftBox({
+        gifts: allGifts,
         player: state.player,
         tab: state.giftTab,
         lastResult: state.giftResult,
@@ -4600,15 +4611,24 @@ function renderScreen(): void {
            * `claimGift` に保存を渡しておくと、失敗した時に所持品も受取の印も
            * まとめて元へ戻る。片方だけ残ることがない。
            */
-          state.giftResult = claimGift(GIFT_DEFINITIONS, state.player, giftId, { save: savePlayerState });
+          state.giftResult = claimGift(allGifts, state.player, giftId, { save: savePlayerState });
+          if (state.giftResult.ok && giftId.startsWith("personal:")) {
+            void markPersonalGiftClaimed(giftId).then((ok) => {
+              if (ok) state.personalGifts = state.personalGifts.filter((g) => g.giftId !== giftId);
+            });
+          }
           render();
         },
         onClaimAll: () => {
-          state.giftResult = claimAllGifts(GIFT_DEFINITIONS, state.player, { save: savePlayerState });
+          state.giftResult = claimAllGifts(allGifts, state.player, { save: savePlayerState });
+          for (const entry of state.giftResult.claimed) {
+            if (entry.gift.giftId.startsWith("personal:")) void markPersonalGiftClaimed(entry.gift.giftId);
+          }
           render();
         },
       });
       break;
+    }
 
     case "ARENA_BATTLE": {
       showNav = false;
