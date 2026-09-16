@@ -238,8 +238,6 @@ import {
 import type { TrialTowerRankingEntry } from "../net/trialTowerSync.js";
 import {
   ARENA_TEAM_SIZE,
-  ARENA_TICKET_MAX,
-  ARENA_TICKET_REFILL_COST,
   advanceArenaOpponentSeed,
   applyArenaTicketRegen,
   arenaNextTicketAt,
@@ -5635,4 +5633,5 @@ document.addEventListener("visibilitychange", () => {
   savePlayerState(state.player);
   if (document.visibilityState === "visible") scheduleBackgroundFarm(0);
 });
-window.addEventListener("pagehide", () => savePlayerState(state.player));
+window.addEventListener("pagehide", () => savePlayerState(state.player));import { ARENA_TICKET_MAX, ARENA_TICKET_REFILL_COST } from "../data/pvpArena.js";
+
