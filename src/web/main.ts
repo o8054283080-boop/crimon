@@ -168,7 +168,7 @@ import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { renderGiftBox, type GiftTab } from "./views/giftBox.js";
 import { GIFT_DEFINITIONS } from "../data/gifts.js";
-import { claimAllGifts, claimGift, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
+import { claimAllGifts, claimGift, unclaimedGiftCount, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
