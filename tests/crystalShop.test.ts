@@ -84,9 +84,9 @@ describe("買う", () => {
   it("ゴールド交換はダイヤを引いてゴールドを足す", () => {
     const state = richState(1_600);
     expect(buyCrystalShopItem(state, "gold_200k", NOW).ok).toBe(true);
-    expect([state.crystal, state.gold]).toEqual([1_500, 200_000]);
+    expect([state.crystal, state.gold]).toEqual([1_500, 300_000]);
     expect(buyCrystalShopItem(state, "gold_1200k", NOW).ok).toBe(true);
-    expect([state.crystal, state.gold]).toEqual([1_000, 1_400_000]);
+    expect([state.crystal, state.gold]).toEqual([1_000, 2_100_000]);
     expect(buyCrystalShopItem(state, "gold_3000k", NOW).ok).toBe(true);
     expect([state.crystal, state.gold]).toEqual([0, 4_400_000]);
   });
@@ -94,7 +94,7 @@ describe("買う", () => {
   it("ゴールド交換に回数の上限は無い", () => {
     const state = richState(1_000);
     for (let i = 0; i < 10; i += 1) expect(buyCrystalShopItem(state, "gold_200k", NOW).ok).toBe(true);
-    expect([state.crystal, state.gold]).toEqual([0, 2_000_000]);
+    expect([state.crystal, state.gold]).toEqual([0, 3_000_000]);
     expect(crystalShopRemaining(state, findCrystalShopItem("gold_200k")!, NOW)).toBeNull();
   });
 
