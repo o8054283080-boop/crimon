@@ -517,10 +517,20 @@ export function enhanceEquipmentTotalCost(star: EquipStar, from = 0, to = EQUIP_
  * 多いほど(=それだけ育成に投資されているほど)高くなる。
  */
 export function equipmentSellPrice(equipment: Equipment): number {
-  const base = 100 * equipment.star * equipment.star;
-  const levelBonus = equipment.level * 40 * equipment.star;
-  const subStatBonus = equipment.subStats.length * 50;
-  return Math.round(base + levelBonus + subStatBonus);
+  const baseByStar: Record<EquipStar, number> = {
+    1: 500,
+    2: 1_500,
+    3: 3_500,
+    4: 8_000,
+    5: 20_000,
+    6: 40_000,
+  };
+  const base = baseByStar[equipment.star];
+  const subStatBonus = base * 0.1 * equipment.subStats.length;
+  // 育てた装備を手放す時は、そこまでに投入した強化費の30%を回収できる。
+  const investedEnhanceGold = enhanceEquipmentTotalCost(equipment.star, 0, equipment.level);
+  const enhanceRefund = investedEnhanceGold * 0.3;
+  return Math.round(base + subStatBonus + enhanceRefund);
 }
 
 /**
