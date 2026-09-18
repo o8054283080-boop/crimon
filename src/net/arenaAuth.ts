@@ -265,14 +265,19 @@ async function login(): Promise<ArenaSession | null> {
       return refreshed;
     }
     /*
-     * 延ばせなかった。**ここで匿名ユーザを作り直すと、それまでのレートも
-     * 防衛も置き去りになる。** ただし作らない選択もできない(繋げなくなる)。
-     * 保存を捨ててから作り直す——同じ壊れた札で毎回失敗し続けるよりはよい。
+     * 延ばせなかった時に新しい匿名ユーザを作ると、レート・防衛・履歴が
+     * 旧 uid に置き去りになる。ネットワーク一時断や GoTrue 側の失敗でも
+     * 同じ事故になるため、**保存済みの本人情報は絶対に捨てない**。
+     *
+     * この起動ではオンライン同期を諦めて null を返す。次回 ensureArenaAuth()
+     * で同じ refresh token を再試行する。明示的な復旧操作なしに別人を作らない。
      */
-    save(null);
+    session = stored;
+    setArenaSyncAccessToken(null);
+    return null;
   }
 
-  // 4. 新しい匿名ユーザを作る
+  // 4. 保存済み本人が存在しない初回だけ、新しい匿名ユーザを作る
   const created = fromTokenResponse(await post("signup", {}, target.anonKey));
   if (!created) return null;
   save(created);
