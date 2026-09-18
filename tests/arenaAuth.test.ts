@@ -172,7 +172,7 @@ describe("起動のたびに別人にならない", () => {
     expect(gotrue.calls[0].path).toBe("token?grant_type=refresh_token");
   });
 
-  it("更新に失敗したら、壊れた札を捨てて作り直す", async () => {
+  it("更新に失敗しても、保存済みの本人を捨てず別人を作らない", async () => {
     const past = Math.floor(Date.now() / 1000) - 10;
     store.map.set(ARENA_AUTH_STORAGE_KEY, JSON.stringify({
       userId: UID, accessToken: "old", refreshToken: "revoked", expiresAt: past,
@@ -183,8 +183,29 @@ describe("起動のたびに別人にならない", () => {
 
     const session = await ensureArenaAuth();
     expect(gotrue.calls.map((c) => c.path))
-      .toEqual(["token?grant_type=refresh_token", "signup"]);
-    expect(session?.userId).toBe("99999999-2222-4333-8444-555555555555");
+      .toEqual(["token?grant_type=refresh_token"]);
+    expect(session).toBeNull();
+    // uid と refresh token は残す。通信復旧後に同じ本人として再試行できる。
+    const saved = JSON.parse(store.map.get(ARENA_AUTH_STORAGE_KEY) ?? "{}");
+    expect(saved.userId).toBe(UID);
+    expect(saved.refreshToken).toBe("revoked");
+    expect(arenaAuthUserId()).toBe(UID);
+  });
+
+  it("更新失敗を繰り返しても signup は絶対に呼ばない", async () => {
+    const past = Math.floor(Date.now() / 1000) - 10;
+    store.map.set(ARENA_AUTH_STORAGE_KEY, JSON.stringify({
+      userId: UID, accessToken: "old", refreshToken: "temporarily-failing", expiresAt: past,
+    }));
+    const gotrue = fakeGoTrue((path) =>
+      path.startsWith("token") ? null : tokenResponse({ user: { id: "99999999-2222-4333-8444-555555555555" } }));
+    configureArenaAuth({ url: URL_BASE, anonKey: ANON, storage: store, fetchImpl: gotrue.fetchImpl });
+
+    await ensureArenaAuth();
+    await ensureArenaAuth();
+    expect(gotrue.calls.every((call) => call.path.startsWith("token"))).toBe(true);
+    expect(gotrue.calls.filter((call) => call.path === "signup")).toHaveLength(0);
+    expect(arenaAuthUserId()).toBe(UID);
   });
 });
 
