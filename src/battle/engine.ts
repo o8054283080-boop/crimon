@@ -1,5 +1,5 @@
 import { ELEMENT_JA } from "../core/element.js";
-import { ATK_DOWN, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
+import { ATK_DOWN, ATK_UP, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
@@ -101,6 +101,7 @@ import {
   hasAnyBuff,
   hasStatus,
   hpRatio,
+  passiveAccuracyBonus,
   passiveEffectOf,
   stealBuffs,
   tickCooldownsAtTurnStart,
@@ -430,6 +431,15 @@ export class BattleEngine {
       }
     });
 
+    /*
+     * 味方から受け取るオーラ(水の祝福)のため、各自に同じチームの面々を持たせる。
+     * 被ダメージの計算は受け手1人で完結しているので、こうしないと
+     * 「誰かが生きている限り効く」という形が書けない。
+     */
+    for (const unit of this.units) {
+      unit.alliesForAura = this.units.filter((other) => other.team === unit.team);
+    }
+
     options.initialSkyStacks?.forEach((stacks, i) => { if (this.units[i]) this.units[i].skyStacks = Math.max(0, Math.min(8, stacks)); });
     if (options.initialPlayerHp) {
       options.initialPlayerHp.forEach((hp, i) => {
@@ -728,6 +738,38 @@ export class BattleEngine {
       this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount: healAmount });
     }
 
+    /*
+     * ガッツチャージ(モッチー電気)。**通常のターンでだけ溜まる。**
+     *
+     * 追加ターンで溜まると、追加ターンを生む技と組み合わせた瞬間に
+     * 1手で2つ3つと増えて青天井になる。数えるのは「順番が回ってきた回数」。
+     */
+    const turnStartPassive = passiveEffectOf(unit);
+    if (turnStartPassive?.kind === "GUTS_CHARGE" && !extraTurn && unit.alive) {
+      const before = unit.gutsStacks ?? 0;
+      if (before < turnStartPassive.maxStacks) {
+        unit.gutsStacks = before + 1;
+        this.pushPassiveCue(unit);
+        this.push(`${this.label(unit)} の気合が高まった！ (${unit.gutsStacks}/${turnStartPassive.maxStacks})`);
+        // 満タンになった瞬間に1度だけ。以降のターンでは配らない
+        if (unit.gutsStacks === turnStartPassive.maxStacks && turnStartPassive.gaugeAtMax) {
+          this.gainGauge(unit, turnStartPassive.gaugeAtMax);
+        }
+      }
+    }
+
+    /* 深淵の主(グジラ闇)。自分のターンの頭に回復する */
+    if (turnStartPassive?.kind === "ABYSS_LORD" && unit.alive && turnStartPassive.healOnTurn > 0) {
+      const before = unit.currentHp;
+      applyHeal(unit, Math.round(unit.maxHp * turnStartPassive.healOnTurn));
+      const healed = unit.currentHp - before;
+      if (healed > 0) {
+        this.pushPassiveCue(unit);
+        this.push(`${this.label(unit)} は深淵の力でHPが ${healed} 回復！ (${unit.currentHp}/${unit.maxHp})`);
+        this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount: healed });
+      }
+    }
+
     this.applyRegenAtTurnStart(unit);
     this.applyPoisonAtTurnStart(unit);
     for (const curse of unit.curses ?? []) curse.turns--;
@@ -782,6 +824,30 @@ export class BattleEngine {
    * 動いただけでゲージが満ちてしまう。
    */
   private onUnitActed(actor: BattleUnit): void {
+    /*
+     * 水の祝福(ウンディーネ)。**自身が動いた後、味方全体を癒やして攻撃を上げる。**
+     *
+     * 回復量は**ウンディーネ自身の最大HP**が基準(受け手の最大HPではない)。
+     * 守りの部分(被ダメ軽減・被クリ率低下)と違い、**こちらは自分にも入る。**
+     * 癒やしと攻撃UPは「狙う場所が無くなる」問題を起こさないため。
+     */
+    const blessing = passiveEffectOf(actor);
+    if (blessing?.kind === "WATER_BLESSING" && actor.alive) {
+      const allies = this.units.filter((u) => u.alive && u.team === actor.team);
+      if (allies.length > 0) {
+        this.pushPassiveCue(actor);
+        const healAmount = Math.round(actor.maxHp * blessing.healOnAct);
+        for (const ally of allies) {
+          const before = ally.currentHp;
+          applyHeal(ally, healAmount);
+          const healed = ally.currentHp - before;
+          if (healed > 0) this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount: healed });
+          applyStatEffect(ally, "atk", ATK_UP, blessing.atkUpTurns, "BUFF");
+        }
+        this.push(`  → ${this.label(actor)} の「水の祝福」で味方全体が ${healAmount} 回復し、攻撃力が上がった！`);
+      }
+    }
+
     // 70階の再生は「始祖ベヒモス自身が実際に行動した手番の終了時」だけ。
     // スタンで行動できなかった時や、取り巻きの手番では進めない。
     if (this.isTower70Boss(actor)) this.applyTower70BossRegen(actor);
@@ -874,6 +940,22 @@ export class BattleEngine {
     if (!attacker?.alive || !victim.alive) return;
     const passive = passiveEffectOf(victim);
     const already = resolutionKey?.victimPassiveUsed.has(victim.instanceId) ?? false;
+    /*
+     * 深淵の主(グジラ闇)。**敵の1スキルにつき1スタック。**
+     *
+     * `victimPassiveUsed` は「この解決でこの被害者のパッシブを既に使ったか」を
+     * 覚えている集合。4回殴る技でも、ここで弾かれて1つしか溜まらない。
+     * **1ヒット1スタックにすると、全体多段の技ひとつで上限まで飛ぶ。**
+     */
+    if (passive?.kind === "ABYSS_LORD" && !already) {
+      resolutionKey?.victimPassiveUsed.add(victim.instanceId);
+      const before = victim.abyssStacks ?? 0;
+      if (before < passive.maxStacks) {
+        victim.abyssStacks = before + 1;
+        this.pushPassiveCue(victim);
+        this.push(`  → ${this.label(victim)} の深淵が深まった！ (${victim.abyssStacks}/${passive.maxStacks})`);
+      }
+    }
     if (passive?.kind === "FALSE_TREASURE" && !already) {
       resolutionKey?.victimPassiveUsed.add(victim.instanceId);
       this.pushPassiveCue(victim);
@@ -1827,6 +1909,44 @@ export class BattleEngine {
         if (!this.isImmune(affected) && this.rollEffectSuccess(source, affected, passive.stunChance)) {
           affected.stunTurns = Math.max(affected.stunTurns, 1);
           this.push(`  → ${this.label(affected)} はスタンした！`);
+        }
+      }
+    }
+    /*
+     * 魅惑のまなこ(スエゾー光)。**解除・気絶・追撃をそれぞれ1スキルにつき1度ずつ。**
+     *
+     * `sourcePassiveUsed` を最初に立てるので、多段でも全体でもここは1回しか通らない。
+     * **追撃からさらに追撃は起きない**——追撃は `applyIncomingDamage` へ
+     * 直接渡していて、スキル解決をもう一度回さないため。
+     */
+    if (passive.kind === "CHARM_EYE" && resolution.damageDealt > 0) {
+      resolution.sourcePassiveUsed = true;
+      if (primary.alive && !this.isImmune(primary)) {
+        if (this.rollEffectSuccess(source, primary, passive.stripChance) && stripBuffs(primary, 1) > 0) {
+          this.push(`  → ${this.label(primary)} の強化が1つ解除された！`);
+        }
+        if (this.rollEffectSuccess(source, primary, passive.stunChance)) {
+          primary.stunTurns = Math.max(primary.stunTurns, 1);
+          this.push(`  → ${this.label(primary)} は気絶した！ (1ターン)`);
+        }
+      }
+      /*
+       * 全体追撃。**そのスキルで会心が1回でも出ていれば。**
+       * `resolution.anyCrit` は解決中に立つので、多段のどれかが会心すれば通る。
+       */
+      if (resolution.anyCrit) {
+        const others = this.units.filter((u) => u.alive && u.team !== source.team);
+        if (others.length > 0) {
+          this.pushPassiveCue(source);
+          this.push(`  → ${this.label(source)} の「魅惑のまなこ」が敵全体を撃った！`);
+          for (const other of others) {
+            const result = calcDamage(source, other, { kind: "DAMAGE", multiplier: passive.followUpMultiplier }, this.rng);
+            const applied = this.applyIncomingDamage(other, result.damage, source, "normal", resolution);
+            resolution.damageDealt += applied.hpDamage;
+            if (applied.died) { resolution.kills += 1; this.onKill(source); }
+            this.push(`  → ${this.label(other)} に ${applied.hpDamage} ダメージ！ (残りHP ${other.currentHp}/${other.maxHp})`);
+            this.pushEvent({ targetId: other.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
+          }
         }
       }
     }
@@ -3301,7 +3421,8 @@ export class BattleEngine {
       skill?.talentMods?.ignoreResistance ?? 0,
     );
     const effectiveResistance = target.def.stats.resistance * (1 - ignoreRatio);
-    const accuracy = source.def.stats.accuracy;
+    // パッシブぶんの的中を足す(魅惑のまなこ)。BuffStat に的中が無いのでここで合流する
+    const accuracy = source.def.stats.accuracy + passiveAccuracyBonus(source);
     const hitChance = Math.max(0, Math.min(1, (1 - effectiveResistance + accuracy) / (1 + accuracy)));
 
     if (this.rng() < hitChance) {

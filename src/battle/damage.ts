@@ -90,6 +90,19 @@ export function adaptationMultiplier(attacker: BattleUnit, defender: BattleUnit)
   return 1 - Math.min(trait.maxReduction, stacks * trait.perStack);
 }
 
+/**
+ * 水の祝福による被クリ率の低下。**張り主自身には効かない。**
+ * 守る側が同時にいちばん会心されにくくなると、狙う場所が無くなる。
+ */
+function waterBlessingCritReduction(defender: BattleUnit): number {
+  for (const holder of defender.alliesForAura ?? []) {
+    if (!holder.alive || holder === defender) continue;
+    const aura = passiveEffectOf(holder);
+    if (aura?.kind === "WATER_BLESSING") return aura.critTaken;
+  }
+  return 0;
+}
+
 export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit, skillBonus = 0): number {
   const weak = passiveEffectOf(attacker);
   const conditionalCrit = weak?.kind === "WEAK_POINT" && defender.currentHp / defender.maxHp <= weak.hpRatio ? weak.critRate : 0;
@@ -97,7 +110,9 @@ export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit, ski
     + skillBonus
     // 被クリ率の上げ下げ。**受ける側に付く**効果なので、名前の UP/DOWN は相手から見た向き
     + (hasStatus(defender, "CRIT_RATE_UP") ? CRIT_RATE_TAKEN_UP : 0)
-    - (hasStatus(defender, "CRIT_RATE_DOWN") ? CRIT_RATE_TAKEN_DOWN : 0);
+    - (hasStatus(defender, "CRIT_RATE_DOWN") ? CRIT_RATE_TAKEN_DOWN : 0)
+    // 水の祝福。**守られているのは自分以外の味方**なので、防御側の仲間を辿る
+    - waterBlessingCritReduction(defender);
   return Math.max(0, Math.min(1, rate));
 }
 
@@ -157,6 +172,14 @@ export function calcDamage(
    */
   let finalBonus = (effect.finalDamageBonus ?? 0) + (effect.currentHpBonus ?? 0) * defenderRatio + (defenderRatio >= 1 ? effect.fullHpBonus ?? 0 : 0);
   if (prey?.kind === "REBIRTH") finalBonus += prey.damage * defenderRatio;
+  /*
+   * ガッツチャージ。**与えるダメージへの上乗せ**であって攻撃力ではない。
+   * 攻撃力を上げると防御で削られる前の値が動き、
+   * 「与えるダメージが+25%」より大きくも小さくもなってしまう。
+   */
+  if (prey?.kind === "GUTS_CHARGE") {
+    finalBonus += prey.damageUp * Math.min(prey.maxStacks, attacker.gutsStacks ?? 0);
+  }
   if (prey?.kind === "ILLUSION" && ["LIGHT", "DARK"].includes(defender.def.element)) finalBonus += .5;
   const hpTier = [...(effect.targetHpBonus ?? [])]
     .sort((a, b) => a.hpRatio - b.hpRatio)

@@ -108,7 +108,47 @@ export type PassiveLevelEffect =
    * ベヒモス「古代巨獣」。
    * HPが減るほど被ダメージが減り、HP比例ダメージが増える。**段階は重複しない。**
    */
-  | { kind: "ANCIENT_BEHEMOTH"; tiers: readonly { hpRatio: number; damageTaken: number; hpDamageUp: number }[] };
+  | { kind: "ANCIENT_BEHEMOTH"; tiers: readonly { hpRatio: number; damageTaken: number; hpDamageUp: number }[] }
+  /**
+   * ガッツチャージ(モッチー電気)。**通常のターンが回ってくるたびに1つ溜まる。**
+   *
+   * **追加ターンでは溜まらない。**溜めた結果もう一度動けるようになる技と
+   * 組み合わせると、1手で2つ3つと増えて青天井になるため。
+   * 「順番が回ってきた回数」だけを数える。
+   *
+   * 速度の上がり幅は全レベル共通で、レベルで伸びるのは与ダメージのほう。
+   * `gaugeAtMax` は最大まで溜めた時だけ1度もらえる行動ゲージ。
+   */
+  | { kind: "GUTS_CHARGE"; damageUp: number; spd: number; maxStacks: number; gaugeAtMax?: number }
+  /**
+   * 深淵の主(グジラ闇)。**敵のスキル攻撃を受けるたびに1つ溜まる。**
+   *
+   * **多段攻撃でも1スキルにつき1つ。**4回殴られても1つ。
+   * ここを1ヒット1つにすると、全体多段の技1つで上限まで飛ぶ。
+   *
+   * 溜まるほど攻撃と速度が上がり、自分のターンの頭にHPが戻る。
+   * 被ダメージ軽減はレベルで伸びる。
+   */
+  | { kind: "ABYSS_LORD"; damageTaken: number; atkPerStack: number; spdPerStack: number; maxStacks: number; healOnTurn: number }
+  /**
+   * 水の祝福(ウンディーネ水・草)。**生きている限り、自分以外の味方を守る。**
+   *
+   * **自分自身には軽減も被クリ率低下もかけない。**守る側が同時に
+   * いちばん硬くなると、狙う場所が無くなって戦いが止まる。
+   * 行動時の回復と攻撃UPは自分にも入る(こちらは守りではないため)。
+   *
+   * 回復量は**ウンディーネ自身の最大HP**が基準。
+   */
+  | { kind: "WATER_BLESSING"; damageTaken: number; critTaken: number; healOnAct: number; atkUpTurns: number }
+  /**
+   * 魅惑のまなこ(スエゾー光)。**攻撃するたびに、1スキルにつき1度ずつ効く。**
+   *
+   * 解除も気絶も追撃も**それぞれ1スキルにつき最大1回**。多段技で
+   * 何度も起こさない。追撃からさらに追撃も起こさない。
+   *
+   * 的中とクリ率の上乗せは常時・全レベル固定。
+   */
+  | { kind: "CHARM_EYE"; accuracy: number; critRate: number; stripChance: number; stunChance: number; followUpMultiplier: number };
 
 export interface PassiveSpec {
   trigger: PassiveTrigger;
@@ -154,6 +194,20 @@ export function describePassiveLevel(effect: PassiveLevelEffect): string {
       return `クリダメ+${pct(effect.critDmg)}。敵を倒すと追加ターンを得る`;
     case "TIME_KEEPER":
       return `味方が行動するたび自身の行動ゲージ+${pct(effect.allyGauge)}。自身の攻撃スキルに行動ゲージ${pct(effect.drain)}吸収と${pct(effect.stunChance)}のスタンが乗る(1スキルにつき1回)`;
+    case "GUTS_CHARGE":
+      return `通常のターンが回るたび1スタック(最大${effect.maxStacks})。1スタックにつき与ダメージ+${pct(effect.damageUp)}・速度+${effect.spd}`
+        + `${effect.gaugeAtMax ? `。最大まで溜まった時、行動ゲージ+${pct(effect.gaugeAtMax)}` : ""}`
+        + "。追加ターンでは溜まらない。同一戦闘中は維持し、戦闘終了でリセット";
+    case "ABYSS_LORD":
+      return `受けるダメージ-${pct(effect.damageTaken)}。敵のスキル攻撃を受けるたび1スタック(多段でも1スキルにつき1、最大${effect.maxStacks})。`
+        + `1スタックにつき攻撃+${pct(effect.atkPerStack)}・速度+${pct(effect.spdPerStack)}。自身のターン開始時、最大HPの${pct(effect.healOnTurn)}回復`;
+    case "WATER_BLESSING":
+      return `生存中、自分以外の味方全体が受けるダメージ-${pct(effect.damageTaken)}・被クリ率-${pct(effect.critTaken)}。`
+        + `自身の行動時、味方全体を自身の最大HPの${pct(effect.healOnAct)}回復し攻撃力UP(${effect.atkUpTurns}ターン)`;
+    case "CHARM_EYE":
+      return `的中+${pct(effect.accuracy)}・クリ率+${pct(effect.critRate)}。攻撃スキル使用時、${pct(effect.stripChance)}で対象の強化1個を解除し、`
+        + `${pct(effect.stunChance)}で1ターン気絶。そのスキルでクリティカルが出ていれば敵全体へ攻撃力${effect.followUpMultiplier}倍の追撃`
+        + "(解除・気絶・追撃はいずれも1スキルにつき1回。追撃から追撃は起きない)";
     case "ANCIENT_BEHEMOTH":
       return effect.tiers
         .map((tier) => `HP${pct(tier.hpRatio)}以下: 受けるダメージ-${pct(tier.damageTaken)}・最大HP比例ダメージ+${pct(tier.hpDamageUp)}`)
