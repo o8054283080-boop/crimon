@@ -14,9 +14,23 @@ export interface DefenseBreakdown {
   afterDefense: number;
 }
 
-/** ATK/HP/DEFの独立項を合成する。途中では丸めない。 */
-export function calculateBaseDamage(atk: number, atkMultiplier: number, dependentStat = 0, coefficient = 0): number {
-  return Math.max(0, atk) * Math.max(0, atkMultiplier) + Math.max(0, dependentStat) * Math.max(0, coefficient);
+/**
+ * ATK/HP/DEFの独立項を合成する。途中では丸めない。
+ *
+ * **比例の項は2つまで同時に乗る。**
+ * 長らく1つしか取らない形で、`hpCoefficient` と `defCoefficient` を
+ * 両方書いた技は**HP項だけが効いてDEF項が黙って消えていた**
+ * (既存のスキルはどれも片方しか持たなかったので表に出なかった)。
+ * モッチーのS1がATK・最大HP・防御力の3つを足す技なので、2つ目を開けてある。
+ */
+export function calculateBaseDamage(
+  atk: number, atkMultiplier: number,
+  dependentStat = 0, coefficient = 0,
+  secondStat = 0, secondCoefficient = 0,
+): number {
+  return Math.max(0, atk) * Math.max(0, atkMultiplier)
+    + Math.max(0, dependentStat) * Math.max(0, coefficient)
+    + Math.max(0, secondStat) * Math.max(0, secondCoefficient);
 }
 
 /**

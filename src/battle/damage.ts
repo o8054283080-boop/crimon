@@ -158,14 +158,19 @@ export function calcDamage(
   const scaleBonus = passiveSpeedBonus + (effect.scaleBonus
     ? effect.scaleBonus.bonusAtReference * (scaleBonusStatValue / SCALE_REFERENCE[effect.scaleBonus.stat])
     : 0);
-  const dependentStat = effect.hpCoefficient !== undefined
-    ? attacker.maxHp
-    : effect.defCoefficient !== undefined
-      ? getEffectiveStat(attacker, "def")
-      : 0;
+  /*
+   * HP比例とDEF比例は**両方同時に乗る。**
+   *
+   * ここを三項演算子で排他にしていた頃は、両方書いた技から
+   * **DEF項が黙って消えていた**(既存のスキルはどれも片方しか持たず、
+   * モッチーのS1がATK・最大HP・防御力の3つを足す初めての技になった)。
+   */
+  const dependentStat = effect.hpCoefficient !== undefined ? attacker.maxHp : 0;
   // ベヒモスの「古代巨獣」は、HPが減るほど最大HP比例のダメージが伸びる
   const hpDamageBonus = effect.hpCoefficient !== undefined ? passiveHpDamageBonus(attacker) : 0;
-  const coefficient = (effect.hpCoefficient ?? effect.defCoefficient ?? 0) * (1 + hpDamageBonus);
+  const coefficient = (effect.hpCoefficient ?? 0) * (1 + hpDamageBonus);
+  const defStat = effect.defCoefficient !== undefined ? getEffectiveStat(attacker, "def") : 0;
+  const defCoefficient = effect.defCoefficient ?? 0;
   const debuffCount = countDebuffs(defender);
   const debuffBonus = effect.debuffDamageBonus
     ? Math.min(effect.debuffDamageBonus.maxBonus, debuffCount * effect.debuffDamageBonus.perDebuff) : 0;
@@ -203,8 +208,9 @@ export function calcDamage(
 
   // 最終ダメージへの上乗せは、ATK項だけでなくHP/DEF比例の項にも同じように掛ける。
   // 片方だけに掛けると、HP比例が主のモンスターでは条件を満たしてもほとんど変わらない
-  const perHitBase = calculateBaseDamage(atk, (effect.multiplier + scaleBonus) * (1 + debuffBonus), dependentStat, coefficient)
-    * (1 + finalBonus);
+  const perHitBase = calculateBaseDamage(
+    atk, (effect.multiplier + scaleBonus) * (1 + debuffBonus), dependentStat, coefficient, defStat, defCoefficient,
+  ) * (1 + finalBonus);
   const hits = Math.max(1, Math.floor(effect.hits ?? 1));
   // 割合軽減は線形なのでhitごとの結果と同じ。固定軽減だけは解決全体で算出し均等配賦する。
   const resolutionDefense = applyDefense(perHitBase * hits, atk, def, effect.ignoreDefense);
