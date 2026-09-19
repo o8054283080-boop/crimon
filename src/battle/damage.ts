@@ -36,6 +36,13 @@ export function evaluateTargetCondition(condition: EffectCondition, source: Batt
     case "TARGET_DEBUFF_AT_LEAST_2": return countDebuffs(target) >= 2;
     case "TARGET_DEBUFF_AT_LEAST_3": return countDebuffs(target) >= 3;
     case "SELF_HP_ABOVE_50": return source.currentHp / source.maxHp >= 0.5;
+    /*
+     * 実効値どうしで比べる。**素の値ではない。**
+     * 防御バフを撒いてから撃つ、相手を遅くしてから撃つ、という
+     * 手順そのものが条件を満たしにいく動きになる。
+     */
+    case "SELF_DEF_ABOVE_TARGET": return getEffectiveStat(source, "def") > getEffectiveStat(target, "def");
+    case "TARGET_SPD_ABOVE_SELF": return getEffectiveStat(target, "spd") > getEffectiveStat(source, "spd");
     // 解決の文脈が要る条件は、ここでは判定できない
     case "ANY_CRIT": case "CRITS_AT_LEAST_2": case "CRITS_AT_LEAST_3":
     case "STUN_FAILED": case "KILLED_TARGET": case "STRIPPED_TARGET":
@@ -83,6 +90,19 @@ export function adaptationMultiplier(attacker: BattleUnit, defender: BattleUnit)
   return 1 - Math.min(trait.maxReduction, stacks * trait.perStack);
 }
 
+/**
+ * 水の祝福による被クリ率の低下。**張り主自身には効かない。**
+ * 守る側が同時にいちばん会心されにくくなると、狙う場所が無くなる。
+ */
+function waterBlessingCritReduction(defender: BattleUnit): number {
+  for (const holder of defender.alliesForAura ?? []) {
+    if (!holder.alive || holder === defender) continue;
+    const aura = passiveEffectOf(holder);
+    if (aura?.kind === "WATER_BLESSING") return aura.critTaken;
+  }
+  return 0;
+}
+
 export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit, skillBonus = 0): number {
   const weak = passiveEffectOf(attacker);
   const conditionalCrit = weak?.kind === "WEAK_POINT" && defender.currentHp / defender.maxHp <= weak.hpRatio ? weak.critRate : 0;
@@ -90,7 +110,9 @@ export function getFinalCritRate(attacker: BattleUnit, defender: BattleUnit, ski
     + skillBonus
     // 被クリ率の上げ下げ。**受ける側に付く**効果なので、名前の UP/DOWN は相手から見た向き
     + (hasStatus(defender, "CRIT_RATE_UP") ? CRIT_RATE_TAKEN_UP : 0)
-    - (hasStatus(defender, "CRIT_RATE_DOWN") ? CRIT_RATE_TAKEN_DOWN : 0);
+    - (hasStatus(defender, "CRIT_RATE_DOWN") ? CRIT_RATE_TAKEN_DOWN : 0)
+    // 水の祝福。**守られているのは自分以外の味方**なので、防御側の仲間を辿る
+    - waterBlessingCritReduction(defender);
   return Math.max(0, Math.min(1, rate));
 }
 
@@ -114,8 +136,13 @@ export function calcDamage(
   const weak = passiveEffectOf(attacker);
   const weakActive = weak?.kind === "WEAK_POINT" && defenderRatio <= weak.hpRatio;
   const debuffIgnore = effect.debuffIgnoreDefense && countDebuffs(defender) >= effect.debuffIgnoreDefense.count ? effect.debuffIgnoreDefense.ratio : 0;
+  // 条件付きの防御無視。当たること自体は条件に左右されない
+  const condIgnore = effect.conditionalIgnoreDefense
+    && evaluateTargetCondition(effect.conditionalIgnoreDefense.when, attacker, defender)
+    ? effect.conditionalIgnoreDefense.ratio : 0;
   const ratio = Math.max(0, Math.min(1, Math.max(
-    effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0, attacker.deathBoostDefenseIgnore ?? 0, debuffIgnore, weakActive ? weak.ignore : 0,
+    effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0, attacker.deathBoostDefenseIgnore ?? 0, debuffIgnore, condIgnore,
+    weakActive ? weak.ignore : 0,
   )));
   const def = getEffectiveStat(defender, "def") * (1 - ratio);
 
@@ -131,14 +158,19 @@ export function calcDamage(
   const scaleBonus = passiveSpeedBonus + (effect.scaleBonus
     ? effect.scaleBonus.bonusAtReference * (scaleBonusStatValue / SCALE_REFERENCE[effect.scaleBonus.stat])
     : 0);
-  const dependentStat = effect.hpCoefficient !== undefined
-    ? attacker.maxHp
-    : effect.defCoefficient !== undefined
-      ? getEffectiveStat(attacker, "def")
-      : 0;
+  /*
+   * HP比例とDEF比例は**両方同時に乗る。**
+   *
+   * ここを三項演算子で排他にしていた頃は、両方書いた技から
+   * **DEF項が黙って消えていた**(既存のスキルはどれも片方しか持たず、
+   * モッチーのS1がATK・最大HP・防御力の3つを足す初めての技になった)。
+   */
+  const dependentStat = effect.hpCoefficient !== undefined ? attacker.maxHp : 0;
   // ベヒモスの「古代巨獣」は、HPが減るほど最大HP比例のダメージが伸びる
   const hpDamageBonus = effect.hpCoefficient !== undefined ? passiveHpDamageBonus(attacker) : 0;
-  const coefficient = (effect.hpCoefficient ?? effect.defCoefficient ?? 0) * (1 + hpDamageBonus);
+  const coefficient = (effect.hpCoefficient ?? 0) * (1 + hpDamageBonus);
+  const defStat = effect.defCoefficient !== undefined ? getEffectiveStat(attacker, "def") : 0;
+  const defCoefficient = effect.defCoefficient ?? 0;
   const debuffCount = countDebuffs(defender);
   const debuffBonus = effect.debuffDamageBonus
     ? Math.min(effect.debuffDamageBonus.maxBonus, debuffCount * effect.debuffDamageBonus.perDebuff) : 0;
@@ -150,6 +182,14 @@ export function calcDamage(
    */
   let finalBonus = (effect.finalDamageBonus ?? 0) + (effect.currentHpBonus ?? 0) * defenderRatio + (defenderRatio >= 1 ? effect.fullHpBonus ?? 0 : 0);
   if (prey?.kind === "REBIRTH") finalBonus += prey.damage * defenderRatio;
+  /*
+   * ガッツチャージ。**与えるダメージへの上乗せ**であって攻撃力ではない。
+   * 攻撃力を上げると防御で削られる前の値が動き、
+   * 「与えるダメージが+25%」より大きくも小さくもなってしまう。
+   */
+  if (prey?.kind === "GUTS_CHARGE") {
+    finalBonus += prey.damageUp * Math.min(prey.maxStacks, attacker.gutsStacks ?? 0);
+  }
   if (prey?.kind === "ILLUSION" && ["LIGHT", "DARK"].includes(defender.def.element)) finalBonus += .5;
   const hpTier = [...(effect.targetHpBonus ?? [])]
     .sort((a, b) => a.hpRatio - b.hpRatio)
@@ -168,8 +208,9 @@ export function calcDamage(
 
   // 最終ダメージへの上乗せは、ATK項だけでなくHP/DEF比例の項にも同じように掛ける。
   // 片方だけに掛けると、HP比例が主のモンスターでは条件を満たしてもほとんど変わらない
-  const perHitBase = calculateBaseDamage(atk, (effect.multiplier + scaleBonus) * (1 + debuffBonus), dependentStat, coefficient)
-    * (1 + finalBonus);
+  const perHitBase = calculateBaseDamage(
+    atk, (effect.multiplier + scaleBonus) * (1 + debuffBonus), dependentStat, coefficient, defStat, defCoefficient,
+  ) * (1 + finalBonus);
   const hits = Math.max(1, Math.floor(effect.hits ?? 1));
   // 割合軽減は線形なのでhitごとの結果と同じ。固定軽減だけは解決全体で算出し均等配賦する。
   const resolutionDefense = applyDefense(perHitBase * hits, atk, def, effect.ignoreDefense);
@@ -195,7 +236,8 @@ export function calcDamage(
     : 0;
   const isGlancing = swElement && affinity === "DISADVANTAGE" && rng() < SW_GLANCING_CHANCE;
   const isCrit = !isGlancing
-    && rng() < getFinalCritRate(attacker, defender, (effect.critRateBonus ?? 0) + swCritBonus);
+    && (effect.alwaysCrit === true
+      || rng() < getFinalCritRate(attacker, defender, (effect.critRateBonus ?? 0) + swCritBonus));
   const critMultiplier = isCrit ? (getEffectiveStat(attacker, "criDmg") + (weakActive ? weak.critDmg : 0)) * (1 + (effect.critDamageBonus ?? 0)) : 1;
 
   const dealtMultiplier = (attacker.def.combatMods?.damageDealtMultiplier ?? 1)
