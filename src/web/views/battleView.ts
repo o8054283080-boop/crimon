@@ -904,6 +904,13 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       showResult(engine.getWinner() ?? "DRAW");
       return;
     }
+    /*
+     * getNextActor() は次の行動者を決めるために、内部では全員の行動ゲージを
+     * 同じ時間だけ進めている。ここで一度HUDへ同期しないと、その進行が
+     * 行動後の snapshot まで見えず、初手では相手のゲージが0%のまま止まって
+     * 見える。行動順の計算には触れず、行動直前の実値だけを表示へ写す。
+     */
+    applySnapshot(engine.snapshotUnits());
     if (mode === "MANUAL" && actor.team === "PLAYER" && actor.stunTurns === 0) {
       const opening = engine.prepareInteractiveTurn(actor);
       if (opening) {
