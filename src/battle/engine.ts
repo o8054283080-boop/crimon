@@ -2385,6 +2385,52 @@ export class BattleEngine {
           break;
         }
 
+        /*
+         * 固定ダメージ。**防御も会心倍率も属性相性も通さない。**
+         * `applyIncomingDamage` へ直接渡すので、シールドだけは先に削る
+         * (シールドは「肩代わりする壁」で、軽減とは別のもの)。
+         */
+        case "FLAT_DAMAGE": {
+          if (!met(effect.requires)) break;
+          const amount = Math.max(1, Math.round(effect.amount));
+          const applied = this.applyIncomingDamage(target, amount, source, "normal", resolution);
+          damageDealtThisCall += applied.hpDamage;
+          resolution.damageDealt += applied.hpDamage;
+          if (applied.died) { resolution.kills += 1; this.onKill(source); }
+          this.push(`  → ${this.label(target)} に固定ダメージ ${applied.hpDamage}！ (残りHP ${target.currentHp}/${target.maxHp})`);
+          this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage });
+          break;
+        }
+
+        /*
+         * 対象の最大HPに対する割合ダメージ。こちらも防御を通さない。
+         * **HPを積んだ相手ほど大きく入る**ので、硬さで止められない削りになる。
+         */
+        case "MAX_HP_DAMAGE": {
+          if (!met(effect.requires)) break;
+          const amount = Math.max(1, Math.round(target.maxHp * effect.ratio));
+          const applied = this.applyIncomingDamage(target, amount, source, "normal", resolution);
+          damageDealtThisCall += applied.hpDamage;
+          resolution.damageDealt += applied.hpDamage;
+          if (applied.died) { resolution.kills += 1; this.onKill(source); }
+          this.push(`  → ${this.label(target)} に最大HPの${Math.round(effect.ratio * 100)}%のダメージ ${applied.hpDamage}！ (残りHP ${target.currentHp}/${target.maxHp})`);
+          this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage });
+          break;
+        }
+
+        /*
+         * 自傷。**倒れることもそのまま許す**(依頼主の指定で「HP1で止まる」は足さない)。
+         * 自分で自分を殴るので、反撃も拡散も起こさず `applyIncomingDamage` を通さない。
+         */
+        case "SELF_DAMAGE": {
+          const amount = Math.max(1, Math.round(source.maxHp * effect.ratio));
+          source.currentHp = Math.max(0, source.currentHp - amount);
+          if (source.currentHp === 0) source.alive = false;
+          this.push(`  → ${this.label(source)} は反動で ${amount} のダメージを受けた！ (残りHP ${source.currentHp}/${source.maxHp})`);
+          this.pushEvent({ targetId: source.instanceId, kind: "DAMAGE", amount });
+          break;
+        }
+
         case "HEAL": {
           // 回復先はスキルの対象とは限らない。敵を殴りながら味方を癒す技がある
           const receivers = this.receiversFor(source, target, effect.applyTo);
@@ -2476,8 +2522,18 @@ export class BattleEngine {
         }
 
         case "DEBUFF": {
+          /*
+           * **免疫は抵抗無視でも貫けない。**
+           *
+           * 抵抗は「運で弾く」もの、免疫は「弱体を受け付けないと決めて張った答え」。
+           * ここを貫くようにすると、免疫を張る意味そのものが消える。
+           * 抵抗無視の技(`ignoreResistance`)でも、免疫の前では止まる。
+           */
           if (this.isImmune(target)) break;
-          if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution, skill)) break;
+          if (effect.ignoreResistance) {
+            // 書いた確率がそのまま通る。命中・抵抗の判定を通さない
+            if (effect.chance !== undefined && this.rng() >= effect.chance) break;
+          } else if (!this.rollEffectSuccess(source, target, effect.chance, effect.chanceGroup, resolution, skill)) break;
           // 弱化延長。**確率は効果ごとではなく、その効果1つにつき1回**振る
           const debuffTurns = effect.durationTurns + this.talentExtend(skill, "debuff");
           // 同じ能力の弱体は重ねない。すでに付いていれば長い方のターンを採る

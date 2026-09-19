@@ -36,6 +36,13 @@ export function evaluateTargetCondition(condition: EffectCondition, source: Batt
     case "TARGET_DEBUFF_AT_LEAST_2": return countDebuffs(target) >= 2;
     case "TARGET_DEBUFF_AT_LEAST_3": return countDebuffs(target) >= 3;
     case "SELF_HP_ABOVE_50": return source.currentHp / source.maxHp >= 0.5;
+    /*
+     * 実効値どうしで比べる。**素の値ではない。**
+     * 防御バフを撒いてから撃つ、相手を遅くしてから撃つ、という
+     * 手順そのものが条件を満たしにいく動きになる。
+     */
+    case "SELF_DEF_ABOVE_TARGET": return getEffectiveStat(source, "def") > getEffectiveStat(target, "def");
+    case "TARGET_SPD_ABOVE_SELF": return getEffectiveStat(target, "spd") > getEffectiveStat(source, "spd");
     // 解決の文脈が要る条件は、ここでは判定できない
     case "ANY_CRIT": case "CRITS_AT_LEAST_2": case "CRITS_AT_LEAST_3":
     case "STUN_FAILED": case "KILLED_TARGET": case "STRIPPED_TARGET":

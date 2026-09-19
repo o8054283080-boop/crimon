@@ -54,6 +54,9 @@ const REQUIRED_WORDS: Record<SkillEffect["kind"], string[]> = {
   GAUGE_ON_HIT: ["ゲージ"],
   // 拡散。**対象以外へ広がることが読めないと、単体技にしか見えない**
   SPLASH: ["拡散", "広が"],
+  FLAT_DAMAGE: ["固定ダメージ"],
+  MAX_HP_DAMAGE: ["最大HP"],
+  SELF_DAMAGE: ["自傷"],
 };
 
 function allSkills(t: MonsterTemplate): { where: string; skill: Skill }[] {
