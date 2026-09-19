@@ -76,6 +76,18 @@ export interface MonsterTemplate {
    * 補正を通さなければ丸めは★とLvの1回だけになり、設計値ちょうどに置ける。
    */
   noElementFlavor?: true;
+  /**
+   * 属性補正のどの型を使うかを、属性ごとに番号で指定する(0〜3)。
+   *
+   * **省略した既存モンスターは、先頭2つから従来どおり自動で決まる。**
+   * 型は属性ごとに4つあるが、自動で選ぶ範囲を4へ広げると
+   * 既に居る全モンスターの補正が総入れ替えになるため、
+   * 2番・3番はここで명示指定した新モンスターだけが使う。
+   *
+   * 番号は `ELEMENT_STAT_FLAVORS` の並び順。範囲外や欠けている属性は
+   * 自動選択へ落ちるので、**一部の属性だけ指定してもよい。**
+   */
+  elementFlavorAssignment?: Partial<Record<Element, number>>;
 }
 
 /** 属性ごとの色違いバリエーションとして実体化されたモンスター定義(静的データ) */
@@ -246,21 +258,29 @@ const ELEMENT_STAT_FLAVORS: Record<Element, readonly ElementStatFlavor[]> = {
   FIRE: [
     { note: "攻撃+12% / 防御-12%", apply: (s) => ({ ...s, atk: scale(s.atk, 1.12), def: scale(s.def, 0.88) }) },
     { note: "クリダメ+5% / 防御-6%", apply: (s) => ({ ...s, criDmg: s.criDmg + 0.05, def: scale(s.def, 0.94) }) },
+    { note: "HP+10% / 攻撃-7%", apply: (s) => ({ ...s, hp: scale(s.hp, 1.10), atk: scale(s.atk, 0.93) }) },
+    { note: "速度+4% / HP-7%", apply: (s) => ({ ...s, spd: scale(s.spd, 1.04), hp: scale(s.hp, 0.93) }) },
   ],
   // 水は守り。防御で弾くか、HPで受けるか
   WATER: [
     { note: "防御+14% / 攻撃-10%", apply: (s) => ({ ...s, def: scale(s.def, 1.14), atk: scale(s.atk, 0.90) }) },
     { note: "HP+12% / 速度-4%", apply: (s) => ({ ...s, hp: scale(s.hp, 1.12), spd: scale(s.spd, 0.96) }) },
+    { note: "速度+5% / 防御-8%", apply: (s) => ({ ...s, spd: scale(s.spd, 1.05), def: scale(s.def, 0.92) }) },
+    { note: "命中+7% / HP-6%", apply: (s) => ({ ...s, accuracy: Math.min(1, s.accuracy + 0.07), hp: scale(s.hp, 0.94) }) },
   ],
   // 電気は手数。速く動くか、外さなくなるか
   ELECTRIC: [
     { note: "速度+6% / HP-10%", apply: (s) => ({ ...s, spd: scale(s.spd, 1.06), hp: scale(s.hp, 0.90) }) },
     { note: "命中+8% / 防御-10%", apply: (s) => ({ ...s, accuracy: Math.min(1, s.accuracy + 0.08), def: scale(s.def, 0.90) }) },
+    { note: "攻撃+10% / HP-8%", apply: (s) => ({ ...s, atk: scale(s.atk, 1.10), hp: scale(s.hp, 0.92) }) },
+    { note: "防御+10% / 速度-3%", apply: (s) => ({ ...s, def: scale(s.def, 1.10), spd: scale(s.spd, 0.97) }) },
   ],
   // 木は粘り。HPで受けるか、防御で受けるか
   GRASS: [
     { note: "HP+14% / 攻撃-10%", apply: (s) => ({ ...s, hp: scale(s.hp, 1.14), atk: scale(s.atk, 0.90) }) },
     { note: "防御+12% / 攻撃-8%", apply: (s) => ({ ...s, def: scale(s.def, 1.12), atk: scale(s.atk, 0.92) }) },
+    { note: "クリ率+3% / HP-6%", apply: (s) => ({ ...s, criRate: Math.min(1, s.criRate + 0.03), hp: scale(s.hp, 0.94) }) },
+    { note: "速度+4% / 防御-7%", apply: (s) => ({ ...s, spd: scale(s.spd, 1.04), def: scale(s.def, 0.93) }) },
   ],
   /*
    * 光と闇は会心のまま。**依頼は「火水木電気で上がるものが決まっているのがつまらない」**で、
@@ -271,10 +291,14 @@ const ELEMENT_STAT_FLAVORS: Record<Element, readonly ElementStatFlavor[]> = {
   LIGHT: [
     { note: "クリ率+3% / 防御-6%", apply: (s) => ({ ...s, criRate: Math.min(1, s.criRate + 0.03), def: scale(s.def, 0.94) }) },
     { note: "命中+7% / HP-6%", apply: (s) => ({ ...s, accuracy: Math.min(1, s.accuracy + 0.07), hp: scale(s.hp, 0.94) }) },
+    { note: "HP+10% / クリダメ-4%", apply: (s) => ({ ...s, hp: scale(s.hp, 1.10), criDmg: s.criDmg - 0.04 }) },
+    { note: "速度+4% / 攻撃-6%", apply: (s) => ({ ...s, spd: scale(s.spd, 1.04), atk: scale(s.atk, 0.94) }) },
   ],
   DARK: [
     { note: "クリダメ+5% / HP-5%", apply: (s) => ({ ...s, criDmg: s.criDmg + 0.05, hp: scale(s.hp, 0.95) }) },
     { note: "攻撃+10% / 防御-12%", apply: (s) => ({ ...s, atk: scale(s.atk, 1.10), def: scale(s.def, 0.88) }) },
+    { note: "防御+10% / 攻撃-7%", apply: (s) => ({ ...s, def: scale(s.def, 1.10), atk: scale(s.atk, 0.93) }) },
+    { note: "HP+9% / 速度-3%", apply: (s) => ({ ...s, hp: scale(s.hp, 1.09), spd: scale(s.spd, 0.97) }) },
   ],
 };
 
@@ -312,10 +336,37 @@ export function elementFlavorIndexOf(templateId: string, element: Element, count
   return (hash >>> 0) % count;
 }
 
-/** そのモンスターに掛かる属性補正。図鑑やテストから中身を説明できるよう note も返す */
-export function elementStatFlavorOf(templateId: string, element: Element): ElementStatFlavor {
+/**
+ * **既存モンスターが選ぶ範囲。先頭の2つだけ。**
+ *
+ * 型は属性ごとに4つへ増えたが、`elementFlavorIndexOf` は個数で剰余を取るので、
+ * ここを4にすると**既に居る全モンスターの補正が総入れ替えになる**。
+ * 引いて育てた個体の性能が、更新しただけで変わってしまう。
+ *
+ * 2番・3番は**明示指定した新モンスターだけ**が使う
+ * (`MonsterTemplate.elementFlavorAssignment`)。
+ * `tests/elementFlavorRegression.test.ts` が、既存の補正結果が
+ * 1体も動いていないことを見張る。
+ */
+const LEGACY_FLAVOR_COUNT = 2;
+
+/**
+ * そのモンスターに掛かる属性補正。図鑑やテストから中身を説明できるよう note も返す。
+ *
+ * `assignment` に番号があればそれを使い、無ければ従来どおり
+ * **先頭2つから**テンプレートIDと属性で決める。
+ */
+export function elementStatFlavorOf(
+  templateId: string,
+  element: Element,
+  assignment?: Partial<Record<Element, number>>,
+): ElementStatFlavor {
   const flavors = ELEMENT_STAT_FLAVORS[element];
-  return flavors[elementFlavorIndexOf(templateId, element, flavors.length)];
+  const assigned = assignment?.[element];
+  if (assigned !== undefined && Number.isInteger(assigned) && assigned >= 0 && assigned < flavors.length) {
+    return flavors[assigned];
+  }
+  return flavors[elementFlavorIndexOf(templateId, element, LEGACY_FLAVOR_COUNT)];
 }
 
 /**
@@ -452,7 +503,7 @@ function pickSkillVariant(variants: Skill[], element: Element, groupOffset: numb
 export function createMonsterVariant(template: MonsterTemplate, element: Element): MonsterDefinition {
   const flavoredStats = template.noElementFlavor
     ? cloneStats(template.baseStats)
-    : elementStatFlavorOf(template.templateId, element).apply(cloneStats(template.baseStats));
+    : elementStatFlavorOf(template.templateId, element, template.elementFlavorAssignment).apply(cloneStats(template.baseStats));
   const assignment = template.skillAssignment?.[element];
   const skill2 = applyLegacySkillBalance(
     template.skill2Variants[assignment?.skill2 ?? -1] ?? pickSkillVariant(template.skill2Variants, element, 0),
