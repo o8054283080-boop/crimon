@@ -3,6 +3,7 @@ import { MonsterTemplate, createAllVariants } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
 import { setCreatedSkillResolver } from "../core/monsterInstance.js";
 import { NEW_MONSTER_TEMPLATES, NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES } from "./newMonsters/index.js";
+import { COLLAB_MONSTER_TEMPLATES } from "./collabMonsters/index.js";
 import { CRIMOARK, CRIMOARK_ATTACK, CRIMOARK_DEBUFF, CRIMOARK_SUPPORT } from "./crimoark.js";
 import { ARCHEOS, TALENT_SHARD_ATK, TALENT_SHARD_DEF } from "./awakeningDepthsMonsters.js";
 import {
@@ -1866,6 +1867,7 @@ export const ALL_MONSTER_TEMPLATES: MonsterTemplate[] = [
   ANCIENT_GUARD_BEAST,
   ANCIENT_FANG_BEAST,
   ...NEW_MONSTER_TEMPLATES,
+  ...COLLAB_MONSTER_TEMPLATES,
   // 試練の塔100階のクリモアークと分身3種。**召喚にも図鑑にも出さない**
   CRIMOARK,
   CRIMOARK_ATTACK,
@@ -2060,11 +2062,21 @@ export const GACHA_EXCLUSIVE_DEX = [
 /** 今回追加した11種の全6属性(66体)。図鑑にも召喚にも通常のモンスターとして出る */
 export const NEW_MONSTERS_DEX = NEW_MONSTER_TEMPLATES.flatMap((template) => createAllVariants(template));
 
+/**
+ * コラボ4種の全6属性(24体)。通常のモンスターとして育成・装備・召喚ができる。
+ *
+ * **並びは必ず末尾。**潜在覚醒の候補IDは
+ * `ALL_DISPLAYABLE_MONSTERS_DEX` の添字から作られるので、
+ * 途中へ差し込むと既に覚醒済みの個体の候補がずれる。
+ */
+export const COLLAB_MONSTERS_DEX = COLLAB_MONSTER_TEMPLATES.flatMap((template) => createAllVariants(template));
+
 /** 検索用の全モンスター図鑑(通常モンスター + ガチャ限定高レア + 転生ピッグ + 経験ピッグ + 装備ダンジョン専用ボス/お供) */
 export const MONSTER_DEX = [
   ...MONSTER_TEMPLATES_DEX,
   ...GACHA_EXCLUSIVE_DEX,
   ...NEW_MONSTERS_DEX,
+  ...COLLAB_MONSTERS_DEX,
   ...REINCARNATION_PIG_DEX,
   ...EXP_PIG_DEX,
   ...SKILL_PIG_DEX,
@@ -2107,7 +2119,9 @@ export const TOWER_BOSS_ONLY_DEX = [
  * 素材専用のピッグをここへ入れてはいけない——覚醒できない相手に
  * 候補が3つ生えて、図鑑が嘘をつく。
  */
-export const ALL_DISPLAYABLE_MONSTERS_DEX = [...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...NEW_MONSTERS_DEX];
+export const ALL_DISPLAYABLE_MONSTERS_DEX = [
+  ...MONSTER_TEMPLATES_DEX, ...GACHA_EXCLUSIVE_DEX, ...NEW_MONSTERS_DEX, ...COLLAB_MONSTERS_DEX,
+];
 
 /** 素材専用のモンスター。戦力にはならないが、使い道が分からないままなので図鑑には載せる */
 export const MATERIAL_PIG_DEX = [...REINCARNATION_PIG_DEX, ...EXP_PIG_DEX, ...SKILL_PIG_DEX];

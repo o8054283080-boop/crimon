@@ -136,8 +136,13 @@ export function calcDamage(
   const weak = passiveEffectOf(attacker);
   const weakActive = weak?.kind === "WEAK_POINT" && defenderRatio <= weak.hpRatio;
   const debuffIgnore = effect.debuffIgnoreDefense && countDebuffs(defender) >= effect.debuffIgnoreDefense.count ? effect.debuffIgnoreDefense.ratio : 0;
+  // 条件付きの防御無視。当たること自体は条件に左右されない
+  const condIgnore = effect.conditionalIgnoreDefense
+    && evaluateTargetCondition(effect.conditionalIgnoreDefense.when, attacker, defender)
+    ? effect.conditionalIgnoreDefense.ratio : 0;
   const ratio = Math.max(0, Math.min(1, Math.max(
-    effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0, attacker.deathBoostDefenseIgnore ?? 0, debuffIgnore, weakActive ? weak.ignore : 0,
+    effect.ignoreDefenseRatio ?? 0, hpIgnore?.ratio ?? 0, attacker.deathBoostDefenseIgnore ?? 0, debuffIgnore, condIgnore,
+    weakActive ? weak.ignore : 0,
   )));
   const def = getEffectiveStat(defender, "def") * (1 - ratio);
 
@@ -225,7 +230,8 @@ export function calcDamage(
     : 0;
   const isGlancing = swElement && affinity === "DISADVANTAGE" && rng() < SW_GLANCING_CHANCE;
   const isCrit = !isGlancing
-    && rng() < getFinalCritRate(attacker, defender, (effect.critRateBonus ?? 0) + swCritBonus);
+    && (effect.alwaysCrit === true
+      || rng() < getFinalCritRate(attacker, defender, (effect.critRateBonus ?? 0) + swCritBonus));
   const critMultiplier = isCrit ? (getEffectiveStat(attacker, "criDmg") + (weakActive ? weak.critDmg : 0)) * (1 + (effect.critDamageBonus ?? 0)) : 1;
 
   const dealtMultiplier = (attacker.def.combatMods?.damageDealtMultiplier ?? 1)

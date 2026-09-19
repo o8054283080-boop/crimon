@@ -191,6 +191,22 @@ export interface DamageEffect {
   ignoreDefense?: boolean;
   /** 0～1の部分防御無視率。 */
   ignoreDefenseRatio?: number;
+  /**
+   * 条件を満たした時だけ乗る防御無視。**ダメージそのものは条件に関わらず出る。**
+   *
+   * `requires` を使うとヒットごと消えてしまうので分けてある
+   * (「自分の防御が高ければ深く刺さる」は、低くても当たること自体は変わらない)。
+   * 他の防御無視と同じく**足さずに大きい方を取る**。
+   */
+  conditionalIgnoreDefense?: { when: EffectCondition; ratio: number };
+  /**
+   * **必ずクリティカルになる。**
+   *
+   * クリ率の上乗せ(`critRateBonus`)では、被クリ率DOWNや味方のオーラで
+   * 100%を割る。「必ず」と書いた技は、相手の守りで確率へ戻ってはいけない。
+   * かすり(属性不利)だけは別で、あちらはクリティカルそのものを禁じる。
+   */
+  alwaysCrit?: true;
   /** 対象に付与済みの弱体効果数による倍率（上限必須）。 */
   debuffDamageBonus?: { perDebuff: number; maxBonus: number };
   /**
@@ -1019,18 +1035,26 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "SELF_DAMAGE":
       return `自身の最大HPの${percent(effect.ratio)}を自傷`;
     case "DAMAGE": {
-      const scaleText = effect.scaleBonus
-        ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
-        : effect.hpCoefficient !== undefined
-          ? `(最大HPの${percent(effect.hpCoefficient)}を加算)`
-          : effect.defCoefficient !== undefined
-            ? `(防御力の${percent(effect.defCoefficient)}を加算)`
-            : "";
+      /*
+       * **HP比例とDEF比例は同時に書ける。**
+       * ここを三項演算子で排他にしていた頃は、両方持つ技の説明から
+       * 片方が黙って消えていた(モッチーのS1がATK+HP+DEFの3項)。
+       */
+      const scaleParts = [
+        effect.scaleBonus ? `自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇` : "",
+        effect.hpCoefficient !== undefined ? `最大HPの${percent(effect.hpCoefficient)}を加算` : "",
+        effect.defCoefficient !== undefined ? `防御力の${percent(effect.defCoefficient)}を加算` : "",
+      ].filter(Boolean);
+      const scaleText = scaleParts.length > 0 ? `(${scaleParts.join("、")})` : "";
       const ignoreDefenseText = effect.ignoreDefense
         ? "(防御力無視)"
         : effect.ignoreDefenseRatio
           ? `(防御力${Math.round(effect.ignoreDefenseRatio * 100)}%無視)`
           : "";
+      const condIgnoreText = effect.conditionalIgnoreDefense
+        ? `(${EFFECT_CONDITION_JA[effect.conditionalIgnoreDefense.when]}防御力${Math.round(effect.conditionalIgnoreDefense.ratio * 100)}%無視)`
+        : "";
+      const alwaysCritText = effect.alwaysCrit ? "(必ずクリティカル)" : "";
       const hpBonusText = (effect.targetHpBonus ?? [])
         .map((tier) => ` 対象HP${Math.round(tier.hpRatio * 100)}%以下で最終ダメージ+${Math.round(tier.bonus * 100)}%`)
         .join("");
@@ -1057,7 +1081,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
         effect.perHitEffects ? `各ヒットごとに: ${effect.perHitEffects.map(describeSkillEffect).join('、')}` : '',
       ].filter(Boolean).join('。');
       const requiresText = conditionPrefix(effect.requires);
-      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${critGaugeText}${special ? `。${special}` : ""}`;
+      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${condIgnoreText}${alwaysCritText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${critGaugeText}${special ? `。${special}` : ""}`;
     }
     case "HEAL": {
       const who = effect.applyTo === "SELF" ? "自身を" : effect.applyTo === "ALLIES" ? "味方全体を" : "";
@@ -1073,7 +1097,13 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `${scope}${BUFF_STAT_JA[effect.stat]}+${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
     }
     case "DEBUFF":
-      return `${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
+      /*
+       * **抵抗無視は必ず出す。**プレイヤーが編成を考えるために要る情報で、
+       * 「85%で防御DOWN」としか書かないと、抵抗の高い相手に
+       * 効かないものと読まれる(実際は通る)。免疫では防がれることも併記する。
+       */
+      return `${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`
+        + (effect.ignoreResistance ? "(抵抗を無視。ただし免疫中の相手には入らない)" : "");
     case "STATUS": {
       const scope = effect.applyTo === "ALLIES" ? "味方全体に" : effect.applyTo === "SELF" ? "自身に" : "";
       return `${chanceSuffix(effect.chance)}${scope}${STATUS_EFFECT_JA[effect.status]} (${effect.durationTurns}ターン)`;

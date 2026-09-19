@@ -77,6 +77,18 @@ describe("スキルの説明文と効果", () => {
     const lies: string[] = [];
     for (const { where, skill } of EVERY_SKILL) {
       const d = skill.description ?? "";
+      /*
+       * **説明文を効果から生成しているスキルは、この検査を通す必要が無い。**
+       *
+       * ここが見ているのは「手で書いた説明文から効果が抜け落ちていないか」で、
+       * 語彙の表(`REQUIRED_WORDS`)は既存の手書き文から拾ってある
+       * (「攻撃力を低下させる」の『低下』など)。生成側は同じことを
+       * 「攻撃力-50%」と書くので、**書き漏らしが1つも無いのに落ちる。**
+       *
+       * 生成した文かどうかは、下の検査が `describeSkillLines` との
+       * 一致で確かめている。そちらが通る文には、定義上すべての効果が入っている。
+       */
+      if (d.startsWith(describeSkillLines(skill).join("。"))) continue;
       for (const effect of skill.effects) {
         const words = REQUIRED_WORDS[effect.kind];
         if (words.length > 0 && !words.some((w) => d.includes(w))) {
