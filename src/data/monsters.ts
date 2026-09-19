@@ -3,7 +3,7 @@ import { MonsterTemplate, createAllVariants } from "../core/monster.js";
 import { Skill } from "../core/skill.js";
 import { setCreatedSkillResolver } from "../core/monsterInstance.js";
 import { NEW_MONSTER_TEMPLATES, NEW_STAR3_TEMPLATES, NEW_STAR4_TEMPLATES, NEW_STAR5_TEMPLATES } from "./newMonsters/index.js";
-import { COLLAB_MONSTER_TEMPLATES } from "./collabMonsters/index.js";
+import { COLLAB_MONSTER_TEMPLATES, GUJIRA, MOCCHI, SUEZO, UNDINE } from "./collabMonsters/index.js";
 import { CRIMOARK, CRIMOARK_ATTACK, CRIMOARK_DEBUFF, CRIMOARK_SUPPORT } from "./crimoark.js";
 import { ARCHEOS, TALENT_SHARD_ATK, TALENT_SHARD_DEF } from "./awakeningDepthsMonsters.js";
 import {
@@ -1886,10 +1886,19 @@ export const ALL_MONSTER_TEMPLATES: MonsterTemplate[] = [
 
 /** 星3の抽選対象。既存8種 + 今回の3種 */
 export const GACHA_STAR3_TEMPLATES: MonsterTemplate[] = [...MONSTER_TEMPLATES, ...NEW_STAR3_TEMPLATES, SCORPION];
-/** 星4の抽選対象。既存2種 + 今回の4種 */
-export const GACHA_STAR4_TEMPLATES: MonsterTemplate[] = [GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, ...NEW_STAR4_TEMPLATES, HARPY];
-/** 星5の抽選対象。既存2種 + 今回の4種 */
-export const GACHA_STAR5_TEMPLATES: MonsterTemplate[] = [GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE, ...NEW_STAR5_TEMPLATES, PHOENIX, JOKER];
+/**
+ * 星4の抽選対象。既存2種 + 11種のうちの4種 + コラボ2種。
+ *
+ * **星ごとの排出比率は触っていない。**増えたのは「その星を引いた時の顔ぶれ」だけで、
+ * 星4そのものの出やすさは前と同じ。
+ */
+export const GACHA_STAR4_TEMPLATES: MonsterTemplate[] = [
+  GACHA_SR_COMMON_TEMPLATE, GACHA_SR_RARE_TEMPLATE, ...NEW_STAR4_TEMPLATES, HARPY, MOCCHI, SUEZO,
+];
+/** 星5の抽選対象。既存2種 + 11種のうちの4種 + コラボ2種 */
+export const GACHA_STAR5_TEMPLATES: MonsterTemplate[] = [
+  GACHA_SSR_COMMON_TEMPLATE, GACHA_SSR_RARE_TEMPLATE, ...NEW_STAR5_TEMPLATES, PHOENIX, JOKER, UNDINE, GUJIRA,
+];
 
 export const GACHA_SR_COMMON_DEX = createAllVariants(GRIFFON);
 export const GACHA_SSR_COMMON_DEX = createAllVariants(DRAGON);
