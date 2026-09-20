@@ -117,6 +117,14 @@ body.notice-sheet-open{overflow:hidden!important}
   white-space:pre-line;
   overflow-wrap:anywhere;
 }
+/*
+ * 本文の強調。**大きさは本文のまま**にして、色と太さだけ変える。
+ * 前はここが `**` という記号のまま画面に出ていた(実機で確認)。
+ */
+.notice-card p strong{
+  color:#ffe09a;
+  font-weight:800;
+}
 .notice-card__reward{
   margin-top:9px!important;
   padding-top:8px;

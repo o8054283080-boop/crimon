@@ -1,4 +1,5 @@
 import { COMPENSATIONS, Compensation } from "../game/compensation.js";
+import { emphasizedNodes } from "./dom.js";
 import "./noticeUi.css";
 
 const BUTTON_ID = "persistent-notice-button";
@@ -125,7 +126,8 @@ function openSheet(): void {
     const heading = document.createElement("h3");
     heading.textContent = notice.title;
     const message = document.createElement("p");
-    message.textContent = notice.message;
+    // **`**` は太字にする。**textContent で流し込むと画面にアスタリスクが出る
+    message.append(...emphasizedNodes(notice.message));
     article.append(meta, heading, message);
 
     const reward = rewardText(notice);

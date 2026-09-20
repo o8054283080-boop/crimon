@@ -12,7 +12,7 @@ import {
   recordCollabFarmRun, recordCollabWin, syncMissions,
 } from "../src/game/missions.js";
 import { COLLAB_MILESTONES, COLLAB_MISSIONS } from "../src/game/collabMissions.js";
-import { COLLAB_GIFT_DEX_ID } from "../src/data/collabEvent.js";
+import { COLLAB_EVENT_TO_DATE, COLLAB_GIFT_DEX_ID } from "../src/data/collabEvent.js";
 import { addMonster, createInitialState } from "../src/game/playerState.js";
 import { GIFT_DEFINITIONS } from "../src/data/gifts.js";
 import { claimGift } from "../src/game/gift.js";
@@ -21,8 +21,15 @@ import { decodeSave, encodeSave } from "../src/game/saveCodec.js";
 
 /** 開催期間の中の1日 */
 const DURING = new Date("2026-09-25T03:00:00Z");
-/** 開催が終わった後 */
-const AFTER = new Date("2026-11-01T03:00:00Z");
+/*
+ * 開催が終わった後。**終了日から数えて出す。**
+ * 日付を直に書いていたら、期間を伸ばした時にここが期間の中へ入ってしまった
+ * (10月19日までのつもりで11月1日と書いてあった)。
+ */
+const AFTER = (() => {
+  const [year, month, day] = COLLAB_EVENT_TO_DATE.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1, 15, 0, 0));
+})();
 
 function freshPlayer() {
   const state = createInitialState();
