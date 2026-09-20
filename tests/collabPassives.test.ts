@@ -210,6 +210,71 @@ describe("魅惑のまなこ(スエゾー光)", () => {
     expect(crit.log.some((l) => /「魅惑のまなこ」が敵全体を撃った/.test(l))).toBe(true);
   });
 
+  /*
+   * **追撃で撃った敵にも解除と気絶が乗る**(依頼主の指定)。
+   *
+   * 前は主対象だけだったので、会心が出て敵全体を撃っても
+   * **妨害が入るのは1体だけ**だった。追撃自体が1スキルにつき1回しか
+   * 起きないので、これで1体が2回受けることにはならない。
+   */
+  it("会心で追撃した時、主対象以外にも気絶が乗る", () => {
+    const skill: Skill = {
+      id: "one", name: "一撃", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0,
+      effects: [{ kind: "DAMAGE", multiplier: 0.1 }],
+    };
+    const result = new BattleEngine(
+      [unit("m", skill, { passive: spec, stats: { spd: 300, criRate: 1 } })],
+      [
+        unit("d1", IDLE, { stats: { spd: 10, hp: 10_000_000 } }),
+        unit("d2", IDLE, { stats: { spd: 10, hp: 10_000_000 } }),
+        unit("d3", IDLE, { stats: { spd: 10, hp: 10_000_000 } }),
+      ],
+      { rng: () => 0.01, maxTurns: 1 },
+    ).run();
+
+    expect(result.log.some((l) => /「魅惑のまなこ」が敵全体を撃った/.test(l))).toBe(true);
+    // 3体とも気絶する(主対象で1回 + 追撃で残り2体)
+    expect(result.log.filter((l) => /は気絶した/.test(l)).length).toBe(3);
+  });
+
+  it("追撃で撃った敵の強化も解除される", () => {
+    const skill: Skill = {
+      id: "one", name: "一撃", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0,
+      effects: [{ kind: "DAMAGE", multiplier: 0.1 }],
+    };
+    // 敵側が先に全体強化を撃ってから殴られる(速い方を鼓舞役にする)
+    const allyBuff: Skill = {
+      id: "brace", name: "鼓舞", description: "", target: "ALL_ALLIES", cooldownTurns: 0,
+      effects: [{ kind: "BUFF", stat: "atk", amount: 0.5, durationTurns: 3 }],
+    };
+    const result = new BattleEngine(
+      [unit("m", skill, { passive: spec, stats: { spd: 200, criRate: 1 } })],
+      [
+        unit("d1", allyBuff, { stats: { spd: 300, hp: 10_000_000 } }),
+        unit("d2", allyBuff, { stats: { spd: 10, hp: 10_000_000 } }),
+      ],
+      { rng: () => 0.01, maxTurns: 2 },
+    ).run();
+
+    // 主対象(d1)で1回 + 追撃で撃った d2 で1回
+    expect(result.log.filter((l) => /の強化が1つ解除された/.test(l)).length).toBe(2);
+    expect(result.log.some((l) => /d2.*の強化が1つ解除された/.test(l))).toBe(true);
+  });
+
+  it("主対象へ二重には掛からない", () => {
+    const skill: Skill = {
+      id: "one", name: "一撃", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0,
+      effects: [{ kind: "DAMAGE", multiplier: 0.1 }],
+    };
+    const result = new BattleEngine(
+      [unit("m", skill, { passive: spec, stats: { spd: 300, criRate: 1 } })],
+      [unit("d", IDLE, { stats: { spd: 10, hp: 10_000_000 } })],
+      { rng: () => 0.01, maxTurns: 1 },
+    ).run();
+    // 敵が1体しか居ない = 追撃の相手も主対象だけ。気絶は1回に留まる
+    expect(result.log.filter((l) => /は気絶した/.test(l)).length).toBe(1);
+  });
+
   it("追撃からさらに追撃は起きない", () => {
     const skill: Skill = {
       id: "one", name: "一撃", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0,
