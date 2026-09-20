@@ -245,9 +245,12 @@ function renderIdle(props: SummonProps): HTMLElement {
       el("h2", { className: "collab-summon__title" }, ["コラボピックアップ召喚"]),
     ]),
     el("p", { className: "collab-summon__lead" }, ["★4・★5でコラボモンスターの出現率UP"]),
-    el("div", { className: "summon-cta collab-summon__cta" }, [
+    el("div", { className: "summon-cta__pair collab-summon__cta" }, [
       ctaButton({
-        className: "summon-cta__btn--ten collab-summon__btn",
+        // **`--ten` の大きな書体は使わない。**画面いっぱいの幅を前提にしていて、
+        // 半分の幅に入れると「コ ラ ボ 10 連」と1文字ずつ折り返される(実際にそうなった)。
+        // 既存の「書で10連 / 書で1回」と同じ素のボタンに、金の縁だけを足す
+        className: "collab-summon__btn collab-summon__btn--lead",
         lead: "コラボ10連",
         sub: "★4以上 1体確定",
         costIcon: "crystal",
@@ -256,7 +259,7 @@ function renderIdle(props: SummonProps): HTMLElement {
         onClick: () => props.onCollabSummon?.(10),
       }),
       ctaButton({
-        className: "summon-cta__btn--single collab-summon__btn",
+        className: "collab-summon__btn",
         lead: "コラボ1回",
         sub: "★3以上 確定",
         costIcon: "crystal",

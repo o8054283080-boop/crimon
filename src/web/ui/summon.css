@@ -2120,8 +2120,22 @@
 /* **%は書かない**(依頼主との約束)。「UP」とだけ言う */
 .collab-summon__lead { margin: 0 0 10px; color: #cbd8ef; font-size: .74rem; line-height: 1.5; }
 /* 2つのボタンは横に並べる。縦に積むと枠が高くなりすぎて下が切れる */
-.collab-summon__cta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
-.collab-summon__btn { width: 100%; }
+.collab-summon__cta { margin: 0; }
+/*
+ * **名前は途中で折らない。**半分の幅だと「コラボ1 / 回」と割れて読みにくい。
+ * 折り返す場所が無ければ縮める方がまだ読める。
+ */
+.collab-summon__btn .summon-cta__lead {
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.collab-summon__btn .summon-cta__sub { font-size: 0.58rem; }
+/* 主役の10連にだけ金の縁。**書体は素のままにする**(大きくすると半分の幅に入らない) */
+.collab-summon__btn--lead {
+  box-shadow: var(--bevel), var(--drop), inset 0 0 0 1px rgba(255, 211, 106, 0.55);
+}
+.collab-summon__btn--lead .summon-cta__lead { color: #ffe69a; }
 
 /* 幅の狭い端末では横並びをやめる。**文字が縮むより、縦に伸びる方がよい** */
 @media (max-width: 360px) {

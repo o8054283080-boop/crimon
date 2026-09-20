@@ -1,3 +1,4 @@
+import { COLLAB_EVENT_FROM_DATE, COLLAB_EVENT_TO_DATE, COLLAB_GIFT_DEX_ID } from "./collabEvent.js";
 import { CRIM_DEX_ID } from "../game/crim.js";
 import type { GiftDefinition } from "../game/gift.js";
 
@@ -20,6 +21,33 @@ import type { GiftDefinition } from "../game/gift.js";
  * 後から確かめてほしい時、期限を切りたい時はこちらを使う。
  */
 export const GIFT_DEFINITIONS: readonly GiftDefinition[] = [
+  {
+    /*
+     * コラボ開催記念の配布。**全員へ1回だけ。**
+     *
+     * プレゼントボックスに任せるのは、この仕組みが既に
+     * 「受け取ったかどうかを giftId で覚える」を持っているから。
+     * 再ログインしても、端末を変えてセーブを復旧しても、二重には配られない。
+     * 受け取る前なら一覧に残り続ける。
+     *
+     * **電気スエゾーは配布専用の弱い個体ではない。**
+     * 召喚で引いたものとまったく同じ図鑑IDと星で入る。
+     */
+    giftId: "collab_celebration_20260919",
+    title: "コラボ開催記念プレゼント",
+    description: "コラボ開催を記念して、全員へお配りします。"
+      + "電気スエゾーは召喚で引いたものとまったく同じ個体で、育成・装備・ランクアップ・"
+      + "タイプ転生・才能覚醒まで何も制限がありません。"
+      + "コラボ限定★4以上召喚書はコラボモンスターしか出ない特別な召喚書です。",
+    rewards: [
+      { kind: "MONSTER", dexId: COLLAB_GIFT_DEX_ID, star: 4, amount: 1 },
+      { kind: "CRYSTAL", amount: 3_000 },
+      { kind: "SUMMON_SCROLL", amount: 30 },
+      { kind: "COLLAB_FOUR_STAR_SUMMON_SCROLL", amount: 1 },
+    ],
+    startsAt: `${COLLAB_EVENT_FROM_DATE}T00:00:00+09:00`,
+    expiresAt: `${COLLAB_EVENT_TO_DATE}T23:59:59+09:00`,
+  },
   {
     /*
      * クリムの配布。**全員へ1体だけ。**

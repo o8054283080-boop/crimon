@@ -14,7 +14,8 @@ import {
 import { COLLAB_MILESTONES, COLLAB_MISSIONS } from "../src/game/collabMissions.js";
 import { COLLAB_GIFT_DEX_ID } from "../src/data/collabEvent.js";
 import { addMonster, createInitialState } from "../src/game/playerState.js";
-import { claimCompensations } from "../src/game/compensation.js";
+import { GIFT_DEFINITIONS } from "../src/data/gifts.js";
+import { claimGift } from "../src/game/gift.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { decodeSave, encodeSave } from "../src/game/saveCodec.js";
 
@@ -86,7 +87,7 @@ describe("進捗の測り方", () => {
   it("配布の電気スエゾーを受け取ると、1つ目が達成になる", () => {
     const state = freshPlayer();
     expect(getCollabCampaignView(state, DURING)!.missions[0].complete).toBe(false);
-    claimCompensations(state, DURING);
+    claimGift(GIFT_DEFINITIONS, state, "collab_celebration_20260919", { now: DURING.getTime() });
     expect(getCollabCampaignView(state, DURING)!.missions[0].complete).toBe(true);
   });
 
@@ -158,14 +159,14 @@ describe("報酬の受け取り", () => {
   it("達成したものだけ受け取れる", () => {
     const state = freshPlayer();
     expect(claimCollabMission(state, "collab-01-gift", DURING), "未達成でも受け取れてしまった").toBeNull();
-    claimCompensations(state, DURING);
+    claimGift(GIFT_DEFINITIONS, state, "collab_celebration_20260919", { now: DURING.getTime() });
     expect(claimCollabMission(state, "collab-01-gift", DURING)).not.toBeNull();
   });
 
   /** **二度目は必ず null。**押し続けてもダイヤが増え続けない */
   it("個別報酬を二重に受け取れない", () => {
     const state = freshPlayer();
-    claimCompensations(state, DURING);
+    claimGift(GIFT_DEFINITIONS, state, "collab_celebration_20260919", { now: DURING.getTime() });
     const first = claimCollabMission(state, "collab-01-gift", DURING);
     expect(first).not.toBeNull();
     const crystal = state.crystal;
@@ -178,7 +179,7 @@ describe("報酬の受け取り", () => {
   it("累計報酬も二重に受け取れない", () => {
     const state = freshPlayer();
     // 5個ぶん達成させる
-    claimCompensations(state, DURING);
+    claimGift(GIFT_DEFINITIONS, state, "collab_celebration_20260919", { now: DURING.getTime() });
     const monster = state.monsters.find((m) => m.dexId === COLLAB_GIFT_DEX_ID)!;
     state.partyIds.push(monster.id);
     monster.level = 20;
@@ -208,7 +209,7 @@ describe("報酬の受け取り", () => {
     for (const mission of COLLAB_MISSIONS) campaign.claimedIds.push(`__not_${mission.id}`);
     campaign.collabWins = 1_000;
     campaign.farmRuns = 1_000;
-    claimCompensations(state, DURING);
+    claimGift(GIFT_DEFINITIONS, state, "collab_celebration_20260919", { now: DURING.getTime() });
     const monster = state.monsters.find((m) => m.dexId === COLLAB_GIFT_DEX_ID)!;
     monster.level = 60;
     monster.star = 6;
@@ -231,7 +232,7 @@ describe("期間とセーブ", () => {
   /** 受け取り済みの印がセーブを跨いで残る */
   it("セーブして読み戻しても、受け取り済みのものは受け取れない", () => {
     const state = freshPlayer();
-    claimCompensations(state, DURING);
+    claimGift(GIFT_DEFINITIONS, state, "collab_celebration_20260919", { now: DURING.getTime() });
     claimCollabMission(state, "collab-01-gift", DURING);
 
     const restored = decodeSave(encodeSave(state))!;
