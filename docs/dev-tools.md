@@ -160,6 +160,14 @@ rm -rf node_modules/.vite
 HARNESS_VITE_PORT=... HARNESS_PORT=... node tools/harness.mjs &
 ```
 
+**`HARNESS_PORT` は制御ポート(既定5311)で、Viteのポート(既定5310)ではない。**
+`HARNESS_PORT=5310` を渡すとViteと同じ番号を取りにいって
+`EADDRINUSE` で落ちる。**ログには先にVite側の「起動」が出るので、
+立ち上がったように見えて制御だけが死んでいる。**
+止める時も両方(5310と5311)を見ること
+——制御だけ残ってブラウザが閉じていると、
+`probe` が「Target page… has been closed」を返す。
+
 2回踏んだ。**CSSが丸ごと効かなくなったら、まず配信されているバイト数を見ること。**
 波括弧の対応を数えても何も出てこない。
 
