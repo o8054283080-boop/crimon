@@ -23,6 +23,7 @@ on:
       - "scripts/build-edge.mjs"
       - "package.json"
       - "package-lock.json"
+      - ".github/workflows/arena-edge.yml"
   workflow_dispatch:
 
 permissions:
