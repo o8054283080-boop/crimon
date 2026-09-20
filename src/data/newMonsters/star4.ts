@@ -1,6 +1,6 @@
 import { MonsterTemplate } from "../../core/monster.js";
 import {
-  ATK_DOWN, ATK_UP, CRI_DMG_UP, CRI_RATE_UP, DEF_DOWN, DEF_UP, HEAL_BLOCK_HALF, POISON_RATE, SPD_DOWN, SPD_UP, passive,
+  ATK_DOWN, ATK_UP, CRI_DMG_UP, CRI_RATE_UP, DEF_DOWN, DEF_UP, POISON_RATE, SPD_DOWN, SPD_UP, passive,
 } from "./shared.js";
 
 /*
@@ -193,7 +193,7 @@ export const MIMIC: MonsterTemplate = {
       cooldownTurns: 4,
       effects: [
         { kind: "DAMAGE", multiplier: 1.0, hpCoefficient: 0.08 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.8 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 },
         { kind: "GAUGE", amount: -0.25 },
       ],
     },

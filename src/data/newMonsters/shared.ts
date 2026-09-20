@@ -22,8 +22,12 @@ export {
 /** 毒1スタックあたりのダメージ割合。既存の毒と同じ水準 */
 export const POISON_RATE = 0.05;
 
-/** 治癒阻害の倍率(受ける回復が半分になる) */
-export const HEAL_BLOCK_HALF = 0.5;
+/*
+ * **治癒阻害に強さの段は無い。**掛かっている間は回復を受け付けない、の一本。
+ * 前はここに `HEAL_BLOCK_HALF = 0.5` があったが、エンジンは昔から
+ * 回復量を0に固定していて、半減はどこにも効いていなかった
+ * (説明文だけが「回復50%減」と嘘をついていた)。
+ */
 
 /** Lv1〜5の5段を、書き並べた配列から作る。数が5でないとその場で分かる */
 export function passive(trigger: PassiveTrigger, levels: PassiveLevelEffect[]): PassiveSpec {

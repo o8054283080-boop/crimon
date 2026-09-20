@@ -527,15 +527,20 @@ export interface StripEffect {
 }
 
 /**
- * 治癒阻害: かかっている間、受ける回復量が減る。
+ * 治癒阻害: かかっている間、**回復をいっさい受け付けない。**
  *
  * **耐久で押し切る戦い方への答え。**回復し続けて時間を稼ぐ相手に対して、
  * 「削り切れない」を「削り切れる」に変えるための唯一の手段になる。
+ *
+ * **効き目の強さは持たない。**前は `healMultiplier` という欄があり、
+ * 0.5(半減)と書かれたスキルがいくつもあった。ところがエンジンは
+ * 昔から**掛かった時点で回復量を0に固定**していて、この欄は
+ * 説明文と戦闘ログにしか出ていなかった。
+ * つまり「回復50%減」と書いてあるのに実際は回復不能、という食い違いが
+ * ずっと表に出ていた(依頼主の指摘)。**書ける場所を無くして揃えた。**
  */
 export interface HealBlockEffect {
   kind: "HEAL_BLOCK";
-  /** 回復量に掛かる倍率(0.5なら回復半減)。0にすると完全に回復できなくなる */
-  healMultiplier: number;
   durationTurns: number;
   /** この効果が発動を試みる基礎確率(0-1) */
   chance?: number;
@@ -1175,7 +1180,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "GAUGE_ON_HIT":
       return `${effect.durationTurns}ターン、攻撃を受けるたび行動ゲージ+${Math.round(effect.amount * 100)}%`;
     case "HEAL_BLOCK":
-      return `${chanceSuffix(effect.chance)}治癒阻害 (${effect.durationTurns}ターン、受ける回復が${Math.round((1 - effect.healMultiplier) * 100)}%減る)`;
+      return `${chanceSuffix(effect.chance)}治癒阻害 (${effect.durationTurns}ターン、回復を受けられない)`;
     case "COOLDOWN_EXTEND":
       return `${chanceSuffix(effect.chance)}敵の全スキルのクールタイムを${effect.turns}ターン延長`;
     case "BLIND":

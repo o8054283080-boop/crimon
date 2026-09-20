@@ -1,5 +1,5 @@
 import { MonsterTemplate } from "../../core/monster.js";
-import { ATK_DOWN, DEF_DOWN, HEAL_BLOCK_HALF, POISON_RATE, passive } from "./shared.js";
+import { ATK_DOWN, DEF_DOWN, POISON_RATE, passive } from "./shared.js";
 
 /*
  * 星5の4種。
@@ -234,7 +234,7 @@ export const FENRIR: MonsterTemplate = {
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 2.8 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.8 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 },
         { kind: "POISON", damageRatePerStack: POISON_RATE, durationTurns: 2, chance: 0.8, stacks: 2 },
       ],
     },

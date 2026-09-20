@@ -2955,7 +2955,7 @@ export class BattleEngine {
           // 複数から掛かったら、いちばんきついものが残る
           target.healBlockMultiplier = 0;
           this.push(
-            `  → ${this.label(target)} は治癒阻害を受けた！ (${effect.durationTurns}ターン、回復${Math.round((1 - effect.healMultiplier) * 100)}%減)`,
+            `  → ${this.label(target)} は治癒阻害を受けた！ (${effect.durationTurns}ターン、回復を受けられない)`,
           );
           break;
         }

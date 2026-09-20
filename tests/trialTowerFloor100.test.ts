@@ -411,7 +411,7 @@ describe("100階: スキル4「オーバークリエイト」", () => {
     expect(CRIMOARK_S4.effects[2]).toMatchObject({ amount: -0.50 });
     // 防御DOWNの量は共通値(`core/statusValues.ts`)。持続3ターンはこのスキル固有
     expect(CRIMOARK_S4.effects[3]).toMatchObject({ stat: "def", amount: DEF_DOWN, durationTurns: 3 });
-    expect(CRIMOARK_S4.effects[4]).toMatchObject({ healMultiplier: 0, durationTurns: 2 });
+    expect(CRIMOARK_S4.effects[4]).toMatchObject({ durationTurns: 2 });
     expect(CRIMOARK_S4.effects[5]).toMatchObject({ amount: 0.30, applyTo: "SELF" });
   });
 

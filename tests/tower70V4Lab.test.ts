@@ -31,8 +31,9 @@ describe("70階V4: 回復阻害編成と終盤段階", () => {
     const fenrir = healBlockEffects("fenrir_ELECTRIC");
     expect(mush.length).toBeGreaterThan(0);
     expect(fenrir.length).toBeGreaterThan(0);
-    expect(mush.some((effect) => effect.kind === "HEAL_BLOCK" && effect.healMultiplier === 0.5)).toBe(true);
-    expect(fenrir.some((effect) => effect.kind === "HEAL_BLOCK" && effect.healMultiplier === 0.5)).toBe(true);
+    // 治癒阻害に強さの段は無い。**掛かっている間は回復を受け付けない**の一本
+    expect(mush.every((effect) => effect.durationTurns > 0)).toBe(true);
+    expect(fenrir.every((effect) => effect.durationTurns > 0)).toBe(true);
     expect(TOWER70_HEAL_BLOCK).toHaveLength(5);
   });
 

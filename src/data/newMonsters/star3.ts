@@ -1,6 +1,6 @@
 import { MonsterTemplate } from "../../core/monster.js";
 import {
-  ATK_DOWN, DEF_DOWN, DEF_UP, HEAL_BLOCK_HALF, POISON_RATE, SPD_DOWN, SPD_UP, passive,
+  ATK_DOWN, DEF_DOWN, DEF_UP, POISON_RATE, SPD_DOWN, SPD_UP, passive,
 } from "./shared.js";
 
 /*
@@ -58,7 +58,7 @@ export const MUSHROON: MonsterTemplate = {
       effects: [
         { kind: "DAMAGE", multiplier: 1.2 },
         { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.75 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.75 },
       ],
     },
     {

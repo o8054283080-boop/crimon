@@ -158,7 +158,7 @@ const JUSHOU_SKILLS: [Skill, Skill, Skill] = [
        * 半減では「回復が間に合うか」の勝負にならず、ただ時間が伸びるだけだった
        * (前の形でクロノスは受けた量より多く回復していた)。
        */
-      { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 0.75 },
+      { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.75 },
     ],
   },
 ];

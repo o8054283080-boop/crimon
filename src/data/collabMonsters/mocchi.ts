@@ -1,7 +1,7 @@
 import { MonsterTemplate } from "../../core/monster.js";
 import { Skill } from "../../core/skill.js";
 import { ATK_UP, DEF_DOWN } from "../../core/statusValues.js";
-import { HEAL_BLOCK_HALF, passive } from "../newMonsters/shared.js";
+import { passive } from "../newMonsters/shared.js";
 import { described, fromStar6Lv60 } from "./shared.js";
 
 /**
@@ -313,7 +313,7 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
   cooldownTurns: 5,
   effects: [
     { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.10 },
-    { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.7 },
+    { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
   ],
   levelOverrides: [
     // Lv1
@@ -321,7 +321,7 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.7 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
       ],
     },
     // Lv2 倍率 1.60 → 1.75
@@ -329,7 +329,7 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.7 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
       ],
     },
     // Lv3 回復阻害 70% → 80%
@@ -337,7 +337,7 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.8 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 },
       ],
     },
     // Lv4 回復阻害 2ターン → 3ターン
@@ -345,7 +345,7 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 3, chance: 0.8 },
+        { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 },
       ],
     },
     // Lv5 CT5 → CT4
@@ -353,7 +353,7 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
       cooldownTurns: 4,
       effects: [
         { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 3, chance: 0.8 },
+        { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 },
       ],
     },
   ],

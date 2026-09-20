@@ -182,7 +182,7 @@ const WOLF: MonsterTemplate = {
       effects: [
         { kind: "DAMAGE", multiplier: 1.65 },
         { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 1 },
-        { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 0.7 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
       ],
     },
   ],
@@ -1751,7 +1751,7 @@ export const ANCIENT_CRYSTAL_CURSE: MonsterTemplate = {
         { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 },
         // **回復で粘る戦い方への答え。**9・10階にしか現れないので、
         // ここに置けば序盤の階を巻き添えにしない
-        { kind: "HEAL_BLOCK", healMultiplier: 0.4, durationTurns: 3, chance: 0.7 },
+        { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.7 },
       ],
     },
   ],
