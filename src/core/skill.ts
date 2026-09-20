@@ -1483,6 +1483,35 @@ export function describeSkillGrowth(skill: Skill): SkillGrowthStep[] {
   return steps;
 }
 
+/**
+ * 説明文のうち、**生成文の後ろに人が書き足した一言**だけを返す。
+ *
+ * 新しいモンスターの説明は `described()` で
+ * 「`describeSkillLines` の出力」＋「一言」の形に作ってある(CLAUDE.md)。
+ * そのまま画面へ出すと、**すぐ下に並ぶ効果の行と同じ文が二度出る。**
+ * しかも説明文の数字はLv1で焼いてあるので、育てると
+ * **同じ項目に違う数字が2つ並ぶ**(依頼主の指摘。スエゾー光のS3が
+ * 上は85%、下は90%と出ていた)。
+ *
+ * 生成文で始まっていない昔ながらの説明文は、効果の行とは別のことを
+ * 書いている(情景や平たい言い換え)ので、そのまま出す。その時は null。
+ */
+export function skillDescriptionNote(skill: Skill): string | null {
+  if (!skill.description) return null;
+  const lines = describeSkillLines(skill).join("。");
+  if (!lines) return null;
+  /*
+   * **句点の有無は揃っていない。**`described()` は最後に「。」を足すが、
+   * 生成文をそのまま貼っただけの説明はそこで終わっている。
+   * どちらも二度書きなので、両方の形を見る。
+   */
+  for (const prefix of [`${lines}。`, lines]) {
+    if (!skill.description.startsWith(prefix)) continue;
+    return skill.description.slice(prefix.length).replace(/^。/, "").trim();
+  }
+  return null;
+}
+
 export function describeSkillLines(skill: Skill): string[] {
   if (skill.passive) return [describePassiveLevel(passiveAtLevel(skill.passive, skill.passiveLevel ?? 1))];
   return [...skill.effects.map(describeSkillEffect),

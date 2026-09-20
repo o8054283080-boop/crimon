@@ -1,0 +1,75 @@
+/*
+ * 「レベルを上げると何が変わるか」の要約。
+ *
+ * **図鑑と所持モンスターの両方で使う。**だから画面のCSSではなく、
+ * 描いている部品(`views/skillPanel.ts`)が自分で持つ。
+ * 片方の画面のCSSへ書くと、もう片方で枠だけ出て色が付かない。
+ *
+ * **style.css へは足さない。**あちらは追記が続くと
+ * Vite が黙って空のCSSを配ることがある(CLAUDE.md)。
+ */
+.skill-growth-summary {
+  margin-top: 6px;
+  padding: 6px 7px;
+  border: 1px solid rgba(255, 211, 106, .28);
+  border-radius: 7px;
+  background: rgba(255, 211, 106, .06);
+}
+
+.skill-growth-summary__head {
+  margin-bottom: 3px;
+  color: #ffd166;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.skill-growth-diff {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  font-size: .68rem;
+  line-height: 1.45;
+}
+
+/* 段の番号は幅を揃えて左端に並べる。目で段を追えるようにする */
+.skill-growth-diff__level {
+  flex: 0 0 auto;
+  min-width: 34px;
+  color: var(--text-dim);
+  font-weight: 800;
+}
+
+.skill-growth-diff__change {
+  min-width: 0;
+  color: #fff0a8;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * 所持モンスターの画面では、いまのレベルが分かる。
+ *
+ * **もう通った段は落とし、次の段を起こす。**
+ * どこまで来ていて次に何が起きるのかが、数字を数えなくても分かる。
+ * 落とす側も**読める明るさは保つ**(何が起きたかは後から確かめたい)。
+ */
+.skill-growth-diff.is-done .skill-growth-diff__level,
+.skill-growth-diff.is-done .skill-growth-diff__change {
+  color: #8fa0c4;
+}
+
+.skill-growth-diff.is-next .skill-growth-diff__level {
+  color: #ffd166;
+}
+
+.skill-growth-diff.is-next .skill-growth-diff__change {
+  color: #fff6c8;
+  font-weight: 700;
+}
+
+/* 次の段だけ、左に印を立てる。色が見えない環境でも位置で分かる */
+.skill-growth-diff.is-next {
+  margin-left: -5px;
+  padding-left: 3px;
+  border-left: 2px solid #ffd166;
+}

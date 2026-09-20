@@ -43,6 +43,17 @@
 .monster-detail-section h2 small { font-size: .57rem; font-weight: 500; color: var(--text-dim); }
 .monster-detail-skills__grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; }
 .monster-skill-compact { min-width: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: rgba(0,0,0,.2); }
+/*
+ * **開いている間は縦1列にする。**
+ *
+ * 3列のままだと1枚が110pxしかなく、開いた中身が
+ * 「ダ / メ / ージ倍率」と1文字ずつ折れて読めなかった
+ * (レベルの要約を入れて実機で分かった)。
+ *
+ * 開いた札だけを列またぎにすると、**畳んだ札の隣に空きが出る。**
+ * どれか1つでも開いている間は3つとも縦に並べ、閉じれば3列へ戻す。
+ */
+.monster-detail-skills__grid:has(.monster-skill-compact[open]) { grid-template-columns: 1fr; }
 .monster-skill-compact summary { position: relative; display: flex; flex-direction: column; min-height: 74px; gap: 1px; padding: 4px; overflow: hidden; list-style: none; cursor: pointer; }
 .monster-skill-compact summary::-webkit-details-marker { display: none; }
 .monster-skill-compact__slot { position: absolute; top: 3px; right: 3px; font-size: .58rem; font-weight: 900; color: var(--accent); }
