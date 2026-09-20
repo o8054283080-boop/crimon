@@ -1,5 +1,15 @@
 /* 図鑑だけの高密度レイアウト。他画面の .panel / button には漏らさない。 */
-.monster-dex { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+/*
+ * **下タブのぶんを空ける。**
+ *
+ * 前は `max(14px, env(safe-area-inset-bottom))` しか無く、下タブ(64px)は
+ * その上に固定で乗っているので、**一番下まで送っても最後の部品が
+ * タブの裏から出てこなかった。**実際に「スキルLv別の変化を見る」が
+ * どうやっても押せない、と指摘を受けている。
+ *
+ * 所持モンスターの一覧(`monsterList.css`)・編成(`party.css`)と同じ形へ揃える。
+ */
+.monster-dex { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 14px); }
 .monster-dex__header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 /* 「モンスター / 図鑑」と語の途中で折れていた。見出しは1行で読ませる */
 .monster-dex__header h1 { margin:0; font-size:1.15rem; white-space:nowrap; }
@@ -47,7 +57,11 @@
 .monster-dex-detail__unlock { display:block; margin-top:5px; color:#9fb0d8; font-size:.58rem; line-height:1.25; }
 .monster-dex-detail__empty { margin:6px 0; color:var(--text-dim); font-size:.68rem; }
 .monster-dex-detail__growth { padding:6px 8px; border:1px solid rgba(255,255,255,.09); border-radius:8px; }
-.monster-dex-detail__growth summary { cursor:pointer; font-size:.7rem; font-weight:700; }
+/*
+ * **指で押す的にする。**文字の高さだけだと15pxしかなく、
+ * 画面の一番下に置いてあるぶん、狙って押すのが難しかった。
+ */
+.monster-dex-detail__growth summary { display:flex; align-items:center; min-height:44px; cursor:pointer; font-size:.7rem; font-weight:700; }
 .monster-dex-detail__growth .skill-row { margin-top:6px; }
 .monster-dex-detail__note { margin:0; color:var(--text-dim); font-size:.6rem; line-height:1.3; text-align:center; }
 .monster-dex__error { min-height:50dvh; justify-content:center; }
