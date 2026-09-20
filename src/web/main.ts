@@ -3115,7 +3115,12 @@ function startArenaMatch(entry: ArenaOpponentEntry, onRefused?: () => void): boo
        */
       state.arenaEntry = null;
       state.lastRun = null;
-      state.arenaNotice = arenaRefusalText(result.reason);
+      // 図鑑IDで弾かれた時は、モンスター名まで出す。
+      // **どの1体が原因か分からないと、外して挑み直すこともできない**
+      state.arenaNotice = arenaRefusalText(
+        result.reason,
+        (dexId) => findMonsterById(dexId)?.name ?? null,
+      );
       // 呼んだ側が先に付けた印(リベンジの1回きりの権利など)を戻させる
       onRefused?.();
       playSfx("denied", 0.7);

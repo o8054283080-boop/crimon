@@ -579,12 +579,32 @@ export async function beginArenaMatch(input: ArenaBeginMatchInput): Promise<Aren
 }
 
 /**
+ * 「どれが弾かれたのか」が名指しで出る符丁。
+ *
+ * サーバは `UNKNOWN_DEX_ID: gujira_WATER` の形で、**弾いた相手を添えて**返す。
+ * 符丁だけに切り詰めると、その一言が落ちる。
+ */
+const REFUSALS_WITH_CULPRIT = new Set(["UNKNOWN_DEX_ID", "UNKNOWN_SET", "UNKNOWN_LATENT"]);
+
+/**
  * 断られた理由を、プレイヤーが読める言葉にする。
  *
  * **符丁も必ず添える。** 言い換えだけにすると、報告を受けた側が
  * サーバのどの検分で止まったのかを追えなくなる。
+ *
+ * **「このモンスター」で止めない。**コラボ4種を照合表へ流し忘れた時、
+ * 画面に出たのは「このモンスターはサーバの照合表にまだ載っていません
+ * (UNKNOWN_DEX_ID)」だけだった。プレイヤーには**どの1体が原因か分からず、
+ * 外して挑み直すこともできない。**報告を受けた側も、編成を聞き出すまで
+ * 何が足りないのか追えなかった。だから名前まで出す。
+ *
+ * 図鑑IDをモンスター名へ直すのは `describeDexId` に任せる。
+ * ここで `data/monsters` を取り込むと、通信の層が図鑑の層を引いてしまう。
  */
-export function arenaRefusalText(reason: string | null): string {
+export function arenaRefusalText(
+  reason: string | null,
+  describeDexId?: (dexId: string) => string | null,
+): string {
   if (!reason) return "サーバが対戦を受け付けませんでした";
   const head = reason.split(/[:\s(]/)[0];
   const known: Record<string, string> = {
@@ -603,7 +623,16 @@ export function arenaRefusalText(reason: string | null): string {
     INVALID_TICKET: "サーバの返事が読めませんでした",
   };
   const text = known[head];
-  return text ? `${text}（${head}）` : `サーバが対戦を受け付けませんでした（${reason}）`;
+  if (!text) return `サーバが対戦を受け付けませんでした（${reason}）`;
+  if (!REFUSALS_WITH_CULPRIT.has(head)) return `${text}（${head}）`;
+
+  // 符丁の後ろに続く中身。`UNKNOWN_DEX_ID: gujira_WATER` の `gujira_WATER`
+  const culprit = reason.slice(head.length).replace(/^[\s:]+/, "").trim();
+  if (!culprit) return `${text}（${head}）`;
+  const name = head === "UNKNOWN_DEX_ID" ? describeDexId?.(culprit) : null;
+  return name
+    ? `「${name}」がサーバの照合表にまだ載っていません。編成から外すと挑めます（${head}: ${culprit}）`
+    : `${text}（${head}: ${culprit}）`;
 }
 
 /**

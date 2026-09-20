@@ -211,3 +211,49 @@ describe("生成物であることが分かるようにしてある", () => {
     expect(sql).toContain("tools/exportArenaCatalog.mts");
   });
 });
+
+/*
+ * 照合表は、作り直しただけでは効かない。**本番へ流して初めて効く。**
+ *
+ * そこを手で押す作りにしていたせいで、同じ事故を2回出している:
+ *
+ *   1. 装備メインのクリダメを見直した回。★6+15 の上限だけが本番で古く、
+ *      その装備を着けている人は全員 `MAIN_STAT_OVER_CAP` で弾かれた
+ *   2. コラボ4種(24体)を足した回。本番の図鑑は217件のまま241件に届かず、
+ *      コラボのモンスターを編成へ入れた人は `UNKNOWN_DEX_ID` で
+ *      アリーナに一度も入れなかった(プレイヤーからの報告で発覚)
+ *
+ * どちらも**押し忘れ**で、コードは正しかった。だから押さずに流れる形にした。
+ * ここはその仕掛けが外れていないことだけを見る。
+ */
+describe("照合表が本番へ届く道", () => {
+  const workflow = readFileSync(
+    fileURLToPath(new URL("../.github/workflows/arena-catalog.yml", import.meta.url)),
+    "utf8",
+  );
+
+  it("main へ入った生成物は、押さなくても流れる", () => {
+    expect(workflow).toMatch(/on:\s*\n\s*#[^\n]*\n(\s*#[^\n]*\n)*\s*push:/);
+    expect(workflow).toContain("supabase/migrations/*arena_catalog*.sql");
+  });
+
+  it("push で来た時も「見るだけ」にならない", () => {
+    // `inputs.dry_run` は push では空になる。空を偽として素通しすると、
+    // 自動で走っているつもりで1行も流れない
+    // **`- name: 流す` で切らない。**「流すファイルを決める」が先に当たる
+    const applying = workflow.split("- name: 流す\n")[1] ?? "";
+    expect(applying).toContain("github.event_name == 'push'");
+  });
+
+  it("流した後、図鑑の件数を手元と突き合わせる", () => {
+    // 装備の上限だけを見ていた頃は、モンスターの取りこぼしを拾えなかった
+    expect(workflow).toContain("arena_catalog_monsters");
+    expect(workflow).toContain("本番の図鑑の件数が生成物と合っていません");
+  });
+
+  it("件数の突き合わせに使う見出しが、生成物の側にある", () => {
+    // ワークフローはこの行を `grep` で読む。書式が変わると黙って空になる
+    expect(sql).toMatch(/^-- 図鑑 \d+ 件$/m);
+    expect(sql.match(/^-- 図鑑 (\d+) 件$/m)?.[1]).toBe(String(MONSTER_DEX.length));
+  });
+});
