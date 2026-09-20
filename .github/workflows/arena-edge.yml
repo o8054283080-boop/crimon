@@ -55,6 +55,8 @@ jobs:
           set -euo pipefail
           url="$(grep -E '^VITE_SUPABASE_URL=' .env.production | cut -d= -f2-)"
           ref="$(printf '%s' "$url" | sed -E 's#^https?://([^.]+)\\..*#\\1#')"
+          # .env.production の値が引用符付きでも project ref だけを抽出する
+          ref="$(printf '%s' "$ref" | sed -E 's#^https?://##; s#\\.supabase\\.co.*$##; s#["'\'' ]##g')"
           test -n "$ref"
           echo "SUPABASE_PROJECT_REF=$ref" >> "$GITHUB_ENV"
 
