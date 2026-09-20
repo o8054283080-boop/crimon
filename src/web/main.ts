@@ -484,6 +484,15 @@ interface AppState {
   farmEquipmentSelectedIds: string[];
   farmEquipmentDetailId: string | null;
   farmEquipmentSelling: boolean;
+  /**
+   * 獲得装備のシート専用の絞り込み。
+   *
+   * **所持装備の一覧とは別に持つ。**共有すると、一覧を「★6だけ」に
+   * 絞ったまま周回を終えた人が、今回の装備が1個も出ないシートを見ることになる
+   * (装備を選ぶ画面で同じ理由から分けてある)。
+   */
+  farmEquipmentFilter: EquipmentFilter;
+  farmEquipmentFilterOpen: boolean;
   /** ショップで直前に買ったものの案内。次に何か操作したら消す */
   shopNotice: string | null;
   monsterExchangeNotice: string | null;
@@ -665,6 +674,8 @@ const state: AppState = {
   farmEquipmentSelectedIds: [],
   farmEquipmentDetailId: null,
   farmEquipmentSelling: false,
+  farmEquipmentFilter: { ...EMPTY_EQUIPMENT_FILTER },
+  farmEquipmentFilterOpen: false,
   shopNotice: null,
   monsterExchangeNotice: null,
   equipmentSelecting: false,
@@ -5137,6 +5148,13 @@ function renderScreen(): void {
         actions,
         onViewEquipment: result.earnedEquipmentIds?.length ? () => {
           state.farmEquipmentOpen = true;
+          /*
+           * **開くたびに条件を白紙へ戻す。**
+           * 前の周回で「★6だけ」に絞ったまま残っていると、次に開いた人は
+           * 今回の装備が1個も出ないシートを見ることになる。
+           */
+          state.farmEquipmentFilter = { ...EMPTY_EQUIPMENT_FILTER };
+          state.farmEquipmentFilterOpen = false;
           render();
         } : undefined,
       });
@@ -5150,6 +5168,10 @@ function renderScreen(): void {
           selectedIds: state.farmEquipmentSelectedIds,
           detailId: state.farmEquipmentDetailId,
           selling: state.farmEquipmentSelling,
+          filter: state.farmEquipmentFilter,
+          filterOpen: state.farmEquipmentFilterOpen,
+          onChangeFilter: (filter) => { state.farmEquipmentFilter = filter; render(); },
+          onToggleFilterOpen: () => { state.farmEquipmentFilterOpen = !state.farmEquipmentFilterOpen; render(); },
           onToggleLock: (id) => {
             const item = state.player.equipment.find((entry) => entry.id === id);
             if (!item || !setEquipmentLocked(state.player, id, !item.locked)) return;
@@ -5180,7 +5202,16 @@ function renderScreen(): void {
             savePlayerState(state.player);
             state.farmEquipmentSelling = false; state.farmEquipmentSelectedIds = []; state.farmEquipmentDetailId = null; render();
           },
-          onSelectAll: () => { state.farmEquipmentSelectedIds = sellableEquipmentIds(equipment); render(); },
+          /*
+           * **画面が渡してきたIDだけを選ぶ。**
+           * 以前はここで全件から選び直していたので、絞り込みを足した今は
+           * 「表示中をすべて選ぶ」が絞り込みを無視して**見えていないものまで選ぶ。**
+           */
+          onSelectAll: (ids) => {
+            const valid = new Set(sellableEquipmentIds(equipment));
+            state.farmEquipmentSelectedIds = ids.filter((id) => valid.has(id));
+            render();
+          },
           onClearSelection: () => { state.farmEquipmentSelectedIds = []; render(); },
           onClose: () => { state.farmEquipmentOpen = false; state.farmEquipmentDetailId = null; render(); },
         }));
@@ -5777,6 +5808,37 @@ if (import.meta.env.DEV) {
         handleAutoEquipSearch(monster.id, state.autoEquipSettings);
         return;
       }
+      render();
+    },
+    /*
+     * **周回結果の「獲得装備」のシートを巡回に見せるための口。**
+     *
+     * 周回を回さないと開けない画面なので、これまで一度も検査されていなかった。
+     * シートは `position:fixed` で下から出て、中に絞り込み・一覧・操作帯が入る
+     * ——**いちばん崩れやすい形**をしている。
+     */
+    openFarmEquipmentSheet(withFilter = false) {
+      const result = emptyResult();
+      result.attempts = 10;
+      result.cleared = 10;
+      // 12個。絞り込みの札が何種類も出て、絞った後も残る程度の数にする
+      for (let i = 0; i < 12; i += 1) {
+        const item = generateEquipment({
+          slot: ((i % 6) + 1) as 1 | 2 | 3 | 4 | 5 | 6,
+          star: ((i % 3) + 4) as 4 | 5 | 6,
+          subStatCount: (i % 5) as 0 | 1 | 2 | 3 | 4,
+        });
+        addEquipment(state.player, item);
+        (result.earnedEquipmentIds ??= []).push(item.id);
+        result.equipmentDropCount += 1;
+      }
+      state.autoFarmResult = result;
+      state.autoFarmTargetName = "装備ダンジョン 5階";
+      state.screen = "AUTO_FARM_RESULT";
+      state.farmEquipmentOpen = true;
+      state.farmEquipmentFilter = { ...EMPTY_EQUIPMENT_FILTER };
+      // 条件の札を開いた姿も見せる。畳んだままだと中の札が一度も測られない
+      state.farmEquipmentFilterOpen = withFilter;
       render();
     },
   };

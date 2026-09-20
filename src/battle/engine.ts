@@ -1946,6 +1946,21 @@ export class BattleEngine {
             if (applied.died) { resolution.kills += 1; this.onKill(source); }
             this.push(`  → ${this.label(other)} に ${applied.hpDamage} ダメージ！ (残りHP ${other.currentHp}/${other.maxHp})`);
             this.pushEvent({ targetId: other.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
+            /*
+             * **追撃で撃った相手にも解除と気絶を乗せる**(依頼主の指定)。
+             *
+             * 主対象は上で済ませてあるので飛ばす。**回数の約束は変わらない**
+             * ——追撃そのものが1スキルにつき1回しか起きないので、
+             * 誰も2回は受けない(多段技でも `sourcePassiveUsed` が止める)。
+             */
+            if (other === primary || !other.alive || this.isImmune(other)) continue;
+            if (this.rollEffectSuccess(source, other, passive.stripChance) && stripBuffs(other, 1) > 0) {
+              this.push(`  → ${this.label(other)} の強化が1つ解除された！`);
+            }
+            if (this.rollEffectSuccess(source, other, passive.stunChance)) {
+              other.stunTurns = Math.max(other.stunTurns, 1);
+              this.push(`  → ${this.label(other)} は気絶した！ (1ターン)`);
+            }
           }
         }
       }

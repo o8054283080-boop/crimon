@@ -42,6 +42,90 @@ export const INSPECT = `(() => {
    */
   const buttons = [...scope.querySelectorAll('button:not([disabled]), a[href], summary')]
     .filter((b) => !b.matches('.regular-missions__scrim'));
+
+  /** ページを送ると一緒に動くか。固定・粘着の中に居るものは動かない */
+  const movesWithPage = (el) => {
+    for (let node = el; node && node !== document.body; node = node.parentElement) {
+      const pos = getComputedStyle(node).position;
+      if (pos === 'fixed' || pos === 'sticky') return false;
+    }
+    return true;
+  };
+
+  /*
+   * **いま実際に見えている部分**を返す。画面と、内側の巻物で切った後の矩形。
+   *
+   * 中心の座標で「最前面が自分か」を見るので、**的が端でまたいでいると
+   * 中心が箱の外へ出る**。そこを踏むのは下に敷かれた別の要素で、
+   * 送れば見えるだけのものを「覆われている」と誤報していた
+   * (絞り込みを開いた状態を巡回へ入れた回に、札11個ぶんが一斉に出た)。
+   */
+  const visibleRect = (el, r) => {
+    let top = Math.max(r.top, 0);
+    let bottom = Math.min(r.bottom, vh);
+    let left = Math.max(r.left, 0);
+    let right = Math.min(r.right, vw);
+    for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+      const cs = getComputedStyle(node);
+      if (!/(auto|scroll)/.test(cs.overflowY + ' ' + cs.overflowX)) continue;
+      const nr = node.getBoundingClientRect();
+      if (nr.width < 1 || nr.height < 1) continue;
+      top = Math.max(top, nr.top);
+      bottom = Math.min(bottom, nr.bottom);
+      left = Math.max(left, nr.left);
+      right = Math.min(right, nr.right);
+    }
+    return { top, bottom, left, right };
+  };
+
+  /*
+   * **その的を、いちばん内側の巻物を送って動かせるか。**
+   *
+   * movesWithPage はページ基準なので、下から出るシートのように
+   * 全体が position:fixed の中では**中身が全部「動かない」**になる。
+   * シートの中身は panel を送れば動くので、そこまでを見る。
+   */
+  const pinnedInsideScroller = (el) => {
+    for (let node = el; node && node !== document.body; node = node.parentElement) {
+      const cs = getComputedStyle(node);
+      if (cs.position === 'fixed' || cs.position === 'sticky') return true;
+      if (/(auto|scroll)/.test(cs.overflowY)) return false;
+    }
+    return false;
+  };
+
+  /*
+   * **覆っているのが「端に貼り付いた帯」か。**
+   *
+   * 下タブや操作帯のように面の上端・下端へ貼り付いているものは、
+   * 送れば的の方が抜け出せる。**中ほどに浮いているものは別で、
+   * そこに居座るかぎり下の的は押せない**——初心者ミッションの浮遊パネル、
+   * ホームの小窓、ログインボーナスの札で3回作っている事故がこれ。
+   * 端に貼り付いたものだけを見逃し、浮いているものは必ず拾う。
+   */
+  const pinnedEdgeBand = (el) => {
+    for (let node = el; node && node !== document.body; node = node.parentElement) {
+      const cs = getComputedStyle(node);
+      if (cs.position !== 'fixed' && cs.position !== 'sticky') {
+        if (/(auto|scroll)/.test(cs.overflowY)) return false;
+        continue;
+      }
+      const nr = node.getBoundingClientRect();
+      // その帯が乗っている面(いちばん内側の巻物、無ければ画面)
+      let faceTop = 0;
+      let faceBottom = vh;
+      for (let p = node.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (!/(auto|scroll)/.test(getComputedStyle(p).overflowY)) continue;
+        const pr = p.getBoundingClientRect();
+        faceTop = pr.top;
+        faceBottom = pr.bottom;
+        break;
+      }
+      return nr.top <= faceTop + 4 || nr.bottom >= faceBottom - 4;
+    }
+    return false;
+  };
+
   for (const b of buttons) {
     const r = b.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
@@ -51,12 +135,20 @@ export const INSPECT = `(() => {
       continue;
     }
     // 見えている位置にあるのに、最前面が自分でない
-    const cx = Math.min(vw - 2, Math.max(2, r.x + r.width / 2));
-    const cy = Math.min(vh - 2, Math.max(2, r.y + r.height / 2));
+    const vis = visibleRect(b, r);
+    // 見えている部分がほぼ無い = 送れば出てくるもの
+    if (vis.bottom - vis.top < 2 || vis.right - vis.left < 2) continue;
+    const cx = Math.min(vw - 2, Math.max(2, (vis.left + vis.right) / 2));
+    const cy = Math.min(vh - 2, Math.max(2, (vis.top + vis.bottom) / 2));
     if (cy > navTop - 2) continue; // 下タブの下は判定しない
-    if (r.bottom < 0 || r.top > vh) continue; // 画面外(スクロールすれば見える)は許す
     const top = document.elementFromPoint(cx, cy);
     if (top && !b.contains(top) && top !== b && !b.closest('.bottom-nav')) {
+      /*
+       * **覆っているのが動かない帯で、的の方は動くなら、送れば出てくる。**
+       * 下タブの下を判定しないのと同じ理由(粘着の操作帯も同じ性質)。
+       * 送りきっても出てこないものは、次の検査が拾う。
+       */
+      if (pinnedEdgeBand(top) && !pinnedInsideScroller(b)) continue;
       problems.push('押せないボタン「' + (b.textContent || '').trim().slice(0, 14) + '」の手前に ' + (top.className || top.tagName));
     }
   }
@@ -73,13 +165,6 @@ export const INSPECT = `(() => {
    */
   const scroller = document.scrollingElement || document.documentElement;
   const maxScroll = Math.max(0, scroller.scrollHeight - vh);
-  const movesWithPage = (el) => {
-    for (let node = el; node && node !== document.body; node = node.parentElement) {
-      const pos = getComputedStyle(node).position;
-      if (pos === 'fixed' || pos === 'sticky') return false;
-    }
-    return true;
-  };
   for (const b of buttons) {
     if (b.closest('.bottom-nav') || b.closest('.dev-menu')) continue;
     if (!movesWithPage(b)) continue;

@@ -207,7 +207,7 @@ export function describePassiveLevel(effect: PassiveLevelEffect): string {
     case "CHARM_EYE":
       return `的中+${pct(effect.accuracy)}・クリ率+${pct(effect.critRate)}。攻撃スキル使用時、${pct(effect.stripChance)}で対象の強化1個を解除し、`
         + `${pct(effect.stunChance)}で1ターン気絶。そのスキルでクリティカルが出ていれば敵全体へ攻撃力${effect.followUpMultiplier}倍の追撃`
-        + "(解除・気絶・追撃はいずれも1スキルにつき1回。追撃から追撃は起きない)";
+        + "(追撃で撃った敵にも同じ確率で解除と気絶。解除・気絶は1体につき1回、追撃は1スキルにつき1回で、追撃から追撃は起きない)";
     case "ANCIENT_BEHEMOTH":
       return effect.tiers
         .map((tier) => `HP${pct(tier.hpRatio)}以下: 受けるダメージ-${pct(tier.damageTaken)}・最大HP比例ダメージ+${pct(tier.hpDamageUp)}`)
