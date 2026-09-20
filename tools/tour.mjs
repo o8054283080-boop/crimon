@@ -172,6 +172,14 @@ const SCREENS = [
    * ランキングを検査し続けたのと同じ穴)。
    */
   { name: "モンスター詳細(才能覚醒あり)", tab: "MONSTERS", setup: "window.__crimonDev?.openMonsterDetailWithTalents()" },
+  /*
+   * 周回結果の「獲得装備」のシート。**周回を回さないと開けない**ので、
+   * これまで一度も検査していなかった。下から出る `position:fixed` の中に
+   * 絞り込み・一覧・操作帯が入る、いちばん崩れやすい形をしている。
+   * 条件の札を開いた姿も見る(畳んだままだと中の札が一度も測られない)。
+   */
+  { name: "周回結果/獲得装備", tab: "HOME", setup: "window.__crimonDev?.openFarmEquipmentSheet()" },
+  { name: "周回結果/獲得装備(絞り込みを開く)", tab: "HOME", setup: "window.__crimonDev?.openFarmEquipmentSheet(true)" },
   { name: "クリエイト/スキル継承", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('SKILL')" },
   { name: "クリエイト/タイプ転生", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TYPE')" },
   { name: "クリエイト/能力付与", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('ABILITY')" },

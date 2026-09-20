@@ -59,6 +59,7 @@ export function renderEquipmentFilterBar(props: EquipmentFilterBarProps): HTMLEl
     stars: EQUIP_STARS,
     sets: SET_TYPES,
     mainStats: STAT_TYPES,
+    subStats: STAT_TYPES,
   });
   const activeCount = activeEquipmentFilterCount(filter);
 
@@ -93,6 +94,19 @@ export function renderEquipmentFilterBar(props: EquipmentFilterBarProps): HTMLEl
   const mainChips = facets.mainStats.map((stat) =>
     chip(STAT_LABEL[stat], filter.mainStats.includes(stat), () =>
       onChange({ ...filter, mainStats: toggleEquipmentFilterValue(filter.mainStats, stat) }),
+    ),
+  );
+
+  /*
+   * サブ効果。**探し方としてはメインより使う。**
+   *
+   * 「速度サブが付いているものだけ見たい」「クリ率サブを集めたい」が
+   * いちばん多い探し方なのに、軸が無いので**1個ずつ開いて確かめる**しかなかった
+   * (依頼主の指摘)。1個でも持っていれば残す読み方にしてある。
+   */
+  const subChips = facets.subStats.map((stat) =>
+    chip(STAT_LABEL[stat], filter.subStats.includes(stat), () =>
+      onChange({ ...filter, subStats: toggleEquipmentFilterValue(filter.subStats, stat) }),
     ),
   );
 
@@ -138,6 +152,7 @@ export function renderEquipmentFilterBar(props: EquipmentFilterBarProps): HTMLEl
           group("星", starChips),
           group("シリーズ", setChips),
           group("メイン効果", mainChips),
+          group("サブ効果", subChips),
           group("状態", useChips),
         ].filter((n): n is HTMLElement => n !== null),
       )

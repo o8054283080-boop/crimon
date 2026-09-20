@@ -37,4 +37,29 @@ describe("巡回の検査が壊れていないこと", () => {
     expect(INSPECT).toContain("b.dataset.tapSmall");
     expect(INSPECT).not.toMatch(/if \(b\.closest\('\.mcard'\)\) continue/);
   });
+
+  /*
+   * **覆われている的の見逃しは、端に貼り付いた帯だけ。**
+   *
+   * 下タブや操作帯は送れば的の方が抜け出せるので見逃してよいが、
+   * **中ほどに浮いているものは居座るかぎり下の的を押せなくする**
+   * ——初心者ミッションの浮遊パネル、ホームの小窓、ログインボーナスの札で
+   * 3回作っている事故がこれ。ここを「固定なら全部見逃す」に緩めると、
+   * その3回が全部すり抜ける。
+   */
+  it("覆っているものを見逃すのは、面の端に貼り付いている時だけ", () => {
+    expect(INSPECT).toContain("pinnedEdgeBand");
+    // 端かどうかを見ずに、位置指定だけで見逃していないこと
+    expect(INSPECT).not.toMatch(/if \(!movesWithPage\(top\)\) continue/);
+    expect(INSPECT).not.toMatch(/if \(pinnedInsideScroller\(top\)\) continue/);
+    // 面の端(上端・下端)との比較が残っていること
+    expect(INSPECT).toContain("nr.top <= faceTop + 4 || nr.bottom >= faceBottom - 4");
+  });
+
+  it("的は「いま見えている部分」の中心で判定する", () => {
+    // 端でまたいだ的の中心が箱の外へ出ると、下に敷かれた別の要素を踏む
+    expect(INSPECT).toContain("visibleRect");
+    expect(INSPECT).toContain("(vis.left + vis.right) / 2");
+    expect(INSPECT).toContain("(vis.top + vis.bottom) / 2");
+  });
 });

@@ -22,7 +22,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-const ORDER = { rarities: EQUIPMENT_RARITIES, stars: EQUIP_STARS, sets: SET_TYPES, mainStats: STAT_TYPES };
+const ORDER = { rarities: EQUIPMENT_RARITIES, stars: EQUIP_STARS, sets: SET_TYPES, mainStats: STAT_TYPES, subStats: STAT_TYPES };
 
 /** 条件を確かめやすいよう、性質を指定して1個作る */
 function make(options: { star?: 1 | 2 | 3 | 4 | 5 | 6; sub?: number; set?: (typeof SET_TYPES)[number]; seed?: number }): Equipment {
@@ -98,6 +98,59 @@ describe("所持装備の絞り込み", () => {
     expect(activeEquipmentFilterCount(EMPTY_EQUIPMENT_FILTER)).toBe(0);
     expect(activeEquipmentFilterCount({ ...EMPTY_EQUIPMENT_FILTER, rarities: ["EPIC", "LEGEND"] })).toBe(1);
     expect(activeEquipmentFilterCount({ ...EMPTY_EQUIPMENT_FILTER, rarities: ["EPIC"], sets: ["SWIFT"], use: "FREE" })).toBe(3);
+    // サブ効果も1つの軸として数える(畳んでいる時に「絞っている」と分かる)
+    expect(activeEquipmentFilterCount({ ...EMPTY_EQUIPMENT_FILTER, subStats: ["SPD"] })).toBe(1);
+  });
+
+  /*
+   * サブ効果。**探し方としてはメインより使う。**
+   * 「速度サブが付いているものだけ」「クリ率サブを集めたい」が読めないと、
+   * 数百個を1個ずつ開いて確かめることになっていた(依頼主の指摘で足した)。
+   */
+  describe("サブ効果で絞る", () => {
+    const withSubs = (subs: (typeof STAT_TYPES)[number][], id: string): Equipment => ({
+      id,
+      slot: 1,
+      star: 6,
+      level: 0,
+      set: "CRIT",
+      mainStat: { type: "ATK_FLAT", value: 10 },
+      subStats: subs.map((type) => ({ type, value: 5 })),
+      initialSubStatCount: subs.length,
+    });
+
+    it("1個でも持っていれば残る(メインと違って「どれか」で読む)", () => {
+      const spd = withSubs(["SPD", "HP_PERCENT"], "spd");
+      const crit = withSubs(["CRIT_RATE", "DEF_FLAT"], "crit");
+      const all = [spd, crit];
+
+      expect(filterEquipment(all, { ...EMPTY_EQUIPMENT_FILTER, subStats: ["SPD"] }, never)).toEqual([spd]);
+      // 同じ軸の中はOR。速度かクリ率を持つものが残る
+      expect(filterEquipment(all, { ...EMPTY_EQUIPMENT_FILTER, subStats: ["SPD", "CRIT_RATE"] }, never)).toHaveLength(2);
+    });
+
+    it("メイン効果とは別の軸。メインが速度でもサブに無ければ残らない", () => {
+      const mainSpd: Equipment = { ...withSubs(["HP_PERCENT"], "mainSpd"), mainStat: { type: "SPD", value: 18 } };
+      expect(filterEquipment([mainSpd], { ...EMPTY_EQUIPMENT_FILTER, subStats: ["SPD"] }, never)).toEqual([]);
+      expect(filterEquipment([mainSpd], { ...EMPTY_EQUIPMENT_FILTER, mainStats: ["SPD"] }, never)).toEqual([mainSpd]);
+    });
+
+    it("他の軸とはAND(★6の、速度サブ付き)", () => {
+      const six = withSubs(["SPD"], "six");
+      const five: Equipment = { ...withSubs(["SPD"], "five"), star: 5 };
+      expect(filterEquipment([six, five], { ...EMPTY_EQUIPMENT_FILTER, subStats: ["SPD"], stars: [6] }, never)).toEqual([six]);
+    });
+
+    it("札は持っているサブだけ出す", () => {
+      const facets = availableEquipmentFacets([withSubs(["SPD", "CRIT_RATE"], "a")], ORDER);
+      expect(facets.subStats).toEqual(STAT_TYPES.filter((t) => t === "CRIT_RATE" || t === "SPD"));
+      // サブなしの装備しか無ければ、札は1つも出ない
+      expect(availableEquipmentFacets([withSubs([], "b")], ORDER).subStats).toEqual([]);
+    });
+
+    it("サブなしの装備は、サブで絞ると必ず外れる", () => {
+      expect(filterEquipment([withSubs([], "none")], { ...EMPTY_EQUIPMENT_FILTER, subStats: ["SPD"] }, never)).toEqual([]);
+    });
   });
 
   it("札は押すたびに出し入れされる", () => {

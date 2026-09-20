@@ -7,7 +7,7 @@
  * (所持モンスター側で同じ問題を先に解いてある——`monsterFilter.ts`)。
  *
  * ここでは**探し方の軸**を用意する。軸は「装備を選ぶ時に人が口にする条件」に揃えた。
- *   レア度 / 星 / シリーズ / メイン効果 / 装着しているか・ロックしているか
+ *   レア度 / 星 / シリーズ / メイン効果 / サブ効果 / 装着しているか・ロックしているか
  *
  * 枠(スロット)は既に専用の帯があるのでここには入れない。
  *
@@ -25,6 +25,14 @@ export interface EquipmentFilter {
   stars: EquipStar[];
   sets: SetType[];
   mainStats: StatType[];
+  /**
+   * サブ効果。**1個でも持っていれば残す。**
+   *
+   * メイン効果と違って装備は最大4つ持つので、「どれか1つに当てはまる」で読む。
+   * 速度サブを持つものだけを集めたい、という探し方が実際にいちばん多い
+   * (依頼主の指摘で足した)。
+   */
+  subStats: StatType[];
   use: EquipUseFilter;
 }
 
@@ -33,6 +41,7 @@ export const EMPTY_EQUIPMENT_FILTER: EquipmentFilter = {
   stars: [],
   sets: [],
   mainStats: [],
+  subStats: [],
   use: "ALL",
 };
 
@@ -59,6 +68,7 @@ export function activeEquipmentFilterCount(filter: EquipmentFilter): number {
     + (filter.stars.length > 0 ? 1 : 0)
     + (filter.sets.length > 0 ? 1 : 0)
     + (filter.mainStats.length > 0 ? 1 : 0)
+    + (filter.subStats.length > 0 ? 1 : 0)
     + (filter.use === "ALL" ? 0 : 1)
   );
 }
@@ -75,28 +85,38 @@ export interface EquipmentFacets {
   stars: EquipStar[];
   sets: SetType[];
   mainStats: StatType[];
+  subStats: StatType[];
 }
 
 /** 並びは呼び出し側で決めた順序を保つため、定義順の配列を渡してもらう */
 export function availableEquipmentFacets(
   all: readonly Equipment[],
-  order: { rarities: readonly EquipmentRarity[]; stars: readonly EquipStar[]; sets: readonly SetType[]; mainStats: readonly StatType[] },
+  order: {
+    rarities: readonly EquipmentRarity[];
+    stars: readonly EquipStar[];
+    sets: readonly SetType[];
+    mainStats: readonly StatType[];
+    subStats?: readonly StatType[];
+  },
 ): EquipmentFacets {
   const rarities = new Set<EquipmentRarity>();
   const stars = new Set<EquipStar>();
   const sets = new Set<SetType>();
   const mainStats = new Set<StatType>();
+  const subStats = new Set<StatType>();
   for (const item of all) {
     rarities.add(getEquipmentRarity(item));
     stars.add(item.star);
     sets.add(item.set);
     mainStats.add(item.mainStat.type);
+    for (const sub of item.subStats) subStats.add(sub.type);
   }
   return {
     rarities: order.rarities.filter((value) => rarities.has(value)),
     stars: order.stars.filter((value) => stars.has(value)),
     sets: order.sets.filter((value) => sets.has(value)),
     mainStats: order.mainStats.filter((value) => mainStats.has(value)),
+    subStats: (order.subStats ?? order.mainStats).filter((value) => subStats.has(value)),
   };
 }
 
@@ -117,6 +137,8 @@ export function filterEquipment(
     if (filter.stars.length > 0 && !filter.stars.includes(item.star)) return false;
     if (filter.sets.length > 0 && !filter.sets.includes(item.set)) return false;
     if (filter.mainStats.length > 0 && !filter.mainStats.includes(item.mainStat.type)) return false;
+    // サブは最大4つ持つ。**1個でも当てはまれば残す**(メインと違って「どれか」で読む)
+    if (filter.subStats.length > 0 && !item.subStats.some((sub) => filter.subStats.includes(sub.type))) return false;
     if (filter.use === "EQUIPPED" && !isEquipped(item)) return false;
     if (filter.use === "FREE" && isEquipped(item)) return false;
     if (filter.use === "LOCKED" && item.locked !== true) return false;

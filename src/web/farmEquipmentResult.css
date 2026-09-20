@@ -14,7 +14,22 @@
 .farm-equip-card__select { min-height: 40px; display: flex; align-items: center; }
 .farm-equip-card__select--disabled { opacity: .45; }
 .farm-equip-sheet__panel > footer { position: sticky; bottom: -20px; display: grid; gap: 8px; margin: 14px -2px -20px; padding: 12px 2px calc(20px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, #0d1224 16%); }
-.farm-equip-sheet__bulk { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/*
+ * 左右の幅は同じにしない。**左は「表示中をすべて選ぶ (12)」で長い。**
+ * 半々だと2行に折れる(390px幅で実際に折れた)。右の「選択解除」は
+ * 4文字しかないので、余りをそのまま左へ渡す。
+ */
+.farm-equip-sheet__bulk { display: grid; grid-template-columns: 1.6fr 1fr; gap: 8px; }
 .farm-equip-detail { position: fixed; z-index: 3; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 420px; margin: auto; padding: 18px; border: 1px solid #ffd36a; border-radius: 16px; background: #151c33; box-shadow: 0 20px 60px #000; }
 .farm-equip-detail h3 { margin-top: 0; }
 .farm-equip-detail .btn { width: 100%; margin-top: 10px; }
+
+/* ==========================================================================
+ * 絞り込み(所持装備の一覧と共通の部品)
+ *
+ * シートは `max-height:90dvh` の中に見出し・一覧・操作帯が入っている。
+ * 条件の札を開いた時に**中身を押し出して切り落とさない**よう、
+ * 札の側を巻物にする(所持装備の一覧と同じ考え方)。
+ * ========================================================================== */
+.farm-equip-sheet__panel .mfilter { margin: 10px 0 12px; }
+.farm-equip-sheet__panel .mfilter__body { max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; }
