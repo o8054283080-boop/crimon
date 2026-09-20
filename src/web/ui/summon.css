@@ -2087,3 +2087,47 @@
 .special-scroll__copy strong,.special-scroll__copy span { display: block; }
 .special-scroll__copy strong { color: #fff0a8; }
 .special-scroll__copy span,.special-scroll__count { color: #cbd8ef; font-size: .72rem; }
+
+/* ===== コラボピックアップ召喚 =====================================
+ *
+ * **通常召喚の下に、別の枠として置く。**
+ * 既存のボタン群へ継ぎ足すと同じ見た目のボタンが6つ縦に並び、
+ * どれが何だか分からなくなる。枠でくくって色を分け、
+ * 「ここから先は期間限定」と一目で分かる形にしてある。
+ *
+ * 配色は既存のまま(濃紺の地に金の縁)。**コラボだけ別世界の色にしない。**
+ */
+.collab-summon {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(255, 211, 106, .55);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(92, 44, 96, .72), rgba(18, 35, 70, .9));
+}
+.collab-summon__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+/* 「期間限定」の札。**金地に濃紺**で、見出しより先に目に入る */
+.collab-summon__badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--gold-grad);
+  color: #2a1a05;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.collab-summon__title { margin: 0; color: #ffe69a; font-size: .95rem; letter-spacing: .06em; }
+/* **%は書かない**(依頼主との約束)。「UP」とだけ言う */
+.collab-summon__lead { margin: 0 0 10px; color: #cbd8ef; font-size: .74rem; line-height: 1.5; }
+/* 2つのボタンは横に並べる。縦に積むと枠が高くなりすぎて下が切れる */
+.collab-summon__cta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.collab-summon__btn { width: 100%; }
+
+/* 幅の狭い端末では横並びをやめる。**文字が縮むより、縦に伸びる方がよい** */
+@media (max-width: 360px) {
+  .collab-summon__cta { grid-template-columns: 1fr; }
+}
+
+/* コラボ限定召喚書の棚。通常の特別召喚書と同じ作りで、縁の色だけ変える */
+.special-scrolls--collab { border-color: rgba(214, 150, 255, .55); }
+.special-scrolls--collab h2 { color: #e9c9ff; }

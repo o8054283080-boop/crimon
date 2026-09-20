@@ -193,3 +193,16 @@ export function collabProgressValue(
 export function isCollabCampaignActive(today: string): boolean {
   return today >= COLLAB_EVENT_FROM_DATE && today <= COLLAB_EVENT_TO_DATE;
 }
+
+/**
+ * いま開催中か。**画面はこちらを使う。**
+ *
+ * 日本時間で数えるのは既存のミッションと同じ(`missions.ts` の日付の扱い)。
+ * 画面側に日付の作り方を持たせると、そこだけ協定世界時で数えて
+ * 「終わったはずの入口が半日残る」といったずれが出る。
+ */
+export function isCollabEventOpen(now: Date = new Date()): boolean {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const today = jst.toISOString().slice(0, 10);
+  return isCollabCampaignActive(today);
+}

@@ -34,6 +34,8 @@ import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, SPECIAL_SCROLL_FIELD, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
 import { recordCollabFarmRun } from "../game/missions.js";
+import { COLLAB_SCROLL_FIELD, CollabSummonScroll, summonCollabMany, useCollabSummonScroll } from "../game/collabGacha.js";
+import { isCollabEventOpen } from "../game/collabMissions.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
 import {
   BackgroundFarmJob,
@@ -1226,6 +1228,60 @@ function handleSummon(count: number): void {
   state.summonResults = results;
   state.lastSummonMethod = { kind: "CRYSTAL", count };
   playSummonSfx(results);
+  render();
+}
+
+/**
+ * コラボピックアップ召喚。
+ *
+ * **通常召喚とまったく同じ値段・同じ天井**で、★4・★5を引いた時だけ
+ * コラボの顔ぶれから出る目が混じる(`summonCollabMany`)。
+ * 保存できなかった時に引けなかったことにする作りも通常召喚と同じ。
+ */
+function handleCollabSummon(count: number): void {
+  const cost = count >= 10 ? SUMMON_COST_TEN : SUMMON_COST_SINGLE * count;
+  if (state.player.crystal < cost) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  state.player.crystal -= cost;
+  const results = summonCollabMany(count);
+  const added = results.map((r) => addMonster(state.player, r.dexId, r.star));
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, added.map((m) => m.id));
+    state.player.crystal += cost;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.summonResults = results;
+  state.lastSummonMethod = { kind: "CRYSTAL", count };
+  playSummonSfx(results);
+  render();
+}
+
+/**
+ * コラボ限定召喚書で引く。
+ *
+ * 所持の確認・抽選・消費は `useCollabSummonScroll` が1操作でやる
+ * (**0枚では引けず、連打しても残数が負にならない**)。
+ * ここが持つのは、保存できなかった時に巻き戻す役目だけ。
+ */
+function handleUseCollabSummonScroll(type: CollabSummonScroll): void {
+  const before = state.player.monsters.length;
+  const result = useCollabSummonScroll(state.player, type);
+  if (!result) { playSfx("denied", 0.7); return; }
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, state.player.monsters.slice(before).map((m) => m.id));
+    const field = COLLAB_SCROLL_FIELD[type];
+    state.player[field] = (state.player[field] ?? 0) + 1;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.summonResults = [result];
+  state.lastSummonMethod = { kind: "CRYSTAL", count: 1 };
+  playSummonSfx([result]);
   render();
 }
 
@@ -5159,6 +5215,11 @@ function renderSummonScreen(): HTMLElement {
     onUseSummonScroll: handleUseSummonScroll,
     onUseSpecialSummonScroll: handleUseSpecialSummonScroll,
     onTutorialSummon: handleTutorialSummon,
+    // **開催中だけ渡す。**期間外は undefined なので入口ごと画面に出ない
+    ...(isCollabEventOpen() ? {
+      onCollabSummon: handleCollabSummon,
+      onUseCollabSummonScroll: handleUseCollabSummonScroll,
+    } : {}),
   });
 }
 

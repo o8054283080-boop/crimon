@@ -1054,6 +1054,14 @@ export function missionRewardText(reward: MissionReward): string {
   if (reward.awakeningShards) parts.push(`目覚の欠片×${reward.awakeningShards.toLocaleString("ja-JP")}`);
   if (reward.awakeningCrystals) parts.push(`目覚の結晶×${reward.awakeningCrystals.toLocaleString("ja-JP")}`);
   if (reward.awakeningStones) parts.push(`目覚の奇石×${reward.awakeningStones}`);
+  if (reward.skillPig) parts.push(`スキルピッグ×${reward.skillPig}`);
+  /*
+   * コラボ限定の書。**ここを忘れると「報酬なし」と書かれた札**になる
+   * (配ってはいるのに、何が入るのか画面から読めない)。
+   */
+  if (reward.collabFourStarSummonScrolls) parts.push(`コラボ限定★4以上召喚書×${reward.collabFourStarSummonScrolls}`);
+  if (reward.collabLightDarkFourStarSummonScrolls) parts.push(`コラボ限定★4以上光闇召喚書×${reward.collabLightDarkFourStarSummonScrolls}`);
+  if (reward.collabFiveStarSummonScrolls) parts.push(`コラボ限定★5召喚書×${reward.collabFiveStarSummonScrolls}`);
   return parts.join(" / ") || "報酬なし";
 }
 

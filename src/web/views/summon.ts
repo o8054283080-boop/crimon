@@ -2,6 +2,7 @@ import { ELEMENT_JA } from "../../core/element.js";
 import { Star } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { SpecialSummonScroll, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult } from "../../game/gacha.js";
+import { CollabSummonScroll } from "../../game/collabGacha.js";
 import { PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
@@ -104,6 +105,13 @@ export interface SummonProps {
   onUseSpecialSummonScroll: (type: SpecialSummonScroll) => void;
   /** はじまりの10連。1度きり、無料 */
   onTutorialSummon: () => void;
+  /**
+   * コラボピックアップ召喚を引く。**開催中だけ渡される。**
+   * 期間外は `undefined` なので、入口ごと画面に出ない。
+   */
+  onCollabSummon?: (count: number) => void;
+  /** コラボ限定召喚書で引く */
+  onUseCollabSummonScroll?: (type: CollabSummonScroll) => void;
 }
 
 /* ===== 引く前 ============================================================
@@ -221,6 +229,78 @@ function renderIdle(props: SummonProps): HTMLElement {
     ]),
   ];
   const cta = el("div", { className: "summon-cta" }, ctaChildren.filter((n): n is HTMLElement => n !== null));
+
+  /*
+   * コラボピックアップ召喚。**通常召喚とは別の枠として置く。**
+   *
+   * 既存のボタン群へ継ぎ足すと、同じ見た目のボタンが6つ縦に並んで
+   * どれが何だか分からなくなる。1つの枠でくくり、色を分けて、
+   * 「ここから先は期間限定」と一目で分かる形にした。
+   *
+   * **%は出さない**(依頼主との約束)。「出現率UP」とだけ書く。
+   */
+  const collabPanel = props.onCollabSummon ? el("section", { className: "collab-summon" }, [
+    el("div", { className: "collab-summon__head" }, [
+      el("span", { className: "collab-summon__badge" }, ["期間限定"]),
+      el("h2", { className: "collab-summon__title" }, ["コラボピックアップ召喚"]),
+    ]),
+    el("p", { className: "collab-summon__lead" }, ["★4・★5でコラボモンスターの出現率UP"]),
+    el("div", { className: "summon-cta collab-summon__cta" }, [
+      ctaButton({
+        className: "summon-cta__btn--ten collab-summon__btn",
+        lead: "コラボ10連",
+        sub: "★4以上 1体確定",
+        costIcon: "crystal",
+        cost: SUMMON_COST_TEN,
+        enough: canTen,
+        onClick: () => props.onCollabSummon?.(10),
+      }),
+      ctaButton({
+        className: "summon-cta__btn--single collab-summon__btn",
+        lead: "コラボ1回",
+        sub: "★3以上 確定",
+        costIcon: "crystal",
+        cost: SUMMON_COST_SINGLE,
+        enough: canSingle,
+        onClick: () => props.onCollabSummon?.(1),
+      }),
+    ]),
+  ]) : null;
+
+  /*
+   * コラボ限定召喚書。**1枚も持っていなければ枠ごと出さない。**
+   * 空の棚を出しておくと、引けないボタンが画面を占めるだけになる。
+   */
+  const collabScrolls: { type: CollabSummonScroll; name: string; description: string; count: number }[] = [
+    {
+      type: "COLLAB_FOUR_STAR", name: "コラボ限定★4以上召喚書",
+      description: "コラボモンスターの★4以上を確定召喚。まれに★5が出る",
+      count: player.collabFourStarSummonScrolls ?? 0,
+    },
+    {
+      type: "COLLAB_LIGHT_DARK_FOUR_STAR", name: "コラボ限定★4以上光闇召喚書",
+      description: "光闇属性のコラボ★4以上を確定召喚。まれに★5が出る",
+      count: player.collabLightDarkFourStarSummonScrolls ?? 0,
+    },
+    {
+      type: "COLLAB_FIVE_STAR", name: "コラボ限定★5召喚書",
+      description: "コラボモンスターの★5を確定召喚",
+      count: player.collabFiveStarSummonScrolls ?? 0,
+    },
+  ];
+  const collabScrollPanel = props.onUseCollabSummonScroll && collabScrolls.some((s) => s.count > 0)
+    ? el("section", { className: "special-scrolls special-scrolls--collab" }, [
+      el("h2", {}, ["コラボ限定召喚書"]),
+      ...collabScrolls.filter((scroll) => scroll.count > 0).map((scroll) => el("div", { className: "special-scroll" }, [
+        el("div", { className: "special-scroll__copy" }, [el("strong", {}, [scroll.name]), el("span", {}, [scroll.description])]),
+        el("span", { className: "special-scroll__count" }, [`所持 ${scroll.count}`]),
+        el("button", {
+          type: "button", className: "btn btn--primary",
+          onclick: () => props.onUseCollabSummonScroll?.(scroll.type),
+        }, ["召喚"]),
+      ])),
+    ])
+    : null;
   /*
    * **排出率の数字は画面に出さない**(依頼主との約束)。
    * ここには「何が保証されるか」だけを書く。%を並べていた頃は、
@@ -262,6 +342,10 @@ function renderIdle(props: SummonProps): HTMLElement {
       // 確定の話はボタンの副題が言っている。ここに残すのは**そこに書けない1つ**だけ
       el("p", { className: "summon-note" }, ["光・闇のレア枠は確定枠とは別に抽選されます"]),
       cta,
+      // 期間限定のものは通常召喚の下に置く。**上に割り込ませない**
+      // (毎日使う導線を、期間が終われば消えるもので押し下げない)
+      collabPanel,
+      collabScrollPanel,
       specialPanel,
     ] as (HTMLElement | null)[]).filter((node): node is HTMLElement => node !== null)),
   ]);
