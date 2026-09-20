@@ -57,8 +57,11 @@ describe("コラボピックアップ召喚", () => {
 
   it("通常属性と光闇の比率も通常召喚と同じ", () => {
     const rare = results.filter((r) => r.isRare).length / TRIALS;
-    // 0.03 + 0.0135 + 0.0065 = 0.05
-    expect(rare).toBeCloseTo(0.05, 2);
+    // 光闇の重み(0.03 + 0.0135 + 0.0065 = 0.05)を重みの合計 0.80 で割って 6.25%
+    expect(rare).toBeCloseTo(0.0625, 2);
+    // 通常召喚と突き合わせる。**どちらも同じ表から引いている**ことの確認
+    const normalRare = summonMany(TRIALS, seeded(31)).filter((r) => r.isRare).length / TRIALS;
+    expect(Math.abs(rare - normalRare)).toBeLessThan(0.005);
   });
 
   it("★3にはコラボが1体も出ない", () => {
@@ -96,17 +99,32 @@ describe("コラボピックアップ召喚", () => {
   /*
    * **同じ条件のコラボは完全に均等。**
    * 特定の1体だけ出やすくすると、狙って引く意味がなくなる。
+   *
+   * 「同じ条件」は**同じ星・同じ属性枠**のこと。
+   * 星をまたいで均等にすると★5が出やすくなり、
+   * 属性枠をまたいで均等にすると光闇が出やすくなる——
+   * どちらも通常召喚の比率を崩すので、そこは枠のまま保つ。
    */
-  it("同じ条件のコラボモンスターが均等に出る", () => {
+  it("同じ星・同じ属性枠のコラボモンスターが均等に出る", () => {
     for (const [star, rare] of [[4, false], [4, true], [5, false], [5, true]] as const) {
       const hit = results.filter((r) => r.isCollab && r.star === star && r.isRare === rare);
       const counts = new Map<string, number>();
       for (const r of hit) counts.set(r.dexId, (counts.get(r.dexId) ?? 0) + 1);
       // 種族2 × 属性(通常4 or 光闇2)
       const expectedKinds = 2 * (rare ? 2 : 4);
-      expect(counts.size, `★${star}${rare ? "光闇" : "通常"} の顔ぶれ数`).toBe(expectedKinds);
-      const share = [...counts.values()].map((n) => n / hit.length);
-      for (const s of share) expect(s, `★${star}${rare ? "光闇" : "通常"} の偏り`).toBeCloseTo(1 / expectedKinds, 2);
+      const where = `★${star}${rare ? "光闇" : "通常"}`;
+      expect(counts.size, `${where} の顔ぶれ数`).toBe(expectedKinds);
+      /*
+       * **許す幅は試行数で決める。**光闇は全体の 1.75%(★4) しか出ないので、
+       * 20万回でも1枠あたり数百件しか集まらない。固定の幅で測ると
+       * 「偏っている」ではなく「まだ足りない」を拾ってしまう。
+       */
+      const expectedShare = 1 / expectedKinds;
+      const tolerance = Math.max(0.02, 4 / Math.sqrt(hit.length));
+      for (const [dexId, n] of counts) {
+        expect(Math.abs(n / hit.length - expectedShare), `${where} の ${dexId} が偏っている`)
+          .toBeLessThan(tolerance);
+      }
     }
   });
 
@@ -207,13 +225,30 @@ describe("コラボ限定召喚書", () => {
     expect([...templateIds].sort()).toEqual(COLLAB_STAR5_TEMPLATES.map((t) => t.templateId).sort());
   });
 
-  it("どの書も、その条件の中では均等に出る", () => {
+  /*
+   * **属性枠の比率は保つ。**12体を完全に均等にすると、
+   * 光闇が 1/12 = 8.3% ずつ、合わせて33%出ることになる。
+   * 光闇は召喚でしか手に入らない希少枠で、既存の★4以上召喚書も
+   * ★5召喚書も光闇に低い重みを置いている
+   * (`SPECIAL_GACHA_TABLES`)。コラボ限定の書だけ光闇が出やすい、
+   * という歪みを作らないため、枠の比率はそのままにしてある。
+   *
+   * 均等なのは**同じ属性枠の中**。そこでは種族も属性も完全に均等。
+   */
+  it("同じ属性枠の中では、どの顔ぶれも均等に出る", () => {
     const results = draw("COLLAB_FIVE_STAR", TRIALS, 404);
-    const counts = new Map<string, number>();
-    for (const r of results) counts.set(r.dexId, (counts.get(r.dexId) ?? 0) + 1);
-    // ★5コラボ2種 × 6属性 = 12体
-    expect(counts.size).toBe(12);
-    for (const n of counts.values()) expect(n / TRIALS).toBeCloseTo(1 / 12, 2);
+    for (const rare of [false, true]) {
+      const hit = results.filter((r) => r.isRare === rare);
+      const counts = new Map<string, number>();
+      for (const r of hit) counts.set(r.dexId, (counts.get(r.dexId) ?? 0) + 1);
+      // ★5コラボ2種 × 属性(通常4 or 光闇2)
+      const expectedKinds = 2 * (rare ? 2 : 4);
+      expect(counts.size, `${rare ? "光闇" : "通常"} の顔ぶれ数`).toBe(expectedKinds);
+      const tolerance = Math.max(0.02, 4 / Math.sqrt(hit.length));
+      for (const [dexId, n] of counts) {
+        expect(Math.abs(n / hit.length - 1 / expectedKinds), `${dexId} が偏っている`).toBeLessThan(tolerance);
+      }
+    }
   });
 });
 

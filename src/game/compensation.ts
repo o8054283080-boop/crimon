@@ -1,4 +1,10 @@
-import { PlayerState } from "./playerState.js";
+import { PlayerState, addMonster } from "./playerState.js";
+import {
+  COLLAB_EVENT_FROM_DATE, COLLAB_EVENT_TO_DATE, COLLAB_GIFT_DEX_ID,
+} from "../data/collabEvent.js";
+
+/** コラボ開催記念の配布の識別子。二重配布を止める要なので、**絶対に変えないこと** */
+export const COLLAB_GIFT_ID = "2026-09-collab-celebration";
 
 /**
  * 配布・お知らせ。
@@ -28,9 +34,54 @@ export interface Compensation {
    * どれか1つでも忘れると、**配ったのに増えない**か**何も出ない札**になる。
    */
   lightDarkFourStarSummonScrolls?: number;
+  /**
+   * コラボ限定の召喚書3種。**通常の書とは別枠**で、コラボの顔ぶれしか出ない。
+   *
+   * 足す時は3か所そろえること
+   * (受け取り `claimCompensations` / 有無の判定 `hasReward` / ホームの札)。
+   */
+  collabFourStarSummonScrolls?: number;
+  collabLightDarkFourStarSummonScrolls?: number;
+  collabFiveStarSummonScrolls?: number;
+  /**
+   * モンスターそのものを配る。**図鑑IDと星をそのまま渡す。**
+   *
+   * 配布専用の弱い個体は作らない。`createMonsterInstance` に
+   * 同じ図鑑IDを渡すだけなので、**召喚で引いた個体と1つも違いが出ない。**
+   *
+   * `claimedCompensationIds` で二重受け取りを止めているので、
+   * 再ログインしても、セーブを復旧しても、配られるのは一度きり。
+   */
+  monsters?: readonly { dexId: string; star: 1 | 2 | 3 | 4 | 5 | 6; name: string }[];
 }
 
 export const COMPENSATIONS: Compensation[] = [
+  {
+    /*
+     * コラボ開催記念の配布。
+     *
+     * **`claimedCompensationIds` に id が入るのは1回だけ**なので、
+     * 再ログインしても、端末を変えてセーブを復旧しても、二重には配られない。
+     * 受け取る前ならプレゼントボックスに残り続ける。
+     */
+    id: COLLAB_GIFT_ID,
+    title: "コラボ開催記念 プレゼント",
+    message: "コラボ開催を記念して、全員へお配りします。\n\n"
+      + "【電気スエゾー ×1】\n配布専用の弱い個体ではありません。**召喚で引いた電気スエゾーとまったく同じ個体**です。"
+      + "育成・装備・ランクアップ・タイプ転生・才能覚醒まで、通常のモンスターとして何も制限がありません。\n\n"
+      + "【ダイヤ ×3,000】\nコラボピックアップ召喚の10連(900ダイヤ)が3回引けます。\n\n"
+      + "【召喚の書 ×30】\n通常召喚を30回ぶん引けます。\n\n"
+      + "【コラボ限定★4以上召喚書 ×1】\n**コラボモンスターしか出ない**特別な召喚書です。"
+      + "電気スエゾーと合わせて2体目のコラボモンスターが手に入るので、コラボ限定ミッションはここから進められます。",
+    kind: "CELEBRATION",
+    fromDate: COLLAB_EVENT_FROM_DATE,
+    toDate: COLLAB_EVENT_TO_DATE,
+    crystal: 3_000,
+    gold: 0,
+    summonScrolls: 30,
+    collabFourStarSummonScrolls: 1,
+    monsters: [{ dexId: COLLAB_GIFT_DEX_ID, star: 4, name: "スエゾー【電気】" }],
+  },
   {
     id: "2026-09-19-collab-monsters",
     title: "9/19 コラボモンスター4種・全24属性を追加しました",
@@ -661,7 +712,11 @@ export function compensationBannerLabel(claims: readonly CompensationClaim[]): s
 export function hasReward(compensation: Compensation): boolean {
   return compensation.crystal > 0 || compensation.gold > 0
     || compensation.summonScrolls > 0 || (compensation.fourStarSummonScrolls ?? 0) > 0
-    || (compensation.lightDarkFourStarSummonScrolls ?? 0) > 0;
+    || (compensation.lightDarkFourStarSummonScrolls ?? 0) > 0
+    || (compensation.collabFourStarSummonScrolls ?? 0) > 0
+    || (compensation.collabLightDarkFourStarSummonScrolls ?? 0) > 0
+    || (compensation.collabFiveStarSummonScrolls ?? 0) > 0
+    || (compensation.monsters?.length ?? 0) > 0;
 }
 
 export interface HomeBannerSelection {
@@ -732,6 +787,18 @@ export function claimCompensations(state: PlayerState, now: Date = new Date()): 
     state.summonScrolls += compensation.summonScrolls;
     state.fourStarSummonScrolls += compensation.fourStarSummonScrolls ?? 0;
     state.lightDarkFourStarSummonScrolls += compensation.lightDarkFourStarSummonScrolls ?? 0;
+    // コラボ限定の書。**欄が無い古いセーブでも 0 から足せる**
+    state.collabFourStarSummonScrolls = (state.collabFourStarSummonScrolls ?? 0)
+      + (compensation.collabFourStarSummonScrolls ?? 0);
+    state.collabLightDarkFourStarSummonScrolls = (state.collabLightDarkFourStarSummonScrolls ?? 0)
+      + (compensation.collabLightDarkFourStarSummonScrolls ?? 0);
+    state.collabFiveStarSummonScrolls = (state.collabFiveStarSummonScrolls ?? 0)
+      + (compensation.collabFiveStarSummonScrolls ?? 0);
+    /*
+     * モンスターそのもの。**召喚で引いたものと同じ個体を渡す。**
+     * 受け取り済みの印は下で1回だけ付くので、何度開いても増えない。
+     */
+    for (const gift of compensation.monsters ?? []) addMonster(state, gift.dexId, gift.star);
     state.claimedCompensationIds.push(compensation.id);
     claims.push({ compensation });
   }
