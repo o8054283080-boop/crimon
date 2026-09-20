@@ -94,31 +94,49 @@ describe("ダイヤでのスタミナ回復 (tryRefillStaminaPartial / tryRefill
     expect(state.stamina).toBe(state.maxStamina + STAMINA_REFILL_PARTIAL_AMOUNT * 2);
   });
 
-  it("ダイヤ200を消費してスタミナが全回復する", () => {
+  it("ダイヤ200で最大スタミナと同じ量が入る", () => {
     const state = createInitialState();
     state.stamina = 1;
     state.crystal = 500;
     const result = tryRefillStaminaFull(state);
     expect(result.ok).toBe(true);
-    expect(state.stamina).toBe(state.maxStamina);
+    expect(state.stamina).toBe(1 + state.maxStamina);
     expect(state.crystal).toBe(500 - STAMINA_REFILL_FULL_COST);
   });
 
-  it("**全回復は上限超過中のスタミナを削らない**", () => {
+  it("**入る量は残りスタミナで変わらない**", () => {
     /*
-     * 上限を超えている間は「既に満タンです」で弾かれるので、
-     * ダイヤも減らないし超過分も減らない。
-     * 450/150 の人が全回復を買って 150/150 になる、という壊れ方をしない
+     * 以前は上限までしか戻さなかったので、120/150 で買うと **30しか増えない**のに
+     * 値段は同じ200ダイヤだった(依頼主の指摘)。満タンに近いほど損をするので、
+     * **使う前にわざわざ空にする**のが最適になっていた。
      */
+    const empty = createInitialState();
+    empty.stamina = 0;
+    empty.crystal = 500;
+    tryRefillStaminaFull(empty);
+
+    const nearlyFull = createInitialState();
+    nearlyFull.stamina = nearlyFull.maxStamina - 30;
+    nearlyFull.crystal = 500;
+    tryRefillStaminaFull(nearlyFull);
+
+    expect(empty.stamina).toBe(empty.maxStamina);
+    expect(nearlyFull.stamina).toBe(nearlyFull.maxStamina * 2 - 30);
+    // どちらも同じ値段で、**同じ量**が入っている
+    expect(empty.crystal).toBe(nearlyFull.crystal);
+  });
+
+  it("**満タンでも買えて、超過分は消えない**", () => {
+    // 450/150 の人が買って 150/150 に戻る、という壊れ方をしない
     const state = createInitialState();
     state.stamina = state.maxStamina + 300;
     state.crystal = 500;
 
     const result = tryRefillStaminaFull(state);
 
-    expect(result.ok).toBe(false);
-    expect(state.stamina).toBe(state.maxStamina + 300);
-    expect(state.crystal).toBe(500);
+    expect(result.ok).toBe(true);
+    expect(state.stamina).toBe(state.maxStamina * 2 + 300);
+    expect(state.crystal).toBe(500 - STAMINA_REFILL_FULL_COST);
   });
 
   it("全回復もダイヤが足りない場合は失敗する", () => {

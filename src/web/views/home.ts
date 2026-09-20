@@ -617,7 +617,7 @@ function renderVitals(
   party: readonly MonsterInstance[],
 ): HTMLElement {
   const power = party.reduce((sum, m) => sum + monsterPower(m), 0);
-  const full = player.stamina >= player.maxStamina;
+  // 上限を超えて持てるので、帯は1で止める(270/150 で帯が画面からはみ出さないように)
   const ratio = Math.max(0, Math.min(1, player.stamina / Math.max(1, player.maxStamina)));
 
   const stat = (name: IconName, label: string, value: number): HTMLElement =>
@@ -641,19 +641,29 @@ function renderVitals(
         el("span", { className: "home-stamina__body" }, [
           el("small", {}, ["スタミナ"]),
           el("span", { className: "home-stamina__num" }, [
-            el("strong", {}, [String(player.stamina)]),
-            el("span", {}, [`/ ${player.maxStamina}`]),
+            // 上限を超えて貯まると4桁になる。**上の帯と同じく桁で区切る**
+            el("strong", {}, [player.stamina.toLocaleString("ja-JP")]),
+            el("span", {}, [`/ ${player.maxStamina.toLocaleString("ja-JP")}`]),
           ]),
         ]),
         el("div", { className: "home-stamina__track" }, [el("i", { style: `width:${(ratio * 100).toFixed(1)}%` }, [])]),
       ]),
+      /*
+       * 回復の3つは**どれも満タンで押せる。**
+       *
+       * 以前はダイヤの2つだけが満タンで押せず、しかも上の方は
+       * 上限までしか戻さなかった。120/150 で買うと **30しか増えない**のに
+       * 値段は同じ200ダイヤで、**使う前にわざわざ空にするのが得**という
+       * 妙なことになっていた(依頼主の指摘)。
+       * いまはどれも残量に関わらず同じ量が入り、超えた分も消えない。
+       */
       el("div", { className: "home-vitals__actions" }, [
         el(
           "button",
           {
             type: "button",
             className: "btn btn--ghost",
-            disabled: full || player.crystal < STAMINA_REFILL_PARTIAL_COST,
+            disabled: player.crystal < STAMINA_REFILL_PARTIAL_COST,
             onclick: onPartial,
           },
           [icon("crystal"), `${STAMINA_REFILL_PARTIAL_COST} で +${STAMINA_REFILL_PARTIAL_AMOUNT}`],
@@ -663,14 +673,14 @@ function renderVitals(
           {
             type: "button",
             className: "btn btn--ghost",
-            disabled: full || player.crystal < STAMINA_REFILL_FULL_COST,
+            disabled: player.crystal < STAMINA_REFILL_FULL_COST,
             onclick: onFull,
           },
-          [icon("crystal"), `${STAMINA_REFILL_FULL_COST} で全回復`],
+          // **「全回復」とは書かない。**入る量は最大スタミナぶんで、残量では変わらない
+          [icon("crystal"), `${STAMINA_REFILL_FULL_COST} で +${player.maxStamina}`],
         ),
         /*
-         * ポーションはダイヤと違って**スタミナにしか使えない**ので、
-         * 満タンでも押せるようにしてある(上限を超えて持てる)。
+         * ポーションはダイヤと違って**スタミナにしか使えない。**
          * 持っていない時だけ押せない。
          */
         el(
