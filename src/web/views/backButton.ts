@@ -40,6 +40,19 @@ export interface GlobalBackButtonProps {
  * 一本化した。画面ごとに幅の違う言葉が入ると、左上のボタンの大きさが
  * 場所によって変わり、目が毎回それを読み直すことになる。
  */
+/**
+ * **自前の戻り口を持っている画面。**ここでは共通ボタンを出さない。
+ *
+ * どちらも左上に置かれるので、出すと**同じ場所にボタンが2つ**並ぶ。
+ * さらに共通ボタンは `fixed`、自前のものは画面と一緒に動くため、
+ * 少し巻いた瞬間に**自前のボタンが共通ボタンの裏へ入って押せなくなる**
+ * (図鑑の「‹ 一覧」で実際に起きた。依頼主の指摘)。
+ *
+ * 行き先は同じなので、**場所を言う自前のボタンを残す**方を選ぶ。
+ * 「戻る」より「‹ 一覧」の方が、どこへ行くかが読める。
+ */
+export const OWN_BACK_SELECTOR = ".monster-detail-head, .monster-dex-detail__back";
+
 export function renderGlobalBackButton(props: GlobalBackButtonProps): HTMLElement {
   /*
    * モンスター詳細は独自の `.monster-detail-head__back` をすでに持っている。
@@ -50,7 +63,7 @@ export function renderGlobalBackButton(props: GlobalBackButtonProps): HTMLElemen
    *
    * 判定時点では `content` が root に追加済みなので、DOMから安全に確認できる。
    */
-  if (document.querySelector(".monster-detail-head")) {
+  if (document.querySelector(OWN_BACK_SELECTOR)) {
     return el("span", { hidden: true, ariaHidden: "true" }, []);
   }
 
