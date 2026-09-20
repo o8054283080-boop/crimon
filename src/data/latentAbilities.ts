@@ -8,6 +8,13 @@ const SPECIES_LABEL: Record<string, string> = {
   scorpion: "スコーピオン", harpy: "ハーピー", phoenix: "フェニックス", joker: "ジョーカー",
   slime: "スライム", wolf: "ウルフ", golem: "ゴーレム", fairy: "フェアリー", imp: "インプ", wisp: "ウィスプ",
   treant: "トレント", knight: "ナイト", griffon: "グリフォン", dragon: "ドラゴン", seraph: "セラフ", nemesis: "ネメシス",
+  /*
+   * **種族を足したら必ずここも足す。**
+   * 抜けると潜在覚醒の名前が「炎のundefined」になり、
+   * 図鑑の詳細に3つ並ぶ(コラボ4種を入れた時に実際に出た)。
+   * `tests/latentAbilityAudit.test.ts` が名前に undefined が入らないことを見張る。
+   */
+  mocchi: "モッチー", suezo: "スエゾー", undine: "ウンディーネ", gujira: "グジラ",
 };
 const DISRUPTIONS: readonly { label: string; description: string; effect: LatentRuntimeEffect }[] = [
   { label: "治癒封じ", description: "80%の確率で2ターン回復を阻害", effect: { kind: "DEBUFF", status: "HEAL_BLOCK", chance: .8, duration: 2 } },

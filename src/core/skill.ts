@@ -89,6 +89,20 @@ export type EffectCondition =
   | "TARGET_DEBUFF_AT_LEAST_3"
   /** 自身のHPが50%以上 */
   | "SELF_HP_ABOVE_50"
+  /**
+   * **自身の防御力が対象より高い。**
+   *
+   * 「硬い者が振ると重い」という形を書くための条件。
+   * 見るのは戦闘時点の実効値なので、防御バフ・デバフの結果が反映される。
+   */
+  | "SELF_DEF_ABOVE_TARGET"
+  /**
+   * **対象の速度が自身より高い。**
+   *
+   * 「先に動く相手ほど刺さる」という形。遅い者が後出しで刺す技に使う。
+   * こちらも戦闘時点の実効値を見る。
+   */
+  | "TARGET_SPD_ABOVE_SELF"
   /** このスキルで1回以上クリティカルした */
   | "ANY_CRIT"
   /** このスキルで2回以上クリティカルした */
@@ -177,6 +191,22 @@ export interface DamageEffect {
   ignoreDefense?: boolean;
   /** 0～1の部分防御無視率。 */
   ignoreDefenseRatio?: number;
+  /**
+   * 条件を満たした時だけ乗る防御無視。**ダメージそのものは条件に関わらず出る。**
+   *
+   * `requires` を使うとヒットごと消えてしまうので分けてある
+   * (「自分の防御が高ければ深く刺さる」は、低くても当たること自体は変わらない)。
+   * 他の防御無視と同じく**足さずに大きい方を取る**。
+   */
+  conditionalIgnoreDefense?: { when: EffectCondition; ratio: number };
+  /**
+   * **必ずクリティカルになる。**
+   *
+   * クリ率の上乗せ(`critRateBonus`)では、被クリ率DOWNや味方のオーラで
+   * 100%を割る。「必ず」と書いた技は、相手の守りで確率へ戻ってはいけない。
+   * かすり(属性不利)だけは別で、あちらはクリティカルそのものを禁じる。
+   */
+  alwaysCrit?: true;
   /** 対象に付与済みの弱体効果数による倍率（上限必須）。 */
   debuffDamageBonus?: { perDebuff: number; maxBonus: number };
   /**
@@ -273,6 +303,16 @@ export interface DebuffEffect {
   chanceGroup?: string;
   /** Lv5でも継続ターンを延ばさない印 */
   fixedDuration?: true;
+  /**
+   * **抵抗を無視して通す。**書いた確率がそのまま通る。
+   *
+   * **免疫は無視できない。**免疫は「弱体を受け付けない」という
+   * 相手が自分で用意した答えで、抵抗(運で弾く)とは別のもの。
+   * ここを免疫まで貫くようにすると、免疫を張る意味が消える。
+   *
+   * 明記された技だけに付ける。既定の弱体は従来どおり抵抗判定を通る。
+   */
+  ignoreResistance?: true;
 }
 
 export interface StunEffect {
@@ -590,12 +630,60 @@ export interface SplashEffect {
   ratio: number;
 }
 
+/**
+ * 固定ダメージ。**防御もクリダメ倍率も属性相性も一切掛からない。**
+ *
+ * 数字がそのまま入るので、**硬い相手ほど相対的に効く。**
+ * 逆に、育てても伸びない。攻撃力を積んだ側から見ると
+ * 終盤ほど比重が下がるので、置ける量は限られる。
+ *
+ * `requires` と組み合わせて「会心した時だけ」のように条件を付ける。
+ */
+export interface FlatDamageEffect {
+  kind: "FLAT_DAMAGE";
+  /** そのまま引かれるHPの量 */
+  amount: number;
+  /** この効果を出す条件。満たさなければ何も起きない */
+  requires?: EffectCondition;
+}
+
+/**
+ * 対象の最大HPに対する割合ダメージ。**防御の影響を受けない。**
+ *
+ * HPを積んだ相手ほど大きく入る、防御では止められない削り。
+ * **上限を設けていない。**ボス相手に効きすぎると感じたら、
+ * 技ごとの割合を下げること——ここに一律の上限を足すと、
+ * 「割合で削る」という手札そのものが機能しなくなる。
+ */
+export interface MaxHpDamageEffect {
+  kind: "MAX_HP_DAMAGE";
+  /** 対象の最大HPに対する割合(0〜1) */
+  ratio: number;
+  requires?: EffectCondition;
+}
+
+/**
+ * 自傷。**使った本人のHPを、自分の最大HPの割合で削る。**
+ *
+ * 強い一撃の代償として置く。**倒れることもそのまま許す**
+ * (「HP1で止まる」を勝手に足さない。依頼主の指定)。
+ * 止めたい技があれば、その技の側で条件を書くこと。
+ */
+export interface SelfDamageEffect {
+  kind: "SELF_DAMAGE";
+  /** 自身の最大HPに対する割合(0〜1) */
+  ratio: number;
+}
+
 export type SkillEffect =
   | { kind: "CURSE"; chance: number }
   | { kind: "DETONATE_CURSES" }
   | { kind: "CONVERT_CURSES"; chance: number }
   | { kind: "DAMAGE_BOOST"; amount: number; durationTurns: number; applyTo?: EffectApplyTo }
   | SplashEffect
+  | FlatDamageEffect
+  | MaxHpDamageEffect
+  | SelfDamageEffect
   | DamageEffect
   | HealEffect
   | LifestealEffect
@@ -875,6 +963,8 @@ export const STATUS_EFFECT_JA: Record<StatusEffectType, string> = {
 
 export const EFFECT_CONDITION_JA: Record<EffectCondition, string> = {
   TARGET_HAS_DEBUFF: "対象が弱体状態なら",
+  SELF_DEF_ABOVE_TARGET: "自分の防御力が対象より高いなら",
+  TARGET_SPD_ABOVE_SELF: "対象の速度が自分より高いなら",
   TARGET_SPD_DOWN: "対象が速度低下状態なら",
   TARGET_POISONED: "対象が毒状態なら",
   TARGET_TAUNTED: "対象が挑発状態なら",
@@ -934,19 +1024,37 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "DAMAGE_BOOST": return `与ダメージ+${Math.round(effect.amount * 100)}%(${effect.durationTurns}ターン)`;
     // **「対象以外へ」と書く。**対象を含めると、本命に二重で入るように読める
     case "SPLASH": return `対象に与えたダメージの${Math.round(effect.ratio * 100)}%を対象以外の敵全体へ拡散`;
+    /*
+     * **「防御を無視する」と明記する。**割合ダメージは、書かないと
+     * 「防御で減るのに割合?」と読まれて編成の判断材料にならない。
+     */
+    case "FLAT_DAMAGE":
+      return `${conditionPrefix(effect.requires)}固定ダメージ${effect.amount.toLocaleString("ja-JP")}(防御・会心倍率の影響を受けない)`;
+    case "MAX_HP_DAMAGE":
+      return `${conditionPrefix(effect.requires)}対象の最大HPの${percent(effect.ratio)}のダメージ(防御の影響を受けない)`;
+    case "SELF_DAMAGE":
+      return `自身の最大HPの${percent(effect.ratio)}を自傷`;
     case "DAMAGE": {
-      const scaleText = effect.scaleBonus
-        ? `(自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇)`
-        : effect.hpCoefficient !== undefined
-          ? `(最大HPの${percent(effect.hpCoefficient)}を加算)`
-          : effect.defCoefficient !== undefined
-            ? `(防御力の${percent(effect.defCoefficient)}を加算)`
-            : "";
+      /*
+       * **HP比例とDEF比例は同時に書ける。**
+       * ここを三項演算子で排他にしていた頃は、両方持つ技の説明から
+       * 片方が黙って消えていた(モッチーのS1がATK+HP+DEFの3項)。
+       */
+      const scaleParts = [
+        effect.scaleBonus ? `自身の${SCALE_BONUS_STAT_JA[effect.scaleBonus.stat]}が高いほど上昇` : "",
+        effect.hpCoefficient !== undefined ? `最大HPの${percent(effect.hpCoefficient)}を加算` : "",
+        effect.defCoefficient !== undefined ? `防御力の${percent(effect.defCoefficient)}を加算` : "",
+      ].filter(Boolean);
+      const scaleText = scaleParts.length > 0 ? `(${scaleParts.join("、")})` : "";
       const ignoreDefenseText = effect.ignoreDefense
         ? "(防御力無視)"
         : effect.ignoreDefenseRatio
           ? `(防御力${Math.round(effect.ignoreDefenseRatio * 100)}%無視)`
           : "";
+      const condIgnoreText = effect.conditionalIgnoreDefense
+        ? `(${EFFECT_CONDITION_JA[effect.conditionalIgnoreDefense.when]}防御力${Math.round(effect.conditionalIgnoreDefense.ratio * 100)}%無視)`
+        : "";
+      const alwaysCritText = effect.alwaysCrit ? "(必ずクリティカル)" : "";
       const hpBonusText = (effect.targetHpBonus ?? [])
         .map((tier) => ` 対象HP${Math.round(tier.hpRatio * 100)}%以下で最終ダメージ+${Math.round(tier.bonus * 100)}%`)
         .join("");
@@ -973,7 +1081,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
         effect.perHitEffects ? `各ヒットごとに: ${effect.perHitEffects.map(describeSkillEffect).join('、')}` : '',
       ].filter(Boolean).join('。');
       const requiresText = conditionPrefix(effect.requires);
-      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${critGaugeText}${special ? `。${special}` : ""}`;
+      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${condIgnoreText}${alwaysCritText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${critGaugeText}${special ? `。${special}` : ""}`;
     }
     case "HEAL": {
       const who = effect.applyTo === "SELF" ? "自身を" : effect.applyTo === "ALLIES" ? "味方全体を" : "";
@@ -989,7 +1097,13 @@ export function describeSkillEffect(effect: SkillEffect): string {
       return `${scope}${BUFF_STAT_JA[effect.stat]}+${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
     }
     case "DEBUFF":
-      return `${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`;
+      /*
+       * **抵抗無視は必ず出す。**プレイヤーが編成を考えるために要る情報で、
+       * 「85%で防御DOWN」としか書かないと、抵抗の高い相手に
+       * 効かないものと読まれる(実際は通る)。免疫では防がれることも併記する。
+       */
+      return `${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`
+        + (effect.ignoreResistance ? "(抵抗を無視。ただし免疫中の相手には入らない)" : "");
     case "STATUS": {
       const scope = effect.applyTo === "ALLIES" ? "味方全体に" : effect.applyTo === "SELF" ? "自身に" : "";
       return `${chanceSuffix(effect.chance)}${scope}${STATUS_EFFECT_JA[effect.status]} (${effect.durationTurns}ターン)`;

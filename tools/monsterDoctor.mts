@@ -118,6 +118,15 @@ function checkNumbers(where: string, skill: Skill): void {
 /** 2. 実際には起きるのに、説明文に一言も書かれていない効果 */
 function checkUndescribed(where: string, skill: Skill): void {
   const d = skill.description ?? "";
+  /*
+   * **説明文を効果から生成しているスキルは見ない。**
+   *
+   * ここの語彙(`REQUIRED_WORDS`)は手書きの説明文から拾ってある
+   * (「攻撃力を低下させる」の『低下』など)。生成側は同じことを
+   * 「攻撃力-50%」と書くので、書き漏らしが1つも無いのに全部「だめ」になる。
+   * 生成した文かどうかは `checkNumbers` が一致で確かめている。
+   */
+  if (d.startsWith(describeSkillLines(skill).join("。"))) return;
   for (const effect of skill.effects) {
     const words = REQUIRED_WORDS[effect.kind];
     if (!words || words.length === 0) continue;

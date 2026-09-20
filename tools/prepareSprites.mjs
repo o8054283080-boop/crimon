@@ -53,6 +53,26 @@ const WEBP_QUALITY = 0.9;
 const KEY_INNER = 20;
 const KEY_OUTER = 96;
 
+/**
+ * 左右を反転して出す種族。
+ *
+ * **この案件の絵は全員が右を向いている。**図鑑に並べた時、
+ * 1体だけ左を向いていると、その札だけ顔がよそを向いて浮く
+ * (コラボ4種24体が届いた時に実際にそうなり、依頼主の指摘で気付いた)。
+ *
+ * **元絵は触らない。**反転した元絵を置き直すと「どちらが正か」が
+ * 分からなくなるので、出す時だけここで揃える。
+ * 種族IDの前方一致で見るので、属性ごとの6枚がまとめて対象になる。
+ */
+const MIRRORED_TEMPLATE_IDS = ["mocchi", "suezo", "undine", "gujira"];
+
+/** そのファイルを反転して出すか。`<種族>-<属性>.png` の種族側だけを見る */
+function shouldMirror(fileName) {
+  const base = path.basename(fileName, path.extname(fileName));
+  const templateId = base.includes("-") ? base.slice(0, base.indexOf("-")) : base;
+  return MIRRORED_TEMPLATE_IDS.includes(templateId);
+}
+
 const log = (...args) => console.log(`[${new Date().toTimeString().slice(0, 8)}]`, ...args);
 
 /**
@@ -131,8 +151,24 @@ const PREPARE = `async (dataUrl, options) => {
   const octx = out.getContext("2d");
   octx.imageSmoothingEnabled = true;
   octx.imageSmoothingQuality = "high";
+  /*
+   * **左右を反転して出すものがある。**
+   *
+   * この案件の絵は全員が右を向いている。左を向いた絵が1体でも混ざると、
+   * 図鑑に並べた時にその1体だけ顔の向きが違って浮く
+   * (コラボ4種24体が実際にそうだった)。
+   *
+   * **元絵は触らない。**描き直してもらうのは筋が悪いし、
+   * 反転した元絵を置くと「どちらが正か」が分からなくなる。
+   * 出す時にここで揃える。
+   */
+  if (options.mirror) {
+    octx.translate(outW, 0);
+    octx.scale(-1, 1);
+  }
   octx.drawImage(source, minX, minY, cropW, cropH,
     pad * scale, pad * scale, cropW * scale, cropH * scale);
+  if (options.mirror) octx.setTransform(1, 0, 0, 1, 0, 0);
 
   /*
    * 3. 体の主色(支配的な色相)を測る。
@@ -331,6 +367,7 @@ async function main() {
       [PREPARE, dataUrl, {
         alphaFloor: ALPHA_FLOOR, padding: PADDING, longEdge: LONG_EDGE, quality: WEBP_QUALITY,
         keyInner: KEY_INNER, keyOuter: KEY_OUTER,
+        mirror: shouldMirror(name),
       }],
     );
 

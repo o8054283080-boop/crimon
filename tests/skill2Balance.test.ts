@@ -34,11 +34,19 @@ describe("スキル2の全体攻撃・弱スキル見直し", () => {
     }
   });
 
-  it("攻撃型スキル2の全体攻撃が15種類ある", () => {
+  /*
+   * **数は種族を足すたびに増える。**ここが見張っているのは
+   * 「全体攻撃の割合が偏っていないか」で、絶対数そのものではない。
+   * 56本中15本(27%)から、コラボ4種の9本を足して65本中18本(28%)。
+   * 足した種族だけ全体攻撃に寄せる、という崩れ方をここで止める。
+   */
+  it("攻撃型スキル2のうち、全体攻撃は3割ほどに収まっている", () => {
     const attacking = PLAYABLE_TEMPLATES.flatMap((template) => template.skill2Variants)
       .filter((skill) => skill.effects.some((effect) => effect.kind === "DAMAGE"));
-    expect(attacking).toHaveLength(56);
-    expect(attacking.filter((skill) => skill.target === "ALL_ENEMIES")).toHaveLength(15);
+    expect(attacking).toHaveLength(65);
+    const wide = attacking.filter((skill) => skill.target === "ALL_ENEMIES");
+    expect(wide).toHaveLength(18);
+    expect(wide.length / attacking.length).toBeLessThanOrEqual(0.35);
   });
 
   it("コボルトの急所突きは強化後の威力と防御無視率を持つ", () => {

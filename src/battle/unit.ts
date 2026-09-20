@@ -24,6 +24,24 @@ export interface ActiveStatusEffect {
 export interface BattleUnit {
   curses?: { attack: number; turns: number; sourceId: string }[];
   skyStacks?: number;
+  /**
+   * ガッツチャージ(モッチー電気)の溜まり。**通常のターンが回った回数。**
+   * 追加ターンでは増えない。同一戦闘中は維持し、戦闘が終われば消える。
+   */
+  gutsStacks?: number;
+  /**
+   * 深淵の主(グジラ闇)の溜まり。**敵のスキル攻撃を受けた回数。**
+   * 多段でも1スキルにつき1つ。
+   */
+  abyssStacks?: number;
+  /**
+   * 同じチームの面々。**味方から受け取るオーラ(水の祝福)のためだけにある。**
+   *
+   * 被ダメージの計算は `damageTakenMultiplier(unit)` が単体で完結していて、
+   * 戦場の他の面々を知らない。オーラは「誰かが生きている限り効く」ものなので、
+   * 受け手の側から仲間を辿れる必要がある。戦闘開始時に engine が入れる。
+   */
+  alliesForAura?: BattleUnit[];
   instanceId: string;
   def: MonsterDefinition;
   team: Team;
@@ -206,7 +224,37 @@ export function passiveStatBonus(unit: BattleUnit, stat: BuffStat): { multiplier
     if (stat === "spd") return { multiplier: 1, add: effect.spd ?? 0 };
   }
   if (effect.kind === "PACK_INSTINCT" && stat === "criDmg") return { multiplier: 1, add: effect.critDmg };
+  /*
+   * ガッツチャージ。速度は**加算**、与ダメージは別の場所(最終ダメージ)で効く。
+   * ここで攻撃力を上げないのは、仕様が「与えるダメージ+」だから——
+   * 攻撃力を上げると防御で削られる前の値が動き、
+   * 「与えるダメージが増える」より大きくも小さくもなってしまう。
+   */
+  if (effect.kind === "GUTS_CHARGE" && stat === "spd") {
+    return { multiplier: 1, add: effect.spd * Math.min(effect.maxStacks, unit.gutsStacks ?? 0) };
+  }
+  /* 深淵の主。こちらは攻撃も速度も**割合**で上がる */
+  if (effect.kind === "ABYSS_LORD") {
+    const stacks = Math.min(effect.maxStacks, unit.abyssStacks ?? 0);
+    if (stat === "atk") return { multiplier: 1 + effect.atkPerStack * stacks, add: 0 };
+    if (stat === "spd") return { multiplier: 1 + effect.spdPerStack * stacks, add: 0 };
+  }
+  /*
+   * 魅惑のまなこ。クリ率は常時・全レベル固定。
+   * **的中はここでは扱えない**(`BuffStat` に含まれていない)ので、
+   * 弱体の成否を決める側(`passiveAccuracyBonus`)で足す。
+   */
+  if (effect.kind === "CHARM_EYE" && stat === "criRate") return { multiplier: 1, add: effect.critRate };
   return { multiplier: 1, add: 0 };
+}
+
+/**
+ * パッシブが上乗せする的中。**`BuffStat` に的中が無いので、ここだけ別口。**
+ * 弱体が通るかを決める時に足す。
+ */
+export function passiveAccuracyBonus(unit: BattleUnit): number {
+  const effect = passiveEffectOf(unit);
+  return effect?.kind === "CHARM_EYE" ? effect.accuracy : 0;
 }
 
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
@@ -638,6 +686,19 @@ export function damageTakenMultiplier(unit: BattleUnit, fromTaunted = false): nu
     // 段階は重複しない。**当てはまるうち最も低い閾値の段だけ**が効く
     const tier = [...passive.tiers].sort((a, b) => a.hpRatio - b.hpRatio).find((t) => ratio <= t.hpRatio);
     if (tier) reduction += tier.damageTaken;
+  }
+  /* 深淵の主(グジラ闇)。HPに関係なく常に効く */
+  if (passive?.kind === "ABYSS_LORD") reduction += passive.damageTaken;
+  /*
+   * 水の祝福(ウンディーネ)。**守っているのは自分ではない。**
+   * 生きている味方のウンディーネから受け取る。自分自身は対象外なので、
+   * `holder !== unit` で弾く——守る側が同時にいちばん硬くなると、
+   * 狙う場所が無くなって戦いが止まる。
+   */
+  for (const holder of unit.alliesForAura ?? []) {
+    if (!holder.alive || holder === unit) continue;
+    const aura = passiveEffectOf(holder);
+    if (aura?.kind === "WATER_BLESSING") reduction += aura.damageTaken;
   }
   if (unit.latentOneShotMitigate > 0) reduction += unit.latentOneShotMitigate;
   return Math.max(0.05, 1 - Math.min(0.9, reduction));

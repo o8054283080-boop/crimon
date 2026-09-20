@@ -227,6 +227,42 @@
     "bodyVal": 0.87,
     "aspect": 1.156
   },
+  "gujira-DARK": {
+    "bodyHue": 0.729,
+    "bodySat": 0.54,
+    "bodyVal": 0.58,
+    "aspect": 0.857
+  },
+  "gujira-ELECTRIC": {
+    "bodyHue": 0.12,
+    "bodySat": 0.83,
+    "bodyVal": 0.98,
+    "aspect": 0.85
+  },
+  "gujira-FIRE": {
+    "bodyHue": 0.964,
+    "bodySat": 0.25,
+    "bodyVal": 0.99,
+    "aspect": 0.803
+  },
+  "gujira-GRASS": {
+    "bodyHue": 0.327,
+    "bodySat": 0.64,
+    "bodyVal": 0.65,
+    "aspect": 0.861
+  },
+  "gujira-LIGHT": {
+    "bodyHue": 0.608,
+    "bodySat": 0.2,
+    "bodyVal": 0.98,
+    "aspect": 0.855
+  },
+  "gujira-WATER": {
+    "bodyHue": 0.62,
+    "bodySat": 0.67,
+    "bodyVal": 0.76,
+    "aspect": 0.879
+  },
   "harpy": {
     "bodyHue": 0.041,
     "bodySat": 0.74,
@@ -262,6 +298,42 @@
     "bodySat": 0.78,
     "bodyVal": 0.63,
     "aspect": 1.148
+  },
+  "mocchi-DARK": {
+    "bodyHue": 0.781,
+    "bodySat": 0.52,
+    "bodyVal": 0.47,
+    "aspect": 0.846
+  },
+  "mocchi-ELECTRIC": {
+    "bodyHue": 0.124,
+    "bodySat": 0.49,
+    "bodyVal": 0.98,
+    "aspect": 0.924
+  },
+  "mocchi-FIRE": {
+    "bodyHue": 0.018,
+    "bodySat": 0.29,
+    "bodyVal": 0.99,
+    "aspect": 0.801
+  },
+  "mocchi-GRASS": {
+    "bodyHue": 0.224,
+    "bodySat": 0.42,
+    "bodyVal": 0.91,
+    "aspect": 0.85
+  },
+  "mocchi-LIGHT": {
+    "bodyHue": 0.164,
+    "bodySat": 0.61,
+    "bodyVal": 0.71,
+    "aspect": 0.801
+  },
+  "mocchi-WATER": {
+    "bodyHue": 0.55,
+    "bodySat": 0.52,
+    "bodyVal": 0.99,
+    "aspect": 0.867
   },
   "mushroon": {
     "bodyHue": 0.993,
@@ -333,6 +405,42 @@
     },
     "aspect": 1.024
   },
+  "suezo-DARK": {
+    "bodyHue": 0.823,
+    "bodySat": 0.67,
+    "bodyVal": 0.49,
+    "aspect": 0.992
+  },
+  "suezo-ELECTRIC": {
+    "bodyHue": 0.095,
+    "bodySat": 0.66,
+    "bodyVal": 0.99,
+    "aspect": 0.881
+  },
+  "suezo-FIRE": {
+    "bodyHue": 0.929,
+    "bodySat": 0.7,
+    "bodyVal": 0.98,
+    "aspect": 0.998
+  },
+  "suezo-GRASS": {
+    "bodyHue": 0.152,
+    "bodySat": 0.7,
+    "bodyVal": 0.88,
+    "aspect": 0.883
+  },
+  "suezo-LIGHT": {
+    "bodyHue": 0.014,
+    "bodySat": 0.6,
+    "bodyVal": 0.92,
+    "aspect": 0.914
+  },
+  "suezo-WATER": {
+    "bodyHue": 0.659,
+    "bodySat": 0.8,
+    "bodyVal": 0.98,
+    "aspect": 0.832
+  },
   "thunderbeast": {
     "bodyHue": 0.041,
     "bodySat": 0.84,
@@ -344,6 +452,42 @@
     "bodySat": 0.82,
     "bodyVal": 0.63,
     "aspect": 1.099
+  },
+  "undine-DARK": {
+    "bodyHue": 0.72,
+    "bodySat": 0.7,
+    "bodyVal": 0.84,
+    "aspect": 0.738
+  },
+  "undine-ELECTRIC": {
+    "bodyHue": 0.121,
+    "bodySat": 0.67,
+    "bodyVal": 0.98,
+    "aspect": 0.719
+  },
+  "undine-FIRE": {
+    "bodyHue": 0.035,
+    "bodySat": 0.75,
+    "bodyVal": 0.97,
+    "aspect": 0.701
+  },
+  "undine-GRASS": {
+    "bodyHue": 0.54,
+    "bodySat": 0.79,
+    "bodyVal": 0.94,
+    "aspect": 0.627
+  },
+  "undine-LIGHT": {
+    "bodyHue": 0.515,
+    "bodySat": 0.22,
+    "bodyVal": 0.98,
+    "aspect": 0.65
+  },
+  "undine-WATER": {
+    "bodyHue": 0.593,
+    "bodySat": 0.72,
+    "bodyVal": 0.97,
+    "aspect": 0.695
   },
   "valkyria": {
     "bodyHue": 0.012,
