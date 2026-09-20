@@ -459,7 +459,7 @@ describe("試練の塔 60階: 豪魔人", () => {
     expect(skill.target).toBe("ALL_ENEMIES");
     expect(skill.cooldownTurns).toBe(4);
     expect(skill.effects).toHaveLength(1);
-    expect(skill.effects[0]).toMatchObject({ kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 0.75 });
+    expect(skill.effects[0]).toMatchObject({ kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.75 });
     // ダメージを持たせない(削りではなく「回復が間に合うか」の札)
     expect(skill.effects.some((e) => e.kind === "DAMAGE")).toBe(false);
   });

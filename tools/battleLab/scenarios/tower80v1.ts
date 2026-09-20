@@ -84,7 +84,7 @@ const curseSkills: [Skill, Skill, Skill] = [
   ]),
   skill("tower80_curse_s3", "呪縛領域", "ALL_ENEMIES", 5, [
     { kind: "DAMAGE", multiplier: 0.8 },
-    { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 0.8 },
+    { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 },
     { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.6 },
     { kind: "GAUGE", amount: -0.2 },
   ]),

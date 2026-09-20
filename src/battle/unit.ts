@@ -79,7 +79,13 @@ export interface BattleUnit {
   blindTurns: number;
   /** 治癒阻害の残りターン。0より大きい間、受ける回復に healBlockMultiplier が掛かる */
   healBlockTurns: number;
-  /** 治癒阻害中に受ける回復への倍率(0.5なら半減) */
+  /**
+   * 治癒阻害中に受ける回復への倍率。
+   *
+   * **掛かっている間は必ず0**(=回復を受け付けない)で、切れると1へ戻る。
+   * 効き目に段は無い。スキル側に `healMultiplier` という欄があった頃も、
+   * ここは昔から0を入れていて、**半減はどこにも効いていなかった。**
+   */
   healBlockMultiplier: number;
   /**
    * 受けた攻撃の回数。**反撃を持つ相手のためだけに数えている。**

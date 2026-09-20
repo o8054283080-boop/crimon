@@ -219,7 +219,7 @@ export const CRIMOARK_S4: Skill = {
     { kind: "DAMAGE", multiplier: 1.30 },
     { kind: "GAUGE", amount: -0.50 },
     { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1, fixedDuration: true },
-    { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 1, fixedDuration: true },
+    { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true },
     { kind: "GAUGE", amount: 0.30, applyTo: "SELF" },
   ],
 };
@@ -310,7 +310,7 @@ const DEBUFF_SKILLS: [Skill, Skill, Skill] = [
       { kind: "DAMAGE", multiplier: 0.40 },
       { kind: "STRIP", count: 1, chance: 1 },
       { kind: "STATUS", status: "BUFF_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true },
-      { kind: "HEAL_BLOCK", healMultiplier: 0, durationTurns: 2, chance: 1, fixedDuration: true },
+      { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true },
       { kind: "GAUGE", amount: -0.25 },
     ],
   },

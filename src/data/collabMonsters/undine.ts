@@ -1,7 +1,7 @@
 import { MonsterTemplate } from "../../core/monster.js";
 import { Skill } from "../../core/skill.js";
 import { ATK_UP, DEF_UP, SPD_DOWN, SPD_UP } from "../../core/statusValues.js";
-import { HEAL_BLOCK_HALF, passive } from "../newMonsters/shared.js";
+import { passive } from "../newMonsters/shared.js";
 import { described, fromStar6Lv60 } from "./shared.js";
 
 /**
@@ -284,7 +284,7 @@ const UNDINE_S3_ARROW: Skill = described({
   effects: [
     { kind: "DAMAGE", multiplier: 3.4 },
     { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 2, chance: 0.9, fixedDuration: true },
-    { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.9 },
+    { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 },
   ],
   levelOverrides: [
     // Lv1
@@ -293,7 +293,7 @@ const UNDINE_S3_ARROW: Skill = described({
       effects: [
         { kind: "DAMAGE", multiplier: 3.4 },
         { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 2, chance: 0.9, fixedDuration: true },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.9 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 },
       ],
     },
     // Lv2 倍率 3.40 → 3.70
@@ -302,7 +302,7 @@ const UNDINE_S3_ARROW: Skill = described({
       effects: [
         { kind: "DAMAGE", multiplier: 3.7 },
         { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 2, chance: 0.9, fixedDuration: true },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 0.9 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 },
       ],
     },
     // Lv3 付与率 90% → 100%
@@ -311,7 +311,7 @@ const UNDINE_S3_ARROW: Skill = described({
       effects: [
         { kind: "DAMAGE", multiplier: 3.7 },
         { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 2, chance: 1.0, fixedDuration: true },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 2, chance: 1.0 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1.0 },
       ],
     },
     // Lv4 回復阻害 2ターン → 3ターン
@@ -320,7 +320,7 @@ const UNDINE_S3_ARROW: Skill = described({
       effects: [
         { kind: "DAMAGE", multiplier: 3.7 },
         { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 2, chance: 1.0, fixedDuration: true },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 3, chance: 1.0 },
+        { kind: "HEAL_BLOCK", durationTurns: 3, chance: 1.0 },
       ],
     },
     // Lv5 CT5 → CT4
@@ -329,7 +329,7 @@ const UNDINE_S3_ARROW: Skill = described({
       effects: [
         { kind: "DAMAGE", multiplier: 3.7 },
         { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 2, chance: 1.0, fixedDuration: true },
-        { kind: "HEAL_BLOCK", healMultiplier: HEAL_BLOCK_HALF, durationTurns: 3, chance: 1.0 },
+        { kind: "HEAL_BLOCK", durationTurns: 3, chance: 1.0 },
       ],
     },
   ],

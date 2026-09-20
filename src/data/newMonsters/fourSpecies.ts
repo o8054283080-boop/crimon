@@ -41,7 +41,7 @@ const heal = (healRate: number, applyTo?: 'ALLIES'): SkillEffect => ({ kind: 'HE
 const regen = (healRate: number, durationTurns: number): SkillEffect => ({ kind: 'REGEN', healRate, durationTurns });
 const gauge = (amount: number, applyTo?: 'SELF'|'ALLIES', extra = {}): SkillEffect => ({ kind: 'GAUGE', amount, applyTo, ...extra });
 const poison = (chance: number, extra = {}): SkillEffect => ({ kind: 'POISON', chance, durationTurns: 2, damageRatePerStack: .05, ...extra });
-const block = (chance: number): SkillEffect => ({ kind: 'HEAL_BLOCK', chance, durationTurns: 2, healMultiplier: .5 });
+const block = (chance: number): SkillEffect => ({ kind: 'HEAL_BLOCK', chance, durationTurns: 2});
 const growth25 = [power(1.1), power(1.15/1.1), power(1.25/1.15)];
 const growth20 = [power(1.05), power(1.1/1.05), power(1.2/1.1)];
 const stats = (hp: number, atk: number, def: number, spd: number) => ({ hp, atk, def, spd, criRate: .18, criDmg: 1.6, accuracy: .2, resistance: .2 });
