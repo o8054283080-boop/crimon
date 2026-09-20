@@ -1197,6 +1197,157 @@ export function describeSkillEffect(effect: SkillEffect): string {
  * UI表示用に、スキル1つの中身を行の配列にする。
  * パッシブはそのレベルの中身を1行で返す(効果の配列を持たないため)。
  */
+/* ===== スキルレベルで何が変わるか =====================================
+ *
+ * **Lv別の全文を5段ぶん並べても、どこが変わったのかは読み取れない。**
+ * 「スキルレベル2 → ダメージ20%アップ」「Lv5 → CT-1」のように、
+ * **変わった一点だけ**を短く出すための道具(依頼主の指定)。
+ *
+ * 数字は `computeLeveledSkill` の結果どうしを突き合わせて出す。
+ * 手で書かないので、データを直せば表示も一緒に動く。
+ */
+
+/** レベルが1つ上がった時に変わるもの1件 */
+interface GrowthField {
+  /** 画面に出す名前 */
+  label: string;
+  /** 数の書き方。割合・倍率・ターン数で単位が違う */
+  unit: "percent" | "multiplier" | "turns";
+  /**
+   * 効果の名前を頭に付けるか。
+   *
+   * **「持続」だけだと、どれの持続なのか分からない。**毒と弱体の両方を
+   * 持つ技では「持続 1→2ターン / 持続 2→3ターン」と並んで読めなかった。
+   * 付けると「毒の持続」「弱体の持続」になる。
+   */
+  qualify?: true;
+}
+
+/** 効果の短い呼び名。**「持続」「発動率」がどれの話かを言うためだけに要る** */
+const GROWTH_EFFECT_LABEL: Record<string, string> = {
+  DAMAGE: "ダメージ",
+  DEBUFF: "弱体",
+  BUFF: "強化",
+  POISON: "毒",
+  BURN: "火傷",
+  STUN: "スタン",
+  BLIND: "暗闇",
+  HEAL: "回復",
+  HEAL_BLOCK: "治癒阻害",
+  REGEN: "継続回復",
+  SHIELD: "シールド",
+  IMMUNITY: "免疫",
+  LIFESTEAL: "吸収",
+  GAUGE: "行動ゲージ",
+  STRIP: "強化解除",
+  STEAL_BUFF: "強化奪取",
+  COOLDOWN_EXTEND: "CT延長",
+  MITIGATE: "被ダメージ軽減",
+  PROTECT: "肩代わり",
+  COUNTER_STANCE: "反撃",
+  CLEANSE: "弱体解除",
+  SPLASH: "拡散",
+};
+
+/**
+ * レベルで実際に動く欄だけを並べてある。
+ *
+ * **ここに無い欄が動いたら、画面には「強くなる」としか出せない。**
+ * 静かに消えると「Lv3で何も変わらない」という嘘になるので、
+ * `tests/skillGrowthSummary.test.ts` が**取りこぼしを機械的に見張っている。**
+ * 新しい欄が育つようになったら、ここへ足すこと。
+ */
+const GROWTH_FIELDS: Record<string, GrowthField> = {
+  multiplier: { label: "ダメージ倍率", unit: "multiplier" },
+  hpCoefficient: { label: "最大HP比例", unit: "percent" },
+  defCoefficient: { label: "防御力比例", unit: "percent" },
+  chance: { label: "発動率", unit: "percent", qualify: true },
+  durationTurns: { label: "持続", unit: "turns", qualify: true },
+  turns: { label: "ターン数", unit: "turns", qualify: true },
+  healRate: { label: "回復量", unit: "percent" },
+  shieldRate: { label: "シールド量", unit: "percent" },
+  amount: { label: "行動ゲージ", unit: "percent" },
+  damageRatePerStack: { label: "毒1スタック", unit: "percent" },
+  stacks: { label: "スタック", unit: "turns", qualify: true },
+  hits: { label: "ヒット数", unit: "turns" },
+  ratio: { label: "割合", unit: "percent", qualify: true },
+};
+
+function growthNumber(value: number, unit: GrowthField["unit"]): string {
+  if (unit === "multiplier") return `${value.toFixed(2)}倍`;
+  if (unit === "turns") return `${value}`;
+  return percent(value);
+}
+
+function growthLine(field: GrowthField, kind: string, before: number, after: number): string {
+  const tail = field.unit === "turns" ? "ターン" : "";
+  const head = field.qualify && GROWTH_EFFECT_LABEL[kind] ? `${GROWTH_EFFECT_LABEL[kind]}の` : "";
+  return `${head}${field.label} ${growthNumber(before, field.unit)}→${growthNumber(after, field.unit)}${tail}`;
+}
+
+/**
+ * 効果の並びどうしを突き合わせる。
+ *
+ * **入れ子の中まで見る。**多段攻撃の1発ごとの効果(`perHitEffects`)は
+ * ここを通らないと読めない。実際にクリムのS2は Lv3・Lv4 の伸びが
+ * まるごと `perHitEffects` の中にあり、**「変化なし」と出ていた。**
+ */
+function diffEffectLists(before: readonly SkillEffect[], after: readonly SkillEffect[]): string[] {
+  if (before.length !== after.length) {
+    return [before.length < after.length ? "効果が増える" : "効果が変わる"];
+  }
+  const changes: string[] = [];
+  after.forEach((next, index) => {
+    const prev = before[index] as unknown as Record<string, unknown>;
+    const now = next as unknown as Record<string, unknown>;
+    if (prev.kind !== now.kind) {
+      changes.push("効果が変わる");
+      return;
+    }
+    for (const key of Object.keys(GROWTH_FIELDS)) {
+      const a = prev[key];
+      const b = now[key];
+      if (typeof a !== "number" || typeof b !== "number" || a === b) continue;
+      changes.push(growthLine(GROWTH_FIELDS[key], String(now.kind), a, b));
+    }
+    if (Array.isArray(prev.perHitEffects) && Array.isArray(now.perHitEffects)) {
+      changes.push(...diffEffectLists(prev.perHitEffects as SkillEffect[], now.perHitEffects as SkillEffect[]));
+    }
+  });
+  return changes;
+}
+
+/** そのレベルで変わったこと。何も変わらない段は空になる */
+export interface SkillGrowthStep {
+  level: number;
+  changes: string[];
+}
+
+/**
+ * Lv2〜Lv5の各段で何が変わるかを出す。
+ *
+ * **同じ言い回しは1回にまとめる。**全体攻撃の「60%で〜」が
+ * 4つの効果に同じだけ乗っている時、同じ行を4本出しても読めない。
+ */
+export function describeSkillGrowth(skill: Skill): SkillGrowthStep[] {
+  const steps: SkillGrowthStep[] = [];
+  for (let level = 2; level <= MAX_SKILL_LEVEL; level += 1) {
+    const before = computeLeveledSkill(skill, level - 1);
+    const after = computeLeveledSkill(skill, level);
+    const changes: string[] = [];
+
+    if (after.cooldownTurns < before.cooldownTurns) {
+      changes.push(`クールタイム -${before.cooldownTurns - after.cooldownTurns}(${before.cooldownTurns}→${after.cooldownTurns}ターン)`);
+    } else if (after.cooldownTurns > before.cooldownTurns) {
+      changes.push(`クールタイム +${after.cooldownTurns - before.cooldownTurns}(${before.cooldownTurns}→${after.cooldownTurns}ターン)`);
+    }
+
+    changes.push(...diffEffectLists(before.effects, after.effects));
+    steps.push({ level, changes: [...new Set(changes)] });
+  }
+  return steps;
+}
+
 export function describeSkillLines(skill: Skill): string[] {
   if (skill.passive) return [describePassiveLevel(passiveAtLevel(skill.passive, skill.passiveLevel ?? 1))];
   return [...skill.effects.map(describeSkillEffect),
