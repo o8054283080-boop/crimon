@@ -5,6 +5,7 @@ import {
   PeriodMissionGroupView,
   ReleaseCampaignView,
   claimAllAvailableMissionRewards,
+  countClaimableMissionRewards,
   claimCumulativeMission,
   claimPeriodClear,
   claimPeriodMission,
@@ -32,6 +33,15 @@ const PERIOD_LABELS: Record<MissionPeriod, string> = {
 let root: HTMLElement | null = null;
 type MissionTab = MissionPeriod | "CAMPAIGN" | "COLLAB" | "CUMULATIVE";
 let activeTab: MissionTab = "DAILY";
+
+/**
+ * 直前の一括受取で何が入ったか。
+ *
+ * **画面の流れの中に置く。**浮かせた札で知らせると下のボタンを覆う
+ * (この案件で3回やった事故。CLAUDE.md)。受け取りボタンのすぐ下に1行出し、
+ * 次に何か押したら消す。
+ */
+let lastClaimResult: string | null = null;
 
 function button(label: string, className: string, onClick: () => void, disabled = false): HTMLButtonElement {
   const element = document.createElement("button");
@@ -378,6 +388,7 @@ function renderModal(player: PlayerState): void {
   for (const [tab, label] of tabEntries) {
     const tabButton = button(label, `regular-missions__tab${activeTab === tab ? " is-active" : ""}`, () => {
       activeTab = tab;
+      lastClaimResult = null;
       renderModal(player);
     });
     tabs.append(tabButton);
@@ -385,11 +396,32 @@ function renderModal(player: PlayerState): void {
 
   const actions = document.createElement("div");
   actions.className = "regular-missions__actions";
-  actions.append(button("受け取れる報酬を一括受取", "regular-missions__claim-all", () => {
-    claimAllAvailableMissionRewards(player);
-    refreshMissionRewardResourceDisplay(player);
-    renderModal(player);
-  }));
+  /*
+   * **受け取れるものが無い時は押せなくする。**
+   *
+   * 前は常に押せて、何も起きないのに押した手応えだけが返っていた
+   * (依頼主の指摘「何回も押せてしまう」)。件数を出して、
+   * 0なら文言ごと変えて止める。
+   */
+  const claimable = countClaimableMissionRewards(player);
+  actions.append(button(
+    claimable > 0 ? `受け取れる報酬を一括受取（${claimable}件）` : "受け取れる報酬はありません",
+    "regular-missions__claim-all",
+    () => {
+      const reward = claimAllAvailableMissionRewards(player);
+      refreshMissionRewardResourceDisplay(player);
+      // **何が入ったかを言う。**数字だけ動いても、何を受け取ったかは分からない
+      lastClaimResult = missionRewardText(reward) || null;
+      renderModal(player);
+    },
+    claimable === 0,
+  ));
+  if (lastClaimResult) {
+    const result = document.createElement("p");
+    result.className = "regular-missions__claim-result";
+    result.textContent = `受け取りました：${lastClaimResult}`;
+    actions.append(result);
+  }
 
   const body = document.createElement("main");
   body.className = "regular-missions__body";
@@ -430,6 +462,8 @@ function installMissionButtonOverride(): void {
     event.stopImmediatePropagation();
     // 期限のあるものを先に見せる。コラボ → 公開記念 → デイリーの順
     activeTab = getCollabCampaignView(player) ? "COLLAB" : getReleaseCampaignView(player) ? "CAMPAIGN" : "DAILY";
+    // 前に開いた時の受け取り結果は持ち越さない
+    lastClaimResult = null;
     renderModal(player);
   }, true);
 
