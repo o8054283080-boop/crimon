@@ -1,16 +1,32 @@
 name: アリーナ照合表を本番へ流す
 
-# 照合表を、押すだけで本番のSupabaseへ入れる。
+# 照合表を本番のSupabaseへ入れる。
 #
 # **作り直しても、流すまでは効かない。**
 # `npm run arena:catalog` が作るのは `supabase/migrations/` のファイルだけで、
-# CIも「手元の定義と揃っているか」しか見ていない。本番へ入れる作業は手動だった。
+# CIも「手元の定義と揃っているか」しか見ていない。
 #
-# 実際に流し忘れて事故になった。メインのクリダメを1.35倍にした時、
-# ★6+15 の上限は 0.948 → 1.274 へ動いたのに本番の表は古いまま。
-# クリダメメインの★6装備を着けている人は全員 `MAIN_STAT_OVER_CAP` で弾かれ、
-# **防衛の登録も、対戦の発行も落ちていた。**
+# ## 流し忘れで、同じ事故を2回出している
+#
+# 1回目。メインのクリダメを1.35倍にした時、★6+15 の上限は 0.948 → 1.274 へ
+# 動いたのに本番の表は古いまま。クリダメメインの★6装備を着けている人は全員
+# `MAIN_STAT_OVER_CAP` で弾かれ、**防衛の登録も、対戦の発行も落ちていた。**
 # しかもそれは画面に「挑戦券が減らない」としてしか現れなかった。
+#
+# 2回目。コラボ4種(全24体)を足して照合表も作り直したのに、
+# **押す作業が抜けていた。**本番の表は24体ぶん足りないまま
+# (図鑑 217件 / 手元 241件)、コラボのモンスターを編成へ入れた人は
+# `UNKNOWN_DEX_ID` で**アリーナに一度も入れなかった。**
+# プレイヤーからの報告で分かった。
+#
+# ## だから、押さなくても流れるようにした
+#
+# `main` に**新しい `arena_catalog_*.sql` が入った時**は自動で流す。
+# 照合表は `delete` → `insert` の入れ替えなので、余分に走っても結果は同じ。
+# 手で押す道(`workflow_dispatch`)は、本番の値を見たい時のために残してある。
+#
+# **モンスターを足す変更は、これで必ず本番へ届く。**
+# 届かせるのを人の記憶に任せない——2回とも、そこで落ちている。
 #
 # 照合表は `delete` してから `insert` する作りなので、**何度流しても同じ結果**になる。
 # 流す時は `--single-transaction` で囲む。途中で落ちて表が空になると、
@@ -36,7 +52,15 @@ name: アリーナ照合表を本番へ流す
 # (Supabase の Connect → Direct → Session pooler に出ているホスト名)。
 
 on:
-  # 押した時だけ流す。データを書き換えるので、自動では走らせない
+  # **生成物が main へ入ったら、押さなくても流す。**
+  # ここを手動だけにしていたせいで、2回とも押し忘れてアリーナが壊れた。
+  # `paths` を絞ってあるので、照合表に関係のない push では走らない。
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/*arena_catalog*.sql"
+  # 手で押す道も残す。`dry_run` で、流さずに本番の値だけを見られる
   workflow_dispatch:
     inputs:
       dry_run:
@@ -143,7 +167,8 @@ jobs:
             select '図鑑の件数: ' || count(*) from public.arena_catalog_monsters;"
 
       - name: 流す
-        if: ${{ !inputs.dry_run }}
+        # push で来た時に `inputs` は空になる。**空を「見るだけ」と読ませない**
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
@@ -152,7 +177,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 --single-transaction -f "${{ steps.pick.outputs.file }}"
 
       - name: 入ったか確かめる
-        if: ${{ !inputs.dry_run }}
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
@@ -171,9 +196,24 @@ jobs:
           got="$(psql -v ON_ERROR_STOP=1 -t -A -c "
             select main_max from public.arena_catalog_stat_caps
              where stat_type = 'CRIT_DMG' and star = 6 and level = 15;")"
-          echo "手元 $want / 本番 $got"
+          echo "装備の上限: 手元 $want / 本番 $got"
           if [ "$(printf '%s' "$want" | sed 's/0*$//')" != "$(printf '%s' "$got" | sed 's/0*$//')" ]; then
             echo "本番の値が生成物と合っていません" >&2
+            exit 1
+          fi
+
+          # **図鑑の件数も突き合わせる。**
+          # ここまでは装備の上限しか見ていなかった。上限が合っていても
+          # モンスターが足りなければ、その種族を編成へ入れた人は
+          # `UNKNOWN_DEX_ID` でアリーナに入れない——実際にそれで
+          # コラボ4種(24体)を落とし、プレイヤーからの報告で気づいた。
+          want_dex="$(grep -oE '^-- 図鑑 [0-9]+ 件' "${{ steps.pick.outputs.file }}" \
+                      | head -1 | grep -oE '[0-9]+')"
+          got_dex="$(psql -v ON_ERROR_STOP=1 -t -A -c "
+            select count(*) from public.arena_catalog_monsters;")"
+          echo "図鑑の件数: 手元 $want_dex / 本番 $got_dex"
+          if [ -z "$want_dex" ] || [ "$want_dex" != "$got_dex" ]; then
+            echo "本番の図鑑の件数が生成物と合っていません" >&2
             exit 1
           fi
           echo "照合表は最新です"

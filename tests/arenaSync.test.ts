@@ -516,4 +516,34 @@ describe("断られたのか、届かなかったのか", () => {
     expect(arenaRefusalText("SOMETHING_NEW")).toContain("SOMETHING_NEW");
     expect(arenaRefusalText(null)).toBe("サーバが対戦を受け付けませんでした");
   });
+
+  /*
+   * コラボ4種を照合表へ流し忘れた時、画面に出たのは
+   * 「このモンスターはサーバの照合表にまだ載っていません(UNKNOWN_DEX_ID)」だけで、
+   * **どの1体が原因かプレイヤーにも報告を受けた側にも分からなかった。**
+   */
+  it("照合表に無いモンスターは、名指しで出す", () => {
+    const text = arenaRefusalText("UNKNOWN_DEX_ID: gujira_WATER", () => "グジラ[水]");
+    expect(text).toContain("グジラ[水]");
+    // 図鑑IDも符丁も落とさない。報告からそのまま追える形にしておく
+    expect(text).toContain("gujira_WATER");
+    expect(text).toContain("UNKNOWN_DEX_ID");
+    // 外せば挑めることまで言う。**「駄目です」で止めると打つ手が無い**
+    expect(text).toContain("編成から外す");
+  });
+
+  it("名前を引けなくても、図鑑IDだけは出す", () => {
+    // 手元の図鑑にも無い(クライアントの方が古い)場合。**黙って消さない**
+    expect(arenaRefusalText("UNKNOWN_DEX_ID: mystery_FIRE", () => null))
+      .toBe("このモンスターはサーバの照合表にまだ載っていません（UNKNOWN_DEX_ID: mystery_FIRE）");
+    expect(arenaRefusalText("UNKNOWN_DEX_ID: mystery_FIRE"))
+      .toContain("mystery_FIRE");
+  });
+
+  it("装備シリーズ・潜在覚醒も、弾かれた相手を添える", () => {
+    expect(arenaRefusalText("UNKNOWN_SET: PHANTOM"))
+      .toBe("この装備シリーズはサーバの照合表にまだ載っていません（UNKNOWN_SET: PHANTOM）");
+    expect(arenaRefusalText("UNKNOWN_LATENT: latent_9_1"))
+      .toBe("この潜在覚醒はサーバの照合表にまだ載っていません（UNKNOWN_LATENT: latent_9_1）");
+  });
 });
