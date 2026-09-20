@@ -175,7 +175,7 @@ import { claimAllGifts, claimGift, unclaimedGiftCount, type GiftClaimAllResult, 
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations } from "../game/compensation.js";
-import { renderGlobalBackButton } from "./views/backButton.js";
+import { OWN_BACK_SELECTOR, renderGlobalBackButton } from "./views/backButton.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
 import { loadNavigationState, saveNavigationState } from "./navigationState.js";
@@ -5218,7 +5218,7 @@ function renderScreen(): void {
    * 共通の「戻る」。**自前の見出しを持つ画面には出さない。**
    * 一覧で持つと足し忘れるので、描き上がった中身をそのまま見て決める。
    */
-  if (canGoBack() && !content.querySelector(".management-header")) {
+  if (canGoBack() && !content.querySelector(".management-header") && !content.querySelector(OWN_BACK_SELECTOR)) {
     root.append(renderGlobalBackButton({ onBack: goBack }));
     document.body.classList.add("has-global-back");
   } else {
