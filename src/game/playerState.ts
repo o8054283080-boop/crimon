@@ -1184,7 +1184,18 @@ export function trySpendStamina(state: PlayerState, cost: number): StaminaSpendR
 /** ダイヤ50でスタミナ100回復。配布と同じく現在上限を超えて保持できる */
 export const STAMINA_REFILL_PARTIAL_COST = 50;
 export const STAMINA_REFILL_PARTIAL_AMOUNT = 100;
-/** ダイヤ200でスタミナ全回復 */
+/**
+ * ダイヤ200で**最大スタミナと同じ量**を回復する。
+ *
+ * ## 「全回復」ではなく「最大値ぶん」にした理由
+ *
+ * 以前は上限まで戻すだけだった。そのため 120/150 で買うと **30しか増えず、
+ * 同じ200ダイヤで得られる量が残りスタミナ次第で変わっていた**(依頼主の指摘)。
+ * 満タンに近いほど損をするので、**使う前にわざわざ空にする**のが最適になる。
+ *
+ * いまは残量に関わらず `maxStamina` をそのまま足す。
+ * 上限を超えた分は消えない(部分回復・ポーション・配布と同じ扱い)。
+ */
 export const STAMINA_REFILL_FULL_COST = 200;
 
 export interface StaminaRefillResult {
@@ -1201,19 +1212,22 @@ export function tryRefillStaminaPartial(state: PlayerState): StaminaRefillResult
   return { ok: true };
 }
 
-/** ダイヤを消費してスタミナを全回復する。呼ぶ前に自然回復を反映する */
+/**
+ * ダイヤを消費して**最大スタミナと同じ量**を回復する。呼ぶ前に自然回復を反映する。
+ *
+ * **満タンでも買える。**上限を超えた分は消えないので、断る理由が無い
+ * (断っていた頃は、満タンに近い人ほど1ダイヤあたりの量が減っていた)。
+ */
 export function tryRefillStaminaFull(state: PlayerState): StaminaRefillResult {
   applyPassiveStaminaRegen(state);
-  if (state.stamina >= state.maxStamina) return { ok: false, reason: "スタミナは既に満タンです" };
   if (state.crystal < STAMINA_REFILL_FULL_COST) return { ok: false, reason: "ダイヤが足りません" };
   state.crystal -= STAMINA_REFILL_FULL_COST;
   /*
-   * **持っている方を残す。**上の「既に満タンなら失敗」で上限超過中は弾かれるので、
-   * いまは常に `maxStamina` を代入するのと同じ。それでも `Math.max` で書くのは、
-   * ここが素の代入だと**ガードを緩めた瞬間に、配布でもらった超過分が黙って消える**から。
-   * 450/150 の人が全回復を買って 150/150 になる、という壊れ方をしない形にしておく
+   * **上限で切らない。**`Math.min(max, ...)` で丸めると、
+   * 120/150 の人が払った200ダイヤのうち**120ぶんが消える。**
+   * 部分回復もポーションも配布も超過を許しているので、ここだけ削る理由が無い
    */
-  state.stamina = Math.max(state.stamina, state.maxStamina);
+  state.stamina += state.maxStamina;
   return { ok: true };
 }
 

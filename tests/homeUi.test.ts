@@ -249,3 +249,34 @@ describe("スタミナポーションの所持数", () => {
     }
   });
 });
+
+/**
+ * スタミナ回復の小窓。
+ *
+ * ダイヤ200の回復は**上限までしか戻していなかった。**
+ * 120/150 で買うと30しか増えないのに値段は同じで、
+ * **使う前にわざわざ空にするのが最適**という形になっていた(依頼主の指摘)。
+ */
+describe("スタミナ回復(ダイヤ・ポーション)", () => {
+  it("3つとも満タンで押せる", () => {
+    // 満タンで止める指定(`full`)を戻さないこと。上限を超えた分は消えない
+    const actions = source.slice(
+      source.indexOf('className: "home-vitals__actions"'),
+      source.indexOf("home-vitals__potion") + 400,
+    );
+    expect(actions.length).toBeGreaterThan(100);
+    expect(actions).not.toMatch(/disabled:\s*full\b/);
+    expect(actions).toContain("disabled: player.crystal < STAMINA_REFILL_PARTIAL_COST");
+    expect(actions).toContain("disabled: player.crystal < STAMINA_REFILL_FULL_COST");
+  });
+
+  it("ダイヤ200のボタンは、入る量そのものを出す", () => {
+    // 「全回復」は嘘になる。入るのは残量に関わらず最大スタミナぶん
+    expect(source).toContain("で +${player.maxStamina}");
+    expect(source).not.toContain("で全回復");
+  });
+
+  it("帯は1で止める(上限を超えてもはみ出さない)", () => {
+    expect(source).toContain("Math.min(1, player.stamina / Math.max(1, player.maxStamina))");
+  });
+});
