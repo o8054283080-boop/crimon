@@ -166,3 +166,13 @@
 .depth-exchange__btn--short {
   color: #93a2c4;
 }
+
+/*
+ * **どの編成で挑むのか。**
+ *
+ * 編成は3つある(通常・装備ダンジョン・試練の塔)のに、この画面には
+ * 「編成を変更する」としか書いていなかった。使う顔ぶれをそのまま並べる。
+ */
+.depth-party { display: grid; gap: 6px; }
+.depth-party__title { margin: 0; font-size: .9rem; color: #ffd166; letter-spacing: .06em; }
+.depth-party__note { margin: 0; font-size: .7rem; line-height: 1.5; color: var(--text-dim); }

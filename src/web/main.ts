@@ -85,7 +85,8 @@ import { CREATE_GOLD_COST, CreateSlot, applyMonsterCreate, clearMonsterCreate, d
 import { awakenLatentAbility, confirmAbilityPoints, confirmLatentAwakening, LATENT_ABILITY_CANDIDATES, reawakenLatentAbility, reincarnateMonsterType, resetAbilityPoints, setAbilityPoint, usedAbilityPoints } from "../game/monsterDevelopment.js";
 import {
   TYPE_REINCARNATION_GOLD_COST,
-  ABILITY_POINT_RESET_COST, AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType } from "../core/monsterDevelopment.js";
+  ABILITY_POINT_RESET_COST, AllocatableStat, MONSTER_TYPE_DESCRIPTIONS, MONSTER_TYPE_LABELS, MonsterType,
+  createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
 import {
   ARENA_HISTORY_MAX,
   claimDailyLoginBonus,
@@ -5651,6 +5652,36 @@ if (import.meta.env.DEV) {
       state.talentTab = "BASIC";
       state.talentSkillSlot = 1;
       navigate("MONSTER_CREATE");
+      render();
+    },
+    /*
+     * **才能覚醒を取った状態の詳細を巡回に見せるための口。**
+     *
+     * 詳細の「◆ 才能覚醒」は、取っていなければ1行の案内で終わる。
+     * 初期セーブは★6が居ないので、そのまま開くと
+     * 「★6で解放」だけを検査して、**取った後に伸びる行を一度も見ない。**
+     * (行が1つも無いランキングを検査し続けたのと同じ穴。)
+     */
+    openMonsterDetailWithTalents() {
+      const monster = state.player.monsters.find((m) => m.star === 6) ?? state.player.monsters[0];
+      if (!monster) return;
+      monster.star = 6;
+      monster.development = {
+        ...(monster.development ?? createDefaultMonsterDevelopment()),
+        talents: {
+          schemaVersion: 1,
+          unlockedPoints: 20,
+          // **いちばん行が伸びる形**を出す。基礎3・戦闘2・スキル両枠・覚醒
+          basic: { atk: 3, criDmg: 2, spd: 1 },
+          battle: { damageDealt: 3, debuffChance: 1 },
+          skill: { 1: ["atk_power1", "atk_crit"], 2: ["heal_boost1"] },
+          awakening: { slot: 1, id: "awk_atk_strip" },
+        },
+      };
+      state.monsterDetailReturn = null;
+      state.monsterDetailId = monster.id;
+      state.rankUpMode = false;
+      state.screen = "MONSTERS";
       render();
     },
     /*

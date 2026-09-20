@@ -377,6 +377,15 @@ export const MAX_TOWER_PARTY_SIZE = 5;
 /** 装備ダンジョン専用パーティの最大人数(通常ステージの4体より1体多い) */
 export const MAX_DUNGEON_PARTY_SIZE = 5;
 
+/**
+ * 通常の編成の最大人数。**冒険・目覚の深域はこれで戦う。**
+ *
+ * 画面ごとに数を書いていると、どの編成の話をしているのか読めない
+ * (目覚の深域で「どの編成で挑むのか分からない」と指摘を受けている)。
+ * 3つの人数をここに並べて置く。
+ */
+export const MAX_PARTY_SIZE = 4;
+
 const STARTER_MONSTERS: { templateId: string; element: string }[] = [
   { templateId: "slime", element: "FIRE" },
   { templateId: "wolf", element: "WATER" },

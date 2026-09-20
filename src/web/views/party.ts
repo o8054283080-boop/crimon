@@ -1,4 +1,4 @@
-import { MAX_DUNGEON_PARTY_SIZE, PlayerState } from "../../game/playerState.js";
+import { MAX_DUNGEON_PARTY_SIZE, MAX_PARTY_SIZE, PlayerState } from "../../game/playerState.js";
 import { MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
 import { MonsterFilter, filterMonsters } from "../monsterFilter.js";
 import { el } from "../dom.js";
@@ -41,7 +41,6 @@ export interface PartyProps {
   returnLabel?: string;
 }
 
-const MAX_PARTY_SIZE = 4;
 
 interface ModeSpec {
   mode: PartyEditMode;
