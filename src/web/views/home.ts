@@ -225,6 +225,22 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
     if ((compensation.lightDarkFourStarSummonScrolls ?? 0) > 0) {
       items.push({ name: "scroll", amount: `+${compensation.lightDarkFourStarSummonScrolls}`, unit: "★4以上光闇召喚書" });
     }
+    /*
+     * コラボ限定の書とモンスター。**ここを忘れると「配ったのに何も出ない札」になる**
+     * (`compensation.ts` の欄の説明に書いてある3か所のうちの1つ)。
+     */
+    if ((compensation.collabFourStarSummonScrolls ?? 0) > 0) {
+      items.push({ name: "scroll", amount: `+${compensation.collabFourStarSummonScrolls}`, unit: "コラボ限定★4以上召喚書" });
+    }
+    if ((compensation.collabLightDarkFourStarSummonScrolls ?? 0) > 0) {
+      items.push({ name: "scroll", amount: `+${compensation.collabLightDarkFourStarSummonScrolls}`, unit: "コラボ限定★4以上光闇召喚書" });
+    }
+    if ((compensation.collabFiveStarSummonScrolls ?? 0) > 0) {
+      items.push({ name: "scroll", amount: `+${compensation.collabFiveStarSummonScrolls}`, unit: "コラボ限定★5召喚書" });
+    }
+    for (const gift of compensation.monsters ?? []) {
+      items.push({ name: "scroll", amount: "+1", unit: gift.name });
+    }
     return el("section", { className: "panel reward-banner compensation" }, [
       rewardSeal("scroll"),
       el("div", { className: "reward-banner__body" }, [

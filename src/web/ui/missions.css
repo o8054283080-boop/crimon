@@ -276,3 +276,24 @@ body.regular-missions-open { overflow: hidden; }
   .regular-missions__card { padding: 10px; }
   .regular-missions__milestones { grid-template-columns: 1fr; }
 }
+
+/* ===== コラボ限定ミッション ======================================
+ *
+ * 作りは公開記念キャンペーンと同じ。**違うのは見出しの色だけ。**
+ * 同じ形の画面が2つあるより、色で見分けられる方が迷わない。
+ */
+.regular-missions__campaign-hero--collab {
+  border-color: rgba(214, 150, 255, 0.5);
+  background: linear-gradient(135deg, rgba(92, 44, 96, 0.78), rgba(24, 28, 62, 0.92));
+}
+.regular-missions__campaign-hero--collab strong { color: #f2d9ff; }
+
+/* 最終報酬の一行。**達成数のすぐ下**に置いて、何を目指すのかを最初に見せる */
+.regular-missions__collab-final {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid rgba(214, 150, 255, 0.28);
+  color: #ffe7a5;
+  font-size: 12px;
+  font-weight: 600;
+}

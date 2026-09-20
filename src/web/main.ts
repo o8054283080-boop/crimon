@@ -33,6 +33,9 @@ import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/l
 import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, SPECIAL_SCROLL_FIELD, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
+import { recordCollabFarmRun } from "../game/missions.js";
+import { COLLAB_SCROLL_FIELD, CollabSummonScroll, summonCollabMany, useCollabSummonScroll } from "../game/collabGacha.js";
+import { isCollabEventOpen } from "../game/collabMissions.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
 import {
   BackgroundFarmJob,
@@ -253,7 +256,7 @@ import { EMPTY_MONSTER_TRAINING_FILTER, MonsterTrainingFilter, renderMonsterTrai
 import { CreateMenu, renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
-import { renderSummon, type SummonMethod } from "./views/summon.js";
+import { renderSummon, type SummonMethod, type SummonTab } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
 import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
@@ -413,6 +416,8 @@ interface AppState {
   summonResults: SummonResult[] | null;
   /** 直前に何で引いたか。結果画面の「もう一度」を同じ手段で繰り返すために覚える */
   lastSummonMethod: SummonMethod | null;
+  /** 召喚画面で通常とコラボのどちらを見ているか。**保存はしない**(起動時は通常) */
+  summonTab: SummonTab;
   monsterDetailId: string | null;
   rankUpMode: boolean;
   rankUpSacrificeIds: string[];
@@ -620,6 +625,7 @@ const state: AppState = {
   player: loadPlayerState(),
   summonResults: null,
   lastSummonMethod: null,
+  summonTab: "NORMAL",
   monsterDetailId: null,
   rankUpMode: false,
   rankUpSacrificeIds: [],
@@ -1225,6 +1231,87 @@ function handleSummon(count: number): void {
   state.summonResults = results;
   state.lastSummonMethod = { kind: "CRYSTAL", count };
   playSummonSfx(results);
+  render();
+}
+
+/**
+ * コラボピックアップ召喚。
+ *
+ * **通常召喚とまったく同じ値段・同じ天井**で、★4・★5を引いた時だけ
+ * コラボの顔ぶれから出る目が混じる(`summonCollabMany`)。
+ * 保存できなかった時に引けなかったことにする作りも通常召喚と同じ。
+ */
+function handleCollabSummon(count: number): void {
+  const cost = count >= 10 ? SUMMON_COST_TEN : SUMMON_COST_SINGLE * count;
+  if (state.player.crystal < cost) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  state.player.crystal -= cost;
+  const results = summonCollabMany(count);
+  const added = results.map((r) => addMonster(state.player, r.dexId, r.star));
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, added.map((m) => m.id));
+    state.player.crystal += cost;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.summonResults = results;
+  state.lastSummonMethod = { kind: "COLLAB_CRYSTAL", count };
+  playSummonSfx(results);
+  render();
+}
+
+/**
+ * コラボピックアップ召喚を、**通常の召喚の書で引く**(依頼主の指定)。
+ *
+ * ダイヤを貯めていない人がコラボを一度も引けない、という形にしない。
+ * 消費するのは通常の書で、出る中身だけがコラボ側の抽選になる。
+ */
+function handleCollabSummonScroll(count: number): void {
+  if (!trySpendSummonScrolls(state.player, count)) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  const results = summonCollabMany(count);
+  const added = results.map((r) => addMonster(state.player, r.dexId, r.star));
+  // 保存できないなら引けなかったことにする(理由は handleUseSummonScroll のコメント)
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, added.map((m) => m.id));
+    state.player.summonScrolls += count;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.summonResults = results;
+  state.lastSummonMethod = { kind: "COLLAB_SCROLL", count };
+  playSummonSfx(results);
+  render();
+}
+
+/**
+ * コラボ限定召喚書で引く。
+ *
+ * 所持の確認・抽選・消費は `useCollabSummonScroll` が1操作でやる
+ * (**0枚では引けず、連打しても残数が負にならない**)。
+ * ここが持つのは、保存できなかった時に巻き戻す役目だけ。
+ */
+function handleUseCollabSummonScroll(type: CollabSummonScroll): void {
+  const before = state.player.monsters.length;
+  const result = useCollabSummonScroll(state.player, type);
+  if (!result) { playSfx("denied", 0.7); return; }
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, state.player.monsters.slice(before).map((m) => m.id));
+    const field = COLLAB_SCROLL_FIELD[type];
+    state.player[field] = (state.player[field] ?? 0) + 1;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.summonResults = [result];
+  state.lastSummonMethod = { kind: "COLLAB_SPECIAL", type };
+  playSummonSfx([result]);
   render();
 }
 
@@ -2183,6 +2270,8 @@ function processBackgroundFarmOnce(): void {
   state.player.gold += battle.extraGold;
   mergeReward(job.result, reward, battle.extraGold);
   job.result.cleared += 1; job.completedRuns += 1; job.inFlight = false;
+  // コラボミッションの「自動周回を30周」。**1周おわるたびに1つ**
+  recordCollabFarmRun(state.player);
   // 実行にかかったCPU時間で権利を失わない。経過した基準時間を1周ぶんだけ消費する。
   job.lastProcessedAt = Math.min(Date.now(), job.lastProcessedAt + job.referenceRunSeconds * 1000);
   savePlayerState(state.player);
@@ -5156,6 +5245,17 @@ function renderSummonScreen(): HTMLElement {
     onUseSummonScroll: handleUseSummonScroll,
     onUseSpecialSummonScroll: handleUseSpecialSummonScroll,
     onTutorialSummon: handleTutorialSummon,
+    // **開催中だけ渡す。**期間外は undefined なので入口ごと画面に出ない
+    ...(isCollabEventOpen() ? {
+      onCollabSummon: handleCollabSummon,
+      onUseCollabSummonScroll: handleUseCollabSummonScroll,
+      onCollabSummonScroll: handleCollabSummonScroll,
+      tab: state.summonTab,
+      onChangeTab: (tab: SummonTab) => {
+        state.summonTab = tab;
+        render();
+      },
+    } : {}),
   });
 }
 

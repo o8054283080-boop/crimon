@@ -48,7 +48,14 @@ export type GiftReward =
   /** モンスター。`dexId` は図鑑のID。スキルピッグなら `SKILL_PIG_DEX` のもの */
   | { kind: "MONSTER"; dexId: string; star: Star; amount: number }
   /** スキルピッグ。6属性を順に配るので、種類を指定せずに数だけ書ける */
-  | { kind: "SKILL_PIG"; amount: number };
+  | { kind: "SKILL_PIG"; amount: number }
+  /*
+   * コラボ限定の召喚書3種。**通常の書とは別枠**で、コラボの顔ぶれしか出ない。
+   * どれも省略可の欄なので、足す前に0で埋める。
+   */
+  | { kind: "COLLAB_FOUR_STAR_SUMMON_SCROLL"; amount: number }
+  | { kind: "COLLAB_LIGHT_DARK_FOUR_STAR_SUMMON_SCROLL"; amount: number }
+  | { kind: "COLLAB_FIVE_STAR_SUMMON_SCROLL"; amount: number };
 
 export interface GiftDefinition {
   giftId: string;
@@ -83,6 +90,9 @@ export const GIFT_REWARD_ICON: Record<GiftReward["kind"], string> = {
   AWAKENING_ORB: "🔮",
   MONSTER: "🥚",
   SKILL_PIG: "🐽",
+  COLLAB_FOUR_STAR_SUMMON_SCROLL: "📜",
+  COLLAB_LIGHT_DARK_FOUR_STAR_SUMMON_SCROLL: "📜",
+  COLLAB_FIVE_STAR_SUMMON_SCROLL: "📜",
 };
 
 export const GIFT_REWARD_LABEL: Record<GiftReward["kind"], string> = {
@@ -95,6 +105,9 @@ export const GIFT_REWARD_LABEL: Record<GiftReward["kind"], string> = {
   AWAKENING_ORB: "覚醒オーブ",
   MONSTER: "モンスター",
   SKILL_PIG: "スキルピッグ",
+  COLLAB_FOUR_STAR_SUMMON_SCROLL: "コラボ限定★4以上召喚書",
+  COLLAB_LIGHT_DARK_FOUR_STAR_SUMMON_SCROLL: "コラボ限定★4以上光闇召喚書",
+  COLLAB_FIVE_STAR_SUMMON_SCROLL: "コラボ限定★5召喚書",
 };
 
 /** 「💎 ダイヤ ×5,000」の1行 */
@@ -258,6 +271,16 @@ function applyReward(state: PlayerState, reward: GiftReward): void {
       for (let i = 0; i < reward.amount; i += 1) {
         addMonster(state, SKILL_PIG_DEX[i % SKILL_PIG_DEX.length].id, 1, 1);
       }
+      break;
+    // コラボ限定の書。**古いセーブには欄が無い**ので0で埋めてから足す
+    case "COLLAB_FOUR_STAR_SUMMON_SCROLL":
+      state.collabFourStarSummonScrolls = (state.collabFourStarSummonScrolls ?? 0) + reward.amount;
+      break;
+    case "COLLAB_LIGHT_DARK_FOUR_STAR_SUMMON_SCROLL":
+      state.collabLightDarkFourStarSummonScrolls = (state.collabLightDarkFourStarSummonScrolls ?? 0) + reward.amount;
+      break;
+    case "COLLAB_FIVE_STAR_SUMMON_SCROLL":
+      state.collabFiveStarSummonScrolls = (state.collabFiveStarSummonScrolls ?? 0) + reward.amount;
       break;
   }
 }

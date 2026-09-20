@@ -13,6 +13,10 @@ import {
   getCumulativeMissionViews,
   getPeriodMissionView,
   getRegisteredMissionPlayer,
+  getCollabCampaignView,
+  type CollabCampaignView,
+  claimCollabMission,
+  claimCollabMilestone,
   getReleaseCampaignView,
   missionRewardText,
   startMissionObserver,
@@ -26,7 +30,7 @@ const PERIOD_LABELS: Record<MissionPeriod, string> = {
 };
 
 let root: HTMLElement | null = null;
-type MissionTab = MissionPeriod | "CAMPAIGN" | "CUMULATIVE";
+type MissionTab = MissionPeriod | "CAMPAIGN" | "COLLAB" | "CUMULATIVE";
 let activeTab: MissionTab = "DAILY";
 
 function button(label: string, className: string, onClick: () => void, disabled = false): HTMLButtonElement {
@@ -237,6 +241,85 @@ function renderCampaign(player: PlayerState, campaign: ReleaseCampaignView): HTM
   return section;
 }
 
+/**
+ * コラボ限定ミッション。
+ *
+ * **公開記念キャンペーンと同じ作りにしてある。**同じ形の画面が2つあるより、
+ * 見出しと色だけが違う方が、どちらを見ているか迷わない。
+ *
+ * スマホの縦で見るものなので、上から
+ * 「あと何日」→「達成数 n/30」→「累計報酬」→「30個の一覧」の順に置く。
+ * **最終報酬は累計の最後に来る**ので、下まで送れば必ず目に入る。
+ */
+function renderCollabCampaign(player: PlayerState, campaign: CollabCampaignView): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "regular-missions__list regular-missions__list--campaign regular-missions__list--collab";
+
+  const hero = document.createElement("article");
+  hero.className = "regular-missions__campaign-hero regular-missions__campaign-hero--collab";
+  const heading = document.createElement("strong");
+  heading.textContent = "🌸 コラボ限定ミッション";
+  const deadline = document.createElement("p");
+  deadline.textContent = campaign.remainingDays === 0
+    ? "本日終了"
+    : `あと${campaign.remainingDays}日`;
+  const count = document.createElement("b");
+  count.textContent = `達成数 ${campaign.completedCount} / ${campaign.totalCount}`;
+  const finalNote = document.createElement("p");
+  finalNote.className = "regular-missions__collab-final";
+  finalNote.textContent = "30個達成でコラボ限定★5召喚書";
+  hero.append(heading, deadline, count, progressBar(campaign.completedCount, campaign.totalCount), finalNote);
+  section.append(hero);
+
+  const milestoneList = document.createElement("div");
+  milestoneList.className = "regular-missions__milestones";
+  for (const milestone of campaign.milestones) {
+    const card = document.createElement("article");
+    card.className = `regular-missions__milestone${milestone.complete ? " is-complete" : ""}${milestone.claimed ? " is-claimed" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = `${milestone.target}個達成報酬`;
+    card.append(title, rewardLine(missionRewardText(milestone.reward)), button(
+      milestone.claimed ? "受取済み" : milestone.complete ? "受け取る" : `${Math.min(campaign.completedCount, milestone.target)} / ${milestone.target}`,
+      "regular-missions__claim regular-missions__claim--milestone",
+      () => {
+        const reward = claimCollabMilestone(player, milestone.target);
+        if (reward) refreshMissionRewardResourceDisplay(player);
+        renderModal(player);
+      },
+      milestone.claimed || !milestone.complete,
+    ));
+    milestoneList.append(card);
+  }
+  section.append(milestoneList);
+
+  for (const [index, mission] of campaign.missions.entries()) {
+    const card = document.createElement("article");
+    card.className = `regular-missions__card${mission.complete ? " is-complete" : ""}${mission.claimed ? " is-claimed" : ""}`;
+    const head = document.createElement("div");
+    head.className = "regular-missions__card-head";
+    const name = document.createElement("strong");
+    name.textContent = `${index + 1}. ${mission.title}`;
+    const progress = document.createElement("span");
+    progress.textContent = `${mission.current.toLocaleString("ja-JP")} / ${mission.target.toLocaleString("ja-JP")}`;
+    head.append(name, progress);
+    const condition = document.createElement("p");
+    condition.className = "regular-missions__condition";
+    condition.textContent = mission.condition;
+    card.append(head, condition, progressBar(mission.current, mission.target), rewardLine(missionRewardText(mission.reward)), button(
+      mission.claimed ? "受取済み" : mission.complete ? "受け取る" : "未達成",
+      "regular-missions__claim",
+      () => {
+        const reward = claimCollabMission(player, mission.id);
+        if (reward) refreshMissionRewardResourceDisplay(player);
+        renderModal(player);
+      },
+      mission.claimed || !mission.complete,
+    ));
+    section.append(card);
+  }
+  return section;
+}
+
 function closeModal(): void {
   root?.remove();
   root = null;
@@ -261,6 +344,9 @@ function renderModal(player: PlayerState): void {
   panel.className = "regular-missions__panel";
   const campaign = getReleaseCampaignView(player);
   if (!campaign && activeTab === "CAMPAIGN") activeTab = "DAILY";
+  // **開催中だけタブが出る。**終わった後に開くと、そのままデイリーへ落ちる
+  const collab = getCollabCampaignView(player);
+  if (!collab && activeTab === "COLLAB") activeTab = "DAILY";
   const header = document.createElement("header");
   header.className = "regular-missions__header";
   const headerCopy = document.createElement("div");
@@ -271,13 +357,17 @@ function renderModal(player: PlayerState): void {
   const note = document.createElement("p");
   note.textContent = activeTab === "CAMPAIGN"
     ? "1か月限定。30個達成で★5召喚書も獲得できます。"
-    : "全部やらなくてもOK。好きな遊び方で報酬を獲得しよう。";
+    : activeTab === "COLLAB"
+      ? "期間限定。30個達成でコラボ限定★5召喚書を獲得できます。"
+      : "全部やらなくてもOK。好きな遊び方で報酬を獲得しよう。";
   headerCopy.append(eyebrow, heading, note);
   header.append(headerCopy, button("閉じる", "regular-missions__close", closeModal));
 
   const tabs = document.createElement("nav");
   tabs.className = "regular-missions__tabs";
   const tabEntries: readonly (readonly [MissionTab, string])[] = [
+    // コラボは期間限定なので**いちばん左**。期限のあるものから目に入れる
+    ...(collab ? [["COLLAB", "コラボ"]] as const : []),
     ...(campaign ? [["CAMPAIGN", "公開記念"]] as const : []),
     ["DAILY", "デイリー"],
     ["WEEKLY", "ウィークリー"],
@@ -305,13 +395,15 @@ function renderModal(player: PlayerState): void {
   body.className = "regular-missions__body";
   if (activeTab === "CAMPAIGN" && campaign) {
     body.append(renderCampaign(player, campaign));
+  } else if (activeTab === "COLLAB" && collab) {
+    body.append(renderCollabCampaign(player, collab));
   } else if (activeTab === "CUMULATIVE") {
     const intro = document.createElement("p");
     intro.className = "regular-missions__infinite-note";
     intro.textContent = "累計ミッションに終わりはありません。達成後は次の目標と報酬が自動で続きます。";
     body.append(intro);
     for (const mission of getCumulativeMissionViews(player)) body.append(renderCumulativeCard(player, mission));
-  } else if (activeTab !== "CAMPAIGN") {
+  } else if (activeTab !== "CAMPAIGN" && activeTab !== "COLLAB") {
     body.append(renderPeriodCard(player, activeTab, getPeriodMissionView(player, activeTab)));
   }
 
@@ -336,7 +428,8 @@ function installMissionButtonOverride(): void {
     if (!player) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    activeTab = getReleaseCampaignView(player) ? "CAMPAIGN" : "DAILY";
+    // 期限のあるものを先に見せる。コラボ → 公開記念 → デイリーの順
+    activeTab = getCollabCampaignView(player) ? "COLLAB" : getReleaseCampaignView(player) ? "CAMPAIGN" : "DAILY";
     renderModal(player);
   }, true);
 

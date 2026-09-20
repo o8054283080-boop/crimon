@@ -2087,3 +2087,84 @@
 .special-scroll__copy strong,.special-scroll__copy span { display: block; }
 .special-scroll__copy strong { color: #fff0a8; }
 .special-scroll__copy span,.special-scroll__count { color: #cbd8ef; font-size: .72rem; }
+
+/* ===== 通常とコラボの切り替え =====================================
+ *
+ * **縦に並べない。**前は通常召喚の下にコラボの枠を継ぎ足していたので、
+ * 毎日使う導線が期間限定のもので下へ押し下げられていた(依頼主の指摘)。
+ * 上の帯で選び、**選んだ方だけを出す。**
+ *
+ * 選んでいない方も必ず読める明るさにする。薄い灰色にすると
+ * 「押せないボタン」に見えて、切り替えがあること自体が伝わらない。
+ */
+.summon-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(8, 16, 36, .66);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.summon-switch__btn {
+  /* 指で押す的は44pxを割らない。文字の高さだけだと36pxまで縮む */
+  min-height: 44px;
+  padding: 9px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #cbd8ef;
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+/* 選んでいる方は**地を起こして濃紺の文字**。色だけでなく明暗も変える */
+.summon-switch__btn.is-active {
+  background: var(--gold-grad);
+  color: #2a1a05;
+  box-shadow: var(--bevel);
+}
+/* コラボ側だけ紫を差す。**選んでいない時も分かる**ように縁で示す */
+.summon-switch__btn--collab { box-shadow: inset 0 0 0 1px rgba(214, 150, 255, .45); }
+.summon-switch__btn--collab.is-active {
+  background: linear-gradient(135deg, #f0c2ff, #b978e8);
+  color: #2a0a36;
+  box-shadow: var(--bevel);
+}
+
+/* ===== コラボピックアップ召喚 =====================================
+ *
+ * 切り替えた先の頭に置く**説明の帯。**ボタンは通常召喚と同じ形のものを
+ * そのまま使う(コラボだけ別の作りにすると、押す場所を覚え直すことになる)。
+ *
+ * 配色は既存のまま(濃紺の地に金の縁)。**コラボだけ別世界の色にしない。**
+ */
+.collab-summon__banner {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 211, 106, .55);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(92, 44, 96, .72), rgba(18, 35, 70, .9));
+}
+.collab-summon__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+/* 「期間限定」の札。**金地に濃紺**で、見出しより先に目に入る */
+.collab-summon__badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--gold-grad);
+  color: #2a1a05;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.collab-summon__title { margin: 0; color: #ffe69a; font-size: .95rem; letter-spacing: .06em; }
+/* **%は書かない**(依頼主との約束)。「UP」とだけ言う */
+.collab-summon__lead { margin: 0; color: #cbd8ef; font-size: .74rem; line-height: 1.5; }
+
+/* コラボ限定召喚書の棚。通常の特別召喚書と同じ作りで、縁の色だけ変える */
+.special-scrolls--collab { border-color: rgba(214, 150, 255, .55); }
+.special-scrolls--collab h2 { color: #e9c9ff; }

@@ -1,4 +1,10 @@
-import { PlayerState } from "./playerState.js";
+import { PlayerState, addMonster } from "./playerState.js";
+import {
+  COLLAB_EVENT_FROM_DATE, COLLAB_EVENT_TO_DATE, COLLAB_GIFT_DEX_ID,
+} from "../data/collabEvent.js";
+
+/** コラボ開催記念の配布の識別子。二重配布を止める要なので、**絶対に変えないこと** */
+export const COLLAB_GIFT_ID = "2026-09-collab-celebration";
 
 /**
  * 配布・お知らせ。
@@ -28,9 +34,52 @@ export interface Compensation {
    * どれか1つでも忘れると、**配ったのに増えない**か**何も出ない札**になる。
    */
   lightDarkFourStarSummonScrolls?: number;
+  /**
+   * コラボ限定の召喚書3種。**通常の書とは別枠**で、コラボの顔ぶれしか出ない。
+   *
+   * 足す時は3か所そろえること
+   * (受け取り `claimCompensations` / 有無の判定 `hasReward` / ホームの札)。
+   */
+  collabFourStarSummonScrolls?: number;
+  collabLightDarkFourStarSummonScrolls?: number;
+  collabFiveStarSummonScrolls?: number;
+  /**
+   * モンスターそのものを配る。**図鑑IDと星をそのまま渡す。**
+   *
+   * 配布専用の弱い個体は作らない。`createMonsterInstance` に
+   * 同じ図鑑IDを渡すだけなので、**召喚で引いた個体と1つも違いが出ない。**
+   *
+   * `claimedCompensationIds` で二重受け取りを止めているので、
+   * 再ログインしても、セーブを復旧しても、配られるのは一度きり。
+   */
+  monsters?: readonly { dexId: string; star: 1 | 2 | 3 | 4 | 5 | 6; name: string }[];
 }
 
 export const COMPENSATIONS: Compensation[] = [
+  {
+    id: "2026-09-19-collab-event",
+    title: "コラボイベント開催のお知らせ",
+    message: "コラボイベントを開催します。開催期間は9月19日〜10月19日です。\n\n"
+      + "【開催記念プレゼント】\n全員へ **電気スエゾー ×1 / ダイヤ ×3,000 / 召喚の書 ×30 / コラボ限定★4以上召喚書 ×1** をお配りします。"
+      + "プレゼントボックスから受け取ってください。電気スエゾーは配布専用の弱い個体ではなく、召喚で引いたものとまったく同じ個体です。\n\n"
+      + "【コラボピックアップ召喚】\n召喚画面の上に「通常召喚 / コラボ」の切り替えが出ます。"
+      + "**コラボを選ぶと、引く先がコラボピックアップ召喚に変わります。**\n"
+      + "**★4・★5を引いた時、コラボモンスターが出る枠が加わります。**光・闇でも同じ割合です。"
+      + "★3にコラボモンスターは出ません。値段と★4以上1体確定(10連)は通常召喚と同じで、**通常召喚の確率は何も変えていません。**\n"
+      + "**コラボピックアップ召喚は、ダイヤでも「召喚の書」でも引けます。**書は通常召喚と同じものを使い、10枚で10連になります。\n\n"
+      + "【コラボ限定召喚書】\n**コラボモンスターしか出ない**召喚書が3種類あります。"
+      + "「コラボ限定★4以上召喚書」「コラボ限定★4以上光闇召喚書」「コラボ限定★5召喚書」で、"
+      + "通常のモンスターは1体も出ません。持っている時だけ召喚画面に棚が出ます。\n\n"
+      + "【コラボ限定ミッション】\nホームの「ミッション」に「コラボ」のタブが増えます。全30個です。"
+      + "ミッションを達成した数に応じて累計報酬もあり、**30個達成の最終報酬は「コラボ限定★5召喚書」**です。\n\n"
+      + "配布の電気スエゾーとコラボ限定★4以上召喚書で、**引きに関わらず30個すべて達成できます。**",
+    kind: "CELEBRATION",
+    fromDate: COLLAB_EVENT_FROM_DATE,
+    toDate: COLLAB_EVENT_TO_DATE,
+    crystal: 0,
+    gold: 0,
+    summonScrolls: 0,
+  },
   {
     id: "2026-09-19-collab-monsters",
     title: "9/19 コラボモンスター4種・全24属性を追加しました",
@@ -661,7 +710,11 @@ export function compensationBannerLabel(claims: readonly CompensationClaim[]): s
 export function hasReward(compensation: Compensation): boolean {
   return compensation.crystal > 0 || compensation.gold > 0
     || compensation.summonScrolls > 0 || (compensation.fourStarSummonScrolls ?? 0) > 0
-    || (compensation.lightDarkFourStarSummonScrolls ?? 0) > 0;
+    || (compensation.lightDarkFourStarSummonScrolls ?? 0) > 0
+    || (compensation.collabFourStarSummonScrolls ?? 0) > 0
+    || (compensation.collabLightDarkFourStarSummonScrolls ?? 0) > 0
+    || (compensation.collabFiveStarSummonScrolls ?? 0) > 0
+    || (compensation.monsters?.length ?? 0) > 0;
 }
 
 export interface HomeBannerSelection {
@@ -732,6 +785,18 @@ export function claimCompensations(state: PlayerState, now: Date = new Date()): 
     state.summonScrolls += compensation.summonScrolls;
     state.fourStarSummonScrolls += compensation.fourStarSummonScrolls ?? 0;
     state.lightDarkFourStarSummonScrolls += compensation.lightDarkFourStarSummonScrolls ?? 0;
+    // コラボ限定の書。**欄が無い古いセーブでも 0 から足せる**
+    state.collabFourStarSummonScrolls = (state.collabFourStarSummonScrolls ?? 0)
+      + (compensation.collabFourStarSummonScrolls ?? 0);
+    state.collabLightDarkFourStarSummonScrolls = (state.collabLightDarkFourStarSummonScrolls ?? 0)
+      + (compensation.collabLightDarkFourStarSummonScrolls ?? 0);
+    state.collabFiveStarSummonScrolls = (state.collabFiveStarSummonScrolls ?? 0)
+      + (compensation.collabFiveStarSummonScrolls ?? 0);
+    /*
+     * モンスターそのもの。**召喚で引いたものと同じ個体を渡す。**
+     * 受け取り済みの印は下で1回だけ付くので、何度開いても増えない。
+     */
+    for (const gift of compensation.monsters ?? []) addMonster(state, gift.dexId, gift.star);
     state.claimedCompensationIds.push(compensation.id);
     claims.push({ compensation });
   }

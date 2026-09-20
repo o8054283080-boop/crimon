@@ -84,6 +84,19 @@ export interface PlayerState {
   lightDarkFourStarSummonScrolls: number;
   /** ★5を保証する正式な召喚書 */
   fiveStarSummonScrolls: number;
+  /*
+   * --- コラボ限定の召喚書3種 ---
+   *
+   * **どれも省略可。**前から遊んでいる人の控えには無いので、
+   * 読み込み時に0で埋める(`normalizePlayerState`)。
+   * 通常の召喚書とは別枠で、**コラボの顔ぶれしか出ない。**
+   */
+  /** コラボの★4以上が出る召喚書 */
+  collabFourStarSummonScrolls?: number;
+  /** コラボの★4以上、かつ光・闇だけが出る召喚書 */
+  collabLightDarkFourStarSummonScrolls?: number;
+  /** コラボの★5だけが出る召喚書。このコラボの最終報酬 */
+  collabFiveStarSummonScrolls?: number;
   /** 潜在覚醒で1個消費する素材 */
   awakeningOrbs: number;
   /*
@@ -426,6 +439,9 @@ export function createInitialState(): PlayerState {
     fourStarSummonScrolls: 0,
     lightDarkFourStarSummonScrolls: 0,
     fiveStarSummonScrolls: 0,
+    collabFourStarSummonScrolls: 0,
+    collabLightDarkFourStarSummonScrolls: 0,
+    collabFiveStarSummonScrolls: 0,
     awakeningOrbs: 0,
     awakeningShards: 0,
     awakeningCrystals: 0,
@@ -662,6 +678,14 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.fourStarSummonScrolls !== "number") state.fourStarSummonScrolls = 0;
   if (typeof state.lightDarkFourStarSummonScrolls !== "number") state.lightDarkFourStarSummonScrolls = 0;
   if (typeof state.fiveStarSummonScrolls !== "number") state.fiveStarSummonScrolls = 0;
+  /*
+   * コラボ限定の召喚書。**前から遊んでいる人の控えには無い。**
+   * 欄そのものが無いセーブを読んでも 0 から始まるだけで、
+   * 他の所持品には一切触らない。
+   */
+  if (typeof state.collabFourStarSummonScrolls !== "number") state.collabFourStarSummonScrolls = 0;
+  if (typeof state.collabLightDarkFourStarSummonScrolls !== "number") state.collabLightDarkFourStarSummonScrolls = 0;
+  if (typeof state.collabFiveStarSummonScrolls !== "number") state.collabFiveStarSummonScrolls = 0;
   if (typeof state.awakeningOrbs !== "number") state.awakeningOrbs = 0;
   // 前から遊んでいる人の控えには無い。0から始める
   if (!Array.isArray(state.monsterStorage)) state.monsterStorage = [];
