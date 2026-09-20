@@ -34,7 +34,13 @@ export const INSPECT = `(() => {
       return r.width > 0 && r.height > 0;
     });
   const scope = modal ?? document;
-  const buttons = [...scope.querySelectorAll('button:not([disabled]), a[href]')]
+  /*
+   * **summary も押しもの。**
+   * 折りたたみの見出しは button でも a でもないので、ここに入れるまで
+   * **一度も検査されていなかった。**図鑑の「スキルLv別の変化を見る」が
+   * 下タブの裏に入ってどうやっても押せない状態で、巡回を素通りしている。
+   */
+  const buttons = [...scope.querySelectorAll('button:not([disabled]), a[href], summary')]
     .filter((b) => !b.matches('.regular-missions__scrim'));
   for (const b of buttons) {
     const r = b.getBoundingClientRect();
@@ -55,7 +61,39 @@ export const INSPECT = `(() => {
     }
   }
 
-  // 3. 指で押すには小さすぎる的。
+  /*
+   * 3. **一番下まで送っても、下タブの裏から出てこない押しもの。**
+   *
+   * 上の検査は「下タブの下は判定しない」(送れば出てくるため)なので、
+   * **送りきっても出てこないもの**だけがここに残っていた。
+   * 図鑑の詳細がこれで、画面の下余白に下タブ(64px)のぶんが入っておらず、
+   * 「スキルLv別の変化を見る」が**どうやっても押せなかった**。
+   *
+   * 送った量に関係なく決まるので、いまのスクロール位置のまま計算できる。
+   */
+  const scroller = document.scrollingElement || document.documentElement;
+  const maxScroll = Math.max(0, scroller.scrollHeight - vh);
+  const movesWithPage = (el) => {
+    for (let node = el; node && node !== document.body; node = node.parentElement) {
+      const pos = getComputedStyle(node).position;
+      if (pos === 'fixed' || pos === 'sticky') return false;
+    }
+    return true;
+  };
+  for (const b of buttons) {
+    if (b.closest('.bottom-nav') || b.closest('.dev-menu')) continue;
+    if (!movesWithPage(b)) continue;
+    const r = b.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    // 一番下まで送った時に、この的の中心がどこへ来るか
+    const bestCenter = r.top + scroller.scrollTop - maxScroll + r.height / 2;
+    if (bestCenter >= navTop) {
+      problems.push('下タブの裏から出てこない「' + ((b.textContent || '').trim().slice(0, 14) || b.className) + '」(画面の下余白に下タブのぶんが無い)');
+      break;
+    }
+  }
+
+  // 4. 指で押すには小さすぎる的。
   //    実測したところ、並べ替えの札が29px、ショップの購入が31pxしかなく、
   //    **買う・編成するという取り返しのつかない操作ほど的が小さい**
   //    という逆転が起きていた。36pxを下回るものを拾う。
@@ -83,7 +121,7 @@ export const INSPECT = `(() => {
     }
   }
 
-  // 4. 極端に小さい文字。実機で読めない
+  // 5. 極端に小さい文字。実機で読めない
   for (const el of document.querySelectorAll('p, span, div, button')) {
     if (!el.textContent || el.children.length > 0) continue;
     const size = parseFloat(getComputedStyle(el).fontSize);
@@ -94,7 +132,7 @@ export const INSPECT = `(() => {
   }
 
   /*
-   * 5. 文字が「‥」で切り落とされている。
+   * 6. 文字が「‥」で切り落とされている。
    *
    * text-overflow: ellipsis は、本来**長い名前を1行に収めるための保険**で、
    * 数文字しか入らない枠に落ちた時の非常口ではない。
@@ -119,7 +157,7 @@ export const INSPECT = `(() => {
     break;
   }
 
-  // 6. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
+  // 7. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
   const header = document.querySelector('.app-header h1, .battle-topbar__title');
   if (header) {
     const hr = header.getBoundingClientRect();

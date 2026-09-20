@@ -1155,6 +1155,9 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+  /* 指で押す的。文字の高さだけだと19pxしかない */
+  min-height: 44px;
+  padding: 12px 0;
   margin-bottom: 0;
 }
 
