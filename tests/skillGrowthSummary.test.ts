@@ -12,17 +12,35 @@
  */
 import { describe, expect, it } from "vitest";
 import { MAX_SKILL_LEVEL, computeLeveledSkill, describeSkillGrowth } from "../src/core/skill.js";
-import { MONSTER_TEMPLATES_DEX } from "../src/data/monsters.js";
+import { MONSTER_DEX_ENTRIES, MONSTER_TEMPLATES_DEX } from "../src/data/monsters.js";
 import { CRIM } from "../src/data/newMonsters/crim.js";
 import type { Skill } from "../src/core/skill.js";
 
-/** 図鑑に出る全スキル。パッシブと自動発動はレベルの伸び方が別物なので外す */
+/** 図鑑に出る全スキル。自動発動だけはレベルで伸びないので外す */
 function activeSkills(): { name: string; skill: Skill }[] {
   const out: { name: string; skill: Skill }[] = [];
   for (const template of MONSTER_TEMPLATES_DEX) {
     for (const skill of template.skills ?? []) {
       if (skill.passive || skill.automatic) continue;
       out.push({ name: `${template.name} / ${skill.name}`, skill });
+    }
+  }
+  return out;
+}
+
+/**
+ * 図鑑に出るパッシブ全部。
+ *
+ * **`MONSTER_TEMPLATES_DEX` には入っていない。**コラボや追加種のパッシブは
+ * 図鑑の一覧(`MONSTER_DEX_ENTRIES`)にしか出てこないので、
+ * そちらを見ないと0件になる(最初それで見張れていなかった)。
+ */
+function passiveSkills(): { name: string; skill: Skill }[] {
+  const out: { name: string; skill: Skill }[] = [];
+  for (const entry of MONSTER_DEX_ENTRIES) {
+    for (const skill of entry.skills ?? []) {
+      if (!skill.passive) continue;
+      out.push({ name: `${entry.name} / ${skill.name}`, skill });
     }
   }
   return out;
@@ -76,6 +94,49 @@ describe("取りこぼさない", () => {
     const steps = describeSkillGrowth(rush!);
     expect(steps.find((step) => step.level === 3)!.changes.join()).toContain("発動率");
     expect(steps.find((step) => step.level === 4)!.changes.join()).toContain("持続");
+  });
+
+  /*
+   * **パッシブは別の場所に値がある。**
+   *
+   * `computeLeveledSkill` はパッシブに対してレベルを焼き込むだけで、
+   * 中身(`passive.levels`)には触らない。そこを見ずに作ったせいで、
+   * **伸びているのに全段「変化なし」と出ていた**(依頼主の指摘。
+   * ウンディーネの「水の祝福」は Lv3で軽減20%→22%、Lv5で25%になる)。
+   */
+  it("パッシブも、段が違えば必ず何か書ける", () => {
+    const all = passiveSkills();
+    expect(all.length, "パッシブを1つも見ていない").toBeGreaterThan(0);
+    const missed: string[] = [];
+    for (const { name, skill } of all) {
+      const levels = skill.passive!.levels;
+      for (const step of describeSkillGrowth(skill)) {
+        if (step.changes.length > 0) continue;
+        if (JSON.stringify(levels[step.level - 2]) !== JSON.stringify(levels[step.level - 1])) {
+          missed.push(`${name} Lv.${step.level}`);
+        }
+      }
+    }
+    expect(missed, `動いているのに「変化なし」と出るパッシブ: ${missed.join(", ")}`).toEqual([]);
+  });
+
+  /** 名前を付けていない欄は「強くなる」としか書けない。**1つも残さない** */
+  it("パッシブの欄に名前が付いている", () => {
+    const vague: string[] = [];
+    for (const { name, skill } of passiveSkills()) {
+      for (const step of describeSkillGrowth(skill)) {
+        if (step.changes.includes("強くなる")) vague.push(`${name} Lv.${step.level}`);
+      }
+    }
+    expect(vague, `名前の無い欄が伸びている: ${vague.join(", ")}`).toEqual([]);
+  });
+
+  /** その段で初めて生える効果も拾う(モッチー電気のLv5) */
+  it("その段で初めて付く効果も書ける", () => {
+    const guts = passiveSkills().find((entry) => /ガッツチャージ/.test(entry.name));
+    expect(guts, "ガッツチャージが見つからない").toBeDefined();
+    const lv5 = describeSkillGrowth(guts!.skill).find((step) => step.level === 5)!;
+    expect(lv5.changes.join(" / ")).toContain("が付く");
   });
 
   it("1つも書けない段が全体のごく一部に収まっている", () => {

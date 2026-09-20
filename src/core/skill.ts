@@ -1211,8 +1211,8 @@ export function describeSkillEffect(effect: SkillEffect): string {
 interface GrowthField {
   /** 画面に出す名前 */
   label: string;
-  /** 数の書き方。割合・倍率・ターン数で単位が違う */
-  unit: "percent" | "multiplier" | "turns";
+  /** 数の書き方。割合・倍率・ターン数・素の数で書き分ける */
+  unit: "percent" | "multiplier" | "turns" | "flat";
   /**
    * 効果の名前を頭に付けるか。
    *
@@ -1275,7 +1275,7 @@ const GROWTH_FIELDS: Record<string, GrowthField> = {
 
 function growthNumber(value: number, unit: GrowthField["unit"]): string {
   if (unit === "multiplier") return `${value.toFixed(2)}倍`;
-  if (unit === "turns") return `${value}`;
+  if (unit === "turns" || unit === "flat") return `${value}`;
   return percent(value);
 }
 
@@ -1317,6 +1317,125 @@ function diffEffectLists(before: readonly SkillEffect[], after: readonly SkillEf
   return changes;
 }
 
+/*
+ * パッシブはアクティブと成長のしかたが違う。
+ *
+ * `computeLeveledSkill` はパッシブに対して**レベルを焼き込むだけ**で、
+ * 効果そのものは触らない(中身は `skill.passive.levels[Lv-1]` に5段ぶん
+ * 別々に書いてある)。そのため上の差分では何も動いて見えず、
+ * **伸びているのに「変化なし」と出ていた**(依頼主の指摘。
+ * ウンディーネの「水の祝福」は Lv4 で軽減20%→22%、Lv5で25%になる)。
+ *
+ * 欄の名前が種類ごとに違う意味を持つ(`spd` は素の速度、`gauge` は割合…)ので、
+ * **種類と欄の組で**名前と単位を決める。
+ */
+const PASSIVE_GROWTH_FIELDS: Record<string, GrowthField> = {
+  "WEAK_POINT.hpRatio": { label: "対象のHP条件", unit: "percent" },
+  "WEAK_POINT.critRate": { label: "クリ率", unit: "percent" },
+  "WEAK_POINT.critDmg": { label: "クリダメ", unit: "percent" },
+  "WEAK_POINT.ignore": { label: "防御無視", unit: "percent" },
+  "SKY_RULER.atk": { label: "攻撃力", unit: "percent" },
+  "SKY_RULER.critDmg": { label: "クリダメ", unit: "percent" },
+  "REBIRTH.heal": { label: "回復量", unit: "percent" },
+  "REBIRTH.damage": { label: "与ダメージ", unit: "percent" },
+  "REBIRTH.cooldown": { label: "復活のクールタイム", unit: "turns" },
+  "ILLUSION.chance": { label: "呪いの発動率", unit: "percent" },
+  "ILLUSION.damage": { label: "攻撃力倍率", unit: "multiplier" },
+  "CHEAT.reduction": { label: "クリティカル被ダメージ軽減", unit: "percent" },
+  "GAUGE_ON_ENEMY_POISON.gauge": { label: "行動ゲージ", unit: "percent" },
+  "GAUGE_ON_SLOWED_ENEMY_ACT.gauge": { label: "行動ゲージ", unit: "percent" },
+  "LAST_STAND.hpRatio": { label: "発動するHP", unit: "percent" },
+  "LAST_STAND.defUp": { label: "防御力", unit: "percent" },
+  "LAST_STAND.damageTaken": { label: "被ダメージ軽減", unit: "percent" },
+  "SCENT_OF_PREY.hpRatio": { label: "対象のHP条件", unit: "percent" },
+  "SCENT_OF_PREY.damageUp": { label: "最終ダメージ", unit: "percent" },
+  "SCENT_OF_PREY.atkUp": { label: "攻撃力", unit: "percent" },
+  "SCENT_OF_PREY.spd": { label: "速度", unit: "flat" },
+  "SCENT_OF_PREY.speedCoefficient": { label: "速度比例", unit: "multiplier" },
+  "FALSE_TREASURE.heal": { label: "回復量", unit: "percent" },
+  "FALSE_TREASURE.chance": { label: "発動率", unit: "percent" },
+  "FALSE_TREASURE.atkDown": { label: "攻撃力低下", unit: "percent" },
+  "FALSE_TREASURE.duration": { label: "低下の持続", unit: "turns" },
+  "VALKYRIE_OATH.hpRatio": { label: "発動するHP", unit: "percent" },
+  "VALKYRIE_OATH.heal": { label: "回復量", unit: "percent" },
+  "VALKYRIE_OATH.internalCooldown": { label: "内部クールタイム", unit: "turns" },
+  "THUNDER_INSTINCT.critDmg": { label: "クリダメ", unit: "percent" },
+  "THUNDER_INSTINCT.spd": { label: "速度", unit: "flat" },
+  "THUNDER_INSTINCT.drain": { label: "ゲージ吸収", unit: "percent" },
+  "REAPER_HARVEST.chance": { label: "発動率", unit: "percent" },
+  "REAPER_HARVEST.heal": { label: "回復量", unit: "percent" },
+  "REAPER_HARVEST.gauge": { label: "行動ゲージ", unit: "percent" },
+  "PACK_INSTINCT.critDmg": { label: "クリダメ", unit: "percent" },
+  "TIME_KEEPER.allyGauge": { label: "味方行動時の行動ゲージ", unit: "percent" },
+  "TIME_KEEPER.drain": { label: "ゲージ吸収", unit: "percent" },
+  "TIME_KEEPER.stunChance": { label: "スタンの発動率", unit: "percent" },
+  "GUTS_CHARGE.damageUp": { label: "1スタックの与ダメージ", unit: "percent" },
+  "GUTS_CHARGE.spd": { label: "1スタックの速度", unit: "flat" },
+  "GUTS_CHARGE.maxStacks": { label: "最大スタック", unit: "flat" },
+  "GUTS_CHARGE.gaugeAtMax": { label: "最大時の行動ゲージ", unit: "percent" },
+  "ABYSS_LORD.damageTaken": { label: "被ダメージ軽減", unit: "percent" },
+  "ABYSS_LORD.atkPerStack": { label: "1スタックの攻撃力", unit: "percent" },
+  "ABYSS_LORD.spdPerStack": { label: "1スタックの速度", unit: "percent" },
+  "ABYSS_LORD.maxStacks": { label: "最大スタック", unit: "flat" },
+  "ABYSS_LORD.healOnTurn": { label: "ターン開始時の回復", unit: "percent" },
+  "WATER_BLESSING.damageTaken": { label: "被ダメージ軽減", unit: "percent" },
+  "WATER_BLESSING.critTaken": { label: "被クリ率低下", unit: "percent" },
+  "WATER_BLESSING.healOnAct": { label: "行動時の回復", unit: "percent" },
+  "WATER_BLESSING.atkUpTurns": { label: "攻撃力UPの持続", unit: "turns" },
+  "CHARM_EYE.accuracy": { label: "的中", unit: "percent" },
+  "CHARM_EYE.critRate": { label: "クリ率", unit: "percent" },
+  "CHARM_EYE.stripChance": { label: "解除の発動率", unit: "percent" },
+  "CHARM_EYE.stunChance": { label: "気絶の発動率", unit: "percent" },
+  "CHARM_EYE.followUpMultiplier": { label: "追撃の倍率", unit: "multiplier" },
+  "ANCIENT_BEHEMOTH.hpRatio": { label: "発動するHP", unit: "percent" },
+  "ANCIENT_BEHEMOTH.damageTaken": { label: "被ダメージ軽減", unit: "percent" },
+  "ANCIENT_BEHEMOTH.hpDamageUp": { label: "最大HP比例ダメージ", unit: "percent" },
+};
+
+/** パッシブ1段ぶんの差分。**段になっているもの(ベヒモス)は中まで降りる** */
+function diffPassiveLevel(kind: string, before: Record<string, unknown>, after: Record<string, unknown>, prefix = ""): string[] {
+  const changes: string[] = [];
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    const a = before[key];
+    const b = after[key];
+    if (JSON.stringify(a) === JSON.stringify(b)) continue;
+    if (Array.isArray(a) && Array.isArray(b) && a.length === b.length) {
+      a.forEach((tier, index) => {
+        const head = typeof (tier as Record<string, number>).hpRatio === "number"
+          ? `HP${percent((tier as Record<string, number>).hpRatio)}以下の`
+          : "";
+        changes.push(...diffPassiveLevel(kind, tier as Record<string, unknown>, b[index] as Record<string, unknown>, head));
+      });
+      continue;
+    }
+    const field = PASSIVE_GROWTH_FIELDS[`${kind}.${key}`];
+    if (!field) {
+      changes.push("強くなる");
+      continue;
+    }
+    const tail = field.unit === "turns" ? "ターン" : "";
+    /*
+     * **その段で初めて付く効果がある。**モッチー電気のガッツチャージは
+     * Lv5で「最大まで溜めた時の行動ゲージ」が生える(それまでは欄ごと無い)。
+     * 前後を突き合わせるだけだと数として比べられず、取りこぼす。
+     */
+    if (typeof a !== "number" && typeof b === "number") {
+      changes.push(`${prefix}${field.label} ${growthNumber(b, field.unit)}${tail} が付く`);
+      continue;
+    }
+    if (typeof a === "number" && typeof b !== "number") {
+      changes.push(`${prefix}${field.label} が無くなる`);
+      continue;
+    }
+    if (typeof a !== "number" || typeof b !== "number") {
+      changes.push("強くなる");
+      continue;
+    }
+    changes.push(`${prefix}${field.label} ${growthNumber(a, field.unit)}→${growthNumber(b, field.unit)}${tail}`);
+  }
+  return changes;
+}
+
 /** そのレベルで変わったこと。何も変わらない段は空になる */
 export interface SkillGrowthStep {
   level: number;
@@ -1331,6 +1450,22 @@ export interface SkillGrowthStep {
  */
 export function describeSkillGrowth(skill: Skill): SkillGrowthStep[] {
   const steps: SkillGrowthStep[] = [];
+
+  /*
+   * **パッシブは別の場所を見る。**中身は `passive.levels` に5段ぶん
+   * 書いてあり、`computeLeveledSkill` はレベルを焼くだけで触らない。
+   * ここを通さないと、伸びているのに「変化なし」と出る。
+   */
+  if (skill.passive) {
+    for (let level = 2; level <= MAX_SKILL_LEVEL; level += 1) {
+      const before = skill.passive.levels[level - 2] as unknown as Record<string, unknown>;
+      const after = skill.passive.levels[level - 1] as unknown as Record<string, unknown>;
+      const changes = diffPassiveLevel(String(after.kind), before, after);
+      steps.push({ level, changes: [...new Set(changes)] });
+    }
+    return steps;
+  }
+
   for (let level = 2; level <= MAX_SKILL_LEVEL; level += 1) {
     const before = computeLeveledSkill(skill, level - 1);
     const after = computeLeveledSkill(skill, level);
