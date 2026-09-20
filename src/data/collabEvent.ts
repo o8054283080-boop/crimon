@@ -21,7 +21,7 @@ export const COLLAB_EVENT_ID = "2026-09-collab";
  * 次に同じIDのイベントを開いた時に二重で配ることになる。
  */
 export const COLLAB_EVENT_FROM_DATE = "2026-09-19";
-export const COLLAB_EVENT_TO_DATE = "2026-10-19";
+export const COLLAB_EVENT_TO_DATE = "2026-12-19";
 
 /**
  * コラボの対象種族。**★4以上だけ。**

@@ -22,7 +22,7 @@ import { unclaimedGiftCount } from "../../game/gift.js";
 import { monsterPower } from "../../game/monsterSort.js";
 import { withPortrait } from "../three/portrait.js";
 import { partyCardAction } from "../uxHelpers.js";
-import { el } from "../dom.js";
+import { el, emphasizedNodes } from "../dom.js";
 import { icon, IconName } from "../icons.js";
 import { AudioSettingsProps, renderAudioSettings } from "./audioSettings.js";
 import { TUTORIAL_MISSIONS, TutorialDestination, canClaimTutorialMission, nextTutorialMission } from "../../game/tutorialMissions.js";
@@ -247,7 +247,8 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
         // 見出しは先頭の1本にだけ出す。同じ言葉が縦に並ぶと、何本あるのか読みにくい
         index === 0 ? el("p", { className: "reward-banner__label" }, [label]) : null,
         el("p", { className: "compensation__title" }, [compensation.title]),
-        el("p", { className: "compensation__message" }, [compensation.message]),
+        // **`**` は太字にする。**そのまま渡すとアスタリスクが画面に出る
+        el("p", { className: "compensation__message" }, emphasizedNodes(compensation.message)),
         items.length > 0 ? rewardList(items) : null,
       ].filter((node): node is HTMLElement => node !== null)),
       el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
