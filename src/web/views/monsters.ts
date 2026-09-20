@@ -27,6 +27,8 @@ import { stickyActions } from "./stickyActions.js";
 import { computeLeveledSkill, describeSkillLines, MAX_SKILL_LEVEL } from "../../core/skill.js";
 import { describeSkillTarget, renderSkillGrowthSummary, skillDescriptionText } from "./skillPanel.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
+import { summarizeTalents } from "../../core/talentSummary.js";
+import { TALENT_UNLOCK_STAR } from "../../core/talents.js";
 import "../ui/monsterDetail.css";
 import { renderMonsterListDensityToggle } from "../monsterListDensity.js";
 
@@ -333,6 +335,8 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
   const skills = dex?.skills.map((skill, index) => index === 0 ? skill : currentSkillOf(instance, index as CreateSlot) ?? skill) ?? [];
   const latentId = instance.development?.latentAbilityId ?? null;
   const latent = latentId ? LATENT_ABILITY_CANDIDATES[instance.dexId]?.find((candidate) => candidate.id === latentId) : undefined;
+  // 才能覚醒で取ったものの一覧。**空なら「未取得」と出す**
+  const talentLines = summarizeTalents(instance.development?.talents);
   const activeSets = getActiveSetBonuses(equippedItems);
   const lockView = monsterListLockView(instance);
   const onBack = options.onBack ?? (() => props.onSelectDetail(null));
@@ -422,6 +426,25 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
         el("h2", {}, ["◆ 潜在覚醒"]),
         latent ? el("div", {}, [el("strong", {}, [latent.name || "名称未設定"]), el("span", {}, [latent.description || "説明未登録"])])
           : el("span", { className: "monster-detail-empty" }, [latentId ? "潜在覚醒：未設定" : "🔒 未解放"]),
+      ]),
+      /*
+       * **才能覚醒も、取ったものをここに出す。**
+       *
+       * 潜在覚醒は出ているのに、才能覚醒は何も出ていなかった。
+       * スキルを覚醒させても強化しても、詳細で分かるのは能力の数字だけで、
+       * **何を取ったのかは才能覚醒の画面まで戻らないと分からなかった**
+       * (依頼主の指摘)。潜在覚醒と同じ形で並べる。
+       */
+      el("section", { className: "monster-detail-section monster-detail-talent" }, [
+        el("h2", {}, ["◆ 才能覚醒"]),
+        ...(talentLines.length > 0
+          ? talentLines.map((line) => el("div", {}, [
+            el("strong", {}, [`${line.group === "覚醒" ? "★ " : ""}${line.label}`]),
+            el("span", {}, [line.effect]),
+          ]))
+          : [el("span", { className: "monster-detail-empty" }, [
+            instance.star >= TALENT_UNLOCK_STAR ? "才能覚醒：未取得" : `🔒 ★${TALENT_UNLOCK_STAR}で解放`,
+          ])]),
       ]),
       el("section", { className: "monster-detail-section monster-detail-equipment" }, [
         el("h2", {}, ["装備"]),

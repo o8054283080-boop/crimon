@@ -62,8 +62,13 @@
 .monster-skill-compact__effect { display: -webkit-box; overflow: hidden; font-size: .58rem; line-height: 1.2; color: #79dba5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .monster-skill-compact__full { grid-column: 1 / -1; padding: 5px; border-top: 1px solid rgba(255,255,255,.08); font-size: .65rem; line-height: 1.35; color: #c8d3ee; }
 .monster-skill-compact__full p { margin: 0 0 3px; }
-.monster-detail-latent > div { display: grid; grid-template-columns: minmax(90px,auto) 1fr; gap: 6px; font-size: .62rem; line-height: 1.25; }
-.monster-detail-latent strong { color: #f2d477; }
+/* 潜在覚醒と才能覚醒は**同じ形で並べる。**どちらも「名前 / 効果」の2列 */
+.monster-detail-latent > div,
+.monster-detail-talent > div { display: grid; grid-template-columns: minmax(90px,auto) 1fr; gap: 6px; font-size: .62rem; line-height: 1.25; }
+.monster-detail-latent strong,
+.monster-detail-talent strong { color: #f2d477; }
+/* 取った才能は行が増える。詰まりすぎないよう1行ぶんの間を置く */
+.monster-detail-talent > div + div { margin-top: 3px; }
 .monster-detail-empty { margin: 0; font-size: .62rem; color: var(--text-dim); }
 
 .monster-detail-equipment .equip-slot-grid { grid-template-columns: repeat(6,minmax(0,1fr)); gap: 3px; }

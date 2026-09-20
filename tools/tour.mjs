@@ -163,6 +163,15 @@ const SCREENS = [
   { name: "おまかせ装備", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip()" },
   { name: "おまかせ装備(探した後)", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip(true)" },
   { name: "おまかせ装備(シリーズ指定)", tab: "MONSTERS", setup: "window.__crimonDev?.openAutoEquip(false, true)" },
+  /*
+   * モンスターの詳細。**才能覚醒を取った状態で見る。**
+   *
+   * 詳細には「◆ 潜在覚醒」と「◆ 才能覚醒」が縦に並ぶ。取っていなければ
+   * どちらも1行の案内で終わるので、初期セーブのまま開くと
+   * **取った後に行が伸びた姿を一度も検査しない**(行が1つも無い
+   * ランキングを検査し続けたのと同じ穴)。
+   */
+  { name: "モンスター詳細(才能覚醒あり)", tab: "MONSTERS", setup: "window.__crimonDev?.openMonsterDetailWithTalents()" },
   { name: "クリエイト/スキル継承", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('SKILL')" },
   { name: "クリエイト/タイプ転生", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('TYPE')" },
   { name: "クリエイト/能力付与", tab: "MONSTERS", setup: "window.__crimonDev?.openCreateMenu('ABILITY')" },

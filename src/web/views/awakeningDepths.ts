@@ -1,6 +1,7 @@
 import "../ui/awakeningDepths.css";
 import { AWAKENING_DEPTH_FLOORS, AwakeningDepthFloor } from "../../data/awakeningDepths.js";
-import { getParty, PlayerState } from "../../game/playerState.js";
+import { MAX_PARTY_SIZE, getParty, PlayerState } from "../../game/playerState.js";
+import { renderPartySlots } from "./partyCard.js";
 import {
   MATERIAL_EXCHANGES, isAwakeningDepthCleared, isAwakeningDepthUnlocked, materialCount,
 } from "../../game/awakeningDepths.js";
@@ -196,9 +197,24 @@ function renderDetail(props: AwakeningDepthProps, floor: AwakeningDepthFloor): H
         el("span", {}, [`⚡${floor.stamina}`]),
       ]),
     ].filter((node) => node !== null) as HTMLElement[]),
+    /*
+     * **どの編成で挑むのかを見せる。**
+     *
+     * 編成は3つある(通常・装備ダンジョン・試練の塔)のに、この画面には
+     * 「編成を変更する」としか書いていなかった。**どれが使われるのか
+     * 分からない**(依頼主の指摘)。使うのは通常の編成なので、
+     * そう言い切ったうえで、実際に出る顔ぶれを並べる。
+     */
+    el("section", { className: "card depth-party" }, [
+      el("h2", { className: "depth-party__title" }, ["この編成で挑みます"]),
+      el("p", { className: "depth-party__note" }, [
+        `目覚の深域は**通常の編成**で戦います(装備ダンジョン・試練の塔の編成とは別です)`.replace(/\*\*/g, ""),
+      ]),
+      renderPartySlots(party, MAX_PARTY_SIZE),
+    ]),
     ...blockers.map((text) => el("p", { className: "warn-text" }, [text])),
     el("div", { className: "stage-actions" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["編成を変更する"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["通常の編成を変更する"]),
       el(
         "button",
         { type: "button", className: "btn btn--primary", disabled: !canChallenge, onclick: () => props.onStartFloor(floor) },
