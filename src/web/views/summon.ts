@@ -31,7 +31,15 @@ import {
 export type SummonMethod =
   | { kind: "CRYSTAL"; count: number }
   | { kind: "SCROLL"; count: number }
-  | { kind: "SPECIAL"; type: SpecialSummonScroll };
+  | { kind: "SPECIAL"; type: SpecialSummonScroll }
+  /*
+   * コラボ側も**引いた手段のまま繰り返す。**
+   * ここを通常召喚と同じ印にしていると、コラボを引いた直後の「もう一度」が
+   * 通常召喚になり、**画面はコラボのままなのに中身だけが通常**になる。
+   */
+  | { kind: "COLLAB_CRYSTAL"; count: number }
+  | { kind: "COLLAB_SCROLL"; count: number }
+  | { kind: "COLLAB_SPECIAL"; type: CollabSummonScroll };
 
 /** 「もう一度」の的に出すもの */
 export interface SummonAgain {
@@ -54,6 +62,12 @@ const SPECIAL_SCROLL_LEAD: Record<SpecialSummonScroll, string> = {
   FIVE_STAR: "書でもう一度",
 };
 
+const COLLAB_SCROLL_OWNED: Record<CollabSummonScroll, (player: PlayerState) => number> = {
+  COLLAB_FOUR_STAR: (player) => player.collabFourStarSummonScrolls ?? 0,
+  COLLAB_LIGHT_DARK_FOUR_STAR: (player) => player.collabLightDarkFourStarSummonScrolls ?? 0,
+  COLLAB_FIVE_STAR: (player) => player.collabFiveStarSummonScrolls ?? 0,
+};
+
 /**
  * 「もう一度」で何を引くかを決める。
  *
@@ -67,7 +81,35 @@ export function resolveSummonAgain(
   player: PlayerState,
   last: SummonMethod | null,
   resultCount: number,
+  /**
+   * コラボ開催中か。**終わっていたら通常召喚へ落とす。**
+   * 期間が切れた後に結果画面だけが残っていても、コラボを引き直せてはいけない。
+   */
+  collabOpen = true,
 ): SummonAgain {
+  if (collabOpen && last?.kind === "COLLAB_SCROLL" && player.summonScrolls >= last.count) {
+    return {
+      method: last,
+      lead: last.count >= 10 ? "書でもう10連" : "書でもう一度",
+      costIcon: "scroll",
+      cost: last.count,
+      enabled: true,
+    };
+  }
+  if (collabOpen && last?.kind === "COLLAB_SPECIAL" && COLLAB_SCROLL_OWNED[last.type](player) >= 1) {
+    return { method: last, lead: "書でもう一度", costIcon: "scroll", cost: 1, enabled: true };
+  }
+  if (collabOpen && last?.kind === "COLLAB_CRYSTAL") {
+    const ten = last.count >= 10;
+    const cost = ten ? SUMMON_COST_TEN : SUMMON_COST_SINGLE;
+    return {
+      method: { kind: "COLLAB_CRYSTAL", count: ten ? 10 : 1 },
+      lead: ten ? "もう10連" : "もう一度",
+      costIcon: "crystal",
+      cost,
+      enabled: player.crystal >= cost,
+    };
+  }
   if (last?.kind === "SCROLL" && player.summonScrolls >= last.count) {
     return {
       method: last,
@@ -82,7 +124,7 @@ export function resolveSummonAgain(
   }
 
   // 書が尽きた時と、もともとダイヤで引いた時。**引いた数に合わせる**
-  const ten = last ? (last.kind === "SPECIAL" ? false : last.count >= 10) : resultCount >= 10;
+  const ten = last ? ("count" in last ? last.count >= 10 : false) : resultCount >= 10;
   const cost = ten ? SUMMON_COST_TEN : SUMMON_COST_SINGLE;
   return {
     method: { kind: "CRYSTAL", count: ten ? 10 : 1 },
@@ -112,7 +154,18 @@ export interface SummonProps {
   onCollabSummon?: (count: number) => void;
   /** コラボ限定召喚書で引く */
   onUseCollabSummonScroll?: (type: CollabSummonScroll) => void;
+  /** コラボピックアップ召喚を、通常の召喚の書で引く */
+  onCollabSummonScroll?: (count: number) => void;
+  /**
+   * いまどちらの召喚を見ているか。**画面を切り替える。**
+   * 通常とコラボを縦に並べると、毎日使う導線が期間限定のもので押し下がる。
+   */
+  tab?: SummonTab;
+  onChangeTab?: (tab: SummonTab) => void;
 }
+
+/** 召喚画面の切り替え。期間外は "NORMAL" しか無い */
+export type SummonTab = "NORMAL" | "COLLAB";
 
 /* ===== 引く前 ============================================================
  * 召喚は周回ゲームの最大の見せ場なので、待機画面から「これから何かが起きる」
@@ -231,44 +284,65 @@ function renderIdle(props: SummonProps): HTMLElement {
   const cta = el("div", { className: "summon-cta" }, ctaChildren.filter((n): n is HTMLElement => n !== null));
 
   /*
-   * コラボピックアップ召喚。**通常召喚とは別の枠として置く。**
+   * コラボピックアップ召喚。**通常召喚と切り替えて出す。**
    *
-   * 既存のボタン群へ継ぎ足すと、同じ見た目のボタンが6つ縦に並んで
-   * どれが何だか分からなくなる。1つの枠でくくり、色を分けて、
-   * 「ここから先は期間限定」と一目で分かる形にした。
+   * 縦に並べていた頃は、毎日使う通常召喚の導線が
+   * 期間限定のもので下へ押し下げられていた(依頼主の指摘)。
+   * 上の帯で選び、選んだ方だけを出す。
    *
    * **%は出さない**(依頼主との約束)。「出現率UP」とだけ書く。
    */
-  const collabPanel = props.onCollabSummon ? el("section", { className: "collab-summon" }, [
-    el("div", { className: "collab-summon__head" }, [
-      el("span", { className: "collab-summon__badge" }, ["期間限定"]),
-      el("h2", { className: "collab-summon__title" }, ["コラボピックアップ召喚"]),
+  const collabCta = el("div", { className: "summon-cta" }, [
+    el("section", { className: "collab-summon__banner" }, [
+      el("div", { className: "collab-summon__head" }, [
+        el("span", { className: "collab-summon__badge" }, ["期間限定"]),
+        el("h2", { className: "collab-summon__title" }, ["コラボピックアップ召喚"]),
+      ]),
+      el("p", { className: "collab-summon__lead" }, ["★4・★5でコラボモンスターの出現率UP"]),
     ]),
-    el("p", { className: "collab-summon__lead" }, ["★4・★5でコラボモンスターの出現率UP"]),
-    el("div", { className: "summon-cta__pair collab-summon__cta" }, [
+    ctaButton({
+      className: "summon-cta__btn--ten",
+      lead: "コラボ10連",
+      sub: "★4以上 1体確定",
+      costIcon: "crystal",
+      cost: SUMMON_COST_TEN,
+      enough: canTen,
+      onClick: () => props.onCollabSummon?.(10),
+    }),
+    ctaButton({
+      className: "summon-cta__btn--single",
+      lead: "コラボ1回",
+      sub: "★3以上 確定",
+      costIcon: "crystal",
+      cost: SUMMON_COST_SINGLE,
+      enough: canSingle,
+      onClick: () => props.onCollabSummon?.(1),
+    }),
+    /*
+     * **召喚の書でも引ける。**通常召喚と同じ書を使う(依頼主の指定)。
+     * ダイヤを貯めていない人がコラボを一度も引けない、という形にしない。
+     */
+    el("div", { className: "summon-cta__pair" }, [
       ctaButton({
-        // **`--ten` の大きな書体は使わない。**画面いっぱいの幅を前提にしていて、
-        // 半分の幅に入れると「コ ラ ボ 10 連」と1文字ずつ折り返される(実際にそうなった)。
-        // 既存の「書で10連 / 書で1回」と同じ素のボタンに、金の縁だけを足す
-        className: "collab-summon__btn collab-summon__btn--lead",
-        lead: "コラボ10連",
+        className: "summon-cta__btn--scroll",
+        lead: "書で10連",
         sub: "★4以上 1体確定",
-        costIcon: "crystal",
-        cost: SUMMON_COST_TEN,
-        enough: canTen,
-        onClick: () => props.onCollabSummon?.(10),
+        costIcon: "scroll",
+        cost: 10,
+        enough: hasScrollTen,
+        onClick: () => props.onCollabSummonScroll?.(10),
       }),
       ctaButton({
-        className: "collab-summon__btn",
-        lead: "コラボ1回",
-        sub: "★3以上 確定",
-        costIcon: "crystal",
-        cost: SUMMON_COST_SINGLE,
-        enough: canSingle,
-        onClick: () => props.onCollabSummon?.(1),
+        className: "summon-cta__btn--scroll",
+        lead: "書で1回",
+        sub: "ダイヤ不要",
+        costIcon: "scroll",
+        cost: 1,
+        enough: hasScroll,
+        onClick: () => props.onCollabSummonScroll?.(1),
       }),
     ]),
-  ]) : null;
+  ]);
 
   /*
    * コラボ限定召喚書。**1枚も持っていなければ枠ごと出さない。**
@@ -304,6 +378,7 @@ function renderIdle(props: SummonProps): HTMLElement {
       ])),
     ])
     : null;
+
   /*
    * **排出率の数字は画面に出さない**(依頼主との約束)。
    * ここには「何が保証されるか」だけを書く。%を並べていた頃は、
@@ -323,6 +398,30 @@ function renderIdle(props: SummonProps): HTMLElement {
     ])),
   ]) : null;
 
+  /*
+   * 通常とコラボの切り替え。**開催中だけ帯が出る。**
+   *
+   * 期間が終われば `onCollabSummon` が渡されなくなるので、
+   * 帯ごと消えて通常召喚だけの画面に戻る。
+   */
+  const tab: SummonTab = props.onCollabSummon ? (props.tab ?? "NORMAL") : "NORMAL";
+  const tabBar = props.onCollabSummon ? el("div", { className: "summon-switch", role: "tablist" }, [
+    el("button", {
+      type: "button",
+      className: `summon-switch__btn${tab === "NORMAL" ? " is-active" : ""}`,
+      role: "tab",
+      ariaSelected: tab === "NORMAL" ? "true" : "false",
+      onclick: () => props.onChangeTab?.("NORMAL"),
+    }, ["通常召喚"]),
+    el("button", {
+      type: "button",
+      className: `summon-switch__btn summon-switch__btn--collab${tab === "COLLAB" ? " is-active" : ""}`,
+      role: "tab",
+      ariaSelected: tab === "COLLAB" ? "true" : "false",
+      onclick: () => props.onChangeTab?.("COLLAB"),
+    }, ["コラボ"]),
+  ]) : null;
+
   return el("div", { className: "screen summon-screen" }, [
     el("div", { className: "summon-top" }, [
       el("h1", { className: "summon-top__title" }, ["召　喚"]),
@@ -335,6 +434,7 @@ function renderIdle(props: SummonProps): HTMLElement {
     // 台座と、その下から昇る熾火がホームの寒暖対比をこの画面へつなぐ
     el("div", { className: "summon-stage" }, [buildAltar(), el("i", { className: "summon-stage__plinth" }, [])]),
     el("div", { className: "summon-bottom" }, ([
+      tabBar,
       el("div", { className: "summon-rates" }, [
         el("span", { className: "summon-rates__label" }, ["出現"]),
         el("span", { className: "summon-tag summon-tag--r" }, ["★3 R"]),
@@ -344,12 +444,10 @@ function renderIdle(props: SummonProps): HTMLElement {
       ]),
       // 確定の話はボタンの副題が言っている。ここに残すのは**そこに書けない1つ**だけ
       el("p", { className: "summon-note" }, ["光・闇のレア枠は確定枠とは別に抽選されます"]),
-      cta,
-      // 期間限定のものは通常召喚の下に置く。**上に割り込ませない**
-      // (毎日使う導線を、期間が終われば消えるもので押し下げない)
-      collabPanel,
-      collabScrollPanel,
-      specialPanel,
+      // **選んだ方だけを出す。**縦に並べると、毎日使う導線が
+      // 期間限定のもので下へ押し下げられる(依頼主の指摘で切り替え式にした)
+      tab === "COLLAB" ? collabCta : cta,
+      tab === "COLLAB" ? collabScrollPanel : specialPanel,
     ] as (HTMLElement | null)[]).filter((node): node is HTMLElement => node !== null)),
   ]);
 }
@@ -477,7 +575,7 @@ function renderResult(props: SummonProps): HTMLElement {
    * ここが常にダイヤだったので、書で10連した直後の「もう一度」がダイヤ10連に
    * なっていた。書がまだ何十枚もあっても、続けて引くには一度閉じて戻る必要があった。
    */
-  const again = resolveSummonAgain(player, props.lastMethod, results.length);
+  const again = resolveSummonAgain(player, props.lastMethod, results.length, props.onCollabSummon !== undefined);
 
   // 周回する遊びなので、次に押されるのはほぼ必ず「もう一度」。
   // 前は「閉じる」と同じ幅・同じ高さで並んでいて、**次の一手が読めなかった**。
@@ -493,6 +591,9 @@ function renderResult(props: SummonProps): HTMLElement {
         onclick: () => {
           if (again.method.kind === "SCROLL") props.onUseSummonScroll(again.method.count);
           else if (again.method.kind === "SPECIAL") props.onUseSpecialSummonScroll(again.method.type);
+          else if (again.method.kind === "COLLAB_SCROLL") props.onCollabSummonScroll?.(again.method.count);
+          else if (again.method.kind === "COLLAB_SPECIAL") props.onUseCollabSummonScroll?.(again.method.type);
+          else if (again.method.kind === "COLLAB_CRYSTAL") props.onCollabSummon?.(again.method.count);
           else onSummon(again.method.count);
         },
       },

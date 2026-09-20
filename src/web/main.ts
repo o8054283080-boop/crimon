@@ -256,7 +256,7 @@ import { EMPTY_MONSTER_TRAINING_FILTER, MonsterTrainingFilter, renderMonsterTrai
 import { CreateMenu, renderMonsterCreate } from "./views/monsterCreate.js";
 import { renderStages } from "./views/stages.js";
 import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/stageResult.js";
-import { renderSummon, type SummonMethod } from "./views/summon.js";
+import { renderSummon, type SummonMethod, type SummonTab } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
 import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
@@ -416,6 +416,8 @@ interface AppState {
   summonResults: SummonResult[] | null;
   /** 直前に何で引いたか。結果画面の「もう一度」を同じ手段で繰り返すために覚える */
   lastSummonMethod: SummonMethod | null;
+  /** 召喚画面で通常とコラボのどちらを見ているか。**保存はしない**(起動時は通常) */
+  summonTab: SummonTab;
   monsterDetailId: string | null;
   rankUpMode: boolean;
   rankUpSacrificeIds: string[];
@@ -623,6 +625,7 @@ const state: AppState = {
   player: loadPlayerState(),
   summonResults: null,
   lastSummonMethod: null,
+  summonTab: "NORMAL",
   monsterDetailId: null,
   rankUpMode: false,
   rankUpSacrificeIds: [],
@@ -1255,7 +1258,34 @@ function handleCollabSummon(count: number): void {
     return;
   }
   state.summonResults = results;
-  state.lastSummonMethod = { kind: "CRYSTAL", count };
+  state.lastSummonMethod = { kind: "COLLAB_CRYSTAL", count };
+  playSummonSfx(results);
+  render();
+}
+
+/**
+ * コラボピックアップ召喚を、**通常の召喚の書で引く**(依頼主の指定)。
+ *
+ * ダイヤを貯めていない人がコラボを一度も引けない、という形にしない。
+ * 消費するのは通常の書で、出る中身だけがコラボ側の抽選になる。
+ */
+function handleCollabSummonScroll(count: number): void {
+  if (!trySpendSummonScrolls(state.player, count)) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  const results = summonCollabMany(count);
+  const added = results.map((r) => addMonster(state.player, r.dexId, r.star));
+  // 保存できないなら引けなかったことにする(理由は handleUseSummonScroll のコメント)
+  if (!savePlayerState(state.player)) {
+    removeMonsters(state.player, added.map((m) => m.id));
+    state.player.summonScrolls += count;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.summonResults = results;
+  state.lastSummonMethod = { kind: "COLLAB_SCROLL", count };
   playSummonSfx(results);
   render();
 }
@@ -1280,7 +1310,7 @@ function handleUseCollabSummonScroll(type: CollabSummonScroll): void {
     return;
   }
   state.summonResults = [result];
-  state.lastSummonMethod = { kind: "CRYSTAL", count: 1 };
+  state.lastSummonMethod = { kind: "COLLAB_SPECIAL", type };
   playSummonSfx([result]);
   render();
 }
@@ -5219,6 +5249,12 @@ function renderSummonScreen(): HTMLElement {
     ...(isCollabEventOpen() ? {
       onCollabSummon: handleCollabSummon,
       onUseCollabSummonScroll: handleUseCollabSummonScroll,
+      onCollabSummonScroll: handleCollabSummonScroll,
+      tab: state.summonTab,
+      onChangeTab: (tab: SummonTab) => {
+        state.summonTab = tab;
+        render();
+      },
     } : {}),
   });
 }
