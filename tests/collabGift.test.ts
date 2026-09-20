@@ -88,7 +88,8 @@ describe("受け取り", () => {
   it("セーブして読み戻した後も、もう一度は配られない", () => {
     const state = createInitialState();
     claimCompensations(state, DURING);
-    const restored = decodeSave(encodeSave(state));
+    const restored = decodeSave(encodeSave(state))!;
+    expect(restored, "セーブを読み戻せなかった").not.toBeNull();
     const crystal = restored.crystal;
     const monsters = restored.monsters.length;
 

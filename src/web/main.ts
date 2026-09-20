@@ -33,6 +33,7 @@ import { LevelDungeonDef, LevelDungeonTier, LEVEL_DUNGEON_DEFS } from "../data/l
 import { Difficulty, DIFFICULTY_JA, Stage, STAGES, stageWaveGold } from "../data/stages.js";
 import { summonTutorial, SUMMON_COST_SINGLE, SUMMON_COST_TEN, SummonResult, summonMany, SpecialSummonScroll, SPECIAL_SCROLL_FIELD, useSpecialSummonScroll } from "../game/gacha.js";
 import { setupDungeonBattle } from "../game/dungeonRunner.js";
+import { recordCollabFarmRun } from "../game/missions.js";
 import { AutoFarmResult, AutoFarmStopReason, emptyResult, farmBlockReason, mergeReward } from "../game/autoFarm.js";
 import {
   BackgroundFarmJob,
@@ -2183,6 +2184,8 @@ function processBackgroundFarmOnce(): void {
   state.player.gold += battle.extraGold;
   mergeReward(job.result, reward, battle.extraGold);
   job.result.cleared += 1; job.completedRuns += 1; job.inFlight = false;
+  // コラボミッションの「自動周回を30周」。**1周おわるたびに1つ**
+  recordCollabFarmRun(state.player);
   // 実行にかかったCPU時間で権利を失わない。経過した基準時間を1周ぶんだけ消費する。
   job.lastProcessedAt = Math.min(Date.now(), job.lastProcessedAt + job.referenceRunSeconds * 1000);
   savePlayerState(state.player);

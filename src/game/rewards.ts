@@ -33,7 +33,7 @@ import {
   markLevelDungeonTierCleared,
   markStageCleared,
 } from "./playerState.js";
-import { recordMissionProgress } from "./missions.js";
+import { recordCollabWin, recordMissionProgress } from "./missions.js";
 
 /** 初回クリアはダイヤ200確定。2回目以降は3%の確率でダイヤ50がもらえる */
 function rollClearCrystal(isFirstClear: boolean, rng: () => number): number {
@@ -166,6 +166,8 @@ export function applyStageClearRewards(
   difficulty: Difficulty = "NORMAL",
   rng: () => number = Math.random,
 ): ClearRewardResult {
+  // コラボモンスターを入れた編成で勝った回数を数える(編成に1体でも居れば1回)
+  recordCollabWin(state, partyInstances);
   const isFirstClear = !isStageCleared(state, stage.id, difficulty);
   markStageCleared(state, stage.id, difficulty);
 
@@ -219,6 +221,8 @@ export function applyDungeonClearRewards(
   partyInstances: MonsterInstance[],
   rng: () => number = Math.random,
 ): ClearRewardResult {
+  // コラボモンスターを入れた編成で勝った回数を数える(編成に1体でも居れば1回)
+  recordCollabWin(state, partyInstances);
   recordMissionProgress(state, "dungeonClears");
   const isFirstClear = !isDungeonFloorCleared(state, floor.floor, floor.kind);
   markDungeonFloorCleared(state, floor.floor, floor.kind);
@@ -297,6 +301,8 @@ export function applyLevelDungeonClearRewards(
   partyInstances: MonsterInstance[],
   rng: () => number = Math.random,
 ): ClearRewardResult {
+  // コラボモンスターを入れた編成で勝った回数を数える(編成に1体でも居れば1回)
+  recordCollabWin(state, partyInstances);
   recordMissionProgress(state, "dungeonClears");
   const isFirstClear = !isLevelDungeonTierCleared(state, def.tier);
   markLevelDungeonTierCleared(state, def.tier);
@@ -343,6 +349,8 @@ export function applyGoldDungeonClearRewards(
   floor: GoldDungeonFloor,
   partyInstances: MonsterInstance[],
 ): ClearRewardResult {
+  // コラボモンスターを入れた編成で勝った回数を数える(編成に1体でも居れば1回)
+  recordCollabWin(state, partyInstances);
   recordMissionProgress(state, "dungeonClears");
   const expTotal = floor.floor * 20;
   const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, expTotal);

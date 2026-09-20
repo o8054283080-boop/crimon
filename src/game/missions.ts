@@ -1,8 +1,13 @@
 import { createMonsterInstance, MonsterInstance } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL, Star } from "../core/rarity.js";
-import { EXP_PIG, EXP_PIG_DEX, REINCARNATION_PIG, REINCARNATION_PIG_DEX, SKILL_PIG, findMonsterById } from "../data/monsters.js";
+import { EXP_PIG, EXP_PIG_DEX, REINCARNATION_PIG, REINCARNATION_PIG_DEX, SKILL_PIG, SKILL_PIG_DEX, findMonsterById } from "../data/monsters.js";
 import { addArenaCoins } from "./arena/progress.js";
 import { PlayerState, savePlayerState } from "./playerState.js";
+import {
+  COLLAB_MILESTONES, COLLAB_MISSIONS, CollabCampaignState, CollabMissionDefinition,
+  collabProgressValue, createCollabCampaignState, isCollabCampaignActive,
+} from "./collabMissions.js";
+import { COLLAB_EVENT_FROM_DATE, COLLAB_EVENT_ID, COLLAB_EVENT_TO_DATE, isCollabDexId } from "../data/collabEvent.js";
 
 export type MissionPeriod = "DAILY" | "WEEKLY" | "MONTHLY";
 export type MissionCounterKey =
@@ -54,6 +59,15 @@ export interface MissionReward {
   awakeningShards?: number;
   awakeningCrystals?: number;
   awakeningStones?: number;
+  /** スキル上げ用のピッグ。★1固定で、コラボミッションの報酬に使う */
+  skillPig?: number;
+  /*
+   * コラボ限定の召喚書3種。**通常の書とは別枠**で、コラボの顔ぶれしか出ない。
+   * どれも省略可の欄なので、足す前に0で埋める。
+   */
+  collabFourStarSummonScrolls?: number;
+  collabLightDarkFourStarSummonScrolls?: number;
+  collabFiveStarSummonScrolls?: number;
 }
 
 export interface PeriodMissionDefinition {
@@ -104,6 +118,11 @@ export interface MissionState {
   cumulative: Record<string, CumulativeClaimState>;
   observed: MissionObservedState;
   releaseCampaign?: ReleaseCampaignState;
+  /**
+   * コラボ限定ミッションの進捗。**期間限定なので省略可。**
+   * 無いセーブを読んでも、開催中に初めて触った時に作られるだけ。
+   */
+  collabCampaign?: CollabCampaignState;
 }
 
 type MissionPlayerState = PlayerState & { missionState?: MissionState };
@@ -578,6 +597,8 @@ export function syncMissions(player: PlayerState, now: Date = new Date()): Missi
   let changed = resetExpiredPeriods(state, now);
   // 基準値は進捗を観測する前に固定する。公開記念の外で積んだ累計を持ち込ませない。
   if (ensureReleaseCampaignState(player, state, now)) changed = true;
+  // コラボも同じ。**開催前に積んだダンジョン100回**が初日に全部達成済みになるのを防ぐ
+  if (ensureCollabCampaignState(state, now)) changed = true;
   if (observeProgress(player, state, now)) changed = true;
   if (changed) persist(player);
   return state;
@@ -655,6 +676,21 @@ export function grantMissionReward(player: PlayerState, reward: MissionReward): 
   if (reward.awakeningShards) player.awakeningShards = (player.awakeningShards ?? 0) + reward.awakeningShards;
   if (reward.awakeningCrystals) player.awakeningCrystals = (player.awakeningCrystals ?? 0) + reward.awakeningCrystals;
   if (reward.awakeningStones) player.awakeningStones = (player.awakeningStones ?? 0) + reward.awakeningStones;
+  // スキルピッグは★1固定。既存のピッグと同じく手持ちへ直接入る
+  for (let i = 0; i < (reward.skillPig ?? 0); i += 1) {
+    player.monsters.push(createMonsterInstance(SKILL_PIG_DEX[i % SKILL_PIG_DEX.length].id, 1, STAR_MAX_LEVEL[1]));
+  }
+  // コラボ限定の書。**古いセーブには欄が無い**ので0で埋めてから足す
+  if (reward.collabFourStarSummonScrolls) {
+    player.collabFourStarSummonScrolls = (player.collabFourStarSummonScrolls ?? 0) + reward.collabFourStarSummonScrolls;
+  }
+  if (reward.collabLightDarkFourStarSummonScrolls) {
+    player.collabLightDarkFourStarSummonScrolls = (player.collabLightDarkFourStarSummonScrolls ?? 0)
+      + reward.collabLightDarkFourStarSummonScrolls;
+  }
+  if (reward.collabFiveStarSummonScrolls) {
+    player.collabFiveStarSummonScrolls = (player.collabFiveStarSummonScrolls ?? 0) + reward.collabFiveStarSummonScrolls;
+  }
 }
 
 export function claimPeriodMission(player: PlayerState, period: MissionPeriod, id: string, now: Date = new Date()): MissionReward | null {
@@ -1038,4 +1074,161 @@ export function startMissionObserver(): void {
   observerHandle = window.setInterval(() => {
     if (registeredPlayer) syncMissions(registeredPlayer);
   }, 250);
+}
+
+/* ───────── コラボ限定ミッション ─────────
+ *
+ * 定義は `collabMissions.ts`。ここは**進捗の保存と受け取り**だけを持つ。
+ * 公開記念キャンペーンと同じ形にしてあるので、終わらせる時も同じ手順で済む。
+ */
+
+/** キャンペーンの基準に使う、既存カウンタの束 */
+function collabBaselineOf(counters: MissionCounters): CollabCampaignState["baseline"] {
+  return {
+    equipmentEnhancements: counters.equipmentEnhancements,
+    dungeonClears: counters.dungeonClears,
+    arenaBattles: counters.arenaBattles,
+    rankUps: counters.rankUps,
+  };
+}
+
+/**
+ * 開催中なら進捗の置き場を用意する。
+ *
+ * **開催前・終了後は作らない。**作ってしまうと、期間外に
+ * 受け取れない報酬の枠だけが残って画面が嘘をつく。
+ */
+function ensureCollabCampaignState(state: MissionState, now: Date): boolean {
+  if (!isCollabCampaignActive(jstDateString(now))) return false;
+  if (state.collabCampaign?.id === COLLAB_EVENT_ID) {
+    // 古い形を読んだ時のために、欠けた欄をここで埋める
+    const campaign = state.collabCampaign;
+    if (!campaign.baseline || typeof campaign.baseline !== "object") campaign.baseline = collabBaselineOf(state.counters);
+    for (const key of ["equipmentEnhancements", "dungeonClears", "arenaBattles", "rankUps"] as const) {
+      campaign.baseline[key] = finiteNonNegative(campaign.baseline[key]);
+    }
+    if (!Array.isArray(campaign.claimedIds)) campaign.claimedIds = [];
+    if (!Array.isArray(campaign.claimedMilestones)) campaign.claimedMilestones = [];
+    campaign.collabWins = finiteNonNegative(campaign.collabWins);
+    campaign.farmRuns = finiteNonNegative(campaign.farmRuns);
+    return false;
+  }
+  state.collabCampaign = createCollabCampaignState(collabBaselineOf(state.counters));
+  return true;
+}
+
+export interface CollabMissionView extends CollabMissionDefinition {
+  current: number;
+  complete: boolean;
+  claimed: boolean;
+}
+
+export interface CollabMilestoneView {
+  target: number;
+  reward: MissionReward;
+  complete: boolean;
+  claimed: boolean;
+}
+
+export interface CollabCampaignView {
+  id: string;
+  fromDate: string;
+  toDate: string;
+  remainingDays: number;
+  missions: CollabMissionView[];
+  completedCount: number;
+  totalCount: number;
+  milestones: CollabMilestoneView[];
+}
+
+function collabRemainingDays(now: Date): number {
+  if (jstDateString(now) === COLLAB_EVENT_TO_DATE) return 0;
+  const [year, month, day] = COLLAB_EVENT_TO_DATE.split("-").map(Number);
+  const endAt = Date.UTC(year, month - 1, day, 14, 59, 59, 999); // 日本時間23:59:59
+  return Math.max(1, Math.ceil((endAt - now.getTime()) / 86_400_000));
+}
+
+/** 開催中でなければ null。画面はこれを見て入口ごと隠す */
+export function getCollabCampaignView(player: PlayerState, now: Date = new Date()): CollabCampaignView | null {
+  if (!isCollabCampaignActive(jstDateString(now))) return null;
+  const state = syncMissions(player, now);
+  const campaign = state.collabCampaign;
+  if (!campaign) return null;
+
+  const missions = COLLAB_MISSIONS.map((mission) => {
+    const raw = collabProgressValue(player, campaign, state.counters, mission.progress);
+    return {
+      ...mission,
+      current: Math.min(mission.target, raw),
+      complete: raw >= mission.target,
+      claimed: campaign.claimedIds.includes(mission.id),
+    };
+  });
+  const completedCount = missions.filter((mission) => mission.complete).length;
+  return {
+    id: COLLAB_EVENT_ID,
+    fromDate: COLLAB_EVENT_FROM_DATE,
+    toDate: COLLAB_EVENT_TO_DATE,
+    remainingDays: collabRemainingDays(now),
+    missions,
+    completedCount,
+    totalCount: COLLAB_MISSIONS.length,
+    milestones: COLLAB_MILESTONES.map((milestone) => ({
+      ...milestone,
+      complete: completedCount >= milestone.target,
+      claimed: campaign.claimedMilestones.includes(milestone.target),
+    })),
+  };
+}
+
+/** 個別報酬を受け取る。**達成していないもの・受け取り済みのものは null** */
+export function claimCollabMission(player: PlayerState, id: string, now: Date = new Date()): MissionReward | null {
+  const view = getCollabCampaignView(player, now);
+  const mission = view?.missions.find((entry) => entry.id === id);
+  if (!mission || !mission.complete || mission.claimed) return null;
+  const campaign = missionStateFor(player, now).collabCampaign;
+  if (!campaign) return null;
+  // **印を先に付ける。**先に配ると、途中で失敗した時に二重で受け取れる
+  campaign.claimedIds.push(id);
+  grantMissionReward(player, mission.reward);
+  persist(player);
+  return mission.reward;
+}
+
+/** 累計報酬を受け取る。こちらも一度きり */
+export function claimCollabMilestone(player: PlayerState, target: number, now: Date = new Date()): MissionReward | null {
+  const view = getCollabCampaignView(player, now);
+  const milestone = view?.milestones.find((entry) => entry.target === target);
+  if (!milestone || !milestone.complete || milestone.claimed) return null;
+  const campaign = missionStateFor(player, now).collabCampaign;
+  if (!campaign) return null;
+  campaign.claimedMilestones.push(target);
+  grantMissionReward(player, milestone.reward);
+  persist(player);
+  return milestone.reward;
+}
+
+/**
+ * コラボモンスターを入れた編成で勝った時に1回ぶん数える。
+ *
+ * **編成にコラボが1体でも居れば数える。**「そのコラボが生き残ったか」
+ * 「何体入れたか」は見ない——数え方が細かいほど、
+ * プレイヤーには「なぜ増えないのか」が分からなくなる。
+ */
+export function recordCollabWin(player: PlayerState, party: readonly MonsterInstance[], now: Date = new Date()): void {
+  if (!party.some((monster) => isCollabDexId(monster.dexId))) return;
+  const state = missionStateFor(player, now);
+  if (!ensureCollabCampaignState(state, now) && !state.collabCampaign) return;
+  const campaign = state.collabCampaign;
+  if (!campaign) return;
+  campaign.collabWins += 1;
+}
+
+/** 自動周回が1周おわった時に数える */
+export function recordCollabFarmRun(player: PlayerState, now: Date = new Date()): void {
+  const state = missionStateFor(player, now);
+  if (!ensureCollabCampaignState(state, now) && !state.collabCampaign) return;
+  const campaign = state.collabCampaign;
+  if (!campaign) return;
+  campaign.farmRuns += 1;
 }
