@@ -1,4 +1,4 @@
-import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill, describeSkillLines } from "../../core/skill.js";
+import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill, describeSkillGrowth, describeSkillLines } from "../../core/skill.js";
 import { el } from "../dom.js";
 
 const TARGET_LABEL: Record<Skill["target"], string> = {
@@ -64,9 +64,27 @@ export function renderSkillGrowthRows(skills: readonly Skill[]): HTMLElement[] {
       ]);
     });
 
+    /*
+     * **「何が変わったか」を先に出す。**
+     *
+     * Lv別の全文を5段ぶん並べても、どこが動いたのかは読み取れない
+     * (依頼主の指摘)。1段につき変わった一点だけを短く並べて、
+     * 細かい値を見たい時のために全文をその下へ残す。
+     */
+    const summaryRows = describeSkillGrowth(skill).map((step) => el("div", { className: "skill-growth-diff" }, [
+      el("span", { className: "skill-growth-diff__level" }, [`Lv.${step.level}`]),
+      el("span", { className: "skill-growth-diff__change" }, [
+        step.changes.length > 0 ? step.changes.join(" / ") : "変化なし",
+      ]),
+    ]));
+
     return el("div", { className: "skill-row" }, [
       el("div", { className: "skill-row__header" }, [el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`])]),
       ...(!skill.levelOverrides ? [el("div", { className: "skill-row__desc" }, [skill.description])] : []),
+      el("div", { className: "skill-growth-summary" }, [
+        el("div", { className: "skill-growth-summary__head" }, ["レベルを上げると"]),
+        ...summaryRows,
+      ]),
       el("div", { className: "skill-growth" }, previewRows),
     ]);
   });
