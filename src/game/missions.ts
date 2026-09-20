@@ -1031,8 +1031,69 @@ export function claimAllAvailableMissionRewards(player: PlayerState, now: Date =
       if (reward) addReward(total, reward);
     }
   }
+  /*
+   * **コラボを忘れていた。**
+   *
+   * タブは6つあるのに、一括受取が見ていたのは5つだった(コラボが抜けていた)。
+   * そのため**コラボの報酬だけ、一括受取を押しても入らない**
+   * (依頼主の指摘「まとめて取得できない時がある」)。
+   *
+   * 個別の段は先に取る。累計の段は「達成した数」で決まっていて、
+   * 受け取っても数は動かないので順番で取りこぼすことはない。
+   */
+  const collab = getCollabCampaignView(player, now);
+  if (collab) {
+    for (const mission of collab.missions) {
+      const reward = claimCollabMission(player, mission.id, now);
+      if (reward) addReward(total, reward);
+    }
+    for (const milestone of collab.milestones) {
+      const reward = claimCollabMilestone(player, milestone.target, now);
+      if (reward) addReward(total, reward);
+    }
+  }
   persist(player);
   return total;
+}
+
+/**
+ * いま受け取れるものが何件あるか。
+ *
+ * **0件なら一括受取は押せない。**前は常に押せて、何も起きないのに
+ * 押した手応えだけが返っていた(依頼主の指摘「何回も押せてしまう」)。
+ *
+ * 数える場所は `claimAllAvailableMissionRewards` と**必ず同じ**にすること。
+ * ずれると「◯件」と出ているのに押しても入らない、が起きる
+ * (`tests/missionClaimAll.test.ts` が両者を突き合わせている)。
+ */
+export function countClaimableMissionRewards(player: PlayerState, now: Date = new Date()): number {
+  const state = syncMissions(player, now);
+  let count = 0;
+
+  for (const period of ["DAILY", "WEEKLY", "MONTHLY"] as const) {
+    const view = getPeriodMissionView(player, period, now);
+    count += view.missions.filter((mission) => mission.complete && !mission.claimed).length;
+    if (view.canClaimClear) count += 1;
+  }
+
+  // 累計は段が続く。**いま届いている段の数**をそのまま数える
+  for (const definition of CUMULATIVE_DEFINITIONS) {
+    let last = state.cumulative[definition.key]?.lastClaimedTarget ?? 0;
+    for (let safety = 0; safety < 10_000; safety += 1) {
+      const step = nextCumulativeStep(definition, last);
+      if (state.counters[definition.counter] < step.target) break;
+      count += 1;
+      last = step.target;
+    }
+  }
+
+  for (const view of [getReleaseCampaignView(player, now), getCollabCampaignView(player, now)]) {
+    if (!view) continue;
+    count += view.missions.filter((mission) => mission.complete && !mission.claimed).length;
+    count += view.milestones.filter((milestone) => milestone.complete && !milestone.claimed).length;
+  }
+
+  return count;
 }
 
 export function missionRewardText(reward: MissionReward): string {
