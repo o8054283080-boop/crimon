@@ -1,7 +1,7 @@
 import { ELEMENT_COLOR, ELEMENT_JA } from "../../core/element.js";
 import { MonsterDefinition } from "../../core/monster.js";
 import { describeSkillLines } from "../../core/skill.js";
-import { describeSkillTarget } from "./skillPanel.js";
+import { describeSkillTarget, skillDescriptionText } from "./skillPanel.js";
 import { Stats, formatExtraStatLines } from "../../core/stats.js";
 import { computeEffectiveStats } from "../../core/rarity.js";
 import { applyPlayerStatBoost } from "../../core/playerStatBoost.js";
@@ -232,7 +232,8 @@ function renderSkills(dex: MonsterDefinition): HTMLElement {
         el("strong", {}, [`S${index + 1} ${skill.name}`]),
         el("span", {}, [skill.cooldownTurns ? `CT${skill.cooldownTurns}` : "通常"]),
       ]),
-      ...(!skill.levelOverrides && skill.description ? [el("p", {}, [skill.description])] : []),
+      // **生成文で始まる説明は、その先の一言だけ。**下の効果の行と二度書きになる
+      ...skillDescriptionText(skill).map((text) => el("p", {}, [text])),
       el("small", {}, [[describeSkillTarget(skill), ...describeSkillLines(skill)].join(" / ") || "効果データなし"]),
     ])),
   ]);

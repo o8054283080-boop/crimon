@@ -25,7 +25,7 @@ import { withPortrait } from "../three/portrait.js";
 import { managementHeader } from "./managementHeader.js";
 import { stickyActions } from "./stickyActions.js";
 import { computeLeveledSkill, describeSkillLines, MAX_SKILL_LEVEL } from "../../core/skill.js";
-import { describeSkillTarget } from "./skillPanel.js";
+import { describeSkillTarget, renderSkillGrowthSummary, skillDescriptionText } from "./skillPanel.js";
 import { LATENT_ABILITY_CANDIDATES } from "../../data/latentAbilities.js";
 import "../ui/monsterDetail.css";
 import { renderMonsterListDensityToggle } from "../monsterListDensity.js";
@@ -404,8 +404,16 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
               el("span", { className: "monster-skill-compact__effect" }, [effects.length ? effects.join(" / ") : "効果データなし"]),
             ]),
             el("div", { className: "monster-skill-compact__full" }, [
-              ...(!skill.levelOverrides && skill.description ? [el("p", {}, [skill.description])] : []),
+              /*
+               * **説明文は、生成文の後ろの一言だけを出す。**
+               * そのまま出すと下の効果の行と同じ文が二度出るうえ、
+               * 説明文の数字はLv1で焼いてあるので、育てると
+               * **同じ項目に違う数字が2つ並ぶ**(依頼主の指摘)。
+               */
+              ...skillDescriptionText(skill).map((text) => el("p", {}, [text])),
               el("p", {}, [effects.length ? effects.join(" / ") : "効果データなし"]),
+              // **育てるかどうかを決めるのはこの画面。**図鑑と同じ要約をここにも置く
+              renderSkillGrowthSummary(skill, level),
             ]),
           ]);
         }) : [el("p", { className: "monster-detail-empty" }, ["スキル未設定"]) ]),

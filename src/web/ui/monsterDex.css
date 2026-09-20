@@ -64,31 +64,6 @@
 .monster-dex-detail__growth summary { display:flex; align-items:center; min-height:44px; cursor:pointer; font-size:.7rem; font-weight:700; }
 .monster-dex-detail__growth .skill-row { margin-top:6px; }
 
-/*
- * レベルを上げると何が変わるかの要約。
- *
- * **Lv別の全文より先に置く。**5段の全文を並べても、どこが動いたのかは
- * 読み取れない(依頼主の指摘)。ここは1段1行で、**変わった一点だけ**を言う。
- * 細かい値を見たい人のために、全文はこの下に残してある。
- */
-.monster-dex-detail__growth .skill-growth-summary {
-  margin-top:6px;
-  padding:6px 7px;
-  border:1px solid rgba(255,211,106,.28);
-  border-radius:7px;
-  background:rgba(255,211,106,.06);
-}
-.monster-dex-detail__growth .skill-growth-summary__head {
-  margin-bottom:3px;
-  color:#ffd166;
-  font-size:.68rem;
-  font-weight:800;
-  letter-spacing:.04em;
-}
-.skill-growth-diff { display:flex; gap:7px; align-items:baseline; font-size:.68rem; line-height:1.45; }
-/* 段の番号は幅を揃えて左端に並べる。目で段を追えるようにする */
-.skill-growth-diff__level { flex:0 0 auto; min-width:34px; color:var(--text-dim); font-weight:800; }
-.skill-growth-diff__change { min-width:0; color:#fff0a8; overflow-wrap:anywhere; }
 .monster-dex-detail__note { margin:0; color:var(--text-dim); font-size:.6rem; line-height:1.3; text-align:center; }
 .monster-dex__error { min-height:50dvh; justify-content:center; }
 .monster-dex__error h1 { font-size:1.15rem; }

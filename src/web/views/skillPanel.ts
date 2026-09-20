@@ -1,5 +1,6 @@
-import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill, describeSkillGrowth, describeSkillLines } from "../../core/skill.js";
+import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill, describeSkillGrowth, describeSkillLines, skillDescriptionNote } from "../../core/skill.js";
 import { el } from "../dom.js";
+import "../ui/skillGrowth.css";
 
 const TARGET_LABEL: Record<Skill["target"], string> = {
   SINGLE_ENEMY: "敵単体",
@@ -22,6 +23,25 @@ export function describeSkillTarget(skill: Skill): string {
 }
 
 /**
+ * 説明文の行。
+ *
+ * **生成文で始まる説明は、その先の一言だけを出す。**
+ * そのまま出すと、すぐ下に並ぶ効果の行とまったく同じ文が二度出る。
+ * しかも説明文の数字はLv1で焼いてあるので、育てると
+ * **同じ項目に違う数字が2つ並ぶ**(依頼主の指摘)。
+ */
+export function skillDescriptionText(skill: Skill): string[] {
+  const note = skillDescriptionNote(skill);
+  const text = note !== null ? note : skill.description;
+  return text ? [text] : [];
+}
+
+/** 上の文を、スキル一覧の形(`skill-row__desc`)で包んだもの */
+export function descriptionNodes(skill: Skill): HTMLElement[] {
+  return skillDescriptionText(skill).map((text) => el("div", { className: "skill-row__desc" }, [text]));
+}
+
+/**
  * スキル1〜3の一覧を表示する行を作る。levelsを渡すと、そのレベルを反映した実効値
  * (ダメージ倍率・回復量・クールタイム・バフ継続ターンなど)とレベル表示が付く。
  * levelsを渡さない場合は図鑑用にレベル1(基礎値)の表示になる。
@@ -37,7 +57,7 @@ export function renderSkillRows(skills: readonly Skill[], levels?: readonly numb
         el("span", { className: "skill-row__name" }, [nameText]),
         el("span", { className: "skill-row__cooldown" }, [leveled.cooldownTurns > 0 ? `CT ${leveled.cooldownTurns}ターン` : "CTなし"]),
       ]),
-      ...(!skill.levelOverrides ? [el("div", { className: "skill-row__desc" }, [skill.description])] : []),
+      ...descriptionNodes(skill),
       el(
         "div",
         { className: "skill-row__effects" },
@@ -45,6 +65,32 @@ export function renderSkillRows(skills: readonly Skill[], levels?: readonly numb
       ),
     ]);
   });
+}
+
+/**
+ * 「レベルを上げると何が変わるか」の要約。
+ *
+ * **図鑑と所持モンスターの両方で同じものを出す。**
+ * 育てるかどうかを決めるのは手持ちの画面なので、
+ * そちらで見られないと意味が薄い(依頼主の指摘)。
+ *
+ * `currentLevel` を渡すと、**もう通った段と次の段**が分かる印が付く。
+ */
+export function renderSkillGrowthSummary(skill: Skill, currentLevel?: number): HTMLElement {
+  const rows = describeSkillGrowth(skill).map((step) => {
+    const done = currentLevel !== undefined && step.level <= currentLevel;
+    const next = currentLevel !== undefined && step.level === currentLevel + 1;
+    return el("div", { className: `skill-growth-diff${done ? " is-done" : ""}${next ? " is-next" : ""}` }, [
+      el("span", { className: "skill-growth-diff__level" }, [`Lv.${step.level}`]),
+      el("span", { className: "skill-growth-diff__change" }, [
+        step.changes.length > 0 ? step.changes.join(" / ") : "変化なし",
+      ]),
+    ]);
+  });
+  return el("div", { className: "skill-growth-summary" }, [
+    el("div", { className: "skill-growth-summary__head" }, ["レベルを上げると"]),
+    ...rows,
+  ]);
 }
 
 /** 図鑑用: スキルレベルを上げると何がどう変わるかを、Lv.1/Lv.4/Lv.5の実効値を並べて見せるプレビュー行 */
@@ -71,20 +117,10 @@ export function renderSkillGrowthRows(skills: readonly Skill[]): HTMLElement[] {
      * (依頼主の指摘)。1段につき変わった一点だけを短く並べて、
      * 細かい値を見たい時のために全文をその下へ残す。
      */
-    const summaryRows = describeSkillGrowth(skill).map((step) => el("div", { className: "skill-growth-diff" }, [
-      el("span", { className: "skill-growth-diff__level" }, [`Lv.${step.level}`]),
-      el("span", { className: "skill-growth-diff__change" }, [
-        step.changes.length > 0 ? step.changes.join(" / ") : "変化なし",
-      ]),
-    ]));
-
     return el("div", { className: "skill-row" }, [
       el("div", { className: "skill-row__header" }, [el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`])]),
-      ...(!skill.levelOverrides ? [el("div", { className: "skill-row__desc" }, [skill.description])] : []),
-      el("div", { className: "skill-growth-summary" }, [
-        el("div", { className: "skill-growth-summary__head" }, ["レベルを上げると"]),
-        ...summaryRows,
-      ]),
+      ...descriptionNodes(skill),
+      renderSkillGrowthSummary(skill),
       el("div", { className: "skill-growth" }, previewRows),
     ]);
   });
