@@ -36,6 +36,9 @@ type ArenaPlayer = {
   createdAt: string | null;
   updatedAt: string | null;
   lastMatchAt: string | null;
+  /** サーバが直接持つ塔の到達階。控えの古さに引きずられない */
+  towerBestFloor?: number | null;
+  towerReachedAt?: string | null;
 };
 
 /**
@@ -51,13 +54,25 @@ type SaveProgress = {
   stageLabel: string;
   stageCleared: number;
   stageHardCleared: number;
-  towerBestFloor: number;
-  towerLifetimeFloor: number;
-  equipFloor: number;
-  beastFloor: number;
-  goldFloor: number;
-  levelTiers: number;
-  arenaPoints: number;
+  /**
+   * **`null` は「この控えに項目が無い」。0 とは違う。**
+   *
+   * 試練の塔が入ったのは 9/5 で、それより前の控えには塔の項目が無い。
+   * 0 と同じ顔で扱うと、**69階まで登った人を「未挑戦」と言い切る**(実際に言い切った)。
+   */
+  towerBestFloor: number | null;
+  towerLifetimeFloor: number | null;
+  equipFloor: number | null;
+  beastFloor: number | null;
+  goldFloor: number | null;
+  levelTiers: number | null;
+  arenaPoints: number | null;
+  fighterName: string | null;
+  fighterLevel: number | null;
+  gold: number | null;
+  crystal: number | null;
+  monsterCount: number | null;
+  equipmentCount: number | null;
   monsterStars: Record<string, number>;
   monsterMaxStar: number;
   monsterMaxLevel: number;
@@ -78,6 +93,21 @@ type AdminOverview = {
   equipment: number;
   chapters: Record<string, number>;
   towerFloors: Record<string, number>;
+};
+
+/**
+ * 塔の到達階。**サーバの `trial_tower_progress` から直接来る。**
+ *
+ * 控えから読むと、塔より古い保存の人がまとめて「未挑戦」に化ける。
+ * この表はアリーナの `user_id` で引いてあり、復旧IDとは身元の体系が違うので、
+ * 登録データの行へは結び付けられない。**独立した並びとして出す。**
+ */
+type AdminTowerRow = {
+  rank: number;
+  userId: string;
+  name: string;
+  bestFloor: number;
+  reachedAt: string | null;
 };
 
 /** 日別の動き。**0の日も行として返る**(止まっている日が消えると読めない) */
@@ -104,6 +134,8 @@ type RecoveryAccount = {
   crystal: number;
   monsterCount: number;
   equipmentCount: number;
+  /** 控えの中で、本人の値と進め具合が食い違っていた(控えそのものが壊れている合図) */
+  sourceMismatch?: boolean;
   /** 古いサーバ(取り出して置き直す前)は返さないので、無い場合がある */
   progress?: SaveProgress | null;
 };
@@ -113,6 +145,7 @@ type AdminDashboard = {
   activeSeason: { id: string; name: string; status: string; starts_at: string; ends_at: string } | null;
   summary: AdminSummary;
   overview?: AdminOverview | null;
+  towerRanking?: AdminTowerRow[] | null;
   daily?: AdminDailyRow[] | null;
   arenaPlayers: ArenaPlayer[];
   recoveryAccounts: RecoveryAccount[];
@@ -342,6 +375,25 @@ function renderDaily(rows: readonly AdminDailyRow[]): HTMLElement {
   return wrap;
 }
 
+/**
+ * 控えに無い項目を、**0 と同じ顔で出さない。**
+ *
+ * 試練の塔が入ったのは 9/5。9/3 の控えには塔の項目がそもそも無いので、
+ * 0 として出すと「未挑戦」と断定してしまう——**実際に、69階まで登った人を
+ * 「未挑戦」と表示した。**古い控えに無いものは「記録なし」と言うべきで、
+ * 「していない」と言ってはいけない。
+ */
+function savedValue(value: number | null | undefined, format: (n: number) => string, zero = "なし"): { text: string; missing: boolean } {
+  if (value === null || value === undefined) return { text: "記録なし", missing: true };
+  return { text: value > 0 ? format(value) : zero, missing: false };
+}
+
+/** 控えから読んだ値。無ければ「記録なし」と出し、**古い控えなら印を付ける** */
+function savedMetricOf(label: string, value: number | null | undefined, format: (n: number) => string, stale: boolean, zero = "なし"): HTMLElement {
+  const shown = savedValue(value, format, zero);
+  return metric(label, shown.text, stale || shown.missing);
+}
+
 function summaryCard(label: string, value: number): HTMLElement {
   const card = el("div", "crimon-admin-summary__card");
   card.append(el("small", "", label), el("strong", "", formatNumber(value)));
@@ -523,6 +575,38 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
     dash.append(box);
   }
 
+  /*
+   * **塔の到達階は、ここが本当の値。**
+   *
+   * 登録データの行に出る塔の階は「最後にクラウド保存した時点」のもので、
+   * 試練の塔が入ったのは 9/5——**それより前の保存には塔の項目が無い。**
+   * 実際、9/3 が最終保存の人が69階まで登っているのに「未挑戦」と出した。
+   *
+   * こちらはサーバの表を直接読んでいて、塔の画面を開くたびに更新される。
+   * ただしアリーナの身元で引いてあるので、復旧IDの行へは結び付かない。
+   */
+  const towerRanking = dashboard.towerRanking;
+  if (towerRanking && towerRanking.length > 0) {
+    const box = el("details", "crimon-admin-fold");
+    box.append(el("summary", "", `試練の塔の到達階（最高 ${towerRanking[0].bestFloor}階 / ${towerRanking.length}人）`));
+    const inner = el("div", "crimon-admin-fold__inner");
+    const list = el("div", "crimon-admin-tower");
+    for (const row of towerRanking) {
+      const line = el("div", "crimon-admin-tower__row");
+      line.append(
+        el("small", "", `${row.rank}位`),
+        el("strong", "", row.name || "名前未設定"),
+        el("b", "", `${row.bestFloor}階`),
+        el("small", "", formatDate(row.reachedAt)),
+      );
+      list.append(line);
+    }
+    inner.append(list);
+    inner.append(el("p", "crimon-admin-fold__note", "サーバが直接持っている値です（塔の画面を開くたびに更新されます）。登録データの行に出る「試練の塔」は、最後にクラウド保存した時点のものなので別の数字になります"));
+    box.append(inner);
+    dash.append(box);
+  }
+
   const daily = dashboard.daily;
   if (daily && daily.length > 0) {
     const box = el("details", "crimon-admin-fold");
@@ -649,6 +733,17 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
       const primary = el("span", "crimon-admin-row__primary");
       primary.append(el("strong", "", row.fighterName || "名前未設定"), el("small", "", `復旧ID: ${row.recoveryId || "-"}`));
       /*
+       * **この行は丸ごと「最後にクラウド保存した時点」のもの。**
+       *
+       * 保存が古ければ、ここに並ぶ値も全部そのぶん古い。それを言わずに
+       * 数字だけ並べると、**17日前の姿を今の姿として読ませる**ことになる
+       * ——実際、9/3 が最終保存の人の塔を「未挑戦」と出して、
+       * 依頼主に「データがおかしい」と指摘された。
+       */
+      const savedHours = sinceText(row.latestSavedAt).hours;
+      const stale = savedHours >= 24;
+      if (stale) primary.append(el("small", "crimon-admin-row__stale", `${sinceText(row.latestSavedAt).text}の保存時点`));
+      /*
        * **サーバが返しているものは、全部出す。**
        * これまで出していたのは5つだけで、モンスター数も装備数も
        * 登録日もロック状態も、受け取っておきながら捨てていた。
@@ -677,15 +772,31 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
       const progress = row.progress;
       if (progress) {
         item.append(
-          metric("ステージ", progress.stageLabel || "未クリア"),
-          metric("試練の塔", progress.towerLifetimeFloor > 0 ? `${progress.towerLifetimeFloor}階` : "未挑戦"),
-          metric("装備ダンジョン", progress.equipFloor > 0 ? `${progress.equipFloor}階` : "-"),
-          metric("モンスター内訳", starBreakdown(progress.monsterStars)),
-          metric("最大Lv", progress.monsterMaxLevel > 0 ? `★${progress.monsterMaxStar} Lv.${progress.monsterMaxLevel}` : "-"),
-          metric("育て切った", `${formatNumber(progress.monsterMaxed)}体`),
-          metric("装備内訳", starBreakdown(progress.equipStars)),
-          metric("+15の装備", `${formatNumber(progress.equipMaxed)}個`),
+          metric("ステージ", progress.stageLabel || "未クリア", stale),
+          /*
+           * **「未挑戦」と言い切らない。**
+           *
+           * 試練の塔が入ったのは 9/5 で、それより前の控えには塔の項目が無い。
+           * 無いものを 0 として出すと「挑んでいない」と断定することになり、
+           * **69階まで登った人を「未挑戦」と表示した。**
+           * サーバが直接持っている値は上の「試練の塔の到達階」に出る。
+           */
+          savedMetricOf("試練の塔(保存時点)", progress.towerLifetimeFloor, (n) => `${n}階`, stale, "未挑戦"),
+          savedMetricOf("装備ダンジョン", progress.equipFloor, (n) => `${n}階`, stale, "未クリア"),
+          metric("モンスター内訳", starBreakdown(progress.monsterStars), stale),
+          metric("最大Lv", progress.monsterMaxLevel > 0 ? `★${progress.monsterMaxStar} Lv.${progress.monsterMaxLevel}` : "-", stale),
+          metric("育て切った", `${formatNumber(progress.monsterMaxed)}体`, stale),
+          metric("装備内訳", starBreakdown(progress.equipStars), stale),
+          metric("+15の装備", `${formatNumber(progress.equipMaxed)}個`, stale),
         );
+      }
+      /*
+       * 控えの中で、本人の値と進め具合が食い違っていた時だけ出す。
+       * 「Lv.1 なのに★6が12体」のような組み合わせは、控えそのものが
+       * 壊れている合図なので、黙って片方を表示しない。
+       */
+      if (row.sourceMismatch) {
+        item.append(metric("⚠ 控えの食い違い", "レベルと中身の出どころがずれています", true));
       }
       list.append(item);
     }
@@ -713,6 +824,8 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
         metric("防衛", `${row.defenseWins}勝 ${row.defenseLosses}敗`),
         metric("コイン", `${formatNumber(row.coins)}（累計 ${formatNumber(row.lifetimeCoins)}）`),
         metric("挑戦券", `${formatNumber(row.tickets)} / ${formatNumber(row.ticketsMax)}`),
+        // 塔だけは別の表から。**アリーナの user_id で引けるのはこちらの一覧だけ**
+        metric("試練の塔", row.towerBestFloor ? `${row.towerBestFloor}階` : "未挑戦"),
         savedMetric("最終対戦", row.lastMatchAt, 24),
         metric("登録", formatDate(row.createdAt)),
       );
