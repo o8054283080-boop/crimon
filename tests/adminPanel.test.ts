@@ -93,6 +93,18 @@ describe("受け取っている値を捨てない", () => {
     // 5列の決め打ちでは収まらない。入るだけ並べて折り返す
     expect(CSS).toContain("repeat(auto-fit, minmax(96px, 1fr))");
   });
+
+  it("狭い画面で項目を消さない", () => {
+    /*
+     * 640px 未満で 4番目と 5番目を消していた。列を3つに決め打ちしていた
+     * 頃の名残で、**消えていたのは「ダイヤ」と「モンスターの体数」**
+     * ——問い合わせを受けた時にまっ先に見る値だった。
+     * しかも消えたことは画面に出ないので、**端末によって答えが変わる。**
+     */
+    expect(CSS, "行の項目を display:none で落としている").not.toMatch(
+      /\.crimon-admin-row\s*>\s*:nth-child\([45]\)[^}]*display:\s*none/,
+    );
+  });
 });
 
 describe("探し方", () => {
@@ -105,6 +117,106 @@ describe("探し方", () => {
     expect(PANEL).toContain('currentSort: "RECENT" | "RATING" | "LEVEL" | "NAME" = "RECENT"');
     expect(PANEL).toContain("function sortRecovery(");
     expect(PANEL).toContain("function sortArena(");
+  });
+});
+
+/**
+ * 見られる情報を増やす(依頼主の指定は3つ)。
+ *
+ *   1. **プレイヤーの進め具合** — ステージ・試練の塔・ダンジョン
+ *   2. **モンスターと装備の中身** — 合計だけでは、
+ *      「300体持っているが★6が0体」と「30体で★6が10体」が同じ顔で並ぶ
+ *   3. **日別の動き** — いま遊んでいるのか、止まっているのか
+ *
+ * どれも**サーバが数えて返す**。控えの丸ごとは大きく(モンスター数百体・
+ * 装備数千個)、そのまま画面へ送ると1000人ぶんで数十MBになる。
+ */
+const EDGE = readFileSync(new URL("../supabase/functions/crimon-admin/index.ts", import.meta.url), "utf8");
+const PROGRESS = readFileSync(new URL("../supabase/functions/crimon-admin/progress.ts", import.meta.url), "utf8");
+
+describe("進め具合が分かる", () => {
+  it("数える所は、手元から動かせる形に切り出してある", () => {
+    /*
+     * 本体(`index.ts`)は `jsr:` から取り込むので**手元では動かせない。**
+     * 数え方が間違っていても、本番へ流して画面を開くまで気づけない。
+     * だから数える所だけ切り離し、`tests/adminProgress.test.ts` が
+     * 実際に値を入れて確かめている。**ここに Deno 固有のものを入れないこと。**
+     */
+    expect(PROGRESS).toContain("export function saveProgress(");
+    // コメントで名前を挙げるのは自由。見るのは**取り込みと呼び出し**だけ
+    expect(PROGRESS, "Deno API を呼んでいる").not.toMatch(/^[^*/]*\bDeno\./m);
+    expect(PROGRESS, "jsr から取り込んでいる").not.toMatch(/^import .*jsr:/m);
+    expect(EDGE).toContain('from "./progress.ts"');
+  });
+
+  it("画面に、ステージ・塔・装備ダンジョンを出す", () => {
+    expect(PANEL).toContain("progress.stageLabel");
+    expect(PANEL).toContain("progress.towerLifetimeFloor");
+    expect(PANEL).toContain("progress.equipFloor");
+  });
+});
+
+describe("モンスターと装備の中身が分かる", () => {
+  it("星ごとに数える", () => {
+    expect(PROGRESS).toContain("monsterStars");
+    expect(PROGRESS).toContain("equipStars");
+    expect(PANEL).toContain("function starBreakdown(");
+  });
+
+  it("育て切った数と、+15の装備を出す", () => {
+    expect(PANEL).toContain("progress.monsterMaxed");
+    expect(PANEL).toContain("progress.equipMaxed");
+  });
+
+  it("0の星は書かない(並びが読めなくなる)", () => {
+    expect(PANEL).toContain("count > 0");
+  });
+});
+
+describe("日別の動きが分かる", () => {
+  /*
+   * 日の切り方と、0の日を落とさないことは `tests/adminProgress.test.ts` が
+   * 実際に動かして確かめている(**日本時間で切らないと山が1日ずれる**)。
+   * ここで見るのは、画面とサーバが繋がっているかどうか。
+   */
+  it("対戦の行そのものを数える", () => {
+    // arena_standings の勝敗は合計なので、「いつ動いたか」が出てこない
+    expect(EDGE).toContain('from("arena_matches").select("created_at")');
+  });
+
+  it("画面に出す", () => {
+    expect(PANEL).toContain("function renderDaily(");
+    expect(PANEL).toContain("dashboard.daily");
+  });
+});
+
+describe("足した部品が、下の何かを覆わない", () => {
+  it("折りたたみで、画面の流れの中に置く", () => {
+    /*
+     * **浮かせた部品は必ず下の何かを覆う。**この案件で3回やっている。
+     * 初心者ミッションの浮遊パネル・ホームの fixed の小窓・
+     * ログインボーナスの absolute の札。どれも押せないボタンを作った。
+     */
+    expect(PANEL).toContain('el("details", "crimon-admin-fold")');
+    expect(CSS).toContain(".crimon-admin-fold");
+    const fold = CSS.slice(CSS.indexOf(".crimon-admin-fold {"), CSS.indexOf(".crimon-admin-fold {") + 400);
+    expect(fold, "浮かせている").not.toMatch(/position:\s*(fixed|absolute)/);
+  });
+
+  it("既定では閉じておく(一覧が画面の外へ押し出される)", () => {
+    expect(PANEL, "open を付けている").not.toContain('box.open = true');
+  });
+});
+
+describe("古いサーバでも画面が壊れない", () => {
+  it("進め具合が無ければ、その欄を出さないだけにする", () => {
+    /*
+     * **サーバ側のdeployと、画面の配信は別の道を通る。**
+     * どちらが先に着くかは決まっていないので、片方だけ新しい時間が必ずある。
+     */
+    expect(PANEL).toContain("progress?: SaveProgress | null");
+    expect(PANEL).toContain("if (progress) {");
+    expect(PANEL).toContain("if (overview) {");
   });
 });
 

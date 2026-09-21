@@ -20,6 +20,7 @@
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { buildDaily, DAILY_DAYS, number, type SaveProgress, saveProgress, text } from "./progress.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -94,15 +95,6 @@ async function verifyToken(token: unknown, secret: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-function number(value: unknown): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 type SaveSummary = {
@@ -190,7 +182,22 @@ Deno.serve(async (req: Request) => {
   }
 
   if (action === "dashboard") {
-    const [{ data: seasons }, authResult, profilesResult, standingsResult, walletsResult, recoveryResult] = await Promise.all([
+    /*
+     * **日別の動きは、対戦の行そのものを数える。**
+     * `arena_standings` の勝敗は合計なので、「いつ動いたか」が出てこない。
+     * 直近14日ぶんだけを、`created_at` の1列に絞って取る。
+     */
+    const dailySince = new Date(Date.now() - DAILY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    const [
+      { data: seasons },
+      authResult,
+      profilesResult,
+      standingsResult,
+      walletsResult,
+      recoveryResult,
+      matchDaysResult,
+    ] = await Promise.all([
       supabase.from("arena_seasons").select("id,name,status,starts_at,ends_at").order("starts_at", { ascending: false }).limit(5),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       supabase.from("arena_profiles")
@@ -203,6 +210,7 @@ Deno.serve(async (req: Request) => {
       supabase.from("crimon_recovery_accounts")
         .select("id,recovery_id,latest_revision,latest_saved_at,failed_attempts,locked_until,created_at,updated_at,latest_save")
         .order("updated_at", { ascending: false }).limit(1000),
+      supabase.from("arena_matches").select("created_at").gte("created_at", dailySince).limit(20000),
     ]);
 
     type Season = { id: string; name: string; status: string; starts_at: string; ends_at: string };
@@ -257,7 +265,47 @@ Deno.serve(async (req: Request) => {
       createdAt: account.created_at,
       updatedAt: account.updated_at,
       ...saveSummary(account.latest_save),
+      progress: saveProgress(account.latest_save),
     }));
+
+    const daily = buildDaily(DAILY_DAYS, {
+      created: ((recoveryResult.data ?? []) as RecoveryRow[]).map((row) => row.created_at),
+      saved: ((recoveryResult.data ?? []) as RecoveryRow[]).map((row) => row.latest_saved_at),
+      matched: ((matchDaysResult.data ?? []) as { created_at: string }[]).map((row) => row.created_at),
+      arenaCreated: ((profilesResult.data ?? []) as Profile[]).map((row) => row.created_at),
+    });
+
+    /*
+     * **全体の進み具合。**1人ずつの行を上から読まなくても、
+     * 「どこで止まっている人が多いか」がここだけで分かるようにする。
+     */
+    const withProgress = recoveryAccounts.map((row) => row.progress).filter((row): row is SaveProgress => row !== null);
+    const sum = (pick: (row: SaveProgress) => number) => withProgress.reduce((total, row) => total + pick(row), 0);
+    const overview = {
+      players: withProgress.length,
+      // 「直近7日で保存があった人」。登録数ではなく、**いま遊んでいる人の数**
+      activePlayers: ((recoveryResult.data ?? []) as RecoveryRow[]).filter((row) => {
+        const at = new Date(text(row.latest_saved_at)).getTime();
+        return Number.isFinite(at) && Date.now() - at < 7 * 24 * 60 * 60 * 1000;
+      }).length,
+      towerReached: withProgress.filter((row) => row.towerLifetimeFloor > 0).length,
+      towerBest: withProgress.reduce((best, row) => Math.max(best, row.towerLifetimeFloor), 0),
+      sixStarOwners: withProgress.filter((row) => row.monsterMaxStar >= 6).length,
+      monsters: sum((row) => Object.values(row.monsterStars).reduce((a, b) => a + b, 0)),
+      equipment: sum((row) => Object.values(row.equipStars).reduce((a, b) => a + b, 0)),
+      // 章ごとの人数。**詰まっている場所は、ここにしか出ない**
+      chapters: withProgress.reduce<Record<string, number>>((table, row) => {
+        const key = String(row.stageChapter);
+        table[key] = (table[key] ?? 0) + 1;
+        return table;
+      }, {}),
+      towerFloors: withProgress.reduce<Record<string, number>>((table, row) => {
+        // 10階ごとの節でまとめる(1階刻みでは読めない)
+        const band = row.towerLifetimeFloor <= 0 ? "0" : String(Math.floor((row.towerLifetimeFloor - 1) / 10) * 10 + 1);
+        table[band] = (table[band] ?? 0) + 1;
+        return table;
+      }, {}),
+    };
 
     return json({
       generatedAt: new Date().toISOString(),
@@ -267,6 +315,8 @@ Deno.serve(async (req: Request) => {
         arenaProfiles: arenaPlayers.length,
         recoveryAccounts: recoveryAccounts.length,
       },
+      overview,
+      daily,
       arenaPlayers,
       recoveryAccounts,
     });

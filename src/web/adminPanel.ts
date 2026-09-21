@@ -38,6 +38,57 @@ type ArenaPlayer = {
   lastMatchAt: string | null;
 };
 
+/**
+ * 控えの中身から数えた、**進め具合と持ち物の内訳**(サーバ側で集計)。
+ *
+ * レベルと所持金だけでは、その人がどこで止まっているのかが分からない。
+ * **詰まっている場所は、クリア済みの並びにしか出ない。**
+ * 星ごとの所持数も同じで、合計だけ見ていると
+ * 「300体持っているが★6が0体」と「30体で★6が10体」が同じ顔で並ぶ。
+ */
+type SaveProgress = {
+  stageChapter: number;
+  stageLabel: string;
+  stageCleared: number;
+  stageHardCleared: number;
+  towerBestFloor: number;
+  towerLifetimeFloor: number;
+  equipFloor: number;
+  beastFloor: number;
+  goldFloor: number;
+  levelTiers: number;
+  arenaPoints: number;
+  monsterStars: Record<string, number>;
+  monsterMaxStar: number;
+  monsterMaxLevel: number;
+  monsterMaxed: number;
+  equipStars: Record<string, number>;
+  equipMaxed: number;
+  equipLocked: number;
+};
+
+/** 全体の進み具合。1人ずつ行を読まなくても、どこで止まっているかが分かる */
+type AdminOverview = {
+  players: number;
+  activePlayers: number;
+  towerReached: number;
+  towerBest: number;
+  sixStarOwners: number;
+  monsters: number;
+  equipment: number;
+  chapters: Record<string, number>;
+  towerFloors: Record<string, number>;
+};
+
+/** 日別の動き。**0の日も行として返る**(止まっている日が消えると読めない) */
+type AdminDailyRow = {
+  date: string;
+  newAccounts: number;
+  saves: number;
+  matches: number;
+  newArena: number;
+};
+
 type RecoveryAccount = {
   id: string;
   recoveryId: string;
@@ -53,12 +104,16 @@ type RecoveryAccount = {
   crystal: number;
   monsterCount: number;
   equipmentCount: number;
+  /** 古いサーバ(取り出して置き直す前)は返さないので、無い場合がある */
+  progress?: SaveProgress | null;
 };
 
 type AdminDashboard = {
   generatedAt: string;
   activeSeason: { id: string; name: string; status: string; starts_at: string; ends_at: string } | null;
   summary: AdminSummary;
+  overview?: AdminOverview | null;
+  daily?: AdminDailyRow[] | null;
   arenaPlayers: ArenaPlayer[];
   recoveryAccounts: RecoveryAccount[];
 };
@@ -199,6 +254,92 @@ function savedMetric(label: string, value: unknown, staleHours = 3): HTMLElement
   const since = sinceText(value);
   const when = formatDate(value);
   return metric(label, when === "-" ? "-" : `${when}（${since.text}）`, since.hours >= staleHours);
+}
+
+/**
+ * 星ごとの所持数を1行にする。**多い星から並べ、0は書かない。**
+ *
+ * `★6 3 / ★5 12 / ★4 40` のような形。合計だけでは、
+ * 「300体持っているが★6が0体」と「30体で★6が10体」の区別が付かない。
+ */
+function starBreakdown(table: Record<string, number> | undefined): string {
+  if (!table) return "-";
+  const parts = Object.entries(table)
+    .map(([star, count]) => [Number(star), Number(count)] as const)
+    .filter(([star, count]) => Number.isFinite(star) && count > 0)
+    .sort((a, b) => b[0] - a[0])
+    .map(([star, count]) => `★${star} ${count}`);
+  return parts.length > 0 ? parts.join(" / ") : "-";
+}
+
+/**
+ * 内訳の棒。**数字だけ並べても、偏りは読めない。**
+ *
+ * 章ごとの人数や塔の到達帯は、「どこで止まっているか」を見るための形なので、
+ * 長さで比べられるようにする。いちばん多い所を満幅にした相対の長さ。
+ */
+function distribution(table: Record<string, number> | undefined, label: (key: string) => string): HTMLElement {
+  const wrap = el("div", "crimon-admin-dist");
+  const rows = Object.entries(table ?? {})
+    .map(([key, count]) => [key, Number(count)] as const)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => Number(a[0]) - Number(b[0]));
+  if (rows.length === 0) {
+    wrap.append(el("div", "crimon-admin-empty", "まだデータがありません"));
+    return wrap;
+  }
+  const most = rows.reduce((max, [, count]) => Math.max(max, count), 1);
+  for (const [key, count] of rows) {
+    const row = el("div", "crimon-admin-dist__row");
+    const bar = el("span", "crimon-admin-dist__bar");
+    const fill = el("i");
+    fill.style.width = `${Math.max(4, Math.round((count / most) * 100))}%`;
+    bar.append(fill);
+    row.append(el("small", "", label(key)), bar, el("strong", "", `${count}人`));
+    wrap.append(row);
+  }
+  return wrap;
+}
+
+/**
+ * 日別の動き。**1日も飛ばさずに並べる。**
+ *
+ * 動きのあった日だけを出すと、**止まっている日が一覧から消える**ので、
+ * 「4日連続で誰も遊んでいない」が見えなくなる。0の日も行として出す。
+ */
+function renderDaily(rows: readonly AdminDailyRow[]): HTMLElement {
+  const wrap = el("div", "crimon-admin-daily");
+  const most = rows.reduce((max, row) => Math.max(max, row.saves, row.matches, row.newAccounts), 1);
+  const head = el("div", "crimon-admin-daily__legend");
+  head.append(
+    el("span", "is-saves", "保存(遊んだ人)"),
+    el("span", "is-matches", "アリーナ対戦"),
+    el("span", "is-new", "新規登録"),
+  );
+  wrap.append(head);
+  for (const row of rows) {
+    const line = el("div", "crimon-admin-daily__row");
+    const date = row.date.slice(5).replace("-", "/");
+    const bars = el("span", "crimon-admin-daily__bars");
+    for (const [kind, value] of [["is-saves", row.saves], ["is-matches", row.matches], ["is-new", row.newAccounts + row.newArena]] as const) {
+      const bar = el("i", kind);
+      /*
+       * **0 の日は、点も残さない。**
+       * 最低幅を一律に与えていたら、`0 / 0 / 0` の日に3本の点が並び、
+       * 「少しは動いた日」に見えた。1以上の時だけ、消えない太さを保証する。
+       */
+      bar.style.width = value > 0 ? `max(2px, ${Math.round((value / most) * 100)}%)` : "0";
+      bar.title = String(value);
+      bars.append(bar);
+    }
+    line.append(
+      el("small", "", date),
+      bars,
+      el("strong", "", `${row.saves} / ${row.matches} / ${row.newAccounts + row.newArena}`),
+    );
+    wrap.append(line);
+  }
+  return wrap;
 }
 
 function summaryCard(label: string, value: number): HTMLElement {
@@ -349,6 +490,52 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
   );
   dash.append(stamp);
 
+  /*
+   * **全体の進み具合と、日別の動き。**
+   *
+   * これまでは「登録数」しか無く、その人たちがどこまで進んでいるのか、
+   * いま遊んでいるのか止まっているのかが、一覧を全部読むまで分からなかった。
+   *
+   * **開いた状態を既定にしない。**まず見たいのは個々のプレイヤーで、
+   * ここを常に開いていると一覧が画面の外へ押し出される。
+   */
+  const overview = dashboard.overview;
+  if (overview) {
+    const box = el("details", "crimon-admin-fold");
+    box.append(el("summary", "", `全体の進み具合（直近7日で遊んだ人 ${formatNumber(overview.activePlayers)} / ${formatNumber(overview.players)}人）`));
+    const inner = el("div", "crimon-admin-fold__inner");
+    const cards = el("div", "crimon-admin-summary");
+    cards.append(
+      summaryCard("直近7日で遊んだ", overview.activePlayers),
+      summaryCard("塔に挑んだ", overview.towerReached),
+      summaryCard("★6を持つ", overview.sixStarOwners),
+      summaryCard("塔の最高到達", overview.towerBest),
+    );
+    inner.append(cards);
+    inner.append(el("h4", "crimon-admin-fold__head", "どの章まで進んでいるか"));
+    inner.append(distribution(overview.chapters, (key) => (key === "0" ? "未クリア" : `${key}章`)));
+    inner.append(el("h4", "crimon-admin-fold__head", "試練の塔の到達階"));
+    inner.append(distribution(overview.towerFloors, (key) => (key === "0" ? "未挑戦" : `${key}〜${Number(key) + 9}階`)));
+    inner.append(
+      el("p", "crimon-admin-fold__note", `合計 モンスター${formatNumber(overview.monsters)}体 / 装備${formatNumber(overview.equipment)}個`),
+    );
+    box.append(inner);
+    dash.append(box);
+  }
+
+  const daily = dashboard.daily;
+  if (daily && daily.length > 0) {
+    const box = el("details", "crimon-admin-fold");
+    const today = daily[daily.length - 1];
+    box.append(el("summary", "", `日別の動き（今日 保存${today.saves} / 対戦${today.matches} / 新規${today.newAccounts + today.newArena}）`));
+    const inner = el("div", "crimon-admin-fold__inner");
+    inner.append(renderDaily(daily));
+    // 日本時間で切っている。UTCのままだと朝9時が境目になり、山が1日ずれる
+    inner.append(el("p", "crimon-admin-fold__note", "日本時間で1日を区切っています。「保存」はクラウド保存が届いた回数で、遊んだ人の数の目安です"));
+    box.append(inner);
+    dash.append(box);
+  }
+
   const tabs = el("div", "crimon-admin-tabs");
   const recoveryTab = el("button", `crimon-admin-tab${currentTab === "RECOVERY" ? " is-active" : ""}`, "登録データ") as HTMLButtonElement;
   const arenaTab = el("button", `crimon-admin-tab${currentTab === "ARENA" ? " is-active" : ""}`, "アリーナ") as HTMLButtonElement;
@@ -481,6 +668,25 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
           ? metric("ロック", `${formatDate(row.lockedUntil)}まで`, true)
           : metric("失敗回数", row.failedAttempts > 0 ? `${row.failedAttempts}回` : "なし", row.failedAttempts > 0),
       );
+      /*
+       * **進め具合と、持ち物の中身。**
+       *
+       * レベルと所持金だけでは、その人がどこで止まっているのかが分からない。
+       * 「モンスター300体」も、★6が0体なのか10体なのかで話がまるで違う。
+       */
+      const progress = row.progress;
+      if (progress) {
+        item.append(
+          metric("ステージ", progress.stageLabel || "未クリア"),
+          metric("試練の塔", progress.towerLifetimeFloor > 0 ? `${progress.towerLifetimeFloor}階` : "未挑戦"),
+          metric("装備ダンジョン", progress.equipFloor > 0 ? `${progress.equipFloor}階` : "-"),
+          metric("モンスター内訳", starBreakdown(progress.monsterStars)),
+          metric("最大Lv", progress.monsterMaxLevel > 0 ? `★${progress.monsterMaxStar} Lv.${progress.monsterMaxLevel}` : "-"),
+          metric("育て切った", `${formatNumber(progress.monsterMaxed)}体`),
+          metric("装備内訳", starBreakdown(progress.equipStars)),
+          metric("+15の装備", `${formatNumber(progress.equipMaxed)}個`),
+        );
+      }
       list.append(item);
     }
     if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当する登録データはありません"));

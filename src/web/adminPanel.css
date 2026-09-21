@@ -423,16 +423,17 @@ button.crimon-admin-row:active {
   color: #8e9bad;
 }
 
-@media (max-width: 640px) {
-  .crimon-admin-row {
-    grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(70px, 0.7fr));
-  }
-
-  .crimon-admin-row > :nth-child(4),
-  .crimon-admin-row > :nth-child(5) {
-    display: none;
-  }
-}
+/*
+ * **狭い画面で項目を消さない。**
+ *
+ * ここは 640px 未満で 4番目と 5番目を `display:none` にしていた。
+ * 列を3つに決め打ちしていた頃の名残で、**消えるのは「ダイヤ」と
+ * 「モンスターの体数」**——問い合わせを受けた時にまっ先に見る値だった。
+ * しかも消えたことは画面に出ないので、**端末によって答えが変わる。**
+ *
+ * いまは入るだけ並べて折り返す(下の auto-fit)ので、隠す理由が無い。
+ * 「潰れた箱が中身を黙って切り落とす」は、この案件で何度もやっている。
+ */
 
 @media (max-width: 390px) {
   .crimon-admin-summary__card {
@@ -495,3 +496,149 @@ button.crimon-admin-row:active {
 .crimon-admin-row {
   grid-template-columns: minmax(120px, 1.4fr) repeat(auto-fit, minmax(96px, 1fr));
 }
+
+/* ==========================================================================
+ * 全体の進み具合 / 日別の動き
+ *
+ * 「登録数」しか無かったので、**その人たちがどこまで進んでいるのか、
+ * いま遊んでいるのか止まっているのかが、一覧を全部読むまで分からなかった。**
+ *
+ * どちらも**画面の流れの中に置く**(折りたたみ)。浮かせると下のものを覆う——
+ * この案件で3回やっている事故なので、ここでは絶対に浮かせない。
+ * ========================================================================== */
+.crimon-admin-fold {
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 10px;
+  background: #101826;
+}
+
+.crimon-admin-fold > summary {
+  padding: 11px 12px;
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 700;
+  list-style-position: inside;
+}
+
+.crimon-admin-fold__inner {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.crimon-admin-fold__head {
+  margin: 4px 0 0;
+  font-size: .78rem;
+  color: #9fb0c8;
+}
+
+.crimon-admin-fold__note {
+  margin: 0;
+  font-size: .7rem;
+  line-height: 1.6;
+  color: #8f9db0;
+}
+
+/* 内訳の棒。**数字だけ並べても偏りは読めない**ので、長さで比べられるようにする */
+.crimon-admin-dist {
+  display: grid;
+  gap: 5px;
+}
+
+.crimon-admin-dist__row {
+  display: grid;
+  grid-template-columns: 66px 1fr 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.crimon-admin-dist__row > small {
+  font-size: .7rem;
+  color: #9aa8bb;
+}
+
+.crimon-admin-dist__row > strong {
+  font-size: .72rem;
+  text-align: right;
+}
+
+.crimon-admin-dist__bar {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .07);
+  overflow: hidden;
+}
+
+.crimon-admin-dist__bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #4f8cff, #7ad0ff);
+}
+
+/* 日別。**0の日も行として出す**(止まっている日が消えると読めない) */
+.crimon-admin-daily {
+  display: grid;
+  gap: 4px;
+}
+
+.crimon-admin-daily__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.crimon-admin-daily__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .68rem;
+  color: #9aa8bb;
+}
+
+.crimon-admin-daily__legend > span::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.crimon-admin-daily__legend > .is-saves::before { background: #4f8cff; }
+.crimon-admin-daily__legend > .is-matches::before { background: #f2a33c; }
+.crimon-admin-daily__legend > .is-new::before { background: #56d39a; }
+
+.crimon-admin-daily__row {
+  display: grid;
+  grid-template-columns: 42px 1fr 74px;
+  align-items: center;
+  gap: 8px;
+}
+
+.crimon-admin-daily__row > small {
+  font-size: .7rem;
+  color: #9aa8bb;
+}
+
+.crimon-admin-daily__row > strong {
+  font-size: .7rem;
+  text-align: right;
+  color: #c6d3e4;
+}
+
+.crimon-admin-daily__bars {
+  display: grid;
+  gap: 2px;
+}
+
+.crimon-admin-daily__bars > i {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+}
+
+.crimon-admin-daily__bars > .is-saves { background: #4f8cff; }
+.crimon-admin-daily__bars > .is-matches { background: #f2a33c; }
+.crimon-admin-daily__bars > .is-new { background: #56d39a; }
