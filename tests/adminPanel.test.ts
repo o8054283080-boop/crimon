@@ -156,6 +156,76 @@ describe("進め具合が分かる", () => {
   });
 });
 
+/**
+ * **控えが古い時に、嘘をつかないこと。**
+ *
+ * 依頼主の指摘:「荒モンボス猿さんは試練の塔を69階までクリアしてます」。
+ * あの行の最終保存は 9/3 19:24 で、**試練の塔が入ったのは 9/5。**
+ * その控えには塔の項目がそもそも無く、それを 0 として読んで
+ * **「未挑戦」と断定して表示した。**
+ *
+ * 直し方は2つとも要る:
+ *   1. 塔の階は**サーバの表**(`trial_tower_progress`)から取る。控えは遅れる
+ *   2. 控えに無い項目は「記録なし」と言う。**「していない」と言ってはいけない**
+ */
+describe("古い控えを、今の姿として出さない", () => {
+  it("塔の階を、サーバの表から取る", () => {
+    expect(EDGE, "控えだけを見ている").toContain('from("trial_tower_progress")');
+    expect(EDGE).toContain("towerRanking");
+    expect(PANEL).toContain("dashboard.towerRanking");
+  });
+
+  it("全体の集計も、控えではなくサーバの表から数える", () => {
+    // 控えから数えていたので、塔より古い保存の人がまとめて「未挑戦」に化けていた
+    expect(EDGE).toContain("towerReached: towerRows.length");
+    expect(EDGE, "towerFloors をまだ控えから数えている").not.toMatch(
+      /towerFloors:\s*withProgress\./,
+    );
+  });
+
+  it("控えに無い項目を「未挑戦」と言い切らない", () => {
+    expect(PANEL).toContain("function savedValue(");
+    expect(PANEL).toContain("記録なし");
+    // 0 と null を同じ顔で扱っていた古い書き方へ戻したら落とす
+    expect(PANEL, "null を 0 と同じに扱っている").not.toMatch(
+      /progress\.towerLifetimeFloor\s*>\s*0\s*\?/,
+    );
+  });
+
+  it("行ごと古い時は、いつ時点かを名前の下に出す", () => {
+    /*
+     * **数字を隠さない。**隠すと何も分からなくなる。
+     * ただし黙って出すと、17日前の姿が今の姿として読まれる。
+     */
+    expect(PANEL).toContain("crimon-admin-row__stale");
+    expect(PANEL).toContain("の保存時点");
+    expect(CSS).toContain(".crimon-admin-row__stale");
+  });
+
+  it("アリーナの行には、サーバが持つ塔の階を出す", () => {
+    // user_id で引けるのはこちらだけ(復旧IDとは身元の体系が違う)
+    expect(PANEL).toContain("row.towerBestFloor");
+  });
+});
+
+describe("出どころを混ぜない", () => {
+  it("本人の値も、進め具合と同じ控えから読む", () => {
+    /*
+     * 依頼主の指摘:「いちかさんのプレイヤーレベルは1なのに星6MAXが12体」。
+     * レベルは `summary`、中身は `state` から読んでいたので、
+     * **同じ行に2つの出どころが並んでいた。**
+     */
+    expect(PROGRESS).toContain("fighterLevel: numberOrNull(row.fighterLevel)");
+    expect(EDGE).toContain("progress?.fighterLevel");
+    expect(EDGE).toContain("出どころを混ぜない");
+  });
+
+  it("食い違ったら、黙って片方を出さずに印を付ける", () => {
+    expect(EDGE).toContain("sourceMismatch");
+    expect(PANEL).toContain("row.sourceMismatch");
+  });
+});
+
 describe("モンスターと装備の中身が分かる", () => {
   it("星ごとに数える", () => {
     expect(PROGRESS).toContain("monsterStars");

@@ -642,3 +642,56 @@ button.crimon-admin-row:active {
 .crimon-admin-daily__bars > .is-saves { background: #4f8cff; }
 .crimon-admin-daily__bars > .is-matches { background: #f2a33c; }
 .crimon-admin-daily__bars > .is-new { background: #56d39a; }
+
+/* ==========================================================================
+ * 塔の到達階 / 保存が古い行の印
+ *
+ * **控えから読んだ値は「最後にクラウド保存した時点」のもの。**
+ * 試練の塔が入ったのは 9/5 で、それより前の控えには塔の項目が無い。
+ * 無いものを 0 として出したせいで、69階まで登った人を「未挑戦」と表示した。
+ * サーバが直接持っている値はこちらに出す。
+ * ========================================================================== */
+.crimon-admin-tower {
+  display: grid;
+  gap: 4px;
+}
+
+.crimon-admin-tower__row {
+  display: grid;
+  grid-template-columns: 38px 1fr auto 74px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+.crimon-admin-tower__row > small {
+  font-size: .7rem;
+  color: #9aa8bb;
+}
+
+.crimon-admin-tower__row > small:last-child {
+  text-align: right;
+}
+
+.crimon-admin-tower__row > strong {
+  font-size: .8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crimon-admin-tower__row > b {
+  font-size: .82rem;
+  color: #9fe6bd;
+}
+
+/*
+ * 行ごと古い時の印。**数字を隠さず、「いつ時点か」を名前の下へ置く。**
+ * 隠すと何も分からなくなるが、黙って出すと今の姿として読まれる。
+ */
+.crimon-admin-row__stale {
+  margin-top: 3px;
+  color: #ffc89a !important;
+  font-size: 9px;
+}

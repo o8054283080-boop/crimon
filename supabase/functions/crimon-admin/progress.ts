@@ -26,13 +26,33 @@ export type SaveProgress = {
   stageLabel: string;
   stageCleared: number;
   stageHardCleared: number;
-  towerBestFloor: number;
-  towerLifetimeFloor: number;
-  equipFloor: number;
-  beastFloor: number;
-  goldFloor: number;
-  levelTiers: number;
-  arenaPoints: number;
+  /**
+   * 塔の到達階。**その項目が控えに無ければ `null`。**
+   *
+   * 0 と「無い」を同じ顔で返してはいけない。試練の塔が入ったのは 9/5 で、
+   * それより前の控えには塔の項目がそもそも無い。0 として返すと、画面は
+   * **69階まで登った人を「未挑戦」と言い切る**(実際に言い切った)。
+   */
+  towerBestFloor: number | null;
+  towerLifetimeFloor: number | null;
+  equipFloor: number | null;
+  beastFloor: number | null;
+  goldFloor: number | null;
+  levelTiers: number | null;
+  arenaPoints: number | null;
+  /**
+   * **控えの `state` から読んだ本人の値。**
+   *
+   * これまでレベル・所持金・所持数は `summary` から、進め具合は `state` から
+   * 読んでいた。**同じ行に2つの出どころが混ざる**ので、片方だけ古い控えだと
+   * 「Lv.1 なのに★6が12体」のような、あり得ない組み合わせが並ぶ。
+   */
+  fighterName: string | null;
+  fighterLevel: number | null;
+  gold: number | null;
+  crystal: number | null;
+  monsterCount: number | null;
+  equipmentCount: number | null;
   /** 星ごとの所持数。`{"6": 3, "5": 12}` のような形で返す */
   monsterStars: Record<string, number>;
   monsterMaxStar: number;
@@ -47,9 +67,27 @@ export function numbers(value: unknown): number[] {
   return Array.isArray(value) ? value.map(number).filter((n) => Number.isFinite(n)) : [];
 }
 
-export function maxOf(value: unknown): number {
+/**
+ * 並びの最大値。**並びそのものが無ければ `null`。**
+ *
+ * 空の配列は「挑んで一度も勝てていない」で、`null` は「この控えには項目が無い」。
+ * 別のことなので、同じ 0 にまとめない。
+ */
+export function maxOf(value: unknown): number | null {
+  if (!Array.isArray(value)) return null;
   const list = numbers(value);
   return list.length === 0 ? 0 : Math.max(...list);
+}
+
+/** 数として入っていれば返す。無い・読めないなら `null` */
+function numberOrNull(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function textOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }
 
 /**
@@ -129,13 +167,20 @@ export function saveProgress(save: unknown): SaveProgress | null {
     stageLabel: stageChapter > 0 ? `${stageChapter}-${stageNumber}` : "",
     stageCleared,
     stageHardCleared,
-    towerBestFloor: number(row.trialTowerBestFloor),
-    towerLifetimeFloor: number(row.trialTowerLifetimeBestFloor),
+    towerBestFloor: numberOrNull(row.trialTowerBestFloor),
+    towerLifetimeFloor: numberOrNull(row.trialTowerLifetimeBestFloor),
     equipFloor: maxOf(row.clearedDungeonFloors),
     beastFloor: maxOf(row.clearedBeastDungeonFloors),
     goldFloor: maxOf(row.clearedGoldDungeonFloors),
-    levelTiers: Array.isArray(row.clearedLevelDungeonTiers) ? row.clearedLevelDungeonTiers.length : 0,
-    arenaPoints: number(row.arenaPoints),
+    levelTiers: Array.isArray(row.clearedLevelDungeonTiers) ? row.clearedLevelDungeonTiers.length : null,
+    arenaPoints: numberOrNull(row.arenaPoints),
+    // **本人の値も同じ控えから読む。**summary と混ぜると、片方だけ古い時に嘘が並ぶ
+    fighterName: textOrNull(row.fighterName),
+    fighterLevel: numberOrNull(row.fighterLevel),
+    gold: numberOrNull(row.gold),
+    crystal: numberOrNull(row.crystal),
+    monsterCount: Array.isArray(row.monsters) ? row.monsters.length : null,
+    equipmentCount: Array.isArray(row.equipment) ? row.equipment.length : null,
     monsterStars,
     monsterMaxStar,
     monsterMaxLevel,

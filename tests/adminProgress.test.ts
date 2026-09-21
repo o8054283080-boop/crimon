@@ -18,6 +18,68 @@ import { buildDaily, jstDay, maxOf, saveProgress } from "../supabase/functions/c
 /** 控えの形。`src/game/saveFile.ts` が書き出すものと同じ入れ子 */
 const save = (state: Record<string, unknown>) => ({ summary: {}, state });
 
+/**
+ * **実際に出した誤り。**
+ *
+ * 荒モンボス猿さんの最終クラウド保存は 9/3 19:24。
+ * **試練の塔が入ったのは 9/5** なので、その控えには塔の項目がそもそも無い。
+ * 無いものを 0 として読んだ結果、**69階まで登っている人を「未挑戦」と表示した。**
+ *
+ * 「0」と「この控えには無い」は別のこと。混ぜると、画面が
+ * **していないことを、していないと断定する**側へ倒れる。
+ */
+describe("控えに無い項目を、0と同じ顔で返さない", () => {
+  it("塔より前の控えは、塔の階を null で返す", () => {
+    const old = saveProgress(save({ clearedStageIds: ["8-5"], monsters: [], equipment: [] }));
+    expect(old?.towerLifetimeFloor, "無いものを0にしている").toBeNull();
+    expect(old?.towerBestFloor).toBeNull();
+  });
+
+  it("本当に0なら0を返す(挑んで一度も勝てていない)", () => {
+    const zero = saveProgress(save({ trialTowerBestFloor: 0, trialTowerLifetimeBestFloor: 0 }));
+    expect(zero?.towerLifetimeFloor).toBe(0);
+  });
+
+  it("ダンジョンも同じ。並びが無ければ null、空なら 0", () => {
+    expect(saveProgress(save({}))?.equipFloor).toBeNull();
+    expect(saveProgress(save({ clearedDungeonFloors: [] }))?.equipFloor).toBe(0);
+    expect(saveProgress(save({ clearedDungeonFloors: [3, 9] }))?.equipFloor).toBe(9);
+  });
+});
+
+/**
+ * **出どころを混ぜない。**
+ *
+ * レベル・所持金・所持数は `summary` から、進め具合は `state` から読んでいた。
+ * 同じ行に2つの出どころが並ぶので、片方だけ古い形の控えだと
+ * **「Lv.1 なのに★6が12体」**という、あり得ない組み合わせが出る。
+ */
+describe("本人の値も、進め具合と同じ控えから読む", () => {
+  it("state から名前・レベル・所持金を読む", () => {
+    const progress = saveProgress(save({
+      fighterName: "いちか",
+      fighterLevel: 42,
+      gold: 1234,
+      crystal: 56,
+      monsters: [{ star: 6, level: 60 }],
+      equipment: [{ star: 6, level: 15 }],
+    }));
+    expect(progress?.fighterName).toBe("いちか");
+    expect(progress?.fighterLevel).toBe(42);
+    expect(progress?.gold).toBe(1234);
+    expect(progress?.crystal).toBe(56);
+    // 数も state から数える。summary の数え違いに引きずられない
+    expect(progress?.monsterCount).toBe(1);
+    expect(progress?.equipmentCount).toBe(1);
+  });
+
+  it("state に無ければ null(0 と言い切らない)", () => {
+    const progress = saveProgress(save({}));
+    expect(progress?.fighterLevel).toBeNull();
+    expect(progress?.monsterCount).toBeNull();
+  });
+});
+
 describe("進め具合を数える", () => {
   it("到達した章は、いちばん奥のクリアから決まる", () => {
     const progress = saveProgress(save({ clearedStageIds: ["1-1", "1-2", "2-1", "1-3"] }));
@@ -180,9 +242,10 @@ describe("日別の動き", () => {
 });
 
 describe("最大値の取り方", () => {
-  it("空なら0。並び順には頼らない", () => {
+  it("並びが無ければ null、空なら0。並び順には頼らない", () => {
+    // **「挑んで勝てていない(空)」と「この控えに項目が無い(null)」は別のこと**
     expect(maxOf([])).toBe(0);
-    expect(maxOf(undefined)).toBe(0);
+    expect(maxOf(undefined)).toBeNull();
     expect(maxOf([3, 12, 7])).toBe(12);
     // 数でないものが混ざっても落ちない
     expect(maxOf([1, "2", null])).toBe(2);

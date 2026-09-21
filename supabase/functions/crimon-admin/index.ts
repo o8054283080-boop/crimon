@@ -197,6 +197,7 @@ Deno.serve(async (req: Request) => {
       walletsResult,
       recoveryResult,
       matchDaysResult,
+      towerResult,
     ] = await Promise.all([
       supabase.from("arena_seasons").select("id,name,status,starts_at,ends_at").order("starts_at", { ascending: false }).limit(5),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
@@ -211,6 +212,16 @@ Deno.serve(async (req: Request) => {
         .select("id,recovery_id,latest_revision,latest_saved_at,failed_attempts,locked_until,created_at,updated_at,latest_save")
         .order("updated_at", { ascending: false }).limit(1000),
       supabase.from("arena_matches").select("created_at").gte("created_at", dailySince).limit(20000),
+      /*
+       * **塔の到達階は、控えから読んではいけない。**
+       *
+       * 試練の塔が入ったのは 9/5。それより前の控えには塔の項目が無いので、
+       * 控えから読むと**69階まで登った人が「未挑戦」と出る**(実際に出した)。
+       * この表はサーバが直接持っていて、塔の画面を開くたびに更新される。
+       */
+      supabase.from("trial_tower_progress")
+        .select("user_id,player_name,best_floor,best_floor_reached_at,updated_at")
+        .order("best_floor", { ascending: false }).limit(1000),
     ]);
 
     type Season = { id: string; name: string; status: string; starts_at: string; ends_at: string };
@@ -228,11 +239,19 @@ Deno.serve(async (req: Request) => {
     type Wallet = Record<string, unknown> & { user_id: string };
     const walletMap = new Map<string, Wallet>((walletsResult.data ?? []).map((row) => [(row as Wallet).user_id, row as Wallet]));
 
+    type TowerRow = { user_id: string; player_name: string; best_floor: number; best_floor_reached_at: string; updated_at: string };
+    const towerRows = (towerResult.data ?? []) as TowerRow[];
+    const towerMap = new Map<string, TowerRow>(towerRows.map((row) => [row.user_id, row]));
+
     type Profile = Record<string, unknown> & { user_id: string };
     const arenaPlayers = ((profilesResult.data ?? []) as Profile[]).map((profile) => {
       const standing = standingMap.get(profile.user_id) ?? {} as Standing;
       const wallet = walletMap.get(profile.user_id) ?? {} as Wallet;
+      const tower = towerMap.get(profile.user_id);
       return {
+        // **塔だけは控えではなく、サーバが直接持つ値。**遅れない
+        towerBestFloor: tower ? number(tower.best_floor) : null,
+        towerReachedAt: tower?.best_floor_reached_at ?? null,
         userId: profile.user_id,
         displayName: profile.display_name,
         leadDexId: profile.lead_dex_id,
@@ -255,18 +274,40 @@ Deno.serve(async (req: Request) => {
     });
 
     type RecoveryRow = Record<string, unknown> & { id: string };
-    const recoveryAccounts = ((recoveryResult.data ?? []) as RecoveryRow[]).map((account) => ({
-      id: account.id,
-      recoveryId: account.recovery_id,
-      latestRevision: number(account.latest_revision),
-      latestSavedAt: account.latest_saved_at,
-      failedAttempts: number(account.failed_attempts),
-      lockedUntil: account.locked_until,
-      createdAt: account.created_at,
-      updatedAt: account.updated_at,
-      ...saveSummary(account.latest_save),
-      progress: saveProgress(account.latest_save),
-    }));
+    const recoveryAccounts = ((recoveryResult.data ?? []) as RecoveryRow[]).map((account) => {
+      const progress = saveProgress(account.latest_save);
+      const summary = saveSummary(account.latest_save);
+      /*
+       * **出どころを混ぜない。**
+       *
+       * レベル・所持金・所持数は `summary` から、進め具合は `state` から読んでいた。
+       * 同じ行に2つの出どころが並ぶので、片方だけ古い形の控えだと
+       * 「Lv.1 なのに★6が12体」という、あり得ない組み合わせが出る。
+       * **`state` を先に見て、そこに無い時だけ `summary` で補う。**
+       */
+      const pick = (fromState: number | null | undefined, fromSummary: number | undefined) =>
+        fromState ?? fromSummary ?? 0;
+      return {
+        id: account.id,
+        recoveryId: account.recovery_id,
+        latestRevision: number(account.latest_revision),
+        latestSavedAt: account.latest_saved_at,
+        failedAttempts: number(account.failed_attempts),
+        lockedUntil: account.locked_until,
+        createdAt: account.created_at,
+        updatedAt: account.updated_at,
+        fighterName: progress?.fighterName ?? summary.fighterName ?? "",
+        fighterLevel: pick(progress?.fighterLevel, summary.fighterLevel),
+        gold: pick(progress?.gold, summary.gold),
+        crystal: pick(progress?.crystal, summary.crystal),
+        monsterCount: pick(progress?.monsterCount, summary.monsterCount),
+        equipmentCount: pick(progress?.equipmentCount, summary.equipmentCount),
+        /** 本人の値と進め具合が食い違ったら、控えそのものが壊れている合図 */
+        sourceMismatch: progress !== null && summary.fighterLevel !== undefined
+          && progress.fighterLevel !== null && progress.fighterLevel !== summary.fighterLevel,
+        progress,
+      };
+    });
 
     const daily = buildDaily(DAILY_DAYS, {
       created: ((recoveryResult.data ?? []) as RecoveryRow[]).map((row) => row.created_at),
@@ -288,8 +329,13 @@ Deno.serve(async (req: Request) => {
         const at = new Date(text(row.latest_saved_at)).getTime();
         return Number.isFinite(at) && Date.now() - at < 7 * 24 * 60 * 60 * 1000;
       }).length,
-      towerReached: withProgress.filter((row) => row.towerLifetimeFloor > 0).length,
-      towerBest: withProgress.reduce((best, row) => Math.max(best, row.towerLifetimeFloor), 0),
+      /*
+       * **塔はサーバの表から数える。**控えから数えていたが、塔が入ったのは 9/5 で、
+       * それより前の控えには項目が無い。控えが古い人がまとめて「未挑戦」に化けて、
+       * 69階まで登った人まで0人側に入っていた。
+       */
+      towerReached: towerRows.length,
+      towerBest: towerRows.reduce((best, row) => Math.max(best, number(row.best_floor)), 0),
       sixStarOwners: withProgress.filter((row) => row.monsterMaxStar >= 6).length,
       monsters: sum((row) => Object.values(row.monsterStars).reduce((a, b) => a + b, 0)),
       equipment: sum((row) => Object.values(row.equipStars).reduce((a, b) => a + b, 0)),
@@ -299,13 +345,34 @@ Deno.serve(async (req: Request) => {
         table[key] = (table[key] ?? 0) + 1;
         return table;
       }, {}),
-      towerFloors: withProgress.reduce<Record<string, number>>((table, row) => {
+      towerFloors: towerRows.reduce<Record<string, number>>((table, row) => {
         // 10階ごとの節でまとめる(1階刻みでは読めない)
-        const band = row.towerLifetimeFloor <= 0 ? "0" : String(Math.floor((row.towerLifetimeFloor - 1) / 10) * 10 + 1);
+        const floor = number(row.best_floor);
+        const band = floor <= 0 ? "0" : String(Math.floor((floor - 1) / 10) * 10 + 1);
         table[band] = (table[band] ?? 0) + 1;
         return table;
       }, {}),
     };
+
+    /*
+     * **塔の到達階は、ここでしか正しく出せない。**
+     *
+     * この表はアリーナの `user_id` で引いてある。一方、登録データ(復旧ID)は
+     * **別の身元の体系**で、アリーナの id は端末の localStorage にあって
+     * 控えには入っていない。だから復旧IDの行へは結び付けられない。
+     * 名前で当てにいくと別人を混ぜるので、**独立した並びとして出す。**
+     */
+    const towerRanking = towerRows
+      .slice()
+      .sort((a, b) => number(b.best_floor) - number(a.best_floor))
+      .slice(0, 50)
+      .map((row, index) => ({
+        rank: index + 1,
+        userId: row.user_id,
+        name: row.player_name,
+        bestFloor: number(row.best_floor),
+        reachedAt: row.best_floor_reached_at,
+      }));
 
     return json({
       generatedAt: new Date().toISOString(),
@@ -316,6 +383,7 @@ Deno.serve(async (req: Request) => {
         recoveryAccounts: recoveryAccounts.length,
       },
       overview,
+      towerRanking,
       daily,
       arenaPlayers,
       recoveryAccounts,
