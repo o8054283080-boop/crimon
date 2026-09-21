@@ -447,3 +447,51 @@ button.crimon-admin-row:active {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+ * いつ時点の値か / 古い値の印 / 並べ替え
+ *
+ * **「遅れている」と感じた時に、遅れの出どころが分かる形にする。**
+ * レートは対戦の瞬間、所持品はプレイヤーの端末がクラウド保存した時点。
+ * 同じ画面に並んでいると区別が付かないので、時刻と経過を必ず添える。
+ * ========================================================================== */
+.crimon-admin-generated {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(120, 200, 160, .35);
+  border-radius: 8px;
+  background: rgba(16, 32, 26, .6);
+}
+
+.crimon-admin-generated strong { font-size: .86rem; color: #9fe6bd; }
+.crimon-admin-generated small { font-size: .7rem; line-height: 1.5; color: #9fb0c8; }
+
+/* 1時間以上前なら、集計そのものが止まっている可能性がある */
+.crimon-admin-generated.is-stale {
+  border-color: rgba(230, 160, 110, .5);
+  background: rgba(40, 26, 16, .6);
+}
+.crimon-admin-generated.is-stale strong { color: #ffc89a; }
+
+/* 古い値。**赤で塗らず、数字の色だけ変える。**塗ると一覧が警告だらけになる */
+.crimon-admin-metric.is-stale strong { color: #ffb4a2; }
+
+.crimon-admin-sort {
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 8px;
+  background: #101826;
+  color: inherit;
+  font-size: .8rem;
+}
+
+/*
+ * 行の項目を5つから9〜10へ増やした。**固定の5列では収まらない。**
+ * 入るだけ並べて折り返す(狭い画面では2段・3段になる)。
+ */
+.crimon-admin-row {
+  grid-template-columns: minmax(120px, 1.4fr) repeat(auto-fit, minmax(96px, 1fr));
+}
