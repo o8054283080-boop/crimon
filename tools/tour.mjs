@@ -124,6 +124,16 @@ const SCREENS = [
   },
   { name: "レベル上げダンジョン", tab: "HOME", tile: "dungeon", tile2: "trainDungeon" },
   { name: "ゴールドダンジョン", tab: "HOME", tile: "dungeon", tile2: "goldDungeon" },
+  /*
+   * ホームから開く順位の一覧。**アリーナと試練の塔で中身がまるごと入れ替わる**ので、
+   * 両方見る。どちらも「繋がっていない」時の案内が出る状態で検査される
+   * (巡回はオフラインなので、表そのものは出ない)。
+   */
+  { name: "ランキング/アリーナ", tab: "HOME", tile: "ranking" },
+  {
+    name: "ランキング/試練の塔", tab: "HOME", tile: "ranking",
+    setup: "document.querySelector('[data-tour=\"rankings:tower\"]')?.click()",
+  },
   { name: "目覚の深域", tab: "HOME", tile: "dungeon", tile2: "awakeningDepth" },
   // 階の詳細。**一覧と詳細は別の作り**なので、入口だけ見ても足りない
   {

@@ -31,7 +31,9 @@ export type ScreenName =
   | "TRIAL_TOWER"
   | "TOWER_BATTLE"
   | "HOW_TO_PLAY"
-  | "GIFT_BOX";
+  | "GIFT_BOX"
+  /** ホームから開く順位の一覧。アリーナと試練の塔を1か所で見る */
+  | "RANKINGS";
 
 /**
  * 下のタブ。

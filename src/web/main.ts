@@ -179,6 +179,7 @@ import { CompensationClaim, claimCompensations } from "../game/compensation.js";
 import { OWN_BACK_SELECTOR, renderGlobalBackButton } from "./views/backButton.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
+import { RankingTab, renderRankings } from "./views/rankings.js";
 import { loadNavigationState, saveNavigationState } from "./navigationState.js";
 import { DungeonReturnContext, keepReturnContext, normalStageReturnContext, rememberedScrollTop, replacePartySlot, restoreDungeonSelection, restoreScrollTop, sellableEquipmentIds } from "./uxHelpers.js";
 import { ResultAction } from "./views/resultActions.js";
@@ -587,6 +588,8 @@ interface AppState {
   towerPanel: "NONE" | "ENEMY_INFO" | "RANKING" | "REWARDS";
   /** 敵情報で選んだ階。未到達の階も一覧から確認できる。 */
   towerEnemyInfoFloor: number;
+  /** ホームから開く順位の一覧で、いまどちらを見ているか */
+  rankingTab: RankingTab;
   towerRankingEntries: TrialTowerRankingEntry[];
   towerRankingSelf: TrialTowerRankingEntry | null;
   towerRankingLoading: boolean;
@@ -729,6 +732,7 @@ const state: AppState = {
   towerStopRequested: false,
   towerPanel: "NONE",
   towerEnemyInfoFloor: 60,
+  rankingTab: "ARENA",
   towerRankingEntries: [],
   towerRankingSelf: null,
   towerRankingLoading: false,
@@ -3001,6 +3005,19 @@ async function refreshArenaHistory(): Promise<void> {
 }
 
 /** ランキングを引き直す。未接続なら何もしない(嘘の順位を出さないため) */
+/**
+ * ホームから順位の一覧を開く。
+ *
+ * **開いた札のぶんだけ取りに行く。**両方いきなり呼ぶと、
+ * 塔しか見ない人にもアリーナの通信が走る。
+ */
+function openRankings(tab: RankingTab): void {
+  state.rankingTab = tab;
+  navigate("RANKINGS");
+  if (tab === "ARENA") void refreshArenaRanking();
+  else void refreshTrialTowerRanking();
+}
+
 async function refreshArenaRanking(): Promise<void> {
   if (!(await connectArena())) {
     state.arenaRankingTop = [];
@@ -3989,6 +4006,7 @@ function renderScreen(): void {
         onGoMonsters: () => navigate("MONSTERS"),
         onGoEquipment: () => navigate("EQUIPMENT"),
         onGoMonsterDex: () => navigate("MONSTER_DEX"),
+        onGoRankings: () => { openRankings(state.rankingTab); },
         onGoStages: () => navigate("STAGES"),
         onGoParty: () => navigate("PARTY"),
         onViewPartyMonster: (id) => { openMonsterDetail(id, { kind: "HOME" }); },
@@ -4741,6 +4759,38 @@ function renderScreen(): void {
 
     case "HOW_TO_PLAY":
       content = renderHowToPlay({ onBack: () => navigate("HOME") });
+      break;
+
+    /*
+     * ホームから開く順位の一覧。**アリーナと試練の塔を1か所で見る。**
+     * どちらの順位も前からあったが、それぞれの画面の奥にしか入口が無く、
+     * ホームの「ランキング」は押せないまま置いてあった(依頼主の指摘)。
+     */
+    case "RANKINGS":
+      // 開いた時に繋ぎに行く。アリーナ側は「繋がっているか」で表の出し方が変わる
+      if (arenaConnectionStatus === "IDLE") void connectArena().then(() => render());
+      content = renderRankings({
+        tab: state.rankingTab,
+        onSelectTab: (tab) => { openRankings(tab); },
+        arena: {
+          online: arenaConnectionStatus === "ONLINE",
+          loading: state.arenaRankingLoading,
+          top: state.arenaRankingTop,
+          around: state.arenaRankingAround,
+          myUserId: arenaSelfId(),
+          myRank: state.arenaMyRank,
+        },
+        tower: {
+          loading: state.towerRankingLoading,
+          offline: state.towerRankingOffline,
+          error: state.towerRankingError,
+          entries: state.towerRankingEntries,
+          self: state.towerRankingSelf,
+          // 手元の記録。**繋がっていなくてもこれは出せる**
+          myBestFloor: state.player.trialTowerLifetimeBestFloor,
+        },
+        onReload: () => { openRankings(state.rankingTab); },
+      });
       break;
 
     case "GIFT_BOX": {
