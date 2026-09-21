@@ -59,12 +59,20 @@ jobs:
             echo "::error::取り出せていません: $target が無い"
             exit 1
           fi
-          # 直書きの鍵・トークン・長い秘密らしき並び。1つでも当たったら中身は出さない
-          if grep -rEn 'service_role|SERVICE_ROLE|eyJ[A-Za-z0-9_-]{20,}|sb_secret|[A-Za-z0-9+/]{60,}={0,2}' "$target"; then
-            echo "::error::秘密らしき文字列が見つかりました。ログへは出しません(上の行番号だけを手掛かりに、Supabaseの画面から手で取り出してください)"
+          # **鍵の「値」だけを拾う。**
+          #
+          # 最初は `SERVICE_ROLE` という並びも危険信号にしていたが、
+          # それでは `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` という
+          # **正しい書き方**に当たって止まる(実際に止まった)。
+          # 変数名は普通に出るものなので、当てるのは値の形に限る——
+          # JWT(`eyJ...`)・`sb_secret_...`・引用符でくくった長い英数字。
+          hits="$(grep -rEn "eyJ[A-Za-z0-9_-]{30,}|sb_secret_[A-Za-z0-9_-]{10,}|['\"][A-Za-z0-9+/]{60,}={0,2}['\"]" "$target" || true)"
+          if [ -n "$hits" ]; then
+            echo "$hits" | sed -E 's/:.*/: (中身は伏せます)/'
+            echo "::error::秘密らしき値が見つかりました。ログへは出しません(上の行番号だけを手掛かりに、Supabaseの画面から手で取り出してください)"
             exit 1
           fi
-          echo "秘密らしき文字列は見つかりませんでした"
+          echo "秘密らしき値は見つかりませんでした"
       - name: 中身をログへ出す
         run: |
           set -euo pipefail
