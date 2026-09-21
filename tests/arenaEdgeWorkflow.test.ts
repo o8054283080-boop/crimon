@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -104,8 +104,25 @@ function runBlocks(source: string): string[] {
   return blocks;
 }
 
+/**
+ * **置いてあるワークフロー全部を見る。**
+ *
+ * 2本だけ名指ししていたので、**新しく足したものは検査されなかった。**
+ * どれも本番へ触る道具なので、1本でも漏らすと同じ事故が起きる。
+ */
+const WORKFLOWS = readdirSync(fileURLToPath(new URL("../.github/workflows", import.meta.url)))
+  .filter((name) => name.endsWith(".yml") || name.endsWith(".yaml"))
+  .sort();
+
 describe("ワークフローのスクリプトがシェルとして通る", () => {
-  for (const name of ["arena-edge.yml", "arena-catalog.yml"]) {
+  it("検査する相手が1本も欠けていない", () => {
+    expect(WORKFLOWS.length).toBeGreaterThanOrEqual(5);
+    for (const must of ["arena-edge.yml", "arena-catalog.yml"]) {
+      expect(WORKFLOWS, `${must} が見つからない`).toContain(must);
+    }
+  });
+
+  for (const name of WORKFLOWS) {
     it(`${name} の run が、どれも構文として正しい`, () => {
       const blocks = runBlocks(read(name));
       expect(blocks.length, `${name} に run: | が1つも無い`).toBeGreaterThan(0);
