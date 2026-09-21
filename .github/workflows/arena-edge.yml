@@ -1,5 +1,17 @@
 name: アリーナ精算Edge Functionを本番へ同期
 
+# 精算の Edge Function(`arena-settle`)は、**戦闘エンジンとモンスター定義を
+# `_shared` へ同梱して動く。**新しいモンスターや戦闘の直しが main へ入っても
+# ここを流し直さないと、クライアントでは決着しているのにサーバ側の再戦闘が失敗し、
+# 対戦が OPEN のまま残る。**挑戦券だけ減って、レートもコインも入らない。**
+#
+# 照合表(`arena-catalog.yml`)と同じで、**押し忘れが事故になる形**だった。
+# だから押さずに流れるようにする。精算へ影響するものが main へ入ったら
+# `build:edge` → `arena-settle` の deploy までを自動で通す。
+#
+# Secrets に `SUPABASE_ACCESS_TOKEN` が要る。
+# 接続先(project ref)は公開設定の `.env.production` から取るので二重管理しない。
+
 on:
   push:
     branches: [main]
