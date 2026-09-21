@@ -18,9 +18,21 @@ import {
 } from "../game/cloudRecovery.js";
 
 const PANEL_MARKER = "data-crimon-cloud-recovery";
-const AUTO_SYNC_MS = 12 * 60 * 60 * 1000;
-const STALE_BACKUP_MS = 24 * 60 * 60 * 1000;
-const STALE_RETRY_MS = 60 * 60 * 1000;
+/*
+ * クラウドへ控えを上げる間隔。
+ *
+ * **12時間に1回だった。**端末が壊れた人は半日ぶんを失うし、
+ * 管理者画面から見えるレベルや所持品も**最大12時間古い**
+ * (「遅れすぎている」という指摘の出どころがこれ)。
+ *
+ * セーブはJSON1本で軽い。1時間ごとなら、遊んでいる人の通信も
+ * 1日に数回で済む。**上げるのは中身が変わった時だけ**
+ * (`uploadCloudSave` が同じ内容なら世代を増やさない)。
+ */
+const AUTO_SYNC_MS = 60 * 60 * 1000;
+/** これより古い控えは「置いていかれている」扱いにして、短い間隔で追いつかせる */
+const STALE_BACKUP_MS = 3 * 60 * 60 * 1000;
+const STALE_RETRY_MS = 20 * 60 * 1000;
 const LAST_ATTEMPT_KEY = "crimon_cloud_backup_last_attempt_v1";
 let syncRunning = false;
 let conflictDetected = false;

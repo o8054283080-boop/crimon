@@ -163,10 +163,42 @@ function formatDate(value: unknown): string {
   return date.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function metric(label: string, value: string): HTMLElement {
-  const wrap = el("span", "crimon-admin-metric");
+function metric(label: string, value: string, stale = false): HTMLElement {
+  const wrap = el("span", `crimon-admin-metric${stale ? " is-stale" : ""}`);
   wrap.append(el("small", "", label), el("strong", "", value));
   return wrap;
+}
+
+/**
+ * **いつ時点の値かを、必ず添える。**
+ *
+ * 管理者画面が見ているものには2種類ある:
+ *
+ *   - **サーバが直接持っている値**(レート・勝敗・コイン)。対戦の瞬間に更新される
+ *   - **プレイヤーの端末から上がってくる値**(Lv・ゴールド・所持数)。
+ *     クラウド保存のたびに更新されるので、**その間隔ぶんだけ古い**
+ *
+ * 後者を「遅れている」と感じるのは当然で、実際に遅れている。
+ * 直す道は2つあって、どちらもやる——**間隔を詰める**(`cloudRecoveryBootstrap.ts`)のと、
+ * **いつ時点かを画面に出す**(ここ)。
+ */
+function sinceText(value: unknown): { text: string; hours: number } {
+  if (typeof value !== "string" || !value) return { text: "-", hours: Number.POSITIVE_INFINITY };
+  const at = new Date(value).getTime();
+  if (!Number.isFinite(at)) return { text: "-", hours: Number.POSITIVE_INFINITY };
+  const minutes = Math.max(0, Math.round((Date.now() - at) / 60000));
+  const hours = minutes / 60;
+  if (minutes < 1) return { text: "たった今", hours };
+  if (minutes < 60) return { text: `${minutes}分前`, hours };
+  if (hours < 24) return { text: `${Math.floor(hours)}時間前`, hours };
+  return { text: `${Math.floor(hours / 24)}日前`, hours };
+}
+
+/** 保存時刻と「◯時間前」を1つの値に。**古ければ印が付く** */
+function savedMetric(label: string, value: unknown, staleHours = 3): HTMLElement {
+  const since = sinceText(value);
+  const when = formatDate(value);
+  return metric(label, when === "-" ? "-" : `${when}（${since.text}）`, since.hours >= staleHours);
 }
 
 function summaryCard(label: string, value: number): HTMLElement {
@@ -185,9 +217,40 @@ let previousBodyOverflow = "";
 let currentDashboard: AdminDashboard | null = null;
 let currentTab: "RECOVERY" | "ARENA" = "RECOVERY";
 let currentSearch = "";
+/** 一覧の並び。**既定は「動きが新しい順」**——いま遊んでいる人から見たい */
+let currentSort: "RECENT" | "RATING" | "LEVEL" | "NAME" = "RECENT";
+/** 自動で読み直す時計。画面を閉じたら止める */
+let autoTimer: ReturnType<typeof setInterval> | null = null;
+
+/** 自動更新の間隔。**開いたまま古くならない**ための最低限 */
+const AUTO_RELOAD_MS = 60_000;
+
+/**
+ * 開いている間だけ、黙って読み直す。
+ *
+ * これまでは開いた時に1回読むだけで、**「更新」を押すまで数字が止まっていた。**
+ * 見ている側からは、止まっているのか本当に動きが無いのか分からない。
+ *
+ * 読み直しは**画面が見えている時だけ**(裏に回ったタブが叩き続けない)。
+ */
+function stopAutoReload(): void {
+  if (autoTimer === null) return;
+  clearInterval(autoTimer);
+  autoTimer = null;
+}
+
+function startAutoReload(root: HTMLElement): void {
+  stopAutoReload();
+  autoTimer = setInterval(() => {
+    if (!overlay || overlay.hidden || document.hidden) return;
+    if (!token()) { stopAutoReload(); return; }
+    void loadDashboard(root, true);
+  }, AUTO_RELOAD_MS);
+}
 
 function closeAdmin(): void {
   if (!overlay) return;
+  stopAutoReload();
   overlay.hidden = true;
   document.body.style.overflow = previousBodyOverflow;
 }
@@ -270,6 +333,22 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
   const season = dashboard.activeSeason;
   dash.append(el("p", "crimon-admin-season", season ? `現在のアリーナ: ${season.name} (${season.id})` : "アリーナシーズン情報なし"));
 
+  /*
+   * **いつ時点の値かを、いちばん上に出す。**
+   *
+   * サーバは `generatedAt` を返していたのに、画面は受け取って捨てていた。
+   * そのため「古いのか新しいのか、そもそも判断できない」という状態だった
+   * (依頼主の指摘)。あわせて、遅れの出どころも1行で書く——
+   * **レートは即時・所持品はクラウド保存のたび**、と分かれば読み方が変わる。
+   */
+  const since = sinceText(dashboard.generatedAt);
+  const stamp = el("p", `crimon-admin-generated${since.hours >= 1 ? " is-stale" : ""}`);
+  stamp.append(
+    el("strong", "", `${formatDate(dashboard.generatedAt)} 時点（${since.text}）`),
+    el("small", "", "レート・勝敗・コインは対戦の瞬間に更新されます。レベル・所持金・所持数は、プレイヤーの端末がクラウド保存した時点のものです"),
+  );
+  dash.append(stamp);
+
   const tabs = el("div", "crimon-admin-tabs");
   const recoveryTab = el("button", `crimon-admin-tab${currentTab === "RECOVERY" ? " is-active" : ""}`, "登録データ") as HTMLButtonElement;
   const arenaTab = el("button", `crimon-admin-tab${currentTab === "ARENA" ? " is-active" : ""}`, "アリーナ") as HTMLButtonElement;
@@ -281,9 +360,22 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
   search.type = "search";
   search.placeholder = "プレイヤー名 / IDで検索";
   search.value = currentSearch;
+  const sort = el("select", "crimon-admin-sort") as HTMLSelectElement;
+  for (const [value, label] of [
+    ["RECENT", "動きが新しい順"],
+    ["RATING", "レートの高い順"],
+    ["LEVEL", "レベルの高い順"],
+    ["NAME", "名前順"],
+  ] as const) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    sort.append(option);
+  }
+  sort.value = currentSort;
   const refresh = el("button", "crimon-admin-btn", "更新") as HTMLButtonElement;
   refresh.type = "button";
-  toolbar.append(search, refresh);
+  toolbar.append(search, sort, refresh);
 
   const listHost = el("section", "crimon-admin-section");
   const rerenderList = () => renderActiveList(listHost, dashboard);
@@ -301,6 +393,10 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
   };
   search.oninput = () => {
     currentSearch = search.value;
+    rerenderList();
+  };
+  sort.onchange = () => {
+    currentSort = sort.value as typeof currentSort;
     rerenderList();
   };
   refresh.onclick = async () => {
@@ -327,41 +423,92 @@ function matchesSearch(...values: unknown[]): boolean {
   return values.some((value) => String(value ?? "").toLocaleLowerCase("ja-JP").includes(needle));
 }
 
+/** 時刻の文字列を比較できる数にする。無いものは必ず後ろへ */
+function timeOf(value: unknown): number {
+  if (typeof value !== "string" || !value) return 0;
+  const at = new Date(value).getTime();
+  return Number.isFinite(at) ? at : 0;
+}
+
+/*
+ * 並べ替え。**既定は「動きが新しい順」。**
+ *
+ * 登録順に並んでいると、いま遊んでいる人を探すのに全部見ることになる。
+ * 問い合わせを受けて開く時も、まず見たいのは直近で動いた人。
+ */
+function sortRecovery(a: RecoveryAccount, b: RecoveryAccount): number {
+  if (currentSort === "NAME") return (a.fighterName || "").localeCompare(b.fighterName || "", "ja");
+  if (currentSort === "LEVEL" || currentSort === "RATING") return b.fighterLevel - a.fighterLevel;
+  return timeOf(b.latestSavedAt) - timeOf(a.latestSavedAt);
+}
+
+function sortArena(a: ArenaPlayer, b: ArenaPlayer): number {
+  if (currentSort === "NAME") return (a.displayName || "").localeCompare(b.displayName || "", "ja");
+  if (currentSort === "RATING" || currentSort === "LEVEL") return b.rating - a.rating;
+  return timeOf(b.lastMatchAt) - timeOf(a.lastMatchAt);
+}
+
 function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
   host.replaceChildren();
   const head = el("div", "crimon-admin-section__head");
   const list = el("div", "crimon-admin-list");
   if (currentTab === "RECOVERY") {
-    const rows = dashboard.recoveryAccounts.filter((row) => matchesSearch(row.fighterName, row.recoveryId, row.id));
+    const rows = dashboard.recoveryAccounts
+      .filter((row) => matchesSearch(row.fighterName, row.recoveryId, row.id))
+      .sort(sortRecovery);
     head.append(el("h3", "", "データ復旧に登録されているプレイヤー"), el("span", "", `${rows.length}件`));
     for (const row of rows) {
       const item = el("div", "crimon-admin-row");
       const primary = el("span", "crimon-admin-row__primary");
       primary.append(el("strong", "", row.fighterName || "名前未設定"), el("small", "", `復旧ID: ${row.recoveryId || "-"}`));
+      /*
+       * **サーバが返しているものは、全部出す。**
+       * これまで出していたのは5つだけで、モンスター数も装備数も
+       * 登録日もロック状態も、受け取っておきながら捨てていた。
+       */
       item.append(
         primary,
         metric("レベル", row.fighterLevel ? `Lv.${row.fighterLevel}` : "-"),
         metric("ゴールド", formatNumber(row.gold)),
         metric("ダイヤ", formatNumber(row.crystal)),
-        metric("最終保存", formatDate(row.latestSavedAt)),
+        metric("モンスター", `${formatNumber(row.monsterCount)}体`),
+        metric("装備", `${formatNumber(row.equipmentCount)}個`),
+        savedMetric("最終保存", row.latestSavedAt),
+        metric("世代", formatNumber(row.latestRevision)),
+        metric("登録", formatDate(row.createdAt)),
+        // ロックと失敗回数は、問い合わせを受けた時にまっ先に見る場所
+        row.lockedUntil
+          ? metric("ロック", `${formatDate(row.lockedUntil)}まで`, true)
+          : metric("失敗回数", row.failedAttempts > 0 ? `${row.failedAttempts}回` : "なし", row.failedAttempts > 0),
       );
       list.append(item);
     }
     if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当する登録データはありません"));
   } else {
-    const rows = dashboard.arenaPlayers.filter((row) => matchesSearch(row.displayName, row.userId, row.tierId));
+    const rows = dashboard.arenaPlayers
+      .filter((row) => matchesSearch(row.displayName, row.userId, row.tierId))
+      .sort(sortArena);
     head.append(el("h3", "", "アリーナに登録されているプレイヤー"), el("span", "", `${rows.length}件`));
     for (const row of rows) {
       const item = el("button", "crimon-admin-row") as HTMLButtonElement;
       item.type = "button";
       const primary = el("span", "crimon-admin-row__primary");
       primary.append(el("strong", "", row.displayName || "名前未設定"), el("small", "", row.userId));
+      /*
+       * **こちらはサーバが直接持っている値。**対戦の瞬間に更新されるので遅れない。
+       * 遅れるのは復旧データの側(プレイヤーの端末から上がってくる)。
+       * 同じ画面に並ぶと区別が付かないので、最終対戦の時刻を添える。
+       */
       item.append(
         primary,
-        metric("レート", formatNumber(row.rating)),
+        metric("レート", `${formatNumber(row.rating)}（最高 ${formatNumber(row.bestRating)}）`),
         metric("ランク", row.tierId || "-"),
-        metric("勝敗", `${row.wins}勝 ${row.losses}敗`),
-        metric("コイン", formatNumber(row.coins)),
+        metric("攻撃", `${row.wins}勝 ${row.losses}敗`),
+        metric("防衛", `${row.defenseWins}勝 ${row.defenseLosses}敗`),
+        metric("コイン", `${formatNumber(row.coins)}（累計 ${formatNumber(row.lifetimeCoins)}）`),
+        metric("挑戦券", `${formatNumber(row.tickets)} / ${formatNumber(row.ticketsMax)}`),
+        savedMetric("最終対戦", row.lastMatchAt, 24),
+        metric("登録", formatDate(row.createdAt)),
       );
       item.onclick = () => void loadArenaDetail(host.closest(".crimon-admin-overlay") as HTMLElement, row);
       list.append(item);
@@ -509,28 +656,44 @@ function renderArenaDetail(root: HTMLElement, player: ArenaPlayer, detail: Arena
   return wrap;
 }
 
-async function loadDashboard(root: HTMLElement): Promise<void> {
+/**
+ * 一覧を読む。`quiet` なら**読み込み中の表示に差し替えない。**
+ *
+ * 自動更新でここを毎分すり替えると、押そうとした札が
+ * 「読み込み中…」に化けて操作を取りこぼす。検索の途中の文字も消える。
+ */
+async function loadDashboard(root: HTMLElement, quiet = false): Promise<void> {
   const session = token();
   if (!session) {
     renderLogin(root);
     return;
   }
-  root.replaceChildren();
-  topbar(root);
-  const body = el("div", "crimon-admin-body");
-  body.append(el("div", "crimon-admin-loading", "登録プレイヤーを読み込み中…"));
-  root.append(body);
+  if (!quiet) {
+    root.replaceChildren();
+    topbar(root);
+    const body = el("div", "crimon-admin-body");
+    body.append(el("div", "crimon-admin-loading", "登録プレイヤーを読み込み中…"));
+    root.append(body);
+  }
   try {
     const dashboard = await adminPost<AdminDashboard>("dashboard", { token: session });
     currentDashboard = dashboard;
     renderDashboard(root, dashboard);
+    startAutoReload(root);
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "管理者データを取得できませんでした";
     if (!token()) {
       renderLogin(root, message);
       return;
     }
-    body.replaceChildren(el("div", "crimon-admin-empty", message));
+    /*
+     * **黙って読み直している時は、出ている一覧を消さない。**
+     * 一度の失敗で画面が空になると、見ていた数字ごと消える
+     * (次の1分後に戻ってくるだけなので、消す価値が無い)。
+     */
+    if (quiet) return;
+    const host = root.querySelector(".crimon-admin-body") ?? root;
+    host.replaceChildren(el("div", "crimon-admin-empty", message));
   }
 }
 
