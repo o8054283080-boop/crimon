@@ -13,6 +13,7 @@
  * の3つを、fetch を差し替えて機械的に押さえる。
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { ARENA_TIERS } from "../src/data/arena/ranks.js";
 import { ArenaDefenseSnapshot, ArenaOpponentEntry } from "../src/game/arena/types.js";
 import {
@@ -134,7 +135,7 @@ describe("鍵が無い時", () => {
     await expect(fetchArenaRanking()).resolves.toEqual([]);
     await expect(fetchArenaRankingAround("me")).resolves.toEqual([]);
     await expect(fetchArenaMatchHistory("me")).resolves.toEqual([]);
-    await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
+    await expect(pushArenaDefense(snapshot())).resolves.toEqual({ ok: false, reached: false, reason: null });
     await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() }))
       .resolves.toEqual({ ok: false, reached: false, reason: null });
     await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
@@ -157,7 +158,7 @@ describe("通信が失敗した時", () => {
     connect(vi.fn(async () => { throw new Error("offline"); }));
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
     await expect(fetchArenaRanking()).resolves.toEqual([]);
-    await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
+    await expect(pushArenaDefense(snapshot())).resolves.toEqual({ ok: false, reached: false, reason: null });
     // **サーバまで届いていない。** ここを「断られた」と混ぜると、
     // 圏外で挑んだ人が手元でも遊べなくなる
     await expect(beginArenaMatch({ kind: "PLAYER", attackerSnapshot: snapshot(), opponentId: "u2" }))
@@ -170,7 +171,8 @@ describe("通信が失敗した時", () => {
   it("HTTPが失敗した時も既定値。**ただし断られたことは伝える**", async () => {
     connect(stubFetch({ message: "permission denied" }, false));
     await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
-    await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
+    await expect(pushArenaDefense(snapshot()))
+      .resolves.toEqual({ ok: false, reached: true, reason: "permission denied" });
     /*
      * **届いたうえで断られた。**通信断と同じ `null` に潰していたせいで、
      * 画面は「オフライン」と思い込んで手元だけで戦い、
@@ -194,7 +196,7 @@ describe("通信が失敗した時", () => {
     try {
       (globalThis as { fetch?: typeof fetch }).fetch = undefined;
       await expect(fetchArenaOpponents("me", 1200)).resolves.toEqual([]);
-      await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
+      await expect(pushArenaDefense(snapshot())).resolves.toEqual({ ok: false, reached: false, reason: null });
     } finally {
       (globalThis as { fetch?: typeof fetch }).fetch = original;
     }
@@ -336,7 +338,8 @@ describe("送っている中身", () => {
   it("防衛はスナップショットが空なら送りもしない", async () => {
     const fetchImpl = stubFetch({ ok: true });
     connect(fetchImpl);
-    await expect(pushArenaDefense({ version: 1, capturedAt: 0, units: [] } as ArenaDefenseSnapshot)).resolves.toBe(false);
+    await expect(pushArenaDefense({ version: 1, capturedAt: 0, units: [] } as ArenaDefenseSnapshot))
+      .resolves.toEqual({ ok: false, reached: false, reason: "EMPTY_DEFENSE" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -391,7 +394,8 @@ describe("サーバの答えの読み取り", () => {
     await expect(beginArenaMatch({ kind: "NPC", attackerSnapshot: snapshot() }))
       .resolves.toEqual({ ok: false, reached: true, reason: null });
     await expect(settleArenaMatch("m1", "n1")).resolves.toBeNull();
-    await expect(pushArenaDefense(snapshot())).resolves.toBe(false);
+    // 届いたうえで断られた。理由が無い返事なので reason は null
+    await expect(pushArenaDefense(snapshot())).resolves.toEqual({ ok: false, reached: true, reason: null });
     await expect(purchaseArenaShopItem("summon_scroll")).resolves.toBeNull();
   });
 
@@ -545,5 +549,79 @@ describe("断られたのか、届かなかったのか", () => {
       .toBe("この装備シリーズはサーバの照合表にまだ載っていません（UNKNOWN_SET: PHANTOM）");
     expect(arenaRefusalText("UNKNOWN_LATENT: latent_9_1"))
       .toBe("この潜在覚醒はサーバの照合表にまだ載っていません（UNKNOWN_LATENT: latent_9_1）");
+  });
+});
+
+/**
+ * 防衛編成の登録。
+ *
+ * **手元にあることと、相手として並んでいることは別。**
+ * 以前は `boolean` を返すだけで、呼ぶ側も `void` で捨てていた。
+ * サーバに上がっていなくても「防衛編成を登録しました」と出るので、
+ * **本人は登録できたつもりのまま誰にも挑まれない**(依頼主の指摘)。
+ * しかも理由が無いので、手の打ちようがなかった。
+ */
+describe("防衛編成の登録の結果", () => {
+  it("通った時だけ ok", async () => {
+    connect(stubFetch({ ok: true, unitCount: 4 }));
+    await expect(pushArenaDefense(snapshot())).resolves.toEqual({ ok: true, reached: true, reason: null });
+  });
+
+  it("断られた理由を、符丁ごと持ち帰る", async () => {
+    // 照合表に無いモンスターを入れた時に、サーバが返す形
+    connect(stubFetch({ message: "UNKNOWN_DEX_ID: gujira_WATER", code: "P0001" }, false));
+    const result = await pushArenaDefense(snapshot());
+    expect(result.ok).toBe(false);
+    expect(result.reached, "届いたことが落ちている").toBe(true);
+    expect(result.reason).toContain("UNKNOWN_DEX_ID: gujira_WATER");
+  });
+
+  /*
+   * **「届かなかった」と「断られた」を混ぜない。**
+   * 前者は繋がれば同じ編成のまま通る。後者は編成を直さないと永久に通らない。
+   * 打つ手がまるで違うので、画面の文も分ける。
+   */
+  it("届かなかった時は理由が無い", async () => {
+    connect(vi.fn(async () => { throw new Error("offline"); }));
+    await expect(pushArenaDefense(snapshot())).resolves.toEqual({ ok: false, reached: false, reason: null });
+  });
+});
+
+describe("防衛編成の登録が画面へ届く道", () => {
+  const MAIN = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+  const TEAMS = readFileSync(new URL("../src/web/views/arena/teams.ts", import.meta.url), "utf8");
+
+  it("投げっぱなしにしない(結果を待って見せる)", () => {
+    const at = MAIN.indexOf("onRegisterDefense:");
+    expect(at).toBeGreaterThan(-1);
+    const block = MAIN.slice(at, at + 2600);
+    expect(block, "結果を捨てている").not.toContain("void pushArenaDefense(");
+    expect(block).toContain("await pushArenaDefense(");
+    // 断られた時と届かなかった時で、別の文を出す
+    expect(block).toContain("サーバが防衛編成を受け付けませんでした");
+    expect(block).toContain("サーバへ届きませんでした");
+  });
+
+  it("成功するまで「登録しました」と言わない", () => {
+    const at = MAIN.indexOf("onRegisterDefense:");
+    const block = MAIN.slice(at, at + 2600);
+    // コメントにも同じ文言があるので、**実際に画面へ出す行**だけを見る
+    const success = block.indexOf("state.arenaNotice = `防衛編成を登録しました");
+    const flag = block.indexOf("state.player.arenaDefenseSyncedAt = Date.now()");
+    expect(flag, "届いた印を焼いていない").toBeGreaterThan(-1);
+    expect(success, "成功の文が、届いた印より前にある").toBeGreaterThan(flag);
+  });
+
+  it("組み直したら、届いた印を落とす", () => {
+    // 古い姿が上がったままなのに「登録済み」と出してはいけない
+    const at = MAIN.indexOf("onRegisterDefense:");
+    const block = MAIN.slice(at, at + 2600);
+    expect(block).toContain("delete state.player.arenaDefenseSyncedAt");
+  });
+
+  it("画面が「相手として並ぶか」を言い切る", () => {
+    expect(TEAMS).toContain("props.player.arenaDefenseSyncedAt");
+    expect(TEAMS).toContain("サーバへ届いています。相手として並びます");
+    expect(TEAMS).toContain("まだサーバへ届いていません");
   });
 });

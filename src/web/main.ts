@@ -4520,12 +4520,50 @@ function renderScreen(): void {
            */
           state.player.arenaDefenseIds = [...state.arenaDefenseDraftIds];
           state.player.arenaDefenseSnapshot = captureArenaDefense(members, state.player.equipment);
+          // **新しい姿はまだ届いていない。**古い「届いた」を残すと嘘になる
+          delete state.player.arenaDefenseSyncedAt;
           savePlayerState(state.player);
-          // 繋がっていれば上げる。失敗しても控えには残っているので進行は止めない
-          void pushArenaDefense(state.player.arenaDefenseSnapshot);
-          state.arenaNotice = `防衛編成を登録しました（${members.length}体）`;
-          playSfx("stageClear");
+          state.arenaNotice = "防衛編成をサーバへ登録しています…";
           render();
+
+          /*
+           * **結果を見せる。**
+           *
+           * 以前は `void` で投げっぱなしにして、その場で
+           * 「防衛編成を登録しました」と出していた。サーバに上がっていなくても
+           * 同じ文が出るので、**本人は登録できたつもりのまま相手として
+           * 誰にも並ばない**(依頼主の指摘)。しかも理由が無いので手の打ちようがない。
+           *
+           * 手元の控えは既に保存してあるので、失敗しても進行は止まらない。
+           * 伝えるのは「いま相手として並んでいるかどうか」と、その理由。
+           */
+          void (async () => {
+            const snapshot = state.player.arenaDefenseSnapshot;
+            if (!snapshot) return;
+            await connectArena();
+            const result = await pushArenaDefense(snapshot);
+            // 待っている間に組み直していたら、古い結果は捨てる
+            if (state.player.arenaDefenseSnapshot !== snapshot) return;
+
+            if (result.ok) {
+              state.player.arenaDefenseSyncedAt = Date.now();
+              savePlayerState(state.player);
+              state.arenaNotice = `防衛編成を登録しました（${members.length}体）`;
+              playSfx("stageClear");
+            } else if (result.reason) {
+              // 断られた。**編成を直さないと、繋がっていても永久に通らない**
+              state.arenaNotice = `サーバが防衛編成を受け付けませんでした。いまは相手として並びません。${
+                arenaRefusalText(result.reason, (dexId) => findMonsterById(dexId)?.name ?? null)
+              }`;
+              playSfx("denied", 0.7);
+            } else {
+              // 届かなかった。**繋がれば同じ編成のまま通る**
+              state.arenaNotice = "サーバへ届きませんでした。編成は手元に残っていますが、"
+                + "いまは相手として並びません。通信できる時にもう一度登録してください";
+              playSfx("denied", 0.7);
+            }
+            render();
+          })();
         },
         onBuy: (itemId) => {
           /*

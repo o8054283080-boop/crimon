@@ -137,6 +137,18 @@ export function renderArenaDefense(props: PvpArenaProps): HTMLElement {
         el("p", { className: "ar-note" }, [
           "登録した瞬間の姿が保存されています。この後に装備を外しても、相手の画面ではこの姿のまま戦います",
         ]),
+        /*
+         * **手元にあることと、相手として並んでいることは別。**
+         *
+         * ここは焼いた姿を出すだけだったので、サーバへ上がっていなくても
+         * 「登録中の防衛編成」と見えていた。誰にも挑まれないまま、
+         * 本人は登録できたつもりでいる(依頼主の指摘)。届いたかを言い切る。
+         */
+        props.player.arenaDefenseSyncedAt
+          ? el("p", { className: "ar-note ar-registered__synced" }, ["✓ サーバへ届いています。相手として並びます"])
+          : el("p", { className: "ar-warn" }, [
+            "⚠ まだサーバへ届いていません。この編成は相手として並びません。通信できる時にもう一度登録してください",
+          ]),
         registered.usableCount === 0
           ? el("p", { className: "ar-warn" }, ["この編成は戦える状態ではありません。組み直して登録してください"])
           : null,

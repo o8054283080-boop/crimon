@@ -298,6 +298,18 @@ export interface PlayerState {
   arenaCoins: number;
   /** 防衛パーティを登録した時点の姿。登録後に本人が何をしても壊れない */
   arenaDefenseSnapshot: ArenaDefenseSnapshot | null;
+  /**
+   * その姿が**サーバへ届いた**時刻。届いていなければ未設定。
+   *
+   * **手元にあることと、相手として並んでいることは別。**
+   * 以前は登録の成否を見ずに「登録しました」と出していたので、
+   * サーバへ上がっていなくても本人は登録できたつもりでいた
+   * ——誰にも挑まれないまま、理由も分からない(依頼主の指摘)。
+   *
+   * 焼いた姿が変われば0に戻す。**古い姿が上がったままなのに
+   * 「登録済み」と出してはいけない。**
+   */
+  arenaDefenseSyncedAt?: number;
   /** 攻撃と防衛の記録。新しいものが先頭 */
   arenaMatchHistory: ArenaMatchRecord[];
   /** 直近で候補に出した相手。同じ顔ぶれが続かないようにする */
@@ -826,6 +838,17 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
    */
   if (typeof state.arenaCoins !== "number" || !Number.isFinite(state.arenaCoins) || state.arenaCoins < 0) state.arenaCoins = 0;
   if (!state.arenaDefenseSnapshot || !Array.isArray(state.arenaDefenseSnapshot.units)) state.arenaDefenseSnapshot = null;
+  /*
+   * 焼いた姿が無いのに「届いている」は有り得ない。
+   * **前から遊んでいる人には、この控えが丸ごと無い。**
+   * その人たちは「届いたか分からない」から始まる(嘘の「登録済み」は出さない)。
+   */
+  if (!state.arenaDefenseSnapshot
+    || typeof state.arenaDefenseSyncedAt !== "number"
+    || !Number.isFinite(state.arenaDefenseSyncedAt)
+    || state.arenaDefenseSyncedAt <= 0) {
+    delete state.arenaDefenseSyncedAt;
+  }
   if (!Array.isArray(state.arenaMatchHistory)) state.arenaMatchHistory = [];
   if (state.arenaMatchHistory.length > ARENA_HISTORY_MAX) state.arenaMatchHistory.length = ARENA_HISTORY_MAX;
   if (!Array.isArray(state.arenaRecentOpponentIds)) state.arenaRecentOpponentIds = [];

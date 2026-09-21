@@ -23,7 +23,7 @@
 html:has(.crimon-home),
 body:has(.crimon-home) {
   --home-header-h: 106px;
-  --home-nav-base-h: 82px;
+  --home-nav-base-h: 70px;
   /* 実機ではノッチ／ホームインジケーターの高さが入る。previewではこの変数を
    * 一時的に差し替え、safe-area がある状態も検査できるようにする。 */
   --home-safe-top: env(safe-area-inset-top);
@@ -370,7 +370,7 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
 }
 
 @media (max-width: 405px) {
-  body:has(.crimon-home) { --home-header-h: 100px; --home-nav-base-h: 78px; }
+  body:has(.crimon-home) { --home-header-h: 100px; --home-nav-base-h: 66px; }
   .crimon-resource-header { grid-template-columns: minmax(0, 1fr) 154px !important; }
   /* 390px幅でも、お詫び／ミッションの獲得数を切らずに読める密度にする。 */
   .crimon-home .reward-banner { gap: 4px !important; padding-inline: 5px !important; }
@@ -659,7 +659,17 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
    * 変数なら注入して実機相当を再現できる。 */
   height: 100dvh !important;
   padding-top: max(12px, var(--home-safe-top)) !important;
-  padding-bottom: calc(var(--bottom-nav-h) + 4px) !important;
+  /*
+   * **+4px では、実機でプレゼントが沈む。**
+   *
+   * 枠は `flex:1 1 auto` で余りを全部吸うので、**バーを低くしても
+   * その分まで枠が伸びて隙間は変わらない**(実測: バーを112→94pxにしても
+   * プレゼントの下は17pxのまま)。隙間はここで先に取り置くしかない。
+   *
+   * 確認用ブラウザには safe-area が無いので、**こちらでは17pxに見えていて
+   * 沈んでいることに気づけない。**`tools/homeSafeArea.mjs` で測ること。
+   */
+  padding-bottom: calc(var(--bottom-nav-h) + 28px) !important;
 }
 
 /* 下タブも同じ理由で変数を通す。ここが `env()` 直書きのままだと、

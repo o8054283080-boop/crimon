@@ -95,3 +95,54 @@ describe("巡回の検査", () => {
     expect(INSPECT).toContain("'fixed' || pos === 'sticky'");
   });
 });
+
+/**
+ * ホームの下端。**プレゼントが下のバーに食い込んでいた**(依頼主の実機)。
+ *
+ * ## なぜ字面で見張るのか
+ *
+ * **確認用ブラウザには safe-area が無い。**こちらでは隙間が17pxに見えていて、
+ * 実機で沈んでいることに気づけない。実測は `tools/homeSafeArea.mjs` が
+ * 変数を注入してやるが、あれは手で走らせる道具なので、
+ * 値が戻されたことを機械的に拾えるのはここだけ。
+ *
+ * ## 「バーを低くすれば空く」は効かない
+ *
+ * 世界の枠は `flex:1 1 auto` で余りを全部吸う。**バーを112→94pxにしても、
+ * プレゼントの下は17pxのままだった**(実測)。隙間は
+ * `.crimon-home` の下余白で先に取り置くしかない。
+ */
+describe("ホームの下端に、バーとの隙間がある", () => {
+  const css = read("home-pop-design.css");
+
+  it("下余白がバーの高さ + 余裕になっている", () => {
+    const at = css.indexOf("padding-bottom: calc(var(--bottom-nav-h)");
+    expect(at, "ホームの下余白が --bottom-nav-h を通っていない").toBeGreaterThan(-1);
+    const extra = /padding-bottom: calc\(var\(--bottom-nav-h\) \+ (\d+)px\)/.exec(css.slice(at));
+    expect(extra, "余裕のpxが読めない").not.toBeNull();
+    /*
+     * 実測(`tools/homeSafeArea.mjs`)で、ここが+4pxだとプレゼントの下は17px。
+     * +28pxで41pxになる。**17pxでは実機で沈む**ので、20px以上は残す。
+     */
+    expect(Number(extra![1]), "バーとの隙間が足りない(実機でプレゼントが沈む)").toBeGreaterThanOrEqual(20);
+  });
+
+  it("safe-area は変数を通す(確認用ブラウザで測れなくなる)", () => {
+    // 上下とも `--home-safe-*` を通していること
+    expect(css).toContain("padding-top: max(12px, var(--home-safe-top))");
+    expect(css).toContain("padding-bottom: max(6px, var(--home-safe-bottom))");
+    // ホームの箱の指定に `env()` を直書きしていないこと
+    const at = css.indexOf("padding-top: max(12px, var(--home-safe-top))");
+    const body = css.slice(at - 400, at + 400);
+    expect(body, "env() を直に書くと、実機相当を注入して測れない").not.toContain("env(safe-area-inset");
+  });
+
+  it("バーの高さは、指で押せる大きさを保つ", () => {
+    const base = /--home-nav-base-h:\s*(\d+)px/.exec(css);
+    expect(base, "バーの基準の高さが読めない").not.toBeNull();
+    // safe-area を除いた実質がボタンの高さになる。36pxを割ると巡回が落ちる
+    expect(Number(base![1]), "バーが低すぎて的が小さくなる").toBeGreaterThanOrEqual(56);
+    // 低くした意味が無くならないよう、上も見る(元は82px)
+    expect(Number(base![1]), "バーを低くした変更が戻っている").toBeLessThanOrEqual(76);
+  });
+});
