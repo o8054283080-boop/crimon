@@ -79,6 +79,14 @@
   line-height: 1.55;
 }
 
+/* 届いていることの印。**警告と同じ重さでは出さない。**
+   困りごとは「届いていない時に気づけない」ことなので、
+   注意を引くのは警告の側だけでよい */
+.ar-registered__synced {
+  color: #9fe6bd;
+  font-weight: 700;
+}
+
 .ar-chip {
   display: inline-flex;
   align-items: center;

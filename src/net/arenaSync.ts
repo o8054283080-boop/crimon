@@ -479,15 +479,44 @@ export async function fetchArenaOpponents(
   }
 }
 
-/** 防衛編成を登録する。**成否だけ返す** */
-export async function pushArenaDefense(snapshot: ArenaDefenseSnapshot): Promise<boolean> {
+/**
+ * 防衛編成の登録の結果。
+ *
+ * **成否だけでは足りない。**「届かなかった」と「届いたが断られた」は
+ * 打つ手がまるで違う(前者は繋がれば通る / 後者は編成を直さないと永久に通らない)。
+ * 断られた理由は `arenaRefusalText` が読める言葉にする。
+ */
+export interface ArenaDefensePushResult {
+  ok: boolean;
+  /** サーバまで届いて返事をもらえたか。false は通信断・時間切れ・未設定 */
+  reached: boolean;
+  /** 断られた理由。サーバの言葉をそのまま(例: `UNKNOWN_DEX_ID: gujira_WATER`) */
+  reason: string | null;
+}
+
+/**
+ * 防衛編成を登録する。
+ *
+ * **投げっぱなしにしない。**以前は `boolean` を返すだけで、呼ぶ側も
+ * `void` で捨てていた。そのため**サーバに上がっていなくても
+ * 「防衛編成を登録しました」と出て**、本人は登録できたつもりのまま
+ * 相手として誰にも並んでいない、ということが起きた(依頼主の指摘)。
+ */
+export async function pushArenaDefense(snapshot: ArenaDefenseSnapshot): Promise<ArenaDefensePushResult> {
   try {
-    if (!arenaSyncAvailable()) return false;
-    if (!snapshot || !Array.isArray(snapshot.units) || snapshot.units.length < 1) return false;
-    const result = await callRpc("arena_set_defense", { p_snapshot: snapshot });
-    return isRecord(result) && result.ok === true;
+    if (!arenaSyncAvailable()) return { ok: false, reached: false, reason: null };
+    if (!snapshot || !Array.isArray(snapshot.units) || snapshot.units.length < 1) {
+      return { ok: false, reached: false, reason: "EMPTY_DEFENSE" };
+    }
+    const outcome = await callRpcDetailed("arena_set_defense", { p_snapshot: snapshot });
+    if (!outcome.reached) return { ok: false, reached: false, reason: null };
+    const result = outcome.value;
+    if (!isRecord(result) || result.ok !== true) {
+      return { ok: false, reached: true, reason: outcome.error };
+    }
+    return { ok: true, reached: true, reason: null };
   } catch {
-    return false;
+    return { ok: false, reached: false, reason: null };
   }
 }
 
@@ -621,6 +650,8 @@ export function arenaRefusalText(
     UNKNOWN_SET: "この装備シリーズはサーバの照合表にまだ載っていません",
     UNKNOWN_LATENT: "この潜在覚醒はサーバの照合表にまだ載っていません",
     INVALID_TICKET: "サーバの返事が読めませんでした",
+    // 防衛編成の登録で使う。ここへ来る前に画面が弾いているはずの形
+    EMPTY_DEFENSE: "登録する編成が空です",
   };
   const text = known[head];
   if (!text) return `サーバが対戦を受け付けませんでした（${reason}）`;

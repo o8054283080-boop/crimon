@@ -20,7 +20,13 @@
  *   node tools/harness.mjs &
  *   HARNESS_PORT=<port> node tools/homeSafeArea.mjs
  *
- * ホーム画面を開いた状態で走らせる(タイトル画面のままだと測れない)。
+ * **ホームは自分で開く。**以前は「開いた状態で走らせること」と書いてあったが、
+ * サイズを変えるたびに `goto` からやり直す必要があるので、毎回タイトル画面に
+ * 戻ってしまい `getBoundingClientRect of null` で測れなかった。
+ *
+ * **下のバーの余白も注入する。**`mobile-ux.css` が `.bottom-nav` へ
+ * `env()` を直に書いているので、変数を差し替えてもバーの高さだけが
+ * 実機と合わない(CLAUDE.md が禁じている書き方が残っている)。
  */
 const PORT = process.env.HARNESS_PORT ?? "7784";
 
@@ -45,7 +51,9 @@ const CASES = [
 const MEASURE = `(() => {
   const d = document.scrollingElement;
   d.scrollTop = 9999; const scrolled = d.scrollTop; d.scrollTop = 0;
-  const world = document.querySelector(".home-world").getBoundingClientRect();
+  const worldEl = document.querySelector(".home-world");
+  if (!worldEl) return null;
+  const world = worldEl.getBoundingClientRect();
   const nav = document.querySelector(".bottom-nav").getBoundingClientRect();
   const buttons = [...document.querySelectorAll(".world-actions--left .world-action, .world-actions--right .world-action")];
   const hidden = buttons.filter((button) => {
@@ -56,16 +64,51 @@ const MEASURE = `(() => {
   const small = buttons.filter((button) => button.getBoundingClientRect().height < 44)
     .map((button) => (button.getAttribute("aria-label") || button.textContent || "").trim().slice(0, 8));
   const step = Math.round(buttons[0].getBoundingClientRect().height);
-  return { scrolled, hidden, small, step, world: Math.round(world.height), gap: Math.round(nav.top - world.bottom) };
+  /*
+   * **プレゼントは左の縦列の一番下。**実機で下のバーに沈んだのがここなので、
+   * バーの上端との隙間を数字で出す。40px を切ったら危ない。
+   */
+  const gift = document.querySelector('[data-tour="tile:giftBox"]');
+  const giftGap = gift ? Math.round(nav.top - gift.getBoundingClientRect().bottom) : null;
+  return {
+    scrolled, hidden, small, step, giftGap,
+    world: Math.round(world.height),
+    gap: Math.round(nav.top - world.bottom),
+    nav: Math.round(nav.height),
+  };
 })()`;
 
-for (const c of CASES) {
+/** タイトル画面を押してホームへ入る。safe-area も注入する */
+async function openHome(c) {
+  await probe("goto", { path: "/", width: c.w, height: c.h });
   await probe("size", { width: c.w, height: c.h });
-  await new Promise((r) => setTimeout(r, 400));
+  await new Promise((r) => setTimeout(r, 500));
+  /*
+   * 変数の差し替えは**ホームへ入る前に**。`.crimon-home` が現れた瞬間から
+   * 高さの計算に使われるので、後から入れると一度ずれた姿で組まれる。
+   *
+   * `.bottom-nav` の余白だけは `mobile-ux.css` が `env()` を直書きしている。
+   * 変数を通っていないので、ここで直に足す(実機のバーはその分だけ高い)。
+   */
   await probe("eval", {
-    expression: `(() => { for (const el of [document.documentElement, document.body]) { el.style.setProperty("--home-safe-top","${c.top}px"); el.style.setProperty("--home-safe-bottom","${c.bottom}px"); } return "ok"; })()`,
+    expression: `(() => {
+      for (const el of [document.documentElement, document.body]) {
+        el.style.setProperty("--home-safe-top", "${c.top}px");
+        el.style.setProperty("--home-safe-bottom", "${c.bottom}px");
+      }
+      let style = document.getElementById("safe-area-probe");
+      if (!style) { style = document.createElement("style"); style.id = "safe-area-probe"; document.head.appendChild(style); }
+      style.textContent = ".bottom-nav{padding-bottom:max(6px, ${c.bottom}px) !important}";
+      const start = document.querySelector('[data-tour="start"]');
+      if (start) start.click();
+      return "ok";
+    })()`,
   });
-  await new Promise((r) => setTimeout(r, 400));
+  await new Promise((r) => setTimeout(r, 900));
+}
+
+for (const c of CASES) {
+  await openHome(c);
   const result = await probe("eval", { expression: MEASURE });
   const v = result.value;
   if (!v) { console.log(`${c.name.padEnd(18)} 測れず: ${JSON.stringify(result).slice(0, 120)}`); continue; }
@@ -73,6 +116,7 @@ for (const c of CASES) {
     v.scrolled === 0 ? "スクロール0" : `スクロール${v.scrolled}px`,
     v.hidden.length === 0 ? "全部押せる" : `押せない: ${v.hidden.join("/")}`,
     v.small.length === 0 ? "44px以上" : `小さい: ${v.small.join("/")}`,
+    v.giftGap === null ? "プレゼント無し" : `プレゼント下${v.giftGap}px`,
   ];
-  console.log(`${c.name.padEnd(18)} ${String(c.w)}x${c.h} 安全域${c.top}/${c.bottom}  世界${v.world}px 段${v.step}px 下余白${v.gap}px  ${marks.join(" / ")}`);
+  console.log(`${c.name.padEnd(18)} ${String(c.w)}x${c.h} 安全域${c.top}/${c.bottom}  バー${v.nav}px 世界${v.world}px 段${v.step}px 下余白${v.gap}px  ${marks.join(" / ")}`);
 }

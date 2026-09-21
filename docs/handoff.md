@@ -5,70 +5,29 @@
 守るべき約束と、繰り返し痛い目を見たことは `CLAUDE.md`(毎回自動で読まれる)にある。
 ここに書くのは**まだ終わっていない作業の中身**と、**その領域を触る時にだけ効く罠**。
 
-## いま残っている課題: ホームのプレゼントが下のバーと被る
+## ホームの下端(片付いた。測り方だけ残す)
 
-**未解決。**依頼主の実機(iPhone・PWA)で、左の縦メニューの一番下
-「プレゼント」が下のタブバーに食い込んでいる。
+依頼主の実機でプレゼントが下のバーに食い込んでいた件は `#389` で直した。
 
-### 確認用ブラウザでは見えない
+**「バーを低くすれば空く」は効かない。**世界の枠は `flex:1 1 auto` で
+余りを全部吸うので、バーを112→94pxにしても**プレゼントの下は17pxのまま**だった
+(実測)。隙間は `.crimon-home` の `padding-bottom` で先に取り置くしかない。
 
-`env(safe-area-inset-bottom)` が0で返るので、**下のバーが
-ホームインジケーターぶん(34px)低く写る。**この状態の画像を
-「収まっています」と見せてしまい、依頼主の実機とは別の画面を見せていた。
+いまは `calc(var(--bottom-nav-h) + 28px)` で、実機相当の隙間は41px。
+バーの基準の高さ(`--home-nav-base-h`)も 82→70px にしてある。
+`tests/bottomNavClearance.test.ts` が、この2つが戻されたら落ちる。
 
-`docs/dev-tools.md` の「確認用ブラウザには safe-area が無い」に
-書いてあることを、そのまま踏んだ。
+**測る道具は `tools/homeSafeArea.mjs`。**動くようになった(自分でホームを開く。
+`.bottom-nav` の余白も注入する——`mobile-ux.css` が `env()` を直書きしていて
+変数を通っていないため)。ホームの縦を触ったら必ず走らせること:
 
-### 再現のしかた
-
-`tools/homeSafeArea.mjs` は**いま動かない**
-(`getBoundingClientRect` が null。タイトル画面を押していないため)。
-**まずこの道具を直すこと。**手で注入していては同じ見落としを繰り返す。
-
-手で再現する場合:
-
-```js
-// 393x852 で開いてから
-const st = document.createElement('style');
-st.textContent = 'html:has(.crimon-home),body:has(.crimon-home){'
-  + '--home-safe-top:59px !important;--home-safe-bottom:34px !important}'
-  + '.bottom-nav{padding-bottom:34px !important}';
-document.head.appendChild(st);
-document.querySelector('[data-tour=start]').click();
+```
+node tools/harness.mjs &
+HARNESS_PORT=5311 node tools/homeSafeArea.mjs
 ```
 
-### 測った値(393x852・safe-area あり)
-
-| | 位置 |
-|---|---|
-| 世界の枠の下端 | 736px |
-| 下のバーの上端 | 740px |
-| プレゼントの下端 | 723px |
-
-**枠とバーのすき間が4pxしかない。**段は枠の中には収まっているが
-余裕がゼロなので、実機のわずかな差(dvhの扱い、バーの実高)で食い込む。
-
-### 試して戻したこと
-
-`.world-actions--left/--right` へ `bottom` と `justify-content:space-between`、
-段へ `min-height:44px; flex:0 1 auto` を入れた。
-**すき間が17pxのまま変わらず、効いていることを確認できなかった。**
-320x568 では逆に3つが押せなくなった(元からかは未確認)。
-効果を確認できない変更は残さない方がよいので戻した。
-
-### 根本はどこか
-
-- 世界の枠の高さ計算
-  (`src/web/crimon-visual-system.css` の
-  `calc(100dvh - var(--bottom-nav-h) - 72px - 82px - 48px - 5px ...)`)
-- **`src/web/mobile-ux.css` が `.bottom-nav` へ `env()` を直書きしている。**
-  `--home-safe-bottom` を通していないので、変数を差し替えても
-  バーの高さだけが実機と合わない。CLAUDE.md が禁じている書き方が残っている
-
-### 出す前に確かめること
-
-実機サイズ × safe-area あり で「バーとのすき間」を測り、
-**40px以上**を確保してから出す。17pxでは足りない。
+6機種ぶんの「バーの高さ / 世界の枠 / 段 / 下余白 / プレゼントの下の隙間」が出る。
+**プレゼントの下は40px以上を保つこと。**17pxでは実機で沈む。
 
 ---
 
@@ -662,8 +621,9 @@ probe が「Target page… has been closed」を返す)。詳しくは `docs/dev
 
 手で確かめたい時は、Actions から `dry_run` を付けて押すと本番の件数だけが出る。
 
-**まだ直っていないこと: 防衛編成の登録が失敗しても画面に何も出ない。**
-`pushArenaDefense` は成否だけを返して捨てている(`src/net/arenaSync.ts`)。
-今回もコラボのモンスターを置いた人は防衛を登録できておらず、
-**相手として誰にも並んでいなかったのに、本人にはその自覚が無かった。**
-挑戦側と同じように理由を出すのが筋。
+**防衛編成の登録の失敗は `#389` で直した。**`pushArenaDefense` は
+`{ ok, reached, reason }` を返す。**「届かなかった」と「断られた」を混ぜない**
+——前者は繋がれば同じ編成のまま通り、後者は編成を直さないと永久に通らない。
+届いた時刻は `arenaDefenseSyncedAt` に焼き、防衛の画面が
+「✓ サーバへ届いています」/「⚠ まだ届いていません」を常に出す。
+**組み直したらこの印を落とす**(古い姿が上がったまま「登録済み」と出さない)。
