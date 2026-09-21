@@ -627,3 +627,42 @@ probe が「Target page… has been closed」を返す)。詳しくは `docs/dev
 届いた時刻は `arenaDefenseSyncedAt` に焼き、防衛の画面が
 「✓ サーバへ届いています」/「⚠ まだ届いていません」を常に出す。
 **組み直したらこの印を落とす**(古い姿が上がったまま「登録済み」と出さない)。
+
+## 管理者画面と管理API(片付いた。触る時の罠だけ残す)
+
+`crimon-admin` は**リポジトリに無かった。**Supabase の画面から直接貼って
+動かしていたので、手元から中身が読めず、**画面に項目を足せなかった**。
+`supabase functions download` で取り出して
+`supabase/functions/crimon-admin/` へ置き、
+`.github/workflows/admin-edge.yml` で **main へ入れば自動で流れる**ようにした。
+
+- **Supabase の画面から直接編集しないこと。**次に main が動いた時に消える
+- 数える所(`progress.ts`)には **Deno 固有のものを入れない。**
+  `jsr:` を1つでも取り込むと `tests/adminProgress.test.ts` が読めなくなり、
+  **数え方の誤りは本番で画面を開くまで気づけなくなる**
+- **日の切り方は日本時間で。**UTC のままだと朝9時が境目になり、
+  深夜に遊んだぶんが翌日へ回って山が丸ごと1日ずれる(`jstDay`)
+
+### 画面を実ブラウザで見る手順(ログインを通さずに済ませる)
+
+開発ビルドには接続設定が無いので、そのままでは「接続設定がありません」で止まる。
+`readEnv` は `import.meta.env` → `process.env` の順に見るので、**`process` を
+作って差し込めば `endpoint()` が通る**。あとは `fetch` を差し替えて偽の応答を返す。
+
+```js
+globalThis.process = { env: { VITE_SUPABASE_URL: "http://127.0.0.1:5310/fake", VITE_SUPABASE_ANON_KEY: "x" } };
+const real = window.fetch.bind(window);
+window.fetch = async (input, init) => { /* /fake 宛てだけ偽の JSON を返す */ };
+```
+
+その後 `[data-tour="start"]` → `.crimon-admin-entry` → ログイン欄へ何か入れて送信。
+**`.click()` の成否で「押せた」と判断しないこと**(覆われていても成功する)。
+`document.elementFromPoint` で最前面が自分かを見る。
+
+### ここで1つ踏んだ
+
+行の項目を `@media (max-width: 640px)` で `display:none` にしていた
+(列を3つに決め打ちしていた頃の名残)。**消えるのは「ダイヤ」と
+「モンスターの体数」**で、問い合わせを受けた時にまっ先に見る値だった。
+しかも消えたことは画面に出ないので、**端末によって答えが変わる。**
+いまは入るだけ並べて折り返す。`tests/adminPanel.test.ts` が戻されたら落とす。
