@@ -66,6 +66,63 @@ describe("精算のEdge Functionが本番へ届く道", () => {
 });
 
 /**
+ * 管理APIが本番へ届く道。
+ *
+ * ## ここは長いあいだ**リポジトリに無かった**
+ *
+ * `crimon-admin` は Supabase の画面から直接貼って動かしていた。そのせいで
+ *
+ *   - 手元から中身が読めず、**管理者画面に項目を足せなかった**
+ *     (サーバが返していないものは、画面側では出しようがない)
+ *   - 誰がいつ何を変えたのか、履歴がどこにも残らない
+ *
+ * 取り出して置き直したので、**押さずに流れる**形にしてある。
+ * ここが外れると、また「画面を開いて貼る」へ戻る——そして
+ * **リポジトリの中身と本番が黙って食い違う。**
+ */
+const ADMIN_EDGE = read("admin-edge.yml");
+
+describe("管理APIが本番へ届く道", () => {
+  it("main へ入ったら、押さなくても流れる", () => {
+    expect(ADMIN_EDGE).toMatch(/on:\s*\n\s*push:\s*\n\s*branches:\s*\[main\]/);
+    expect(ADMIN_EDGE).toContain("supabase/functions/crimon-admin/**");
+  });
+
+  it("deploy のステップがある(消えても成功と出る)", () => {
+    expect(ADMIN_EDGE).toContain("functions deploy crimon-admin");
+  });
+
+  it("鍵が無い時は、黙って素通りせずに落とす", () => {
+    expect(ADMIN_EDGE).toContain("SUPABASE_ACCESS_TOKEN が未登録です");
+  });
+
+  it("関数の中身がリポジトリにある", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("../supabase/functions/crimon-admin/index.ts", import.meta.url)),
+      "utf8",
+    );
+    // 画面が叩く4つ。1つでも消えると、その操作が丸ごと効かなくなる
+    for (const action of ["login", "change_password", "dashboard", "arena_detail"]) {
+      expect(source, `${action} が無い`).toContain(`action === "${action}"`);
+    }
+  });
+
+  it("鍵の値がソースに焼き込まれていない", () => {
+    /*
+     * **このリポジトリは公開されている。**service_role の鍵が1行でも入れば、
+     * 守り全部が無意味になる。環境変数から読む形だけを許す。
+     */
+    const source = readFileSync(
+      fileURLToPath(new URL("../supabase/functions/crimon-admin/index.ts", import.meta.url)),
+      "utf8",
+    );
+    expect(source).toContain('Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")');
+    expect(source, "JWT らしき値が入っている").not.toMatch(/eyJ[A-Za-z0-9_-]{30,}/);
+    expect(source, "秘密鍵らしき値が入っている").not.toMatch(/sb_secret_[A-Za-z0-9_-]{10,}/);
+  });
+});
+
+/**
  * **`run:` のスクリプトが、シェルとして通る形か。**
  *
  * 実際に壊れたまま3回 main へ入っている。`'^[a-z0-9]{20}$'` の
