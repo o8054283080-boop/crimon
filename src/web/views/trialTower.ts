@@ -138,21 +138,60 @@ function renderRankingRow(entry: TrialTowerRankingEntry, selfId: string | null):
   ]);
 }
 
+/** 塔のランキングの入力。**塔の画面とホームの一覧の両方が同じ表を出す** */
+export interface TrialTowerRankingInput {
+  loading: boolean;
+  offline: boolean;
+  error: boolean;
+  entries: readonly TrialTowerRankingEntry[];
+  self: TrialTowerRankingEntry | null;
+  onReload: () => void;
+}
+
+/**
+ * 表の中身だけ。**外枠は呼ぶ側が持つ。**
+ *
+ * 塔の中の小窓と、ホームから開く一覧が同じ表を出す。
+ * 片方だけ直すと、同じ順位が2つの見た目で並ぶ。
+ */
+export function renderTrialTowerRankingBody(input: TrialTowerRankingInput): HTMLElement {
+  const selfId = input.self?.userId ?? null;
+  if (input.loading) return el("p", { className: "tower-ranking__state" }, ["ランキングを読み込んでいます…"]);
+  if (input.offline) {
+    return el("div", { className: "tower-ranking__state" }, [
+      el("p", {}, ["いまは通信につながっていないため、ほかのプレイヤーの記録は見られません。"]),
+      el("p", {}, ["自分の最高到達階は、つながった時にまとめて反映されます。"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: input.onReload }, ["もう一度試す"]),
+    ]);
+  }
+  if (input.error) {
+    return el("div", { className: "tower-ranking__state" }, [
+      el("p", {}, ["ランキングを取得できませんでした"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: input.onReload }, ["もう一度試す"]),
+    ]);
+  }
+  if (input.entries.length === 0) return el("p", { className: "tower-ranking__state" }, ["まだ到達記録がありません"]);
+  return el("div", { className: "tower-ranking__list" }, input.entries.map((entry) => renderRankingRow(entry, selfId)));
+}
+
+/** 「あなたは◯位」の行。表の下に添える */
+export function renderTrialTowerRankingSelf(self: TrialTowerRankingEntry | null): HTMLElement | null {
+  if (!self) return null;
+  return el("div", { className: "tower-ranking__self" }, [
+    el("span", {}, ["あなた"]),
+    el("strong", {}, [`${self.rank}位 / ${rankingFloor(self)}`]),
+  ]);
+}
+
 function renderRankingModal(props: TrialTowerProps): HTMLElement {
-  const selfId = props.rankingSelf?.userId ?? null;
-  let body: HTMLElement;
-  if (props.rankingLoading) body = el("p", { className: "tower-ranking__state" }, ["ランキングを読み込んでいます…"]);
-  else if (props.rankingOffline) body = el("div", { className: "tower-ranking__state" }, [
-    el("p", {}, ["いまは通信につながっていないため、ほかのプレイヤーの記録は見られません。"]),
-    el("p", {}, ["自分の最高到達階は、つながった時にまとめて反映されます。"]),
-    el("button", { type: "button", className: "btn btn--ghost", onclick: props.onReloadRanking }, ["もう一度試す"]),
-  ]);
-  else if (props.rankingError) body = el("div", { className: "tower-ranking__state" }, [
-    el("p", {}, ["ランキングを取得できませんでした"]),
-    el("button", { type: "button", className: "btn btn--ghost", onclick: props.onReloadRanking }, ["もう一度試す"]),
-  ]);
-  else if (props.rankingEntries.length === 0) body = el("p", { className: "tower-ranking__state" }, ["まだ到達記録がありません"]);
-  else body = el("div", { className: "tower-ranking__list" }, props.rankingEntries.map((entry) => renderRankingRow(entry, selfId)));
+  const body = renderTrialTowerRankingBody({
+    loading: props.rankingLoading,
+    offline: props.rankingOffline,
+    error: props.rankingError,
+    entries: props.rankingEntries,
+    self: props.rankingSelf,
+    onReload: props.onReloadRanking,
+  });
 
   return el("div", { className: "tower-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "tower-ranking-title", "data-tour": "tower-ranking" }, [
     el("button", { type: "button", className: "tower-modal__backdrop", "aria-label": "閉じる", onclick: props.onClosePanel }, []),
@@ -166,12 +205,7 @@ function renderRankingModal(props: TrialTowerProps): HTMLElement {
       ]),
       el("p", { className: "tower-modal__lead" }, ["歴代最高階の高い順。同じ階では先に到達したプレイヤーが上位です。"]),
       body,
-      props.rankingSelf
-        ? el("div", { className: "tower-ranking__self" }, [
-            el("span", {}, ["あなた"]),
-            el("strong", {}, [`${props.rankingSelf.rank}位 / ${rankingFloor(props.rankingSelf)}`]),
-          ])
-        : null,
+      renderTrialTowerRankingSelf(props.rankingSelf),
     ])),
   ]);
 }

@@ -37,6 +37,8 @@ export interface HomeProps {
   onGoMonsters: () => void;
   onGoEquipment: () => void;
   onGoMonsterDex: () => void;
+  /** ランキング(アリーナ・試練の塔)。**押せないまま置いてあったのを繋いだ** */
+  onGoRankings: () => void;
   onGoStages: () => void;
   onGoParty: () => void;
   onViewPartyMonster: (instanceId: string) => void;
@@ -967,7 +969,7 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("div", { className: "world-actions world-actions--left" }, [
           worldButton("left", "menu-mission", "ミッション", openTutorial),
           worldButton("left", "menu-dex", "図鑑", props.onGoMonsterDex),
-          worldButton("left", "menu-ranking", "ランキング"),
+          worldButton("left", "menu-ranking", "ランキング", props.onGoRankings),
           worldButton("left", "menu-help", "遊び方", onGoHowToPlay),
           // **お知らせはここに挟まる。**`noticeUi.ts` が「遊び方」の直後へ
           // 差し込むので、並びは 遊び方 → お知らせ → プレゼント になる

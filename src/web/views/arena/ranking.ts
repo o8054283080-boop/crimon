@@ -37,48 +37,56 @@ function renderRow(entry: ArenaRankingEntry, mine: boolean): HTMLElement {
   ]));
 }
 
+/**
+ * 表の中身だけ。**外枠は呼ぶ側が持つ。**
+ *
+ * アリーナの中の「ランキング」と、ホームから開く一覧の両方が同じ表を出す。
+ * 片方だけ直すと、同じ順位が2つの見た目で並ぶことになるので、ここを1つにする。
+ */
+export function renderArenaRankingBody(input: {
+  online: boolean;
+  loading: boolean;
+  top: readonly ArenaRankingEntry[];
+  around: readonly ArenaRankingEntry[];
+  myUserId: string | null;
+}): HTMLElement[] {
+  const view = arenaRankingView(input);
+  if (view.unavailableText) {
+    return [
+      el("section", { className: "panel" }, nodes([
+        el("p", { className: "ar-empty" }, [view.unavailableText]),
+        !view.online
+          ? el("p", { className: "ar-note" }, [
+            "この端末の中だけで遊べる状態です。レート・コイン・報酬はすべて動きますが、他の人と順位を並べることはできません",
+          ])
+          : null,
+      ])),
+    ];
+  }
+  return nodes([
+    view.around.length > 0
+      ? el("section", { className: "panel ar-rank" }, [
+        el("h2", {}, ["自分の周辺"]),
+        el("div", { className: "ar-rank__list" }, view.around.map((entry) => renderRow(entry, entry.userId === input.myUserId))),
+      ])
+      : null,
+    view.top.length > 0
+      ? el("section", { className: "panel ar-rank" }, [
+        el("h2", {}, [`上位 ${view.top.length} 人`]),
+        el("div", { className: "ar-rank__list" }, view.top.map((entry) => renderRow(entry, entry.userId === input.myUserId))),
+      ])
+      : null,
+  ]);
+}
+
 export function renderArenaRanking(props: PvpArenaProps): HTMLElement {
-  const view = arenaRankingView({
+  const body = renderArenaRankingBody({
     online: props.online,
     loading: props.ranking.loading,
     top: props.ranking.top,
     around: props.ranking.around,
     myUserId: props.ranking.myUserId,
   });
-
-  const body: (HTMLElement | null)[] = view.unavailableText
-    ? [
-        el("section", { className: "panel" }, nodes([
-          el("p", { className: "ar-empty" }, [view.unavailableText]),
-          !view.online
-            ? el("p", { className: "ar-note" }, [
-                "この端末の中だけで遊べる状態です。レート・コイン・報酬はすべて動きますが、他の人と順位を並べることはできません",
-              ])
-            : null,
-        ])),
-      ]
-    : [
-        view.around.length > 0
-          ? el("section", { className: "panel ar-rank" }, [
-              el("h2", {}, ["自分の周辺"]),
-              el(
-                "div",
-                { className: "ar-rank__list" },
-                view.around.map((entry) => renderRow(entry, entry.userId === props.ranking.myUserId)),
-              ),
-            ])
-          : null,
-        view.top.length > 0
-          ? el("section", { className: "panel ar-rank" }, [
-              el("h2", {}, [`上位 ${view.top.length} 人`]),
-              el(
-                "div",
-                { className: "ar-rank__list" },
-                view.top.map((entry) => renderRow(entry, entry.userId === props.ranking.myUserId)),
-              ),
-            ])
-          : null,
-      ];
 
   return el("div", { className: "screen ar-screen" }, nodes([
     el("header", { className: "app-header" }, [el("h1", {}, ["ランキング"])]),
