@@ -33,6 +33,10 @@ export interface ArenaNpcTeamMember {
   /** 図鑑ID(`ALL_DISPLAYABLE_MONSTERS_DEX` に実在するもの) */
   dexId: string;
   role: ArenaNpcRole;
+  /** 上位NPC向けの個体別4個セット。未指定なら編成指定→役割既定の順で使う。 */
+  set?: SetType;
+  /** 個体別2個セット。未指定なら役割既定のsecondaryを使う。 */
+  secondarySet?: SetType;
 }
 
 /**
