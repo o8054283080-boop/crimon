@@ -66,6 +66,24 @@ function validRecoveryId(id: string): boolean {
   return /^[a-z][a-z0-9._-]{3,19}$/.test(id);
 }
 
+/**
+ * アリーナの身元(`auth.uid()`)。
+ *
+ * **アリーナの身元は端末の localStorage にしかない。**クラウドの控えにも
+ * セーブファイルにも入らないので、端末を変えたりサイトデータが消えたりすると
+ * 新しい匿名ユーザが生まれ、名前はセーブから来るので**ランキングに
+ * 同じ名前で2人並ぶ**(実際に起きた)。
+ *
+ * 復旧IDの側に覚えさせておけば、復旧した時に元の身元へ戻せる。
+ * **形だけを検める。**ここで持ち主かどうかは判定しない(判定はセッションの仕事)。
+ */
+function arenaUserId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
@@ -229,6 +247,8 @@ Deno.serve(async (req: Request) => {
         recovery_key_hash: recoveryKeyHash,
         latest_save: save,
         latest_revision: 1,
+        // 登録した端末のアリーナの身元。復旧した時に元へ戻すための覚え書き
+        arena_user_id: arenaUserId(body.arenaUserId),
       }).select("id,latest_revision,latest_saved_at").single();
       if (error) throw error;
 
@@ -251,7 +271,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: account, error } = await supabase
         .from("crimon_recovery_accounts")
-        .select("id,password_salt,password_hash,recovery_key_salt,recovery_key_hash,failed_attempts,locked_until,latest_revision,latest_saved_at,latest_save")
+        .select("id,password_salt,password_hash,recovery_key_salt,recovery_key_hash,failed_attempts,locked_until,latest_revision,latest_saved_at,latest_save,arena_user_id")
         .eq("recovery_id", recoveryId).maybeSingle();
       if (error) throw error;
       if (!account) return json(401, { ok: false, code: "INVALID_CREDENTIALS" });
@@ -281,6 +301,9 @@ Deno.serve(async (req: Request) => {
         savedAt: account.latest_saved_at,
         save: account.latest_save,
         session,
+        // **復旧する側へ、元のアリーナの身元を渡す。**
+        // 受け取った側は、自分の身元と違えば「別のアカウントになっている」と分かる
+        arenaUserId: account.arena_user_id ?? null,
       });
     }
 
@@ -289,7 +312,7 @@ Deno.serve(async (req: Request) => {
       if (!session) return json(401, { ok: false, code: "SESSION_INVALID" });
       const { data, error } = await supabase
         .from("crimon_recovery_accounts")
-        .select("latest_revision,latest_saved_at,latest_save")
+        .select("latest_revision,latest_saved_at,latest_save,arena_user_id")
         .eq("id", session.row.account_id).single();
       if (error) throw error;
       return json(200, {
@@ -297,6 +320,7 @@ Deno.serve(async (req: Request) => {
         revision: data.latest_revision,
         savedAt: data.latest_saved_at,
         save: data.latest_save,
+        arenaUserId: data.arena_user_id ?? null,
         // 延ばした期限を返す。クライアントは手元の期限も一緒に進める
         sessionExpiresAt: session.expiresAt,
       });
@@ -319,6 +343,16 @@ Deno.serve(async (req: Request) => {
         // 別の端末が先に上げていた。**古い方で上書きしない**
         if (String(error.message).includes("STALE_REVISION")) return json(409, { ok: false, code: "STALE_REVISION" });
         throw error;
+      }
+      /*
+       * **いま使っているアリーナの身元を覚え直す。**
+       * 控えと一緒に上がってくるので、機種を変えた後もここが最新になる。
+       * 送られてこない時は消さない(古い版のクライアントが上げた時に失いたくない)。
+       */
+      const arena = arenaUserId(body.arenaUserId);
+      if (arena) {
+        await supabase.from("crimon_recovery_accounts")
+          .update({ arena_user_id: arena }).eq("id", session.row.account_id);
       }
       return json(200, {
         ok: true,

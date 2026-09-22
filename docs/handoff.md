@@ -744,3 +744,48 @@ window.fetch = async (input, init) => { /* /fake 宛てだけ偽の JSON を返�
 いまは30通りの種を固定してある。**乱数の流れを30通り見る**という元の狙いは
 そのままで、結果だけが揺れなくなる。
 **戦闘を回すテストを足す時は、必ず `rng` を渡すこと。**
+
+## アリーナのアカウントが2つに分かれる(調査済み。同じ調査を二度やらない)
+
+依頼主の指摘:「荒モンボス猿さんが2人になってしまっています」。
+
+**アリーナの身元は端末の localStorage (`crimon.arena.auth.v1`) にしかない。**
+クラウドの控えにもセーブファイルにも入らないので、
+
+- 端末やブラウザを変えた
+- サイトデータが消えた(iOS Safari は訪問が途切れると消すことがある)
+- **クラウド復旧で別端末へ移した**
+
+のどれかで新しい匿名ユーザが生まれ、名前はセーブから来るので**同じ名前で2人**になる。
+アプリ内で身元を捨てる経路は無い(`clearArenaAuth` はどこからも呼ばれていない)。
+`arenaAuth.ts` は refresh token がある限り新規作成しない作りなので、
+**保存が消えた時だけ**生まれる。
+
+### user_id を持つ表(2026-09-22 時点・本番から取得)
+
+**`arena_profiles.user_id` が親で、9つが CASCADE で参照している。**
+統合する時に1つでも漏らすと、成績やコインが置き去りになる。
+
+| 表 | 主キー | 統合時 |
+|---|---|---|
+| `arena_profiles` | user_id | 親。最後に消す |
+| `arena_defenses` | user_id | 衝突する |
+| `arena_standings` | user_id, season_id | 衝突する |
+| `arena_wallets` | user_id | 衝突する |
+| `trial_tower_progress` | user_id | 衝突する |
+| `arena_season_results` | season_id, user_id | 衝突する |
+| `arena_reward_claims` | id (UNIQUE user_id,kind,period_key) | 衝突する |
+| `personal_gifts` | id (UNIQUE user_id,gift_key) | 衝突する。FKは無い |
+| `arena_matches` | id | attacker=CASCADE / defender=SET NULL |
+| `arena_match_sessions` | id | FKは season_id だけ |
+| `arena_shop_purchases` | id | 付け替えるだけ |
+
+`arena_opponent_pool` / `arena_public_ranking` / `trial_tower_public_ranking` は
+ビュー(列が全て nullable で主キーが無い)。付け替え不要。
+
+### 本番のSQLを流す道はある
+
+`arena-catalog.yml` が `SUPABASE_DB_PASSWORD` で psql を叩いている。
+接続は Session pooler で、利用者名は `postgres.<ref>`(`postgres` だけだと弾かれる)。
+**`crimon_recovery_accounts` も `arena_*` も migration に無い**(Supabase 上で
+直接作られた)ので、`db push` は使えない。**冪等なSQLを名指しで流すこと。**

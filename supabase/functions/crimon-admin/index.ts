@@ -209,7 +209,7 @@ Deno.serve(async (req: Request) => {
         .order("updated_at", { ascending: false }).limit(2000),
       supabase.from("arena_wallets").select("user_id,coins,lifetime_coins,tickets,tickets_max,updated_at").limit(1000),
       supabase.from("crimon_recovery_accounts")
-        .select("id,recovery_id,latest_revision,latest_saved_at,failed_attempts,locked_until,created_at,updated_at,latest_save")
+        .select("id,recovery_id,latest_revision,latest_saved_at,failed_attempts,locked_until,created_at,updated_at,latest_save,arena_user_id")
         .order("updated_at", { ascending: false }).limit(1000),
       supabase.from("arena_matches").select("created_at").gte("created_at", dailySince).limit(20000),
       /*
@@ -296,6 +296,11 @@ Deno.serve(async (req: Request) => {
         lockedUntil: account.locked_until,
         createdAt: account.created_at,
         updatedAt: account.updated_at,
+        /*
+         * **この復旧IDが最後に使っていたアリーナの身元。**
+         * 同じ名前がランキングに2人並んだ時、どちらが本人かを引き当てる手掛かり。
+         */
+        arenaUserId: account.arena_user_id ?? null,
         fighterName: progress?.fighterName ?? summary.fighterName ?? "",
         fighterLevel: pick(progress?.fighterLevel, summary.fighterLevel),
         gold: pick(progress?.gold, summary.gold),
