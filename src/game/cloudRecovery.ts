@@ -197,16 +197,16 @@ export async function registerRecovery(
   return { meta: metaFromAuth(normalized, data, save), recoveryKey: data.recoveryKey };
 }
 
-export async function loginRecovery(recoveryId: string, password: string): Promise<{ meta: CloudRecoveryMeta; save: CloudSaveEnvelope }> {
+export async function loginRecovery(recoveryId: string, password: string, arenaUserId?: string | null): Promise<{ meta: CloudRecoveryMeta; save: CloudSaveEnvelope }> {
   const normalized = recoveryId.trim().toLowerCase();
-  const data = await request({ action: "login", recoveryId: normalized, password });
+  const data = await request({ action: "login", recoveryId: normalized, password, arenaUserId });
   if (!data.save) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   return { meta: metaFromAuth(normalized, data, data.save), save: data.save };
 }
 
-export async function recoverWithKey(recoveryId: string, recoveryKey: string): Promise<{ meta: CloudRecoveryMeta; save: CloudSaveEnvelope }> {
+export async function recoverWithKey(recoveryId: string, recoveryKey: string, arenaUserId?: string | null): Promise<{ meta: CloudRecoveryMeta; save: CloudSaveEnvelope }> {
   const normalized = recoveryId.trim().toLowerCase();
-  const data = await request({ action: "recover", recoveryId: normalized, recoveryKey: recoveryKey.trim().toUpperCase() });
+  const data = await request({ action: "recover", recoveryId: normalized, recoveryKey: recoveryKey.trim().toUpperCase(), arenaUserId });
   if (!data.save) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   return { meta: metaFromAuth(normalized, data, data.save), save: data.save };
 }
