@@ -119,7 +119,7 @@ describe("上限が、正しく作った装備を弾かないこと", () => {
       }
     }
 
-    expect(violations.slice(0, 5)).toEqual([]);
+    expect(violations.slice(0, 5), violations.slice(0, 5).join("\n")).toEqual([]);
   });
 
   it("上限は星と強化について下がらない", () => {

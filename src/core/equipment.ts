@@ -284,9 +284,9 @@ const STAR_LEVEL_GROWTH_RATE: Record<EquipStar, number> = {
  * レベル成長が丸めで潰れて差が出なくなることのないよう、ある程度大きめの値にしてある。
  */
 const STAT_BASE_VALUE: Record<StatType, number> = {
-  ATK_FLAT: 20,
-  DEF_FLAT: 18,
-  HP_FLAT: 220,
+  ATK_FLAT: 66.7,
+  DEF_FLAT: 66.7,
+  HP_FLAT: 666.7,
   ATK_PERCENT: 0.09,
   DEF_PERCENT: 0.09,
   HP_PERCENT: 0.09,
@@ -312,6 +312,18 @@ const STAT_BASE_VALUE: Record<StatType, number> = {
 
 /** サブステータスはメインステータスに対してこの比率分だけ弱くなる */
 const SUB_STAT_RATIO = 0.2;
+
+/**
+ * 実数OPのメインだけを抑える調整。サブは上の基準値をそのまま使い、
+ * ★6の1ロール中央値を HP+800 / ATK+80 / DEF+80 付近にする。
+ * 1・3・5番の固定メインは全体ステータスを押し上げ過ぎないよう、
+ * ★6+15中央値を HP+3500 / ATK+320 / DEF+320 付近に留める。
+ */
+const FLAT_MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
+  HP_FLAT: 0.479,
+  ATK_FLAT: 0.430,
+  DEF_FLAT: 0.430,
+};
 
 /**
  * **メイン効果だけに掛かる調整倍率。サブOPには掛からない。**
@@ -343,6 +355,11 @@ export const MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
 
 export function mainStatTuning(type: StatType): number {
   return MAIN_STAT_TUNING[type] ?? 1;
+}
+
+/** 新規生成・強化時のメインOP倍率。旧HP%/クリダメ調整と実数メイン調整を合成する。 */
+function generatedMainStatTuning(type: StatType): number {
+  return mainStatTuning(type) * (FLAT_MAIN_STAT_TUNING[type] ?? 1);
 }
 
 /** 装備の最大強化レベル */
@@ -388,7 +405,7 @@ export function rollStatValue(type: StatType, star: EquipStar, ratio: number, rn
  * 言い切れる入口を分けてある(Battle Lab の `craftGear` もこちらを通る)。
  */
 export function rollMainStatValue(type: StatType, star: EquipStar, rng: () => number): number {
-  const base = STAT_BASE_VALUE[type] * STAR_INITIAL_MULTIPLIER[star] * mainStatTuning(type);
+  const base = STAT_BASE_VALUE[type] * STAR_INITIAL_MULTIPLIER[star] * generatedMainStatTuning(type);
   const variance = 0.85 + rng() * 0.3; // 0.85〜1.15倍のばらつき
   return roundStatValue(type, base * variance);
 }
@@ -396,7 +413,7 @@ export function rollMainStatValue(type: StatType, star: EquipStar, rng: () => nu
 /** 強化レベルが1上がったときにメインステータスへ加算される量(15レベル到達時のみ大きく増える) */
 function mainStatLevelIncrement(type: StatType, star: EquipStar, reachedLevel: number): number {
   // 初期値と同じ倍率を強化の伸びにも掛ける。片方だけだと+0と+15で基準がずれる
-  const base = STAT_BASE_VALUE[type] * STAR_LEVEL_GROWTH_RATE[star] * mainStatTuning(type);
+  const base = STAT_BASE_VALUE[type] * STAR_LEVEL_GROWTH_RATE[star] * generatedMainStatTuning(type);
   const bonus = reachedLevel === EQUIP_MAX_LEVEL ? LEVEL_MAX_BONUS_MULTIPLIER : 1;
   return roundStatValue(type, base * bonus);
 }
