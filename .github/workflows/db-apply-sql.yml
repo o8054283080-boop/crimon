@@ -1,0 +1,83 @@
+name: 名指ししたSQLを本番へ流す
+
+# **`db push` は使えない。**`crimon_recovery_accounts` も `arena_*` も
+# migration に無く(Supabase 上で直接作られた)、記録が食い違っているため、
+# 一括で流すと既にある表とぶつかる。
+#
+# だから**冪等なSQLを1本だけ名指しで流す。**押した時だけ動く。
+# 流すファイルは `file` で指定する(既定は下の値)。
+#
+# 接続の作りは `arena-catalog.yml` と同じ。Session pooler なので
+# 利用者名は `postgres.<ref>`(`postgres` だけだと弾かれる)。
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 流すSQLファイル(冪等であること)
+        required: true
+        default: supabase/migrations/20260922080000_recovery_arena_link.sql
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crimon-db-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: SQLを流す
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: psql を入れる
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+      - name: 流すファイルを確かめる
+        env:
+          TARGET: ${{ inputs.file }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            supabase/migrations/*.sql) ;;
+            *) echo "::error::supabase/migrations/ の .sql だけを流せます: $TARGET"; exit 1 ;;
+          esac
+          if [ ! -f "$TARGET" ]; then
+            echo "::error::ファイルがありません: $TARGET"
+            exit 1
+          fi
+          echo "SQL_FILE=$TARGET" >> "$GITHUB_ENV"
+          echo "流すファイル: $TARGET"
+      - name: 接続先を組み立てる
+        env:
+          HOST_OVERRIDE: ${{ secrets.SUPABASE_DB_HOST }}
+        run: |
+          set -euo pipefail
+          url="$(grep -E '^VITE_SUPABASE_URL=' .env.production | cut -d= -f2-)"
+          ref="$(printf '%s' "$url" | sed -E 's#^https?://([^.]+)\..*#\1#')"
+          if [ -z "$ref" ]; then
+            echo "::error::.env.production から Supabase の識別子を読めませんでした"
+            exit 1
+          fi
+          host="${HOST_OVERRIDE:-aws-0-ap-northeast-1.pooler.supabase.com}"
+          {
+            echo "PGHOST=$host"
+            echo "PGPORT=5432"
+            echo "PGUSER=postgres.$ref"
+            echo "PGDATABASE=postgres"
+          } >> "$GITHUB_ENV"
+      - name: 流す
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PGPASSWORD:-}" ]; then
+            echo "::error::SUPABASE_DB_PASSWORD が登録されていません"
+            exit 1
+          fi
+          # **1本の取引にまとめる。**途中で落ちたら何も残さない
+          psql -v ON_ERROR_STOP=1 --single-transaction -f "$SQL_FILE"
+          echo "流し終えました"
