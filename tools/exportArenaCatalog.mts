@@ -140,13 +140,7 @@ function subStatCap(type: StatType, star: EquipStar, level: number): number {
   const one = measureSubRoll(type, star);
   if (one <= 0) return 0;
   const powerups = SUBSTAT_POWERUP_LEVELS.filter((l) => l <= level).length;
-  /*
-   * サブOPは「同じ型を毎回強化」だけでなく、途中の+3/+6/+9/+12/+15で
-   * 新しいサブ枠が追加され、その後その枠へ強化が集中する経路もある。
-   * 生成器の丸め誤差を含め、正規装備を誤って弾かないよう1ロール分だけ
-   * 安全余裕を持たせる。サーバ側の上限は不正値の許可ではなく到達可能値の上限。
-   */
-  return roundLike(type, one * (2 + powerups));
+  return roundLike(type, one * (1 + powerups));
 }
 
 /** 実数系は整数、割合系は小数3桁。`roundStatValue` と同じ扱い */
