@@ -182,7 +182,7 @@ describe("NPCの編成テンプレート", () => {
      * 候補が3つしかない帯では衝突が普通に起きる。並んだ相手がどれも同じ
      * 顔ぶれだと、「どれに挑むか」を選ぶ意味そのものが消える。
      */
-    for (const rating of [900, 1000, 1350, 1650, 1950, 2250, 2600]) {
+    for (const rating of [900, 1000, 1350, 1650, 1950, 2250, 2600, 3500, 4000, 4500, 5000, 5500, 6000]) {
       const npcs = buildArenaNpcs(rating, 12345, 5);
       const names = npcs.map((entry) => entry.archetypeName ?? "");
       const distinct = new Set(names).size;
