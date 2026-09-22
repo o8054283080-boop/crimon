@@ -647,7 +647,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     ],
   },
   {
-    id: "ascend_t9_burst", claims: ["DEBUFF", name: "終焉竜撃",
+    id: "ascend_t9_burst", claims: ["DEBUFF"], name: "終焉竜撃",
     note: "高速支援から弱体と高火力を重ねて短期決着を狙う", tier: 9,
     members: [
       { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
