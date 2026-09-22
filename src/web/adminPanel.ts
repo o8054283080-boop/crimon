@@ -235,6 +235,11 @@ async function adminPost<T>(action: string, data: Record<string, unknown> = {}):
       unauthorized: "管理者セッションの有効期限が切れました。もう一度ログインしてください",
       password_length: "新しいパスワードは10〜128文字で入力してください",
       admin_not_configured: "管理者設定がまだ完了していません",
+      confirm_name_mismatch: "移し先の表示名が一致しません。そのまま正確に入力してください",
+      same_user: "同じアカウントは選べません",
+      from_not_found: "移す元のアカウントが見つかりません",
+      to_not_found: "移し先のアカウントが見つかりません",
+      merge_failed: "合わせられませんでした（サーバ側で止まりました）",
     };
     throw new Error(messages[code] ?? `管理APIエラー: ${code}`);
   }
@@ -684,7 +689,7 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
   };
 
   const settings = renderAdminSettings(root);
-  dash.append(tabs, toolbar, listHost, settings);
+  dash.append(tabs, toolbar, listHost, renderArenaMerge(dashboard), settings);
   body.append(dash);
   root.append(body);
   rerenderList();
@@ -842,6 +847,111 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
     if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当するアリーナプレイヤーはいません"));
   }
   host.append(head, list);
+}
+
+/**
+ * 分かれてしまったアリーナアカウントを合わせる。
+ *
+ * ## 2段構えにしてある
+ *
+ * **本番のデータを動かす。**押し間違いで取り返しがつかなくなるので、
+ *
+ *   1. 「こうなります」を出す(何も書かない)
+ *   2. **移し先の表示名を打って**から実行
+ *
+ * 実行前の姿はサーバ側で控える(`crimon_arena_merge_log`)ので、戻せる。
+ */
+function renderArenaMerge(dashboard: AdminDashboard): HTMLElement {
+  const box = el("details", "crimon-admin-settings");
+  box.append(el("summary", "", "アリーナアカウントを合わせる"));
+  const inner = el("div", "crimon-admin-settings__inner");
+
+  inner.append(el("p", "crimon-admin-merge__lead", "機種変更などでアリーナだけが作り直され、同じ名前が2つ並んだ時に使います。古い方の成績を新しい方へ移します。モンスターや装備には触れません。"));
+
+  const pick = (label: string): { wrap: HTMLElement; select: HTMLSelectElement } => {
+    const wrap = el("label", "crimon-admin-field");
+    wrap.append(el("span", "", label));
+    const select = el("select", "crimon-admin-sort") as HTMLSelectElement;
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "選んでください";
+    select.append(blank);
+    // 動きの新しい順ではなく**名前順**。同じ名前を隣どうしに並べたい
+    for (const row of [...dashboard.arenaPlayers].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "ja"))) {
+      const option = document.createElement("option");
+      option.value = row.userId;
+      option.textContent = `${row.displayName || "名前未設定"}｜レート${formatNumber(row.rating)}｜${row.wins}勝${row.losses}敗`;
+      select.append(option);
+    }
+    wrap.append(select);
+    return { wrap, select };
+  };
+
+  const from = pick("移す元（古い方・この登録は消えます）");
+  const to = pick("移し先（いま使っている方・こちらが残ります）");
+  const confirm = el("input", "crimon-admin-search") as HTMLInputElement;
+  confirm.type = "text";
+  confirm.placeholder = "移し先の表示名を入力（実行の合言葉）";
+
+  const out = el("div", "crimon-admin-merge__out");
+  const preview = el("button", "crimon-admin-btn", "こうなります（確認だけ）") as HTMLButtonElement;
+  preview.type = "button";
+  const run = el("button", "crimon-admin-btn crimon-admin-btn--danger", "合わせる（戻せます）") as HTMLButtonElement;
+  run.type = "button";
+
+  type MergeResult = { ok: boolean; result?: { after?: Record<string, unknown> } };
+  const show = (result: MergeResult, done: boolean) => {
+    out.replaceChildren();
+    const after = result.result?.after ?? {};
+    const rating = after.rating as { from?: number; to?: number; after?: number } | undefined;
+    out.append(el("strong", "", done ? "合わせました" : "こうなります"));
+    const list = el("div", "crimon-admin-kv");
+    const add = (label: string, value: string) => {
+      const item = el("div");
+      item.append(el("small", "", label), el("strong", "", value));
+      list.append(item);
+    };
+    if (rating) add("レート", `${formatNumber(rating.from)} と ${formatNumber(rating.to)} → ${formatNumber(rating.after)}`);
+    add("勝敗", `${formatNumber(after.wins)}勝 ${formatNumber(after.losses)}敗`);
+    add("コイン", formatNumber(after.coins_after));
+    add("試練の塔", `${formatNumber(after.tower_after)}階`);
+    add("移る対戦履歴", `${formatNumber(after.matches_moved)}件`);
+    out.append(list);
+    if (!done) out.append(el("p", "crimon-admin-merge__note", "よければ、移し先の表示名を入力して「合わせる」を押してください。実行前の姿はサーバ側に控えるので、間違えても戻せます。"));
+  };
+
+  const call = async (action: string, button: HTMLButtonElement, done: boolean) => {
+    const session = token();
+    if (!session) { out.replaceChildren(el("div", "crimon-admin-error", "管理者セッションの有効期限が切れました")); return; }
+    if (!from.select.value || !to.select.value) { out.replaceChildren(el("div", "crimon-admin-error", "移す元と移し先を選んでください")); return; }
+    if (from.select.value === to.select.value) { out.replaceChildren(el("div", "crimon-admin-error", "同じアカウントは選べません")); return; }
+    setBusy(button, true, button.textContent ?? "", "実行中…");
+    try {
+      const result = await adminPost<MergeResult>(action, {
+        token: session,
+        fromUserId: from.select.value,
+        toUserId: to.select.value,
+        confirmName: confirm.value,
+      });
+      show(result, done);
+    } catch (caught) {
+      out.replaceChildren(el("div", "crimon-admin-error", caught instanceof Error ? caught.message : "実行できませんでした"));
+    } finally {
+      setBusy(button, false, done ? "合わせる（戻せます）" : "こうなります（確認だけ）", "実行中…");
+    }
+  };
+
+  preview.onclick = () => void call("arena_merge_preview", preview, false);
+  run.onclick = () => {
+    if (!window.confirm(`「${from.select.selectedOptions[0]?.textContent ?? ""}」の成績を「${to.select.selectedOptions[0]?.textContent ?? ""}」へ移します。よろしいですか？`)) return;
+    void call("arena_merge", run, true);
+  };
+
+  const actions = el("div", "crimon-admin-merge__actions");
+  actions.append(preview, run);
+  inner.append(from.wrap, to.wrap, confirm, actions, out);
+  box.append(inner);
+  return box;
 }
 
 function renderAdminSettings(root: HTMLElement): HTMLElement {

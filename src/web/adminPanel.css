@@ -695,3 +695,46 @@ button.crimon-admin-row:active {
   color: #ffc89a !important;
   font-size: 9px;
 }
+
+/* ==========================================================================
+ * アリーナアカウントを合わせる
+ *
+ * **本番のデータを動かす場所。**押し間違いで取り返しがつかなくなるので、
+ * 「確認だけ」と「実行」を見分けやすくし、実行の側には合言葉を要る形にした。
+ * ========================================================================== */
+.crimon-admin-merge__lead {
+  margin: 0;
+  font-size: .74rem;
+  line-height: 1.6;
+  color: #9fb0c8;
+}
+
+.crimon-admin-merge__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.crimon-admin-merge__out:empty {
+  display: none;
+}
+
+.crimon-admin-merge__out {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px;
+  border: 1px solid rgba(233, 181, 76, .45);
+  border-radius: 8px;
+  background: rgba(233, 181, 76, .08);
+}
+
+.crimon-admin-merge__out > strong { font-size: .82rem; color: #ffd9a8; }
+
+.crimon-admin-merge__note {
+  margin: 0;
+  font-size: .7rem;
+  line-height: 1.6;
+  color: #9fb0c8;
+}
