@@ -11,7 +11,7 @@ import {
   staminaPotionsOwned,
 } from "../../game/playerState.js";
 import { CompensationClaim, compensationBannerLabel, selectHomeBanners } from "../../game/compensation.js";
-import { hasCloudRecoveryAccount } from "../../game/cloudRecovery.js";
+import { cloudRecoveryWarning } from "../../game/cloudRecovery.js";
 import { PERSIST_STATE_NOTE, PersistState } from "../../game/saveDurability.js";
 import { ELEMENT_JA, ELEMENT_MARK } from "../../core/element.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
@@ -300,15 +300,27 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
  * 消し方は「登録すること」ひとつだけにしてある。
  */
 function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | null {
-  if (hasCloudRecoveryAccount()) return null;
+  /*
+   * **「登録したか」だけでは足りない。**
+   *
+   * セッションは30日で切れ、切れるとバックアップが止まる。
+   * 登録の有無しか見ていなかったので、**いちばん危ない人**——登録はしたが
+   * もうサーバへ届いていない人——にだけ、何も出ていなかった。
+   * 依頼主の「ログインしているはずなのに保存されていません」がこれ。
+   */
+  const warning = cloudRecoveryWarning();
+  if (warning === "NONE") return null;
+  const expired = warning === "EXPIRED";
   return el("section", {
     className: "cloud-warn",
     "data-cloud-recovery-warning": "",
-    ariaLabel: "アカウント復旧の登録",
+    ariaLabel: expired ? "クラウドのログインし直し" : "アカウント復旧の登録",
   }, [
     el("div", { className: "cloud-warn__mark", "aria-hidden": "true" }, ["⚠"]),
     el("div", { className: "cloud-warn__text" }, [
-      el("div", { className: "cloud-warn__title" }, ["アカウント復旧の登録がまだです"]),
+      el("div", { className: "cloud-warn__title" }, [
+        expired ? "クラウドへ保存できていません" : "アカウント復旧の登録がまだです",
+      ]),
       /*
        * **短く書く。**最初は理由を丁寧に書いて2行で打ち切られ、
        * 肝心の「どうすれば登録できるか」が省略記号の向こうへ消えていた
@@ -316,7 +328,9 @@ function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | nul
        * 詳しい手順3つは、押した先のクラウド復旧の欄にある。
        */
       el("div", { className: "cloud-warn__lead" }, [
-        "データはこの端末の中だけ。消すと戻せません。右の「登録する」から、IDとパスワードを決めるだけです（メール不要）。",
+        expired
+          ? "ログインの期限が切れました。いまの進み具合はこの端末の中だけです。右のボタンから復旧IDでログインし直すと、バックアップが再開します。"
+          : "データはこの端末の中だけ。消すと戻せません。右の「登録する」から、IDとパスワードを決めるだけです（メール不要）。",
       ]),
     ]),
     el("button", {
@@ -335,7 +349,7 @@ function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | nul
           document.querySelector(".cloud-recovery")?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       },
-    }, ["登録する"]),
+    }, [expired ? "ログインし直す" : "登録する"]),
   ]);
 }
 
