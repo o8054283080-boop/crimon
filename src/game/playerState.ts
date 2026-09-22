@@ -236,6 +236,8 @@ export interface PlayerState {
    * ここが無いと、開くたびに ×0.85 が重なって装備が消えていく。
    */
   equipmentMainHpCritRebalanced?: boolean;
+  /** 実数OP(HP+/攻撃+/防御+)を新基準へ移行済みか。 */
+  equipmentFlatStatsRebalanced?: boolean;
 
   /* --- アリーナ(対人戦) --- */
   /**
@@ -495,6 +497,7 @@ export function createInitialState(): PlayerState {
     equipmentSpeedRebalanced: true,
     // 新しく始めた人の装備は最初から新基準で生成される。移行を走らせない
     equipmentMainHpCritRebalanced: true,
+    equipmentFlatStatsRebalanced: true,
     arenaDefenseIds: [],
     arenaOffenseIds: [],
     arenaPoints: ARENA_START_POINTS,
@@ -798,6 +801,33 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
       if (tuning !== 1) main.value = roundStatValue(main.type, main.value * tuning);
     }
     state.equipmentMainHpCritRebalanced = true;
+  }
+
+  /*
+   * 実数OPの見直し。既存装備も新規ドロップと同じ基準へ一度だけ揃える。
+   * 個体差・強化回数・セット・ロック・装着先はそのまま保ち、数値だけ倍率換算する。
+   */
+  if (!state.equipmentFlatStatsRebalanced) {
+    const subScale: Partial<Record<Equipment["mainStat"]["type"], number>> = {
+      HP_FLAT: 666.7 / 220,
+      ATK_FLAT: 66.7 / 20,
+      DEF_FLAT: 66.7 / 18,
+    };
+    const mainScale: Partial<Record<Equipment["mainStat"]["type"], number>> = {
+      HP_FLAT: (666.7 * 0.32) / 220,
+      ATK_FLAT: (66.7 * 0.293) / 20,
+      DEF_FLAT: (66.7 * 0.293) / 18,
+    };
+    for (const equipment of state.equipment) {
+      const main = equipment.mainStat;
+      const mainFactor = mainScale[main.type];
+      if (mainFactor) main.value = roundStatValue(main.type, main.value * mainFactor);
+      for (const sub of equipment.subStats) {
+        const subFactor = subScale[sub.type];
+        if (subFactor) sub.value = roundStatValue(sub.type, sub.value * subFactor);
+      }
+    }
+    state.equipmentFlatStatsRebalanced = true;
   }
 
   // アリーナ。古い控えには丸ごと無いので、初参加と同じ状態から始める
