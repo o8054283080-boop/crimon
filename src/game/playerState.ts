@@ -814,9 +814,9 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
       DEF_FLAT: 66.7 / 18,
     };
     const mainScale: Partial<Record<Equipment["mainStat"]["type"], number>> = {
-      HP_FLAT: (666.7 * 0.32) / 220,
-      ATK_FLAT: (66.7 * 0.293) / 20,
-      DEF_FLAT: (66.7 * 0.293) / 18,
+      HP_FLAT: (666.7 * 0.479) / 220,
+      ATK_FLAT: (66.7 * 0.438) / 20,
+      DEF_FLAT: (66.7 * 0.438) / 18,
     };
     for (const equipment of state.equipment) {
       const main = equipment.mainStat;
