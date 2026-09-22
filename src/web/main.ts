@@ -596,6 +596,17 @@ interface AppState {
   towerRankingError: boolean;
   /** 通信につながっていないだけ。障害(`towerRankingError`)とは分けて出す */
   towerRankingOffline: boolean;
+  /**
+   * **歴代最高をサーバへ送れていない。**
+   *
+   * これまで送るきっかけは2つだけで(階を登った瞬間と、ランキングを開いた時)、
+   * **どちらも失敗を誰にも伝えなかった**(`void syncTrialTowerBest()`)。
+   * 一度こけると、ランキングを開くまで二度と追いつかない。
+   * 塔で遊んでいてもランキングを見ない人は、**登った記録が永久に届かない。**
+   *
+   * 実際、99階まで登った方のサーバ側が69階で止まっていた。
+   */
+  towerSyncPending: number;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
   /** 結果確認後に通知だけを閉じる対象。報酬データとは独立して扱う。 */
@@ -738,6 +749,7 @@ const state: AppState = {
   towerRankingLoading: false,
   towerRankingError: false,
   towerRankingOffline: false,
+  towerSyncPending: 0,
   autoFarmResult: null,
   autoFarmTargetName: "",
   viewingBackgroundFarmJobId: null,
@@ -3259,11 +3271,60 @@ async function connectTrialTower(): Promise<boolean> {
   return true;
 }
 
-/** ローカルの歴代最高を送る。失敗しても塔・報酬・セーブには一切触れない。 */
-async function syncTrialTowerBest(): Promise<boolean> {
+/**
+ * ローカルの歴代最高を送る。失敗しても塔・報酬・セーブには一切触れない。
+ *
+ * **ただし、失敗を黙って捨てない。**
+ *
+ * これまでは `void syncTrialTowerBest()` で投げっぱなしだった。送るきっかけは
+ * 2つだけ(階を登った瞬間と、ランキングを開いた時)で、一度こけると
+ * ランキングを開くまで二度と追いつかない。**塔で遊んでいてもランキングを
+ * 見ない人は、登った記録が永久に届かない。**
+ * 実際、99階まで登った方のサーバ側が69階で止まっていた。
+ *
+ * 送れなかった階を覚えておき、塔の画面でそう伝える。
+ *
+ * 呼び出し元には**描画の途中**(`render()` の中)も含まれるので、
+ *
+ *   - 届いた階を覚えて、同じ階を何度も送らない
+ *   - 走っている最中は重ねない
+ *   - 失敗した時の再試行は間隔を空ける
+ *
+ * の3つで、描き直しのたびに通信が走るのを止めている。
+ */
+const TOWER_SYNC_RETRY_MS = 30_000;
+let towerSyncSentFloor = 0;
+let towerSyncRunning = false;
+let towerSyncLastAttemptAt = 0;
+
+async function syncTrialTowerBest(force = false): Promise<boolean> {
   const best = state.player.trialTowerLifetimeBestFloor;
-  if (best < 1 || !(await connectTrialTower())) return false;
-  return (await submitTrialTowerProgress(best)) !== null;
+  if (best < 1) return false;
+  /*
+   * **同期の口が無い環境では、何も言わない。**
+   * ここで pending を立てると、ランキングそのものが無い環境で
+   * 「送れていません」とだけ出る(送り先が無いだけで、失敗ではない)。
+   */
+  if (!arenaSyncAvailable()) return false;
+  if (towerSyncSentFloor >= best) return true;
+  if (towerSyncRunning) return false;
+  if (!force && Date.now() - towerSyncLastAttemptAt < TOWER_SYNC_RETRY_MS) return false;
+
+  towerSyncRunning = true;
+  towerSyncLastAttemptAt = Date.now();
+  let ok = false;
+  try {
+    ok = (await connectTrialTower()) && (await submitTrialTowerProgress(best)) !== null;
+  } finally {
+    towerSyncRunning = false;
+  }
+  if (ok) towerSyncSentFloor = best;
+  const pending = ok ? 0 : best;
+  if (state.towerSyncPending !== pending) {
+    state.towerSyncPending = pending;
+    render();
+  }
+  return ok;
 }
 
 async function refreshTrialTowerRanking(): Promise<void> {
@@ -3273,10 +3334,8 @@ async function refreshTrialTowerRanking(): Promise<void> {
   render();
 
   const connected = await connectTrialTower();
-  if (connected && state.player.trialTowerLifetimeBestFloor > 0) {
-    // 前回の通信断で送れなかった自己ベストも、ランキングを開いた時に追いつかせる。
-    await submitTrialTowerProgress(state.player.trialTowerLifetimeBestFloor);
-  }
+  // 前回の通信断で送れなかった自己ベストも、ランキングを開いた時に追いつかせる。
+  if (connected) await syncTrialTowerBest(true);
   const [ranking, self] = await Promise.all([
     fetchTrialTowerRanking(50),
     fetchTrialTowerSelf(arenaAuthUserId()),
@@ -3341,7 +3400,8 @@ function finishTowerFloor(cleared: boolean, setup: TowerBattleSetup, engine: Bat
 
   const outcome = applyTowerFloorResult(state.player, run, setup, engine, cleared);
   savePlayerState(state.player);
-  if (outcome.lifetimeBestUpdated) void syncTrialTowerBest();
+  // 新記録は待たせない(再試行の間隔を飛ばして、その場で送る)
+  if (outcome.lifetimeBestUpdated) void syncTrialTowerBest(true);
 
   /** 塔の画面へ戻す。⏹ の押下は登坂ごとのものなので、ここで必ず畳む */
   const backToTower = (kind: TowerOutcome["kind"], fanfare = false): void => {
@@ -4684,6 +4744,18 @@ function renderScreen(): void {
 
     case "TRIAL_TOWER": {
       if (ensureTowerMonthlyState(state.player)) savePlayerState(state.player);
+      /*
+       * **塔の画面を開くたびに、歴代最高を送り直す。**
+       *
+       * これまで送るきっかけは「階を登った瞬間」と「ランキングを開いた時」の
+       * 2つだけだった。前者は失敗しても黙って終わり、後者は**ランキングを
+       * 開かない人には一生訪れない。**塔で遊んでいるのに記録が届かない。
+       *
+       * ここなら、塔で遊ぶ人は必ず通る。同じ階の再送はサーバ側が弾く
+       * (`trial_tower_submit_progress` は低い階では更新しない)ので、
+       * 何度送っても害は無い。
+       */
+      void syncTrialTowerBest();
       const blockedReason = towerBlockReason(state.player);
       content = renderTrialTower({
         bestFloor: state.player.trialTowerBestFloor,
@@ -4698,6 +4770,7 @@ function renderScreen(): void {
          * スタミナ切れで「上の帯」と「ボタンの赤字」に同じ文が2つ並んでいた
          */
         notice: state.towerNotice === blockedReason ? null : state.towerNotice,
+        syncPendingFloor: state.towerSyncPending,
         outcome: state.towerOutcome,
         blockedReason,
         panel: state.towerPanel,
@@ -5843,6 +5916,22 @@ if (import.meta.env.DEV) {
         }
       }
       navigate("SHOP");
+      render();
+    },
+    /*
+     * **記録が届いていない知らせを巡回に見せるための口。**
+     *
+     * 通信が途切れていないと出ない知らせなので、そのままでは
+     * 一度も検査されない。しかもこの知らせは**案内(スタミナ切れなど)と
+     * 同じ場所に出る**ので、2つ出た時の重なりが見たい所そのもの。
+     * 案内も一緒に立てて、並んだ姿を撮らせる。
+     */
+    showTowerSyncPending(floor = 99) {
+      state.player.trialTowerLifetimeBestFloor = Math.max(state.player.trialTowerLifetimeBestFloor, floor);
+      navigate("TRIAL_TOWER");
+      // `navigate` が案内を畳むので、必ずその後で立てる
+      state.towerSyncPending = floor;
+      state.towerNotice = "確認用の案内です。ここに2つ目の知らせが並びます。";
       render();
     },
     showDemoRanking() {

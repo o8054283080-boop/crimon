@@ -72,6 +72,18 @@ const SCREENS = [
   { name: "パーティ", tab: "HOME", tile: "party" },
   { name: "アリーナ", tab: "HOME", tile: "arena" },
   { name: "試練の塔", tab: "HOME", tile: "tower" },
+  /*
+   * **記録がサーバへ届いていない時の知らせも見る。**
+   *
+   * この知らせは案内(スタミナ切れなど)と**同じ場所**に出る。
+   * 広い画面では `.tower-screen` が格子になっていて、`.tower-notice` の
+   * 行が名指しで決まっているので、2枚並べると重なって読めなくなる。
+   * 通信が途切れていないと出ない状態なので、DEV限定の口で立ててから見る。
+   */
+  {
+    name: "試練の塔(記録が届いていない)", tab: "HOME", tile: "tower",
+    setup: "window.__crimonDev?.showTowerSyncPending(99)",
+  },
   { name: "遊び方", tab: "HOME", tile: "help" },
   /*
    * **開いた状態も見る。**畳んだ見出しだけを検査していると、
