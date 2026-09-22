@@ -209,6 +209,40 @@ async function requireSession(token: unknown): Promise<{ row: SessionRow; expire
   return { row, expiresAt: nextExpiry };
 }
 
+/**
+ * 復旧IDが覚えているアリーナIDと、いまの端末のIDが違う時に元データを移す。
+ *
+ * 復旧IDのパスワード/復旧キーまたは有効なセッションを通った後だけ呼ぶ。
+ * そのため、クライアントから任意の他人のアリーナを移すことはできない。
+ */
+async function reconcileArenaIdentity(accountId: string, currentValue: unknown): Promise<string | null> {
+  const current = arenaUserId(currentValue);
+  const { data: account, error } = await supabase
+    .from("crimon_recovery_accounts").select("arena_user_id").eq("id", accountId).single();
+  if (error) throw error;
+  const remembered = arenaUserId(account?.arena_user_id);
+
+  if (!current) return remembered;
+  if (!remembered) {
+    const { error: linkError } = await supabase.from("crimon_recovery_accounts")
+      .update({ arena_user_id: current }).eq("id", accountId);
+    if (linkError) throw linkError;
+    return current;
+  }
+  if (remembered === current) return current;
+
+  // **ここが再発防止の本体。**新しい側の仮戦績は捨て、元の成績をそのまま移す。
+  const { error: relinkError } = await supabase.rpc("crimon_arena_relink", {
+    p_from: remembered,
+    p_to: current,
+  });
+  if (relinkError) throw relinkError;
+  const { error: linkError } = await supabase.from("crimon_recovery_accounts")
+    .update({ arena_user_id: current }).eq("id", accountId);
+  if (linkError) throw linkError;
+  return current;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json(405, { ok: false, code: "METHOD_NOT_ALLOWED" });
@@ -260,6 +294,7 @@ Deno.serve(async (req: Request) => {
         revision: data.latest_revision,
         savedAt: data.latest_saved_at,
         session,
+        arenaUserId: arenaUserId(body.arenaUserId),
       });
     }
 
@@ -294,6 +329,7 @@ Deno.serve(async (req: Request) => {
 
       await supabase.from("crimon_recovery_accounts")
         .update({ failed_attempts: 0, locked_until: null }).eq("id", account.id);
+      const resolvedArenaUserId = await reconcileArenaIdentity(account.id as string, body.arenaUserId);
       const session = await createSession(account.id as string);
       return json(200, {
         ok: true,
@@ -303,7 +339,7 @@ Deno.serve(async (req: Request) => {
         session,
         // **復旧する側へ、元のアリーナの身元を渡す。**
         // 受け取った側は、自分の身元と違えば「別のアカウントになっている」と分かる
-        arenaUserId: account.arena_user_id ?? null,
+        arenaUserId: resolvedArenaUserId ?? account.arena_user_id ?? null,
       });
     }
 
@@ -331,6 +367,8 @@ Deno.serve(async (req: Request) => {
       if (!session) return json(401, { ok: false, code: "SESSION_INVALID" });
       const revision = Number(body.revision);
       const save = body.save;
+      // 有効な復旧セッションを持つ本人だけが、アリーナの身元を自動復旧できる。
+      const resolvedArenaUserId = await reconcileArenaIdentity(session.row.account_id, body.arenaUserId);
       if (!Number.isSafeInteger(revision) || revision < 2 || !validateSave(save)) {
         return json(400, { ok: false, code: "INVALID_SAVE" });
       }
@@ -349,16 +387,14 @@ Deno.serve(async (req: Request) => {
        * 控えと一緒に上がってくるので、機種を変えた後もここが最新になる。
        * 送られてこない時は消さない(古い版のクライアントが上げた時に失いたくない)。
        */
-      const arena = arenaUserId(body.arenaUserId);
-      if (arena) {
-        await supabase.from("crimon_recovery_accounts")
-          .update({ arena_user_id: arena }).eq("id", session.row.account_id);
-      }
+      // arena_user_id を新IDで無条件上書きしない。
+      // 不一致なら reconcileArenaIdentity が元成績を移してから更新する。
       return json(200, {
         ok: true,
         revision: data?.[0]?.saved_revision ?? revision,
         savedAt: data?.[0]?.saved_at ?? new Date().toISOString(),
         sessionExpiresAt: session.expiresAt,
+        arenaUserId: resolvedArenaUserId,
       });
     }
 
