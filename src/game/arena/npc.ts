@@ -264,8 +264,9 @@ function buildUnitEquipment(
   rng: () => number,
 ): Equipment[] {
   const plan = ARENA_NPC_ROLE_PLANS[member.role];
-  const primary = team.set ?? plan.sets.primary;
-  const secondary = plan.sets.secondary === primary ? plan.sets.primary : plan.sets.secondary;
+  // 個体指定を最優先にする。従来テンプレートは指定が無いので挙動は変わらない。
+  const primary = member.set ?? team.set ?? plan.sets.primary;
+  const secondary = member.secondarySet ?? (plan.sets.secondary === primary ? plan.sets.primary : plan.sets.secondary);
   const coherent = rng() < band.setCoherence;
   // 4個セットに使う枠を決める。決定的に選びたいので、乱数で並べ替えず先頭4枠を使う
   const fourPieceSlots = new Set<EquipSlot>(EQUIP_SLOTS.slice(0, 4));
