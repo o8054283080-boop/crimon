@@ -21,7 +21,7 @@ describe("レート3000より上の倍率", () => {
 
   it("3100から上は、レートが上がるほど倍率も上がる", () => {
     const above = ARENA_NPC_BANDS.filter((b) => b.minRating > 3000);
-    expect(above.length).toBe(5);
+    expect(above.length).toBe(15);
     for (const band of above) {
       expect(band.statMultiplier, `${band.id} に倍率が無い`).toBeDefined();
     }
