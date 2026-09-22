@@ -155,7 +155,9 @@ export type ArenaNpcBandId =
    * 違うのは `gearRolls` ——**何本引いて一番良いものを残したか**だけ。
    */
   | "ASCEND_1" | "ASCEND_2" | "ASCEND_3" | "ASCEND_4" | "ASCEND_5"
-  | "ASCEND_6" | "ASCEND_7" | "ASCEND_8" | "ASCEND_9";
+  | "ASCEND_6" | "ASCEND_7" | "ASCEND_8" | "ASCEND_9"
+  | "ASCEND_10" | "ASCEND_11" | "ASCEND_12" | "ASCEND_13" | "ASCEND_14"
+  | "ASCEND_15" | "ASCEND_16" | "ASCEND_17" | "ASCEND_18" | "ASCEND_19";
 
 export interface WeightedStar {
   star: Star;
@@ -583,6 +585,76 @@ export const ARENA_NPC_BANDS: readonly ArenaNpcBand[] = [
     typeChance: 1,
     teamTiers: [5],
   },
+  {
+    id: "ASCEND_10", name: "天級", minRating: 3750,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.73, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [5, 6],
+  },
+  {
+    id: "ASCEND_11", name: "天級II", minRating: 4000,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.76, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [6],
+  },
+  {
+    id: "ASCEND_12", name: "天級III", minRating: 4250,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.79, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [6, 7],
+  },
+  {
+    id: "ASCEND_13", name: "神級", minRating: 4500,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.82, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [7],
+  },
+  {
+    id: "ASCEND_14", name: "神級II", minRating: 4750,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.85, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [7, 8],
+  },
+  {
+    id: "ASCEND_15", name: "神級III", minRating: 5000,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.88, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [8],
+  },
+  {
+    id: "ASCEND_16", name: "超越級", minRating: 5250,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.91, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [8, 9],
+  },
+  {
+    id: "ASCEND_17", name: "超越級II", minRating: 5500,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.94, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [9],
+  },
+  {
+    id: "ASCEND_18", name: "超越級III", minRating: 5750,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 1.97, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [9],
+  },
+  {
+    id: "ASCEND_19", name: "極致", minRating: 6000,
+    starWeights: [{ star: 6, weight: 100 }], levelRatio: [1, 1], skillLevel: [5, 5],
+    equipStar: [6, 6], equipEnhance: [15, 15], equipSubStats: [4, 4],
+    mainStatRerolls: 20, gearRolls: 22, statMultiplier: 2, setCoherence: 1,
+    abilityPointRatio: [1, 1], latentChance: 1, typeChance: 1, teamTiers: [9],
+  },
 ];
 
 /** そのレートの帯。表の外の値でも必ず1つ返す */
@@ -612,7 +684,7 @@ export const ARENA_NPC_DEFAULT_COUNT = 3;
  * ここを動かす時は帯の表も一緒に伸ばすこと——上限だけ上げると、
  * 一番上の帯が伸びしろのないまま横に広がる。
  */
-export const ARENA_NPC_MAX_RATING = 3500;
+export const ARENA_NPC_MAX_RATING = 6000;
 
 /**
  * 並んだNPCのレートの置き方。

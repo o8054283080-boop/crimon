@@ -33,6 +33,10 @@ export interface ArenaNpcTeamMember {
   /** 図鑑ID(`ALL_DISPLAYABLE_MONSTERS_DEX` に実在するもの) */
   dexId: string;
   role: ArenaNpcRole;
+  /** 上位NPC向けの個体別4個セット。未指定なら編成指定→役割既定の順で使う。 */
+  set?: SetType;
+  /** 個体別2個セット。未指定なら役割既定のsecondaryを使う。 */
+  secondarySet?: SetType;
 }
 
 /**
@@ -494,6 +498,172 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
       { dexId: "wolf_DARK", role: "ATTACK" },
       { dexId: "fairy_LIGHT", role: "SUPPORT" },
       { dexId: "imp_DARK", role: "DISRUPT" },
+    ],
+  },
+
+  /* ---------------- 段6〜9: 3500以降の個体別装備編成 ---------------- */
+  /* ---------------- 段6〜9: 上位帯。役割と装備を明示して戦術を尖らせる ---------------- */
+  {
+    id: "ascend_t6_speed", claims: ["SPEED", "DEBUFF"], name: "迅雷先陣",
+    note: "先手役から攻撃役へつなぎ、弱体を入れて押し切る", tier: 6,
+    members: [
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK", set: "CRIT" },
+    ],
+  },
+  {
+    id: "ascend_t6_control", claims: ["CONTROL", "DEBUFF"], name: "呪縛連鎖",
+    note: "妨害役を先に動かし、行動を崩してから削る", tier: 6,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_guard", claims: ["HEAL", "GUARD"], name: "不沈陣",
+    note: "耐久役を厚くして回復と守りで長期戦へ持ち込む", tier: 6,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "behemoth_LIGHT", role: "HP", set: "VITALITY" },
+      { dexId: "mocchi_DARK", role: "HP", set: "VITALITY" },
+      { dexId: "undine_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_break", claims: ["DEBUFF", "BURST"], name: "破城槌",
+    note: "弱体から高火力役へつないで一点を崩す", tier: 6,
+    members: [
+      { dexId: "scorpion_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "valkyria_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+
+  {
+    id: "ascend_t7_speed", claims: ["SPEED", "DEBUFF"], name: "雷帝先陣",
+    note: "高速支援から二枚の攻撃役へつないで主導権を取る", tier: 7,
+    members: [
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK", set: "CRIT" },
+    ],
+  },
+  {
+    id: "ascend_t7_control", claims: ["CONTROL", "DEBUFF"], name: "封殺劇場",
+    note: "妨害を重ねて相手の行動順を崩し続ける", tier: 7,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_guard", claims: ["HEAL", "GUARD"], name: "聖域堅陣",
+    note: "回復と守りを重ね、崩れないまま反撃機会を待つ", tier: 7,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "shellturtle_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_collab", claims: ["HEAL", "DEBUFF"], name: "異界連携",
+    note: "コラボ組の役割を分け、弱体と回復を両立する", tier: 7,
+    members: [
+      { dexId: "gujira_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "suezo_FIRE", role: "ATTACK", set: "CRIT" },
+      { dexId: "mocchi_GRASS", role: "HP", set: "VITALITY" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+
+  {
+    id: "ascend_t8_control", claims: ["CONTROL", "DEBUFF"], name: "終幕の呪縛",
+    note: "高命中の妨害を重ね、立て直す前に押し切る", tier: 8,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_guard", claims: ["HEAL", "GUARD"], name: "神殿守護",
+    note: "高耐久の壁と回復役で攻め手を受け切る", tier: 8,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "behemoth_LIGHT", role: "HP", set: "VITALITY" },
+      { dexId: "shellturtle_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_burst", claims: ["DEBUFF"], name: "竜撃決戦",
+    note: "弱体を起点に高火力二枚で短期決戦を狙う", tier: 8,
+    members: [
+      { dexId: "dragon_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "valkyria_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_speed", claims: ["SPEED", "DEBUFF"], name: "神速雷陣",
+    note: "高速支援を二枚置き、攻撃役まで一気につなぐ", tier: 8,
+    members: [
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "nemesis_LIGHT", role: "ATTACK", set: "CRIT" },
+    ],
+  },
+
+  {
+    id: "ascend_t9_control", claims: ["CONTROL", "DEBUFF"], name: "絶対封鎖",
+    note: "高命中妨害と高速支援で相手の手番を奪い続ける", tier: 9,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_guard", claims: ["HEAL", "GUARD"], name: "不落神域",
+    note: "最大育成の耐久役と回復役で長期戦を制する", tier: 9,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "behemoth_LIGHT", role: "HP", set: "VITALITY" },
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_burst", claims: ["DEBUFF"], name: "終焉竜撃",
+    note: "高速支援から弱体と高火力を重ねて短期決着を狙う", tier: 9,
+    members: [
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "dragon_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "valkyria_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+    ],
+  },
+  {
+    id: "ascend_t9_regulars", claims: ["HEAL", "GUARD", "DEBUFF"], name: "極致の常連",
+    note: "通常モンスターを役割別に極限まで育てた総合編成", tier: 9,
+    members: [
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "wolf_DARK", role: "ATTACK", set: "CRIT" },
+      { dexId: "fairy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "imp_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
     ],
   },
 ];

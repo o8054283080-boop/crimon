@@ -73,7 +73,7 @@ describe("アリーナNPC", () => {
         expect(npc.rating).toBeLessThanOrEqual(ARENA_NPC_MAX_RATING);
       }
     }
-    expect(ARENA_NPC_MAX_RATING).toBe(3500);
+    expect(ARENA_NPC_MAX_RATING).toBe(6000);
   });
 
   /*
@@ -91,7 +91,7 @@ describe("アリーナNPC", () => {
       expect(Math.min(...ratings), `${myRating} で格下が出ない`).toBeLessThan(myRating);
     }
     // 上限より上では、さすがに全員が格下になる
-    const beyond = buildArenaNpcs(4000, 12345, 8).map((npc) => npc.rating);
+    const beyond = buildArenaNpcs(6500, 12345, 8).map((npc) => npc.rating);
     expect(Math.max(...beyond)).toBe(ARENA_NPC_MAX_RATING);
   });
 
