@@ -136,6 +136,8 @@ type RecoveryAccount = {
   equipmentCount: number;
   /** 控えの中で、本人の値と進め具合が食い違っていた(控えそのものが壊れている合図) */
   sourceMismatch?: boolean;
+  /** この復旧IDが最後に使っていたアリーナの身元。同名が2人並んだ時の引き当てに使う */
+  arenaUserId?: string | null;
   /** 古いサーバ(取り出して置き直す前)は返さないので、無い場合がある */
   progress?: SaveProgress | null;
 };
@@ -798,6 +800,11 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
       if (row.sourceMismatch) {
         item.append(metric("⚠ 控えの食い違い", "レベルと中身の出どころがずれています", true));
       }
+      /*
+       * **同じ名前がランキングに2人並んだ時、どちらが本人かを引き当てる。**
+       * アリーナの身元は端末の中にしかないので、機種を変えると作り直される。
+       */
+      if (row.arenaUserId) item.append(metric("アリーナID", row.arenaUserId));
       list.append(item);
     }
     if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当する登録データはありません"));

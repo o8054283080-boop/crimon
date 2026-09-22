@@ -15,6 +15,8 @@ export interface CloudRecoveryMeta {
   revision: number;
   savedAt: string;
   lastUploadedSave: string;
+  /** サーバが覚えている、この復旧IDのアリーナの身元。まだ無ければ未定義 */
+  arenaUserId?: string | null;
 }
 
 export interface CloudSaveEnvelope {
@@ -35,6 +37,15 @@ interface ApiOk {
   session?: { token: string; expiresAt: string };
   /** 使ったついでにサーバが延ばした期限。**手元の期限も一緒に進める** */
   sessionExpiresAt?: string;
+  /**
+   * この復旧IDが最後に使っていたアリーナの身元。
+   *
+   * **アリーナの身元は端末の中にしかない。**機種を変えたりサイトデータが
+   * 消えたりすると新しい匿名ユーザが生まれ、名前はセーブから来るので
+   * **ランキングに同じ名前で2人並ぶ**(実際に起きた)。
+   * ここを突き合わせれば、「別のアカウントになっている」と気づける。
+   */
+  arenaUserId?: string | null;
 }
 interface ApiFail { ok: false; code: string }
 export type CloudRecoveryResponse = ApiOk | ApiFail;
@@ -170,12 +181,18 @@ function metaFromAuth(recoveryId: string, data: ApiOk, save: CloudSaveEnvelope):
     revision: data.revision,
     savedAt: data.savedAt,
     lastUploadedSave: envelopeFingerprint(save),
+    arenaUserId: data.arenaUserId ?? null,
   };
 }
 
-export async function registerRecovery(recoveryId: string, password: string, save: CloudSaveEnvelope): Promise<{ meta: CloudRecoveryMeta; recoveryKey: string }> {
+export async function registerRecovery(
+  recoveryId: string,
+  password: string,
+  save: CloudSaveEnvelope,
+  arenaUserId?: string | null,
+): Promise<{ meta: CloudRecoveryMeta; recoveryKey: string }> {
   const normalized = recoveryId.trim().toLowerCase();
-  const data = await request({ action: "register", recoveryId: normalized, password, save });
+  const data = await request({ action: "register", recoveryId: normalized, password, save, arenaUserId });
   if (!data.recoveryKey) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   return { meta: metaFromAuth(normalized, data, save), recoveryKey: data.recoveryKey };
 }
@@ -205,15 +222,21 @@ export async function loadLatestCloud(meta: CloudRecoveryMeta): Promise<{ meta: 
       savedAt: data.savedAt,
       lastUploadedSave: envelopeFingerprint(data.save),
       sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
+      arenaUserId: data.arenaUserId ?? meta.arenaUserId ?? null,
     },
   };
 }
 
-export async function uploadCloudSave(meta: CloudRecoveryMeta, save: CloudSaveEnvelope): Promise<CloudRecoveryMeta> {
+export async function uploadCloudSave(
+  meta: CloudRecoveryMeta,
+  save: CloudSaveEnvelope,
+  arenaUserId?: string | null,
+): Promise<CloudRecoveryMeta> {
   const fingerprint = envelopeFingerprint(save);
   if (fingerprint === meta.lastUploadedSave) return meta;
   const revision = meta.revision + 1;
-  const data = await request({ action: "save", sessionToken: meta.sessionToken, revision, save });
+  // **いま使っているアリーナの身元も一緒に上げる。**機種を変えた後もここが最新になる
+  const data = await request({ action: "save", sessionToken: meta.sessionToken, revision, save, arenaUserId });
   if (!data.savedAt) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   /*
    * **サーバが延ばした期限を受け取る。**
@@ -228,6 +251,7 @@ export async function uploadCloudSave(meta: CloudRecoveryMeta, save: CloudSaveEn
     savedAt: data.savedAt,
     lastUploadedSave: fingerprint,
     sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
+    arenaUserId: arenaUserId ?? meta.arenaUserId ?? null,
   };
 }
 

@@ -18,6 +18,7 @@ import {
   uploadCloudSave,
   type CloudSaveEnvelope,
 } from "../game/cloudRecovery.js";
+import { arenaAuthUserId } from "../net/arenaAuth.js";
 
 const PANEL_MARKER = "data-crimon-cloud-recovery";
 /*
@@ -144,7 +145,7 @@ async function syncNow(showUnchanged = false, scheduled = false): Promise<void> 
   }
   syncRunning = true;
   try {
-    const next = await uploadCloudSave(meta, save);
+    const next = await uploadCloudSave(meta, save, arenaAuthUserId());
     storeCloudMeta(next);
     if (scheduled || next.revision !== meta.revision) localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
     if (next.revision !== meta.revision) {
@@ -318,7 +319,7 @@ function renderDisconnected(panel: HTMLElement) {
     }
     register.disabled = true;
     try {
-      const result = await registerRecovery(id.value, password.value, save);
+      const result = await registerRecovery(id.value, password.value, save, arenaAuthUserId());
       storeCloudMeta(result.meta);
       setStatus(`登録・バックアップ完了：${formatSavedAt(result.meta.savedAt)}`, "ok");
       showRecoveryKey(panel, result.meta.recoveryId, result.recoveryKey);
@@ -394,6 +395,30 @@ function renderConnected(panel: HTMLElement, meta: CloudRecoveryMeta) {
       } catch (error) { setStatus(cloudRecoveryMessage(error), "error"); }
     }),
   );
+  /*
+   * **アリーナの身元が入れ替わっていないか。**
+   *
+   * アリーナの身元は端末の localStorage にしかなく、クラウドの控えにも
+   * セーブファイルにも入らない。機種を変えたりサイトデータが消えたりすると
+   * 新しい匿名ユーザが生まれ、名前はセーブから来るので
+   * **ランキングに同じ名前で2人並ぶ**(実際に起きた)。
+   *
+   * サーバが覚えている身元と、いまの身元がずれていたら、そう伝える。
+   * **こちらでは直せない**(成績を移すのは運営の仕事)ので、
+   * 直せるふりをせず、何が起きているかだけをはっきり書く。
+   */
+  const mine = arenaAuthUserId();
+  if (meta.arenaUserId && mine && meta.arenaUserId !== mine) {
+    const split = document.createElement("div");
+    split.className = "cloud-recovery__steps";
+    const title = document.createElement("strong");
+    title.textContent = "アリーナが別のアカウントになっています";
+    const note = document.createElement("small");
+    note.textContent = "機種変更やブラウザのデータ削除で、アリーナの登録だけが作り直されたようです。手持ちのモンスターや装備は無事ですが、アリーナのレートと戦績は新しい方で1から始まります。元の成績へ戻したい場合は、この画面を見せてお問い合わせください。";
+    split.append(title, note);
+    panel.append(split);
+  }
+
   const disconnect = button("この端末のクラウド接続を解除", "btn btn--ghost", async () => {
     if (!window.confirm("この端末のログイン情報だけ解除します。クラウド上の復旧データは削除されません。よろしいですか？")) return;
     await logoutRecovery(meta);
