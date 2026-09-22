@@ -52,6 +52,14 @@ export interface TrialTowerProps {
   /** 塔の画面に出す案内(スタミナ切れ・編成が空など)。null なら出さない */
   notice: string | null;
   /**
+   * **歴代最高がサーバへ届いていない階。**0 なら届いている。
+   *
+   * 届いていないと、ランキングに載るのは古い階のまま。
+   * これまでは黙っていたので、**99階まで登った方のサーバ側が
+   * 69階で止まっていても、誰も気づけなかった。**
+   */
+  syncPendingFloor: number;
+  /**
    * 直前の階の決着。**戦闘から塔の画面へ戻ってきた理由**を伝えるためのもの。
    * null なら、ただ塔を開いただけ。
    */
@@ -358,6 +366,31 @@ function claimedItems(reward: TowerRewardResult): RewardItem[] {
   if (reward.fiveStarSummonScrolls > 0) items.push({ icon: "📙", text: `★5召喚書 ${reward.fiveStarSummonScrolls}`, strong: true });
   if (reward.skillPigs > 0) items.push({ icon: "🐽", text: `スキルピッグ ${reward.skillPigs}`, strong: true });
   return items;
+}
+
+/**
+ * 案内(スタミナ切れなど)と、記録が届いていない知らせ。
+ *
+ * **2つを別の `.tower-notice` として並べない。**広い画面では
+ * `.tower-screen` が格子になっていて、`.tower-notice` は同じ行に置かれる。
+ * 2枚目を出すと1枚目の上に重なり、下の文字が読めなくなる。
+ * 1枚の中へ行として積む。
+ */
+function renderNotices(props: TrialTowerProps): HTMLElement | null {
+  const lines = nodes([
+    props.notice ? el("p", { className: "tower-notice__line" }, [props.notice]) : null,
+    /*
+     * **届いていないことを、黙って飲み込まない。**
+     * 記録そのものは端末に残っているので、失った訳ではない。
+     * 「消えた」と読ませないよう、そこをはっきり書く。
+     */
+    props.syncPendingFloor > 0
+      ? el("p", { className: "tower-notice__line tower-notice__line--sync" }, [
+          `${props.syncPendingFloor}階の記録をサーバへ送れていません。ランキングには前回までの階が出ます(記録はこの端末に残っています)。通信のつながる所でもう一度この画面を開くと送られます。`,
+        ])
+      : null,
+  ]);
+  return lines.length === 0 ? null : el("div", { className: "tower-notice" }, lines);
 }
 
 /* ============================================================
@@ -839,7 +872,7 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
       el("button", { type: "button", className: "btn btn--ghost tower-actions__button", onclick: props.onOpenRanking, "data-tour": "tower-ranking-open" }, ["🏆 ランキング"]),
     ])),
     renderOutcome(props),
-    props.notice ? el("div", { className: "tower-notice" }, [props.notice]) : null,
+    renderNotices(props),
     renderHero(props),
     renderMonthlyRewards(props),
     renderRules(),

@@ -159,6 +159,7 @@ if (params.get("view") === "tower") {
   const props: TrialTowerProps = {
     bestFloor: Math.max(0, previewFloor - 1),
     nextFloor: previewFloor,
+    syncPendingFloor: 0,
     run: inRun
       ? {
           floor: previewFloor,

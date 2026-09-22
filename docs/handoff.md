@@ -835,3 +835,47 @@ psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authentic
 空にした上で、**すべてのオブジェクトを `public.` で修飾する。**
 空にしないと、呼ぶ側が同じ名前の関数を自分のスキーマへ置くだけで
 定義者の権限で走ってしまう。
+
+---
+
+## 試練の塔の記録が、サーバへ届いていなかった(片付いた)
+
+依頼主の指摘「試練の塔も99階までいっているはずです」。管理者画面では**69階**。
+
+原因は送る回数ではなく、**送るきっかけと、失敗の扱い**だった。
+
+- きっかけは2つだけ。「階をクリアした瞬間」(`finishTowerFloor`)と
+  「ランキングを開いた時」(`refreshTrialTowerRanking`)
+- 前者は `void syncTrialTowerBest()` の投げっぱなしで、失敗を誰にも伝えない
+- 後者は**ランキングを開かない人には一生訪れない**
+
+つまりクリアした瞬間に通信がこけると、その階は永久に届かない。
+
+直した形(`src/web/main.ts` / `src/web/views/trialTower.ts`):
+
+- **塔の画面を開くたびに送る**(`case "TRIAL_TOWER"` の先頭)。塔で遊ぶ人は必ず通る
+- 送れなかった階を `state.towerSyncPending` に覚えて、塔の画面に出す
+- サーバ側は低い階では上書きしないので、何度送っても害は無い
+
+### 触る時の罠
+
+- **`case "TRIAL_TOWER"` は `render()` の中。**素直に送ると描き直しのたびに
+  RPCが飛び、しかも `render()` を呼び返す。`towerSyncSentFloor`(届いた階)・
+  `towerSyncRunning`(重ねない)・`TOWER_SYNC_RETRY_MS`(失敗時の間隔)の3つで止めている
+- **`arenaSyncAvailable()` が偽の時は pending を立てない。**通信の失敗ではなく、
+  ランキングそのものが無い環境というだけ。立てると直しようのない警告が出っぱなしになる
+- **案内(`.tower-notice`)を2枚並べない。**広い画面では `.tower-screen` が格子で、
+  `.tower-notice` の `grid-row` が名指し。2枚出すと同じ枡に重なる。
+  `renderNotices()` が1枚の中へ行(`.tower-notice__line`)として積む
+- 巡回に `試練の塔(記録が届いていない)` を足した。DEVの口は
+  `window.__crimonDev.showTowerSyncPending(99)`。`navigate()` が案内を畳むので、
+  **立てるのは `navigate()` の後**
+
+### まだ確かめていないこと
+
+**なぜ69階で止まったのか(通信断か、別の理由か)は特定できていない。**
+サーバ側RPC(`trial_tower_submit_progress`)・クライアント側の検め(1〜100)・
+`trialTowerLifetimeBestFloor` の引き継ぎは、いずれも読んだ限り正しい。
+今回の直しは「どの理由で落ちても追いつく」形にしたもの。
+**依頼主に一度塔の画面を開いてもらえば、そのまま正しい階へ直る。**
+直らなければ、原因は送信以外(アカウントが分かれている等)にある。
