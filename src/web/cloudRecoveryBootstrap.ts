@@ -4,10 +4,12 @@ import {
   cloudRecoveryMessage,
   clearCloudMeta,
   currentSaveEnvelope,
+  isSessionExpired,
   loadCloudMeta,
   loadLatestCloud,
   loginRecovery,
   logoutRecovery,
+  readCloudMeta,
   recoverWithKey,
   registerRecovery,
   restoreBeforeCloudRecovery,
@@ -97,8 +99,40 @@ function shouldRunScheduledSync(meta: CloudRecoveryMeta): boolean {
   return sinceAttempt >= AUTO_SYNC_MS;
 }
 
+/**
+ * セッションが切れている時に、**黙って止まらない。**
+ *
+ * ## 何が起きていたか
+ *
+ * セッションはサーバ側で**発行から30日**(`crimon-recovery` の `SESSION_DAYS`)。
+ * 使っても延びなかったので、毎日遊んでいる人でも30日目にいきなり切れる。
+ *
+ * 切れると `loadCloudMeta()` が `null` を返し、ここが `if (!meta) return;` で
+ * **何も言わずに終わっていた。**ホームの警告も出ない
+ * (`hasCloudRecoveryAccount` は期限を見ないので「登録済み」のまま)。
+ * つまりプレイヤーからは**何も起きていないように見えたまま、
+ * ひと月ぶんの遊びがサーバに届かない。**
+ * 依頼主の「ログインしているはずなのに保存されていません」がこれ。
+ *
+ * いまはサーバが使うたびに期限を延ばすので、遊んでいれば切れない。
+ * それでも切れた時は**ここで声を上げる。**
+ */
+function expiredNotice(): void {
+  setStatus("クラウドのセッションが切れています。下の「復旧IDでログイン」からログインし直すと、バックアップが再開します。", "error");
+  for (const node of document.querySelectorAll<HTMLElement>("[data-cloud-recovery-warning]")) {
+    node.dataset.cloudExpired = "1";
+  }
+}
+
 async function syncNow(showUnchanged = false, scheduled = false): Promise<void> {
   if (syncRunning || conflictDetected) return;
+  const stored = readCloudMeta();
+  // 登録していない人はここで終わり。**警告はホーム側が出している**
+  if (!stored) return;
+  if (isSessionExpired(stored)) {
+    expiredNotice();
+    return;
+  }
   const meta = loadCloudMeta();
   if (!meta) return;
   if (scheduled && !shouldRunScheduledSync(meta)) return;
@@ -208,6 +242,57 @@ function registerSteps(): HTMLElement {
   note.textContent = "登録すると、この端末の最新セーブが自動でクラウドへ控えられます。機種を変えても、IDとパスワードで取り戻せます。";
   box.append(title, list, note);
   return box;
+}
+
+/**
+ * セッションが切れた人の画面。
+ *
+ * ## 「以前のデータを復旧」へ流してはいけない
+ *
+ * あちらはクラウドの控えを**端末へ上書きする**道。切れている人の
+ * クラウド側は**切れた時点の古い控え**なので、押させると
+ * **その後に遊んだぶんが丸ごと消える。**いちばんやってはいけない事故。
+ *
+ * ここが欲しいのは逆で、**手元のデータはそのまま、送る口だけを開け直す。**
+ * ログインして新しいセッションを受け取り、そのまま今の端末セーブを上げる。
+ */
+function renderExpired(panel: HTMLElement, meta: CloudRecoveryMeta) {
+  const box = document.createElement("div");
+  box.className = "cloud-recovery__steps";
+  const title = document.createElement("strong");
+  title.textContent = "ログインし直すと、バックアップが再開します";
+  const note = document.createElement("small");
+  note.textContent = "登録は消えていません。復旧IDとパスワードはそのままです。いまの端末のデータはそのまま残り、ログインし直した時点でクラウドへ上がります（クラウドの古いデータで上書きはしません）。";
+  box.append(title, note);
+
+  const details = document.createElement("details");
+  details.className = "cloud-recovery__details";
+  details.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = "復旧IDでログイン";
+  const id = input("text", "復旧ID", "username");
+  id.autocapitalize = "none";
+  id.value = meta.recoveryId;
+  const password = input("password", "パスワード", "current-password");
+  const login = button("ログインしてバックアップを再開", "btn btn--primary", async () => {
+    login.disabled = true;
+    try {
+      const result = await loginRecovery(id.value, password.value);
+      // **控えは受け取るが、端末へは入れない。**セッションだけ取り直す
+      storeCloudMeta(result.meta);
+      password.value = "";
+      setStatus("ログインしました。いまの端末データをクラウドへ上げています…", "ok");
+      renderPanelInto(panel);
+      dismissHomeWarning();
+      await syncNow(true);
+    } catch (error) {
+      setStatus(cloudRecoveryMessage(error), "error");
+    } finally {
+      login.disabled = false;
+    }
+  });
+  details.append(summary, id, password, login);
+  panel.append(box, details);
 }
 
 function renderDisconnected(panel: HTMLElement) {
@@ -334,8 +419,15 @@ function renderPanelInto(panel: HTMLElement, preserveKey = false) {
   status.dataset.tone = statusTone;
   status.textContent = statusText;
   panel.append(header, status);
+  /*
+   * 3つに分ける。**期限切れを未登録と同じ画面にしない。**
+   * 前は「登録のやり方」が出ていたので、**登録が消えたように見えていた。**
+   */
   const meta = loadCloudMeta();
-  if (meta) renderConnected(panel, meta); else renderDisconnected(panel);
+  const stored = readCloudMeta();
+  if (meta) renderConnected(panel, meta);
+  else if (stored) renderExpired(panel, stored);
+  else renderDisconnected(panel);
   if (keyBox) panel.append(keyBox);
   if (preview) panel.append(preview);
 
@@ -387,10 +479,13 @@ function boot() {
   installStyles();
   attachPanel();
   new MutationObserver(attachPanel).observe(document.body, { childList: true, subtree: true });
-  const meta = loadCloudMeta();
-  if (meta) {
-    if (backupAge(meta) >= STALE_BACKUP_MS) setStatus(`バックアップが24時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(meta.savedAt)}`, "warn");
-    else setStatus(`クラウド接続済み：${formatSavedAt(meta.savedAt)}`, "ok");
+  const stored = readCloudMeta();
+  if (stored && isSessionExpired(stored)) {
+    // **登録はしている。切れているだけ。**ここを黙らせると誰も気づけない
+    expiredNotice();
+  } else if (stored) {
+    if (backupAge(stored) >= STALE_BACKUP_MS) setStatus(`バックアップが24時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
+    else setStatus(`クラウド接続済み：${formatSavedAt(stored.savedAt)}`, "ok");
   }
   window.setInterval(() => { void syncNow(false, true); }, AUTO_SYNC_MS);
   document.addEventListener("visibilitychange", () => {

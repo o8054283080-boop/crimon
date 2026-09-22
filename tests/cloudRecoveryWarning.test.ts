@@ -78,11 +78,36 @@ describe("アカウント復旧の登録判定", () => {
 });
 
 describe("ホームの警告札", () => {
-  it("未登録の時だけ作り、登録済みなら作らない", () => {
+  it("届いている人には作らない", () => {
     expect(home).toContain("function renderCloudRecoveryWarning");
-    expect(home).toContain("if (hasCloudRecoveryAccount()) return null;");
-    // 期限で消える判定に差し替えられていないこと
+    expect(home).toContain('if (warning === "NONE") return null;');
+    /*
+     * **`loadCloudMeta` で判定しないこと**は変わらない。
+     * あれは期限切れで null を返すので、そのまま使うと
+     * **登録した人に「登録がまだです」と出続ける**(それがこの見張りの元の理由)。
+     *
+     * いまは3つに分けてある。期限切れは「登録がまだです」ではなく
+     * 「クラウドへ保存できていません／ログインし直す」を出す。
+     * 登録済みの人に未登録の文面を見せない、という一点は守られている。
+     */
     expect(home).not.toContain("loadCloudMeta()");
+    expect(home).toContain("cloudRecoveryWarning()");
+  });
+
+  it("**期限切れの人に「登録がまだです」と言わない**", () => {
+    /*
+     * セッションは30日で切れる。切れた人は登録を済ませているので、
+     * 登録を促すのは嘘だし、やることも違う(登録ではなくログインし直し)。
+     */
+    const block = home.slice(
+      home.indexOf("function renderCloudRecoveryWarning"),
+      home.indexOf("/** 畳んだぶんの行"),
+    );
+    expect(block).toContain("expired");
+    expect(block).toContain("クラウドへ保存できていません");
+    expect(block).toContain("ログインし直す");
+    // 未登録の文面は、未登録の時だけ出る形になっていること
+    expect(block).toMatch(/expired\s*\n?\s*\?[\s\S]{0,200}:\s*"アカウント復旧の登録がまだです"/);
   });
 
   it("配布の札より先に積む", () => {

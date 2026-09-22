@@ -33,6 +33,8 @@ interface ApiOk {
   savedAt?: string;
   save?: CloudSaveEnvelope;
   session?: { token: string; expiresAt: string };
+  /** 使ったついでにサーバが延ばした期限。**手元の期限も一緒に進める** */
+  sessionExpiresAt?: string;
 }
 interface ApiFail { ok: false; code: string }
 export type CloudRecoveryResponse = ApiOk | ApiFail;
@@ -74,17 +76,37 @@ export function envelopeFingerprint(save: CloudSaveEnvelope): string {
   return JSON.stringify(save.state);
 }
 
-export function loadCloudMeta(storage: Pick<Storage, "getItem"> = localStorage): CloudRecoveryMeta | null {
+/**
+ * 形だけを見て読む。**期限は見ない。**
+ *
+ * `loadCloudMeta` は期限切れを `null` で返すので、呼び出し側からは
+ * 「登録していない」と**区別が付かない**。実際それで、
+ * 自動バックアップが `if (!meta) return;` で黙って止まり、
+ * プレイヤーには何も出ないまま**ひと月ぶんの遊びがサーバに届いていなかった。**
+ * 「期限が切れている」と言うには、切れた本人を掴めないといけない。
+ */
+export function readCloudMeta(storage: Pick<Storage, "getItem"> = localStorage): CloudRecoveryMeta | null {
   try {
     const raw = storage.getItem(CLOUD_RECOVERY_META_KEY);
     if (!raw) return null;
     const meta = JSON.parse(raw) as CloudRecoveryMeta;
     if (!meta.recoveryId || !meta.sessionToken || !Number.isSafeInteger(meta.revision) || meta.revision < 1) return null;
-    if (new Date(meta.sessionExpiresAt).getTime() <= Date.now()) return null;
     return meta;
   } catch {
     return null;
   }
+}
+
+/** セッションの期限が切れているか。**切れていても登録はしている** */
+export function isSessionExpired(meta: CloudRecoveryMeta): boolean {
+  const at = new Date(meta.sessionExpiresAt).getTime();
+  return !Number.isFinite(at) || at <= Date.now();
+}
+
+export function loadCloudMeta(storage: Pick<Storage, "getItem"> = localStorage): CloudRecoveryMeta | null {
+  const meta = readCloudMeta(storage);
+  if (!meta || isSessionExpired(meta)) return null;
+  return meta;
 }
 
 export function storeCloudMeta(meta: CloudRecoveryMeta, storage: Pick<Storage, "setItem"> = localStorage): void {
@@ -115,6 +137,28 @@ export function hasCloudRecoveryAccount(storage: Pick<Storage, "getItem"> = loca
   } catch {
     return false;
   }
+}
+
+/**
+ * ホームに出す警告の種類。
+ *
+ * ## なぜ2種類要るのか
+ *
+ * 前は「登録したか」だけを見ていた。**登録さえしていれば警告は出ない。**
+ * ところがセッションは30日で切れ、切れた後はバックアップが黙って止まる。
+ * 結果、**いちばん危ない人**——登録はしたがもう届いていない人——にだけ
+ * 何も出ていなかった。「ログインしているのに保存されていない」がこれ。
+ *
+ * `"EXPIRED"` は登録済みで期限切れ。やることが違う(登録ではなくログインし直し)
+ * ので、文面も飛び先も分ける。
+ */
+export type CloudRecoveryWarning = "NONE" | "UNREGISTERED" | "EXPIRED";
+
+export function cloudRecoveryWarning(storage: Pick<Storage, "getItem"> = localStorage): CloudRecoveryWarning {
+  if (!hasCloudRecoveryAccount(storage)) return "UNREGISTERED";
+  const meta = readCloudMeta(storage);
+  if (!meta || isSessionExpired(meta)) return "EXPIRED";
+  return "NONE";
 }
 
 function metaFromAuth(recoveryId: string, data: ApiOk, save: CloudSaveEnvelope): CloudRecoveryMeta {
@@ -155,7 +199,13 @@ export async function loadLatestCloud(meta: CloudRecoveryMeta): Promise<{ meta: 
   if (!data.save || !data.revision || !data.savedAt) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   return {
     save: data.save,
-    meta: { ...meta, revision: data.revision, savedAt: data.savedAt, lastUploadedSave: envelopeFingerprint(data.save) },
+    meta: {
+      ...meta,
+      revision: data.revision,
+      savedAt: data.savedAt,
+      lastUploadedSave: envelopeFingerprint(data.save),
+      sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
+    },
   };
 }
 
@@ -165,7 +215,20 @@ export async function uploadCloudSave(meta: CloudRecoveryMeta, save: CloudSaveEn
   const revision = meta.revision + 1;
   const data = await request({ action: "save", sessionToken: meta.sessionToken, revision, save });
   if (!data.savedAt) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
-  return { ...meta, revision, savedAt: data.savedAt, lastUploadedSave: fingerprint };
+  /*
+   * **サーバが延ばした期限を受け取る。**
+   *
+   * 前は `...meta` で古い期限を持ち回っていたので、毎日上げている人でも
+   * 発行から30日でいきなり切れた。切れた後は黙って止まるので、
+   * プレイヤーには何も起きていないように見えていた。
+   */
+  return {
+    ...meta,
+    revision,
+    savedAt: data.savedAt,
+    lastUploadedSave: fingerprint,
+    sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
+  };
 }
 
 export async function logoutRecovery(meta: CloudRecoveryMeta): Promise<void> {
