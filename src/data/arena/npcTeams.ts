@@ -500,6 +500,328 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
       { dexId: "imp_DARK", role: "DISRUPT" },
     ],
   },
+
+  /* ---------------- 段6〜9: 3500以降の個体別装備編成 ---------------- */
+  {
+    id: "ascend_t6_1", claims: [], name: "超越6-1",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "dragon_FIRE", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "griffon_GRASS", role: "ATTACK", set: "CRIT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_2", claims: [], name: "超越6-2",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK", set: "CRIT" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_3", claims: [], name: "超越6-3",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "dragon_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_4", claims: [], name: "超越6-4",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_5", claims: [], name: "超越6-5",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "behemoth_LIGHT", role: "HP", set: "VITALITY" },
+      { dexId: "mocchi_DARK", role: "HP", set: "VITALITY" },
+      { dexId: "undine_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_6", claims: [], name: "超越6-6",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "scorpion_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "valkyria_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_7", claims: [], name: "超越6-7",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "gujira_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "suezo_FIRE", role: "ATTACK", set: "CRIT" },
+      { dexId: "mocchi_GRASS", role: "HP", set: "VITALITY" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t6_8", claims: [], name: "超越6-8",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 6,
+    members: [
+      { dexId: "nemesis_LIGHT", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "shellturtle_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+    ],
+  },
+  {
+    id: "ascend_t7_1", claims: [], name: "超越7-1",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK", set: "CRIT" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_2", claims: [], name: "超越7-2",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "dragon_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_3", claims: [], name: "超越7-3",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_4", claims: [], name: "超越7-4",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "behemoth_LIGHT", role: "HP", set: "VITALITY" },
+      { dexId: "mocchi_DARK", role: "HP", set: "VITALITY" },
+      { dexId: "undine_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_5", claims: [], name: "超越7-5",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "scorpion_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "valkyria_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_6", claims: [], name: "超越7-6",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "gujira_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "suezo_FIRE", role: "ATTACK", set: "CRIT" },
+      { dexId: "mocchi_GRASS", role: "HP", set: "VITALITY" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t7_7", claims: [], name: "超越7-7",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "nemesis_LIGHT", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "shellturtle_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+    ],
+  },
+  {
+    id: "ascend_t7_8", claims: [], name: "超越7-8",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 7,
+    members: [
+      { dexId: "dragon_FIRE", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "griffon_GRASS", role: "ATTACK", set: "CRIT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_1", claims: [], name: "超越8-1",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "dragon_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_2", claims: [], name: "超越8-2",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_3", claims: [], name: "超越8-3",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "behemoth_LIGHT", role: "HP", set: "VITALITY" },
+      { dexId: "mocchi_DARK", role: "HP", set: "VITALITY" },
+      { dexId: "undine_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_4", claims: [], name: "超越8-4",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "scorpion_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "valkyria_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_5", claims: [], name: "超越8-5",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "gujira_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "suezo_FIRE", role: "ATTACK", set: "CRIT" },
+      { dexId: "mocchi_GRASS", role: "HP", set: "VITALITY" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_6", claims: [], name: "超越8-6",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "nemesis_LIGHT", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "shellturtle_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+    ],
+  },
+  {
+    id: "ascend_t8_7", claims: [], name: "超越8-7",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "dragon_FIRE", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "griffon_GRASS", role: "ATTACK", set: "CRIT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t8_8", claims: [], name: "超越8-8",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 8,
+    members: [
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK", set: "CRIT" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_1", claims: [], name: "超越9-1",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "joker_ELECTRIC", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "joker_DARK", role: "DISRUPT", set: "ACCURACY_SET" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_2", claims: [], name: "超越9-2",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+      { dexId: "behemoth_LIGHT", role: "HP", set: "VITALITY" },
+      { dexId: "mocchi_DARK", role: "HP", set: "VITALITY" },
+      { dexId: "undine_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_3", claims: [], name: "超越9-3",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "scorpion_DARK", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "valkyria_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_4", claims: [], name: "超越9-4",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "gujira_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "suezo_FIRE", role: "ATTACK", set: "CRIT" },
+      { dexId: "mocchi_GRASS", role: "HP", set: "VITALITY" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_5", claims: [], name: "超越9-5",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "nemesis_LIGHT", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "shellturtle_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
+    ],
+  },
+  {
+    id: "ascend_t9_6", claims: [], name: "超越9-6",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "dragon_FIRE", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "griffon_GRASS", role: "ATTACK", set: "CRIT" },
+      { dexId: "undine_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "seraph_WATER", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_7", claims: [], name: "超越9-7",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "fenrir_ELECTRIC", role: "ATTACK", set: "COLLAPSE" },
+      { dexId: "thunderbeast_ELECTRIC", role: "ATTACK", set: "CRIT" },
+      { dexId: "harpy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "chronos_ELECTRIC", role: "SUPPORT", set: "SWIFT" },
+    ],
+  },
+  {
+    id: "ascend_t9_8", claims: [], name: "超越9-8",
+    note: "個体別装備で役割を尖らせた上位編成", tier: 9,
+    members: [
+      { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
+      { dexId: "wolf_DARK", role: "ATTACK", set: "CRIT" },
+      { dexId: "fairy_LIGHT", role: "SUPPORT", set: "SWIFT" },
+      { dexId: "imp_DARK", role: "ATTACK", set: "CRIT" },
+    ],
+  },
 ];
 
 /** その段で使える編成テンプレート。1つも無ければ全体から返す(空を返さない) */
