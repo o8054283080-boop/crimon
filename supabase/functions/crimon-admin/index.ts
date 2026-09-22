@@ -395,6 +395,58 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  /*
+   * **分かれてしまったアリーナアカウントを合わせる。**
+   *
+   * アリーナの身元は端末の中にしかないので、機種を変えたりサイトデータが
+   * 消えたりすると新しい匿名ユーザが生まれ、ランキングに同じ名前で2人並ぶ。
+   * 既に分かれたぶんは、ここで合わせるしかない。
+   *
+   * **本番のデータを動かす。**だから2段構えにしてある:
+   *
+   *   1. `arena_merge_preview` … 何も書かずに「こうなります」だけ返す
+   *   2. `arena_merge`         … 実行。**実行前の姿を控えてから**触る
+   *
+   * 押す前に必ず 1 を見る。間違えたら控え(`crimon_arena_merge_log`)から戻せる。
+   */
+  if (action === "arena_merge_preview" || action === "arena_merge") {
+    const from = text(body.fromUserId);
+    const to = text(body.toUserId);
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuid.test(from) || !uuid.test(to)) return json({ error: "invalid_user_id" }, 400);
+    if (from === to) return json({ error: "same_user" }, 400);
+    const dryRun = action === "arena_merge_preview";
+    /*
+     * **実行の側だけ、合言葉を要る。**
+     * 一覧の行を押し間違えただけで本番のデータが動くのは危ない。
+     * 画面は移し先の表示名を打たせて、ここで突き合わせる。
+     */
+    if (!dryRun) {
+      const { data: target } = await supabase
+        .from("arena_profiles").select("display_name").eq("user_id", to).maybeSingle();
+      const typed = text(body.confirmName).trim();
+      if (!target || typed !== text(target.display_name).trim()) {
+        return json({ error: "confirm_name_mismatch" }, 400);
+      }
+    }
+    const { data, error } = await supabase.rpc("crimon_arena_merge", {
+      p_from: from,
+      p_to: to,
+      p_dry_run: dryRun,
+    });
+    if (error) {
+      const known: Record<string, string> = {
+        SAME_USER: "same_user",
+        FROM_NOT_FOUND: "from_not_found",
+        TO_NOT_FOUND: "to_not_found",
+        MISSING_USER: "invalid_user_id",
+      };
+      const hit = Object.keys(known).find((key) => String(error.message).includes(key));
+      return json({ error: hit ? known[hit] : "merge_failed" }, 400);
+    }
+    return json({ ok: true, result: data });
+  }
+
   if (action === "arena_detail") {
     const userId = text(body.userId);
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: "invalid_user_id" }, 400);

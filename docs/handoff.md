@@ -789,3 +789,49 @@ window.fetch = async (input, init) => { /* /fake 宛てだけ偽の JSON を返�
 接続は Session pooler で、利用者名は `postgres.<ref>`(`postgres` だけだと弾かれる)。
 **`crimon_recovery_accounts` も `arena_*` も migration に無い**(Supabase 上で
 直接作られた)ので、`db push` は使えない。**冪等なSQLを名指しで流すこと。**
+
+### 分かれたアリーナアカウントを合わせる道具
+
+`supabase/migrations/20260922090000_arena_merge.sql` に
+`crimon_arena_merge(p_from, p_to, p_dry_run)` がある。
+管理者画面の「アリーナアカウントを合わせる」から呼ぶ。
+
+**押す前に必ず「こうなります」を見ること。**実行の側は
+**移し先の表示名を打たないと通らない**(一覧の押し間違いで本番が動かないように)。
+実行前の姿は `crimon_arena_merge_log.before_snapshot` に丸ごと控える。
+
+合わせ方:
+
+| もの | どうするか |
+|---|---|
+| レート・最高レート | **高い方** |
+| 勝敗(攻撃・防衛) | **合算** |
+| コイン・累計コイン | 合算 |
+| 挑戦券 | 合算しない(持てる数なので**多い方**) |
+| 塔の到達階 | 高い方と、**その階に着いた方**の時刻 |
+| 防衛編成 | **新しい方を残す**(古い編成はいま持っていないモンスターが並ぶ) |
+| 受け取り記録・個別配布 | **衝突したら残す**(移すと二重受け取りになる) |
+| 登録日 | **古い方**(いつから遊んでいるかが消える) |
+
+**親(`arena_profiles`)を消すのは最後。**先に消すと9つの子が CASCADE で
+道連れになる。`tests/arenaMerge.test.ts` が順序を見張っている。
+
+#### 手元で本当に動かして確かめられる
+
+`psql` が入っている。本番と同じ形(列・主キー・**CASCADE**)を作れば、
+実際に合わせて結果を見られる。Supabase 固有のロールが要る:
+
+```
+su postgres -s /bin/bash -c "/usr/lib/postgresql/16/bin/initdb -D /var/tmp/crimonpg -A trust"
+su postgres -s /bin/bash -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/tmp/crimonpg -o '-p 5433 -k /var/tmp' start"
+psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authenticated;"
+```
+
+**`/tmp` の下には作れない**(権限で initdb が落ちる)。`/var/tmp` を使うこと。
+
+#### `security definer` は `search_path` を空にする
+
+`set search_path = public` と書いて `tests/arenaSecurity.test.ts` に落とされた。
+空にした上で、**すべてのオブジェクトを `public.` で修飾する。**
+空にしないと、呼ぶ側が同じ名前の関数を自分のスキーマへ置くだけで
+定義者の権限で走ってしまう。
