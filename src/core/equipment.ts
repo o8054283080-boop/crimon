@@ -320,9 +320,9 @@ const SUB_STAT_RATIO = 0.2;
  * ★6+15中央値を HP+3500 / ATK+320 / DEF+320 付近に留める。
  */
 const FLAT_MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
-  HP_FLAT: 0.32,
-  ATK_FLAT: 0.293,
-  DEF_FLAT: 0.293,
+  HP_FLAT: 0.479,
+  ATK_FLAT: 0.438,
+  DEF_FLAT: 0.438,
 };
 
 /**
