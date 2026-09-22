@@ -321,8 +321,8 @@ const SUB_STAT_RATIO = 0.2;
  */
 const FLAT_MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
   HP_FLAT: 0.479,
-  ATK_FLAT: 0.438,
-  DEF_FLAT: 0.438,
+  ATK_FLAT: 0.430,
+  DEF_FLAT: 0.430,
 };
 
 /**
@@ -354,7 +354,12 @@ export const MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
 };
 
 export function mainStatTuning(type: StatType): number {
-  return (MAIN_STAT_TUNING[type] ?? 1) * (FLAT_MAIN_STAT_TUNING[type] ?? 1);
+  return MAIN_STAT_TUNING[type] ?? 1;
+}
+
+/** 新規生成・強化時のメインOP倍率。旧HP%/クリダメ調整と実数メイン調整を合成する。 */
+function generatedMainStatTuning(type: StatType): number {
+  return mainStatTuning(type) * (FLAT_MAIN_STAT_TUNING[type] ?? 1);
 }
 
 /** 装備の最大強化レベル */
@@ -400,7 +405,7 @@ export function rollStatValue(type: StatType, star: EquipStar, ratio: number, rn
  * 言い切れる入口を分けてある(Battle Lab の `craftGear` もこちらを通る)。
  */
 export function rollMainStatValue(type: StatType, star: EquipStar, rng: () => number): number {
-  const base = STAT_BASE_VALUE[type] * STAR_INITIAL_MULTIPLIER[star] * mainStatTuning(type);
+  const base = STAT_BASE_VALUE[type] * STAR_INITIAL_MULTIPLIER[star] * generatedMainStatTuning(type);
   const variance = 0.85 + rng() * 0.3; // 0.85〜1.15倍のばらつき
   return roundStatValue(type, base * variance);
 }
@@ -408,7 +413,7 @@ export function rollMainStatValue(type: StatType, star: EquipStar, rng: () => nu
 /** 強化レベルが1上がったときにメインステータスへ加算される量(15レベル到達時のみ大きく増える) */
 function mainStatLevelIncrement(type: StatType, star: EquipStar, reachedLevel: number): number {
   // 初期値と同じ倍率を強化の伸びにも掛ける。片方だけだと+0と+15で基準がずれる
-  const base = STAT_BASE_VALUE[type] * STAR_LEVEL_GROWTH_RATE[star] * mainStatTuning(type);
+  const base = STAT_BASE_VALUE[type] * STAR_LEVEL_GROWTH_RATE[star] * generatedMainStatTuning(type);
   const bonus = reachedLevel === EQUIP_MAX_LEVEL ? LEVEL_MAX_BONUS_MULTIPLIER : 1;
   return roundStatValue(type, base * bonus);
 }
