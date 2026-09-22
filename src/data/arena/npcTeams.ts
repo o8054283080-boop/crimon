@@ -565,7 +565,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     ],
   },
   {
-    id: "ascend_t7_guard", claims: ["HEAL", "GUARD"], name: "聖域",
+    id: "ascend_t7_guard", claims: ["HEAL", "GUARD"], name: "聖域堅陣",
     note: "回復と守りを重ね、崩れないまま反撃機会を待つ", tier: 7,
     members: [
       { dexId: "phoenix_WATER", role: "HP", set: "VITALITY" },
@@ -606,7 +606,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     ],
   },
   {
-    id: "ascend_t8_burst", claims: ["DEBUFF", "BURST"], name: "竜撃決戦",
+    id: "ascend_t8_burst", claims: ["DEBUFF"], name: "竜撃決戦",
     note: "弱体を起点に高火力二枚で短期決戦を狙う", tier: 8,
     members: [
       { dexId: "dragon_DARK", role: "ATTACK", set: "COLLAPSE" },
@@ -647,7 +647,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     ],
   },
   {
-    id: "ascend_t9_burst", claims: ["DEBUFF", "BURST"], name: "終焉竜撃",
+    id: "ascend_t9_burst", claims: ["DEBUFF", name: "終焉竜撃",
     note: "高速支援から弱体と高火力を重ねて短期決着を狙う", tier: 9,
     members: [
       { dexId: "chronos_WATER", role: "SUPPORT", set: "SWIFT" },
@@ -657,7 +657,7 @@ export const ARENA_NPC_TEAMS: readonly ArenaNpcTeam[] = [
     ],
   },
   {
-    id: "ascend_t9_regulars", claims: ["HEAL", "GUARD", "DEBUFF"], name: "研ぎ澄ました常連",
+    id: "ascend_t9_regulars", claims: ["HEAL", "GUARD", "DEBUFF"], name: "極致の常連",
     note: "通常モンスターを役割別に極限まで育てた総合編成", tier: 9,
     members: [
       { dexId: "golem_DARK", role: "DEFENSE", set: "GUARD" },
