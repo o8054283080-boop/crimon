@@ -278,7 +278,7 @@ function renderExpired(panel: HTMLElement, meta: CloudRecoveryMeta) {
   const login = button("ログインしてバックアップを再開", "btn btn--primary", async () => {
     login.disabled = true;
     try {
-      const result = await loginRecovery(id.value, password.value);
+      const result = await loginRecovery(id.value, password.value, arenaAuthUserId());
       // **控えは受け取るが、端末へは入れない。**セッションだけ取り直す
       storeCloudMeta(result.meta);
       password.value = "";
@@ -343,7 +343,7 @@ function renderDisconnected(panel: HTMLElement) {
   const login = button("クラウドデータを確認", "btn btn--ghost", async () => {
     login.disabled = true;
     try {
-      const result = await loginRecovery(loginId.value, loginPassword.value);
+      const result = await loginRecovery(loginId.value, loginPassword.value, arenaAuthUserId());
       setStatus("復旧候補を読み込みました。まだ端末データは変更していません。", "ok");
       previewRestore(panel, result.save, result.meta);
     } catch (error) {
@@ -363,7 +363,7 @@ function renderDisconnected(panel: HTMLElement) {
   const recover = button("復旧キーで確認", "btn btn--ghost", async () => {
     recover.disabled = true;
     try {
-      const result = await recoverWithKey(keyId.value, recoveryKey.value);
+      const result = await recoverWithKey(keyId.value, recoveryKey.value, arenaAuthUserId());
       setStatus("復旧候補を読み込みました。まだ端末データは変更していません。", "ok");
       previewRestore(panel, result.save, result.meta);
     } catch (error) {

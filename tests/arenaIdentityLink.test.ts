@@ -69,9 +69,9 @@ describe("復旧IDに、アリーナの身元を覚えさせる", () => {
   it("登録と保存で、サーバが記録する", () => {
     expect(RECOVERY).toContain("function arenaUserId(");
     expect(RECOVERY).toContain("arena_user_id: arenaUserId(body.arenaUserId)");
-    // 保存のたびに覚え直す(機種を変えた後もここが最新になる)
+    // 保存時も、別IDなら無条件上書きせず元成績を移してから覚え直す
     const save = RECOVERY.indexOf('action === "save"');
-    expect(RECOVERY.slice(save)).toContain('.update({ arena_user_id: arena })');
+    expect(RECOVERY.slice(save)).toContain("reconcileArenaIdentity(session.row.account_id, body.arenaUserId)");
   });
 
   it("送られてこない時は消さない", () => {
@@ -80,11 +80,12 @@ describe("復旧IDに、アリーナの身元を覚えさせる", () => {
      * **消えると、2つに分かれたことに気づけなくなる。**
      */
     const save = RECOVERY.indexOf('action === "save"');
-    expect(RECOVERY.slice(save)).toContain("if (arena) {");
+    expect(RECOVERY.slice(save)).not.toContain('.update({ arena_user_id: arena })');
+    expect(RECOVERY).toContain("if (!current) return remembered;");
   });
 
   it("ログイン・復旧・読み込みで返す", () => {
-    expect(RECOVERY).toContain("arenaUserId: account.arena_user_id ?? null");
+    expect(RECOVERY).toContain("arenaUserId: resolvedArenaUserId ?? account.arena_user_id ?? null");
     expect(RECOVERY).toContain("arenaUserId: data.arena_user_id ?? null");
   });
 
@@ -97,6 +98,8 @@ describe("クライアントが、身元を送って受け取る", () => {
   it("保存と登録で送る", () => {
     expect(CLOUD).toContain("action: \"save\", sessionToken: meta.sessionToken, revision, save, arenaUserId");
     expect(CLOUD).toContain("action: \"register\", recoveryId: normalized, password, save, arenaUserId");
+    expect(CLOUD).toContain("action: \"login\", recoveryId: normalized, password, arenaUserId");
+    expect(CLOUD).toContain("action: \"recover\", recoveryId: normalized, recoveryKey: recoveryKey.trim().toUpperCase(), arenaUserId");
     // 実際に今の身元を渡していること(渡し忘れると常に空で上がる)
     expect(BOOTSTRAP).toContain("uploadCloudSave(meta, save, arenaAuthUserId())");
     expect(BOOTSTRAP).toContain("registerRecovery(id.value, password.value, save, arenaAuthUserId())");
@@ -154,5 +157,25 @@ describe("本番へSQLを流す道", () => {
 
   it("鍵が無い時は落とす", () => {
     expect(APPLY).toContain("SUPABASE_DB_PASSWORD が登録されていません");
+  });
+});
+
+
+describe("分裂を検知したら自動で元成績へ戻す", () => {
+  const RELINK = read("supabase/migrations/20260922183000_arena_identity_relink.sql");
+
+  it("復旧IDで本人確認した後だけrelinkする", () => {
+    expect(RECOVERY).toContain('supabase.rpc("crimon_arena_relink"');
+    expect(RECOVERY).toContain("remembered === current");
+  });
+
+  it("新しい側の仮戦績を合算せず破棄する", () => {
+    expect(RELINK).toContain("delete from public.arena_standings where user_id = p_to");
+    expect(RELINK).toContain("update public.arena_standings set user_id = p_to where user_id = p_from");
+    expect(RELINK).not.toContain("wins +");
+  });
+
+  it("ブラウザからRPCを直接呼べない", () => {
+    expect(RELINK).toContain("revoke all on function public.crimon_arena_relink(uuid, uuid) from public, anon, authenticated");
   });
 });
