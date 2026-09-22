@@ -284,9 +284,9 @@ const STAR_LEVEL_GROWTH_RATE: Record<EquipStar, number> = {
  * レベル成長が丸めで潰れて差が出なくなることのないよう、ある程度大きめの値にしてある。
  */
 const STAT_BASE_VALUE: Record<StatType, number> = {
-  ATK_FLAT: 20,
-  DEF_FLAT: 18,
-  HP_FLAT: 220,
+  ATK_FLAT: 66.7,
+  DEF_FLAT: 66.7,
+  HP_FLAT: 666.7,
   ATK_PERCENT: 0.09,
   DEF_PERCENT: 0.09,
   HP_PERCENT: 0.09,
@@ -312,6 +312,18 @@ const STAT_BASE_VALUE: Record<StatType, number> = {
 
 /** サブステータスはメインステータスに対してこの比率分だけ弱くなる */
 const SUB_STAT_RATIO = 0.2;
+
+/**
+ * 実数OPのメインだけを抑える調整。サブは上の基準値をそのまま使い、
+ * ★6の1ロール中央値を HP+800 / ATK+80 / DEF+80 付近にする。
+ * 1・3・5番の固定メインは全体ステータスを押し上げ過ぎないよう、
+ * ★6+15中央値を HP+3500 / ATK+320 / DEF+320 付近に留める。
+ */
+const FLAT_MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
+  HP_FLAT: 0.32,
+  ATK_FLAT: 0.293,
+  DEF_FLAT: 0.293,
+};
 
 /**
  * **メイン効果だけに掛かる調整倍率。サブOPには掛からない。**
@@ -342,7 +354,7 @@ export const MAIN_STAT_TUNING: Partial<Record<StatType, number>> = {
 };
 
 export function mainStatTuning(type: StatType): number {
-  return MAIN_STAT_TUNING[type] ?? 1;
+  return (MAIN_STAT_TUNING[type] ?? 1) * (FLAT_MAIN_STAT_TUNING[type] ?? 1);
 }
 
 /** 装備の最大強化レベル */
