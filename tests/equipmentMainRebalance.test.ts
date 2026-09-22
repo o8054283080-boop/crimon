@@ -36,11 +36,13 @@ describe("装備メインの調整倍率", () => {
   it("倍率が乗るのはメインHP%とメインクリダメ%だけ", () => {
     expect(MAIN_STAT_TUNING.HP_PERCENT).toBe(0.85);
     expect(MAIN_STAT_TUNING.CRIT_DMG).toBe(1.35);
-    // 他のメインは1倍のまま。ここが増えたら値域の再測定が要る
-    for (const type of ["ATK_PERCENT", "DEF_PERCENT", "SPD", "CRIT_RATE", "ACCURACY", "RESISTANCE",
-      "ATK_FLAT", "DEF_FLAT", "HP_FLAT"] as StatType[]) {
+    // 割合系など、今回の実数メイン調整対象外は1倍のまま
+    for (const type of ["ATK_PERCENT", "DEF_PERCENT", "SPD", "CRIT_RATE", "ACCURACY", "RESISTANCE"] as StatType[]) {
       expect(mainStatTuning(type), `${type} には倍率を掛けない`).toBe(1);
     }
+    expect(mainStatTuning("HP_FLAT")).toBeCloseTo(0.32, 6);
+    expect(mainStatTuning("ATK_FLAT")).toBeCloseTo(0.293, 6);
+    expect(mainStatTuning("DEF_FLAT")).toBeCloseTo(0.293, 6);
   });
 
   it("★6+15のメインHP%は70〜95%帯、クリダメ%は105〜130%帯に収まる", () => {
