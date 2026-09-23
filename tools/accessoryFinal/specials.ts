@@ -40,7 +40,11 @@ export const ATK_SPECIALS = {
   DEBUFF3: { label: "弱体3個以上の敵への与ダメUP", ranges: r([0.07, 0.09], [0.09, 0.12], [0.12, 0.15]) },
   MULTI2: { label: "2Hit目以降ダメUP", ranges: r([0.04, 0.06], [0.06, 0.09], [0.09, 0.12]) },
   MULTI3: { label: "3Hit目以降ダメUP", ranges: r([0.06, 0.08], [0.08, 0.11], [0.11, 0.15]) },
-  FIRST: { label: "最初の攻撃ダメUP", ranges: r([0.05, 0.07], [0.07, 0.10], [0.10, 0.13]) },
+  /*
+   * 実戦アリーナ最終検証(`arenaFinalLab.ts`)で微調整した値。
+   * 前回の最終検証(`accessoryFinalLab.ts` のレポート)は レジェンド7〜10% / エピック10〜13% で測っている。
+   */
+  FIRST: { label: "最初の攻撃ダメUP", ranges: r([0.05, 0.07], [0.07, 0.09], [0.09, 0.12]) },
   KILL_GAUGE: { label: "撃破時 行動ゲージUP", ranges: r([0.04, 0.06], [0.06, 0.08], [0.08, 0.10]) },
 } as const;
 
