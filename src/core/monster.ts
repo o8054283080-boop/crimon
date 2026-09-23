@@ -1,5 +1,6 @@
 import { Element, ELEMENT_COLOR, ELEMENT_JA, ELEMENTS } from "./element.js";
 import { CombatModifiers } from "./equipment.js";
+import type { AccessoryBattleEffects } from "./accessory.js";
 import { Skill, SkillEffect } from "./skill.js";
 import { applySeptemberSkillBalance } from "./skillRebalance.js";
 import { Stats, cloneStats } from "./stats.js";
@@ -104,6 +105,11 @@ export interface MonsterDefinition {
   skills: [Skill, Skill, Skill];
   /** 装備セット由来の戦闘専用効果。装備なし(敵など)ではundefined */
   combatMods?: CombatModifiers;
+  /**
+   * アクセサリーの戦闘中の効き目。**着けていなければ未設定。**
+   * 未設定の個体だけの戦闘では、エンジンはアクセの処理を1行も通らない。
+   */
+  accessory?: AccessoryBattleEffects;
   /** 所有個体で選択済みの潜在能力。静的な図鑑/敵定義には存在しない。 */
   latentAbility?: LatentAbilityCandidate;
   /**

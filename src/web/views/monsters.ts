@@ -1,6 +1,7 @@
 import { ELEMENTS, ELEMENT_JA, Element } from "../../core/element.js";
 import { EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
-import { MonsterInstance, isSkillMaxLevel, resolveEquippedItems, starLabel, toBattleDefinition } from "../../core/monsterInstance.js";
+import { MonsterInstance, isSkillMaxLevel, resolveAccessory, resolveEquippedItems, starLabel, toBattleDefinition } from "../../core/monsterInstance.js";
+import { renderAccessorySummary } from "./accessoryCard.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { applyPlayerStatBoost } from "../../core/playerStatBoost.js";
 import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "../../core/stats.js";
@@ -59,6 +60,10 @@ export interface MonstersProps {
   onToggleFilterOpen: () => void;
   dense: boolean;
   onToggleDense: () => void;
+  /** アクセサリーの枠を押した時(着ける・付け替える)。省略時は枠を出すだけ */
+  onOpenAccessorySlot?: (monsterId: string) => void;
+  /** 限界能力付与を開く */
+  onOpenLimitBreak?: (monsterId: string) => void;
 }
 
 export function monsterCard(
@@ -324,7 +329,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
     ? applyPlayerStatBoost(computeEffectiveStats(dex.stats, instance.star, instance.level), dex.templateId, instance.star)
     : null;
   const equippedItems = resolveEquippedItems(instance, props.player.equipment);
-  const effectiveStats = dex ? toBattleDefinition(instance, dex, equippedItems).stats : null;
+  const effectiveStats = dex ? toBattleDefinition(instance, dex, equippedItems, resolveAccessory(instance, props.player.accessories)).stats : null;
   const rankReady = canRankUp(instance.star, instance.level);
   const expNeeded = requiredExpForLevel(instance.level);
   const inParty = props.player.partyIds.includes(instance.id);
@@ -463,6 +468,7 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
           return [`${SET_LABEL[bonus.set]}：${bonus.twoActive ? description.two : ""}${bonus.twoActive && bonus.fourActive ? " / " : ""}${bonus.fourActive ? description.four : ""}`];
         }).join("　")]) : null,
       ].filter((node): node is HTMLElement => node !== null)),
+      renderAccessorySection(props, instance),
       el("section", { className: "monster-detail-actions" }, [
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoMonsterTraining(instance.id) }, ["強化"]),
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoCreate(instance.id) }, [instance.createdSkill ? "クリエイトし直す" : "クリエイト"]),
@@ -708,3 +714,36 @@ export function renderMonsters(props: MonstersProps): HTMLElement {
   if (target) return renderDetail(props, target);
   return renderList(props);
 }
+
+/**
+ * アクセサリーの枠。**装備の6枠とは別の、1体に1つだけの枠。**
+ *
+ * 着けているアクセの ★・レア度・系統・Lv・メイン・特殊・弱効果を全部出す。
+ * どの効果が乗っているかを、付け替えの画面まで行かずにここで読めるようにする。
+ */
+function renderAccessorySection(props: MonstersProps, instance: MonsterInstance): HTMLElement {
+  const acc = resolveAccessory(instance, props.player.accessories);
+  const limitUnlocked = instance.development.limitBreak?.unlocked === true;
+  return el("section", { className: "monster-detail-section monster-detail-accessory" }, [
+    el("h2", {}, ["アクセサリー", el("small", {}, ["1体に1つ"])]),
+    acc ? renderAccessorySummary(acc) : el("p", { className: "monster-detail-empty" }, ["未装着"]),
+    el("div", { className: "monster-detail-accessory__actions" }, [
+      props.onOpenAccessorySlot
+        ? el("button", {
+          type: "button",
+          className: "btn btn--ghost",
+          "data-tour": "accessory-slot",
+          onclick: () => props.onOpenAccessorySlot?.(instance.id),
+        }, [acc ? "付け替える・外す" : "アクセを着ける"])
+        : null,
+      props.onOpenLimitBreak
+        ? el("button", {
+          type: "button",
+          className: "btn btn--ghost",
+          onclick: () => props.onOpenLimitBreak?.(instance.id),
+        }, [limitUnlocked ? "限界能力付与" : "限界能力付与(未解放)"])
+        : null,
+    ].filter((n) => n !== null) as HTMLElement[]),
+  ]);
+}
+

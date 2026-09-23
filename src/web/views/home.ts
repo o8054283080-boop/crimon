@@ -47,6 +47,8 @@ export interface HomeProps {
   onGoGoldDungeon: () => void;
   /** 目覚の深域(才能覚醒の素材) */
   onGoAwakeningDepth: () => void;
+  /** 力の遺跡・守護の遺跡(アクセサリー)。省略時は入口を出さない */
+  onGoRuins?: () => void;
   onGoArena: () => void;
   onGoTrialTower: () => void;
   onGoHowToPlay: () => void;
@@ -802,7 +804,14 @@ export function renderHome(props: HomeProps): HTMLElement {
      * 才能覚醒そのものはモンスターの詳細から開く。
      */
     el("button", { type: "button", "data-tour": "tile:awakeningDepth", onclick: onGoAwakeningDepth }, [icon("trainDungeon"), el("span", {}, ["目覚"])]),
-  ]);
+    /*
+     * 力の遺跡・守護の遺跡。**アクセサリーを取りに行く場所。**
+     * 素材の場所なので、装備・育成・ゴールド・目覚と同じ並びに置く。
+     */
+    props.onGoRuins
+      ? el("button", { type: "button", "data-tour": "tile:ruins", onclick: props.onGoRuins }, [icon("equipDungeon"), el("span", {}, ["遺跡"])])
+      : null,
+  ].filter((n) => n !== null) as HTMLElement[]);
   const toggleDungeonChooser = () => { dungeonChooser.hidden = !dungeonChooser.hidden; };
   const rewardText = (mission: (typeof TUTORIAL_MISSIONS)[number]): string => [
     mission.reward.gold ? `🪙 ${mission.reward.gold.toLocaleString()}` : null,

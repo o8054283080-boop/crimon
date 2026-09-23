@@ -1,3 +1,4 @@
+import { AccessoryRuntime } from "./accessoryRuntime.js";
 import { ELEMENT_JA } from "../core/element.js";
 import { ATK_DOWN, ATK_UP, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
@@ -411,6 +412,11 @@ export class BattleEngine {
   private readonly mournedDeaths = new Set<string>();
   /** いま解決中のスキル。パッシブの「1スキル1回」を数えるのに使う */
   private resolution: SkillResolution | null = null;
+  /**
+   * アクセサリーの戦闘中の効果。**誰もアクセの戦闘効果を持たない戦闘では null。**
+   * null の間はアクセの処理を1行も通らず、乱数も引かない。
+   */
+  private readonly acc: AccessoryRuntime | null;
 
   constructor(playerTeam: MonsterDefinition[], enemyTeam: MonsterDefinition[], options: BattleEngineOptions = {}) {
     if (playerTeam.length === 0 || enemyTeam.length === 0) {
@@ -460,6 +466,15 @@ export class BattleEngine {
       });
     }
     this.rng = options.rng ?? Math.random;
+    this.acc = AccessoryRuntime.needed(this.units) ? new AccessoryRuntime({
+      units: this.units,
+      rng: () => this.rng(),
+      gainGauge: (unit, amount) => this.gainGauge(unit, amount),
+      push: (message) => this.push(message),
+      label: (unit) => this.label(unit),
+      pushHealEvent: (unit, amount) => this.pushEvent({ targetId: unit.instanceId, kind: "HEAL", amount }),
+      dealFollowUp: (source, target, multiplier) => this.accessoryFollowUp(source, target, multiplier),
+    }) : null;
     this.maxTurns = options.maxTurns ?? 300;
     this.damageRamp = options.damageRamp;
     this.trialTowerFloor = options.trialTowerFloor;
@@ -727,6 +742,7 @@ export class BattleEngine {
 
   /** ターン開始時の継続効果・CT・自動発動パッシブをまとめて処理する。 */
   private applyTurnStart(unit: BattleUnit, extraTurn = false): void {
+    this.acc?.onTurnStart(unit);
     tickEffectsAtTurnStart(unit);
     tickCooldownsAtTurnStart(unit);
     tickShieldAtTurnStart(unit);
@@ -782,10 +798,13 @@ export class BattleEngine {
     const passive = passiveEffectOf(unit);
     if (unit.alive && passive?.kind === "REBIRTH") {
       this.pushPassiveCue(unit);
+      const rebirthKey = {};
       for (const ally of this.units.filter(u => u.alive && u.team === unit.team)) {
         const before = ally.currentHp;
+        const ratioBefore = hpRatio(ally);
         applyHeal(ally, Math.round(unit.maxHp * passive.heal));
         this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount: ally.currentHp - before });
+        this.acc?.onHealed(unit, ally, ratioBefore, rebirthKey);
       }
     }
     if (unit.alive && passive?.kind === "ILLUSION" && !extraTurn) {
@@ -842,11 +861,14 @@ export class BattleEngine {
       if (allies.length > 0) {
         this.pushPassiveCue(actor);
         const healAmount = Math.round(actor.maxHp * blessing.healOnAct);
+        const blessingKey = {};
         for (const ally of allies) {
           const before = ally.currentHp;
+          const ratioBefore = hpRatio(ally);
           applyHeal(ally, healAmount);
           const healed = ally.currentHp - before;
           if (healed > 0) this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount: healed });
+          if (healed > 0) this.acc?.onHealed(actor, ally, ratioBefore, blessingKey);
           applyStatEffect(ally, "atk", ATK_UP, blessing.atkUpTurns, "BUFF");
         }
         this.push(`  → ${this.label(actor)} の「水の祝福」で味方全体が ${healAmount} 回復し、攻撃力が上がった！`);
@@ -999,6 +1021,7 @@ export class BattleEngine {
   /** 敵を倒した時に呼ぶ。フェンリルの「群狼の本能」は倒すたびに追加ターンを得る */
   private onKill(killer: BattleUnit | undefined): void {
     if (!killer?.alive) return;
+    this.acc?.onKill(killer);
     const passive = passiveEffectOf(killer);
     if (passive?.kind === "SKY_RULER") {
       killer.skyStacks = Math.min(8, (killer.skyStacks ?? 0) + 1);
@@ -1873,7 +1896,18 @@ export class BattleEngine {
     if (tower100Copy) this.applyTower100Copy(unit);
     if (tower100CloneSkillId) this.applyTower100CloneSupport(unit, tower100CloneSkillId, resolution.kills);
     this.applyCoopAttack(unit, resolvedSkill, targets[0]);
+    if (!missed) this.acc?.afterSkill(unit, targets[0], resolution);
     this.resolution = previousResolution;
+  }
+
+  /** アクセサリーの弱効果「追撃」。解決記録を持たないので、攻撃側の与ダメUPは乗らない */
+  private accessoryFollowUp(source: BattleUnit, target: BattleUnit, multiplier: number): void {
+    if (!source.alive || !target.alive) return;
+    const result = calcDamage(source, target, { kind: "DAMAGE", multiplier }, this.rng);
+    const applied = this.applyIncomingDamage(target, result.damage, source, "normal", null);
+    this.push(`  → ${this.label(target)} に ${applied.hpDamage} ダメージ！ (残りHP ${target.currentHp}/${target.maxHp})`);
+    this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
+    if (applied.died) this.onKill(source);
   }
 
   /** 溜めた上乗せを、そのスキルのダメージ効果へ差し込む */
@@ -2365,6 +2399,10 @@ export class BattleEngine {
    *   全体技では対象ごとにこの関数が呼ばれるため、最初の対象のときだけtrueになる。
    *   ライフスティールは与えたダメージに比例するので、ここには含めず毎回適用する。
    */
+  /**
+   * スキル効果の解決。アクセの効果が盤面に居る時だけ、**どのスキルを解決中か**を控える
+   * (与ダメUP・被ダメ軽減の「S1/S2/S3」「単体/全体」の判定に使う)。
+   */
   private applySkillEffects(
     source: BattleUnit,
     target: BattleUnit,
@@ -2374,6 +2412,25 @@ export class BattleEngine {
     latent?: LatentAbilityCandidate,
     resolution: SkillResolution = newResolution(),
     perHit = false,
+  ): { anyCrit: boolean; debuffApplied: boolean } {
+    if (!this.acc) return this.resolveSkillEffects(source, target, skill, missed, sourceScoped, latent, resolution, perHit);
+    this.acc.enterSkill(source, skill);
+    try {
+      return this.resolveSkillEffects(source, target, skill, missed, sourceScoped, latent, resolution, perHit);
+    } finally {
+      this.acc.exitSkill();
+    }
+  }
+
+  private resolveSkillEffects(
+    source: BattleUnit,
+    target: BattleUnit,
+    skill: Skill,
+    missed: boolean,
+    sourceScoped: boolean,
+    latent: LatentAbilityCandidate | undefined,
+    resolution: SkillResolution,
+    perHit: boolean,
   ): { anyCrit: boolean; debuffApplied: boolean } {
     let damageDealtThisCall = 0;
     // 反撃は効果の解決の途中に割り込ませない(解決中に相手が動くと、
@@ -2439,6 +2496,7 @@ export class BattleEngine {
             if (!receiver.alive || hasStatus(receiver, "BUFF_BLOCK")) continue;
             receiver.damageDealtBonus = Math.max(receiver.damageDealtBonus ?? 0, effect.amount);
             receiver.damageDealtBonusTurns = Math.max(receiver.damageDealtBonusTurns ?? 0, effect.durationTurns);
+            this.acc?.onBuffGiven(source, receiver, resolution);
           }
           break;
         }
@@ -2595,9 +2653,13 @@ export class BattleEngine {
             // 緊急回復。受け手が落ちかけている時だけ乗る
             const lowHp = effect.lowHpExtra && hpRatio(receiver) <= effect.lowHpExtra.hpRatio
               ? effect.lowHpExtra.extra : 0;
-            const healAmount = Math.round(healBase * effect.healRate * healBoost * (1 + lowHp));
+            // アクセ(サポート)の「HP50%以下の味方への回復量UP」。アクセが無ければ1
+            const accHeal = this.acc ? this.acc.healMultiplier(source, receiver) : 1;
+            const healAmount = Math.round(healBase * effect.healRate * healBoost * (1 + lowHp) * accHeal);
             if (healAmount <= 0) continue;
+            const ratioBeforeHeal = hpRatio(receiver);
             applyHeal(receiver, healAmount);
+            this.acc?.onHealed(source, receiver, ratioBeforeHeal, resolution);
             this.push(`  → ${this.label(receiver)} のHPが ${healAmount} 回復！ (${receiver.currentHp}/${receiver.maxHp})`);
             this.pushEvent({ targetId: receiver.instanceId, kind: "HEAL", amount: healAmount });
             /*
@@ -2647,6 +2709,7 @@ export class BattleEngine {
             // 同じ能力の強化は重ねない。すでに付いていれば長い方のターンを採る
             applyStatEffect(receiver, effect.stat, buffAmount, buffTurns, "BUFF");
             this.push(`  → ${this.label(receiver)} の ${effect.stat.toUpperCase()} が上昇！ (${buffTurns}ターン)`);
+            this.acc?.onBuffGiven(source, receiver, resolution);
           }
           /*
            * 高揚支援。**強化を配った相手の与ダメージを上げる。**
@@ -2702,6 +2765,7 @@ export class BattleEngine {
             }
             this.push(`  → ${this.label(receiver)} は${STATUS_EFFECT_JA[effect.status]}を得た！ (${effect.durationTurns}ターン)`);
             if (category === "DEBUFF") { resolution.debuffApplied = true; resolution.applied.add(effect.status); }
+            else this.acc?.onBuffGiven(source, receiver, resolution);
           }
           break;
         }
@@ -2745,6 +2809,10 @@ export class BattleEngine {
              */
             if (amount > 0 && receiver.team === source.team) {
               amount *= source.def.combatMods?.gaugeUpMultiplier ?? 1;
+            }
+            // アクセ(妨害)のゲージ減少量UP。**元の減少量へ掛ける**(ptで足さない)
+            if (this.acc && receiver.team !== source.team && (amount < 0 || effect.drain)) {
+              amount *= this.acc.gaugeDownMultiplier(source, receiver, resolution);
             }
             if (effect.drain) {
               // 吸収: 対象から減らした分をそのまま術者へ移す
@@ -2815,6 +2883,7 @@ export class BattleEngine {
             const extend = mods?.shieldExtendChance && this.rng() < mods.shieldExtendChance ? 1 : 0;
             receiver.shieldValue = Math.max(receiver.shieldValue, shieldAmount);
             receiver.shieldTurns = Math.max(receiver.shieldTurns, effect.durationTurns + extend);
+            this.acc?.onBuffGiven(source, receiver, resolution);
             if (mods?.shieldMitigate) {
               receiver.shieldMitigate = Math.max(receiver.shieldMitigate ?? 0, mods.shieldMitigate);
             }
@@ -2839,6 +2908,7 @@ export class BattleEngine {
           if (hasStatus(target, "BUFF_BLOCK")) { this.push(`  → ${this.label(target)} は強化不可でBUFF付与を防いだ！`); break; }
           target.immuneTurns = Math.max(target.immuneTurns, effect.durationTurns);
           this.push(`  → ${this.label(target)} は状態異常免疫を得た！ (${effect.durationTurns}ターン)`);
+          this.acc?.onBuffGiven(source, target, resolution);
           break;
         }
 
@@ -2851,6 +2921,7 @@ export class BattleEngine {
             receiver.regenRate = Math.max(receiver.regenRate, effect.healRate);
             receiver.regenTurns = Math.max(receiver.regenTurns, effect.durationTurns);
             this.push(`  → ${this.label(receiver)} は継続回復を得た！ (${effect.durationTurns}ターン)`);
+            this.acc?.onBuffGiven(source, receiver, resolution);
           }
           break;
         }
@@ -2876,6 +2947,7 @@ export class BattleEngine {
             resolution.applied.add("STRIP");
             this.push(`  → ${this.label(target)} の有利な効果が剥がされた！`);
             if (effect.selfGaugePerRemoved) this.gainGauge(source, effect.selfGaugePerRemoved * removed);
+            this.acc?.onStrip(source, target, resolution);
           }
           break;
         }
@@ -2887,6 +2959,7 @@ export class BattleEngine {
           if (stolen > 0) {
             resolution.stolenBuffs += stolen;
             resolution.applied.add("STRIP");
+            this.acc?.onStrip(source, target, resolution);
             this.push(`  → ${this.label(source)} が ${this.label(target)} の有利な効果を ${stolen}個 奪った！`);
           }
           break;
@@ -2912,6 +2985,7 @@ export class BattleEngine {
               : Math.max(receiver.mitigateAmount, effect.amount);
             receiver.mitigateVsTaunted = Math.max(receiver.mitigateVsTaunted, effect.vsTauntedExtra ?? 0);
             receiver.mitigateTurns = Math.max(receiver.mitigateTurns, effect.durationTurns);
+            if (!weaken) this.acc?.onBuffGiven(source, receiver, resolution);
             this.push(weaken
               ? `  → ${this.label(receiver)} は受けるダメージが ${Math.round(-effect.amount * 100)}% 増加した！ (${effect.durationTurns}ターン)`
               : `  → ${this.label(receiver)} は受けるダメージが軽減された！ (${effect.durationTurns}ターン)`);
@@ -3102,6 +3176,8 @@ export class BattleEngine {
     resolution: SkillResolution | null = null,
   ): DamageApplicationResult {
     this.syncTower80Boss();
+    // アクセの与ダメUP・被ダメ軽減。アクセの効果が盤面に無ければ通らない
+    if (this.acc) amount = this.acc.adjustIncoming(target, amount, source, sourceType, resolution);
     const equipmentMultiplier = Math.max(0, Math.min(1, target.def.latentAbility?.damageTakenMultiplier ?? 1));
     const hpBefore = hpRatio(target);
     // 軽減とパッシブによる被ダメージ減は、無敵・シールドより手前で1度だけ掛ける
@@ -3184,6 +3260,7 @@ export class BattleEngine {
         this.pushEvent({ targetId: source.instanceId, kind: "DAMAGE", amount: reflectedResult.hpDamage });
       }
     }
+    this.acc?.afterIncoming(target, source, sourceType);
     return applied;
   }
 

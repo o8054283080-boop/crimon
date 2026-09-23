@@ -2,7 +2,8 @@ import { scaledEnemyAtk } from "../battle/enemyPower.js";
 import { BattleEngine } from "../battle/engine.js";
 import { DEFAULT_COMBAT_MODIFIERS, Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
-import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
+import type { Accessory } from "../core/accessory.js";
+import { MonsterInstance, resolveAccessory, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL, computeEffectiveStats } from "../core/rarity.js";
 import { Difficulty, DIFFICULTY_MODIFIERS, Wave, WaveEnemy } from "../data/stages.js";
 import { findMonsterById } from "../data/monsters.js";
@@ -100,9 +101,10 @@ export function setupWaveBattle(
   wave: Wave,
   allEquipment: Equipment[] = [],
   difficulty: Difficulty = "NORMAL",
+  allAccessories: readonly Accessory[] = [],
 ): WaveBattleSetup {
   const playerDefs = partyInstances.map((instance) =>
-    toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, allEquipment)),
+    toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, allEquipment), resolveAccessory(instance, allAccessories)),
   );
   const enemyDefs = buildEnemyTeam(wave, difficulty);
   const initialPlayerHp = carryHp

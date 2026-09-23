@@ -230,6 +230,8 @@ function packDevelopment(development: MonsterDevelopment): Packed | null {
   if (development.abilityPointsConfirmed) packed.c = 1;
   const talents = development.talents ? packTalents(development.talents) : null;
   if (talents) packed.l = talents;
+  // 限界能力付与。**解放した個体だけ**書く(配分は素通し。4つの数しかない)
+  if (development.limitBreak?.unlocked) packed.z = development.limitBreak;
   return Object.keys(packed).length > 0 ? packed : null;
 }
 
@@ -251,6 +253,7 @@ function unpackDevelopment(packed: Packed | undefined): MonsterDevelopment {
     latentReselectPending: Boolean(packed?.r),
     abilityPointsConfirmed: Boolean(packed?.c),
     talents: unpackTalents(packed?.l as Packed | undefined),
+    ...(packed?.z && typeof packed.z === "object" ? { limitBreak: packed.z as MonsterDevelopment["limitBreak"] } : {}),
   };
 }
 
@@ -288,6 +291,8 @@ function packMonster(monster: MonsterInstance): Packed {
    */
   const presets = monster.equipmentPresets?.filter((preset) => preset.savedAt > 0);
   if (presets && presets.length > 0) packed.p = monster.equipmentPresets;
+  // 着けているアクセ。**着けている個体だけ書く**
+  if (typeof monster.accessoryId === "string" && monster.accessoryId) packed.g = monster.accessoryId;
   return packed;
 }
 
@@ -304,6 +309,7 @@ function unpackMonster(packed: Packed): MonsterInstance {
   };
   if (packed.o) monster.locked = true;
   if (Array.isArray(packed.p)) monster.equipmentPresets = packed.p as MonsterInstance["equipmentPresets"];
+  if (typeof packed.g === "string" && packed.g) monster.accessoryId = packed.g;
   if (packed.c) {
     const [slot, skillId, sourceDexId] = packed.c as [CreatedSkill["slot"], string, string];
     monster.createdSkill = { slot, skillId, sourceDexId };

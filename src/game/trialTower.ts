@@ -1,7 +1,7 @@
 import { BattleEngine } from "../battle/engine.js";
 import { Equipment, generateEquipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
-import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
+import { MonsterInstance, resolveAccessory, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { Star, STAR_MAX_LEVEL } from "../core/rarity.js";
 import { REINCARNATION_PIG_DEX, SKILL_PIG_DEX } from "../data/monsters.js";
 import {
@@ -191,7 +191,7 @@ export function setupTowerBattle(state: PlayerState, run: TowerRun): TowerBattle
   if (instances.length === 0) return null;
 
   const playerDefs = instances.map((instance) =>
-    toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, state.equipment)),
+    toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, state.equipment), resolveAccessory(instance, state.accessories)),
   );
 
   // 満タンの印(-1)が1つでも混じっていたら、そこは上書きしない値を入れる必要がある。
@@ -384,7 +384,7 @@ export function describeTowerRun(state: PlayerState, mode: TowerMode = "NORMAL")
       if (!instance) {
         return { instanceId: member.instanceId, name: "?", dexId: "", hp: 0, maxHp: 0, fallen: true };
       }
-      const def = toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, state.equipment));
+      const def = toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, state.equipment), resolveAccessory(instance, state.accessories));
       return {
         instanceId: member.instanceId,
         name: def.name,

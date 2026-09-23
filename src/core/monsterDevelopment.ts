@@ -50,6 +50,65 @@ export interface MonsterDevelopment {
    * 中身の意味は `src/core/talents.ts`。
    */
   talents?: TalentState;
+  /**
+   * 限界能力付与。**進化核100個で1体ずつ解放する、能力ポイントの外側の配分。**
+   *
+   * 省略可。古い控えには無く、無ければ「未解放・0」として扱う。
+   * 中身の決まりは `sanitizeLimitPoints` と `limitStatValue`。
+   */
+  limitBreak?: LimitBreakState;
+}
+
+/**
+ * 限界能力付与の状態。
+ *
+ * **足した分だけ、どこかを削る。**+側の合計は50まで、−側の合計は+側と同じでなければならない。
+ * +1pt は通常の能力ポイント1ptと同じ伸び、−1pt は**その2倍**減る。
+ * 同じ量を動かしても総量は必ず目減りするので、「尖らせる」ための仕組みで、
+ * 全体を底上げする道にはならない。
+ */
+export interface LimitBreakState {
+  unlocked: boolean;
+  points: AbilityPointAllocation;
+}
+
+/** 限界能力付与の+側の合計の上限 */
+export const LIMIT_POINT_MAX_PLUS = 50;
+/** −側は通常の換算値の何倍減るか */
+export const LIMIT_POINT_MINUS_FACTOR = 2;
+/** 解放に要る進化核 */
+export const LIMIT_BREAK_CORE_COST = 100;
+
+const LIMIT_STATS: readonly AllocatableStat[] = ["hp", "atk", "def", "spd"];
+
+/**
+ * 保存された限界配分を検分する。**決まりを外れていたら丸ごと無効(null)。**
+ *
+ * 部分的に直して通すと、壊れ方によっては「+だけ残って−が消えた」状態が
+ * 生まれて全体の底上げになる。だから直さずに捨てる。
+ * アリーナの防衛データも同じ道を通るので、手で書き換えた配分も効かない。
+ */
+export function sanitizeLimitPoints(state: unknown): AbilityPointAllocation | null {
+  if (!state || typeof state !== "object") return null;
+  const lb = state as Partial<LimitBreakState>;
+  if (lb.unlocked !== true || !lb.points || typeof lb.points !== "object") return null;
+  let plus = 0;
+  let minus = 0;
+  const out: AbilityPointAllocation = { hp: 0, atk: 0, def: 0, spd: 0 };
+  for (const stat of LIMIT_STATS) {
+    const value = (lb.points as Record<string, unknown>)[stat] ?? 0;
+    if (typeof value !== "number" || !Number.isInteger(value) || Math.abs(value) > LIMIT_POINT_MAX_PLUS) return null;
+    out[stat] = value;
+    if (value > 0) plus += value; else minus -= value;
+  }
+  if (plus > LIMIT_POINT_MAX_PLUS || plus !== minus) return null;
+  return out;
+}
+
+/** 1能力ぶんの限界配分が戦闘の値へ足す量。速度だけは端数を持ったまま返す(呼ぶ側で切り捨てる) */
+export function limitStatValue(points: number, stat: AllocatableStat): number {
+  const unit = ABILITY_POINT_VALUES[stat];
+  return points >= 0 ? points * unit : points * unit * LIMIT_POINT_MINUS_FACTOR;
 }
 
 /**

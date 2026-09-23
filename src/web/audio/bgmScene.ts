@@ -21,6 +21,7 @@ export const BATTLE_SCREENS: ReadonlySet<ScreenName> = new Set<ScreenName>([
   "ARENA_BATTLE",
   "TOWER_BATTLE",
   "AWAKENING_DEPTH_BATTLE",
+  "RUINS_BATTLE",
 ]);
 
 export function bgmSceneOf(screen: ScreenName): BgmScene {

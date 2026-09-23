@@ -21,7 +21,7 @@ import { GOLD_DUNGEON_FLOORS } from "../src/data/goldDungeon.js";
 const MAIN = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
 
 /** 周回できる種類。増やしたら、下の3つすべてに現れる必要がある */
-const KINDS: BackgroundFarmKind[] = ["STAGE", "EQUIP_DUNGEON", "LEVEL_DUNGEON", "GOLD_DUNGEON", "AWAKENING_DEPTH"];
+const KINDS: BackgroundFarmKind[] = ["STAGE", "EQUIP_DUNGEON", "LEVEL_DUNGEON", "GOLD_DUNGEON", "AWAKENING_DEPTH", "RUINS"];
 
 describe("周回は種類ごとに正しい場所を見る", () => {
   it("スタミナは switch で書き、種類が増えたら型が漏れを教える", () => {
@@ -46,6 +46,19 @@ describe("周回は種類ごとに正しい場所を見る", () => {
     expect(scope).toContain("grantAwakeningDepthReward(state.player, floor)");
     // 素材はゴールドや経験値と別枠。ここへ積まないと結果画面に何も出ない
     expect(scope).toContain("job.result.awakeningShards");
+  });
+
+  it("遺跡は場所IDから階を引き、戦う相手も報酬も遺跡のものを使う", () => {
+    const sim = MAIN.slice(MAIN.indexOf("function simulateBackgroundBattle"));
+    const simScope = sim.slice(0, sim.indexOf("\n}"));
+    expect(simScope).toContain('job.kind === "RUINS"');
+    expect(simScope).toContain("findRuinFloorByLocationId(job.targetId)");
+    const proc = MAIN.slice(MAIN.indexOf("function processBackgroundFarmOnce"));
+    const procScope = proc.slice(0, proc.indexOf("\n}\n"));
+    expect(procScope).toContain('job.kind === "RUINS"');
+    expect(procScope).toContain("grantRuinReward(state.player, floor)");
+    const start = MAIN.slice(MAIN.indexOf("function startFromLastRun"));
+    expect(start.slice(0, start.indexOf("\n}"))).toContain("startRuinFloor(last.floor)");
   });
 
   it("「もう一度」から始められる種類に、深域が入っている", () => {

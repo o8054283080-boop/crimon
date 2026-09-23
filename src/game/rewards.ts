@@ -1,3 +1,4 @@
+import type { Accessory } from "../core/accessory.js";
 import { MonsterInstance, addExp } from "../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../core/rarity.js";
 import { Equipment } from "../core/equipment.js";
@@ -89,6 +90,16 @@ export interface ClearRewardResult {
   skillPigDrop?: StageDrop | null;
   summonScrollDropped: boolean;
   fighterLevelsGained: number;
+  /*
+   * --- 遺跡だけが持つ報酬(省略可) ---
+   * 他の場所の報酬には無いので、周回の集計は「あれば足す」で読む。
+   */
+  /** 落ちたアクセサリー(既に持ち物へ入っている) */
+  accessoryDrop?: Accessory | null;
+  /** 進化核 */
+  evolutionCores?: number;
+  /** 古代のカケラ */
+  ancientShards?: number;
 }
 
 /** 通常ステージはモンスターEXPの25%。難易度倍率を含む値から算出する。 */

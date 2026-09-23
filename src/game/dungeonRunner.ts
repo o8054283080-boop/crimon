@@ -1,7 +1,8 @@
 import { scaledEnemyAtk } from "../battle/enemyPower.js";
 import { Equipment } from "../core/equipment.js";
 import { MonsterDefinition } from "../core/monster.js";
-import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
+import type { Accessory } from "../core/accessory.js";
+import { MonsterInstance, resolveAccessory, resolveEquippedItems, toBattleDefinition } from "../core/monsterInstance.js";
 import { computeEffectiveStats } from "../core/rarity.js";
 import { DungeonEnemy } from "../data/equipmentDungeon.js";
 import { resolveDex } from "./stageRunner.js";
@@ -65,9 +66,10 @@ export function setupDungeonBattle(
   partyInstances: MonsterInstance[],
   floor: DungeonLikeFloor,
   allEquipment: Equipment[] = [],
+  allAccessories: readonly Accessory[] = [],
 ): DungeonBattleSetup {
   const playerDefs = partyInstances.map((instance) =>
-    toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, allEquipment)),
+    toBattleDefinition(instance, resolveDex(instance.dexId), resolveEquippedItems(instance, allEquipment), resolveAccessory(instance, allAccessories)),
   );
   const enemyDefs = buildDungeonEnemyTeam(floor);
   return { playerDefs, enemyDefs };

@@ -24,6 +24,7 @@ const KNOWN_BATTLE_SCREENS: ScreenName[] = [
   "ARENA_BATTLE",
   "TOWER_BATTLE",
   "AWAKENING_DEPTH_BATTLE",
+  "RUINS_BATTLE",
 ];
 
 describe("画面ごとのBGM", () => {

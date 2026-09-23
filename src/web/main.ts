@@ -139,7 +139,7 @@ import {
 } from "../game/playerState.js";
 import { MonsterSortKey, monsterPower } from "../game/monsterSort.js";
 import { findMonsterById } from "../data/monsters.js";
-import { toBattleDefinition } from "../core/monsterInstance.js";
+import { resolveAccessory, toBattleDefinition } from "../core/monsterInstance.js";
 import type { Stats } from "../core/stats.js";
 import { EMPTY_MONSTER_FILTER, MonsterFilter } from "./monsterFilter.js";
 import { forgetShownCounts } from "./incrementalGrid.js";
@@ -264,6 +264,21 @@ import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
 import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
 import { buyCrystalShopItem, crystalShopRows } from "../game/crystalShop.js";
+import type { Accessory } from "../core/accessory.js";
+import type { Equipment as CraftedEquipment } from "../core/equipment.js";
+import type { AbilityPointAllocation } from "../core/monsterDevelopment.js";
+import { findRuinFloorByLocationId, ruinLocationId, type RuinFloor, type RuinKind } from "../data/ruins.js";
+import { grantRuinReward, isRuinFloorCleared, isRuinFloorUnlocked, type RuinReward } from "../game/ruins.js";
+import {
+  type AccessoryFilter, type AccessorySortKey, equipAccessory, sellAccessory, setAccessoryLocked,
+  tryEnhanceAccessory, unequipAccessory, findAccessory,
+} from "../game/accessories.js";
+import { craftAccessory, craftEquipment, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
+import { accessoryTitle, describeSpecial } from "../core/accessory.js";
+import { renderRuins } from "./views/ruins.js";
+import { renderAccessories } from "./views/accessories.js";
+import { renderAncientCraft } from "./views/ancientCraft.js";
+import { renderLimitBreak } from "./views/limitBreak.js";
 
 let appMounted = false;
 let pwaRegistration: ServiceWorkerRegistration | null = null;
@@ -361,6 +376,13 @@ interface AwakeningDepthRunState {
   manualStartedAt: number;
 }
 
+/** 遺跡の1戦。深域と同じ形 */
+interface RuinRunState {
+  floor: RuinFloor;
+  partyInstances: MonsterInstance[];
+  manualStartedAt: number;
+}
+
 /**
  * 直前に挑んだ場所。
  *
@@ -374,6 +396,7 @@ type LastRun =
   | { kind: "LEVEL_DUNGEON"; def: LevelDungeonDef }
   | { kind: "GOLD_DUNGEON"; floor: GoldDungeonFloor }
   | { kind: "AWAKENING_DEPTH"; floor: AwakeningDepthFloor }
+  | { kind: "RUINS"; floor: RuinFloor }
   | { kind: "ARENA"; entry: ArenaOpponentEntry };
 
 /**
@@ -512,6 +535,25 @@ interface AppState {
   /* --- 目覚の深域と才能覚醒 --- */
   selectedAwakeningDepthFloor: number | null;
   awakeningDepthRun: AwakeningDepthRunState | null;
+  /* --- 遺跡・アクセサリー・カケラ製作・限界能力付与 --- */
+  ruinKind: RuinKind;
+  selectedRuinFloor: number | null;
+  ruinRun: RuinRunState | null;
+  accessorySort: AccessorySortKey;
+  accessoryFilter: AccessoryFilter;
+  selectedAccessoryId: string | null;
+  /** 着ける先のモンスター(モンスター詳細のアクセ枠から来た時) */
+  accessoryPickFor: string | null;
+  accessoryNotice: string | null;
+  /** アクセ一覧から戻る先 */
+  accessoryReturn: ScreenName | null;
+  craftLastAccessory: Accessory | null;
+  craftLastEquipment: CraftedEquipment | null;
+  craftNotice: string | null;
+  craftReturn: ScreenName | null;
+  limitTargetId: string | null;
+  limitDraft: AbilityPointAllocation;
+  limitNotice: string | null;
   /** 才能覚醒を開いている個体 */
   talentTargetId: string | null;
   /** 才能覚醒のタブ */
@@ -705,6 +747,22 @@ const state: AppState = {
   goldDungeonRun: null,
   selectedAwakeningDepthFloor: null,
   awakeningDepthRun: null,
+  ruinKind: "POWER",
+  selectedRuinFloor: null,
+  ruinRun: null,
+  accessorySort: "NEWEST",
+  accessoryFilter: {},
+  selectedAccessoryId: null,
+  accessoryPickFor: null,
+  accessoryNotice: null,
+  accessoryReturn: null,
+  craftLastAccessory: null,
+  craftLastEquipment: null,
+  craftNotice: null,
+  craftReturn: null,
+  limitTargetId: null,
+  limitDraft: { hp: 0, atk: 0, def: 0, spd: 0 },
+  limitNotice: null,
   talentTargetId: null,
   talentTab: "BASIC",
   talentSkillSlot: 1,
@@ -960,6 +1018,7 @@ function hasBattleRun(screen: ScreenName): boolean {
     case "LEVEL_DUNGEON_BATTLE": return state.levelDungeonRun !== null;
     case "GOLD_DUNGEON_BATTLE": return state.goldDungeonRun !== null;
     case "AWAKENING_DEPTH_BATTLE": return state.awakeningDepthRun !== null;
+    case "RUINS_BATTLE": return state.ruinRun !== null;
     case "TOWER_BATTLE": return (state.towerMode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun) != null;
     case "ARENA_BATTLE": return state.arenaEntry !== null;
     default: return true;
@@ -1057,6 +1116,7 @@ function navigate(screen: ScreenName): void {
   state.selectedDungeonKind = "DEMON";
   state.selectedLevelDungeonTier = null;
   state.selectedGoldDungeonFloor = null;
+  state.selectedRuinFloor = null;
   state.selectedDexEntryId = null;
   state.monsterTrainingTargetId = null;
   state.monsterTrainingMaterialIds = [];
@@ -1584,7 +1644,7 @@ function previewStatsOf(monster: MonsterInstance, assignment: Partial<Record<Equ
   const items = Object.values(assignment)
     .map((id) => (id ? byId.get(id) : undefined))
     .filter((e): e is Equipment => e !== undefined);
-  return toBattleDefinition(monster, dex, items).stats;
+  return toBattleDefinition(monster, dex, items, resolveAccessory(monster, state.player.accessories)).stats;
 }
 
 function handleConfirmRankUp(): void {
@@ -1927,6 +1987,9 @@ function lastRunStaminaCost(last: LastRun): number {
     // 深域は階ごとに消費が違う(6〜15)ので、階から引く
     case "AWAKENING_DEPTH":
       return last.floor.stamina;
+    // 遺跡も階ごとに消費が違う(8〜12)
+    case "RUINS":
+      return last.floor.stamina;
     case "ARENA":
       // アリーナは挑戦券で回すのでスタミナは要らない
       return 0;
@@ -1983,6 +2046,9 @@ function startFromLastRun(last: LastRun): void {
     case "AWAKENING_DEPTH":
       startAwakeningDepthFloor(last.floor);
       break;
+    case "RUINS":
+      startRuinFloor(last.floor);
+      break;
     case "ARENA":
       // 同じ相手へもう一度。焼いた防衛を持っているので、そのまま組み直せる
       startArenaMatch(last.entry);
@@ -2022,6 +2088,10 @@ function backToLastRunList(): void {
       break;
     case "AWAKENING_DEPTH":
       navigate("AWAKENING_DEPTH");
+      break;
+    case "RUINS":
+      navigate("RUINS");
+      state.ruinKind = last.floor.kind;
       break;
     case "ARENA":
       /*
@@ -2141,11 +2211,14 @@ function backgroundFarmCost(job: BackgroundFarmJob): number {
     case "GOLD_DUNGEON": return GOLD_DUNGEON_STAMINA_COST;
     // 深域は階ごとに消費が違う形で作ってあるので、階から引く
     case "AWAKENING_DEPTH": return findAwakeningDepthFloor(Number(job.targetId))?.stamina ?? AWAKENING_DEPTH_FALLBACK_STAMINA;
+    // 遺跡は場所IDから階を引く。見つからない時は最も重い階の値で止まる側へ倒す
+    case "RUINS": return findRuinFloorByLocationId(job.targetId)?.stamina ?? RUINS_FALLBACK_STAMINA;
   }
 }
 
 /** 階が見つからない時のスタミナ。いまは全階10で揃えてある */
 const AWAKENING_DEPTH_FALLBACK_STAMINA = 10;
+const RUINS_FALLBACK_STAMINA = 12;
 
 /**
  * 何も配らない報酬。
@@ -2185,7 +2258,7 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
     let skyStacks = new Map<string, number>();
     let waves = 0;
     for (const wave of stage.waves) {
-      const setup = setupWaveBattle(alive, hp, wave, state.player.equipment, difficulty);
+      const setup = setupWaveBattle(alive, hp, wave, state.player.equipment, difficulty, state.player.accessories);
       const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp, initialSkyStacks: alive.map(m => skyStacks.get(m.id) ?? 0) });
       if (engine.run().winner !== "PLAYER") return { won: false, waves, extraGold: waves * stageWaveGold(stage, difficulty) };
       const survivors = extractSurvivors(engine, alive);
@@ -2200,6 +2273,12 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
    * **同じ階番号のゴールドダンジョンと戦っていた**(見つからない階は全敗扱い)。
    * 種類を1つずつ書き、当てはまらないものは黙って別の場所へ落とさない。
    */
+  if (job.kind === "RUINS") {
+    const floor = findRuinFloorByLocationId(job.targetId);
+    if (!floor) return { won: false, waves: 0, extraGold: 0 };
+    const setup = setupDungeonBattle(party, floor, state.player.equipment, state.player.accessories);
+    return { won: new BattleEngine(setup.playerDefs, setup.enemyDefs).run().winner === "PLAYER", waves: 1, extraGold: 0 };
+  }
   const target = job.kind === "EQUIP_DUNGEON"
     ? findDungeonFloorByKey(job.targetId)
     : job.kind === "LEVEL_DUNGEON"
@@ -2208,7 +2287,7 @@ function simulateBackgroundBattle(job: BackgroundFarmJob, party: MonsterInstance
         ? GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)
         : findAwakeningDepthFloor(Number(job.targetId));
   if (!target) return { won: false, waves: 0, extraGold: 0 };
-  const setup = setupDungeonBattle(party, target, state.player.equipment);
+  const setup = setupDungeonBattle(party, target, state.player.equipment, state.player.accessories);
   return { won: new BattleEngine(setup.playerDefs, setup.enemyDefs).run().winner === "PLAYER", waves: 1, extraGold: 0 };
 }
 
@@ -2297,6 +2376,14 @@ function processBackgroundFarmOnce(): void {
     job.result.awakeningStones = (job.result.awakeningStones ?? 0) + materials.stones;
     // 深域はゴールドも経験値も配らない(手で挑んだ時と同じ)。素材だけが報酬
     reward = EMPTY_CLEAR_REWARD;
+  } else if (job.kind === "RUINS") {
+    /*
+     * 遺跡。アクセ・進化核・カケラと副ドロップだけ(手で挑んだ時と同じ)。
+     * 集計は `mergeReward` がアクセ・核・カケラの欄へ積む。
+     */
+    const floor = findRuinFloorByLocationId(job.targetId);
+    if (!floor) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
+    reward = grantRuinReward(state.player, floor);
   } else reward = applyGoldDungeonClearRewards(state.player, GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
   state.player.gold += battle.extraGold;
   mergeReward(job.result, reward, battle.extraGold);
@@ -2678,7 +2765,7 @@ function renderCurrentAwakeningDepthBattle(): BattleViewHandle {
   const run = state.awakeningDepthRun;
   if (!run) throw new Error("awakeningDepthRun is not set");
 
-  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment);
+  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment, state.player.accessories);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
 
   return renderBattleView({
@@ -2690,6 +2777,156 @@ function renderCurrentAwakeningDepthBattle(): BattleViewHandle {
     onFinish: (winner) => finishAwakeningDepth(winner === "PLAYER"),
     chain: battleChainInfo(),
   });
+}
+
+/* ==========================================================================
+ * 力の遺跡・守護の遺跡
+ * ========================================================================== */
+
+function startRuinFloor(floor: RuinFloor): void {
+  const party = getParty(state.player);
+  if (party.length === 0) return;
+  if (!isRuinFloorUnlocked(state.player, floor.kind, floor.floor)) { playSfx("denied", 0.7); return; }
+  if (!trySpendStamina(state.player, floor.stamina).ok) {
+    playSfx("denied", 0.7);
+    return;
+  }
+  savePlayerState(state.player);
+  state.lastRun = { kind: "RUINS", floor };
+  state.ruinRun = { floor, partyInstances: party, manualStartedAt: Date.now() };
+  state.screen = "RUINS_BATTLE";
+  render();
+}
+
+/** 1勝ぶんの報酬を結果画面の行にする。**確率の数字は出さない** */
+function ruinRewardLines(reward: RuinReward): string[] {
+  const acc = reward.accessoryDrop;
+  return [
+    `💍 ${accessoryTitle(acc)}`,
+    ...acc.specials.map((roll) => `　${describeSpecial(roll)}`),
+    `進化核 ×${reward.evolutionCores} / 古代のカケラ ×${reward.ancientShards}`,
+    reward.summonScrollDropped ? "📜 召喚の書 ×1" : null,
+    reward.pigDrop ? "🐷 転生ピッグ★3 ×1" : null,
+    reward.skillPigDrop ? "🐷 スキルピッグ★1 ×1" : null,
+  ].filter((v): v is string => v !== null);
+}
+
+function finishRuin(cleared: boolean): void {
+  const run = state.ruinRun;
+  if (!run) return;
+  const floor = run.floor;
+  if (cleared) {
+    recordManualBattle(
+      state.player.recentManualClearTimes,
+      manualClearKey("RUINS", ruinLocationId(floor.kind, floor.floor)),
+      run.manualStartedAt, Date.now(),
+    );
+  }
+  // 報酬は**勝った時だけ**。負けても消費したスタミナは戻らない(他のダンジョンと同じ)
+  const reward = cleared ? grantRuinReward(state.player, floor) : null;
+  savePlayerState(state.player);
+  state.ruinRun = null;
+  state.stageResult = {
+    cleared,
+    stageName: floor.name + (reward?.firstClear ? "(初回クリア)" : ""),
+    goldEarned: 0,
+    crystalEarned: 0,
+    wavesCleared: cleared ? 1 : 0,
+    totalWaves: 1,
+    levelUps: [],
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop: reward?.pigDrop ?? null,
+    summonScrollDropped: reward?.summonScrollDropped ?? false,
+    extraLines: reward ? ruinRewardLines(reward) : [],
+  };
+  enterStageResult();
+}
+
+function handleAutoFarmRuin(floor: RuinFloor, count: number): void {
+  beginBackgroundFarm(
+    { kind: "RUINS", targetId: ruinLocationId(floor.kind, floor.floor), targetName: floor.name, requestedRuns: count },
+    state.player.partyIds,
+    // 周回は**一度クリアした階だけ。**勝てるか分からない階でスタミナだけが消えるのを防ぐ
+    isRuinFloorCleared(state.player, floor.kind, floor.floor),
+  );
+}
+
+function renderCurrentRuinBattle(): BattleViewHandle {
+  const run = state.ruinRun;
+  if (!run) throw new Error("ruinRun is not set");
+  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment, state.player.accessories);
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
+  return renderBattleView({
+    engine,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    title: run.floor.name,
+    resultLabel: (winner) => (winner === "PLAYER" ? "🎁 報酬を受け取る" : "遺跡に戻る"),
+    onFinish: (winner) => finishRuin(winner === "PLAYER"),
+    chain: battleChainInfo(),
+  });
+}
+
+/* ==========================================================================
+ * アクセサリー・カケラ製作・限界能力付与の画面遷移
+ * ========================================================================== */
+
+function openAccessories(pickFor: string | null): void {
+  const from = state.screen;
+  const detail = state.monsterDetailId;
+  state.accessoryReturn = from;
+  state.accessoryPickFor = pickFor;
+  state.selectedAccessoryId = null;
+  state.accessoryNotice = null;
+  state.screen = "ACCESSORIES";
+  // モンスター詳細から来た時は、戻った時に同じ詳細を開き直す
+  accessoryReturnDetailId = from === "MONSTERS" ? detail : null;
+  render();
+}
+
+let accessoryReturnDetailId: string | null = null;
+
+function closeAccessories(): void {
+  const back = state.accessoryReturn ?? "HOME";
+  state.accessoryPickFor = null;
+  state.selectedAccessoryId = null;
+  state.accessoryNotice = null;
+  state.screen = back;
+  if (back === "MONSTERS" && accessoryReturnDetailId) state.monsterDetailId = accessoryReturnDetailId;
+  accessoryReturnDetailId = null;
+  render();
+}
+
+function openCraft(): void {
+  state.craftReturn = state.screen;
+  state.craftNotice = null;
+  state.craftLastAccessory = null;
+  state.craftLastEquipment = null;
+  state.screen = "ANCIENT_CRAFT";
+  render();
+}
+
+let limitReturnDetailId: string | null = null;
+
+function openLimitBreak(monsterId: string): void {
+  const monster = state.player.monsters.find((m) => m.id === monsterId);
+  if (!monster) return;
+  limitReturnDetailId = state.monsterDetailId;
+  state.limitTargetId = monsterId;
+  state.limitDraft = { ...(monster.development.limitBreak?.points ?? { hp: 0, atk: 0, def: 0, spd: 0 }) };
+  state.limitNotice = null;
+  state.screen = "LIMIT_BREAK";
+  render();
+}
+
+function closeLimitBreak(): void {
+  state.screen = "MONSTERS";
+  state.monsterDetailId = limitReturnDetailId ?? state.limitTargetId;
+  state.limitTargetId = null;
+  state.limitNotice = null;
+  render();
 }
 
 /* ==========================================================================
@@ -2761,7 +2998,7 @@ function renderCurrentDungeonBattle(): BattleViewHandle {
   const run = state.dungeonRun;
   if (!run) throw new Error("dungeonRun is not set");
 
-  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment);
+  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment, state.player.accessories);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
 
   return renderBattleView({
@@ -2779,7 +3016,7 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
   const run = state.levelDungeonRun;
   if (!run) throw new Error("levelDungeonRun is not set");
 
-  const setup = setupDungeonBattle(run.partyInstances, run.def, state.player.equipment);
+  const setup = setupDungeonBattle(run.partyInstances, run.def, state.player.equipment, state.player.accessories);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
 
   return renderBattleView({
@@ -3114,7 +3351,7 @@ function startArenaMatch(entry: ArenaOpponentEntry, onRefused?: () => void): boo
   render();
 
   // 攻撃編成も防衛と同じ形で焼く。**サーバは同じ検分をかける**
-  const attackerSnapshot = captureArenaDefense(party, state.player.equipment);
+  const attackerSnapshot = captureArenaDefense(party, state.player.equipment, Date.now(), state.player.accessories ?? []);
 
   void (async () => {
     const connected = await connectArena();
@@ -3494,7 +3731,7 @@ function renderCurrentArenaBattle(): BattleViewHandle {
     ? { ...entry, defense: ticket.defenderSnapshot }
     : entry;
   const setup = buildArenaEntryBattle(
-    getArenaTeam(state.player, "OFFENSE"), opponent, state.player.equipment, state.arenaAttackerSnapshot);
+    getArenaTeam(state.player, "OFFENSE"), opponent, state.player.equipment, state.arenaAttackerSnapshot, state.player.accessories);
   /*
    * **乱数の種もサーバのものを使う。**
    *
@@ -3530,7 +3767,7 @@ function renderCurrentGoldDungeonBattle(): BattleViewHandle {
   const run = state.goldDungeonRun;
   if (!run) throw new Error("goldDungeonRun is not set");
 
-  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment);
+  const setup = setupDungeonBattle(run.partyInstances, run.floor, state.player.equipment, state.player.accessories);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs);
 
   return renderBattleView({
@@ -3549,7 +3786,7 @@ function renderCurrentWaveBattle(): BattleViewHandle {
   if (!run) throw new Error("stageRun is not set");
 
   const wave = run.stage.waves[run.waveIndex];
-  const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave, state.player.equipment, run.difficulty);
+  const setup = setupWaveBattle(run.currentPartyInstances, run.carryHp, wave, state.player.equipment, run.difficulty, state.player.accessories);
   const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { initialPlayerHp: setup.initialPlayerHp, initialSkyStacks: run.currentPartyInstances.map(m => run.carrySkyStacks?.get(m.id) ?? 0) });
   const isLastWave = run.waveIndex >= run.stage.waves.length - 1;
   const difficultySuffix = run.difficulty === "NORMAL" ? "" : ` [${DIFFICULTY_JA[run.difficulty]}]`;
@@ -4085,6 +4322,7 @@ function renderScreen(): void {
         onGoLevelDungeon: () => navigate("LEVEL_DUNGEON"),
         onGoGoldDungeon: () => navigate("GOLD_DUNGEON"),
         onGoAwakeningDepth: () => navigate("AWAKENING_DEPTH"),
+        onGoRuins: () => navigate("RUINS"),
         onGoShop: () => navigate("SHOP"),
         onGoArena: () => navigate("ARENA"),
         onGoTrialTower: () => navigate("TRIAL_TOWER"),
@@ -4403,6 +4641,172 @@ function renderScreen(): void {
       break;
     }
 
+    case "RUINS":
+      content = renderRuins({
+        player: state.player,
+        kind: state.ruinKind,
+        selectedFloor: state.selectedRuinFloor,
+        onSelectKind: (kind) => {
+          state.ruinKind = kind;
+          state.selectedRuinFloor = null;
+          render();
+        },
+        onSelectFloor: (floor) => {
+          state.selectedRuinFloor = floor;
+          render();
+        },
+        onStartFloor: startRuinFloor,
+        onGoParty: () => openPartyFrom({
+          screen: "RUINS",
+          label: `遺跡${state.selectedRuinFloor ?? ""}F`,
+        }, "NORMAL"),
+        onGoAccessories: () => openAccessories(null),
+        onGoCraft: openCraft,
+        autoFarmCount: state.autoFarmCount,
+        onChangeStaminaPotionBudget: setStaminaPotionFarmBudget,
+        onChangeAutoFarmCount: (count) => {
+          state.autoFarmCount = count;
+          render();
+        },
+        onAutoFarm: handleAutoFarmRuin,
+      });
+      break;
+
+    case "RUINS_BATTLE": {
+      showNav = false;
+      const handle = renderCurrentRuinBattle();
+      disposeCurrentView = handle.dispose;
+      content = handle.element;
+      break;
+    }
+
+    case "ACCESSORIES":
+      content = renderAccessories({
+        player: state.player,
+        sort: state.accessorySort,
+        filter: state.accessoryFilter,
+        selectedId: state.selectedAccessoryId,
+        pickFor: state.accessoryPickFor,
+        notice: state.accessoryNotice,
+        onSelect: (id) => {
+          state.selectedAccessoryId = id;
+          state.accessoryNotice = null;
+          render();
+        },
+        onChangeSort: (sort) => { state.accessorySort = sort; render(); },
+        onChangeFilter: (filter) => { state.accessoryFilter = filter; render(); },
+        onEquip: (accessoryId) => {
+          if (!state.accessoryPickFor) return;
+          const result = equipAccessory(state.player, state.accessoryPickFor, accessoryId);
+          if (!result.ok) { state.accessoryNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+          savePlayerState(state.player);
+          closeAccessories();
+        },
+        onUnequipPicked: () => {
+          if (!state.accessoryPickFor) return;
+          unequipAccessory(state.player, state.accessoryPickFor);
+          savePlayerState(state.player);
+          state.accessoryNotice = "アクセサリーを外しました";
+          render();
+        },
+        onEnhance: (accessoryId) => {
+          const result = tryEnhanceAccessory(state.player, accessoryId);
+          if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
+          savePlayerState(state.player);
+          state.accessoryNotice = `Lv${result.level}になりました(🪙${result.cost.toLocaleString("ja-JP")})`;
+          render();
+        },
+        onSell: (accessoryId) => {
+          const acc = findAccessory(state.player, accessoryId);
+          if (!acc) return;
+          if (!window.confirm(`${accessoryTitle(acc)} を売却しますか?`)) return;
+          const result = sellAccessory(state.player, accessoryId);
+          if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
+          savePlayerState(state.player);
+          state.selectedAccessoryId = null;
+          state.accessoryNotice = `売却しました(🪙${result.goldEarned.toLocaleString("ja-JP")})`;
+          render();
+        },
+        onToggleLock: (accessoryId) => {
+          const acc = findAccessory(state.player, accessoryId);
+          if (!acc) return;
+          setAccessoryLocked(state.player, accessoryId, !acc.locked);
+          savePlayerState(state.player);
+          render();
+        },
+        onBack: closeAccessories,
+      });
+      break;
+
+    case "ANCIENT_CRAFT":
+      content = renderAncientCraft({
+        player: state.player,
+        lastAccessory: state.craftLastAccessory,
+        lastEquipment: state.craftLastEquipment,
+        notice: state.craftNotice,
+        onCraftAccessory: (family) => {
+          const result = craftAccessory(state.player, family);
+          if (!result.ok) { state.craftNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+          savePlayerState(state.player);
+          state.craftLastAccessory = result.item;
+          state.craftLastEquipment = null;
+          state.craftNotice = "アクセサリーを作りました";
+          render();
+        },
+        onCraftEquipment: (set) => {
+          const result = craftEquipment(state.player, set);
+          if (!result.ok) { state.craftNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+          savePlayerState(state.player);
+          state.craftLastEquipment = result.item;
+          state.craftLastAccessory = null;
+          state.craftNotice = "装備を作りました";
+          render();
+        },
+        onBack: () => {
+          const back = state.craftReturn ?? "RUINS";
+          state.craftReturn = null;
+          state.screen = back;
+          render();
+        },
+        onGoAccessories: () => openAccessories(null),
+      });
+      break;
+
+    case "LIMIT_BREAK": {
+      const monster = state.player.monsters.find((m) => m.id === state.limitTargetId);
+      if (!monster) { state.screen = "MONSTERS"; render(); return; }
+      content = renderLimitBreak({
+        player: state.player,
+        monster,
+        draft: state.limitDraft,
+        notice: state.limitNotice,
+        onUnlock: () => {
+          const result = unlockLimitBreak(state.player, monster.id);
+          if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+          savePlayerState(state.player);
+          state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 };
+          state.limitNotice = "限界能力付与を解放しました";
+          render();
+        },
+        onChange: (stat, delta) => {
+          const next = Math.max(-50, Math.min(50, state.limitDraft[stat] + delta));
+          state.limitDraft = { ...state.limitDraft, [stat]: next };
+          state.limitNotice = null;
+          render();
+        },
+        onReset: () => { state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 }; render(); },
+        onSave: () => {
+          const result = setLimitPoints(state.player, monster.id, state.limitDraft);
+          if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+          savePlayerState(state.player);
+          state.limitNotice = "保存しました";
+          render();
+        },
+        onBack: closeLimitBreak,
+      });
+      break;
+    }
+
     case "ARENA": {
       if (arenaConnectionStatus === "IDLE") void connectArena().then(() => render());
       const arenaOnline = arenaConnectionStatus === "ONLINE";
@@ -4608,7 +5012,7 @@ function renderScreen(): void {
            * 売っても、相手の画面の防衛は1バイトも変わらない。
            */
           state.player.arenaDefenseIds = [...state.arenaDefenseDraftIds];
-          state.player.arenaDefenseSnapshot = captureArenaDefense(members, state.player.equipment);
+          state.player.arenaDefenseSnapshot = captureArenaDefense(members, state.player.equipment, Date.now(), state.player.accessories ?? []);
           // **新しい姿はまだ届いていない。**古い「届いた」を残すと嘘になる
           delete state.player.arenaDefenseSyncedAt;
           savePlayerState(state.player);
@@ -5594,6 +5998,8 @@ function renderMonstersScreen(): HTMLElement {
     onToggleFilterOpen: handleToggleMonsterFilterOpen,
     dense: state.monsterListDense,
     onToggleDense: handleToggleMonsterListDense,
+    onOpenAccessorySlot: (monsterId) => openAccessories(monsterId),
+    onOpenLimitBreak: openLimitBreak,
   });
 }
 
