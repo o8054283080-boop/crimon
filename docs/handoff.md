@@ -902,3 +902,32 @@ psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authentic
 直接書き換えれば同じ形になる。**食い違いを疑う時は、まず
 `arena_profiles` / `arena_standings` / `arena_wallets` / `trial_tower_progress` の
 4つが同じ `user_id` を向いているかを見る。
+
+## アクセサリー・力の遺跡・守護の遺跡(PR待ち。依頼主の確認でマージ)
+
+入口: `src/core/accessory.ts`(型・表・生成・無害化)/ `src/core/accessoryApply.ts`(定義へ着ける)/
+`src/battle/accessoryRuntime.ts`(戦闘中の効果)/ `src/data/ruins.ts`・`src/game/ruins.ts`(遺跡)/
+`src/game/ancientCraft.ts`(カケラ製作・限界能力付与)。
+
+**触る時の罠:**
+
+- **アクセの無い戦闘は、アクセの処理を1行も通らない**(`engine.acc` が null)。
+  乱数も引かないので、アクセ無しの装備ダンジョン・アリーナは実装前と完全に同じ経過になる
+  (mainと同じ種で比べて一致を確認済み)。**`acc` を常に作る形へ変えると、既存の戦闘の乱数がずれる。**
+- **防衛データ(`ArenaUnitSnapshot.accessory`)の版は上げていない。**
+  サーバの受け取り上限は `max_version: 1`。上げた瞬間に登録も対戦も全員が弾かれる。
+  欄を足しただけなので、古い読み手は読み飛ばす。
+- 照合表(SQL)は**アクセを見ていない**。改ざん値は `sanitizeAccessory` が正規の幅へ丸める
+  (クライアントもサーバの再戦闘も同じ関数を通る)。限界配分も `sanitizeLimitPoints` が
+  決まりを外れたら丸ごと無効にする。
+- セーブの圧縮(`saveCodec.ts`)は**モンスターの項目を列挙している。**
+  `accessoryId` は `g`、限界配分は育成の `z`。新しい項目を個体へ足したら、ここにも足すこと。
+- 遺跡は**通常の編成(4体)**で戦う(深域と同じ)。
+
+**まだ終わっていないこと:**
+
+- **攻略率が依頼主の前回検証と合っていない。**力5F「汎用STRONG ~12%」に対し、
+  `npx tsx tools/ruinPressure.ts --size 4` の毒なし汎用は95%。守護5Fは毒なし汎用が
+  STRONG 2.5% / FINISHED 15.5% で目安に近い(汎用に電気インプの毒が入ると、
+  毒は身代わりされないので100%になる)。前回の編成定義がリポジトリに無いので、
+  **敵は触らずに**依頼主へ判断を仰いでいる。

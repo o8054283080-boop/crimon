@@ -14,7 +14,7 @@ import { getAudioSettings, initAudio, playBgm, playSfx, updateAudioSettings } fr
 import { BATTLE_SCREENS, bgmSceneOf } from "./audio/bgmScene.js";
 import { registerSW } from "virtual:pwa-register";
 import { BattleEngine } from "../battle/engine.js";
-import { EQUIP_SLOTS, equipmentSellPrice, EquipSlot, generateEquipment, SET_TYPES, type Equipment } from "../core/equipment.js";
+import { EQUIP_SLOTS, enhanceEquipment as enhanceEquipmentForDev, equipmentSellPrice, EquipSlot, generateEquipment, SET_TYPES, type Equipment } from "../core/equipment.js";
 import { DUNGEON_STAMINA_COST, GOLD_DUNGEON_STAMINA_COST, LEVEL_DUNGEON_STAMINA_COST, STAGE_STAMINA_COST } from "../core/fighterLevel.js";
 import { MonsterInstance } from "../core/monsterInstance.js";
 import { DungeonFloor, EquipmentDungeonKind, dungeonFloorKey, findDungeonFloorByKey } from "../data/equipmentDungeon.js";
@@ -274,7 +274,7 @@ import {
   tryEnhanceAccessory, unequipAccessory, findAccessory,
 } from "../game/accessories.js";
 import { craftAccessory, craftEquipment, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
-import { accessoryTitle, describeSpecial } from "../core/accessory.js";
+import { accessoryTitle, describeSpecial, generateAccessory as generateAccessoryForDev } from "../core/accessory.js";
 import { renderRuins } from "./views/ruins.js";
 import { renderAccessories } from "./views/accessories.js";
 import { renderAncientCraft } from "./views/ancientCraft.js";
@@ -545,12 +545,9 @@ interface AppState {
   /** 着ける先のモンスター(モンスター詳細のアクセ枠から来た時) */
   accessoryPickFor: string | null;
   accessoryNotice: string | null;
-  /** アクセ一覧から戻る先 */
-  accessoryReturn: ScreenName | null;
   craftLastAccessory: Accessory | null;
   craftLastEquipment: CraftedEquipment | null;
   craftNotice: string | null;
-  craftReturn: ScreenName | null;
   limitTargetId: string | null;
   limitDraft: AbilityPointAllocation;
   limitNotice: string | null;
@@ -755,11 +752,9 @@ const state: AppState = {
   selectedAccessoryId: null,
   accessoryPickFor: null,
   accessoryNotice: null,
-  accessoryReturn: null,
   craftLastAccessory: null,
   craftLastEquipment: null,
   craftNotice: null,
-  craftReturn: null,
   limitTargetId: null,
   limitDraft: { hp: 0, atk: 0, def: 0, spd: 0 },
   limitNotice: null,
@@ -933,6 +928,11 @@ let lastRouteKey: string | null = null;
  */
 interface RouteState {
   screen: ScreenName;
+  /* 遺跡・アクセ・限界付与。戻った時に同じ遺跡・同じ階・同じ着け先・同じ個体を開き直す */
+  ruinKind: RuinKind;
+  selectedRuinFloor: number | null;
+  accessoryPickFor: string | null;
+  limitTargetId: string | null;
   monsterDetailId: string | null;
   rankUpMode: boolean;
   equipmentDetailId: string | null;
@@ -981,6 +981,7 @@ const ROUTE_FIELDS = [
   "selectedGoldDungeonFloor", "selectedAwakeningDepthFloor", "talentTargetId", "talentTab",
   "createTargetId", "createMenu", "partyEditMode",
   "arenaView", "arenaDetailIndex", "arenaUnitIndex",
+  "ruinKind", "selectedRuinFloor", "accessoryPickFor", "limitTargetId",
 ] as const satisfies readonly (keyof RouteState)[];
 
 function routeState(): RouteState {
@@ -2798,17 +2799,18 @@ function startRuinFloor(floor: RuinFloor): void {
   render();
 }
 
-/** 1勝ぶんの報酬を結果画面の行にする。**確率の数字は出さない** */
+/**
+ * 1勝ぶんの報酬を結果画面の行にする。**1行に1つ**(結果画面は「名前 ×数」を札にする)。
+ * 召喚の書・ピッグは結果画面が元から出すので、ここでは重ねない。確率の数字は出さない。
+ */
 function ruinRewardLines(reward: RuinReward): string[] {
   const acc = reward.accessoryDrop;
   return [
-    `💍 ${accessoryTitle(acc)}`,
-    ...acc.specials.map((roll) => `　${describeSpecial(roll)}`),
-    `進化核 ×${reward.evolutionCores} / 古代のカケラ ×${reward.ancientShards}`,
-    reward.summonScrollDropped ? "📜 召喚の書 ×1" : null,
-    reward.pigDrop ? "🐷 転生ピッグ★3 ×1" : null,
-    reward.skillPigDrop ? "🐷 スキルピッグ★1 ×1" : null,
-  ].filter((v): v is string => v !== null);
+    accessoryTitle(acc),
+    ...acc.specials.map((roll) => `特殊 ${describeSpecial(roll)}`),
+    `進化核 ×${reward.evolutionCores}`,
+    `古代のカケラ ×${reward.ancientShards}`,
+  ];
 }
 
 function finishRuin(cleared: boolean): void {
@@ -2874,33 +2876,25 @@ function renderCurrentRuinBattle(): BattleViewHandle {
  * ========================================================================== */
 
 function openAccessories(pickFor: string | null): void {
-  const from = state.screen;
-  const detail = state.monsterDetailId;
-  state.accessoryReturn = from;
   state.accessoryPickFor = pickFor;
   state.selectedAccessoryId = null;
   state.accessoryNotice = null;
   state.screen = "ACCESSORIES";
-  // モンスター詳細から来た時は、戻った時に同じ詳細を開き直す
-  accessoryReturnDetailId = from === "MONSTERS" ? detail : null;
   render();
 }
 
-let accessoryReturnDetailId: string | null = null;
-
+/**
+ * アクセ一覧を閉じる。**戻り先は共通の履歴に任せる**(画面上の「戻る」と同じ道)。
+ * 履歴が無い時だけホームへ。
+ */
 function closeAccessories(): void {
-  const back = state.accessoryReturn ?? "HOME";
-  state.accessoryPickFor = null;
   state.selectedAccessoryId = null;
   state.accessoryNotice = null;
-  state.screen = back;
-  if (back === "MONSTERS" && accessoryReturnDetailId) state.monsterDetailId = accessoryReturnDetailId;
-  accessoryReturnDetailId = null;
-  render();
+  if (canGoBack()) goBack();
+  else navigate("HOME");
 }
 
 function openCraft(): void {
-  state.craftReturn = state.screen;
   state.craftNotice = null;
   state.craftLastAccessory = null;
   state.craftLastEquipment = null;
@@ -2908,24 +2902,13 @@ function openCraft(): void {
   render();
 }
 
-let limitReturnDetailId: string | null = null;
-
 function openLimitBreak(monsterId: string): void {
   const monster = state.player.monsters.find((m) => m.id === monsterId);
   if (!monster) return;
-  limitReturnDetailId = state.monsterDetailId;
   state.limitTargetId = monsterId;
   state.limitDraft = { ...(monster.development.limitBreak?.points ?? { hp: 0, atk: 0, def: 0, spd: 0 }) };
   state.limitNotice = null;
   state.screen = "LIMIT_BREAK";
-  render();
-}
-
-function closeLimitBreak(): void {
-  state.screen = "MONSTERS";
-  state.monsterDetailId = limitReturnDetailId ?? state.limitTargetId;
-  state.limitTargetId = null;
-  state.limitNotice = null;
   render();
 }
 
@@ -4734,7 +4717,6 @@ function renderScreen(): void {
           savePlayerState(state.player);
           render();
         },
-        onBack: closeAccessories,
       });
       break;
 
@@ -4762,19 +4744,13 @@ function renderScreen(): void {
           state.craftNotice = "装備を作りました";
           render();
         },
-        onBack: () => {
-          const back = state.craftReturn ?? "RUINS";
-          state.craftReturn = null;
-          state.screen = back;
-          render();
-        },
         onGoAccessories: () => openAccessories(null),
       });
       break;
 
     case "LIMIT_BREAK": {
       const monster = state.player.monsters.find((m) => m.id === state.limitTargetId);
-      if (!monster) { state.screen = "MONSTERS"; render(); return; }
+      if (!monster) { navigate("MONSTERS"); return; }
       content = renderLimitBreak({
         player: state.player,
         monster,
@@ -4802,7 +4778,6 @@ function renderScreen(): void {
           state.limitNotice = "保存しました";
           render();
         },
-        onBack: closeLimitBreak,
       });
       break;
     }
@@ -6272,6 +6247,97 @@ if (import.meta.env.DEV) {
   ];
 
   (window as unknown as Record<string, unknown>).__crimonDev = {
+    /*
+     * **アクセ・遺跡・製作・限界付与の中身を巡回と実機確認に見せるための口。**
+     * 初期セーブはアクセ0個・素材0・遺跡未クリアなので、そのまま開くと
+     * 空の一覧と「未開放」だけを検査することになる。
+     */
+    seedAccessoryContent() {
+      const rng = Math.random;
+      const families = ["ATTACK", "DURABILITY", "SUPPORT", "DISRUPT"] as const;
+      const rarities = ["HERO", "LEGEND", "EPIC"] as const;
+      for (const family of families) for (const rarity of rarities) {
+        const acc = generateAccessoryForDev({ star: rarity === "EPIC" ? 6 : rarity === "LEGEND" ? 5 : 4, rarity, family, rng });
+        acc.level = rarity === "EPIC" ? 15 : rarity === "LEGEND" ? 10 : 1;
+        (state.player.accessories ??= []).push(acc);
+      }
+      const lead = getParty(state.player)[0] ?? state.player.monsters[0];
+      if (lead) {
+        lead.star = 6;
+        lead.level = 60;
+        lead.accessoryId = state.player.accessories![state.player.accessories!.length - 1].id;
+      }
+      state.player.ancientShards = 320;
+      state.player.evolutionCores = 250;
+      state.player.clearedPowerRuinFloors = [1, 2, 3, 4, 5];
+      state.player.clearedGuardianRuinFloors = [1, 2, 3, 4, 5];
+      savePlayerState(state.player);
+      render();
+    },
+    /** 実機確認用: 編成を★6 Lv60・★6+15装備にして、遺跡の低層を勝てる状態にする */
+    strongPartyForDev() {
+      for (const monster of getParty(state.player)) {
+        monster.star = 6;
+        monster.level = 60;
+        monster.skillLevels = [5, 5, 5];
+        for (const slot of EQUIP_SLOTS) {
+          const item = generateEquipment({ star: 6, slot, subStatCount: 4 });
+          while (item.level < 15) enhanceEquipmentForDev(item);
+          state.player.equipment.push(item);
+          monster.equipment[slot] = item.id;
+        }
+      }
+      state.player.stamina = Math.max(state.player.stamina, 500);
+      savePlayerState(state.player);
+      render();
+    },
+    /** 実機確認用: 編成を★1 Lv1・装備なしにする(負けたら周回が止まるかを見る) */
+    weakPartyForDev() {
+      for (const monster of getParty(state.player)) {
+        monster.star = 1;
+        monster.level = 1;
+        monster.equipment = {};
+        monster.accessoryId = null;
+      }
+      savePlayerState(state.player);
+      render();
+    },
+    /** 編成の先頭の詳細を開く(アクセ枠の実タップ確認用) */
+    openLeadDetailForDev() {
+      const lead = getParty(state.player)[0] ?? state.player.monsters[0];
+      if (!lead) return;
+      navigate("MONSTERS");
+      state.monsterDetailId = lead.id;
+      render();
+    },
+    /** 遺跡を開く。`floor` を渡せばその階の詳細 */
+    openRuins(kind: RuinKind = "POWER", floor: number | null = null) {
+      navigate("RUINS");
+      state.ruinKind = kind;
+      state.selectedRuinFloor = floor;
+      render();
+    },
+    /** アクセ一覧。`pick` なら先頭の編成メンバーに着ける画面、`select` なら先頭のアクセを選んだ状態 */
+    openAccessoriesForDev(pick = false, select = false) {
+      navigate(pick ? "MONSTERS" : "RUINS");
+      const lead = getParty(state.player)[0] ?? state.player.monsters[0];
+      openAccessories(pick && lead ? lead.id : null);
+      if (select) state.selectedAccessoryId = state.player.accessories?.at(-1)?.id ?? null;
+      render();
+    },
+    openCraftForDev() {
+      navigate("RUINS");
+      openCraft();
+    },
+    openLimitBreakForDev(unlock = false) {
+      const lead = getParty(state.player)[0] ?? state.player.monsters[0];
+      if (!lead) return;
+      lead.star = 6;
+      if (unlock) lead.development.limitBreak = { unlocked: true, points: { hp: -10, atk: 10, def: 0, spd: 0 } };
+      navigate("MONSTERS");
+      state.monsterDetailId = lead.id;
+      openLimitBreak(lead.id);
+    },
     /*
      * **才能覚醒の中身を巡回に見せるための口。**
      *

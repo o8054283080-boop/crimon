@@ -195,6 +195,18 @@ const SCREENS = [
    */
   { name: "モンスター詳細(才能覚醒あり)", tab: "MONSTERS", setup: "window.__crimonDev?.openMonsterDetailWithTalents()" },
   /*
+   * アクセサリー・遺跡・カケラ製作・限界能力付与。
+   * **中身を入れてから見る。**初期セーブはアクセ0個・素材0・遺跡未クリアなので、
+   * そのまま開くと空の一覧と「未開放」だけを検査することになる。
+   */
+  { name: "遺跡/力(一覧)", tab: "HOME", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openRuins('POWER')" },
+  { name: "遺跡/守護5階(詳細)", tab: "HOME", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openRuins('GUARDIAN', 5)" },
+  { name: "アクセサリー一覧(選択中)", tab: "HOME", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openAccessoriesForDev(false, true)" },
+  { name: "アクセサリー(着ける先を選ぶ)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openAccessoriesForDev(true, true)" },
+  { name: "カケラ製作", tab: "HOME", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openCraftForDev()" },
+  { name: "限界能力付与(未解放)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(false)" },
+  { name: "限界能力付与(配分中)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(true)" },
+  /*
    * 周回結果の「獲得装備」のシート。**周回を回さないと開けない**ので、
    * これまで一度も検査していなかった。下から出る `position:fixed` の中に
    * 絞り込み・一覧・操作帯が入る、いちばん崩れやすい形をしている。

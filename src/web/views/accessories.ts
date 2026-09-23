@@ -34,7 +34,6 @@ export interface AccessoriesProps {
   onEnhance: (accessoryId: string) => void;
   onSell: (accessoryId: string) => void;
   onToggleLock: (accessoryId: string) => void;
-  onBack: () => void;
 }
 
 const SORTS: { key: AccessorySortKey; label: string }[] = [
@@ -131,7 +130,6 @@ export function renderAccessories(props: AccessoriesProps): HTMLElement {
   const title = props.pickFor ? `${pickedName ?? ""}のアクセサリー` : "アクセサリー";
   return el("div", { className: "screen accessories-screen" }, [
     el("header", { className: "app-header app-header--row" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onBack }, ["◀ 戻る"]),
       el("h1", {}, [title]),
     ]),
     props.notice ? el("p", { className: "acc-note", role: "status" }, [props.notice]) : null,

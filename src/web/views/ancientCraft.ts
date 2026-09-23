@@ -22,7 +22,6 @@ export interface AncientCraftProps {
   notice: string | null;
   onCraftAccessory: (family: AccessoryFamily) => void;
   onCraftEquipment: (set: SetType) => void;
-  onBack: () => void;
   onGoAccessories: () => void;
 }
 
@@ -32,7 +31,6 @@ export function renderAncientCraft(props: AncientCraftProps): HTMLElement {
   const short = ok ? null : `あと${(ANCIENT_CRAFT_COST - have).toLocaleString("ja-JP")}個`;
   return el("div", { className: "screen craft-screen" }, [
     el("header", { className: "app-header app-header--row" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onBack }, ["◀ 戻る"]),
       el("h1", {}, ["カケラ製作"]),
     ]),
     renderRuinMaterials(props.player),

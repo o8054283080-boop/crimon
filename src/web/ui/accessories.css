@@ -141,7 +141,8 @@
 }
 
 .acc-chip {
-  min-height: 34px;
+  /* 指で押す札。44pxを割ると巡回が落とす(実機で押し損ねる) */
+  min-height: 44px;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid rgba(214, 180, 104, 0.35);

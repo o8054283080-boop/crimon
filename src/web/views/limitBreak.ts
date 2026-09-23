@@ -25,7 +25,6 @@ export interface LimitBreakProps {
   onChange: (stat: AllocatableStat, delta: number) => void;
   onReset: () => void;
   onSave: () => void;
-  onBack: () => void;
 }
 
 const STATS: { key: AllocatableStat; label: string }[] = [
@@ -47,7 +46,6 @@ export function renderLimitBreak(props: LimitBreakProps): HTMLElement {
   const unlocked = props.monster.development.limitBreak?.unlocked === true;
   const cores = props.player.evolutionCores ?? 0;
   const header = el("header", { className: "app-header app-header--row" }, [
-    el("button", { type: "button", className: "btn btn--ghost", onclick: props.onBack }, ["◀ 戻る"]),
     el("h1", {}, ["限界能力付与"]),
   ]);
   if (!unlocked) {
