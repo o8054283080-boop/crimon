@@ -413,6 +413,34 @@ function plan(name: string) {
       break;
     }
 
+    /* ---------------- 23章の分解: どの妨害特殊がハメを伸ばすか ---------------- */
+    case "lock-split": {
+      const one = (k: Dis5, v?: number) => (m: Member5) => ({ ...single(k, m.profiles[m.role5].main === "ATK" ? "ATK" : "HP", v) });
+      const conds = [
+        C("LS:main", "妨害4体 メインだけ", (m) => single(null, m.profiles[m.role5].main === "ATK" ? "ATK" : "HP"), none),
+        ...(["GAUGE_DOWN_UP", "DEBUFFED_GAUGE_DOWN", "DEBUFF_SELF_GAUGE", "DEBUFF_RATE", "S3_RATE", "STUNNED_DMG"] as Dis5[]).map((k) => C(`LS:${k}`, `妨害4体 ${DIS5[k].label} 1個(上限値)`, one(k), none)),
+        C("LS:GAUGE_DOWN_UP:ADD", "妨害4体 ゲージ減少量UP 1個(12pt加算)", one("GAUGE_DOWN_UP"), none, { gaugeMode: "ADD" }),
+      ];
+      run("lock-split-atk", [OFF_X], DEF_ALL, conds);
+      run("lock-split-def", ALL_OFF, [DEF_X], conds.map((c) => ({ ...c, atk: none, def: c.atk })));
+      break;
+    }
+    /* ---------------- 30章: 妨害の値の絞り込み(ゲージ減少倍率・付与率) ---------------- */
+    case "dis-sweep": {
+      const gaugeTeams = [byKey(ATTACKS5, "OFF-E"), OFF_X];
+      const gAcc = (up: number, cond: number) => (m: Member5) => (m.role5.startsWith("DIS") ? acc(m, "DIS_GAUGE", "EPIC", "STD", 1, { GAUGE_DOWN_UP: up, DEBUFFED_GAUGE_DOWN: cond }) : NONE5);
+      run("dis-sweep-gauge", gaugeTeams, DEF_ALL, [
+        C("DG:none", "妨害役 アクセなし", none, none),
+        ...[[0.08, 0.06], [0.10, 0.08], [0.12, 0.10], [0.15, 0.12]].map(([u, c]) => C(`DG:${u}/${c}`, `妨害役 ゲージ妨害(減少量×${1 + u}・弱体中×${1 + c}・自身ゲージ4%)`, gAcc(u, c), none)),
+      ]);
+      const rAcc = (v: number) => (m: Member5) => (m.role5.startsWith("DIS") ? acc(m, m.role5 === "DIS_GAUGE" ? "DIS_RATE" : m.role5, "EPIC", "STD", 1, { DEBUFF_RATE: v, S1_RATE: v, S2_RATE: v, S3_RATE: v }) : NONE5);
+      run("dis-sweep-rate", [OFF_B5, byKey(ATTACKS5, "OFF-E")], DEF_ALL, [
+        C("DR:none", "妨害役 アクセなし", none, none),
+        ...[0.03, 0.04, 0.05, 0.07].map((v) => C(`DR:${v}`, `妨害役 役割最適(付与率の特殊を ${v * 100}pt に)`, rAcc(v), none)),
+      ]);
+      break;
+    }
+
     /* ---------------- 24章: サポート永久耐久 ---------------- */
     case "wall": {
       const wallDefs = [...DEFENSES_NEW, byKey(DEFENSES5, "A"), byKey(DEFENSES5, "C")];
