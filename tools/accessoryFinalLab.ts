@@ -360,6 +360,12 @@ const STAGES: Stage[] = [
   { key: "XA", label: "攻撃側だけ理想エピック(防御はアクセなし)", atk: (s, p) => atkAcc(s, p, "EPIC", "MAX", 1.2), def: null, defChoose: false },
   { key: "XD", label: "防御側だけ理想エピック(攻撃はアクセなし・防御は基本)", atk: null, def: (d, p) => defAcc(d, p, "EPIC", "MAX", 1.2), defChoose: false },
   { key: "XD特", label: "防御側だけ理想エピック(攻撃はアクセなし・防御は相手に特化)", atk: null, def: (d, p) => defAcc(d, p, "EPIC", "MAX", 1.2), defChoose: true },
+  /*
+   * **前回のレポート(6A・6D)と同じ土台。**前回は片側だけ最上位にした時、
+   * もう片方を「アクセなし」ではなく「メインのみ」にしていた。縮み方を直接比べるため。
+   */
+  { key: "XA'", label: "攻撃側だけ理想エピック(防御はメインのみ・前回の6A相当)", atk: (s, p) => atkAcc(s, p, "EPIC", "MAX", 1.2), def: (d) => defMain(d), defChoose: false },
+  { key: "XD'", label: "防御側だけ理想エピック(攻撃はメインのみ・防御は相手に特化・前回の6D相当)", atk: fixedAtk(mainOnly("ATK", ATK_MAIN)), def: (d, p) => defAcc(d, p, "EPIC", "MAX", 1.2), defChoose: true },
 ];
 const stage = (key: string) => STAGES.find((s) => s.key === key)!;
 
@@ -769,6 +775,8 @@ const battleStages: { st: Stage; def: "基本" | "対S3全体"; label: string }[
   { st: stage("XA"), def: "基本", label: "XA 攻撃側だけ理想エピック" },
   { st: stage("XD"), def: "基本", label: "XD 防御側だけ理想エピック(基本)" },
   { st: stage("XD"), def: "対S3全体", label: "XD特 防御側だけ理想エピック(対S3全体)" },
+  { st: stage("XA'"), def: "基本", label: "XA' 攻撃側だけ理想エピック(防御はメインのみ)" },
+  { st: stage("XD'"), def: "対S3全体", label: "XD' 防御側だけ理想エピック(攻撃はメインのみ・対S3全体)" },
 ];
 for (const b of battleStages) {
   const { attack, defense } = teamFor(b.st, b.def);
