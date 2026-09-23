@@ -279,7 +279,11 @@ interface EngineInternals {
 export function attachAccessories(
   engine: BattleEngine,
   accessoryOf: (unit: BattleUnit) => Accessory,
-  options: { stackAtk: Stacking; stackDef: Stacking; rng: () => number; shield50Turns?: number },
+  options: {
+    stackAtk: Stacking; stackDef: Stacking; rng: () => number; shield50Turns?: number;
+    /** 修正案の検証用: 1Hitに乗る攻撃アクセの与ダメUPの合計の上限(0.15 = +15%まで)。省略で上限なし */
+    atkCap?: number;
+  },
 ): { stats: { shield50: number; hitHeals: number; killGauge: number } } {
   const e = engine as unknown as EngineInternals;
   const stats = { shield50: 0, hitHeals: 0, killGauge: 0 };
@@ -317,7 +321,9 @@ export function attachAccessories(
         hitIndex, firstAttack: firstResolution.get(source.instanceId) === resolution, crit,
         stackAtk: options.stackAtk, stackDef: options.stackDef,
       };
-      adjusted = Math.max(1, Math.round(amount * attackMultiplier(ctx).factor * defenseMultiplier(ctx).factor));
+      const atkFactor = attackMultiplier(ctx).factor;
+      const cappedAtk = options.atkCap === undefined ? atkFactor : Math.min(atkFactor, 1 + options.atkCap);
+      adjusted = Math.max(1, Math.round(amount * cappedAtk * defenseMultiplier(ctx).factor));
     } else if (sourceType !== "reflect") {
       // スキル以外(継続ダメージなど)は、条件の無い軽減だけを見る
       const ctx: HitContext = {

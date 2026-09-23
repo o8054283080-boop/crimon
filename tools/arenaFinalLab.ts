@@ -109,6 +109,8 @@ function accOf(m: Member, side: Side, tier: Tier | "MAIN" | null, roll: Roll = "
 interface Condition {
   key: string;
   label: string;
+  /** 修正案の検証用: 1Hitに乗る攻撃特殊の合計の上限 */
+  atkCap?: number;
   atk: (m: Member) => Accessory;
   def: (m: Member) => Accessory;
 }
@@ -145,6 +147,12 @@ const CONDITIONS: Condition[] = [
     atk: () => NONE, def: (m) => { const a = accOf(m, "D", "EPIC", "MAX", 1.2); return { ...a, specials: a.specials.filter((_, j) => j !== i) }; },
   })),
   { key: "XD-w", label: "XD-w 防衛側だけ理想エピックから弱効果を外す", atk: () => NONE, def: (m) => ({ ...accOf(m, "D", "EPIC", "MAX", 1.2), weak: null }) },
+  /* --- 修正案: 1Hitに乗る攻撃特殊の合計に上限を置く(本番の候補値ではない) --- */
+  ...[0.15, 0.20].flatMap((cap): Condition[] => [
+    { key: `XA-c${cap * 100}`, label: `XA-c${cap * 100} 攻撃側だけ理想エピック・攻撃特殊の合計上限${cap * 100}%`, atkCap: cap, atk: (m) => accOf(m, "A", "EPIC", "MAX", 1.2), def: () => NONE },
+    { key: `LA-c${cap * 100}`, label: `LA-c${cap * 100} 攻撃側だけレジェンド・攻撃特殊の合計上限${cap * 100}%`, atkCap: cap, atk: (m) => accOf(m, "A", "LEGEND"), def: () => NONE },
+    { key: `X-c${cap * 100}`, label: `X-c${cap * 100} 双方 理想エピック・攻撃特殊の合計上限${cap * 100}%`, atkCap: cap, atk: (m) => accOf(m, "A", "EPIC", "MAX", 1.2), def: (m) => accOf(m, "D", "EPIC", "MAX", 1.2) },
+  ]),
   {
     key: "XS", label: "XS 双方 理想エピック・防衛は回復特化(ターン回復+被弾回復+50%シールド+弱:微回復)",
     atk: (m) => accOf(m, "A", "EPIC", "MAX", 1.2),
@@ -183,7 +191,7 @@ function runBattle(attack: Team, defense: Team, cond: Condition, seed: number, n
   attack.members.forEach((m, i) => accOf.set(`P${i + 1}`, cond.atk(m)));
   defense.members.forEach((m, i) => accOf.set(`E${i + 1}`, cond.def(m)));
   const engine = new BattleEngine(players, enemies, noRamp ? { rng: mulberry32(seed) } : { ...ARENA_BATTLE_OPTIONS, rng: mulberry32(seed) });
-  const attached = attachAccessories(engine, (u) => accOf.get(u.instanceId) ?? NONE, { ...STACK, rng: mulberry32(seed ^ 0x9e3779b9) });
+  const attached = attachAccessories(engine, (u) => accOf.get(u.instanceId) ?? NONE, { ...STACK, atkCap: cond.atkCap, rng: mulberry32(seed ^ 0x9e3779b9) });
   const internals = engine as unknown as { units: BattleUnit[]; turns: unknown[]; recordTurn: (unit: BattleUnit, ...rest: unknown[]) => unknown };
   const original = internals.recordTurn.bind(engine);
   const alive = (team: "PLAYER" | "ENEMY") => internals.units.filter((u) => u.team === team && u.alive).length;
@@ -320,7 +328,7 @@ if (MODE === "trace") {
   const NO_RAMP = argv.includes("--no-ramp");
   if (NO_RAMP) console.log("**参考測定: アリーナの『長引いた時のダメージ増加』を外している。本番の条件ではない。**\n");
   const conds = MODE === "baseline" ? CONDITIONS.filter((c) => c.key === "A")
-    : CONDITIONS.filter((c) => (ONLY_COND ? ONLY_COND.split(",").includes(c.key) : !/^(HA|LA|HD|LD|EA|ED|XAm|XDm|XA-|XD-)/.test(c.key)));
+    : CONDITIONS.filter((c) => (ONLY_COND ? ONLY_COND.split(",").includes(c.key) : !/^(HA|LA|HD|LD|EA|ED|XAm|XDm|XA-|XD-|LA-|X-c)/.test(c.key)));
   const pool = argv.includes("--variants") ? [...DEFENSE_ROUND1, ...DEFENSE_VARIANTS] : DEFENSES;
   const defs = pool.filter((d) => !ONLY_DEF || ONLY_DEF.split(",").includes(d.key));
   const atkPool = argv.includes("--variants") ? [...ATTACK_ROUND1, ...ATTACK_VARIANTS] : ATTACKS;
