@@ -367,8 +367,11 @@ function ruinEngine(kind: "POWER" | "GUARDIAN", floor: number) {
 describe("遺跡", () => {
   it("能力値・スタミナ・消費は指定どおり(5階)", () => {
     const p5 = findRuinFloor("POWER", 5)!;
+    // 力の遺跡の4・5階は、依頼主の指示(「力の遺跡をつよくして目標に近づけて」)で
+    // 指定値(本体 510000/9000/3150/210)から HPを約半分・攻撃力を約3.8倍・本体の速さ+15 にした。
+    // 経緯と計測は docs/handoff.md
     expect(p5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
-      [510_000, 9_000, 3_150, 210], [180_000, 1_800, 2_200, 205], [145_000, 2_600, 1_800, 200],
+      [255_000, 34_000, 3_150, 225], [90_000, 5_400, 2_200, 205], [72_000, 7_800, 1_800, 200],
     ]);
     const g5 = findRuinFloor("GUARDIAN", 5)!;
     expect(g5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
