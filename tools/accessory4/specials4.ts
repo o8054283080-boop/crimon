@@ -140,10 +140,20 @@ function rangesOf4(key: Special4): Ranges {
   return table[key].ranges;
 }
 
+/**
+ * **再調整候補を測るためだけの倍率。**既定は1(依頼の候補値そのまま)。
+ * 環境変数 `ACC4_SUP_SCALE` / `ACC4_DIS_SCALE` で、サポート・妨害の特殊効果の値だけを何倍かにする。
+ */
+function familyScale(key: SupSpecial | DisSpecial): number {
+  const raw = key in SUP_SPECIALS ? process.env.ACC4_SUP_SCALE : process.env.ACC4_DIS_SCALE;
+  const v = Number(raw ?? "1");
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
 /** サポート・妨害の効き目。特殊の値 + (同じ仕組みの弱効果があれば)その値 */
 export function v4(acc: Acc4, key: SupSpecial | DisSpecial): number {
   if (new Set(acc.specials).size !== acc.specials.length) throw new Error("同一の特殊効果は1つのアクセに重複不可");
-  const special = acc.specials.includes(key) ? valueOf(rangesOf4(key)[acc.tier], acc.roll) : 0;
+  const special = acc.specials.includes(key) ? valueOf(rangesOf4(key)[acc.tier], acc.roll) * familyScale(key) : 0;
   const weak = acc.weak && acc.weak in WEAKS4 && WEAKS4[acc.weak as keyof typeof WEAKS4].as === key ? WEAKS4[acc.weak as keyof typeof WEAKS4].value : 0;
   return special + weak;
 }
