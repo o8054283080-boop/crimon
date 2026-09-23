@@ -126,6 +126,25 @@ const CONDITIONS: Condition[] = [
   { key: "B12", label: "B12 双方メインのみ・個体差1.2倍(ATK+2,400 / HP+6,000 / DEF+900)", atk: (m) => accOf(m, "A", "MAIN", "STD", 1.2), def: (m) => accOf(m, "D", "MAIN", "STD", 1.2) },
   { key: "MA", label: "MA 攻撃側だけメイン(ATK+2,000・防衛アクセなし)", atk: (m) => accOf(m, "A", "MAIN"), def: () => NONE },
   { key: "MD", label: "MD 防衛側だけメイン(HP+5,000/DEF+750・攻撃アクセなし)", atk: () => NONE, def: (m) => accOf(m, "D", "MAIN") },
+  /* --- 片側だけ理想エピックの振れ幅を切り分ける(代表の組だけで回す) --- */
+  { key: "HA", label: "HA 攻撃側だけヒーロー(中央値)", atk: (m) => accOf(m, "A", "HERO"), def: () => NONE },
+  { key: "LA", label: "LA 攻撃側だけレジェンド(中央値)", atk: (m) => accOf(m, "A", "LEGEND"), def: () => NONE },
+  { key: "HD", label: "HD 防衛側だけヒーロー(中央値)", atk: () => NONE, def: (m) => accOf(m, "D", "HERO") },
+  { key: "LD", label: "LD 防衛側だけレジェンド(中央値)", atk: () => NONE, def: (m) => accOf(m, "D", "LEGEND") },
+  { key: "EA", label: "EA 攻撃側だけエピック(中央値・メイン1.0倍)", atk: (m) => accOf(m, "A", "EPIC"), def: () => NONE },
+  { key: "ED", label: "ED 防衛側だけエピック(中央値・メイン1.0倍)", atk: () => NONE, def: (m) => accOf(m, "D", "EPIC") },
+  { key: "XAm", label: "XAm 攻撃側だけメイン1.2倍(特殊なし)", atk: (m) => accOf(m, "A", "MAIN", "STD", 1.2), def: () => NONE },
+  { key: "XDm", label: "XDm 防衛側だけメイン1.2倍(特殊なし)", atk: () => NONE, def: (m) => accOf(m, "D", "MAIN", "STD", 1.2) },
+  ...[0, 1, 2].map((i): Condition => ({
+    key: `XA-${i + 1}`, label: `XA-${i + 1} 攻撃側だけ理想エピックから特殊${i + 1}番目を外す`,
+    atk: (m) => { const a = accOf(m, "A", "EPIC", "MAX", 1.2); return { ...a, specials: a.specials.filter((_, j) => j !== i) }; }, def: () => NONE,
+  })),
+  { key: "XA-w", label: "XA-w 攻撃側だけ理想エピックから弱効果を外す", atk: (m) => ({ ...accOf(m, "A", "EPIC", "MAX", 1.2), weak: null }), def: () => NONE },
+  ...[0, 1, 2].map((i): Condition => ({
+    key: `XD-${i + 1}`, label: `XD-${i + 1} 防衛側だけ理想エピックから特殊${i + 1}番目を外す`,
+    atk: () => NONE, def: (m) => { const a = accOf(m, "D", "EPIC", "MAX", 1.2); return { ...a, specials: a.specials.filter((_, j) => j !== i) }; },
+  })),
+  { key: "XD-w", label: "XD-w 防衛側だけ理想エピックから弱効果を外す", atk: () => NONE, def: (m) => ({ ...accOf(m, "D", "EPIC", "MAX", 1.2), weak: null }) },
   {
     key: "XS", label: "XS 双方 理想エピック・防衛は回復特化(ターン回復+被弾回復+50%シールド+弱:微回復)",
     atk: (m) => accOf(m, "A", "EPIC", "MAX", 1.2),
@@ -157,7 +176,7 @@ interface BattleOut {
 
 const STACK = { stackAtk: "ADD" as const, stackDef: "MUL" as const };
 
-function runBattle(attack: Team, defense: Team, cond: Condition, seed: number, noRamp = false): BattleOut {
+function runBattle(attack: Team, defense: Team, cond: Condition, seed: number, noRamp = false, trace?: (log: string[]) => void): BattleOut {
   const players = attack.members.map((m) => arenaDef(m, "A", cond.atk(m)));
   const enemies = defense.members.map((m) => arenaDef(m, "D", cond.def(m)));
   const accOf = new Map<string, Accessory>();
@@ -182,6 +201,7 @@ function runBattle(attack: Team, defense: Team, cond: Condition, seed: number, n
     return out;
   };
   const result = engine.run();
+  trace?.(result.log);
   const hpLeft = (team: "PLAYER" | "ENEMY") => {
     const us = internals.units.filter((u) => u.team === team);
     return us.reduce((s, u) => s + (u.alive ? Math.max(0, u.currentHp) : 0), 0) / us.reduce((s, u) => s + u.maxHp, 0);
@@ -285,7 +305,13 @@ const csvRows: string[] = ["attack,defense,condition,battles,atk_win,def_win,dra
 
 console.log(`<!-- ${new Date().toISOString()} / 攻撃UP ${ATK_UP * 100}% / 防御DOWN ${DEF_DOWN * 100}% / ダメージ増加 ${JSON.stringify(ARENA_BATTLE_OPTIONS.damageRamp)} -->\n`);
 
-if (MODE === "roster") {
+if (MODE === "trace") {
+  // 1戦のログ: --atk 3 --def F --cond XD --seed 70000 --lines 80
+  const cond = CONDITIONS.find((c) => c.key === (ONLY_COND || "A"))!;
+  const out = runBattle(ATTACKS.find((t) => t.key === ONLY_ATK)!, DEFENSES.find((t) => t.key === ONLY_DEF)!, cond, Number(arg("--seed", "70000")), argv.includes("--no-ramp"),
+    (log) => console.log(log.slice(0, Number(arg("--lines", "80"))).join("\n")));
+  console.log(JSON.stringify(out));
+} else if (MODE === "roster") {
   console.log("## 防衛編成\n");
   for (const t of DEFENSES) console.log(rosterTable(t, "D"));
   console.log("## 攻撃編成\n");
@@ -294,7 +320,7 @@ if (MODE === "roster") {
   const NO_RAMP = argv.includes("--no-ramp");
   if (NO_RAMP) console.log("**参考測定: アリーナの『長引いた時のダメージ増加』を外している。本番の条件ではない。**\n");
   const conds = MODE === "baseline" ? CONDITIONS.filter((c) => c.key === "A")
-    : CONDITIONS.filter((c) => !ONLY_COND || ONLY_COND.split(",").includes(c.key));
+    : CONDITIONS.filter((c) => (ONLY_COND ? ONLY_COND.split(",").includes(c.key) : !/^(HA|LA|HD|LD|EA|ED|XAm|XDm|XA-|XD-)/.test(c.key)));
   const pool = argv.includes("--variants") ? [...DEFENSE_ROUND1, ...DEFENSE_VARIANTS] : DEFENSES;
   const defs = pool.filter((d) => !ONLY_DEF || ONLY_DEF.split(",").includes(d.key));
   const atkPool = argv.includes("--variants") ? [...ATTACK_ROUND1, ...ATTACK_VARIANTS] : ATTACKS;
