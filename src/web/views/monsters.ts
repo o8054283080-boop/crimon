@@ -746,4 +746,3 @@ function renderAccessorySection(props: MonstersProps, instance: MonsterInstance)
     ].filter((n) => n !== null) as HTMLElement[]),
   ]);
 }
-
