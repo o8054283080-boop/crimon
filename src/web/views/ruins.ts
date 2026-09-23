@@ -6,7 +6,7 @@ import {
 } from "../../data/ruins.js";
 import { isRuinFloorCleared, isRuinFloorUnlocked } from "../../game/ruins.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
-import { MAX_PARTY_SIZE, getParty, type PlayerState } from "../../game/playerState.js";
+import { MAX_DUNGEON_PARTY_SIZE, getDungeonParty, type PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
@@ -106,12 +106,12 @@ function renderList(props: RuinsProps): HTMLElement {
 }
 
 function renderDetail(props: RuinsProps, floor: RuinFloor): HTMLElement {
-  const party = getParty(props.player);
+  const party = getDungeonParty(props.player);
   const hasStamina = props.player.stamina >= floor.stamina;
   const canChallenge = party.length > 0 && hasStamina;
   const cleared = isRuinFloorCleared(props.player, floor.kind, floor.floor);
   const blockers = [
-    party.length === 0 ? "パーティにモンスターを編成してください" : null,
+    party.length === 0 ? "ダンジョン編成にモンスターを入れてください" : null,
     hasStamina ? null : `スタミナが足りません(⚡${floor.stamina}必要)`,
   ].filter((v): v is string => v !== null);
   const rarities = floor.rarityWeights.filter(([, w]) => w > 0).map(([r]) => ACCESSORY_RARITY_JA[r]).join("・");
@@ -146,12 +146,12 @@ function renderDetail(props: RuinsProps, floor: RuinFloor): HTMLElement {
     ]),
     el("section", { className: "card depth-party" }, [
       el("h2", { className: "depth-party__title" }, ["この編成で挑みます"]),
-      el("p", { className: "depth-party__note" }, ["遺跡は通常の編成で戦います(装備ダンジョン・試練の塔の編成とは別です)"]),
-      renderPartySlots(party, MAX_PARTY_SIZE),
+      el("p", { className: "depth-party__note" }, ["遺跡は装備ダンジョンと同じ「ダンジョン編成」(最大5体)で戦います"]),
+      renderPartySlots(party, MAX_DUNGEON_PARTY_SIZE),
     ]),
     ...blockers.map((text) => el("p", { className: "warn-text" }, [text])),
     el("div", { className: "stage-actions" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["通常の編成を変更する"]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["ダンジョン編成を変更する"]),
       el("button", {
         type: "button",
         className: "btn btn--primary",

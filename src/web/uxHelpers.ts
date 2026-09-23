@@ -16,6 +16,9 @@ export interface DungeonReturnContext {
   selectedGoldDungeonFloor?: number;
   /** 目覚の深域。編成を変えて戻った時に、同じ階を開いたままにする */
   selectedAwakeningDepthFloor?: number;
+  /** 遺跡。編成を変えて戻った時に、同じ遺跡の同じ階を開いたままにする */
+  ruinKind?: "POWER" | "GUARDIAN";
+  selectedRuinFloor?: number;
 }
 
 export interface RestorableDungeonSelection {

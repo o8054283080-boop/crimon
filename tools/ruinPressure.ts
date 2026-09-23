@@ -7,7 +7,7 @@
  *
  *   npx tsx tools/ruinPressure.ts                     # 5階・全編成・STRONG/FINISHED
  *   npx tsx tools/ruinPressure.ts --floors 1,2,3,4,5 --gear TYPICAL,STRONG --trials 200
- *   npx tsx tools/ruinPressure.ts --size 4            # 4体(通常の編成)で測る
+ *   npx tsx tools/ruinPressure.ts --size 4            # 4体で測る(本編はダンジョン編成の5体)
  *
  * 「像先落とし」の編成だけ、戦闘開始時に身代わり像へ集中攻撃を指定する
  * (本編の画面で敵をタップして狙いを決めるのと同じ `setFocusTarget`)。
@@ -40,6 +40,9 @@ const GENERIC: AllySpec[] = [
   ally("支援・草ウィスプ", "wisp", "GRASS", "MAX_SUPPORT"),
 ];
 
+/** 汎用からインプ(毒)を外し、毒を持たない草ナイトを入れた5体 */
+const GENERIC_NO_POISON: AllySpec[] = GENERIC.map((a) => (a.templateId === "imp" ? ally("サブ・草ナイト", "knight", "GRASS", "MAX_ATTACKER") : a));
+
 export const RUIN_TEAMS: Record<string, RuinTeam> = {
   "力・汎用": { kind: "POWER", purpose: "属性を合わせない通常の編成", allies: GENERIC },
   "力・制圧(水)": {
@@ -58,8 +61,8 @@ export const RUIN_TEAMS: Record<string, RuinTeam> = {
    * 汎用の電気インプは「どくのきり」で毒を撒く。**毒は身代わりされない**(依頼主の指定)ので、
    * 汎用のままだと実質「毒編成」になる。毒を持たない汎用を別に並べて、身代わりの圧を測る。
    */
-  "力・汎用(毒なし)": { kind: "POWER", purpose: "汎用からインプ(毒)を抜いた通常の編成", allies: GENERIC.filter((a) => a.templateId !== "imp") },
-  "守護・汎用(毒なし)": { kind: "GUARDIAN", purpose: "汎用からインプ(毒)を抜いた通常の編成", allies: GENERIC.filter((a) => a.templateId !== "imp") },
+  "力・汎用(毒なし)": { kind: "POWER", purpose: "汎用のインプ(毒)を草ナイトに替えた通常の編成", allies: GENERIC_NO_POISON },
+  "守護・汎用(毒なし)": { kind: "GUARDIAN", purpose: "汎用のインプ(毒)を草ナイトに替えた通常の編成", allies: GENERIC_NO_POISON },
   "守護・解除対策(電気)": {
     kind: "GUARDIAN",
     purpose: "解除で身代わりを剥がし、水に強い電気で本体を削る",

@@ -1210,6 +1210,8 @@ function returnFromParty(): void {
   state.selectedDungeonKind = restored.selectedDungeonKind;
   state.selectedGoldDungeonFloor = restored.selectedGoldDungeonFloor;
   state.selectedLevelDungeonTier = restored.selectedLevelDungeonTier;
+  if (context.ruinKind) state.ruinKind = context.ruinKind;
+  if (context.selectedRuinFloor !== undefined) state.selectedRuinFloor = context.selectedRuinFloor;
   render();
 }
 
@@ -2010,7 +2012,7 @@ function retryBlockedReason(last: LastRun): string | null {
     if (state.player.arenaTickets <= 0) return "挑戦券が足りません(時間で回復します)";
     return null;
   }
-  const party = last.kind === "EQUIP_DUNGEON" ? getDungeonParty(state.player) : getParty(state.player);
+  const party = usesDungeonParty(last) ? getDungeonParty(state.player) : getParty(state.player);
   if (party.length === 0) return "パーティが編成されていません";
   const cost = lastRunStaminaCost(last);
   if (state.player.stamina < cost) return `スタミナが足りません(⚡${cost}必要 / 手持ち⚡${state.player.stamina})`;
@@ -2433,7 +2435,7 @@ function setStaminaPotionFarmBudget(next: number): void {
 
 /** いまの手持ちで、その場所へもう1回挑めるか(判定そのものは autoFarm.ts) */
 function farmBlockReasonFor(last: LastRun): AutoFarmStopReason | null {
-  const party = last.kind === "EQUIP_DUNGEON" ? getDungeonParty(state.player) : getParty(state.player);
+  const party = usesDungeonParty(last) ? getDungeonParty(state.player) : getParty(state.player);
   return farmBlockReason({
     partySize: party.length,
     stamina: state.player.stamina,
@@ -2784,8 +2786,16 @@ function renderCurrentAwakeningDepthBattle(): BattleViewHandle {
  * 力の遺跡・守護の遺跡
  * ========================================================================== */
 
+/**
+ * ダンジョン編成(最大5体)で戦う場所か。**装備ダンジョンと遺跡。**
+ * 遺跡は装備ダンジョンと同じ格の周回場所なので、同じ編成を使う(依頼主の指定)。
+ */
+function usesDungeonParty(last: LastRun): boolean {
+  return last.kind === "EQUIP_DUNGEON" || last.kind === "RUINS";
+}
+
 function startRuinFloor(floor: RuinFloor): void {
-  const party = getParty(state.player);
+  const party = getDungeonParty(state.player);
   if (party.length === 0) return;
   if (!isRuinFloorUnlocked(state.player, floor.kind, floor.floor)) { playSfx("denied", 0.7); return; }
   if (!trySpendStamina(state.player, floor.stamina).ok) {
@@ -2849,7 +2859,7 @@ function finishRuin(cleared: boolean): void {
 function handleAutoFarmRuin(floor: RuinFloor, count: number): void {
   beginBackgroundFarm(
     { kind: "RUINS", targetId: ruinLocationId(floor.kind, floor.floor), targetName: floor.name, requestedRuns: count },
-    state.player.partyIds,
+    state.player.dungeonPartyIds,
     // 周回は**一度クリアした階だけ。**勝てるか分からない階でスタミナだけが消えるのを防ぐ
     isRuinFloorCleared(state.player, floor.kind, floor.floor),
   );
@@ -4641,8 +4651,10 @@ function renderScreen(): void {
         onStartFloor: startRuinFloor,
         onGoParty: () => openPartyFrom({
           screen: "RUINS",
-          label: `遺跡${state.selectedRuinFloor ?? ""}F`,
-        }, "NORMAL"),
+          label: `${state.ruinKind === "POWER" ? "力" : "守護"}の遺跡${state.selectedRuinFloor ?? ""}F`,
+          ruinKind: state.ruinKind,
+          selectedRuinFloor: state.selectedRuinFloor ?? undefined,
+        }, "DUNGEON"),
         onGoAccessories: () => openAccessories(null),
         onGoCraft: openCraft,
         autoFarmCount: state.autoFarmCount,
@@ -6276,7 +6288,9 @@ if (import.meta.env.DEV) {
     },
     /** 実機確認用: 編成を★6 Lv60・★6+15装備にして、遺跡の低層を勝てる状態にする */
     strongPartyForDev() {
-      for (const monster of getParty(state.player)) {
+      // 遺跡・装備ダンジョンはダンジョン編成で戦う。未編成なら通常の編成を写す
+      if (state.player.dungeonPartyIds.length === 0) state.player.dungeonPartyIds = [...state.player.partyIds];
+      for (const monster of getDungeonParty(state.player)) {
         monster.star = 6;
         monster.level = 60;
         monster.skillLevels = [5, 5, 5];
@@ -6293,7 +6307,7 @@ if (import.meta.env.DEV) {
     },
     /** 実機確認用: 編成を★1 Lv1・装備なしにする(負けたら周回が止まるかを見る) */
     weakPartyForDev() {
-      for (const monster of getParty(state.player)) {
+      for (const monster of getDungeonParty(state.player)) {
         monster.star = 1;
         monster.level = 1;
         monster.equipment = {};

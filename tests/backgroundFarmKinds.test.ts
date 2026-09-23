@@ -61,6 +61,22 @@ describe("周回は種類ごとに正しい場所を見る", () => {
     expect(start.slice(0, start.indexOf("\n}"))).toContain("startRuinFloor(last.floor)");
   });
 
+  it("遺跡は装備ダンジョンと同じダンジョン編成(最大5体)で戦う(依頼主の指定)", () => {
+    const scope = (name: string) => {
+      const body = MAIN.slice(MAIN.indexOf(`function ${name}`));
+      return body.slice(0, body.indexOf("\n}"));
+    };
+    expect(scope("startRuinFloor")).toContain("getDungeonParty(state.player)");
+    expect(scope("handleAutoFarmRuin")).toContain("state.player.dungeonPartyIds");
+    expect(scope("usesDungeonParty")).toContain('last.kind === "RUINS"');
+    // 「もう一度」と周回の続行判定も、同じ判定を通す
+    expect(scope("retryBlockedReason")).toContain("usesDungeonParty(last)");
+    expect(scope("farmBlockReasonFor")).toContain("usesDungeonParty(last)");
+    // 編成を変える時はダンジョン編成を開く
+    const ruinsCase = MAIN.slice(MAIN.indexOf('case "RUINS":\n      content = renderRuins'));
+    expect(ruinsCase.slice(0, ruinsCase.indexOf("break;"))).toContain('}, "DUNGEON")');
+  });
+
   it("「もう一度」から始められる種類に、深域が入っている", () => {
     const body = MAIN.slice(MAIN.indexOf("function startFromLastRun"));
     const scope = body.slice(0, body.indexOf("\n}"));
