@@ -54,6 +54,7 @@ export function isMonsterStorageEligible(state: PlayerState, monster: MonsterIns
     ...(state.arenaOffenseIds ?? []),
     ...(state.backgroundFarmJob?.status === "RUNNING" ? state.backgroundFarmJob.partyIds : []),
     ...(state.trialTowerRun?.members.map((member) => member.instanceId) ?? []),
+    ...(state.trialTowerHardRun?.members.map((member) => member.instanceId) ?? []),
   ]);
   return !used.has(monster.id);
 }

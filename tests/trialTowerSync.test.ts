@@ -58,6 +58,23 @@ describe("試練の塔ランキング同期", () => {
     expect((options?.headers as Record<string, string>).Authorization).toBe("Bearer player-token");
   });
 
+  it("HARDは専用RPC・専用viewへ送り、NORMALランキングと混ぜない", async () => {
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response(
+      String(_input).includes("/rpc/")
+        ? { ok: true, updated: true, bestFloor: 12, bestFloorReachedAt: row.best_floor_reached_at, updatedAt: row.updated_at }
+        : [row],
+    ));
+    connect(fetchImpl as typeof fetch);
+
+    await expect(submitTrialTowerProgress(12, "HARD")).resolves.toMatchObject({ bestFloor: 12 });
+    await expect(fetchTrialTowerRanking(50, "HARD")).resolves.toMatchObject({ ok: true });
+    await expect(fetchTrialTowerSelf("user-a", "HARD")).resolves.toMatchObject({ userId: "user-a" });
+
+    expect(String(fetchImpl.mock.calls[0][0])).toContain("rpc/trial_tower_hard_submit_progress");
+    expect(String(fetchImpl.mock.calls[1][0])).toContain("trial_tower_hard_public_ranking");
+    expect(String(fetchImpl.mock.calls[2][0])).toContain("trial_tower_hard_public_ranking");
+  });
+
   it("1〜100以外は送らない", async () => {
     const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response([]));
     connect(fetchImpl as typeof fetch);
@@ -125,19 +142,19 @@ describe("送るきっかけ", () => {
   it("塔の画面を開いた時にも送る(ランキングを開かない人が取り残される)", () => {
     const at = MAIN.indexOf('case "TRIAL_TOWER": {');
     expect(at).toBeGreaterThan(-1);
-    expect(MAIN.slice(at, at + 1400), "塔の画面から送っていない").toContain("void syncTrialTowerBest()");
+    expect(MAIN.slice(at, at + 1800), "塔の画面から送っていない").toContain("void syncTrialTowerBest(activeMode)");
   });
 
   it("階を登った時と、ランキングを開いた時にも送る", () => {
-    expect(MAIN).toContain("if (outcome.lifetimeBestUpdated) void syncTrialTowerBest(true)");
+    expect(MAIN).toContain("if (outcome.lifetimeBestUpdated) void syncTrialTowerBest(setup.mode, true)");
     const at = MAIN.indexOf("async function refreshTrialTowerRanking(");
-    expect(MAIN.slice(at, at + 900)).toContain("await syncTrialTowerBest(true)");
+    expect(MAIN.slice(at, at + 900)).toContain("await syncTrialTowerBest(mode, true)");
   });
 
   it("新記録は待たせない(再試行の間隔を飛ばす)", () => {
     // 登った直後は、間隔を空けずにその場で送る
-    expect(MAIN).toContain("async function syncTrialTowerBest(force = false)");
-    expect(MAIN).toContain("if (!force && Date.now() - towerSyncLastAttemptAt < TOWER_SYNC_RETRY_MS) return false;");
+    expect(MAIN).toContain("async function syncTrialTowerBest(mode: TowerMode, force = false)");
+    expect(MAIN).toContain("if (!force && Date.now() - towerSyncLastAttemptAt[mode] < TOWER_SYNC_RETRY_MS) return false;");
   });
 });
 
@@ -147,14 +164,14 @@ describe("描き直しのたびに通信しない", () => {
    * ボタンを押すたびにRPCが飛ぶ(しかも `render()` を呼び返す)。
    */
   it("届いた階を覚えて、同じ階を送り直さない", () => {
-    expect(MAIN).toContain("if (towerSyncSentFloor >= best) return true;");
-    expect(MAIN).toContain("if (ok) towerSyncSentFloor = best;");
+    expect(MAIN).toContain("if (towerSyncSentFloor[mode] >= best) return true;");
+    expect(MAIN).toContain("if (ok) towerSyncSentFloor[mode] = best;");
   });
 
   it("走っている最中は重ねない", () => {
-    expect(MAIN).toContain("if (towerSyncRunning) return false;");
+    expect(MAIN).toContain("if (towerSyncRunning[mode]) return false;");
     // 失敗して抜けても必ず下ろす(下ろし忘れると二度と送れなくなる)
-    const at = MAIN.indexOf("towerSyncRunning = true;");
+    const at = MAIN.indexOf("towerSyncRunning[mode] = true;");
     expect(MAIN.slice(at, at + 500)).toContain("} finally {");
   });
 });
@@ -162,8 +179,16 @@ describe("描き直しのたびに通信しない", () => {
 describe("失敗を捨てない", () => {
   it("送れなかった階を覚えて、画面へ渡す", () => {
     expect(MAIN).toContain("const pending = ok ? 0 : best;");
-    expect(MAIN).toContain("syncPendingFloor: state.towerSyncPending,");
+    expect(MAIN).toContain("syncPendingFloor: state.towerSyncPending[activeMode],");
     expect(VIEW).toContain("syncPendingFloor: number;");
+  });
+
+  it("NORMALとHARDの送信済み・再試行・未送信を別々に覚える", () => {
+    expect(MAIN).toContain("const towerSyncSentFloor: Record<TowerMode, number>");
+    expect(MAIN).toContain("const towerSyncRunning: Record<TowerMode, boolean>");
+    expect(MAIN).toContain("const towerSyncLastAttemptAt: Record<TowerMode, number>");
+    expect(MAIN).toContain("towerSyncPending: Record<TowerMode, number>;");
+    expect(MAIN).toContain("state.towerSyncPending[mode] = pending;");
   });
 
   it("**記録は端末に残っている**と書く(いちばん不安な所)", () => {
@@ -181,7 +206,7 @@ describe("失敗を捨てない", () => {
      * 直しようのない警告が塔の画面に出っぱなしになる。
      */
     const at = MAIN.indexOf("async function syncTrialTowerBest(");
-    const block = MAIN.slice(at, at + 900);
+    const block = MAIN.slice(at, at + 1400);
     expect(block).toContain("if (!arenaSyncAvailable()) return false;");
     expect(block.indexOf("if (!arenaSyncAvailable()) return false;")).toBeLessThan(block.indexOf("const pending = ok ? 0 : best;"));
   });

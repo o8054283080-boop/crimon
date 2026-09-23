@@ -51,7 +51,13 @@ function toEnemySpec(def: MonsterDefinition, index: number): EnemySpec {
   };
 }
 
-function buildFloorScenario(floor: number): Scenario {
+/**
+ * 任意の本編階を検証ツールから組み立てる。
+ *
+ * 代表階の一覧へ追加しなくても、比較専用ツールが同じ経路を再利用できるように
+ * export している。本編データは複製して読むだけで、一切書き換えない。
+ */
+export function buildFloorScenario(floor: number): Scenario {
   const def = findTowerFloor(floor);
   if (!def) throw new Error(`試練の塔にない階: ${floor}`);
   const enemies = buildDungeonEnemyTeam(def).map(toEnemySpec);

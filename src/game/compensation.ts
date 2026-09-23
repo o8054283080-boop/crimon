@@ -57,6 +57,20 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-22-trial-tower-hard",
+    title: "9/22 試練の塔にHARDを追加しました",
+    message: "NORMAL 100階をクリアした方向けに、試練の塔HARDを追加しました。\n\n"
+      + "【HARDの特徴】\n"
+      + "・NORMAL 100階クリア後に解放されます\n"
+      + "・敵の編成・スキル・AI・階固有ギミックはNORMALと同じですが、敵のHP・攻撃力・防御力・速度が強化されています\n"
+      + "・後半は現在の最高装備でも突破が難しい、今後の育成や新装備も含めた長期目標です\n"
+      + "・NORMALとHARDで、最高到達階・途中の登坂・報酬の受取状態・ランキングを別々に記録します\n\n"
+      + "【報酬】\n"
+      + "各階の報酬はNORMALとは別に受け取れます。HARDで獲得できるゴールドはNORMALの3倍です。\n\n"
+      + "NORMALと同じく、毎月1日00:00（JST）に月間進行と報酬の受取状態がリセットされます。歴代最高到達階は残ります。",
+    kind: "UPDATE", fromDate: "2026-09-22", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-22-tower-ranking-sync",
     title: "9/22 試練の塔のランキングが、登った階まで上がっていなかったのを直しました",
     message: "**99階まで登っているのに、ランキングには69階と出ている**というご報告をいただきました。ありがとうございます。\n\n"

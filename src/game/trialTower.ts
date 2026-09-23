@@ -15,6 +15,11 @@ import {
 } from "../data/trialTower.js";
 import { buildDungeonEnemyTeam } from "./dungeonRunner.js";
 import {
+  scaleTrialTowerHardEnemies,
+  trialTowerHardMultipliers,
+  type TrialTowerHardMultipliers,
+} from "../data/trialTowerHard.js";
+import {
   PlayerState,
   addEquipment,
   addMonster,
@@ -44,7 +49,20 @@ export interface TowerMemberState {
   cooldowns: [number, number, number];
 }
 
+export type TowerMode = "NORMAL" | "HARD";
+
+/** HARDは長期目標なので、各階の確定ゴールドをNORMALの3倍にする。 */
+export const TRIAL_TOWER_HARD_GOLD_MULTIPLIER = 3;
+
+/** 表示と実付与で同じ報酬補正を使い、一覧だけ旧額になる事故を防ぐ。 */
+export function towerRewardForMode(reward: TowerReward, mode: TowerMode): TowerReward {
+  if (mode !== "HARD" || !reward.gold) return reward;
+  return { ...reward, gold: reward.gold * TRIAL_TOWER_HARD_GOLD_MULTIPLIER };
+}
+
 export interface TowerRun {
+  /** NORMALとHARDの途中経過を取り違えないため、登坂そのものへ難度を固定する。 */
+  mode?: TowerMode;
   /** これから挑む階 */
   floor: number;
   /** この登坂で連れている顔ぶれ。途中で入れ替えられない */
@@ -78,7 +96,10 @@ export function emptyTowerRewardResult(): TowerRewardResult {
 }
 
 /** 登坂を始められない理由。始められるなら null */
-export function towerBlockReason(state: PlayerState): string | null {
+export function towerBlockReason(state: PlayerState, mode: TowerMode = "NORMAL"): string | null {
+  if (mode === "HARD" && state.trialTowerLifetimeBestFloor < TOWER_FLOOR_COUNT) {
+    return "HARDはNORMAL 100階クリア後に解放されます";
+  }
   if (getTowerParty(state).length === 0) return "塔の編成が組まれていません";
   if (state.stamina < TOWER_STAMINA_COST) {
     return `スタミナが足りません(⚡${TOWER_STAMINA_COST}必要 / 手持ち⚡${state.stamina})`;
@@ -94,21 +115,36 @@ export function getTowerParty(state: PlayerState): MonsterInstance[] {
 }
 
 /** 次に挑む階。節を越えていればそこから、登坂の途中ならその階 */
-export function nextTowerFloor(state: PlayerState): number {
-  if (state.trialTowerRun) return state.trialTowerRun.floor;
-  return towerStartFloor(state.trialTowerBestFloor);
+function towerRunOf(state: PlayerState, mode: TowerMode): TowerRun | null {
+  return mode === "HARD" ? state.trialTowerHardRun : state.trialTowerRun;
+}
+
+function setTowerRun(state: PlayerState, mode: TowerMode, run: TowerRun | null): void {
+  if (mode === "HARD") state.trialTowerHardRun = run;
+  else state.trialTowerRun = run;
+}
+
+function towerBestFloorOf(state: PlayerState, mode: TowerMode): number {
+  return mode === "HARD" ? state.trialTowerHardBestFloor : state.trialTowerBestFloor;
+}
+
+export function nextTowerFloor(state: PlayerState, mode: TowerMode = "NORMAL"): number {
+  const run = towerRunOf(state, mode);
+  if (run) return run.floor;
+  return towerStartFloor(towerBestFloorOf(state, mode));
 }
 
 /**
  * 登坂を始める(または節から再開する)。
  * 全員が最大HP・クールタイム0の状態で始まる。
  */
-export function beginTowerRun(state: PlayerState): TowerRun | null {
+export function beginTowerRun(state: PlayerState, mode: TowerMode = "NORMAL"): TowerRun | null {
   ensureTowerMonthlyState(state);
-  if (towerBlockReason(state) !== null) return null;
+  if (towerBlockReason(state, mode) !== null) return null;
   const party = getTowerParty(state);
   const run: TowerRun = {
-    floor: nextTowerFloor(state),
+    mode,
+    floor: nextTowerFloor(state, mode),
     members: party.map((instance) => ({
       instanceId: instance.id,
       // 開始時は満タン。実際の最大HPは装備込みで決まるので、ここでは -1 を「満タン」の印にする
@@ -116,13 +152,13 @@ export function beginTowerRun(state: PlayerState): TowerRun | null {
       cooldowns: [0, 0, 0],
     })),
   };
-  state.trialTowerRun = run;
+  setTowerRun(state, mode, run);
   return run;
 }
 
 /** 登坂をやめる。途中経過は捨て、次は節からやり直しになる */
-export function abandonTowerRun(state: PlayerState): void {
-  state.trialTowerRun = null;
+export function abandonTowerRun(state: PlayerState, mode: TowerMode = "NORMAL"): void {
+  setTowerRun(state, mode, null);
 }
 
 export interface TowerBattleSetup {
@@ -134,6 +170,8 @@ export interface TowerBattleSetup {
   /** この階に出る顔ぶれ(倒れた仲間を除いたもの)。結果の反映に同じ並びが要る */
   standingMembers: TowerMemberState[];
   floor: TowerFloor;
+  mode: TowerMode;
+  hardMultipliers?: TrialTowerHardMultipliers;
 }
 
 /**
@@ -160,13 +198,18 @@ export function setupTowerBattle(state: PlayerState, run: TowerRun): TowerBattle
   // 最大HPは装備込みで決まるので、ここで def から引いて渡す
   const initialPlayerHp = standingMembers.map((m, i) => (m.hp < 0 ? playerDefs[i].stats.hp : m.hp));
 
+  const mode = run.mode ?? "NORMAL";
+  const enemies = buildDungeonEnemyTeam(floor);
+  const hardMultipliers = mode === "HARD" ? trialTowerHardMultipliers(floor.floor) : undefined;
   return {
     playerDefs,
-    enemyDefs: buildDungeonEnemyTeam(floor),
+    enemyDefs: hardMultipliers ? scaleTrialTowerHardEnemies(enemies, floor.floor) : enemies,
     initialPlayerHp,
     initialCooldowns: standingMembers.map((m) => [...m.cooldowns] as [number, number, number]),
     standingMembers,
     floor,
+    mode,
+    hardMultipliers,
   };
 }
 
@@ -197,6 +240,7 @@ export function applyTowerFloorResult(
   cleared: boolean,
   rng: () => number = Math.random,
 ): TowerFloorOutcome {
+  const mode = run.mode ?? "NORMAL";
   const units = engine.getUnits();
 
   // 生死とHP・クールタイムを控えへ写す。並びは setupTowerBattle が組んだ順
@@ -209,29 +253,36 @@ export function applyTowerFloorResult(
 
   if (!cleared) {
     // 負けたらこの登坂は終わり。次は節からやり直し
-    state.trialTowerRun = null;
+    setTowerRun(state, mode, null);
     return { cleared: false, restored: false, completed: false, wiped: true, reward: emptyTowerRewardResult(), lifetimeBestUpdated: false };
   }
 
   const clearedFloor = run.floor;
-  const reward = claimTowerFloorReward(state, clearedFloor, rng);
-  if (clearedFloor > state.trialTowerBestFloor) state.trialTowerBestFloor = clearedFloor;
-  const lifetimeBestUpdated = clearedFloor > state.trialTowerLifetimeBestFloor;
-  if (lifetimeBestUpdated) state.trialTowerLifetimeBestFloor = clearedFloor;
+  const reward = claimTowerFloorReward(state, clearedFloor, rng, mode);
+  let lifetimeBestUpdated: boolean;
+  if (mode === "HARD") {
+    if (clearedFloor > state.trialTowerHardBestFloor) state.trialTowerHardBestFloor = clearedFloor;
+    lifetimeBestUpdated = clearedFloor > state.trialTowerHardLifetimeBestFloor;
+    if (lifetimeBestUpdated) state.trialTowerHardLifetimeBestFloor = clearedFloor;
+  } else {
+    if (clearedFloor > state.trialTowerBestFloor) state.trialTowerBestFloor = clearedFloor;
+    lifetimeBestUpdated = clearedFloor > state.trialTowerLifetimeBestFloor;
+    if (lifetimeBestUpdated) state.trialTowerLifetimeBestFloor = clearedFloor;
+  }
 
   const completed = clearedFloor >= TOWER_FLOOR_COUNT;
   if (completed) {
-    state.trialTowerRun = null;
+    setTowerRun(state, mode, null);
     return { cleared: true, restored: false, completed: true, wiped: false, reward, lifetimeBestUpdated };
   }
 
   const restored = isTowerCheckpoint(clearedFloor);
   if (restored) {
     // 節を越えた。倒れた仲間も戻り、全回復してここから再開できる
-    state.trialTowerRun = null;
+    setTowerRun(state, mode, null);
   } else {
     run.floor = clearedFloor + 1;
-    state.trialTowerRun = run;
+    setTowerRun(state, mode, run);
   }
 
   return { cleared: true, restored, completed: false, wiped: false, reward, lifetimeBestUpdated };
@@ -243,18 +294,27 @@ export function applyTowerFloorResult(
  * **登り直しても増えない。**そうしないと、easy な階を往復するのが
  * 一番効率のいい遊び方になり、塔が塔でなくなる。
  */
-export function claimTowerFloorReward(state: PlayerState, floor: number, rng: () => number = Math.random): TowerRewardResult {
+export function claimTowerFloorReward(
+  state: PlayerState,
+  floor: number,
+  rng: () => number = Math.random,
+  mode: TowerMode = "NORMAL",
+): TowerRewardResult {
   ensureTowerMonthlyState(state);
   const result = emptyTowerRewardResult();
   const def = findTowerFloor(floor);
   if (!def) return result;
-  if (state.trialTowerClaimedFloors.includes(floor)) return result;
-  state.trialTowerClaimedFloors.push(floor);
+  const claimedFloors = mode === "HARD" ? state.trialTowerHardClaimedFloors : state.trialTowerClaimedFloors;
+  const orbClaimedFloors = mode === "HARD"
+    ? state.trialTowerHardMonthlyOrbClaimedFloors
+    : state.trialTowerMonthlyOrbClaimedFloors;
+  if (claimedFloors.includes(floor)) return result;
+  claimedFloors.push(floor);
 
-  const reward: TowerReward = def.firstClearReward;
-  if (isTrialTowerMonthlyOrbFloor(floor) && !state.trialTowerMonthlyOrbClaimedFloors.includes(floor)) {
+  const reward = towerRewardForMode(def.firstClearReward, mode);
+  if (isTrialTowerMonthlyOrbFloor(floor) && !orbClaimedFloors.includes(floor)) {
     state.awakeningOrbs += 1;
-    state.trialTowerMonthlyOrbClaimedFloors.push(floor);
+    orbClaimedFloors.push(floor);
     result.awakeningOrbs = 1;
   }
   if (reward.crystal) {
@@ -314,8 +374,8 @@ export interface TowerRunMemberView {
  * **最大HPは装備込みでしか出せない**(素の値ではない)ので、
  * 画面側で組み直させず、ここで戦闘用の定義から引いて渡す。
  */
-export function describeTowerRun(state: PlayerState): { floor: number; members: TowerRunMemberView[] } | null {
-  const run = state.trialTowerRun;
+export function describeTowerRun(state: PlayerState, mode: TowerMode = "NORMAL"): { floor: number; members: TowerRunMemberView[] } | null {
+  const run = towerRunOf(state, mode);
   if (!run) return null;
   return {
     floor: run.floor,

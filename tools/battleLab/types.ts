@@ -65,6 +65,11 @@ export interface AllySpec {
    */
   baseStatMultipliers?: Partial<Pick<Stats, "hp" | "atk" | "def" | "spd">>;
   /**
+   * 検証専用の最終ステータス倍率。装備・タイプ・能力ポイントをすべて反映した後へ掛ける。
+   * 将来装備やアクセサリーでどの程度伸びた時に突破できるかを、本番データを変えずに測る。
+   */
+  finalStatMultipliers?: Partial<Pick<Stats, "hp" | "atk" | "def" | "spd">>;
+  /**
    * 最終ステータスの直接上書き。**プリセットも装備も通した後にかかる。**
    * 「速度180ちょうどで比べたい」のような、詰めの確認に使う。
    */
@@ -156,6 +161,18 @@ export interface TrackedUnit {
   /** かかっている弱体の数(効果・状態・毒・気絶などを合わせた数) */
   readonly debuffCount: number;
   readonly alive: boolean;
+  /**
+   * 戦闘中に定義そのものが作り直される敵へ、基礎ステータス倍率を1度だけ掛ける。
+   *
+   * 100階の分身は生成時に `unit.def` が型ごとの定義へ差し替わるため、開幕盤面を
+   * 倍率化するだけではHARDのATK/DEF/SPDが反映されない。定義の参照が変わった時だけ
+   * 適用することで、同じ分身へ手番ごとに倍率が累積する事故を防ぐ。
+   * 戻り値は今回実際に適用したか。
+   */
+  multiplySpawnedStatsOnce(
+    multipliers: Partial<Pick<Stats, "atk" | "def" | "spd">>,
+    minimumHp?: number,
+  ): boolean;
   readonly skills: readonly { name: string; hpCoefficients: readonly number[] }[];
   /**
    * HP比例ダメージの係数を、**元の定義から**この倍率で置き直す。

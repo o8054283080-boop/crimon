@@ -14,6 +14,53 @@
   overflow-x: clip;
 }
 
+.tower-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(7, 4, 13, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.tower-mode-tab {
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  color: #a9a0b5;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.tower-mode-tab.is-active {
+  color: #241907;
+  background: linear-gradient(180deg, #f1d27e, #b88731);
+  box-shadow: 0 3px 12px rgba(191, 137, 42, 0.28);
+}
+
+.tower-mode-tab--hard.is-active {
+  color: #fff1f1;
+  background: linear-gradient(180deg, #a63747, #571522);
+  box-shadow: 0 3px 14px rgba(153, 30, 49, 0.38);
+}
+
+.tower-mode-tab:disabled { opacity: 0.46; }
+
+.tower-hard-note {
+  margin: -4px 2px 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  color: #f2c9ce;
+  background: rgba(95, 18, 32, 0.36);
+  box-shadow: inset 0 0 0 1px rgba(226, 84, 105, 0.28);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 .tower-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

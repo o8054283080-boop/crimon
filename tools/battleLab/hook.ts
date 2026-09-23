@@ -55,6 +55,7 @@ function track(unit: BattleUnit, engine: EngineInternals): TrackedUnit {
    */
   let hpFactor = 1;
   let mulFactor = 1;
+  let lastSpawnDefinition: BattleUnit["def"] | null = null;
   const applyFactors = (): void => {
     const skills = baseSkills.map((skill) => ({
       ...skill,
@@ -83,6 +84,27 @@ function track(unit: BattleUnit, engine: EngineInternals): TrackedUnit {
     get flatStatBonus() { return unit.flatStatBonus as { spd?: number; atk?: number; def?: number }; },
     get poisonStacks() { return unit.poisonStacks; },
     get alive() { return unit.alive; },
+    multiplySpawnedStatsOnce(multipliers, minimumHp) {
+      if (!unit.alive || lastSpawnDefinition === unit.def) return false;
+
+      const hpRatio = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 1;
+      const maxHp = Math.max(unit.maxHp, Math.round(minimumHp ?? unit.maxHp));
+      const nextDef = {
+        ...unit.def,
+        stats: {
+          ...unit.def.stats,
+          hp: maxHp,
+          atk: Math.max(1, Math.round(unit.def.stats.atk * (multipliers.atk ?? 1))),
+          def: Math.max(1, Math.round(unit.def.stats.def * (multipliers.def ?? 1))),
+          spd: Math.max(1, Math.round(unit.def.stats.spd * (multipliers.spd ?? 1))),
+        },
+      };
+      unit.def = nextDef;
+      unit.maxHp = maxHp;
+      unit.currentHp = Math.max(1, Math.min(maxHp, Math.round(maxHp * hpRatio)));
+      lastSpawnDefinition = nextDef;
+      return true;
+    },
     /*
      * 弱体の数え方は本編の `cleanseDebuffs` が消す対象に合わせてある。
      * ここがずれると「解除で何個消えたか」が実際と食い違う

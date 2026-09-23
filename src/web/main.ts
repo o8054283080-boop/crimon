@@ -71,6 +71,7 @@ import {
   setupTowerBattle,
   spendTowerStamina,
   towerBlockReason,
+  type TowerMode,
 } from "../game/trialTower.js";
 import { renderTrialTower } from "./views/trialTower.js";
 import {
@@ -579,6 +580,7 @@ interface AppState {
   /** 周回の途中。null なら単発の挑戦 */
   farmRun: FarmRun | null;
   /* --- 試練の塔 --- */
+  towerMode: TowerMode;
   /** 塔の画面に出す案内(スタミナ切れ・編成が空など)。次の操作まで残す */
   towerNotice: string | null;
   /** 直前の階の決着。塔の画面へ戻った理由と、受け取った報酬を伝える */
@@ -606,7 +608,7 @@ interface AppState {
    *
    * 実際、99階まで登った方のサーバ側が69階で止まっていた。
    */
-  towerSyncPending: number;
+  towerSyncPending: Record<TowerMode, number>;
   autoFarmResult: AutoFarmResult | null;
   autoFarmTargetName: string;
   /** 結果確認後に通知だけを閉じる対象。報酬データとは独立して扱う。 */
@@ -739,6 +741,7 @@ const state: AppState = {
   devShopNow: null,
   farmRun: null,
   towerNotice: null,
+  towerMode: "NORMAL",
   towerOutcome: null,
   towerStopRequested: false,
   towerPanel: "NONE",
@@ -749,7 +752,7 @@ const state: AppState = {
   towerRankingLoading: false,
   towerRankingError: false,
   towerRankingOffline: false,
-  towerSyncPending: 0,
+  towerSyncPending: { NORMAL: 0, HARD: 0 },
   autoFarmResult: null,
   autoFarmTargetName: "",
   viewingBackgroundFarmJobId: null,
@@ -957,7 +960,7 @@ function hasBattleRun(screen: ScreenName): boolean {
     case "LEVEL_DUNGEON_BATTLE": return state.levelDungeonRun !== null;
     case "GOLD_DUNGEON_BATTLE": return state.goldDungeonRun !== null;
     case "AWAKENING_DEPTH_BATTLE": return state.awakeningDepthRun !== null;
-    case "TOWER_BATTLE": return state.player.trialTowerRun != null;
+    case "TOWER_BATTLE": return (state.towerMode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun) != null;
     case "ARENA_BATTLE": return state.arenaEntry !== null;
     default: return true;
   }
@@ -1809,7 +1812,7 @@ function handleToggleDungeonPartyMember(instanceId: string): void {
 function handleToggleTowerPartyMember(instanceId: string): void {
   // 登坂の途中で顔ぶれが変わると、持ち越しているHPとクールタイムの持ち主が入れ替わる。
   // **登坂中は編成を触らせない。**外した1体が塔の中でだけ生き続ける、という状態を作らない
-  if (state.player.trialTowerRun) {
+  if (state.player.trialTowerRun || state.player.trialTowerHardRun) {
     playSfx("denied", 0.7);
     state.partyNotice = "登坂の途中は編成を変えられません。塔の画面で登坂をやめてください。";
     render();
@@ -3293,12 +3296,14 @@ async function connectTrialTower(): Promise<boolean> {
  * の3つで、描き直しのたびに通信が走るのを止めている。
  */
 const TOWER_SYNC_RETRY_MS = 30_000;
-let towerSyncSentFloor = 0;
-let towerSyncRunning = false;
-let towerSyncLastAttemptAt = 0;
+const towerSyncSentFloor: Record<TowerMode, number> = { NORMAL: 0, HARD: 0 };
+const towerSyncRunning: Record<TowerMode, boolean> = { NORMAL: false, HARD: false };
+const towerSyncLastAttemptAt: Record<TowerMode, number> = { NORMAL: 0, HARD: 0 };
 
-async function syncTrialTowerBest(force = false): Promise<boolean> {
-  const best = state.player.trialTowerLifetimeBestFloor;
+async function syncTrialTowerBest(mode: TowerMode, force = false): Promise<boolean> {
+  const best = mode === "HARD"
+    ? state.player.trialTowerHardLifetimeBestFloor
+    : state.player.trialTowerLifetimeBestFloor;
   if (best < 1) return false;
   /*
    * **同期の口が無い環境では、何も言わない。**
@@ -3306,28 +3311,29 @@ async function syncTrialTowerBest(force = false): Promise<boolean> {
    * 「送れていません」とだけ出る(送り先が無いだけで、失敗ではない)。
    */
   if (!arenaSyncAvailable()) return false;
-  if (towerSyncSentFloor >= best) return true;
-  if (towerSyncRunning) return false;
-  if (!force && Date.now() - towerSyncLastAttemptAt < TOWER_SYNC_RETRY_MS) return false;
+  if (towerSyncSentFloor[mode] >= best) return true;
+  if (towerSyncRunning[mode]) return false;
+  if (!force && Date.now() - towerSyncLastAttemptAt[mode] < TOWER_SYNC_RETRY_MS) return false;
 
-  towerSyncRunning = true;
-  towerSyncLastAttemptAt = Date.now();
+  towerSyncRunning[mode] = true;
+  towerSyncLastAttemptAt[mode] = Date.now();
   let ok = false;
   try {
-    ok = (await connectTrialTower()) && (await submitTrialTowerProgress(best)) !== null;
+    ok = (await connectTrialTower()) && (await submitTrialTowerProgress(best, mode)) !== null;
   } finally {
-    towerSyncRunning = false;
+    towerSyncRunning[mode] = false;
   }
-  if (ok) towerSyncSentFloor = best;
+  if (ok) towerSyncSentFloor[mode] = best;
   const pending = ok ? 0 : best;
-  if (state.towerSyncPending !== pending) {
-    state.towerSyncPending = pending;
+  if (state.towerSyncPending[mode] !== pending) {
+    state.towerSyncPending[mode] = pending;
     render();
   }
   return ok;
 }
 
 async function refreshTrialTowerRanking(): Promise<void> {
+  const mode = state.towerMode;
   state.towerRankingLoading = true;
   state.towerRankingError = false;
   state.towerRankingOffline = false;
@@ -3335,11 +3341,13 @@ async function refreshTrialTowerRanking(): Promise<void> {
 
   const connected = await connectTrialTower();
   // 前回の通信断で送れなかった自己ベストも、ランキングを開いた時に追いつかせる。
-  if (connected) await syncTrialTowerBest(true);
+  if (connected) await syncTrialTowerBest(mode, true);
   const [ranking, self] = await Promise.all([
-    fetchTrialTowerRanking(50),
-    fetchTrialTowerSelf(arenaAuthUserId()),
+    fetchTrialTowerRanking(50, mode),
+    fetchTrialTowerSelf(arenaAuthUserId(), mode),
   ]);
+  // 通信中に難易度を切り替えた場合、前のモードの順位を新しいタブへ表示しない。
+  if (state.towerMode !== mode) return;
   state.towerRankingEntries = ranking.entries;
   state.towerRankingSelf = self;
   state.towerRankingLoading = false;
@@ -3361,14 +3369,16 @@ async function refreshTrialTowerRanking(): Promise<void> {
  * ここは画面遷移とスタミナだけを見る。
  */
 function startTowerFloor(): void {
-  const blocked = towerBlockReason(state.player);
+  const mode = state.towerMode;
+  const blocked = towerBlockReason(state.player, mode);
   if (blocked) {
     state.towerNotice = blocked;
     playSfx("denied", 0.7);
     render();
     return;
   }
-  const run = state.player.trialTowerRun ?? beginTowerRun(state.player);
+  const currentRun = mode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun;
+  const run = currentRun ?? beginTowerRun(state.player, mode);
   if (!run) return;
   if (!spendTowerStamina(state.player)) {
     // 登坂そのものは残す。**理由(スタミナが足りない)はボタンの脇が伝える**ので、
@@ -3394,14 +3404,14 @@ function startTowerFloor(): void {
  * 節を越えた時と、負けた時と、登り切った時だけ画面を止める。
  */
 function finishTowerFloor(cleared: boolean, setup: TowerBattleSetup, engine: BattleEngine): void {
-  const run = state.player.trialTowerRun;
+  const run = setup.mode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun;
   if (!run) return;
   const clearedFloor = run.floor;
 
   const outcome = applyTowerFloorResult(state.player, run, setup, engine, cleared);
   savePlayerState(state.player);
   // 新記録は待たせない(再試行の間隔を飛ばして、その場で送る)
-  if (outcome.lifetimeBestUpdated) void syncTrialTowerBest(true);
+  if (outcome.lifetimeBestUpdated) void syncTrialTowerBest(setup.mode, true);
 
   /** 塔の画面へ戻す。⏹ の押下は登坂ごとのものなので、ここで必ず畳む */
   const backToTower = (kind: TowerOutcome["kind"], fanfare = false): void => {
@@ -3430,7 +3440,7 @@ function finishTowerFloor(cleared: boolean, setup: TowerBattleSetup, engine: Bat
 }
 
 function renderCurrentTowerBattle(): BattleViewHandle {
-  const run = state.player.trialTowerRun;
+  const run = state.towerMode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun;
   if (!run) throw new Error("trialTowerRun is not set");
   const setup = setupTowerBattle(state.player, run);
   if (!setup) throw new Error("試練の塔の編成を組めません");
@@ -3439,6 +3449,7 @@ function renderCurrentTowerBattle(): BattleViewHandle {
     initialPlayerHp: setup.initialPlayerHp,
     initialCooldowns: setup.initialCooldowns,
     trialTowerFloor: setup.floor.floor,
+    trialTowerHardMultipliers: setup.hardMultipliers,
   });
 
   const traitLabel = TOWER_TRAIT_LABEL[setup.floor.trait];
@@ -3446,7 +3457,7 @@ function renderCurrentTowerBattle(): BattleViewHandle {
     engine,
     playerTeam: setup.playerDefs,
     enemyTeam: setup.enemyDefs,
-    title: `塔 ${setup.floor.floor}階${traitLabel ? ` ${traitLabel}` : ""}`,
+    title: `塔 ${setup.mode === "HARD" ? "HARD " : ""}${setup.floor.floor}階${traitLabel ? ` ${traitLabel}` : ""}`,
     // 塔は上っていく1つの場所。階ごとに舞台が変わると上っている感じが消える
     venue: "tower",
     resultLabel: (winner) => (winner === "PLAYER" ? "▲ 次の階へ" : "塔に戻る"),
@@ -4755,22 +4766,30 @@ function renderScreen(): void {
        * (`trial_tower_submit_progress` は低い階では更新しない)ので、
        * 何度送っても害は無い。
        */
-      void syncTrialTowerBest();
-      const blockedReason = towerBlockReason(state.player);
+      const mode = state.towerMode;
+      const hardUnlocked = state.player.trialTowerLifetimeBestFloor >= TOWER_FLOOR_COUNT;
+      if (mode === "HARD" && !hardUnlocked) state.towerMode = "NORMAL";
+      const activeMode = state.towerMode;
+      void syncTrialTowerBest(activeMode);
+      const blockedReason = towerBlockReason(state.player, activeMode);
+      const bestFloor = activeMode === "HARD" ? state.player.trialTowerHardBestFloor : state.player.trialTowerBestFloor;
+      const claimedFloors = activeMode === "HARD" ? state.player.trialTowerHardClaimedFloors : state.player.trialTowerClaimedFloors;
       content = renderTrialTower({
-        bestFloor: state.player.trialTowerBestFloor,
-        nextFloor: nextTowerFloor(state.player),
-        run: describeTowerRun(state.player),
+        mode: activeMode,
+        hardUnlocked,
+        bestFloor,
+        nextFloor: nextTowerFloor(state.player, activeMode),
+        run: describeTowerRun(state.player, activeMode),
         party: getTowerParty(state.player),
         player: state.player,
-        claimedFloors: state.player.trialTowerClaimedFloors,
+        claimedFloors,
         /*
          * 挑めない理由(`blockedReason`)はボタンの脇に必ず出る。
          * 案内がそれと同じことを言っている時は**上の帯に出さない**。
          * スタミナ切れで「上の帯」と「ボタンの赤字」に同じ文が2つ並んでいた
          */
         notice: state.towerNotice === blockedReason ? null : state.towerNotice,
-        syncPendingFloor: state.towerSyncPending,
+        syncPendingFloor: state.towerSyncPending[activeMode],
         outcome: state.towerOutcome,
         blockedReason,
         panel: state.towerPanel,
@@ -4800,14 +4819,14 @@ function renderScreen(): void {
         },
         onEditParty: () => {
           state.towerOutcome = null;
-          openPartyFrom({ screen: "TRIAL_TOWER", label: `試練の塔${nextTowerFloor(state.player)}F` }, "TOWER");
+          openPartyFrom({ screen: "TRIAL_TOWER", label: `試練の塔${activeMode} ${nextTowerFloor(state.player, activeMode)}F` }, "TOWER");
         },
         onChallenge: () => {
           state.towerOutcome = null;
           startTowerFloor();
         },
         onAbandon: () => {
-          abandonTowerRun(state.player);
+          abandonTowerRun(state.player, activeMode);
           savePlayerState(state.player);
           state.towerOutcome = null;
           state.towerNotice = "登坂をやめました。次は節から登り直しになります。";
@@ -4815,6 +4834,24 @@ function renderScreen(): void {
         },
         onDismissOutcome: () => {
           state.towerOutcome = null;
+          render();
+        },
+        onChangeMode: (nextMode) => {
+          if (nextMode === "HARD" && !hardUnlocked) {
+            state.towerNotice = "HARDはNORMAL 100階クリア後に解放されます。";
+            playSfx("denied", 0.7);
+            render();
+            return;
+          }
+          state.towerMode = nextMode;
+          state.towerNotice = null;
+          state.towerOutcome = null;
+          state.towerPanel = "NONE";
+          state.towerRankingEntries = [];
+          state.towerRankingSelf = null;
+          state.towerRankingLoading = false;
+          state.towerRankingError = false;
+          state.towerRankingOffline = false;
           render();
         },
         onBack: () => navigate("HOME"),
@@ -5930,7 +5967,7 @@ if (import.meta.env.DEV) {
       state.player.trialTowerLifetimeBestFloor = Math.max(state.player.trialTowerLifetimeBestFloor, floor);
       navigate("TRIAL_TOWER");
       // `navigate` が案内を畳むので、必ずその後で立てる
-      state.towerSyncPending = floor;
+      state.towerSyncPending[state.towerMode] = floor;
       state.towerNotice = "確認用の案内です。ここに2つ目の知らせが並びます。";
       render();
     },

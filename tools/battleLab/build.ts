@@ -183,7 +183,15 @@ export function buildAlly(spec: AllySpec, rng: () => number, grade?: GearGrade):
     },
   } : dex;
   const def = toBattleDefinition(instance, patchedDex, gear);
-  const stats = spec.statOverrides ? { ...def.stats, ...spec.statOverrides } : def.stats;
+  const overriddenStats = spec.statOverrides ? { ...def.stats, ...spec.statOverrides } : def.stats;
+  const finalMultipliers = spec.finalStatMultipliers;
+  const stats = finalMultipliers ? {
+    ...overriddenStats,
+    hp: Math.max(1, Math.round(overriddenStats.hp * (finalMultipliers.hp ?? 1))),
+    atk: Math.max(1, Math.round(overriddenStats.atk * (finalMultipliers.atk ?? 1))),
+    def: Math.max(1, Math.round(overriddenStats.def * (finalMultipliers.def ?? 1))),
+    spd: Math.max(1, Math.round(overriddenStats.spd * (finalMultipliers.spd ?? 1))),
+  } : overriddenStats;
   return { ...def, name: spec.label ?? def.name, stats };
 }
 

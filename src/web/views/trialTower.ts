@@ -19,6 +19,8 @@ import {
   TRIAL_TOWER_MONTHLY_ORB_FLOORS,
   TowerRewardResult,
   isTrialTowerMonthlyOrbFloor,
+  towerRewardForMode,
+  type TowerMode,
 } from "../../game/trialTower.js";
 import { TrialTowerRankingEntry } from "../../net/trialTowerSync.js";
 import { el } from "../dom.js";
@@ -33,6 +35,8 @@ import { withPortrait } from "../three/portrait.js";
  */
 
 export interface TrialTowerProps {
+  mode: TowerMode;
+  hardUnlocked: boolean;
   /** 最高到達階(0 = まだ一度も越えていない) */
   bestFloor: number;
   /** 次に挑む階 */
@@ -97,6 +101,7 @@ export interface TrialTowerProps {
   /** 登坂をやめる(途中経過を捨てて節からやり直しになる) */
   onAbandon: () => void;
   onBack: () => void;
+  onChangeMode: (mode: TowerMode) => void;
 }
 
 function renderEnemyAbilityList(label: string, items: TowerEnemyInfo["skills"]): HTMLElement | null {
@@ -207,7 +212,7 @@ function renderRankingModal(props: TrialTowerProps): HTMLElement {
       el("div", { className: "tower-modal__head" }, [
         el("div", {}, [
           el("span", { className: "tower-modal__eyebrow" }, ["ALL-TIME BEST"]),
-          el("h2", { id: "tower-ranking-title" }, ["最高到達階ランキング"]),
+          el("h2", { id: "tower-ranking-title" }, [`${props.mode} 最高到達階ランキング`]),
         ]),
         el("button", { type: "button", className: "btn btn--ghost tower-modal__close", onclick: props.onClosePanel, "aria-label": "ランキングを閉じる" }, ["✕"]),
       ]),
@@ -220,7 +225,10 @@ function renderRankingModal(props: TrialTowerProps): HTMLElement {
 
 function renderMonthlyRewards(props: TrialTowerProps): HTMLElement {
   const rewardRow = (floor: (typeof TRIAL_TOWER_MONTHLY_ORB_FLOORS)[number]) => {
-    const claimed = props.player.trialTowerMonthlyOrbClaimedFloors.includes(floor);
+    const claimedFloors = props.mode === "HARD"
+      ? props.player.trialTowerHardMonthlyOrbClaimedFloors
+      : props.player.trialTowerMonthlyOrbClaimedFloors;
+    const claimed = claimedFloors.includes(floor);
     return el("div", { className: `tower-monthly__row${claimed ? " is-claimed" : ""}` }, [
       el("span", { className: "tower-monthly__floor" }, [`${floor}階`]),
       el("span", { className: "tower-monthly__reward" }, ["🔮 覚醒オーブ ×1"]),
@@ -275,7 +283,8 @@ interface RewardItem {
  * 塔の初回報酬は**確定**なので、中身も数量もそのまま出してよい
  * (伏せるのは抽選の確率であって、確定で渡すものではない)。
  */
-function rewardItems(reward: TowerReward): RewardItem[] {
+function rewardItems(reward: TowerReward, mode: TowerMode): RewardItem[] {
+  reward = towerRewardForMode(reward, mode);
   const items: RewardItem[] = [];
   if (reward.crystal) items.push({ icon: "💎", text: reward.crystal.toLocaleString("ja-JP") });
   if (reward.gold) items.push({ icon: "🪙", text: reward.gold.toLocaleString("ja-JP") });
@@ -303,8 +312,8 @@ function renderRewardItemChips(items: RewardItem[]): HTMLElement {
   );
 }
 
-function renderRewardChips(reward: TowerReward): HTMLElement {
-  return renderRewardItemChips(rewardItems(reward));
+function renderRewardChips(reward: TowerReward, mode: TowerMode): HTMLElement {
+  return renderRewardItemChips(rewardItems(reward, mode));
 }
 
 function renderRewardsModal(props: TrialTowerProps): HTMLElement {
@@ -321,7 +330,7 @@ function renderRewardsModal(props: TrialTowerProps): HTMLElement {
       ]),
       el("div", { className: "tower-reward-band__rows" }, floors.map((floor) => {
         const claimed = props.claimedFloors.includes(floor.floor);
-        const items = rewardItems(floor.firstClearReward);
+        const items = rewardItems(floor.firstClearReward, props.mode);
         if (isTrialTowerMonthlyOrbFloor(floor.floor)) {
           items.push({ icon: "🔮", text: "覚醒オーブ 1（追加）", strong: true });
         }
@@ -342,11 +351,13 @@ function renderRewardsModal(props: TrialTowerProps): HTMLElement {
       el("div", { className: "tower-modal__head" }, [
         el("div", {}, [
           el("span", { className: "tower-modal__eyebrow" }, [props.player.trialTowerSeason]),
-          el("h2", { id: "tower-rewards-title" }, ["全100階の報酬"]),
+          el("h2", { id: "tower-rewards-title" }, [`${props.mode} 全100階の報酬`]),
         ]),
         el("button", { type: "button", className: "btn btn--ghost tower-modal__close", onclick: props.onClosePanel, "aria-label": "報酬一覧を閉じる" }, ["✕"]),
       ]),
-      el("p", { className: "tower-modal__lead" }, ["各階で今月最初にクリアした時の報酬です。受取状態は毎月1日00:00（JST）にリセットされます。"]),
+      el("p", { className: "tower-modal__lead" }, [props.mode === "HARD"
+        ? "各階で今月最初にクリアした時の報酬です。HARDのゴールドはNORMALの3倍です。"
+        : "各階で今月最初にクリアした時の報酬です。受取状態は毎月1日00:00（JST）にリセットされます。"]),
       el("div", { className: "tower-reward-catalog" }, sections),
     ]),
   ]);
@@ -681,7 +692,7 @@ function renderNextFloor(props: TrialTowerProps, floor: TowerFloor): HTMLElement
       floor.enemies.filter((enemy) => !enemy.summonedInBattle).map(renderEnemy)),
     el("div", { className: "tower-floor__reward" }, nodes([
       el("span", { className: "tower-floor__reward-label" }, [claimed ? "初回報酬(受取済み)" : "初回到達報酬"]),
-      renderRewardChips(floor.firstClearReward),
+      renderRewardChips(floor.firstClearReward, props.mode),
     ])),
   ]));
 }
@@ -733,7 +744,8 @@ function renderChallenge(props: TrialTowerProps): HTMLElement {
  * ============================================================ */
 
 function renderParty(props: TrialTowerProps): HTMLElement {
-  const locked = props.run !== null;
+  // NORMAL/HARDで編成は共用。非表示側の登坂中にも変更を許すと持ち越しの持ち主が変わる。
+  const locked = props.player.trialTowerRun !== null || props.player.trialTowerHardRun !== null;
   const slots = Array.from({ length: MAX_TOWER_PARTY_SIZE }, (_, i) => {
     const instance = props.party[i];
     if (!instance) return el("div", { className: "tower-slot tower-slot--empty" }, ["＋"]);
@@ -862,9 +874,26 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
 
   return el("div", { className: "screen tower-screen" }, nodes([
     el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["試練の塔"]),
+      el("h1", {}, [`試練の塔 ${props.mode}`]),
       el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
     ]),
+    el("div", { className: "tower-mode-tabs", role: "tablist", "aria-label": "試練の塔の難易度" }, [
+      el("button", {
+        type: "button", role: "tab", className: `tower-mode-tab${props.mode === "NORMAL" ? " is-active" : ""}`,
+        "aria-selected": props.mode === "NORMAL" ? "true" : "false",
+        onclick: () => props.onChangeMode("NORMAL"),
+      }, ["NORMAL"]),
+      el("button", {
+        type: "button", role: "tab", className: `tower-mode-tab tower-mode-tab--hard${props.mode === "HARD" ? " is-active" : ""}`,
+        "aria-selected": props.mode === "HARD" ? "true" : "false",
+        disabled: !props.hardUnlocked,
+        title: props.hardUnlocked ? "試練の塔HARD" : "NORMAL 100階クリアで解放",
+        onclick: () => props.onChangeMode("HARD"),
+      }, [props.hardUnlocked ? "HARD" : "🔒 HARD"]),
+    ]),
+    props.mode === "HARD"
+      ? el("p", { className: "tower-hard-note" }, ["敵編成・AI・ギミックはNORMALと同じ。完成ステータスだけが大幅に強化されています。"])
+      : null,
     el("div", { className: "tower-actions" }, nodes([
       props.nextFloor >= 60
         ? el("button", { type: "button", className: "btn btn--ghost tower-actions__button", onclick: () => props.onOpenEnemyInfo(props.nextFloor), "data-tour": "tower-enemy-info-open" }, ["📖 敵情報"])

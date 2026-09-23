@@ -1,6 +1,7 @@
 import { ELEMENT_JA } from "../core/element.js";
 import { ATK_DOWN, ATK_UP, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
+import type { TrialTowerHardMultipliers } from "../data/trialTowerHard.js";
 import { MonsterDefinition } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
 import { EffectApplyTo, EffectCondition, STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
@@ -303,6 +304,8 @@ export interface BattleEngineOptions {
   initialCooldowns?: [number, number, number][];
   /** 試練の塔だけが指定する階番号。通常戦闘へ特殊ボス規則を漏らさない。 */
   trialTowerFloor?: number;
+  /** HARD 100階で戦闘中に生成される分身にも同じ追加倍率を適用する。 */
+  trialTowerHardMultipliers?: TrialTowerHardMultipliers;
   /**
    * 長引いた戦いで、**与えるダメージが段階的に増えていく**仕掛け。
    *
@@ -360,6 +363,7 @@ export class BattleEngine {
   private focusTargetId: string | null = null;
   private readonly consumedLatents = new Set<string>();
   private readonly trialTowerFloor?: number;
+  private readonly trialTowerHardMultipliers?: TrialTowerHardMultipliers;
   private trialBossTurns = 0;
   /** 70階「始祖の咆哮」を既に発動したHP閾値。回復して跨ぎ直しても再発動しない。 */
   private readonly tower70RoaredThresholds = new Set<number>();
@@ -459,6 +463,7 @@ export class BattleEngine {
     this.maxTurns = options.maxTurns ?? 300;
     this.damageRamp = options.damageRamp;
     this.trialTowerFloor = options.trialTowerFloor;
+    this.trialTowerHardMultipliers = options.trialTowerHardMultipliers;
     if (options.trialTowerFloor === 80) { this.grantTower80Immunity(); this.syncTower80Boss(); }
     if (options.trialTowerFloor === 100) this.setupTower100();
   }
@@ -1387,7 +1392,11 @@ export class BattleEngine {
      * 本体が削れるたびに追従させると、後から生まれた分身ほど紙になり、
      * 先に生まれた分身まで一緒に縮む
      */
-    const maxHp = Math.max(CRIMOARK_CLONE_HP_FLOOR, Math.round(boss.currentHp * CRIMOARK_CLONE_HP_RATIO));
+    const hard = this.trialTowerHardMultipliers;
+    const maxHp = Math.max(
+      Math.round(CRIMOARK_CLONE_HP_FLOOR * (hard?.hp ?? 1)),
+      Math.round(boss.currentHp * CRIMOARK_CLONE_HP_RATIO),
+    );
 
     empty.unit.def = {
       ...empty.unit.def,
@@ -1397,9 +1406,9 @@ export class BattleEngine {
       stats: {
         ...empty.unit.def.stats,
         hp: maxHp,
-        atk: profile.atk,
-        def: profile.def,
-        spd: profile.spd,
+        atk: Math.max(1, Math.round(profile.atk * (hard?.atk ?? 1))),
+        def: Math.max(1, Math.round(profile.def * (hard?.def ?? 1))),
+        spd: Math.max(1, Math.round(profile.spd * (hard?.spd ?? 1))),
         criRate: profile.criRate,
         criDmg: profile.criDmg,
         accuracy: profile.accuracy,
