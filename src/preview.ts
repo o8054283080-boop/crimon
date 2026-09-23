@@ -157,6 +157,8 @@ if (params.get("view") === "tower") {
   }
 
   const props: TrialTowerProps = {
+    mode: params.get("mode")?.toUpperCase() === "HARD" ? "HARD" : "NORMAL",
+    hardUnlocked: true,
     bestFloor: Math.max(0, previewFloor - 1),
     nextFloor: previewFloor,
     syncPendingFloor: 0,
@@ -207,6 +209,7 @@ if (params.get("view") === "tower") {
     onChallenge: () => undefined,
     onAbandon: () => undefined,
     onBack: () => undefined,
+    onChangeMode: () => undefined,
   };
 
   app?.append(renderTrialTower(props));

@@ -369,10 +369,18 @@ export interface PlayerState {
    * **アプリを閉じても続きから入れる**ように途中のHPとクールタイムごと控えに残す。
    */
   trialTowerRun: TowerRunSave | null;
+  /** HARDはNORMALと進行・報酬・歴代最高・途中登坂を完全に分ける。 */
+  trialTowerHardBestFloor: number;
+  trialTowerHardLifetimeBestFloor: number;
+  trialTowerHardClaimedFloors: number[];
+  trialTowerHardMonthlyOrbClaimedFloors: number[];
+  trialTowerHardRun: TowerRunSave | null;
 }
 
 /** 保存する登坂の途中経過。`src/game/trialTower.ts` の TowerRun と同じ形 */
 export interface TowerRunSave {
+  /** 旧セーブでは未定義なので、読込時にNORMALとして補完する。 */
+  mode?: "NORMAL" | "HARD";
   floor: number;
   members: { instanceId: string; hp: number; cooldowns: [number, number, number] }[];
 }
@@ -424,12 +432,15 @@ export function towerSeasonKeyAt(now: Date = new Date()): string {
  */
 export function ensureTowerMonthlyState(state: PlayerState, now: Date = new Date()): boolean {
   const season = towerSeasonKeyAt(now);
+  // normalizeLoadedStateを経ない呼び出しでも、旧セーブ由来の未定義を配列操作へ流さない。
+  if (!Array.isArray(state.trialTowerMonthlyOrbClaimedFloors)) state.trialTowerMonthlyOrbClaimedFloors = [];
+  if (!Array.isArray(state.trialTowerHardClaimedFloors)) state.trialTowerHardClaimedFloors = [];
+  if (!Array.isArray(state.trialTowerHardMonthlyOrbClaimedFloors)) state.trialTowerHardMonthlyOrbClaimedFloors = [];
   if (typeof state.trialTowerSeason !== "string") {
     state.trialTowerSeason = season;
     state.trialTowerMonthlyOrbClaimedFloors = [15, 30].filter((floor) => state.trialTowerBestFloor >= floor);
     return false;
   }
-  if (!Array.isArray(state.trialTowerMonthlyOrbClaimedFloors)) state.trialTowerMonthlyOrbClaimedFloors = [];
   if (state.trialTowerSeason === season) return false;
 
   state.trialTowerSeason = season;
@@ -437,6 +448,10 @@ export function ensureTowerMonthlyState(state: PlayerState, now: Date = new Date
   state.trialTowerClaimedFloors = [];
   state.trialTowerMonthlyOrbClaimedFloors = [];
   state.trialTowerRun = null;
+  state.trialTowerHardBestFloor = 0;
+  state.trialTowerHardClaimedFloors = [];
+  state.trialTowerHardMonthlyOrbClaimedFloors = [];
+  state.trialTowerHardRun = null;
   return true;
 }
 
@@ -533,6 +548,11 @@ export function createInitialState(): PlayerState {
     trialTowerSeason: towerSeasonKeyAt(),
     trialTowerMonthlyOrbClaimedFloors: [],
     trialTowerRun: null,
+    trialTowerHardBestFloor: 0,
+    trialTowerHardLifetimeBestFloor: 0,
+    trialTowerHardClaimedFloors: [],
+    trialTowerHardMonthlyOrbClaimedFloors: [],
+    trialTowerHardRun: null,
   };
 }
 
@@ -911,6 +931,22 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   );
   if (!Array.isArray(state.trialTowerClaimedFloors)) state.trialTowerClaimedFloors = [];
   if (!state.trialTowerRun || !Array.isArray(state.trialTowerRun.members)) state.trialTowerRun = null;
+  if (state.trialTowerRun) state.trialTowerRun.mode = "NORMAL";
+  if (typeof state.trialTowerHardBestFloor !== "number" || !Number.isFinite(state.trialTowerHardBestFloor)) {
+    state.trialTowerHardBestFloor = 0;
+  }
+  state.trialTowerHardBestFloor = Math.max(0, Math.min(100, Math.round(state.trialTowerHardBestFloor)));
+  if (typeof state.trialTowerHardLifetimeBestFloor !== "number" || !Number.isFinite(state.trialTowerHardLifetimeBestFloor)) {
+    state.trialTowerHardLifetimeBestFloor = state.trialTowerHardBestFloor;
+  }
+  state.trialTowerHardLifetimeBestFloor = Math.max(
+    state.trialTowerHardBestFloor,
+    Math.max(0, Math.min(100, Math.round(state.trialTowerHardLifetimeBestFloor))),
+  );
+  if (!Array.isArray(state.trialTowerHardClaimedFloors)) state.trialTowerHardClaimedFloors = [];
+  if (!Array.isArray(state.trialTowerHardMonthlyOrbClaimedFloors)) state.trialTowerHardMonthlyOrbClaimedFloors = [];
+  if (!state.trialTowerHardRun || !Array.isArray(state.trialTowerHardRun.members)) state.trialTowerHardRun = null;
+  if (state.trialTowerHardRun) state.trialTowerHardRun.mode = "HARD";
   ensureTowerMonthlyState(state, now);
 
   // 手放したモンスターが編成に残っていると、対戦の準備で必ず落ちる
@@ -925,6 +961,9 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
    */
   if (state.trialTowerRun && state.trialTowerRun.members.some((m) => !owned.has(m.instanceId))) {
     state.trialTowerRun = null;
+  }
+  if (state.trialTowerHardRun && state.trialTowerHardRun.members.some((m) => !owned.has(m.instanceId))) {
+    state.trialTowerHardRun = null;
   }
   return state;
 }

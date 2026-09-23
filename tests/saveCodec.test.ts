@@ -186,6 +186,27 @@ describe("触らないと決めたものは、素通しする", () => {
     const restored = decodeSave(encodeSave(state))!;
     expect(restored.trialTowerRun).toEqual(state.trialTowerRun);
   });
+
+  it("HARDの進行と途中経過もNORMALとは別にそのまま", () => {
+    const state = richState(8, 20);
+    state.trialTowerHardBestFloor = 37;
+    state.trialTowerHardLifetimeBestFloor = 52;
+    state.trialTowerHardClaimedFloors = [1, 2, 15, 37];
+    state.trialTowerHardMonthlyOrbClaimedFloors = [15];
+    state.trialTowerHardRun = {
+      mode: "HARD",
+      floor: 38,
+      members: state.monsters.slice(0, 3).map((m, i) => ({
+        instanceId: m.id, hp: 2000 + i, cooldowns: [1, 0, 3] as [number, number, number],
+      })),
+    };
+    const restored = decodeSave(encodeSave(state))!;
+    expect(restored.trialTowerHardBestFloor).toBe(37);
+    expect(restored.trialTowerHardLifetimeBestFloor).toBe(52);
+    expect(restored.trialTowerHardClaimedFloors).toEqual(state.trialTowerHardClaimedFloors);
+    expect(restored.trialTowerHardMonthlyOrbClaimedFloors).toEqual([15]);
+    expect(restored.trialTowerHardRun).toEqual(state.trialTowerHardRun);
+  });
 });
 
 /**

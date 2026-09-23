@@ -5,6 +5,19 @@ const view = readFileSync(new URL("../src/web/views/trialTower.ts", import.meta.
 const css = readFileSync(new URL("../src/web/ui/trialTower.css", import.meta.url), "utf8");
 
 describe("試練の塔: 敵情報・ランキングUI", () => {
+  it("NORMAL/HARDを切り替え、NORMAL 100階まではHARDをロックする", () => {
+    expect(view).toContain('props.onChangeMode("NORMAL")');
+    expect(view).toContain('props.onChangeMode("HARD")');
+    expect(view).toContain("NORMAL 100階クリアで解放");
+    expect(view).toContain("tower-mode-tab--hard");
+    expect(css).toContain(".tower-mode-tabs");
+  });
+
+  it("HARD報酬一覧は実付与と同じ3倍ゴールドを表示する", () => {
+    expect(view).toContain("towerRewardForMode(reward, mode)");
+    expect(view).toContain("HARDのゴールドはNORMALの3倍です");
+  });
+
   it("60階以降の各階を未到達でもボタンとして開き、選択階の実データを使う", () => {
     expect(view).toContain("const hasEnemyInfo = floor.floor >= 60");
     expect(view).toContain('return el("button"');

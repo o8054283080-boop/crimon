@@ -11,6 +11,8 @@ export interface TrialTowerRankingEntry {
   updatedAt: string;
 }
 
+export type TrialTowerRankingMode = "NORMAL" | "HARD";
+
 export type TrialTowerRankingResult =
   | { ok: true; entries: TrialTowerRankingEntry[] }
   | { ok: false; entries: [] };
@@ -82,10 +84,14 @@ async function request(path: string, method: "GET" | "POST" = "GET", body?: unkn
 }
 
 /** 歴代最高階を送る。同じ階以下はサーバ側で日時を含めて変更されない。 */
-export async function submitTrialTowerProgress(bestFloor: number): Promise<TrialTowerProgressResult | null> {
+export async function submitTrialTowerProgress(
+  bestFloor: number,
+  mode: TrialTowerRankingMode = "NORMAL",
+): Promise<TrialTowerProgressResult | null> {
   try {
     if (!arenaSyncAvailable() || !Number.isInteger(bestFloor) || bestFloor < 1 || bestFloor > 100) return null;
-    const response = await request("rpc/trial_tower_submit_progress", "POST", { p_best_floor: bestFloor });
+    const rpc = mode === "HARD" ? "trial_tower_hard_submit_progress" : "trial_tower_submit_progress";
+    const response = await request(`rpc/${rpc}`, "POST", { p_best_floor: bestFloor });
     if (!response.ok || !isRecord(response.value) || response.value.ok !== true) return null;
     const value = response.value;
     if (typeof value.bestFloor !== "number" || !validDate(value.bestFloorReachedAt) || !validDate(value.updatedAt)) return null;
@@ -102,7 +108,10 @@ export async function submitTrialTowerProgress(bestFloor: number): Promise<Trial
 }
 
 /** 公開ランキング。接続失敗と正常な空一覧を区別する。 */
-export async function fetchTrialTowerRanking(limit = 50): Promise<TrialTowerRankingResult> {
+export async function fetchTrialTowerRanking(
+  limit = 50,
+  mode: TrialTowerRankingMode = "NORMAL",
+): Promise<TrialTowerRankingResult> {
   try {
     if (!arenaSyncAvailable()) return { ok: false, entries: [] };
     const params = new URLSearchParams({
@@ -110,7 +119,8 @@ export async function fetchTrialTowerRanking(limit = 50): Promise<TrialTowerRank
       order: "best_floor.desc,best_floor_reached_at.asc,user_id.asc",
       limit: String(Math.max(1, Math.min(100, Math.floor(limit)))),
     });
-    const response = await request(`trial_tower_public_ranking?${params.toString()}`);
+    const view = mode === "HARD" ? "trial_tower_hard_public_ranking" : "trial_tower_public_ranking";
+    const response = await request(`${view}?${params.toString()}`);
     if (!response.ok || !Array.isArray(response.value)) return { ok: false, entries: [] };
     return { ok: true, entries: response.value.map(rankingEntry).filter((entry): entry is TrialTowerRankingEntry => entry !== null) };
   } catch {
@@ -119,7 +129,10 @@ export async function fetchTrialTowerRanking(limit = 50): Promise<TrialTowerRank
 }
 
 /** 一覧外でも固定表示できるよう、自分の行だけ取得する。 */
-export async function fetchTrialTowerSelf(userId: string | null): Promise<TrialTowerRankingEntry | null> {
+export async function fetchTrialTowerSelf(
+  userId: string | null,
+  mode: TrialTowerRankingMode = "NORMAL",
+): Promise<TrialTowerRankingEntry | null> {
   try {
     if (!arenaSyncAvailable() || !userId) return null;
     const params = new URLSearchParams({
@@ -127,7 +140,8 @@ export async function fetchTrialTowerSelf(userId: string | null): Promise<TrialT
       user_id: `eq.${userId}`,
       limit: "1",
     });
-    const response = await request(`trial_tower_public_ranking?${params.toString()}`);
+    const view = mode === "HARD" ? "trial_tower_hard_public_ranking" : "trial_tower_public_ranking";
+    const response = await request(`${view}?${params.toString()}`);
     if (!response.ok || !Array.isArray(response.value)) return null;
     return rankingEntry(response.value[0]);
   } catch {
