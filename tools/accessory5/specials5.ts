@@ -147,7 +147,36 @@ export interface Acc5 {
 }
 export const NONE5: Acc5 = { main: null, mainValue: 0, specials: [], tier: "EPIC", roll: "STD", weak: null };
 
+/**
+ * **修正値案 V2(検証で決めた再調整候補)。**依頼の値(V1)では、どの相手にもサポートが耐久に届かなかった。
+ * 1個ずつの寄与を1倍・2倍・3倍で測った伸び方から、特殊ごとに倍率を変えて作った値。
+ *   回復・シールド・軽減系 … 約2倍(伸び方が素直)
+ *   ゲージ系           … 約1.5倍(3倍で伸びすぎる。回復時ゲージは3倍で−7.5pt)
+ *   シールド量UP        … 依頼の値のまま(25/30/35%の差が小さく、上げても伸びが鈍い)
+ *   蘇生HP・自身ゲージ    … 据え置き(現在の main では効く場面がほぼ無い)
+ * 環境変数 `ACC5_SET=V2` の時だけ使う。既定は V1(依頼の値)。
+ */
+export const SUP5_V2: Record<Sup5, Ranges> = {
+  HEAL_UP: r([0.10, 0.14], [0.14, 0.20], [0.20, 0.25]),
+  SHIELD_UP: r([0.10, 0.15], [0.15, 0.22], [0.30, 0.35]),
+  LOW50_HEAL: r([0.16, 0.22], [0.22, 0.30], [0.30, 0.40]),
+  HEALED_DR: r([0.06, 0.08], [0.08, 0.11], [0.12, 0.15]),
+  HEALED_SHIELD: fixed(0.04, 0.06, 0.08),
+  LOW50_HEALED_SHIELD: r([0.06, 0.06], [0.08, 0.08], [0.10, 0.12]),
+  CLEANSE_SHIELD: r([0.04, 0.04], [0.06, 0.06], [0.08, 0.10]),
+  CLEANSE_HEAL: r([0.04, 0.04], [0.06, 0.06], [0.08, 0.10]),
+  HEALED_GAUGE: fixed(0.03, 0.045, 0.06),
+  CLEANSE_GAUGE: fixed(0.03, 0.045, 0.06),
+  BUFF_SHIELD: fixed(0.03, 0.05, 0.07),
+  BUFF_GAUGE: fixed(0.03, 0.045, 0.06),
+  REVIVE_HP: fixed(0.03, 0.05, 0.07),
+  REVIVE_SHIELD: fixed(0.06, 0.10, 0.14),
+  SUPPORT_SELF_GAUGE: fixed(0.02, 0.03, 0.04),
+};
+const useV2 = () => process.env.ACC5_SET === "V2";
+
 function rangesOf5(key: Sup5 | Dis5): Ranges {
+  if (useV2() && key in SUP5_V2) return SUP5_V2[key as Sup5];
   return ((SUP5 as Record<string, { ranges: Ranges }>)[key] ?? (DIS5 as Record<string, { ranges: Ranges }>)[key]).ranges;
 }
 

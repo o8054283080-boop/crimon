@@ -121,12 +121,12 @@ function to5(m: Member4 | Member, role5: string, extra: Partial<Member5> = {}): 
 
 /* ================================================================ 役割最適 */
 
-/** 役割最適: タンク → 耐久 / ヒーラー → サポート回復特化 / シールド役 → サポートシールド特化 / 妨害役 → 妨害ゲージ / 火力 → 攻撃 */
+/** 役割最適: タンク → 耐久 / ヒーラー → サポート保護特化(1個ずつの寄与と直接比較で回復特化より強かった) / シールド役 → サポートシールド特化 / 妨害役 → 妨害ゲージ / 火力 → 攻撃 */
 function roleOf(m: Member4 | Member): string {
   const kit = KIT[m.key];
   if (m.role === "ATK") return "ATK";
   if (m.key === "phoenix_DARK") return "DEF";
-  if (kit?.sup.includes("HEALER")) return "SUP_HEAL";
+  if (kit?.sup.includes("HEALER")) return "SUP_GUARD";
   if (kit?.sup.includes("SHIELDER")) return "SUP_SHIELD";
   if (kit?.sup.includes("GAUGE") && m.role !== "HP") return "DIS_GAUGE";
   if (m.role === "DIS" || m.role === "SUP") return "DIS_RATE";
@@ -209,11 +209,11 @@ const undineElectric = newMember("undine_ELECTRIC", "ウンディーネ[電気]"
 const std = (m: Member4 | Member, role: string) => to5(m, role);
 export const DEFENSES_NEW: Team5[] = [
   { key: "G", label: "G サポート耐久", concept: "ヒーラー(フェアリー光)・シールド役(ゴーレム光)・蘇生役(フェニックス闇)・タンク(ベヒモス水)。サポートアクセだけで永久耐久が作れないかを見る(24章)",
-    members: [std(fairyLight, "SUP_HEAL"), std(golemLight, "SUP_SHIELD"), std(phoenixDark, "DEF"), std(behemothWater, "DEF")] },
+    members: [std(fairyLight, "SUP_GUARD"), std(golemLight, "SUP_SHIELD"), std(phoenixDark, "DEF"), std(behemothWater, "DEF")] },
   { key: "G2", label: "G2 サポート耐久2", concept: "ヒーラー(ウンディーネ水)・シールド+我慢(ベヒモス光)・蘇生役(フェニックス闇)・バフ支援タンク(シェルタートル光)",
-    members: [std(undineWater, "SUP_HEAL"), std(behemothLight, "SUP_SHIELD"), std(phoenixDark, "DEF"), std(shellLight, "DEF")] },
+    members: [std(undineWater, "SUP_GUARD"), std(behemothLight, "SUP_SHIELD"), std(phoenixDark, "DEF"), std(shellLight, "DEF")] },
   { key: "H", label: "H 純ヒーラー", concept: "回復だけのフェアリー水と、回復・解除・シールドのウンディーネ電気。ベヒモス光(シールド)・シェルタートル光(防御UP・保護)と組む",
-    members: [std(fairyWater, "SUP_HEAL"), std(undineElectric, "SUP_SHIELD"), std(behemothLight, "DEF"), std(shellLight, "DEF")] },
+    members: [std(fairyWater, "SUP_GUARD"), std(undineElectric, "SUP_SHIELD"), std(behemothLight, "DEF"), std(shellLight, "DEF")] },
 ];
 
 /** ゲージハメ検証(23章): 防衛側の妨害4体 */
