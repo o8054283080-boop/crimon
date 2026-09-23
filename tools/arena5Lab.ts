@@ -346,7 +346,10 @@ function plan(name: string) {
     }
 
     /* ---------------- 21章: 耐久 vs サポート(ケース別) ---------------- */
-    case "direct": {
+    case "direct":
+    case "direct-sup": {
+      // direct-sup: サポートの条件だけ(`ACC5_SUP_SCALE` で値を何倍かにして、耐久と競合する倍率を探す)
+      const supOnly = name === "direct-sup";
       const cases: { key: string; atk: Team5[]; focus?: (m: Member5) => boolean }[] = [
         { key: "全体", atk: [byKey(ATTACKS5, "OFF-A"), byKey(ATTACKS5, "OFF-C")] },
         { key: "単体", atk: [byKey(ATTACKS5, "OFF-D")] },
@@ -358,14 +361,16 @@ function plan(name: string) {
         { key: "シールド役", pred: (m) => SHIELDER(m) || m.key === "undine_ELECTRIC", profiles: ["DEF_STD", "SUP_SHIELD", "SUP_GUARD", "SUP_TEMPO"] },
         { key: "蘇生役", pred: REVIVER, profiles: ["DEF_STD", "SUP_REVIVE", "SUP_GUARD", "SUP_HEAL"] },
       ];
-      for (const w of who) {
+      for (const w0 of who) {
+        const w = supOnly ? { ...w0, profiles: w0.profiles.filter((p) => p.startsWith("SUP_")) } : w0;
+        const base = supOnly ? [] : ["none"];
         const defs = DEF_ALL.filter((t) => t.members.some(w.pred));
         for (const c of cases) {
-          const conds = ["none", ...w.profiles].map((p) => C(`${w.key}:${c.key}:${p}`, `${w.key}だけ ${p}(エピック)・${c.key}`, none, onlyIf(w.pred, (m) => acc(m, p === "none" ? null : p)), { watch: watchDef(w.pred) }));
+          const conds = [...base, ...w.profiles].map((p) => C(`${w.key}:${c.key}:${p}`, `${w.key}だけ ${p}(エピック)・${c.key}`, none, onlyIf(w.pred, (m) => acc(m, p === "none" ? null : p)), { watch: watchDef(w.pred) }));
           run(`direct-${w.key}`, c.atk, defs, conds);
         }
         // 本人を集中攻撃されるケース: OFF-D と OFF-A の単体技を本人へ向ける
-        const conds = ["none", ...w.profiles].map((p) => C(`${w.key}:集中:${p}`, `${w.key}だけ ${p}(エピック)・本人を集中攻撃`, none, onlyIf(w.pred, (m) => acc(m, p === "none" ? null : p)), { watch: watchDef(w.pred), focus: w.pred }));
+        const conds = [...base, ...w.profiles].map((p) => C(`${w.key}:集中:${p}`, `${w.key}だけ ${p}(エピック)・本人を集中攻撃`, none, onlyIf(w.pred, (m) => acc(m, p === "none" ? null : p)), { watch: watchDef(w.pred), focus: w.pred }));
         run(`direct-${w.key}`, [byKey(ATTACKS5, "OFF-D"), byKey(ATTACKS5, "OFF-A")], defs, conds);
       }
       break;

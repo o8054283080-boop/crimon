@@ -151,11 +151,21 @@ function rangesOf5(key: Sup5 | Dis5): Ranges {
   return ((SUP5 as Record<string, { ranges: Ranges }>)[key] ?? (DIS5 as Record<string, { ranges: Ranges }>)[key]).ranges;
 }
 
+/**
+ * **再調整候補を測るためだけの倍率。**既定は1(依頼の候補値そのまま)。
+ * 環境変数 `ACC5_SUP_SCALE` で、サポート特殊の値(上書き値を含む・弱効果は含まない)だけを何倍かにする。
+ */
+function supScale(key: Sup5 | Dis5): number {
+  if (!(key in SUP5)) return 1;
+  const v = Number(process.env.ACC5_SUP_SCALE ?? "1");
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
 /** サポート・妨害の効き目。特殊の値 + (同じ仕組みの弱効果があれば)その値 */
 export function v5(acc: Acc5, key: Sup5 | Dis5): number {
   if (new Set(acc.specials).size !== acc.specials.length) throw new Error("同一の特殊効果は1つのアクセに重複不可");
   let special = 0;
-  if (acc.specials.includes(key)) special = acc.override?.[key] ?? valueOf(rangesOf5(key)[acc.tier], acc.roll);
+  if (acc.specials.includes(key)) special = (acc.override?.[key] ?? valueOf(rangesOf5(key)[acc.tier], acc.roll)) * supScale(key);
   const w = acc.weak && acc.weak in WEAK5 ? WEAK5[acc.weak as Weak5] : null;
   return special + (w && w.as === key ? w.value : 0);
 }
