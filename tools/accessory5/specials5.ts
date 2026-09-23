@@ -484,10 +484,15 @@ export function attach5(engine: BattleEngine, accOf: (u: BattleUnit) => Acc5, op
     }
   };
 
-  /* --- 回復パッシブ(水の祝福=行動後 / 輪廻転生=手番の頭)も「1回の発動」を1つの窓にする --- */
+  /*
+   * --- 回復パッシブ(水の祝福=行動後 / 輪廻転生=手番の頭)も「1回の発動」を1つの窓にする ---
+   * **比較用:** 環境変数 `ACC5_PASSIVE_HEAL=0` の時は、パッシブの回復ではサポート特殊を発動させない
+   * (スキルを使った時だけ)。毎ターン・毎行動に全体を回復するパッシブ持ちで発動回数が膨らむのを抑える案。
+   */
+  const passiveHealCounts = process.env.ACC5_PASSIVE_HEAL !== "0";
   const originalActed = e.onUnitActed.bind(engine);
   e.onUnitActed = (actor) => {
-    const isHealer = passiveEffectOf(actor)?.kind === "WATER_BLESSING";
+    const isHealer = passiveHealCounts && passiveEffectOf(actor)?.kind === "WATER_BLESSING";
     const w: Window | null = isHealer ? { source: actor, before: snapAll(), healed: new Set(), key: {} } : null;
     if (w) windows.push(w);
     try { return originalActed(actor); } finally { if (w) { windows.pop(); closeHealWindow(w); } }
@@ -496,7 +501,7 @@ export function attach5(engine: BattleEngine, accOf: (u: BattleUnit) => Acc5, op
   e.applyTurnStart = (unit, ...rest) => {
     // 回復時の軽減は、受け手自身の手番が始まったら消える
     dr.delete(unit.instanceId);
-    const isHealer = passiveEffectOf(unit)?.kind === "REBIRTH";
+    const isHealer = passiveHealCounts && passiveEffectOf(unit)?.kind === "REBIRTH";
     const w: Window | null = isHealer ? { source: unit, before: snapAll(), healed: new Set(), key: {} } : null;
     if (w) windows.push(w);
     try { return originalTurnStart(unit, ...rest); } finally { if (w) { windows.pop(); closeHealWindow(w); } }
