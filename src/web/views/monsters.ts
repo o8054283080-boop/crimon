@@ -1,7 +1,7 @@
 import { ELEMENTS, ELEMENT_JA, Element } from "../../core/element.js";
 import { EQUIP_SLOTS, EquipSlot, getActiveSetBonuses, SET_BONUS_DESCRIPTION, SET_LABEL, STAT_LABEL } from "../../core/equipment.js";
 import { MonsterInstance, isSkillMaxLevel, resolveAccessory, resolveEquippedItems, starLabel, toBattleDefinition } from "../../core/monsterInstance.js";
-import { renderAccessorySummary } from "./accessoryCard.js";
+import { ACCESSORY_FAMILY_JA, ACCESSORY_MAIN_JA, ACCESSORY_RARITY_JA, describeSpecial, describeWeak } from "../../core/accessory.js";
 import { computeEffectiveStats, requiredExpForLevel, RANK_UP_SACRIFICE_COUNT, STAR_MAX_LEVEL, canRankUp } from "../../core/rarity.js";
 import { applyPlayerStatBoost } from "../../core/playerStatBoost.js";
 import { EXTRA_STAT_FORMATS, PRIMARY_STAT_FORMATS, buildStatBreakdown } from "../../core/stats.js";
@@ -62,8 +62,6 @@ export interface MonstersProps {
   onToggleDense: () => void;
   /** アクセサリーの枠を押した時(着ける・付け替える)。省略時は枠を出すだけ */
   onOpenAccessorySlot?: (monsterId: string) => void;
-  /** 限界能力付与を開く */
-  onOpenLimitBreak?: (monsterId: string) => void;
 }
 
 export function monsterCard(
@@ -261,7 +259,71 @@ function renderSlotGrid(props: MonstersProps, instance: MonsterInstance): HTMLEl
       el("div", { className: "equip-slot__plus" }, ["+"]),
     ]);
   });
-  return el("div", { className: "equip-slot-grid" }, boxes);
+  return el("div", { className: "equip-slot-grid" }, [
+    ...boxes,
+    renderAccessorySlot(props, instance),
+    /*
+     * おまかせは**装備の並びのすぐ下**に置く。アクセ札の右の空きへ入れる。
+     * 下の操作列(強化・クリエイト)へ混ぜると、装備の話から離れて見つからない。
+     */
+    el("button", {
+      type: "button",
+      className: "btn btn--primary monster-detail-equipment__auto",
+      onclick: () => props.onGoAutoEquip(instance.id),
+    }, ["⚙ おまかせ装備・プリセット"]),
+  ]);
+}
+
+/**
+ * アクセサリーの札。**装備の6枠と同じ並び・同じ形**で7枚目に置く(依頼主の指定)。
+ * 別の欄にしていた時は、装備と別物に見えて探しにくかった。
+ *
+ * 札に出すのは装備と同じ4つ(枠名とLv / ★ / メイン / 系統)。
+ * 特殊効果と弱効果は、セット効果と同じく札の下の緑の行に出す。
+ */
+function renderAccessorySlot(props: MonstersProps, instance: MonsterInstance): HTMLElement {
+  const acc = resolveAccessory(instance, props.player.accessories);
+  const open = props.onOpenAccessorySlot ? () => props.onOpenAccessorySlot?.(instance.id) : undefined;
+  if (!acc) {
+    return el("button", {
+      type: "button",
+      className: "equip-slot equip-slot--empty equip-slot--accessory",
+      "data-tour": "accessory-slot",
+      "aria-label": "アクセサリーを着ける",
+      disabled: !open,
+      onclick: open,
+    }, [
+      el("div", { className: "equip-slot__label" }, ["アクセ"]),
+      el("div", { className: "equip-slot__plus" }, ["+"]),
+    ]);
+  }
+  return el("button", {
+    type: "button",
+    className: "equip-slot equip-slot--filled equip-slot--accessory",
+    "data-tour": "accessory-slot",
+    "data-rarity": acc.rarity,
+    "data-star": String(acc.star),
+    "aria-label": "アクセサリーを付け替える・外す",
+    disabled: !open,
+    onclick: open,
+  }, [
+    el("div", { className: "equip-slot__head" }, [
+      el("span", { className: "equip-slot__label" }, ["アクセ"]),
+      el("span", { className: "equip-slot__level" }, [`+${acc.level}`]),
+    ]),
+    el("div", { className: "equip-slot__star" }, ["★".repeat(acc.star)]),
+    el("div", { className: "equip-slot__stat" }, [`${ACCESSORY_MAIN_JA[acc.mainStat]}+`]),
+    el("div", { className: "equip-slot__set" }, [ACCESSORY_FAMILY_JA[acc.family]]),
+  ]);
+}
+
+/** 着けているアクセの効果を1行で。セット効果の行と同じ見た目 */
+function accessoryEffectLine(props: MonstersProps, instance: MonsterInstance): HTMLElement | null {
+  const acc = resolveAccessory(instance, props.player.accessories);
+  if (!acc) return null;
+  return el("p", { className: "monster-detail-equipment__sets monster-detail-equipment__accessory" }, [
+    `アクセ(${ACCESSORY_RARITY_JA[acc.rarity]})：${[...acc.specials.map(describeSpecial), `弱効果 ${describeWeak(acc.weak, acc.level)}`].join(" / ")}`,
+  ]);
 }
 
 function renderSkillPanel(
@@ -454,21 +516,12 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
       el("section", { className: "monster-detail-section monster-detail-equipment" }, [
         el("h2", {}, ["装備"]),
         renderSlotGrid(props, instance),
-        /*
-         * おまかせは**装備の並びのすぐ下**に置く。
-         * 下の操作列(強化・クリエイト)へ混ぜると、装備の話から離れて見つからない。
-         */
-        el("button", {
-          type: "button",
-          className: "btn btn--primary monster-detail-equipment__auto",
-          onclick: () => props.onGoAutoEquip(instance.id),
-        }, ["⚙ おまかせ装備・プリセット"]),
         activeSets.length ? el("p", { className: "monster-detail-equipment__sets" }, [activeSets.flatMap((bonus) => {
           const description = SET_BONUS_DESCRIPTION[bonus.set];
           return [`${SET_LABEL[bonus.set]}：${bonus.twoActive ? description.two : ""}${bonus.twoActive && bonus.fourActive ? " / " : ""}${bonus.fourActive ? description.four : ""}`];
         }).join("　")]) : null,
+        accessoryEffectLine(props, instance),
       ].filter((node): node is HTMLElement => node !== null)),
-      renderAccessorySection(props, instance),
       el("section", { className: "monster-detail-actions" }, [
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoMonsterTraining(instance.id) }, ["強化"]),
         el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onGoCreate(instance.id) }, [instance.createdSkill ? "クリエイトし直す" : "クリエイト"]),
@@ -713,36 +766,4 @@ export function renderMonsters(props: MonstersProps): HTMLElement {
   rankUpPigFilter = "ALL";
   if (target) return renderDetail(props, target);
   return renderList(props);
-}
-
-/**
- * アクセサリーの枠。**装備の6枠とは別の、1体に1つだけの枠。**
- *
- * 着けているアクセの ★・レア度・系統・Lv・メイン・特殊・弱効果を全部出す。
- * どの効果が乗っているかを、付け替えの画面まで行かずにここで読めるようにする。
- */
-function renderAccessorySection(props: MonstersProps, instance: MonsterInstance): HTMLElement {
-  const acc = resolveAccessory(instance, props.player.accessories);
-  const limitUnlocked = instance.development.limitBreak?.unlocked === true;
-  return el("section", { className: "monster-detail-section monster-detail-accessory" }, [
-    el("h2", {}, ["アクセサリー", el("small", {}, ["1体に1つ"])]),
-    acc ? renderAccessorySummary(acc) : el("p", { className: "monster-detail-empty" }, ["未装着"]),
-    el("div", { className: "monster-detail-accessory__actions" }, [
-      props.onOpenAccessorySlot
-        ? el("button", {
-          type: "button",
-          className: "btn btn--ghost",
-          "data-tour": "accessory-slot",
-          onclick: () => props.onOpenAccessorySlot?.(instance.id),
-        }, [acc ? "付け替える・外す" : "アクセを着ける"])
-        : null,
-      props.onOpenLimitBreak
-        ? el("button", {
-          type: "button",
-          className: "btn btn--ghost",
-          onclick: () => props.onOpenLimitBreak?.(instance.id),
-        }, [limitUnlocked ? "限界能力付与" : "限界能力付与(未解放)"])
-        : null,
-    ].filter((n) => n !== null) as HTMLElement[]),
-  ]);
 }

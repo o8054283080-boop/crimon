@@ -16,6 +16,7 @@ import { el } from "../dom.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
+import { type LimitBreakPanelProps, renderLimitBreakPanel } from "./limitBreak.js";
 import {
   ABILITY_POINT_RESET_COST,
   ABILITY_POINT_VALUES,
@@ -78,6 +79,11 @@ export interface MonsterCreateProps {
   onResetAbilityPoints: () => void;
   /** いまの配分で確定する。ここから先は有料でしか変えられない */
   onConfirmAbilityPoints: () => void;
+  /**
+   * 限界能力付与。**能力付与の欄の中、能力ポイントのすぐ下**に出す。
+   * 省略時は出さない(★6未満でも、解放の案内として出す)。
+   */
+  limitBreak?: Omit<LimitBreakPanelProps, "monster">;
   onAwaken: (candidateId: string) => void;
   reawakenConfirmOpen: boolean;
   onRequestReawaken: () => void;
@@ -393,7 +399,9 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
           onclick: props.onResetAbilityPoints,
         }, [`能力ポイントリセット ${ABILITY_POINT_RESET_COST.toLocaleString("ja-JP")} GOLD`])
         : null,
-    ] as (HTMLElement | null)[]).filter(isEl))]);
+    ] as (HTMLElement | null)[]).filter(isEl)),
+    props.limitBreak ? renderLimitBreakPanel({ ...props.limitBreak, monster: target }) : null,
+    ].filter(isEl));
   }
   if (props.menu === "LATENT") {
     const candidates = LATENT_ABILITY_CANDIDATES[target.dexId] ?? [];

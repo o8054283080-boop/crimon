@@ -204,8 +204,8 @@ const SCREENS = [
   { name: "アクセサリー一覧(選択中)", tab: "HOME", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openAccessoriesForDev(false, true)" },
   { name: "アクセサリー(着ける先を選ぶ)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openAccessoriesForDev(true, true)" },
   { name: "カケラ製作", tab: "HOME", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openCraftForDev()" },
-  { name: "限界能力付与(未解放)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(false)" },
-  { name: "限界能力付与(配分中)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(true)" },
+  { name: "クリエイト/能力付与(限界・未解放)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(false)" },
+  { name: "クリエイト/能力付与(限界・配分中)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(true)" },
   /*
    * 周回結果の「獲得装備」のシート。**周回を回さないと開けない**ので、
    * これまで一度も検査していなかった。下から出る `position:fixed` の中に

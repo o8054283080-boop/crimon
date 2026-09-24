@@ -79,6 +79,23 @@
 .monster-detail-equipment .equip-slot__level { font-size: .58rem; }
 .monster-detail-equipment .equip-slot__plus { font-size: .8rem; }
 .monster-detail-equipment__sets { margin: 3px 0 0; font-size: .57rem; line-height: 1.2; color: #79dba5; }
+/*
+ * モンスター詳細のアクセ札。**装備の6枠と同じ並び**の7枚目(2段目の左端)。
+ * 縁の色だけをレア度で変える(一覧の札と同じ色)。
+ */
+.monster-detail-equipment .equip-slot--accessory[data-rarity="HERO"] { border-color: rgba(140, 190, 255, 0.75); }
+.monster-detail-equipment .equip-slot--accessory[data-rarity="LEGEND"] { border-color: rgba(214, 140, 255, 0.8); }
+.monster-detail-equipment .equip-slot--accessory[data-rarity="EPIC"] { border-color: rgba(255, 170, 80, 0.9); }
+.monster-detail-equipment .equip-slot--accessory .equip-slot__label { color: #e4b9ff; }
+
+/* おまかせはアクセ札の右、2段目の残り5列ぶん */
+.monster-detail-equipment .monster-detail-equipment__auto {
+  grid-column: 2 / -1;
+  min-height: 42px;
+  margin: 0;
+}
+
+.monster-detail-equipment__accessory { color: #d9b8ff; }
 .monster-detail-actions { display: grid; grid-template-columns: repeat(2,1fr); gap: 4px; }
 .monster-detail-actions .btn { min-height: 44px; padding: 5px; font-size: .72rem; }
 .monster-detail-actions__hint { grid-column: 1 / -1; text-align: center; font-size: .58rem; color: var(--text-dim); }
