@@ -15,6 +15,7 @@ type AdminSummary = {
   authUsers: number;
   arenaProfiles: number;
   recoveryAccounts: number;
+  playerSnapshots?: number;
 };
 
 type ArenaPlayer = {
@@ -142,7 +143,7 @@ type RecoveryAccount = {
   progress?: SaveProgress | null;
 };
 
-type AdminDashboard = {
+type PlayerSnapshot = { userId: string; savedAt: string; summary: { fighterName?: string; fighterLevel?: number; gold?: number; crystal?: number; monsterCount?: number; equipmentCount?: number }; progress?: SaveProgress | null; };\n\ntype AdminDashboard = {
   generatedAt: string;
   activeSeason: { id: string; name: string; status: string; starts_at: string; ends_at: string } | null;
   summary: AdminSummary;
@@ -151,6 +152,7 @@ type AdminDashboard = {
   daily?: AdminDailyRow[] | null;
   arenaPlayers: ArenaPlayer[];
   recoveryAccounts: RecoveryAccount[];
+  playerSnapshots?: PlayerSnapshot[];
 };
 
 type ArenaDetail = {
