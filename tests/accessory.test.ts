@@ -12,13 +12,13 @@ import {
   specialRange, weakValue, sanitizeAccessory, describeSpecial,
 } from "../src/core/accessory.js";
 import { appearanceTemplateOf, type MonsterDefinition } from "../src/core/monster.js";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { SET_TYPES } from "../src/core/equipment.js";
 import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterInstance.js";
 import type { Skill } from "../src/core/skill.js";
 import { findMonsterById } from "../src/data/monsters.js";
 import {
-  GUARDIAN_PROTECT_SHARE, POWER_DEATH_BUFF, findRuinFloor, ruinFloors, ruinLocationId, findRuinFloorByLocationId,
+  GUARDIAN_PROTECT_SHARE, HERALD_GUARD_MITIGATE, POWER_DEATH_BUFF, POWER_RUIN_DAMAGE_RAMP, findRuinFloor, ruinFloors, ruinLocationId, findRuinFloorByLocationId,
 } from "../src/data/ruins.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import {
@@ -373,10 +373,15 @@ describe("遺跡", () => {
     // 指定値(本体 510000/9000/3150/210)から HPを約半分・攻撃力を約3.8倍・本体の速さ+15 にした。
     // そのうえで「塔を倒すと必ず損」(既定の狙い19% / 本体を狙い撃ち94%)を直した。
     // 1回目は塔を脆くしすぎて「号令塔から倒すのが常に得」に裏返ったので、2回目で号令塔を巻き添えで
-    // 倒れない硬さ(HP 47,250・防御2,860)へ戻し、妨害塔は防御を上げ(既定の狙いが先に削りに行かない)、
-    // 指揮兵器は会心寄り(会心80%・攻撃33,235)にした。比は tests/ruinPowerRoles.test.ts、表は src/data/ruins.ts の注記
+    // 倒れない硬さ(HP 47,250・防御2,860)へ戻し、妨害塔は硬く(既定の狙いが先に削りに行かない)、
+    // 指揮兵器は会心寄りにした。3回目で回復阻害を外して長期戦の決着(POWER_RUIN_DAMAGE_RAMP)に替え、
+    // 妨害塔のHPを2倍(57,600)・指揮兵器の攻撃を0.95倍(31,573)にした。比は tests/ruinPowerRoles.test.ts
     expect(p5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
-      [216_750, 33_235, 3_150, 225], [47_250, 5_400, 2_860, 205], [28_800, 7_800, 5_400, 200],
+      [216_750, 31_573, 3_150, 225], [47_250, 5_400, 2_860, 205], [57_600, 7_800, 5_400, 200],
+    ]);
+    // 4階は5階と分けて決める(4階STRONGの汎用の放置が約5割になる強さ)
+    expect(findRuinFloor("POWER", 4)!.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
+      [191_250, 28_445, 3_150, 216], [42_000, 4_650, 2_730, 195], [48_000, 7_050, 5_100, 188],
     ]);
     expect(p5.enemies[0].fixedStats!.criRate).toBe(0.8);
     // 1〜3階は両遺跡で共通の作りのまま(会心率は図鑑どおり)
@@ -425,8 +430,10 @@ describe("遺跡", () => {
       expect(herald.cooldowns[2]).toBe(0);
       herald.gauge = 100;
       engine.resolveTurn(herald);
-      expect(boss.mitigateAmount).toBe(0.55);
-      expect(boss.mitigateTurns).toBe(3);
+      expect(boss.mitigateAmount).toBe(HERALD_GUARD_MITIGATE[floor as 4 | 5]);
+      expect(boss.mitigateTurns).toBe(6);
+      // 張り直しはクールタイム5。解除で剥がすと、次に張られるまで穴が開く
+      expect(herald.cooldowns[2]).toBe(5);
       expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "atk")).toBe(true);
       expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "spd")).toBe(true);
       // 倒すと強くなる仕掛けは残す(値は小さくした)
@@ -451,9 +458,44 @@ describe("遺跡", () => {
     expect(findRuinFloor("POWER", 5)!.enemies[1].skills![2].description).toContain("解除1個で攻撃力UP");
   });
 
-  it("力の遺跡4・5階の指揮兵器だけ、戦線圧迫が回復を阻害する(1〜3階は元のまま)", () => {
-    const healBlock = (floor: number) => findRuinFloor("POWER", floor)!.enemies[0].skills!.some((s) => s.effects.some((e) => e.kind === "HEAL_BLOCK"));
-    expect([1, 2, 3, 4, 5].map(healBlock)).toEqual([false, false, false, true, true]);
+  it("力の遺跡: 回復阻害は持たない(回復を選んだ編成だけへの税になったので取りやめた)", () => {
+    for (const f of ruinFloors("POWER")) {
+      expect(f.enemies.some((e) => e.skills?.some((sk) => sk.effects.some((ef) => ef.kind === "HEAL_BLOCK"))), `${f.floor}階`).toBe(false);
+    }
+  });
+
+  it("力の遺跡4・5階の指揮兵器だけが、長期戦の決着(battleDamageRamp)を持つ", () => {
+    const ramp = (kind: "POWER" | "GUARDIAN", floor: number) => buildDungeonEnemyTeam(findRuinFloor(kind, floor)!).some((d) => d.bossTraits?.battleDamageRamp);
+    expect([1, 2, 3, 4, 5].map((f) => ramp("POWER", f))).toEqual([false, false, false, true, true]);
+    expect([1, 2, 3, 4, 5].map((f) => ramp("GUARDIAN", f))).toEqual([false, false, false, false, false]);
+    expect(buildDungeonEnemyTeam(findRuinFloor("POWER", 5)!)[0].bossTraits?.battleDamageRamp).toEqual(POWER_RUIN_DAMAGE_RAMP);
+    // 遺跡のほかに、この特性を書いているデータは無い(塔・ダンジョン・アリーナの戦闘は1つも変わらない)
+    const dataDir = new URL("../src/data/", import.meta.url);
+    const offenders = readdirSync(dataDir, { recursive: true }).map(String).filter((file) => file.endsWith(".ts") && file !== "ruins.ts")
+      .filter((file) => readFileSync(new URL(file, dataDir), "utf8").includes("battleDamageRamp"));
+    expect(offenders).toEqual([]);
+  });
+
+  it("エンジン: 敵の特性の battleDamageRamp は、組み立て側が同じ damageRamp を渡したのと同じ経過になる。組み立て側の指定が優先する", () => {
+    const floor = findRuinFloor("POWER", 5)!;
+    const withTrait = buildDungeonEnemyTeam(floor);
+    const withoutTrait = withTrait.map((d) => ({ ...d, bossTraits: d.bossTraits?.battleDamageRamp ? {} : d.bossTraits }));
+    const runWith = (enemies: MonsterDefinition[], options: { damageRamp?: typeof POWER_RUIN_DAMAGE_RAMP }) => {
+      let seed = 7;
+      const rng = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      const engine = new BattleEngine([dummy(), dummy()], enemies, { rng, maxTurns: 300, ...options });
+      const result = engine.run();
+      return `${result.winner}:${result.turnsTaken}:${engine.getUnits().map((u) => u.currentHp).join(",")}`;
+    };
+    // 特性から拾った長期戦のダメージ増 = 組み立て側から同じ設定を渡した場合
+    expect(runWith(withTrait, {})).toBe(runWith(withoutTrait, { damageRamp: POWER_RUIN_DAMAGE_RAMP }));
+    // 特性が無ければ、長期戦のダメージ増は掛からない(従来どおり)
+    const noRamp = new BattleEngine([dummy()], withoutTrait, { rng: () => 0.5 }) as unknown as { damageRamp?: unknown };
+    expect(noRamp.damageRamp).toBeUndefined();
+    // 組み立て側の指定(アリーナなど)があれば、そちらを使う
+    const arenaLike = { afterTurns: 20, everyTurns: 10, factorPerStep: 1.25 };
+    const both = new BattleEngine([dummy()], withTrait, { rng: () => 0.5, damageRamp: arenaLike }) as unknown as { damageRamp?: unknown };
+    expect(both.damageRamp).toEqual(arenaLike);
   });
 
   it("守護の遺跡: 身代わり像が霊獣のダメージを階ごとの割合で肩代わりし、解除で剥がれる", () => {
