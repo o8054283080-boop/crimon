@@ -8,7 +8,8 @@
  *   npx tsx tools/ruinPressure.ts                     # 5階・全編成・STRONG/FINISHED
  *   npx tsx tools/ruinPressure.ts --floors 1,2,3,4,5 --gear TYPICAL,STRONG --trials 200
  *   npx tsx tools/ruinPressure.ts --size 4            # 4体で測る(本編はダンジョン編成の5体)
- *   npx tsx tools/ruinPressure.ts --aim 既定,本体,号令塔,妨害塔 --teams 力
+ *   npx tsx tools/ruinPressure.ts --aim 既定,本体,号令塔,妨害塔 --teams 力・
+ *   (`--teams` は名前の部分一致。「力」だけだと「守護・別解 防御DOWN+火力」も拾うので「力・」と書く)
  *
  * ## 狙い(`--aim`)を必ず2通りで測る
  *

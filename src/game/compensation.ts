@@ -1,4 +1,4 @@
-import { PlayerState, addMonster } from "./playerState.js";
+import { PlayerState, addMonster, type SaveOrigin } from "./playerState.js";
 import {
   COLLAB_EVENT_FROM_DATE, COLLAB_EVENT_TO_DATE, COLLAB_GIFT_DEX_ID,
 } from "../data/collabEvent.js";
@@ -1023,15 +1023,27 @@ export interface CompensationClaim {
 /**
  * このセーブが**今日はじめて開かれたものか**。
  *
- * 初回起動日は持っていないので、ログインボーナスを一度も受け取っていないことで見る。
- * ログインボーナスは起動のたびに必ず受け取られるので、一度でも遊んだセーブは
- * ここが偽になる。**ログインボーナスより先に聞くこと**(受け取った瞬間に偽になる)。
+ * **保存データが最初から無かった**(`origin === "NEW"`)ことで決める。
+ * 出どころは `startupSaveOrigin()`(ページで最初にセーブを読んだ時の結果)を渡す。
  *
- * セーブの中身だけで決めるのは、経験値のお詫び(`expBalanceCompensation.ts`)が
- * main より先に初期セーブを書き込むため。「保存が無かった」では見分けられない。
+ * ## セーブの中身だけで決めない
+ *
+ * 前は「ログインボーナスを一度も受け取っていない」だけで見ていた。これだと
+ * **ログインボーナスが入る前のセーブを持ち、それ以来開いていない人**が、
+ * 久しぶりに開いた日に「はじめて」と誤判定され、お知らせが全部既読になり、
+ * 過去の更新も札に出なくなる。
+ *
+ * 壊れたセーブから作り直した人(`REBUILT`)も含めない。前から遊んでいた人なので、
+ * 誤って既読にするより、今までどおり全部見せる方が安全。
+ *
+ * ログインボーナスの条件は「かつ」で残す。同じページの中で2回目に聞かれても
+ * (受け取った後なら)偽になるように。**ログインボーナスより先に聞くこと。**
  */
-export function isFirstLaunch(state: Pick<PlayerState, "lastLoginBonusAt" | "loginBonusClaimCount">): boolean {
-  return state.lastLoginBonusAt === null && (state.loginBonusClaimCount ?? 0) === 0;
+export function isFirstLaunch(
+  state: Pick<PlayerState, "lastLoginBonusAt" | "loginBonusClaimCount">,
+  origin: SaveOrigin | null,
+): boolean {
+  return origin === "NEW" && state.lastLoginBonusAt === null && (state.loginBonusClaimCount ?? 0) === 0;
 }
 
 export interface ClaimCompensationsOptions {

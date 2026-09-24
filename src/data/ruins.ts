@@ -4,7 +4,8 @@
  * ## 2つの遺跡の違い
  *
  *   力の遺跡(火) … 指揮兵器を倒せば勝ち。取り巻きの塔は**倒すと本体を強くする。**
- *                   放っておけば号令と妨害が続き、倒せば本体が化ける——どちらを選ぶかの場所。
+ *                   4階からは、号令塔が生きている間は指揮兵器を守り続ける(被ダメ軽減と強化)。
+ *                   残せば守られた本体と戦い、倒せば守りが外れる代わりに本体が化ける——どちらを選ぶかの場所。
  *                   落ちるアクセは 攻撃 / 妨害 が半々。
  *   守護の遺跡(水) … 霊獣を倒せば勝ち。身代わり像が**霊獣が受けるダメージを肩代わりする。**
  *                   身代わりは強化扱いなので、解除で剥がせる。像を先に倒してもよい。
@@ -23,7 +24,7 @@ import { Element } from "../core/element.js";
 import type { AccessoryFamily, AccessoryRarity, AccessoryStar } from "../core/accessory.js";
 import type { BossTraits } from "../core/monster.js";
 import type { Skill } from "../core/skill.js";
-import { ATK_UP } from "../core/statusValues.js";
+import { ATK_UP, SPD_UP } from "../core/statusValues.js";
 import type { DungeonEnemy } from "./equipmentDungeon.js";
 import {
   ANCIENT_BEAST, ANCIENT_CRYSTAL, ANCIENT_CRYSTAL_CURSE, ANCIENT_DEMON, ANCIENT_GUARD_BEAST, ANCIENT_FANG_BEAST,
@@ -78,21 +79,33 @@ const SHARED_STATS: Record<1 | 2 | 3, { boss: Quad; a: Quad; b: Quad }> = {
 };
 
 /*
- * 力の遺跡の4・5階は、依頼書の指定値(5階の指揮兵器 510000/9000/3150/210)から
- * **HPを約半分・攻撃力を約3.8倍(塔は3倍)・指揮兵器の速さ+15** にしてある。
+ * 力の遺跡の4・5階。**「塔を倒すか残すか」が本物の選択になるように組んである。**
  *
- * 指定値のままだと敵が味方をほとんど倒せず、5階STRONGで汎用も制圧も100%だった
- * (目安は 汎用約12% / 水の制圧約98%)。HPを据え置いて攻撃力だけ上げると、
- * 毒で割合を削る汎用より、属性で押す制圧の方が先に崩れた。
- * 「属性を合わせれば通る・合わせないと押し潰される」が出るのは、HPを下げて攻撃力を上げた形だけだった。
- * 撃破時強化(POWER_DEATH_BUFF)を攻撃力に比例させると制圧だけが落ちたので、据え置いている。
- * 測り方: `npx tsx tools/ruinPressure.ts --teams 力 --floors 4,5 --gear TYPICAL,STRONG,FINISHED`
+ * 以前は号令塔・妨害塔が生きていても本体はほとんど得をせず、倒すと本体が強くなるだけだった。
+ * そのため**本体だけを狙うのが常に正解**で、5階STRONGの汎用は
+ * 既定の狙い(放置周回と同じ)19% / 本体を狙い撃ち94% と、同じ階が2つの難しさに割れていた。
+ *
+ * いまの形:
+ *   - 号令塔は生きている間、指揮兵器へ「攻撃力UP・速さUP・被ダメ60%軽減」を張り続ける
+ *     (HERALD_GUARD_SKILLS。強化扱いなので解除で剥がせる。毒・火傷は軽減されない)
+ *   - 塔は脆くした(号令塔HP 1/4・妨害塔HP 2/5)。倒す手間が小さいぶん、倒すかどうかを選べる
+ *   - 撃破時強化は小さくした(POWER_DEATH_BUFF)。倒すと本体は強くなるが、守りも外れる
+ *   - 指揮兵器は会心率を高くし(80%)、HPを0.85倍・攻撃力を1.15倍にした。会心は属性で効き方が変わる
+ *     (火→水は会心率-15ptで、かすった攻撃は会心しない)ので、**水で揃えた方が受ける痛手が小さい**
+ *
+ * 5階STRONG(5体・200戦)で 汎用 既定27% / 本体狙い23% / 号令塔先落とし30%、
+ * 通常モンスターの水 40% / 13% / 52%、制圧(水・SR/SSR)94% / 97% / 94%。
+ * 解除(草ウルフの「いあつ」)を持つ汎用は本体を狙っても戦えるが、解除の無い水の通常編成は
+ * 号令塔を先に落とすのが正解になる。
+ * 測り方: `npx tsx tools/ruinPressure.ts --teams 力・ --floors 4,5 --gear TYPICAL,STRONG,FINISHED --aim 既定,本体,号令塔`
  */
 const POWER_STATS: Record<number, { boss: Quad; a: Quad; b: Quad }> = {
   ...SHARED_STATS,
-  4: { boss: [225_000, 30_000, 3_150, 216], a: [80_000, 4_650, 2_100, 195], b: [60_000, 7_050, 1_700, 188] },
-  5: { boss: [255_000, 34_000, 3_150, 225], a: [90_000, 5_400, 2_200, 205], b: [72_000, 7_800, 1_800, 200] },
+  4: { boss: [191_250, 34_500, 3_150, 216], a: [20_000, 4_650, 2_100, 195], b: [24_000, 7_050, 1_700, 188] },
+  5: { boss: [216_750, 39_100, 3_150, 225], a: [22_500, 5_400, 2_200, 205], b: [28_800, 7_800, 1_800, 200] },
 };
+/** 力の遺跡4・5階の指揮兵器の会心率。1〜3階は図鑑(古代の魔人)のまま */
+const POWER_COMMANDER_CRI_RATE = 0.8;
 
 const GUARDIAN_STATS: Record<number, { boss: Quad; a: Quad; b: Quad }> = {
   ...SHARED_STATS,
@@ -105,8 +118,10 @@ export const POWER_DEATH_BUFF: Record<number, { atk: number; spd: number }> = {
   1: { atk: 200, spd: 5 },
   2: { atk: 850, spd: 15 },
   3: { atk: 2_000, spd: 30 },
-  4: { atk: 3_000, spd: 50 },
-  5: { atk: 4_500, spd: 75 },
+  // 4・5階は号令塔が生きている間の守り(HERALD_GUARD_SKILLS)と対で決めてある。
+  // 以前の 3000/50・4500/75 では、塔を倒すことが常に損だった
+  4: { atk: 1_000, spd: 15 },
+  5: { atk: 1_500, spd: 20 },
 };
 
 /** 守護の遺跡: 身代わり像が肩代わりする割合 */
@@ -157,6 +172,28 @@ const HERALD_SKILLS: [Skill, Skill, Skill] = [
     description: "味方単体の攻撃力を2ターン上昇させる。",
     target: "SINGLE_ALLY", cooldownTurns: 4,
     effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }],
+  },
+];
+
+/**
+ * 4・5階の号令塔。**生きている間は指揮兵器を守り続ける。**
+ *
+ * 3番目の技を、指揮兵器へ攻撃力UP・速さUP・被ダメ軽減を張る技に替えた。
+ * 持続4・CT3で、塔が生きている限り守りが途切れない(開幕すぐに張る)。
+ * 攻撃力UPを含むので、狙い先は支援AIの主要対象(`primaryTarget` の指揮兵器)になる。
+ */
+const HERALD_GUARD_SKILLS: [Skill, Skill, Skill] = [
+  HERALD_SKILLS[0],
+  HERALD_SKILLS[1],
+  {
+    id: "ruin_herald_s3_guard", name: "指揮の護り",
+    description: "指揮兵器の攻撃力と速さを4ターン上昇させ、受けるダメージを4ターン60%軽減する。",
+    target: "SINGLE_ALLY", cooldownTurns: 3,
+    effects: [
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 },
+      { kind: "MITIGATE", amount: 0.6, durationTurns: 4 },
+      { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 4 },
+    ],
   },
 ];
 
@@ -292,25 +329,31 @@ function buildPowerFloor(floor: number): RuinFloor {
   const element = RUIN_ELEMENT.POWER;
   const stats = POWER_STATS[floor];
   const buff = POWER_DEATH_BUFF[floor];
+  // 号令塔の守りと会心寄りの指揮兵器は4・5階だけ。1〜3階は両遺跡で共通の作りのまま
+  const guarded = floor >= 4;
   return {
     kind: "POWER", floor, name: `${RUIN_NAME.POWER} ${floor}階`,
     powerScale: 1, speedScale: 1,
     stamina: STAMINA[floor],
     rarityWeights: RARITY_WEIGHTS[floor], starWeights: STAR_WEIGHTS[floor],
     cores: CORES[floor], shards: SHARDS[floor], bonus: BONUS[floor],
-    note: "指揮兵器を倒せば勝ち。塔を倒すと指揮兵器が強くなる(号令塔は攻撃力、妨害塔は速さ)。",
+    note: guarded
+      ? "指揮兵器を倒せば勝ち。号令塔は生きている間、指揮兵器を守り続ける(解除で剥がせる)。塔を倒すと守りは外れるが、指揮兵器が強くなる(号令塔は攻撃力、妨害塔は速さ)。"
+      : "指揮兵器を倒せば勝ち。塔を倒すと指揮兵器が強くなる(号令塔は攻撃力、妨害塔は速さ)。",
     enemies: [
       {
         templateId: ANCIENT_DEMON.templateId, element, star: 6, level: 60,
         displayName: "指揮兵器", isBoss: true, victoryTarget: true, primaryTarget: true,
-        fixedStats: fixed(stats.boss), skills: COMMANDER_SKILLS, bossTraits: NO_TRAITS, initialCooldowns: [0, 2, 3],
+        fixedStats: guarded ? { ...fixed(stats.boss), criRate: POWER_COMMANDER_CRI_RATE } : fixed(stats.boss),
+        skills: COMMANDER_SKILLS, bossTraits: NO_TRAITS, initialCooldowns: [0, 2, 3],
         // 戦い方は古代の魔人を借り、姿だけ専用の絵(ruin_commander-FIRE.webp)
         artTemplateId: "ruin_commander",
       },
       {
         templateId: ANCIENT_CRYSTAL.templateId, element, star: 6, level: 60,
-        displayName: "号令塔", fixedStats: fixed(stats.a), skills: HERALD_SKILLS,
-        bossTraits: { empowerBossOnDeath: { atk: buff.atk } }, initialCooldowns: [0, 1, 2],
+        displayName: "号令塔", fixedStats: fixed(stats.a), skills: guarded ? HERALD_GUARD_SKILLS : HERALD_SKILLS,
+        // 守りは開幕すぐに張る(3番目のCTを0で始める)
+        bossTraits: { empowerBossOnDeath: { atk: buff.atk } }, initialCooldowns: guarded ? [0, 1, 0] : [0, 1, 2],
       },
       {
         templateId: ANCIENT_CRYSTAL_CURSE.templateId, element, star: 6, level: 60,

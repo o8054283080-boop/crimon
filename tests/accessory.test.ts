@@ -370,10 +370,15 @@ describe("遺跡", () => {
     const p5 = findRuinFloor("POWER", 5)!;
     // 力の遺跡の4・5階は、依頼主の指示(「力の遺跡をつよくして目標に近づけて」)で
     // 指定値(本体 510000/9000/3150/210)から HPを約半分・攻撃力を約3.8倍・本体の速さ+15 にした。
-    // 経緯と計測は docs/handoff.md
+    // そのうえで「塔を倒すと必ず損」(既定の狙い19% / 本体を狙い撃ち94%)を直すため、
+    // 号令塔に守りを持たせ、塔を脆く(号令塔1/4・妨害塔2/5)、指揮兵器を会心寄り(HP0.85倍・攻撃1.15倍・会心80%)にした。
+    // 計測は src/data/ruins.ts の POWER_STATS の注記と tools/ruinPressure.ts
     expect(p5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
-      [255_000, 34_000, 3_150, 225], [90_000, 5_400, 2_200, 205], [72_000, 7_800, 1_800, 200],
+      [216_750, 39_100, 3_150, 225], [22_500, 5_400, 2_200, 205], [28_800, 7_800, 1_800, 200],
     ]);
+    expect(p5.enemies[0].fixedStats!.criRate).toBe(0.8);
+    // 1〜3階は両遺跡で共通の作りのまま(会心率は図鑑どおり)
+    expect(findRuinFloor("POWER", 3)!.enemies[0].fixedStats!.criRate).toBeUndefined();
     const g5 = findRuinFloor("GUARDIAN", 5)!;
     expect(g5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
       [830_000, 9_000, 3_400, 198], [1_250_000, 1_900, 3_000, 210], [165_000, 1_700, 2_400, 204],
@@ -408,6 +413,26 @@ describe("遺跡", () => {
       expect(boss.flatStatBonus.atk).toBe(POWER_DEATH_BUFF[floor].atk);
       expect(boss.flatStatBonus.spd).toBe(POWER_DEATH_BUFF[floor].spd);
     }
+  });
+
+  it("力の遺跡4・5階: 号令塔は生きている間、指揮兵器へ攻撃力UP・速さUP・被ダメ軽減を張る(1〜3階は張らない)", () => {
+    for (const floor of [4, 5]) {
+      const { engine, units } = ruinEngine("POWER", floor);
+      const [, boss, herald] = units;
+      // 開幕すぐに張れる(3番目のCTが0で始まる)
+      expect(herald.cooldowns[2]).toBe(0);
+      herald.gauge = 100;
+      engine.resolveTurn(herald);
+      expect(boss.mitigateAmount).toBe(0.6);
+      expect(boss.mitigateTurns).toBe(4);
+      expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "atk")).toBe(true);
+      expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "spd")).toBe(true);
+      // 倒すと強くなる仕掛けは残す(値は小さくした)
+      expect(POWER_DEATH_BUFF[floor].atk).toBeGreaterThan(0);
+      expect(POWER_DEATH_BUFF[floor].spd).toBeGreaterThan(0);
+    }
+    const { units } = ruinEngine("POWER", 3);
+    expect(units[2].def.skills.some((s) => s.effects.some((e) => e.kind === "MITIGATE"))).toBe(false);
   });
 
   it("守護の遺跡: 身代わり像が霊獣のダメージを階ごとの割合で肩代わりし、解除で剥がれる", () => {

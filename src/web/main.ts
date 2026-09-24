@@ -106,6 +106,7 @@ import {
   MAX_DUNGEON_PARTY_SIZE,
   getParty,
   loadPlayerState,
+  startupSaveOrigin,
   normalizeLoadedState,
   removeMonsters,
   savePlayerState,
@@ -863,7 +864,8 @@ let persistState: PersistState = "UNSUPPORTED";
   });
 
   // **ログインボーナスより先に聞く。**受け取った瞬間に「はじめて」ではなくなる
-  const firstLaunch = isFirstLaunch(state.player);
+  // 「はじめて」は**保存データが最初から無かったか**で見る(`startupSaveOrigin`)
+  const firstLaunch = isFirstLaunch(state.player, startupSaveOrigin());
   const loginBonus = claimDailyLoginBonus(state.player);
   if (loginBonus.claimed) {
     state.loginBonusResult = loginBonus;
