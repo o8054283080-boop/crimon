@@ -129,6 +129,25 @@ function expiredNotice(): void {
   }
 }
 
+async function syncAdminSnapshot(): Promise<void> {
+  const last = Number(localStorage.getItem(ADMIN_SNAPSHOT_LAST_ATTEMPT_KEY) ?? "0");
+  if (Number.isFinite(last) && last > 0 && Date.now() - last < ADMIN_SNAPSHOT_MS) return;
+  const save = currentSaveEnvelope();
+  if (!save) return;
+  const token = await arenaAuthAccessToken();
+  if (!token) return;
+  try {
+    const response = await fetch("https://plufhhhxokqgedlyfsfz.supabase.co/functions/v1/crimon-player-snapshot", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ save }),
+    });
+    if (response.ok) localStorage.setItem(ADMIN_SNAPSHOT_LAST_ATTEMPT_KEY, String(Date.now()));
+  } catch {
+    // 管理用控えの失敗でゲーム本体や復旧保存を止めない。
+  }
+}
+
 async function syncNow(showUnchanged = false, scheduled = false): Promise<void> {
   if (syncRunning || conflictDetected) return;
   const stored = readCloudMeta();
