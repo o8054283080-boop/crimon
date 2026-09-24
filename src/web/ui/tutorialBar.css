@@ -343,7 +343,10 @@
  * 案内は見出しの真下にあり、巻き戻せば必ず出てくる。
  */
 .screen > .tutorial-bar[data-tutorial-bar] {
-  position: static;
+  /* 流れの中のまま、重ね順だけ持つ。召喚の祭壇の絵は上へはみ出して描くので、
+     順を持たないと「移動する」の上に宝珠が乗る */
+  position: relative;
+  z-index: 30;
 }
 
 /*

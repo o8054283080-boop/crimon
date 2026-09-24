@@ -114,7 +114,7 @@ describe("案内帯は見出しの下。題名を切らない", () => {
     const bar = read("ui/tutorialBar.css");
     const at = bar.indexOf(".screen > .tutorial-bar[data-tutorial-bar] {");
     const body = bar.slice(at, bar.indexOf("}", at));
-    expect(body).toContain("position: static;");
+    expect(body).not.toMatch(/position:\s*(sticky|fixed|absolute)/);
   });
 });
 
