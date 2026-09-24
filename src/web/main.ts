@@ -179,7 +179,7 @@ import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations, isFirstLaunch } from "../game/compensation.js";
 import { markAllNoticesRead } from "./noticeUi.js";
-import { attachScreenBack } from "./views/managementHeader.js";
+import { attachScreenBack, screenHeader } from "./views/managementHeader.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
 import { RankingTab, renderRankings } from "./views/rankings.js";
@@ -4215,10 +4215,24 @@ function mountTutorialBar(content: HTMLElement): void {
  * 自前の戻り口を持つ画面と2つ並び、巻くと案内帯の上に重なっていた。
  */
 function mountScreenBack(content: HTMLElement): void {
-  const head = content.querySelector<HTMLElement>(":scope > [data-screen-head]");
-  if (!head || !canGoBack()) return;
-  attachScreenBack(head, goBack);
+  if (!canGoBack()) return;
+  let head = content.querySelector<HTMLElement>(":scope > [data-screen-head]");
+  /*
+   * 帯を持たない画面(戦闘の結果・周回の結果)にも、前は浮いた「戻る」が出ていた。
+   * 帯へ移したせいで**そこだけ出口が消えない**よう、題だけの帯を足して同じ所に置く。
+   */
+  if (!head && content.classList.contains("screen")) {
+    head = screenHeader(FALLBACK_HEAD_TITLES[state.screen] ?? "");
+    content.prepend(head);
+  }
+  if (head) attachScreenBack(head, goBack);
 }
+
+/**
+ * 自前の見出しを持たない画面に足す帯の題。
+ * 結果画面は中央に大きな「勝利 / 周回結果」を持っているので、帯の題は空にする(2つ並べない)
+ */
+const FALLBACK_HEAD_TITLES: Partial<Record<ScreenName, string>> = {};
 
 /** 前景画面には触れず、周回の帯だけを差分更新する。 */
 function refreshBackgroundFarmStatus(): void {

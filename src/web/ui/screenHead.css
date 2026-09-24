@@ -44,6 +44,8 @@
   align-items: center;
   gap: 10px;
   min-height: var(--screen-head-h);
+  /* 中身を中央へ寄せる画面(結果画面)でも、帯は横いっぱい */
+  align-self: stretch;
   margin: 0;
   padding: var(--screen-head-safe) 0 0;
   background: var(--screen-head-bg);
