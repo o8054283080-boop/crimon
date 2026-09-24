@@ -298,6 +298,12 @@ export function ensureArenaAuth(): Promise<ArenaSession | null> {
   return inFlight;
 }
 
+/** 現在有効なアクセストークン。管理用スナップショット等、本人認証が必要な通信だけに使う。 */
+export async function arenaAuthAccessToken(): Promise<string | null> {
+  const current = await ensureArenaAuth();
+  return current?.accessToken ?? null;
+}
+
 /** いま分かっている `auth.uid()`。まだログインしていなければ null */
 export function arenaAuthUserId(): string | null {
   if (session) return session.userId;
