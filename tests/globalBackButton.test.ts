@@ -65,11 +65,16 @@ describe("戻るは見出し帯の左端に1つだけ", () => {
   });
 
   /*
-   * 帯の地は影で画面の端まで伸ばしている。**下へ逃がすと、真下の案内帯の題名に被さる**
-   * (実際に「最初の召喚」の上半分が隠れた)。切り抜きの下端は0。
+   * 帯の地は画面の端まで伸ばす。**影(box-shadow)で伸ばすと四方へ同じだけ伸び**、
+   * 下を開けると真下の案内帯の題名に被さった(「最初の召喚」の上半分が隠れた)。
+   * 下を切ると、巻いた時に真下の札の縁(案内帯の緑)が罫のすぐ下からのぞいた。
+   * `border-image` の外へのはみ出しは描くだけで、巻物の大きさにも押す判定にも数えない。
+   * 下へは8pxのぼかしだけを出す(地の色の塊を出さない)。
    */
-  it("帯の地は下へはみ出さない", () => {
-    expect(css).toContain("clip-path: inset(0 -100vmax);");
+  it("帯の地は横へは端まで、下へはぼかし8pxだけ", () => {
+    expect(css).not.toContain("box-shadow: 0 0 0 100vmax");
+    expect(css).toContain("border-image-outset: 0 100vmax 8px;");
+    expect(css).toContain("rgba(11, 14, 32, 0) 100%");
   });
 
   it("画面の中に、2つ目の戻り口(◀ … に戻る / ‹ 一覧)を置かない", () => {
@@ -129,10 +134,48 @@ describe("下のバーはどの画面でも同じ絵", () => {
     expect(pop).not.toContain("body:has(.crimon-home) .bottom-nav,");
   });
 
+  /*
+   * **今いるタブに印を付ける。**金の絵の上では文字の色が変わるだけで、
+   * モンスター画面にいても「モンスター」が選ばれて見えなかった(判定役の指摘)。
+   */
+  it("今いるタブは枠で囲む", () => {
+    const pop = read("home-pop-design.css");
+    const at = pop.indexOf("body .bottom-nav__btn--active::after {");
+    expect(at, "今いるタブの印が無い").toBeGreaterThan(-1);
+    const body = pop.slice(at, pop.indexOf("}", at));
+    expect(body).toMatch(/border: [\d.]+px solid/);
+    expect(body).toContain("pointer-events: none;");
+  });
+
+  /*
+   * 実機の下34pxぶん絵を引き伸ばすと、文字が絵の意匠の上に乗って読めなかった。
+   * 絵は safe-area を除いた上の部分だけに敷く。
+   */
+  it("絵は safe-area を除いた部分だけに敷く", () => {
+    const pop = read("home-pop-design.css");
+    expect(pop).toContain("center top / 100% calc(100% - var(--nav-safe)) no-repeat");
+    expect(pop).toContain("padding: 0 0 var(--nav-safe) !important;");
+  });
+
   /** ホーム以外の `--bottom-nav-h` は safe-area 抜き。バーの側で足さないと実機で沈む */
   it("ホーム以外でも下の safe-area を足す", () => {
     const pop = read("home-pop-design.css");
     expect(pop).toContain("height: calc(var(--bottom-nav-h) + var(--bottom-nav-safe, env(safe-area-inset-bottom, 0px))) !important;");
     expect(pop).toContain("--bottom-nav-safe: 0px;");
+  });
+});
+
+/*
+ * 編成の駒(`.party-current`)は `sticky` + `top` を書いていたが、後から読まれる
+ * `.panel` の `position: relative` に負けて貼り付きは効かず、**`top` のぶん札が下へずれて**
+ * 「所持モンスター」の見出しと「絞り込み」を覆っていた(見出し帯を入れた時に 16px → 58px)。
+ */
+describe("編成の駒は流れの中", () => {
+  it("top で札をずらさない", () => {
+    const css = read("style.css");
+    const at = css.indexOf(".party-current {");
+    const body = css.slice(at, css.indexOf("}", at));
+    expect(body).not.toMatch(/(^|\s)top:/);
+    expect(body).not.toContain("position: sticky");
   });
 });
