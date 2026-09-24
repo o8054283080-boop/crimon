@@ -93,6 +93,8 @@ export interface EquipmentProps {
    * 並び順・絞り込みを変えた時に組み直す(`null` を渡すと組み直し)。
    */
   orderIds: readonly string[] | null;
+  /** 見出しの直後に出す切り替え(装備 / アクセサリー)。着ける装備を選ぶ画面では出さない */
+  tabs?: HTMLElement;
   onToggleSelecting: () => void;
   onToggleSelected: (equipmentId: string) => void;
   onSelectAllShown: (ids: string[]) => void;
@@ -691,6 +693,7 @@ function renderList(props: EquipmentProps): HTMLElement {
       el("h1", {}, ["所持装備"]),
       el("p", { className: "app-subtitle" }, [`${items.length}個`]),
     ]),
+    props.pickerContext ? null : (props.tabs ?? null),
     toolbar,
     // 枠の行は picker では出さない。**その枠に着く物しか並んでいない**
     props.pickerContext ? null : renderSlotFilterRow(props),

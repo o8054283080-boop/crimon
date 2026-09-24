@@ -55,6 +55,7 @@ const SCREENS = [
   },
   { name: "モンスター", tab: "MONSTERS" },
   { name: "装備", tab: "EQUIPMENT" },
+  { name: "装備/アクセサリー", tab: "EQUIPMENT", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openGearAccessoryTabForDev()" },
   { name: "召喚", tab: "SUMMON" },
   { name: "ショップ", tab: "SHOP" },
   /*
