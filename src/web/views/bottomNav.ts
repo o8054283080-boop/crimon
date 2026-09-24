@@ -25,8 +25,6 @@ export type ScreenName =
   | "ACCESSORIES"
   /** 古代のカケラでの製作 */
   | "ANCIENT_CRAFT"
-  /** 限界能力付与 */
-  | "LIMIT_BREAK"
   | "MONSTER_DEX"
   | "MONSTER_EXCHANGE"
   | "MONSTER_STORAGE"

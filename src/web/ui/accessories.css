@@ -321,9 +321,16 @@
 
 .limit-row__name { font-size: 13px; color: #eef2ff; min-width: 0; }
 .limit-row__name small { display: block; font-size: 11px; color: #9fb0d8; }
+.limit-row__effect { margin-left: 6px; font-size: 13px; font-variant-numeric: tabular-nums; color: #9fb0d8; }
 .limit-row__value { text-align: center; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.limit-row__value--plus { color: #9ff0b8; }
-.limit-row__value--minus { color: #ff9f8a; }
+/* 足した行は緑、**削った行は赤**(依頼主の指定)。値も実際の増減も同じ色にそろえる */
+.limit-row--plus { border-color: rgba(120, 220, 150, 0.45); }
+.limit-row--plus .limit-row__value,
+.limit-row--plus .limit-row__effect { color: #8ff0a8; }
+.limit-row--minus { border-color: rgba(255, 90, 90, 0.6); background: rgba(50, 12, 16, 0.92); }
+.limit-row--minus .limit-row__value,
+.limit-row--minus .limit-row__effect { color: #ff6b6b; }
+.limit-panel { display: grid; gap: 8px; }
 
 .limit-row .btn {
   min-height: 44px;
@@ -343,15 +350,4 @@
 }
 
 .limit-total--bad { color: #ff9f8a; }
-
-.monster-detail-accessory__actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.monster-detail-accessory__actions .btn {
-  min-height: 44px;
-  white-space: normal;
-}
+.limit-total__minus { color: #ff6b6b; font-weight: 700; }

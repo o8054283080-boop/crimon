@@ -266,7 +266,7 @@ import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
 import { buyCrystalShopItem, crystalShopRows } from "../game/crystalShop.js";
 import type { Accessory } from "../core/accessory.js";
 import type { Equipment as CraftedEquipment } from "../core/equipment.js";
-import type { AbilityPointAllocation } from "../core/monsterDevelopment.js";
+import { type AbilityPointAllocation, LIMIT_POINT_MAX_PLUS } from "../core/monsterDevelopment.js";
 import { findRuinFloorByLocationId, ruinLocationId, type RuinFloor, type RuinKind } from "../data/ruins.js";
 import { grantRuinReward, isRuinFloorCleared, isRuinFloorUnlocked, type RuinReward } from "../game/ruins.js";
 import {
@@ -278,7 +278,6 @@ import { accessoryTitle, describeSpecial, generateAccessory as generateAccessory
 import { renderRuins } from "./views/ruins.js";
 import { renderAccessories } from "./views/accessories.js";
 import { renderAncientCraft } from "./views/ancientCraft.js";
-import { renderLimitBreak } from "./views/limitBreak.js";
 
 let appMounted = false;
 let pwaRegistration: ServiceWorkerRegistration | null = null;
@@ -2912,14 +2911,32 @@ function openCraft(): void {
   render();
 }
 
+/**
+ * 限界能力付与を開く。**クリエイトの「能力付与」の中にある**(能力ポイントのすぐ下)。
+ * 単独の画面だった頃の入口(開発用の窓口)もここを通す。
+ */
 function openLimitBreak(monsterId: string): void {
   const monster = state.player.monsters.find((m) => m.id === monsterId);
   if (!monster) return;
-  state.limitTargetId = monsterId;
+  syncLimitDraft(monster, true);
+  state.createTargetId = monsterId;
+  state.createMaterialId = null;
+  state.createSlot = null;
+  state.createNotice = null;
+  state.createMenu = "ABILITY";
+  state.screen = "MONSTER_CREATE";
+  render();
+}
+
+/**
+ * 限界配分の下書きを、いま見ている1体の保存値へ合わせる。
+ * **別の1体へ移った時だけ**読み直す(同じ1体の下書きは、保存前でも消さない)。
+ */
+function syncLimitDraft(monster: MonsterInstance, force = false): void {
+  if (!force && state.limitTargetId === monster.id) return;
+  state.limitTargetId = monster.id;
   state.limitDraft = { ...(monster.development.limitBreak?.points ?? { hp: 0, atk: 0, def: 0, spd: 0 }) };
   state.limitNotice = null;
-  state.screen = "LIMIT_BREAK";
-  render();
 }
 
 /* ==========================================================================
@@ -4760,40 +4777,6 @@ function renderScreen(): void {
       });
       break;
 
-    case "LIMIT_BREAK": {
-      const monster = state.player.monsters.find((m) => m.id === state.limitTargetId);
-      if (!monster) { navigate("MONSTERS"); return; }
-      content = renderLimitBreak({
-        player: state.player,
-        monster,
-        draft: state.limitDraft,
-        notice: state.limitNotice,
-        onUnlock: () => {
-          const result = unlockLimitBreak(state.player, monster.id);
-          if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
-          savePlayerState(state.player);
-          state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 };
-          state.limitNotice = "限界能力付与を解放しました";
-          render();
-        },
-        onChange: (stat, delta) => {
-          const next = Math.max(-50, Math.min(50, state.limitDraft[stat] + delta));
-          state.limitDraft = { ...state.limitDraft, [stat]: next };
-          state.limitNotice = null;
-          render();
-        },
-        onReset: () => { state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 }; render(); },
-        onSave: () => {
-          const result = setLimitPoints(state.player, monster.id, state.limitDraft);
-          if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
-          savePlayerState(state.player);
-          state.limitNotice = "保存しました";
-          render();
-        },
-      });
-      break;
-    }
-
     case "ARENA": {
       if (arenaConnectionStatus === "IDLE") void connectArena().then(() => render());
       const arenaOnline = arenaConnectionStatus === "ONLINE";
@@ -5560,6 +5543,8 @@ function renderScreen(): void {
       }
       const createDex = findMonsterById(createTarget.dexId);
       if (!createDex) { navigate("MONSTERS"); return; }
+      // 限界能力付与の下書き。別の1体へ移った時だけ保存値から読み直す
+      syncLimitDraft(createTarget);
       /*
        * **開くたびに、継承で不適合になった才能を外してptを戻す。**
        * 開かない限り直らない形にすると、クリエイトで技を替えた個体が
@@ -5624,6 +5609,33 @@ function renderScreen(): void {
           if (!setAbilityPoint(createTarget, stat, points)) return;
           savePlayerState(state.player);
           render();
+        },
+        limitBreak: {
+          evolutionCores: state.player.evolutionCores ?? 0,
+          draft: state.limitDraft,
+          notice: state.limitNotice,
+          onUnlock: () => {
+            const result = unlockLimitBreak(state.player, createTarget.id);
+            if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+            savePlayerState(state.player);
+            state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 };
+            state.limitNotice = "限界能力付与を解放しました";
+            render();
+          },
+          onChange: (stat, delta) => {
+            const next = Math.max(-LIMIT_POINT_MAX_PLUS, Math.min(LIMIT_POINT_MAX_PLUS, state.limitDraft[stat] + delta));
+            state.limitDraft = { ...state.limitDraft, [stat]: next };
+            state.limitNotice = null;
+            render();
+          },
+          onReset: () => { state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 }; state.limitNotice = null; render(); },
+          onSave: () => {
+            const result = setLimitPoints(state.player, createTarget.id, state.limitDraft);
+            if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+            savePlayerState(state.player);
+            state.limitNotice = "保存しました";
+            render();
+          },
         },
         onConfirmAbilityPoints: () => {
           /*
@@ -5986,7 +5998,6 @@ function renderMonstersScreen(): HTMLElement {
     dense: state.monsterListDense,
     onToggleDense: handleToggleMonsterListDense,
     onOpenAccessorySlot: (monsterId) => openAccessories(monsterId),
-    onOpenLimitBreak: openLimitBreak,
   });
 }
 
