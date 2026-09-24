@@ -275,7 +275,8 @@ body .crimon-bottom-nav {
   box-sizing: border-box !important;
   align-items: stretch !important;
   gap: 0 !important;
-  padding: 0 !important;
+  /* ボタンは safe-area の上で終わる(ホームは下の指定で最低6pxを持つ) */
+  padding: 0 0 var(--nav-safe) !important;
   border: 0 !important;
   /*
    * **絵は safe-area を除いた上の部分だけに敷く。**全体へ引き伸ばすと、実機の下34px
@@ -347,7 +348,7 @@ body .bottom-nav__icon {
 body .bottom-nav__label {
   position: absolute !important;
   right: 2px !important;
-  bottom: calc(7px + var(--nav-safe, 0px)) !important;
+  bottom: 7px !important;
   left: 2px !important;
   display: block !important;
   min-height: 0 !important;
@@ -383,7 +384,7 @@ body .bottom-nav__btn--active::after {
   z-index: 0;
   top: 9%;
   right: 7%;
-  bottom: calc(3px + var(--nav-safe, 0px));
+  bottom: 3px;
   left: 7%;
   border: 1.5px solid rgba(255, 220, 140, .92);
   border-radius: 11px;
