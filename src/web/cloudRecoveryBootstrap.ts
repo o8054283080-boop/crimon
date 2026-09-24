@@ -18,7 +18,9 @@ import {
   uploadCloudSave,
   type CloudSaveEnvelope,
 } from "../game/cloudRecovery.js";
-import { arenaAuthAccessToken, arenaAuthUserId } from "../net/arenaAuth.js";
+import { arenaAuthUserId } from "../net/arenaAuth.js";
+
+import { syncAdminSnapshot, ADMIN_SNAPSHOT_RETRY_MS } from "../net/playerSnapshot.js";
 
 const PANEL_MARKER = "data-crimon-cloud-recovery";
 /*
@@ -39,8 +41,6 @@ const STALE_BACKUP_MS = 3 * 60 * 60 * 1000;
 const FORCE_BACKUP_MS = 48 * 60 * 60 * 1000;
 const STALE_RETRY_MS = 20 * 60 * 1000;
 const LAST_ATTEMPT_KEY = "crimon_cloud_backup_last_attempt_v1";
-const ADMIN_SNAPSHOT_LAST_ATTEMPT_KEY = "crimon_admin_snapshot_last_attempt_v1";
-const ADMIN_SNAPSHOT_MS = 60 * 60 * 1000;
 let syncRunning = false;
 let conflictDetected = false;
 let statusText = "";
@@ -126,29 +126,6 @@ function expiredNotice(): void {
   setStatus("クラウドのセッションが切れています。下の「復旧IDでログイン」からログインし直すと、バックアップが再開します。", "error");
   for (const node of document.querySelectorAll<HTMLElement>("[data-cloud-recovery-warning]")) {
     node.dataset.cloudExpired = "1";
-  }
-}
-
-async function syncAdminSnapshot(): Promise<void> {
-  const last = Number(localStorage.getItem(ADMIN_SNAPSHOT_LAST_ATTEMPT_KEY) ?? "0");
-  if (Number.isFinite(last) && last > 0 && Date.now() - last < ADMIN_SNAPSHOT_MS) return;
-  const save = currentSaveEnvelope();
-  if (!save) return;
-  // 管理用保存だけを理由に新しい匿名アリーナIDを作らない。
-  if (!arenaAuthUserId()) return;
-  const token = await arenaAuthAccessToken();
-  if (!token) return;
-  try {
-    const base = String((import.meta as unknown as { env?: Record<string, unknown> }).env?.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
-    if (!base) return;
-    const response = await fetch(`${base}/functions/v1/crimon-player-snapshot`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ save }),
-    });
-    if (response.ok) localStorage.setItem(ADMIN_SNAPSHOT_LAST_ATTEMPT_KEY, String(Date.now()));
-  } catch {
-    // 管理用控えの失敗でゲーム本体や復旧保存を止めない。
   }
 }
 
@@ -541,9 +518,11 @@ function boot() {
     else if (backupAge(stored) >= STALE_BACKUP_MS) setStatus(`バックアップが3時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
     else setStatus(`クラウド接続済み：${formatSavedAt(stored.savedAt)}`, "ok");
   }
-  window.setInterval(() => { void syncNow(false, true); void syncAdminSnapshot(); }, AUTO_SYNC_MS);
+  window.setInterval(() => { void syncNow(false, true); }, AUTO_SYNC_MS);
+  window.setInterval(() => { void syncAdminSnapshot(); }, ADMIN_SNAPSHOT_RETRY_MS);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") void syncNow(false, true);
+    else void syncAdminSnapshot();
   });
   window.addEventListener("pagehide", () => { void syncNow(false, true); });
   window.setTimeout(() => { void syncNow(false, true); void syncAdminSnapshot(); }, 5_000);

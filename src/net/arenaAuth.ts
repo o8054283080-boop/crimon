@@ -241,7 +241,7 @@ function stillFresh(candidate: ArenaSession | null): boolean {
   return candidate !== null && candidate.expiresAt - REFRESH_MARGIN_SEC > nowSec();
 }
 
-async function login(): Promise<ArenaSession | null> {
+async function login(allowCreate = true): Promise<ArenaSession | null> {
   const target = endpoint();
   if (!target) return null;
 
@@ -260,7 +260,7 @@ async function login(): Promise<ArenaSession | null> {
     const refreshed = fromTokenResponse(
       await post("token?grant_type=refresh_token", { refresh_token: stored.refreshToken }, target.anonKey),
     );
-    if (refreshed) {
+    if (refreshed && refreshed.userId === stored.userId) {
       save(refreshed);
       return refreshed;
     }
@@ -276,6 +276,8 @@ async function login(): Promise<ArenaSession | null> {
     setArenaSyncAccessToken(null);
     return null;
   }
+
+  if (!allowCreate) return null;
 
   // 4. 保存済み本人が存在しない初回だけ、新しい匿名ユーザを作る
   const created = fromTokenResponse(await post("signup", {}, target.anonKey));
@@ -298,10 +300,13 @@ export function ensureArenaAuth(): Promise<ArenaSession | null> {
   return inFlight;
 }
 
-/** 現在有効なアクセストークン。管理用スナップショット等、本人認証が必要な通信だけに使う。 */
+/** 管理用保存専用。本人がない時は匿名ログインを開始しない。 */
 export async function arenaAuthAccessToken(): Promise<string | null> {
-  const current = await ensureArenaAuth();
-  return current?.accessToken ?? null;
+  const expected = session ?? loadStored();
+  if (!expected || !arenaAuthAvailable()) return null;
+  if (!inFlight) inFlight = login(false).finally(() => { inFlight = null; });
+  const current = await inFlight;
+  return current?.userId === expected.userId ? current.accessToken : null;
 }
 
 /** いま分かっている `auth.uid()`。まだログインしていなければ null */

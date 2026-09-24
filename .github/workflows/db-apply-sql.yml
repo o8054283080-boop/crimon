@@ -4,17 +4,23 @@ name: 名指ししたSQLを本番へ流す
 # migration に無く(Supabase 上で直接作られた)、記録が食い違っているため、
 # 一括で流すと既にある表とぶつかる。
 #
-# だから**冪等なSQLを1本だけ名指しで流す。**押した時だけ動く。
+# だから**冪等なSQLを1本だけ名指しで流す。**手動実行と依存ジョブから呼ぶ。
 # 流すファイルは `file` で指定する(既定は下の値)。
 #
 # 接続の作りは `arena-catalog.yml` と同じ。Session pooler なので
 # 利用者名は `postgres.<ref>`(`postgres` だけだと弾かれる)。
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "supabase/migrations/20260924223000_player_admin_snapshots.sql"
+  workflow_call:
+    inputs:
+      file:
+        type: string
+        required: true
+    secrets:
+      SUPABASE_DB_PASSWORD:
+        required: true
+      SUPABASE_DB_HOST:
+        required: false
   workflow_dispatch:
     inputs:
       file:
@@ -75,6 +81,8 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: 流す
         env:
+          PGSSLMODE: require
+          PGCONNECT_TIMEOUT: "15"
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail

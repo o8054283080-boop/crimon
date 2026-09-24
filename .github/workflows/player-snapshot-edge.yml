@@ -6,6 +6,9 @@ on:
     paths:
       - "supabase/functions/crimon-player-snapshot/**"
       - ".github/workflows/player-snapshot-edge.yml"
+      - "supabase/config.toml"
+      - "supabase/migrations/20260924223000_player_admin_snapshots.sql"
+      - ".github/workflows/db-apply-sql.yml"
   workflow_dispatch:
 
 permissions:
@@ -16,7 +19,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  database:
+    uses: ./.github/workflows/db-apply-sql.yml
+    with:
+      file: supabase/migrations/20260924223000_player_admin_snapshots.sql
+    secrets: inherit
   deploy:
+    needs: database
     name: 本番へdeploy
     runs-on: ubuntu-latest
     steps:

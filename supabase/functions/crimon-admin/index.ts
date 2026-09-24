@@ -147,6 +147,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "invalid_json" }, 400);
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "invalid_json" }, 400);
   const action = text(body.action);
 
   const { data: setting, error: settingError } = await supabase
@@ -190,7 +191,7 @@ Deno.serve(async (req: Request) => {
     const dailySince = new Date(Date.now() - DAILY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
     const [
-      { data: seasons },
+      seasonsResult,
       authResult,
       profilesResult,
       standingsResult,
@@ -226,8 +227,19 @@ Deno.serve(async (req: Request) => {
       supabase.from("crimon_player_snapshots").select("user_id,save,saved_at").order("saved_at", { ascending: false }).limit(1000),
     ]);
 
+    // 取得失敗を「プレイヤー0人」に変換しない。
+    const requiredResults = { seasonsResult, authResult, profilesResult, standingsResult, walletsResult, recoveryResult, matchDaysResult, towerResult };
+    for (const [source, result] of Object.entries(requiredResults)) {
+      if (result.error) {
+        console.error("dashboard_read_failed", source, result.error.code);
+        return json({ error: "dashboard_read_failed" }, 503);
+      }
+    }
+    const snapshotStatus = snapshotsResult.error ? "unavailable" : "ready";
+    if (snapshotsResult.error) console.error("snapshot_read_failed", snapshotsResult.error.code);
+
     type Season = { id: string; name: string; status: string; starts_at: string; ends_at: string };
-    const seasonRows = (seasons ?? []) as Season[];
+    const seasonRows = (seasonsResult.data ?? []) as Season[];
     const activeSeason = seasonRows.find((season) => season.status === "ACTIVE") ?? seasonRows[0] ?? null;
 
     type Standing = Record<string, unknown> & { user_id: string; season_id: string };
@@ -316,7 +328,15 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    type SnapshotRow = { user_id: string; save: unknown; saved_at: string };\n    const playerSnapshots = ((snapshotsResult.data ?? []) as SnapshotRow[]).map((row) => ({\n      userId: row.user_id,\n      savedAt: row.saved_at,\n      summary: saveSummary(row.save),\n      progress: saveProgress(row.save),\n    }));\n\n    const daily = buildDaily(DAILY_DAYS, {
+    type SnapshotRow = { user_id: string; save: unknown; saved_at: string };
+    const playerSnapshots = ((snapshotsResult.data ?? []) as SnapshotRow[]).map((row) => ({
+      userId: row.user_id,
+      savedAt: row.saved_at,
+      summary: saveSummary(row.save),
+      progress: saveProgress(row.save),
+    }));
+
+    const daily = buildDaily(DAILY_DAYS, {
       created: ((recoveryResult.data ?? []) as RecoveryRow[]).map((row) => row.created_at),
       saved: ((recoveryResult.data ?? []) as RecoveryRow[]).map((row) => row.latest_saved_at),
       matched: ((matchDaysResult.data ?? []) as { created_at: string }[]).map((row) => row.created_at),
@@ -396,6 +416,7 @@ Deno.serve(async (req: Request) => {
       arenaPlayers,
       recoveryAccounts,
       playerSnapshots,
+      snapshotStatus,
     });
   }
 

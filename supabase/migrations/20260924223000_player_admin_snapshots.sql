@@ -9,5 +9,6 @@ create table if not exists public.crimon_player_snapshots (
   constraint crimon_player_snapshots_save_kind check (save->>'kind' = 'crimon-save')
 );
 alter table public.crimon_player_snapshots enable row level security;
-revoke all on public.crimon_player_snapshots from anon, authenticated;
+revoke all on public.crimon_player_snapshots from public, anon, authenticated;
+grant select, insert, update on public.crimon_player_snapshots to service_role;
 comment on table public.crimon_player_snapshots is 'Operational/admin snapshots. Separate from user recovery accounts and arena progression.';
