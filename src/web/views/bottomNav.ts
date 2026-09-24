@@ -18,6 +18,15 @@ export type ScreenName =
   | "GOLD_DUNGEON_BATTLE"
   | "AWAKENING_DEPTH"
   | "AWAKENING_DEPTH_BATTLE"
+  /** 力の遺跡・守護の遺跡 */
+  | "RUINS"
+  | "RUINS_BATTLE"
+  /** アクセサリーの一覧・着脱・強化・売却 */
+  | "ACCESSORIES"
+  /** 古代のカケラでの製作 */
+  | "ANCIENT_CRAFT"
+  /** 限界能力付与 */
+  | "LIMIT_BREAK"
   | "MONSTER_DEX"
   | "MONSTER_EXCHANGE"
   | "MONSTER_STORAGE"

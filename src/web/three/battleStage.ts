@@ -4,7 +4,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { Element } from "../../core/element.js";
-import { MonsterDefinition } from "../../core/monster.js";
+import { MonsterDefinition, appearanceTemplateOf } from "../../core/monster.js";
 import { ArenaHandles, createArena } from "./arena.js";
 import { BackdropHandles, BattleVenue, backdropUrlFor, createBackdrop } from "./stageBackdrop.js";
 import { SPRITE_MAX_HEIGHT } from "./spriteAvatar.js";
@@ -918,7 +918,7 @@ export class BattleStage {
         const avatar = createBattleAvatar({
           element: unit.def.element,
           role: unit.def.role,
-          templateId: unit.def.templateId,
+          templateId: appearanceTemplateOf(unit.def),
           facing: team === "PLAYER" ? 1 : -1,
           bodyScale: unit.def.isBoss ? BOSS_BODY_SCALE : 1,
         });
@@ -948,7 +948,7 @@ export class BattleStage {
         // 画面比が変わったら組み直せるよう、誰がどの列の何番目かを残しておく
         this.formation.push({ avatar, light, team, index, count: list.length, isBoss: unit.def.isBoss === true });
         // 今の姿を控える。**これが無いと、最初の同期で全員が組み直される**
-        this.avatarStyles.set(unit.instanceId, `${unit.def.templateId}/${unit.def.element}/${unit.def.role}`);
+        this.avatarStyles.set(unit.instanceId, `${appearanceTemplateOf(unit.def)}/${unit.def.element}/${unit.def.role}`);
       });
     };
 

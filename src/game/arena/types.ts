@@ -14,6 +14,7 @@
  * 実際この案件では「装備の生成側を変えても控えに焼いた値は変わらない」
  * 事故を出している(CLAUDE.md)。写す面を増やさないことがそのまま安全になる。
  */
+import type { Accessory } from "../../core/accessory.js";
 import { Equipment } from "../../core/equipment.js";
 import { MonsterInstance } from "../../core/monsterInstance.js";
 import { ArenaTierId } from "../../data/arena/ranks.js";
@@ -31,6 +32,16 @@ export const ARENA_SNAPSHOT_VERSION = 1;
 export interface ArenaUnitSnapshot {
   instance: MonsterInstance;
   equipment: Equipment[];
+  /**
+   * 登録した時に着けていたアクセサリー。**焼いた写し**で、手持ちのIDは指さない。
+   *
+   * **省略可。**アクセ実装前の防衛データには無く、無い・null・読めない値は
+   * どれも「着けていない」として戦う(`snapshotUnitToDefinition`)。
+   * 保存形式の版(`ARENA_SNAPSHOT_VERSION`)は上げない——上げるとサーバの
+   * 受け取り上限(`max_version: 1`)に弾かれて登録も対戦もできなくなる。
+   * 項目を1つ足しただけなので、古い読み手はこの欄を読み飛ばすだけで済む。
+   */
+  accessory?: Accessory | null;
 }
 
 /** 防衛パーティ1つぶん */

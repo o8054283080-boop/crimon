@@ -62,6 +62,10 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
   if ((result.awakeningShards ?? 0) > 0) tiles.push(rewardTile("🔷", "目覚の欠片", `+${result.awakeningShards}`, "crystal"));
   if ((result.awakeningCrystals ?? 0) > 0) tiles.push(rewardTile("💠", "目覚の結晶", `+${result.awakeningCrystals}`, "crystal"));
   if ((result.awakeningStones ?? 0) > 0) tiles.push(rewardTile("🌟", "目覚の奇石", `+${result.awakeningStones}`, "crystal"));
+  // 遺跡の報酬。**遺跡の周回でだけ出る**(ゴールドも経験値も配らないので、出さないと空の画面になる)
+  if ((result.accessoryDropCount ?? 0) > 0) tiles.push(rewardTile("💍", "アクセサリー", `+${result.accessoryDropCount}`));
+  if ((result.evolutionCores ?? 0) > 0) tiles.push(rewardTile("🔶", "進化核", `+${result.evolutionCores}`, "crystal"));
+  if ((result.ancientShards ?? 0) > 0) tiles.push(rewardTile("🧩", "古代のカケラ", `+${result.ancientShards}`, "crystal"));
 
   // 同じモンスターは1枚にまとめ、枚数を重ねて表示する
   const dropCards = drops.map((drop) => {

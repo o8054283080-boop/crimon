@@ -23,7 +23,8 @@
  */
 import { Equipment } from "../../core/equipment.js";
 import { MonsterDefinition } from "../../core/monster.js";
-import { MonsterInstance, resolveEquippedItems, toBattleDefinition } from "../../core/monsterInstance.js";
+import type { Accessory } from "../../core/accessory.js";
+import { MonsterInstance, resolveAccessory, resolveEquippedItems, toBattleDefinition } from "../../core/monsterInstance.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { ARENA_SNAPSHOT_VERSION, ArenaDefenseSnapshot, ArenaUnitSnapshot } from "./types.js";
 
@@ -43,6 +44,7 @@ export function captureArenaUnit(
   instance: MonsterInstance,
   allEquipment: readonly Equipment[],
   index: number,
+  allAccessories: readonly Accessory[] = [],
 ): ArenaUnitSnapshot {
   const equipped = resolveEquippedItems(instance, allEquipment as Equipment[]);
   const copiedInstance = deepCopy(instance);
@@ -62,7 +64,17 @@ export function captureArenaUnit(
   }
   copiedInstance.equipment = slots;
   copiedInstance.id = `snap${index}`;
-  return { instance: copiedInstance, equipment: copiedEquipment };
+  /*
+   * アクセも装備と同じく**焼いた写し**を持つ。手持ちのIDは残さない
+   * (売った・付け替えた・強化した後も、登録した時の姿のまま戦う)。
+   */
+  delete copiedInstance.accessoryId;
+  const accessory = resolveAccessory(instance, allAccessories);
+  if (!accessory) return { instance: copiedInstance, equipment: copiedEquipment };
+  const frozenAccessory = deepCopy(accessory);
+  frozenAccessory.id = `snap${index}_acc`;
+  delete frozenAccessory.locked;
+  return { instance: copiedInstance, equipment: copiedEquipment, accessory: frozenAccessory };
 }
 
 /** 防衛パーティ全体を焼く */
@@ -70,11 +82,12 @@ export function captureArenaDefense(
   members: readonly MonsterInstance[],
   allEquipment: readonly Equipment[],
   now: number = Date.now(),
+  allAccessories: readonly Accessory[] = [],
 ): ArenaDefenseSnapshot {
   return {
     version: ARENA_SNAPSHOT_VERSION,
     capturedAt: now,
-    units: members.map((member, index) => captureArenaUnit(member, allEquipment, index)),
+    units: members.map((member, index) => captureArenaUnit(member, allEquipment, index, allAccessories)),
   };
 }
 
@@ -87,7 +100,19 @@ export function captureArenaDefense(
 export function snapshotUnitToDefinition(unit: ArenaUnitSnapshot): MonsterDefinition | null {
   const dex = findMonsterById(unit.instance.dexId);
   if (!dex) return null;
-  const def = toBattleDefinition(unit.instance, dex, unit.equipment);
+  /*
+   * アクセは**あれば効かせる、無ければ着けていない。**
+   * 旧形式(欄が無い)・null・壊れた値は `toBattleDefinition` の中の
+   * `sanitizeAccessory` が null に落とすので、ここでは何も判定しない。
+   * 値の範囲もそこで正規の上限へ収まる(照合表はアクセを見ていないため)。
+   */
+  let def: MonsterDefinition;
+  try {
+    def = toBattleDefinition(unit.instance, dex, unit.equipment, unit.accessory ?? null);
+  } catch {
+    // アクセ1個のせいで防衛全体を落とさない。**その1体だけアクセ無しで戦う**
+    def = toBattleDefinition(unit.instance, dex, unit.equipment);
+  }
   return { ...def, name: `${dex.name}★${unit.instance.star} Lv${unit.instance.level}` };
 }
 

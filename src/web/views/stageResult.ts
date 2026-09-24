@@ -101,7 +101,10 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
      * 欠片と結晶が結果画面では見分けられなかった
      * (深域の持ち数の帯では 🔹/💠/🌟 と描き分けている)。
      */
-    const emoji = name.includes("結晶") ? "💠" : name.includes("奇石") ? "🌟" : "🔹";
+    const emoji = name.includes("結晶") ? "💠" : name.includes("奇石") ? "🌟"
+      // 遺跡の報酬。アクセそのもの・特殊効果・進化核・古代のカケラを見分けられるように
+      : name.includes("のアクセ") ? "💍" : name.startsWith("特殊") ? "✦"
+        : name.includes("進化核") ? "🔶" : name.includes("カケラ") ? "🧩" : "🔹";
     tiles.push(rewardTile(emoji, name, amount ? `+${amount}` : "", "material"));
   }
 

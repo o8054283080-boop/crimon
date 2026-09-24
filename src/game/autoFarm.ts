@@ -50,6 +50,14 @@ export interface AutoFarmResult {
   awakeningShards?: number;
   awakeningCrystals?: number;
   awakeningStones?: number;
+  /*
+   * 遺跡の報酬。**遺跡の周回でだけ増える。**旧セーブの周回結果には無いので省略可。
+   */
+  /** 手に入れたアクセの数と、そのID(既に持ち物へ入っている。報酬の再生成には使わない) */
+  accessoryDropCount?: number;
+  earnedAccessoryIds?: string[];
+  evolutionCores?: number;
+  ancientShards?: number;
 }
 
 export function emptyResult(): AutoFarmResult {
@@ -123,6 +131,14 @@ export function mergeReward(result: AutoFarmResult, reward: ClearRewardResult, e
     result.monsterDrops.push({ dexId: pigDrop.dexId, star: pigDrop.star });
   }
   if (reward.summonScrollDropped) result.summonScrollCount += 1;
+  // スキルピッグ(装備ダンジョン上位階・遺跡)。転生ピッグの数には混ぜず、入手一覧にだけ載せる
+  if (reward.skillPigDrop) result.monsterDrops.push({ dexId: reward.skillPigDrop.dexId, star: reward.skillPigDrop.star });
+  if (reward.accessoryDrop) {
+    result.accessoryDropCount = (result.accessoryDropCount ?? 0) + 1;
+    (result.earnedAccessoryIds ??= []).push(reward.accessoryDrop.id);
+  }
+  if (reward.evolutionCores) result.evolutionCores = (result.evolutionCores ?? 0) + reward.evolutionCores;
+  if (reward.ancientShards) result.ancientShards = (result.ancientShards ?? 0) + reward.ancientShards;
 
   for (const levelUp of reward.levelUps) {
     const existing = result.levelUps.find((l) => l.instanceId === levelUp.instanceId);

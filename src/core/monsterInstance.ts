@@ -4,7 +4,9 @@ import { Star, computeEffectiveStats, requiredExpForStarLevel } from "./rarity.j
 import { applyPlayerStatBoost } from "./playerStatBoost.js";
 import { MAX_SKILL_LEVEL, Skill, computeLeveledSkill } from "./skill.js";
 import { MonsterDevelopment, createDefaultMonsterDevelopment } from "./monsterDevelopment.js";
-import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS } from "./monsterDevelopment.js";
+import { ABILITY_POINT_VALUES, MONSTER_TYPE_STAT_MULTIPLIERS, limitStatValue, sanitizeLimitPoints } from "./monsterDevelopment.js";
+import { type Accessory, sanitizeAccessory } from "./accessory.js";
+import { applyAccessoryToDefinition } from "./accessoryApply.js";
 import type { LatentAbilityCandidate } from "./monsterDevelopment.js";
 import { applySkillTalents } from "./talentApply.js";
 import { talentCombatBonus, talentStatBonus, type TalentState } from "./talents.js";
@@ -66,6 +68,13 @@ export interface MonsterInstance {
    * 1体に空の3枠を配ると、持っているモンスターの数だけ無駄が増える。
    */
   equipmentPresets?: EquipmentPreset[];
+  /**
+   * 着けているアクセサリーのID。**省略可。**
+   *
+   * 古いセーブには無い。無い・空・持ち物に見つからない(売った後など)は、
+   * どれも「着けていない」として扱う(`resolveAccessory`)。
+   */
+  accessoryId?: string | null;
 }
 
 /** 移し替えたスキル1つ分の記録 */
@@ -157,6 +166,12 @@ export function toBattleDefinition(
   instance: MonsterInstance,
   dex: MonsterDefinition,
   equippedItems: Equipment[] = [],
+  /**
+   * 着けているアクセサリー。**省略・null は「着けていない」。**
+   * 渡された値は必ず `sanitizeAccessory` を通してから効かせる
+   * (古い防衛データや壊れた値でも例外を出さず、着けていない扱いへ落ちる)。
+   */
+  accessory: unknown = null,
 ): MonsterDefinition {
   /* プレイヤー側のステータス補正。**ここはプレイヤーの手持ちの道。**
      敵は stageRunner / dungeonRunner の別の道を通るので掛からない */
@@ -168,12 +183,18 @@ export function toBattleDefinition(
   const type = instance.development.type;
   const multiplier = type ? MONSTER_TYPE_STAT_MULTIPLIERS[type] : MONSTER_TYPE_STAT_MULTIPLIERS.BALANCE;
   const points = instance.development.abilityPoints;
+  /*
+   * 限界能力付与。**決まりを外れた配分は丸ごと無視する**(`sanitizeLimitPoints`)。
+   * 配分が無ければ全部0で、下の式は付与前と1ビットも変わらない。
+   */
+  const limit = sanitizeLimitPoints(instance.development.limitBreak) ?? NO_LIMIT_POINTS;
   const developedStats = {
     ...growthStats,
-    hp: Math.round(growthStats.hp * multiplier.hp + points.hp * ABILITY_POINT_VALUES.hp),
-    atk: Math.round(growthStats.atk * multiplier.atk + points.atk * ABILITY_POINT_VALUES.atk),
-    def: Math.round(growthStats.def * multiplier.def + points.def * ABILITY_POINT_VALUES.def),
-    spd: Math.round(growthStats.spd * multiplier.spd + Math.floor(points.spd * ABILITY_POINT_VALUES.spd)),
+    hp: Math.round(growthStats.hp * multiplier.hp + points.hp * ABILITY_POINT_VALUES.hp + limitStatValue(limit.hp, "hp")),
+    atk: Math.round(growthStats.atk * multiplier.atk + points.atk * ABILITY_POINT_VALUES.atk + limitStatValue(limit.atk, "atk")),
+    def: Math.round(growthStats.def * multiplier.def + points.def * ABILITY_POINT_VALUES.def + limitStatValue(limit.def, "def")),
+    spd: Math.round(growthStats.spd * multiplier.spd
+      + Math.floor(points.spd * ABILITY_POINT_VALUES.spd + limitStatValue(limit.spd, "spd"))),
     criRate: Math.max(0, Math.min(1, growthStats.criRate + multiplier.criRate)),
     criDmg: Math.max(1, growthStats.criDmg + multiplier.criDmg),
     accuracy: Math.max(0, Math.min(1, growthStats.accuracy + multiplier.accuracy)),
@@ -216,17 +237,34 @@ export function toBattleDefinition(
       if (ids.length > 0) skills[slot] = applySkillTalents(skills[slot], ids);
     }
   }
-  return {
+  const def: MonsterDefinition = {
     ...dex,
     id: instance.id,
     name: `${dex.name}★${instance.star} Lv${instance.level}`,
-    stats,
+    stats: limit === NO_LIMIT_POINTS ? stats : { ...stats, hp: Math.max(1, stats.hp), atk: Math.max(1, stats.atk), def: Math.max(1, stats.def), spd: Math.max(1, stats.spd) },
     skills,
     combatMods,
     latentAbility: instance.development.latentAbilityId
       ? latentAbilityResolver?.(instance.dexId, instance.development.latentAbilityId)
       : undefined,
   };
+  // アクセは最後。装備・才能まで載った値へ足し、割合を掛ける
+  return applyAccessoryToDefinition(def, sanitizeAccessory(accessory));
+}
+
+const NO_LIMIT_POINTS = Object.freeze({ hp: 0, atk: 0, def: 0, spd: 0 });
+
+/**
+ * 個体が着けているアクセを、持ち物の一覧から引く。
+ *
+ * **見つからなければ null(= 着けていない)。**IDが無い・空・売った後・
+ * 壊れた値のどれでも例外は出さない。
+ */
+export function resolveAccessory(instance: Pick<MonsterInstance, "accessoryId">, allAccessories: readonly Accessory[] | undefined | null): Accessory | null {
+  const id = instance.accessoryId;
+  if (typeof id !== "string" || !id || !Array.isArray(allAccessories)) return null;
+  const found = allAccessories.find((acc) => acc && acc.id === id);
+  return found ? sanitizeAccessory(found) : null;
 }
 
 export function starLabel(star: Star): string {

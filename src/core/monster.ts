@@ -1,5 +1,6 @@
 import { Element, ELEMENT_COLOR, ELEMENT_JA, ELEMENTS } from "./element.js";
 import { CombatModifiers } from "./equipment.js";
+import type { AccessoryBattleEffects } from "./accessory.js";
 import { Skill, SkillEffect } from "./skill.js";
 import { applySeptemberSkillBalance } from "./skillRebalance.js";
 import { Stats, cloneStats } from "./stats.js";
@@ -104,6 +105,11 @@ export interface MonsterDefinition {
   skills: [Skill, Skill, Skill];
   /** 装備セット由来の戦闘専用効果。装備なし(敵など)ではundefined */
   combatMods?: CombatModifiers;
+  /**
+   * アクセサリーの戦闘中の効き目。**着けていなければ未設定。**
+   * 未設定の個体だけの戦闘では、エンジンはアクセの処理を1行も通らない。
+   */
+  accessory?: AccessoryBattleEffects;
   /** 所有個体で選択済みの潜在能力。静的な図鑑/敵定義には存在しない。 */
   latentAbility?: LatentAbilityCandidate;
   /**
@@ -131,6 +137,19 @@ export interface MonsterDefinition {
   initialCooldowns?: [number, number, number];
   /** 図鑑に出す説明。テンプレートの `dexNote` がそのまま渡る */
   dexNote?: string;
+  /**
+   * 絵だけを別の種族名で引く。**見た目にだけ効く。**戦闘の計算には1つも入らない。
+   *
+   * 遺跡のボスは古代系の種族を借りて戦う(新しい図鑑を足すとアリーナの照合表が動く)が、
+   * 姿は専用の絵にしたい。`templateId` を書き換えると種族で引く処理すべてに波及するので、
+   * 絵を引く所だけがこちらを見る(`appearanceTemplateOf`)。
+   */
+  artTemplateId?: string;
+}
+
+/** 絵を引く時に使う種族名。見た目の指定があればそちら */
+export function appearanceTemplateOf(def: Pick<MonsterDefinition, "templateId" | "artTemplateId">): string {
+  return def.artTemplateId ?? def.templateId;
 }
 
 export interface BossTraits {

@@ -1,0 +1,357 @@
+/*
+ * アクセサリー・遺跡・カケラ製作・限界能力付与。
+ *
+ * **縦持ち390pxが基準。**横に並べるものは必ず折り返すか、`minmax(0, 1fr)` で縮める。
+ * 色は紺と金(既存のダンジョン画面に揃える)。文字は9pxを下回らせない。
+ * 浮かせた部品は置かない——案内も結果も画面の流れの中に置く。
+ */
+
+/* ------------------------------------------------------------ バッジ */
+
+.acc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.acc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 180, 104, 0.45);
+  background: rgba(20, 24, 44, 0.9);
+  color: #eadbb8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.acc-badge--star { color: #ffd76a; }
+.acc-badge--hero { border-color: rgba(140, 190, 255, 0.6); color: #b8d6ff; }
+.acc-badge--legend { border-color: rgba(214, 140, 255, 0.7); color: #e4b9ff; }
+.acc-badge--epic { border-color: rgba(255, 170, 80, 0.8); color: #ffc98a; background: rgba(60, 30, 12, 0.85); }
+.acc-badge--level { color: #cfe0ff; }
+.acc-family--attack { color: #ff9f8a; }
+.acc-family--durability { color: #8fd1ff; }
+.acc-family--support { color: #9ff0b8; }
+.acc-family--disrupt { color: #d9a8ff; }
+
+/* ------------------------------------------------------------ 中身の札 */
+
+.acc-summary {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(214, 180, 104, 0.35);
+  background: linear-gradient(180deg, rgba(22, 28, 52, 0.95), rgba(10, 13, 26, 0.97));
+  min-width: 0;
+}
+
+.acc-summary--epic { border-color: rgba(255, 170, 80, 0.55); }
+.acc-summary--legend { border-color: rgba(214, 140, 255, 0.5); }
+
+.acc-summary__main,
+.acc-summary__weak {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  color: #eef2ff;
+  min-width: 0;
+}
+
+.acc-summary__specials {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.acc-summary__specials li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  color: #ffe7b3;
+  overflow-wrap: anywhere;
+}
+
+.acc-summary__weak { color: #c8d3ee; }
+
+.acc-summary__label {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(214, 180, 104, 0.16);
+  color: #d6b468;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.acc-summary__hint {
+  color: #8fa0c8;
+  font-size: 10px;
+}
+
+/* ------------------------------------------------------------ 一覧の1行 */
+
+.acc-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.acc-row {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(214, 180, 104, 0.28);
+  background: linear-gradient(180deg, rgba(22, 28, 52, 0.94), rgba(10, 13, 26, 0.96));
+  color: #eef2ff;
+  text-align: left;
+  font: inherit;
+}
+
+.acc-row--selected {
+  border-color: #ffd76a;
+  box-shadow: 0 0 0 1px #ffd76a inset, 0 0 14px rgba(255, 215, 106, 0.25);
+}
+
+.acc-row__main { font-size: 13px; font-weight: 700; }
+.acc-row__specials { font-size: 12px; color: #ffe7b3; overflow-wrap: anywhere; }
+.acc-row__owner { font-size: 11px; color: #9fb0d8; }
+
+/* ------------------------------------------------------------ 並べ替え・絞り込み */
+
+.acc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.acc-chip {
+  /* 指で押す札。44pxを割ると巡回が落とす(実機で押し損ねる) */
+  min-height: 44px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 180, 104, 0.35);
+  background: rgba(16, 20, 38, 0.92);
+  color: #d8def0;
+  font-size: 12px;
+}
+
+.acc-chip--active {
+  border-color: #ffd76a;
+  color: #ffd76a;
+  background: rgba(60, 46, 14, 0.9);
+}
+
+.acc-detail {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.acc-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.acc-actions .btn {
+  min-height: 44px;
+  white-space: normal;
+}
+
+.acc-note {
+  margin: 4px 0;
+  color: #9fb0d8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.acc-empty {
+  padding: 16px 8px;
+  text-align: center;
+  color: #8fa0c8;
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------ 遺跡 */
+
+.ruin-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.ruin-tab {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 180, 104, 0.35);
+  background: rgba(16, 20, 38, 0.92);
+  color: #d8def0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.ruin-tab--active {
+  border-color: #ffd76a;
+  color: #ffd76a;
+  background: linear-gradient(180deg, rgba(64, 48, 18, 0.95), rgba(26, 20, 10, 0.95));
+}
+
+.ruin-materials {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.ruin-material {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(214, 180, 104, 0.3);
+  background: linear-gradient(180deg, rgba(24, 30, 56, 0.92), rgba(12, 16, 30, 0.95));
+  min-width: 0;
+}
+
+.ruin-material__name { font-size: 10px; color: #c9b27a; white-space: nowrap; }
+.ruin-material__count { font-size: 15px; font-weight: 800; color: #f4ecd6; font-variant-numeric: tabular-nums; }
+
+.ruin-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.ruin-links .btn { min-height: 44px; }
+
+.ruin-detail {
+  display: grid;
+  gap: 8px;
+}
+
+/* その階の主の絵。絵は applyPortrait が background-image で敷く */
+.ruin-boss-art {
+  height: 150px;
+  margin: 0 -4px;
+  border-radius: 10px;
+  background-color: rgba(8, 10, 20, 0.55);
+}
+
+.ruin-detail__row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 6px;
+  align-items: baseline;
+  font-size: 13px;
+  color: #e6ebf8;
+}
+
+.ruin-detail__label {
+  color: #d6b468;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ruin-enemy {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(12, 16, 30, 0.8);
+  border: 1px solid rgba(143, 160, 200, 0.2);
+}
+
+.ruin-enemy strong { font-size: 13px; color: #f4ecd6; }
+.ruin-enemy span { font-size: 11px; color: #aab6d6; overflow-wrap: anywhere; }
+
+/* ------------------------------------------------------------ カケラ製作 */
+
+.craft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.craft-grid .btn {
+  min-height: 48px;
+  white-space: normal;
+}
+
+.craft-result {
+  margin: 8px 0;
+}
+
+/* ------------------------------------------------------------ 限界能力付与 */
+
+.limit-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.limit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 52px 44px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 180, 104, 0.25);
+  background: rgba(14, 18, 34, 0.92);
+}
+
+.limit-row__name { font-size: 13px; color: #eef2ff; min-width: 0; }
+.limit-row__name small { display: block; font-size: 11px; color: #9fb0d8; }
+.limit-row__value { text-align: center; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.limit-row__value--plus { color: #9ff0b8; }
+.limit-row__value--minus { color: #ff9f8a; }
+
+.limit-row .btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  font-size: 18px;
+}
+
+.limit-total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 6px 0;
+  font-size: 13px;
+  color: #e6ebf8;
+}
+
+.limit-total--bad { color: #ff9f8a; }
+
+.monster-detail-accessory__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.monster-detail-accessory__actions .btn {
+  min-height: 44px;
+  white-space: normal;
+}

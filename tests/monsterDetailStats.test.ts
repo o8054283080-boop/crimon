@@ -20,7 +20,8 @@ describe("詳細の数字は戦闘と同じ計算で出す", () => {
     const at = SOURCE.indexOf("function renderDetail");
     expect(at, "renderDetail が無い").toBeGreaterThan(-1);
     const body = SOURCE.slice(at, at + 2000);
-    expect(body, "戦闘と同じ計算を使っていない").toContain("toBattleDefinition(instance, dex, equippedItems)");
+    // アクセサリーの実装で4つ目の引数(着けているアクセ)が増えた。戦闘と同じくアクセまで載せた値を出す
+    expect(body, "戦闘と同じ計算を使っていない").toContain("toBattleDefinition(instance, dex, equippedItems, resolveAccessory(instance, props.player.accessories))");
     /*
      * **レベル成長＋装備だけの計算に戻さない。**
      * これを実効値に使うと、育てたぶんが画面から消える。

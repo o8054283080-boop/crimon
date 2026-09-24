@@ -74,6 +74,8 @@ export interface DungeonEnemy {
   /** 画面に出す名前。省略時は「図鑑名★星 Lv」 */
   displayName?: string;
   initialCooldowns?: [number, number, number];
+  /** 絵だけを別の種族名で引く(`MonsterDefinition.artTemplateId`)。省略時は `templateId` の絵 */
+  artTemplateId?: string;
 }
 
 export type EquipmentDungeonKind = "DEMON" | "BEAST";

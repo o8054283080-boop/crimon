@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { MonsterDefinition } from "../../core/monster.js";
+import { MonsterDefinition, appearanceTemplateOf } from "../../core/monster.js";
 import { MonsterAvatar } from "./monsterAvatar.js";
 import { ELEMENT_TINT, NO_TINT_TEMPLATES, SPRITE_TINT, TINT_MASK, bodyHueFor, isElementSpecific, spriteUrlFor, tintThresholdsFor } from "./spriteArt.js";
 import { Element } from "../../core/element.js";
@@ -44,7 +44,7 @@ let unavailable = false;
 let renderer: THREE.WebGLRenderer | null = null;
 
 function keyOf(def: MonsterDefinition): PortraitKey {
-  return `${def.templateId}:${def.element}`;
+  return `${appearanceTemplateOf(def)}:${def.element}`;
 }
 
 function getRenderer(): THREE.WebGLRenderer | null {
@@ -76,7 +76,7 @@ function bake(def: MonsterDefinition): string | null {
   const avatar = new MonsterAvatar({
     element: def.element,
     role: def.role,
-    templateId: def.templateId,
+    templateId: appearanceTemplateOf(def),
     facing: 1,
   });
   // バトル中は敵の方(-Z)を向いているが、肖像では顔を見せたいので正面へ据える
@@ -234,9 +234,9 @@ export function requestPortrait(def: MonsterDefinition): Promise<string | null> 
    * 2Dの絵があるなら焼く必要がない。戦闘で見る姿とカードの姿も、
    * 同じ1枚なので確実に一致する。
    */
-  const sprite = spriteUrlFor(def.templateId, def.element);
+  const sprite = spriteUrlFor(appearanceTemplateOf(def), def.element);
   if (sprite) {
-    if (isElementSpecific(def.templateId, def.element) || NO_TINT_TEMPLATES.has(def.templateId)) {
+    if (isElementSpecific(appearanceTemplateOf(def), def.element) || NO_TINT_TEMPLATES.has(appearanceTemplateOf(def))) {
       // その属性のために描かれた絵か、属性を持たない種族(転生ピッグ)。
       // どちらも色替えは掛けない
       cache.set(key, sprite);
@@ -246,7 +246,7 @@ export function requestPortrait(def: MonsterDefinition): Promise<string | null> 
     // **寄せないと「スライム[火]」が青いまま並ぶ。**
     // 戦闘画面のシェーダ(spriteAvatar.ts)と同じ式にしてあり、
     // カードで見た色と戦闘で見た色が食い違わない
-    const task = tintSprite(sprite, def.templateId, def.element).then((url) => {
+    const task = tintSprite(sprite, appearanceTemplateOf(def), def.element).then((url) => {
       pending.delete(key);
       const result = url ?? sprite;
       cache.set(key, result);

@@ -32,6 +32,13 @@ export const FALLBACK_REFERENCE_SECONDS: Record<BackgroundFarmKind, number> = {
   LEVEL_DUNGEON: 120,
   GOLD_DUNGEON: 120,
   AWAKENING_DEPTH: 160,
+  /*
+   * 遺跡。**装備ダンジョン12階の150秒を流用しない。**
+   * 実ブラウザの x8 で1勝おおむね11〜20秒(完成編成)なので、等倍に直すと
+   * 90〜160秒ほど。記録が1件も無い時だけ使う値なので、その真ん中の120秒に置く。
+   * 周回は手で1度クリアしてからしか始められないので、ふつうはここへ来る前に実測が入る。
+   */
+  RUINS: 120,
 };
 
 /** 難易度を含め、報酬・解放単位と同じ粒度で実戦記録を分離する。 */
@@ -42,6 +49,8 @@ export function manualClearKey(kind: BackgroundFarmKind, targetId: string, diffi
     case "LEVEL_DUNGEON": return `level_${targetId}`;
     case "GOLD_DUNGEON": return `gold_${targetId}`;
     case "AWAKENING_DEPTH": return `depth_${targetId}`;
+    // 場所IDがそのまま鍵(`ruins_power_5` など)。遺跡と階ごとに記録が分かれる
+    case "RUINS": return targetId;
   }
 }
 

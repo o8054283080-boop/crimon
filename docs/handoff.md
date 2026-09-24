@@ -902,3 +902,52 @@ psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authentic
 直接書き換えれば同じ形になる。**食い違いを疑う時は、まず
 `arena_profiles` / `arena_standings` / `arena_wallets` / `trial_tower_progress` の
 4つが同じ `user_id` を向いているかを見る。
+
+## アクセサリー・力の遺跡・守護の遺跡(2026-09-24 に PR #405 でマージ済み)
+
+入口: `src/core/accessory.ts`(型・表・生成・無害化)/ `src/core/accessoryApply.ts`(定義へ着ける)/
+`src/battle/accessoryRuntime.ts`(戦闘中の効果)/ `src/data/ruins.ts`・`src/game/ruins.ts`(遺跡)/
+`src/game/ancientCraft.ts`(カケラ製作・限界能力付与)。
+
+**触る時の罠:**
+
+- **アクセの無い戦闘は、アクセの処理を1行も通らない**(`engine.acc` が null)。
+  乱数も引かないので、アクセ無しの装備ダンジョン・アリーナは実装前と完全に同じ経過になる
+  (mainと同じ種で比べて一致を確認済み)。**`acc` を常に作る形へ変えると、既存の戦闘の乱数がずれる。**
+- **防衛データ(`ArenaUnitSnapshot.accessory`)の版は上げていない。**
+  サーバの受け取り上限は `max_version: 1`。上げた瞬間に登録も対戦も全員が弾かれる。
+  欄を足しただけなので、古い読み手は読み飛ばす。
+- 照合表(SQL)は**アクセを見ていない**。改ざん値は `sanitizeAccessory` が正規の幅へ丸める
+  (クライアントもサーバの再戦闘も同じ関数を通る)。限界配分も `sanitizeLimitPoints` が
+  決まりを外れたら丸ごと無効にする。
+- セーブの圧縮(`saveCodec.ts`)は**モンスターの項目を列挙している。**
+  `accessoryId` は `g`、限界配分は育成の `z`。新しい項目を個体へ足したら、ここにも足すこと。
+- 遺跡は**装備ダンジョンと同じダンジョン編成(最大5体)**で戦う(依頼主の指定)。
+  手動・もう一度・自動周回・編成変更のどれもダンジョン編成を見る(`usesDungeonParty`)。
+
+**まだ終わっていないこと:**
+
+- **力の遺跡の4・5階は、依頼主の指示で指定値より強くしてある**(`src/data/ruins.ts` の `POWER_STATS` の注記)。
+  指定値のままでは5体・5階STRONGで汎用も制圧も100%だった。HP約半分・攻撃力約3.8倍(塔3倍)・本体の速さ+15で、
+  5階(200戦)は **STRONG 汎用19% / 制圧(水)91.5%、FINISHED 制圧100% / 汎用78.5%**
+  (目安 汎用約12% / 制圧約98% / FINISHED約100%)。汎用は毒入り(電気インプ)。毒なし汎用はSTRONG 0.5%。
+  - **汎用と制圧の目安を両方同時には満たせない。**汎用を12%まで下げると制圧が90%を切る(掃いた結果の直線上にある)
+  - **HPを据え置いて攻撃力だけ上げると、毒の汎用より制圧が先に崩れる**(HP×1・ATK×3: 汎用34% / 制圧78%)
+  - **撃破時強化を攻撃力に比例させると制圧だけが落ちる**ので据え置き
+  - 代わりに**戦闘が短くなった。**制圧STRONG 56手(前は79手)で、×8の目安 約12.7秒より短い見込み。
+    HP×0.7なら手数は目安どおりだが、汎用STRONGが33%になる
+  - 3階(両遺跡の共有)は触っていないので、**3階→4階の段差が大きい**(汎用TYPICALが100%→10%)
+- 前回の検証(案U)の編成定義はリポジトリに無い。`tools/ruinPressure.ts` の「汎用」は装備ダンジョンの実戦通常の5体。
+
+**遺跡のボスの絵(依頼主の描いた専用の2枚):**
+
+- 絵は `ruin_commander-FIRE`(指揮兵器)と `ruin_spirit-WATER`(霊獣)。
+  **種族は古代の魔人・古代のけものを借りたまま**で、絵だけを `artTemplateId` で差し替えている
+  (`MonsterDefinition.artTemplateId` / `appearanceTemplateOf`)。`templateId` を書き換えると
+  種族で引く処理すべてに波及し、新しい図鑑を足すとアリーナの照合表が動くため。
+- 絵を引く所は3つ: 戦闘の配置(`battleStage.ts`)、戦闘の状態の `templateId`(`engine.snapshotUnits`。
+  **ここを揃えないと、画面が毎フレーム照合して古代の魔人の絵へ組み直す**)、肖像(`portrait.ts`)。
+- **霊獣の元絵は市松模様が焼き込まれて届いた。**`tools/removeCheckerboard.mjs` で抜いてある。
+  暗い床の上では目立たないが、**明るい地に重ねると、もやの下にうっすら格子が残る。**
+  透過PNGを描き直してもらえたら、`art/monsters-raw/ruin_spirit-WATER.png` を置き換えて
+  `node tools/prepareSprites.mjs <その1枚だけのフォルダ> src/web/assets/monsters` で差し替える。

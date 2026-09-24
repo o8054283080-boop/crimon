@@ -2,9 +2,11 @@ import { Equipment, EquipSlot, SET_TYPES, canEnhanceEquipment, enhanceEquipment,
 import { clampInitialSubStatCount } from "../core/equipmentRarity.js";
 import { MAX_FIGHTER_LEVEL, INITIAL_MAX_STAMINA, maxStaminaForFighterLevel, requiredExpForFighterLevel } from "../core/fighterLevel.js";
 import { MonsterInstance, createMonsterInstance } from "../core/monsterInstance.js";
-import { abilityPointBudget, createDefaultMonsterDevelopment } from "../core/monsterDevelopment.js";
+import { abilityPointBudget, createDefaultMonsterDevelopment, sanitizeLimitPoints } from "../core/monsterDevelopment.js";
 import { createDefaultTalentState } from "../core/talents.js";
 import { normalizeMonsterPresets } from "./equipmentPreset.js";
+import { normalizeAccessories } from "./accessories.js";
+import type { Accessory } from "../core/accessory.js";
 import { decodeSave, encodeSave } from "./saveCodec.js";
 import { AWAKENING_MATERIAL_LABEL } from "./shop.js";
 import { Star } from "../core/rarity.js";
@@ -114,6 +116,22 @@ export interface PlayerState {
   awakeningStones?: number;
   /** クリア済みの目覚の深域の階(初回報酬を二重に渡さないための印) */
   clearedAwakeningDepthFloors?: number[];
+  /*
+   * --- アクセサリーと遺跡(力の遺跡・守護の遺跡) ---
+   *
+   * **どれも省略可。**前から遊んでいる人の控えには無いので、
+   * 読み込み時に空・0で埋める(`normalizeState`)。
+   */
+  /** 持っているアクセサリー。装着はモンスター側の `accessoryId` が指す */
+  accessories?: Accessory[];
+  /** 古代のカケラ。150個でアクセか装備を1つ作れる */
+  ancientShards?: number;
+  /** 進化核。100個で1体の限界能力付与を解放する */
+  evolutionCores?: number;
+  /** クリア済みの力の遺跡の階 */
+  clearedPowerRuinFloors?: number[];
+  /** クリア済みの守護の遺跡の階 */
+  clearedGuardianRuinFloors?: number[];
   /** 覚醒オーブの達成報酬を受取済みのID。既存報酬の受取印とは分け、後付け報酬も安全に配る */
   claimedAwakeningOrbRewardIds: string[];
   /**
@@ -485,6 +503,11 @@ export function createInitialState(): PlayerState {
     awakeningCrystals: 0,
     awakeningStones: 0,
     clearedAwakeningDepthFloors: [],
+    accessories: [],
+    ancientShards: 0,
+    evolutionCores: 0,
+    clearedPowerRuinFloors: [],
+    clearedGuardianRuinFloors: [],
     claimedAwakeningOrbRewardIds: [],
     monsterPoints: 0,
     crimShards: 0,
@@ -640,6 +663,18 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
       monster.development.latentReselectPending = monster.development.latentReselectPending === true;
       // 壊れた控えで選択済みと待機中が同居した場合は、選択済みの潜在を優先する。
       if (monster.development.latentAbilityId !== null) monster.development.latentReselectPending = false;
+      /*
+       * 限界能力付与。**旧セーブには無い = 未解放。**
+       * 解放済みの印は残し(進化核を払っている)、決まりを外れた配分だけを0へ戻す。
+       */
+      const limitBreak = monster.development.limitBreak as unknown;
+      if (limitBreak !== undefined) {
+        if (!limitBreak || typeof limitBreak !== "object" || (limitBreak as { unlocked?: unknown }).unlocked !== true) {
+          delete monster.development.limitBreak;
+        } else if (!sanitizeLimitPoints(limitBreak)) {
+          monster.development.limitBreak = { unlocked: true, points: { hp: 0, atk: 0, def: 0, spd: 0 } };
+        }
+      }
       if (!(monster.development.type === null || ["ATTACK", "HP", "DEFENSE", "SUPPORT", "DISRUPT", "BALANCE"].includes(monster.development.type))) {
         monster.development.type = null;
       }
@@ -696,6 +731,18 @@ function normalizeState(state: PlayerState, now: Date = new Date()): PlayerState
   if (typeof state.awakeningCrystals !== "number" || state.awakeningCrystals < 0) state.awakeningCrystals = 0;
   if (typeof state.awakeningStones !== "number" || state.awakeningStones < 0) state.awakeningStones = 0;
   if (!Array.isArray(state.clearedAwakeningDepthFloors)) state.clearedAwakeningDepthFloors = [];
+  /*
+   * アクセサリーと遺跡。**無い控えは空・0から。**
+   * 読めないアクセは持ち物から外し、持ち物に無いアクセを指す装着は外す
+   * (`normalizeAccessories`)。どれも戦闘に渡る前に済ませる。
+   */
+  normalizeAccessories(state);
+  if (typeof state.ancientShards !== "number" || !(state.ancientShards >= 0)) state.ancientShards = 0;
+  else state.ancientShards = Math.floor(state.ancientShards);
+  if (typeof state.evolutionCores !== "number" || !(state.evolutionCores >= 0)) state.evolutionCores = 0;
+  else state.evolutionCores = Math.floor(state.evolutionCores);
+  if (!Array.isArray(state.clearedPowerRuinFloors)) state.clearedPowerRuinFloors = [];
+  if (!Array.isArray(state.clearedGuardianRuinFloors)) state.clearedGuardianRuinFloors = [];
   // クリムのかけらと、その配布記録。前から遊んでいる人の控えには無い
   if (typeof state.crimShards !== "number" || !(state.crimShards >= 0)) state.crimShards = 0;
   else state.crimShards = Math.floor(state.crimShards);

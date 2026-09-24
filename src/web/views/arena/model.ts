@@ -30,8 +30,10 @@ import {
   formatStatValue,
 } from "../../../core/equipment.js";
 import { MonsterDefinition } from "../../../core/monster.js";
+import type { Accessory } from "../../../core/accessory.js";
 import {
   MonsterInstance,
+  resolveAccessory,
   resolveEquippedItems,
   toBattleDefinition,
 } from "../../../core/monsterInstance.js";
@@ -291,7 +293,7 @@ export function arenaUnitDetailView(unit: ArenaUnitSnapshot): ArenaUnitDetailVie
     maxLevel: STAR_MAX_LEVEL[instance.star] ?? instance.level,
     typeLabel: development?.type ? MONSTER_TYPE_LABELS[development.type] : null,
     skillLevels: Array.isArray(instance.skillLevels) ? [...instance.skillLevels] : [],
-    stats: dex ? statLines(toBattleDefinition(instance, dex, equipment)) : [],
+    stats: dex ? statLines(toBattleDefinition(instance, dex, equipment, unit.accessory ?? null)) : [],
     equipment: equipment.map(equipmentView),
     equippedCount: equipment.length,
     abilityPoints,
@@ -638,6 +640,7 @@ export function buildArenaEntryBattle(
    * この焼き付けなので、画面もこれから組む。
    */
   attackerSnapshot?: ArenaDefenseSnapshot | null,
+  allAccessories: readonly Accessory[] = [],
 ): ArenaBattleSetupV2 {
   if (attackerSnapshot && attackerSnapshot.units.length > 0) {
     return {
@@ -650,7 +653,7 @@ export function buildArenaEntryBattle(
     const dex = findMonsterById(instance.dexId);
     if (!dex) continue;
     playerDefs.push(
-      withArenaSpeed(toBattleDefinition(instance, dex, resolveEquippedItems(instance, allEquipment as Equipment[]))),
+      withArenaSpeed(toBattleDefinition(instance, dex, resolveEquippedItems(instance, allEquipment as Equipment[]), resolveAccessory(instance, allAccessories))),
     );
   }
   return { playerDefs, enemyDefs: snapshotToDefinitions(entry.defense).map(withArenaSpeed) };
