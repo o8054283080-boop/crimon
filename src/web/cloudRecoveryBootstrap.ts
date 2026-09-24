@@ -537,12 +537,12 @@ function boot() {
     else if (backupAge(stored) >= STALE_BACKUP_MS) setStatus(`バックアップが3時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
     else setStatus(`クラウド接続済み：${formatSavedAt(stored.savedAt)}`, "ok");
   }
-  window.setInterval(() => { void syncNow(false, true); }, AUTO_SYNC_MS);
+  window.setInterval(() => { void syncNow(false, true); void syncAdminSnapshot(); }, AUTO_SYNC_MS);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") void syncNow(false, true);
   });
   window.addEventListener("pagehide", () => { void syncNow(false, true); });
-  window.setTimeout(() => { void syncNow(false, true); }, 5_000);
+  window.setTimeout(() => { void syncNow(false, true); void syncAdminSnapshot(); }, 5_000);
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
