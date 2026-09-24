@@ -8,6 +8,7 @@ import { el } from "../dom.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
+import { screenHeader } from "./managementHeader.js";
 
 export interface EquipmentDungeonProps {
   player: PlayerState;
@@ -80,10 +81,7 @@ function setNames(floors: readonly DungeonFloor[]): string {
 function renderList(props: EquipmentDungeonProps): HTMLElement {
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["装備ダンジョン"]),
-      el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
-    ]),
+    screenHeader("装備ダンジョン", { meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
     renderDungeonIntro(
       "階層が上がるほど高い星の装備が出ます。敵は階ごとに1属性で揃っているので、弱点を突ける子で挑むと楽になります。",
       /*
@@ -166,10 +164,7 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
   ].filter((t): t is string => t !== null);
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, [floor.name]),
-      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: () => props.onSelectFloor(floor.kind, null) }, ["◀ 階層"]),
-    ]),
+    screenHeader(floor.name, { onBack: () => props.onSelectFloor(floor.kind, null), backLabel: "階層選択に戻る", meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
 
     // 挑戦の入口を最初に置く。情報を読み終えないと挑めない並びだと、
     // 2回目以降の周回で毎回スクロールさせることになる
@@ -228,7 +223,6 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
       el("p", { className: "app-subtitle" }, [`ダンジョン専用パーティ: ${party.length}/5体`]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoDungeonParty }, ["編成を変更する"]),
     ]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectFloor(floor.kind, null) }, ["◀ 階層選択に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 

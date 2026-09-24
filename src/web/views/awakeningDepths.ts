@@ -9,6 +9,7 @@ import { el } from "../dom.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
+import { screenHeader } from "./managementHeader.js";
 
 /**
  * 目覚の深域の画面。
@@ -79,9 +80,7 @@ function renderList(props: AwakeningDepthProps): HTMLElement {
   });
 
   return el("div", { className: "screen stages-screen depth-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["目覚の深域"]),
-    ]),
+    screenHeader("目覚の深域", { meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
     renderDungeonIntro(
       "才能覚醒の素材を集める場所です。上の階ほど多く落ちますが、"
       + "5階からは同じ相手で殴り続けるほどダメージが通らなくなる「才能適応」が働きます。",
@@ -165,10 +164,7 @@ function renderDetail(props: AwakeningDepthProps, floor: AwakeningDepthFloor): H
   );
 
   return el("div", { className: "screen stages-screen depth-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectFloor(null) }, ["◀ 階層選択に戻る"]),
-      el("h1", {}, [`${floor.floor}階`]),
-    ]),
+    screenHeader(`目覚の深域 ${floor.floor}階`, { onBack: () => props.onSelectFloor(null), backLabel: "階層選択に戻る", meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
     renderMaterialBar(props.player),
     el("section", { className: "card depth-detail" }, [
       el("p", { className: "depth-detail__note" }, [floor.note.replace(/\*\*/g, "")]),

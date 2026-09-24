@@ -11,6 +11,7 @@
 import { el } from "../../dom.js";
 import { arenaHistoryRowView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
+import { screenHeader } from "../managementHeader.js";
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
@@ -20,7 +21,7 @@ export function renderArenaHistory(props: PvpArenaProps): HTMLElement {
   const rows = props.history.map((input) => arenaHistoryRowView(input.record, input.block));
 
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header" }, [el("h1", {}, ["防衛履歴"])]),
+    screenHeader("防衛履歴", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る" }),
     props.notice ? el("p", { className: "panel ar-notice" }, [props.notice]) : null,
     el("p", { className: "panel ar-note" }, [
       "登録した防衛編成が挑まれた記録です。破られた相手には1回だけリベンジできます",
@@ -69,6 +70,5 @@ export function renderArenaHistory(props: PvpArenaProps): HTMLElement {
         row.blockedReason ? el("p", { className: "ar-card__blocked" }, [row.blockedReason]) : null,
       ])),
     ),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onGo("TOP") }, ["◀ アリーナに戻る"]),
   ]));
 }

@@ -11,6 +11,7 @@
 import { el } from "../../dom.js";
 import { arenaShopRowView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
+import { screenHeader } from "../managementHeader.js";
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
@@ -21,10 +22,7 @@ export function renderArenaShop(props: PvpArenaProps): HTMLElement {
   const rows = props.shopRows.map((row) => arenaShopRowView(row, coins));
 
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["アリーナショップ"]),
-      el("span", { className: "head-note" }, [`🎫 ${coins.toLocaleString("ja-JP")}`]),
-    ]),
+    screenHeader("アリーナショップ", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る", meta: `🎫 ${coins.toLocaleString("ja-JP")}` }),
     props.notice ? el("p", { className: "panel ar-notice" }, [props.notice]) : null,
     el("p", { className: "panel ar-note" }, [
       "アリーナコインは対戦と防衛で貯まります。上限は週・月・シーズンごとに数え直されます",
@@ -53,6 +51,5 @@ export function renderArenaShop(props: PvpArenaProps): HTMLElement {
         row.disabledReason ? el("p", { className: "ar-card__blocked" }, [row.disabledReason]) : null,
       ])),
     ),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onGo("TOP") }, ["◀ アリーナに戻る"]),
   ]));
 }

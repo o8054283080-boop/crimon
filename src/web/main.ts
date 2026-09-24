@@ -179,7 +179,7 @@ import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations, isFirstLaunch } from "../game/compensation.js";
 import { markAllNoticesRead } from "./noticeUi.js";
-import { OWN_BACK_SELECTOR, renderGlobalBackButton } from "./views/backButton.js";
+import { attachScreenBack } from "./views/managementHeader.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
 import { RankingTab, renderRankings } from "./views/rankings.js";
@@ -4186,15 +4186,38 @@ function buildSaveFailureBar(): HTMLElement | null {
 }
 
 function mountTutorialBar(content: HTMLElement): void {
+  /*
+   * 帯は**見出し帯の下**へ入れる。見出しより上に入れていた頃は、
+   * 画面によって「案内 → 見出し」と「見出し → 案内」が入れ替わっていた
+   * (詳細と管理画面だけ見出しが案内の下にあった)。
+   */
+  const head = content.querySelector<HTMLElement>(":scope > [data-screen-head]");
+  const putTop = (node: HTMLElement) => {
+    if (head) head.after(node); else content.prepend(node);
+  };
   const bar = buildTutorialBar();
-  if (bar) content.prepend(bar);
+  if (bar) putTop(bar);
   // 保存の警告は案内より上。**遊び方より先に知らせる**
   const saveBar = buildSaveFailureBar();
-  if (saveBar) content.prepend(saveBar);
+  if (saveBar) putTop(saveBar);
   const farm = buildFarmBar();
   if (!farm) return;
   const world = content.querySelector(".home-world");
-  if (world) world.before(farm); else content.prepend(farm);
+  if (world) world.before(farm); else putTop(farm);
+}
+
+/**
+ * 見出し帯の左端へ「戻る」を入れる。**戻るはこの1か所からしか出ない。**
+ *
+ * 画面が自分で行き先を渡した帯(階の詳細 → 階の一覧など)には足さない。
+ * 帯を持たない画面(ホーム・戦闘・結果)には出さない。
+ * 前は `position: fixed` の浮いた「戻る」をここで足していて、
+ * 自前の戻り口を持つ画面と2つ並び、巻くと案内帯の上に重なっていた。
+ */
+function mountScreenBack(content: HTMLElement): void {
+  const head = content.querySelector<HTMLElement>(":scope > [data-screen-head]");
+  if (!head || !canGoBack()) return;
+  attachScreenBack(head, goBack);
 }
 
 /** 前景画面には触れず、周回の帯だけを差分更新する。 */
@@ -5801,6 +5824,7 @@ function renderScreen(): void {
     }
   }
 
+  mountScreenBack(content);
   mountTutorialBar(content);
   root.append(content);
   const farmPanel = root.querySelector<HTMLElement>(".farm-equip-sheet__panel");
@@ -5827,16 +5851,6 @@ function renderScreen(): void {
     ]));
   }
   if (showNav) root.append(renderBottomNav(state.screen, navigate));
-  /*
-   * 共通の「戻る」。**自前の見出しを持つ画面には出さない。**
-   * 一覧で持つと足し忘れるので、描き上がった中身をそのまま見て決める。
-   */
-  if (canGoBack() && !content.querySelector(".management-header") && !content.querySelector(OWN_BACK_SELECTOR)) {
-    root.append(renderGlobalBackButton({ onBack: goBack }));
-    document.body.classList.add("has-global-back");
-  } else {
-    document.body.classList.remove("has-global-back");
-  }
   playBgm(bgmSceneOf(state.screen));
 
   const newRouteKey = routeKey();

@@ -6,6 +6,7 @@ import { el } from "../dom.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
+import { screenHeader } from "./managementHeader.js";
 
 export interface GoldDungeonProps {
   player: PlayerState;
@@ -34,10 +35,7 @@ function renderList(props: GoldDungeonProps): HTMLElement {
   });
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["ゴールドダンジョン"]),
-      el("span", { className: "head-note" }, [`残り ${remaining}/${GOLD_DUNGEON_DAILY_LIMIT}回`]),
-    ]),
+    screenHeader("ゴールドダンジョン", { meta: `残り ${remaining}/${GOLD_DUNGEON_DAILY_LIMIT}回` }),
     renderDungeonIntro(
       "ゴールド稼ぎ専用です。装備もダイヤも出ませんが、その分クリア報酬のゴールドが桁違いに大きくなっています。",
       [`⚡${GOLD_DUNGEON_STAMINA_COST}/回`, `1日${GOLD_DUNGEON_DAILY_LIMIT}回まで(日付で回復)`],
@@ -65,10 +63,7 @@ function renderDetail(props: GoldDungeonProps, floor: GoldDungeonFloor): HTMLEle
   ].filter((t): t is string => t !== null);
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, [floor.name]),
-      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: () => props.onSelectFloor(null) }, ["◀ 階層"]),
-    ]),
+    screenHeader(floor.name, { onBack: () => props.onSelectFloor(null), backLabel: "階層選択に戻る" }),
 
     el(
       "section",
@@ -115,7 +110,6 @@ function renderDetail(props: GoldDungeonProps, floor: GoldDungeonFloor): HTMLEle
       el("p", { className: "app-subtitle" }, [`挑戦パーティ(通常パーティと共通): ${party.length}/4体`]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["編成を変更する"]),
     ]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectFloor(null) }, ["◀ 階層選択に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 

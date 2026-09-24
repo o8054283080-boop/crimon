@@ -8,6 +8,7 @@ import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
 import { buildMonsterCard } from "./monsterCard.js";
 import "../ui/summon.css";
+import { screenHeader } from "./managementHeader.js";
 import {
   buildAltar,
   buildFxStage,
@@ -423,13 +424,14 @@ function renderIdle(props: SummonProps): HTMLElement {
   ]) : null;
 
   return el("div", { className: "screen summon-screen" }, [
-    el("div", { className: "summon-top" }, [
-      el("h1", { className: "summon-top__title" }, ["召　喚"]),
-      el("div", { className: "summon-top__wallet" }, [
+    // 見出しは全画面共通の帯。所持数は帯の右端へ
+    screenHeader("召喚", {
+      className: "summon-top",
+      action: el("div", { className: "summon-top__wallet" }, [
         el("span", { className: "summon-wallet" }, [icon("crystal"), String(player.crystal.toLocaleString("ja-JP"))]),
         el("span", { className: "summon-wallet summon-wallet--scroll" }, [icon("scroll"), String(player.summonScrolls)]),
       ]),
-    ]),
+    }),
     // 祭壇は「浮いている絵」ではなく「坩堝の上に立っているもの」にする。
     // 台座と、その下から昇る熾火がホームの寒暖対比をこの画面へつなぐ
     el("div", { className: "summon-stage" }, [buildAltar(), el("i", { className: "summon-stage__plinth" }, [])]),

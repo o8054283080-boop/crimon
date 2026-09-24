@@ -7,6 +7,7 @@ import {
 } from "../../game/gift.js";
 import type { PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { screenHeader } from "./managementHeader.js";
 
 /**
  * プレゼントボックス。**運営から届いたものを、押して受け取る場所。**
@@ -152,7 +153,7 @@ export function renderGiftBox(props: GiftBoxProps): HTMLElement {
     ]);
 
   return el("div", { className: "screen gift-screen" }, nodes([
-    el("h2", { className: "gift-screen__title" }, ["プレゼントボックス"]),
+    screenHeader("プレゼントボックス"),
     el("p", { className: "gift-screen__lead" }, ["運営から届いたものを受け取れます。受取期限を過ぎると受け取れなくなります。"]),
     el("div", { className: "gift-tabs", role: "tablist" }, [
       tabButton("OPEN", "未受取", open.length),

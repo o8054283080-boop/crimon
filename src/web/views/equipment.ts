@@ -4,7 +4,7 @@ import { findEquippedOwner, PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon, slotIcon } from "../icons.js";
-import { managementHeader } from "./managementHeader.js";
+import { managementHeader, screenHeader } from "./managementHeader.js";
 import { compareEquipmentStats, equipmentForSlot, equipmentLockLabel, equipmentStatTotal, sellableEquipmentIds } from "../uxHelpers.js";
 import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
 import { equipmentRarityRank, getEquipmentRarity } from "../../core/equipmentRarity.js";
@@ -687,12 +687,7 @@ function renderList(props: EquipmentProps): HTMLElement {
       `スロット${props.pickerContext.slot}を変更`,
       props.onCancelPicker,
       pickerMonster ? (findMonsterById(pickerMonster.dexId)?.name ?? pickerMonster.dexId) : "",
-    ) : el("header", { className: "app-header" }, [
-      // 「スロット1の装備を選択」は390pxの幅で「…装備を / 選択」と2行に割れ、
-      // 見出しだけで縦100pxを使っていた。同じことを1行で言う
-      el("h1", {}, ["所持装備"]),
-      el("p", { className: "app-subtitle" }, [`${items.length}個`]),
-    ]),
+    ) : screenHeader("所持装備", { meta: `${items.length}個` }),
     props.pickerContext ? null : (props.tabs ?? null),
     toolbar,
     // 枠の行は picker では出さない。**その枠に着く物しか並んでいない**

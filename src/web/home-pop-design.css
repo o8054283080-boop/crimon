@@ -29,6 +29,8 @@ body:has(.crimon-home) {
   --home-safe-top: env(safe-area-inset-top);
   --home-safe-bottom: env(safe-area-inset-bottom);
   --bottom-nav-h: calc(var(--home-nav-base-h) + var(--home-safe-bottom));
+  /* 上の高さに safe-area が入っているので、バーの側では足さない */
+  --bottom-nav-safe: 0px;
   background: var(--home-navy-950) !important;
 }
 
@@ -255,10 +257,21 @@ body:has(.crimon-home) {
    幅が足りない時は crimon-visual-system.css 側の省略記号で畳まれる */
 .crimon-home .reward-banner .compensation__title { font-size: 11px !important; color: var(--home-gold-bright) !important; }
 
-/* HOMEにいる時だけ下部ナビを濃紺＋金にする。他画面の導線へは影響させない。 */
-body:has(.crimon-home) .bottom-nav,
-body:has(.crimon-home) .crimon-bottom-nav {
-  height: var(--bottom-nav-h) !important;
+/*
+ * 下のバー。**どの画面でもホームと同じ金の装飾の絵にする。**
+ *
+ * 前はホームにいる時だけこの絵で、他の画面は線画のアイコンの帯だった。
+ * 下のタブを押して画面を移るたびに、バーそのものが別の物に入れ替わり、
+ * 1つのアプリに見えなかった(U8)。5マスとも同じ並び・同じ絵を使う。
+ *
+ * 高さはホーム以外では `--bottom-nav-h`(64px)+ 下の safe-area。
+ * 絵は `100% 100%` で敷くので、高さが違っても仕切りの位置は同じ割合に残る。
+ */
+body .bottom-nav,
+body .crimon-bottom-nav {
+  /* ホームの `--bottom-nav-h` は safe-area 込み、他の画面は抜き。足りない方だけ足す */
+  height: calc(var(--bottom-nav-h) + var(--bottom-nav-safe, env(safe-area-inset-bottom, 0px))) !important;
+  min-height: 0 !important;
   box-sizing: border-box !important;
   align-items: stretch !important;
   gap: 0 !important;
@@ -268,11 +281,11 @@ body:has(.crimon-home) .crimon-bottom-nav {
   box-shadow: 0 -5px 17px rgba(1, 12, 29, .36) !important;
 }
 
-body:has(.crimon-home) .bottom-nav::before,
-body:has(.crimon-home) .bottom-nav::after { display: none !important; }
+body .bottom-nav::before,
+body .bottom-nav::after { display: none !important; }
 
-body:has(.crimon-home) .bottom-nav__btn,
-body:has(.crimon-home) .crimon-bottom-nav button {
+body .bottom-nav__btn,
+body .crimon-bottom-nav button {
   position: relative !important;
   display: flex !important;
   flex: 1 1 0 !important;
@@ -290,8 +303,8 @@ body:has(.crimon-home) .crimon-bottom-nav button {
   box-shadow: none !important;
 }
 
-body:has(.crimon-home) .bottom-nav__btn + .bottom-nav__btn,
-body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 0 !important; }
+body .bottom-nav__btn + .bottom-nav__btn,
+body .crimon-bottom-nav button + button { margin-left: 0 !important; }
 
 /* 下の帯の5マスは**等分ではない。**
  *
@@ -305,28 +318,28 @@ body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 0 !impo
  * 文字だけを動かすのではなく、**ボタンの幅を仕切りに合わせる。**
  * 文字は中央揃えのままで絵と揃い、押せる範囲もマスと一致する。
  * (絵の中の意匠の重心も測ってあり、マスの中心と±0.35%で一致している) */
-body:has(.crimon-home) .bottom-nav__btn:nth-child(1) { flex: 0 0 21.1% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(2) { flex: 0 0 19.1% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(3) { flex: 0 0 19.1% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(4) { flex: 0 0 19.0% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(5) { flex: 0 0 21.7% !important; }
+body .bottom-nav__btn:nth-child(1) { flex: 0 0 21.1% !important; }
+body .bottom-nav__btn:nth-child(2) { flex: 0 0 19.1% !important; }
+body .bottom-nav__btn:nth-child(3) { flex: 0 0 19.1% !important; }
+body .bottom-nav__btn:nth-child(4) { flex: 0 0 19.0% !important; }
+body .bottom-nav__btn:nth-child(5) { flex: 0 0 21.7% !important; }
 
 /* 左端のマスだけは、絵の仕切りの外に外枠の縁(0.9%)がある。
  * ボタンを画面の左端から始めるぶん中心が0.45%左へ寄るので、
  * 文字だけをその半分ぶん右へ戻す(実測 -1.8px → -0.1px)。 */
-body:has(.crimon-home) .bottom-nav__btn:nth-child(1) .bottom-nav__label {
+body .bottom-nav__btn:nth-child(1) .bottom-nav__label {
   padding-left: 4.3% !important;
 }
 
-body:has(.crimon-home) .bottom-nav__icon {
+body .bottom-nav__icon {
   /* 画像側の大きなシンボルを使う。HTMLアイコンは二重表示しない。 */
   display: none !important;
 }
 
-body:has(.crimon-home) .bottom-nav__label {
+body .bottom-nav__label {
   position: absolute !important;
   right: 2px !important;
-  bottom: calc(7px + var(--home-safe-bottom)) !important;
+  bottom: calc(7px + var(--home-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
   left: 2px !important;
   display: block !important;
   min-height: 0 !important;
@@ -339,8 +352,8 @@ body:has(.crimon-home) .bottom-nav__label {
   text-shadow: 0 1px 3px #000, 0 0 5px #000 !important;
 }
 
-body:has(.crimon-home) .bottom-nav__btn--active,
-body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
+body .bottom-nav__btn--active,
+body .bottom-nav button[aria-current="page"] {
   color: var(--home-gold-bright) !important;
   text-shadow: 0 0 9px rgba(105,215,255,.65) !important;
   background: transparent !important;
@@ -348,7 +361,7 @@ body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
   box-shadow: none !important;
 }
 
-body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !important; }
+body .bottom-nav__btn--active::before { display: none !important; }
 
 /*
  * ここには「ミッションを全部終えた時だけ」HOMEを画面いっぱいの固定レーンに

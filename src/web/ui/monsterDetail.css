@@ -4,17 +4,8 @@
   padding: max(6px, env(safe-area-inset-top)) 8px max(92px, calc(env(safe-area-inset-bottom) + 82px));
 }
 
-.monster-detail-head {
-  display: grid;
-  grid-template-columns: 68px minmax(0, 1fr) 44px;
-  align-items: center;
-  min-height: 44px;
-  border-bottom: 1px solid rgba(255,255,255,.1);
-}
-.monster-detail-head h1 { margin: 0; overflow: hidden; font-size: 1.05rem; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.monster-detail-head button { min-height: 44px; border: 0; background: transparent; color: var(--text); }
-.monster-detail-head__back { display: flex; align-items: center; gap: 2px; padding: 0; font-weight: 800; }
-.monster-detail-head__lock { display: grid; place-items: center; min-width: 44px; opacity: .55; }
+/* 見出しは共通の帯(ui/screenHead.css)。ここは右端の鍵だけ */
+.monster-detail-head__lock { padding: 0; opacity: .6; }
 .monster-detail-head__lock.is-locked { color: #ffd45d; opacity: 1; filter: drop-shadow(0 0 5px #dcae3e88); }
 
 .monster-detail-layout { display: grid; gap: 5px; }

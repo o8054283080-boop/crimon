@@ -11,6 +11,7 @@ import {
 import type { PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAccessoryRow, renderAccessorySummary } from "./accessoryCard.js";
+import { screenHeader } from "./managementHeader.js";
 
 /**
  * アクセサリーの一覧。**持ち物の確認と、着ける先を選ぶ画面を兼ねる。**
@@ -136,13 +137,9 @@ export function renderAccessories(props: AccessoriesProps): HTMLElement {
      * 切り替えるたびに見出しの形が変わると、別の画面へ飛んだように見える。
      */
     props.tabs
-      ? el("header", { className: "app-header" }, [
-        el("h1", {}, ["所持アクセサリー"]),
-        el("p", { className: "app-subtitle" }, [`${list.length}個`]),
-      ])
-      : el("header", { className: "app-header app-header--row" }, [
-        el("h1", {}, [title]),
-      ]),
+      ? screenHeader("所持アクセサリー", { meta: `${list.length}個` })
+      // 装備の枠を選び直す時(「スロット1を変更 / 名前」)と同じ形にそろえる
+      : screenHeader(props.pickFor ? "アクセを変更" : title, props.pickFor && pickedName ? { meta: pickedName } : {}),
     props.tabs ?? null,
     props.notice ? el("p", { className: "acc-note", role: "status" }, [props.notice]) : null,
     props.pickFor && pickedMonster?.accessoryId

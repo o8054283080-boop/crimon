@@ -20,6 +20,7 @@ import { el } from "../dom.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 import "../ui/catalog.css";
+import { screenHeader } from "./managementHeader.js";
 
 export interface StagesProps {
   player: PlayerState;
@@ -233,11 +234,8 @@ function renderList(props: StagesProps): HTMLElement {
   const resumeStage = nextStage ?? STAGES[STAGES.length - 1];
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "stages-head" }, [
-      el("div", { className: "stages-head__row" }, [
-        el("h1", { className: "stages-head__title" }, ["ステージ選択"]),
-        el("span", { className: "stages-head__stamina" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
-      ]),
+    screenHeader("ステージ選択", { meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
+    el("div", { className: "stages-head" }, [
       el("div", { className: "stages-head__progress" }, [
         progressBar(clearedTotal / STAGES.length, "cat-bar--total"),
         el("span", { className: "stages-head__count" }, [`${clearedTotal}/${STAGES.length}`]),
@@ -344,13 +342,10 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
   ].filter((t): t is string => t !== null);
 
   return el("div", { className: "screen stages-screen stage-detail-screen", style: `--ch:${look.color};--ch2:${look.color2}` }, [
+    // 戻るは見出しの1つだけ(前は絵の上の「◀」と、下の「◀ ステージ選択に戻る」の2つ)
+    screenHeader(`第${stage.chapter}章 ${look.title}`, { onBack: () => props.onSelectStage(null), backLabel: "ステージ選択に戻る", meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
     el("header", { className: "stage-hero" }, [
       el("span", { className: "stage-hero__scenery" }, [look.scenery]),
-      el(
-        "button",
-        { type: "button", className: "stage-hero__back", onclick: () => props.onSelectStage(null) },
-        ["◀"],
-      ),
       el("div", { className: "stage-hero__chapter" }, [`CHAPTER ${stage.chapter} · ${look.title}`]),
       el("h1", { className: "stage-hero__name" }, [stage.name]),
       el("div", { className: "stage-hero__tags" }, [
@@ -419,7 +414,6 @@ function renderDetail(props: StagesProps, stage: Stage): HTMLElement {
       ]),
     ]),
 
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectStage(null) }, ["◀ ステージ選択に戻る"]),
   ]);
 }
 

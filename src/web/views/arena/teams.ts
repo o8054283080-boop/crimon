@@ -27,18 +27,11 @@ import { arenaDefenseView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
 import { renderArenaUnitInspector } from "./unitInspector.js";
 import { ARENA_TEAM_SIZE } from "../../../data/pvpArena.js";
+import { screenHeader } from "../managementHeader.js";
 
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
-}
-
-function backRow(props: PvpArenaProps): HTMLElement {
-  return el(
-    "button",
-    { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onGo("TOP") },
-    ["◀ アリーナに戻る"],
-  );
 }
 
 /**
@@ -102,10 +95,7 @@ export function renderArenaOffenseTeam(props: PvpArenaProps): HTMLElement {
   const selectedIds = props.player.arenaOffenseIds;
   const members = [...props.offenseMembers];
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["攻撃編成"]),
-      el("span", { className: "head-note" }, [`${selectedIds.length} / ${ARENA_TEAM_SIZE}`]),
-    ]),
+    screenHeader("攻撃編成", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る", meta: `${selectedIds.length} / ${ARENA_TEAM_SIZE}` }),
     el("section", { className: "panel" }, nodes([
       el("p", { className: "ar-note" }, [
         "こちらから挑む時の編成です。相手の編成を見てから選べるので、ステージ用とは別に組めます",
@@ -115,7 +105,6 @@ export function renderArenaOffenseTeam(props: PvpArenaProps): HTMLElement {
         : renderPartySlots(members, ARENA_TEAM_SIZE),
     ])),
     renderPicker(props, selectedIds, props.onToggleOffenseMember),
-    backRow(props),
   ]));
 }
 
@@ -161,10 +150,7 @@ export function renderArenaDefense(props: PvpArenaProps): HTMLElement {
       ]);
 
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["防衛"]),
-      el("span", { className: "head-note" }, [`${draftIds.length} / ${ARENA_TEAM_SIZE}`]),
-    ]),
+    screenHeader("防衛", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る", meta: `${draftIds.length} / ${ARENA_TEAM_SIZE}` }),
     props.notice ? el("p", { className: "panel ar-notice" }, [props.notice]) : null,
     registeredSection,
     // 登録済みの中身は、相手を検分するのと同じ部品で見せる
@@ -194,6 +180,5 @@ export function renderArenaDefense(props: PvpArenaProps): HTMLElement {
       ? el("p", { className: "ar-card__blocked" }, ["1体以上選ぶと登録できます"])
       : null,
     renderPicker(props, draftIds, props.onToggleDefenseDraft),
-    backRow(props),
   ]));
 }

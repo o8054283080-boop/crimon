@@ -243,7 +243,7 @@ export const INSPECT = `(() => {
   }
 
   // 7. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
-  const header = document.querySelector('.app-header h1, .battle-topbar__title');
+  const header = document.querySelector('.screen-head__title, .app-header h1, .battle-topbar__title');
   if (header) {
     const hr = header.getBoundingClientRect();
     for (const el of document.querySelectorAll('.battle-logstrip, .shop-notice, .app-subtitle')) {

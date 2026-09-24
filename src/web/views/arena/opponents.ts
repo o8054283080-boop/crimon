@@ -13,17 +13,10 @@ import { PvpArenaProps } from "./props.js";
 import { renderArenaUnitInspector } from "./unitInspector.js";
 import { findMonsterById } from "../../../data/monsters.js";
 import { withPortrait } from "../../three/portrait.js";
+import { screenHeader } from "../managementHeader.js";
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
-}
-
-function backRow(props: PvpArenaProps): HTMLElement {
-  return el(
-    "button",
-    { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onGo("TOP") },
-    ["◀ アリーナに戻る"],
-  );
 }
 
 /** 候補1人の札。**名前・レート・ランク・編成が札の上で全部見える** */
@@ -87,10 +80,7 @@ function renderCandidate(props: PvpArenaProps, entry: ArenaOpponentEntry): HTMLE
 export function renderArenaOpponents(props: PvpArenaProps): HTMLElement {
   const list = [...props.candidates];
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["対戦"]),
-      el("span", { className: "head-note" }, [`挑戦券 ${props.player.arenaTickets} / ${props.ticketMax}`]),
-    ]),
+    screenHeader("対戦", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る", meta: `挑戦券 ${props.player.arenaTickets} / ${props.ticketMax}` }),
     props.notice ? el("p", { className: "panel ar-notice" }, [props.notice]) : null,
     el("section", { className: "panel ar-listhead" }, nodes([
       el("p", { className: "ar-listhead__note" }, [
@@ -112,7 +102,6 @@ export function renderArenaOpponents(props: PvpArenaProps): HTMLElement {
      * 「どれも違った」と分かった直後にいちばんやらせたくない動きになる。
      */
     list.length > 0 ? el("section", { className: "panel ar-listhead" }, [rerollButton(props)]) : null,
-    backRow(props),
   ]));
 }
 
@@ -149,19 +138,15 @@ export function renderArenaOpponentDetail(props: PvpArenaProps): HTMLElement {
   const entry = props.detailEntry;
   if (!entry) {
     return el("div", { className: "screen ar-screen" }, [
-      el("header", { className: "app-header" }, [el("h1", {}, ["相手の編成"])]),
+      screenHeader("相手の編成", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る" }),
       el("p", { className: "panel ar-empty" }, ["相手が選ばれていません"]),
-      backRow(props),
     ]);
   }
   const view = arenaOpponentView(entry, props.player.arenaPoints);
   const ready = props.offenseMembers.length > 0 && props.player.arenaTickets > 0 && view.usable;
 
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, [view.name]),
-      el("span", { className: "head-note" }, [`${view.tier.name} ${view.rating.toLocaleString("ja-JP")}`]),
-    ]),
+    screenHeader(view.name, { onBack: () => props.onGo("OPPONENTS"), backLabel: "相手の一覧へ戻る", meta: `${view.tier.name} ${view.rating.toLocaleString("ja-JP")}` }),
     el("section", { className: "panel ar-detailhead", style: `--tier:${view.tier.color}` }, nodes([
       el("div", { className: "ar-card__tags" }, nodes([
         el("span", { className: `ar-chip${view.isNpc ? "" : " ar-chip--player"}` }, [view.isNpc ? "NPC" : "プレイヤー"]),
@@ -177,11 +162,6 @@ export function renderArenaOpponentDetail(props: PvpArenaProps): HTMLElement {
       "button",
       { type: "button", className: "btn btn--gold btn--large", disabled: !ready, onclick: () => props.onChallenge(entry) },
       ["この相手に挑戦する"],
-    ),
-    el(
-      "button",
-      { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onGo("OPPONENTS") },
-      ["◀ 相手の一覧へ"],
     ),
   ]));
 }

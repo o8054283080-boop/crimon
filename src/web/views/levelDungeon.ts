@@ -6,6 +6,7 @@ import { el } from "../dom.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
+import { screenHeader } from "./managementHeader.js";
 
 export interface LevelDungeonProps {
   player: PlayerState;
@@ -38,10 +39,7 @@ function renderList(props: LevelDungeonProps): HTMLElement {
   }));
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["育成ダンジョン"]),
-      el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
-    ]),
+    screenHeader("育成ダンジョン", { meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
     renderDungeonIntro(
       "モンスターの経験値稼ぎ専用です。クリアするたびに、餌にすると経験値が入る「経験ピッグ」も必ず手に入ります。",
       [
@@ -72,10 +70,7 @@ function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLEleme
   ].filter((t): t is string => t !== null);
 
   return el("div", { className: "screen stages-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, [def.name]),
-      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: () => props.onSelectTier(null) }, ["◀ 一覧"]),
-    ]),
+    screenHeader(def.name, { onBack: () => props.onSelectTier(null), backLabel: "一覧に戻る", meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
 
     // 挑戦の入口を先に置く。周回のたびに説明を読み飛ばすスクロールをさせない
     el(
@@ -123,7 +118,6 @@ function renderDetail(props: LevelDungeonProps, def: LevelDungeonDef): HTMLEleme
       el("p", { className: "app-subtitle" }, [`挑戦パーティ(通常パーティと共通): ${party.length}/4体`]),
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["編成を変更する"]),
     ]),
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onSelectTier(null) }, ["◀ 階の一覧に戻る"]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 

@@ -360,7 +360,8 @@ async function goScreen(screen) {
        * 戻るボタンが消えるまで押して、必ず同じところから始める。
        */
       for (let i = 0; i < 4; i += 1) {
-        const back = document.querySelector('.global-back');
+        // 戻るは見出し帯の左端に1つだけ(data-tour="back")。前は浮いた .global-back だった
+        const back = document.querySelector('[data-tour="back"]');
         if (!back) break;
         back.click();
         await wait(200);

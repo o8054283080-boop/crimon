@@ -23,7 +23,7 @@ import { icon } from "../icons.js";
 import { CreateSlot, currentSkillOf, describeCreatedSkill } from "../../game/monsterCreate.js";
 import { renderSkillRows } from "./skillPanel.js";
 import { withPortrait } from "../three/portrait.js";
-import { managementHeader } from "./managementHeader.js";
+import { managementHeader, screenHeadAction, screenHeader } from "./managementHeader.js";
 import { stickyActions } from "./stickyActions.js";
 import { computeLeveledSkill, describeSkillLines, MAX_SKILL_LEVEL } from "../../core/skill.js";
 import { describeSkillTarget, renderSkillGrowthSummary, skillDescriptionText } from "./skillPanel.js";
@@ -123,15 +123,12 @@ function renderList(props: MonstersProps): HTMLElement {
   });
 
   return el("div", { className: "screen monsters-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["所持モンスター"]),
-      /*
-       * 交換所は**余りが並ぶこの場所から入る。**
-       * 目覚素材の交換所を一度ショップへ置こうとして間違えている
-       * (集める場所から離すと使われない)。
-       */
-      el("button", { type: "button", className: "btn btn--ghost head-action", onclick: props.onGoMonsterDex }, ["📖 図鑑"]),
-    ]),
+    /*
+     * 交換所は**余りが並ぶこの場所から入る。**
+     * 目覚素材の交換所を一度ショップへ置こうとして間違えている
+     * (集める場所から離すと使われない)。
+     */
+    screenHeader("所持モンスター", { action: screenHeadAction("📖 図鑑", props.onGoMonsterDex) }),
     el("section", { className: "panel monsters-list-panel" }, [
       el("div", { className: "bulk-bar__row" }, [
         el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoStorage }, ["📦 モンスター保管所"]),
@@ -410,18 +407,19 @@ function renderDetail(props: MonstersProps, instance: MonsterInstance, options: 
   const onToggleLock = options.onToggleLock ?? props.onToggleLock;
 
   return el("div", { className: "screen monsters-screen monster-detail-screen" }, [
-    el("header", { className: "monster-detail-head" }, [
-      el("button", { type: "button", className: "monster-detail-head__back", onclick: onBack, ariaLabel: options.backLabel ?? "所持モンスター一覧へ戻る" }, [icon("back", { size: 17 }), options.backLabel ?? "戻る"]),
-      el("h1", {}, [dex?.name ?? instance.dexId ?? "名称未設定"]),
-      el("button", {
+    screenHeader(dex?.name ?? instance.dexId ?? "名称未設定", {
+      onBack,
+      backLabel: options.backLabel ?? "所持モンスター一覧へ戻る",
+      className: "monster-detail-head",
+      action: el("button", {
         type: "button",
-        className: `monster-detail-head__lock${lockView.locked ? " is-locked" : ""}`,
+        className: `screen-head__action monster-detail-head__lock${lockView.locked ? " is-locked" : ""}`,
         onclick: (event: MouseEvent) => { event.stopPropagation(); onToggleLock(instance.id); },
         ariaLabel: lockView.label,
         title: lockView.title,
         "aria-pressed": String(lockView.locked),
       }, [icon("lock", { size: 19 })]),
-    ]),
+    }),
     el("main", { className: "monster-detail-layout" }, [
       el("section", { className: "monster-detail monster-detail-summary", "data-star": String(instance.star) }, [
         el("div", { className: "monster-detail__hero" }, [
