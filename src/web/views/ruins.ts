@@ -95,7 +95,7 @@ function renderList(props: RuinsProps): HTMLElement {
       }, [RUIN_NAME[kind]]))),
     renderDungeonIntro(
       props.kind === "POWER"
-        ? "指揮兵器を倒せば勝ち。号令塔・妨害塔を倒すと指揮兵器が強くなります。"
+        ? "指揮兵器を倒せば勝ち。号令塔・妨害塔を倒すと指揮兵器が強くなります。4階からは号令塔が指揮兵器に護りを張り、解除で剥がすと張り直すまで穴が開きます。"
         : "霊獣を倒せば勝ち。身代わり像が霊獣のダメージを肩代わりします(解除で剥がせます)。",
       [`アクセ(${familiesText(props.kind)})が必ず落ちる`, "曜日の縛りなし"],
     ),

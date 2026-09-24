@@ -327,7 +327,9 @@ export interface BattleEngineOptions {
    * そこから `everyTurns` 手番ごとに `factorPerStep` 倍ずつ**累積**する。
    * 上限は設けない——上限を置くと、そこで再び「終わらない」が戻ってくる。
    *
-   * **この設定はアリーナ専用。**PvEへ持ち込むと、耐久編成で塔を登る道が消える。
+   * **PvEへ一律に持ち込まないこと。**耐久編成で塔を登る道が消える。
+   * PvEで使っているのは、敵の特性 `bossTraits.battleDamageRamp` を持つ
+   * 力の遺跡4・5階の指揮兵器だけ(その戦闘に限って、ここへ入る)。
    */
   damageRamp?: DamageRampConfig;
 }
