@@ -941,7 +941,7 @@ psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authentic
 
 **遺跡のボスの絵(依頼主の描いた専用の2枚):**
 
-- `ruin_commander-FIRE.webp`(指揮兵器)/ `ruin_spirit-WATER.webp`(霊獣)。
+- 絵は `ruin_commander-FIRE`(指揮兵器)と `ruin_spirit-WATER`(霊獣)。
   **種族は古代の魔人・古代のけものを借りたまま**で、絵だけを `artTemplateId` で差し替えている
   (`MonsterDefinition.artTemplateId` / `appearanceTemplateOf`)。`templateId` を書き換えると
   種族で引く処理すべてに波及し、新しい図鑑を足すとアリーナの照合表が動くため。
