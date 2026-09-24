@@ -157,6 +157,8 @@ HARNESS_PORT=<port> node tools/tour.mjs   # 全画面の巡回
   止めるのは自分のポートだけ(`lsof -ti :<port> | xargs -r kill`)
 - 報告は日本語
 - **同時に立てるのは2〜3個まで。** 5個並べてセッション上限を焼き切った
+- UIとバランスを良くする時は、**評価する役と直す役を分けた4役**が `.claude/agents/` にある
+  (辛口評価UI・辛口評価バランス・改善・目隠し判定)。回し方は `docs/improvement-loop.md`
 
 ## 今どこまで進んでいるか
 
