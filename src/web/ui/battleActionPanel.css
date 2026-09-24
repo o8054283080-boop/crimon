@@ -1,0 +1,125 @@
+/*
+ * 戦闘画面の下端: 対象選び(スキルドックの置き換え)と決着の帯。
+ *
+ * ## 対象選びを浮かせない
+ *
+ * 以前は対象選びの札を戦場の上(下から108px)へ浮かせていて、
+ * **左下の味方(P1)の本体に乗っていた。**味方単体スキルで
+ * いちばん下の味方を狙えず、`elementFromPoint` でもP1の位置は札が返っていた。
+ * いまはスキルドックの中身をその場で入れ替える。高さはスキルの列とほぼ同じで、
+ * 戦場の上に新しく覆うものを作らない。
+ *
+ * ## 下の safe-area は変数を通す
+ *
+ * `--battle-safe-bottom` は `.screen.battle-view`(style.css)で
+ * `env(safe-area-inset-bottom)` から作っている。確認用ブラウザでは env() が0なので、
+ * この変数へ34pxを入れれば iPhone のホームバーぶんを再現して撮れる。
+ */
+
+/* --- 対象選び(スキルドックの中) --- */
+.battle-view .skill-dock--target {
+  gap: 4px;
+  /* 文字と押しボタンが戦場の上に乗るので、スキルの列より少し濃く敷く */
+  background: linear-gradient(0deg, rgba(4, 6, 14, 0.92) 62%, transparent);
+}
+
+.battle-view .skill-dock .action-panel--target {
+  width: min(380px, 100%);
+  max-width: none;
+  padding: 0;
+  gap: 5px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  pointer-events: auto;
+}
+
+.battle-view .skill-dock .action-panel__title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #eaf0ff;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 「敵を / 味方を」だけ色を変え、どちらを叩くかを一目で分ける */
+.battle-view .action-panel--enemy .action-panel__side {
+  color: #ff9a8a;
+}
+
+.battle-view .action-panel--ally .action-panel__side {
+  color: #86e8a8;
+}
+
+.battle-view .skill-dock .action-panel__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.battle-view .skill-dock .action-panel__row .btn {
+  min-height: 44px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.battle-view .skill-dock .action-panel__chosen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 90, 74, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 120, 100, 0.55);
+}
+
+.battle-view .action-panel--ally .action-panel__chosen {
+  background: rgba(70, 200, 120, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(120, 230, 160, 0.55);
+}
+
+.battle-view .skill-dock .action-panel__chosen-name {
+  min-width: 0;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.battle-view .skill-dock .action-panel__chosen-hp {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+/* --- 決着の帯(勝敗の札と、結果へ進むボタン) --- */
+.battle-result-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px max(10px, env(safe-area-inset-right)) max(6px, var(--battle-safe-bottom, 0px))
+    max(10px, env(safe-area-inset-left));
+  background: #05070f;
+}
+
+.battle-result-foot--hidden {
+  display: none;
+}
+
+.battle-result-foot .result-banner {
+  padding: 10px;
+}
+
+.battle-result-foot .battle-controls__finish {
+  min-height: 46px;
+}

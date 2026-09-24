@@ -8,9 +8,21 @@
  *   npx tsx tools/ruinPressure.ts                     # 5階・全編成・STRONG/FINISHED
  *   npx tsx tools/ruinPressure.ts --floors 1,2,3,4,5 --gear TYPICAL,STRONG --trials 200
  *   npx tsx tools/ruinPressure.ts --size 4            # 4体で測る(本編はダンジョン編成の5体)
+ *   npx tsx tools/ruinPressure.ts --aim 既定,本体,号令塔,妨害塔 --teams 力
  *
- * 「像先落とし」の編成だけ、戦闘開始時に身代わり像へ集中攻撃を指定する
- * (本編の画面で敵をタップして狙いを決めるのと同じ `setFocusTarget`)。
+ * ## 狙い(`--aim`)を必ず2通りで測る
+ *
+ * 本編には狙いが2通りある。**放置周回は狙いを付けられない**(既定の自動の狙い)が、
+ * 手で遊ぶ人は本体を1回タップするだけで狙い撃ちになる(`setFocusTarget`)。
+ * 片方だけで目安を合わせると、もう片方が別の難しさの階になる
+ * (力5階STRONGの汎用が 既定19% / 本体を狙い撃ち94% だった)。
+ * 既定は `既定,本体` の2通り。`号令塔` `妨害塔` は「その塔を先に落とす」手。
+ *
+ * - 既定 … 編成に書いた狙い(`focus`)。書いていなければ狙い無し(放置周回と同じ)
+ * - 本体 … 開幕に勝利条件の敵(並び0)を狙う
+ * - 号令塔 / 妨害塔 … 開幕にその塔(並び1 / 2)を狙う。倒れたら狙いは外れ、既定の狙いに戻る
+ *
+ * 「像先落とし」の編成は、既定の狙いが身代わり像になっている。
  */
 import { BattleEngine } from "../src/battle/engine.js";
 import { findRuinFloor, type RuinKind } from "../src/data/ruins.js";
@@ -45,6 +57,22 @@ const GENERIC_NO_POISON: AllySpec[] = GENERIC.map((a) => (a.templateId === "imp"
 
 export const RUIN_TEAMS: Record<string, RuinTeam> = {
   "力・汎用": { kind: "POWER", purpose: "属性を合わせない通常の編成", allies: GENERIC },
+  /*
+   * 通常モンスターだけで火に強い水を揃えた5体。**「属性を合わせれば通る」が、
+   * SR/SSRを持っていない人にも成り立つか**を見る(制圧は5体とも高レア)。
+   * 汎用と同じく毒(水スライム・水インプ)を持つ。
+   */
+  "力・通常水": {
+    kind: "POWER",
+    purpose: "通常モンスターだけで水に揃えた編成",
+    allies: [
+      ally("主力・水ナイト", "knight", "WATER", "MAX_ATTACKER"),
+      ally("妨害・水スライム", "slime", "WATER", "MAX_DEBUFFER"),
+      ally("妨害・水インプ", "imp", "WATER", "MAX_DEBUFFER"),
+      ally("回復・水フェアリー", "fairy", "WATER", "MAX_HEALER"),
+      ally("主力・水ウルフ", "wolf", "WATER", "MAX_ATTACKER"),
+    ],
+  },
   "力・制圧(水)": {
     kind: "POWER",
     purpose: "火に強い水で揃え、本体へ火力を集める",
@@ -110,33 +138,55 @@ export const RUIN_TEAMS: Record<string, RuinTeam> = {
   },
 };
 
+export type RuinAim = "既定" | "本体" | "号令塔" | "妨害塔";
+export const RUIN_AIMS: readonly RuinAim[] = ["既定", "本体", "号令塔", "妨害塔"];
+const AIM_INDEX: Record<Exclude<RuinAim, "既定">, number> = { 本体: 0, 号令塔: 1, 妨害塔: 2 };
+
 export interface RuinResult {
   rate: number;
   bossHpLeft: number;
   turns: number;
   timeoutRate: number;
+  /** 倒した取り巻きの数(0〜2)の平均 */
+  towerKills: number;
+  /** 倒れた味方の数の平均 */
+  allyDeaths: number;
 }
 
-export function measureRuin(team: RuinTeam, floorNum: number, gear: GearGrade, trials: number, size: number, seedBase = 700): RuinResult {
+/** その狙いで開幕に指定する敵の並び番号。undefined なら狙い無し */
+function focusIndexOf(team: RuinTeam, aim: RuinAim): number | undefined {
+  return aim === "既定" ? team.focus : AIM_INDEX[aim];
+}
+
+export function measureRuin(
+  team: RuinTeam, floorNum: number, gear: GearGrade, trials: number, size: number, seedBase = 700, aim: RuinAim = "既定",
+): RuinResult {
   const floor = findRuinFloor(team.kind, floorNum);
   if (!floor) throw new Error(`${team.kind} ${floorNum}階が無い`);
-  let wins = 0, bossLeft = 0, turns = 0, timeouts = 0;
+  const focus = focusIndexOf(team, aim);
+  let wins = 0, bossLeft = 0, turns = 0, timeouts = 0, towerKills = 0, allyDeaths = 0;
   for (let t = 0; t < trials; t += 1) {
     const rng = mulberry32(seedBase + t * 7919 + floorNum * 31);
     const allies = team.allies.slice(0, size).map((spec) => buildAlly(spec, rng, gear));
     const engine = new BattleEngine(allies, buildDungeonEnemyTeam(floor), { rng });
-    if (team.focus !== undefined) {
-      const target = engine.getUnits().filter((u) => u.team === "ENEMY")[team.focus];
+    if (focus !== undefined) {
+      const target = engine.getUnits().filter((u) => u.team === "ENEMY")[focus];
       if (target) engine.setFocusTarget(target.instanceId);
     }
     const result = engine.run();
     if (result.winner === "PLAYER") wins += 1;
     if (result.winner === "DRAW" || (result.winner !== "PLAYER" && result.turnsTaken >= 300)) timeouts += 1;
-    const boss = engine.getUnits().find((u) => u.team === "ENEMY" && u.def.victoryTarget);
+    const units = engine.getUnits();
+    const boss = units.find((u) => u.team === "ENEMY" && u.def.victoryTarget);
     bossLeft += boss ? boss.currentHp / boss.maxHp : 0;
     turns += result.turnsTaken;
+    towerKills += units.filter((u) => u.team === "ENEMY" && !u.def.victoryTarget && !u.alive).length;
+    allyDeaths += units.filter((u) => u.team === "PLAYER" && !u.alive).length;
   }
-  return { rate: wins / trials, bossHpLeft: bossLeft / trials, turns: turns / trials, timeoutRate: timeouts / trials };
+  return {
+    rate: wins / trials, bossHpLeft: bossLeft / trials, turns: turns / trials, timeoutRate: timeouts / trials,
+    towerKills: towerKills / trials, allyDeaths: allyDeaths / trials,
+  };
 }
 
 if (process.argv[1]?.endsWith("ruinPressure.ts")) {
@@ -150,12 +200,19 @@ if (process.argv[1]?.endsWith("ruinPressure.ts")) {
   const trials = Number(opt("--trials", "200"));
   const size = Number(opt("--size", "5"));
   const only = opt("--teams", "");
+  const aims = opt("--aim", "既定,本体").split(",") as RuinAim[];
+  for (const aim of aims) if (!RUIN_AIMS.includes(aim)) throw new Error(`--aim は ${RUIN_AIMS.join(" / ")} のどれか: ${aim}`);
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
   for (const floor of floors) for (const gear of gears) {
     console.log(`\n=== ${floor}階 / ${gear} / ${size}体 / ${trials}戦 ===`);
     for (const [name, team] of Object.entries(RUIN_TEAMS)) {
       if (only && !name.includes(only)) continue;
-      const r = measureRuin(team, floor, gear, trials, size);
-      console.log(`${name}: 勝率${(r.rate * 100).toFixed(1)}% 本体残HP${(r.bossHpLeft * 100).toFixed(1)}% 平均手数${r.turns.toFixed(0)} 時間切れ${(r.timeoutRate * 100).toFixed(1)}%`);
+      for (const aim of aims) {
+        // 守護の遺跡に「号令塔」「妨害塔」は無い(並び1・2は身代わり像・霧の巫女)ので、名前の合う狙いだけ
+        if (team.kind === "GUARDIAN" && (aim === "号令塔" || aim === "妨害塔")) continue;
+        const r = measureRuin(team, floor, gear, trials, size, 700, aim);
+        console.log(`${name} [狙い:${aim}]: 勝率${pct(r.rate)} 本体残HP${pct(r.bossHpLeft)} 平均手数${r.turns.toFixed(0)} 時間切れ${pct(r.timeoutRate)} 塔撃破${r.towerKills.toFixed(2)} 倒れた味方${r.allyDeaths.toFixed(2)}`);
+      }
     }
   }
 }

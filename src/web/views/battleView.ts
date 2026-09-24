@@ -1,5 +1,6 @@
 import "../ui/battleSurrender.css";
 import "../ui/battleSkillName.css";
+import "../ui/battleActionPanel.css";
 import { BattleEngine, BattleEvent, BattleWinner, ManualChoice, TurnRecord, UnitSnapshot } from "../../battle/engine.js";
 import { formatHpPair } from "../../core/stats.js";
 import { BattleUnit } from "../../battle/unit.js";
@@ -140,6 +141,16 @@ const LEADER_MIN = 18;
  */
 const HUD_MIN_SCALE = 0.88;
 
+/**
+ * 対象選びの案内で「どちらを叩くか」。
+ *
+ * 以前は「敵をタップして選び」で固定されていて、回復など
+ * **味方単体のスキルでも「敵を」と出ていた。**
+ */
+export function targetSideOf(target: string): "敵" | "味方" {
+  return target === "SINGLE_ALLY" ? "味方" : "敵";
+}
+
 export function actionNamesFromLines(lines: readonly string[]): string[] {
   return lines
     .filter((line) => !line.startsWith(" "))
@@ -217,7 +228,11 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       card.setAttribute("aria-label", `${unit.def.name}を集中攻撃ターゲットに指定`);
       card.addEventListener("pointerup", (event) => {
         event.stopPropagation();
-        if (picker.phase === "TARGET") return;
+        // 対象選びの最中なら、札を叩いてもその敵を選べるようにする
+        if (picker.phase === "TARGET") {
+          pickTargetDuringSelection(unit.instanceId);
+          return;
+        }
         engine.setFocusTarget(unit.instanceId);
         syncFocusTarget();
       });
@@ -364,7 +379,6 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
   }
   overlayFrame = requestAnimationFrame(syncOverlay);
 
-  const actionPanelEl = el("div", { className: "action-panel-slot" });
   const skillDock = el("div", { className: "skill-dock" });
 
   /** スキルドックに出す対象。手番待ちならその者、そうでなければ直前に動いた味方 */
@@ -376,8 +390,21 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 手番が来ていない時も、直前に動いた味方のスキルとクールタイムを
    * 出したままにする。押せる時だけ現れる作りだと、そのたびに
    * 画面の高さが変わって戦場が揺れてしまう。
+   *
+   * **対象を選んでいる間は、スキルの列をその場で対象選びに置き換える。**
+   * 以前は対象選びの札を戦場の上(下から108px)へ浮かせていて、
+   * **左下の味方(P1)の真上に乗っていた。**味方単体スキルで
+   * いちばん下の味方を回復したくても、本体が札に隠れて見えず狙えない。
+   * そのうえ下のスキル欄は「直前に動いた別の味方」を出したままで、
+   * 誰の手番なのかを画面が取り違えていた。
+   * 置き換えれば、覆うものが増えず、持ち主の名前も同じ場所に残る。
    */
   function renderSkillDock(): void {
+    if (picker.phase === "TARGET") {
+      renderTargetDock(picker.unit, picker.skillIndex);
+      return;
+    }
+    skillDock.classList.remove("skill-dock--target");
     const unit = picker.phase === "SKILL" ? picker.unit : dockUnit;
     if (!unit) {
       skillDock.replaceChildren();
@@ -729,71 +756,94 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     return [];
   }
 
+  /**
+   * 対象選び。スキルドックの場所に、スキルの列と入れ替えて出す。
+   *
+   * 持ち主の名前(`skill-dock__owner`)は**スキルを選んだ時と同じ位置に残す。**
+   * 押した本人の名前が、押した場所のすぐ上に見えたままになる。
+   */
+  function renderTargetDock(unit: BattleUnit, skillIndex: 0 | 1 | 2): void {
+    const skill = unit.def.skills[skillIndex];
+    const candidates = getTargetCandidates(unit, skill);
+    // 選んでいた相手が倒れていたら選び直させる
+    if (selectedTargetId && !candidates.some((t) => t.instanceId === selectedTargetId)) selectedTargetId = null;
+    // 迷わせないよう、最初の1体をあらかじめ選んでおく
+    if (!selectedTargetId && candidates.length > 0) selectedTargetId = candidates[0].instanceId;
+    stage.setTargetedUnit(selectedTargetId);
+
+    const chosen = candidates.find((t) => t.instanceId === selectedTargetId);
+    const side = targetSideOf(skill.target);
+    const sideClass = side === "味方" ? "ally" : "enemy";
+    skillDock.classList.add("skill-dock--active", "skill-dock--target");
+
+    skillDock.replaceChildren(
+      el("div", { className: "skill-dock__owner" }, [unit.def.name]),
+      el("div", { className: `action-panel action-panel--target action-panel--${sideClass}` }, [
+        el("div", { className: "action-panel__title" }, [
+          `「${skill.name}」の対象 ― `,
+          el("span", { className: "action-panel__side" }, [side]),
+          "をタップ",
+        ]),
+        el("div", { className: "action-panel__row" }, [
+          el(
+            "button",
+            {
+              type: "button",
+              className: "btn btn--ghost action-panel__back",
+              title: "スキルを選び直す",
+              onclick: () => {
+                picker = { phase: "SKILL", unit };
+                selectedTargetId = null;
+                stage.setTargetedUnit(null);
+                renderActionPanel();
+              },
+            },
+            ["◀ 戻る"],
+          ),
+          chosen
+            ? el("div", { className: "action-panel__chosen", title: `${chosen.def.name} HP ${chosen.currentHp}/${chosen.maxHp}` }, [
+                el("span", { className: "action-panel__chosen-name" }, [parseUnitName(chosen.def.name).base || chosen.def.name]),
+                el("span", { className: "action-panel__chosen-hp" }, [formatHpPair(chosen.currentHp, chosen.maxHp)]),
+              ])
+            : el("div", { className: "action-panel__chosen" }, ["未選択"]),
+          el(
+            "button",
+            {
+              type: "button",
+              className: "btn btn--primary action-panel__decide",
+              disabled: !chosen,
+              onclick: () => {
+                if (!selectedTargetId) return;
+                const id = selectedTargetId;
+                selectedTargetId = null;
+                stage.setTargetedUnit(null);
+                handleTargetPicked(unit, skillIndex, id);
+              },
+            },
+            ["決定"],
+          ),
+        ]),
+      ]),
+    );
+  }
+
   function renderActionPanel(): void {
     renderSkillDock();
-    actionPanelEl.innerHTML = "";
-    if (picker.phase === "TARGET") {
-      const { unit, skillIndex } = picker;
-      const skill = unit.def.skills[skillIndex];
-      const candidates = getTargetCandidates(unit, skill);
-      // 選んでいた相手が倒れていたら選び直させる
-      if (selectedTargetId && !candidates.some((t) => t.instanceId === selectedTargetId)) selectedTargetId = null;
-      // 迷わせないよう、最初の1体をあらかじめ選んでおく
-      if (!selectedTargetId && candidates.length > 0) selectedTargetId = candidates[0].instanceId;
-      stage.setTargetedUnit(selectedTargetId);
-
-      const chosen = candidates.find((t) => t.instanceId === selectedTargetId);
-      actionPanelEl.append(
-        el("div", { className: "action-panel action-panel--target" }, [
-          el("div", { className: "action-panel__title" }, [`「${skill.name}」の対象を選んでください`]),
-          el("div", { className: "action-panel__hint" }, ["敵をタップして選び、決定で発動します"]),
-          chosen
-            ? el("div", { className: "action-panel__chosen" }, [
-                el("span", { className: "action-panel__chosen-name" }, [chosen.def.name]),
-                el("span", { className: "action-panel__chosen-hp" }, [`${chosen.currentHp}/${chosen.maxHp}`]),
-              ])
-            : el("div", { className: "action-panel__chosen" }, ["対象が選ばれていません"]),
-          el("div", { className: "action-panel__row" }, [
-            el(
-              "button",
-              {
-                type: "button",
-                className: "btn btn--ghost",
-                onclick: () => {
-                  picker = { phase: "SKILL", unit };
-                  selectedTargetId = null;
-                  stage.setTargetedUnit(null);
-                  renderActionPanel();
-                },
-              },
-              ["◀ スキル選び直し"],
-            ),
-            el(
-              "button",
-              {
-                type: "button",
-                className: "btn btn--primary",
-                disabled: !chosen,
-                onclick: () => {
-                  if (!selectedTargetId) return;
-                  const id = selectedTargetId;
-                  selectedTargetId = null;
-                  stage.setTargetedUnit(null);
-                  handleTargetPicked(unit, skillIndex, id);
-                },
-              },
-              ["決定"],
-            ),
-          ]),
-        ]),
-      );
-    } else {
+    if (picker.phase !== "TARGET" && selectedTargetId !== null) {
       // 対象選びを抜けたら光を消す。消し忘れると戦闘中ずっと光り続ける
-      if (selectedTargetId !== null) {
-        selectedTargetId = null;
-        stage.setTargetedUnit(null);
-      }
+      selectedTargetId = null;
+      stage.setTargetedUnit(null);
     }
+  }
+
+  /** 対象選びの最中に、その相手を選ぶ。候補でなければ何もしない */
+  function pickTargetDuringSelection(instanceId: string): boolean {
+    if (picker.phase !== "TARGET") return false;
+    const candidates = getTargetCandidates(picker.unit, picker.unit.def.skills[picker.skillIndex]);
+    if (!candidates.some((t) => t.instanceId === instanceId)) return false;
+    selectedTargetId = instanceId;
+    renderActionPanel();
+    return true;
   }
 
   /**
@@ -803,6 +853,14 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * 選ばれた相手は足元の紋様が警告色に変わって脈打つ。
    */
   function handleStageTap(event: PointerEvent): void {
+    /*
+     * **操作欄の上で離した指は、戦場のタップとして数えない。**
+     * 舞台の受け口は操作欄ごと包んでいるので、放っておくと
+     * 「決定」を押した指がその裏の本体まで届き、押した瞬間に
+     * 対象が裏の1体へすり替わってから発動していた。
+     */
+    const origin = event.target instanceof Element ? event.target : null;
+    if (origin?.closest("button, .skill-dock, .battle-topbar")) return;
     const hit = stage.pickUnitAt(event.clientX, event.clientY);
     if (!hit) return;
     if (picker.phase !== "TARGET") {
@@ -813,11 +871,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
       }
       return;
     }
-    const { unit, skillIndex } = picker;
-    const candidates = getTargetCandidates(unit, unit.def.skills[skillIndex]);
-    if (!candidates.some((t) => t.instanceId === hit)) return;
-    selectedTargetId = hit;
-    renderActionPanel();
+    pickTargetDuringSelection(hit);
   }
 
   function handleSkillPicked(unit: BattleUnit, skillIndex: 0 | 1 | 2, skill: MonsterDefinition["skills"][number]): void {
@@ -850,6 +904,7 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
     renderActionPanel();
     disarmSurrender();
     surrenderBtn?.classList.add("battle-surrender-btn--gone");
+    resultFoot.classList.remove("battle-result-foot--hidden");
     resultBanner.classList.remove("result-banner--hidden");
     resultBanner.textContent = "";
     if (winner === "PLAYER") playSfx("victory");
@@ -1158,10 +1213,17 @@ export function renderBattleView(props: BattleViewProps): BattleViewHandle {
    * どちらとも重ならない。戦場の上ではあるが、
    * **止まっている間だけ出る**ので、敵を指す邪魔もその間だけになる。
    */
-  stageHost.append(topBar, actionPanelEl, skillDock, logStrip);
+  stageHost.append(topBar, skillDock, logStrip);
   if (surrenderBtn) stageHost.append(surrenderBtn);
 
-  const container = el("div", { className: "screen battle-view" }, [stageHost, resultBanner, finishBtn]);
+  /*
+   * 決着の札とボタンは、戦場の下に**1つの帯として**置く。
+   * 帯の下余白が safe-area を見ている(`battleActionPanel.css`)。
+   * 以前は画面の下端にボタンが貼り付いていて、実機では
+   * 「報酬を受け取る」が iPhone のホームバーの帯に沈んでいた。
+   */
+  const resultFoot = el("div", { className: "battle-result-foot battle-result-foot--hidden" }, [resultBanner, finishBtn]);
+  const container = el("div", { className: "screen battle-view" }, [stageHost, resultFoot]);
 
   /*
    * 開幕の状態を札へ写しておく。
