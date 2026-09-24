@@ -316,7 +316,7 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    const daily = buildDaily(DAILY_DAYS, {
+    type SnapshotRow = { user_id: string; save: unknown; saved_at: string };\n    const playerSnapshots = ((snapshotsResult.data ?? []) as SnapshotRow[]).map((row) => ({\n      userId: row.user_id,\n      savedAt: row.saved_at,\n      summary: saveSummary(row.save),\n      progress: saveProgress(row.save),\n    }));\n\n    const daily = buildDaily(DAILY_DAYS, {
       created: ((recoveryResult.data ?? []) as RecoveryRow[]).map((row) => row.created_at),
       saved: ((recoveryResult.data ?? []) as RecoveryRow[]).map((row) => row.latest_saved_at),
       matched: ((matchDaysResult.data ?? []) as { created_at: string }[]).map((row) => row.created_at),
