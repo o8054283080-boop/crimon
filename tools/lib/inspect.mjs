@@ -126,8 +126,8 @@ export const INSPECT = `(() => {
        * 画面の縁ではなく下タブの上端を縁として見る。見ないと、送れば出てくる的を
        * 「押せない」と誤報する(交換所の実行バーで、見出しの高さが変わった時に出た)
        */
-      const edge = faceBottom === vh ? Math.min(faceBottom, navTop) : faceBottom;
-      return nr.top <= faceTop + 4 || nr.bottom >= edge - 12;
+      if (nr.top <= faceTop + 4 || nr.bottom >= faceBottom - 4) return true;
+      return faceBottom === vh && nr.bottom >= navTop - 12;
     }
     return false;
   };
