@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   COMPENSATIONS, claimCompensations, hasReward, isFirstLaunch, pendingCompensations, selectHomeBanners,
 } from "../src/game/compensation.js";
-import { claimDailyLoginBonus, createInitialState } from "../src/game/playerState.js";
+import { claimDailyLoginBonus, createInitialState, readPlayerSave } from "../src/game/playerState.js";
 
 /*
  * 始めたばかりの人に、始める前のお知らせを札で配らない。
@@ -33,24 +33,80 @@ function localNoonOn(date: string): Date {
 /** いちばん新しいお知らせの日。この日なら、期間内のもの全部が一度に届く */
 const NEWEST = [...COMPENSATIONS].map((c) => c.fromDate).sort().at(-1)!;
 
-describe("はじめて開いたかどうか", () => {
-  it("作ったばかりのセーブは「はじめて」", () => {
-    expect(isFirstLaunch(createInitialState())).toBe(true);
+/** 保存データを1件だけ持つ、確かめる用の置き場 */
+function storageWith(raw: string | null): Pick<Storage, "getItem"> {
+  return { getItem: (key: string) => (key === "crimon_save_v1" ? raw : null) };
+}
+
+/** 保存データを読み、main と同じ形で「はじめてか」を聞く */
+function firstLaunchFor(raw: string | null): { origin: string; firstLaunch: boolean } {
+  const { state, origin } = readPlayerSave(storageWith(raw));
+  return { origin, firstLaunch: isFirstLaunch(state, origin) };
+}
+
+describe("はじめて開いたかどうか(保存データの有無で決める)", () => {
+  it("保存データが無い人は「はじめて」", () => {
+    expect(firstLaunchFor(null)).toEqual({ origin: "NEW", firstLaunch: true });
   });
 
-  it("ログインボーナスを一度でも受け取ったら「はじめて」ではない", () => {
+  it("ログインボーナスが入る前のセーブの人は「はじめて」にならない", () => {
+    /*
+     * **前の判定の穴。**ログインボーナスの欄が無い古いセーブは、読み込むと
+     * `lastLoginBonusAt: null` / `loginBonusClaimCount: 0` に補われる。
+     * セーブの中身だけで見ていた頃は、ここが「はじめて」になり、
+     * 久しぶりに開いた人のお知らせが全部既読にされていた。
+     */
+    const legacy = createInitialState() as Partial<ReturnType<typeof createInitialState>>;
+    delete legacy.lastLoginBonusAt;
+    delete legacy.loginBonusClaimCount;
+    const { state, origin } = readPlayerSave(storageWith(JSON.stringify(legacy)));
+    expect(state.lastLoginBonusAt, "古いセーブの補い方が変わった(このテストの前提)").toBeNull();
+    expect(state.loginBonusClaimCount).toBe(0);
+    expect(origin).toBe("LOADED");
+    expect(isFirstLaunch(state, origin)).toBe(false);
+  });
+
+  it("壊れたセーブ・空のセーブから作り直した人は「はじめて」にしない(安全な側)", () => {
+    // 前から遊んでいた人。既読にして過去の更新を隠すより、全部見せる方が安全
+    for (const raw of ["{壊れている", "", JSON.stringify({ monsters: [] }), "null"]) {
+      expect(firstLaunchFor(raw), `保存データ ${JSON.stringify(raw)}`).toEqual({ origin: "REBUILT", firstLaunch: false });
+    }
+  });
+
+  it("保存データが読めない(置き場そのものが使えない)人も「はじめて」にしない", () => {
+    const broken = { getItem: () => { throw new Error("SecurityError"); } };
+    const { state, origin } = readPlayerSave(broken);
+    expect(origin).toBe("REBUILT");
+    expect(isFirstLaunch(state, origin)).toBe(false);
+  });
+
+  it("まだ一度も読んでいない(出どころが分からない)時は「はじめて」にしない", () => {
+    expect(isFirstLaunch(createInitialState(), null)).toBe(false);
+  });
+
+  it("保存データが無くても、ログインボーナスを受け取った後なら「はじめて」ではない", () => {
     /*
      * main はこの判定を**ログインボーナスより先に**取る。
      * 後で取ると、受け取った瞬間に偽になり、誰も「はじめて」にならない。
      */
     const state = createInitialState();
     claimDailyLoginBonus(state);
-    expect(isFirstLaunch(state)).toBe(false);
+    expect(isFirstLaunch(state, "NEW")).toBe(false);
+  });
+
+  it("出どころは、ページで最初にセーブを読んだ時のものを使う", () => {
+    /*
+     * 経験値のお詫び(`expBalanceCompensation.ts`)が main より先にセーブを読み、
+     * 保存まで済ませる。main の読み込みで決めると、新しく始めた人も「読めた」になる。
+     */
+    const playerState = readFileSync(new URL("../src/game/playerState.ts", import.meta.url), "utf8");
+    expect(playerState).toMatch(/if \(startupSaveOriginValue === null\) startupSaveOriginValue = origin;/);
   });
 
   it("起動の順番を守っている(ログインボーナスより先に判定し、その結果で受け取る)", () => {
     const main = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
-    const judge = main.indexOf("isFirstLaunch(state.player)");
+    expect(main).toContain("isFirstLaunch(state.player, startupSaveOrigin())");
+    const judge = main.indexOf("isFirstLaunch(state.player");
     const bonus = main.indexOf("claimDailyLoginBonus(state.player)");
     expect(judge, "main が「はじめて」を判定していない").toBeGreaterThan(0);
     expect(judge, "ログインボーナスの後で判定している(必ず偽になる)").toBeLessThan(bonus);
