@@ -35,6 +35,8 @@ const PANEL_MARKER = "data-crimon-cloud-recovery";
 const AUTO_SYNC_MS = 60 * 60 * 1000;
 /** これより古い控えは「置いていかれている」扱いにして、短い間隔で追いつかせる */
 const STALE_BACKUP_MS = 3 * 60 * 60 * 1000;
+/** 48時間以上古い場合は、起動直後の同期を待たず強制的に試す。アカウント再登録は絶対に行わない。 */
+const FORCE_BACKUP_MS = 48 * 60 * 60 * 1000;
 const STALE_RETRY_MS = 20 * 60 * 1000;
 const LAST_ATTEMPT_KEY = "crimon_cloud_backup_last_attempt_v1";
 let syncRunning = false;
@@ -136,7 +138,8 @@ async function syncNow(showUnchanged = false, scheduled = false): Promise<void> 
   }
   const meta = loadCloudMeta();
   if (!meta) return;
-  if (scheduled && !shouldRunScheduledSync(meta)) return;
+  // 強制更新も既存セッションの save だけを使う。register/login は呼ばず、recoveryId を作り直さない。
+  if (scheduled && backupAge(meta) < FORCE_BACKUP_MS && !shouldRunScheduledSync(meta)) return;
   if (scheduled) localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
   const save = currentSaveEnvelope();
   if (!save) {
@@ -509,7 +512,8 @@ function boot() {
     // **登録はしている。切れているだけ。**ここを黙らせると誰も気づけない
     expiredNotice();
   } else if (stored) {
-    if (backupAge(stored) >= STALE_BACKUP_MS) setStatus(`バックアップが24時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
+    if (backupAge(stored) >= FORCE_BACKUP_MS) setStatus(`バックアップが48時間以上更新されていません。既存アカウントのまま強制バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
+    else if (backupAge(stored) >= STALE_BACKUP_MS) setStatus(`バックアップが3時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
     else setStatus(`クラウド接続済み：${formatSavedAt(stored.savedAt)}`, "ok");
   }
   window.setInterval(() => { void syncNow(false, true); }, AUTO_SYNC_MS);
