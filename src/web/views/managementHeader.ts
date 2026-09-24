@@ -52,11 +52,21 @@ export function screenHeader(title: string, options: ScreenHeaderOptions = {}): 
   }, [
     ...(options.onBack ? [renderBackButton(options.onBack, options.backLabel)] : []),
     el("div", { className: "screen-head__titles" }, [
-      el("h1", { className: "screen-head__title" }, [title]),
+      el("h1", { className: "screen-head__title" }, titleParts(title)),
       ...(options.sub ? [el("p", { className: "screen-head__sub" }, [options.sub])] : []),
     ]),
     ...(side.length > 0 ? [el("div", { className: "screen-head__side" }, side)] : []),
   ]);
+}
+
+/**
+ * 題の最後の語(「1階」「NORMAL」)を割らない塊にする。
+ * 2行に折れる時、「魔人のダンジョン 1 / 階」と数字と単位が分かれていた。
+ */
+function titleParts(title: string): (string | HTMLElement)[] {
+  const at = title.lastIndexOf(" ");
+  if (at <= 0) return [title];
+  return [title.slice(0, at + 1), el("span", { className: "screen-head__keep" }, [title.slice(at + 1)])];
 }
 
 /**

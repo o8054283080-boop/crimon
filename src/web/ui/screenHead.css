@@ -48,27 +48,31 @@
   align-self: stretch;
   margin: 0;
   padding: var(--screen-head-safe) 0 0;
-  background: var(--screen-head-bg);
   /*
-   * 帯の地を画面の端まで伸ばす。**幅そのものは広げない**(広げると横に巻ける画面になる)。
-   * 影を左右へ伸ばし、上下は `clip-path` で帯の高さちょうどに切る。
-   * **下へ1pxでも逃がさない。**影は四方へ同じだけ伸びるので、下を開けると
-   * 帯の地が真下の案内帯の題名に被さる(実際に「最初の召喚」が半分隠れた)。
+   * 帯の地を画面の端まで伸ばし、下端に金の罫と8pxのぼかしを付ける。
+   *
+   * **幅そのものは広げない。**`border-image` の外へのはみ出し(outset)は
+   * 描くだけで巻物の大きさに数えられないので、横に巻ける画面にならない。
+   * 前は影(box-shadow)で伸ばしていたが、影は四方へ同じだけ伸びるため
+   * 下を切り落とすしかなく、巻いた時に真下の札の縁(案内帯の緑)が
+   * 罫のすぐ下から細くのぞいていた。ぼかしはその縁を沈める。
+   * ぼかしは押しものの上に乗っても押すのを邪魔しない(描くだけ)。
    */
-  box-shadow: 0 0 0 100vmax var(--screen-head-bg);
-  clip-path: inset(0 -100vmax);
+  border-image-source: linear-gradient(180deg,
+    var(--screen-head-bg) 0,
+    var(--screen-head-bg) calc(100% - 9px),
+    rgba(236, 196, 120, 0.7) calc(100% - 9px),
+    rgba(236, 196, 120, 0.7) calc(100% - 8px),
+    rgba(11, 14, 32, 0.85) calc(100% - 8px),
+    rgba(11, 14, 32, 0) 100%);
+  border-image-slice: 0 fill;
+  border-image-width: 0;
+  border-image-outset: 0 100vmax 8px;
 }
 
-/* 下端の金の罫。両端を消して、線ではなく縁に当たった光に見せる */
-.screen-head::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  pointer-events: none;
-  background: linear-gradient(90deg, rgba(226, 182, 110, 0), rgba(236, 196, 120, 0.75) 18%, rgba(236, 196, 120, 0.75) 82%, rgba(226, 182, 110, 0));
+/* 題の最後の語(「5階」「NORMAL」)は割らない。「1」と「階」が別の行に分かれていた */
+.screen-head__keep {
+  white-space: nowrap;
 }
 
 /* 1画面の中に帯は1本。2本目以降(詳細の中の詳細など)は貼り付かせない */

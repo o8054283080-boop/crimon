@@ -165,11 +165,14 @@ body {
   background: linear-gradient(90deg, transparent, rgba(255, 205, 100, 0.75), transparent);
 }
 
-/* 編成の駒は一覧をスクロールしても残す。**見出し帯の真下に貼り付く**(帯の裏へ潜らせない) */
+/*
+ * 編成の駒。**貼り付かせない(流れの中に置く)。**
+ * 前は `sticky` + `top` を書いていたが、後から読まれる `.panel` の
+ * `position: relative` に上書きされて貼り付きは一度も効いておらず、
+ * `top` のぶんだけ札が下へずれて「所持モンスター」の見出しを覆っていた。
+ */
 .party-current {
-  position: sticky;
-  top: calc(var(--screen-head-h, max(8px, env(safe-area-inset-top))) + 6px);
-  z-index: 18;
+  z-index: 1;
   background: linear-gradient(180deg, rgba(20, 24, 46, 0.98), rgba(9, 13, 29, 0.96));
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42), var(--edge-line);
 }

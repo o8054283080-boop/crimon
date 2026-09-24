@@ -277,7 +277,15 @@ body .crimon-bottom-nav {
   gap: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  background: url("./assets/home/home-bottom-nav-frame-v5.webp") center / 100% 100% no-repeat !important;
+  /*
+   * **絵は safe-area を除いた上の部分だけに敷く。**全体へ引き伸ばすと、実機の下34px
+   * のぶん絵の中の意匠が縦に伸び、下から safe-area ぶん上げた文字が
+   * 意匠の上に乗って読めなかった。下の帯(ホームインジケーターの居場所)は無地。
+   */
+  --nav-safe: var(--home-safe-bottom, env(safe-area-inset-bottom, 0px));
+  background:
+    url("./assets/home/home-bottom-nav-frame-v5.webp") center top / 100% calc(100% - var(--nav-safe)) no-repeat,
+    linear-gradient(180deg, #0b1122, #04060c) !important;
   box-shadow: 0 -5px 17px rgba(1, 12, 29, .36) !important;
 }
 
@@ -339,7 +347,7 @@ body .bottom-nav__icon {
 body .bottom-nav__label {
   position: absolute !important;
   right: 2px !important;
-  bottom: calc(7px + var(--home-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+  bottom: calc(7px + var(--nav-safe, 0px)) !important;
   left: 2px !important;
   display: block !important;
   min-height: 0 !important;
@@ -362,6 +370,37 @@ body .bottom-nav button[aria-current="page"] {
 }
 
 body .bottom-nav__btn--active::before { display: none !important; }
+
+/*
+ * **今いるタブに印を付ける。**金の絵の上では文字の色が変わるだけで、
+ * モンスター画面にいても「モンスター」が選ばれて見えなかった
+ * (前の簡素なバーは枠で囲んでいた)。マスの内側に金の枠と下からの光を置く。
+ * 押すのを邪魔しない(描くだけ)。
+ */
+body .bottom-nav__btn--active::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 9%;
+  right: 7%;
+  bottom: calc(3px + var(--nav-safe, 0px));
+  left: 7%;
+  border: 1.5px solid rgba(255, 220, 140, .92);
+  border-radius: 11px;
+  pointer-events: none;
+  background: radial-gradient(ellipse 90% 70% at 50% 100%, rgba(255, 186, 72, .42), rgba(255, 186, 72, 0) 72%);
+  box-shadow: 0 0 12px rgba(255, 190, 80, .6), inset 0 0 10px rgba(255, 206, 110, .35);
+}
+
+body .bottom-nav__btn:nth-child(1).bottom-nav__btn--active::after { left: 11%; }
+body .bottom-nav__btn:nth-child(5).bottom-nav__btn--active::after { right: 11%; }
+
+body .bottom-nav__btn--active .bottom-nav__label {
+  z-index: 1;
+  color: #ffe7a6 !important;
+  font-weight: 900 !important;
+  text-shadow: 0 1px 2px #000, 0 0 8px rgba(255, 180, 60, .9) !important;
+}
 
 /*
  * ここには「ミッションを全部終えた時だけ」HOMEを画面いっぱいの固定レーンに
