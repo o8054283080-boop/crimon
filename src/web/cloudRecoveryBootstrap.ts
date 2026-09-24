@@ -134,10 +134,14 @@ async function syncAdminSnapshot(): Promise<void> {
   if (Number.isFinite(last) && last > 0 && Date.now() - last < ADMIN_SNAPSHOT_MS) return;
   const save = currentSaveEnvelope();
   if (!save) return;
+  // 管理用保存だけを理由に新しい匿名アリーナIDを作らない。
+  if (!arenaAuthUserId()) return;
   const token = await arenaAuthAccessToken();
   if (!token) return;
   try {
-    const response = await fetch("https://plufhhhxokqgedlyfsfz.supabase.co/functions/v1/crimon-player-snapshot", {
+    const base = String((import.meta as unknown as { env?: Record<string, unknown> }).env?.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
+    if (!base) return;
+    const response = await fetch(`${base}/functions/v1/crimon-player-snapshot`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ save }),
