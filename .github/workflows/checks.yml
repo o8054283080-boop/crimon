@@ -67,7 +67,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: 管理・自動保存APIの型チェック
-        run: deno check supabase/functions/crimon-admin/index.ts supabase/functions/crimon-player-snapshot/index.ts
+        run: deno check --node-modules-dir=auto supabase/functions/crimon-admin/index.ts supabase/functions/crimon-player-snapshot/index.ts
 
   tour:
     name: 巡回(画面の崩れ)

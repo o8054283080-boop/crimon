@@ -534,7 +534,7 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
     summaryCard("Supabase認証", dashboard.summary.authUsers),
     summaryCard("アリーナ登録", dashboard.summary.arenaProfiles),
     summaryCard("データ復旧登録", dashboard.summary.recoveryAccounts),
-    summaryCard("自動保存", dashboard.snapshotStatus === "unavailable" ? "取得失敗" : dashboard.summary.playerSnapshots ?? 0),
+    summaryCard("自動保存", dashboard.snapshotStatus === "unavailable" ? "取得失敗" : dashboard.summary.playerSnapshots ?? "API更新待ち"),
   );
   dash.append(summary);
   const season = dashboard.activeSeason;
@@ -879,6 +879,8 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
     }
     if (dashboard.snapshotStatus === "unavailable") {
       snap.append(el("div", "crimon-admin-error", "自動保存データを取得できません。時間をおいて再読み込みしてください"));
+    } else if (!dashboard.playerSnapshots) {
+      snap.append(el("div", "crimon-admin-empty", "自動保存APIの更新を待っています。時間をおいて再読み込みしてください"));
     } else if (snapshots.length === 0) {
       snap.append(el("div", "crimon-admin-empty", "表示する自動保存はありません。既存の認証情報がある端末で更新版を開くと保存されます。復旧IDは自動作成しません。"));
     }
