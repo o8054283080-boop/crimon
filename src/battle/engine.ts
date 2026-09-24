@@ -3,7 +3,7 @@ import { ELEMENT_JA } from "../core/element.js";
 import { ATK_DOWN, ATK_UP, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
 import type { TrialTowerHardMultipliers } from "../data/trialTowerHard.js";
-import { MonsterDefinition } from "../core/monster.js";
+import { MonsterDefinition, appearanceTemplateOf } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
 import { EffectApplyTo, EffectCondition, STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
 import {
@@ -710,7 +710,8 @@ export class BattleEngine {
        * サポート型の絵のまま殴ることになる
        */
       name: u.def.name,
-      templateId: u.def.templateId,
+      // 絵を引く種族名。遺跡のボスは種族を借りたまま専用の絵を持つ
+      templateId: appearanceTemplateOf(u.def),
       role: u.def.role,
       hidden: this.isDormant(u),
     }));
@@ -1424,6 +1425,8 @@ export class BattleEngine {
     empty.unit.def = {
       ...empty.unit.def,
       templateId: profile.templateId,
+      // 分身は型の絵になる。元の席に見た目の指定があっても引き継がない
+      artTemplateId: undefined,
       name: profile.displayName,
       role: role === "ATTACK" ? "アタッカー" : role === "SUPPORT" ? "サポート" : "デバッファー",
       stats: {

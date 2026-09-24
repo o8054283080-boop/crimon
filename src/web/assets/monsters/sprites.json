@@ -367,6 +367,18 @@
     "bodyVal": 0.96,
     "aspect": 0.965
   },
+  "ruin_commander-FIRE": {
+    "bodyHue": 0.048,
+    "bodySat": 0.71,
+    "bodyVal": 0.5,
+    "aspect": 1.156
+  },
+  "ruin_spirit-WATER": {
+    "bodyHue": 0.598,
+    "bodySat": 0.52,
+    "bodyVal": 0.94,
+    "aspect": 1.365
+  },
   "scorpion": {
     "bodyHue": 0.052,
     "bodySat": 0.85,

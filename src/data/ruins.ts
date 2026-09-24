@@ -304,6 +304,8 @@ function buildPowerFloor(floor: number): RuinFloor {
         templateId: ANCIENT_DEMON.templateId, element, star: 6, level: 60,
         displayName: "指揮兵器", isBoss: true, victoryTarget: true, primaryTarget: true,
         fixedStats: fixed(stats.boss), skills: COMMANDER_SKILLS, bossTraits: NO_TRAITS, initialCooldowns: [0, 2, 3],
+        // 戦い方は古代の魔人を借り、姿だけ専用の絵(ruin_commander-FIRE.webp)
+        artTemplateId: "ruin_commander",
       },
       {
         templateId: ANCIENT_CRYSTAL.templateId, element, star: 6, level: 60,
@@ -335,6 +337,8 @@ function buildGuardianFloor(floor: number): RuinFloor {
         displayName: "霊獣", isBoss: true, victoryTarget: true, primaryTarget: true,
         fixedStats: fixed(stats.boss), skills: spiritSkills(GUARDIAN_S3_MAX_HP[floor]), bossTraits: NO_TRAITS,
         initialCooldowns: [0, 2, 3],
+        // 戦い方は古代のけものを借り、姿だけ専用の絵(ruin_spirit-WATER.webp)
+        artTemplateId: "ruin_spirit",
       },
       {
         templateId: ANCIENT_GUARD_BEAST.templateId, element, star: 6, level: 60,

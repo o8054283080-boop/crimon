@@ -938,3 +938,16 @@ psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authentic
     HP×0.7なら手数は目安どおりだが、汎用STRONGが33%になる
   - 3階(両遺跡の共有)は触っていないので、**3階→4階の段差が大きい**(汎用TYPICALが100%→10%)
 - 前回の検証(案U)の編成定義はリポジトリに無い。`tools/ruinPressure.ts` の「汎用」は装備ダンジョンの実戦通常の5体。
+
+**遺跡のボスの絵(依頼主の描いた専用の2枚):**
+
+- `ruin_commander-FIRE.webp`(指揮兵器)/ `ruin_spirit-WATER.webp`(霊獣)。
+  **種族は古代の魔人・古代のけものを借りたまま**で、絵だけを `artTemplateId` で差し替えている
+  (`MonsterDefinition.artTemplateId` / `appearanceTemplateOf`)。`templateId` を書き換えると
+  種族で引く処理すべてに波及し、新しい図鑑を足すとアリーナの照合表が動くため。
+- 絵を引く所は3つ: 戦闘の配置(`battleStage.ts`)、戦闘の状態の `templateId`(`engine.snapshotUnits`。
+  **ここを揃えないと、画面が毎フレーム照合して古代の魔人の絵へ組み直す**)、肖像(`portrait.ts`)。
+- **霊獣の元絵は市松模様が焼き込まれて届いた。**`tools/removeCheckerboard.mjs` で抜いてある。
+  暗い床の上では目立たないが、**明るい地に重ねると、もやの下にうっすら格子が残る。**
+  透過PNGを描き直してもらえたら、`art/monsters-raw/ruin_spirit-WATER.png` を置き換えて
+  `node tools/prepareSprites.mjs <その1枚だけのフォルダ> src/web/assets/monsters` で差し替える。

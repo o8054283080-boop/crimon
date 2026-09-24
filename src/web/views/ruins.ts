@@ -8,6 +8,8 @@ import { isRuinFloorCleared, isRuinFloorUnlocked } from "../../game/ruins.js";
 import { referenceRunTime } from "../../game/manualClearTimes.js";
 import { MAX_DUNGEON_PARTY_SIZE, getDungeonParty, type PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { buildDungeonEnemyTeam } from "../../game/dungeonRunner.js";
+import { applyPortrait } from "../three/portrait.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 import { renderPartySlots } from "./partyCard.js";
@@ -105,6 +107,17 @@ function renderList(props: RuinsProps): HTMLElement {
   ]);
 }
 
+/**
+ * その階の主の絵。**流れの中に置く**(浮かせると下の何かを覆う)。
+ * 絵は戦闘と同じ肖像(`applyPortrait`)なので、戦闘で見る姿と必ず一致する。
+ */
+function renderBossArt(floor: RuinFloor): HTMLElement {
+  const boss = buildDungeonEnemyTeam(floor)[0];
+  const art = el("div", { className: "ruin-boss-art", role: "img", "aria-label": floor.enemies[0].displayName ?? "" }, []);
+  applyPortrait(art, boss);
+  return art;
+}
+
 function renderDetail(props: RuinsProps, floor: RuinFloor): HTMLElement {
   const party = getDungeonParty(props.player);
   const hasStamina = props.player.stamina >= floor.stamina;
@@ -122,6 +135,7 @@ function renderDetail(props: RuinsProps, floor: RuinFloor): HTMLElement {
     ]),
     renderRuinMaterials(props.player),
     el("section", { className: "card ruin-detail" }, [
+      renderBossArt(floor),
       el("p", { className: "acc-note" }, [floor.note]),
       ...floor.enemies.map((enemy) => el("div", { className: "ruin-enemy" }, [
         el("strong", {}, [`${enemy.displayName ?? enemy.templateId}${enemy.victoryTarget ? "(倒せば勝ち)" : ""}`]),

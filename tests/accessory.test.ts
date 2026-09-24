@@ -10,7 +10,8 @@ import {
   type Accessory, type AccessoryBattleEffects, accessoryMainValue, emptyAccessoryEffects, generateAccessory,
   specialRange, weakValue, sanitizeAccessory, describeSpecial,
 } from "../src/core/accessory.js";
-import type { MonsterDefinition } from "../src/core/monster.js";
+import { appearanceTemplateOf, type MonsterDefinition } from "../src/core/monster.js";
+import { existsSync } from "node:fs";
 import { SET_TYPES } from "../src/core/equipment.js";
 import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterInstance.js";
 import type { Skill } from "../src/core/skill.js";
@@ -441,6 +442,30 @@ describe("遺跡", () => {
     expect(ruinLocationId("GUARDIAN", 5)).toBe("ruins_guardian_5");
     expect(findRuinFloorByLocationId("ruins_power_3")?.floor).toBe(3);
     expect(findRuinFloorByLocationId("ruins_x_3")).toBeUndefined();
+  });
+
+  /*
+   * ボスの姿は依頼主の描いた専用の絵。**戦い方は古代系を借りたまま**なので、
+   * 種族ID(templateId)は変えず、絵を引く所だけが見た目の名前を見る。
+   */
+  it("ボスは全階で専用の絵を持ち、種族は古代系のまま", () => {
+    const art = { POWER: "ruin_commander-FIRE", GUARDIAN: "ruin_spirit-WATER" } as const;
+    for (const kind of ["POWER", "GUARDIAN"] as const) {
+      for (const floor of ruinFloors(kind)) {
+        const [boss, ...others] = buildDungeonEnemyTeam(floor);
+        expect(`${appearanceTemplateOf(boss)}-${boss.element}`).toBe(art[kind]);
+        expect(boss.templateId).toBe(kind === "POWER" ? "ancient_demon" : "ancient_beast");
+        expect(existsSync(`src/web/assets/monsters/${art[kind]}.webp`)).toBe(true);
+        // 取り巻きは図鑑の絵のまま
+        for (const other of others) expect(other.artTemplateId).toBeUndefined();
+      }
+    }
+  });
+
+  it("戦闘の状態に載る種族IDは見た目の名前(画面がこれで絵を組み直す)", () => {
+    const { engine } = ruinEngine("POWER", 5);
+    const boss = engine.snapshotUnits().find((u) => u.name.startsWith("指揮兵器"));
+    expect(boss?.templateId).toBe("ruin_commander");
   });
 });
 

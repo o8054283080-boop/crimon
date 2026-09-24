@@ -165,10 +165,14 @@ const MOTION_BY_TEMPLATE: Record<string, MotionStyle> = {
   golem: "heavy",
   treant: "heavy",
   knight: "heavy",
+  // 力の遺跡の指揮兵器(車輪の付いた大砲)。呼吸で胴が膨らむと機械に見えない
+  ruin_commander: "heavy",
   // 獣型。踏み込む距離を長く
   wolf: "beast",
   griffon: "beast",
   dragon: "beast",
+  // 守護の遺跡の霊獣
+  ruin_spirit: "beast",
   // 粘体。横に広がって縦に縮む
   slime: "blob",
   // 小動物。軽く弾む

@@ -49,6 +49,8 @@ function defFromDungeonEnemy(enemy: DungeonEnemy, powerScale: number, speedScale
     isBoss: enemy.isBoss,
     primaryTarget: enemy.primaryTarget,
     initialCooldowns: enemy.initialCooldowns,
+    // 見た目だけ。指定の無い階は図鑑の絵のまま
+    ...(enemy.artTemplateId ? { artTemplateId: enemy.artTemplateId } : {}),
   };
 }
 

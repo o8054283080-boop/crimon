@@ -249,6 +249,14 @@
   gap: 8px;
 }
 
+/* その階の主の絵。絵は applyPortrait が background-image で敷く */
+.ruin-boss-art {
+  height: 150px;
+  margin: 0 -4px;
+  border-radius: 10px;
+  background-color: rgba(8, 10, 20, 0.55);
+}
+
 .ruin-detail__row {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);

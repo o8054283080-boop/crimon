@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { ELEMENTS } from "../src/core/element.js";
 import { ALL_MONSTER_TEMPLATES, EXP_PIG, REINCARNATION_PIG, SKILL_PIG } from "../src/data/monsters.js";
 import { ARCHEOS, TALENT_SHARD_ATK, TALENT_SHARD_DEF } from "../src/data/awakeningDepthsMonsters.js";
+import { RUIN_KINDS, ruinFloors } from "../src/data/ruins.js";
 
 /*
  * モンスターの2Dの絵まわり。
@@ -41,6 +42,13 @@ const TEMPLATE_IDS = new Set([
   ARCHEOS.templateId,
   TALENT_SHARD_ATK.templateId,
   TALENT_SHARD_DEF.templateId,
+  /*
+   * 遺跡のボス。**種族を持たない、絵だけの名前**(`artTemplateId`)。
+   * 戦い方は古代系を借り、姿だけを専用の絵で引く。
+   * 遺跡のデータから集めるので、指定が消えればここからも消える。
+   */
+  ...RUIN_KINDS.flatMap((kind) => ruinFloors(kind).flatMap((f) => f.enemies.map((e) => e.artTemplateId)))
+    .filter((id): id is string => typeof id === "string"),
 ]);
 const ELEMENT_NAMES = new Set<string>(ELEMENTS);
 /*
