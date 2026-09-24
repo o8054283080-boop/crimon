@@ -1011,7 +1011,47 @@ export function pendingCompensations(state: PlayerState, now: Date = new Date())
   return COMPENSATIONS.filter((c) => isWithinPeriod(c, today) && !claimed.has(c.id));
 }
 
-export interface CompensationClaim { compensation: Compensation; }
+export interface CompensationClaim {
+  compensation: Compensation;
+  /**
+   * **始める前から出ていた配布。**受け取りは済ませるが、ホームの札には出さない。
+   * 付くのは {@link claimCompensations} を `firstLaunch` で呼んだ時だけ。
+   */
+  beforeStart?: boolean;
+}
+
+/**
+ * このセーブが**今日はじめて開かれたものか**。
+ *
+ * 初回起動日は持っていないので、ログインボーナスを一度も受け取っていないことで見る。
+ * ログインボーナスは起動のたびに必ず受け取られるので、一度でも遊んだセーブは
+ * ここが偽になる。**ログインボーナスより先に聞くこと**(受け取った瞬間に偽になる)。
+ *
+ * セーブの中身だけで決めるのは、経験値のお詫び(`expBalanceCompensation.ts`)が
+ * main より先に初期セーブを書き込むため。「保存が無かった」では見分けられない。
+ */
+export function isFirstLaunch(state: Pick<PlayerState, "lastLoginBonusAt" | "loginBonusClaimCount">): boolean {
+  return state.lastLoginBonusAt === null && (state.loginBonusClaimCount ?? 0) === 0;
+}
+
+export interface ClaimCompensationsOptions {
+  /**
+   * 始めたばかりの人として受け取る。
+   *
+   * **始める前のアップデート履歴やお詫びを、その人に配らない。**
+   * 期間の長いお知らせが100件を超え、はじめて開いた人のホームが
+   * 「経験値バランス調整のお詫び」「ほかに119件」で埋まっていた。
+   * まだ遊んでいない人には、直した不具合も変わった仕様も関係が無い。
+   *
+   * - **モノの無いお知らせ**は、受け取り済みの印だけ付けて札にしない
+   *   (中身はホーム左の「お知らせ」から読める)
+   * - **モノの付いた配布は、今までどおり受け取る。**量は1つも変えない。
+   *   ここで配らないことにすると、始めた日によって手持ちが変わる。
+   *   それは画面の直しではなく配布の方針なので、ここでは決めない。
+   *   ただし札にはせず、`beforeStart` を付けて1行にまとめる
+   */
+  firstLaunch?: boolean;
+}
 
 export function compensationBannerLabel(claims: readonly CompensationClaim[]): string {
   const kinds = new Set(claims.map(({ compensation }) => compensation.kind ?? "APOLOGY"));
@@ -1034,8 +1074,10 @@ export function hasReward(compensation: Compensation): boolean {
 export interface HomeBannerSelection {
   /** ホームに札として出すもの */
   shown: CompensationClaim[];
-  /** 出さずに畳んだお知らせの件数 */
+  /** 出さずに畳んだお知らせの件数(始める前の配布は含まない) */
   hiddenCount: number;
+  /** 始める前から出ていて、受け取りだけ済ませた配布の件数 */
+  beforeStartCount: number;
 }
 
 /**
@@ -1077,21 +1119,29 @@ export const HOME_BANNER_LIMIT = 2;
  * 中身はホーム左の「お知らせ」から全部読める。
  */
 export function selectHomeBanners(claims: readonly CompensationClaim[]): HomeBannerSelection {
+  // 始める前の配布は札にしない。数だけ数えて1行にまとめる
+  const current = claims.filter((claim) => !claim.beforeStart);
+  const beforeStartCount = claims.length - current.length;
+
   // 並び順は当てにしない。日付の新しい順に見て、先頭を「最新」とする
   const byNewest = (a: CompensationClaim, b: CompensationClaim) =>
     b.compensation.fromDate.localeCompare(a.compensation.fromDate);
-  const plain = claims.filter(({ compensation }) => !hasReward(compensation)).sort(byNewest);
-  const gifts = claims.filter(({ compensation }) => hasReward(compensation)).sort(byNewest);
+  const plain = current.filter(({ compensation }) => !hasReward(compensation)).sort(byNewest);
+  const gifts = current.filter(({ compensation }) => hasReward(compensation)).sort(byNewest);
 
   const keep = new Set(plain.slice(0, 1).map(({ compensation }) => compensation.id));
   for (const { compensation } of gifts.slice(0, HOME_BANNER_LIMIT - keep.size)) keep.add(compensation.id);
 
   // 出す順は元の並びのまま。日付順に並べ替えると、見出しの位置が動いて読みにくい
-  const shown = claims.filter(({ compensation }) => keep.has(compensation.id));
-  return { shown, hiddenCount: claims.length - shown.length };
+  const shown = current.filter(({ compensation }) => keep.has(compensation.id));
+  return { shown, hiddenCount: current.length - shown.length, beforeStartCount };
 }
 
-export function claimCompensations(state: PlayerState, now: Date = new Date()): CompensationClaim[] {
+export function claimCompensations(
+  state: PlayerState,
+  now: Date = new Date(),
+  options: ClaimCompensationsOptions = {},
+): CompensationClaim[] {
   const claims: CompensationClaim[] = [];
   for (const compensation of pendingCompensations(state, now)) {
     state.crystal += compensation.crystal;
@@ -1112,7 +1162,12 @@ export function claimCompensations(state: PlayerState, now: Date = new Date()): 
      */
     for (const gift of compensation.monsters ?? []) addMonster(state, gift.dexId, gift.star);
     state.claimedCompensationIds.push(compensation.id);
-    claims.push({ compensation });
+    if (!options.firstLaunch) {
+      claims.push({ compensation });
+      continue;
+    }
+    // 始めたばかりの人: モノの無いお知らせは印だけ。モノの付いた配布は1行へまとめる
+    if (hasReward(compensation)) claims.push({ compensation, beforeStart: true });
   }
   return claims;
 }

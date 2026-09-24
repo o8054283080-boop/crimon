@@ -258,6 +258,29 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
       el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
     ]);
   });
+  /*
+   * 始めたばかりの人が、始める前から出ていた配布を受け取った時の札。
+   *
+   * 1件ずつ札にすると、はじめて開いた画面の1枚目が
+   * 「経験値バランス調整のお詫び」になっていた。その人は何も迷惑を被っていない。
+   * だから**「お詫び」とは書かず、件数だけを1枚にまとめる。**
+   * 受け取ったこと自体は伝える(ダイヤが最初から多い理由が分からなくなる)。
+   *
+   * 1行の案内ではなく札にするのは、**閉じられるようにするため。**
+   * 「ほかにN件」の行は配布の札の閉じると一緒に消えるが、
+   * ここには他の札が無いので、行のままだと二度と消せない。
+   */
+  const { beforeStartCount } = selectHomeBanners(claims);
+  if (beforeStartCount > 0) {
+    banners.push(el("section", { className: "panel reward-banner compensation compensation--before-start" }, [
+      rewardSeal("scroll"),
+      el("div", { className: "reward-banner__body" }, [
+        el("p", { className: "reward-banner__label" }, ["これまでの配布"]),
+        el("p", { className: "compensation__message" }, [`${beforeStartCount}件ぶんも受け取りました`]),
+      ]),
+      el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
+    ]));
+  }
   return banners;
 }
 
@@ -360,7 +383,9 @@ function renderHiddenNoticeLine(claims: CompensationClaim[]): HTMLElement | null
   const { hiddenCount } = selectHomeBanners(claims);
   if (hiddenCount === 0) return null;
   return el("p", { className: "reward-banner-stack__rest" }, [
-    `ほかに${hiddenCount}件のお知らせがあります（配布は受け取り済み。左の「お知らせ」から読めます）`,
+    // **2行に収まる長さにする。**札の列は198pxしかなく、前の文は3行になって
+    // 肝心の「左の『お知らせ』から」が省略記号の向こうへ消えていた
+    `ほかに${hiddenCount}件のお知らせがあります（受け取り済み。左の「お知らせ」で読めます）`,
   ]);
 }
 

@@ -43,6 +43,17 @@ function unreadNoticeCount(): number {
   return COMPENSATIONS.filter((n) => n.fromDate <= now && !read.has(noticeId(n))).length;
 }
 
+/**
+ * いま出ているお知らせを全部読んだことにする。
+ *
+ * **始めたばかりの人にだけ使う**(`main.ts` の起動時)。その人にとって
+ * 過去のアップデート履歴は「新しいもの」ではないのに、印が「9+」で出ていた。
+ * 一覧からは消さないので、読みたければ今までどおり全部読める。
+ */
+export function markAllNoticesRead(): void {
+  markNoticeRead();
+}
+
 function markNoticeRead(): void {
   try {
     const now = today();

@@ -176,7 +176,8 @@ import { GIFT_DEFINITIONS } from "../data/gifts.js";
 import { claimAllGifts, claimGift, unclaimedGiftCount, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
-import { CompensationClaim, claimCompensations } from "../game/compensation.js";
+import { CompensationClaim, claimCompensations, isFirstLaunch } from "../game/compensation.js";
+import { markAllNoticesRead } from "./noticeUi.js";
 import { OWN_BACK_SELECTOR, renderGlobalBackButton } from "./views/backButton.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
@@ -861,17 +862,22 @@ let persistState: PersistState = "UNSUPPORTED";
     render();
   });
 
+  // **ログインボーナスより先に聞く。**受け取った瞬間に「はじめて」ではなくなる
+  const firstLaunch = isFirstLaunch(state.player);
   const loginBonus = claimDailyLoginBonus(state.player);
   if (loginBonus.claimed) {
     state.loginBonusResult = loginBonus;
     savePlayerState(state.player);
   }
   // お詫びの配布。期間中に一度開けば自動で受け取れる(重複はしない)
-  const claims = claimCompensations(state.player);
-  if (claims.length > 0) {
-    state.compensationClaims = claims;
-    savePlayerState(state.player);
-  }
+  // 始めたばかりの人には、始める前のお知らせを札にしない(`ClaimCompensationsOptions`)
+  const claimedBefore = state.player.claimedCompensationIds.length;
+  const claims = claimCompensations(state.player, new Date(), { firstLaunch });
+  if (claims.length > 0) state.compensationClaims = claims;
+  // 札が0枚でも印は付いている(モノの無いお知らせ)。数で見て保存する
+  if (state.player.claimedCompensationIds.length !== claimedBefore) savePlayerState(state.player);
+  // 左の「お知らせ」の赤い印も同じ。始める前の更新履歴を「未読 9+」と数えない
+  if (firstLaunch) markAllNoticesRead();
 
   /*
    * アリーナ。挑戦券の自然回復だけを反映する(起動のたびに1度だけ)。

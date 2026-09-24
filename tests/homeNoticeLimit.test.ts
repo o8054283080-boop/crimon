@@ -128,15 +128,41 @@ describe("ホームに出すお知らせを絞る", () => {
     expect(css).toContain(".home-world > .reward-banner-stack");
   });
 
-  it("札の中の閉じるボタンは、切り落とされない場所に置く", () => {
+  it("札の中の閉じるボタンは、本文の上に重ねず右の列に置く", () => {
     /*
-     * 札は1本ぶんの高さに抑えてある(縦に伸ばすとモンスターを覆う)。
-     * 中身と一緒に流れていると、抑えた瞬間に「閉じる」が枠の外へ出て
-     * `overflow:hidden` に切り落とされ、**押せない的になる。**
-     * 一度それをやって巡回が8件拾っている。位置を中身から切り離す。
+     * **前はここが逆だった。**札を54pxに抑え、切り落とされないよう
+     * 閉じるを右上へ `position:absolute` で浮かせていた。その44x44の不透明な箱が
+     * 本文の上に乗り、「+1,500 ダイヤ」の「ダイヤ」やアップデートの本文を覆い、
+     * 抑えた高さは報酬の2行目「+20 召喚の書」を切り落としていた。
+     *
+     * いまは閉じるを本文と同じ流れの右の列に置き、高さは中身に任せる。
+     * 閉じるが切り落とされないのは、**高さを抑えないから**。
      */
     const css = readFileSync(new URL("../src/web/home-pop-design.css", import.meta.url), "utf8");
-    const close = css.slice(css.indexOf(".home-world .reward-banner-stack .reward-banner__close"));
-    expect(close.slice(0, 220)).toContain("position: absolute");
+    const selector = ".crimon-home .home-world .reward-banner-stack .reward-banner .reward-banner__close {";
+    const close = css.slice(css.indexOf(selector), css.indexOf("}", css.indexOf(selector)));
+    expect(close, "閉じるの指定が見つからない").toContain("reward-banner__close");
+    expect(close, "閉じるをまた浮かせている(本文の上に乗る)").not.toContain("position: absolute");
+    expect(close).toContain("grid-column: 2");
+
+    const cardSelector = ".crimon-home .home-world .reward-banner-stack .reward-banner {";
+    const card = css.slice(css.indexOf(cardSelector), css.indexOf("}", css.indexOf(cardSelector)));
+    expect(card).toContain("grid-template-columns: minmax(0, 1fr) 44px");
+    expect(card, "札の高さをまた決め打ちしている(報酬の2行目が切れる)").toContain("max-height: none");
+    // 本文の右に閉じるぶんの余白を空けて、そこへ浮かせる形へ戻していない
+    expect(card).not.toMatch(/padding:\s*\d+px\s+4[48]px/);
+  });
+
+  it("札の箱は世界の枠の中で止め、入りきらない日は巻物にする", () => {
+    // 札の高さを中身に任せた。世界の枠は overflow:hidden なので、越えた分は黙って切れる
+    const css = readFileSync(new URL("../src/web/home-pop-design.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.home-world > \.world-info \{\s*max-height: calc\(100% - 12px\)/);
+    expect(css).toMatch(/\.home-world > \.world-info > \.reward-banner-stack \{[^}]*overflow-y: auto/);
+  });
+
+  it("札の枚数から高さを当てる決め打ちを戻さない", () => {
+    // 52px刻みの `:has()`。札の高さは中身次第なので、当たりようがない
+    const css = readFileSync(new URL("../src/web/crimon-visual-system.css", import.meta.url), "utf8");
+    expect(css).not.toMatch(/:has\(\.reward-banner[^)]*\)\{--home-banner-h:\d+px\}/);
   });
 });

@@ -25,17 +25,17 @@
 .home-world .crimon-dungeon-chooser{position:absolute;z-index:8;right:82px;top:98px;width:196px;padding:5px;background:#080610f2;box-shadow:0 8px 22px #000}.home-world .crimon-dungeon-chooser button{font-size:9px}
 .current-party-panel{height:88px;display:grid;grid-template-columns:104px minmax(0,1fr) 56px;align-items:center;gap:5px;padding:7px 7px;border:1px solid #7d6336;border-radius:2px;background:linear-gradient(100deg,#08070e,#181021 55%,#08070e);box-shadow:inset 0 0 15px #000,0 -4px 17px #000}.current-party-panel__title strong,.current-party-panel__title small{display:block}.current-party-panel__title strong{font:700 10px Georgia,serif;letter-spacing:.08em;color:#e5c77c}.current-party-panel__title small{margin-top:6px;font-size:9px;color:#c5b9c7}.current-party-panel__portraits{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;height:63px}.current-party-panel__portraits .hp-card{min-width:0;min-height:0;width:auto;height:63px;border:1px solid #6b5533;border-radius:2px;background:#08070e}.current-party-panel__portraits .hp-card__art{inset:0!important;background-size:cover}.current-party-panel__portraits .hp-card__gem,.current-party-panel__portraits .hp-card__stars,.current-party-panel__portraits .hp-card__level,.current-party-panel__portraits .hp-card__shade{display:none}.current-party-panel__edit{min-width:52px;min-height:44px;padding:0 3px;border:1px solid #8d713e;background:#130d1a;color:#e9d49c;font-size:10px}.current-party-panel__edit svg{width:12px}
 .crimon-tutorial{height:48px;min-height:48px;margin:2px 0 0;padding:5px 8px;border-radius:2px;overflow:hidden;background:linear-gradient(90deg,#0b0911,#15101d);cursor:pointer}.crimon-tutorial__head{height:36px}.crimon-tutorial__head small{font-size:9.5px}.crimon-tutorial__head strong{font-size:10px}.crimon-tutorial__current{margin:0;padding:0;border:0;background:#080810}.crimon-tutorial__current>summary{position:absolute;right:18px;margin-top:-31px;width:42px;height:32px;overflow:hidden;font-size:0}.crimon-tutorial__current>summary:after{content:"›";font-size:24px;color:#d4b56d}.crimon-tutorial__current[open]{position:fixed;z-index:50;left:10px;right:10px;bottom:calc(var(--bottom-nav-h) + 8px);max-height:65dvh;overflow:auto;padding:14px;border:1px solid #9c7b40;background:#090710f8;box-shadow:0 0 40px #000}.crimon-tutorial__current[open]>summary{position:static;width:auto;height:34px;margin:0;font-size:13px}.crimon-tutorial__current[open]>summary:after{display:none}
-.crimon-home .reward-banner-stack{position:static;z-index:20;display:grid;gap:6px;margin:4px 0 0}.crimon-home:has(.reward-banner){--home-banner-h:52px}.crimon-home:has(.reward-banner + .reward-banner){--home-banner-h:106px}.crimon-home:has(.reward-banner + .reward-banner + .reward-banner){--home-banner-h:160px}.crimon-home:has(.reward-banner + .reward-banner + .reward-banner + .reward-banner){--home-banner-h:214px}.reward-banner{position:static!important}
-/*
- * 畳んだお知らせの件数を出す1行。**高さを世界の枠へ必ず申告する。**
- * ホームは高さを削り合う縦並びなので、申告しない分だけ `.home-world` が
- * 潰れ、「試練の塔」が切り落とされて押せなくなる(過去にそれを出している)。
- */
+.crimon-home .reward-banner-stack{position:static;z-index:20;display:grid;gap:6px;margin:4px 0 0}.reward-banner{position:static!important}
+/* 畳んだお知らせの件数を出す1行 */
 .reward-banner-stack__rest{margin:0;padding:5px 8px;border:1px solid #7d633666;border-radius:6px;background:#0a0810e8;color:#e2d6bd;font-size:11px;line-height:1.45}
-.crimon-home:has(.reward-banner-stack__rest){--home-banner-h:80px}
-.crimon-home:has(.reward-banner + .reward-banner):has(.reward-banner-stack__rest){--home-banner-h:134px}
-.crimon-home:has(.reward-banner + .reward-banner + .reward-banner):has(.reward-banner-stack__rest){--home-banner-h:188px}
-.crimon-home:has(.reward-banner + .reward-banner + .reward-banner + .reward-banner):has(.reward-banner-stack__rest){--home-banner-h:242px}
+/*
+ * ここには札の枚数から `--home-banner-h` を52px刻みで当てる `:has()` が8本あった。
+ * **札は世界の中へ移ったので、世界の枠が札のぶん縮む理由はもう無い**
+ * (`home-pop-design.css` の「配布の札を、世界の空へ置く」)。
+ * そのうえ札の高さを中身に任せたので、刻みの数字は当たりようがない。
+ * 残すと、まだ引き算の式を持つ指定(`beginnerMissionReferenceLayout.css`)へ
+ * 当たらない数字が流れ込むだけなので、外した。
+ */
 /*
  * 自動周回の帯。**浮かせず、世界の枠と同じ親に置いて高さを申告する。**
  * 浮遊パネルだった頃は左端に幅176pxで貼り付き、「お知らせ」のボタンごと覆っていた。
