@@ -476,7 +476,9 @@ export class BattleEngine {
       dealFollowUp: (source, target, multiplier) => this.accessoryFollowUp(source, target, multiplier),
     }) : null;
     this.maxTurns = options.maxTurns ?? 300;
-    this.damageRamp = options.damageRamp;
+    // 組み立て側の指定が無ければ、敵の特性に書かれた長期戦のダメージ増を使う(力の遺跡4・5階)。
+    // 特性を持つ敵がいない戦闘では undefined のままなので、既存の戦闘は1つも変わらない
+    this.damageRamp = options.damageRamp ?? enemyTeam.find((def) => def.bossTraits?.battleDamageRamp)?.bossTraits?.battleDamageRamp;
     this.trialTowerFloor = options.trialTowerFloor;
     this.trialTowerHardMultipliers = options.trialTowerHardMultipliers;
     if (options.trialTowerFloor === 80) { this.grantTower80Immunity(); this.syncTower80Boss(); }

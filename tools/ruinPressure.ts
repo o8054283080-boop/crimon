@@ -31,6 +31,7 @@ import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import { buildAlly } from "./battleLab/build.js";
 import { mulberry32 } from "./battleLab/rng.js";
 import type { AllySpec, GearGrade } from "./battleLab/types.js";
+import type { MonsterDefinition } from "../src/core/monster.js";
 
 interface RuinTeam {
   kind: RuinKind;
@@ -38,6 +39,16 @@ interface RuinTeam {
   allies: AllySpec[];
   /** 開幕に狙う敵の並び番号(0=本体, 1=取り巻きA, 2=取り巻きB) */
   focus?: number;
+  /**
+   * 味方の技から**解除(STRIP)の効果だけ**を取り除く。顔ぶれも属性も他の効果もそのまま。
+   * 「解除があるから得をしているのか」を、属性の差と混ぜずに見るための版
+   */
+  stripRemoved?: boolean;
+}
+
+/** 解除だけを抜く。技の他の効果(攻撃DOWNなど)は残す */
+function withoutStrip(def: MonsterDefinition): MonsterDefinition {
+  return { ...def, skills: def.skills.map((skill) => ({ ...skill, effects: skill.effects.filter((effect) => effect.kind !== "STRIP") })) as MonsterDefinition["skills"] };
 }
 
 const ally = (label: string, templateId: string, element: AllySpec["element"], preset: NonNullable<AllySpec["preset"]>): AllySpec => ({
@@ -67,6 +78,23 @@ export const RUIN_TEAMS: Record<string, RuinTeam> = {
    * (`tests/ruinPowerRoles.test.ts` が比を固定している)。
    */
   "力・汎用(水ウルフ版・解除なし)": { kind: "POWER", purpose: "汎用の草ウルフを水ウルフに替えた(解除を持たない)", allies: GENERIC_NO_STRIP },
+  /*
+   * 汎用と**同じ5体・同じ属性**で、草ウルフの「いあつ」から解除だけを抜いた版。
+   * 汎用との差が、そのまま解除の働き(`tests/ruinPowerRoles.test.ts` が固定している)。
+   */
+  "力・汎用(解除抜き)": { kind: "POWER", purpose: "汎用の解除(いあつのSTRIP)だけを抜いた", allies: GENERIC, stripRemoved: true },
+  /* 回復と継続回復で粘り、毒で削る通常5体。長期戦の仕掛けが、回復を選んだ編成への税になっていないかを見る */
+  "力・回復+毒": {
+    kind: "POWER",
+    purpose: "回復で粘って毒で削る(★3中心・水)",
+    allies: [
+      ally("盾・水シェルタートル", "shellturtle", "WATER", "MAX_TANK"),
+      ally("回復・水フェアリー", "fairy", "WATER", "MAX_HEALER"),
+      ally("支援・水ウィスプ", "wisp", "WATER", "MAX_SUPPORT"),
+      ally("毒・水スライム", "slime", "WATER", "MAX_DEBUFFER"),
+      ally("主力・水ナイト", "knight", "WATER", "MAX_ATTACKER"),
+    ],
+  },
   "力・耐久3+火力2": {
     kind: "POWER",
     purpose: "耐久という戦い方が通るか(遅い編成への罰になっていないか)",
@@ -192,7 +220,8 @@ export function measureRuin(
   let wins = 0, bossLeft = 0, turns = 0, timeouts = 0, towerKills = 0, allyDeaths = 0, heraldAlive = 0, heraldKillSum = 0;
   for (let t = 0; t < trials; t += 1) {
     const rng = mulberry32(seedBase + t * 7919 + floorNum * 31);
-    const allies = team.allies.slice(0, size).map((spec) => buildAlly(spec, rng, gear));
+    const built = team.allies.slice(0, size).map((spec) => buildAlly(spec, rng, gear));
+    const allies = team.stripRemoved ? built.map(withoutStrip) : built;
     const engine = new BattleEngine(allies, buildDungeonEnemyTeam(floor), { rng });
     const enemies = engine.getUnits().filter((u) => u.team === "ENEMY");
     if (focus !== undefined) {
