@@ -37,7 +37,9 @@ describe("自動周回の進捗は浮かせない", () => {
   it("共通の帯(.tutorial-bar)を使い、画面の流れの中へ差し込む", () => {
     expect(main).toContain('className: `tutorial-bar tutorial-bar--farm');
     expect(main).toContain("world.before(farm)");
-    expect(main).toContain("content.prepend(farm)");
+    // 見出し帯があればその直後、無ければ画面の先頭(どちらも流れの中)
+    expect(main).toContain("world.before(farm); else putTop(farm)");
+    expect(main).toContain("if (head) head.after(node); else content.prepend(node);");
   });
 
   it("ホームでは世界の枠と同じ親に入れ、高さを申告する", () => {
@@ -111,18 +113,19 @@ describe("自動周回の進捗は浮かせない", () => {
     expect(css).toMatch(/\.tutorial-bar__cond--full \{[^}]*grid-column: 1 \/ -1;/);
   });
 
-  it("左上の「戻る」の逃げ場を、ボタンの上端と同じ変数から積む", () => {
+  it("ノッチの余白は見出し帯が持ち、画面の上余白は0にする", () => {
     /*
-     * **実機だけで壊れていた。** 逃げ場は `var(--global-back-h) + 10px` = 52pxで、
-     * `.screen` の素の上余白 `max(16px, env(safe-area-inset-top))` を上書きして
-     * ノッチぶんを消していた。iPhoneでは inset が約59pxあり、
-     * ボタンの下端は 59+4+42=105px。差ぶん、自動周回の帯に「戻る」が乗っていた。
+     * **実機だけで壊れていた。** 前は左上に浮いた「戻る」のために画面の上へ
+     * 逃げ場を空けていて、その式がノッチぶんを上書きして消していた
+     * (iPhoneでは自動周回の帯の左上に「戻る」が乗った)。
+     * いまは戻るが見出し帯の中にあり、ノッチの余白は帯の上余白だけが持つ。
+     * 両方で持つと、巻く前に59px余計に空くか、貼り付いた時にノッチへ潜る。
      * 巡回のChromiumは inset が0なので再現しない。だから式で見張る。
      */
-    const css = readFileSync(new URL("../src/web/style.css", import.meta.url), "utf8");
-    expect(css).toContain("--global-back-top: calc(max(6px, env(safe-area-inset-top)) + 4px)");
-    expect(css).toMatch(/\.global-back \{[^}]*top: var\(--global-back-top\);/);
-    expect(css).toContain("padding-top: calc(var(--global-back-top) + var(--global-back-h) + 10px)");
+    const css = readFileSync(new URL("../src/web/ui/screenHead.css", import.meta.url), "utf8");
+    expect(css).toContain("--screen-head-safe: env(safe-area-inset-top, 0px);");
+    expect(css).toContain("padding: var(--screen-head-safe) 0 0;");
+    expect(css).toMatch(/:has\(> \.screen-head\) \{\s*padding-top: 0 !important;/);
   });
 
   it("狭い端末でも周回の中身は畳まない", () => {
