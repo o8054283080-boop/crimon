@@ -276,7 +276,8 @@ import {
 import { craftAccessory, craftEquipment, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
 import { accessoryTitle, describeSpecial, generateAccessory as generateAccessoryForDev } from "../core/accessory.js";
 import { renderRuins } from "./views/ruins.js";
-import { renderAccessories } from "./views/accessories.js";
+import { type AccessoriesProps, renderAccessories } from "./views/accessories.js";
+import { type GearTab, renderGearTabs } from "./views/gearTabs.js";
 import { renderAncientCraft } from "./views/ancientCraft.js";
 
 let appMounted = false;
@@ -550,6 +551,8 @@ interface AppState {
   limitTargetId: string | null;
   limitDraft: AbilityPointAllocation;
   limitNotice: string | null;
+  /** 装備画面で「装備」と「アクセサリー」のどちらを見ているか */
+  equipmentTab: GearTab;
   /** 才能覚醒を開いている個体 */
   talentTargetId: string | null;
   /** 才能覚醒のタブ */
@@ -757,6 +760,7 @@ const state: AppState = {
   limitTargetId: null,
   limitDraft: { hp: 0, atk: 0, def: 0, spd: 0 },
   limitNotice: null,
+  equipmentTab: "GEAR",
   talentTargetId: null,
   talentTab: "BASIC",
   talentSkillSlot: 1,
@@ -932,6 +936,8 @@ interface RouteState {
   selectedRuinFloor: number | null;
   accessoryPickFor: string | null;
   limitTargetId: string | null;
+  /** 装備画面の「装備 / アクセサリー」。戻った時に同じ側を開く */
+  equipmentTab: GearTab;
   monsterDetailId: string | null;
   rankUpMode: boolean;
   equipmentDetailId: string | null;
@@ -980,7 +986,7 @@ const ROUTE_FIELDS = [
   "selectedGoldDungeonFloor", "selectedAwakeningDepthFloor", "talentTargetId", "talentTab",
   "createTargetId", "createMenu", "partyEditMode",
   "arenaView", "arenaDetailIndex", "arenaUnitIndex",
-  "ruinKind", "selectedRuinFloor", "accessoryPickFor", "limitTargetId",
+  "ruinKind", "selectedRuinFloor", "accessoryPickFor", "limitTargetId", "equipmentTab",
 ] as const satisfies readonly (keyof RouteState)[];
 
 function routeState(): RouteState {
@@ -4395,9 +4401,23 @@ function renderScreen(): void {
       content = renderMonstersScreen();
       break;
 
-    case "EQUIPMENT":
-      content = renderEquipmentScreen();
+    case "EQUIPMENT": {
+      /*
+       * 「装備 / アクセサリー」の切り替え(依頼主の指定)。
+       * 着ける装備を選んでいる最中と、1つの装備の詳細を見ている時は装備側のまま。
+       */
+      const gearTabs = renderGearTabs(state.equipmentTab, (tab) => {
+        state.equipmentTab = tab;
+        state.selectedAccessoryId = null;
+        state.accessoryNotice = null;
+        render();
+      }, { gear: state.player.equipment.length, accessory: (state.player.accessories ?? []).length });
+      const browsingGear = !state.equipmentPickerContext && !state.equipmentDetailId;
+      content = browsingGear && state.equipmentTab === "ACCESSORY"
+        ? renderAccessories({ ...accessoriesScreenProps(), pickFor: null, tabs: gearTabs })
+        : renderEquipmentScreen(gearTabs);
       break;
+    }
 
     case "SHOP":
       content = renderShop({
@@ -4693,60 +4713,7 @@ function renderScreen(): void {
     }
 
     case "ACCESSORIES":
-      content = renderAccessories({
-        player: state.player,
-        sort: state.accessorySort,
-        filter: state.accessoryFilter,
-        selectedId: state.selectedAccessoryId,
-        pickFor: state.accessoryPickFor,
-        notice: state.accessoryNotice,
-        onSelect: (id) => {
-          state.selectedAccessoryId = id;
-          state.accessoryNotice = null;
-          render();
-        },
-        onChangeSort: (sort) => { state.accessorySort = sort; render(); },
-        onChangeFilter: (filter) => { state.accessoryFilter = filter; render(); },
-        onEquip: (accessoryId) => {
-          if (!state.accessoryPickFor) return;
-          const result = equipAccessory(state.player, state.accessoryPickFor, accessoryId);
-          if (!result.ok) { state.accessoryNotice = result.reason; playSfx("denied", 0.7); render(); return; }
-          savePlayerState(state.player);
-          closeAccessories();
-        },
-        onUnequipPicked: () => {
-          if (!state.accessoryPickFor) return;
-          unequipAccessory(state.player, state.accessoryPickFor);
-          savePlayerState(state.player);
-          state.accessoryNotice = "アクセサリーを外しました";
-          render();
-        },
-        onEnhance: (accessoryId) => {
-          const result = tryEnhanceAccessory(state.player, accessoryId);
-          if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
-          savePlayerState(state.player);
-          state.accessoryNotice = `Lv${result.level}になりました(🪙${result.cost.toLocaleString("ja-JP")})`;
-          render();
-        },
-        onSell: (accessoryId) => {
-          const acc = findAccessory(state.player, accessoryId);
-          if (!acc) return;
-          if (!window.confirm(`${accessoryTitle(acc)} を売却しますか?`)) return;
-          const result = sellAccessory(state.player, accessoryId);
-          if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
-          savePlayerState(state.player);
-          state.selectedAccessoryId = null;
-          state.accessoryNotice = `売却しました(🪙${result.goldEarned.toLocaleString("ja-JP")})`;
-          render();
-        },
-        onToggleLock: (accessoryId) => {
-          const acc = findAccessory(state.player, accessoryId);
-          if (!acc) return;
-          setAccessoryLocked(state.player, accessoryId, !acc.locked);
-          savePlayerState(state.player);
-          render();
-        },
-      });
+      content = renderAccessories(accessoriesScreenProps());
       break;
 
     case "ANCIENT_CRAFT":
@@ -6021,8 +5988,70 @@ function handleToggleMonsterFilterOpen(): void {
   render();
 }
 
-function renderEquipmentScreen(): HTMLElement {
+/**
+ * アクセ一覧の組み立て。**アクセ一覧画面と、装備画面の「アクセサリー」タブで共有する。**
+ * 着ける先(`accessoryPickFor`)があるのはアクセ一覧画面の時だけ。
+ */
+function accessoriesScreenProps(): AccessoriesProps {
+  return {
+    player: state.player,
+    sort: state.accessorySort,
+    filter: state.accessoryFilter,
+    selectedId: state.selectedAccessoryId,
+    pickFor: state.accessoryPickFor,
+    notice: state.accessoryNotice,
+    onSelect: (id) => {
+      state.selectedAccessoryId = id;
+      state.accessoryNotice = null;
+      render();
+    },
+    onChangeSort: (sort) => { state.accessorySort = sort; render(); },
+    onChangeFilter: (filter) => { state.accessoryFilter = filter; render(); },
+    onEquip: (accessoryId) => {
+      if (!state.accessoryPickFor) return;
+      const result = equipAccessory(state.player, state.accessoryPickFor, accessoryId);
+      if (!result.ok) { state.accessoryNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+      savePlayerState(state.player);
+      closeAccessories();
+    },
+    onUnequipPicked: () => {
+      if (!state.accessoryPickFor) return;
+      unequipAccessory(state.player, state.accessoryPickFor);
+      savePlayerState(state.player);
+      state.accessoryNotice = "アクセサリーを外しました";
+      render();
+    },
+    onEnhance: (accessoryId) => {
+      const result = tryEnhanceAccessory(state.player, accessoryId);
+      if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
+      savePlayerState(state.player);
+      state.accessoryNotice = `Lv${result.level}になりました(🪙${result.cost.toLocaleString("ja-JP")})`;
+      render();
+    },
+    onSell: (accessoryId) => {
+      const acc = findAccessory(state.player, accessoryId);
+      if (!acc) return;
+      if (!window.confirm(`${accessoryTitle(acc)} を売却しますか?`)) return;
+      const result = sellAccessory(state.player, accessoryId);
+      if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
+      savePlayerState(state.player);
+      state.selectedAccessoryId = null;
+      state.accessoryNotice = `売却しました(🪙${result.goldEarned.toLocaleString("ja-JP")})`;
+      render();
+    },
+    onToggleLock: (accessoryId) => {
+      const acc = findAccessory(state.player, accessoryId);
+      if (!acc) return;
+      setAccessoryLocked(state.player, accessoryId, !acc.locked);
+      savePlayerState(state.player);
+      render();
+    },
+  };
+}
+
+function renderEquipmentScreen(tabs?: HTMLElement): HTMLElement {
   const props: EquipmentProps = {
+    tabs,
     player: state.player,
     detailId: state.equipmentDetailId,
     pickerContext: state.equipmentPickerContext,
@@ -6348,6 +6377,14 @@ if (import.meta.env.DEV) {
       const lead = getParty(state.player)[0] ?? state.player.monsters[0];
       openAccessories(pick && lead ? lead.id : null);
       if (select) state.selectedAccessoryId = state.player.accessories?.at(-1)?.id ?? null;
+      render();
+    },
+    /** 装備画面の「アクセサリー」側を開く(巡回用) */
+    openGearAccessoryTabForDev() {
+      navigate("EQUIPMENT");
+      state.equipmentPickerContext = null;
+      state.equipmentDetailId = null;
+      state.equipmentTab = "ACCESSORY";
       render();
     },
     openCraftForDev() {

@@ -190,14 +190,17 @@
 
 /* ------------------------------------------------------------ 遺跡 */
 
-.ruin-tabs {
+/* 2つ並びの切り替え。遺跡(力/守護)と装備画面(装備/アクセサリー)で同じ見た目 */
+.ruin-tabs,
+.gear-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin: 6px 0;
 }
 
-.ruin-tab {
+.ruin-tab,
+.gear-tab {
   min-height: 44px;
   border-radius: 10px;
   border: 1px solid rgba(214, 180, 104, 0.35);
@@ -207,7 +210,8 @@
   font-size: 14px;
 }
 
-.ruin-tab--active {
+.ruin-tab--active,
+.gear-tab--active {
   border-color: #ffd76a;
   color: #ffd76a;
   background: linear-gradient(180deg, rgba(64, 48, 18, 0.95), rgba(26, 20, 10, 0.95));

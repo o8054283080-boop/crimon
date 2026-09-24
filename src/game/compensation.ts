@@ -57,6 +57,15 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-24-gear-accessory-tab",
+    title: "装備画面からアクセサリーを見られるようにしました",
+    message: "下のメニューの「装備」画面の上に、**「装備」と「アクセサリー」の切り替え**を追加しました。\n\n"
+      + "・「アクセサリー」を押すと、持っているアクセサリーの一覧が開きます\n"
+      + "・一覧から強化・売却・ロック・並べ替え・絞り込みができます(着けたまま・ロック中は売却できません)\n"
+      + "・モンスターに着ける・外すのは、これまでどおりモンスター詳細の装備欄にある「アクセ」枠からです",
+    kind: "UPDATE", fromDate: "2026-09-24", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-24-accessory-slot-limit-in-create",
     title: "アクセサリー枠と限界能力付与の場所を見直しました",
     message: "モンスターの詳細画面を、より分かりやすく整理しました。\n\n"

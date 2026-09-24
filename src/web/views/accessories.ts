@@ -34,6 +34,8 @@ export interface AccessoriesProps {
   onEnhance: (accessoryId: string) => void;
   onSell: (accessoryId: string) => void;
   onToggleLock: (accessoryId: string) => void;
+  /** 見出しの直後に出す切り替え(装備画面の中で開いた時だけ) */
+  tabs?: HTMLElement;
 }
 
 const SORTS: { key: AccessorySortKey; label: string }[] = [
@@ -129,9 +131,19 @@ export function renderAccessories(props: AccessoriesProps): HTMLElement {
   const pickedMonster = props.pickFor ? props.player.monsters.find((m) => m.id === props.pickFor) : undefined;
   const title = props.pickFor ? `${pickedName ?? ""}のアクセサリー` : "アクセサリー";
   return el("div", { className: "screen accessories-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, [title]),
-    ]),
+    /*
+     * 装備画面の中で開いた時は、**装備側と同じ見出し**(「所持装備 / ○個」)にそろえる。
+     * 切り替えるたびに見出しの形が変わると、別の画面へ飛んだように見える。
+     */
+    props.tabs
+      ? el("header", { className: "app-header" }, [
+        el("h1", {}, ["所持アクセサリー"]),
+        el("p", { className: "app-subtitle" }, [`${list.length}個`]),
+      ])
+      : el("header", { className: "app-header app-header--row" }, [
+        el("h1", {}, [title]),
+      ]),
+    props.tabs ?? null,
     props.notice ? el("p", { className: "acc-note", role: "status" }, [props.notice]) : null,
     props.pickFor && pickedMonster?.accessoryId
       ? el("div", { className: "acc-actions" }, [
