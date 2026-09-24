@@ -223,6 +223,7 @@ Deno.serve(async (req: Request) => {
       supabase.from("trial_tower_progress")
         .select("user_id,player_name,best_floor,best_floor_reached_at,updated_at")
         .order("best_floor", { ascending: false }).limit(1000),
+      supabase.from("crimon_player_snapshots").select("user_id,save,saved_at").order("saved_at", { ascending: false }).limit(1000),
     ]);
 
     type Season = { id: string; name: string; status: string; starts_at: string; ends_at: string };
