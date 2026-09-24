@@ -728,6 +728,9 @@ function sortArena(a: ArenaPlayer, b: ArenaPlayer): number {
 
 function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
   host.replaceChildren();
+  // 管理APIの一時的な不整合で「0件」と断定しない。summary と一覧件数が
+  // 食い違う場合はデータ消失ではなく取得/描画異常として明示する。
+  const expectedArena = Number(dashboard.summary?.arenaProfiles ?? 0);
   const head = el("div", "crimon-admin-section__head");
   const list = el("div", "crimon-admin-list");
   if (currentTab === "RECOVERY") {
@@ -844,7 +847,17 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
       item.onclick = () => void loadArenaDetail(host.closest(".crimon-admin-overlay") as HTMLElement, row);
       list.append(item);
     }
-    if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当するアリーナプレイヤーはいません"));
+    if (rows.length === 0) {
+      const searchActive = currentSearch.trim().length > 0;
+      const inconsistent = !searchActive && expectedArena > 0;
+      list.append(el(
+        "div",
+        inconsistent ? "crimon-admin-error" : "crimon-admin-empty",
+        inconsistent
+          ? `⚠ アリーナ登録は${expectedArena}件ありますが一覧を取得できませんでした。データは削除されていません。更新してください。`
+          : "該当するアリーナプレイヤーはいません",
+      ));
+    }
   }
   host.append(head, list);
 }
