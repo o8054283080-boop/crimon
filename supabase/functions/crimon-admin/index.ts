@@ -198,6 +198,7 @@ Deno.serve(async (req: Request) => {
       recoveryResult,
       matchDaysResult,
       towerResult,
+      snapshotsResult,
     ] = await Promise.all([
       supabase.from("arena_seasons").select("id,name,status,starts_at,ends_at").order("starts_at", { ascending: false }).limit(5),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
