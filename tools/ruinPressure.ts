@@ -8,7 +8,7 @@
  *   npx tsx tools/ruinPressure.ts                     # 5階・全編成・STRONG/FINISHED
  *   npx tsx tools/ruinPressure.ts --floors 1,2,3,4,5 --gear TYPICAL,STRONG --trials 200
  *   npx tsx tools/ruinPressure.ts --size 4            # 4体で測る(本編はダンジョン編成の5体)
- *   npx tsx tools/ruinPressure.ts --aim 既定,本体,号令塔,妨害塔 --teams 力・
+ *   npx tsx tools/ruinPressure.ts --aim 既定,本体,号令塔,妨害塔 --teams 力・ --seeds 700,424242
  *   (`--teams` は名前の部分一致。「力」だけだと「守護・別解 防御DOWN+火力」も拾うので「力・」と書く)
  *
  * ## 狙い(`--aim`)を必ず2通りで測る
@@ -56,8 +56,28 @@ const GENERIC: AllySpec[] = [
 /** 汎用からインプ(毒)を外し、毒を持たない草ナイトを入れた5体 */
 const GENERIC_NO_POISON: AllySpec[] = GENERIC.map((a) => (a.templateId === "imp" ? ally("サブ・草ナイト", "knight", "GRASS", "MAX_ATTACKER") : a));
 
+/** 汎用の草ウルフ(いあつ=全体の解除)を水ウルフ(解除なし)に替えた5体。解除の有無だけが違う */
+const GENERIC_NO_STRIP: AllySpec[] = GENERIC.map((a) => (a.templateId === "wolf" ? ally("主力・水ウルフ", "wolf", "WATER", "MAX_ATTACKER") : a));
+
 export const RUIN_TEAMS: Record<string, RuinTeam> = {
-  "力・汎用": { kind: "POWER", purpose: "属性を合わせない通常の編成", allies: GENERIC },
+  "力・汎用": { kind: "POWER", purpose: "属性を合わせない通常の編成(草ウルフの全体解除を持つ)", allies: GENERIC },
+  /*
+   * 力の遺跡4・5階の号令塔は、指揮兵器へ解除で剥がせる護りを張る。
+   * **解除を持つ汎用と、解除だけを抜いた汎用で、正しい狙いが分かれるか**を見る組
+   * (`tests/ruinPowerRoles.test.ts` が比を固定している)。
+   */
+  "力・汎用(水ウルフ版・解除なし)": { kind: "POWER", purpose: "汎用の草ウルフを水ウルフに替えた(解除を持たない)", allies: GENERIC_NO_STRIP },
+  "力・耐久3+火力2": {
+    kind: "POWER",
+    purpose: "耐久という戦い方が通るか(遅い編成への罰になっていないか)",
+    allies: [
+      ally("盾・水ゴーレム", "golem", "WATER", "MAX_TANK"),
+      ally("盾・電気トレント", "treant", "ELECTRIC", "MAX_TANK"),
+      ally("回復・水フェアリー", "fairy", "WATER", "MAX_HEALER"),
+      ally("主力・水ナイト", "knight", "WATER", "MAX_ATTACKER"),
+      ally("妨害・水スライム", "slime", "WATER", "MAX_DEBUFFER"),
+    ],
+  },
   /*
    * 通常モンスターだけで火に強い水を揃えた5体。**「属性を合わせれば通る」が、
    * SR/SSRを持っていない人にも成り立つか**を見る(制圧は5体とも高レア)。
@@ -152,6 +172,10 @@ export interface RuinResult {
   towerKills: number;
   /** 倒れた味方の数の平均 */
   allyDeaths: number;
+  /** 取り巻きA(力の遺跡では号令塔)が最後まで生き残った割合 */
+  heraldAlive: number;
+  /** 取り巻きAが倒れた手(倒れた戦闘だけの平均。倒れなければ NaN) */
+  heraldKillTurn: number;
 }
 
 /** その狙いで開幕に指定する敵の並び番号。undefined なら狙い無し */
@@ -165,16 +189,30 @@ export function measureRuin(
   const floor = findRuinFloor(team.kind, floorNum);
   if (!floor) throw new Error(`${team.kind} ${floorNum}階が無い`);
   const focus = focusIndexOf(team, aim);
-  let wins = 0, bossLeft = 0, turns = 0, timeouts = 0, towerKills = 0, allyDeaths = 0;
+  let wins = 0, bossLeft = 0, turns = 0, timeouts = 0, towerKills = 0, allyDeaths = 0, heraldAlive = 0, heraldKillSum = 0;
   for (let t = 0; t < trials; t += 1) {
     const rng = mulberry32(seedBase + t * 7919 + floorNum * 31);
     const allies = team.allies.slice(0, size).map((spec) => buildAlly(spec, rng, gear));
     const engine = new BattleEngine(allies, buildDungeonEnemyTeam(floor), { rng });
+    const enemies = engine.getUnits().filter((u) => u.team === "ENEMY");
     if (focus !== undefined) {
-      const target = engine.getUnits().filter((u) => u.team === "ENEMY")[focus];
+      const target = enemies[focus];
       if (target) engine.setFocusTarget(target.instanceId);
     }
+    // 取り巻きAが倒れた手を拾う。手番の記録(非公開)に1枚かぶせるだけで、戦闘の経過は変えない
+    const herald = enemies[1];
+    let turnNo = 0, heraldDiedAt = -1;
+    // **引数はすべてそのまま渡す。**3つ目(追加ターンの印)を落とすと、追加ターンが通常の手番として解かれて経過が変わる
+    const hooked = engine as unknown as { recordTurn: (...args: unknown[]) => unknown };
+    const record = hooked.recordTurn.bind(engine);
+    hooked.recordTurn = (...args) => {
+      const out = record(...args);
+      turnNo += 1;
+      if (heraldDiedAt < 0 && herald && !herald.alive) heraldDiedAt = turnNo;
+      return out;
+    };
     const result = engine.run();
+    if (heraldDiedAt < 0) heraldAlive += 1; else heraldKillSum += heraldDiedAt;
     if (result.winner === "PLAYER") wins += 1;
     if (result.winner === "DRAW" || (result.winner !== "PLAYER" && result.turnsTaken >= 300)) timeouts += 1;
     const units = engine.getUnits();
@@ -187,6 +225,7 @@ export function measureRuin(
   return {
     rate: wins / trials, bossHpLeft: bossLeft / trials, turns: turns / trials, timeoutRate: timeouts / trials,
     towerKills: towerKills / trials, allyDeaths: allyDeaths / trials,
+    heraldAlive: heraldAlive / trials, heraldKillTurn: heraldAlive < trials ? heraldKillSum / (trials - heraldAlive) : Number.NaN,
   };
 }
 
@@ -202,6 +241,8 @@ if (process.argv[1]?.endsWith("ruinPressure.ts")) {
   const size = Number(opt("--size", "5"));
   const only = opt("--teams", "");
   const aims = opt("--aim", "既定,本体").split(",") as RuinAim[];
+  // 種の土台。評価は 700(既定)と 424242 の2つで見る
+  const seeds = opt("--seeds", "700").split(",").map(Number);
   for (const aim of aims) if (!RUIN_AIMS.includes(aim)) throw new Error(`--aim は ${RUIN_AIMS.join(" / ")} のどれか: ${aim}`);
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
   for (const floor of floors) for (const gear of gears) {
@@ -211,8 +252,11 @@ if (process.argv[1]?.endsWith("ruinPressure.ts")) {
       for (const aim of aims) {
         // 守護の遺跡に「号令塔」「妨害塔」は無い(並び1・2は身代わり像・霧の巫女)ので、名前の合う狙いだけ
         if (team.kind === "GUARDIAN" && (aim === "号令塔" || aim === "妨害塔")) continue;
-        const r = measureRuin(team, floor, gear, trials, size, 700, aim);
-        console.log(`${name} [狙い:${aim}]: 勝率${pct(r.rate)} 本体残HP${pct(r.bossHpLeft)} 平均手数${r.turns.toFixed(0)} 時間切れ${pct(r.timeoutRate)} 塔撃破${r.towerKills.toFixed(2)} 倒れた味方${r.allyDeaths.toFixed(2)}`);
+        for (const seed of seeds) {
+          const r = measureRuin(team, floor, gear, trials, size, seed, aim);
+          const seedText = seeds.length > 1 ? ` 種${seed}` : "";
+          console.log(`${name} [狙い:${aim}]${seedText}: 勝率${pct(r.rate)} 本体残HP${pct(r.bossHpLeft)} 平均手数${r.turns.toFixed(0)} 時間切れ${pct(r.timeoutRate)} 塔撃破${r.towerKills.toFixed(2)} 倒れた味方${r.allyDeaths.toFixed(2)} 号令塔生存${pct(r.heraldAlive)} 号令塔撃破手${Number.isNaN(r.heraldKillTurn) ? "-" : r.heraldKillTurn.toFixed(1)}`);
+        }
       }
     }
   }

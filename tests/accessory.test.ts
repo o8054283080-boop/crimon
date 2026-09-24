@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
+import { stripBuffs } from "../src/battle/unit.js";
 import {
   ACCESSORY_FAMILIES, ACCESSORY_RARITIES, ACCESSORY_SPECIALS, SPECIAL_COUNT,
   type Accessory, type AccessoryBattleEffects, accessoryMainValue, emptyAccessoryEffects, generateAccessory,
@@ -370,11 +371,12 @@ describe("遺跡", () => {
     const p5 = findRuinFloor("POWER", 5)!;
     // 力の遺跡の4・5階は、依頼主の指示(「力の遺跡をつよくして目標に近づけて」)で
     // 指定値(本体 510000/9000/3150/210)から HPを約半分・攻撃力を約3.8倍・本体の速さ+15 にした。
-    // そのうえで「塔を倒すと必ず損」(既定の狙い19% / 本体を狙い撃ち94%)を直すため、
-    // 号令塔に守りを持たせ、塔を脆く(号令塔1/4・妨害塔2/5)、指揮兵器を会心寄り(HP0.85倍・攻撃1.15倍・会心80%)にした。
-    // 計測は src/data/ruins.ts の POWER_STATS の注記と tools/ruinPressure.ts
+    // そのうえで「塔を倒すと必ず損」(既定の狙い19% / 本体を狙い撃ち94%)を直した。
+    // 1回目は塔を脆くしすぎて「号令塔から倒すのが常に得」に裏返ったので、2回目で号令塔を巻き添えで
+    // 倒れない硬さ(HP 47,250・防御2,860)へ戻し、妨害塔は防御を上げ(既定の狙いが先に削りに行かない)、
+    // 指揮兵器は会心寄り(会心80%・攻撃33,235)にした。比は tests/ruinPowerRoles.test.ts、表は src/data/ruins.ts の注記
     expect(p5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
-      [216_750, 39_100, 3_150, 225], [22_500, 5_400, 2_200, 205], [28_800, 7_800, 1_800, 200],
+      [216_750, 33_235, 3_150, 225], [47_250, 5_400, 2_860, 205], [28_800, 7_800, 5_400, 200],
     ]);
     expect(p5.enemies[0].fixedStats!.criRate).toBe(0.8);
     // 1〜3階は両遺跡で共通の作りのまま(会心率は図鑑どおり)
@@ -423,8 +425,8 @@ describe("遺跡", () => {
       expect(herald.cooldowns[2]).toBe(0);
       herald.gauge = 100;
       engine.resolveTurn(herald);
-      expect(boss.mitigateAmount).toBe(0.6);
-      expect(boss.mitigateTurns).toBe(4);
+      expect(boss.mitigateAmount).toBe(0.55);
+      expect(boss.mitigateTurns).toBe(3);
       expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "atk")).toBe(true);
       expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "spd")).toBe(true);
       // 倒すと強くなる仕掛けは残す(値は小さくした)
@@ -433,6 +435,25 @@ describe("遺跡", () => {
     }
     const { units } = ruinEngine("POWER", 3);
     expect(units[2].def.skills.some((s) => s.effects.some((e) => e.kind === "MITIGATE"))).toBe(false);
+  });
+
+  it("力の遺跡4・5階: 護りは解除1個で攻撃力UP、2個で速さUP、3個で軽減が外れる(説明文どおり)", () => {
+    for (const [count, left] of [[1, { atk: false, spd: true, mit: true }], [2, { atk: false, spd: false, mit: true }], [3, { atk: false, spd: false, mit: false }]] as const) {
+      const { engine, units } = ruinEngine("POWER", 5);
+      const [, boss, herald] = units;
+      herald.gauge = 100;
+      engine.resolveTurn(herald);
+      expect(stripBuffs(boss, count)).toBe(count);
+      expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "atk"), `解除${count}個`).toBe(left.atk);
+      expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "spd"), `解除${count}個`).toBe(left.spd);
+      expect(boss.mitigateTurns > 0, `解除${count}個`).toBe(left.mit);
+    }
+    expect(findRuinFloor("POWER", 5)!.enemies[1].skills![2].description).toContain("解除1個で攻撃力UP");
+  });
+
+  it("力の遺跡4・5階の指揮兵器だけ、戦線圧迫が回復を阻害する(1〜3階は元のまま)", () => {
+    const healBlock = (floor: number) => findRuinFloor("POWER", floor)!.enemies[0].skills!.some((s) => s.effects.some((e) => e.kind === "HEAL_BLOCK"));
+    expect([1, 2, 3, 4, 5].map(healBlock)).toEqual([false, false, false, true, true]);
   });
 
   it("守護の遺跡: 身代わり像が霊獣のダメージを階ごとの割合で肩代わりし、解除で剥がれる", () => {
