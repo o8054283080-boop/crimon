@@ -388,12 +388,14 @@ Deno.serve(async (req: Request) => {
         authUsers: authResult.data?.users?.length ?? 0,
         arenaProfiles: arenaPlayers.length,
         recoveryAccounts: recoveryAccounts.length,
+        playerSnapshots: playerSnapshots.length,
       },
       overview,
       towerRanking,
       daily,
       arenaPlayers,
       recoveryAccounts,
+      playerSnapshots,
     });
   }
 
