@@ -18,7 +18,7 @@ import {
   uploadCloudSave,
   type CloudSaveEnvelope,
 } from "../game/cloudRecovery.js";
-import { arenaAuthUserId } from "../net/arenaAuth.js";
+import { arenaAuthAccessToken, arenaAuthUserId } from "../net/arenaAuth.js";
 
 const PANEL_MARKER = "data-crimon-cloud-recovery";
 /*
