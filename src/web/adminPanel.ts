@@ -849,6 +849,31 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
     if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当するアリーナプレイヤーはいません"));
   }
   host.append(head, list);
+  const snapshots = dashboard.playerSnapshots ?? [];
+  if (snapshots.length > 0) {
+    const snap = el("div", "crimon-admin-list");
+    const snapHead = el("div", "crimon-admin-section__head");
+    snapHead.append(el("h3", "", "自動保存プレイヤー"), el("span", "", `${snapshots.length}件`));
+    host.append(snapHead);
+    for (const row of snapshots) {
+      const item = el("div", "crimon-admin-row");
+      const p = row.progress;
+      const s = row.summary ?? {};
+      const primary = el("span", "crimon-admin-row__primary");
+      primary.append(el("strong", "", p?.fighterName || s.fighterName || "名前未設定"), el("small", "", row.userId));
+      item.append(
+        primary,
+        metric("レベル", p?.fighterLevel ? `Lv.${p.fighterLevel}` : s.fighterLevel ? `Lv.${s.fighterLevel}` : "-"),
+        metric("ゴールド", formatNumber(p?.gold ?? s.gold)),
+        metric("ダイヤ", formatNumber(p?.crystal ?? s.crystal)),
+        metric("モンスター", `${formatNumber(p?.monsterCount ?? s.monsterCount)}体`),
+        metric("装備", `${formatNumber(p?.equipmentCount ?? s.equipmentCount)}個`),
+        savedMetric("自動保存", row.savedAt),
+      );
+      snap.append(item);
+    }
+    host.append(snap);
+  }
 }
 
 /**
