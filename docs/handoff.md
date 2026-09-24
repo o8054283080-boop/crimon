@@ -903,7 +903,7 @@ psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authentic
 `arena_profiles` / `arena_standings` / `arena_wallets` / `trial_tower_progress` の
 4つが同じ `user_id` を向いているかを見る。
 
-## アクセサリー・力の遺跡・守護の遺跡(PR待ち。依頼主の確認でマージ)
+## アクセサリー・力の遺跡・守護の遺跡(2026-09-24 に PR #405 でマージ済み)
 
 入口: `src/core/accessory.ts`(型・表・生成・無害化)/ `src/core/accessoryApply.ts`(定義へ着ける)/
 `src/battle/accessoryRuntime.ts`(戦闘中の効果)/ `src/data/ruins.ts`・`src/game/ruins.ts`(遺跡)/
