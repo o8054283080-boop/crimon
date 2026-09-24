@@ -11,12 +11,16 @@ name: 名指ししたSQLを本番へ流す
 # 利用者名は `postgres.<ref>`(`postgres` だけだと弾かれる)。
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260924223000_player_admin_snapshots.sql"
   workflow_dispatch:
     inputs:
       file:
         description: 流すSQLファイル(冪等であること)
         required: true
-        default: supabase/migrations/20260922080000_recovery_arena_link.sql
+        default: supabase/migrations/20260924223000_player_admin_snapshots.sql
 
 permissions:
   contents: read
@@ -38,7 +42,7 @@ jobs:
           sudo apt-get install -y -qq postgresql-client
       - name: 流すファイルを確かめる
         env:
-          TARGET: ${{ inputs.file }}
+          TARGET: ${{ inputs.file || 'supabase/migrations/20260924223000_player_admin_snapshots.sql' }}
         run: |
           set -euo pipefail
           case "$TARGET" in
