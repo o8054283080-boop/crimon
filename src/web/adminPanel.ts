@@ -143,7 +143,9 @@ type RecoveryAccount = {
   progress?: SaveProgress | null;
 };
 
-type PlayerSnapshot = { userId: string; savedAt: string; summary: { fighterName?: string; fighterLevel?: number; gold?: number; crystal?: number; monsterCount?: number; equipmentCount?: number }; progress?: SaveProgress | null; };\n\ntype AdminDashboard = {
+type PlayerSnapshot = { userId: string; savedAt: string; summary: { fighterName?: string; fighterLevel?: number; gold?: number; crystal?: number; monsterCount?: number; equipmentCount?: number }; progress?: SaveProgress | null; };
+
+type AdminDashboard = {
   generatedAt: string;
   activeSeason: { id: string; name: string; status: string; starts_at: string; ends_at: string } | null;
   summary: AdminSummary;
