@@ -25,6 +25,11 @@ concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 
+# 検証用のブラウザ・ビルドから本番の認証や保存を呼ばない。
+env:
+  VITE_SUPABASE_URL: ""
+  VITE_SUPABASE_ANON_KEY: ""
+
 jobs:
   types-and-tests:
     name: 型とテスト

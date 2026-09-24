@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+# 検証用のブラウザ・ビルドから本番の認証や保存を呼ばない。
+env:
+  VITE_SUPABASE_URL: ""
+  VITE_SUPABASE_ANON_KEY: ""
+
 jobs:
   screenshot:
     runs-on: ubuntu-latest
