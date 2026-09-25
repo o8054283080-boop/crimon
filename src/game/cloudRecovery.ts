@@ -83,7 +83,11 @@ async function request(body: Record<string, unknown>, fetchImpl: typeof fetch = 
 }
 
 export function currentSaveEnvelope(storage: Pick<Storage, "getItem"> = localStorage): CloudSaveEnvelope | null {
-  const raw = storage.getItem(PLAYER_STORAGE_KEY);
+  return saveEnvelopeFromRaw(storage.getItem(PLAYER_STORAGE_KEY));
+}
+
+/** 端末に保存されている形(縮めた文字列)から、クラウドへ送る形を作る */
+export function saveEnvelopeFromRaw(raw: string | null): CloudSaveEnvelope | null {
   if (!raw) return null;
   try {
     // 縮めた形で保存されている。**生の JSON.parse では読めない**
@@ -374,6 +378,106 @@ export async function saveConfirmedCloud(meta: CloudRecoveryMeta, save: CloudSav
     syncConflict: false, pendingSaveHash: undefined, sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
     arenaUserId: data.arenaUserId ?? meta.arenaUserId ?? null,
     conflictCopySavedAt: undefined, conflictCopyFingerprint: undefined };
+}
+
+/**
+ * 開いた時にクラウドと合わせる。**いちばん後で遊んだ端末のデータに揃える。**
+ *
+ * ## なぜ要るのか
+ *
+ * 前は、端末はクラウドへ「上げる」だけで、開いた時に「取りに行く」ことをしなかった。
+ * だから別の端末で遊んだ後にこちらを開くと、古いデータのまま遊び始め、
+ * 次の保存で世代がぶつかって**保存が2つに分かれていた。**
+ * 依頼主「ログインした時点でそのアカウントに合わせるだけではだめなんですか？」——
+ * その通りなので、開くたびに(復帰した時も)クラウドを見に行く。
+ *
+ * - `IN_SYNC`     … 同じ内容。分かれていた印を消すだけ
+ * - `UP_TO_DATE`  … 他の端末は保存していない。いつも通り上げればよい
+ * - `ADOPT_CLOUD` … 他の端末で後から遊んでいる。クラウドのデータに合わせる
+ * - `KEEP_LOCAL`  … この端末の方が後で遊ばれている。この端末のデータでクラウドを更新する
+ *
+ * 「後で遊んだ」は、この端末がセーブを最後に書いた時刻と、クラウドの保存時刻で比べる。
+ * 最後に上げた後この端末で何も遊んでいなければ、比べるまでもなくクラウドに合わせる。
+ * **どちらに揃えても、負けた方は別のバックアップとしてクラウドに残す**(黙って消さない)。
+ */
+export type OpenSyncDecision = "IN_SYNC" | "UP_TO_DATE" | "ADOPT_CLOUD" | "KEEP_LOCAL";
+
+export function decideOpenSync(args: {
+  meta: CloudRecoveryMeta;
+  local: CloudSaveEnvelope;
+  /** この端末がセーブを最後に書いた時刻。分からなければ null */
+  localTouchedAt: number | null;
+  cloud: { revision: number; savedAt: string; save: CloudSaveEnvelope };
+}): { decision: OpenSyncDecision; localChanged: boolean } {
+  const { meta, local, cloud } = args;
+  if (canonical(cloud.save.state) === canonical(local.state)) return { decision: "IN_SYNC", localChanged: false };
+  // 世代が進んでいない = この端末が最後に上げてから、誰もクラウドへ保存していない
+  if (cloud.revision <= meta.revision) return { decision: "UP_TO_DATE", localChanged: true };
+  let base: unknown = null;
+  try { base = JSON.parse(meta.lastUploadedSave); } catch { base = null; }
+  const localChanged = base === null || canonical(local.state) !== canonical(base);
+  // 最後に上げた後、この端末では遊んでいない。別の端末の続きに合わせるだけ
+  if (!localChanged) return { decision: "ADOPT_CLOUD", localChanged };
+  /*
+   * **両方で遊んでいる。**後で遊んだ方に揃える。
+   * 書いた時刻を持たない古い端末は、分かれた後に控えた時刻を使う。
+   * どちらも無ければクラウドに合わせる(この端末のデータは控えに残す)。
+   */
+  const copiedAt = meta.conflictCopySavedAt ? Date.parse(meta.conflictCopySavedAt) : Number.NaN;
+  const localAt = args.localTouchedAt ?? (Number.isFinite(copiedAt) ? copiedAt : null);
+  const cloudAt = Date.parse(cloud.savedAt);
+  if (localAt !== null && Number.isFinite(cloudAt) && localAt > cloudAt) return { decision: "KEEP_LOCAL", localChanged };
+  return { decision: "ADOPT_CLOUD", localChanged };
+}
+
+/** クラウドの本来のバックアップを、この端末のデータで置き換える前に控える行の番号 */
+export const REPLACED_MAIN_COPY_ID = "replaced-main";
+
+export type OpenSyncResult =
+  | { kind: "IN_SYNC" | "UP_TO_DATE" | "KEEP_LOCAL"; meta: CloudRecoveryMeta }
+  | { kind: "ADOPT_CLOUD"; meta: CloudRecoveryMeta; save: CloudSaveEnvelope; keptLocalCopy: boolean };
+
+/**
+ * `decideOpenSync` の判断を実行する。**端末のセーブは書き換えない**
+ * (`ADOPT_CLOUD` の時に書き換えて読み直すのは画面側の仕事)。
+ *
+ * @param local       判断に使う端末のデータ(起動直後なら、このページが書く前の姿)
+ * @param currentSave `KEEP_LOCAL` の時にクラウドへ上げる、いまの端末のデータ
+ */
+export async function syncOnOpen(
+  meta: CloudRecoveryMeta,
+  local: CloudSaveEnvelope,
+  localTouchedAt: number | null,
+  currentSave: () => CloudSaveEnvelope | null,
+  arenaUserId?: string | null,
+): Promise<OpenSyncResult> {
+  const latest = await loadLatestCloud(meta);
+  const cleared = { syncConflict: false, pendingSaveHash: undefined, conflictCopySavedAt: undefined, conflictCopyFingerprint: undefined };
+  const { decision, localChanged } = decideOpenSync({
+    meta, local, localTouchedAt,
+    cloud: { revision: latest.meta.revision, savedAt: latest.meta.savedAt, save: latest.save },
+  });
+  if (decision === "IN_SYNC") return { kind: "IN_SYNC", meta: { ...latest.meta, ...cleared } };
+  if (decision === "UP_TO_DATE") return { kind: "UP_TO_DATE", meta: { ...meta, sessionExpiresAt: latest.meta.sessionExpiresAt } };
+  if (decision === "ADOPT_CLOUD") {
+    // この端末でも遊んでいたなら、その姿を別のバックアップとして残してから合わせる。
+    // **控えられなかったら合わせない**(この端末にしか無いデータを置き去りにしない)
+    if (!localChanged) return { kind: "ADOPT_CLOUD", save: latest.save, keptLocalCopy: false, meta: { ...latest.meta, ...cleared } };
+    const withCopy = await saveConflictCopy({ ...meta, sessionExpiresAt: latest.meta.sessionExpiresAt }, local);
+    /*
+     * 控えは「いま」の時刻で入るので、そのままだと**負けた方が一番新しく見える**
+     * (管理画面は新しい方を出す)。同じ内容で本来のバックアップを保存し直し、
+     * こちらが最新だと日時の上でも分かるようにする。
+     */
+    const touched = await saveConfirmedCloud(latest.meta, latest.save, arenaUserId);
+    return { kind: "ADOPT_CLOUD", save: latest.save, keptLocalCopy: true,
+      meta: { ...touched, ...cleared, deviceCopyId: withCopy.deviceCopyId } };
+  }
+  const save = currentSave() ?? local;
+  // 置き換えられる側(別の端末の続き)も、別のバックアップとして残す
+  await request({ action: "save_copy", sessionToken: meta.sessionToken, deviceId: REPLACED_MAIN_COPY_ID, baseRevision: latest.meta.revision, save: latest.save });
+  const next = await saveConfirmedCloud(latest.meta, save, arenaUserId);
+  return { kind: "KEEP_LOCAL", meta: { ...next, deviceCopyId: meta.deviceCopyId } };
 }
 
 export async function logoutRecovery(meta: CloudRecoveryMeta): Promise<void> {
