@@ -76,7 +76,10 @@ try {
     button.textContent === "この端末のデータでバックアップを再開" && !button.disabled));
   await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("保存内容が異なる"));
   assert.equal(lastSaved, undefined, "確認後の競合を上書きした");
+  const oldPreview = await connected.locator(".cloud-recovery__preview").elementHandle();
   await inspect.click();
+  await oldPreview!.waitForElementState("hidden");
+  await resume.waitFor();
   await reachable(resume);
   page.once("dialog", dialog => dialog.accept());
   await resume.click();
