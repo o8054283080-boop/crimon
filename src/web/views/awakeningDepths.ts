@@ -176,6 +176,15 @@ function renderDetail(props: AwakeningDepthProps, floor: AwakeningDepthFloor): H
         el("span", { className: "depth-detail__label" }, ["ドロップ"]),
         el("span", {}, [dropText(floor)]),
       ]),
+      // 勝つたびに必ず入る額。確率ではないので数字をそのまま出す
+      el("div", { className: "depth-detail__row" }, [
+        el("span", { className: "depth-detail__label" }, ["ゴールド"]),
+        el("span", {}, [`${floor.goldReward.toLocaleString("ja-JP")} G`]),
+      ]),
+      el("div", { className: "depth-detail__row" }, [
+        el("span", { className: "depth-detail__label" }, ["経験値"]),
+        el("span", {}, [`${floor.expReward.toLocaleString("ja-JP")}(1体ずつ)`]),
+      ]),
       firstClear
         ? el("div", { className: "depth-detail__row depth-detail__row--first" }, [
             el("span", { className: "depth-detail__label" }, ["初回報酬"]),

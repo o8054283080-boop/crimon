@@ -136,8 +136,8 @@ describe("目覚の深域と才能覚醒の累計", () => {
     expect(cumulative(player, "awakening-depth").current).toBe(0);
 
     // 1階と、開いていない深い階を混ぜても、増え方は同じ
-    grantAwakeningDepthReward(player, findAwakeningDepthFloor(1)!, () => 0.5);
-    grantAwakeningDepthReward(player, findAwakeningDepthFloor(10)!, () => 0.5);
+    grantAwakeningDepthReward(player, findAwakeningDepthFloor(1)!, [], () => 0.5);
+    grantAwakeningDepthReward(player, findAwakeningDepthFloor(10)!, [], () => 0.5);
     expect(cumulative(player, "awakening-depth").current).toBe(2);
   });
 
@@ -179,7 +179,7 @@ describe("目覚の深域と才能覚醒の累計", () => {
     expect(missionRewardText(view.reward)).toBe("目覚の欠片×30");
 
     for (let i = 0; i < 5; i += 1) {
-      grantAwakeningDepthReward(player, findAwakeningDepthFloor(1)!, () => 0.5);
+      grantAwakeningDepthReward(player, findAwakeningDepthFloor(1)!, [], () => 0.5);
     }
     const before = player.awakeningShards ?? 0;
     expect(claimCumulativeMission(player, "awakening-depth", NOW)).toEqual({ awakeningShards: 30 });

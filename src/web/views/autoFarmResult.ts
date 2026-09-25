@@ -55,16 +55,11 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
   if (result.equipmentDropCount > 0) tiles.push(rewardTile("⚔", "装備", `+${result.equipmentDropCount}`));
   if (result.summonScrollCount > 0) tiles.push(rewardTile("📜", "召喚の書", `+${result.summonScrollCount}`, "scroll"));
   if (result.totalFighterLevels > 0) tiles.push(rewardTile("🎖", "ファイター", `Lv+${result.totalFighterLevels}`, "fighter"));
-  /*
-   * 目覚の素材。**深域の周回でだけ出る。**
-   *
-   * 深域はゴールドも経験値も配らないので、これを出さないと
-   * 「10回まわしたのに何ももらえていない」画面になる。
-   */
+  // 目覚の素材。**深域の周回でだけ出る。**深域の主役の報酬なので、ゴールドとは別の札で見せる
   if ((result.awakeningShards ?? 0) > 0) tiles.push(rewardTile("🔷", "目覚の欠片", `+${result.awakeningShards}`, "crystal"));
   if ((result.awakeningCrystals ?? 0) > 0) tiles.push(rewardTile("💠", "目覚の結晶", `+${result.awakeningCrystals}`, "crystal"));
   if ((result.awakeningStones ?? 0) > 0) tiles.push(rewardTile("🌟", "目覚の奇石", `+${result.awakeningStones}`, "crystal"));
-  // 遺跡の報酬。**遺跡の周回でだけ出る**(ゴールドも経験値も配らないので、出さないと空の画面になる)
+  // 遺跡の報酬。**遺跡の周回でだけ出る**(アクセと素材が主役。ゴールドと経験値は上の札に入る)
   if ((result.accessoryDropCount ?? 0) > 0) tiles.push(rewardTile("💍", "アクセサリー", `+${result.accessoryDropCount}`));
   if ((result.evolutionCores ?? 0) > 0) tiles.push(rewardTile("🔶", "進化核", `+${result.evolutionCores}`, "crystal"));
   if ((result.ancientShards ?? 0) > 0) tiles.push(rewardTile("🧩", "古代のカケラ", `+${result.ancientShards}`, "crystal"));

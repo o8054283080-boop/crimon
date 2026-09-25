@@ -62,6 +62,12 @@ export interface RuinFloor {
   shards: readonly [number, number];
   /** 副ドロップ。**それぞれ独立に引く** */
   bonus: { summonScroll: number; reincarnationPig3: number; skillPig1: number };
+  /** 勝つたびに入るゴールド */
+  goldReward: number;
+  /** 勝つたびにダンジョン編成の1体ずつへ入るモンスターEXP */
+  expReward: number;
+  /** 勝つたびに入るファイターEXP */
+  fighterExp: number;
   note: string;
 }
 
@@ -338,6 +344,22 @@ const BONUS: Record<number, RuinFloor["bonus"]> = {
   5: { summonScroll: 0.10, reincarnationPig3: 0.05, skillPig1: 0.01 },
 };
 const STAMINA: Record<number, number> = { 1: 8, 2: 9, 3: 10, 4: 11, 5: 12 };
+/*
+ * ゴールドと経験値。**アクセと素材が主役の場所なので、ステージほどは出さない。**
+ * 5階建てで1階ぶんの重みが目覚の深域の2階ぶんにあたるので、1階あたりの伸びも深域の倍。
+ * 5階(10,000G・EXP10,000・ファイターEXP750)は深域10階と揃う。
+ */
+export const RUIN_GOLD_PER_FLOOR = 2_000;
+export const RUIN_EXP_PER_FLOOR = 2_000;
+export const RUIN_FIGHTER_EXP_PER_FLOOR = 150;
+
+function goldAndExp(floor: number): Pick<RuinFloor, "goldReward" | "expReward" | "fighterExp"> {
+  return {
+    goldReward: RUIN_GOLD_PER_FLOOR * floor,
+    expReward: RUIN_EXP_PER_FLOOR * floor,
+    fighterExp: RUIN_FIGHTER_EXP_PER_FLOOR * floor,
+  };
+}
 
 /* ==========================================================================
  * 階の組み立て
@@ -355,6 +377,7 @@ function buildPowerFloor(floor: number): RuinFloor {
     stamina: STAMINA[floor],
     rarityWeights: RARITY_WEIGHTS[floor], starWeights: STAR_WEIGHTS[floor],
     cores: CORES[floor], shards: SHARDS[floor], bonus: BONUS[floor],
+    ...goldAndExp(floor),
     note: guarded
       ? "指揮兵器を倒せば勝ち。号令塔は生きている間、指揮兵器へ攻撃力UP・速さUP・被ダメ軽減を張る(解除1個で攻撃力UPが外れ、張り直すまで穴が開く)。塔を倒すと護りは外れるが、指揮兵器が強くなる(号令塔は攻撃力、妨害塔は速さ)。長引くと両陣営のダメージが増える。"
       : "指揮兵器を倒せば勝ち。塔を倒すと指揮兵器が強くなる(号令塔は攻撃力、妨害塔は速さ)。",
@@ -392,6 +415,7 @@ function buildGuardianFloor(floor: number): RuinFloor {
     stamina: STAMINA[floor],
     rarityWeights: RARITY_WEIGHTS[floor], starWeights: STAR_WEIGHTS[floor],
     cores: CORES[floor], shards: SHARDS[floor], bonus: BONUS[floor],
+    ...goldAndExp(floor),
     note: "霊獣を倒せば勝ち。身代わり像が霊獣のダメージを肩代わりする(解除で剥がせる。継続ダメージは肩代わりしない)。",
     enemies: [
       {
