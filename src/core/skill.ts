@@ -500,6 +500,11 @@ export interface CoopAttackEffect {
   allies: number;
   /** 呼ばれた味方のクールタイムをこのターン数だけ縮める */
   allyCooldownReduce?: number;
+  /**
+   * 協力攻撃で呼ばれた味方の与ダメージに掛ける倍率。省略時は1(そのまま)。
+   * スキル1のダメージの倍率・HP比例・防御比例にまとめて掛かる
+   */
+  damageMultiplier?: number;
 }
 
 /**
@@ -1175,7 +1180,10 @@ export function describeSkillEffect(effect: SkillEffect): string {
     }
     case "COOP_ATTACK": {
       const cd = effect.allyCooldownReduce ? `(参加した味方のクールタイム-${effect.allyCooldownReduce})` : "";
-      return `味方${effect.allies}体とともに同じ相手へスキル1で協力攻撃${cd}`;
+      const boost = effect.damageMultiplier !== undefined && effect.damageMultiplier !== 1
+        ? ` / 協力攻撃のダメージ${effect.damageMultiplier.toFixed(2)}倍`
+        : "";
+      return `味方${effect.allies}体とともに同じ相手へスキル1で協力攻撃${cd}${boost}`;
     }
     case "GAUGE_ON_HIT":
       return `${effect.durationTurns}ターン、攻撃を受けるたび行動ゲージ+${Math.round(effect.amount * 100)}%`;
@@ -1271,6 +1279,7 @@ const GROWTH_FIELDS: Record<string, GrowthField> = {
   stacks: { label: "スタック", unit: "turns", qualify: true },
   hits: { label: "ヒット数", unit: "turns" },
   ratio: { label: "割合", unit: "percent", qualify: true },
+  damageMultiplier: { label: "協力攻撃のダメージ", unit: "multiplier" },
 };
 
 function growthNumber(value: number, unit: GrowthField["unit"]): string {
