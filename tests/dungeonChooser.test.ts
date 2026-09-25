@@ -123,4 +123,41 @@ describe("ダンジョンの選択", () => {
     expect(block(".dungeon-chooser")).toContain("var(--home-safe-top");
     expect(css).not.toContain("env(safe-area");
   });
+  it("枠はホームの金細工と同じ系統で、SVGは大きさを持つ", () => {
+    const panel = block(".dungeon-chooser__panel");
+    expect(panel).toContain("border-image-source: url(\"data:image/svg+xml,");
+    // 大きさが無いSVGは箱いっぱいに伸ばされ、切り出した隅が3倍に写った
+    for (const svg of css.match(/<svg[^>]*>/g) ?? []) {
+      expect(svg).toMatch(/width='\d+'/);
+      expect(svg).toMatch(/height='\d+'/);
+    }
+  });
+
+  it("状況・説明・英字の見出しは11px以上で、灰色に沈めない", () => {
+    for (const selector of [".dungeon-chooser__status", ".dungeon-chooser__lead", ".dungeon-chooser__title small"]) {
+      const body = block(selector);
+      expect(Number(body.match(/font-size: ([\d.]+)px/)![1]), selector).toBeGreaterThanOrEqual(11);
+      // 明るさ(0〜255の平均)。前は #a9b1c9 / #b9bfd4 / #b89755 で背景に沈んでいた
+      const hex = body.match(/color: #([0-9a-f]{6})/i)![1];
+      const rgb = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      expect(Math.max(...rgb), selector).toBeGreaterThanOrEqual(0xd8);
+    }
+  });
+
+  it("5つの色帯は色相が30度以上離れている(育成の緑と遺跡の青緑が近かった)", () => {
+    const hue = ([r, g, b]: number[]) => {
+      const [R, G, B] = [r / 255, g / 255, b / 255];
+      const max = Math.max(R, G, B), min = Math.min(R, G, B), d = max - min;
+      const h = max === R ? ((G - B) / d) % 6 : max === G ? (B - R) / d + 2 : (R - G) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const tones = [...css.matchAll(/--(equip|train|gold|awakening|ruins) \{ --tone: (\d+), (\d+), (\d+); \}/g)]
+      .map((m) => ({ name: m[1], h: hue([Number(m[2]), Number(m[3]), Number(m[4])]) }));
+    expect(tones.map((t) => t.name).sort()).toEqual(["awakening", "equip", "gold", "ruins", "train"]);
+    for (const a of tones) for (const b of tones) {
+      if (a.name >= b.name) continue;
+      const diff = Math.min(Math.abs(a.h - b.h), 360 - Math.abs(a.h - b.h));
+      expect(diff, `${a.name} と ${b.name}`).toBeGreaterThanOrEqual(30);
+    }
+  });
 });
