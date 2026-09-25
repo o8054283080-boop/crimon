@@ -182,6 +182,7 @@ import { markAllNoticesRead } from "./noticeUi.js";
 import { attachScreenBack, screenHeader } from "./views/managementHeader.js";
 import { renderAutoFarmResult } from "./views/autoFarmResult.js";
 import { renderFarmEquipmentResult } from "./views/farmEquipmentResult.js";
+import { renderFarmAccessoryResult } from "./views/farmAccessoryResult.js";
 import { RankingTab, renderRankings } from "./views/rankings.js";
 import { loadNavigationState, saveNavigationState } from "./navigationState.js";
 import { DungeonReturnContext, keepReturnContext, normalStageReturnContext, rememberedScrollTop, replacePartySlot, restoreDungeonSelection, restoreScrollTop, sellableEquipmentIds } from "./uxHelpers.js";
@@ -273,10 +274,11 @@ import { findRuinFloorByLocationId, ruinLocationId, type RuinFloor, type RuinKin
 import { grantRuinReward, isRuinFloorCleared, isRuinFloorUnlocked, type RuinReward } from "../game/ruins.js";
 import {
   type AccessoryFilter, type AccessorySortKey, equipAccessory, sellAccessory, setAccessoryLocked,
-  tryEnhanceAccessory, unequipAccessory, findAccessory,
+  tryEnhanceAccessory, unequipAccessory, findAccessory, EMPTY_ACCESSORY_FILTER, accessoriesOf,
+  accessoryOwner, bulkSellAccessories, sellableAccessoryIds, wornAccessoryIds,
 } from "../game/accessories.js";
 import { craftAccessory, craftEquipment, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
-import { accessoryTitle, describeSpecial, generateAccessory as generateAccessoryForDev } from "../core/accessory.js";
+import { accessorySellPrice, accessoryTitle, describeSpecial, generateAccessory as generateAccessoryForDev } from "../core/accessory.js";
 import { renderRuins } from "./views/ruins.js";
 import { type AccessoriesProps, renderAccessories } from "./views/accessories.js";
 import { type GearTab, renderGearTabs } from "./views/gearTabs.js";
@@ -542,7 +544,34 @@ interface AppState {
   selectedRuinFloor: number | null;
   ruinRun: RuinRunState | null;
   accessorySort: AccessorySortKey;
+  /** アクセの一覧の絞り込み。装備の一覧と同じく、画面を出入りしても残す */
   accessoryFilter: AccessoryFilter;
+  accessoryFilterOpen: boolean;
+  /**
+   * 着ける先を選ぶ画面(`accessoryPickFor`)専用の絞り込み。**開くたびに白紙へ戻す。**
+   * 一覧と共有すると、一覧で「★6だけ」に絞ったままモンスターのアクセ枠を開いた人が、
+   * 理由の分からない空の一覧を見ることになる(装備の枠を選ぶ画面と同じ理由)。
+   */
+  accessoryPickFilter: AccessoryFilter;
+  accessoryPickFilterOpen: boolean;
+  /** アクセのまとめ売りの選択モード中か */
+  accessorySelecting: boolean;
+  accessorySelectedIds: string[];
+  /**
+   * 「今回獲得したアクセサリー」のシート。
+   *
+   * `farmAccessorySource` は**どの結果について開いたか**(結果そのものへの参照)。
+   * 次の結果画面へ移った時に、前の結果のシートが開いたまま残らないようにする。
+   * 参照は履歴(RouteState)には入れない——JSONにすると結果が丸ごと入る。
+   */
+  farmAccessoryOpen: boolean;
+  farmAccessorySource: AutoFarmResult | StageResultInfo | null;
+  farmAccessorySelectedIds: string[];
+  farmAccessoryDetailId: string | null;
+  farmAccessorySelling: boolean;
+  /** シート専用の絞り込み。**開くたびに白紙へ戻す**(前の条件で今回の分が1個も見えない、を起こさない) */
+  farmAccessoryFilter: AccessoryFilter;
+  farmAccessoryFilterOpen: boolean;
   selectedAccessoryId: string | null;
   /** 着ける先のモンスター(モンスター詳細のアクセ枠から来た時) */
   accessoryPickFor: string | null;
@@ -752,7 +781,19 @@ const state: AppState = {
   selectedRuinFloor: null,
   ruinRun: null,
   accessorySort: "NEWEST",
-  accessoryFilter: {},
+  accessoryFilter: { ...EMPTY_ACCESSORY_FILTER },
+  accessoryFilterOpen: false,
+  accessoryPickFilter: { ...EMPTY_ACCESSORY_FILTER },
+  accessoryPickFilterOpen: false,
+  accessorySelecting: false,
+  accessorySelectedIds: [],
+  farmAccessoryOpen: false,
+  farmAccessorySource: null,
+  farmAccessorySelectedIds: [],
+  farmAccessoryDetailId: null,
+  farmAccessorySelling: false,
+  farmAccessoryFilter: { ...EMPTY_ACCESSORY_FILTER },
+  farmAccessoryFilterOpen: false,
   selectedAccessoryId: null,
   accessoryPickFor: null,
   accessoryNotice: null,
@@ -955,6 +996,10 @@ interface RouteState {
   equipmentSelecting: boolean;
   farmEquipmentOpen: boolean;
   farmEquipmentDetailId: string | null;
+  /** アクセのまとめ売り・獲得のシート。装備と同じく「見ている場所」の一部にする */
+  accessorySelecting: boolean;
+  farmAccessoryOpen: boolean;
+  farmAccessoryDetailId: string | null;
   selectedStageId: string | null;
   selectedDifficulty: Difficulty;
   selectedDungeonFloor: number | null;
@@ -995,6 +1040,7 @@ const ROUTE_FIELDS = [
   "createTargetId", "createMenu", "partyEditMode",
   "arenaView", "arenaDetailIndex", "arenaUnitIndex",
   "ruinKind", "selectedRuinFloor", "accessoryPickFor", "limitTargetId", "equipmentTab",
+  "accessorySelecting", "farmAccessoryOpen", "farmAccessoryDetailId",
 ] as const satisfies readonly (keyof RouteState)[];
 
 function routeState(): RouteState {
@@ -2865,6 +2911,8 @@ function finishRuin(cleared: boolean): void {
     pigDrop: reward?.pigDrop ?? null,
     summonScrollDropped: reward?.summonScrollDropped ?? false,
     extraLines: reward ? ruinRewardLines(reward) : [],
+    // 「獲得したアクセサリーを見る」のシートを開くためだけのID(既に所持品へ入っている)
+    earnedAccessoryIds: reward ? [reward.accessoryDrop.id] : [],
   };
   enterStageResult();
 }
@@ -2902,6 +2950,13 @@ function openAccessories(pickFor: string | null): void {
   state.accessoryPickFor = pickFor;
   state.selectedAccessoryId = null;
   state.accessoryNotice = null;
+  // まとめ売りの選択は持ち越さない。着ける先を選ぶ画面では出しもしない
+  state.accessorySelecting = false;
+  state.accessorySelectedIds = [];
+  if (pickFor !== null) {
+    state.accessoryPickFilter = { ...EMPTY_ACCESSORY_FILTER };
+    state.accessoryPickFilterOpen = false;
+  }
   state.screen = "ACCESSORIES";
   render();
 }
@@ -2910,6 +2965,111 @@ function openAccessories(pickFor: string | null): void {
  * アクセ一覧を閉じる。**戻り先は共通の履歴に任せる**(画面上の「戻る」と同じ道)。
  * 履歴が無い時だけホームへ。
  */
+/**
+ * 「今回獲得したアクセサリー」のシートを開く。**開くたびに条件と選択を白紙へ戻す。**
+ * 前の結果で「★6だけ」に絞ったまま残っていると、今回の分が1個も見えないシートになる。
+ */
+function openFarmAccessorySheet(source: AutoFarmResult | StageResultInfo): void {
+  state.farmAccessoryOpen = true;
+  state.farmAccessorySource = source;
+  state.farmAccessorySelectedIds = [];
+  state.farmAccessoryDetailId = null;
+  state.farmAccessorySelling = false;
+  state.farmAccessoryFilter = { ...EMPTY_ACCESSORY_FILTER };
+  state.farmAccessoryFilterOpen = false;
+  // 巻物の位置は装備のシートと同じ控えを使う。開き直したら先頭から
+  farmEquipmentScrollTop = 0;
+  render();
+}
+
+function closeFarmAccessorySheet(): void {
+  state.farmAccessoryOpen = false;
+  state.farmAccessoryDetailId = null;
+  state.farmAccessorySelectedIds = [];
+  render();
+}
+
+/**
+ * シートを描く。**開いた時の結果と、いま出している結果が同じ時だけ。**
+ * 中身は所持品に残っている今回のアクセだけ(売った・消えたものは出さない)。
+ */
+function renderFarmAccessorySheetFor(source: AutoFarmResult | StageResultInfo, earnedIds: readonly string[]): HTMLElement | null {
+  if (!state.farmAccessoryOpen) return null;
+  if (state.farmAccessorySource !== source) {
+    state.farmAccessoryOpen = false;
+    state.farmAccessoryDetailId = null;
+    return null;
+  }
+  const earned = new Set(earnedIds);
+  const accessories = accessoriesOf(state.player).filter((acc) => earned.has(acc.id));
+  const worn = wornAccessoryIds(state.player);
+  const sellable = new Set(sellableAccessoryIds(accessories, worn));
+  state.farmAccessorySelectedIds = state.farmAccessorySelectedIds.filter((id) => sellable.has(id));
+  if (state.farmAccessoryDetailId && !accessories.some((acc) => acc.id === state.farmAccessoryDetailId)) state.farmAccessoryDetailId = null;
+  const ownerName = (accessoryId: string): string | null => {
+    const owner = accessoryOwner(state.player, accessoryId);
+    if (!owner) return null;
+    return `${findMonsterById(owner.dexId)?.name ?? owner.dexId}★${owner.star}`;
+  };
+  return renderFarmAccessoryResult({
+    accessories,
+    wornIds: worn,
+    ownerName,
+    selectedIds: state.farmAccessorySelectedIds,
+    detailId: state.farmAccessoryDetailId,
+    selling: state.farmAccessorySelling,
+    filter: state.farmAccessoryFilter,
+    filterOpen: state.farmAccessoryFilterOpen,
+    onChangeFilter: (filter) => { state.farmAccessoryFilter = filter; render(); },
+    onToggleFilterOpen: () => { state.farmAccessoryFilterOpen = !state.farmAccessoryFilterOpen; render(); },
+    onToggleLock: (id) => {
+      const acc = findAccessory(state.player, id);
+      if (!acc || !earned.has(id)) return;
+      setAccessoryLocked(state.player, id, !acc.locked);
+      if (acc.locked) state.farmAccessorySelectedIds = state.farmAccessorySelectedIds.filter((selectedId) => selectedId !== id);
+      savePlayerState(state.player);
+      render();
+    },
+    onToggleSelected: (id) => {
+      if (!sellable.has(id)) return;
+      state.farmAccessorySelectedIds = state.farmAccessorySelectedIds.includes(id)
+        ? state.farmAccessorySelectedIds.filter((selectedId) => selectedId !== id)
+        : [...state.farmAccessorySelectedIds, id];
+      render();
+    },
+    onDetail: (id) => { state.farmAccessoryDetailId = id; render(); },
+    onSell: () => {
+      if (state.farmAccessorySelling) return;
+      const currentWorn = wornAccessoryIds(state.player);
+      const targets = accessoriesOf(state.player)
+        .filter((acc) => earned.has(acc.id) && state.farmAccessorySelectedIds.includes(acc.id));
+      if (!targets.length || targets.some((acc) => acc.locked || currentWorn.has(acc.id))) {
+        state.farmAccessorySelectedIds = [];
+        render();
+        return;
+      }
+      const total = targets.reduce((sum, acc) => sum + accessorySellPrice(acc), 0);
+      if (!window.confirm(`選択した${targets.length}個のアクセサリーを${total.toLocaleString("ja-JP")}ゴールドで売却します。\nこの操作は取り消せません。`)) return;
+      // 確認の後にも、今の所持品・ロック・装着を見直す(`bulkSellAccessories` が1個でも駄目なら丸ごと断る)
+      state.farmAccessorySelling = true;
+      const result = bulkSellAccessories(state.player, targets.map((acc) => acc.id));
+      state.farmAccessorySelling = false;
+      if (result.ok) savePlayerState(state.player);
+      else playSfx("denied", 0.7);
+      state.farmAccessorySelectedIds = [];
+      state.farmAccessoryDetailId = null;
+      render();
+    },
+    // 画面が渡したID(絞り込みで見えていて売れるもの)だけを選ぶ
+    onSelectAllShown: (ids) => {
+      state.farmAccessorySelectedIds = ids.filter((id) => sellable.has(id));
+      render();
+    },
+    onClearSelection: () => { state.farmAccessorySelectedIds = []; render(); },
+    onClose: closeFarmAccessorySheet,
+  });
+}
+
 function closeAccessories(): void {
   state.selectedAccessoryId = null;
   state.accessoryNotice = null;
@@ -4455,11 +4615,14 @@ function renderScreen(): void {
         state.equipmentTab = tab;
         state.selectedAccessoryId = null;
         state.accessoryNotice = null;
+        // 見えていない側の選択で売ってしまわないよう、切り替えたら選び直しにする
+        state.accessorySelecting = false;
+        state.accessorySelectedIds = [];
         render();
       }, { gear: state.player.equipment.length, accessory: (state.player.accessories ?? []).length });
       const browsingGear = !state.equipmentPickerContext && !state.equipmentDetailId;
       content = browsingGear && state.equipmentTab === "ACCESSORY"
-        ? renderAccessories({ ...accessoriesScreenProps(), pickFor: null, tabs: gearTabs })
+        ? renderAccessories({ ...accessoriesScreenProps(), pickFor: null, tabs: gearTabs, onGoRuins: () => navigate("RUINS") })
         : renderEquipmentScreen(gearTabs);
       break;
     }
@@ -5740,7 +5903,15 @@ function renderScreen(): void {
         navigate("HOME");
         return;
       }
-      content = renderStageResult({ info, actions: buildResultActions(false) });
+      content = renderStageResult({
+        info,
+        actions: buildResultActions(false),
+        onViewAccessories: info.earnedAccessoryIds?.length ? () => openFarmAccessorySheet(info) : undefined,
+      });
+      {
+        const sheet = renderFarmAccessorySheetFor(info, info.earnedAccessoryIds ?? []);
+        if (sheet) content.append(sheet);
+      }
       break;
     }
 
@@ -5775,7 +5946,12 @@ function renderScreen(): void {
           state.farmEquipmentFilterOpen = false;
           render();
         } : undefined,
+        onViewAccessories: result.earnedAccessoryIds?.length ? () => openFarmAccessorySheet(result) : undefined,
       });
+      {
+        const sheet = renderFarmAccessorySheetFor(result, result.earnedAccessoryIds ?? []);
+        if (sheet) content.append(sheet);
+      }
       if (state.farmEquipmentOpen) {
         const earnedIds = new Set(result.earnedEquipmentIds ?? []);
         const equipment = state.player.equipment.filter((item) => earnedIds.has(item.id));
@@ -6029,10 +6205,12 @@ function handleToggleMonsterFilterOpen(): void {
  * 着ける先(`accessoryPickFor`)があるのはアクセ一覧画面の時だけ。
  */
 function accessoriesScreenProps(): AccessoriesProps {
+  const picking = state.accessoryPickFor !== null;
   return {
     player: state.player,
     sort: state.accessorySort,
-    filter: state.accessoryFilter,
+    filter: picking ? state.accessoryPickFilter : state.accessoryFilter,
+    filterOpen: picking ? state.accessoryPickFilterOpen : state.accessoryFilterOpen,
     selectedId: state.selectedAccessoryId,
     pickFor: state.accessoryPickFor,
     notice: state.accessoryNotice,
@@ -6042,7 +6220,45 @@ function accessoriesScreenProps(): AccessoriesProps {
       render();
     },
     onChangeSort: (sort) => { state.accessorySort = sort; render(); },
-    onChangeFilter: (filter) => { state.accessoryFilter = filter; render(); },
+    onChangeFilter: (filter) => {
+      if (state.accessoryPickFor !== null) state.accessoryPickFilter = filter;
+      else state.accessoryFilter = filter;
+      render();
+    },
+    onToggleFilterOpen: () => {
+      if (state.accessoryPickFor !== null) state.accessoryPickFilterOpen = !state.accessoryPickFilterOpen;
+      else state.accessoryFilterOpen = !state.accessoryFilterOpen;
+      render();
+    },
+    selecting: state.accessorySelecting && !picking,
+    selectedIds: state.accessorySelectedIds,
+    onToggleSelecting: () => {
+      state.accessorySelecting = !state.accessorySelecting;
+      state.selectedAccessoryId = null;
+      state.accessoryNotice = null;
+      if (!state.accessorySelecting) state.accessorySelectedIds = [];
+      render();
+    },
+    onToggleSelected: (accessoryId) => {
+      const acc = findAccessory(state.player, accessoryId);
+      // ロック中・装着中は売れないので選ばせない(画面側でも弾いてある)
+      if (!acc || acc.locked || accessoryOwner(state.player, accessoryId)) return;
+      state.accessorySelectedIds = state.accessorySelectedIds.includes(accessoryId)
+        ? state.accessorySelectedIds.filter((id) => id !== accessoryId)
+        : [...state.accessorySelectedIds, accessoryId];
+      render();
+    },
+    /*
+     * **画面が渡してきたIDだけを選ぶ**(絞り込みで見えているもの)。
+     * ここでも売れるものだけに絞り直す。
+     */
+    onSelectAllShown: (ids) => {
+      const valid = new Set(sellableAccessoryIds(accessoriesOf(state.player), wornAccessoryIds(state.player)));
+      state.accessorySelectedIds = ids.filter((id) => valid.has(id));
+      render();
+    },
+    onClearSelection: () => { state.accessorySelectedIds = []; render(); },
+    onBulkSell: handleBulkSellAccessories,
     onEquip: (accessoryId) => {
       if (!state.accessoryPickFor) return;
       const result = equipAccessory(state.player, state.accessoryPickFor, accessoryId);
@@ -6079,10 +6295,48 @@ function accessoriesScreenProps(): AccessoriesProps {
       const acc = findAccessory(state.player, accessoryId);
       if (!acc) return;
       setAccessoryLocked(state.player, accessoryId, !acc.locked);
+      // 鍵を掛けたものは売れない。選ばれていたら外す
+      if (acc.locked) state.accessorySelectedIds = state.accessorySelectedIds.filter((id) => id !== accessoryId);
       savePlayerState(state.player);
       render();
     },
   };
+}
+
+/**
+ * 選んだアクセをまとめて売る(アクセの一覧から)。
+ *
+ * 取り消せないので、**何個いくらで売れるかを確認の文面に必ず出す。**
+ * 確認の**後に**ロックと装着を見直す(`bulkSellAccessories`)。
+ * 1個でも売れないものが混ざっていたら1個も売らず、選び直してもらう。
+ */
+function handleBulkSellAccessories(): void {
+  const worn = wornAccessoryIds(state.player);
+  const targets = accessoriesOf(state.player).filter((acc) => state.accessorySelectedIds.includes(acc.id));
+  if (targets.length === 0) return;
+  if (targets.some((acc) => acc.locked || worn.has(acc.id))) {
+    const valid = new Set(sellableAccessoryIds(targets, worn));
+    state.accessorySelectedIds = state.accessorySelectedIds.filter((id) => valid.has(id));
+    state.accessoryNotice = "ロック中・装着中のアクセサリーを選択から外しました";
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  const total = targets.reduce((sum, acc) => sum + accessorySellPrice(acc), 0);
+  if (!window.confirm(`選択した${targets.length}個のアクセサリーを${total.toLocaleString("ja-JP")}ゴールドで売却します。\nこの操作は取り消せません。`)) return;
+  const result = bulkSellAccessories(state.player, targets.map((acc) => acc.id));
+  if (!result.ok) {
+    state.accessorySelectedIds = [];
+    state.accessoryNotice = `${result.reason ?? "売却できませんでした"}。選び直してください`;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  savePlayerState(state.player);
+  state.accessorySelectedIds = [];
+  state.selectedAccessoryId = null;
+  state.accessoryNotice = `${result.sold}個を売却しました(🪙${result.goldEarned.toLocaleString("ja-JP")})`;
+  render();
 }
 
 function renderEquipmentScreen(tabs?: HTMLElement): HTMLElement {
@@ -6628,6 +6882,64 @@ if (import.meta.env.DEV) {
       state.farmEquipmentFilter = { ...EMPTY_EQUIPMENT_FILTER };
       // 条件の札を開いた姿も見せる。畳んだままだと中の札が一度も測られない
       state.farmEquipmentFilterOpen = withFilter;
+      render();
+    },
+    /*
+     * **遺跡の周回結果と「今回獲得したアクセサリー」のシートを巡回に見せるための口。**
+     * 周回を回さないと開けない画面なので、ここから中身を作って開く。
+     */
+    openRuinFarmResult(withSheet = false, withFilter = false) {
+      const result = emptyResult();
+      result.attempts = 10;
+      result.cleared = 10;
+      const rng = Math.random;
+      const families = ["ATTACK", "DURABILITY", "SUPPORT", "DISRUPT"] as const;
+      const rarities = ["HERO", "LEGEND", "EPIC"] as const;
+      for (let i = 0; i < 10; i += 1) {
+        const rarity = rarities[i % 3];
+        const acc = generateAccessoryForDev({ star: rarity === "EPIC" ? 6 : rarity === "LEGEND" ? 5 : 4, rarity, family: families[i % 4], rng });
+        (state.player.accessories ??= []).push(acc);
+        (result.earnedAccessoryIds ??= []).push(acc.id);
+        result.accessoryDropCount = (result.accessoryDropCount ?? 0) + 1;
+      }
+      // 1個は鍵を掛けておく(選べない札の見え方も検査に載せる)
+      const first = findAccessory(state.player, result.earnedAccessoryIds![0]);
+      if (first) first.locked = true;
+      result.evolutionCores = 30;
+      result.ancientShards = 40;
+      savePlayerState(state.player);
+      state.autoFarmResult = result;
+      state.autoFarmTargetName = "力の遺跡 3階";
+      state.screen = "AUTO_FARM_RESULT";
+      state.farmAccessoryOpen = false;
+      if (withSheet) {
+        openFarmAccessorySheet(result);
+        state.farmAccessoryFilterOpen = withFilter;
+      }
+      render();
+    },
+    /** 1戦の遺跡の結果(アクセ1個)。`withSheet` なら獲得のシートまで開く */
+    openRuinStageResultForDev(withSheet = false) {
+      const acc = generateAccessoryForDev({ star: 6, rarity: "EPIC", family: "ATTACK", rng: Math.random });
+      (state.player.accessories ??= []).push(acc);
+      savePlayerState(state.player);
+      state.stageResult = {
+        cleared: true,
+        stageName: "力の遺跡 3階",
+        goldEarned: 0,
+        crystalEarned: 0,
+        wavesCleared: 1,
+        totalWaves: 1,
+        levelUps: [],
+        dropDexId: null,
+        dropStar: null,
+        equipmentDrop: null,
+        extraLines: [accessoryTitle(acc), ...acc.specials.map((roll) => `特殊 ${describeSpecial(roll)}`), "進化核 ×3", "古代のカケラ ×4"],
+        earnedAccessoryIds: [acc.id],
+      };
+      state.screen = "STAGE_RESULT";
+      state.farmAccessoryOpen = false;
+      if (withSheet) openFarmAccessorySheet(state.stageResult);
       render();
     },
   };

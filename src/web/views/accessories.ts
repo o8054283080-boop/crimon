@@ -1,16 +1,18 @@
 import "../ui/accessories.css";
 import {
-  type Accessory, type AccessoryFamily, type AccessoryRarity, type AccessoryStar,
-  ACCESSORY_FAMILIES, ACCESSORY_FAMILY_JA, ACCESSORY_RARITIES, ACCESSORY_RARITY_JA,
+  type Accessory,
   accessoryEnhanceCost, accessorySellPrice, canEnhanceAccessory,
 } from "../../core/accessory.js";
 import { findMonsterById } from "../../data/monsters.js";
 import {
-  type AccessoryFilter, type AccessorySortKey, accessoryOwner, findAccessory, sortAndFilterAccessories,
+  type AccessoryFilter, type AccessorySortKey, accessoriesOf, accessoryOwner, findAccessory,
+  sellableAccessoryIds, sortAndFilterAccessories, wornAccessoryIds,
 } from "../../game/accessories.js";
 import type { PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
+import { icon } from "../icons.js";
 import { renderAccessoryRow, renderAccessorySummary } from "./accessoryCard.js";
+import { renderAccessoryFilterBar } from "./accessoryFilterBar.js";
 import { screenHeader } from "./managementHeader.js";
 
 /**
@@ -37,14 +39,36 @@ export interface AccessoriesProps {
   onToggleLock: (accessoryId: string) => void;
   /** 見出しの直後に出す切り替え(装備画面の中で開いた時だけ) */
   tabs?: HTMLElement;
+  /** 絞り込みの札を開いているか(装備の一覧と同じく、既定は畳む) */
+  filterOpen: boolean;
+  onToggleFilterOpen: () => void;
+  /**
+   * まとめ売りの選択モード中か。**着ける先を選ぶ画面(`pickFor`)では出さない**
+   * ——着けに来た人の前に売却の操作を並べると、押し間違えた時に取り返しがつかない。
+   */
+  selecting: boolean;
+  /** まとめ売りに選ばれているアクセ */
+  selectedIds: readonly string[];
+  onToggleSelecting: () => void;
+  onToggleSelected: (accessoryId: string) => void;
+  /** 画面が渡したID(絞り込みで見えていて、売れるもの)だけを選ぶ */
+  onSelectAllShown: (ids: string[]) => void;
+  onClearSelection: () => void;
+  onBulkSell: () => void;
+  /** 遺跡へ行く。装備画面の「装備ダンジョン」と同じ位置に置く(無ければ出さない) */
+  onGoRuins?: () => void;
 }
 
+/*
+ * 並べ替えは**装備と同じくネイティブの選択欄**にする。
+ * 札を5枚並べていた頃は、それだけで1段を取り、絞り込みの札と同じ見た目で続いていた。
+ */
 const SORTS: { key: AccessorySortKey; label: string }[] = [
   { key: "NEWEST", label: "新しい順" },
-  { key: "STAR", label: "★順" },
+  { key: "STAR", label: "★の高い順" },
   { key: "RARITY", label: "レア度順" },
-  { key: "LEVEL", label: "Lv順" },
-  { key: "MAIN", label: "メイン順" },
+  { key: "LEVEL", label: "強化順" },
+  { key: "MAIN", label: "メインの高い順" },
 ];
 
 function monsterName(player: PlayerState, monsterId: string | undefined): string | null {
@@ -54,29 +78,80 @@ function monsterName(player: PlayerState, monsterId: string | undefined): string
   return `${findMonsterById(monster.dexId)?.name ?? monster.dexId}★${monster.star}`;
 }
 
-function chip(label: string, active: boolean, onClick: () => void): HTMLElement {
-  return el("button", { type: "button", className: `acc-chip${active ? " acc-chip--active" : ""}`, onclick: onClick }, [label]);
+/** 並べ替えの帯。**装備の一覧と同じ部品(`equip-sort`)**で、1段に収める */
+function renderSortRow(props: AccessoriesProps): HTMLElement {
+  return el("div", { className: "equip-sort acc-sort" }, [
+    el("label", { className: "equip-sort__label", htmlFor: "accessory-sort" }, ["並べ替え"]),
+    el("div", { className: "equip-sort__control" }, [
+      el("select", {
+        id: "accessory-sort",
+        className: "equip-sort__select",
+        value: props.sort,
+        ariaLabel: "アクセサリーの並べ替え",
+        onchange: (event: Event) => props.onChangeSort((event.currentTarget as HTMLSelectElement).value as AccessorySortKey),
+      }, SORTS.map((s) => el("option", { value: s.key, selected: s.key === props.sort }, [s.label]))),
+    ]),
+  ]);
 }
 
-function renderFilters(props: AccessoriesProps): HTMLElement[] {
-  const f = props.filter;
-  const setFilter = (next: Partial<AccessoryFilter>) => props.onChangeFilter({ ...f, ...next });
-  return [
-    el("div", { className: "acc-filters" }, SORTS.map((s) => chip(s.label, props.sort === s.key, () => props.onChangeSort(s.key)))),
-    el("div", { className: "acc-filters" }, [
-      chip("全系統", !f.family, () => setFilter({ family: null })),
-      ...ACCESSORY_FAMILIES.map((family: AccessoryFamily) =>
-        chip(ACCESSORY_FAMILY_JA[family], f.family === family, () => setFilter({ family: f.family === family ? null : family }))),
+/**
+ * 上の操作帯。**装備の一覧と同じ形**(左に行き先、右にまとめ売り)。
+ * 装備とアクセを切り替えても、同じ位置に同じ道具があるようにする。
+ */
+function renderToolbar(props: AccessoriesProps): HTMLElement {
+  const selectButton = el("button", {
+    type: "button",
+    className: `btn equip-toolbar__select${props.selecting ? " equip-toolbar__select--on" : ""}`,
+    "data-tour": "accessory-bulk-toggle",
+    "aria-pressed": String(props.selecting),
+    onclick: props.onToggleSelecting,
+  }, [icon("check"), el("span", {}, [props.selecting ? "選択を終える" : "まとめ売り"])]);
+  const goRuins = props.onGoRuins
+    ? el("button", { type: "button", className: "btn btn--gold equip-toolbar__go", onclick: props.onGoRuins }, [
+      el("span", { className: "acc-toolbar__ring", ariaHidden: "true" }, ["💍"]),
+      el("span", {}, ["遺跡へ行く"]),
+    ])
+    : null;
+  return el("div", { className: `equip-toolbar${goRuins ? "" : " acc-toolbar--single"}` },
+    ([goRuins, selectButton] as (HTMLElement | null)[]).filter((n): n is HTMLElement => n !== null));
+}
+
+/**
+ * まとめ売りの操作帯。選択モードの時だけ出す。**装備の一覧と同じ部品(`bulk-bar`)。**
+ *
+ * 「表示中をすべて選ぶ」は、**絞り込みで見えているもののうち、売れるものだけ。**
+ * 全件を選ぶと、絞り込んだ意味が無いうえに見えていないものまで売れてしまう。
+ */
+function renderBulkBar(props: AccessoriesProps, shown: readonly Accessory[]): HTMLElement {
+  const worn = wornAccessoryIds(props.player);
+  const sellableShown = sellableAccessoryIds(shown, worn);
+  // 合計は「今も売れるもの」だけで数える。選んだ後に鍵を掛けたものは数に入れない
+  const picked = accessoriesOf(props.player)
+    .filter((acc) => props.selectedIds.includes(acc.id) && acc.locked !== true && !worn.has(acc.id));
+  const total = picked.reduce((sum, acc) => sum + accessorySellPrice(acc), 0);
+  return el("div", { className: "bulk-bar acc-bulk-bar" }, [
+    el("div", { className: "bulk-bar__row" }, [
+      el("button", {
+        type: "button",
+        className: "btn btn--ghost",
+        disabled: sellableShown.length === 0,
+        onclick: () => props.onSelectAllShown(sellableShown),
+      }, [`表示中をすべて選ぶ (${sellableShown.length})`]),
+      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onClearSelection }, ["選択を解除"]),
     ]),
-    el("div", { className: "acc-filters" }, [
-      chip("全レア", !f.rarity, () => setFilter({ rarity: null })),
-      ...ACCESSORY_RARITIES.map((rarity: AccessoryRarity) =>
-        chip(ACCESSORY_RARITY_JA[rarity], f.rarity === rarity, () => setFilter({ rarity: f.rarity === rarity ? null : rarity }))),
-      ...([4, 5, 6] as AccessoryStar[]).map((star) =>
-        chip(`★${star}`, f.star === star, () => setFilter({ star: f.star === star ? null : star }))),
-      chip("未装着のみ", f.unequippedOnly === true, () => setFilter({ unequippedOnly: !f.unequippedOnly })),
+    // 売値は**押す前に見せる**。押してから知る金額であってはいけない
+    el("div", { className: "bulk-bar__summary" }, [
+      `${picked.length}個を選択中`,
+      el("span", { className: "bulk-bar__price" }, [icon("coin"), el("strong", {}, [total.toLocaleString("ja-JP")])]),
     ]),
-  ];
+    el("button", {
+      type: "button",
+      className: "btn btn--danger btn--large bulk-bar__go",
+      "data-tour": "accessory-bulk-sell",
+      disabled: picked.length === 0,
+      onclick: props.onBulkSell,
+    }, [icon("tag"), `${picked.length}個を売却　+${total.toLocaleString("ja-JP")}G`]),
+  ]);
 }
 
 function renderDetail(props: AccessoriesProps, acc: Accessory): HTMLElement {
@@ -127,11 +202,15 @@ function renderDetail(props: AccessoriesProps, acc: Accessory): HTMLElement {
 
 export function renderAccessories(props: AccessoriesProps): HTMLElement {
   const list = sortAndFilterAccessories(props.player, props.sort, props.filter);
-  const selected = props.selectedId ? findAccessory(props.player, props.selectedId) : undefined;
+  const all = accessoriesOf(props.player);
+  const selecting = props.selecting && props.pickFor === null;
+  // まとめ売りで選んでいる間は詳細を出さない(札を押す意味が「選ぶ」に変わっているため)
+  const selected = !selecting && props.selectedId ? findAccessory(props.player, props.selectedId) : undefined;
   const pickedName = monsterName(props.player, props.pickFor ?? undefined);
   const pickedMonster = props.pickFor ? props.player.monsters.find((m) => m.id === props.pickFor) : undefined;
   const title = props.pickFor ? `${pickedName ?? ""}のアクセサリー` : "アクセサリー";
-  return el("div", { className: "screen accessories-screen" }, [
+  const worn = wornAccessoryIds(props.player);
+  return el("div", { className: `screen accessories-screen${selecting ? " accessories-screen--selecting" : ""}` }, [
     /*
      * 装備画面の中で開いた時は、**装備側と同じ見出し**(「所持装備 / ○個」)にそろえる。
      * 切り替えるたびに見出しの形が変わると、別の画面へ飛んだように見える。
@@ -147,19 +226,40 @@ export function renderAccessories(props: AccessoriesProps): HTMLElement {
         el("button", { type: "button", className: "btn btn--ghost", "data-tour": "accessory-unequip", onclick: props.onUnequipPicked }, ["今のアクセを外す"]),
       ])
       : null,
+    props.pickFor === null ? renderToolbar(props) : null,
     selected ? renderDetail(props, selected) : null,
-    ...renderFilters(props),
+    // 絞り込みは**流れの中**に置く。浮かせると下の札を覆って押せなくする
+    renderAccessoryFilterBar({
+      all,
+      shownCount: list.length,
+      filter: props.filter,
+      open: props.filterOpen,
+      onToggleOpen: props.onToggleFilterOpen,
+      onChange: props.onChangeFilter,
+    }),
+    renderSortRow(props),
+    selecting ? renderBulkBar(props, list) : null,
     list.length === 0
       ? el("p", { className: "acc-empty" }, [
-        (props.player.accessories ?? []).length === 0
+        all.length === 0
           ? "アクセサリーはまだありません。力の遺跡・守護の遺跡で手に入ります。"
           : "条件に合うアクセサリーはありません。",
       ])
-      : el("div", { className: "acc-list" }, list.map((acc) =>
-        renderAccessoryRow(acc, {
-          selected: acc.id === props.selectedId,
+      : el("div", { className: "acc-list" }, list.map((acc) => {
+        const blocked = acc.locked === true || worn.has(acc.id);
+        return renderAccessoryRow(acc, {
+          selected: !selecting && acc.id === props.selectedId,
           ownerName: monsterName(props.player, accessoryOwner(props.player, acc.id)?.id),
-          onClick: () => props.onSelect(acc.id === props.selectedId ? null : acc.id),
-        }))),
+          bulk: selecting ? (blocked ? "BLOCKED" : props.selectedIds.includes(acc.id) ? "PICKED" : "FREE") : undefined,
+          onClick: () => {
+            if (!selecting) {
+              props.onSelect(acc.id === props.selectedId ? null : acc.id);
+              return;
+            }
+            // ロック中・装着中は売れないので、選ぶことそのものをさせない
+            if (!blocked) props.onToggleSelected(acc.id);
+          },
+        });
+      })),
   ].filter((n): n is HTMLElement => n !== null));
 }

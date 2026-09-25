@@ -45,12 +45,19 @@ export interface StageResultInfo {
    * 場所が増えるたびに結果画面の形が増える。ここは「文字で言うだけ」に留める。
    */
   extraLines?: readonly string[];
+  /**
+   * この1戦で所持品に入ったアクセのID(遺跡の結果だけ)。
+   * 報酬の再生成には使わない。「今回獲得したアクセサリー」のシートを開くためだけのもの。
+   */
+  earnedAccessoryIds?: readonly string[];
 }
 
 export interface StageResultProps {
   info: StageResultInfo;
   /** 次の行き先。周回で押すのはほぼ「もう一度」なので、それを主役に置く */
   actions: ResultAction[];
+  /** 今回獲得したアクセのシートを開く(遺跡でアクセを得た時だけ渡す) */
+  onViewAccessories?: () => void;
 }
 
 /** 通貨などの「数が出るだけ」の報酬を、横に並ぶ小さな札で表す */
@@ -182,6 +189,15 @@ export function renderStageResult(props: StageResultProps): HTMLElement {
       ]),
     ]),
     el("div", { className: "result-body" }, body.filter((n): n is HTMLElement => n !== null)),
+    // 周回の結果と同じ入口。1個でも、ロック・売却・詳細をここで済ませられる
+    (info.earnedAccessoryIds?.length ?? 0) > 0 && props.onViewAccessories
+      ? el("button", {
+        type: "button",
+        className: "btn btn--gold btn--large",
+        "data-tour": "result:accessories",
+        onclick: props.onViewAccessories,
+      }, ["💍 獲得したアクセサリーを見る"])
+      : null,
     renderResultActions(props.actions),
-  ]);
+  ].filter((node): node is HTMLElement => node !== null));
 }

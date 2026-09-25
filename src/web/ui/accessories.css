@@ -131,30 +131,139 @@
 .acc-row__specials { font-size: 12px; color: #ffe7b3; overflow-wrap: anywhere; }
 .acc-row__owner { font-size: 11px; color: #9fb0d8; }
 
-/* ------------------------------------------------------------ 並べ替え・絞り込み */
+/* ------------------------------------------------------------ 並べ替え・絞り込み・まとめ売り
+ *
+ * 部品は装備の一覧と共有している(`mfilter*` / `equip-sort` / `equip-toolbar` / `bulk-bar`)。
+ * ここに書くのは**アクセだけの差分**に限る。形そのものを変えると装備と割れる。
+ */
 
-.acc-filters {
+/* 画面ぜんぶの間隔。装備の一覧(10px)とそろえる */
+.accessories-screen {
+  gap: 10px;
+}
+
+/*
+ * 札を開いた時、**アクセが1枚も見えないまま画面が終わらないようにする。**
+ * 潰して切り落とすのではなく巻物にする(装備の一覧と同じ上限)。
+ */
+.accessories-screen .mfilter__body {
+  max-height: 38vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 行き先が無い時(遺跡から開いた一覧)は、まとめ売りだけを1段に置く */
+.equip-toolbar.acc-toolbar--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.acc-toolbar__ring {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/*
+ * 項目名の幅。共有の既定(2.6em)では「レア度」「メイン」が2行に折れた。
+ * アクセの項目名は3文字までなので、その分だけ広げる。
+ */
+.acc-filter .mfilter__label {
+  width: 3.4em;
+}
+
+/* 特殊効果の行の案内。札の代わりに出す文なので、札と同じ高さの中で読ませる */
+.acc-filter__hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  color: #8fa0c8;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* 系統とレア度の札は、選んでいない時も一覧の札と同じ色を乗せる(字を読まずに分かる) */
+.acc-filter-chip--hero:not(.slot-filter-chip--active) { color: #b8d6ff; border-color: rgba(140, 190, 255, 0.45); }
+.acc-filter-chip--legend:not(.slot-filter-chip--active) { color: #e4b9ff; border-color: rgba(214, 140, 255, 0.5); }
+.acc-filter-chip--epic:not(.slot-filter-chip--active) { color: #ffc98a; border-color: rgba(255, 170, 80, 0.6); }
+
+/* --- まとめ売りの選択 --- */
+
+.acc-row {
+  position: relative;
+}
+
+.acc-row--selectable {
+  cursor: pointer;
+}
+
+/* 選ばれた札。枠の色だけだとレア度の色と紛れるので、装備と同じく✓の印を出す */
+.acc-row--picked {
+  border-color: #ffd23f;
+  box-shadow: inset 0 0 0 2px #ffd23f, 0 0 14px rgba(255, 210, 63, 0.4);
+}
+
+.acc-row--picked::after {
+  content: "✓";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 6px 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  color: #2a1c02;
+  background: linear-gradient(180deg, #ffe08a, #d9a520);
 }
 
-.acc-chip {
-  /* 指で押す札。44pxを割ると巡回が落とす(実機で押し損ねる) */
-  min-height: 44px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(214, 180, 104, 0.35);
-  background: rgba(16, 20, 38, 0.92);
-  color: #d8def0;
-  font-size: 12px;
+/* ロック中・装着中は売れない。押しても反応しないことが分かるよう沈める */
+.acc-row--blocked {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.acc-chip--active {
-  border-color: #ffd76a;
-  color: #ffd76a;
-  background: rgba(60, 46, 14, 0.9);
+.acc-row__blocked {
+  font-size: 11px;
+  color: #ffb4a8;
+}
+
+/* --- 獲得のシート(装備のシートと同じ部品に、アクセの色だけ足す) --- */
+
+.farm-acc-card--legend { border-color: rgba(214, 140, 255, 0.45); }
+.farm-acc-card--epic { border-color: rgba(255, 170, 80, 0.6); }
+.farm-acc-card[data-locked="true"] { border-color: rgba(255, 211, 106, 0.65); }
+.farm-acc-card .farm-equip-card__detail b { font-size: 14px; }
+.farm-acc-card__owner { color: #9fb0d8; }
+.farm-acc-card .farm-equip-card__actions .btn { min-height: 44px; }
+.farm-acc-card .farm-equip-card__select { min-height: 44px; }
+
+/* 題は装備(「今回獲得した装備」)より長い。既定の大きさでは2行に折れ、「閉じる」まで折れた */
+.farm-acc-sheet .farm-equip-sheet__panel h2 {
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+.farm-acc-sheet .farm-equip-sheet__panel > header .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+/*
+ * 下の操作帯の地。共有の既定は上の16%が透けていて、
+ * 「選択 0個 売却予定」の字が後ろの札の字と重なって読めなかった。
+ * 字が乗る所から先は塗りつぶす(形は装備のシートと同じまま、地の色だけ)。
+ */
+.farm-acc-sheet .farm-equip-sheet__panel > footer {
+  background: linear-gradient(rgba(13, 18, 36, 0), #0d1224 10px);
+}
+
+.farm-acc-detail {
+  display: grid;
+  gap: 8px;
+  max-height: 80dvh;
+  overflow-y: auto;
 }
 
 .acc-detail {

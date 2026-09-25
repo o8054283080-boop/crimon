@@ -18,6 +18,11 @@ export function accessoryHeadline(acc: Accessory): string {
   return `${FAMILY_ICON[acc.family]} ${ACCESSORY_FAMILY_JA[acc.family]}`;
 }
 
+/** ★・レア度・系統・Lv・鍵の札の並び。一覧・詳細・獲得のシートで同じ形を使う */
+export function renderAccessoryBadges(acc: Accessory): HTMLElement {
+  return badges(acc);
+}
+
 function badges(acc: Accessory): HTMLElement {
   return el("div", { className: "acc-badges" }, [
     el("span", { className: "acc-badge acc-badge--star" }, [`★${acc.star}`]),
@@ -49,21 +54,39 @@ export function renderAccessorySummary(acc: Accessory): HTMLElement {
   ]);
 }
 
+/**
+ * まとめ売りの選択モードでの札の状態。
+ *   PICKED  … 売却に選ばれている(✓の印)
+ *   FREE    … 選べる
+ *   BLOCKED … ロック中・装着中で売れない(沈めて、押しても反応しない)
+ */
+export type AccessoryBulkState = "PICKED" | "FREE" | "BLOCKED";
+
 /** 一覧の1行。押すと選ぶ */
 export function renderAccessoryRow(acc: Accessory, options: {
   selected?: boolean;
   ownerName?: string | null;
+  /** まとめ売りの選択モード中だけ渡す */
+  bulk?: AccessoryBulkState;
   onClick: () => void;
 }): HTMLElement {
+  const bulkClass = options.bulk === undefined ? ""
+    : ` acc-row--selectable${options.bulk === "PICKED" ? " acc-row--picked" : ""}${options.bulk === "BLOCKED" ? " acc-row--blocked" : ""}`;
   return el("button", {
     type: "button",
-    className: `acc-row acc-row--${acc.rarity.toLowerCase()}${options.selected ? " acc-row--selected" : ""}`,
+    className: `acc-row acc-row--${acc.rarity.toLowerCase()}${options.selected ? " acc-row--selected" : ""}${bulkClass}`,
     "data-accessory-id": acc.id,
+    "aria-pressed": options.bulk === undefined ? undefined : String(options.bulk === "PICKED"),
+    "aria-disabled": options.bulk === "BLOCKED" ? "true" : undefined,
     onclick: options.onClick,
   }, [
     badges(acc),
     el("div", { className: "acc-row__main" }, [describeAccessoryMain(acc)]),
     el("div", { className: "acc-row__specials" }, [acc.specials.map(describeSpecial).join(" / ")]),
     options.ownerName ? el("div", { className: "acc-row__owner" }, [`装着中: ${options.ownerName}`]) : null,
+    // 売れない理由は札の中で言う。沈めただけでは「なぜ押せないか」が分からない
+    options.bulk === "BLOCKED"
+      ? el("div", { className: "acc-row__blocked" }, [acc.locked ? "ロック中は売却できません" : "装着中は売却できません"])
+      : null,
   ].filter((n): n is HTMLElement => n !== null));
 }
