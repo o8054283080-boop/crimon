@@ -87,8 +87,9 @@ async function openHome(c) {
    * 変数の差し替えは**ホームへ入る前に**。`.crimon-home` が現れた瞬間から
    * 高さの計算に使われるので、後から入れると一度ずれた姿で組まれる。
    *
-   * `.bottom-nav` の余白だけは `mobile-ux.css` が `env()` を直書きしている。
-   * 変数を通っていないので、ここで直に足す(実機のバーはその分だけ高い)。
+   * 下のバーは、絵をバー全体(safe-area 込み)に敷いて下の余白を持たない形にした
+   * (`home-pop-design.css` の `body .bottom-nav`)。高さは `--home-safe-bottom` を通る
+   * `--bottom-nav-h` で決まるので、変数の差し替えだけで実機相当になる。
    */
   await probe("eval", {
     expression: `(() => {
@@ -96,9 +97,6 @@ async function openHome(c) {
         el.style.setProperty("--home-safe-top", "${c.top}px");
         el.style.setProperty("--home-safe-bottom", "${c.bottom}px");
       }
-      let style = document.getElementById("safe-area-probe");
-      if (!style) { style = document.createElement("style"); style.id = "safe-area-probe"; document.head.appendChild(style); }
-      style.textContent = ".bottom-nav{padding-bottom:max(6px, ${c.bottom}px) !important}";
       const start = document.querySelector('[data-tour="start"]');
       if (start) start.click();
       return "ok";

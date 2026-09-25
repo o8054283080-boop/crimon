@@ -57,6 +57,15 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-25-bottom-nav-height",
+    title: "下のメニューが窮屈に見えていたのを直しました",
+    message: "画面の一番下のメニュー(ホーム・モンスター・装備・召喚・ショップ)の見た目を直しました。\n\n"
+      + "・メニューの絵が横長に押しつぶされて見えていたので、本来の形に近い高さで表示するようにしました\n"
+      + "・名前の文字を絵の下側の決まった位置に置き、絵と重ならないようにしました\n"
+      + "・メニューの下に、何もない帯が残らないようにしました",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-25-accessory-filter-bulk-sell",
     title: "アクセサリーを絞り込んでまとめて売れるようにしました",
     message: "アクセサリーの整理を、装備と同じようにできるようにしました。\n\n"
