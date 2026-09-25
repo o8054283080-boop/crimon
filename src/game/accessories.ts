@@ -1,5 +1,7 @@
 import {
-  type Accessory, type AccessoryFamily, type AccessoryRarity, type AccessoryStar,
+  type Accessory, type AccessoryFamily, type AccessoryMainStat, type AccessoryRarity, type AccessorySpecialId,
+  type AccessoryStar,
+  ACCESSORY_FAMILIES, ACCESSORY_MAIN_STATS, ACCESSORY_RARITIES, ACCESSORY_SPECIALS, ACCESSORY_STARS,
   accessoryEnhanceCost, accessoryMainValue, accessorySellPrice, canEnhanceAccessory, enhanceAccessory,
   sanitizeAccessory,
 } from "../core/accessory.js";
@@ -105,12 +107,158 @@ export function setAccessoryLocked(state: PlayerState, accessoryId: string, lock
 
 export type AccessorySortKey = "NEWEST" | "STAR" | "RARITY" | "LEVEL" | "MAIN";
 
+/** 装着しているかの絞り込み。ALLは条件なし */
+export type AccessoryWornFilter = "ALL" | "EQUIPPED" | "FREE";
+/** ロックしているかの絞り込み。ALLは条件なし */
+export type AccessoryLockFilter = "ALL" | "LOCKED" | "UNLOCKED";
+
+/**
+ * 絞り込みの条件。**作りは所持装備の絞り込み(`src/web/equipmentFilter.ts`)と同じ。**
+ *
+ * 空配列は「すべて」。軸どうしは AND、同じ軸の中の複数選択は OR。
+ * 「★6 または ★5 の、攻撃系統」という読み方になる。
+ *
+ * 前は系統・レア・★を1つずつしか選べず、札を3段に常に並べていた。
+ * アクセが数十個たまると札の段だけで画面が埋まり、一覧が1枚半しか見えなかった。
+ */
 export interface AccessoryFilter {
-  family?: AccessoryFamily | null;
-  rarity?: AccessoryRarity | null;
-  star?: AccessoryStar | null;
-  /** 誰も着けていないものだけ */
-  unequippedOnly?: boolean;
+  families: AccessoryFamily[];
+  rarities: AccessoryRarity[];
+  stars: AccessoryStar[];
+  mainStats: AccessoryMainStat[];
+  /** 特殊効果。**1個でも持っていれば残す**(装備のサブ効果と同じ読み方) */
+  specials: AccessorySpecialId[];
+  worn: AccessoryWornFilter;
+  lock: AccessoryLockFilter;
+}
+
+export const EMPTY_ACCESSORY_FILTER: AccessoryFilter = {
+  families: [],
+  rarities: [],
+  stars: [],
+  mainStats: [],
+  specials: [],
+  worn: "ALL",
+  lock: "ALL",
+};
+
+/** いま何個の軸で絞っているか。畳んでいる間もバッジで見せる */
+export function activeAccessoryFilterCount(filter: AccessoryFilter): number {
+  return (filter.families.length > 0 ? 1 : 0)
+    + (filter.rarities.length > 0 ? 1 : 0)
+    + (filter.stars.length > 0 ? 1 : 0)
+    + (filter.mainStats.length > 0 ? 1 : 0)
+    + (filter.specials.length > 0 ? 1 : 0)
+    + (filter.worn === "ALL" ? 0 : 1)
+    + (filter.lock === "ALL" ? 0 : 1);
+}
+
+/** 実際に持っている値。**手元に無い値の札は出さない**(押しても0件になるだけ) */
+export interface AccessoryFacets {
+  families: AccessoryFamily[];
+  rarities: AccessoryRarity[];
+  stars: AccessoryStar[];
+  mainStats: AccessoryMainStat[];
+  specials: AccessorySpecialId[];
+}
+
+export function availableAccessoryFacets(all: readonly Accessory[]): AccessoryFacets {
+  const families = new Set<AccessoryFamily>();
+  const rarities = new Set<AccessoryRarity>();
+  const stars = new Set<AccessoryStar>();
+  const mainStats = new Set<AccessoryMainStat>();
+  const specials = new Set<AccessorySpecialId>();
+  for (const acc of all) {
+    families.add(acc.family);
+    rarities.add(acc.rarity);
+    stars.add(acc.star);
+    mainStats.add(acc.mainStat);
+    for (const roll of acc.specials) specials.add(roll.id);
+  }
+  // 並びは定義順(系統ごとにまとまっている)を保つ
+  return {
+    families: ACCESSORY_FAMILIES.filter((v) => families.has(v)),
+    rarities: ACCESSORY_RARITIES.filter((v) => rarities.has(v)),
+    stars: ACCESSORY_STARS.filter((v) => stars.has(v)),
+    mainStats: ACCESSORY_MAIN_STATS.filter((v) => mainStats.has(v)),
+    specials: (Object.keys(ACCESSORY_SPECIALS) as AccessorySpecialId[]).filter((v) => specials.has(v)),
+  };
+}
+
+/**
+ * 絞り込みを当てる(並べ替えはしない)。`isWorn` は「誰かが着けているか」。
+ * 条件は一部だけ渡してもよい(書いていない軸は「すべて」)。
+ */
+export function filterAccessories(
+  all: readonly Accessory[],
+  filter: Partial<AccessoryFilter>,
+  isWorn: (acc: Accessory) => boolean,
+): Accessory[] {
+  const f = { ...EMPTY_ACCESSORY_FILTER, ...filter };
+  return all.filter((acc) => {
+    if (f.families.length > 0 && !f.families.includes(acc.family)) return false;
+    if (f.rarities.length > 0 && !f.rarities.includes(acc.rarity)) return false;
+    if (f.stars.length > 0 && !f.stars.includes(acc.star)) return false;
+    if (f.mainStats.length > 0 && !f.mainStats.includes(acc.mainStat)) return false;
+    if (f.specials.length > 0 && !acc.specials.some((roll) => f.specials.includes(roll.id))) return false;
+    if (f.worn === "EQUIPPED" && !isWorn(acc)) return false;
+    if (f.worn === "FREE" && isWorn(acc)) return false;
+    if (f.lock === "LOCKED" && acc.locked !== true) return false;
+    if (f.lock === "UNLOCKED" && acc.locked === true) return false;
+    return true;
+  });
+}
+
+/** 誰かが着けているアクセのIDの集合。1件ごとに全モンスターを走査しないよう、先に1回だけ作る */
+export function wornAccessoryIds(state: Pick<PlayerState, "monsters">): Set<string> {
+  return new Set(state.monsters.map((m) => m.accessoryId).filter((id): id is string => typeof id === "string"));
+}
+
+/**
+ * まとめて売れるアクセのID。**ロック中と装着中は除く**(`sellAccessory` が断るもの)。
+ * 「表示中をすべて選ぶ」は、画面に見えているものからこれを通して選ぶ。
+ */
+export function sellableAccessoryIds(list: readonly Accessory[], worn: ReadonlySet<string>): string[] {
+  return list.filter((acc) => acc.locked !== true && !worn.has(acc.id)).map((acc) => acc.id);
+}
+
+export interface AccessoryBulkSellResult {
+  ok: boolean;
+  reason?: string;
+  sold: number;
+  goldEarned: number;
+}
+
+/**
+ * 選んだアクセをまとめて売る。**1個でも売れないものが混ざっていたら、1個も売らない。**
+ *
+ * 確認ダイアログの後に呼ぶ。確認を出している間に鍵を掛けた・着けた・
+ * もう売れていた、があり得るので、ここで持ち物の今の状態を見直す。
+ * 一部だけ売ると「確認した金額と違う額が入った」になるので、丸ごと断る。
+ */
+export function bulkSellAccessories(state: PlayerState, ids: readonly string[]): AccessoryBulkSellResult {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return { ok: false, reason: "売却するアクセサリーが選ばれていません", sold: 0, goldEarned: 0 };
+  const worn = wornAccessoryIds(state);
+  const targets = unique.map((id) => findAccessory(state, id));
+  if (targets.some((acc) => acc === undefined)) {
+    return { ok: false, reason: "選んだアクセサリーの一部が見つかりません", sold: 0, goldEarned: 0 };
+  }
+  if (targets.some((acc) => acc!.locked === true)) {
+    return { ok: false, reason: "ロック中のアクセサリーが含まれています", sold: 0, goldEarned: 0 };
+  }
+  if (targets.some((acc) => worn.has(acc!.id))) {
+    return { ok: false, reason: "装着中のアクセサリーが含まれています(先に外してください)", sold: 0, goldEarned: 0 };
+  }
+  let sold = 0;
+  let goldEarned = 0;
+  for (const acc of targets) {
+    const result = sellAccessory(state, acc!.id);
+    if (!result.ok) continue;
+    sold += 1;
+    goldEarned += result.goldEarned;
+  }
+  return { ok: sold > 0, sold, goldEarned };
 }
 
 const RARITY_ORDER: Record<AccessoryRarity, number> = { HERO: 0, LEGEND: 1, EPIC: 2 };
@@ -118,16 +266,11 @@ const RARITY_ORDER: Record<AccessoryRarity, number> = { HERO: 0, LEGEND: 1, EPIC
 export function sortAndFilterAccessories(
   state: Pick<PlayerState, "accessories" | "monsters">,
   sort: AccessorySortKey,
-  filter: AccessoryFilter = {},
+  filter: Partial<AccessoryFilter> = {},
 ): Accessory[] {
-  const worn = new Set(state.monsters.map((m) => m.accessoryId).filter((id): id is string => typeof id === "string"));
-  const list = accessoriesOf(state).map((acc, index) => ({ acc, index })).filter(({ acc }) => {
-    if (filter.family && acc.family !== filter.family) return false;
-    if (filter.rarity && acc.rarity !== filter.rarity) return false;
-    if (filter.star && acc.star !== filter.star) return false;
-    if (filter.unequippedOnly && worn.has(acc.id)) return false;
-    return true;
-  });
+  const worn = wornAccessoryIds(state);
+  const kept = new Set(filterAccessories(accessoriesOf(state), filter, (acc) => worn.has(acc.id)));
+  const list = accessoriesOf(state).map((acc, index) => ({ acc, index })).filter(({ acc }) => kept.has(acc));
   const by = (f: (a: Accessory) => number) => (x: { acc: Accessory; index: number }, y: { acc: Accessory; index: number }) =>
     f(y.acc) - f(x.acc) || y.index - x.index;
   switch (sort) {

@@ -37,7 +37,6 @@
 .world-actions--right .world-action:focus-visible{outline:2px solid #f4d18e!important;outline-offset:2px!important}
 .world-actions--right .world-action:nth-child(1){transform:scale(1.06)!important;margin-bottom:2px!important}
 .world-actions--right .world-action:nth-child(1):active{transform:scale(1.01)!important}
-.crimon-dungeon-chooser{right:92px!important;top:108px!important}
 .world-actions--left .world-action{opacity:.78!important}
 @media(max-width:405px){.world-actions--right{right:0!important;width:88px!important}.world-actions--right .world-action{width:86px!important;min-height:92px!important;transform:scale(.96)!important}.world-actions--right .world-action:nth-child(1){transform:scale(1.01)!important}}
-@media(max-height:860px){.world-actions--right{gap:1px!important}.world-actions--right .world-action{min-height:87px!important;transform:scale(.93)!important}.world-actions--right .world-action:nth-child(1){transform:scale(.98)!important}.crimon-dungeon-chooser{top:96px!important}}
+@media(max-height:860px){.world-actions--right{gap:1px!important}.world-actions--right .world-action{min-height:87px!important;transform:scale(.93)!important}.world-actions--right .world-action:nth-child(1){transform:scale(.98)!important}}

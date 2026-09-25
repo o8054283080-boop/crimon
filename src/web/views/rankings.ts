@@ -23,6 +23,7 @@ import { TrialTowerRankingEntry } from "../../net/trialTowerSync.js";
 import { el } from "../dom.js";
 import { renderArenaRankingBody } from "./arena/ranking.js";
 import { renderTrialTowerRankingBody, renderTrialTowerRankingSelf } from "./trialTower.js";
+import { screenHeader } from "./managementHeader.js";
 
 /** どちらの順位を見ているか */
 export type RankingTab = "ARENA" | "TOWER";
@@ -105,7 +106,7 @@ export function renderRankings(props: RankingsProps): HTMLElement {
     : [];
 
   return el("div", { className: "screen rankings-screen" }, nodes([
-    el("header", { className: "app-header" }, [el("h1", {}, ["ランキング"])]),
+    screenHeader("ランキング"),
     el("div", { className: "rankings-tabs" }, [
       tabButton(props, "ARENA", "アリーナ", props.arena.myRank ? `あなた ${props.arena.myRank}位` : "対人戦のレート順"),
       tabButton(props, "TOWER", "試練の塔", props.tower.myBestFloor > 0 ? `あなた ${props.tower.myBestFloor}F` : "最高到達階の順"),

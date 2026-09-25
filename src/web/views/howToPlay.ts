@@ -2,6 +2,7 @@ import { GUARANTEED_MIN_STAR, SUMMON_COST_SINGLE, SUMMON_COST_TEN } from "../../
 import { MAX_DUNGEON_PARTY_SIZE } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { icon, IconName } from "../icons.js";
+import { screenHeader } from "./managementHeader.js";
 
 /**
  * 遊び方 / ゲームガイド。
@@ -639,12 +640,11 @@ export function renderHowToPlay(props: HowToPlayProps): HTMLElement {
   }
 
   return el("div", { className: "screen howto-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["遊び方・ゲームガイド"])]),
+    screenHeader("遊び方・ゲームガイド"),
     el("p", { className: "howto-intro" }, [
       `全${TOPICS.length}項目。読みたい見出しを押すと説明が開きます。`
       + "初めての進め方から、育成・装備・クリエイト・周回・試練の塔・アリーナまでまとめています。",
     ]),
     ...blocks,
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onBack }, ["◀ 戻る"]),
   ]);
 }

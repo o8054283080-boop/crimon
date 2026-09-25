@@ -1,77 +1,181 @@
 /**
- * 左上の「戻る」が2つ並ばないこと。
+ * 見出しと「戻る」を、全画面で1つの形にそろえる(U8)。
  *
- * 共通の「戻る」は `position: fixed` で左上に居座る。自前の戻り口を持つ
- * 画面でこれを出すと、**同じ場所にボタンが2つ**並ぶ。
+ * ## 前はばらばらだった
  *
- * さらに困るのは、自前のものは画面と一緒に動くこと。少し巻いた瞬間に
- * **自前のボタンが共通ボタンの裏へ入って押せなくなる。**
- * 図鑑の「‹ 一覧」で実際に起きている(依頼主の指摘)。
+ * 見出しは6通り(中央の特大の題字、左の小さな題、題と右のボタン、帯の中の中央の題、
+ * 詳細だけの「‹ 戻る」、題が絵の中にある召喚)、戻るは5通りあった。
+ * 左上に `position: fixed` で浮いた「戻る」と、画面ごとの「◀ 階層選択に戻る」
+ * 「閉じる」「‹ 一覧」が同じ画面に同時に出て、浮いた方は巻くと
+ * 案内帯の「STEP 1」の上に乗っていた。
  *
- * モンスター詳細では前に同じことが起きて、共通ボタンを出さない形で直した。
- * 図鑑の詳細も同じ扱いにする。
+ * ## いまの決まり
+ *
+ * - どの画面も、一番上は見出し帯(`screenHeader`)1本
+ * - 戻るは帯の左端に1つだけ。**浮かせない**(帯は流れの中にあり、巻くと貼り付く)
+ * - 画面の中に2つ目の戻り口を置かない。行き先が違うなら帯へ `onBack` を渡す
+ * - 案内帯は見出し帯の下
+ *
+ * 見た目の崩れは型にもテストにも出ないので、字面で見張れるところを見張る。
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { OWN_BACK_SELECTOR } from "../src/web/views/backButton.js";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const read = (path: string) => readFileSync(new URL(`../src/web/${path}`, import.meta.url), "utf8");
 
-describe("自前の戻り口を持つ画面", () => {
-  it("モンスター詳細と図鑑の詳細が入っている", () => {
-    expect(OWN_BACK_SELECTOR).toContain(".monster-detail-head");
-    expect(OWN_BACK_SELECTOR).toContain(".monster-dex-detail__back");
+/** 画面の組み立て(views 以下の .ts)を全部読む */
+function viewSources(): { file: string; source: string }[] {
+  const root = new URL("../src/web/views/", import.meta.url).pathname;
+  const out: { file: string; source: string }[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (name.endsWith(".ts")) out.push({ file: path.slice(root.length), source: readFileSync(path, "utf8") });
+    }
+  };
+  walk(root);
+  return out;
+}
+
+describe("戻るは見出し帯の左端に1つだけ", () => {
+  const css = read("ui/screenHead.css");
+
+  it("浮いた「戻る」は、もう描かない", () => {
+    const main = read("main.ts");
+    expect(main).not.toContain("renderGlobalBackButton");
+    expect(main).not.toContain("has-global-back");
+    expect(read("style.css")).not.toMatch(/\.global-back \{/);
   });
 
-  it("描く側が、その画面では共通ボタンを返さない", () => {
-    const source = read("views/backButton.ts");
-    expect(source).toContain("document.querySelector(OWN_BACK_SELECTOR)");
+  it("外側が差し込むのは、帯の中だけ。既に戻るを持つ帯には足さない", () => {
+    const main = read("main.ts");
+    expect(main).toContain("attachScreenBack(head, goBack)");
+    const header = read("views/managementHeader.ts");
+    expect(header).toContain('if (header.querySelector(".screen-head__back")) return false;');
+  });
+
+  /** **浮かせない。**浮かせた部品はこの案件で4回、下の何かを覆っている */
+  it("帯は流れの中で貼り付くだけ。固定も絶対配置もしない", () => {
+    const head = css.slice(css.indexOf(".screen-head {"), css.indexOf("}", css.indexOf(".screen-head {")));
+    expect(head).toContain("position: sticky;");
+    const back = css.slice(css.indexOf(".screen-head__back {"), css.indexOf("}", css.indexOf(".screen-head__back {")));
+    expect(back).not.toMatch(/position:\s*(fixed|absolute)/);
   });
 
   /*
-   * **逃げ場の余白も一緒に止める。**
-   * クラスだけ付けたままだと、ボタンが無いのに上が42px空く。
+   * 帯の地は画面の端まで伸ばす。**影(box-shadow)で伸ばすと四方へ同じだけ伸び**、
+   * 下を開けると真下の案内帯の題名に被さった(「最初の召喚」の上半分が隠れた)。
+   * 下を切ると、巻いた時に真下の札の縁(案内帯の緑)が罫のすぐ下からのぞいた。
+   * `border-image` の外へのはみ出しは描くだけで、巻物の大きさにも押す判定にも数えない。
+   * 下へは8pxのぼかしだけを出す(地の色の塊を出さない)。
    */
-  it("上の余白を空けるかどうかも、同じ物差しで決めている", () => {
+  it("帯の地は横へは端まで、下へはぼかし8pxだけ", () => {
+    expect(css).not.toContain("box-shadow: 0 0 0 100vmax");
+    expect(css).toContain("border-image-outset: 0 100vmax 8px;");
+    expect(css).toContain("rgba(11, 14, 32, 0) 100%");
+  });
+
+  it("画面の中に、2つ目の戻り口(◀ … に戻る / ‹ 一覧)を置かない", () => {
+    /*
+     * 「◀ 階層選択に戻る」「◀ アリーナに戻る」「‹ 一覧」「◀ 階層」の形を拾う。
+     * 戦闘画面は見出し帯を持たない(戦場いっぱいの配置)ので、決着後の「◀ 戻る」が出口。
+     * (札や引き出しを畳む「閉じる」は画面の出口ではないので、ここでは見ない)
+     */
+    const exits = viewSources()
+      .filter(({ file }) => file !== "battleView.ts")
+      .flatMap(({ file, source }) => [...source.matchAll(/\["([◀‹][^"]*)"\]/g)].map((m) => `${file}: ${m[1]}`));
+    expect(exits).toEqual([]);
+  });
+
+  it("古い見出し(中央の特大の題字・題と右のボタン)を使う画面が残っていない", () => {
+    const left = viewSources().filter(({ source }) => source.includes('className: "app-header'));
+    expect(left.map(({ file }) => file)).toEqual([]);
+  });
+});
+
+describe("案内帯は見出しの下。題名を切らない", () => {
+  it("見出し帯の直後へ差し込む", () => {
     const main = read("main.ts");
-    expect(main).toContain("!content.querySelector(OWN_BACK_SELECTOR)");
+    expect(main).toContain('content.querySelector<HTMLElement>(":scope > [data-screen-head]")');
+    expect(main).toContain("if (head) head.after(node); else content.prepend(node);");
+  });
+
+  /*
+   * 題・条件・ボタン2つを1行に並べていたため、390px幅では題の欄が100pxほどしか無く、
+   * 「🎯 最初の召…」と全画面で切れていた。題は上の段を右端まで使う。
+   */
+  it("題は上の段を右端まで使い、折り返してよい", () => {
+    const bar = read("ui/tutorialBar.css");
+    expect(bar).toContain('"badge title title"');
+    const title = bar.slice(bar.indexOf(".tutorial-bar[data-tutorial-bar] .tutorial-bar__title {"));
+    const body = title.slice(0, title.indexOf("}"));
+    expect(body).toContain("white-space: normal;");
+  });
+
+  /** 帯が2本とも貼り付くと、巻いた時に中身の見える幅が半分になる */
+  it("案内帯は貼り付かない(貼り付くのは見出し帯だけ)", () => {
+    const bar = read("ui/tutorialBar.css");
+    const at = bar.indexOf(".screen > .tutorial-bar[data-tutorial-bar] {");
+    const body = bar.slice(at, bar.indexOf("}", at));
+    expect(body).not.toMatch(/position:\s*(sticky|fixed|absolute)/);
+  });
+});
+
+describe("下のバーはどの画面でも同じ絵", () => {
+  /*
+   * 前はホームにいる時だけ金の装飾の絵で、他の画面は線画のアイコンの帯だった。
+   * 下のタブで画面を移るたびに、バーそのものが別の物に入れ替わっていた。
+   */
+  it("金の装飾の絵をホームに限らない", () => {
+    const pop = read("home-pop-design.css");
+    expect(pop).toMatch(/body \.bottom-nav,\s*body \.crimon-bottom-nav \{[^}]*home-bottom-nav-frame-v5\.webp/);
+    expect(pop).not.toContain("body:has(.crimon-home) .bottom-nav,");
+  });
+
+  /*
+   * **今いるタブに印を付ける。**金の絵の上では文字の色が変わるだけで、
+   * モンスター画面にいても「モンスター」が選ばれて見えなかった(判定役の指摘)。
+   */
+  it("今いるタブは枠で囲む", () => {
+    const pop = read("home-pop-design.css");
+    const at = pop.indexOf("body .bottom-nav__btn--active::after {");
+    expect(at, "今いるタブの印が無い").toBeGreaterThan(-1);
+    const body = pop.slice(at, pop.indexOf("}", at));
+    expect(body).toMatch(/border: [\d.]+px solid/);
+    expect(body).toContain("pointer-events: none;");
+  });
+
+  /*
+   * 実機の下34pxぶん絵を引き伸ばすと、文字が絵の意匠の上に乗って読めなかった。
+   * 絵は safe-area を除いた上の部分だけに敷く。
+   */
+  it("絵は safe-area を除いた部分だけに敷く", () => {
+    const pop = read("home-pop-design.css");
+    expect(pop).toContain("center top / 100% calc(100% - var(--nav-safe)) no-repeat");
+    expect(pop).toContain("padding: 0 0 var(--nav-safe) !important;");
+  });
+
+  /** ホーム以外の `--bottom-nav-h` は safe-area 抜き。バーの側で足さないと実機で沈む */
+  it("ホーム以外でも下の safe-area を足す", () => {
+    const pop = read("home-pop-design.css");
+    expect(pop).toContain("height: calc(var(--bottom-nav-h) + var(--bottom-nav-safe, env(safe-area-inset-bottom, 0px))) !important;");
+    expect(pop).toContain("--bottom-nav-safe: 0px;");
   });
 });
 
 /*
- * 初心者ミッションの帯は粘着(`z-index: 30`)で、巻くと上に残る。
- * 図鑑の「‹ 一覧」はその下を通るので、**帯は半透明で、うっすら見えているのに
- * 押せない**状態になっていた。重ね順だけ上げて、見えている間は押せるようにする。
+ * 編成の駒(`.party-current`)は `sticky` + `top` を書いていたが、後から読まれる
+ * `.panel` の `position: relative` に負けて貼り付きは効かず、**`top` のぶん札が下へずれて**
+ * 「所持モンスター」の見出しと「絞り込み」を覆っていた(見出し帯を入れた時に 16px → 58px)。
  */
-describe("初心者ミッションの帯より手前に置く", () => {
-  const dexCss = readFileSync(new URL("../src/web/ui/monsterDex.css", import.meta.url), "utf8");
-  const tutorialCss = readFileSync(new URL("../src/web/ui/tutorialBar.css", import.meta.url), "utf8");
-
-  /** 帯の重ね順を読む。ここが変わったら「‹ 一覧」側も見直す */
-  function barZIndex(): number {
-    const at = tutorialCss.indexOf(".screen > .tutorial-bar[data-tutorial-bar]");
-    expect(at, "帯の粘着指定が見つからない").toBeGreaterThanOrEqual(0);
-    const body = tutorialCss.slice(at, tutorialCss.indexOf("}", at));
-    const matched = /z-index:\s*(\d+)/.exec(body);
-    expect(matched, "帯に z-index が無い").not.toBeNull();
-    return Number(matched![1]);
-  }
-
-  it("「‹ 一覧」の重ね順が帯より上", () => {
-    const at = dexCss.indexOf(".monster-dex-detail__back {");
-    expect(at, "「‹ 一覧」の指定が見つからない").toBeGreaterThanOrEqual(0);
-    const body = dexCss.slice(at, dexCss.indexOf("}", at));
-    const matched = /z-index:\s*(\d+)/.exec(body);
-    expect(matched, "「‹ 一覧」に z-index が無い").not.toBeNull();
-    expect(Number(matched![1])).toBeGreaterThan(barZIndex());
-  });
-
-  /** **浮かせない。**粘着や固定にすると、今度は下の中身を覆う */
-  it("「‹ 一覧」は画面と一緒に動く(粘着も固定もしない)", () => {
-    const at = dexCss.indexOf(".monster-dex-detail__back {");
-    const body = dexCss.slice(at, dexCss.indexOf("}", at));
-    expect(body).toContain("position:relative");
-    expect(body).not.toContain("position:sticky");
-    expect(body).not.toContain("position:fixed");
+describe("編成の駒は流れの中", () => {
+  it("top で札をずらさない", () => {
+    const css = read("style.css");
+    const at = css.indexOf(".party-current {");
+    const body = css.slice(at, css.indexOf("}", at));
+    expect(body).not.toMatch(/(^|\s)top:/);
+    expect(body).not.toContain("position: sticky");
   });
 });

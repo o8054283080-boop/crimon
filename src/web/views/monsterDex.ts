@@ -23,6 +23,7 @@ import { withPortrait } from "../three/portrait.js";
 import "../ui/monsterDex.css";
 import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillGrowthRows } from "./skillPanel.js";
+import { screenHeader } from "./managementHeader.js";
 
 const LATENT_CATEGORY_LABEL = { OFFENSE: "攻勢", DISRUPT: "妨害", DURABILITY: "耐久", SUPPORT: "支援", SPECIAL: "特殊" } as const;
 
@@ -153,10 +154,8 @@ function renderList(props: MonsterDexProps): HTMLElement {
   const entries = sortDexEntries(shown, props.sortKey);
   const cards = entries.map((dex) => dexCard(dex, numbers.get(dex.id) ?? 0, () => props.onSelectEntry(dex.id)));
   return el("div", { className: "screen monster-dex monster-dex--list" }, [
-    el("header", { className: "app-header monster-dex__header" }, [
-      el("div", {}, [el("h1", {}, ["モンスター図鑑"]), el("p", { className: "app-subtitle" }, ["タップで能力を確認"])]),
-      el("button", { type: "button", className: "btn btn--ghost monster-dex__back", onclick: props.onBack }, ["閉じる"]),
-    ]),
+    // 「閉じる」は見出しの戻るに一本化した(同じ行き先のボタンが2つあった)
+    screenHeader("モンスター図鑑", { sub: "タップで能力を確認", onBack: props.onBack, backLabel: "モンスター画面へ戻る" }),
     renderDexFilterBar(props, cards.length),
     renderDexSortRow(props),
     el("section", { className: "panel monster-dex__catalog" }, [
@@ -282,8 +281,9 @@ function renderDetail(props: MonsterDexProps, dex: MonsterDefinition): HTMLEleme
   ]);
 
   return el("div", { className: "screen monster-dex monster-dex-detail" }, [
+    // 「‹ 一覧」は見出しの戻るに一本化した。行き先は同じ(図鑑の一覧)
+    screenHeader("モンスター図鑑", { onBack: () => props.onSelectEntry(null), backLabel: "図鑑の一覧に戻る", meta: `No.${String(index + 1).padStart(3, "0")}` }),
     el("header", { className: "monster-dex-detail__top" }, [
-      el("button", { type: "button", className: "btn btn--ghost monster-dex-detail__back", onclick: () => props.onSelectEntry(null) }, ["‹ 一覧"]),
       withPortrait(el("div", { className: "monster-dex-detail__portrait", style: `background:${dex.color}` }, [dex.emoji]), dex),
       el("div", { className: "monster-dex-detail__identity" }, [
         el("span", { className: "monster-dex-detail__number" }, [`No.${String(index + 1).padStart(3, "0")}`]),

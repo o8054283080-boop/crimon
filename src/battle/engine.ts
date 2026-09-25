@@ -327,7 +327,9 @@ export interface BattleEngineOptions {
    * そこから `everyTurns` 手番ごとに `factorPerStep` 倍ずつ**累積**する。
    * 上限は設けない——上限を置くと、そこで再び「終わらない」が戻ってくる。
    *
-   * **この設定はアリーナ専用。**PvEへ持ち込むと、耐久編成で塔を登る道が消える。
+   * **PvEへ一律に持ち込まないこと。**耐久編成で塔を登る道が消える。
+   * PvEで使っているのは、敵の特性 `bossTraits.battleDamageRamp` を持つ
+   * 力の遺跡4・5階の指揮兵器だけ(その戦闘に限って、ここへ入る)。
    */
   damageRamp?: DamageRampConfig;
 }
@@ -476,7 +478,9 @@ export class BattleEngine {
       dealFollowUp: (source, target, multiplier) => this.accessoryFollowUp(source, target, multiplier),
     }) : null;
     this.maxTurns = options.maxTurns ?? 300;
-    this.damageRamp = options.damageRamp;
+    // 組み立て側の指定が無ければ、敵の特性に書かれた長期戦のダメージ増を使う(力の遺跡4・5階)。
+    // 特性を持つ敵がいない戦闘では undefined のままなので、既存の戦闘は1つも変わらない
+    this.damageRamp = options.damageRamp ?? enemyTeam.find((def) => def.bossTraits?.battleDamageRamp)?.bossTraits?.battleDamageRamp;
     this.trialTowerFloor = options.trialTowerFloor;
     this.trialTowerHardMultipliers = options.trialTowerHardMultipliers;
     if (options.trialTowerFloor === 80) { this.grantTower80Immunity(); this.syncTower80Boss(); }

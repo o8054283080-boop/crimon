@@ -83,8 +83,8 @@ export function renderMonsterTraining(props: MonsterTrainingProps): HTMLElement 
   const target = props.player.monsters.find((m) => m.id === props.targetId);
   if (!target) {
     return el("div", { className: "screen monsters-screen" }, [
+      managementHeader("モンスター強化", props.onCancel),
       el("p", { className: "app-subtitle" }, ["対象のモンスターが見つかりません"]),
-      el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onCancel }, ["◀ 戻る"]),
     ]);
   }
 

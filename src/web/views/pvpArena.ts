@@ -27,6 +27,7 @@ import { renderArenaDefense, renderArenaOffenseTeam } from "./arena/teams.js";
 import { renderArenaRanking } from "./arena/ranking.js";
 import { renderArenaShop } from "./arena/shopView.js";
 import { renderArenaHistory } from "./arena/history.js";
+import { screenHeader } from "./managementHeader.js";
 
 export type { ArenaViewName } from "./arena/model.js";
 export type { PvpArenaProps, ArenaHistoryInput } from "./arena/props.js";
@@ -59,9 +60,8 @@ export function renderPvpArena(props: PvpArenaProps): HTMLElement {
      */
     console.error("[arena] 画面の組み立てに失敗しました", error);
     return el("div", { className: "screen ar-screen" }, [
-      el("header", { className: "app-header" }, [el("h1", {}, ["アリーナ"])]),
+      screenHeader("アリーナ", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る" }),
       el("p", { className: "panel ar-warn" }, ["この画面を開けませんでした。アリーナのトップへ戻ってください"]),
-      el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onGo("TOP") }, ["◀ アリーナに戻る"]),
     ]);
   }
 }

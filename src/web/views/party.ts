@@ -10,6 +10,7 @@ import { renderMonsterFilterBar } from "./monsterFilterBar.js";
 import { partyMemberCard } from "./partyCard.js";
 import { findMonsterById } from "../../data/monsters.js";
 import "../ui/party.css";
+import { screenHeader } from "./managementHeader.js";
 
 export type PartyEditMode = "NORMAL" | "DUNGEON" | "TOWER";
 
@@ -175,12 +176,11 @@ export function renderParty(props: PartyProps): HTMLElement {
   );
 
   return el("div", { className: "screen party-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["パーティ編成"]),
-      props.onComplete
-        ? el("button", { type: "button", className: "btn btn--ghost", onclick: props.onComplete }, [`← ${props.returnLabel ?? "戻る"}`])
-        : el("span", { className: "head-note" }, [`${activeIds.length} / ${maxSize}`]),
-    ]),
+    // 呼んだ画面へ帰す時(階の詳細から編成を開いた時など)は、見出しの戻るがそこへ帰す
+    screenHeader("パーティ編成", {
+      meta: `${activeIds.length} / ${maxSize}`,
+      ...(props.onComplete ? { onBack: props.onComplete, backLabel: props.returnLabel ?? "戻る" } : {}),
+    }),
     el(
       "section",
       { className: "panel mode-toggle party-mode-toggle" },

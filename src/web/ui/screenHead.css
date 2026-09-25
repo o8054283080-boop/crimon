@@ -1,0 +1,194 @@
+/*
+ * 画面の見出し帯(`views/managementHeader.ts` の `screenHeader`)。
+ *
+ * **アプリのどの画面も、一番上はこの1本。**
+ *   [‹ 戻る] 題(金・左寄せ)            [補足 / 小さなボタン1つ]
+ *
+ * ## 浮かせない
+ *
+ * 前の「戻る」は `position: fixed` で左上に浮いていて、巻くと案内帯の
+ * 「STEP 1」の上に乗っていた。**浮かせた部品は必ず下の何かを覆う**
+ * (この案件で4回目)。帯は画面の流れの一番上に置き、巻いた時だけ
+ * 上に貼り付く(`sticky`)。貼り付いている間に下を通るのは巻いている中身で、
+ * 押したければ巻き戻せば出てくる。覆われて押せない物は作らない。
+ *
+ * ## 実機のノッチ
+ *
+ * 帯の上余白が safe-area を持つ。**画面の上余白は0にする**——両方で持つと、
+ * 貼り付いた時にノッチの下へ題が潜るか、巻く前に59px余計に空く。
+ */
+
+:root {
+  /* 帯の中身の高さ(戻るボタン44px + 上下の余白) */
+  --screen-head-inner: 52px;
+  --screen-head-safe: env(safe-area-inset-top, 0px);
+  /* 貼り付く帯の下に、別の貼り付く部品を置く時はこの値を top に使う */
+  --screen-head-h: calc(var(--screen-head-safe) + var(--screen-head-inner));
+  --screen-head-bg: #0b0e20;
+}
+
+/*
+ * 帯を持つ画面は、上の余白を帯に任せる。**`!important` なのは意図して。**
+ * 画面ごとに「左上の浮いた戻る」を避けるための上余白(56pxなど)が残っていて、
+ * それが帯の上に空き地を作る。帯を持つなら、上端はどの画面も同じ。
+ */
+:has(> .screen-head) {
+  padding-top: 0 !important;
+}
+
+.screen-head {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--screen-head-h);
+  /* 中身を中央へ寄せる画面(結果画面)でも、帯は横いっぱい */
+  align-self: stretch;
+  margin: 0;
+  padding: var(--screen-head-safe) 0 0;
+  /*
+   * 帯の地を画面の端まで伸ばし、下端に金の罫と8pxのぼかしを付ける。
+   *
+   * **幅そのものは広げない。**`border-image` の外へのはみ出し(outset)は
+   * 描くだけで巻物の大きさに数えられないので、横に巻ける画面にならない。
+   * 前は影(box-shadow)で伸ばしていたが、影は四方へ同じだけ伸びるため
+   * 下を切り落とすしかなく、巻いた時に真下の札の縁(案内帯の緑)が
+   * 罫のすぐ下から細くのぞいていた。ぼかしはその縁を沈める。
+   * ぼかしは押しものの上に乗っても押すのを邪魔しない(描くだけ)。
+   */
+  border-image-source: linear-gradient(180deg,
+    var(--screen-head-bg) 0,
+    var(--screen-head-bg) calc(100% - 9px),
+    rgba(236, 196, 120, 0.7) calc(100% - 9px),
+    rgba(236, 196, 120, 0.7) calc(100% - 8px),
+    rgba(11, 14, 32, 0.85) calc(100% - 8px),
+    rgba(11, 14, 32, 0) 100%);
+  border-image-slice: 0 fill;
+  border-image-width: 0;
+  border-image-outset: 0 100vmax 8px;
+}
+
+/* 題の最後の語(「5階」「NORMAL」)は割らない。「1」と「階」が別の行に分かれていた */
+.screen-head__keep {
+  white-space: nowrap;
+}
+
+/* 1画面の中に帯は1本。2本目以降(詳細の中の詳細など)は貼り付かせない */
+.screen-head ~ .screen-head {
+  position: static;
+}
+
+.screen-head__back {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px 0 10px;
+  border: 1px solid rgba(226, 182, 110, 0.5);
+  border-radius: 999px;
+  color: #f5d48a;
+  background: linear-gradient(180deg, rgba(34, 36, 62, 0.95), rgba(14, 16, 32, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 232, 190, 0.14);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.screen-head__back:active {
+  transform: translateY(1px);
+}
+
+.screen-head__back-label {
+  white-space: nowrap;
+}
+
+.screen-head__titles {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+/* 題。**どの画面でも同じ大きさ・同じ金・左寄せ。**長い題は2行まで折る(切らない) */
+.screen-head__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  font-size: 1.14rem;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-align: left;
+  background: var(--gold-grad, linear-gradient(180deg, #fff1c4, #e8b659));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  overflow-wrap: anywhere;
+}
+
+.screen-head__sub {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-dim, #a9a3bc);
+  font-size: 0.7rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen-head__side {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 46%;
+}
+
+.screen-head__meta {
+  overflow: hidden;
+  padding: 5px 10px;
+  border: 1px solid rgba(226, 182, 110, 0.28);
+  border-radius: 999px;
+  color: #f3dca0;
+  background: rgba(255, 210, 120, 0.07);
+  font-size: 0.74rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen-head__action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(226, 182, 110, 0.5);
+  border-radius: 999px;
+  color: #f5d48a;
+  background: rgba(255, 210, 120, 0.08);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.screen-head__action:active {
+  transform: translateY(1px);
+}

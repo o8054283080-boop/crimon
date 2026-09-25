@@ -19,6 +19,7 @@ import { ArenaRankingEntry } from "../../../net/arenaSync.js";
 import { arenaRankingView } from "./model.js";
 import { PvpArenaProps } from "./props.js";
 import { withPortrait } from "../../three/portrait.js";
+import { screenHeader } from "../managementHeader.js";
 
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
   return items.filter((node): node is HTMLElement => node !== null);
@@ -89,11 +90,10 @@ export function renderArenaRanking(props: PvpArenaProps): HTMLElement {
   });
 
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header" }, [el("h1", {}, ["ランキング"])]),
+    screenHeader("ランキング", { onBack: () => props.onGo("TOP"), backLabel: "アリーナに戻る" }),
     ...body,
     props.online
       ? el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onReloadRanking }, ["🔄 読み込み直す"])
       : null,
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: () => props.onGo("TOP") }, ["◀ アリーナに戻る"]),
   ]));
 }

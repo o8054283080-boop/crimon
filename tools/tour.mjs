@@ -56,6 +56,14 @@ const SCREENS = [
   { name: "モンスター", tab: "MONSTERS" },
   { name: "装備", tab: "EQUIPMENT" },
   { name: "装備/アクセサリー", tab: "EQUIPMENT", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openGearAccessoryTabForDev()" },
+  /*
+   * **入手時のアクセのシートも見る。**周回・1戦の結果から開くシートで、
+   * 絞り込みを開いた状態とまとめ売りの帯を含む。結果画面はタブから辿れないので、
+   * DEV限定の口で立ててから見る。
+   */
+  { name: "遺跡の周回結果/獲得アクセ", tab: "HOME", setup: "window.__crimonDev?.openRuinFarmResult(true)" },
+  { name: "遺跡の周回結果/獲得アクセ(絞り込み)", tab: "HOME", setup: "window.__crimonDev?.openRuinFarmResult(true, true)" },
+  { name: "遺跡の1戦の結果/獲得アクセ", tab: "HOME", setup: "window.__crimonDev?.openRuinStageResultForDev(true)" },
   { name: "召喚", tab: "SUMMON" },
   { name: "ショップ", tab: "SHOP" },
   /*
@@ -104,7 +112,12 @@ const SCREENS = [
     setup: "document.querySelector('[data-tour=giftTabHistory]')?.click()",
   },
   { name: "ミッション", tab: "HOME", tile: "mission" },
-  // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く
+  /*
+   * ダンジョンは1段深い。「ダンジョン」を押すと選択のシートが開く。
+   * **シートそのものも検査する。**前は世界に浮いた小窓で、押す所が44x39pxしかなく、
+   * 「ゴールド」が2行に折れていたのに、行き先の画面しか見ていなかった。
+   */
+  { name: "ダンジョンの選択", tab: "HOME", tile: "dungeon" },
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
   /*
    * 上位階(11・12)。**開いた状態も見る。**
@@ -350,6 +363,12 @@ async function goScreen(screen) {
         modalClose.click();
         await wait(200);
       }
+      // ダンジョンの選択も同じ。ホームのタブを押し直しても開いたまま残る
+      const dungeonClose = document.querySelector('.dungeon-chooser:not([hidden]) .dungeon-chooser__close');
+      if (dungeonClose instanceof HTMLElement) {
+        dungeonClose.click();
+        await wait(200);
+      }
       /*
        * **まず今いる階層から出る。**
        *
@@ -360,7 +379,8 @@ async function goScreen(screen) {
        * 戻るボタンが消えるまで押して、必ず同じところから始める。
        */
       for (let i = 0; i < 4; i += 1) {
-        const back = document.querySelector('.global-back');
+        // 戻るは見出し帯の左端に1つだけ(data-tour="back")。前は浮いた .global-back だった
+        const back = document.querySelector('[data-tour="back"]');
         if (!back) break;
         back.click();
         await wait(200);

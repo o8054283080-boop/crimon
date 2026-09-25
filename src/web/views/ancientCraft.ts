@@ -6,6 +6,7 @@ import type { PlayerState } from "../../game/playerState.js";
 import { el } from "../dom.js";
 import { renderAccessorySummary } from "./accessoryCard.js";
 import { renderRuinMaterials } from "./ruins.js";
+import { screenHeader } from "./managementHeader.js";
 
 /**
  * 古代のカケラでの製作。**150個で1つ。余りは残る。**
@@ -30,9 +31,7 @@ export function renderAncientCraft(props: AncientCraftProps): HTMLElement {
   const ok = canCraft(props.player);
   const short = ok ? null : `あと${(ANCIENT_CRAFT_COST - have).toLocaleString("ja-JP")}個`;
   return el("div", { className: "screen craft-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["カケラ製作"]),
-    ]),
+    screenHeader("カケラ製作"),
     renderRuinMaterials(props.player),
     el("p", { className: "acc-note" }, [
       `古代のカケラ${ANCIENT_CRAFT_COST}個で1つ作れます。余ったカケラはそのまま残ります。`,

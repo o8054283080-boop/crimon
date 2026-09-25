@@ -11,6 +11,8 @@ export interface AutoFarmResultProps {
   /** 次の行き先。同じ場所をもう一度回すのが最も多い操作 */
   actions: ResultAction[];
   onViewEquipment?: () => void;
+  /** 今回獲得したアクセのシートを開く(遺跡の周回でアクセを得た時だけ渡す) */
+  onViewAccessories?: () => void;
 }
 
 const STOP_REASON_LABEL: Record<AutoFarmResult["stopReason"], string> = {
@@ -120,6 +122,18 @@ export function renderAutoFarmResult(props: AutoFarmResultProps): HTMLElement {
     el("div", { className: "result-body" }, body.filter((n): n is HTMLElement => n !== null)),
     result.equipmentDropCount > 0 && props.onViewEquipment
       ? el("button", { type: "button", className: "btn btn--gold btn--large", onclick: props.onViewEquipment }, ["獲得装備を見る"])
+      : null,
+    /*
+     * 遺跡の周回で得たアクセ。**札の「+10」だけでは中身が分からない。**
+     * 装備と同じく、ここで絞り込んでロック・まとめ売りまで済ませられるようにする。
+     */
+    (result.earnedAccessoryIds?.length ?? 0) > 0 && props.onViewAccessories
+      ? el("button", {
+        type: "button",
+        className: "btn btn--gold btn--large",
+        "data-tour": "result:accessories",
+        onclick: props.onViewAccessories,
+      }, ["💍 今回獲得したアクセサリーを見る"])
       : null,
     renderResultActions(props.actions),
   ].filter((node): node is HTMLElement => node !== null));

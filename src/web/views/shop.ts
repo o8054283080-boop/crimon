@@ -8,6 +8,7 @@ import { el } from "../dom.js";
 import { icon, slotIcon } from "../icons.js";
 import { equipmentRarityAttrs, equipmentRarityTag } from "./equipmentRarityTag.js";
 import { withPortrait } from "../three/portrait.js";
+import { screenHeader } from "./managementHeader.js";
 
 /** null を落として並べる。この画面だけの小道具(他の画面も同じ形で持っている) */
 function nodes(items: (HTMLElement | null)[]): HTMLElement[] {
@@ -186,7 +187,7 @@ export function renderShop(props: ShopProps): HTMLElement {
   }
 
   return el("div", { className: "screen shop-screen" }, [
-    el("header", { className: "app-header" }, [el("h1", {}, ["ショップ"])]),
+    screenHeader("ショップ"),
 
     /* 帳場。
      * 前は3行の説明文と、その下に青い字で入れ替えまでの時間が置いてあるだけで、

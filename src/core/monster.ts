@@ -190,6 +190,17 @@ export interface BossTraits {
    */
   empowerBossOnDeath?: { atk?: number; spd?: number; def?: number };
   /**
+   * **この敵が盤面にいる戦闘だけ**、長引くほど両陣営の与えるダメージを増やす
+   * (アリーナの `damageRamp` と同じ仕組み・同じ形)。
+   *
+   * 回復役と支援役だけが残り、互いに削り切れないまま300手に届く戦いを、
+   * **どちらかへ**決着させるためのもの。回復阻害のように回復を選んだ編成だけに
+   * 掛けるのではなく、両陣営に同じだけ掛かる。
+   * 戦闘の組み立て側が `damageRamp` を渡していれば、そちらが優先する。
+   * 形は `battle/engine.ts` の `DamageRampConfig` と同じ(core から battle へは向かないので、ここで書く)。
+   */
+  battleDamageRamp?: { afterTurns: number; everyTurns: number; factorPerStep: number };
+  /**
    * **この個体が倒れた時**、生き残っている `victoryTarget` の敵へ足す割合の変化。
    *
    * `empowerBossOnDeath` は実数(攻撃力を2000上げる)だが、

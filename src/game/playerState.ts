@@ -1031,17 +1031,52 @@ export function normalizeLoadedState(state: PlayerState, now: Date = new Date())
   return normalizeState(state, now);
 }
 
-export function loadPlayerState(): PlayerState {
+/**
+ * 読み込んだセーブの出どころ。
+ *
+ * - `NEW` … 保存データが**最初から無かった**。新しく作った
+ * - `LOADED` … 保存データを読めた
+ * - `REBUILT` … 保存データはあったが、空・壊れている・読めなかったので作り直した
+ *
+ * **`REBUILT` を「はじめて」に含めない。**そこに居るのは前から遊んでいた人で、
+ * はじめてと扱うと、その人のお知らせが全部既読になり、過去の更新も札に出なくなる。
+ */
+export type SaveOrigin = "NEW" | "LOADED" | "REBUILT";
+
+/**
+ * このページで**最初に**セーブを読んだ時の出どころ。
+ *
+ * 「最初に」なのは、`expBalanceCompensation.ts` が main より先にセーブを読み、
+ * 経験ピッグを配って**保存まで済ませる**から。main が読む頃には、
+ * 新しく始めた人にも保存データがある。2回目以降の読み込みでは見分けられない。
+ */
+let startupSaveOriginValue: SaveOrigin | null = null;
+
+/** このページで最初にセーブを読んだ時の出どころ。まだ一度も読んでいなければ null */
+export function startupSaveOrigin(): SaveOrigin | null {
+  return startupSaveOriginValue;
+}
+
+/** 保存データを読み、出どころと一緒に返す。`storage` を渡せるのは確かめるため */
+export function readPlayerSave(storage?: Pick<Storage, "getItem">): { state: PlayerState; origin: SaveOrigin } {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createInitialState();
+    const raw = (storage ?? localStorage).getItem(STORAGE_KEY);
+    if (raw === null) return { state: createInitialState(), origin: "NEW" };
+    // 空の文字列は「無かった」ではなく「あったが中身が無い」。安全な側(作り直し)へ倒す
+    if (!raw) return { state: createInitialState(), origin: "REBUILT" };
     // 縮めた形も、縮めていない昔の形も、ここが見分ける
     const parsed = decodeSave(raw);
-    if (!parsed?.monsters || parsed.monsters.length === 0) return createInitialState();
-    return normalizeState(parsed);
+    if (!parsed?.monsters || parsed.monsters.length === 0) return { state: createInitialState(), origin: "REBUILT" };
+    return { state: normalizeState(parsed), origin: "LOADED" };
   } catch {
-    return createInitialState();
+    return { state: createInitialState(), origin: "REBUILT" };
   }
+}
+
+export function loadPlayerState(): PlayerState {
+  const { state, origin } = readPlayerSave();
+  if (startupSaveOriginValue === null) startupSaveOriginValue = origin;
+  return state;
 }
 
 /**

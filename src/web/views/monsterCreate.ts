@@ -27,6 +27,7 @@ import {
   MonsterType,
   abilityPointBudget,
 } from "../../core/monsterDevelopment.js";
+import { screenHeader } from "./managementHeader.js";
 import {
   abilityPointsConfirmed,
   LATENT_ABILITY_CANDIDATES,
@@ -310,10 +311,8 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
     { id: "TALENT", label: "才能覚醒" },
   ];
   const shared = [
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, ["クリエイト"]),
-      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onBack }, ["戻る"]),
-    ]),
+    // 戻るは見出しの1つだけ(前は浮いた「戻る」と、ここの「戻る」が同時に出ていた)
+    screenHeader("クリエイト", { onBack: props.onBack }),
     el("nav", { className: "create-menu", "aria-label": "クリエイトメニュー" }, menuItems.map((item) =>
       el("button", { type: "button", className: `btn ${props.menu === item.id ? "btn--primary" : "btn--ghost"}`, onclick: () => props.onSelectMenu(item.id) }, [item.label]),
     )),

@@ -13,6 +13,7 @@ import { applyPortrait } from "../three/portrait.js";
 import { autoFarmPotionProps, renderAutoFarmPanel } from "./autoFarmPanel.js";
 import { renderDungeonIntro, renderFloorGrid } from "./dungeonList.js";
 import { renderPartySlots } from "./partyCard.js";
+import { screenHeader } from "./managementHeader.js";
 
 /**
  * 力の遺跡・守護の遺跡。
@@ -84,7 +85,7 @@ function renderList(props: RuinsProps): HTMLElement {
     };
   });
   return el("div", { className: "screen stages-screen ruins-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [el("h1", {}, ["遺跡"])]),
+    screenHeader("遺跡"),
     el("div", { className: "ruin-tabs" }, RUIN_KINDS.map((kind) =>
       el("button", {
         type: "button",
@@ -94,7 +95,7 @@ function renderList(props: RuinsProps): HTMLElement {
       }, [RUIN_NAME[kind]]))),
     renderDungeonIntro(
       props.kind === "POWER"
-        ? "指揮兵器を倒せば勝ち。号令塔・妨害塔を倒すと指揮兵器が強くなります。"
+        ? "指揮兵器を倒せば勝ち。号令塔・妨害塔を倒すと指揮兵器が強くなります。4階からは号令塔が指揮兵器に護りを張り、解除で剥がすと張り直すまで穴が開きます。"
         : "霊獣を倒せば勝ち。身代わり像が霊獣のダメージを肩代わりします(解除で剥がせます)。",
       [`アクセ(${familiesText(props.kind)})が必ず落ちる`, "曜日の縛りなし"],
     ),
@@ -129,10 +130,8 @@ function renderDetail(props: RuinsProps, floor: RuinFloor): HTMLElement {
   ].filter((v): v is string => v !== null);
   const rarities = floor.rarityWeights.filter(([, w]) => w > 0).map(([r]) => ACCESSORY_RARITY_JA[r]).join("・");
   return el("div", { className: "screen stages-screen ruins-screen" }, [
-    el("header", { className: "app-header app-header--row" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onSelectFloor(null) }, ["◀ 階層選択に戻る"]),
-      el("h1", {}, [floor.name]),
-    ]),
+    // 戻るは見出しの1つだけ。行き先は「階の一覧」(履歴ではなく1つ上)
+    screenHeader(floor.name, { onBack: () => props.onSelectFloor(null), backLabel: "階層選択に戻る", meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
     renderRuinMaterials(props.player),
     el("section", { className: "card ruin-detail" }, [
       renderBossArt(floor),
@@ -162,13 +161,18 @@ function renderDetail(props: RuinsProps, floor: RuinFloor): HTMLElement {
       el("h2", { className: "depth-party__title" }, ["この編成で挑みます"]),
       el("p", { className: "depth-party__note" }, ["遺跡は装備ダンジョンと同じ「ダンジョン編成」(最大5体)で戦います"]),
       renderPartySlots(party, MAX_DUNGEON_PARTY_SIZE),
-    ]),
-    ...blockers.map((text) => el("p", { className: "warn-text" }, [text])),
-    el("div", { className: "stage-actions" }, [
       el("button", { type: "button", className: "btn btn--ghost", onclick: props.onGoParty }, ["ダンジョン編成を変更する"]),
+    ]),
+    /*
+     * 1戦の「挑戦する」が**この階の主役。**前は編成の変更と並べた小さな札で左に寄り、
+     * 下の「▶ 10回まとめて挑戦」の方が大きかった(主と従が逆)。
+     * 装備ダンジョンの階と同じ、幅いっぱいの大きな札にする。
+     */
+    el("section", { className: "panel challenge-panel" }, [
+      ...(blockers.length > 0 ? [el("p", { className: "challenge-panel__warn" }, [blockers.join(" / ")])] : []),
       el("button", {
         type: "button",
-        className: "btn btn--primary",
+        className: "btn btn--primary btn--large challenge-panel__go",
         "data-tour": "ruin:start",
         disabled: !canChallenge,
         onclick: () => props.onStartFloor(floor),

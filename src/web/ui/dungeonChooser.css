@@ -1,0 +1,324 @@
+/*
+ * ダンジョンの選択(ホームの「ダンジョン」を押すと開くシート)。
+ *
+ * **この部品のルールはここだけに置く。**
+ * 前は `crimon-visual-system.css` / `home-mode-buttons-phase4.css` /
+ * `home-mode-buttons-phase4-fix.css` / `home-pop-design.css` の4つに
+ * `!important` で上書きが積み重なり、位置も幅も誰が決めているのか読めなかった
+ * (右端は 82 → 92 → 108 → 101px と4回書き換えられていた)。
+ * クラス名を `crimon-dungeon-chooser` から `dungeon-chooser` へ変えて、
+ * 古い上書きが当たる余地を無くしてある。`!important` は使わない。
+ *
+ * **世界の中に浮かせない。**`position:absolute` の小窓だった頃は
+ * お知らせの札の上に乗り、札を覆っていた。いまは画面いっぱいの
+ * 暗幕の上に出るので、閉じるまで背面は触れない(`aria-modal`)。
+ *
+ * 下のバーはホーム画面の重なり文脈の外にいて、暗幕より上に描かれる
+ * (`home-theme.css` の設定シートと同じ事情)。だからパネルは
+ * **バーの上端より上で止める。**潜り込ませると下の行が押せなくなる。
+ */
+.dungeon-chooser {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: max(12px, var(--home-safe-top, 0px)) 10px calc(var(--bottom-nav-h, 64px) + 10px);
+}
+
+.dungeon-chooser[hidden] {
+  display: none;
+}
+
+.dungeon-chooser__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 5, 12, .74);
+  backdrop-filter: blur(3px);
+}
+
+.dungeon-chooser__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 100%;
+  /*
+   * **枠はホームの金細工と同じ系統にする。**
+   *
+   * 前は紫紺のほぼ平らな板に細い金線が1本だけで、すぐ上の情報欄と
+   * 下のバー(どちらも金細工の枠)と並ぶと一段地味だった(目隠しの判定の指摘)。
+   * 下のバーの枠(`home-bottom-nav-frame-v5.webp`)と同じく、
+   * 隅に金の渦と青い宝石、辺は二重の金線、上下の中央に宝石を置く。
+   *
+   * バーの絵そのものは貼れない。隅を切り出すと中の城の絵が辺へ入り込む。
+   * だから同じ部品立てをSVGで描いて `border-image` で伸ばす
+   * (辺はまっすぐな線だけなので、伸ばしても歪まない)。
+   * **SVGに width/height を必ず書く。**無いと固有の大きさが無いものとして
+   * 枠の画像が箱いっぱいに引き伸ばされ、切り出す40pxが3倍の大きさで写る。
+   * 絵のファイルにしないのは、画像の目録の枚数を動かさないため。
+   */
+  border: 1px solid transparent;
+  border-image-source: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><defs><linearGradient id='b' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23e2f3ff'/><stop offset='.5' stop-color='%234d9bff'/><stop offset='1' stop-color='%23173a94'/></linearGradient><g id='c'><path d='M3 40V16L16 3H40' fill='none' stroke='%23c99a48' stroke-width='4.5'/><path d='M3 40V16L16 3H40' fill='none' stroke='%23fbe3a4' stroke-width='1.2'/><path d='M10 40V20L20 10H40' fill='none' stroke='%23a47a34' stroke-width='1.6'/><path d='M15 37C15 25 25 15 37 15' fill='none' stroke='%23d9ae5c' stroke-width='1.5'/><path d='M21 33C16 27 20 20 26 21C30 22 29 27 25 27' fill='none' stroke='%23e7c070' stroke-width='1.8' stroke-linecap='round'/><path d='M9.5 2L17 9.5L9.5 17L2 9.5Z' fill='url(%23b)' stroke='%23f3d488' stroke-width='1.4'/></g></defs><use href='%23c'/><use href='%23c' transform='matrix(-1 0 0 1 120 0)'/><use href='%23c' transform='matrix(1 0 0 -1 0 120)'/><use href='%23c' transform='matrix(-1 0 0 -1 120 120)'/><path d='M40 3H80M40 117H80M3 40V80M117 40V80' stroke='%23c99a48' stroke-width='4.5'/><path d='M40 3H80M40 117H80M3 40V80M117 40V80' stroke='%23fbe3a4' stroke-width='1.2'/><path d='M40 10H80M40 110H80M10 40V80M110 40V80' stroke='%23a47a34' stroke-width='1.6'/></svg>");
+  border-image-slice: 40;
+  border-image-width: 32px;
+  border-image-repeat: stretch;
+  border-radius: 10px;
+  /* 隅の飾り(32px角)と内側の金線(8px)に中身が触れない余白 */
+  padding: 28px 18px 22px;
+  background:
+    radial-gradient(110% 50% at 50% 0%, rgba(74, 128, 235, .24), transparent 70%),
+    linear-gradient(180deg, #0f1c44 0%, #0a1331 58%, #070c22 100%);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .6);
+  animation: dungeon-chooser-rise .18s ease-out;
+}
+
+/* 上下の中央の宝石。下のバーの上端の飾りと同じ形 */
+.dungeon-chooser__panel::before,
+.dungeon-chooser__panel::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 36px);
+  width: 72px;
+  height: 22px;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='72' height='22' viewBox='0 0 72 22'><defs><linearGradient id='b' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23e2f3ff'/><stop offset='.5' stop-color='%234d9bff'/><stop offset='1' stop-color='%23173a94'/></linearGradient></defs><path d='M4 11C14 11 17 5 25 7C29 8 29 13 25 13' fill='none' stroke='%23e7c070' stroke-width='1.8' stroke-linecap='round'/><path d='M68 11C58 11 55 5 47 7C43 8 43 13 47 13' fill='none' stroke='%23e7c070' stroke-width='1.8' stroke-linecap='round'/><path d='M36 1L46 11L36 21L26 11Z' fill='%23c99a48'/><path d='M36 4L43 11L36 18L29 11Z' fill='url(%23b)' stroke='%23fbe3a4' stroke-width='1'/></svg>") center / contain no-repeat;
+  pointer-events: none;
+}
+
+.dungeon-chooser__panel::before {
+  top: -10px;
+}
+
+.dungeon-chooser__panel::after {
+  bottom: -10px;
+}
+
+@keyframes dungeon-chooser-rise {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dungeon-chooser__panel { animation: none; }
+}
+
+.dungeon-chooser__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dungeon-chooser__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* 淡い灰色の小さな字は背景に沈んでいた(目隠しの判定の指摘)。11px以上・明るい金へ */
+.dungeon-chooser__title small {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .3em;
+  color: #e6c37a;
+}
+
+/* 見出しは他の画面の見出し帯(`screenHead.css`)と同じ金のグラデ */
+.dungeon-chooser__title h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: .12em;
+  background: var(--gold-grad, linear-gradient(180deg, #fff1c4, #e8b659));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8));
+}
+
+.dungeon-chooser .dungeon-chooser__close {
+  flex: none;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(226, 182, 110, .6);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(34, 36, 62, .95), rgba(14, 16, 32, .95));
+  box-shadow: inset 0 1px 0 rgba(255, 232, 190, .14);
+  color: #f5d48a;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.dungeon-chooser__close:active {
+  transform: scale(.97);
+}
+
+.dungeon-chooser__lead {
+  margin: -2px 2px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #dfe4f2;
+}
+
+/* 巻くのは一覧だけ。枠と見出しは止めたまま(宝石の飾りが一緒に流れない) */
+.dungeon-chooser__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 札の影と押した時の縮みが切れないだけの余白 */
+  margin: 0 -4px;
+  padding: 2px 4px 4px;
+}
+
+/* ---- 1件の札 ----------------------------------------------------------
+ *
+ * 札と「閉じる」は `.dungeon-chooser` の中に限って書く。`mobile-ux.css` の
+ * `.crimon-home button { min-height: 44px }` の方が詳細度で勝ち、
+ * 72px と書いた高さが 44px に負けていた(中身が高いので見た目は崩れなかった)。 */
+
+.dungeon-chooser .dungeon-chooser__card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 10px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 72px;
+  margin: 0;
+  padding: 8px 12px 8px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--tone), .5);
+  border-radius: 14px;
+  background:
+    linear-gradient(100deg, rgba(var(--tone), .30) 0%, rgba(var(--tone), .08) 46%, transparent 72%),
+    linear-gradient(180deg, #14204a, #0b1330);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 6px 16px rgba(0, 0, 0, .35);
+  color: #f5efe2;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 左端の色の帯。5つの系統を、絵を見なくても色で分けられるように */
+.dungeon-chooser__card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: rgb(var(--tone));
+  box-shadow: 0 0 10px rgba(var(--tone), .8);
+}
+
+.dungeon-chooser__card:active {
+  transform: scale(.985);
+  filter: brightness(1.12);
+}
+
+.dungeon-chooser__card:focus-visible {
+  outline: 2px solid #f4d18e;
+  outline-offset: 2px;
+}
+
+/* 系統の色。**基底の札に既定の色を書かない**(詳細度が上なので、ここを全部上書きしてしまう) */
+.dungeon-chooser__card--equip { --tone: 224, 85, 63; }
+.dungeon-chooser__card--train { --tone: 63, 207, 138; }
+.dungeon-chooser__card--gold { --tone: 240, 180, 60; }
+.dungeon-chooser__card--awakening { --tone: 154, 98, 255; }
+/* 遺跡は蒼。青緑だと育成の緑と色帯が近く、絵に頼って見分けていた(目隠しの判定の指摘) */
+.dungeon-chooser__card--ruins { --tone: 92, 150, 255; }
+
+.dungeon-chooser__art {
+  display: block;
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .55));
+}
+
+.dungeon-chooser__body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dungeon-chooser__name {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: .04em;
+  color: #fff6e2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dungeon-chooser__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
+.dungeon-chooser__yield {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border: 1px solid rgba(var(--tone), .55);
+  border-radius: 999px;
+  background: rgba(var(--tone), .16);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fff1d0;
+  white-space: nowrap;
+}
+
+.dungeon-chooser__yield small {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: rgb(var(--tone));
+  filter: brightness(1.35);
+}
+
+.dungeon-chooser__status {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #dde3f3;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 右の山括弧 */
+.dungeon-chooser__go {
+  justify-self: end;
+  width: 9px;
+  height: 9px;
+  border-top: 2px solid rgba(var(--tone), .95);
+  border-right: 2px solid rgba(var(--tone), .95);
+  transform: rotate(45deg);
+}
+
+/* 本日の回数を使い切った札。**押せる**(中で明日の分や詳細を見られる)ので消さず、色だけ落とす */
+.dungeon-chooser__card.is-spent .dungeon-chooser__art {
+  filter: grayscale(.7) brightness(.8) drop-shadow(0 3px 6px rgba(0, 0, 0, .55));
+}
+
+.dungeon-chooser__card.is-spent .dungeon-chooser__status {
+  color: #ffab98;
+}

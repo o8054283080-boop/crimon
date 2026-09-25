@@ -15,6 +15,7 @@ import { PvpArenaProps } from "./props.js";
 import { ARENA_TEAM_SIZE } from "../../../data/pvpArena.js";
 import { ARENA_WEEKLY_REWARDS, ARENA_SEASON_REWARDS, ARENA_SEASON_RANK_REWARDS, ArenaRewardBundle, arenaWeeklyReward, arenaSeasonReward, arenaSeasonRankReward } from "../../../data/arena/season.js";
 import { ARENA_TIERS } from "../../../data/arena/ranks.js";
+import { screenHeader } from "../managementHeader.js";
 
 
 function rewardText(reward: ArenaRewardBundle): string {
@@ -194,7 +195,7 @@ export function renderArenaTop(props: PvpArenaProps): HTMLElement {
   });
 
   return el("div", { className: "screen ar-screen" }, nodes([
-    el("header", { className: "app-header" }, [el("h1", {}, ["アリーナ"])]),
+    screenHeader("アリーナ"),
     props.notice ? el("p", { className: "panel ar-notice" }, [props.notice]) : null,
     renderStanding(view),
     renderTickets(props, view),

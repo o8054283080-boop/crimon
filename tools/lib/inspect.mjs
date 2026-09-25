@@ -121,7 +121,13 @@ export const INSPECT = `(() => {
         faceBottom = pr.bottom;
         break;
       }
-      return nr.top <= faceTop + 4 || nr.bottom >= faceBottom - 4;
+      /*
+       * 画面そのものの下端に貼る帯は、**下タブの上に載る**(bottom: 下タブ + 8px)。
+       * 画面の縁ではなく下タブの上端を縁として見る。見ないと、送れば出てくる的を
+       * 「押せない」と誤報する(交換所の実行バーで、見出しの高さが変わった時に出た)
+       */
+      if (nr.top <= faceTop + 4 || nr.bottom >= faceBottom - 4) return true;
+      return faceBottom === vh && nr.bottom >= navTop - 12;
     }
     return false;
   };
@@ -167,6 +173,14 @@ export const INSPECT = `(() => {
   const maxScroll = Math.max(0, scroller.scrollHeight - vh);
   for (const b of buttons) {
     if (b.closest('.bottom-nav') || b.closest('.dev-menu')) continue;
+    /*
+     * **畳んだ details の中身は見えていない。**Chromium は畳んだ中身を
+     * content-visibility: hidden で隠すだけなので、箱の位置は残っていて
+     * ここで拾ってしまう(試練の塔の未解放の節「96階」)。開けば出てくる物は、
+     * 開いた姿で検査する。畳んだままの見出し(summary)は見る
+     */
+    const folded = b.closest('details:not([open])');
+    if (folded && !b.closest('summary')) continue;
     if (!movesWithPage(b)) continue;
     const r = b.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
@@ -243,7 +257,7 @@ export const INSPECT = `(() => {
   }
 
   // 7. 見出しと重なっている要素(上帯の文字の重なりを何度も出しているため)
-  const header = document.querySelector('.app-header h1, .battle-topbar__title');
+  const header = document.querySelector('.screen-head__title, .app-header h1, .battle-topbar__title');
   if (header) {
     const hr = header.getBoundingClientRect();
     for (const el of document.querySelectorAll('.battle-logstrip, .shop-notice, .app-subtitle')) {

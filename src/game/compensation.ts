@@ -1,4 +1,4 @@
-import { PlayerState, addMonster } from "./playerState.js";
+import { PlayerState, addMonster, type SaveOrigin } from "./playerState.js";
 import {
   COLLAB_EVENT_FROM_DATE, COLLAB_EVENT_TO_DATE, COLLAB_GIFT_DEX_ID,
 } from "../data/collabEvent.js";
@@ -56,6 +56,75 @@ export interface Compensation {
 }
 
 export const COMPENSATIONS: Compensation[] = [
+  {
+    id: "2026-09-25-accessory-filter-bulk-sell",
+    title: "アクセサリーを絞り込んでまとめて売れるようにしました",
+    message: "アクセサリーの整理を、装備と同じようにできるようにしました。\n\n"
+      + "【装備画面の「アクセサリー」】\n"
+      + "・「絞り込み」を押すと、系統・レア度・★・メイン・特殊効果・装着・ロックで絞り込めます(特殊効果は系統を選ぶと出ます)\n"
+      + "・「まとめ売り」で、表示中のアクセサリーをまとめて選んで売却できます。ロック中・装着中のものは選べません\n\n"
+      + "【遺跡で手に入れた時】\n"
+      + "・周回の結果と1戦の結果に「今回獲得したアクセサリーを見る」を追加しました\n"
+      + "・今回手に入れたアクセサリーだけを並べて、絞り込み・ロック・まとめ売りができます",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
+    id: "2026-09-25-dungeon-chooser",
+    title: "ダンジョンの選択を見やすくしました",
+    message: "ホームの「ダンジョン」から開く行き先の選択を作り直しました。\n\n"
+      + "・装備ダンジョン・育成ダンジョン・ゴールドダンジョン・目覚の深域・遺跡の5つが、それぞれの絵と正式な名前で並びます\n"
+      + "・手に入るもの(装備・経験値・ゴールド・才能覚醒の素材・アクセサリー)と、本日の残り回数や踏破した階が一目で分かります\n"
+      + "・選択は画面の下から大きく開き、外側か「閉じる」を押すと閉じます。ホームのお知らせに重ならなくなりました",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
+    id: "2026-09-25-accessory-sell-price",
+    title: "★4・★5アクセサリーの売値を見直しました",
+    message: "アクセサリーを売った時に受け取れるゴールドを見直しました。\n\n"
+      + "・★4と★5のアクセサリーの売値を下げました(★6は変わりません)\n"
+      + "・強化に使ったゴールドの一部が売値に上乗せされる仕組みは、これまでどおりです",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
+    id: "2026-09-24-screen-header-unify",
+    title: "画面の見出しと「戻る」をそろえました",
+    message: "どの画面でも、同じ場所に同じ形で並ぶように整理しました。\n\n"
+      + "・画面のいちばん上に、左から「‹ 戻る」・画面の名前・残り回数や所持数を1本の帯で並べました。下へ巻いても帯は上に残ります\n"
+      + "・1つの画面に2つあった戻るボタン(「◀ 階層選択に戻る」「◀ 階層」など)を、左上の「戻る」1つにまとめました\n"
+      + "・下のメニューは、どの画面でもホームと同じデザインになりました。いま開いている画面のボタンは金の枠で囲まれます\n"
+      + "・初心者ミッションの題名が途中で切れないようにしました\n"
+      + "・遺跡の階の「挑戦する」ボタンを大きくしました",
+    kind: "UPDATE", fromDate: "2026-09-24", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
+    id: "2026-09-24-power-ruins-rebalance",
+    title: "力の遺跡4・5階を調整しました",
+    message: "力の遺跡4・5階で、どの敵から狙うかを選べるようにしました。\n\n"
+      + "・号令塔は、生きている間ずっと指揮兵器に「攻撃力UP・速さUP・受けるダメージ軽減」の護りを張ります。張り直しには時間がかかるので、**解除で剥がすと、次に張られるまで護りに穴が開きます**\n"
+      + "・解除を持つ編成は指揮兵器を、持たない編成は号令塔を先に狙うのがおすすめです\n"
+      + "・号令塔と妨害塔を硬くしました。指揮兵器だけを狙っても、塔が巻き添えで倒れにくくなっています\n"
+      + "・戦闘が長引くと、敵味方の与えるダメージが少しずつ増えるようにしました。決着がつかないまま時間切れになることがなくなります\n"
+      + "・4階の難しさを見直し、5階より挑みやすくしました",
+    kind: "UPDATE", fromDate: "2026-09-24", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
+    id: "2026-09-24-battle-target-select",
+    title: "戦闘で対象を選ぶ時の表示を見直しました",
+    message: "手動で戦う時に、スキルの対象を選びやすくしました。\n\n"
+      + "・対象を選んでいる間は、スキル欄の場所に「敵をタップ」「味方をタップ」の案内と、いま行動しているモンスターを表示します(戦場の上に札が浮かなくなりました)\n"
+      + "・敵のHPの札を押しても、そのモンスターを対象にできます\n"
+      + "・ボタンの上で指を離した時に、うっかり戦場のモンスターを選んでしまうことがなくなりました\n"
+      + "・勝敗が決まった時の帯が、画面の下端に詰まらないようにしました",
+    kind: "UPDATE", fromDate: "2026-09-24", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
+    id: "2026-09-24-home-notice-cards",
+    title: "ホームのお知らせの札を読みやすくしました",
+    message: "ホームに並ぶお知らせ・配布の札を整理しました。\n\n"
+      + "・「×」(閉じる)を札の右側の列に置き、本文と重ならないようにしました\n"
+      + "・はじめて遊ぶ方には、遊び始める前のお知らせを札にせず、これまでの配布は1件ずつではなく、まとめた札で表示します(受け取れる中身は変わりません)",
+    kind: "UPDATE", fromDate: "2026-09-24", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
   {
     id: "2026-09-24-gear-accessory-tab",
     title: "装備画面からアクセサリーを見られるようにしました",
@@ -1011,7 +1080,59 @@ export function pendingCompensations(state: PlayerState, now: Date = new Date())
   return COMPENSATIONS.filter((c) => isWithinPeriod(c, today) && !claimed.has(c.id));
 }
 
-export interface CompensationClaim { compensation: Compensation; }
+export interface CompensationClaim {
+  compensation: Compensation;
+  /**
+   * **始める前から出ていた配布。**受け取りは済ませるが、ホームの札には出さない。
+   * 付くのは {@link claimCompensations} を `firstLaunch` で呼んだ時だけ。
+   */
+  beforeStart?: boolean;
+}
+
+/**
+ * このセーブが**今日はじめて開かれたものか**。
+ *
+ * **保存データが最初から無かった**(`origin === "NEW"`)ことで決める。
+ * 出どころは `startupSaveOrigin()`(ページで最初にセーブを読んだ時の結果)を渡す。
+ *
+ * ## セーブの中身だけで決めない
+ *
+ * 前は「ログインボーナスを一度も受け取っていない」だけで見ていた。これだと
+ * **ログインボーナスが入る前のセーブを持ち、それ以来開いていない人**が、
+ * 久しぶりに開いた日に「はじめて」と誤判定され、お知らせが全部既読になり、
+ * 過去の更新も札に出なくなる。
+ *
+ * 壊れたセーブから作り直した人(`REBUILT`)も含めない。前から遊んでいた人なので、
+ * 誤って既読にするより、今までどおり全部見せる方が安全。
+ *
+ * ログインボーナスの条件は「かつ」で残す。同じページの中で2回目に聞かれても
+ * (受け取った後なら)偽になるように。**ログインボーナスより先に聞くこと。**
+ */
+export function isFirstLaunch(
+  state: Pick<PlayerState, "lastLoginBonusAt" | "loginBonusClaimCount">,
+  origin: SaveOrigin | null,
+): boolean {
+  return origin === "NEW" && state.lastLoginBonusAt === null && (state.loginBonusClaimCount ?? 0) === 0;
+}
+
+export interface ClaimCompensationsOptions {
+  /**
+   * 始めたばかりの人として受け取る。
+   *
+   * **始める前のアップデート履歴やお詫びを、その人に配らない。**
+   * 期間の長いお知らせが100件を超え、はじめて開いた人のホームが
+   * 「経験値バランス調整のお詫び」「ほかに119件」で埋まっていた。
+   * まだ遊んでいない人には、直した不具合も変わった仕様も関係が無い。
+   *
+   * - **モノの無いお知らせ**は、受け取り済みの印だけ付けて札にしない
+   *   (中身はホーム左の「お知らせ」から読める)
+   * - **モノの付いた配布は、今までどおり受け取る。**量は1つも変えない。
+   *   ここで配らないことにすると、始めた日によって手持ちが変わる。
+   *   それは画面の直しではなく配布の方針なので、ここでは決めない。
+   *   ただし札にはせず、`beforeStart` を付けて1行にまとめる
+   */
+  firstLaunch?: boolean;
+}
 
 export function compensationBannerLabel(claims: readonly CompensationClaim[]): string {
   const kinds = new Set(claims.map(({ compensation }) => compensation.kind ?? "APOLOGY"));
@@ -1034,8 +1155,10 @@ export function hasReward(compensation: Compensation): boolean {
 export interface HomeBannerSelection {
   /** ホームに札として出すもの */
   shown: CompensationClaim[];
-  /** 出さずに畳んだお知らせの件数 */
+  /** 出さずに畳んだお知らせの件数(始める前の配布は含まない) */
   hiddenCount: number;
+  /** 始める前から出ていて、受け取りだけ済ませた配布の件数 */
+  beforeStartCount: number;
 }
 
 /**
@@ -1077,21 +1200,29 @@ export const HOME_BANNER_LIMIT = 2;
  * 中身はホーム左の「お知らせ」から全部読める。
  */
 export function selectHomeBanners(claims: readonly CompensationClaim[]): HomeBannerSelection {
+  // 始める前の配布は札にしない。数だけ数えて1行にまとめる
+  const current = claims.filter((claim) => !claim.beforeStart);
+  const beforeStartCount = claims.length - current.length;
+
   // 並び順は当てにしない。日付の新しい順に見て、先頭を「最新」とする
   const byNewest = (a: CompensationClaim, b: CompensationClaim) =>
     b.compensation.fromDate.localeCompare(a.compensation.fromDate);
-  const plain = claims.filter(({ compensation }) => !hasReward(compensation)).sort(byNewest);
-  const gifts = claims.filter(({ compensation }) => hasReward(compensation)).sort(byNewest);
+  const plain = current.filter(({ compensation }) => !hasReward(compensation)).sort(byNewest);
+  const gifts = current.filter(({ compensation }) => hasReward(compensation)).sort(byNewest);
 
   const keep = new Set(plain.slice(0, 1).map(({ compensation }) => compensation.id));
   for (const { compensation } of gifts.slice(0, HOME_BANNER_LIMIT - keep.size)) keep.add(compensation.id);
 
   // 出す順は元の並びのまま。日付順に並べ替えると、見出しの位置が動いて読みにくい
-  const shown = claims.filter(({ compensation }) => keep.has(compensation.id));
-  return { shown, hiddenCount: claims.length - shown.length };
+  const shown = current.filter(({ compensation }) => keep.has(compensation.id));
+  return { shown, hiddenCount: current.length - shown.length, beforeStartCount };
 }
 
-export function claimCompensations(state: PlayerState, now: Date = new Date()): CompensationClaim[] {
+export function claimCompensations(
+  state: PlayerState,
+  now: Date = new Date(),
+  options: ClaimCompensationsOptions = {},
+): CompensationClaim[] {
   const claims: CompensationClaim[] = [];
   for (const compensation of pendingCompensations(state, now)) {
     state.crystal += compensation.crystal;
@@ -1112,7 +1243,12 @@ export function claimCompensations(state: PlayerState, now: Date = new Date()): 
      */
     for (const gift of compensation.monsters ?? []) addMonster(state, gift.dexId, gift.star);
     state.claimedCompensationIds.push(compensation.id);
-    claims.push({ compensation });
+    if (!options.firstLaunch) {
+      claims.push({ compensation });
+      continue;
+    }
+    // 始めたばかりの人: モノの無いお知らせは印だけ。モノの付いた配布は1行へまとめる
+    if (hasReward(compensation)) claims.push({ compensation, beforeStart: true });
   }
   return claims;
 }

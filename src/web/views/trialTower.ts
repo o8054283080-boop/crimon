@@ -25,6 +25,7 @@ import {
 import { TrialTowerRankingEntry } from "../../net/trialTowerSync.js";
 import { el } from "../dom.js";
 import { withPortrait } from "../three/portrait.js";
+import { screenHeader } from "./managementHeader.js";
 
 /**
  * 試練の塔の画面。
@@ -873,10 +874,7 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
   const floor = findTowerFloor(props.nextFloor);
 
   return el("div", { className: "screen tower-screen" }, nodes([
-    el("header", { className: "app-header app-header--row" }, [
-      el("h1", {}, [`試練の塔 ${props.mode}`]),
-      el("span", { className: "head-note" }, [`⚡${props.player.stamina}/${props.player.maxStamina}`]),
-    ]),
+    screenHeader(`試練の塔 ${props.mode}`, { meta: `⚡${props.player.stamina}/${props.player.maxStamina}` }),
     el("div", { className: "tower-mode-tabs", role: "tablist", "aria-label": "試練の塔の難易度" }, [
       el("button", {
         type: "button", role: "tab", className: `tower-mode-tab${props.mode === "NORMAL" ? " is-active" : ""}`,
@@ -917,7 +915,6 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
           ["登坂をやめる(節から登り直しになります)"],
         )
       : null,
-    el("button", { type: "button", className: "btn btn--ghost btn--large", onclick: props.onBack }, ["◀ 戻る"]),
     props.panel === "ENEMY_INFO" ? renderEnemyInfoModal(props) : null,
     props.panel === "RANKING" ? renderRankingModal(props) : null,
     props.panel === "REWARDS" ? renderRewardsModal(props) : null,

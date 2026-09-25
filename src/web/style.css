@@ -165,65 +165,14 @@ body {
   background: linear-gradient(90deg, transparent, rgba(255, 205, 100, 0.75), transparent);
 }
 
-/* 管理画面の出口。screen 自体の再描画方式には触れず、見出しだけを通常フロー内で固定する。 */
-.management-header {
-  position: sticky;
-  top: 0;
-  z-index: 24;
-  min-height: 48px;
-  margin: calc(-1 * max(16px, env(safe-area-inset-top))) -16px 0;
-  padding: max(8px, env(safe-area-inset-top)) 12px 8px;
-  display: grid;
-  grid-template-columns: minmax(78px, auto) minmax(0, 1fr) minmax(58px, auto);
-  align-items: center;
-  gap: 8px;
-  background: linear-gradient(180deg, rgba(12, 16, 34, 0.98), rgba(7, 10, 23, 0.94));
-  border-bottom: 1px solid rgba(226, 182, 110, 0.35);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(12px);
-}
-
-.management-header__back {
-  appearance: none;
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 5px;
-  padding: 5px 8px;
-  border: 0;
-  border-radius: 10px;
-  color: #f5d48a;
-  background: rgba(255, 210, 120, 0.08);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.management-header__title {
-  margin: 0;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 1rem;
-  color: #fff3c5;
-}
-
-.management-header__meta {
-  overflow: hidden;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.68rem;
-  color: var(--text-dim);
-}
-
-/* 編成の駒は一覧をスクロールしても残す。safe-area は screen 上端の余白が担う。 */
+/*
+ * 編成の駒。**貼り付かせない(流れの中に置く)。**
+ * 前は `sticky` + `top` を書いていたが、後から読まれる `.panel` の
+ * `position: relative` に上書きされて貼り付きは一度も効いておらず、
+ * `top` のぶんだけ札が下へずれて「所持モンスター」の見出しを覆っていた。
+ */
 .party-current {
-  position: sticky;
-  top: max(8px, env(safe-area-inset-top));
-  z-index: 18;
+  z-index: 1;
   background: linear-gradient(180deg, rgba(20, 24, 46, 0.98), rgba(9, 13, 29, 0.96));
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42), var(--edge-line);
 }
@@ -637,6 +586,8 @@ body {
  */
 
 .screen.battle-view {
+  /* 下の safe-area。確認用ブラウザでは0なので、ここへ34pxを入れて実機を再現する */
+  --battle-safe-bottom: env(safe-area-inset-bottom, 0px);
   height: 100dvh;
   min-height: 0;
   max-width: none;
@@ -715,7 +666,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 14px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+  padding: 14px max(10px, env(safe-area-inset-right)) max(8px, var(--battle-safe-bottom, 0px))
     max(10px, env(safe-area-inset-left));
   background: linear-gradient(0deg, rgba(4, 6, 14, 0.82), transparent);
   pointer-events: none;
@@ -869,71 +820,7 @@ body {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
 
-/* 対象選択は戦場の上に浮かせる */
-.battle-view .action-panel-slot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 108px;
-  z-index: 7;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.battle-view .action-panel-slot:empty {
-  display: none;
-}
-
-/* 対象選び: 一覧ではなく「今選ばれている相手」だけを出す */
-.action-panel__hint {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  text-align: center;
-}
-
-.action-panel__chosen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-weight: 800;
-  background: rgba(255, 90, 74, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(255, 120, 100, 0.5);
-}
-
-.action-panel__chosen-hp {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text-dim);
-}
-
-.action-panel__row {
-  display: flex;
-  gap: 8px;
-}
-
-.action-panel__row .btn {
-  flex: 1;
-  /* 「スキル選び直し」が途中で折り返して読みにくくなるのを防ぐ */
-  white-space: nowrap;
-  min-height: 40px;
-  padding: 8px 12px;
-}
-
-/* 対象選びの札は、選んだ相手を隠さないよう幅を詰める */
-.battle-view .action-panel--target {
-  max-width: min(360px, 88vw);
-  gap: 6px;
-  padding: 10px 12px;
-}
-
-.battle-view .action-panel {
-  pointer-events: auto;
-  max-width: min(560px, 94vw);
-}
+/* 対象選びはスキルドックの中身と入れ替える(src/web/ui/battleActionPanel.css) */
 
 /*
  * 3Dの舞台。位置の基準をここに置くことが必須。
@@ -7966,71 +7853,8 @@ body::before {
 .equip-picker-card__delta { padding:4px 6px; border-radius:7px; background:rgba(7,11,24,.8); }
 .equip-picker-card__delta.is-up { color:#82e6a5; } .equip-picker-card__delta.is-down { color:#ff9c9c; }
 
-/* ------------------------------------------------------ 共通の「戻る」
-
-   画面のどこを巻いていても左上に残る。**浮かせた部品は下の何かを覆う**
-   ので、`body.has-global-back` の時だけ画面の中身へ逃げ場を空けている
-   (この案件では覆って押せなくする事故を3回出している)。 */
-/*
- * ボタンの上端を**変数で1か所に持つ**。逃げ場の計算と別々に書いていたせいで
- * 実機だけズレた(下の `body.has-global-back .screen` の注記)。
- */
-:root {
-  --global-back-h: 42px;
-  --global-back-top: calc(max(6px, env(safe-area-inset-top)) + 4px);
-}
-
-.global-back {
-  position: fixed;
-  top: var(--global-back-top);
-  left: calc(max(8px, env(safe-area-inset-left)) + 4px);
-  z-index: 60;
-  appearance: none;
-  min-height: var(--global-back-h);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 46vw;
-  padding: 6px 12px 6px 9px;
-  border: 1px solid rgba(226, 182, 110, 0.45);
-  border-radius: 999px;
-  color: #f5d48a;
-  background: linear-gradient(180deg, rgba(14, 18, 38, 0.96), rgba(7, 10, 23, 0.94));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(10px);
-  font: inherit;
-  /* 9px未満は実機で読めない(tests/cssReadability.test.ts が見張っている) */
-  font-size: 0.76rem;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.global-back:active { transform: translateY(1px); }
-
-.global-back__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/*
- * 中身を押し下げて、ボタンの下に隠れるものを作らない。
- *
- * **ここは実機だけで壊れていた。** 元は `calc(var(--global-back-h) + 10px)`、
- * つまり52pxしか空けていなかった。`.screen` の素の上余白は
- * `max(16px, env(safe-area-inset-top))` なので、この指定は
- * **ノッチぶんの余白を上書きして消してしまう**。
- * iPhoneでは inset が約59pxあり、ボタンの下端は 59+4+42=105px。
- * 逃げ場52pxとの差ぶん、自動周回の帯の左上に「戻る」が乗っていた。
- * 画面の枠が0だけの環境(巡回のChromium)では inset が0なので再現しない。
- *
- * ボタンの上端と同じ変数から積み上げて、二度とズレないようにする。
- */
-body.has-global-back .screen {
-  padding-top: calc(var(--global-back-top) + var(--global-back-h) + 10px);
-}
+/* 共通の「戻る」は見出し帯の中へ移した(ui/screenHead.css)。
+   ここにあった `position: fixed` の浮いた戻るは、巻くと案内帯の上に乗っていた。 */
 
 /* ------------------------------------------------------ 下に貼り付く実行バー
 

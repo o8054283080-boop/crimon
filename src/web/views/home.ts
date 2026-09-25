@@ -1,6 +1,14 @@
+import "../ui/dungeonChooser.css";
 import { MAX_FIGHTER_LEVEL, requiredExpForFighterLevel } from "../../core/fighterLevel.js";
+import { BEAST_DUNGEON_FLOORS, EQUIPMENT_DUNGEON_FLOORS } from "../../data/equipmentDungeon.js";
+import { GOLD_DUNGEON_DAILY_LIMIT } from "../../data/goldDungeon.js";
+import { LEVEL_DUNGEON_DAILY_LIMIT } from "../../data/levelDungeon.js";
+import { AWAKENING_DEPTH_FLOOR_COUNT } from "../../data/awakeningDepths.js";
+import { RUIN_FLOOR_COUNT } from "../../data/ruins.js";
 import {
   getParty,
+  goldDungeonChallengesRemaining,
+  levelDungeonChallengesRemaining,
   LoginBonusResult,
   LOGIN_BONUS_MILESTONE_INTERVAL_DAYS,
   PlayerState,
@@ -108,6 +116,67 @@ export function dungeonActions(
   props: Pick<HomeProps, "onGoEquipDungeon" | "onGoLevelDungeon" | "onGoGoldDungeon" | "onGoAwakeningDepth">,
 ): readonly (() => void)[] {
   return [props.onGoEquipDungeon, props.onGoLevelDungeon, props.onGoGoldDungeon, props.onGoAwakeningDepth];
+}
+
+/** ダンジョンの選択に並べる1件。**絵と押した時の行き先は描画側で付ける** */
+export interface DungeonChooserEntry {
+  /** 巡回(tools/tour.mjs)の目印 `tile:<mark>`。**変えると巡回が中へ入れなくなる** */
+  mark: "equipDungeon" | "trainDungeon" | "goldDungeon" | "awakeningDepth" | "ruins";
+  /** 絵と色の系統。5つとも別にする(前は目覚=育成、遺跡=装備の使い回しだった) */
+  tone: "equip" | "train" | "gold" | "awakening" | "ruins";
+  name: string;
+  /** そこで手に入るもの */
+  yields: string;
+  /** 回数か踏破の状況。**確率は書かない** */
+  status: string;
+  /** 本日の回数を使い切った(押せるが、色を落とす) */
+  spent: boolean;
+}
+
+const maxFloor = (floors: readonly number[] | undefined): number => (floors ?? []).reduce((a, b) => Math.max(a, b), 0);
+
+/**
+ * ダンジョンの選択に並べる中身。
+ *
+ * **正式な名前と、何が手に入るかを必ず書く。**前は「目覚」「遺跡」と略称だけで、
+ * 何を取りに行く場所なのかが画面から分からなかった。
+ * 曜日の縛りはどこにも無い(`data/ruins.ts`)ので、代わりに
+ * 1日の回数(育成・ゴールド)か踏破の階(装備・目覚・遺跡)を添える。
+ */
+export function dungeonChooserEntries(player: PlayerState, hasRuins: boolean, now: number = Date.now()): DungeonChooserEntry[] {
+  const equipTotal = Math.max(EQUIPMENT_DUNGEON_FLOORS.length, BEAST_DUNGEON_FLOORS.length);
+  const equipBest = Math.max(maxFloor(player.clearedDungeonFloors), maxFloor(player.clearedBeastDungeonFloors));
+  const levelLeft = levelDungeonChallengesRemaining(player, now);
+  const goldLeft = goldDungeonChallengesRemaining(player, now);
+  const powerRuin = new Set(player.clearedPowerRuinFloors ?? []).size;
+  const guardianRuin = new Set(player.clearedGuardianRuinFloors ?? []).size;
+  const entries: DungeonChooserEntry[] = [
+    {
+      mark: "equipDungeon", tone: "equip", name: "装備ダンジョン", yields: "装備",
+      status: `踏破 ${Math.min(equipBest, equipTotal)}/${equipTotal}階`, spent: false,
+    },
+    {
+      mark: "trainDungeon", tone: "train", name: "育成ダンジョン", yields: "経験値",
+      status: `本日 残り${levelLeft}/${LEVEL_DUNGEON_DAILY_LIMIT}回`, spent: levelLeft === 0,
+    },
+    {
+      mark: "goldDungeon", tone: "gold", name: "ゴールドダンジョン", yields: "ゴールド",
+      status: `本日 残り${goldLeft}/${GOLD_DUNGEON_DAILY_LIMIT}回`, spent: goldLeft === 0,
+    },
+    {
+      mark: "awakeningDepth", tone: "awakening", name: "目覚の深域", yields: "才能覚醒の素材",
+      status: `踏破 ${Math.min(maxFloor(player.clearedAwakeningDepthFloors), AWAKENING_DEPTH_FLOOR_COUNT)}/${AWAKENING_DEPTH_FLOOR_COUNT}階`,
+      spent: false,
+    },
+  ];
+  if (hasRuins) {
+    entries.push({
+      mark: "ruins", tone: "ruins", name: "遺跡", yields: "アクセサリー",
+      // 力と守護の2か所を合わせて数える(並べて書くと375px幅で折れ、この札だけ背が伸びた)
+      status: `踏破 ${powerRuin + guardianRuin}/${RUIN_FLOOR_COUNT * 2}階`, spent: false,
+    });
+  }
+  return entries;
 }
 
 export function tutorialMissionActions(
@@ -258,6 +327,29 @@ function renderCompensationBanners(claims: CompensationClaim[], onDismiss: () =>
       el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
     ]);
   });
+  /*
+   * 始めたばかりの人が、始める前から出ていた配布を受け取った時の札。
+   *
+   * 1件ずつ札にすると、はじめて開いた画面の1枚目が
+   * 「経験値バランス調整のお詫び」になっていた。その人は何も迷惑を被っていない。
+   * だから**「お詫び」とは書かず、件数だけを1枚にまとめる。**
+   * 受け取ったこと自体は伝える(ダイヤが最初から多い理由が分からなくなる)。
+   *
+   * 1行の案内ではなく札にするのは、**閉じられるようにするため。**
+   * 「ほかにN件」の行は配布の札の閉じると一緒に消えるが、
+   * ここには他の札が無いので、行のままだと二度と消せない。
+   */
+  const { beforeStartCount } = selectHomeBanners(claims);
+  if (beforeStartCount > 0) {
+    banners.push(el("section", { className: "panel reward-banner compensation compensation--before-start" }, [
+      rewardSeal("scroll"),
+      el("div", { className: "reward-banner__body" }, [
+        el("p", { className: "reward-banner__label" }, ["これまでの配布"]),
+        el("p", { className: "compensation__message" }, [`${beforeStartCount}件ぶんも受け取りました`]),
+      ]),
+      el("button", { type: "button", className: "btn btn--ghost reward-banner__close", onclick: onDismiss }, ["閉じる"]),
+    ]));
+  }
   return banners;
 }
 
@@ -360,7 +452,9 @@ function renderHiddenNoticeLine(claims: CompensationClaim[]): HTMLElement | null
   const { hiddenCount } = selectHomeBanners(claims);
   if (hiddenCount === 0) return null;
   return el("p", { className: "reward-banner-stack__rest" }, [
-    `ほかに${hiddenCount}件のお知らせがあります（配布は受け取り済み。左の「お知らせ」から読めます）`,
+    // **2行に収まる長さにする。**札の列は198pxしかなく、前の文は3行になって
+    // 肝心の「左の『お知らせ』から」が省略記号の向こうへ消えていた
+    `ほかに${hiddenCount}件のお知らせがあります（受け取り済み。左の「お知らせ」で読めます）`,
   ]);
 }
 
@@ -794,25 +888,71 @@ export function renderHome(props: HomeProps): HTMLElement {
       el("img", { src: homeAsset(asset), alt: "", "aria-hidden": "true" }, []),
       el("span", {}, [el("strong", {}, [label]), detail ? el("small", {}, [detail]) : null].filter((node): node is HTMLElement => node !== null)),
     ]);
-  const dungeonChooser = el("div", { className: "crimon-dungeon-chooser", hidden: true, ariaLabel: "ダンジョンを選択" }, [
-    el("button", { type: "button", "data-tour": "tile:equipDungeon", onclick: onGoEquipDungeon }, [icon("equipDungeon"), el("span", {}, ["装備"])]),
-    el("button", { type: "button", "data-tour": "tile:trainDungeon", onclick: onGoLevelDungeon }, [icon("trainDungeon"), el("span", {}, ["育成"])]),
-    el("button", { type: "button", "data-tour": "tile:goldDungeon", onclick: onGoGoldDungeon }, [icon("goldDungeon"), el("span", {}, ["ゴールド"])]),
-    /*
-     * 目覚の深域。**才能覚醒の素材を集める場所。**
-     * ここに置くのは、装備・育成・ゴールドと同じ「素材を取りに行く場所」だから。
-     * 才能覚醒そのものはモンスターの詳細から開く。
-     */
-    el("button", { type: "button", "data-tour": "tile:awakeningDepth", onclick: onGoAwakeningDepth }, [icon("trainDungeon"), el("span", {}, ["目覚"])]),
-    /*
-     * 力の遺跡・守護の遺跡。**アクセサリーを取りに行く場所。**
-     * 素材の場所なので、装備・育成・ゴールド・目覚と同じ並びに置く。
-     */
-    props.onGoRuins
-      ? el("button", { type: "button", "data-tour": "tile:ruins", onclick: props.onGoRuins }, [icon("equipDungeon"), el("span", {}, ["遺跡"])])
-      : null,
-  ].filter((n) => n !== null) as HTMLElement[]);
-  const toggleDungeonChooser = () => { dungeonChooser.hidden = !dungeonChooser.hidden; };
+  /*
+   * ダンジョンの選択。**背景を暗くしたシートで出す。**
+   *
+   * 前は世界の中に `position:absolute` の小窓を浮かせていて、
+   * - お知らせの札の上に乗って札を覆っていた(浮かせた部品は必ず下の何かを覆う)
+   * - 3列の格子に5つなので下の段が欠け、幅142pxに押し込んだ「ゴールド」が2行に折れた
+   * - 名前は「目覚」「遺跡」と略称だけで、何が手に入るかが書かれていなかった
+   * - 絵は目覚=育成、遺跡=装備の使い回しで、見分けられなかった
+   *
+   * 設定・スタミナと同じく**閉じるまで背面を触らせない**ので、そう名乗らせる
+   * (`role="dialog"` と `aria-modal`。巡回はこの印で「裏が押せないのは正しい」と見分ける)。
+   *
+   * 目覚の深域は才能覚醒の素材、遺跡(力・守護)はアクセサリーを取りに行く場所。
+   * どちらも装備・育成・ゴールドと同じ「素材を取りに行く場所」なので、同じ並びに置く。
+   */
+  const dungeonArt: Record<DungeonChooserEntry["tone"], string> = {
+    equip: new URL("../assets/home/dungeon-equip.svg", import.meta.url).href,
+    train: new URL("../assets/home/dungeon-train.svg", import.meta.url).href,
+    gold: new URL("../assets/home/dungeon-gold.svg", import.meta.url).href,
+    awakening: new URL("../assets/home/dungeon-awakening.svg", import.meta.url).href,
+    ruins: new URL("../assets/home/dungeon-ruins.svg", import.meta.url).href,
+  };
+  const dungeonGo: Record<DungeonChooserEntry["mark"], (() => void) | undefined> = {
+    equipDungeon: onGoEquipDungeon,
+    trainDungeon: onGoLevelDungeon,
+    goldDungeon: onGoGoldDungeon,
+    awakeningDepth: onGoAwakeningDepth,
+    ruins: props.onGoRuins,
+  };
+  const dungeonChooser = el("div", {
+    className: "dungeon-chooser", role: "dialog", "aria-modal": "true", "aria-labelledby": "dungeon-chooser-title", hidden: true,
+  }, []);
+  const closeDungeonChooser = () => { dungeonChooser.hidden = true; };
+  dungeonChooser.append(
+    el("div", { className: "dungeon-chooser__scrim", onclick: closeDungeonChooser }, []),
+    el("section", { className: "dungeon-chooser__panel" }, [
+      el("header", { className: "dungeon-chooser__head" }, [
+        el("div", { className: "dungeon-chooser__title" }, [
+          el("small", {}, ["DUNGEON"]),
+          el("h2", { id: "dungeon-chooser-title" }, ["ダンジョン"]),
+        ]),
+        el("button", { type: "button", className: "dungeon-chooser__close", onclick: closeDungeonChooser }, ["閉じる"]),
+      ]),
+      el("p", { className: "dungeon-chooser__lead" }, ["強くするための装備や素材を集める場所です。"]),
+      el("div", { className: "dungeon-chooser__list" }, dungeonChooserEntries(player, Boolean(props.onGoRuins)).map((entry) =>
+        el("button", {
+          type: "button",
+          className: `dungeon-chooser__card dungeon-chooser__card--${entry.tone}${entry.spent ? " is-spent" : ""}`,
+          "data-tour": `tile:${entry.mark}`,
+          onclick: dungeonGo[entry.mark],
+        }, [
+          el("img", { className: "dungeon-chooser__art", src: dungeonArt[entry.tone], alt: "", "aria-hidden": "true" }, []),
+          el("span", { className: "dungeon-chooser__body" }, [
+            el("strong", { className: "dungeon-chooser__name" }, [entry.name]),
+            el("span", { className: "dungeon-chooser__meta" }, [
+              el("span", { className: "dungeon-chooser__yield" }, [el("small", {}, ["入手"]), entry.yields]),
+              el("span", { className: "dungeon-chooser__status" }, [entry.status]),
+            ]),
+          ]),
+          el("span", { className: "dungeon-chooser__go", "aria-hidden": "true" }, []),
+        ]),
+      )),
+    ]),
+  );
+  const openDungeonChooser = () => { dungeonChooser.hidden = false; };
   const rewardText = (mission: (typeof TUTORIAL_MISSIONS)[number]): string => [
     mission.reward.gold ? `🪙 ${mission.reward.gold.toLocaleString()}` : null,
     mission.reward.crystal ? `💎 ${mission.reward.crystal}` : null,
@@ -1032,11 +1172,10 @@ export function renderHome(props: HomeProps): HTMLElement {
         el("div", { className: "world-party", ariaLabel: "現在のパーティ" }, partyFigures),
         el("div", { className: "world-actions world-actions--right" }, [
           worldButton("right", "activity-adventure", "冒険", props.onGoStages),
-          worldButton("right", "activity-dungeon", "ダンジョン", toggleDungeonChooser),
+          worldButton("right", "activity-dungeon", "ダンジョン", openDungeonChooser),
           worldButton("right", "activity-arena", "闘技場", onGoArena),
           worldButton("right", "activity-tower", "試練の塔", props.onGoTrialTower, `最高 ${tower.bestFloor}F`),
         ]),
-        dungeonChooser,
         el("div", { className: "world-foreground", "aria-hidden": "true" }, [
           el("span", { className: "world-foreground__spire world-foreground__spire--left" }, []),
           el("span", { className: "world-foreground__spire world-foreground__spire--right" }, []),
@@ -1044,6 +1183,8 @@ export function renderHome(props: HomeProps): HTMLElement {
       ].filter((node): node is NonNullable<typeof node> => node !== null)),
       staminaSheet,
       settingsSheet,
+      // 世界の中に置かない。世界の `overflow:hidden` と重なり順に巻き込まれる
+      dungeonChooser,
     ].filter((node): node is HTMLElement => node !== null));
   /*
    * **札の高さはもう申告しない。**

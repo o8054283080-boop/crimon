@@ -29,6 +29,8 @@ body:has(.crimon-home) {
   --home-safe-top: env(safe-area-inset-top);
   --home-safe-bottom: env(safe-area-inset-bottom);
   --bottom-nav-h: calc(var(--home-nav-base-h) + var(--home-safe-bottom));
+  /* 上の高さに safe-area が入っているので、バーの側では足さない */
+  --bottom-nav-safe: 0px;
   background: var(--home-navy-950) !important;
 }
 
@@ -255,24 +257,44 @@ body:has(.crimon-home) {
    幅が足りない時は crimon-visual-system.css 側の省略記号で畳まれる */
 .crimon-home .reward-banner .compensation__title { font-size: 11px !important; color: var(--home-gold-bright) !important; }
 
-/* HOMEにいる時だけ下部ナビを濃紺＋金にする。他画面の導線へは影響させない。 */
-body:has(.crimon-home) .bottom-nav,
-body:has(.crimon-home) .crimon-bottom-nav {
-  height: var(--bottom-nav-h) !important;
+/*
+ * 下のバー。**どの画面でもホームと同じ金の装飾の絵にする。**
+ *
+ * 前はホームにいる時だけこの絵で、他の画面は線画のアイコンの帯だった。
+ * 下のタブを押して画面を移るたびに、バーそのものが別の物に入れ替わり、
+ * 1つのアプリに見えなかった(U8)。5マスとも同じ並び・同じ絵を使う。
+ *
+ * 高さはホーム以外では `--bottom-nav-h`(64px)+ 下の safe-area。
+ * 絵は `100% 100%` で敷くので、高さが違っても仕切りの位置は同じ割合に残る。
+ */
+body .bottom-nav,
+body .crimon-bottom-nav {
+  /* ホームの `--bottom-nav-h` は safe-area 込み、他の画面は抜き。足りない方だけ足す */
+  height: calc(var(--bottom-nav-h) + var(--bottom-nav-safe, env(safe-area-inset-bottom, 0px))) !important;
+  min-height: 0 !important;
   box-sizing: border-box !important;
   align-items: stretch !important;
   gap: 0 !important;
-  padding: 0 !important;
+  /* ボタンは safe-area の上で終わる(ホームは下の指定で最低6pxを持つ) */
+  padding: 0 0 var(--nav-safe) !important;
   border: 0 !important;
-  background: url("./assets/home/home-bottom-nav-frame-v5.webp") center / 100% 100% no-repeat !important;
+  /*
+   * **絵は safe-area を除いた上の部分だけに敷く。**全体へ引き伸ばすと、実機の下34px
+   * のぶん絵の中の意匠が縦に伸び、下から safe-area ぶん上げた文字が
+   * 意匠の上に乗って読めなかった。下の帯(ホームインジケーターの居場所)は無地。
+   */
+  --nav-safe: var(--home-safe-bottom, env(safe-area-inset-bottom, 0px));
+  background:
+    url("./assets/home/home-bottom-nav-frame-v5.webp") center top / 100% calc(100% - var(--nav-safe)) no-repeat,
+    linear-gradient(180deg, #0b1122, #04060c) !important;
   box-shadow: 0 -5px 17px rgba(1, 12, 29, .36) !important;
 }
 
-body:has(.crimon-home) .bottom-nav::before,
-body:has(.crimon-home) .bottom-nav::after { display: none !important; }
+body .bottom-nav::before,
+body .bottom-nav::after { display: none !important; }
 
-body:has(.crimon-home) .bottom-nav__btn,
-body:has(.crimon-home) .crimon-bottom-nav button {
+body .bottom-nav__btn,
+body .crimon-bottom-nav button {
   position: relative !important;
   display: flex !important;
   flex: 1 1 0 !important;
@@ -290,8 +312,8 @@ body:has(.crimon-home) .crimon-bottom-nav button {
   box-shadow: none !important;
 }
 
-body:has(.crimon-home) .bottom-nav__btn + .bottom-nav__btn,
-body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 0 !important; }
+body .bottom-nav__btn + .bottom-nav__btn,
+body .crimon-bottom-nav button + button { margin-left: 0 !important; }
 
 /* 下の帯の5マスは**等分ではない。**
  *
@@ -305,28 +327,28 @@ body:has(.crimon-home) .crimon-bottom-nav button + button { margin-left: 0 !impo
  * 文字だけを動かすのではなく、**ボタンの幅を仕切りに合わせる。**
  * 文字は中央揃えのままで絵と揃い、押せる範囲もマスと一致する。
  * (絵の中の意匠の重心も測ってあり、マスの中心と±0.35%で一致している) */
-body:has(.crimon-home) .bottom-nav__btn:nth-child(1) { flex: 0 0 21.1% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(2) { flex: 0 0 19.1% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(3) { flex: 0 0 19.1% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(4) { flex: 0 0 19.0% !important; }
-body:has(.crimon-home) .bottom-nav__btn:nth-child(5) { flex: 0 0 21.7% !important; }
+body .bottom-nav__btn:nth-child(1) { flex: 0 0 21.1% !important; }
+body .bottom-nav__btn:nth-child(2) { flex: 0 0 19.1% !important; }
+body .bottom-nav__btn:nth-child(3) { flex: 0 0 19.1% !important; }
+body .bottom-nav__btn:nth-child(4) { flex: 0 0 19.0% !important; }
+body .bottom-nav__btn:nth-child(5) { flex: 0 0 21.7% !important; }
 
 /* 左端のマスだけは、絵の仕切りの外に外枠の縁(0.9%)がある。
  * ボタンを画面の左端から始めるぶん中心が0.45%左へ寄るので、
  * 文字だけをその半分ぶん右へ戻す(実測 -1.8px → -0.1px)。 */
-body:has(.crimon-home) .bottom-nav__btn:nth-child(1) .bottom-nav__label {
+body .bottom-nav__btn:nth-child(1) .bottom-nav__label {
   padding-left: 4.3% !important;
 }
 
-body:has(.crimon-home) .bottom-nav__icon {
+body .bottom-nav__icon {
   /* 画像側の大きなシンボルを使う。HTMLアイコンは二重表示しない。 */
   display: none !important;
 }
 
-body:has(.crimon-home) .bottom-nav__label {
+body .bottom-nav__label {
   position: absolute !important;
   right: 2px !important;
-  bottom: calc(7px + var(--home-safe-bottom)) !important;
+  bottom: 7px !important;
   left: 2px !important;
   display: block !important;
   min-height: 0 !important;
@@ -339,8 +361,8 @@ body:has(.crimon-home) .bottom-nav__label {
   text-shadow: 0 1px 3px #000, 0 0 5px #000 !important;
 }
 
-body:has(.crimon-home) .bottom-nav__btn--active,
-body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
+body .bottom-nav__btn--active,
+body .bottom-nav button[aria-current="page"] {
   color: var(--home-gold-bright) !important;
   text-shadow: 0 0 9px rgba(105,215,255,.65) !important;
   background: transparent !important;
@@ -348,7 +370,38 @@ body:has(.crimon-home) .bottom-nav button[aria-current="page"] {
   box-shadow: none !important;
 }
 
-body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !important; }
+body .bottom-nav__btn--active::before { display: none !important; }
+
+/*
+ * **今いるタブに印を付ける。**金の絵の上では文字の色が変わるだけで、
+ * モンスター画面にいても「モンスター」が選ばれて見えなかった
+ * (前の簡素なバーは枠で囲んでいた)。マスの内側に金の枠と下からの光を置く。
+ * 押すのを邪魔しない(描くだけ)。
+ */
+body .bottom-nav__btn--active::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 9%;
+  right: 7%;
+  bottom: 3px;
+  left: 7%;
+  border: 1.5px solid rgba(255, 220, 140, .92);
+  border-radius: 11px;
+  pointer-events: none;
+  background: radial-gradient(ellipse 90% 70% at 50% 100%, rgba(255, 186, 72, .42), rgba(255, 186, 72, 0) 72%);
+  box-shadow: 0 0 12px rgba(255, 190, 80, .6), inset 0 0 10px rgba(255, 206, 110, .35);
+}
+
+body .bottom-nav__btn:nth-child(1).bottom-nav__btn--active::after { left: 11%; }
+body .bottom-nav__btn:nth-child(5).bottom-nav__btn--active::after { right: 11%; }
+
+body .bottom-nav__btn--active .bottom-nav__label {
+  z-index: 1;
+  color: #ffe7a6 !important;
+  font-weight: 900 !important;
+  text-shadow: 0 1px 2px #000, 0 0 8px rgba(255, 180, 60, .9) !important;
+}
 
 /*
  * ここには「ミッションを全部終えた時だけ」HOMEを画面いっぱいの固定レーンに
@@ -483,48 +536,162 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   margin: 0 !important;
 }
 
-/* 札は1本ぶんの高さに抑える。**縦に伸ばすとモンスターを覆う**
- * (抑えずに出したら、世界の下半分まで札が伸びて顔が隠れた)。
+/* ==========================================================================
+ * 札の形: [本文 | 閉じる] の2列。**高さは中身に任せる。**
  *
- * 中身は溢れるが、切り落とされて困るのは「閉じる」だけ。
- * それは下で右上へ絶対配置して、**必ず枠の中に残す**。
- * 詳しい中身は左の「お知らせ」から全部読める。 */
-.home-world .reward-banner-stack .reward-banner {
+ * 以前は札を54pxに抑え(`max-height`)、閉じるを右上へ `position:absolute` で
+ * 浮かせていた。2つとも中身を隠していた:
+ *
+ * - 閉じる(44x44の不透明な箱)が本文の上に乗り、「+1,500 ダイヤ」の
+ *   「ダイヤ」や、アップデートの本文の右端を覆っていた
+ * - 報酬が2行ある札は中身66pxを54pxへ押し込み、**2行目の「+20 召喚の書」が
+ *   下で切れて読めなかった**(390x844で実測。どちらも評価で致命と判定)
+ *
+ * 閉じるは**本文と同じ流れの中の、右端の列**に置く。本文はその列へ入れないので、
+ * 重なりようがない。高さを抑えないので、切れようもない。
+ *
+ * 「伸ばすとモンスターを覆う」のは本当で、ここは本数の側で止めている
+ * (`HOME_BANNER_LIMIT`、始めたばかりの人には過去の配布を1枚にまとめる)。
+ * それでも入りきらない日は、札の箱(`.world-info`)が**巻物になる**。
+ * 潰して切り落とすことは、もうしない。
+ *
+ * セレクタに `.crimon-home` を付けているのは、`update-notice.css` の
+ * 「本文のあるお知らせ」の指定(同じ強さで先に読まれる)に勝つため。
+ * ========================================================================== */
+.crimon-home .home-world .reward-banner-stack .reward-banner {
   position: relative !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 44px !important;
+  align-items: start !important;
+  gap: 0 5px !important;
   min-height: 54px !important;
-  max-height: 54px !important;
-  padding: 5px 48px 5px 6px !important;
+  max-height: none !important;
+  height: auto !important;
+  padding: 5px 5px 5px 6px !important;
+  overflow: hidden !important;
   font-size: 10px !important;
   line-height: 1.3 !important;
 }
 
-/* 畳んだ件数は**1行に収める。**
- * 折り返すと3行になり、それだけでモンスターの顔ぶんの高さを食う。
- * ここは押す物が無いので、あふれた文字は省略してよい
- * (中身は左の「お知らせ」から全部読める)。 */
-.home-world .reward-banner-stack .reward-banner-stack__rest {
-  padding: 4px 7px !important;
-  font-size: 9.5px !important;
-  line-height: 1.4 !important;
-  white-space: nowrap !important;
+/* 封蝋(金の丸い印)は、ここでは出さない。
+ *
+ * 札は縦列の間の198pxしかない。印(28px)と閉じる(44px)を両脇に置くと
+ * 本文は約110pxで、「+3,200 ダイヤ」の単位が折れ、アップデートの見出しは
+ * 「アップデートのお知/らせ」と割れた(実測)。**読める幅を印より優先する。**
+ * 何の札かは、見出しと報酬の行のアイコンで分かる。 */
+.crimon-home .home-world .reward-banner-stack .reward-banner .reward-banner__seal {
+  display: none !important;
+}
+
+/* 見出しは1行。「アップデートのお知らせ」が2行に割れると、それだけで1行食う */
+.crimon-home .home-world .reward-banner-stack .reward-banner .reward-banner__label {
   overflow: hidden !important;
+  white-space: nowrap !important;
   text-overflow: ellipsis !important;
 }
 
-/* 閉じるボタンは**右上へ固定する。**
+/* 本文は縦に積む。横一列に流すと、数字と単位が列の境で割れる */
+.crimon-home .home-world .reward-banner-stack .reward-banner .reward-banner__body {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 1px !important;
+  overflow: visible !important;
+}
+
+/* 題名は2行まで。1行で切ると「経験値バランス調整のお…」で何の配布か分からない */
+.crimon-home .home-world .reward-banner-stack .reward-banner .compensation__title {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden !important;
+  white-space: normal !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* 貰ったものは**1つにつき1行。**数字と単位は同じ行に置き、入らない時だけ単位を折る */
+.crimon-home .home-world .reward-banner-stack .reward-banner .reward-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  white-space: normal !important;
+}
+
+.crimon-home .home-world .reward-banner-stack .reward-banner .reward-list li {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: baseline !important;
+  column-gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.crimon-home .home-world .reward-banner-stack .reward-banner .reward-list li .icon {
+  align-self: center !important;
+}
+
+/* 閉じるは右の列。**浮かせない。**本文と同じ流れにいるので、本文の上には乗らない。
  *
- * 札の中身と一緒に流れていると、高さを抑えた時に枠の外へ押し出され、
- * `overflow:hidden` に切り落とされて押せなくなる。
- * 一度それをやって巡回が8件拾っている(「押せないボタン『閉じる』の
- * 手前に home-world」)。**位置を中身から切り離せば、二度と起きない。** */
-.home-world .reward-banner-stack .reward-banner__close {
-  position: absolute !important;
-  top: 5px !important;
-  right: 5px !important;
+ * `static` ではなく `relative`。「×」は `::after` の絶対配置で描いてあり、
+ * `static` にすると基準が札へ移って、×が本文の見出しの横へ飛んでいった(実測)。
+ * `relative` は流れの中の位置を変えない。 */
+.crimon-home .home-world .reward-banner-stack .reward-banner .reward-banner__close {
+  position: relative !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: start !important;
   /* **44pxを割らない。**34pxにしたら巡回が「指で押すには小さい」を拾った */
+  width: 44px !important;
   min-width: 44px !important;
+  height: 44px !important;
   min-height: 44px !important;
   margin: 0 !important;
+}
+
+/* 畳んだ件数は2行まで。1行に詰めると「(配布は受け取り済み…」の肝心な方が切れる。
+ * ここは押す物が無いので、それより長い分は省略してよい
+ * (中身は左の「お知らせ」から全部読める)。 */
+.home-world .reward-banner-stack .reward-banner-stack__rest {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  padding: 4px 7px !important;
+  font-size: 9.5px !important;
+  line-height: 1.4 !important;
+  white-space: normal !important;
+  overflow: hidden !important;
+}
+
+/* 札と初心者ミッションの箱は、**世界の枠の中で止めて巻物にする。**
+ *
+ * 札の高さを中身に任せたので、本数の多い日は世界の下端を越えうる。
+ * 世界の枠は `overflow:hidden` なので、越えた分は黙って切り落とされ、
+ * その中の「閉じる」「受け取る」が押せなくなる。**潰さずに巻物を出す。**
+ * 初心者ミッションは巻物に入れない(「受け取る」を常に見せる)。 */
+.home-world > .world-info {
+  max-height: calc(100% - 12px) !important;
+}
+
+.home-world > .world-info > .reward-banner-stack {
+  flex: 0 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* 巻物の中の札は**縮めない。**箱(grid)が縮んだ時、行の高さが中身ではなく
+ * 下限へ寄せられ、札が54pxまで潰れて報酬の2行目がまた切れた(375x667で実測)。
+ * 札は `overflow:hidden` なので、自動の下限が0になるのが原因。
+ * 行を中身の高さに固定し、縮むのは箱だけ・中身は巻いて見せる。 */
+.home-world > .world-info > .reward-banner-stack {
+  grid-auto-rows: max-content !important;
+  align-content: start !important;
+}
+
+.home-world > .world-info > .crimon-tutorial {
+  flex: 0 0 auto !important;
 }
 
 /* アカウント復旧の案内も1本ぶんに抑える。
@@ -617,18 +784,6 @@ body:has(.crimon-home) .bottom-nav__btn--active::before { display: none !importa
   /* `i` で作ってあるので、斜体を戻す(`span` は縦列の読み上げ用の隠しに巻き込まれる) */
   font-style: normal !important;
   text-shadow: none !important;
-}
-
-/* ダンジョンの選択(装備／育成／ゴールド／目覚)は**札より上**。
- *
- * 札の箱を z-index 12 にした時、選択の 8 を追い越してしまい、
- * 4つの行き先が札の裏へ回り込んで押せなくなった
- * (巡回が29件: 「押せないボタン『装備』の手前に reward-banner」と、
- *  そこから先へ進めない画面が芋づるで11件)。
- *
- * **押した時だけ開く一時的なものが、常設の案内より下にあってはいけない。** */
-.home-world .crimon-dungeon-chooser {
-  z-index: 20 !important;
 }
 
 /* ホームの下の余白。
