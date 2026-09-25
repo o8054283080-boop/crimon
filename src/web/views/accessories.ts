@@ -216,7 +216,8 @@ export function renderAccessories(props: AccessoriesProps): HTMLElement {
      * 切り替えるたびに見出しの形が変わると、別の画面へ飛んだように見える。
      */
     props.tabs
-      ? screenHeader("所持アクセサリー", { meta: `${list.length}個` })
+      // 見出しは**持っている数**(タブと同じ数)。絞った後の数は絞り込みの帯が言う
+      ? screenHeader("所持アクセサリー", { meta: `${all.length}個` })
       // 装備の枠を選び直す時(「スロット1を変更 / 名前」)と同じ形にそろえる
       : screenHeader(props.pickFor ? "アクセを変更" : title, props.pickFor && pickedName ? { meta: pickedName } : {}),
     props.tabs ?? null,

@@ -142,13 +142,15 @@ export function renderAccessoryFilterBar(props: AccessoryFilterBarProps): HTMLEl
       const families = toggle(filter.families, family);
       const specials = filter.specials.filter((id) => families.includes(specialDef(id).family));
       onChange({ ...filter, families, specials });
-    }, ` acc-filter-chip--family acc-family--${family.toLowerCase()}`));
+    }));
 
-  // レア度は選んでいない時も色を乗せる(一覧の札と同じ色。字を読まずに分かる)
+  /*
+   * 系統・レア度の札は**選んでいない時は色を乗せない。**
+   * 全部を系統やレア度の色で塗っていた時は、どれが選ばれているのか見分けが付かなかった。
+   */
   const rarityChips = facets.rarities.map((rarity: AccessoryRarity) =>
     chip(ACCESSORY_RARITY_JA[rarity], filter.rarities.includes(rarity),
-      () => onChange({ ...filter, rarities: toggle(filter.rarities, rarity) }),
-      ` acc-filter-chip--rarity acc-filter-chip--${rarity.toLowerCase()}`));
+      () => onChange({ ...filter, rarities: toggle(filter.rarities, rarity) })));
 
   const starChips = facets.stars.map((star: AccessoryStar) =>
     chip(`★${star}`, filter.stars.includes(star), () => onChange({ ...filter, stars: toggle(filter.stars, star) })));
@@ -181,8 +183,12 @@ export function renderAccessoryFilterBar(props: AccessoryFilterBarProps): HTMLEl
       activeCount > 0 ? el("span", { className: "mfilter__badge" }, [String(activeCount)]) : null,
       el("span", { className: "mfilter__caret" }, [props.open ? "▲" : "▼"]),
     ].filter((n): n is HTMLElement => n !== null)),
+    /*
+     * 件数は「何を数えたか」まで言う。「36個中 9個」は、隣のタブの
+     * 「アクセサリー(36)」と食い違って見えた。絞った時は「9 / 36個を表示」にする。
+     */
     el("span", { className: "mfilter__count" }, [
-      props.shownCount === props.all.length ? `${props.all.length}個` : `${props.all.length}個中 ${props.shownCount}個`,
+      props.shownCount === props.all.length ? `${props.all.length}個を表示` : `${props.shownCount} / ${props.all.length}個を表示`,
     ]),
     activeCount > 0
       ? el("button", { type: "button", className: "mfilter__clear", onclick: () => onChange({ ...EMPTY_ACCESSORY_FILTER }) }, ["✕ 解除"])

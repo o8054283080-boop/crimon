@@ -143,13 +143,16 @@
 }
 
 /*
- * 札を開いた時、**アクセが1枚も見えないまま画面が終わらないようにする。**
- * 潰して切り落とすのではなく巻物にする(装備の一覧と同じ上限)。
+ * 開いた札は**画面の流れの中で全部見せる。**
+ * 一度は枠に高さの上限(38vh)を付けて中を巻かせたが、「特殊」の最後の段が
+ * 枠の縁で切れ、枠の中と画面の2つを巻くことになった。アクセの札は
+ * 系統を選ぶまで特殊効果を出さないので、全部出しても画面を埋めない。
+ * 獲得のシートも同じ(共通の既定 34vh の上限を外す。シートそのものが巻物)。
  */
-.accessories-screen .mfilter__body {
-  max-height: 38vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+.accessories-screen .mfilter__body,
+.farm-acc-sheet .farm-equip-sheet__panel .mfilter__body {
+  max-height: none;
+  overflow: visible;
 }
 
 /* 行き先が無い時(遺跡から開いた一覧)は、まとめ売りだけを1段に置く */
@@ -180,10 +183,23 @@
   line-height: 1.4;
 }
 
-/* 系統とレア度の札は、選んでいない時も一覧の札と同じ色を乗せる(字を読まずに分かる) */
-.acc-filter-chip--hero:not(.slot-filter-chip--active) { color: #b8d6ff; border-color: rgba(140, 190, 255, 0.45); }
-.acc-filter-chip--legend:not(.slot-filter-chip--active) { color: #e4b9ff; border-color: rgba(214, 140, 255, 0.5); }
-.acc-filter-chip--epic:not(.slot-filter-chip--active) { color: #ffc98a; border-color: rgba(255, 170, 80, 0.6); }
+/*
+ * 札の色は**選ばれた札だけに乗せる**(装備の絞り込みの札と同じ扱い)。
+ * 選んでいない札まで系統・レア度の色で塗っていた時は、どれが選ばれているのか
+ * 見分けが付かなかった(目隠しの判定で指摘)。
+ */
+
+/* まとめ売りの帯。「表示中をすべて選ぶ (35)」を1行に収める(半々だと2行に折れた) */
+.acc-bulk-bar .bulk-bar__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+}
+
+.acc-bulk-bar .bulk-bar__row .btn {
+  white-space: nowrap;
+  padding-left: 8px;
+  padding-right: 8px;
+}
 
 /* --- まとめ売りの選択 --- */
 
@@ -236,8 +252,59 @@
 .farm-acc-card[data-locked="true"] { border-color: rgba(255, 211, 106, 0.65); }
 .farm-acc-card .farm-equip-card__detail b { font-size: 14px; }
 .farm-acc-card__owner { color: #9fb0d8; }
-.farm-acc-card .farm-equip-card__actions .btn { min-height: 44px; }
-.farm-acc-card .farm-equip-card__select { min-height: 44px; }
+.farm-acc-card { position: relative; }
+
+/*
+ * 売却に選ぶ操作は、**ロックと同じ大きさのボタン**にする。
+ * ブラウザ標準の小さなチェック箱だった時は、隣のロックの方が主役に見えた。
+ * 左右を半々にして、どちらも同じ重さで押せるようにする。
+ */
+.farm-acc-card .farm-equip-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.farm-acc-card .farm-equip-card__actions .btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.farm-acc-card__pick.is-picked {
+  color: #2a1c02;
+  background: linear-gradient(180deg, #ffe08a, #d9a520);
+  border-color: #ffd23f;
+}
+
+/* 選ばれた札は一覧のまとめ売りと同じく、金の枠と✓の印 */
+.farm-acc-card--picked {
+  border-color: #ffd23f;
+  box-shadow: inset 0 0 0 2px #ffd23f, 0 0 14px rgba(255, 210, 63, 0.35);
+}
+
+.farm-acc-card--picked::after {
+  content: "✓";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  color: #2a1c02;
+  background: linear-gradient(180deg, #ffe08a, #d9a520);
+}
+
+/*
+ * 一覧の下に、下の操作帯の高さぶんの余白を取る。
+ * 無いと、巻き切っても最後の札が帯の裏に隠れたままになる。
+ */
+.farm-acc-sheet .farm-equip-sheet__list {
+  padding-bottom: 24px;
+}
 
 /* 題は装備(「今回獲得した装備」)より長い。既定の大きさでは「ー」だけが次の行へ落ちた */
 .farm-acc-sheet .farm-equip-sheet__panel h2 {

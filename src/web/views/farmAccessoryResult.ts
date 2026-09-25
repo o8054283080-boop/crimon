@@ -49,8 +49,9 @@ export function renderFarmAccessoryResult(props: FarmAccessoryResultProps): HTML
 
   const cards = shown.map((acc) => {
     const owner = props.ownerName(acc.id);
+    const picked = props.selectedIds.includes(acc.id) && !blocked(acc);
     return el("article", {
-      className: `farm-equip-card farm-acc-card farm-acc-card--${acc.rarity.toLowerCase()}`,
+      className: `farm-equip-card farm-acc-card farm-acc-card--${acc.rarity.toLowerCase()}${picked ? " farm-acc-card--picked" : ""}`,
       "data-locked": String(acc.locked === true),
       "data-accessory-id": acc.id,
     }, [
@@ -67,16 +68,18 @@ export function renderFarmAccessoryResult(props: FarmAccessoryResultProps): HTML
           "aria-pressed": String(acc.locked === true),
           onclick: () => props.onToggleLock(acc.id),
         }, [acc.locked ? "🔓 ロック解除" : "🔒 ロック"]),
-        el("label", { className: `farm-equip-card__select${blocked(acc) ? " farm-equip-card__select--disabled" : ""}` }, [
-          el("input", {
-            type: "checkbox",
-            disabled: blocked(acc),
-            checked: props.selectedIds.includes(acc.id) && !blocked(acc),
-            onchange: () => props.onToggleSelected(acc.id),
-          }),
-          // 選べない理由をその場で言う。灰色にしただけでは分からない
-          acc.locked ? " ロック中" : isWorn(acc) ? " 装着中" : " 売却選択",
-        ]),
+        /*
+         * 売却に選ぶ操作は**ロックと同じ大きさのボタン**にする。
+         * ブラウザ標準の小さなチェック箱だった時は、隣のロックの方が主役に見えた。
+         * 選べない時は、理由(ロック中・装着中)をボタンの字で言う。
+         */
+        el("button", {
+          type: "button",
+          className: `btn btn--ghost farm-acc-card__pick${picked ? " is-picked" : ""}`,
+          "aria-pressed": String(picked),
+          disabled: blocked(acc),
+          onclick: () => props.onToggleSelected(acc.id),
+        }, [acc.locked ? "ロック中は売れません" : isWorn(acc) ? "装着中は売れません" : picked ? "✓ 売却に選択中" : "売却に選ぶ"]),
       ]),
     ]);
   });
@@ -89,7 +92,7 @@ export function renderFarmAccessoryResult(props: FarmAccessoryResultProps): HTML
     el("div", { className: "farm-equip-sheet__scrim", onclick: props.onClose }),
     el("section", { className: "farm-equip-sheet__panel" }, [
       el("header", {}, [
-        el("div", {}, [el("h2", {}, ["今回獲得したアクセサリー"]), el("p", {}, ["所持品に追加済みのアクセサリーだけを表示しています"])]),
+        el("div", {}, [el("h2", {}, ["今回獲得したアクセサリー"]), el("p", {}, ["所持品に残っている分だけを表示します"])]),
         el("button", { type: "button", className: "btn btn--ghost", onclick: props.onClose }, ["閉じる"]),
       ]),
       // 絞り込みは**流れの中**に置く。浮かせると下の札を覆って押せなくする
