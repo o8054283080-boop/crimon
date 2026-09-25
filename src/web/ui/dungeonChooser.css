@@ -1,0 +1,282 @@
+/*
+ * ダンジョンの選択(ホームの「ダンジョン」を押すと開くシート)。
+ *
+ * **この部品のルールはここだけに置く。**
+ * 前は `crimon-visual-system.css` / `home-mode-buttons-phase4.css` /
+ * `home-mode-buttons-phase4-fix.css` / `home-pop-design.css` の4つに
+ * `!important` で上書きが積み重なり、位置も幅も誰が決めているのか読めなかった
+ * (右端は 82 → 92 → 108 → 101px と4回書き換えられていた)。
+ * クラス名を `crimon-dungeon-chooser` から `dungeon-chooser` へ変えて、
+ * 古い上書きが当たる余地を無くしてある。`!important` は使わない。
+ *
+ * **世界の中に浮かせない。**`position:absolute` の小窓だった頃は
+ * お知らせの札の上に乗り、札を覆っていた。いまは画面いっぱいの
+ * 暗幕の上に出るので、閉じるまで背面は触れない(`aria-modal`)。
+ *
+ * 下のバーはホーム画面の重なり文脈の外にいて、暗幕より上に描かれる
+ * (`home-theme.css` の設定シートと同じ事情)。だからパネルは
+ * **バーの上端より上で止める。**潜り込ませると下の行が押せなくなる。
+ */
+.dungeon-chooser {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: max(12px, var(--home-safe-top, 0px)) 10px calc(var(--bottom-nav-h, 64px) + 10px);
+}
+
+.dungeon-chooser[hidden] {
+  display: none;
+}
+
+.dungeon-chooser__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 5, 12, .74);
+  backdrop-filter: blur(3px);
+}
+
+.dungeon-chooser__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 12px 12px;
+  border: 1px solid rgba(214, 175, 98, .5);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(122, 88, 190, .22), transparent 70%),
+    linear-gradient(180deg, #1a2140 0%, #0e1328 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 200, .12), 0 18px 44px rgba(0, 0, 0, .6);
+  animation: dungeon-chooser-rise .18s ease-out;
+}
+
+/* 上端の金の細線。見出しの格を他の画面(金の見出し+濃紺の札)にそろえる */
+.dungeon-chooser__panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18%;
+  right: 18%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f0d38b, transparent);
+  pointer-events: none;
+}
+
+@keyframes dungeon-chooser-rise {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dungeon-chooser__panel { animation: none; }
+}
+
+.dungeon-chooser__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dungeon-chooser__title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.dungeon-chooser__title small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .32em;
+  color: #b89755;
+}
+
+.dungeon-chooser__title h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  color: #f3d58c;
+  text-shadow: 0 1px 0 #5a3d0f, 0 0 14px rgba(240, 190, 90, .28);
+}
+
+.dungeon-chooser .dungeon-chooser__close {
+  flex: none;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(214, 175, 98, .55);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #262c48, #161a30);
+  color: #f0e6cf;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.dungeon-chooser__close:active {
+  transform: scale(.97);
+}
+
+.dungeon-chooser__lead {
+  margin: -2px 2px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #b9bfd4;
+}
+
+.dungeon-chooser__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---- 1件の札 ----------------------------------------------------------
+ *
+ * 札と「閉じる」は `.dungeon-chooser` の中に限って書く。`mobile-ux.css` の
+ * `.crimon-home button { min-height: 44px }` の方が詳細度で勝ち、
+ * 72px と書いた高さが 44px に負けていた(中身が高いので見た目は崩れなかった)。 */
+
+.dungeon-chooser .dungeon-chooser__card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 12px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  margin: 0;
+  padding: 8px 14px 8px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--tone), .5);
+  border-radius: 14px;
+  background:
+    linear-gradient(100deg, rgba(var(--tone), .30) 0%, rgba(var(--tone), .08) 46%, transparent 72%),
+    linear-gradient(180deg, #161c34, #0d1124);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 6px 16px rgba(0, 0, 0, .35);
+  color: #f5efe2;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 左端の色の帯。5つの系統を、絵を見なくても色で分けられるように */
+.dungeon-chooser__card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: rgb(var(--tone));
+  box-shadow: 0 0 10px rgba(var(--tone), .8);
+}
+
+.dungeon-chooser__card:active {
+  transform: scale(.985);
+  filter: brightness(1.12);
+}
+
+.dungeon-chooser__card:focus-visible {
+  outline: 2px solid #f4d18e;
+  outline-offset: 2px;
+}
+
+/* 系統の色。**基底の札に既定の色を書かない**(詳細度が上なので、ここを全部上書きしてしまう) */
+.dungeon-chooser__card--equip { --tone: 224, 85, 63; }
+.dungeon-chooser__card--train { --tone: 63, 207, 138; }
+.dungeon-chooser__card--gold { --tone: 240, 180, 60; }
+.dungeon-chooser__card--awakening { --tone: 154, 98, 255; }
+.dungeon-chooser__card--ruins { --tone: 57, 214, 200; }
+
+.dungeon-chooser__art {
+  display: block;
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .55));
+}
+
+.dungeon-chooser__body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dungeon-chooser__name {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: .04em;
+  color: #fff6e2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dungeon-chooser__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 10px;
+  min-width: 0;
+}
+
+.dungeon-chooser__yield {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border: 1px solid rgba(var(--tone), .55);
+  border-radius: 999px;
+  background: rgba(var(--tone), .16);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fff1d0;
+  white-space: nowrap;
+}
+
+.dungeon-chooser__yield small {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: rgb(var(--tone));
+  filter: brightness(1.35);
+}
+
+.dungeon-chooser__status {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #a9b1c9;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 右の山括弧 */
+.dungeon-chooser__go {
+  justify-self: end;
+  width: 9px;
+  height: 9px;
+  border-top: 2px solid rgba(var(--tone), .95);
+  border-right: 2px solid rgba(var(--tone), .95);
+  transform: rotate(45deg);
+}
+
+/* 本日の回数を使い切った札。**押せる**(中で明日の分や詳細を見られる)ので消さず、色だけ落とす */
+.dungeon-chooser__card.is-spent .dungeon-chooser__art {
+  filter: grayscale(.7) brightness(.8) drop-shadow(0 3px 6px rgba(0, 0, 0, .55));
+}
+
+.dungeon-chooser__card.is-spent .dungeon-chooser__status {
+  color: #d58a7a;
+}

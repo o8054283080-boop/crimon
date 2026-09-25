@@ -786,18 +786,6 @@ body .bottom-nav__btn--active .bottom-nav__label {
   text-shadow: none !important;
 }
 
-/* ダンジョンの選択(装備／育成／ゴールド／目覚)は**札より上**。
- *
- * 札の箱を z-index 12 にした時、選択の 8 を追い越してしまい、
- * 4つの行き先が札の裏へ回り込んで押せなくなった
- * (巡回が29件: 「押せないボタン『装備』の手前に reward-banner」と、
- *  そこから先へ進めない画面が芋づるで11件)。
- *
- * **押した時だけ開く一時的なものが、常設の案内より下にあってはいけない。** */
-.home-world .crimon-dungeon-chooser {
-  z-index: 20 !important;
-}
-
 /* ホームの下の余白。
  *
  * `mobile-ux.css` が `--bottom-nav-h + 32px`(実測110px)を空けている。

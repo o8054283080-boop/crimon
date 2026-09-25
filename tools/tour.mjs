@@ -104,7 +104,12 @@ const SCREENS = [
     setup: "document.querySelector('[data-tour=giftTabHistory]')?.click()",
   },
   { name: "ミッション", tab: "HOME", tile: "mission" },
-  // ダンジョンは1段深い。「ダンジョン」を押すと選択肢が開く
+  /*
+   * ダンジョンは1段深い。「ダンジョン」を押すと選択のシートが開く。
+   * **シートそのものも検査する。**前は世界に浮いた小窓で、押す所が44x39pxしかなく、
+   * 「ゴールド」が2行に折れていたのに、行き先の画面しか見ていなかった。
+   */
+  { name: "ダンジョンの選択", tab: "HOME", tile: "dungeon" },
   { name: "装備ダンジョン", tab: "HOME", tile: "dungeon", tile2: "equipDungeon" },
   /*
    * 上位階(11・12)。**開いた状態も見る。**
@@ -348,6 +353,12 @@ async function goScreen(screen) {
       const modalClose = document.querySelector('[role="dialog"][aria-modal="true"] .regular-missions__close');
       if (modalClose instanceof HTMLElement) {
         modalClose.click();
+        await wait(200);
+      }
+      // ダンジョンの選択も同じ。ホームのタブを押し直しても開いたまま残る
+      const dungeonClose = document.querySelector('.dungeon-chooser:not([hidden]) .dungeon-chooser__close');
+      if (dungeonClose instanceof HTMLElement) {
+        dungeonClose.click();
         await wait(200);
       }
       /*
