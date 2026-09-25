@@ -71,7 +71,7 @@ export function renderFarmAccessoryResult(props: FarmAccessoryResultProps): HTML
         /*
          * 売却に選ぶ操作は**ロックと同じ大きさのボタン**にする。
          * ブラウザ標準の小さなチェック箱だった時は、隣のロックの方が主役に見えた。
-         * 選べない時は、理由(ロック中・装着中)をボタンの字で言う。
+         * 選べない時は、理由(ロック中・装着中)をボタンの字で言う(半分の幅に収まる短さで)。
          */
         el("button", {
           type: "button",
@@ -79,7 +79,7 @@ export function renderFarmAccessoryResult(props: FarmAccessoryResultProps): HTML
           "aria-pressed": String(picked),
           disabled: blocked(acc),
           onclick: () => props.onToggleSelected(acc.id),
-        }, [acc.locked ? "ロック中は売れません" : isWorn(acc) ? "装着中は売れません" : picked ? "✓ 売却に選択中" : "売却に選ぶ"]),
+        }, [acc.locked ? "ロック中" : isWorn(acc) ? "装着中" : picked ? "✓ 売却に選択中" : "売却に選ぶ"]),
       ]),
     ]);
   });
