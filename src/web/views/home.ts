@@ -414,7 +414,7 @@ function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | nul
     el("div", { className: "cloud-warn__mark", "aria-hidden": "true" }, ["⚠"]),
     el("div", { className: "cloud-warn__text" }, [
       el("div", { className: "cloud-warn__title" }, [
-        (expired || conflict) ? "クラウドへ保存できていません" : "アカウント復旧の登録がまだです",
+        conflict ? "クラウドの保存が2つに分かれています" : expired ? "クラウドへ保存できていません" : "アカウント復旧の登録がまだです",
       ]),
       /*
        * **短く書く。**最初は理由を丁寧に書いて2行で打ち切られ、
@@ -423,7 +423,7 @@ function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | nul
        * 詳しい手順3つは、押した先のクラウド復旧の欄にある。
        */
       el("div", { className: "cloud-warn__lead" }, [
-        conflict ? "保存内容の違いを確認する必要があります。右のボタンから、今の端末のデータでバックアップを再開できます。" : expired
+        conflict ? "この端末のデータは別のバックアップとして自動で保存しています。右のボタンから、どちらを使うか選べます。" : expired
           ? "ログインの期限が切れました。いまの進み具合はこの端末の中だけです。右のボタンから復旧IDでログインし直すと、バックアップが再開します。"
           : "データはこの端末の中だけ。消すと戻せません。右の「登録する」から、IDとパスワードを決めるだけです（メール不要）。",
       ]),

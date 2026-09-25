@@ -200,6 +200,7 @@ Deno.serve(async (req: Request) => {
       matchDaysResult,
       towerResult,
       snapshotsResult,
+      conflictCopiesResult,
     ] = await Promise.all([
       supabase.from("arena_seasons").select("id,name,status,starts_at,ends_at").order("starts_at", { ascending: false }).limit(5),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
@@ -225,6 +226,13 @@ Deno.serve(async (req: Request) => {
         .select("user_id,player_name,best_floor,best_floor_reached_at,updated_at")
         .order("best_floor", { ascending: false }).limit(1000),
       supabase.from("crimon_player_snapshots").select("user_id,save,saved_at").order("saved_at", { ascending: false }).limit(1000),
+      /*
+       * **保存が2つに分かれた端末の控え**(crimon-recovery の save_copy)。
+       * 分かれている間、端末の新しい遊びはこちらにしか届かない。
+       * ここを読まないと、管理画面には止まった方の古い姿しか出ない。
+       */
+      supabase.from("crimon_recovery_conflict_copies").select("account_id,device_id,save,base_revision,saved_at")
+        .order("saved_at", { ascending: false }).limit(2000),
     ]);
 
     // 取得失敗を「プレイヤー0人」に変換しない。
@@ -237,6 +245,15 @@ Deno.serve(async (req: Request) => {
     }
     const snapshotStatus = snapshotsResult.error ? "unavailable" : "ready";
     if (snapshotsResult.error) console.error("snapshot_read_failed", snapshotsResult.error.code);
+    // 控えの表は後から足したもの。読めなくても本体の一覧は出す(読めなかったことは画面へ伝える)
+    const conflictCopyStatus = conflictCopiesResult.error ? "unavailable" : "ready";
+    if (conflictCopiesResult.error) console.error("conflict_copy_read_failed", conflictCopiesResult.error.code);
+    type CopyRow = { account_id: string; device_id: string; save: unknown; base_revision: number | null; saved_at: string };
+    const copiesByAccount = new Map<string, CopyRow[]>();
+    for (const row of (conflictCopiesResult.data ?? []) as CopyRow[]) {
+      const key = String(row.account_id);
+      copiesByAccount.set(key, [...(copiesByAccount.get(key) ?? []), row]);
+    }
 
     type Season = { id: string; name: string; status: string; starts_at: string; ends_at: string };
     const seasonRows = (seasonsResult.data ?? []) as Season[];
@@ -289,8 +306,22 @@ Deno.serve(async (req: Request) => {
 
     type RecoveryRow = Record<string, unknown> & { id: string };
     const recoveryAccounts = ((recoveryResult.data ?? []) as RecoveryRow[]).map((account) => {
-      const progress = saveProgress(account.latest_save);
-      const summary = saveSummary(account.latest_save);
+      /*
+       * **いちばん新しいデータを出す。**
+       *
+       * 保存が2つに分かれると、本来のバックアップ(latest_save)は止まり、
+       * 端末の新しい遊びは控え(conflict copies)にだけ届く。本来の方だけを見ていると
+       * **止まった古い姿を今の姿として読ませる**(依頼主「新しいデータが見れないと意味がない」)。
+       * 控えの方が新しければ、行の値はすべて控えから読む。どちらから読んだかは `newestSource` で返す。
+       */
+      const copies = (copiesByAccount.get(String(account.id)) ?? [])
+        .slice().sort((a, b) => new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime());
+      const newestCopy = copies[0] ?? null;
+      const copyIsNewer = newestCopy !== null
+        && new Date(newestCopy.saved_at).getTime() > new Date(text(account.latest_saved_at)).getTime();
+      const shownSave = copyIsNewer ? newestCopy!.save : account.latest_save;
+      const progress = saveProgress(shownSave);
+      const summary = saveSummary(shownSave);
       /*
        * **出どころを混ぜない。**
        *
@@ -325,6 +356,40 @@ Deno.serve(async (req: Request) => {
         sourceMismatch: progress !== null && summary.fighterLevel !== undefined
           && progress.fighterLevel !== null && progress.fighterLevel !== summary.fighterLevel,
         progress,
+        /** 行の値をどちらから読んだか。COPY なら保存が2つに分かれていて、端末の控えの方が新しい */
+        newestSource: copyIsNewer ? "COPY" : "MAIN",
+        /** 行の値の保存日時(控えから読んだ時は控えの日時) */
+        shownSavedAt: copyIsNewer ? newestCopy!.saved_at : account.latest_saved_at,
+        /*
+         * 分かれた端末の控えを全部。端末ごとに1行。
+         * 本来のバックアップの姿も、比べられるように `main` として添える。
+         */
+        conflictCopies: copies.map((copy) => {
+          const copyProgress = saveProgress(copy.save);
+          const copySummary = saveSummary(copy.save);
+          return {
+            deviceId: copy.device_id,
+            savedAt: copy.saved_at,
+            baseRevision: copy.base_revision,
+            fighterLevel: pick(copyProgress?.fighterLevel, copySummary.fighterLevel),
+            gold: pick(copyProgress?.gold, copySummary.gold),
+            crystal: pick(copyProgress?.crystal, copySummary.crystal),
+            monsterCount: pick(copyProgress?.monsterCount, copySummary.monsterCount),
+            equipmentCount: pick(copyProgress?.equipmentCount, copySummary.equipmentCount),
+          };
+        }),
+        main: copies.length > 0 ? (() => {
+          const mainProgress = saveProgress(account.latest_save);
+          const mainSummary = saveSummary(account.latest_save);
+          return {
+            savedAt: account.latest_saved_at,
+            fighterLevel: pick(mainProgress?.fighterLevel, mainSummary.fighterLevel),
+            gold: pick(mainProgress?.gold, mainSummary.gold),
+            crystal: pick(mainProgress?.crystal, mainSummary.crystal),
+            monsterCount: pick(mainProgress?.monsterCount, mainSummary.monsterCount),
+            equipmentCount: pick(mainProgress?.equipmentCount, mainSummary.equipmentCount),
+          };
+        })() : null,
       };
     });
 
@@ -352,8 +417,9 @@ Deno.serve(async (req: Request) => {
     const overview = {
       players: withProgress.length,
       // 「直近7日で保存があった人」。登録数ではなく、**いま遊んでいる人の数**
-      activePlayers: ((recoveryResult.data ?? []) as RecoveryRow[]).filter((row) => {
-        const at = new Date(text(row.latest_saved_at)).getTime();
+      // 保存が分かれた人は控えの日時で数える(本来の方は止まっているので、遊んでいても数えられなくなる)
+      activePlayers: recoveryAccounts.filter((row) => {
+        const at = new Date(text(row.shownSavedAt)).getTime();
         return Number.isFinite(at) && Date.now() - at < 7 * 24 * 60 * 60 * 1000;
       }).length,
       /*
@@ -417,6 +483,7 @@ Deno.serve(async (req: Request) => {
       recoveryAccounts,
       playerSnapshots,
       snapshotStatus,
+      conflictCopyStatus,
     });
   }
 

@@ -157,6 +157,20 @@ async function syncNow(showUnchanged = false, scheduled = false): Promise<void> 
     storeCloudMeta(await pendingCloudMeta(meta, save));
     const next = await uploadCloudSave(meta, save, arenaAuthUserId());
     storeCloudMeta(next);
+    if (next.syncConflict) {
+      /*
+       * **競合していても止まらない。**この端末の最新データは別のバックアップとして
+       * クラウドへ控えた(本来のバックアップと世代・アリーナには触れていない)。
+       * 本来のバックアップをどちらにするかは、本人が「保存内容を確認して再開」で選ぶ。
+       */
+      conflictDetected = false;
+      localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
+      if (!meta.syncConflict) document.querySelectorAll<HTMLElement>(`[${PANEL_MARKER}]`).forEach(panel => renderPanelInto(panel));
+      if (showUnchanged || next.conflictCopySavedAt !== meta.conflictCopySavedAt) {
+        setStatus(`クラウドの保存内容と異なるため、この端末のデータを別のバックアップとして保存しました：${formatSavedAt(next.conflictCopySavedAt ?? new Date().toISOString())}。元のバックアップも残しています。`, "ok");
+      }
+      return;
+    }
     conflictDetected = false;
     if (scheduled || next.revision !== meta.revision) localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
     if (next.revision !== meta.revision) {
@@ -446,6 +460,14 @@ function renderConnected(panel: HTMLElement, meta: CloudRecoveryMeta) {
   const saved = document.createElement("p");
   saved.className = "save-data__note";
   saved.textContent = `最終クラウドバックアップ：${formatSavedAt(meta.savedAt)} / 世代 ${meta.revision}`;
+  // 競合中は、この端末のデータが別のバックアップとして控えられていることを見せる(止まって見えないように)
+  const copyNote = meta.syncConflict ? document.createElement("p") : null;
+  if (copyNote) {
+    copyNote.className = "save-data__note";
+    copyNote.textContent = meta.conflictCopySavedAt
+      ? `この端末のデータは別のバックアップとして保存中：${formatSavedAt(meta.conflictCopySavedAt)}（元のバックアップも残しています）`
+      : "この端末のデータを別のバックアップとして保存します（元のバックアップも残します）";
+  }
   const actions = document.createElement("div");
   actions.className = "save-data__actions";
   actions.append(
@@ -491,7 +513,9 @@ function renderConnected(panel: HTMLElement, meta: CloudRecoveryMeta) {
     setStatus("この端末のクラウド接続を解除しました。クラウドデータは残っています。", "ok");
     renderPanelInto(panel, true);
   });
-  panel.append(connected, saved, actions, disconnect);
+  panel.append(connected, saved);
+  if (copyNote) panel.append(copyNote);
+  panel.append(actions, disconnect);
 }
 
 function renderPanelInto(panel: HTMLElement, preserveKey = false) {
