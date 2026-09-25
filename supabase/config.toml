@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.crimon-player-snapshot]
 verify_jwt = true
+
+# 復旧APIも既存の独自セッションを検証する。JWTを要求して保存を止めない。
+[functions.crimon-recovery]
+verify_jwt = false
