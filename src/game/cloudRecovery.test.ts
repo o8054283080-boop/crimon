@@ -56,7 +56,7 @@ describe("cloud recovery", () => {
   });
 
   it("does not advance local revision when the server rejects a stale revision", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ ok: false, code: "STALE_REVISION" }), {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ ok: false, code: "STALE_REVISION" }), {
       status: 409,
       headers: { "Content-Type": "application/json" },
     }));

@@ -57,6 +57,12 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-25-recovery-save-conflict",
+    title: "止まっていたクラウド保存を再開できるようにしました",
+    message: "保存世代の食い違いでバックアップが止まる問題を修正しました。同じ保存内容なら自動で同期し、内容が異なる場合は設定の「クラウド復旧」→「保存内容を確認して再開」から、この端末の進み具合を保存できます。確認するだけでクラウドデータを上書きすることはありません。",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-25-home-mode-art-trim",
     title: "ホームの行き先の絵のはみ出しを直しました",
     message: "ホーム右側の「ダンジョン」「闘技場」「試練の塔」の絵の縁に、となりの絵の切れ端(赤いリボンや飾りのかけら)が写り込んでいたのを消しました。",

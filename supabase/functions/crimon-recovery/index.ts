@@ -367,8 +367,11 @@ Deno.serve(async (req: Request) => {
       if (!session) return json(401, { ok: false, code: "SESSION_INVALID" });
       const revision = Number(body.revision);
       const save = body.save;
-      // 有効な復旧セッションを持つ本人だけが、アリーナの身元を自動復旧できる。
-      const resolvedArenaUserId = await reconcileArenaIdentity(session.row.account_id, body.arenaUserId);
+      // バックアップはアリーナの身元・成績を移動しない。競合時にも副作用を起こさない。
+      const { data: account, error: accountError } = await supabase
+        .from("crimon_recovery_accounts").select("arena_user_id").eq("id", session.row.account_id).single();
+      if (accountError) throw accountError;
+      const resolvedArenaUserId = account?.arena_user_id ?? null;
       if (!Number.isSafeInteger(revision) || revision < 2 || !validateSave(save)) {
         return json(400, { ok: false, code: "INVALID_SAVE" });
       }
@@ -382,13 +385,6 @@ Deno.serve(async (req: Request) => {
         if (String(error.message).includes("STALE_REVISION")) return json(409, { ok: false, code: "STALE_REVISION" });
         throw error;
       }
-      /*
-       * **いま使っているアリーナの身元を覚え直す。**
-       * 控えと一緒に上がってくるので、機種を変えた後もここが最新になる。
-       * 送られてこない時は消さない(古い版のクライアントが上げた時に失いたくない)。
-       */
-      // arena_user_id を新IDで無条件上書きしない。
-      // 不一致なら reconcileArenaIdentity が元成績を移してから更新する。
       return json(200, {
         ok: true,
         revision: data?.[0]?.saved_revision ?? revision,

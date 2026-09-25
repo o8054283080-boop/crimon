@@ -107,7 +107,7 @@ describe("ホームの警告札", () => {
     expect(block).toContain("クラウドへ保存できていません");
     expect(block).toContain("ログインし直す");
     // 未登録の文面は、未登録の時だけ出る形になっていること
-    expect(block).toMatch(/expired\s*\n?\s*\?[\s\S]{0,200}:\s*"アカウント復旧の登録がまだです"/);
+    expect(block).toMatch(/\(expired \|\| conflict\)\s*\n?\s*\?[\s\S]{0,200}:\s*"アカウント復旧の登録がまだです"/);
   });
 
   it("配布の札より先に積む", () => {

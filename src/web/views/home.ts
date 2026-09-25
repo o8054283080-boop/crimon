@@ -405,15 +405,16 @@ function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | nul
   const warning = cloudRecoveryWarning();
   if (warning === "NONE") return null;
   const expired = warning === "EXPIRED";
+  const conflict = warning === "CONFLICT";
   return el("section", {
     className: "cloud-warn",
     "data-cloud-recovery-warning": "",
-    ariaLabel: expired ? "クラウドのログインし直し" : "アカウント復旧の登録",
+    ariaLabel: conflict ? "クラウド保存の再開" : expired ? "クラウドのログインし直し" : "アカウント復旧の登録",
   }, [
     el("div", { className: "cloud-warn__mark", "aria-hidden": "true" }, ["⚠"]),
     el("div", { className: "cloud-warn__text" }, [
       el("div", { className: "cloud-warn__title" }, [
-        expired ? "クラウドへ保存できていません" : "アカウント復旧の登録がまだです",
+        (expired || conflict) ? "クラウドへ保存できていません" : "アカウント復旧の登録がまだです",
       ]),
       /*
        * **短く書く。**最初は理由を丁寧に書いて2行で打ち切られ、
@@ -422,7 +423,7 @@ function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | nul
        * 詳しい手順3つは、押した先のクラウド復旧の欄にある。
        */
       el("div", { className: "cloud-warn__lead" }, [
-        expired
+        conflict ? "保存内容の違いを確認する必要があります。右のボタンから、今の端末のデータでバックアップを再開できます。" : expired
           ? "ログインの期限が切れました。いまの進み具合はこの端末の中だけです。右のボタンから復旧IDでログインし直すと、バックアップが再開します。"
           : "データはこの端末の中だけ。消すと戻せません。右の「登録する」から、IDとパスワードを決めるだけです（メール不要）。",
       ]),
@@ -443,7 +444,7 @@ function renderCloudRecoveryWarning(openSettings: () => void): HTMLElement | nul
           document.querySelector(".cloud-recovery")?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       },
-    }, [expired ? "ログインし直す" : "登録する"]),
+    }, [conflict ? "保存を確認" : expired ? "ログインし直す" : "登録する"]),
   ]);
 }
 
