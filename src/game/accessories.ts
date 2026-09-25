@@ -3,7 +3,7 @@ import {
   type AccessoryStar,
   ACCESSORY_FAMILIES, ACCESSORY_MAIN_STATS, ACCESSORY_RARITIES, ACCESSORY_SPECIALS, ACCESSORY_STARS,
   accessoryEnhanceCost, accessoryMainValue, accessorySellPrice, canEnhanceAccessory, enhanceAccessory,
-  sanitizeAccessory,
+  grantSpecialBoosts, sanitizeAccessory,
 } from "../core/accessory.js";
 import type { MonsterInstance } from "../core/monsterInstance.js";
 import type { PlayerState } from "./playerState.js";
@@ -62,10 +62,15 @@ export interface AccessoryEnhanceResult {
   reason?: string;
   cost: number;
   level: number;
+  /** Lv5・10・15 に届いて伸びた特殊効果(届かなければ空) */
+  grownSpecials?: AccessorySpecialId[];
 }
 
-/** 1段強化する。**ゴールドだけ・必ず成功。** */
-export function tryEnhanceAccessory(state: PlayerState, accessoryId: string): AccessoryEnhanceResult {
+/**
+ * 1段強化する。**ゴールドだけ・必ず成功。**
+ * Lv5・10・15 に届いた時は、特殊効果の中から1つを選んで伸ばす(`grantSpecialBoosts`)。
+ */
+export function tryEnhanceAccessory(state: PlayerState, accessoryId: string, rng: () => number = Math.random): AccessoryEnhanceResult {
   const acc = findAccessory(state, accessoryId);
   if (!acc) return { ok: false, reason: "アクセサリーが見つかりません", cost: 0, level: 0 };
   if (!canEnhanceAccessory(acc)) return { ok: false, reason: "これ以上強化できません", cost: 0, level: acc.level };
@@ -73,7 +78,8 @@ export function tryEnhanceAccessory(state: PlayerState, accessoryId: string): Ac
   if (state.gold < cost) return { ok: false, reason: "ゴールドが足りません", cost, level: acc.level };
   state.gold -= cost;
   enhanceAccessory(acc);
-  return { ok: true, cost, level: acc.level };
+  const grownSpecials = grantSpecialBoosts(acc, rng);
+  return { ok: true, cost, level: acc.level, grownSpecials };
 }
 
 export interface AccessorySellResult {
@@ -302,6 +308,12 @@ export function normalizeAccessories(state: PlayerState): void {
     const acc = sanitizeAccessory(raw);
     if (!acc || acc.id === "acc_unknown" || seen.has(acc.id)) continue;
     seen.add(acc.id);
+    /*
+     * **控えの移行。**特殊効果が Lv5・10・15 で伸びるようになる前に育てたアクセは、
+     * 届いている段のぶんの強化をまだ受け取っていない。ここで配る
+     * (配り済みの回数は数え直さないので、読み込むたびに増えることはない)。
+     */
+    grantSpecialBoosts(acc, Math.random);
     cleaned.push(acc);
   }
   state.accessories = cleaned;

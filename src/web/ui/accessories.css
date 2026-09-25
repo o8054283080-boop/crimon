@@ -54,8 +54,7 @@
 .acc-summary--epic { border-color: rgba(255, 170, 80, 0.55); }
 .acc-summary--legend { border-color: rgba(214, 140, 255, 0.5); }
 
-.acc-summary__main,
-.acc-summary__weak {
+.acc-summary__main {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -75,7 +74,8 @@
 
 .acc-summary__specials li {
   display: flex;
-  flex-wrap: wrap;
+  /* 見出し・強化の印・文の3つを1行に並べ、長い文は文の中で折り返す(文だけが次の行へ落ちない) */
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 6px;
   font-size: 13px;
@@ -83,7 +83,6 @@
   overflow-wrap: anywhere;
 }
 
-.acc-summary__weak { color: #c8d3ee; }
 
 .acc-summary__label {
   flex: none;
@@ -96,8 +95,24 @@
 }
 
 .acc-summary__hint {
-  color: #8fa0c8;
+  color: #a9b6d8;
+  font-size: 11px;
+}
+
+.acc-summary__specials li > span:last-child {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Lv5・10・15 の強化で伸びた回数。金の小札 */
+.acc-summary__boost {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 206, 110, 0.55);
+  border-radius: 999px;
+  color: #ffd98a;
   font-size: 10px;
+  font-weight: 800;
 }
 
 /* ------------------------------------------------------------ 一覧の1行 */

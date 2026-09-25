@@ -57,7 +57,14 @@ export const ACCESSORY_MAX_LEVEL = 15;
 /** 特殊効果1つ。`value` は割合(0.085 = 8.5%)。倍率型(×1.12)は 0.12 で持つ */
 export interface AccessorySpecialRoll {
   id: AccessorySpecialId;
+  /** 引いた時の値(基礎)。強化で書き換えない */
   value: number;
+  /**
+   * Lv5・10・15 の強化で、この特殊が選ばれた回数(0〜3)。
+   * 1回ごとに基礎値の2割ずつ伸びる(`specialValue`)。どれが選ばれるかは強化した時に決まり、
+   * アクセそのものに焼く(依頼主の指定:「特殊を1つずつ伸ばす」)。
+   */
+  boosts?: number;
 }
 
 export interface Accessory {
@@ -307,6 +314,50 @@ export function weakValue(id: AccessoryWeakId, level: number): number {
 }
 
 /* ==========================================================================
+ * 特殊効果の強化(Lv5・10・15)
+ *
+ * 前は Lv5・10・15 で伸びるのが弱効果だけで、特殊効果は引いた値のまま動かなかった
+ * (依頼主の指摘「5、10、15の強化が弱能力しか強化されない」)。
+ * いまは段に届くたびに、**特殊効果の中から1つを選んで基礎値の2割ぶん伸ばす。**
+ * どれが伸びるかは強化した時に決まり、`boosts` として焼く(サマナーズウォーのルーンの伸び方に近い)。
+ * ========================================================================== */
+
+/** 特殊効果が1回選ばれた時の伸び(基礎値に対する割合) */
+export const SPECIAL_BOOST_PER_STEP = 0.2;
+
+/** そのLvまでに届いた段の数(Lv5・10・15)。これが特殊効果の強化回数の合計になる */
+export function specialBoostSteps(level: number): number {
+  return weakStepIndex(level);
+}
+
+/** 特殊効果の現在値。**表示と戦闘の両方がここを見る** */
+export function specialValue(roll: AccessorySpecialRoll): number {
+  const boosts = Math.max(0, Math.min(3, Math.floor(roll.boosts ?? 0)));
+  return roundFraction(roll.value * (1 + SPECIAL_BOOST_PER_STEP * boosts));
+}
+
+/**
+ * 届いている段のぶんだけ、特殊効果の強化を配る。**配り済みの回数は数え直さない**
+ * (合計が段の数に届くまで足すだけ)ので、何度呼んでも増えすぎない。
+ *
+ * 強化した直後と、前からLv5以上だったアクセ(この仕組みの前に育てたもの)の移行の両方で使う。
+ * 返り値は今回伸びた特殊のID(伸びなければ空)。
+ */
+export function grantSpecialBoosts(acc: Accessory, rng: () => number): AccessorySpecialId[] {
+  const grown: AccessorySpecialId[] = [];
+  if (acc.specials.length === 0) return grown;
+  const target = specialBoostSteps(acc.level);
+  let given = acc.specials.reduce((sum, roll) => sum + Math.max(0, Math.floor(roll.boosts ?? 0)), 0);
+  while (given < target) {
+    const roll = acc.specials[Math.min(acc.specials.length - 1, Math.floor(rng() * acc.specials.length))];
+    roll.boosts = Math.max(0, Math.floor(roll.boosts ?? 0)) + 1;
+    grown.push(roll.id);
+    given += 1;
+  }
+  return grown;
+}
+
+/* ==========================================================================
  * 生成
  * ========================================================================== */
 
@@ -494,7 +545,7 @@ function formatValue(value: number, unit: SpecialUnit): string {
 
 export function describeSpecial(roll: AccessorySpecialRoll): string {
   const def = ACCESSORY_SPECIALS[roll.id];
-  return def.format.replace("{v}", formatValue(roll.value, def.unit));
+  return def.format.replace("{v}", formatValue(specialValue(roll), def.unit));
 }
 
 export function describeWeak(id: AccessoryWeakId, level: number): string {
@@ -551,7 +602,23 @@ export function sanitizeAccessory(value: unknown): Accessory | null {
         if (typeof raw.value !== "number" || !Number.isFinite(raw.value)) continue;
         const [lo, hi] = specialRange(raw.id, rarity);
         seen.add(raw.id);
-        specials.push({ id: raw.id, value: Math.max(lo, Math.min(hi, raw.value)) });
+        const roll: AccessorySpecialRoll = { id: raw.id, value: Math.max(lo, Math.min(hi, raw.value)) };
+        const boosts = typeof raw.boosts === "number" && Number.isFinite(raw.boosts) ? Math.floor(raw.boosts) : 0;
+        if (boosts > 0) roll.boosts = Math.min(3, boosts);
+        specials.push(roll);
+      }
+    }
+    /*
+     * 強化回数の合計は、届いている段の数を超えられない(防衛データの改ざんで
+     * Lv1 のアクセに3回ぶん乗せる、を止める)。超えたぶんは後ろの特殊から削る。
+     */
+    let over = specials.reduce((sum, roll) => sum + (roll.boosts ?? 0), 0) - specialBoostSteps(level);
+    for (let i = specials.length - 1; i >= 0 && over > 0; i -= 1) {
+      const cut = Math.min(over, specials[i].boosts ?? 0);
+      if (cut > 0) {
+        const left = (specials[i].boosts ?? 0) - cut;
+        if (left > 0) specials[i].boosts = left; else delete specials[i].boosts;
+        over -= cut;
       }
     }
     const weak = isAccessoryWeakId(value.weak) && ACCESSORY_WEAKS[value.weak].family === family
@@ -668,13 +735,15 @@ const WEAK_TO_EFFECT: Record<AccessoryWeakId, NumericEffectKey> = {
 export function accessoryBattleEffects(acc: Accessory): AccessoryBattleEffects {
   const out = emptyAccessoryEffects();
   for (const roll of acc.specials) {
+    // 強化(Lv5・10・15)で伸びたぶんを含めた値。表示と同じ `specialValue` を通す
+    const value = specialValue(roll);
     const element = elementOfSpecial(roll.id);
     if (element) {
-      out.elementDamage[element] = (out.elementDamage[element] ?? 0) + roll.value;
+      out.elementDamage[element] = (out.elementDamage[element] ?? 0) + value;
       continue;
     }
     const key = SPECIAL_TO_EFFECT[roll.id as Exclude<AccessorySpecialId, ElementSpecialId>];
-    if (key) out[key] += roll.value;
+    if (key) out[key] += value;
   }
   out[WEAK_TO_EFFECT[acc.weak]] += weakValue(acc.weak, acc.level);
   return out;

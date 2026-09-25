@@ -6286,7 +6286,14 @@ function accessoriesScreenProps(pickFor: string | null = state.accessoryPickFor)
       const result = tryEnhanceAccessory(state.player, accessoryId);
       if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
       savePlayerState(state.player);
-      state.accessoryNotice = `Lv${result.level}になりました(🪙${result.cost.toLocaleString("ja-JP")})`;
+      // Lv5・10・15 に届いた時は、どの特殊効果が伸びたかを添える(強化した実感を1行で出す)
+      const acc = findAccessory(state.player, accessoryId);
+      const grown = (result.grownSpecials ?? []).map((id) => {
+        const roll = acc?.specials.find((r) => r.id === id);
+        return roll ? `「${describeSpecial(roll)}」` : "";
+      }).filter(Boolean);
+      state.accessoryNotice = `Lv${result.level}になりました(🪙${result.cost.toLocaleString("ja-JP")})`
+        + (grown.length > 0 ? `。特殊効果 ${grown.join("")} が強くなりました` : "");
       render();
     },
     onSell: (accessoryId) => {

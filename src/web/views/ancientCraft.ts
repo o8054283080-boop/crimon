@@ -47,7 +47,7 @@ export function renderAncientCraft(props: AncientCraftProps): HTMLElement {
       : null,
     el("section", { className: "card" }, [
       el("h2", {}, ["アクセサリー(★6確定)"]),
-      el("p", { className: "acc-note" }, ["系統を選びます。レア度・メイン・特殊効果・弱効果は作った時に決まります。"]),
+      el("p", { className: "acc-note" }, ["系統を選びます。レア度・メイン・効果は作った時に決まります。"]),
       el("div", { className: "craft-grid" }, ACCESSORY_FAMILIES.map((family) =>
         el("button", {
           type: "button",
