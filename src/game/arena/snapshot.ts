@@ -131,7 +131,13 @@ export function snapshotToDefinitions(snapshot: ArenaDefenseSnapshot): MonsterDe
   const multiplier = snapshot.statMultiplier ?? 1;
   if (multiplier === 1) return defs;
   /*
-   * **速度には掛けない。**速度は手番の数に直結するので、
+   * **掛けるのは攻撃・防御の2つだけ。**
+   *
+   * **HPには掛けない**(依頼主の指定「HPが高すぎてしまうので、HPだけは倍率をつけない」)。
+   * 前はHPにも掛けていたが、HPは装備・能力ポイントで元々いちばん大きく伸びる値で、
+   * そこへ最大2倍が乗ると、倒し切るまでの手数ばかりが伸びて長引くだけの戦いになっていた。
+   *
+   * **速度にも掛けない。**速度は手番の数に直結するので、
    * ここを伸ばすと相手だけが何度も動く別のゲームになる。
    * クリ率・クリダメ・的中・抵抗も触らない(確率は積み上げても頭打ちで、
    * 100%を超えた瞬間から「絶対に当たる」という別の性質に変わる)。
@@ -140,7 +146,6 @@ export function snapshotToDefinitions(snapshot: ArenaDefenseSnapshot): MonsterDe
     ...def,
     stats: {
       ...def.stats,
-      hp: Math.round(def.stats.hp * multiplier),
       atk: Math.round(def.stats.atk * multiplier),
       def: Math.round(def.stats.def * multiplier),
     },

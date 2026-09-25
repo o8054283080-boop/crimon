@@ -37,7 +37,7 @@ describe("レート3000より上の倍率", () => {
    * クリ率・クリダメ・的中・抵抗も同じで、確率は積み上げても頭打ちになり、
    * 100%を超えた瞬間に「絶対に当たる」という別の性質へ変わる。
    */
-  it("掛かるのはHP・攻撃・防御だけ。速度も確率も動かさない", () => {
+  it("掛かるのは攻撃・防御だけ。HP・速度・確率は動かさない", () => {
     /*
      * **同じ控えで、倍率の有無だけを比べる。**
      * レート3000と3500では引く編成の段が違うので(段4も引くか、段5だけか)、
@@ -65,7 +65,8 @@ describe("レート3000より上の倍率", () => {
       const a = plain[i].stats;
       const b = boosted[i].stats;
       // 同じ種・同じ並び位置なので、素の個体は同じはず(倍率だけが違う)
-      expect(b.hp).toBe(Math.round(a.hp * multiplier));
+      // HPには掛けない(依頼主「HPが高すぎてしまうので、HPだけは倍率をつけない」)
+      expect(b.hp, "HPに掛かっている").toBe(a.hp);
       expect(b.atk).toBe(Math.round(a.atk * multiplier));
       expect(b.def).toBe(Math.round(a.def * multiplier));
       expect(b.spd, "速度に掛かっている").toBe(a.spd);
@@ -90,7 +91,10 @@ describe("レート3000より上の倍率", () => {
     const boosted = snapshotToDefinitions(npc.defense);
     const plain = snapshotToDefinitions(asPlayer);
     for (let i = 0; i < plain.length; i += 1) {
-      expect(plain[i].stats.hp).toBeLessThan(boosted[i].stats.hp);
+      // 倍率が残るのは攻撃・防御(HPには掛けないので、ここで比べる値にならない)
+      expect(plain[i].stats.atk).toBeLessThan(boosted[i].stats.atk);
+      expect(plain[i].stats.def).toBeLessThan(boosted[i].stats.def);
+      expect(plain[i].stats.hp).toBe(boosted[i].stats.hp);
     }
   });
 
