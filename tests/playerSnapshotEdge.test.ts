@@ -48,13 +48,13 @@ describe("保存APIの書き込み境界", () => {
   });
 });
 
-async function dashboard(failedTable?: string) {
+async function dashboard(failedTable?: string, rows: Record<string, unknown[]> = {}) {
   const tables: string[] = [];
   const from = (table: string) => {
     tables.push(table);
     const result = table === "crimon_admin_settings"
       ? { data: { value: createHash("sha256").update("test-password").digest("hex") }, error: null }
-      : { data: table === "arena_profiles" ? Array.from({ length: 5 }, (_, i) => ({ user_id: `existing-${i}` })) : [], error: table === failedTable ? { code: "42P01" } : null };
+      : { data: rows[table] ?? (table === "arena_profiles" ? Array.from({ length: 5 }, (_, i) => ({ user_id: `existing-${i}` })) : []), error: table === failedTable ? { code: "42P01" } : null };
     const query: Record<string, unknown> = { then: (resolve: (v: unknown) => void) => Promise.resolve(result).then(resolve) };
     for (const name of ["select", "eq", "order", "limit", "gte", "maybeSingle"]) query[name] = () => query;
     return query;
@@ -71,6 +71,11 @@ describe("管理APIは取得失敗を0件にしない", () => {
     expect(response.status).toBe(200);
     expect(body.arenaPlayers).toHaveLength(5);
     expect(body.snapshotStatus).toBe("unavailable");
+  });
+  it("端末の別バックアップの表が無くても、一覧は出して取得失敗を伝える", async () => {
+    const { response, body } = await dashboard("crimon_recovery_conflict_copies");
+    expect(response.status).toBe(200);
+    expect(body.conflictCopyStatus).toBe("unavailable");
   });
   it("アリーナ取得失敗なら503として通知する", async () => {
     const { response, body } = await dashboard("arena_profiles");
@@ -152,5 +157,48 @@ describe("競合した端末の控えは、本来のバックアップとアリ�
       expect((await call(request(body))).status).toBe(400);
     }
     expect(writes.filter((w) => w.table === "crimon_recovery_conflict_copies")).toEqual([]);
+  });
+});
+
+/*
+ * 依頼主「新しいデータが見れないと何の意味もありません」。
+ * 保存が分かれた人は、本来のバックアップが止まっている。管理画面の行は、いちばん新しい方(端末の控え)から出す。
+ */
+describe("管理画面は、保存が分かれた人のいちばん新しいデータを出す", () => {
+  const saveOf = (level: number, gold: number) => ({ kind: "crimon-save", version: 1, summary: { fighterName: "ドラ", fighterLevel: level, gold, crystal: 1, monsterCount: 3, equipmentCount: 2 }, state: { fighterName: "ドラ", monsters: [{}], equipment: [] } });
+  const account = { id: "acc-1", recovery_id: "dora", latest_revision: 5, latest_saved_at: "2026-09-20T00:00:00Z", created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-20T00:00:00Z", latest_save: saveOf(60, 100) };
+
+  it("控えの方が新しければ、行の値と日時を控えから出し、本来の方も並べて返す", async () => {
+    const { body } = await dashboard(undefined, {
+      crimon_recovery_accounts: [account],
+      crimon_recovery_conflict_copies: [{ account_id: "acc-1", device_id: "0123456789abcdef", save: saveOf(70, 900), base_revision: 5, saved_at: "2026-09-25T00:00:00Z" }],
+    });
+    const row = body.recoveryAccounts[0];
+    expect(row.newestSource).toBe("COPY");
+    expect(row.shownSavedAt).toBe("2026-09-25T00:00:00Z");
+    expect(row.fighterLevel).toBe(70);
+    expect(row.gold).toBe(900);
+    expect(row.conflictCopies).toHaveLength(1);
+    expect(row.main).toMatchObject({ fighterLevel: 60, gold: 100, savedAt: "2026-09-20T00:00:00Z" });
+    expect(body.conflictCopyStatus).toBe("ready");
+  });
+
+  it("控えより本来の方が新しければ、本来の方を出す(控えは比較用に並べる)", async () => {
+    const { body } = await dashboard(undefined, {
+      crimon_recovery_accounts: [{ ...account, latest_saved_at: "2026-09-26T00:00:00Z" }],
+      crimon_recovery_conflict_copies: [{ account_id: "acc-1", device_id: "0123456789abcdef", save: saveOf(70, 900), base_revision: 5, saved_at: "2026-09-25T00:00:00Z" }],
+    });
+    const row = body.recoveryAccounts[0];
+    expect(row.newestSource).toBe("MAIN");
+    expect(row.fighterLevel).toBe(60);
+    expect(row.conflictCopies).toHaveLength(1);
+  });
+
+  it("控えが無い人は、これまでどおり本来のバックアップだけ", async () => {
+    const { body } = await dashboard(undefined, { crimon_recovery_accounts: [account] });
+    const row = body.recoveryAccounts[0];
+    expect(row.newestSource).toBe("MAIN");
+    expect(row.conflictCopies).toEqual([]);
+    expect(row.main).toBeNull();
   });
 });

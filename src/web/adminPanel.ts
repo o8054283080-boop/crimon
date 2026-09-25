@@ -141,7 +141,18 @@ type RecoveryAccount = {
   arenaUserId?: string | null;
   /** 古いサーバ(取り出して置き直す前)は返さないので、無い場合がある */
   progress?: SaveProgress | null;
+  /** 行の値の出どころ。COPY は保存が2つに分かれていて、端末の控えの方が新しい */
+  newestSource?: "MAIN" | "COPY";
+  /** 行の値の保存日時(控えから読んだ時は控えの日時) */
+  shownSavedAt?: string | null;
+  /** 保存が分かれた端末の控え(端末ごとに1行) */
+  conflictCopies?: ConflictCopy[];
+  /** 控えがある時だけ、本来のバックアップの姿を比べるために返す */
+  main?: SaveBrief | null;
 };
+
+type SaveBrief = { savedAt: string | null; fighterLevel: number; gold: number; crystal: number; monsterCount: number; equipmentCount: number };
+type ConflictCopy = SaveBrief & { deviceId: string; baseRevision: number | null };
 
 type PlayerSnapshot = { userId: string; savedAt: string; summary: { fighterName?: string; fighterLevel?: number; gold?: number; crystal?: number; monsterCount?: number; equipmentCount?: number }; progress?: SaveProgress | null; };
 
@@ -156,6 +167,8 @@ type AdminDashboard = {
   recoveryAccounts: RecoveryAccount[];
   playerSnapshots?: PlayerSnapshot[];
   snapshotStatus?: "ready" | "unavailable";
+  /** 保存が分かれた端末の控えの表を読めたか */
+  conflictCopyStatus?: "ready" | "unavailable";
 };
 
 type ArenaDetail = {
@@ -724,7 +737,13 @@ function timeOf(value: unknown): number {
 function sortRecovery(a: RecoveryAccount, b: RecoveryAccount): number {
   if (currentSort === "NAME") return (a.fighterName || "").localeCompare(b.fighterName || "", "ja");
   if (currentSort === "LEVEL" || currentSort === "RATING") return b.fighterLevel - a.fighterLevel;
-  return timeOf(b.latestSavedAt) - timeOf(a.latestSavedAt);
+  // 保存が分かれた人は、端末の控えの日時で並べる(本来の方は止まっている)
+  return timeOf(b.shownSavedAt ?? b.latestSavedAt) - timeOf(a.shownSavedAt ?? a.latestSavedAt);
+}
+
+/** 1つの保存の中身を1行で。控えと本来のバックアップを並べて比べるのに使う */
+function briefText(save: SaveBrief): string {
+  return `Lv.${save.fighterLevel || "-"} / ゴールド ${formatNumber(save.gold)} / ダイヤ ${formatNumber(save.crystal)} / モンスター ${formatNumber(save.monsterCount)}体 / 装備 ${formatNumber(save.equipmentCount)}個`;
 }
 
 function sortArena(a: ArenaPlayer, b: ArenaPlayer): number {
@@ -754,9 +773,12 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
        * ——実際、9/3 が最終保存の人の塔を「未挑戦」と出して、
        * 依頼主に「データがおかしい」と指摘された。
        */
-      const savedHours = sinceText(row.latestSavedAt).hours;
+      const shownAt = row.shownSavedAt ?? row.latestSavedAt;
+      const savedHours = sinceText(shownAt).hours;
       const stale = savedHours >= 24;
-      if (stale) primary.append(el("small", "crimon-admin-row__stale", `${sinceText(row.latestSavedAt).text}の保存時点`));
+      if (stale) primary.append(el("small", "crimon-admin-row__stale", `${sinceText(shownAt).text}の保存時点`));
+      const fromCopy = row.newestSource === "COPY";
+      if (fromCopy) primary.append(el("small", "crimon-admin-row__stale", "端末の別バックアップ(最新)を表示中"));
       /*
        * **サーバが返しているものは、全部出す。**
        * これまで出していたのは5つだけで、モンスター数も装備数も
@@ -769,7 +791,7 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
         metric("ダイヤ", formatNumber(row.crystal)),
         metric("モンスター", `${formatNumber(row.monsterCount)}体`),
         metric("装備", `${formatNumber(row.equipmentCount)}個`),
-        savedMetric("最終保存", row.latestSavedAt),
+        savedMetric(fromCopy ? "最終保存(端末の別バックアップ)" : "最終保存", shownAt),
         metric("世代", formatNumber(row.latestRevision)),
         metric("登録", formatDate(row.createdAt)),
         // ロックと失敗回数は、問い合わせを受けた時にまっ先に見る場所
@@ -817,9 +839,30 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
        * アリーナの身元は端末の中にしかないので、機種を変えると作り直される。
        */
       if (row.arenaUserId) item.append(metric("アリーナID", row.arenaUserId));
+      /*
+       * **保存が2つに分かれている人。**
+       *
+       * 同じ復旧IDを2台で使うなどすると、本来のバックアップは止まり、端末の新しい遊びは
+       * 別のバックアップ(端末ごとの控え)にだけ届く。上の行の値はいちばん新しい方から出しているので、
+       * ここで両方を並べ、どちらが古いのかを見比べられるようにする。
+       */
+      const copies = row.conflictCopies ?? [];
+      if (copies.length > 0) {
+        item.append(metric("⚠ 保存が分かれています", `端末の別バックアップ ${copies.length}件`, true));
+        // 1行の比較は長いので、行の幅いっぱいに置く(細い升目に押し込むと4〜5行に折れて読めない)
+        const wide = (node: HTMLElement) => { node.classList.add("crimon-admin-metric--wide"); return node; };
+        if (row.main) item.append(wide(metric(`本来のバックアップ(${formatDate(row.main.savedAt)})`, briefText(row.main))));
+        copies.forEach((copy, index) => {
+          item.append(wide(metric(`別バックアップ${copies.length > 1 ? index + 1 : ""}(${formatDate(copy.savedAt)})`, briefText(copy))));
+        });
+      }
       list.append(item);
     }
     if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当する登録データはありません"));
+    // 控えの表を読めなかった時は、黙って本来の方だけを出さない(古い姿を今の姿と読ませない)
+    if (dashboard.conflictCopyStatus === "unavailable") {
+      list.prepend(el("div", "crimon-admin-error", "端末の別バックアップを取得できませんでした。保存が分かれている人は、表示より新しいデータがある可能性があります"));
+    }
   } else {
     const rows = dashboard.arenaPlayers
       .filter((row) => matchesSearch(row.displayName, row.userId, row.tierId))

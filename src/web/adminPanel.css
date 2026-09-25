@@ -738,3 +738,8 @@ button.crimon-admin-row:active {
   line-height: 1.6;
   color: #9fb0c8;
 }
+
+/* 保存が分かれた人の「本来のバックアップ / 別バックアップ」の比較。1行が長いので行の幅いっぱいに置く */
+.crimon-admin-metric--wide {
+  grid-column: 1 / -1;
+}
