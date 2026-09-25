@@ -400,7 +400,41 @@ export async function saveConfirmedCloud(meta: CloudRecoveryMeta, save: CloudSav
  * 最後に上げた後この端末で何も遊んでいなければ、比べるまでもなくクラウドに合わせる。
  * **どちらに揃えても、負けた方は別のバックアップとしてクラウドに残す**(黙って消さない)。
  */
-export type OpenSyncDecision = "IN_SYNC" | "UP_TO_DATE" | "ADOPT_CLOUD" | "KEEP_LOCAL";
+export type OpenSyncDecision = "IN_SYNC" | "UP_TO_DATE" | "ADOPT_CLOUD" | "KEEP_LOCAL" | "UNDECIDED";
+
+/**
+ * セーブの中に残っている、**最後に遊んだおおよその時刻。**
+ *
+ * スタミナの計算・ログインボーナス・アリーナ券・防衛の確認は、遊んでいれば
+ * どれかが必ず進む。端末の書き込み時刻(`crimon_save_touched_at_v1`)は
+ * 入れたばかりで古い端末には無いが、**これは両方のセーブが持っている**ので、
+ * 端末とクラウドを同じ物差しで比べられる。
+ */
+export function lastPlayedAtOf(state: unknown): number | null {
+  const s = state as Record<string, unknown> | null;
+  if (!s || typeof s !== "object") return null;
+  const limit = Date.now() + 24 * 60 * 60 * 1000; // 端末の時計が大きく進んでいる値は信じない
+  const times = ["lastStaminaUpdateAt", "lastLoginBonusAt", "lastArenaTicketUpdateAt", "arenaDefenseSyncedAt", "arenaLastDefenseCheckAt"]
+    .map((key) => s[key])
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0 && value <= limit);
+  return times.length > 0 ? Math.max(...times) : null;
+}
+
+/**
+ * 進み具合の比較(ファイターLv → 経験値)。**遊べば増えるだけで、減らない値。**
+ * 正なら a の方が進んでいる。
+ */
+function compareProgress(a: unknown, b: unknown): number {
+  const pick = (state: unknown) => {
+    const s = (state ?? {}) as Record<string, unknown>;
+    const level = typeof s.fighterLevel === "number" && Number.isFinite(s.fighterLevel) ? s.fighterLevel : 0;
+    const exp = typeof s.fighterExp === "number" && Number.isFinite(s.fighterExp) ? s.fighterExp : 0;
+    return [level, exp] as const;
+  };
+  const [la, ea] = pick(a);
+  const [lb, eb] = pick(b);
+  return la !== lb ? Math.sign(la - lb) : Math.sign(ea - eb);
+}
 
 export function decideOpenSync(args: {
   meta: CloudRecoveryMeta;
@@ -420,21 +454,43 @@ export function decideOpenSync(args: {
   if (!localChanged) return { decision: "ADOPT_CLOUD", localChanged };
   /*
    * **両方で遊んでいる。**後で遊んだ方に揃える。
-   * 書いた時刻を持たない古い端末は、分かれた後に控えた時刻を使う。
-   * どちらも無ければクラウドに合わせる(この端末のデータは控えに残す)。
+   *
+   * まず両方のセーブの中の時刻同士で比べる(同じ物差し)。取れなければ、
+   * この端末の書き込み時刻(無ければ分かれた後に控えた時刻)とクラウドの保存時刻で比べる。
+   *
+   * **前は、時刻が分からない時にクラウドへ合わせていた。**旧版の頃から保存が止まっていた
+   * 端末(9/4 のLv62がクラウド、端末は9/25のLv77)は書き込み時刻をまだ持たないので、
+   * 開いた瞬間に21日ぶん巻き戻るところだった。
    */
-  const copiedAt = meta.conflictCopySavedAt ? Date.parse(meta.conflictCopySavedAt) : Number.NaN;
-  const localAt = args.localTouchedAt ?? (Number.isFinite(copiedAt) ? copiedAt : null);
-  const cloudAt = Date.parse(cloud.savedAt);
-  if (localAt !== null && Number.isFinite(cloudAt) && localAt > cloudAt) return { decision: "KEEP_LOCAL", localChanged };
-  return { decision: "ADOPT_CLOUD", localChanged };
+  const localPlayed = lastPlayedAtOf(local.state);
+  const cloudPlayed = lastPlayedAtOf(cloud.save.state);
+  let later: "LOCAL" | "CLOUD" | null = null;
+  if (localPlayed !== null && cloudPlayed !== null && localPlayed !== cloudPlayed) {
+    later = localPlayed > cloudPlayed ? "LOCAL" : "CLOUD";
+  } else {
+    const copiedAt = meta.conflictCopySavedAt ? Date.parse(meta.conflictCopySavedAt) : Number.NaN;
+    const localAt = args.localTouchedAt ?? (Number.isFinite(copiedAt) ? copiedAt : null);
+    const cloudAt = Date.parse(cloud.savedAt);
+    if (localAt !== null && Number.isFinite(cloudAt) && localAt !== cloudAt) later = localAt > cloudAt ? "LOCAL" : "CLOUD";
+  }
+  /*
+   * **巻き戻りの安全網。**ファイターLvと経験値は遊べば増えるだけなので、
+   * 「後で遊んだ方」がもう一方より進んでいないのはおかしい。
+   * そういう時と、どちらとも言えない時は、自動では切り替えない(両方を残して本人が選ぶ)。
+   */
+  const progress = compareProgress(local.state, cloud.save.state);
+  if (later === "LOCAL" && progress >= 0) return { decision: "KEEP_LOCAL", localChanged };
+  if (later === "CLOUD" && progress <= 0) return { decision: "ADOPT_CLOUD", localChanged };
+  if (later === null && progress > 0) return { decision: "KEEP_LOCAL", localChanged };
+  if (later === null && progress < 0) return { decision: "ADOPT_CLOUD", localChanged };
+  return { decision: "UNDECIDED", localChanged };
 }
 
 /** クラウドの本来のバックアップを、この端末のデータで置き換える前に控える行の番号 */
 export const REPLACED_MAIN_COPY_ID = "replaced-main";
 
 export type OpenSyncResult =
-  | { kind: "IN_SYNC" | "UP_TO_DATE" | "KEEP_LOCAL"; meta: CloudRecoveryMeta }
+  | { kind: "IN_SYNC" | "UP_TO_DATE" | "KEEP_LOCAL" | "UNDECIDED"; meta: CloudRecoveryMeta }
   | { kind: "ADOPT_CLOUD"; meta: CloudRecoveryMeta; save: CloudSaveEnvelope; keptLocalCopy: boolean };
 
 /**
@@ -458,7 +514,8 @@ export async function syncOnOpen(
     cloud: { revision: latest.meta.revision, savedAt: latest.meta.savedAt, save: latest.save },
   });
   if (decision === "IN_SYNC") return { kind: "IN_SYNC", meta: { ...latest.meta, ...cleared } };
-  if (decision === "UP_TO_DATE") return { kind: "UP_TO_DATE", meta: { ...meta, sessionExpiresAt: latest.meta.sessionExpiresAt } };
+  // 決められない時は何もしない。いつもの自動保存が競合を見つけ、この端末のデータを控える
+  if (decision === "UP_TO_DATE" || decision === "UNDECIDED") return { kind: decision, meta: { ...meta, sessionExpiresAt: latest.meta.sessionExpiresAt } };
   if (decision === "ADOPT_CLOUD") {
     // この端末でも遊んでいたなら、その姿を別のバックアップとして残してから合わせる。
     // **控えられなかったら合わせない**(この端末にしか無いデータを置き去りにしない)

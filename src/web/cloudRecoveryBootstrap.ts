@@ -244,7 +244,7 @@ async function syncOpen(atStartup: boolean): Promise<void> {
       return;
     }
     storeCloudMeta(result.meta);
-    if (result.kind === "UP_TO_DATE") return;
+    if (result.kind === "UP_TO_DATE" || result.kind === "UNDECIDED") return;
     conflictDetected = false;
     if (result.kind === "KEEP_LOCAL") {
       setStatus(`この端末の方が新しいため、この端末のデータでバックアップしました：${formatSavedAt(result.meta.savedAt)}。前のクラウドのデータも別のバックアップとして残しています。`, "ok");
