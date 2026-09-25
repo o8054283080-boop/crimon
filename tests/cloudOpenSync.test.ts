@@ -47,8 +47,50 @@ describe("開いた時の判断(decideOpenSync)", () => {
     const older = meta({ syncConflict: true, conflictCopySavedAt: "2026-09-25T08:00:00Z" });
     expect(decideOpenSync({ meta: older, local: save(20), localTouchedAt: null, cloud: cloud(50) }).decision).toBe("ADOPT_CLOUD");
   });
-  it("どちらが後か分からない時はクラウドに合わせる(この端末の分は控えに残す)", () => {
-    expect(decideOpenSync({ meta: meta(), local: save(20), localTouchedAt: null, cloud: cloud(50) })).toEqual({ decision: "ADOPT_CLOUD", localChanged: true });
+  it("どちらが後か分からず、進み具合も同じなら、自動では切り替えない(両方を残して本人が選ぶ)", () => {
+    expect(decideOpenSync({ meta: meta(), local: save(20), localTouchedAt: null, cloud: cloud(50) })).toEqual({ decision: "UNDECIDED", localChanged: true });
+  });
+});
+
+/** ファイターLv・経験値と、セーブの中の時刻を持ったセーブ */
+const played = (level: number, exp: number, at: string, gold = level) => ({ kind: "crimon-save", version: 1, exportedAt: at,
+  state: { gold, fighterLevel: level, fighterExp: exp, lastStaminaUpdateAt: Date.parse(at), lastLoginBonusAt: Date.parse(at) - 3_600_000, monsters: [{ id: "one" }], equipment: [] } }) as unknown as CloudSaveEnvelope;
+
+describe("巻き戻りを起こさない(旧版の頃から保存が止まっていた端末)", () => {
+  // 実例: クラウドは 9/4 の Lv62 のまま、端末は 9/25 まで遊んで Lv77。端末は書き込み時刻をまだ持たない
+  const stuck = meta({ revision: 240, lastUploadedSave: envelopeFingerprint(played(62, 0, "2026-09-04T05:00:00Z", 1)) });
+  it("書き込み時刻が無くても、セーブの中の時刻同士で比べて、この端末のデータを残す", () => {
+    const result = decideOpenSync({ meta: stuck, local: played(77, 100, "2026-09-25T04:03:00Z"), localTouchedAt: null,
+      cloud: { revision: 241, savedAt: "2026-09-04T05:27:00Z", save: played(62, 500, "2026-09-04T05:20:00Z") } });
+    expect(result.decision).toBe("KEEP_LOCAL");
+  });
+  it("書き込み時刻がクラウドより古く見えても、中身の時刻と進み具合が勝っていれば巻き戻さない", () => {
+    const result = decideOpenSync({ meta: stuck, local: played(77, 100, "2026-09-25T04:03:00Z"), localTouchedAt: Date.parse("2026-09-01T00:00:00Z"),
+      cloud: { revision: 241, savedAt: "2026-09-04T05:27:00Z", save: played(62, 500, "2026-09-04T05:20:00Z") } });
+    expect(result.decision).toBe("KEEP_LOCAL");
+  });
+  it("後で遊ばれた方が進み具合で負けている時は、どちらにも自動で切り替えない", () => {
+    // クラウドの方が後だが Lv が低い → クラウドに合わせると端末の Lv77 が巻き戻る
+    const result = decideOpenSync({ meta: stuck, local: played(77, 0, "2026-09-20T00:00:00Z"), localTouchedAt: null,
+      cloud: { revision: 241, savedAt: "2026-09-25T00:00:00Z", save: played(63, 0, "2026-09-25T00:00:00Z") } });
+    expect(result.decision).toBe("UNDECIDED");
+  });
+  it("時刻が同じなら、進んでいる方に揃える", () => {
+    const at = "2026-09-25T00:00:00Z";
+    expect(decideOpenSync({ meta: stuck, local: played(70, 0, at), localTouchedAt: null, cloud: { revision: 241, savedAt: at, save: played(65, 0, at) } }).decision).toBe("KEEP_LOCAL");
+    expect(decideOpenSync({ meta: stuck, local: played(60, 0, at), localTouchedAt: null, cloud: { revision: 241, savedAt: at, save: played(65, 0, at) } }).decision).toBe("ADOPT_CLOUD");
+  });
+  it("別の端末で後から遊び、進んでもいれば、クラウドに合わせる", () => {
+    const result = decideOpenSync({ meta: stuck, local: played(70, 0, "2026-09-20T00:00:00Z"), localTouchedAt: null,
+      cloud: { revision: 241, savedAt: "2026-09-25T00:00:00Z", save: played(72, 0, "2026-09-25T00:00:00Z") } });
+    expect(result.decision).toBe("ADOPT_CLOUD");
+  });
+  it("決められない時は、開いた時にはクラウドへ何も書かない", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(latest(save(50)));
+    vi.stubGlobal("fetch", fetch);
+    const result = await syncOnOpen(meta(), save(20), null, () => save(20));
+    expect(result.kind).toBe("UNDECIDED");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -88,7 +130,7 @@ describe("開いた時の実行(syncOnOpen)", () => {
   it("控えられなかったら、合わせない(この端末にしか無いデータを置き去りにしない)", async () => {
     const fetch = vi.fn().mockResolvedValueOnce(latest(save(50))).mockRejectedValueOnce(new Error("offline"));
     vi.stubGlobal("fetch", fetch);
-    await expect(syncOnOpen(meta(), save(20), null, () => save(20))).rejects.toThrow("offline");
+    await expect(syncOnOpen(meta(), save(20), at("2026-09-25T09:00:00Z"), () => save(20))).rejects.toThrow("offline");
   });
   it("この端末の方が後なら、置き換える前のクラウドを控えてから、この端末のデータで更新する", async () => {
     const fetch = vi.fn()
