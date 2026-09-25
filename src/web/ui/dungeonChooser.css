@@ -44,28 +44,51 @@
   flex-direction: column;
   gap: 10px;
   max-height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 14px 12px 12px;
-  border: 1px solid rgba(214, 175, 98, .5);
-  border-radius: 20px;
+  /*
+   * **枠はホームの金細工と同じ系統にする。**
+   *
+   * 前は紫紺のほぼ平らな板に細い金線が1本だけで、すぐ上の情報欄と
+   * 下のバー(どちらも金細工の枠)と並ぶと一段地味だった(目隠しの判定の指摘)。
+   * 下のバーの枠(`home-bottom-nav-frame-v5.webp`)と同じく、
+   * 隅に金の渦と青い宝石、辺は二重の金線、上下の中央に宝石を置く。
+   *
+   * バーの絵そのものは貼れない。隅を切り出すと中の城の絵が辺へ入り込む。
+   * だから同じ部品立てをSVGで描いて `border-image` で伸ばす
+   * (辺はまっすぐな線だけなので、伸ばしても歪まない)。
+   * 絵のファイルにしないのは、画像の目録の枚数を動かさないため。
+   */
+  border: 1px solid transparent;
+  border-image-source: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='b' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23e2f3ff'/><stop offset='.5' stop-color='%234d9bff'/><stop offset='1' stop-color='%23173a94'/></linearGradient><g id='c'><path d='M3 40V16L16 3H40' fill='none' stroke='%23c99a48' stroke-width='4.5'/><path d='M3 40V16L16 3H40' fill='none' stroke='%23fbe3a4' stroke-width='1.2'/><path d='M10 40V20L20 10H40' fill='none' stroke='%23a47a34' stroke-width='1.6'/><path d='M15 37C15 25 25 15 37 15' fill='none' stroke='%23d9ae5c' stroke-width='1.5'/><path d='M21 33C16 27 20 20 26 21C30 22 29 27 25 27' fill='none' stroke='%23e7c070' stroke-width='1.8' stroke-linecap='round'/><path d='M9.5 2L17 9.5L9.5 17L2 9.5Z' fill='url(%23b)' stroke='%23f3d488' stroke-width='1.4'/></g></defs><use href='%23c'/><use href='%23c' transform='matrix(-1 0 0 1 120 0)'/><use href='%23c' transform='matrix(1 0 0 -1 0 120)'/><use href='%23c' transform='matrix(-1 0 0 -1 120 120)'/><path d='M40 3H80M40 117H80M3 40V80M117 40V80' stroke='%23c99a48' stroke-width='4.5'/><path d='M40 3H80M40 117H80M3 40V80M117 40V80' stroke='%23fbe3a4' stroke-width='1.2'/><path d='M40 10H80M40 110H80M10 40V80M110 40V80' stroke='%23a47a34' stroke-width='1.6'/></svg>");
+  border-image-slice: 40;
+  border-image-width: 26px;
+  border-image-repeat: stretch;
+  border-radius: 10px;
+  padding: 20px 16px 16px;
   background:
-    radial-gradient(120% 60% at 50% 0%, rgba(122, 88, 190, .22), transparent 70%),
-    linear-gradient(180deg, #1a2140 0%, #0e1328 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 240, 200, .12), 0 18px 44px rgba(0, 0, 0, .6);
+    radial-gradient(110% 50% at 50% 0%, rgba(74, 128, 235, .24), transparent 70%),
+    linear-gradient(180deg, #0f1c44 0%, #0a1331 58%, #070c22 100%);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .6);
   animation: dungeon-chooser-rise .18s ease-out;
 }
 
-/* 上端の金の細線。見出しの格を他の画面(金の見出し+濃紺の札)にそろえる */
-.dungeon-chooser__panel::before {
+/* 上下の中央の宝石。下のバーの上端の飾りと同じ形 */
+.dungeon-chooser__panel::before,
+.dungeon-chooser__panel::after {
   content: "";
   position: absolute;
-  top: 0;
-  left: 18%;
-  right: 18%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #f0d38b, transparent);
+  left: calc(50% - 36px);
+  width: 72px;
+  height: 22px;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 22'><defs><linearGradient id='b' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23e2f3ff'/><stop offset='.5' stop-color='%234d9bff'/><stop offset='1' stop-color='%23173a94'/></linearGradient></defs><path d='M4 11C14 11 17 5 25 7C29 8 29 13 25 13' fill='none' stroke='%23e7c070' stroke-width='1.8' stroke-linecap='round'/><path d='M68 11C58 11 55 5 47 7C43 8 43 13 47 13' fill='none' stroke='%23e7c070' stroke-width='1.8' stroke-linecap='round'/><path d='M36 1L46 11L36 21L26 11Z' fill='%23c99a48'/><path d='M36 4L43 11L36 18L29 11Z' fill='url(%23b)' stroke='%23fbe3a4' stroke-width='1'/></svg>") center / contain no-repeat;
   pointer-events: none;
+}
+
+.dungeon-chooser__panel::before {
+  top: -10px;
+}
+
+.dungeon-chooser__panel::after {
+  bottom: -10px;
 }
 
 @keyframes dungeon-chooser-rise {
@@ -87,24 +110,30 @@
 .dungeon-chooser__title {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
+/* 淡い灰色の小さな字は背景に沈んでいた(目隠しの判定の指摘)。11px以上・明るい金へ */
 .dungeon-chooser__title small {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .32em;
-  color: #b89755;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .3em;
+  color: #e6c37a;
 }
 
+/* 見出しは他の画面の見出し帯(`screenHead.css`)と同じ金のグラデ */
 .dungeon-chooser__title h2 {
   margin: 0;
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 900;
+  line-height: 1.2;
   letter-spacing: .12em;
-  color: #f3d58c;
-  text-shadow: 0 1px 0 #5a3d0f, 0 0 14px rgba(240, 190, 90, .28);
+  background: var(--gold-grad, linear-gradient(180deg, #fff1c4, #e8b659));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8));
 }
 
 .dungeon-chooser .dungeon-chooser__close {
@@ -112,12 +141,13 @@
   min-width: 72px;
   min-height: 44px;
   padding: 0 14px;
-  border: 1px solid rgba(214, 175, 98, .55);
+  border: 1px solid rgba(226, 182, 110, .6);
   border-radius: 999px;
-  background: linear-gradient(180deg, #262c48, #161a30);
-  color: #f0e6cf;
+  background: linear-gradient(180deg, rgba(34, 36, 62, .95), rgba(14, 16, 32, .95));
+  box-shadow: inset 0 1px 0 rgba(255, 232, 190, .14);
+  color: #f5d48a;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: .08em;
 }
 
@@ -127,15 +157,22 @@
 
 .dungeon-chooser__lead {
   margin: -2px 2px 0;
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.5;
-  color: #b9bfd4;
+  color: #dfe4f2;
 }
 
+/* 巻くのは一覧だけ。枠と見出しは止めたまま(宝石の飾りが一緒に流れない) */
 .dungeon-chooser__list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 札の影と押した時の縮みが切れないだけの余白 */
+  margin: 0 -4px;
+  padding: 2px 4px 4px;
 }
 
 /* ---- 1件の札 ----------------------------------------------------------
@@ -159,7 +196,7 @@
   border-radius: 14px;
   background:
     linear-gradient(100deg, rgba(var(--tone), .30) 0%, rgba(var(--tone), .08) 46%, transparent 72%),
-    linear-gradient(180deg, #161c34, #0d1124);
+    linear-gradient(180deg, #14204a, #0b1330);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 6px 16px rgba(0, 0, 0, .35);
   color: #f5efe2;
   text-align: left;
@@ -196,7 +233,8 @@
 .dungeon-chooser__card--train { --tone: 63, 207, 138; }
 .dungeon-chooser__card--gold { --tone: 240, 180, 60; }
 .dungeon-chooser__card--awakening { --tone: 154, 98, 255; }
-.dungeon-chooser__card--ruins { --tone: 57, 214, 200; }
+/* 遺跡は蒼。青緑だと育成の緑と色帯が近く、絵に頼って見分けていた(目隠しの判定の指摘) */
+.dungeon-chooser__card--ruins { --tone: 92, 150, 255; }
 
 .dungeon-chooser__art {
   display: block;
@@ -239,7 +277,7 @@
   border: 1px solid rgba(var(--tone), .55);
   border-radius: 999px;
   background: rgba(var(--tone), .16);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.35;
   color: #fff1d0;
@@ -247,7 +285,7 @@
 }
 
 .dungeon-chooser__yield small {
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: .06em;
   color: rgb(var(--tone));
@@ -255,9 +293,10 @@
 }
 
 .dungeon-chooser__status {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1.35;
-  color: #a9b1c9;
+  color: #dde3f3;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -278,5 +317,5 @@
 }
 
 .dungeon-chooser__card.is-spent .dungeon-chooser__status {
-  color: #d58a7a;
+  color: #ffab98;
 }
