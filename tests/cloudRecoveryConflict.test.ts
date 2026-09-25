@@ -27,12 +27,22 @@ describe("保存の応答が届かなかった場合の安全な再開", () => {
     expect((await uploadCloudSave(meta(), save(20))).revision).toBe(9);
     expect(JSON.parse(fetch.mock.calls[2][1].body).revision).toBe(9);
   });
-  it("内容の違う別端末の保存には世代を合わせて上書きしない", async () => {
-    const fetch = vi.fn().mockResolvedValueOnce(stale()).mockResolvedValueOnce(latest(save(30), 100));
+  it("内容の違う別端末の保存には世代を合わせて上書きせず、この端末の最新データを別のバックアップとして控える", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(stale()).mockResolvedValueOnce(latest(save(30), 100))
+      .mockResolvedValueOnce(reply({ ok: true, savedAt: "2026-09-25T06:00:00Z" }));
     vi.stubGlobal("fetch", fetch);
-    await expect(uploadCloudSave(meta(), save(20))).rejects.toMatchObject({ code: "STALE_REVISION" });
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(meta().revision).toBe(2);
+    const result = await uploadCloudSave(meta(), save(20));
+    expect(fetch).toHaveBeenCalledTimes(3);
+    const body = JSON.parse(fetch.mock.calls[2][1].body);
+    // 本来のバックアップ(save)ではなく、別の控え(save_copy)へ送る
+    expect(body.action).toBe("save_copy");
+    expect(body.save.state.gold).toBe(20);
+    expect(body.deviceId).toMatch(/^[a-z0-9-]{8,64}$/);
+    // 世代も既知の保存内容も進めない(次の自動保存が別端末の続きを上書きしないため)
+    expect(result.revision).toBe(2);
+    expect(result.lastUploadedSave).toBe(meta().lastUploadedSave);
+    expect(result.syncConflict).toBe(true);
+    expect(result.conflictCopySavedAt).toBe("2026-09-25T06:00:00Z");
   });
   it("確認と再送の間に別端末が保存したら再び停止し、再試行を繰り返さない", async () => {
     const fetch = vi.fn().mockResolvedValueOnce(stale()).mockResolvedValueOnce(latest(save(10))).mockResolvedValueOnce(stale());
@@ -55,12 +65,46 @@ describe("保存の応答が届かなかった場合の安全な再開", () => {
     expect(result.revision).toBe(4);
     expect(result.pendingSaveHash).toBeUndefined();
   });
-  it("前回の送信内容とも違う場合は自動で上書きしない", async () => {
+  it("前回の送信内容とも違う場合は上書きせず、別のバックアップとして控える", async () => {
     const pending = await pendingCloudMeta(meta(), save(20));
-    const fetch = vi.fn().mockResolvedValueOnce(stale()).mockResolvedValueOnce(latest(save(40), 3));
+    const fetch = vi.fn().mockResolvedValueOnce(stale()).mockResolvedValueOnce(latest(save(40), 3))
+      .mockResolvedValueOnce(reply({ ok: true, savedAt: "2026-09-25T06:00:00Z" }));
     vi.stubGlobal("fetch", fetch);
-    await expect(uploadCloudSave(pending, save(30))).rejects.toMatchObject({ code: "STALE_REVISION" });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    const result = await uploadCloudSave(pending, save(30));
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(fetch.mock.calls[2][1].body).action).toBe("save_copy");
+    expect(result.revision).toBe(2);
+    expect(result.syncConflict).toBe(true);
+  });
+  it("競合している間は本来のバックアップへ書きに行かず、控えを更新し続ける", async () => {
+    const conflicted: CloudRecoveryMeta = { ...meta(), syncConflict: true, deviceCopyId: "0123456789abcdef", conflictCopySavedAt: "2026-09-25T06:00:00Z", conflictCopyFingerprint: envelopeFingerprint(save(20)) };
+    const fetch = vi.fn().mockResolvedValueOnce(latest(save(40), 5))
+      .mockResolvedValueOnce(reply({ ok: true, savedAt: "2026-09-25T07:00:00Z" }));
+    vi.stubGlobal("fetch", fetch);
+    const result = await uploadCloudSave(conflicted, save(25));
+    const actions = fetch.mock.calls.map((call) => JSON.parse(call[1].body).action);
+    expect(actions).toEqual(["load", "save_copy"]);
+    // 同じ端末は同じ控えの行を上書きする
+    expect(JSON.parse(fetch.mock.calls[1][1].body).deviceId).toBe("0123456789abcdef");
+    expect(result.revision).toBe(2);
+    expect(result.conflictCopySavedAt).toBe("2026-09-25T07:00:00Z");
+  });
+  it("競合中でも、端末の内容が変わっていなければ控えを送り直さない", async () => {
+    const conflicted: CloudRecoveryMeta = { ...meta(), syncConflict: true, deviceCopyId: "0123456789abcdef", conflictCopySavedAt: "2026-09-25T06:00:00Z", conflictCopyFingerprint: envelopeFingerprint(save(25)) };
+    const fetch = vi.fn().mockResolvedValueOnce(latest(save(40), 5));
+    vi.stubGlobal("fetch", fetch);
+    const result = await uploadCloudSave(conflicted, save(25));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(result.syncConflict).toBe(true);
+  });
+  it("クラウドがこの端末と同じ内容になっていれば、競合を解いて控えの記録を消す", async () => {
+    const conflicted: CloudRecoveryMeta = { ...meta(), syncConflict: true, deviceCopyId: "0123456789abcdef", conflictCopySavedAt: "2026-09-25T06:00:00Z" };
+    const fetch = vi.fn().mockResolvedValueOnce(latest(save(25), 6));
+    vi.stubGlobal("fetch", fetch);
+    const result = await uploadCloudSave(conflicted, save(25));
+    expect(result.syncConflict).toBe(false);
+    expect(result.revision).toBe(6);
+    expect(result.conflictCopySavedAt).toBeUndefined();
   });
   it("本人が選んだデータも確認後の競合は無視しない", async () => {
     const fetch = vi.fn().mockResolvedValue(stale());

@@ -23,6 +23,7 @@ on:
     paths:
       - "supabase/functions/crimon-recovery/**"
       - ".github/workflows/recovery-edge.yml"
+      - "supabase/migrations/20260925150000_recovery_conflict_copies.sql"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +34,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 競合した端末の控え(save_copy)の表を先に作る。冪等なので毎回流してよい。
+  # 表が無いまま新しいAPIを配ると、競合した端末の控えが500で落ちる
+  database:
+    uses: ./.github/workflows/db-apply-sql.yml
+    with:
+      file: supabase/migrations/20260925150000_recovery_conflict_copies.sql
+    secrets: inherit
   deploy:
+    needs: database
     name: 本番へdeploy
     runs-on: ubuntu-latest
     steps:

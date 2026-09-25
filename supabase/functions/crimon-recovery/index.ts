@@ -394,6 +394,33 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    /*
+     * **競合した端末の最新データを、別のバックアップとして控える。**
+     *
+     * 端末とクラウドの内容が分かれると `save` は STALE_REVISION で止まる。
+     * 止まっている間の遊びをクラウドへ残すため、ここへ端末ごとに1行で置く。
+     * 本来のバックアップ(latest_save)・世代・アリーナの行には**触らない。**
+     */
+    if (action === "save_copy") {
+      const session = await requireSession(body.sessionToken);
+      if (!session) return json(401, { ok: false, code: "SESSION_INVALID" });
+      const deviceId = typeof body.deviceId === "string" ? body.deviceId : "";
+      const baseRevision = Number(body.baseRevision);
+      if (!/^[a-z0-9-]{8,64}$/.test(deviceId) || !validateSave(body.save)) {
+        return json(400, { ok: false, code: "INVALID_SAVE" });
+      }
+      const savedAt = new Date().toISOString();
+      const { error } = await supabase.from("crimon_recovery_conflict_copies").upsert({
+        account_id: String(session.row.account_id),
+        device_id: deviceId,
+        save: body.save,
+        base_revision: Number.isSafeInteger(baseRevision) ? baseRevision : null,
+        saved_at: savedAt,
+      }, { onConflict: "account_id,device_id" });
+      if (error) throw error;
+      return json(200, { ok: true, savedAt, sessionExpiresAt: session.expiresAt });
+    }
+
     if (action === "logout") {
       if (typeof body.sessionToken === "string") {
         const tokenHash = await sha256Base64(body.sessionToken);

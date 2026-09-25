@@ -194,6 +194,6 @@ describe("手元の期限も、サーバに合わせて進む", () => {
     const source = readFileSync(new URL("../src/game/cloudRecovery.ts", import.meta.url), "utf8");
     const at = source.indexOf("export async function uploadCloudSave(");
     expect(at).toBeGreaterThan(-1);
-    expect(source.slice(at, at + 1200)).toContain("sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt");
+    expect(source.slice(at, source.indexOf("\n}\n", at))).toContain("sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt");
   });
 });

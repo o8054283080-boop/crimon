@@ -104,3 +104,53 @@ describe("復旧保存の競合はアリーナに副作用を起こさない", (
     });
   }
 });
+
+/*
+ * 競合した端末の控え(save_copy)。依頼主の指定:
+ * 「競合したら最新の端末データを別のバックアップとして自動保存し、既存のバックアップも残す」。
+ * 本来のバックアップ(crimon_store_recovery_save / crimon_recovery_accounts)とアリーナには触れない。
+ */
+describe("競合した端末の控えは、本来のバックアップとアリーナに触れない", () => {
+  function harness() {
+    const writes: { table: string; op: string; row?: unknown; onConflict?: string }[] = [];
+    const from = (table: string) => {
+      const data = table === "crimon_recovery_sessions"
+        ? { id: "session", account_id: "account-1", expires_at: "2099-01-01T00:00:00Z" }
+        : { arena_user_id: "original-arena-id" };
+      const query: Record<string, unknown> = { then: (resolve: (v: unknown) => void) => Promise.resolve({ data, error: null }).then(resolve) };
+      for (const method of ["select", "eq", "single", "maybeSingle"]) query[method] = () => query;
+      query.update = () => { writes.push({ table, op: "update" }); return query; };
+      query.upsert = (row: unknown, options: { onConflict?: string }) => { writes.push({ table, op: "upsert", row, onConflict: options?.onConflict }); return query; };
+      query.insert = () => { writes.push({ table, op: "insert" }); return query; };
+      return query;
+    };
+    const rpc = vi.fn();
+    return { call: handler("crimon-recovery", { from, rpc }), writes, rpc };
+  }
+  const token = "test-session-token-abcdefghijklmnopqrstuvwxyz";
+
+  it("端末ごとの控えを1行で上書きし、世代・本来の控え・アリーナは動かさない", async () => {
+    const { call, writes, rpc } = harness();
+    const response = await call(request({ action: "save_copy", sessionToken: token, deviceId: "0123456789abcdef", baseRevision: 7, save }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).ok).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+    const copy = writes.find((w) => w.table === "crimon_recovery_conflict_copies");
+    expect(copy?.op).toBe("upsert");
+    expect(copy?.onConflict).toBe("account_id,device_id");
+    expect(copy?.row).toMatchObject({ account_id: "account-1", device_id: "0123456789abcdef", base_revision: 7 });
+    // セッションの最終利用の記録以外に、書き込み先は控えの表だけ
+    expect(writes.map((w) => w.table).filter((t) => t !== "crimon_recovery_sessions")).toEqual(["crimon_recovery_conflict_copies"]);
+  });
+
+  it("端末番号や中身が不正なら書き込まない", async () => {
+    const { call, writes } = harness();
+    for (const body of [
+      { action: "save_copy", sessionToken: token, deviceId: "../x", save },
+      { action: "save_copy", sessionToken: token, deviceId: "0123456789abcdef", save: { kind: "crimon-save", version: 1, state: { monsters: [], equipment: [] } } },
+    ]) {
+      expect((await call(request(body))).status).toBe(400);
+    }
+    expect(writes.filter((w) => w.table === "crimon_recovery_conflict_copies")).toEqual([]);
+  });
+});

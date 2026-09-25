@@ -21,12 +21,18 @@ try {
   let revision = 2;
   let saves = 0;
   let lastSaved: unknown;
+  // 競合中の控え(save_copy)。本来のバックアップ(save)とは別に数える
+  const copies: { deviceId: string; baseRevision: number }[] = [];
   await page.route("**/*.supabase.co/**", async route => {
     if (!route.request().url().endsWith("/crimon-recovery")) return route.abort();
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type" } });
     const body = route.request().postDataJSON();
     const headers = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
     if (body.action === "load") return route.fulfill({ headers, json: { ok: true, revision, savedAt: "2026-09-02T00:00:00Z", save: remote } });
+    if (body.action === "save_copy") {
+      copies.push({ deviceId: body.deviceId, baseRevision: body.baseRevision });
+      return route.fulfill({ headers, json: { ok: true, savedAt: "2026-09-25T00:00:00Z" } });
+    }
     assert.equal(body.action, "save");
     saves++;
     if (body.revision <= revision) return route.fulfill({ status: 409, headers, json: { ok: false, code: "STALE_REVISION" } });
@@ -44,8 +50,12 @@ try {
   await page.getByRole("button", { name: "設定を開く", exact: true }).click();
   const connected = page.locator(".cloud-recovery");
   await connected.getByText("復旧設定済み", { exact: false }).waitFor();
-  // 起動時の保存が競合するまで待つ。止まっても手動確認できることを検証する。
-  await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("保存内容が異なる"));
+  // 起動時の保存は競合中。**止まらずに、この端末のデータを別のバックアップとして控える。**
+  await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("別のバックアップとして保存しました"));
+  assert.equal(copies.length, 1, "競合中なのに端末のデータを控えていない");
+  assert.equal(saves, 0, "競合中に本来のバックアップへ書きに行った");
+  assert.equal(copies[0].baseRevision, 1, "控えに端末の知っている世代が付いていない");
+  assert.equal(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).revision, CLOUD_RECOVERY_META_KEY), 1, "控えただけで世代が変わった");
   async function reachable(button: Locator) {
     await button.click({ trial: true }); // スクロールのアニメーション終了・操作可能を待って測定する
     assert.equal(await button.evaluate(el => {
@@ -74,7 +84,7 @@ try {
   await rejected;
   await page.waitForFunction(() => Array.from(document.querySelectorAll("button")).some(button =>
     button.textContent === "この端末のデータでバックアップを再開" && !button.disabled));
-  await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("保存内容が異なる"));
+  await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("保存内容が異なり"));
   assert.equal(lastSaved, undefined, "確認後の競合を上書きした");
   const oldPreview = await connected.locator(".cloud-recovery__preview").elementHandle();
   await inspect.click();
@@ -89,5 +99,5 @@ try {
   assert.equal(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).syncConflict, CLOUD_RECOVERY_META_KEY), false);
   await connected.locator(".cloud-recovery__status").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "artifacts/home-preview/recovery-resumed-390x844.png" });
-  console.log("保存競合の比較・取消・再競合拒否・再開を実ブラウザで確認しました。");
+  console.log("保存競合の自動の控え・比較・取消・再競合拒否・再開を実ブラウザで確認しました。");
 } finally { await browser.close(); }
