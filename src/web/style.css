@@ -20,7 +20,15 @@
    * その上に何かを置く側は必ずこの分だけ床を上げる。**
    * 設定シートの一番下のボタンがタブに覆われて押せなかった事故がある。
    */
-  --bottom-nav-h: 64px;
+  /*
+   * 下のバーの絵(1536x512・3:1)を敷く高さ。**幅から決める。**
+   * 70px前後に押し込むと、絵の城や剣が横長に潰れて「ぎゅっとしすぎ」に見えた
+   * (依頼主の実機。U8で絵を safe-area の上だけに敷いた時に 100px → 66px へ縮んでいた)。
+   * 390px幅で108px(3.6:1)。safe-area も絵の中に含める。
+   */
+  --bottom-nav-art-h: clamp(96px, calc(100vw / 3.6), 124px);
+  /* ホーム以外は safe-area 抜きの値。バーの側で safe-area を足すと、ちょうど絵の高さになる */
+  --bottom-nav-h: max(64px, calc(var(--bottom-nav-art-h) - env(safe-area-inset-bottom, 0px)));
   --bg: #06050c;
   --bg-alt: #0d0a16;
   /* 黒硝子。背景の絵を透かす。不透明な板にしないこと */
@@ -92,6 +100,11 @@
   --rar-6-b: #a8450a;
 
   color-scheme: dark;
+}
+
+/* 背の低い画面(iPhone SE の 667px など)は、世界の枠を削りすぎないよう下のバーを少し低く(375px幅で89px) */
+@media (max-height: 720px) {
+  :root { --bottom-nav-art-h: clamp(84px, calc(100vw / 4.2), 110px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -130,7 +130,8 @@ describe("ホームの下端に、バーとの隙間がある", () => {
   it("safe-area は変数を通す(確認用ブラウザで測れなくなる)", () => {
     // 上下とも `--home-safe-*` を通していること
     expect(css).toContain("padding-top: max(12px, var(--home-safe-top))");
-    expect(css).toContain("padding-bottom: max(6px, var(--home-safe-bottom))");
+    // 下はバーの高さ(`--bottom-nav-h`)の中で通す。バーは絵を全体に敷き、下の余白を持たない
+    expect(css).toMatch(/--bottom-nav-h: max\(calc\(var\(--home-nav-base-h\) \+ var\(--home-safe-bottom\)\)/);
     // ホームの箱の指定に `env()` を直書きしていないこと
     const at = css.indexOf("padding-top: max(12px, var(--home-safe-top))");
     const body = css.slice(at - 400, at + 400);

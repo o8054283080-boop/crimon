@@ -18,8 +18,10 @@
  * ========================================================================= */
 
 .screen.summon-screen {
-  /* 1画面完結。縦横どちらでもスクロールを出さない */
-  --summon-nav: 68px;
+  /* 1画面完結。縦横どちらでもスクロールを出さない。
+   * 下のバーの高さは幅から決まる(`--bottom-nav-h`)ので、数字を直に書かない。
+   * 68px と書いていた時、バーを絵の比率に合わせて高くしたら、召喚ボタンが裏に入った */
+  --summon-nav: var(--bottom-nav-h, 68px);
 
   height: 100dvh;
   min-height: 0;
@@ -1763,7 +1765,7 @@
 
 @media (orientation: landscape) and (max-height: 560px) {
   .screen.summon-screen {
-    --summon-nav: 60px;
+    --summon-nav: var(--bottom-nav-h, 60px);
 
     display: grid;
     grid-template-columns: 1fr minmax(320px, 1fr);

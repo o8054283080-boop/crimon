@@ -196,7 +196,7 @@ function renderDetail(props: AccessoriesProps, acc: Accessory): HTMLElement {
     owner !== undefined || acc.locked
       ? el("p", { className: "acc-note" }, [owner !== undefined ? "装着中は売却できません(先に外してください)" : "ロック中は売却できません"])
       : null,
-    el("p", { className: "acc-note" }, ["強化はゴールドだけで、失敗しません。Lv5・10・15で弱効果が少し強くなります。"]),
+    el("p", { className: "acc-note" }, ["強化はゴールドだけで、失敗しません。Lv5・10・15で、特殊効果のどれか1つが大きく伸びます。"]),
   ].filter((n): n is HTMLElement => n !== null));
 }
 

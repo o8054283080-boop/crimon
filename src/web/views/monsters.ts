@@ -319,7 +319,7 @@ function accessoryEffectLine(props: MonstersProps, instance: MonsterInstance): H
   const acc = resolveAccessory(instance, props.player.accessories);
   if (!acc) return null;
   return el("p", { className: "monster-detail-equipment__sets monster-detail-equipment__accessory" }, [
-    `アクセ(${ACCESSORY_RARITY_JA[acc.rarity]})：${[...acc.specials.map(describeSpecial), `弱効果 ${describeWeak(acc.weak, acc.level)}`].join(" / ")}`,
+    `アクセ(${ACCESSORY_RARITY_JA[acc.rarity]})：${[...acc.specials.map(describeSpecial), describeWeak(acc.weak, acc.level)].join(" / ")}`,
   ]);
 }
 

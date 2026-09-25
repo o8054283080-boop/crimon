@@ -148,13 +148,23 @@ describe("下のバーはどの画面でも同じ絵", () => {
   });
 
   /*
-   * 実機の下34pxぶん絵を引き伸ばすと、文字が絵の意匠の上に乗って読めなかった。
-   * 絵は safe-area を除いた上の部分だけに敷く。
+   * 一度、絵を safe-area を除いた上の部分だけに敷いた。実機では絵が66pxに押し込まれて
+   * 城や剣が横長に潰れ、下に無地の帯が残って「ぎゅっとしすぎ」になった(依頼主の実機)。
+   * 絵はバー全体に敷き、高さは幅から決めた絵の高さを下回らない。文字は割合で絵の文字の段へ置く。
    */
-  it("絵は safe-area を除いた部分だけに敷く", () => {
+  it("絵はバー全体に敷き、潰れる高さまで縮めない", () => {
     const pop = read("home-pop-design.css");
-    expect(pop).toContain("center top / 100% calc(100% - var(--nav-safe)) no-repeat");
-    expect(pop).toContain("padding: 0 0 var(--nav-safe) !important;");
+    const style = read("style.css");
+    expect(pop).toContain('url("./assets/home/home-bottom-nav-frame-v5.webp") center / 100% 100% no-repeat');
+    expect(pop).not.toContain("calc(100% - var(--nav-safe))");
+    expect(style).toMatch(/--bottom-nav-art-h: clamp\(\d+px, calc\(100vw \/ 3\.\d\), \d+px\);/);
+    // ホーム以外: safe-area 抜きの値に safe-area を足すと、ちょうど絵の高さになる
+    expect(style).toContain("--bottom-nav-h: max(64px, calc(var(--bottom-nav-art-h) - env(safe-area-inset-bottom, 0px)));");
+    // ホーム: safe-area 込みの値が、絵の高さを下回らない
+    expect(pop).toContain("--bottom-nav-h: max(calc(var(--home-nav-base-h) + var(--home-safe-bottom)), var(--bottom-nav-art-h));");
+    // 文字は px ではなく絵の高さに対する割合で置く(safe-area の有無で絵の中の位置がずれない)
+    const at = pop.indexOf("body .bottom-nav__label {");
+    expect(pop.slice(at, pop.indexOf("}", at))).toMatch(/bottom: \d+% !important;/);
   });
 
   /** ホーム以外の `--bottom-nav-h` は safe-area 抜き。バーの側で足さないと実機で沈む */

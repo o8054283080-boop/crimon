@@ -224,3 +224,28 @@ describe("アクセの一覧", () => {
     expect(view).toContain("props.pickFor === null ? renderToolbar(props) : null");
   });
 });
+
+/*
+ * **一度でも着ける先を選んだ人は、装備画面で「まとめ売り」が効かなかった**(依頼主の実機)。
+ *
+ * `state.accessoryPickFor` はモンスター詳細のアクセ枠から入り、その後どこでも消されない。
+ * 装備画面は `pickFor: null` を渡していたのに、中の判定が `state.accessoryPickFor` を直に見ていたため
+ * 「着ける先を選んでいる最中」扱いになり、選択モードに入らなかった。
+ */
+describe("装備画面のアクセ欄は、前に選んだ着ける先に引きずられない", () => {
+  const main = readFileSync(new URL("../src/web/main.ts", import.meta.url), "utf8");
+  const at = main.indexOf("function accessoriesScreenProps(");
+  // 引数の既定値(署名)は除き、関数の中身だけを見る
+  const body = main.slice(main.indexOf("{", at), main.indexOf("\n}\n", at))
+    // 注記の中の言及は数えない
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+  it("装備画面は着ける先なしで組み立てる", () => {
+    expect(main).toContain("renderAccessories({ ...accessoriesScreenProps(null), tabs: gearTabs");
+  });
+
+  it("選択モードと絞り込みの判定は、引数の着ける先だけを見る", () => {
+    expect(body).toContain("const picking = pickFor !== null;");
+    expect(body, "state.accessoryPickFor を直に見ると、前の着ける先が残る").not.toContain("state.accessoryPickFor");
+  });
+});

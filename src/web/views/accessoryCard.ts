@@ -1,15 +1,17 @@
 import "../ui/accessories.css";
 import {
   type Accessory, ACCESSORY_FAMILY_JA, ACCESSORY_RARITY_JA, ACCESSORY_MAX_LEVEL,
-  describeAccessoryMain, describeSpecial, describeWeak, weakStepIndex,
+  describeAccessoryMain, describeSpecial, describeWeak, specialBoostSteps,
 } from "../../core/accessory.js";
 import { el } from "../dom.js";
 
 /**
  * アクセサリーの見せ方。**モンスター詳細・一覧・遺跡の結果で同じ形を使う。**
  *
- * 出すものは依頼主の指定どおり: ★・レア度・系統・Lv・メイン・特殊効果・弱効果。
- * 特殊効果は**実際の値**で書く(「S3ダメージ +11%」「行動ゲージ減少量 ×1.12」)。
+ * 出すものは依頼主の指定どおり: ★・レア度・系統・Lv・メイン・効果(特殊効果と、もう1つの効果)。
+ * 効果は**実際の値**で書く(「S3ダメージ +11%」「行動ゲージ減少量 ×1.12」)。
+ *
+ * **「弱効果」とは書かない**(依頼主の指定)。もう1つの効果は特殊効果と同じ並び・同じ形の行に出す。
  */
 
 const FAMILY_ICON: Record<Accessory["family"], string> = { ATTACK: "⚔", DURABILITY: "🛡", SUPPORT: "✚", DISRUPT: "⛓" };
@@ -35,23 +37,28 @@ function badges(acc: Accessory): HTMLElement {
 
 /** 中身をすべて出す札。詳細・モンスター詳細で使う */
 export function renderAccessorySummary(acc: Accessory): HTMLElement {
-  const nextWeak = [5, 10, 15].find((lv) => lv > acc.level);
+  const nextStep = [5, 10, 15].find((lv) => lv > acc.level);
+  const effectLine = (text: string, boosts = 0): HTMLElement => el("li", {}, [
+    el("span", { className: "acc-summary__label" }, ["効果"]),
+    // Lv5・10・15 の強化で伸びた回数。どれが育ったかを一目で分かるようにする。
+    // 文の後ろに置くと、長い効果の時に印だけが次の行へ落ちるので、見出しのすぐ隣に置く
+    boosts > 0 ? el("span", { className: "acc-summary__boost" }, [`強化+${boosts}`]) : null,
+    el("span", {}, [text]),
+  ].filter((n): n is HTMLElement => n !== null));
   return el("div", { className: `acc-summary acc-summary--${acc.rarity.toLowerCase()}` }, [
     badges(acc),
     el("div", { className: "acc-summary__main" }, [
       el("span", { className: "acc-summary__label" }, ["メイン"]),
       el("strong", {}, [describeAccessoryMain(acc)]),
     ]),
-    el("ul", { className: "acc-summary__specials" }, acc.specials.map((roll) =>
-      el("li", {}, [el("span", { className: "acc-summary__label" }, ["特殊"]), describeSpecial(roll)]))),
-    el("div", { className: "acc-summary__weak" }, [
-      el("span", { className: "acc-summary__label" }, ["弱効果"]),
-      el("span", {}, [describeWeak(acc.weak, acc.level)]),
-      nextWeak !== undefined && weakStepIndex(acc.level) < 3
-        ? el("small", { className: "acc-summary__hint" }, [`Lv${nextWeak}で少し強化`])
-        : null,
-    ].filter((n): n is HTMLElement => n !== null)),
-  ]);
+    el("ul", { className: "acc-summary__specials" }, [
+      ...acc.specials.map((roll) => effectLine(describeSpecial(roll), roll.boosts ?? 0)),
+      effectLine(describeWeak(acc.weak, acc.level)),
+    ]),
+    nextStep !== undefined && specialBoostSteps(acc.level) < 3 && acc.specials.length > 0
+      ? el("small", { className: "acc-summary__hint" }, [`Lv${nextStep}で特殊効果のどれか1つが大きく伸びます`])
+      : null,
+  ].filter((n): n is HTMLElement => n !== null));
 }
 
 /**

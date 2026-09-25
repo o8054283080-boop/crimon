@@ -4622,7 +4622,7 @@ function renderScreen(): void {
       }, { gear: state.player.equipment.length, accessory: (state.player.accessories ?? []).length });
       const browsingGear = !state.equipmentPickerContext && !state.equipmentDetailId;
       content = browsingGear && state.equipmentTab === "ACCESSORY"
-        ? renderAccessories({ ...accessoriesScreenProps(), pickFor: null, tabs: gearTabs, onGoRuins: () => navigate("RUINS") })
+        ? renderAccessories({ ...accessoriesScreenProps(null), tabs: gearTabs, onGoRuins: () => navigate("RUINS") })
         : renderEquipmentScreen(gearTabs);
       break;
     }
@@ -6204,15 +6204,24 @@ function handleToggleMonsterFilterOpen(): void {
  * アクセ一覧の組み立て。**アクセ一覧画面と、装備画面の「アクセサリー」タブで共有する。**
  * 着ける先(`accessoryPickFor`)があるのはアクセ一覧画面の時だけ。
  */
-function accessoriesScreenProps(): AccessoriesProps {
-  const picking = state.accessoryPickFor !== null;
+function accessoriesScreenProps(pickFor: string | null = state.accessoryPickFor): AccessoriesProps {
+  /*
+   * **着ける先は引数で受け取る。**装備画面の「アクセサリー」は着ける先なし(`null`)で開く。
+   *
+   * 前は `state.accessoryPickFor` を直に見ていた。この値は、モンスター詳細の
+   * アクセ枠から着ける先を選んだ時に入り、**その後どこでも消されない。**
+   * そのため一度でも着ける先を選んだ人は、装備画面で `pickFor: null` を渡しても
+   * 中では「着ける先を選んでいる最中」と判定され、**「まとめ売り」を押しても
+   * 選択モードに入らなかった**(依頼主の実機で発覚)。絞り込みも、着ける先用の条件が使われていた。
+   */
+  const picking = pickFor !== null;
   return {
     player: state.player,
     sort: state.accessorySort,
     filter: picking ? state.accessoryPickFilter : state.accessoryFilter,
     filterOpen: picking ? state.accessoryPickFilterOpen : state.accessoryFilterOpen,
     selectedId: state.selectedAccessoryId,
-    pickFor: state.accessoryPickFor,
+    pickFor,
     notice: state.accessoryNotice,
     onSelect: (id) => {
       state.selectedAccessoryId = id;
@@ -6221,12 +6230,12 @@ function accessoriesScreenProps(): AccessoriesProps {
     },
     onChangeSort: (sort) => { state.accessorySort = sort; render(); },
     onChangeFilter: (filter) => {
-      if (state.accessoryPickFor !== null) state.accessoryPickFilter = filter;
+      if (picking) state.accessoryPickFilter = filter;
       else state.accessoryFilter = filter;
       render();
     },
     onToggleFilterOpen: () => {
-      if (state.accessoryPickFor !== null) state.accessoryPickFilterOpen = !state.accessoryPickFilterOpen;
+      if (picking) state.accessoryPickFilterOpen = !state.accessoryPickFilterOpen;
       else state.accessoryFilterOpen = !state.accessoryFilterOpen;
       render();
     },
@@ -6260,15 +6269,15 @@ function accessoriesScreenProps(): AccessoriesProps {
     onClearSelection: () => { state.accessorySelectedIds = []; render(); },
     onBulkSell: handleBulkSellAccessories,
     onEquip: (accessoryId) => {
-      if (!state.accessoryPickFor) return;
-      const result = equipAccessory(state.player, state.accessoryPickFor, accessoryId);
+      if (!pickFor) return;
+      const result = equipAccessory(state.player, pickFor, accessoryId);
       if (!result.ok) { state.accessoryNotice = result.reason; playSfx("denied", 0.7); render(); return; }
       savePlayerState(state.player);
       closeAccessories();
     },
     onUnequipPicked: () => {
-      if (!state.accessoryPickFor) return;
-      unequipAccessory(state.player, state.accessoryPickFor);
+      if (!pickFor) return;
+      unequipAccessory(state.player, pickFor);
       savePlayerState(state.player);
       state.accessoryNotice = "アクセサリーを外しました";
       render();
@@ -6277,7 +6286,14 @@ function accessoriesScreenProps(): AccessoriesProps {
       const result = tryEnhanceAccessory(state.player, accessoryId);
       if (!result.ok) { state.accessoryNotice = result.reason ?? null; playSfx("denied", 0.7); render(); return; }
       savePlayerState(state.player);
-      state.accessoryNotice = `Lv${result.level}になりました(🪙${result.cost.toLocaleString("ja-JP")})`;
+      // Lv5・10・15 に届いた時は、どの特殊効果が伸びたかを添える(強化した実感を1行で出す)
+      const acc = findAccessory(state.player, accessoryId);
+      const grown = (result.grownSpecials ?? []).map((id) => {
+        const roll = acc?.specials.find((r) => r.id === id);
+        return roll ? `「${describeSpecial(roll)}」` : "";
+      }).filter(Boolean);
+      state.accessoryNotice = `Lv${result.level}になりました(🪙${result.cost.toLocaleString("ja-JP")})`
+        + (grown.length > 0 ? `。特殊効果 ${grown.join("")} が強くなりました` : "");
       render();
     },
     onSell: (accessoryId) => {

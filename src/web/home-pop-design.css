@@ -28,7 +28,8 @@ body:has(.crimon-home) {
    * 一時的に差し替え、safe-area がある状態も検査できるようにする。 */
   --home-safe-top: env(safe-area-inset-top);
   --home-safe-bottom: env(safe-area-inset-bottom);
-  --bottom-nav-h: calc(var(--home-nav-base-h) + var(--home-safe-bottom));
+  /* safe-area 込み。絵の高さ(`--bottom-nav-art-h`)より低くはしない */
+  --bottom-nav-h: max(calc(var(--home-nav-base-h) + var(--home-safe-bottom)), var(--bottom-nav-art-h));
   /* 上の高さに safe-area が入っているので、バーの側では足さない */
   --bottom-nav-safe: 0px;
   background: var(--home-navy-950) !important;
@@ -40,7 +41,14 @@ body:has(.crimon-home) {
 
 .crimon-home {
   color: var(--home-text) !important;
-  background: linear-gradient(180deg, #75ccec, #e9f8ff 48%, #57896e) !important;
+  /*
+   * 世界の枠の下とバーの間には、プレゼントを沈ませないための取り置き(28px)がある。
+   * 空の色の続きのままだと、そこだけ薄緑の帯が浮いて見えた(目隠しの判定の指摘)。
+   * バーの上端へ向けて、バーの地の濃紺へ落としておく。
+   */
+  background:
+    linear-gradient(180deg, transparent calc(100% - var(--bottom-nav-h, 64px) - 30px), #0a1528 calc(100% - var(--bottom-nav-h, 64px))),
+    linear-gradient(180deg, #75ccec, #e9f8ff 48%, #57896e) !important;
 }
 
 .crimon-home::before {
@@ -275,18 +283,20 @@ body .crimon-bottom-nav {
   box-sizing: border-box !important;
   align-items: stretch !important;
   gap: 0 !important;
-  /* ボタンは safe-area の上で終わる(ホームは下の指定で最低6pxを持つ) */
-  padding: 0 0 var(--nav-safe) !important;
+  /* ボタンはバーの下端まで。文字の位置は絵の側の「文字の段」に合わせて割合で置く */
+  padding: 0 !important;
   border: 0 !important;
   /*
-   * **絵は safe-area を除いた上の部分だけに敷く。**全体へ引き伸ばすと、実機の下34px
-   * のぶん絵の中の意匠が縦に伸び、下から safe-area ぶん上げた文字が
-   * 意匠の上に乗って読めなかった。下の帯(ホームインジケーターの居場所)は無地。
+   * **絵はバー全体(safe-area も含めて)に敷く。**
+   *
+   * 一度、絵を safe-area を除いた上の部分だけに敷いた(U8)。実機では絵が66pxに
+   * 押し込まれて城や剣が横長に潰れ、その下に無地の帯が34px残って、
+   * 「タブがぎゅっとしすぎて違和感がすごい」になった(依頼主の実機の画面)。
+   * 高さは幅から決めた `--bottom-nav-art-h` を下回らない。
+   * 文字は絵の下端の「文字の段」(絵の高さの約80〜90%)に置くので、
+   * ホームインジケーター(下端から約5〜13px)には掛からない。
    */
-  --nav-safe: var(--home-safe-bottom, env(safe-area-inset-bottom, 0px));
-  background:
-    url("./assets/home/home-bottom-nav-frame-v5.webp") center top / 100% calc(100% - var(--nav-safe)) no-repeat,
-    linear-gradient(180deg, #0b1122, #04060c) !important;
+  background: url("./assets/home/home-bottom-nav-frame-v5.webp") center / 100% 100% no-repeat, #06101f !important;
   box-shadow: 0 -5px 17px rgba(1, 12, 29, .36) !important;
 }
 
@@ -348,12 +358,13 @@ body .bottom-nav__icon {
 body .bottom-nav__label {
   position: absolute !important;
   right: 2px !important;
-  bottom: 7px !important;
+  /* 絵の各マスの下の縁(高さの約89%)のすぐ上。城・剣などの意匠(約20〜78%)と重ねない */
+  bottom: 12% !important;
   left: 2px !important;
   display: block !important;
   min-height: 0 !important;
   margin: 0 !important;
-  font-size: .63rem !important;
+  font-size: .66rem !important;
   font-weight: 800 !important;
   line-height: 1 !important;
   letter-spacing: .01em !important;
@@ -382,9 +393,10 @@ body .bottom-nav__btn--active::after {
   content: "";
   position: absolute;
   z-index: 0;
-  top: 9%;
+  /* 絵の各マスの内枠(高さの約8〜92%)に沿わせる */
+  top: 8%;
   right: 7%;
-  bottom: 3px;
+  bottom: 8%;
   left: 7%;
   border: 1.5px solid rgba(255, 220, 140, .92);
   border-radius: 11px;
@@ -830,7 +842,8 @@ body .bottom-nav__btn--active .bottom-nav__label {
 /* 下タブも同じ理由で変数を通す。ここが `env()` 直書きのままだと、
  * 帯の高さ(`--bottom-nav-h`)だけ実機相当になり、中の余白が置き去りになる。 */
 body:has(.crimon-home) .bottom-nav {
-  padding-bottom: max(6px, var(--home-safe-bottom)) !important;
+  /* 絵はバー全体に敷き、文字は割合で置く。下の余白は持たない(上の `body .bottom-nav` と同じ) */
+  padding-bottom: 0 !important;
 }
 
 /* 左右の縦列は、**枠に合わせて段の方を縮める。**
