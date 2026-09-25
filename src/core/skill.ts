@@ -1266,7 +1266,7 @@ const GROWTH_FIELDS: Record<string, GrowthField> = {
   turns: { label: "ターン数", unit: "turns", qualify: true },
   healRate: { label: "回復量", unit: "percent" },
   shieldRate: { label: "シールド量", unit: "percent" },
-  amount: { label: "行動ゲージ", unit: "percent" },
+  amount: { label: "行動ゲージ", unit: "percent" },  // 種類ごとの意味は `amountField` が決める
   damageRatePerStack: { label: "毒1スタック", unit: "percent" },
   stacks: { label: "スタック", unit: "turns", qualify: true },
   hits: { label: "ヒット数", unit: "turns" },
@@ -1275,8 +1275,28 @@ const GROWTH_FIELDS: Record<string, GrowthField> = {
 
 function growthNumber(value: number, unit: GrowthField["unit"]): string {
   if (unit === "multiplier") return `${value.toFixed(2)}倍`;
-  if (unit === "turns" || unit === "flat") return `${value}`;
+  if (unit === "turns") return `${value}`;
+  if (unit === "flat") return value.toLocaleString("ja-JP");
   return percent(value);
+}
+
+/**
+ * `amount` の名前と単位。**同じ欄名でも、効果の種類で意味がまるで違う。**
+ *
+ * 元は一律に「行動ゲージ(%)」と読んでいたため、ホワイトサージのLv3
+ * (固定ダメージ 10,000→12,000)が「行動ゲージ 1000000%→1200000%」と出ていた
+ * (依頼主の指摘)。行動ゲージとして読んでよいのは GAUGE と GAUGE_ON_HIT だけ。
+ */
+function amountField(effect: Record<string, unknown>): GrowthField {
+  const stat = BUFF_STAT_JA[effect.stat as BuffStat] ?? "";
+  switch (effect.kind) {
+    case "FLAT_DAMAGE": return { label: "固定ダメージ", unit: "flat" };
+    case "BUFF": return { label: `${stat}UP`, unit: "percent" };
+    case "DEBUFF": return { label: `${stat}DOWN`, unit: "percent" };
+    case "MITIGATE": return { label: "被ダメージ軽減", unit: "percent" };
+    case "DAMAGE_BOOST": return { label: "与ダメージ増加", unit: "percent" };
+    default: return GROWTH_FIELDS.amount;
+  }
 }
 
 function growthLine(field: GrowthField, kind: string, before: number, after: number): string {
@@ -1308,7 +1328,8 @@ function diffEffectLists(before: readonly SkillEffect[], after: readonly SkillEf
       const a = prev[key];
       const b = now[key];
       if (typeof a !== "number" || typeof b !== "number" || a === b) continue;
-      changes.push(growthLine(GROWTH_FIELDS[key], String(now.kind), a, b));
+      const field = key === "amount" ? amountField(now) : GROWTH_FIELDS[key];
+      changes.push(growthLine(field, String(now.kind), a, b));
     }
     if (Array.isArray(prev.perHitEffects) && Array.isArray(now.perHitEffects)) {
       changes.push(...diffEffectLists(prev.perHitEffects as SkillEffect[], now.perHitEffects as SkillEffect[]));
