@@ -15,6 +15,8 @@ export interface CloudRecoveryMeta {
   revision: number;
   /** 内容の競合は、本人が保存元を選ぶまで保持する。 */
   syncConflict?: boolean;
+  /** 送信済み・応答未確認の内容。応答欠落後も保存元の連続性を確認する。 */
+  pendingSaveHash?: string;
   savedAt: string;
   lastUploadedSave: string;
   /** サーバが覚えている、この復旧IDのアリーナの身元。まだ無ければ未定義 */
@@ -257,6 +259,7 @@ export async function uploadCloudSave(
     ...meta,
     revision: data.revision ?? revision,
     syncConflict: false,
+    pendingSaveHash: undefined,
     savedAt: data.savedAt,
     lastUploadedSave: fingerprint,
     sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
@@ -270,11 +273,25 @@ function canonical(value: unknown): string {
     ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
 }
 
+async function saveHash(state: unknown): Promise<string> {
+  const bytes = new TextEncoder().encode(canonical(state));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** 通信を始める前に保存する。終了時に応答を受け取れなくても次回照合できる。 */
+export async function pendingCloudMeta(meta: CloudRecoveryMeta, save: CloudSaveEnvelope): Promise<CloudRecoveryMeta> {
+  return { ...meta, pendingSaveHash: await saveHash(save.state) };
+}
+
 async function reconcileCloudSave(meta: CloudRecoveryMeta, save: CloudSaveEnvelope, arenaUserId?: string | null): Promise<CloudRecoveryMeta> {
   const latest = await loadLatestCloud(meta);
   const remote = canonical(latest.save.state);
   // サーバで保存済みだが、応答が届かなかった場合。書き直す必要はない。
-  if (remote === canonical(save.state)) return { ...latest.meta, syncConflict: false };
+  if (remote === canonical(save.state)) return { ...latest.meta, syncConflict: false, pendingSaveHash: undefined };
+  if (meta.pendingSaveHash && meta.pendingSaveHash === await saveHash(latest.save.state)) {
+    return saveConfirmedCloud(latest.meta, save, arenaUserId);
+  }
   let base: unknown;
   try { base = JSON.parse(meta.lastUploadedSave); } catch { throw new CloudRecoveryError("STALE_REVISION", 409); }
   // 世代だけを合わせてはいけない。既知の保存内容と一致した時だけ一度再送する。
@@ -288,7 +305,7 @@ export async function saveConfirmedCloud(meta: CloudRecoveryMeta, save: CloudSav
   const data = await request({ action: "save", sessionToken: meta.sessionToken, revision, save, arenaUserId });
   if (!data.savedAt || data.revision !== revision) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   return { ...meta, revision, savedAt: data.savedAt, lastUploadedSave: envelopeFingerprint(save),
-    syncConflict: false, sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
+    syncConflict: false, pendingSaveHash: undefined, sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
     arenaUserId: data.arenaUserId ?? meta.arenaUserId ?? null };
 }
 
