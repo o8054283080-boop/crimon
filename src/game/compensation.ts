@@ -57,6 +57,14 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-25-accessory-bulk-sell-fix",
+    title: "アクセサリーの「まとめ売り」が押せなかった不具合を直しました",
+    message: "装備画面の「アクセサリー」で、「まとめ売り」を押しても選択が始まらないことがありました。\n\n"
+      + "・モンスターの詳細からアクセサリーを着け替えたことがあると起きていました\n"
+      + "・いまは押すと選択が始まり、表示中のアクセサリーをまとめて選んで売却できます",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-25-bottom-nav-height",
     title: "下のメニューが窮屈に見えていたのを直しました",
     message: "画面の一番下のメニュー(ホーム・モンスター・装備・召喚・ショップ)の見た目を直しました。\n\n"
