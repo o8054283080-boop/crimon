@@ -47,7 +47,6 @@ try {
   // 起動時の保存が競合するまで待つ。止まっても手動確認できることを検証する。
   await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("保存内容が異なる"));
   async function reachable(button: Locator) {
-    await button.scrollIntoViewIfNeeded();
     await button.click({ trial: true }); // スクロールのアニメーション終了・操作可能を待って測定する
     assert.equal(await button.evaluate(el => {
       const r = el.getBoundingClientRect();
@@ -73,6 +72,8 @@ try {
   page.once("dialog", dialog => dialog.accept());
   await resume.click();
   await rejected;
+  await page.waitForFunction(() => Array.from(document.querySelectorAll("button")).some(button =>
+    button.textContent === "この端末のデータでバックアップを再開" && !button.disabled));
   await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("保存内容が異なる"));
   assert.equal(lastSaved, undefined, "確認後の競合を上書きした");
   await inspect.click();
