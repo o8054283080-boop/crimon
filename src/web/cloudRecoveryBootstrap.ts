@@ -17,10 +17,13 @@ import {
   registerRecovery,
   restoreBeforeCloudRecovery,
   restoreCloudSave,
+  saveEnvelopeFromRaw,
   storeCloudMeta,
+  syncOnOpen,
   uploadCloudSave,
   type CloudSaveEnvelope,
 } from "../game/cloudRecovery.js";
+import { SAVE_TOUCHED_AT_KEY, startupSaveSnapshot } from "../game/playerState.js";
 import { arenaAuthUserId } from "../net/arenaAuth.js";
 
 import { syncAdminSnapshot, ADMIN_SNAPSHOT_RETRY_MS } from "../net/playerSnapshot.js";
@@ -189,6 +192,84 @@ async function syncNow(showUnchanged = false, scheduled = false): Promise<void> 
   } finally {
     syncRunning = false;
   }
+}
+
+/** 別の端末のデータに合わせて読み直した後、設定の欄に一度だけ伝えるための印 */
+const ADOPTED_NOTICE_KEY = "crimon_cloud_adopted_notice_v1";
+/** `cloudRestoreNavigationGuard.ts` と同じ鍵。読み直しの途中で古いデータが書き戻されないようにする */
+const PENDING_RESTORE_KEY = "crimon_cloud_restore_pending_navigation_v1";
+/** 復帰のたびに取りに行くと通信が増えるので、間を空ける */
+const OPEN_SYNC_MIN_INTERVAL_MS = 60 * 1000;
+let lastOpenSyncAt = 0;
+
+function localTouchedAt(): number | null {
+  const value = Number(localStorage.getItem(SAVE_TOUCHED_AT_KEY));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * **開いた時・復帰した時に、クラウドと合わせる。**
+ *
+ * 別の端末で後から遊んでいれば、そのデータに合わせて読み直す。
+ * この端末の方が後で遊ばれていれば、この端末のデータでクラウドを更新する。
+ * どちらの場合も、負けた方は別のバックアップとしてクラウドに残る(`syncOnOpen`)。
+ *
+ * @param atStartup 起動直後か。起動直後は、このページが書く前の姿で判断する
+ *                  (ログインボーナスなどの書き込みを「遊んだ」と数えないため)
+ */
+async function syncOpen(atStartup: boolean): Promise<void> {
+  if (syncRunning) return;
+  if (!atStartup && Date.now() - lastOpenSyncAt < OPEN_SYNC_MIN_INTERVAL_MS) return;
+  const meta = loadCloudMeta();
+  if (!meta) return;
+  const snapshot = atStartup ? startupSaveSnapshot() : null;
+  const local = (snapshot ? saveEnvelopeFromRaw(snapshot.raw) : null) ?? currentSaveEnvelope();
+  if (!local) return;
+  const touchedAt = snapshot && snapshot.raw ? snapshot.touchedAt : localTouchedAt();
+  lastOpenSyncAt = Date.now();
+  syncRunning = true;
+  try {
+    const result = await syncOnOpen(meta, local, touchedAt, () => currentSaveEnvelope(), arenaAuthUserId());
+    // 待っている間に接続を解除した・別の復旧IDへ入り直した
+    if (readCloudMeta()?.sessionToken !== meta.sessionToken) return;
+    if (result.kind === "ADOPT_CLOUD") {
+      restoreCloudSave(result.save); // いまの端末のデータは「クラウド復旧前の端末データ」として残る
+      storeCloudMeta(result.meta);
+      try {
+        const raw = localStorage.getItem("crimon_save_v1");
+        if (raw) sessionStorage.setItem(PENDING_RESTORE_KEY, raw);
+        sessionStorage.setItem(ADOPTED_NOTICE_KEY, result.keptLocalCopy ? "copied" : "plain");
+      } catch { /* 印が残せなくても読み直しはできる */ }
+      window.location.reload();
+      return;
+    }
+    storeCloudMeta(result.meta);
+    if (result.kind === "UP_TO_DATE") return;
+    conflictDetected = false;
+    if (result.kind === "KEEP_LOCAL") {
+      setStatus(`この端末の方が新しいため、この端末のデータでバックアップしました：${formatSavedAt(result.meta.savedAt)}。前のクラウドのデータも別のバックアップとして残しています。`, "ok");
+    }
+    if (meta.syncConflict) {
+      document.querySelectorAll<HTMLElement>(`[${PANEL_MARKER}]`).forEach(panel => renderPanelInto(panel));
+      dismissHomeWarning();
+    }
+  } catch {
+    // 通信できない時は何もしない。端末のデータはそのまま、いつもの自動保存が後で試す
+  } finally {
+    syncRunning = false;
+  }
+}
+
+function showAdoptedNotice(): void {
+  let kind: string | null = null;
+  try {
+    kind = sessionStorage.getItem(ADOPTED_NOTICE_KEY);
+    sessionStorage.removeItem(ADOPTED_NOTICE_KEY);
+  } catch { kind = null; }
+  if (!kind) return;
+  setStatus(kind === "copied"
+    ? "別の端末で後から遊んだデータに合わせました。この端末で遊んでいた分は、別のバックアップとしてクラウドに残しています。"
+    : "別の端末で遊んだ最新のデータに合わせました。", "ok");
 }
 
 /**
@@ -600,12 +681,18 @@ function boot() {
     if (backupAge(stored) >= FORCE_BACKUP_MS) setStatus(`バックアップが48時間以上更新されていません。既存アカウントのまま強制バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
     else if (backupAge(stored) >= STALE_BACKUP_MS) setStatus(`バックアップが3時間以上更新されていません。次の同期で自動バックアップを試します。最終：${formatSavedAt(stored.savedAt)}`, "warn");
     else setStatus(`クラウド接続済み：${formatSavedAt(stored.savedAt)}`, "ok");
+    showAdoptedNotice();
+    // 開いたらまずクラウドを見に行く。別の端末で後から遊んでいれば、そちらに合わせる
+    void syncOpen(true);
   }
   window.setInterval(() => { void syncNow(false, true); }, AUTO_SYNC_MS);
   window.setInterval(() => { void syncAdminSnapshot(); }, ADMIN_SNAPSHOT_RETRY_MS);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") void syncNow(false, true);
-    else void syncAdminSnapshot();
+    else {
+      void syncOpen(false);
+      void syncAdminSnapshot();
+    }
   });
   window.addEventListener("pagehide", () => { void syncNow(false, true); });
   window.setTimeout(() => { void syncNow(false, true); void syncAdminSnapshot(); }, 5_000);

@@ -1073,6 +1073,36 @@ export function readPlayerSave(storage?: Pick<Storage, "getItem">): { state: Pla
   }
 }
 
+/**
+ * 端末のセーブを最後に書いた時刻(ミリ秒)。`savePlayerState` が書く。
+ *
+ * クラウドと突き合わせて**どちらの端末が後で遊ばれたか**を決めるのに使う
+ * (`src/game/cloudRecovery.ts` の `decideOpenSync`)。
+ */
+export const SAVE_TOUCHED_AT_KEY = "crimon_save_touched_at_v1";
+
+/**
+ * **このページが何かを書く前の**、端末のセーブとその書いた時刻。
+ *
+ * 起動すると、経験ピッグの配布・お知らせの受け取り・ログインボーナスなどで
+ * 遊ぶ前からセーブが書き換わる。それを「この端末で遊んだ」と数えると、
+ * 別の端末で遊んだ続きを、開いただけの端末が上書きしてしまう。
+ * だから**モジュールを読んだ瞬間**(=どこかがセーブを読む前)に控えておく。
+ */
+const startupSnapshotValue: { raw: string | null; touchedAt: number | null } = (() => {
+  try {
+    const touched = Number(localStorage.getItem(SAVE_TOUCHED_AT_KEY));
+    return { raw: localStorage.getItem(STORAGE_KEY), touchedAt: Number.isFinite(touched) && touched > 0 ? touched : null };
+  } catch {
+    return { raw: null, touchedAt: null };
+  }
+})();
+
+/** 起動直後(このページが書く前)の端末セーブ。読めなかった時は raw が null */
+export function startupSaveSnapshot(): { raw: string | null; touchedAt: number | null } {
+  return startupSnapshotValue;
+}
+
 export function loadPlayerState(): PlayerState {
   const { state, origin } = readPlayerSave();
   if (startupSaveOriginValue === null) startupSaveOriginValue = origin;
@@ -1165,6 +1195,7 @@ export function savePlayerState(state: PlayerState): boolean {
   try {
     json = encodeSave(state);
     localStorage.setItem(STORAGE_KEY, json);
+    try { localStorage.setItem(SAVE_TOUCHED_AT_KEY, String(Date.now())); } catch { /* 時刻が残らなくてもセーブは済んでいる */ }
     saveFailure = null;
     return true;
   } catch (error) {

@@ -847,13 +847,22 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
        * ここで両方を並べ、どちらが古いのかを見比べられるようにする。
        */
       const copies = row.conflictCopies ?? [];
-      if (copies.length > 0) {
+      /*
+       * 開いた時にいちばん後で遊んだ端末へ揃えるようになったので、揃った後も
+       * **負けた方の控えは残る。**控えがあるだけで「分かれています」と出すと、
+       * 揃った人までずっと警告が付く。控えの方が新しい時だけ警告する。
+       */
+      if (copies.length > 0 && row.newestSource !== "COPY") {
+        item.append(metric("別バックアップ", `${copies.length}件(本来のバックアップの方が新しい)`));
+      } else if (copies.length > 0) {
         item.append(metric("⚠ 保存が分かれています", `端末の別バックアップ ${copies.length}件`, true));
         // 1行の比較は長いので、行の幅いっぱいに置く(細い升目に押し込むと4〜5行に折れて読めない)
         const wide = (node: HTMLElement) => { node.classList.add("crimon-admin-metric--wide"); return node; };
         if (row.main) item.append(wide(metric(`本来のバックアップ(${formatDate(row.main.savedAt)})`, briefText(row.main))));
         copies.forEach((copy, index) => {
-          item.append(wide(metric(`別バックアップ${copies.length > 1 ? index + 1 : ""}(${formatDate(copy.savedAt)})`, briefText(copy))));
+          // replaced-main は、端末のデータで置き換える直前のクラウドの姿
+          const label = copy.deviceId === "replaced-main" ? "置き換え前のクラウド" : `別バックアップ${copies.length > 1 ? index + 1 : ""}`;
+          item.append(wide(metric(`${label}(${formatDate(copy.savedAt)})`, briefText(copy))));
         });
       }
       list.append(item);
