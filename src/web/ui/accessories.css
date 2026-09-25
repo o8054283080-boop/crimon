@@ -522,6 +522,79 @@
   font-size: 18px;
 }
 
+/*
+ * スライダーは行の幅いっぱい(能力ポイントの `.create-allocation` と同じ素の形)。
+ * 左端が−50、右端が+50、**真ん中が0。**その0の位置に目盛りを1本引く。
+ */
+.limit-row__slider {
+  grid-column: 1 / -1;
+  position: relative;
+  padding: 2px 0;
+}
+.limit-row__slider::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: rgba(214, 180, 104, 0.55);
+  pointer-events: none;
+}
+/*
+ * 溝は自前で描く。**真ん中(0)からつまみまでを塗る**(`paintSlider` が位置と色を渡す)。
+ * 素の形は左端から塗るため、0の能力でも左半分が塗られていた。
+ */
+.limit-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  background: transparent;
+  --limit-track: rgba(255, 255, 255, 0.14);
+}
+.limit-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right,
+    var(--limit-track) 0 var(--limit-from, 50%),
+    var(--limit-fill, #8ff0a8) var(--limit-from, 50%) var(--limit-to, 50%),
+    var(--limit-track) var(--limit-to, 50%) 100%);
+}
+.limit-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right,
+    var(--limit-track) 0 var(--limit-from, 50%),
+    var(--limit-fill, #8ff0a8) var(--limit-from, 50%) var(--limit-to, 50%),
+    var(--limit-track) var(--limit-to, 50%) 100%);
+}
+.limit-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -10px;
+  border-radius: 50%;
+  border: 2px solid #d6b468;
+  background: #f4efe2;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.limit-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #d6b468;
+  background: #f4efe2;
+}
+/* 確定後は動かせないことが見て分かるように、つまみと塗りを沈める */
+.limit-slider:disabled::-webkit-slider-thumb { background: #7d8090; border-color: #555a6a; box-shadow: none; }
+.limit-slider:disabled::-moz-range-thumb { background: #7d8090; border-color: #555a6a; }
+
 .limit-total {
   display: flex;
   flex-wrap: wrap;

@@ -1,10 +1,10 @@
 import "../ui/accessories.css";
 import {
   type AbilityPointAllocation, type AllocatableStat, ABILITY_POINT_VALUES,
-  LIMIT_BREAK_CORE_COST, LIMIT_POINT_MAX_PLUS, LIMIT_POINT_MINUS_FACTOR, limitStatValue, sanitizeLimitPoints,
+  LIMIT_BREAK_CORE_COST, LIMIT_POINT_MAX_PLUS, LIMIT_POINT_MINUS_FACTOR, LIMIT_POINT_RESET_COST, limitStatValue, sanitizeLimitPoints,
 } from "../../core/monsterDevelopment.js";
 import type { MonsterInstance } from "../../core/monsterInstance.js";
-import { limitPointTotals } from "../../game/ancientCraft.js";
+import { isLimitPointsConfirmed, limitPointTotals } from "../../game/ancientCraft.js";
 import { el } from "../dom.js";
 
 /**
@@ -17,17 +17,29 @@ import { el } from "../dom.js";
  * 足した分だけ、どこかを削る。+側の合計は50まで、−側の合計は+側と同じ。
  * +1pt は通常の能力ポイント1ptと同じ伸び、−1pt は**その2倍**減る。
  * **削った側は赤で出す。**何を失っているかを一目で分かるようにする。
- * 何度でも振り直せる(保存するまでは実際の値は変わらない)。
+ *
+ * 能力ポイントと同じ作り(依頼主の指定):各能力にスライダーを付け(±は微調整用)、
+ * 確定するまでは自由、確定後は `LIMIT_POINT_RESET_COST` のリセットでしか変えられない。
+ * 前は±ボタンだけで、+50まで振るのに50回押す必要があった。
  */
 export interface LimitBreakPanelProps {
   monster: MonsterInstance;
   evolutionCores: number;
+  gold: number;
   draft: AbilityPointAllocation;
   notice: string | null;
   onUnlock: () => void;
-  onChange: (stat: AllocatableStat, delta: number) => void;
+  /**
+   * 1つの能力を動かす。**丸めた後の下書き全体を返す。**描き直さない
+   * (スライダーを動かしている最中に画面を作り直すと、指のドラッグが途切れる)。
+   */
+  onSet: (stat: AllocatableStat, value: number) => AbilityPointAllocation;
+  /** 指を離した・±を押した後に、画面を描き直す */
+  onCommit: () => void;
   onReset: () => void;
   onSave: () => void;
+  /** 確定した配分を有料で0へ戻す */
+  onPaidReset: () => void;
 }
 
 const STATS: { key: AllocatableStat; label: string }[] = [
@@ -49,6 +61,19 @@ function effectText(stat: AllocatableStat, points: number): string {
   if (points === 0) return "±0";
   const value = limitStatValue(points, stat);
   return value > 0 ? `+${fmt(value)}` : `−${fmt(-value)}`;
+}
+
+/**
+ * スライダーの塗り。**真ん中(0)から、つまみの位置までを塗る。**
+ * 素のスライダーは左端(−50)から塗るので、0の能力まで左半分が塗られ、
+ * 「少し振ってある」ように見えていた。足した側は緑、削った側は赤(行の色と同じ)。
+ */
+function paintSlider(slider: HTMLInputElement, value: number): void {
+  const at = 50 + (value / LIMIT_POINT_MAX_PLUS) * 50;
+  slider.style.setProperty("--limit-from", `${Math.min(50, at)}%`);
+  slider.style.setProperty("--limit-to", `${Math.max(50, at)}%`);
+  // 確定後(動かせない)は灰色に沈める
+  slider.style.setProperty("--limit-fill", slider.disabled ? "rgba(200, 200, 210, 0.45)" : value < 0 ? "#ff6b6b" : "#8ff0a8");
 }
 
 export function renderLimitBreakPanel(props: LimitBreakPanelProps): HTMLElement {
@@ -77,42 +102,107 @@ export function renderLimitBreakPanel(props: LimitBreakPanelProps): HTMLElement 
     ] as (HTMLElement | null)[]).filter((n): n is HTMLElement => n !== null));
   }
 
-  const { plus, minus } = limitPointTotals(props.draft);
-  const valid = sanitizeLimitPoints({ unlocked: true, points: props.draft }) !== null;
   const saved = props.monster.development.limitBreak?.points ?? { hp: 0, atk: 0, def: 0, spd: 0 };
-  const dirty = STATS.some(({ key }) => saved[key] !== props.draft[key]);
+  const confirmed = isLimitPointsConfirmed(props.monster);
+  // 確定後は保存済みの配分を見せる(下書きは使わない)
+  let draft = confirmed ? { ...saved } : { ...props.draft };
+
+  /*
+   * 動かしている最中は、数字だけを書き換える。
+   * 行ごとの「効果・値・スライダー」と、合計の帯と保存ボタンの参照を持っておく。
+   */
+  const rowRefs = new Map<AllocatableStat, { row: HTMLElement; effect: HTMLElement; value: HTMLElement; slider: HTMLInputElement }>();
+  const plusText = el("span", {}, []);
+  const minusText = el("span", {}, []);
+  const stateText = el("span", {}, []);
+  const total = el("div", { className: "limit-total" }, [plusText, minusText, stateText]);
+  const saveButton = el("button", {
+    type: "button",
+    className: "btn btn--primary",
+    "data-tour": "limit:save",
+    onclick: props.onSave,
+  }, ["確定する"]) as HTMLButtonElement;
+
+  const refresh = () => {
+    for (const { key } of STATS) {
+      const refs = rowRefs.get(key);
+      if (!refs) continue;
+      const value = draft[key];
+      refs.row.className = `limit-row${value > 0 ? " limit-row--plus" : value < 0 ? " limit-row--minus" : ""}`;
+      refs.effect.textContent = effectText(key, value);
+      refs.value.textContent = value > 0 ? `+${value}` : value < 0 ? `−${-value}` : "0";
+      if (Number(refs.slider.value) !== value) refs.slider.value = String(value);
+      paintSlider(refs.slider, value);
+    }
+    const { plus, minus } = limitPointTotals(draft);
+    const valid = sanitizeLimitPoints({ unlocked: true, points: draft }) !== null;
+    const empty = plus === 0 && minus === 0;
+    total.className = `limit-total${valid || confirmed ? "" : " limit-total--bad"}`;
+    plusText.textContent = `+側 ${plus} / ${LIMIT_POINT_MAX_PLUS}`;
+    minusText.textContent = `−側 ${minus}`;
+    minusText.className = minus > 0 ? "limit-total__minus" : "";
+    stateText.textContent = confirmed ? "確定済み" : empty ? "未設定" : valid ? "確定できます" : "+側と−側を同じにしてください";
+    saveButton.disabled = !valid || empty;
+  };
+
+  const rows = STATS.map(({ key, label }) => {
+    const effect = el("strong", { className: "limit-row__effect" }, []);
+    const value = el("span", { className: "limit-row__value" }, []);
+    const step = (delta: number) => { draft = props.onSet(key, draft[key] + delta); refresh(); props.onCommit(); };
+    const slider = el("input", {
+      type: "range",
+      min: String(-LIMIT_POINT_MAX_PLUS),
+      max: String(LIMIT_POINT_MAX_PLUS),
+      step: "1",
+      value: String(draft[key]),
+      className: "limit-slider",
+      disabled: confirmed,
+      "aria-label": `${label}の配分`,
+      // 動かしている最中: 丸めて数字だけ直す。上限で止まったらつまみも戻す
+      oninput: (event: Event) => { draft = props.onSet(key, Number((event.target as HTMLInputElement).value)); refresh(); },
+      // 指を離した時だけ描き直す
+      onchange: () => props.onCommit(),
+    }, []) as HTMLInputElement;
+    const row = el("div", { className: "limit-row" }, [
+      el("div", { className: "limit-row__name" }, [
+        el("span", {}, [label]),
+        effect,
+        el("small", {}, [perPointText(key)]),
+      ]),
+      el("button", { type: "button", className: "btn btn--ghost", disabled: confirmed, "aria-label": `${label}を1下げる`, onclick: () => step(-1) }, ["−"]),
+      value,
+      el("button", { type: "button", className: "btn btn--ghost", disabled: confirmed, "aria-label": `${label}を1上げる`, onclick: () => step(1) }, ["+"]),
+      el("div", { className: "limit-row__slider" }, [slider]),
+    ]);
+    rowRefs.set(key, { row, effect, value, slider });
+    return row;
+  });
+  refresh();
+
+  const cost = LIMIT_POINT_RESET_COST.toLocaleString("ja-JP");
   return el("section", { className: "panel limit-panel" }, ([
     heading,
     el("p", { className: "acc-note" }, ["能力ポイントとは別の配分です。足した分と同じだけどこかを削り、削った側は2倍減ります。"]),
-    el("div", { className: "limit-rows" }, STATS.map(({ key, label }) => {
-      const value = props.draft[key];
-      const tone = value > 0 ? " limit-row--plus" : value < 0 ? " limit-row--minus" : "";
-      return el("div", { className: `limit-row${tone}` }, [
-        el("div", { className: "limit-row__name" }, [
-          el("span", {}, [label]),
-          el("strong", { className: "limit-row__effect" }, [effectText(key, value)]),
-          el("small", {}, [perPointText(key)]),
-        ]),
-        el("button", { type: "button", className: "btn btn--ghost", "aria-label": `${label}を1下げる`, onclick: () => props.onChange(key, -1) }, ["−"]),
-        el("span", { className: "limit-row__value" }, [value > 0 ? `+${value}` : value < 0 ? `−${-value}` : "0"]),
-        el("button", { type: "button", className: "btn btn--ghost", "aria-label": `${label}を1上げる`, onclick: () => props.onChange(key, 1) }, ["+"]),
-      ]);
-    })),
-    el("div", { className: `limit-total${valid ? "" : " limit-total--bad"}` }, [
-      el("span", {}, [`+側 ${plus} / ${LIMIT_POINT_MAX_PLUS}`]),
-      el("span", { className: minus > 0 ? "limit-total__minus" : "" }, [`−側 ${minus}`]),
-      el("span", {}, [valid ? (dirty ? "保存できます" : "保存済み") : "+側と−側を同じにしてください"]),
+    // **いま自由に動かせるのか、確定済みなのかを先に言う**(能力ポイントと同じ)
+    el("p", { className: confirmed ? "create-notice" : "acc-note" }, [
+      confirmed
+        ? `この配分で確定しています。変えるには ${cost}G のリセットが要ります`
+        : "確定するまでは、何度でも無料で振り直せます",
     ]),
+    el("div", { className: "limit-rows" }, rows),
+    total,
     props.notice ? el("p", { className: "acc-note", role: "status" }, [props.notice]) : null,
-    el("div", { className: "acc-actions" }, [
-      el("button", { type: "button", className: "btn btn--ghost", onclick: props.onReset }, ["0に戻す"]),
-      el("button", {
+    confirmed
+      ? el("button", {
         type: "button",
-        className: "btn btn--primary",
-        "data-tour": "limit:save",
-        disabled: !valid || !dirty,
-        onclick: props.onSave,
-      }, ["保存する"]),
-    ]),
+        className: "btn btn--ghost",
+        "data-tour": "limit:reset",
+        disabled: props.gold < LIMIT_POINT_RESET_COST,
+        onclick: props.onPaidReset,
+      }, [`限界能力付与リセット ${cost} GOLD`])
+      : el("div", { className: "acc-actions" }, [
+        el("button", { type: "button", className: "btn btn--ghost", onclick: props.onReset }, ["0に戻す"]),
+        saveButton,
+      ]),
   ] as (HTMLElement | null)[]).filter((n): n is HTMLElement => n !== null));
 }

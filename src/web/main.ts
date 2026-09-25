@@ -269,7 +269,7 @@ import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
 import { buyCrystalShopItem, crystalShopRows } from "../game/crystalShop.js";
 import type { Accessory } from "../core/accessory.js";
 import type { Equipment as CraftedEquipment } from "../core/equipment.js";
-import { type AbilityPointAllocation, LIMIT_POINT_MAX_PLUS } from "../core/monsterDevelopment.js";
+import { type AbilityPointAllocation, LIMIT_POINT_RESET_COST } from "../core/monsterDevelopment.js";
 import { findRuinFloorByLocationId, ruinLocationId, type RuinFloor, type RuinKind } from "../data/ruins.js";
 import { grantRuinReward, isRuinFloorCleared, isRuinFloorUnlocked, type RuinReward } from "../game/ruins.js";
 import {
@@ -277,7 +277,7 @@ import {
   tryEnhanceAccessory, unequipAccessory, findAccessory, EMPTY_ACCESSORY_FILTER, accessoriesOf,
   accessoryOwner, bulkSellAccessories, sellableAccessoryIds, wornAccessoryIds,
 } from "../game/accessories.js";
-import { craftAccessory, craftEquipment, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
+import { clampLimitDraft, craftAccessory, craftEquipment, resetLimitPoints, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
 import { accessorySellPrice, accessoryTitle, describeSpecial, generateAccessory as generateAccessoryForDev } from "../core/accessory.js";
 import { renderRuins } from "./views/ruins.js";
 import { type AccessoriesProps, renderAccessories } from "./views/accessories.js";
@@ -5797,18 +5797,37 @@ function renderScreen(): void {
             state.limitNotice = "限界能力付与を解放しました";
             render();
           },
-          onChange: (stat, delta) => {
-            const next = Math.max(-LIMIT_POINT_MAX_PLUS, Math.min(LIMIT_POINT_MAX_PLUS, state.limitDraft[stat] + delta));
-            state.limitDraft = { ...state.limitDraft, [stat]: next };
+          gold: state.player.gold,
+          // 動かしている最中は描き直さない(ドラッグが途切れる)。丸めた下書きを返すだけ
+          onSet: (stat, value) => {
+            state.limitDraft = clampLimitDraft(state.limitDraft, stat, value);
             state.limitNotice = null;
-            render();
+            return state.limitDraft;
           },
+          onCommit: () => render(),
           onReset: () => { state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 }; state.limitNotice = null; render(); },
           onSave: () => {
+            /*
+             * **ここで確定する。**能力ポイントと同じく、押した後は有料のリセットでしか変えられない。
+             * 取り返しがつかないので、押す前に必ず1度たずねる。
+             */
+            const cost = LIMIT_POINT_RESET_COST.toLocaleString("ja-JP");
+            if (!window.confirm(`限界能力付与をこの配分で確定しますか？\n\n確定すると、変えるには ${cost}G のリセットが必要になります。`)) return;
             const result = setLimitPoints(state.player, createTarget.id, state.limitDraft);
             if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
             savePlayerState(state.player);
-            state.limitNotice = "保存しました";
+            state.limitNotice = "限界能力付与の配分を確定しました";
+            playSfx("levelUp");
+            render();
+          },
+          onPaidReset: () => {
+            const cost = LIMIT_POINT_RESET_COST.toLocaleString("ja-JP");
+            if (!window.confirm(`限界能力付与をリセットしますか？\n配分がすべて0になります\nもう一度、無料で自由に振り直せます\n費用：${cost}ゴールド`)) return;
+            const result = resetLimitPoints(state.player, createTarget.id);
+            if (!result.ok) { state.limitNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+            savePlayerState(state.player);
+            state.limitDraft = { hp: 0, atk: 0, def: 0, spd: 0 };
+            state.limitNotice = "限界能力付与をリセットしました";
             render();
           },
         },
@@ -6697,14 +6716,24 @@ if (import.meta.env.DEV) {
       navigate("RUINS");
       openCraft();
     },
-    openLimitBreakForDev(unlock = false) {
+    /**
+     * @param unlock false = 未解放 / true = 解放済みで**配分中**(未確定。スライダーと±が動く)
+     *               / "confirmed" = 確定済み(有料のリセットが出る)
+     */
+    openLimitBreakForDev(unlock: boolean | "confirmed" = false) {
       const lead = getParty(state.player)[0] ?? state.player.monsters[0];
       if (!lead) return;
       lead.star = 6;
-      if (unlock) lead.development.limitBreak = { unlocked: true, points: { hp: -10, atk: 10, def: 0, spd: 0 } };
+      if (unlock) {
+        lead.development.limitBreak = { unlocked: true, points: unlock === "confirmed" ? { hp: -10, atk: 10, def: 0, spd: 0 } : { hp: 0, atk: 0, def: 0, spd: 0 } };
+      }
       navigate("MONSTERS");
       state.monsterDetailId = lead.id;
       openLimitBreak(lead.id);
+      if (unlock === true) {
+        state.limitDraft = { hp: -10, atk: 10, def: 0, spd: 0 };
+        render();
+      }
     },
     /*
      * **才能覚醒の中身を巡回に見せるための口。**
