@@ -4,7 +4,7 @@ import {
 import { type Equipment, type SetType, SET_TYPES, generateEquipment } from "../core/equipment.js";
 import { dungeonFloorInitialSubWeights, pickInitialSubStatCount } from "../core/equipmentRarity.js";
 import {
-  type AbilityPointAllocation, LIMIT_BREAK_CORE_COST, LIMIT_POINT_MAX_PLUS, sanitizeLimitPoints,
+  type AbilityPointAllocation, LIMIT_BREAK_CORE_COST, LIMIT_POINT_MAX_PLUS, LIMIT_POINT_RESET_COST, sanitizeLimitPoints,
 } from "../core/monsterDevelopment.js";
 import { addAccessory } from "./accessories.js";
 import { addEquipment, type PlayerState } from "./playerState.js";
@@ -94,16 +94,47 @@ export function unlockLimitBreak(state: PlayerState, monsterId: string): LimitAc
 }
 
 /**
- * 限界配分をまるごと置き換える。**決まりを外れた配分は受け付けない**
+ * 限界配分を確定済みか。**1点でも振って保存してあれば確定。**
+ * 能力ポイントと同じく、確定した配分は有料のリセット(`resetLimitPoints`)でしか変えられない。
+ * 前から保存していた人も、そのまま確定済みとして扱う(印を別に持たないので移行は要らない)。
+ */
+export function isLimitPointsConfirmed(monster: { development: { limitBreak?: { points: AbilityPointAllocation } } }): boolean {
+  const points = monster.development.limitBreak?.points;
+  return !!points && (points.hp !== 0 || points.atk !== 0 || points.def !== 0 || points.spd !== 0);
+}
+
+/**
+ * 1つの能力を指定の値へ動かした下書きを返す。**決まりの範囲へ丸める**
+ * (+側の合計は50まで。−側の合計も+側の上限と同じ50まで)。
+ * スライダーを端まで引いても、他の能力と合わせて上限を越えないところで止まる。
+ */
+export function clampLimitDraft(draft: AbilityPointAllocation, stat: keyof AbilityPointAllocation, value: number): AbilityPointAllocation {
+  const others = (Object.keys(draft) as (keyof AbilityPointAllocation)[]).filter((key) => key !== stat).map((key) => draft[key]);
+  const otherPlus = others.filter((v) => v > 0).reduce((a, b) => a + b, 0);
+  const otherMinus = -others.filter((v) => v < 0).reduce((a, b) => a + b, 0);
+  const whole = Math.trunc(Number.isFinite(value) ? value : 0);
+  const next = whole > 0
+    ? Math.min(whole, Math.max(0, LIMIT_POINT_MAX_PLUS - otherPlus))
+    : -Math.min(-whole, Math.max(0, LIMIT_POINT_MAX_PLUS - otherMinus));
+  return { ...draft, [stat]: next === 0 ? 0 : next };
+}
+
+/**
+ * 限界配分を確定する。**決まりを外れた配分は受け付けない**
  * (+側の合計は50まで、−側の合計は+側と同じ)。
- * 何度でも無料で振り直せる——足した分だけ必ずどこかが2倍削れるので、
- * 振り直しに代金を取る理由が無い。
+ *
+ * 前は何度でも無料で振り直せたが、依頼主の指定で能力ポイントと同じ作りにした:
+ * 確定するまでは自由、確定した後は `LIMIT_POINT_RESET_COST` を払ってリセットする。
  */
 export function setLimitPoints(state: PlayerState, monsterId: string, points: AbilityPointAllocation): LimitActionResult {
   const monster = state.monsters.find((m) => m.id === monsterId);
   if (!monster) return { ok: false, reason: "モンスターが見つかりません" };
   if (!isLimitBreakUnlocked(monster)) return { ok: false, reason: "限界能力付与が解放されていません" };
+  if (isLimitPointsConfirmed(monster)) {
+    return { ok: false, reason: `確定済みです。変えるには ${LIMIT_POINT_RESET_COST.toLocaleString("ja-JP")}G のリセットが要ります` };
+  }
   const next = { unlocked: true, points: { hp: points.hp, atk: points.atk, def: points.def, spd: points.spd } };
+  if (Object.values(next.points).every((v) => v === 0)) return { ok: false, reason: "1pt以上振ってから確定してください" };
   const valid = sanitizeLimitPoints(next);
   if (!valid) {
     const plus = Object.values(next.points).filter((v) => v > 0).reduce((a, b) => a + b, 0);
@@ -113,6 +144,21 @@ export function setLimitPoints(state: PlayerState, monsterId: string, points: Ab
     return { ok: false, reason: "配分が正しくありません" };
   }
   monster.development.limitBreak = { unlocked: true, points: valid };
+  return { ok: true };
+}
+
+/**
+ * 確定した限界配分を0へ戻す。**払った後は、また無料で配れる状態に戻る。**
+ * 検証と支払いと書き換えを同じ区間で行う。連打しても、2回目は「確定していない」で弾く。
+ */
+export function resetLimitPoints(state: PlayerState, monsterId: string): LimitActionResult {
+  const monster = state.monsters.find((m) => m.id === monsterId);
+  if (!monster) return { ok: false, reason: "モンスターが見つかりません" };
+  if (!isLimitBreakUnlocked(monster)) return { ok: false, reason: "限界能力付与が解放されていません" };
+  if (!isLimitPointsConfirmed(monster)) return { ok: false, reason: "まだ確定していません" };
+  if (state.gold < LIMIT_POINT_RESET_COST) return { ok: false, reason: `ゴールドが${LIMIT_POINT_RESET_COST.toLocaleString("ja-JP")}必要です` };
+  state.gold -= LIMIT_POINT_RESET_COST;
+  monster.development.limitBreak = { unlocked: true, points: { hp: 0, atk: 0, def: 0, spd: 0 } };
   return { ok: true };
 }
 

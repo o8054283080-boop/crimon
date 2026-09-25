@@ -78,6 +78,11 @@ export const LIMIT_POINT_MAX_PLUS = 50;
 export const LIMIT_POINT_MINUS_FACTOR = 2;
 /** 解放に要る進化核 */
 export const LIMIT_BREAK_CORE_COST = 100;
+/**
+ * 確定した限界配分を戻す代金(依頼主の指定)。
+ * 能力ポイントのリセット(`ABILITY_POINT_RESET_COST`)と同じく、払えば0に戻って配り直せる。
+ */
+export const LIMIT_POINT_RESET_COST = 500_000;
 
 const LIMIT_STATS: readonly AllocatableStat[] = ["hp", "atk", "def", "spd"];
 

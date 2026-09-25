@@ -220,6 +220,7 @@ const SCREENS = [
   { name: "カケラ製作", tab: "HOME", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openCraftForDev()" },
   { name: "クリエイト/能力付与(限界・未解放)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(false)" },
   { name: "クリエイト/能力付与(限界・配分中)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(true)" },
+  { name: "クリエイト/能力付与(限界・確定済み)", tab: "MONSTERS", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openLimitBreakForDev(\"confirmed\")" },
   /*
    * 周回結果の「獲得装備」のシート。**周回を回さないと開けない**ので、
    * これまで一度も検査していなかった。下から出る `position:fixed` の中に

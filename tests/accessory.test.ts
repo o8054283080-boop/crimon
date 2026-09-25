@@ -24,7 +24,8 @@ import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import {
   addAccessory, equipAccessory, sellAccessory, tryEnhanceAccessory, unequipAccessory, accessoryOwner, setAccessoryLocked,
 } from "../src/game/accessories.js";
-import { ANCIENT_CRAFT_COST, craftAccessory, craftEquipment, setLimitPoints, unlockLimitBreak } from "../src/game/ancientCraft.js";
+import { ANCIENT_CRAFT_COST, craftAccessory, craftEquipment, resetLimitPoints, setLimitPoints, unlockLimitBreak } from "../src/game/ancientCraft.js";
+import { LIMIT_POINT_RESET_COST } from "../src/core/monsterDevelopment.js";
 import { grantRuinReward, isRuinFloorUnlocked, rollRuinDrop } from "../src/game/ruins.js";
 import { createInitialState, normalizeLoadedState, type PlayerState } from "../src/game/playerState.js";
 import { decodeSave, encodeSave } from "../src/game/saveCodec.js";
@@ -697,6 +698,10 @@ describe("進化核・限界能力付与", () => {
     const after = toBattleDefinition(m, dex).stats;
     expect(after.atk - before.atk).toBe(10 * 2);
     expect(before.hp - after.hp).toBe(10 * 20 * 2);
+    // 確定後は、リセット(有料)してからでないと振り直せない
+    expect(setLimitPoints(state, m.id, { hp: 0, atk: 0, def: -50, spd: 50 }).ok).toBe(false);
+    state.gold = LIMIT_POINT_RESET_COST;
+    expect(resetLimitPoints(state, m.id).ok).toBe(true);
     expect(setLimitPoints(state, m.id, { hp: 0, atk: 0, def: -50, spd: 50 }).ok).toBe(true);
     const spd = toBattleDefinition(m, dex).stats;
     expect(spd.spd - before.spd).toBe(5);
