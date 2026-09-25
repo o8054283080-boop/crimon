@@ -1,8 +1,10 @@
 import {
   AWAKENING_DEPTH_FLOORS, AwakeningDepthFloor, findAwakeningDepthFloor, rollAwakeningDepthDrop,
 } from "../data/awakeningDepths.js";
+import type { MonsterInstance } from "../core/monsterInstance.js";
 import type { PlayerState } from "./playerState.js";
 import { recordMissionProgress } from "./missions.js";
+import { type ClearRewardResult, grantGoldAndExp } from "./rewards.js";
 
 /**
  * 目覚の深域の進行。**素材を配るのはここだけ。**
@@ -30,7 +32,11 @@ export function deepestUnlockedFloor(state: PlayerState): number {
   return deepest;
 }
 
-export interface AwakeningDepthReward {
+/**
+ * 1勝ぶんの報酬。素材に加えて、ゴールドと経験値も `ClearRewardResult` の形で持つ
+ * (周回の集計 `mergeReward` にそのまま流せるように)。
+ */
+export interface AwakeningDepthReward extends ClearRewardResult {
   shards: number;
   crystals: number;
   stones: number;
@@ -39,13 +45,14 @@ export interface AwakeningDepthReward {
 }
 
 /**
- * 勝った時の報酬を配る。
+ * 勝った時の報酬を配る。素材と、階に応じたゴールド・経験値。
+ * 経験値を受け取るのは `partyInstances`(深域は通常の編成)。
  *
- * **初回クリアの上乗せは1度だけ。**印は階ごとに残すので、
+ * **初回クリアの上乗せは1度だけ(素材だけ)。**印は階ごとに残すので、
  * 同じ階を何度回しても2度目からは周回ぶんだけになる。
  */
 export function grantAwakeningDepthReward(
-  state: PlayerState, floor: AwakeningDepthFloor, rng: () => number = Math.random,
+  state: PlayerState, floor: AwakeningDepthFloor, partyInstances: MonsterInstance[], rng: () => number = Math.random,
 ): AwakeningDepthReward {
   const drop = rollAwakeningDepthDrop(floor, rng);
   const cleared = state.clearedAwakeningDepthFloors ?? (state.clearedAwakeningDepthFloors = []);
@@ -58,7 +65,17 @@ export function grantAwakeningDepthReward(
    */
   recordMissionProgress(state, "awakeningDepthClears");
 
+  const goldAndExp = grantGoldAndExp(state, partyInstances, {
+    gold: floor.goldReward, exp: floor.expReward, fighterExp: floor.fighterExp,
+  });
   const reward: AwakeningDepthReward = {
+    ...goldAndExp,
+    crystalEarned: 0,
+    dropDexId: null,
+    dropStar: null,
+    equipmentDrop: null,
+    pigDrop: null,
+    summonScrollDropped: false,
     shards: drop.shards + (firstClear ? floor.firstClear.shards : 0),
     crystals: drop.crystals + (firstClear ? floor.firstClear.crystals : 0),
     stones: drop.stones + (firstClear ? floor.firstClear.stones : 0),

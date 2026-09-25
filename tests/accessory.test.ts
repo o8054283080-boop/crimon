@@ -525,7 +525,7 @@ describe("遺跡", () => {
     const state = createInitialState();
     expect(isRuinFloorUnlocked(state, "POWER", 1)).toBe(true);
     expect(isRuinFloorUnlocked(state, "POWER", 2)).toBe(false);
-    grantRuinReward(state, findRuinFloor("POWER", 1)!, rng(9));
+    grantRuinReward(state, findRuinFloor("POWER", 1)!, [], rng(9));
     expect(isRuinFloorUnlocked(state, "POWER", 2)).toBe(true);
     expect(isRuinFloorUnlocked(state, "GUARDIAN", 2)).toBe(false);
     expect(ruinLocationId("GUARDIAN", 5)).toBe("ruins_guardian_5");
@@ -603,16 +603,18 @@ describe("遺跡の報酬", () => {
     expect(Math.abs(scrollAndPig / n - (scroll / n) * (pig / n))).toBeLessThan(0.002);
   });
 
-  it("配ると持ち物・素材が増える(ゴールドと経験値は配らない)", () => {
+  it("配ると持ち物・素材が増え、階に応じたゴールドも入る", () => {
     const state = createInitialState();
     const gold = state.gold;
-    const reward = grantRuinReward(state, findRuinFloor("GUARDIAN", 3)!, rng(12));
+    const floor = findRuinFloor("GUARDIAN", 3)!;
+    const reward = grantRuinReward(state, floor, [], rng(12));
     expect(state.accessories).toHaveLength(1);
     expect(state.evolutionCores).toBe(reward.evolutionCores);
     expect(state.ancientShards).toBe(reward.ancientShards);
-    expect(state.gold).toBe(gold);
+    expect(reward.goldEarned).toBe(floor.goldReward);
+    expect(state.gold).toBe(gold + floor.goldReward);
     expect(reward.firstClear).toBe(true);
-    expect(grantRuinReward(state, findRuinFloor("GUARDIAN", 3)!, rng(13)).firstClear).toBe(false);
+    expect(grantRuinReward(state, findRuinFloor("GUARDIAN", 3)!, [], rng(13)).firstClear).toBe(false);
   });
 });
 
@@ -725,7 +727,7 @@ describe("周回", () => {
   it("周回の集計にアクセ・進化核・カケラが積まれる", () => {
     const state = createInitialState();
     const result = emptyResult();
-    for (let i = 0; i < 3; i += 1) mergeReward(result, grantRuinReward(state, findRuinFloor("POWER", 2)!, rng(20 + i)), 0);
+    for (let i = 0; i < 3; i += 1) mergeReward(result, grantRuinReward(state, findRuinFloor("POWER", 2)!, [], rng(20 + i)), 0);
     expect(result.accessoryDropCount).toBe(3);
     expect(result.earnedAccessoryIds).toHaveLength(3);
     expect(result.evolutionCores).toBe(state.evolutionCores);

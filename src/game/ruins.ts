@@ -6,8 +6,9 @@ import {
 } from "../data/ruins.js";
 import { addAccessory } from "./accessories.js";
 import { addMonster, addSummonScrolls, type PlayerState } from "./playerState.js";
+import type { MonsterInstance } from "../core/monsterInstance.js";
 import type { StageDrop } from "../data/stages.js";
-import type { ClearRewardResult } from "./rewards.js";
+import { type ClearRewardResult, grantGoldAndExp } from "./rewards.js";
 
 /**
  * 力の遺跡・守護の遺跡の進行と報酬。**配るのはここだけ。**
@@ -91,11 +92,14 @@ export interface RuinReward extends ClearRewardResult {
 }
 
 /**
- * 勝った時の報酬を配る。**ゴールド・経験値は配らない**(遺跡はアクセと素材だけの場所)。
+ * 勝った時の報酬を配る。主役はアクセと素材で、ゴールドと経験値も階に応じて入る。
+ * 経験値を受け取るのは `partyInstances`(遺跡はダンジョン編成)。
  *
  * 周回の集計(`mergeReward`)に流せるよう、`ClearRewardResult` の形で返す。
  */
-export function grantRuinReward(state: PlayerState, floor: RuinFloor, rng: () => number = Math.random): RuinReward {
+export function grantRuinReward(
+  state: PlayerState, floor: RuinFloor, partyInstances: MonsterInstance[], rng: () => number = Math.random,
+): RuinReward {
   const cleared = clearedList(state, floor.kind);
   const firstClear = !cleared.includes(floor.floor);
   if (firstClear) cleared.push(floor.floor);
@@ -111,13 +115,13 @@ export function grantRuinReward(state: PlayerState, floor: RuinFloor, rng: () =>
     addMonster(state, pig.dexId, pig.star, STAR_MAX_LEVEL[pig.star]);
   }
   if (drop.reincarnationPig) pigDrops.push(drop.reincarnationPig);
+  const goldAndExp = grantGoldAndExp(state, partyInstances, {
+    gold: floor.goldReward, exp: floor.expReward, fighterExp: floor.fighterExp,
+  });
 
   return {
-    goldEarned: 0,
+    ...goldAndExp,
     crystalEarned: 0,
-    expTotal: 0,
-    fighterExp: 0,
-    levelUps: [],
     dropDexId: null,
     dropStar: null,
     equipmentDrop: null,
@@ -125,7 +129,6 @@ export function grantRuinReward(state: PlayerState, floor: RuinFloor, rng: () =>
     pigDrops,
     skillPigDrop: drop.skillPig,
     summonScrollDropped: drop.summonScroll,
-    fighterLevelsGained: 0,
     accessoryDrop: drop.accessory,
     evolutionCores: drop.cores,
     ancientShards: drop.shards,

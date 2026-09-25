@@ -148,6 +148,15 @@ function renderDetail(props: RuinsProps, floor: RuinFloor): HTMLElement {
         el("span", { className: "ruin-detail__label" }, ["素材"]),
         el("span", {}, [`進化核 ${range(floor.cores)} / 古代のカケラ ${range(floor.shards)}`]),
       ]),
+      // 勝つたびに必ず入る額。確率ではないので数字をそのまま出す
+      el("div", { className: "ruin-detail__row" }, [
+        el("span", { className: "ruin-detail__label" }, ["ゴールド"]),
+        el("span", {}, [`${floor.goldReward.toLocaleString("ja-JP")} G`]),
+      ]),
+      el("div", { className: "ruin-detail__row" }, [
+        el("span", { className: "ruin-detail__label" }, ["経験値"]),
+        el("span", {}, [`${floor.expReward.toLocaleString("ja-JP")}(1体ずつ)`]),
+      ]),
       el("div", { className: "ruin-detail__row" }, [
         el("span", { className: "ruin-detail__label" }, ["ボーナス"]),
         el("span", {}, [bonusText(floor)]),

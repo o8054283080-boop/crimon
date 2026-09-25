@@ -142,13 +142,13 @@ describe("ドロップと初回報酬", () => {
      * (0 < 0.06)、初回報酬の1個と周回の1個が混ざって数が読めない。
      * 0.5 なら奇石は落ちず、欠片・結晶は範囲の中ほどになる。
      */
-    const first = grantAwakeningDepthReward(state, floor, () => 0.5);
+    const first = grantAwakeningDepthReward(state, floor, [], () => 0.5);
     expect(first.firstClear).toBe(true);
     expect(first.shards).toBe(150 + 16);
     expect(first.crystals).toBe(30 + 5);
     expect(first.stones).toBe(1);
 
-    const second = grantAwakeningDepthReward(state, floor, () => 0.5);
+    const second = grantAwakeningDepthReward(state, floor, [], () => 0.5);
     expect(second.firstClear).toBe(false);
     expect(second.shards).toBe(16);
     expect(second.crystals).toBe(5);
@@ -163,7 +163,7 @@ describe("階の開放", () => {
     expect(isAwakeningDepthUnlocked(state, 2)).toBe(false);
     expect(deepestUnlockedFloor(state)).toBe(1);
 
-    grantAwakeningDepthReward(state, findAwakeningDepthFloor(1)!, () => 0);
+    grantAwakeningDepthReward(state, findAwakeningDepthFloor(1)!, [], () => 0);
     expect(isAwakeningDepthUnlocked(state, 2)).toBe(true);
     expect(isAwakeningDepthUnlocked(state, 3)).toBe(false);
     expect(deepestUnlockedFloor(state)).toBe(2);

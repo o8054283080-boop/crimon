@@ -43,7 +43,7 @@ describe("周回は種類ごとに正しい場所を見る", () => {
     const body = MAIN.slice(MAIN.indexOf("function processBackgroundFarmOnce"));
     const scope = body.slice(0, body.indexOf("\n}\n"));
     expect(scope).toContain('job.kind === "AWAKENING_DEPTH"');
-    expect(scope).toContain("grantAwakeningDepthReward(state.player, floor)");
+    expect(scope).toContain("grantAwakeningDepthReward(state.player, floor, party)");
     // 素材はゴールドや経験値と別枠。ここへ積まないと結果画面に何も出ない
     expect(scope).toContain("job.result.awakeningShards");
   });
@@ -56,7 +56,7 @@ describe("周回は種類ごとに正しい場所を見る", () => {
     const proc = MAIN.slice(MAIN.indexOf("function processBackgroundFarmOnce"));
     const procScope = proc.slice(0, proc.indexOf("\n}\n"));
     expect(procScope).toContain('job.kind === "RUINS"');
-    expect(procScope).toContain("grantRuinReward(state.player, floor)");
+    expect(procScope).toContain("grantRuinReward(state.player, floor, party)");
     const start = MAIN.slice(MAIN.indexOf("function startFromLastRun"));
     expect(start.slice(0, start.indexOf("\n}"))).toContain("startRuinFloor(last.floor)");
   });

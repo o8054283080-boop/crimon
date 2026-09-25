@@ -165,6 +165,30 @@ export function applyExpAndLevelUps(partyInstances: MonsterInstance[], expTotal:
   return { levelUps, expAwards };
 }
 
+export type GoldAndExpReward = Pick<ClearRewardResult, "goldEarned" | "expTotal" | "fighterExp" | "levelUps" | "expAwards" | "fighterLevelsGained">;
+
+/**
+ * ゴールド・モンスターEXP・ファイターEXPだけを配る。
+ * 素材が主役の場所(目覚の深域・遺跡)が、他の報酬と別に使う。
+ */
+export function grantGoldAndExp(
+  state: PlayerState,
+  partyInstances: MonsterInstance[],
+  amounts: { gold: number; exp: number; fighterExp: number },
+): GoldAndExpReward {
+  const { levelUps, expAwards } = applyExpAndLevelUps(partyInstances, amounts.exp);
+  const fighterLevelsGained = addFighterExp(state, amounts.fighterExp).levelsGained;
+  state.gold += amounts.gold;
+  return {
+    goldEarned: amounts.gold,
+    expTotal: amounts.exp,
+    fighterExp: amounts.fighterExp,
+    levelUps,
+    expAwards,
+    fighterLevelsGained,
+  };
+}
+
 /**
  * ステージクリア(全ウェーブ)時の報酬をまとめて付与する。
  * ダイヤは初回クリアなら200確定、既にクリア済みのステージなら3%の確率で50。

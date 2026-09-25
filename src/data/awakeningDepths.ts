@@ -64,6 +64,12 @@ export interface AwakeningDepthFloor {
   drop: AwakeningDepthDrop;
   /** 初回クリアだけの報酬 */
   firstClear: AwakeningDepthFirstClear;
+  /** 勝つたびに入るゴールド */
+  goldReward: number;
+  /** 勝つたびに編成の1体ずつへ入るモンスターEXP */
+  expReward: number;
+  /** 勝つたびに入るファイターEXP */
+  fighterExp: number;
   /**
    * その階のねらい。挑む前の画面に出して、
    * **何を試される階なのか**を先に伝える
@@ -261,6 +267,17 @@ function buildEnemies(floor: number, cfg: FloorConfig): DungeonEnemy[] {
   return [boss, ...shards];
 }
 
+/*
+ * ゴールドと経験値。**素材が主役の場所なので、ステージほどは出さない。**
+ *
+ * スタミナ1あたりで、ステージ終盤(8章)のおよそ4割のゴールドと3分の1の経験値。
+ * ファイターEXPは装備ダンジョンと同じ(10階で750)。
+ * 深い階ほど多いのは、勝てる階を上げていく手応えを素材以外にも持たせるため。
+ */
+export const AWAKENING_DEPTH_GOLD_PER_FLOOR = 1_000;
+export const AWAKENING_DEPTH_EXP_PER_FLOOR = 1_000;
+export const AWAKENING_DEPTH_FIGHTER_EXP_PER_FLOOR = 75;
+
 export const AWAKENING_DEPTH_FLOORS: AwakeningDepthFloor[] = Array.from(
   { length: AWAKENING_DEPTH_FLOOR_COUNT },
   (_, i) => {
@@ -275,6 +292,9 @@ export const AWAKENING_DEPTH_FLOORS: AwakeningDepthFloor[] = Array.from(
       stamina: cfg.stamina,
       drop: cfg.drop,
       firstClear: cfg.firstClear,
+      goldReward: AWAKENING_DEPTH_GOLD_PER_FLOOR * floor,
+      expReward: AWAKENING_DEPTH_EXP_PER_FLOOR * floor,
+      fighterExp: AWAKENING_DEPTH_FIGHTER_EXP_PER_FLOOR * floor,
       note: cfg.note,
     };
   },

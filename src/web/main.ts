@@ -2285,26 +2285,6 @@ function backgroundFarmCost(job: BackgroundFarmJob): number {
 const AWAKENING_DEPTH_FALLBACK_STAMINA = 10;
 const RUINS_FALLBACK_STAMINA = 12;
 
-/**
- * 何も配らない報酬。
- *
- * 深域はゴールドも経験値もドロップも無く、素材だけを配る。
- * 周回の集計は `ClearRewardResult` を通す作りなので、空を1つ渡す。
- */
-const EMPTY_CLEAR_REWARD = {
-  goldEarned: 0,
-  crystalEarned: 0,
-  expTotal: 0,
-  fighterExp: 0,
-  levelUps: [],
-  dropDexId: null,
-  dropStar: null,
-  equipmentDrop: null,
-  pigDrop: null,
-  summonScrollDropped: false,
-  fighterLevelsGained: 0,
-} as const satisfies ClearRewardResult;
-
 function scheduleBackgroundFarm(delay = 0): void {
   if (backgroundFarmTimer !== null) return;
   backgroundFarmTimer = window.setTimeout(() => {
@@ -2434,21 +2414,21 @@ function processBackgroundFarmOnce(): void {
      */
     const floor = findAwakeningDepthFloor(Number(job.targetId));
     if (!floor) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
-    const materials = grantAwakeningDepthReward(state.player, floor);
+    const materials = grantAwakeningDepthReward(state.player, floor, party);
     // 素材はゴールドや経験値と別の枠。周回の結果へそのまま積む
     job.result.awakeningShards = (job.result.awakeningShards ?? 0) + materials.shards;
     job.result.awakeningCrystals = (job.result.awakeningCrystals ?? 0) + materials.crystals;
     job.result.awakeningStones = (job.result.awakeningStones ?? 0) + materials.stones;
-    // 深域はゴールドも経験値も配らない(手で挑んだ時と同じ)。素材だけが報酬
-    reward = EMPTY_CLEAR_REWARD;
+    // ゴールドと経験値は `mergeReward` が他の場所と同じ欄へ積む(手で挑んだ時と同じ額)
+    reward = materials;
   } else if (job.kind === "RUINS") {
     /*
-     * 遺跡。アクセ・進化核・カケラと副ドロップだけ(手で挑んだ時と同じ)。
+     * 遺跡。アクセ・進化核・カケラと副ドロップ、ゴールドと経験値(手で挑んだ時と同じ)。
      * 集計は `mergeReward` がアクセ・核・カケラの欄へ積む。
      */
     const floor = findRuinFloorByLocationId(job.targetId);
     if (!floor) { job.inFlight = false; finishBackgroundFarm(job, "DEFEAT"); savePlayerState(state.player); refreshBackgroundFarmStatus(); return; }
-    reward = grantRuinReward(state.player, floor);
+    reward = grantRuinReward(state.player, floor, party);
   } else reward = applyGoldDungeonClearRewards(state.player, GOLD_DUNGEON_FLOORS.find((f) => String(f.floor) === job.targetId)!, party);
   state.player.gold += battle.extraGold;
   mergeReward(job.result, reward, battle.extraGold);
@@ -2790,7 +2770,7 @@ function finishAwakeningDepth(cleared: boolean): void {
    * 素材は**勝った時だけ。**負けても消費したスタミナは戻らないが、
    * それは他のダンジョンと同じ扱い。
    */
-  const reward = cleared ? grantAwakeningDepthReward(state.player, floor) : null;
+  const reward = cleared ? grantAwakeningDepthReward(state.player, floor, run.partyInstances) : null;
   savePlayerState(state.player);
   state.awakeningDepthRun = null;
 
@@ -2805,14 +2785,16 @@ function finishAwakeningDepth(cleared: boolean): void {
   state.stageResult = {
     cleared,
     stageName: floor.name + (reward?.firstClear ? "(初回クリア)" : ""),
-    goldEarned: 0,
+    goldEarned: reward?.goldEarned ?? 0,
     crystalEarned: 0,
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
-    levelUps: [],
+    levelUps: reward?.levelUps ?? [],
+    expAwards: reward?.expAwards ?? [],
     dropDexId: null,
     dropStar: null,
     equipmentDrop: null,
+    fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
     extraLines: materialLines,
   };
   enterStageResult();
@@ -2897,17 +2879,19 @@ function finishRuin(cleared: boolean): void {
     );
   }
   // 報酬は**勝った時だけ**。負けても消費したスタミナは戻らない(他のダンジョンと同じ)
-  const reward = cleared ? grantRuinReward(state.player, floor) : null;
+  const reward = cleared ? grantRuinReward(state.player, floor, run.partyInstances) : null;
   savePlayerState(state.player);
   state.ruinRun = null;
   state.stageResult = {
     cleared,
     stageName: floor.name + (reward?.firstClear ? "(初回クリア)" : ""),
-    goldEarned: 0,
+    goldEarned: reward?.goldEarned ?? 0,
     crystalEarned: 0,
     wavesCleared: cleared ? 1 : 0,
     totalWaves: 1,
-    levelUps: [],
+    levelUps: reward?.levelUps ?? [],
+    expAwards: reward?.expAwards ?? [],
+    fighterLevelsGained: reward?.fighterLevelsGained ?? 0,
     dropDexId: null,
     dropStar: null,
     equipmentDrop: null,
