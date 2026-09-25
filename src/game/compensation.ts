@@ -57,6 +57,12 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-25-home-mode-art-trim",
+    title: "ホームの行き先の絵のはみ出しを直しました",
+    message: "ホーム右側の「ダンジョン」「闘技場」「試練の塔」の絵の縁に、となりの絵の切れ端(赤いリボンや飾りのかけら)が写り込んでいたのを消しました。",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-25-accessory-special-growth",
     title: "アクセサリーの強化で、特殊効果が伸びるようになりました",
     message: "アクセサリーを強化した時の伸び方を見直しました。\n\n"
