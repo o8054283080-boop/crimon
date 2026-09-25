@@ -200,3 +200,70 @@ describe("画面への配線", () => {
     expect(panel.indexOf("skill-growth-summary")).toBeLessThan(panel.lastIndexOf('className: "skill-growth" }'));
   });
 });
+
+/*
+ * `amount` は**効果の種類で意味が違う。**一律に「行動ゲージ(%)」と読んでいたため、
+ * グジラ電気のホワイトサージLv3(固定ダメージ 10,000→12,000)が
+ * 「行動ゲージ 1000000%→1200000%」と出ていた(依頼主の指摘)。
+ */
+/**
+ * 図鑑に並ぶ個体(属性ごと)が実際に持つ全スキル。
+ * `activeSkills` はテンプレートしか見ないので、**コラボや新種の属性別S3が入らない**
+ * (ホワイトサージもそこから漏れていた)。
+ */
+function dexSkills(): { name: string; skill: Skill }[] {
+  const out = new Map<string, { name: string; skill: Skill }>();
+  for (const entry of MONSTER_DEX_ENTRIES) {
+    for (const skill of entry.skills ?? []) {
+      if (skill.passive || skill.automatic || out.has(skill.id)) continue;
+      out.set(skill.id, { name: `${entry.name} / ${skill.name}`, skill });
+    }
+  }
+  return [...out.values()];
+}
+
+describe("amount を効果の種類ごとに読み分ける", () => {
+  const SURGE: Skill = {
+    id: "t_surge", name: "t", description: "", target: "SINGLE_ENEMY", cooldownTurns: 5,
+    effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 10_000, requires: "ANY_CRIT" }],
+    levelOverrides: [
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 10_000, requires: "ANY_CRIT" }] },
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 12_000, requires: "ANY_CRIT" }] },
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 12_000, requires: "ANY_CRIT" }] },
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 12_000, requires: "ANY_CRIT" }] },
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 12_000, requires: "ANY_CRIT" }] },
+    ],
+  };
+
+  it("固定ダメージは桁区切りの素の数で出す", () => {
+    expect(describeSkillGrowth(SURGE)[0].changes).toEqual(["固定ダメージ 10,000→12,000"]);
+  });
+
+  it("本物のホワイトサージとセレスティアルストームも正しい名前で出る", () => {
+    const find = (id: string) => dexSkills().find((s) => s.skill.id === id)!.skill;
+    const lv3 = (id: string) => describeSkillGrowth(find(id)).find((s) => s.level === 3)!.changes;
+    expect(lv3("gujira_s3_white_surge")).toEqual(["固定ダメージ 10,000→12,000"]);
+    expect(lv3("harpy_s3_light")).toEqual(["与ダメージ増加 20%→25%"]);
+  });
+
+  it("「行動ゲージ」と出す行は、実際に行動ゲージを動かす効果だけ", () => {
+    for (const { name, skill } of dexSkills()) {
+      for (let level = 2; level <= MAX_SKILL_LEVEL; level += 1) {
+        // 1撃ごとの効果(`perHitEffects`)の中の行動ゲージも数える(モッチー水のガッチャー)
+        const effects = computeLeveledSkill(skill, level).effects
+          .flatMap((e) => [e, ...((e as { perHitEffects?: typeof e[] }).perHitEffects ?? [])]);
+        const kinds = new Set(effects.map((e) => e.kind));
+        const says = describeSkillGrowth(skill)[level - 2].changes.some((c) => c.startsWith("行動ゲージ"));
+        if (says) expect(kinds.has("GAUGE") || kinds.has("GAUGE_ON_HIT"), `${name} Lv${level}`).toBe(true);
+      }
+    }
+  });
+
+  it("どの段にも、ありえない大きさの割合は出ない", () => {
+    for (const { name, skill } of dexSkills()) {
+      for (const step of describeSkillGrowth(skill)) {
+        for (const change of step.changes) expect(change, `${name} Lv${step.level}`).not.toMatch(/\d{4,}%/);
+      }
+    }
+  });
+});
