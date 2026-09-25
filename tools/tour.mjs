@@ -56,6 +56,14 @@ const SCREENS = [
   { name: "モンスター", tab: "MONSTERS" },
   { name: "装備", tab: "EQUIPMENT" },
   { name: "装備/アクセサリー", tab: "EQUIPMENT", setup: "window.__crimonDev?.seedAccessoryContent(); await wait(200); window.__crimonDev?.openGearAccessoryTabForDev()" },
+  /*
+   * **入手時のアクセのシートも見る。**周回・1戦の結果から開くシートで、
+   * 絞り込みを開いた状態とまとめ売りの帯を含む。結果画面はタブから辿れないので、
+   * DEV限定の口で立ててから見る。
+   */
+  { name: "遺跡の周回結果/獲得アクセ", tab: "HOME", setup: "window.__crimonDev?.openRuinFarmResult(true)" },
+  { name: "遺跡の周回結果/獲得アクセ(絞り込み)", tab: "HOME", setup: "window.__crimonDev?.openRuinFarmResult(true, true)" },
+  { name: "遺跡の1戦の結果/獲得アクセ", tab: "HOME", setup: "window.__crimonDev?.openRuinStageResultForDev(true)" },
   { name: "召喚", tab: "SUMMON" },
   { name: "ショップ", tab: "SHOP" },
   /*
