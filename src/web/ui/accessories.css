@@ -239,25 +239,13 @@
 .farm-acc-card .farm-equip-card__actions .btn { min-height: 44px; }
 .farm-acc-card .farm-equip-card__select { min-height: 44px; }
 
-/* 題は装備(「今回獲得した装備」)より長い。既定の大きさでは2行に折れ、「閉じる」まで折れた */
+/* 題は装備(「今回獲得した装備」)より長い。既定の大きさでは「ー」だけが次の行へ落ちた */
 .farm-acc-sheet .farm-equip-sheet__panel h2 {
   font-size: 1.2rem;
   line-height: 1.3;
 }
 
-.farm-acc-sheet .farm-equip-sheet__panel > header .btn {
-  flex: none;
-  white-space: nowrap;
-}
-
-/*
- * 下の操作帯の地。共有の既定は上の16%が透けていて、
- * 「選択 0個 売却予定」の字が後ろの札の字と重なって読めなかった。
- * 字が乗る所から先は塗りつぶす(形は装備のシートと同じまま、地の色だけ)。
- */
-.farm-acc-sheet .farm-equip-sheet__panel > footer {
-  background: linear-gradient(rgba(13, 18, 36, 0), #0d1224 10px);
-}
+/* 「閉じる」の折り返しと下の帯の地は、装備のシートと共通(`farmEquipmentResult.css`) */
 
 .farm-acc-detail {
   display: grid;
