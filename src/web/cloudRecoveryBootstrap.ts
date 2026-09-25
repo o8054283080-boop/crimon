@@ -3,6 +3,7 @@ import {
   CloudRecoveryMeta,
   CloudRecoveryError,
   saveConfirmedCloud,
+  pendingCloudMeta,
   cloudRecoveryMessage,
   clearCloudMeta,
   currentSaveEnvelope,
@@ -153,6 +154,7 @@ async function syncNow(showUnchanged = false, scheduled = false): Promise<void> 
   }
   syncRunning = true;
   try {
+    storeCloudMeta(await pendingCloudMeta(meta, save));
     const next = await uploadCloudSave(meta, save, arenaAuthUserId());
     storeCloudMeta(next);
     conflictDetected = false;
@@ -419,6 +421,7 @@ async function previewResume(panel: HTMLElement): Promise<void> {
       try {
         const save = currentSaveEnvelope();
         if (!save) throw new Error("端末セーブを確認できません");
+        storeCloudMeta(await pendingCloudMeta(connected, save));
         const next = await saveConfirmedCloud(latest.meta, save, arenaAuthUserId());
         storeCloudMeta(next);
         conflictDetected = false;
