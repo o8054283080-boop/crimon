@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CloudRecoveryError, envelopeFingerprint, uploadCloudSave, saveConfirmedCloud, cloudRecoveryWarning, CLOUD_RECOVERY_META_KEY, type CloudRecoveryMeta, type CloudSaveEnvelope } from "../src/game/cloudRecovery.js";
+import { CloudRecoveryError, pendingCloudMeta, envelopeFingerprint, uploadCloudSave, saveConfirmedCloud, cloudRecoveryWarning, CLOUD_RECOVERY_META_KEY, type CloudRecoveryMeta, type CloudSaveEnvelope } from "../src/game/cloudRecovery.js";
 
 const save = (gold: number) => ({ kind: "crimon-save", version: 1, exportedAt: "2026-09-25T00:00:00Z", state: { gold, monsters: [{ id: "one" }], equipment: [] } }) as unknown as CloudSaveEnvelope;
 const meta = (): CloudRecoveryMeta => ({ recoveryId: "test", sessionToken: "test-session", sessionExpiresAt: "2099-01-01", revision: 2, savedAt: "2026-09-01", lastUploadedSave: envelopeFingerprint(save(10)), arenaUserId: "original" });
@@ -45,6 +45,22 @@ describe("保存の応答が届かなかった場合の安全な再開", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(uploadCloudSave(meta(), save(20))).rejects.toThrow("offline");
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("前回送信の応答が失われ、その後遊びが進んでいても内容の連続性を確認して再開する", async () => {
+    const pending = await pendingCloudMeta(meta(), save(20));
+    const fetch = vi.fn().mockResolvedValueOnce(stale()).mockResolvedValueOnce(latest(save(20), 3))
+      .mockResolvedValueOnce(reply({ ok: true, revision: 4, savedAt: "2026-09-25" }));
+    vi.stubGlobal("fetch", fetch);
+    const result = await uploadCloudSave(pending, save(30));
+    expect(result.revision).toBe(4);
+    expect(result.pendingSaveHash).toBeUndefined();
+  });
+  it("前回の送信内容とも違う場合は自動で上書きしない", async () => {
+    const pending = await pendingCloudMeta(meta(), save(20));
+    const fetch = vi.fn().mockResolvedValueOnce(stale()).mockResolvedValueOnce(latest(save(40), 3));
+    vi.stubGlobal("fetch", fetch);
+    await expect(uploadCloudSave(pending, save(30))).rejects.toMatchObject({ code: "STALE_REVISION" });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it("本人が選んだデータも確認後の競合は無視しない", async () => {
     const fetch = vi.fn().mockResolvedValue(stale());
