@@ -204,7 +204,9 @@ import { renderHowToPlay } from "./views/howToPlay.js";
 import type { ArenaViewName } from "./views/pvpArena.js";
 import { buildArenaEntryBattle } from "./views/arena/model.js";
 import { arenaNpcRng, buildArenaNpcs } from "../game/arena/npc.js";
-import { buildArenaCandidates } from "../game/arena/matchmaking.js";
+import {
+  ARENA_CANDIDATE_TOTAL, ARENA_NPC_GENERATE_COUNT, ARENA_PLAYER_SLOTS, buildArenaCandidates, orderArenaPlayerPicks,
+} from "../game/arena/matchmaking.js";
 import { captureArenaDefense } from "../game/arena/snapshot.js";
 import { arenaDefenseHistory, arenaRevengeBlock, markArenaRevenged, mergeArenaHistory, recordArenaMatch } from "../game/arena/match.js";
 import {
@@ -222,7 +224,8 @@ import {
   arenaSyncAvailable,
   claimArenaWeeklyReward as claimArenaWeeklyRewardRemote,
   ensureArenaProfile,
-  fetchArenaOpponents,
+  fetchArenaOpponentPool,
+  fetchArenaOpponentsByIds,
   fetchArenaRanking,
   fetchArenaMatchHistory,
   fetchArenaRankingAround,
@@ -3218,8 +3221,6 @@ function renderCurrentLevelDungeonBattle(): BattleViewHandle {
  * アリーナ(対人戦)
  * ========================================================================== */
 
-/** 何人並べるか。実プレイヤーが足りない分はNPCで埋める */
-const ARENA_CANDIDATE_COUNT = 5;
 
 /**
  * 自分の識別子。
@@ -3359,33 +3360,45 @@ async function reconcileArenaShopPurchases(): Promise<number> {
 }
 
 /**
- * 対戦候補を組み直す。
+ * 対戦候補を組み直す。**10枠 = 実プレイヤー3 + NPC7。**
  *
- * **実プレイヤーを先に、足りない分をNPCで埋める。** 人口が少ない前提なので、
- * 実プレイヤーが0人でも必ず5人並ぶ。未接続なら `fetchArenaOpponents` が
- * 通信せず空を返すので、そのままNPCだけになる。
+ * 実プレイヤーは**レート差に関係なく**、近い・中くらい・遠いを1人ずつ選ぶ
+ * (`orderArenaPlayerPicks`)。前は自分の ±300 に居る人だけだったので、
+ * 人口が少ないと実プレイヤーが1人も並ばなかった。
+ * 実プレイヤーが3人に満たない時だけ、その分もNPCで埋める。
+ * 未接続なら通信せずにNPCだけで並べる(オフラインでも遊べる状態を壊さない)。
  */
 async function refreshArenaCandidates(): Promise<void> {
   const rating = state.player.arenaPoints;
   const seed = state.player.arenaOpponentSeed;
-  const npcs = buildArenaNpcs(rating, seed, ARENA_CANDIDATE_COUNT * 2);
-  // まずNPCだけで即座に並べる。通信を待つ間、画面が空にならないようにする
-  state.arenaCandidates = buildArenaCandidates([], npcs, {
-    count: ARENA_CANDIDATE_COUNT,
+  // NPCは10人ぶん作る。**サーバもこの数で作り直して相手を特定する**(`ARENA_NPC_GENERATE_COUNT`)
+  const npcs = buildArenaNpcs(rating, seed, ARENA_NPC_GENERATE_COUNT);
+  const options = {
+    count: ARENA_CANDIDATE_TOTAL,
     selfId: arenaSelfId(),
     recentIds: state.player.arenaRecentOpponentIds,
-  });
+    maxPlayers: ARENA_PLAYER_SLOTS,
+    keepPlayerOrder: true,
+  };
+  // まずNPCだけで即座に並べる。通信を待つ間、画面が空にならないようにする
+  state.arenaCandidates = buildArenaCandidates([], npcs, options);
   if (!(await connectArena())) return;
   state.arenaCandidatesLoading = true;
-  const players = await fetchArenaOpponents(arenaSelfId(), rating, ARENA_CANDIDATE_COUNT);
+  // 1. 全員のID・レートだけを軽く取り、近・中・遠から選ぶ順番を決める
+  const pool = await fetchArenaOpponentPool(arenaSelfId());
+  const order = orderArenaPlayerPicks(pool, {
+    selfId: arenaSelfId(),
+    myRating: rating,
+    seed,
+    recentIds: state.player.arenaRecentOpponentIds,
+    slots: ARENA_PLAYER_SLOTS,
+  });
+  // 2. 選んだ人(と控え)の防衛編成だけを取る。壊れていた人は落ち、控えが繰り上がる
+  const players = await fetchArenaOpponentsByIds(order);
   state.arenaCandidatesLoading = false;
   // 戻ってくる頃に別の画面へ移っていることがある。その時は捨てる
   if (state.screen !== "ARENA") return;
-  state.arenaCandidates = buildArenaCandidates(players, npcs, {
-    count: ARENA_CANDIDATE_COUNT,
-    selfId: arenaSelfId(),
-    recentIds: state.player.arenaRecentOpponentIds,
-  });
+  state.arenaCandidates = buildArenaCandidates(players, npcs, options);
   render();
 }
 
@@ -3546,7 +3559,7 @@ function startArenaMatch(entry: ArenaOpponentEntry, onRefused?: () => void): boo
         opponentId: entry.kind === "PLAYER" ? entry.id : null,
         opponentSeed: entry.kind === "NPC" ? String(state.player.arenaOpponentSeed) : null,
         opponentIndex: entry.kind === "NPC" ? (entry.npcGenerationIndex ?? entry.index) : null,
-        opponentCount: entry.kind === "NPC" ? ARENA_CANDIDATE_COUNT * 2 : null,
+        opponentCount: entry.kind === "NPC" ? ARENA_NPC_GENERATE_COUNT : null,
         opponentName: entry.name,
       })
       : ({ ok: false, reached: false, reason: null } as const);

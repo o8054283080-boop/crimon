@@ -276,9 +276,16 @@ export const ARENA_REROLL_LIMIT = 3;
  * 周回そのものが止まる。逆にアリーナ側も「今日はもう周回で使い切った」で
  * 触れなくなる。どちらの遊びも相手の都合で止まらないように分ける。
  */
-export const ARENA_TICKET_MAX = 10;
+/*
+ * 2026-09 に 10枚/60分 → **5枚/120分**(1日に回復する枚数 24 → 12)。日課の負担を半分にし、
+ * 1戦のコインを2倍にして総量は保つ(`data/arena/shop.ts`)。
+ *
+ * **5枚を超えて持っている人の分は消さない。**上限を超えている間は自然回復が止まるだけで、
+ * 使って5枚未満になれば、また回復する(サーバ `arena__refill_tickets` も同じ)。
+ */
+export const ARENA_TICKET_MAX = 5;
 /** 挑戦券が1枚回復するまでの実時間(分) */
-export const ARENA_TICKET_REGEN_MINUTES = 60;
+export const ARENA_TICKET_REGEN_MINUTES = 120;
 /** ダイヤを払って挑戦券を全回復する時の価格 */
 export const ARENA_TICKET_REFILL_COST = 100;
 

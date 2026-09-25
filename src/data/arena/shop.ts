@@ -17,11 +17,18 @@ import { ARENA_TICKET_MAX, ARENA_TICKET_REGEN_MINUTES } from "../pvpArena.js";
 /**
  * 1戦で貰えるコイン。
  * **負けても0にしない。** 勝てない人ほど参加する理由が要る。
+ *
+ * 2026-09 に**2倍にした**(10/3 → 20/6)。挑戦券を半分(10枚/60分 → 5枚/120分)に
+ * したので、1日に入るコインの総量を変えないため。NPC戦と実プレイヤー戦は同じ額。
+ * サーバの `arena_config.match_coins` と同じ値(`tests/arenaConfigParity.test.ts`)。
  */
-export const ARENA_COIN_WIN = 10;
-export const ARENA_COIN_LOSS = 3;
-/** 防衛で退けた時。自分で挑んでいないので控えめ */
-export const ARENA_COIN_DEFENSE_WIN = 4;
+export const ARENA_COIN_WIN = 20;
+export const ARENA_COIN_LOSS = 6;
+/**
+ * 防衛で退けた時。自分で挑んでいないので控えめ。
+ * 攻めてくる回数も半分になるので、1回ぶんを2倍にした(4 → 8)。1日の上限40は据え置き
+ */
+export const ARENA_COIN_DEFENSE_WIN = 8;
 /** 防衛だけで際限なく増えないようにするJST1日ぶんの上限 */
 export const ARENA_COIN_DEFENSE_DAILY_CAP = 40;
 

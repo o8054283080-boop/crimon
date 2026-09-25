@@ -32,6 +32,7 @@ import {
   ArenaOpponentEntry,
   ArenaOpponentKind,
 } from "../game/arena/types.js";
+import type { ArenaPoolRow } from "../game/arena/matchmaking.js";
 
 /** 環境変数の名前。**ここ以外に書かない** */
 export const ARENA_SYNC_URL_ENV = "VITE_SUPABASE_URL";
@@ -453,17 +454,21 @@ export async function fetchArenaOpponents(
   myId: string,
   rating: number,
   limit = 10,
-  band = 300,
+  /**
+   * レートの幅。**省略時は絞らない**(2026-09 に ±300 の制限を外した)。
+   * 渡した時だけ `rating ± band` に絞る。
+   */
+  band?: number,
 ): Promise<ArenaOpponentEntry[]> {
   try {
     if (!arenaSyncAvailable()) return [];
     const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
-    const low = Math.max(0, Math.round(rating - band));
-    const high = Math.round(rating + band);
     const params = new URLSearchParams();
     params.set("select", "user_id,display_name,rating,tier_id,snapshot,unit_count,captured_at");
-    params.append("rating", `gte.${low}`);
-    params.append("rating", `lte.${high}`);
+    if (typeof band === "number" && Number.isFinite(band)) {
+      params.append("rating", `gte.${Math.max(0, Math.round(rating - band))}`);
+      params.append("rating", `lte.${Math.round(rating + band)}`);
+    }
     if (myId) params.set("user_id", `neq.${myId}`);
     params.set("limit", String(safeLimit));
     const rows = await request(`arena_opponent_pool?${params.toString()}`);
@@ -474,6 +479,70 @@ export async function fetchArenaOpponents(
       if (entry) entries.push(entry);
     }
     return entries;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 実プレイヤー候補の一覧を**軽く**引く(ID・レート・防衛の体数だけ)。**失敗したら空配列。**
+ *
+ * 2026-09 から、候補の実プレイヤーはレート差に関係なく選ぶ(`orderArenaPlayerPicks`)。
+ * 全員の防衛編成まで一度に取ると重いので、先にここで選び、
+ * 選んだ人の編成だけを `fetchArenaOpponentsByIds` で取る。
+ *
+ * 自分は候補表(ビュー)が `auth.uid()` で落としている。ここでも `neq` で重ねて落とす。
+ */
+export async function fetchArenaOpponentPool(myId: string, limit = 200): Promise<ArenaPoolRow[]> {
+  try {
+    if (!arenaSyncAvailable()) return [];
+    const params = new URLSearchParams();
+    params.set("select", "user_id,rating,unit_count");
+    if (myId) params.set("user_id", `neq.${myId}`);
+    params.set("limit", String(Math.max(1, Math.min(1000, Math.floor(limit)))));
+    const rows = await request(`arena_opponent_pool?${params.toString()}`);
+    if (!Array.isArray(rows)) return [];
+    const out: ArenaPoolRow[] = [];
+    for (const row of rows) {
+      if (!isRecord(row)) continue;
+      const id = row.user_id;
+      if (typeof id !== "string" || !id || id === myId) continue;
+      // 防衛が空の人は挑めない(開始時にサーバが断る)ので、ここで外す
+      if (typeof row.unit_count === "number" && row.unit_count < 1) continue;
+      out.push({ id, rating: Math.max(0, Math.round(asFiniteNumber(row.rating, 1000))) });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** PostgREST の `in.(...)` に入れてよい形か(user_id は uuid) */
+const SAFE_ID = /^[0-9A-Za-z-]{1,64}$/;
+
+/**
+ * 選んだ実プレイヤーの防衛編成を取る。**渡した順に並べて返す。失敗したら空配列。**
+ * 編成が壊れている人は落とす(`toOpponentEntry`)。
+ */
+export async function fetchArenaOpponentsByIds(ids: readonly string[]): Promise<ArenaOpponentEntry[]> {
+  try {
+    if (!arenaSyncAvailable()) return [];
+    const wanted = [...new Set(ids.filter((id) => SAFE_ID.test(id)))].slice(0, 50);
+    if (wanted.length === 0) return [];
+    const params = new URLSearchParams();
+    params.set("select", "user_id,display_name,rating,tier_id,snapshot,unit_count,captured_at");
+    params.set("user_id", `in.(${wanted.join(",")})`);
+    const rows = await request(`arena_opponent_pool?${params.toString()}`);
+    if (!Array.isArray(rows)) return [];
+    const byId = new Map<string, ArenaOpponentEntry>();
+    for (const row of rows) {
+      const entry = toOpponentEntry(row, 0);
+      if (entry && !byId.has(entry.id)) byId.set(entry.id, entry);
+    }
+    return wanted
+      .map((id) => byId.get(id))
+      .filter((entry): entry is ArenaOpponentEntry => entry !== undefined)
+      .map((entry, index) => ({ ...entry, index }));
   } catch {
     return [];
   }
