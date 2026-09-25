@@ -66,12 +66,13 @@ describe("復旧IDに、アリーナの身元を覚えさせる", () => {
     expect(SQL).not.toMatch(/references\s+public\.arena_profiles/i);
   });
 
-  it("登録と保存で、サーバが記録する", () => {
+  it("登録時に記録し、バックアップでは既存の身元を動かさない", () => {
     expect(RECOVERY).toContain("function arenaUserId(");
     expect(RECOVERY).toContain("arena_user_id: arenaUserId(body.arenaUserId)");
-    // 保存時も、別IDなら無条件上書きせず元成績を移してから覚え直す
+    // 保存時は既存IDを読むだけ。競合再試行が戦績移動を起こしてはいけない。
     const save = RECOVERY.indexOf('action === "save"');
-    expect(RECOVERY.slice(save)).toContain("reconcileArenaIdentity(session.row.account_id, body.arenaUserId)");
+    expect(RECOVERY.slice(save)).not.toContain("reconcileArenaIdentity(");
+    expect(RECOVERY.slice(save)).toContain('select("arena_user_id")');
   });
 
   it("送られてこない時は消さない", () => {

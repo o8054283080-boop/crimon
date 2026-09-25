@@ -1,6 +1,9 @@
 import {
   CLOUD_RESTORE_BACKUP_AT_KEY,
   CloudRecoveryMeta,
+  CloudRecoveryError,
+  saveConfirmedCloud,
+  pendingCloudMeta,
   cloudRecoveryMessage,
   clearCloudMeta,
   currentSaveEnvelope,
@@ -130,7 +133,8 @@ function expiredNotice(): void {
 }
 
 async function syncNow(showUnchanged = false, scheduled = false): Promise<void> {
-  if (syncRunning || conflictDetected) return;
+  if (syncRunning) return;
+  if (conflictDetected && !showUnchanged) return;
   const stored = readCloudMeta();
   // 登録していない人はここで終わり。**警告はホーム側が出している**
   if (!stored) return;
@@ -150,8 +154,10 @@ async function syncNow(showUnchanged = false, scheduled = false): Promise<void> 
   }
   syncRunning = true;
   try {
+    storeCloudMeta(await pendingCloudMeta(meta, save));
     const next = await uploadCloudSave(meta, save, arenaAuthUserId());
     storeCloudMeta(next);
+    conflictDetected = false;
     if (scheduled || next.revision !== meta.revision) localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
     if (next.revision !== meta.revision) {
       setStatus(`バックアップ済み：${formatSavedAt(next.savedAt)}（世代 ${next.revision}）`, "ok");
@@ -160,7 +166,11 @@ async function syncNow(showUnchanged = false, scheduled = false): Promise<void> 
     }
   } catch (error) {
     const message = cloudRecoveryMessage(error);
-    if (message.includes("古いデータ")) conflictDetected = true;
+    if (error instanceof CloudRecoveryError && error.code === "STALE_REVISION") {
+      conflictDetected = true;
+      storeCloudMeta({ ...meta, syncConflict: true });
+      document.querySelectorAll<HTMLElement>(`[${PANEL_MARKER}]`).forEach(panel => renderPanelInto(panel));
+    }
     setStatus(message, "error");
   } finally {
     syncRunning = false;
@@ -380,6 +390,55 @@ function renderDisconnected(panel: HTMLElement) {
   panel.append(intro, registerDetails, loginDetails, keyDetails);
 }
 
+async function previewResume(panel: HTMLElement): Promise<void> {
+  if (syncRunning) return;
+  syncRunning = true;
+  try {
+    const meta = loadCloudMeta();
+    const local = currentSaveEnvelope();
+    if (!meta || !local) throw new Error("保存内容を確認できません");
+    const latest = await loadLatestCloud(meta);
+    // 閲覧した世代を接続情報へ保存しない。本人の選択前に自動保存が上書きしてしまう。
+    panel.querySelector(".cloud-recovery__preview")?.remove();
+    const preview = document.createElement("div");
+    preview.className = "cloud-recovery__preview";
+    const title = document.createElement("strong");
+    title.textContent = "バックアップに使うデータを確認";
+    const current = document.createElement("p");
+    current.textContent = `この端末：${summaryText(local)}`;
+    const remote = document.createElement("p");
+    remote.textContent = `クラウド（${formatSavedAt(latest.meta.savedAt)}）：${summaryText(latest.save)}`;
+    const resume = button("この端末のデータでバックアップを再開", "btn btn--primary", async () => {
+      if (syncRunning) return;
+      if (!window.confirm("この端末の現在のデータをクラウドへ保存しますか？ 別の端末で遊んだ続きがないことを確認してください。現在のクラウドデータは履歴に残ります。")) return;
+      const connected = readCloudMeta();
+      if (!connected || connected.sessionToken !== meta.sessionToken) {
+        setStatus("接続先が変わりました。保存内容をもう一度確認してください。", "error");
+        return;
+      }
+      syncRunning = true;
+      resume.disabled = true;
+      try {
+        const save = currentSaveEnvelope();
+        if (!save) throw new Error("端末セーブを確認できません");
+        storeCloudMeta(await pendingCloudMeta(connected, save));
+        const next = await saveConfirmedCloud(latest.meta, save, arenaAuthUserId());
+        storeCloudMeta(next);
+        conflictDetected = false;
+        preview.remove();
+        setStatus(`バックアップを再開しました：${formatSavedAt(next.savedAt)}`, "ok");
+        renderPanelInto(panel);
+        dismissHomeWarning();
+      } catch (error) { setStatus(cloudRecoveryMessage(error), "error"); }
+      finally { syncRunning = false; resume.disabled = false; }
+    });
+    preview.append(title, current, remote, resume);
+    panel.append(preview);
+    preview.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (error) { setStatus(cloudRecoveryMessage(error), "error"); }
+  finally { syncRunning = false; }
+}
+
 function renderConnected(panel: HTMLElement, meta: CloudRecoveryMeta) {
   const connected = document.createElement("p");
   connected.className = "cloud-recovery__connected";
@@ -391,10 +450,10 @@ function renderConnected(panel: HTMLElement, meta: CloudRecoveryMeta) {
   actions.className = "save-data__actions";
   actions.append(
     button("☁ 今すぐバックアップ", "btn btn--primary", () => syncNow(true)),
+    button("☁ 保存内容を確認して再開", "btn btn--primary", () => previewResume(panel)),
     button("☁ 最新クラウドを確認", "btn btn--ghost", async () => {
       try {
-        const latest = await loadLatestCloud(meta);
-        storeCloudMeta(latest.meta);
+        const latest = await loadLatestCloud(readCloudMeta() ?? meta);
         setStatus("クラウドの最新データを確認しました。", "ok");
         previewRestore(panel, latest.save, latest.meta);
       } catch (error) { setStatus(cloudRecoveryMessage(error), "error"); }

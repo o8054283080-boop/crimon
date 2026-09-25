@@ -13,6 +13,10 @@ export interface CloudRecoveryMeta {
   sessionToken: string;
   sessionExpiresAt: string;
   revision: number;
+  /** 内容の競合は、本人が保存元を選ぶまで保持する。 */
+  syncConflict?: boolean;
+  /** 送信済み・応答未確認の内容。応答欠落後も保存元の連続性を確認する。 */
+  pendingSaveHash?: string;
   savedAt: string;
   lastUploadedSave: string;
   /** サーバが覚えている、この復旧IDのアリーナの身元。まだ無ければ未定義 */
@@ -163,13 +167,13 @@ export function hasCloudRecoveryAccount(storage: Pick<Storage, "getItem"> = loca
  * `"EXPIRED"` は登録済みで期限切れ。やることが違う(登録ではなくログインし直し)
  * ので、文面も飛び先も分ける。
  */
-export type CloudRecoveryWarning = "NONE" | "UNREGISTERED" | "EXPIRED";
+export type CloudRecoveryWarning = "NONE" | "UNREGISTERED" | "EXPIRED" | "CONFLICT";
 
 export function cloudRecoveryWarning(storage: Pick<Storage, "getItem"> = localStorage): CloudRecoveryWarning {
   if (!hasCloudRecoveryAccount(storage)) return "UNREGISTERED";
   const meta = readCloudMeta(storage);
   if (!meta || isSessionExpired(meta)) return "EXPIRED";
-  return "NONE";
+  return meta.syncConflict ? "CONFLICT" : "NONE";
 }
 
 function metaFromAuth(recoveryId: string, data: ApiOk, save: CloudSaveEnvelope): CloudRecoveryMeta {
@@ -233,10 +237,16 @@ export async function uploadCloudSave(
   arenaUserId?: string | null,
 ): Promise<CloudRecoveryMeta> {
   const fingerprint = envelopeFingerprint(save);
-  if (fingerprint === meta.lastUploadedSave) return meta;
+  if (!meta.syncConflict && fingerprint === meta.lastUploadedSave) return meta;
   const revision = meta.revision + 1;
   // **いま使っているアリーナの身元も一緒に上げる。**機種を変えた後もここが最新になる
-  const data = await request({ action: "save", sessionToken: meta.sessionToken, revision, save, arenaUserId });
+  let data: ApiOk;
+  try {
+    data = await request({ action: "save", sessionToken: meta.sessionToken, revision, save, arenaUserId });
+  } catch (error) {
+    if (!(error instanceof CloudRecoveryError) || error.code !== "STALE_REVISION") throw error;
+    return reconcileCloudSave(meta, save, arenaUserId);
+  }
   if (!data.savedAt) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
   /*
    * **サーバが延ばした期限を受け取る。**
@@ -247,12 +257,56 @@ export async function uploadCloudSave(
    */
   return {
     ...meta,
-    revision,
+    revision: data.revision ?? revision,
+    syncConflict: false,
+    pendingSaveHash: undefined,
     savedAt: data.savedAt,
     lastUploadedSave: fingerprint,
     sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
-    arenaUserId: arenaUserId ?? meta.arenaUserId ?? null,
+    arenaUserId: data.arenaUserId ?? meta.arenaUserId ?? null,
   };
+}
+
+/** JSONBでキー順が変わっても、同じ内容として比較する。配列の順序は維持する。 */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
+    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+}
+
+async function saveHash(state: unknown): Promise<string> {
+  const bytes = new TextEncoder().encode(canonical(state));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** 通信を始める前に保存する。終了時に応答を受け取れなくても次回照合できる。 */
+export async function pendingCloudMeta(meta: CloudRecoveryMeta, save: CloudSaveEnvelope): Promise<CloudRecoveryMeta> {
+  return { ...meta, pendingSaveHash: await saveHash(save.state) };
+}
+
+async function reconcileCloudSave(meta: CloudRecoveryMeta, save: CloudSaveEnvelope, arenaUserId?: string | null): Promise<CloudRecoveryMeta> {
+  const latest = await loadLatestCloud(meta);
+  const remote = canonical(latest.save.state);
+  // サーバで保存済みだが、応答が届かなかった場合。書き直す必要はない。
+  if (remote === canonical(save.state)) return { ...latest.meta, syncConflict: false, pendingSaveHash: undefined };
+  if (meta.pendingSaveHash && meta.pendingSaveHash === await saveHash(latest.save.state)) {
+    return saveConfirmedCloud(latest.meta, save, arenaUserId);
+  }
+  let base: unknown;
+  try { base = JSON.parse(meta.lastUploadedSave); } catch { throw new CloudRecoveryError("STALE_REVISION", 409); }
+  // 世代だけを合わせてはいけない。既知の保存内容と一致した時だけ一度再送する。
+  if (remote !== canonical(base)) throw new CloudRecoveryError("STALE_REVISION", 409);
+  return saveConfirmedCloud(latest.meta, save, arenaUserId);
+}
+
+/** 確認した世代の次だけを送る。確認後に他端末が保存したら、再競合として止める。 */
+export async function saveConfirmedCloud(meta: CloudRecoveryMeta, save: CloudSaveEnvelope, arenaUserId?: string | null): Promise<CloudRecoveryMeta> {
+  const revision = meta.revision + 1;
+  const data = await request({ action: "save", sessionToken: meta.sessionToken, revision, save, arenaUserId });
+  if (!data.savedAt || data.revision !== revision) throw new CloudRecoveryError("INVALID_RESPONSE", 500);
+  return { ...meta, revision, savedAt: data.savedAt, lastUploadedSave: envelopeFingerprint(save),
+    syncConflict: false, pendingSaveHash: undefined, sessionExpiresAt: data.sessionExpiresAt ?? meta.sessionExpiresAt,
+    arenaUserId: data.arenaUserId ?? meta.arenaUserId ?? null };
 }
 
 export async function logoutRecovery(meta: CloudRecoveryMeta): Promise<void> {
@@ -296,7 +350,7 @@ export function cloudRecoveryMessage(error: unknown): string {
     INVALID_CREDENTIALS: "復旧IDまたはパスワード／復旧キーが違います。",
     TEMPORARILY_LOCKED: "入力失敗が続いたため15分間ロックされています。",
     SESSION_INVALID: "クラウド接続の期限が切れました。もう一度ログインしてください。",
-    STALE_REVISION: "別の端末または新しいデータがクラウドにあります。古いデータでは上書きしませんでした。",
+    STALE_REVISION: "端末とクラウドの保存内容が異なるため、自動保存を止めています。古いデータで上書きしないよう「保存内容を確認して再開」から選んでください。",
     NETWORK: "クラウドに接続できませんでした。端末内のセーブはそのままです。",
   };
   return messages[code] ?? "クラウド処理に失敗しました。端末内のセーブは変更していません。";

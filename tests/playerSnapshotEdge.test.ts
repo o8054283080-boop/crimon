@@ -78,3 +78,29 @@ describe("管理APIは取得失敗を0件にしない", () => {
     expect(body.error).toBe("dashboard_read_failed");
   });
 });
+
+describe("復旧保存の競合はアリーナに副作用を起こさない", () => {
+  for (const conflict of [false, true]) {
+    it(conflict ? "世代競合なら409、戦績とIDは不変" : "保存成功時も元のIDを返し戦績を移さない", async () => {
+      const writes: string[] = [];
+      const from = (table: string) => {
+        const data = table === "crimon_recovery_sessions"
+          ? { id: "session", account_id: "account", expires_at: "2099-01-01T00:00:00Z" }
+          : { arena_user_id: "original-arena-id" };
+        const query: Record<string, unknown> = { then: (resolve: (v: unknown) => void) => Promise.resolve({ data, error: null }).then(resolve) };
+        for (const method of ["select", "eq", "single", "maybeSingle"]) query[method] = () => query;
+        query.update = () => { writes.push(table); return query; };
+        return query;
+      };
+      const rpc = vi.fn().mockResolvedValue(conflict
+        ? { error: { message: "STALE_REVISION" } }
+        : { data: [{ saved_revision: 10, saved_at: "2026-09-25" }], error: null });
+      const call = handler("crimon-recovery", { from, rpc });
+      const response = await call(request({ action: "save", sessionToken: "test-session-token-abcdefghijklmnopqrstuvwxyz", revision: 10, save, arenaUserId: "11111111-1111-4111-8111-111111111111" }));
+      expect(response.status).toBe(conflict ? 409 : 200);
+      expect(rpc.mock.calls.map(args => args[0])).toEqual(["crimon_store_recovery_save"]);
+      expect(writes).toEqual(["crimon_recovery_sessions"]);
+      if (!conflict) expect((await response.json()).arenaUserId).toBe("original-arena-id");
+    });
+  }
+});

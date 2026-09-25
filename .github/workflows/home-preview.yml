@@ -40,6 +40,8 @@ jobs:
           done
           cat /tmp/crimon-preview.log
           exit 1
+      - name: 保存競合の確認と再開を実ブラウザで検査
+        run: npx tsx tools/recoveryPreview.mts
       - name: Capture HOME screenshots
         run: node tools/homePreview.mjs
       - name: Start Trial Tower preview server
