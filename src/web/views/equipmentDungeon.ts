@@ -217,7 +217,7 @@ function renderDetail(props: EquipmentDungeonProps, floor: DungeonFloor): HTMLEl
       el("h2", {}, ["報酬"]),
       el("p", { className: "app-subtitle" }, [`装備セット: ${floor.setPool.map((set) => SET_LABEL[set]).join("・")}（種類は毎回ランダム）`]),
       ...bonusNotes.map((note) => el("p", { className: "app-subtitle" }, [note])),
-      el("p", {}, [`🪙 クリア報酬ゴールド: ${floor.goldReward}`]),
+      el("p", {}, [`🪙 クリア報酬ゴールド: ${floor.goldReward.toLocaleString("ja-JP")}`]),
     ]),
     el("section", { className: "panel" }, [
       el("p", { className: "app-subtitle" }, [`ダンジョン専用パーティ: ${party.length}/5体`]),

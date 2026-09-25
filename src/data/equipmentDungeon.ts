@@ -89,6 +89,7 @@ export interface DungeonFloor {
   powerScale: number;
   /** 敵の速度に掛かる倍率。powerScale とは別にする(速度は手番の数に直結するため) */
   speedScale: number;
+  /** 勝つたびに入るゴールド(`EQUIPMENT_DUNGEON_GOLD_PER_FLOOR` × 階) */
   goldReward: number;
   setPool: readonly SetType[];
 }
@@ -317,6 +318,14 @@ function fixedStats(values: readonly [number, number, number, number]) {
   return { hp: values[0], atk: values[1], def: values[2], spd: values[3] };
 }
 
+/*
+ * 勝つたびに入るゴールド。**魔人・魔獣とも、上位階(11・12)も同じ式。**
+ *
+ * 元は 60 × 階(10階で600)で、同じスタミナ10の目覚の深域(10階で10,000)と比べて
+ * 桁が1つ違っていた。装備が主役の場所なのは深域(素材が主役)と同じなので、額も揃える。
+ */
+export const EQUIPMENT_DUNGEON_GOLD_PER_FLOOR = 1_000;
+
 function buildFloor(floor: number): DungeonFloor {
   // 各階層の敵は単一属性で統一する。弱点を突く属性のパーティを組めば有利に戦えるようになる
   const floorElement = NORMAL_ELEMENTS[(floor - 1) % NORMAL_ELEMENTS.length];
@@ -373,7 +382,7 @@ function buildFloor(floor: number): DungeonFloor {
     enemies,
     powerScale: powerScaleForFloor(floor),
     speedScale: speedScaleForFloor(floor),
-    goldReward: 60 * floor,
+    goldReward: EQUIPMENT_DUNGEON_GOLD_PER_FLOOR * floor,
     setPool: DEMON_DUNGEON_SET_TYPES,
   };
 }
@@ -526,7 +535,7 @@ function buildDemonUpperFloor(floor: number): DungeonFloor {
     // 実数で置くので倍率は掛からない。1を入れて「掛けていない」ことを明示する
     powerScale: 1,
     speedScale: 1,
-    goldReward: 60 * floor,
+    goldReward: EQUIPMENT_DUNGEON_GOLD_PER_FLOOR * floor,
     setPool: DEMON_DUNGEON_SET_TYPES,
     enemies: [
       {
@@ -595,7 +604,7 @@ function buildBeastFloor(floor: number): DungeonFloor {
     name: `魔獣のダンジョン ${floor}階`,
     powerScale: 1,
     speedScale: 1,
-    goldReward: 60 * floor,
+    goldReward: EQUIPMENT_DUNGEON_GOLD_PER_FLOOR * floor,
     setPool: BEAST_DUNGEON_SET_TYPES,
     enemies: [
       { templateId: ANCIENT_BEAST.templateId, element, star: 6, level: 60, isBoss: true, victoryTarget: true, primaryTarget: true, fixedStats: fixedStats(stats.boss), initialCooldowns: [0, 3, 5] },
@@ -643,7 +652,7 @@ function buildBeastUpperFloor(floor: number): DungeonFloor {
     name: `魔獣のダンジョン ${floor}階`,
     powerScale: 1,
     speedScale: 1,
-    goldReward: 60 * floor,
+    goldReward: EQUIPMENT_DUNGEON_GOLD_PER_FLOOR * floor,
     setPool: BEAST_DUNGEON_SET_TYPES,
     enemies: [
       { templateId: ANCIENT_BEAST.templateId, element, star: 6, level: 60, isBoss: true, victoryTarget: true, primaryTarget: true, fixedStats: fixedStats(stats.boss), initialCooldowns: [0, 3, 5] },

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../src/core/rarity.js";
 import { AWAKENING_DEPTH_FLOORS, findAwakeningDepthFloor } from "../src/data/awakeningDepths.js";
+import { BEAST_DUNGEON_FLOORS, EQUIPMENT_DUNGEON_FLOORS, EQUIPMENT_DUNGEON_GOLD_PER_FLOOR } from "../src/data/equipmentDungeon.js";
 import { RUIN_KINDS, findRuinFloor, ruinFloors } from "../src/data/ruins.js";
 import { grantAwakeningDepthReward } from "../src/game/awakeningDepths.js";
 import { emptyResult, mergeReward } from "../src/game/autoFarm.js";
@@ -10,6 +11,7 @@ import { grantRuinReward } from "../src/game/ruins.js";
 
 /**
  * 目覚の深域と遺跡にも、ゴールドと経験値を付けた(依頼主の指定)。
+ * あわせて、桁が1つ少なかった装備ダンジョンのゴールドを深域と同じ額へ上げた。
  * どちらも素材が主役の場所なので量は控えめだが、**勝てば必ず入る。**
  */
 
@@ -63,6 +65,20 @@ describe("目覚の深域のゴールドと経験値", () => {
     for (let i = 0; i < 3; i += 1) mergeReward(result, grantAwakeningDepthReward(state, floor, [], () => 0.5), 0);
     expect(result.totalGold).toBe(floor.goldReward * 3);
     expect(result.totalExp).toBe(floor.expReward * 3);
+  });
+});
+
+describe("装備ダンジョンのゴールド", () => {
+  it("魔人・魔獣とも、上位階まで 1,000 × 階。同じスタミナの深域と同じ額", () => {
+    const DUNGEON_FLOORS = [...EQUIPMENT_DUNGEON_FLOORS, ...BEAST_DUNGEON_FLOORS];
+    for (const floor of DUNGEON_FLOORS) {
+      expect(floor.goldReward).toBe(EQUIPMENT_DUNGEON_GOLD_PER_FLOOR * floor.floor);
+      const depth = findAwakeningDepthFloor(floor.floor);
+      if (depth) expect(floor.goldReward).toBe(depth.goldReward);
+    }
+    // 魔獣と上位階(11・12)も漏れていない
+    expect(new Set(DUNGEON_FLOORS.map((f) => f.kind))).toEqual(new Set(["DEMON", "BEAST"]));
+    expect(Math.max(...DUNGEON_FLOORS.map((f) => f.floor))).toBe(12);
   });
 });
 

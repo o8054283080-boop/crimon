@@ -519,8 +519,10 @@ describe("1〜10階を壊していない", () => {
    * 決まるので、DEFがまだ低い序盤は旧式より受けるダメージが大きくなる。
    * 1階が抜けられなくなったため、1階の敵にだけ atkMultiplier 0.7 を置いた。
    * 2〜10階は1文字も変えていない。
+   *
+   * ゴールドだけは 60 × 階 → 1,000 × 階 へ上げた(依頼主の指定。敵と倍率はそのまま)。
    */
-  it("既存階の敵・倍率・勝利条件・ゴールドが据え置き", () => {
+  it("既存階の敵・倍率・勝利条件が据え置き(ゴールドは 1,000 × 階)", () => {
     const digest: string[] = [];
     for (const kind of ["DEMON", "BEAST"] as const) {
       const floors = kind === "BEAST" ? BEAST_DUNGEON_FLOORS : EQUIPMENT_DUNGEON_FLOORS;
