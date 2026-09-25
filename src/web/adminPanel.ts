@@ -15,6 +15,7 @@ type AdminSummary = {
   authUsers: number;
   arenaProfiles: number;
   recoveryAccounts: number;
+  playerSnapshots?: number;
 };
 
 type ArenaPlayer = {
@@ -142,6 +143,8 @@ type RecoveryAccount = {
   progress?: SaveProgress | null;
 };
 
+type PlayerSnapshot = { userId: string; savedAt: string; summary: { fighterName?: string; fighterLevel?: number; gold?: number; crystal?: number; monsterCount?: number; equipmentCount?: number }; progress?: SaveProgress | null; };
+
 type AdminDashboard = {
   generatedAt: string;
   activeSeason: { id: string; name: string; status: string; starts_at: string; ends_at: string } | null;
@@ -151,6 +154,8 @@ type AdminDashboard = {
   daily?: AdminDailyRow[] | null;
   arenaPlayers: ArenaPlayer[];
   recoveryAccounts: RecoveryAccount[];
+  playerSnapshots?: PlayerSnapshot[];
+  snapshotStatus?: "ready" | "unavailable";
 };
 
 type ArenaDetail = {
@@ -231,6 +236,7 @@ async function adminPost<T>(action: string, data: Record<string, unknown> = {}):
     const code = typeof json.error === "string" ? json.error : "request_failed";
     if (response.status === 401 && action !== "login") saveToken(null);
     const messages: Record<string, string> = {
+      dashboard_read_failed: "データ取得に失敗しました。0件ではありません。時間をおいて再読み込みしてください",
       invalid_password: "パスワードが違います",
       unauthorized: "管理者セッションの有効期限が切れました。もう一度ログインしてください",
       password_length: "新しいパスワードは10〜128文字で入力してください",
@@ -401,9 +407,9 @@ function savedMetricOf(label: string, value: number | null | undefined, format: 
   return metric(label, shown.text, stale || shown.missing);
 }
 
-function summaryCard(label: string, value: number): HTMLElement {
+function summaryCard(label: string, value: number | string): HTMLElement {
   const card = el("div", "crimon-admin-summary__card");
-  card.append(el("small", "", label), el("strong", "", formatNumber(value)));
+  card.append(el("small", "", label), el("strong", "", typeof value === "string" ? value : formatNumber(value)));
   return card;
 }
 
@@ -528,6 +534,7 @@ function renderDashboard(root: HTMLElement, dashboard: AdminDashboard): void {
     summaryCard("Supabase認証", dashboard.summary.authUsers),
     summaryCard("アリーナ登録", dashboard.summary.arenaProfiles),
     summaryCard("データ復旧登録", dashboard.summary.recoveryAccounts),
+    summaryCard("自動保存", dashboard.snapshotStatus === "unavailable" ? "取得失敗" : dashboard.summary.playerSnapshots ?? "API更新待ち"),
   );
   dash.append(summary);
   const season = dashboard.activeSeason;
@@ -847,6 +854,38 @@ function renderActiveList(host: HTMLElement, dashboard: AdminDashboard): void {
     if (rows.length === 0) list.append(el("div", "crimon-admin-empty", "該当するアリーナプレイヤーはいません"));
   }
   host.append(head, list);
+  const snapshots = (dashboard.playerSnapshots ?? []).filter((row) => matchesSearch(row.progress?.fighterName, row.summary?.fighterName, row.userId));
+  {
+    const snap = el("div", "crimon-admin-list");
+    const snapHead = el("div", "crimon-admin-section__head");
+    snapHead.append(el("h3", "", "自動保存プレイヤー"), el("span", "", `${snapshots.length}件`));
+    host.append(snapHead);
+    for (const row of snapshots) {
+      const item = el("div", "crimon-admin-row");
+      const p = row.progress;
+      const s = row.summary ?? {};
+      const primary = el("span", "crimon-admin-row__primary");
+      primary.append(el("strong", "", p?.fighterName || s.fighterName || "名前未設定"), el("small", "", row.userId));
+      item.append(
+        primary,
+        metric("レベル", p?.fighterLevel ? `Lv.${p.fighterLevel}` : s.fighterLevel ? `Lv.${s.fighterLevel}` : "-"),
+        metric("ゴールド", formatNumber(p?.gold ?? s.gold)),
+        metric("ダイヤ", formatNumber(p?.crystal ?? s.crystal)),
+        metric("モンスター", `${formatNumber(p?.monsterCount ?? s.monsterCount)}体`),
+        metric("装備", `${formatNumber(p?.equipmentCount ?? s.equipmentCount)}個`),
+        savedMetric("自動保存", row.savedAt),
+      );
+      snap.append(item);
+    }
+    if (dashboard.snapshotStatus === "unavailable") {
+      snap.append(el("div", "crimon-admin-error", "自動保存データを取得できません。時間をおいて再読み込みしてください"));
+    } else if (!dashboard.playerSnapshots) {
+      snap.append(el("div", "crimon-admin-empty", "自動保存APIの更新を待っています。時間をおいて再読み込みしてください"));
+    } else if (snapshots.length === 0) {
+      snap.append(el("div", "crimon-admin-empty", "表示する自動保存はありません。既存の認証情報がある端末で更新版を開くと保存されます。復旧IDは自動作成しません。"));
+    }
+    host.append(snap);
+  }
 }
 
 /**

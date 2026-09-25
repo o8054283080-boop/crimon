@@ -20,6 +20,8 @@ import {
 } from "../game/cloudRecovery.js";
 import { arenaAuthUserId } from "../net/arenaAuth.js";
 
+import { syncAdminSnapshot, ADMIN_SNAPSHOT_RETRY_MS } from "../net/playerSnapshot.js";
+
 const PANEL_MARKER = "data-crimon-cloud-recovery";
 /*
  * クラウドへ控えを上げる間隔。
@@ -517,11 +519,13 @@ function boot() {
     else setStatus(`クラウド接続済み：${formatSavedAt(stored.savedAt)}`, "ok");
   }
   window.setInterval(() => { void syncNow(false, true); }, AUTO_SYNC_MS);
+  window.setInterval(() => { void syncAdminSnapshot(); }, ADMIN_SNAPSHOT_RETRY_MS);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") void syncNow(false, true);
+    else void syncAdminSnapshot();
   });
   window.addEventListener("pagehide", () => { void syncNow(false, true); });
-  window.setTimeout(() => { void syncNow(false, true); }, 5_000);
+  window.setTimeout(() => { void syncNow(false, true); void syncAdminSnapshot(); }, 5_000);
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });

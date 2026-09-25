@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   ARENA_AUTH_STORAGE_KEY,
   arenaAuthAvailable,
+  arenaAuthAccessToken,
   arenaAuthUserId,
   clearArenaAuth,
   configureArenaAuth,
@@ -269,5 +270,33 @@ describe("自分のIDの取り出し", () => {
     clearArenaAuth();
     expect(store.map.get(ARENA_AUTH_STORAGE_KEY)).toBeUndefined();
     expect(arenaAuthUserId()).toBeNull();
+  });
+});
+
+
+describe("管理用保存から別人を作らない", () => {
+  it("保存済み本人がなければsignupしない", async () => {
+    const fake = fakeGoTrue(() => tokenResponse());
+    configureArenaAuth({ url: URL_BASE, anonKey: ANON, storage: store, fetchImpl: fake.fetchImpl });
+    expect(await arenaAuthAccessToken()).toBeNull();
+    expect(fake.calls).toHaveLength(0);
+  });
+  it("更新に失敗してもIDと保存済み認証を維持する", async () => {
+    const original = JSON.stringify({ userId: UID, accessToken: "old", refreshToken: "refresh", expiresAt: 1 });
+    store.setItem(ARENA_AUTH_STORAGE_KEY, original);
+    const fake = fakeGoTrue(() => null);
+    configureArenaAuth({ url: URL_BASE, anonKey: ANON, storage: store, fetchImpl: fake.fetchImpl });
+    expect(await arenaAuthAccessToken()).toBeNull();
+    expect(fake.calls.map((c) => c.path)).toEqual(["token?grant_type=refresh_token"]);
+    expect(store.getItem(ARENA_AUTH_STORAGE_KEY)).toBe(original);
+    expect(arenaAuthUserId()).toBe(UID);
+  });
+  it("refreshが別IDを返しても受け入れない", async () => {
+    const original = JSON.stringify({ userId: UID, accessToken: "old", refreshToken: "refresh", expiresAt: 1 });
+    store.setItem(ARENA_AUTH_STORAGE_KEY, original);
+    const fake = fakeGoTrue(() => tokenResponse({ user: { id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee" } }));
+    configureArenaAuth({ url: URL_BASE, anonKey: ANON, storage: store, fetchImpl: fake.fetchImpl });
+    expect(await arenaAuthAccessToken()).toBeNull();
+    expect(store.getItem(ARENA_AUTH_STORAGE_KEY)).toBe(original);
   });
 });

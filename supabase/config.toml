@@ -1,0 +1,7 @@
+# 管理APIは独自の期限付き管理者セッションをハンドラーで検証する。
+# 既存本番の設定をデプロイで上書きしない。
+[functions.crimon-admin]
+verify_jwt = false
+
+[functions.crimon-player-snapshot]
+verify_jwt = true

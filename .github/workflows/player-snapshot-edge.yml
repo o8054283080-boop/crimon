@@ -1,0 +1,51 @@
+name: プレイヤー自動保存APIを本番へ同期
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/crimon-player-snapshot/**"
+      - ".github/workflows/player-snapshot-edge.yml"
+      - "supabase/config.toml"
+      - "supabase/migrations/20260924223000_player_admin_snapshots.sql"
+      - ".github/workflows/db-apply-sql.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crimon-player-snapshot-deploy
+  cancel-in-progress: false
+
+jobs:
+  database:
+    uses: ./.github/workflows/db-apply-sql.yml
+    with:
+      file: supabase/migrations/20260924223000_player_admin_snapshots.sql
+    secrets: inherit
+  deploy:
+    needs: database
+    name: 本番へdeploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Supabase project refを取得
+        run: |
+          set -euo pipefail
+          url="$(grep -E '^VITE_SUPABASE_URL=' .env.production | cut -d= -f2- | tr -d '"[:space:]')"
+          ref="$(printf '%s' "$url" | sed -E 's#^https?://##' | cut -d. -f1)"
+          printf '%s' "$ref" | grep -Eq '^[a-z0-9]{20}$' || exit 1
+          echo "SUPABASE_PROJECT_REF=$ref" >> "$GITHUB_ENV"
+      - name: crimon-player-snapshotをdeploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN:-}"
+          npx supabase functions deploy crimon-player-snapshot --project-ref "$SUPABASE_PROJECT_REF" --use-api

@@ -25,6 +25,11 @@ concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 
+# 検証用のブラウザ・ビルドから本番の認証や保存を呼ばない。
+env:
+  VITE_SUPABASE_URL: ""
+  VITE_SUPABASE_ANON_KEY: ""
+
 jobs:
   types-and-tests:
     name: 型とテスト
@@ -62,6 +67,12 @@ jobs:
       # ここで落としておかないと、気づくのは本番へ配った後になる。
       - name: Edge Function 向けの組み立て
         run: npm run build:edge
+      # build:edge の対象外だった管理APIの入口も、Deno本来の型で検査する。
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: 管理・自動保存APIの型チェック
+        run: deno check --node-modules-dir=auto supabase/functions/crimon-admin/index.ts supabase/functions/crimon-player-snapshot/index.ts
 
   tour:
     name: 巡回(画面の崩れ)
