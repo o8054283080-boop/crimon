@@ -68,11 +68,16 @@ describe("ランク表", () => {
 });
 
 describe("レートの増減", () => {
-  it("確定したレート差カーブの主要点と端を守る", () => {
+  /*
+   * 2026-09 の改修。**攻撃側の勝ちは新しい式、負けは格下へ v1・格上へは期待値0の表、防衛は v1 の半分。**
+   * サーバ(`20260926090000_arena_rebalance_2026_09.sql`)と同じ値であることは
+   * `tests/arenaRebalance.test.ts` がSQLを読んで突き合わせている。
+   */
+  it("格上に勝つほど大きく、差1500で最大+250。格下に勝つと小さく、差400以上で+1", () => {
     const cases: Array<[number, number, number]> = [
-      [-500, 1, -32], [-300, 1, -30], [-200, 3, -24], [-100, 6, -18],
-      [0, 12, -13], [100, 18, -9], [200, 26, -5], [300, 34, -3],
-      [500, 40, -1], [1000, 40, -1],
+      [-1000, 1, -15], [-400, 1, -15], [-300, 1, -15], [-200, 3, -13], [-100, 6, -12],
+      [0, 10, -10], [100, 21, -10], [200, 34, -10], [300, 50, -9],
+      [500, 83, -5], [1000, 167, -1], [1500, 250, -1], [3000, 250, -1],
     ];
     for (const [diff, win, loss] of cases) {
       expect(arenaRatingDelta(2000, 2000 + diff, true), `勝利 diff=${diff}`).toBe(win);
@@ -80,21 +85,26 @@ describe("レートの増減", () => {
     }
   });
 
-  it("表の中間は滑らかに補間する", () => {
-    expect(arenaRatingDelta(2000, 1925, true)).toBe(8);
-    expect(arenaRatingDelta(2000, 2075, true)).toBe(17);
-    expect(arenaRatingDelta(2000, 1925, false)).toBe(-17);
-    expect(arenaRatingDelta(2000, 2075, false)).toBe(-10);
+  it("差が広がるほど増加は単調に増える(段差で減らない)", () => {
+    let last = 0;
+    for (let diff = -600; diff <= 2000; diff += 1) {
+      const gain = arenaRatingDelta(2000, 2000 + diff, true);
+      expect(gain, `diff=${diff}`).toBeGreaterThanOrEqual(last);
+      last = gain;
+    }
   });
 
   it("レートは0を下回らない", () => {
     expect(applyArenaRating(3, 0, false).rating).toBe(0);
   });
 
-  it("防衛は攻撃戦の60%相当で、最低1は動く", () => {
-    expect(applyArenaDefenseRating(1500, 1500, false).delta).toBe(-8);
-    expect(applyArenaDefenseRating(1500, 1800, true).delta).toBe(20);
+  it("防衛は v1 の半分(最低1)。500以上格上に破られたら−1", () => {
+    expect(applyArenaDefenseRating(1500, 1500, false).delta).toBe(-5);
+    expect(applyArenaDefenseRating(1500, 1800, true).delta).toBe(13);
+    expect(applyArenaDefenseRating(1500, 1800, false).delta).toBe(-3);
     expect(applyArenaDefenseRating(1500, 2000, false).delta).toBe(-1);
+    // 格下に破られた時も −8 まで(攻撃側の +250 をそのまま引かない)
+    expect(applyArenaDefenseRating(4000, 2500, false).delta).toBe(-8);
   });
 });
 
@@ -329,15 +339,15 @@ describe("アリーナショップ", () => {
 });
 
 describe("防衛成功コイン", () => {
-  it("1勝4コインで、JST1日40コインを超えない", () => {
+  it("1勝8コインで、JST1日40コインを超えない", () => {
     const state = createInitialState();
     const now = Date.parse("2026-09-03T10:00:00.000Z");
     for (let i = 0; i < 12; i += 1) {
       recordArenaMatch(state, { opponent: opponent(`npc${i}`, "NPC", 1200), won: true, side: "DEFENSE", now: now + i });
     }
     expect(state.arenaCoins).toBe(40);
-    expect(state.arenaMatchHistory.filter((record) => record.coins === 4)).toHaveLength(10);
-    expect(state.arenaMatchHistory.filter((record) => record.coins === 0)).toHaveLength(2);
+    expect(state.arenaMatchHistory.filter((record) => record.coins === 8)).toHaveLength(5);
+    expect(state.arenaMatchHistory.filter((record) => record.coins === 0)).toHaveLength(7);
   });
 
   it("JSTの日付が変われば防衛コイン上限を数え直す", () => {
@@ -347,7 +357,7 @@ describe("防衛成功コイン", () => {
       recordArenaMatch(state, { opponent: opponent(`a${i}`, "NPC", 1200), won: true, side: "DEFENSE", now: before - i });
     }
     recordArenaMatch(state, { opponent: opponent("next", "NPC", 1200), won: true, side: "DEFENSE", now: before + 1_000 });
-    expect(state.arenaCoins).toBe(44);
+    expect(state.arenaCoins).toBe(48);
   });
 });
 

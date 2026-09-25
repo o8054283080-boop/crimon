@@ -1,118 +1,173 @@
 /**
- * アリーナのレート増減。
+ * アリーナのレート増減。**サーバ(`supabase/migrations/*_arena_rebalance_2026_09.sql`)と同じ式。**
  *
- * 相手との差を強く反映する。格下狩りではほとんど伸びず、
- * 格上に勝った時は後発でも追いつけるだけ大きく伸びる。
+ * ## 3つに分けてある
  *
- * 差 = 相手レート - 自分レート。
- * 表の間は線形補間し、表の外は端の値で固定する。
+ *   攻撃側の勝ち … `arenaAttackWinGain`。格上に勝つほど大きく、差1500で最大+250。
+ *                  格下に勝った時は小さく、差400以上で+1(格下狩りでレートが膨らまない)
+ *   攻撃側の負け … `arenaAttackLossAmount`。格下に負けたら v1 のまま(互角−10 → 差300以上で−15)。
+ *                  格上に負けたら、実力どおりの人の期待値がほぼ0になる量(差250まで−10、500で−5、900以上で−1)
+ *   防衛側       … v1 の半分(最低1)、1日の減少は60まで。**攻撃側のボーナスとは切り離す**
+ *                  (格下に1回破られただけで−200、を起こさない)。500以上格上に破られたら−1
+ *   同じ相手への連勝 … 20時間以内の2回目以降は「半分(切り捨て)かつ v1 が上限」
+ *
+ * ## 整数だけで計算する
+ *
+ * 小数で書くと、JavaScript と Postgres で四捨五入が1点ずれることがある
+ * (`0.1` が2進で割り切れないため。9.5 が 9.4999… になる)。
+ * **画面の予告とサーバの結果が食い違う事故をこの案件で何度も出している**ので、
+ * 分子と分母を整数で持ち、四捨五入も整数の割り算でする。SQL も同じ形で書く。
+ *
+ * ## なぜ v1 が「今の式」なのか(2026-09-25 の調査)
+ *
+ * リポジトリには v2 のカーブ(`20260912120000_arena_rating_gap_rebalance.sql`)があったが、
+ * **本番には一度も流れていなかった**(アリーナのSQLは自動で流れる経路が無かった)。
+ * 本番で効いていたのは `arena_rpc.sql` の v1 で、防衛の倍率も 0.6 ではなく 0.5。
+ * 画面側だけが v2 を見ていたので、オフラインの予告と本番の結果がずれていた。
+ * 今回はここを本番に合わせたうえで、攻撃側の勝ちだけを新しい式にする。
  */
-
-export interface ArenaRatingPoint {
-  diff: number;
-  value: number;
-}
-
-export interface ArenaRatingRules {
-  /** 勝利時の増加量。value は正数 */
-  winCurve: readonly ArenaRatingPoint[];
-  /** 敗北時の減少量。value は正数 */
-  lossCurve: readonly ArenaRatingPoint[];
-  /** レートの下限 */
-  floor: number;
-}
-
-/**
- * 確定バランス。
- *
- * 勝利:
- * -300以下:+1 / -200:+3 / -100:+6 / 0:+12 / +100:+18 /
- * +200:+26 / +300:+34 / +500以上:+40
- *
- * 敗北:
- * +500以上:-1 / +400:-2 / +300:-3 / +200:-5 / +100:-9 /
- * 0:-13 / -100:-18 / -200:-24 / -300:-30 / -400以下:-32
- */
-export const ARENA_RATING_RULES: ArenaRatingRules = {
-  winCurve: [
-    { diff: -300, value: 1 },
-    { diff: -250, value: 2 },
-    { diff: -200, value: 3 },
-    { diff: -150, value: 4 },
-    { diff: -100, value: 6 },
-    { diff: -50, value: 9 },
-    { diff: 0, value: 12 },
-    { diff: 50, value: 15 },
-    { diff: 100, value: 18 },
-    { diff: 150, value: 22 },
-    { diff: 200, value: 26 },
-    { diff: 250, value: 30 },
-    { diff: 300, value: 34 },
-    { diff: 400, value: 38 },
-    { diff: 500, value: 40 },
-  ],
-  lossCurve: [
-    { diff: -400, value: 32 },
-    { diff: -300, value: 30 },
-    { diff: -250, value: 27 },
-    { diff: -200, value: 24 },
-    { diff: -150, value: 21 },
-    { diff: -100, value: 18 },
-    { diff: -50, value: 15 },
-    { diff: 0, value: 13 },
-    { diff: 50, value: 11 },
-    { diff: 100, value: 9 },
-    { diff: 150, value: 7 },
-    { diff: 200, value: 5 },
-    { diff: 250, value: 4 },
-    { diff: 300, value: 3 },
-    { diff: 400, value: 2 },
-    { diff: 500, value: 1 },
-  ],
-  floor: 0,
-};
-
-/**
- * 防衛は自分で相手を選べないため、攻撃戦の60%。
- * 0にはせず、動いたことが分かるよう最低1は残す。
- */
-export const ARENA_DEFENSE_RATING_SCALE = 0.6;
-
-/** 1日に防衛で減らせるレートの上限。既存の安全弁は維持する */
-export const ARENA_DEFENSE_DAILY_LOSS_CAP = 60;
 
 export interface ArenaRatingChange {
   delta: number;
   rating: number;
 }
 
-function interpolateCurve(diff: number, curve: readonly ArenaRatingPoint[]): number {
-  if (curve.length === 0) return 0;
-  if (diff <= curve[0].diff) return curve[0].value;
-  const last = curve[curve.length - 1];
-  if (diff >= last.diff) return last.value;
+/** レートの下限 */
+export const ARENA_RATING_FLOOR = 0;
 
-  for (let i = 1; i < curve.length; i += 1) {
-    const high = curve[i];
-    if (diff > high.diff) continue;
-    const low = curve[i - 1];
-    const span = high.diff - low.diff;
-    const t = span <= 0 ? 0 : (diff - low.diff) / span;
-    return Math.round(low.value + (high.value - low.value) * t);
-  }
-  return last.value;
+/** 格上撃破で得られる最大値。差1500以上で頭打ち */
+export const ARENA_GIANT_KILL_MAX = 250;
+
+/**
+ * 同じ実プレイヤーに続けて勝った時、増加を絞る時間(時間)。
+ *
+ * この時間内の**2回目以降の勝利**は「増加量の半分(切り捨て)」かつ「v1 の値が上限」。
+ *
+ *   ・身内の弱い防衛を殴り続けて +250 を重ねる、を止める(2回目からは最大+25)
+ *   ・大幅な格下(+1)を狩り続けてレートを積む、を止める(2回目からは+0)
+ *     ——±300の制限を外すと、最上位の人から見える実プレイヤーは全員格下になる。
+ *     シミュレーションで、実力4500の人が30日で+368流れた(旧は+166)
+ *
+ * 1回目の勝利は満額。NPC は毎回別の相手として生成されるので対象外。
+ */
+export const ARENA_REPEAT_WIN_WINDOW_HOURS = 20;
+
+/**
+ * 防衛側が、これ以上格上の攻撃側に負けた時は −1 にする。
+ *
+ * ±300の制限を外すと、上位の人が下位の防衛を好きなだけ殴れる。
+ * 格上に負けるのは当然なので、**狩られる側のレートを削らない**
+ * (v1 のままだと毎回 −3、1日で最大 −60)。
+ */
+export const ARENA_DEFENSE_OUTCLASSED_GAP = 500;
+
+/** 防衛は攻撃戦(v1)の半分。**本番の設定値(0.5)に合わせた**(前はここだけ 0.6 だった) */
+export const ARENA_DEFENSE_RATING_SCALE = 0.5;
+
+/** 1日に防衛で減らせるレートの上限 */
+export const ARENA_DEFENSE_DAILY_LOSS_CAP = 60;
+
+/** 正の整数の割り算を、四捨五入(0.5は切り上げ)で返す。SQL の `(n*2 + d) / (d*2)` と同じ */
+function roundDiv(numerator: number, denominator: number): number {
+  return Math.floor((numerator * 2 + denominator) / (denominator * 2));
 }
 
-/** 1戦ぶんのレート増減。diff が正なら格上。 */
+/**
+ * 攻撃側が勝った時の増加量。`diff = 相手 − 自分`(正なら格上)。**連続した1本の式。**
+ *
+ *   diff ≤ −400      … +1
+ *   −400 < diff < 0  … 10 × ((400 + diff) / 400)²   (格下ほど小さく。−100で+6、−200で+3)
+ *   0 ≤ diff ≤ 300   … 10 + diff/10 + diff²/9000     (100で+21、200で+34、300で+50)
+ *   300 < diff       … diff / 6                       (500で+83、1000で+167)、最大+250(差1500)
+ *
+ * 300の継ぎ目では値も傾きも一致する(50、1/6)。0の継ぎ目は値が一致する(10)。
+ */
+export function arenaAttackWinGain(diff: number): number {
+  const d = Math.round(diff);
+  if (d <= -400) return 1;
+  if (d < 0) {
+    const x = 400 + d;
+    return Math.max(1, roundDiv(10 * x * x, 160_000));
+  }
+  if (d <= 300) return roundDiv(d * d + 900 * d + 90_000, 9_000);
+  return Math.min(ARENA_GIANT_KILL_MAX, roundDiv(d, 6));
+}
+
+/**
+ * v1(本番でずっと効いていた式)。攻撃側の負けと、防衛側に使う。
+ *
+ *   勝ち: 互角+15 → 格上(差300以上)+25 / 格下(差300以上)+8
+ *   負け: 互角−10 → 格上に負けて−5 / 格下に負けて−15
+ *
+ * 差300までの間は直線でつなぐ。SQL の `arena__rating_delta_v1` と同じ。
+ */
+export function arenaLegacyRatingDelta(myRating: number, opponentRating: number, won: boolean): number {
+  const diff = Math.round(opponentRating) - Math.round(myRating);
+  const t = Math.min(300, Math.abs(diff));
+  const up = diff > 0;
+  if (won) {
+    const target = up ? 25 : 8;
+    // 15 + (target − 15) × t/300 を、300倍した整数で
+    const num = 15 * 300 + (target - 15) * t;
+    return roundDiv(num, 300);
+  }
+  const target = up ? 5 : 15;
+  const num = 10 * 300 + (target - 10) * t;
+  return -roundDiv(num, 300);
+}
+
+/**
+ * 攻撃側が**格上に負けた**時の減少量の表(差, 減少)。間は直線でつなぎ、900より先は1。
+ *
+ * ## なぜ v1 のままにしなかったのか
+ *
+ * 格上撃破のボーナスだけを大きくすると、**実力どおりのレートに居る人でも
+ * 少し格上に挑み続けるだけで期待値がプラスになる**(v1 は格上に負けても−5〜−10)。
+ * シミュレーションで、実力3000・レート3000の人が30日で+176流れた(旧は+161)。
+ *
+ * そこで、実力どおりの人の期待値がほぼ0になる量(勝率をロジスティックで見た
+ * `増加 × 相手に負ける見込み ÷ 勝つ見込み`)にした。ただし**互角に負けた時の10は超えない**
+ * ——格上に負けて互角より減るのは理不尽に感じるため。0〜250はその上限に張り付く。
+ */
+export const ARENA_ATTACK_LOSS_TO_STRONGER: readonly (readonly [number, number])[] = [
+  [0, 10], [250, 10], [300, 9], [400, 7], [500, 5], [600, 3], [750, 2], [900, 1],
+];
+
+/** 攻撃側が負けた時の減少量(正の数)。`diff = 相手 − 自分` */
+export function arenaAttackLossAmount(diff: number): number {
+  const d = Math.round(diff);
+  // 格下に負けた時は v1 のまま(互角10 → 差300以上で15)
+  if (d < 0) return -arenaLegacyRatingDelta(0, d, false);
+  const table = ARENA_ATTACK_LOSS_TO_STRONGER;
+  const last = table[table.length - 1];
+  if (d >= last[0]) return last[1];
+  for (let i = 1; i < table.length; i += 1) {
+    const [d1, v1] = table[i];
+    if (d > d1) continue;
+    const [d0, v0] = table[i - 1];
+    const span = d1 - d0;
+    // v0 + (v1 − v0) × (d − d0) / span を、整数で四捨五入
+    return roundDiv(v0 * span + (v1 - v0) * (d - d0), span);
+  }
+  return last[1];
+}
+
+/**
+ * 攻撃側の1戦ぶんの増減。
+ *
+ * @param repeatWin 同じ実プレイヤーに `ARENA_REPEAT_WIN_WINDOW_HOURS` 以内に勝っていたか。
+ *                  その時は「新しい式の半分(切り捨て)」と v1 の小さい方
+ */
 export function arenaRatingDelta(
   myRating: number,
   opponentRating: number,
   won: boolean,
-  rules: ArenaRatingRules = ARENA_RATING_RULES,
+  options: { repeatWin?: boolean } = {},
 ): number {
-  const diff = opponentRating - myRating;
-  const amount = interpolateCurve(diff, won ? rules.winCurve : rules.lossCurve);
-  return won ? amount : -amount;
+  if (!won) return -arenaAttackLossAmount(Math.round(opponentRating) - Math.round(myRating));
+  const gain = arenaAttackWinGain(Math.round(opponentRating) - Math.round(myRating));
+  if (options.repeatWin) return Math.min(Math.floor(gain / 2), arenaLegacyRatingDelta(myRating, opponentRating, true));
+  return gain;
 }
 
 /** 攻撃側の1戦を適用する */
@@ -120,21 +175,33 @@ export function applyArenaRating(
   myRating: number,
   opponentRating: number,
   won: boolean,
-  rules: ArenaRatingRules = ARENA_RATING_RULES,
+  options: { repeatWin?: boolean } = {},
 ): ArenaRatingChange {
-  const delta = arenaRatingDelta(myRating, opponentRating, won, rules);
-  return { delta, rating: Math.max(rules.floor, myRating + delta) };
+  const delta = arenaRatingDelta(myRating, opponentRating, won, options);
+  const rating = Math.max(ARENA_RATING_FLOOR, myRating + delta);
+  return { delta: rating - myRating, rating };
 }
 
-/** 防衛側の1戦を適用する。won は防衛側から見た勝敗。 */
+/**
+ * 防衛側の1戦を適用する。won は防衛側から見た勝敗。
+ *
+ * **v1 の半分(最低1)。新しい格上ボーナスは使わない。**
+ * 使うと、格上に攻められて守り切っただけで +125 が入る(寝ている間に膨らむ)。
+ * 1日の減少上限は呼ぶ側(`capDefenseLoss` / サーバ)が掛ける。
+ */
 export function applyArenaDefenseRating(
   myRating: number,
   attackerRating: number,
   won: boolean,
-  rules: ArenaRatingRules = ARENA_RATING_RULES,
   scale: number = ARENA_DEFENSE_RATING_SCALE,
 ): ArenaRatingChange {
-  const raw = arenaRatingDelta(myRating, attackerRating, won, rules);
+  // 大幅に格上の攻撃側に破られた時は −1(狩られる側を削らない)
+  if (!won && Math.round(attackerRating) - Math.round(myRating) >= ARENA_DEFENSE_OUTCLASSED_GAP) {
+    const rating = Math.max(ARENA_RATING_FLOOR, myRating - 1);
+    return { delta: rating - myRating, rating };
+  }
+  const raw = arenaLegacyRatingDelta(myRating, attackerRating, won);
   const delta = raw === 0 ? 0 : Math.sign(raw) * Math.max(1, Math.round(Math.abs(raw) * scale));
-  return { delta, rating: Math.max(rules.floor, myRating + delta) };
+  const rating = Math.max(ARENA_RATING_FLOOR, myRating + delta);
+  return { delta: rating - myRating, rating };
 }

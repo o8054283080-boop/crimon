@@ -54,7 +54,22 @@ const sqlShopAdditions = [
   readFileSync(new URL("../supabase/migrations/20260915090000_arena_shop_stamina_potion.sql", import.meta.url), "utf8"),
 ];
 const sqlShopAll = [sqlShopGoals, ...sqlShopAdditions].join("\n");
-const sqlRatingRebalance = readFileSync(new URL("../supabase/migrations/20260912120000_arena_rating_gap_rebalance.sql", import.meta.url), "utf8");
+/*
+ * **本番へ流すのはこの1本**(`arena-edge.yml` の database ジョブ)。
+ * 前は 0912(v2)と突き合わせていたが、0912 は本番に一度も流れておらず、
+ * テストが通っていても本番(v1)とはずれていた。本番に流すファイルと比べる。
+ */
+const sqlRebalance = readFileSync(new URL("../supabase/migrations/20260926090000_arena_rebalance_2026_09.sql", import.meta.url), "utf8");
+
+/** 今回のマイグレーションが arena_config へ入れる値 */
+function rebalanceConfig(key: string): Record<string, number> {
+  const marker = `('${key}',`;
+  const at = sqlRebalance.indexOf(marker);
+  expect(at, `今回のマイグレーションに ${key} が無い`).toBeGreaterThan(-1);
+  const json = sqlRebalance.slice(at).match(/'(\{[^']*\})'::jsonb/);
+  expect(json, `${key} のJSONを読めない`).not.toBeNull();
+  return JSON.parse(json![1]) as Record<string, number>;
+}
 
 /** `arena_config` に入れている初期値を1件取り出す */
 function seededConfig(key: string): Record<string, number> {
@@ -75,37 +90,58 @@ function fallbacksIn(sql: string, key: string): Record<string, number>[] {
 }
 
 describe("サーバ設定とクライアント定数が同じ値であること", () => {
-  it("レート差カーブがサーバ移行SQLと一致する", () => {
+  it("レートの式がサーバと一致する(主要点)", () => {
+    // 格上撃破・格下撃破・格上負け・格下負け。値の突き合わせは tests/arenaRebalance.test.ts が全点で行う
     const anchors: Array<[number, number, number]> = [
-      [-300, 1, 30], [-200, 3, 24], [-100, 6, 18], [0, 12, 13],
-      [100, 18, 9], [200, 26, 5], [300, 34, 3], [500, 40, 1],
+      [-400, 1, 15], [-200, 3, 13], [0, 10, 10], [300, 50, 9], [1500, 250, 1],
     ];
     for (const [diff, win, loss] of anchors) {
       expect(arenaRatingDelta(2000, 2000 + diff, true)).toBe(win);
       expect(arenaRatingDelta(2000, 2000 + diff, false)).toBe(-loss);
-      expect(sqlRatingRebalance).toContain(`(${diff},${win})`);
-      expect(sqlRatingRebalance).toContain(`(${diff},${loss})`);
     }
+    expect(sqlRebalance).toContain("create or replace function public.arena__attack_win_gain");
+    expect(sqlRebalance).toContain("create or replace function public.arena__attack_loss_amount");
+    expect(sqlRebalance).toContain("create or replace function public.arena__rating_delta_v1");
   });
 
   it("防衛の増減と1日の下落上限", () => {
-    expect(sqlRatingRebalance).toContain('"scale":0.6');
-    expect(ARENA_DEFENSE_RATING_SCALE).toBe(0.6);
+    const defense = rebalanceConfig("defense");
+    expect(defense.scale).toBe(ARENA_DEFENSE_RATING_SCALE);
+    expect(defense.daily_loss_cap).toBe(ARENA_DEFENSE_DAILY_LOSS_CAP);
+    expect(ARENA_DEFENSE_RATING_SCALE).toBe(0.5);
     expect(ARENA_DEFENSE_DAILY_LOSS_CAP).toBe(60);
   });
 
   it("挑戦券の上限と回復間隔", () => {
     // 実際にずれていた(サーバ30分 / クライアント60分)
-    const tickets = seededConfig("tickets");
+    const tickets = rebalanceConfig("tickets");
     expect(tickets.max).toBe(ARENA_TICKET_MAX);
     expect(tickets.refill_minutes).toBe(ARENA_TICKET_REGEN_MINUTES);
+    expect(ARENA_TICKET_MAX).toBe(5);
+    expect(ARENA_TICKET_REGEN_MINUTES).toBe(120);
   });
 
   it("1戦で入るコイン", () => {
     // 実際にずれていた(サーバ 30/8 / クライアント 10/3)
-    const coins = seededConfig("match_coins");
+    const coins = rebalanceConfig("match_coins");
     expect(coins.win_base).toBe(ARENA_COIN_WIN);
     expect(coins.loss_base).toBe(ARENA_COIN_LOSS);
+    expect(coins.upset_max).toBe(0);
+    expect(ARENA_COIN_WIN).toBe(20);
+    expect(ARENA_COIN_LOSS).toBe(6);
+  });
+
+  it("今回のRPCの中の既定値も、今回の設定と同じ", () => {
+    // 設定の行が無い時に使われる値。ここだけ古いと、静かに10枚/60分へ戻る
+    for (const key of ["tickets"]) {
+      const expected = rebalanceConfig(key);
+      const fallbacks = fallbacksIn(sqlRebalance, key);
+      expect(fallbacks.length, `${key} の既定値がRPCに無い`).toBeGreaterThan(0);
+      for (const fallback of fallbacks) expect(fallback).toEqual(expected);
+    }
+    for (const fallback of fallbacksIn(sqlRebalance, "defense")) {
+      expect(fallback).toEqual(rebalanceConfig("defense"));
+    }
   });
 
   it("クライアントに無い上乗せをサーバだけで持たない", () => {
@@ -245,8 +281,11 @@ describe("報酬・シーズン・棚がクライアントと同じ値である�
   });
 
   it("防衛成功コインと日次上限がサーバ設定と一致する", () => {
-    expect(sqlShopGoals).toContain(`\"coin_win\":${ARENA_COIN_DEFENSE_WIN}`);
-    expect(sqlShopGoals).toContain(`\"daily_coin_cap\":${ARENA_COIN_DEFENSE_DAILY_CAP}`);
+    // 2026-09 に 4 → 8(上限40は据え置き)。**defense の他のキーを消さずに coin_win だけを差し替える**
+    const defense = rebalanceConfig("defense");
+    expect(defense.coin_win).toBe(ARENA_COIN_DEFENSE_WIN);
+    expect(defense.daily_coin_cap).toBe(ARENA_COIN_DEFENSE_DAILY_CAP);
+    expect(sqlRebalance).toContain(`public.arena_config.value || '{"coin_win":${ARENA_COIN_DEFENSE_WIN}}'::jsonb`);
     expect(sqlShopGoals).toContain("defender_coins_awarded");
     expect(sqlShopGoals).toContain("at time zone 'Asia/Tokyo'");
   });

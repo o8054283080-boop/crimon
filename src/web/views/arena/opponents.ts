@@ -85,7 +85,7 @@ export function renderArenaOpponents(props: PvpArenaProps): HTMLElement {
     el("section", { className: "panel ar-listhead" }, nodes([
       el("p", { className: "ar-listhead__note" }, [
         props.online
-          ? "近いレートの相手を並べています。実プレイヤーが足りない分はNPCで埋まります"
+          ? "実プレイヤー3人(レートの近い人・離れた人を混ぜて)とNPCを並べています。実プレイヤーが3人に満たない時はNPCで埋まります"
           : "オフラインのため、いまはNPCだけが並びます",
       ]),
       rerollButton(props),
@@ -97,7 +97,7 @@ export function renderArenaOpponents(props: PvpArenaProps): HTMLElement {
         : null,
     ...list.map((entry) => renderCandidate(props, entry)),
     /*
-     * **下にも置く。** 候補は5人ぶん縦に伸びるので、全部見終わった時には
+     * **下にも置く。** 候補は10人ぶん縦に伸びるので、全部見終わった時には
      * 上のボタンは画面の外にある。そこから指を戻させるのは、
      * 「どれも違った」と分かった直後にいちばんやらせたくない動きになる。
      */

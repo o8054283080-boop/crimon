@@ -21,6 +21,7 @@ on:
       - "src/game/arena/**"
       - "src/battle/**"
       - "supabase/functions/arena-settle/**"
+      - "supabase/migrations/20260926090000_arena_rebalance_2026_09.sql"
       - "scripts/build-edge.mjs"
       - "package.json"
       - "package-lock.json"
@@ -35,7 +36,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # **アリーナのSQLを先に流す。冪等なので毎回流してよい。**
+  #
+  # 以前はアリーナのSQLを自動で流す経路が無く、`20260912120000_arena_rating_gap_rebalance.sql`
+  # (レート差カーブv2)が**本番に一度も流れないまま**、画面側だけがv2を見ていた。
+  # 精算の式(DB)と画面の予告が別物になっていたので、ここで必ず流す。
+  database:
+    uses: ./.github/workflows/db-apply-sql.yml
+    with:
+      file: supabase/migrations/20260926090000_arena_rebalance_2026_09.sql
+    secrets: inherit
   deploy:
+    needs: database
     name: buildして本番へdeploy
     runs-on: ubuntu-latest
     steps:
