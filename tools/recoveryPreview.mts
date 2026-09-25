@@ -48,6 +48,7 @@ try {
   await page.waitForFunction(() => document.querySelector(".cloud-recovery__status")?.textContent?.includes("保存内容が異なる"));
   async function reachable(button: Locator) {
     await button.scrollIntoViewIfNeeded();
+    await button.click({ trial: true }); // スクロールのアニメーション終了・操作可能を待って測定する
     assert.equal(await button.evaluate(el => {
       const r = el.getBoundingClientRect();
       const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
