@@ -460,7 +460,14 @@ export function accessoryEnhanceTotalCost(star: AccessoryStar, from: number, to:
   return sum;
 }
 
-const SELL_BASE: Record<AccessoryStar, number> = { 4: 8_000, 5: 20_000, 6: 40_000 };
+/**
+ * 売値の基本額(ヒーロー・Lv1)。
+ *
+ * はじめは装備と同じ額(★4 8,000 / ★5 20,000)だったが、依頼主の指定で
+ * ★4・★5だけを7割に下げた。★6は装備と同じまま。
+ * 売値は持っている時点の値を焼かず、その都度ここから計算するので、控えの移行は要らない。
+ */
+const SELL_BASE: Record<AccessoryStar, number> = { 4: 5_600, 5: 14_000, 6: 40_000 };
 const SELL_RARITY: Record<AccessoryRarity, number> = { HERO: 1, LEGEND: 1.25, EPIC: 1.5 };
 
 /** 売値。装備と同じく、注ぎ込んだ強化費の3割を戻す */

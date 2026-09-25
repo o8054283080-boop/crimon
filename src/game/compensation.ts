@@ -57,6 +57,14 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-25-accessory-sell-price",
+    title: "★4・★5アクセサリーの売値を見直しました",
+    message: "アクセサリーを売った時に受け取れるゴールドを見直しました。\n\n"
+      + "・★4と★5のアクセサリーの売値を下げました(★6は変わりません)\n"
+      + "・強化に使ったゴールドの一部が売値に上乗せされる仕組みは、これまでどおりです",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-24-screen-header-unify",
     title: "画面の見出しと「戻る」をそろえました",
     message: "どの画面でも、同じ場所に同じ形で並ぶように整理しました。\n\n"
