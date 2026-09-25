@@ -57,6 +57,15 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-25-dungeon-chooser",
+    title: "ダンジョンの選択を見やすくしました",
+    message: "ホームの「ダンジョン」から開く行き先の選択を作り直しました。\n\n"
+      + "・装備ダンジョン・育成ダンジョン・ゴールドダンジョン・目覚の深域・遺跡の5つが、それぞれの絵と正式な名前で並びます\n"
+      + "・手に入るもの(装備・経験値・ゴールド・才能覚醒の素材・アクセサリー)と、本日の残り回数や踏破した階が一目で分かります\n"
+      + "・選択は画面の下から大きく開き、外側か「閉じる」を押すと閉じます。ホームのお知らせに重ならなくなりました",
+    kind: "UPDATE", fromDate: "2026-09-25", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-25-accessory-sell-price",
     title: "★4・★5アクセサリーの売値を見直しました",
     message: "アクセサリーを売った時に受け取れるゴールドを見直しました。\n\n"
