@@ -1,0 +1,305 @@
+/*
+ * スキル図鑑。部品はモンスター図鑑・所持一覧と同じもの(`mfilter` / `slot-filter-chip` / `screen-head`)を使い、
+ * ここには図鑑だけの並べ方を書く。
+ *
+ * **下タブのぶんを空ける**(モンスター図鑑と同じ)。最後の札がタブの裏に沈まないように。
+ * 文字は9px未満にしない(`tests/cssReadability.test.ts`)。
+ */
+.skill-dex {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 14px);
+}
+
+/* ---------------------------------------------------------- スキル1/2/3 */
+/*
+ * 片手の親指で押す帯。3つを等分し、的は44px以上にする。
+ * 見た目は装備画面の「装備 / アクセサリー」の切り替えと揃えてある。
+ */
+.skill-dex__slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.skill-dex__slot {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 180, 104, 0.35);
+  background: rgba(16, 20, 38, 0.92);
+  color: #d8def0;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.skill-dex__slot--active {
+  border-color: #ffd76a;
+  color: #ffd76a;
+  background: linear-gradient(180deg, rgba(64, 48, 18, 0.95), rgba(26, 20, 10, 0.95));
+}
+
+/* ---------------------------------------------------------- 検索欄 */
+.skill-dex__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: rgba(8, 11, 24, 0.72);
+}
+
+.skill-dex__search-icon {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* iPhone は16px未満の入力欄を押すと画面を拡大する。16pxで置く */
+.skill-dex__search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.skill-dex__search-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------- 絞り込み */
+.skill-dex__filter {
+  margin-bottom: 0;
+}
+
+.skill-dex__count {
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-dex__count strong {
+  color: #ffd76a;
+  font-size: 0.9rem;
+}
+
+.skill-dex__reset {
+  align-self: flex-start;
+}
+
+.skill-dex__filter-body {
+  max-height: 52vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.skill-dex__group .mfilter__label {
+  width: 4.6em;
+}
+
+.skill-dex__filter-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------- 結果 */
+.skill-dex__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-dex__empty {
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.skill-dex__empty p {
+  margin: 0;
+}
+
+.skill-dex__empty-sub {
+  margin-top: 6px !important;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.skill-dex__card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(9, 12, 25, 0.78);
+}
+
+.skill-dex__card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.skill-dex__card-slot {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(255, 215, 106, 0.16);
+  color: #ffd76a;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.skill-dex__card-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.95rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.skill-dex__card-ct {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-dex__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.skill-dex__badges:empty {
+  display: none;
+}
+
+.skill-dex__badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.skill-dex__badge--create {
+  background: rgba(88, 196, 140, 0.18);
+  color: #9ff0c3;
+  border: 1px solid rgba(88, 196, 140, 0.45);
+}
+
+.skill-dex__badge--nocreate {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.skill-dex__badge--passive {
+  background: rgba(150, 120, 255, 0.18);
+  color: #cdbdff;
+  border: 1px solid rgba(150, 120, 255, 0.45);
+}
+
+.skill-dex__card-desc {
+  margin: 0;
+  color: #d8def0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.skill-dex__card-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #a9e6c0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.skill-dex__card-lines li + li {
+  margin-top: 1px;
+}
+
+.skill-dex__holders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.skill-dex__holders-label {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.skill-dex__holder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* 持ち主。**絵は小さく**(スキルの札が主役)。押すとモンスター図鑑の詳細へ */
+.skill-dex__holder {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  max-width: 100%;
+  padding: 3px 8px 3px 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.skill-dex__holder-face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  font-size: 1rem;
+}
+
+.skill-dex__holder-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.skill-dex__holder-element {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #10131f;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+/* クリエイトのスキル継承欄から開く入口。**探すだけ**の小さなボタン */
+.create-target__skill-dex {
+  align-self: flex-start;
+  min-height: 38px;
+  margin-top: 4px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}

@@ -16,6 +16,7 @@ import { el } from "../dom.js";
 import { createIncrementalGrid } from "../incrementalGrid.js";
 import { icon } from "../icons.js";
 import { withPortrait } from "../three/portrait.js";
+import "../ui/skillDex.css";
 import { type LimitBreakPanelProps, renderLimitBreakPanel } from "./limitBreak.js";
 import {
   ABILITY_POINT_RESET_COST,
@@ -75,6 +76,11 @@ export interface MonsterCreateProps {
   awakeningOrbs: number;
   gold: number;
   onSelectMenu: (menu: CreateMenu) => void;
+  /**
+   * スキル図鑑を開く(スキル継承の欄に出す)。**探すだけで、ここでは何も移さない。**
+   * 省略時は出さない。
+   */
+  onGoSkillDex?: () => void;
   onReincarnate: (type: MonsterType) => void;
   onSetAbilityPoint: (stat: AllocatableStat, points: number) => void;
   onResetAbilityPoints: () => void;
@@ -453,6 +459,14 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
         el("span", { className: "create-target__note" }, [
           `星${CREATE_MATERIAL_STAR}まで育てた別のモンスターを合成すると、そのスキル2か3をこの子へ移せます。`,
         ]),
+        props.onGoSkillDex
+          ? el("button", {
+            type: "button",
+            className: "btn btn--ghost create-target__skill-dex",
+            "data-tour": "create-to-skill-dex",
+            onclick: props.onGoSkillDex,
+          }, ["📘 スキル図鑑で素材を探す"])
+          : null,
         target.createdSkill
           ? el("div", { className: "create-target__has" }, [
               el("span", { className: "create-mark" }, [icon("summon", { size: 12 }), "移し替え済み"]),
