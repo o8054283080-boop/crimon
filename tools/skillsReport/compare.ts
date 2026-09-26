@@ -94,7 +94,9 @@ function compareNested(where: string, before: object, after: object, out: (w: st
   for (const [key, value] of Object.entries(before)) {
     const next = (after as Record<string, unknown>)[key];
     if (typeof value === "number" && typeof next === "number") {
-      if (next + 1e-9 < value) out(`${where}.${key}`, value, next);
+      // クールタイムは短いほど強い(復活・内部CTなど、パッシブの中にもある)
+      const smallerIsStronger = /cooldown/i.test(key);
+      if (smallerIsStronger ? next > value + 1e-9 : next + 1e-9 < value) out(`${where}.${key}`, value, next);
     } else if (value && typeof value === "object" && next && typeof next === "object") {
       compareNested(`${where}.${key}`, value, next, out);
     } else if (JSON.stringify(value) !== JSON.stringify(next)) {
