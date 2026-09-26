@@ -57,6 +57,16 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-09-26-fenrir-hunting-instinct-self",
+    title: "フェンリルの「狩猟本能」でフェンリル自身も攻撃するようにしました",
+    message: "フェンリルのスキル2「狩猟本能」は、これまで呼ばれた味方2体だけが攻撃し、フェンリル自身は攻撃していませんでした。\n\n"
+      + "・**フェンリル自身が先頭でスキル1を使い**、続いて攻撃力の高い味方2体がスキル1で加わるようにしました\n"
+      + "・スキルレベルで伸びる「協力攻撃のダメージ」は、フェンリル自身の一撃にも掛かります\n"
+      + "・呼べる味方がいない時も、フェンリル自身の一撃は出ます\n"
+      + "・クールタイムが1縮むのは、これまでどおり参加した味方だけです",
+    kind: "UPDATE", fromDate: "2026-09-26", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-09-26-fenrir-pack-instinct-up",
     title: "フェンリルの「群狼の本能」を強化しました",
     message: "フェンリル(草・水)のパッシブ「群狼の本能」を強化しました。\n\n"

@@ -215,7 +215,7 @@ export const FENRIR: MonsterTemplate = {
         // Lv5 CT4 → CT3
         { cooldownTurns: 3, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.2 }] },
       ],
-    }, "【対象】敵単体。フェンリル自身のクールタイムは短縮されない"),
+    }, "【対象】敵単体。フェンリル自身が先頭でスキル1を使い、続いて攻撃力の高い味方2体が加わる。フェンリル自身のクールタイムは短縮されない"),
     {
       id: "fenrir_s2_c",
       name: "喉笛裂き",
