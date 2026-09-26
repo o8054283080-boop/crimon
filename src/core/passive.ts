@@ -97,8 +97,9 @@ export type PassiveLevelEffect =
   /**
    * フェンリル「群狼の本能」。
    * クリダメが上がり、敵を倒すと追加ターンを得る(回数制限なし)。
+   * スキル1を使った後、`repeatS1Chance` でもう一度スキル1を使う(もう一度の方からは続かない)。
    */
-  | { kind: "PACK_INSTINCT"; critDmg: number }
+  | { kind: "PACK_INSTINCT"; critDmg: number; repeatS1Chance: number }
   /**
    * クロノス「時の管理者」(闇専用)。
    * 味方が行動するたびゲージを得る。自身の攻撃スキルにゲージ吸収とスタンが乗る。
@@ -191,7 +192,7 @@ export function describePassiveLevel(effect: PassiveLevelEffect): string {
     case "REAPER_HARVEST":
       return `攻撃スキル使用時、${pct(effect.chance)}で対象に1ターンの強化阻害と回復阻害。成功時、自身のHPを最大HPの${pct(effect.heal)}回復し行動ゲージ+${pct(effect.gauge)}(1スキルにつき1回)`;
     case "PACK_INSTINCT":
-      return `クリダメ+${pct(effect.critDmg)}。敵を倒すと追加ターンを得る`;
+      return `クリダメ+${pct(effect.critDmg)}。敵を倒すと追加ターンを得る。スキル1を使った後、${pct(effect.repeatS1Chance)}でもう一度スキル1を使う`;
     case "TIME_KEEPER":
       return `味方が行動するたび自身の行動ゲージ+${pct(effect.allyGauge)}。自身の攻撃スキルに行動ゲージ${pct(effect.drain)}吸収と${pct(effect.stunChance)}のスタンが乗る(1スキルにつき1回)`;
     case "GUTS_CHARGE":

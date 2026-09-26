@@ -225,6 +225,45 @@ describe("⑩ 群狼の本能の追加ターン", () => {
   });
 });
 
+describe("⑩-2 群狼の本能の強化(クリダメ20〜50%・スキル1の再使用50%)", () => {
+  const packAt = (level: number) => passiveAtLevel(findMonster("fenrir", "GRASS")!.skills[2].passive!, level);
+
+  it("クリダメは Lv1 20% から Lv5 50%、再使用は全段50%", () => {
+    expect([1, 2, 3, 4, 5].map((lv) => packAt(lv))).toEqual([0.2, 0.25, 0.3, 0.4, 0.5].map((critDmg) => ({
+      kind: "PACK_INSTINCT", critDmg, repeatS1Chance: 0.5,
+    })));
+  });
+
+  /** 草フェンリル1体 vs 硬いゴーレム1体。スキル1を1回使った時の記録 */
+  const useS1 = (rngValue: number) => {
+    const engine = battle(["fenrir_GRASS"], ["golem_WATER"], () => rngValue);
+    const [fenrir, golem] = engine.getUnits();
+    golem.maxHp = 1_000_000;
+    golem.currentHp = 1_000_000;
+    return { record: engine.resolveTurn(fenrir, { skillIndex: 0 }), fenrir, engine };
+  };
+
+  it("スキル1の後、判定に通ればもう一度スキル1を使う", () => {
+    const { record } = useS1(0.1); // 0.1 < 0.5 なので通る
+    expect(record.lines.filter((line) => line.includes("追加攻撃")).length).toBe(1);
+  });
+
+  it("判定に外れれば使わない。もう一度の方から、さらに続くことはない", () => {
+    expect(useS1(0.99).record.lines.some((line) => line.includes("追加攻撃"))).toBe(false);
+    // 乱数が常に通る値でも、もう一度は1回だけ
+    expect(useS1(0).record.lines.filter((line) => line.includes("追加攻撃")).length).toBeLessThanOrEqual(1);
+  });
+
+  it("スキル1以外を使った手番では起きない", () => {
+    const engine = battle(["fenrir_GRASS"], ["golem_WATER"], () => 0.1);
+    const [fenrir, golem] = engine.getUnits();
+    golem.maxHp = 1_000_000;
+    golem.currentHp = 1_000_000;
+    const record = engine.resolveTurn(fenrir, { skillIndex: 1 });
+    expect(record.lines.some((line) => line.includes("追加攻撃"))).toBe(false);
+  });
+});
+
 describe("⑪ フェンリルの協力攻撃", () => {
   it("呼ばれた味方がスキル1で同じ相手を殴り、クールタイムが縮む", () => {
     const engine = battle(["fenrir_GRASS", "kobold_FIRE", "slime_FIRE"], ["golem_WATER"], () => 0.99);
