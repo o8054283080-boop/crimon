@@ -304,8 +304,8 @@ const WOLF: MonsterTemplate = {
         { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
         // Lv4 ダメージ倍率 0.50倍→0.55倍
         { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
-        // Lv5 クールタイム -1(2→1ターン)
-        { cooldownTurns: 1, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        // Lv5
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
       ],
     },
     {

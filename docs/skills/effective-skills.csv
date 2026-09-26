@@ -53,7 +53,7 @@ templateId,monster,rarity,slot,skillId,skillName,elements,unique,growth,runtimeO
 "wolf","ウルフ","★3","S2","wolf_s2_a","ふいうちの牙","FIRE|WATER","","levelOverrides","false","2","SINGLE_ENEMY","2","ダメージ倍率 0.50倍 × 2回(自身の速度が高いほど上昇)(防御力無視)"
 "wolf","ウルフ","★3","S2","wolf_s2_a","ふいうちの牙","FIRE|WATER","","levelOverrides","false","3","SINGLE_ENEMY","2","ダメージ倍率 0.50倍 × 2回(自身の速度が高いほど上昇)(防御力無視)"
 "wolf","ウルフ","★3","S2","wolf_s2_a","ふいうちの牙","FIRE|WATER","","levelOverrides","false","4","SINGLE_ENEMY","2","ダメージ倍率 0.55倍 × 2回(自身の速度が高いほど上昇)(防御力無視)"
-"wolf","ウルフ","★3","S2","wolf_s2_a","ふいうちの牙","FIRE|WATER","","levelOverrides","false","5","SINGLE_ENEMY","1","ダメージ倍率 0.55倍 × 2回(自身の速度が高いほど上昇)(防御力無視)"
+"wolf","ウルフ","★3","S2","wolf_s2_a","ふいうちの牙","FIRE|WATER","","levelOverrides","false","5","SINGLE_ENEMY","2","ダメージ倍率 0.55倍 × 2回(自身の速度が高いほど上昇)(防御力無視)"
 "wolf","ウルフ","★3","S2","wolf_s2_b","いあつ","GRASS|LIGHT","","levelOverrides","false","1","ALL_ENEMIES","3","50%で有利な効果(シールド・無効・能力上昇)を解除 / 70%で攻撃力-50% (2ターン)"
 "wolf","ウルフ","★3","S2","wolf_s2_b","いあつ","GRASS|LIGHT","","levelOverrides","false","2","ALL_ENEMIES","3","60%で有利な効果(シールド・無効・能力上昇)を解除 / 75%で攻撃力-50% (2ターン)"
 "wolf","ウルフ","★3","S2","wolf_s2_b","いあつ","GRASS|LIGHT","","levelOverrides","false","3","ALL_ENEMIES","3","75%で有利な効果(シールド・無効・能力上昇)を解除 / 80%で攻撃力-50% (2ターン)"

@@ -57,6 +57,14 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-wolf-fuiuchi-ct",
+    title: "ウルフ「ふいうちの牙」のクールタイムを調整しました",
+    message: "ウルフのスキル2「ふいうちの牙」は、スキルレベル最大でクールタイムが1ターンになっていました。\n\n"
+      + "・スキルレベル最大でもクールタイムは2ターンのままにしました\n"
+      + "・ダメージ倍率と速度による上昇はこれまでどおりです",
+    kind: "UPDATE", fromDate: "2026-09-26", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-skill-dex-levels-and-nav",
     title: "スキル図鑑でスキルLv別の変化を見られるようにしました",
     message: "・スキル図鑑のスキルを押すと、「レベルを上げると」何が変わるかと、Lv別の効果がその場で開きます(もう一度押すと閉じます)\n"

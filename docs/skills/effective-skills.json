@@ -1479,7 +1479,7 @@
      {
       "level": 5,
       "target": "SINGLE_ENEMY",
-      "cooldownTurns": 1,
+      "cooldownTurns": 2,
       "lines": [
        "ダメージ倍率 0.55倍 × 2回(自身の速度が高いほど上昇)(防御力無視)"
       ],
