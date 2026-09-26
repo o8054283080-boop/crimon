@@ -1393,13 +1393,20 @@ const WISP: MonsterTemplate = {
   darkSkill3: {
     id: "wisp_s3_dark",
     name: "ヴォイドシフト",
-    description: "味方全体の行動ゲージを35%進め、素早さを3ターン上昇させ、最大HPの15%のシールドを3ターン張る。",
-    target: "ALL_ALLIES",
-    cooldownTurns: 6,
+    description: "味方単体の行動ゲージを100%進め、攻撃力を2ターン上昇させる。自身の行動ゲージを20%進める。",
+    target: "SINGLE_ALLY",
+    cooldownTurns: 3,
     effects: [
-      { kind: "GAUGE", amount: 0.35 },
-      { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
-      { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+      { kind: "GAUGE", amount: 1.0 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+      { kind: "GAUGE", amount: 0.20, applyTo: "SELF" },
+    ],
+    levelOverrides: [
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.20, applyTo: "SELF" }] },
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.30, applyTo: "SELF" }] },
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.40, applyTo: "SELF" }] },
+      { cooldownTurns: 2, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.40, applyTo: "SELF" }] },
     ],
   },
 };
