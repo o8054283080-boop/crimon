@@ -152,13 +152,13 @@ export const BASILISK: MonsterTemplate = {
       // Lv1
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.6, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] }] },
       // Lv2 ダメージ倍率 0.60倍→0.70倍 / 行動ゲージ -30%→-50%
-      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.5, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] }] },
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] }] },
       // Lv3 行動ゲージ -50%→-60% / スタンの発動率 25%→30%
-      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.6, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] }] },
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.6 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] }] },
       // Lv4 ダメージ倍率 0.70倍→0.80倍 / スタンの発動率 30%→35%
-      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.6, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.35 }] }] },
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.6 }, { kind: "STUN", durationTurns: 1, chance: 0.35 }] }] },
       // Lv5 クールタイム -1(5→4ターン) / 行動ゲージ -60%→-70% / スタンの発動率 35%→40%
-      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.7, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] }] },
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.7 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] }] },
     ],
   },
   skillAssignment: {

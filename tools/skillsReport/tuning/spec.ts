@@ -286,7 +286,18 @@ export const SPEC: SkillSpec[] = [
   },
   {
     id: "wisp_s3_dark",
-    pending: "指定の「味方単体ゲージ100%+攻撃UP+自身ゲージ」は、今の闇S3(ヴォイドシフト: 味方全体ゲージ35%+速度UP+シールド)と別の技。「ときわたり」の今の姿(単体100%)と混同している可能性があり、完全な作り直しの明記も無いため保留",
+    target: "SINGLE_ALLY",
+    structure: [rebuild([
+      { kind: "GAUGE", amount: 1.0 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+      { kind: "GAUGE", amount: 0.20, applyTo: "SELF" },
+    ])],
+    values: {
+      "GAUGE#1.amount": c(0.20, 0.25, 0.30, 0.40),
+      ct: c(3, 3, 3, 3, 2),
+    },
+    allowWeaker: { "*": "会話で闇S3を完全再設計すると明示確定。旧ヴォイドシフトから置換" },
+    note: "味方単体ゲージ100% + 攻撃UP2T + 自身ゲージ20/25/30/40/40%。Lv5 CT2",
   },
 
   /* ================================================================ 7. トレント */
@@ -794,14 +805,15 @@ export const SPEC: SkillSpec[] = [
     }])],
     values: {
       "DAMAGE#0.multiplier": c(0.60, 0.70, 0.70, 0.80),
-      "DAMAGE#0.perHit.GAUGE#0.amount": c(-0.30, -0.50, -0.60, -0.60, -0.70),
+      "DAMAGE#0.perHit.GAUGE#0.amount": c(-0.30),
+      "DAMAGE#0.perHit.GAUGE#0.chance": c(0.50, 0.50, 0.60, 0.60, 0.70),
       "DAMAGE#0.perHit.STUN#0.chance": c(0.25, 0.25, 0.30, 0.35, 0.40),
       ct: c(5, 5, 5, 5, 4),
     },
     allowWeaker: {
       "*": "指定「完全再設計」。単体2.0倍+ゲージ-70%を、全体0.6倍×3回(1撃ごとにゲージとスタンを判定)へ作り直す",
     },
-    note: "「gauge50/60/70」は1撃ごとのゲージ減少量として読み、発動率は Lv1 の 50% のまま固定した",
+    note: "会話の最終仕様どおり、1Hitあたりのゲージ減少量は30%固定。発動率をLv1-2 50% / Lv3-4 60% / Lv5 70%へ成長させる",
   },
 
   /* ================================================================ 21. ミミック */
