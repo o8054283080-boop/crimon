@@ -406,113 +406,13 @@ export function elementStatFlavorOf(
  * 実体化の直前にIDで差し替える。光/闇固有技や新規高レアには一切波及しない。
  */
 function applyLegacySkillBalance(skill: Skill): Skill {
-  skill = applySeptemberSkillBalance(skill);
-  switch (skill.id) {
-    case "slime_s3_a":
-      return {
-        ...skill,
-        description: "限界を超えた力で敵全体に攻撃力1.8倍のダメージを与える。この攻撃で敵を倒していた場合、自身の行動ゲージを20%進める。",
-        effects: [
-          { kind: "DAMAGE", multiplier: 1.8 },
-          { kind: "GAUGE", amount: 0.2, applyTo: "SELF", requires: "KILLED_TARGET" },
-        ],
-      };
-    case "slime_s3_c":
-      return {
-        ...skill,
-        description: "眩い粘液を弾けさせ、敵全体に攻撃力1.5倍のダメージを与え、75%で2ターン暗闇を付与する。",
-        effects: [
-          { kind: "DAMAGE", multiplier: 1.5 },
-          { kind: "BLIND", durationTurns: 2, chance: 0.75 },
-        ],
-      };
-    case "wolf_s3_a":
-      return {
-        ...skill,
-        description: "渾身の一撃(2.8倍)を叩き込み、50%で相手をスタンさせる。",
-        effects: [
-          { kind: "DAMAGE", multiplier: 2.8 },
-          { kind: "STUN", durationTurns: 1, chance: 0.5 },
-        ],
-      };
-    case "wolf_s3_b":
-      return {
-        ...skill,
-        description: "敵単体に攻撃力0.85倍のダメージを3回与え、1撃ごとに防御力を25%低下させる。",
-        effects: skill.effects.map((effect) => effect.kind === "DAMAGE" ? { ...effect, multiplier: 0.85 } : effect),
-      };
-    case "imp_s3_a":
-      return {
-        ...skill,
-        description: "敵全体に攻撃力1.1倍のダメージを与え、75%で2ターン攻撃力を大きく低下させ、行動ゲージを15%減少させる。",
-        effects: [
-          { kind: "DAMAGE", multiplier: 1.1 },
-          { kind: "DEBUFF", stat: "atk", amount: 0.5, durationTurns: 2, chance: 0.75 },
-          { kind: "GAUGE", amount: -0.15 },
-        ],
-      };
-    case "imp_s3_b":
-      return {
-        ...skill,
-        description: "敵全体に攻撃力1.1倍のダメージを与え、75%で全員のスキルのクールタイムを1ターン延長する。",
-        cooldownTurns: 4,
-        effects: [
-          { kind: "DAMAGE", multiplier: 1.1 },
-          { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.75 },
-        ],
-      };
-    case "wisp_s2_b":
-      return {
-        ...skill,
-        description: "味方全体の素早さを2ターン上昇させ、行動ゲージを25%進める。",
-        effects: skill.effects.map((effect) => effect.kind === "GAUGE" ? { ...effect, amount: 0.25 } : effect),
-      };
-    case "fairy_s3_c":
-      return {
-        ...skill,
-        description: "味方全体のHPを最大HPの25%回復し、防御力を2ターン上昇させる。",
-        cooldownTurns: 4,
-        effects: [
-          { kind: "HEAL", healRate: 0.25 },
-          { kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 2 },
-        ],
-      };
-    case "knight_s3_b":
-      return {
-        ...skill,
-        description: "敵全体に攻撃力1.5倍のダメージを与え、60%で1ターン行動不能にする。",
-        effects: [
-          { kind: "DAMAGE", multiplier: 1.5 },
-          { kind: "STUN", durationTurns: 1, chance: 0.6 },
-        ],
-      };
-    case "chronos_s3_b": {
-      /*
-       * **素直に2つ並べる。**
-       *
-       * 以前は「GAUGEに発動率が無い」という理由で、0ターンのスタンを
-       * 発動判定の印として使い、外れた時だけ +100% を足して打ち消す、
-       * という組み方をしていた。**GAUGEに `chance` が入った後もそのまま
-       * 残っていて**、画面には
-       *   「70%でスタン(0ターン) / 行動ゲージ-100%(スタンが失敗したらさらに100%)」
-       * と出ていた。何が起きるのか誰にも読めない(依頼主の指摘)。
-       *
-       * 発動率はそれぞれの効果が自分で持てるので、書いたままが起きる形にする。
-       */
-      return {
-        ...skill,
-        description: "時空が軋み、敵全体に攻撃力1.0倍のダメージを与える。"
-          + "70%で行動ゲージを100%減少させ、20%で1ターン行動不能にする。",
-        effects: [
-          { kind: "DAMAGE", multiplier: 1.0 },
-          { kind: "GAUGE", amount: -1, chance: 0.7 },
-          { kind: "STUN", durationTurns: 1, chance: 0.2 },
-        ],
-      };
-    }
-    default:
-      return skill;
-  }
+  /*
+   * **ここにあった差し替え(スライム・ウルフ・インプ・ウィスプ・フェアリー・ナイト・クロノスの10件)は、
+   * 2026年10月のスキル調整で定義ファイルの `levelOverrides` へ移した。**
+   * 実体化の直前に数字を書き換えると、定義ファイルを読んだ人が本番の数字を読み違える
+   * (`docs/SKILL_BALANCE_GUIDE.md`)。新しい調整はここではなく定義ファイルへ書くこと。
+   */
+  return applySeptemberSkillBalance(skill);
 }
 
 /**

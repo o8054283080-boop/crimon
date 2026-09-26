@@ -110,7 +110,8 @@ describe("毒・火傷は戦術として通す", () => {
     expect(carriers).toContain("imp_DARK");
     // 実測で毒編成に選んでしまった顔ぶれ。持っていないことをここに残しておく
     expect(carriers).not.toContain("imp_GRASS");
-    expect(carriers).not.toContain("imp_WATER");
-    expect(carriers).not.toContain("imp_FIRE");
+    // 水・火のインプは2026年10月の調整で S2(imp_s2_a)に毒が付き、毒を撒けるようになった
+    expect(carriers).toContain("imp_WATER");
+    expect(carriers).toContain("imp_FIRE");
   });
 });

@@ -114,6 +114,7 @@ import {
   tickHealBlockAtTurnStart,
   tickShieldAtTurnStart,
   stripBuffs,
+  countBuffs,
 } from "./unit.js";
 
 const ATB_THRESHOLD = 100;
@@ -152,6 +153,11 @@ interface SkillResolution {
   damageDealt: number;
   /** このスキルで倒した相手の数 */
   kills: number;
+  /**
+   * 相手ごとの、DAMAGE効果が当たった回数。**多段なら1撃ごとに1つ増える。**
+   * アビスリーパーの「死神の収穫」が、当たった回数だけ判定するために数える
+   */
+  readonly hitsOn: Map<string, number>;
   /** 術者側のパッシブで「1スキル1回」のものを、もう使ったか */
   sourcePassiveUsed: boolean;
   /** 受け手側のパッシブを既に出した相手(instanceId)。全体技でも1体につき1回に保つ */
@@ -181,7 +187,7 @@ interface SkillResolution {
 function newResolution(): SkillResolution {
   return {
     anyCrit: false, critCount: 0, debuffApplied: false, stunFailed: false,
-    stolenBuffs: 0, strippedTargets: 0, damageDealt: 0, kills: 0,
+    stolenBuffs: 0, strippedTargets: 0, damageDealt: 0, kills: 0, hitsOn: new Map(),
     sourcePassiveUsed: false, victimPassiveUsed: new Set(), applied: new Set(), gaugeRemoved: 0,
     targetHpBefore: new Map(), chanceGroups: new Map(), glancedTargets: new Set(),
   };
@@ -230,6 +236,9 @@ function isSourceScopedEffect(effect: SkillEffect): boolean {
     // 協力攻撃・反撃態勢は術者そのものに1度だけかかる
     case "COOP_ATTACK": case "COUNTER_STANCE":
       return true;
+    // 敵全体へ掛ける弱体は、スキル1回につき1度だけ配る(全体技で敵の数だけ重ならないように)
+    case "DEBUFF": case "BLIND": case "HEAL_BLOCK":
+      return effect.applyTo === "ENEMIES";
     default:
       return false;
   }
@@ -1031,6 +1040,19 @@ export class BattleEngine {
         applyStatEffect(attacker, "atk", -passive.atkDown, passive.duration, "DEBUFF");
         this.push(`  → ${this.label(attacker)} の ATK が低下！ (${passive.duration}ターン)`);
       }
+      /*
+       * HP反撃。**自身の最大HPの割合を、攻撃者へそのまま返す**(防御を通さない)。
+       * "reflect" として当てるので、相手の被弾パッシブ・反射は起きない
+       * (ミミック同士で撃ち合っても往復しない)。回数は上の「敵1行動につき1回」に乗る。
+       */
+      if (passive.counterHpRatio && victim.alive && attacker?.alive && attacker.team !== victim.team) {
+        const back = Math.round(victim.maxHp * passive.counterHpRatio);
+        if (back > 0) {
+          const hit = this.applyIncomingDamage(attacker, back, victim, "reflect");
+          this.push(`  → ${this.label(victim)} の「偽りの財宝」が ${this.label(attacker)} へ ${hit.hpDamage} ダメージを返した！`);
+          this.pushEvent({ targetId: attacker.instanceId, kind: "DAMAGE", amount: hit.hpDamage });
+        }
+      }
     }
   }
 
@@ -1115,6 +1137,7 @@ export class BattleEngine {
       if (allies.length === 0) return [];
       return [allies.reduce((lowest, unit) => (hpRatio(unit) < hpRatio(lowest) ? unit : lowest), allies[0])];
     }
+    if (applyTo === "ENEMIES") return this.units.filter((unit) => unit.team !== source.team && unit.alive);
     return [target];
   }
 
@@ -2047,29 +2070,40 @@ export class BattleEngine {
         }
       }
     }
+    /*
+     * 死神の収穫。**主対象に当たった回数だけ判定する**(依頼主の指定「multi-hitでは各Hitごとに発動判定」)。
+     *
+     * 判定はスキル本体の効果をすべて解決した後にまとめて回す。1回ごとが
+     * 「強化不可+治癒阻害を試みる → どちらか入れば回復とゲージ」のフル効果。
+     * ここから別のスキルは撃たないので、何度回っても再帰はしない。
+     * `sourcePassiveUsed` を立てるので、同じ解決の中で二度は入らない。
+     */
     if (passive.kind === "REAPER_HARVEST" && resolution.damageDealt > 0 && primary.alive) {
       resolution.sourcePassiveUsed = true;
-      let landed = false;
-      if (!this.isImmune(primary)) {
-        // 強化阻害・回復阻害はどちらも1ターン固定(依頼主の指定)
-        if (this.rollEffectSuccess(source, primary, passive.chance) && applyStatus(primary, "BUFF_BLOCK", 1, source.instanceId)) {
-          this.push(`  → ${this.label(primary)} は強化不可になった！ (1ターン)`);
-          landed = true;
+      const hits = Math.max(1, resolution.hitsOn.get(primary.instanceId) ?? 0);
+      for (let h = 0; h < hits && primary.alive && source.alive; h += 1) {
+        let landed = false;
+        if (!this.isImmune(primary)) {
+          // 強化阻害・回復阻害はどちらも1ターン固定(依頼主の指定)
+          if (this.rollEffectSuccess(source, primary, passive.chance) && applyStatus(primary, "BUFF_BLOCK", 1, source.instanceId)) {
+            this.push(`  → ${this.label(primary)} は強化不可になった！ (1ターン)`);
+            landed = true;
+          }
+          if (this.rollEffectSuccess(source, primary, passive.chance)) {
+            primary.healBlockTurns = Math.max(primary.healBlockTurns, 1);
+            primary.healBlockMultiplier = 0;
+            this.push(`  → ${this.label(primary)} は治癒阻害を受けた！ (1ターン)`);
+            landed = true;
+          }
         }
-        if (this.rollEffectSuccess(source, primary, passive.chance)) {
-          primary.healBlockTurns = Math.max(primary.healBlockTurns, 1);
-          primary.healBlockMultiplier = 0;
-          this.push(`  → ${this.label(primary)} は治癒阻害を受けた！ (1ターン)`);
-          landed = true;
+        if (landed) {
+          this.pushPassiveCue(source);
+          const healAmount = Math.round(source.maxHp * passive.heal);
+          applyHeal(source, healAmount);
+          this.pushEvent({ targetId: source.instanceId, kind: "HEAL", amount: healAmount });
+          this.gainGauge(source, passive.gauge);
+          this.push(`  → ${this.label(source)} の「死神の収穫」でHPが ${healAmount} 回復し、行動ゲージが進んだ！`);
         }
-      }
-      if (landed) {
-        this.pushPassiveCue(source);
-        const healAmount = Math.round(source.maxHp * passive.heal);
-        applyHeal(source, healAmount);
-        this.pushEvent({ targetId: source.instanceId, kind: "HEAL", amount: healAmount });
-        this.gainGauge(source, passive.gauge);
-        this.push(`  → ${this.label(source)} の「死神の収穫」でHPが ${healAmount} 回復し、行動ゲージが進んだ！`);
       }
     }
   }
@@ -2525,6 +2559,18 @@ export class BattleEngine {
       if (!sourceScoped && isSourceScopedEffect(effect)) continue;
 
       if ('requires' in effect && !met(effect.requires)) continue;
+      /*
+       * 敵全体へ掛ける弱体(味方向けの技に付く)。**敵1体ずつ、普段の弱体と同じ道を通す。**
+       * 命中・抵抗・免疫・かすりの判定はそちらに任せる。向き先を外した1効果だけの
+       * スキルとして流すので、ここへは戻ってこない(再帰は1段で止まる)。
+       */
+      if ((effect.kind === "DEBUFF" || effect.kind === "BLIND" || effect.kind === "HEAL_BLOCK") && effect.applyTo === "ENEMIES") {
+        const single = { ...effect, applyTo: undefined } as SkillEffect;
+        for (const enemy of this.units.filter((unit) => unit.alive && unit.team !== source.team)) {
+          this.applySkillEffects(source, enemy, { ...skill, effects: [single] }, false, false, undefined, resolution);
+        }
+        continue;
+      }
       switch (effect.kind) {
         case "CURSE": {
           if (!this.isImmune(target) && this.rollEffectSuccess(source, target, effect.chance)) this.addCurse(source, target);
@@ -2556,8 +2602,12 @@ export class BattleEngine {
           const stolenBonus = effect.stolenBuffBonus
             ? Math.min(effect.stolenBuffBonus.maxBonus, resolution.stolenBuffs * effect.stolenBuffBonus.perBuff)
             : 0;
-          const damageEffect = stolenBonus > 0
-            ? { ...effect, finalDamageBonus: (effect.finalDamageBonus ?? 0) + stolenBonus }
+          // 「対象の強化1個につき」は**攻撃を始めた時点の数**。同じ技の後ろの解除より前に数える
+          const buffBonus = effect.buffCountBonus && target.alive
+            ? Math.min(effect.buffCountBonus.maxBonus, countBuffs(target) * effect.buffCountBonus.perBuff)
+            : 0;
+          const damageEffect = stolenBonus + buffBonus > 0
+            ? { ...effect, finalDamageBonus: (effect.finalDamageBonus ?? 0) + stolenBonus + buffBonus }
             : effect;
           const hits = effect.hits ?? 1;
           for (let h = 0; h < hits && target.alive; h += 1) {
@@ -2577,6 +2627,7 @@ export class BattleEngine {
             const applied = this.applyIncomingDamage(target, result.damage, source, "normal", resolution);
             damageDealtThisCall += applied.hpDamage;
             resolution.damageDealt += applied.hpDamage;
+            resolution.hitsOn.set(target.instanceId, (resolution.hitsOn.get(target.instanceId) ?? 0) + 1);
             if (applied.died) { resolution.kills += 1; this.onKill(source); }
             if (result.isCrit && target.alive && passiveEffectOf(target)?.kind === "CHEAT") {
               const key = `cheat:${target.instanceId}`;
@@ -2997,6 +3048,7 @@ export class BattleEngine {
             resolution.applied.add("STRIP");
             this.push(`  → ${this.label(target)} の有利な効果が剥がされた！`);
             if (effect.selfGaugePerRemoved) this.gainGauge(source, effect.selfGaugePerRemoved * removed);
+            if (effect.selfGaugePerTarget) this.gainGauge(source, effect.selfGaugePerTarget);
             this.acc?.onStrip(source, target, resolution);
           }
           break;

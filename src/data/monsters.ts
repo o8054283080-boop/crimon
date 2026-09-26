@@ -29,43 +29,94 @@ const SLIME: MonsterTemplate = {
   skill1: {
     id: "slime_s1",
     name: "たたく",
-    description: "敵単体に攻撃力1.0倍のダメージを与える。",
+    description: "ダメージ倍率 1.00倍",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.0 }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 1 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }] },
+      // Lv2 ダメージ倍率 1.00倍→1.10倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }] },
+      // Lv3 ダメージ倍率 1.10倍→1.15倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.15 }] },
+      // Lv4 ダメージ倍率 1.15倍→1.20倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }] },
+      // Lv5 ダメージ倍率 1.20倍→1.25倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.25 }] },
+    ],
   },
   skill2Variants: [
     {
       id: "slime_s2_a",
       name: "エレメンタルバースト",
-      description: "属性の力を弾けさせ、敵全体に攻撃力1.05倍のダメージを与え、それぞれ45%で2ターン攻撃力を低下させる。",
+      description: "ダメージ倍率 1.05倍。45%で攻撃力-50% (2ターン)。50%で強化不可 (2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.05 },
         { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.45 },
+        { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.5, durationTurns: 2, fixedDuration: true },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.05 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.45 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.5, durationTurns: 2, fixedDuration: true }] },
+        // Lv2 ダメージ倍率 1.05倍→1.15倍 / 弱体の発動率 45%→50%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.15 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.5, durationTurns: 2, fixedDuration: true }] },
+        // Lv3 ダメージ倍率 1.15倍→1.20倍 / 弱体の発動率 50%→60%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.5, durationTurns: 2, fixedDuration: true }] },
+        // Lv4 ダメージ倍率 1.20倍→1.25倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.25 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.5, durationTurns: 2, fixedDuration: true }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.25 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 3, chance: 0.6 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.5, durationTurns: 2, fixedDuration: true }] },
       ],
     },
     {
       id: "slime_s2_b",
       name: "どくづき",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、60%で2ターン毒(1スタック)を付与する。",
+      description: "ダメージ倍率 1.30倍。60%で毒1スタック (1スタックにつき最大HPの5%、最大5スタック、2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
         { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.6 },
       ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.6 }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / 毒の発動率 60%→65% / 毒1スタック 5%→5.5%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.65 }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 毒の発動率 65%→75% / 毒1スタック 5.5%→6%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.75 }] },
+        // Lv4 ダメージ倍率 1.50倍→1.55倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.75 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 毒の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.75 }] },
+      ],
     },
     {
       id: "slime_s2_c",
       name: "ねばつく一撃",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、70%で素早さを低下させる。",
+      description: "ダメージ倍率 1.30倍。70%で速度-30% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3 },
         { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / 弱体の発動率 70%→75%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.75 }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 弱体の発動率 75%→85%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv4 ダメージ倍率 1.50倍→1.55倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.85 }] },
       ],
     },
   ],
@@ -73,31 +124,71 @@ const SLIME: MonsterTemplate = {
     {
       id: "slime_s3_a",
       name: "げんかいとっぱ",
-      description: "限界を超えた力で敵全体に攻撃力1.3倍のダメージを与える。",
+      description: "ダメージ倍率 1.80倍。相手を倒したら自身の行動ゲージ+20%。自身の攻撃力+30% (2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
-      effects: [{ kind: "DAMAGE", multiplier: 1.3 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.8 },
+        { kind: "GAUGE", amount: 0.2, applyTo: "SELF", requires: "KILLED_TARGET" },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF", requires: "KILLED_TARGET" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "SELF" }] },
+        // Lv2 ダメージ倍率 1.80倍→1.95倍 / 行動ゲージ 20%→25%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.95 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "KILLED_TARGET" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "SELF" }] },
+        // Lv3 ダメージ倍率 1.95倍→2.05倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.05 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "KILLED_TARGET" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "SELF" }] },
+        // Lv4 ダメージ倍率 2.05倍→2.15倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.15 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "KILLED_TARGET" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.15 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "KILLED_TARGET" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "SELF" }] },
+      ],
     },
     {
       id: "slime_s3_b",
       name: "毒噴射",
-      description: "毒液を撒き散らし、敵全体に攻撃力1.1倍のダメージを2回与え、70%で2ターン毒(1スタック)を付与する。",
+      description: "ダメージ倍率 1.10倍 × 2回。70%で毒1スタック (1スタックにつき最大HPの5%、最大5スタック、2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.1, hits: 2 },
         { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 },
       ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.1, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.10倍→1.20倍 / 毒の発動率 70%→75% / 毒1スタック 5%→5.5%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.75 }] },
+        // Lv3 ダメージ倍率 1.20倍→1.25倍 / 毒の発動率 75%→85% / 毒1スタック 5.5%→6%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.25, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.85 }] },
+        // Lv4 ダメージ倍率 1.25倍→1.30倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 毒の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.3, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.85 }] },
+      ],
     },
     {
       id: "slime_s3_c",
       name: "スラフラッシュ",
-      description: "眩い粘液を弾けさせ、敵全体に攻撃力1.2倍のダメージを与え、55%で2ターン暗闇を付与する。",
+      description: "ダメージ倍率 1.50倍。75%で暗闇 (2ターン、攻撃時50%でダメージ-75%・追加効果なし)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.2 },
-        { kind: "BLIND", durationTurns: 2, chance: 0.55 },
+        { kind: "DAMAGE", multiplier: 1.5 },
+        { kind: "BLIND", durationTurns: 2, chance: 0.75 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
+        // Lv2 ダメージ倍率 1.50倍→1.60倍 / 暗闇の発動率 75%→80%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "BLIND", durationTurns: 2, chance: 0.8 }] },
+        // Lv3 ダメージ倍率 1.60倍→1.70倍 / 暗闇の発動率 80%→85%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "BLIND", durationTurns: 2, chance: 0.85 }] },
+        // Lv4 ダメージ倍率 1.70倍→1.80倍 / 暗闇の発動率 85%→90%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BLIND", durationTurns: 2, chance: 0.9 }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BLIND", durationTurns: 2, chance: 0.9 }] },
       ],
     },
   ],
@@ -109,26 +200,50 @@ const SLIME: MonsterTemplate = {
   lightSkill3: {
     id: "slime_s3_light",
     name: "セイントスラッシュ",
-    description: "聖なる粘液を弾けさせ、敵全体に攻撃力1.5倍のダメージを与え、70%で2ターン暗闇を付与し、与えたダメージの20%を回復する。",
+    // 全体技なので、HEALではなくLIFESTEALで組む。
+    // HEALをそのまま置くと対象(=敵)を回復してしまう。当たった数に比例させたいのでLIFESTEALを使う
+    description: "ダメージ倍率 1.50倍。70%で暗闇 (2ターン、攻撃時50%でダメージ-75%・追加効果なし)。与えたダメージの20%を自身が回復",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.5 },
       { kind: "BLIND", durationTurns: 2, chance: 0.7 },
-      // 全体技なので、HEALではなくLIFESTEALで組む。
-      // HEALをそのまま置くと対象(=敵)を回復してしまう。当たった数に比例させたいのでLIFESTEALを使う
       { kind: "LIFESTEAL", healRate: 0.2 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "BLIND", durationTurns: 2, chance: 0.7 }, { kind: "LIFESTEAL", healRate: 0.2 }] },
+      // Lv2 ダメージ倍率 1.50倍→1.60倍 / 暗闇の発動率 70%→75% / 回復量 20%→22%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }, { kind: "LIFESTEAL", healRate: 0.22 }] },
+      // Lv3 ダメージ倍率 1.60倍→1.70倍 / 暗闇の発動率 75%→85% / 回復量 22%→23%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "BLIND", durationTurns: 2, chance: 0.85 }, { kind: "LIFESTEAL", healRate: 0.23 }] },
+      // Lv4 ダメージ倍率 1.70倍→1.80倍 / 回復量 23%→25%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BLIND", durationTurns: 2, chance: 0.85 }, { kind: "LIFESTEAL", healRate: 0.25 }] },
+      // Lv5 クールタイム -1(4→3ターン)
+      { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BLIND", durationTurns: 2, chance: 0.85 }, { kind: "LIFESTEAL", healRate: 0.25 }] },
     ],
   },
   darkSkill3: {
     id: "slime_s3_dark",
     name: "アビススラッジ",
-    description: "深淵の粘液で敵全体に攻撃力1.3倍のダメージを2回与え、80%で3ターン毒(1スタック)を付与する。",
+    description: "ダメージ倍率 1.30倍 × 2回。80%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 1.3, hits: 2 },
       { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.8 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.3, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.8 }] },
+      // Lv2 ダメージ倍率 1.30倍→1.40倍 / 毒の発動率 80%→85% / 毒1スタック 6%→6.5%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.4, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.065, durationTurns: 3, chance: 0.85 }] },
+      // Lv3 ダメージ倍率 1.40倍→1.50倍 / 毒の発動率 85%→90% / 毒1スタック 6.5%→7%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.07, durationTurns: 3, chance: 0.9 }] },
+      // Lv4 ダメージ倍率 1.50倍→1.55倍 / 毒の発動率 90%→95% / 毒1スタック 7%→7.5%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.55, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.075, durationTurns: 3, chance: 0.95 }] },
+      // Lv5 クールタイム -1(4→3ターン) / 毒の持続 3→4ターン
+      { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.55, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.075, durationTurns: 4, chance: 0.95 }] },
     ],
   },
 };
@@ -151,38 +266,93 @@ const WOLF: MonsterTemplate = {
   skill1: {
     id: "wolf_s1",
     name: "かみつく",
-    description: "敵単体に攻撃力0.8倍のダメージを与える。自身の速度が高いほど威力が上がる。",
+    description: "ダメージ倍率 0.80倍(自身の速度が高いほど上昇)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }] },
+      // Lv2 ダメージ倍率 0.80倍→0.85倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }] },
+      // Lv3 ダメージ倍率 0.85倍→0.90倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
+      // Lv4 ダメージ倍率 0.90倍→0.95倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.95, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
+      // Lv5 ダメージ倍率 0.95倍→1.00倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }] },
+    ],
   },
   skill2Variants: [
     {
       id: "wolf_s2_a",
       name: "ふいうちの牙",
-      description: "急所を的確に突き、敵単体の防御力を無視して攻撃力0.45倍のダメージを2回与える。",
+      description: "ダメージ倍率 0.45倍 × 2回(自身の速度が高いほど上昇)(防御力無視)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 2,
-      effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 2, ignoreDefense: true }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.45, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        // Lv2 ダメージ倍率 0.45倍→0.50倍
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        // Lv3
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        // Lv4 ダメージ倍率 0.50倍→0.55倍
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        // Lv5 クールタイム -1(2→1ターン)
+        { cooldownTurns: 1, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+      ],
     },
     {
       id: "wolf_s2_b",
       name: "いあつ",
-      description: "威圧の咆哮で敵全体の強化を50%で剥がし、70%で1ターン攻撃力を50%低下させる。",
+      description: "50%で有利な効果(シールド・無効・能力上昇)を解除。70%で攻撃力-50% (2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "STRIP", chance: 0.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.7 }],
+      effects: [
+        { kind: "STRIP", chance: 0.5 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "STRIP", chance: 0.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 強化解除の発動率 50%→60% / 弱体の発動率 70%→75%
+        { cooldownTurns: 3, effects: [{ kind: "STRIP", chance: 0.6 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 }] },
+        // Lv3 強化解除の発動率 60%→75% / 弱体の発動率 75%→80%
+        { cooldownTurns: 3, effects: [{ kind: "STRIP", chance: 0.75 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv4 弱体の発動率 80%→85%
+        { cooldownTurns: 3, effects: [{ kind: "STRIP", chance: 0.75 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "STRIP", chance: 0.75 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.85 }] },
+      ],
     },
     {
       id: "wolf_s2_c",
       name: "するどいツメ",
-      description: "敵単体に攻撃力1.65倍のダメージを与え、1ターン毒と2ターン回復封じを付与する。",
+      description: "ダメージ倍率 1.65倍。毒1スタック (1スタックにつき最大HPの5%、最大5スタック、2ターン)。70%で治癒阻害 (2ターン、回復を受けられない)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 1.65 },
-        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 1 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2 },
         { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.65 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.65倍→1.80倍 / 毒1スタック 5%→5.5% / 治癒阻害の発動率 70%→75%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.75 }] },
+        // Lv3 ダメージ倍率 1.80倍→1.85倍 / 毒1スタック 5.5%→6% / 治癒阻害の発動率 75%→85%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.85 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.85 }] },
+        // Lv4 ダメージ倍率 1.85倍→1.95倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.95 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 治癒阻害の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.95 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.85 }] },
       ],
     },
   ],
@@ -190,20 +360,29 @@ const WOLF: MonsterTemplate = {
     {
       id: "wolf_s3_a",
       name: "全力の一撃",
-      description: "渾身の一撃(2.2倍)を叩き込み、30%で相手をスタンさせる。",
+      description: "ダメージ倍率 2.80倍(自身の速度が高いほど上昇) 対象HP50%以下で最終ダメージ+30%。50%でスタン (1ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.2 },
-        { kind: "STUN", durationTurns: 1, chance: 0.3 },
+        { kind: "DAMAGE", multiplier: 2.8, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], scaleBonus: { stat: "spd", bonusAtReference: 0.2 } },
+        { kind: "STUN", durationTurns: 1, chance: 0.5 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.8, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+        // Lv2 ダメージ倍率 2.80倍→3.00倍 / スタンの発動率 50%→55%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "STUN", durationTurns: 1, chance: 0.55 }] },
+        // Lv3 ダメージ倍率 3.00倍→3.15倍 / スタンの発動率 55%→65%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.15, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "STUN", durationTurns: 1, chance: 0.65 }] },
+        // Lv4 ダメージ倍率 3.15倍→3.30倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.3, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "STUN", durationTurns: 1, chance: 0.65 }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.3, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "STUN", durationTurns: 1, chance: 0.65 }] },
       ],
     },
     {
       id: "wolf_s3_b",
       name: "ウルフスラッシュ",
-      description: "敵単体に攻撃力0.9倍のダメージを3回与え、1撃ごとに25%で2ターン防御力を75%低下させる。",
-      target: "SINGLE_ENEMY",
-      cooldownTurns: 4,
       /*
        * 以前は防御低下を**3つ重ねて確定で**かける技だった。同じ弱体を重ねない
        * 決まりに揃えたので、**1撃ごとに25%の独立判定**へ作り直してある。
@@ -211,46 +390,95 @@ const WOLF: MonsterTemplate = {
        * 何度成功しても効果量は共通値の1つぶんで、ターンだけが長い方に揃う。
        * 重ねがけぶんの火力が消えたので、1撃の倍率を 0.7 → 0.9 に上げた。
        */
+      description: "ダメージ倍率 0.95倍 × 3回。各ヒットごとに: 25%で防御力-75% (2ターン)",
+      target: "SINGLE_ENEMY",
+      cooldownTurns: 4,
       effects: [
-        {
-          kind: "DAMAGE", multiplier: 0.9, hits: 3,
-          perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }],
-        },
+        { kind: "DAMAGE", multiplier: 0.95, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }] },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }] }] },
+        // Lv2 ダメージ倍率 0.95倍→1.00倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }] }] },
+        // Lv3 弱体の発動率 25%→35%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 }] }] },
+        // Lv4
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 }] }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 }] }] },
       ],
     },
     {
       id: "wolf_s3_c",
       name: "はやての号令",
-      description: "味方全体の行動ゲージを20%進め、速度を2ターン上昇させる。",
+      description: "行動ゲージ+20%。速度+20% (2ターン)。使用後、即時に追加ターンを獲得",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "GAUGE", amount: 0.2 },
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
       ],
+      extraTurn: true,
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+        // Lv2 行動ゲージ 20%→25%
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+        // Lv3 行動ゲージ 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+        // Lv4 行動ゲージ 30%→35%
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
+      ],
     },
   ],
   lightSkill3: {
     id: "wolf_s3_light",
     name: "ホーリーファング",
-    description: "光を纏った牙で敵単体に攻撃力3.6倍のダメージを与え、行動ゲージを30%奪う。自身の速度が高いほど威力が上がる。",
+    // 吸収にしないと、敵を狙う技なので相手のゲージを進めてしまう
+    description: "ダメージ倍率 3.60倍(自身の速度が高いほど上昇)。行動ゲージを30%吸収",
     target: "SINGLE_ENEMY",
     cooldownTurns: 4,
     effects: [
       { kind: "DAMAGE", multiplier: 3.6, scaleBonus: { stat: "spd", bonusAtReference: 1.2 } },
-      // 吸収にしないと、敵を狙う技なので相手のゲージを進めてしまう
       { kind: "GAUGE", amount: 0.3, drain: true },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.6, scaleBonus: { stat: "spd", bonusAtReference: 1.2 } }, { kind: "GAUGE", amount: 0.3, drain: true }] },
+      // Lv2 ダメージ倍率 3.60倍→3.85倍 / 行動ゲージ 30%→35%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.85, scaleBonus: { stat: "spd", bonusAtReference: 1.2 } }, { kind: "GAUGE", amount: 0.35, drain: true }] },
+      // Lv3 ダメージ倍率 3.85倍→4.05倍
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.05, scaleBonus: { stat: "spd", bonusAtReference: 1.3 } }, { kind: "GAUGE", amount: 0.35, drain: true }] },
+      // Lv4 ダメージ倍率 4.05倍→4.25倍 / 行動ゲージ 35%→40%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.25, scaleBonus: { stat: "spd", bonusAtReference: 1.3 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
+      // Lv5 クールタイム -1(4→3ターン)
+      { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 4.25, scaleBonus: { stat: "spd", bonusAtReference: 1.4 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
     ],
   },
   darkSkill3: {
     id: "wolf_s3_dark",
     name: "シャドウレンド",
-    description: "影から敵単体に攻撃力1.5倍のダメージを3回与え、与えたダメージの30%を回復する。",
+    description: "ダメージ倍率 1.55倍 × 3回。各ヒットごとに: 30%で速度-30% (2ターン)。与えたダメージの30%を自身が回復",
     target: "SINGLE_ENEMY",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.5, hits: 3 },
+      { kind: "DAMAGE", multiplier: 1.55, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.3 }] },
       { kind: "LIFESTEAL", healRate: 0.3 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.55, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.3 }] }, { kind: "LIFESTEAL", healRate: 0.3 }] },
+      // Lv2 ダメージ倍率 1.55倍→1.60倍 / 弱体の発動率 30%→40% / 回復量 30%→32%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 }] }, { kind: "LIFESTEAL", healRate: 0.32 }] },
+      // Lv3 ダメージ倍率 1.60倍→1.70倍 / 回復量 32%→35%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 }] }, { kind: "LIFESTEAL", healRate: 0.35 }] },
+      // Lv4 ダメージ倍率 1.70倍→1.80倍 / 回復量 35%→36%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 }] }, { kind: "LIFESTEAL", healRate: 0.36 }] },
+      // Lv5 クールタイム -1(4→3ターン)
+      { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 }] }, { kind: "LIFESTEAL", healRate: 0.36 }] },
     ],
   },
 };
@@ -273,38 +501,92 @@ const GOLEM: MonsterTemplate = {
   skill1: {
     id: "golem_s1",
     name: "たいあたり",
-    description: "敵単体に攻撃力0.7倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
+    description: "ダメージ倍率 0.70倍(防御力の85%を加算)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.75 }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.85 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.85 }] },
+      // Lv2 ダメージ倍率 0.70倍→0.75倍 / 防御力比例 85%→95%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75, defCoefficient: 0.95 }] },
+      // Lv3 ダメージ倍率 0.75倍→0.80倍 / 防御力比例 95%→105%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8, defCoefficient: 1.05 }] },
+      // Lv4 ダメージ倍率 0.80倍→0.85倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85, defCoefficient: 1.05 }] },
+      // Lv5 ダメージ倍率 0.85倍→0.90倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9, defCoefficient: 1.05 }] },
+    ],
   },
   skill2Variants: [
     {
       id: "golem_s2_a",
       name: "岩石落とし",
-      description: "巨岩を降らせ敵全体に攻撃力0.9倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
+      description: "ダメージ倍率 0.95倍(防御力の120%を加算)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.9, defCoefficient: 1.125 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.95, defCoefficient: 1.2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, defCoefficient: 1.2 }] },
+        // Lv2 防御力比例 120%→130%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, defCoefficient: 1.3 }] },
+        // Lv3 ダメージ倍率 0.95倍→1.05倍 / 防御力比例 130%→140%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.05, defCoefficient: 1.4 }] },
+        // Lv4 ダメージ倍率 1.05倍→1.10倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.1, defCoefficient: 1.4 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.1, defCoefficient: 1.4 }] },
+      ],
     },
     {
       id: "golem_s2_b",
       name: "たいあたりラッシュ",
-      description: "敵全体に攻撃力0.45倍のダメージを3回与える。自身の防御力が高いほど威力が上がる。",
+      description: "ダメージ倍率 0.48倍 × 3回(防御力の80%を加算)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, defCoefficient: 0.75 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.48, hits: 3, defCoefficient: 0.8 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.48, hits: 3, defCoefficient: 0.8 }] },
+        // Lv2 ダメージ倍率 0.48倍→0.52倍 / 防御力比例 80%→85%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.52, hits: 3, defCoefficient: 0.85 }] },
+        // Lv3
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.52, hits: 3, defCoefficient: 0.85 }] },
+        // Lv4 ダメージ倍率 0.52倍→0.55倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 3, defCoefficient: 0.85 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 3, defCoefficient: 0.85 }] },
+      ],
     },
     {
       id: "golem_s2_c",
       name: "いわくだき",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、80%で1ターン防御力を75%低下させる。",
+      // 持続1ターンと短いぶん、通る確率を上げてある(60%→80%)
+      description: "ダメージ倍率 1.50倍(防御力の60%を加算)。85%で防御力-75% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.3 },
-        // 持続1ターンと短いぶん、通る確率を上げてある(60%→80%)
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 1, chance: 0.8 },
+        { kind: "DAMAGE", multiplier: 1.5, defCoefficient: 0.6 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, chance: 0.85, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5, defCoefficient: 0.6 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, chance: 0.85, durationTurns: 2 }] },
+        // Lv2 ダメージ倍率 1.50倍→1.60倍 / 防御力比例 60%→65% / 弱体の発動率 85%→95%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.6, defCoefficient: 0.65 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, chance: 0.95, durationTurns: 2 }] },
+        // Lv3 ダメージ倍率 1.60倍→1.70倍 / 弱体の発動率 95%→100%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.7, defCoefficient: 0.65 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, chance: 1, durationTurns: 2 }] },
+        // Lv4 ダメージ倍率 1.70倍→1.80倍 / 防御力比例 65%→75%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, defCoefficient: 0.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, chance: 1, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.8, defCoefficient: 0.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, chance: 1, durationTurns: 3 }] },
       ],
     },
   ],
@@ -313,12 +595,24 @@ const GOLEM: MonsterTemplate = {
     {
       id: "golem_s3_b",
       name: "溶岩落とし",
-      description: "溶岩を噴き上げ、敵全体に攻撃力1.2倍のダメージを与え、1ターン火傷させる。",
+      description: "ダメージ倍率 1.20倍(防御力の75%を加算)。100%で火傷 (2ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.2 },
-        { kind: "BURN", durationTurns: 1, chance: 1 },
+        { kind: "DAMAGE", multiplier: 1.2, defCoefficient: 0.75 },
+        { kind: "BURN", durationTurns: 2, chance: 1 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.2, defCoefficient: 0.75 }, { kind: "BURN", durationTurns: 2, chance: 1 }] },
+        // Lv2 ダメージ倍率 1.20倍→1.30倍 / 防御力比例 75%→80%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.3, defCoefficient: 0.8 }, { kind: "BURN", durationTurns: 2, chance: 1 }] },
+        // Lv3 ダメージ倍率 1.30倍→1.35倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.35, defCoefficient: 0.8 }, { kind: "BURN", durationTurns: 2, chance: 1 }] },
+        // Lv4 ダメージ倍率 1.35倍→1.45倍 / 防御力比例 80%→90%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.45, defCoefficient: 0.9 }, { kind: "BURN", durationTurns: 2, chance: 1 }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.45, defCoefficient: 0.9 }, { kind: "BURN", durationTurns: 2, chance: 1 }] },
       ],
     },
     {
@@ -332,38 +626,76 @@ const GOLEM: MonsterTemplate = {
     {
       id: "golem_s3_c",
       name: "きょじんのふんぬ",
-      description: "味方全体の攻撃力と防御力を2ターン上昇させる。",
+      description: "攻撃力+30% (2ターン)。防御力+30% (2ターン)。自身の行動ゲージ+30%",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
+        { kind: "GAUGE", amount: 0.3, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+        // Lv2 行動ゲージ 30%→35%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.35, applyTo: "SELF" }] },
+        // Lv3 行動ゲージ 35%→40%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+        // Lv4 行動ゲージ 40%→50%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.5, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(4→3ターン) / 効果が増える
+        { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.5, applyTo: "SELF" }, { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] },
       ],
     },
   ],
   lightSkill3: {
     id: "golem_s3_light",
     name: "オーロラウォール",
-    description: "味方全体に最大HPの40%のシールドを3ターン張り、防御力を3ターン30%上昇させ、3ターンのあいだ毎ターン8%ずつ回復させ、デバフを解除する。",
+    // 攻撃を持たないぶん、量で釣り合わせないと通常のスキル3(溶岩落とし)に届かない
+    description: "シールド 最大HPの40% (3ターン、ダメージを肩代わり)。防御力+30% (3ターン)。継続回復 最大HPの8.0% (3ターン、自身のターン開始時)。デバフを解除。回復 最大HPの25.0%",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
-      // 攻撃を持たないぶん、量で釣り合わせないと通常のスキル3(溶岩落とし)に届かない
       { kind: "SHIELD", shieldRate: 0.4, durationTurns: 3 },
       { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
       { kind: "REGEN", healRate: 0.08, durationTurns: 3 },
       { kind: "CLEANSE" },
+      { kind: "HEAL", healRate: 0.25 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.4, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.08, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "HEAL", healRate: 0.25 }] },
+      // Lv2 シールド量 40%→43% / 回復量 8%→10%
+      { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.43, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "HEAL", healRate: 0.25 }] },
+      // Lv3 シールド量 43%→45%
+      { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.45, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "HEAL", healRate: 0.25 }] },
+      // Lv4 シールド量 45%→48% / 回復量 10%→12%
+      { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.48, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "HEAL", healRate: 0.25 }] },
+      // Lv5 クールタイム -1(5→4ターン) / シールドの持続 3→4ターン / 強化の持続 3→4ターン / 継続回復の持続 3→4ターン
+      { cooldownTurns: 4, effects: [{ kind: "SHIELD", shieldRate: 0.48, durationTurns: 4 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 4 }, { kind: "REGEN", healRate: 0.12, durationTurns: 4 }, { kind: "CLEANSE" }, { kind: "HEAL", healRate: 0.25 }] },
     ],
   },
   darkSkill3: {
     id: "golem_s3_dark",
     name: "オブシディアンクラッシュ",
-    description: "敵全体に攻撃力1.6倍のダメージを与え、70%で2ターン防御力を75%低下させる。自身の防御力が高いほど威力が上がる。",
+    description: "ダメージ倍率 1.70倍(防御力の160%を加算)。70%で防御力-75% (2ターン)",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.5 },
+      { kind: "DAMAGE", multiplier: 1.7, defCoefficient: 1.6 },
       { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, defCoefficient: 1.6 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 }] },
+      // Lv2 弱体の発動率 70%→85%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, defCoefficient: 1.6 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+      // Lv3 ダメージ倍率 1.70倍→1.80倍 / 防御力比例 160%→175%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, defCoefficient: 1.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+      // Lv4 ダメージ倍率 1.80倍→1.90倍
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.9, defCoefficient: 1.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+      // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン
+      { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.9, defCoefficient: 1.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.85 }] },
     ],
   },
 };
@@ -386,43 +718,94 @@ const FAIRY: MonsterTemplate = {
   skill1: {
     id: "fairy_s1",
     name: "ちいさな一撃",
-    description: "敵単体に攻撃力0.7倍のダメージを与え、自身の最大HPの2%を回復する。",
+    description: "ダメージ倍率 0.85倍。自身を回復 最大HPの5.0%",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.7 },
-      { kind: "HEAL", healRate: 0.02, applyTo: "SELF" },
+      { kind: "DAMAGE", multiplier: 0.85 },
+      { kind: "HEAL", healRate: 0.05, applyTo: "SELF" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85 }, { kind: "HEAL", healRate: 0.05, applyTo: "SELF" }] },
+      // Lv2 ダメージ倍率 0.85倍→0.95倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.95 }, { kind: "HEAL", healRate: 0.05, applyTo: "SELF" }] },
+      // Lv3 回復量 5%→7%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.95 }, { kind: "HEAL", healRate: 0.07, applyTo: "SELF" }] },
+      // Lv4 ダメージ倍率 0.95倍→1.05倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.05 }, { kind: "HEAL", healRate: 0.07, applyTo: "SELF" }] },
+      // Lv5 回復量 7%→10%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.05 }, { kind: "HEAL", healRate: 0.1, applyTo: "SELF" }] },
     ],
   },
   skill2Variants: [
     {
       id: "fairy_s2_a",
       name: "いやしのかぜ",
-      description: "味方全体のHPを最大HPの22%回復する。",
+      description: "回復 最大HPの25.0%",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
-      effects: [{ kind: "HEAL", healRate: 0.22 }],
+      effects: [
+        { kind: "HEAL", healRate: 0.25 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.25 }] },
+        // Lv2 回復量 25%→27%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.27 }] },
+        // Lv3 回復量 27%→30%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.3 }] },
+        // Lv4 回復量 30%→33%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.33 }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.33 }] },
+      ],
     },
     {
       id: "fairy_s2_b",
       name: "せいすいのしずく",
-      description: "味方単体のHPを最大HPの32%回復し、デバフを解除する。",
+      description: "回復 最大HPの40.0%。デバフを解除。行動ゲージ+20%",
       target: "SINGLE_ALLY",
       cooldownTurns: 3,
       effects: [
-        { kind: "HEAL", healRate: 0.32 },
+        { kind: "HEAL", healRate: 0.4 },
         { kind: "CLEANSE" },
+        { kind: "GAUGE", amount: 0.2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv2 回復量 40%→45% / 行動ゲージ 20%→25%
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.45 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv3 回復量 45%→50%
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv4
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.25 }] },
       ],
     },
     {
       id: "fairy_s2_c",
       name: "せいめいの葉",
-      description: "味方全体のHPを最大HPの10%回復し、3ターンの間、毎ターン開始時に最大HPの6%回復する継続回復を付与する。",
+      description: "回復 最大HPの15.0%。継続回復 最大HPの8.0% (3ターン、自身のターン開始時)",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "HEAL", healRate: 0.1 },
-        { kind: "REGEN", healRate: 0.06, durationTurns: 3 },
+        { kind: "HEAL", healRate: 0.15 },
+        { kind: "REGEN", healRate: 0.08, durationTurns: 3 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.15 }, { kind: "REGEN", healRate: 0.08, durationTurns: 3 }] },
+        // Lv2 回復量 15%→18%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.18 }, { kind: "REGEN", healRate: 0.08, durationTurns: 3 }] },
+        // Lv3 回復量 8%→10%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.18 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }] },
+        // Lv4 回復量 18%→20%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.2 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 継続回復の持続 3→4ターン
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.2 }, { kind: "REGEN", healRate: 0.1, durationTurns: 4 }] },
       ],
     },
   ],
@@ -430,59 +813,124 @@ const FAIRY: MonsterTemplate = {
     {
       id: "fairy_s3_a",
       name: "せいれいの加護",
-      description: "味方全体の攻撃力を2ターン上昇させ、デバフを解除する。",
+      description: "攻撃力+30% (2ターン)。デバフを解除。行動ゲージ+20%",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
         { kind: "CLEANSE" },
+        { kind: "GAUGE", amount: 0.2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv2 行動ゲージ 20%→25%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv3 行動ゲージ 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.3 }] },
+        // Lv4 行動ゲージ 30%→35%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.35 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.35 }] },
       ],
     },
     {
       id: "fairy_s3_b",
       name: "だいちのめぐみ",
-      description: "味方全体のHPを最大HPの35%回復する。",
+      description: "回復 最大HPの40.0%。シールド 最大HPの15% (2ターン、ダメージを肩代わり)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
-      effects: [{ kind: "HEAL", healRate: 0.35 }],
+      effects: [
+        { kind: "HEAL", healRate: 0.4 },
+        { kind: "SHIELD", shieldRate: 0.15, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "SHIELD", shieldRate: 0.15, durationTurns: 2 }] },
+        // Lv2 回復量 40%→45% / シールド量 15%→20%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.45 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2 }] },
+        // Lv3 回復量 45%→50%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2 }] },
+        // Lv4
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2 }] },
+      ],
     },
     {
       id: "fairy_s3_c",
       name: "れいこんのもり",
-      description: "味方全体のHPを最大HPの15%回復し、防御力を上昇させる。",
+      description: "回復 最大HPの25.0%。防御力+30% (2ターン)。継続回復 最大HPの10.0% (2ターン、自身のターン開始時)",
       target: "ALL_ALLIES",
-      cooldownTurns: 5,
+      cooldownTurns: 4,
       effects: [
-        { kind: "HEAL", healRate: 0.15 },
+        { kind: "HEAL", healRate: 0.25 },
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
+        { kind: "REGEN", healRate: 0.1, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.25 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.1, durationTurns: 2 }] },
+        // Lv2 回復量 25%→28% / 回復量 10%→12%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.12, durationTurns: 2 }] },
+        // Lv3
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.12, durationTurns: 2 }] },
+        // Lv4 回復量 28%→32%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.32 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.12, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.32 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.12, durationTurns: 2 }] },
       ],
     },
   ],
   lightSkill3: {
     id: "fairy_s3_light",
     name: "セラフィックブレス",
-    description: "味方全体のHPを最大HPの40%回復し、3ターンのあいだ毎ターン10%ずつ回復させ、デバフを解除して2ターン状態異常を無効にする。",
+    // 通常の「だいちのめぐみ」が35%回復。40%では差が5ポイントしかなく、
+    // 実測でも通常と区別がつかなかったので、継続回復で厚みを付ける
+    description: "回復 最大HPの45.0%。継続回復 最大HPの10.0% (3ターン、自身のターン開始時)。デバフを解除。状態異常無効 (2ターン)",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "HEAL", healRate: 0.4 },
-      // 通常の「だいちのめぐみ」が35%回復。40%では差が5ポイントしかなく、
-      // 実測でも通常と区別がつかなかったので、継続回復で厚みを付ける
+      { kind: "HEAL", healRate: 0.45 },
       { kind: "REGEN", healRate: 0.1, durationTurns: 3 },
       { kind: "CLEANSE" },
       { kind: "IMMUNITY", durationTurns: 2 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.45 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }] },
+      // Lv2 回復量 10%→12%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.45 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }] },
+      // Lv3 回復量 45%→50%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }] },
+      // Lv4
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }] },
+      // Lv5 クールタイム -1(5→4ターン) / 継続回復の持続 3→4ターン / 免疫の持続 2→3ターン
+      { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "REGEN", healRate: 0.12, durationTurns: 4 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }] },
     ],
   },
   darkSkill3: {
     id: "fairy_s3_dark",
     name: "ナイトメアミスト",
-    description: "夢の霧で味方全体のHPを最大HPの30%回復し、素早さを3ターン上昇させ、行動ゲージを35%進める。",
+    description: "回復 最大HPの35.0%。速度+20% (3ターン)。行動ゲージ+35%",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "HEAL", healRate: 0.3 },
+      { kind: "HEAL", healRate: 0.35 },
       { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
       { kind: "GAUGE", amount: 0.35 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.35 }] },
+      // Lv2 行動ゲージ 35%→40%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.4 }] },
+      // Lv3 回復量 35%→40%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.4 }] },
+      // Lv4 行動ゲージ 40%→45%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.45 }] },
+      // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン
+      { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 4 }, { kind: "GAUGE", amount: 0.45 }] },
     ],
   },
 };
@@ -512,41 +960,78 @@ const IMP: MonsterTemplate = {
   skill1: {
     id: "imp_s1",
     name: "ひっかき",
-    description: "敵単体に攻撃力0.9倍のダメージを与え、30%で1ターン攻撃力を低下させる。",
+    description: "ダメージ倍率 1.00倍。40%で攻撃力-50% (2ターン)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.9 },
-      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.3 },
+      { kind: "DAMAGE", multiplier: 1 },
+      { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.4 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.4 }] },
+      // Lv2 ダメージ倍率 1.00倍→1.10倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.4 }] },
+      // Lv3 弱体の発動率 40%→55%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.55 }] },
+      // Lv4 ダメージ倍率 1.10倍→1.20倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.55 }] },
+      // Lv5 弱体の発動率 55%→70%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
     ],
   },
   skill2Variants: [
     {
       id: "imp_s2_a",
       name: "のろいのつめ",
-      description: "敵単体に攻撃力1.3倍のダメージを与え、70%で2ターン防御力を75%低下させる。",
+      description: "ダメージ倍率 1.40倍。70%で防御力-75% (2ターン)。70%で毒1スタック (1スタックにつき最大HPの5%、最大5スタック、2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.3 },
+        { kind: "DAMAGE", multiplier: 1.4 },
         { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.40倍→1.55倍 / 弱体の発動率 70%→75%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 }] },
+        // Lv3 弱体の発動率 75%→85%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 }] },
+        // Lv4 ダメージ倍率 1.55倍→1.70倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.85 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 }] },
       ],
     },
     {
       id: "imp_s2_b",
       name: "めつぶし",
-      description: "敵全体に攻撃力0.9倍のダメージを与え、それぞれ50%で2ターン暗闇を付与する。",
+      description: "ダメージ倍率 1.00倍。60%で暗闇 (2ターン、攻撃時50%でダメージ-75%・追加効果なし)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.9 },
-        { kind: "BLIND", durationTurns: 2, chance: 0.5 },
+        { kind: "DAMAGE", multiplier: 1 },
+        { kind: "BLIND", durationTurns: 2, chance: 0.6 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "BLIND", durationTurns: 2, chance: 0.6 }] },
+        // Lv2 ダメージ倍率 1.00倍→1.10倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "BLIND", durationTurns: 2, chance: 0.6 }] },
+        // Lv3 暗闇の発動率 60%→75%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
+        // Lv4 ダメージ倍率 1.10倍→1.20倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
       ],
     },
     {
       id: "imp_s2_c",
       name: "あしばらい",
-      description: "敵単体に攻撃力1.2倍のダメージを与え、行動ゲージを15%奪い、70%で2ターン素早さを低下させる。",
+      description: "ダメージ倍率 1.20倍。行動ゲージを15%吸収。70%で速度-30% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
@@ -554,69 +1039,145 @@ const IMP: MonsterTemplate = {
         { kind: "GAUGE", amount: 0.15, drain: true },
         { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
       ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "GAUGE", amount: 0.15, drain: true }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.20倍→1.35倍 / 行動ゲージ 15%→20% / 弱体の発動率 70%→75%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "GAUGE", amount: 0.2, drain: true }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.75 }] },
+        // Lv3 弱体の発動率 75%→80%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "GAUGE", amount: 0.2, drain: true }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv4 ダメージ倍率 1.35倍→1.45倍 / 弱体の発動率 80%→85%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.45 }, { kind: "GAUGE", amount: 0.2, drain: true }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.45 }, { kind: "GAUGE", amount: 0.2, drain: true }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.85 }] },
+      ],
     },
   ],
   skill3Variants: [
     {
       id: "imp_s3_a",
       name: "あくいのばらまき",
-      description: "敵全体に攻撃力1.1倍のダメージを与え、55%で2ターン攻撃力を50%低下させる。",
+      description: "ダメージ倍率 1.25倍。75%で攻撃力-50% (2ターン)。行動ゲージ-15%。70%で治癒阻害 (2ターン、回復を受けられない)。50%で呪い1個(対象の2回目のターン開始時、付与時攻撃力×4の固定ダメージと1ターンスタン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.1 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.55 },
+        { kind: "DAMAGE", multiplier: 1.25 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 },
+        { kind: "GAUGE", amount: -0.15 },
+        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
+        { kind: "CURSE", chance: 0.5 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.25 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 }, { kind: "GAUGE", amount: -0.15 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }, { kind: "CURSE", chance: 0.5 }] },
+        // Lv2 ダメージ倍率 1.25倍→1.35倍 / 弱体の発動率 75%→80% / 行動ゲージ -15%→-20%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.8 }, { kind: "GAUGE", amount: -0.2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }, { kind: "CURSE", chance: 0.5 }] },
+        // Lv3 弱体の発動率 80%→85% / 治癒阻害の発動率 70%→80%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.85 }, { kind: "GAUGE", amount: -0.2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }, { kind: "CURSE", chance: 0.5 }] },
+        // Lv4 ダメージ倍率 1.35倍→1.50倍 / 弱体の発動率 85%→90%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }, { kind: "CURSE", chance: 0.5 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 3, chance: 0.9 }, { kind: "GAUGE", amount: -0.2 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }, { kind: "CURSE", chance: 0.5 }] },
       ],
     },
     {
       id: "imp_s3_b",
       name: "ふういんのわらい",
-      description: "敵全体に攻撃力1.1倍のダメージを与え、60%で全員のスキルのクールタイムを1ターン延長する。",
+      // CT5でクールタイム延長1ターンだけでは、妨害役の目安にも届いていなかった
+      description: "ダメージ倍率 1.20倍。75%で敵の全スキルのクールタイムを1ターン延長。70%で強化不可 (2ターン)",
       target: "ALL_ENEMIES",
-      cooldownTurns: 5,
+      cooldownTurns: 4,
       effects: [
-        // CT5でクールタイム延長1ターンだけでは、妨害役の目安にも届いていなかった
-        { kind: "DAMAGE", multiplier: 1.1 },
-        { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.6 },
+        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.75 },
+        { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.7, durationTurns: 2, fixedDuration: true },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.75 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.7, durationTurns: 2, fixedDuration: true }] },
+        // Lv2 ダメージ倍率 1.20倍→1.35倍 / CT延長の発動率 75%→80%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.7, durationTurns: 2, fixedDuration: true }] },
+        // Lv3 CT延長の発動率 80%→85% / 発動率 70%→85%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.85 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.85, durationTurns: 2, fixedDuration: true }] },
+        // Lv4 CT延長の発動率 85%→90%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.9 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.85, durationTurns: 2, fixedDuration: true }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.9 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.85, durationTurns: 2, fixedDuration: true }] },
       ],
     },
     {
       id: "imp_s3_c",
       name: "どくのきり",
-      description: "敵全体に攻撃力0.7倍のダメージを2回与え、65%で3ターン毒(1スタック)を付与する。",
+      description: "ダメージ倍率 0.75倍 × 2回。70%で毒1スタック (1スタックにつき最大HPの5%、最大5スタック、3ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.7, hits: 2 },
-        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.65 },
+        { kind: "DAMAGE", multiplier: 0.75, hits: 2 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 0.75倍→0.80倍 / 毒の発動率 70%→80% / 毒1スタック 5%→5.5%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 3, chance: 0.8 }] },
+        // Lv3 ダメージ倍率 0.80倍→0.90倍 / 毒1スタック 5.5%→6%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.8 }] },
+        // Lv4
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.8 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 毒の持続 3→4ターン
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 4, chance: 0.8 }] },
       ],
     },
   ],
   lightSkill3: {
     id: "imp_s3_light",
     name: "ジャッジメントヘイズ",
-    description: "敵全体に攻撃力1.4倍のダメージを与え、70%で2ターン攻撃力を50%低下させ、60%で2ターン暗闇を付与する。",
+    description: "ダメージ倍率 1.55倍。70%で攻撃力-50% (2ターン)。60%で暗闇 (2ターン、攻撃時50%でダメージ-75%・追加効果なし)",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.4 },
+      { kind: "DAMAGE", multiplier: 1.55 },
       { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
       { kind: "BLIND", durationTurns: 2, chance: 0.6 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }, { kind: "BLIND", durationTurns: 2, chance: 0.6 }] },
+      // Lv2 弱体の発動率 70%→75% / 暗闇の発動率 60%→75%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
+      // Lv3 ダメージ倍率 1.55倍→1.70倍 / 弱体の発動率 75%→85%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.85 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
+      // Lv4
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.85 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
+      // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン
+      { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 3, chance: 0.85 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }] },
     ],
   },
   darkSkill3: {
     id: "imp_s3_dark",
     name: "サイレントカース",
-    description: "敵全体に攻撃力2.0倍のダメージを与え、70%で全員のスキルのクールタイムを1ターン延長し、85%で4ターン毒(1スタック)を付与する。",
+    // 延長を2ターン100%から1ターン70%へ落としたぶん、火力と毒で釣り合わせる
+    // (実測で通常のスキル3を0.17下回っていた)
+    // 2ターン延長は、当たった相手が2巡ぶん何もできなくなる。1ターンでも十分に重い
+    description: "ダメージ倍率 2.00倍。70%で敵の全スキルのクールタイムを1ターン延長。85%で毒1スタック (1スタックにつき最大HPの8%、最大5スタック、4ターン)",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      // 延長を2ターン100%から1ターン70%へ落としたぶん、火力と毒で釣り合わせる
-      // (実測で通常のスキル3を0.17下回っていた)
-      { kind: "DAMAGE", multiplier: 2.0 },
-      // 2ターン延長は、当たった相手が2巡ぶん何もできなくなる。1ターンでも十分に重い
+      { kind: "DAMAGE", multiplier: 2 },
       { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 },
       { kind: "POISON", damageRatePerStack: 0.08, durationTurns: 4, chance: 0.85 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 }, { kind: "POISON", damageRatePerStack: 0.08, durationTurns: 4, chance: 0.85 }] },
+      // Lv2 ダメージ倍率 2.00倍→2.15倍 / CT延長の発動率 70%→75% / 毒の発動率 85%→95% / 毒1スタック 8%→8.5%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.15 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.75 }, { kind: "POISON", damageRatePerStack: 0.085, durationTurns: 4, chance: 0.95 }] },
+      // Lv3 ダメージ倍率 2.15倍→2.25倍 / CT延長の発動率 75%→80% / 毒の発動率 95%→100% / 毒1スタック 8.5%→9%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.25 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 }, { kind: "POISON", damageRatePerStack: 0.09, durationTurns: 4, chance: 1 }] },
+      // Lv4 ダメージ倍率 2.25倍→2.40倍 / CT延長の発動率 80%→85% / 毒1スタック 9%→9.5%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.85 }, { kind: "POISON", damageRatePerStack: 0.095, durationTurns: 4, chance: 1 }] },
+      // Lv5 クールタイム -1(5→4ターン) / 毒の持続 4→5ターン
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.85 }, { kind: "POISON", damageRatePerStack: 0.095, durationTurns: 5, chance: 1 }] },
     ],
   },
 };
@@ -646,48 +1207,96 @@ const WISP: MonsterTemplate = {
   skill1: {
     id: "wisp_s1",
     name: "ほのかなともしび",
-    description: "敵単体に攻撃力0.7倍のダメージを与え、味方全体の防御力を1ターン上昇させる。",
+    description: "ダメージ倍率 0.80倍。味方全体の防御力+30% (1ターン)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.7 },
+      { kind: "DAMAGE", multiplier: 0.8 },
       { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" }] },
+      // Lv2 効果が増える
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.1, applyTo: "SELF" }] },
+      // Lv3 ダメージ倍率 0.90倍→1.00倍 / 行動ゲージ 10%→20%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
+      // Lv4
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
+      // Lv5 強化の持続 1→2ターン
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
     ],
   },
   skill2Variants: [
     {
       id: "wisp_s2_a",
       name: "まもりのりんこう",
-      description: "味方全体のデバフを解除し、最大HPの15%のシールドを3ターン張る。",
-      target: "ALL_ALLIES",
       // シールドと状態異常無効が同時に乗ると、受けを一枚で成立させてしまい強すぎた。
       // 無効を解除に置き換え、「先回りして防ぐ」のではなく「掛かった後に立て直す」役に寄せている
+      description: "シールド 最大HPの20% (3ターン、ダメージを肩代わり)。デバフを解除",
+      target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+        { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 },
         { kind: "CLEANSE" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 }, { kind: "CLEANSE" }] },
+        // Lv2 シールド量 20%→22%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.22, durationTurns: 3 }, { kind: "CLEANSE" }] },
+        // Lv3 効果が増える
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.22, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.1 }] },
+        // Lv4 シールド量 22%→25%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.1 }] },
+        // Lv5 クールタイム -1(5→4ターン) / シールドの持続 3→4ターン
+        { cooldownTurns: 4, effects: [{ kind: "SHIELD", shieldRate: 0.25, durationTurns: 4 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.1 }] },
       ],
     },
     {
       id: "wisp_s2_b",
       name: "かそくのりんこう",
-      description: "味方全体の素早さを2ターン上昇させ、行動ゲージを15%進める。",
+      description: "速度+20% (2ターン)。行動ゲージ+25%",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
-        { kind: "GAUGE", amount: 0.15 },
+        { kind: "GAUGE", amount: 0.25 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv2 行動ゲージ 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3 }] },
+        // Lv3
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3 }] },
+        // Lv4
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.3 }] },
       ],
     },
     {
       id: "wisp_s2_c",
       name: "いやしのりんこう",
-      description: "味方全体のHPを最大HPの15%回復し、2ターンのあいだ毎ターン7%ずつ回復させる。",
+      description: "回復 最大HPの18.0%。継続回復 最大HPの8.0% (2ターン、自身のターン開始時)",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "HEAL", healRate: 0.15 },
-        { kind: "REGEN", healRate: 0.07, durationTurns: 2 },
+        { kind: "HEAL", healRate: 0.18 },
+        { kind: "REGEN", healRate: 0.08, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.18 }, { kind: "REGEN", healRate: 0.08, durationTurns: 2 }] },
+        // Lv2 回復量 18%→20%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.2 }, { kind: "REGEN", healRate: 0.08, durationTurns: 2 }] },
+        // Lv3 回復量 8%→10%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.2 }, { kind: "REGEN", healRate: 0.1, durationTurns: 2 }] },
+        // Lv4 回復量 20%→22%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.22 }, { kind: "REGEN", healRate: 0.1, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 継続回復の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.22 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }] },
       ],
     },
   ],
@@ -695,26 +1304,53 @@ const WISP: MonsterTemplate = {
     {
       id: "wisp_s3_a",
       name: "ほしくずのわ",
-      description: "味方全体の攻撃力を30%、クリティカル率を20pt、2ターン上昇させる。",
-      target: "ALL_ALLIES",
       // 効果量が共通値に下がったぶん、回せる速さで釣り合わせる(5→4)
+      description: "攻撃力+30% (2ターン)。クリ率+20% (2ターン)。クリダメ+30% (2ターン)。行動ゲージ+10%",
+      target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
         { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 },
+        { kind: "GAUGE", amount: 0.1 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.1 }] },
+        // Lv2 行動ゲージ 10%→15%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.15 }] },
+        // Lv3 行動ゲージ 15%→20%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv4
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2 }] },
       ],
     },
     {
       id: "wisp_s3_b",
       name: "じょうかのひかり",
-      description: "味方全体のHPを最大HPの20%回復し、2ターン状態異常を無効にする。",
-      target: "ALL_ALLIES",
       // 解除・回復・無効の3つが1つに乗っていて、これ1枚で崩れなくなっていた。
       // 解除は「まもりのりんこう」の役目に移し、こちらは回復と無効に絞る
+      description: "回復 最大HPの30.0%。状態異常無効 (2ターン)。デバフを解除",
+      target: "ALL_ALLIES",
       cooldownTurns: 6,
       effects: [
-        { kind: "HEAL", healRate: 0.2 },
+        { kind: "HEAL", healRate: 0.3 },
         { kind: "IMMUNITY", durationTurns: 2 },
+        { kind: "CLEANSE" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }] },
+        // Lv2 回復量 30%→35%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }] },
+        // Lv3 効果が増える
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.15 }] },
+        // Lv4 回復量 35%→40%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.15 }] },
+        // Lv5 クールタイム -1(6→5ターン) / 免疫の持続 2→3ターン
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "IMMUNITY", durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.15 }] },
       ],
     },
     {
@@ -732,13 +1368,26 @@ const WISP: MonsterTemplate = {
   lightSkill3: {
     id: "wisp_s3_light",
     name: "ラディアントブレッシング",
-    description: "味方全体の攻撃力とクリティカル率を3ターン上昇させ、行動ゲージを25%進める。",
+    description: "攻撃力+30% (3ターン)。クリ率+20% (3ターン)。行動ゲージ+25%。クリダメ+30% (3ターン)",
     target: "ALL_ALLIES",
     cooldownTurns: 6,
     effects: [
       { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
       { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 },
       { kind: "GAUGE", amount: 0.25 },
+      { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
+      // Lv2 行動ゲージ 25%→30%
+      { cooldownTurns: 6, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
+      // Lv3 行動ゲージ 30%→35%
+      { cooldownTurns: 6, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
+      // Lv4 行動ゲージ 35%→40%
+      { cooldownTurns: 6, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.4 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
+      // Lv5 クールタイム -1(6→5ターン) / 強化の持続 3→4ターン
+      { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 4 }, { kind: "GAUGE", amount: 0.4 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
     ],
   },
   darkSkill3: {
@@ -780,43 +1429,94 @@ const TREANT: MonsterTemplate = {
   skill1: {
     id: "treant_s1",
     name: "えだのひとふり",
-    description: "敵単体に攻撃力0.6倍のダメージを与える。自身の最大HPが高いほど威力が上がる。",
+    description: "ダメージ倍率 0.60倍(最大HPの7.5%を加算)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.06 }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.075 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.075 }] },
+      // Lv2 ダメージ倍率 0.60倍→0.65倍 / 最大HP比例 7.5%→8%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.08 }] },
+      // Lv3 ダメージ倍率 0.65倍→0.70倍 / 最大HP比例 8%→8.5%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.085 }] },
+      // Lv4 ダメージ倍率 0.70倍→0.75倍 / 最大HP比例 8.5%→9.5%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75, hpCoefficient: 0.095 }] },
+      // Lv5 最大HP比例 9.5%→10.5%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75, hpCoefficient: 0.105 }] },
+    ],
   },
   skill2Variants: [
     {
       id: "treant_s2_a",
       name: "からみつくねっこ",
-      description: "敵全体に攻撃力0.7倍のダメージを与え、それぞれ40%で1ターン行動不能にする。自身の最大HPが高いほど威力が上がる。",
+      description: "ダメージ倍率 0.70倍(最大HPの7.5%を加算)。50%でスタン (1ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.06 },
-        { kind: "STUN", durationTurns: 1, chance: 0.4 },
+        { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.075 },
+        { kind: "STUN", durationTurns: 1, chance: 0.5 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.075 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+        // Lv2 ダメージ倍率 0.70倍→0.75倍 / 最大HP比例 7.5%→8.5%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.75, hpCoefficient: 0.085 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+        // Lv3 ダメージ倍率 0.75倍→0.80倍 / スタンの発動率 50%→60%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.085 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
+        // Lv4 ダメージ倍率 0.80倍→0.85倍 / 最大HP比例 8.5%→10%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.1 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.1 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
       ],
     },
     {
       id: "treant_s2_b",
       name: "ねづよいかまえ",
-      description: "自身の防御力を3ターン上昇させ、最大HPの15%のシールドを3ターン張る。",
+      description: "防御力+30% (3ターン)。シールド 最大HPの25% (3ターン、ダメージを肩代わり)。デバフを解除",
       target: "SELF",
       cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
-        { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+        { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 },
+        { kind: "CLEANSE" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "CLEANSE" }] },
+        // Lv2 シールド量 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "CLEANSE" }] },
+        // Lv3 効果が増える
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
+        // Lv4 シールド量 30%→35%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.35, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 3→4ターン / シールドの持続 3→4ターン
+        { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 4 }, { kind: "SHIELD", shieldRate: 0.35, durationTurns: 4 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
       ],
     },
     {
       id: "treant_s2_c",
       name: "ようぶんきゅうしゅう",
-      description: "敵単体に攻撃力0.9倍のダメージを与え、与えたダメージの40%を回復する。自身の最大HPが高いほど威力が上がる。",
+      description: "ダメージ倍率 0.90倍(最大HPの10%を加算)。与えたダメージの50%を自身が回復 (自身の最大HPの30%まで)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.08 },
-        { kind: "LIFESTEAL", healRate: 0.4 },
+        { kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.1 },
+        { kind: "LIFESTEAL", healRate: 0.5, maxSourceHpRate: 0.3 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.1 }, { kind: "LIFESTEAL", healRate: 0.5, maxSourceHpRate: 0.3 }] },
+        // Lv2 ダメージ倍率 0.90倍→0.95倍 / 最大HP比例 10%→11%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.11 }, { kind: "LIFESTEAL", healRate: 0.5, maxSourceHpRate: 0.3 }] },
+        // Lv3 ダメージ倍率 0.95倍→1.05倍 / 回復量 50%→60%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.05, hpCoefficient: 0.11 }, { kind: "LIFESTEAL", healRate: 0.6, maxSourceHpRate: 0.3 }] },
+        // Lv4 ダメージ倍率 1.05倍→1.10倍 / 最大HP比例 11%→13%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.1, hpCoefficient: 0.13 }, { kind: "LIFESTEAL", healRate: 0.6, maxSourceHpRate: 0.3 }] },
+        // Lv5 クールタイム -1(3→2ターン) / ダメージ倍率 1.10倍→1.50倍
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.13 }, { kind: "LIFESTEAL", healRate: 0.6, maxSourceHpRate: 0.3 }] },
       ],
     },
   ],
@@ -824,65 +1524,126 @@ const TREANT: MonsterTemplate = {
     {
       id: "treant_s3_a",
       name: "もりのゆりかご",
-      description: "味方全体のHPを最大HPの12%回復し、3ターンのあいだ毎ターン8%ずつ回復させる。",
+      description: "回復 最大HPの20.0%。継続回復 最大HPの10.0% (3ターン、自身のターン開始時)。シールド 最大HPの15% (3ターン、ダメージを肩代わり)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "HEAL", healRate: 0.12 },
-        { kind: "REGEN", healRate: 0.08, durationTurns: 3 },
+        { kind: "HEAL", healRate: 0.2 },
+        { kind: "REGEN", healRate: 0.1, durationTurns: 3 },
+        { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.2 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 }] },
+        // Lv2 回復量 20%→23%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.23 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 }] },
+        // Lv3 回復量 10%→12%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.23 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 }] },
+        // Lv4 シールド量 15%→20%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.23 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 継続回復の持続 3→4ターン
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.23 }, { kind: "REGEN", healRate: 0.12, durationTurns: 4 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 }] },
       ],
     },
     {
       id: "treant_s3_b",
       name: "たいじゅのいかり",
-      description: "敵全体に攻撃力0.8倍のダメージを与え、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が上がる。",
+      description: "ダメージ倍率 0.80倍(最大HPの11%を加算)。70%で速度-30% (2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.08 },
-        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
+        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.11 },
+        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.11 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 0.80倍→0.85倍 / 最大HP比例 11%→12%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.12 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv3 ダメージ倍率 0.85倍→0.90倍 / 弱体の発動率 70%→85%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.12 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv4 ダメージ倍率 0.90倍→0.95倍 / 最大HP比例 12%→14%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.14 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.14 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.85 }] },
       ],
     },
     {
       id: "treant_s3_c",
       name: "だいちのとりで",
-      description: "味方全体に最大HPの20%のシールドを3ターン張り、2ターン状態異常を無効にする。",
+      description: "シールド 最大HPの25% (3ターン、ダメージを肩代わり)。状態異常無効 (2ターン)。防御力+30% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 },
+        { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 },
         { kind: "IMMUNITY", durationTurns: 2 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv2 シールド量 25%→28%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.28, durationTurns: 3 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv3 シールド量 28%→30%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv4 シールド量 30%→35%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.35, durationTurns: 3 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(5→4ターン) / シールドの持続 3→4ターン / 免疫の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "SHIELD", shieldRate: 0.35, durationTurns: 4 }, { kind: "IMMUNITY", durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
       ],
     },
   ],
   lightSkill3: {
     id: "treant_s3_light",
     name: "ワールドツリー",
-    description: "味方全体のHPを最大HPの20%回復し、4ターンのあいだ毎ターン10%ずつ回復させ、デバフを解除する。",
+    description: "回復 最大HPの25.0%。継続回復 最大HPの10.0% (4ターン、自身のターン開始時)。デバフを解除",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "HEAL", healRate: 0.2 },
+      { kind: "HEAL", healRate: 0.25 },
       { kind: "REGEN", healRate: 0.1, durationTurns: 4 },
       { kind: "CLEANSE" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.25 }, { kind: "REGEN", healRate: 0.1, durationTurns: 4 }, { kind: "CLEANSE" }] },
+      // Lv2 回復量 25%→28% / 回復量 10%→11%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "REGEN", healRate: 0.11, durationTurns: 4 }, { kind: "CLEANSE" }] },
+      // Lv3 回復量 11%→12%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "REGEN", healRate: 0.12, durationTurns: 4 }, { kind: "CLEANSE" }] },
+      // Lv4 回復量 28%→32%
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.32 }, { kind: "REGEN", healRate: 0.12, durationTurns: 4 }, { kind: "CLEANSE" }] },
+      // Lv5 クールタイム -1(5→4ターン) / 継続回復の持続 4→5ターン
+      { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.32 }, { kind: "REGEN", healRate: 0.12, durationTurns: 5 }, { kind: "CLEANSE" }] },
     ],
   },
   darkSkill3: {
     id: "treant_s3_dark",
     name: "ソウルルート",
-    description:
-      "根を伸ばして敵全体に攻撃力2.0倍のダメージを与え、吸い上げた力で味方全体のHPを最大HPの15%回復し、防御力を3ターン上昇させる。与えたダメージの40%を自身が回復し、60%で2ターン素早さを低下させる。自身の最大HPが高いほど威力が上がる。",
+    // トレントは味方を保たせる種族。火力だけを積んでも、通常のスキル3(もりのゆりかご)を
+    // 外したぶんの穴が埋まらず、実測では30戦中29敗になっていた。
+    // **役割を捨てさせないこと。**吸った分を味方へ回す形にして、闇でも支え役として成立させる
+    description: "ダメージ倍率 2.00倍(最大HPの13%を加算)。与えたダメージの40%を自身が回復。60%で速度-30% (2ターン)。味方全体を回復 最大HPの15.0%。味方全体の防御力+30% (3ターン)",
     target: "ALL_ENEMIES",
     cooldownTurns: 4,
     effects: [
-      { kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.1 },
+      { kind: "DAMAGE", multiplier: 2, hpCoefficient: 0.13 },
       { kind: "LIFESTEAL", healRate: 0.4 },
       { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 },
-      // トレントは味方を保たせる種族。火力だけを積んでも、通常のスキル3(もりのゆりかご)を
-      // 外したぶんの穴が埋まらず、実測では30戦中29敗になっていた。
-      // **役割を捨てさせないこと。**吸った分を味方へ回す形にして、闇でも支え役として成立させる
       { kind: "HEAL", healRate: 0.15, applyTo: "ALLIES" },
       { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "ALLIES" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2, hpCoefficient: 0.13 }, { kind: "LIFESTEAL", healRate: 0.4 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.6 }, { kind: "HEAL", healRate: 0.15, applyTo: "ALLIES" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv2 ダメージ倍率 2.00倍→2.15倍 / 最大HP比例 13%→15% / 回復量 40%→43% / 弱体の発動率 60%→65% / 回復量 15%→16%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.15, hpCoefficient: 0.15 }, { kind: "LIFESTEAL", healRate: 0.43 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.65 }, { kind: "HEAL", healRate: 0.16, applyTo: "ALLIES" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv3 ダメージ倍率 2.15倍→2.25倍 / 回復量 43%→50% / 弱体の発動率 65%→75% / 回復量 16%→17%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.25, hpCoefficient: 0.15 }, { kind: "LIFESTEAL", healRate: 0.5 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.75 }, { kind: "HEAL", healRate: 0.17, applyTo: "ALLIES" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv4 ダメージ倍率 2.25倍→2.40倍 / 最大HP比例 15%→18% / 回復量 17%→20%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4, hpCoefficient: 0.18 }, { kind: "LIFESTEAL", healRate: 0.5 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.75 }, { kind: "HEAL", healRate: 0.2, applyTo: "ALLIES" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン / 強化の持続 3→4ターン
+      { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.4, hpCoefficient: 0.18 }, { kind: "LIFESTEAL", healRate: 0.5 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.75 }, { kind: "HEAL", healRate: 0.2, applyTo: "ALLIES" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 4, applyTo: "ALLIES" }] },
     ],
   },
 };
@@ -911,101 +1672,218 @@ const KNIGHT: MonsterTemplate = {
   skill1: {
     id: "knight_s1",
     name: "なぎはらい",
-    description: "敵単体に攻撃力1.0倍のダメージを与える。自身の防御力が高いほど威力が上がる。",
+    description: "ダメージ倍率 1.00倍(防御力の90%を加算)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.0, defCoefficient: 0.75 }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 1, defCoefficient: 0.9 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1, defCoefficient: 0.9 }] },
+      // Lv2 ダメージ倍率 1.00倍→1.10倍 / 防御力比例 90%→100%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1, defCoefficient: 1 }] },
+      // Lv3 ダメージ倍率 1.10倍→1.15倍 / 防御力比例 100%→110%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.15, defCoefficient: 1.1 }] },
+      // Lv4 ダメージ倍率 1.15倍→1.20倍 / 防御力比例 110%→120%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2, defCoefficient: 1.2 }] },
+      // Lv5 ダメージ倍率 1.20倍→1.25倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.25, defCoefficient: 1.2 }] },
+    ],
   },
   skill2Variants: [
     {
       id: "knight_s2_a",
       name: "かぶとわり",
-      description: "敵単体に攻撃力1.5倍のダメージを与え、65%で2ターン防御力を低下させる。",
+      description: "ダメージ倍率 1.60倍。70%で防御力-75% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.5 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 },
+        { kind: "DAMAGE", multiplier: 1.6 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.60倍→1.75倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv3 弱体の発動率 70%→85%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv4 ダメージ倍率 1.75倍→1.90倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.9 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.9 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.85 }] },
       ],
     },
     {
       id: "knight_s2_b",
       name: "たてうけ",
-      description: "味方全体のデバフを解除し、自身の防御力を3ターン上昇させる。",
+      description: "デバフを解除。自身の防御力+30% (3ターン)。シールド 最大HPの10% (2ターン、ダメージを肩代わり)",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "CLEANSE" },
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" },
+        { kind: "SHIELD", shieldRate: 0.1, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "CLEANSE" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "SHIELD", shieldRate: 0.1, durationTurns: 2 }] },
+        // Lv2 シールド量 10%→12%
+        { cooldownTurns: 4, effects: [{ kind: "CLEANSE" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "SHIELD", shieldRate: 0.12, durationTurns: 2 }] },
+        // Lv3 シールド量 12%→15%
+        { cooldownTurns: 4, effects: [{ kind: "CLEANSE" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "SHIELD", shieldRate: 0.15, durationTurns: 2 }] },
+        // Lv4 シールド量 15%→18%
+        { cooldownTurns: 4, effects: [{ kind: "CLEANSE" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "SHIELD", shieldRate: 0.18, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 3→4ターン
+        { cooldownTurns: 3, effects: [{ kind: "CLEANSE" }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 4, applyTo: "SELF" }, { kind: "SHIELD", shieldRate: 0.18, durationTurns: 2 }] },
       ],
     },
     {
       id: "knight_s2_c",
       name: "れんげき",
-      description: "敵単体に攻撃力0.7倍のダメージを3回与える。",
+      description: "ダメージ倍率 0.75倍 × 3回。各ヒットごとに: 25%で防御力-75% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.75, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }] },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }] }] },
+        // Lv2 ダメージ倍率 0.75倍→0.80倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 }] }] },
+        // Lv3 弱体の発動率 25%→35%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 }] }] },
+        // Lv4 ダメージ倍率 0.80倍→0.90倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 }] }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 }] }] },
+      ],
     },
   ],
   skill3Variants: [
     {
       id: "knight_s3_a",
       name: "しんげきのごうれい",
-      description: "味方全体の攻撃力を2ターン上昇させ、敵単体に攻撃力1.8倍のダメージを与える。",
+      description: "ダメージ倍率 2.00倍。味方全体の攻撃力+30% (2ターン)。味方全体の行動ゲージ+15%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.8 },
+        { kind: "DAMAGE", multiplier: 2 },
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" },
+        { kind: "GAUGE", amount: 0.15, applyTo: "ALLIES" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.15, applyTo: "ALLIES" }] },
+        // Lv2 ダメージ倍率 2.00倍→2.20倍 / 行動ゲージ 15%→20%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.2, applyTo: "ALLIES" }] },
+        // Lv3 ダメージ倍率 2.20倍→2.40倍 / 行動ゲージ 20%→25%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.25, applyTo: "ALLIES" }] },
+        // Lv4
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.25, applyTo: "ALLIES" }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.25, applyTo: "ALLIES" }] },
       ],
     },
     {
       id: "knight_s3_b",
       name: "じゅうじざん",
-      description: "敵全体に攻撃力1.2倍のダメージを与え、50%で1ターン行動不能にする。",
+      description: "ダメージ倍率 1.50倍。60%でスタン (1ターン)。70%で攻撃力-50% (2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.2 },
-        { kind: "STUN", durationTurns: 1, chance: 0.5 },
+        { kind: "DAMAGE", multiplier: 1.5 },
+        { kind: "STUN", durationTurns: 1, chance: 0.6 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.50倍→1.65倍 / スタンの発動率 60%→65%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.65 }, { kind: "STUN", durationTurns: 1, chance: 0.65 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv3 ダメージ倍率 1.65倍→1.70倍 / スタンの発動率 65%→70%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv4 ダメージ倍率 1.70倍→1.80倍 / スタンの発動率 70%→75% / 弱体の発動率 70%→85%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "STUN", durationTurns: 1, chance: 0.75 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "STUN", durationTurns: 1, chance: 0.75 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.85 }] },
       ],
     },
     {
       id: "knight_s3_c",
       name: "きしのちかい",
-      description: "味方全体に最大HPの12%のシールドを3ターン張り、防御力とクリティカル率を2ターン上昇させる。",
+      description: "シールド 最大HPの20% (3ターン、ダメージを肩代わり)。防御力+30% (2ターン)。クリ率+20% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "SHIELD", shieldRate: 0.12, durationTurns: 3 },
+        { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 },
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
         { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }] },
+        // Lv2 シールド量 20%→23%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.23, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }] },
+        // Lv3 シールド量 23%→25%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }] },
+        // Lv4 シールド量 25%→30%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(5→4ターン) / シールドの持続 3→4ターン / 強化の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "SHIELD", shieldRate: 0.3, durationTurns: 4 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }] },
       ],
     },
   ],
   lightSkill3: {
     id: "knight_s3_light",
     name: "セイクリッドオーダー",
-    description: "味方全体の攻撃力と防御力を3ターン上昇させ、最大HPの15%のシールドを3ターン張る。",
+    description: "攻撃力+30% (3ターン)。防御力+30% (3ターン)。シールド 最大HPの20% (3ターン、ダメージを肩代わり)。行動ゲージ+15%。敵全体に85%で暗闇 (2ターン、攻撃時50%でダメージ-75%・追加効果なし)",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
       { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
       { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
-      { kind: "SHIELD", shieldRate: 0.15, durationTurns: 3 },
+      { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 },
+      { kind: "GAUGE", amount: 0.15 },
+      { kind: "BLIND", durationTurns: 2, chance: 0.85, applyTo: "ENEMIES" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 }, { kind: "GAUGE", amount: 0.15 }, { kind: "BLIND", durationTurns: 2, chance: 0.85, applyTo: "ENEMIES" }] },
+      // Lv2 シールド量 20%→23%
+      { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.23, durationTurns: 3 }, { kind: "GAUGE", amount: 0.15 }, { kind: "BLIND", durationTurns: 2, chance: 0.85, applyTo: "ENEMIES" }] },
+      // Lv3 シールド量 23%→25%
+      { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "GAUGE", amount: 0.15 }, { kind: "BLIND", durationTurns: 2, chance: 0.85, applyTo: "ENEMIES" }] },
+      // Lv4 行動ゲージ 15%→20%
+      { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "GAUGE", amount: 0.2 }, { kind: "BLIND", durationTurns: 2, chance: 0.85, applyTo: "ENEMIES" }] },
+      // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン / シールドの持続 3→4ターン
+      { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 4 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 4 }, { kind: "GAUGE", amount: 0.2 }, { kind: "BLIND", durationTurns: 2, chance: 0.85, applyTo: "ENEMIES" }] },
     ],
   },
   darkSkill3: {
     id: "knight_s3_dark",
     name: "ブラッドエッジ",
-    description: "敵全体に攻撃力1.8倍のダメージを与え、65%で1ターン行動不能にし、与えたダメージの25%を回復する。",
+    description: "ダメージ倍率 2.10倍。70%でスタン (1ターン)。与えたダメージの35%を自身が回復",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.8 },
-      { kind: "STUN", durationTurns: 1, chance: 0.65 },
-      { kind: "LIFESTEAL", healRate: 0.25 },
+      { kind: "DAMAGE", multiplier: 2.1 },
+      { kind: "STUN", durationTurns: 1, chance: 0.7 },
+      { kind: "LIFESTEAL", healRate: 0.35 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.1 }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "LIFESTEAL", healRate: 0.35 }] },
+      // Lv2 ダメージ倍率 2.10倍→2.30倍
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.3 }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "LIFESTEAL", healRate: 0.35 }] },
+      // Lv3 スタンの発動率 70%→80%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.3 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }, { kind: "LIFESTEAL", healRate: 0.35 }] },
+      // Lv4 ダメージ倍率 2.30倍→2.50倍 / 回復量 35%→50%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.5 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }, { kind: "LIFESTEAL", healRate: 0.5 }] },
+      // Lv5 クールタイム -1(5→4ターン)
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.5 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }, { kind: "LIFESTEAL", healRate: 0.5 }] },
     ],
   },
 };
@@ -1034,43 +1912,94 @@ const GRIFFON: MonsterTemplate = {
   skill1: {
     id: "griffon_s1",
     name: "ついばみ",
-    description: "敵単体に攻撃力1.1倍のダメージを与え、15%で1ターンスタンさせる。",
+    description: "ダメージ倍率 1.20倍。20%でスタン (1ターン)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.1 },
-      { kind: "STUN", durationTurns: 1, chance: 0.15 },
+      { kind: "DAMAGE", multiplier: 1.2 },
+      { kind: "STUN", durationTurns: 1, chance: 0.2 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] },
+      // Lv2 ダメージ倍率 1.20倍→1.30倍 / スタンの発動率 20%→30%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] },
+      // Lv3 ダメージ倍率 1.30倍→1.40倍 / スタンの発動率 30%→40%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
+      // Lv4
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
+      // Lv5
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
     ],
   },
   skill2Variants: [
     {
       id: "griffon_s2_a",
       name: "きりさく突風",
-      description: "鋭い風の刃で敵全体に攻撃力1.2倍のダメージを与え、それぞれ25%で1ターンスタンさせる。",
+      description: "ダメージ倍率 1.30倍。30%でスタン (1ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.2 },
-        { kind: "STUN", durationTurns: 1, chance: 0.25 },
+        { kind: "DAMAGE", multiplier: 1.3 },
+        { kind: "STUN", durationTurns: 1, chance: 0.3 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / スタンの発動率 30%→40%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
+        // Lv4
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
       ],
     },
     {
       id: "griffon_s2_b",
       name: "はやてづき",
-      description: "敵単体に攻撃力0.95倍のダメージを2回与える。自身の素早さが高いほど威力が上がる。",
+      description: "ダメージ倍率 0.95倍 × 2回(自身の速度が高いほど上昇)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 0.95, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }] },
+        // Lv2 ダメージ倍率 0.95倍→1.05倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.05, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }] },
+        // Lv3 ダメージ倍率 1.05倍→1.10倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.1, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }] },
+        // Lv4 ダメージ倍率 1.10倍→1.15倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.15, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.15, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }] },
+      ],
     },
     {
       id: "griffon_s2_c",
       name: "ダイブアタック",
-      description: "急降下して敵単体に攻撃力1.6倍のダメージを与え、70%で2ターン速度を25%低下させる。",
+      description: "ダメージ倍率 1.80倍。80%で速度-30% (2ターン)。行動ゲージ-20%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.6 },
-        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
+        { kind: "DAMAGE", multiplier: 1.8 },
+        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.8 },
+        { kind: "GAUGE", amount: -0.2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.8 }, { kind: "GAUGE", amount: -0.2 }] },
+        // Lv2 ダメージ倍率 1.80倍→2.00倍 / 弱体の発動率 80%→90%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.2 }] },
+        // Lv3 ダメージ倍率 2.00倍→2.20倍 / 行動ゲージ -20%→-30%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.3 }] },
+        // Lv4
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.3 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.9 }, { kind: "GAUGE", amount: -0.3 }] },
       ],
     },
   ],
@@ -1078,55 +2007,119 @@ const GRIFFON: MonsterTemplate = {
     {
       id: "griffon_s3_a",
       name: "嵐の一撃",
-      description: "渾身の一撃(2.8倍)を叩き込み、55%で相手をスタンさせる。",
+      description: "ダメージ倍率 3.20倍(自身の速度が高いほど上昇)。70%でスタン (1ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.8 },
-        { kind: "STUN", durationTurns: 1, chance: 0.55 },
+        { kind: "DAMAGE", multiplier: 3.2, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } },
+        { kind: "STUN", durationTurns: 1, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.2, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 3.20倍→3.40倍 / スタンの発動率 70%→80%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.4, scaleBonus: { stat: "spd", bonusAtReference: 0.75 } }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
+        // Lv3 ダメージ倍率 3.40倍→3.70倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.7, scaleBonus: { stat: "spd", bonusAtReference: 0.9 } }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
+        // Lv4
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.7, scaleBonus: { stat: "spd", bonusAtReference: 0.9 } }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.7, scaleBonus: { stat: "spd", bonusAtReference: 0.9 } }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
       ],
     },
     {
       id: "griffon_s3_b",
       name: "せんぷうげき",
-      description: "旋風を巻き起こし敵全体に攻撃力2.2倍のダメージを与える。",
+      description: "ダメージ倍率 2.40倍(自身の速度が高いほど上昇)。自身の行動ゲージ+30%",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 2.2 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 2.4, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
+        { kind: "GAUGE", amount: 0.3, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+        // Lv2 ダメージ倍率 2.40倍→2.55倍 / 行動ゲージ 30%→40%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.55, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+        // Lv3 ダメージ倍率 2.55倍→2.70倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.7, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+        // Lv4
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.7, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.7, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+      ],
     },
     {
       id: "griffon_s3_c",
       name: "猛禽の加護",
-      description: "味方全体の攻撃力とクリティカルダメージを3ターン上昇させる。",
+      description: "攻撃力+30% (3ターン)。クリダメ+30% (3ターン)。行動ゲージ+20%",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
         { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 },
+        { kind: "GAUGE", amount: 0.2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv2 行動ゲージ 20%→25%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv3 行動ゲージ 25%→30%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.3 }] },
+        // Lv4 行動ゲージ 30%→35%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.35 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 4 }, { kind: "GAUGE", amount: 0.35 }] },
       ],
     },
   ],
   lightSkill3: {
     id: "griffon_s3_light",
     name: "テンペストジャッジ",
-    description: "光の暴風で敵全体に攻撃力2.4倍のダメージを与え、50%で1ターン行動不能にし、味方全体の攻撃力を3ターン上昇させる。",
+    description: "ダメージ倍率 2.50倍(自身の速度が高いほど上昇)。60%でスタン (1ターン)。味方全体の攻撃力+30% (3ターン)",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 2.4 },
-      { kind: "STUN", durationTurns: 1, chance: 0.5 },
+      { kind: "DAMAGE", multiplier: 2.5, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
+      { kind: "STUN", durationTurns: 1, chance: 0.6 },
       { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.5, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "STUN", durationTurns: 1, chance: 0.6 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv2 ダメージ倍率 2.50倍→2.65倍 / スタンの発動率 60%→70%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.65, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv3 ダメージ倍率 2.65倍→2.80倍
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.8, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv4 ダメージ倍率 2.80倍→2.85倍
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.85, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+      // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.85, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4, applyTo: "ALLIES" }] },
     ],
   },
   darkSkill3: {
     id: "griffon_s3_dark",
     name: "シャドウタロン",
-    description: "影の鉤爪で敵単体に攻撃力1.9倍のダメージを3回与え、70%で2ターン防御力を75%低下させる。自身の速度が高いほど威力が上がる。",
+    description: "ダメージ倍率 1.90倍 × 3回(自身の速度が高いほど上昇)。70%で防御力-75% (2ターン)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
       { kind: "DAMAGE", multiplier: 1.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } },
       { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 }] },
+      // Lv2 ダメージ倍率 1.90倍→2.05倍 / 弱体の発動率 70%→85%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.05, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+      // Lv3 ダメージ倍率 2.05倍→2.15倍
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.15, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+      // Lv4 ダメージ倍率 2.15倍→2.25倍
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.25, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+      // Lv5 クールタイム -1(5→4ターン) / 弱体の持続 2→3ターン
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.25, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.85 }] },
     ],
   },
 };
@@ -1138,15 +2131,27 @@ const GRIFFON: MonsterTemplate = {
 const DRAGON_LIGHT_SKILL3: Skill = {
   id: "dragon_s3_shining",
   name: "シャイニングブレス",
-  description: "聖なる光の息を吐き、敵全体に攻撃力2.6倍のダメージを与え、75%で2ターン暗闇、60%で2ターン攻撃力低下を付与する。自身の最大HPが高いほど威力が上がる。",
+  // 比較相手の「破滅の咆哮」は2.0倍にHP補正(0.0003)が乗るので、育てるほど差が開く。
+  // 固定倍率をいくら上げても追いつけないため、こちらにも一段厚いHP補正を持たせる
+  description: "ダメージ倍率 2.60倍(最大HPの10%を加算)。75%で暗闇 (2ターン、攻撃時50%でダメージ-75%・追加効果なし)。60%で攻撃力-50% (2ターン)",
   target: "ALL_ENEMIES",
   cooldownTurns: 5,
   effects: [
-    // 比較相手の「破滅の咆哮」は2.0倍にHP補正(0.0003)が乗るので、育てるほど差が開く。
-    // 固定倍率をいくら上げても追いつけないため、こちらにも一段厚いHP補正を持たせる
     { kind: "DAMAGE", multiplier: 2.6, hpCoefficient: 0.1 },
     { kind: "BLIND", durationTurns: 2, chance: 0.75 },
     { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 },
+  ],
+  levelOverrides: [
+    // Lv1
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.6, hpCoefficient: 0.1 }, { kind: "BLIND", durationTurns: 2, chance: 0.75 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 }] },
+    // Lv2 ダメージ倍率 2.60倍→2.80倍 / 暗闇の発動率 75%→80% / 弱体の発動率 60%→65%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.8, hpCoefficient: 0.1 }, { kind: "BLIND", durationTurns: 2, chance: 0.8 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.65 }] },
+    // Lv3 ダメージ倍率 2.80倍→2.95倍 / 最大HP比例 10%→11% / 暗闇の発動率 80%→85% / 弱体の発動率 65%→70%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.95, hpCoefficient: 0.11 }, { kind: "BLIND", durationTurns: 2, chance: 0.85 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
+    // Lv4 ダメージ倍率 2.95倍→3.10倍 / 暗闇の発動率 85%→90% / 弱体の発動率 70%→75%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.1, hpCoefficient: 0.11 }, { kind: "BLIND", durationTurns: 2, chance: 0.9 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 }] },
+    // Lv5 クールタイム -1(5→4ターン) / 最大HP比例 11%→12% / 弱体の持続 2→3ターン
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.1, hpCoefficient: 0.12 }, { kind: "BLIND", durationTurns: 2, chance: 0.9 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 3, chance: 0.75 }] },
   ],
 };
 
@@ -1180,12 +2185,24 @@ const DRAGON: MonsterTemplate = {
   skill1: {
     id: "dragon_s1",
     name: "つのぶつけ",
-    description: "敵単体に攻撃力1.2倍のダメージを与え、25%で防御力を75%低下させる。",
+    description: "ダメージ倍率 1.30倍。35%で防御力-75% (2ターン)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.2 },
-      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.25 },
+      { kind: "DAMAGE", multiplier: 1.3 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 }] },
+      // Lv2 ダメージ倍率 1.30倍→1.40倍 / 弱体の発動率 35%→45%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.45 }] },
+      // Lv3 ダメージ倍率 1.40倍→1.50倍 / 弱体の発動率 45%→55%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 }] },
+      // Lv4
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 }] },
+      // Lv5 弱体の持続 2→3ターン
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.55 }] },
     ],
   },
   // 6件に揃えることで、属性の並び(火・草・電気・水・光・闇)と1対1で対応する
@@ -1202,66 +2219,144 @@ const DRAGON: MonsterTemplate = {
        * クリティカル・反撃回数・ヒット数で数える仕掛けへの噛み合い方が変わる。
        * 数字の大小ではなく、別のスキルになる。
        */
-      description: "灼熱の息を吐き、敵全体に攻撃力0.7倍のダメージを3回与える。",
+      description: "ダメージ倍率 0.70倍 × 3回。50%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 0.7, hits: 3 },
+        { kind: "BURN", durationTurns: 1, chance: 0.5 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.5 }] },
+        // Lv2 ダメージ倍率 0.70倍→0.75倍 / 火傷の発動率 50%→65%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
+        // Lv3 ダメージ倍率 0.75倍→0.80倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
+        // Lv4 ダメージ倍率 0.80倍→0.85倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
       ],
     },
     {
       id: "dragon_s2_claw",
       name: "ドラゴンクロー",
-      description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を75%低下させる。",
+      description: "ダメージ倍率 2.50倍。65%で防御力-75% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.4 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 },
+        { kind: "DAMAGE", multiplier: 2.5 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.5 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }] },
+        // Lv2 ダメージ倍率 2.50倍→2.70倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }] },
+        // Lv3 弱体の発動率 65%→80%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv4 ダメージ倍率 2.70倍→3.00倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.8 }] },
       ],
     },
     {
       id: "dragon_s2_spirit",
       name: "りゅうの闘気",
-      description: "味方全体のクリティカルダメージと速度を2ターン上昇させる。",
+      description: "クリダメ+30% (2ターン)。速度+20% (2ターン)。行動ゲージ+15%。敵全体に70%で防御力-75% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 },
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
+        { kind: "GAUGE", amount: 0.15 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7, applyTo: "ENEMIES" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.15 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7, applyTo: "ENEMIES" }] },
+        // Lv2 行動ゲージ 15%→20% / 弱体の発動率 70%→80%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8, applyTo: "ENEMIES" }] },
+        // Lv3 行動ゲージ 20%→25% / 弱体の発動率 80%→90%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9, applyTo: "ENEMIES" }] },
+        // Lv4 行動ゲージ 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9, applyTo: "ENEMIES" }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9, applyTo: "ENEMIES" }] },
       ],
     },
     {
       id: "dragon_s2_w_claw",
       name: "ドラゴンクロー",
-      description: "敵単体に攻撃力2.4倍のダメージを与え、55%で防御力を75%低下させる。",
+      description: "ダメージ倍率 2.50倍。65%で防御力-75% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.4 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 },
+        { kind: "DAMAGE", multiplier: 2.5 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.5 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }] },
+        // Lv2 ダメージ倍率 2.50倍→2.70倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }] },
+        // Lv3 弱体の発動率 65%→80%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv4 ダメージ倍率 2.70倍→3.00倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.8 }] },
       ],
     },
     {
       id: "dragon_s2_l_spirit",
       name: "りゅうの闘気",
-      description: "味方全体のクリティカルダメージと速度を2ターン上昇させる。",
+      description: "クリダメ+30% (2ターン)。速度+20% (2ターン)。行動ゲージ+15%。敵全体に70%で防御力-75% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 },
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
+        { kind: "GAUGE", amount: 0.15 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7, applyTo: "ENEMIES" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.15 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7, applyTo: "ENEMIES" }] },
+        // Lv2 行動ゲージ 15%→20% / 弱体の発動率 70%→80%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8, applyTo: "ENEMIES" }] },
+        // Lv3 行動ゲージ 20%→25% / 弱体の発動率 80%→90%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9, applyTo: "ENEMIES" }] },
+        // Lv4 行動ゲージ 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9, applyTo: "ENEMIES" }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9, applyTo: "ENEMIES" }] },
       ],
     },
     {
       id: "dragon_s2_d_flame",
       name: "フレイムブレス",
       // 火のドラゴンと同じ。片方だけ直すと、同じ名前で中身が違うことになる
-      description: "灼熱の息を吐き、敵全体に攻撃力0.7倍のダメージを3回与える。",
+      description: "ダメージ倍率 0.70倍 × 3回。50%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 0.7, hits: 3 },
+        { kind: "BURN", durationTurns: 1, chance: 0.5 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.5 }] },
+        // Lv2 ダメージ倍率 0.70倍→0.75倍 / 火傷の発動率 50%→65%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
+        // Lv3 ダメージ倍率 0.75倍→0.80倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
+        // Lv4 ダメージ倍率 0.80倍→0.85倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 3 }, { kind: "BURN", durationTurns: 1, chance: 0.65 }] },
       ],
     },
   ],
@@ -1271,40 +2366,94 @@ const DRAGON: MonsterTemplate = {
     {
       id: "dragon_s3_roar",
       name: "破滅の咆哮",
-      description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
+      description: "ダメージ倍率 2.00倍(最大HPの14%を加算)",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.1 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 2, hpCoefficient: 0.14 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2, hpCoefficient: 0.14 }] },
+        // Lv2 ダメージ倍率 2.00倍→2.15倍 / 最大HP比例 14%→16%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.15, hpCoefficient: 0.16 }] },
+        // Lv3 ダメージ倍率 2.15倍→2.25倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.25, hpCoefficient: 0.16 }] },
+        // Lv4 ダメージ倍率 2.25倍→2.40倍 / 最大HP比例 16%→18%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4, hpCoefficient: 0.18 }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4, hpCoefficient: 0.18 }] },
+      ],
     },
     {
       id: "dragon_s3_scale",
       name: "竜神の逆鱗",
-      description: "渾身の一撃(3.6倍)を叩き込み、味方全体の攻撃力を2ターン上昇させる。",
+      description: "ダメージ倍率 4.00倍。味方全体の攻撃力+30% (2ターン)。自身の行動ゲージ+30%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 3.6 },
+        { kind: "DAMAGE", multiplier: 4 },
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" },
+        { kind: "GAUGE", amount: 0.3, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+        // Lv2 ダメージ倍率 4.00倍→4.30倍 / 行動ゲージ 30%→40%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+        // Lv3 ダメージ倍率 4.30倍→4.60倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.6 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+        // Lv4
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.6 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.6 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
       ],
     },
     {
       id: "dragon_s3_roar_e",
       name: "破滅の咆哮",
-      description: "敵全体に攻撃力2.0倍のダメージを与える。自身の最大HPが高いほどダメージが上昇する。",
+      description: "ダメージ倍率 2.00倍(最大HPの14%を加算)",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 2.0, hpCoefficient: 0.1 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 2, hpCoefficient: 0.14 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2, hpCoefficient: 0.14 }] },
+        // Lv2 ダメージ倍率 2.00倍→2.15倍 / 最大HP比例 14%→16%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.15, hpCoefficient: 0.16 }] },
+        // Lv3 ダメージ倍率 2.15倍→2.25倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.25, hpCoefficient: 0.16 }] },
+        // Lv4 ダメージ倍率 2.25倍→2.40倍 / 最大HP比例 16%→18%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4, hpCoefficient: 0.18 }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4, hpCoefficient: 0.18 }] },
+      ],
     },
     {
       id: "dragon_s3_blessing",
       name: "古龍の加護",
-      description: "味方全体の攻撃力・防御力を3ターン上昇させ、自身の防御力の150%のHPを回復する。",
+      description: "攻撃力+30% (3ターン)。防御力+30% (3ターン)。回復 最大HPの20.0%。行動ゲージ+15%",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
-        { kind: "HEAL", scaleStat: "def", healRate: 1.5 },
+        { kind: "HEAL", healRate: 0.2 },
+        { kind: "GAUGE", amount: 0.15 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "HEAL", healRate: 0.2 }, { kind: "GAUGE", amount: 0.15 }] },
+        // Lv2 回復量 20%→25% / 行動ゲージ 15%→20%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "HEAL", healRate: 0.25 }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv3 回復量 25%→30% / 行動ゲージ 20%→25%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "HEAL", healRate: 0.3 }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv4
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "HEAL", healRate: 0.3 }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 4 }, { kind: "HEAL", healRate: 0.3 }, { kind: "GAUGE", amount: 0.25 }] },
       ],
     },
     // 光/闇はこのあとの lightSkill3 / darkSkill3 が優先されるので、この2件が選ばれることはない。
@@ -1335,46 +2484,97 @@ const SERAPH: MonsterTemplate = {
   skill1: {
     id: "seraph_s1",
     name: "光の一閃",
-    description: "敵単体に攻撃力1.15倍のダメージを与え、与えたダメージの10%を自身が回復する。",
+    description: "ダメージ倍率 1.30倍。与えたダメージの15%を自身が回復",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.15 },
-      { kind: "LIFESTEAL", healRate: 0.1 },
+      { kind: "DAMAGE", multiplier: 1.3 },
+      { kind: "LIFESTEAL", healRate: 0.15 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "LIFESTEAL", healRate: 0.15 }] },
+      // Lv2 ダメージ倍率 1.30倍→1.40倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "LIFESTEAL", healRate: 0.15 }] },
+      // Lv3 ダメージ倍率 1.40倍→1.50倍 / 回復量 15%→20%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "LIFESTEAL", healRate: 0.2 }] },
+      // Lv4 ダメージ倍率 1.50倍→1.60倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "LIFESTEAL", healRate: 0.2 }] },
+      // Lv5 ダメージ倍率 1.60倍→1.70倍 / 回復量 20%→25%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "LIFESTEAL", healRate: 0.25 }] },
     ],
   },
   skill2Variants: [
     {
       id: "seraph_s2_a",
       name: "さばきの光",
-      description: "敵全体に攻撃力1.25倍のダメージを与え、それぞれ60%で1ターン暗闇を付与する。",
+      description: "ダメージ倍率 1.40倍。70%で暗闇 (1ターン、攻撃時50%でダメージ-75%・追加効果なし)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.25 },
-        { kind: "BLIND", durationTurns: 1, chance: 0.6 },
+        { kind: "DAMAGE", multiplier: 1.4 },
+        { kind: "BLIND", durationTurns: 1, chance: 0.7 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "BLIND", durationTurns: 1, chance: 0.7 }] },
+        // Lv2 ダメージ倍率 1.40倍→1.50倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "BLIND", durationTurns: 1, chance: 0.7 }] },
+        // Lv3 ダメージ倍率 1.50倍→1.60倍 / 暗闇の発動率 70%→80%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "BLIND", durationTurns: 1, chance: 0.8 }] },
+        // Lv4 ダメージ倍率 1.60倍→1.70倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "BLIND", durationTurns: 1, chance: 0.8 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "BLIND", durationTurns: 1, chance: 0.8 }] },
       ],
     },
     {
       id: "seraph_s2_b",
       name: "いやしの詠唱",
-      description: "自身の攻撃力に応じて味方単体のHPを回復し、2ターン攻撃力を上昇させる。",
+      description: "回復 自身の攻撃力の300%。攻撃力+30% (2ターン)。行動ゲージ+20%",
       target: "SINGLE_ALLY",
       cooldownTurns: 3,
       effects: [
-        { kind: "HEAL", scaleStat: "atk", healRate: 1.6 },
+        { kind: "HEAL", scaleStat: "atk", healRate: 3 },
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+        { kind: "GAUGE", amount: 0.2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv2 回復量 300%→330%
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 3.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2 }] },
+        // Lv3 回復量 330%→360% / 行動ゲージ 20%→25%
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 3.6 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25 }] },
+        // Lv4 回復量 360%→400% / 行動ゲージ 25%→30%
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 4 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 4 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.3 }] },
       ],
     },
     {
       id: "seraph_s2_c",
       name: "封印の光",
-      description: "敵単体に攻撃力1.8倍のダメージを与え、70%でスキルのクールタイムを1ターン延長する。",
+      description: "ダメージ倍率 2.00倍。80%で敵の全スキルのクールタイムを1ターン延長。行動ゲージ-20%。80%で強化不可 (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.8 },
-        { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 },
+        { kind: "DAMAGE", multiplier: 2 },
+        { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 },
+        { kind: "GAUGE", amount: -0.2 },
+        { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.8, durationTurns: 2, fixedDuration: true },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 }, { kind: "GAUGE", amount: -0.2 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.8, durationTurns: 2, fixedDuration: true }] },
+        // Lv2 ダメージ倍率 2.00倍→2.20倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 }, { kind: "GAUGE", amount: -0.2 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.8, durationTurns: 2, fixedDuration: true }] },
+        // Lv3 ダメージ倍率 2.20倍→2.40倍 / CT延長の発動率 80%→90% / 行動ゲージ -20%→-25% / 発動率 80%→90%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.9 }, { kind: "GAUGE", amount: -0.25 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.9, durationTurns: 2, fixedDuration: true }] },
+        // Lv4 ダメージ倍率 2.40倍→2.60倍 / 行動ゲージ -25%→-30%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.6 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.9 }, { kind: "GAUGE", amount: -0.3 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.9, durationTurns: 2, fixedDuration: true }] },
+        // Lv5 クールタイム -1(4→3ターン)
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.6 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.9 }, { kind: "GAUGE", amount: -0.3 }, { kind: "STATUS", status: "BUFF_BLOCK", chance: 0.9, durationTurns: 2, fixedDuration: true }] },
       ],
     },
   ],
@@ -1382,62 +2582,122 @@ const SERAPH: MonsterTemplate = {
     {
       id: "seraph_s3_a",
       name: "裁きの雷光",
-      description: "天より雷光を降らせ、敵全体に攻撃力1.6倍のダメージを与え、70%で1ターン防御力を75%低下させる。",
+      description: "ダメージ倍率 1.80倍。80%で防御力-75% (2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.6 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 1, chance: 0.7 },
+        { kind: "DAMAGE", multiplier: 1.8 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv2 ダメージ倍率 1.80倍→2.00倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv3 ダメージ倍率 2.00倍→2.20倍 / 弱体の発動率 80%→90%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
+        // Lv4 ダメージ倍率 2.20倍→2.40倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.9 }] },
       ],
     },
     {
       id: "seraph_s3_b",
       name: "聖なる守護陣",
-      description: "自身の防御力に応じて味方全体のHPを回復し、2ターンの間状態異常を無効にする加護を与える。",
+      description: "回復 自身の攻撃力の180%。状態異常無効 (2ターン)。防御力+30% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 6,
       effects: [
-        { kind: "HEAL", scaleStat: "def", healRate: 2.0 },
+        { kind: "HEAL", scaleStat: "atk", healRate: 1.8 },
         { kind: "IMMUNITY", durationTurns: 2 },
+        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 1.8 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv2 回復量 180%→200%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv3 回復量 200%→220%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2.2 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv4 回復量 220%→240%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2.4 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(6→5ターン) / 免疫の持続 2→3ターン / 強化の持続 2→3ターン
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2.4 }, { kind: "IMMUNITY", durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }] },
       ],
     },
     {
       id: "seraph_s3_c",
       name: "セラフィムの祝福",
-      description: "味方全体の行動ゲージを20%進め、攻撃力と速度を3ターン上昇させる。",
+      description: "行動ゲージ+25%。攻撃力+30% (3ターン)。速度+20% (3ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "GAUGE", amount: 0.2 },
+        { kind: "GAUGE", amount: 0.25 },
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 },
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
+        // Lv2 行動ゲージ 25%→30%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
+        // Lv3
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
+        // Lv4 行動ゲージ 30%→35%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 4 }] },
       ],
     },
   ],
   lightSkill3: {
     id: "seraph_s3_light",
     name: "エターナルヘイロー",
-    description:
-      "消えない光輪を掲げ、自身の防御力の220%ぶん味方全体のHPを回復し、デバフを解除して3ターン状態異常を無効にし、4ターンのあいだ毎ターン8%ずつ回復させる。",
+    description: "回復 自身の攻撃力の200%。デバフを解除。状態異常無効 (3ターン)。継続回復 最大HPの8.0% (4ターン、自身のターン開始時)",
     target: "ALL_ALLIES",
     cooldownTurns: 6,
     effects: [
-      { kind: "HEAL", scaleStat: "def", healRate: 2.2 },
+      { kind: "HEAL", scaleStat: "atk", healRate: 2 },
       { kind: "CLEANSE" },
       { kind: "IMMUNITY", durationTurns: 3 },
       { kind: "REGEN", healRate: 0.08, durationTurns: 4 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }, { kind: "REGEN", healRate: 0.08, durationTurns: 4 }] },
+      // Lv2 回復量 200%→220% / 回復量 8%→9%
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2.2 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }, { kind: "REGEN", healRate: 0.09, durationTurns: 4 }] },
+      // Lv3 回復量 220%→240%
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2.4 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }, { kind: "REGEN", healRate: 0.09, durationTurns: 4 }] },
+      // Lv4 回復量 240%→260% / 回復量 9%→10%
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2.6 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }, { kind: "REGEN", healRate: 0.1, durationTurns: 4 }] },
+      // Lv5 クールタイム -1(6→5ターン) / 免疫の持続 3→4ターン / 継続回復の持続 4→5ターン
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", scaleStat: "atk", healRate: 2.6 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 4 }, { kind: "REGEN", healRate: 0.1, durationTurns: 5 }] },
     ],
   },
   darkSkill3: {
     id: "seraph_s3_dark",
     name: "フォールンウィング",
-    description: "堕ちた翼で敵全体に攻撃力2.1倍のダメージを与え、80%で2ターン暗闇を付与し、与えたダメージの30%を回復する。",
+    description: "ダメージ倍率 2.30倍。85%で暗闇 (2ターン、攻撃時50%でダメージ-75%・追加効果なし)。与えたダメージの35%を自身が回復",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 2.1 },
-      { kind: "BLIND", durationTurns: 2, chance: 0.8 },
-      { kind: "LIFESTEAL", healRate: 0.3 },
+      { kind: "DAMAGE", multiplier: 2.3 },
+      { kind: "BLIND", durationTurns: 2, chance: 0.85 },
+      { kind: "LIFESTEAL", healRate: 0.35 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.3 }, { kind: "BLIND", durationTurns: 2, chance: 0.85 }, { kind: "LIFESTEAL", healRate: 0.35 }] },
+      // Lv2 ダメージ倍率 2.30倍→2.40倍 / 暗闇の発動率 85%→90%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "BLIND", durationTurns: 2, chance: 0.9 }, { kind: "LIFESTEAL", healRate: 0.35 }] },
+      // Lv3 ダメージ倍率 2.40倍→2.50倍 / 暗闇の発動率 90%→95% / 回復量 35%→40%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.5 }, { kind: "BLIND", durationTurns: 2, chance: 0.95 }, { kind: "LIFESTEAL", healRate: 0.4 }] },
+      // Lv4 ダメージ倍率 2.50倍→2.70倍 / 暗闇の発動率 95%→100% / 暗闇の持続 2→3ターン / 回復量 40%→45%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "BLIND", durationTurns: 3, chance: 1 }, { kind: "LIFESTEAL", healRate: 0.45 }] },
+      // Lv5 クールタイム -1(5→4ターン)
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "BLIND", durationTurns: 3, chance: 1 }, { kind: "LIFESTEAL", healRate: 0.45 }] },
     ],
   },
 };
@@ -1460,101 +2720,213 @@ const NEMESIS: MonsterTemplate = {
   skill1: {
     id: "nemesis_s1",
     name: "ダークスラッシュ",
-    description: "敵単体に攻撃力1.3倍のダメージを与える。",
+    description: "ダメージ倍率 1.50倍",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 1.3 }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 1.5 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.5 }] },
+      // Lv2 ダメージ倍率 1.50倍→1.60倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.6 }] },
+      // Lv3 ダメージ倍率 1.60倍→1.70倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.7 }] },
+      // Lv4 ダメージ倍率 1.70倍→1.80倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.8 }] },
+      // Lv5 ダメージ倍率 1.80倍→2.00倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 2 }] },
+    ],
   },
   skill2Variants: [
     {
       id: "nemesis_s2_a",
       name: "冥府の炎",
-      description: "暗黒の炎で敵全体に攻撃力1.7倍のダメージを与え、1ターン火傷させる。",
+      description: "ダメージ倍率 1.80倍。100%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.7 },
+        { kind: "DAMAGE", multiplier: 1.8 },
         { kind: "BURN", durationTurns: 1, chance: 1 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8 }, { kind: "BURN", durationTurns: 1, chance: 1 }] },
+        // Lv2 ダメージ倍率 1.80倍→1.90倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.9 }, { kind: "BURN", durationTurns: 1, chance: 1 }] },
+        // Lv3 ダメージ倍率 1.90倍→2.00倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "BURN", durationTurns: 1, chance: 1 }] },
+        // Lv4 ダメージ倍率 2.00倍→2.20倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "BURN", durationTurns: 1, chance: 1 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "BURN", durationTurns: 1, chance: 1 }] },
       ],
     },
     {
       id: "nemesis_s2_b",
       name: "デーモンクロー",
-      description: "敵単体に攻撃力2.7倍のダメージを与え、75%で防御力を75%低下させる。",
+      description: "ダメージ倍率 3.00倍。80%で防御力-75% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.7 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 },
+        { kind: "DAMAGE", multiplier: 3 },
+        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv2 ダメージ倍率 3.00倍→3.20倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv3 ダメージ倍率 3.20倍→3.40倍 / 弱体の発動率 80%→90%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.4 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
+        // Lv4 ダメージ倍率 3.40倍→3.60倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.6 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
+        // Lv5 クールタイム -1(3→2ターン) / 弱体の持続 2→3ターン
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 3.6 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.9 }] },
       ],
     },
     {
       id: "nemesis_s2_c",
       name: "血のいけにえ",
-      description: "敵単体に攻撃力1.2倍のダメージを2回与える。自身の防御力が高いほど威力が上がる。",
+      description: "ダメージ倍率 1.30倍 × 2回(防御力の90%を加算)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 3,
-      effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2, defCoefficient: 0.75 }],
+      effects: [
+        { kind: "DAMAGE", multiplier: 1.3, hits: 2, defCoefficient: 0.9 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.3, hits: 2, defCoefficient: 0.9 }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / 防御力比例 90%→100%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4, hits: 2, defCoefficient: 1 }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 防御力比例 100%→110%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5, hits: 2, defCoefficient: 1.1 }] },
+        // Lv4 ダメージ倍率 1.50倍→1.60倍 / 防御力比例 110%→120%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.6, hits: 2, defCoefficient: 1.2 }] },
+        // Lv5 クールタイム -1(3→2ターン)
+        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.6, hits: 2, defCoefficient: 1.2 }] },
+      ],
     },
   ],
   skill3Variants: [
     {
       id: "nemesis_s3_a",
       name: "終焉の一撃",
-      description: "渾身の一撃(3.9倍)を叩き込み、70%で相手をスタンさせる。自身の防御力が高いほど威力が上がる。",
+      description: "ダメージ倍率 4.20倍(防御力の130%を加算)。75%でスタン (1ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 3.9, defCoefficient: 1.125 },
-        { kind: "STUN", durationTurns: 1, chance: 0.7 },
+        { kind: "DAMAGE", multiplier: 4.2, defCoefficient: 1.3 },
+        { kind: "STUN", durationTurns: 1, chance: 0.75 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.2, defCoefficient: 1.3 }, { kind: "STUN", durationTurns: 1, chance: 0.75 }] },
+        // Lv2 ダメージ倍率 4.20倍→4.50倍 / 防御力比例 130%→140% / スタンの発動率 75%→80%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.5, defCoefficient: 1.4 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
+        // Lv3 ダメージ倍率 4.50倍→4.80倍 / 防御力比例 140%→150% / スタンの発動率 80%→85%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.8, defCoefficient: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.85 }] },
+        // Lv4 ダメージ倍率 4.80倍→5.20倍 / 防御力比例 150%→170% / スタンの発動率 85%→90%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5.2, defCoefficient: 1.7 }, { kind: "STUN", durationTurns: 1, chance: 0.9 }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 5.2, defCoefficient: 1.7 }, { kind: "STUN", durationTurns: 1, chance: 0.9 }] },
       ],
     },
     {
       id: "nemesis_s3_b",
       name: "冥王の激震",
-      description: "敵全体に攻撃力1.15倍のダメージを2回与え、行動ゲージを10%吸収する。",
+      description: "ダメージ倍率 1.30倍 × 2回。行動ゲージを15%吸収",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.15, hits: 2 },
-        { kind: "GAUGE", amount: 0.1, drain: true },
+        { kind: "DAMAGE", multiplier: 1.3, hits: 2 },
+        { kind: "GAUGE", amount: 0.15, drain: true },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3, hits: 2 }, { kind: "GAUGE", amount: 0.15, drain: true }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4, hits: 2 }, { kind: "GAUGE", amount: 0.15, drain: true }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 行動ゲージ 15%→20%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5, hits: 2 }, { kind: "GAUGE", amount: 0.2, drain: true }] },
+        // Lv4 ダメージ倍率 1.50倍→1.60倍 / 行動ゲージ 20%→25%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6, hits: 2 }, { kind: "GAUGE", amount: 0.25, drain: true }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, hits: 2 }, { kind: "GAUGE", amount: 0.25, drain: true }] },
       ],
     },
     {
       id: "nemesis_s3_c",
       name: "加速の号令",
-      description: "味方全体の行動ゲージを30%進め、2ターンクリティカル率を30%上昇させる。",
+      description: "行動ゲージ+30%。クリ率+20% (2ターン)。クリダメ+30% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 4,
       effects: [
         { kind: "GAUGE", amount: 0.3 },
         { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+        // Lv2 行動ゲージ 30%→35%
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+        // Lv3 行動ゲージ 35%→40%
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.4 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+        // Lv4 行動ゲージ 40%→45%
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.45 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 0.45 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
       ],
     },
   ],
   lightSkill3: {
     id: "nemesis_s3_light",
     name: "ラストジャッジメント",
-    description:
-      "裁きの一撃(5.0倍)を叩き込み、75%で相手をスタンさせ、行動ゲージを40%奪う。自身の防御力が高いほど威力が上がる。",
+    description: "ダメージ倍率 5.00倍(防御力の150%を加算)。75%でスタン (1ターン)。行動ゲージを40%吸収",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 5.0, defCoefficient: 1.5 },
+      { kind: "DAMAGE", multiplier: 5, defCoefficient: 1.5 },
       { kind: "STUN", durationTurns: 1, chance: 0.75 },
       { kind: "GAUGE", amount: 0.4, drain: true },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5, defCoefficient: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.75 }, { kind: "GAUGE", amount: 0.4, drain: true }] },
+      // Lv2 ダメージ倍率 5.00倍→5.30倍 / スタンの発動率 75%→80% / 行動ゲージ 40%→45%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5.3, defCoefficient: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }, { kind: "GAUGE", amount: 0.45, drain: true }] },
+      // Lv3 ダメージ倍率 5.30倍→5.60倍 / スタンの発動率 80%→85%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5.6, defCoefficient: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.85 }, { kind: "GAUGE", amount: 0.45, drain: true }] },
+      // Lv4 ダメージ倍率 5.60倍→5.90倍 / スタンの発動率 85%→90% / 行動ゲージ 45%→50%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5.9, defCoefficient: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.9 }, { kind: "GAUGE", amount: 0.5, drain: true }] },
+      // Lv5 クールタイム -1(5→4ターン)
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 5.9, defCoefficient: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.9 }, { kind: "GAUGE", amount: 0.5, drain: true }] },
     ],
   },
   darkSkill3: {
     id: "nemesis_s3_dark",
     name: "エンドオブオール",
-    description: "終焉の波動で敵全体に攻撃力1.8倍のダメージを2回与え、行動ゲージを20%吸収し、70%で2ターン防御力を75%低下させる。",
+    description: "ダメージ倍率 1.80倍 × 2回。行動ゲージを20%吸収。70%で防御力-75% (2ターン)",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
       { kind: "DAMAGE", multiplier: 1.8, hits: 2 },
       { kind: "GAUGE", amount: 0.2, drain: true },
       { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8, hits: 2 }, { kind: "GAUGE", amount: 0.2, drain: true }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 }] },
+      // Lv2 ダメージ倍率 1.80倍→1.95倍 / 行動ゲージ 20%→25% / 弱体の発動率 70%→75%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.95, hits: 2 }, { kind: "GAUGE", amount: 0.25, drain: true }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 }] },
+      // Lv3 ダメージ倍率 1.95倍→2.05倍 / 弱体の発動率 75%→80%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.05, hits: 2 }, { kind: "GAUGE", amount: 0.25, drain: true }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+      // Lv4 ダメージ倍率 2.05倍→2.15倍 / 弱体の発動率 80%→85%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.15, hits: 2 }, { kind: "GAUGE", amount: 0.25, drain: true }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
+      // Lv5 クールタイム -1(5→4ターン) / 弱体の持続 2→3ターン
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.15, hits: 2 }, { kind: "GAUGE", amount: 0.25, drain: true }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.85 }] },
     ],
   },
 };

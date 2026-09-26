@@ -79,39 +79,66 @@ export const ABYSSREAPER: MonsterTemplate = {
     {
       id: "abyssreaper_s3_a",
       name: "魂喰らいの宴",
-      description: "敵全体に攻撃力1.15倍のダメージを与え、それぞれ75%で有利な効果を1個剥がす。成功した敵1体につき自身の行動ゲージが10%進む。",
+      description: "ダメージ倍率 1.30倍。80%で有利な効果を3個解除(解除できた相手1体につき自身の行動ゲージ+10%)",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.15 },
-        { kind: "STRIP", chance: 0.75, count: 1, selfGaugePerRemoved: 0.1 },
+        { kind: "DAMAGE", multiplier: 1.3 },
+        { kind: "STRIP", chance: 0.8, count: 3, selfGaugePerTarget: 0.1 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "STRIP", chance: 0.8, count: 3, selfGaugePerTarget: 0.1 }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / 強化解除の発動率 80%→90%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "STRIP", chance: 0.9, count: 3, selfGaugePerTarget: 0.1 }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STRIP", chance: 0.9, count: 3, selfGaugePerTarget: 0.15 }] },
+        // Lv4 ダメージ倍率 1.50倍→1.60倍 / 強化解除の発動率 90%→100%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "STRIP", chance: 1, count: 3, selfGaugePerTarget: 0.15 }] },
+        // Lv5 クールタイム -1(5→4ターン)
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "STRIP", chance: 1, count: 3, selfGaugePerTarget: 0.2 }] },
       ],
     },
     {
       id: "abyssreaper_s3_b",
       name: "死の宣告",
-      description: "敵単体に攻撃力2.0倍のダメージを与える。対象の弱体効果1個につき最終ダメージが8%上昇する(最大40%)。対象に残っている有利な効果はすべて剥がす。",
+      description: "ダメージ倍率 2.30倍 対象の強化効果1個につき最終ダメージ+15%(最大+100%)。有利な効果(シールド・無効・能力上昇)を解除",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.0, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } },
+        { kind: "DAMAGE", multiplier: 2.3, buffCountBonus: { perBuff: 0.15, maxBonus: 1 } },
         { kind: "STRIP" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.3, buffCountBonus: { perBuff: 0.15, maxBonus: 1 } }, { kind: "STRIP" }] },
+        // Lv2 ダメージ倍率 2.30倍→2.60倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.6, buffCountBonus: { perBuff: 0.15, maxBonus: 1 } }, { kind: "STRIP" }] },
+        // Lv3 ダメージ倍率 2.60倍→2.90倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.9, buffCountBonus: { perBuff: 0.2, maxBonus: 1 } }, { kind: "STRIP" }] },
+        // Lv4 ダメージ倍率 2.90倍→3.20倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.2, buffCountBonus: { perBuff: 0.2, maxBonus: 1 } }, { kind: "STRIP" }] },
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 3.20倍→3.50倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.5, buffCountBonus: { perBuff: 0.25, maxBonus: 1 } }, { kind: "STRIP" }] },
       ],
     },
     {
       id: "abyssreaper_s3_c",
       name: "死神の収穫",
-      description: "パッシブ。攻撃スキルを使うたび、対象に1ターンの強化不可と回復阻害を試みる。どちらかが成功すると自身のHPが回復し、行動ゲージが進む(多段でも1スキルにつき1回)。",
+      description: "パッシブ。攻撃スキル使用時、50%で対象に1ターンの強化阻害と回復阻害。成功時、自身のHPを最大HPの10%回復し行動ゲージ+15%(多段技は対象に当たった回数だけ判定)",
       target: "SELF",
       cooldownTurns: 0,
       effects: [],
-      passive: passive("SELF_ATTACK_SKILL", [
-        { kind: "REAPER_HARVEST", chance: 0.40, heal: 0.06, gauge: 0.12 },
-        { kind: "REAPER_HARVEST", chance: 0.45, heal: 0.07, gauge: 0.14 },
-        { kind: "REAPER_HARVEST", chance: 0.50, heal: 0.08, gauge: 0.16 },
-        { kind: "REAPER_HARVEST", chance: 0.55, heal: 0.09, gauge: 0.18 },
-        { kind: "REAPER_HARVEST", chance: 0.60, heal: 0.10, gauge: 0.20 },
-      ]),
+      passive: {
+        trigger: "SELF_ATTACK_SKILL",
+        levels: [
+          { kind: "REAPER_HARVEST", chance: 0.5, heal: 0.1, gauge: 0.15 },
+          { kind: "REAPER_HARVEST", chance: 0.6, heal: 0.1, gauge: 0.2 },
+          { kind: "REAPER_HARVEST", chance: 0.7, heal: 0.15, gauge: 0.2 },
+          { kind: "REAPER_HARVEST", chance: 0.8, heal: 0.15, gauge: 0.25 },
+          { kind: "REAPER_HARVEST", chance: 1, heal: 0.2, gauge: 0.3 },
+        ],
+      },
     },
   ],
   lightSkill3: {
@@ -165,26 +192,50 @@ export const FENRIR: MonsterTemplate = {
   skill1: {
     id: "fenrir_s1",
     name: "狩狼牙",
-    description: "敵単体へ攻撃力0.55倍のダメージを与える牙を二度立てる。それぞれの攻撃ごとに35%で2ターン防御力を75%低下させる。",
+    description: "ダメージ倍率 0.65倍。40%で防御力-75% (2ターン)。ダメージ倍率 0.65倍。40%で防御力-75% (2ターン)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.55 },
-      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 },
-      { kind: "DAMAGE", multiplier: 0.55 },
-      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.35 },
+      { kind: "DAMAGE", multiplier: 0.65 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.4 },
+      { kind: "DAMAGE", multiplier: 0.65 },
+      { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.4 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.4 }, { kind: "DAMAGE", multiplier: 0.65 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.4 }] },
+      // Lv2 ダメージ倍率 0.65倍→0.70倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.4 }, { kind: "DAMAGE", multiplier: 0.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.4 }] },
+      // Lv3 ダメージ倍率 0.70倍→0.75倍 / 弱体の発動率 40%→50%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }, { kind: "DAMAGE", multiplier: 0.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }] },
+      // Lv4 ダメージ倍率 0.75倍→0.80倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }, { kind: "DAMAGE", multiplier: 0.8 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }] },
+      // Lv5 ダメージ倍率 0.80倍→0.85倍 / 弱体の発動率 50%→60% / 弱体の持続 2→3ターン
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.6 }, { kind: "DAMAGE", multiplier: 0.85 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.6 }] },
     ],
   },
   skill2Variants: [
     {
       id: "fenrir_s2_a",
       name: "裂牙連撃",
-      description: "敵単体へ攻撃力0.6倍のダメージを二度浴びせたのち、防御力を完全に無視する3撃目を放つ。",
+      description: "ダメージ倍率 0.70倍 × 2回。ダメージ倍率 0.80倍(防御力無視)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.6, hits: 2 },
-        { kind: "DAMAGE", multiplier: 0.6, ignoreDefense: true },
+        { kind: "DAMAGE", multiplier: 0.7, hits: 2 },
+        { kind: "DAMAGE", multiplier: 0.8, ignoreDefense: true },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 2 }, { kind: "DAMAGE", multiplier: 0.8, ignoreDefense: true }] },
+        // Lv2 ダメージ倍率 0.70倍→0.75倍 / ダメージ倍率 0.80倍→0.90倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 2 }, { kind: "DAMAGE", multiplier: 0.9, ignoreDefense: true }] },
+        // Lv3 ダメージ倍率 0.75倍→0.80倍 / ダメージ倍率 0.90倍→1.00倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2 }, { kind: "DAMAGE", multiplier: 1, ignoreDefense: true }] },
+        // Lv4 ダメージ倍率 0.80倍→0.90倍 / ダメージ倍率 1.00倍→1.10倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2 }, { kind: "DAMAGE", multiplier: 1.1, ignoreDefense: true }] },
+        // Lv5 クールタイム -1(4→3ターン) / ダメージ倍率 1.10倍→1.20倍
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2 }, { kind: "DAMAGE", multiplier: 1.2, ignoreDefense: true }] },
       ],
     },
     /*
@@ -206,26 +257,38 @@ export const FENRIR: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 5, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1 }] },
-        // Lv2 協力攻撃のダメージ 1.0 → 1.1倍
+        // Lv2 協力攻撃のダメージ 1.00倍→1.10倍
         { cooldownTurns: 5, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.1 }] },
-        // Lv3 協力攻撃のダメージ 1.1 → 1.2倍
+        // Lv3 協力攻撃のダメージ 1.10倍→1.20倍
         { cooldownTurns: 5, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.2 }] },
-        // Lv4 CT5 → CT4
-        { cooldownTurns: 4, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.2 }] },
-        // Lv5 CT4 → CT3
-        { cooldownTurns: 3, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.2 }] },
+        // Lv4 クールタイム -1(5→4ターン) / 協力攻撃のダメージ 1.20倍→1.30倍
+        { cooldownTurns: 4, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.3 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 協力攻撃のダメージ 1.30倍→1.40倍
+        { cooldownTurns: 3, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.4 }] },
       ],
     }, "【対象】敵単体。フェンリル自身が先頭でスキル1を使い、続いて攻撃力の高い味方2体が加わる。フェンリル自身のクールタイムは短縮されない"),
     {
       id: "fenrir_s2_c",
       name: "喉笛裂き",
-      description: "喉笛を狙い、敵単体に攻撃力1.35倍のダメージを与える。80%で2ターン防御力を75%低下させる。対象のHPが50%以下なら自身の行動ゲージが50%進む。",
+      description: "ダメージ倍率 1.50倍。80%で防御力-75% (2ターン)。対象のHPが50%以下なら自身の行動ゲージ+50%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.35 },
+        { kind: "DAMAGE", multiplier: 1.5 },
         { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
         { kind: "GAUGE", amount: 0.5, applyTo: "SELF", requires: "TARGET_HP_BELOW_50" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }, { kind: "GAUGE", amount: 0.5, applyTo: "SELF", requires: "TARGET_HP_BELOW_50" }] },
+        // Lv2 ダメージ倍率 1.50倍→1.70倍 / 弱体の発動率 80%→90% / 行動ゲージ 50%→55%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: 0.55, applyTo: "SELF", requires: "TARGET_HP_BELOW_50" }] },
+        // Lv3 ダメージ倍率 1.70倍→1.90倍 / 行動ゲージ 55%→60%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.9 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: 0.6, applyTo: "SELF", requires: "TARGET_HP_BELOW_50" }] },
+        // Lv4 ダメージ倍率 1.90倍→2.10倍 / 弱体の発動率 90%→100% / 行動ゲージ 60%→70%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.1 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 }, { kind: "GAUGE", amount: 0.7, applyTo: "SELF", requires: "TARGET_HP_BELOW_50" }] },
+        // Lv5 クールタイム -1(4→3ターン) / ダメージ倍率 2.10倍→2.30倍 / 弱体の持続 2→3ターン / 行動ゲージ 70%→80%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 }, { kind: "GAUGE", amount: 0.8, applyTo: "SELF", requires: "TARGET_HP_BELOW_50" }] },
       ],
     },
   ],
@@ -233,80 +296,119 @@ export const FENRIR: MonsterTemplate = {
     {
       id: "fenrir_s3_a",
       name: "月下連牙",
-      description: "月光の下、敵単体に攻撃力0.55倍のダメージを4回与える。対象のHPが50%以下なら各ヒットの最終ダメージが15%上昇し、クリティカルが出るたび自身の行動ゲージが8%進む。",
+      description: "ダメージ倍率 0.65倍 × 4回 対象HP50%以下で最終ダメージ+20% 各ヒットのクリティカルで自身の行動ゲージ+10%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        {
-          kind: "DAMAGE",
-          multiplier: 0.55,
-          hits: 4,
-          targetHpBonus: [{ hpRatio: 0.5, bonus: 0.15 }],
-          gaugeOnCritPerHit: 0.08,
-        },
+        { kind: "DAMAGE", multiplier: 0.65, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.2 }], gaugeOnCritPerHit: 0.1 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.65, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.2 }], gaugeOnCritPerHit: 0.1 }] },
+        // Lv2 ダメージ倍率 0.65倍→0.70倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.2 }], gaugeOnCritPerHit: 0.1 }] },
+        // Lv3 ダメージ倍率 0.70倍→0.75倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.25 }], gaugeOnCritPerHit: 0.1 }] },
+        // Lv4 ダメージ倍率 0.75倍→0.80倍
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.25 }], gaugeOnCritPerHit: 0.15 }] },
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 0.80倍→0.85倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], gaugeOnCritPerHit: 0.15 }] },
       ],
     },
     {
       id: "fenrir_s3_b",
       name: "血の追跡",
-      description: "血の匂いを追い、敵単体に攻撃力2.8倍のダメージを与える。80%で2ターン回復封じを付与し、80%で2ターン毒(2スタック)を付与する。",
+      description: "ダメージ倍率 3.00倍。80%で治癒阻害 (2ターン、回復を受けられない)。80%で毒2スタック (1スタックにつき最大HPの5%、最大5スタック、2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 2.8 },
+        { kind: "DAMAGE", multiplier: 3 },
         { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 },
-        { kind: "POISON", damageRatePerStack: POISON_RATE, durationTurns: 2, chance: 0.8, stacks: 2 },
+        { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.8, stacks: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.8, stacks: 2 }] },
+        // Lv2 ダメージ倍率 3.00倍→3.30倍 / 治癒阻害の発動率 80%→90% / 毒の発動率 80%→90% / 毒1スタック 5%→5.5%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.3 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.9, stacks: 2 }] },
+        // Lv3 ダメージ倍率 3.30倍→3.60倍 / 毒1スタック 5.5%→6%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.6 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.9, stacks: 2 }] },
+        // Lv4 ダメージ倍率 3.60倍→4.00倍 / 治癒阻害の発動率 90%→100% / 毒の発動率 90%→100%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 1, stacks: 2 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 治癒阻害の持続 2→3ターン / 毒の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 1 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 1, stacks: 2 }] },
       ],
     },
     {
       id: "fenrir_s3_c",
       name: "群狼の本能",
-      description: "パッシブ。クリダメが常に上がり、敵を倒すたびに追加ターンを得る(回数の制限はない)。スキル1を使った後、50%でもう一度スキル1を使う。",
-      target: "SELF",
-      cooldownTurns: 0,
-      effects: [],
       /*
        * クリダメは 20%から最大50%(依頼主の指定)。元は 4%〜10% で、
        * 追加ターンの条件(倒すこと)を満たす力が足りなかった。
        * スキル1の再使用は全段50%で固定し、レベルで伸びるのはクリダメだけにする
        */
-      passive: passive("SELF_KILL", [
-        { kind: "PACK_INSTINCT", critDmg: 0.20, repeatS1Chance: 0.5 },
-        { kind: "PACK_INSTINCT", critDmg: 0.25, repeatS1Chance: 0.5 },
-        { kind: "PACK_INSTINCT", critDmg: 0.30, repeatS1Chance: 0.5 },
-        { kind: "PACK_INSTINCT", critDmg: 0.40, repeatS1Chance: 0.5 },
-        { kind: "PACK_INSTINCT", critDmg: 0.50, repeatS1Chance: 0.5 },
-      ]),
+      description: "パッシブ。クリダメ+20%。敵を倒すと追加ターンを得る。スキル1を使った後、50%でもう一度スキル1を使う",
+      target: "SELF",
+      cooldownTurns: 0,
+      effects: [],
+      passive: {
+        trigger: "SELF_KILL",
+        levels: [
+          { kind: "PACK_INSTINCT", critDmg: 0.2, repeatS1Chance: 0.5 },
+          { kind: "PACK_INSTINCT", critDmg: 0.3, repeatS1Chance: 0.5 },
+          { kind: "PACK_INSTINCT", critDmg: 0.4, repeatS1Chance: 0.5 },
+          { kind: "PACK_INSTINCT", critDmg: 0.5, repeatS1Chance: 0.5 },
+          { kind: "PACK_INSTINCT", critDmg: 0.6, repeatS1Chance: 0.6 },
+        ],
+      },
     },
   ],
   lightSkill3: {
     id: "fenrir_s3_light",
     name: "白狼の咆哮",
-    description: "白い咆哮が響き、敵全体に攻撃力1.4倍のダメージを与える。70%で1ターンスタンさせ、70%で全スキルのクールタイムを1ターン延長し、行動ゲージを15%減少させる。",
+    description: "ダメージ倍率 1.50倍。70%でスタン (1ターン)。70%で敵の全スキルのクールタイムを1ターン延長。行動ゲージ-20%",
     target: "ALL_ENEMIES",
     cooldownTurns: 6,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.4 },
+      { kind: "DAMAGE", multiplier: 1.5 },
       { kind: "STUN", durationTurns: 1, chance: 0.7 },
       { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 },
-      { kind: "GAUGE", amount: -0.15 },
+      { kind: "GAUGE", amount: -0.2 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 }, { kind: "GAUGE", amount: -0.2 }] },
+      // Lv2 ダメージ倍率 1.50倍→1.70倍 / スタンの発動率 70%→80% / CT延長の発動率 70%→75%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.75 }, { kind: "GAUGE", amount: -0.2 }] },
+      // Lv3 ダメージ倍率 1.70倍→1.90倍 / CT延長の発動率 75%→80% / 行動ゲージ -20%→-25%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.9 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 }, { kind: "GAUGE", amount: -0.25 }] },
+      // Lv4 ダメージ倍率 1.90倍→2.10倍 / スタンの発動率 80%→90% / CT延長の発動率 80%→85% / 行動ゲージ -25%→-30%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 2.1 }, { kind: "STUN", durationTurns: 1, chance: 0.9 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.85 }, { kind: "GAUGE", amount: -0.3 }] },
+      // Lv5 クールタイム -1(6→5ターン) / スタンの発動率 90%→100% / CT延長の発動率 85%→100% / 行動ゲージ -30%→-35%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.1 }, { kind: "STUN", durationTurns: 1, chance: 1 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 1 }, { kind: "GAUGE", amount: -0.35 }] },
     ],
   },
   darkSkill3: {
     id: "fenrir_s3_dark",
     name: "終焉の牙",
-    description: "終焉の牙が敵単体へ攻撃力0.65倍のダメージを5回与える。対象のHPが50%以下なら防御力を30%無視し、30%以下ならさらに最終ダメージが25%上昇する。この攻撃で相手を倒すと自身の行動ゲージが100%まで進む。",
+    description: "ダメージ倍率 0.75倍 × 5回 対象HP30%以下で最終ダメージ+30% 対象HP50%以下で防御力40%無視。相手を倒したら自身の行動ゲージ+100%",
     target: "SINGLE_ENEMY",
     cooldownTurns: 6,
     effects: [
-      {
-        kind: "DAMAGE",
-        multiplier: 0.65,
-        hits: 5,
-        targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.3 }],
-        targetHpBonus: [{ hpRatio: 0.3, bonus: 0.25 }],
-      },
-      { kind: "GAUGE", amount: 1.0, applyTo: "SELF", requires: "KILLED_TARGET" },
+      { kind: "DAMAGE", multiplier: 0.75, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.4 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.3 }] },
+      { kind: "GAUGE", amount: 1, applyTo: "SELF", requires: "KILLED_TARGET" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.4 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.3 }] }, { kind: "GAUGE", amount: 1, applyTo: "SELF", requires: "KILLED_TARGET" }] },
+      // Lv2 ダメージ倍率 0.75倍→0.80倍 / 行動ゲージ 100%→110%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.5 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.3 }] }, { kind: "GAUGE", amount: 1.1, applyTo: "SELF", requires: "KILLED_TARGET" }] },
+      // Lv3 ダメージ倍率 0.80倍→0.85倍 / 行動ゲージ 110%→115%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.6 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.4 }] }, { kind: "GAUGE", amount: 1.15, applyTo: "SELF", requires: "KILLED_TARGET" }] },
+      // Lv4 ダメージ倍率 0.85倍→0.90倍 / 行動ゲージ 115%→120%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.7 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.4 }] }, { kind: "GAUGE", amount: 1.2, applyTo: "SELF", requires: "KILLED_TARGET" }] },
+      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 0.90倍→1.00倍
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.8 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.5 }] }, { kind: "GAUGE", amount: 1.2, applyTo: "SELF", requires: "KILLED_TARGET" }] },
     ],
   },
   skillAssignment: {
@@ -336,48 +438,96 @@ export const CHRONOS: MonsterTemplate = {
   skill1: {
     id: "chronos_s1",
     name: "時針の一撃",
-    description: "敵単体に攻撃力0.8倍のダメージを与え、行動ゲージを15%減少させる。",
+    description: "ダメージ倍率 0.90倍。行動ゲージ-20%",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.8 },
-      { kind: "GAUGE", amount: -0.15 },
+      { kind: "DAMAGE", multiplier: 0.9 },
+      { kind: "GAUGE", amount: -0.2 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9 }, { kind: "GAUGE", amount: -0.2 }] },
+      // Lv2 ダメージ倍率 0.90倍→1.00倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "GAUGE", amount: -0.2 }] },
+      // Lv3 ダメージ倍率 1.00倍→1.10倍 / 行動ゲージ -20%→-25%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "GAUGE", amount: -0.25 }] },
+      // Lv4 ダメージ倍率 1.10倍→1.20倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "GAUGE", amount: -0.25 }] },
+      // Lv5 ダメージ倍率 1.20倍→1.30倍 / 行動ゲージ -25%→-30%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "GAUGE", amount: -0.3 }] },
     ],
   },
   skill2Variants: [
     {
       id: "chronos_s2_a",
       name: "時間加速",
-      description: "味方1体の時を速め、行動ゲージを50%進め、その味方の全スキルのクールタイムを1ターン短縮する。",
+      description: "行動ゲージ+50%。全スキルのクールタイムを1ターン短縮",
       target: "SINGLE_ALLY",
       cooldownTurns: 5,
       effects: [
         { kind: "GAUGE", amount: 0.5 },
         { kind: "COOLDOWN_REDUCE", turns: 1 },
       ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.5 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv2 行動ゲージ 50%→60%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.6 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv3 行動ゲージ 60%→70%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.7 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv4 行動ゲージ 70%→80%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.8 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 行動ゲージ 80%→100%
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 1 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+      ],
     },
     {
       id: "chronos_s2_b",
       name: "時間停止",
-      description: "時を止め、敵単体に攻撃力1.0倍のダメージを与える。80%で1ターンスタンさせ、行動ゲージを50%減少させる。",
+      description: "ダメージ倍率 1.10倍。80%でスタン (1ターン)。行動ゲージ-50%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.0 },
+        { kind: "DAMAGE", multiplier: 1.1 },
         { kind: "STUN", durationTurns: 1, chance: 0.8 },
         { kind: "GAUGE", amount: -0.5 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "STUN", durationTurns: 1, chance: 0.8 }, { kind: "GAUGE", amount: -0.5 }] },
+        // Lv2 ダメージ倍率 1.10倍→1.20倍 / スタンの発動率 80%→90% / 行動ゲージ -50%→-60%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "STUN", durationTurns: 1, chance: 0.9 }, { kind: "GAUGE", amount: -0.6 }] },
+        // Lv3 ダメージ倍率 1.20倍→1.30倍 / 行動ゲージ -60%→-70%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "STUN", durationTurns: 1, chance: 0.9 }, { kind: "GAUGE", amount: -0.7 }] },
+        // Lv4 ダメージ倍率 1.30倍→1.40倍 / スタンの発動率 90%→100% / 行動ゲージ -70%→-80%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "STUN", durationTurns: 1, chance: 1 }, { kind: "GAUGE", amount: -0.8 }] },
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 1.40倍→1.50倍 / 行動ゲージ -80%→-100%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STUN", durationTurns: 1, chance: 1 }, { kind: "GAUGE", amount: -1 }] },
       ],
     },
     {
       id: "chronos_s2_c",
       name: "時の逆流",
-      description: "時を巻き戻し、味方1体のHPを最大HPの25%回復し、弱体効果をすべて解除して全スキルのクールタイムを1ターン短縮する。",
+      description: "回復 最大HPの30.0%。デバフを解除。全スキルのクールタイムを1ターン短縮",
       target: "SINGLE_ALLY",
       cooldownTurns: 5,
       effects: [
-        { kind: "HEAL", healRate: 0.25 },
+        { kind: "HEAL", healRate: 0.3 },
         { kind: "CLEANSE" },
         { kind: "COOLDOWN_REDUCE", turns: 1 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE" }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv2 回復量 30%→35%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE" }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv3 回復量 35%→40%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE" }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv4 回復量 40%→45%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.45 }, { kind: "CLEANSE" }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 回復量 45%→50% / ターン数 1→2ターン
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "COOLDOWN_REDUCE", turns: 2 }] },
       ],
     },
   ],
@@ -385,44 +535,80 @@ export const CHRONOS: MonsterTemplate = {
     {
       id: "chronos_s3_a",
       name: "クロノブースト",
-      description: "味方全体の行動ゲージを25%進め、全スキルのクールタイムを1ターン短縮する。",
+      description: "行動ゲージ+30%。全スキルのクールタイムを1ターン短縮",
       target: "ALL_ALLIES",
       cooldownTurns: 6,
       effects: [
-        { kind: "GAUGE", amount: 0.25 },
+        { kind: "GAUGE", amount: 0.3 },
         { kind: "COOLDOWN_REDUCE", turns: 1 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv2 行動ゲージ 30%→35%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv3 行動ゲージ 35%→40%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.4 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv4 行動ゲージ 40%→45%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.45 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
+        // Lv5 クールタイム -1(6→5ターン) / 行動ゲージ 45%→50%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.5 }, { kind: "COOLDOWN_REDUCE", turns: 1 }] },
       ],
     },
     {
       id: "chronos_s3_b",
       name: "時空崩壊",
-      description: "時空が軋み、敵全体に攻撃力1.0倍のダメージを与える。70%で全スキルのクールタイムを1ターン延長し、行動ゲージを20%減少させる。",
+      description: "ダメージ倍率 1.10倍。70%で行動ゲージ-100%。20%でスタン (1ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 6,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.0 },
-        { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 },
-        { kind: "GAUGE", amount: -0.2 },
+        { kind: "DAMAGE", multiplier: 1.1 },
+        { kind: "GAUGE", amount: -1, chance: 0.7 },
+        { kind: "STUN", durationTurns: 1, chance: 0.2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "GAUGE", amount: -1, chance: 0.7 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] },
+        // Lv2 ダメージ倍率 1.10倍→1.20倍 / 行動ゲージの発動率 70%→80% / 行動ゲージ -100%→-110% / スタンの発動率 20%→25%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "GAUGE", amount: -1.1, chance: 0.8 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] },
+        // Lv3 ダメージ倍率 1.20倍→1.30倍 / 行動ゲージの発動率 80%→85% / 行動ゲージ -110%→-115%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "GAUGE", amount: -1.15, chance: 0.85 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] },
+        // Lv4 ダメージ倍率 1.30倍→1.40倍 / 行動ゲージの発動率 85%→90% / 行動ゲージ -115%→-120% / スタンの発動率 25%→30%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "GAUGE", amount: -1.2, chance: 0.9 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] },
+        // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.40倍→1.50倍 / 行動ゲージの発動率 90%→100%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "GAUGE", amount: -1.2, chance: 1 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] },
       ],
     },
     {
       id: "chronos_s3_c",
       name: "終焉時計",
-      description: "終わりの針が回り、敵全体に攻撃力1.2倍のダメージを与える。80%で全スキルのクールタイムを1ターン延長し、行動ゲージを50%減少させる。その処理のあと、行動ゲージが20%以下になっている敵を100%で1ターンスタンさせる。",
+      description: "ダメージ倍率 1.30倍。80%で敵の全スキルのクールタイムを1ターン延長。行動ゲージ-50%。対象の行動ゲージが20%以下なら100%でスタン (1ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 6,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.2 },
+        { kind: "DAMAGE", multiplier: 1.3 },
         { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 },
         { kind: "GAUGE", amount: -0.5 },
         { kind: "STUN", durationTurns: 1, chance: 1, requires: "TARGET_GAUGE_BELOW_20" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 }, { kind: "GAUGE", amount: -0.5 }, { kind: "STUN", durationTurns: 1, chance: 1, requires: "TARGET_GAUGE_BELOW_20" }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / CT延長の発動率 80%→90% / 行動ゲージ -50%→-55%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.9 }, { kind: "GAUGE", amount: -0.55 }, { kind: "STUN", durationTurns: 1, chance: 1, requires: "TARGET_GAUGE_BELOW_20" }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 行動ゲージ -55%→-60%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.9 }, { kind: "GAUGE", amount: -0.6 }, { kind: "STUN", durationTurns: 1, chance: 1, requires: "TARGET_GAUGE_BELOW_20" }] },
+        // Lv4 ダメージ倍率 1.50倍→1.60倍 / CT延長の発動率 90%→100% / 行動ゲージ -60%→-65%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 1 }, { kind: "GAUGE", amount: -0.65 }, { kind: "STUN", durationTurns: 1, chance: 1, requires: "TARGET_GAUGE_BELOW_20" }] },
+        // Lv5 クールタイム -1(6→5ターン) / 行動ゲージ -65%→-70%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 1 }, { kind: "GAUGE", amount: -0.7 }, { kind: "STUN", durationTurns: 1, chance: 1, requires: "TARGET_GAUGE_BELOW_20" }] },
       ],
     },
   ],
   lightSkill3: {
     id: "chronos_s3_light",
     name: "永久機関",
-    description: "止まらぬ歯車が回り、味方全体の行動ゲージを30%進め、全スキルのクールタイムを2ターン短縮する。HP割合が最も低い味方に1ターン無敵を与える。この無敵はスキルレベルが最大でも1ターンのまま。",
+    description: "行動ゲージ+30%。全スキルのクールタイムを2ターン短縮。無敵 (1ターン)",
     target: "ALL_ALLIES",
     cooldownTurns: 8,
     effects: [
@@ -430,21 +616,36 @@ export const CHRONOS: MonsterTemplate = {
       { kind: "COOLDOWN_REDUCE", turns: 2 },
       { kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true, applyTo: "LOWEST_HP_ALLY" },
     ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 8, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "COOLDOWN_REDUCE", turns: 2 }, { kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv2 行動ゲージ 30%→35%
+      { cooldownTurns: 8, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "COOLDOWN_REDUCE", turns: 2 }, { kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv3 行動ゲージ 35%→40%
+      { cooldownTurns: 8, effects: [{ kind: "GAUGE", amount: 0.4 }, { kind: "COOLDOWN_REDUCE", turns: 2 }, { kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv4 行動ゲージ 40%→45%
+      { cooldownTurns: 8, effects: [{ kind: "GAUGE", amount: 0.45 }, { kind: "COOLDOWN_REDUCE", turns: 2 }, { kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv5 クールタイム -1(8→7ターン) / 行動ゲージ 45%→50%
+      { cooldownTurns: 7, effects: [{ kind: "GAUGE", amount: 0.5 }, { kind: "COOLDOWN_REDUCE", turns: 2 }, { kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true, applyTo: "LOWEST_HP_ALLY" }] },
+    ],
   },
   darkSkill3: {
     id: "chronos_s3_dark",
     name: "時の管理者",
-    description: "パッシブ。味方が行動するたび自身の行動ゲージが進み、自身の攻撃スキルに行動ゲージ吸収とスタンが加わる(多段でも1スキルにつき1回)。",
+    description: "パッシブ。味方が行動するたび自身の行動ゲージ+10%。自身の攻撃スキルに行動ゲージ10%吸収と20%のスタンが乗る(1スキルにつき1回)",
     target: "SELF",
     cooldownTurns: 0,
     effects: [],
-    passive: passive("ALLY_ACTED", [
-      { kind: "TIME_KEEPER", allyGauge: 0.06, drain: 0.06, stunChance: 0.20 },
-      { kind: "TIME_KEEPER", allyGauge: 0.07, drain: 0.07, stunChance: 0.22 },
-      { kind: "TIME_KEEPER", allyGauge: 0.08, drain: 0.08, stunChance: 0.25 },
-      { kind: "TIME_KEEPER", allyGauge: 0.09, drain: 0.09, stunChance: 0.27 },
-      { kind: "TIME_KEEPER", allyGauge: 0.10, drain: 0.10, stunChance: 0.30 },
-    ]),
+    passive: {
+      trigger: "ALLY_ACTED",
+      levels: [
+        { kind: "TIME_KEEPER", allyGauge: 0.1, drain: 0.1, stunChance: 0.2 },
+        { kind: "TIME_KEEPER", allyGauge: 0.1, drain: 0.15, stunChance: 0.25 },
+        { kind: "TIME_KEEPER", allyGauge: 0.15, drain: 0.15, stunChance: 0.3 },
+        { kind: "TIME_KEEPER", allyGauge: 0.15, drain: 0.2, stunChance: 0.35 },
+        { kind: "TIME_KEEPER", allyGauge: 0.2, drain: 0.2, stunChance: 0.4 },
+      ],
+    },
   },
 };
 
@@ -465,46 +666,95 @@ export const BEHEMOTH: MonsterTemplate = {
   skill1: {
     id: "behemoth_s1",
     name: "巨獣の一撃",
-    description: "敵単体に攻撃力0.55倍のダメージを与える(最大HP×0.08を加算)。50%で2ターン挑発する。",
+    description: "ダメージ倍率 0.55倍(最大HPの8%を加算)。50%で挑発 (2ターン)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
       { kind: "DAMAGE", multiplier: 0.55, hpCoefficient: 0.08 },
       { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.5 },
     ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.55, hpCoefficient: 0.08 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.5 }] },
+      // Lv2 ダメージ倍率 0.55倍→0.60倍 / 発動率 50%→55%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.08 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.55 }] },
+      // Lv3 ダメージ倍率 0.60倍→0.65倍 / 最大HP比例 8%→9% / 発動率 55%→60%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.09 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.6 }] },
+      // Lv4 ダメージ倍率 0.65倍→0.70倍 / 発動率 60%→65%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.09 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.65 }] },
+      // Lv5 ダメージ倍率 0.70倍→0.75倍 / 最大HP比例 9%→10% / 発動率 65%→70% / 持続 2→3ターン
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75, hpCoefficient: 0.1 }, { kind: "STATUS", status: "TAUNT", durationTurns: 3, chance: 0.7 }] },
+    ],
   },
   skill2Variants: [
     {
       id: "behemoth_s2_a",
       name: "大地踏み",
-      description: "大地を踏み鳴らし、敵全体に攻撃力0.8倍のダメージを与える(最大HP×0.12を加算)。70%で2ターン攻撃力を50%低下させる。",
+      description: "ダメージ倍率 0.80倍(最大HPの12%を加算)。70%で攻撃力-50% (2ターン)。行動ゲージ-30%",
       target: "ALL_ENEMIES",
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.12 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
+        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.7, durationTurns: 2 },
+        { kind: "GAUGE", amount: -0.3 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.12 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.7, durationTurns: 2 }, { kind: "GAUGE", amount: -0.3 }] },
+        // Lv2 ダメージ倍率 0.80倍→0.85倍 / 最大HP比例 12%→13% / 弱体の発動率 70%→75% / 行動ゲージ -30%→-35%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.13 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.75, durationTurns: 2 }, { kind: "GAUGE", amount: -0.35 }] },
+        // Lv3 ダメージ倍率 0.85倍→0.90倍 / 弱体の発動率 75%→80%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.13 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.8, durationTurns: 2 }, { kind: "GAUGE", amount: -0.35 }] },
+        // Lv4 ダメージ倍率 0.90倍→0.95倍 / 最大HP比例 13%→14% / 弱体の発動率 80%→85% / 行動ゲージ -35%→-40%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.14 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.85, durationTurns: 2 }, { kind: "GAUGE", amount: -0.4 }] },
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 0.95倍→1.00倍 / 最大HP比例 14%→15% / 弱体の発動率 85%→90% / 弱体の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1, hpCoefficient: 0.15 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.9, durationTurns: 3 }, { kind: "GAUGE", amount: -0.4 }] },
       ],
     },
     {
       id: "behemoth_s2_b",
       name: "巨体の圧力",
-      description: "巨体で圧し掛かり、敵単体に攻撃力1.3倍のダメージを与える(最大HP×0.20を加算)。行動ゲージを40%減少させ、対象のHP割合が自身より高ければさらに20%減少させる。",
+      description: "ダメージ倍率 1.30倍(最大HPの20%を加算)。行動ゲージ-40% (対象のHP割合が自身より高いならさらに20%)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
         { kind: "DAMAGE", multiplier: 1.3, hpCoefficient: 0.2 },
         { kind: "GAUGE", amount: -0.4, conditionalExtra: { when: "TARGET_HP_ABOVE_SELF", amount: -0.2 } },
       ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3, hpCoefficient: 0.2 }, { kind: "GAUGE", amount: -0.4, conditionalExtra: { when: "TARGET_HP_ABOVE_SELF", amount: -0.2 } }] },
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / 最大HP比例 20%→21% / 行動ゲージ -40%→-45%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4, hpCoefficient: 0.21 }, { kind: "GAUGE", amount: -0.45, conditionalExtra: { when: "TARGET_HP_ABOVE_SELF", amount: -0.2 } }] },
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 最大HP比例 21%→22%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.22 }, { kind: "GAUGE", amount: -0.45, conditionalExtra: { when: "TARGET_HP_ABOVE_SELF", amount: -0.2 } }] },
+        // Lv4 ダメージ倍率 1.50倍→1.60倍 / 最大HP比例 22%→23% / 行動ゲージ -45%→-50%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.23 }, { kind: "GAUGE", amount: -0.5, conditionalExtra: { when: "TARGET_HP_ABOVE_SELF", amount: -0.2 } }] },
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 1.60倍→1.70倍 / 最大HP比例 23%→25%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, hpCoefficient: 0.25 }, { kind: "GAUGE", amount: -0.5, conditionalExtra: { when: "TARGET_HP_ABOVE_SELF", amount: -0.2 } }] },
+      ],
     },
     {
       id: "behemoth_s2_c",
       name: "巨獣の守り",
-      description: "味方全体に自身の最大HPの15%ぶんのシールドを2ターン張り、自身に2ターン反射を得る。",
+      description: "シールド 自身の最大HPの15% (2ターン、ダメージを肩代わり)。自身に反射 (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
         { kind: "SHIELD", shieldRate: 0.15, durationTurns: 2, fromSourceHp: true },
         { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.15, durationTurns: 2, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+        // Lv2 シールド量 15%→16%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.16, durationTurns: 2, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+        // Lv3 シールド量 16%→17%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.17, durationTurns: 2, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+        // Lv4 シールド量 17%→18%
+        { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.18, durationTurns: 2, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(5→4ターン) / シールドの持続 2→3ターン / シールド量 18%→20% / 持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "SHIELD", shieldRate: 0.2, durationTurns: 3, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] },
       ],
     },
   ],
@@ -512,7 +762,7 @@ export const BEHEMOTH: MonsterTemplate = {
     {
       id: "behemoth_s3_a",
       name: "天地崩壊",
-      description: "天地が崩れ、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.15を加算)。80%で2ターン防御力を75%低下させる。自身のHPが50%以上なら敵全体の行動ゲージをさらに20%減少させる。",
+      description: "ダメージ倍率 1.20倍(最大HPの15%を加算)。80%で防御力-75% (2ターン)。自身のHPが50%以上なら行動ゲージ-20%",
       target: "ALL_ENEMIES",
       cooldownTurns: 6,
       effects: [
@@ -520,17 +770,41 @@ export const BEHEMOTH: MonsterTemplate = {
         { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
         { kind: "GAUGE", amount: -0.2, requires: "SELF_HP_ABOVE_50" },
       ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.15 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }, { kind: "GAUGE", amount: -0.2, requires: "SELF_HP_ABOVE_50" }] },
+        // Lv2 ダメージ倍率 1.20倍→1.30倍 / 最大HP比例 15%→16% / 弱体の発動率 80%→85% / 行動ゲージ -20%→-25%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.3, hpCoefficient: 0.16 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }, { kind: "GAUGE", amount: -0.25, requires: "SELF_HP_ABOVE_50" }] },
+        // Lv3 ダメージ倍率 1.30倍→1.35倍 / 弱体の発動率 85%→90%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.35, hpCoefficient: 0.16 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.25, requires: "SELF_HP_ABOVE_50" }] },
+        // Lv4 ダメージ倍率 1.35倍→1.45倍 / 最大HP比例 16%→17% / 弱体の発動率 90%→95%
+        { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.45, hpCoefficient: 0.17 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.95 }, { kind: "GAUGE", amount: -0.25, requires: "SELF_HP_ABOVE_50" }] },
+        // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.45倍→1.50倍 / 最大HP比例 17%→18% / 弱体の発動率 95%→100% / 弱体の持続 2→3ターン / 行動ゲージ -25%→-30%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.18 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 }, { kind: "GAUGE", amount: -0.3, requires: "SELF_HP_ABOVE_50" }] },
+      ],
     },
     {
       id: "behemoth_s3_b",
       name: "不落の巨体",
-      description: "自身のHPを最大HPの35%回復し、弱体効果をすべて解除する。2ターンのあいだ受けるダメージを25%軽減し、挑発状態の敵から受けるダメージはさらに15%軽減する。",
+      description: "自身を回復 最大HPの35.0%。自身のデバフを解除。自身の受けるダメージ-25% (2ターン)(挑発状態の敵からはさらに15%軽減)",
       target: "SELF",
       cooldownTurns: 6,
       effects: [
         { kind: "HEAL", healRate: 0.35, applyTo: "SELF" },
         { kind: "CLEANSE", applyTo: "SELF" },
         { kind: "MITIGATE", amount: 0.25, durationTurns: 2, vsTauntedExtra: 0.15, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.35, applyTo: "SELF" }, { kind: "CLEANSE", applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.25, durationTurns: 2, vsTauntedExtra: 0.15, applyTo: "SELF" }] },
+        // Lv2 回復量 35%→38%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.38, applyTo: "SELF" }, { kind: "CLEANSE", applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.25, durationTurns: 2, vsTauntedExtra: 0.15, applyTo: "SELF" }] },
+        // Lv3 回復量 38%→40%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.4, applyTo: "SELF" }, { kind: "CLEANSE", applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.25, durationTurns: 2, vsTauntedExtra: 0.15, applyTo: "SELF" }] },
+        // Lv4 回復量 40%→42%
+        { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.42, applyTo: "SELF" }, { kind: "CLEANSE", applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.25, durationTurns: 2, vsTauntedExtra: 0.15, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(6→5ターン) / 回復量 42%→45% / 被ダメージ軽減の持続 2→3ターン
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.45, applyTo: "SELF" }, { kind: "CLEANSE", applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.25, durationTurns: 3, vsTauntedExtra: 0.15, applyTo: "SELF" }] },
       ],
     },
     {
@@ -572,7 +846,7 @@ export const BEHEMOTH: MonsterTemplate = {
   lightSkill3: {
     id: "behemoth_s3_light",
     name: "神獣の城壁",
-    description: "神獣の壁が立ち上がり、味方全体に自身の最大HPの25%ぶんのシールドを2ターン張る。弱体効果を1個解除し、1ターンの我慢を与える。",
+    description: "シールド 自身の最大HPの25% (2ターン、ダメージを肩代わり)。デバフを1個解除。我慢 (1ターン)",
     target: "ALL_ALLIES",
     cooldownTurns: 7,
     effects: [
@@ -580,11 +854,23 @@ export const BEHEMOTH: MonsterTemplate = {
       { kind: "CLEANSE", count: 1 },
       { kind: "STATUS", status: "ENDURE", durationTurns: 1 },
     ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 7, effects: [{ kind: "SHIELD", shieldRate: 0.25, durationTurns: 2, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv2 シールド量 25%→27%
+      { cooldownTurns: 7, effects: [{ kind: "SHIELD", shieldRate: 0.27, durationTurns: 2, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv3 シールド量 27%→28%
+      { cooldownTurns: 7, effects: [{ kind: "SHIELD", shieldRate: 0.28, durationTurns: 2, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv4 シールド量 28%→30%
+      { cooldownTurns: 7, effects: [{ kind: "SHIELD", shieldRate: 0.3, durationTurns: 2, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv5 クールタイム -1(7→6ターン) / シールドの持続 2→3ターン / シールド量 30%→32% / 持続 1→2ターン
+      { cooldownTurns: 6, effects: [{ kind: "SHIELD", shieldRate: 0.32, durationTurns: 3, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 2 }] },
+    ],
   },
   darkSkill3: {
     id: "behemoth_s3_dark",
     name: "滅界の咆哮",
-    description: "世界を砕く咆哮が響き、敵全体に攻撃力1.2倍のダメージを与える(最大HP×0.15を加算)。80%で2ターン挑発し、行動ゲージを30%減少させる。自身に2ターン反射を得る。",
+    description: "ダメージ倍率 1.20倍(最大HPの15%を加算)。80%で挑発 (2ターン)。行動ゲージ-30%。自身に反射 (2ターン)",
     target: "ALL_ENEMIES",
     cooldownTurns: 6,
     effects: [
@@ -592,6 +878,18 @@ export const BEHEMOTH: MonsterTemplate = {
       { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.8 },
       { kind: "GAUGE", amount: -0.3 },
       { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.2, hpCoefficient: 0.15 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.8 }, { kind: "GAUGE", amount: -0.3 }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+      // Lv2 ダメージ倍率 1.20倍→1.30倍 / 最大HP比例 15%→16% / 発動率 80%→85% / 行動ゲージ -30%→-35%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.3, hpCoefficient: 0.16 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.85 }, { kind: "GAUGE", amount: -0.35 }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+      // Lv3 ダメージ倍率 1.30倍→1.35倍 / 発動率 85%→90%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.35, hpCoefficient: 0.16 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.35 }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+      // Lv4 ダメージ倍率 1.35倍→1.45倍 / 最大HP比例 16%→17% / 発動率 90%→95% / 行動ゲージ -35%→-40%
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.45, hpCoefficient: 0.17 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.95 }, { kind: "GAUGE", amount: -0.4 }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
+      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.45倍→1.50倍 / 最大HP比例 17%→18% / 発動率 95%→100% / 持続 2→3ターン
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.18 }, { kind: "STATUS", status: "TAUNT", durationTurns: 3, chance: 1 }, { kind: "GAUGE", amount: -0.4 }, { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] },
     ],
   },
   skillAssignment: {

@@ -26,7 +26,8 @@
     "floor10:rebalance": "tsx tools/floor10Rebalance.ts",
     "build:edge": "tsc --project tsconfig.edge.json",
     "arena:catalog": "tsx tools/exportArenaCatalog.mts",
-    "battle:lab": "tsx tools/battleLab/index.ts"
+    "battle:lab": "tsx tools/battleLab/index.ts",
+    "skills:report": "tsx tools/skillsReport/index.mts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

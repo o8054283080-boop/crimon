@@ -51,6 +51,7 @@ describe("スキル2の全体攻撃・弱スキル見直し", () => {
 
   it("コボルトの急所突きは強化後の威力と防御無視率を持つ", () => {
     const damage = skill2("kobold_s2_a").effects.find((effect) => effect.kind === "DAMAGE");
-    expect(damage).toMatchObject({ multiplier: 1.9, ignoreDefenseRatio: 0.25 });
+    // 2026年10月の調整で 1.9 → 2.0、HP50%以下で防御100%無視を追加
+    expect(damage).toMatchObject({ multiplier: 2.0, ignoreDefenseRatio: 0.25, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 1 }] });
   });
 });

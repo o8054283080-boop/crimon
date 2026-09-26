@@ -35,18 +35,20 @@ const MOCCHI_S1: Skill = described({
   description: "",
   target: "SINGLE_ENEMY",
   cooldownTurns: 0,
-  effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.05, defCoefficient: 0.5 }],
+  effects: [
+    { kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.05, defCoefficient: 0.5 },
+  ],
   levelOverrides: [
     // Lv1
     { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.05, defCoefficient: 0.5 }] },
-    // Lv2 倍率 0.60 → 0.65
+    // Lv2 ダメージ倍率 0.60倍→0.65倍
     { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.05, defCoefficient: 0.5 }] },
-    // Lv3 HP係数 0.05 → 0.055
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.055, defCoefficient: 0.5 }] },
-    // Lv4 DEF係数 0.50 → 0.55
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.055, defCoefficient: 0.55 }] },
-    // Lv5 倍率 0.65 → 0.70
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.70, hpCoefficient: 0.055, defCoefficient: 0.55 }] },
+    // Lv3 最大HP比例 5%→6%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.06, defCoefficient: 0.5 }] },
+    // Lv4 防御力比例 50%→55%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.06, defCoefficient: 0.55 }] },
+    // Lv5 ダメージ倍率 0.65倍→0.70倍 / 防御力比例 55%→60%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.06, defCoefficient: 0.6 }] },
   ],
 }, "【対象】敵単体。攻撃力・最大HP・防御力の3つを足してから殴るので、どこを育てても手応えが増える。");
 
@@ -68,45 +70,15 @@ const MOCCHI_S2_FUBUKI: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.4, hpCoefficient: 0.12 },
-        { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.7, fixedDuration: true },
-      ],
-    },
-    // Lv2 倍率 1.40 → 1.50
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.12 },
-        { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.7, fixedDuration: true },
-      ],
-    },
-    // Lv3 封印 70% → 80%
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.12 },
-        { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.8, fixedDuration: true },
-      ],
-    },
-    // Lv4 HP係数 0.12 → 0.135
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.135 },
-        { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.8, fixedDuration: true },
-      ],
-    },
-    // Lv5 CT3 → CT2
-    {
-      cooldownTurns: 2,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.135 },
-        { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.8, fixedDuration: true },
-      ],
-    },
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4, hpCoefficient: 0.12 }, { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.7, fixedDuration: true }] },
+    // Lv2 ダメージ倍率 1.40倍→1.50倍
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.12 }, { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.7, fixedDuration: true }] },
+    // Lv3 発動率 70%→80%
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.12 }, { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.8, fixedDuration: true }] },
+    // Lv4 最大HP比例 12%→14%
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.14 }, { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.8, fixedDuration: true }] },
+    // Lv5 クールタイム -1(3→2ターン) / 最大HP比例 14%→15%
+    { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.15 }, { kind: "STATUS", status: "SKILL_LOCK", durationTurns: 1, chance: 0.8, fixedDuration: true }] },
   ],
 }, "【対象】敵単体。当たればスキルを封じ、相手の一番痛い技を1手ぶん遅らせる。");
 
@@ -123,51 +95,20 @@ const MOCCHI_S2_GATCHER: Skill = described({
   description: "",
   target: "SINGLE_ENEMY",
   cooldownTurns: 3,
-  effects: [{
-    kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.6, hits: 2,
-    perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.4 }],
-  }],
+  effects: [
+    { kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.6, hits: 2, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.4 }] },
+  ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.6, hits: 2,
-        perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.4 }],
-      }],
-    },
-    // Lv2 倍率 0.70 → 0.75
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.75, defCoefficient: 0.6, hits: 2,
-        perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.4 }],
-      }],
-    },
-    // Lv3 ゲージ低下 40% → 45%
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.75, defCoefficient: 0.6, hits: 2,
-        perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.45 }],
-      }],
-    },
-    // Lv4 DEF係数 0.60 → 0.65
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.75, defCoefficient: 0.65, hits: 2,
-        perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.45 }],
-      }],
-    },
-    // Lv5 CT3 → CT2
-    {
-      cooldownTurns: 2,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.75, defCoefficient: 0.65, hits: 2,
-        perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.45 }],
-      }],
-    },
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.7, defCoefficient: 0.6, hits: 2, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.4 }] }] },
+    // Lv2 ダメージ倍率 0.70倍→0.75倍
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.75, defCoefficient: 0.6, hits: 2, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.4 }] }] },
+    // Lv3 行動ゲージの発動率 40%→45%
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.75, defCoefficient: 0.6, hits: 2, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.45 }] }] },
+    // Lv4 ダメージ倍率 0.75倍→0.80倍 / 防御力比例 60%→65%
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, defCoefficient: 0.65, hits: 2, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.45 }] }] },
+    // Lv5 クールタイム -1(3→2ターン) / 防御力比例 65%→70%
+    { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.8, defCoefficient: 0.7, hits: 2, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.45 }] }] },
   ],
 }, "【対象】敵単体・2回攻撃。ゲージを削る判定は当たるたびに行うので、2回とも通れば相手の手番が大きく遠のく。");
 
@@ -184,51 +125,20 @@ const MOCCHI_S2_CANNON: Skill = described({
   description: "",
   target: "SINGLE_ENEMY",
   cooldownTurns: 4,
-  effects: [{
-    kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.2,
-    conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 },
-  }],
+  effects: [
+    { kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.2, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 } },
+  ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.2,
-        conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 },
-      }],
-    },
-    // Lv2 倍率 1.60 → 1.75
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.2,
-        conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 },
-      }],
-    },
-    // Lv3 防御無視 30% → 35%
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.2,
-        conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.35 },
-      }],
-    },
-    // Lv4 DEF係数 1.20 → 1.35
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.35,
-        conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.35 },
-      }],
-    },
-    // Lv5 CT4 → CT3
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.35,
-        conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.35 },
-      }],
-    },
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.2, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 } }] },
+    // Lv2 ダメージ倍率 1.60倍→1.75倍
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.2, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 } }] },
+    // Lv3
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.2, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.35 } }] },
+    // Lv4 ダメージ倍率 1.75倍→1.80倍 / 防御力比例 120%→140%
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, defCoefficient: 1.4, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.35 } }] },
+    // Lv5 クールタイム -1(4→3ターン)
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, defCoefficient: 1.4, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.4 } }] },
   ],
 }, "【対象】敵単体。防御力を積むほど威力が上がり、相手より硬ければ守りの一部を抜ける。");
 
@@ -246,56 +156,21 @@ const MOCCHI_S3_SUPER_CANNON: Skill = described({
   target: "SINGLE_ENEMY",
   cooldownTurns: 6,
   effects: [
-    { kind: "DAMAGE", multiplier: 2.8, defCoefficient: 2.0 },
+    { kind: "DAMAGE", multiplier: 2.8, defCoefficient: 2 },
     { kind: "GAUGE", amount: -0.4, chance: 0.75 },
     { kind: "STUN", durationTurns: 1, chance: 0.5 },
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.8, defCoefficient: 2.0 },
-        { kind: "GAUGE", amount: -0.4, chance: 0.75 },
-        { kind: "STUN", durationTurns: 1, chance: 0.5 },
-      ],
-    },
-    // Lv2 倍率 2.80 → 3.00
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DAMAGE", multiplier: 3.0, defCoefficient: 2.0 },
-        { kind: "GAUGE", amount: -0.4, chance: 0.75 },
-        { kind: "STUN", durationTurns: 1, chance: 0.5 },
-      ],
-    },
-    // Lv3 ゲージ低下 75% → 85%
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DAMAGE", multiplier: 3.0, defCoefficient: 2.0 },
-        { kind: "GAUGE", amount: -0.4, chance: 0.85 },
-        { kind: "STUN", durationTurns: 1, chance: 0.5 },
-      ],
-    },
-    // Lv4 DEF係数 2.0 → 2.2、気絶 50% → 60%
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DAMAGE", multiplier: 3.0, defCoefficient: 2.2 },
-        { kind: "GAUGE", amount: -0.4, chance: 0.85 },
-        { kind: "STUN", durationTurns: 1, chance: 0.6 },
-      ],
-    },
-    // Lv5 CT6 → CT5
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 3.0, defCoefficient: 2.2 },
-        { kind: "GAUGE", amount: -0.4, chance: 0.85 },
-        { kind: "STUN", durationTurns: 1, chance: 0.6 },
-      ],
-    },
+    { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 2.8, defCoefficient: 2 }, { kind: "GAUGE", amount: -0.4, chance: 0.75 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+    // Lv2 ダメージ倍率 2.80倍→3.00倍
+    { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 3, defCoefficient: 2 }, { kind: "GAUGE", amount: -0.4, chance: 0.75 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+    // Lv3 行動ゲージの発動率 75%→85%
+    { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 3, defCoefficient: 2 }, { kind: "GAUGE", amount: -0.4, chance: 0.85 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+    // Lv4 防御力比例 200%→220% / スタンの発動率 50%→60%
+    { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 3, defCoefficient: 2.2 }, { kind: "GAUGE", amount: -0.4, chance: 0.85 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
+    // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 3.00倍→3.10倍
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.1, defCoefficient: 2.2 }, { kind: "GAUGE", amount: -0.4, chance: 0.85 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
   ],
 }, "【対象】敵単体。気絶は1ターン固定。手番を奪う技なので、相手が動く直前に合わせると効き目が大きい。");
 
@@ -312,50 +187,20 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
   target: "ALL_ENEMIES",
   cooldownTurns: 5,
   effects: [
-    { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.10 },
+    { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.1 },
     { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
-      ],
-    },
-    // Lv2 倍率 1.60 → 1.75
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
-      ],
-    },
-    // Lv3 回復阻害 70% → 80%
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 },
-      ],
-    },
-    // Lv4 回復阻害 2ターン → 3ターン
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 },
-      ],
-    },
-    // Lv5 CT5 → CT4
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.10 },
-        { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 },
-      ],
-    },
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }] },
+    // Lv2 ダメージ倍率 1.60倍→1.75倍
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }] },
+    // Lv3 治癒阻害の発動率 70%→80%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }] },
+    // Lv4 ダメージ倍率 1.75倍→1.80倍 / 治癒阻害の持続 2→3ターン
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
+    // Lv5 クールタイム -1(5→4ターン) / 最大HP比例 10%→12%
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.12 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
   ],
 }, "【対象】敵全体。回復で粘る相手を削り切るための技で、試練の塔の回復する階に効く。");
 

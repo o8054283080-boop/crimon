@@ -38,45 +38,15 @@ const UNDINE_S1: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.8 },
-        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.8 },
-      ],
-    },
-    // Lv2 倍率 0.80 → 0.90
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.9 },
-        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.8 },
-      ],
-    },
-    // Lv3 速度DOWN 80% → 90%
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.9 },
-        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.9 },
-      ],
-    },
-    // Lv4 倍率 0.90 → 1.00
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.0 },
-        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.9 },
-      ],
-    },
-    // Lv5 速度DOWN 90% → 100%
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.0 },
-        { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 1.0 },
-      ],
-    },
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.8 }] },
+    // Lv2 ダメージ倍率 0.80倍→0.90倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.8 }] },
+    // Lv3 弱体の発動率 80%→90%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.9 }] },
+    // Lv4 ダメージ倍率 0.90倍→1.00倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 0.9 }] },
+    // Lv5 ダメージ倍率 1.00倍→1.10倍 / 弱体の発動率 90%→100%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 1, chance: 1 }] },
   ],
 }, "【対象】敵単体。回復が要らないターンでも仕事がある。");
 
@@ -101,30 +71,15 @@ const UNDINE_S2_VEIL: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 3,
-      effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }],
-    },
-    // Lv2 回復 40% → 43%
-    {
-      cooldownTurns: 3,
-      effects: [{ kind: "HEAL", healRate: 0.43 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }],
-    },
-    // Lv3 回復 43% → 46%
-    {
-      cooldownTurns: 3,
-      effects: [{ kind: "HEAL", healRate: 0.46 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }],
-    },
-    // Lv4 免疫 2ターン → 3ターン
-    {
-      cooldownTurns: 3,
-      effects: [{ kind: "HEAL", healRate: 0.46 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }],
-    },
-    // Lv5 CT3 → CT2
-    {
-      cooldownTurns: 2,
-      effects: [{ kind: "HEAL", healRate: 0.46 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }],
-    },
+    { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }] },
+    // Lv2 回復量 40%→45%
+    { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.45 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }] },
+    // Lv3 回復量 45%→50%
+    { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 2 }] },
+    // Lv4 免疫の持続 2→3ターン
+    { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }] },
+    // Lv5 クールタイム -1(3→2ターン)
+    { cooldownTurns: 2, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "IMMUNITY", durationTurns: 3 }] },
   ],
 }, "【対象】味方単体。回復量は受け手の最大HPが基準。弱化を落としてから免疫を張るので、今かかっている不利も一緒に消える。");
 
@@ -147,14 +102,14 @@ const UNDINE_S2_HEALING: Skill = described({
   levelOverrides: [
     // Lv1
     { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.25 }, { kind: "REGEN", healRate: 0.1, durationTurns: 2 }] },
-    // Lv2 即時回復 25% → 28%
-    { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "REGEN", healRate: 0.1, durationTurns: 2 }] },
-    // Lv3 継続回復 10% → 12%
-    { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "REGEN", healRate: 0.12, durationTurns: 2 }] },
-    // Lv4 継続回復 2ターン → 3ターン
-    { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }] },
-    // Lv5 CT4 → CT3
-    { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.28 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }] },
+    // Lv2 回復量 25%→30%
+    { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "REGEN", healRate: 0.1, durationTurns: 2 }] },
+    // Lv3 回復量 10%→12%
+    { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "REGEN", healRate: 0.12, durationTurns: 2 }] },
+    // Lv4 継続回復の持続 2→3ターン
+    { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }] },
+    // Lv5 クールタイム -1(4→3ターン)
+    { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "REGEN", healRate: 0.12, durationTurns: 3 }] },
   ],
 }, "【対象】味方全体。回復量は受け手それぞれの最大HPが基準。HPを次の階へ持ち越す試練の塔で効く。");
 
@@ -171,69 +126,20 @@ const UNDINE_S2_RAIN: Skill = described({
   description: "",
   target: "ALL_ENEMIES",
   cooldownTurns: 4,
-  effects: [{
-    kind: "DAMAGE", multiplier: 0.4, hits: 3,
-    perHitEffects: [
-      { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 },
-      { kind: "STUN", durationTurns: 1, chance: 0.2 },
-    ],
-  }],
+  effects: [
+    { kind: "DAMAGE", multiplier: 0.4, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] },
+  ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.4, hits: 3,
-        perHitEffects: [
-          { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 },
-          { kind: "STUN", durationTurns: 1, chance: 0.2 },
-        ],
-      }],
-    },
-    // Lv2 倍率 0.40 → 0.45
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.45, hits: 3,
-        perHitEffects: [
-          { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 },
-          { kind: "STUN", durationTurns: 1, chance: 0.2 },
-        ],
-      }],
-    },
-    // Lv3 速度DOWN 40% → 45%
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.45, hits: 3,
-        perHitEffects: [
-          { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.45 },
-          { kind: "STUN", durationTurns: 1, chance: 0.2 },
-        ],
-      }],
-    },
-    // Lv4 速度DOWN 2ターン → 3ターン
-    {
-      cooldownTurns: 4,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.45, hits: 3,
-        perHitEffects: [
-          { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.45 },
-          { kind: "STUN", durationTurns: 1, chance: 0.2 },
-        ],
-      }],
-    },
-    // Lv5 CT4 → CT3
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.45, hits: 3,
-        perHitEffects: [
-          { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.45 },
-          { kind: "STUN", durationTurns: 1, chance: 0.2 },
-        ],
-      }],
-    },
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.4, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] }] },
+    // Lv2 ダメージ倍率 0.40倍→0.45倍
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.4 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] }] },
+    // Lv3 弱体の発動率 40%→45%
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.45 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] }] },
+    // Lv4 弱体の持続 2→3ターン
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.45 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] }] },
+    // Lv5 クールタイム -1(4→3ターン) / ダメージ倍率 0.45倍→0.50倍
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 3, perHitEffects: [{ kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.45 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] }] },
   ],
 }, "【対象】敵全体・3回攻撃。追加効果は当たるたびに判定する。気絶は1ターン固定。");
 
@@ -356,55 +262,15 @@ const UNDINE_S3_GOD_BLESSING: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "COOLDOWN_REDUCE", turns: 1 },
-        { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2 },
-        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
-        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
-      ],
-    },
-    // Lv2 シールド 25% → 27%
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "COOLDOWN_REDUCE", turns: 1 },
-        { kind: "SHIELD", shieldRate: 0.27, durationTurns: 2 },
-        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
-        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
-      ],
-    },
-    // Lv3 シールド 27% → 30%
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "COOLDOWN_REDUCE", turns: 1 },
-        { kind: "SHIELD", shieldRate: 0.3, durationTurns: 2 },
-        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
-        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
-      ],
-    },
-    // Lv4 シールド・防御UP・速度UP 2ターン → 3ターン
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "COOLDOWN_REDUCE", turns: 1 },
-        { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 },
-        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
-        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
-      ],
-    },
-    // Lv5 CT7 → CT6
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "COOLDOWN_REDUCE", turns: 1 },
-        { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 },
-        { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 },
-        { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 },
-      ],
-    },
+    { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+    // Lv2 シールド量 25%→30%
+    { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+    // Lv3
+    { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+    // Lv4 シールドの持続 2→3ターン / 強化の持続 2→3ターン
+    { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
+    // Lv5 クールタイム -1(7→6ターン)
+    { cooldownTurns: 6, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
   ],
 }, "【対象】味方全体。シールド量は受け手それぞれの最大HPが基準。クールタイムの短縮量は伸びない。");
 
@@ -429,55 +295,15 @@ const UNDINE_S3_LIGHT: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "STRIP" },
-        { kind: "GAUGE", amount: -0.3 },
-        { kind: "HEAL", healRate: 0.2, applyTo: "ALLIES" },
-        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" },
-      ],
-    },
-    // Lv2 回復 20% → 23%
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "STRIP" },
-        { kind: "GAUGE", amount: -0.3 },
-        { kind: "HEAL", healRate: 0.23, applyTo: "ALLIES" },
-        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" },
-      ],
-    },
-    // Lv3 ゲージ低下 30% → 35%
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "STRIP" },
-        { kind: "GAUGE", amount: -0.35 },
-        { kind: "HEAL", healRate: 0.23, applyTo: "ALLIES" },
-        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" },
-      ],
-    },
-    // Lv4 回復 23% → 25%
-    {
-      cooldownTurns: 7,
-      effects: [
-        { kind: "STRIP" },
-        { kind: "GAUGE", amount: -0.35 },
-        { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" },
-        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" },
-      ],
-    },
-    // Lv5 CT7 → CT6
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "STRIP" },
-        { kind: "GAUGE", amount: -0.35 },
-        { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" },
-        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" },
-      ],
-    },
+    { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.3 }, { kind: "HEAL", healRate: 0.2, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+    // Lv2 回復量 20%→25%
+    { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.3 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+    // Lv3 行動ゲージ -30%→-35%
+    { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+    // Lv4
+    { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+    // Lv5 クールタイム -1(7→6ターン)
+    { cooldownTurns: 6, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
   ],
 }, "【対象】敵全体＋味方全体。ダメージは出さない。強化を剥がしてからゲージを削るので、剥がす前に動かれることがない。");
 
@@ -500,30 +326,15 @@ const UNDINE_S3_DARK: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 4,
-      effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.1 }],
-    },
-    // Lv2 DEF係数 2.10 → 2.25
-    {
-      cooldownTurns: 4,
-      effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.25 }],
-    },
-    // Lv3 DEF係数 2.25 → 2.40
-    {
-      cooldownTurns: 4,
-      effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.4 }],
-    },
-    // Lv4 DEF係数 2.40 → 2.60
-    {
-      cooldownTurns: 4,
-      effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.6 }],
-    },
-    // Lv5 CT4 → CT3
-    {
-      cooldownTurns: 3,
-      effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.6 }],
-    },
+    { cooldownTurns: 4, effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.1 }] },
+    // Lv2 防御力比例 210%→230%
+    { cooldownTurns: 4, effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.3 }] },
+    // Lv3 防御力比例 230%→240%
+    { cooldownTurns: 4, effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.4 }] },
+    // Lv4 防御力比例 240%→260%
+    { cooldownTurns: 4, effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.6 }] },
+    // Lv5 クールタイム -1(4→3ターン)
+    { cooldownTurns: 3, effects: [{ kind: "MAX_HP_DAMAGE", ratio: 0.3 }, { kind: "DAMAGE", multiplier: 0, defCoefficient: 2.6 }] },
   ],
 }, "【対象】敵単体。最大HPを削る部分には相手の防御が効かないので、硬い相手ほどよく通る。");
 

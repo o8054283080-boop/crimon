@@ -54,25 +54,24 @@ const CRIM_S1: Skill = {
    * 突き合わせていて、手で書いた数字が効果とずれることを防いでいる。
    * 後ろへ、初心者向けに「どこへ当たるのか」を足す。
    */
-  description: "ダメージ倍率 1.00倍。対象に与えたダメージの50%を対象以外の敵全体へ拡散。"
-    + "【対象】敵単体＋対象以外の敵全体。狙った1体を撃ち抜き、その1体に実際に通ったダメージを基準に、残りの敵へ光が広がる。",
+  description: "ダメージ倍率 1.00倍。対象に与えたダメージの50%を対象以外の敵全体へ拡散。【対象】敵単体＋対象以外の敵全体。狙った1体を撃ち抜き、その1体に実際に通ったダメージを基準に、残りの敵へ光が広がる。",
   target: "SINGLE_ENEMY",
   cooldownTurns: 0,
   effects: [
-    { kind: "DAMAGE", multiplier: 1.0 },
+    { kind: "DAMAGE", multiplier: 1 },
     { kind: "SPLASH", ratio: 0.5 },
   ],
   levelOverrides: [
     // Lv1
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.0 }, { kind: "SPLASH", ratio: 0.5 }] },
-    // Lv2 倍率 1.0 → 1.05
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.05 }, { kind: "SPLASH", ratio: 0.5 }] },
-    // Lv3 拡散 50% → 60%
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.05 }, { kind: "SPLASH", ratio: 0.6 }] },
-    // Lv4 倍率 1.05 → 1.10
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.10 }, { kind: "SPLASH", ratio: 0.6 }] },
-    // Lv5 拡散 60% → 70%
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.10 }, { kind: "SPLASH", ratio: 0.7 }] },
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "SPLASH", ratio: 0.5 }] },
+    // Lv2 ダメージ倍率 1.00倍→1.10倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "SPLASH", ratio: 0.5 }] },
+    // Lv3 拡散の割合 50%→60%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "SPLASH", ratio: 0.6 }] },
+    // Lv4 ダメージ倍率 1.10倍→1.20倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "SPLASH", ratio: 0.6 }] },
+    // Lv5 拡散の割合 60%→70%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "SPLASH", ratio: 0.7 }] },
   ],
 };
 
@@ -86,57 +85,23 @@ const CRIM_S1: Skill = {
 const CRIM_S2: Skill = {
   id: "crim_s2",
   name: "クリスタルラッシュ",
-  description: "ダメージ倍率 0.80倍 × 2回。各ヒットごとに: 35%で攻撃力-50% (1ターン)。"
-    + "【対象】敵全体・2回攻撃。当たるたびに判定するので、2回とも通れば2体ぶんの手応えがある。",
+  description: "ダメージ倍率 0.80倍 × 2回。各ヒットごとに: 35%で攻撃力-50% (1ターン)。【対象】敵全体・2回攻撃。当たるたびに判定するので、2回とも通れば2体ぶんの手応えがある。",
   target: "ALL_ENEMIES",
   cooldownTurns: 3,
   effects: [
-    {
-      kind: "DAMAGE", multiplier: 0.8, hits: 2,
-      perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.35 }],
-    },
+    { kind: "DAMAGE", multiplier: 0.8, hits: 2, perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.35 }] },
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.8, hits: 2,
-        perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.35 }],
-      }],
-    },
-    // Lv2 倍率 0.8 → 0.9
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.9, hits: 2,
-        perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.35 }],
-      }],
-    },
-    // Lv3 付与率 35% → 50%
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.9, hits: 2,
-        perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.5 }],
-      }],
-    },
-    // Lv4 攻撃DOWN 1ターン → 2ターン
-    {
-      cooldownTurns: 3,
-      effects: [{
-        kind: "DAMAGE", multiplier: 0.9, hits: 2,
-        perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 }],
-      }],
-    },
-    // Lv5 倍率 0.9 → 1.0、CT3 → CT2
-    {
-      cooldownTurns: 2,
-      effects: [{
-        kind: "DAMAGE", multiplier: 1.0, hits: 2,
-        perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 }],
-      }],
-    },
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2, perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.35 }] }] },
+    // Lv2 ダメージ倍率 0.80倍→0.90倍
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2, perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.35 }] }] },
+    // Lv3 弱体の発動率 35%→50%
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2, perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.5 }] }] },
+    // Lv4 ダメージ倍率 0.90倍→0.95倍 / 弱体の持続 1→2ターン
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 2, perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 }] }] },
+    // Lv5 クールタイム -1(3→2ターン) / ダメージ倍率 0.95倍→1.00倍
+    { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1, hits: 2, perHitEffects: [{ kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.5 }] }] },
   ],
 };
 
@@ -161,56 +126,25 @@ const CRIM_S2: Skill = {
 const CRIM_S3: Skill = {
   id: "crim_s3",
   name: "創世の宝珠",
-  description: "ダメージ倍率 2.00倍。味方全体にシールド 自身の最大HPの20% (2ターン、ダメージを肩代わり)。"
-    + "【対象】敵全体＋味方全体。この攻撃で敵を1体でも倒すと追加ターンを得る(何体倒しても1回)。シールドは倒せなくても必ず張る。",
+  description: "ダメージ倍率 2.00倍。味方全体にシールド 自身の最大HPの20% (2ターン、ダメージを肩代わり)。【対象】敵全体＋味方全体。この攻撃で敵を1体でも倒すと追加ターンを得る(何体倒しても1回)。シールドは倒せなくても必ず張る。",
   target: "ALL_ENEMIES",
   cooldownTurns: 5,
-  extraTurnOnKill: true,
   effects: [
-    { kind: "DAMAGE", multiplier: 2.0 },
+    { kind: "DAMAGE", multiplier: 2 },
     { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true },
   ],
+  extraTurnOnKill: true,
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true },
-      ],
-    },
-    // Lv2 倍率 2.0 → 2.3
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.3 },
-        { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true },
-      ],
-    },
-    // Lv3 シールド 20% → 25%
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.3 },
-        { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true },
-      ],
-    },
-    // Lv4 倍率 2.3 → 2.7
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.7 },
-        { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true },
-      ],
-    },
-    // Lv5 CT5 → CT4
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.7 },
-        { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true },
-      ],
-    },
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true }] },
+    // Lv2 ダメージ倍率 2.00倍→2.30倍
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.3 }, { kind: "SHIELD", shieldRate: 0.2, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true }] },
+    // Lv3 シールド量 20%→25%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.3 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true }] },
+    // Lv4 ダメージ倍率 2.30倍→2.70倍
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true }] },
+    // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 2.70倍→2.80倍
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.8 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2, fromSourceHp: true, applyTo: "ALLIES", fixedDuration: true }] },
   ],
 };
 

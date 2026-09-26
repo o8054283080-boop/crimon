@@ -155,7 +155,8 @@ describe("⑦ パッシブのLv1〜5成長", () => {
     const leveled = computeLeveledSkill(skill, 5);
     expect(leveled.passiveLevel).toBe(5);
     expect(leveled.effects).toHaveLength(0);
-    expect(passiveAtLevel(leveled.passive!, 5)).toEqual({ kind: "GAUGE_ON_ENEMY_POISON", gauge: 0.1 });
+    // 2026年10月の調整で Lv5 は 10%→12%
+    expect(passiveAtLevel(leveled.passive!, 5)).toEqual({ kind: "GAUGE_ON_ENEMY_POISON", gauge: 0.12 });
   });
 });
 
@@ -228,10 +229,15 @@ describe("⑩ 群狼の本能の追加ターン", () => {
 describe("⑩-2 群狼の本能の強化(クリダメ20〜50%・スキル1の再使用50%)", () => {
   const packAt = (level: number) => passiveAtLevel(findMonster("fenrir", "GRASS")!.skills[2].passive!, level);
 
-  it("クリダメは Lv1 20% から Lv5 50%、再使用は全段50%", () => {
-    expect([1, 2, 3, 4, 5].map((lv) => packAt(lv))).toEqual([0.2, 0.25, 0.3, 0.4, 0.5].map((critDmg) => ({
-      kind: "PACK_INSTINCT", critDmg, repeatS1Chance: 0.5,
-    })));
+  it("クリダメは Lv1 20% から Lv5 60%、再使用は Lv1〜4 50%・Lv5 60%", () => {
+    // 2026年10月の調整で クリダメ 20/30/40/50/60%、再使用は Lv5 だけ 60%
+    expect([1, 2, 3, 4, 5].map((lv) => packAt(lv))).toEqual([
+      { kind: "PACK_INSTINCT", critDmg: 0.2, repeatS1Chance: 0.5 },
+      { kind: "PACK_INSTINCT", critDmg: 0.3, repeatS1Chance: 0.5 },
+      { kind: "PACK_INSTINCT", critDmg: 0.4, repeatS1Chance: 0.5 },
+      { kind: "PACK_INSTINCT", critDmg: 0.5, repeatS1Chance: 0.5 },
+      { kind: "PACK_INSTINCT", critDmg: 0.6, repeatS1Chance: 0.6 },
+    ]);
   });
 
   /** 草フェンリル1体 vs 硬いゴーレム1体。スキル1を1回使った時の記録 */
@@ -295,14 +301,15 @@ describe("⑪ フェンリルの協力攻撃", () => {
     expect(damageAt(3) / lv1).toBeCloseTo(1.2, 1);
   });
 
-  it("狩猟本能は Lv2・3でダメージ、Lv4・5でクールタイムが伸びる", () => {
+  it("狩猟本能は Lv2・3でダメージ、Lv4・5でクールタイムとダメージが伸びる", () => {
     const skill = findMonsterById("fenrir_GRASS")!.skills[1];
     expect(skill.id).toBe("fenrir_s2_b");
     expect(describeSkillGrowth(skill).map((step) => step.changes)).toEqual([
       ["協力攻撃のダメージ 1.00倍→1.10倍"],
       ["協力攻撃のダメージ 1.10倍→1.20倍"],
-      ["クールタイム -1(5→4ターン)"],
-      ["クールタイム -1(4→3ターン)"],
+      // 2026年10月の調整で Lv4 1.3倍・Lv5 1.4倍も足した
+      ["クールタイム -1(5→4ターン)", "協力攻撃のダメージ 1.20倍→1.30倍"],
+      ["クールタイム -1(4→3ターン)", "協力攻撃のダメージ 1.30倍→1.40倍"],
     ]);
   });
 
@@ -374,8 +381,9 @@ describe("⑬ 多段スキルで追加効果が多重発動しない", () => {
     const record = engine.resolveTurn(chronos, { skillIndex: 0 });
     const drains = record.lines.filter((line) => line.includes("「時の管理者」で行動ゲージを吸収")).length;
     expect(drains).toBe(1);
-    expect(enemy.gauge).toBeCloseTo(44, 5);
-    expect(chronos.gauge).toBeCloseTo(6, 5);
+    // 時の管理者の吸収は Lv1 10%(2026年10月の調整で 6%→10%)
+    expect(enemy.gauge).toBeCloseTo(40, 5);
+    expect(chronos.gauge).toBeCloseTo(10, 5);
   });
 
   it("闇クロノスは全体攻撃で生存敵それぞれから1回ずつゲージを吸収する", () => {
@@ -398,8 +406,9 @@ describe("⑬ 多段スキルで追加効果が多重発動しない", () => {
 
     const record = engine.resolveTurn(source, { skillIndex: 1 });
 
-    expect(source.gauge).toBeCloseTo(40, 5);
-    expect(targets.map((target) => target.gauge)).toEqual([40, 40, 40, 40]);
+    // Lv5 の吸収は1体あたり20%(2026年10月の調整で 10%→20%)。4体から1回ずつ
+    expect(source.gauge).toBeCloseTo(80, 5);
+    expect(targets.map((target) => target.gauge)).toEqual([30, 30, 30, 30]);
     expect(targets.every((target) => target.stunTurns === 1)).toBe(true);
     expect(record.lines.filter((line) => line.includes("「時の管理者」で行動ゲージを吸収"))).toHaveLength(4);
   });

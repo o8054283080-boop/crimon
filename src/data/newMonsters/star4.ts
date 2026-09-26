@@ -117,25 +117,48 @@ export const BASILISK: MonsterTemplate = {
   lightSkill3: {
     id: "basilisk_s3_light",
     name: "神眼の裁き",
-    description: "裁きの眼光が走り、敵全体の有利な効果を1個剥がし、行動ゲージを25%減少させ、80%で2ターン速度を低下させる。",
+    description: "有利な効果を3個解除。行動ゲージ-30%。80%で速度-30% (2ターン)。100%で治癒阻害 (2ターン、回復を受けられない)",
     target: "ALL_ENEMIES",
     cooldownTurns: 5,
     effects: [
-      { kind: "STRIP", count: 1 },
-      { kind: "GAUGE", amount: -0.25 },
+      { kind: "STRIP", count: 3 },
+      { kind: "GAUGE", amount: -0.3 },
       { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.8 },
+      { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "STRIP", count: 3 }, { kind: "GAUGE", amount: -0.3 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.8 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true }] },
+      // Lv2 行動ゲージ -30%→-40% / 弱体の発動率 80%→85%
+      { cooldownTurns: 5, effects: [{ kind: "STRIP", count: 3 }, { kind: "GAUGE", amount: -0.4 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true }] },
+      // Lv3 行動ゲージ -40%→-50% / 弱体の発動率 85%→90%
+      { cooldownTurns: 5, effects: [{ kind: "STRIP", count: 3 }, { kind: "GAUGE", amount: -0.5 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true }] },
+      // Lv4 行動ゲージ -50%→-60% / 弱体の発動率 90%→100%
+      { cooldownTurns: 5, effects: [{ kind: "STRIP", count: 3 }, { kind: "GAUGE", amount: -0.6 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true }] },
+      // Lv5 クールタイム -1(5→4ターン) / 弱体の持続 2→3ターン
+      { cooldownTurns: 4, effects: [{ kind: "STRIP", count: 3 }, { kind: "GAUGE", amount: -0.6 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, fixedDuration: true }] },
     ],
   },
   darkSkill3: {
     id: "basilisk_s3_dark",
     name: "深淵の魔眼",
-    description: "深淵を映す魔眼で敵単体に攻撃力2.0倍のダメージを与え、行動ゲージを70%減少させる。対象の弱体効果が3個以上なら1ターンスタンさせる。",
-    target: "SINGLE_ENEMY",
-    cooldownTurns: 6,
+    description: "ダメージ倍率 0.60倍 × 3回。各ヒットごとに: 50%で行動ゲージ-30%、25%でスタン (1ターン)",
+    target: "ALL_ENEMIES",
+    cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 2.0 },
-      { kind: "GAUGE", amount: -0.7 },
-      { kind: "STUN", durationTurns: 1, requires: "TARGET_DEBUFF_AT_LEAST_3" },
+      { kind: "DAMAGE", multiplier: 0.6, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.6, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] }] },
+      // Lv2 ダメージ倍率 0.60倍→0.70倍 / 行動ゲージ -30%→-50%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.5, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] }] },
+      // Lv3 行動ゲージ -50%→-60% / スタンの発動率 25%→30%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.6, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] }] },
+      // Lv4 ダメージ倍率 0.70倍→0.80倍 / スタンの発動率 30%→35%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.6, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.35 }] }] },
+      // Lv5 クールタイム -1(5→4ターン) / 行動ゲージ -60%→-70% / スタンの発動率 35%→40%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.7, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] }] },
     ],
   },
   skillAssignment: {
@@ -177,12 +200,24 @@ export const MIMIC: MonsterTemplate = {
     {
       id: "mimic_s2_a",
       name: "がぶ飲み",
-      description: "喰らいついて敵単体に攻撃力1.0倍のダメージを与える(最大HP×0.08を加算)。与えたダメージの40%を自身が回復し、自身のHPが50%以下ならさらに20%ぶん多く回復する。",
+      description: "ダメージ倍率 1.80倍(最大HPの10%を加算)。与えたダメージの40%を自身が回復",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.0, hpCoefficient: 0.08 },
+        { kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.1 },
         { kind: "LIFESTEAL", healRate: 0.4, selfLowHpExtra: { hpRatio: 0.5, extra: 0.2 } },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.1 }, { kind: "LIFESTEAL", healRate: 0.4, selfLowHpExtra: { hpRatio: 0.5, extra: 0.2 } }] },
+        // Lv2 ダメージ倍率 1.80倍→1.95倍 / 最大HP比例 10%→11% / 回復量 40%→45%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.95, hpCoefficient: 0.11 }, { kind: "LIFESTEAL", healRate: 0.45, selfLowHpExtra: { hpRatio: 0.5, extra: 0.2 } }] },
+        // Lv3 ダメージ倍率 1.95倍→2.05倍 / 最大HP比例 11%→12%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.05, hpCoefficient: 0.12 }, { kind: "LIFESTEAL", healRate: 0.45, selfLowHpExtra: { hpRatio: 0.5, extra: 0.2 } }] },
+        // Lv4 ダメージ倍率 2.05倍→2.15倍 / 最大HP比例 12%→14% / 回復量 45%→50%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.15, hpCoefficient: 0.14 }, { kind: "LIFESTEAL", healRate: 0.5, selfLowHpExtra: { hpRatio: 0.5, extra: 0.2 } }] },
+        // Lv5 クールタイム -1(4→3ターン) / 最大HP比例 14%→15%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.15, hpCoefficient: 0.15 }, { kind: "LIFESTEAL", healRate: 0.5, selfLowHpExtra: { hpRatio: 0.5, extra: 0.2 } }] },
       ],
     },
     {
@@ -200,13 +235,25 @@ export const MIMIC: MonsterTemplate = {
     {
       id: "mimic_s2_c",
       name: "誘い込む宝箱",
-      description: "宝物のふりをして、1ターンのあいだ敵の単体攻撃の対象を自身に固定する。そのあいだ受けるダメージを15%軽減し、攻撃を受けるたび自身の行動ゲージが8%進む。",
+      description: "自身にターゲット集中 (1ターン)。自身の受けるダメージ-20% (1ターン)。1ターン、攻撃を受けるたび行動ゲージ+10%",
       target: "SELF",
       cooldownTurns: 5,
       effects: [
         { kind: "STATUS", status: "FOCUS", durationTurns: 1, applyTo: "SELF" },
-        { kind: "MITIGATE", amount: 0.15, durationTurns: 1, applyTo: "SELF" },
-        { kind: "GAUGE_ON_HIT", amount: 0.08, durationTurns: 1, applyTo: "SELF" },
+        { kind: "MITIGATE", amount: 0.2, durationTurns: 1, applyTo: "SELF" },
+        { kind: "GAUGE_ON_HIT", amount: 0.1, durationTurns: 1, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "FOCUS", durationTurns: 1, applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.2, durationTurns: 1, applyTo: "SELF" }, { kind: "GAUGE_ON_HIT", amount: 0.1, durationTurns: 1, applyTo: "SELF" }] },
+        // Lv2 被ダメージ軽減 20%→25%
+        { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "FOCUS", durationTurns: 1, applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.25, durationTurns: 1, applyTo: "SELF" }, { kind: "GAUGE_ON_HIT", amount: 0.1, durationTurns: 1, applyTo: "SELF" }] },
+        // Lv3 行動ゲージ 10%→15%
+        { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "FOCUS", durationTurns: 1, applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.25, durationTurns: 1, applyTo: "SELF" }, { kind: "GAUGE_ON_HIT", amount: 0.15, durationTurns: 1, applyTo: "SELF" }] },
+        // Lv4 被ダメージ軽減 25%→30%
+        { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "FOCUS", durationTurns: 1, applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.3, durationTurns: 1, applyTo: "SELF" }, { kind: "GAUGE_ON_HIT", amount: 0.15, durationTurns: 1, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(5→4ターン) / 持続 1→2ターン / 被ダメージ軽減の持続 1→2ターン / 行動ゲージ 15%→20%
+        { cooldownTurns: 4, effects: [{ kind: "STATUS", status: "FOCUS", durationTurns: 2, applyTo: "SELF" }, { kind: "MITIGATE", amount: 0.3, durationTurns: 2, applyTo: "SELF" }, { kind: "GAUGE_ON_HIT", amount: 0.2, durationTurns: 2, applyTo: "SELF" }] },
       ],
     },
   ],
@@ -225,48 +272,88 @@ export const MIMIC: MonsterTemplate = {
     {
       id: "mimic_s3_b",
       name: "食らいつく",
-      description: "全身で食らいつき、敵単体に攻撃力1.4倍のダメージを与える(最大HP×0.10を加算)。自身が失ったHPの割合が高いほど最終ダメージが上昇する(最大40%)。",
+      description: "ダメージ倍率 1.60倍(最大HPの13%を加算) 自身が失ったHPが多いほど最終ダメージ上昇(最大+50%)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.4, hpCoefficient: 0.1, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.4 } },
+        { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.13, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.5 } },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.13, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.5 } }] },
+        // Lv2 ダメージ倍率 1.60倍→1.90倍 / 最大HP比例 13%→16%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.9, hpCoefficient: 0.16, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.5 } }] },
+        // Lv3 ダメージ倍率 1.90倍→2.20倍 / 最大HP比例 16%→19%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.2, hpCoefficient: 0.19, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.6 } }] },
+        // Lv4 ダメージ倍率 2.20倍→2.60倍 / 最大HP比例 19%→22%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.6, hpCoefficient: 0.22, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.6 } }] },
+        // Lv5 クールタイム -2(5→3ターン) / ダメージ倍率 2.60倍→3.00倍 / 最大HP比例 22%→25%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3, hpCoefficient: 0.25, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.7 } }] },
       ],
     },
     {
       id: "mimic_s3_c",
       name: "偽りの財宝",
-      description: "パッシブ。攻撃を受けた時に自身のHPを回復し、同時に60%で攻撃者の攻撃力を2ターン50%低下させる(敵1行動につき1回)。",
+      description: "パッシブ。攻撃を受けた時、自身のHPを最大HPの5%回復し、70%で攻撃者の攻撃力-50%(2ターン)。攻撃者へ自身の最大HPの5%のダメージを返す(防御を無視)。敵1行動につき1回",
       target: "SELF",
       cooldownTurns: 0,
       effects: [],
-      passive: passive("SELF_HIT", [
-        { kind: "FALSE_TREASURE", heal: 0.04, chance: 0.6, atkDown: ATK_DOWN, duration: 2 },
-        { kind: "FALSE_TREASURE", heal: 0.05, chance: 0.6, atkDown: ATK_DOWN, duration: 2 },
-        { kind: "FALSE_TREASURE", heal: 0.06, chance: 0.6, atkDown: ATK_DOWN, duration: 2 },
-        { kind: "FALSE_TREASURE", heal: 0.07, chance: 0.6, atkDown: ATK_DOWN, duration: 2 },
-        { kind: "FALSE_TREASURE", heal: 0.10, chance: 0.6, atkDown: ATK_DOWN, duration: 2 },
-      ]),
+      passive: {
+        trigger: "SELF_HIT",
+        levels: [
+          { kind: "FALSE_TREASURE", heal: 0.05, chance: 0.7, atkDown: 0.5, duration: 2, counterHpRatio: 0.05 },
+          { kind: "FALSE_TREASURE", heal: 0.06, chance: 0.75, atkDown: 0.5, duration: 2, counterHpRatio: 0.06 },
+          { kind: "FALSE_TREASURE", heal: 0.07, chance: 0.8, atkDown: 0.5, duration: 2, counterHpRatio: 0.07 },
+          { kind: "FALSE_TREASURE", heal: 0.08, chance: 0.9, atkDown: 0.5, duration: 2, counterHpRatio: 0.08 },
+          { kind: "FALSE_TREASURE", heal: 0.1, chance: 1, atkDown: 0.5, duration: 2, counterHpRatio: 0.1 },
+        ],
+      },
     },
   ],
   lightSkill3: {
     id: "mimic_s3_light",
     name: "聖なる宝箱",
-    description: "聖なる光が箱から溢れ、味方全体に1ターン無敵を与える。この無敵はスキルレベルが最大でも1ターンのまま延びない。",
+    description: "無敵 (1ターン)。敵全体に60%で治癒阻害 (2ターン、回復を受けられない)",
     target: "ALL_ALLIES",
     cooldownTurns: 5,
     effects: [
       { kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true },
+      { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.6, applyTo: "ENEMIES" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.6, applyTo: "ENEMIES" }] },
+      // Lv2 治癒阻害の発動率 60%→70%
+      { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7, applyTo: "ENEMIES" }] },
+      // Lv3 治癒阻害の発動率 70%→80%
+      { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8, applyTo: "ENEMIES" }] },
+      // Lv4 治癒阻害の発動率 80%→90%
+      { cooldownTurns: 5, effects: [{ kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9, applyTo: "ENEMIES" }] },
+      // Lv5 クールタイム -1(5→4ターン) / 治癒阻害の発動率 90%→100%
+      { cooldownTurns: 4, effects: [{ kind: "STATUS", status: "INVINCIBLE", durationTurns: 1, fixedDuration: true }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 1, applyTo: "ENEMIES" }] },
     ],
   },
   darkSkill3: {
     id: "mimic_s3_dark",
     name: "強欲の魔箱",
-    description: "強欲が形を成し、敵単体に攻撃力1.6倍のダメージを与える(最大HP×0.10を加算)。対象が弱体状態なら最終ダメージが25%上昇し、与えたダメージの50%を自身が回復する。",
+    description: "ダメージ倍率 1.80倍(最大HPの12%を加算) 対象が弱体状態なら最終ダメージ+25% 自身が失ったHPが多いほど最終ダメージ上昇(最大+30%)。行動ゲージを30%吸収",
     target: "SINGLE_ENEMY",
     cooldownTurns: 5,
     effects: [
-      { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.1, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }] },
-      { kind: "LIFESTEAL", healRate: 0.5 },
+      { kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.12, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.3, maxBonus: 0.3 } },
+      { kind: "GAUGE", amount: 0.3, drain: true },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.12, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.3, maxBonus: 0.3 } }, { kind: "GAUGE", amount: 0.3, drain: true }] },
+      // Lv2 ダメージ倍率 1.80倍→2.10倍 / 最大HP比例 12%→14%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.1, hpCoefficient: 0.14, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.35, maxBonus: 0.35 } }, { kind: "GAUGE", amount: 0.3, drain: true }] },
+      // Lv3 ダメージ倍率 2.10倍→2.50倍 / 最大HP比例 14%→16% / 行動ゲージ 30%→40%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.5, hpCoefficient: 0.16, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.4 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
+      // Lv4 ダメージ倍率 2.50倍→2.90倍 / 最大HP比例 16%→18%
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.9, hpCoefficient: 0.18, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.45, maxBonus: 0.45 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
+      // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 2.90倍→3.30倍 / 最大HP比例 18%→20% / 行動ゲージ 40%→50%
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.3, hpCoefficient: 0.2, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.5, maxBonus: 0.5 } }, { kind: "GAUGE", amount: 0.5, drain: true }] },
     ],
   },
   skillAssignment: {
@@ -296,47 +383,96 @@ export const VALKYRIA: MonsterTemplate = {
   skill1: {
     id: "valkyria_s1",
     name: "聖槍の一撃",
-    description: "敵単体に攻撃力0.9倍のダメージを与え、HP割合が最も低い味方の行動ゲージを8%進める。",
+    description: "ダメージ倍率 1.00倍。行動ゲージ+10%",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.9 },
-      { kind: "GAUGE", amount: 0.08, applyTo: "LOWEST_HP_ALLY" },
+      { kind: "DAMAGE", multiplier: 1 },
+      { kind: "GAUGE", amount: 0.1, applyTo: "LOWEST_HP_ALLY" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "GAUGE", amount: 0.1, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv2 ダメージ倍率 1.00倍→1.10倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "GAUGE", amount: 0.1, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv3 行動ゲージ 10%→15%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "GAUGE", amount: 0.15, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv4 ダメージ倍率 1.10倍→1.20倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "GAUGE", amount: 0.15, applyTo: "LOWEST_HP_ALLY" }] },
+      // Lv5 行動ゲージ 15%→20%
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "GAUGE", amount: 0.2, applyTo: "LOWEST_HP_ALLY" }] },
     ],
   },
   skill2Variants: [
     {
       id: "valkyria_s2_a",
       name: "守護の翼",
-      description: "味方1体のHPを最大HPの25%回復し、弱体効果を1個解除して防御力を2ターン上昇させる。",
+      description: "回復 最大HPの30.0%。デバフを1個解除。防御力+30% (2ターン)",
       target: "SINGLE_ALLY",
       cooldownTurns: 4,
       effects: [
-        { kind: "HEAL", healRate: 0.25 },
+        { kind: "HEAL", healRate: 0.3 },
         { kind: "CLEANSE", count: 1 },
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv2 回復量 30%→35%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv3
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv4 回復量 35%→40%
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }] },
       ],
     },
     {
       id: "valkyria_s2_b",
       name: "戦乙女の号令",
-      description: "号令を上げ、味方全体の行動ゲージを20%進め、攻撃力を2ターン上昇させる。",
+      description: "行動ゲージ+20%。攻撃力+30% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
         { kind: "GAUGE", amount: 0.2 },
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
       ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv2 行動ゲージ 20%→25%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv3
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv4 行動ゲージ 25%→30%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }] },
+      ],
     },
     {
       id: "valkyria_s2_c",
       name: "不屈の祝福",
-      description: "味方1体に1ターンの我慢を与え、HPを最大HPの20%回復する。",
+      description: "我慢 (1ターン)。攻撃力+30% (2ターン)。継続回復 最大HPの5.0% (2ターン、自身のターン開始時)",
       target: "SINGLE_ALLY",
-      cooldownTurns: 5,
+      cooldownTurns: 3,
       effects: [
         { kind: "STATUS", status: "ENDURE", durationTurns: 1 },
-        { kind: "HEAL", healRate: 0.2 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+        { kind: "REGEN", healRate: 0.05, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
+        // Lv2
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
+        // Lv3
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
+        // Lv4
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
+        // Lv5 持続 1→2ターン
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
       ],
     },
   ],
@@ -344,64 +480,116 @@ export const VALKYRIA: MonsterTemplate = {
     {
       id: "valkyria_s3_a",
       name: "天翼の加護",
-      description: "翼を広げ、味方全体のHPを最大HPの20%回復し、弱体効果を1個解除して防御力を2ターン上昇させる。",
+      description: "回復 最大HPの25.0%。デバフを1個解除。防御力+30% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 5,
       effects: [
-        { kind: "HEAL", healRate: 0.2 },
+        { kind: "HEAL", healRate: 0.25 },
         { kind: "CLEANSE", count: 1 },
         { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.25 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv2 回復量 25%→30%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv3
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv4 回復量 30%→35%
+        { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(5→4ターン) / 回復量 35%→40% / 強化の持続 2→3ターン
+        { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }] },
       ],
     },
     {
       id: "valkyria_s3_b",
       name: "勝利への進軍",
-      description: "味方全体の行動ゲージを25%進め、速度を2ターン上昇させる。HPが50%以下の味方は行動ゲージがさらに10%進む。",
+      description: "行動ゲージ+30% (HP50%以下ならさらに15%)。速度+20% (2ターン)。攻撃力+30% (2ターン)",
       target: "ALL_ALLIES",
       cooldownTurns: 6,
       effects: [
-        { kind: "GAUGE", amount: 0.25, lowHpExtra: { hpRatio: 0.5, amount: 0.1 } },
+        { kind: "GAUGE", amount: 0.3, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } },
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.3, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv2 行動ゲージ 30%→35%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.35, lowHpExtra: { hpRatio: 0.5, amount: 0.2 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv3
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.35, lowHpExtra: { hpRatio: 0.5, amount: 0.25 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv4 行動ゲージ 35%→40%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.4, lowHpExtra: { hpRatio: 0.5, amount: 0.25 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv5 クールタイム -1(6→5ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.4, lowHpExtra: { hpRatio: 0.5, amount: 0.25 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }] },
       ],
     },
     {
       id: "valkyria_s3_c",
       name: "戦乙女の誓い",
-      description: "パッシブ。味方のHPが30%以下になった時、その味方に1ターン無敵を与え、自身の最大HPを基準に回復する(内部クールタイムあり)。無敵はスキルレベルが最大でも1ターンのまま。",
+      description: "パッシブ。味方のHPが30%以下になった時、その味方に1ターン無敵と自身の最大HPの25%回復(内部クールタイム5ターン)",
       target: "SELF",
       cooldownTurns: 0,
       effects: [],
-      passive: passive("ALLY_HP_THRESHOLD", [
-        { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.20, internalCooldown: 5 },
-        { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.22, internalCooldown: 5 },
-        { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.25, internalCooldown: 5 },
-        { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.27, internalCooldown: 5 },
-        { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.30, internalCooldown: 4 },
-      ]),
+      passive: {
+        trigger: "ALLY_HP_THRESHOLD",
+        levels: [
+          { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.25, internalCooldown: 5 },
+          { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.3, internalCooldown: 5 },
+          { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.35, internalCooldown: 5 },
+          { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.4, internalCooldown: 5 },
+          { kind: "VALKYRIE_OATH", hpRatio: 0.3, heal: 0.45, internalCooldown: 4 },
+        ],
+      },
     },
   ],
   lightSkill3: {
     id: "valkyria_s3_light",
     name: "神聖なる翼",
-    description: "神々しい翼が味方を包み、味方全体のHPを最大HPの25%回復し、弱体効果をすべて解除して1ターンの我慢を与える。",
+    description: "回復 最大HPの30.0%。デバフを解除。我慢 (1ターン)",
     target: "ALL_ALLIES",
     cooldownTurns: 6,
     effects: [
-      { kind: "HEAL", healRate: 0.25 },
+      { kind: "HEAL", healRate: 0.3 },
       { kind: "CLEANSE" },
       { kind: "STATUS", status: "ENDURE", durationTurns: 1 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE" }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv2 回復量 30%→35%
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE" }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv3 回復量 35%→40%
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE" }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv4 回復量 40%→45%
+      { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.45 }, { kind: "CLEANSE" }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
+      // Lv5 クールタイム -1(6→5ターン) / 回復量 45%→50% / 持続 1→2ターン
+      { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.5 }, { kind: "CLEANSE" }, { kind: "STATUS", status: "ENDURE", durationTurns: 2 }] },
     ],
   },
   darkSkill3: {
     id: "valkyria_s3_dark",
     name: "黒翼の戦歌",
-    description: "黒い戦歌が響き、味方全体の行動ゲージを30%進め、クリ率とクリダメを2ターン上昇させる。HPが50%以下の味方は行動ゲージがさらに15%進む。",
+    description: "行動ゲージ+30% (HP50%以下ならさらに15%)。クリ率+20% (2ターン)。クリダメ+30% (2ターン)",
     target: "ALL_ALLIES",
     cooldownTurns: 6,
     effects: [
       { kind: "GAUGE", amount: 0.3, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } },
       { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
       { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.3, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+      // Lv2 行動ゲージ 30%→35%
+      { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.35, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+      // Lv3 行動ゲージ 35%→40%
+      { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.4, lowHpExtra: { hpRatio: 0.5, amount: 0.2 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+      // Lv4 行動ゲージ 40%→45%
+      { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.45, lowHpExtra: { hpRatio: 0.5, amount: 0.2 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
+      // Lv5 クールタイム -1(6→5ターン) / 行動ゲージ 45%→50% / 強化の持続 2→3ターン
+      { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.5, lowHpExtra: { hpRatio: 0.5, amount: 0.25 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
     ],
   },
   skillAssignment: {
@@ -431,43 +619,93 @@ export const THUNDERBEAST: MonsterTemplate = {
   skill1: {
     id: "thunderbeast_s1",
     name: "雷牙",
-    description: "敵単体に攻撃力0.8倍のダメージを与える(自身の速度が高いほど上昇)。",
+    description: "ダメージ倍率 0.90倍(自身の速度が高いほど上昇)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 0,
-    effects: [{ kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }],
+    effects: [
+      { kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
+      // Lv2 ダメージ倍率 0.90倍→1.00倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
+      // Lv3
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }] },
+      // Lv4 ダメージ倍率 1.00倍→1.10倍
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }] },
+      // Lv5
+      { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }] },
+    ],
   },
   skill2Variants: [
     {
       id: "thunderbeast_s2_a",
       name: "雷光突進",
-      description: "敵単体に攻撃力1.4倍のダメージを与える(自身の速度が高いほど上昇)。自身の行動ゲージを20%進める。",
+      description: "ダメージ倍率 1.50倍(自身の速度が高いほど上昇)。自身の行動ゲージ+25%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.4, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } },
-        { kind: "GAUGE", amount: 0.2, applyTo: "SELF" },
+        { kind: "DAMAGE", multiplier: 1.5, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
+        { kind: "GAUGE", amount: 0.25, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
+        // Lv2 ダメージ倍率 1.50倍→1.60倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
+        // Lv3 ダメージ倍率 1.60倍→1.70倍 / 行動ゲージ 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+        // Lv4 ダメージ倍率 1.70倍→1.80倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(4→3ターン) / 行動ゲージ 30%→35%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "GAUGE", amount: 0.35, applyTo: "SELF" }] },
       ],
     },
     {
       id: "thunderbeast_s2_b",
       name: "連雷",
-      description: "敵全体に攻撃力0.55倍のダメージを2回与える。一度でもクリティカルすれば自身の行動ゲージが25%進む。",
+      description: "ダメージ倍率 0.65倍 × 2回(自身の速度が高いほど上昇)。1回以上クリティカルしたら自身の行動ゲージ+25%",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.55, hits: 2 },
+        { kind: "DAMAGE", multiplier: 0.65, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.15 } },
         { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "ANY_CRIT" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.65, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.15 } }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "ANY_CRIT" }] },
+        // Lv2 ダメージ倍率 0.65倍→0.70倍 / 行動ゲージ 25%→30%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF", requires: "ANY_CRIT" }] },
+        // Lv3 ダメージ倍率 0.70倍→0.75倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF", requires: "ANY_CRIT" }] },
+        // Lv4 ダメージ倍率 0.75倍→0.80倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.25 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF", requires: "ANY_CRIT" }] },
+        // Lv5 クールタイム -1(4→3ターン) / 行動ゲージ 30%→35%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }, { kind: "GAUGE", amount: 0.35, applyTo: "SELF", requires: "ANY_CRIT" }] },
       ],
     },
     {
       id: "thunderbeast_s2_c",
       name: "雷鳴の爪",
-      description: "敵単体に攻撃力1.25倍のダメージを与える(自身の速度が高いほど上昇)。80%で2ターン防御力を75%低下させる。",
+      description: "ダメージ倍率 1.40倍(自身の速度が高いほど上昇)。80%で防御力-75% (2ターン)",
       target: "SINGLE_ENEMY",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 1.25, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } },
+        { kind: "DAMAGE", multiplier: 1.4, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
         { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.4, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
+        // Lv2 ダメージ倍率 1.40倍→1.50倍 / 弱体の発動率 80%→90%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
+        // Lv3 ダメージ倍率 1.50倍→1.60倍
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
+        // Lv4 ダメージ倍率 1.60倍→1.70倍 / 弱体の発動率 90%→100%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 }] },
+        // Lv5 クールタイム -1(4→3ターン) / ダメージ倍率 1.70倍→1.80倍 / 弱体の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 }] },
       ],
     },
   ],
@@ -475,64 +713,117 @@ export const THUNDERBEAST: MonsterTemplate = {
     {
       id: "thunderbeast_s3_a",
       name: "迅雷乱舞",
-      description: "敵単体に攻撃力0.65倍のダメージを3回与える(自身の速度が高いほど上昇)。3撃のうち2撃以上がクリティカルなら自身の行動ゲージが40%進む。",
+      description: "ダメージ倍率 0.75倍 × 3回(自身の速度が高いほど上昇)。2回以上クリティカルしたら自身の行動ゲージ+40%",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.65, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
+        { kind: "DAMAGE", multiplier: 0.75, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } },
         { kind: "GAUGE", amount: 0.4, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
+        // Lv2 ダメージ倍率 0.75倍→0.80倍 / 行動ゲージ 40%→45%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "GAUGE", amount: 0.45, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
+        // Lv3 ダメージ倍率 0.80倍→0.85倍 / 行動ゲージ 45%→50%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.5, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
+        // Lv4 ダメージ倍率 0.85倍→0.90倍 / 行動ゲージ 50%→55%
+        { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "GAUGE", amount: 0.55, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
+        // Lv5 クールタイム -2(5→3ターン) / 行動ゲージ 55%→60%
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }, { kind: "GAUGE", amount: 0.6, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
       ],
     },
     {
       id: "thunderbeast_s3_b",
       name: "天雷の号令",
-      description: "天から雷を呼び、味方全体の行動ゲージを20%進め、速度とクリ率を2ターン上昇させる。自身の行動ゲージはさらに20%進む。",
+      description: "行動ゲージ+20%。速度+20% (2ターン)。クリ率+20% (2ターン)。自身の行動ゲージ+25%",
       target: "ALL_ALLIES",
       cooldownTurns: 6,
       effects: [
         { kind: "GAUGE", amount: 0.2 },
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 },
         { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 },
-        { kind: "GAUGE", amount: 0.2, applyTo: "SELF" },
+        { kind: "GAUGE", amount: 0.25, applyTo: "SELF" },
+      ],
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
+        // Lv2 行動ゲージ 20%→25%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
+        // Lv3 行動ゲージ 25%→30%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+        // Lv4 行動ゲージ 25%→30%
+        { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(6→5ターン) / 強化の持続 2→3ターン / 行動ゲージ 30%→35%
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.35, applyTo: "SELF" }] },
       ],
     },
     {
       id: "thunderbeast_s3_c",
       name: "雷獣覚醒",
-      description: "雷を纏い、自身の速度とクリ率を3ターン上昇させる。発動と同時に自身の行動ゲージが40%進む。",
+      description: "自身の速度+20% (3ターン)。自身のクリ率+20% (3ターン)。自身の攻撃力+30% (3ターン)。継続回復 最大HPの5.0% (3ターン、自身のターン開始時)。使用後、即時に追加ターンを獲得",
       target: "SELF",
       cooldownTurns: 5,
       effects: [
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "SELF" },
         { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3, applyTo: "SELF" },
-        { kind: "GAUGE", amount: 0.4, applyTo: "SELF" },
+        { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "SELF" },
+        { kind: "REGEN", healRate: 0.05, durationTurns: 3, applyTo: "SELF" },
+      ],
+      extraTurn: true,
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.05, durationTurns: 3, applyTo: "SELF" }] },
+        // Lv2 回復量 5%→7%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.07, durationTurns: 3, applyTo: "SELF" }] },
+        // Lv3 回復量 7%→10%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.1, durationTurns: 3, applyTo: "SELF" }] },
+        // Lv4 回復量 10%→12%
+        { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.12, durationTurns: 3, applyTo: "SELF" }] },
+        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン / 継続回復の持続 3→4ターン / 回復量 12%→15%
+        { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 4, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 4, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.15, durationTurns: 4, applyTo: "SELF" }] },
       ],
     },
   ],
   lightSkill3: {
     id: "thunderbeast_s3_light",
     name: "雷の本能",
-    description: "パッシブ。クリダメと速度が常に上がり、攻撃スキルでクリティカルが出た時に対象の行動ゲージを吸収する(多段でも1スキルにつき1回)。",
+    description: "パッシブ。クリダメ+25%・速度+20。攻撃スキルのクリティカル時、対象の行動ゲージを15%吸収(1スキルにつき1回)",
     target: "SELF",
     cooldownTurns: 0,
     effects: [],
-    passive: passive("SELF_ATTACK_SKILL", [
-      { kind: "THUNDER_INSTINCT", critDmg: 0.22, spd: 17, drain: 0.11 },
-      { kind: "THUNDER_INSTINCT", critDmg: 0.24, spd: 19, drain: 0.12 },
-      { kind: "THUNDER_INSTINCT", critDmg: 0.26, spd: 21, drain: 0.13 },
-      { kind: "THUNDER_INSTINCT", critDmg: 0.28, spd: 23, drain: 0.14 },
-      { kind: "THUNDER_INSTINCT", critDmg: 0.30, spd: 25, drain: 0.15 },
-    ]),
+    passive: {
+      trigger: "SELF_ATTACK_SKILL",
+      levels: [
+        { kind: "THUNDER_INSTINCT", critDmg: 0.25, spd: 20, drain: 0.15 },
+        { kind: "THUNDER_INSTINCT", critDmg: 0.3, spd: 25, drain: 0.15 },
+        { kind: "THUNDER_INSTINCT", critDmg: 0.35, spd: 30, drain: 0.2 },
+        { kind: "THUNDER_INSTINCT", critDmg: 0.4, spd: 35, drain: 0.2 },
+        { kind: "THUNDER_INSTINCT", critDmg: 0.45, spd: 40, drain: 0.25 },
+      ],
+    },
   },
   darkSkill3: {
     id: "thunderbeast_s3_dark",
     name: "黒雷連獄",
-    description: "黒い雷が檻となり、敵単体に攻撃力0.7倍のダメージを4回与える(自身の速度が高いほど上昇)。クリティカルが3撃以上なら、防御力を50%無視する追撃を放つ。",
+    description: "ダメージ倍率 0.75倍 × 4回(自身の速度が高いほど上昇)。3回以上クリティカルしたらダメージ倍率 0.80倍(自身の速度が高いほど上昇)(防御力50%無視)",
     target: "SINGLE_ENEMY",
     cooldownTurns: 6,
     effects: [
-      { kind: "DAMAGE", multiplier: 0.7, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } },
-      { kind: "DAMAGE", multiplier: 0.7, scaleBonus: { stat: "spd", bonusAtReference: 0.4 }, ignoreDefenseRatio: 0.5, requires: "CRITS_AT_LEAST_3" },
+      { kind: "DAMAGE", multiplier: 0.75, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } },
+      { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.45 }, ignoreDefenseRatio: 0.5, requires: "CRITS_AT_LEAST_3" },
+    ],
+    levelOverrides: [
+      // Lv1
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.45 }, ignoreDefenseRatio: 0.5, requires: "CRITS_AT_LEAST_3" }] },
+      // Lv2 ダメージ倍率 0.75倍→0.80倍 / ダメージ倍率 0.80倍→0.90倍
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "spd", bonusAtReference: 0.5 }, ignoreDefenseRatio: 0.5, requires: "CRITS_AT_LEAST_3" }] },
+      // Lv3 ダメージ倍率 0.80倍→0.85倍 / ダメージ倍率 0.90倍→1.00倍
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.55 }, ignoreDefenseRatio: 0.6, requires: "CRITS_AT_LEAST_3" }] },
+      // Lv4 ダメージ倍率 0.85倍→0.90倍 / ダメージ倍率 1.00倍→1.10倍
+      { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", bonusAtReference: 0.6 }, ignoreDefenseRatio: 0.7, requires: "CRITS_AT_LEAST_3" }] },
+      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.10倍→1.20倍
+      { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }, { kind: "DAMAGE", multiplier: 1.2, scaleBonus: { stat: "spd", bonusAtReference: 0.65 }, ignoreDefenseRatio: 0.8, requires: "CRITS_AT_LEAST_3" }] },
     ],
   },
 };
