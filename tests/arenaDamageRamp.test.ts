@@ -18,7 +18,12 @@ import { mulberry32 } from "../tools/battleLab/rng.js";
 
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
-/** 硬いだけで火力の無い相手。放っておくと決着しない盤面を作る */
+/**
+ * 硬いだけで火力の無い相手。放っておくと決着しない盤面を作る。
+ *
+ * **火傷を持つ種族を使わない。**火傷は受け手の最大HPに比例する(上限50,000)ので、
+ * HPを盛った壁ほどよく削れて、壁にならない(火のゴーレムの「溶岩落とし」で決着していた)。
+ */
 function wall(id: string, hp: number, atk: number): MonsterDefinition {
   const dex = findMonsterById(id)!;
   return { ...dex, stats: { ...dex.stats, hp, atk, def: 3_000, spd: 100 } };
@@ -50,7 +55,7 @@ describe("アリーナの、長引いた試合の決着", () => {
   });
 
   it("猶予の内側では、ダメージが増えない", () => {
-    const attacker = wall("golem_FIRE", 200_000, 400);
+    const attacker = wall("golem_GRASS", 200_000, 400);
     const defender = wall("golem_WATER", 200_000, 400);
     const plain = new BattleEngine([attacker], [defender], { rng: mulberry32(7), maxTurns: 12 }).run();
     const ramped = new BattleEngine([attacker], [defender], {
@@ -68,7 +73,7 @@ describe("アリーナの、長引いた試合の決着", () => {
    * 補正なしでは上限まで終わらず、補正ありでは決着することを見る。
    */
   it("削り切れない相手どうしでも、放っておけば決着する", () => {
-    const attacker = wall("golem_FIRE", 400_000, 300);
+    const attacker = wall("golem_GRASS", 400_000, 300);
     const defender = wall("golem_WATER", 400_000, 300);
 
     const plain = new BattleEngine([attacker], [defender], { rng: mulberry32(11) }).run();
@@ -86,7 +91,7 @@ describe("アリーナの、長引いた試合の決着", () => {
      * 耐久編成で塔を登る道が消えるので、ここを広げてはいけない。
      * 設定を渡さない限り倍率は1のまま、という当たり前を固定しておく。
      */
-    const attacker = wall("golem_FIRE", 400_000, 300);
+    const attacker = wall("golem_GRASS", 400_000, 300);
     const defender = wall("golem_WATER", 400_000, 300);
     const result = new BattleEngine([attacker], [defender], { rng: mulberry32(11), trialTowerFloor: 30 }).run();
     expect(result.winner).toBe("DRAW");

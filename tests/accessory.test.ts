@@ -18,7 +18,7 @@ import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterIn
 import type { Skill } from "../src/core/skill.js";
 import { findMonsterById } from "../src/data/monsters.js";
 import {
-  GUARDIAN_PROTECT_SHARE, HERALD_GUARD_MITIGATE, POWER_DEATH_BUFF, POWER_RUIN_DAMAGE_RAMP, findRuinFloor, ruinFloors, ruinLocationId, findRuinFloorByLocationId,
+  GUARDIAN_PROTECT_SHARE, HERALD_GUARD_COOLDOWN, HERALD_GUARD_MITIGATE, POWER_DEATH_BUFF, POWER_RUIN_DAMAGE_RAMP, findRuinFloor, ruinFloors, ruinLocationId, findRuinFloorByLocationId,
 } from "../src/data/ruins.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import {
@@ -377,8 +377,10 @@ describe("遺跡", () => {
     // 倒れない硬さ(HP 47,250・防御2,860)へ戻し、妨害塔は硬く(既定の狙いが先に削りに行かない)、
     // 指揮兵器は会心寄りにした。3回目で回復阻害を外して長期戦の決着(POWER_RUIN_DAMAGE_RAMP)に替え、
     // 妨害塔のHPを2倍(57,600)・指揮兵器の攻撃を0.95倍(31,573)にした。比は tests/ruinPowerRoles.test.ts
+    // 2026-10のスキル調整で味方が強くなった後、HPを 1.8 / 1.15 / 1.3倍・攻撃を一律1.33倍にし、
+    // 護りの張り直しを CT3 にして比を戻した(`HERALD_GUARD_COOLDOWN`)
     expect(p5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
-      [216_750, 31_573, 3_150, 225], [47_250, 5_400, 2_860, 205], [57_600, 7_800, 5_400, 200],
+      [390_150, 41_992, 3_150, 225], [54_338, 7_182, 2_860, 205], [74_880, 10_374, 5_400, 200],
     ]);
     // 4階は5階と分けて決める(4階STRONGの汎用の放置が約5割になる強さ)
     expect(findRuinFloor("POWER", 4)!.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
@@ -433,8 +435,8 @@ describe("遺跡", () => {
       engine.resolveTurn(herald);
       expect(boss.mitigateAmount).toBe(HERALD_GUARD_MITIGATE[floor as 4 | 5]);
       expect(boss.mitigateTurns).toBe(6);
-      // 張り直しはクールタイム5。解除で剥がすと、次に張られるまで穴が開く
-      expect(herald.cooldowns[2]).toBe(5);
+      // 張り直しはクールタイム5(5階は3)。解除で剥がすと、次に張られるまで穴が開く
+      expect(herald.cooldowns[2]).toBe(HERALD_GUARD_COOLDOWN[floor as 4 | 5]);
       expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "atk")).toBe(true);
       expect(boss.effects.some((e) => e.kind === "BUFF" && e.stat === "spd")).toBe(true);
       // 倒すと強くなる仕掛けは残す(値は小さくした)

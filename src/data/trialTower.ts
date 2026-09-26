@@ -120,11 +120,16 @@ export function towerStartFloor(bestFloor: number): number {
 
 const CYCLE: Element[] = ["FIRE", "WATER", "ELECTRIC", "GRASS"];
 
+/*
+ * **回復も盾も持たない種族・属性だけを並べる**(癒やしの階・守りの階の意味が消えるので)。
+ * 草ナイトは「たてうけ」に全体シールドが付いた(2026-10のスキル調整)ので火ナイトへ替えた。
+ * ナイトで盾を持たないのは火・水・闇だけ。
+ */
 const ATTACKER_ROSTER: { templateId: string; element: Element }[] = [
   { templateId: "slime", element: "GRASS" },
   { templateId: "wolf", element: "FIRE" },
   { templateId: "imp", element: "WATER" },
-  { templateId: "knight", element: "GRASS" },
+  { templateId: "knight", element: "FIRE" },
   { templateId: "slime", element: "ELECTRIC" },
   { templateId: "wolf", element: "WATER" },
   { templateId: "imp", element: "FIRE" },
