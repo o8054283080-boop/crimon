@@ -857,6 +857,8 @@ export class BattleEngine {
       this.push(`${this.label(unit)} はスタン中で行動できない！`);
     } else {
       this.applyTrialBossAction(unit);
+      // 前の誰かの技を引きずらない。手番の終わりの「スキル1を使ったか」はこの手番の技だけで見る
+      this.lastUsedSkill = null;
       this.act(unit, choice);
       acted = true;
     }
@@ -923,10 +925,18 @@ export class BattleEngine {
      * もう一撃だけ出る)。反撃の中では起こさない——反撃から反撃を
      * 呼び続ける形になり、盤面が止まらなくなる。
      */
-    const followUp = this.lastUsedSkill?.talentMods?.followUpS1Chance ?? 0;
+    /*
+     * フェンリルの「群狼の本能」も同じ枠で撃つ。**スキル1を使った手番だけ。**
+     * 才能の追加攻撃と重なっても、もう一撃は1回だけ(高い方の確率で判定する)。
+     */
+    const pack = passiveEffectOf(actor);
+    const usedS1 = this.lastUsedSkill !== null && this.lastUsedSkill.id === actor.def.skills[0]?.id;
+    const packRepeat = pack?.kind === "PACK_INSTINCT" && usedS1 ? pack.repeatS1Chance : 0;
+    const followUp = Math.max(this.lastUsedSkill?.talentMods?.followUpS1Chance ?? 0, packRepeat);
     if (actor.alive && followUp > 0 && this.counterDepth === 0 && this.rng() < followUp) {
       const s1 = actor.def.skills[0];
       if (s1 && !s1.passive) {
+        if (packRepeat > 0) this.pushPassiveCue(actor);
         this.push(`  → ${this.label(actor)} の追加攻撃！`);
         this.counterDepth += 1;
         try {

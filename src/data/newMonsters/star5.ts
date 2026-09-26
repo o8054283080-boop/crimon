@@ -261,16 +261,21 @@ export const FENRIR: MonsterTemplate = {
     {
       id: "fenrir_s3_c",
       name: "群狼の本能",
-      description: "パッシブ。クリダメが常に上がり、敵を倒すたびに追加ターンを得る(回数の制限はない)。",
+      description: "パッシブ。クリダメが常に上がり、敵を倒すたびに追加ターンを得る(回数の制限はない)。スキル1を使った後、50%でもう一度スキル1を使う。",
       target: "SELF",
       cooldownTurns: 0,
       effects: [],
+      /*
+       * クリダメは 20%から最大50%(依頼主の指定)。元は 4%〜10% で、
+       * 追加ターンの条件(倒すこと)を満たす力が足りなかった。
+       * スキル1の再使用は全段50%で固定し、レベルで伸びるのはクリダメだけにする
+       */
       passive: passive("SELF_KILL", [
-        { kind: "PACK_INSTINCT", critDmg: 0.04 },
-        { kind: "PACK_INSTINCT", critDmg: 0.05 },
-        { kind: "PACK_INSTINCT", critDmg: 0.06 },
-        { kind: "PACK_INSTINCT", critDmg: 0.08 },
-        { kind: "PACK_INSTINCT", critDmg: 0.10 },
+        { kind: "PACK_INSTINCT", critDmg: 0.20, repeatS1Chance: 0.5 },
+        { kind: "PACK_INSTINCT", critDmg: 0.25, repeatS1Chance: 0.5 },
+        { kind: "PACK_INSTINCT", critDmg: 0.30, repeatS1Chance: 0.5 },
+        { kind: "PACK_INSTINCT", critDmg: 0.40, repeatS1Chance: 0.5 },
+        { kind: "PACK_INSTINCT", critDmg: 0.50, repeatS1Chance: 0.5 },
       ]),
     },
   ],
