@@ -1,5 +1,6 @@
 import { MonsterTemplate } from "../../core/monster.js";
 import { ATK_DOWN, DEF_DOWN, POISON_RATE, passive } from "./shared.js";
+import { described } from "../collabMonsters/shared.js";
 
 /*
  * 星5の4種。
@@ -186,16 +187,35 @@ export const FENRIR: MonsterTemplate = {
         { kind: "DAMAGE", multiplier: 0.6, ignoreDefense: true },
       ],
     },
-    {
+    /*
+     * 狩猟本能。**Lv2・3で協力攻撃のダメージ、Lv4・5でクールタイム。**
+     *
+     * 元は Lv5 のCT-1しか伸びず、Lv2〜4が「変化なし」だった(依頼主の指摘)。
+     * CT短縮は重いので大体Lv5に置く決まりだが、この技は殴る量が味方のスキル1に
+     * 縛られていて素の強さが控えめなので、依頼主の指定で Lv4・Lv5 の2段に置く。
+     */
+    described({
       id: "fenrir_s2_b",
       name: "狩猟本能",
-      description: "遠吠えで味方2体を呼び、指定した敵へ全員がスキル1で協力攻撃を行う。参加した味方はクールタイムが1ターン短縮される(フェンリル自身は短縮されない)。",
+      description: "",
       target: "SINGLE_ENEMY",
       cooldownTurns: 5,
       effects: [
-        { kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1 },
+        { kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1 },
       ],
-    },
+      levelOverrides: [
+        // Lv1
+        { cooldownTurns: 5, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1 }] },
+        // Lv2 協力攻撃のダメージ 1.0 → 1.1倍
+        { cooldownTurns: 5, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.1 }] },
+        // Lv3 協力攻撃のダメージ 1.1 → 1.2倍
+        { cooldownTurns: 5, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.2 }] },
+        // Lv4 CT5 → CT4
+        { cooldownTurns: 4, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.2 }] },
+        // Lv5 CT4 → CT3
+        { cooldownTurns: 3, effects: [{ kind: "COOP_ATTACK", allies: 2, allyCooldownReduce: 1, damageMultiplier: 1.2 }] },
+      ],
+    }, "【対象】敵単体。フェンリル自身のクールタイムは短縮されない"),
     {
       id: "fenrir_s2_c",
       name: "喉笛裂き",

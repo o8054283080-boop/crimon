@@ -200,6 +200,28 @@ const GAUGE_EPSILON = 1e-6;
  * 敵4体の技で自己バフが4重にかかる。呼び出し側はこれを見て、
  * 1回の使用につき1度だけ適用する。
  */
+/**
+ * 協力攻撃の与ダメージ倍率(フェンリルの狩猟本能)を、呼ばれた味方のスキル1へ掛ける。
+ *
+ * **倍率だけでなくHP比例・防御比例にも掛ける。**倍率にしか掛けないと、
+ * 防御やHPで殴る味方を呼んだ時に「ダメージ1.1倍」にならない。
+ * 元のスキルは書き換えない(図鑑やその味方自身の手番に漏れる)。
+ */
+function scaleCoopDamage(skill: Skill, factor: number): Skill {
+  if (factor === 1) return skill;
+  return {
+    ...skill,
+    effects: skill.effects.map((effect) => effect.kind === "DAMAGE"
+      ? {
+        ...effect,
+        multiplier: effect.multiplier * factor,
+        hpCoefficient: effect.hpCoefficient === undefined ? undefined : effect.hpCoefficient * factor,
+        defCoefficient: effect.defCoefficient === undefined ? undefined : effect.defCoefficient * factor,
+      }
+      : effect),
+  };
+}
+
 function isSourceScopedEffect(effect: SkillEffect): boolean {
   switch (effect.kind) {
     case "DAMAGE_BOOST": case "HEAL": case "BUFF": case "STATUS": case "GAUGE": case "SHIELD":
@@ -2074,10 +2096,11 @@ export class BattleEngine {
         this.push(`  → ${this.label(helper)} が協力攻撃に加わった！`);
         const helperSkill = helper.def.skills[0];
         const helperLatent = helper.def.latentAbility?.skillSlot === 0 ? helper.def.latentAbility : undefined;
-        const resolved = this.applyChargeToSkill(
+        const charged = this.applyChargeToSkill(
           helperLatent ? this.applyLatentToSkill(helperSkill, helperLatent) : helperSkill,
           helper.latentChargeBonus,
         );
+        const resolved = scaleCoopDamage(charged, coop.damageMultiplier ?? 1);
         helper.latentChargeBonus = 0;
         const resolution = newResolution();
         const previous = this.resolution;

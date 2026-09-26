@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ELEMENTS } from "../src/core/element.js";
 import { createMonsterVariant } from "../src/core/monster.js";
-import { MAX_SKILL_LEVEL, computeLeveledSkill } from "../src/core/skill.js";
+import { MAX_SKILL_LEVEL, computeLeveledSkill, describeSkillGrowth } from "../src/core/skill.js";
 import { passiveAtLevel } from "../src/core/passive.js";
 import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterInstance.js";
 import { BattleEngine } from "../src/battle/engine.js";
@@ -237,6 +237,34 @@ describe("⑪ フェンリルの協力攻撃", () => {
     const reduced = [kobold, slime].filter((unit) => unit.cooldowns[1] === 2).length;
     expect(reduced).toBe(2);
     expect(fenrir.cooldowns[1]).toBeGreaterThan(0);
+  });
+
+  it("スキルLvで協力攻撃のダメージが伸びる(Lv3で1.2倍)", () => {
+    const damageAt = (level: number) => {
+      const engine = battle(["fenrir_GRASS", "kobold_FIRE", "slime_FIRE"], ["golem_WATER"], () => 0.99);
+      const [fenrir, , , golem] = engine.getUnits();
+      const skills = [...fenrir.def.skills];
+      skills[1] = computeLeveledSkill(skills[1], level);
+      fenrir.def = { ...fenrir.def, skills: skills as typeof fenrir.def.skills };
+      const before = golem.currentHp;
+      engine.resolveTurn(fenrir, { skillIndex: 1 });
+      return before - golem.currentHp;
+    };
+    const lv1 = damageAt(1);
+    expect(lv1).toBeGreaterThan(0);
+    expect(damageAt(2) / lv1).toBeCloseTo(1.1, 1);
+    expect(damageAt(3) / lv1).toBeCloseTo(1.2, 1);
+  });
+
+  it("狩猟本能は Lv2・3でダメージ、Lv4・5でクールタイムが伸びる", () => {
+    const skill = findMonsterById("fenrir_GRASS")!.skills[1];
+    expect(skill.id).toBe("fenrir_s2_b");
+    expect(describeSkillGrowth(skill).map((step) => step.changes)).toEqual([
+      ["協力攻撃のダメージ 1.00倍→1.10倍"],
+      ["協力攻撃のダメージ 1.10倍→1.20倍"],
+      ["クールタイム -1(5→4ターン)"],
+      ["クールタイム -1(4→3ターン)"],
+    ]);
   });
 
   it("協力攻撃が協力攻撃を呼ばない", () => {
