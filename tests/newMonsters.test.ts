@@ -306,6 +306,26 @@ describe("⑪ フェンリルの協力攻撃", () => {
     ]);
   });
 
+  it("フェンリル自身が先頭でスキル1を撃ち、続いて味方2体が加わる(依頼主の指定)", () => {
+    const engine = battle(["fenrir_GRASS", "kobold_FIRE", "slime_FIRE"], ["golem_WATER"], () => 0.99);
+    const [fenrir] = engine.getUnits();
+    const lines = engine.resolveTurn(fenrir, { skillIndex: 1 }).lines;
+    const lead = lines.findIndex((line) => line.includes("先陣を切った"));
+    const firstHelper = lines.findIndex((line) => line.includes("協力攻撃に加わった"));
+    expect(lead).toBeGreaterThan(-1);
+    expect(lead).toBeLessThan(firstHelper);
+    // 本人のスキル1(2連撃)の分だけ、先陣と最初の味方の間にダメージの行がある
+    expect(lines.slice(lead, firstHelper).filter((line) => line.includes("ダメージ")).length).toBeGreaterThan(0);
+  });
+
+  it("呼べる味方がいなくても、フェンリル自身の一撃は出る", () => {
+    const engine = battle(["fenrir_GRASS"], ["golem_WATER"], () => 0.99);
+    const [fenrir, golem] = engine.getUnits();
+    const before = golem.currentHp;
+    engine.resolveTurn(fenrir, { skillIndex: 1 });
+    expect(golem.currentHp).toBeLessThan(before);
+  });
+
   it("協力攻撃が協力攻撃を呼ばない", () => {
     // フェンリル2体でも、入れ子にならず1段で止まる
     const engine = battle(["fenrir_GRASS", "fenrir_GRASS"], ["golem_WATER"], () => 0.99);

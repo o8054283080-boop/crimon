@@ -489,7 +489,8 @@ export interface StealBuffEffect {
 }
 
 /**
- * 協力攻撃。指定した味方を呼び、**同じ相手へそれぞれのスキル1で攻撃させる。**
+ * 協力攻撃。指定した味方を呼び、**本人と呼んだ味方が同じ相手へそれぞれのスキル1で攻撃する。**
+ * 本人が先頭。クールタイムが縮むのは呼ばれた味方だけ。
  *
  * 呼ばれた側のスキル1の追加効果も潜在能力も普通に乗る。
  * ただし**協力攻撃が協力攻撃を呼ぶことはない**(無限に連鎖するため)。
@@ -1183,7 +1184,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
       const boost = effect.damageMultiplier !== undefined && effect.damageMultiplier !== 1
         ? ` / 協力攻撃のダメージ${effect.damageMultiplier.toFixed(2)}倍`
         : "";
-      return `味方${effect.allies}体とともに同じ相手へスキル1で協力攻撃${cd}${boost}`;
+      return `自身と味方${effect.allies}体が同じ相手へスキル1で協力攻撃${cd}${boost}`;
     }
     case "GAUGE_ON_HIT":
       return `${effect.durationTurns}ターン、攻撃を受けるたび行動ゲージ+${Math.round(effect.amount * 100)}%`;

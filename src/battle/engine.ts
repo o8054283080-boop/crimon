@@ -2097,30 +2097,40 @@ export class BattleEngine {
       .filter((unit) => unit.team === source.team && unit.alive && unit !== source && unit.stunTurns <= 0)
       .sort((a, b) => getEffectiveStat(b, "atk") - getEffectiveStat(a, "atk"))
       .slice(0, Math.max(0, coop.allies));
-    if (helpers.length === 0) return;
+    /*
+     * **呼んだ本人も先頭でスキル1を撃つ**(依頼主の指定。「自身と仲間2体がスキル1で攻撃する」)。
+     * 元は呼ばれた味方だけが殴り、フェンリル自身は何もしていなかった。
+     * 本人のクールタイムは縮めない。呼べる味方がいない時も、本人の一撃は出る
+     */
+    const attackers = source.alive ? [source, ...helpers] : helpers;
+    if (attackers.length === 0) return;
 
     this.coopDepth += 1;
     try {
-      for (const helper of helpers) {
+      for (const attacker of attackers) {
         if (!target.alive) break;
-        this.push(`  → ${this.label(helper)} が協力攻撃に加わった！`);
-        const helperSkill = helper.def.skills[0];
-        const helperLatent = helper.def.latentAbility?.skillSlot === 0 ? helper.def.latentAbility : undefined;
+        const isSource = attacker === source;
+        this.push(isSource
+          ? `  → ${this.label(attacker)} が先陣を切った！`
+          : `  → ${this.label(attacker)} が協力攻撃に加わった！`);
+        const s1 = attacker.def.skills[0];
+        if (!s1 || s1.passive) continue;
+        const latent = attacker.def.latentAbility?.skillSlot === 0 ? attacker.def.latentAbility : undefined;
         const charged = this.applyChargeToSkill(
-          helperLatent ? this.applyLatentToSkill(helperSkill, helperLatent) : helperSkill,
-          helper.latentChargeBonus,
+          latent ? this.applyLatentToSkill(s1, latent) : s1,
+          attacker.latentChargeBonus,
         );
         const resolved = scaleCoopDamage(charged, coop.damageMultiplier ?? 1);
-        helper.latentChargeBonus = 0;
+        attacker.latentChargeBonus = 0;
         const resolution = newResolution();
         const previous = this.resolution;
         this.resolution = resolution;
-        this.applySkillEffects(helper, target, resolved, false, true, helperLatent, resolution);
-        this.applyAttackPassives(helper, [target], resolution);
-        if (helperLatent) this.applyLatentAfterSkill(helper, target, helperLatent, resolution);
+        this.applySkillEffects(attacker, target, resolved, false, true, latent, resolution);
+        this.applyAttackPassives(attacker, [target], resolution);
+        if (latent) this.applyLatentAfterSkill(attacker, target, latent, resolution);
         this.resolution = previous;
-        if (coop.allyCooldownReduce) {
-          helper.cooldowns = helper.cooldowns.map((c) => Math.max(0, c - coop.allyCooldownReduce!)) as [number, number, number];
+        if (!isSource && coop.allyCooldownReduce) {
+          attacker.cooldowns = attacker.cooldowns.map((c) => Math.max(0, c - coop.allyCooldownReduce!)) as [number, number, number];
         }
       }
     } finally {
