@@ -109,8 +109,10 @@ const SCREENS = [
    * スキル3は札がいちばん多く、パッシブの札もここにだけ出る。
    */
   {
-    name: "スキル図鑑", tab: "HOME", tile: "dex",
-    setup: "document.querySelector('[data-tour=\"monster-dex-to-skill-dex\"]')?.click()",
+    // 札を1枚開いた姿(スキルLv別の変化)も一緒に測る
+    name: "スキル図鑑(札を開く)", tab: "HOME", tile: "dex",
+    setup: "document.querySelector('[data-tour=\"monster-dex-to-skill-dex\"]')?.click(); await wait(400);"
+      + " document.querySelector('[data-tour=\"skill-dex-card\"]')?.click()",
   },
   {
     name: "スキル図鑑(スキル3・絞り込みを開く)", tab: "HOME", tile: "dex",

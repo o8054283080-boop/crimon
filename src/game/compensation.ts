@@ -57,6 +57,14 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-skill-dex-levels-and-nav",
+    title: "スキル図鑑でスキルLv別の変化を見られるようにしました",
+    message: "・スキル図鑑のスキルを押すと、「レベルを上げると」何が変わるかと、Lv別の効果がその場で開きます(もう一度押すと閉じます)\n"
+      + "・iPhoneで、文字を入力してキーボードを閉じた後などに、下のバーが画面の途中に表示されることがある不具合を直しました\n"
+      + "・パッシブスキルのLv別の表示に「CTなし」と出ていたのをやめました",
+    kind: "UPDATE", fromDate: "2026-09-26", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-pve-rebalance-after-skill-tuning",
     title: "スキル調整に合わせて、一部の敵を調整しました",
     message: "先日のスキル調整と火傷の見直しで、敵が使うスキルも強くなったり、味方が強くなりすぎたりした場所を直しました。\n\n"

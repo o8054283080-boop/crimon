@@ -11,7 +11,7 @@ import { el } from "../dom.js";
 import { withPortrait } from "../three/portrait.js";
 import "../ui/skillDex.css";
 import { screenHeadAction, screenHeader } from "./managementHeader.js";
-import { describeSkillTarget, skillDescriptionText } from "./skillPanel.js";
+import { describeSkillTarget, renderSkillLevelDetail, skillDescriptionText } from "./skillPanel.js";
 
 /**
  * スキル図鑑。**欲しい効果のスキルを探して、誰が持っているかを見る。**
@@ -209,26 +209,81 @@ function badges(entry: SkillDexEntry): HTMLElement[] {
   return out;
 }
 
+/**
+ * Lv別の変化を開いている札(枠とスキルIDの組)。
+ *
+ * 絞り込みや検索で画面を描き直しても、開いた札は開いたまま残す。
+ * 開け閉めそのものは**描き直さずにその場で**切り替える(一覧の位置が飛ばない)。
+ */
+const openLevelKeys = new Set<string>();
+
+function toggleLevels(key: string, card: HTMLElement, skill: SkillDexResult["entry"]["skill"]): void {
+  const open = !openLevelKeys.has(key);
+  if (open) openLevelKeys.add(key); else openLevelKeys.delete(key);
+  const trigger = card.querySelector<HTMLElement>(".skill-dex__card-main");
+  trigger?.setAttribute("aria-expanded", String(open));
+  const hint = card.querySelector<HTMLElement>(".skill-dex__card-hint");
+  if (hint) hint.textContent = levelHint(open);
+  let panel = card.querySelector<HTMLElement>(".skill-dex__levels");
+  if (open && !panel) {
+    panel = levelPanel(skill);
+    card.querySelector(".skill-dex__holders")?.before(panel);
+  }
+  if (panel) panel.hidden = !open;
+}
+
+function levelHint(open: boolean): string {
+  return open ? "▲ スキルLv別の変化を閉じる" : "▼ タップでスキルLv別の変化を見る";
+}
+
+/** モンスター図鑑の「スキルLv別の変化」と同じ部品(`renderSkillLevelDetail`) */
+function levelPanel(skill: SkillDexResult["entry"]["skill"]): HTMLElement {
+  return el("section", { className: "skill-dex__levels", ariaLabel: `${skill.name}のスキルLv別の変化` }, renderSkillLevelDetail(skill));
+}
+
 function resultCard(result: SkillDexResult, props: SkillDexProps): HTMLElement {
   const { entry, holders } = result;
   const { skill } = entry;
   const ct = entry.isPassive ? "常時" : skill.cooldownTurns > 0 ? `CT${skill.cooldownTurns}` : "CTなし";
   // 効果の行は**効果から作った文**(Lv1)。手書きの説明は、生成文の後ろの一言だけを添える
   const lines = [describeSkillTarget(skill), ...describeSkillLines(skill)];
-  return el("article", { className: "skill-dex__card", "data-skill-id": skill.id }, [
-    el("header", { className: "skill-dex__card-head" }, [
-      el("span", { className: "skill-dex__card-slot" }, [`S${entry.slot + 1}`]),
-      el("strong", { className: "skill-dex__card-name" }, [skill.name]),
-      el("span", { className: "skill-dex__card-ct" }, [ct]),
+  const open = openLevelKeys.has(entry.key);
+  /*
+   * **札の上側(名前・効果)を押すと、Lv別の変化が開く。**
+   * 持ち主の札は別のボタン(図鑑の詳細へ)なので、押せる範囲を分けてある。
+   * 中に段落と箇条書きがあるので button 要素ではなく role="button" にする。
+   */
+  const card: HTMLElement = el("article", { className: "skill-dex__card", "data-skill-id": skill.id }, [
+    el("div", {
+      className: "skill-dex__card-main",
+      role: "button",
+      tabIndex: 0,
+      "aria-expanded": String(open),
+      "data-tour": "skill-dex-card",
+      onclick: () => toggleLevels(entry.key, card, skill),
+      onkeydown: (event: KeyboardEvent) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        toggleLevels(entry.key, card, skill);
+      },
+    }, [
+      el("header", { className: "skill-dex__card-head" }, [
+        el("span", { className: "skill-dex__card-slot" }, [`S${entry.slot + 1}`]),
+        el("strong", { className: "skill-dex__card-name" }, [skill.name]),
+        el("span", { className: "skill-dex__card-ct" }, [ct]),
+      ]),
+      el("div", { className: "skill-dex__badges" }, badges(entry)),
+      ...skillDescriptionText(skill).map((text) => el("p", { className: "skill-dex__card-desc" }, [text])),
+      el("ul", { className: "skill-dex__card-lines" }, lines.map((line) => el("li", {}, [line]))),
+      el("span", { className: "skill-dex__card-hint" }, [levelHint(open)]),
     ]),
-    el("div", { className: "skill-dex__badges" }, badges(entry)),
-    ...skillDescriptionText(skill).map((text) => el("p", { className: "skill-dex__card-desc" }, [text])),
-    el("ul", { className: "skill-dex__card-lines" }, lines.map((line) => el("li", {}, [line]))),
+    open ? levelPanel(skill) : null,
     el("div", { className: "skill-dex__holders" }, [
       el("span", { className: "skill-dex__holders-label" }, [`持っているモンスター(${holders.length}体)`]),
       el("div", { className: "skill-dex__holder-list" }, holders.map((dex) => holderChip(dex, props.onOpenMonster))),
     ]),
-  ]);
+  ].filter((node): node is HTMLElement => node !== null));
+  return card;
 }
 
 export function renderSkillDex(props: SkillDexProps): HTMLElement {

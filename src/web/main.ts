@@ -270,6 +270,7 @@ import { StageResultInfo, StageResultLevelUp, renderStageResult } from "./views/
 import { renderSummon, type SummonMethod, type SummonTab } from "./views/summon.js";
 import { el } from "./dom.js";
 import { PwaUpdateController } from "./pwaUpdate.js";
+import { installViewportNavFix } from "./viewportNavFix.js";
 import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
 import { buyCrystalShopItem, crystalShopRows } from "../game/crystalShop.js";
 import type { Accessory } from "../core/accessory.js";
@@ -961,6 +962,7 @@ let persistState: PersistState = "UNSUPPORTED";
 const rootCandidate = document.getElementById("app");
 if (!rootCandidate) throw new Error("#app root element not found");
 const root: HTMLElement = rootCandidate;
+installViewportNavFix();
 
 /*
  * 横持ちの案内。**このゲームは縦持ち専用。**
