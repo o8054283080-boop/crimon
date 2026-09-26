@@ -320,13 +320,32 @@ function waveTemplateIds(theme: ChapterTheme, stageNumber: number, waveNumber: n
   return fixed ? [...fixed] : rotatingWaveTemplateIds(theme.templateId, globalStageIndex(theme.chapter, stageNumber), waveNumber);
 }
 
+/**
+ * 属性の並びを手で決めるウェーブ(「章-面-ウェーブ」)。**並びの式では困る所だけ**を書く。
+ *
+ * 敵はスキルを Lv1 のまま使う。2026-10のスキル調整で Lv1 が上がった技と、
+ * 火傷の式の見直し(受け手の実効攻撃力×2 + 最大HP比例)で、序盤の2か所が約束を割った。
+ * スキルは依頼主の指定なので触らず、**同じ種族のまま属性だけを入れ替えて**その技を外す。
+ *
+ * - 1-1 の1波目: 火ゴーレムの「溶岩落とし」(全体に火傷)。初期編成が2%ほど負けるようになった
+ *   (`tests/stageRunner.test.ts`)。ゴーレムとフェアリーの属性を入れ替える
+ * - 2-5 の1波目: 火トレントの「もりのゆりかご」(全体回復+継続回復+シールド)。
+ *   ★2Lv20の2章ボス突破が97%→69%に落ちた(`tests/stageChapterBalance.test.ts`)。
+ *   トレントとナイトの属性を入れ替える
+ */
+const WAVE_ELEMENT_OVERRIDES: Record<string, Element[]> = {
+  "1-1-1": ["ELECTRIC", "GRASS", "WATER", "FIRE"],
+  "2-5-1": ["ELECTRIC", "GRASS", "WATER", "FIRE"],
+};
+
 function buildWave(theme: ChapterTheme, stageNumber: number, waveNumber: number, isBossWave: boolean): Wave {
   const globalIndex = globalStageIndex(theme.chapter, stageNumber);
   const baseStar = baseStarForGlobalIndex(globalIndex);
   const baseLevel = baseLevelForGlobalIndex(globalIndex, waveNumber);
+  const elementOverride = WAVE_ELEMENT_OVERRIDES[`${theme.chapter}-${stageNumber}-${waveNumber}`];
 
   const enemies: WaveEnemy[] = waveTemplateIds(theme, stageNumber, waveNumber).map((templateId, i) => {
-    const element = NORMAL_ELEMENTS[(i + stageNumber + waveNumber) % NORMAL_ELEMENTS.length];
+    const element = elementOverride?.[i] ?? NORMAL_ELEMENTS[(i + stageNumber + waveNumber) % NORMAL_ELEMENTS.length];
     return {
       templateId,
       element,

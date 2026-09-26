@@ -595,7 +595,7 @@ const GOLEM: MonsterTemplate = {
     {
       id: "golem_s3_b",
       name: "溶岩落とし",
-      description: "ダメージ倍率 1.20倍(防御力の75%を加算)。100%で火傷 (2ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
+      description: "ダメージ倍率 1.20倍(防御力の75%を加算)。100%で火傷 (2ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
@@ -2231,7 +2231,7 @@ const DRAGON: MonsterTemplate = {
        * クリティカル・反撃回数・ヒット数で数える仕掛けへの噛み合い方が変わる。
        * 数字の大小ではなく、別のスキルになる。
        */
-      description: "ダメージ倍率 0.70倍 × 3回。50%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
+      description: "ダメージ倍率 0.70倍 × 3回。50%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
@@ -2351,7 +2351,7 @@ const DRAGON: MonsterTemplate = {
       id: "dragon_s2_d_flame",
       name: "フレイムブレス",
       // 火のドラゴンと同じ。片方だけ直すと、同じ名前で中身が違うことになる
-      description: "ダメージ倍率 0.70倍 × 3回。50%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
+      description: "ダメージ倍率 0.70倍 × 3回。50%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [
@@ -2755,7 +2755,7 @@ const NEMESIS: MonsterTemplate = {
     {
       id: "nemesis_s2_a",
       name: "冥府の炎",
-      description: "ダメージ倍率 1.80倍。100%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)",
+      description: "ダメージ倍率 1.80倍。100%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)",
       target: "ALL_ENEMIES",
       cooldownTurns: 3,
       effects: [

@@ -95,7 +95,7 @@ const SHARED_STATS: Record<1 | 2 | 3, { boss: Quad; a: Quad; b: Quad }> = {
  * 2回目の直しでは、汎用が本体を得とする理由が解除ではなく属性の差だった。回復阻害は膠着を負けに変えただけで、
  * 4階も重くなりすぎた。いまの形:
  *
- *   - 号令塔は生きている間、指揮兵器へ護り(攻撃力UP・速さUP・被ダメ軽減)を張る。**CT5・持続6**
+ *   - 号令塔は生きている間、指揮兵器へ護り(攻撃力UP・速さUP・被ダメ軽減)を張る。**CT5(5階は3)・持続6**
  *     (`heraldGuardSkills`)。張り直しが遅いので、**解除で剥がすと次に張られるまで穴が開く。**
  *     剥がれる順は 攻撃力UP → 速さUP → 軽減(`stripBuffs` の順)。本体狙いを重くしているのは攻撃力UPと速さUPで、
  *     軽減だけの護りでは本体狙いがまた最善に戻った(5階STRONGで汎用80%)
@@ -113,10 +113,21 @@ const SHARED_STATS: Record<1 | 2 | 3, { boss: Quad; a: Quad; b: Quad }> = {
 const POWER_STATS: Record<number, { boss: Quad; a: Quad; b: Quad }> = {
   ...SHARED_STATS,
   4: { boss: [191_250, 28_445, 3_150, 216], a: [42_000, 4_650, 2_730, 195], b: [48_000, 7_050, 5_100, 188] },
-  5: { boss: [216_750, 31_573, 3_150, 225], a: [47_250, 5_400, 2_860, 205], b: [57_600, 7_800, 5_400, 200] },
+  /*
+   * 5階は2026-10のスキル調整の後に測り直した。味方が強くなり、汎用が 既定77% まで上がって
+   * 「号令塔を倒すか残すか」の差も消えていた。旧値(指揮兵器 216,750/31,573、号令塔 47,250/5,400、
+   * 妨害塔 57,600/7,800)から HP を 1.8 / 1.15 / 1.3倍、攻撃を一律1.33倍にし、護りの張り直しを CT3 にした
+   * (`HERALD_GUARD_COOLDOWN`)。`tests/ruinPowerRoles.test.ts` の比がすべて戻る組を格子で探して決めた
+   */
+  5: { boss: [390_150, 41_992, 3_150, 225], a: [54_338, 7_182, 2_860, 205], b: [74_880, 10_374, 5_400, 200] },
 };
 /** 力の遺跡4・5階の号令塔が指揮兵器へ張る被ダメ軽減。4階は放置で汎用が半分勝てるよう軽くしてある */
 export const HERALD_GUARD_MITIGATE: Record<4 | 5, number> = { 4: 0.65, 5: 0.8 };
+/**
+ * 号令塔の護りの張り直し(クールタイム)。5階は3。
+ * 味方の解除が強くなって5階で本体狙いが得すぎた(放置が最善から10pt以上離れた)ので、剥がされても早く張り直す
+ */
+export const HERALD_GUARD_COOLDOWN: Record<4 | 5, number> = { 4: 5, 5: 3 };
 /**
  * 力の遺跡4・5階の長期戦の決着。180手を過ぎると、10手ごとに両陣営の与えるダメージが1.35倍ずつ増える
  * (アリーナの `ARENA_DAMAGE_RAMP` と同じ仕組み。指揮兵器の特性 `battleDamageRamp` としてエンジンへ渡る)。
@@ -203,15 +214,15 @@ const HERALD_SKILLS: [Skill, Skill, Skill] = [
  *
  * **解除で剥がれる順は 攻撃力UP → 速さUP → 軽減。**
  */
-function heraldGuardSkills(mitigate: number): [Skill, Skill, Skill] {
+function heraldGuardSkills(mitigate: number, cooldownTurns: number): [Skill, Skill, Skill] {
   const pct = Math.round(mitigate * 100);
   return [
     HERALD_SKILLS[0],
     HERALD_SKILLS[1],
     {
       id: "ruin_herald_s3_guard", name: "指揮の護り",
-      description: `指揮兵器の攻撃力と速さを6ターン上昇させ、受けるダメージを6ターン${pct}%軽減する(強化。解除1個で攻撃力UP、2個で速さUP、3個で軽減が外れる。張り直しはクールタイム5)。`,
-      target: "SINGLE_ALLY", cooldownTurns: 5,
+      description: `指揮兵器の攻撃力と速さを6ターン上昇させ、受けるダメージを6ターン${pct}%軽減する(強化。解除1個で攻撃力UP、2個で速さUP、3個で軽減が外れる。張り直しはクールタイム${cooldownTurns})。`,
+      target: "SINGLE_ALLY", cooldownTurns,
       effects: [
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 6 },
         { kind: "MITIGATE", amount: mitigate, durationTurns: 6 },
@@ -393,7 +404,7 @@ function buildPowerFloor(floor: number): RuinFloor {
       },
       {
         templateId: ANCIENT_CRYSTAL.templateId, element, star: 6, level: 60,
-        displayName: "号令塔", fixedStats: fixed(stats.a), skills: guarded ? heraldGuardSkills(HERALD_GUARD_MITIGATE[floor as 4 | 5]) : HERALD_SKILLS,
+        displayName: "号令塔", fixedStats: fixed(stats.a), skills: guarded ? heraldGuardSkills(HERALD_GUARD_MITIGATE[floor as 4 | 5], HERALD_GUARD_COOLDOWN[floor as 4 | 5]) : HERALD_SKILLS,
         // 護りは開幕すぐに張る(3番目のCTを0で始める)
         bossTraits: { empowerBossOnDeath: { atk: buff.atk } }, initialCooldowns: guarded ? [0, 1, 0] : [0, 1, 2],
       },

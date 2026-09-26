@@ -123,9 +123,14 @@ const BOSS_TEMPLATE = ANCIENT_DEMON;
  */
 /**
  * 1階だけの攻撃力倍率。**新しい防御式が序盤で効かないぶんを、敵の痛さで戻す。**
- * 星3+★1装備で1階を抜けられる水準として依頼主が決めた値。
+ * 星3+★1装備で1階を抜けられる水準として依頼主が決めた値(当初 0.7)。
+ *
+ * **2026-10のスキル調整で 1.0 に戻した。**味方のスキル(特にフェアリーの回復)が強くなり、
+ * 0.7 のままだと★3が**装備なしでも**1階を100%抜けていた(装備ダンジョンの入口で装備が要らない)。
+ * 1.0 で★3装備なし3% / ★3+★1装備93%(`tests/equipmentDungeonBalance.test.ts`、120回)。
+ * 依頼主の基準「星3+★1装備で抜けられる」はそのまま満たしている。
  */
-export const FIRST_FLOOR_ATK_MULTIPLIER = 0.7;
+export const FIRST_FLOOR_ATK_MULTIPLIER = 1.0;
 const BOSS_HP_MULTIPLIER = 5;
 
 /**
