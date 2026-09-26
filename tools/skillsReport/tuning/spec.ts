@@ -83,7 +83,13 @@ export const SPEC: SkillSpec[] = [
   {
     id: "wolf_s2_a",
     structure: [patch(0, { scaleBonus: { stat: "spd", bonusAtReference: 0.10 } })],
-    note: "「少量の速度比例を追加」は量の指定が無いため 0.10(速度200で攻撃力0.10倍ぶん)とした",
+    values: { ct: ct5(2) },
+    // 変更前は Lv5 で CT1(一律成長の -1)。CT1 の2回攻撃は毎手番に近く撃てるので長くする(依頼主の指定)
+    allowWeaker: {
+      ct: "依頼主の指定: ふいうちの牙はスキルMAXでもCT2(2026-09-26)",
+      cooldownTurns: "依頼主の指定: ふいうちの牙はスキルMAXでもCT2(2026-09-26)",
+    },
+    note: "「少量の速度比例を追加」は量の指定が無いため 0.10(速度200で攻撃力0.10倍ぶん)とした。Lv5のCTは依頼主の指定で2(CT1にしない)",
   },
   {
     id: "wolf_s2_b",

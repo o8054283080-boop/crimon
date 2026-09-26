@@ -380,7 +380,7 @@ describe("遺跡", () => {
     // 2026-10のスキル調整で味方が強くなった後、HPを 1.8 / 1.15 / 1.3倍・攻撃を一律1.33倍にし、
     // 護りの張り直しを CT3 にして比を戻した(`HERALD_GUARD_COOLDOWN`)
     expect(p5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
-      [390_150, 41_992, 3_150, 225], [54_338, 7_182, 2_860, 205], [74_880, 10_374, 5_400, 200],
+      [390_150, 41_992, 3_150, 225], [57_055, 7_182, 2_860, 205], [74_880, 10_374, 5_400, 200],
     ]);
     // 4階は5階と分けて決める(4階STRONGの汎用の放置が約5割になる強さ)
     expect(findRuinFloor("POWER", 4)!.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([
