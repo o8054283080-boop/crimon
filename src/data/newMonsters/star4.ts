@@ -151,13 +151,13 @@ export const BASILISK: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.6, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] }] },
-      // Lv2 ダメージ倍率 0.60倍→0.70倍 / 行動ゲージ -30%→-50%
+      // Lv2 ダメージ倍率 0.60倍→0.70倍
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.5 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] }] },
-      // Lv3 行動ゲージ -50%→-60% / スタンの発動率 25%→30%
+      // Lv3 行動ゲージの発動率 50%→60% / スタンの発動率 25%→30%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.6 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] }] },
       // Lv4 ダメージ倍率 0.70倍→0.80倍 / スタンの発動率 30%→35%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.6 }, { kind: "STUN", durationTurns: 1, chance: 0.35 }] }] },
-      // Lv5 クールタイム -1(5→4ターン) / 行動ゲージ -60%→-70% / スタンの発動率 35%→40%
+      // Lv5 クールタイム -1(5→4ターン) / 行動ゲージの発動率 60%→70% / スタンの発動率 35%→40%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, perHitEffects: [{ kind: "GAUGE", amount: -0.3, chance: 0.7 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] }] },
     ],
   },
@@ -283,11 +283,11 @@ export const MIMIC: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.13, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.5 } }] },
         // Lv2 ダメージ倍率 1.60倍→1.90倍 / 最大HP比例 13%→16%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.9, hpCoefficient: 0.16, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.5 } }] },
-        // Lv3 ダメージ倍率 1.90倍→2.20倍 / 最大HP比例 16%→19%
+        // Lv3 ダメージ倍率 1.90倍→2.20倍 / 最大HP比例 16%→19% / 失ったHPによる上昇の上限 50%→60%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.2, hpCoefficient: 0.19, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.6 } }] },
         // Lv4 ダメージ倍率 2.20倍→2.60倍 / 最大HP比例 19%→22%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.6, hpCoefficient: 0.22, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.6 } }] },
-        // Lv5 クールタイム -2(5→3ターン) / ダメージ倍率 2.60倍→3.00倍 / 最大HP比例 22%→25%
+        // Lv5 クールタイム -2(5→3ターン) / ダメージ倍率 2.60倍→3.00倍 / 最大HP比例 22%→25% / 失ったHPによる上昇の上限 60%→70%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3, hpCoefficient: 0.25, missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.7 } }] },
       ],
     },
@@ -346,13 +346,13 @@ export const MIMIC: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.12, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.3, maxBonus: 0.3 } }, { kind: "GAUGE", amount: 0.3, drain: true }] },
-      // Lv2 ダメージ倍率 1.80倍→2.10倍 / 最大HP比例 12%→14%
+      // Lv2 ダメージ倍率 1.80倍→2.10倍 / 最大HP比例 12%→14% / 失ったHPによる上昇の効き 30%→35% / 失ったHPによる上昇の上限 30%→35%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.1, hpCoefficient: 0.14, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.35, maxBonus: 0.35 } }, { kind: "GAUGE", amount: 0.3, drain: true }] },
-      // Lv3 ダメージ倍率 2.10倍→2.50倍 / 最大HP比例 14%→16% / 行動ゲージ 30%→40%
+      // Lv3 ダメージ倍率 2.10倍→2.50倍 / 最大HP比例 14%→16% / 失ったHPによる上昇の効き 35%→40% / 失ったHPによる上昇の上限 35%→40% / 行動ゲージ 30%→40%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.5, hpCoefficient: 0.16, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.4, maxBonus: 0.4 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
-      // Lv4 ダメージ倍率 2.50倍→2.90倍 / 最大HP比例 16%→18%
+      // Lv4 ダメージ倍率 2.50倍→2.90倍 / 最大HP比例 16%→18% / 失ったHPによる上昇の効き 40%→45% / 失ったHPによる上昇の上限 40%→45%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.9, hpCoefficient: 0.18, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.45, maxBonus: 0.45 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
-      // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 2.90倍→3.30倍 / 最大HP比例 18%→20% / 行動ゲージ 40%→50%
+      // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 2.90倍→3.30倍 / 最大HP比例 18%→20% / 失ったHPによる上昇の効き 45%→50% / 失ったHPによる上昇の上限 45%→50% / 行動ゲージ 40%→50%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.3, hpCoefficient: 0.2, conditionalBonus: [{ when: "TARGET_HAS_DEBUFF", bonus: 0.25 }], missingHpBonus: { perLostRatio: 0.5, maxBonus: 0.5 } }, { kind: "GAUGE", amount: 0.5, drain: true }] },
     ],
   },
@@ -420,7 +420,7 @@ export const VALKYRIA: MonsterTemplate = {
         { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
         // Lv2 回復量 30%→35%
         { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
-        // Lv3
+        // Lv3 弱体解除の個数 1→2ターン
         { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
         // Lv4 回復量 35%→40%
         { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
@@ -493,7 +493,7 @@ export const VALKYRIA: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.25 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
         // Lv2 回復量 25%→30%
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE", count: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
-        // Lv3
+        // Lv3 弱体解除の個数 1→2ターン
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
         // Lv4 回復量 30%→35%
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "CLEANSE", count: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }] },
@@ -515,9 +515,9 @@ export const VALKYRIA: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.3, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
-        // Lv2 行動ゲージ 30%→35%
+        // Lv2 行動ゲージ 30%→35% / HPが低い時の追加ゲージ 15%→20%
         { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.35, lowHpExtra: { hpRatio: 0.5, amount: 0.2 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
-        // Lv3
+        // Lv3 HPが低い時の追加ゲージ 20%→25%
         { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.35, lowHpExtra: { hpRatio: 0.5, amount: 0.25 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
         // Lv4 行動ゲージ 35%→40%
         { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.4, lowHpExtra: { hpRatio: 0.5, amount: 0.25 } }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
@@ -584,11 +584,11 @@ export const VALKYRIA: MonsterTemplate = {
       { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.3, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
       // Lv2 行動ゲージ 30%→35%
       { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.35, lowHpExtra: { hpRatio: 0.5, amount: 0.15 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
-      // Lv3 行動ゲージ 35%→40%
+      // Lv3 行動ゲージ 35%→40% / HPが低い時の追加ゲージ 15%→20%
       { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.4, lowHpExtra: { hpRatio: 0.5, amount: 0.2 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
       // Lv4 行動ゲージ 40%→45%
       { cooldownTurns: 6, effects: [{ kind: "GAUGE", amount: 0.45, lowHpExtra: { hpRatio: 0.5, amount: 0.2 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }] },
-      // Lv5 クールタイム -1(6→5ターン) / 行動ゲージ 45%→50% / 強化の持続 2→3ターン
+      // Lv5 クールタイム -1(6→5ターン) / 行動ゲージ 45%→50% / HPが低い時の追加ゲージ 20%→25% / 強化の持続 2→3ターン
       { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.5, lowHpExtra: { hpRatio: 0.5, amount: 0.25 } }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3 }, { kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 3 }] },
     ],
   },
@@ -630,11 +630,11 @@ export const THUNDERBEAST: MonsterTemplate = {
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
       // Lv2 ダメージ倍率 0.90倍→1.00倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
-      // Lv3
+      // Lv3 速度比例 35%→40%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }] },
       // Lv4 ダメージ倍率 1.00倍→1.10倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }] },
-      // Lv5
+      // Lv5 速度比例 40%→45%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }] },
     ],
   },
@@ -652,13 +652,13 @@ export const THUNDERBEAST: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
-        // Lv2 ダメージ倍率 1.50倍→1.60倍
+        // Lv2 ダメージ倍率 1.50倍→1.60倍 / 速度比例 40%→45%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
-        // Lv3 ダメージ倍率 1.60倍→1.70倍 / 行動ゲージ 25%→30%
+        // Lv3 ダメージ倍率 1.60倍→1.70倍 / 速度比例 45%→50% / 行動ゲージ 25%→30%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
-        // Lv4 ダメージ倍率 1.70倍→1.80倍
+        // Lv4 ダメージ倍率 1.70倍→1.80倍 / 速度比例 50%→55%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
-        // Lv5 クールタイム -1(4→3ターン) / 行動ゲージ 30%→35%
+        // Lv5 クールタイム -1(4→3ターン) / 速度比例 55%→60% / 行動ゲージ 30%→35%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "GAUGE", amount: 0.35, applyTo: "SELF" }] },
       ],
     },
@@ -675,13 +675,13 @@ export const THUNDERBEAST: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.65, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.15 } }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF", requires: "ANY_CRIT" }] },
-        // Lv2 ダメージ倍率 0.65倍→0.70倍 / 行動ゲージ 25%→30%
+        // Lv2 ダメージ倍率 0.65倍→0.70倍 / 速度比例 15%→20% / 行動ゲージ 25%→30%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF", requires: "ANY_CRIT" }] },
         // Lv3 ダメージ倍率 0.70倍→0.75倍
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.2 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF", requires: "ANY_CRIT" }] },
-        // Lv4 ダメージ倍率 0.75倍→0.80倍
+        // Lv4 ダメージ倍率 0.75倍→0.80倍 / 速度比例 20%→25%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.25 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF", requires: "ANY_CRIT" }] },
-        // Lv5 クールタイム -1(4→3ターン) / 行動ゲージ 30%→35%
+        // Lv5 クールタイム -1(4→3ターン) / 速度比例 25%→30% / 行動ゲージ 30%→35%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }, { kind: "GAUGE", amount: 0.35, applyTo: "SELF", requires: "ANY_CRIT" }] },
       ],
     },
@@ -698,13 +698,13 @@ export const THUNDERBEAST: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.4, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.8 }] },
-        // Lv2 ダメージ倍率 1.40倍→1.50倍 / 弱体の発動率 80%→90%
+        // Lv2 ダメージ倍率 1.40倍→1.50倍 / 速度比例 40%→45% / 弱体の発動率 80%→90%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
-        // Lv3 ダメージ倍率 1.50倍→1.60倍
+        // Lv3 ダメージ倍率 1.50倍→1.60倍 / 速度比例 45%→50%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }] },
-        // Lv4 ダメージ倍率 1.60倍→1.70倍 / 弱体の発動率 90%→100%
+        // Lv4 ダメージ倍率 1.60倍→1.70倍 / 速度比例 50%→55% / 弱体の発動率 90%→100%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 1 }] },
-        // Lv5 クールタイム -1(4→3ターン) / ダメージ倍率 1.70倍→1.80倍 / 弱体の持続 2→3ターン
+        // Lv5 クールタイム -1(4→3ターン) / ダメージ倍率 1.70倍→1.80倍 / 速度比例 55%→60% / 弱体の持続 2→3ターン
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 }] },
       ],
     },
@@ -723,13 +723,13 @@ export const THUNDERBEAST: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
-        // Lv2 ダメージ倍率 0.75倍→0.80倍 / 行動ゲージ 40%→45%
+        // Lv2 ダメージ倍率 0.75倍→0.80倍 / 速度比例 45%→50% / 行動ゲージ 40%→45%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "GAUGE", amount: 0.45, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
-        // Lv3 ダメージ倍率 0.80倍→0.85倍 / 行動ゲージ 45%→50%
+        // Lv3 ダメージ倍率 0.80倍→0.85倍 / 速度比例 50%→55% / 行動ゲージ 45%→50%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.5, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
-        // Lv4 ダメージ倍率 0.85倍→0.90倍 / 行動ゲージ 50%→55%
+        // Lv4 ダメージ倍率 0.85倍→0.90倍 / 速度比例 55%→60% / 行動ゲージ 50%→55%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "GAUGE", amount: 0.55, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
-        // Lv5 クールタイム -2(5→3ターン) / 行動ゲージ 55%→60%
+        // Lv5 クールタイム -2(5→3ターン) / 速度比例 60%→65% / 行動ゲージ 55%→60%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }, { kind: "GAUGE", amount: 0.6, applyTo: "SELF", requires: "CRITS_AT_LEAST_2" }] },
       ],
     },
@@ -780,7 +780,7 @@ export const THUNDERBEAST: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.1, durationTurns: 3, applyTo: "SELF" }] },
         // Lv4 回復量 10%→12%
         { cooldownTurns: 5, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.12, durationTurns: 3, applyTo: "SELF" }] },
-        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン / 継続回復の持続 3→4ターン / 回復量 12%→15%
+        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 3→4ターン / 回復量 12%→15% / 継続回復の持続 3→4ターン
         { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 4, applyTo: "SELF" }, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 4, applyTo: "SELF" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.15, durationTurns: 4, applyTo: "SELF" }] },
       ],
     },
@@ -816,13 +816,13 @@ export const THUNDERBEAST: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }, { kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.45 }, ignoreDefenseRatio: 0.5, requires: "CRITS_AT_LEAST_3" }] },
-      // Lv2 ダメージ倍率 0.75倍→0.80倍 / ダメージ倍率 0.80倍→0.90倍
+      // Lv2 ダメージ倍率 0.75倍→0.80倍 / 速度比例 45%→50% / ダメージ倍率 0.80倍→0.90倍
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "spd", bonusAtReference: 0.5 }, ignoreDefenseRatio: 0.5, requires: "CRITS_AT_LEAST_3" }] },
-      // Lv3 ダメージ倍率 0.80倍→0.85倍 / ダメージ倍率 0.90倍→1.00倍
+      // Lv3 ダメージ倍率 0.80倍→0.85倍 / 速度比例 50%→55% / ダメージ倍率 0.90倍→1.00倍 / 防御無視 50%→60%
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.55 }, ignoreDefenseRatio: 0.6, requires: "CRITS_AT_LEAST_3" }] },
-      // Lv4 ダメージ倍率 0.85倍→0.90倍 / ダメージ倍率 1.00倍→1.10倍
+      // Lv4 ダメージ倍率 0.85倍→0.90倍 / 速度比例 55%→60% / ダメージ倍率 1.00倍→1.10倍 / 防御無視 60%→70%
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DAMAGE", multiplier: 1.1, scaleBonus: { stat: "spd", bonusAtReference: 0.6 }, ignoreDefenseRatio: 0.7, requires: "CRITS_AT_LEAST_3" }] },
-      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.10倍→1.20倍
+      // Lv5 クールタイム -1(6→5ターン) / 速度比例 60%→65% / ダメージ倍率 1.10倍→1.20倍 / 防御無視 70%→80%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 4, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }, { kind: "DAMAGE", multiplier: 1.2, scaleBonus: { stat: "spd", bonusAtReference: 0.65 }, ignoreDefenseRatio: 0.8, requires: "CRITS_AT_LEAST_3" }] },
     ],
   },
