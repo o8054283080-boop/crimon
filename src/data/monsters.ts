@@ -86,9 +86,9 @@ const SLIME: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.6 }] },
-        // Lv2 ダメージ倍率 1.30倍→1.40倍 / 毒の発動率 60%→65% / 毒1スタック 5%→5.5%
+        // Lv2 ダメージ倍率 1.30倍→1.40倍 / 毒1スタック 5%→5.5% / 毒の発動率 60%→65%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.65 }] },
-        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 毒の発動率 65%→75% / 毒1スタック 5.5%→6%
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 毒1スタック 5.5%→6% / 毒の発動率 65%→75%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.75 }] },
         // Lv4 ダメージ倍率 1.50倍→1.55倍
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.55 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.75 }] },
@@ -158,9 +158,9 @@ const SLIME: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.1, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.7 }] },
-        // Lv2 ダメージ倍率 1.10倍→1.20倍 / 毒の発動率 70%→75% / 毒1スタック 5%→5.5%
+        // Lv2 ダメージ倍率 1.10倍→1.20倍 / 毒1スタック 5%→5.5% / 毒の発動率 70%→75%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.2, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.75 }] },
-        // Lv3 ダメージ倍率 1.20倍→1.25倍 / 毒の発動率 75%→85% / 毒1スタック 5.5%→6%
+        // Lv3 ダメージ倍率 1.20倍→1.25倍 / 毒1スタック 5.5%→6% / 毒の発動率 75%→85%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.25, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.85 }] },
         // Lv4 ダメージ倍率 1.25倍→1.30倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.85 }] },
@@ -236,11 +236,11 @@ const SLIME: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.3, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.8 }] },
-      // Lv2 ダメージ倍率 1.30倍→1.40倍 / 毒の発動率 80%→85% / 毒1スタック 6%→6.5%
+      // Lv2 ダメージ倍率 1.30倍→1.40倍 / 毒1スタック 6%→6.5% / 毒の発動率 80%→85%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.4, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.065, durationTurns: 3, chance: 0.85 }] },
-      // Lv3 ダメージ倍率 1.40倍→1.50倍 / 毒の発動率 85%→90% / 毒1スタック 6.5%→7%
+      // Lv3 ダメージ倍率 1.40倍→1.50倍 / 毒1スタック 6.5%→7% / 毒の発動率 85%→90%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.07, durationTurns: 3, chance: 0.9 }] },
-      // Lv4 ダメージ倍率 1.50倍→1.55倍 / 毒の発動率 90%→95% / 毒1スタック 7%→7.5%
+      // Lv4 ダメージ倍率 1.50倍→1.55倍 / 毒1スタック 7%→7.5% / 毒の発動率 90%→95%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.55, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.075, durationTurns: 3, chance: 0.95 }] },
       // Lv5 クールタイム -1(4→3ターン) / 毒の持続 3→4ターン
       { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.55, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.075, durationTurns: 4, chance: 0.95 }] },
@@ -277,11 +277,11 @@ const WOLF: MonsterTemplate = {
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }] },
       // Lv2 ダメージ倍率 0.80倍→0.85倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85, scaleBonus: { stat: "spd", bonusAtReference: 0.3 } }] },
-      // Lv3 ダメージ倍率 0.85倍→0.90倍
+      // Lv3 ダメージ倍率 0.85倍→0.90倍 / 速度比例 30%→35%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
       // Lv4 ダメージ倍率 0.90倍→0.95倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.95, scaleBonus: { stat: "spd", bonusAtReference: 0.35 } }] },
-      // Lv5 ダメージ倍率 0.95倍→1.00倍
+      // Lv5 ダメージ倍率 0.95倍→1.00倍 / 速度比例 35%→40%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }] },
     ],
   },
@@ -450,11 +450,11 @@ const WOLF: MonsterTemplate = {
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.6, scaleBonus: { stat: "spd", bonusAtReference: 1.2 } }, { kind: "GAUGE", amount: 0.3, drain: true }] },
       // Lv2 ダメージ倍率 3.60倍→3.85倍 / 行動ゲージ 30%→35%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.85, scaleBonus: { stat: "spd", bonusAtReference: 1.2 } }, { kind: "GAUGE", amount: 0.35, drain: true }] },
-      // Lv3 ダメージ倍率 3.85倍→4.05倍
+      // Lv3 ダメージ倍率 3.85倍→4.05倍 / 速度比例 120%→130%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.05, scaleBonus: { stat: "spd", bonusAtReference: 1.3 } }, { kind: "GAUGE", amount: 0.35, drain: true }] },
       // Lv4 ダメージ倍率 4.05倍→4.25倍 / 行動ゲージ 35%→40%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.25, scaleBonus: { stat: "spd", bonusAtReference: 1.3 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
-      // Lv5 クールタイム -1(4→3ターン)
+      // Lv5 クールタイム -1(4→3ターン) / 速度比例 130%→140%
       { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 4.25, scaleBonus: { stat: "spd", bonusAtReference: 1.4 } }, { kind: "GAUGE", amount: 0.4, drain: true }] },
     ],
   },
@@ -643,7 +643,7 @@ const GOLEM: MonsterTemplate = {
         { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
         // Lv4 行動ゲージ 40%→50%
         { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.5, applyTo: "SELF" }] },
-        // Lv5 クールタイム -1(4→3ターン) / 効果が増える
+        // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン / 「自身に反射 (3ターン)」が付く
         { cooldownTurns: 3, effects: [{ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "GAUGE", amount: 0.5, applyTo: "SELF" }, { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] },
       ],
     },
@@ -1118,7 +1118,7 @@ const IMP: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.7 }] },
-        // Lv2 ダメージ倍率 0.75倍→0.80倍 / 毒の発動率 70%→80% / 毒1スタック 5%→5.5%
+        // Lv2 ダメージ倍率 0.75倍→0.80倍 / 毒1スタック 5%→5.5% / 毒の発動率 70%→80%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 3, chance: 0.8 }] },
         // Lv3 ダメージ倍率 0.80倍→0.90倍 / 毒1スタック 5.5%→6%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.8 }] },
@@ -1170,9 +1170,9 @@ const IMP: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.7 }, { kind: "POISON", damageRatePerStack: 0.08, durationTurns: 4, chance: 0.85 }] },
-      // Lv2 ダメージ倍率 2.00倍→2.15倍 / CT延長の発動率 70%→75% / 毒の発動率 85%→95% / 毒1スタック 8%→8.5%
+      // Lv2 ダメージ倍率 2.00倍→2.15倍 / CT延長の発動率 70%→75% / 毒1スタック 8%→8.5% / 毒の発動率 85%→95%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.15 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.75 }, { kind: "POISON", damageRatePerStack: 0.085, durationTurns: 4, chance: 0.95 }] },
-      // Lv3 ダメージ倍率 2.15倍→2.25倍 / CT延長の発動率 75%→80% / 毒の発動率 95%→100% / 毒1スタック 8.5%→9%
+      // Lv3 ダメージ倍率 2.15倍→2.25倍 / CT延長の発動率 75%→80% / 毒1スタック 8.5%→9% / 毒の発動率 95%→100%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.25 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.8 }, { kind: "POISON", damageRatePerStack: 0.09, durationTurns: 4, chance: 1 }] },
       // Lv4 ダメージ倍率 2.25倍→2.40倍 / CT延長の発動率 80%→85% / 毒1スタック 9%→9.5%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "COOLDOWN_EXTEND", turns: 1, chance: 0.85 }, { kind: "POISON", damageRatePerStack: 0.095, durationTurns: 4, chance: 1 }] },
@@ -1217,7 +1217,7 @@ const WISP: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" }] },
-      // Lv2 効果が増える
+      // Lv2 ダメージ倍率 0.80倍→0.90倍 / 「自身の行動ゲージ+10%」が付く
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.9 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.1, applyTo: "SELF" }] },
       // Lv3 ダメージ倍率 0.90倍→1.00倍 / 行動ゲージ 10%→20%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 1, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
@@ -1245,7 +1245,7 @@ const WISP: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.2, durationTurns: 3 }, { kind: "CLEANSE" }] },
         // Lv2 シールド量 20%→22%
         { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.22, durationTurns: 3 }, { kind: "CLEANSE" }] },
-        // Lv3 効果が増える
+        // Lv3 「行動ゲージ+10%」が付く
         { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.22, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.1 }] },
         // Lv4 シールド量 22%→25%
         { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.1 }] },
@@ -1345,7 +1345,7 @@ const WISP: MonsterTemplate = {
         { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.3 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }] },
         // Lv2 回復量 30%→35%
         { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }] },
-        // Lv3 効果が増える
+        // Lv3 「行動ゲージ+15%」が付く
         { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.35 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.15 }] },
         // Lv4 回復量 35%→40%
         { cooldownTurns: 6, effects: [{ kind: "HEAL", healRate: 0.4 }, { kind: "IMMUNITY", durationTurns: 2 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.15 }] },
@@ -1393,20 +1393,25 @@ const WISP: MonsterTemplate = {
   darkSkill3: {
     id: "wisp_s3_dark",
     name: "ヴォイドシフト",
-    description: "味方単体の行動ゲージを100%進め、攻撃力を2ターン上昇させる。自身の行動ゲージを20%進める。",
+    description: "行動ゲージ+100%。攻撃力+30% (2ターン)。自身の行動ゲージ+20%",
     target: "SINGLE_ALLY",
     cooldownTurns: 3,
     effects: [
-      { kind: "GAUGE", amount: 1.0 },
+      { kind: "GAUGE", amount: 1 },
       { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
-      { kind: "GAUGE", amount: 0.20, applyTo: "SELF" },
+      { kind: "GAUGE", amount: 0.2, applyTo: "SELF" },
     ],
     levelOverrides: [
-      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.20, applyTo: "SELF" }] },
-      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
-      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.30, applyTo: "SELF" }] },
-      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.40, applyTo: "SELF" }] },
-      { cooldownTurns: 2, effects: [{ kind: "GAUGE", amount: 1.0 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.40, applyTo: "SELF" }] },
+      // Lv1
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
+      // Lv2 行動ゲージ 20%→25%
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }] },
+      // Lv3 行動ゲージ 25%→30%
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
+      // Lv4 行動ゲージ 30%→40%
+      { cooldownTurns: 3, effects: [{ kind: "GAUGE", amount: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
+      // Lv5 クールタイム -1(3→2ターン)
+      { cooldownTurns: 2, effects: [{ kind: "GAUGE", amount: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
     ],
   },
 };
@@ -1495,7 +1500,7 @@ const TREANT: MonsterTemplate = {
         { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 3 }, { kind: "CLEANSE" }] },
         // Lv2 シールド量 25%→30%
         { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "CLEANSE" }] },
-        // Lv3 効果が増える
+        // Lv3 「自身の行動ゲージ+20%」が付く
         { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
         // Lv4 シールド量 30%→35%
         { cooldownTurns: 4, effects: [{ kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "SHIELD", shieldRate: 0.35, durationTurns: 3 }, { kind: "CLEANSE" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
@@ -1975,9 +1980,9 @@ const GRIFFON: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.45 } }] },
-        // Lv2 ダメージ倍率 0.95倍→1.05倍
+        // Lv2 ダメージ倍率 0.95倍→1.05倍 / 速度比例 45%→55%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.05, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }] },
-        // Lv3 ダメージ倍率 1.05倍→1.10倍
+        // Lv3 ダメージ倍率 1.05倍→1.10倍 / 速度比例 55%→65%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.1, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }] },
         // Lv4 ダメージ倍率 1.10倍→1.15倍
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.15, hits: 2, scaleBonus: { stat: "spd", bonusAtReference: 0.65 } }] },
@@ -2024,9 +2029,9 @@ const GRIFFON: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.2, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }] },
-        // Lv2 ダメージ倍率 3.20倍→3.40倍 / スタンの発動率 70%→80%
+        // Lv2 ダメージ倍率 3.20倍→3.40倍 / 速度比例 60%→75% / スタンの発動率 70%→80%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.4, scaleBonus: { stat: "spd", bonusAtReference: 0.75 } }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
-        // Lv3 ダメージ倍率 3.40倍→3.70倍
+        // Lv3 ダメージ倍率 3.40倍→3.70倍 / 速度比例 75%→90%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.7, scaleBonus: { stat: "spd", bonusAtReference: 0.9 } }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
         // Lv4
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.7, scaleBonus: { stat: "spd", bonusAtReference: 0.9 } }, { kind: "STUN", durationTurns: 1, chance: 0.8 }] },
@@ -2049,7 +2054,7 @@ const GRIFFON: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }] },
         // Lv2 ダメージ倍率 2.40倍→2.55倍 / 行動ゲージ 30%→40%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.55, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
-        // Lv3 ダメージ倍率 2.55倍→2.70倍
+        // Lv3 ダメージ倍率 2.55倍→2.70倍 / 速度比例 40%→55%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.7, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
         // Lv4
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.7, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "GAUGE", amount: 0.4, applyTo: "SELF" }] },
@@ -2098,7 +2103,7 @@ const GRIFFON: MonsterTemplate = {
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.5, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "STUN", durationTurns: 1, chance: 0.6 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
       // Lv2 ダメージ倍率 2.50倍→2.65倍 / スタンの発動率 60%→70%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.65, scaleBonus: { stat: "spd", bonusAtReference: 0.4 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
-      // Lv3 ダメージ倍率 2.65倍→2.80倍
+      // Lv3 ダメージ倍率 2.65倍→2.80倍 / 速度比例 40%→55%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.8, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
       // Lv4 ダメージ倍率 2.80倍→2.85倍
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.85, scaleBonus: { stat: "spd", bonusAtReference: 0.55 } }, { kind: "STUN", durationTurns: 1, chance: 0.7 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
@@ -2121,7 +2126,7 @@ const GRIFFON: MonsterTemplate = {
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.9, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.7 }] },
       // Lv2 ダメージ倍率 1.90倍→2.05倍 / 弱体の発動率 70%→85%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.05, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.5 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
-      // Lv3 ダメージ倍率 2.05倍→2.15倍
+      // Lv3 ダメージ倍率 2.05倍→2.15倍 / 速度比例 50%→60%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.15, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
       // Lv4 ダメージ倍率 2.15倍→2.25倍
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.25, hits: 3, scaleBonus: { stat: "spd", bonusAtReference: 0.6 } }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.85 }] },
@@ -2701,7 +2706,7 @@ const SERAPH: MonsterTemplate = {
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.4 }, { kind: "BLIND", durationTurns: 2, chance: 0.9 }, { kind: "LIFESTEAL", healRate: 0.35 }] },
       // Lv3 ダメージ倍率 2.40倍→2.50倍 / 暗闇の発動率 90%→95% / 回復量 35%→40%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.5 }, { kind: "BLIND", durationTurns: 2, chance: 0.95 }, { kind: "LIFESTEAL", healRate: 0.4 }] },
-      // Lv4 ダメージ倍率 2.50倍→2.70倍 / 暗闇の発動率 95%→100% / 暗闇の持続 2→3ターン / 回復量 40%→45%
+      // Lv4 ダメージ倍率 2.50倍→2.70倍 / 暗闇の持続 2→3ターン / 暗闇の発動率 95%→100% / 回復量 40%→45%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "BLIND", durationTurns: 3, chance: 1 }, { kind: "LIFESTEAL", healRate: 0.45 }] },
       // Lv5 クールタイム -1(5→4ターン)
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.7 }, { kind: "BLIND", durationTurns: 3, chance: 1 }, { kind: "LIFESTEAL", healRate: 0.45 }] },

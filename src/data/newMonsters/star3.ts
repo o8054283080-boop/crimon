@@ -41,11 +41,11 @@ export const MUSHROON: MonsterTemplate = {
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.6 }] },
       // Lv2 ダメージ倍率 1.00倍→1.10倍 / 毒1スタック 5%→5.5%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.6 }] },
-      // Lv3 毒の発動率 60%→70% / 毒1スタック 5.5%→6%
+      // Lv3 毒1スタック 5.5%→6% / 毒の発動率 60%→70%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.7 }] },
       // Lv4 ダメージ倍率 1.10倍→1.20倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.7 }] },
-      // Lv5 毒の発動率 70%→80% / 毒の持続 2→3ターン / 毒1スタック 6%→6.5%
+      // Lv5 毒1スタック 6%→6.5% / 毒の持続 2→3ターン / 毒の発動率 70%→80%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "POISON", damageRatePerStack: 0.065, durationTurns: 3, chance: 0.8 }] },
     ],
   },
@@ -63,9 +63,9 @@ export const MUSHROON: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9 }, { kind: "POISON", damageRatePerStack: 0.05, stacks: 2, chance: 0.75, durationTurns: 2 }] },
-        // Lv2 ダメージ倍率 0.90倍→1.00倍 / 毒の発動率 75%→80% / 毒1スタック 5%→5.5%
+        // Lv2 ダメージ倍率 0.90倍→1.00倍 / 毒1スタック 5%→5.5% / 毒の発動率 75%→80%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "POISON", damageRatePerStack: 0.055, stacks: 2, chance: 0.8, durationTurns: 2 }] },
-        // Lv3 毒の発動率 80%→85% / 毒1スタック 5.5%→6%
+        // Lv3 毒1スタック 5.5%→6% / 毒の発動率 80%→85%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 2, chance: 0.85, durationTurns: 2 }] },
         // Lv4 ダメージ倍率 1.00倍→1.10倍 / 毒の発動率 85%→90%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 2, chance: 0.9, durationTurns: 2 }] },
@@ -93,7 +93,7 @@ export const MUSHROON: MonsterTemplate = {
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 }] },
         // Lv4 ダメージ倍率 1.50倍→1.60倍
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 }] },
-        // Lv5 クールタイム -1(4→3ターン) / 弱体の発動率 90%→100% / 弱体の持続 2→3ターン / 治癒阻害の発動率 90%→100% / 治癒阻害の持続 2→3ターン
+        // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン / 弱体の発動率 90%→100% / 治癒阻害の持続 2→3ターン / 治癒阻害の発動率 90%→100%
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 3, chance: 1 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 1 }] },
       ],
     },
@@ -138,11 +138,11 @@ export const MUSHROON: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 3, chance: 0.8, extraStacksIfPoisoned: 1 }] },
         // Lv2 ダメージ倍率 1.00倍→1.10倍 / 毒1スタック 5%→5.5%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 3, chance: 0.8, extraStacksIfPoisoned: 1 }] },
-        // Lv3 毒の発動率 80%→90% / 毒1スタック 5.5%→6%
+        // Lv3 毒1スタック 5.5%→6% / 毒の発動率 80%→90%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.9, extraStacksIfPoisoned: 1 }] },
         // Lv4 ダメージ倍率 1.10倍→1.20倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 3, chance: 0.9, extraStacksIfPoisoned: 1 }] },
-        // Lv5 クールタイム -1(5→4ターン) / 毒の発動率 90%→100% / 毒の持続 3→4ターン
+        // Lv5 クールタイム -1(5→4ターン) / 毒の持続 3→4ターン / 毒の発動率 90%→100%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 4, chance: 1, extraStacksIfPoisoned: 1 }] },
       ],
     },
@@ -166,7 +166,7 @@ export const MUSHROON: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.3, requires: "TARGET_HAS_DEBUFF" }] },
         // Lv4 ダメージ倍率 1.30倍→1.40倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.3, requires: "TARGET_HAS_DEBUFF" }] },
-        // Lv5 クールタイム -1(5→4ターン) / 弱体の発動率 90%→100% / 弱体の持続 2→3ターン / 行動ゲージ -30%→-35%
+        // Lv5 クールタイム -1(5→4ターン) / 弱体の持続 2→3ターン / 弱体の発動率 90%→100% / 行動ゲージ -30%→-35%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 }, { kind: "GAUGE", amount: -0.35, requires: "TARGET_HAS_DEBUFF" }] },
       ],
     },
@@ -226,13 +226,13 @@ export const MUSHROON: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.2, debuffDamageBonus: { perDebuff: 0.06, maxBonus: 0.3 } }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.8 }] },
-      // Lv2 ダメージ倍率 1.20倍→1.30倍 / 毒の発動率 80%→85% / 毒1スタック 5%→5.5%
+      // Lv2 ダメージ倍率 1.20倍→1.30倍 / 弱体1個あたりの最終ダメージ 6%→7% / 弱体による上昇の上限 30%→35% / 毒1スタック 5%→5.5% / 毒の発動率 80%→85%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3, debuffDamageBonus: { perDebuff: 0.07, maxBonus: 0.35 } }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.85 }] },
-      // Lv3 毒の発動率 85%→90% / 毒1スタック 5.5%→6%
+      // Lv3 毒1スタック 5.5%→6% / 毒の発動率 85%→90%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3, debuffDamageBonus: { perDebuff: 0.07, maxBonus: 0.35 } }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.9 }] },
-      // Lv4 ダメージ倍率 1.30倍→1.40倍 / 毒の発動率 90%→95%
+      // Lv4 ダメージ倍率 1.30倍→1.40倍 / 弱体1個あたりの最終ダメージ 7%→8% / 弱体による上昇の上限 35%→40% / 毒の発動率 90%→95%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.95 }] },
-      // Lv5 クールタイム -1(5→4ターン) / 効果が増える
+      // Lv5 クールタイム -1(5→4ターン) / 3回攻撃になる(1回 0.50倍) / 毒の持続 2→3ターン / 毒の発動率 95%→100%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 1, chance: 1, durationTurns: 3 }, { kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 1, chance: 1, durationTurns: 3 }, { kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 1, chance: 1, durationTurns: 3 }] },
     ],
   },
@@ -279,7 +279,7 @@ export const SHELLTURTLE: MonsterTemplate = {
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.7, defCoefficient: 1 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
       // Lv4 ダメージ倍率 0.70倍→0.75倍 / 防御力比例 100%→110%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75, defCoefficient: 1.1 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }] },
-      // Lv5 ダメージ倍率 0.75倍→0.80倍 / 防御力比例 110%→120% / 弱体の発動率 70%→80% / 弱体の持続 2→3ターン
+      // Lv5 ダメージ倍率 0.75倍→0.80倍 / 防御力比例 110%→120% / 弱体の持続 2→3ターン / 弱体の発動率 70%→80%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8, defCoefficient: 1.2 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 3, chance: 0.8 }] },
     ],
   },
@@ -297,11 +297,11 @@ export const SHELLTURTLE: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 4, effects: [{ kind: "PROTECT", share: 0.5, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "SELF" }] },
-        // Lv2
+        // Lv2 肩代わりの割合 50%→55%
         { cooldownTurns: 4, effects: [{ kind: "PROTECT", share: 0.55, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "SELF" }] },
-        // Lv3
+        // Lv3 肩代わりの割合 55%→60%
         { cooldownTurns: 4, effects: [{ kind: "PROTECT", share: 0.6, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "SELF" }] },
-        // Lv4 効果が増える
+        // Lv4 「自身の行動ゲージ+20%」が付く
         { cooldownTurns: 4, effects: [{ kind: "PROTECT", share: 0.6, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "SELF" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
         // Lv5 クールタイム -1(4→3ターン) / 強化の持続 2→3ターン
         { cooldownTurns: 3, effects: [{ kind: "PROTECT", share: 0.6, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }] },
@@ -347,11 +347,11 @@ export const SHELLTURTLE: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.3, applyTo: "SELF" }, { kind: "CLEANSE", count: 1, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.1, durationTurns: 2, applyTo: "SELF" }] },
         // Lv2 回復量 30%→35%
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.35, applyTo: "SELF" }, { kind: "CLEANSE", count: 1, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.1, durationTurns: 2, applyTo: "SELF" }] },
-        // Lv3 回復量 10%→12%
+        // Lv3 弱体解除の個数 1→2ターン / 回復量 10%→12%
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.35, applyTo: "SELF" }, { kind: "CLEANSE", count: 2, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.12, durationTurns: 2, applyTo: "SELF" }] },
         // Lv4 回復量 35%→40%
         { cooldownTurns: 5, effects: [{ kind: "HEAL", healRate: 0.4, applyTo: "SELF" }, { kind: "CLEANSE", count: 2, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.12, durationTurns: 2, applyTo: "SELF" }] },
-        // Lv5 クールタイム -1(5→4ターン) / 継続回復の持続 2→3ターン / 回復量 12%→15%
+        // Lv5 クールタイム -1(5→4ターン) / 回復量 12%→15% / 継続回復の持続 2→3ターン
         { cooldownTurns: 4, effects: [{ kind: "HEAL", healRate: 0.4, applyTo: "SELF" }, { kind: "CLEANSE", count: 2, applyTo: "SELF" }, { kind: "REGEN", healRate: 0.15, durationTurns: 3, applyTo: "SELF" }] },
       ],
     },
@@ -374,7 +374,7 @@ export const SHELLTURTLE: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "MITIGATE", amount: 0.22, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "SELF" }] },
         // Lv3 被ダメージ軽減 22%→25%
         { cooldownTurns: 5, effects: [{ kind: "MITIGATE", amount: 0.25, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "SELF" }] },
-        // Lv4 効果が増える
+        // Lv4 「行動ゲージ+10%」が付く
         { cooldownTurns: 5, effects: [{ kind: "MITIGATE", amount: 0.25, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2, applyTo: "SELF" }, { kind: "GAUGE", amount: 0.1 }] },
         // Lv5 クールタイム -1(5→4ターン) / 被ダメージ軽減の持続 2→3ターン / 強化の持続 2→3ターン
         { cooldownTurns: 4, effects: [{ kind: "MITIGATE", amount: 0.25, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3, applyTo: "SELF" }, { kind: "GAUGE", amount: 0.1 }] },
@@ -399,7 +399,7 @@ export const SHELLTURTLE: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.2, defCoefficient: 1.5 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.9 }] },
         // Lv4 ダメージ倍率 1.20倍→1.30倍 / 防御力比例 150%→170%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3, defCoefficient: 1.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.9 }] },
-        // Lv5 クールタイム -1(5→4ターン) / 弱体の発動率 90%→100% / 弱体の持続 2→3ターン
+        // Lv5 クールタイム -1(5→4ターン) / 弱体の持続 2→3ターン / 弱体の発動率 90%→100%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.3, defCoefficient: 1.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 3, chance: 1 }] },
       ],
     },
@@ -508,11 +508,11 @@ export const KOBOLD: MonsterTemplate = {
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.25 }] }] },
       // Lv2 ダメージ倍率 1.10倍→1.20倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.2, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.25 }] }] },
-      // Lv3 ダメージ倍率 1.20倍→1.30倍
+      // Lv3 ダメージ倍率 1.20倍→1.30倍 / 対象HP50%以下の最終ダメージ 25%→30%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.3, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }] }] },
       // Lv4 ダメージ倍率 1.30倍→1.40倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }] }] },
-      // Lv5 ダメージ倍率 1.40倍→1.50倍
+      // Lv5 ダメージ倍率 1.40倍→1.50倍 / 対象HP50%以下の最終ダメージ 30%→35%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.5, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.35 }] }] },
     ],
   },
@@ -529,11 +529,11 @@ export const KOBOLD: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2, ignoreDefenseRatio: 0.25, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 1 }] }] },
-        // Lv2 ダメージ倍率 2.00倍→2.10倍
+        // Lv2 ダメージ倍率 2.00倍→2.10倍 / 防御無視 25%→30%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.1, ignoreDefenseRatio: 0.3, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 1 }] }] },
-        // Lv3 ダメージ倍率 2.10倍→2.20倍
+        // Lv3 ダメージ倍率 2.10倍→2.20倍 / 防御無視 30%→40%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.2, ignoreDefenseRatio: 0.4, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 1 }] }] },
-        // Lv4 ダメージ倍率 2.20倍→2.40倍
+        // Lv4 ダメージ倍率 2.20倍→2.40倍 / 防御無視 40%→50%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.4, ignoreDefenseRatio: 0.5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 1 }] }] },
         // Lv5 クールタイム -1(4→3ターン)
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.4, ignoreDefenseRatio: 0.5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 1 }] }] },
@@ -554,11 +554,11 @@ export const KOBOLD: MonsterTemplate = {
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.75, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.4 }] }, { kind: "GAUGE", amount: 0.3, drain: true }] },
         // Lv2 ダメージ倍率 1.75倍→1.90倍 / 行動ゲージ 30%→35%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.9, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.4 }] }, { kind: "GAUGE", amount: 0.35, drain: true }] },
-        // Lv3 ダメージ倍率 1.90倍→2.00倍
+        // Lv3 ダメージ倍率 1.90倍→2.00倍 / 対象HP50%以下の最終ダメージ 40%→50%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.5 }] }, { kind: "GAUGE", amount: 0.35, drain: true }] },
         // Lv4 ダメージ倍率 2.00倍→2.10倍 / 行動ゲージ 35%→40%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 2.1, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.5 }] }, { kind: "GAUGE", amount: 0.4, drain: true }] },
-        // Lv5 クールタイム -2(4→2ターン)
+        // Lv5 クールタイム -2(4→2ターン) / 対象HP50%以下の最終ダメージ 50%→60%
         { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 2.1, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.6 }] }, { kind: "GAUGE", amount: 0.4, drain: true }] },
       ],
     },
@@ -602,11 +602,11 @@ export const KOBOLD: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3, targetHpIgnoreDefense: [{ hpRatio: 0.3, ratio: 1 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.5 }] }] },
         // Lv2 ダメージ倍率 3.00倍→3.40倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.4, targetHpIgnoreDefense: [{ hpRatio: 0.3, ratio: 1 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.5 }] }] },
-        // Lv3 ダメージ倍率 3.40倍→3.80倍
+        // Lv3 ダメージ倍率 3.40倍→3.80倍 / 対象HP30%以下の最終ダメージ 50%→60%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.8, targetHpIgnoreDefense: [{ hpRatio: 0.3, ratio: 1 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.6 }] }] },
         // Lv4 ダメージ倍率 3.80倍→4.20倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.2, targetHpIgnoreDefense: [{ hpRatio: 0.3, ratio: 1 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.6 }] }] },
-        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 4.20倍→4.50倍
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 4.20倍→4.50倍 / 対象HP30%以下の最終ダメージ 60%→70%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.5, targetHpIgnoreDefense: [{ hpRatio: 0.3, ratio: 1 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.7 }] }] },
       ],
     },
@@ -690,13 +690,13 @@ export const KOBOLD: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.6, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.5 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.3 }] }] },
-      // Lv2 ダメージ倍率 2.60倍→2.90倍
+      // Lv2 ダメージ倍率 2.60倍→2.90倍 / 対象HP50%以下の防御無視 50%→60%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.9, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.6 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.3 }] }] },
-      // Lv3 ダメージ倍率 2.90倍→3.30倍
+      // Lv3 ダメージ倍率 2.90倍→3.30倍 / 対象HP30%以下の最終ダメージ 30%→40%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.3, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.6 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.4 }] }] },
-      // Lv4 ダメージ倍率 3.30倍→3.70倍
+      // Lv4 ダメージ倍率 3.30倍→3.70倍 / 対象HP50%以下の防御無視 60%→70%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.7, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.7 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.4 }] }] },
-      // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 3.70倍→4.00倍
+      // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 3.70倍→4.00倍 / 対象HP30%以下の最終ダメージ 40%→50%
       { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.7 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.5 }] }] },
     ],
   },
