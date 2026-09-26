@@ -518,6 +518,21 @@ export function tickHealBlockAtTurnStart(unit: BattleUnit): void {
 }
 
 /** 有利な効果を指定個数だけ解除する。省略時は既存STRIP互換ですべて解除する。実際に解除できた個数を返す。 */
+/**
+ * 有利な効果の数。**`stripBuffs` が剥がせるものと同じものを数える。**
+ * 片方だけに項目を足すと、「剥がせる数」と「数えた数」が食い違う。
+ */
+export function countBuffs(unit: BattleUnit): number {
+  const flags = [
+    unit.immuneTurns > 0, unit.shieldTurns > 0, unit.regenTurns > 0,
+    (unit.damageDealtBonusTurns ?? 0) > 0, unit.mitigateTurns > 0, unit.protectTurns > 0,
+    unit.counterTurns > 0, unit.hitGaugeTurns > 0,
+  ].filter(Boolean).length;
+  return flags
+    + unit.effects.filter((effect) => effect.kind === "BUFF").length
+    + unit.statusEffects.filter((effect) => effect.category === "BUFF").length;
+}
+
 export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): number {
   let remaining = Math.max(0, Math.floor(count));
   let removed = 0;

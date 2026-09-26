@@ -38,50 +38,15 @@ const SUEZO_S1: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.75 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 },
-        { kind: "GAUGE", amount: -0.2, chance: 0.7 },
-      ],
-    },
-    // Lv2 倍率 0.75 → 0.85
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.85 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 },
-        { kind: "GAUGE", amount: -0.2, chance: 0.7 },
-      ],
-    },
-    // Lv3 攻撃DOWN 60% → 70%
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.85 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
-        { kind: "GAUGE", amount: -0.2, chance: 0.7 },
-      ],
-    },
-    // Lv4 ゲージ低下 70% → 80%
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 0.85 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
-        { kind: "GAUGE", amount: -0.2, chance: 0.8 },
-      ],
-    },
-    // Lv5 倍率 0.85 → 1.00
-    {
-      cooldownTurns: 0,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.0 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 },
-        { kind: "GAUGE", amount: -0.2, chance: 0.8 },
-      ],
-    },
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 }, { kind: "GAUGE", amount: -0.2, chance: 0.7 }] },
+    // Lv2 ダメージ倍率 0.75倍→0.85倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.6 }, { kind: "GAUGE", amount: -0.2, chance: 0.7 }] },
+    // Lv3 弱体の発動率 60%→70%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }, { kind: "GAUGE", amount: -0.2, chance: 0.7 }] },
+    // Lv4 行動ゲージの発動率 70%→80%
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }, { kind: "GAUGE", amount: -0.2, chance: 0.8 }] },
+    // Lv5 ダメージ倍率 0.85倍→1.10倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.7 }, { kind: "GAUGE", amount: -0.2, chance: 0.8 }] },
   ],
 }, "【対象】敵単体。クールタイムが無いので毎ターン撃てる。妨害の量はこのスキルで稼ぐ。");
 
@@ -105,55 +70,15 @@ const SUEZO_S2_KISS: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.7 },
-        { kind: "GAUGE", amount: -0.35, chance: 0.9 },
-        { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 2 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true },
-      ],
-    },
-    // Lv2 倍率 1.70 → 1.85
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.85 },
-        { kind: "GAUGE", amount: -0.35, chance: 0.9 },
-        { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 2 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true },
-      ],
-    },
-    // Lv3 ゲージ低下 90% → 100%
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.85 },
-        { kind: "GAUGE", amount: -0.35, chance: 1.0 },
-        { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 2 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true },
-      ],
-    },
-    // Lv4 被クリ率UP 2ターン → 3ターン
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.85 },
-        { kind: "GAUGE", amount: -0.35, chance: 1.0 },
-        { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 3 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true },
-      ],
-    },
-    // Lv5 CT4 → CT3(防御DOWNは2ターンのまま)
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.85 },
-        { kind: "GAUGE", amount: -0.35, chance: 1.0 },
-        { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 3 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true },
-      ],
-    },
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.7 }, { kind: "GAUGE", amount: -0.35, chance: 0.9 }, { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true }] },
+    // Lv2 ダメージ倍率 1.70倍→1.90倍
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.9 }, { kind: "GAUGE", amount: -0.35, chance: 0.9 }, { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true }] },
+    // Lv3 ダメージ倍率 1.90倍→1.85倍 / 行動ゲージの発動率 90%→100%
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.85 }, { kind: "GAUGE", amount: -0.35, chance: 1 }, { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true }] },
+    // Lv4 持続 2→3ターン
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.85 }, { kind: "GAUGE", amount: -0.35, chance: 1 }, { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true }] },
+    // Lv5 クールタイム -1(4→3ターン)
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.85 }, { kind: "GAUGE", amount: -0.35, chance: 1 }, { kind: "STATUS", status: "CRIT_RATE_UP", durationTurns: 3 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, fixedDuration: true }] },
   ],
 }, "【対象】敵単体。防御低下は2ターン固定。狙った1体を味方のアタッカーが落としやすい状態にする。");
 
@@ -242,50 +167,15 @@ const SUEZO_S2_PSYCHO: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.35 },
-        { kind: "GAUGE", amount: -0.3, chance: 0.6 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.75 },
-      ],
-    },
-    // Lv2 倍率 1.35 → 1.45
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.45 },
-        { kind: "GAUGE", amount: -0.3, chance: 0.6 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.75 },
-      ],
-    },
-    // Lv3 ゲージ低下 60% → 70%
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.45 },
-        { kind: "GAUGE", amount: -0.3, chance: 0.7 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.75 },
-      ],
-    },
-    // Lv4 攻撃DOWN 1ターン → 2ターン
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.45 },
-        { kind: "GAUGE", amount: -0.3, chance: 0.7 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 },
-      ],
-    },
-    // Lv5 CT3 → CT2
-    {
-      cooldownTurns: 2,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.45 },
-        { kind: "GAUGE", amount: -0.3, chance: 0.7 },
-        { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 },
-      ],
-    },
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.35 }, { kind: "GAUGE", amount: -0.3, chance: 0.6 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.75 }] },
+    // Lv2 ダメージ倍率 1.35倍→1.50倍
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "GAUGE", amount: -0.3, chance: 0.6 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.75 }] },
+    // Lv3 ダメージ倍率 1.50倍→1.45倍 / 行動ゲージの発動率 60%→70%
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.45 }, { kind: "GAUGE", amount: -0.3, chance: 0.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 1, chance: 0.75 }] },
+    // Lv4 弱体の持続 1→2ターン
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.45 }, { kind: "GAUGE", amount: -0.3, chance: 0.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 }] },
+    // Lv5 クールタイム -1(3→2ターン)
+    { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 1.45 }, { kind: "GAUGE", amount: -0.3, chance: 0.7 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, durationTurns: 2, chance: 0.75 }] },
   ],
 }, "【対象】敵全体。全員の手番を後ろへずらすので、自分の次の番が回りやすくなる。");
 
@@ -382,50 +272,15 @@ const SUEZO_S3_EAT: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 3.8 },
-        { kind: "GAUGE", amount: 0.5, chance: 0.8, drain: true },
-        { kind: "LIFESTEAL", healRate: 0.3 },
-      ],
-    },
-    // Lv2 倍率 3.80 → 4.10
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 4.1 },
-        { kind: "GAUGE", amount: 0.5, chance: 0.8, drain: true },
-        { kind: "LIFESTEAL", healRate: 0.3 },
-      ],
-    },
-    // Lv3 ゲージ吸収 80% → 90%
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 4.1 },
-        { kind: "GAUGE", amount: 0.5, chance: 0.9, drain: true },
-        { kind: "LIFESTEAL", healRate: 0.3 },
-      ],
-    },
-    // Lv4 回復 30% → 35%
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DAMAGE", multiplier: 4.1 },
-        { kind: "GAUGE", amount: 0.5, chance: 0.9, drain: true },
-        { kind: "LIFESTEAL", healRate: 0.35 },
-      ],
-    },
-    // Lv5 CT5 → CT4
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "DAMAGE", multiplier: 4.1 },
-        { kind: "GAUGE", amount: 0.5, chance: 0.9, drain: true },
-        { kind: "LIFESTEAL", healRate: 0.35 },
-      ],
-    },
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.8 }, { kind: "GAUGE", amount: 0.5, chance: 0.8, drain: true }, { kind: "LIFESTEAL", healRate: 0.3 }] },
+    // Lv2 ダメージ倍率 3.80倍→4.10倍
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.1 }, { kind: "GAUGE", amount: 0.5, chance: 0.8, drain: true }, { kind: "LIFESTEAL", healRate: 0.3 }] },
+    // Lv3 行動ゲージの発動率 80%→90%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.1 }, { kind: "GAUGE", amount: 0.5, chance: 0.9, drain: true }, { kind: "LIFESTEAL", healRate: 0.3 }] },
+    // Lv4 回復量 30%→35%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.1 }, { kind: "GAUGE", amount: 0.5, chance: 0.9, drain: true }, { kind: "LIFESTEAL", healRate: 0.35 }] },
+    // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 4.10倍→4.20倍
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.2 }, { kind: "GAUGE", amount: 0.5, chance: 0.9, drain: true }, { kind: "LIFESTEAL", healRate: 0.35 }] },
   ],
 }, "【対象】敵単体。奪ったゲージはそのまま自分のものになるので、遅らせるだけの技より一手ぶん得をする。");
 
@@ -442,18 +297,20 @@ const SUEZO_S3_BEAM: Skill = described({
   description: "",
   target: "SINGLE_ENEMY",
   cooldownTurns: 5,
-  effects: [{ kind: "DAMAGE", multiplier: 3.5, alwaysCrit: true }],
+  effects: [
+    { kind: "DAMAGE", multiplier: 3.5, alwaysCrit: true },
+  ],
   levelOverrides: [
     // Lv1
     { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.5, alwaysCrit: true }] },
-    // Lv2 倍率 3.50 → 3.80
+    // Lv2 ダメージ倍率 3.50倍→3.80倍
     { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.8, alwaysCrit: true }] },
-    // Lv3 倍率 3.80 → 4.10
+    // Lv3 ダメージ倍率 3.80倍→4.10倍
     { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.1, alwaysCrit: true }] },
-    // Lv4 倍率 4.10 → 4.50
+    // Lv4 ダメージ倍率 4.10倍→4.50倍
     { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.5, alwaysCrit: true }] },
-    // Lv5 CT5 → CT4
-    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.5, alwaysCrit: true }] },
+    // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 4.50倍→4.60倍
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 4.6, alwaysCrit: true }] },
   ],
 }, "【対象】敵単体。クリティカル率を積まなくても必ず会心するので、装備は会心ダメージだけを伸ばせばよい。");
 

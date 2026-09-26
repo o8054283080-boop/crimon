@@ -166,8 +166,11 @@ describe("書き方", () => {
    * 並んで読めなかった。効果の名前を頭に付ける。
    */
   it("同じ名前の項目は、どの効果のものか分かるように書く", () => {
-    const claw = describeSkillGrowth(first.skills[1]);
-    const lv5 = claw.find((step) => step.level === 5)!.changes.join(" / ");
+    // 2026年10月の調整で、ウルフの毒の持続は Lv1 から2ターンになり Lv5 では伸びなくなった。
+    // 毒と治癒阻害の持続が同じ段で伸びる技として、雷フェンリルのS3を見る
+    const fenrir = MONSTER_DEX_ENTRIES.find((t) => t.templateId === "fenrir" && t.element === "ELECTRIC")!;
+    const fang = describeSkillGrowth(fenrir.skills[2]);
+    const lv5 = fang.find((step) => step.level === 5)!.changes.join(" / ");
     expect(lv5).toContain("毒の持続");
     expect(lv5).toContain("治癒阻害の持続");
   });

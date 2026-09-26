@@ -173,10 +173,10 @@ describe("防御計算は 1000/(1000+1.2×DEF)", () => {
 });
 
 describe("個別に直したスキル", () => {
-  it("ウルフスラッシュは0.9倍×3、各ヒット25%で防御DOWN", () => {
+  it("ウルフスラッシュは0.95倍×3、各ヒット25%で防御DOWN", () => {
     const skill = skillOf("wolf", "ウルフスラッシュ");
     const damage = skill.effects[0] as { multiplier: number; hits: number; perHitEffects: { chance: number; amount: number; durationTurns: number }[] };
-    expect(damage).toMatchObject({ multiplier: 0.9, hits: 3 });
+    expect(damage).toMatchObject({ multiplier: 0.95, hits: 3 });
     expect(damage.perHitEffects).toHaveLength(1);
     expect(damage.perHitEffects[0]).toMatchObject({ chance: 0.25, amount: DEF_DOWN, durationTurns: 2 });
     // 3回とも外す確率は 0.75^3。1回以上入るのは約57.8%
@@ -202,13 +202,15 @@ describe("個別に直したスキル", () => {
   it("ほしくずのわのCTは4", () => {
     const skill = skillOf("wisp", "ほしくずのわ");
     expect(skill.cooldownTurns).toBe(4);
-    expect(skill.effects.every((e) => e.kind === "BUFF" && e.durationTurns === 2)).toBe(true);
+    // 2026年10月の調整で味方ゲージ+10%が付いた。強化はどれも2ターンのまま
+    expect(skill.effects.filter((e) => e.kind === "BUFF").every((e) => e.kind === "BUFF" && e.durationTurns === 2)).toBe(true);
   });
 
-  it("いわくだきの付与確率は80%、持続1ターン、CT3", () => {
+  it("いわくだきの付与確率は85%、持続2ターン、CT3", () => {
     const skill = skillOf("golem", "いわくだき");
     expect(skill.cooldownTurns).toBe(3);
-    expect(skill.effects[1]).toMatchObject({ chance: 0.8, amount: DEF_DOWN, durationTurns: 1 });
+    // 9月の調整(実行時の差し替え)で 85%・2ターンになっていたものを、2026年10月に定義へ移した
+    expect(skill.effects[1]).toMatchObject({ chance: 0.85, amount: DEF_DOWN, durationTurns: 2 });
   });
 });
 

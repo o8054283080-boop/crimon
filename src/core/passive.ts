@@ -76,7 +76,11 @@ export type PassiveLevelEffect =
    * ミミック「偽りの財宝」。
    * 攻撃を受けた時に回復し、攻撃してきた相手の攻撃力を下げる。
    */
-  | { kind: "FALSE_TREASURE"; heal: number; chance: number; atkDown: number; duration: number }
+  | {
+    kind: "FALSE_TREASURE"; heal: number; chance: number; atkDown: number; duration: number;
+    /** 攻撃者へ返す固定ダメージ(自身の最大HPに対する割合)。防御を通さない */
+    counterHpRatio?: number;
+  }
   /**
    * ヴァルキリア「戦乙女の誓い」。
    * 味方がHP閾値を下回った時、その味方へ1ターンの無敵と回復を与える。
@@ -184,13 +188,15 @@ export function describePassiveLevel(effect: PassiveLevelEffect): string {
     case "GAUGE_ON_SLOWED_ENEMY_ACT":
       return `速度低下状態の敵が行動するたび、自身の行動ゲージ+${pct(effect.gauge)}`;
     case "FALSE_TREASURE":
-      return `攻撃を受けた時、自身のHPを最大HPの${pct(effect.heal)}回復し、${pct(effect.chance)}で攻撃者の攻撃力-${pct(effect.atkDown)}(${effect.duration}ターン)。敵1行動につき1回`;
+      return `攻撃を受けた時、自身のHPを最大HPの${pct(effect.heal)}回復し、${pct(effect.chance)}で攻撃者の攻撃力-${pct(effect.atkDown)}(${effect.duration}ターン)`
+        + (effect.counterHpRatio ? `。攻撃者へ自身の最大HPの${pct(effect.counterHpRatio)}のダメージを返す(防御を無視)` : "")
+        + "。敵1行動につき1回";
     case "VALKYRIE_OATH":
       return `味方のHPが${pct(effect.hpRatio)}以下になった時、その味方に1ターン無敵と自身の最大HPの${pct(effect.heal)}回復(内部クールタイム${effect.internalCooldown}ターン)`;
     case "THUNDER_INSTINCT":
       return `クリダメ+${pct(effect.critDmg)}・速度+${effect.spd}。攻撃スキルのクリティカル時、対象の行動ゲージを${pct(effect.drain)}吸収(1スキルにつき1回)`;
     case "REAPER_HARVEST":
-      return `攻撃スキル使用時、${pct(effect.chance)}で対象に1ターンの強化阻害と回復阻害。成功時、自身のHPを最大HPの${pct(effect.heal)}回復し行動ゲージ+${pct(effect.gauge)}(1スキルにつき1回)`;
+      return `攻撃スキル使用時、${pct(effect.chance)}で対象に1ターンの強化阻害と回復阻害。成功時、自身のHPを最大HPの${pct(effect.heal)}回復し行動ゲージ+${pct(effect.gauge)}(多段技は対象に当たった回数だけ判定)`;
     case "PACK_INSTINCT":
       return `クリダメ+${pct(effect.critDmg)}。敵を倒すと追加ターンを得る。スキル1を使った後、${pct(effect.repeatS1Chance)}でもう一度スキル1を使う`;
     case "TIME_KEEPER":

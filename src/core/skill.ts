@@ -36,7 +36,13 @@ export type StatusEffectType =
  * 「敵を殴りながら、いちばん危ない味方を助ける」という支援の形を、
  * スキルの対象タイプを変えずに書けるようにするためのもの。
  */
-export type EffectApplyTo = "SELF" | "ALLIES" | "LOWEST_HP_ALLY";
+/**
+ * 効果の向き先。省略時はスキルの対象。
+ *
+ * `ENEMIES` は**味方に使う技から敵全体へ掛ける弱体**(ドラゴンのりゅうの闘気など)のためのもの。
+ * 弱体(DEBUFF / BLIND / HEAL_BLOCK)だけが持てる。敵全体へ1回ずつ、普段の命中・抵抗判定を通して掛かる。
+ */
+export type EffectApplyTo = "SELF" | "ALLIES" | "LOWEST_HP_ALLY" | "ENEMIES";
 
 export type StatusEffectCategory = "BUFF" | "DEBUFF";
 
@@ -233,6 +239,12 @@ export interface DamageEffect {
   /** 同じスキルで奪った強化効果1個につき乗る最終ダメージの上乗せ(上限必須) */
   stolenBuffBonus?: { perBuff: number; maxBonus: number };
   /**
+   * **攻撃を始めた時点で**対象が持っている強化1個につき乗る最終ダメージの上乗せ(上限必須)。
+   * アビスリーパーの「死の宣告」。数えるのはこの効果の解決の直前なので、
+   * 同じ技の後ろにある解除(STRIP)より前の数になる
+   */
+  buffCountBonus?: { perBuff: number; maxBonus: number };
+  /**
    * この効果のクリティカル率への上乗せ。**才能覚醒の「会心補助」が使う。**
    * 個体のクリ率ではなく、この一撃だけが会心しやすくなる。
    */
@@ -293,6 +305,8 @@ export interface BuffEffect {
 
 export interface DebuffEffect {
   kind: "DEBUFF";
+  /** "ENEMIES" なら、味方向けの技からでも敵全体へ掛ける */
+  applyTo?: "ENEMIES";
   stat: BuffStat;
   /** 例: 0.3 で -30% */
   amount: number;
@@ -530,6 +544,11 @@ export interface StripEffect {
   count?: number;
   /** 解除に成功した1個につき、術者の行動ゲージを増やす */
   selfGaugePerRemoved?: number;
+  /**
+   * 解除に成功した**相手1体につき**、術者の行動ゲージを増やす(剥がした個数は問わない)。
+   * アビスリーパーの「魂喰らいの宴」
+   */
+  selfGaugePerTarget?: number;
 }
 
 /**
@@ -547,6 +566,8 @@ export interface StripEffect {
  */
 export interface HealBlockEffect {
   kind: "HEAL_BLOCK";
+  /** "ENEMIES" なら、味方向けの技からでも敵全体へ掛ける */
+  applyTo?: "ENEMIES";
   durationTurns: number;
   /** この効果が発動を試みる基礎確率(0-1) */
   chance?: number;
@@ -594,6 +615,8 @@ export interface CooldownExtendEffect {
  */
 export interface BlindEffect {
   kind: "BLIND";
+  /** "ENEMIES" なら、味方向けの技からでも敵全体へ掛ける */
+  applyTo?: "ENEMIES";
   durationTurns: number;
   /** この効果が発動を試みる基礎確率(0-1)。省略時は常に発動を試みる */
   chance?: number;
@@ -1081,6 +1104,9 @@ export function describeSkillEffect(effect: SkillEffect): string {
       const debuffBonusText = effect.debuffDamageBonus
         ? ` 対象の弱体効果1個につき最終ダメージ+${Math.round(effect.debuffDamageBonus.perDebuff * 100)}%(最大+${Math.round(effect.debuffDamageBonus.maxBonus * 100)}%)`
         : "";
+      const buffCountText = effect.buffCountBonus
+        ? ` 対象の強化効果1個につき最終ダメージ+${Math.round(effect.buffCountBonus.perBuff * 100)}%(最大+${Math.round(effect.buffCountBonus.maxBonus * 100)}%)`
+        : "";
       const critGaugeText = effect.gaugeOnCritPerHit
         ? ` 各ヒットのクリティカルで自身の行動ゲージ+${Math.round(effect.gaugeOnCritPerHit * 100)}%`
         : "";
@@ -1092,7 +1118,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
         effect.perHitEffects ? `各ヒットごとに: ${effect.perHitEffects.map(describeSkillEffect).join('、')}` : '',
       ].filter(Boolean).join('。');
       const requiresText = conditionPrefix(effect.requires);
-      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${condIgnoreText}${alwaysCritText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${critGaugeText}${special ? `。${special}` : ""}`;
+      return `${requiresText}ダメージ倍率 ${effect.multiplier.toFixed(2)}倍${effect.hits && effect.hits > 1 ? ` × ${effect.hits}回` : ""}${scaleText}${ignoreDefenseText}${condIgnoreText}${alwaysCritText}${hpBonusText}${hpIgnoreText}${condBonusText}${missingText}${debuffBonusText}${buffCountText}${critGaugeText}${special ? `。${special}` : ""}`;
     }
     case "HEAL": {
       const who = effect.applyTo === "SELF" ? "自身を" : effect.applyTo === "ALLIES" ? "味方全体を" : "";
@@ -1113,7 +1139,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
        * 「85%で防御DOWN」としか書かないと、抵抗の高い相手に
        * 効かないものと読まれる(実際は通る)。免疫では防がれることも併記する。
        */
-      return `${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`
+      return `${effect.applyTo === "ENEMIES" ? "敵全体に" : ""}${chanceSuffix(effect.chance)}${BUFF_STAT_JA[effect.stat]}-${Math.round(effect.amount * 100)}% (${effect.durationTurns}ターン)`
         + (effect.ignoreResistance ? "(抵抗を無視。ただし免疫中の相手には入らない)" : "");
     case "STATUS": {
       const scope = effect.applyTo === "ALLIES" ? "味方全体に" : effect.applyTo === "SELF" ? "自身に" : "";
@@ -1157,10 +1183,17 @@ export function describeSkillEffect(effect: SkillEffect): string {
       const scope = effect.applyTo === "ALLIES" ? "味方全体の" : effect.applyTo === "SELF" ? "自身の" : "";
       return effect.count === undefined ? `${scope}デバフを解除` : `${scope}デバフを${effect.count}個解除`;
     }
-    case "STRIP":
+    case "STRIP": {
+      const perTarget = effect.selfGaugePerTarget
+        ? `(解除できた相手1体につき自身の行動ゲージ+${Math.round(effect.selfGaugePerTarget * 100)}%)`
+        : "";
+      const perRemoved = effect.selfGaugePerRemoved
+        ? `(解除した1個につき自身の行動ゲージ+${Math.round(effect.selfGaugePerRemoved * 100)}%)`
+        : "";
       return effect.count === undefined
-        ? `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}有利な効果(シールド・無効・能力上昇)を解除`
-        : `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}有利な効果を${effect.count}個解除`;
+        ? `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}有利な効果(シールド・無効・能力上昇)を解除${perRemoved}${perTarget}`
+        : `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}有利な効果を${effect.count}個解除${perRemoved}${perTarget}`;
+    }
     case "STEAL_BUFF":
       return `${chanceSuffix(effect.chance)}有利な効果を${effect.count ?? 1}個奪って自身に付与`;
     case "MITIGATE": {
@@ -1189,11 +1222,11 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "GAUGE_ON_HIT":
       return `${effect.durationTurns}ターン、攻撃を受けるたび行動ゲージ+${Math.round(effect.amount * 100)}%`;
     case "HEAL_BLOCK":
-      return `${chanceSuffix(effect.chance)}治癒阻害 (${effect.durationTurns}ターン、回復を受けられない)`;
+      return `${effect.applyTo === "ENEMIES" ? "敵全体に" : ""}${chanceSuffix(effect.chance)}治癒阻害 (${effect.durationTurns}ターン、回復を受けられない)`;
     case "COOLDOWN_EXTEND":
       return `${chanceSuffix(effect.chance)}敵の全スキルのクールタイムを${effect.turns}ターン延長`;
     case "BLIND":
-      return `${chanceSuffix(effect.chance)}暗闇 (${effect.durationTurns}ターン、攻撃時50%でダメージ-75%・追加効果なし)`;
+      return `${effect.applyTo === "ENEMIES" ? "敵全体に" : ""}${chanceSuffix(effect.chance)}暗闇 (${effect.durationTurns}ターン、攻撃時50%でダメージ-75%・追加効果なし)`;
     case "POISON": {
       const stacks = effect.stacks && effect.stacks > 1 ? `${effect.stacks}スタック` : "1スタック";
       const extra = effect.extraStacksIfPoisoned ? ` (既に毒状態ならさらに${effect.extraStacksIfPoisoned}スタック)` : "";
@@ -1387,6 +1420,7 @@ const PASSIVE_GROWTH_FIELDS: Record<string, GrowthField> = {
   "FALSE_TREASURE.chance": { label: "発動率", unit: "percent" },
   "FALSE_TREASURE.atkDown": { label: "攻撃力低下", unit: "percent" },
   "FALSE_TREASURE.duration": { label: "低下の持続", unit: "turns" },
+  "FALSE_TREASURE.counterHpRatio": { label: "HP反撃", unit: "percent" },
   "VALKYRIE_OATH.hpRatio": { label: "発動するHP", unit: "percent" },
   "VALKYRIE_OATH.heal": { label: "回復量", unit: "percent" },
   "VALKYRIE_OATH.internalCooldown": { label: "内部クールタイム", unit: "turns" },
@@ -1397,6 +1431,7 @@ const PASSIVE_GROWTH_FIELDS: Record<string, GrowthField> = {
   "REAPER_HARVEST.heal": { label: "回復量", unit: "percent" },
   "REAPER_HARVEST.gauge": { label: "行動ゲージ", unit: "percent" },
   "PACK_INSTINCT.critDmg": { label: "クリダメ", unit: "percent" },
+  "PACK_INSTINCT.repeatS1Chance": { label: "スキル1の再使用率", unit: "percent" },
   "TIME_KEEPER.allyGauge": { label: "味方行動時の行動ゲージ", unit: "percent" },
   "TIME_KEEPER.drain": { label: "ゲージ吸収", unit: "percent" },
   "TIME_KEEPER.stunChance": { label: "スタンの発動率", unit: "percent" },

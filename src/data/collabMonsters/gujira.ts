@@ -33,18 +33,20 @@ const GUJIRA_S1: Skill = described({
   description: "",
   target: "SINGLE_ENEMY",
   cooldownTurns: 0,
-  effects: [{ kind: "DAMAGE", multiplier: 1.5 }],
+  effects: [
+    { kind: "DAMAGE", multiplier: 1.5 },
+  ],
   levelOverrides: [
     // Lv1
     { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.5 }] },
-    // Lv2 倍率 1.50 → 1.65
+    // Lv2 ダメージ倍率 1.50倍→1.65倍
     { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.65 }] },
-    // Lv3 倍率 1.65 → 1.80
+    // Lv3 ダメージ倍率 1.65倍→1.80倍
     { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.8 }] },
-    // Lv4 倍率 1.80 → 1.95
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1.95 }] },
-    // Lv5 倍率 1.95 → 2.10
-    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 2.1 }] },
+    // Lv4 ダメージ倍率 1.80倍→2.00倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 2 }] },
+    // Lv5 ダメージ倍率 2.00倍→2.20倍
+    { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 2.2 }] },
   ],
 }, "【対象】敵単体。追加効果を持たない代わりに、スキル1としては倍率が高い。");
 
@@ -61,20 +63,20 @@ const GUJIRA_S2_PRESS: Skill = described({
   target: "SINGLE_ENEMY",
   cooldownTurns: 3,
   effects: [
-    { kind: "DAMAGE", multiplier: 3.0 },
+    { kind: "DAMAGE", multiplier: 3 },
     { kind: "STUN", durationTurns: 1, chance: 0.4 },
   ],
   levelOverrides: [
     // Lv1
-    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.0 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
-    // Lv2 倍率 3.00 → 3.20
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
+    // Lv2 ダメージ倍率 3.00倍→3.20倍
     { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.2 }, { kind: "STUN", durationTurns: 1, chance: 0.4 }] },
-    // Lv3 気絶 40% → 50%
+    // Lv3 スタンの発動率 40%→50%
     { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.2 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
-    // Lv4 倍率 3.20 → 3.50
-    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.5 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
-    // Lv5 CT3 → CT2
-    { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 3.5 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+    // Lv4 ダメージ倍率 3.20倍→3.60倍
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 3.6 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+    // Lv5 クールタイム -1(3→2ターン) / ダメージ倍率 3.60倍→3.70倍
+    { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 3.7 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
   ],
 }, "【対象】敵単体。気絶は1ターン固定。クールタイムが短いので、同じ相手を止め続けられる。");
 
@@ -97,50 +99,15 @@ const GUJIRA_S2_QUAKE: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 1.9 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 },
-        { kind: "STUN", durationTurns: 1, chance: 0.15 },
-      ],
-    },
-    // Lv2 倍率 1.90 → 2.00
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 },
-        { kind: "STUN", durationTurns: 1, chance: 0.15 },
-      ],
-    },
-    // Lv3 防御DOWN 55% → 65%
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 },
-        { kind: "STUN", durationTurns: 1, chance: 0.15 },
-      ],
-    },
-    // Lv4 防御DOWN 2ターン → 3ターン
-    {
-      cooldownTurns: 3,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.65 },
-        { kind: "STUN", durationTurns: 1, chance: 0.15 },
-      ],
-    },
-    // Lv5 CT3 → CT2
-    {
-      cooldownTurns: 2,
-      effects: [
-        { kind: "DAMAGE", multiplier: 2.0 },
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.65 },
-        { kind: "STUN", durationTurns: 1, chance: 0.15 },
-      ],
-    },
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.9 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 }, { kind: "STUN", durationTurns: 1, chance: 0.15 }] },
+    // Lv2 ダメージ倍率 1.90倍→2.00倍
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.55 }, { kind: "STUN", durationTurns: 1, chance: 0.15 }] },
+    // Lv3 弱体の発動率 55%→65%
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }, { kind: "STUN", durationTurns: 1, chance: 0.15 }] },
+    // Lv4 ダメージ倍率 2.00倍→2.10倍 / 弱体の持続 2→3ターン
+    { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 2.1 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.65 }, { kind: "STUN", durationTurns: 1, chance: 0.15 }] },
+    // Lv5 クールタイム -1(3→2ターン) / ダメージ倍率 2.10倍→2.20倍 / 弱体の発動率 65%→70%
+    { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 2.2 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.7 }, { kind: "STUN", durationTurns: 1, chance: 0.15 }] },
   ],
 }, "【対象】敵全体。気絶は1ターン固定。守りを崩してから自分の必殺技へ繋ぐ形になる。");
 
@@ -232,45 +199,15 @@ const GUJIRA_S3_TSUNAMI: Skill = described({
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 },
-        { kind: "DAMAGE", multiplier: 2.5 },
-      ],
-    },
-    // Lv2 倍率 2.50 → 2.70
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 },
-        { kind: "DAMAGE", multiplier: 2.7 },
-      ],
-    },
-    // Lv3 防御DOWN 65% → 75%
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 },
-        { kind: "DAMAGE", multiplier: 2.7 },
-      ],
-    },
-    // Lv4 防御DOWN 2ターン → 3ターン
-    {
-      cooldownTurns: 6,
-      effects: [
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.75 },
-        { kind: "DAMAGE", multiplier: 2.7 },
-      ],
-    },
-    // Lv5 CT6 → CT5
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.75 },
-        { kind: "DAMAGE", multiplier: 2.7 },
-      ],
-    },
+    { cooldownTurns: 6, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }, { kind: "DAMAGE", multiplier: 2.5 }] },
+    // Lv2 ダメージ倍率 2.50倍→2.70倍
+    { cooldownTurns: 6, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }, { kind: "DAMAGE", multiplier: 2.7 }] },
+    // Lv3 弱体の発動率 65%→75%
+    { cooldownTurns: 6, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 }, { kind: "DAMAGE", multiplier: 2.7 }] },
+    // Lv4 弱体の発動率 75%→80% / 弱体の持続 2→3ターン / ダメージ倍率 2.70倍→2.80倍
+    { cooldownTurns: 6, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.8 }, { kind: "DAMAGE", multiplier: 2.8 }] },
+    // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 2.80倍→3.00倍
+    { cooldownTurns: 5, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.8 }, { kind: "DAMAGE", multiplier: 3 }] },
   ],
 }, "【対象】敵全体。守りを崩す判定が先なので、通った相手にはこの一撃から低下が効く。");
 
@@ -292,52 +229,19 @@ const GUJIRA_S3_WAVE_PRESS: Skill = described({
   cooldownTurns: 5,
   effects: [
     { kind: "SELF_DAMAGE", ratio: 0.25 },
-    {
-      kind: "DAMAGE", multiplier: 6.5,
-      conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 },
-    },
+    { kind: "DAMAGE", multiplier: 6.5, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 } },
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "SELF_DAMAGE", ratio: 0.25 },
-        { kind: "DAMAGE", multiplier: 6.5, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 } },
-      ],
-    },
-    // Lv2 倍率 6.50 → 6.90
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "SELF_DAMAGE", ratio: 0.25 },
-        { kind: "DAMAGE", multiplier: 6.9, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 } },
-      ],
-    },
-    // Lv3 防御無視 50% → 55%
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "SELF_DAMAGE", ratio: 0.25 },
-        { kind: "DAMAGE", multiplier: 6.9, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.55 } },
-      ],
-    },
-    // Lv4 倍率 6.90 → 7.30
-    {
-      cooldownTurns: 5,
-      effects: [
-        { kind: "SELF_DAMAGE", ratio: 0.25 },
-        { kind: "DAMAGE", multiplier: 7.3, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.55 } },
-      ],
-    },
-    // Lv5 CT5 → CT4
-    {
-      cooldownTurns: 4,
-      effects: [
-        { kind: "SELF_DAMAGE", ratio: 0.25 },
-        { kind: "DAMAGE", multiplier: 7.3, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.55 } },
-      ],
-    },
+    { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 6.5, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 } }] },
+    // Lv2 ダメージ倍率 6.50倍→6.90倍
+    { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 6.9, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 } }] },
+    // Lv3
+    { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 6.9, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.55 } }] },
+    // Lv4 ダメージ倍率 6.90倍→7.40倍
+    { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 7.4, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.55 } }] },
+    // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 7.40倍→7.50倍
+    { cooldownTurns: 4, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 7.5, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.6 } }] },
   ],
 }, "【対象】敵単体。自傷の割合は伸びない。HPが足りない時に撃つと自分が倒れるので、撃つ判断そのものが賭けになる。");
 
@@ -356,34 +260,19 @@ const GUJIRA_S3_SURGE: Skill = described({
   cooldownTurns: 5,
   effects: [
     { kind: "DAMAGE", multiplier: 4.8 },
-    { kind: "FLAT_DAMAGE", amount: 10_000, requires: "ANY_CRIT" },
+    { kind: "FLAT_DAMAGE", amount: 10000, requires: "ANY_CRIT" },
   ],
   levelOverrides: [
     // Lv1
-    {
-      cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 10_000, requires: "ANY_CRIT" }],
-    },
-    // Lv2 倍率 4.80 → 5.10
-    {
-      cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 5.1 }, { kind: "FLAT_DAMAGE", amount: 10_000, requires: "ANY_CRIT" }],
-    },
-    // Lv3 固定ダメージ 10000 → 12000
-    {
-      cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 5.1 }, { kind: "FLAT_DAMAGE", amount: 12_000, requires: "ANY_CRIT" }],
-    },
-    // Lv4 倍率 5.10 → 5.50
-    {
-      cooldownTurns: 5,
-      effects: [{ kind: "DAMAGE", multiplier: 5.5 }, { kind: "FLAT_DAMAGE", amount: 12_000, requires: "ANY_CRIT" }],
-    },
-    // Lv5 CT5 → CT4
-    {
-      cooldownTurns: 4,
-      effects: [{ kind: "DAMAGE", multiplier: 5.5 }, { kind: "FLAT_DAMAGE", amount: 12_000, requires: "ANY_CRIT" }],
-    },
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 4.8 }, { kind: "FLAT_DAMAGE", amount: 10000, requires: "ANY_CRIT" }] },
+    // Lv2 ダメージ倍率 4.80倍→5.10倍
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5.1 }, { kind: "FLAT_DAMAGE", amount: 10000, requires: "ANY_CRIT" }] },
+    // Lv3 固定ダメージ 10,000→12,000
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5.1 }, { kind: "FLAT_DAMAGE", amount: 12000, requires: "ANY_CRIT" }] },
+    // Lv4 ダメージ倍率 5.10倍→5.60倍
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 5.6 }, { kind: "FLAT_DAMAGE", amount: 12000, requires: "ANY_CRIT" }] },
+    // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 5.60倍→5.80倍 / 固定ダメージ 12,000→15,000
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 5.8 }, { kind: "FLAT_DAMAGE", amount: 15000, requires: "ANY_CRIT" }] },
   ],
 }, "【対象】敵単体。固定ダメージは相手の防御でも会心倍率でも変わらないので、硬い相手にも同じだけ通る。");
 

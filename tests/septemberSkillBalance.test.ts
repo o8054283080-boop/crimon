@@ -16,12 +16,14 @@ describe("合意したスキル強化", () => {
     expect(skill("wisp_s3_c")).toMatchObject({ target: "SINGLE_ALLY", cooldownTurns: 3, effects: [
       { amount: 1 }, { durationTurns: 3 }] });
     expect(skill("wisp_s3_c", 1)).toMatchObject({ cooldownTurns: 4, effects: [{ amount: 0.8 }, { durationTurns: 2 }] });
-    expect(skill("fairy_s1").effects).toMatchObject([{ multiplier: 1 }, { healRate: 0.04 }]);
+    // 以下は2026年10月の調整で Lv1〜5 を levelOverrides に書いた後の値(Lv5 は9月の値以上)
+    expect(skill("fairy_s1").effects).toMatchObject([{ multiplier: 1.05 }, { healRate: 0.1 }]);
     expect(skill("mimic_s3_b").cooldownTurns).toBe(3);
     expect(skill("mimic_s3_b", 4).cooldownTurns).toBe(5);
-    expect(skill("treant_s2_c").effects).toMatchObject([{ multiplier: 1.5, hpCoefficient: 0.12 }, { maxSourceHpRate: 0.3 }]);
-    expect(skill("golem_s3_c").effects[2]).toMatchObject({ status: "REFLECT", durationTurns: 3, applyTo: "SELF" });
-    expect(skill("golem_s3_c", 4).effects).toHaveLength(2);
+    expect(skill("treant_s2_c").effects).toMatchObject([{ multiplier: 1.5, hpCoefficient: 0.13 }, { maxSourceHpRate: 0.3 }]);
+    // 自身のゲージ上昇が足されたので、反射は4番目
+    expect(skill("golem_s3_c").effects[3]).toMatchObject({ status: "REFLECT", durationTurns: 3, applyTo: "SELF" });
+    expect(skill("golem_s3_c", 4).effects.some((e) => e.kind === "STATUS")).toBe(false);
   });
   it("終末胞子は生存敵に3回攻撃し、毒も3回付与する", () => {
     const s = skill("mushroon_s3_dark");

@@ -101,10 +101,11 @@ describe("S1 プリズムスプレッド", () => {
   it("スキルLvで倍率と拡散率が交互に伸びる", () => {
     const table = [
       { level: 1, multiplier: 1.0, ratio: 0.5 },
-      { level: 2, multiplier: 1.05, ratio: 0.5 },
-      { level: 3, multiplier: 1.05, ratio: 0.6 },
-      { level: 4, multiplier: 1.10, ratio: 0.6 },
-      { level: 5, multiplier: 1.10, ratio: 0.7 },
+      // 2026年10月の調整で Lv2 1.05→1.10、Lv4 1.10→1.20(拡散率は据え置き)
+      { level: 2, multiplier: 1.10, ratio: 0.5 },
+      { level: 3, multiplier: 1.10, ratio: 0.6 },
+      { level: 4, multiplier: 1.20, ratio: 0.6 },
+      { level: 5, multiplier: 1.20, ratio: 0.7 },
     ];
     for (const row of table) {
       const skill = leveled(0, row.level);
@@ -133,7 +134,8 @@ describe("S2 クリスタルラッシュ", () => {
       { level: 1, multiplier: 0.8, chance: 0.35, turns: 1, cooldown: 3 },
       { level: 2, multiplier: 0.9, chance: 0.35, turns: 1, cooldown: 3 },
       { level: 3, multiplier: 0.9, chance: 0.50, turns: 1, cooldown: 3 },
-      { level: 4, multiplier: 0.9, chance: 0.50, turns: 2, cooldown: 3 },
+      // 2026年10月の調整で Lv4 の倍率だけ 0.90→0.95
+      { level: 4, multiplier: 0.95, chance: 0.50, turns: 2, cooldown: 3 },
       { level: 5, multiplier: 1.0, chance: 0.50, turns: 2, cooldown: 2 },
     ];
     for (const row of table) {
@@ -169,7 +171,8 @@ describe("S3 創世の宝珠", () => {
       { level: 2, multiplier: 2.3, shield: 0.20, cooldown: 5 },
       { level: 3, multiplier: 2.3, shield: 0.25, cooldown: 5 },
       { level: 4, multiplier: 2.7, shield: 0.25, cooldown: 5 },
-      { level: 5, multiplier: 2.7, shield: 0.25, cooldown: 4 },
+      // 2026年10月の調整で Lv5 の倍率だけ 2.70→2.80
+      { level: 5, multiplier: 2.8, shield: 0.25, cooldown: 4 },
     ];
     for (const row of table) {
       const skill = leveled(2, row.level);

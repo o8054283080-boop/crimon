@@ -61,27 +61,29 @@ describe("電気ドラゴンのスキル3(破滅の咆哮)", () => {
     const skill3 = dragon.skills[2];
     expect(skill3.name).toBe("破滅の咆哮");
     const damage = skill3.effects.find((e) => e.kind === "DAMAGE");
-    expect(damage).toMatchObject({ kind: "DAMAGE", hpCoefficient: 0.1 });
+    // 2026年10月の調整で 10% → 14%
+    expect(damage).toMatchObject({ kind: "DAMAGE", hpCoefficient: 0.14 });
   });
 });
 
 describe("水ドラゴンのスキル3(古龍の加護)", () => {
-  it("ALL_ALLIES対象でATK/DEFバフとDEFスケール回復を持つ", () => {
+  it("ALL_ALLIES対象でATK/DEFバフと最大HP基準の回復を持つ", () => {
     const dragon = findMonster("dragon", "WATER")!;
     const skill3 = dragon.skills[2];
     expect(skill3.target).toBe("ALL_ALLIES");
     expect(skill3.effects).toContainEqual({ kind: "BUFF", stat: "atk", amount: 0.3, durationTurns: 3 });
     expect(skill3.effects).toContainEqual({ kind: "BUFF", stat: "def", amount: 0.3, durationTurns: 3 });
-    expect(skill3.effects.some((e) => e.kind === "HEAL" && e.scaleStat === "def" && e.healRate === 1.5)).toBe(true);
+    // 2026年10月の調整で、防御力比例の回復(1.5倍)を最大HPの20%へ置き換えた
+    expect(skill3.effects.some((e) => e.kind === "HEAL" && e.scaleStat === undefined && e.healRate === 0.2)).toBe(true);
   });
 });
 
-describe("終焉の一撃のスタン確率(70%に変更)", () => {
+describe("終焉の一撃のスタン確率(2026年10月に75%へ)", () => {
   // 光/闇のネメシスは固有スキル3を持つようになったので、通常枠での確認は火で行う
-  it("火ネメシスのスキル3に含まれるSTUN効果のchanceが0.7", () => {
+  it("火ネメシスのスキル3に含まれるSTUN効果のchanceが0.75", () => {
     const skill3 = findMonster("nemesis", "FIRE")!.skills[2];
     expect(skill3.name).toBe("終焉の一撃");
-    expect(skill3.effects.find((e) => e.kind === "STUN")).toMatchObject({ chance: 0.7 });
+    expect(skill3.effects.find((e) => e.kind === "STUN")).toMatchObject({ chance: 0.75 });
   });
 });
 
@@ -91,7 +93,8 @@ describe("血のいけにえに自身の防御力スケールダメージを追�
     const skill2 = nemesis.skills[1];
     expect(skill2.name).toBe("血のいけにえ");
     const damage = skill2.effects.find((e) => e.kind === "DAMAGE");
-    expect(damage).toMatchObject({ kind: "DAMAGE", defCoefficient: 0.75 });
+    // 2026年10月の調整で 0.75 → 0.9
+    expect(damage).toMatchObject({ kind: "DAMAGE", defCoefficient: 0.9 });
   });
 });
 
@@ -107,7 +110,8 @@ describe("光ネメシスのスキル3(ラストジャッジメント)", () => {
     const damageOf = (s: typeof light) => s.effects.find((e) => e.kind === "DAMAGE")!;
     const stunOf = (s: typeof light) => s.effects.find((e) => e.kind === "STUN")!;
     expect(damageOf(light).multiplier).toBeGreaterThan(damageOf(normal).multiplier);
-    expect(stunOf(light).chance!).toBeGreaterThan(stunOf(normal).chance!);
+    // 2026年10月の調整で通常の終焉の一撃が75%へ上がり、Lv1 では光と並んだ(光は「強化しない」指定)
+    expect(stunOf(light).chance!).toBeGreaterThanOrEqual(stunOf(normal).chance!);
     // ゲージ操作は吸収でなければ、敵を先に動かしてしまう
     expect(light.effects).toContainEqual({ kind: "GAUGE", amount: 0.4, drain: true });
   });

@@ -24,7 +24,8 @@ describe("既存モンスターの弱スキル底上げ", () => {
     expect(fullPower.effects[1]).toMatchObject({ kind: "STUN", chance: 0.5 });
 
     const slash = skill("wolf_s3_b");
-    expect(slash.effects[0]).toMatchObject({ kind: "DAMAGE", multiplier: 0.85, hits: 3 });
+    // 2026年10月の調整で 0.85 → 0.95(3回攻撃のまま)
+    expect(slash.effects[0]).toMatchObject({ kind: "DAMAGE", multiplier: 0.95, hits: 3 });
   });
 
   it("インプの全体妨害を強化する", () => {
@@ -64,10 +65,12 @@ describe("既存モンスターの弱スキル底上げ", () => {
    */
   it("時空崩壊は70%でゲージ100%ダウン、20%でスタン", () => {
     const collapse = skill("chronos_s3_b");
-    expect(collapse.description).toContain("70%で行動ゲージを100%減少");
-    expect(collapse.description).toContain("20%で1ターン行動不能");
+    // 説明文は効果から作る(2026年10月の調整で levelOverrides 化)
+    expect(collapse.description).toContain("70%で行動ゲージ-100%");
+    expect(collapse.description).toContain("20%でスタン (1ターン)");
     expect(collapse.effects).toHaveLength(3);
-    expect(collapse.effects[0]).toMatchObject({ kind: "DAMAGE", multiplier: 1.0 });
+    // 2026年10月の調整で倍率 1.0 → 1.1
+    expect(collapse.effects[0]).toMatchObject({ kind: "DAMAGE", multiplier: 1.1 });
     expect(collapse.effects[1]).toMatchObject({ kind: "GAUGE", amount: -1, chance: 0.7 });
     expect(collapse.effects[2]).toMatchObject({ kind: "STUN", durationTurns: 1, chance: 0.2 });
     // **判定の印として使う0ターンのスタンは、もう持たない**
