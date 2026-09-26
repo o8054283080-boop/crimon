@@ -199,6 +199,8 @@ import { renderLevelDungeon } from "./views/levelDungeon.js";
 import { renderMonsterDex } from "./views/monsterDex.js";
 import { DexSortKey } from "../game/monsterDexSort.js";
 import { DexFilter, EMPTY_DEX_FILTER } from "../game/monsterDexFilter.js";
+import { renderSkillDex } from "./views/skillDex.js";
+import { EMPTY_SKILL_DEX_FILTER, type SkillDexFilter } from "../game/skillDex.js";
 import { renderPvpArena } from "./views/pvpArena.js";
 import { renderHowToPlay } from "./views/howToPlay.js";
 import type { ArenaViewName } from "./views/pvpArena.js";
@@ -600,6 +602,13 @@ interface AppState {
   dexFilter: DexFilter;
   /** 絞り込みの札を開いているか。既定は畳む(開いたままだと一覧が見えない) */
   dexFilterOpen: boolean;
+  /** スキル図鑑の検索条件(枠・検索語・効果・属性・対象)。画面を離れても覚えておく */
+  skillDexFilter: SkillDexFilter;
+  skillDexFilterOpen: boolean;
+  /** スキル図鑑を閉じた時に戻る画面(開いた場所へ戻す) */
+  skillDexReturn: ScreenName;
+  /** モンスター図鑑の詳細をスキル図鑑から開いたか。戻るでスキル図鑑へ帰す */
+  dexOpenedFromSkillDex: boolean;
   /* --- アリーナ --- */
   /** 編成を編集中の枠。null なら対戦相手の一覧 */
   /** アリーナの中のどこを見ているか */
@@ -814,6 +823,10 @@ const state: AppState = {
   dexSortKey: "number",
   dexFilter: { ...EMPTY_DEX_FILTER },
   dexFilterOpen: false,
+  skillDexFilter: { ...EMPTY_SKILL_DEX_FILTER },
+  skillDexFilterOpen: false,
+  skillDexReturn: "MONSTER_DEX",
+  dexOpenedFromSkillDex: false,
   arenaView: "TOP",
   arenaTicket: null,
   arenaHistoryLoaded: false,
@@ -1144,6 +1157,18 @@ function persistNavigationState(): void {
     createTargetId: state.createTargetId ?? undefined,
     returnContext: state.returnContext ?? undefined,
   });
+}
+
+/**
+ * スキル図鑑を開く。**開いた場所へ戻れるように覚えておく**
+ * (モンスター図鑑から開けば図鑑へ、クリエイトから開けばクリエイトへ)。
+ * 検索条件は画面をまたいで残す——素材を探しながら行き来するため。
+ */
+function openSkillDex(from: ScreenName): void {
+  state.skillDexReturn = from;
+  state.dexOpenedFromSkillDex = false;
+  state.screen = "SKILL_DEX";
+  render();
 }
 
 function navigate(screen: ScreenName): void {
@@ -5661,14 +5686,56 @@ function renderScreen(): void {
           render();
         },
         onSelectEntry: (id) => {
+          // スキル図鑑から持ち主を開いていたら、詳細を閉じた時はスキル図鑑へ帰す
+          if (id === null && state.dexOpenedFromSkillDex) {
+            state.dexOpenedFromSkillDex = false;
+            state.selectedDexEntryId = null;
+            state.screen = "SKILL_DEX";
+            render();
+            return;
+          }
           state.selectedDexEntryId = id;
           render();
         },
         onBack: () => {
           state.selectedDexEntryId = null;
+          state.dexOpenedFromSkillDex = false;
           state.screen = "MONSTERS";
           render();
         },
+        onGoSkillDex: () => openSkillDex("MONSTER_DEX"),
+      });
+      break;
+
+    case "SKILL_DEX":
+      content = renderSkillDex({
+        filter: state.skillDexFilter,
+        filterOpen: state.skillDexFilterOpen,
+        onChangeFilter: (filter) => {
+          state.skillDexFilter = filter;
+          render();
+        },
+        onToggleFilterOpen: () => {
+          state.skillDexFilterOpen = !state.skillDexFilterOpen;
+          render();
+        },
+        onOpenMonster: (dexId) => {
+          state.selectedDexEntryId = dexId;
+          state.dexOpenedFromSkillDex = true;
+          state.screen = "MONSTER_DEX";
+          render();
+        },
+        onGoMonsterDex: () => {
+          state.selectedDexEntryId = null;
+          state.dexOpenedFromSkillDex = false;
+          state.screen = "MONSTER_DEX";
+          render();
+        },
+        onBack: () => {
+          state.screen = state.skillDexReturn;
+          render();
+        },
+        backLabel: state.skillDexReturn === "MONSTER_CREATE" ? "クリエイトへ戻る" : "モンスター図鑑へ戻る",
       });
       break;
 
@@ -5766,6 +5833,7 @@ function renderScreen(): void {
           state.reawakenConfirmOpen = false;
           render();
         },
+        onGoSkillDex: () => openSkillDex("MONSTER_CREATE"),
         onReincarnate: (type: MonsterType) => {
           const label = MONSTER_TYPE_LABELS[type];
           // **金額は定数から出す。** 文言に直接書くと、値を変えた時にここだけ古くなる

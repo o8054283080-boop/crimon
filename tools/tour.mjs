@@ -104,6 +104,20 @@ const SCREENS = [
     setup: "document.querySelectorAll('.howto-card').forEach((c) => { c.open = true; })",
   },
   { name: "モンスター図鑑", tab: "HOME", tile: "dex" },
+  /*
+   * スキル図鑑。**絞り込みを開いた姿も見る**(畳んだままだと中の札が一度も測られない)。
+   * スキル3は札がいちばん多く、パッシブの札もここにだけ出る。
+   */
+  {
+    name: "スキル図鑑", tab: "HOME", tile: "dex",
+    setup: "document.querySelector('[data-tour=\"monster-dex-to-skill-dex\"]')?.click()",
+  },
+  {
+    name: "スキル図鑑(スキル3・絞り込みを開く)", tab: "HOME", tile: "dex",
+    setup: "document.querySelector('[data-tour=\"monster-dex-to-skill-dex\"]')?.click(); await wait(400);"
+      + " document.querySelector('[data-tour=\"skill-dex-slot:3\"]')?.click(); await wait(300);"
+      + " document.querySelector('[data-tour=\"skill-dex-filter\"]')?.click()",
+  },
   // プレゼントボックス。**受取履歴の側も見る**(空の一覧だけ見ていると、
   // 札が出た時の崩れに気づけない)
   { name: "プレゼントボックス", tab: "HOME", tile: "giftBox" },

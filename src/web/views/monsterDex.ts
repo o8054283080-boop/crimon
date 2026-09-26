@@ -23,7 +23,7 @@ import { withPortrait } from "../three/portrait.js";
 import "../ui/monsterDex.css";
 import { buildMonsterCard } from "./monsterCard.js";
 import { renderSkillGrowthRows } from "./skillPanel.js";
-import { screenHeader } from "./managementHeader.js";
+import { screenHeadAction, screenHeader } from "./managementHeader.js";
 
 const LATENT_CATEGORY_LABEL = { OFFENSE: "攻勢", DISRUPT: "妨害", DURABILITY: "耐久", SUPPORT: "支援", SPECIAL: "特殊" } as const;
 
@@ -37,6 +37,8 @@ export interface MonsterDexProps {
   onToggleFilterOpen: () => void;
   onSelectEntry: (dexId: string | null) => void;
   onBack: () => void;
+  /** スキル図鑑へ。見出しの右端に出す(省略時は出さない) */
+  onGoSkillDex?: () => void;
 }
 
 /** 入手先の判定に使う集合。データ側の定数をここで1度だけ束ねる */
@@ -155,7 +157,13 @@ function renderList(props: MonsterDexProps): HTMLElement {
   const cards = entries.map((dex) => dexCard(dex, numbers.get(dex.id) ?? 0, () => props.onSelectEntry(dex.id)));
   return el("div", { className: "screen monster-dex monster-dex--list" }, [
     // 「閉じる」は見出しの戻るに一本化した(同じ行き先のボタンが2つあった)
-    screenHeader("モンスター図鑑", { sub: "タップで能力を確認", onBack: props.onBack, backLabel: "モンスター画面へ戻る" }),
+    screenHeader("モンスター図鑑", {
+      sub: "タップで能力を確認",
+      onBack: props.onBack,
+      backLabel: "モンスター画面へ戻る",
+      // スキルから探す入口。**見出しの右端の1つだけ**(並べると題が潰れる)
+      action: props.onGoSkillDex ? screenHeadAction("📘 スキル図鑑", props.onGoSkillDex, { dataTour: "monster-dex-to-skill-dex" }) : null,
+    }),
     renderDexFilterBar(props, cards.length),
     renderDexSortRow(props),
     el("section", { className: "panel monster-dex__catalog" }, [
