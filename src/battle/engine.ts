@@ -2429,11 +2429,30 @@ export class BattleEngine {
     }
   }
 
-  /** 火傷している場合、手番の最後(行動の有無・スタンの有無を問わず)に自分の攻撃力分のダメージを受ける */
+  /**
+   * 火傷している場合、手番の最後(行動の有無・スタンの有無を問わず)にダメージを受ける。
+   *
+   * 火傷は受け手自身の実効ATKと最大HPを参照する。
+   * - ATK部分: 実効ATK × 2
+   * - HP部分: 28,000 × (最大HP / 100,000)^2
+   * - 1回あたり上限: 50,000
+   *
+   * 例:
+   * HP100,000 / 実効ATK2,500 => 33,000
+   * HP20,000 / 実効ATK10,000 => 21,120
+   */
   private applyBurnAtTurnEnd(unit: BattleUnit): void {
     if (unit.burnTurns <= 0 || !unit.alive) return;
     unit.burnTurns -= 1;
-    const burnDamage = Math.max(1, Math.round(getEffectiveStat(unit, "atk")));
+    const effectiveAtk = getEffectiveStat(unit, "atk");
+    const hpRatioToReference = unit.maxHp / 100_000;
+    const burnDamage = Math.max(
+      1,
+      Math.min(
+        50_000,
+        Math.round(effectiveAtk * 2 + 28_000 * hpRatioToReference * hpRatioToReference),
+      ),
+    );
     applyDamage(unit, burnDamage);
     if (this.isTower70Boss(unit)) this.afterTower70BossHpChanged(unit);
     this.push(`  → ${this.label(unit)} は火傷でダメージを受けた！ ${burnDamage} (残りHP ${unit.currentHp}/${unit.maxHp})`);

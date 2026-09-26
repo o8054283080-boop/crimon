@@ -338,7 +338,7 @@ export interface StunEffect {
   requires?: EffectCondition;
 }
 
-/** 火傷: 付与された相手が、自身の手番終了時に自分の攻撃力と同じ量のダメージを受ける */
+/** 火傷: 付与された相手が自身の手番終了時に、実効ATK×2 + 最大HP比例(上限50,000)のダメージを受ける */
 export interface BurnEffect {
   kind: "BURN";
   durationTurns: number;
@@ -1148,7 +1148,7 @@ export function describeSkillEffect(effect: SkillEffect): string {
     case "STUN":
       return `${conditionPrefix(effect.requires)}${chanceSuffix(effect.chance)}スタン (${effect.durationTurns}ターン)`;
     case "BURN":
-      return `${chanceSuffix(effect.chance)}火傷 (${effect.durationTurns}ターン、自身のターン終了時に自身の攻撃力分のダメージ)`;
+      return `${chanceSuffix(effect.chance)}火傷 (${effect.durationTurns}ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)`;
     case "GAUGE": {
       const scope = effect.applyTo === "ALLIES" ? "味方全体の" : effect.applyTo === "SELF" ? "自身の" : "";
       const extra = effect.conditionalExtra
