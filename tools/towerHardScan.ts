@@ -25,8 +25,8 @@ type CandidateName = "NORMAL" | "A" | "B" | "C" | "D" | "E"
   | "H4_UPPER51_A" | "H4_UPPER51_B" | "H4_UPPER51_C"
   | "H4_UPPER51_54A" | "H4_UPPER51_54B" | "H4_UPPER51_FINAL"
   | "H5_SMOOTH_A" | "H5_SMOOTH_B" | "H6_SMOOTH_A" | "H7_BAND_TARGET"
-  | "H8_BOSS_A" | "H8_BOSS_B" | "H8_BOSS_FINAL";
-type PartyProfile = "STRONG" | "STRONG_PLUS" | "CONTROL" | "CONTROL_PLUS";
+  | "H8_BOSS_A" | "H8_BOSS_B" | "H8_BOSS_FINAL" | "ABSOLUTE_CURVE";
+type PartyProfile = "STRONG" | "STRONG_PLUS" | "CONTROL" | "CONTROL_PLUS" | "DOT_CONTROL";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -454,6 +454,59 @@ function multipliersOf(candidate: CandidateName, floor: number): StatMultipliers
   return band.stats;
 }
 
+type AbsoluteStats = { hp: number; def: number; atk: number; spd: number };
+
+const ABSOLUTE_ANCHORS: Array<{ floor: number; stats: AbsoluteStats }> = [
+  { floor: 1, stats: { hp: 54000, atk: 4300, def: 2360, spd: 135 } },
+  { floor: 9, stats: { hp: 70000, atk: 5100, def: 2440, spd: 151 } },
+  { floor: 19, stats: { hp: 85000, atk: 6200, def: 3000, spd: 158 } },
+  { floor: 29, stats: { hp: 105000, atk: 7500, def: 3600, spd: 165 } },
+  { floor: 39, stats: { hp: 130000, atk: 9000, def: 4300, spd: 172 } },
+  { floor: 49, stats: { hp: 160000, atk: 11000, def: 5000, spd: 180 } },
+  { floor: 59, stats: { hp: 190000, atk: 14000, def: 6200, spd: 200 } },
+  { floor: 69, stats: { hp: 225000, atk: 17000, def: 7200, spd: 215 } },
+  { floor: 79, stats: { hp: 265000, atk: 20000, def: 8200, spd: 230 } },
+  { floor: 89, stats: { hp: 310000, atk: 23500, def: 9200, spd: 245 } },
+  { floor: 99, stats: { hp: 360000, atk: 27000, def: 10500, spd: 260 } },
+];
+
+function absoluteStatsOf(floor: number): AbsoluteStats {
+  const upperIndex = ABSOLUTE_ANCHORS.findIndex((entry) => floor <= entry.floor);
+  if (upperIndex <= 0) return ABSOLUTE_ANCHORS[0].stats;
+  if (upperIndex < 0) return ABSOLUTE_ANCHORS.at(-1)!.stats;
+  const lower = ABSOLUTE_ANCHORS[upperIndex - 1];
+  const upper = ABSOLUTE_ANCHORS[upperIndex];
+  const t = (floor - lower.floor) / (upper.floor - lower.floor);
+  return {
+    hp: lower.stats.hp + (upper.stats.hp - lower.stats.hp) * t,
+    def: lower.stats.def + (upper.stats.def - lower.stats.def) * t,
+    atk: lower.stats.atk + (upper.stats.atk - lower.stats.atk) * t,
+    spd: lower.stats.spd + (upper.stats.spd - lower.stats.spd) * t,
+  };
+}
+
+function absoluteCurveEnemies(base: Scenario, floor: number): Scenario["enemies"] {
+  const target = absoluteStatsOf(floor);
+  const withStats = base.enemies.filter((enemy) => enemy.stats);
+  const meanOf = (key: keyof AbsoluteStats): number =>
+    withStats.reduce((sum, enemy) => sum + Number(enemy.stats?.[key] ?? 0), 0) / Math.max(1, withStats.length);
+  const means = { hp: meanOf("hp"), def: meanOf("def"), atk: meanOf("atk"), spd: meanOf("spd") };
+  return base.enemies.map((enemy) => {
+    if (!enemy.stats) return enemy;
+    const relative = (key: keyof AbsoluteStats): number => Number(enemy.stats?.[key] ?? means[key]) / Math.max(1, means[key]);
+    return {
+      ...enemy,
+      stats: {
+        ...enemy.stats,
+        hp: Math.max(1, Math.round(target.hp * relative("hp"))),
+        def: Math.max(1, Math.round(target.def * relative("def"))),
+        atk: Math.max(1, Math.round(target.atk * relative("atk"))),
+        spd: Math.max(1, Math.round(target.spd * relative("spd"))),
+      },
+    };
+  });
+}
+
 function tower100CloneAuditHook(stats: StatMultipliers): ScenarioHook {
   return ({ unitOf }) => {
     let births = 0;
@@ -518,7 +571,16 @@ function scaledScenario(floor: number, candidate: CandidateName, profile: PartyP
     { label: "ドラゴン[闇]", templateId: "dragon", element: "DARK", preset: "MAX_ATTACKER" },
     { label: "ウィスプ[水]", templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
   ];
-  const profileBase = profile === "CONTROL" || profile === "CONTROL_PLUS" ? controlAllies : base.allies;
+  const dotControlAllies: Scenario["allies"] = [
+    { label: "クロノス[電気]", templateId: "chronos", element: "ELECTRIC", preset: "MAX_SPEED" },
+    { label: "アビスリーパー[闇]", templateId: "abyssreaper", element: "DARK", preset: "MAX_DEBUFFER" },
+    { label: "グリフォン[光]", templateId: "griffon", element: "LIGHT", preset: "MAX_DEBUFFER" },
+    { label: "マッシュルン[火]", templateId: "mushroon", element: "FIRE", preset: "MAX_DEBUFFER" },
+    { label: "ウィスプ[水]", templateId: "wisp", element: "WATER", preset: "MAX_HEALER" },
+  ];
+  const profileBase = profile === "DOT_CONTROL"
+    ? dotControlAllies
+    : profile === "CONTROL" || profile === "CONTROL_PLUS" ? controlAllies : base.allies;
   const isFutureGrowth = profile === "STRONG_PLUS" || profile === "CONTROL_PLUS";
   const allies = isFutureGrowth
     ? profileBase.map((ally) => ({
@@ -526,6 +588,16 @@ function scaledScenario(floor: number, candidate: CandidateName, profile: PartyP
         finalStatMultipliers: { hp: 1.25, atk: 1.25, def: 1.20, spd: 1.05 },
       }))
     : profileBase;
+  if (candidate === "ABSOLUTE_CURVE") {
+    return {
+      ...base,
+      allies,
+      id: `${base.id}-hard-absolute-curve`,
+      title: `${base.title} HARD実数カーブ検証`,
+      maxTurns: MAX_TURNS,
+      enemies: absoluteCurveEnemies(base, floor),
+    };
+  }
   if (candidate === "NORMAL") {
     return {
       ...base,
