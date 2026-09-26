@@ -645,21 +645,23 @@ export const SPEC: SkillSpec[] = [
   {
     id: "mushroon_s3_dark",
     values: {
-      "DAMAGE#0.multiplier": c(1.20, 1.30, 1.30, 1.40),
-      "DAMAGE#0.debuffDamageBonus.perDebuff": c(0.06, 0.07, 0.07, 0.08),
-      "DAMAGE#0.debuffDamageBonus.maxBonus": c(0.30, 0.35, 0.35, 0.40),
-      "POISON#0.chance": c(0.80, 0.85, 0.90, 0.95),
+      // Lv5 は下の levelStructure が形ごと作る(ここの値を Lv5 に掛けると、3回攻撃の1回目だけが変わる)
+      "DAMAGE#0.multiplier": [1.20, 1.30, 1.30, 1.40, undefined],
+      "DAMAGE#0.debuffDamageBonus.perDebuff": [0.06, 0.07, 0.07, 0.08, undefined],
+      "DAMAGE#0.debuffDamageBonus.maxBonus": [0.30, 0.35, 0.35, 0.40, undefined],
+      "POISON#0.chance": [0.80, 0.85, 0.90, 0.95, undefined],
       ct: ct5(4),
     },
-    // Lv5 は今の最大レベル差し替え(全体0.5倍の3回攻撃・毒3ターン)の形を残す。
-    // 指定の「Lv5 1.40/100/3T」を1回攻撃で入れると、今の Lv5(合計1.5倍・毒3回判定)より弱くなる
+    // Lv5 は今の最大レベル差し替え(全体0.5倍の3回攻撃・各攻撃後に毒)の形を残す。
+    // 指定の「Lv5 1.40/100/3T」を1回攻撃で入れると、今の Lv5(合計1.5倍・毒3回判定)より弱くなる。
+    // 指定の「100%・3ターン」と Lv4 の弱体ボーナス・毒%は、3回それぞれに入れる
     levelStructure: (level, effects, before) => {
       if (level !== 5) return effects;
       return (JSON.parse(JSON.stringify(before.effects)) as Effect[]).map((e) => e.kind === "DAMAGE"
         ? { ...e, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.40 } }
-        : e);
+        : e.kind === "POISON" ? { ...e, chance: 1.0, durationTurns: 3, damageRatePerStack: 0.06 } : e);
     },
-    note: "Lv5 は今の最大レベル差し替え(0.5倍×3回・各攻撃後に毒)を残し、弱体ボーナスだけ Lv4 と同じ +8%/最大40% へ上げた",
+    note: "Lv5 は今の最大レベル差し替え(0.5倍×3回・各攻撃後に毒)を残し、3回それぞれを指定の「毒100%・3ターン」と Lv4 の弱体ボーナス(+8%/最大40%)・毒6%にそろえた",
   },
 
   /* ================================================================ 18. シェルタートル */
@@ -1217,9 +1219,9 @@ export const SPEC: SkillSpec[] = [
 
   /* ================================================================ 31. スエゾー */
   { id: "suezo_s1", values: { "DAMAGE#0.multiplier": lv5(1.10) } },
-  { id: "suezo_s2_kiss", values: { "DAMAGE#0.multiplier": only({ 2: 1.90 }) } },
+  { id: "suezo_s2_kiss", values: { "DAMAGE#0.multiplier": only({ 2: 1.90 }) }, note: "「Lv3〜5現行」の現行値(1.85)は Lv2 の指定(1.90)を下回るので、前の段にそろえて 1.90 にした" },
   { id: "suezo_s2_telepathy", keep: true },
-  { id: "suezo_s2_psychokinesis", values: { "DAMAGE#0.multiplier": only({ 2: 1.50 }) } },
+  { id: "suezo_s2_psychokinesis", values: { "DAMAGE#0.multiplier": only({ 2: 1.50 }) }, note: "「Lv3〜5現行」の現行値(1.45)は Lv2 の指定(1.50)を下回るので、前の段にそろえて 1.50 にした" },
   { id: "suezo_s3_sing", keep: true },
   { id: "suezo_s3_eat", values: { "DAMAGE#0.multiplier": lv5(4.20) } },
   { id: "suezo_s3_beam", values: { "DAMAGE#0.multiplier": lv5(4.60) } },

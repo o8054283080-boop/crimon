@@ -11,6 +11,7 @@
  *   R2 指定が無い値 … 変更前の同じ Lv の値を引き継ぐ。一律成長の端数は上方向へ整理する
  *   R3 新しい効果    … 指定に書かれたものだけ(`structure`)。変更前には無いので R1/R2 は掛からない
  *   R4 弱くなって良い … 置き換え・作り直しの指定がある所だけ(`allowWeaker`)。理由を必ず書く
+ *   R5 段の並び      … Lv が上がって弱くなる数字は、前の段にそろえて引き上げる(逸脱として記録する)
  *
  * ここで決めた値をそのまま定義ファイルの `levelOverrides` に書く(`emit.ts`)。
  * テストも同じ関数で「期待値」を作り、実効値と1件ずつ照合する。
@@ -274,6 +275,7 @@ export function resolveSkill(spec: SkillSpec, before: SkillReport): ResolvedSkil
     return { cooldownTurns, effects: strip(effects) as unknown as SkillEffect[] };
   });
 
+  enforceMonotonic(spec.id, levels as unknown as { cooldownTurns: number; effects: Effect[] }[], deviations);
   return {
     id: spec.id,
     target: spec.target ?? before.levels[0].target,
@@ -281,6 +283,54 @@ export function resolveSkill(spec: SkillSpec, before: SkillReport): ResolvedSkil
     levels,
     deviations,
   };
+}
+
+/*
+ * R5: **段が上がって弱くなる数字を作らない。**
+ *
+ * 「Lv2だけ1.45→1.50、Lv3〜5は現行」のような指定を素直に入れると、
+ * 現行の Lv3(1.45)が Lv2(1.50)を下回り、**育てると弱くなる段**ができる
+ * (スエゾーのキス・サイコキネシスで実際に起きた)。前の段にそろえて引き上げる。
+ * 効果の数が変わる段(Lv5 で3回攻撃になるなど)は形が別物なので比べない。
+ */
+function enforceMonotonic(skillId: string, levels: { cooldownTurns: number; effects: Effect[] }[], deviations: Deviation[]): void {
+  for (let i = 1; i < levels.length; i += 1) {
+    const prev = levels[i - 1];
+    const cur = levels[i];
+    const level = i + 1;
+    if (cur.cooldownTurns > prev.cooldownTurns) {
+      deviations.push({ skillId, level, path: "ct", specified: cur.cooldownTurns, final: prev.cooldownTurns, reason: `前の段(Lv${i})より長いため、前の段にそろえた` });
+      cur.cooldownTurns = prev.cooldownTurns;
+    }
+    raiseList(skillId, level, "", prev.effects, cur.effects, deviations);
+  }
+}
+
+function raiseList(skillId: string, level: number, prefix: string, prev: Effect[], cur: Effect[], deviations: Deviation[]): void {
+  if (prev.length !== cur.length) return;
+  const before = keyOf(prev);
+  keyOf(cur).forEach((effect, key) => {
+    const old = before.get(key);
+    if (!old) return;
+    raiseFields(skillId, level, `${prefix}${key}`, effect.kind, old, effect, deviations);
+    if (Array.isArray(old.perHitEffects) && Array.isArray(effect.perHitEffects)) {
+      raiseList(skillId, level, `${prefix}${key}.perHit.`, old.perHitEffects as Effect[], effect.perHitEffects as Effect[], deviations);
+    }
+  });
+}
+
+function raiseFields(skillId: string, level: number, path: string, kind: string, old: Record<string, unknown>, cur: Record<string, unknown>, deviations: Deviation[]): void {
+  for (const [key, was] of Object.entries(old)) {
+    const now = cur[key];
+    if (typeof was === "number" && typeof now === "number") {
+      const dir = direction(kind, key);
+      if (dir === null || !weaker(dir, was, now)) continue;
+      deviations.push({ skillId, level, path: `${path}.${key}`, specified: now, final: was, reason: `前の段(Lv${level - 1})を下回るため、前の段にそろえた` });
+      cur[key] = was;
+    } else if (was && now && typeof was === "object" && typeof now === "object" && key !== "perHitEffects") {
+      raiseFields(skillId, level, `${path}.${key}`, kind, was as Record<string, unknown>, now as Record<string, unknown>, deviations);
+    }
+  }
 }
 
 /** 印を外し、ゼロの新効果(その Lv ではまだ付かない)を落とす */

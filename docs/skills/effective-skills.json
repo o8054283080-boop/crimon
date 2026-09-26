@@ -23164,17 +23164,17 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 1.40倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
-       "95%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
        "ダメージ倍率 0.50倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
-       "65%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
+       "100%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
        "ダメージ倍率 0.50倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
-       "65%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)"
+       "100%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
+       "ダメージ倍率 0.50倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
+       "100%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.4,
+        "multiplier": 0.5,
         "debuffDamageBonus": {
          "perDebuff": 0.08,
          "maxBonus": 0.4
@@ -23182,9 +23182,9 @@
        },
        {
         "kind": "POISON",
-        "damageRatePerStack": 0.059,
+        "damageRatePerStack": 0.06,
         "stacks": 1,
-        "chance": 0.95,
+        "chance": 1,
         "durationTurns": 3
        },
        {
@@ -23197,9 +23197,9 @@
        },
        {
         "kind": "POISON",
-        "damageRatePerStack": 0.059,
+        "damageRatePerStack": 0.06,
         "stacks": 1,
-        "chance": 0.65,
+        "chance": 1,
         "durationTurns": 3
        },
        {
@@ -23212,9 +23212,9 @@
        },
        {
         "kind": "POISON",
-        "damageRatePerStack": 0.059,
+        "damageRatePerStack": 0.06,
         "stacks": 1,
-        "chance": 0.65,
+        "chance": 1,
         "durationTurns": 3
        }
       ],
@@ -40096,7 +40096,7 @@
       "target": "SINGLE_ENEMY",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 1.85倍",
+       "ダメージ倍率 1.90倍",
        "100%で行動ゲージ-35%",
        "被クリ率アップ (2ターン)",
        "防御力-75% (2ターン)"
@@ -40104,7 +40104,7 @@
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.85
+        "multiplier": 1.9
        },
        {
         "kind": "GAUGE",
@@ -40131,7 +40131,7 @@
       "target": "SINGLE_ENEMY",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 1.85倍",
+       "ダメージ倍率 1.90倍",
        "100%で行動ゲージ-35%",
        "被クリ率アップ (3ターン)",
        "防御力-75% (2ターン)"
@@ -40139,7 +40139,7 @@
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.85
+        "multiplier": 1.9
        },
        {
         "kind": "GAUGE",
@@ -40166,7 +40166,7 @@
       "target": "SINGLE_ENEMY",
       "cooldownTurns": 3,
       "lines": [
-       "ダメージ倍率 1.85倍",
+       "ダメージ倍率 1.90倍",
        "100%で行動ゲージ-35%",
        "被クリ率アップ (3ターン)",
        "防御力-75% (2ターン)"
@@ -40174,7 +40174,7 @@
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.85
+        "multiplier": 1.9
        },
        {
         "kind": "GAUGE",
@@ -40277,14 +40277,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 3,
       "lines": [
-       "ダメージ倍率 1.45倍",
+       "ダメージ倍率 1.50倍",
        "70%で行動ゲージ-30%",
        "75%で攻撃力-50% (1ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.45
+        "multiplier": 1.5
        },
        {
         "kind": "GAUGE",
@@ -40306,14 +40306,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 3,
       "lines": [
-       "ダメージ倍率 1.45倍",
+       "ダメージ倍率 1.50倍",
        "70%で行動ゲージ-30%",
        "75%で攻撃力-50% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.45
+        "multiplier": 1.5
        },
        {
         "kind": "GAUGE",
@@ -40335,14 +40335,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 2,
       "lines": [
-       "ダメージ倍率 1.45倍",
+       "ダメージ倍率 1.50倍",
        "70%で行動ゲージ-30%",
        "75%で攻撃力-50% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.45
+        "multiplier": 1.5
        },
        {
         "kind": "GAUGE",

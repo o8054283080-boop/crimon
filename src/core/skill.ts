@@ -1349,35 +1349,171 @@ function growthLine(field: GrowthField, kind: string, before: number, after: num
 }
 
 /**
+ * 1つの効果の中で、GROWTH_FIELDS 以外に Lv で動く数字の名前。
+ *
+ * **ここに無い数字が動くと「強くなる」としか出せない。**依頼主の指摘
+ * (フェンリル闇の終焉の牙で、「対象HP30%以下の最終ダメージ」「防御無視」が
+ * 伸びているのに表示されず、効かない「行動ゲージ100%→110%」だけが出ていた)。
+ * `tests/skillGrowthSummary.test.ts` が全スキル全段で「強くなる」を出さないことを見張っている。
+ */
+const EXTRA_GROWTH_FIELDS: Record<string, GrowthField> = {
+  ignoreDefenseRatio: { label: "防御無視", unit: "percent" },
+  count: { label: "個数", unit: "turns", qualify: true },
+  share: { label: "肩代わりの割合", unit: "percent" },
+  gaugeOnCritPerHit: { label: "会心1回ごとの行動ゲージ", unit: "percent" },
+  selfGaugePerRemoved: { label: "解除1個ごとの自身の行動ゲージ", unit: "percent" },
+  selfGaugePerTarget: { label: "解除できた相手1体ごとの自身の行動ゲージ", unit: "percent" },
+  extraStacksIfPoisoned: { label: "毒状態の相手への追加スタック", unit: "turns" },
+  maxSourceHpRate: { label: "回復の上限", unit: "percent" },
+  finalDamageBonus: { label: "最終ダメージ上乗せ", unit: "percent" },
+  critDamageBonus: { label: "会心時の最終ダメージ", unit: "percent" },
+  fullHpBonus: { label: "対象HP100%時の最終ダメージ", unit: "percent" },
+  currentHpBonus: { label: "対象の残りHPによる上昇の上限", unit: "percent" },
+  allies: { label: "協力攻撃に参加する味方", unit: "turns" },
+  allyCooldownReduce: { label: "参加した味方のクールタイム短縮", unit: "turns" },
+  vsTauntedExtra: { label: "挑発状態の敵からの追加軽減", unit: "percent" },
+  multiplierPerStack: { label: "1スタックあたりの倍率", unit: "multiplier" },
+};
+
+/** 入れ子になった数字(段の配列・条件つきの上乗せ)を、名前つきの行にする */
+function nestedGrowth(key: string, prev: unknown, now: unknown): string[] | null {
+  const pct = (v: number) => percent(v);
+  const tiers = (label: (tier: Record<string, number>) => string, field: string) => {
+    const a = (prev ?? []) as Record<string, number>[];
+    const b = (now ?? []) as Record<string, number>[];
+    if (a.length !== b.length) return ["効果が変わる"];
+    return b.flatMap((tier, i) => (a[i][field] === tier[field] ? [] : [`${label(tier)} ${pct(a[i][field])}→${pct(tier[field])}`]));
+  };
+  const pair = (fields: Record<string, string>) => {
+    const a = (prev ?? {}) as Record<string, number>;
+    const b = (now ?? {}) as Record<string, number>;
+    return Object.entries(fields).flatMap(([field, label]) =>
+      typeof a[field] === "number" && typeof b[field] === "number" && a[field] !== b[field] ? [`${label} ${pct(a[field])}→${pct(b[field])}`] : []);
+  };
+  switch (key) {
+    case "targetHpBonus": return tiers((t) => `対象HP${pct(t.hpRatio)}以下の最終ダメージ`, "bonus");
+    case "targetHpIgnoreDefense": return tiers((t) => `対象HP${pct(t.hpRatio)}以下の防御無視`, "ratio");
+    case "conditionalBonus": {
+      const a = (prev ?? []) as { when: EffectCondition; bonus: number }[];
+      const b = (now ?? []) as { when: EffectCondition; bonus: number }[];
+      if (a.length !== b.length) return ["効果が変わる"];
+      return b.flatMap((e, i) => (a[i].bonus === e.bonus ? [] : [`${EFFECT_CONDITION_JA[e.when]}最終ダメージ ${pct(a[i].bonus)}→${pct(e.bonus)}`]));
+    }
+    case "conditionalIgnoreDefense": return pair({ ratio: `${EFFECT_CONDITION_JA[(now as { when: EffectCondition }).when]}防御無視` });
+    case "missingHpBonus": return pair({ perLostRatio: "失ったHPによる上昇の効き", maxBonus: "失ったHPによる上昇の上限" });
+    case "debuffDamageBonus": return pair({ perDebuff: "弱体1個あたりの最終ダメージ", maxBonus: "弱体による上昇の上限" });
+    case "buffCountBonus": return pair({ perBuff: "強化1個あたりの最終ダメージ", maxBonus: "強化による上昇の上限" });
+    case "stolenBuffBonus": return pair({ perBuff: "奪った強化1個あたりの最終ダメージ", maxBonus: "奪った強化による上昇の上限" });
+    case "scaleBonus": return pair({ bonusAtReference: `${SCALE_BONUS_STAT_JA[(now as { stat: "spd" | "def" | "hp" }).stat]}比例` });
+    case "lowHpExtra": return pair({ amount: "HPが低い時の追加ゲージ", extra: "HPが低い時の追加量" });
+    case "conditionalExtra": return pair({ amount: "条件つきの追加ゲージ" });
+    case "debuffIgnoreDefense": return pair({ ratio: "弱体が多い時の防御無視" });
+    default: return null;
+  }
+}
+
+/**
+ * 1つの効果の差分。**全部の数字を見る。**名前の無い数字が動いたら「強くなる」と出す
+ * (テストがそれを拾うので、黙って消えることはない)。
+ */
+function diffEffect(prev: Record<string, unknown>, now: Record<string, unknown>): string[] {
+  const changes: string[] = [];
+  const kind = String(now.kind);
+  for (const key of new Set([...Object.keys(prev), ...Object.keys(now)])) {
+    if (key === "kind" || key === "perHitEffects") continue;
+    let a = prev[key];
+    let b = now[key];
+    if (JSON.stringify(a) === JSON.stringify(b)) continue;
+    /*
+     * **行動ゲージは0〜100%で止まる。**100%を超える指定は100%と同じなので、
+     * 「100%→110%」は何も変わっていない(依頼主の指摘。フェンリル闇の終焉の牙)。
+     * 説明文と同じく100%で打ち止めにして比べる。
+     */
+    if (key === "amount" && (kind === "GAUGE" || kind === "GAUGE_ON_HIT") && typeof a === "number" && typeof b === "number") {
+      a = Math.sign(a) * Math.min(1, Math.abs(a));
+      b = Math.sign(b) * Math.min(1, Math.abs(b));
+      if (a === b) continue;
+    }
+    // その段で初めて書かれた数字は、書かれていない時の値(スタック・ヒット数は1、他は0)から伸びたと読む
+    const unset: Record<string, number> = { stacks: 1, hits: 1 };
+    if (a === undefined && typeof b === "number") a = unset[key] ?? 0;
+    if (a === b) continue;
+    if (typeof a === "number" && typeof b === "number") {
+      const field = key === "amount" ? amountField(now) : GROWTH_FIELDS[key] ?? EXTRA_GROWTH_FIELDS[key];
+      changes.push(field ? growthLine(field, kind, a, b) : "強くなる");
+      continue;
+    }
+    if (typeof a === "number" && b === undefined) {
+      changes.push(`${(GROWTH_FIELDS[key] ?? EXTRA_GROWTH_FIELDS[key])?.label ?? key} が無くなる`);
+      continue;
+    }
+    const nested = nestedGrowth(key, a, b);
+    if (nested) {
+      changes.push(...nested);
+      continue;
+    }
+    if (a === undefined && b !== undefined) {
+      changes.push(`「${describeSkillEffect(now as unknown as SkillEffect)}」になる`);
+      continue;
+    }
+    changes.push("強くなる");
+  }
+  return changes;
+}
+
+/**
  * 効果の並びどうしを突き合わせる。
  *
  * **入れ子の中まで見る。**多段攻撃の1発ごとの効果(`perHitEffects`)は
  * ここを通らないと読めない。実際にクリムのS2は Lv3・Lv4 の伸びが
  * まるごと `perHitEffects` の中にあり、**「変化なし」と出ていた。**
+ *
+ * 効果は「種類 + 何番目か」で対応させる。**その段で初めて付く効果は、
+ * 中身をそのまま書いて「が付く」と出す**(「効果が増える」では何が増えたのか読めない)。
  */
 function diffEffectLists(before: readonly SkillEffect[], after: readonly SkillEffect[]): string[] {
-  if (before.length !== after.length) {
-    return [before.length < after.length ? "効果が増える" : "効果が変わる"];
-  }
+  const keyed = (list: readonly SkillEffect[]) => {
+    const counts = new Map<string, number>();
+    return list.map((effect) => {
+      const n = counts.get(effect.kind) ?? 0;
+      counts.set(effect.kind, n + 1);
+      return { key: `${effect.kind}#${n}`, effect };
+    });
+  };
+  const damageCount = (list: readonly SkillEffect[]) => list.filter((e) => e.kind === "DAMAGE").length;
   const changes: string[] = [];
-  after.forEach((next, index) => {
-    const prev = before[index] as unknown as Record<string, unknown>;
-    const now = next as unknown as Record<string, unknown>;
-    if (prev.kind !== now.kind) {
-      changes.push("効果が変わる");
-      return;
+  const prevKeyed = new Map(keyed(before).map((x) => [x.key, x.effect]));
+  const nextKeyed = keyed(after);
+  /*
+   * 攻撃の回数そのものが変わる段(マッシュルン闇のLv5: 1回 → 0.5倍×3回)。
+   * 1回目どうしを比べると「倍率 1.40→0.50」と弱くなったように読めるので、先に回数を書く。
+   */
+  const hitsChanged = damageCount(before) === 1 && damageCount(after) > 1;
+  if (hitsChanged) {
+    const first = after.find((e) => e.kind === "DAMAGE") as DamageEffect;
+    changes.push(`${damageCount(after)}回攻撃になる(1回 ${first.multiplier.toFixed(2)}倍)`);
+  }
+  const added = new Map<string, number>();
+  for (const { key, effect } of nextKeyed) {
+    const prev = prevKeyed.get(key) as unknown as Record<string, unknown> | undefined;
+    if (!prev) {
+      if (hitsChanged && before.some((e) => e.kind === effect.kind)) continue;
+      const text = `「${describeSkillEffect(effect)}」が付く`;
+      added.set(text, (added.get(text) ?? 0) + 1);
+      continue;
     }
-    for (const key of Object.keys(GROWTH_FIELDS)) {
-      const a = prev[key];
-      const b = now[key];
-      if (typeof a !== "number" || typeof b !== "number" || a === b) continue;
-      const field = key === "amount" ? amountField(now) : GROWTH_FIELDS[key];
-      changes.push(growthLine(field, String(now.kind), a, b));
-    }
+    const now = effect as unknown as Record<string, unknown>;
+    const diff = diffEffect(prev, now);
+    changes.push(...(hitsChanged && effect.kind === "DAMAGE" ? diff.filter((d) => !d.startsWith("ダメージ倍率")) : diff));
     if (Array.isArray(prev.perHitEffects) && Array.isArray(now.perHitEffects)) {
       changes.push(...diffEffectLists(prev.perHitEffects as SkillEffect[], now.perHitEffects as SkillEffect[]));
     }
-  });
+  }
+  for (const [text, n] of added) changes.push(n > 1 ? `${text}(${n}つ)` : text);
+  const nextKeys = new Set(nextKeyed.map((x) => x.key));
+  for (const [key, effect] of prevKeyed) {
+    if (!nextKeys.has(key)) changes.push(`「${describeSkillEffect(effect)}」が無くなる`);
+  }
   return changes;
 }
 

@@ -233,7 +233,7 @@ export const MUSHROON: MonsterTemplate = {
       // Lv4 ダメージ倍率 1.30倍→1.40倍 / 毒の発動率 90%→95%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.95 }] },
       // Lv5 クールタイム -1(5→4ターン) / 効果が増える
-      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.4, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.059, stacks: 1, chance: 0.95, durationTurns: 3 }, { kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.059, stacks: 1, chance: 0.65, durationTurns: 3 }, { kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.059, stacks: 1, chance: 0.65, durationTurns: 3 }] },
+      { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 1, chance: 1, durationTurns: 3 }, { kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 1, chance: 1, durationTurns: 3 }, { kind: "DAMAGE", multiplier: 0.5, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.4 } }, { kind: "POISON", damageRatePerStack: 0.06, stacks: 1, chance: 1, durationTurns: 3 }] },
     ],
   },
   skillAssignment: {
