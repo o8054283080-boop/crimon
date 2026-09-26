@@ -140,6 +140,47 @@
   background: rgba(9, 12, 25, 0.78);
 }
 
+/* 札の上側(名前・効果)。押すとLv別の変化が開く */
+.skill-dex__card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: -4px;
+  padding: 4px;
+  border-radius: 9px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.skill-dex__card-main:active {
+  background: rgba(255, 215, 106, 0.06);
+}
+
+.skill-dex__card-main:focus-visible {
+  outline: 2px solid #ffd76a;
+  outline-offset: 1px;
+}
+
+.skill-dex__card-hint {
+  align-self: flex-end;
+  color: #ffd76a;
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.skill-dex__levels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.skill-dex__levels[hidden] {
+  display: none;
+}
+
 .skill-dex__card-head {
   display: flex;
   align-items: baseline;
