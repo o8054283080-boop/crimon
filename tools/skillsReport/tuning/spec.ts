@@ -286,7 +286,18 @@ export const SPEC: SkillSpec[] = [
   },
   {
     id: "wisp_s3_dark",
-    pending: "指定の「味方単体ゲージ100%+攻撃UP+自身ゲージ」は、今の闇S3(ヴォイドシフト: 味方全体ゲージ35%+速度UP+シールド)と別の技。「ときわたり」の今の姿(単体100%)と混同している可能性があり、完全な作り直しの明記も無いため保留",
+    target: "SINGLE_ALLY",
+    structure: [rebuild([
+      { kind: "GAUGE", amount: 1.0 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+      { kind: "GAUGE", amount: 0.20, applyTo: "SELF" },
+    ])],
+    values: {
+      "GAUGE#1.amount": c(0.20, 0.25, 0.30, 0.40),
+      ct: c(3, 3, 3, 3, 2),
+    },
+    allowWeaker: { "*": "会話で闇S3を完全再設計すると明示確定。旧ヴォイドシフトから置換" },
+    note: "味方単体ゲージ100% + 攻撃UP2T + 自身ゲージ20/25/30/40/40%。Lv5 CT2",
   },
 
   /* ================================================================ 7. トレント */
