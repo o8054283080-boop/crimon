@@ -8,7 +8,7 @@ import {
   CRIMOARK_CLONE_HP_FLOOR,
   CRIMOARK_CLONE_HP_RATIO,
 } from "../src/data/crimoark.js";
-import { TRIAL_TOWER_HARD_BOSS_INTERRUPTS, TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_UPPER_HP_BOOST, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
+import { TRIAL_TOWER_HARD_BOSS_INTERRUPTS, TRIAL_TOWER_HARD_BOSS_STATS, TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_MINION_HP_OF_BOSS, TRIAL_TOWER_HARD_UPPER_HP_BOOST, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
 import { trialTowerEnemyInfo } from "../src/data/trialTowerEnemyInfo.js";
 import { findTowerFloor } from "../src/data/trialTower.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
@@ -119,7 +119,8 @@ describe("試練の塔HARD: モードと進行", () => {
 });
 
 describe("試練の塔HARD: 完成済みNORMALステータスへの倍率", () => {
-  it.each([1, 40, 50, 51, 70, 90, 100])("%d階で完成済みNORMAL敵へだけHARD倍率を掛ける", (floor) => {
+  // 70〜100階のボス階は実数で決める(下の「70〜100階のボスは実数」)。倍率が効くのはそれ以外
+  it.each([1, 40, 50, 51, 60, 99])("%d階で完成済みNORMAL敵へだけHARD倍率を掛ける", (floor) => {
     const state = unlockedState();
     state.trialTowerHardBestFloor = floor - 1;
     const run = beginTowerRun(state, "HARD")!;
@@ -325,5 +326,67 @@ describe("試練の塔HARD: 80・90階の割り込み技", () => {
     expect(hardNames(70).some((name) => name.includes("聖光") || name.includes("報復"))).toBe(false);
     expect(trialTowerEnemyInfo(80)[0].passives.map((p) => p.name).some((name) => name.includes("HARD"))).toBe(false);
     expect(trialTowerEnemyInfo(90, "HARD")[1].passives.map((p) => p.name).some((name) => name.includes("HARD"))).toBe(false);
+  });
+});
+
+describe("試練の塔HARD: 70〜100階のボスは実数、お供のHPはボスの半分", () => {
+  function hardSetup(floor: number) {
+    const state = unlockedState();
+    state.trialTowerHardBestFloor = floor - 1;
+    const run = beginTowerRun(state, "HARD")!;
+    run.floor = floor;
+    return setupTowerBattle(state, run)!;
+  }
+
+  it("依頼主の指定した値がそのまま入る", () => {
+    expect(TRIAL_TOWER_HARD_BOSS_STATS).toEqual({
+      70: { hp: 250_000, atk: 60_000, def: 3_500, spd: 200 },
+      80: { hp: 350_000, atk: 65_000, def: 4_000, spd: 225 },
+      90: { hp: 500_000, atk: 70_000, def: 3_800, spd: 250 },
+      100: { hp: 700_000, atk: 80_000, def: 5_500, spd: 280 },
+    });
+  });
+
+  it.each([70, 80, 90, 100])("%d階のボスは実数、会心・的中・抵抗は元のまま", (floor) => {
+    const setup = hardSetup(floor);
+    const normal = buildDungeonEnemyTeam(findTowerFloor(floor)!);
+    const index = setup.enemyDefs.findIndex((e) => e.isBoss);
+    expect(setup.enemyDefs[index].stats).toMatchObject(TRIAL_TOWER_HARD_BOSS_STATS[floor]);
+    expect(setup.enemyDefs[index].stats.criRate).toBe(normal[index].stats.criRate);
+    expect(setup.enemyDefs[index].stats.accuracy).toBe(normal[index].stats.accuracy);
+    expect(setup.enemyDefs[index].stats.resistance).toBe(normal[index].stats.resistance);
+  });
+
+  it.each([70, 80, 90])("%d階のお供はHPの平均がボスの半分で、差は残り、攻撃・防御・速度は倍率のまま", (floor) => {
+    const setup = hardSetup(floor);
+    const normal = buildDungeonEnemyTeam(findTowerFloor(floor)!);
+    const scale = trialTowerHardMultipliers(floor);
+    const minions = setup.enemyDefs.map((e, i) => ({ e, base: normal[i] })).filter(({ e }) => !e.isBoss);
+    const mean = minions.reduce((sum, { e }) => sum + e.stats.hp, 0) / minions.length;
+    expect(mean).toBeCloseTo(TRIAL_TOWER_HARD_BOSS_STATS[floor].hp * TRIAL_TOWER_HARD_MINION_HP_OF_BOSS, -1);
+    const ratios = minions.map(({ e, base }) => e.stats.hp / base.stats.hp);
+    for (const ratio of ratios) expect(ratio).toBeCloseTo(ratios[0], 3);
+    for (const { e, base } of minions) {
+      expect(e.stats.atk).toBe(Math.round(base.stats.atk * scale.atk));
+      expect(e.stats.def).toBe(Math.round(base.stats.def * scale.def));
+      expect(e.stats.spd).toBe(Math.round(base.stats.spd * scale.spd));
+    }
+  });
+
+  it("100階の分身の空席は触らない(戦闘中にボスの今のHPから生まれる)", () => {
+    const setup = hardSetup(100);
+    const normal = buildDungeonEnemyTeam(findTowerFloor(100)!);
+    const scale = trialTowerHardMultipliers(100);
+    setup.enemyDefs.forEach((e, i) => {
+      if (!e.isBoss) expect(e.stats.hp).toBe(Math.max(1, Math.round(normal[i].stats.hp * scale.hp)));
+    });
+  });
+
+  it("NORMALは変わらない", () => {
+    const state = unlockedState();
+    const run = beginTowerRun(state, "NORMAL")!;
+    run.floor = 80;
+    const normal = buildDungeonEnemyTeam(findTowerFloor(80)!);
+    expect(setupTowerBattle(state, run)!.enemyDefs.map((e) => e.stats)).toEqual(normal.map((e) => e.stats));
   });
 });
