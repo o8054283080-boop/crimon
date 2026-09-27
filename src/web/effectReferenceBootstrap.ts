@@ -27,7 +27,7 @@ const BUFF_ITEMS: readonly ReferenceItem[] = [
   { name: STATUS_EFFECT_JA.INVINCIBLE, description: "効果中はダメージを受けません。" },
   { name: STATUS_EFFECT_JA.FOCUS, description: "敵の単体攻撃の対象を自分へ集中させます。全体攻撃には影響しません。" },
   { name: "シールド", description: "一定量のダメージをHPの代わりに受けます。量と持続ターンはスキルごとに異なります。" },
-  { name: "状態異常無効（免疫）", description: "効果中、弱体効果や状態異常の付与を防ぎます。" },
+  { name: "状態異常無効（免疫）", description: "効果中、弱体効果・状態異常・行動ゲージの減少や吸収・クールタイム延長など、相手からの不利な効果をすべて防ぎます。強化解除で剥がされると消えます。" },
   { name: "継続回復", description: "自分のターン開始時にHPを回復します。" },
   { name: "被ダメージ軽減", description: "受けるダメージを一定割合減らします。" },
   { name: "保護", description: "対象が受けるダメージの一部を、保護した味方が代わりに受けます。" },

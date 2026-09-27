@@ -610,3 +610,44 @@ describe("行動ゲージの吸収", () => {
     expect(casterUnit.gauge).toBe(10);
   });
 });
+
+/*
+ * 依頼主の指定(2026-09-27): **免疫は剥がされない限り、状態異常もゲージ操作もすべて無効にする。**
+ * 以前はゲージの減少・吸収には免疫の確認が無く、免疫を張っていても行動ゲージだけは削られた。
+ */
+describe("免疫はゲージ操作も防ぐ", () => {
+  const gaugeSkill = (effect: Skill["effects"][number]): Skill => ({
+    id: "test_gauge_vs_immune", name: "テストゲージ", description: "テスト用", target: "SINGLE_ENEMY", cooldownTurns: 0, effects: [effect],
+  });
+  function setupImmune(skill: Skill) {
+    const caster = withSkills(findMonster("nemesis", "DARK")!, [skill, skill, skill]);
+    const engine = new BattleEngine([caster], [findMonster("golem", "ELECTRIC")!], { rng: () => 0, maxTurns: 1 });
+    const units = engine.getUnits();
+    const casterUnit = units.find((u) => u.instanceId === "P1")!;
+    const targetUnit = units.find((u) => u.instanceId === "E1")!;
+    targetUnit.gauge = 50;
+    casterUnit.gauge = 100;
+    targetUnit.immuneTurns = 2;
+    return { engine, casterUnit, targetUnit };
+  }
+
+  it("ゲージ減少は通らない", () => {
+    const { engine, casterUnit, targetUnit } = setupImmune(gaugeSkill({ kind: "GAUGE", amount: -0.5 }));
+    engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
+    expect(targetUnit.gauge).toBe(50);
+  });
+
+  it("吸収も通らず、術者も得ない", () => {
+    const { engine, casterUnit, targetUnit } = setupImmune(gaugeSkill({ kind: "GAUGE", amount: 0.3, drain: true }));
+    engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
+    expect(targetUnit.gauge).toBe(50);
+    expect(casterUnit.gauge).toBe(0);
+  });
+
+  it("強化解除で免疫を剥がした後は、同じ技でゲージが減る", () => {
+    const { engine, casterUnit, targetUnit } = setupImmune(gaugeSkill({ kind: "GAUGE", amount: -0.5 }));
+    targetUnit.immuneTurns = 0;
+    engine.resolveTurn(casterUnit, { skillIndex: 0, targetId: targetUnit.instanceId });
+    expect(targetUnit.gauge).toBe(0);
+  });
+});
