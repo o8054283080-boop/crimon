@@ -204,7 +204,7 @@ const CANDIDATES: Record<"A" | "B" | "C" | "D" | "E" | "F" | "G" | "G2" | "H", A
 };
 
 function multipliersOf(candidate: CandidateName, floor: number): StatMultipliers {
-  if (candidate === "NORMAL") return { hp: 1, def: 1, atk: 1, spd: 1 };
+  if (candidate === "NORMAL" || candidate === "ABSOLUTE_CURVE") return { hp: 1, def: 1, atk: 1, spd: 1 };
   // 50Fを約10%、60F以降のボスを0%付近へ揃える探索案。
   // 通常階はH7を維持し、対象ボスだけを個別に調整する。
   if (candidate === "H8_BOSS_A" || candidate === "H8_BOSS_B" || candidate === "H8_BOSS_FINAL") {
