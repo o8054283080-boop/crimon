@@ -250,6 +250,27 @@ export interface BossTraits {
    * 全員に付けると戦い方ごと潰れる(実測で、上位の5体が100階に届かなくなった)。
    */
   gaugeResist?: number;
+  /**
+   * 割り込み技。**相手の手番の途中でも、条件を満たした切れ目で必ず撃つ**全体攻撃。
+   *
+   * 70階の「始祖の咆哮」と同じ考え方(気絶させてもゲージを削っても止まらない)を、
+   * 階ごとに違う条件・違う効果で持たせるためのもの。試練の塔HARDの80・90階が使う。
+   * 回数は少なく抑える(1戦に1〜2回)。多いと「火力で削り切れ」以外の答えが消える。
+   */
+  interrupt?: BossInterrupt;
+}
+
+export interface BossInterrupt {
+  /** 技の名前(戦闘ログに出す) */
+  name: string;
+  /** 自分のHPがこの割合を下回ったら、それぞれ1回ずつ撃つ */
+  hpThresholds?: readonly number[];
+  /** 同じ陣営の取り巻きが倒れるたびに撃つ。この回数まで */
+  onAllyDeath?: number;
+  /** 攻撃力に掛けるダメージ倍率 */
+  multiplier: number;
+  /** 当てた相手の強化効果を全て消す */
+  stripBuffs?: boolean;
 }
 
 /*

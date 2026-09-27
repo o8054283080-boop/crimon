@@ -1,4 +1,4 @@
-import type { MonsterDefinition } from "../core/monster.js";
+import type { BossInterrupt, MonsterDefinition } from "../core/monster.js";
 
 /** NORMAL完成ステータスへ追加で掛けるHARD専用倍率。 */
 export interface TrialTowerHardMultipliers {
@@ -87,12 +87,37 @@ export const TRIAL_TOWER_HARD_BOSS_TRAITS = {
   gaugeResist: 0.5,
 } as const;
 
+/**
+ * HARDの80・90階のボスにだけ持たせる割り込み技(2026-09-27、依頼主の案)。
+ *
+ * 70階の「始祖の咆哮」が気絶でもゲージ操作でも止まらない壁になっていた一方、
+ * 80・90階はほとんど負けない通過点だった(依頼主の5体で40回登って 70階33 / 80階1 / 90階7 / 100階54)。
+ * **咆哮の写しにはしない。**階ごとにそのボスのテーマへ沿わせ、別の役が活きる形にする。
+ * 回数は依頼主の指定で少なめ(1戦に1〜2回)。100階は既にいちばんの壁なので付けない。
+ *
+ * - 80階 古代聖竜(免疫と強化解除の階): HP50%を切った時に1回、全体攻撃と**味方の強化の全消去**。
+ *   張り直せる支援役・強化に頼らない耐久役が活きる
+ * - 90階 古代ネメシス(お供を倒すと狂化する階): **お供が倒れた時**に2回まで全体攻撃。
+ *   「いつ倒すか」——回復やシールドを整えてから落とす判断が要る
+ */
+export const TRIAL_TOWER_HARD_BOSS_INTERRUPTS: Readonly<Record<number, BossInterrupt>> = {
+  80: { name: "聖光の裁き", hpThresholds: [0.5], multiplier: 3, stripBuffs: true },
+  90: { name: "報復の冥炎", onAllyDeath: 2, multiplier: 3 },
+};
+
 /** 戦闘用に完成したNORMAL敵定義の複製だけを倍率化する。ボス階の主(`isBoss`)にはHARDのボス特性も付ける。 */
 export function scaleTrialTowerHardEnemies(enemies: MonsterDefinition[], floor: number): MonsterDefinition[] {
   const scale = trialTowerHardMultipliers(floor);
   return enemies.map((enemy) => ({
     ...enemy,
-    ...(enemy.isBoss ? { bossTraits: { ...enemy.bossTraits, ...TRIAL_TOWER_HARD_BOSS_TRAITS, stunHaste: { ...TRIAL_TOWER_HARD_BOSS_TRAITS.stunHaste } } } : {}),
+    ...(enemy.isBoss ? {
+      bossTraits: {
+        ...enemy.bossTraits,
+        ...TRIAL_TOWER_HARD_BOSS_TRAITS,
+        stunHaste: { ...TRIAL_TOWER_HARD_BOSS_TRAITS.stunHaste },
+        ...(TRIAL_TOWER_HARD_BOSS_INTERRUPTS[floor] ? { interrupt: TRIAL_TOWER_HARD_BOSS_INTERRUPTS[floor] } : {}),
+      },
+    } : {}),
     stats: {
       ...enemy.stats,
       hp: Math.max(1, Math.round(enemy.stats.hp * scale.hp)),

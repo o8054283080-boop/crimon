@@ -57,6 +57,16 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-tower-hard-interrupts",
+    title: "試練の塔HARDの80階・90階のボスが割り込み技を使うようになりました",
+    message: "試練の塔HARDの80階と90階のボスに、気絶していても止まらない割り込み技を追加しました。\n\n"
+      + "・80階「古代聖竜」: HPが50%を下回った時に1回、「聖光の裁き」で敵全体を攻撃し、当たった相手の強化効果をすべて消します\n"
+      + "・90階「古代ネメシス」: お供が倒れた時に、「報復の冥炎」で敵全体を攻撃します(1戦に2回まで)\n"
+      + "・HARDの60階以降の敵情報に、ボスの特性と割り込み技を載せました\n"
+      + "・NORMALは変わりません",
+    kind: "UPDATE", fromDate: "2026-09-27", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-tower-hard-boss-traits",
     title: "試練の塔HARDの難易度を上げました",
     message: "育て切った編成だと、試練の塔HARDの100階まで楽に登れてしまっていたため、手応えを強めました。\n\n"
