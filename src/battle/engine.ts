@@ -1153,10 +1153,14 @@ export class BattleEngine {
 
   /**
    * **相手の手で**行動ゲージを減らす。減らした割合(0〜1)を返す。
-   * 減少・吸収・奪取は必ずここを通す。ボス特性 `gaugeResist` がここで効く。
+   * 減少・吸収・奪取は必ずここを通す。ボス特性 `gaugeResist` と免疫がここで効く。
+   *
+   * **免疫はゲージ操作も防ぐ**(依頼主の指定: 免疫は剥がされない限り、状態異常もゲージ操作も
+   * すべて無効にする)。吸収・奪取は減らせなかった分だけ術者も得ない。
    */
   private loseGauge(target: BattleUnit, ratio: number): number {
     if (ratio <= 0) return 0;
+    if (this.isImmune(target)) return 0;
     const resist = target.def.bossTraits?.gaugeResist ?? 0;
     const before = target.gauge;
     target.gauge = Math.max(0, target.gauge - ratio * (1 - resist) * ATB_THRESHOLD);
@@ -1681,7 +1685,7 @@ export class BattleEngine {
         this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
         this.loseGauge(target, TOWER70_ROAR_GAUGE_DOWN);
         // 咆哮はもともと重ねがけしない作りだった。いまは全体の共通処理と同じ道を通る
-        if (target.alive) {
+        if (target.alive && !this.isImmune(target)) {
           applyStatEffect(target, "def", -TOWER70_ROAR_DEF_DOWN, TOWER70_ROAR_DEF_DOWN_TURNS, "DEBUFF");
         }
       }
@@ -2382,7 +2386,7 @@ export class BattleEngine {
         if (this.rng() < effect.chance) { for (const ally of allies) ally.gauge = Math.min(ATB_THRESHOLD, ally.gauge + effect.value * ATB_THRESHOLD); announce(); }
       } else if (effect.kind === "DEBUFF_EXTEND") {
         // **明示的な延長だけ**が残りターンへ加算する道。通常の再付与は長い方を採るだけ
-        if (receiver.alive && this.rng() < effect.chance) { extendEffects(receiver, effect.duration, "DEBUFF"); if (receiver.poisonTurns) receiver.poisonTurns += effect.duration; if (receiver.healBlockTurns) receiver.healBlockTurns += effect.duration; announce(); }
+        if (receiver.alive && !this.isImmune(receiver) && this.rng() < effect.chance) { extendEffects(receiver, effect.duration, "DEBUFF"); if (receiver.poisonTurns) receiver.poisonTurns += effect.duration; if (receiver.healBlockTurns) receiver.healBlockTurns += effect.duration; announce(); }
       } else if (effect.kind === "HEAL_CLEANSE") {
         applyHeal(lowestAlly, Math.round(lowestAlly.maxHp * effect.value));
         cleanseDebuffs(lowestAlly, 1);

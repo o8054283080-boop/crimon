@@ -387,7 +387,7 @@ export interface ShieldEffect {
   fixedDuration?: true;
 }
 
-/** 状態異常免疫: この間、新たなスタン・火傷・デバフ・毒の付与を防ぐ(既にかかっている効果は解除しない) */
+/** 状態異常免疫: この間、新たなスタン・火傷・デバフ・毒の付与、行動ゲージの減少・吸収・奪取、クールタイム延長を防ぐ(既にかかっている効果は解除しない。強化解除で剥がされる) */
 export interface ImmunityEffect {
   kind: "IMMUNITY";
   durationTurns: number;

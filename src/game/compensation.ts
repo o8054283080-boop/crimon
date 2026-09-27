@@ -57,6 +57,16 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-immunity-blocks-gauge",
+    title: "免疫が行動ゲージの操作も防ぐようになりました",
+    message: "免疫(状態異常無効)の効果を、本来の仕様どおりに揃えました。\n\n"
+      + "・免疫中は、弱体効果や状態異常に加えて、行動ゲージの減少・吸収・奪取も受けなくなりました\n"
+      + "・弱体効果の延長も受けなくなりました(クールタイム延長はこれまでどおり防ぎます)\n"
+      + "・免疫は、強化解除で剥がされると消えます。剥がされない限り、相手からの不利な効果をすべて防ぎます\n"
+      + "・味方・敵のどちらの免疫も同じです。アリーナ・ダンジョン・試練の塔など全ての戦闘に効きます",
+    kind: "UPDATE", fromDate: "2026-09-27", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-tower-hard-interrupts",
     title: "試練の塔HARDの80階・90階のボスが割り込み技を使うようになりました",
     message: "試練の塔HARDの80階と90階のボスに、気絶していても止まらない割り込み技を追加しました。\n\n"
