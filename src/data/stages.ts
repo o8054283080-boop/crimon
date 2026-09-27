@@ -330,7 +330,7 @@ function waveTemplateIds(theme: ChapterTheme, stageNumber: number, waveNumber: n
  * - 1-1 の1波目: 火ゴーレムの「溶岩落とし」(全体に火傷)。初期編成が2%ほど負けるようになった
  *   (`tests/stageRunner.test.ts`)。ゴーレムとフェアリーの属性を入れ替える
  * - 2-5 の1波目: 火トレントの「もりのゆりかご」(全体回復+継続回復+シールド)。
- *   ★2Lv20の2章ボス突破が97%→69%に落ちた(`tests/stageChapterBalance.test.ts`)。
+ *   ★2Lv20の2章ボス突破が97%→69%に落ちた(`tests/balance/stageChapterBalance.test.ts`)。
  *   トレントとナイトの属性を入れ替える
  */
 const WAVE_ELEMENT_OVERRIDES: Record<string, Element[]> = {

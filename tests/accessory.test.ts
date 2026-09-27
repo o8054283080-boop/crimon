@@ -376,7 +376,7 @@ describe("遺跡", () => {
     // 1回目は塔を脆くしすぎて「号令塔から倒すのが常に得」に裏返ったので、2回目で号令塔を巻き添えで
     // 倒れない硬さ(HP 47,250・防御2,860)へ戻し、妨害塔は硬く(既定の狙いが先に削りに行かない)、
     // 指揮兵器は会心寄りにした。3回目で回復阻害を外して長期戦の決着(POWER_RUIN_DAMAGE_RAMP)に替え、
-    // 妨害塔のHPを2倍(57,600)・指揮兵器の攻撃を0.95倍(31,573)にした。比は tests/ruinPowerRoles.test.ts
+    // 妨害塔のHPを2倍(57,600)・指揮兵器の攻撃を0.95倍(31,573)にした。比は tests/balance/ruinPowerRoles.test.ts
     // 2026-10のスキル調整で味方が強くなった後、HPを 1.8 / 1.15 / 1.3倍・攻撃を一律1.33倍にし、
     // 護りの張り直しを CT3 にして比を戻した(`HERALD_GUARD_COOLDOWN`)
     expect(p5.enemies.map((e) => [e.fixedStats!.hp, e.fixedStats!.atk, e.fixedStats!.def, e.fixedStats!.spd])).toEqual([

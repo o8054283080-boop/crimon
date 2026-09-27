@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BattleEngine } from "../src/battle/engine.js";
-import { EQUIP_SLOTS, EquipStar, generateEquipment } from "../src/core/equipment.js";
-import { createMonsterInstance, MonsterInstance } from "../src/core/monsterInstance.js";
-import { EQUIPMENT_DUNGEON_FLOORS } from "../src/data/equipmentDungeon.js";
-import { DUNGEON_FLOOR_COUNT } from "../src/core/equipment.js";
-import { MAX_DUNGEON_PARTY_SIZE, addEquipment, createInitialState, equipToMonster, PlayerState } from "../src/game/playerState.js";
-import { setupDungeonBattle } from "../src/game/dungeonRunner.js";
+import { BattleEngine } from "../../src/battle/engine.js";
+import { EQUIP_SLOTS, EquipStar, generateEquipment } from "../../src/core/equipment.js";
+import { createMonsterInstance, MonsterInstance } from "../../src/core/monsterInstance.js";
+import { EQUIPMENT_DUNGEON_FLOORS } from "../../src/data/equipmentDungeon.js";
+import { DUNGEON_FLOOR_COUNT } from "../../src/core/equipment.js";
+import { MAX_DUNGEON_PARTY_SIZE, addEquipment, createInitialState, equipToMonster, PlayerState } from "../../src/game/playerState.js";
+import { setupDungeonBattle } from "../../src/game/dungeonRunner.js";
 
 function mulberry32(seed: number): () => number {
   let a = seed;

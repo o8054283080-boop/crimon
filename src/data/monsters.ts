@@ -291,20 +291,20 @@ const WOLF: MonsterTemplate = {
       name: "ふいうちの牙",
       description: "ダメージ倍率 0.45倍 × 2回(自身の速度が高いほど上昇)(防御力無視)",
       target: "SINGLE_ENEMY",
-      cooldownTurns: 2,
+      cooldownTurns: 3,
       effects: [
         { kind: "DAMAGE", multiplier: 0.45, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } },
       ],
       levelOverrides: [
         // Lv1
-        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.45, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
         // Lv2 ダメージ倍率 0.45倍→0.50倍
-        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
         // Lv3
-        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.5, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
         // Lv4 ダメージ倍率 0.50倍→0.55倍
-        { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
-        // Lv5
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
+        // Lv5 クールタイム -1(3→2ターン)
         { cooldownTurns: 2, effects: [{ kind: "DAMAGE", multiplier: 0.55, hits: 2, ignoreDefense: true, scaleBonus: { stat: "spd", bonusAtReference: 0.1 } }] },
       ],
     },

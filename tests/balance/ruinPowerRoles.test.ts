@@ -26,7 +26,7 @@
  * 妨害塔を先に落とす手はどの編成でも最善にならない(5〜40pt下)ので、最善の候補から外してある。
  */
 import { describe, expect, it } from "vitest";
-import { RUIN_TEAMS, measureRuin, type RuinAim } from "../tools/ruinPressure.js";
+import { RUIN_TEAMS, measureRuin, type RuinAim } from "../../tools/ruinPressure.js";
 
 const TRIALS = 200;
 const SEEDS = [700, 424242];

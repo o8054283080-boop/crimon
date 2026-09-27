@@ -7,6 +7,7 @@
   "scripts": {
     "battle": "tsx src/simulate.ts",
     "test": "vitest run",
+    "balance:check": "CRIMON_BALANCE=1 vitest run tests/balance",
     "typecheck": "tsc --noEmit",
     "dev": "vite",
     "build": "vite build",
