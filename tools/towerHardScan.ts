@@ -470,6 +470,22 @@ const ABSOLUTE_ANCHORS: Array<{ floor: number; stats: AbsoluteStats }> = [
   { floor: 99, stats: { hp: 360000, atk: 27000, def: 10500, spd: 260 } },
 ];
 
+/**
+ * 試算用: アンカーの一部だけを差し替える(`--anchor-override "89:spd=238;99:spd=246"`)。
+ * **既定では何も差し替えない。**ABSOLUTE_CURVE の本来の値を測る時は付けないこと。
+ */
+const ANCHOR_OVERRIDES = arg("anchor-override", "");
+for (const part of ANCHOR_OVERRIDES.split(";").map((x) => x.trim()).filter(Boolean)) {
+  const [floorText, assignments] = part.split(":");
+  const anchor = ABSOLUTE_ANCHORS.find((entry) => entry.floor === Number(floorText));
+  if (!anchor) throw new Error(`--anchor-override: ${floorText}F はアンカーに無い`);
+  for (const assignment of assignments.split(",")) {
+    const [key, value] = assignment.split("=");
+    if (!["hp", "atk", "def", "spd"].includes(key)) throw new Error(`--anchor-override: ${key} は hp/atk/def/spd のどれか`);
+    anchor.stats[key as keyof AbsoluteStats] = Number(value);
+  }
+}
+
 function absoluteStatsOf(floor: number): AbsoluteStats {
   const upperIndex = ABSOLUTE_ANCHORS.findIndex((entry) => floor <= entry.floor);
   if (upperIndex <= 0) return ABSOLUTE_ANCHORS[0].stats;
@@ -658,7 +674,68 @@ function firstEnemyActionOrdinal(tally: BattleTally): number | null {
   return null;
 }
 
-function summarize(floor: number, candidate: CandidateName, profile: PartyProfile, stats: StatMultipliers, tallies: BattleTally[]) {
+/**
+ * ログから数える計測。**BattleEngine の挙動には触らない**(本編が出した行を読むだけ)。
+ *
+ *   毒      … 「[敵:E1]… は毒(Nスタック)でダメージを受けた！ D」と「… は毒を受けた！ (Nスタック」
+ *   気絶    … 「[敵:E1]… はスタンした！」(敵が気絶した回数)
+ *   ゲージ  … 敵の行動ゲージが後退した / 敵の行動ゲージを吸収した・奪った
+ */
+function logMeasures(tally: BattleTally) {
+  let poisonDamage = 0;
+  let poisonTicks = 0;
+  let poisonApplications = 0;
+  let maxPoisonStacks = 0;
+  let enemyStuns = 0;
+  let enemyGaugeDowns = 0;
+  let allyBurnDamage = 0;
+  let enemyHealed = 0;
+  for (const line of tally.log) {
+    const burn = /\[味方:P\d+\][^\n]*は火傷でダメージを受けた！ (\d+)/.exec(line);
+    if (burn) { allyBurnDamage += Number(burn[1]); continue; }
+    const heal = /→ \[敵:E\d+\][^\n]*HPが (\d+) 回復/.exec(line);
+    if (heal) enemyHealed += Number(heal[1]);
+    const tick = /\[敵:E\d+\][^\n]*は毒\((\d+)スタック\)でダメージを受けた！ (\d+)/.exec(line);
+    if (tick) {
+      poisonTicks += 1;
+      poisonDamage += Number(tick[2]);
+      maxPoisonStacks = Math.max(maxPoisonStacks, Number(tick[1]));
+      continue;
+    }
+    const applied = /\[敵:E\d+\][^\n]*は毒を受けた！ \((\d+)スタック/.exec(line);
+    if (applied) {
+      poisonApplications += 1;
+      maxPoisonStacks = Math.max(maxPoisonStacks, Number(applied[1]));
+      continue;
+    }
+    if (/→ \[敵:E\d+\][^\n]*はスタンした！/.test(line)) { enemyStuns += 1; continue; }
+    if (/→ \[敵:E\d+\][^\n]*の行動ゲージが後退した！/.test(line)) { enemyGaugeDowns += 1; continue; }
+    if (/が \[敵:E\d+\][^\n]*の行動ゲージを(吸収した|奪った)！/.test(line)) { enemyGaugeDowns += 1; continue; }
+  }
+  const enemies = tally.units.filter((unit) => unit.team === "ENEMY");
+  const enemyMaxHp = enemies.reduce((sum, unit) => sum + unit.maxHp, 0);
+  // Battle Lab の damageTaken は「〜に N ダメージ！」の行(直接の攻撃)だけで、毒の行は入らない。
+  // 割合は「直接+毒」を分母にする
+  const directDamage = enemies.reduce((sum, unit) => sum + unit.damageTaken, 0);
+  return {
+    poisonDamage, poisonTicks, poisonApplications, maxPoisonStacks, enemyStuns, enemyGaugeDowns, directDamage,
+    allyBurnDamage, enemyHealed,
+    enemyHealedShareOfMaxHp: enemyMaxHp > 0 ? enemyHealed / enemyMaxHp : 0,
+    poisonShareOfEnemyMaxHp: enemyMaxHp > 0 ? poisonDamage / enemyMaxHp : 0,
+    directShareOfEnemyMaxHp: enemyMaxHp > 0 ? directDamage / enemyMaxHp : 0,
+    poisonShareOfDamageTaken: directDamage + poisonDamage > 0 ? poisonDamage / (directDamage + poisonDamage) : 0,
+  };
+}
+
+/** 敵の実際のステータス(1体あたりの平均)。ABSOLUTE_CURVE が目標へ合っているかを残す */
+function enemyMeanStats(scenario: Scenario): AbsoluteStats {
+  const withStats = scenario.enemies.filter((enemy) => enemy.stats);
+  const m = (key: keyof AbsoluteStats): number =>
+    withStats.reduce((sum, enemy) => sum + Number(enemy.stats?.[key] ?? 0), 0) / Math.max(1, withStats.length);
+  return { hp: m("hp"), atk: m("atk"), def: m("def"), spd: m("spd") };
+}
+
+function summarize(floor: number, candidate: CandidateName, profile: PartyProfile, stats: StatMultipliers, tallies: BattleTally[], scenario: Scenario) {
   const turns = tallies.map((tally) => tally.turns);
   const wins = tallies.filter((tally) => tally.winner === "PLAYER").length;
   const wipes = tallies.filter((tally) => tally.units.filter((u) => u.team === "PLAYER").every((u) => !u.alive)).length;
@@ -698,6 +775,8 @@ function summarize(floor: number, candidate: CandidateName, profile: PartyProfil
   const survivorDistribution = Object.fromEntries(
     Array.from({ length: 6 }, (_, count) => [count, allySurvivors.filter((value) => value === count).length]),
   );
+  const measures = tallies.map(logMeasures);
+  const m = <K extends keyof ReturnType<typeof logMeasures>>(key: K): number[] => measures.map((x) => x[key]);
   const bossHpLeft = tallies.map((tally) => {
     const boss = tally.units.find((unit) => unit.id === "E1");
     return boss && boss.maxHp > 0 ? Math.max(0, boss.hpLeft) / boss.maxHp : 0;
@@ -719,15 +798,41 @@ function summarize(floor: number, candidate: CandidateName, profile: PartyProfil
       meanFirstEnemyActionOrdinal: mean(firstEnemyActions),
       enemyDefeatedRate: mean(enemyDefeatedRates),
     },
+    enemyStats: {
+      target: candidate === "ABSOLUTE_CURVE" ? absoluteStatsOf(floor) : undefined,
+      actualMean: enemyMeanStats(scenario),
+      // 戦闘の中で実際に使われた最大HP(エンジンの最終スナップショット)。盤面の値がそのまま入ったかの確認
+      engineMeanMaxHp: mean(tallies.map((tally) => {
+        const enemies = tally.units.filter((unit) => unit.team === "ENEMY");
+        return enemies.reduce((sum, unit) => sum + unit.maxHp, 0) / Math.max(1, enemies.length);
+      })),
+    },
+    dot: {
+      poisonDamagePerBattle: mean(m("poisonDamage")),
+      poisonTicksPerBattle: mean(m("poisonTicks")),
+      poisonApplicationsPerBattle: mean(m("poisonApplications")),
+      meanMaxPoisonStacks: mean(m("maxPoisonStacks")),
+      maxPoisonStacks: Math.max(0, ...m("maxPoisonStacks")),
+      poisonShareOfEnemyMaxHp: mean(m("poisonShareOfEnemyMaxHp")),
+      poisonShareOfDamageTaken: mean(m("poisonShareOfDamageTaken")),
+      directDamagePerBattle: mean(m("directDamage")),
+      directShareOfEnemyMaxHp: mean(m("directShareOfEnemyMaxHp")),
+      // 膠着の原因を探るための2つ(敵の回復量と、味方が受けた火傷)
+      enemyHealedShareOfMaxHp: mean(m("enemyHealedShareOfMaxHp")),
+      allyBurnDamagePerBattle: mean(m("allyBurnDamage")),
+    },
     speedPressure: {
       enemyActionsPerPlayerAction: mean(enemyActionRatios),
       meanMaxEnemyStreak: mean(streaks),
+      maxEnemyStreak: Math.max(0, ...streaks),
       p95MaxEnemyStreak: quantile(streaks, 0.95),
       battlesWithEnemyStreak8Plus: streaks.filter((value) => value >= 8).length / tallies.length,
     },
     controlPressure: {
       playerStunsPerBattle: mean(playerStuns),
       playerGaugeDrainsPerBattle: mean(playerGaugeDrains),
+      enemyStunnedPerBattle: mean(m("enemyStuns")),
+      enemyGaugeDownsPerBattle: mean(m("enemyGaugeDowns")),
       battlesWithoutEnemyAction: enemyActions.filter((value) => value === 0).length / tallies.length,
     },
     tower100: floor === 100 ? {
@@ -760,7 +865,8 @@ try {
         process.stderr.write(`測定中: ${floor}F ${candidate} ${profile} ${RUNS}戦 / seed ${SEED}\n`);
         // 既存 `tools/towerFloorScan.ts` と同じく、対象の強制指定はせず既存AIへ任せる。
         const tallies = runMany(scenario, SEED, RUNS, undefined, "STRONG");
-        const row = summarize(floor, candidate, profile, multipliersOf(candidate, floor), tallies);
+        const row = summarize(floor, candidate, profile, multipliersOf(candidate, floor), tallies, scenario);
+        if (row.runs !== RUNS) throw new Error(`${floor}F ${profile}: ${row.runs}戦しか走っていない(${RUNS}戦のはず)`);
         rows.push(row);
         console.log(
           `${String(floor).padStart(3)}F ${candidate.padEnd(6)} ${profile.padEnd(11)} 勝${pct(row.winRate).padStart(6)} `
@@ -770,7 +876,8 @@ try {
           + `敵行動有${pct(row.offensePressure.enemyActedRate).padStart(6)} 敵撃破${pct(row.offensePressure.enemyDefeatedRate).padStart(6)} `
           + `敵/味方行動${row.speedPressure.enemyActionsPerPlayerAction.toFixed(2)} `
           + `敵連続p95=${row.speedPressure.p95MaxEnemyStreak} `
-          + `味方気絶${row.controlPressure.playerStunsPerBattle.toFixed(1)} ゲージ吸収${row.controlPressure.playerGaugeDrainsPerBattle.toFixed(1)}`,
+          + `敵気絶${row.controlPressure.enemyStunnedPerBattle.toFixed(1)} 敵ゲージ減${row.controlPressure.enemyGaugeDownsPerBattle.toFixed(1)} `
+          + `毒${Math.round(row.dot.poisonDamagePerBattle)}(敵HP比${pct(row.dot.poisonShareOfEnemyMaxHp)}) 最大${row.dot.maxPoisonStacks}スタック`,
         );
       }
     }
@@ -797,13 +904,18 @@ const output = rows.map((row) => {
 const resultDir = resolve(HERE, "battleLab/results");
 mkdirSync(resultDir, { recursive: true });
 const resultPath = resolve(resultDir, `${OUT_NAME}.json`);
-writeFileSync(resultPath, JSON.stringify({ runs: RUNS, seed: SEED, gear: "STRONG", profiles: REQUESTED_PROFILES, maxTurns: MAX_TURNS, rows: output }, null, 2) + "\n", "utf8");
+writeFileSync(resultPath, JSON.stringify({ runs: RUNS, seed: SEED, gear: "STRONG", profiles: REQUESTED_PROFILES, maxTurns: MAX_TURNS, anchorOverride: ANCHOR_OVERRIDES || undefined, rows: output }, null, 2) + "\n", "utf8");
 const csvColumns = [
   "floor", "candidate", "profile", "isBoss", "hpMultiplier", "defMultiplier", "atkMultiplier", "spdMultiplier",
   "winRate", "medianTurns", "meanTurns", "wipeRate", "timeoutRate", "allyHpLeftRate", "enemyHpLeftRate",
   "meanAllySurvivors", "enemyActionsPerPlayerAction", "p95MaxEnemyStreak", "battlesWithEnemyStreak8Plus",
   "enemyActedRate", "meanEnemyActions", "meanFirstEnemyActionOrdinal", "enemyDefeatedRate",
   "playerStunsPerBattle", "playerGaugeDrainsPerBattle", "battlesWithoutEnemyAction",
+  "meanMaxEnemyStreak", "maxEnemyStreak", "enemyStunnedPerBattle", "enemyGaugeDownsPerBattle",
+  "poisonDamagePerBattle", "poisonTicksPerBattle", "poisonApplicationsPerBattle", "meanMaxPoisonStacks", "maxPoisonStacks",
+  "poisonShareOfEnemyMaxHp", "poisonShareOfDamageTaken", "directDamagePerBattle", "directShareOfEnemyMaxHp",
+  "enemyHealedShareOfMaxHp", "allyBurnDamagePerBattle",
+  "enemyMeanHp", "enemyMeanAtk", "enemyMeanDef", "enemyMeanSpd", "targetHp", "targetAtk", "targetDef", "targetSpd",
 ];
 const csvRows = output.map((row) => [
   row.floor, row.candidate, row.profile, row.floor % 10 === 0, row.multipliers.hp, row.multipliers.def, row.multipliers.atk, row.multipliers.spd,
@@ -814,6 +926,16 @@ const csvRows = output.map((row) => [
   row.offensePressure.meanFirstEnemyActionOrdinal, row.offensePressure.enemyDefeatedRate,
   row.controlPressure.playerStunsPerBattle, row.controlPressure.playerGaugeDrainsPerBattle,
   row.controlPressure.battlesWithoutEnemyAction,
+  row.speedPressure.meanMaxEnemyStreak, row.speedPressure.maxEnemyStreak,
+  row.controlPressure.enemyStunnedPerBattle, row.controlPressure.enemyGaugeDownsPerBattle,
+  row.dot.poisonDamagePerBattle, row.dot.poisonTicksPerBattle, row.dot.poisonApplicationsPerBattle,
+  row.dot.meanMaxPoisonStacks, row.dot.maxPoisonStacks, row.dot.poisonShareOfEnemyMaxHp, row.dot.poisonShareOfDamageTaken,
+  row.dot.directDamagePerBattle, row.dot.directShareOfEnemyMaxHp,
+  row.dot.enemyHealedShareOfMaxHp, row.dot.allyBurnDamagePerBattle,
+  Math.round(row.enemyStats.actualMean.hp), Math.round(row.enemyStats.actualMean.atk),
+  Math.round(row.enemyStats.actualMean.def), Math.round(row.enemyStats.actualMean.spd),
+  row.enemyStats.target ? Math.round(row.enemyStats.target.hp) : "", row.enemyStats.target ? Math.round(row.enemyStats.target.atk) : "",
+  row.enemyStats.target ? Math.round(row.enemyStats.target.def) : "", row.enemyStats.target ? Math.round(row.enemyStats.target.spd) : "",
 ]);
 const csvPath = resolve(resultDir, `${OUT_NAME}.csv`);
 writeFileSync(csvPath, [csvColumns, ...csvRows].map((row) => row.join(",")).join("\n") + "\n", "utf8");
