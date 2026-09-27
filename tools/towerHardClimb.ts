@@ -15,6 +15,7 @@ import { BattleEngine } from "../src/battle/engine.js";
 import { generateEquipment, EQUIP_SLOTS, type SetType } from "../src/core/equipment.js";
 import { createMonsterInstance, type MonsterInstance } from "../src/core/monsterInstance.js";
 import { createDefaultTalentState } from "../src/core/talents.js";
+import { applyStatEffect } from "../src/battle/unit.js";
 import type { Accessory } from "../src/core/accessory.js";
 import type { Stats } from "../src/core/monster.js";
 import { addEquipment, createInitialState, equipToMonster, type PlayerState } from "../src/game/playerState.js";
@@ -52,7 +53,7 @@ interface Member {
   stats: Pick<Stats, "hp" | "atk" | "def" | "spd" | "criRate" | "criDmg" | "accuracy" | "resistance">;
 }
 
-const TEAM: Member[] = [
+const OWNER_TEAM: Member[] = [
   {
     dexId: "phoenix_WATER", skillLevels: [5, 5, 5], latentId: "phoenix_WATER_latent_2",
     sets: ["VITALITY", "VITALITY", "VITALITY", "WARD", "VITALITY", "WARD"],
@@ -89,6 +90,58 @@ const TEAM: Member[] = [
     stats: { hp: 27728, atk: 17241, def: 1567, spd: 169, criRate: 0.83, criDmg: 4.14, accuracy: 0.45, resistance: 0.55 },
   },
 ];
+
+/*
+ * 依頼主の案(2026-09-27)で入れ替える個体。**スクショが無いので仮の組み**。
+ * 依頼主の5体と同じ仕上がり(★6Lv60・スキルMAX・速度才能2)で、「速い」に合わせて
+ * クロノス(302)前後の速度、的中はクロノス並みに置いた。
+ */
+const EXTRA: Record<string, Member> = {
+  mushroon_FIRE: {
+    // S2 毒胞子の雨 / S3 毒床。潜在は猛毒培養(スキル1の毒+30%)
+    dexId: "mushroon_FIRE", skillLevels: [5, 5, 5], latentId: "mushroon_FIRE_latent_1",
+    sets: ["SWIFT", "VITALITY", "SWIFT", "VITALITY", "SWIFT", "SWIFT"],
+    talents: (t) => { t.basic.spd = 2; },
+    stats: { hp: 42000, atk: 2400, def: 2900, spd: 300, criRate: 0.25, criDmg: 1.7, accuracy: 0.85, resistance: 0.40 },
+  },
+  basilisk_DARK: {
+    // S2 石化の眼差し / S3 深淵の魔眼。潜在は時喰み(速度低下が入ったらゲージ-25%)
+    dexId: "basilisk_DARK", skillLevels: [5, 5, 5], latentId: "basilisk_DARK_latent_3",
+    sets: ["SWIFT", "VITALITY", "SWIFT", "VITALITY", "SWIFT", "SWIFT"],
+    talents: (t) => { t.basic.spd = 2; },
+    stats: { hp: 40000, atk: 2600, def: 2800, spd: 310, criRate: 0.25, criDmg: 1.7, accuracy: 0.90, resistance: 0.40 },
+  },
+  basilisk_ELECTRIC: {
+    // 回復なし編成の「もう1体の気絶係」。S2 石化の眼差し / S3 死の凝視
+    dexId: "basilisk_ELECTRIC", skillLevels: [5, 5, 5], latentId: "basilisk_ELECTRIC_latent_2",
+    sets: ["SWIFT", "VITALITY", "SWIFT", "VITALITY", "SWIFT", "SWIFT"],
+    talents: (t) => { t.basic.spd = 2; },
+    stats: { hp: 40000, atk: 2600, def: 2800, spd: 290, criRate: 0.25, criDmg: 1.7, accuracy: 0.90, resistance: 0.40 },
+  },
+};
+
+/** `CLIMB_TEAM=<名前>` で選ぶ。既定は依頼主の5体そのまま */
+const [PHOENIX, THUNDER, CHRONOS, UNDINE, CRIM] = OWNER_TEAM;
+const TEAMS: Record<string, Member[]> = {
+  owner: OWNER_TEAM,
+  // クリムを抜いて速い火マッシュルン
+  mush: [PHOENIX, THUNDER, CHRONOS, UNDINE, EXTRA.mushroon_FIRE],
+  // クリムを抜いてマッシュルン、回復はフェニックスだけ、ウンディーネの代わりに闇バジリスク
+  mush_basi_phx: [PHOENIX, THUNDER, CHRONOS, EXTRA.mushroon_FIRE, EXTRA.basilisk_DARK],
+  // 同じく、フェニックスの代わりにウンディーネを残す
+  mush_basi_und: [UNDINE, THUNDER, CHRONOS, EXTRA.mushroon_FIRE, EXTRA.basilisk_DARK],
+  // 回復役を抜き、ゲージ操作・気絶係をもう1体
+  noheal: [THUNDER, CHRONOS, EXTRA.mushroon_FIRE, EXTRA.basilisk_DARK, EXTRA.basilisk_ELECTRIC],
+};
+const TEAM_NAME = process.env.CLIMB_TEAM ?? "owner";
+if (!TEAMS[TEAM_NAME]) throw new Error(`CLIMB_TEAM は ${Object.keys(TEAMS).join(" / ")} のどれか`);
+/** `CLIMB_EXTRA_SPD=60` で仮の組みの個体だけ速度を足す(「どれだけ速ければ効くか」を見る) */
+const EXTRA_SPD = Number(process.env.CLIMB_EXTRA_SPD ?? "0");
+const EXTRA_MEMBERS = new Set(Object.values(EXTRA));
+const TEAM: Member[] = TEAMS[TEAM_NAME].map((m) => ({
+  ...m, sets: [...m.sets],
+  stats: EXTRA_MEMBERS.has(m) ? { ...m.stats, spd: m.stats.spd + EXTRA_SPD } : m.stats,
+}));
 
 /**
  * 切り分け用(`CLIMB_ABLATE=no_tb_create,no_rampage,...`)。何が効いているかを1つずつ外して測る。
@@ -149,6 +202,65 @@ function applyAbsoluteCurve(enemies: { stats: Quad & Record<string, unknown> }[]
   }
 }
 
+/*
+ * 対策の試し付け(本番には無い)。依頼主の案「敵のHPを上げ、ボスには気絶時に速度大幅アップと
+ * ゲージ操作半減」を、エンジンを書き換えずに外から被せて測る。
+ *   CLIMB_ENEMY_HP=1.5          … 敵全員の最大HPを倍率で上げる(ボスも含む)
+ *   CLIMB_BOSS_TRAITS=stun_haste,gauge_half
+ *     stun_haste … 新しく気絶した時、速度+50%(3ターン)を得る
+ *     gauge_half … 相手から受ける行動ゲージの減少・吸収を半分にする
+ *   CLIMB_TRAIT_SCOPE=boss|all  … 特性を付ける相手(既定はボス階のボスだけ)
+ */
+const ENEMY_HP = Number(process.env.CLIMB_ENEMY_HP ?? "1");
+const BOSS_TRAITS = new Set((process.env.CLIMB_BOSS_TRAITS ?? "").split(",").filter(Boolean));
+const TRAIT_SCOPE = process.env.CLIMB_TRAIT_SCOPE ?? "boss";
+const STUN_HASTE = { amount: 0.5, turns: 3 };
+const ATB = 100;
+/** 特性が実際に働いた回数(効いていないのに「差が無い」と読まないための確認用) */
+const traitHits = { stunHaste: 0, gaugeHalved: 0 };
+
+function installBossTraits(engine: BattleEngine, floor: number): void {
+  if (BOSS_TRAITS.size === 0) return;
+  const enemies = engine.getUnits().filter((u) => u.team === "ENEMY");
+  let targets = enemies;
+  if (TRAIT_SCOPE === "boss") {
+    if (floor % 10 !== 0) return;
+    const boss = enemies.find((u) => u.def.victoryTarget) ?? [...enemies].sort((a, b) => b.maxHp - a.maxHp)[0];
+    targets = boss ? [boss] : [];
+  }
+  for (const unit of targets) {
+    if (BOSS_TRAITS.has("gauge_half")) {
+      let gauge = unit.gauge;
+      Object.defineProperty(unit, "gauge", {
+        configurable: true, enumerable: true,
+        get: () => gauge,
+        set: (next: number) => {
+          const drop = gauge - next;
+          // 自分の手番でゲージを使う時(ちょうど100減る)はそのまま。それ以外の減少を半分に
+          const halve = drop > 0 && unit.alive && Math.abs(drop - ATB) > 1e-6;
+          if (halve) traitHits.gaugeHalved += 1;
+          gauge = halve ? gauge - drop * 0.5 : next;
+        },
+      });
+    }
+    if (BOSS_TRAITS.has("stun_haste")) {
+      // 気絶は状態の配列ではなく `stunTurns` の数で持っている。0 → 正 になった瞬間を拾う
+      let stun = unit.stunTurns;
+      Object.defineProperty(unit, "stunTurns", {
+        configurable: true, enumerable: true,
+        get: () => stun,
+        set: (next: number) => {
+          if (stun <= 0 && next > 0 && unit.alive) {
+            applyStatEffect(unit, "spd", STUN_HASTE.amount, STUN_HASTE.turns, "BUFF");
+            traitHits.stunHaste += 1;
+          }
+          stun = next;
+        },
+      });
+    }
+  }
+}
+
 function buildState(rng: () => number): { state: PlayerState; statsById: Map<string, Member["stats"]> } {
   const state = createInitialState();
   state.monsters = [];
@@ -206,6 +318,7 @@ function climb(seed: number): ClimbResult {
       if (setup.standingMembers[i].hp < 0) setup.initialPlayerHp[i] = s.hp;
     });
     applyAbsoluteCurve(setup.enemyDefs as never, setup.floor.floor);
+    if (ENEMY_HP !== 1) for (const e of setup.enemyDefs) e.stats = { ...e.stats, hp: Math.round(e.stats.hp * ENEMY_HP) };
     const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, {
       rng,
       initialPlayerHp: setup.initialPlayerHp,
@@ -213,6 +326,7 @@ function climb(seed: number): ClimbResult {
       trialTowerFloor: setup.floor.floor,
       trialTowerHardMultipliers: setup.hardMultipliers,
     });
+    installBossTraits(engine, setup.floor.floor);
     const battle = engine.run();
     const cleared = battle.winner === "PLAYER";
     if (!cleared && process.env.CLIMB_DEBUG) {
@@ -243,7 +357,10 @@ function climb(seed: number): ClimbResult {
 const results: ClimbResult[] = [];
 for (let i = 0; i < CLIMBS; i += 1) results.push(climb(SEED + i * 7919));
 const reached = results.map((r) => r.reached).sort((a, b) => a - b);
-console.log(`登坂 ${CLIMBS}回 / 負けたら節からやり直し ${RETRIES}回まで / 切り分け: ${[...ABLATE].join(",") || "なし"} / 曲線: ${CURVE}${process.env.CLIMB_ANCHOR ? ` (${process.env.CLIMB_ANCHOR})` : ""}`);
+console.log(`編成: ${TEAM_NAME} (${TEAM.map((m) => m.dexId).join(", ")})`);
+console.log(`登坂 ${CLIMBS}回 / 負けたら節からやり直し ${RETRIES}回まで / 切り分け: ${[...ABLATE].join(",") || "なし"} / 曲線: ${CURVE}${process.env.CLIMB_ANCHOR ? ` (${process.env.CLIMB_ANCHOR})` : ""}`
+  + ` / 敵HP×${ENEMY_HP} / 特性: ${[...BOSS_TRAITS].join(",") || "なし"}${BOSS_TRAITS.size ? `(${TRAIT_SCOPE})` : ""}`);
+if (BOSS_TRAITS.size) console.log(`特性の発動: 気絶で加速 ${traitHits.stunHaste}回 / ゲージ減少を半分 ${traitHits.gaugeHalved}回`);
 console.log(`負け: 合計 ${results.reduce((a, r) => a + r.losses, 0)} / 1回の登坂あたり ${(results.reduce((a, r) => a + r.losses, 0) / CLIMBS).toFixed(1)}`);
 console.log(`到達階: 最低 ${reached[0]} / 中央 ${reached[Math.floor(reached.length / 2)]} / 最高 ${reached.at(-1)} / 100階踏破 ${reached.filter((f) => f >= 100).length}/${CLIMBS}`);
 const lostCounts = new Map<number, number>();
