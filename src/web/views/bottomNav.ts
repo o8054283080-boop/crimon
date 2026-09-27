@@ -26,6 +26,8 @@ export type ScreenName =
   /** 古代のカケラでの製作 */
   | "ANCIENT_CRAFT"
   | "MONSTER_DEX"
+  /** スキル図鑑(効果からスキルと持ち主を探す) */
+  | "SKILL_DEX"
   | "MONSTER_EXCHANGE"
   | "MONSTER_STORAGE"
   | "AUTO_EQUIP"

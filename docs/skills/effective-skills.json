@@ -1479,7 +1479,7 @@
      {
       "level": 5,
       "target": "SINGLE_ENEMY",
-      "cooldownTurns": 1,
+      "cooldownTurns": 2,
       "lines": [
        "ダメージ倍率 0.55倍 × 2回(自身の速度が高いほど上昇)(防御力無視)"
       ],
@@ -3028,7 +3028,7 @@
       "cooldownTurns": 4,
       "lines": [
        "ダメージ倍率 1.20倍(防御力の75%を加算)",
-       "100%で火傷 (2ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (2ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -3050,7 +3050,7 @@
       "cooldownTurns": 4,
       "lines": [
        "ダメージ倍率 1.30倍(防御力の80%を加算)",
-       "100%で火傷 (2ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (2ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -3072,7 +3072,7 @@
       "cooldownTurns": 4,
       "lines": [
        "ダメージ倍率 1.35倍(防御力の80%を加算)",
-       "100%で火傷 (2ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (2ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -3094,7 +3094,7 @@
       "cooldownTurns": 4,
       "lines": [
        "ダメージ倍率 1.45倍(防御力の90%を加算)",
-       "100%で火傷 (2ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (2ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -3116,7 +3116,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 1.45倍(防御力の90%を加算)",
-       "100%で火傷 (2ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (2ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -7781,146 +7781,146 @@
      "DARK"
     ],
     "uniqueLightDark": "DARK",
-    "growth": "generic",
+    "growth": "levelOverrides",
     "maxLevelOverride": false,
     "runtimeOverride": false,
     "levels": [
      {
       "level": 1,
-      "target": "ALL_ALLIES",
-      "cooldownTurns": 6,
+      "target": "SINGLE_ALLY",
+      "cooldownTurns": 3,
       "lines": [
-       "行動ゲージ+35%",
-       "速度+20% (3ターン)",
-       "シールド 最大HPの15% (3ターン、ダメージを肩代わり)"
+       "行動ゲージ+100%",
+       "攻撃力+30% (2ターン)",
+       "自身の行動ゲージ+20%"
       ],
       "effects": [
        {
         "kind": "GAUGE",
-        "amount": 0.35
+        "amount": 1
        },
        {
         "kind": "BUFF",
-        "stat": "spd",
-        "amount": 0.2,
-        "durationTurns": 3
+        "stat": "atk",
+        "amount": 0.3,
+        "durationTurns": 2
        },
        {
-        "kind": "SHIELD",
-        "shieldRate": 0.15,
-        "durationTurns": 3
+        "kind": "GAUGE",
+        "amount": 0.2,
+        "applyTo": "SELF"
        }
       ],
       "flags": {}
      },
      {
       "level": 2,
-      "target": "ALL_ALLIES",
-      "cooldownTurns": 6,
+      "target": "SINGLE_ALLY",
+      "cooldownTurns": 3,
       "lines": [
-       "行動ゲージ+37%",
-       "速度+20% (3ターン)",
-       "シールド 最大HPの16% (3ターン、ダメージを肩代わり)"
+       "行動ゲージ+100%",
+       "攻撃力+30% (2ターン)",
+       "自身の行動ゲージ+25%"
       ],
       "effects": [
        {
         "kind": "GAUGE",
-        "amount": 0.371
+        "amount": 1
        },
        {
         "kind": "BUFF",
-        "stat": "spd",
-        "amount": 0.2,
-        "durationTurns": 3
+        "stat": "atk",
+        "amount": 0.3,
+        "durationTurns": 2
        },
        {
-        "kind": "SHIELD",
-        "shieldRate": 0.159,
-        "durationTurns": 3
+        "kind": "GAUGE",
+        "amount": 0.25,
+        "applyTo": "SELF"
        }
       ],
       "flags": {}
      },
      {
       "level": 3,
-      "target": "ALL_ALLIES",
-      "cooldownTurns": 6,
+      "target": "SINGLE_ALLY",
+      "cooldownTurns": 3,
       "lines": [
-       "行動ゲージ+39%",
-       "速度+20% (3ターン)",
-       "シールド 最大HPの17% (3ターン、ダメージを肩代わり)"
+       "行動ゲージ+100%",
+       "攻撃力+30% (2ターン)",
+       "自身の行動ゲージ+30%"
       ],
       "effects": [
        {
         "kind": "GAUGE",
-        "amount": 0.392
+        "amount": 1
        },
        {
         "kind": "BUFF",
-        "stat": "spd",
-        "amount": 0.2,
-        "durationTurns": 3
+        "stat": "atk",
+        "amount": 0.3,
+        "durationTurns": 2
        },
        {
-        "kind": "SHIELD",
-        "shieldRate": 0.168,
-        "durationTurns": 3
+        "kind": "GAUGE",
+        "amount": 0.3,
+        "applyTo": "SELF"
        }
       ],
       "flags": {}
      },
      {
       "level": 4,
-      "target": "ALL_ALLIES",
-      "cooldownTurns": 6,
+      "target": "SINGLE_ALLY",
+      "cooldownTurns": 3,
       "lines": [
-       "行動ゲージ+41%",
-       "速度+20% (3ターン)",
-       "シールド 最大HPの18% (3ターン、ダメージを肩代わり)"
+       "行動ゲージ+100%",
+       "攻撃力+30% (2ターン)",
+       "自身の行動ゲージ+40%"
       ],
       "effects": [
        {
         "kind": "GAUGE",
-        "amount": 0.413
+        "amount": 1
        },
        {
         "kind": "BUFF",
-        "stat": "spd",
-        "amount": 0.2,
-        "durationTurns": 3
+        "stat": "atk",
+        "amount": 0.3,
+        "durationTurns": 2
        },
        {
-        "kind": "SHIELD",
-        "shieldRate": 0.177,
-        "durationTurns": 3
+        "kind": "GAUGE",
+        "amount": 0.4,
+        "applyTo": "SELF"
        }
       ],
       "flags": {}
      },
      {
       "level": 5,
-      "target": "ALL_ALLIES",
-      "cooldownTurns": 5,
+      "target": "SINGLE_ALLY",
+      "cooldownTurns": 2,
       "lines": [
-       "行動ゲージ+41%",
-       "速度+20% (4ターン)",
-       "シールド 最大HPの18% (4ターン、ダメージを肩代わり)"
+       "行動ゲージ+100%",
+       "攻撃力+30% (2ターン)",
+       "自身の行動ゲージ+40%"
       ],
       "effects": [
        {
         "kind": "GAUGE",
-        "amount": 0.413
+        "amount": 1
        },
        {
         "kind": "BUFF",
-        "stat": "spd",
-        "amount": 0.2,
-        "durationTurns": 4
+        "stat": "atk",
+        "amount": 0.3,
+        "durationTurns": 2
        },
        {
-        "kind": "SHIELD",
-        "shieldRate": 0.177,
-        "durationTurns": 4
+        "kind": "GAUGE",
+        "amount": 0.4,
+        "applyTo": "SELF"
        }
       ],
       "flags": {}
@@ -12209,7 +12209,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.70倍 × 3回",
-       "50%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "50%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -12231,7 +12231,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.75倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -12253,7 +12253,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.80倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -12275,7 +12275,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.85倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -12297,7 +12297,7 @@
       "cooldownTurns": 2,
       "lines": [
        "ダメージ倍率 0.85倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -13014,7 +13014,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.70倍 × 3回",
-       "50%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "50%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -13036,7 +13036,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.75倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -13058,7 +13058,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.80倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -13080,7 +13080,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 0.85倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -13102,7 +13102,7 @@
       "cooldownTurns": 2,
       "lines": [
        "ダメージ倍率 0.85倍 × 3回",
-       "65%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "65%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -15463,7 +15463,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 1.80倍",
-       "100%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -15484,7 +15484,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 1.90倍",
-       "100%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -15505,7 +15505,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 2.00倍",
-       "100%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -15526,7 +15526,7 @@
       "cooldownTurns": 3,
       "lines": [
        "ダメージ倍率 2.20倍",
-       "100%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -15547,7 +15547,7 @@
       "cooldownTurns": 2,
       "lines": [
        "ダメージ倍率 2.20倍",
-       "100%で火傷 (1ターン、自身のターン終了時に自身の攻撃力分のダメージ)"
+       "100%で火傷 (1ターン、自身のターン終了時に実効攻撃力×2 + 最大HP比例ダメージ、上限50,000)"
       ],
       "effects": [
        {
@@ -23164,17 +23164,17 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 1.40倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
-       "95%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
        "ダメージ倍率 0.50倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
-       "65%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
+       "100%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
        "ダメージ倍率 0.50倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
-       "65%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)"
+       "100%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)",
+       "ダメージ倍率 0.50倍 対象の弱体効果1個につき最終ダメージ+8%(最大+40%)",
+       "100%で毒1スタック (1スタックにつき最大HPの6%、最大5スタック、3ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.4,
+        "multiplier": 0.5,
         "debuffDamageBonus": {
          "perDebuff": 0.08,
          "maxBonus": 0.4
@@ -23182,9 +23182,9 @@
        },
        {
         "kind": "POISON",
-        "damageRatePerStack": 0.059,
+        "damageRatePerStack": 0.06,
         "stacks": 1,
-        "chance": 0.95,
+        "chance": 1,
         "durationTurns": 3
        },
        {
@@ -23197,9 +23197,9 @@
        },
        {
         "kind": "POISON",
-        "damageRatePerStack": 0.059,
+        "damageRatePerStack": 0.06,
         "stacks": 1,
-        "chance": 0.65,
+        "chance": 1,
         "durationTurns": 3
        },
        {
@@ -23212,9 +23212,9 @@
        },
        {
         "kind": "POISON",
-        "damageRatePerStack": 0.059,
+        "damageRatePerStack": 0.06,
         "stacks": 1,
-        "chance": 0.65,
+        "chance": 1,
         "durationTurns": 3
        }
       ],
@@ -27171,7 +27171,7 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 5,
       "lines": [
-       "ダメージ倍率 0.70倍 × 3回。各ヒットごとに: 50%で行動ゲージ-50%、25%でスタン (1ターン)"
+       "ダメージ倍率 0.70倍 × 3回。各ヒットごとに: 50%で行動ゲージ-30%、25%でスタン (1ターン)"
       ],
       "effects": [
        {
@@ -27181,7 +27181,7 @@
         "perHitEffects": [
          {
           "kind": "GAUGE",
-          "amount": -0.5,
+          "amount": -0.3,
           "chance": 0.5
          },
          {
@@ -27199,7 +27199,7 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 5,
       "lines": [
-       "ダメージ倍率 0.70倍 × 3回。各ヒットごとに: 50%で行動ゲージ-60%、30%でスタン (1ターン)"
+       "ダメージ倍率 0.70倍 × 3回。各ヒットごとに: 60%で行動ゲージ-30%、30%でスタン (1ターン)"
       ],
       "effects": [
        {
@@ -27209,8 +27209,8 @@
         "perHitEffects": [
          {
           "kind": "GAUGE",
-          "amount": -0.6,
-          "chance": 0.5
+          "amount": -0.3,
+          "chance": 0.6
          },
          {
           "kind": "STUN",
@@ -27227,7 +27227,7 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 5,
       "lines": [
-       "ダメージ倍率 0.80倍 × 3回。各ヒットごとに: 50%で行動ゲージ-60%、35%でスタン (1ターン)"
+       "ダメージ倍率 0.80倍 × 3回。各ヒットごとに: 60%で行動ゲージ-30%、35%でスタン (1ターン)"
       ],
       "effects": [
        {
@@ -27237,8 +27237,8 @@
         "perHitEffects": [
          {
           "kind": "GAUGE",
-          "amount": -0.6,
-          "chance": 0.5
+          "amount": -0.3,
+          "chance": 0.6
          },
          {
           "kind": "STUN",
@@ -27255,7 +27255,7 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.80倍 × 3回。各ヒットごとに: 50%で行動ゲージ-70%、40%でスタン (1ターン)"
+       "ダメージ倍率 0.80倍 × 3回。各ヒットごとに: 70%で行動ゲージ-30%、40%でスタン (1ターン)"
       ],
       "effects": [
        {
@@ -27265,8 +27265,8 @@
         "perHitEffects": [
          {
           "kind": "GAUGE",
-          "amount": -0.7,
-          "chance": 0.5
+          "amount": -0.3,
+          "chance": 0.7
          },
          {
           "kind": "STUN",
@@ -40096,7 +40096,7 @@
       "target": "SINGLE_ENEMY",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 1.85倍",
+       "ダメージ倍率 1.90倍",
        "100%で行動ゲージ-35%",
        "被クリ率アップ (2ターン)",
        "防御力-75% (2ターン)"
@@ -40104,7 +40104,7 @@
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.85
+        "multiplier": 1.9
        },
        {
         "kind": "GAUGE",
@@ -40131,7 +40131,7 @@
       "target": "SINGLE_ENEMY",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 1.85倍",
+       "ダメージ倍率 1.90倍",
        "100%で行動ゲージ-35%",
        "被クリ率アップ (3ターン)",
        "防御力-75% (2ターン)"
@@ -40139,7 +40139,7 @@
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.85
+        "multiplier": 1.9
        },
        {
         "kind": "GAUGE",
@@ -40166,7 +40166,7 @@
       "target": "SINGLE_ENEMY",
       "cooldownTurns": 3,
       "lines": [
-       "ダメージ倍率 1.85倍",
+       "ダメージ倍率 1.90倍",
        "100%で行動ゲージ-35%",
        "被クリ率アップ (3ターン)",
        "防御力-75% (2ターン)"
@@ -40174,7 +40174,7 @@
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.85
+        "multiplier": 1.9
        },
        {
         "kind": "GAUGE",
@@ -40277,14 +40277,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 3,
       "lines": [
-       "ダメージ倍率 1.45倍",
+       "ダメージ倍率 1.50倍",
        "70%で行動ゲージ-30%",
        "75%で攻撃力-50% (1ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.45
+        "multiplier": 1.5
        },
        {
         "kind": "GAUGE",
@@ -40306,14 +40306,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 3,
       "lines": [
-       "ダメージ倍率 1.45倍",
+       "ダメージ倍率 1.50倍",
        "70%で行動ゲージ-30%",
        "75%で攻撃力-50% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.45
+        "multiplier": 1.5
        },
        {
         "kind": "GAUGE",
@@ -40335,14 +40335,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 2,
       "lines": [
-       "ダメージ倍率 1.45倍",
+       "ダメージ倍率 1.50倍",
        "70%で行動ゲージ-30%",
        "75%で攻撃力-50% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.45
+        "multiplier": 1.5
        },
        {
         "kind": "GAUGE",

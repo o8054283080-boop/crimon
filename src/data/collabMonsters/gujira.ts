@@ -204,7 +204,7 @@ const GUJIRA_S3_TSUNAMI: Skill = described({
     { cooldownTurns: 6, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.65 }, { kind: "DAMAGE", multiplier: 2.7 }] },
     // Lv3 弱体の発動率 65%→75%
     { cooldownTurns: 6, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.75 }, { kind: "DAMAGE", multiplier: 2.7 }] },
-    // Lv4 弱体の発動率 75%→80% / 弱体の持続 2→3ターン / ダメージ倍率 2.70倍→2.80倍
+    // Lv4 弱体の持続 2→3ターン / 弱体の発動率 75%→80% / ダメージ倍率 2.70倍→2.80倍
     { cooldownTurns: 6, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.8 }, { kind: "DAMAGE", multiplier: 2.8 }] },
     // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 2.80倍→3.00倍
     { cooldownTurns: 5, effects: [{ kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.8 }, { kind: "DAMAGE", multiplier: 3 }] },
@@ -236,11 +236,11 @@ const GUJIRA_S3_WAVE_PRESS: Skill = described({
     { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 6.5, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 } }] },
     // Lv2 ダメージ倍率 6.50倍→6.90倍
     { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 6.9, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.5 } }] },
-    // Lv3
+    // Lv3 対象の速度が自分より高いなら防御無視 50%→55%
     { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 6.9, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.55 } }] },
     // Lv4 ダメージ倍率 6.90倍→7.40倍
     { cooldownTurns: 5, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 7.4, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.55 } }] },
-    // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 7.40倍→7.50倍
+    // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 7.40倍→7.50倍 / 対象の速度が自分より高いなら防御無視 55%→60%
     { cooldownTurns: 4, effects: [{ kind: "SELF_DAMAGE", ratio: 0.25 }, { kind: "DAMAGE", multiplier: 7.5, conditionalIgnoreDefense: { when: "TARGET_SPD_ABOVE_SELF", ratio: 0.6 } }] },
   ],
 }, "【対象】敵単体。自傷の割合は伸びない。HPが足りない時に撃つと自分が倒れるので、撃つ判断そのものが賭けになる。");

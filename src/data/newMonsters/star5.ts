@@ -91,11 +91,11 @@ export const ABYSSREAPER: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "STRIP", chance: 0.8, count: 3, selfGaugePerTarget: 0.1 }] },
         // Lv2 ダメージ倍率 1.30倍→1.40倍 / 強化解除の発動率 80%→90%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "STRIP", chance: 0.9, count: 3, selfGaugePerTarget: 0.1 }] },
-        // Lv3 ダメージ倍率 1.40倍→1.50倍
+        // Lv3 ダメージ倍率 1.40倍→1.50倍 / 解除できた相手1体ごとの自身の行動ゲージ 10%→15%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "STRIP", chance: 0.9, count: 3, selfGaugePerTarget: 0.15 }] },
         // Lv4 ダメージ倍率 1.50倍→1.60倍 / 強化解除の発動率 90%→100%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "STRIP", chance: 1, count: 3, selfGaugePerTarget: 0.15 }] },
-        // Lv5 クールタイム -1(5→4ターン)
+        // Lv5 クールタイム -1(5→4ターン) / 解除できた相手1体ごとの自身の行動ゲージ 15%→20%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6 }, { kind: "STRIP", chance: 1, count: 3, selfGaugePerTarget: 0.2 }] },
       ],
     },
@@ -114,11 +114,11 @@ export const ABYSSREAPER: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.3, buffCountBonus: { perBuff: 0.15, maxBonus: 1 } }, { kind: "STRIP" }] },
         // Lv2 ダメージ倍率 2.30倍→2.60倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.6, buffCountBonus: { perBuff: 0.15, maxBonus: 1 } }, { kind: "STRIP" }] },
-        // Lv3 ダメージ倍率 2.60倍→2.90倍
+        // Lv3 ダメージ倍率 2.60倍→2.90倍 / 強化1個あたりの最終ダメージ 15%→20%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 2.9, buffCountBonus: { perBuff: 0.2, maxBonus: 1 } }, { kind: "STRIP" }] },
         // Lv4 ダメージ倍率 2.90倍→3.20倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.2, buffCountBonus: { perBuff: 0.2, maxBonus: 1 } }, { kind: "STRIP" }] },
-        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 3.20倍→3.50倍
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 3.20倍→3.50倍 / 強化1個あたりの最終ダメージ 20%→25%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 3.5, buffCountBonus: { perBuff: 0.25, maxBonus: 1 } }, { kind: "STRIP" }] },
       ],
     },
@@ -210,7 +210,7 @@ export const FENRIR: MonsterTemplate = {
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }, { kind: "DAMAGE", multiplier: 0.75 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }] },
       // Lv4 ダメージ倍率 0.75倍→0.80倍
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.8 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }, { kind: "DAMAGE", multiplier: 0.8 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.5 }] },
-      // Lv5 ダメージ倍率 0.80倍→0.85倍 / 弱体の発動率 50%→60% / 弱体の持続 2→3ターン
+      // Lv5 ダメージ倍率 0.80倍→0.85倍 / 弱体の持続 2→3ターン / 弱体の発動率 50%→60%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.85 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.6 }, { kind: "DAMAGE", multiplier: 0.85 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 0.6 }] },
     ],
   },
@@ -307,11 +307,11 @@ export const FENRIR: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.65, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.2 }], gaugeOnCritPerHit: 0.1 }] },
         // Lv2 ダメージ倍率 0.65倍→0.70倍
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.7, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.2 }], gaugeOnCritPerHit: 0.1 }] },
-        // Lv3 ダメージ倍率 0.70倍→0.75倍
+        // Lv3 ダメージ倍率 0.70倍→0.75倍 / 対象HP50%以下の最終ダメージ 20%→25%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.25 }], gaugeOnCritPerHit: 0.1 }] },
-        // Lv4 ダメージ倍率 0.75倍→0.80倍
+        // Lv4 ダメージ倍率 0.75倍→0.80倍 / 会心1回ごとの行動ゲージ 10%→15%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.25 }], gaugeOnCritPerHit: 0.15 }] },
-        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 0.80倍→0.85倍
+        // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 0.80倍→0.85倍 / 対象HP50%以下の最終ダメージ 25%→30%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 4, targetHpBonus: [{ hpRatio: 0.5, bonus: 0.3 }], gaugeOnCritPerHit: 0.15 }] },
       ],
     },
@@ -329,7 +329,7 @@ export const FENRIR: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }, { kind: "POISON", damageRatePerStack: 0.05, durationTurns: 2, chance: 0.8, stacks: 2 }] },
-        // Lv2 ダメージ倍率 3.00倍→3.30倍 / 治癒阻害の発動率 80%→90% / 毒の発動率 80%→90% / 毒1スタック 5%→5.5%
+        // Lv2 ダメージ倍率 3.00倍→3.30倍 / 治癒阻害の発動率 80%→90% / 毒1スタック 5%→5.5% / 毒の発動率 80%→90%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.3 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 }, { kind: "POISON", damageRatePerStack: 0.055, durationTurns: 2, chance: 0.9, stacks: 2 }] },
         // Lv3 ダメージ倍率 3.30倍→3.60倍 / 毒1スタック 5.5%→6%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 3.6 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.9 }, { kind: "POISON", damageRatePerStack: 0.06, durationTurns: 2, chance: 0.9, stacks: 2 }] },
@@ -401,13 +401,13 @@ export const FENRIR: MonsterTemplate = {
     levelOverrides: [
       // Lv1
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.75, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.4 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.3 }] }, { kind: "GAUGE", amount: 1, applyTo: "SELF", requires: "KILLED_TARGET" }] },
-      // Lv2 ダメージ倍率 0.75倍→0.80倍 / 行動ゲージ 100%→110%
+      // Lv2 ダメージ倍率 0.75倍→0.80倍 / 対象HP50%以下の防御無視 40%→50%
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.8, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.5 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.3 }] }, { kind: "GAUGE", amount: 1.1, applyTo: "SELF", requires: "KILLED_TARGET" }] },
-      // Lv3 ダメージ倍率 0.80倍→0.85倍 / 行動ゲージ 110%→115%
+      // Lv3 ダメージ倍率 0.80倍→0.85倍 / 対象HP50%以下の防御無視 50%→60% / 対象HP30%以下の最終ダメージ 30%→40%
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.85, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.6 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.4 }] }, { kind: "GAUGE", amount: 1.15, applyTo: "SELF", requires: "KILLED_TARGET" }] },
-      // Lv4 ダメージ倍率 0.85倍→0.90倍 / 行動ゲージ 115%→120%
+      // Lv4 ダメージ倍率 0.85倍→0.90倍 / 対象HP50%以下の防御無視 60%→70%
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 0.9, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.7 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.4 }] }, { kind: "GAUGE", amount: 1.2, applyTo: "SELF", requires: "KILLED_TARGET" }] },
-      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 0.90倍→1.00倍
+      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 0.90倍→1.00倍 / 対象HP50%以下の防御無視 70%→80% / 対象HP30%以下の最終ダメージ 40%→50%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1, hits: 5, targetHpIgnoreDefense: [{ hpRatio: 0.5, ratio: 0.8 }], targetHpBonus: [{ hpRatio: 0.3, bonus: 0.5 }] }, { kind: "GAUGE", amount: 1.2, applyTo: "SELF", requires: "KILLED_TARGET" }] },
     ],
   },
@@ -569,11 +569,11 @@ export const CHRONOS: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.1 }, { kind: "GAUGE", amount: -1, chance: 0.7 }, { kind: "STUN", durationTurns: 1, chance: 0.2 }] },
-        // Lv2 ダメージ倍率 1.10倍→1.20倍 / 行動ゲージの発動率 70%→80% / 行動ゲージ -100%→-110% / スタンの発動率 20%→25%
+        // Lv2 ダメージ倍率 1.10倍→1.20倍 / 行動ゲージの発動率 70%→80% / スタンの発動率 20%→25%
         { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.2 }, { kind: "GAUGE", amount: -1.1, chance: 0.8 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] },
-        // Lv3 ダメージ倍率 1.20倍→1.30倍 / 行動ゲージの発動率 80%→85% / 行動ゲージ -110%→-115%
+        // Lv3 ダメージ倍率 1.20倍→1.30倍 / 行動ゲージの発動率 80%→85%
         { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.3 }, { kind: "GAUGE", amount: -1.15, chance: 0.85 }, { kind: "STUN", durationTurns: 1, chance: 0.25 }] },
-        // Lv4 ダメージ倍率 1.30倍→1.40倍 / 行動ゲージの発動率 85%→90% / 行動ゲージ -115%→-120% / スタンの発動率 25%→30%
+        // Lv4 ダメージ倍率 1.30倍→1.40倍 / 行動ゲージの発動率 85%→90% / スタンの発動率 25%→30%
         { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.4 }, { kind: "GAUGE", amount: -1.2, chance: 0.9 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] },
         // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.40倍→1.50倍 / 行動ゲージの発動率 90%→100%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5 }, { kind: "GAUGE", amount: -1.2, chance: 1 }, { kind: "STUN", durationTurns: 1, chance: 0.3 }] },
@@ -682,7 +682,7 @@ export const BEHEMOTH: MonsterTemplate = {
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.09 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.6 }] },
       // Lv4 ダメージ倍率 0.65倍→0.70倍 / 発動率 60%→65%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.09 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.65 }] },
-      // Lv5 ダメージ倍率 0.70倍→0.75倍 / 最大HP比例 9%→10% / 発動率 65%→70% / 持続 2→3ターン
+      // Lv5 ダメージ倍率 0.70倍→0.75倍 / 最大HP比例 9%→10% / 持続 2→3ターン / 発動率 65%→70%
       { cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 0.75, hpCoefficient: 0.1 }, { kind: "STATUS", status: "TAUNT", durationTurns: 3, chance: 0.7 }] },
     ],
   },
@@ -753,7 +753,7 @@ export const BEHEMOTH: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.17, durationTurns: 2, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
         // Lv4 シールド量 17%→18%
         { cooldownTurns: 5, effects: [{ kind: "SHIELD", shieldRate: 0.18, durationTurns: 2, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
-        // Lv5 クールタイム -1(5→4ターン) / シールドの持続 2→3ターン / シールド量 18%→20% / 持続 2→3ターン
+        // Lv5 クールタイム -1(5→4ターン) / シールド量 18%→20% / シールドの持続 2→3ターン / 持続 2→3ターン
         { cooldownTurns: 4, effects: [{ kind: "SHIELD", shieldRate: 0.2, durationTurns: 3, fromSourceHp: true }, { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] },
       ],
     },
@@ -779,7 +779,7 @@ export const BEHEMOTH: MonsterTemplate = {
         { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.35, hpCoefficient: 0.16 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.25, requires: "SELF_HP_ABOVE_50" }] },
         // Lv4 ダメージ倍率 1.35倍→1.45倍 / 最大HP比例 16%→17% / 弱体の発動率 90%→95%
         { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.45, hpCoefficient: 0.17 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 2, chance: 0.95 }, { kind: "GAUGE", amount: -0.25, requires: "SELF_HP_ABOVE_50" }] },
-        // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.45倍→1.50倍 / 最大HP比例 17%→18% / 弱体の発動率 95%→100% / 弱体の持続 2→3ターン / 行動ゲージ -25%→-30%
+        // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.45倍→1.50倍 / 最大HP比例 17%→18% / 弱体の持続 2→3ターン / 弱体の発動率 95%→100% / 行動ゲージ -25%→-30%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.18 }, { kind: "DEBUFF", stat: "def", amount: DEF_DOWN, durationTurns: 3, chance: 1 }, { kind: "GAUGE", amount: -0.3, requires: "SELF_HP_ABOVE_50" }] },
       ],
     },
@@ -863,7 +863,7 @@ export const BEHEMOTH: MonsterTemplate = {
       { cooldownTurns: 7, effects: [{ kind: "SHIELD", shieldRate: 0.28, durationTurns: 2, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
       // Lv4 シールド量 28%→30%
       { cooldownTurns: 7, effects: [{ kind: "SHIELD", shieldRate: 0.3, durationTurns: 2, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 1 }] },
-      // Lv5 クールタイム -1(7→6ターン) / シールドの持続 2→3ターン / シールド量 30%→32% / 持続 1→2ターン
+      // Lv5 クールタイム -1(7→6ターン) / シールド量 30%→32% / シールドの持続 2→3ターン / 持続 1→2ターン
       { cooldownTurns: 6, effects: [{ kind: "SHIELD", shieldRate: 0.32, durationTurns: 3, fromSourceHp: true }, { kind: "CLEANSE", count: 1 }, { kind: "STATUS", status: "ENDURE", durationTurns: 2 }] },
     ],
   },
@@ -888,7 +888,7 @@ export const BEHEMOTH: MonsterTemplate = {
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.35, hpCoefficient: 0.16 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.9 }, { kind: "GAUGE", amount: -0.35 }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
       // Lv4 ダメージ倍率 1.35倍→1.45倍 / 最大HP比例 16%→17% / 発動率 90%→95% / 行動ゲージ -35%→-40%
       { cooldownTurns: 6, effects: [{ kind: "DAMAGE", multiplier: 1.45, hpCoefficient: 0.17 }, { kind: "STATUS", status: "TAUNT", durationTurns: 2, chance: 0.95 }, { kind: "GAUGE", amount: -0.4 }, { kind: "STATUS", status: "REFLECT", durationTurns: 2, applyTo: "SELF" }] },
-      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.45倍→1.50倍 / 最大HP比例 17%→18% / 発動率 95%→100% / 持続 2→3ターン
+      // Lv5 クールタイム -1(6→5ターン) / ダメージ倍率 1.45倍→1.50倍 / 最大HP比例 17%→18% / 持続 2→3ターン / 発動率 95%→100%
       { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.5, hpCoefficient: 0.18 }, { kind: "STATUS", status: "TAUNT", durationTurns: 3, chance: 1 }, { kind: "GAUGE", amount: -0.4 }, { kind: "STATUS", status: "REFLECT", durationTurns: 3, applyTo: "SELF" }] },
     ],
   },

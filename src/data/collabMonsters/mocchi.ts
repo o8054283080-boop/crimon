@@ -133,11 +133,11 @@ const MOCCHI_S2_CANNON: Skill = described({
     { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.6, defCoefficient: 1.2, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 } }] },
     // Lv2 ダメージ倍率 1.60倍→1.75倍
     { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.2, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.3 } }] },
-    // Lv3
+    // Lv3 自分の防御力が対象より高いなら防御無視 30%→35%
     { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.75, defCoefficient: 1.2, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.35 } }] },
     // Lv4 ダメージ倍率 1.75倍→1.80倍 / 防御力比例 120%→140%
     { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, defCoefficient: 1.4, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.35 } }] },
-    // Lv5 クールタイム -1(4→3ターン)
+    // Lv5 クールタイム -1(4→3ターン) / 自分の防御力が対象より高いなら防御無視 35%→40%
     { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1.8, defCoefficient: 1.4, conditionalIgnoreDefense: { when: "SELF_DEF_ABOVE_TARGET", ratio: 0.4 } }] },
   ],
 }, "【対象】敵単体。防御力を積むほど威力が上がり、相手より硬ければ守りの一部を抜ける。");

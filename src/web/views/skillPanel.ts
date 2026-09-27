@@ -97,31 +97,34 @@ export function renderSkillGrowthSummary(skill: Skill, currentLevel?: number): H
 const GROWTH_PREVIEW_LEVELS = [1, 4, 5] as const;
 
 export function renderSkillGrowthRows(skills: readonly Skill[]): HTMLElement[] {
-  return skills.map((skill, i) => {
-    const previewRows = (skill.levelOverrides ? [1, 2, 3, 4, 5] : GROWTH_PREVIEW_LEVELS).map((level) => {
-      const leveled = computeLeveledSkill(skill, level);
-      const cooldownText = leveled.cooldownTurns > 0 ? `CT ${leveled.cooldownTurns}ターン` : "CTなし";
-      const effectText = [describeSkillTarget(leveled), ...describeSkillLines(leveled)].join(" / ");
-      const levelLabel = level === 1 ? "Lv.1(初期)" : level === MAX_SKILL_LEVEL ? `Lv.${level}(最大)` : `Lv.${level}`;
+  return skills.map((skill, i) => el("div", { className: "skill-row" }, [
+    el("div", { className: "skill-row__header" }, [el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`])]),
+    ...descriptionNodes(skill),
+    ...renderSkillLevelDetail(skill),
+  ]));
+}
 
-      return el("div", { className: "skill-growth-row" }, [
-        el("span", { className: "skill-growth-row__level" }, [levelLabel]),
-        el("span", { className: "skill-growth-row__value" }, [`${effectText} (${cooldownText})`]),
-      ]);
-    });
+/**
+ * スキル1つの「レベルを上げると」と、Lv別の全文。モンスター図鑑とスキル図鑑で同じものを出す。
+ *
+ * **「何が変わったか」を先に出す。**
+ * Lv別の全文を5段ぶん並べても、どこが動いたのかは読み取れない
+ * (依頼主の指摘)。1段につき変わった一点だけを短く並べて、
+ * 細かい値を見たい時のために全文をその下へ残す。
+ */
+export function renderSkillLevelDetail(skill: Skill): HTMLElement[] {
+  const previewRows = (skill.levelOverrides ? [1, 2, 3, 4, 5] : GROWTH_PREVIEW_LEVELS).map((level) => {
+    const leveled = computeLeveledSkill(skill, level);
+    // パッシブは手番で使わないので、CTの表記を付けない(「CTなし」は使える技に見える)
+    const cooldownText = skill.passive ? "" : leveled.cooldownTurns > 0 ? ` (CT ${leveled.cooldownTurns}ターン)` : " (CTなし)";
+    const effectText = [describeSkillTarget(leveled), ...describeSkillLines(leveled)].join(" / ");
+    const levelLabel = level === 1 ? "Lv.1(初期)" : level === MAX_SKILL_LEVEL ? `Lv.${level}(最大)` : `Lv.${level}`;
 
-    /*
-     * **「何が変わったか」を先に出す。**
-     *
-     * Lv別の全文を5段ぶん並べても、どこが動いたのかは読み取れない
-     * (依頼主の指摘)。1段につき変わった一点だけを短く並べて、
-     * 細かい値を見たい時のために全文をその下へ残す。
-     */
-    return el("div", { className: "skill-row" }, [
-      el("div", { className: "skill-row__header" }, [el("span", { className: "skill-row__name" }, [`スキル${i + 1}: ${skill.name}`])]),
-      ...descriptionNodes(skill),
-      renderSkillGrowthSummary(skill),
-      el("div", { className: "skill-growth" }, previewRows),
+    return el("div", { className: "skill-growth-row" }, [
+      el("span", { className: "skill-growth-row__level" }, [levelLabel]),
+      el("span", { className: "skill-growth-row__value" }, [`${effectText}${cooldownText}`]),
     ]);
   });
+
+  return [renderSkillGrowthSummary(skill), el("div", { className: "skill-growth" }, previewRows)];
 }

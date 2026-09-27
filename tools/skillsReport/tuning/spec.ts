@@ -83,7 +83,13 @@ export const SPEC: SkillSpec[] = [
   {
     id: "wolf_s2_a",
     structure: [patch(0, { scaleBonus: { stat: "spd", bonusAtReference: 0.10 } })],
-    note: "「少量の速度比例を追加」は量の指定が無いため 0.10(速度200で攻撃力0.10倍ぶん)とした",
+    values: { ct: ct5(2) },
+    // 変更前は Lv5 で CT1(一律成長の -1)。CT1 の2回攻撃は毎手番に近く撃てるので長くする(依頼主の指定)
+    allowWeaker: {
+      ct: "依頼主の指定: ふいうちの牙はスキルMAXでもCT2(2026-09-26)",
+      cooldownTurns: "依頼主の指定: ふいうちの牙はスキルMAXでもCT2(2026-09-26)",
+    },
+    note: "「少量の速度比例を追加」は量の指定が無いため 0.10(速度200で攻撃力0.10倍ぶん)とした。Lv5のCTは依頼主の指定で2(CT1にしない)",
   },
   {
     id: "wolf_s2_b",
@@ -286,7 +292,18 @@ export const SPEC: SkillSpec[] = [
   },
   {
     id: "wisp_s3_dark",
-    pending: "指定の「味方単体ゲージ100%+攻撃UP+自身ゲージ」は、今の闇S3(ヴォイドシフト: 味方全体ゲージ35%+速度UP+シールド)と別の技。「ときわたり」の今の姿(単体100%)と混同している可能性があり、完全な作り直しの明記も無いため保留",
+    target: "SINGLE_ALLY",
+    structure: [rebuild([
+      { kind: "GAUGE", amount: 1.0 },
+      { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 },
+      { kind: "GAUGE", amount: 0.20, applyTo: "SELF" },
+    ])],
+    values: {
+      "GAUGE#1.amount": c(0.20, 0.25, 0.30, 0.40),
+      ct: c(3, 3, 3, 3, 2),
+    },
+    allowWeaker: { "*": "会話で闇S3を完全再設計すると明示確定。旧ヴォイドシフトから置換" },
+    note: "味方単体ゲージ100% + 攻撃UP2T + 自身ゲージ20/25/30/40/40%。Lv5 CT2",
   },
 
   /* ================================================================ 7. トレント */
@@ -634,21 +651,23 @@ export const SPEC: SkillSpec[] = [
   {
     id: "mushroon_s3_dark",
     values: {
-      "DAMAGE#0.multiplier": c(1.20, 1.30, 1.30, 1.40),
-      "DAMAGE#0.debuffDamageBonus.perDebuff": c(0.06, 0.07, 0.07, 0.08),
-      "DAMAGE#0.debuffDamageBonus.maxBonus": c(0.30, 0.35, 0.35, 0.40),
-      "POISON#0.chance": c(0.80, 0.85, 0.90, 0.95),
+      // Lv5 は下の levelStructure が形ごと作る(ここの値を Lv5 に掛けると、3回攻撃の1回目だけが変わる)
+      "DAMAGE#0.multiplier": [1.20, 1.30, 1.30, 1.40, undefined],
+      "DAMAGE#0.debuffDamageBonus.perDebuff": [0.06, 0.07, 0.07, 0.08, undefined],
+      "DAMAGE#0.debuffDamageBonus.maxBonus": [0.30, 0.35, 0.35, 0.40, undefined],
+      "POISON#0.chance": [0.80, 0.85, 0.90, 0.95, undefined],
       ct: ct5(4),
     },
-    // Lv5 は今の最大レベル差し替え(全体0.5倍の3回攻撃・毒3ターン)の形を残す。
-    // 指定の「Lv5 1.40/100/3T」を1回攻撃で入れると、今の Lv5(合計1.5倍・毒3回判定)より弱くなる
+    // Lv5 は今の最大レベル差し替え(全体0.5倍の3回攻撃・各攻撃後に毒)の形を残す。
+    // 指定の「Lv5 1.40/100/3T」を1回攻撃で入れると、今の Lv5(合計1.5倍・毒3回判定)より弱くなる。
+    // 指定の「100%・3ターン」と Lv4 の弱体ボーナス・毒%は、3回それぞれに入れる
     levelStructure: (level, effects, before) => {
       if (level !== 5) return effects;
       return (JSON.parse(JSON.stringify(before.effects)) as Effect[]).map((e) => e.kind === "DAMAGE"
         ? { ...e, debuffDamageBonus: { perDebuff: 0.08, maxBonus: 0.40 } }
-        : e);
+        : e.kind === "POISON" ? { ...e, chance: 1.0, durationTurns: 3, damageRatePerStack: 0.06 } : e);
     },
-    note: "Lv5 は今の最大レベル差し替え(0.5倍×3回・各攻撃後に毒)を残し、弱体ボーナスだけ Lv4 と同じ +8%/最大40% へ上げた",
+    note: "Lv5 は今の最大レベル差し替え(0.5倍×3回・各攻撃後に毒)を残し、3回それぞれを指定の「毒100%・3ターン」と Lv4 の弱体ボーナス(+8%/最大40%)・毒6%にそろえた",
   },
 
   /* ================================================================ 18. シェルタートル */
@@ -794,14 +813,15 @@ export const SPEC: SkillSpec[] = [
     }])],
     values: {
       "DAMAGE#0.multiplier": c(0.60, 0.70, 0.70, 0.80),
-      "DAMAGE#0.perHit.GAUGE#0.amount": c(-0.30, -0.50, -0.60, -0.60, -0.70),
+      "DAMAGE#0.perHit.GAUGE#0.amount": c(-0.30),
+      "DAMAGE#0.perHit.GAUGE#0.chance": c(0.50, 0.50, 0.60, 0.60, 0.70),
       "DAMAGE#0.perHit.STUN#0.chance": c(0.25, 0.25, 0.30, 0.35, 0.40),
       ct: c(5, 5, 5, 5, 4),
     },
     allowWeaker: {
       "*": "指定「完全再設計」。単体2.0倍+ゲージ-70%を、全体0.6倍×3回(1撃ごとにゲージとスタンを判定)へ作り直す",
     },
-    note: "「gauge50/60/70」は1撃ごとのゲージ減少量として読み、発動率は Lv1 の 50% のまま固定した",
+    note: "会話の最終仕様どおり、1Hitあたりのゲージ減少量は30%固定。発動率をLv1-2 50% / Lv3-4 60% / Lv5 70%へ成長させる",
   },
 
   /* ================================================================ 21. ミミック */
@@ -1205,9 +1225,9 @@ export const SPEC: SkillSpec[] = [
 
   /* ================================================================ 31. スエゾー */
   { id: "suezo_s1", values: { "DAMAGE#0.multiplier": lv5(1.10) } },
-  { id: "suezo_s2_kiss", values: { "DAMAGE#0.multiplier": only({ 2: 1.90 }) } },
+  { id: "suezo_s2_kiss", values: { "DAMAGE#0.multiplier": only({ 2: 1.90 }) }, note: "「Lv3〜5現行」の現行値(1.85)は Lv2 の指定(1.90)を下回るので、前の段にそろえて 1.90 にした" },
   { id: "suezo_s2_telepathy", keep: true },
-  { id: "suezo_s2_psychokinesis", values: { "DAMAGE#0.multiplier": only({ 2: 1.50 }) } },
+  { id: "suezo_s2_psychokinesis", values: { "DAMAGE#0.multiplier": only({ 2: 1.50 }) }, note: "「Lv3〜5現行」の現行値(1.45)は Lv2 の指定(1.50)を下回るので、前の段にそろえて 1.50 にした" },
   { id: "suezo_s3_sing", keep: true },
   { id: "suezo_s3_eat", values: { "DAMAGE#0.multiplier": lv5(4.20) } },
   { id: "suezo_s3_beam", values: { "DAMAGE#0.multiplier": lv5(4.60) } },

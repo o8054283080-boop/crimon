@@ -52,7 +52,7 @@ export interface BattleUnit {
   /** スキルごとの残りクールタイム(0=使用可能)。index 0-2 が skill 0-2 に対応 */
   cooldowns: [number, number, number];
   stunTurns: number;
-  /** 火傷の残りターン数。0より大きい間、自身の手番終了時に自分の攻撃力分のダメージを受ける */
+  /** 火傷の残りターン数。0より大きい間、自身の手番終了時に 実効攻撃力×2 + 最大HP比例(上限50,000)のダメージを受ける */
   burnTurns: number;
   effects: ActiveEffect[];
   statusEffects: ActiveStatusEffect[];

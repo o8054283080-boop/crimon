@@ -270,3 +270,84 @@ describe("amount を効果の種類ごとに読み分ける", () => {
     }
   });
 });
+
+/*
+ * **図鑑に出る全スキルの全段で、動いた数字を1つも取りこぼさない。**
+ *
+ * 上の `activeSkills()` は古参12種しか見ていなかった。2026年10月のスキル調整で
+ * 入れ子の数字(対象HP条件の上乗せ・条件つき防御無視・弱体数ボーナス・速度比例)が
+ * 段ごとに伸びるようになったのに、成長表示はそれを読めず、フェンリル闇の終焉の牙では
+ * **効かない「行動ゲージ100%→110%」だけ**が出ていた(依頼主の指摘)。
+ */
+describe("全種の成長表示", () => {
+  const everyActive = (() => {
+    const seen = new Set<string>();
+    const out: { name: string; skill: Skill }[] = [];
+    for (const entry of MONSTER_DEX_ENTRIES) {
+      for (const skill of entry.skills ?? []) {
+        if (skill.passive || skill.automatic || seen.has(skill.id)) continue;
+        seen.add(skill.id);
+        out.push({ name: `${entry.name} / ${skill.name}(${skill.id})`, skill });
+      }
+    }
+    return out;
+  })();
+
+  /** 効果の数字を「場所 → 値」へ平らにする。行動ゲージは100%で打ち止めにして比べる */
+  const numbers = (skill: Skill, level: number) => {
+    const out: Record<string, number> = {};
+    const walk = (value: unknown, path: string, kind: string) => {
+      if (typeof value === "number") {
+        out[path] = path.endsWith(".amount") && kind === "GAUGE" ? Math.sign(value) * Math.min(1, Math.abs(value)) : value;
+      } else if (Array.isArray(value)) value.forEach((v, i) => walk(v, `${path}[${i}]`, kind));
+      else if (value && typeof value === "object") {
+        const k = String((value as { kind?: string }).kind ?? kind);
+        for (const [key, v] of Object.entries(value)) walk(v, `${path}.${key}`, k);
+      }
+    };
+    walk(computeLeveledSkill(skill, level).effects, "", "");
+    out.cooldown = computeLeveledSkill(skill, level).cooldownTurns;
+    return out;
+  };
+
+  it("数字が動いた段には、必ず名前つきの行が出る(「強くなる」「効果が変わる」を出さない)", () => {
+    const problems: string[] = [];
+    for (const { name, skill } of everyActive) {
+      for (const step of describeSkillGrowth(skill)) {
+        const text = step.changes.join(" / ");
+        if (/強くなる|効果が変わる|効果が増える/.test(text)) problems.push(`${name} Lv.${step.level}: ${text}`);
+        const a = numbers(skill, step.level - 1);
+        const b = numbers(skill, step.level);
+        const moved = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((key) => a[key] !== b[key]);
+        if (moved.length > 0 && step.changes.length === 0) problems.push(`${name} Lv.${step.level}: ${moved.join(", ")} が動いたのに何も出ない`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it("行動ゲージは100%を超えて伸びたように書かない", () => {
+    const problems: string[] = [];
+    for (const { name, skill } of everyActive) {
+      for (const step of describeSkillGrowth(skill)) {
+        for (const line of step.changes) {
+          if (/行動ゲージ -?\d+%→-?(10[1-9]|1[1-9]\d|[2-9]\d\d)%/.test(line)) problems.push(`${name} Lv.${step.level}: ${line}`);
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it("フェンリル闇の終焉の牙: 対象HP条件の上乗せと防御無視の伸びが出る", () => {
+    const fang = MONSTER_DEX_ENTRIES.find((e) => e.templateId === "fenrir" && e.element === "DARK")!.skills[2];
+    expect(fang.id).toBe("fenrir_s3_dark");
+    const steps = describeSkillGrowth(fang).map((step) => step.changes.join(" / "));
+    expect(steps[1]).toContain("対象HP30%以下の最終ダメージ 30%→40%");
+    expect(steps[1]).toContain("対象HP50%以下の防御無視 50%→60%");
+    expect(steps.join(" / ")).not.toContain("行動ゲージ");
+  });
+
+  it("その段で付く効果は、中身を書いて「が付く」と出す", () => {
+    const golem = MONSTER_DEX_ENTRIES.flatMap((e) => e.skills).find((s) => s.id === "golem_s3_c")!;
+    expect(describeSkillGrowth(golem)[3].changes).toContain("「自身に反射 (3ターン)」が付く");
+  });
+});

@@ -2102,6 +2102,8 @@ body {
   padding: 7px 6px max(6px, env(safe-area-inset-bottom));
   z-index: 10;
   isolation: isolate;
+  /* キーボードを閉じた後に iPhone が途中へ取り残したぶんを戻す(`viewportNavFix.ts`)。普段は0 */
+  transform: translateY(var(--viewport-nav-shift, 0px));
 }
 
 /* 上辺の金の罫。両端を消すと、線ではなく縁に当たった光に見える */

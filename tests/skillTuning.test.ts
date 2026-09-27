@@ -140,6 +140,31 @@ describe("2026年10月のスキル調整", () => {
     expect(COLLAB_MONSTER_TEMPLATES.map((t) => t.templateId)).toEqual(["mocchi", "suezo", "undine", "gujira"]);
   });
 
+  /*
+   * **育てると弱くなる段を作らない。**
+   *
+   * 「Lv2だけ上げて、Lv3〜5は現行」の指定を素直に入れると、現行の Lv3 が Lv2 を下回る
+   * (スエゾーのキス 1.90→1.85 が実際に出た)。全スキルの Lv n → Lv n+1 を
+   * 「変更前 → 変更後」と見立てて、弱くなった数字を探す。
+   */
+  it("どのスキルも、Lv が上がって弱くなる数字が無い", () => {
+    // 形が変わる段(攻撃の回数が変わる)だけは、1回目どうしの倍率が下がって見える
+    const reshaped = new Set(["mushroon_s3_dark Lv4→Lv5 effects.DAMAGE#0.multiplier"]);
+    const found: string[] = [];
+    for (const monster of AFTER) {
+      for (const skill of monster.skills) {
+        for (let i = 1; i < skill.levels.length; i += 1) {
+          const at = (index: number): MonsterReport[] => [{ ...monster, skills: [{ ...skill, levels: [skill.levels[index]] }] }];
+          for (const w of findWeakenings(at(i - 1), at(i))) {
+            const label = `${skill.skillId} Lv${i}→Lv${i + 1} ${w.where}`;
+            if (!reshaped.has(label)) found.push(`${label}: ${JSON.stringify(w.before)} → ${JSON.stringify(w.after)}`);
+          }
+        }
+      }
+    }
+    expect(found).toEqual([]);
+  });
+
   it("書き出したレポートが最新の実効値と一致している(npm run skills:report)", () => {
     const committed = JSON.parse(readFileSync("docs/skills/effective-skills.json", "utf8")) as MonsterReport[];
     expect(JSON.stringify(committed)).toBe(JSON.stringify(AFTER));
