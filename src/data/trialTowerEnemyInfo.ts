@@ -3,7 +3,7 @@ import { TOWER80_PASSIVES } from "./trialTowerFloor80.js";
 import { CRIMOARK_CLONE_PROFILE, CRIMOARK_CLONE_ROLES, CRIMOARK_S4 } from "./crimoark.js";
 import { findTowerFloor } from "./trialTower.js";
 import { buildDungeonEnemyTeam } from "../game/dungeonRunner.js";
-import { TRIAL_TOWER_HARD_BOSS_INTERRUPTS } from "./trialTowerHard.js";
+import { TRIAL_TOWER_HARD_80_IMMUNITY_GUARD, TRIAL_TOWER_HARD_BOSS_INTERRUPTS } from "./trialTowerHard.js";
 
 export interface TowerEnemyAbilityInfo {
   name: string;
@@ -80,6 +80,9 @@ function hardBossPassives(floor: number): TowerEnemyAbilityInfo[] {
     { name: "反動の加速(HARD)", description: "気絶すると、反動で3ターンのあいだ速度が上がる。" },
     { name: "揺るがぬ時(HARD)", description: "行動ゲージを下げられても、下がる量が半分になる(吸収・奪取も同じ)。" },
   ];
+  if (floor === 80) {
+    list.push({ name: "聖竜の守り(HARD)", description: `「聖竜の免疫」を張る時、先に攻撃力UPと防御力UPを張ってから免疫を張る(解除は先に付いたものから外れる)。免疫が付いている間、この階の敵全員の速度が${Math.round(TRIAL_TOWER_HARD_80_IMMUNITY_GUARD.spdWhileImmune * 100)}%上がる。` });
+  }
   const move = TRIAL_TOWER_HARD_BOSS_INTERRUPTS[floor];
   if (move?.hpThresholds) {
     const when = move.hpThresholds.map((ratio) => `${Math.round(ratio * 100)}%`).join("・");

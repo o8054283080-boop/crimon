@@ -258,6 +258,19 @@ export interface BossTraits {
    * 回数は少なく抑える(1戦に1〜2回)。多いと「火力で削り切れ」以外の答えが消える。
    */
   interrupt?: BossInterrupt;
+  /**
+   * 試練の塔80階の「聖竜の免疫」を固める(HARD)。
+   *
+   * 解除は付いた順に外れるので、**免疫の前に別の強化を張れば、免疫は後ろに回る。**
+   * 免疫が付いている間は速度も上がる(強化ではなく特性なので、剥がせるのは免疫の方)。
+   * 免疫を剥がすまでは速くて止められない、剥がせば元に戻る——解除役の出番を作る。
+   */
+  immunityGuard?: {
+    /** 免疫の前に張る強化(量は共通値) */
+    buffs: readonly ("atk" | "def")[];
+    /** 免疫が付いている間の速度上昇(素の速度への割合) */
+    spdWhileImmune: number;
+  };
 }
 
 export interface BossInterrupt {

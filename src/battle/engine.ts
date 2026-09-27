@@ -1,6 +1,6 @@
 import { AccessoryRuntime } from "./accessoryRuntime.js";
 import { ELEMENT_JA } from "../core/element.js";
-import { ATK_DOWN, ATK_UP, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
+import { ATK_DOWN, ATK_UP, DEF_DOWN, DEF_UP, SPD_DOWN } from "../core/statusValues.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
 import type { TrialTowerHardMultipliers } from "../data/trialTowerHard.js";
 import { BossInterrupt, MonsterDefinition, appearanceTemplateOf } from "../core/monster.js";
@@ -114,6 +114,7 @@ import {
   tickHealBlockAtTurnStart,
   tickShieldAtTurnStart,
   stripBuffs,
+  nextApplyOrder,
   countBuffs,
 } from "./unit.js";
 
@@ -1224,11 +1225,16 @@ export class BattleEngine {
 
   private grantTower80Immunity(): void {
     if (this.trialTowerFloor !== 80 || !this.units.some((unit) => this.isTower80Boss(unit) && unit.alive)) return;
+    const guard = this.units.find((unit) => this.isTower80Boss(unit))?.def.bossTraits?.immunityGuard;
     for (const unit of this.units) {
       if (unit.team !== "ENEMY" || !unit.alive) continue;
       if (hasStatus(unit, "BUFF_BLOCK")) {
         this.push(`${this.label(unit)} は強化阻害で免疫の付与を防がれた！`);
         continue;
+      }
+      // HARDの聖竜は、免疫の前に強化を張って免疫を後ろへ回す(解除は付いた順に外れる)
+      for (const stat of guard?.buffs ?? []) {
+        applyStatEffect(unit, stat, stat === "atk" ? ATK_UP : DEF_UP, TOWER80_RULES.immunityTurns, "BUFF");
       }
       unit.immuneTurns = Math.max(unit.immuneTurns, TOWER80_RULES.immunityTurns);
     }
@@ -1251,6 +1257,14 @@ export class BattleEngine {
       }
     }
     boss.flatStatBonus.atk = boss.immuneTurns > 0 ? TOWER80_RULES.immuneAtkBonus : 0;
+    // HARD: 免疫が付いている間だけ、80階の敵全員の速度が上がる。剥がれた次の切れ目で戻る
+    const hasteRatio = boss.def.bossTraits?.immunityGuard?.spdWhileImmune ?? 0;
+    if (hasteRatio > 0) {
+      for (const unit of this.units) {
+        if (unit.team !== "ENEMY") continue;
+        unit.flatStatBonus.spd = unit.alive && unit.immuneTurns > 0 ? Math.round(unit.def.stats.spd * hasteRatio) : 0;
+      }
+    }
   }
 
   private tower80DamageTakenFactor(unit: BattleUnit): number {
@@ -1473,8 +1487,8 @@ export class BattleEngine {
          * 通常の強化の重ねがけ禁止(`applyStatEffect`)は通さない。
          * 3体倒せば3段ぶん乗り、倒すほど本体が重くなる、という階の形。
          */
-        boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_CLONE_DEATH_ATK, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1 });
-        boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_CLONE_DEATH_SPD, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1 });
+        boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_CLONE_DEATH_ATK, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1, order: nextApplyOrder() });
+        boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_CLONE_DEATH_SPD, remainingTurns: CRIMOARK_CLONE_DEATH_TURNS + 1, order: nextApplyOrder() });
         this.push(`  → ${this.label(boss)} は失った分身の力を取り込んだ！`);
       }
       slot.previousAlive = alive;
@@ -1573,8 +1587,8 @@ export class BattleEngine {
     }
     if (skillId === CRIMOARK_SUPPORT_S2_ID) {
       // 支援分身が本体へ送る強化も**積み上がる**(上の分身死亡時と同じ理由)
-      boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_SUPPORT_BUFF_ATK, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1 });
-      boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_SUPPORT_BUFF_SPD, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1 });
+      boss.effects.push({ kind: "BUFF", stat: "atk", amount: CRIMOARK_SUPPORT_BUFF_ATK, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1, order: nextApplyOrder() });
+      boss.effects.push({ kind: "BUFF", stat: "spd", amount: CRIMOARK_SUPPORT_BUFF_SPD, remainingTurns: CRIMOARK_SUPPORT_BUFF_TURNS + 1, order: nextApplyOrder() });
       const shield = Math.round(boss.maxHp * CRIMOARK_SUPPORT_SHIELD_RATE);
       boss.shieldValue = Math.max(boss.shieldValue, shield);
       boss.shieldTurns = Math.max(boss.shieldTurns, CRIMOARK_SUPPORT_BUFF_TURNS + 1);
@@ -3281,7 +3295,7 @@ export class BattleEngine {
 
   /** 特殊ダメージにも共通の致死処理を通し、通常由来だけ反射を1段生成する。 */
   private addCurse(source: BattleUnit, target: BattleUnit): void {
-    (target.curses ??= []).push({ attack: getEffectiveStat(source, "atk"), turns: 2, sourceId: source.instanceId });
+    (target.curses ??= []).push({ attack: getEffectiveStat(source, "atk"), turns: 2, sourceId: source.instanceId, order: nextApplyOrder() });
     this.push(`  → ${this.label(target)} に呪いが付与された！`);
   }
 

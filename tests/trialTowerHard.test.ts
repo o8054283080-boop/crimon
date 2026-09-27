@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BattleEngine } from "../src/battle/engine.js";
+import { stripBuffs } from "../src/battle/unit.js";
 import { createMonsterInstance } from "../src/core/monsterInstance.js";
 import {
   CRIMOARK_CLONE_PROFILE,
@@ -8,7 +9,7 @@ import {
   CRIMOARK_CLONE_HP_FLOOR,
   CRIMOARK_CLONE_HP_RATIO,
 } from "../src/data/crimoark.js";
-import { TRIAL_TOWER_HARD_BOSS_INTERRUPTS, TRIAL_TOWER_HARD_BOSS_STATS, TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_MINION_HP_OF_BOSS, TRIAL_TOWER_HARD_UPPER_HP_BOOST, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
+import { TRIAL_TOWER_HARD_80_IMMUNITY_GUARD, TRIAL_TOWER_HARD_BOSS_INTERRUPTS, TRIAL_TOWER_HARD_BOSS_STATS, TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_MINION_HP_OF_BOSS, TRIAL_TOWER_HARD_UPPER_HP_BOOST, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
 import { trialTowerEnemyInfo } from "../src/data/trialTowerEnemyInfo.js";
 import { findTowerFloor } from "../src/data/trialTower.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
@@ -388,5 +389,47 @@ describe("試練の塔HARD: 70〜100階のボスは実数、お供のHPはボス
     run.floor = 80;
     const normal = buildDungeonEnemyTeam(findTowerFloor(80)!);
     expect(setupTowerBattle(state, run)!.enemyDefs.map((e) => e.stats)).toEqual(normal.map((e) => e.stats));
+  });
+});
+
+describe("試練の塔HARD: 80階の聖竜は免疫の前に強化を張り、免疫中は速い", () => {
+  function hardEngine(mode: "NORMAL" | "HARD") {
+    const state = unlockedState();
+    state.trialTowerHardBestFloor = 79;
+    state.trialTowerBestFloor = 79;
+    const run = beginTowerRun(state, mode)!;
+    run.floor = 80;
+    const setup = setupTowerBattle(state, run)!;
+    const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng: () => 0.5, maxTurns: 1, trialTowerFloor: 80 });
+    const enemies = engine.getUnits().filter((unit) => unit.team === "ENEMY");
+    return { engine, enemies, boss: enemies.find((unit) => unit.def.isBoss)! };
+  }
+
+  it("開幕の免疫より先に攻撃UP・防御UPが付き、1個解除では免疫が残る", () => {
+    const { enemies } = hardEngine("HARD");
+    for (const enemy of enemies) {
+      expect(enemy.immuneTurns).toBeGreaterThan(0);
+      expect(enemy.effects.filter((e) => e.kind === "BUFF").map((e) => e.stat).sort()).toEqual(["atk", "def"]);
+      stripBuffs(enemy, 2);
+      expect(enemy.immuneTurns).toBeGreaterThan(0);
+      stripBuffs(enemy, 1);
+      expect(enemy.immuneTurns).toBe(0);
+    }
+  });
+
+  it("免疫が付いている間は速度が30%上がり、剥がすと戻る", () => {
+    const { engine, enemies } = hardEngine("HARD");
+    for (const enemy of enemies) expect(enemy.flatStatBonus.spd).toBe(Math.round(enemy.def.stats.spd * TRIAL_TOWER_HARD_80_IMMUNITY_GUARD.spdWhileImmune));
+    for (const enemy of enemies) stripBuffs(enemy);
+    (engine as unknown as { syncTower80Boss(): void }).syncTower80Boss();
+    for (const enemy of enemies) expect(enemy.flatStatBonus.spd ?? 0).toBe(0);
+  });
+
+  it("NORMALの80階には付かない", () => {
+    const { enemies } = hardEngine("NORMAL");
+    for (const enemy of enemies) {
+      expect(enemy.effects.some((e) => e.kind === "BUFF")).toBe(false);
+      expect(enemy.flatStatBonus.spd ?? 0).toBe(0);
+    }
   });
 });

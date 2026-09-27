@@ -226,9 +226,10 @@ function heraldGuardSkills(mitigate: number, cooldownTurns: number): [Skill, Ski
       description: `指揮兵器の攻撃力と速さを6ターン上昇させ、受けるダメージを6ターン${pct}%軽減する(強化。解除1個で攻撃力UP、2個で速さUP、3個で軽減が外れる。張り直しはクールタイム${cooldownTurns})。`,
       target: "SINGLE_ALLY", cooldownTurns,
       effects: [
+        // 解除は「付いた順」に外れる。説明文の順(攻撃力UP→速さUP→軽減)に張る
         { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 6 },
-        { kind: "MITIGATE", amount: mitigate, durationTurns: 6 },
         { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 6 },
+        { kind: "MITIGATE", amount: mitigate, durationTurns: 6 },
       ],
     },
   ];

@@ -11,6 +11,8 @@ export interface ActiveEffect {
   amount: number;
   remainingTurns: number;
   kind: "BUFF" | "DEBUFF";
+  /** 付いた順番(`nextApplyOrder`)。解除はこれの小さい方から。掛け直すと新しくなる */
+  order?: number;
 }
 
 export interface ActiveStatusEffect {
@@ -19,10 +21,17 @@ export interface ActiveStatusEffect {
   remainingTurns: number;
   /** 挑発だけが使用する。付与者のinstanceId。 */
   sourceId?: string;
+  /** 付いた順番(`nextApplyOrder`)。解除はこれの小さい方から。掛け直すと新しくなる */
+  order?: number;
 }
 
 export interface BattleUnit {
-  curses?: { attack: number; turns: number; sourceId: string }[];
+  curses?: { attack: number; turns: number; sourceId: string; order?: number }[];
+  /**
+   * ターン数で持っている強化・弱体(免疫・シールド・毒・気絶…)が**付いた順番**。
+   * `trackApplyOrder` が書き込むので、付ける側は何もしなくてよい。
+   */
+  applyOrder?: Record<string, number>;
   skyStacks?: number;
   /**
    * ガッツチャージ(モッチー電気)の溜まり。**通常のターンが回った回数。**
@@ -263,13 +272,101 @@ export function passiveAccuracyBonus(unit: BattleUnit): number {
   return effect?.kind === "CHARM_EYE" ? effect.accuracy : 0;
 }
 
+/*
+ * ===================================================================
+ * 付いた順番(依頼主の指定 2026-09-27)
+ * ===================================================================
+ *
+ * **解除は、種類ではなく「付いた順」に消す。**強化解除・強化奪取・弱体解除すべて同じ。
+ * 以前は種類ごとに順番が決まっていて、強化解除は必ず免疫から剥がしていた。
+ * 張る順番を工夫しても意味が無く、免疫だけが特別扱いになっていた。
+ *
+ * 掛け直したものは「新しく付いた」扱いで後ろへ回る。
+ *
+ * 能力の強化・弱体(`effects`)と状態(`statusEffects`)は、項目ごとに `order` を持つ
+ * (`applyStatEffect` / `applyStatus` が付ける)。
+ * ターン数で持つもの(免疫・シールド・毒・気絶…)は、付ける場所がエンジン中に散らばっていて
+ * 1つずつ印を足すと必ず取りこぼすので、**欄への書き込みそのものを見張る。**
+ * 値が0から増えた時と、同じ値以上で書き直された時(掛け直し)を「付いた」と数える。
+ * 減る書き込み(手番ごとの経過・解除)は数えない。
+ */
+let applySequence = 0;
+export function nextApplyOrder(): number {
+  applySequence += 1;
+  return applySequence;
+}
+
+const ORDER_TRACKED_FIELDS: Readonly<Record<string, string>> = {
+  immuneTurns: "IMMUNE",
+  shieldTurns: "SHIELD",
+  regenTurns: "REGEN",
+  damageDealtBonusTurns: "DAMAGE_BONUS",
+  mitigateTurns: "MITIGATE",
+  protectTurns: "PROTECT",
+  counterTurns: "COUNTER",
+  hitGaugeTurns: "HIT_GAUGE",
+  poisonStacks: "POISON",
+  poisonTurns: "POISON",
+  healBlockTurns: "HEAL_BLOCK",
+  stunTurns: "STUN",
+  burnTurns: "BURN",
+  blindTurns: "BLIND",
+};
+
+function trackApplyOrder(unit: BattleUnit): BattleUnit {
+  const order: Record<string, number> = {};
+  Object.defineProperty(unit, "applyOrder", { value: order, enumerable: false, writable: false });
+  const record = unit as unknown as Record<string, number | undefined>;
+  for (const [field, key] of Object.entries(ORDER_TRACKED_FIELDS)) {
+    let value = record[field] ?? 0;
+    Object.defineProperty(unit, field, {
+      configurable: true,
+      enumerable: true,
+      get: () => value,
+      set: (next: number) => {
+        if (next > 0 && (value <= 0 || next >= value)) order[key] = nextApplyOrder();
+        value = next;
+      },
+    });
+  }
+  return unit;
+}
+
+/** その強化・弱体が付いた順番。記録の無いもの(戦闘前から付いていた等)は最も古い扱い */
+function orderOf(unit: BattleUnit, key: string): number {
+  return unit.applyOrder?.[key] ?? 0;
+}
+
+interface RemovableSlot {
+  order: number;
+  remove: () => void;
+}
+
+/** 古い順に count 個だけ取り除く。同じ順番のものは並べた順(以前の種類順)で決める */
+function removeOldest(slots: RemovableSlot[], count: number): number {
+  const limit = Math.max(0, Math.floor(count));
+  const sorted = slots.map((slot, index) => ({ slot, index })).sort((a, b) => a.slot.order - b.slot.order || a.index - b.index);
+  let removed = 0;
+  for (const { slot } of sorted) {
+    if (removed >= limit) break;
+    slot.remove();
+    removed += 1;
+  }
+  return removed;
+}
+
+const spliceOut = <T>(list: T[], item: T) => {
+  const index = list.indexOf(item);
+  if (index >= 0) list.splice(index, 1);
+};
+
 export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId: string): BattleUnit {
   const latent = def.latentAbility;
   const hpMultiplier = Math.max(0.1, latent?.hpMultiplier ?? 1);
   const defMultiplier = Math.max(0.1, latent?.defMultiplier ?? 1);
   const effectiveDef = defMultiplier === 1 ? def : { ...def, stats: { ...def.stats, def: Math.round(def.stats.def * defMultiplier) } };
   const maxHp = Math.round(def.stats.hp * hpMultiplier);
-  return {
+  return trackApplyOrder({
     instanceId,
     def: effectiveDef,
     team,
@@ -297,7 +394,7 @@ export function createBattleUnit(def: MonsterDefinition, team: Team, instanceId:
     flatStatBonus: {},
     adaptationStacks: new Map<string, number>(),
     ...freshExtendedState(),
-  };
+  });
 }
 
 /** バフ/デバフを反映した実効ステータス値を計算する。criRate/criDmgは加算、それ以外は乗算で効く */
@@ -371,10 +468,11 @@ export function applyStatus(unit: BattleUnit, type: StatusEffectType, durationTu
   const existing = unit.statusEffects.find((effect) => effect.type === type);
   if (existing) {
     existing.remainingTurns = Math.max(existing.remainingTurns, durationTurns);
+    existing.order = nextApplyOrder();
     if (type === "TAUNT") existing.sourceId = sourceId;
     return true;
   }
-  const next: ActiveStatusEffect = { type, category: STATUS_EFFECT_CATEGORY[type], remainingTurns: durationTurns };
+  const next: ActiveStatusEffect = { type, category: STATUS_EFFECT_CATEGORY[type], remainingTurns: durationTurns, order: nextApplyOrder() };
   if (type === "TAUNT") next.sourceId = sourceId;
   unit.statusEffects.push(next);
   return true;
@@ -403,9 +501,10 @@ export function applyStatEffect(
   if (existing) {
     if (Math.abs(amount) > Math.abs(existing.amount)) existing.amount = amount;
     existing.remainingTurns = Math.max(existing.remainingTurns, remainingTurns);
+    existing.order = nextApplyOrder();
     return;
   }
-  unit.effects.push({ stat, amount, remainingTurns, kind });
+  unit.effects.push({ stat, amount, remainingTurns, kind, order: nextApplyOrder() });
 }
 
 /**
@@ -534,29 +633,20 @@ export function countBuffs(unit: BattleUnit): number {
 }
 
 export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): number {
-  let remaining = Math.max(0, Math.floor(count));
-  let removed = 0;
-  // IMMUNITYを最優先にすることで、解除後に続くデバフが正式な免疫判定へ進める。
-  if (remaining > 0 && unit.immuneTurns > 0) { unit.immuneTurns = 0; remaining -= 1; removed += 1; }
-  if (remaining > 0 && unit.shieldTurns > 0) { unit.shieldValue = 0; unit.shieldTurns = 0; remaining -= 1; removed += 1; }
-  if (remaining > 0 && unit.regenTurns > 0) { unit.regenTurns = 0; unit.regenRate = 0; remaining -= 1; removed += 1; }
-  while (remaining > 0) {
-    const index = unit.effects.findIndex((effect) => effect.kind === "BUFF");
-    if (index < 0) break;
-    unit.effects.splice(index, 1); remaining -= 1; removed += 1;
-  }
-  while (remaining > 0) {
-    const index = unit.statusEffects.findIndex((effect) => effect.category === "BUFF");
-    if (index < 0) break;
-    unit.statusEffects.splice(index, 1); remaining -= 1; removed += 1;
-  }
-  const take = (active: boolean, clear: () => void) => { if (remaining > 0 && active) { clear(); remaining--; removed++; } };
-  take((unit.damageDealtBonusTurns ?? 0) > 0, () => { unit.damageDealtBonus = 0; unit.damageDealtBonusTurns = 0; });
-  take(unit.mitigateTurns > 0, () => { unit.mitigateTurns = 0; unit.mitigateAmount = 0; unit.mitigateVsTaunted = 0; });
-  take(unit.protectTurns > 0, () => { unit.protectTurns = 0; unit.protectShare = 0; unit.protectorId = undefined; });
-  take(unit.counterTurns > 0, () => { unit.counterTurns = 0; unit.counterMultiplier = 0; unit.counterHpCoefficient = 0; unit.counterHealRate = 0; });
-  take(unit.hitGaugeTurns > 0, () => { unit.hitGaugeTurns = 0; unit.hitGaugeAmount = 0; });
-  return removed;
+  // **付いた順に剥がす。**以前は免疫を必ず最初に剥がしていた(先頭の説明を参照)
+  const slots: RemovableSlot[] = [];
+  const add = (active: boolean, key: string, clear: () => void) => { if (active) slots.push({ order: orderOf(unit, key), remove: clear }); };
+  add(unit.immuneTurns > 0, "IMMUNE", () => { unit.immuneTurns = 0; });
+  add(unit.shieldTurns > 0, "SHIELD", () => { unit.shieldValue = 0; unit.shieldTurns = 0; });
+  add(unit.regenTurns > 0, "REGEN", () => { unit.regenTurns = 0; unit.regenRate = 0; });
+  for (const effect of unit.effects.filter((e) => e.kind === "BUFF")) slots.push({ order: effect.order ?? 0, remove: () => spliceOut(unit.effects, effect) });
+  for (const status of unit.statusEffects.filter((e) => e.category === "BUFF")) slots.push({ order: status.order ?? 0, remove: () => spliceOut(unit.statusEffects, status) });
+  add((unit.damageDealtBonusTurns ?? 0) > 0, "DAMAGE_BONUS", () => { unit.damageDealtBonus = 0; unit.damageDealtBonusTurns = 0; });
+  add(unit.mitigateTurns > 0, "MITIGATE", () => { unit.mitigateTurns = 0; unit.mitigateAmount = 0; unit.mitigateVsTaunted = 0; });
+  add(unit.protectTurns > 0, "PROTECT", () => { unit.protectTurns = 0; unit.protectShare = 0; unit.protectorId = undefined; });
+  add(unit.counterTurns > 0, "COUNTER", () => { unit.counterTurns = 0; unit.counterMultiplier = 0; unit.counterHpCoefficient = 0; unit.counterHealRate = 0; });
+  add(unit.hitGaugeTurns > 0, "HIT_GAUGE", () => { unit.hitGaugeTurns = 0; unit.hitGaugeAmount = 0; });
+  return removeOldest(slots, count);
 }
 
 /**
@@ -566,38 +656,31 @@ export function stripBuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): 
  * 支えを重ねる相手ほど痛い一手になる。奪えた個数を返す。
  */
 export function stealBuffs(from: BattleUnit, to: BattleUnit, count = 1): number {
-  let remaining = Math.max(0, Math.floor(count));
-  let stolen = 0;
-  const give = () => { remaining -= 1; stolen += 1; };
-  if (remaining > 0 && from.immuneTurns > 0) {
+  // 剥がす順番は解除と同じ(付いた順)。奪った側では「新しく付いた」扱いになる
+  const slots: RemovableSlot[] = [];
+  if (from.immuneTurns > 0) slots.push({ order: orderOf(from, "IMMUNE"), remove: () => {
     to.immuneTurns = Math.max(to.immuneTurns, from.immuneTurns);
-    from.immuneTurns = 0; give();
-  }
-  if (remaining > 0 && from.shieldTurns > 0) {
+    from.immuneTurns = 0;
+  } });
+  if (from.shieldTurns > 0) slots.push({ order: orderOf(from, "SHIELD"), remove: () => {
     to.shieldValue = Math.max(to.shieldValue, from.shieldValue);
     to.shieldTurns = Math.max(to.shieldTurns, from.shieldTurns);
-    from.shieldValue = 0; from.shieldTurns = 0; give();
-  }
-  if (remaining > 0 && from.regenTurns > 0) {
+    from.shieldValue = 0; from.shieldTurns = 0;
+  } });
+  if (from.regenTurns > 0) slots.push({ order: orderOf(from, "REGEN"), remove: () => {
     to.regenRate = Math.max(to.regenRate, from.regenRate);
     to.regenTurns = Math.max(to.regenTurns, from.regenTurns);
-    from.regenRate = 0; from.regenTurns = 0; give();
-  }
-  while (remaining > 0) {
-    const index = from.effects.findIndex((effect) => effect.kind === "BUFF");
-    if (index < 0) break;
-    const [moved] = from.effects.splice(index, 1);
-    to.effects.push({ ...moved });
-    give();
-  }
-  while (remaining > 0) {
-    const index = from.statusEffects.findIndex((effect) => effect.category === "BUFF");
-    if (index < 0) break;
-    const [moved] = from.statusEffects.splice(index, 1);
-    applyStatus(to, moved.type, moved.remainingTurns, moved.sourceId);
-    give();
-  }
-  return stolen;
+    from.regenRate = 0; from.regenTurns = 0;
+  } });
+  for (const effect of from.effects.filter((e) => e.kind === "BUFF")) slots.push({ order: effect.order ?? 0, remove: () => {
+    spliceOut(from.effects, effect);
+    to.effects.push({ ...effect, order: nextApplyOrder() });
+  } });
+  for (const status of from.statusEffects.filter((e) => e.category === "BUFF")) slots.push({ order: status.order ?? 0, remove: () => {
+    spliceOut(from.statusEffects, status);
+    applyStatus(to, status.type, status.remainingTurns, status.sourceId);
+  } });
+  return removeOldest(slots, count);
 }
 
 /** その相手が有利な効果を持っているか。奪取・解除の条件判定に使う */
@@ -622,29 +705,18 @@ export function countDebuffs(unit: BattleUnit): number {
 
 /** フィールド別に保持されるものも含め、弱体効果を指定個数だけ正式解除する。 */
 export function cleanseDebuffs(unit: BattleUnit, count = Number.POSITIVE_INFINITY): number {
-  let remaining = Math.max(0, Math.floor(count));
-  let removed = 0;
-  const take = (condition: boolean, clear: () => void) => {
-    if (!condition || remaining <= 0) return;
-    clear(); remaining -= 1; removed += 1;
-  };
-  while (remaining > 0) {
-    const index = unit.effects.findIndex((effect) => effect.kind === "DEBUFF");
-    if (index < 0) break;
-    unit.effects.splice(index, 1); remaining -= 1; removed += 1;
-  }
-  while (remaining > 0) {
-    const index = unit.statusEffects.findIndex((effect) => effect.category === "DEBUFF");
-    if (index < 0) break;
-    unit.statusEffects.splice(index, 1); remaining -= 1; removed += 1;
-  }
-  take(unit.poisonStacks > 0 || unit.poisonTurns > 0, () => { unit.poisonStacks = 0; unit.poisonTurns = 0; unit.poisonDamageRate = 0; });
-  take(unit.healBlockTurns > 0, () => { unit.healBlockTurns = 0; unit.healBlockMultiplier = 1; });
-  take(unit.stunTurns > 0, () => { unit.stunTurns = 0; });
-  take(unit.burnTurns > 0, () => { unit.burnTurns = 0; });
-  take(unit.blindTurns > 0, () => { unit.blindTurns = 0; });
-  while (remaining > 0 && unit.curses?.length) { unit.curses.shift(); remaining--; removed++; }
-  return removed;
+  // **付いた順に消す。**以前は能力の弱体→状態→毒→治癒阻害→気絶…の種類順で、気絶や毒が後回しだった
+  const slots: RemovableSlot[] = [];
+  const add = (active: boolean, key: string, clear: () => void) => { if (active) slots.push({ order: orderOf(unit, key), remove: clear }); };
+  for (const effect of unit.effects.filter((e) => e.kind === "DEBUFF")) slots.push({ order: effect.order ?? 0, remove: () => spliceOut(unit.effects, effect) });
+  for (const status of unit.statusEffects.filter((e) => e.category === "DEBUFF")) slots.push({ order: status.order ?? 0, remove: () => spliceOut(unit.statusEffects, status) });
+  add(unit.poisonStacks > 0 || unit.poisonTurns > 0, "POISON", () => { unit.poisonStacks = 0; unit.poisonTurns = 0; unit.poisonDamageRate = 0; });
+  add(unit.healBlockTurns > 0, "HEAL_BLOCK", () => { unit.healBlockTurns = 0; unit.healBlockMultiplier = 1; });
+  add(unit.stunTurns > 0, "STUN", () => { unit.stunTurns = 0; });
+  add(unit.burnTurns > 0, "BURN", () => { unit.burnTurns = 0; });
+  add(unit.blindTurns > 0, "BLIND", () => { unit.blindTurns = 0; });
+  for (const curse of unit.curses ?? []) slots.push({ order: curse.order ?? 0, remove: () => { if (unit.curses) spliceOut(unit.curses, curse); } });
+  return removeOldest(slots, count);
 }
 
 /** そのユニットの手番開始時に呼ぶ。暗闇の残りターンを減らす */
