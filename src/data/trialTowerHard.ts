@@ -105,8 +105,44 @@ export const TRIAL_TOWER_HARD_BOSS_INTERRUPTS: Readonly<Record<number, BossInter
   90: { name: "報復の冥炎", onAllyDeath: 2, multiplier: 3 },
 };
 
+/**
+ * HARDの70〜100階のボスは、倍率ではなく**実数で決める**(2026-09-27、依頼主の指定)。
+ *
+ * 倍率だと階ごとの素の値の癖がそのまま出て、80階のボスが防御950・HP24万の
+ * 「一番軽いボス」になっていた(依頼主の5体で40回登って、80階の負けは1〜2回)。
+ * ボスの強さを4階で揃えて書けるよう、HP・攻撃・防御・速度をここへ直に置く。
+ * 会心・的中・抵抗・スキル・ギミックは元のまま。
+ */
+export const TRIAL_TOWER_HARD_BOSS_STATS: Readonly<Record<number, { hp: number; atk: number; def: number; spd: number }>> = {
+  70: { hp: 250_000, atk: 60_000, def: 3_500, spd: 200 },
+  80: { hp: 350_000, atk: 65_000, def: 4_000, spd: 225 },
+  90: { hp: 500_000, atk: 70_000, def: 3_800, spd: 250 },
+  100: { hp: 700_000, atk: 80_000, def: 5_500, spd: 280 },
+};
+
+/**
+ * 同じ階のお供のHPは、**平均がボスのHPのこの割合**になるよう揃える(依頼主「HP半分くらい」)。
+ * お供どうしの差(硬い晶・脆い獣)は残す。攻撃・防御・速度は倍率のまま。
+ * 100階の分身は戦闘中に「ボスの今のHPの25%(最低は倍率×7.5万)」で生まれるので、ここでは触らない。
+ */
+export const TRIAL_TOWER_HARD_MINION_HP_OF_BOSS = 0.5;
+
 /** 戦闘用に完成したNORMAL敵定義の複製だけを倍率化する。ボス階の主(`isBoss`)にはHARDのボス特性も付ける。 */
 export function scaleTrialTowerHardEnemies(enemies: MonsterDefinition[], floor: number): MonsterDefinition[] {
+  const scaled = scaleByMultipliers(enemies, floor);
+  const bossStats = TRIAL_TOWER_HARD_BOSS_STATS[floor];
+  if (!bossStats) return scaled;
+  const minions = floor === 100 ? [] : scaled.filter((enemy) => !enemy.isBoss);
+  const minionMean = minions.reduce((sum, enemy) => sum + enemy.stats.hp, 0) / Math.max(1, minions.length);
+  const minionFactor = minions.length > 0 ? (bossStats.hp * TRIAL_TOWER_HARD_MINION_HP_OF_BOSS) / minionMean : 1;
+  return scaled.map((enemy) => {
+    if (enemy.isBoss) return { ...enemy, stats: { ...enemy.stats, ...bossStats } };
+    if (!minions.includes(enemy)) return enemy;
+    return { ...enemy, stats: { ...enemy.stats, hp: Math.max(1, Math.round(enemy.stats.hp * minionFactor)) } };
+  });
+}
+
+function scaleByMultipliers(enemies: MonsterDefinition[], floor: number): MonsterDefinition[] {
   const scale = trialTowerHardMultipliers(floor);
   return enemies.map((enemy) => ({
     ...enemy,

@@ -57,6 +57,18 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-tower-hard-boss-stats",
+    title: "試練の塔HARDの70・80・90・100階のボスを見直しました",
+    message: "試練の塔HARDの70階・80階・90階・100階のボスとお供の強さを見直しました。\n\n"
+      + "・4体のボスとも、HPと防御力が大きく上がりました\n"
+      + "・70階のボスは攻撃力が下がり、そのぶんHPが増えました\n"
+      + "・80階のボスは、攻撃力はほぼそのままで、倒しにくくなりました\n"
+      + "・90階・100階のボスは攻撃力も大きく上がりました\n"
+      + "・70・80・90階のお供は、HPがボスの半分ほどになりました\n"
+      + "・スキル・ギミック・NORMALは変わりません",
+    kind: "UPDATE", fromDate: "2026-09-27", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-immunity-blocks-gauge",
     title: "免疫が行動ゲージの操作も防ぐようになりました",
     message: "免疫(状態異常無効)の効果を、本来の仕様どおりに揃えました。\n\n"
