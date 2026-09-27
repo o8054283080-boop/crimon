@@ -890,7 +890,7 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
       }, [props.hardUnlocked ? "HARD" : "🔒 HARD"]),
     ]),
     props.mode === "HARD"
-      ? el("p", { className: "tower-hard-note" }, ["敵編成・AI・ギミックはNORMALと同じ。完成ステータスだけが大幅に強化されています。"])
+      ? el("p", { className: "tower-hard-note" }, ["敵編成・AI・ギミックはNORMALと同じで、完成ステータスが大幅に強化されています。10階ごとのボスは気絶すると速度が上がり、行動ゲージを下げられても半分しか下がりません。"])
       : null,
     el("div", { className: "tower-actions" }, nodes([
       props.nextFloor >= 60

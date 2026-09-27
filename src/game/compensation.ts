@@ -57,6 +57,16 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-tower-hard-boss-traits",
+    title: "試練の塔HARDの難易度を上げました",
+    message: "育て切った編成だと、試練の塔HARDの100階まで楽に登れてしまっていたため、手応えを強めました。\n\n"
+      + "・51〜99階(10階ごとのボス階を除く)の敵のHPが増えました\n"
+      + "・10階ごとのボスは、気絶すると反動で3ターンのあいだ速度が上がるようになりました\n"
+      + "・10階ごとのボスは、行動ゲージを下げられても、下がる量が半分になりました(吸収・奪取も同じです)\n"
+      + "・取り巻きの敵と普通の階の敵には、この2つは付きません。NORMALは変わりません",
+    kind: "UPDATE", fromDate: "2026-09-27", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-wolf-fuiuchi-ct3",
     title: "ウルフ「ふいうちの牙」のクールタイムを見直しました",
     message: "ウルフのスキル2「ふいうちの牙」のクールタイムを見直しました。\n\n"
