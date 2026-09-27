@@ -185,6 +185,8 @@ for (const part of (process.env.CLIMB_ANCHOR ?? "").split(";").filter(Boolean)) 
   for (const kv of assigns.split(",")) { const [k, v] = kv.split("="); anchor.stats[k as keyof Quad] = Number(v); }
 }
 const CURVE = process.env.CLIMB_CURVE ?? "production";
+/** `CLIMB_CURVE_FLOORS=51-99` で、実数の案を掛ける階をその範囲の通常階へ絞る */
+const CURVE_FLOORS = process.env.CLIMB_CURVE_FLOORS?.split("-").map(Number);
 function anchorAt(floor: number): Quad {
   const upper = ANCHORS.findIndex((a) => floor <= a.floor);
   if (upper <= 0) return ANCHORS[0].stats;
@@ -195,6 +197,7 @@ function anchorAt(floor: number): Quad {
 }
 function applyAbsoluteCurve(enemies: { stats: Quad & Record<string, unknown> }[], floor: number): void {
   if (CURVE !== "absolute" || floor % 10 === 0) return;
+  if (CURVE_FLOORS && (floor < CURVE_FLOORS[0] || floor > CURVE_FLOORS[1])) return;
   const target = anchorAt(floor);
   const mean = (k: keyof Quad) => enemies.reduce((a, e) => a + e.stats[k], 0) / enemies.length;
   const means = { hp: mean("hp"), atk: mean("atk"), def: mean("def"), spd: mean("spd") };
