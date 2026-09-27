@@ -208,7 +208,7 @@ Lv1 を変えると、ステージ・ダンジョン・遺跡・塔に**敵と�
 2. `実行時の差し替え: あり` なら、先に「5」の手順で定義へ統合する
 3. 定義ファイルの `levelOverrides` を直す。一律成長のスキルなら、今の実効値を起点に5段を書き起こす
 4. **Lv1 を変えるなら、敵としての影響を測る。**同じ種族がステージ・ダンジョン・遺跡・塔の敵として出ている
-   (`npx tsx tools/towerPressure.mjs`、`npx tsx tools/ruinPressure.ts`、`tests/stageChapterBalance.test.ts`)
+   (`npx tsx tools/towerPressure.mjs`、`npx tsx tools/ruinPressure.ts`、`tests/balance/stageChapterBalance.test.ts`)
 5. `npm run skills:report` をやり直し、`docs/skills/effective-skills.md` の差分で**意図した所だけ**変わったか見る
 6. プレイヤー向けの変更なので、`src/game/compensation.ts` にお知らせを足す(確率の数値は書かない。スキルの発動%は書いてよい)
 

@@ -74,6 +74,39 @@ jobs:
       - name: 管理・自動保存APIの型チェック
         run: deno check --node-modules-dir=auto supabase/functions/crimon-admin/index.ts supabase/functions/crimon-player-snapshot/index.ts
 
+  # 難易度の目安(勝率・比)。**CIの合否には入れない。**
+  # スキル強化で勝率が上がるのは良い(依頼主の指定)ので、ここが割れても止めずに数字だけ残す。
+  # 割れた目安は、この実行の Summary に一覧で出る。
+  balance:
+    name: 難易度の目安(参考・止めない)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 目安を測る
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run balance:check -- --reporter=default 2>&1 | tee balance.log
+      - name: 結果を Summary に出す
+        if: always()
+        run: |
+          {
+            echo "## 難易度の目安(参考・合否には入れない)"
+            echo
+            if grep -q "FAIL" balance.log; then
+              echo "目安から外れたもの(直すかどうかは依頼主が決める):"
+              echo
+              grep -E "^ *(FAIL|×)" balance.log | sed 's/^ */- /' | sort -u
+            else
+              echo "すべて目安の中"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   tour:
     name: 巡回(画面の崩れ)
     runs-on: ubuntu-latest

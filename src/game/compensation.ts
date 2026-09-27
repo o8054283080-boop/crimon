@@ -57,6 +57,15 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-wolf-fuiuchi-ct3",
+    title: "ウルフ「ふいうちの牙」のクールタイムを見直しました",
+    message: "ウルフのスキル2「ふいうちの牙」のクールタイムを見直しました。\n\n"
+      + "・スキルレベル1〜4はクールタイム3ターンになりました\n"
+      + "・スキルレベル最大でクールタイムが1短くなり、2ターンになります(最大の性能は前回の調整と同じです)\n"
+      + "・ダメージ倍率と速度による上昇はこれまでどおりです",
+    kind: "UPDATE", fromDate: "2026-09-27", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-wolf-fuiuchi-ct",
     title: "ウルフ「ふいうちの牙」のクールタイムを調整しました",
     message: "ウルフのスキル2「ふいうちの牙」は、スキルレベル最大でクールタイムが1ターンになっていました。\n\n"

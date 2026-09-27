@@ -148,7 +148,7 @@ const NO_BOOST: StatBoost = { hp: 1, atk: 1, def: 1 };
  * 今の星ごとの効き方。**★5から効き始め、★6で満額。**
  *
  * 序盤には効かせない。装備ダンジョン1階は「★3のLv上限・装備なしでは
- * 勝てない」ところに置いてあり(`tests/equipmentDungeonBalance.test.ts`)、
+ * 勝てない」ところに置いてあり(`tests/balance/equipmentDungeonBalance.test.ts`)、
  * ここが**装備を取りに行く理由**そのものになっている。
  * 満額を最初から掛けたとき、その勝率が実測で 12% から 100% へ飛んだ。
  *

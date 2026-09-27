@@ -37,6 +37,11 @@
 - **確率の数字を画面やREADMEに出さない。** ガチャの排出率もドロップ率もコード内だけ。
   ただし**戦闘スキルの発動%(「65%で火傷」など)は出してよい**。これは
   プレイヤーが編成を考えるために要る情報なので、伏せる対象ではない
+- **スキル強化で勝率が上がるのはOK。そのたびに難易度(敵)を上げない。**
+  スキル調整のたびに勝率の目安が割れ、敵の数値を探し直してCIを直していた
+  (依頼主「きりなくないですか？」「いちいちその時に難易度を上げなくていい」)。
+  勝率・比の目安は `tests/balance/` にあり、**CIの合否に入らない**(`npm run balance:check` で測る)。
+  目安から外れたら数字を報告するだけにして、直すかどうかは依頼主が決める
 - 作業ブランチは `claude/turn-based-battle-game-ioqjai`
 
 ## 芯にある考え方
@@ -132,7 +137,8 @@ GLSLのコンパイル失敗も、重なり順の誤りも、`position` の指�
 ```
 npx tsc --noEmit                  # 型
 npm run build:edge                # サーバ側(Deno)へ持っていく組み立て
-npx vitest run                    # テスト
+npx vitest run                    # テスト(tests/balance/ は入らない)
+npm run balance:check             # 難易度の目安(勝率・比)。参考。CIでも止めずに Summary へ出す
 node tools/harness.mjs &          # 常駐サーバ(実ブラウザ)
 HARNESS_PORT=<port> node tools/tour.mjs   # 全画面の巡回
 ```

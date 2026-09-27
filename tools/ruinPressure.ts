@@ -75,12 +75,12 @@ export const RUIN_TEAMS: Record<string, RuinTeam> = {
   /*
    * 力の遺跡4・5階の号令塔は、指揮兵器へ解除で剥がせる護りを張る。
    * **解除を持つ汎用と、解除だけを抜いた汎用で、正しい狙いが分かれるか**を見る組
-   * (`tests/ruinPowerRoles.test.ts` が比を固定している)。
+   * (`tests/balance/ruinPowerRoles.test.ts` が比を固定している)。
    */
   "力・汎用(水ウルフ版・解除なし)": { kind: "POWER", purpose: "汎用の草ウルフを水ウルフに替えた(解除を持たない)", allies: GENERIC_NO_STRIP },
   /*
    * 汎用と**同じ5体・同じ属性**で、草ウルフの「いあつ」から解除だけを抜いた版。
-   * 汎用との差が、そのまま解除の働き(`tests/ruinPowerRoles.test.ts` が固定している)。
+   * 汎用との差が、そのまま解除の働き(`tests/balance/ruinPowerRoles.test.ts` が固定している)。
    */
   "力・汎用(解除抜き)": { kind: "POWER", purpose: "汎用の解除(いあつのSTRIP)だけを抜いた", allies: GENERIC, stripRemoved: true },
   /* 回復と継続回復で粘り、毒で削る通常5体。長期戦の仕掛けが、回復を選んだ編成への税になっていないかを見る */
