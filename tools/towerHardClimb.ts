@@ -11,6 +11,7 @@
  * アクセの特殊効果は画面に出ている分だけ合わせた(見えない分は近い値)。
  * 本番のデータ・エンジンには触らない。
  */
+import { mkdirSync, writeFileSync } from "node:fs";
 import { BattleEngine } from "../src/battle/engine.js";
 import { generateEquipment, EQUIP_SLOTS, type SetType } from "../src/core/equipment.js";
 import { createMonsterInstance, type MonsterInstance } from "../src/core/monsterInstance.js";
@@ -300,6 +301,10 @@ function buildState(rng: () => number): { state: PlayerState; statsById: Map<str
   return { state, statsById };
 }
 
+const DUMP_DIR = process.env.CLIMB_DUMP_DIR;
+if (DUMP_DIR) mkdirSync(DUMP_DIR, { recursive: true });
+let dumpCount = 0;
+
 interface ClimbResult { reached: number; losses: number; floorTurns: Record<number, number>; lostAt: number[] }
 
 function climb(seed: number): ClimbResult {
@@ -343,6 +348,11 @@ function climb(seed: number): ClimbResult {
       console.log(battle.log.slice(0, 40).join("\n"));
     }
     result.floorTurns[setup.floor.floor] = battle.turnsTaken;
+    // `CLIMB_DUMP_FLOOR=70 CLIMB_DUMP_DIR=<場所>` で、その階の戦闘ログを1戦ずつ書き出す(壁の中身を読む用)
+    if (DUMP_DIR && Number(process.env.CLIMB_DUMP_FLOOR) === setup.floor.floor) {
+      dumpCount += 1;
+      writeFileSync(`${DUMP_DIR}/${setup.floor.floor}F-${String(dumpCount).padStart(4, "0")}-${cleared ? "win" : "lose"}.log`, battle.log.join("\n"));
+    }
     if (process.env.CLIMB_TRACE) {
       const units = engine.getUnits().filter((u) => u.team === "PLAYER");
       console.log(`${setup.floor.floor}F ${cleared ? "勝" : "負"} ${battle.turnsTaken}手 残り: ${units.map((u) => `${u.def.name.replace(/★.*/, "")}${u.alive ? Math.round(100 * u.currentHp / u.maxHp) + "%" : "×"}`).join(" ")}`);

@@ -22,7 +22,7 @@ describe("試練の塔: 敵情報・ランキングUI", () => {
     expect(view).toContain("const hasEnemyInfo = floor.floor >= 60");
     expect(view).toContain('return el("button"');
     expect(view).toContain("props.onOpenEnemyInfo(floor.floor)");
-    expect(view).toContain("trialTowerEnemyInfo(props.enemyInfoFloor)");
+    expect(view).toContain("trialTowerEnemyInfo(props.enemyInfoFloor, props.mode)");
     expect(view).toContain("ⓘ 60階以降は敵情報");
     expect(view).toContain('"data-tour": "tower-enemy-info-open"');
   });

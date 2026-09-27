@@ -116,7 +116,7 @@ function renderEnemyAbilityList(label: string, items: TowerEnemyInfo["skills"]):
 }
 
 function renderEnemyInfoModal(props: TrialTowerProps): HTMLElement {
-  const enemies = trialTowerEnemyInfo(props.enemyInfoFloor);
+  const enemies = trialTowerEnemyInfo(props.enemyInfoFloor, props.mode);
   return el("div", { className: "tower-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "tower-enemy-info-title", "data-tour": "tower-enemy-info" }, [
     el("button", { type: "button", className: "tower-modal__backdrop", "aria-label": "閉じる", onclick: props.onClosePanel }, []),
     el("section", { className: "tower-modal__sheet" }, [
@@ -890,7 +890,7 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
       }, [props.hardUnlocked ? "HARD" : "🔒 HARD"]),
     ]),
     props.mode === "HARD"
-      ? el("p", { className: "tower-hard-note" }, ["敵編成・AI・ギミックはNORMALと同じで、完成ステータスが大幅に強化されています。10階ごとのボスは気絶すると速度が上がり、行動ゲージを下げられても半分しか下がりません。"])
+      ? el("p", { className: "tower-hard-note" }, ["敵編成・AI・ギミックはNORMALと同じで、完成ステータスが大幅に強化されています。10階ごとのボスは気絶すると速度が上がり、行動ゲージを下げられても半分しか下がりません。80階と90階のボスは割り込み技も使います。"])
       : null,
     el("div", { className: "tower-actions" }, nodes([
       props.nextFloor >= 60

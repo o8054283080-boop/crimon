@@ -3,7 +3,7 @@ import { ELEMENT_JA } from "../core/element.js";
 import { ATK_DOWN, ATK_UP, DEF_DOWN, SPD_DOWN } from "../core/statusValues.js";
 import { TOWER80_RULES } from "../data/trialTowerFloor80.js";
 import type { TrialTowerHardMultipliers } from "../data/trialTowerHard.js";
-import { MonsterDefinition, appearanceTemplateOf } from "../core/monster.js";
+import { BossInterrupt, MonsterDefinition, appearanceTemplateOf } from "../core/monster.js";
 import { LatentAbilityCandidate } from "../core/monsterDevelopment.js";
 import { EffectApplyTo, EffectCondition, STATUS_EFFECT_CATEGORY, STATUS_EFFECT_JA, Skill, SkillEffect } from "../core/skill.js";
 import {
@@ -443,6 +443,8 @@ export class BattleEngine {
   private lastUsedSkill: Skill | null = null;
   /** `empowerBossOnDeath` を処理し終えた個体。同じ死で二度強くしない */
   private readonly mournedDeaths = new Set<string>();
+  /** 割り込み技をどこまで撃ったか。HPの閾値・数えた撃破・撃った回数 */
+  private readonly interruptsFired = new Map<string, { thresholds: Set<number>; deaths: number; seen: Set<string> }>();
   /** いま解決中のスキル。パッシブの「1スキル1回」を数えるのに使う */
   private resolution: SkillResolution | null = null;
   /**
@@ -582,6 +584,7 @@ export class BattleEngine {
      * スナップショットより前に置いて、強化が画面へ反映されるようにする。
      */
     this.applyAllyDeathBoosts();
+    this.applyBossInterrupts();
     const record: TurnRecord = {
       actorId: unit.instanceId,
       lines: this.log.slice(linesBefore),
@@ -3497,6 +3500,51 @@ export class BattleEngine {
    * 効き先は「生き残っている勝利条件の敵」だけ。取り巻き同士では強め合わない
    * (どちらを先に倒しても同じ、では順番を考える意味が無くなる)。
    */
+  /**
+   * 割り込み技(`bossTraits.interrupt`)。**手番の切れ目ごとに条件を見て、満たしていれば撃つ。**
+   *
+   * 撃破の強化(`applyAllyDeathBoosts`)と同じく、倒れ方・減り方ごとに合図を挿さず
+   * 切れ目で走査する。毒でも火傷でも反撃でも取りこぼさない。
+   * 撃つのは生きている間だけ。**気絶していても撃つ**(止められないことがこの技の芯)。
+   */
+  private applyBossInterrupts(): void {
+    for (const boss of this.units) {
+      const move = boss.def.bossTraits?.interrupt;
+      if (!move || !boss.alive) continue;
+      const fired = this.interruptsFired.get(boss.instanceId) ?? { thresholds: new Set<number>(), deaths: 0, seen: new Set<string>() };
+      this.interruptsFired.set(boss.instanceId, fired);
+      let times = 0;
+      for (const threshold of move.hpThresholds ?? []) {
+        if (hpRatio(boss) >= threshold || fired.thresholds.has(threshold)) continue;
+        fired.thresholds.add(threshold);
+        times += 1;
+      }
+      for (const ally of this.units) {
+        if (ally === boss || ally.team !== boss.team || ally.alive || fired.seen.has(ally.instanceId)) continue;
+        fired.seen.add(ally.instanceId);
+        if (fired.deaths < (move.onAllyDeath ?? 0)) { fired.deaths += 1; times += 1; }
+      }
+      for (let i = 0; i < times && boss.alive; i += 1) this.fireBossInterrupt(boss, move);
+    }
+  }
+
+  private fireBossInterrupt(boss: BattleUnit, move: BossInterrupt): void {
+    this.push(`${this.label(boss)} の「${move.name}」！`);
+    for (const target of this.units.filter((unit) => unit.team !== boss.team && unit.alive)) {
+      const result = calcDamage(boss, target, { kind: "DAMAGE", multiplier: move.multiplier }, this.rng);
+      // 咆哮と同じく割り込み。反撃・反射を呼び返さない
+      const applied = this.applyIncomingDamage(target, result.damage, boss, "reflect");
+      this.push(`  → ${this.label(target)} に ${applied.hpDamage} ダメージ！ (残りHP ${target.currentHp}/${target.maxHp})`);
+      this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
+      if (applied.died) {
+        this.push(`  → ${this.label(target)} は倒れた！`);
+        this.pushEvent({ targetId: target.instanceId, kind: "DEATH" });
+      } else if (move.stripBuffs && stripBuffs(target) > 0) {
+        this.push(`  → ${this.label(target)} の強化効果がすべて消えた！`);
+      }
+    }
+  }
+
   private applyAllyDeathBoosts(): void {
     for (const victim of this.units) {
       if (victim.alive || this.mournedDeaths.has(victim.instanceId)) continue;

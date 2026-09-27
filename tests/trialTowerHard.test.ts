@@ -8,7 +8,8 @@ import {
   CRIMOARK_CLONE_HP_FLOOR,
   CRIMOARK_CLONE_HP_RATIO,
 } from "../src/data/crimoark.js";
-import { TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_UPPER_HP_BOOST, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
+import { TRIAL_TOWER_HARD_BOSS_INTERRUPTS, TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_UPPER_HP_BOOST, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
+import { trialTowerEnemyInfo } from "../src/data/trialTowerEnemyInfo.js";
 import { findTowerFloor } from "../src/data/trialTower.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
 import { createInitialState, ensureTowerMonthlyState, type PlayerState } from "../src/game/playerState.js";
@@ -249,5 +250,80 @@ describe("試練の塔HARD: 51〜99階のHPとボス特性", () => {
 
     hooks.stun(minion, 1);
     expect(minion.effects.some((e) => e.kind === "BUFF" && e.stat === "spd")).toBe(false);
+  });
+});
+
+describe("試練の塔HARD: 80・90階の割り込み技", () => {
+  function hardEngine(floor: number) {
+    const state = unlockedState();
+    state.trialTowerHardBestFloor = floor - 1;
+    const run = beginTowerRun(state, "HARD")!;
+    run.floor = floor;
+    const setup = setupTowerBattle(state, run)!;
+    const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, { rng: () => 0.5, maxTurns: 1, trialTowerFloor: floor });
+    const internals = engine as unknown as { applyBossInterrupts(): void; log: string[]; stun(unit: unknown, turns: number): void };
+    const enemies = engine.getUnits().filter((unit) => unit.team === "ENEMY");
+    const boss = enemies.find((unit) => unit.def.isBoss)!;
+    return { setup, internals, enemies, boss, fired: (name: string) => internals.log.filter((line) => line.includes(`「${name}」`)).length };
+  }
+
+  it("80階と90階のボスにだけ付く。70階・100階・NORMALには付かない", () => {
+    for (const floor of [80, 90]) {
+      const boss = hardEngine(floor).setup.enemyDefs.find((e) => e.isBoss)!;
+      expect(boss.bossTraits?.interrupt).toEqual(TRIAL_TOWER_HARD_BOSS_INTERRUPTS[floor]);
+    }
+    for (const floor of [70, 100]) {
+      expect(hardEngine(floor).setup.enemyDefs.some((e) => e.bossTraits?.interrupt)).toBe(false);
+    }
+    const state = unlockedState();
+    const run = beginTowerRun(state, "NORMAL")!;
+    run.floor = 80;
+    expect(setupTowerBattle(state, run)!.enemyDefs.some((e) => e.bossTraits?.interrupt)).toBe(false);
+  });
+
+  it("80階はHP50%を下回った時に1回だけ撃ち、当てた相手の強化を消す。気絶中でも撃つ", () => {
+    const { internals, boss, fired } = hardEngine(80);
+    const player = (internals as unknown as { units: { team: string; maxHp: number; currentHp: number; effects: { stat: string; amount: number; remainingTurns: number; kind: string }[] }[] }).units.find((u) => u.team === "PLAYER")!;
+    // 1発で倒れると解除まで進まないので、耐えられるだけのHPを持たせる
+    player.maxHp = 10_000_000;
+    player.currentHp = 10_000_000;
+    player.effects.push({ stat: "def", amount: 0.5, remainingTurns: 3, kind: "BUFF" });
+    internals.applyBossInterrupts();
+    expect(fired("聖光の裁き")).toBe(0);
+
+    boss.currentHp = Math.floor(boss.maxHp * 0.49);
+    internals.stun(boss, 1);
+    internals.applyBossInterrupts();
+    expect(fired("聖光の裁き")).toBe(1);
+    expect(player.effects.some((e) => e.kind === "BUFF")).toBe(false);
+
+    internals.applyBossInterrupts();
+    boss.currentHp = Math.floor(boss.maxHp * 0.1);
+    internals.applyBossInterrupts();
+    expect(fired("聖光の裁き")).toBe(1);
+  });
+
+  it("90階はお供が倒れた時に撃ち、1戦に2回まで", () => {
+    const { internals, enemies, fired } = hardEngine(90);
+    internals.applyBossInterrupts();
+    expect(fired("報復の冥炎")).toBe(0);
+    const minions = enemies.filter((unit) => !unit.def.isBoss);
+    for (const minion of minions) {
+      minion.alive = false;
+      minion.currentHp = 0;
+      internals.applyBossInterrupts();
+    }
+    expect(minions.length).toBeGreaterThan(2);
+    expect(fired("報復の冥炎")).toBe(2);
+  });
+
+  it("敵情報はHARDの時だけボスの特性と割り込み技を載せる", () => {
+    const hardNames = (floor: number) => trialTowerEnemyInfo(floor, "HARD")[0].passives.map((p) => p.name);
+    expect(hardNames(80)).toContain("聖光の裁き(HARD)");
+    expect(hardNames(90)).toContain("報復の冥炎(HARD)");
+    expect(hardNames(70)).toContain("反動の加速(HARD)");
+    expect(hardNames(70).some((name) => name.includes("聖光") || name.includes("報復"))).toBe(false);
+    expect(trialTowerEnemyInfo(80)[0].passives.map((p) => p.name).some((name) => name.includes("HARD"))).toBe(false);
+    expect(trialTowerEnemyInfo(90, "HARD")[1].passives.map((p) => p.name).some((name) => name.includes("HARD"))).toBe(false);
   });
 });

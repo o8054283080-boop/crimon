@@ -3,6 +3,7 @@ import { TOWER80_PASSIVES } from "./trialTowerFloor80.js";
 import { CRIMOARK_CLONE_PROFILE, CRIMOARK_CLONE_ROLES, CRIMOARK_S4 } from "./crimoark.js";
 import { findTowerFloor } from "./trialTower.js";
 import { buildDungeonEnemyTeam } from "../game/dungeonRunner.js";
+import { TRIAL_TOWER_HARD_BOSS_INTERRUPTS } from "./trialTowerHard.js";
 
 export interface TowerEnemyAbilityInfo {
   name: string;
@@ -70,8 +71,28 @@ function enginePassives(floor: number, enemyIndex: number): TowerEnemyAbilityInf
   return [];
 }
 
+/**
+ * HARDのボスにだけ付く特性(`src/data/trialTowerHard.ts`)。NORMALの敵情報には出さない。
+ * 割り込み技は階ごとに中身が違う(80階・90階だけ)。
+ */
+function hardBossPassives(floor: number): TowerEnemyAbilityInfo[] {
+  const list: TowerEnemyAbilityInfo[] = [
+    { name: "反動の加速(HARD)", description: "気絶すると、反動で3ターンのあいだ速度が上がる。" },
+    { name: "揺るがぬ時(HARD)", description: "行動ゲージを下げられても、下がる量が半分になる(吸収・奪取も同じ)。" },
+  ];
+  const move = TRIAL_TOWER_HARD_BOSS_INTERRUPTS[floor];
+  if (move?.hpThresholds) {
+    const when = move.hpThresholds.map((ratio) => `${Math.round(ratio * 100)}%`).join("・");
+    list.push({ name: `${move.name}(HARD)`, description: `HPが${when}を下回った時に割り込み、敵全体へ攻撃する${move.stripBuffs ? "。当たった相手の強化効果をすべて消す" : ""}。気絶していても止まらない。` });
+  }
+  if (move?.onAllyDeath) {
+    list.push({ name: `${move.name}(HARD)`, description: `お供が倒れた時に割り込み、敵全体へ攻撃する(1戦に${move.onAllyDeath}回まで)${move.stripBuffs ? "。当たった相手の強化効果をすべて消す" : ""}。気絶していても止まらない。` });
+  }
+  return list;
+}
+
 /** 60階以降で、その戦闘が実際に使う定義から攻略情報を組み立てる。 */
-export function trialTowerEnemyInfo(floorNumber: number): TowerEnemyInfo[] {
+export function trialTowerEnemyInfo(floorNumber: number, mode: "NORMAL" | "HARD" = "NORMAL"): TowerEnemyInfo[] {
   if (floorNumber < 60 || floorNumber > 100) return [];
   const floor = findTowerFloor(floorNumber);
   if (!floor) return [];
@@ -90,6 +111,7 @@ export function trialTowerEnemyInfo(floorNumber: number): TowerEnemyInfo[] {
       passives: [
         ...definition.skills.filter(isPassiveSkill).map(ability),
         ...enginePassives(floorNumber, index),
+        ...(mode === "HARD" && definition.isBoss ? hardBossPassives(floorNumber) : []),
       ],
     };
   });
