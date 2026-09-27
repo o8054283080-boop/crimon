@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { nextApplyOrder } from "../src/battle/unit.js";
 import { BattleEngine } from "../src/battle/engine.js";
 import { LatentAbilityCandidate } from "../src/core/monsterDevelopment.js";
 import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterInstance.js";
@@ -161,12 +162,21 @@ describe("役割変更潜在", () => {
     expect(run(setup.player, setup.enemy)).toBe(run(plainSetup.player, plainSetup.enemy));
   });
 
-  it("潜在STRIP count=1はIMMUNITYを優先して1個だけ解除する", () => {
+  /*
+   * 解除は「付いた順」(依頼主の指定 2026-09-27)。以前は免疫を必ず最初に剥がしていた。
+   * 先に付いた方が1個だけ外れ、後から付いた方は残る。
+   */
+  it.each([
+    ["免疫が先", true],
+    ["攻撃UPが先", false],
+  ] as const)("潜在STRIP count=1は付いた順で古い方を1個だけ解除する(%s)", (_label, immuneFirst) => {
     const ability = latent("DAMAGE_UP", { value: 0, runtimeEffects: [{ kind: "STRIP", chance: 1, count: 1 }] });
     const setup = defs(ability); setup.enemy.stats.resistance = 0;
     const engine = new BattleEngine([setup.player], [setup.enemy], { rng: () => 0 }); const enemy = engine.getUnits()[1];
-    enemy.immuneTurns = 2; enemy.effects.push({ stat: "atk", amount: .3, remainingTurns: 2, kind: "BUFF" });
+    const giveBuff = () => enemy.effects.push({ stat: "atk", amount: .3, remainingTurns: 2, kind: "BUFF", order: nextApplyOrder() });
+    if (immuneFirst) { enemy.immuneTurns = 2; giveBuff(); } else { giveBuff(); enemy.immuneTurns = 2; }
     engine.resolveTurn(engine.getNextActor()!, { skillIndex: 0, targetId: "E1" });
-    expect(enemy.immuneTurns).toBe(0); expect(enemy.effects.filter((effect) => effect.kind === "BUFF")).toHaveLength(1);
+    expect(enemy.immuneTurns > 0).toBe(!immuneFirst);
+    expect(enemy.effects.filter((effect) => effect.kind === "BUFF")).toHaveLength(immuneFirst ? 1 : 0);
   });
 });

@@ -127,6 +127,16 @@ export const TRIAL_TOWER_HARD_BOSS_STATS: Readonly<Record<number, { hp: number; 
  */
 export const TRIAL_TOWER_HARD_MINION_HP_OF_BOSS = 0.5;
 
+/**
+ * HARD 80階「古代聖竜」の免疫の固め方(2026-09-27、依頼主の案)。
+ *
+ * 80階は依頼主の5体だと敵が1戦で9回ほどしか動けず(味方は59回)、硬くしても負けなかった。
+ * 聖竜の免疫(戦闘開始時・HP70%・40%)を張る時、**先に攻撃UP・防御UPを張ってから免疫**にする。
+ * 解除は付いた順に外れるので、1個ずつ剥がす相手なら免疫に届くまで3回かかる。
+ * 免疫が付いている間は80階の敵全員の速度が30%上がる(剥がせば戻る)。
+ */
+export const TRIAL_TOWER_HARD_80_IMMUNITY_GUARD = { buffs: ["atk", "def"] as const, spdWhileImmune: 0.3 };
+
 /** 戦闘用に完成したNORMAL敵定義の複製だけを倍率化する。ボス階の主(`isBoss`)にはHARDのボス特性も付ける。 */
 export function scaleTrialTowerHardEnemies(enemies: MonsterDefinition[], floor: number): MonsterDefinition[] {
   const scaled = scaleByMultipliers(enemies, floor);
@@ -152,6 +162,7 @@ function scaleByMultipliers(enemies: MonsterDefinition[], floor: number): Monste
         ...TRIAL_TOWER_HARD_BOSS_TRAITS,
         stunHaste: { ...TRIAL_TOWER_HARD_BOSS_TRAITS.stunHaste },
         ...(TRIAL_TOWER_HARD_BOSS_INTERRUPTS[floor] ? { interrupt: TRIAL_TOWER_HARD_BOSS_INTERRUPTS[floor] } : {}),
+        ...(floor === 80 ? { immunityGuard: TRIAL_TOWER_HARD_80_IMMUNITY_GUARD } : {}),
       },
     } : {}),
     stats: {

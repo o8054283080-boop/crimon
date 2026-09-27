@@ -63,7 +63,7 @@ describe('新4種の登録と個別成長',()=>{
 describe('呪いの戦闘処理',()=>{
   it('攻撃力を付与時に記録し、対象の2回目の手番で個別に発動する',()=>{
     const {engine,a,b,act}=battle('joker');act(0);
-    expect(b.curses).toEqual([{attack:100,turns:2,sourceId:a.instanceId}]);
+    expect(b.curses).toEqual([{attack:100,turns:2,sourceId:a.instanceId,order:expect.any(Number)}]);
     a.effects.push({kind:'BUFF',stat:'atk',amount:2,remainingTurns:9});
     b.gauge=100;engine.resolveTurn(b,{skillIndex:0,targetId:a.instanceId});
     expect(b.curses?.[0].turns).toBe(1);
