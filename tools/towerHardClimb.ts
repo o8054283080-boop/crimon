@@ -195,6 +195,36 @@ function anchorAt(floor: number): Quad {
   const mix = (k: keyof Quad) => lo.stats[k] + (hi.stats[k] - lo.stats[k]) * t;
   return { hp: mix("hp"), atk: mix("atk"), def: mix("def"), spd: mix("spd") };
 }
+/**
+ * 普通の階を「均した案」にする(`CLIMB_CURVE=smooth`)。ボス階は触らない。
+ * 攻撃は階の平均を下のアンカーの間で補間、防御は51階から上だけアンカーへ、HPは本番のまま。
+ * 速度は `CLIMB_SPD_MUL=1.1` で本番の値へ掛ける。敵どうしの差は残す。
+ */
+const SMOOTH_ATK: [number, number][] = [[1, 25_000], [19, 30_000], [39, 40_000], [49, 60_000], [59, 90_000], [69, 95_000], [79, 100_000], [89, 110_000], [99, 120_000]];
+const SMOOTH_DEF: [number, number][] = [[51, 1_500], [99, 2_000]];
+const SPD_MUL = Number(process.env.CLIMB_SPD_MUL ?? "1");
+function lerpAnchors(points: [number, number][], floor: number): number {
+  if (floor <= points[0][0]) return points[0][1];
+  const upper = points.findIndex(([f]) => floor <= f);
+  if (upper < 0) return points[points.length - 1][1];
+  const [f0, v0] = points[upper - 1], [f1, v1] = points[upper];
+  return v0 + (v1 - v0) * (floor - f0) / (f1 - f0);
+}
+function applySmoothCurve(enemies: { stats: Quad & Record<string, unknown> }[], floor: number): void {
+  if (floor % 10 === 0) return;
+  if (CURVE === "smooth") {
+    const mean = (k: keyof Quad) => enemies.reduce((a, e) => a + e.stats[k], 0) / enemies.length;
+    const atkMean = mean("atk"), defMean = mean("def");
+    const atkTarget = lerpAnchors(SMOOTH_ATK, floor);
+    const defTarget = floor >= 51 ? lerpAnchors(SMOOTH_DEF, floor) : defMean;
+    for (const e of enemies) {
+      e.stats.atk = Math.max(1, Math.round(atkTarget * e.stats.atk / atkMean));
+      e.stats.def = Math.max(1, Math.round(defTarget * e.stats.def / defMean));
+    }
+  }
+  if (SPD_MUL !== 1) for (const e of enemies) e.stats.spd = Math.max(1, Math.round(e.stats.spd * SPD_MUL));
+}
+
 function applyAbsoluteCurve(enemies: { stats: Quad & Record<string, unknown> }[], floor: number): void {
   if (CURVE !== "absolute" || floor % 10 === 0) return;
   if (CURVE_FLOORS && (floor < CURVE_FLOORS[0] || floor > CURVE_FLOORS[1])) return;
@@ -332,6 +362,7 @@ function climb(seed: number): ClimbResult {
       if (setup.standingMembers[i].hp < 0) setup.initialPlayerHp[i] = s.hp;
     });
     applyAbsoluteCurve(setup.enemyDefs as never, setup.floor.floor);
+    applySmoothCurve(setup.enemyDefs as never, setup.floor.floor);
     const hpScale = hpScaleAt(setup.floor.floor);
     if (hpScale !== 1) for (const e of setup.enemyDefs) e.stats = { ...e.stats, hp: Math.round(e.stats.hp * hpScale) };
     const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, {
@@ -379,7 +410,7 @@ for (let i = 0; i < CLIMBS; i += 1) results.push(climb(SEED + i * 7919));
 const reached = results.map((r) => r.reached).sort((a, b) => a - b);
 console.log(`編成: ${TEAM_NAME} (${TEAM.map((m) => m.dexId).join(", ")})`);
 console.log(`登坂 ${CLIMBS}回 / 負けたら節からやり直し ${RETRIES}回まで / 切り分け: ${[...ABLATE].join(",") || "なし"} / 曲線: ${CURVE}${process.env.CLIMB_ANCHOR ? ` (${process.env.CLIMB_ANCHOR})` : ""}`
-  + ` / 敵HP×${ENEMY_HP}${HP_FLOORS ? `(${HP_FLOORS.join("〜")}階の通常階)` : ""} / 特性: ${[...BOSS_TRAITS].join(",") || "なし"}${BOSS_TRAITS.size ? `(${TRAIT_SCOPE})` : ""}`);
+  + `${SPD_MUL !== 1 ? ` / 通常階の速度×${SPD_MUL}` : ""} / 敵HP×${ENEMY_HP}${HP_FLOORS ? `(${HP_FLOORS.join("〜")}階の通常階)` : ""} / 特性: ${[...BOSS_TRAITS].join(",") || "なし"}${BOSS_TRAITS.size ? `(${TRAIT_SCOPE})` : ""}`);
 if (BOSS_TRAITS.size) console.log(`特性の発動: 気絶で加速 ${traitHits.stunHaste}回 / ゲージ減少を半分 ${traitHits.gaugeHalved}回`);
 console.log(`負け: 合計 ${results.reduce((a, r) => a + r.losses, 0)} / 1回の登坂あたり ${(results.reduce((a, r) => a + r.losses, 0) / CLIMBS).toFixed(1)}`);
 console.log(`到達階: 最低 ${reached[0]} / 中央 ${reached[Math.floor(reached.length / 2)]} / 最高 ${reached.at(-1)} / 100階踏破 ${reached.filter((f) => f >= 100).length}/${CLIMBS}`);
