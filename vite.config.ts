@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+import { configDefaults } from "vitest/config";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -13,6 +15,19 @@ const buildId = new Date().toISOString().slice(0, 16).replace("T", " ");
 
 export default defineConfig({
   base: basePath,
+  test: {
+    /*
+     * **難易度の目安(勝率・比)は `tests/balance/` に置き、既定のテストとCIの合否には入れない。**
+     *
+     * スキルを1つ調整するたびに「汎用の勝率12〜30%」「号令塔が3割残る」のような目安が割れ、
+     * そのたびに敵の数値を探し直してCIを直していた(依頼主「きりなくないですか？」)。
+     * **スキル強化で勝率が上がるのは良い**(依頼主の指定)。そのたびに難易度を上げない。
+     * 目安は `npm run balance` で測って参考にするだけで、直すかどうかは依頼主が決める。
+     * **崩れてはいけない約束**(1-1は初期編成で必ず勝てる、癒やしの階以外に回復役を置かない、
+     * 通常編成でも塔の20階あたりまで届く など)は、これまでどおり既定のテストに残す。
+     */
+    exclude: process.env.CRIMON_BALANCE ? configDefaults.exclude : [...configDefaults.exclude, "tests/balance/**"],
+  },
   define: {
     __BUILD_ID__: JSON.stringify(buildId),
   },

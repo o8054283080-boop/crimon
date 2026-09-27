@@ -24,7 +24,7 @@
 | スタミナ | `src/core/fighterLevel.ts`（全階10） |
 | 育成上限 | `src/core/rarity.ts`（★6 Lv60）、`src/core/monsterInstance.ts` |
 | 能力ポイント/タイプ/潜在 | `src/core/monsterDevelopment.ts`、`src/game/monsterDevelopment.ts` |
-| 難易度回帰 | `tests/equipmentDungeonBalance.test.ts`、`tests/speedBudget.test.ts` |
+| 難易度回帰 | `tests/balance/equipmentDungeonBalance.test.ts`、`tests/speedBudget.test.ts` |
 
 装備ダンジョンは**1種類**（固有IDフィールドなし。識別子は階層番号、画面名「装備ダンジョン」）、目的は装備収集。全10階、各階**1 Wave・3体（古代の魔人ボス+お供2）**、前階クリアによるロック処理はなく、専用パーティ最大5体で挑戦する。全階スタミナ10、推奨戦力という数値はない。初回は各階ダイヤ200、再戦は3%で50、経験値20×階、ゴールド60×階、装備1個確定、召喚の書5%、転生ピッグ10%（1～6階★2、7～10階★3）。Wave途中報酬や中ボスはない。
 

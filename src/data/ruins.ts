@@ -107,7 +107,7 @@ const SHARED_STATS: Record<1 | 2 | 3, { boss: Quad; a: Quad; b: Quad }> = {
  *     回復役と支援役だけが残って300手の時間切れになる戦いを、どちらかへ決着させる。
  *     回復阻害で膠着を崩す形は、回復を選んだ編成だけへの税になった(回復+毒の本体狙いが 94→73%)ので取りやめた
  *
- * 数字は `tests/ruinPowerRoles.test.ts` の頭と、報告の表を参照。
+ * 数字は `tests/balance/ruinPowerRoles.test.ts` の頭と、報告の表を参照。
  * 測り方: `npx tsx tools/ruinPressure.ts --teams 力・ --floors 4,5 --gear TYPICAL,STRONG,FINISHED --aim 既定,本体,号令塔,妨害塔 --seeds 700,424242`
  */
 const POWER_STATS: Record<number, { boss: Quad; a: Quad; b: Quad }> = {
@@ -117,7 +117,7 @@ const POWER_STATS: Record<number, { boss: Quad; a: Quad; b: Quad }> = {
    * 5階は2026-10のスキル調整の後に測り直した。味方が強くなり、汎用が 既定77% まで上がって
    * 「号令塔を倒すか残すか」の差も消えていた。旧値(指揮兵器 216,750/31,573、号令塔 47,250/5,400、
    * 妨害塔 57,600/7,800)から HP を 1.8 / 1.15 / 1.3倍、攻撃を一律1.33倍にし、護りの張り直しを CT3 にした
-   * (`HERALD_GUARD_COOLDOWN`)。`tests/ruinPowerRoles.test.ts` の比がすべて戻る組を格子で探して決めた。
+   * (`HERALD_GUARD_COOLDOWN`)。`tests/balance/ruinPowerRoles.test.ts` の比がすべて戻る組を格子で探して決めた。
    * ふいうちの牙(水ウルフ)のLv5をCT2にした時(2026-09-26)、号令塔の生き残りが3割を切ったので、
    * 号令塔のHPを 54,338→57,055、撃破時強化の攻撃を 1,000→500 にした
    */

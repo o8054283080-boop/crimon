@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BattleEngine } from "../src/battle/engine.js";
-import { EquipStar, generateEquipment, SetType } from "../src/core/equipment.js";
-import { createMonsterInstance } from "../src/core/monsterInstance.js";
-import { Star } from "../src/core/rarity.js";
-import { STAGES } from "../src/data/stages.js";
-import { extractSurvivors, setupWaveBattle } from "../src/game/stageRunner.js";
+import { BattleEngine } from "../../src/battle/engine.js";
+import { EquipStar, generateEquipment, SetType } from "../../src/core/equipment.js";
+import { createMonsterInstance } from "../../src/core/monsterInstance.js";
+import { Star } from "../../src/core/rarity.js";
+import { STAGES } from "../../src/data/stages.js";
+import { extractSurvivors, setupWaveBattle } from "../../src/game/stageRunner.js";
 
 function mulberry32(seed: number): () => number {
   let a = seed;
