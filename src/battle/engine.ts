@@ -1148,6 +1148,32 @@ export class BattleEngine {
     if (message) this.push(`  → ${message}`);
   }
 
+  /**
+   * **相手の手で**行動ゲージを減らす。減らした割合(0〜1)を返す。
+   * 減少・吸収・奪取は必ずここを通す。ボス特性 `gaugeResist` がここで効く。
+   */
+  private loseGauge(target: BattleUnit, ratio: number): number {
+    if (ratio <= 0) return 0;
+    const resist = target.def.bossTraits?.gaugeResist ?? 0;
+    const before = target.gauge;
+    target.gauge = Math.max(0, target.gauge - ratio * (1 - resist) * ATB_THRESHOLD);
+    return (before - target.gauge) / ATB_THRESHOLD;
+  }
+
+  /**
+   * 気絶させる。気絶は必ずここを通す。
+   * 新しく気絶した時(0 → 正)だけ、ボス特性 `stunHaste` の速度強化が起きる。
+   */
+  private stun(target: BattleUnit, turns: number): void {
+    const wasStunned = target.stunTurns > 0;
+    target.stunTurns = Math.max(target.stunTurns, turns);
+    const haste = target.def.bossTraits?.stunHaste;
+    if (haste && !wasStunned && target.stunTurns > 0 && target.alive) {
+      applyStatEffect(target, "spd", haste.spd, haste.turns, "BUFF");
+      this.push(`  → ${this.label(target)} は気絶の反動で速度が上がった！`);
+    }
+  }
+
   private trialBoss(): BattleUnit | undefined {
     return this.units.find((u) => u.team === "ENEMY" && u.def.victoryTarget);
   }
@@ -1650,7 +1676,7 @@ export class BattleEngine {
         const applied = this.applyIncomingDamage(target, result.damage, boss, "reflect");
         this.push(`  → ${this.label(target)} に ${applied.hpDamage} ダメージ！ (残りHP ${target.currentHp}/${target.maxHp})`);
         this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: applied.hpDamage, isCrit: result.isCrit });
-        target.gauge = Math.max(0, target.gauge - TOWER70_ROAR_GAUGE_DOWN * ATB_THRESHOLD);
+        this.loseGauge(target, TOWER70_ROAR_GAUGE_DOWN);
         // 咆哮はもともと重ねがけしない作りだった。いまは全体の共通処理と同じ道を通る
         if (target.alive) {
           applyStatEffect(target, "def", -TOWER70_ROAR_DEF_DOWN, TOWER70_ROAR_DEF_DOWN_TURNS, "DEBUFF");
@@ -1930,7 +1956,7 @@ export class BattleEngine {
       if (removed > 0) this.push(`  → ${this.label(unit)} は自身の弱体効果をすべて解除した！`);
       if (tower70BossS3AboveHalf) {
         for (const enemy of this.units.filter((candidate) => candidate.team === "PLAYER" && candidate.alive)) {
-          enemy.gauge = Math.max(0, enemy.gauge - 0.2 * ATB_THRESHOLD);
+          this.loseGauge(enemy, 0.2);
         }
         this.push("  → 天地崩壊で味方全体の行動ゲージが20%後退した！");
       }
@@ -2012,7 +2038,7 @@ export class BattleEngine {
           this.push(`  → ${this.label(source)} の「時の管理者」で行動ゲージを吸収した！ (対象: ${this.label(affected)})`);
         }
         if (!this.isImmune(affected) && this.rollEffectSuccess(source, affected, passive.stunChance)) {
-          affected.stunTurns = Math.max(affected.stunTurns, 1);
+          this.stun(affected, 1);
           this.push(`  → ${this.label(affected)} はスタンした！`);
         }
       }
@@ -2031,7 +2057,7 @@ export class BattleEngine {
           this.push(`  → ${this.label(primary)} の強化が1つ解除された！`);
         }
         if (this.rollEffectSuccess(source, primary, passive.stunChance)) {
-          primary.stunTurns = Math.max(primary.stunTurns, 1);
+          this.stun(primary, 1);
           this.push(`  → ${this.label(primary)} は気絶した！ (1ターン)`);
         }
       }
@@ -2063,7 +2089,7 @@ export class BattleEngine {
               this.push(`  → ${this.label(other)} の強化が1つ解除された！`);
             }
             if (this.rollEffectSuccess(source, other, passive.stunChance)) {
-              other.stunTurns = Math.max(other.stunTurns, 1);
+              this.stun(other, 1);
               this.push(`  → ${this.label(other)} は気絶した！ (1ターン)`);
             }
           }
@@ -2111,11 +2137,9 @@ export class BattleEngine {
   /** 相手のゲージを減らし、減らした分をそのまま自分へ移す */
   private drainGauge(source: BattleUnit, target: BattleUnit, ratio: number): number {
     if (!target.alive || ratio <= 0) return 0;
-    const before = target.gauge;
-    target.gauge = Math.max(0, target.gauge - ratio * ATB_THRESHOLD);
-    const stolen = before - target.gauge;
-    source.gauge = Math.max(0, Math.min(ATB_THRESHOLD, source.gauge + stolen));
-    return stolen / ATB_THRESHOLD;
+    const stolen = this.loseGauge(target, ratio);
+    source.gauge = Math.max(0, Math.min(ATB_THRESHOLD, source.gauge + stolen * ATB_THRESHOLD));
+    return stolen;
   }
 
   /**
@@ -2339,7 +2363,7 @@ export class BattleEngine {
       } else if (effect.kind === "STRIP") {
         if (receiver.alive && this.rollEffectSuccess(source, receiver, effect.chance) && stripBuffs(receiver, effect.count)) announce();
       } else if (effect.kind === "GAUGE_DOWN") {
-        if (receiver.alive && this.rng() < effect.chance) { receiver.gauge = Math.max(0, receiver.gauge - effect.value * ATB_THRESHOLD); announce(); }
+        if (receiver.alive && this.rng() < effect.chance) { this.loseGauge(receiver, effect.value); announce(); }
       } else if (effect.kind === "DEBUFF") {
         if (!receiver.alive || this.isImmune(receiver) || !this.rollEffectSuccess(source, receiver, effect.chance)) continue;
         if (effect.status === "HEAL_BLOCK") { receiver.healBlockTurns = Math.max(receiver.healBlockTurns, effect.duration); receiver.healBlockMultiplier = 0; }
@@ -2348,7 +2372,7 @@ export class BattleEngine {
         else if (effect.status === "ATK_DOWN") applyStatEffect(receiver, "atk", -ATK_DOWN, effect.duration, "DEBUFF");
         else if (effect.status === "DEF_DOWN") applyStatEffect(receiver, "def", -DEF_DOWN, effect.duration, "DEBUFF");
         else if (effect.status === "POISON") { receiver.poisonStacks = Math.min(5, receiver.poisonStacks + 1); receiver.poisonTurns = Math.max(receiver.poisonTurns, effect.duration); receiver.poisonDamageRate = effect.value ?? .05; }
-        else if (effect.status === "STUN") receiver.stunTurns = Math.max(receiver.stunTurns, effect.duration);
+        else if (effect.status === "STUN") this.stun(receiver, effect.duration);
         else applyStatus(receiver, "BUFF_BLOCK", effect.duration, source.instanceId);
         announce();
       } else if (effect.kind === "ALLY_GAUGE_UP") {
@@ -2392,7 +2416,7 @@ export class BattleEngine {
         return;
       }
       case "TURN_METER_DOWN":
-        if (receiver.alive && proc()) { receiver.gauge = Math.max(0, receiver.gauge - latent.value * ATB_THRESHOLD); announce(); }
+        if (receiver.alive && proc()) { this.loseGauge(receiver, latent.value); announce(); }
         return;
       case "SELF_HEAL": case "ALLY_SUPPORT": {
         if (latent.resolution === "ON_CRIT" && !anyCrit) return;
@@ -2602,7 +2626,7 @@ export class BattleEngine {
           const removed = stripBuffs(target);
           if (!this.isImmune(target)) {
             for (let i = 0; i < removed; i++) this.addCurse(source, target);
-            if (removed > 0) target.stunTurns = Math.max(target.stunTurns, 1);
+            if (removed > 0) this.stun(target, 1);
           }
           break;
         }
@@ -2897,7 +2921,7 @@ export class BattleEngine {
             resolution.stunFailed = true;
             break;
           }
-          target.stunTurns = Math.max(target.stunTurns, effect.durationTurns);
+          this.stun(target, effect.durationTurns);
           resolution.debuffApplied = true;
           resolution.applied.add("STUN");
           this.push(`  → ${this.label(target)} はスタンした！`);
@@ -2940,10 +2964,9 @@ export class BattleEngine {
               this.push(`  → ${this.label(source)} が ${this.label(receiver)} の行動ゲージを吸収した！`);
               continue;
             }
-            const before = receiver.gauge;
-            receiver.gauge = Math.max(0, Math.min(ATB_THRESHOLD, receiver.gauge + amount * ATB_THRESHOLD));
+            if (amount >= 0) receiver.gauge = Math.min(ATB_THRESHOLD, receiver.gauge + amount * ATB_THRESHOLD);
             if (amount < 0) {
-              const removed = (before - receiver.gauge) / ATB_THRESHOLD;
+              const removed = this.loseGauge(receiver, -amount);
               resolution.gaugeRemoved += removed;
               /*
                * 奪取。**減らした分の一部を術者が受け取る。**
@@ -3218,7 +3241,7 @@ export class BattleEngine {
         this.gainGauge(source, mods.selfGaugeOnDebuff, `${this.label(source)} の行動ゲージが進んだ！ (追圧)`);
       }
       if (mods.targetGaugeOnDebuff) {
-        target.gauge = Math.max(0, target.gauge - mods.targetGaugeOnDebuff * ATB_THRESHOLD);
+        this.loseGauge(target, mods.targetGaugeOnDebuff);
         this.push(`  → ${this.label(target)} の行動ゲージが後退した！ (ゲージ抑制)`);
       }
       /*
@@ -3240,9 +3263,8 @@ export class BattleEngine {
      * 減らす量と得る量が同じなので、盤面全体の手番の総量は変わらない。
      */
     if (mods?.gaugeSteal && damageDealtThisCall > 0 && target.alive && this.rng() < mods.gaugeSteal.chance) {
-      const moved = Math.min(target.gauge, mods.gaugeSteal.value * ATB_THRESHOLD);
-      target.gauge -= moved;
-      this.gainGauge(source, moved / ATB_THRESHOLD);
+      const moved = this.loseGauge(target, mods.gaugeSteal.value);
+      this.gainGauge(source, moved);
       this.push(`  → ${this.label(source)} が ${this.label(target)} の行動ゲージを奪った！`);
     }
 
@@ -3267,7 +3289,7 @@ export class BattleEngine {
       this.push(`  → ${this.label(target)} の呪いが発動！ ${hit.hpDamage}ダメージ`);
       this.pushEvent({ targetId: target.instanceId, kind: "DAMAGE", amount: hit.hpDamage });
       if (hit.died) { this.onKill(source); this.pushEvent({ targetId: target.instanceId, kind: "DEATH" }); if (this.resolution) this.resolution.kills++; }
-      if (target.alive && !this.isImmune(target) && source && this.rollEffectSuccess(source, target, 1)) target.stunTurns = Math.max(target.stunTurns, 1);
+      if (target.alive && !this.isImmune(target) && source && this.rollEffectSuccess(source, target, 1)) this.stun(target, 1);
     }
   }
 

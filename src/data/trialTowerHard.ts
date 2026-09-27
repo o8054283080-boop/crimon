@@ -56,16 +56,43 @@ export function trialTowerHardMultipliers(floor: number): TrialTowerHardMultipli
     97: M(2.7, 1, 12, 1.20), 98: M(2, 1, 8, 1.20),
     99: M(2, 1, 8, 1.20), 100: M(1.6, 1.15, 1.5, 1.22),
   };
-  const value = fixed[Math.max(40, Math.min(100, Math.round(floor)))];
+  const at = Math.max(40, Math.min(100, Math.round(floor)));
+  const value = fixed[at];
   if (!value) throw new Error(`試練の塔HARD ${floor}階の倍率がありません`);
-  return value;
+  return isUpperNormalFloor(at) ? { ...value, hp: value.hp * TRIAL_TOWER_HARD_UPPER_HP_BOOST } : value;
 }
 
-/** 戦闘用に完成したNORMAL敵定義の複製だけを倍率化する。 */
+/**
+ * 51〜99階の**通常階**だけ、敵のHPを上の表からさらに1.2倍にする(2026-09-27)。
+ *
+ * 上位の5体(依頼主の実際の育成)が1回の登頂で4〜5回しか負けず、楽に100階へ届いていた。
+ * 依頼主の目標は「1回の登頂で10回くらい負ける」。ボス特性(下)と合わせて
+ * `tools/towerHardClimb.ts` で 8.7回 / 10.2回(種を変えて2通り)。
+ * 1.3倍で12〜13回、1.5倍で15回。表の値を1つずつ書き換えず掛け算で持つのは、
+ * **元の表がPR #431 の検証と対になっている**ので、どこから動かしたかを残すため。
+ */
+export const TRIAL_TOWER_HARD_UPPER_HP_BOOST = 1.2;
+const isUpperNormalFloor = (floor: number): boolean => floor >= 51 && floor <= 99 && floor % 10 !== 0;
+
+/**
+ * HARDの**ボス階の主**にだけ付ける特性。
+ *
+ * 気絶とゲージ操作で主に一度も手番を渡さない戦い方が、HARDの山場を平らにしていた。
+ * 効き目は消さずに**半分**にし、気絶させた後に速くなる。止めたらその後をどう受けるかを問う。
+ * **取り巻きと通常階には付けない。**全ての敵へ付けると、ゲージ操作という戦い方そのものが潰れる
+ * (実測: 上位の5体が1回の登頂で61回負け、20回とも100階に届かなかった)。
+ */
+export const TRIAL_TOWER_HARD_BOSS_TRAITS = {
+  stunHaste: { spd: 0.5, turns: 3 },
+  gaugeResist: 0.5,
+} as const;
+
+/** 戦闘用に完成したNORMAL敵定義の複製だけを倍率化する。ボス階の主(`isBoss`)にはHARDのボス特性も付ける。 */
 export function scaleTrialTowerHardEnemies(enemies: MonsterDefinition[], floor: number): MonsterDefinition[] {
   const scale = trialTowerHardMultipliers(floor);
   return enemies.map((enemy) => ({
     ...enemy,
+    ...(enemy.isBoss ? { bossTraits: { ...enemy.bossTraits, ...TRIAL_TOWER_HARD_BOSS_TRAITS, stunHaste: { ...TRIAL_TOWER_HARD_BOSS_TRAITS.stunHaste } } } : {}),
     stats: {
       ...enemy.stats,
       hp: Math.max(1, Math.round(enemy.stats.hp * scale.hp)),

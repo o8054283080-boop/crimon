@@ -212,6 +212,12 @@ function applyAbsoluteCurve(enemies: { stats: Quad & Record<string, unknown> }[]
  *   CLIMB_TRAIT_SCOPE=boss|all  … 特性を付ける相手(既定はボス階のボスだけ)
  */
 const ENEMY_HP = Number(process.env.CLIMB_ENEMY_HP ?? "1");
+/** `CLIMB_HP_FLOORS=51-99` で、敵HPの倍率を**その範囲の通常階だけ**へ絞る(ボス階には掛けない) */
+const HP_FLOORS = process.env.CLIMB_HP_FLOORS?.split("-").map(Number);
+const hpScaleAt = (floor: number): number => {
+  if (!HP_FLOORS) return ENEMY_HP;
+  return floor >= HP_FLOORS[0] && floor <= HP_FLOORS[1] && floor % 10 !== 0 ? ENEMY_HP : 1;
+};
 const BOSS_TRAITS = new Set((process.env.CLIMB_BOSS_TRAITS ?? "").split(",").filter(Boolean));
 const TRAIT_SCOPE = process.env.CLIMB_TRAIT_SCOPE ?? "boss";
 const STUN_HASTE = { amount: 0.5, turns: 3 };
@@ -318,7 +324,8 @@ function climb(seed: number): ClimbResult {
       if (setup.standingMembers[i].hp < 0) setup.initialPlayerHp[i] = s.hp;
     });
     applyAbsoluteCurve(setup.enemyDefs as never, setup.floor.floor);
-    if (ENEMY_HP !== 1) for (const e of setup.enemyDefs) e.stats = { ...e.stats, hp: Math.round(e.stats.hp * ENEMY_HP) };
+    const hpScale = hpScaleAt(setup.floor.floor);
+    if (hpScale !== 1) for (const e of setup.enemyDefs) e.stats = { ...e.stats, hp: Math.round(e.stats.hp * hpScale) };
     const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, {
       rng,
       initialPlayerHp: setup.initialPlayerHp,
@@ -359,7 +366,7 @@ for (let i = 0; i < CLIMBS; i += 1) results.push(climb(SEED + i * 7919));
 const reached = results.map((r) => r.reached).sort((a, b) => a - b);
 console.log(`編成: ${TEAM_NAME} (${TEAM.map((m) => m.dexId).join(", ")})`);
 console.log(`登坂 ${CLIMBS}回 / 負けたら節からやり直し ${RETRIES}回まで / 切り分け: ${[...ABLATE].join(",") || "なし"} / 曲線: ${CURVE}${process.env.CLIMB_ANCHOR ? ` (${process.env.CLIMB_ANCHOR})` : ""}`
-  + ` / 敵HP×${ENEMY_HP} / 特性: ${[...BOSS_TRAITS].join(",") || "なし"}${BOSS_TRAITS.size ? `(${TRAIT_SCOPE})` : ""}`);
+  + ` / 敵HP×${ENEMY_HP}${HP_FLOORS ? `(${HP_FLOORS.join("〜")}階の通常階)` : ""} / 特性: ${[...BOSS_TRAITS].join(",") || "なし"}${BOSS_TRAITS.size ? `(${TRAIT_SCOPE})` : ""}`);
 if (BOSS_TRAITS.size) console.log(`特性の発動: 気絶で加速 ${traitHits.stunHaste}回 / ゲージ減少を半分 ${traitHits.gaugeHalved}回`);
 console.log(`負け: 合計 ${results.reduce((a, r) => a + r.losses, 0)} / 1回の登坂あたり ${(results.reduce((a, r) => a + r.losses, 0) / CLIMBS).toFixed(1)}`);
 console.log(`到達階: 最低 ${reached[0]} / 中央 ${reached[Math.floor(reached.length / 2)]} / 最高 ${reached.at(-1)} / 100階踏破 ${reached.filter((f) => f >= 100).length}/${CLIMBS}`);
