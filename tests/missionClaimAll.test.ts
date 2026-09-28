@@ -132,18 +132,50 @@ describe("画面への配線", () => {
     expect(UI).toContain("受け取れる報酬はありません");
   });
 
-  /** 何が入ったかを言う。**数字だけ動いても、何を受け取ったかは分からない** */
-  it("受け取った中身を画面に出す", () => {
-    expect(UI).toContain("lastClaimResult = missionRewardText(reward)");
-    expect(UI).toContain("regular-missions__claim-result");
+  /*
+   * 何が入ったかを言う。**数字だけ動いても、何を受け取ったかは分からない。**
+   *
+   * 以前は一括受取の時だけボタンの下に1行出していて、1件ずつ受け取った時は何も出さず、
+   * 受け取るたびに一覧が一番上へ戻っていた(依頼主「何を受け取ったかわからない」)。
+   * いまは**どの受け取りでも**、「OK」を押すまで消えないダイアログで中身を並べる。
+   */
+  it("どの受け取りでも、受け取った中身をダイアログで出す", () => {
+    for (const call of [
+      "claimPeriodClear(player, period)",
+      "claimPeriodMission(player, period, mission.id)",
+      "claimCumulativeMission(player, mission.key)",
+      "claimReleaseCampaignMilestone(player, milestone.target)",
+      "claimReleaseCampaignMission(player, mission.id)",
+      "claimCollabMilestone(player, milestone.target)",
+      "claimCollabMission(player, mission.id)",
+      "claimAllAvailableMissionRewards(player)",
+    ]) {
+      expect(UI, call).toMatch(new RegExp(`afterClaim\\(player, [^;]*${call.replace(/[()[\].]/g, "\\$&")}\\)`));
+    }
+    expect(UI).toContain("受け取りました");
   });
 
-  /** 浮かせない。**この案件で3回、浮かせた部品が下のボタンを覆っている** */
-  it("結果は浮かせず、画面の流れの中に置く", () => {
+  /*
+   * ダイアログは `aria-modal` で、**「OK」を押せば必ず閉じる。**
+   * 浮かせた札を「知らせ」に使って下のボタンを覆ったまま残したことが3回あるが、
+   * これは閉じるまでの間だけ覆う確認の場面なので、裏が押せなくて正しい(巡回もこの印で見分ける)。
+   */
+  it("結果のダイアログは aria-modal で、OK で閉じる", () => {
+    expect(UI).toContain('popup.setAttribute("aria-modal", "true")');
+    expect(UI).toContain('button("OK", "regular-missions__claimed-ok", close)');
+  });
+
+  it("受け取った後も一覧の位置を保つ(一番上へ戻さない)", () => {
+    expect(UI).toContain("body.scrollTop = keepScroll");
+  });
+
+  /** 報酬の行とダイアログのクラス名を分ける。同じ名前にして、報酬の行がボタンを覆ったことがある */
+  it("報酬の行(regular-missions__reward)を重ねる指定にしない", () => {
     const css = readFileSync(new URL("../src/web/ui/missions.css", import.meta.url), "utf8");
-    const rule = css.slice(css.indexOf(".regular-missions__claim-result"));
-    const body = rule.slice(0, rule.indexOf("}"));
-    expect(body).not.toContain("position: fixed");
-    expect(body).not.toContain("position: absolute");
+    const rules = css.split("}").filter((rule) => /\.regular-missions__reward\s*[,{]/.test(rule));
+    for (const rule of rules) {
+      expect(rule).not.toContain("position: absolute");
+      expect(rule).not.toContain("position: fixed");
+    }
   });
 });

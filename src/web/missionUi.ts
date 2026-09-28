@@ -21,6 +21,7 @@ import {
   getReleaseCampaignView,
   missionRewardText,
   startMissionObserver,
+  type MissionReward,
 } from "../game/missions.js";
 import { PlayerState } from "../game/playerState.js";
 
@@ -35,13 +36,63 @@ type MissionTab = MissionPeriod | "CAMPAIGN" | "COLLAB" | "CUMULATIVE";
 let activeTab: MissionTab = "DAILY";
 
 /**
- * 直前の一括受取で何が入ったか。
+ * 直前に受け取った報酬。**受け取るたびに、何が入ったかをダイアログで見せる。**
  *
- * **画面の流れの中に置く。**浮かせた札で知らせると下のボタンを覆う
- * (この案件で3回やった事故。CLAUDE.md)。受け取りボタンのすぐ下に1行出し、
- * 次に何か押したら消す。
+ * 以前は一括受取の時だけボタンの下に1行出していて、1件ずつ「受け取る」を押した時は
+ * 何も出さなかった。しかも受け取るたびに画面を作り直して一覧が一番上へ巻き戻るので、
+ * 「押したら何かが減った/増えた気がするが、何を受け取ったか分からない」状態だった(依頼主の指摘)。
+ *
+ * 出すのは `aria-modal` 付きのダイアログで、「OK」で閉じる。**裏の一覧を覆うのは閉じるまでの間だけ**で、
+ * 閉じれば元の位置のまま一覧に戻る(巡回もこの印で「いま裏が押せないのは正しい」と見分ける)。
  */
-let lastClaimResult: string | null = null;
+let lastClaim: { title: string; items: string[] } | null = null;
+/** 作り直す前の一覧の位置。受け取った後も同じ場所に戻す */
+let lastRenderedTab: MissionTab | null = null;
+
+function rewardItems(reward: MissionReward): string[] {
+  return missionRewardText(reward).split(" / ").filter((text) => text && text !== "報酬なし");
+}
+
+function afterClaim(player: PlayerState, title: string, reward: MissionReward | null): void {
+  if (reward) {
+    refreshMissionRewardResourceDisplay(player);
+    lastClaim = { title, items: rewardItems(reward) };
+  }
+  renderModal(player);
+}
+
+function renderClaimResult(): HTMLElement | null {
+  if (!lastClaim) return null;
+  const popup = document.createElement("div");
+  popup.className = "regular-missions__claimed";
+  popup.setAttribute("role", "dialog");
+  popup.setAttribute("aria-modal", "true");
+  popup.setAttribute("aria-label", "受け取った報酬");
+  popup.dataset.tour = "mission-claim-result";
+  const close = () => { lastClaim = null; popup.remove(); };
+  const scrim = document.createElement("button");
+  scrim.type = "button";
+  scrim.className = "regular-missions__claimed-scrim";
+  scrim.setAttribute("aria-label", "閉じる");
+  scrim.addEventListener("click", close);
+  const card = document.createElement("section");
+  card.className = "regular-missions__claimed-card";
+  const heading = document.createElement("h3");
+  heading.textContent = "受け取りました";
+  const title = document.createElement("p");
+  title.className = "regular-missions__claimed-title";
+  title.textContent = lastClaim.title;
+  const list = document.createElement("ul");
+  list.className = "regular-missions__claimed-list";
+  for (const item of lastClaim.items.length ? lastClaim.items : ["(報酬はありませんでした)"]) {
+    const row = document.createElement("li");
+    row.textContent = item;
+    list.append(row);
+  }
+  card.append(heading, title, list, button("OK", "regular-missions__claimed-ok", close));
+  popup.append(scrim, card);
+  return popup;
+}
 
 function button(label: string, className: string, onClick: () => void, disabled = false): HTMLButtonElement {
   const element = document.createElement("button");
@@ -120,9 +171,7 @@ function renderPeriodCard(player: PlayerState, period: MissionPeriod, group: Per
     group.clearClaimed ? "受取済み" : group.canClaimClear ? "クリア報酬を受け取る" : `あと${Math.max(0, group.requiredCount - group.completedCount)}個達成`,
     "regular-missions__claim regular-missions__claim--clear",
     () => {
-      const reward = claimPeriodClear(player, period);
-      if (reward) refreshMissionRewardResourceDisplay(player);
-      renderModal(player);
+      afterClaim(player, `${PERIOD_LABELS[period]} クリア報酬`, claimPeriodClear(player, period));
     },
     group.clearClaimed || !group.canClaimClear,
   );
@@ -147,9 +196,7 @@ function renderPeriodCard(player: PlayerState, period: MissionPeriod, group: Per
       mission.claimed ? "受取済み" : mission.complete ? "受け取る" : "未達成",
       "regular-missions__claim",
       () => {
-        const reward = claimPeriodMission(player, period, mission.id);
-        if (reward) refreshMissionRewardResourceDisplay(player);
-        renderModal(player);
+        afterClaim(player, mission.title, claimPeriodMission(player, period, mission.id));
       },
       mission.claimed || !mission.complete,
     ));
@@ -176,9 +223,7 @@ function renderCumulativeCard(player: PlayerState, mission: CumulativeMissionVie
     mission.complete ? "受け取る" : "未達成",
     "regular-missions__claim",
     () => {
-      const reward = claimCumulativeMission(player, mission.key);
-      if (reward) refreshMissionRewardResourceDisplay(player);
-      renderModal(player);
+      afterClaim(player, mission.title, claimCumulativeMission(player, mission.key));
     },
     !mission.complete,
   ));
@@ -213,9 +258,7 @@ function renderCampaign(player: PlayerState, campaign: ReleaseCampaignView): HTM
       milestone.claimed ? "受取済み" : milestone.complete ? "受け取る" : `${Math.min(campaign.completedCount, milestone.target)} / ${milestone.target}`,
       "regular-missions__claim regular-missions__claim--milestone",
       () => {
-        const reward = claimReleaseCampaignMilestone(player, milestone.target);
-        if (reward) refreshMissionRewardResourceDisplay(player);
-        renderModal(player);
+        afterClaim(player, `${milestone.target}個達成報酬`, claimReleaseCampaignMilestone(player, milestone.target));
       },
       milestone.claimed || !milestone.complete,
     ));
@@ -240,9 +283,7 @@ function renderCampaign(player: PlayerState, campaign: ReleaseCampaignView): HTM
       mission.claimed ? "受取済み" : mission.complete ? "受け取る" : "未達成",
       "regular-missions__claim",
       () => {
-        const reward = claimReleaseCampaignMission(player, mission.id);
-        if (reward) refreshMissionRewardResourceDisplay(player);
-        renderModal(player);
+        afterClaim(player, mission.title, claimReleaseCampaignMission(player, mission.id));
       },
       mission.claimed || !mission.complete,
     ));
@@ -292,9 +333,7 @@ function renderCollabCampaign(player: PlayerState, campaign: CollabCampaignView)
       milestone.claimed ? "受取済み" : milestone.complete ? "受け取る" : `${Math.min(campaign.completedCount, milestone.target)} / ${milestone.target}`,
       "regular-missions__claim regular-missions__claim--milestone",
       () => {
-        const reward = claimCollabMilestone(player, milestone.target);
-        if (reward) refreshMissionRewardResourceDisplay(player);
-        renderModal(player);
+        afterClaim(player, `${milestone.target}個達成報酬`, claimCollabMilestone(player, milestone.target));
       },
       milestone.claimed || !milestone.complete,
     ));
@@ -319,9 +358,7 @@ function renderCollabCampaign(player: PlayerState, campaign: CollabCampaignView)
       mission.claimed ? "受取済み" : mission.complete ? "受け取る" : "未達成",
       "regular-missions__claim",
       () => {
-        const reward = claimCollabMission(player, mission.id);
-        if (reward) refreshMissionRewardResourceDisplay(player);
-        renderModal(player);
+        afterClaim(player, mission.title, claimCollabMission(player, mission.id));
       },
       mission.claimed || !mission.complete,
     ));
@@ -337,6 +374,8 @@ function closeModal(): void {
 }
 
 function renderModal(player: PlayerState): void {
+  // 同じタブを作り直す時は、一覧の位置を保つ(受け取るたびに一番上へ戻っていた)
+  const keepScroll = lastRenderedTab === activeTab ? root?.querySelector<HTMLElement>(".regular-missions__body")?.scrollTop ?? 0 : 0;
   root?.remove();
   root = document.createElement("div");
   root.className = "regular-missions";
@@ -388,7 +427,7 @@ function renderModal(player: PlayerState): void {
   for (const [tab, label] of tabEntries) {
     const tabButton = button(label, `regular-missions__tab${activeTab === tab ? " is-active" : ""}`, () => {
       activeTab = tab;
-      lastClaimResult = null;
+      lastClaim = null;
       renderModal(player);
     });
     tabs.append(tabButton);
@@ -408,20 +447,11 @@ function renderModal(player: PlayerState): void {
     claimable > 0 ? `受け取れる報酬を一括受取（${claimable}件）` : "受け取れる報酬はありません",
     "regular-missions__claim-all",
     () => {
-      const reward = claimAllAvailableMissionRewards(player);
-      refreshMissionRewardResourceDisplay(player);
       // **何が入ったかを言う。**数字だけ動いても、何を受け取ったかは分からない
-      lastClaimResult = missionRewardText(reward) || null;
-      renderModal(player);
+      afterClaim(player, `${claimable}件をまとめて受け取り`, claimAllAvailableMissionRewards(player));
     },
     claimable === 0,
   ));
-  if (lastClaimResult) {
-    const result = document.createElement("p");
-    result.className = "regular-missions__claim-result";
-    result.textContent = `受け取りました：${lastClaimResult}`;
-    actions.append(result);
-  }
 
   const body = document.createElement("main");
   body.className = "regular-missions__body";
@@ -441,7 +471,11 @@ function renderModal(player: PlayerState): void {
 
   panel.append(header, tabs, actions, body);
   root.append(scrim, panel);
+  const claimResult = renderClaimResult();
+  if (claimResult) root.append(claimResult);
   document.body.append(root);
+  body.scrollTop = keepScroll;
+  lastRenderedTab = activeTab;
   document.body.classList.add("regular-missions-open");
 }
 
@@ -463,7 +497,8 @@ function installMissionButtonOverride(): void {
     // 期限のあるものを先に見せる。コラボ → 公開記念 → デイリーの順
     activeTab = getCollabCampaignView(player) ? "COLLAB" : getReleaseCampaignView(player) ? "CAMPAIGN" : "DAILY";
     // 前に開いた時の受け取り結果は持ち越さない
-    lastClaimResult = null;
+    lastClaim = null;
+    lastRenderedTab = null;
     renderModal(player);
   }, true);
 

@@ -273,8 +273,8 @@ import { PwaUpdateController } from "./pwaUpdate.js";
 import { installViewportNavFix } from "./viewportNavFix.js";
 import { ARENA_BATTLE_OPTIONS, ARENA_REROLL_LIMIT } from "../data/pvpArena.js";
 import { buyCrystalShopItem, crystalShopRows } from "../game/crystalShop.js";
-import type { Accessory } from "../core/accessory.js";
-import type { Equipment as CraftedEquipment } from "../core/equipment.js";
+import type { Accessory, AccessoryFamily } from "../core/accessory.js";
+import type { Equipment as CraftedEquipment, SetType } from "../core/equipment.js";
 import { type AbilityPointAllocation, LIMIT_POINT_RESET_COST } from "../core/monsterDevelopment.js";
 import { findRuinFloorByLocationId, ruinLocationId, type RuinFloor, type RuinKind } from "../data/ruins.js";
 import { grantRuinReward, isRuinFloorCleared, isRuinFloorUnlocked, type RuinReward } from "../game/ruins.js";
@@ -283,7 +283,7 @@ import {
   tryEnhanceAccessory, unequipAccessory, findAccessory, EMPTY_ACCESSORY_FILTER, accessoriesOf,
   accessoryOwner, bulkSellAccessories, sellableAccessoryIds, wornAccessoryIds,
 } from "../game/accessories.js";
-import { clampLimitDraft, craftAccessory, craftEquipment, resetLimitPoints, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
+import { canCraft, clampLimitDraft, craftAccessory, craftEquipment, resetLimitPoints, setLimitPoints, unlockLimitBreak } from "../game/ancientCraft.js";
 import { accessorySellPrice, accessoryTitle, describeSpecial, generateAccessory as generateAccessoryForDev } from "../core/accessory.js";
 import { renderRuins } from "./views/ruins.js";
 import { type AccessoriesProps, renderAccessories } from "./views/accessories.js";
@@ -585,6 +585,10 @@ interface AppState {
   craftLastAccessory: Accessory | null;
   craftLastEquipment: CraftedEquipment | null;
   craftNotice: string | null;
+  /** 作った直後の結果ダイアログを開いているか */
+  craftResultOpen: boolean;
+  /** 直前に作ったもの。「同じものをもう1つ」に使う */
+  craftLastChoice: { kind: "ACCESSORY"; family: AccessoryFamily } | { kind: "EQUIPMENT"; set: SetType } | null;
   limitTargetId: string | null;
   limitDraft: AbilityPointAllocation;
   limitNotice: string | null;
@@ -813,6 +817,8 @@ const state: AppState = {
   craftLastAccessory: null,
   craftLastEquipment: null,
   craftNotice: null,
+  craftResultOpen: false,
+  craftLastChoice: null,
   limitTargetId: null,
   limitDraft: { hp: 0, atk: 0, def: 0, spd: 0 },
   limitNotice: null,
@@ -3095,6 +3101,8 @@ function openCraft(): void {
   state.craftNotice = null;
   state.craftLastAccessory = null;
   state.craftLastEquipment = null;
+  state.craftResultOpen = false;
+  state.craftLastChoice = null;
   state.screen = "ANCIENT_CRAFT";
   render();
 }
@@ -4948,33 +4956,46 @@ function renderScreen(): void {
       content = renderAccessories(accessoriesScreenProps());
       break;
 
-    case "ANCIENT_CRAFT":
+    case "ANCIENT_CRAFT": {
+      const craftAccessoryOf = (family: AccessoryFamily) => {
+        const result = craftAccessory(state.player, family);
+        if (!result.ok) { state.craftNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+        savePlayerState(state.player);
+        state.craftLastAccessory = result.item;
+        state.craftLastEquipment = null;
+        state.craftLastChoice = { kind: "ACCESSORY", family };
+        state.craftResultOpen = true;
+        state.craftNotice = "アクセサリーを作りました";
+        render();
+      };
+      const craftEquipmentOf = (set: SetType) => {
+        const result = craftEquipment(state.player, set);
+        if (!result.ok) { state.craftNotice = result.reason; playSfx("denied", 0.7); render(); return; }
+        savePlayerState(state.player);
+        state.craftLastEquipment = result.item;
+        state.craftLastAccessory = null;
+        state.craftLastChoice = { kind: "EQUIPMENT", set };
+        state.craftResultOpen = true;
+        state.craftNotice = "装備を作りました";
+        render();
+      };
+      const again = state.craftLastChoice;
       content = renderAncientCraft({
         player: state.player,
         lastAccessory: state.craftLastAccessory,
         lastEquipment: state.craftLastEquipment,
         notice: state.craftNotice,
-        onCraftAccessory: (family) => {
-          const result = craftAccessory(state.player, family);
-          if (!result.ok) { state.craftNotice = result.reason; playSfx("denied", 0.7); render(); return; }
-          savePlayerState(state.player);
-          state.craftLastAccessory = result.item;
-          state.craftLastEquipment = null;
-          state.craftNotice = "アクセサリーを作りました";
-          render();
-        },
-        onCraftEquipment: (set) => {
-          const result = craftEquipment(state.player, set);
-          if (!result.ok) { state.craftNotice = result.reason; playSfx("denied", 0.7); render(); return; }
-          savePlayerState(state.player);
-          state.craftLastEquipment = result.item;
-          state.craftLastAccessory = null;
-          state.craftNotice = "装備を作りました";
-          render();
-        },
+        resultOpen: state.craftResultOpen,
+        onCloseResult: () => { state.craftResultOpen = false; render(); },
+        onCraftAgain: again && canCraft(state.player)
+          ? () => (again.kind === "ACCESSORY" ? craftAccessoryOf(again.family) : craftEquipmentOf(again.set))
+          : null,
+        onCraftAccessory: craftAccessoryOf,
+        onCraftEquipment: craftEquipmentOf,
         onGoAccessories: () => openAccessories(null),
       });
       break;
+    }
 
     case "ARENA": {
       if (arenaConnectionStatus === "IDLE") void connectArena().then(() => render());
