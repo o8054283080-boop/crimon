@@ -708,7 +708,7 @@ export const BEHEMOTH: MonsterTemplate = {
         // Lv4 ダメージ倍率 0.90倍→0.95倍 / 最大HP比例 13%→14% / 弱体の発動率 80%→85% / 行動ゲージ -35%→-40%
         { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.14 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.85, durationTurns: 2 }, { kind: "GAUGE", amount: -0.4 }] },
         // Lv5 クールタイム -1(5→4ターン) / ダメージ倍率 0.95倍→1.00倍 / 最大HP比例 14%→15% / 弱体の発動率 85%→90% / 弱体の持続 2→3ターン
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1, hpCoefficient: 0.15 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.9, durationTurns: 3 }, { kind: "GAUGE", amount: -0.4 }] },
+        { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 1, hpCoefficient: 0.15 }, { kind: "DEBUFF", stat: "atk", amount: ATK_DOWN, chance: 0.9, durationTurns: 3 }, { kind: "GAUGE", amount: -0.4 }] },
       ],
     },
     {
