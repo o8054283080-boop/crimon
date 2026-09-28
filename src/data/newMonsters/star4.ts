@@ -443,11 +443,11 @@ export const VALKYRIA: MonsterTemplate = {
         { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
         // Lv2 行動ゲージ 20%→25%
         { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
-        // Lv3
-        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
+        // Lv3 攻撃力UPの持続 2→3ターン
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }] },
         // Lv4 行動ゲージ 25%→30%
-        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }] },
-        // Lv5 クールタイム -1(5→4ターン) / 強化の持続 2→3ターン
+        { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }] },
+        // Lv5 クールタイム -1(5→4ターン)
         { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }] },
       ],
     },
@@ -465,14 +465,14 @@ export const VALKYRIA: MonsterTemplate = {
       levelOverrides: [
         // Lv1
         { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
-        // Lv2
-        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
-        // Lv3
-        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
-        // Lv4
-        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
-        // Lv5 持続 1→2ターン
-        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 2 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.05, durationTurns: 2 }] },
+        // Lv2 継続回復 5%→7%
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }, { kind: "REGEN", healRate: 0.07, durationTurns: 2 }] },
+        // Lv3 攻撃力UPの持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.07, durationTurns: 2 }] },
+        // Lv4 継続回復の持続 2→3ターン
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.07, durationTurns: 3 }] },
+        // Lv5 継続回復 7%→10%
+        { cooldownTurns: 3, effects: [{ kind: "STATUS", status: "ENDURE", durationTurns: 1 }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3 }, { kind: "REGEN", healRate: 0.1, durationTurns: 3 }] },
       ],
     },
   ],

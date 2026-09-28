@@ -670,11 +670,11 @@ export const KOBOLD: MonsterTemplate = {
       { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.25 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.2, applyTo: "SELF" }, { kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" }] },
       // Lv2 行動ゲージ 25%→30% / 行動ゲージ 20%→25%
       { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }, { kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" }] },
-      // Lv3
-      { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }, { kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" }] },
+      // Lv3 自身の行動ゲージ 25%→30%
+      { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }, { kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" }] },
       // Lv4 行動ゲージ 30%→35%
-      { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.25, applyTo: "SELF" }, { kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" }] },
-      // Lv5 クールタイム -1(5→4ターン) / 強化の持続 2→3ターン / 行動ゲージ 25%→30%
+      { cooldownTurns: 5, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }, { kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" }] },
+      // Lv5 クールタイム -1(5→4ターン) / 強化の持続 2→3ターン
       { cooldownTurns: 4, effects: [{ kind: "GAUGE", amount: 0.35 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3, applyTo: "ALLIES" }, { kind: "GAUGE", amount: 0.3, applyTo: "SELF" }, { kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" }] },
     ],
   },

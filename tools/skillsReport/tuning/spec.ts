@@ -10,7 +10,7 @@
  * `pending` にして触らない(理由を書く)。
  */
 import {
-  ATK_DOWN, ATK_UP, CRI_DMG_UP, DEF_DOWN, DEF_UP, SPD_DOWN,
+  ATK_DOWN, ATK_UP, CRI_DMG_UP, CRI_RATE_UP, DEF_DOWN, DEF_UP, SPD_DOWN,
 } from "../../../src/core/statusValues.js";
 import { add, patch, rebuild, remove, replace, type Effect, type Series, type SkillSpec } from "./resolve.js";
 
@@ -30,6 +30,8 @@ function c(...values: (number | undefined)[]): Series {
 function only(values: Record<number, number>): Series {
   return [1, 2, 3, 4, 5].map((lv) => values[lv]);
 }
+/** 依頼主の指定(2026-09-28): Lvを上げても何も変わらない段を埋めるため、伸びを後ろの段へ振り分けた */
+const R_FILL = "依頼主の指定(2026-09-28): Lvを上げても何も変わらない段を埋めるため、伸びを後ろの段へ振り分けた(途中の段が少し下がる)";
 /** Lv5 だけ CT を変える */
 const ct5 = (n: number): Series => only({ 5: n });
 /** Lv1〜4 は変更前のまま、Lv5 だけ n */
@@ -89,7 +91,8 @@ export const SPEC: SkillSpec[] = [
   {
     id: "wolf_s2_a",
     structure: [patch(0, { scaleBonus: { stat: "spd", bonusAtReference: 0.10 } })],
-    values: { ct: c(3, 3, 3, 3, 2) },
+    // Lv3 倍率0.55・Lv4 速度比例0.15(依頼主の指定 2026-09-28: 何も変わらない段を埋める)
+    values: { "DAMAGE#0.multiplier": c(0.45, 0.50, 0.55), "DAMAGE#0.scaleBonus.bonusAtReference": c(0.10, 0.10, 0.10, 0.15), ct: c(3, 3, 3, 3, 2) },
     // 変更前は CT2 → Lv5 で CT1(一律成長の -1)。CT1 の2回攻撃は毎手番に近く撃てるので、
     // 初期CTを+1して Lv5 の短縮で CT2 に着地させる(依頼主の指定。Lv5 に CT短縮の段が残る)
     allowWeaker: {
@@ -134,9 +137,10 @@ export const SPEC: SkillSpec[] = [
     id: "wolf_s3_b",
     values: {
       "DAMAGE#0.multiplier": c(0.95, 1.00),
-      "DAMAGE#0.perHit.DEBUFF#0.chance": c(0.25, 0.25, 0.35),
+      "DAMAGE#0.perHit.DEBUFF#0.chance": c(0.25, 0.25, 0.30, 0.35),
       ct: ct5(3),
     },
+    allowWeaker: { "DAMAGE#0.perHit.DEBUFF#0.chance": R_FILL },
   },
   {
     id: "wolf_s3_c",
@@ -162,7 +166,7 @@ export const SPEC: SkillSpec[] = [
   /* ================================================================ 3. ゴーレム */
   { id: "golem_s1", values: { "DAMAGE#0.defCoefficient": c(0.85, 0.95, 1.05) } },
   { id: "golem_s2_a", values: { "DAMAGE#0.multiplier": c(0.95, 0.95, 1.05), "DAMAGE#0.defCoefficient": c(1.20, 1.30, 1.40), ct: ct5(2) } },
-  { id: "golem_s2_b", values: { "DAMAGE#0.multiplier": c(0.48, 0.52), "DAMAGE#0.defCoefficient": c(0.80, 0.85), ct: ct5(2) } },
+  { id: "golem_s2_b", values: { "DAMAGE#0.multiplier": c(0.48, 0.52, 0.52, 0.55), "DAMAGE#0.defCoefficient": c(0.80, 0.80, 0.85), ct: ct5(2) }, allowWeaker: { "DAMAGE#0.defCoefficient": R_FILL } },
   {
     id: "golem_s2_c",
     structure: [patch(0, { defCoefficient: 0.60 })],
@@ -206,21 +210,23 @@ export const SPEC: SkillSpec[] = [
   {
     id: "fairy_s2_b",
     structure: [add({ kind: "GAUGE", amount: 0.20 })],
-    values: { "HEAL#0.healRate": c(0.40, 0.45, 0.50), "GAUGE#0.amount": c(0.20, 0.25), ct: ct5(2) },
+    values: { "HEAL#0.healRate": c(0.40, 0.45, 0.50), "GAUGE#0.amount": c(0.20, 0.20, 0.20, 0.25), ct: ct5(2) },
+    allowWeaker: { "GAUGE#0.amount": R_FILL },
   },
   { id: "fairy_s2_c", values: { "HEAL#0.healRate": c(0.15, 0.18, 0.18, 0.20), "REGEN#0.healRate": c(0.08, 0.08, 0.10), ct: ct5(3) } },
   { id: "fairy_s3_a", structure: [add({ kind: "GAUGE", amount: 0.20 })], values: { "GAUGE#0.amount": c(0.20, 0.25, 0.30, 0.35), ct: ct5(3) } },
   {
     id: "fairy_s3_b",
     structure: [add({ kind: "SHIELD", shieldRate: 0.15, durationTurns: 2 })],
-    values: { "HEAL#0.healRate": c(0.40, 0.45, 0.50), "SHIELD#0.shieldRate": c(0.15, 0.20), ct: ct5(4) },
+    values: { "HEAL#0.healRate": c(0.40, 0.45, 0.50), "SHIELD#0.shieldRate": c(0.15, 0.15, 0.15, 0.20), ct: ct5(4) },
+    allowWeaker: { "SHIELD#0.shieldRate": R_FILL },
   },
   {
     id: "fairy_s3_c",
     structure: [add({ kind: "REGEN", healRate: 0.10, durationTurns: 2 })],
-    values: { "HEAL#0.healRate": c(0.25, 0.28, 0.28, 0.32), "REGEN#0.healRate": c(0.10, 0.12), ct: ct5(4) },
+    values: { "HEAL#0.healRate": c(0.25, 0.28, 0.28, 0.32), "REGEN#0.healRate": c(0.10, 0.12), "BUFF#0.durationTurns": c(2, 2, 3), ct: ct5(3) },
   },
-  { id: "fairy_s3_light", values: { "HEAL#0.healRate": c(0.45, 0.45, 0.50), "REGEN#0.healRate": c(0.10, 0.12), ct: ct5(4) } },
+  { id: "fairy_s3_light", values: { "HEAL#0.healRate": c(0.45, 0.45, 0.50), "REGEN#0.healRate": c(0.10, 0.12), "REGEN#0.durationTurns": c(3, 3, 3, 4), ct: ct5(4) } },
   { id: "fairy_s3_dark", values: { "HEAL#0.healRate": c(0.35, 0.35, 0.40), "GAUGE#0.amount": c(0.35, 0.40), ct: ct5(4) } },
 
   /* ================================================================ 5. インプ */
@@ -261,27 +267,28 @@ export const SPEC: SkillSpec[] = [
     },
     note: "指定のLv5 CT4は今(差し替え後CT4、Lv5でCT3)より長くなるので、Lv5 CT3 のまま",
   },
-  { id: "imp_s3_c", values: { "DAMAGE#0.multiplier": c(0.75, 0.80, 0.90), "POISON#0.chance": c(0.70, 0.80), ct: ct5(3) } },
-  { id: "imp_s3_light", values: { "DAMAGE#0.multiplier": c(1.55, 1.55, 1.70), "BLIND#0.chance": c(0.60, 0.75), "DEBUFF#0.chance": c(0.70, 0.70, 0.85), ct: ct5(3) } },
+  { id: "imp_s3_c", values: { "DAMAGE#0.multiplier": c(0.75, 0.80, 0.90), "POISON#0.chance": c(0.70, 0.80), "POISON#0.durationTurns": c(3, 3, 3, 4), ct: ct5(3) } },
+  { id: "imp_s3_light", values: { "DAMAGE#0.multiplier": c(1.55, 1.55, 1.70), "BLIND#0.chance": c(0.60, 0.75), "DEBUFF#0.chance": c(0.70, 0.70, 0.85), "DEBUFF#0.durationTurns": c(2, 2, 2, 3), ct: ct5(3) } },
   { id: "imp_s3_dark", values: {}, note: "「現行を基準に小幅調整のみ」は数値の指定が無いため、今の一律成長の端数を上方向へ整えるだけにした" },
 
   /* ================================================================ 6. ウィスプ */
   {
     id: "wisp_s1",
     structure: [add({ kind: "GAUGE", amount: 0, applyTo: "SELF" })],
-    values: { "DAMAGE#0.multiplier": c(0.80, 0.90, 1.00), "GAUGE#0.amount": c(0, 0.10, 0.20) },
+    values: { "DAMAGE#0.multiplier": c(0.80, 0.90, 1.00), "GAUGE#0.amount": c(0, 0.10, 0.10, 0.20) },
+    allowWeaker: { "GAUGE#0.amount": R_FILL },
   },
   {
     id: "wisp_s2_a",
     structure: [add({ kind: "GAUGE", amount: 0 })],
     values: { "SHIELD#0.shieldRate": c(0.20, 0.22, 0.22, 0.25), "GAUGE#0.amount": c(0, 0, 0.10), ct: ct5(4) },
   },
-  { id: "wisp_s2_b", values: { "GAUGE#0.amount": c(0.20, 0.22, 0.25, 0.30), ct: ct5(3) } },
+  { id: "wisp_s2_b", values: { "GAUGE#0.amount": c(0.25, 0.30, 0.35), "BUFF#0.durationTurns": c(2, 2, 2, 3), ct: ct5(3) } },
   { id: "wisp_s2_c", values: { "HEAL#0.healRate": c(0.18, 0.20, 0.20, 0.22), "REGEN#0.healRate": c(0.08, 0.08, 0.10), ct: ct5(3) } },
   {
     id: "wisp_s3_a",
     structure: [add({ kind: "BUFF", stat: "criDmg", amount: CRI_DMG_UP, durationTurns: 2 }), add({ kind: "GAUGE", amount: 0.10 })],
-    values: { "GAUGE#0.amount": c(0.10, 0.15, 0.20), ct: ct5(3) },
+    values: { "GAUGE#0.amount": c(0.10, 0.15, 0.20), "BUFF#0.durationTurns": c(2, 2, 2, 3), ct: ct5(3) },
   },
   {
     id: "wisp_s3_b",
@@ -373,7 +380,7 @@ export const SPEC: SkillSpec[] = [
   {
     id: "knight_s3_a",
     structure: [add({ kind: "GAUGE", amount: 0.15, applyTo: "ALLIES" })],
-    values: { "DAMAGE#0.multiplier": c(2.00, 2.20, 2.40), "GAUGE#0.amount": c(0.15, 0.20, 0.25), ct: ct5(3) },
+    values: { "DAMAGE#0.multiplier": c(2.00, 2.20, 2.40), "GAUGE#0.amount": c(0.15, 0.20, 0.25), "BUFF#0.durationTurns": c(2, 2, 2, 3), ct: ct5(3) },
   },
   {
     id: "knight_s3_b",
@@ -392,23 +399,25 @@ export const SPEC: SkillSpec[] = [
   { id: "knight_s3_dark", values: { "DAMAGE#0.multiplier": c(2.10, 2.30, 2.30, 2.50), "STUN#0.chance": c(0.70, 0.70, 0.80), "LIFESTEAL#0.healRate": c(0.35, 0.35, 0.35, 0.50), ct: ct5(4) } },
 
   /* ================================================================ 9. グリフォン */
-  { id: "griffon_s1", values: { "DAMAGE#0.multiplier": c(1.20, 1.30, 1.40), "STUN#0.chance": c(0.20, 0.30, 0.40) } },
-  { id: "griffon_s2_a", values: { "DAMAGE#0.multiplier": c(1.30, 1.40, 1.50), "STUN#0.chance": c(0.30, 0.40), ct: ct5(2) } },
+  { id: "griffon_s1", values: { "DAMAGE#0.multiplier": c(1.20, 1.30, 1.30, 1.40), "STUN#0.chance": c(0.20, 0.20, 0.30, 0.30, 0.40) }, allowWeaker: { "DAMAGE#0.multiplier": R_FILL, "STUN#0.chance": R_FILL } },
+  { id: "griffon_s2_a", values: { "DAMAGE#0.multiplier": c(1.30, 1.40, 1.50), "STUN#0.chance": c(0.30, 0.30, 0.30, 0.40), ct: ct5(2) }, allowWeaker: { "STUN#0.chance": R_FILL } },
   { id: "griffon_s2_b", values: { "DAMAGE#0.multiplier": c(0.95, 1.00, 1.10), "DAMAGE#0.scaleBonus.bonusAtReference": c(0.45, 0.55, 0.65), ct: ct5(2) } },
   {
     id: "griffon_s2_c",
     structure: [add({ kind: "GAUGE", amount: -0.20 })],
-    values: { "DAMAGE#0.multiplier": c(1.80, 2.00, 2.20), "DEBUFF#0.chance": c(0.80, 0.90), "GAUGE#0.amount": c(-0.20, -0.20, -0.30), ct: ct5(2) },
+    values: { "DAMAGE#0.multiplier": c(1.80, 2.00, 2.20), "DEBUFF#0.chance": c(0.80, 0.90), "GAUGE#0.amount": c(-0.20, -0.20, -0.30), "DEBUFF#0.durationTurns": c(2, 2, 2, 3), ct: ct5(2) },
   },
   {
     id: "griffon_s3_a",
     structure: [patch(0, { scaleBonus: { stat: "spd", bonusAtReference: 0.60 } })],
-    values: { "DAMAGE#0.multiplier": c(3.20, 3.40, 3.70), "DAMAGE#0.scaleBonus.bonusAtReference": c(0.60, 0.75, 0.90), "STUN#0.chance": c(0.70, 0.80), ct: ct5(4) },
+    values: { "DAMAGE#0.multiplier": c(3.20, 3.40, 3.70), "DAMAGE#0.scaleBonus.bonusAtReference": c(0.60, 0.75, 0.90), "STUN#0.chance": c(0.70, 0.70, 0.70, 0.80), ct: ct5(4) },
+    allowWeaker: { "STUN#0.chance": R_FILL },
   },
   {
     id: "griffon_s3_b",
     structure: [patch(0, { scaleBonus: { stat: "spd", bonusAtReference: 0.40 } }), add({ kind: "GAUGE", amount: 0.30, applyTo: "SELF" })],
-    values: { "DAMAGE#0.multiplier": c(2.40, 2.55, 2.70), "DAMAGE#0.scaleBonus.bonusAtReference": c(0.40, 0.40, 0.55), "GAUGE#0.amount": c(0.30, 0.40), ct: ct5(4) },
+    values: { "DAMAGE#0.multiplier": c(2.40, 2.55, 2.70), "DAMAGE#0.scaleBonus.bonusAtReference": c(0.40, 0.40, 0.55), "GAUGE#0.amount": c(0.30, 0.30, 0.30, 0.40), ct: ct5(4) },
+    allowWeaker: { "GAUGE#0.amount": R_FILL },
   },
   { id: "griffon_s3_c", values: { "GAUGE#0.amount": c(0.20, 0.25, 0.30, 0.35), ct: ct5(4) } },
   {
@@ -419,7 +428,7 @@ export const SPEC: SkillSpec[] = [
   { id: "griffon_s3_dark", values: { "DAMAGE#0.multiplier": c(1.90, 1.95, 2.00), "DAMAGE#0.scaleBonus.bonusAtReference": c(0.50, 0.50, 0.60), "DEBUFF#0.chance": c(0.70, 0.85), ct: ct5(4) } },
 
   /* ================================================================ 10. ドラゴン */
-  { id: "dragon_s1", values: { "DAMAGE#0.multiplier": c(1.30, 1.40, 1.50), "DEBUFF#0.chance": c(0.35, 0.45, 0.55) } },
+  { id: "dragon_s1", values: { "DAMAGE#0.multiplier": c(1.30, 1.40, 1.50), "DEBUFF#0.chance": c(0.35, 0.45, 0.45, 0.55) }, allowWeaker: { "DEBUFF#0.chance": R_FILL } },
   ...["dragon_s2_flame", "dragon_s2_d_flame"].map((id): SkillSpec => ({
     id,
     structure: [add({ kind: "BURN", durationTurns: 1, chance: 0.50 })],
@@ -442,12 +451,12 @@ export const SPEC: SkillSpec[] = [
   {
     id: "dragon_s3_scale",
     structure: [add({ kind: "GAUGE", amount: 0.30, applyTo: "SELF" })],
-    values: { "DAMAGE#0.multiplier": c(4.0, 4.3, 4.6), "GAUGE#0.amount": c(0.30, 0.40), ct: ct5(4) },
+    values: { "DAMAGE#0.multiplier": c(4.0, 4.3, 4.6), "GAUGE#0.amount": c(0.30, 0.40), "BUFF#0.durationTurns": c(2, 2, 2, 3), ct: ct5(4) },
   },
   {
     id: "dragon_s3_blessing",
     structure: [replace(2, { kind: "HEAL", healRate: 0.20 }), add({ kind: "GAUGE", amount: 0.15 })],
-    values: { "HEAL#0.healRate": c(0.20, 0.25, 0.30), "GAUGE#0.amount": c(0.15, 0.20, 0.25), ct: ct5(4) },
+    values: { "HEAL#0.healRate": c(0.20, 0.25, 0.30), "GAUGE#0.amount": c(0.15, 0.20, 0.25), "BUFF#0.durationTurns": c(3, 3, 3, 4), "BUFF#1.durationTurns": c(3, 3, 3, 4), ct: ct5(4) },
     allowWeaker: {
       "HEAL#0.scaleStat": "指定「heal maxHP20→25→30」で、防御力比例の回復を最大HP比例へ置き換える",
       "HEAL#0.healRate": "同上(基準の能力値が変わるので、数字どうしは比べられない)",
@@ -499,7 +508,7 @@ export const SPEC: SkillSpec[] = [
       "HEAL#0.healRate": "同上(基準の能力値が変わるので、数字どうしは比べられない)",
     },
   },
-  { id: "seraph_s3_c", values: { "GAUGE#0.amount": c(0.25, 0.30, 0.30, 0.35), ct: ct5(4) } },
+  { id: "seraph_s3_c", values: { "GAUGE#0.amount": c(0.25, 0.30, 0.30, 0.35), "BUFF#0.durationTurns": c(3, 3, 4), "BUFF#1.durationTurns": c(3, 3, 4), ct: ct5(4) } },
   {
     id: "seraph_s3_light",
     structure: [replace(0, { kind: "HEAL", scaleStat: "atk", healRate: 2.0 })],
@@ -553,6 +562,26 @@ export const SPEC: SkillSpec[] = [
   { id: "harpy_s3_light", values: { "DAMAGE#0.multiplier": c(1.35, 1.50, 1.50, 1.65) }, note: "実質強化なし。端数整理のみ" },
   { id: "harpy_s3_dark", values: { "DAMAGE#0.multiplier": c(2.20, 2.45, 2.55, 2.75) }, note: "実質強化なし。端数整理のみ" },
   { id: "harpy_s1", values: { "DAMAGE#0.multiplier": c(0.70, 0.80, 0.80, 0.85) }, note: "「既存案と比べてナーフにならない小幅アッパーのみ」: 既存案の数値が手元に無いため、端数(0.77/0.84)を 0.05 刻みへ上げるだけにした" },
+  /*
+   * 依頼主の指定(2026-09-28): Lvを上げても何も変わらない段を埋める。
+   * 羽ばたき: Lv2 攻撃UP3ターン / Lv3 クリ率UP(2ターン)を追加 / Lv4 クリ率UP3ターン / Lv5 CT-1
+   * 狩りの構え: Lv2 ゲージ35% / Lv3 3つの強化3ターン / Lv4 ゲージ40% / Lv5 CT-1
+   */
+  {
+    id: "harpy_s2_b",
+    levelStructure: (level, effects) => (level >= 3 ? [...effects, { kind: "BUFF", stat: "criRate", amount: CRI_RATE_UP, durationTurns: 2 }] : effects),
+    values: { "BUFF#0.durationTurns": c(2, 3), "BUFF#1.durationTurns": only({ 3: 2, 4: 3, 5: 3 }), ct: ct5(3) },
+  },
+  {
+    id: "scorpion_s2_b",
+    values: {
+      "GAUGE#0.amount": c(0.30, 0.35, 0.35, 0.40),
+      "BUFF#0.durationTurns": c(2, 2, 3),
+      "BUFF#1.durationTurns": c(2, 2, 3),
+      "BUFF#2.durationTurns": c(2, 2, 3),
+      ct: ct5(3),
+    },
+  },
   { id: "harpy_s2_a", values: { "DAMAGE#0.multiplier": c(2.40, 2.65, 2.80, 3.00) }, note: "同上(端数整理のみ)" },
   { id: "harpy_s2_c", values: { "DAMAGE#0.multiplier": c(0.70, 0.80, 0.80, 0.85) }, note: "同上(端数整理のみ)" },
   { id: "harpy_s3_a", values: { "DAMAGE#0.multiplier": c(1.15, 1.30, 1.30, 1.40) }, note: "同上(端数整理のみ)" },
@@ -807,7 +836,7 @@ export const SPEC: SkillSpec[] = [
   {
     id: "kobold_s3_light",
     structure: [add({ kind: "COOLDOWN_REDUCE", turns: 1, applyTo: "ALLIES" })],
-    values: { "GAUGE#0.amount": c(0.25, 0.30, 0.30, 0.35), "GAUGE#1.amount": c(0.20, 0.20, 0.25, 0.25, 0.30), "BUFF#0.durationTurns": c(2, 2, 2, 2, 3), ct: ct5(4) },
+    values: { "GAUGE#0.amount": c(0.25, 0.30, 0.30, 0.35), "GAUGE#1.amount": c(0.20, 0.25, 0.30), "BUFF#0.durationTurns": c(2, 2, 2, 2, 3), ct: ct5(4) },
   },
   {
     id: "kobold_s3_dark",
@@ -918,7 +947,7 @@ export const SPEC: SkillSpec[] = [
       return rest as Effect;
     }) : effects,
   },
-  { id: "valkyria_s2_b", values: { "GAUGE#0.amount": c(0.20, 0.25, 0.25, 0.30), "BUFF#0.durationTurns": c(2, 2, 2, 2, 3), ct: ct5(4) } },
+  { id: "valkyria_s2_b", values: { "GAUGE#0.amount": c(0.20, 0.25, 0.25, 0.30), "BUFF#0.durationTurns": c(2, 2, 3), ct: ct5(4) } },
   {
     id: "valkyria_s2_c",
     structure: [
@@ -926,9 +955,19 @@ export const SPEC: SkillSpec[] = [
       add({ kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 2 }),
       add({ kind: "REGEN", healRate: 0.05, durationTurns: 2 }),
     ],
-    values: { ct: c(3) },
-    allowWeaker: { "HEAL#0": "指定「直接回復を削除。ENDURE + ATKup + REGEN型」" },
-    note: "毎ターン5%の継続回復は、攻撃UPと同じ2ターンにした。Lv による伸びの指定は無いので全段同じ(Lv5 の我慢2ターンは今のまま)",
+    // 依頼主の指定(2026-09-28): Lv2 継続回復7% / Lv3 攻撃UP3ターン / Lv4 継続回復3ターン / Lv5 継続回復10%。我慢は全段1ターン・CT3
+    values: {
+      ct: c(3),
+      "STATUS#0.durationTurns": c(1),
+      "BUFF#0.durationTurns": c(2, 2, 3),
+      "REGEN#0.healRate": c(0.05, 0.07, 0.07, 0.07, 0.10),
+      "REGEN#0.durationTurns": c(2, 2, 2, 3),
+    },
+    allowWeaker: {
+      "HEAL#0": "指定「直接回復を削除。ENDURE + ATKup + REGEN型」",
+      "STATUS#0.durationTurns": "依頼主の指定(2026-09-28): Lv5 の我慢は1ターンのまま。代わりに継続回復を10%へ",
+    },
+    note: "毎ターンの継続回復は5%から。Lv2 7% / Lv3 攻撃UP3ターン / Lv4 継続回復3ターン / Lv5 10%(依頼主の指定 2026-09-28)",
   },
   {
     id: "valkyria_s3_a",
@@ -1278,13 +1317,13 @@ export const SPEC: SkillSpec[] = [
     id: "undine_s3_water_god_blessing",
     values: {
       "SHIELD#0.shieldRate": c(0.25, 0.30),
-      "SHIELD#0.durationTurns": only({ 4: 3, 5: 3 }),
+      "SHIELD#0.durationTurns": only({ 3: 3, 4: 3, 5: 3 }),
       "BUFF#0.durationTurns": only({ 4: 3, 5: 3 }),
       "BUFF#1.durationTurns": only({ 4: 3, 5: 3 }),
       ct: ct5(6),
     },
   },
-  { id: "undine_s3_water_god_breath", values: { "HEAL#0.healRate": c(0.20, 0.25), "GAUGE#0.amount": only({ 3: -0.35, 4: -0.35, 5: -0.35 }), ct: ct5(6) } },
+  { id: "undine_s3_water_god_breath", values: { "HEAL#0.healRate": c(0.20, 0.25), "GAUGE#0.amount": only({ 3: -0.35, 4: -0.35, 5: -0.35 }), "BUFF#0.durationTurns": only({ 4: 4, 5: 4 }), ct: ct5(6) } },
   { id: "undine_s3_aqua_dome", values: { "DAMAGE#0.defCoefficient": c(2.10, 2.30, 2.40, 2.60), ct: ct5(3) } },
 ];
 

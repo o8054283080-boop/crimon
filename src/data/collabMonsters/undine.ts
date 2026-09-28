@@ -265,9 +265,9 @@ const UNDINE_S3_GOD_BLESSING: Skill = described({
     { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.25, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
     // Lv2 シールド量 25%→30%
     { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
-    // Lv3
-    { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 2 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
-    // Lv4 シールドの持続 2→3ターン / 強化の持続 2→3ターン
+    // Lv3 シールドの持続 2→3ターン
+    { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 2 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 2 }] },
+    // Lv4 防御力UP・速度UPの持続 2→3ターン
     { cooldownTurns: 7, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
     // Lv5 クールタイム -1(7→6ターン)
     { cooldownTurns: 6, effects: [{ kind: "COOLDOWN_REDUCE", turns: 1 }, { kind: "SHIELD", shieldRate: 0.3, durationTurns: 3 }, { kind: "BUFF", stat: "def", amount: DEF_UP, durationTurns: 3 }, { kind: "BUFF", stat: "spd", amount: SPD_UP, durationTurns: 3 }] },
@@ -300,10 +300,10 @@ const UNDINE_S3_LIGHT: Skill = described({
     { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.3 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
     // Lv3 行動ゲージ -30%→-35%
     { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
-    // Lv4
-    { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+    // Lv4 攻撃力UPの持続 3→4ターン
+    { cooldownTurns: 7, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4, applyTo: "ALLIES" }] },
     // Lv5 クールタイム -1(7→6ターン)
-    { cooldownTurns: 6, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 3, applyTo: "ALLIES" }] },
+    { cooldownTurns: 6, effects: [{ kind: "STRIP" }, { kind: "GAUGE", amount: -0.35 }, { kind: "HEAL", healRate: 0.25, applyTo: "ALLIES" }, { kind: "BUFF", stat: "atk", amount: ATK_UP, durationTurns: 4, applyTo: "ALLIES" }] },
   ],
 }, "【対象】敵全体＋味方全体。ダメージは出さない。強化を剥がしてからゲージを削るので、剥がす前に動かれることがない。");
 
