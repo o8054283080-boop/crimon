@@ -112,6 +112,13 @@ const EXTRA: Record<string, Member> = {
     talents: (t) => { t.basic.spd = 2; },
     stats: { hp: 40000, atk: 2600, def: 2800, spd: 310, criRate: 0.25, criDmg: 1.7, accuracy: 0.90, resistance: 0.40 },
   },
+  mushroon_ELECTRIC: {
+    // 防御DOWN持ち。S2 しびれ胞子 / S3 腐敗の胞子(敵全体の防御-75%)。潜在は高速胞子
+    dexId: "mushroon_ELECTRIC", skillLevels: [5, 5, 5], latentId: "mushroon_ELECTRIC_latent_1",
+    sets: ["SWIFT", "VITALITY", "SWIFT", "VITALITY", "SWIFT", "SWIFT"],
+    talents: (t) => { t.basic.spd = 2; },
+    stats: { hp: 42000, atk: 2400, def: 2900, spd: 300, criRate: 0.25, criDmg: 1.7, accuracy: 0.85, resistance: 0.40 },
+  },
   basilisk_ELECTRIC: {
     // 回復なし編成の「もう1体の気絶係」。S2 石化の眼差し / S3 死の凝視
     dexId: "basilisk_ELECTRIC", skillLevels: [5, 5, 5], latentId: "basilisk_ELECTRIC_latent_2",
@@ -127,6 +134,8 @@ const TEAMS: Record<string, Member[]> = {
   owner: OWNER_TEAM,
   // クリムを抜いて速い火マッシュルン
   mush: [PHOENIX, THUNDER, CHRONOS, UNDINE, EXTRA.mushroon_FIRE],
+  // クリムを抜いて防御DOWN持ちの雷マッシュルン
+  mush_def: [PHOENIX, THUNDER, CHRONOS, UNDINE, EXTRA.mushroon_ELECTRIC],
   // クリムを抜いてマッシュルン、回復はフェニックスだけ、ウンディーネの代わりに闇バジリスク
   mush_basi_phx: [PHOENIX, THUNDER, CHRONOS, EXTRA.mushroon_FIRE, EXTRA.basilisk_DARK],
   // 同じく、フェニックスの代わりにウンディーネを残す
@@ -219,6 +228,18 @@ const NATURAL_ATK: [number, number][] = [[1, 25_000], [19, 35_000], [29, 42_000]
 const NATURAL_DEF: [number, number][] = [[1, 250], [19, 700], [29, 1_200], [39, 2_100], [49, 3_000], [59, 3_300], [69, 3_600], [79, 3_900], [89, 4_200], [99, 4_500]];
 const NATURAL_SPD: [number, number][] = [[1, 190], [19, 198], [29, 203], [39, 209], [49, 215], [59, 225], [69, 233], [79, 240], [89, 248], [99, 255]];
 const NATURAL_TOUGHNESS: [number, number][] = [[1, 150_000], [19, 260_000], [29, 320_000], [39, 380_000], [49, 450_000], [59, 520_000], [69, 600_000], [79, 680_000], [89, 760_000], [99, 850_000]];
+/*
+ * `CLIMB_NATURAL_LOWDEF=1`: 防御の上がり方を抑える(99階で2,500)。倒しにくさは同じなので、その分HPが高くなる。
+ *   防御が高いほど防御DOWN(75%)の効き目が大きく、4,500だと×2.7になるため
+ * `CLIMB_NATURAL_SOFT=1`: 51階から上の倒しにくさと攻撃を、今の本番の平均くらいまで緩める
+ */
+if (process.env.CLIMB_NATURAL_LOWDEF) {
+  NATURAL_DEF.splice(0, NATURAL_DEF.length, [1, 250], [19, 600], [29, 900], [39, 1_400], [49, 2_000], [59, 2_100], [69, 2_200], [79, 2_300], [89, 2_400], [99, 2_500]);
+}
+if (process.env.CLIMB_NATURAL_SOFT) {
+  NATURAL_TOUGHNESS.splice(5, 5, [59, 400_000], [69, 470_000], [79, 530_000], [89, 600_000], [99, 670_000]);
+  NATURAL_ATK.splice(5, 5, [59, 85_000], [69, 92_000], [79, 100_000], [89, 107_000], [99, 115_000]);
+}
 const passRate = (def: number) => 1000 / (1000 + 1.2 * def);
 
 function applySmoothCurve(enemies: { stats: Quad & Record<string, unknown> }[], floor: number): void {
