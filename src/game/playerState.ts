@@ -8,6 +8,7 @@ import { normalizeMonsterPresets } from "./equipmentPreset.js";
 import { normalizeAccessories } from "./accessories.js";
 import type { Accessory } from "../core/accessory.js";
 import { decodeSave, encodeSave } from "./saveCodec.js";
+import { DISPOSABLE_BACKUP_KEYS } from "./disposableStorage.js";
 import { AWAKENING_MATERIAL_LABEL } from "./shop.js";
 import { Star } from "../core/rarity.js";
 import type { ArenaDefenseSnapshot, ArenaMatchRecord } from "./arena/types.js";
@@ -1184,6 +1185,35 @@ function isQuotaError(error: unknown): boolean {
 }
 
 /**
+ * 本体を書く。保存領域が一杯なら、**控えを捨ててから書き直す。**
+ *
+ * 控え(`disposableStorage.ts`)は本体が書けてこそ意味がある。
+ * 控えのせいで本体が書けないのは本末転倒なので、捨てる順に1つずつ外して試す。
+ */
+function writeSaveMakingRoom(json: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, json);
+    return;
+  } catch (error) {
+    if (!isQuotaError(error)) throw error;
+    let lastError: unknown = error;
+    for (const keys of DISPOSABLE_BACKUP_KEYS) {
+      if (keys.every((key) => localStorage.getItem(key) === null)) continue;
+      for (const key of keys) localStorage.removeItem(key);
+      try {
+        localStorage.setItem(STORAGE_KEY, json);
+        console.warn("保存領域が一杯だったため、控えを消して本体を保存しました", keys[0]);
+        return;
+      } catch (retryError) {
+        if (!isQuotaError(retryError)) throw retryError;
+        lastError = retryError;
+      }
+    }
+    throw lastError;
+  }
+}
+
+/**
  * セーブする。**成功したら true。失敗しても例外は投げない。**
  *
  * 返り値を見ない呼び出しがほとんどだが、それでよい。
@@ -1194,7 +1224,7 @@ export function savePlayerState(state: PlayerState): boolean {
   let json = "";
   try {
     json = encodeSave(state);
-    localStorage.setItem(STORAGE_KEY, json);
+    writeSaveMakingRoom(json);
     try { localStorage.setItem(SAVE_TOUCHED_AT_KEY, String(Date.now())); } catch { /* 時刻が残らなくてもセーブは済んでいる */ }
     saveFailure = null;
     return true;

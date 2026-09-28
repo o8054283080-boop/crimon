@@ -4,8 +4,8 @@ import { parseSaveFile, serializeSaveFile } from "./saveFile.js";
 
 export const CLOUD_RECOVERY_ENDPOINT = "https://plufhhhxokqgedlyfsfz.supabase.co/functions/v1/crimon-recovery";
 export const CLOUD_RECOVERY_META_KEY = "crimon_cloud_recovery_v1";
-export const CLOUD_RESTORE_BACKUP_KEY = "crimon_save_before_cloud_restore_v1";
-export const CLOUD_RESTORE_BACKUP_AT_KEY = "crimon_save_before_cloud_restore_at_v1";
+export { CLOUD_RESTORE_BACKUP_AT_KEY, CLOUD_RESTORE_BACKUP_KEY } from "./disposableStorage.js";
+import { CLOUD_RESTORE_BACKUP_AT_KEY, CLOUD_RESTORE_BACKUP_KEY } from "./disposableStorage.js";
 const PLAYER_STORAGE_KEY = "crimon_save_v1";
 
 export interface CloudRecoveryMeta {

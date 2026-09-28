@@ -1,5 +1,7 @@
 import { PlayerState } from "./playerState.js";
-import { SaveFile, parseSaveFile, serializeSaveFile } from "./saveFile.js";
+import { decodeSave, encodeSave } from "./saveCodec.js";
+import { STARTUP_BACKUP_AT_KEY, STARTUP_BACKUP_KEY } from "./disposableStorage.js";
+import { SaveFile, buildSaveFile, parseSaveFile, serializeSaveFile } from "./saveFile.js";
 
 /**
  * 控えが消えないようにするための手立て。
@@ -18,8 +20,8 @@ import { SaveFile, parseSaveFile, serializeSaveFile } from "./saveFile.js";
  * これは 1 も 2 も防がないが、**壊れた読み込みや操作ミスで潰した時に戻れる**。
  */
 
-const BACKUP_KEY = "crimon_save_backup_v1";
-const BACKUP_AT_KEY = "crimon_save_backup_at_v1";
+const BACKUP_KEY = STARTUP_BACKUP_KEY;
+const BACKUP_AT_KEY = STARTUP_BACKUP_AT_KEY;
 
 export type PersistState =
   /** ブラウザが「消さない」と約束している */
@@ -78,10 +80,26 @@ export function backupTakenAt(): Date | null {
 export function takeStartupBackup(state: PlayerState): void {
   try {
     if (state.monsters.length === 0) return;
-    localStorage.setItem(BACKUP_KEY, serializeSaveFile(state));
+    /*
+     * **本体と同じ縮めた形で置く。**
+     *
+     * 以前は書き出し用の整形JSON(`serializeSaveFile`)をそのまま置いていて、
+     * 本体の約14倍あった。344KBの本体に対して控えが5MB近くになり、
+     * Safari の保存領域(1サイト5MB前後)を控えが食い潰して、本体が書けなくなった。
+     *
+     * 先に古い控えを消してから書く。書けなかった時に古い巨大な控えが
+     * 居座ると、本体の邪魔をし続ける。
+     */
+    localStorage.removeItem(BACKUP_KEY);
+    localStorage.removeItem(BACKUP_AT_KEY);
+    localStorage.setItem(BACKUP_KEY, encodeSave(state));
     localStorage.setItem(BACKUP_AT_KEY, new Date().toISOString());
   } catch {
     // 容量が足りない等で控えが取れないことがある。本体の保存は別経路なので続行してよい
+    try {
+      localStorage.removeItem(BACKUP_KEY);
+      localStorage.removeItem(BACKUP_AT_KEY);
+    } catch { /* 消せなくても本体は続行してよい */ }
   }
 }
 
@@ -90,7 +108,12 @@ export function readStartupBackup(): SaveFile | null {
   try {
     const raw = localStorage.getItem(BACKUP_KEY);
     if (!raw) return null;
-    const parsed = parseSaveFile(raw);
+    // 昔の控えは書き出し用の形(`kind` を持つ)。今は本体と同じ縮めた形
+    const legacy = parseSaveFile(raw);
+    if (legacy.ok) return legacy.file;
+    const state = decodeSave(raw);
+    if (!state) return null;
+    const parsed = parseSaveFile(serializeSaveFile(state, backupTakenAt() ?? new Date()));
     return parsed.ok ? parsed.file : null;
   } catch {
     return null;

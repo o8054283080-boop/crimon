@@ -177,6 +177,8 @@ describe("画面側のつなぎ", () => {
   });
   it("端末のセーブを書くたびに、書いた時刻を残す", () => {
     const player = readFileSync(new URL("../src/game/playerState.ts", import.meta.url), "utf8");
-    expect(player).toMatch(/setItem\(STORAGE_KEY, json\);\s*\n\s*try \{ localStorage\.setItem\(SAVE_TOUCHED_AT_KEY/);
+    // 本体は `writeSaveMakingRoom` が書く(容量不足なら控えを捨てて書き直す)。書けた直後に時刻を残す
+    expect(player).toMatch(/writeSaveMakingRoom\(json\);\s*\n\s*try \{ localStorage\.setItem\(SAVE_TOUCHED_AT_KEY/);
+    expect(player).toMatch(/function writeSaveMakingRoom[\s\S]*?localStorage\.setItem\(STORAGE_KEY, json\)/);
   });
 });
