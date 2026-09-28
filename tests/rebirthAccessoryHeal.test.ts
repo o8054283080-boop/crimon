@@ -170,3 +170,134 @@ describe("輪廻転生の全体回復とアクセの「HP50%以下の味方へ�
     expect(heals[1]).toBe(Math.min(team[1].maxHp - Math.round(team[1].maxHp * 0.80), Math.round(phoenix.maxHp * rate)));
   });
 });
+
+/* ====================================================================== 他の味方回復 */
+
+/**
+ * 依頼主の指定「同じように全部のせて」(2026-09-28)。
+ * 味方を回復するパッシブ・潜在・波及治療も、通常の HEAL と同じ補正を通す:
+ *   回復量 = round(基礎 × 術者の回復量補正 × アクセの「HP50%以下の味方への回復量UP」)
+ * 回復後のアクセ効果(onHealed)は受け手1体につき1回。
+ */
+function passiveHolder(dexId: string, accessory?: Partial<AccessoryBattleEffects>, mods?: MonsterDefinition["combatMods"]): MonsterDefinition {
+  const base = structuredClone(findMonsterById(dexId)!);
+  return withAccessory({
+    ...base,
+    stats: { ...base.stats, hp: HP, atk: 100, def: 0, spd: 100, criRate: 0, criDmg: 1.5, accuracy: 1, resistance: 0 },
+    skills: [WAIT, WAIT, base.skills[2]],
+    combatMods: mods,
+    latentAbility: undefined,
+    bossTraits: undefined,
+  }, accessory);
+}
+
+describe("他の味方回復にも、通常の回復と同じ補正が乗る", () => {
+  it("輪廻転生: 術者の回復量補正も掛かる(1.2倍 × 1.3倍)", () => {
+    const mods = { damageDealtMultiplier: 1, damageTakenMultiplier: 1, turnHealPercent: 0, ignoreResistancePercent: 0, healOnResistPercent: 0, healingMultiplier: 1.2 };
+    const def: MonsterDefinition = { ...darkPhoenix({ low50Heal: 0.30 }), combatMods: mods };
+    expect(rebirthHeals(def, [0.40, 0.80]).heals).toEqual([Math.round(HP * 0.10 * 1.2 * 1.3), Math.round(HP * 0.10 * 1.2)]);
+  });
+
+  it("水の祝福(ウンディーネ): 行動後の全体回復に、HP50%以下の味方だけ回復量UP", () => {
+    const run = (accessory?: Partial<AccessoryBattleEffects>) => {
+      const engine = new BattleEngine([passiveHolder("undine_WATER", accessory), dummy(), dummy()], [dummy()], { rng: () => 0.5 });
+      const [undine, low, high] = engine.getUnits();
+      low.currentHp = Math.round(low.maxHp * 0.40);
+      high.currentHp = Math.round(high.maxHp * 0.80);
+      const before = [low.currentHp, high.currentHp];
+      undine.gauge = 100;
+      engine.resolveTurn(undine, { skillIndex: 0 });
+      return [low.currentHp - before[0], high.currentHp - before[1]];
+    };
+    expect(run()).toEqual([Math.round(HP * 0.05), Math.round(HP * 0.05)]);
+    expect(run({ low50Heal: 0.30 })).toEqual([Math.round(HP * 0.05 * 1.3), Math.round(HP * 0.05)]);
+  });
+
+  it("戦乙女の誓い(ヴァルキリア): HPが閾値を切った味方への回復に、回復量UPと回復後の効果が1回乗る", () => {
+    const hit: Skill = { id: "t_hit", name: "打撃", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }] };
+    const run = (accessory?: Partial<AccessoryBattleEffects>) => {
+      const engine = new BattleEngine([passiveHolder("valkyria_WATER", accessory), dummy()], [dummy([hit, WAIT, WAIT])], { rng: () => 0.5 });
+      const [, victim, enemy] = engine.getUnits();
+      victim.currentHp = Math.round(victim.maxHp * 0.3) + 50;
+      victim.gauge = 0;
+      enemy.gauge = 100;
+      engine.resolveTurn(enemy, { skillIndex: 0, targetId: victim.instanceId });
+      return victim;
+    };
+    const plain = run();
+    const boosted = run({ low50Heal: 0.30, healedGauge: 0.06 });
+    expect(boosted.currentHp - plain.currentHp).toBe(Math.round(HP * 0.25 * 1.3) - Math.round(HP * 0.25));
+    expect(plain.gauge).toBe(0);
+    expect(boosted.gauge).toBeCloseTo(6, 5);
+  });
+
+  it("潜在(味方全体回復・一番HPが低い味方の回復・回復＋解除): 受け手ごとに判定し、onHealed は1体1回", () => {
+    const hit: Skill = { id: "t_hit", name: "打撃", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }] };
+    const latent = {
+      id: "t_latent", name: "試験", description: "", skillSlot: 0 as const, category: "SUPPORT" as const,
+      effectType: "DAMAGE_UP" as const, value: 0, chance: 1, duration: 0, target: "SELF" as const, resolution: "ALWAYS" as const,
+      runtimeEffects: [{ kind: "ALLY_HEAL", value: 0.10 }, { kind: "LOWEST_ALLY_HEAL", value: 0.05 }, { kind: "HEAL_CLEANSE", value: 0.02 }],
+    } as unknown as MonsterDefinition["latentAbility"];
+    const run = (accessory?: Partial<AccessoryBattleEffects>) => {
+      const caster = { ...dummy([hit, WAIT, WAIT], accessory), latentAbility: latent };
+      const engine = new BattleEngine([caster, dummy(), dummy()], [dummy()], { rng: () => 0.5 });
+      const [me, low, high, enemy] = engine.getUnits();
+      low.currentHp = Math.round(low.maxHp * 0.20);
+      high.currentHp = Math.round(high.maxHp * 0.80);
+      low.gauge = 10;
+      const before = [low.currentHp, high.currentHp];
+      me.gauge = 100;
+      engine.resolveTurn(me, { skillIndex: 0, targetId: enemy.instanceId });
+      return { low, high, heals: [low.currentHp - before[0], high.currentHp - before[1]] };
+    };
+    // 一番HPが低いのは low(20%)。全体10% + 最低5% + 最低2%
+    expect(run().heals).toEqual([10_000 + 5_000 + 2_000, 10_000]);
+    const boosted = run({ low50Heal: 0.30, healedGauge: 0.06 });
+    // 3つの回復とも、回復直前のHPで判定(20%→30%→36.5%でどれも50%以下)
+    expect(boosted.heals).toEqual([13_000 + 6_500 + 2_600, 10_000]);
+    // 同じスキルの中では onHealed は1回(ゲージ +6 が1回ぶん)
+    expect(boosted.low.gauge).toBeCloseTo(16, 5);
+  });
+
+  it("潜在(味方サポート型の回復): HP50%以下なら回復量UP", () => {
+    const hit: Skill = { id: "t_hit", name: "打撃", description: "", target: "SINGLE_ENEMY", cooldownTurns: 0, effects: [{ kind: "DAMAGE", multiplier: 1 }] };
+    const latent = {
+      id: "t_latent2", name: "試験", description: "", skillSlot: 0 as const, category: "SUPPORT" as const,
+      effectType: "ALLY_SUPPORT" as const, value: 0.10, chance: 1, duration: 0, target: "LOWEST_HP_ALLY" as const, resolution: "ALWAYS" as const,
+    } as unknown as MonsterDefinition["latentAbility"];
+    const run = (accessory?: Partial<AccessoryBattleEffects>) => {
+      const engine = new BattleEngine([{ ...dummy([hit, WAIT, WAIT], accessory), latentAbility: latent }, dummy()], [dummy()], { rng: () => 0.5 });
+      const [me, low, enemy] = engine.getUnits();
+      low.currentHp = Math.round(low.maxHp * 0.30);
+      const before = low.currentHp;
+      me.gauge = 100;
+      engine.resolveTurn(me, { skillIndex: 0, targetId: enemy.instanceId });
+      return low.currentHp - before;
+    };
+    expect(run()).toBe(10_000);
+    expect(run({ low50Heal: 0.30 })).toBe(13_000);
+  });
+
+  it("波及治療: 波及先ごとに判定する。アクセが無ければ従来どおり round(元の回復量 × 波及率)", () => {
+    const heal: Skill = {
+      id: "t_heal", name: "治癒", description: "", target: "SINGLE_ALLY", cooldownTurns: 0,
+      effects: [{ kind: "HEAL", healRate: 0.10 }], talentMods: { healSplash: 0.5 },
+    } as Skill;
+    const run = (accessory: Partial<AccessoryBattleEffects> | undefined, ratios: [number, number]) => {
+      const engine = new BattleEngine([dummy([heal, WAIT, WAIT], accessory), dummy(), dummy()], [dummy()], { rng: () => 0.5 });
+      const [healer, primary, other] = engine.getUnits();
+      healer.currentHp = Math.round(healer.maxHp * 0.95);
+      primary.currentHp = Math.round(primary.maxHp * ratios[0]);
+      other.currentHp = Math.round(other.maxHp * ratios[1]);
+      const before = [primary.currentHp, other.currentHp];
+      healer.gauge = 100;
+      engine.resolveTurn(healer, { skillIndex: 0, targetId: primary.instanceId });
+      return [primary.currentHp - before[0], other.currentHp - before[1]];
+    };
+    expect(run(undefined, [0.80, 0.40])).toEqual([10_000, 5_000]);
+    // 波及先がHP50%以下なら、波及にも回復量UP
+    expect(run({ low50Heal: 0.30 }, [0.80, 0.40])).toEqual([10_000, 6_500]);
+    // 元の受け手がHP50%以下でも、その倍率を波及先へ持ち越さない
+    expect(run({ low50Heal: 0.30 }, [0.40, 0.80])).toEqual([13_000, 5_000]);
+  });
+});
