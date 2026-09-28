@@ -2,7 +2,7 @@ import "../ui/giftBox.css";
 import { GIFT_DEFINITIONS } from "../../data/gifts.js";
 import {
   GIFT_FAILURE_MESSAGE, GIFT_REWARD_ICON, GIFT_REWARD_LABEL,
-  claimedGiftHistory, describeClaimAll, describeExpiry, formatJst, openGifts,
+  claimedGiftHistory, describeClaimAll, describeExpiry, formatJst, giftsFor, openGifts,
   type GiftClaimAllResult, type GiftClaimResult, type GiftDefinition, type GiftReward,
 } from "../../game/gift.js";
 import type { PlayerState } from "../../game/playerState.js";
@@ -115,7 +115,7 @@ function resultPanel(result: GiftClaimResult | GiftClaimAllResult): HTMLElement 
 
 export function renderGiftBox(props: GiftBoxProps): HTMLElement {
   const now = props.now ?? Date.now();
-  const gifts = props.gifts ?? GIFT_DEFINITIONS;
+  const gifts = props.gifts ?? giftsFor(GIFT_DEFINITIONS, null);
   const open = openGifts(gifts, props.player, now);
   const history = claimedGiftHistory(gifts, props.player);
 
