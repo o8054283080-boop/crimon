@@ -187,20 +187,21 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
   target: "ALL_ENEMIES",
   cooldownTurns: 5,
   effects: [
-    { kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.1 },
+    { kind: "DAMAGE", multiplier: 1.25, hpCoefficient: 0.15 },
     { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 },
   ],
+  // HP型の技。攻撃力倍率は全段1.25倍のまま、最大HP比例を伸ばす(依頼主の指定 2026-09-28)
   levelOverrides: [
     // Lv1
-    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.6, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }] },
-    // Lv2 ダメージ倍率 1.60倍→1.75倍
-    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }] },
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.25, hpCoefficient: 0.15 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }] },
+    // Lv2 最大HP比例 15%→17%
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.25, hpCoefficient: 0.17 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.7 }] },
     // Lv3 治癒阻害の発動率 70%→80%
-    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.75, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }] },
-    // Lv4 ダメージ倍率 1.75倍→1.80倍 / 治癒阻害の持続 2→3ターン
-    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
-    // Lv5 クールタイム -1(5→4ターン) / 最大HP比例 10%→12%
-    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.12 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.25, hpCoefficient: 0.17 }, { kind: "HEAL_BLOCK", durationTurns: 2, chance: 0.8 }] },
+    // Lv4 最大HP比例 17%→19% / 治癒阻害の持続 2→3ターン
+    { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.25, hpCoefficient: 0.19 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
+    // Lv5 クールタイム -1(5→4ターン)
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.25, hpCoefficient: 0.19 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
   ],
 }, "【対象】敵全体。回復で粘る相手を削り切るための技で、試練の塔の回復する階に効く。");
 

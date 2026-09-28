@@ -12,6 +12,10 @@
  *   R3 新しい効果    … 指定に書かれたものだけ(`structure`)。変更前には無いので R1/R2 は掛からない
  *   R4 弱くなって良い … 置き換え・作り直しの指定がある所だけ(`allowWeaker`)。理由を必ず書く
  *   R5 段の並び      … Lv が上がって弱くなる数字は、前の段にそろえて引き上げる(逸脱として記録する)
+ *   R6 組み替え      … 1つの段で「ある数字を下げ、別の数字を上げる」指定(`tradeOffs`)。
+ *                     下げてよいのは書いた段・書いた1か所だけで、上げる側が変更前の同じ段と
+ *                     前の段の両方を上回っていなければ、書き間違いとして止める。
+ *                     `allowWeaker` と違って**全段に効く抜け道にならない**
  *
  * ここで決めた値をそのまま定義ファイルの `levelOverrides` に書く(`emit.ts`)。
  * テストも同じ関数で「期待値」を作り、実効値と1件ずつ照合する。
@@ -24,6 +28,21 @@ export type Series = readonly (number | undefined)[];
 
 /** 構造の変更。Lv1 の効果列を受け取り、新しい効果列を返す */
 export type StructureStep = (effects: Effect[]) => Effect[];
+
+/**
+ * 1つの段での組み替え。例: トレントの Lv5 は「ATK倍率 0.85→0.60 の代わりに最大HP比例 10%→15%」。
+ *
+ * R1(変更前より弱い)と R5(前の段より弱い)は、どちらも下げた倍率を元へ引き上げてしまう。
+ * 依頼主の指定で倍率を下げてHP比例へ振り替える時だけ、ここに書いた段・書いた数字を見逃す。
+ */
+export interface TradeOff {
+  level: number;
+  /** 下げる数字(例 "DAMAGE#0.multiplier") */
+  lower: string;
+  /** 代わりに上げる数字(例 "DAMAGE#0.hpCoefficient") */
+  raise: string;
+  reason: string;
+}
 
 export interface SkillSpec {
   id: string;
@@ -42,6 +61,8 @@ export interface SkillSpec {
   values?: Record<string, Series>;
   /** 弱くなって良い所(パス → 理由)。置き換えの指定がある時だけ使う */
   allowWeaker?: Record<string, string>;
+  /** 1つの段で数字を下げて別の数字を上げる組み替え(R6) */
+  tradeOffs?: readonly TradeOff[];
   /** 曖昧な指定をどう具体化したか */
   note?: string;
 }
@@ -216,6 +237,11 @@ function levelEffects(spec: SkillSpec, before: SkillReport, level: number): Effe
   return effects;
 }
 
+/** その段のその数字が、組み替えで下げてよいものか */
+export function isTradeOffLowered(spec: SkillSpec, level: number, path: string): boolean {
+  return (spec.tradeOffs ?? []).some((t) => t.level === level && t.lower === path);
+}
+
 export function resolveSkill(spec: SkillSpec, before: SkillReport): ResolvedSkill {
   const deviations: Deviation[] = [];
   const allow = spec.allowWeaker ?? {};
@@ -266,7 +292,7 @@ export function resolveSkill(spec: SkillSpec, before: SkillReport): ResolvedSkil
       const dir = direction(kind, at.key);
       let final = value;
       const prev = was ? (was.holder[was.key] as unknown) : undefined;
-      if (dir !== null && typeof prev === "number" && weaker(dir, prev, value) && !allow[path] && !allow["*"]) {
+      if (dir !== null && typeof prev === "number" && weaker(dir, prev, value) && !allow[path] && !allow["*"] && !isTradeOffLowered(spec, level, path)) {
         final = dir === -1 ? prev : roundUpNice(prev, niceStep(kind, at.key, at.effect));
         deviations.push({ skillId: spec.id, level, path, specified: value, final, reason: "変更前の値を下回るため引き上げ" });
       }
@@ -275,7 +301,8 @@ export function resolveSkill(spec: SkillSpec, before: SkillReport): ResolvedSkil
     return { cooldownTurns, effects: strip(effects) as unknown as SkillEffect[] };
   });
 
-  enforceMonotonic(spec.id, levels as unknown as { cooldownTurns: number; effects: Effect[] }[], deviations);
+  enforceMonotonic(spec, levels as unknown as { cooldownTurns: number; effects: Effect[] }[], deviations);
+  checkTradeOffs(spec, before, levels as unknown as { cooldownTurns: number; effects: Effect[] }[]);
   return {
     id: spec.id,
     target: spec.target ?? before.levels[0].target,
@@ -293,7 +320,8 @@ export function resolveSkill(spec: SkillSpec, before: SkillReport): ResolvedSkil
  * (スエゾーのキス・サイコキネシスで実際に起きた)。前の段にそろえて引き上げる。
  * 効果の数が変わる段(Lv5 で3回攻撃になるなど)は形が別物なので比べない。
  */
-function enforceMonotonic(skillId: string, levels: { cooldownTurns: number; effects: Effect[] }[], deviations: Deviation[]): void {
+function enforceMonotonic(spec: SkillSpec, levels: { cooldownTurns: number; effects: Effect[] }[], deviations: Deviation[]): void {
+  const skillId = spec.id;
   for (let i = 1; i < levels.length; i += 1) {
     const prev = levels[i - 1];
     const cur = levels[i];
@@ -302,33 +330,70 @@ function enforceMonotonic(skillId: string, levels: { cooldownTurns: number; effe
       deviations.push({ skillId, level, path: "ct", specified: cur.cooldownTurns, final: prev.cooldownTurns, reason: `前の段(Lv${i})より長いため、前の段にそろえた` });
       cur.cooldownTurns = prev.cooldownTurns;
     }
-    raiseList(skillId, level, "", prev.effects, cur.effects, deviations);
+    raiseList(spec, level, "", prev.effects, cur.effects, deviations);
   }
 }
 
-function raiseList(skillId: string, level: number, prefix: string, prev: Effect[], cur: Effect[], deviations: Deviation[]): void {
+/**
+ * R6 の書き間違いを止める。
+ *
+ * 下げた数字は、変更前の同じ段か前の段の**どちらかより本当に下がっている**こと。
+ * 下がった相手ごとに、上げる数字がその相手を上回っていること
+ * (変更前より下げたなら変更前より上、前の段より下げたなら前の段より上)。
+ */
+function checkTradeOffs(spec: SkillSpec, before: SkillReport, levels: { cooldownTurns: number; effects: Effect[] }[]): void {
+  const at = (effects: readonly Effect[] | undefined, path: string): number | undefined => {
+    if (!effects) return undefined;
+    const found = locate(effects as Effect[], path);
+    const value = found ? found.holder[found.key] : undefined;
+    return typeof value === "number" ? value : undefined;
+  };
+  for (const t of spec.tradeOffs ?? []) {
+    const cur = levels[t.level - 1]?.effects;
+    if (!cur) throw new Error(`${spec.id} Lv${t.level}: 組み替えの段がありません`);
+    const prev = levels[t.level - 2]?.effects;
+    const was = before.levels[t.level - 1]?.effects as unknown as Effect[] | undefined;
+    const lowered = at(cur, t.lower);
+    const raised = at(cur, t.raise);
+    if (lowered === undefined || raised === undefined) throw new Error(`${spec.id} Lv${t.level}: ${t.lower} / ${t.raise} が見つかりません`);
+    const against = [at(was, t.lower) !== undefined && lowered < at(was, t.lower)! - EPS ? { label: "変更前", effects: was } : null,
+      at(prev, t.lower) !== undefined && lowered < at(prev, t.lower)! - EPS ? { label: "前の段", effects: prev } : null]
+      .filter((x): x is { label: string; effects: Effect[] } => x !== null);
+    if (against.length === 0) throw new Error(`${spec.id} Lv${t.level}: ${t.lower} が変更前にも前の段にも下がっていないのに、組み替えに書いてある`);
+    for (const { label, effects } of against) {
+      const base = at(effects, t.raise);
+      if (base === undefined || !(raised > base + EPS)) {
+        throw new Error(`${spec.id} Lv${t.level}: ${t.lower} を${label}より下げたのに、${t.raise} が${label}を上回っていない(組み替えにならない)`);
+      }
+    }
+  }
+}
+
+function raiseList(spec: SkillSpec, level: number, prefix: string, prev: Effect[], cur: Effect[], deviations: Deviation[]): void {
   if (prev.length !== cur.length) return;
   const before = keyOf(prev);
   keyOf(cur).forEach((effect, key) => {
     const old = before.get(key);
     if (!old) return;
-    raiseFields(skillId, level, `${prefix}${key}`, effect.kind, old, effect, deviations);
+    raiseFields(spec, level, `${prefix}${key}`, effect.kind, old, effect, deviations);
     if (Array.isArray(old.perHitEffects) && Array.isArray(effect.perHitEffects)) {
-      raiseList(skillId, level, `${prefix}${key}.perHit.`, old.perHitEffects as Effect[], effect.perHitEffects as Effect[], deviations);
+      raiseList(spec, level, `${prefix}${key}.perHit.`, old.perHitEffects as Effect[], effect.perHitEffects as Effect[], deviations);
     }
   });
 }
 
-function raiseFields(skillId: string, level: number, path: string, kind: string, old: Record<string, unknown>, cur: Record<string, unknown>, deviations: Deviation[]): void {
+function raiseFields(spec: SkillSpec, level: number, path: string, kind: string, old: Record<string, unknown>, cur: Record<string, unknown>, deviations: Deviation[]): void {
+  const skillId = spec.id;
   for (const [key, was] of Object.entries(old)) {
     const now = cur[key];
     if (typeof was === "number" && typeof now === "number") {
       const dir = direction(kind, key);
       if (dir === null || !weaker(dir, was, now)) continue;
+      if (isTradeOffLowered(spec, level, `${path}.${key}`)) continue;
       deviations.push({ skillId, level, path: `${path}.${key}`, specified: now, final: was, reason: `前の段(Lv${level - 1})を下回るため、前の段にそろえた` });
       cur[key] = was;
     } else if (was && now && typeof was === "object" && typeof now === "object" && key !== "perHitEffects") {
-      raiseFields(skillId, level, `${path}.${key}`, kind, was as Record<string, unknown>, now as Record<string, unknown>, deviations);
+      raiseFields(spec, level, `${path}.${key}`, kind, was as Record<string, unknown>, now as Record<string, unknown>, deviations);
     }
   }
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { collectAll, type LevelEntry, type MonsterReport } from "../tools/skillsReport/collect.js";
 import { findWeakenings } from "../tools/skillsReport/compare.js";
 import { SPEC } from "../tools/skillsReport/tuning/spec.js";
-import { findSkill, resolveSkill } from "../tools/skillsReport/tuning/resolve.js";
+import { findSkill, isTradeOffLowered, resolveSkill } from "../tools/skillsReport/tuning/resolve.js";
 import { COLLAB_MONSTER_TEMPLATES } from "../src/data/collabMonsters/index.js";
 
 /*
@@ -107,12 +107,15 @@ describe("2026年10月のスキル調整", () => {
     expect(changed, `触っていないはずのスキルが変わった:\n${changed.join("\n")}`).toEqual([]);
   });
 
-  it("弱くなった数字は、置き換えの指定がある所だけ", () => {
+  it("弱くなった数字は、置き換えの指定がある所と、組み替えを書いた段の1か所だけ", () => {
     const allow = new Map(SPEC.map((spec) => [spec.id, spec.allowWeaker ?? {}]));
+    const specs = new Map(SPEC.map((spec) => [spec.id, spec]));
     const unexpected = findWeakenings(BEFORE, AFTER).filter((w) => {
       const allowed = allow.get(w.skillId) ?? {};
       if (allowed["*"]) return false;
       const path = w.where.replace(/^effects\./, "");
+      const spec = specs.get(w.skillId);
+      if (spec && isTradeOffLowered(spec, w.level, path)) return false;
       return !Object.keys(allowed).some((key) => path === key || path.startsWith(`${key}.`));
     });
     expect(unexpected.map((w) => `${w.skillId} Lv${w.level} ${w.where}: ${JSON.stringify(w.before)} → ${JSON.stringify(w.after)}`)).toEqual([]);
@@ -123,6 +126,54 @@ describe("2026年10月のスキル調整", () => {
       for (const [path, reason] of Object.entries(spec.allowWeaker ?? {})) {
         expect(reason.length, `${spec.id} ${path}`).toBeGreaterThan(10);
       }
+      for (const t of spec.tradeOffs ?? []) expect(t.reason.length, `${spec.id} Lv${t.level}`).toBeGreaterThan(10);
+    }
+  });
+
+  /*
+   * **組み替え(ATK倍率を下げてHP比例を上げる)は、実効値で本当に組み替えになっている。**
+   *
+   * 下げた数字は前の段より下で、上げた数字は変更前の同じ段と前の段の両方を上回る。
+   * 組み替えは書いた段の1か所だけを見逃す仕組みなので、他の段・他の数字が下がっていないことも見る。
+   */
+  it("組み替えを書いた段では、下げた数字の代わりに上げた数字が確かに伸びている", () => {
+    const checked = new Set<string>();
+    for (const spec of SPEC) {
+      for (const t of spec.tradeOffs ?? []) {
+        const after = findSkill(AFTER, spec.id);
+        const before = findSkill(BEFORE, spec.id);
+        const num = (level: LevelEntry | undefined, path: string) => (level ? valueAt(level, path) : undefined) as number | undefined;
+        const cur = after.levels[t.level - 1], prev = after.levels[t.level - 2], was = before.levels[t.level - 1];
+        const lowered = num(cur, t.lower)!, raised = num(cur, t.raise)!;
+        let against = 0;
+        for (const [label, ref] of [["変更前", was], ["前の段", prev]] as const) {
+          const refLower = num(ref, t.lower);
+          if (refLower === undefined || lowered >= refLower) continue;
+          against += 1;
+          expect(raised, `${spec.id} Lv${t.level} ${t.raise}(${label}より上)`).toBeGreaterThan(num(ref, t.raise)!);
+        }
+        expect(against, `${spec.id} Lv${t.level}: 下がっていないのに組み替えに書いてある`).toBeGreaterThan(0);
+        checked.add(spec.id);
+      }
+    }
+    expect([...checked].sort()).toEqual(["mocchi_s3_yoiyami", "phoenix_s2_c", "treant_s2_a", "treant_s3_b"]);
+  });
+
+  /*
+   * **HP型に振り替えた技は、攻撃力倍率が全段で同じ・最大HP比例が段ごとに伸びる。**
+   * Lv5 だけ倍率が急に下がる形へ戻さない(依頼主の指定 2026-09-28)。
+   */
+  it("HP型に振り替えた技は、倍率が全段同じで、最大HP比例だけが段ごとに伸びる", () => {
+    const want: Record<string, { multiplier: number; hp: number[] }> = {
+      treant_s2_a: { multiplier: 0.60, hp: [0.12, 0.135, 0.135, 0.15, 0.15] },
+      treant_s3_b: { multiplier: 0.65, hp: [0.16, 0.18, 0.18, 0.20, 0.20] },
+      phoenix_s2_c: { multiplier: 0.55, hp: [0.125, 0.125, 0.125, 0.14, 0.14] },
+      mocchi_s3_yoiyami: { multiplier: 1.25, hp: [0.15, 0.17, 0.17, 0.19, 0.19] },
+    };
+    for (const [id, { multiplier, hp }] of Object.entries(want)) {
+      const levels = findSkill(AFTER, id).levels;
+      expect(levels.map((l) => valueAt(l, "DAMAGE#0.multiplier")), id).toEqual([multiplier, multiplier, multiplier, multiplier, multiplier]);
+      expect(levels.map((l) => valueAt(l, "DAMAGE#0.hpCoefficient")), id).toEqual(hp);
     }
   });
 
@@ -150,6 +201,10 @@ describe("2026年10月のスキル調整", () => {
   it("どのスキルも、Lv が上がって弱くなる数字が無い", () => {
     // 形が変わる段(攻撃の回数が変わる)だけは、1回目どうしの倍率が下がって見える
     const reshaped = new Set(["mushroon_s3_dark Lv4→Lv5 effects.DAMAGE#0.multiplier"]);
+    // 組み替え(依頼主の指定でATK倍率をHP比例へ振り替えた段)は、書いた段の書いた1か所だけ
+    for (const spec of SPEC) {
+      for (const t of spec.tradeOffs ?? []) reshaped.add(`${spec.id} Lv${t.level - 1}→Lv${t.level} effects.${t.lower}`);
+    }
     const found: string[] = [];
     for (const monster of AFTER) {
       for (const skill of monster.skills) {

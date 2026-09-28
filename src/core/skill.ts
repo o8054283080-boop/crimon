@@ -1539,6 +1539,7 @@ const PASSIVE_GROWTH_FIELDS: Record<string, GrowthField> = {
   "REBIRTH.heal": { label: "回復量", unit: "percent" },
   "REBIRTH.damage": { label: "与ダメージ", unit: "percent" },
   "REBIRTH.cooldown": { label: "復活のクールタイム", unit: "turns" },
+  "REBIRTH.hpDamage": { label: "全攻撃への最大HP加算", unit: "percent" },
   "ILLUSION.chance": { label: "呪いの発動率", unit: "percent" },
   "ILLUSION.damage": { label: "攻撃力倍率", unit: "multiplier" },
   "CHEAT.reduction": { label: "クリティカル被ダメージ軽減", unit: "percent" },

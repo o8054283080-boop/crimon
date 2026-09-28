@@ -49,7 +49,7 @@ export type PassiveTrigger =
 export type PassiveLevelEffect =
   | { kind: "WEAK_POINT"; hpRatio: number; critRate: number; critDmg: number; ignore: number }
   | { kind: "SKY_RULER"; atk: number; critDmg: number }
-  | { kind: "REBIRTH"; heal: number; damage: number; cooldown: number }
+  | { kind: "REBIRTH"; heal: number; damage: number; cooldown: number; hpDamage?: number }
   | { kind: "ILLUSION"; damage: number; chance: number }
   | { kind: "CHEAT"; reduction: number }
   /**
@@ -176,7 +176,7 @@ export function describePassiveLevel(effect: PassiveLevelEffect): string {
   switch (effect.kind) {
     case "WEAK_POINT": return `HP${pct(effect.hpRatio)}以下の敵へクリ率+${pct(effect.critRate)}・クリダメ+${pct(effect.critDmg)}・防御${pct(effect.ignore)}無視`;
     case "SKY_RULER": return `敵を倒すたび攻撃+${pct(effect.atk)}・クリダメ+${pct(effect.critDmg)}(最大8スタック)。ウェーブを越えて維持、戦闘終了でリセット`;
-    case "REBIRTH": return `自身のターン開始時、味方全体を自身最大HP${pct(effect.heal)}回復。敵の現在HP割合に応じ与ダメージ最大+${pct(effect.damage)}。HP0で全回復復活、ゲージ維持(CT${effect.cooldown}、戦闘不能中は進まない)`;
+    case "REBIRTH": return `自身のターン開始時、味方全体を自身最大HP${pct(effect.heal)}回復。敵の現在HP割合に応じ与ダメージ最大+${pct(effect.damage)}${effect.hpDamage ? `。全攻撃に自身最大HP${pct(effect.hpDamage)}をダメージ加算` : ""}。HP0で全回復復活、ゲージ維持(CT${effect.cooldown}、戦闘不能中は進まない)`;
     case "ILLUSION": return `光闇からのダメージ50%軽減・光闇への最終ダメージ+50%。通常ターン開始時、敵全体に攻撃力${effect.damage}倍と${pct(effect.chance)}で呪い。追加ターンでは発動しない`;
     case "CHEAT": return `クリティカル被ダメージ${pct(effect.reduction)}軽減。クリティカル被弾時、最大HP10%回復(敵1スキルにつき1回、致死時は回復しない)。全攻撃スキルに自身最大HP7%を加算`;
     case "GAUGE_ON_ENEMY_POISON":
