@@ -144,6 +144,18 @@ const STATES: Record<string, { note: string; build: () => PlayerState }> = {
       return s;
     },
   },
+  "tower-top": {
+    note: "塔を100階まで登り切った月(再挑戦だけが残る。スタミナ0)",
+    build: () => {
+      const s = STATES.maxed.build();
+      s.trialTowerBestFloor = 100;
+      s.trialTowerLifetimeBestFloor = 100;
+      s.trialTowerClaimedFloors = Array.from({ length: 100 }, (_, i) => i + 1);
+      s.trialTowerRun = null;
+      s.stamina = 0;
+      return s;
+    },
+  },
   "no-party": {
     note: "編成が空(挑めない時の見た目を確かめる用)",
     build: () => {

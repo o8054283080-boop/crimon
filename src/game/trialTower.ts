@@ -95,11 +95,22 @@ export function emptyTowerRewardResult(): TowerRewardResult {
   return { crystal: 0, gold: 0, summonScrolls: 0, equipment: null, pigDexId: null, pigStar: null, awakeningOrbs: 0, fourStarSummonScrolls: 0, lightDarkFourStarSummonScrolls: 0, fiveStarSummonScrolls: 0, skillPigs: 0 };
 }
 
+/**
+ * 今月はもう登り切っていて、登る階が残っていないか。
+ *
+ * 100階を越えた次は101階になるが、**101階は無い。**これを見ずに
+ * 「101階から登る」を出していた(依頼主の指摘)。登坂の途中なら残っている。
+ */
+export function isTowerClimbFinished(state: PlayerState, mode: TowerMode = "NORMAL"): boolean {
+  return towerRunOf(state, mode) === null && towerBestFloorOf(state, mode) >= TOWER_FLOOR_COUNT;
+}
+
 /** 登坂を始められない理由。始められるなら null */
 export function towerBlockReason(state: PlayerState, mode: TowerMode = "NORMAL"): string | null {
   if (mode === "HARD" && state.trialTowerLifetimeBestFloor < TOWER_FLOOR_COUNT) {
     return "HARDはNORMAL 100階クリア後に解放されます";
   }
+  if (isTowerClimbFinished(state, mode)) return `今月は${TOWER_FLOOR_COUNT}階まで登り切りました`;
   if (getTowerParty(state).length === 0) return "塔の編成が組まれていません";
   if (state.stamina < TOWER_STAMINA_COST) {
     return `スタミナが足りません(⚡${TOWER_STAMINA_COST}必要 / 手持ち⚡${state.stamina})`;
@@ -128,10 +139,59 @@ function towerBestFloorOf(state: PlayerState, mode: TowerMode): number {
   return mode === "HARD" ? state.trialTowerHardBestFloor : state.trialTowerBestFloor;
 }
 
+/**
+ * 次に挑む階。**100階を越えない。**
+ * 登り切った後は100階を返す(挑めるかは {@link isTowerClimbFinished} で見る)。
+ */
 export function nextTowerFloor(state: PlayerState, mode: TowerMode = "NORMAL"): number {
   const run = towerRunOf(state, mode);
   if (run) return run.floor;
-  return towerStartFloor(towerBestFloorOf(state, mode));
+  return Math.min(TOWER_FLOOR_COUNT, towerStartFloor(towerBestFloorOf(state, mode)));
+}
+
+/* ------------------------------------------------------------------ 再挑戦 */
+
+/**
+ * 再挑戦できる一番上の階。**歴代で越えた階まで。**
+ *
+ * 月が替わって今月の到達がまだ浅くても、前に越えた階は練習に使える。
+ * 再挑戦は報酬も到達も動かさないので、月の区切りを見る必要が無い。
+ */
+export function towerReplayMaxFloor(state: PlayerState, mode: TowerMode = "NORMAL"): number {
+  return Math.min(
+    TOWER_FLOOR_COUNT,
+    mode === "HARD" ? state.trialTowerHardLifetimeBestFloor : state.trialTowerLifetimeBestFloor,
+  );
+}
+
+/** 再挑戦できない理由。できるなら null。**スタミナは見ない**(0で挑めるので) */
+export function towerReplayBlockReason(state: PlayerState, mode: TowerMode, floor: number): string | null {
+  if (mode === "HARD" && state.trialTowerLifetimeBestFloor < TOWER_FLOOR_COUNT) {
+    return "HARDはNORMAL 100階クリア後に解放されます";
+  }
+  if (!Number.isInteger(floor) || floor < 1 || floor > towerReplayMaxFloor(state, mode)) {
+    return "再挑戦できるのは、クリアしたことのある階だけです";
+  }
+  if (getTowerParty(state).length === 0) return "塔の編成が組まれていません";
+  return null;
+}
+
+/**
+ * クリア済みの階へ**1戦だけ**挑む戦闘を組む(依頼主の指定: スタミナ0・報酬なし)。
+ *
+ * - 全員が満タン・クールタイム0から始まる(持ち越しは使わない)
+ * - **登坂の途中経過には一切触れない。**控えの `trialTowerRun` とは別の、
+ *   その場限りの登坂を組んで {@link setupTowerBattle} へ渡す
+ * - 勝っても負けても、報酬・到達階・登坂は動かない。決着の反映は呼び出し側が持たない
+ */
+export function setupTowerReplayBattle(state: PlayerState, mode: TowerMode, floor: number): TowerBattleSetup | null {
+  if (towerReplayBlockReason(state, mode, floor) !== null) return null;
+  const run: TowerRun = {
+    mode,
+    floor,
+    members: getTowerParty(state).map((instance) => ({ instanceId: instance.id, hp: -1, cooldowns: [0, 0, 0] })),
+  };
+  return setupTowerBattle(state, run);
 }
 
 /**

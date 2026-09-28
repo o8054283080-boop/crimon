@@ -1026,6 +1026,59 @@
 }
 
 /* ==========================================================================
+ * クリア済みの階に再挑戦(スタミナ0・報酬なし)
+ * ======================================================================== */
+
+.tower-replay h2 {
+  margin: 0;
+}
+
+.tower-replay__lead {
+  margin: 6px 0 10px;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.tower-replay__row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.tower-replay__select {
+  flex: 0 0 auto;
+  min-width: 96px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 224, 160, 0.35);
+  background: rgba(10, 8, 20, 0.7);
+  color: #fff3d6;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.tower-replay__go {
+  flex: 1 1 auto;
+  min-height: 40px;
+  font-weight: 900;
+}
+
+.tower-replay__label {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  color: #ffe0a0;
+}
+
+.tower-modal__replay {
+  width: 100%;
+  margin: 0 0 12px;
+  min-height: 40px;
+  font-weight: 900;
+}
+
+/* ==========================================================================
  * 塔の編成
  * ======================================================================== */
 

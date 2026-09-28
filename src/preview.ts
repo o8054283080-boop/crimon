@@ -161,6 +161,10 @@ if (params.get("view") === "tower") {
     hardUnlocked: true,
     bestFloor: Math.max(0, previewFloor - 1),
     nextFloor: previewFloor,
+    climbFinished: params.get("finished") === "1",
+    replayMaxFloor: Math.max(0, previewFloor - 1),
+    replayFloor: Math.max(1, previewFloor - 1),
+    replayBlockedReason: empty ? "塔の編成が組まれていません" : null,
     syncPendingFloor: 0,
     run: inRun
       ? {
@@ -207,6 +211,8 @@ if (params.get("view") === "tower") {
     onDismissOutcome: () => location.reload(),
     onEditParty: () => undefined,
     onChallenge: () => undefined,
+    onChangeReplayFloor: () => undefined,
+    onReplay: () => undefined,
     onAbandon: () => undefined,
     onBack: () => undefined,
     onChangeMode: () => undefined,
