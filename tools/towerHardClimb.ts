@@ -236,6 +236,10 @@ const NATURAL_TOUGHNESS: [number, number][] = [[1, 150_000], [19, 260_000], [29,
 if (process.env.CLIMB_NATURAL_LOWDEF) {
   NATURAL_DEF.splice(0, NATURAL_DEF.length, [1, 250], [19, 600], [29, 900], [39, 1_400], [49, 2_000], [59, 2_100], [69, 2_200], [79, 2_300], [89, 2_400], [99, 2_500]);
 }
+/* `CLIMB_NATURAL_SLOW=1`: 51階から上の速度の上がり方を緩める(C案)。B案は敵に先に動かれて崩れる負けが多かった */
+if (process.env.CLIMB_NATURAL_SLOW) {
+  NATURAL_SPD.splice(5, 5, [59, 218], [69, 223], [79, 228], [89, 232], [99, 236]);
+}
 if (process.env.CLIMB_NATURAL_SOFT) {
   NATURAL_TOUGHNESS.splice(5, 5, [59, 400_000], [69, 470_000], [79, 530_000], [89, 600_000], [99, 670_000]);
   NATURAL_ATK.splice(5, 5, [59, 85_000], [69, 92_000], [79, 100_000], [89, 107_000], [99, 115_000]);
