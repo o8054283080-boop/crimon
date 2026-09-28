@@ -1,5 +1,6 @@
 import "../ui/giftBox.css";
 import { GIFT_DEFINITIONS } from "../../data/gifts.js";
+import { findMonsterById } from "../../data/monsters.js";
 import {
   GIFT_FAILURE_MESSAGE, GIFT_REWARD_ICON, GIFT_REWARD_LABEL,
   claimedGiftHistory, describeClaimAll, describeExpiry, formatJst, giftsFor, openGifts,
@@ -42,11 +43,21 @@ export interface GiftBoxProps {
 const nodes = (list: (HTMLElement | null)[]): HTMLElement[] =>
   list.filter((node): node is HTMLElement => node !== null);
 
+/**
+ * 報酬の名前。**モンスターは何が届くのかまで書く**(「★6 コボルト[光]」)。
+ * 「モンスター ×1」だけでは、受け取るまで中身が分からない。
+ */
+function rewardName(reward: GiftReward): string {
+  if (reward.kind !== "MONSTER") return GIFT_REWARD_LABEL[reward.kind];
+  const dex = findMonsterById(reward.dexId);
+  return dex ? `★${reward.star} ${dex.name}` : GIFT_REWARD_LABEL[reward.kind];
+}
+
 /** 「💎 ダイヤ 5,000」の1行。数は右端に揃えて、種類が増えても読み下せるように */
 function rewardRow(reward: GiftReward): HTMLElement {
   return el("li", { className: "gift-card__reward" }, [
     el("span", { className: "gift-card__reward-icon", "aria-hidden": "true" }, [GIFT_REWARD_ICON[reward.kind]]),
-    el("span", { className: "gift-card__reward-name" }, [GIFT_REWARD_LABEL[reward.kind]]),
+    el("span", { className: "gift-card__reward-name" }, [rewardName(reward)]),
     el("span", { className: "gift-card__reward-amount" }, [`×${reward.amount.toLocaleString("ja-JP")}`]),
   ]);
 }

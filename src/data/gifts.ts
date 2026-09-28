@@ -23,6 +23,27 @@ import type { GiftDefinition } from "../game/gift.js";
 export const GIFT_DEFINITIONS: readonly GiftDefinition[] = [
   {
     /*
+     * **ドラさん1人への補填。**(宛先付き。ほかの人の一覧には出ない)
+     *
+     * クリエイトの移し替えが1体1つしか持てなかった頃、S3へ移し替えた後に
+     * S2へ移し替えたらS3が元に戻り、S3のために使った★6光コボルトが
+     * 無駄になった。仕様を枠ごとに直した(#454)うえで、消えた素材を返す。
+     */
+    giftId: "create_slot_refund_dora_20260929",
+    title: "クリエイトの素材をお返しします",
+    description: "クリエイトで移し替えを1体に1つしか持てなかった不具合により、"
+      + "スキル3の移し替えが元に戻り、素材にした★6光コボルトが無駄になっていました。"
+      + "申し訳ありません。同じ★6光コボルトをお返しします。"
+      + "いまはスキル2とスキル3にそれぞれ移し替えを持てるようになっています。",
+    rewards: [
+      { kind: "MONSTER", dexId: "kobold_LIGHT", star: 6, amount: 1 },
+    ],
+    startsAt: "2026-09-29T00:00:00+09:00",
+    expiresAt: null,
+    recipients: ["11faa1e3efd16e"],
+  },
+  {
+    /*
      * コラボ開催記念の配布。**全員へ1回だけ。**
      *
      * プレゼントボックスに任せるのは、この仕組みが既に

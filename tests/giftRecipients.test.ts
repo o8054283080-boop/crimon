@@ -65,6 +65,19 @@ describe("宛先付きのプレゼント", () => {
     }
   });
 
+  it("ドラさんへの★6光コボルトは、ドラさんの復旧IDの時だけ出る", () => {
+    const id = "create_slot_refund_dora_20260929";
+    const refund = GIFT_DEFINITIONS.find((g) => g.giftId === id)!;
+    expect(refund.rewards).toEqual([{ kind: "MONSTER", dexId: "kobold_LIGHT", star: 6, amount: 1 }]);
+    expect(giftsFor(GIFT_DEFINITIONS, "dora1129").some((g) => g.giftId === id)).toBe(true);
+    for (const other of [null, "dora1128", "someone"]) {
+      expect(giftsFor(GIFT_DEFINITIONS, other).some((g) => g.giftId === id)).toBe(false);
+    }
+    const state = createInitialState();
+    expect(claimGift(giftsFor(GIFT_DEFINITIONS, "dora1129"), state, id, { now: NOW }).ok).toBe(true);
+    expect(state.monsters.at(-1)).toMatchObject({ dexId: "kobold_LIGHT", star: 6 });
+  });
+
   it("宛先の無い配布は、復旧IDがあってもなくても全員に出る", () => {
     const everyone = GIFT_DEFINITIONS.filter((g) => !g.recipients).map((g) => g.giftId);
     expect(giftsFor(GIFT_DEFINITIONS, null).map((g) => g.giftId)).toEqual(everyone);
