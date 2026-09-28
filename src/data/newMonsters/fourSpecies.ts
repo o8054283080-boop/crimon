@@ -300,7 +300,7 @@ export const PHOENIX: MonsterTemplate = {
   skill2Variants:[
     skill('phoenix_s2_a','癒しの炎','SINGLE_ALLY',3,[heal(.2),{kind:'CLEANSE',count:1},{kind:'IMMUNITY',durationTurns:1}],[set(0,{healRate:.22}),set(0,{healRate:.24}),set(1,{count:2})]),
     skill('phoenix_s2_b','命の火種','SINGLE_ALLY',3,[heal(.25),regen(.15,3),buff('spd')],[set(0,{healRate:.275}),set(0,{healRate:.3}),set(1,{healRate:.2})]),
-    skill('phoenix_s2_c','炎の翼','ALL_ENEMIES',4,[d(.8,{hpCoefficient:.08}),block(.75),heal(.1,'ALLIES')],[power(1.1),set(1,{chance:.85}),set(2,{healRate:.12})]),
+    skill('phoenix_s2_c','炎の翼','ALL_ENEMIES',4,[d(.8,{hpCoefficient:.08}),block(.75),heal(.1,'ALLIES')],[power(1.1),set(1,{chance:.85}),set(2,{healRate:.12}),set(0,{multiplier:.55,hpCoefficient:.14})]),
   ],
   skill3Variants:[
     skill('phoenix_s3_a','再生の炎','ALL_ALLIES',5,[heal(.15),buff('def'),regen(.15,2)],[set(0,{healRate:.17}),set(0,{healRate:.2}),set(2,{healRate:.2})]),
@@ -354,7 +354,7 @@ export const PHOENIX: MonsterTemplate = {
       { cooldownTurns: 7, effects: [{ kind: "STATUS", status: "INVINCIBLE", durationTurns: 3 }, { kind: "REGEN", healRate: 0.2, durationTurns: 3 }] },
     ],
   },
-  darkSkill3:pass('phoenix_s3_dark','輪廻転生',[{ kind: "REBIRTH", heal: 0.08, damage: 0.5, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.5, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.55, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.55, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.55, cooldown: 8 }]),
+  darkSkill3:pass('phoenix_s3_dark','輪廻転生',[{ kind: "REBIRTH", heal: 0.08, damage: 0.5, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.5, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.55, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.55, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 1.0, cooldown: 8, hpDamage: 0.05 }]),
   skillAssignment:map([[2,2],[0,1],[0,3],[1,0],[0,0],[2,0]]),
 };
 
