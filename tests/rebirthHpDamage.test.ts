@@ -37,12 +37,18 @@ const NO_CRIT = () => 0.99;
 const guard = (target: BattleUnit) => 1000 / (1000 + 1.2 * getEffectiveStat(target, "def"));
 
 describe("輪廻転生 Lv5 の最大HP5%加算と、敵HP割合による最大+100%", () => {
-  it("Lv5のパッシブは damage 1.0 / hpDamage 0.05 / 回復10% / 復活CT8", () => {
+  it("1段に1つずつ伸び、Lv5は damage 1.0 / hpDamage 0.05 / 回復10% / 復活CT8", () => {
     const skill = computeLeveledSkill(findMonster("phoenix", "DARK")!.skills[2], 5);
     expect(skill.id).toBe("phoenix_s3_dark");
     const { phoenix } = pair(5);
     const passive = phoenix.def.skills[2].passive?.levels[4];
     expect(passive).toEqual({ kind: "REBIRTH", heal: 0.1, damage: 1.0, cooldown: 8, hpDamage: 0.05 });
+    // どの段も「何も伸びない段」が無い(前の段から少なくとも1つ動く)
+    const levels = phoenix.def.skills[2].passive!.levels as readonly Record<string, number | string | undefined>[];
+    for (let i = 1; i < 5; i += 1) {
+      const moved = ["heal", "damage", "cooldown", "hpDamage"].filter((k) => levels[i][k] !== levels[i - 1][k]);
+      expect(moved.length, `Lv${i + 1}`).toBeGreaterThan(0);
+    }
   });
 
   it("HP比例を持たない攻撃(S1など)にも、最大HPの5%が加わる", () => {
@@ -66,8 +72,8 @@ describe("輪廻転生 Lv5 の最大HP5%加算と、敵HP割合による最大+1
     expect(Math.abs(calcDamage(phoenix, target, wing, NO_CRIT).damage - base)).toBeLessThanOrEqual(1);
   });
 
-  it("上乗せは Lv1 +60% から1段ごとに+10%。Lv4以下には5%の加算が無い", () => {
-    for (const [level, bonus] of [[1, 0.6], [2, 0.7], [3, 0.8], [4, 0.9]] as const) {
+  it("上乗せは Lv1・2 +60% / Lv3 +80% / Lv4 +100%。Lv4以下には5%の加算が無い", () => {
+    for (const [level, bonus] of [[1, 0.6], [2, 0.6], [3, 0.8], [4, 1.0]] as const) {
       const { phoenix, target } = pair(level);
       // 基礎 = ATK×1 = 100、最終 = 100 × (1 + 上乗せ)
       expect(calcDamage(phoenix, target, { kind: "DAMAGE", multiplier: 1 }, NO_CRIT).damage, `Lv${level}`)

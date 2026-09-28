@@ -355,7 +355,14 @@ export const PHOENIX: MonsterTemplate = {
       { cooldownTurns: 7, effects: [{ kind: "STATUS", status: "INVINCIBLE", durationTurns: 3 }, { kind: "REGEN", healRate: 0.2, durationTurns: 3 }] },
     ],
   },
-  darkSkill3:pass('phoenix_s3_dark','輪廻転生',[{ kind: "REBIRTH", heal: 0.08, damage: 0.6, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.7, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.8, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 0.9, cooldown: 9 }, { kind: "REBIRTH", heal: 0.1, damage: 1.0, cooldown: 8, hpDamage: 0.05 }]),
+  // 1段に1つ: Lv2 回復10% / Lv3 与ダメ上乗せ+80% / Lv4 +100% / Lv5 全攻撃に最大HP5%加算・復活CT8(依頼主の指定 2026-09-28)
+  darkSkill3:pass('phoenix_s3_dark','輪廻転生',[
+    { kind: "REBIRTH", heal: 0.08, damage: 0.6, cooldown: 9 },
+    { kind: "REBIRTH", heal: 0.1, damage: 0.6, cooldown: 9 },
+    { kind: "REBIRTH", heal: 0.1, damage: 0.8, cooldown: 9 },
+    { kind: "REBIRTH", heal: 0.1, damage: 1.0, cooldown: 9 },
+    { kind: "REBIRTH", heal: 0.1, damage: 1.0, cooldown: 8, hpDamage: 0.05 },
+  ]),
   skillAssignment:map([[2,2],[0,1],[0,3],[1,0],[0,0],[2,0]]),
 };
 

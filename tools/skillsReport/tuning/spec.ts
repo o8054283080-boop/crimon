@@ -582,7 +582,7 @@ export const SPEC: SkillSpec[] = [
   { id: "phoenix_s3_b", keep: true },
   { id: "phoenix_s3_electric", keep: true },
   { id: "phoenix_s3_light", values: { "REGEN#0.healRate": c(0.15, 0.18, 0.20) }, note: "17.5% の端数だけを 18% へ" },
-  { id: "phoenix_s3_dark", values: { "passive.heal": c(0.08, 0.10, 0.10, 0.10, 0.10), "passive.damage": c(0.60, 0.70, 0.80, 0.90, 1.00), "passive.hpDamage": only({ 5: 0.05 }) }, note: "依頼主の指定(2026-09-28): 敵HP割合による与ダメージは Lv1 +60% から1段ごとに+10%し、Lv5で最大+100%。Lv5で全攻撃へ自身最大HP5%を加算" },
+  { id: "phoenix_s3_dark", values: { "passive.heal": c(0.08, 0.10, 0.10, 0.10, 0.10), "passive.damage": c(0.60, 0.60, 0.80, 1.00), "passive.hpDamage": only({ 5: 0.05 }) }, note: "依頼主の指定(2026-09-28): 1段に1つ。Lv2 回復10% / Lv3 敵HP割合による与ダメージ+80% / Lv4 +100% / Lv5 全攻撃へ自身最大HP5%を加算・復活CT8" },
 
   /* ================================================================ 16. ジョーカー */
   {
