@@ -69,6 +69,52 @@ export interface GiftDefinition {
    * `null` は無期限。画面には「受取期限：なし」と出す
    */
   expiresAt: string | null;
+  /**
+   * **この人にだけ届ける。**復旧IDを {@link recipientKey} に通した値を並べる。
+   *
+   * 無ければ全員宛て。有れば、その端末の復旧IDが一致する人の一覧にだけ出る
+   * ({@link giftsFor})。クリエイトの仕様で消えた素材を返す時のように、
+   * 一人ぶんの補填を配るために足した。
+   *
+   * **復旧IDをそのまま書かない。**配信するコードに入るので、元に戻せない形にしておく。
+   * 復旧IDは管理画面のプレイヤー一覧に出ている。
+   */
+  recipients?: readonly string[];
+}
+
+/**
+ * 復旧IDを、配信コードへ書いてよい形にする。
+ *
+ * 前後の空白と大文字小文字は揃えてから混ぜる(復旧IDは小文字で登録される)。
+ * 同期で求められる必要がある(ホームの赤い印を描く時に使う)ので、
+ * `crypto.subtle` ではなく cyrb53 を使う。
+ */
+export function recipientKey(recoveryId: string): string {
+  const text = `crimon-gift:${recoveryId.trim().toLowerCase()}`;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, "0");
+}
+
+/**
+ * この人の一覧に並べるプレゼント。**宛先の付いたものは、本人の時だけ残す。**
+ *
+ * `recoveryId` はこの端末で使っている復旧ID。未登録なら `null` で、
+ * 宛先付きのものは1つも出ない。
+ */
+export function giftsFor(
+  gifts: readonly GiftDefinition[],
+  recoveryId: string | null | undefined,
+): GiftDefinition[] {
+  const key = recoveryId ? recipientKey(recoveryId) : null;
+  return gifts.filter((gift) => !gift.recipients || (key !== null && gift.recipients.includes(key)));
 }
 
 /** 受け取った記録。**セーブに残る**ので、形を変える時は互換に気をつける */

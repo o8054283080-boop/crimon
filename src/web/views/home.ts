@@ -26,7 +26,7 @@ import { MonsterInstance } from "../../core/monsterInstance.js";
 import { STAR_MAX_LEVEL } from "../../core/rarity.js";
 import { findMonsterById } from "../../data/monsters.js";
 import { GIFT_DEFINITIONS } from "../../data/gifts.js";
-import { unclaimedGiftCount } from "../../game/gift.js";
+import { giftsFor, unclaimedGiftCount } from "../../game/gift.js";
 import { monsterPower } from "../../game/monsterSort.js";
 import { withPortrait } from "../three/portrait.js";
 import { partyCardAction } from "../uxHelpers.js";
@@ -1028,7 +1028,7 @@ export function renderHome(props: HomeProps): HTMLElement {
    * お知らせは `noticeUi.ts` が「遊び方」の直後へ差し込むので、
    * **ここで遊び方の次に置けば、自動でお知らせの下に回る。**
    */
-  const giftCount = props.giftCount ?? unclaimedGiftCount(GIFT_DEFINITIONS, player);
+  const giftCount = props.giftCount ?? unclaimedGiftCount(giftsFor(GIFT_DEFINITIONS, null), player);
   const giftEntry = el("button", {
     type: "button",
     className: "world-action world-action--left home-gift",

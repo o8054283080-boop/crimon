@@ -174,7 +174,8 @@ import { extractSurvivors, setupWaveBattle } from "../game/stageRunner.js";
 import { renderBottomNav, ScreenName } from "./views/bottomNav.js";
 import { renderGiftBox, type GiftTab } from "./views/giftBox.js";
 import { GIFT_DEFINITIONS } from "../data/gifts.js";
-import { claimAllGifts, claimGift, unclaimedGiftCount, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
+import { readCloudMeta } from "../game/cloudRecovery.js";
+import { claimAllGifts, claimGift, giftsFor, unclaimedGiftCount, type GiftClaimAllResult, type GiftClaimResult } from "../game/gift.js";
 import { renderShop } from "./views/shop.js";
 import { describeSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from "../game/saveFile.js";
 import { CompensationClaim, claimCompensations, isFirstLaunch } from "../game/compensation.js";
@@ -1069,6 +1070,14 @@ const ROUTE_FIELDS = [
   "ruinKind", "selectedRuinFloor", "accessoryPickFor", "limitTargetId", "equipmentTab",
   "accessorySelecting", "farmAccessoryOpen", "farmAccessoryDetailId",
 ] as const satisfies readonly (keyof RouteState)[];
+
+/**
+ * この人のプレゼントボックスに並べるもの。**宛先付きの配布は本人にだけ出す。**
+ * 本人かどうかは、この端末に登録された復旧IDで見る(`GiftDefinition.recipients`)。
+ */
+function visibleGifts() {
+  return giftsFor([...GIFT_DEFINITIONS, ...state.personalGifts], readCloudMeta()?.recoveryId);
+}
 
 function routeState(): RouteState {
   return Object.fromEntries(ROUTE_FIELDS.map((field) => [field, state[field]])) as unknown as RouteState;
@@ -4550,7 +4559,7 @@ function renderScreen(): void {
         player: state.player,
         loginBonusResult: state.loginBonusResult,
         compensationClaims: state.compensationClaims,
-        giftCount: unclaimedGiftCount([...GIFT_DEFINITIONS, ...state.personalGifts], state.player),
+        giftCount: unclaimedGiftCount(visibleGifts(), state.player),
         onDismissCompensation: () => {
           state.compensationClaims = [];
           render();
@@ -5498,7 +5507,7 @@ function renderScreen(): void {
         state.personalGiftsLoaded = true;
         void fetchPersonalGifts().then((gifts) => { state.personalGifts = gifts; if (state.screen === "GIFT_BOX") render(); });
       }
-      const allGifts = [...GIFT_DEFINITIONS, ...state.personalGifts];
+      const allGifts = visibleGifts();
       content = renderGiftBox({
         gifts: allGifts,
         player: state.player,

@@ -57,6 +57,13 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-gift-monster-name",
+    title: "プレゼントボックスで、届くモンスターの種類が分かるようにしました",
+    message: "プレゼントにモンスターが入っている時、これまでは「モンスター ×1」としか表示されず、受け取るまで何が届くのか分かりませんでした。\n\n"
+      + "・「★6 コボルト[光]」のように、星と種類まで表示するようにしました",
+    kind: "UPDATE", fromDate: "2026-09-29", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-create-skill-per-slot",
     title: "クリエイトのスキル継承を、スキル2・スキル3それぞれに持てるようにしました",
     message: "これまでは1体につき移し替えを1つしか持てず、スキル3へ移し替えたあとにスキル2へ移し替えると、スキル3が元のスキルに戻っていました。\n\n"
