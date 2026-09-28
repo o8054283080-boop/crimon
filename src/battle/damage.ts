@@ -165,10 +165,10 @@ export function calcDamage(
    * **DEF項が黙って消えていた**(既存のスキルはどれも片方しか持たず、
    * モッチーのS1がATK・最大HP・防御力の3つを足す初めての技になった)。
    */
-  const dependentStat = effect.hpCoefficient !== undefined ? attacker.maxHp : 0;
+  const dependentStat = effect.hpCoefficient !== undefined || (prey?.kind === "REBIRTH" && prey.hpDamage) ? attacker.maxHp : 0;
   // ベヒモスの「古代巨獣」は、HPが減るほど最大HP比例のダメージが伸びる
   const hpDamageBonus = effect.hpCoefficient !== undefined ? passiveHpDamageBonus(attacker) : 0;
-  const coefficient = (effect.hpCoefficient ?? 0) * (1 + hpDamageBonus);
+  const coefficient = (effect.hpCoefficient ?? 0) * (1 + hpDamageBonus) + (prey?.kind === "REBIRTH" ? prey.hpDamage ?? 0 : 0);
   const defStat = effect.defCoefficient !== undefined ? getEffectiveStat(attacker, "def") : 0;
   const defCoefficient = effect.defCoefficient ?? 0;
   const debuffCount = countDebuffs(defender);
