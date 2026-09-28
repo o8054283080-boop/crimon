@@ -57,6 +57,15 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-rebirth-accessory-heal",
+    title: "闇フェニックス「輪廻転生」の回復に、アクセの回復量UPが乗らない不具合を直しました",
+    message: "サポート系アクセサリーの「HP50%以下の味方への回復量UP」が、闇フェニックスのS3「輪廻転生」でターン開始時に味方全体を回復する時に乗っていなかった不具合を直しました。\n\n"
+      + "・回復する直前のHPが50%以下(50%ちょうども含む)の味方にだけ、アクセの回復量UPが乗ります\n"
+      + "・判定は味方1体ずつです\n"
+      + "・アリーナの対戦でも同じように乗ります",
+    kind: "UPDATE", fromDate: "2026-09-28", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-hp-scaling-skills",
     title: "最大HPで戦うモンスターのスキルを強化しました",
     message: "最大HPを育てるほど強くなるよう、次のスキルを見直しました。攻撃力の倍率はスキルLv1から同じ値にし、そのぶん最大HP比例を大きくして、スキルLvを上げるごとに伸びるようにしています。\n\n"

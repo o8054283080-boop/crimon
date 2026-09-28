@@ -842,7 +842,13 @@ export class BattleEngine {
       for (const ally of this.units.filter(u => u.alive && u.team === unit.team)) {
         const before = ally.currentHp;
         const ratioBefore = hpRatio(ally);
-        applyHeal(ally, Math.round(unit.maxHp * passive.heal));
+        /*
+         * アクセ(サポート)の「HP50%以下の味方への回復量UP」。通常の HEAL と同じ関数を通し、
+         * **受け手1体ごとに、回復する直前のHP割合で**判定する。倍率はアクセが持つ値そのもの。
+         * 回復後の上乗せ(onHealed)は下で1回だけ呼ぶ。
+         */
+        const accHeal = this.acc ? this.acc.healMultiplier(unit, ally) : 1;
+        applyHeal(ally, Math.round(unit.maxHp * passive.heal * accHeal));
         this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount: ally.currentHp - before });
         this.acc?.onHealed(unit, ally, ratioBefore, rebirthKey);
       }
