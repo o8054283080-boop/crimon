@@ -9,7 +9,7 @@ import {
   CRIMOARK_CLONE_HP_FLOOR,
   CRIMOARK_CLONE_HP_RATIO,
 } from "../src/data/crimoark.js";
-import { TRIAL_TOWER_HARD_80_IMMUNITY_GUARD, TRIAL_TOWER_HARD_BOSS_INTERRUPTS, TRIAL_TOWER_HARD_BOSS_STATS, TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_MINION_HP_OF_BOSS, TRIAL_TOWER_HARD_UPPER_HP_BOOST, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
+import { TRIAL_TOWER_HARD_80_IMMUNITY_GUARD, TRIAL_TOWER_HARD_BOSS_INTERRUPTS, TRIAL_TOWER_HARD_BOSS_STATS, TRIAL_TOWER_HARD_BOSS_TRAITS, TRIAL_TOWER_HARD_MINION_HP_OF_BOSS, TRIAL_TOWER_HARD_NORMAL_CURVE, trialTowerHardCurveAt, trialTowerHardMultipliers } from "../src/data/trialTowerHard.js";
 import { trialTowerEnemyInfo } from "../src/data/trialTowerEnemyInfo.js";
 import { findTowerFloor } from "../src/data/trialTower.js";
 import { buildDungeonEnemyTeam } from "../src/game/dungeonRunner.js";
@@ -120,8 +120,8 @@ describe("試練の塔HARD: モードと進行", () => {
 });
 
 describe("試練の塔HARD: 完成済みNORMALステータスへの倍率", () => {
-  // 70〜100階のボス階は実数で決める(下の「70〜100階のボスは実数」)。倍率が効くのはそれ以外
-  it.each([1, 40, 50, 51, 60, 99])("%d階で完成済みNORMAL敵へだけHARD倍率を掛ける", (floor) => {
+  // 通常階は「自然な線」、70〜100階のボスは実数で決める。倍率がそのまま効くのは10〜60階のボス階
+  it.each([10, 20, 30, 40, 50, 60])("%d階で完成済みNORMAL敵へだけHARD倍率を掛ける", (floor) => {
     const state = unlockedState();
     state.trialTowerHardBestFloor = floor - 1;
     const run = beginTowerRun(state, "HARD")!;
@@ -194,18 +194,6 @@ describe("試練の塔HARD: 51〜99階のHPとボス特性", () => {
     run.floor = floor;
     return setupTowerBattle(state, run)!;
   }
-
-  it("HPの上乗せは51〜99階の通常階だけ。ボス階と50階までは表のまま", () => {
-    expect(TRIAL_TOWER_HARD_UPPER_HP_BOOST).toBe(1.2);
-    expect(trialTowerHardMultipliers(51).hp).toBeCloseTo(3 * 1.2);
-    expect(trialTowerHardMultipliers(99).hp).toBeCloseTo(2 * 1.2);
-    expect(trialTowerHardMultipliers(49).hp).toBe(3);
-    expect(trialTowerHardMultipliers(50).hp).toBe(0.7);
-    expect(trialTowerHardMultipliers(60).hp).toBe(1.5);
-    expect(trialTowerHardMultipliers(100).hp).toBe(1.6);
-    // HP以外は動かしていない
-    expect(trialTowerHardMultipliers(55)).toMatchObject({ def: 1, atk: 24, spd: 1.50 });
-  });
 
   it.each([10, 50, 70, 90, 100])("%d階はボス階の主にだけ特性が付き、取り巻きには付かない", (floor) => {
     const setup = hardSetup(floor);
@@ -431,5 +419,51 @@ describe("試練の塔HARD: 80階の聖竜は免疫の前に強化を張り、�
       expect(enemy.effects.some((e) => e.kind === "BUFF")).toBe(false);
       expect(enemy.flatStatBonus.spd ?? 0).toBe(0);
     }
+  });
+});
+
+describe("試練の塔HARD: 通常階は1〜99階を自然に強くなる線に合わせる(C案)", () => {
+  const passRate = (def: number) => 1000 / (1000 + 1.2 * def);
+  function hardEnemies(floor: number) {
+    const state = unlockedState();
+    state.trialTowerHardBestFloor = floor - 1;
+    const run = beginTowerRun(state, "HARD")!;
+    run.floor = floor;
+    return setupTowerBattle(state, run)!.enemyDefs;
+  }
+  const normalFloors = Array.from({ length: 99 }, (_, i) => i + 1).filter((f) => f % 10 !== 0);
+
+  it.each(normalFloors)("%d階の平均の攻撃・防御・速度と倒しにくさが線の上にある", (floor) => {
+    const enemies = hardEnemies(floor);
+    const mean = (f: (e: typeof enemies[number]) => number) => enemies.reduce((a, e) => a + f(e), 0) / enemies.length;
+    const curve = TRIAL_TOWER_HARD_NORMAL_CURVE;
+    expect(mean((e) => e.stats.atk) / trialTowerHardCurveAt(curve.atk, floor)).toBeCloseTo(1, 2);
+    expect(mean((e) => e.stats.def) / trialTowerHardCurveAt(curve.def, floor)).toBeCloseTo(1, 2);
+    expect(mean((e) => e.stats.spd) / trialTowerHardCurveAt(curve.spd, floor)).toBeCloseTo(1, 1);
+    expect(mean((e) => e.stats.hp / passRate(e.stats.def)) / trialTowerHardCurveAt(curve.toughness, floor)).toBeCloseTo(1, 2);
+  });
+
+  it("攻撃・防御・速度は1〜99階で下がらない(のこぎり型にしない)", () => {
+    for (const key of ["atk", "def", "spd"] as const) {
+      const values = normalFloors.map((f) => trialTowerHardCurveAt(TRIAL_TOWER_HARD_NORMAL_CURVE[key], f));
+      for (let i = 1; i < values.length; i += 1) expect(values[i]).toBeGreaterThanOrEqual(values[i - 1]);
+    }
+    // 防御は2,500で止める(防御DOWNの効き目が大きくなりすぎないように)
+    expect(Math.max(...normalFloors.map((f) => trialTowerHardCurveAt(TRIAL_TOWER_HARD_NORMAL_CURVE.def, f)))).toBe(2_500);
+  });
+
+  it("敵どうしの差は残す(同じ階の攻撃の比は元のまま)", () => {
+    const floor = 57;
+    const hard = hardEnemies(floor);
+    const normal = buildDungeonEnemyTeam(findTowerFloor(floor)!);
+    const ratio = (list: { stats: { atk: number } }[]) => list.map((e) => e.stats.atk / list[0].stats.atk);
+    ratio(hard).forEach((r, i) => expect(r).toBeCloseTo(ratio(normal)[i], 2));
+  });
+
+  it("NORMALの通常階は変わらない", () => {
+    const state = unlockedState();
+    const run = beginTowerRun(state, "NORMAL")!;
+    run.floor = 57;
+    expect(setupTowerBattle(state, run)!.enemyDefs.map((e) => e.stats)).toEqual(buildDungeonEnemyTeam(findTowerFloor(57)!).map((e) => e.stats));
   });
 });

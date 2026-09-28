@@ -59,20 +59,13 @@ export function trialTowerHardMultipliers(floor: number): TrialTowerHardMultipli
   const at = Math.max(40, Math.min(100, Math.round(floor)));
   const value = fixed[at];
   if (!value) throw new Error(`試練の塔HARD ${floor}階の倍率がありません`);
-  return isUpperNormalFloor(at) ? { ...value, hp: value.hp * TRIAL_TOWER_HARD_UPPER_HP_BOOST } : value;
+  return value;
 }
 
-/**
- * 51〜99階の**通常階**だけ、敵のHPを上の表からさらに1.2倍にする(2026-09-27)。
- *
- * 上位の5体(依頼主の実際の育成)が1回の登頂で4〜5回しか負けず、楽に100階へ届いていた。
- * 依頼主の目標は「1回の登頂で10回くらい負ける」。ボス特性(下)と合わせて
- * `tools/towerHardClimb.ts` で 8.7回 / 10.2回(種を変えて2通り)。
- * 1.3倍で12〜13回、1.5倍で15回。表の値を1つずつ書き換えず掛け算で持つのは、
- * **元の表がPR #431 の検証と対になっている**ので、どこから動かしたかを残すため。
+/*
+ * 以前は51〜99階の通常階だけHPを表の値から×1.2にしていた(#441)。
+ * 通常階は下の「自然な線」でHPを決め直すようになったので、上乗せは外した(線が全部を決める)。
  */
-export const TRIAL_TOWER_HARD_UPPER_HP_BOOST = 1.2;
-const isUpperNormalFloor = (floor: number): boolean => floor >= 51 && floor <= 99 && floor % 10 !== 0;
 
 /**
  * HARDの**ボス階の主**にだけ付ける特性。
@@ -137,9 +130,72 @@ export const TRIAL_TOWER_HARD_MINION_HP_OF_BOSS = 0.5;
  */
 export const TRIAL_TOWER_HARD_80_IMMUNITY_GUARD = { buffs: ["atk", "def"] as const, spdWhileImmune: 0.3 };
 
+/**
+ * HARDの**通常階(1〜99階、10の倍数を除く)**は、階の平均をこの線に合わせる(2026-09-28、依頼主と決めたC案)。
+ *
+ * 以前は倍率の表だけで決めていて、10階ごとに一度弱くなる「のこぎり型」だった。
+ * 51階で防御が3,590 → 514に落ち、71〜74階だけ攻撃が18万を超えるなど、作りの継ぎ目がそのまま出ていた。
+ * 1〜99階で途切れずに強くなり、51階から上がり方を強める。
+ *
+ * - 攻撃・防御・速度: 階の平均を線に合わせる。**敵どうしの差(硬い晶・脆い獣)は残す**
+ * - HP: 「倒しにくさ」(HP ÷ 防御を通る割合)の目標から逆算する。防御が高い階ほどHPは低い。
+ *   防御だけ上げると火力の低い編成が300手の時間切れで詰まったので、倒す手間は線で決める
+ * - 防御は2,500で止める。防御DOWN(75%)は防御が高いほど効き目が大きく、4,500だと×2.7になるため
+ * - 51階から上の速度は緩めに上げる。速くしすぎると、気絶・ゲージ編成が先に動かれて全滅する負けが増えた
+ *
+ * `tools/towerHardClimb.ts` で測った(40回ずつ、100階クリア): 依頼主の5体 5/40、
+ * 防御DOWN持ち 34/40、気絶・ゲージ編成 33/40。どの階も1度は勝てる。
+ * **ボス階(10の倍数)はこの線に乗らない。**上の倍率・実数・特性のまま。
+ */
+export const TRIAL_TOWER_HARD_NORMAL_CURVE = {
+  atk: [[1, 25_000], [19, 35_000], [29, 42_000], [39, 50_000], [49, 60_000], [59, 85_000], [69, 92_000], [79, 100_000], [89, 107_000], [99, 115_000]],
+  def: [[1, 250], [19, 600], [29, 900], [39, 1_400], [49, 2_000], [59, 2_100], [69, 2_200], [79, 2_300], [89, 2_400], [99, 2_500]],
+  spd: [[1, 190], [19, 198], [29, 203], [39, 209], [49, 215], [59, 218], [69, 223], [79, 228], [89, 232], [99, 236]],
+  /** 敵1体あたりの倒しにくさ。51〜59階は1階の敵が4体(61階から5体)なので、1体あたりは少し下げてある */
+  toughness: [[1, 150_000], [19, 260_000], [29, 320_000], [39, 380_000], [49, 450_000], [59, 400_000], [69, 470_000], [79, 530_000], [89, 600_000], [99, 670_000]],
+} as const satisfies Record<string, readonly (readonly [number, number])[]>;
+
+/** 線の上の値。アンカーの間は直線でつなぐ */
+export function trialTowerHardCurveAt(points: readonly (readonly [number, number])[], floor: number): number {
+  if (floor <= points[0][0]) return points[0][1];
+  const upper = points.findIndex(([f]) => floor <= f);
+  if (upper < 0) return points[points.length - 1][1];
+  const [f0, v0] = points[upper - 1];
+  const [f1, v1] = points[upper];
+  return v0 + (v1 - v0) * (floor - f0) / (f1 - f0);
+}
+
+/** 防御を通るダメージの割合。本番の防御式(`src/battle/damageFormula.ts` の `applyDefenseSw`)と同じ */
+const passRate = (def: number): number => 1000 / (1000 + 1.2 * def);
+
+function applyNormalFloorCurve(enemies: MonsterDefinition[], floor: number): MonsterDefinition[] {
+  if (enemies.length === 0) return enemies;
+  const curve = TRIAL_TOWER_HARD_NORMAL_CURVE;
+  const mean = (f: (enemy: MonsterDefinition) => number) => enemies.reduce((sum, enemy) => sum + f(enemy), 0) / enemies.length;
+  const atkMean = mean((e) => e.stats.atk);
+  const defMean = mean((e) => e.stats.def);
+  const spdMean = mean((e) => e.stats.spd);
+  const atk = trialTowerHardCurveAt(curve.atk, floor);
+  const def = trialTowerHardCurveAt(curve.def, floor);
+  const spd = trialTowerHardCurveAt(curve.spd, floor);
+  const shaped = enemies.map((enemy) => ({
+    ...enemy,
+    stats: {
+      ...enemy.stats,
+      atk: Math.max(1, Math.round(atk * enemy.stats.atk / atkMean)),
+      def: Math.max(1, Math.round(def * enemy.stats.def / defMean)),
+      spd: Math.max(1, Math.round(spd * enemy.stats.spd / spdMean)),
+    },
+  }));
+  const toughness = shaped.reduce((sum, enemy) => sum + enemy.stats.hp / passRate(enemy.stats.def), 0) / shaped.length;
+  const hpScale = trialTowerHardCurveAt(curve.toughness, floor) / toughness;
+  return shaped.map((enemy) => ({ ...enemy, stats: { ...enemy.stats, hp: Math.max(1, Math.round(enemy.stats.hp * hpScale)) } }));
+}
+
 /** 戦闘用に完成したNORMAL敵定義の複製だけを倍率化する。ボス階の主(`isBoss`)にはHARDのボス特性も付ける。 */
 export function scaleTrialTowerHardEnemies(enemies: MonsterDefinition[], floor: number): MonsterDefinition[] {
   const scaled = scaleByMultipliers(enemies, floor);
+  if (floor % 10 !== 0) return applyNormalFloorCurve(scaled, floor);
   const bossStats = TRIAL_TOWER_HARD_BOSS_STATS[floor];
   if (!bossStats) return scaled;
   const minions = floor === 100 ? [] : scaled.filter((enemy) => !enemy.isBoss);
