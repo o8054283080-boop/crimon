@@ -66,10 +66,13 @@ describe("輪廻転生 Lv5 の最大HP5%加算と、敵HP割合による最大+1
     expect(Math.abs(calcDamage(phoenix, target, wing, NO_CRIT).damage - base)).toBeLessThanOrEqual(1);
   });
 
-  it("Lv4以下は5%の加算が無く、上乗せも最大+55%のまま", () => {
-    const { phoenix, target } = pair(4);
-    // 基礎 = 100×1 = 100、最終 = 100 × 1.55 = 155
-    expect(calcDamage(phoenix, target, { kind: "DAMAGE", multiplier: 1 }, NO_CRIT).damage).toBe(155);
+  it("上乗せは Lv1 +60% から1段ごとに+10%。Lv4以下には5%の加算が無い", () => {
+    for (const [level, bonus] of [[1, 0.6], [2, 0.7], [3, 0.8], [4, 0.9]] as const) {
+      const { phoenix, target } = pair(level);
+      // 基礎 = ATK×1 = 100、最終 = 100 × (1 + 上乗せ)
+      expect(calcDamage(phoenix, target, { kind: "DAMAGE", multiplier: 1 }, NO_CRIT).damage, `Lv${level}`)
+        .toBe(Math.round(100 * (1 + bonus) * guard(target)));
+    }
   });
 
   it("輪廻転生を持たないモンスターには何も足さない", () => {

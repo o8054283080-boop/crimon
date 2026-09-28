@@ -34,6 +34,12 @@ function only(values: Record<number, number>): Series {
 const ct5 = (n: number): Series => only({ 5: n });
 /** Lv1〜4 は変更前のまま、Lv5 だけ n */
 const lv5 = (n: number): Series => only({ 5: n });
+/**
+ * 攻撃力倍率を全段で下げ、最大HP比例へ振り替えるHP型の技(依頼主の指定 2026-09-28)。
+ * 倍率は全段同じ値なので、変更前の同じ段より下がる。**全段に組み替えを書く。**
+ */
+const hpTrade = (reason: string): SkillSpec["tradeOffs"] =>
+  [1, 2, 3, 4, 5].map((level) => ({ level, lower: "DAMAGE#0.multiplier", raise: "DAMAGE#0.hpCoefficient", reason }));
 
 const BUFF_BLOCK = (chance: number, turns: number): Effect => ({ kind: "STATUS", status: "BUFF_BLOCK", chance, durationTurns: turns, fixedDuration: true });
 
@@ -311,8 +317,8 @@ export const SPEC: SkillSpec[] = [
   { id: "treant_s1", values: { "DAMAGE#0.hpCoefficient": c(0.075, 0.08, 0.085, 0.095, 0.105) } },
   {
     id: "treant_s2_a",
-    values: { "DAMAGE#0.multiplier": lv5(0.60), "DAMAGE#0.hpCoefficient": c(0.075, 0.085, 0.085, 0.10, 0.15), "STUN#0.chance": c(0.50, 0.50, 0.60), ct: ct5(3) },
-    tradeOffs: [{ level: 5, lower: "DAMAGE#0.multiplier", raise: "DAMAGE#0.hpCoefficient", reason: "依頼主の指定(2026-09-28): Lv5はATK倍率を0.85→0.60へ下げ、最大HP比例を10%→15%へ上げるHP型の強化" }],
+    values: { "DAMAGE#0.multiplier": c(0.60), "DAMAGE#0.hpCoefficient": c(0.12, 0.135, 0.135, 0.15), "STUN#0.chance": c(0.50, 0.50, 0.60), ct: ct5(3) },
+    tradeOffs: hpTrade("依頼主の指定(2026-09-28): 攻撃力倍率を全段0.60倍にし、最大HP比例を12%→15%へ伸ばすHP型の技にする"),
   },
   {
     id: "treant_s2_b",
@@ -331,8 +337,8 @@ export const SPEC: SkillSpec[] = [
   },
   {
     id: "treant_s3_b",
-    values: { "DAMAGE#0.multiplier": lv5(0.65), "DAMAGE#0.hpCoefficient": c(0.11, 0.12, 0.12, 0.14, 0.20), "DEBUFF#0.chance": c(0.70, 0.70, 0.85), ct: ct5(3) },
-    tradeOffs: [{ level: 5, lower: "DAMAGE#0.multiplier", raise: "DAMAGE#0.hpCoefficient", reason: "依頼主の指定(2026-09-28): Lv5はATK倍率を0.95→0.65へ下げ、最大HP比例を14%→20%へ上げるHP型の強化" }],
+    values: { "DAMAGE#0.multiplier": c(0.65), "DAMAGE#0.hpCoefficient": c(0.16, 0.18, 0.18, 0.20), "DEBUFF#0.chance": c(0.70, 0.70, 0.85), ct: ct5(3) },
+    tradeOffs: hpTrade("依頼主の指定(2026-09-28): 攻撃力倍率を全段0.65倍にし、最大HP比例を16%→20%へ伸ばすHP型の技にする"),
   },
   {
     id: "treant_s3_c",
@@ -563,16 +569,20 @@ export const SPEC: SkillSpec[] = [
   },
   {
     id: "phoenix_s2_c",
-    values: { "DAMAGE#0.multiplier": lv5(0.55), "DAMAGE#0.hpCoefficient": lv5(0.14) },
-    tradeOffs: [{ level: 5, lower: "DAMAGE#0.multiplier", raise: "DAMAGE#0.hpCoefficient", reason: "依頼主の指定(2026-09-28): Lv5はATK倍率を0.88→0.55へ下げ、最大HP比例を8.8%→14%へ上げるHP型の強化" }],
-    // Lv2〜4(0.88倍・8.8%)は今回触らない。端数整理で0.90倍へ動かさない
-    inheritExact: true,
+    values: {
+      "DAMAGE#0.multiplier": c(0.55),
+      "DAMAGE#0.hpCoefficient": c(0.125, 0.125, 0.125, 0.14),
+      "HEAL_BLOCK#0.chance": c(0.75, 0.85),
+      "HEAL#0.healRate": c(0.10, 0.10, 0.12),
+    },
+    tradeOffs: hpTrade("依頼主の指定(2026-09-28): 攻撃力倍率を全段0.55倍にし、最大HP比例を12.5%→14%へ伸ばすHP型の技にする"),
+    note: "1段に1つ: Lv2 治癒阻害85% / Lv3 回復12% / Lv4 最大HP比例14% / Lv5 CT-1",
   },
   { id: "phoenix_s3_a", keep: true },
   { id: "phoenix_s3_b", keep: true },
   { id: "phoenix_s3_electric", keep: true },
   { id: "phoenix_s3_light", values: { "REGEN#0.healRate": c(0.15, 0.18, 0.20) }, note: "17.5% の端数だけを 18% へ" },
-  { id: "phoenix_s3_dark", values: { "passive.heal": c(0.08, 0.10, 0.10, 0.10, 0.10), "passive.damage": only({ 5: 1.0 }), "passive.hpDamage": only({ 5: 0.05 }) }, note: "Lv5は依頼主の指定で敵HP割合による与ダメージ最大+100%、全攻撃へ自身最大HP5%を加算(2026-09-28)" },
+  { id: "phoenix_s3_dark", values: { "passive.heal": c(0.08, 0.10, 0.10, 0.10, 0.10), "passive.damage": c(0.60, 0.70, 0.80, 0.90, 1.00), "passive.hpDamage": only({ 5: 0.05 }) }, note: "依頼主の指定(2026-09-28): 敵HP割合による与ダメージは Lv1 +60% から1段ごとに+10%し、Lv5で最大+100%。Lv5で全攻撃へ自身最大HP5%を加算" },
 
   /* ================================================================ 16. ジョーカー */
   {
@@ -1236,8 +1246,8 @@ export const SPEC: SkillSpec[] = [
   { id: "mocchi_s3_super_cannon", values: { "DAMAGE#0.multiplier": lv5(3.10), "DAMAGE#0.defCoefficient": lv5(2.20), "GAUGE#0.chance": lv5(0.85), "STUN#0.chance": lv5(0.60), ct: ct5(5) } },
   {
     id: "mocchi_s3_yoiyami",
-    values: { "DAMAGE#0.multiplier": only({ 4: 1.80, 5: 1.25 }), "DAMAGE#0.hpCoefficient": only({ 4: 0.10, 5: 0.19 }), "HEAL_BLOCK#0.chance": only({ 4: 0.80, 5: 0.80 }), "HEAL_BLOCK#0.durationTurns": only({ 4: 3, 5: 3 }), ct: ct5(4) },
-    tradeOffs: [{ level: 5, lower: "DAMAGE#0.multiplier", raise: "DAMAGE#0.hpCoefficient", reason: "依頼主の指定(2026-09-28): Lv5はATK倍率を1.80→1.25へ下げ、最大HP比例を10%→19%へ上げるHP型の強化" }],
+    values: { "DAMAGE#0.multiplier": c(1.25), "DAMAGE#0.hpCoefficient": c(0.15, 0.17, 0.17, 0.19), "HEAL_BLOCK#0.chance": c(0.70, 0.70, 0.80), "HEAL_BLOCK#0.durationTurns": c(2, 2, 2, 3), ct: ct5(4) },
+    tradeOffs: hpTrade("依頼主の指定(2026-09-28): 攻撃力倍率を全段1.25倍にし、最大HP比例を15%→19%へ伸ばすHP型の技にする"),
   },
   { id: "mocchi_s3_guts", keep: true },
   { id: "mocchi_s3_shiromossama", keep: true },

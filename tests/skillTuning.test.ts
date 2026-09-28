@@ -137,20 +137,44 @@ describe("2026年10月のスキル調整", () => {
    * 組み替えは書いた段の1か所だけを見逃す仕組みなので、他の段・他の数字が下がっていないことも見る。
    */
   it("組み替えを書いた段では、下げた数字の代わりに上げた数字が確かに伸びている", () => {
-    const checked: string[] = [];
+    const checked = new Set<string>();
     for (const spec of SPEC) {
       for (const t of spec.tradeOffs ?? []) {
         const after = findSkill(AFTER, spec.id);
         const before = findSkill(BEFORE, spec.id);
+        const num = (level: LevelEntry | undefined, path: string) => (level ? valueAt(level, path) : undefined) as number | undefined;
         const cur = after.levels[t.level - 1], prev = after.levels[t.level - 2], was = before.levels[t.level - 1];
-        const num = (level: LevelEntry, path: string) => valueAt(level, path) as number;
-        expect(num(cur, t.lower), `${spec.id} Lv${t.level} ${t.lower}`).toBeLessThan(num(prev, t.lower));
-        expect(num(cur, t.raise), `${spec.id} Lv${t.level} ${t.raise}(前の段)`).toBeGreaterThan(num(prev, t.raise));
-        expect(num(cur, t.raise), `${spec.id} Lv${t.level} ${t.raise}(変更前)`).toBeGreaterThan(num(was, t.raise));
-        checked.push(spec.id);
+        const lowered = num(cur, t.lower)!, raised = num(cur, t.raise)!;
+        let against = 0;
+        for (const [label, ref] of [["変更前", was], ["前の段", prev]] as const) {
+          const refLower = num(ref, t.lower);
+          if (refLower === undefined || lowered >= refLower) continue;
+          against += 1;
+          expect(raised, `${spec.id} Lv${t.level} ${t.raise}(${label}より上)`).toBeGreaterThan(num(ref, t.raise)!);
+        }
+        expect(against, `${spec.id} Lv${t.level}: 下がっていないのに組み替えに書いてある`).toBeGreaterThan(0);
+        checked.add(spec.id);
       }
     }
-    expect(checked.sort()).toEqual(["mocchi_s3_yoiyami", "phoenix_s2_c", "treant_s2_a", "treant_s3_b"]);
+    expect([...checked].sort()).toEqual(["mocchi_s3_yoiyami", "phoenix_s2_c", "treant_s2_a", "treant_s3_b"]);
+  });
+
+  /*
+   * **HP型に振り替えた技は、攻撃力倍率が全段で同じ・最大HP比例が段ごとに伸びる。**
+   * Lv5 だけ倍率が急に下がる形へ戻さない(依頼主の指定 2026-09-28)。
+   */
+  it("HP型に振り替えた技は、倍率が全段同じで、最大HP比例だけが段ごとに伸びる", () => {
+    const want: Record<string, { multiplier: number; hp: number[] }> = {
+      treant_s2_a: { multiplier: 0.60, hp: [0.12, 0.135, 0.135, 0.15, 0.15] },
+      treant_s3_b: { multiplier: 0.65, hp: [0.16, 0.18, 0.18, 0.20, 0.20] },
+      phoenix_s2_c: { multiplier: 0.55, hp: [0.125, 0.125, 0.125, 0.14, 0.14] },
+      mocchi_s3_yoiyami: { multiplier: 1.25, hp: [0.15, 0.17, 0.17, 0.19, 0.19] },
+    };
+    for (const [id, { multiplier, hp }] of Object.entries(want)) {
+      const levels = findSkill(AFTER, id).levels;
+      expect(levels.map((l) => valueAt(l, "DAMAGE#0.multiplier")), id).toEqual([multiplier, multiplier, multiplier, multiplier, multiplier]);
+      expect(levels.map((l) => valueAt(l, "DAMAGE#0.hpCoefficient")), id).toEqual(hp);
+    }
   });
 
   it("スキルID・持つ属性・光闇固有・スロットは変わっていない", () => {

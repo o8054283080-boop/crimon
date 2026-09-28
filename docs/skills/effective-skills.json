@@ -8065,14 +8065,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.70倍(最大HPの7.5%を加算)",
+       "ダメージ倍率 0.60倍(最大HPの12%を加算)",
        "50%でスタン (1ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.7,
-        "hpCoefficient": 0.075
+        "multiplier": 0.6,
+        "hpCoefficient": 0.12
        },
        {
         "kind": "STUN",
@@ -8087,14 +8087,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.75倍(最大HPの8.5%を加算)",
+       "ダメージ倍率 0.60倍(最大HPの13.5%を加算)",
        "50%でスタン (1ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.75,
-        "hpCoefficient": 0.085
+        "multiplier": 0.6,
+        "hpCoefficient": 0.135
        },
        {
         "kind": "STUN",
@@ -8109,14 +8109,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.80倍(最大HPの8.5%を加算)",
+       "ダメージ倍率 0.60倍(最大HPの13.5%を加算)",
        "60%でスタン (1ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.8,
-        "hpCoefficient": 0.085
+        "multiplier": 0.6,
+        "hpCoefficient": 0.135
        },
        {
         "kind": "STUN",
@@ -8131,14 +8131,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.85倍(最大HPの10%を加算)",
+       "ダメージ倍率 0.60倍(最大HPの15%を加算)",
        "60%でスタン (1ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.85,
-        "hpCoefficient": 0.1
+        "multiplier": 0.6,
+        "hpCoefficient": 0.15
        },
        {
         "kind": "STUN",
@@ -8644,14 +8644,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.80倍(最大HPの11%を加算)",
+       "ダメージ倍率 0.65倍(最大HPの16%を加算)",
        "70%で速度-30% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.8,
-        "hpCoefficient": 0.11
+        "multiplier": 0.65,
+        "hpCoefficient": 0.16
        },
        {
         "kind": "DEBUFF",
@@ -8668,14 +8668,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.85倍(最大HPの12%を加算)",
+       "ダメージ倍率 0.65倍(最大HPの18%を加算)",
        "70%で速度-30% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.85,
-        "hpCoefficient": 0.12
+        "multiplier": 0.65,
+        "hpCoefficient": 0.18
        },
        {
         "kind": "DEBUFF",
@@ -8692,14 +8692,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.90倍(最大HPの12%を加算)",
+       "ダメージ倍率 0.65倍(最大HPの18%を加算)",
        "85%で速度-30% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.9,
-        "hpCoefficient": 0.12
+        "multiplier": 0.65,
+        "hpCoefficient": 0.18
        },
        {
         "kind": "DEBUFF",
@@ -8716,14 +8716,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.95倍(最大HPの14%を加算)",
+       "ダメージ倍率 0.65倍(最大HPの20%を加算)",
        "85%で速度-30% (2ターン)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.95,
-        "hpCoefficient": 0.14
+        "multiplier": 0.65,
+        "hpCoefficient": 0.2
        },
        {
         "kind": "DEBUFF",
@@ -19238,15 +19238,15 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.80倍(最大HPの8%を加算)",
+       "ダメージ倍率 0.55倍(最大HPの12.5%を加算)",
        "75%で治癒阻害 (2ターン、回復を受けられない)",
        "味方全体を回復 術者の最大HPの10%"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.8,
-        "hpCoefficient": 0.08
+        "multiplier": 0.55,
+        "hpCoefficient": 0.125
        },
        {
         "kind": "HEAL_BLOCK",
@@ -19267,44 +19267,15 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.88倍(最大HPの8.8%を加算)",
-       "75%で治癒阻害 (2ターン、回復を受けられない)",
-       "味方全体を回復 術者の最大HPの10%"
-      ],
-      "effects": [
-       {
-        "kind": "DAMAGE",
-        "multiplier": 0.8800000000000001,
-        "hpCoefficient": 0.08800000000000001
-       },
-       {
-        "kind": "HEAL_BLOCK",
-        "chance": 0.75,
-        "durationTurns": 2
-       },
-       {
-        "kind": "HEAL",
-        "scaleStat": "hp",
-        "healRate": 0.1,
-        "applyTo": "ALLIES"
-       }
-      ],
-      "flags": {}
-     },
-     {
-      "level": 3,
-      "target": "ALL_ENEMIES",
-      "cooldownTurns": 4,
-      "lines": [
-       "ダメージ倍率 0.88倍(最大HPの8.8%を加算)",
+       "ダメージ倍率 0.55倍(最大HPの12.5%を加算)",
        "85%で治癒阻害 (2ターン、回復を受けられない)",
        "味方全体を回復 術者の最大HPの10%"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.8800000000000001,
-        "hpCoefficient": 0.08800000000000001
+        "multiplier": 0.55,
+        "hpCoefficient": 0.125
        },
        {
         "kind": "HEAL_BLOCK",
@@ -19321,19 +19292,48 @@
       "flags": {}
      },
      {
-      "level": 4,
+      "level": 3,
       "target": "ALL_ENEMIES",
       "cooldownTurns": 4,
       "lines": [
-       "ダメージ倍率 0.88倍(最大HPの8.8%を加算)",
+       "ダメージ倍率 0.55倍(最大HPの12.5%を加算)",
        "85%で治癒阻害 (2ターン、回復を受けられない)",
        "味方全体を回復 術者の最大HPの12%"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 0.8800000000000001,
-        "hpCoefficient": 0.08800000000000001
+        "multiplier": 0.55,
+        "hpCoefficient": 0.125
+       },
+       {
+        "kind": "HEAL_BLOCK",
+        "chance": 0.85,
+        "durationTurns": 2
+       },
+       {
+        "kind": "HEAL",
+        "scaleStat": "hp",
+        "healRate": 0.12,
+        "applyTo": "ALLIES"
+       }
+      ],
+      "flags": {}
+     },
+     {
+      "level": 4,
+      "target": "ALL_ENEMIES",
+      "cooldownTurns": 4,
+      "lines": [
+       "ダメージ倍率 0.55倍(最大HPの14%を加算)",
+       "85%で治癒阻害 (2ターン、回復を受けられない)",
+       "味方全体を回復 術者の最大HPの12%"
+      ],
+      "effects": [
+       {
+        "kind": "DAMAGE",
+        "multiplier": 0.55,
+        "hpCoefficient": 0.14
        },
        {
         "kind": "HEAL_BLOCK",
@@ -20531,13 +20531,13 @@
       "target": "SELF",
       "cooldownTurns": 0,
       "lines": [
-       "自身のターン開始時、味方全体を自身最大HP8%回復。敵の現在HP割合に応じ与ダメージ最大+50%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
+       "自身のターン開始時、味方全体を自身最大HP8%回復。敵の現在HP割合に応じ与ダメージ最大+60%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
       ],
       "effects": [],
       "passive": {
        "kind": "REBIRTH",
        "heal": 0.08,
-       "damage": 0.5,
+       "damage": 0.6,
        "cooldown": 9
       },
       "flags": {}
@@ -20547,13 +20547,13 @@
       "target": "SELF",
       "cooldownTurns": 0,
       "lines": [
-       "自身のターン開始時、味方全体を自身最大HP10%回復。敵の現在HP割合に応じ与ダメージ最大+50%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
+       "自身のターン開始時、味方全体を自身最大HP10%回復。敵の現在HP割合に応じ与ダメージ最大+70%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
       ],
       "effects": [],
       "passive": {
        "kind": "REBIRTH",
        "heal": 0.1,
-       "damage": 0.5,
+       "damage": 0.7,
        "cooldown": 9
       },
       "flags": {}
@@ -20563,13 +20563,13 @@
       "target": "SELF",
       "cooldownTurns": 0,
       "lines": [
-       "自身のターン開始時、味方全体を自身最大HP10%回復。敵の現在HP割合に応じ与ダメージ最大+55%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
+       "自身のターン開始時、味方全体を自身最大HP10%回復。敵の現在HP割合に応じ与ダメージ最大+80%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
       ],
       "effects": [],
       "passive": {
        "kind": "REBIRTH",
        "heal": 0.1,
-       "damage": 0.55,
+       "damage": 0.8,
        "cooldown": 9
       },
       "flags": {}
@@ -20579,13 +20579,13 @@
       "target": "SELF",
       "cooldownTurns": 0,
       "lines": [
-       "自身のターン開始時、味方全体を自身最大HP10%回復。敵の現在HP割合に応じ与ダメージ最大+55%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
+       "自身のターン開始時、味方全体を自身最大HP10%回復。敵の現在HP割合に応じ与ダメージ最大+90%。HP0で全回復復活、ゲージ維持(CT9、戦闘不能中は進まない)"
       ],
       "effects": [],
       "passive": {
        "kind": "REBIRTH",
        "heal": 0.1,
-       "damage": 0.55,
+       "damage": 0.9,
        "cooldown": 9
       },
       "flags": {}
@@ -39159,14 +39159,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 5,
       "lines": [
-       "ダメージ倍率 1.60倍(最大HPの10%を加算)",
+       "ダメージ倍率 1.25倍(最大HPの15%を加算)",
        "70%で治癒阻害 (2ターン、回復を受けられない)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.6,
-        "hpCoefficient": 0.1
+        "multiplier": 1.25,
+        "hpCoefficient": 0.15
        },
        {
         "kind": "HEAL_BLOCK",
@@ -39181,14 +39181,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 5,
       "lines": [
-       "ダメージ倍率 1.75倍(最大HPの10%を加算)",
+       "ダメージ倍率 1.25倍(最大HPの17%を加算)",
        "70%で治癒阻害 (2ターン、回復を受けられない)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.75,
-        "hpCoefficient": 0.1
+        "multiplier": 1.25,
+        "hpCoefficient": 0.17
        },
        {
         "kind": "HEAL_BLOCK",
@@ -39203,14 +39203,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 5,
       "lines": [
-       "ダメージ倍率 1.75倍(最大HPの10%を加算)",
+       "ダメージ倍率 1.25倍(最大HPの17%を加算)",
        "80%で治癒阻害 (2ターン、回復を受けられない)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.75,
-        "hpCoefficient": 0.1
+        "multiplier": 1.25,
+        "hpCoefficient": 0.17
        },
        {
         "kind": "HEAL_BLOCK",
@@ -39225,14 +39225,14 @@
       "target": "ALL_ENEMIES",
       "cooldownTurns": 5,
       "lines": [
-       "ダメージ倍率 1.80倍(最大HPの10%を加算)",
+       "ダメージ倍率 1.25倍(最大HPの19%を加算)",
        "80%で治癒阻害 (3ターン、回復を受けられない)"
       ],
       "effects": [
        {
         "kind": "DAMAGE",
-        "multiplier": 1.8,
-        "hpCoefficient": 0.1
+        "multiplier": 1.25,
+        "hpCoefficient": 0.19
        },
        {
         "kind": "HEAL_BLOCK",

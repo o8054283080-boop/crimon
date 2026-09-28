@@ -1464,23 +1464,24 @@ const TREANT: MonsterTemplate = {
     {
       id: "treant_s2_a",
       name: "からみつくねっこ",
-      description: "ダメージ倍率 0.70倍(最大HPの7.5%を加算)。50%でスタン (1ターン)",
+      description: "ダメージ倍率 0.60倍(最大HPの12%を加算)。50%でスタン (1ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.075 },
+        { kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.12 },
         { kind: "STUN", durationTurns: 1, chance: 0.5 },
       ],
+      // HP型の技。攻撃力倍率は全段0.60倍のまま、最大HP比例を伸ばす(依頼主の指定 2026-09-28)
       levelOverrides: [
         // Lv1
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.7, hpCoefficient: 0.075 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
-        // Lv2 ダメージ倍率 0.70倍→0.75倍 / 最大HP比例 7.5%→8.5%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.75, hpCoefficient: 0.085 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
-        // Lv3 ダメージ倍率 0.75倍→0.80倍 / スタンの発動率 50%→60%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.085 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
-        // Lv4 ダメージ倍率 0.80倍→0.85倍 / 最大HP比例 8.5%→10%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.1 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
-        // Lv5 クールタイム -1(4→3ターン) / HP型強化: ATK0.85→0.60 / 最大HP10%→15%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.12 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+        // Lv2 最大HP比例 12%→13.5%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.135 }, { kind: "STUN", durationTurns: 1, chance: 0.5 }] },
+        // Lv3 スタンの発動率 50%→60%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.135 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
+        // Lv4 最大HP比例 13.5%→15%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.15 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
+        // Lv5 クールタイム -1(4→3ターン)
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.15 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
       ],
     },
@@ -1560,23 +1561,24 @@ const TREANT: MonsterTemplate = {
     {
       id: "treant_s3_b",
       name: "たいじゅのいかり",
-      description: "ダメージ倍率 0.80倍(最大HPの11%を加算)。70%で速度-30% (2ターン)",
+      description: "ダメージ倍率 0.65倍(最大HPの16%を加算)。70%で速度-30% (2ターン)",
       target: "ALL_ENEMIES",
       cooldownTurns: 4,
       effects: [
-        { kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.11 },
+        { kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.16 },
         { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 },
       ],
+      // HP型の技。攻撃力倍率は全段0.65倍のまま、最大HP比例を伸ばす(依頼主の指定 2026-09-28)
       levelOverrides: [
         // Lv1
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.11 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
-        // Lv2 ダメージ倍率 0.80倍→0.85倍 / 最大HP比例 11%→12%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.12 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
-        // Lv3 ダメージ倍率 0.85倍→0.90倍 / 弱体の発動率 70%→85%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.12 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
-        // Lv4 ダメージ倍率 0.90倍→0.95倍 / 最大HP比例 12%→14%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.14 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
-        // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン / HP型強化: ATK0.95→0.65 / 最大HP14%→20%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.16 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv2 最大HP比例 16%→18%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.18 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.7 }] },
+        // Lv3 弱体の発動率 70%→85%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.18 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv4 最大HP比例 18%→20%
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.2 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.2 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.85 }] },
       ],
     },

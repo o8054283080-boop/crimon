@@ -63,12 +63,6 @@ export interface SkillSpec {
   allowWeaker?: Record<string, string>;
   /** 1つの段で数字を下げて別の数字を上げる組み替え(R6) */
   tradeOffs?: readonly TradeOff[];
-  /**
-   * 指定の無い値を、変更前から**丸めずに**引き継ぐ(R2 の端数整理をしない)。
-   * 1つの段だけを変えるためにこの一覧へ載せたスキルで、触っていない段が
-   * 端数整理で動いてしまうのを止める(フェニックスの炎の翼 Lv2〜4 の 0.88倍など)。
-   */
-  inheritExact?: true;
   /** 曖昧な指定をどう具体化したか */
   note?: string;
 }
@@ -209,7 +203,7 @@ function locate(effects: Effect[], path: string, create = false): { holder: Reco
 
 /* ============================================================ 解決 */
 
-function inherit(target: Effect, source: Effect, kind: string, exact = false): void {
+function inherit(target: Effect, source: Effect, kind: string): void {
   const fixed = (target as Marked)[FIXED] ?? new Set<string>();
   for (const [key, value] of Object.entries(source)) {
     if (fixed.has(key)) continue;
@@ -218,12 +212,12 @@ function inherit(target: Effect, source: Effect, kind: string, exact = false): v
       const theirs = keyOf(value as Effect[]);
       for (const [k, e] of mine) {
         const src = theirs.get(k);
-        if (src && !(e as Marked)[FRESH]) inherit(e, src, e.kind, exact);
+        if (src && !(e as Marked)[FRESH]) inherit(e, src, e.kind);
       }
       continue;
     }
     if (typeof value === "number" && typeof target[key] === "number") {
-      target[key] = exact || direction(kind, key) === null ? value : roundUpNice(value, niceStep(kind, key, target));
+      target[key] = direction(kind, key) === null ? value : roundUpNice(value, niceStep(kind, key, target));
     }
   }
 }
@@ -237,7 +231,7 @@ function levelEffects(spec: SkillSpec, before: SkillReport, level: number): Effe
   keyOf(effects).forEach((effect, key) => {
     if ((effect as Marked)[FRESH]) return;
     const src = beforeKeyed.get(key);
-    if (src) inherit(effect, src, effect.kind, spec.inheritExact === true);
+    if (src) inherit(effect, src, effect.kind);
   });
   if (spec.levelStructure) effects = spec.levelStructure(level, effects, beforeLevel);
   return effects;
@@ -341,27 +335,36 @@ function enforceMonotonic(spec: SkillSpec, levels: { cooldownTurns: number; effe
 }
 
 /**
- * R6 の書き間違いを止める。下げた数字は本当に前の段より下がっていて、
- * 上げる数字は変更前の同じ段と前の段の**両方**を上回っていること。
+ * R6 の書き間違いを止める。
+ *
+ * 下げた数字は、変更前の同じ段か前の段の**どちらかより本当に下がっている**こと。
+ * 下がった相手ごとに、上げる数字がその相手を上回っていること
+ * (変更前より下げたなら変更前より上、前の段より下げたなら前の段より上)。
  */
 function checkTradeOffs(spec: SkillSpec, before: SkillReport, levels: { cooldownTurns: number; effects: Effect[] }[]): void {
+  const at = (effects: readonly Effect[] | undefined, path: string): number | undefined => {
+    if (!effects) return undefined;
+    const found = locate(effects as Effect[], path);
+    const value = found ? found.holder[found.key] : undefined;
+    return typeof value === "number" ? value : undefined;
+  };
   for (const t of spec.tradeOffs ?? []) {
-    const at = (effects: readonly Effect[], path: string): number | undefined => {
-      const found = locate(effects as Effect[], path);
-      const value = found ? found.holder[found.key] : undefined;
-      return typeof value === "number" ? value : undefined;
-    };
     const cur = levels[t.level - 1]?.effects;
+    if (!cur) throw new Error(`${spec.id} Lv${t.level}: 組み替えの段がありません`);
     const prev = levels[t.level - 2]?.effects;
     const was = before.levels[t.level - 1]?.effects as unknown as Effect[] | undefined;
-    if (!cur || !prev || !was) throw new Error(`${spec.id} Lv${t.level}: 組み替えの段がありません`);
-    const lowered = at(cur, t.lower), lowerPrev = at(prev, t.lower);
-    const raised = at(cur, t.raise), raisePrev = at(prev, t.raise), raiseWas = at(was, t.raise);
-    if (lowered === undefined || lowerPrev === undefined || !(lowered < lowerPrev - EPS)) {
-      throw new Error(`${spec.id} Lv${t.level}: ${t.lower} が前の段より下がっていないのに、組み替えに書いてある`);
-    }
-    if (raised === undefined || raisePrev === undefined || raiseWas === undefined || !(raised > raisePrev + EPS) || !(raised > raiseWas + EPS)) {
-      throw new Error(`${spec.id} Lv${t.level}: ${t.raise} が変更前と前の段の両方を上回っていない(組み替えにならない)`);
+    const lowered = at(cur, t.lower);
+    const raised = at(cur, t.raise);
+    if (lowered === undefined || raised === undefined) throw new Error(`${spec.id} Lv${t.level}: ${t.lower} / ${t.raise} が見つかりません`);
+    const against = [at(was, t.lower) !== undefined && lowered < at(was, t.lower)! - EPS ? { label: "変更前", effects: was } : null,
+      at(prev, t.lower) !== undefined && lowered < at(prev, t.lower)! - EPS ? { label: "前の段", effects: prev } : null]
+      .filter((x): x is { label: string; effects: Effect[] } => x !== null);
+    if (against.length === 0) throw new Error(`${spec.id} Lv${t.level}: ${t.lower} が変更前にも前の段にも下がっていないのに、組み替えに書いてある`);
+    for (const { label, effects } of against) {
+      const base = at(effects, t.raise);
+      if (base === undefined || !(raised > base + EPS)) {
+        throw new Error(`${spec.id} Lv${t.level}: ${t.lower} を${label}より下げたのに、${t.raise} が${label}を上回っていない(組み替えにならない)`);
+      }
     }
   }
 }
