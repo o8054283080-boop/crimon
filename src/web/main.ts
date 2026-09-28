@@ -164,7 +164,7 @@ import {
   PRESET_NAME_MAX_LENGTH,
 } from "../game/equipmentPreset.js";
 import { renderMonsterExchange } from "./views/monsterExchange.js";
-import { renderMonsterStorage } from "./views/monsterStorage.js";
+import { renderMonsterStorage, type MonsterStorageExchangeDraft } from "./views/monsterStorage.js";
 import { depositMonsters, exchangeStoredMonstersForPoints, withdrawMonsters } from "../game/monsterStorage.js";
 import { sendMonstersForPoints, tryExchangeMonsterPoints } from "../game/monsterPoints.js";
 import { crimShardsOwned, useCrimShard } from "../game/crim.js";
@@ -472,6 +472,8 @@ interface AppState {
   monsterExchangeFilterOpen: boolean;
   monsterExchangeSortKey: MonsterSortKey;
   monsterStorageNotice: string | null;
+  /** 保管所で「ポイントへ」を押した後の確かめ待ち */
+  monsterStorageExchange: MonsterStorageExchangeDraft | null;
   selectedStageId: string | null;
   selectedDifficulty: Difficulty;
   stageRun: StageRunState | null;
@@ -756,6 +758,7 @@ const state: AppState = {
   monsterExchangeFilterOpen: false,
   monsterExchangeSortKey: "recommended",
   monsterStorageNotice: null,
+  monsterStorageExchange: null,
   selectedStageId: null,
   selectedDifficulty: "NORMAL",
   stageRun: null,
@@ -1146,6 +1149,7 @@ function goBack(): void {
   state.autoEquipNotice = null;
   state.autoEquipRenamingIndex = null;
   state.monsterStorageNotice = null;
+  state.monsterStorageExchange = null;
   state.createNotice = null;
   state.partyNotice = null;
   state.arenaNotice = null;
@@ -1795,16 +1799,8 @@ function handleSendMonstersForPoints(): void {
 }
 
 /** ポイントを交換する。足りない時は何も減らさない(`tryExchangeMonsterPoints` が守る) */
-function askMonsterStorageQuantity(action: string, max: number): number | null {
-  const raw = window.prompt(`${action}体数を入力してください（1〜${max}）`, String(max));
-  if (raw === null) return null;
-  const count = Math.floor(Number(raw));
-  if (!Number.isFinite(count) || count < 1 || count > max) {
-    window.alert(`1〜${max}の範囲で入力してください。`);
-    return null;
-  }
-  return count;
-}
+/** セーブできずに元へ戻した時の案内。黙って戻すと「押しても預けられない」に見える */
+const MONSTER_STORAGE_SAVE_FAILED = "データを保存できなかったため、元に戻しました。端末の空き容量やブラウザの設定を確かめてください。";
 
 function handleExchangeMonsterPoints(itemId: string): void {
   const beforeMonsters = structuredClone(state.player.monsters);
@@ -5636,16 +5632,20 @@ function renderScreen(): void {
       content = renderMonsterStorage({
         player: state.player,
         notice: state.monsterStorageNotice,
+        pendingExchange: state.monsterStorageExchange,
         onBack: () => navigate("MONSTERS"),
-        onDeposit: (dexId, star, max) => {
-          const count = askMonsterStorageQuantity("預ける", max);
-          if (count === null) return;
+        onDeposit: (dexId, star, count) => {
           const beforeMonsters = structuredClone(state.player.monsters);
           const beforeStorage = structuredClone(state.player.monsterStorage);
           const moved = depositMonsters(state.player, dexId, star, count);
-          if (moved === 0 || !savePlayerState(state.player)) {
+          state.monsterStorageExchange = null;
+          if (moved === 0) {
+            state.monsterStorageNotice = "預けられる個体がいませんでした。編成やロック・育成の状態を確かめてください。";
+            playSfx("denied", 0.7);
+          } else if (!savePlayerState(state.player)) {
             state.player.monsters = beforeMonsters;
             state.player.monsterStorage = beforeStorage;
+            state.monsterStorageNotice = MONSTER_STORAGE_SAVE_FAILED;
             playSfx("denied", 0.7);
           } else {
             state.monsterStorageNotice = `${moved}体を保管所へ預けました。`;
@@ -5653,15 +5653,18 @@ function renderScreen(): void {
           }
           render();
         },
-        onWithdraw: (dexId, star, max) => {
-          const count = askMonsterStorageQuantity("取り出す", max);
-          if (count === null) return;
+        onWithdraw: (dexId, star, count) => {
           const beforeMonsters = structuredClone(state.player.monsters);
           const beforeStorage = structuredClone(state.player.monsterStorage);
           const moved = withdrawMonsters(state.player, dexId, star, count);
-          if (moved === 0 || !savePlayerState(state.player)) {
+          state.monsterStorageExchange = null;
+          if (moved === 0) {
+            state.monsterStorageNotice = "取り出せるモンスターがいませんでした。";
+            playSfx("denied", 0.7);
+          } else if (!savePlayerState(state.player)) {
             state.player.monsters = beforeMonsters;
             state.player.monsterStorage = beforeStorage;
+            state.monsterStorageNotice = MONSTER_STORAGE_SAVE_FAILED;
             playSfx("denied", 0.7);
           } else {
             state.monsterStorageNotice = `${moved}体を所持モンスターへ取り出しました。`;
@@ -5669,17 +5672,29 @@ function renderScreen(): void {
           }
           render();
         },
-        onExchangePoints: (dexId, star, max) => {
-          const count = askMonsterStorageQuantity("ポイントに変える", max);
-          if (count === null) return;
-          const gain = count * star;
-          if (!window.confirm(`★${star} Lv1 を ${count}体送り、${gain}Pに変えます。\n送ったモンスターは戻せません。よろしいですか？`)) return;
+        onRequestExchange: (dexId, star, count) => {
+          state.monsterStorageExchange = { dexId, star, count };
+          playSfx("select");
+          render();
+        },
+        onCancelExchange: () => {
+          state.monsterStorageExchange = null;
+          render();
+        },
+        onConfirmExchange: () => {
+          const draft = state.monsterStorageExchange;
+          state.monsterStorageExchange = null;
+          if (!draft) return;
           const beforeStorage = structuredClone(state.player.monsterStorage);
           const beforePoints = state.player.monsterPoints ?? 0;
-          const result = exchangeStoredMonstersForPoints(state.player, dexId, star, count);
-          if (!result || !savePlayerState(state.player)) {
+          const result = exchangeStoredMonstersForPoints(state.player, draft.dexId, draft.star, draft.count);
+          if (!result) {
+            state.monsterStorageNotice = "ポイントへ変えられるモンスターがいませんでした。";
+            playSfx("denied", 0.7);
+          } else if (!savePlayerState(state.player)) {
             state.player.monsterStorage = beforeStorage;
             state.player.monsterPoints = beforePoints;
+            state.monsterStorageNotice = MONSTER_STORAGE_SAVE_FAILED;
             playSfx("denied", 0.7);
           } else {
             state.monsterStorageNotice = `${result.sent}体を送って ${result.gained}P を受け取りました（所持 ${result.total}P）`;
