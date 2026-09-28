@@ -841,10 +841,9 @@ export class BattleEngine {
       const rebirthKey = {};
       for (const ally of this.units.filter(u => u.alive && u.team === unit.team)) {
         const before = ally.currentHp;
-        const ratioBefore = hpRatio(ally);
-        applyHeal(ally, Math.round(unit.maxHp * passive.heal));
+        // 通常の HEAL と同じ補正(回復量補正・HP50%以下の回復量UP)。onHealed も中で1回だけ
+        this.healAlly(unit, ally, unit.maxHp * passive.heal, rebirthKey);
         this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount: ally.currentHp - before });
-        this.acc?.onHealed(unit, ally, ratioBefore, rebirthKey);
       }
     }
     if (unit.alive && passive?.kind === "ILLUSION" && !extraTurn) {
@@ -906,11 +905,10 @@ export class BattleEngine {
         const blessingKey = {};
         for (const ally of allies) {
           const before = ally.currentHp;
-          const ratioBefore = hpRatio(ally);
-          applyHeal(ally, healAmount);
+          // 通常の HEAL と同じ補正。onHealed も中で1回だけ
+          this.healAlly(actor, ally, actor.maxHp * blessing.healOnAct, blessingKey);
           const healed = ally.currentHp - before;
           if (healed > 0) this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount: healed });
-          if (healed > 0) this.acc?.onHealed(actor, ally, ratioBefore, blessingKey);
           applyStatEffect(ally, "atk", ATK_UP, blessing.atkUpTurns, "BUFF");
         }
         this.push(`  → ${this.label(actor)} の「水の祝福」で味方全体が ${healAmount} 回復し、攻撃力が上がった！`);
@@ -1073,8 +1071,7 @@ export class BattleEngine {
       this.pushPassiveCue(holder);
       // 無敵は1ターン固定。Lv5でも伸ばさない(依頼主の指定)
       applyStatus(victim, "INVINCIBLE", 1, holder.instanceId);
-      const healAmount = Math.round(holder.maxHp * passive.heal);
-      applyHeal(victim, healAmount);
+      const healAmount = this.healAlly(holder, victim, holder.maxHp * passive.heal, {});
       this.push(`  → ${this.label(holder)} の「戦乙女の誓い」！ ${this.label(victim)} は1ターン無敵になり、HPが ${healAmount} 回復！`);
       this.pushEvent({ targetId: victim.instanceId, kind: "HEAL", amount: healAmount });
       return;
@@ -2346,8 +2343,7 @@ export class BattleEngine {
         source.shieldTurns = Math.max(source.shieldTurns, effect.duration);
         announce();
       } else if (effect.kind === "LOWEST_ALLY_HEAL") {
-        const amount = Math.round(lowestAlly.maxHp * effect.value);
-        applyHeal(lowestAlly, amount);
+        const amount = this.healAlly(source, lowestAlly, lowestAlly.maxHp * effect.value, resolution);
         this.pushEvent({ targetId: lowestAlly.instanceId, kind: "HEAL", amount });
         announce();
       } else if (effect.kind === "LOWEST_ALLY_GAUGE") {
@@ -2372,8 +2368,7 @@ export class BattleEngine {
         }
       } else if (effect.kind === "ALLY_HEAL") {
         for (const ally of allies) {
-          const amount = Math.round(ally.maxHp * effect.value);
-          applyHeal(ally, amount);
+          const amount = this.healAlly(source, ally, ally.maxHp * effect.value, resolution);
           this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount });
         }
         announce();
@@ -2402,7 +2397,7 @@ export class BattleEngine {
         // **明示的な延長だけ**が残りターンへ加算する道。通常の再付与は長い方を採るだけ
         if (receiver.alive && !this.isImmune(receiver) && this.rng() < effect.chance) { extendEffects(receiver, effect.duration, "DEBUFF"); if (receiver.poisonTurns) receiver.poisonTurns += effect.duration; if (receiver.healBlockTurns) receiver.healBlockTurns += effect.duration; announce(); }
       } else if (effect.kind === "HEAL_CLEANSE") {
-        applyHeal(lowestAlly, Math.round(lowestAlly.maxHp * effect.value));
+        this.healAlly(source, lowestAlly, lowestAlly.maxHp * effect.value, resolution);
         cleanseDebuffs(lowestAlly, 1);
         announce();
       } else if (effect.kind === "REGEN" && !hasStatus(lowestAlly, "BUFF_BLOCK")) {
@@ -2443,6 +2438,9 @@ export class BattleEngine {
         if (latent.resolution === "ON_CRIT" && !anyCrit) return;
         if (latent.effectType === "ALLY_SUPPORT" && latent.resolution === "ON_CRIT") {
           receiver.gauge += latent.value * ATB_THRESHOLD;
+        } else if (latent.effectType === "ALLY_SUPPORT") {
+          // 味方への回復は通常の HEAL と同じ補正。自分だけの回復(SELF_HEAL)は今までどおり
+          this.healAlly(source, receiver, receiver.maxHp * latent.value, resolution);
         } else {
           applyHeal(receiver, Math.round(receiver.maxHp * latent.value));
         }
@@ -2509,6 +2507,30 @@ export class BattleEngine {
   }
 
   /** 継続回復がかかっている場合、手番開始時に最大HPのregenRate分回復する */
+  /**
+   * **味方を回復するスキル・パッシブ・潜在の回復量。**通常の HEAL と同じ補正を掛ける:
+   *
+   *   回復量 = round(基礎 × 術者の回復量補正 × アクセの「HP50%以下の味方への回復量UP」)
+   *
+   * 回復量補正(`healingMultiplier`)は術者側の才能・装備・アクセの弱効果「回復量+」。
+   * HP50%以下の判定は受け手1体ごとに、回復する**直前**のHPで行う。
+   * 回復後のアクセ効果(onHealed)は `key` ごとに受け手1体につき1回だけ。
+   *
+   * 自分だけの回復・吸血・継続回復・装備の効果・被弾時の回復・ボスの回復には使わない
+   * (アクセの回復量UPを乗せるかは別の判断が要る)。
+   */
+  private healAlly(source: BattleUnit, receiver: BattleUnit, base: number, key: object | null, boosted = false): number {
+    // boosted: 基礎に回復量補正が掛かり済み(波及治療)。二重に掛けない
+    const boost = boosted ? 1 : source.def.combatMods?.healingMultiplier ?? 1;
+    const accHeal = this.acc ? this.acc.healMultiplier(source, receiver) : 1;
+    const amount = Math.round(base * boost * accHeal);
+    if (amount <= 0 || !receiver.alive) return 0;
+    const ratioBefore = hpRatio(receiver);
+    applyHeal(receiver, amount);
+    this.acc?.onHealed(source, receiver, ratioBefore, key);
+    return amount;
+  }
+
   private applyRegenAtTurnStart(unit: BattleUnit): void {
     if (unit.regenTurns <= 0 || !unit.alive) return;
     const savedRate = unit.regenRate;
@@ -2821,6 +2843,8 @@ export class BattleEngine {
             // アクセ(サポート)の「HP50%以下の味方への回復量UP」。アクセが無ければ1
             const accHeal = this.acc ? this.acc.healMultiplier(source, receiver) : 1;
             const healAmount = Math.round(healBase * effect.healRate * healBoost * (1 + lowHp) * accHeal);
+            // 波及治療の元。アクセの倍率は受け手ごとに掛け直すので、ここでは外しておく
+            const splashBase = Math.round(healBase * effect.healRate * healBoost * (1 + lowHp));
             if (healAmount <= 0) continue;
             const ratioBeforeHeal = hpRatio(receiver);
             applyHeal(receiver, healAmount);
@@ -2834,13 +2858,20 @@ export class BattleEngine {
              */
             const splash = skill.talentMods?.healSplash;
             if (splash && receivers.length === 1) {
-              const amount = Math.round(healAmount * splash);
+              /*
+               * 波及した回復も味方への回復なので、通常の HEAL と同じ補正を**受け手ごとに**掛ける。
+               * 元の受け手のアクセ倍率は持ち越さない(元がHP50%以下でも、波及先がそうとは限らない)。
+               */
+              let spread = 0;
               for (const ally of this.units) {
-                if (!ally.alive || ally.team !== source.team || ally === receiver || amount <= 0) continue;
-                applyHeal(ally, amount);
+                if (!ally.alive || ally.team !== source.team || ally === receiver) continue;
+                // アクセが無ければ従来どおり round(元の回復量 × 波及率)
+                const amount = this.healAlly(source, ally, splashBase * splash, resolution, true);
+                if (amount <= 0) continue;
+                spread = Math.max(spread, amount);
                 this.pushEvent({ targetId: ally.instanceId, kind: "HEAL", amount });
               }
-              if (amount > 0) this.push(`  → 回復が味方全体へ波及した！ (${amount})`);
+              if (spread > 0) this.push(`  → 回復が味方全体へ波及した！ (${spread})`);
             }
           }
           break;
