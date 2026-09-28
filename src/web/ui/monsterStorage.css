@@ -1,1 +1,20 @@
-.monster-storage-screen{padding-bottom:calc(var(--bottom-nav-height,72px) + 24px)}.monster-storage-list{display:grid;gap:10px}.monster-storage-row{display:grid;gap:10px;padding:12px;border:1px solid rgba(214,180,96,.28);border-radius:12px;background:rgba(10,24,48,.72)}.monster-storage-row__main{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.monster-storage-row__main strong{flex:1 1 160px}.monster-storage-row__count{font-size:1.15rem;font-weight:800;color:#f0d58a}.monster-storage-row__actions{display:flex;gap:8px;flex-wrap:wrap}.monster-storage-row__actions .btn{flex:1 1 120px}
+.monster-storage-screen{padding-bottom:calc(var(--bottom-nav-height,72px) + 24px)}
+/* 一画面にできるだけ多く並べる。1種類=1行(高さ約44px) */
+.monster-storage-section{display:grid;gap:4px;margin:0 0 10px}
+.monster-storage-section__title{margin:4px 2px 0;font-size:.9rem;font-weight:800;color:#f0d58a}
+.monster-storage-section__note,.monster-storage-section__empty{margin:0 2px 2px;font-size:.72rem;line-height:1.4;color:rgba(230,222,200,.72)}
+.monster-storage-list{display:grid;gap:3px}
+.monster-storage-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;min-height:44px;padding:4px 6px 4px 8px;box-sizing:border-box;border:1px solid rgba(214,180,96,.22);border-radius:8px;background:rgba(10,24,48,.72)}
+.monster-storage-row__main{display:grid;gap:1px;min-width:0}
+.monster-storage-row__name{overflow:hidden;font-size:.82rem;line-height:1.2;white-space:nowrap;text-overflow:ellipsis}
+.monster-storage-row__meta{overflow:hidden;font-size:.7rem;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;color:rgba(230,222,200,.78)}
+.monster-storage-row__count{font-size:.8rem;font-weight:800;color:#f0d58a}
+.monster-storage-row__actions{display:flex;align-items:center;gap:4px}
+.monster-storage-qty{display:grid;grid-template-columns:28px 44px 28px;height:34px;border:1px solid rgba(214,180,96,.4);border-radius:8px;overflow:hidden;background:rgba(4,12,26,.9)}
+.monster-storage-qty__step{padding:0;border:0;background:rgba(214,180,96,.14);color:#f0d58a;font-size:1rem;font-weight:800;cursor:pointer}
+/* iOS は16px未満の入力欄を押すと画面を拡大する */
+.monster-storage-qty__input{width:100%;min-width:0;height:100%;box-sizing:border-box;padding:0;border:0;background:transparent;color:#fff4d4;font-size:16px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield}
+.monster-storage-qty__input::-webkit-outer-spin-button,.monster-storage-qty__input::-webkit-inner-spin-button{margin:0;-webkit-appearance:none}
+.monster-storage-act{min-width:0;min-height:34px;height:34px;padding:0 9px;font-size:.78rem;white-space:nowrap}
+.monster-storage-row--confirm{grid-template-columns:minmax(0,1fr) auto;border-color:rgba(240,120,96,.55);background:rgba(60,16,16,.6)}
+.monster-storage-confirm__text{margin:0;font-size:.72rem;line-height:1.35;color:#ffe2d6}

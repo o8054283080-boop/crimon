@@ -1244,3 +1244,15 @@ psql -h /var/tmp -p 5433 -U postgres -c "create role anon; create role authentic
   暗い床の上では目立たないが、**明るい地に重ねると、もやの下にうっすら格子が残る。**
   透過PNGを描き直してもらえたら、`art/monsters-raw/ruin_spirit-WATER.png` を置き換えて
   `node tools/prepareSprites.mjs <その1枚だけのフォルダ> src/web/assets/monsters` で差し替える。
+
+## モンスター保管所(2026-09-28)
+
+- 依頼主「保管所に保管できなくなっています」。ロジック(`isMonsterStorageEligible` / `depositMonsters`)は
+  召喚→保存→読み込み後の個体でも正しく通っていた。PCのChromiumでは預けられる。
+- 数量を `window.prompt` で聞いていたので、**ホーム画面に追加したアプリ(PWA)やダイアログを止めた端末では
+  入力窓が出ずに null が返り、押しても何も起きなかった**と見て、画面内の数量選び(−/数字/＋)へ置き換えた。
+  ポイント化の `window.confirm` も画面内の確認へ。セーブ失敗で元に戻した時は理由を出す。
+- あわせて「一画面にできるだけ多く」の指定で、1種類=1行(44px)に詰めた。
+- `tests/monsterStorageUi.test.ts` がブラウザのダイアログへ戻すと落とす。**このリポジトリのテストに DOM は無い**
+  (jsdom が入っていない)ので、押した時の動きは実ブラウザで確かめること。
+- **これで直らなかった場合**、次に疑うのは依頼主の個体が条件外(編成・塔の挑戦中・才能やロック)であること。
