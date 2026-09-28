@@ -4386,7 +4386,21 @@ body {
 
 .result-actions__row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+/*
+ * 4つ以上並ぶ時(冒険の「次のステージへ」が加わった時など)は、主役を1段目に1つだけ置く。
+ * 横1列のままだと390px幅で「次のステージ…」「もう一…」と文字が切れて読めなかった
+ */
+.result-actions__row:has(> :nth-child(4)) > .result-actions__btn {
+  flex: 1 1 auto;
+}
+
+.result-actions__row:has(> :nth-child(4)) > .result-actions__btn.btn--primary {
+  flex-basis: 100%;
+  order: -1;
 }
 
 .result-actions__btn {

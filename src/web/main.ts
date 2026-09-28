@@ -66,11 +66,16 @@ import {
   beginTowerRun,
   abandonTowerRun,
   describeTowerRun,
+  emptyTowerRewardResult,
   getTowerParty,
+  isTowerClimbFinished,
   nextTowerFloor,
   setupTowerBattle,
+  setupTowerReplayBattle,
   spendTowerStamina,
   towerBlockReason,
+  towerReplayBlockReason,
+  towerReplayMaxFloor,
   type TowerMode,
 } from "../game/trialTower.js";
 import { renderTrialTower } from "./views/trialTower.js";
@@ -417,7 +422,7 @@ type LastRun =
  * 次にやることが分からないまま同じボタンだけが残る。
  */
 type TowerOutcome = {
-  kind: "CHECKPOINT" | "WIPED" | "COMPLETED" | "PAUSED";
+  kind: "CHECKPOINT" | "WIPED" | "COMPLETED" | "PAUSED" | "REPLAY_WIN" | "REPLAY_LOSE";
   /** その決着がついた階 */
   floor: number;
   reward: TowerRewardResult;
@@ -677,6 +682,13 @@ interface AppState {
   towerNotice: string | null;
   /** 直前の階の決着。塔の画面へ戻った理由と、受け取った報酬を伝える */
   towerOutcome: TowerOutcome | null;
+  /**
+   * クリア済みの階への再挑戦(スタミナ0・報酬なし)。戦っている間だけ入る。
+   * **控えの登坂(trialTowerRun)とは別物**で、保存もしない。
+   */
+  towerReplay: { mode: TowerMode; floor: number } | null;
+  /** 再挑戦の欄で選んでいる階。null なら到達した一番上の階 */
+  towerReplayFloor: number | null;
   /** 戦闘画面の ⏹ が押された。今の階を終えたら登坂を止める */
   towerStopRequested: boolean;
   towerPanel: "NONE" | "ENEMY_INFO" | "RANKING" | "REWARDS";
@@ -869,6 +881,8 @@ const state: AppState = {
   towerNotice: null,
   towerMode: "NORMAL",
   towerOutcome: null,
+  towerReplay: null,
+  towerReplayFloor: null,
   towerStopRequested: false,
   towerPanel: "NONE",
   towerEnemyInfoFloor: 60,
@@ -1115,7 +1129,8 @@ function hasBattleRun(screen: ScreenName): boolean {
     case "GOLD_DUNGEON_BATTLE": return state.goldDungeonRun !== null;
     case "AWAKENING_DEPTH_BATTLE": return state.awakeningDepthRun !== null;
     case "RUINS_BATTLE": return state.ruinRun !== null;
-    case "TOWER_BATTLE": return (state.towerMode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun) != null;
+    case "TOWER_BATTLE": return state.towerReplay !== null
+      || (state.towerMode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun) != null;
     case "ARENA_BATTLE": return state.arenaEntry !== null;
     default: return true;
   }
@@ -1247,6 +1262,7 @@ function navigate(screen: ScreenName): void {
   state.towerNotice = null;
   state.towerOutcome = null;
   state.towerStopRequested = false;
+  state.towerReplay = null;
   state.towerPanel = "NONE";
   state.towerEnemyInfoFloor = 60;
   render();
@@ -2242,6 +2258,16 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
    * 素直な流れなので、そこだけ残す。
    */
   const arenaRetry = isArena && state.stageResult?.cleared === false;
+  /*
+   * **冒険をクリアしたら、次のステージへそのまま進める**(依頼主の指定:「サクサク進める」)。
+   * 選び直す → 次のステージを探す → 挑戦、の3手を1手にする。難易度はそのまま引き継ぐ。
+   * 次がまだ未クリアならそちらが主役。もう越えた先へ戻る周回中は「もう一度」を主役に残す。
+   */
+  const nextStage = !fromAutoFarm && last?.kind === "STAGE" && state.stageResult?.cleared
+    ? STAGES[STAGES.findIndex((s) => s.id === last.stage.id) + 1] ?? null
+    : null;
+  const nextIsNew = nextStage !== null && last?.kind === "STAGE"
+    && !isStageCleared(state.player, nextStage.id, last.difficulty);
   if (last && (!isArena || arenaRetry)) {
     actions.push({
       // アリーナはスタミナではなく挑戦券で回す。⚡0 と出すと「無料で回せる」と読めてしまう
@@ -2250,7 +2276,7 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
         : arenaRetry
           ? "🔁 同じ相手にもう一度 (挑戦券1)"
           : `🔁 もう一度 (⚡${cost})`,
-      variant: "primary",
+      variant: nextIsNew ? "ghost" : "primary",
       disabled: reason !== null,
       reason: reason ?? undefined,
       run: () => {
@@ -2272,6 +2298,20 @@ function buildResultActions(fromAutoFarm: boolean): ResultAction[] {
             handleAutoFarmGoldDungeon(last.floor, state.autoFarmCount);
             break;
         }
+      },
+    });
+  }
+  if (nextStage && last?.kind === "STAGE") {
+    const difficulty = last.difficulty;
+    actions.push({
+      label: `▶ 次のステージへ ${nextStage.chapter}-${nextStage.stageNumber} (⚡${STAGE_STAMINA_COST})`,
+      variant: nextIsNew ? "primary" : "ghost",
+      disabled: reason !== null,
+      run: () => {
+        const before = state.screen;
+        startStage(nextStage, difficulty);
+        // 始められなかった時は結果画面に留める(黙って消えると何が起きたか分からない)
+        if (state.screen === before) render();
       },
     });
   }
@@ -3897,7 +3937,58 @@ function finishTowerFloor(cleared: boolean, setup: TowerBattleSetup, engine: Bat
   startTowerFloor();
 }
 
+/**
+ * クリア済みの階へ1戦だけ挑む(依頼主の指定: スタミナ0・報酬なし)。
+ *
+ * 登坂の途中経過・到達階・報酬には触れない。全回復の状態から始まる。
+ */
+function startTowerReplay(floor: number): void {
+  const mode = state.towerMode;
+  const blocked = towerReplayBlockReason(state.player, mode, floor);
+  if (blocked) {
+    state.towerNotice = blocked;
+    playSfx("denied", 0.7);
+    render();
+    return;
+  }
+  state.towerNotice = null;
+  state.towerOutcome = null;
+  state.towerPanel = "NONE";
+  state.towerReplay = { mode, floor };
+  state.screen = "TOWER_BATTLE";
+  render();
+}
+
+function finishTowerReplay(cleared: boolean, floor: number): void {
+  state.towerReplay = null;
+  state.towerOutcome = { kind: cleared ? "REPLAY_WIN" : "REPLAY_LOSE", floor, reward: emptyTowerRewardResult() };
+  state.screen = "TRIAL_TOWER";
+  render();
+}
+
+function renderCurrentTowerReplay(replay: { mode: TowerMode; floor: number }): BattleViewHandle {
+  const setup = setupTowerReplayBattle(state.player, replay.mode, replay.floor);
+  if (!setup) throw new Error("試練の塔の再挑戦を組めません");
+  const engine = new BattleEngine(setup.playerDefs, setup.enemyDefs, {
+    initialPlayerHp: setup.initialPlayerHp,
+    initialCooldowns: setup.initialCooldowns,
+    trialTowerFloor: setup.floor.floor,
+    trialTowerHardMultipliers: setup.hardMultipliers,
+  });
+  const traitLabel = TOWER_TRAIT_LABEL[setup.floor.trait];
+  return renderBattleView({
+    engine,
+    playerTeam: setup.playerDefs,
+    enemyTeam: setup.enemyDefs,
+    title: `塔 ${setup.mode === "HARD" ? "HARD " : ""}${setup.floor.floor}階 再挑戦${traitLabel ? ` ${traitLabel}` : ""}`,
+    venue: "tower",
+    resultLabel: () => "塔に戻る",
+    onFinish: (winner) => finishTowerReplay(winner === "PLAYER", setup.floor.floor),
+  });
+}
+
 function renderCurrentTowerBattle(): BattleViewHandle {
+  if (state.towerReplay) return renderCurrentTowerReplay(state.towerReplay);
   const run = state.towerMode === "HARD" ? state.player.trialTowerHardRun : state.player.trialTowerRun;
   if (!run) throw new Error("trialTowerRun is not set");
   const setup = setupTowerBattle(state.player, run);
@@ -5378,6 +5469,10 @@ function renderScreen(): void {
         hardUnlocked,
         bestFloor,
         nextFloor: nextTowerFloor(state.player, activeMode),
+        climbFinished: isTowerClimbFinished(state.player, activeMode),
+        replayMaxFloor: towerReplayMaxFloor(state.player, activeMode),
+        replayFloor: state.towerReplayFloor ?? towerReplayMaxFloor(state.player, activeMode),
+        replayBlockedReason: getTowerParty(state.player).length === 0 ? "塔の編成が組まれていません" : null,
         run: describeTowerRun(state.player, activeMode),
         party: getTowerParty(state.player),
         player: state.player,
@@ -5424,6 +5519,11 @@ function renderScreen(): void {
           state.towerOutcome = null;
           startTowerFloor();
         },
+        onChangeReplayFloor: (floor) => {
+          state.towerReplayFloor = floor;
+          render();
+        },
+        onReplay: (floor) => startTowerReplay(floor),
         onAbandon: () => {
           abandonTowerRun(state.player, activeMode);
           savePlayerState(state.player);
@@ -5443,6 +5543,7 @@ function renderScreen(): void {
             return;
           }
           state.towerMode = nextMode;
+          state.towerReplayFloor = null;
           state.towerNotice = null;
           state.towerOutcome = null;
           state.towerPanel = "NONE";

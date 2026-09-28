@@ -42,6 +42,14 @@ export interface TrialTowerProps {
   bestFloor: number;
   /** 次に挑む階 */
   nextFloor: number;
+  /** 今月は100階まで登り切り、登る階が残っていない */
+  climbFinished: boolean;
+  /** 再挑戦できる一番上の階(0 = まだ1階も越えていない) */
+  replayMaxFloor: number;
+  /** 再挑戦に選んでいる階 */
+  replayFloor: number;
+  /** 再挑戦できない理由(編成が空など)。null なら挑める */
+  replayBlockedReason: string | null;
   /** 登坂の途中なら、その顔ぶれの今の状態。null なら登坂していない */
   run: {
     floor: number;
@@ -69,7 +77,7 @@ export interface TrialTowerProps {
    * null なら、ただ塔を開いただけ。
    */
   outcome: {
-    kind: "CHECKPOINT" | "WIPED" | "COMPLETED" | "PAUSED";
+    kind: "CHECKPOINT" | "WIPED" | "COMPLETED" | "PAUSED" | "REPLAY_WIN" | "REPLAY_LOSE";
     /** その決着がついた階 */
     floor: number;
     reward: TowerRewardResult;
@@ -99,6 +107,9 @@ export interface TrialTowerProps {
   onEditParty: () => void;
   /** 次の階へ挑む(登坂の開始も継続もこれ) */
   onChallenge: () => void;
+  onChangeReplayFloor: (floor: number) => void;
+  /** クリア済みの階へ1戦だけ挑む(スタミナ0・報酬なし) */
+  onReplay: (floor: number) => void;
   /** 登坂をやめる(途中経過を捨てて節からやり直しになる) */
   onAbandon: () => void;
   onBack: () => void;
@@ -119,7 +130,7 @@ function renderEnemyInfoModal(props: TrialTowerProps): HTMLElement {
   const enemies = trialTowerEnemyInfo(props.enemyInfoFloor, props.mode);
   return el("div", { className: "tower-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "tower-enemy-info-title", "data-tour": "tower-enemy-info" }, [
     el("button", { type: "button", className: "tower-modal__backdrop", "aria-label": "閉じる", onclick: props.onClosePanel }, []),
-    el("section", { className: "tower-modal__sheet" }, [
+    el("section", { className: "tower-modal__sheet" }, nodes([
       el("div", { className: "tower-modal__head" }, [
         el("div", {}, [
           el("span", { className: "tower-modal__eyebrow" }, [`${props.enemyInfoFloor}F`]),
@@ -128,6 +139,15 @@ function renderEnemyInfoModal(props: TrialTowerProps): HTMLElement {
         el("button", { type: "button", className: "btn btn--ghost tower-modal__close", onclick: props.onClosePanel, "aria-label": "敵情報を閉じる" }, ["✕"]),
       ]),
       el("p", { className: "tower-modal__lead" }, ["この階で実際に使われるスキルと固有効果です。能力値・装備は表示していません。"]),
+      // クリアした階なら、敵を見たその場で練習に入れる(スタミナ0・報酬なし)
+      props.enemyInfoFloor <= props.replayMaxFloor
+        ? el("button", {
+            type: "button",
+            className: "btn btn--ghost tower-modal__replay",
+            disabled: props.replayBlockedReason !== null,
+            onclick: () => props.onReplay(props.enemyInfoFloor),
+          }, [`この階に再挑戦 (⚡0・報酬なし)`])
+        : null,
       el("div", { className: "tower-intel" }, enemies.map((enemy) =>
         el("article", { className: "tower-intel__card" }, nodes([
           el("h3", {}, [`【${enemy.name}】`]),
@@ -135,7 +155,7 @@ function renderEnemyInfoModal(props: TrialTowerProps): HTMLElement {
           renderEnemyAbilityList("パッシブ", enemy.passives),
         ])),
       )),
-    ]),
+    ])),
   ]);
 }
 
@@ -423,7 +443,7 @@ function renderOutcome(props: TrialTowerProps): HTMLElement | null {
     COMPLETED: {
       icon: "👑",
       title: "塔を登り切りました",
-      lines: [`${TOWER_FLOOR_COUNT}階すべてを踏破しました。`, "もう一度、下から登り直すこともできます。"],
+      lines: [`${TOWER_FLOOR_COUNT}階すべてを踏破しました。`, "クリアした階は、下の「クリア済みの階に再挑戦」から何度でも挑めます(スタミナ0・報酬なし)。"],
     },
     CHECKPOINT: {
       icon: "⚑",
@@ -444,6 +464,16 @@ function renderOutcome(props: TrialTowerProps): HTMLElement | null {
       icon: "⏸",
       title: "登坂を中断しました",
       lines: ["削られたHPも待ち時間もそのまま残っています。", `${props.nextFloor}階から続きに入れます。`],
+    },
+    REPLAY_WIN: {
+      icon: "⚔",
+      title: `${outcome.floor}階の再挑戦に勝ちました`,
+      lines: ["再挑戦なので、報酬と到達階・登坂の途中経過は変わりません。"],
+    },
+    REPLAY_LOSE: {
+      icon: "⚔",
+      title: `${outcome.floor}階の再挑戦に敗れました`,
+      lines: ["再挑戦なので、登坂の途中経過や到達階には影響しません。何度でも挑めます。"],
     },
   };
 
@@ -526,18 +556,23 @@ function renderHero(props: TrialTowerProps): HTMLElement {
     el("div", { className: "tower-hero__resume" }, [
       checkpoint > 0 ? `${checkpoint}階の節から再開できます` : "まだ節を越えていません",
     ]),
-    el("div", { className: "tower-hero__next" }, [
-      el("span", { className: "tower-hero__arrow" }, ["▲"]),
-      el("span", { className: "tower-hero__next-label" }, [props.run ? "登坂中 — 次は" : "次に挑む"]),
-      el("span", { className: "tower-hero__next-floor" }, [`${nextFloor}階`]),
-      nextDef && isTowerBossFloor(nextFloor)
-        ? el("span", { className: "tower-tag tower-tag--boss" }, ["関門"])
-        // **傾向からではなく階の名札を出す。**傾向は5種類しかないので、
-        // 51階以降の「妨害」「鉄壁」を名乗れず、加速の階が「疾風の階」と出ていた
-        : nextDef && nextDef.label
-          ? el("span", { className: "tower-tag" }, [nextDef.label])
-          : null,
-    ].filter((n): n is HTMLElement => n !== null)),
+    props.climbFinished
+      ? el("div", { className: "tower-hero__next" }, [
+          el("span", { className: "tower-hero__arrow" }, ["👑"]),
+          el("span", { className: "tower-hero__next-label" }, ["今月は踏破済み"]),
+        ])
+      : el("div", { className: "tower-hero__next" }, [
+          el("span", { className: "tower-hero__arrow" }, ["▲"]),
+          el("span", { className: "tower-hero__next-label" }, [props.run ? "登坂中 — 次は" : "次に挑む"]),
+          el("span", { className: "tower-hero__next-floor" }, [`${nextFloor}階`]),
+          nextDef && isTowerBossFloor(nextFloor)
+            ? el("span", { className: "tower-tag tower-tag--boss" }, ["関門"])
+            // **傾向からではなく階の名札を出す。**傾向は5種類しかないので、
+            // 51階以降の「妨害」「鉄壁」を名乗れず、加速の階が「疾風の階」と出ていた
+            : nextDef && nextDef.label
+              ? el("span", { className: "tower-tag" }, [nextDef.label])
+              : null,
+        ].filter((n): n is HTMLElement => n !== null)),
   ]);
 }
 
@@ -703,7 +738,6 @@ function renderNextFloor(props: TrialTowerProps, floor: TowerFloor): HTMLElement
  * ============================================================ */
 
 function renderChallenge(props: TrialTowerProps): HTMLElement {
-  const done = props.bestFloor >= TOWER_FLOOR_COUNT && !props.run;
   const label = props.run ? `${props.nextFloor}階へ進む` : `${props.nextFloor}階から登る`;
 
   /*
@@ -721,9 +755,20 @@ function renderChallenge(props: TrialTowerProps): HTMLElement {
     ]);
   }
 
+  /*
+   * **登り切った後に「101階から登る」を出さない。**101階は無い(依頼主の指摘)。
+   * 登る階が残っていないので挑戦ボタンそのものを置かず、再挑戦へ案内する。
+   */
+  if (props.climbFinished) {
+    return el("section", { className: "tower-cta" }, [
+      el("p", { className: "tower-cta__done" }, [
+        `今月は${TOWER_FLOOR_COUNT}階まで登り切りました。来月になると到達階が戻り、もう一度報酬を受け取りながら登れます。`,
+      ]),
+    ]);
+  }
+
   return el("section", { className: "tower-cta" }, nodes([
     props.blockedReason ? el("p", { className: "tower-cta__warn" }, [props.blockedReason]) : null,
-    done ? el("p", { className: "tower-cta__done" }, ["塔を登り切りました。もう一度登ることもできます。"]) : null,
     el(
       "button",
       {
@@ -737,6 +782,45 @@ function renderChallenge(props: TrialTowerProps): HTMLElement {
         el("span", { className: "tower-cta__go-cost" }, [`⚡${TOWER_STAMINA_COST}`]),
       ],
     ),
+  ]));
+}
+
+/* ============================================================
+ * 再挑戦
+ *
+ * クリアした階へ、全回復の状態から1戦だけ挑む(依頼主の指定: スタミナ0・報酬なし)。
+ * 登坂の途中経過とは切り離してある。ボスの練習や、編成を試すための場所。
+ * ============================================================ */
+
+function renderReplay(props: TrialTowerProps): HTMLElement | null {
+  if (props.replayMaxFloor < 1) return null;
+  const floor = Math.max(1, Math.min(props.replayMaxFloor, props.replayFloor));
+  const def = findTowerFloor(floor);
+  const options = Array.from({ length: props.replayMaxFloor }, (_, i) => props.replayMaxFloor - i).map((value) =>
+    el("option", { value: String(value), selected: value === floor }, [
+      `${value}階${isTowerBossFloor(value) ? " 👑" : ""}`,
+    ]),
+  );
+  return el("section", { className: "panel tower-replay", "data-tour": "tower-replay" }, nodes([
+    el("h2", {}, ["クリア済みの階に再挑戦"]),
+    el("p", { className: "tower-replay__lead" }, [
+      "全員が全回復した状態で1戦だけ挑みます。スタミナは使わず、報酬は出ません。登坂の途中経過や到達階も変わりません。",
+    ]),
+    el("div", { className: "tower-replay__row" }, [
+      el("select", {
+        className: "tower-replay__select",
+        "aria-label": "再挑戦する階",
+        onchange: (event: Event) => props.onChangeReplayFloor(Number((event.target as HTMLSelectElement).value)),
+      }, options),
+      el("button", {
+        type: "button",
+        className: "btn btn--ghost tower-replay__go",
+        disabled: props.replayBlockedReason !== null,
+        onclick: () => props.onReplay(floor),
+      }, [`${floor}階に再挑戦 (⚡0)`]),
+    ]),
+    def && def.label ? el("p", { className: "tower-replay__label" }, [def.label]) : null,
+    props.replayBlockedReason ? el("p", { className: "tower-cta__warn" }, [props.replayBlockedReason]) : null,
   ]));
 }
 
@@ -782,7 +866,7 @@ function renderParty(props: TrialTowerProps): HTMLElement {
 
 function renderLadderTile(props: TrialTowerProps, floor: TowerFloor): HTMLElement {
   const passed = floor.floor <= props.bestFloor;
-  const now = floor.floor === props.nextFloor;
+  const now = !props.climbFinished && floor.floor === props.nextFloor;
   const boss = isTowerBossFloor(floor.floor);
   const check = isTowerCheckpoint(floor.floor);
   const locked = floor.floor > props.nextFloor;
@@ -834,7 +918,7 @@ function renderLadder(props: TrialTowerProps): HTMLElement {
     const from = s * TOWER_CHECKPOINT_INTERVAL + 1;
     const to = Math.min(TOWER_FLOOR_COUNT, (s + 1) * TOWER_CHECKPOINT_INTERVAL);
     const floors = TRIAL_TOWER_FLOORS.filter((f) => f.floor >= from && f.floor <= to);
-    const active = props.nextFloor >= from && props.nextFloor <= to;
+    const active = !props.climbFinished && props.nextFloor >= from && props.nextFloor <= to;
     const passed = props.bestFloor >= to;
     const locked = from > props.nextFloor;
     const boss = floors.find((floor) => isTowerBossFloor(floor.floor));
@@ -904,8 +988,9 @@ export function renderTrialTower(props: TrialTowerProps): HTMLElement {
     renderMonthlyRewards(props),
     renderRules(),
     renderRun(props),
-    floor ? renderNextFloor(props, floor) : null,
+    floor && !props.climbFinished ? renderNextFloor(props, floor) : null,
     renderChallenge(props),
+    renderReplay(props),
     renderParty(props),
     renderLadder(props),
     props.run
