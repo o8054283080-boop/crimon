@@ -1,4 +1,4 @@
-import { MonsterInstance, starLabel } from "../../core/monsterInstance.js";
+import { MonsterInstance, createdSkillsOf, starLabel } from "../../core/monsterInstance.js";
 import { Skill, describeSkillLines } from "../../core/skill.js";
 import { describeSkillTarget } from "./skillPanel.js";
 import { findMonsterById } from "../../data/monsters.js";
@@ -9,6 +9,7 @@ import {
   checkMonsterCreate,
   creatableSkills,
   currentSkillOf,
+  describeCreatedSkill,
 } from "../../game/monsterCreate.js";
 import { MonsterSortKey, sortMonsters } from "../../game/monsterSort.js";
 import { TalentAwakeningProps, renderTalentAwakeningBody } from "./talentAwakening.js";
@@ -68,7 +69,8 @@ export interface MonsterCreateProps {
   onSelectMaterial: (instanceId: string | null) => void;
   onSelectSlot: (slot: CreateSlot) => void;
   onConfirm: () => void;
-  onClear: () => void;
+  /** その枠の移し替えを取り消す。**別の枠の移し替えは残る** */
+  onClear: (slot: CreateSlot) => void;
   onBack: () => void;
   /** 直前の操作の結果。断った理由もここに出す */
   notice: string | null;
@@ -284,6 +286,8 @@ function renderSwap(props: MonsterCreateProps, material: MonsterInstance): HTMLE
 
   const chosen = props.slot !== null ? offers.find((o) => o.slot === props.slot) : undefined;
   const before = props.slot !== null ? currentSkillOf(props.target, props.slot) : undefined;
+  // 同じ枠に前の移し替えがあれば、それだけが置き換わる(別の枠の移し替えは残る)
+  const overwritten = props.slot !== null ? createdSkillsOf(props.target).find((c) => c.slot === props.slot) : undefined;
 
   const rows: (HTMLElement | null)[] = [
     el("h2", {}, ["どの枠を移し替えるか"]),
@@ -293,6 +297,11 @@ function renderSwap(props: MonsterCreateProps, material: MonsterInstance): HTMLE
           skillCard(before, { heading: "いま", tone: "from" }),
           el("div", { className: "create-compare__arrow" }, [icon("chevron")]),
           skillCard(chosen.skill, { heading: "移し替え後", tone: "to" }),
+        ])
+      : null,
+    chosen && overwritten
+      ? el("p", { className: "create-cost__warn create-cost__warn--sub" }, [
+          `この枠の移し替え「${describeCreatedSkill(overwritten)}」と置き換わります。もう一方の枠の移し替えはそのまま残ります。`,
         ])
       : null,
   ];
@@ -467,12 +476,11 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
             onclick: props.onGoSkillDex,
           }, ["📘 スキル図鑑で素材を探す"])
           : null,
-        target.createdSkill
-          ? el("div", { className: "create-target__has" }, [
-              el("span", { className: "create-mark" }, [icon("summon", { size: 12 }), "移し替え済み"]),
-              el("button", { type: "button", className: "btn btn--ghost", onclick: props.onClear }, ["元に戻す"]),
-            ])
-          : null,
+        // 移し替えは枠ごとに持てる。どの枠に何が入っているかを1行ずつ並べ、枠ごとに戻せるようにする
+        ...createdSkillsOf(target).map((created) => el("div", { className: "create-target__has" }, [
+          el("span", { className: "create-mark" }, [icon("summon", { size: 12 }), describeCreatedSkill(created)]),
+          el("button", { type: "button", className: "btn btn--ghost", onclick: () => props.onClear(created.slot) }, [`${SLOT_LABEL[created.slot]}を元に戻す`]),
+        ])),
       ].filter(isEl)),
     ]),
 
@@ -483,7 +491,7 @@ export function renderMonsterCreate(props: MonsterCreateProps): HTMLElement {
         `素材にしたモンスターは**消滅します**。星${CREATE_MATERIAL_STAR}であること、どちらの編成にも入っていないことが条件です。`.replace(/\*\*/g, ""),
       ]),
       el("p", { className: "create-cost__warn create-cost__warn--sub" }, [
-        "移し替えを持てるのは1体につき1つだけです。別のモンスターを合成すると、前の移し替えは失われます。",
+        "移し替えはスキル2とスキル3にそれぞれ1つずつ持てます。同じ枠へもう一度合成すると、その枠の前の移し替えだけが置き換わります。",
       ]),
       /*
        * **払う額を、押す前に見せる。**

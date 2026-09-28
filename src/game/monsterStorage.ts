@@ -1,5 +1,5 @@
 import type { MonsterInstance } from "../core/monsterInstance.js";
-import { createMonsterInstance } from "../core/monsterInstance.js";
+import { createMonsterInstance, createdSkillsOf } from "../core/monsterInstance.js";
 import type { Star } from "../core/rarity.js";
 import { isCrim } from "./crim.js";
 import type { PlayerState } from "./playerState.js";
@@ -44,7 +44,7 @@ export function isMonsterStorageEligible(state: PlayerState, monster: MonsterIns
   if (monster.level !== 1 || monster.exp !== 0 || monster.locked) return false;
   if (Object.values(monster.equipment ?? {}).some(Boolean)) return false;
   if (monster.skillLevels.some((level) => level !== 1)) return false;
-  if (monster.createdSkill) return false;
+  if (createdSkillsOf(monster).length > 0) return false;
   if (!hasDefaultDevelopment(monster)) return false;
   const used = new Set([
     ...state.partyIds,

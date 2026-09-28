@@ -1,5 +1,5 @@
 import type { Equipment, EquipSlot, EquipStar, SetType, StatRoll, StatType } from "../core/equipment.js";
-import type { CreatedSkill, MonsterInstance } from "../core/monsterInstance.js";
+import { createdSkillsOf, writeCreatedSkills, type CreatedSkill, type MonsterInstance } from "../core/monsterInstance.js";
 import type { MonsterDevelopment, MonsterType } from "../core/monsterDevelopment.js";
 import type { TalentState } from "../core/talents.js";
 import type { Star } from "../core/rarity.js";
@@ -278,9 +278,13 @@ function packMonster(monster: MonsterInstance): Packed {
   // 全部Lv1なら書かない(引いたばかりの個体はこれ)
   if (monster.skillLevels.some((level) => level !== 1)) packed.k = monster.skillLevels;
 
-  if (monster.createdSkill) {
-    packed.c = [monster.createdSkill.slot, monster.createdSkill.skillId, monster.createdSkill.sourceDexId];
-  }
+  /*
+   * 移し替えは枠ごとに最大2つ。**1つ目は旧形式と同じ `c`** に書き、2つ目だけ `c2` に足す
+   * (古い版で開いても1つ目は読める)。
+   */
+  const created = createdSkillsOf(monster);
+  if (created[0]) packed.c = [created[0].slot, created[0].skillId, created[0].sourceDexId];
+  if (created[1]) packed.c2 = [created[1].slot, created[1].skillId, created[1].sourceDexId];
   const development = packDevelopment(monster.development);
   if (development) packed.v = development;
 
@@ -310,10 +314,13 @@ function unpackMonster(packed: Packed): MonsterInstance {
   if (packed.o) monster.locked = true;
   if (Array.isArray(packed.p)) monster.equipmentPresets = packed.p as MonsterInstance["equipmentPresets"];
   if (typeof packed.g === "string" && packed.g) monster.accessoryId = packed.g;
-  if (packed.c) {
-    const [slot, skillId, sourceDexId] = packed.c as [CreatedSkill["slot"], string, string];
-    monster.createdSkill = { slot, skillId, sourceDexId };
+  const created: CreatedSkill[] = [];
+  for (const key of ["c", "c2"] as const) {
+    if (!Array.isArray(packed[key])) continue;
+    const [slot, skillId, sourceDexId] = packed[key] as [CreatedSkill["slot"], string, string];
+    created.push({ slot, skillId, sourceDexId });
   }
+  if (created.length > 0) writeCreatedSkills(monster, createdSkillsOf({ createdSkills: created }));
   return monster;
 }
 

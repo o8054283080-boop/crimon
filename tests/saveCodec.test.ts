@@ -74,7 +74,9 @@ function richState(monsterCount = 40, equipmentCount = 120): PlayerState {
     }
     // 移し替えたスキルを持つ個体
     if (i % 9 === 0) {
-      monster.createdSkill = { slot: 1, skillId: `created_${i}`, sourceDexId: DEX_IDS[(i + 3) % DEX_IDS.length] };
+      monster.createdSkills = [{ slot: 1, skillId: `created_${i}`, sourceDexId: DEX_IDS[(i + 3) % DEX_IDS.length] }];
+      // スキル2・スキル3の両方に移し替えた個体
+      if (i % 18 === 0) monster.createdSkills.push({ slot: 2, skillId: `created3_${i}`, sourceDexId: DEX_IDS[(i + 5) % DEX_IDS.length] });
     }
   }
   return state;
