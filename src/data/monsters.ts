@@ -1479,7 +1479,7 @@ const TREANT: MonsterTemplate = {
         // Lv3 ダメージ倍率 0.75倍→0.80倍 / スタンの発動率 50%→60%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.8, hpCoefficient: 0.085 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
         // Lv4 ダメージ倍率 0.80倍→0.85倍 / 最大HP比例 8.5%→10%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.1 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.6, hpCoefficient: 0.15 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
         // Lv5 クールタイム -1(4→3ターン)
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.85, hpCoefficient: 0.1 }, { kind: "STUN", durationTurns: 1, chance: 0.6 }] },
       ],
@@ -1575,7 +1575,7 @@ const TREANT: MonsterTemplate = {
         // Lv3 ダメージ倍率 0.85倍→0.90倍 / 弱体の発動率 70%→85%
         { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.9, hpCoefficient: 0.12 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
         // Lv4 ダメージ倍率 0.90倍→0.95倍 / 最大HP比例 12%→14%
-        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.14 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
+        { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 0.65, hpCoefficient: 0.2 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 2, chance: 0.85 }] },
         // Lv5 クールタイム -1(4→3ターン) / 弱体の持続 2→3ターン
         { cooldownTurns: 3, effects: [{ kind: "DAMAGE", multiplier: 0.95, hpCoefficient: 0.14 }, { kind: "DEBUFF", stat: "spd", amount: SPD_DOWN, durationTurns: 3, chance: 0.85 }] },
       ],
