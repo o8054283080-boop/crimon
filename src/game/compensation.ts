@@ -57,6 +57,14 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-type-hp-support",
+    title: "タイプ転生の「体力」と「補助」の補正を見直しました",
+    message: "体力タイプが補助タイプより良いところが無かったため、補正を見直しました。すでに転生しているモンスターにもそのまま反映されます。\n\n"
+      + "・体力: HP +15%・抵抗 +10pt / ATK -15%・DEF -10%(HPを +10% から +15% に。クリ率・クリダメの短所をなくしました)\n"
+      + "・補助: SPD +10%・HP +8%・抵抗 +5pt / ATK -10%・クリ率 -5pt・クリダメ -10pt(HPを +10% から +8% に。ATKの短所は -15% から -10% に、クリダメの短所は -15pt から -10pt に小さくし、クリ率 -5pt が加わりました)",
+    kind: "UPDATE", fromDate: "2026-09-28", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-save-backup-quota",
     title: "「データを保存できていません」が出て、保管所へ預けられない不具合を直しました",
     message: "・長く遊んでいる端末で「データを保存できていません」と出て、保管所へ預ける・召喚するなどの結果が保存されず元に戻る不具合を直しました\n"

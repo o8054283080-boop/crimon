@@ -24,7 +24,7 @@ const originalHp = { ...MONSTER_TYPE_STAT_MULTIPLIERS.HP };
 const originalDef = { ...MONSTER_TYPE_STAT_MULTIPLIERS.DEFENSE };
 const originalDefPoint = ABILITY_POINT_VALUES.def;
 function apply(c: Candidate): void {
-  Object.assign(types.HP, { hp: 1.10, atk: .85, def: .90 });
+  Object.assign(types.HP, originalHp);
   Object.assign(types.DEFENSE, { hp: .85, atk: .90, def: c.defenseMultiplier });
   points.def = 5;
 }

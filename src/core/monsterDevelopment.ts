@@ -197,23 +197,30 @@ export function effectiveAbilityPointValues(): Readonly<Record<AllocatableStat, 
  *   ・防御無視    体力型が**約3倍**強い
  *
  * 体力型の `def: 0.90` と防御型の `hp: 0.85` は、この入れ替えを作るための短所。
+ *
+ * ## 体力型を補助型の下位互換にしない
+ *
+ * 以前は体力型と補助型が同じ HP+10%・ATK-15% で、補助型だけが DEF±0・SPD+10% を持っていた。
+ * HPが同じで防御が高いので、防御無視の場面でも体力型が勝てず、**丸ごと下位互換**だった
+ * (依頼主の指摘)。いまは体力型が HP+15% でいちばん倒れにくく、クリの短所も無い。
+ * 補助型は HP+8% に抑えた「速さの型」。`tests/statusValues.test.ts` が逆転を見張る。
  * どちらか片方だけ動かすと3段階が崩れるので、**必ず162個体で測り直すこと**
  * (`npx tsx tools/playerTypeAbilityAudit.ts --runs 200`)。
  */
 export const MONSTER_TYPE_STAT_MULTIPLIERS: Readonly<Record<MonsterType, Readonly<MonsterTypeModifiers>>> = {
   ATTACK: { hp: 0.85, atk: 1.20, def: 0.90, spd: 1, criRate: 0.10, criDmg: 0, accuracy: 0, resistance: -0.10 },
-  HP: { hp: 1.10, atk: 0.85, def: 0.90, spd: 1, criRate: -0.05, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
+  HP: { hp: 1.15, atk: 0.85, def: 0.90, spd: 1, criRate: 0, criDmg: 0, accuracy: 0, resistance: 0.10 },
   DEFENSE: { hp: 0.85, atk: 0.90, def: 1.40, spd: 1, criRate: -0.10, criDmg: -0.10, accuracy: 0, resistance: 0.10 },
-  SUPPORT: { hp: 1.10, atk: 0.85, def: 1, spd: 1.10, criRate: 0, criDmg: -0.15, accuracy: 0, resistance: 0.05 },
+  SUPPORT: { hp: 1.08, atk: 0.90, def: 1, spd: 1.10, criRate: -0.05, criDmg: -0.10, accuracy: 0, resistance: 0.05 },
   DISRUPT: { hp: 1, atk: 0.85, def: 1, spd: 1.08, criRate: 0, criDmg: -0.15, accuracy: 0.15, resistance: -0.05 },
   BALANCE: { hp: 1, atk: 1, def: 1, spd: 1, criRate: 0, criDmg: 0, accuracy: 0, resistance: 0 },
 };
 
 export const MONSTER_TYPE_DESCRIPTIONS: Readonly<Record<MonsterType, string>> = {
   ATTACK: "長所: ATK +20%・クリ率 +10pt / 短所: HP -15%・DEF -10%・抵抗 -10pt",
-  HP: "長所: HP +10%・抵抗 +10pt / 短所: ATK -15%・DEF -10%・クリ率 -5pt・クリダメ -10pt",
+  HP: "長所: HP +15%・抵抗 +10pt / 短所: ATK -15%・DEF -10%",
   DEFENSE: "長所: DEF +40%・抵抗 +10pt / 短所: HP -15%・ATK -10%・クリ率 -10pt・クリダメ -10pt",
-  SUPPORT: "長所: SPD +10%・HP +10%・抵抗 +5pt / 短所: ATK -15%・クリダメ -15pt",
+  SUPPORT: "長所: SPD +10%・HP +8%・抵抗 +5pt / 短所: ATK -10%・クリ率 -5pt・クリダメ -10pt",
   DISRUPT: "長所: SPD +8%・的中 +15pt / 短所: ATK -15%・クリダメ -15pt・抵抗 -5pt",
   BALANCE: "すべての能力補正なし。長所も短所もない標準型",
 };

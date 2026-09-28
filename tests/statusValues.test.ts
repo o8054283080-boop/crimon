@@ -149,8 +149,20 @@ describe("再付与は長い方、明示的な延長だけが足し算", () => {
 });
 
 describe("タイプ転生と能力付与", () => {
-  it("体力タイプは HP+10% / DEF-10%", () => {
-    expect(MONSTER_TYPE_STAT_MULTIPLIERS.HP).toMatchObject({ hp: 1.10, def: 0.90, atk: 0.85 });
+  it("体力タイプは HP+15% / DEF-10%。クリの短所は無い", () => {
+    expect(MONSTER_TYPE_STAT_MULTIPLIERS.HP).toMatchObject({ hp: 1.15, def: 0.90, atk: 0.85, criRate: 0, criDmg: 0, resistance: 0.10 });
+  });
+  it("補助タイプは HP+8% / SPD+10% / ATK-10% / クリ率-5pt / クリダメ-10pt", () => {
+    expect(MONSTER_TYPE_STAT_MULTIPLIERS.SUPPORT).toMatchObject({ hp: 1.08, atk: 0.90, def: 1, spd: 1.10, criRate: -0.05, criDmg: -0.10, resistance: 0.05 });
+  });
+  it("体力タイプは補助タイプの下位互換ではない(防御無視の場面では体力タイプの方が倒れにくい)", () => {
+    const { HP, SUPPORT } = MONSTER_TYPE_STAT_MULTIPLIERS;
+    expect(HP.hp).toBeGreaterThan(SUPPORT.hp);
+    expect(HP.resistance).toBeGreaterThan(SUPPORT.resistance);
+    // 補助型に勝てる長所が1つも無い、という形へ戻さない
+    const better = (["hp", "atk", "def", "spd", "criRate", "criDmg", "accuracy", "resistance"] as const)
+      .filter((key) => HP[key] > SUPPORT[key]);
+    expect(better.length).toBeGreaterThanOrEqual(2);
   });
   it("防御タイプは HP-15% / DEF+40%", () => {
     expect(MONSTER_TYPE_STAT_MULTIPLIERS.DEFENSE).toMatchObject({ hp: 0.85, def: 1.40, atk: 0.90 });
