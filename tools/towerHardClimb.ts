@@ -210,8 +210,32 @@ function lerpAnchors(points: [number, number][], floor: number): number {
   const [f0, v0] = points[upper - 1], [f1, v1] = points[upper];
   return v0 + (v1 - v0) * (floor - f0) / (f1 - f0);
 }
+/**
+ * 1〜99階を「自然に強くなる1本の線」にする案(`CLIMB_CURVE=natural`)。51階から上がり方を強める。
+ * 攻撃・防御・速度は階の平均をアンカーの間で補間。HPは「倒しにくさ」(HP÷通る割合)の目標から逆算するので、
+ * 防御が高い階ほどHPは低い。敵どうしの差は残す。
+ */
+const NATURAL_ATK: [number, number][] = [[1, 25_000], [19, 35_000], [29, 42_000], [39, 50_000], [49, 60_000], [59, 95_000], [69, 105_000], [79, 115_000], [89, 125_000], [99, 135_000]];
+const NATURAL_DEF: [number, number][] = [[1, 250], [19, 700], [29, 1_200], [39, 2_100], [49, 3_000], [59, 3_300], [69, 3_600], [79, 3_900], [89, 4_200], [99, 4_500]];
+const NATURAL_SPD: [number, number][] = [[1, 190], [19, 198], [29, 203], [39, 209], [49, 215], [59, 225], [69, 233], [79, 240], [89, 248], [99, 255]];
+const NATURAL_TOUGHNESS: [number, number][] = [[1, 150_000], [19, 260_000], [29, 320_000], [39, 380_000], [49, 450_000], [59, 520_000], [69, 600_000], [79, 680_000], [89, 760_000], [99, 850_000]];
+const passRate = (def: number) => 1000 / (1000 + 1.2 * def);
+
 function applySmoothCurve(enemies: { stats: Quad & Record<string, unknown> }[], floor: number): void {
   if (floor % 10 === 0) return;
+  if (CURVE === "natural") {
+    const mean = (f: (e: { stats: Quad }) => number) => enemies.reduce((a, e) => a + f(e), 0) / enemies.length;
+    const atkMean = mean((e) => e.stats.atk), defMean = mean((e) => e.stats.def), spdMean = mean((e) => e.stats.spd);
+    const atk = lerpAnchors(NATURAL_ATK, floor), def = lerpAnchors(NATURAL_DEF, floor), spd = lerpAnchors(NATURAL_SPD, floor);
+    for (const e of enemies) {
+      e.stats.atk = Math.max(1, Math.round(atk * e.stats.atk / atkMean));
+      e.stats.def = Math.max(1, Math.round(def * e.stats.def / defMean));
+      e.stats.spd = Math.max(1, Math.round(spd * e.stats.spd / spdMean));
+    }
+    const toughness = mean((e) => e.stats.hp / passRate(e.stats.def));
+    const k = lerpAnchors(NATURAL_TOUGHNESS, floor) / toughness;
+    for (const e of enemies) e.stats.hp = Math.max(1, Math.round(e.stats.hp * k));
+  }
   if (CURVE === "smooth") {
     const mean = (k: keyof Quad) => enemies.reduce((a, e) => a + e.stats[k], 0) / enemies.length;
     const atkMean = mean("atk"), defMean = mean("def");
