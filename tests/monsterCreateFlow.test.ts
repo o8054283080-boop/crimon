@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toBattleDefinition } from "../src/core/monsterInstance.js";
+import { createdSkillsOf, toBattleDefinition } from "../src/core/monsterInstance.js";
 import { findMonsterById } from "../src/data/monsters.js";
 import { applyMonsterCreate, currentSkillOf } from "../src/game/monsterCreate.js";
 import { addMonster, createInitialState, removeMonsters } from "../src/game/playerState.js";
@@ -38,7 +38,7 @@ describe("画面から実行したときのクリエイト", () => {
     removeMonsters(state, [material.id]);
 
     expect(state.monsters.map((m) => m.id)).toEqual([target.id]);
-    expect(state.monsters[0].createdSkill).toBeDefined();
+    expect(createdSkillsOf(state.monsters[0])).toHaveLength(1);
   });
 
   it("**断られたときは素材を消さない**", () => {
@@ -52,7 +52,7 @@ describe("画面から実行したときのクリエイト", () => {
     expect(result.ok).toBe(false);
     // 画面側は ok を見てから取り除く。ここで消してしまうと素材だけ失う
     expect(state.monsters).toHaveLength(2);
-    expect(target.createdSkill).toBeUndefined();
+    expect(createdSkillsOf(target)).toEqual([]);
   });
 
   it("移し替えた技が、画面の表示と戦闘の中身で一致する", () => {
@@ -73,7 +73,7 @@ describe("画面から実行したときのクリエイト", () => {
     expect(inBattle.name).toBe(shown!.name);
   });
 
-  it("置き換えたとき、前の移し替えは消えて枠が戻る", () => {
+  it("別の枠へ移したとき、前の移し替えは残る(両方の素材が消える)", () => {
     const { state, made } = stateWith(
       { dexId: "slime_FIRE", star: 4, level: 30 },
       { dexId: "wisp_WATER", star: 6, level: 60 },
@@ -86,11 +86,13 @@ describe("画面から実行したときのクリエイト", () => {
     const replaced = applyMonsterCreate(target, second, 2, state.partyIds, state.dungeonPartyIds);
     removeMonsters(state, [second.id]);
 
-    expect(replaced.replaced).toBeDefined();
+    expect(replaced.replaced).toBeUndefined();
     expect(state.monsters.map((m) => m.id)).toEqual([target.id]);
 
-    // 前に触った枠は元へ戻っている
-    const dex = findMonsterById(target.dexId)!;
-    expect(currentSkillOf(target, 1)?.id).toBe(dex.skills[1].id);
+    // 前に触った枠(スキル2)も移し替わったまま
+    const wisp = findMonsterById("wisp_WATER")!;
+    const imp = findMonsterById("imp_DARK")!;
+    expect(currentSkillOf(target, 1)?.id).toBe(wisp.skills[1].id);
+    expect(currentSkillOf(target, 2)?.id).toBe(imp.skills[2].id);
   });
 });

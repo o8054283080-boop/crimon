@@ -37,6 +37,28 @@ function resolveCreatedSkill(skillId: string): Skill | undefined {
   return createdSkillResolver?.(skillId);
 }
 
+/**
+ * この個体が持っている移し替え(枠ごとに最大1つ、スキル2→スキル3の順)。
+ *
+ * 新形式 `createdSkills` を優先し、同じ枠が無ければ旧形式 `createdSkill` も拾う。
+ */
+export function createdSkillsOf(instance: Pick<MonsterInstance, "createdSkills" | "createdSkill">): CreatedSkill[] {
+  const bySlot = new Map<1 | 2, CreatedSkill>();
+  const legacy = instance.createdSkill;
+  if (legacy && (legacy.slot === 1 || legacy.slot === 2)) bySlot.set(legacy.slot, legacy);
+  for (const created of instance.createdSkills ?? []) {
+    if (created && (created.slot === 1 || created.slot === 2)) bySlot.set(created.slot, created);
+  }
+  return [...bySlot.values()].sort((a, b) => a.slot - b.slot);
+}
+
+/** 移し替えを書き込む。**書くのは新形式だけ**にして、旧形式の欄は消す */
+export function writeCreatedSkills(instance: MonsterInstance, list: readonly CreatedSkill[]): void {
+  delete instance.createdSkill;
+  if (list.length === 0) delete instance.createdSkills;
+  else instance.createdSkills = [...list].sort((a, b) => a.slot - b.slot);
+}
+
 /** プレイヤーが実際に所持しているモンスター1体分のデータ */
 export interface MonsterInstance {
   id: string;
@@ -51,11 +73,19 @@ export interface MonsterInstance {
   /** 素材への誤使用を防ぐ保護。未設定の旧セーブは未ロックとして扱う。 */
   locked?: boolean;
   /**
-   * クリエイト(スキル合成)で上書きしたスキル。
+   * クリエイト(スキル合成)で上書きしたスキル。**スキル2・スキル3の枠ごとに1つずつ持てる。**
    *
-   * このゲーム独自の仕組みで、星6まで育てた別のモンスターを素材にすると、
-   * その素材のスキル2または3を、この個体の同じ枠へ移し替えられる。
-   * **持てるのは常に1つだけ**で、別のモンスターを合成すると置き換わる。
+   * 星6まで育てた別のモンスターを素材にすると、その素材のスキル2または3を、
+   * この個体の同じ枠へ移し替えられる。**同じ枠へ合成した時だけ**前の移し替えと置き換わる
+   * (依頼主の指定 2026-09-28: スキル3を継承した後にスキル2を継承したら、両方とも変わっているのが本来の構想)。
+   *
+   * 読む時は必ず `createdSkillsOf()` を通すこと(旧形式の `createdSkill` も拾う)。
+   */
+  createdSkills?: CreatedSkill[];
+  /**
+   * **旧形式。読むだけ。**以前は1体に1つしか持てず、この欄に入っていた。
+   * 旧セーブ・登録済みのアリーナ防衛データにはこの形で残っているので、
+   * `createdSkillsOf()` が `createdSkills` と合わせて読む。書き込む時は `createdSkills` へ移して消す。
    */
   createdSkill?: CreatedSkill;
   /** 将来のタイプ転生・能力ポイント・潜在覚醒をまとめた、個体固有の育成情報 */
@@ -219,8 +249,7 @@ export function toBattleDefinition(
   ];
   // 移し替えたスキルがあれば、その枠だけ差し替える。
   // レベルは元の枠のものをそのまま使う(枠を鍛えた分は無駄にしない)
-  const created = instance.createdSkill;
-  if (created) {
+  for (const created of createdSkillsOf(instance)) {
     const source = resolveCreatedSkill(created.skillId);
     if (source) skills[created.slot] = computeLeveledSkill(source, instance.skillLevels[created.slot]);
   }

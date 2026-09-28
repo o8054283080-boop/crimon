@@ -1,4 +1,4 @@
-import { CreatedSkill, MonsterInstance } from "../core/monsterInstance.js";
+import { CreatedSkill, MonsterInstance, createdSkillsOf, writeCreatedSkills } from "../core/monsterInstance.js";
 import { Skill } from "../core/skill.js";
 import { findMonsterById } from "../data/monsters.js";
 import { CRIM_MATERIAL_REFUSAL, isCrim } from "./crim.js";
@@ -15,8 +15,9 @@ import { CRIM_MATERIAL_REFUSAL, isCrim } from "./crim.js";
  * - **素材は星6でなければならない。** 移し替えは編成の幅を大きく広げるので、
  *   1体を最後まで育てる覚悟と釣り合わせる
  * - **素材は消滅する。** 星6を1体失うから、何を犠牲にするかの選択が生まれる
- * - **持てる移し替えは常に1つだけ。** 別のモンスターを合成すると置き換わる。
- *   全員が理想のスキルを2つ持つ状態になると、編成の選択そのものが消える
+ * - **移し替えはスキル2・スキル3の枠ごとに1つずつ持てる。** 同じ枠へ合成した時だけ置き換わる。
+ *   以前は1体に1つだけで、スキル3を移した後にスキル2を移すとスキル3が元に戻っていた。
+ *   依頼主の構想は「両方とも変わる」だったので改めた(2026-09-28)
  * - **枠は動かせない**(スキル2はスキル2へ、スキル3はスキル3へ)。
  *   長いクールタイム前提の必殺技をスキル2の枠へ持ってくると、
  *   バランスが根本から壊れる
@@ -103,10 +104,11 @@ export function creatableSkills(material: MonsterInstance): { slot: CreateSlot; 
 export function currentSkillOf(target: MonsterInstance, slot: CreateSlot): Skill | undefined {
   const dex = findMonsterById(target.dexId);
   if (!dex) return undefined;
-  if (target.createdSkill?.slot === slot) {
+  const created = createdSkillsOf(target).find((c) => c.slot === slot);
+  if (created) {
     // 移し替え済みの枠は、元のスキルではなく移した側を返す
-    const source = findMonsterById(target.createdSkill.sourceDexId);
-    return source?.skills.find((s) => s.id === target.createdSkill?.skillId) ?? dex.skills[slot];
+    const source = findMonsterById(created.sourceDexId);
+    return source?.skills.find((s) => s.id === created.skillId) ?? dex.skills[slot];
   }
   return dex.skills[slot];
 }
@@ -116,7 +118,7 @@ export interface CreateResult {
   reason?: string;
   /** 実際に適用された移し替え */
   created?: CreatedSkill;
-  /** 置き換わって失われた、直前の移し替え */
+  /** 置き換わって失われた、**同じ枠の**直前の移し替え(別の枠の移し替えは残る) */
   replaced?: CreatedSkill;
 }
 
@@ -149,8 +151,7 @@ export function applyMonsterCreate(
   if (!skill) return { ok: false, reason: "素材のスキルが見つかりません" };
   if (skill.passive) return { ok: false, reason: "パッシブスキルは移し替えの元にできません" };
 
-  const targetDex = findMonsterById(target.dexId);
-  if (targetDex && targetDex.skills[slot].id === skill.id && !target.createdSkill) {
+  if (currentSkillOf(target, slot)?.id === skill.id) {
     return { ok: false, reason: "同じスキルなので、移し替える意味がありません" };
   }
 
@@ -161,16 +162,29 @@ export function applyMonsterCreate(
    */
   if (wallet) wallet.gold -= CREATE_GOLD_COST;
 
-  const replaced = target.createdSkill;
-  target.createdSkill = { slot, skillId: skill.id, sourceDexId: material.dexId };
-  return { ok: true, created: target.createdSkill, replaced };
+  // **同じ枠だけを置き換える。**別の枠の移し替えは残す
+  const others = createdSkillsOf(target).filter((c) => c.slot !== slot);
+  const replaced = createdSkillsOf(target).find((c) => c.slot === slot);
+  const created: CreatedSkill = { slot, skillId: skill.id, sourceDexId: material.dexId };
+  writeCreatedSkills(target, [...others, created]);
+  return { ok: true, created, replaced };
 }
 
-/** 移し替えを取り消して、元のスキルへ戻す */
-export function clearMonsterCreate(target: MonsterInstance): boolean {
-  if (!target.createdSkill) return false;
-  target.createdSkill = undefined;
+/**
+ * 移し替えを取り消して、元のスキルへ戻す。
+ * `slot` を渡すとその枠だけ、渡さなければ全部。
+ */
+export function clearMonsterCreate(target: MonsterInstance, slot?: CreateSlot): boolean {
+  const all = createdSkillsOf(target);
+  const kept = slot === undefined ? [] : all.filter((c) => c.slot !== slot);
+  if (kept.length === all.length) return false;
+  writeCreatedSkills(target, kept);
   return true;
+}
+
+/** 移し替えを持っているか */
+export function hasCreatedSkill(target: MonsterInstance): boolean {
+  return createdSkillsOf(target).length > 0;
 }
 
 /** 表示用。どのモンスターから何を移したかを1行で表す */

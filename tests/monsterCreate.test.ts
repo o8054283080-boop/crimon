@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMonsterInstance, toBattleDefinition } from "../src/core/monsterInstance.js";
+import { createMonsterInstance, createdSkillsOf, toBattleDefinition } from "../src/core/monsterInstance.js";
 import { findMonsterById } from "../src/data/monsters.js";
 import {
   CREATE_GOLD_COST,
@@ -66,7 +66,7 @@ describe("クリエイトの実行", () => {
     const result = applyMonsterCreate(t, m, 1, NO_PARTY);
 
     expect(result.ok).toBe(true);
-    expect(t.createdSkill).toEqual({ slot: 1, skillId: wisp.skills[1].id, sourceDexId: "wisp_WATER" });
+    expect(createdSkillsOf(t)).toEqual([{ slot: 1, skillId: wisp.skills[1].id, sourceDexId: "wisp_WATER" }]);
   });
 
   it("移し替えたスキルが実際の戦闘データに反映される", () => {
@@ -93,21 +93,58 @@ describe("クリエイトの実行", () => {
     expect(toBattleDefinition(t, dex).skills[2].name).toBe(wisp.skills[2].name);
   });
 
-  it("**持てる移し替えは常に1つだけ**。別のを合成すると置き換わる", () => {
+  /*
+   * **移し替えはスキル2・スキル3の枠ごとに1つずつ持てる。**
+   * 依頼主の指摘(2026-09-28): スキル3を継承した後に同じモンスターでスキル2を継承したら、
+   * スキル3が元に戻って星6の素材が無駄になった。本来の構想は「両方とも変わる」。
+   */
+  it("スキル3を移した後にスキル2を移すと、両方とも移し替わったまま", () => {
     const t = target();
-    applyMonsterCreate(t, material("wisp_WATER"), 1, NO_PARTY);
-    const first = t.createdSkill;
-
-    const second = applyMonsterCreate(t, material("imp_DARK"), 2, NO_PARTY);
+    applyMonsterCreate(t, material("wisp_WATER"), 2, NO_PARTY);
+    const second = applyMonsterCreate(t, material("imp_DARK"), 1, NO_PARTY);
 
     expect(second.ok).toBe(true);
-    expect(second.replaced).toEqual(first);
-    expect(t.createdSkill?.sourceDexId).toBe("imp_DARK");
-    expect(t.createdSkill?.slot).toBe(2);
-
-    // 前の枠は元のスキルへ戻っている
+    expect(second.replaced).toBeUndefined();
+    const wisp = findMonsterById("wisp_WATER")!;
+    const imp = findMonsterById("imp_DARK")!;
     const dex = findMonsterById(t.dexId)!;
-    expect(toBattleDefinition(t, dex).skills[1].name).toBe(dex.skills[1].name);
+    const def = toBattleDefinition(t, dex);
+    expect(def.skills[1].id).toBe(imp.skills[1].id);
+    expect(def.skills[2].id).toBe(wisp.skills[2].id);
+    expect(createdSkillsOf(t).map((c) => [c.slot, c.sourceDexId])).toEqual([[1, "imp_DARK"], [2, "wisp_WATER"]]);
+  });
+
+  it("同じ枠へ合成した時だけ、その枠の前の移し替えと置き換わる", () => {
+    const t = target();
+    applyMonsterCreate(t, material("wisp_WATER"), 2, NO_PARTY);
+    applyMonsterCreate(t, material("wisp_WATER"), 1, NO_PARTY);
+    const first3 = createdSkillsOf(t).find((c) => c.slot === 2);
+
+    const again = applyMonsterCreate(t, material("imp_DARK"), 2, NO_PARTY);
+
+    expect(again.ok).toBe(true);
+    expect(again.replaced).toEqual(first3);
+    // スキル2の移し替えは残っている
+    expect(createdSkillsOf(t).map((c) => [c.slot, c.sourceDexId])).toEqual([[1, "wisp_WATER"], [2, "imp_DARK"]]);
+  });
+
+  it("旧形式(1体に1つ)の移し替えを持つ個体も、別の枠へ移すと両方残る", () => {
+    const t = target();
+    const wisp = findMonsterById("wisp_WATER")!;
+    t.createdSkill = { slot: 2, skillId: wisp.skills[2].id, sourceDexId: "wisp_WATER" };
+    applyMonsterCreate(t, material("imp_DARK"), 1, NO_PARTY);
+    // 書き込んだ時点で旧形式の欄は新形式へ移り、消えている
+    expect(t.createdSkill).toBeUndefined();
+    expect(createdSkillsOf(t).map((c) => [c.slot, c.sourceDexId])).toEqual([[1, "imp_DARK"], [2, "wisp_WATER"]]);
+  });
+
+  it("取り消しは枠ごと。もう一方の枠は残る", () => {
+    const t = target();
+    applyMonsterCreate(t, material("wisp_WATER"), 1, NO_PARTY);
+    applyMonsterCreate(t, material("imp_DARK"), 2, NO_PARTY);
+    expect(clearMonsterCreate(t, 1)).toBe(true);
+    expect(createdSkillsOf(t).map((c) => c.slot)).toEqual([2]);
+    expect(clearMonsterCreate(t, 1)).toBe(false);
   });
 
   it("同じスキルを移そうとしても意味がないので断る", () => {
@@ -121,7 +158,7 @@ describe("クリエイトの実行", () => {
     const t = target();
     const result = applyMonsterCreate(t, material("wisp_WATER", 1), 1, NO_PARTY);
     expect(result.ok).toBe(false);
-    expect(t.createdSkill).toBeUndefined();
+    expect(createdSkillsOf(t)).toEqual([]);
   });
 
   it("取り消すと元のスキルへ戻る", () => {
@@ -129,7 +166,7 @@ describe("クリエイトの実行", () => {
     const dex = findMonsterById(t.dexId)!;
     applyMonsterCreate(t, material(), 1, NO_PARTY);
     expect(clearMonsterCreate(t)).toBe(true);
-    expect(t.createdSkill).toBeUndefined();
+    expect(createdSkillsOf(t)).toEqual([]);
     expect(toBattleDefinition(t, dex).skills[1].name).toBe(dex.skills[1].name);
   });
 });
@@ -154,7 +191,7 @@ describe("表示用の情報", () => {
   it("どこから何を移したかが文字で分かる", () => {
     const t = target();
     applyMonsterCreate(t, material(), 1, NO_PARTY);
-    const text = describeCreatedSkill(t.createdSkill!);
+    const text = describeCreatedSkill(createdSkillsOf(t)[0]);
     expect(text).toContain("スキル2");
     expect(text).toContain("ウィスプ");
   });
@@ -194,7 +231,7 @@ describe("スキル継承の費用", () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toContain("ゴールドが足りません");
     expect(wallet.gold).toBe(CREATE_GOLD_COST - 1);
-    expect(t.createdSkill).toBeUndefined();
+    expect(createdSkillsOf(t)).toEqual([]);
   });
 
   it("断られた移し替えでは請求しない", () => {
@@ -213,6 +250,27 @@ describe("スキル継承の費用", () => {
   it("財布を渡さない呼び出しは無料のまま", () => {
     const t = target();
     expect(applyMonsterCreate(t, material(), 1, NO_PARTY).ok).toBe(true);
-    expect(t.createdSkill).toBeDefined();
+    expect(createdSkillsOf(t)).toHaveLength(1);
+  });
+});
+
+describe("アリーナの防衛データ", () => {
+  it("スキル2・スキル3の両方の移し替えが、防衛データから組んだ戦闘の定義にも乗る", async () => {
+    const { snapshotUnitToDefinition } = await import("../src/game/arena/snapshot.js");
+    const t = createMonsterInstance("slime_FIRE", 6, 60);
+    applyMonsterCreate(t, createMonsterInstance("wisp_WATER", 6, 60), 1, NO_PARTY);
+    applyMonsterCreate(t, createMonsterInstance("imp_DARK", 6, 60), 2, NO_PARTY);
+    const def = snapshotUnitToDefinition({ instance: structuredClone(t), equipment: [] })!;
+    expect(def.skills[1].id).toBe(findMonsterById("wisp_WATER")!.skills[1].id);
+    expect(def.skills[2].id).toBe(findMonsterById("imp_DARK")!.skills[2].id);
+  });
+
+  it("登録済みの旧形式(createdSkill 1つ)の防衛データも、そのまま効く", async () => {
+    const { snapshotUnitToDefinition } = await import("../src/game/arena/snapshot.js");
+    const t = createMonsterInstance("slime_FIRE", 6, 60);
+    const wisp = findMonsterById("wisp_WATER")!;
+    t.createdSkill = { slot: 2, skillId: wisp.skills[2].id, sourceDexId: "wisp_WATER" };
+    const def = snapshotUnitToDefinition({ instance: t, equipment: [] })!;
+    expect(def.skills[2].id).toBe(wisp.skills[2].id);
   });
 });

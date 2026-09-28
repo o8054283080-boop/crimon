@@ -1858,12 +1858,12 @@ function handleConfirmMonsterCreate(): void {
   render();
 }
 
-function handleClearMonsterCreate(): void {
+function handleClearMonsterCreate(slot: CreateSlot): void {
   const target = state.player.monsters.find((m) => m.id === state.createTargetId);
-  if (!target || !clearMonsterCreate(target)) return;
+  if (!target || !clearMonsterCreate(target, slot)) return;
   savePlayerState(state.player);
   playSfx("tap");
-  state.createNotice = "移し替えを取り消し、元のスキルへ戻しました";
+  state.createNotice = `${slot === 1 ? "スキル2" : "スキル3"}の移し替えを取り消し、元のスキルへ戻しました`;
   render();
 }
 
