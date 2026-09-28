@@ -57,6 +57,15 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-craft-and-mission-results",
+    title: "カケラ製作とミッションで、手に入れた物が分かるようにしました",
+    message: "・カケラ製作で装備やアクセサリーを作ると、できた物(★・レア度・メイン・サブや効果)が画面の真ん中に表示されるようになりました。使ったカケラと残りの数も出ます\n"
+      + "・製作結果から「同じものをもう1つ作る」を選べます\n"
+      + "・ミッションの報酬を受け取ると、受け取った物の一覧が「OK」を押すまで表示されるようになりました(一括受取も同じです)\n"
+      + "・ミッションを受け取った後、一覧が一番上まで戻ってしまう不具合を直しました",
+    kind: "UPDATE", fromDate: "2026-09-28", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-tower-hard-normal-floors",
     title: "試練の塔HARDの普通の階を、上へ行くほど自然に強くなるよう作り直しました",
     message: "試練の塔HARDの普通の階(10階ごとのボス階以外)の強さを見直しました。\n\n"

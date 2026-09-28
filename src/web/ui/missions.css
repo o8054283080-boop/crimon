@@ -131,15 +131,72 @@ body.regular-missions-open { overflow: hidden; }
   color: rgba(247, 241, 228, 0.55);
 }
 /*
- * 何が入ったか。**浮かせず、ボタンのすぐ下に置く。**
- * 浮かせた札は下のものを覆う(この案件で3回やった事故)。
+ * 受け取った報酬のダイアログ。**`aria-modal` で、閉じるまでの間だけ裏を覆う。**
+ * 浮かせた札を「知らせ」に使うと下のボタンを覆ったまま残る(この案件で3回やった事故)が、
+ * これは「OK」で必ず閉じる確認の場面なので、覆っている間は裏が押せなくて正しい。
  */
-.regular-missions__claim-result {
-  margin: 6px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #ffe6a4;
+.regular-missions__claimed {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  /* 行の高さを画面に固定する。auto のままだと札の max-height が効かず、報酬が多いと「OK」が下へはみ出す */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding: 16px;
+}
+.regular-missions__claimed-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(5, 9, 18, 0.72);
+}
+.regular-missions__claimed-card {
+  position: relative;
+  width: min(100%, 360px);
+  /* 報酬が多い時(一括受取)は一覧だけを巻物にし、「OK」は常に見えるようにする */
+  max-height: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 18px 16px 16px;
+  border: 1px solid rgba(242, 203, 114, 0.8);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(40, 46, 66, 0.99), rgba(16, 20, 32, 0.99));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.regular-missions__claimed-card h3 { margin: 0; font-size: 18px; color: #ffe6a4; }
+.regular-missions__claimed-title { margin: 0; font-size: 13px; color: rgba(247, 241, 228, 0.8); overflow-wrap: anywhere; }
+.regular-missions__claimed-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.regular-missions__claimed-list li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 230, 164, 0.1);
+  border: 1px solid rgba(255, 230, 164, 0.25);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff4d6;
   overflow-wrap: anywhere;
+}
+.regular-missions__claimed-ok {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f3c867, #c8922e);
+  color: #1d1406;
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .regular-missions__body {

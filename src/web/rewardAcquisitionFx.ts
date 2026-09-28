@@ -61,33 +61,12 @@ export function showRewardAcquisitionFx(options: RewardAcquisitionFxOptions): vo
   }, 1600);
 }
 
-function rewardTextFromClaimButton(button: HTMLButtonElement): string[] {
-  if (button.classList.contains("regular-missions__claim-all")) {
-    const modal = button.closest(".regular-missions");
-    if (!modal) return ["受取可能なミッション報酬"];
-    const ready = Array.from(modal.querySelectorAll<HTMLElement>(
-      ".regular-missions__card.is-complete:not(.is-claimed) .regular-missions__reward, .regular-missions__clear.is-ready .regular-missions__reward",
-    ));
-    const texts = ready.map((node) => node.textContent ?? "").filter(Boolean);
-    return texts.length > 0 ? texts : ["受取可能なミッション報酬"];
-  }
-
-  const card = button.closest(".regular-missions__card, .regular-missions__clear");
-  const reward = card?.querySelector<HTMLElement>(".regular-missions__reward")?.textContent ?? "";
-  return reward ? [reward] : ["ミッション報酬"];
-}
-
-/**
- * ミッションUIの付与ロジックに手を入れず、受取ボタンが正常に押された時だけ演出する。
- * 将来ショップやログイン報酬などからは showRewardAcquisitionFx() を直接再利用できる。
+/*
+ * **ミッションの受け取りでは、もうこの演出を出さない。**
+ *
+ * 以前は受け取りボタンの押下を拾って、1.6秒だけこの札を出していた。
+ * 消えるのが早く、一括受取は5件までしか載らず、しかも受け取るたびに一覧が一番上へ
+ * 巻き戻っていたので、「何を受け取ったか分からない」と言われた(依頼主の指摘)。
+ * いまは `missionUi.ts` が「OK」を押すまで消えない受け取り結果のダイアログを出すので、
+ * ここで重ねて出すと2枚が重なる。演出そのもの(`showRewardAcquisitionFx`)は他の場面で使えるよう残す。
  */
-document.addEventListener("click", (event) => {
-  const target = event.target;
-  if (!(target instanceof Element)) return;
-  const button = target.closest<HTMLButtonElement>(
-    ".regular-missions__claim:not(:disabled), .regular-missions__claim-all:not(:disabled)",
-  );
-  if (!button) return;
-  const items = rewardTextFromClaimButton(button);
-  window.setTimeout(() => showRewardAcquisitionFx({ items }), 0);
-}, true);
