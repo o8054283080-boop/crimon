@@ -226,12 +226,14 @@ describe("5〜7. スキルLvの成長", () => {
     expect(healBlockTurns(3)).toBe(2);
     expect(healBlockTurns(4)).toBe(3);
 
-    // ウンディーネ 水神の祝福: Lv4でシールド・防御UP・速度UPが 2 → 3
+    // ウンディーネ 水神の祝福: Lv3でシールド 2 → 3、Lv4で防御UP・速度UPが 2 → 3
+    // (依頼主の指定 2026-09-28: 何も変わらない段が無いよう、シールドの持続をLv3へ前倒し)
     const blessing = UNDINE.skill3Variants.find((s) => s.name === "水神の祝福")!;
     const turns = (lv: number) => computeLeveledSkill(blessing, lv).effects
       .filter((e) => e.kind === "SHIELD" || e.kind === "BUFF")
       .map((e) => (e as { durationTurns: number }).durationTurns);
-    expect(turns(3)).toEqual([2, 2, 2]);
+    expect(turns(2)).toEqual([2, 2, 2]);
+    expect(turns(3)).toEqual([3, 2, 2]);
     expect(turns(4)).toEqual([3, 3, 3]);
   });
 });

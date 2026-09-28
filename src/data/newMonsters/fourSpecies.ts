@@ -54,7 +54,8 @@ export const SCORPION: MonsterTemplate = {
   skill2Variants:[
     skill('scorpion_s2_a','急所刺し','SINGLE_ENEMY',3,[d(1.9,{critDamageBonus:.3}),deb('def')],growth25),
     // 強化の量は共通値で固定なので、レベルで伸ばすのは行動ゲージだけ(Lv5でCT-1)
-    skill('scorpion_s2_b','狩りの構え','SELF',4,[buff('atk'),buff('criRate'),buff('criDmg'),gauge(.3)],[set(3,{amount:.35})]),
+    // Lv2 行動ゲージ30→35% / Lv3 3つの強化の持続2→3ターン / Lv4 行動ゲージ35→40% / Lv5 CT-1(依頼主の指定 2026-09-28)
+    skill('scorpion_s2_b','狩りの構え','SELF',4,[buff('atk'),buff('criRate'),buff('criDmg'),gauge(.3)],[set(3,{amount:.35}),e=>{for(const x of e.slice(0,3)) (x as {durationTurns:number}).durationTurns=3;},set(3,{amount:.4})]),
     skill('scorpion_s2_c','麻痺針','SINGLE_ENEMY',3,[d(1.6),deb('spd',.8),gauge(-.3),{kind:'STUN',chance:.6,durationTurns:1,requires:'TARGET_HP_BELOW_50'}],[power(1.1),set(1,{chance:.9}),set(3,{chance:.7})]),
   ],
   skill3Variants:[
@@ -140,7 +141,8 @@ export const HARPY: MonsterTemplate = {
     },
     // 強化の量は共通値で固定。このスキルは効果量でしか伸びていなかったので、
     // いまはLv5のCT短縮だけが成長になる(**要検討として報告済み**)
-    skill('harpy_s2_b','羽ばたき','SELF',4,[buff('atk')],[],{extraTurn:true}),
+    // Lv2 攻撃力UPの持続2→3ターン / Lv3 クリ率UP(2ターン)を追加 / Lv4 クリ率UPの持続2→3ターン / Lv5 CT-1(依頼主の指定 2026-09-28)
+    skill('harpy_s2_b','羽ばたき','SELF',4,[buff('atk')],[set(0,{durationTurns:3}),e=>{e.push(buff('criRate'));},set(1,{durationTurns:3})],{extraTurn:true}),
     {
       id: 'harpy_s2_c',
       name: 'ツインフェザー',
