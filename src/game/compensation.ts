@@ -57,6 +57,17 @@ export interface Compensation {
 
 export const COMPENSATIONS: Compensation[] = [
   {
+    id: "2026-10-tower-hard-normal-floors",
+    title: "試練の塔HARDの普通の階を、上へ行くほど自然に強くなるよう作り直しました",
+    message: "試練の塔HARDの普通の階(10階ごとのボス階以外)の強さを見直しました。\n\n"
+      + "・これまでは10階ごとに一度弱くなったり、51階から急に防御が下がったりしていました\n"
+      + "・1階から99階まで、攻撃力・防御力・速度が途切れずに上がっていくようになりました。51階からは上がり方が強くなります\n"
+      + "・防御力が高い階ほど、HPは控えめになります(倒すまでの手間は階に合わせて少しずつ増えます)\n"
+      + "・同じ階の敵どうしの違い(硬い敵・素早い敵など)はそのままです\n"
+      + "・ボス階とNORMALは変わりません",
+    kind: "UPDATE", fromDate: "2026-09-28", toDate: "9999-12-31", crystal: 0, gold: 0, summonScrolls: 0,
+  },
+  {
     id: "2026-10-strip-order-and-tower80",
     title: "解除の順番を「先に付いたものから」に揃え、試練の塔HARD80階を強くしました",
     message: "強化解除と弱体解除で消える順番を見直しました。\n\n"
