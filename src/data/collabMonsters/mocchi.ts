@@ -200,7 +200,7 @@ const MOCCHI_S3_YOIYAMI: Skill = described({
     // Lv4 ダメージ倍率 1.75倍→1.80倍 / 治癒阻害の持続 2→3ターン
     { cooldownTurns: 5, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.1 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
     // Lv5 クールタイム -1(5→4ターン) / 最大HP比例 10%→12%
-    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.8, hpCoefficient: 0.12 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
+    { cooldownTurns: 4, effects: [{ kind: "DAMAGE", multiplier: 1.25, hpCoefficient: 0.19 }, { kind: "HEAL_BLOCK", durationTurns: 3, chance: 0.8 }] },
   ],
 }, "【対象】敵全体。回復で粘る相手を削り切るための技で、試練の塔の回復する階に効く。");
 
