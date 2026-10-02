@@ -1,0 +1,44 @@
+name: HARD通常階バランス検証
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/towerHardScan.ts"
+      - ".github/workflows/tower-hard-validation.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    name: 代表10階 x 3編成 x 200戦
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: HARD通常階を実測
+        run: >
+          npx tsx tools/towerHardScan.ts
+          --floors 9,19,29,39,49,59,69,79,89,99
+          --candidates ABSOLUTE_CURVE
+          --profiles STRONG,CONTROL,DOT_CONTROL
+          --runs 200
+          --seed 20260926
+          --max-turns 300
+          --out tower-hard-absolute-dot-control
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tower-hard-absolute-dot-control
+          path: |
+            tools/battleLab/results/tower-hard-absolute-dot-control.json
+            tools/battleLab/results/tower-hard-absolute-dot-control.csv
+          if-no-files-found: error
+          retention-days: 7

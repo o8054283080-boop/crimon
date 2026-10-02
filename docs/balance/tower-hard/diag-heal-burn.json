@@ -1,0 +1,625 @@
+{
+  "runs": 200,
+  "seed": 20260926,
+  "gear": "STRONG",
+  "profiles": [
+    "STRONG",
+    "CONTROL",
+    "DOT_CONTROL"
+  ],
+  "maxTurns": 300,
+  "rows": [
+    {
+      "floor": 79,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "STRONG",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.86,
+      "medianTurns": 181,
+      "meanTurns": 196.085,
+      "wipeRate": 0,
+      "timeoutRate": 0.14,
+      "allyHpLeftRate": 0.9751348456594842,
+      "enemyHpLeftRate": 0.11751275661340121,
+      "meanAllySurvivors": 4.86,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 31.465,
+        "meanFirstEnemyActionOrdinal": 16.315,
+        "enemyDefeatedRate": 0.871
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 265000,
+          "def": 8200,
+          "atk": 20000,
+          "spd": 230
+        },
+        "actualMean": {
+          "hp": 264999.8,
+          "atk": 20000,
+          "def": 8199.8,
+          "spd": 230
+        },
+        "engineMeanMaxHp": 264999.79999999923
+      },
+      "dot": {
+        "poisonDamagePerBattle": 0,
+        "poisonTicksPerBattle": 0,
+        "poisonApplicationsPerBattle": 0,
+        "meanMaxPoisonStacks": 0,
+        "maxPoisonStacks": 0,
+        "poisonShareOfEnemyMaxHp": 0,
+        "poisonShareOfDamageTaken": 0,
+        "directDamagePerBattle": 774462.02,
+        "directShareOfEnemyMaxHp": 0.584500078867984,
+        "enemyHealedShareOfMaxHp": 0.4870130468022996,
+        "allyBurnDamagePerBattle": 0
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.21894538778255307,
+        "meanMaxEnemyStreak": 4.17,
+        "maxEnemyStreak": 10,
+        "p95MaxEnemyStreak": 5,
+        "battlesWithEnemyStreak8Plus": 0.005
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 26.005,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 26.005,
+        "enemyGaugeDownsPerBattle": 71.665,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 79,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "CONTROL",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.995,
+      "medianTurns": 112,
+      "meanTurns": 118.09,
+      "wipeRate": 0,
+      "timeoutRate": 0.005,
+      "allyHpLeftRate": 0.9792548491386404,
+      "enemyHpLeftRate": 0.004355482532439647,
+      "meanAllySurvivors": 4.99,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 18.945,
+        "meanFirstEnemyActionOrdinal": 14.535,
+        "enemyDefeatedRate": 0.995
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 265000,
+          "def": 8200,
+          "atk": 20000,
+          "spd": 230
+        },
+        "actualMean": {
+          "hp": 264999.8,
+          "atk": 20000,
+          "def": 8199.8,
+          "spd": 230
+        },
+        "engineMeanMaxHp": 264999.79999999923
+      },
+      "dot": {
+        "poisonDamagePerBattle": 0,
+        "poisonTicksPerBattle": 0,
+        "poisonApplicationsPerBattle": 0,
+        "meanMaxPoisonStacks": 0,
+        "maxPoisonStacks": 0,
+        "poisonShareOfEnemyMaxHp": 0,
+        "poisonShareOfDamageTaken": 0,
+        "directDamagePerBattle": 1214552.63,
+        "directShareOfEnemyMaxHp": 0.9166441861465553,
+        "enemyHealedShareOfMaxHp": 0.38402328605531044,
+        "allyBurnDamagePerBattle": 0
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.23119057948593544,
+        "meanMaxEnemyStreak": 4.09,
+        "maxEnemyStreak": 8,
+        "p95MaxEnemyStreak": 6,
+        "battlesWithEnemyStreak8Plus": 0.005
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 26.89,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 26.89,
+        "enemyGaugeDownsPerBattle": 40.795,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 79,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "DOT_CONTROL",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 1,
+      "medianTurns": 129,
+      "meanTurns": 135.7,
+      "wipeRate": 0,
+      "timeoutRate": 0,
+      "allyHpLeftRate": 0.9831118728140916,
+      "enemyHpLeftRate": 0,
+      "meanAllySurvivors": 5,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 18.995,
+        "meanFirstEnemyActionOrdinal": 14.555,
+        "enemyDefeatedRate": 1
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 265000,
+          "def": 8200,
+          "atk": 20000,
+          "spd": 230
+        },
+        "actualMean": {
+          "hp": 264999.8,
+          "atk": 20000,
+          "def": 8199.8,
+          "spd": 230
+        },
+        "engineMeanMaxHp": 264999.79999999923
+      },
+      "dot": {
+        "poisonDamagePerBattle": 1605736.33,
+        "poisonTicksPerBattle": 33.81,
+        "poisonApplicationsPerBattle": 35.1,
+        "meanMaxPoisonStacks": 5,
+        "maxPoisonStacks": 5,
+        "poisonShareOfEnemyMaxHp": 1.211877390096143,
+        "poisonShareOfDamageTaken": 0.8920225196243678,
+        "directDamagePerBattle": 195380.79,
+        "directShareOfEnemyMaxHp": 0.14745731128853676,
+        "enemyHealedShareOfMaxHp": 0.3621482469043375,
+        "allyBurnDamagePerBattle": 0
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.20386288925140625,
+        "meanMaxEnemyStreak": 4.03,
+        "maxEnemyStreak": 7,
+        "p95MaxEnemyStreak": 5,
+        "battlesWithEnemyStreak8Plus": 0
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 28.85,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 28.85,
+        "enemyGaugeDownsPerBattle": 45.56,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 89,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "STRONG",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.035,
+      "medianTurns": 300,
+      "meanTurns": 285.99,
+      "wipeRate": 0.07,
+      "timeoutRate": 0.895,
+      "allyHpLeftRate": 0.7326329991796112,
+      "enemyHpLeftRate": 0.9203678193548379,
+      "meanAllySurvivors": 3.405,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 79.425,
+        "meanFirstEnemyActionOrdinal": 15.315,
+        "enemyDefeatedRate": 0.045
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 310000,
+          "def": 9200,
+          "atk": 23500,
+          "spd": 245
+        },
+        "actualMean": {
+          "hp": 310000,
+          "atk": 23500.2,
+          "def": 9200,
+          "spd": 245
+        },
+        "engineMeanMaxHp": 310000
+      },
+      "dot": {
+        "poisonDamagePerBattle": 0,
+        "poisonTicksPerBattle": 0,
+        "poisonApplicationsPerBattle": 0,
+        "meanMaxPoisonStacks": 0,
+        "maxPoisonStacks": 0,
+        "poisonShareOfEnemyMaxHp": 0,
+        "poisonShareOfDamageTaken": 0,
+        "directDamagePerBattle": 360701.825,
+        "directShareOfEnemyMaxHp": 0.23271085483870968,
+        "enemyHealedShareOfMaxHp": 0.5940329129032262,
+        "allyBurnDamagePerBattle": 25220.42
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.5207521016008853,
+        "meanMaxEnemyStreak": 5.435,
+        "maxEnemyStreak": 11,
+        "p95MaxEnemyStreak": 9,
+        "battlesWithEnemyStreak8Plus": 0.12
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 47.065,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 47.065,
+        "enemyGaugeDownsPerBattle": 107.55,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 89,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "CONTROL",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.04,
+      "medianTurns": 300,
+      "meanTurns": 255.16,
+      "wipeRate": 0.295,
+      "timeoutRate": 0.665,
+      "allyHpLeftRate": 0.427420751019179,
+      "enemyHpLeftRate": 0.905015529032259,
+      "meanAllySurvivors": 1.81,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 88.99,
+        "meanFirstEnemyActionOrdinal": 13.43,
+        "enemyDefeatedRate": 0.048999999999999995
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 310000,
+          "def": 9200,
+          "atk": 23500,
+          "spd": 245
+        },
+        "actualMean": {
+          "hp": 310000,
+          "atk": 23500.2,
+          "def": 9200,
+          "spd": 245
+        },
+        "engineMeanMaxHp": 310000
+      },
+      "dot": {
+        "poisonDamagePerBattle": 0,
+        "poisonTicksPerBattle": 0,
+        "poisonApplicationsPerBattle": 0,
+        "meanMaxPoisonStacks": 0,
+        "maxPoisonStacks": 0,
+        "poisonShareOfEnemyMaxHp": 0,
+        "poisonShareOfDamageTaken": 0,
+        "directDamagePerBattle": 583838.255,
+        "directShareOfEnemyMaxHp": 0.37666984193548353,
+        "enemyHealedShareOfMaxHp": 0.6004115838709675,
+        "allyBurnDamagePerBattle": 29876.825
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.8043735211469604,
+        "meanMaxEnemyStreak": 5.825,
+        "maxEnemyStreak": 11,
+        "p95MaxEnemyStreak": 10,
+        "battlesWithEnemyStreak8Plus": 0.175
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 54.88,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 54.88,
+        "enemyGaugeDownsPerBattle": 93.14,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 89,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "DOT_CONTROL",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.365,
+      "medianTurns": 162,
+      "meanTurns": 194.71,
+      "wipeRate": 0.255,
+      "timeoutRate": 0.38,
+      "allyHpLeftRate": 0.5246684510783222,
+      "enemyHpLeftRate": 0.5792074290322579,
+      "meanAllySurvivors": 2.39,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 63.145,
+        "meanFirstEnemyActionOrdinal": 13.495,
+        "enemyDefeatedRate": 0.38699999999999996
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 310000,
+          "def": 9200,
+          "atk": 23500,
+          "spd": 245
+        },
+        "actualMean": {
+          "hp": 310000,
+          "atk": 23500.2,
+          "def": 9200,
+          "spd": 245
+        },
+        "engineMeanMaxHp": 310000
+      },
+      "dot": {
+        "poisonDamagePerBattle": 1137546.15,
+        "poisonTicksPerBattle": 24.21,
+        "poisonApplicationsPerBattle": 21.36,
+        "meanMaxPoisonStacks": 4.15,
+        "maxPoisonStacks": 5,
+        "poisonShareOfEnemyMaxHp": 0.7339007419354838,
+        "poisonShareOfDamageTaken": 0.8482107507790586,
+        "directDamagePerBattle": 128174.585,
+        "directShareOfEnemyMaxHp": 0.08269328064516131,
+        "enemyHealedShareOfMaxHp": 0.4598971161290322,
+        "allyBurnDamagePerBattle": 17918.56
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.6743794364911889,
+        "meanMaxEnemyStreak": 5.345,
+        "maxEnemyStreak": 11,
+        "p95MaxEnemyStreak": 9,
+        "battlesWithEnemyStreak8Plus": 0.135
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 40.71,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 40.71,
+        "enemyGaugeDownsPerBattle": 68.88,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 99,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "STRONG",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.005,
+      "medianTurns": 300,
+      "meanTurns": 248.115,
+      "wipeRate": 0.385,
+      "timeoutRate": 0.61,
+      "allyHpLeftRate": 0.5077097154549144,
+      "enemyHpLeftRate": 0.9046118277777779,
+      "meanAllySurvivors": 2.465,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 79.46,
+        "meanFirstEnemyActionOrdinal": 14.065,
+        "enemyDefeatedRate": 0.03600000000000001
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 360000,
+          "def": 10500,
+          "atk": 27000,
+          "spd": 260
+        },
+        "actualMean": {
+          "hp": 360000,
+          "atk": 27000,
+          "def": 10500,
+          "spd": 260
+        },
+        "engineMeanMaxHp": 360000
+      },
+      "dot": {
+        "poisonDamagePerBattle": 0,
+        "poisonTicksPerBattle": 0,
+        "poisonApplicationsPerBattle": 0,
+        "meanMaxPoisonStacks": 0,
+        "maxPoisonStacks": 0,
+        "poisonShareOfEnemyMaxHp": 0,
+        "poisonShareOfDamageTaken": 0,
+        "directDamagePerBattle": 390924.265,
+        "directShareOfEnemyMaxHp": 0.21718014722222215,
+        "enemyHealedShareOfMaxHp": 0.577530497222223,
+        "allyBurnDamagePerBattle": 0
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.6784835008606457,
+        "meanMaxEnemyStreak": 7.105,
+        "maxEnemyStreak": 16,
+        "p95MaxEnemyStreak": 11,
+        "battlesWithEnemyStreak8Plus": 0.415
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 35.985,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 35.985,
+        "enemyGaugeDownsPerBattle": 84.365,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 99,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "CONTROL",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.07,
+      "medianTurns": 168,
+      "meanTurns": 178.84,
+      "wipeRate": 0.675,
+      "timeoutRate": 0.255,
+      "allyHpLeftRate": 0.23063049970148686,
+      "enemyHpLeftRate": 0.8351484555555551,
+      "meanAllySurvivors": 1.095,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 62.04,
+        "meanFirstEnemyActionOrdinal": 12.13,
+        "enemyDefeatedRate": 0.09
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 360000,
+          "def": 10500,
+          "atk": 27000,
+          "spd": 260
+        },
+        "actualMean": {
+          "hp": 360000,
+          "atk": 27000,
+          "def": 10500,
+          "spd": 260
+        },
+        "engineMeanMaxHp": 360000
+      },
+      "dot": {
+        "poisonDamagePerBattle": 0,
+        "poisonTicksPerBattle": 0,
+        "poisonApplicationsPerBattle": 0,
+        "meanMaxPoisonStacks": 0,
+        "maxPoisonStacks": 0,
+        "poisonShareOfEnemyMaxHp": 0,
+        "poisonShareOfDamageTaken": 0,
+        "directDamagePerBattle": 754957.76,
+        "directShareOfEnemyMaxHp": 0.4194209777777782,
+        "enemyHealedShareOfMaxHp": 0.5548661500000012,
+        "allyBurnDamagePerBattle": 0
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.8924085038261925,
+        "meanMaxEnemyStreak": 6.555,
+        "maxEnemyStreak": 14,
+        "p95MaxEnemyStreak": 11,
+        "battlesWithEnemyStreak8Plus": 0.245
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 39.505,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 39.505,
+        "enemyGaugeDownsPerBattle": 58.405,
+        "battlesWithoutEnemyAction": 0
+      }
+    },
+    {
+      "floor": 99,
+      "candidate": "ABSOLUTE_CURVE",
+      "profile": "DOT_CONTROL",
+      "multipliers": {
+        "hp": 1,
+        "def": 1,
+        "atk": 1,
+        "spd": 1
+      },
+      "runs": 200,
+      "winRate": 0.275,
+      "medianTurns": 154,
+      "meanTurns": 165.04,
+      "wipeRate": 0.52,
+      "timeoutRate": 0.205,
+      "allyHpLeftRate": 0.3933411550419268,
+      "enemyHpLeftRate": 0.6568982083333332,
+      "meanAllySurvivors": 1.975,
+      "offensePressure": {
+        "enemyActedRate": 1,
+        "meanEnemyActions": 49.82,
+        "meanFirstEnemyActionOrdinal": 12.12,
+        "enemyDefeatedRate": 0.3050000000000001
+      },
+      "enemyStats": {
+        "target": {
+          "hp": 360000,
+          "def": 10500,
+          "atk": 27000,
+          "spd": 260
+        },
+        "actualMean": {
+          "hp": 360000,
+          "atk": 27000,
+          "def": 10500,
+          "spd": 260
+        },
+        "engineMeanMaxHp": 360000
+      },
+      "dot": {
+        "poisonDamagePerBattle": 1178553.945,
+        "poisonTicksPerBattle": 23.03,
+        "poisonApplicationsPerBattle": 19.83,
+        "meanMaxPoisonStacks": 3.955,
+        "maxPoisonStacks": 5,
+        "poisonShareOfEnemyMaxHp": 0.6547521916666671,
+        "poisonShareOfDamageTaken": 0.8508112632593178,
+        "directDamagePerBattle": 139861.775,
+        "directShareOfEnemyMaxHp": 0.07770098611111112,
+        "enemyHealedShareOfMaxHp": 0.49305323055555633,
+        "allyBurnDamagePerBattle": 0
+      },
+      "speedPressure": {
+        "enemyActionsPerPlayerAction": 0.7529722804433192,
+        "meanMaxEnemyStreak": 6.085,
+        "maxEnemyStreak": 12,
+        "p95MaxEnemyStreak": 10,
+        "battlesWithEnemyStreak8Plus": 0.2
+      },
+      "controlPressure": {
+        "playerStunsPerBattle": 36.35,
+        "playerGaugeDrainsPerBattle": 0,
+        "enemyStunnedPerBattle": 36.35,
+        "enemyGaugeDownsPerBattle": 53.075,
+        "battlesWithoutEnemyAction": 0
+      }
+    }
+  ]
+}
